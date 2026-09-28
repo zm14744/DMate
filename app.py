@@ -116,6 +116,42 @@ _ocr_status = (
 _rate_lock = threading.Lock()
 _request_history = defaultdict(deque)
 
+# 图片识别撤销状态。当前部署使用单 worker + 多线程，进程内集合即可让
+# “撤销”请求在普通 OCR 与 Vision 两阶段之间生效。
+_ocr_cancel_lock = threading.Lock()
+_cancelled_ocr_requests = set()
+
+
+def _normalize_ocr_request_id(value):
+    request_id = str(value or "").strip()
+    if not request_id or len(request_id) > 128:
+        return ""
+    if not re.fullmatch(r"[A-Za-z0-9._:-]+", request_id):
+        return ""
+    return request_id
+
+
+def _mark_ocr_cancelled(request_id):
+    request_id = _normalize_ocr_request_id(request_id)
+    if not request_id:
+        return False
+
+    with _ocr_cancel_lock:
+        _cancelled_ocr_requests.add(request_id)
+    return True
+
+
+def _take_ocr_cancelled(request_id):
+    request_id = _normalize_ocr_request_id(request_id)
+    if not request_id:
+        return False
+
+    with _ocr_cancel_lock:
+        if request_id not in _cancelled_ocr_requests:
+            return False
+        _cancelled_ocr_requests.discard(request_id)
+        return True
+
 
 def _get_client_ip():
     forwarded = request.headers.get(
@@ -788,19 +824,36 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
     return corrected_text or ocr_text, {"required": True, "reasons": reasons, "critical_changes": changes}
 
 
+@app.route("/ocr/cancel", methods=["POST"])
+def cancel_ocr():
+    data = request.get_json(silent=True) or {}
+    request_id = _normalize_ocr_request_id(data.get("request_id"))
+
+    if not request_id:
+        return jsonify({"error": "撤销请求无效。"}), 400
+
+    _mark_ocr_cancelled(request_id)
+    return jsonify({"cancelled": True})
+
+
 @app.route("/ocr", methods=["POST"])
 def ocr():
-    if not OCR_AVAILABLE or recognize_image is None:
-        return jsonify({
-            "error": "图片识别模块暂时不可用，请稍后重试。"
-        }), 503
-
+    # 普通 OCR 与 Vision 互为兜底。即使 PaddleOCR 暂时不可用，
+    # 也允许 Vision 处理“只有图、没有文字”的题目。
     ip = _get_client_ip()
 
     if not _check_rate_limit(ip, "ocr"):
         return jsonify({
             "error": "图片识别请求过于频繁，请稍后再试。"
         }), 429
+
+    request_id = _normalize_ocr_request_id(
+        request.form.get("request_id", "")
+    )
+
+    # 如果撤销通知比上传请求更早抵达，直接结束，不启动模型。
+    if request_id and _take_ocr_cancelled(request_id):
+        return jsonify({"cancelled": True})
 
     uploaded = (
         request.files.get("image")
@@ -825,29 +878,66 @@ def ocr():
         }), 413
 
     try:
-        result = recognize_image(raw)
+        result = {
+            "text": "",
+            "text_count": 0,
+            "formula_count": 0,
+            "warning": None,
+            "review_regions": None,
+        }
+        ocr_fallback_reason = None
+        ocr_succeeded = False
 
-        # 即使后台预热曾经失败，只要本次识别成功，就同步刷新就绪状态。
-        global _ocr_ready
-        global _ocr_status
-        _ocr_ready = True
-        _ocr_status = (
-            "已就绪（公式识别降级）"
-            if result.get("warning")
-            else "已就绪"
+        if OCR_AVAILABLE and recognize_image is not None:
+            try:
+                result = recognize_image(raw)
+                ocr_succeeded = True
+
+                # 即使后台预热曾经失败，只要本次识别成功，就同步刷新就绪状态。
+                global _ocr_ready
+                global _ocr_status
+                _ocr_ready = True
+                _ocr_status = (
+                    "已就绪（公式识别降级）"
+                    if result.get("warning")
+                    else "已就绪"
+                )
+            except OCRError as exc:
+                # “完全无文字的图论图”会走到这里。不要直接 400，
+                # 改由 Vision 读取整图及上下/左右局部。
+                ocr_fallback_reason = str(exc)
+                print(f"普通 OCR 未得到可用文字，转纯图 Vision：{ocr_fallback_reason}")
+        else:
+            ocr_fallback_reason = "普通文字 OCR 当前不可用"
+
+        ocr_text = str(result.get("text", "") or "").strip()
+
+        # 撤销若发生在普通 OCR 期间，到这里立即结束，不再调用 Vision。
+        if request_id and _take_ocr_cancelled(request_id):
+            return jsonify({"cancelled": True})
+
+        # OCR 成功时使用它定位出的题干区域；OCR 无文字/失败时传 None，
+        # 让 Vision 进入纯图模式，同时查看上下和左右局部。
+        vision_regions = (
+            result.get("review_regions", [])
+            if ocr_succeeded
+            else None
         )
 
-        ocr_text = result.get("text", "")
-
-        # Vision 独立读取整图及题干局部。两种识别结果保留到核对页，
-        # 不把模型改写后的题干直接送去解题。
         try:
             vision_result = analyze_image_structure(
-                raw, review_regions=result.get("review_regions", [])
+                raw, review_regions=vision_regions
             )
         except Exception as exc:
-            print(f"Vision 增强层异常，保留 OCR：{type(exc).__name__}")
-            vision_result = {"ok": False, "error": "图片复核暂时不可用，请对照原图检查文字。"}
+            print(f"Vision 增强层异常：{type(exc).__name__}")
+            vision_result = {
+                "ok": False,
+                "error": "图片复核暂时不可用。"
+            }
+
+        # 撤销若发生在 Vision 调用期间，模型返回后立即丢弃结果。
+        if request_id and _take_ocr_cancelled(request_id):
+            return jsonify({"cancelled": True})
 
         corrected_text = ""
         visual_text = ""
@@ -882,13 +972,34 @@ def ocr():
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
 
+        # 撤销若发生在 Vision 调用期间，结果也直接丢弃。
+        if request_id and _take_ocr_cancelled(request_id):
+            return jsonify({"cancelled": True})
+
+        # 两路都没有拿到任何可用内容时才真正判定识别失败。
+        if not ocr_text and not corrected_text and not visual_text:
+            message = (
+                vision_warning
+                or ocr_fallback_reason
+                or "没有识别到有效的题目内容。"
+            )
+            return jsonify({
+                "error": message + " 请尝试重新拍摄、裁剪，或提高图形与背景的对比度。"
+            }), 400
+
         warnings = []
         if result.get("warning"):
             warnings.append(str(result.get("warning")))
-        if vision_warning:
+        if ocr_fallback_reason and (corrected_text or visual_text):
+            warnings.append("未识别到可用文字，已按纯图形模式解析。")
+        if vision_warning and ocr_text:
+            # OCR 有结果时 Vision 失败只是降级；纯图模式下如果 Vision 失败，
+            # 上面已经作为整体失败返回，不再重复警告。
             warnings.append(str(vision_warning))
 
-        display_text, review = _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields)
+        display_text, review = _prepare_ocr_review(
+            ocr_text, corrected_text, uncertain_fields
+        )
 
         return jsonify({
             "text": display_text,
