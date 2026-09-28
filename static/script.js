@@ -756,9 +756,13 @@ function refreshInputAvailability() {
     const imageBtn = document.getElementById("imageBtn");
     const ocrCancelBtn = document.getElementById("ocrCancelBtn");
 
-    // 图片识别期间只锁“发送/再次选图”，聊天输入框保持可编辑。
-    // 这样可以一边等 OCR，一边补充“只做第 2 问 / 直接完整解析”等本轮要求。
-    if (input) input.disabled = hardBlocked;
+    // 图片识别与核对期间锁定主聊天输入区；本轮要求统一在图片核对界面填写。
+    if (input) {
+        input.disabled = hardBlocked || ocrReviewInProgress;
+        input.placeholder = ocrReviewInProgress
+            ? "图片识别中…"
+            : "输入消息…";
+    }
     if (sendBtn) sendBtn.disabled = hardBlocked || ocrReviewInProgress;
     if (imageBtn) imageBtn.disabled = hardBlocked || ocrReviewInProgress;
 
@@ -8150,11 +8154,9 @@ function reviewRecognizedQuestion(file, data) {
     const question = document.getElementById("ocrReviewQuestion");
     const graph = document.getElementById("ocrReviewGraph");
     const requestText = document.getElementById("ocrReviewRequest");
-    const notice = document.getElementById("ocrReviewNotice");
     const error = document.getElementById("ocrReviewError");
     const confirm = document.getElementById("ocrReviewConfirm");
     const cancel = document.getElementById("ocrReviewCancel");
-    const original = document.getElementById("ocrReviewOriginal");
     const zoom = document.getElementById("ocrReviewZoom");
     if (!dialog || !preview || !question || !graph || !requestText || !confirm || !cancel) {
         throw new Error("图片核对界面未加载，请刷新页面。");
@@ -8169,17 +8171,9 @@ function reviewRecognizedQuestion(file, data) {
         question.value = typeof data.text === "string" ? data.text.trim() : "";
         graph.value = typeof data.visual_text === "string" ? data.visual_text.trim() : "";
 
-        // OCR 返回前，主聊天框始终可编辑。进入核对页时，把用户刚刚输入的
-        // 本轮要求带进来；核对页里仍可继续修改。
-        const chatInput = document.getElementById("text");
-        requestText.value = chatInput ? chatInput.value.trim() : "";
-
-        original.textContent = data.raw_ocr_text || data.text || "";
-        original.parentElement.open = false;
+        // 本轮要求只在图片核对界面填写，不从主聊天框继承。
+        requestText.value = "";
         error.textContent = "";
-        const reasons = Array.isArray(data.review?.reasons) ? data.review.reasons : [];
-        notice.textContent = [data.warning, ...reasons].filter(x => typeof x === "string" && x.trim()).join("\n");
-        notice.hidden = !notice.textContent;
 
         const resizePreview = () => { preview.style.width = `${zoom.value}%`; };
         const cleanup = () => {
@@ -8192,7 +8186,6 @@ function reviewRecognizedQuestion(file, data) {
             question.value = "";
             graph.value = "";
             requestText.value = "";
-            original.textContent = "";
         };
         const finish = () => {
             cleanup();
@@ -8385,12 +8378,6 @@ async function handleImageSelected(event) {
             apiText
         });
 
-        // 这段文字已经作为本次图片题的要求提交，不再留在聊天框里。
-        const chatInput = document.getElementById("text");
-        if (chatInput) {
-            chatInput.value = "";
-        }
-
         maybeAutoNameSession(
             session,
             text || visualText || "图片识题",
@@ -8404,7 +8391,7 @@ async function handleImageSelected(event) {
 
     } catch (error) {
         if (error && error.name === "AbortError") {
-            // 用户主动撤销：不产生错误气泡、不登记题目，也不清空已经输入的要求。
+            // 用户主动撤销：不产生错误气泡，也不登记题目。
             return;
         }
 
