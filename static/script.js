@@ -746,10 +746,26 @@ function isCurrentSessionTyping() {
 }
 
 function refreshInputAvailability() {
-    enableInput(
-        !isSessionBusy(currentId)
-        && !isCurrentSessionTyping()
+    const hardBlocked = (
+        isSessionBusy(currentId)
+        || isCurrentSessionTyping()
     );
+
+    const input = document.getElementById("text");
+    const sendBtn = document.getElementById("sendBtn");
+    const imageBtn = document.getElementById("imageBtn");
+    const ocrCancelBtn = document.getElementById("ocrCancelBtn");
+
+    // 图片识别期间只锁“发送/再次选图”，聊天输入框保持可编辑。
+    // 这样可以一边等 OCR，一边补充“只做第 2 问 / 直接完整解析”等本轮要求。
+    if (input) input.disabled = hardBlocked;
+    if (sendBtn) sendBtn.disabled = hardBlocked || ocrReviewInProgress;
+    if (imageBtn) imageBtn.disabled = hardBlocked || ocrReviewInProgress;
+
+    if (ocrCancelBtn) {
+        ocrCancelBtn.hidden = !ocrRequestInFlight;
+        ocrCancelBtn.disabled = !ocrRequestInFlight;
+    }
 }
 
 function setSessionBusy(sessionId, busy) {
@@ -2189,6 +2205,7 @@ function extractOcrQuestionPayload(text) {
 
     const questionMarker = "【题目文字】";
     const graphMarker = "【图形信息】";
+    const requestMarker = "【我的要求】";
 
     if (!value.includes(questionMarker)) {
         return cutQuestionAfterMetaSections(value);
@@ -2196,20 +2213,29 @@ function extractOcrQuestionPayload(text) {
 
     const qStart = value.indexOf(questionMarker) + questionMarker.length;
     const gStart = value.indexOf(graphMarker);
+    const rStart = value.indexOf(requestMarker);
+    const qEndCandidates = [gStart, rStart].filter(index => index >= 0);
+    const qEnd = qEndCandidates.length
+        ? Math.min(...qEndCandidates)
+        : value.length;
 
     let question = value.slice(
         qStart,
-        gStart >= 0 ? gStart : value.length
+        qEnd
     ).trim();
 
     question = cutQuestionAfterMetaSections(question);
 
     if (gStart >= 0) {
+        const graphEnd = (rStart >= 0 && rStart > gStart)
+            ? rStart
+            : value.length;
         const graphInfo = value
-            .slice(gStart + graphMarker.length)
+            .slice(gStart + graphMarker.length, graphEnd)
             .trim();
 
-        // 图形结构是题目必要条件，不属于“无关聊天内容”。
+        // 图形结构是题目必要条件，不属于“无关聊天内容”；
+        // “我的要求”是本轮操作指令，不能混进题干或错题本。
         if (graphInfo) {
             question = `${question}\n\n【图形信息】\n${graphInfo}`.trim();
         }
@@ -7896,7 +7922,8 @@ async function requestAiReply(session) {
 
 function send() {
     if (
-        isCurrentSessionTyping()
+        ocrReviewInProgress
+        || isCurrentSessionTyping()
         || isSessionBusy(currentId)
     ) {
         return;
@@ -8071,19 +8098,65 @@ function cleanOcrTextForVisual(rawText, hasVisualStructure) {
 // OCR 图片识题
 // -----------------------------
 let ocrReviewInProgress = false;
+let ocrRequestInFlight = false;
+let ocrAbortController = null;
+let ocrRequestId = "";
+
+function makeOcrRequestId() {
+    try {
+        if (window.crypto && typeof window.crypto.randomUUID === "function") {
+            return window.crypto.randomUUID();
+        }
+    } catch (_error) {
+        // 旧浏览器回退到时间戳 + 随机串。
+    }
+
+    return `ocr-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function notifyOcrCancelled(requestId) {
+    const value = String(requestId || "").trim();
+    if (!value) return;
+
+    fetch("/ocr/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_id: value }),
+        keepalive: true
+    }).catch(() => {
+        // 撤销通知失败也不影响前端立即结束本次识别。
+    });
+}
+
+function cancelImageRecognition() {
+    if (!ocrRequestInFlight || !ocrAbortController) {
+        return;
+    }
+
+    const requestId = ocrRequestId;
+
+    // 前端立即停止等待本次 /ocr，并通知后端尽早结束后续阶段。
+    ocrRequestInFlight = false;
+    ocrAbortController.abort();
+    ocrAbortController = null;
+    ocrRequestId = "";
+    notifyOcrCancelled(requestId);
+    refreshInputAvailability();
+}
 
 function reviewRecognizedQuestion(file, data) {
     const dialog = document.getElementById("ocrReviewDialog");
     const preview = document.getElementById("ocrReviewImage");
     const question = document.getElementById("ocrReviewQuestion");
     const graph = document.getElementById("ocrReviewGraph");
+    const requestText = document.getElementById("ocrReviewRequest");
     const notice = document.getElementById("ocrReviewNotice");
     const error = document.getElementById("ocrReviewError");
     const confirm = document.getElementById("ocrReviewConfirm");
     const cancel = document.getElementById("ocrReviewCancel");
     const original = document.getElementById("ocrReviewOriginal");
     const zoom = document.getElementById("ocrReviewZoom");
-    if (!dialog || !preview || !question || !graph || !confirm || !cancel) {
+    if (!dialog || !preview || !question || !graph || !requestText || !confirm || !cancel) {
         throw new Error("图片核对界面未加载，请刷新页面。");
     }
 
@@ -8095,6 +8168,12 @@ function reviewRecognizedQuestion(file, data) {
         if (zoom) zoom.value = "100";
         question.value = typeof data.text === "string" ? data.text.trim() : "";
         graph.value = typeof data.visual_text === "string" ? data.visual_text.trim() : "";
+
+        // OCR 返回前，主聊天框始终可编辑。进入核对页时，把用户刚刚输入的
+        // 本轮要求带进来；核对页里仍可继续修改。
+        const chatInput = document.getElementById("text");
+        requestText.value = chatInput ? chatInput.value.trim() : "";
+
         original.textContent = data.raw_ocr_text || data.text || "";
         original.parentElement.open = false;
         error.textContent = "";
@@ -8112,6 +8191,7 @@ function reviewRecognizedQuestion(file, data) {
             URL.revokeObjectURL(imageUrl);
             question.value = "";
             graph.value = "";
+            requestText.value = "";
             original.textContent = "";
         };
         const finish = () => {
@@ -8122,20 +8202,21 @@ function reviewRecognizedQuestion(file, data) {
         const submit = () => {
             const text = question.value.trim();
             const visualText = graph.value.trim();
-            if (!text) {
-                error.textContent = "请先填写题目文字。";
-                question.focus();
+            const userRequest = requestText.value.trim();
+            if (!text && !visualText) {
+                error.textContent = "请至少保留题目文字或图形信息。";
+                graph.focus();
                 return;
             }
             if (/\[(?:待核对|不清楚)\]/.test(text + visualText)) {
                 error.textContent = "请对照原图补全标为“待核对”的内容；看不清时可以取消并重新上传。";
                 return;
             }
-            if (text.length + visualText.length > 5800) {
-                error.textContent = "题目过长，请只保留本次要讨论的题目和图形信息。";
+            if (text.length + visualText.length + userRequest.length > 5600) {
+                error.textContent = "题目和本次要求合计过长，请适当精简后再发送。";
                 return;
             }
-            result = { text, visualText };
+            result = { text, visualText, userRequest };
             dialog.close();
         };
         confirm.addEventListener("click", submit);
@@ -8212,18 +8293,33 @@ async function handleImageSelected(event) {
     if (!session) return;
 
     ocrReviewInProgress = true;
-    setSessionBusy(session.id, true);
+    ocrRequestInFlight = true;
+    ocrAbortController = new AbortController();
+    ocrRequestId = makeOcrRequestId();
+    refreshInputAvailability();
 
     try {
         const formData = new FormData();
         formData.append("image", file);
+        formData.append("request_id", ocrRequestId);
 
         const response = await fetch("/ocr", {
             method: "POST",
-            body: formData
+            body: formData,
+            signal: ocrAbortController.signal
         });
 
         const data = await parseResponseJson(response);
+
+        // 网络识别阶段已经结束；进入核对页后由核对页自己的取消按钮负责。
+        ocrRequestInFlight = false;
+        ocrAbortController = null;
+        ocrRequestId = "";
+        refreshInputAvailability();
+
+        if (data && data.cancelled) {
+            return;
+        }
 
         if (!response.ok || data.error) {
             showAssistantMessage(
@@ -8248,25 +8344,52 @@ async function handleImageSelected(event) {
         // 这里不再自动删除题干片段，避免把真实条件当成图形噪声删掉。
         const reviewed = await reviewRecognizedQuestion(file, data);
         if (!reviewed || !sessions.some(item => item.id === session.id)) return;
-        const { text, visualText } = reviewed;
+        const { text, visualText, userRequest } = reviewed;
 
-        const parts = [];
+        const questionParts = [];
 
         if (text) {
-            parts.push(`【题目文字】\n${text}`);
+            questionParts.push(`【题目文字】\n${text}`);
         }
 
         if (visualText) {
-            parts.push(`【图形信息】\n${visualText}`);
+            questionParts.push(`【图形信息】\n${visualText}`);
         }
 
-        const combinedText = parts.join("\n\n");
+        const questionText = questionParts.join("\n\n");
+        const displayParts = [questionText];
+
+        if (userRequest) {
+            displayParts.push(`【我的要求】\n${userRequest}`);
+        }
+
+        const combinedText = displayParts.join("\n\n");
+        const apiText = userRequest
+            ? [
+                "【当前指向题目】",
+                questionText,
+                "【当前指向题目结束】",
+                "",
+                "【本轮唯一需要执行的用户请求】",
+                userRequest,
+                "【本轮请求结束】",
+                "",
+                "只回答上面的本轮最新请求。题目正文只作为本轮题目背景，不要把要求混入题干。"
+            ].join("\n")
+            : undefined;
 
         session.messages.push({
             role: "user",
             text: combinedText,
-            source: "ocr"
+            source: "ocr",
+            apiText
         });
+
+        // 这段文字已经作为本次图片题的要求提交，不再留在聊天框里。
+        const chatInput = document.getElementById("text");
+        if (chatInput) {
+            chatInput.value = "";
+        }
 
         maybeAutoNameSession(
             session,
@@ -8280,6 +8403,11 @@ async function handleImageSelected(event) {
         renderInfo();
 
     } catch (error) {
+        if (error && error.name === "AbortError") {
+            // 用户主动撤销：不产生错误气泡、不登记题目，也不清空已经输入的要求。
+            return;
+        }
+
         console.error("OCR 请求失败：", error);
 
         showAssistantMessage(
@@ -8290,8 +8418,11 @@ async function handleImageSelected(event) {
         return;
 
     } finally {
+        ocrRequestInFlight = false;
+        ocrAbortController = null;
+        ocrRequestId = "";
         ocrReviewInProgress = false;
-        setSessionBusy(session.id, false);
+        refreshInputAvailability();
     }
 
     // 只把用户核对后的题目交给 AI。
@@ -12208,6 +12339,14 @@ document.addEventListener(
             imageBtn.addEventListener(
                 "click",
                 openImagePicker
+            );
+        }
+
+        const ocrCancelBtn = document.getElementById("ocrCancelBtn");
+        if (ocrCancelBtn) {
+            ocrCancelBtn.addEventListener(
+                "click",
+                cancelImageRecognition
             );
         }
 
