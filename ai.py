@@ -105,13 +105,15 @@ VISION_ENABLED = os.environ.get(
 
 VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结构解析器”。
 
-第一张图是完整题目，后续图片是同一张图的题干局部放大，不是新题。
-请先独立逐行读取图片，再整理图形。你的任务不是解题，而是把图片整理成两部分：
+第一张图是用户上传的完整图片，后续图片是同一张图的局部放大，不是新题。
+图片可能包含题干文字，也可能完全没有文字，只包含一个或多个离散数学图形。
+请先独立读取整张图片，再整理文字与图形。你的任务不是解题，而是把图片整理成两部分：
 1. corrected_text：干净、可读的题目文字；
 2. visual_text：OCR 难以表达的图形结构信息。
 
 【corrected_text 要求】
 - 只根据图片逐字转录题干，每道小问单独一行，不改写问法。
+- 如果整张图片本来就没有题干文字，corrected_text 必须返回空字符串；这不是识别失败。
 - 保留题目标题、题干、(1)(2)(3)…等小问及数学符号。
 - 逐问核对顶点下标、指数、数字、起点和终点；相邻小问可能使用不同顶点。
 - 不得把上一问的顶点复制到下一问，也不得根据图中哪个点居中、出现频率或解题便利性猜题干。
@@ -122,6 +124,13 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 
 【visual_text 要求】
 - 图论优先确认：有向/无向、是否带权、顶点、边连接关系、箭头、自环、重边。
+- 如果同一张图片里有两个或更多彼此分开的图，必须分别写成“图1”“图2”……，不要把它们合并成一个图。
+- 如果图中的顶点没有任何可读标签，不要因此放弃识别，也不要把“没有标签”当成不确定项。请为每张图独立创建临时顶点名，例如 G1_v1、G1_v2……和 G2_v1、G2_v2……。
+- 临时顶点编号按视觉位置保持稳定：优先从上到下扫描；处在同一高度带时从左到右。首次列出临时顶点时，用括号补充大致位置（如“左上、上中、右下”），随后逐条给出边。
+- 对无标签图，至少输出：每张图的顶点数、是否有向/带权、临时顶点及位置、完整可确认的边集合；若存在自环或重边要单独注明。这样后续系统即使没有原始顶点名，也能依据邻接结构继续推理。
+- 顶点即使没有圆点也可能由线段端点或明确汇合处表示；不要因为“没有点标记”就判定没有顶点。反过来，单纯两条边在画面上交叉、但没有圆点或明显汇合语义时，不要擅自把交叉处新增为顶点；确实无法判断时才标记为不确定。
+- 不要把边的弯折处当成新顶点；每个临时顶点都必须对应图片中实际可辨认的端点、圆点或连接节点。
+- 如果图片只有纯图形、没有任何题干文字，只要能确认图形结构，仍应正常返回 visual_text，并将 has_visual_structure 设为 true。
 - e1、e2、e3 这类写在边旁的符号默认是“边的名称”，绝不能自动解释成权值 1、2、3。
 - 只有题目明确说明是带权图，或图片中存在与边名分离且清晰可确认的数值时，才输出边权。
 - 不要根据 OCR 的乱码猜出 22、86 之类的权值。
@@ -970,10 +979,11 @@ def _vision_success(corrected_text, visual_text, uncertain_fields=None):
 
 
 def _prepare_vision_images(image_bytes, review_regions=None):
-    """返回整图和最多四张题干局部 PNG；所有图片使用同一个 EXIF 方向。
+    """返回整图和局部放大 PNG；所有图片使用同一个 EXIF 方向。
 
-    区域来自 OCR 的坐标，字符本身不传给 Vision，避免先入为主地照抄误读。
-    无可用区域时附上有重叠的上下两部分，兼容旧版 OCR 返回值。
+    有 OCR 区域时优先放大题干；如果 review_regions 为 None，表示普通 OCR
+    没拿到可用文字，此时按纯图模式同时补充上下、左右半幅，方便识别
+    并排或上下排列的多个无标签图。
     """
     with Image.open(io.BytesIO(image_bytes)) as source:
         original = ImageOps.exif_transpose(source).convert("RGB")
@@ -992,6 +1002,7 @@ def _prepare_vision_images(image_bytes, review_regions=None):
         encoded = base64.b64encode(output.getvalue()).decode("ascii")
         return "data:image/png;base64," + encoded
 
+    pure_visual_mode = review_regions is None
     crops = []
     for region in (review_regions or [])[:4]:
         try:
@@ -1009,8 +1020,20 @@ def _prepare_vision_images(image_bytes, review_regions=None):
         except (TypeError, ValueError, OverflowError):
             continue
     if not crops:
-        crops = [original.crop((0, 0, width, math.ceil(height * 0.6))),
-                 original.crop((0, math.floor(height * 0.4), width, height))]
+        if pure_visual_mode:
+            # 纯图模式同时覆盖上下排列和左右排列；保留约 20% 重叠，
+            # 避免恰好位于中线附近的顶点/边被裁断。
+            crops = [
+                original.crop((0, 0, width, math.ceil(height * 0.6))),
+                original.crop((0, math.floor(height * 0.4), width, height)),
+                original.crop((0, 0, math.ceil(width * 0.6), height)),
+                original.crop((math.floor(width * 0.4), 0, width, height)),
+            ]
+        else:
+            crops = [
+                original.crop((0, 0, width, math.ceil(height * 0.6))),
+                original.crop((0, math.floor(height * 0.4), width, height)),
+            ]
     return [encode(original, 2200)] + [encode(crop, 1600, True) for crop in crops]
 
 
@@ -1044,7 +1067,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
         return _failure("图片局部放大失败，已保留文字识别结果。")
     content_parts = [{"type": "text", "text": VISION_PROMPT}]
     for index, data_url in enumerate(image_urls):
-        content_parts.append({"type": "text", "text": "完整题目" if index == 0 else f"题干局部 {index}"})
+        content_parts.append({"type": "text", "text": "完整上传图片" if index == 0 else f"局部放大 {index}"})
         content_parts.append({"type": "image_url", "image_url": {"url": data_url, "detail": "high"}})
 
     headers = {
