@@ -231,6 +231,36 @@ body {
     margin-right:0;
 }
 
+/* 图片识别中的撤销按钮：沿用系统里红色圆点的视觉，但用 × 明确表示可撤销。 */
+#ocrCancelBtn {
+    flex:0 0 auto;
+    width:30px;
+    height:30px;
+    min-height:30px;
+    padding:0;
+    border:none;
+    border-radius:50%;
+    background:#ef4444;
+    color:#fff;
+    font-size:22px;
+    font-weight:600;
+    line-height:1;
+    cursor:pointer;
+}
+
+#ocrCancelBtn:hover {
+    background:#dc2626;
+}
+
+#ocrCancelBtn:focus-visible {
+    outline:2px solid rgba(239,68,68,.32);
+    outline-offset:3px;
+}
+
+#ocrCancelBtn[hidden] {
+    display:none !important;
+}
+
 .right {
     width:240px;
     background:var(--surface-1);
@@ -334,6 +364,7 @@ body {
     border:1px solid var(--border-strong); border-radius:8px;
 }
 .ocr-review-fields pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; font-size:.9em; }
+.ocr-review-request-note { margin:-2px 0 12px; color:var(--text-subtle); font-size:var(--font-xxs); line-height:1.5; }
 .ocr-review-notice { white-space:pre-wrap; padding:12px; background:var(--surface-3); border-radius:8px; }
 .ocr-review-actions { display:flex; justify-content:flex-end; gap:12px; margin-top:18px; }
 .ocr-review-actions button { padding:10px 18px; font:inherit; border:1px solid var(--border-strong); border-radius:8px; cursor:pointer; background:var(--surface-3); color:var(--text-primary); }
@@ -2145,6 +2176,7 @@ window.MathJax = {
         <input id="text" type="text" placeholder="输入消息…" autocomplete="off">
         <input id="imageInput" type="file" accept="image/*" hidden>
         <button id="imageBtn" type="button">图片识题</button>
+        <button id="ocrCancelBtn" type="button" hidden aria-label="撤销图片识别" title="撤销图片识别">×</button>
         <button id="sendBtn" type="button" onclick="send()">发送</button>
     </div>
 </div>
@@ -2187,10 +2219,13 @@ window.MathJax = {
             <div class="ocr-review-preview"><img id="ocrReviewImage" alt="本次上传的题目原图"></div>
         </div>
         <div class="ocr-review-fields">
-            <label for="ocrReviewQuestion">题目文字</label>
+            <label for="ocrReviewQuestion">题目文字（纯图题可留空）</label>
             <textarea id="ocrReviewQuestion" rows="8" spellcheck="false"></textarea>
             <label for="ocrReviewGraph">图形信息（没有图形可留空）</label>
             <textarea id="ocrReviewGraph" rows="4" spellcheck="false"></textarea>
+            <label for="ocrReviewRequest">本次要求（可选）</label>
+            <textarea id="ocrReviewRequest" rows="3" spellcheck="false" placeholder="例如：只讲第 2 问；直接完整解析；先给我提示，不要答案"></textarea>
+            <div class="ocr-review-request-note">图片识别期间可直接在主聊天框输入要求；识别完成后会自动带到这里。</div>
             <details><summary>查看另一份文字识别结果</summary><pre id="ocrReviewOriginal"></pre></details>
         </div>
     </div>
@@ -2473,7 +2508,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=context-nav-v2-20260910c"></script>
+<script src="/static/script.js?v=ocr-request-phase1-20260928"></script>
 
 </body>
 </html>
