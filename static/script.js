@@ -813,6 +813,9 @@ function normalizeTeaching(value) {
         prerequisite_points: asTextList(value.prerequisite_points),
         knowledge_path: asTextList(value.knowledge_path),
         question_type: asText(value.question_type) || "综合题",
+        difficulty: ["简单", "中等", "困难"].includes(asText(value.difficulty))
+            ? asText(value.difficulty)
+            : "",
         mode: asText(value.mode) || "hint",
         mode_label: asText(value.mode_label) || "提示引导",
         confidence: asText(value.confidence) || "低",
@@ -907,6 +910,9 @@ function normalizeLearningQuestion(value) {
         focusPoints,
         category: typeof value.category === "string"
             ? value.category.trim()
+            : "",
+        difficulty: ["简单", "中等", "困难"].includes(value.difficulty)
+            ? value.difficulty
             : "",
         source: value.source === "ocr"
             ? "ocr"
@@ -1013,6 +1019,9 @@ function normalizeLearningState(value) {
                         : [],
                     category: typeof item.category === "string"
                         ? item.category.trim()
+                        : "",
+                    difficulty: ["简单", "中等", "困难"].includes(item.difficulty)
+                        ? item.difficulty
                         : "",
                     feedback: typeof item.feedback === "string"
                         ? item.feedback.trim().slice(0, 1000)
@@ -1167,6 +1176,10 @@ function normalizeLearningState(value) {
 
             if (!newer.note && older.note) {
                 newer.note = older.note;
+            }
+
+            if (!newer.difficulty && older.difficulty) {
+                newer.difficulty = older.difficulty;
             }
 
             if (!newer.referenceAnswer && older.referenceAnswer) {
@@ -1840,7 +1853,7 @@ function namedQuestionTopicReference(text) {
         ["初等数论", /初等数论|数论|整除|素数|质数|同余|最大公(?:约|因)数|欧几里得/],
         ["计数与组合", /计数与组合|组合|排列|鸽巢|容斥|计数/],
         ["递推关系", /递推关系|递推|递归|生成函数/],
-        ["图论", /图论|邻接矩阵|欧拉(?:图|通路|回路)|哈密顿|最短路|生成树|顶点|边/],
+        ["图论", /图论|图.{0,12}同构|同构.{0,12}图|邻接矩阵|欧拉(?:图|通路|回路)|哈密顿|最短路|生成树|顶点|边/],
         ["代数结构", /代数结构|群|子群|半群|幺半群|同态|同构|环|域|格|布尔代数/],
         ["函数", /函数|映射|单射|满射|双射|逆函数|复合函数/],
         ["集合与关系", /集合与关系/],
@@ -1953,6 +1966,96 @@ function isShortLearningFollowUp(text) {
     return value.length <= 6;
 }
 
+function extractOcrPrintedQuestionText(text) {
+    const value = String(text || "").trim();
+    if (!value) return "";
+
+    const markers = [
+        "【题目文字】",
+        "【题干与公式识别】"
+    ];
+    const marker = markers.find(item => value.includes(item));
+    if (!marker) return "";
+
+    const start = value.indexOf(marker) + marker.length;
+    const endMarkers = [
+        "【图形信息】",
+        "【图形结构识别】",
+        "【我的要求】"
+    ];
+    const ends = endMarkers
+        .map(item => value.indexOf(item, start))
+        .filter(index => index >= 0);
+    const end = ends.length ? Math.min(...ends) : value.length;
+
+    return cutQuestionAfterMetaSections(
+        value.slice(start, end)
+    ).trim();
+}
+
+function extractOcrUserRequest(text) {
+    const value = String(text || "");
+    if (!value) return "";
+
+    const apiMatch = value.match(
+        /【本轮唯一需要执行的用户请求】\s*([\s\S]*?)\s*【本轮请求结束】/
+    );
+    if (apiMatch) {
+        return String(apiMatch[1] || "").trim();
+    }
+
+    const marker = "【我的要求】";
+    const start = value.indexOf(marker);
+    return start >= 0
+        ? value.slice(start + marker.length).trim()
+        : "";
+}
+
+function looksLikeFormalPureImageRequest(text) {
+    const value = String(text || "").replace(/\s+/g, "").trim();
+    if (!value) return false;
+
+    // 观察型临时询问只回答，不登记为题目。
+    if (
+        /(?:这里|这个|图里|图中|里面|这张图).{0,10}(?:有)?(?:多少|几个|几条)(?:个)?(?:点|顶点|节点|边|线)/.test(value)
+        || /(?:多少|几个|几条)(?:个)?(?:点|顶点|节点|边|线)/.test(value)
+        || /^(?:这|这个|这里|图里|图中|里面).{0,12}(?:是什么|什么意思|怎么看|怎么读)$/.test(value)
+    ) {
+        return false;
+    }
+
+    return Boolean(
+        /^(?:请)?(?:判断|证明|求证|求解|计算|求|写出|列出|找出|给出|构造|画出|作出|确定|说明)/.test(value)
+        || /(?:是否同构|是否连通|欧拉(?:通路|回路)|哈密顿(?:通路|回路)|最短(?:路|路径)|最小生成树|生成树|邻接矩阵|关联矩阵|度数序列)/.test(value)
+    );
+}
+
+function isRecordableOcrQuestionMessage(message) {
+    if (
+        !message
+        || message.source !== "ocr"
+        || typeof message.text !== "string"
+    ) {
+        return false;
+    }
+
+    const printed = extractOcrPrintedQuestionText(message.text);
+    if (printed) {
+        return Boolean(
+            looksLikeChatQuestionText(printed)
+            || countTopLevelQuestionParts(printed) >= 1
+            || /^(?:图中|图\s*[A-Za-z0-9_]*|在图.+中).*(?:求|判断|证明|计算|写出|列出|多少|几个|是否)/.test(printed)
+        );
+    }
+
+    // OCR 没有题干时，只有“纯图 + 明确解题要求”才登记成题。
+    // “这里有几个点”之类临时观察问题不登记。
+    return looksLikeFormalPureImageRequest(
+        extractOcrUserRequest(message.text)
+    );
+}
+
+
 function looksLikeActualLearningProblem(message) {
     if (
         !message
@@ -1962,7 +2065,7 @@ function looksLikeActualLearningProblem(message) {
     }
 
     if (message.source === "ocr") {
-        return true;
+        return isRecordableOcrQuestionMessage(message);
     }
 
     const text = message.text.trim();
@@ -2041,8 +2144,11 @@ function buildLearningQuestionFromSession(session, teaching, excludeLatest = fal
             continue;
         }
 
+        const questionText = extractQuestionOnlyFromMessage(message).trim();
+        if (!questionText) continue;
+
         return {
-            text: text.slice(0, 3000),
+            text: questionText.slice(0, 3000),
             knowledgePoints: Array.isArray(teaching?.knowledge_points)
                 ? teaching.knowledge_points.slice(0, 4)
                 : [],
@@ -2051,6 +2157,9 @@ function buildLearningQuestionFromSession(session, teaching, excludeLatest = fal
                 : [],
             category: typeof teaching?.category === "string"
                 ? teaching.category
+                : "",
+            difficulty: ["简单", "中等", "困难"].includes(teaching?.difficulty)
+                ? teaching.difficulty
                 : "",
             source: message.source === "ocr" ? "ocr" : "text",
             sessionId: session.id,
@@ -2567,11 +2676,7 @@ function shouldOfferWrongBookAction(
         }
 
         if (message.source === "ocr") {
-            return Boolean(
-                sanitizeStoredWrongQuestionText(
-                    extractQuestionOnlyFromMessage(message)
-                )
-            );
+            return isRecordableOcrQuestionMessage(message);
         }
 
         if (isConversationControlOnly(message.text)) {
@@ -2754,7 +2859,7 @@ function exerciseTopicReference(text) {
         ["初等数论", /初等数论|数论|整除|素数|质数|同余|最大公(?:约|因)数|欧几里得|RSA/],
         ["计数与组合", /计数与组合|组合|排列|鸽巢|容斥|计数/],
         ["递推关系", /递推关系|递推|递归|生成函数/],
-        ["图论", /图论|邻接矩阵|欧拉(?:图|通路|回路)|哈密顿|最短路|生成树|顶点|边/],
+        ["图论", /图论|图.{0,12}同构|同构.{0,12}图|邻接矩阵|欧拉(?:图|通路|回路)|哈密顿|最短路|生成树|顶点|边/],
         ["代数结构", /代数结构|半群|幺半群|子群|同态|同构|布尔代数|环|域|格/],
         ["函数", /函数|映射|单射|满射|双射|逆函数|复合函数/],
         ["关系", /二元关系|偏序|等价关系|关系闭包|哈斯图|自反|反自反|对称|反对称|传递/],
@@ -3430,6 +3535,10 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
             existing.category = info.category;
         }
 
+        if (info.difficulty) {
+            existing.difficulty = info.difficulty;
+        }
+
         if (info.sessionId !== null) {
             existing.sessionId = info.sessionId;
         }
@@ -3477,6 +3586,7 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
         knowledgePoints: info.knowledgePoints,
         focusPoints: info.focusPoints,
         category: info.category,
+        difficulty: info.difficulty || "",
         feedback: compactFeedback(feedback),
         referenceAnswer: info.referenceAnswer || "",
         answer: "",
@@ -3550,7 +3660,10 @@ function currentLearningQuestion(session, teaching) {
                 && currentTeaching.category !== "待识别"
             )
                 ? currentTeaching.category
-                : saved.category
+                : saved.category,
+            difficulty: currentTeaching?.difficulty
+                || saved.difficulty
+                || ""
         };
     }
 
@@ -3603,6 +3716,7 @@ function processLearningFromReply(
             knowledgePoints: points.slice(0, 4),
             focusPoints: normalized.focus_points.slice(0, 2),
             category: normalized.category,
+            difficulty: normalized.difficulty || "",
             source: "ai",
             referenceAnswer: String(
                 generatedAnswer || ""
@@ -3641,10 +3755,18 @@ function processLearningFromReply(
 
         if (activeCandidate) {
             const latestMessage = getLatestUserMessage(session);
-            const targetTeaching = (
+            const preserveActiveQuestionTeaching = Boolean(
                 latestMessage
-                && isShortLearningFollowUp(latestMessage.text)
-            )
+                && (
+                    isShortLearningFollowUp(latestMessage.text)
+                    || (
+                        latestMessage.source === "ocr"
+                        && !isRecordableOcrQuestionMessage(latestMessage)
+                    )
+                )
+            );
+
+            const targetTeaching = preserveActiveQuestionTeaching
                 ? (
                     candidateTeachingSnapshot(
                         session,
@@ -3662,11 +3784,14 @@ function processLearningFromReply(
     }
 
     if (isSubstantiveQuestion && points.length) {
+        const learningQuestionText = extractQuestionOnlyFromMessage(latest) || latestText;
+
         session.learningQuestion = {
-            text: latestText.slice(0, 3000),
+            text: learningQuestionText.slice(0, 3000),
             knowledgePoints: points.slice(0, 4),
             focusPoints: normalized.focus_points.slice(0, 2),
             category: normalized.category,
+            difficulty: normalized.difficulty || "",
             source: latest.source === "ocr" ? "ocr" : "text",
             sessionId: session.id,
             updatedAt: Date.now()
@@ -4242,12 +4367,55 @@ function updateWrongBookToolbar(allItems, visibleItems) {
     }
 }
 
+async function refreshWrongBookDifficulties() {
+    const missing = learningState.wrongQuestions.filter(
+        item => !["简单", "中等", "困难"].includes(item.difficulty)
+    );
+    if (!missing.length) return;
+
+    try {
+        const response = await fetch("/analyze-questions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                questions: missing.map(item => ({ key: item.id, text: item.question }))
+            })
+        });
+        if (!response.ok) return;
+
+        const payload = await parseResponseJson(response);
+        const byId = new Map(
+            (payload?.results || []).map(item => [
+                String(item?.key || ""),
+                normalizeTeaching(item?.teaching)
+            ])
+        );
+        let changed = false;
+
+        for (const item of missing) {
+            const difficulty = byId.get(String(item.id))?.difficulty || "";
+            if (!["简单", "中等", "困难"].includes(difficulty)) continue;
+            item.difficulty = difficulty;
+            changed = true;
+        }
+
+        if (changed) {
+            saveLearningState();
+            renderWrongBook();
+        }
+    } catch (error) {
+        console.warn("错题难度补齐失败：", error);
+    }
+}
+
+
 function openWrongBook() {
     const modal = document.getElementById("wrongBookModal");
     if (!modal) return;
 
     renderWrongBook();
     modal.classList.remove("hidden");
+    void refreshWrongBookDifficulties();
 
     const search = document.getElementById("wrongBookSearch");
     if (search) {
@@ -5875,6 +6043,18 @@ function renderWrongBook() {
         top.appendChild(status);
         top.appendChild(date);
 
+        const difficulty = ["简单", "中等", "困难"].includes(item.difficulty)
+            ? item.difficulty
+            : "";
+        const difficultyBadge = difficulty
+            ? document.createElement("div")
+            : null;
+
+        if (difficultyBadge) {
+            difficultyBadge.className = "difficulty-badge";
+            difficultyBadge.textContent = difficulty;
+        }
+
         const question = document.createElement("div");
         question.className = "wrong-question";
         question.innerHTML = markdownToHtml(item.question);
@@ -6159,6 +6339,9 @@ function renderWrongBook() {
         actions.appendChild(removeButton);
 
         card.appendChild(top);
+        if (difficultyBadge) {
+            card.appendChild(difficultyBadge);
+        }
         card.appendChild(question);
 
         if (meta.textContent) {
@@ -7333,7 +7516,10 @@ function buildApiMessages(session, targetCandidate = null) {
     // 真正的新自包含题也优先独立发送，不要因为会话中已有 target 就
     // 被错误包装成“上一题的追问”。
     if (
-        looksLikeActualLearningProblem(latestUser)
+        (
+            latestUser.source === "ocr"
+            || looksLikeActualLearningProblem(latestUser)
+        )
         && !isQuestionNavigationFollowUp(latestUser.text)
     ) {
         return [{
@@ -7413,7 +7599,10 @@ function buildApiMessages(session, targetCandidate = null) {
     }
 
     // 一道全新的自包含题目，不需要把上一道题的完整回答继续塞进请求。
-    if (looksLikeActualLearningProblem(latestUser)) {
+    if (
+        latestUser.source === "ocr"
+        || looksLikeActualLearningProblem(latestUser)
+    ) {
         return [{
             role: "user",
             content: messageContent(latestUser)
@@ -7488,13 +7677,17 @@ function attachTeachingSnapshotToLatestQuestion(
             message
         );
 
+        if (message.source === "ocr") {
+            if (isRecordableOcrQuestionMessage(message)) {
+                message.questionTeaching = normalized;
+            }
+            return;
+        }
+
         if (
-            message.source === "ocr"
-            || (
-                question
-                && looksLikeQuestionPayload(question)
-                && !isConversationControlOnly(message.text)
-            )
+            question
+            && looksLikeQuestionPayload(question)
+            && !isConversationControlOnly(message.text)
         ) {
             message.questionTeaching = normalized;
             return;
@@ -7559,8 +7752,11 @@ async function requestAiReply(session) {
 
     const latestIsFreshQuestion = Boolean(
         latestUserBeforeRequest
-        && looksLikeActualLearningProblem(
-            latestUserBeforeRequest
+        && (
+            latestUserBeforeRequest.source === "ocr"
+            || looksLikeActualLearningProblem(
+                latestUserBeforeRequest
+            )
         )
         && !latestIsNavigationRequest
     );
@@ -8627,6 +8823,7 @@ function questionInfoFromChatMessage(session, messageIndex) {
     const teaching = normalizeTeaching(session.teaching);
     const messageTeaching = normalizeTeaching(
         message.generatedTeaching
+        || message.questionTeaching
     );
     const saved = normalizeLearningQuestion(
         session.learningQuestion
@@ -8705,6 +8902,9 @@ function questionInfoFromChatMessage(session, messageIndex) {
                             : ""
                     )
             ),
+        difficulty: messageTeaching?.difficulty
+            || (savedMatches ? saved.difficulty : "")
+            || (isRecent ? (teaching?.difficulty || "") : ""),
         source,
         referenceAnswer: (
             String(message.generatedAnswer || "").trim()
@@ -9196,6 +9396,23 @@ function renderChat() {
         }
 
         div.appendChild(content);
+
+        const difficultyTeaching = normalizeTeaching(
+            message.role === "user"
+                ? message.questionTeaching
+                : (
+                    message.generatedExercise
+                        ? message.generatedTeaching
+                        : null
+                )
+        );
+
+        if (difficultyTeaching?.difficulty) {
+            const difficultyBadge = document.createElement("div");
+            difficultyBadge.className = "difficulty-badge";
+            difficultyBadge.textContent = difficultyTeaching.difficulty;
+            div.insertBefore(difficultyBadge, content);
+        }
 
         const actions = document.createElement("div");
         actions.className = "msg-actions";
@@ -9693,10 +9910,11 @@ function looksLikeFormalStudyQuestionForHistory(
         return false;
     }
 
-    if (
-        message?.source === "ocr"
-        || /【(?:题目|练习题|题目文字)】/.test(value)
-    ) {
+    if (message?.source === "ocr") {
+        return isRecordableOcrQuestionMessage(message);
+    }
+
+    if (/【(?:题目|练习题|题目文字)】/.test(value)) {
         return true;
     }
 
@@ -10044,6 +10262,7 @@ function candidateTeachingSnapshot(
             question_type: candidate.role === "ai"
                 ? "练习题"
                 : "综合题",
+            difficulty: saved.difficulty || "",
             mode: candidate.role === "ai"
                 ? "exercise"
                 : "hint",
@@ -10104,6 +10323,7 @@ function applyQuestionCandidateAsCurrent(
             teaching?.focus_points || []
         ).slice(0, 2),
         category: teaching?.category || "",
+        difficulty: teaching?.difficulty || "",
         source: candidate.role === "ai"
             ? "ai"
             : (
@@ -10365,6 +10585,7 @@ async function refreshConversationKnowledgeIndex(
                 latestTeaching.focus_points || []
             ).slice(0, 2),
             category: latestTeaching.category || "",
+            difficulty: latestTeaching.difficulty || "",
             source: (
                 latestCandidate.role === "ai"
                     ? "ai"
