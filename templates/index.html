@@ -164,6 +164,19 @@ body {
     min-width:0;
 }
 
+.difficulty-badge {
+    display:inline-block;
+    margin:0 0 7px;
+    padding:2px 8px;
+    border:1px solid rgba(255,255,255,.28);
+    border-radius:999px;
+    font-size:var(--font-xxs);
+    font-weight:600;
+    line-height:1.4;
+    color:inherit;
+    background:rgba(15,23,42,.18);
+}
+
 .msg-actions {
     display:flex;
     justify-content:flex-end;
@@ -2205,16 +2218,15 @@ window.MathJax = {
 
 <dialog id="ocrReviewDialog" class="ocr-review-dialog" aria-labelledby="ocrReviewTitle" aria-describedby="ocrReviewHelp">
     <h2 id="ocrReviewTitle">核对图片里的题目</h2>
-    <p id="ocrReviewHelp">请对照原图检查小问、上下标和连线。有识别错误，可以直接修改右侧文字。</p>
     <div class="ocr-review-body">
         <div>
             <label class="ocr-review-zoom" for="ocrReviewZoom">放大原图<input id="ocrReviewZoom" type="range" min="100" max="300" step="25" value="100"></label>
             <div class="ocr-review-preview"><img id="ocrReviewImage" alt="本次上传的题目原图"></div>
         </div>
         <div class="ocr-review-fields">
-            <label for="ocrReviewQuestion">题目文字（纯图题可留空）</label>
+            <label for="ocrReviewQuestion">题目文字</label>
             <textarea id="ocrReviewQuestion" rows="8" spellcheck="false"></textarea>
-            <label for="ocrReviewGraph">图形信息（没有图形可留空）</label>
+            <label for="ocrReviewGraph">图形信息</label>
             <textarea id="ocrReviewGraph" rows="4" spellcheck="false"></textarea>
             <label for="ocrReviewRequest">本次要求（可选）</label>
             <textarea id="ocrReviewRequest" rows="3" spellcheck="false"></textarea>
