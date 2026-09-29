@@ -571,6 +571,18 @@ def _looks_like_generated_exercise_text(text):
 def _detect_mode(latest_text):
     text = _normalize(latest_text)
 
+    # “完整解析，不要只给提示”同时含有“完整解析”和“只给提示”。
+    # 这里先识别“明确拒绝仅提示”的表达，避免被 NO_SOLUTION_PATTERNS
+    # 中的“只给提示”子串误伤。
+    rejects_hint_only = bool(
+        re.search(
+            r"(?:不要|别|不用|无需)(?:再)?(?:只|仅)(?:给)?提示",
+            text,
+        )
+    )
+    if rejects_hint_only and _contains_any(text, FULL_SOLUTION_PATTERNS):
+        return "full_solution"
+
     # 否定式要求优先级必须高于“给我答案”等子串，避免
     # “不要给我答案”被误判为完整解析。
     if _contains_any(text, NO_SOLUTION_PATTERNS):
@@ -613,6 +625,72 @@ def _detect_question_type(text, mode):
     return "综合题"
 
 
+def _estimate_difficulty(text, knowledge_points=None, question_type="综合题"):
+    """
+    轻量三档难度评级。
+
+    只返回：简单 / 中等 / 困难。
+    不调用额外模型，也不参与回答提示词，避免难度功能改变原有教学行为。
+    """
+    value = str(text or "")
+    normalized = _normalize(value)
+    points = [
+        str(item).strip()
+        for item in (knowledge_points or [])
+        if str(item).strip()
+    ]
+
+    score = 0
+
+    # 多小问通常意味着需要组合多个步骤。
+    parenthesized = re.findall(r"(?:^|\n)\s*[（(]\s*\d{1,2}\s*[）)]", value)
+    numbered = re.findall(r"(?:^|\n)\s*\d{1,2}[.．、]", value)
+    subquestion_count = max(len(parenthesized), len(numbered))
+    if subquestion_count >= 4:
+        score += 2
+    elif subquestion_count >= 2:
+        score += 1
+
+    # 证明、构造、枚举全部结果一类题通常步骤更多。
+    if question_type == "证明题" or any(
+        keyword in normalized
+        for keyword in (
+            "证明", "推导", "构造", "求证", "反证",
+            "所有通路", "所有回路", "所有路径", "所有方案",
+        )
+    ):
+        score += 2
+
+    # 常见需要连续算法/结构判断的任务。
+    if any(
+        keyword in normalized
+        for keyword in (
+            "同构", "欧拉通路", "欧拉回路", "哈密顿",
+            "最短路", "最小生成树", "传递闭包",
+            "主析取范式", "主合取范式", "前束范式",
+            "生成函数", "非齐次递推", "矩阵树定理",
+            "rsa",
+        )
+    ):
+        score += 1
+
+    # 同一道题同时落到多个知识点时，给组合性留一档空间。
+    if len(points) >= 3:
+        score += 2
+    elif len(points) >= 2:
+        score += 1
+
+    # 很短的概念/直接判断题保持简单，不因为术语本身被抬高。
+    if question_type == "概念题" and len(normalized) <= 80:
+        score = min(score, 1)
+
+    if score >= 4:
+        return "困难"
+    if score >= 2:
+        return "中等"
+    return "简单"
+
+
 def _keyword_weight(keyword):
     # 更长、更具体的术语权重更高，减轻“群”“树”等短词误触发。
     length = len(keyword)
@@ -635,6 +713,21 @@ def _score_categories(text):
             if keyword.lower() in normalized:
                 score += _keyword_weight(keyword)
         scores[category] = score
+
+    # “同构”同时存在于代数结构与图论语境。出现明确图语境时，
+    # 应判作图论，不让“同构”这个单词把图同构误拉到代数结构。
+    graph_isomorphism = bool(re.search(
+        r"(?:图|顶点|边|邻接|g\s*[_-]?\d+|图\s*\d+).{0,36}同构"
+        r"|同构.{0,36}(?:图|顶点|边|邻接|g\s*[_-]?\d+|图\s*\d+)",
+        normalized,
+        flags=re.IGNORECASE,
+    ))
+    if graph_isomorphism:
+        scores["图论"] = scores.get("图论", 0) + 8
+        scores["代数结构"] = max(
+            0,
+            scores.get("代数结构", 0) - _keyword_weight("同构"),
+        )
 
     return scores
 
@@ -716,12 +809,19 @@ def analyze_question(text):
         classified["score"],
     )
 
+    question_type = _detect_question_type(text, mode)
+
     result = {
         "category": classified["category"],
         "related_categories": classified["related_categories"],
         "knowledge_points": classified["knowledge_points"],
         "focus_points": focus_points,
-        "question_type": _detect_question_type(text, mode),
+        "question_type": question_type,
+        "difficulty": _estimate_difficulty(
+            text,
+            classified["knowledge_points"],
+            question_type,
+        ),
         "mode": mode,
         "mode_label": MODE_LABELS[mode],
         "confidence": classified["confidence"],
@@ -1133,6 +1233,98 @@ def _looks_like_explicit_generated_question(text):
     ))
 
 
+def _extract_image_printed_question(text):
+    value = str(text or "")
+    markers = ("【题目文字】", "【题干与公式识别】")
+    marker = next((item for item in markers if item in value), None)
+    if not marker:
+        return ""
+
+    start = value.find(marker) + len(marker)
+    ends = []
+    for end_marker in ("【图形信息】", "【图形结构识别】", "【我的要求】"):
+        pos = value.find(end_marker, start)
+        if pos >= 0:
+            ends.append(pos)
+
+    end = min(ends) if ends else len(value)
+    return value[start:end].strip()
+
+
+def _looks_like_formal_printed_question(text):
+    value = str(text or "").strip()
+    if not value:
+        return False
+
+    compact = re.sub(r"\s+", "", value)
+
+    if re.search(r"(?:^|\n)\s*(?:[（(]\s*\d{1,2}\s*[）)]|\d{1,2}[.．、])\s*\S+", value):
+        return True
+
+    if re.search(r"^(?:设|已知|给定|若|求|求解|证明|计算|判断|写出|列出|选择|填空|解答|下列)", compact):
+        return True
+
+    if re.search(r"^(?:图中|图[A-Za-z0-9_]*|在图.+中).*(?:求|判断|证明|计算|写出|列出|多少|几个|是否)", compact):
+        return True
+
+    if re.search(r"[？?]$", compact) and re.search(
+        r"命题|公式|集合|关系|函数|图|矩阵|树|通路|回路|欧拉|哈密顿|递推|组合|群|环|域",
+        compact,
+    ):
+        return True
+
+    return False
+
+
+def _extract_image_user_request(text):
+    value = str(text or "")
+
+    # API 消息使用这组内部标记。
+    match = re.search(
+        r"【本轮唯一需要执行的用户请求】\s*([\s\S]*?)\s*【本轮请求结束】",
+        value,
+    )
+    if match:
+        return match.group(1).strip()
+
+    # 兼容聊天历史中的可见图片消息。
+    marker = "【我的要求】"
+    start = value.find(marker)
+    if start < 0:
+        return ""
+    return value[start + len(marker):].strip()
+
+
+def _looks_like_formal_image_request(text):
+    """纯图情况下，只把明确的解题任务登记为题目。
+
+    “这里有几个点/几条边/这是什么”属于临时观察询问：照常回答，
+    但不进入题目历史、难度评级和错题本。
+    """
+    value = re.sub(r"\s+", "", str(text or "").strip())
+    if not value:
+        return False
+
+    # 明确排除用户特别要求不要登记的观察型问题。
+    if re.search(
+        r"(?:这里|这个|图里|图中|里面|这张图).{0,10}"
+        r"(?:有)?(?:多少|几个|几条)(?:个)?(?:点|顶点|节点|边|线)"
+        r"|(?:多少|几个|几条)(?:个)?(?:点|顶点|节点|边|线)",
+        value,
+    ):
+        return False
+
+    if re.search(r"^(?:这|这个|这里|图里|图中|里面).{0,12}(?:是什么|什么意思|怎么看|怎么读)$", value):
+        return False
+
+    # 只有明确要求完成一个数学任务，才把“纯图 + 要求”提升为正式题。
+    return bool(re.search(
+        r"^(?:请)?(?:判断|证明|求证|求解|计算|求|写出|列出|找出|给出|构造|画出|作出|确定|说明)"
+        r"|(?:是否同构|是否连通|欧拉(?:通路|回路)|哈密顿(?:通路|回路)|最短(?:路|路径)|最小生成树|生成树|邻接矩阵|关联矩阵|度数序列)",
+        value,
+    ))
+
+
 def _looks_like_user_question_for_context(text):
     """判断一条 user 消息是否是在提出新的学习题，而不是控制/追问语句。"""
     value = str(text or "").strip()
@@ -1150,7 +1342,12 @@ def _looks_like_user_question_for_context(text):
         return False
 
     if _is_image_input(value):
-        return True
+        printed = _extract_image_printed_question(value)
+        if _looks_like_formal_printed_question(printed):
+            return True
+        return _looks_like_formal_image_request(
+            _extract_image_user_request(value)
+        )
 
     compact = re.sub(r"\s+", "", value)
 
@@ -1334,12 +1531,19 @@ def analyze_messages(messages):
         classified["score"],
     )
 
+    question_type = _detect_question_type(classification_text, mode)
+
     return _enrich_with_graph({
         "category": classified["category"],
         "related_categories": classified["related_categories"],
         "knowledge_points": classified["knowledge_points"],
         "focus_points": focus_points,
-        "question_type": _detect_question_type(classification_text, mode),
+        "question_type": question_type,
+        "difficulty": _estimate_difficulty(
+            classification_text,
+            classified["knowledge_points"],
+            question_type,
+        ),
         "mode": mode,
         "mode_label": MODE_LABELS[mode],
         "confidence": classified["confidence"],
