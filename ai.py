@@ -12,8 +12,34 @@ from PIL import Image, ImageOps
 
 from teaching import teaching_prompt
 
-API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-API_URL = "https://api.deepseek.com/chat/completions"
+DEEPSEEK_API_KEY = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
+DEEPSEEK_CHAT_MODEL = (
+    os.environ.get("DEEPSEEK_CHAT_MODEL", "deepseek-flash")
+    or "deepseek-flash"
+).strip()
+
+# 鲁信杯算力：优先使用。接口按 OpenAI Chat Completions 兼容格式调用。
+# 默认模型使用当前 DeepSeek-V4.1-Flash 的官方模型名 deepseek-flash；
+# 如果鲁信平台控制台给出的模型 ID 不同，可仅覆盖 LUXIN_MODEL_ID，
+# 无需改代码。
+LUXIN_API_KEY = (os.environ.get("LUXIN_API_KEY") or "").strip()
+LUXIN_API_URL = (
+    os.environ.get(
+        "LUXIN_API_URL",
+        "https://www.tokensd.com.cn/v1/chat/completions",
+    )
+    or "https://www.tokensd.com.cn/v1/chat/completions"
+).strip()
+LUXIN_CHAT_MODEL = (
+    os.environ.get("LUXIN_MODEL_ID", "deepseek-flash")
+    or "deepseek-flash"
+).strip()
+
+# 兼容原有 Vision 路径：图片识别仍走原来的 DeepSeek 接口，
+# 第二阶段已经稳定的 OCR/Vision 行为不因为接入鲁信算力而改变。
+API_KEY = DEEPSEEK_API_KEY
+API_URL = DEEPSEEK_API_URL
 
 # 调试模式：True 时返回模拟回复，不调用真实 API
 ASK_AI_MOCK = False
@@ -23,6 +49,16 @@ MAX_HISTORY_MESSAGES = 32
 MAX_HISTORY_CHARS = 60000
 MAX_MESSAGE_CHARS = 6000
 MAX_OUTPUT_TOKENS = max(2000, min(6000, int(os.environ.get("DEEPSEEK_MAX_OUTPUT_TOKENS", "5000"))))
+# 中等题开启常规深度思考；困难题开启 max 思考。
+# 思考模式会消耗额外输出预算，因此分别预留更充足的 token。
+MEDIUM_MAX_OUTPUT_TOKENS = max(
+    MAX_OUTPUT_TOKENS,
+    min(12000, int(os.environ.get("MEDIUM_MAX_OUTPUT_TOKENS", "8000"))),
+)
+HARD_MAX_OUTPUT_TOKENS = max(
+    MEDIUM_MAX_OUTPUT_TOKENS,
+    min(20000, int(os.environ.get("HARD_MAX_OUTPUT_TOKENS", "12000"))),
+)
 MAX_CONTINUATION_ROUNDS = 1
 
 SYSTEM_PROMPT = r"""你是离散数学智能辅学系统中的教学助手。
@@ -519,23 +555,285 @@ def _fallback_math_to_readable_text(text):
     return value.strip()
 
 
+def _text_provider_configs(preferred_provider=None):
+    """返回文本模型调用顺序：鲁信优先，原 DeepSeek 永久保留为兜底。"""
+    providers = []
+
+    if LUXIN_API_KEY:
+        providers.append({
+            "id": "luxin",
+            "name": "鲁信算力",
+            "url": LUXIN_API_URL,
+            "api_key": LUXIN_API_KEY,
+            "model": LUXIN_CHAT_MODEL,
+        })
+
+    if DEEPSEEK_API_KEY:
+        providers.append({
+            "id": "deepseek",
+            "name": "DeepSeek",
+            "url": DEEPSEEK_API_URL,
+            "api_key": DEEPSEEK_API_KEY,
+            "model": DEEPSEEK_CHAT_MODEL,
+        })
+
+    if preferred_provider:
+        providers.sort(
+            key=lambda item: 0 if item["id"] == preferred_provider else 1
+        )
+
+    return providers
+
+
+def _reasoning_effort_for_context(teaching_context):
+    """按三档题目难度选择文本模型思考强度。"""
+    difficulty = str((teaching_context or {}).get("difficulty", "")).strip()
+    if difficulty == "困难":
+        return "max"
+    if difficulty == "中等":
+        return "high"
+    return "none"
+
+
+def _build_text_payload(provider, messages, reasoning_effort="none", max_tokens=None):
+    effort = str(reasoning_effort or "none").strip().lower()
+    if effort not in ("none", "high", "max"):
+        effort = "none"
+
+    if max_tokens is not None:
+        token_limit = int(max_tokens)
+    elif effort == "max":
+        token_limit = HARD_MAX_OUTPUT_TOKENS
+    elif effort == "high":
+        token_limit = MEDIUM_MAX_OUTPUT_TOKENS
+    else:
+        token_limit = MAX_OUTPUT_TOKENS
+
+    payload = {
+        "model": provider["model"],
+        "messages": messages,
+        "max_tokens": token_limit,
+        "stream": False,
+    }
+
+    if effort in ("high", "max"):
+        payload["thinking"] = {"type": "enabled"}
+        payload["reasoning_effort"] = effort
+    else:
+        payload["thinking"] = {"type": "disabled"}
+
+    return payload
+
+
+def _request_text_completion(
+    messages,
+    retries=2,
+    reasoning_effort="none",
+    max_tokens=None,
+    preferred_provider=None,
+    timeout=(10, 60),
+):
+    """
+    调用文本模型。
+
+    默认顺序：鲁信算力 -> 原 DeepSeek。
+    鲁信 Key 被撤销、额度不足、模型不可用、网络异常或返回格式异常时，
+    自动切回原 DeepSeek，不让外部算力支援成为单点故障。
+    """
+    providers = _text_provider_configs(preferred_provider)
+    if not providers:
+        return {
+            "ok": False,
+            "error": "AI 服务尚未完成配置，请联系管理员。",
+        }
+
+    last_status = None
+    last_error = None
+
+    for provider_index, provider in enumerate(providers):
+        # 鲁信作为外部主路径时最多快速重试一次，然后立即走原路径；
+        # 最后的兜底路径保留原先完整重试次数。
+        is_last = provider_index == len(providers) - 1
+        attempts = max(1, retries + 1)
+        if not is_last:
+            attempts = min(attempts, 2)
+
+        payload = _build_text_payload(
+            provider,
+            messages,
+            reasoning_effort=reasoning_effort,
+            max_tokens=max_tokens,
+        )
+        headers = {
+            "Authorization": f"Bearer {provider['api_key']}",
+            "Content-Type": "application/json",
+        }
+
+        for attempt in range(attempts):
+            try:
+                mode_text = {
+                    "max": "max 思考",
+                    "high": "high 思考",
+                }.get(reasoning_effort, "非思考")
+                print(
+                    f"正在调用{provider['name']} "
+                    f"{provider['model']}（{mode_text}，"
+                    f"第 {attempt + 1}/{attempts} 次）"
+                )
+
+                response = requests.post(
+                    provider["url"],
+                    headers=headers,
+                    json=payload,
+                    timeout=timeout,
+                )
+                last_status = response.status_code
+
+                if response.status_code in RETRYABLE_STATUS:
+                    if attempt < attempts - 1:
+                        wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
+                        print(
+                            f"{provider['name']} 暂时不可用，"
+                            f"HTTP {response.status_code}，"
+                            f"{wait_seconds:.1f} 秒后重试"
+                        )
+                        time.sleep(wait_seconds)
+                        continue
+                    break
+
+                if not response.ok:
+                    print(
+                        f"{provider['name']} 请求失败："
+                        f"HTTP {response.status_code}；"
+                        f"响应内容：{response.text[:500]}"
+                    )
+                    break
+
+                try:
+                    result = response.json()
+                except ValueError as exc:
+                    last_error = exc
+                    print(
+                        f"{provider['name']} 返回内容解析失败：{repr(exc)}"
+                    )
+                    break
+
+                if "error" in result:
+                    print(
+                        f"{provider['name']} API 返回错误："
+                        f"{result['error']}"
+                    )
+                    break
+
+                choices = result.get("choices")
+                if not choices:
+                    print(
+                        f"{provider['name']} 返回缺少 choices：{result}"
+                    )
+                    break
+
+                choice = choices[0] if isinstance(choices[0], dict) else {}
+                message = choice.get("message", {})
+                content = message.get("content") if isinstance(message, dict) else None
+
+                if not isinstance(content, str) or not content.strip():
+                    reasoning_content = (
+                        message.get("reasoning_content")
+                        if isinstance(message, dict)
+                        else None
+                    )
+                    print(
+                        f"{provider['name']} 返回正文为空；"
+                        f"reasoning_len="
+                        f"{len(reasoning_content) if isinstance(reasoning_content, str) else 0}"
+                    )
+                    break
+
+                return {
+                    "ok": True,
+                    "choice": choice,
+                    "content": content.strip(),
+                    "provider_id": provider["id"],
+                    "provider_name": provider["name"],
+                    "model": provider["model"],
+                }
+
+            except requests.exceptions.Timeout as exc:
+                last_error = exc
+                print(f"{provider['name']} 请求超时：{repr(exc)}")
+                if attempt < attempts - 1:
+                    wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
+                    time.sleep(wait_seconds)
+                    continue
+                break
+
+            except requests.exceptions.ConnectionError as exc:
+                last_error = exc
+                print(f"{provider['name']} 网络连接异常：{repr(exc)}")
+                if attempt < attempts - 1:
+                    wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
+                    time.sleep(wait_seconds)
+                    continue
+                break
+
+            except requests.exceptions.RequestException as exc:
+                last_error = exc
+                print(f"{provider['name']} 请求异常：{repr(exc)}")
+                break
+
+            except Exception as exc:
+                last_error = exc
+                print(f"{provider['name']} 未知异常：{repr(exc)}")
+                break
+
+        if provider_index < len(providers) - 1:
+            print(
+                f"{provider['name']} 当前不可用，自动切换到"
+                f"{providers[provider_index + 1]['name']}。"
+            )
+
+    if last_status is not None:
+        return {
+            "ok": False,
+            "error": _friendly_http_error(last_status),
+        }
+
+    if isinstance(last_error, requests.exceptions.Timeout):
+        return {
+            "ok": False,
+            "error": "AI 服务响应时间过长，请稍后重新发送。",
+        }
+
+    if isinstance(last_error, requests.exceptions.ConnectionError):
+        return {
+            "ok": False,
+            "error": "暂时无法连接 AI 服务，请检查网络后重试。",
+        }
+
+    return {
+        "ok": False,
+        "error": "AI 服务暂时不可用，请稍后重试。",
+    }
+
+
 def _regenerate_broken_math_answer(
     final_messages,
     broken_content,
-    timeout=(10, 60)
+    preferred_provider=None,
+    reasoning_effort="none",
 ):
     """
     仅在答案数学格式损坏时额外重生成一次。
-    这是异常兜底，正常回答不会多一次 API 调用。
+    优先沿用刚才成功的供应路径；该路径失效时仍可自动回退。
     """
     repair_instruction = (
         "你上一条回答中的 Markdown/LaTeX 格式损坏了。"
         "请完整重写上一条回答，保持原来的数学含义、教学方式和答案内容，"
-        "不要提到“格式修复”或这条指令。"
+        "不要提到‘格式修复’或这条指令。"
         "严格使用标准 MathJax LaTeX：行内 $...$，独立公式 $$...$$；"
         "下标只用 _{...}；所有‘若……否则……’的条件定义必须使用多行 cases；"
         "整个 a_{ij}=\\begin{cases}...\\end{cases} 必须放在同一对 $$ 中；"
-        "矩阵维数写成 $A=(a_{ij})_{5\\times5}$，中文“满足/其中”放在公式外；"
+        "矩阵维数写成 $A=(a_{ij})_{5\\times5}$，中文‘满足/其中’放在公式外；"
         "禁止把 a_{ij}={1, 条件, 0, 否则} 摊成一行；"
         "禁止使用星号代替下标，禁止出现 a*{ij}、$*、*a*{ij}。"
         "输出前检查所有美元符号、花括号和 begin/end 是否成对。"
@@ -544,70 +842,41 @@ def _regenerate_broken_math_answer(
     retry_messages = list(final_messages)
     retry_messages.append({
         "role": "assistant",
-        "content": broken_content
+        "content": broken_content,
     })
     retry_messages.append({
         "role": "user",
-        "content": repair_instruction
+        "content": repair_instruction,
     })
 
-    payload = {
-        "model": "deepseek-v4-flash",
-        "messages": retry_messages,
-        "thinking": {"type": "disabled"},
-        "max_tokens": MAX_OUTPUT_TOKENS,
-        "stream": False
-    }
-
-    try:
-        response = requests.post(
-            API_URL,
-            headers={
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json=payload,
-            timeout=timeout
-        )
-
-        if response.status_code != 200:
-            print(
-                "数学格式重生成失败："
-                f"HTTP {response.status_code}；"
-                f"{response.text[:500]}"
-            )
-            return None
-
-        result = response.json()
-        choices = result.get("choices")
-
-        if not choices:
-            print("数学格式重生成失败：缺少 choices")
-            return None
-
-        content = choices[0].get("message", {}).get("content")
-
-        if not isinstance(content, str) or not content.strip():
-            print("数学格式重生成失败：返回内容为空")
-            return None
-
-        repaired = _repair_common_latex_typos(content.strip())
-
-        if _looks_like_broken_math(repaired):
-            print("数学格式重生成后仍检测到异常")
-            return None
-
-        print("数学格式异常已自动重生成")
-        return repaired
-
-    except Exception as exc:
-        print(f"数学格式重生成异常：{repr(exc)}")
+    result = _request_text_completion(
+        retry_messages,
+        retries=0,
+        reasoning_effort=reasoning_effort,
+        preferred_provider=preferred_provider,
+    )
+    if not result.get("ok"):
+        print("数学格式重生成失败：所有可用文本路径均失败")
         return None
 
+    content = result.get("content", "")
+    repaired = _repair_common_latex_typos(content)
+
+    if _looks_like_broken_math(repaired):
+        print("数学格式重生成后仍检测到异常")
+        return None
+
+    print("数学格式异常已自动重生成")
+    return repaired
 
 
-def _continue_truncated_answer(api_messages, partial_content, headers, timeout=(10, 60)):
-    """当模型因为 max_tokens 截断时，最多自动续写一次并拼接完整答案。"""
+def _continue_truncated_answer(
+    api_messages,
+    partial_content,
+    preferred_provider=None,
+    reasoning_effort="none",
+):
+    """当模型因为输出长度限制截断时，最多自动续写一次并拼接完整答案。"""
     content = str(partial_content or "").strip()
     if not content:
         return content
@@ -617,6 +886,8 @@ def _continue_truncated_answer(api_messages, partial_content, headers, timeout=(
         "role": "assistant",
         "content": content,
     })
+
+    current_provider = preferred_provider
 
     for _round in range(MAX_CONTINUATION_ROUNDS):
         messages.append({
@@ -628,51 +899,31 @@ def _continue_truncated_answer(api_messages, partial_content, headers, timeout=(
             ),
         })
 
-        payload = {
-            "model": "deepseek-v4-flash",
-            "messages": messages,
-            "max_tokens": MAX_OUTPUT_TOKENS,
-            "thinking": {"type": "disabled"},
-            "stream": False,
-        }
-
-        try:
-            response = requests.post(
-                API_URL,
-                headers=headers,
-                json=payload,
-                timeout=timeout,
-            )
-            if not response.ok:
-                print(
-                    "长回答自动续写失败："
-                    f"HTTP {response.status_code}；{response.text[:300]}"
-                )
-                break
-
-            result = response.json()
-            choices = result.get("choices") or []
-            if not choices:
-                break
-
-            choice = choices[0]
-            piece = choice.get("message", {}).get("content")
-            if not isinstance(piece, str) or not piece.strip():
-                break
-
-            piece = piece.strip()
-            content = content.rstrip() + "\n" + piece
-
-            if choice.get("finish_reason") != "length":
-                break
-
-            messages.append({
-                "role": "assistant",
-                "content": piece,
-            })
-        except Exception as exc:
-            print(f"长回答自动续写异常：{repr(exc)}")
+        result = _request_text_completion(
+            messages,
+            retries=0,
+            reasoning_effort=reasoning_effort,
+            preferred_provider=current_provider,
+        )
+        if not result.get("ok"):
+            print("长回答自动续写失败：所有可用文本路径均失败")
             break
+
+        piece = str(result.get("content", "") or "").strip()
+        if not piece:
+            break
+
+        content = content.rstrip() + "\n" + piece
+        current_provider = result.get("provider_id") or current_provider
+
+        choice = result.get("choice") or {}
+        if choice.get("finish_reason") != "length":
+            break
+
+        messages.append({
+            "role": "assistant",
+            "content": piece,
+        })
 
     return content.strip()
 
@@ -694,22 +945,10 @@ def _friendly_http_error(status_code):
 
 def ask_ai(messages, retries=2, teaching_context=None):
     """
-    调用 DeepSeek。
+    文本回答优先使用鲁信杯算力，异常时自动回退原 DeepSeek 路径。
 
-    返回：
-        成功：
-        {
-            "ok": True,
-            "reply": "..."
-        }
-
-        失败：
-        {
-            "ok": False,
-            "error": "中文错误提示"
-        }
-
-    默认最多：首次请求 + 2 次自动重试。
+    难度为“困难”时启用 DeepSeek-V4.1-Flash 的 max 思考；
+    简单/中等题保持非思考模式，优先低延迟。
     """
     if ASK_AI_MOCK:
         return _success("""这是一条模拟回复。
@@ -726,161 +965,76 @@ $$
 $$
 """)
 
-    if not API_KEY:
-        print("DeepSeek API 配置错误：未设置 DEEPSEEK_API_KEY")
+    if not (LUXIN_API_KEY or DEEPSEEK_API_KEY):
+        print("AI API 配置错误：LUXIN_API_KEY 与 DEEPSEEK_API_KEY 均未设置")
         return _failure("AI 服务尚未完成配置，请联系管理员。")
 
     clean_messages = _trim_messages(messages)
     if not clean_messages:
         return _failure("没有检测到有效的消息内容。")
 
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-
     system_content = SYSTEM_PROMPT + teaching_prompt(teaching_context)
-
     api_messages = [
         {"role": "system", "content": system_content}
     ] + clean_messages
 
-    data = {
-        "model": "deepseek-v4-flash",
-        "messages": api_messages,
-        "max_tokens": MAX_OUTPUT_TOKENS,
-        # 教学场景以低延迟和稳定输出为优先，显式关闭默认高强度思考。
-        "thinking": {"type": "disabled"},
-        "stream": False
-    }
+    reasoning_effort = _reasoning_effort_for_context(teaching_context)
+    if reasoning_effort == "max":
+        print("检测到困难题：启用 max 思考模式。")
+    elif reasoning_effort == "high":
+        print("检测到中等题：启用 high 思考模式。")
 
-    total_attempts = max(1, retries + 1)
+    result = _request_text_completion(
+        api_messages,
+        retries=retries,
+        reasoning_effort=reasoning_effort,
+    )
+    if not result.get("ok"):
+        return _failure(
+            result.get("error")
+            or "AI 服务暂时不可用，请稍后重试。"
+        )
 
-    for attempt in range(total_attempts):
-        try:
-            print(f"正在调用 DeepSeek API（第 {attempt + 1}/{total_attempts} 次）")
+    choice = result.get("choice") or {}
+    content = str(result.get("content", "") or "").strip()
+    provider_id = result.get("provider_id")
 
-            response = requests.post(
-                API_URL,
-                headers=headers,
-                json=data,
-                timeout=(10, 60)
+    if choice.get("finish_reason") == "length":
+        print("检测到回答达到输出长度上限，自动继续生成。")
+        content = _continue_truncated_answer(
+            api_messages,
+            content,
+            preferred_provider=provider_id,
+            reasoning_effort=reasoning_effort,
+        )
+
+    content = _repair_common_latex_typos(content)
+
+    if _looks_like_broken_math(content):
+        print("检测到 AI 数学格式异常，尝试自动重生成。")
+        regenerated = _regenerate_broken_math_answer(
+            api_messages,
+            content,
+            preferred_provider=provider_id,
+            reasoning_effort=reasoning_effort,
+        )
+
+        if regenerated:
+            content = regenerated
+        else:
+            print(
+                "数学格式自动重生成未成功，"
+                "已降级为可读文本，避免中断当前对话。"
             )
-
-            if response.status_code in RETRYABLE_STATUS:
-                if attempt < total_attempts - 1:
-                    wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
-                    print(
-                        f"DeepSeek 暂时不可用，HTTP {response.status_code}，"
-                        f"{wait_seconds:.1f} 秒后重试"
-                    )
-                    time.sleep(wait_seconds)
-                    continue
-
-                return _failure(
-                    _friendly_http_error(response.status_code)
-                )
-
-            if not response.ok:
-                print(
-                    f"DeepSeek 请求失败：HTTP {response.status_code}；"
-                    f"响应内容：{response.text[:500]}"
-                )
-                return _failure(
-                    _friendly_http_error(response.status_code)
-                )
-
-            try:
-                result = response.json()
-            except ValueError as exc:
-                print(f"DeepSeek 返回内容解析失败：{repr(exc)}")
-                return _failure("AI 服务返回了异常数据，请稍后再试。")
-
-            if "error" in result:
-                print(f"DeepSeek API 返回错误：{result['error']}")
-                return _failure("AI 服务暂时出现异常，请稍后再试。")
-
-            choices = result.get("choices")
-            if not choices:
-                print(f"DeepSeek 返回缺少 choices：{result}")
-                return _failure("AI 服务没有返回有效内容，请重新发送。")
-
-            choice = choices[0]
-            content = choice.get("message", {}).get("content")
+            content = _fallback_math_to_readable_text(content)
             if not content:
                 return _failure("AI 服务没有生成有效回答，请重新发送。")
 
-            if choice.get("finish_reason") == "length":
-                print("检测到回答达到输出长度上限，自动继续生成。")
-                content = _continue_truncated_answer(
-                    api_messages,
-                    content,
-                    headers,
-                )
-
-            content = _repair_common_latex_typos(content)
-
-            if _looks_like_broken_math(content):
-                print(
-                    "检测到 AI 数学格式异常，尝试自动重生成。"
-                )
-
-                regenerated = _regenerate_broken_math_answer(
-                    api_messages,
-                    content
-                )
-
-                if regenerated:
-                    content = regenerated
-                else:
-                    print(
-                        "数学格式自动重生成未成功，"
-                        "已降级为可读文本，避免中断当前对话。"
-                    )
-                    content = _fallback_math_to_readable_text(
-                        content
-                    )
-
-                    if not content:
-                        return _failure(
-                            "AI 服务没有生成有效回答，请重新发送。"
-                        )
-
-            print("DeepSeek API 调用成功")
-            return _success(content)
-
-        except requests.exceptions.Timeout as exc:
-            print(f"DeepSeek 请求超时：{repr(exc)}")
-
-            if attempt < total_attempts - 1:
-                wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
-                print(f"{wait_seconds:.1f} 秒后自动重试")
-                time.sleep(wait_seconds)
-                continue
-
-            return _failure("AI 服务响应时间过长，请稍后重新发送。")
-
-        except requests.exceptions.ConnectionError as exc:
-            print(f"DeepSeek 网络连接异常：{repr(exc)}")
-
-            if attempt < total_attempts - 1:
-                wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
-                print(f"{wait_seconds:.1f} 秒后自动重试")
-                time.sleep(wait_seconds)
-                continue
-
-            return _failure("暂时无法连接 AI 服务，请检查网络后重试。")
-
-        except requests.exceptions.RequestException as exc:
-            print(f"DeepSeek 请求异常：{repr(exc)}")
-            return _failure("AI 服务请求失败，请稍后重试。")
-
-        except Exception as exc:
-            # 详细技术错误仅写服务器日志，不暴露给学生
-            print(f"AI 模块未知异常：{repr(exc)}")
-            return _failure("系统暂时出现异常，请稍后重试。")
-
-    return _failure("AI 服务暂时不可用，请稍后重试。")
+    print(
+        f"AI 调用成功：{result.get('provider_name', '未知路径')} / "
+        f"{result.get('model', '')}"
+    )
+    return _success(content)
 
 def _guess_image_mime(raw):
     """根据文件头判断 DeepSeek Vision 支持的图片 MIME。"""
