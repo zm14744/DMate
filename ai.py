@@ -19,10 +19,16 @@ DEEPSEEK_CHAT_MODEL = (
     or "deepseek-flash"
 ).strip()
 
-# 鲁信杯算力：优先使用。接口按 OpenAI Chat Completions 兼容格式调用。
-# 默认模型使用当前 DeepSeek-V4.1-Flash 的官方模型名 deepseek-flash；
-# 如果鲁信平台控制台给出的模型 ID 不同，可仅覆盖 LUXIN_MODEL_ID，
-# 无需改代码。
+# 鲁信杯算力：优先使用。接口按赛事给出的 OpenAI Chat Completions
+# 兼容格式调用。注意：赛事示例明确把模型写成 YOUR_MODEL_ID，因此这里
+# 不再擅自把官方 DeepSeek 的模型名当作鲁信平台模型 ID。
+#
+# 推荐配置：
+#   LUXIN_API_KEY=...
+#   LUXIN_MODEL_ID=鲁信平台实际显示的模型 ID
+#
+# 如果没有显式配置 LUXIN_MODEL_ID，会尝试一次 /v1/models 自动发现；
+# 发现失败就直接使用原 DeepSeek 兜底，不让鲁信配置拖死聊天。
 LUXIN_API_KEY = (os.environ.get("LUXIN_API_KEY") or "").strip()
 LUXIN_API_URL = (
     os.environ.get(
@@ -31,10 +37,18 @@ LUXIN_API_URL = (
     )
     or "https://www.tokensd.com.cn/v1/chat/completions"
 ).strip()
-LUXIN_CHAT_MODEL = (
-    os.environ.get("LUXIN_MODEL_ID", "deepseek-flash")
-    or "deepseek-flash"
+LUXIN_MODELS_URL = (
+    os.environ.get(
+        "LUXIN_MODELS_URL",
+        "https://www.tokensd.com.cn/v1/models",
+    )
+    or "https://www.tokensd.com.cn/v1/models"
 ).strip()
+LUXIN_CHAT_MODEL = (os.environ.get("LUXIN_MODEL_ID") or "").strip()
+
+_LUXIN_DISCOVERY_ATTEMPTED = False
+_LUXIN_DISCOVERED_MODEL = ""
+_LUXIN_MODEL_WARNING_SHOWN = False
 
 # 兼容原有 Vision 路径：图片识别仍走原来的 DeepSeek 接口，
 # 第二阶段已经稳定的 OCR/Vision 行为不因为接入鲁信算力而改变。
@@ -555,18 +569,140 @@ def _fallback_math_to_readable_text(text):
     return value.strip()
 
 
+def _luxin_model_rank(model_id):
+    """给 /v1/models 返回的模型做保守排序；无法判断时不乱选。"""
+    value = str(model_id or "").strip().lower()
+    if not value:
+        return -1
+
+    score = 0
+    if "deepseek" in value:
+        score += 40
+    if "4.1" in value or "v4.1" in value or "v41" in value:
+        score += 40
+    if "flash" in value:
+        score += 15
+    if "chat" in value:
+        score += 3
+    return score
+
+
+def _discover_luxin_model():
+    """
+    未设置 LUXIN_MODEL_ID 时只自动探测一次。
+
+    赛事示例要求 YOUR_MODEL_ID，但公开示例没有给出具体值。这里优先
+    使用 /v1/models；若接口不支持、鉴权失败或返回多个无法判断的模型，
+    宁可跳过鲁信走原 DeepSeek，也不再猜一个错误模型名反复请求。
+    """
+    global _LUXIN_DISCOVERY_ATTEMPTED
+    global _LUXIN_DISCOVERED_MODEL
+
+    if _LUXIN_DISCOVERY_ATTEMPTED:
+        return _LUXIN_DISCOVERED_MODEL
+
+    _LUXIN_DISCOVERY_ATTEMPTED = True
+    if not LUXIN_API_KEY:
+        return ""
+
+    headers = {"Authorization": f"Bearer {LUXIN_API_KEY}"}
+    try:
+        response = requests.get(
+            LUXIN_MODELS_URL,
+            headers=headers,
+            timeout=(2, 3),
+        )
+    except requests.exceptions.RequestException as exc:
+        print(f"鲁信模型列表访问失败：{type(exc).__name__}")
+        return ""
+    except Exception as exc:
+        print(f"鲁信模型列表探测异常：{type(exc).__name__}")
+        return ""
+
+    if not response.ok:
+        print(
+            "鲁信模型列表不可用："
+            f"HTTP {response.status_code}；请配置 LUXIN_MODEL_ID。"
+        )
+        return ""
+
+    try:
+        payload = response.json()
+    except ValueError:
+        print("鲁信模型列表不是有效 JSON；请配置 LUXIN_MODEL_ID。")
+        return ""
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        print("鲁信模型列表格式未知；请配置 LUXIN_MODEL_ID。")
+        return ""
+
+    ids = []
+    for item in data:
+        if isinstance(item, dict):
+            model_id = str(item.get("id") or "").strip()
+        else:
+            model_id = str(item or "").strip()
+        if model_id and model_id not in ids:
+            ids.append(model_id)
+
+    if not ids:
+        print("鲁信模型列表为空；请配置 LUXIN_MODEL_ID。")
+        return ""
+
+    if len(ids) == 1:
+        _LUXIN_DISCOVERED_MODEL = ids[0]
+    else:
+        ranked = sorted(
+            ((model_id, _luxin_model_rank(model_id)) for model_id in ids),
+            key=lambda pair: pair[1],
+            reverse=True,
+        )
+        best_id, best_score = ranked[0]
+        second_score = ranked[1][1] if len(ranked) > 1 else -1
+        # 只有“明显像 DeepSeek 4.1/Flash”且明显优于其它候选时才自动选。
+        if best_score >= 55 and best_score > second_score:
+            _LUXIN_DISCOVERED_MODEL = best_id
+        else:
+            preview = ", ".join(ids[:8])
+            print(
+                "鲁信返回多个模型但无法安全判断要用哪一个："
+                f"{preview}。请显式配置 LUXIN_MODEL_ID。"
+            )
+            return ""
+
+    print(f"鲁信自动发现模型：{_LUXIN_DISCOVERED_MODEL}")
+    return _LUXIN_DISCOVERED_MODEL
+
+
+def _resolved_luxin_model():
+    configured = str(LUXIN_CHAT_MODEL or "").strip()
+    if configured and configured.upper() != "YOUR_MODEL_ID":
+        return configured
+    return _discover_luxin_model()
+
+
 def _text_provider_configs(preferred_provider=None):
     """返回文本模型调用顺序：鲁信优先，原 DeepSeek 永久保留为兜底。"""
+    global _LUXIN_MODEL_WARNING_SHOWN
     providers = []
 
     if LUXIN_API_KEY:
-        providers.append({
-            "id": "luxin",
-            "name": "鲁信算力",
-            "url": LUXIN_API_URL,
-            "api_key": LUXIN_API_KEY,
-            "model": LUXIN_CHAT_MODEL,
-        })
+        luxin_model = _resolved_luxin_model()
+        if luxin_model:
+            providers.append({
+                "id": "luxin",
+                "name": "鲁信算力",
+                "url": LUXIN_API_URL,
+                "api_key": LUXIN_API_KEY,
+                "model": luxin_model,
+            })
+        elif not _LUXIN_MODEL_WARNING_SHOWN:
+            _LUXIN_MODEL_WARNING_SHOWN = True
+            print(
+                "已配置 LUXIN_API_KEY，但没有可用的鲁信模型 ID。"
+                "请在环境变量中增加 LUXIN_MODEL_ID；当前自动使用原 DeepSeek 兜底。"
+            )
 
     if DEEPSEEK_API_KEY:
         providers.append({
@@ -608,6 +744,21 @@ def _build_text_payload(provider, messages, reasoning_effort="none", max_tokens=
         token_limit = MEDIUM_MAX_OUTPUT_TOKENS
     else:
         token_limit = MAX_OUTPUT_TOKENS
+
+    # 鲁信示例只保证 OpenAI Chat Completions 的基础字段。
+    # 简单请求严格按示例发送，避免第三方网关因为 DeepSeek 私有字段直接 400。
+    if (provider or {}).get("id") == "luxin":
+        payload = {
+            "model": provider["model"],
+            "messages": messages,
+            "stream": False,
+        }
+        # 中等/困难题仍优先尝试赛事网关透传思考控制；若网关不支持，
+        # 当前 provider 会失败并立即切到原 DeepSeek，从而保证 high/max 不缩水。
+        if effort in ("high", "max"):
+            payload["thinking"] = {"type": "enabled"}
+            payload["reasoning_effort"] = effort
+        return payload
 
     payload = {
         "model": provider["model"],
