@@ -1471,12 +1471,24 @@ function hasExplicitExerciseGenerationCue(text) {
         return false;
     }
 
+    // 覆盖“出/来/给/整/弄/安排/生成/考我/刷题”等自然说法。
+    // 这里识别的是“让系统生成一道练习”的动作，不把具体一句话写死。
+    const hasTargetedGeneration = Boolean(
+        /(?:出|生成|来|安排|准备|整|弄|给|考我|考一下|抽).{0,12}(?:题目|题|练习)/.test(value)
+        || /(?:题目|题|练习).{0,8}(?:来一个|来一道|给一个|给一道|出一个|出一道)/.test(value)
+        || /(?:想|要|想要|可以|能不能|帮我|让我).{0,10}(?:做|练|刷|考).{0,16}(?:题目|题|练习)/.test(value)
+    );
+
+    const shortExerciseCommand = Boolean(
+        /^(?:请|麻烦)?(?:给我|帮我)?(?:再|重新|随机|随便)?(?:来|出|给|整|弄|考我|刷)?(?:一|两|二|几|个|道|题|一题|一道|一个){1,4}(?:吧|。|！|!)?$/.test(value)
+        && /(?:一道|一题|题)$/.test(value)
+    );
+
     return Boolean(
-        /(?:出|生成|来|安排|准备).{0,10}(?:题目|题|练习)/.test(value)
-        || /给我(?:来|出|生成)?(?:一|两|二|几|个|道|\d){1,3}.{0,10}(?:题目|题|练习)/.test(value)
+        hasTargetedGeneration
+        || shortExerciseCommand
         || /(?:再来|再出|再给|换)(?:一|两|二|几|个|道|\d){0,3}(?:题目|题|练习)/.test(value)
-        || /(?:想|要|想要|可以|能不能).{0,8}(?:做|练|刷).{0,16}(?:题目|题|练习)/.test(value)
-        || /^(?:请)?给我(?:下一道题|下一题|下一个题)$/.test(value)
+        || /^(?:请|麻烦)?(?:给我|帮我)?(?:下一道题|下一题|下一个题|再来一道|再来一题|换一道|换一题)$/.test(value)
     );
 }
 
@@ -2066,6 +2078,11 @@ function looksLikeActualLearningProblem(message) {
 
     if (message.source === "ocr") {
         return isRecordableOcrQuestionMessage(message);
+    }
+
+    // 出题命令只是控制动作，不是学生提交的一道题。
+    if (isExerciseRequestText(message.text)) {
+        return false;
     }
 
     const text = message.text.trim();
@@ -2672,6 +2689,12 @@ function shouldOfferWrongBookAction(
 
     if (message.role === "user") {
         if (message.isRetestAnswer) {
+            return false;
+        }
+
+        // “出一道题 / 随便来一道 / 给我个困难题”等是命令，
+        // 永远不能出现“记为错题”。
+        if (isExerciseRequestText(message.text)) {
             return false;
         }
 
@@ -7673,6 +7696,13 @@ function attachTeachingSnapshotToLatestQuestion(
             continue;
         }
 
+        // “随便出一道题 / 给我来个难题 / 再来一道”等只是出题命令，
+        // 不是一道可评级的用户题目。即使后端 teaching 带有目标难度，
+        // 也绝不能把这个快照挂到用户命令气泡上。
+        if (isExerciseRequestText(message.text)) {
+            return;
+        }
+
         const question = extractQuestionOnlyFromMessage(
             message
         );
@@ -9399,7 +9429,11 @@ function renderChat() {
 
         const difficultyTeaching = normalizeTeaching(
             message.role === "user"
-                ? message.questionTeaching
+                ? (
+                    isExerciseRequestText(message.text)
+                        ? null
+                        : message.questionTeaching
+                )
                 : (
                     message.generatedExercise
                         ? message.generatedTeaching
@@ -9903,6 +9937,11 @@ function looksLikeFormalStudyQuestionForHistory(
     ).trim();
 
     if (!value) {
+        return false;
+    }
+
+    // 出题请求只负责生成下一道题，本身不进入“题目历史”。
+    if (isExerciseRequestText(value)) {
         return false;
     }
 
