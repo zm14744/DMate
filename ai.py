@@ -625,6 +625,26 @@ def _build_text_payload(provider, messages, reasoning_effort="none", max_tokens=
     return payload
 
 
+
+
+def _provider_request_timeout(provider, reasoning_effort, default_timeout):
+    """
+    鲁信是优先算力，但不能让它的偶发卡顿拖住整个聊天。
+
+    非思考请求（例如“你好”）只给鲁信一个很短的响应窗口；
+    中等/困难题需要真正推理，因此保留更长时间。
+    原 DeepSeek 兜底继续沿用调用方原来的超时设置。
+    """
+    if (provider or {}).get("id") != "luxin":
+        return default_timeout
+
+    effort = str(reasoning_effort or "none").strip().lower()
+    if effort == "max":
+        return (8, 120)
+    if effort == "high":
+        return (6, 60)
+    return (4, 10)
+
 def _request_text_completion(
     messages,
     retries=2,
@@ -651,12 +671,19 @@ def _request_text_completion(
     last_error = None
 
     for provider_index, provider in enumerate(providers):
-        # 鲁信作为外部主路径时最多快速重试一次，然后立即走原路径；
-        # 最后的兜底路径保留原先完整重试次数。
+        # 有后备线路时，优先线路只尝试一次：失败就立即切换，
+        # 避免“你好”这种简单请求因为鲁信卡顿被重复等待。
+        # 最后的兜底线路仍保留原有重试次数。
         is_last = provider_index == len(providers) - 1
         attempts = max(1, retries + 1)
         if not is_last:
-            attempts = min(attempts, 2)
+            attempts = 1
+
+        provider_timeout = _provider_request_timeout(
+            provider,
+            reasoning_effort,
+            timeout,
+        )
 
         payload = _build_text_payload(
             provider,
@@ -685,7 +712,7 @@ def _request_text_completion(
                     provider["url"],
                     headers=headers,
                     json=payload,
-                    timeout=timeout,
+                    timeout=provider_timeout,
                 )
                 last_status = response.status_code
 
@@ -947,8 +974,8 @@ def ask_ai(messages, retries=2, teaching_context=None):
     """
     文本回答优先使用鲁信杯算力，异常时自动回退原 DeepSeek 路径。
 
-    难度为“困难”时启用 DeepSeek-V4.1-Flash 的 max 思考；
-    简单/中等题保持非思考模式，优先低延迟。
+    简单请求关闭思考；中等题使用 high 思考；困难题使用 max 思考。
+    鲁信优先，但简单请求若鲁信短时间无响应会快速回退原 DeepSeek。
     """
     if ASK_AI_MOCK:
         return _success("""这是一条模拟回复。
