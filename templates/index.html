@@ -606,7 +606,7 @@ body {
 
 .wrong-tools {
     display:grid;
-    grid-template-columns:minmax(220px, 1fr) auto auto auto;
+    grid-template-columns:minmax(220px, 1fr) auto auto auto auto;
     gap:8px;
     padding:10px 14px;
     border-bottom:1px solid var(--surface-3);
@@ -2139,6 +2139,97 @@ body[data-appearance-theme="light"] .msg-actions button {
         grid-column:1 / -1;
     }
 }
+
+
+/* 第三阶段：富文本复制。只增强复制层，不改变 Markdown / MathJax 渲染。 */
+.panel-heading-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    margin-bottom:8px;
+}
+
+.panel-heading-row.learning-title {
+    margin-bottom:8px;
+}
+
+.copy-compact,
+.rich-copy-button,
+.graph-side-copy {
+    border:1px solid rgba(148,163,184,.24);
+    border-radius:7px;
+    background:rgba(15,23,42,.28);
+    color:var(--text-secondary);
+    cursor:pointer;
+    font:inherit;
+    line-height:1.35;
+}
+
+.copy-compact {
+    padding:3px 7px;
+    font-size:var(--font-xxs);
+}
+
+.rich-copy-button {
+    padding:3px 8px;
+}
+
+.copy-compact:hover,
+.rich-copy-button:hover,
+.graph-side-copy:hover {
+    background:rgba(15,23,42,.5);
+    color:var(--text-primary);
+}
+
+.rich-copy-surface,
+.msg-content,
+.wrong-card,
+.learning-review-body,
+.graph-summary,
+.graph-detail-body,
+.kg-history-item,
+.kg-history-preview,
+#learningSummary,
+#info {
+    -webkit-user-select:text;
+    user-select:text;
+}
+
+.graph-side-tabs {
+    grid-template-columns:1fr 1fr auto;
+}
+
+.graph-side-copy {
+    padding:8px 9px;
+    white-space:nowrap;
+}
+
+.copy-toast {
+    position:fixed;
+    left:50%;
+    bottom:24px;
+    transform:translateX(-50%);
+    z-index:99999;
+    padding:8px 12px;
+    border:1px solid rgba(148,163,184,.28);
+    border-radius:9px;
+    background:rgba(15,23,42,.94);
+    color:#f8fafc;
+    box-shadow:0 10px 30px rgba(0,0,0,.24);
+    font-size:13px;
+    pointer-events:none;
+}
+
+@media (max-width:700px) {
+    .graph-side-tabs {
+        grid-template-columns:1fr 1fr;
+    }
+
+    .graph-side-copy {
+        grid-column:1 / -1;
+    }
+}
 </style>
 
 <script>
@@ -2189,11 +2280,17 @@ window.MathJax = {
 </div>
 
 <div class="right">
-    <div style="margin-bottom:8px;">会话信息</div>
-    <div id="info" class="small"></div>
+    <div class="panel-heading-row">
+        <div>会话信息</div>
+        <button id="infoCopyBtn" class="copy-compact" type="button">复制</button>
+    </div>
+    <div id="info" class="small rich-copy-surface"></div>
 
     <div class="learning-panel">
-        <div class="learning-title">学习记录</div>
+        <div class="panel-heading-row learning-title">
+            <div>学习记录</div>
+            <button id="learningSummaryCopyBtn" class="copy-compact" type="button">复制</button>
+        </div>
         <div id="learningSummary" class="learning-summary"></div>
 
         <div class="learning-actions">
@@ -2340,6 +2437,7 @@ window.MathJax = {
         <div id="learningReviewBody" class="learning-review-body"></div>
 
         <div class="learning-review-actions">
+            <button id="learningReviewCopy" type="button">复制回顾</button>
             <button id="learningReviewDone" type="button">关闭</button>
         </div>
     </div>
@@ -2373,6 +2471,7 @@ window.MathJax = {
                 <option value="mistakes">错误次数最多</option>
                 <option value="oldest">最早更新</option>
             </select>
+            <button id="wrongCopyBtn" type="button" title="复制当前筛选结果，尽量保留公式和富文本格式">复制当前</button>
             <button id="wrongPdfBtn" type="button" title="导出当前筛选结果为 PDF">导出 PDF</button>
             <button id="wrongClearCompletedBtn" type="button" class="danger-tool">清理已完成</button>
         </div>
@@ -2470,6 +2569,7 @@ window.MathJax = {
                 <select id="knowledgeGraphCategory" aria-label="知识图谱分类"></select>
                 <button id="knowledgeGraphScopeBtn" type="button">查看本对话题目</button>
                 <button id="knowledgeGraphFocusBtn" type="button">查看完整模块</button>
+                <button id="knowledgeGraphCopyBtn" type="button" title="复制当前图谱；支持时优先写入高清图片">复制图谱</button>
             </div>
 
             <div class="graph-legend">
@@ -2493,6 +2593,7 @@ window.MathJax = {
                     <button id="knowledgeGraphHistoryTab" type="button" class="graph-side-tab">
                         题目历史
                     </button>
+                    <button id="knowledgeGraphSideCopyBtn" type="button" class="graph-side-copy">复制当前</button>
                 </div>
 
                 <div id="knowledgeGraphDetailWrap" class="graph-side-page">
@@ -2511,7 +2612,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=ocr-request-phase1-20260928"></script>
+<script src="/static/script.js?v=phase3-rich-copy-20260930"></script>
 
 </body>
 </html>
