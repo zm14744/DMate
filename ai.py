@@ -7,10 +7,28 @@ import json
 import re
 import io
 import math
+import threading
 
 from PIL import Image, ImageOps
 
 from teaching import teaching_prompt
+
+
+def _env_flag(name, default=True):
+    value = os.environ.get(name)
+    if value is None:
+        return bool(default)
+    return str(value).strip().lower() not in {
+        "0", "false", "no", "off", "disable", "disabled"
+    }
+
+
+def _env_float(name, default, minimum, maximum):
+    try:
+        value = float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        value = float(default)
+    return max(float(minimum), min(float(maximum), value))
 
 DEEPSEEK_API_KEY = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
 DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
@@ -45,6 +63,40 @@ LUXIN_MODELS_URL = (
     or "https://www.tokensd.com.cn/v1/models"
 ).strip()
 LUXIN_CHAT_MODEL = (os.environ.get("LUXIN_MODEL_ID") or "").strip()
+
+# 鲁信总开关与熔断。海外部署可以显式设置 LUXIN_ENABLED=0，
+# 此时请求路径与没有接鲁信时一样，完全不增加等待。
+LUXIN_ENABLED = _env_flag("LUXIN_ENABLED", True)
+LUXIN_CIRCUIT_BREAKER = _env_flag("LUXIN_CIRCUIT_BREAKER", True)
+LUXIN_CIRCUIT_COOLDOWN = _env_float(
+    "LUXIN_CIRCUIT_COOLDOWN_SECONDS", 600, 30, 3600
+)
+LUXIN_PROBE_CONNECT_TIMEOUT = _env_float(
+    "LUXIN_PROBE_CONNECT_TIMEOUT", 1.5, 0.3, 5
+)
+LUXIN_PROBE_READ_TIMEOUT = _env_float(
+    "LUXIN_PROBE_READ_TIMEOUT", 2.5, 0.5, 8
+)
+
+# 探测直接打到同一个 API 路径（使用 GET，不产生模型调用）。
+# 即使返回 401/405，也说明海外服务器已经成功连到该 API 网关；
+# 若网络层被国内访问限制拦住，则会在后台超时并打开熔断。
+_LUXIN_DEFAULT_HEALTH_URL = LUXIN_API_URL
+LUXIN_HEALTH_URL = (
+    os.environ.get("LUXIN_HEALTH_URL")
+    or _LUXIN_DEFAULT_HEALTH_URL
+).strip()
+
+_LUXIN_BREAKER_LOCK = threading.Lock()
+_LUXIN_BREAKER_STATE = (
+    "disabled"
+    if (not LUXIN_ENABLED or not LUXIN_API_KEY)
+    else ("closed" if not LUXIN_CIRCUIT_BREAKER else "unknown")
+)
+_LUXIN_BREAKER_OPEN_UNTIL = 0.0
+_LUXIN_PROBE_RUNNING = False
+_LUXIN_LAST_BREAKER_REASON = ""
+_LUXIN_SKIP_LOGGED = False
 
 _LUXIN_DISCOVERY_ATTEMPTED = False
 _LUXIN_DISCOVERED_MODEL = ""
@@ -682,12 +734,174 @@ def _resolved_luxin_model():
     return _discover_luxin_model()
 
 
+def _luxin_breaker_open(reason, cooldown=None):
+    """打开鲁信熔断；之后用户请求会直接走 DeepSeek，不等待鲁信。"""
+    global _LUXIN_BREAKER_STATE
+    global _LUXIN_BREAKER_OPEN_UNTIL
+    global _LUXIN_LAST_BREAKER_REASON
+    global _LUXIN_PROBE_RUNNING
+    global _LUXIN_SKIP_LOGGED
+
+    if not LUXIN_CIRCUIT_BREAKER:
+        return
+
+    wait_seconds = float(cooldown or LUXIN_CIRCUIT_COOLDOWN)
+    with _LUXIN_BREAKER_LOCK:
+        _LUXIN_BREAKER_STATE = "open"
+        _LUXIN_BREAKER_OPEN_UNTIL = time.monotonic() + max(1.0, wait_seconds)
+        _LUXIN_LAST_BREAKER_REASON = str(reason or "鲁信不可用")
+        _LUXIN_PROBE_RUNNING = False
+        _LUXIN_SKIP_LOGGED = False
+
+    print(
+        "鲁信熔断已开启："
+        f"{_LUXIN_LAST_BREAKER_REASON}；"
+        f"未来 {int(wait_seconds)} 秒用户请求直接走 DeepSeek。"
+    )
+
+
+def _luxin_breaker_close():
+    """后台探测或真实请求成功后恢复鲁信主线路。"""
+    global _LUXIN_BREAKER_STATE
+    global _LUXIN_BREAKER_OPEN_UNTIL
+    global _LUXIN_LAST_BREAKER_REASON
+    global _LUXIN_PROBE_RUNNING
+    global _LUXIN_SKIP_LOGGED
+
+    with _LUXIN_BREAKER_LOCK:
+        was_closed = _LUXIN_BREAKER_STATE == "closed"
+        _LUXIN_BREAKER_STATE = "closed"
+        _LUXIN_BREAKER_OPEN_UNTIL = 0.0
+        _LUXIN_LAST_BREAKER_REASON = ""
+        _LUXIN_PROBE_RUNNING = False
+        _LUXIN_SKIP_LOGGED = False
+
+    if not was_closed:
+        print("鲁信后台探测成功：熔断关闭，后续请求恢复优先使用鲁信。")
+
+
+def _luxin_probe_worker():
+    """后台探路。整个函数运行在 daemon 线程中，不占用用户请求时间。"""
+    global _LUXIN_PROBE_RUNNING
+
+    try:
+        # 这里只验证“服务器能不能连到鲁信站点”。任何 HTTP 状态码都说明
+        # TCP/TLS 已经建立；真正的鉴权、模型权限仍由正式请求验证。
+        requests.get(
+            LUXIN_HEALTH_URL,
+            timeout=(LUXIN_PROBE_CONNECT_TIMEOUT, LUXIN_PROBE_READ_TIMEOUT),
+            allow_redirects=False,
+        )
+
+        # 若没有显式模型 ID，把模型发现也放在后台完成，避免第一条聊天消息
+        # 为 /v1/models 额外等待。
+        if not str(LUXIN_CHAT_MODEL or "").strip():
+            model = _discover_luxin_model()
+            if not model:
+                _luxin_breaker_open("没有可用的鲁信模型 ID")
+                return
+
+        _luxin_breaker_close()
+
+    except requests.exceptions.RequestException as exc:
+        _luxin_breaker_open(
+            f"后台连接探测失败（{type(exc).__name__}）"
+        )
+    except Exception as exc:
+        _luxin_breaker_open(
+            f"后台探测异常（{type(exc).__name__}）"
+        )
+    finally:
+        with _LUXIN_BREAKER_LOCK:
+            _LUXIN_PROBE_RUNNING = False
+
+
+def _schedule_luxin_probe(force=False):
+    """需要时启动一次后台探测；绝不在当前聊天请求里同步等待。"""
+    global _LUXIN_BREAKER_STATE
+    global _LUXIN_PROBE_RUNNING
+
+    if not LUXIN_ENABLED or not LUXIN_API_KEY or not LUXIN_CIRCUIT_BREAKER:
+        return False
+
+    now = time.monotonic()
+    with _LUXIN_BREAKER_LOCK:
+        if _LUXIN_PROBE_RUNNING:
+            return False
+        if not force:
+            if _LUXIN_BREAKER_STATE == "closed":
+                return False
+            if (
+                _LUXIN_BREAKER_STATE == "open"
+                and now < _LUXIN_BREAKER_OPEN_UNTIL
+            ):
+                return False
+
+        _LUXIN_BREAKER_STATE = "probing"
+        _LUXIN_PROBE_RUNNING = True
+
+    threading.Thread(
+        target=_luxin_probe_worker,
+        name="luxin-health-probe",
+        daemon=True,
+    ).start()
+    return True
+
+
+def _luxin_ready_for_user_request():
+    """是否允许本次用户请求走鲁信；未知/探测/熔断状态一律直接跳过。"""
+    global _LUXIN_SKIP_LOGGED
+
+    if not LUXIN_ENABLED or not LUXIN_API_KEY:
+        return False
+    if not LUXIN_CIRCUIT_BREAKER:
+        return True
+
+    now = time.monotonic()
+    should_probe = False
+    with _LUXIN_BREAKER_LOCK:
+        state = _LUXIN_BREAKER_STATE
+        if state == "closed":
+            return True
+        if state == "unknown":
+            should_probe = True
+        elif state == "open" and now >= _LUXIN_BREAKER_OPEN_UNTIL:
+            should_probe = True
+
+        if not _LUXIN_SKIP_LOGGED:
+            _LUXIN_SKIP_LOGGED = True
+            if state == "open":
+                print("鲁信处于熔断冷却期：当前请求直接走 DeepSeek，不等待。")
+            else:
+                print("鲁信正在后台探测：当前请求直接走 DeepSeek，不等待。")
+
+    if should_probe:
+        _schedule_luxin_probe()
+    return False
+
+
+def _luxin_response_should_trip(status_code, reasoning_effort):
+    """判断 HTTP 错误是否应让整个鲁信线路进入熔断。"""
+    try:
+        status = int(status_code)
+    except (TypeError, ValueError):
+        return True
+
+    # 中等/困难的 400 可能只是赛事网关不认识 thinking 参数。
+    # 这种情况仍允许简单请求继续吃鲁信额度，不全局熔断。
+    effort = str(reasoning_effort or "none").strip().lower()
+    if status == 400 and effort in ("high", "max"):
+        return False
+
+    return status in {400, 401, 403, 404, 408, 409, 429} or status >= 500
+
+
 def _text_provider_configs(preferred_provider=None):
     """返回文本模型调用顺序：鲁信优先，原 DeepSeek 永久保留为兜底。"""
     global _LUXIN_MODEL_WARNING_SHOWN
     providers = []
 
-    if LUXIN_API_KEY:
+    if LUXIN_API_KEY and _luxin_ready_for_user_request():
         luxin_model = _resolved_luxin_model()
         if luxin_model:
             providers.append({
@@ -719,6 +933,11 @@ def _text_provider_configs(preferred_provider=None):
         )
 
     return providers
+
+
+# 模块加载完成后立即后台探测一次。不会阻塞启动，也不会让第一条聊天消息等待。
+if LUXIN_ENABLED and LUXIN_API_KEY and LUXIN_CIRCUIT_BREAKER:
+    _schedule_luxin_probe(force=True)
 
 
 def _reasoning_effort_for_context(teaching_context):
@@ -877,6 +1096,15 @@ def _request_text_completion(
                         )
                         time.sleep(wait_seconds)
                         continue
+                    if (
+                        provider.get("id") == "luxin"
+                        and _luxin_response_should_trip(
+                            response.status_code, reasoning_effort
+                        )
+                    ):
+                        _luxin_breaker_open(
+                            f"HTTP {response.status_code}"
+                        )
                     break
 
                 if not response.ok:
@@ -885,6 +1113,15 @@ def _request_text_completion(
                         f"HTTP {response.status_code}；"
                         f"响应内容：{response.text[:500]}"
                     )
+                    if (
+                        provider.get("id") == "luxin"
+                        and _luxin_response_should_trip(
+                            response.status_code, reasoning_effort
+                        )
+                    ):
+                        _luxin_breaker_open(
+                            f"HTTP {response.status_code}"
+                        )
                     break
 
                 try:
@@ -894,6 +1131,8 @@ def _request_text_completion(
                     print(
                         f"{provider['name']} 返回内容解析失败：{repr(exc)}"
                     )
+                    if provider.get("id") == "luxin":
+                        _luxin_breaker_open("返回内容不是有效 JSON")
                     break
 
                 if "error" in result:
@@ -901,6 +1140,8 @@ def _request_text_completion(
                         f"{provider['name']} API 返回错误："
                         f"{result['error']}"
                     )
+                    if provider.get("id") == "luxin":
+                        _luxin_breaker_open("API 返回 error")
                     break
 
                 choices = result.get("choices")
@@ -908,6 +1149,8 @@ def _request_text_completion(
                     print(
                         f"{provider['name']} 返回缺少 choices：{result}"
                     )
+                    if provider.get("id") == "luxin":
+                        _luxin_breaker_open("返回缺少 choices")
                     break
 
                 choice = choices[0] if isinstance(choices[0], dict) else {}
@@ -925,7 +1168,12 @@ def _request_text_completion(
                         f"reasoning_len="
                         f"{len(reasoning_content) if isinstance(reasoning_content, str) else 0}"
                     )
+                    if provider.get("id") == "luxin":
+                        _luxin_breaker_open("返回正文为空")
                     break
+
+                if provider.get("id") == "luxin":
+                    _luxin_breaker_close()
 
                 return {
                     "ok": True,
@@ -939,6 +1187,8 @@ def _request_text_completion(
             except requests.exceptions.Timeout as exc:
                 last_error = exc
                 print(f"{provider['name']} 请求超时：{repr(exc)}")
+                if provider.get("id") == "luxin":
+                    _luxin_breaker_open("请求超时")
                 if attempt < attempts - 1:
                     wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
                     time.sleep(wait_seconds)
@@ -948,6 +1198,8 @@ def _request_text_completion(
             except requests.exceptions.ConnectionError as exc:
                 last_error = exc
                 print(f"{provider['name']} 网络连接异常：{repr(exc)}")
+                if provider.get("id") == "luxin":
+                    _luxin_breaker_open("网络连接异常")
                 if attempt < attempts - 1:
                     wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
                     time.sleep(wait_seconds)
@@ -957,11 +1209,19 @@ def _request_text_completion(
             except requests.exceptions.RequestException as exc:
                 last_error = exc
                 print(f"{provider['name']} 请求异常：{repr(exc)}")
+                if provider.get("id") == "luxin":
+                    _luxin_breaker_open(
+                        f"请求异常（{type(exc).__name__}）"
+                    )
                 break
 
             except Exception as exc:
                 last_error = exc
                 print(f"{provider['name']} 未知异常：{repr(exc)}")
+                if provider.get("id") == "luxin":
+                    _luxin_breaker_open(
+                        f"未知异常（{type(exc).__name__}）"
+                    )
                 break
 
         if provider_index < len(providers) - 1:
