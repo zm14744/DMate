@@ -131,7 +131,7 @@ SYSTEM_PROMPT = r"""你是离散数学智能辅学系统中的教学助手。
 # 图像理解模型：独立读取题干并解析图形结构，不直接解题。
 VISION_MODEL = os.environ.get(
     "DEEPSEEK_VISION_MODEL",
-    "deepseek-v4-flash-vision-exp"
+    "deepseek-flash"
 )
 VISION_MAX_OUTPUT_TOKENS = 3000
 VISION_ENABLED = os.environ.get(
