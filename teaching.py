@@ -483,47 +483,44 @@ def _contains_any(text, patterns):
 
 def _looks_like_exercise_request_text(text):
     """
-    识别“请出一道……题/题目/练习”这类自然表达。
-    只匹配短、明确的出题请求，避免把长篇讨论里的“题目”误判成出题。
+    识别自然语言中的“让系统生成练习题”请求。
+    覆盖出/生成/来/给/整/弄/安排/考我/刷题等常见说法，
+    但仍限制为短请求，避免长篇讨论里偶然出现“题目”而误触发。
     """
     value = str(text or "").strip()
     value = re.sub(r"\s+", "", value)
 
-    if (
-        not value
-        or len(value) > 100
-        or re.search(r"^(?:不要|别|不用).{0,12}(?:出题|生成题|来题)", value)
+    if not value or len(value) > 140:
+        return False
+
+    if re.search(
+        r"^(?:不要|别|不用|无需).{0,18}(?:出|生成|来|给|整|弄).{0,8}(?:题目|题|练习)",
+        value,
     ):
         return False
 
-    patterns = (
-        r"^(?:请|麻烦|能不能|可以)?"
-        r"(?:再|重新|随机|随便)?"
-        r"(?:给我|帮我)?"
-        r"(?:出|生成|来)"
-        r"(?:一道|一题|一个|几道|几题|几个)?"
-        r"[^，。！？!?]{0,32}"
-        r"(?:题目|题|练习)"
-        r"(?:吧|。|！|!)?$",
+    targeted = bool(re.search(
+        r"(?:出|生成|来|安排|准备|整|弄|给|考我|考一下|抽).{0,12}(?:题目|题|练习)"
+        r"|(?:题目|题|练习).{0,8}(?:来一个|来一道|给一个|给一道|出一个|出一道)"
+        r"|(?:想|要|想要|可以|能不能|帮我|让我).{0,10}(?:做|练|刷|考).{0,16}(?:题目|题|练习)",
+        value,
+    ))
 
-        r"^(?:请|麻烦|能不能|可以)?"
-        r"(?:再|重新|随机|随便)?"
-        r"(?:给我|给个|来个)"
-        r"(?:一道|一题|一个)?"
-        r"[^，。！？!?]{0,32}"
-        r"(?:题目|题|练习)"
-        r"(?:吧|。|！|!)?$",
-
-        r"^(?:请|麻烦|能不能|可以)?"
-        r"(?:给我)?"
-        r"(?:出题|来一道|再来一道|生成练习|生成题目|练习一下)"
-        r"(?:吧|。|！|!)?$",
+    short_command = bool(
+        re.search(
+            r"^(?:请|麻烦)?(?:给我|帮我)?(?:再|重新|随机|随便)?"
+            r"(?:来|出|给|整|弄|考我|刷)?(?:一道|一题|一个题)(?:吧|。|！|!)?$",
+            value,
+        )
     )
 
-    return any(
-        re.search(pattern, value) is not None
-        for pattern in patterns
-    )
+    repeat = bool(re.search(
+        r"^(?:请|麻烦)?(?:给我|帮我)?(?:下一道题|下一题|下一个题|"
+        r"再来一道|再来一题|换一道题|换一个题|换一道|换一题)(?:吧|。|！|!)?$",
+        value,
+    ))
+
+    return targeted or short_command or repeat
 
 
 def _looks_like_generated_exercise_text(text):
@@ -1565,12 +1562,33 @@ def teaching_prompt(context):
     input_source = context.get("input_source") or "文本输入"
     prerequisite_points = context.get("prerequisite_points") or []
     knowledge_path = context.get("knowledge_path") or []
+    difficulty = context.get("difficulty") if context.get("difficulty") in ("简单", "中等", "困难") else ""
+    exercise_target_difficulty = (
+        context.get("exercise_target_difficulty")
+        if context.get("exercise_target_difficulty") in ("简单", "中等", "困难")
+        else (difficulty or "中等")
+    )
 
     points_text = "、".join(points) if points else "暂未可靠识别"
     focus_text = "、".join(focus_points) if focus_points else "暂未识别出突出难点"
     related_text = "、".join(related) if related else "无"
     prerequisites_text = "、".join(prerequisite_points) if prerequisite_points else "无明确前置知识"
     path_text = " → ".join(knowledge_path) if knowledge_path else "暂无"
+
+    exercise_difficulty_instruction = {
+        "简单": (
+            "目标难度严格为简单：只考一个核心知识点，题意直接，通常1到2个关键步骤即可完成；"
+            "不要叠加多个高阶考点，不要故意增加繁琐计算。"
+        ),
+        "中等": (
+            "目标难度严格为中等：围绕1到2个核心知识点，安排正常的多步判断或计算，通常控制在1到2个小问；"
+            "可以有少量综合，但不要同时堆叠3个以上独立任务，不要叠加证明、复杂构造和多个高阶考点。"
+        ),
+        "困难": (
+            "目标难度严格为困难：允许多步推理、结构判断或知识点组合，体现明显挑战性；"
+            "但必须仍在当前离散数学知识范围内，不用偏题怪题制造假难度。"
+        ),
+    }[exercise_target_difficulty]
 
     mode_instruction = {
         "hint": (
@@ -1585,6 +1603,7 @@ def teaching_prompt(context):
         ),
         "exercise": (
             "学生要求生成练习。用户可见部分必须严格只包含题目本身。"
+            f"本次练习目标难度为{exercise_target_difficulty}。{exercise_difficulty_instruction}"
             "如果请求附有【当前指向题目】，以这道题作为同知识点练习的唯一参照，"
             "保持其核心考点，变换条件或数值；不要取用会话里另一道题的考点，也不要回答原题。"
             "固定使用“【题目】”作为题干标题；标题前不要写“好的、给你一道题”等开场白。"
