@@ -7062,6 +7062,38 @@ function applyClipboardRichStyles(root) {
 
     root.querySelectorAll("h1,h2,h3,h4").forEach(heading => {
         heading.style.margin = "10px 0 6px";
+        heading.style.fontWeight = "700";
+    });
+
+    root.querySelectorAll("p").forEach(paragraph => {
+        paragraph.style.margin = "0 0 8px";
+    });
+
+    root.querySelectorAll("ul,ol").forEach(list => {
+        list.style.paddingLeft = "24px";
+        list.style.margin = "6px 0 10px";
+    });
+
+    root.querySelectorAll("li").forEach(item => {
+        item.style.margin = "2px 0";
+    });
+
+    root.querySelectorAll("strong,b").forEach(node => {
+        node.style.fontWeight = "700";
+    });
+
+    root.querySelectorAll("em,i").forEach(node => {
+        node.style.fontStyle = "italic";
+    });
+
+    root.querySelectorAll("a").forEach(link => {
+        link.style.textDecoration = "underline";
+    });
+
+    root.querySelectorAll("hr").forEach(rule => {
+        rule.style.border = "0";
+        rule.style.borderTop = "1px solid #cbd5e1";
+        rule.style.margin = "10px 0";
     });
 }
 
@@ -7262,6 +7294,43 @@ async function copyKnowledgeGraphVisual() {
     return ok;
 }
 
+function selectionNodeElement(node) {
+    if (node instanceof Element) return node;
+    return node?.parentElement || null;
+}
+
+function cloneSelectionContentsForRichCopy(selection) {
+    if (!selection || selection.rangeCount < 1) {
+        return null;
+    }
+
+    const sourceRange = selection.getRangeAt(0);
+    const range = sourceRange.cloneRange();
+
+    // MathJax 的 SVG 内部由大量 path/use 节点组成。浏览器框选如果刚好
+    // 从公式内部开始或在公式内部结束，Range.cloneContents() 可能只复制
+    // 半个 SVG，粘贴后就会丢公式。只要选择边界碰到公式，就把该公式
+    // 扩展成完整 mjx-container；普通文字边界保持用户原来的精确选择。
+    const startMath = selectionNodeElement(range.startContainer)
+        ?.closest?.("mjx-container");
+    const endMath = selectionNodeElement(range.endContainer)
+        ?.closest?.("mjx-container");
+
+    try {
+        if (startMath && range.intersectsNode(startMath)) {
+            range.setStartBefore(startMath);
+        }
+        if (endMath && range.intersectsNode(endMath)) {
+            range.setEndAfter(endMath);
+        }
+    } catch (error) {
+        console.warn("框选公式边界扩展失败，使用原始选择：", error);
+        return sourceRange.cloneContents();
+    }
+
+    return range.cloneContents();
+}
+
 function installRichSelectionCopy() {
     document.addEventListener("copy", event => {
         const target = event.target;
@@ -7277,7 +7346,9 @@ function installRichSelectionCopy() {
             return;
         }
 
-        const fragment = selection.getRangeAt(0).cloneContents();
+        // 这里专门覆盖用户截图中的使用方式：鼠标直接框选已经渲染好的
+        // Markdown / MathJax 内容，再按 Ctrl+C、右键复制或浏览器迷你菜单复制。
+        const fragment = cloneSelectionContentsForRichCopy(selection);
         if (!fragment || !fragment.childNodes.length) return;
 
         const payload = buildClipboardPayload(fragment);
