@@ -260,39 +260,38 @@ def home():
 
 
 def _looks_like_exercise_request(text):
-    value = str(text or "").strip()
-    value = re.sub(r"\s+", "", value)
+    """后端兜底识别自然语言出题请求，不依赖某一句固定说法。"""
+    value = re.sub(r"\s+", "", str(text or "").strip())
 
-    if not value or len(value) > 120:
+    if not value or len(value) > 140:
         return False
 
     if re.search(
-        r"^(?:不要|别|不用|无需).{0,18}(?:出|生成|来|给).{0,8}(?:题目|题|练习)",
-        value
+        r"^(?:不要|别|不用|无需).{0,18}(?:出|生成|来|给|整|弄).{0,8}(?:题目|题|练习)",
+        value,
     ):
         return False
 
-    has_generate_action = bool(
-        re.search(r"(?:出|生成|来|给我|给个|来个|安排|准备)", value)
-    )
-    has_exercise_target = bool(
-        re.search(r"(?:题目|题|练习)", value)
-    )
-    wants_practice = bool(
-        re.search(
-            r"(?:想|要|想要|可以|能不能).{0,8}(?:做|练|刷).{0,16}(?:题目|题|练习)",
-            value
-        )
-    )
-    short_repeat = bool(
-        re.search(r"(?:再来一个|再来一道|换一道|换一题|下一题)$", value)
-    )
+    targeted = bool(re.search(
+        r"(?:出|生成|来|安排|准备|整|弄|给|考我|考一下|抽).{0,12}(?:题目|题|练习)"
+        r"|(?:题目|题|练习).{0,8}(?:来一个|来一道|给一个|给一道|出一个|出一道)"
+        r"|(?:想|要|想要|可以|能不能|帮我|让我).{0,10}(?:做|练|刷|考).{0,16}(?:题目|题|练习)",
+        value,
+    ))
 
-    return bool(
-        (has_generate_action and has_exercise_target)
-        or wants_practice
-        or short_repeat
-    )
+    short_command = bool(re.search(
+        r"^(?:请|麻烦)?(?:给我|帮我)?(?:再|重新|随机|随便)?"
+        r"(?:来|出|给|整|弄|考我|刷)?(?:一道|一题|一个题)(?:吧|。|！|!)?$",
+        value,
+    ))
+
+    repeat = bool(re.search(
+        r"^(?:请|麻烦)?(?:给我|帮我)?(?:下一道题|下一题|下一个题|"
+        r"再来一道|再来一题|换一道题|换一个题|换一道|换一题)(?:吧|。|！|!)?$",
+        value,
+    ))
+
+    return targeted or short_command or repeat
 
 
 _EXERCISE_ANSWER_PATTERN = re.compile(
@@ -498,6 +497,56 @@ def _clean_answer_only(text):
     return value[:cut_index].strip()
 
 
+def _requested_exercise_difficulty(text):
+    """
+    从自然语言出题请求中读取三档目标难度。
+    返回值严格只有：简单 / 中等 / 困难 / 空串。
+    """
+    value = re.sub(r"\s+", "", str(text or "")).lower()
+    if not value:
+        return ""
+
+    matches = []
+
+    # “别太难 / 不要太简单”表达的是希望回到常规中档。
+    for pattern in (
+        r"不要太难", r"别太难", r"不用太难", r"别那么难", r"不要那么难",
+        r"不要太简单", r"别太简单", r"不用太简单", r"正常点", r"普通点",
+    ):
+        for match in re.finditer(pattern, value):
+            matches.append((match.start(), "中等"))
+
+    patterns = (
+        ("困难", (
+            r"最高难度", r"最难", r"困难", r"高难", r"挑战题", r"难题",
+            r"难度高", r"有难度", r"难一点", r"难一些", r"难点儿", r"复杂一点",
+        )),
+        ("中等", (
+            r"中等难度", r"中等", r"适中", r"普通难度", r"正常难度",
+            r"一般难度", r"常规难度", r"适中一点", r"一般点",
+        )),
+        ("简单", (
+            r"低难度", r"简单", r"基础", r"入门", r"容易", r"轻松",
+            r"简单一点", r"简单一些", r"容易一点", r"容易些", r"基础一点",
+        )),
+    )
+
+    for difficulty, expressions in patterns:
+        for expression in expressions:
+            for match in re.finditer(expression, value):
+                prefix = value[max(0, match.start() - 6):match.start()]
+                if re.search(r"(?:不要|别|不用|无需|不想要|不要太|别太)$", prefix):
+                    continue
+                matches.append((match.start(), difficulty))
+
+    if not matches:
+        return ""
+
+    # 若一句话先否定一种难度、后明确指定另一种，以最后的明确表达为准。
+    matches.sort(key=lambda item: item[0])
+    return matches[-1][1]
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     ip = _get_client_ip()
@@ -566,6 +615,16 @@ def chat():
             "error": "没有检测到有效消息内容。"
         }), 400
 
+    latest_user_before_reference = next(
+        (item for item in reversed(cleaned) if item["role"] == "user"),
+        None,
+    )
+    latest_action_for_exercise = extract_current_request(
+        latest_user_before_reference["content"]
+        if latest_user_before_reference
+        else ""
+    )
+
     # 同知识点出题的参照题由前端显式提交。只接收题干，分类由后端重新计算。
     reference = data.get("exercise_reference")
     reference_teaching = None
@@ -590,13 +649,41 @@ def chat():
 
     teaching = analyze_messages(cleaned)
 
-    # 前端明确声明本轮是“出题”时，模式以该结构化信号为准，
-    # 不再依赖自然语言分类是否恰好命中。这样 AI 一定收到练习出题提示词。
-    if client_requires_exercise:
+    # 双保险：前端 request_kind 是强信号，但后端仍独立理解自然语言。
+    # 因此用户换成“随便来一道 / 整个难题 / 考我一道”等说法时，
+    # 即使前端某次没有命中，也不会退回普通聊天模式。
+    server_detected_exercise = _looks_like_exercise_request(
+        latest_action_for_exercise
+    )
+    effective_exercise_request = bool(
+        client_requires_exercise
+        or (teaching or {}).get("mode") == "exercise"
+        or server_detected_exercise
+    )
+
+    if effective_exercise_request:
         teaching = dict(reference_teaching or teaching or {})
+        requested_difficulty = _requested_exercise_difficulty(
+            latest_action_for_exercise
+        )
+
+        # 用户明确指定难度时严格按指定值；
+        # “照这题再出一道”且未指定时继承参照题；
+        # 独立的“出个题”默认中等，避免无条件生成困难题。
+        if requested_difficulty:
+            exercise_target_difficulty = requested_difficulty
+        elif reference_teaching and reference_teaching.get("difficulty") in (
+            "简单", "中等", "困难"
+        ):
+            exercise_target_difficulty = reference_teaching["difficulty"]
+        else:
+            exercise_target_difficulty = "中等"
+
         teaching["mode"] = "exercise"
         teaching["mode_label"] = "练习出题"
         teaching["question_type"] = teaching.get("question_type") or "出题请求"
+        teaching["difficulty"] = exercise_target_difficulty
+        teaching["exercise_target_difficulty"] = exercise_target_difficulty
 
     try:
         result = ask_ai(
@@ -639,7 +726,7 @@ def chat():
                 break
 
         is_exercise_request = (
-            client_requires_exercise
+            effective_exercise_request
             or teaching.get("mode") == "exercise"
             or _looks_like_exercise_request(
                 latest_user_text
@@ -701,7 +788,108 @@ def chat():
                         "teaching": teaching,
                     }), 502
 
-            # 只有题干和题目分类都完成登记后，才把题目展示给前端。
+            # 生成后再按实际题干验一次难度。默认“随便出一道”目标就是中等；
+            # 若模型偶尔生成成简单/困难，自动重生成，不能把偏离目标的题直接展示。
+            target_difficulty = teaching.get("exercise_target_difficulty")
+            actual_difficulty = generated_teaching.get("difficulty")
+
+            if (
+                target_difficulty in ("简单", "中等", "困难")
+                and actual_difficulty in ("简单", "中等", "困难")
+                and actual_difficulty != target_difficulty
+            ):
+                matched_difficulty = False
+
+                for retry_index in range(2):
+                    retry_messages = list(cleaned)
+                    retry_messages.append({
+                        "role": "user",
+                        "content": (
+                            "系统校验发现刚才生成题的实际难度与目标难度不一致。"
+                            f"请重新生成一道严格属于‘{target_difficulty}’难度的题。"
+                            "保持原来的知识点/参照题要求，但调整步骤数量、综合程度和计算量。"
+                            "仍然严格遵守系统规定的【题目】与隐藏答案格式，不要解释这次重生成。"
+                        ),
+                    })
+
+                    try:
+                        retry_result = ask_ai(
+                            retry_messages,
+                            teaching_context=teaching,
+                        )
+                    except Exception as exc:
+                        print(
+                            "练习难度自动重生成异常：",
+                            repr(exc),
+                        )
+                        break
+
+                    if not isinstance(retry_result, dict) or not retry_result.get("ok"):
+                        break
+
+                    retry_reply = retry_result.get("reply", "")
+                    if not isinstance(retry_reply, str) or not retry_reply.strip():
+                        continue
+
+                    retry_visible, retry_answer = _split_exercise_answer(
+                        retry_reply
+                    )
+                    retry_answer = _clean_answer_only(retry_answer)
+                    retry_question = _extract_generated_question(
+                        retry_visible
+                    )
+                    if not retry_question:
+                        retry_question = str(retry_visible or "").strip()[:6000]
+                    if not retry_question:
+                        continue
+
+                    try:
+                        retry_teaching = analyze_question(
+                            retry_question
+                        )
+                    except Exception as exc:
+                        print(
+                            "练习难度重生成后的题目分析失败：",
+                            repr(exc),
+                        )
+                        continue
+
+                    if not isinstance(retry_teaching, dict):
+                        continue
+
+                    if reference_teaching:
+                        expected = reference_teaching.get("category")
+                        retry_category = retry_teaching.get("category")
+                        if (
+                            expected not in (None, "", "待识别")
+                            and retry_category not in (None, "", "待识别", expected)
+                        ):
+                            continue
+
+                    if retry_teaching.get("difficulty") != target_difficulty:
+                        continue
+
+                    reply = retry_reply
+                    generated_answer = retry_answer
+                    generated_question = retry_question
+                    generated_teaching = retry_teaching
+                    matched_difficulty = True
+                    print(
+                        f"练习难度已在第 {retry_index + 1} 次自动重生成后匹配："
+                        f"{target_difficulty}"
+                    )
+                    break
+
+                if not matched_difficulty:
+                    return jsonify({
+                        "error": (
+                            "连续生成的练习难度都偏离目标，已停止展示不匹配题目。"
+                            "请重新出题。"
+                        ),
+                        "teaching": teaching,
+                    }), 502
+
+            # 只有题干、分类和目标难度都完成校验后，才把题目展示给前端。
             reply = (
                 "【题目】\n\n"
                 + generated_question
