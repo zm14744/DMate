@@ -6354,6 +6354,14 @@ function renderWrongBook() {
         const actions = document.createElement("div");
         actions.className = "wrong-actions";
 
+        const copyButton = document.createElement("button");
+        copyButton.type = "button";
+        copyButton.className = "secondary";
+        copyButton.textContent = "复制";
+        copyButton.title = "复制这道错题及当前已有内容；公式优先保留视觉渲染";
+        copyButton.onclick = () => copyRenderedNode(card);
+        actions.appendChild(copyButton);
+
         if (!item.analysis) {
             const analysisButton = document.createElement("button");
             analysisButton.type = "button";
@@ -6872,6 +6880,416 @@ function renderMath(target) {
         target ? [target] : undefined
     ).catch(error => {
         console.warn("MathJax 渲染失败：", error);
+    });
+}
+
+
+// -----------------------------
+// 第三阶段：富文本 / 公式复制
+// -----------------------------
+function copyMathLatex(mathContainer) {
+    if (!mathContainer) return "";
+
+    const math = mathContainer.querySelector(
+        "mjx-assistive-mml math, .MJX_Assistive_MathML math, math[alttext]"
+    );
+
+    const alt = math?.getAttribute?.("alttext");
+    if (alt && alt.trim()) return alt.trim();
+
+    const aria = mathContainer.getAttribute?.("aria-label");
+    if (aria && aria.trim()) return aria.trim();
+
+    return "";
+}
+
+function clipboardSvgDataUrl(svg) {
+    if (!svg) return "";
+
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    clone.style.color = "#111827";
+
+    clone.querySelectorAll('[fill="currentColor"]').forEach(
+        node => node.setAttribute("fill", "#111827")
+    );
+    clone.querySelectorAll('[stroke="currentColor"]').forEach(
+        node => node.setAttribute("stroke", "#111827")
+    );
+
+    const serialized = new XMLSerializer().serializeToString(clone);
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`;
+}
+
+function flattenClipboardDetails(root) {
+    root.querySelectorAll("details").forEach(details => {
+        const block = document.createElement("div");
+        block.style.margin = "8px 0";
+
+        const summary = details.querySelector(":scope > summary");
+        if (summary) {
+            const heading = document.createElement("div");
+            heading.style.fontWeight = "700";
+            heading.style.marginBottom = "5px";
+            heading.textContent = summary.textContent || "";
+            block.appendChild(heading);
+        }
+
+        [...details.childNodes].forEach(child => {
+            if (child === summary) return;
+            block.appendChild(child.cloneNode(true));
+        });
+
+        details.replaceWith(block);
+    });
+}
+
+function stripClipboardControls(root) {
+    root.querySelectorAll(
+        [
+            "script",
+            "style",
+            "button",
+            "input",
+            "textarea",
+            "select",
+            ".msg-actions",
+            ".wrong-actions",
+            ".kg-history-actions",
+            ".copy-compact",
+            ".rich-copy-button",
+            ".graph-side-copy",
+            ".modal-close-dot"
+        ].join(",")
+    ).forEach(node => node.remove());
+
+    root.querySelectorAll("[hidden], .hidden").forEach(node => node.remove());
+}
+
+function replaceClipboardMathForPlain(root) {
+    root.querySelectorAll("mjx-container").forEach(container => {
+        const latex = copyMathLatex(container);
+        const display = container.getAttribute("display") === "true";
+        const fallback = latex
+            ? (display ? `\n$$${latex}$$\n` : `$${latex}$`)
+            : (container.textContent || "");
+        container.replaceWith(document.createTextNode(fallback));
+    });
+
+    root.querySelectorAll(
+        "mjx-assistive-mml, .MJX_Assistive_MathML, [data-mjx-assistive-mml]"
+    ).forEach(node => node.remove());
+}
+
+function replaceClipboardMathForHtml(root) {
+    root.querySelectorAll("mjx-container").forEach(container => {
+        const svg = container.querySelector("svg");
+        const latex = copyMathLatex(container);
+        const display = container.getAttribute("display") === "true";
+
+        if (!svg) {
+            if (latex) {
+                const fallback = document.createElement(display ? "div" : "span");
+                fallback.textContent = display ? `$$${latex}$$` : `$${latex}$`;
+                container.replaceWith(fallback);
+            }
+            return;
+        }
+
+        const image = document.createElement("img");
+        image.src = clipboardSvgDataUrl(svg);
+        image.alt = latex ? (display ? `$$${latex}$$` : `$${latex}$`) : "数学公式";
+        image.setAttribute("data-latex", latex || "");
+
+        const rect = svg.getBoundingClientRect();
+        if (rect.width > 0) image.style.width = `${rect.width}px`;
+        if (rect.height > 0) image.style.height = `${rect.height}px`;
+        image.style.maxWidth = "100%";
+        image.style.objectFit = "contain";
+
+        if (display) {
+            const wrapper = document.createElement("div");
+            wrapper.style.textAlign = "center";
+            wrapper.style.margin = "8px 0";
+            wrapper.appendChild(image);
+            container.replaceWith(wrapper);
+        } else {
+            image.style.display = "inline-block";
+            image.style.verticalAlign = "middle";
+            image.style.margin = "0 2px";
+            container.replaceWith(image);
+        }
+    });
+
+    root.querySelectorAll(
+        "mjx-assistive-mml, .MJX_Assistive_MathML, [data-mjx-assistive-mml]"
+    ).forEach(node => node.remove());
+}
+
+function applyClipboardRichStyles(root) {
+    root.style.fontFamily = 'Arial, "Microsoft YaHei", "PingFang SC", sans-serif';
+    root.style.lineHeight = "1.6";
+
+    root.querySelectorAll("table").forEach(table => {
+        table.style.borderCollapse = "collapse";
+        table.style.margin = "8px 0";
+    });
+
+    root.querySelectorAll("th, td").forEach(cell => {
+        cell.style.border = "1px solid #94a3b8";
+        cell.style.padding = "5px 8px";
+        cell.style.verticalAlign = "top";
+    });
+
+    root.querySelectorAll("pre").forEach(pre => {
+        pre.style.whiteSpace = "pre-wrap";
+        pre.style.wordBreak = "break-word";
+        pre.style.padding = "9px 11px";
+        pre.style.border = "1px solid #cbd5e1";
+        pre.style.borderRadius = "6px";
+        pre.style.background = "#f8fafc";
+    });
+
+    root.querySelectorAll("code").forEach(code => {
+        code.style.fontFamily = 'Consolas, "SFMono-Regular", monospace';
+    });
+
+    root.querySelectorAll("blockquote").forEach(block => {
+        block.style.marginLeft = "0";
+        block.style.paddingLeft = "10px";
+        block.style.borderLeft = "3px solid #94a3b8";
+    });
+
+    root.querySelectorAll("h1,h2,h3,h4").forEach(heading => {
+        heading.style.margin = "10px 0 6px";
+    });
+}
+
+function cloneClipboardRoot(node) {
+    const wrapper = document.createElement("div");
+
+    if (node instanceof DocumentFragment) {
+        wrapper.appendChild(node.cloneNode(true));
+    } else if (node) {
+        wrapper.appendChild(node.cloneNode(true));
+    }
+
+    return wrapper;
+}
+
+function clipboardPlainTextFromRoot(root) {
+    const plainRoot = root.cloneNode(true);
+    flattenClipboardDetails(plainRoot);
+    stripClipboardControls(plainRoot);
+    replaceClipboardMathForPlain(plainRoot);
+
+    const holder = document.createElement("div");
+    holder.style.position = "fixed";
+    holder.style.left = "-100000px";
+    holder.style.top = "0";
+    holder.style.width = "900px";
+    holder.style.whiteSpace = "normal";
+    holder.appendChild(plainRoot);
+    document.body.appendChild(holder);
+
+    const text = (holder.innerText || holder.textContent || "")
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+    holder.remove();
+    return text;
+}
+
+function clipboardHtmlFromRoot(root) {
+    const htmlRoot = root.cloneNode(true);
+    flattenClipboardDetails(htmlRoot);
+    stripClipboardControls(htmlRoot);
+    replaceClipboardMathForHtml(htmlRoot);
+    applyClipboardRichStyles(htmlRoot);
+    return htmlRoot.innerHTML.trim();
+}
+
+function buildClipboardPayload(node) {
+    const root = cloneClipboardRoot(node);
+    return {
+        text: clipboardPlainTextFromRoot(root),
+        html: clipboardHtmlFromRoot(root)
+    };
+}
+
+function showCopyToast(message = "已复制") {
+    document.querySelectorAll(".copy-toast").forEach(node => node.remove());
+    const toast = document.createElement("div");
+    toast.className = "copy-toast";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 1200);
+}
+
+async function writeRichClipboard(payload) {
+    const text = String(payload?.text || "");
+    const html = String(payload?.html || "");
+
+    if (
+        navigator.clipboard?.write
+        && window.ClipboardItem
+        && html
+    ) {
+        try {
+            const item = new ClipboardItem({
+                "text/plain": new Blob([text], { type: "text/plain" }),
+                "text/html": new Blob([html], { type: "text/html" })
+            });
+            await navigator.clipboard.write([item]);
+            return true;
+        } catch (error) {
+            console.warn("富文本剪贴板写入失败，降级为纯文本：", error);
+        }
+    }
+
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (error) {
+            console.warn("剪贴板文本写入失败：", error);
+        }
+    }
+
+    const legacy = document.createElement("div");
+    legacy.contentEditable = "true";
+    legacy.style.position = "fixed";
+    legacy.style.left = "-100000px";
+    legacy.style.top = "0";
+    legacy.style.width = "900px";
+    legacy.innerHTML = html || escapeRawHtml(text).replace(/\n/g, "<br>");
+    document.body.appendChild(legacy);
+
+    const range = document.createRange();
+    range.selectNodeContents(legacy);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    legacy.focus();
+
+    const ok = document.execCommand("copy");
+    selection.removeAllRanges();
+    legacy.remove();
+    return ok;
+}
+
+async function copyRenderedNode(node, successText = "已复制") {
+    if (!node) return false;
+    const payload = buildClipboardPayload(node);
+    if (!payload.text && !payload.html) return false;
+
+    const ok = await writeRichClipboard(payload);
+    if (ok) showCopyToast(successText);
+    return ok;
+}
+
+function effectiveElementBackground(element) {
+    let current = element;
+
+    while (current instanceof Element) {
+        const color = getComputedStyle(current).backgroundColor;
+        if (
+            color
+            && color !== "transparent"
+            && color !== "rgba(0, 0, 0, 0)"
+        ) {
+            return color;
+        }
+        current = current.parentElement;
+    }
+
+    return "#ffffff";
+}
+
+async function copyKnowledgeGraphVisual() {
+    const target = document.querySelector(".knowledge-graph-main");
+    if (!target) return false;
+
+    const payload = buildClipboardPayload(target);
+
+    if (
+        window.html2canvas
+        && navigator.clipboard?.write
+        && window.ClipboardItem
+    ) {
+        try {
+            if (document.fonts?.ready) {
+                await document.fonts.ready.catch(() => {});
+            }
+
+            const canvas = await html2canvas(target, {
+                backgroundColor: effectiveElementBackground(target),
+                scale: 2,
+                useCORS: true,
+                logging: false
+            });
+
+            const png = await new Promise(resolve => {
+                canvas.toBlob(resolve, "image/png");
+            });
+
+            if (png) {
+                const item = new ClipboardItem({
+                    "image/png": png,
+                    "text/plain": new Blob(
+                        [payload.text],
+                        { type: "text/plain" }
+                    ),
+                    "text/html": new Blob(
+                        [payload.html],
+                        { type: "text/html" }
+                    )
+                });
+
+                await navigator.clipboard.write([item]);
+                showCopyToast("图谱已复制");
+                return true;
+            }
+        } catch (error) {
+            console.warn("图谱图片复制失败，改用富文本：", error);
+        }
+    }
+
+    const ok = await writeRichClipboard(payload);
+    if (ok) showCopyToast("图谱已复制");
+    return ok;
+}
+
+function installRichSelectionCopy() {
+    document.addEventListener("copy", event => {
+        const target = event.target;
+        if (
+            target instanceof Element
+            && target.closest("input, textarea, [contenteditable='true']")
+        ) {
+            return;
+        }
+
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || selection.rangeCount < 1) {
+            return;
+        }
+
+        const fragment = selection.getRangeAt(0).cloneContents();
+        if (!fragment || !fragment.childNodes.length) return;
+
+        const payload = buildClipboardPayload(fragment);
+        if (!payload.text && !payload.html) return;
+
+        if (event.clipboardData) {
+            event.clipboardData.setData("text/plain", payload.text);
+            if (payload.html) {
+                event.clipboardData.setData("text/html", payload.html);
+            }
+            event.preventDefault();
+        }
     });
 }
 
@@ -9523,6 +9941,13 @@ function renderChat() {
 
         const actions = document.createElement("div");
         actions.className = "msg-actions";
+
+        const copyButton = document.createElement("button");
+        copyButton.type = "button";
+        copyButton.textContent = "复制";
+        copyButton.title = "复制这条消息；支持时保留 Markdown、表格、代码和公式渲染";
+        copyButton.onclick = () => copyRenderedNode(content);
+        actions.appendChild(copyButton);
 
         if (
             shouldOfferWrongBookAction(
@@ -12239,6 +12664,15 @@ function renderKnowledgeGraphHistory() {
         const actions = document.createElement("div");
         actions.className = "kg-history-actions";
 
+        const copyButton = document.createElement("button");
+        copyButton.type = "button";
+        copyButton.className = "secondary";
+        copyButton.textContent = "复制";
+        copyButton.addEventListener(
+            "click",
+            () => copyRenderedNode(card)
+        );
+
         const graphButton = document.createElement("button");
         graphButton.type = "button";
         graphButton.textContent = "查看图谱";
@@ -12264,6 +12698,7 @@ function renderKnowledgeGraphHistory() {
             }
         );
 
+        actions.appendChild(copyButton);
         actions.appendChild(graphButton);
         actions.appendChild(locateButton);
 
@@ -12572,6 +13007,7 @@ document.addEventListener(
     "DOMContentLoaded",
     () => {
         initAppearanceSystem();
+        installRichSelectionCopy();
 
         const input = document.getElementById("text");
         const chat = document.getElementById("chat");
@@ -12582,12 +13018,16 @@ document.addEventListener(
         const learningReviewBtn = document.getElementById("learningReviewBtn");
         const learningReviewClose = document.getElementById("learningReviewClose");
         const learningReviewDone = document.getElementById("learningReviewDone");
+        const learningReviewCopy = document.getElementById("learningReviewCopy");
         const learningReviewModal = document.getElementById("learningReviewModal");
+        const infoCopyBtn = document.getElementById("infoCopyBtn");
+        const learningSummaryCopyBtn = document.getElementById("learningSummaryCopyBtn");
         const wrongBookClose = document.getElementById("wrongBookClose");
         const wrongBookModal = document.getElementById("wrongBookModal");
         const wrongBookSearchBox = document.getElementById("wrongBookSearch");
         const wrongBookSearchClear = document.getElementById("wrongBookSearchClear");
         const wrongBookSortBox = document.getElementById("wrongBookSort");
+        const wrongCopyBtn = document.getElementById("wrongCopyBtn");
         const wrongPdfBtn = document.getElementById("wrongPdfBtn");
         const wrongClearCompletedBtn = document.getElementById("wrongClearCompletedBtn");
         const wrongEditClose = document.getElementById("wrongEditClose");
@@ -12608,6 +13048,8 @@ document.addEventListener(
         const knowledgeGraphCategory = document.getElementById("knowledgeGraphCategory");
         const knowledgeGraphScopeBtn = document.getElementById("knowledgeGraphScopeBtn");
         const knowledgeGraphFocusBtn = document.getElementById("knowledgeGraphFocusBtn");
+        const knowledgeGraphCopyBtn = document.getElementById("knowledgeGraphCopyBtn");
+        const knowledgeGraphSideCopyBtn = document.getElementById("knowledgeGraphSideCopyBtn");
         const knowledgeGraphDetailTab = document.getElementById("knowledgeGraphDetailTab");
         const knowledgeGraphHistoryTab = document.getElementById("knowledgeGraphHistoryTab");
         const wrongFilterButtons = document.querySelectorAll(
@@ -12712,6 +13154,36 @@ document.addEventListener(
             );
         }
 
+        if (learningReviewCopy) {
+            learningReviewCopy.addEventListener(
+                "click",
+                () => copyRenderedNode(
+                    document.getElementById("learningReviewBody"),
+                    "学习回顾已复制"
+                )
+            );
+        }
+
+        if (infoCopyBtn) {
+            infoCopyBtn.addEventListener(
+                "click",
+                () => copyRenderedNode(
+                    document.getElementById("info"),
+                    "会话信息已复制"
+                )
+            );
+        }
+
+        if (learningSummaryCopyBtn) {
+            learningSummaryCopyBtn.addEventListener(
+                "click",
+                () => copyRenderedNode(
+                    document.getElementById("learningSummary"),
+                    "学习记录已复制"
+                )
+            );
+        }
+
         if (learningReviewModal) {
             learningReviewModal.addEventListener(
                 "click",
@@ -12780,6 +13252,16 @@ document.addEventListener(
             wrongBookSortBox.addEventListener(
                 "change",
                 event => setWrongBookSort(event.target.value)
+            );
+        }
+
+        if (wrongCopyBtn) {
+            wrongCopyBtn.addEventListener(
+                "click",
+                () => copyRenderedNode(
+                    document.getElementById("wrongBookList"),
+                    "当前错题已复制"
+                )
             );
         }
 
@@ -12958,6 +13440,25 @@ document.addEventListener(
             knowledgeGraphFocusBtn.addEventListener(
                 "click",
                 focusKnowledgeGraphOnCurrent
+            );
+        }
+
+        if (knowledgeGraphCopyBtn) {
+            knowledgeGraphCopyBtn.addEventListener(
+                "click",
+                copyKnowledgeGraphVisual
+            );
+        }
+
+        if (knowledgeGraphSideCopyBtn) {
+            knowledgeGraphSideCopyBtn.addEventListener(
+                "click",
+                () => {
+                    const target = knowledgeGraphSideMode === "history"
+                        ? document.getElementById("knowledgeGraphHistory")
+                        : document.getElementById("knowledgeGraphDetailWrap");
+                    copyRenderedNode(target, "当前内容已复制");
+                }
             );
         }
 
