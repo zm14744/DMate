@@ -7342,29 +7342,47 @@ function ensureRichSelectionVisualStyle() {
     style.id = "richSelectionVisualStyle";
     style.textContent = `
         /*
-         * MathJax 当前仍保持原来的 SVG 输出；不改公式渲染器。
-         * 普通 DOM Selection 跨过整个公式时，仍使用系统选择色做整块反馈。
+         * 浏览器原生文字选区和 CSS 系统色 Highlight 在部分 Chromium / Edge
+         * 环境里并不是同一个蓝色。用户截图里普通文字是深蓝，而 SVG 公式
+         * 用 Highlight 会变成更亮的蓝。这里显式统一两类选区的配色：
+         * 普通文字仍由浏览器原生 Selection 负责，只统一它的视觉颜色；
+         * MathJax SVG 的整块/局部反馈使用完全相同的颜色变量。
          */
+        :root {
+            --rich-selection-bg: rgb(6, 60, 169);
+            --rich-selection-fg: rgb(255, 255, 255);
+        }
+
+        ::selection {
+            background: var(--rich-selection-bg);
+            color: var(--rich-selection-fg);
+        }
+
+        ::-moz-selection {
+            background: var(--rich-selection-bg);
+            color: var(--rich-selection-fg);
+        }
+
         mjx-container.rich-selection-hit > svg {
-            background: Highlight !important;
-            color: HighlightText !important;
+            background: var(--rich-selection-bg) !important;
+            color: var(--rich-selection-fg) !important;
             border-radius: 2px;
             box-decoration-break: clone;
             -webkit-box-decoration-break: clone;
         }
 
         mjx-container.rich-selection-hit > svg [fill="currentColor"] {
-            fill: HighlightText !important;
+            fill: var(--rich-selection-fg) !important;
         }
 
         mjx-container.rich-selection-hit > svg [stroke="currentColor"] {
-            stroke: HighlightText !important;
+            stroke: var(--rich-selection-fg) !important;
         }
 
         /*
          * 直接从公式内部拖选时不再把整条公式当成一个原子。
-         * 下面按 MathJax SVG 的单个 data-c 字形逐个高亮，背景和文字
-         * 都使用浏览器/系统自己的 Highlight / HighlightText 颜色。
+         * 下面按 MathJax SVG 的单个 data-c 字形逐个高亮；局部公式选区
+         * 和上面的普通文字原生选区使用同一组颜色变量。
          */
         mjx-container.rich-granular-selection {
             position: relative !important;
@@ -7389,14 +7407,14 @@ function ensureRichSelectionVisualStyle() {
 
         mjx-container .rich-math-selection-piece {
             position: absolute;
-            background: Highlight;
+            background: var(--rich-selection-bg);
             pointer-events: none;
         }
 
         mjx-container svg [data-c].rich-glyph-selected {
-            fill: HighlightText !important;
-            stroke: HighlightText !important;
-            color: HighlightText !important;
+            fill: var(--rich-selection-fg) !important;
+            stroke: var(--rich-selection-fg) !important;
+            color: var(--rich-selection-fg) !important;
         }
     `;
     document.head.appendChild(style);
