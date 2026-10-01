@@ -7307,10 +7307,9 @@ function cloneSelectionContentsForRichCopy(selection) {
     const sourceRange = selection.getRangeAt(0);
     const range = sourceRange.cloneRange();
 
-    // MathJax 的 SVG 内部由大量 path/use 节点组成。浏览器框选如果刚好
-    // 从公式内部开始或在公式内部结束，Range.cloneContents() 可能只复制
-    // 半个 SVG，粘贴后就会丢公式。只要选择边界碰到公式，就把该公式
-    // 扩展成完整 mjx-container；普通文字边界保持用户原来的精确选择。
+    // 普通文字起选、跨过 MathJax 公式时，浏览器的 Range 只能停在
+    // SVG 容器边界。这里仍把这种“跨过公式”的边界补成完整公式，
+    // 但不会用于下面的“直接从公式内部起选”路径；后者按字形精确处理。
     const startMath = selectionNodeElement(range.startContainer)
         ?.closest?.("mjx-container");
     const endMath = selectionNodeElement(range.endContainer)
@@ -7331,6 +7330,9 @@ function cloneSelectionContentsForRichCopy(selection) {
     return range.cloneContents();
 }
 
+let richMathGranularSelectionState = null;
+let richMathGranularDragState = null;
+
 function ensureRichSelectionVisualStyle() {
     if (document.getElementById("richSelectionVisualStyle")) {
         return;
@@ -7340,14 +7342,8 @@ function ensureRichSelectionVisualStyle() {
     style.id = "richSelectionVisualStyle";
     style.textContent = `
         /*
-         * MathJax 当前使用 SVG 输出。SVG 路径不像普通文字那样拥有
-         * 浏览器原生 ::selection 高亮，所以鼠标框选跨过公式时会出现
-         * “文字变蓝、公式还是白的”的视觉断层。
-         *
-         * 这里不改变 MathJax 的渲染方式，也不把公式降级成文本/图片。
-         * 只要真实 Selection 与某个公式相交，就把该公式的 SVG 作为
-         * 一个原子整体显示为系统选择色；剪贴板仍由下方 copy 事件输出
-         * 完整 SVG 富文本 + LaTeX 纯文本回退。
+         * MathJax 当前仍保持原来的 SVG 输出；不改公式渲染器。
+         * 普通 DOM Selection 跨过整个公式时，仍使用系统选择色做整块反馈。
          */
         mjx-container.rich-selection-hit > svg {
             background: Highlight !important;
@@ -7364,6 +7360,44 @@ function ensureRichSelectionVisualStyle() {
         mjx-container.rich-selection-hit > svg [stroke="currentColor"] {
             stroke: HighlightText !important;
         }
+
+        /*
+         * 直接从公式内部拖选时不再把整条公式当成一个原子。
+         * 下面按 MathJax SVG 的单个 data-c 字形逐个高亮，背景和文字
+         * 都使用浏览器/系统自己的 Highlight / HighlightText 颜色。
+         */
+        mjx-container.rich-granular-selection {
+            position: relative !important;
+            isolation: isolate;
+        }
+
+        mjx-container.rich-granular-selection > svg {
+            position: relative;
+            z-index: 1;
+        }
+
+        mjx-container .rich-math-selection-overlay {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        mjx-container .rich-math-selection-piece {
+            position: absolute;
+            background: Highlight;
+            pointer-events: none;
+        }
+
+        mjx-container svg [data-c].rich-glyph-selected {
+            fill: HighlightText !important;
+            stroke: HighlightText !important;
+            color: HighlightText !important;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -7374,6 +7408,29 @@ function clearRichMathSelectionFeedback() {
     ).forEach(node => {
         node.classList.remove("rich-selection-hit");
     });
+}
+
+function clearGranularMathSelectionVisual() {
+    document.querySelectorAll(
+        ".rich-math-selection-overlay"
+    ).forEach(node => node.remove());
+
+    document.querySelectorAll(
+        "svg [data-c].rich-glyph-selected"
+    ).forEach(node => {
+        node.classList.remove("rich-glyph-selected");
+    });
+
+    document.querySelectorAll(
+        "mjx-container.rich-granular-selection"
+    ).forEach(node => {
+        node.classList.remove("rich-granular-selection");
+    });
+}
+
+function clearGranularMathSelection() {
+    richMathGranularSelectionState = null;
+    clearGranularMathSelectionVisual();
 }
 
 function refreshRichMathSelectionFeedback() {
@@ -7401,6 +7458,14 @@ function refreshRichMathSelectionFeedback() {
     }
 
     document.querySelectorAll("mjx-container").forEach(container => {
+        // 直接从公式内部起选的这一条公式由逐字形高亮负责，
+        // 不能再叠加整块蓝色，否则又退回“整条一起选”的效果。
+        if (
+            richMathGranularSelectionState?.mathContainer === container
+        ) {
+            return;
+        }
+
         let intersects = false;
 
         for (const range of ranges) {
@@ -7411,7 +7476,6 @@ function refreshRichMathSelectionFeedback() {
                 }
             } catch (_error) {
                 // 某些浏览器对特殊 SVG/Shadow DOM 节点可能抛异常。
-                // 只跳过这一项，不影响普通文字选区。
             }
         }
 
@@ -7446,6 +7510,185 @@ function mathContainerFromPointerTarget(target) {
         : target?.parentElement;
 
     return element?.closest?.("mjx-container") || null;
+}
+
+function mathGlyphNodes(mathContainer) {
+    if (!mathContainer) return [];
+
+    return [
+        ...mathContainer.querySelectorAll("svg [data-c]")
+    ].filter(node => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    });
+}
+
+function mathGlyphCharacter(glyph) {
+    const code = glyph?.getAttribute?.("data-c") || "";
+    if (!/^[0-9A-F]+$/i.test(code)) return "";
+
+    try {
+        // MathJax 对拉丁字母经常使用“数学斜体 Unicode”码位。
+        // NFKC 后复制出来仍是用户熟悉的 A、R、x 等普通字符。
+        return String.fromCodePoint(parseInt(code, 16)).normalize("NFKC");
+    } catch (_error) {
+        return "";
+    }
+}
+
+function mathGlyphIndexFromPointer(mathContainer, clientX, clientY) {
+    const glyphs = mathGlyphNodes(mathContainer);
+    if (!glyphs.length) return -1;
+
+    let nearestIndex = -1;
+    let nearestDistance = Infinity;
+
+    for (let i = 0; i < glyphs.length; i += 1) {
+        const rect = glyphs[i].getBoundingClientRect();
+
+        if (
+            clientX >= rect.left
+            && clientX <= rect.right
+            && clientY >= rect.top
+            && clientY <= rect.bottom
+        ) {
+            return i;
+        }
+
+        const dx = clientX < rect.left
+            ? rect.left - clientX
+            : clientX > rect.right
+                ? clientX - rect.right
+                : 0;
+        const dy = clientY < rect.top
+            ? rect.top - clientY
+            : clientY > rect.bottom
+                ? clientY - rect.bottom
+                : 0;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestIndex = i;
+        }
+    }
+
+    return nearestIndex;
+}
+
+function granularMathSelectedIndexes(state) {
+    if (!state) return [];
+
+    const start = Math.min(state.startIndex, state.endIndex);
+    const end = Math.max(state.startIndex, state.endIndex);
+    const result = [];
+
+    for (let i = start; i <= end; i += 1) {
+        result.push(i);
+    }
+
+    return result;
+}
+
+function mergeMathSelectionRects(rects) {
+    const items = rects
+        .filter(rect => rect.width > 0 && rect.height > 0)
+        .map(rect => ({ ...rect }))
+        .sort((a, b) => {
+            const dy = a.top - b.top;
+            return Math.abs(dy) > 2 ? dy : a.left - b.left;
+        });
+
+    const merged = [];
+
+    for (const rect of items) {
+        const expanded = {
+            left: rect.left - 0.75,
+            top: rect.top - 0.5,
+            right: rect.right + 0.75,
+            bottom: rect.bottom + 0.5
+        };
+        expanded.width = expanded.right - expanded.left;
+        expanded.height = expanded.bottom - expanded.top;
+
+        const last = merged[merged.length - 1];
+        if (!last) {
+            merged.push(expanded);
+            continue;
+        }
+
+        const overlapTop = Math.max(last.top, expanded.top);
+        const overlapBottom = Math.min(last.bottom, expanded.bottom);
+        const overlapHeight = Math.max(0, overlapBottom - overlapTop);
+        const minHeight = Math.max(
+            1,
+            Math.min(last.height, expanded.height)
+        );
+        const sameVisualLine = overlapHeight / minHeight >= 0.72;
+        const gap = expanded.left - last.right;
+
+        if (sameVisualLine && gap <= 1.75) {
+            last.left = Math.min(last.left, expanded.left);
+            last.top = Math.min(last.top, expanded.top);
+            last.right = Math.max(last.right, expanded.right);
+            last.bottom = Math.max(last.bottom, expanded.bottom);
+            last.width = last.right - last.left;
+            last.height = last.bottom - last.top;
+        } else {
+            merged.push(expanded);
+        }
+    }
+
+    return merged;
+}
+
+function renderGranularMathSelection(state) {
+    clearGranularMathSelectionVisual();
+
+    const mathContainer = state?.mathContainer;
+    if (!mathContainer) return;
+
+    const glyphs = mathGlyphNodes(mathContainer);
+    const selectedIndexes = granularMathSelectedIndexes(state)
+        .filter(index => index >= 0 && index < glyphs.length);
+
+    if (!selectedIndexes.length) return;
+
+    mathContainer.classList.add("rich-granular-selection");
+
+    const containerRect = mathContainer.getBoundingClientRect();
+    const rawRects = [];
+
+    selectedIndexes.forEach(index => {
+        const glyph = glyphs[index];
+        glyph.classList.add("rich-glyph-selected");
+
+        const rect = glyph.getBoundingClientRect();
+        rawRects.push({
+            left: rect.left - containerRect.left,
+            top: rect.top - containerRect.top,
+            right: rect.right - containerRect.left,
+            bottom: rect.bottom - containerRect.top,
+            width: rect.width,
+            height: rect.height
+        });
+    });
+
+    const overlay = document.createElement("span");
+    overlay.className = "rich-math-selection-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+
+    mergeMathSelectionRects(rawRects).forEach(rect => {
+        const piece = document.createElement("span");
+        piece.className = "rich-math-selection-piece";
+        piece.style.left = `${rect.left}px`;
+        piece.style.top = `${rect.top}px`;
+        piece.style.width = `${rect.width}px`;
+        piece.style.height = `${rect.height}px`;
+        overlay.appendChild(piece);
+    });
+
+    mathContainer.appendChild(overlay);
 }
 
 function mathBoundaryPointFromPointer(mathContainer, clientX) {
@@ -7556,25 +7799,26 @@ function compareBoundaryPointToMath(point, mathContainer) {
     return 0;
 }
 
-function applyMathAnchoredSelection(mathContainer, point) {
+function clearNativeDocumentSelection() {
     const selection = window.getSelection();
-    if (!selection || !mathContainer?.parentNode) return false;
+    if (selection) selection.removeAllRanges();
+}
+
+function setNativeSelectionOutsideMath(mathContainer, point, direction) {
+    const selection = window.getSelection();
+    if (!selection || !point?.node || !mathContainer?.parentNode) {
+        return false;
+    }
 
     const range = document.createRange();
-    const relative = compareBoundaryPointToMath(
-        point,
-        mathContainer
-    );
 
     try {
-        if (relative < 0) {
-            range.setStart(point.node, point.offset);
-            range.setEndAfter(mathContainer);
-        } else if (relative > 0) {
-            range.setStartBefore(mathContainer);
+        if (direction > 0) {
+            range.setStartAfter(mathContainer);
             range.setEnd(point.node, point.offset);
         } else {
-            range.selectNode(mathContainer);
+            range.setStart(point.node, point.offset);
+            range.setEndBefore(mathContainer);
         }
 
         selection.removeAllRanges();
@@ -7585,11 +7829,149 @@ function applyMathAnchoredSelection(mathContainer, point) {
     }
 }
 
-function installDirectMathSelectionStart() {
-    let dragState = null;
+function mathSelectionPlainText(state) {
+    const glyphs = mathGlyphNodes(state?.mathContainer);
+    const selected = granularMathSelectedIndexes(state);
 
+    return selected
+        .map(index => mathGlyphCharacter(glyphs[index]))
+        .join("");
+}
+
+function partialMathSvgPayload(state) {
+    const mathContainer = state?.mathContainer;
+    const originalSvg = mathContainer?.querySelector?.("svg");
+    if (!originalSvg) return null;
+
+    const glyphs = mathGlyphNodes(mathContainer);
+    const selectedIndexes = granularMathSelectedIndexes(state)
+        .filter(index => index >= 0 && index < glyphs.length);
+    if (!selectedIndexes.length) return null;
+
+    const selectedSet = new Set(selectedIndexes);
+    const selectedRects = selectedIndexes.map(index => (
+        glyphs[index].getBoundingClientRect()
+    ));
+
+    const left = Math.min(...selectedRects.map(rect => rect.left));
+    const top = Math.min(...selectedRects.map(rect => rect.top));
+    const right = Math.max(...selectedRects.map(rect => rect.right));
+    const bottom = Math.max(...selectedRects.map(rect => rect.bottom));
+
+    const svgRect = originalSvg.getBoundingClientRect();
+    if (!svgRect.width || !svgRect.height) return null;
+
+    const clone = originalSvg.cloneNode(true);
+    clone.classList.remove("rich-glyph-selected");
+    clone.querySelectorAll(".rich-glyph-selected").forEach(node => {
+        node.classList.remove("rich-glyph-selected");
+    });
+
+    const cloneGlyphs = [
+        ...clone.querySelectorAll("[data-c]")
+    ];
+    cloneGlyphs.forEach((glyph, index) => {
+        if (!selectedSet.has(index)) {
+            glyph.setAttribute("visibility", "hidden");
+        }
+    });
+
+    const baseViewBox = originalSvg.viewBox?.baseVal;
+    if (baseViewBox?.width && baseViewBox?.height) {
+        const scaleX = baseViewBox.width / svgRect.width;
+        const scaleY = baseViewBox.height / svgRect.height;
+        const paddingPx = 1;
+        const cropLeft = Math.max(svgRect.left, left - paddingPx);
+        const cropTop = Math.max(svgRect.top, top - paddingPx);
+        const cropRight = Math.min(svgRect.right, right + paddingPx);
+        const cropBottom = Math.min(svgRect.bottom, bottom + paddingPx);
+
+        const viewX = baseViewBox.x
+            + (cropLeft - svgRect.left) * scaleX;
+        const viewY = baseViewBox.y
+            + (cropTop - svgRect.top) * scaleY;
+        const viewWidth = Math.max(1, (cropRight - cropLeft) * scaleX);
+        const viewHeight = Math.max(1, (cropBottom - cropTop) * scaleY);
+
+        clone.setAttribute(
+            "viewBox",
+            `${viewX} ${viewY} ${viewWidth} ${viewHeight}`
+        );
+    }
+
+    const width = Math.max(1, right - left + 2);
+    const height = Math.max(1, bottom - top + 2);
+    clone.setAttribute("width", `${width}px`);
+    clone.setAttribute("height", `${height}px`);
+    clone.style.width = `${width}px`;
+    clone.style.height = `${height}px`;
+    clone.style.color = "#111827";
+
+    const dataUrl = clipboardSvgDataUrl(clone);
+    const text = mathSelectionPlainText(state);
+
+    const image = document.createElement("img");
+    image.src = dataUrl;
+    image.alt = text || "数学公式";
+    image.style.display = "inline-block";
+    image.style.verticalAlign = "middle";
+    image.style.width = `${width}px`;
+    image.style.height = `${height}px`;
+    image.style.maxWidth = "100%";
+
+    return {
+        text,
+        html: image.outerHTML,
+        width,
+        height
+    };
+}
+
+function buildGranularMathClipboardPayload(state, selection) {
+    const partial = partialMathSvgPayload(state);
+    if (!partial) {
+        return { text: mathSelectionPlainText(state), html: "" };
+    }
+
+    const direction = Number(state?.outsideDirection || 0);
+
+    if (
+        !direction
+        || !selection
+        || selection.isCollapsed
+        || selection.rangeCount < 1
+    ) {
+        return {
+            text: partial.text,
+            html: partial.html
+        };
+    }
+
+    let nativePayload = { text: "", html: "" };
+
+    try {
+        const fragment = selection.getRangeAt(0).cloneContents();
+        nativePayload = buildClipboardPayload(fragment);
+    } catch (_error) {
+        // 外部文字范围复制失败时至少保留已经精确选中的公式部分。
+    }
+
+    if (direction < 0) {
+        return {
+            text: `${nativePayload.text}${partial.text}`,
+            html: `${nativePayload.html}${partial.html}`
+        };
+    }
+
+    return {
+        text: `${partial.text}${nativePayload.text}`,
+        html: `${partial.html}${nativePayload.html}`
+    };
+}
+
+function installDirectMathSelectionStart() {
     const finishDrag = () => {
-        dragState = null;
+        richMathGranularDragState = null;
     };
 
     document.addEventListener("mousedown", event => {
@@ -7598,50 +7980,79 @@ function installDirectMathSelectionStart() {
         const mathContainer = mathContainerFromPointerTarget(
             event.target
         );
-        if (!mathContainer) return;
 
-        // MathJax 的 SVG path 本身不是浏览器可放置文字光标的位置，
-        // 因此原生拖选不能从公式内部起步。仅当鼠标真正按在公式上时
-        // 接管这一次拖选，把公式当作一个原子选择单元；普通文字区域
-        // 完全继续使用浏览器原生 Selection，保持阶段一前原版行为。
-        dragState = {
-            mathContainer,
-            startX: event.clientX,
-            startY: event.clientY
-        };
-
-        event.preventDefault();
-
-        const startPoint = mathBoundaryPointFromPointer(
-            mathContainer,
-            event.clientX
-        );
-
-        if (!applyMathAnchoredSelection(mathContainer, startPoint)) {
-            const selection = window.getSelection();
-            const range = document.createRange();
-
-            try {
-                range.selectNode(mathContainer);
-                selection?.removeAllRanges();
-                selection?.addRange(range);
-            } catch (_error) {
-                finishDrag();
-            }
+        if (!mathContainer) {
+            clearGranularMathSelection();
+            return;
         }
 
-        refreshRichMathSelectionFeedback();
+        const startIndex = mathGlyphIndexFromPointer(
+            mathContainer,
+            event.clientX,
+            event.clientY
+        );
+        if (startIndex < 0) return;
+
+        // SVG path 不能成为浏览器原生文字选区的锚点，因此只接管
+        // “鼠标从公式本身按下”的这次拖选。不是整条选中，而是记录
+        // 起始字形，随后鼠标拖到哪个字形就精确选到哪个字形。
+        event.preventDefault();
+        clearGranularMathSelection();
+        clearNativeDocumentSelection();
+
+        richMathGranularDragState = {
+            mathContainer,
+            startIndex,
+            startX: event.clientX,
+            startY: event.clientY,
+            active: false
+        };
     }, true);
 
     window.addEventListener("mousemove", event => {
-        if (!dragState) return;
+        const drag = richMathGranularDragState;
+        if (!drag) return;
 
         if ((event.buttons & 1) !== 1) {
             finishDrag();
             return;
         }
 
+        const distance = Math.hypot(
+            event.clientX - drag.startX,
+            event.clientY - drag.startY
+        );
+
+        // 与普通文字拖选一样，单击不产生选区；真正拖动后才开始高亮。
+        if (!drag.active && distance < 2) return;
+        drag.active = true;
         event.preventDefault();
+
+        const pointedMath = mathContainerFromPointerTarget(
+            document.elementFromPoint(event.clientX, event.clientY)
+        );
+
+        if (pointedMath === drag.mathContainer) {
+            const endIndex = mathGlyphIndexFromPointer(
+                drag.mathContainer,
+                event.clientX,
+                event.clientY
+            );
+            if (endIndex < 0) return;
+
+            richMathGranularSelectionState = {
+                mathContainer: drag.mathContainer,
+                startIndex: drag.startIndex,
+                endIndex,
+                outsideDirection: 0
+            };
+
+            clearNativeDocumentSelection();
+            renderGranularMathSelection(
+                richMathGranularSelectionState
+            );
+            return;
+        }
 
         const point = caretBoundaryFromViewportPoint(
             event.clientX,
@@ -7649,31 +8060,69 @@ function installDirectMathSelectionStart() {
         );
         if (!point) return;
 
-        // 光标仍位于起始公式时，整个公式保持选中；一旦拖出公式，
-        // 选区就从公式边界继续自然扩展到普通文字或其他公式。
-        if (point.mathContainer === dragState.mathContainer) {
-            const selection = window.getSelection();
-            const range = document.createRange();
+        let relative = compareBoundaryPointToMath(
+            point,
+            drag.mathContainer
+        );
 
-            try {
-                range.selectNode(dragState.mathContainer);
-                selection?.removeAllRanges();
-                selection?.addRange(range);
-            } catch (_error) {
-                return;
-            }
-        } else {
-            applyMathAnchoredSelection(
-                dragState.mathContainer,
-                point
-            );
+        // 极少数浏览器在 SVG 附近给出的 caret 点仍落在容器边界内部，
+        // 用鼠标实际坐标做一次方向兜底。
+        if (relative === 0) {
+            const rect = drag.mathContainer.getBoundingClientRect();
+            if (event.clientX < rect.left) relative = -1;
+            else if (event.clientX > rect.right) relative = 1;
+            else if (event.clientY < rect.top) relative = -1;
+            else if (event.clientY > rect.bottom) relative = 1;
         }
 
+        if (relative === 0) return;
+
+        const glyphs = mathGlyphNodes(drag.mathContainer);
+        const endIndex = relative > 0
+            ? Math.max(0, glyphs.length - 1)
+            : 0;
+
+        richMathGranularSelectionState = {
+            mathContainer: drag.mathContainer,
+            startIndex: drag.startIndex,
+            endIndex,
+            outsideDirection: relative
+        };
+
+        setNativeSelectionOutsideMath(
+            drag.mathContainer,
+            point,
+            relative
+        );
+        renderGranularMathSelection(
+            richMathGranularSelectionState
+        );
         refreshRichMathSelectionFeedback();
     }, true);
 
-    window.addEventListener("mouseup", finishDrag, true);
-    window.addEventListener("blur", finishDrag);
+    window.addEventListener("mouseup", event => {
+        const drag = richMathGranularDragState;
+        if (drag && !drag.active) {
+            clearGranularMathSelection();
+            clearNativeDocumentSelection();
+        }
+        finishDrag();
+    }, true);
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            clearGranularMathSelection();
+            clearNativeDocumentSelection();
+        }
+    });
+
+    window.addEventListener("resize", () => {
+        if (richMathGranularSelectionState) {
+            renderGranularMathSelection(
+                richMathGranularSelectionState
+            );
+        }
+    });
 }
 
 function selectionTouchesMathJax(selection) {
@@ -7709,6 +8158,24 @@ function selectionTouchesMathJax(selection) {
     return false;
 }
 
+function writeSelectionClipboard(event, payload) {
+    if (!payload?.text && !payload?.html) return false;
+    if (!event.clipboardData) return false;
+
+    event.clipboardData.setData(
+        "text/plain",
+        String(payload.text || "")
+    );
+    if (payload.html) {
+        event.clipboardData.setData(
+            "text/html",
+            String(payload.html)
+        );
+    }
+    event.preventDefault();
+    return true;
+}
+
 function installRichSelectionCopy() {
     installRichMathSelectionFeedback();
     installDirectMathSelectionStart();
@@ -7723,34 +8190,37 @@ function installRichSelectionCopy() {
         }
 
         const selection = window.getSelection();
+
+        // 直接从公式内部拖出的“逐字形选区”优先。即使没有原生 DOM
+        // Selection（只在一个公式内部拖选时就是这种情况），Ctrl+C 仍然
+        // 能精确复制当前选中的那一段，而不是整条公式。
+        if (richMathGranularSelectionState) {
+            const payload = buildGranularMathClipboardPayload(
+                richMathGranularSelectionState,
+                selection
+            );
+            writeSelectionClipboard(event, payload);
+            return;
+        }
+
         if (!selection || selection.isCollapsed || selection.rangeCount < 1) {
             return;
         }
 
         // 阶段一之前的原版对普通文字/列表/表格完全使用浏览器原生复制。
-        // 为了确保增强功能严格不削弱原版能力，只有选区真正碰到 MathJax
-        // 公式时才接管 copy；否则直接 return，让浏览器按原版路径处理。
+        // 只有普通 DOM 选区真正跨过 MathJax 时才做公式增强。
         if (!selectionTouchesMathJax(selection)) {
             return;
         }
 
-        // 对包含 MathJax 的选区进行增量增强：边界落在公式内部时把公式
-        // 扩展为完整 mjx-container，并同时写入富文本 SVG 与 LaTeX 纯文本。
         const fragment = cloneSelectionContentsForRichCopy(selection);
         if (!fragment || !fragment.childNodes.length) return;
 
         const payload = buildClipboardPayload(fragment);
-        if (!payload.text && !payload.html) return;
-
-        if (event.clipboardData) {
-            event.clipboardData.setData("text/plain", payload.text);
-            if (payload.html) {
-                event.clipboardData.setData("text/html", payload.html);
-            }
-            event.preventDefault();
-        }
+        writeSelectionClipboard(event, payload);
     });
 }
+
 
 function isChatNearBottom(chat, threshold = 90) {
     if (!chat) return true;
