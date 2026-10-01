@@ -755,16 +755,26 @@ function refreshInputAvailability() {
     const sendBtn = document.getElementById("sendBtn");
     const imageBtn = document.getElementById("imageBtn");
     const ocrCancelBtn = document.getElementById("ocrCancelBtn");
+    const inputLockHint = document.getElementById("inputLockHint");
 
     // 图片识别与核对期间锁定主聊天输入区；本轮要求统一在图片核对界面填写。
     if (input) {
         input.disabled = hardBlocked || ocrReviewInProgress;
-        input.placeholder = ocrReviewInProgress
-            ? "图片识别中…"
-            : "输入消息…";
+        input.placeholder = "";
     }
     if (sendBtn) sendBtn.disabled = hardBlocked || ocrReviewInProgress;
     if (imageBtn) imageBtn.disabled = hardBlocked || ocrReviewInProgress;
+
+    if (inputLockHint) {
+        let hint = "";
+        if (ocrReviewInProgress) {
+            hint = "图片识别中，主输入框已锁定。请在识别/核对区域填写要求。";
+        } else if (hardBlocked) {
+            hint = "AI 正在思考或回答，当前输入框已锁定，请稍等。";
+        }
+        inputLockHint.textContent = hint;
+        inputLockHint.classList.toggle("hidden", !hint);
+    }
 
     if (ocrCancelBtn) {
         ocrCancelBtn.hidden = !ocrRequestInFlight;
@@ -6486,7 +6496,7 @@ function getFriendlyCategory(value) {
     const text = String(value || "").trim();
 
     if (!text || text === "待识别") {
-        return "暂时没判断出来";
+        return "离散数学综合";
     }
 
     return text;
