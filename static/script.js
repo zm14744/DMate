@@ -7440,8 +7440,278 @@ function installRichMathSelectionFeedback() {
     window.addEventListener("blur", clearRichMathSelectionFeedback);
 }
 
+function mathContainerFromPointerTarget(target) {
+    const element = target instanceof Element
+        ? target
+        : target?.parentElement;
+
+    return element?.closest?.("mjx-container") || null;
+}
+
+function mathBoundaryPointFromPointer(mathContainer, clientX) {
+    if (!mathContainer?.parentNode) return null;
+
+    const parent = mathContainer.parentNode;
+    const siblings = [...parent.childNodes];
+    const index = siblings.indexOf(mathContainer);
+    if (index < 0) return null;
+
+    const rect = mathContainer.getBoundingClientRect();
+    const useAfter = clientX >= (rect.left + rect.width / 2);
+
+    return {
+        node: parent,
+        offset: index + (useAfter ? 1 : 0),
+        mathContainer
+    };
+}
+
+function caretBoundaryFromViewportPoint(clientX, clientY) {
+    let node = null;
+    let offset = 0;
+
+    try {
+        if (typeof document.caretPositionFromPoint === "function") {
+            const position = document.caretPositionFromPoint(
+                clientX,
+                clientY
+            );
+            node = position?.offsetNode || null;
+            offset = Number(position?.offset || 0);
+        } else if (typeof document.caretRangeFromPoint === "function") {
+            const range = document.caretRangeFromPoint(
+                clientX,
+                clientY
+            );
+            node = range?.startContainer || null;
+            offset = Number(range?.startOffset || 0);
+        }
+    } catch (_error) {
+        return null;
+    }
+
+    if (!node) return null;
+
+    const mathContainer = selectionNodeElement(node)
+        ?.closest?.("mjx-container");
+
+    if (mathContainer) {
+        return mathBoundaryPointFromPointer(
+            mathContainer,
+            clientX
+        );
+    }
+
+    return { node, offset, mathContainer: null };
+}
+
+function collapsedRangeAtBoundary(point) {
+    if (!point?.node) return null;
+
+    const range = document.createRange();
+
+    try {
+        range.setStart(point.node, point.offset);
+        range.collapse(true);
+        return range;
+    } catch (_error) {
+        return null;
+    }
+}
+
+function compareBoundaryPointToMath(point, mathContainer) {
+    const probe = collapsedRangeAtBoundary(point);
+    if (!probe || !mathContainer?.parentNode) return 0;
+
+    const before = document.createRange();
+    const after = document.createRange();
+
+    try {
+        before.setStartBefore(mathContainer);
+        before.collapse(true);
+        after.setStartAfter(mathContainer);
+        after.collapse(true);
+
+        if (
+            probe.compareBoundaryPoints(
+                Range.START_TO_START,
+                before
+            ) <= 0
+        ) {
+            return -1;
+        }
+
+        if (
+            probe.compareBoundaryPoints(
+                Range.START_TO_START,
+                after
+            ) >= 0
+        ) {
+            return 1;
+        }
+    } catch (_error) {
+        return 0;
+    }
+
+    return 0;
+}
+
+function applyMathAnchoredSelection(mathContainer, point) {
+    const selection = window.getSelection();
+    if (!selection || !mathContainer?.parentNode) return false;
+
+    const range = document.createRange();
+    const relative = compareBoundaryPointToMath(
+        point,
+        mathContainer
+    );
+
+    try {
+        if (relative < 0) {
+            range.setStart(point.node, point.offset);
+            range.setEndAfter(mathContainer);
+        } else if (relative > 0) {
+            range.setStartBefore(mathContainer);
+            range.setEnd(point.node, point.offset);
+        } else {
+            range.selectNode(mathContainer);
+        }
+
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    } catch (_error) {
+        return false;
+    }
+}
+
+function installDirectMathSelectionStart() {
+    let dragState = null;
+
+    const finishDrag = () => {
+        dragState = null;
+    };
+
+    document.addEventListener("mousedown", event => {
+        if (event.button !== 0) return;
+
+        const mathContainer = mathContainerFromPointerTarget(
+            event.target
+        );
+        if (!mathContainer) return;
+
+        // MathJax 的 SVG path 本身不是浏览器可放置文字光标的位置，
+        // 因此原生拖选不能从公式内部起步。仅当鼠标真正按在公式上时
+        // 接管这一次拖选，把公式当作一个原子选择单元；普通文字区域
+        // 完全继续使用浏览器原生 Selection，保持阶段一前原版行为。
+        dragState = {
+            mathContainer,
+            startX: event.clientX,
+            startY: event.clientY
+        };
+
+        event.preventDefault();
+
+        const startPoint = mathBoundaryPointFromPointer(
+            mathContainer,
+            event.clientX
+        );
+
+        if (!applyMathAnchoredSelection(mathContainer, startPoint)) {
+            const selection = window.getSelection();
+            const range = document.createRange();
+
+            try {
+                range.selectNode(mathContainer);
+                selection?.removeAllRanges();
+                selection?.addRange(range);
+            } catch (_error) {
+                finishDrag();
+            }
+        }
+
+        refreshRichMathSelectionFeedback();
+    }, true);
+
+    window.addEventListener("mousemove", event => {
+        if (!dragState) return;
+
+        if ((event.buttons & 1) !== 1) {
+            finishDrag();
+            return;
+        }
+
+        event.preventDefault();
+
+        const point = caretBoundaryFromViewportPoint(
+            event.clientX,
+            event.clientY
+        );
+        if (!point) return;
+
+        // 光标仍位于起始公式时，整个公式保持选中；一旦拖出公式，
+        // 选区就从公式边界继续自然扩展到普通文字或其他公式。
+        if (point.mathContainer === dragState.mathContainer) {
+            const selection = window.getSelection();
+            const range = document.createRange();
+
+            try {
+                range.selectNode(dragState.mathContainer);
+                selection?.removeAllRanges();
+                selection?.addRange(range);
+            } catch (_error) {
+                return;
+            }
+        } else {
+            applyMathAnchoredSelection(
+                dragState.mathContainer,
+                point
+            );
+        }
+
+        refreshRichMathSelectionFeedback();
+    }, true);
+
+    window.addEventListener("mouseup", finishDrag, true);
+    window.addEventListener("blur", finishDrag);
+}
+
+function selectionTouchesMathJax(selection) {
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) {
+        return false;
+    }
+
+    const anchorMath = selectionNodeElement(selection.anchorNode)
+        ?.closest?.("mjx-container");
+    const focusMath = selectionNodeElement(selection.focusNode)
+        ?.closest?.("mjx-container");
+
+    if (anchorMath || focusMath) {
+        return true;
+    }
+
+    const mathContainers = document.querySelectorAll("mjx-container");
+
+    for (let i = 0; i < selection.rangeCount; i += 1) {
+        const range = selection.getRangeAt(i);
+
+        for (const container of mathContainers) {
+            try {
+                if (range.intersectsNode(container)) {
+                    return true;
+                }
+            } catch (_error) {
+                // 特殊 SVG 节点异常时继续检查其他公式。
+            }
+        }
+    }
+
+    return false;
+}
+
 function installRichSelectionCopy() {
     installRichMathSelectionFeedback();
+    installDirectMathSelectionStart();
 
     document.addEventListener("copy", event => {
         const target = event.target;
@@ -7457,8 +7727,15 @@ function installRichSelectionCopy() {
             return;
         }
 
-        // 这里专门覆盖用户截图中的使用方式：鼠标直接框选已经渲染好的
-        // Markdown / MathJax 内容，再按 Ctrl+C、右键复制或浏览器迷你菜单复制。
+        // 阶段一之前的原版对普通文字/列表/表格完全使用浏览器原生复制。
+        // 为了确保增强功能严格不削弱原版能力，只有选区真正碰到 MathJax
+        // 公式时才接管 copy；否则直接 return，让浏览器按原版路径处理。
+        if (!selectionTouchesMathJax(selection)) {
+            return;
+        }
+
+        // 对包含 MathJax 的选区进行增量增强：边界落在公式内部时把公式
+        // 扩展为完整 mjx-container，并同时写入富文本 SVG 与 LaTeX 纯文本。
         const fragment = cloneSelectionContentsForRichCopy(selection);
         if (!fragment || !fragment.childNodes.length) return;
 
