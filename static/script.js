@@ -7331,7 +7331,118 @@ function cloneSelectionContentsForRichCopy(selection) {
     return range.cloneContents();
 }
 
+function ensureRichSelectionVisualStyle() {
+    if (document.getElementById("richSelectionVisualStyle")) {
+        return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "richSelectionVisualStyle";
+    style.textContent = `
+        /*
+         * MathJax 当前使用 SVG 输出。SVG 路径不像普通文字那样拥有
+         * 浏览器原生 ::selection 高亮，所以鼠标框选跨过公式时会出现
+         * “文字变蓝、公式还是白的”的视觉断层。
+         *
+         * 这里不改变 MathJax 的渲染方式，也不把公式降级成文本/图片。
+         * 只要真实 Selection 与某个公式相交，就把该公式的 SVG 作为
+         * 一个原子整体显示为系统选择色；剪贴板仍由下方 copy 事件输出
+         * 完整 SVG 富文本 + LaTeX 纯文本回退。
+         */
+        mjx-container.rich-selection-hit > svg {
+            background: Highlight !important;
+            color: HighlightText !important;
+            border-radius: 2px;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+        }
+
+        mjx-container.rich-selection-hit > svg [fill="currentColor"] {
+            fill: HighlightText !important;
+        }
+
+        mjx-container.rich-selection-hit > svg [stroke="currentColor"] {
+            stroke: HighlightText !important;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function clearRichMathSelectionFeedback() {
+    document.querySelectorAll(
+        "mjx-container.rich-selection-hit"
+    ).forEach(node => {
+        node.classList.remove("rich-selection-hit");
+    });
+}
+
+function refreshRichMathSelectionFeedback() {
+    const selection = window.getSelection();
+
+    clearRichMathSelectionFeedback();
+
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) {
+        return;
+    }
+
+    const focusElement = selectionNodeElement(selection.focusNode);
+    if (
+        focusElement
+        && focusElement.closest(
+            "input, textarea, [contenteditable='true']"
+        )
+    ) {
+        return;
+    }
+
+    const ranges = [];
+    for (let i = 0; i < selection.rangeCount; i += 1) {
+        ranges.push(selection.getRangeAt(i));
+    }
+
+    document.querySelectorAll("mjx-container").forEach(container => {
+        let intersects = false;
+
+        for (const range of ranges) {
+            try {
+                if (range.intersectsNode(container)) {
+                    intersects = true;
+                    break;
+                }
+            } catch (_error) {
+                // 某些浏览器对特殊 SVG/Shadow DOM 节点可能抛异常。
+                // 只跳过这一项，不影响普通文字选区。
+            }
+        }
+
+        if (intersects) {
+            container.classList.add("rich-selection-hit");
+        }
+    });
+}
+
+function installRichMathSelectionFeedback() {
+    ensureRichSelectionVisualStyle();
+
+    let framePending = false;
+
+    const scheduleRefresh = () => {
+        if (framePending) return;
+        framePending = true;
+
+        requestAnimationFrame(() => {
+            framePending = false;
+            refreshRichMathSelectionFeedback();
+        });
+    };
+
+    document.addEventListener("selectionchange", scheduleRefresh);
+    window.addEventListener("blur", clearRichMathSelectionFeedback);
+}
+
 function installRichSelectionCopy() {
+    installRichMathSelectionFeedback();
+
     document.addEventListener("copy", event => {
         const target = event.target;
         if (
