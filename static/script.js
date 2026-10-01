@@ -3117,6 +3117,52 @@ function extractAiGeneratedExerciseText(reply) {
     return text.slice(0, 3000);
 }
 
+function copyChatQuestionOnly(message, session, messageIndex) {
+    let question = "";
+
+    if (message?.role === "ai") {
+        question = recoverGeneratedQuestionFromAssistant(
+            session,
+            messageIndex,
+            message
+        );
+        if (!question) {
+            question = extractQuestionOnlyFromMessage(message);
+        }
+    } else {
+        question = extractQuestionOnlyFromMessage(message);
+    }
+
+    question = sanitizeStoredWrongQuestionText(question);
+    if (!question) return;
+
+    const payload = {
+        text: question,
+        html: `<div class="ai-content">${markdownToHtml(
+            prepareAiDisplayText(question)
+        )}</div>`
+    };
+
+    writeRichClipboard(payload).then(ok => {
+        if (ok) showCopyToast("题目已复制");
+    });
+}
+
+function shouldShowChatCopyButton(message, session, messageIndex) {
+    if (!shouldOfferWrongBookAction(message, session, messageIndex)) {
+        return false;
+    }
+
+    const question = message?.role === "ai"
+        ? recoverGeneratedQuestionFromAssistant(session, messageIndex, message)
+            || extractQuestionOnlyFromMessage(message)
+        : extractQuestionOnlyFromMessage(message);
+
+    return Boolean(
+        sanitizeStoredWrongQuestionText(question)
+    );
+}
+
 function recoverGeneratedQuestionFromAssistant(
     session,
     messageIndex,
@@ -7251,7 +7297,7 @@ function effectiveElementBackground(element) {
 }
 
 async function copyKnowledgeGraphVisual() {
-    const target = document.querySelector(".knowledge-graph-main");
+    const target = document.getElementById("knowledgeGraphCanvas");
     if (!target) return false;
 
     const payload = buildClipboardPayload(target);
@@ -10899,12 +10945,24 @@ function renderChat() {
         const actions = document.createElement("div");
         actions.className = "msg-actions";
 
-        const copyButton = document.createElement("button");
-        copyButton.type = "button";
-        copyButton.textContent = "复制";
-        copyButton.title = "复制这条消息；支持时保留 Markdown、表格、代码和公式渲染";
-        copyButton.onclick = () => copyRenderedNode(content);
-        actions.appendChild(copyButton);
+        if (
+            shouldShowChatCopyButton(
+                message,
+                session,
+                messageIndex
+            )
+        ) {
+            const copyButton = document.createElement("button");
+            copyButton.type = "button";
+            copyButton.textContent = "复制";
+            copyButton.title = "复制这道题目";
+            copyButton.onclick = () => copyChatQuestionOnly(
+                message,
+                session,
+                messageIndex
+            );
+            actions.appendChild(copyButton);
+        }
 
         if (
             shouldOfferWrongBookAction(
@@ -13621,15 +13679,6 @@ function renderKnowledgeGraphHistory() {
         const actions = document.createElement("div");
         actions.className = "kg-history-actions";
 
-        const copyButton = document.createElement("button");
-        copyButton.type = "button";
-        copyButton.className = "secondary";
-        copyButton.textContent = "复制";
-        copyButton.addEventListener(
-            "click",
-            () => copyRenderedNode(card)
-        );
-
         const graphButton = document.createElement("button");
         graphButton.type = "button";
         graphButton.textContent = "查看图谱";
@@ -13655,7 +13704,6 @@ function renderKnowledgeGraphHistory() {
             }
         );
 
-        actions.appendChild(copyButton);
         actions.appendChild(graphButton);
         actions.appendChild(locateButton);
 
@@ -13984,7 +14032,6 @@ document.addEventListener(
         const wrongBookSearchBox = document.getElementById("wrongBookSearch");
         const wrongBookSearchClear = document.getElementById("wrongBookSearchClear");
         const wrongBookSortBox = document.getElementById("wrongBookSort");
-        const wrongCopyBtn = document.getElementById("wrongCopyBtn");
         const wrongPdfBtn = document.getElementById("wrongPdfBtn");
         const wrongClearCompletedBtn = document.getElementById("wrongClearCompletedBtn");
         const wrongEditClose = document.getElementById("wrongEditClose");
@@ -14111,36 +14158,6 @@ document.addEventListener(
             );
         }
 
-        if (learningReviewCopy) {
-            learningReviewCopy.addEventListener(
-                "click",
-                () => copyRenderedNode(
-                    document.getElementById("learningReviewBody"),
-                    "学习回顾已复制"
-                )
-            );
-        }
-
-        if (infoCopyBtn) {
-            infoCopyBtn.addEventListener(
-                "click",
-                () => copyRenderedNode(
-                    document.getElementById("info"),
-                    "会话信息已复制"
-                )
-            );
-        }
-
-        if (learningSummaryCopyBtn) {
-            learningSummaryCopyBtn.addEventListener(
-                "click",
-                () => copyRenderedNode(
-                    document.getElementById("learningSummary"),
-                    "学习记录已复制"
-                )
-            );
-        }
-
         if (learningReviewModal) {
             learningReviewModal.addEventListener(
                 "click",
@@ -14209,16 +14226,6 @@ document.addEventListener(
             wrongBookSortBox.addEventListener(
                 "change",
                 event => setWrongBookSort(event.target.value)
-            );
-        }
-
-        if (wrongCopyBtn) {
-            wrongCopyBtn.addEventListener(
-                "click",
-                () => copyRenderedNode(
-                    document.getElementById("wrongBookList"),
-                    "当前错题已复制"
-                )
             );
         }
 
@@ -14404,18 +14411,6 @@ document.addEventListener(
             knowledgeGraphCopyBtn.addEventListener(
                 "click",
                 copyKnowledgeGraphVisual
-            );
-        }
-
-        if (knowledgeGraphSideCopyBtn) {
-            knowledgeGraphSideCopyBtn.addEventListener(
-                "click",
-                () => {
-                    const target = knowledgeGraphSideMode === "history"
-                        ? document.getElementById("knowledgeGraphHistory")
-                        : document.getElementById("knowledgeGraphDetailWrap");
-                    copyRenderedNode(target, "当前内容已复制");
-                }
             );
         }
 
