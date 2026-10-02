@@ -7522,8 +7522,8 @@ async function copyKnowledgeGraphVisual() {
             }
         }
 
-        const ok = await copyRenderedNode(target, "图谱已复制");
-        return ok;
+        showCopyToast("当前浏览器未能复制纯图片");
+        return false;
     } finally {
         target.remove();
     }
