@@ -231,6 +231,46 @@ body {
     border-color:var(--accent);
 }
 
+
+.input-wrap {
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.input-lock-hint {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-height:24px;
+    padding:0 14px 10px;
+    color:var(--accent-pale);
+    font-size:var(--font-sm);
+    line-height:1.45;
+    font-weight:600;
+}
+
+.input-lock-hint::before {
+    content:"";
+    width:8px;
+    height:8px;
+    flex:0 0 auto;
+    border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 0 0 rgba(59,130,246,.36);
+    animation:inputLockPulse 1.15s ease-out infinite;
+}
+
+@keyframes inputLockPulse {
+    0% { box-shadow:0 0 0 0 rgba(59,130,246,.36); }
+    70% { box-shadow:0 0 0 7px rgba(59,130,246,0); }
+    100% { box-shadow:0 0 0 0 rgba(59,130,246,0); }
+}
+
+.input-lock-hint.hidden {
+    display:none;
+}
+
 .input button {
     padding:8px 20px;
     background:var(--accent);
@@ -1368,21 +1408,31 @@ body {
 }
 
 .graph-side-tabs {
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:6px;
+    display:flex;
+    align-items:stretch;
+    gap:8px;
     padding:10px 10px 8px;
     border-bottom:1px solid var(--surface-3);
 }
 
 .graph-side-tab {
-    padding:8px 9px;
+    flex:1 1 0;
+    min-width:0;
+    padding:8px 6px;
     border:1px solid var(--border-strong);
     border-radius:8px;
     background:var(--surface-2);
     color:var(--text-muted);
     cursor:pointer;
     font:inherit;
+    white-space:nowrap;
+    word-break:keep-all;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
 }
 
 .graph-side-tab.active {
@@ -2196,14 +2246,6 @@ body[data-appearance-theme="light"] .msg-actions button {
     user-select:text;
 }
 
-.graph-side-tabs {
-    grid-template-columns:1fr 1fr auto;
-}
-
-.graph-side-copy {
-    padding:8px 9px;
-    white-space:nowrap;
-}
 
 .copy-toast {
     position:fixed;
@@ -2221,15 +2263,43 @@ body[data-appearance-theme="light"] .msg-actions button {
     pointer-events:none;
 }
 
-@media (max-width:700px) {
-    .graph-side-tabs {
-        grid-template-columns:1fr 1fr;
-    }
 
-    .graph-side-copy {
-        grid-column:1 / -1;
-    }
+/* 用户明确要求：这些位置不提供复制按钮。即使旧 DOM 残留也强制隐藏。 */
+#infoCopyBtn,
+#learningSummaryCopyBtn,
+#learningReviewCopy,
+#knowledgeGraphSideCopyBtn,
+#wrongCopyBtn {
+    display:none !important;
 }
+
+/* 节点详情 / 题目历史必须始终同一行。 */
+.graph-side-tabs {
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    gap:8px;
+}
+.graph-side-tab {
+    flex:1 1 0 !important;
+    min-width:0 !important;
+    white-space:nowrap !important;
+    word-break:keep-all !important;
+    line-height:1.2 !important;
+    font-size:15px !important;
+    padding:10px 6px !important;
+}
+
+/* AI 思考/回答时，让输入区本身也有明确状态，不只靠一行小字。 */
+.input-wrap.ai-input-busy .input {
+    box-shadow:inset 0 0 0 1px var(--accent);
+    background:color-mix(in srgb, var(--surface-1) 92%, var(--accent) 8%);
+}
+.input-wrap.ai-input-busy #text::placeholder {
+    color:var(--accent-pale);
+    opacity:1;
+    font-weight:600;
+}
+
 </style>
 
 <script>
@@ -2270,26 +2340,27 @@ window.MathJax = {
 <div class="center">
     <div id="chat" class="chat"></div>
 
-    <div class="input">
-        <input id="text" type="text" placeholder="输入消息…" autocomplete="off">
-        <input id="imageInput" type="file" accept="image/*" hidden>
-        <button id="imageBtn" type="button">图片识题</button>
-        <button id="ocrCancelBtn" type="button" hidden aria-label="撤销图片识别" title="撤销图片识别"></button>
-        <button id="sendBtn" type="button" onclick="send()">发送</button>
+    <div class="input-wrap">
+        <div class="input">
+            <input id="text" type="text" placeholder="" autocomplete="off">
+            <input id="imageInput" type="file" accept="image/*" hidden>
+            <button id="imageBtn" type="button">图片识题</button>
+            <button id="ocrCancelBtn" type="button" hidden aria-label="撤销图片识别" title="撤销图片识别"></button>
+            <button id="sendBtn" type="button" onclick="send()">发送</button>
+        </div>
+        <div id="inputLockHint" class="input-lock-hint hidden" aria-live="polite"></div>
     </div>
 </div>
 
 <div class="right">
     <div class="panel-heading-row">
         <div>会话信息</div>
-        <button id="infoCopyBtn" class="copy-compact" type="button">复制</button>
     </div>
     <div id="info" class="small rich-copy-surface"></div>
 
     <div class="learning-panel">
         <div class="panel-heading-row learning-title">
             <div>学习记录</div>
-            <button id="learningSummaryCopyBtn" class="copy-compact" type="button">复制</button>
         </div>
         <div id="learningSummary" class="learning-summary"></div>
 
@@ -2437,7 +2508,7 @@ window.MathJax = {
         <div id="learningReviewBody" class="learning-review-body"></div>
 
         <div class="learning-review-actions">
-            <button id="learningReviewCopy" type="button">复制回顾</button>
+            
             <button id="learningReviewDone" type="button">关闭</button>
         </div>
     </div>
@@ -2471,7 +2542,6 @@ window.MathJax = {
                 <option value="mistakes">错误次数最多</option>
                 <option value="oldest">最早更新</option>
             </select>
-            <button id="wrongCopyBtn" type="button" title="复制当前筛选结果，尽量保留公式和富文本格式">复制当前</button>
             <button id="wrongPdfBtn" type="button" title="导出当前筛选结果为 PDF">导出 PDF</button>
             <button id="wrongClearCompletedBtn" type="button" class="danger-tool">清理已完成</button>
         </div>
@@ -2541,11 +2611,11 @@ window.MathJax = {
             <label for="wrongEditQuestion">题目内容</label>
             <textarea id="wrongEditQuestion" rows="8"></textarea>
 
-            <label for="wrongEditFocus">本题难点（最多 2 个，可手动修改，用顿号或逗号分隔）</label>
+            <label for="wrongEditFocus">本题难点</label>
             <input id="wrongEditFocus" type="text">
 
             <label for="wrongEditNote">我的笔记</label>
-            <textarea id="wrongEditNote" rows="5" placeholder="可以记录错误原因、订正思路或容易混淆的地方"></textarea>
+            <textarea id="wrongEditNote" rows="5" placeholder=""></textarea>
         </div>
 
         <div class="wrong-edit-actions">
@@ -2593,7 +2663,7 @@ window.MathJax = {
                     <button id="knowledgeGraphHistoryTab" type="button" class="graph-side-tab">
                         题目历史
                     </button>
-                    <button id="knowledgeGraphSideCopyBtn" type="button" class="graph-side-copy">复制当前</button>
+                    
                 </div>
 
                 <div id="knowledgeGraphDetailWrap" class="graph-side-page">
@@ -2612,7 +2682,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase3-rich-copy-20260930"></script>
+<script src="/static/script.js?v=phase3-final-20261002-2056b"></script>
 
 </body>
 </html>
