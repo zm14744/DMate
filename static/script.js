@@ -695,6 +695,7 @@ const TYPING_CHARS_PER_TICK = 3;
 const LONG_RESPONSE_DIRECT_RENDER_CHARS = 2200;
 
 const busySessionIds = new Set();
+const pendingAiStartSessionIds = new Set();
 
 
 // -----------------------------
@@ -738,6 +739,16 @@ function isSessionBusy(sessionId = currentId) {
     );
 }
 
+function isSessionPendingAiStart(sessionId = currentId) {
+    if (sessionId === null || sessionId === undefined) {
+        return false;
+    }
+
+    return pendingAiStartSessionIds.has(
+        sessionBusyKey(sessionId)
+    );
+}
+
 function isCurrentSessionTyping() {
     return Boolean(
         typingTimer
@@ -746,10 +757,10 @@ function isCurrentSessionTyping() {
 }
 
 function refreshInputAvailability() {
-    const hardBlocked = (
-        isSessionBusy(currentId)
-        || isCurrentSessionTyping()
-    );
+    const pendingStart = isSessionPendingAiStart(currentId);
+    const typingNow = isCurrentSessionTyping();
+    const waitingReply = isSessionBusy(currentId) || pendingStart;
+    const hardBlocked = waitingReply || typingNow;
 
     const input = document.getElementById("text");
     const sendBtn = document.getElementById("sendBtn");
@@ -757,23 +768,30 @@ function refreshInputAvailability() {
     const ocrCancelBtn = document.getElementById("ocrCancelBtn");
     const inputLockHint = document.getElementById("inputLockHint");
 
-    // 图片识别与核对期间锁定主聊天输入区；本轮要求统一在图片核对界面填写。
+    let statusText = "";
+    let placeholder = "";
+
+    if (ocrReviewInProgress) {
+        statusText = "图片识别中，主输入框已锁定。";
+        placeholder = "图片识别中…";
+    } else if (typingNow) {
+        statusText = "AI 正在回答，当前输入框已锁定。";
+        placeholder = "AI 正在回答…";
+    } else if (waitingReply) {
+        statusText = "AI 正在思考，当前输入框已锁定。";
+        placeholder = "AI 正在思考…";
+    }
+
     if (input) {
         input.disabled = hardBlocked || ocrReviewInProgress;
-        input.placeholder = "";
+        input.placeholder = placeholder;
     }
     if (sendBtn) sendBtn.disabled = hardBlocked || ocrReviewInProgress;
     if (imageBtn) imageBtn.disabled = hardBlocked || ocrReviewInProgress;
 
     if (inputLockHint) {
-        let hint = "";
-        if (ocrReviewInProgress) {
-            hint = "图片识别中，主输入框已锁定。请在识别/核对区域填写要求。";
-        } else if (hardBlocked) {
-            hint = "AI 正在思考或回答，当前输入框已锁定，请稍等。";
-        }
-        inputLockHint.textContent = hint;
-        inputLockHint.classList.toggle("hidden", !hint);
+        inputLockHint.textContent = statusText;
+        inputLockHint.classList.toggle("hidden", !statusText);
     }
 
     if (ocrCancelBtn) {
@@ -3117,15 +3135,42 @@ function extractAiGeneratedExerciseText(reply) {
     return text.slice(0, 3000);
 }
 
-function copyChatQuestionOnly(message, session, messageIndex) {
+function completeQuestionTextFromChatMessage(
+    message,
+    session = null,
+    messageIndex = -1
+) {
+    if (
+        !message
+        || message.isError
+        || message.isNotice
+        || typeof message.text !== "string"
+        || !message.text.trim()
+    ) {
+        return "";
+    }
+
+    // “出一道题 / 再来一道 / 给我提示 / 继续”等只是指令或追问，
+    // 即使上下文里有当前题，也不能因此把这条消息当成完整题目。
+    if (
+        isExerciseRequestText(message.text)
+        || isConversationControlOnly(message.text)
+        || isShortLearningFollowUp(message.text)
+    ) {
+        return "";
+    }
+
     let question = "";
 
-    if (message?.role === "ai") {
+    if (message.role === "ai") {
+        // AI 真正生成的题优先使用后端登记的完整题干；
+        // 其次允许 AI 消息本身明确包含完整题目（例如题目回顾）。
         question = recoverGeneratedQuestionFromAssistant(
             session,
             messageIndex,
             message
         );
+
         if (!question) {
             question = extractQuestionOnlyFromMessage(message);
         }
@@ -3134,6 +3179,37 @@ function copyChatQuestionOnly(message, session, messageIndex) {
     }
 
     question = sanitizeStoredWrongQuestionText(question);
+    if (!question) return "";
+
+    if (message.source === "ocr") {
+        return isRecordableOcrQuestionMessage(message)
+            ? question
+            : "";
+    }
+
+    const complete = Boolean(
+        looksLikeChatQuestionText(question)
+        || looksLikeFormalStudyQuestionForHistory(question, message)
+        || (
+            message.role === "ai"
+            && looksLikeStandaloneAiQuestion(message.text)
+        )
+        || (
+            hasExplicitQuestionHeading(message.text)
+            && looksLikeQuestionPayload(question)
+        )
+    );
+
+    return complete ? question : "";
+}
+
+function copyChatQuestionOnly(message, session, messageIndex) {
+    const question = completeQuestionTextFromChatMessage(
+        message,
+        session,
+        messageIndex
+    );
+
     if (!question) return;
 
     const payload = {
@@ -3149,17 +3225,12 @@ function copyChatQuestionOnly(message, session, messageIndex) {
 }
 
 function shouldShowChatCopyButton(message, session, messageIndex) {
-    if (!shouldOfferWrongBookAction(message, session, messageIndex)) {
-        return false;
-    }
-
-    const question = message?.role === "ai"
-        ? recoverGeneratedQuestionFromAssistant(session, messageIndex, message)
-            || extractQuestionOnlyFromMessage(message)
-        : extractQuestionOnlyFromMessage(message);
-
     return Boolean(
-        sanitizeStoredWrongQuestionText(question)
+        completeQuestionTextFromChatMessage(
+            message,
+            session,
+            messageIndex
+        )
     );
 }
 
@@ -6538,11 +6609,16 @@ function renderWrongBook() {
 }
 
 
+function isGenericTeachingCategory(value) {
+    const text = String(value || "").trim();
+    return !text || text === "待识别" || text === "离散数学综合";
+}
+
 function getFriendlyCategory(value) {
     const text = String(value || "").trim();
 
-    if (!text || text === "待识别") {
-        return "离散数学综合";
+    if (isGenericTeachingCategory(text)) {
+        return "正在重新判定";
     }
 
     return text;
@@ -9751,7 +9827,14 @@ function send() {
     renderSessions();
     renderInfo();
 
-    requestAiReply(session);
+    const pendingKey = sessionBusyKey(session.id);
+    pendingAiStartSessionIds.add(pendingKey);
+    refreshInputAvailability();
+
+    requestAiReply(session).finally(() => {
+        pendingAiStartSessionIds.delete(pendingKey);
+        refreshInputAvailability();
+    });
 }
 
 
@@ -11956,10 +12039,19 @@ async function ensureActiveQuestionAfterHistoryChange(
         return;
     }
 
+    const existingTeaching = normalizeTeaching(
+        candidateTeachingSnapshot(session, candidate)
+    );
+
+    // 旧版本曾把无法命中的题目写成“离散数学综合”。这种快照不能继续沿用，
+    // 必须重新走当前分类器；否则修好分类规则后右侧仍会显示旧的“综合”。
     if (
-        applyQuestionCandidateAsCurrent(
+        existingTeaching
+        && !isGenericTeachingCategory(existingTeaching.category)
+        && applyQuestionCandidateAsCurrent(
             session,
-            candidate
+            candidate,
+            existingTeaching
         )
     ) {
         return;
@@ -14023,10 +14115,7 @@ document.addEventListener(
         const learningReviewBtn = document.getElementById("learningReviewBtn");
         const learningReviewClose = document.getElementById("learningReviewClose");
         const learningReviewDone = document.getElementById("learningReviewDone");
-        const learningReviewCopy = document.getElementById("learningReviewCopy");
         const learningReviewModal = document.getElementById("learningReviewModal");
-        const infoCopyBtn = document.getElementById("infoCopyBtn");
-        const learningSummaryCopyBtn = document.getElementById("learningSummaryCopyBtn");
         const wrongBookClose = document.getElementById("wrongBookClose");
         const wrongBookModal = document.getElementById("wrongBookModal");
         const wrongBookSearchBox = document.getElementById("wrongBookSearch");
@@ -14053,7 +14142,6 @@ document.addEventListener(
         const knowledgeGraphScopeBtn = document.getElementById("knowledgeGraphScopeBtn");
         const knowledgeGraphFocusBtn = document.getElementById("knowledgeGraphFocusBtn");
         const knowledgeGraphCopyBtn = document.getElementById("knowledgeGraphCopyBtn");
-        const knowledgeGraphSideCopyBtn = document.getElementById("knowledgeGraphSideCopyBtn");
         const knowledgeGraphDetailTab = document.getElementById("knowledgeGraphDetailTab");
         const knowledgeGraphHistoryTab = document.getElementById("knowledgeGraphHistoryTab");
         const wrongFilterButtons = document.querySelectorAll(
