@@ -223,15 +223,16 @@ CATEGORY_RULES = {
     "图论": {
         "keywords": [
             "图论", "无向图", "有向图", "顶点", "边集", "邻接", "邻接矩阵", "邻接表",
-            "关联矩阵", "度矩阵", "度数", "路径", "回路", "圈", "连通", "连通分量",
+            "关联矩阵", "度矩阵", "度数", "度序列", "路径", "回路", "圈", "连通", "连通分量",
             "欧拉", "哈密顿", "最短路", "dijkstra", "着色", "平面图", "匹配",
             "拉普拉斯矩阵", "laplacian", "树", "生成树", "最小生成树", "带权图", "权值",
             "矩阵树定理", "matrix-tree", "matrix tree", "kirchhoff", "基尔霍夫",
             "kruskal", "prim", "根树", "二叉树", "叶子", "割点", "割边", "桥", "生成森林",
-            "支配集", "覆盖集", "独立集",
+            "支配集", "覆盖集", "独立集", "简单图", "图化", "可图化", "简单图化", "可简单图化",
+            "havel", "hakimi", "havel-hakimi", "握手定理", "度数列", "图序列", "实现度序列",
         ],
         "points": {
-            "图的基本概念": ["无向图", "有向图", "顶点", "边集", "度数", "图论", "邻接表"],
+            "图的基本概念": ["无向图", "有向图", "顶点", "边集", "度数", "度序列", "度数列", "图论", "邻接表", "简单图", "图化", "可图化", "简单图化", "可简单图化", "havel", "hakimi", "havel-hakimi", "握手定理", "实现度序列"],
             "邻接矩阵": ["邻接矩阵", "a^2", "tr(a^2)", "tr(a²)"],
             "图的矩阵表示": ["关联矩阵", "拉普拉斯矩阵", "laplacian", "度矩阵"],
             "路径与连通性": ["路径", "通路", "回路", "圈", "连通", "连通分量"],
@@ -813,17 +814,48 @@ def _extract_points(text, category):
     return [point for _score, point in scored[:4]]
 
 
+def _recover_discrete_math_category(text, scores):
+    normalized = _normalize(text)
+
+    fallback_patterns = [
+        ("图论", [
+            "度序列", "度数列", "简单图", "图化", "可图化", "简单图化", "可简单图化", "havel", "hakimi", "havel-hakimi",
+            "握手定理", "实现度序列", "邻接矩阵", "邻接表", "顶点", "边", "图 g", "图g", "欧拉", "哈密顿",
+        ]),
+        ("集合与关系", [
+            "关系", "集合", "等价关系", "偏序", "闭包", "关系矩阵", "笛卡尔积", "等价类", "划分",
+        ]),
+        ("函数", ["单射", "满射", "双射", "映射", "原像", "逆函数"]),
+        ("命题逻辑", ["真值表", "命题", "蕴含", "逻辑等价", "析取范式", "合取范式"]),
+        ("谓词逻辑", ["谓词", "量词", "全称", "存在量词", "自由变元"]),
+        ("证明与归纳", ["归纳法", "反证法", "直接证明", "强归纳"]),
+        ("计数与组合", ["排列", "组合", "容斥", "鸽巢", "抽屉原理", "生成函数"]),
+        ("递推关系", ["递推", "递归关系", "特征方程", "非齐次"]),
+        ("初等数论", ["同余", "整除", "欧拉函数", "费马小定理", "欧几里得"]),
+        ("代数结构", ["群", "子群", "同态", "同构", "环", "域", "布尔代数"]),
+    ]
+
+    for category, keywords in fallback_patterns:
+        if any(keyword.lower() in normalized for keyword in keywords):
+            return category
+
+    # 不再用“离散数学综合”冒充具体分类。规则没有证据时保留待识别，
+    # 前端会对旧/待识别题目自动重新分析；具体离散数学术语继续在上面的规则中补全。
+    return "待识别"
+
+
 def _classify_content(text):
     scores = _score_categories(text)
     ordered = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     primary, top_score = ordered[0] if ordered else ("待识别", 0)
 
     if top_score <= 0:
+        recovered = _recover_discrete_math_category(text, scores)
         return {
-            "category": "待识别",
+            "category": recovered,
             "related_categories": [],
-            "knowledge_points": [],
-            "confidence": "低",
+            "knowledge_points": _extract_points(text, recovered) if recovered in CATEGORY_RULES else [],
+            "confidence": "低" if recovered == "待识别" else "中",
             "score": 0,
         }
 
