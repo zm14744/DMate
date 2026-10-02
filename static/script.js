@@ -767,27 +767,45 @@ function refreshInputAvailability() {
     const imageBtn = document.getElementById("imageBtn");
     const ocrCancelBtn = document.getElementById("ocrCancelBtn");
     const inputLockHint = document.getElementById("inputLockHint");
+    const inputWrap = input?.closest?.(".input-wrap") || null;
 
     let statusText = "";
     let placeholder = "";
+    let busyMode = "";
 
     if (ocrReviewInProgress) {
         statusText = "图片识别中，主输入框已锁定。";
         placeholder = "图片识别中…";
+        busyMode = "ocr";
     } else if (typingNow) {
         statusText = "AI 正在回答，当前输入框已锁定。";
         placeholder = "AI 正在回答…";
+        busyMode = "answering";
     } else if (waitingReply) {
         statusText = "AI 正在思考，当前输入框已锁定。";
         placeholder = "AI 正在思考…";
+        busyMode = "thinking";
     }
 
     if (input) {
         input.disabled = hardBlocked || ocrReviewInProgress;
         input.placeholder = placeholder;
     }
-    if (sendBtn) sendBtn.disabled = hardBlocked || ocrReviewInProgress;
+    if (sendBtn) {
+        sendBtn.disabled = hardBlocked || ocrReviewInProgress;
+        sendBtn.textContent = busyMode === "thinking"
+            ? "思考中…"
+            : (busyMode === "answering" ? "回答中…" : "发送");
+    }
     if (imageBtn) imageBtn.disabled = hardBlocked || ocrReviewInProgress;
+
+    if (inputWrap) {
+        inputWrap.classList.toggle(
+            "ai-input-busy",
+            busyMode === "thinking" || busyMode === "answering"
+        );
+        inputWrap.dataset.busyMode = busyMode;
+    }
 
     if (inputLockHint) {
         inputLockHint.textContent = statusText;
@@ -3150,8 +3168,7 @@ function completeQuestionTextFromChatMessage(
         return "";
     }
 
-    // “出一道题 / 再来一道 / 给我提示 / 继续”等只是指令或追问，
-    // 即使上下文里有当前题，也不能因此把这条消息当成完整题目。
+    // 纯指令、短追问、寒暄都不是“完整题目”。
     if (
         isExerciseRequestText(message.text)
         || isConversationControlOnly(message.text)
@@ -3163,22 +3180,33 @@ function completeQuestionTextFromChatMessage(
     let question = "";
 
     if (message.role === "ai") {
-        // AI 真正生成的题优先使用后端登记的完整题干；
-        // 其次允许 AI 消息本身明确包含完整题目（例如题目回顾）。
+        // AI 消息严格收口：
+        // 1) 后端登记的 generatedQuestion / 由“上一条明确出题请求”恢复出的题；
+        // 2) 消息本身明确带【题目】/题目标题，并且提取后确实像完整题。
+        // 普通讲解、寒暄、提到“当前题目/度序列”等都不能出现复制按钮。
         question = recoverGeneratedQuestionFromAssistant(
             session,
             messageIndex,
             message
         );
 
-        if (!question) {
-            question = extractQuestionOnlyFromMessage(message);
+        if (!question && hasExplicitQuestionHeading(message.text)) {
+            question = sanitizeStoredWrongQuestionText(
+                extractAiQuestionPayload(message.text)
+            );
         }
-    } else {
-        question = extractQuestionOnlyFromMessage(message);
+
+        if (!question) return "";
+
+        return looksLikeQuestionPayload(question)
+            ? question
+            : "";
     }
 
-    question = sanitizeStoredWrongQuestionText(question);
+    // 用户自己输入、粘贴或 OCR 得到的完整题目都允许复制。
+    question = sanitizeStoredWrongQuestionText(
+        extractQuestionOnlyFromMessage(message)
+    );
     if (!question) return "";
 
     if (message.source === "ocr") {
@@ -3190,10 +3218,6 @@ function completeQuestionTextFromChatMessage(
     const complete = Boolean(
         looksLikeChatQuestionText(question)
         || looksLikeFormalStudyQuestionForHistory(question, message)
-        || (
-            message.role === "ai"
-            && looksLikeStandaloneAiQuestion(message.text)
-        )
         || (
             hasExplicitQuestionHeading(message.text)
             && looksLikeQuestionPayload(question)
@@ -14097,12 +14121,25 @@ function renderAll() {
 }
 
 
+function removeDeprecatedCopyControls() {
+    [
+        "infoCopyBtn",
+        "learningSummaryCopyBtn",
+        "learningReviewCopy",
+        "knowledgeGraphSideCopyBtn",
+        "wrongCopyBtn"
+    ].forEach(id => {
+        document.getElementById(id)?.remove();
+    });
+}
+
 // -----------------------------
 // 初始化
 // -----------------------------
 document.addEventListener(
     "DOMContentLoaded",
     () => {
+        removeDeprecatedCopyControls();
         initAppearanceSystem();
         installRichSelectionCopy();
 
