@@ -2,6 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>离散数学智能辅学系统</title>
 
 <style>
@@ -2298,6 +2299,874 @@ body[data-appearance-theme="light"] .msg-actions button {
     color:var(--accent-pale);
     opacity:1;
     font-weight:600;
+}
+
+
+/* =========================================================
+   移动端主布局
+   手机端不再把整张桌面界面缩小，而是按纵向空间重新分配。
+   桌面布局不受影响。
+   ========================================================= */
+@media (max-width: 760px) {
+    html,
+    body {
+        width:100%;
+        min-width:0;
+        height:100%;
+        overflow:hidden;
+    }
+
+    body {
+        min-height:100dvh;
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+    }
+
+    .layout {
+        width:100%;
+        height:100dvh;
+        min-height:100vh;
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+    }
+
+    /* 顶部会话栏：保持所有原功能，但不再占据整列宽度。 */
+    .left {
+        order:1;
+        width:100%;
+        height:auto;
+        flex:0 0 auto;
+        display:flex;
+        flex-direction:row;
+        align-items:stretch;
+        gap:6px;
+        padding:6px max(6px, env(safe-area-inset-right)) 6px max(6px, env(safe-area-inset-left));
+        border-bottom:1px solid var(--surface-3);
+        overflow:hidden;
+    }
+
+    .left > .btn {
+        width:auto;
+        flex:0 0 auto;
+        margin:0;
+        padding:8px 10px;
+        min-height:38px;
+        white-space:nowrap;
+        font-size:14px;
+    }
+
+    #sessions {
+        flex:1 1 auto;
+        min-width:0;
+        display:flex;
+        align-items:stretch;
+        gap:6px;
+        overflow-x:auto;
+        overflow-y:hidden;
+        padding:0;
+        scrollbar-width:none;
+    }
+
+    #sessions::-webkit-scrollbar {
+        display:none;
+    }
+
+    .session {
+        flex:0 0 auto;
+        width:auto;
+        min-width:108px;
+        max-width:158px;
+        min-height:38px;
+        margin:0;
+        padding:7px 8px;
+        gap:5px;
+    }
+
+    .session span {
+        max-width:112px;
+    }
+
+    .session .del {
+        width:18px;
+        height:18px;
+        margin-left:2px;
+    }
+
+    #appearanceBtn {
+        padding-left:9px;
+        padding-right:9px;
+    }
+
+    /* 会话信息 / 学习记录放在聊天区上方，限制高度，可独立滚动。 */
+    .right {
+        order:2;
+        width:100%;
+        flex:0 0 auto;
+        max-height:min(24dvh, 190px);
+        overflow-y:auto;
+        padding:8px 10px;
+        border-bottom:1px solid var(--surface-3);
+    }
+
+    .right .panel-heading-row {
+        margin-bottom:4px;
+    }
+
+    .right .small,
+    .right .learning-summary {
+        font-size:12px;
+        line-height:1.45;
+    }
+
+    .learning-panel {
+        margin-top:9px;
+        padding-top:8px;
+    }
+
+    .learning-title {
+        margin-bottom:4px !important;
+    }
+
+    .learning-actions {
+        margin-top:6px;
+        gap:6px;
+    }
+
+    .learning-actions button {
+        min-height:34px;
+        padding:6px 7px;
+        font-size:12px;
+    }
+
+    .learning-note {
+        margin-top:5px;
+        font-size:11px;
+    }
+
+    /* 聊天成为手机端主要区域，输入框始终跟着聊天区落在底部。 */
+    .center {
+        order:3;
+        width:100%;
+        min-width:0;
+        min-height:0;
+        flex:1 1 auto;
+        display:flex;
+        flex-direction:column;
+    }
+
+    .chat {
+        min-height:0;
+        flex:1 1 auto;
+        padding:10px 10px 6px;
+    }
+
+    .msg {
+        max-width:92%;
+        padding:10px 12px 8px;
+        margin:7px 0;
+        border-radius:10px;
+        line-height:1.55;
+    }
+
+    .input-wrap {
+        flex:0 0 auto;
+        padding-bottom:env(safe-area-inset-bottom);
+        background:var(--surface-1);
+    }
+
+    .input {
+        gap:6px;
+        padding:8px;
+    }
+
+    .input input {
+        min-width:0;
+        padding:9px 10px;
+        font-size:16px;
+    }
+
+    .input button {
+        flex:0 0 auto;
+        padding:9px 11px;
+        min-height:38px;
+        white-space:nowrap;
+        font-size:14px;
+    }
+
+    #ocrCancelBtn {
+        width:30px;
+        height:30px;
+        min-height:30px;
+        align-self:center;
+    }
+
+    .input-lock-hint {
+        min-height:0;
+        padding:0 10px 7px;
+        font-size:12px;
+    }
+
+    .empty-tip {
+        margin-top:28px;
+    }
+
+    /* 移动端弹窗只缩放尺寸，不改变功能。 */
+    .modal {
+        padding:10px;
+    }
+
+    .modal-card,
+    .graph-modal-card,
+    .appearance-card,
+    .learning-review-card {
+        max-width:100%;
+        max-height:calc(100dvh - 20px);
+    }
+}
+
+@media (max-width: 420px) {
+    .left > .btn {
+        padding-left:8px;
+        padding-right:8px;
+        font-size:13px;
+    }
+
+    .session {
+        min-width:96px;
+        max-width:138px;
+    }
+
+    .session span {
+        max-width:94px;
+    }
+
+    .right {
+        max-height:min(22dvh, 168px);
+    }
+
+    .msg {
+        max-width:95%;
+    }
+
+    .input button {
+        padding-left:9px;
+        padding-right:9px;
+        font-size:13px;
+    }
+}
+
+
+
+/* =========================================================
+   完整响应式补强：手机 / 平板 / 横屏手机
+   只调整布局与尺寸，不改变任何业务功能。
+   ========================================================= */
+
+/* 平板与横屏手机：顶部会话栏 + 聊天主体 + 右侧学习信息。 */
+@media (min-width: 761px) and (max-width: 1100px) {
+    html,
+    body {
+        width:100%;
+        min-width:0;
+        height:100%;
+        overflow:hidden;
+    }
+
+    body {
+        min-height:100dvh;
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+    }
+
+    .layout {
+        width:100%;
+        height:100dvh;
+        min-height:100vh;
+        display:grid;
+        grid-template-columns:minmax(0, 1fr) minmax(250px, 32vw);
+        grid-template-rows:auto minmax(0, 1fr);
+        grid-template-areas:
+            "sessionbar sessionbar"
+            "chatpanel infopanel";
+        overflow:hidden;
+    }
+
+    .left {
+        grid-area:sessionbar;
+        width:auto;
+        height:auto;
+        min-width:0;
+        display:flex;
+        flex-direction:row;
+        align-items:stretch;
+        gap:7px;
+        padding:7px max(8px, env(safe-area-inset-right)) 7px max(8px, env(safe-area-inset-left));
+        border-bottom:1px solid var(--surface-3);
+        overflow:hidden;
+    }
+
+    .left > .btn {
+        width:auto;
+        flex:0 0 auto;
+        min-height:40px;
+        margin:0;
+        padding:8px 12px;
+        white-space:nowrap;
+        font-size:14px;
+    }
+
+    #sessions {
+        flex:1 1 auto;
+        min-width:0;
+        display:flex;
+        align-items:stretch;
+        gap:7px;
+        overflow-x:auto;
+        overflow-y:hidden;
+        scrollbar-width:none;
+    }
+
+    #sessions::-webkit-scrollbar { display:none; }
+
+    .session {
+        flex:0 0 auto;
+        width:auto;
+        min-width:124px;
+        max-width:190px;
+        min-height:40px;
+        margin:0;
+        padding:8px 9px;
+    }
+
+    .session span { max-width:142px; }
+
+    .center {
+        grid-area:chatpanel;
+        min-width:0;
+        min-height:0;
+        width:auto;
+    }
+
+    .chat {
+        padding:14px 14px 8px;
+    }
+
+    .msg { max-width:88%; }
+
+    .right {
+        grid-area:infopanel;
+        width:auto;
+        min-width:0;
+        min-height:0;
+        overflow-y:auto;
+        padding:12px;
+        border-left:1px solid var(--surface-3);
+    }
+
+    .input-wrap { min-width:0; }
+
+    .modal {
+        padding:16px;
+    }
+
+    .modal-card,
+    .appearance-card,
+    .learning-review-card,
+    .wrong-picker-card,
+    .wrong-safe-card,
+    .wrong-edit-card {
+        width:min(820px, calc(100vw - 32px));
+        max-width:calc(100vw - 32px);
+        max-height:calc(100dvh - 32px);
+    }
+
+    .graph-modal-card {
+        width:calc(100vw - 32px);
+        max-width:calc(100vw - 32px);
+        height:calc(100dvh - 32px);
+        max-height:calc(100dvh - 32px);
+    }
+
+    .ocr-review-dialog {
+        width:calc(100vw - 32px);
+        max-width:calc(100vw - 32px);
+        max-height:calc(100dvh - 32px);
+    }
+
+    .wrong-tools {
+        grid-template-columns:minmax(220px, 1fr) repeat(3, auto);
+    }
+
+    .knowledge-graph-layout {
+        grid-template-columns:minmax(0, 1fr) minmax(240px, 31%);
+    }
+}
+
+/* 手机：所有大弹窗直接使用手机全屏工作区。 */
+@media (max-width: 760px) {
+    .modal {
+        padding:0;
+        align-items:stretch;
+        justify-content:stretch;
+    }
+
+    .modal-card,
+    .appearance-card,
+    .learning-review-card,
+    .wrong-picker-card,
+    .wrong-safe-card,
+    .wrong-edit-card,
+    .graph-modal-card {
+        width:100%;
+        max-width:100%;
+        height:100dvh;
+        max-height:100dvh;
+        min-height:0;
+        border:none;
+        border-radius:0;
+        box-shadow:none;
+    }
+
+    .modal-head {
+        flex:0 0 auto;
+        min-height:50px;
+        padding:11px 12px;
+        padding-top:max(11px, env(safe-area-inset-top));
+    }
+
+    .modal-head .modal-close-dot {
+        width:22px;
+        height:22px;
+    }
+
+    /* 错题本 */
+    #wrongBookModal .modal-card {
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+    }
+
+    .wrong-toolbar {
+        flex:0 0 auto;
+        align-items:stretch;
+        flex-direction:column;
+        gap:8px;
+        padding:8px 10px;
+    }
+
+    .wrong-stats {
+        font-size:12px;
+        line-height:1.5;
+    }
+
+    .wrong-filter-group {
+        width:100%;
+        align-items:stretch;
+        flex-direction:column;
+        gap:6px;
+    }
+
+    .wrong-filters {
+        width:100%;
+        display:flex;
+        gap:6px;
+        overflow-x:auto;
+        overflow-y:hidden;
+        padding-bottom:1px;
+        scrollbar-width:none;
+    }
+
+    .wrong-filters::-webkit-scrollbar { display:none; }
+
+    .wrong-filters button {
+        flex:0 0 auto;
+        min-height:36px;
+        padding:7px 10px;
+    }
+
+    .wrong-tools {
+        flex:0 0 auto;
+        grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+        gap:7px;
+        padding:8px 10px;
+    }
+
+    .wrong-search-wrap {
+        grid-column:1 / -1;
+    }
+
+    .wrong-tools input,
+    .wrong-tools select,
+    .wrong-tools button {
+        min-width:0;
+        min-height:40px;
+        font-size:14px;
+    }
+
+    #wrongBookList {
+        flex:1 1 auto;
+        min-height:0;
+        overflow-y:auto;
+        padding:10px;
+        padding-bottom:max(10px, env(safe-area-inset-bottom));
+    }
+
+    .wrong-card {
+        padding:11px;
+        margin-bottom:10px;
+    }
+
+    .wrong-card-top {
+        gap:7px;
+        flex-wrap:wrap;
+    }
+
+    .wrong-meta-row {
+        grid-template-columns:minmax(72px, auto) minmax(0, 1fr);
+    }
+
+    .wrong-actions {
+        gap:6px;
+    }
+
+    .wrong-actions button {
+        min-height:36px;
+    }
+
+    /* 选题、确认、编辑错题 */
+    .wrong-picker-list,
+    .wrong-safe-body,
+    .wrong-edit-body,
+    .learning-review-body,
+    .appearance-body {
+        flex:1 1 auto;
+        min-height:0;
+        overflow-y:auto;
+    }
+
+    .wrong-picker-intro {
+        flex:0 0 auto;
+        padding:10px 12px;
+    }
+
+    .wrong-picker-list {
+        max-height:none;
+        padding:10px 12px;
+    }
+
+    .wrong-picker-actions,
+    .wrong-safe-actions,
+    .wrong-edit-actions,
+    .learning-review-actions,
+    .appearance-footer {
+        flex:0 0 auto;
+        padding:10px 12px max(10px, env(safe-area-inset-bottom));
+        gap:8px;
+        flex-wrap:wrap;
+    }
+
+    .wrong-picker-actions button,
+    .wrong-safe-actions button,
+    .wrong-edit-actions button,
+    .learning-review-actions button,
+    .appearance-footer button {
+        min-height:42px;
+        flex:1 1 120px;
+    }
+
+    .wrong-safe-body textarea {
+        min-height:180px;
+    }
+
+    .wrong-edit-body textarea {
+        min-height:100px;
+    }
+
+    /* 学习回顾 */
+    .learning-review-section {
+        padding:11px 12px;
+    }
+
+    /* 外观 */
+    .appearance-body {
+        padding:4px 12px 12px;
+    }
+
+    .appearance-background-row {
+        align-items:stretch;
+        flex-direction:column;
+    }
+
+    .appearance-background-preview {
+        width:100%;
+        height:120px;
+    }
+
+    .appearance-background-actions {
+        width:100%;
+    }
+
+    .appearance-background-actions button {
+        flex:1 1 120px;
+        min-height:40px;
+    }
+
+    .appearance-segmented button {
+        min-height:40px;
+    }
+
+    /* OCR 核对：手机上全屏，图片与编辑区纵向排列。 */
+    .ocr-review-dialog {
+        position:fixed;
+        inset:0;
+        width:100vw;
+        max-width:100vw;
+        height:100dvh;
+        max-height:100dvh;
+        margin:0;
+        padding:12px;
+        padding-top:max(12px, env(safe-area-inset-top));
+        padding-bottom:max(12px, env(safe-area-inset-bottom));
+        border:none;
+        border-radius:0;
+        overflow-y:auto;
+    }
+
+    .ocr-review-body {
+        grid-template-columns:minmax(0, 1fr);
+        gap:12px;
+    }
+
+    .ocr-review-preview {
+        max-height:30dvh;
+    }
+
+    .ocr-review-fields textarea {
+        min-height:96px;
+        margin-bottom:12px;
+    }
+
+    .ocr-review-actions {
+        position:sticky;
+        bottom:0;
+        z-index:2;
+        padding-top:10px;
+        padding-bottom:max(2px, env(safe-area-inset-bottom));
+        background:var(--surface-2);
+        flex-wrap:wrap;
+    }
+
+    .ocr-review-actions button {
+        flex:1 1 120px;
+        min-height:42px;
+    }
+
+    /* 知识图谱：全屏，上图谱、下详情；两个标签仍保持同一行。 */
+    .graph-modal-card {
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+    }
+
+    .graph-toolbar {
+        flex:0 0 auto;
+        padding:8px 10px;
+        align-items:stretch;
+        flex-direction:column;
+        gap:7px;
+    }
+
+    .graph-toolbar-left {
+        width:100%;
+        display:grid;
+        grid-template-columns:auto minmax(0, 1fr);
+        gap:7px;
+    }
+
+    .graph-toolbar-left label {
+        align-self:center;
+    }
+
+    .graph-toolbar-left select {
+        min-width:0;
+        width:100%;
+    }
+
+    .graph-toolbar-left button {
+        min-height:38px;
+    }
+
+    .graph-toolbar-left button:nth-of-type(1),
+    .graph-toolbar-left button:nth-of-type(2),
+    .graph-toolbar-left button:nth-of-type(3) {
+        grid-column:span 1;
+    }
+
+    .graph-legend {
+        min-width:0;
+        justify-content:flex-start;
+    }
+
+    .knowledge-graph-layout {
+        flex:1 1 auto;
+        min-height:0;
+        display:flex;
+        flex-direction:column;
+        overflow-y:auto;
+    }
+
+    .knowledge-graph-main {
+        flex:1 0 auto;
+        min-height:300px;
+        border-right:none;
+        border-bottom:1px solid var(--surface-3);
+    }
+
+    .graph-summary {
+        flex:0 0 auto;
+        align-items:flex-start;
+        flex-direction:column;
+        padding:8px 10px;
+    }
+
+    .graph-summary-item {
+        max-width:100%;
+    }
+
+    .graph-summary-value {
+        max-width:min(72vw, 320px);
+    }
+
+    .knowledge-graph-canvas {
+        min-height:240px;
+        padding:8px;
+    }
+
+    .kg-section {
+        min-width:max-content;
+        padding:8px;
+    }
+
+    .kg-svg {
+        width:auto;
+        min-width:100%;
+        max-width:none;
+    }
+
+    .knowledge-graph-side {
+        flex:0 0 auto;
+        min-height:210px;
+        max-height:38dvh;
+        border-bottom:none;
+    }
+
+    .graph-side-tabs {
+        flex:0 0 auto;
+        display:flex !important;
+        flex-wrap:nowrap !important;
+        gap:7px;
+        padding:8px;
+    }
+
+    .graph-side-tab {
+        flex:1 1 0 !important;
+        white-space:nowrap !important;
+        font-size:14px !important;
+        min-height:40px;
+    }
+
+    .graph-side-page {
+        min-height:0;
+    }
+
+    .graph-detail-body,
+    .graph-history-list {
+        min-height:0;
+        overflow-y:auto;
+    }
+}
+
+/* 极窄手机（例如 320~360 CSS px）再压一档，避免按钮互相挤压。 */
+@media (max-width: 360px) {
+    .left {
+        gap:4px;
+        padding-left:4px;
+        padding-right:4px;
+    }
+
+    .left > .btn {
+        padding-left:7px;
+        padding-right:7px;
+        font-size:12px;
+    }
+
+    .session {
+        min-width:90px;
+        max-width:124px;
+    }
+
+    .session span { max-width:80px; }
+
+    .right {
+        max-height:min(21dvh, 150px);
+        padding:7px 8px;
+    }
+
+    .input {
+        gap:4px;
+        padding:6px;
+    }
+
+    .input button {
+        padding-left:7px;
+        padding-right:7px;
+        font-size:12px;
+    }
+
+    .wrong-tools {
+        grid-template-columns:1fr;
+    }
+
+    .wrong-search-wrap {
+        grid-column:1;
+    }
+
+    .graph-toolbar-left {
+        grid-template-columns:1fr;
+    }
+
+    .graph-toolbar-left label,
+    .graph-toolbar-left select,
+    .graph-toolbar-left button {
+        grid-column:1 !important;
+        width:100%;
+    }
+}
+
+/* 横屏手机：采用平板式主布局，避免纵向堆叠吃掉聊天高度。 */
+@media (min-width: 761px) and (max-width: 950px) and (max-height: 520px) {
+    .right {
+        font-size:12px;
+    }
+
+    .chat {
+        padding-top:8px;
+    }
+
+    .modal {
+        padding:6px;
+    }
+
+    .modal-card,
+    .graph-modal-card,
+    .appearance-card,
+    .learning-review-card,
+    .wrong-picker-card,
+    .wrong-safe-card,
+    .wrong-edit-card {
+        max-height:calc(100dvh - 12px);
+    }
 }
 
 </style>
