@@ -7396,58 +7396,137 @@ function effectiveElementBackground(element) {
     return "#ffffff";
 }
 
-async function copyKnowledgeGraphVisual() {
-    const target = document.getElementById("knowledgeGraphCanvas");
-    if (!target) return false;
+function buildKnowledgeGraphImageCopyTarget() {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const svg = canvas?.querySelector?.(".kg-svg");
+    if (!canvas || !svg) return null;
 
-    const payload = buildClipboardPayload(target);
-
-    if (
-        window.html2canvas
-        && navigator.clipboard?.write
-        && window.ClipboardItem
-    ) {
-        try {
-            if (document.fonts?.ready) {
-                await document.fonts.ready.catch(() => {});
-            }
-
-            const canvas = await html2canvas(target, {
-                backgroundColor: effectiveElementBackground(target),
-                scale: 2,
-                useCORS: true,
-                logging: false
-            });
-
-            const png = await new Promise(resolve => {
-                canvas.toBlob(resolve, "image/png");
-            });
-
-            if (png) {
-                const item = new ClipboardItem({
-                    "image/png": png,
-                    "text/plain": new Blob(
-                        [payload.text],
-                        { type: "text/plain" }
-                    ),
-                    "text/html": new Blob(
-                        [payload.html],
-                        { type: "text/html" }
-                    )
-                });
-
-                await navigator.clipboard.write([item]);
-                showCopyToast("图谱已复制");
-                return true;
-            }
-        } catch (error) {
-            console.warn("图谱图片复制失败，改用富文本：", error);
-        }
+    // 复制整张图谱，而不是当前滚动窗口能看到的那一截。
+    // getBBox() 会覆盖 SVG 中实际存在的所有节点和连线，包括当前画布下方
+    // 需要滚动才能看到的部分；再额外留一点边距，避免最底/最边缘被裁掉。
+    let bbox = null;
+    try {
+        bbox = svg.getBBox();
+    } catch (_error) {
+        bbox = null;
     }
 
-    const ok = await writeRichClipboard(payload);
-    if (ok) showCopyToast("图谱已复制");
-    return ok;
+    const fallbackViewBox = svg.viewBox?.baseVal;
+    const padding = 18;
+    const x = Number.isFinite(bbox?.x)
+        ? bbox.x - padding
+        : (fallbackViewBox?.x || 0);
+    const y = Number.isFinite(bbox?.y)
+        ? bbox.y - padding
+        : (fallbackViewBox?.y || 0);
+    const width = Math.ceil(
+        (Number.isFinite(bbox?.width) && bbox.width > 0
+            ? bbox.width + padding * 2
+            : fallbackViewBox?.width)
+        || svg.scrollWidth
+        || svg.getBoundingClientRect().width
+        || 1
+    );
+    const height = Math.ceil(
+        (Number.isFinite(bbox?.height) && bbox.height > 0
+            ? bbox.height + padding * 2
+            : fallbackViewBox?.height)
+        || svg.scrollHeight
+        || svg.getBoundingClientRect().height
+        || 1
+    );
+
+    const wrapper = document.createElement("div");
+    wrapper.style.position = "absolute";
+    wrapper.style.left = "0";
+    wrapper.style.top = `${Math.max(
+        document.documentElement.scrollHeight,
+        document.body?.scrollHeight || 0
+    ) + 100}px`;
+    wrapper.style.width = `${width}px`;
+    wrapper.style.height = `${height}px`;
+    wrapper.style.padding = "0";
+    wrapper.style.margin = "0";
+    wrapper.style.background = effectiveElementBackground(canvas) || "#07142d";
+    wrapper.style.overflow = "visible";
+    wrapper.style.pointerEvents = "none";
+    wrapper.style.zIndex = "-2147483648";
+
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("viewBox", `${x} ${y} ${width} ${height}`);
+    clone.setAttribute("width", String(width));
+    clone.setAttribute("height", String(height));
+    clone.style.setProperty("width", `${width}px`, "important");
+    clone.style.setProperty("height", `${height}px`, "important");
+    clone.style.maxWidth = "none";
+    clone.style.maxHeight = "none";
+    clone.style.display = "block";
+    clone.style.overflow = "visible";
+    clone.style.background = "transparent";
+
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+    return wrapper;
+}
+
+async function copyKnowledgeGraphVisual() {
+    const target = buildKnowledgeGraphImageCopyTarget();
+    if (!target) return false;
+
+    try {
+        if (
+            window.html2canvas
+            && navigator.clipboard?.write
+            && window.ClipboardItem
+        ) {
+            try {
+                if (document.fonts?.ready) {
+                    await document.fonts.ready.catch(() => {});
+                }
+
+                const exportWidth = Math.ceil(
+                    target.scrollWidth || target.getBoundingClientRect().width || 1
+                );
+                const exportHeight = Math.ceil(
+                    target.scrollHeight || target.getBoundingClientRect().height || 1
+                );
+
+                const canvas = await html2canvas(target, {
+                    backgroundColor: effectiveElementBackground(target),
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    width: exportWidth,
+                    height: exportHeight,
+                    windowWidth: Math.max(window.innerWidth, exportWidth),
+                    windowHeight: Math.max(window.innerHeight, exportHeight),
+                    scrollX: 0,
+                    scrollY: 0
+                });
+
+                const png = await new Promise(resolve => {
+                    canvas.toBlob(resolve, "image/png");
+                });
+
+                if (png) {
+                    const item = new ClipboardItem({
+                        "image/png": png
+                    });
+
+                    await navigator.clipboard.write([item]);
+                    showCopyToast("图谱已复制");
+                    return true;
+                }
+            } catch (error) {
+                console.warn("图谱纯图片复制失败：", error);
+            }
+        }
+
+        const ok = await copyRenderedNode(target, "图谱已复制");
+        return ok;
+    } finally {
+        target.remove();
+    }
 }
 
 function selectionNodeElement(node) {
