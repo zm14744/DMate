@@ -14188,6 +14188,88 @@ function renderInfo() {
 
 
 // -----------------------------
+// 移动端应用壳：对话抽屉 / 学习工具抽屉
+// -----------------------------
+function isMobileAppShell() {
+    return window.matchMedia?.("(max-width: 1100px)")?.matches ?? false;
+}
+
+function closeMobileShellDrawers() {
+    document.body.classList.remove("mobile-left-open", "mobile-tools-open");
+}
+
+function openMobileShellDrawer(kind) {
+    if (!isMobileAppShell()) return;
+
+    document.body.classList.remove("mobile-left-open", "mobile-tools-open");
+    document.body.classList.add(
+        kind === "tools" ? "mobile-tools-open" : "mobile-left-open"
+    );
+}
+
+function refreshMobileConversationTitle() {
+    const title = document.getElementById("mobileConversationTitle");
+    if (!title) return;
+
+    const session = getCurrent();
+    const name = typeof session?.name === "string" ? session.name.trim() : "";
+    title.textContent = name || "离散数学助手";
+}
+
+function initMobileAppShell() {
+    const navBtn = document.getElementById("mobileNavBtn");
+    const toolsBtn = document.getElementById("mobileToolsBtn");
+    const navClose = document.getElementById("mobileNavClose");
+    const toolsClose = document.getElementById("mobileToolsClose");
+    const backdrop = document.getElementById("mobileShellBackdrop");
+    const sessionsBox = document.getElementById("sessions");
+    const newChatBtn = document.querySelector(".left > .btn:not(.appearance-entry)");
+
+    navBtn?.addEventListener("click", () => openMobileShellDrawer("left"));
+    toolsBtn?.addEventListener("click", () => openMobileShellDrawer("tools"));
+    navClose?.addEventListener("click", closeMobileShellDrawers);
+    toolsClose?.addEventListener("click", closeMobileShellDrawers);
+    backdrop?.addEventListener("click", closeMobileShellDrawers);
+
+    sessionsBox?.addEventListener("click", event => {
+        if (event.target.closest(".session span")) {
+            closeMobileShellDrawers();
+        }
+    });
+
+    newChatBtn?.addEventListener("click", () => {
+        window.setTimeout(closeMobileShellDrawers, 0);
+    });
+
+    [
+        "appearanceBtn",
+        "markWrongBtn",
+        "wrongBookBtn",
+        "knowledgeGraphBtn",
+        "learningReviewBtn"
+    ].forEach(id => {
+        document.getElementById(id)?.addEventListener("click", () => {
+            window.setTimeout(closeMobileShellDrawers, 0);
+        });
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            closeMobileShellDrawers();
+        }
+    });
+
+    const media = window.matchMedia?.("(max-width: 1100px)");
+    media?.addEventListener?.("change", event => {
+        if (!event.matches) {
+            closeMobileShellDrawers();
+        }
+    });
+
+    refreshMobileConversationTitle();
+}
+
+// -----------------------------
 // 全刷新
 // -----------------------------
 function renderAll() {
@@ -14197,6 +14279,7 @@ function renderAll() {
     renderLearningSummary();
     renderKnowledgeGraph();
     refreshInputAvailability();
+    refreshMobileConversationTitle();
 }
 
 
@@ -14221,6 +14304,7 @@ document.addEventListener(
         removeDeprecatedCopyControls();
         initAppearanceSystem();
         installRichSelectionCopy();
+        initMobileAppShell();
 
         const input = document.getElementById("text");
         const chat = document.getElementById("chat");
