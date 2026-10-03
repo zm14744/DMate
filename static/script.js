@@ -184,8 +184,13 @@ function applyAppearanceSettings(options = {}) {
 
     body.dataset.appearanceTheme = theme;
     root.dataset.appearanceTheme = theme;
-    root.style.colorScheme = theme;
-    body.style.colorScheme = theme;
+
+    // 用户明确选择浅色时用 only light，阻止部分安卓浏览器再次强制染成深色。
+    const browserColorScheme = theme === "light" ? "only light" : "dark";
+    root.style.colorScheme = browserColorScheme;
+    body.style.colorScheme = browserColorScheme;
+    document.querySelector('meta[name="color-scheme"]')
+        ?.setAttribute("content", theme);
     root.style.setProperty("--accent", accent.main);
     root.style.setProperty("--accent-rgb", accent.rgb);
     root.style.setProperty("--accent-deep", accent.deep);
@@ -13336,11 +13341,12 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         );
     }
 
-    const nodeWidth = 132;
-    const nodeHeight = 58;
-    const horizontalGap = 74;
-    const verticalGap = 26;
-    const margin = 24;
+    const mobileGraphLayout = isMobileAppShell();
+    const nodeWidth = mobileGraphLayout ? 156 : 132;
+    const nodeHeight = mobileGraphLayout ? 64 : 58;
+    const horizontalGap = mobileGraphLayout ? 94 : 74;
+    const verticalGap = mobileGraphLayout ? 36 : 26;
+    const margin = mobileGraphLayout ? 30 : 24;
 
     const maxRows = Math.max(
         ...columnKeys.map(
@@ -13363,7 +13369,10 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
 
     const svg = createSvgElement("svg", {
         class: "kg-svg",
-        viewBox: `0 0 ${svgWidth} ${svgHeight}`
+        viewBox: `0 0 ${svgWidth} ${svgHeight}`,
+        width: svgWidth,
+        height: svgHeight,
+        preserveAspectRatio: "xMinYMin meet"
     });
 
     const positions = new Map();
@@ -13467,6 +13476,8 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
             x: nodeWidth / 2,
             y: 22,
             fill: graphIsLight ? "#0f172a" : "#f8fafc",
+            "font-size": mobileGraphLayout ? 14 : 12,
+            "font-weight": mobileGraphLayout ? 600 : 500,
             "text-anchor": "middle"
         });
 
@@ -13498,6 +13509,7 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
                 x: nodeWidth / 2,
                 y: nodeHeight - 10,
                 fill: graphIsLight ? "#475569" : "#cbd5e1",
+                "font-size": mobileGraphLayout ? 11 : 10,
                 "text-anchor": "middle"
             });
             badge.textContent = nodeBadge;
@@ -14089,6 +14101,111 @@ function refreshMobileConversationTitle() {
     title.textContent = name || "离散数学助手";
 }
 
+
+function mobileSwipeBlockedTarget(target) {
+    if (!(target instanceof Element)) return false;
+
+    return Boolean(target.closest([
+        "input",
+        "textarea",
+        "select",
+        "button",
+        "a",
+        "[contenteditable='true']",
+        "mjx-container",
+        ".knowledge-graph-canvas",
+        ".kg-history-preview",
+        ".wrong-question",
+        ".wrong-feedback-body",
+        ".wrong-answer-body",
+        ".wrong-solution-body",
+        ".wrong-analysis-body"
+    ].join(",")));
+}
+
+function mobileOverlayIsOpen() {
+    return Boolean(
+        document.querySelector(".modal:not(.hidden)")
+        || document.querySelector("dialog[open]")
+    );
+}
+
+function installMobileSwipeNavigation() {
+    const center = document.querySelector(".center");
+    const left = document.querySelector(".left");
+    const right = document.querySelector(".right");
+    if (!center) return;
+
+    const threshold = 72;
+    const maxDuration = 900;
+
+    const bindSwipe = (element, onSwipe) => {
+        if (!element) return;
+        let start = null;
+
+        element.addEventListener("touchstart", event => {
+            if (!isMobileAppShell() || event.touches.length !== 1) {
+                start = null;
+                return;
+            }
+            if (mobileOverlayIsOpen() || mobileSwipeBlockedTarget(event.target)) {
+                start = null;
+                return;
+            }
+            const touch = event.touches[0];
+            start = {
+                x: touch.clientX,
+                y: touch.clientY,
+                time: Date.now()
+            };
+        }, { passive:true });
+
+        element.addEventListener("touchend", event => {
+            if (!start || !isMobileAppShell()) {
+                start = null;
+                return;
+            }
+            const touch = event.changedTouches?.[0];
+            if (!touch) {
+                start = null;
+                return;
+            }
+
+            const dx = touch.clientX - start.x;
+            const dy = touch.clientY - start.y;
+            const elapsed = Date.now() - start.time;
+            start = null;
+
+            if (
+                elapsed > maxDuration
+                || Math.abs(dx) < threshold
+                || Math.abs(dx) < Math.abs(dy) * 1.25
+            ) {
+                return;
+            }
+
+            onSwipe(dx);
+        }, { passive:true });
+    };
+
+    // 主页面：右滑打开左侧对话；左滑打开右侧学习工具。
+    bindSwipe(center, dx => {
+        if (document.body.classList.contains("mobile-left-open")
+            || document.body.classList.contains("mobile-tools-open")) {
+            return;
+        }
+        openMobileShellDrawer(dx > 0 ? "left" : "tools");
+    });
+
+    // 抽屉也支持反向滑回去。
+    bindSwipe(left, dx => {
+        if (dx < 0) closeMobileShellDrawers();
+    });
+    bindSwipe(right, dx => {
+        if (dx > 0) closeMobileShellDrawers();
+    });
+}
+
 function initMobileAppShell() {
     const navBtn = document.getElementById("mobileNavBtn");
     const toolsBtn = document.getElementById("mobileToolsBtn");
@@ -14178,6 +14295,7 @@ document.addEventListener(
         initAppearanceSystem();
         installRichSelectionCopy();
         initMobileAppShell();
+        installMobileSwipeNavigation();
 
         const input = document.getElementById("text");
         const chat = document.getElementById("chat");
