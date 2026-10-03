@@ -183,6 +183,9 @@ function applyAppearanceSettings(options = {}) {
     const theme = resolveAppearanceTheme();
 
     body.dataset.appearanceTheme = theme;
+    root.dataset.appearanceTheme = theme;
+    root.style.colorScheme = theme;
+    body.style.colorScheme = theme;
     root.style.setProperty("--accent", accent.main);
     root.style.setProperty("--accent-rgb", accent.rgb);
     root.style.setProperty("--accent-deep", accent.deep);
@@ -239,6 +242,15 @@ function applyAppearanceSettings(options = {}) {
     }
 
     syncAppearanceControls();
+
+    const graphModal = document.getElementById("knowledgeGraphModal");
+    if (
+        graphModal
+        && !graphModal.classList.contains("hidden")
+        && typeof renderKnowledgeGraph === "function"
+    ) {
+        renderKnowledgeGraph();
+    }
 }
 
 function syncAppearanceControls() {
@@ -415,14 +427,45 @@ function updateAppearanceBackgroundUi() {
         if (appearanceHasBackground && appearanceBackgroundObjectUrl) {
             preview.textContent = "";
             preview.style.backgroundImage = `url("${appearanceBackgroundObjectUrl}")`;
+            preview.dataset.hasBackground = "true";
+            preview.tabIndex = 0;
+            preview.setAttribute("role", "button");
+            preview.setAttribute("aria-label", "查看当前背景大图");
         } else {
             preview.textContent = "无背景";
             preview.style.backgroundImage = "none";
+            preview.dataset.hasBackground = "false";
+            preview.removeAttribute("tabindex");
+            preview.removeAttribute("role");
+            preview.removeAttribute("aria-label");
         }
     }
 
     if (remove) {
         remove.disabled = !appearanceHasBackground;
+    }
+}
+
+
+function openAppearanceBackgroundViewer() {
+    if (!appearanceHasBackground || !appearanceBackgroundObjectUrl) return;
+
+    const modal = document.getElementById("appearanceBackgroundViewer");
+    const image = document.getElementById("appearanceBackgroundViewerImage");
+    if (!modal || !image) return;
+
+    image.src = appearanceBackgroundObjectUrl;
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+}
+
+function closeAppearanceBackgroundViewer() {
+    const modal = document.getElementById("appearanceBackgroundViewer");
+    const image = document.getElementById("appearanceBackgroundViewerImage");
+    if (image) image.removeAttribute("src");
+    if (modal) {
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
     }
 }
 
@@ -529,6 +572,8 @@ async function handleAppearanceBackgroundSelected(event) {
 }
 
 async function removeAppearanceBackground() {
+    closeAppearanceBackgroundViewer();
+
     try {
         await deleteAppearanceBackgroundBlob();
     } catch (_error) {
@@ -539,6 +584,7 @@ async function removeAppearanceBackground() {
 }
 
 async function resetAppearance() {
+    closeAppearanceBackgroundViewer();
     appearanceSettings = { ...APPEARANCE_DEFAULTS };
     saveAppearanceSettings();
 
@@ -580,6 +626,9 @@ function bindAppearanceControls() {
     const upload = document.getElementById("appearanceBackgroundUpload");
     const remove = document.getElementById("appearanceBackgroundRemove");
     const input = document.getElementById("appearanceBackgroundInput");
+    const preview = document.getElementById("appearanceBackgroundPreview");
+    const viewer = document.getElementById("appearanceBackgroundViewer");
+    const viewerClose = document.getElementById("appearanceBackgroundViewerClose");
 
     appearanceBtn?.addEventListener("click", openAppearance);
     appearanceClose?.addEventListener("click", closeAppearance);
@@ -595,6 +644,18 @@ function bindAppearanceControls() {
     upload?.addEventListener("click", () => input?.click());
     remove?.addEventListener("click", removeAppearanceBackground);
     input?.addEventListener("change", handleAppearanceBackgroundSelected);
+
+    preview?.addEventListener("click", openAppearanceBackgroundViewer);
+    preview?.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openAppearanceBackgroundViewer();
+        }
+    });
+    viewerClose?.addEventListener("click", closeAppearanceBackgroundViewer);
+    viewer?.addEventListener("click", event => {
+        if (event.target === viewer) closeAppearanceBackgroundViewer();
+    });
 
     document.querySelectorAll("[data-appearance-mode]").forEach(button => {
         button.addEventListener("click", () => {
@@ -1156,138 +1217,9 @@ function normalizeLearningState(value) {
             })
             .filter(Boolean);
 
-        // 老版本可能因为知识点识别略有不同，把同一道题存了多份。
-        // 升级时按“题目本身”合并，避免用户看到重复卡片。
-        const mergedMap = new Map();
-
-        for (const item of normalizedWrong) {
-            const key = wrongQuestionFingerprint(item.question);
-            const existing = mergedMap.get(key);
-
-            if (!existing) {
-                mergedMap.set(key, item);
-                continue;
-            }
-
-            const newer = item.updatedAt >= existing.updatedAt
-                ? item
-                : existing;
-            const older = newer === item
-                ? existing
-                : item;
-
-            newer.knowledgePoints = [
-                ...new Set([
-                    ...older.knowledgePoints,
-                    ...newer.knowledgePoints
-                ])
-            ].slice(0, 4);
-
-            newer.focusPoints = [
-                ...new Set([
-                    ...newer.focusPoints,
-                    ...older.focusPoints
-                ])
-            ].slice(0, 2);
-
-            newer.mistakeCount = (
-                Math.max(0, Number(older.mistakeCount) || 0)
-                + Math.max(0, Number(newer.mistakeCount) || 0)
-            );
-
-            // 同一道题的多个旧记录合并时，以更新时间更晚的状态为准。
-            // 这样“后来已订正”不会被更早的待订正记录重新覆盖。
-            newer.corrected = Boolean(newer.corrected);
-            newer.correctedAt = newer.corrected
-                ? (
-                    Number(newer.correctedAt)
-                    || Number(older.correctedAt)
-                    || null
-                )
-                : null;
-
-            newer.createdAt = Math.min(
-                older.createdAt,
-                newer.createdAt
-            );
-
-            newer.lastWrongAt = Math.max(
-                older.lastWrongAt,
-                newer.lastWrongAt
-            );
-
-            if (!newer.sessionId && older.sessionId) {
-                newer.sessionId = older.sessionId;
-            }
-
-            if (!newer.note && older.note) {
-                newer.note = older.note;
-            }
-
-            if (!newer.difficulty && older.difficulty) {
-                newer.difficulty = older.difficulty;
-            }
-
-            if (!newer.referenceAnswer && older.referenceAnswer) {
-                newer.referenceAnswer = older.referenceAnswer;
-            }
-
-            if (!newer.answer && older.answer) {
-                newer.answer = older.answer;
-                newer.answerUpdatedAt = older.answerUpdatedAt;
-            }
-
-            if (!newer.analysis && older.analysis) {
-                newer.analysis = older.analysis;
-                newer.analysisUpdatedAt = older.analysisUpdatedAt;
-            }
-
-            newer.retestCount = (
-                (Number(older.retestCount) || 0)
-                + (Number(newer.retestCount) || 0)
-            );
-            newer.retestPassCount = (
-                (Number(older.retestPassCount) || 0)
-                + (Number(newer.retestPassCount) || 0)
-            );
-            newer.retestFailCount = (
-                (Number(older.retestFailCount) || 0)
-                + (Number(newer.retestFailCount) || 0)
-            );
-
-            const newerRetestTime = Number(newer.lastRetestAt) || 0;
-            const olderRetestTime = Number(older.lastRetestAt) || 0;
-
-            if (olderRetestTime > newerRetestTime) {
-                newer.lastRetestAt = older.lastRetestAt;
-                newer.lastRetestQuestion = older.lastRetestQuestion;
-                newer.lastRetestFeedback = older.lastRetestFeedback;
-                newer.lastRetestResult = older.lastRetestResult;
-            }
-
-            newer.retestPassedAt = Math.max(
-                Number(newer.retestPassedAt) || 0,
-                Number(older.retestPassedAt) || 0
-            ) || null;
-
-            const latestWrongAt = Math.max(
-                Number(newer.lastWrongAt) || 0,
-                Number(older.lastWrongAt) || 0
-            );
-
-            newer.retestPassed = Boolean(
-                newer.retestPassedAt
-                && newer.retestPassedAt >= latestWrongAt
-            );
-
-            if (!newer.lastRetestSessionId && older.lastRetestSessionId) {
-                newer.lastRetestSessionId = older.lastRetestSessionId;
-            }
-
-            mergedMap.set(key, newer);
-        }
-
-        state.wrongQuestions = [...mergedMap.values()]
+        // 错题本本身允许出现重复题目：每次记录都作为独立学习记录保留。
+        // PDF 导出时会按题目内容单独去重，不影响这里的原始记录。
+        state.wrongQuestions = normalizedWrong
             .filter(
                 item => !isClearlyNonQuestionWrongBookText(
                     item.question
@@ -3750,82 +3682,7 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
         };
     }
 
-    const fingerprint = wrongQuestionFingerprint(info.text);
-
-    const existing = learningState.wrongQuestions.find(
-        item => wrongQuestionFingerprint(item.question) === fingerprint
-    );
-
     const now = Date.now();
-
-    if (existing) {
-        const wasCorrected = Boolean(existing.corrected);
-
-        existing.feedback = compactFeedback(feedback) || existing.feedback;
-
-        if (info.referenceAnswer) {
-            existing.referenceAnswer = info.referenceAnswer;
-        }
-
-        existing.knowledgePoints = [
-            ...new Set([
-                ...existing.knowledgePoints,
-                ...info.knowledgePoints
-            ])
-        ].slice(0, 4);
-
-        if (info.focusPoints.length) {
-            existing.focusPoints = info.focusPoints.slice(0, 2);
-        }
-
-        if (info.category) {
-            existing.category = info.category;
-        }
-
-        if (info.difficulty) {
-            existing.difficulty = info.difficulty;
-        }
-
-        if (info.sessionId !== null) {
-            existing.sessionId = info.sessionId;
-        }
-
-        if (source === "auto") {
-            existing.source = "auto";
-        }
-
-        existing.corrected = false;
-        existing.correctedAt = null;
-        existing.updatedAt = now;
-        existing.lastWrongAt = now;
-
-        // 手动重复点“记为错题”不重复累计；
-        // 真正再次答错，或订正后重新加入，才算一次新的错误记录。
-        const countAsMistake = (
-            source === "auto"
-            || wasCorrected
-        );
-
-        if (countAsMistake) {
-            existing.mistakeCount = (
-                Math.max(0, Number(existing.mistakeCount) || 0)
-                + 1
-            );
-            existing.retestPassed = false;
-            existing.retestPassedAt = null;
-        }
-
-        saveLearningState();
-
-        queueWrongQuestionAnswer(
-            existing.id
-        );
-
-        return {
-            entry: existing,
-            countAsMistake
-        };
-    }
 
     const entry = {
         id: `wrong-${now}-${Math.random().toString(36).slice(2, 8)}`,
@@ -5110,7 +4967,30 @@ function rollbackRetestAfterRequestFailure(session) {
     saveState();
 }
 
+function dedupeWrongBookItemsForPdf(items) {
+    const seen = new Set();
+    const unique = [];
+
+    for (const item of items || []) {
+        const fingerprint = wrongQuestionFingerprint(
+            item?.question
+        );
+        const key = fingerprint || `id:${item?.id || unique.length}`;
+
+        if (seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        unique.push(item);
+    }
+
+    return unique;
+}
+
 function buildWrongBookPdfExportElement(items) {
+    items = dedupeWrongBookItemsForPdf(items);
+
     const container = document.createElement("div");
     container.className = "wrong-pdf-export";
     container.style.position = "fixed";
@@ -5180,10 +5060,6 @@ function buildWrongBookPdfExportElement(items) {
                 `整题涉及：${item.knowledgePoints.join("、")}`
             );
         }
-
-        metaParts.push(
-            `累计记录错误：${item.mistakeCount || 1} 次`
-        );
 
         if (item.retestCount) {
             metaParts.push(
@@ -6349,13 +6225,6 @@ function renderWrongBook() {
             appendMetaRow(
                 "整题涉及",
                 item.knowledgePoints.join("、")
-            );
-        }
-
-        if (item.mistakeCount > 1) {
-            appendMetaRow(
-                "错误记录",
-                `${item.mistakeCount} 次`
             );
         }
 
@@ -13591,10 +13460,13 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         const lines = splitKnowledgeGraphLabel(
             node.name
         );
+        const graphIsLight = document.documentElement?.dataset?.appearanceTheme === "light"
+            || document.body?.dataset?.appearanceTheme === "light";
         const text = createSvgElement("text", {
             class: "kg-node-label",
             x: nodeWidth / 2,
             y: 22,
+            fill: graphIsLight ? "#0f172a" : "#f8fafc",
             "text-anchor": "middle"
         });
 
@@ -13625,6 +13497,7 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
                 class: "kg-node-badge",
                 x: nodeWidth / 2,
                 y: nodeHeight - 10,
+                fill: graphIsLight ? "#475569" : "#cbd5e1",
                 "text-anchor": "middle"
             });
             badge.textContent = nodeBadge;
