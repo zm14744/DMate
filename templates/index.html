@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>离散数学智能辅学系统</title>
 
 <style>
@@ -4125,6 +4126,182 @@ body[data-appearance-theme="light"] .appearance-segmented button.active {
     }
 }
 
+
+
+/* =========================================================
+   2026-10-03 手机图谱比例 + 真浅色最终覆盖
+   ========================================================= */
+
+/* 手机图谱：不允许 SVG 直接画出卡片边界。 */
+@media (max-width:760px) {
+    .knowledge-graph-main {
+        flex:0 0 auto !important;
+        min-height:0 !important;
+        max-height:none !important;
+        overflow:visible !important;
+    }
+
+    .knowledge-graph-canvas {
+        width:100% !important;
+        min-height:220px !important;
+        height:clamp(220px, 36dvh, 360px) !important;
+        max-height:360px !important;
+        padding:8px !important;
+        overflow:auto !important;
+        box-sizing:border-box !important;
+        overscroll-behavior:contain !important;
+    }
+
+    .kg-section {
+        width:100% !important;
+        min-width:100% !important;
+        max-width:100% !important;
+        box-sizing:border-box !important;
+        overflow-x:auto !important;
+        overflow-y:hidden !important;
+        padding:8px !important;
+    }
+
+    .kg-svg {
+        display:block !important;
+        width:auto !important;
+        height:auto !important;
+        min-width:0 !important;
+        max-width:none !important;
+        margin:0 auto !important;
+        overflow:visible !important;
+    }
+
+    .kg-node-label {
+        font-size:12px !important;
+        font-weight:600 !important;
+    }
+
+    .kg-node-badge {
+        font-size:9px !important;
+    }
+
+    .knowledge-graph-side {
+        min-height:210px !important;
+        max-height:38dvh !important;
+    }
+}
+
+/*
+ * 手机浏览器（尤其某些安卓浏览器）会在自己的“深色网页”功能下
+ * 二次改写 background-color。浅色模式这里改用实体渐变背景层，颜色
+ * 完全沿用桌面浅色主题，使移动端与桌面外观窗口保持一致。
+ */
+:root[data-appearance-theme="light"],
+:root[data-appearance-theme="light"] body,
+body[data-appearance-theme="light"] {
+    color-scheme:only light !important;
+    forced-color-adjust:none !important;
+}
+
+:root[data-appearance-theme="light"] body:not(.has-custom-background),
+body[data-appearance-theme="light"]:not(.has-custom-background) {
+    background-color:#eef3f8 !important;
+    background-image:linear-gradient(#eef3f8,#eef3f8) !important;
+    color:#0f172a !important;
+}
+
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .center,
+body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
+body[data-appearance-theme="light"]:not(.has-custom-background) .center {
+    background-color:#eef3f8 !important;
+    background-image:linear-gradient(#eef3f8,#eef3f8) !important;
+}
+
+:root[data-appearance-theme="light"] .appearance-card,
+body[data-appearance-theme="light"] .appearance-card,
+:root[data-appearance-theme="light"] .modal-card,
+body[data-appearance-theme="light"] .modal-card,
+:root[data-appearance-theme="light"] .ocr-review-dialog,
+body[data-appearance-theme="light"] .ocr-review-dialog {
+    background-color:#ffffff !important;
+    background-image:linear-gradient(#ffffff,#ffffff) !important;
+    color:#1e293b !important;
+}
+
+:root[data-appearance-theme="light"] .modal-head,
+body[data-appearance-theme="light"] .modal-head,
+:root[data-appearance-theme="light"] .appearance-body,
+body[data-appearance-theme="light"] .appearance-body,
+:root[data-appearance-theme="light"] .appearance-footer,
+body[data-appearance-theme="light"] .appearance-footer,
+:root[data-appearance-theme="light"] .appearance-section,
+body[data-appearance-theme="light"] .appearance-section {
+    background-color:#ffffff !important;
+    background-image:linear-gradient(#ffffff,#ffffff) !important;
+    color:#1e293b !important;
+    border-color:#e2e8f0 !important;
+}
+
+:root[data-appearance-theme="light"] .appearance-section-title,
+body[data-appearance-theme="light"] .appearance-section-title,
+:root[data-appearance-theme="light"] .appearance-slider-row,
+body[data-appearance-theme="light"] .appearance-slider-row,
+:root[data-appearance-theme="light"] .appearance-slider-value,
+body[data-appearance-theme="light"] .appearance-slider-value {
+    color:#64748b !important;
+    -webkit-text-fill-color:#64748b !important;
+}
+
+:root[data-appearance-theme="light"] .appearance-segmented button,
+body[data-appearance-theme="light"] .appearance-segmented button,
+:root[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
+body[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
+:root[data-appearance-theme="light"] .appearance-footer button:not(.primary),
+body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
+    background-color:#e2e8f0 !important;
+    background-image:linear-gradient(#e2e8f0,#e2e8f0) !important;
+    border-color:#cbd5e1 !important;
+    color:#334155 !important;
+    -webkit-text-fill-color:#334155 !important;
+}
+
+:root[data-appearance-theme="light"] .appearance-segmented button.active,
+body[data-appearance-theme="light"] .appearance-segmented button.active {
+    background-color:#dbeafe !important;
+    background-image:linear-gradient(#dbeafe,#dbeafe) !important;
+    border-color:var(--accent) !important;
+    color:#0f172a !important;
+    -webkit-text-fill-color:#0f172a !important;
+}
+
+:root[data-appearance-theme="light"] .appearance-background-preview,
+body[data-appearance-theme="light"] .appearance-background-preview {
+    background-color:#ffffff !important;
+    background-image:linear-gradient(#ffffff,#ffffff) !important;
+    border-color:#cbd5e1 !important;
+    color:#64748b !important;
+    -webkit-text-fill-color:#64748b !important;
+}
+
+:root[data-appearance-theme="light"] .mobile-topbar,
+:root[data-appearance-theme="light"] .left,
+:root[data-appearance-theme="light"] .right,
+body[data-appearance-theme="light"] .mobile-topbar,
+body[data-appearance-theme="light"] .left,
+body[data-appearance-theme="light"] .right {
+    background-color:#f8fafc !important;
+    background-image:linear-gradient(#f8fafc,#f8fafc) !important;
+    color:#0f172a !important;
+}
+
+:root[data-appearance-theme="light"] .input,
+body[data-appearance-theme="light"] .input,
+:root[data-appearance-theme="light"] .input input,
+body[data-appearance-theme="light"] .input input {
+    background-color:#ffffff !important;
+    background-image:linear-gradient(#ffffff,#ffffff) !important;
+    color:#1e293b !important;
+    -webkit-text-fill-color:#1e293b !important;
+    border-color:#cbd5e1 !important;
+}
+
 </style>
 
 <script>
@@ -4540,7 +4717,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-polish-20261003-1506"></script>
+<script src="/static/script.js?v=phase4-mobile-fit-light-20261003-1538"></script>
 
 </body>
 </html>
