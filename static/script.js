@@ -190,7 +190,10 @@ function applyAppearanceSettings(options = {}) {
     root.style.colorScheme = browserColorScheme;
     body.style.colorScheme = browserColorScheme;
     document.querySelector('meta[name="color-scheme"]')
-        ?.setAttribute("content", theme);
+        ?.setAttribute(
+            "content",
+            theme === "light" ? "only light" : "dark"
+        );
     root.style.setProperty("--accent", accent.main);
     root.style.setProperty("--accent-rgb", accent.rgb);
     root.style.setProperty("--accent-deep", accent.deep);
@@ -13342,11 +13345,37 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
     }
 
     const mobileGraphLayout = isMobileAppShell();
-    const nodeWidth = mobileGraphLayout ? 156 : 132;
-    const nodeHeight = mobileGraphLayout ? 64 : 58;
-    const horizontalGap = mobileGraphLayout ? 94 : 74;
-    const verticalGap = mobileGraphLayout ? 36 : 26;
-    const margin = mobileGraphLayout ? 30 : 24;
+    let nodeWidth = 132;
+    let nodeHeight = 58;
+    let horizontalGap = 74;
+    let verticalGap = 26;
+    let margin = 24;
+
+    if (mobileGraphLayout) {
+        const viewportWidth = Math.max(
+            320,
+            Math.min(Number(window.innerWidth) || 390, 760)
+        );
+        const columnCount = Math.max(columnKeys.length, 1);
+        const usableWidth = Math.max(280, viewportWidth - 40);
+
+        horizontalGap = columnCount <= 2 ? 26 : 18;
+        margin = 12;
+
+        const fittedWidth = Math.floor(
+            (
+                usableWidth
+                - margin * 2
+                - Math.max(columnCount - 1, 0) * horizontalGap
+            ) / columnCount
+        );
+
+        // 手机优先把常见 2~3 列图谱完整放进卡片；列数再多时
+        // 保持最低可读宽度，并只在图谱卡片内部横向滚动。
+        nodeWidth = Math.max(88, Math.min(118, fittedWidth));
+        nodeHeight = nodeWidth >= 108 ? 56 : 52;
+        verticalGap = 22;
+    }
 
     const maxRows = Math.max(
         ...columnKeys.map(
