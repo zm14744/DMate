@@ -4571,6 +4571,171 @@ body[data-appearance-theme="light"] .input input {
         -webkit-text-fill-color:#ffffff !important;
     }
 }
+
+
+/* =========================================================
+   2026-10-04 手机知识图谱重构：HTML 节点 + SVG 连线
+   桌面图谱保持原样。
+   ========================================================= */
+@media (max-width:760px) {
+    #knowledgeGraphBtn {
+        display:block !important;
+    }
+
+    .graph-modal-card {
+        height:100dvh !important;
+        max-height:100dvh !important;
+        overflow:hidden !important;
+    }
+
+    .knowledge-graph-layout {
+        flex:1 1 auto !important;
+        min-height:0 !important;
+        display:flex !important;
+        flex-direction:column !important;
+        overflow:hidden !important;
+    }
+
+    .knowledge-graph-main {
+        flex:0 0 auto !important;
+        min-height:0 !important;
+        max-height:none !important;
+        overflow:visible !important;
+        border-right:0 !important;
+        border-bottom:1px solid var(--surface-3) !important;
+    }
+
+    .knowledge-graph-canvas {
+        height:auto !important;
+        min-height:0 !important;
+        max-height:none !important;
+        overflow:visible !important;
+        padding:8px !important;
+    }
+
+    .kg-mobile-section {
+        width:100% !important;
+        min-width:0 !important;
+        max-width:100% !important;
+        padding:8px !important;
+        overflow:hidden !important;
+    }
+
+    .kg-mobile-viewport {
+        width:100%;
+        max-width:100%;
+        min-height:170px;
+        max-height:min(38dvh, 330px);
+        overflow:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+        touch-action:pan-x pan-y;
+        border-radius:10px;
+        background:var(--surface-0);
+    }
+
+    .kg-mobile-stage {
+        position:relative;
+        min-width:100%;
+    }
+
+    .kg-mobile-edge-layer {
+        position:absolute;
+        inset:0;
+        z-index:0;
+        overflow:visible;
+        pointer-events:none;
+    }
+
+    .kg-mobile-edge {
+        fill:none;
+        stroke:var(--border-strong);
+        stroke-width:1.8;
+        opacity:.95;
+    }
+
+    .kg-mobile-node {
+        position:absolute;
+        z-index:1;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:3px;
+        padding:7px 8px;
+        border:2px solid var(--border-strong);
+        border-radius:12px;
+        color:#f8fafc !important;
+        -webkit-text-fill-color:#f8fafc !important;
+        font:inherit;
+        text-align:center;
+        line-height:1.2;
+        box-shadow:none;
+        cursor:pointer;
+        overflow:hidden;
+    }
+
+    .kg-mobile-node.selected {
+        border-width:3px;
+        box-shadow:0 0 0 1px rgba(59,130,246,.18);
+    }
+
+    .kg-mobile-node-name {
+        display:block;
+        width:100%;
+        font-size:13px;
+        font-weight:700;
+        white-space:normal;
+        word-break:break-all;
+        overflow:hidden;
+        text-overflow:ellipsis;
+    }
+
+    .kg-mobile-node-badge {
+        display:block;
+        width:100%;
+        font-size:10px;
+        font-weight:600;
+        opacity:.82;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+    }
+
+    .knowledge-graph-side {
+        flex:1 1 auto !important;
+        min-height:220px !important;
+        max-height:none !important;
+        overflow:hidden !important;
+        border-bottom:0 !important;
+    }
+
+    .graph-side-tabs {
+        flex:0 0 auto !important;
+        display:flex !important;
+        flex-wrap:nowrap !important;
+    }
+
+    .graph-side-tab {
+        flex:1 1 0 !important;
+        min-width:0 !important;
+        white-space:nowrap !important;
+    }
+
+    .graph-side-page {
+        flex:1 1 auto !important;
+        min-height:0 !important;
+        overflow:hidden !important;
+    }
+
+    .graph-detail-body,
+    .graph-history-list {
+        height:100%;
+        min-height:0 !important;
+        overflow:auto !important;
+        -webkit-overflow-scrolling:touch;
+    }
+}
 </style>
 
 <script>
@@ -4986,7 +5151,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-light-match-desktop-20261003-2025"></script>
+<script src="/static/script.js?v=phase4-mobile-graph-html-20261004a"></script>
 
 </body>
 </html>
