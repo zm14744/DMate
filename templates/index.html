@@ -3918,6 +3918,213 @@ body[data-appearance-theme="light"] .kg-node-badge,
     overflow:hidden;
 }
 
+
+
+/* =========================================================
+   2026-10-03 移动端第二轮：图谱 / 浅色 / 外观入口 / 手势视觉
+   ========================================================= */
+
+/* 外观入口不再使用偏小的 Unicode 图标，改成和文字同字号的 CSS 半明半暗圆。 */
+.appearance-entry {
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:.55em !important;
+}
+.appearance-entry-icon {
+    position:relative;
+    display:inline-block;
+    width:1em;
+    height:1em;
+    flex:0 0 1em;
+    border:.12em solid currentColor;
+    border-radius:50%;
+    overflow:hidden;
+    vertical-align:-.08em;
+    color:inherit;
+}
+.appearance-entry-icon::after {
+    content:"";
+    position:absolute;
+    top:-.12em;
+    right:-.12em;
+    bottom:-.12em;
+    width:55%;
+    background:currentColor;
+}
+
+/* 显式 light-only：阻止部分安卓浏览器“强制网页深色”再次把浅色主题染黑。 */
+:root[data-appearance-theme="light"],
+:root[data-appearance-theme="light"] body,
+body[data-appearance-theme="light"] {
+    color-scheme:only light !important;
+}
+
+/* 浅色模式直接给主要工作区明确的浅色表面，不再只依赖 CSS 变量继承。 */
+:root[data-appearance-theme="light"] body:not(.has-custom-background),
+body[data-appearance-theme="light"]:not(.has-custom-background) {
+    background:#eef3f8 !important;
+}
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .center,
+body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
+body[data-appearance-theme="light"]:not(.has-custom-background) .center {
+    background:#eef3f8 !important;
+}
+:root[data-appearance-theme="light"] .mobile-topbar,
+:root[data-appearance-theme="light"] .left,
+:root[data-appearance-theme="light"] .right,
+body[data-appearance-theme="light"] .mobile-topbar,
+body[data-appearance-theme="light"] .left,
+body[data-appearance-theme="light"] .right {
+    background:#f8fafc !important;
+    color:#0f172a !important;
+}
+:root[data-appearance-theme="light"] .modal-card,
+:root[data-appearance-theme="light"] .appearance-card,
+:root[data-appearance-theme="light"] .ocr-review-dialog,
+body[data-appearance-theme="light"] .modal-card,
+body[data-appearance-theme="light"] .appearance-card,
+body[data-appearance-theme="light"] .ocr-review-dialog {
+    background:#ffffff !important;
+    color:#1e293b !important;
+}
+:root[data-appearance-theme="light"] .appearance-section,
+:root[data-appearance-theme="light"] .appearance-background-preview,
+:root[data-appearance-theme="light"] .input,
+:root[data-appearance-theme="light"] .right #info,
+:root[data-appearance-theme="light"] .right .learning-summary,
+body[data-appearance-theme="light"] .appearance-section,
+body[data-appearance-theme="light"] .appearance-background-preview,
+body[data-appearance-theme="light"] .input,
+body[data-appearance-theme="light"] .right #info,
+body[data-appearance-theme="light"] .right .learning-summary {
+    background:#ffffff !important;
+    color:#334155 !important;
+}
+:root[data-appearance-theme="light"] .appearance-segmented button,
+:root[data-appearance-theme="light"] .appearance-background-actions button,
+:root[data-appearance-theme="light"] .appearance-footer button,
+body[data-appearance-theme="light"] .appearance-segmented button,
+body[data-appearance-theme="light"] .appearance-background-actions button,
+body[data-appearance-theme="light"] .appearance-footer button {
+    background:#e2e8f0 !important;
+    color:#334155 !important;
+    border-color:#cbd5e1 !important;
+}
+:root[data-appearance-theme="light"] .appearance-segmented button.active,
+body[data-appearance-theme="light"] .appearance-segmented button.active {
+    background:rgba(var(--accent-rgb),.13) !important;
+    color:#0f172a !important;
+    border-color:var(--accent) !important;
+}
+
+/* 主题色圆点使用多重填充，避免安卓强制深色把青绿改成近黑。 */
+.appearance-swatch[data-appearance-accent="blue"] {
+    background:#3b82f6 !important;
+    background-image:linear-gradient(#3b82f6,#3b82f6) !important;
+    box-shadow:inset 0 0 0 999px #3b82f6,0 0 0 1px var(--border-strong) !important;
+}
+.appearance-swatch[data-appearance-accent="purple"] {
+    background:#8b5cf6 !important;
+    background-image:linear-gradient(#8b5cf6,#8b5cf6) !important;
+    box-shadow:inset 0 0 0 999px #8b5cf6,0 0 0 1px var(--border-strong) !important;
+}
+.appearance-swatch[data-appearance-accent="teal"] {
+    background:#14b8a6 !important;
+    background-image:linear-gradient(#14b8a6,#14b8a6) !important;
+    box-shadow:inset 0 0 0 999px #14b8a6,0 0 0 1px var(--border-strong) !important;
+}
+.appearance-swatch.active[data-appearance-accent="blue"],
+.appearance-swatch.active[data-appearance-accent="purple"],
+.appearance-swatch.active[data-appearance-accent="teal"] {
+    outline:3px solid var(--accent) !important;
+    outline-offset:3px !important;
+}
+
+/* 图谱：移动端容器保持屏幕宽，真正的 SVG 按其实际像素尺寸放进去滚动，禁止整体缩成一团。 */
+@media (max-width:1100px) {
+    .graph-modal-card,
+    .knowledge-graph-layout,
+    .knowledge-graph-main,
+    .knowledge-graph-side,
+    .knowledge-graph-canvas {
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+        box-sizing:border-box !important;
+    }
+
+    .knowledge-graph-layout {
+        overflow:hidden !important;
+    }
+
+    .knowledge-graph-main {
+        flex:0 0 min(58dvh,520px) !important;
+        min-height:330px !important;
+        overflow:hidden !important;
+    }
+
+    .knowledge-graph-canvas {
+        flex:1 1 auto !important;
+        min-height:250px !important;
+        overflow:auto !important;
+        overscroll-behavior:contain !important;
+        -webkit-overflow-scrolling:touch;
+        touch-action:pan-x pan-y;
+        padding:10px !important;
+    }
+
+    .kg-section {
+        width:100% !important;
+        min-width:0 !important;
+        max-width:100% !important;
+        overflow:visible !important;
+        padding:10px !important;
+    }
+
+    .kg-svg {
+        display:block !important;
+        width:auto !important;
+        height:auto !important;
+        min-width:0 !important;
+        max-width:none !important;
+        flex:none !important;
+        overflow:visible !important;
+    }
+
+    .kg-node-label {
+        font-size:14px !important;
+        font-weight:600 !important;
+    }
+
+    .kg-node-badge {
+        font-size:11px !important;
+    }
+
+    .knowledge-graph-side {
+        flex:1 1 auto !important;
+        min-height:230px !important;
+        max-height:none !important;
+    }
+}
+
+@media (max-width:600px) {
+    .knowledge-graph-main {
+        flex-basis:min(55dvh,470px) !important;
+        min-height:310px !important;
+    }
+    .graph-toolbar-left {
+        grid-template-columns:1fr !important;
+    }
+    .graph-toolbar-left label,
+    .graph-toolbar-left select,
+    .graph-toolbar-left button {
+        grid-column:1 !important;
+        width:100% !important;
+    }
+}
+
 </style>
 
 <script>
@@ -3967,7 +4174,7 @@ window.MathJax = {
     </div>
     <button class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
-    <button id="appearanceBtn" class="btn appearance-entry" type="button">◐ 外观</button>
+    <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"></span><span>外观</span></button>
 </div>
 
 <div class="center">
@@ -4011,7 +4218,7 @@ window.MathJax = {
         </div>
 
         <div class="learning-actions learning-actions-single">
-            <button id="learningReviewBtn" type="button">生成学习回顾</button>
+            <button id="learningReviewBtn" type="button">学习回顾</button>
         </div>
 
     </div>
@@ -4333,7 +4540,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-pdf-dedupe-20261003-0415"></script>
+<script src="/static/script.js?v=phase4-mobile-polish-20261003-1506"></script>
 
 </body>
 </html>
