@@ -4574,8 +4574,8 @@ body[data-appearance-theme="light"] .input input {
 
 
 /* =========================================================
-   2026-10-04 手机知识图谱重构：HTML 节点 + SVG 连线
-   桌面图谱保持原样。
+   2026-10-04 手机知识图谱：可滚动完整布局 + 一键沉浸查看
+   节点继续使用 HTML，SVG 只画连线，避免安卓端 SVG 文本兼容问题。
    ========================================================= */
 @media (max-width:760px) {
     #knowledgeGraphBtn {
@@ -4586,14 +4586,21 @@ body[data-appearance-theme="light"] .input input {
         height:100dvh !important;
         max-height:100dvh !important;
         overflow:hidden !important;
+        padding-bottom:env(safe-area-inset-bottom) !important;
     }
 
+    /* 正常模式下让“图谱 + 节点详情”整体可纵向滚动。
+       之前这里被 overflow:hidden 卡死，图谱一高，最下面的详情区就被挤出屏幕。 */
     .knowledge-graph-layout {
         flex:1 1 auto !important;
         min-height:0 !important;
         display:flex !important;
         flex-direction:column !important;
-        overflow:hidden !important;
+        overflow-x:hidden !important;
+        overflow-y:auto !important;
+        overscroll-behavior:contain !important;
+        -webkit-overflow-scrolling:touch;
+        padding-bottom:max(12px, env(safe-area-inset-bottom)) !important;
     }
 
     .knowledge-graph-main {
@@ -4606,6 +4613,7 @@ body[data-appearance-theme="light"] .input input {
     }
 
     .knowledge-graph-canvas {
+        width:100% !important;
         height:auto !important;
         min-height:0 !important;
         max-height:none !important;
@@ -4614,6 +4622,7 @@ body[data-appearance-theme="light"] .input input {
     }
 
     .kg-mobile-section {
+        position:relative;
         width:100% !important;
         min-width:0 !important;
         max-width:100% !important;
@@ -4621,17 +4630,37 @@ body[data-appearance-theme="light"] .input input {
         overflow:hidden !important;
     }
 
+    .kg-mobile-expand {
+        position:absolute;
+        top:8px;
+        right:8px;
+        z-index:4;
+        min-height:32px;
+        padding:5px 10px;
+        border:1px solid var(--border-strong);
+        border-radius:999px;
+        background:var(--surface-2);
+        color:var(--text-primary);
+        font-size:12px;
+        font-weight:700;
+        line-height:1.2;
+        cursor:pointer;
+        box-shadow:0 4px 14px rgba(0,0,0,.18);
+    }
+
     .kg-mobile-viewport {
         width:100%;
         max-width:100%;
-        min-height:170px;
-        max-height:min(38dvh, 330px);
+        height:clamp(230px, 42dvh, 360px);
+        min-height:230px;
+        max-height:360px;
         overflow:auto;
         overscroll-behavior:contain;
         -webkit-overflow-scrolling:touch;
         touch-action:pan-x pan-y;
         border-radius:10px;
         background:var(--surface-0);
+        scrollbar-gutter:stable both-edges;
     }
 
     .kg-mobile-stage {
@@ -4702,9 +4731,10 @@ body[data-appearance-theme="light"] .input input {
         text-overflow:ellipsis;
     }
 
+    /* 详情区不再被主图谱挤没；页面往下滚就能完整看到。 */
     .knowledge-graph-side {
-        flex:1 1 auto !important;
-        min-height:220px !important;
+        flex:0 0 auto !important;
+        min-height:260px !important;
         max-height:none !important;
         overflow:hidden !important;
         border-bottom:0 !important;
@@ -4723,8 +4753,10 @@ body[data-appearance-theme="light"] .input input {
     }
 
     .graph-side-page {
-        flex:1 1 auto !important;
-        min-height:0 !important;
+        flex:0 0 auto !important;
+        height:min(44dvh, 360px) !important;
+        min-height:220px !important;
+        max-height:360px !important;
         overflow:hidden !important;
     }
 
@@ -4734,8 +4766,71 @@ body[data-appearance-theme="light"] .input input {
         min-height:0 !important;
         overflow:auto !important;
         -webkit-overflow-scrolling:touch;
+        padding-bottom:max(12px, env(safe-area-inset-bottom));
+    }
+
+    /* 点击“完整查看”后，只保留标题栏和图谱，让图谱吃满剩余屏幕。
+       图谱本身仍可横向/纵向拖动，不会再被 38dvh 的预览高度限制。 */
+    #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar,
+    #knowledgeGraphModal.graph-fullscreen-view .graph-summary,
+    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-side,
+    #knowledgeGraphModal.graph-fullscreen-view .kg-section-title,
+    #knowledgeGraphModal.graph-fullscreen-view .kg-section-desc {
+        display:none !important;
+    }
+
+    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-layout {
+        overflow:hidden !important;
+        padding-bottom:0 !important;
+    }
+
+    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-main {
+        flex:1 1 auto !important;
+        min-height:0 !important;
+        height:auto !important;
+        overflow:hidden !important;
+        border-bottom:0 !important;
+    }
+
+    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-canvas {
+        display:flex !important;
+        flex-direction:column !important;
+        height:100% !important;
+        min-height:0 !important;
+        padding:0 !important;
+        overflow:hidden !important;
+    }
+
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-section {
+        flex:1 1 auto !important;
+        display:flex !important;
+        flex-direction:column !important;
+        min-height:0 !important;
+        height:100% !important;
+        padding:0 !important;
+        overflow:hidden !important;
+    }
+
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-expand {
+        position:fixed;
+        top:max(58px, calc(env(safe-area-inset-top) + 52px));
+        right:10px;
+        z-index:1003;
+        background:var(--surface-2);
+    }
+
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-viewport {
+        flex:1 1 auto !important;
+        width:100% !important;
+        height:100% !important;
+        min-height:0 !important;
+        max-height:none !important;
+        border-radius:0 !important;
+        padding:10px !important;
+        scroll-padding:16px;
     }
 }
+
 </style>
 
 <script>
@@ -5151,7 +5246,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-graph-html-20261004a"></script>
+<script src="/static/script.js?v=phase4-mobile-graph-complete-20261004b"></script>
 
 </body>
 </html>
