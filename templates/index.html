@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>离散数学智能辅学系统</title>
 
 <style>
@@ -3673,6 +3674,250 @@ body[data-appearance-theme="light"] .msg-actions button {
     .right { width:min(420px,56vw) !important; }
 }
 
+
+/* =========================================================
+   2026-10-03 移动端/外观/公式显示修正
+   ========================================================= */
+
+/* 主题变量同时落到 html 根节点，避免部分移动浏览器/顶层弹窗仍取到暗色根变量。 */
+:root[data-appearance-theme="light"],
+body[data-appearance-theme="light"] {
+    --surface-0:#eef3f8;
+    --surface-0-rgb:238,243,248;
+    --surface-1:rgba(248,250,252,var(--panel-alpha));
+    --surface-1-rgb:248,250,252;
+    --surface-2:rgba(255,255,255,var(--panel-alpha));
+    --surface-2-rgb:255,255,255;
+    --surface-3:rgba(226,232,240,var(--panel-alpha));
+    --surface-3-rgb:226,232,240;
+    --surface-4:rgba(203,213,225,var(--panel-alpha));
+    --surface-4-rgb:203,213,225;
+    --border-strong:#cbd5e1;
+    --border-mid:#cbd5e1;
+    --text-strong:#0f172a;
+    --text-primary:#1e293b;
+    --text-secondary:#334155;
+    --text-muted:#64748b;
+    --text-subtle:#94a3b8;
+    --accent-text:#1e293b;
+    --background-mask-rgb:248,250,252;
+    color-scheme:light;
+}
+
+:root[data-appearance-theme="dark"],
+body[data-appearance-theme="dark"] {
+    color-scheme:dark;
+}
+
+:root[data-appearance-theme="light"] body,
+body[data-appearance-theme="light"] {
+    background:#eef3f8 !important;
+    color:#0f172a;
+}
+
+body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
+body[data-appearance-theme="light"]:not(.has-custom-background) .center {
+    background:#eef3f8;
+}
+body[data-appearance-theme="light"].has-custom-background .layout {
+    background:rgba(238,243,248,var(--workspace-alpha)) !important;
+}
+body[data-appearance-theme="light"].has-custom-background .center {
+    background:transparent !important;
+}
+
+body[data-appearance-theme="light"] .mobile-topbar,
+body[data-appearance-theme="light"] .left,
+body[data-appearance-theme="light"] .right {
+    background:rgba(248,250,252,.99) !important;
+}
+
+body[data-appearance-theme="light"] .modal-card,
+body[data-appearance-theme="light"] .ocr-review-dialog {
+    background:rgba(255,255,255,.98) !important;
+    color:#1e293b !important;
+}
+
+/* 防止部分安卓浏览器的强制深色把主题色圆点改成近黑色。 */
+.appearance-swatch {
+    forced-color-adjust:none;
+    -webkit-print-color-adjust:exact;
+    color-adjust:exact;
+}
+.appearance-swatch[data-appearance-accent="blue"] { background-color:#3b82f6 !important; }
+.appearance-swatch[data-appearance-accent="purple"] { background-color:#8b5cf6 !important; }
+.appearance-swatch[data-appearance-accent="teal"] { background-color:#14b8a6 !important; }
+
+/* 背景缩略图可以直接点开查看原图。 */
+.appearance-background-preview[data-has-background="true"] {
+    cursor:zoom-in;
+}
+.appearance-background-preview[data-has-background="true"]:focus-visible {
+    outline:2px solid var(--accent);
+    outline-offset:3px;
+}
+.appearance-background-viewer-card {
+    width:min(1180px,96vw);
+    height:min(88vh,860px);
+    max-width:96vw;
+    max-height:88vh;
+}
+.appearance-background-viewer-body {
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:auto;
+    padding:14px;
+    background:#05070b;
+}
+.appearance-background-viewer-body img {
+    display:block;
+    max-width:100%;
+    max-height:100%;
+    width:auto;
+    height:auto;
+    object-fit:contain;
+    user-select:none;
+    -webkit-user-drag:none;
+}
+
+/* 移动抽屉关闭键改成与其它窗口一致的纯红色圆点。 */
+@media (max-width:1100px) {
+    .mobile-drawer-close {
+        width:22px !important;
+        height:22px !important;
+        flex:0 0 22px !important;
+        border-radius:50% !important;
+        background:#ef4444 !important;
+        color:transparent !important;
+        font-size:0 !important;
+        padding:0 !important;
+        box-shadow:none !important;
+    }
+    .mobile-drawer-close:active,
+    .mobile-drawer-close:hover {
+        background:#dc2626 !important;
+    }
+
+    .appearance-background-viewer-card {
+        width:100% !important;
+        max-width:100% !important;
+        height:100dvh !important;
+        max-height:100dvh !important;
+        border-radius:0 !important;
+    }
+}
+
+/* 知识图谱 SVG 文本：显式指定颜色，避免移动端强制深色/主题切换后节点文字消失。 */
+.kg-svg,
+.kg-svg text {
+    forced-color-adjust:none;
+}
+.kg-node-label {
+    opacity:1 !important;
+    visibility:visible !important;
+    fill:#f8fafc !important;
+    color:#f8fafc !important;
+    font-family:Arial,"Microsoft YaHei","PingFang SC",sans-serif !important;
+}
+.kg-node-badge {
+    opacity:1 !important;
+    visibility:visible !important;
+    fill:#cbd5e1 !important;
+    color:#cbd5e1 !important;
+    font-family:Arial,"Microsoft YaHei","PingFang SC",sans-serif !important;
+}
+body[data-appearance-theme="light"] .kg-node-label,
+:root[data-appearance-theme="light"] .kg-node-label {
+    fill:#0f172a !important;
+    color:#0f172a !important;
+}
+body[data-appearance-theme="light"] .kg-node-badge,
+:root[data-appearance-theme="light"] .kg-node-badge {
+    fill:#475569 !important;
+    color:#475569 !important;
+}
+
+/* 手机图谱保留完整 SVG 尺寸，通过画布滚动查看，不再把节点文字压没。 */
+@media (max-width:760px) {
+    .knowledge-graph-canvas {
+        overflow:auto !important;
+        -webkit-overflow-scrolling:touch;
+    }
+    .kg-section {
+        width:max-content !important;
+        min-width:100% !important;
+        max-width:none !important;
+    }
+    .kg-svg {
+        display:block !important;
+        width:auto !important;
+        height:auto !important;
+        min-width:100% !important;
+        max-width:none !important;
+        overflow:visible !important;
+    }
+}
+
+/* 聊天、题目、错题答案里的长公式不再被卡片右侧硬截断。 */
+.msg-content,
+.wrong-question,
+.wrong-feedback-body,
+.wrong-answer-body,
+.wrong-solution-body,
+.wrong-analysis-body,
+.kg-history-preview {
+    min-width:0;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+}
+.msg-content mjx-container,
+.wrong-question mjx-container,
+.wrong-feedback-body mjx-container,
+.wrong-answer-body mjx-container,
+.wrong-solution-body mjx-container,
+.wrong-analysis-body mjx-container,
+.kg-history-preview mjx-container {
+    max-width:100%;
+}
+.msg-content mjx-container[display="true"],
+.wrong-question mjx-container[display="true"],
+.wrong-feedback-body mjx-container[display="true"],
+.wrong-answer-body mjx-container[display="true"],
+.wrong-solution-body mjx-container[display="true"],
+.wrong-analysis-body mjx-container[display="true"],
+.kg-history-preview mjx-container[display="true"] {
+    display:block !important;
+    width:100%;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:3px;
+}
+@media (max-width:760px) {
+    .msg-content mjx-container:not([display="true"]),
+    .wrong-question mjx-container:not([display="true"]),
+    .wrong-feedback-body mjx-container:not([display="true"]),
+    .wrong-answer-body mjx-container:not([display="true"]),
+    .wrong-solution-body mjx-container:not([display="true"]),
+    .wrong-analysis-body mjx-container:not([display="true"]) {
+        display:inline-block;
+        max-width:100%;
+        overflow-x:auto;
+        overflow-y:hidden;
+        vertical-align:middle;
+        -webkit-overflow-scrolling:touch;
+    }
+}
+
+/* 桌面 AI 思考/回答状态框：蓝色边框也保持圆角。 */
+.input-wrap.ai-input-busy .input {
+    border-radius:12px !important;
+    overflow:hidden;
+}
+
 </style>
 
 <script>
@@ -3890,6 +4135,20 @@ window.MathJax = {
     </div>
 </div>
 
+
+
+<div id="appearanceBackgroundViewer" class="modal hidden" aria-hidden="true">
+    <div class="modal-card appearance-background-viewer-card">
+        <div class="modal-head">
+            <div>背景预览</div>
+            <button id="appearanceBackgroundViewerClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
+        </div>
+        <div class="appearance-background-viewer-body">
+            <img id="appearanceBackgroundViewerImage" alt="当前全局背景预览">
+        </div>
+    </div>
+</div>
+
 <div id="learningReviewModal" class="modal hidden">
     <div class="modal-card learning-review-card">
         <div class="modal-head">
@@ -4074,7 +4333,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-app-shell-20261003"></script>
+<script src="/static/script.js?v=phase4-pdf-dedupe-20261003-0415"></script>
 
 </body>
 </html>
