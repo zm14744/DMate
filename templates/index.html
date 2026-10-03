@@ -4648,24 +4648,85 @@ body[data-appearance-theme="light"] .input input {
         box-shadow:0 4px 14px rgba(0,0,0,.18);
     }
 
+    .kg-mobile-zoom-controls {
+        display:none;
+        align-items:center;
+        gap:6px;
+        position:fixed;
+        left:50%;
+        bottom:max(12px, calc(env(safe-area-inset-bottom) + 8px));
+        transform:translateX(-50%);
+        z-index:1004;
+        padding:6px;
+        border:1px solid var(--border-strong);
+        border-radius:999px;
+        background:color-mix(in srgb, var(--surface-2) 94%, transparent);
+        box-shadow:0 8px 24px rgba(0,0,0,.28);
+        backdrop-filter:blur(12px);
+        -webkit-backdrop-filter:blur(12px);
+    }
+
+    .kg-mobile-zoom-controls button {
+        width:auto;
+        min-width:40px;
+        min-height:38px;
+        margin:0;
+        padding:6px 10px;
+        border:1px solid var(--border-strong);
+        border-radius:999px;
+        background:var(--surface-3);
+        color:var(--text-primary);
+        font-size:16px;
+        font-weight:700;
+        line-height:1;
+    }
+
+    .kg-mobile-zoom-controls .kg-mobile-zoom-fit {
+        min-width:54px;
+        font-size:12px;
+    }
+
+    .kg-mobile-zoom-label {
+        min-width:50px;
+        color:var(--text-secondary);
+        font-size:12px;
+        font-weight:700;
+        text-align:center;
+        font-variant-numeric:tabular-nums;
+    }
+
     .kg-mobile-viewport {
         width:100%;
         max-width:100%;
         height:clamp(230px, 42dvh, 360px);
         min-height:230px;
         max-height:360px;
-        overflow:auto;
-        overscroll-behavior:contain;
+        overflow-x:auto;
+        overflow-y:hidden;
+        overscroll-behavior-x:contain;
+        overscroll-behavior-y:auto;
         -webkit-overflow-scrolling:touch;
-        touch-action:pan-x pan-y;
+        /* 普通预览把纵向手势留给外层页面。左右拖图由 JS 自己处理。 */
+        touch-action:pan-y;
         border-radius:10px;
         background:var(--surface-0);
         scrollbar-gutter:stable both-edges;
     }
 
-    .kg-mobile-stage {
+    .kg-mobile-zoom-surface {
         position:relative;
         min-width:100%;
+        min-height:100%;
+    }
+
+    .kg-mobile-stage {
+        position:absolute;
+        left:0;
+        top:0;
+        transform-origin:0 0;
+        min-width:0;
+        user-select:none;
+        -webkit-user-select:none;
     }
 
     .kg-mobile-edge-layer {
@@ -4825,9 +4886,17 @@ body[data-appearance-theme="light"] .input input {
         height:100% !important;
         min-height:0 !important;
         max-height:none !important;
+        overflow:auto !important;
+        overscroll-behavior:contain !important;
+        /* 完整查看由 JS 接管单指二维拖动和双指缩放。 */
+        touch-action:none !important;
         border-radius:0 !important;
-        padding:10px !important;
-        scroll-padding:16px;
+        padding:10px 10px 72px !important;
+        scroll-padding:16px 16px 84px;
+    }
+
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-zoom-controls {
+        display:flex !important;
     }
 }
 
