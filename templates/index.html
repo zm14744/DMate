@@ -4302,6 +4302,275 @@ body[data-appearance-theme="light"] .input input {
     border-color:#cbd5e1 !important;
 }
 
+
+
+/* =========================================================
+   2026-10-03 手机最终兜底：真正浅色 + 手机停用知识图谱
+   ========================================================= */
+@media (max-width:760px) {
+    /* 手机端知识图谱暂不提供，避免继续展示不可读/溢出的 SVG。桌面和平板不受影响。 */
+    #knowledgeGraphBtn {
+        display:none !important;
+    }
+
+    /*
+     * 某些安卓浏览器会强制把 CSS 浅色重新染成深色。
+     * 这里把浅色表面改成“实体图片背景 + 明确文字色”，尽量绕过自动深色算法。
+     */
+    html[data-appearance-theme="light"],
+    html[data-appearance-theme="light"] body,
+    body[data-appearance-theme="light"] {
+        color-scheme:light !important;
+        forced-color-adjust:none !important;
+        background-color:#eef3f8 !important;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23eef3f8'/%3E%3C/svg%3E") !important;
+        color:#0f172a !important;
+        -webkit-text-fill-color:currentColor;
+    }
+
+    html[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
+    html[data-appearance-theme="light"] body:not(.has-custom-background) .center,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .center,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .chat,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
+        background-color:#eef3f8 !important;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23eef3f8'/%3E%3C/svg%3E") !important;
+        color:#0f172a !important;
+    }
+
+    html[data-appearance-theme="light"] .mobile-topbar,
+    html[data-appearance-theme="light"] .left,
+    html[data-appearance-theme="light"] .right,
+    body[data-appearance-theme="light"] .mobile-topbar,
+    body[data-appearance-theme="light"] .left,
+    body[data-appearance-theme="light"] .right {
+        background-color:#f8fafc !important;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23f8fafc'/%3E%3C/svg%3E") !important;
+        color:#0f172a !important;
+        border-color:#e2e8f0 !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-card,
+    html[data-appearance-theme="light"] .appearance-body,
+    html[data-appearance-theme="light"] .appearance-footer,
+    html[data-appearance-theme="light"] .appearance-card .modal-head,
+    body[data-appearance-theme="light"] .appearance-card,
+    body[data-appearance-theme="light"] .appearance-body,
+    body[data-appearance-theme="light"] .appearance-footer,
+    body[data-appearance-theme="light"] .appearance-card .modal-head {
+        background-color:#ffffff !important;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E") !important;
+        color:#1e293b !important;
+        border-color:#e2e8f0 !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-section,
+    body[data-appearance-theme="light"] .appearance-section {
+        background:transparent !important;
+        color:#1e293b !important;
+        border-color:#e2e8f0 !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-section-title,
+    html[data-appearance-theme="light"] .appearance-slider-row,
+    html[data-appearance-theme="light"] .appearance-slider-value,
+    body[data-appearance-theme="light"] .appearance-section-title,
+    body[data-appearance-theme="light"] .appearance-slider-row,
+    body[data-appearance-theme="light"] .appearance-slider-value {
+        color:#64748b !important;
+        -webkit-text-fill-color:#64748b !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-segmented button,
+    html[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
+    html[data-appearance-theme="light"] .appearance-footer button:not(.primary),
+    body[data-appearance-theme="light"] .appearance-segmented button,
+    body[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
+    body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
+        -webkit-appearance:none !important;
+        appearance:none !important;
+        background-color:#e2e8f0 !important;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23e2e8f0'/%3E%3C/svg%3E") !important;
+        border-color:#cbd5e1 !important;
+        color:#334155 !important;
+        -webkit-text-fill-color:#334155 !important;
+        filter:none !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-segmented button.active,
+    body[data-appearance-theme="light"] .appearance-segmented button.active {
+        background-color:#dbeafe !important;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23dbeafe'/%3E%3C/svg%3E") !important;
+        border-color:var(--accent) !important;
+        color:#0f172a !important;
+        -webkit-text-fill-color:#0f172a !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-background-preview,
+    body[data-appearance-theme="light"] .appearance-background-preview {
+        background-color:#ffffff !important;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E") !important;
+        border-color:#cbd5e1 !important;
+        color:#64748b !important;
+        -webkit-text-fill-color:#64748b !important;
+    }
+
+    html[data-appearance-theme="light"] .input,
+    html[data-appearance-theme="light"] .input input,
+    body[data-appearance-theme="light"] .input,
+    body[data-appearance-theme="light"] .input input,
+    body[data-appearance-theme="light"] .ai,
+    body[data-appearance-theme="light"] .session,
+    body[data-appearance-theme="light"] .right #info,
+    body[data-appearance-theme="light"] .right .learning-summary {
+        background-color:#ffffff !important;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E") !important;
+        color:#1e293b !important;
+        -webkit-text-fill-color:#1e293b !important;
+        border-color:#cbd5e1 !important;
+    }
+
+    body[data-appearance-theme="light"] .mobile-topbar button,
+    body[data-appearance-theme="light"] .mobile-topbar-title,
+    body[data-appearance-theme="light"] .left,
+    body[data-appearance-theme="light"] .right,
+    body[data-appearance-theme="light"] .panel-heading-row,
+    body[data-appearance-theme="light"] .learning-title {
+        color:#1e293b !important;
+        -webkit-text-fill-color:#1e293b !important;
+    }
+}
+
+
+/* =========================================================
+   2026-10-03 浅色主题统一：移动端严格跟随桌面浅色
+   使用实体 PNG 色块抵抗部分安卓浏览器的强制网页深色。
+   ========================================================= */
+@media (max-width:1100px) {
+    html[data-appearance-theme="light"],
+    html[data-appearance-theme="light"] body,
+    body[data-appearance-theme="light"] {
+        color-scheme:only light !important;
+        forced-color-adjust:none !important;
+        color:#0f172a !important;
+        -webkit-text-fill-color:currentColor;
+    }
+
+    html[data-appearance-theme="light"] body:not(.has-custom-background),
+    body[data-appearance-theme="light"]:not(.has-custom-background),
+    html[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
+    html[data-appearance-theme="light"] body:not(.has-custom-background) .center,
+    html[data-appearance-theme="light"] body:not(.has-custom-background) .chat,
+    html[data-appearance-theme="light"] body:not(.has-custom-background) .input-wrap,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .center,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .chat,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
+        background-color:#eef3f8 !important;
+        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGN89/kHAwMDEwMDAwMDAwAiTALdmlI9FwAAAABJRU5ErkJggg==") !important;
+        color:#0f172a !important;
+    }
+
+    html[data-appearance-theme="light"] .mobile-topbar,
+    html[data-appearance-theme="light"] .left,
+    html[data-appearance-theme="light"] .right,
+    body[data-appearance-theme="light"] .mobile-topbar,
+    body[data-appearance-theme="light"] .left,
+    body[data-appearance-theme="light"] .right {
+        background-color:#f8fafc !important;
+        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP88esPAwMDEwMDAwMDAwAjTgLyrqhBZQAAAABJRU5ErkJggg==") !important;
+        color:#0f172a !important;
+        border-color:#e2e8f0 !important;
+    }
+
+    html[data-appearance-theme="light"] .modal-card,
+    html[data-appearance-theme="light"] .appearance-card,
+    html[data-appearance-theme="light"] .ocr-review-dialog,
+    html[data-appearance-theme="light"] .appearance-body,
+    html[data-appearance-theme="light"] .appearance-footer,
+    html[data-appearance-theme="light"] .appearance-card .modal-head,
+    body[data-appearance-theme="light"] .modal-card,
+    body[data-appearance-theme="light"] .appearance-card,
+    body[data-appearance-theme="light"] .ocr-review-dialog,
+    body[data-appearance-theme="light"] .appearance-body,
+    body[data-appearance-theme="light"] .appearance-footer,
+    body[data-appearance-theme="light"] .appearance-card .modal-head {
+        background-color:#ffffff !important;
+        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8//8/AwMDEwMDAwMDAwAkBgMB/DXemwAAAABJRU5ErkJggg==") !important;
+        color:#1e293b !important;
+        border-color:#e2e8f0 !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-segmented button,
+    html[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
+    html[data-appearance-theme="light"] .appearance-footer button:not(.primary),
+    body[data-appearance-theme="light"] .appearance-segmented button,
+    body[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
+    body[data-appearance-theme="light"] .appearance-footer button:not(.primary),
+    body[data-appearance-theme="light"] .learning-actions button,
+    body[data-appearance-theme="light"] .left > .btn {
+        background-color:#e2e8f0 !important;
+        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGN89OIDAwMDEwMDAwMDAwAg1AK+i4wwtAAAAABJRU5ErkJggg==") !important;
+        color:#334155 !important;
+        -webkit-text-fill-color:#334155 !important;
+        border-color:#cbd5e1 !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-segmented button.active,
+    body[data-appearance-theme="light"] .appearance-segmented button.active,
+    body[data-appearance-theme="light"] .session.active {
+        background-color:#dbeafe !important;
+        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGO8/eofAwMDEwMDAwMDAwAhKwLHLH4k+QAAAABJRU5ErkJggg==") !important;
+        color:#1e293b !important;
+        -webkit-text-fill-color:#1e293b !important;
+        border-color:var(--accent) !important;
+    }
+
+    html[data-appearance-theme="light"] .appearance-background-preview,
+    html[data-appearance-theme="light"] .input,
+    html[data-appearance-theme="light"] .input input,
+    body[data-appearance-theme="light"] .appearance-background-preview,
+    body[data-appearance-theme="light"] .input,
+    body[data-appearance-theme="light"] .input input,
+    body[data-appearance-theme="light"] .session,
+    body[data-appearance-theme="light"] .right #info,
+    body[data-appearance-theme="light"] .right .learning-summary {
+        background-color:#ffffff !important;
+        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8//8/AwMDEwMDAwMDAwAkBgMB/DXemwAAAABJRU5ErkJggg==") !important;
+        color:#1e293b !important;
+        -webkit-text-fill-color:#1e293b !important;
+        border-color:#cbd5e1 !important;
+    }
+
+    body[data-appearance-theme="light"] .ai {
+        background-color:#e2e8f0 !important;
+        background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGN89OIDAwMDEwMDAwMDAwAg1AK+i4wwtAAAAABJRU5ErkJggg==") !important;
+        color:#1e293b !important;
+        -webkit-text-fill-color:#1e293b !important;
+    }
+
+    body[data-appearance-theme="light"] .mobile-topbar button,
+    body[data-appearance-theme="light"] .mobile-topbar-title,
+    body[data-appearance-theme="light"] .panel-heading-row,
+    body[data-appearance-theme="light"] .learning-title,
+    body[data-appearance-theme="light"] .appearance-section-title,
+    body[data-appearance-theme="light"] .appearance-slider-row,
+    body[data-appearance-theme="light"] .appearance-slider-value {
+        color:#334155 !important;
+        -webkit-text-fill-color:#334155 !important;
+    }
+}
+
+/* 桌面浅色下两个主操作按钮始终保持蓝底白字。 */
+@media (min-width:1101px) {
+    body[data-appearance-theme="light"] #imageBtn,
+    body[data-appearance-theme="light"] #sendBtn {
+        background:var(--accent) !important;
+        color:#ffffff !important;
+        -webkit-text-fill-color:#ffffff !important;
+    }
+}
 </style>
 
 <script>
@@ -4717,7 +4986,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-fit-light-20261003-1538"></script>
+<script src="/static/script.js?v=phase4-light-match-desktop-20261003-2025"></script>
 
 </body>
 </html>
