@@ -12682,11 +12682,6 @@ function ensureKnowledgeGraphSelection(visibleNodes, context) {
 }
 
 function openKnowledgeGraph() {
-    if (window.matchMedia?.("(max-width: 760px)")?.matches) {
-        showCopyToast("手机端暂不提供知识图谱，请在平板或电脑端查看");
-        return;
-    }
-
     const modal = document.getElementById(
         "knowledgeGraphModal"
     );
@@ -13298,6 +13293,197 @@ function computeKnowledgeGraphLevels(nodes) {
     }
 
     return memo;
+}
+
+function renderMobileKnowledgeGraphSection(container, nodes, title, description, context) {
+    const section = document.createElement("div");
+    section.className = "kg-section kg-mobile-section";
+
+    const heading = document.createElement("div");
+    heading.className = "kg-section-title";
+    heading.textContent = title;
+    section.appendChild(heading);
+
+    if (description) {
+        const desc = document.createElement("div");
+        desc.className = "kg-section-desc";
+        desc.textContent = description;
+        section.appendChild(desc);
+    }
+
+    if (!nodes.length) {
+        const empty = document.createElement("div");
+        empty.className = "kg-empty";
+        empty.textContent = "这个分类下暂时没有可显示的节点。";
+        section.appendChild(empty);
+        container.appendChild(section);
+        return;
+    }
+
+    const levels = computeKnowledgeGraphLevels(nodes);
+    const orderedNodes = nodes.slice();
+    const orderMap = new Map(
+        orderedNodes.map((node, index) => [node.id, index])
+    );
+    const columns = new Map();
+
+    for (const node of orderedNodes) {
+        const level = levels.get(node.id) || 0;
+        if (!columns.has(level)) columns.set(level, []);
+        columns.get(level).push(node);
+    }
+
+    const columnKeys = [...columns.keys()].sort((a, b) => a - b);
+    for (const key of columnKeys) {
+        columns.get(key).sort(
+            (a, b) => orderMap.get(a.id) - orderMap.get(b.id)
+        );
+    }
+
+    // 手机端节点使用普通 HTML，SVG 只负责画线。
+    // 这样避开部分安卓 WebView/浏览器 SVG <text> 不显示的问题。
+    const viewportWidth = Math.max(
+        280,
+        (container.clientWidth || window.innerWidth || 360) - 36
+    );
+    const columnCount = Math.max(columnKeys.length, 1);
+    const marginX = 12;
+    const marginY = 14;
+    const gapX = columnCount <= 2 ? 24 : 16;
+    const gapY = 18;
+    const fittedNodeWidth = Math.floor(
+        (viewportWidth - marginX * 2 - gapX * Math.max(columnCount - 1, 0))
+        / Math.min(columnCount, 3)
+    );
+    const nodeWidth = columnCount <= 3
+        ? Math.max(92, Math.min(128, fittedNodeWidth))
+        : 108;
+    const nodeHeight = 64;
+    const maxRows = Math.max(
+        ...columnKeys.map(key => columns.get(key).length),
+        1
+    );
+    const stageWidth = Math.max(
+        viewportWidth,
+        marginX * 2
+        + columnCount * nodeWidth
+        + Math.max(columnCount - 1, 0) * gapX
+    );
+    const stageHeight = (
+        marginY * 2
+        + maxRows * nodeHeight
+        + Math.max(maxRows - 1, 0) * gapY
+    );
+
+    const viewport = document.createElement("div");
+    viewport.className = "kg-mobile-viewport";
+
+    const stage = document.createElement("div");
+    stage.className = "kg-mobile-stage";
+    stage.style.width = `${stageWidth}px`;
+    stage.style.height = `${stageHeight}px`;
+
+    const edgeSvg = createSvgElement("svg", {
+        class: "kg-mobile-edge-layer",
+        width: stageWidth,
+        height: stageHeight,
+        viewBox: `0 0 ${stageWidth} ${stageHeight}`,
+        "aria-hidden": "true"
+    });
+    stage.appendChild(edgeSvg);
+
+    const positions = new Map();
+    for (let columnIndex = 0; columnIndex < columnKeys.length; columnIndex += 1) {
+        const level = columnKeys[columnIndex];
+        const group = columns.get(level);
+        const x = marginX + columnIndex * (nodeWidth + gapX);
+        const totalHeight = (
+            group.length * nodeHeight
+            + Math.max(group.length - 1, 0) * gapY
+        );
+        const startY = marginY + (stageHeight - marginY * 2 - totalHeight) / 2;
+
+        for (let rowIndex = 0; rowIndex < group.length; rowIndex += 1) {
+            const node = group[rowIndex];
+            const y = startY + rowIndex * (nodeHeight + gapY);
+            positions.set(node.id, { x, y });
+        }
+    }
+
+    const byName = new Map(nodes.map(node => [node.name, node]));
+    for (const node of orderedNodes) {
+        const current = positions.get(node.id);
+        if (!current) continue;
+
+        for (const prerequisiteName of node.prerequisites || []) {
+            const previousNode = byName.get(prerequisiteName);
+            const previous = previousNode ? positions.get(previousNode.id) : null;
+            if (!previous) continue;
+
+            const x1 = previous.x + nodeWidth;
+            const y1 = previous.y + nodeHeight / 2;
+            const x2 = current.x;
+            const y2 = current.y + nodeHeight / 2;
+            const midX = (x1 + x2) / 2;
+
+            const path = createSvgElement("path", {
+                class: "kg-mobile-edge",
+                d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+            });
+            edgeSvg.appendChild(path);
+        }
+    }
+
+    for (const node of orderedNodes) {
+        const position = positions.get(node.id);
+        if (!position) continue;
+
+        const state = knowledgeGraphNodeState(node.name, context);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = (
+            "kg-mobile-node"
+            + (node.id === knowledgeGraphSelectedNodeId ? " selected" : "")
+        );
+        button.style.left = `${position.x}px`;
+        button.style.top = `${position.y}px`;
+        button.style.width = `${nodeWidth}px`;
+        button.style.height = `${nodeHeight}px`;
+        button.style.background = state.fill;
+        button.style.borderColor = state.stroke;
+        button.setAttribute("aria-label", node.name);
+
+        const name = document.createElement("span");
+        name.className = "kg-mobile-node-name";
+        name.textContent = node.name;
+        button.appendChild(name);
+
+        const badgeText = state.badge || node.level || "";
+        if (badgeText) {
+            const badge = document.createElement("span");
+            badge.className = "kg-mobile-node-badge";
+            badge.textContent = badgeText;
+            button.appendChild(badge);
+        }
+
+        button.addEventListener("click", () => {
+            knowledgeGraphSelectedNodeId = node.id;
+            knowledgeGraphSideMode = "detail";
+            renderKnowledgeGraph();
+        });
+
+        stage.appendChild(button);
+    }
+
+    viewport.appendChild(stage);
+    section.appendChild(viewport);
+    container.appendChild(section);
+
+    // 默认把内容稍微居中；超宽图谱仍只在这个区域内横向滚动。
+    requestAnimationFrame(() => {
+        const overflow = Math.max(0, stage.scrollWidth - viewport.clientWidth);
+        if (overflow > 0) viewport.scrollLeft = Math.min(overflow / 2, nodeWidth / 2);
+    });
 }
 
 function renderKnowledgeGraphSection(container, nodes, title, description, context) {
@@ -14055,13 +14241,25 @@ function renderKnowledgeGraph() {
             )
     );
 
-    renderKnowledgeGraphSection(
-        canvas,
-        visibleNodes,
-        knowledgeGraphFilter || "知识图谱",
-        description,
-        context
-    );
+    const mobileGraph = window.matchMedia?.("(max-width: 760px)")?.matches;
+
+    if (mobileGraph) {
+        renderMobileKnowledgeGraphSection(
+            canvas,
+            visibleNodes,
+            knowledgeGraphFilter || "知识图谱",
+            description,
+            context
+        );
+    } else {
+        renderKnowledgeGraphSection(
+            canvas,
+            visibleNodes,
+            knowledgeGraphFilter || "知识图谱",
+            description,
+            context
+        );
+    }
 
     renderKnowledgeGraphSide();
 }
