@@ -7392,159 +7392,190 @@ function buildKnowledgeGraphImageCopyTarget() {
     return wrapper;
 }
 
-function buildKnowledgeGraphTextCopyPayload() {
-    if (!knowledgeGraphData) return "";
+let knowledgeGraphPreparedPngPromise = null;
+let knowledgeGraphPreparedPngKey = "";
 
-    const context = getActiveKnowledgeContext();
-    const fullNodes = knowledgeGraphVisibleNodes(
-        knowledgeGraphFilter
-    );
-    const visibleNodes = (
-        knowledgeGraphViewMode === "focus"
-            ? knowledgeGraphFocusedNodes(
-                knowledgeGraphFilter,
-                context
-            )
-            : fullNodes
-    );
+function knowledgeGraphCopyKey() {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const mobileStage = canvas?.querySelector?.(".kg-mobile-stage");
+    const svg = canvas?.querySelector?.(".kg-svg");
+    const source = mobileStage || svg;
+    if (!source) return "";
 
-    if (!visibleNodes.length) return "";
+    return [
+        knowledgeGraphFilter || "全部",
+        knowledgeGraphViewMode,
+        knowledgeGraphScope,
+        source.scrollWidth || source.getBoundingClientRect().width || 0,
+        source.scrollHeight || source.getBoundingClientRect().height || 0,
+        source.querySelectorAll?.(".kg-mobile-node, .kg-node")?.length || 0
+    ].join("|");
+}
 
-    const visibleNames = new Set(
-        visibleNodes.map(node => node.name)
-    );
-    const title = knowledgeGraphFilter || "全部";
-    const lines = [
-        `离散数学知识图谱 · ${title}`,
-        `范围：${knowledgeGraphViewMode === "focus" ? "当前相关" : "完整模块"}`,
-        ""
-    ];
-
-    for (const node of visibleNodes) {
-        const prerequisites = (node.prerequisites || [])
-            .filter(name => visibleNames.has(name));
-        const state = knowledgeGraphNodeState(
-            node.name,
-            context
-        );
-        const suffix = state.badge ? ` [${state.badge}]` : "";
-
-        if (prerequisites.length) {
-            lines.push(
-                `${node.name}${suffix} ← ${prerequisites.join("、")}`
-            );
-        } else {
-            lines.push(`${node.name}${suffix}`);
-        }
+async function renderKnowledgeGraphPngBlob() {
+    const target = buildKnowledgeGraphImageCopyTarget();
+    if (!target) {
+        throw new Error("没有可导出的图谱");
     }
 
-    return lines.join("\n");
+    try {
+        if (typeof window.html2canvas !== "function") {
+            throw new Error("html2canvas 不可用");
+        }
+
+        if (document.fonts?.ready) {
+            await document.fonts.ready.catch(() => {});
+        }
+
+        const exportWidth = Math.ceil(
+            target.scrollWidth
+            || target.getBoundingClientRect().width
+            || 1
+        );
+        const exportHeight = Math.ceil(
+            target.scrollHeight
+            || target.getBoundingClientRect().height
+            || 1
+        );
+
+        const renderedCanvas = await window.html2canvas(target, {
+            backgroundColor: effectiveElementBackground(target),
+            scale: Math.min(2, window.devicePixelRatio || 1.5),
+            useCORS: true,
+            logging: false,
+            width: exportWidth,
+            height: exportHeight,
+            windowWidth: Math.max(window.innerWidth, exportWidth),
+            windowHeight: Math.max(window.innerHeight, exportHeight),
+            scrollX: 0,
+            scrollY: 0
+        });
+
+        const png = await new Promise(resolve => {
+            renderedCanvas.toBlob(resolve, "image/png");
+        });
+
+        if (!png) {
+            throw new Error("图谱 PNG 生成失败");
+        }
+
+        return png;
+    } finally {
+        target.remove();
+    }
+}
+
+function prepareKnowledgeGraphPng(force = false) {
+    const key = knowledgeGraphCopyKey();
+    if (!key) return null;
+
+    if (
+        !force
+        && knowledgeGraphPreparedPngPromise
+        && knowledgeGraphPreparedPngKey === key
+    ) {
+        return knowledgeGraphPreparedPngPromise;
+    }
+
+    knowledgeGraphPreparedPngKey = key;
+    knowledgeGraphPreparedPngPromise = renderKnowledgeGraphPngBlob()
+        .catch(error => {
+            if (knowledgeGraphPreparedPngKey === key) {
+                knowledgeGraphPreparedPngPromise = null;
+            }
+            throw error;
+        });
+
+    return knowledgeGraphPreparedPngPromise;
+}
+
+function scheduleKnowledgeGraphPngPreparation() {
+    const prepare = () => {
+        prepareKnowledgeGraphPng().catch(() => {});
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(prepare, { timeout: 900 });
+    } else {
+        window.setTimeout(prepare, 120);
+    }
+}
+
+function downloadKnowledgeGraphPng(blob) {
+    if (!blob) return false;
+
+    try {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+        return true;
+    } catch (error) {
+        console.warn("保存图谱 PNG 失败：", error);
+        return false;
+    }
 }
 
 async function copyKnowledgeGraphVisual() {
-    const target = buildKnowledgeGraphImageCopyTarget();
-    const textFallback = buildKnowledgeGraphTextCopyPayload();
+    const pngPromise = prepareKnowledgeGraphPng();
+    if (!pngPromise) {
+        showCopyToast("当前没有可复制的图谱");
+        return false;
+    }
 
-    try {
-        if (
-            target
-            && typeof window.html2canvas === "function"
-            && navigator.clipboard?.write
-            && window.ClipboardItem
-            && (
-                typeof window.ClipboardItem.supports !== "function"
-                || window.ClipboardItem.supports("image/png")
-            )
-        ) {
+    // 这里绝不再退化为文字。此前把 text/plain 同时塞进 ClipboardItem，
+    // 一些安卓浏览器/粘贴目标会优先取文字，看起来就像“复制图谱=复制文字”。
+    if (
+        navigator.clipboard?.write
+        && window.ClipboardItem
+        && (
+            typeof window.ClipboardItem.supports !== "function"
+            || window.ClipboardItem.supports("image/png")
+        )
+    ) {
+        try {
+            // Chromium 支持 Promise<Blob> 时，先在用户点击仍然有效的时刻
+            // 发起 write，避免等截图完成后丢失剪贴板权限。
+            const item = new ClipboardItem({
+                "image/png": pngPromise
+            });
+            await navigator.clipboard.write([item]);
+            showCopyToast("图谱图片已复制");
+            return true;
+        } catch (firstError) {
+            console.warn("图谱图片即时复制失败：", firstError);
+
+            // 某些浏览器不接受 Promise<Blob>，再用已经生成好的真实 Blob 试一次。
             try {
-                // ClipboardItem 支持 Promise<Blob> 的浏览器会在点击事件仍具备
-                // user activation 时就开始 clipboard.write，避免手机浏览器等待
-                // html2canvas 渲染后丢失剪贴板权限。
-                const pngPromise = (async () => {
-                    if (document.fonts?.ready) {
-                        await document.fonts.ready.catch(() => {});
-                    }
-
-                    const exportWidth = Math.ceil(
-                        target.scrollWidth
-                        || target.getBoundingClientRect().width
-                        || 1
-                    );
-                    const exportHeight = Math.ceil(
-                        target.scrollHeight
-                        || target.getBoundingClientRect().height
-                        || 1
-                    );
-
-                    const renderedCanvas = await window.html2canvas(
-                        target,
-                        {
-                            backgroundColor: effectiveElementBackground(target),
-                            scale: Math.min(2, window.devicePixelRatio || 1.5),
-                            useCORS: true,
-                            logging: false,
-                            width: exportWidth,
-                            height: exportHeight,
-                            windowWidth: Math.max(window.innerWidth, exportWidth),
-                            windowHeight: Math.max(window.innerHeight, exportHeight),
-                            scrollX: 0,
-                            scrollY: 0
-                        }
-                    );
-
-                    const png = await new Promise(resolve => {
-                        renderedCanvas.toBlob(resolve, "image/png");
-                    });
-
-                    if (!png) {
-                        throw new Error("图谱 PNG 生成失败");
-                    }
-                    return png;
-                })();
-
-                const clipboardFormats = {
-                    "image/png": pngPromise
-                };
-                if (textFallback) {
-                    clipboardFormats["text/plain"] = new Blob(
-                        [textFallback],
-                        { type: "text/plain" }
-                    );
-                }
-
-                const item = new ClipboardItem(clipboardFormats);
-
+                const png = await pngPromise;
+                const item = new ClipboardItem({ "image/png": png });
                 await navigator.clipboard.write([item]);
                 showCopyToast("图谱图片已复制");
                 return true;
-            } catch (error) {
-                console.warn("图谱图片复制失败，降级为文字：", error);
+            } catch (secondError) {
+                console.warn("图谱图片 Blob 复制失败：", secondError);
             }
         }
-
-        // 部分安卓浏览器不允许网页把 PNG 写进系统剪贴板。
-        // 此时仍保证按钮有实际结果：复制完整图谱的文字关系，而不是静默失败。
-        if (textFallback) {
-            const ok = await writeRichClipboard({
-                text: textFallback,
-                html: ""
-            });
-
-            if (ok) {
-                showCopyToast(
-                    target
-                        ? "图片复制受限，已复制图谱文字"
-                        : "图谱文字已复制"
-                );
-                return true;
-            }
-        }
-
-        showCopyToast("复制失败，请使用系统截图");
-        return false;
-    } finally {
-        target?.remove?.();
     }
+
+    // 浏览器若根本禁止网页写图片剪贴板，就保存 PNG，而不是偷偷复制文字。
+    try {
+        const png = await pngPromise;
+        if (downloadKnowledgeGraphPng(png)) {
+            showCopyToast("浏览器不支持直接复制图片，已保存 PNG");
+            return true;
+        }
+    } catch (error) {
+        console.warn("图谱 PNG 生成失败：", error);
+    }
+
+    showCopyToast("图谱图片复制失败");
+    return false;
 }
 
 function selectionNodeElement(node) {
@@ -12817,6 +12848,264 @@ function ensureKnowledgeGraphSelection(visibleNodes, context) {
     knowledgeGraphSelectedNodeId = visibleNodes?.[0]?.id || "";
 }
 
+function clampMobileGraphScale(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 1;
+    return Math.max(0.35, Math.min(3, number));
+}
+
+function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
+    if (!viewport || !surface || !stage) return;
+
+    const baseWidth = Math.max(1, Number(stage.dataset.baseWidth) || stage.scrollWidth || 1);
+    const baseHeight = Math.max(1, Number(stage.dataset.baseHeight) || stage.scrollHeight || 1);
+    const modal = document.getElementById("knowledgeGraphModal");
+    const pointers = new Map();
+    let previewDrag = null;
+    let fullscreenPan = null;
+    let pinch = null;
+    let suppressClickUntil = 0;
+
+    const currentScale = () => (
+        clampMobileGraphScale(viewport._kgScale || 1)
+    );
+
+    const updateLabel = scale => {
+        if (zoomLabel) {
+            zoomLabel.textContent = `${Math.round(scale * 100)}%`;
+        }
+    };
+
+    const applyScale = (nextScale, anchor = null) => {
+        const oldScale = currentScale();
+        const scale = clampMobileGraphScale(nextScale);
+
+        let contentX = null;
+        let contentY = null;
+        if (anchor) {
+            contentX = (viewport.scrollLeft + anchor.x) / oldScale;
+            contentY = (viewport.scrollTop + anchor.y) / oldScale;
+        }
+
+        viewport._kgScale = scale;
+        surface.style.width = `${Math.ceil(baseWidth * scale)}px`;
+        surface.style.height = `${Math.ceil(baseHeight * scale)}px`;
+        stage.style.transform = `scale(${scale})`;
+        updateLabel(scale);
+
+        if (anchor && contentX !== null && contentY !== null) {
+            viewport.scrollLeft = Math.max(0, contentX * scale - anchor.x);
+            viewport.scrollTop = Math.max(0, contentY * scale - anchor.y);
+        }
+
+        return scale;
+    };
+
+    const fitGraph = () => {
+        const availableWidth = Math.max(1, viewport.clientWidth - 24);
+        const availableHeight = Math.max(1, viewport.clientHeight - 24);
+        const scale = clampMobileGraphScale(
+            Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight)
+        );
+        applyScale(scale);
+        requestAnimationFrame(() => {
+            viewport.scrollLeft = Math.max(0, (surface.scrollWidth - viewport.clientWidth) / 2);
+            viewport.scrollTop = Math.max(0, (surface.scrollHeight - viewport.clientHeight) / 2);
+        });
+    };
+
+    viewport._kgSetScale = applyScale;
+    viewport._kgFit = fitGraph;
+    viewport._kgReset = () => {
+        applyScale(1);
+        viewport.scrollTop = 0;
+    };
+
+    applyScale(1);
+
+    const viewportPoint = event => {
+        const rect = viewport.getBoundingClientRect();
+        return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        };
+    };
+
+    const pointerDistance = (a, b) => Math.hypot(
+        a.clientX - b.clientX,
+        a.clientY - b.clientY
+    );
+
+    const pointerCenter = (a, b) => {
+        const rect = viewport.getBoundingClientRect();
+        return {
+            x: (a.clientX + b.clientX) / 2 - rect.left,
+            y: (a.clientY + b.clientY) / 2 - rect.top
+        };
+    };
+
+    viewport.addEventListener("pointerdown", event => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+
+        pointers.set(event.pointerId, event);
+        const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
+
+        if (fullscreen) {
+            try { viewport.setPointerCapture(event.pointerId); } catch (_error) {}
+
+            if (pointers.size >= 2) {
+                const [a, b] = [...pointers.values()].slice(0, 2);
+                const center = pointerCenter(a, b);
+                const scale = currentScale();
+                pinch = {
+                    distance: Math.max(1, pointerDistance(a, b)),
+                    scale,
+                    contentX: (viewport.scrollLeft + center.x) / scale,
+                    contentY: (viewport.scrollTop + center.y) / scale
+                };
+                fullscreenPan = null;
+                event.preventDefault();
+                return;
+            }
+
+            fullscreenPan = {
+                pointerId: event.pointerId,
+                x: event.clientX,
+                y: event.clientY,
+                left: viewport.scrollLeft,
+                top: viewport.scrollTop,
+                moved: false
+            };
+            return;
+        }
+
+        // 普通预览只准备“横向拖图”。纵向手势交给外层页面滚动，
+        // 这样手指落在图谱上时也能自然继续往下滑页面。
+        if (pointers.size === 1) {
+            previewDrag = {
+                pointerId: event.pointerId,
+                x: event.clientX,
+                y: event.clientY,
+                left: viewport.scrollLeft,
+                active: false
+            };
+        }
+    }, { passive: false });
+
+    viewport.addEventListener("pointermove", event => {
+        if (!pointers.has(event.pointerId)) return;
+        pointers.set(event.pointerId, event);
+
+        const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
+
+        if (fullscreen && pointers.size >= 2) {
+            const [a, b] = [...pointers.values()].slice(0, 2);
+            if (!pinch) {
+                const center = pointerCenter(a, b);
+                const scale = currentScale();
+                pinch = {
+                    distance: Math.max(1, pointerDistance(a, b)),
+                    scale,
+                    contentX: (viewport.scrollLeft + center.x) / scale,
+                    contentY: (viewport.scrollTop + center.y) / scale
+                };
+            }
+
+            const center = pointerCenter(a, b);
+            const scale = clampMobileGraphScale(
+                pinch.scale * pointerDistance(a, b) / pinch.distance
+            );
+            applyScale(scale);
+            viewport.scrollLeft = Math.max(0, pinch.contentX * scale - center.x);
+            viewport.scrollTop = Math.max(0, pinch.contentY * scale - center.y);
+            suppressClickUntil = performance.now() + 300;
+            event.preventDefault();
+            return;
+        }
+
+        if (fullscreen && fullscreenPan?.pointerId === event.pointerId) {
+            const dx = event.clientX - fullscreenPan.x;
+            const dy = event.clientY - fullscreenPan.y;
+            if (Math.abs(dx) + Math.abs(dy) > 4) {
+                fullscreenPan.moved = true;
+                suppressClickUntil = performance.now() + 300;
+            }
+            viewport.scrollLeft = fullscreenPan.left - dx;
+            viewport.scrollTop = fullscreenPan.top - dy;
+            event.preventDefault();
+            return;
+        }
+
+        if (!fullscreen && previewDrag?.pointerId === event.pointerId) {
+            const dx = event.clientX - previewDrag.x;
+            const dy = event.clientY - previewDrag.y;
+
+            if (!previewDrag.active) {
+                if (Math.abs(dy) >= Math.abs(dx) || Math.abs(dx) < 8) {
+                    return;
+                }
+                previewDrag.active = true;
+                suppressClickUntil = performance.now() + 250;
+                try { viewport.setPointerCapture(event.pointerId); } catch (_error) {}
+            }
+
+            viewport.scrollLeft = previewDrag.left - dx;
+            event.preventDefault();
+        }
+    }, { passive: false });
+
+    const finishPointer = event => {
+        pointers.delete(event.pointerId);
+
+        if (previewDrag?.pointerId === event.pointerId) {
+            previewDrag = null;
+        }
+        if (fullscreenPan?.pointerId === event.pointerId) {
+            fullscreenPan = null;
+        }
+
+        if (pointers.size < 2) {
+            pinch = null;
+        }
+
+        if (
+            modal?.classList.contains("graph-fullscreen-view")
+            && pointers.size === 1
+        ) {
+            const remaining = [...pointers.values()][0];
+            fullscreenPan = {
+                pointerId: remaining.pointerId,
+                x: remaining.clientX,
+                y: remaining.clientY,
+                left: viewport.scrollLeft,
+                top: viewport.scrollTop,
+                moved: false
+            };
+        }
+    };
+
+    viewport.addEventListener("pointerup", finishPointer, { passive: true });
+    viewport.addEventListener("pointercancel", finishPointer, { passive: true });
+
+    viewport.addEventListener("click", event => {
+        if (performance.now() < suppressClickUntil) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }, true);
+
+    // 桌面调试/触控板也能 Ctrl+滚轮缩放完整图谱。
+    viewport.addEventListener("wheel", event => {
+        if (!modal?.classList.contains("graph-fullscreen-view") || !event.ctrlKey) {
+            return;
+        }
+        const point = viewportPoint(event);
+        const factor = event.deltaY < 0 ? 1.12 : 0.89;
+        applyScale(currentScale() * factor, point);
+        event.preventDefault();
+    }, { passive: false });
+}
+
 function setKnowledgeGraphFullscreenView(enabled) {
     const modal = document.getElementById("knowledgeGraphModal");
     if (!modal) return;
@@ -12835,14 +13124,15 @@ function setKnowledgeGraphFullscreenView(enabled) {
 
     requestAnimationFrame(() => {
         const viewport = modal.querySelector(".kg-mobile-viewport");
-        const stage = viewport?.querySelector?.(".kg-mobile-stage");
-        if (!viewport || !stage) return;
+        if (!viewport) return;
 
         if (next) {
-            const maxLeft = Math.max(0, stage.scrollWidth - viewport.clientWidth);
-            const maxTop = Math.max(0, stage.scrollHeight - viewport.clientHeight);
-            viewport.scrollLeft = Math.min(viewport.scrollLeft, maxLeft);
-            viewport.scrollTop = Math.min(viewport.scrollTop, maxTop);
+            // 完整查看默认先把整张图放进屏幕；随后可双指缩放、单指拖动，
+            // 或用底部 +/- / 适应按钮调整。
+            viewport._kgFit?.();
+        } else {
+            // 回到普通预览时恢复 100%，预览只负责横向拖图，纵向手势交给页面。
+            viewport._kgReset?.();
         }
     });
 }
@@ -13504,6 +13794,34 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     });
     section.appendChild(expandButton);
 
+    const zoomControls = document.createElement("div");
+    zoomControls.className = "kg-mobile-zoom-controls";
+
+    const zoomOut = document.createElement("button");
+    zoomOut.type = "button";
+    zoomOut.className = "kg-mobile-zoom-btn";
+    zoomOut.textContent = "−";
+    zoomOut.setAttribute("aria-label", "缩小图谱");
+
+    const zoomLabel = document.createElement("span");
+    zoomLabel.className = "kg-mobile-zoom-label";
+    zoomLabel.textContent = "100%";
+
+    const zoomIn = document.createElement("button");
+    zoomIn.type = "button";
+    zoomIn.className = "kg-mobile-zoom-btn";
+    zoomIn.textContent = "+";
+    zoomIn.setAttribute("aria-label", "放大图谱");
+
+    const zoomFit = document.createElement("button");
+    zoomFit.type = "button";
+    zoomFit.className = "kg-mobile-zoom-fit";
+    zoomFit.textContent = "适应";
+    zoomFit.setAttribute("aria-label", "适应屏幕显示完整图谱");
+
+    zoomControls.append(zoomOut, zoomLabel, zoomIn, zoomFit);
+    section.appendChild(zoomControls);
+
     if (!nodes.length) {
         const empty = document.createElement("div");
         empty.className = "kg-empty";
@@ -13571,8 +13889,15 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     const viewport = document.createElement("div");
     viewport.className = "kg-mobile-viewport";
 
+    const zoomSurface = document.createElement("div");
+    zoomSurface.className = "kg-mobile-zoom-surface";
+    zoomSurface.style.width = `${stageWidth}px`;
+    zoomSurface.style.height = `${stageHeight}px`;
+
     const stage = document.createElement("div");
     stage.className = "kg-mobile-stage";
+    stage.dataset.baseWidth = String(stageWidth);
+    stage.dataset.baseHeight = String(stageHeight);
     stage.style.width = `${stageWidth}px`;
     stage.style.height = `${stageHeight}px`;
 
@@ -13668,14 +13993,52 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         stage.appendChild(button);
     }
 
-    viewport.appendChild(stage);
+    zoomSurface.appendChild(stage);
+    viewport.appendChild(zoomSurface);
     section.appendChild(viewport);
     container.appendChild(section);
 
-    // 默认把内容稍微居中；超宽图谱仍只在这个区域内横向滚动。
+    installMobileGraphInteraction(
+        viewport,
+        zoomSurface,
+        stage,
+        zoomLabel
+    );
+
+    zoomOut.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const rect = viewport.getBoundingClientRect();
+        viewport._kgSetScale?.(
+            (viewport._kgScale || 1) / 1.2,
+            { x: rect.width / 2, y: rect.height / 2 }
+        );
+    });
+
+    zoomIn.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const rect = viewport.getBoundingClientRect();
+        viewport._kgSetScale?.(
+            (viewport._kgScale || 1) * 1.2,
+            { x: rect.width / 2, y: rect.height / 2 }
+        );
+    });
+
+    zoomFit.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        viewport._kgFit?.();
+    });
+
+    // 普通预览默认 100%。横向超出时可左右拖；上下滑动则由外层页面接管。
     requestAnimationFrame(() => {
-        const overflow = Math.max(0, stage.scrollWidth - viewport.clientWidth);
+        const overflow = Math.max(0, zoomSurface.scrollWidth - viewport.clientWidth);
         if (overflow > 0) viewport.scrollLeft = Math.min(overflow / 2, nodeWidth / 2);
+
+        if (graphModal?.classList.contains("graph-fullscreen-view")) {
+            viewport._kgFit?.();
+        }
     });
 }
 
@@ -14376,6 +14739,8 @@ function renderKnowledgeGraph() {
     if (!canvas) return;
 
     renderKnowledgeGraphSummary(context);
+    knowledgeGraphPreparedPngPromise = null;
+    knowledgeGraphPreparedPngKey = "";
     canvas.innerHTML = "";
 
     if (!knowledgeGraphData.nodes.length) {
@@ -14455,6 +14820,7 @@ function renderKnowledgeGraph() {
     }
 
     renderKnowledgeGraphSide();
+    scheduleKnowledgeGraphPngPreparation();
 }
 
 
