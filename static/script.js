@@ -194,6 +194,11 @@ function applyAppearanceSettings(options = {}) {
             "content",
             theme === "light" ? "only light" : "dark"
         );
+    document.querySelector('meta[name="supported-color-schemes"]')
+        ?.setAttribute(
+            "content",
+            theme === "light" ? "light" : "dark"
+        );
     root.style.setProperty("--accent", accent.main);
     root.style.setProperty("--accent-rgb", accent.rgb);
     root.style.setProperty("--accent-deep", accent.deep);
@@ -12677,6 +12682,11 @@ function ensureKnowledgeGraphSelection(visibleNodes, context) {
 }
 
 function openKnowledgeGraph() {
+    if (window.matchMedia?.("(max-width: 760px)")?.matches) {
+        showCopyToast("手机端暂不提供知识图谱，请在平板或电脑端查看");
+        return;
+    }
+
     const modal = document.getElementById(
         "knowledgeGraphModal"
     );
