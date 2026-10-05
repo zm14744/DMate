@@ -4900,6 +4900,59 @@ body[data-appearance-theme="light"] .input input {
     }
 }
 
+
+
+/* =========================================================
+   2026-10-05 手机输入区 / 系统返回键适配
+   - --app-visible-height 由 visualViewport 实时写入；软键盘弹出时输入区仍在可视区域。
+   - 不再依赖 100dvh 在部分安卓浏览器中的键盘覆盖行为。
+   ========================================================= */
+:root {
+    --app-visible-height:100dvh;
+}
+
+@media (max-width:1100px) {
+    html,
+    body {
+        height:var(--app-visible-height, 100dvh) !important;
+        min-height:0 !important;
+    }
+
+    body {
+        overflow:hidden !important;
+    }
+
+    .layout {
+        height:var(--app-visible-height, 100dvh) !important;
+        min-height:0 !important;
+        max-height:var(--app-visible-height, 100dvh) !important;
+    }
+
+    .left,
+    .right {
+        height:var(--app-visible-height, 100dvh) !important;
+        max-height:var(--app-visible-height, 100dvh) !important;
+    }
+
+    .center {
+        min-height:0 !important;
+    }
+
+    .chat {
+        min-height:0 !important;
+    }
+
+    /* 键盘出现时减少底部装饰留白，给输入框更多真实空间。 */
+    body.mobile-keyboard-open .input-wrap {
+        padding-bottom:6px !important;
+        background:rgba(var(--surface-0-rgb),.96) !important;
+    }
+
+    body.mobile-keyboard-open .chat {
+        scroll-padding-bottom:82px !important;
+    }
+}
+
 </style>
 
 <script>
@@ -4983,8 +5036,7 @@ window.MathJax = {
         </div>
         <div id="learningSummary" class="learning-summary"></div>
 
-        <div class="learning-actions">
-            <button id="markWrongBtn" type="button">记为错题</button>
+        <div class="learning-actions learning-actions-single">
             <button id="wrongBookBtn" type="button">查看错题本 (0)</button>
         </div>
 
@@ -5315,7 +5367,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-graph-complete-20261004b"></script>
+<script src="/static/script.js?v=phase4-mobile-shell-fix-20261005c"></script>
 
 </body>
 </html>
