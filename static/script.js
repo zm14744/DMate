@@ -8749,6 +8749,7 @@ function newChat() {
 
     saveState();
     renderAll();
+    animateMobileConversationSwitch();
 }
 
 
@@ -11319,6 +11320,7 @@ function renderSessions() {
             currentId = session.id;
             saveState();
             renderAll();
+            animateMobileConversationSwitch();
         };
 
         span.ondblclick = () => {
@@ -14875,17 +14877,118 @@ function isMobileAppShell() {
     return window.matchMedia?.("(max-width: 1100px)")?.matches ?? false;
 }
 
+let mobileDrawerGestureFrame = 0;
+let mobileDrawerGesturePending = null;
+let mobileDrawerGestureElements = null;
+
+function getMobileDrawerGestureElements() {
+    const cached = mobileDrawerGestureElements;
+    if (
+        cached
+        && cached.center?.isConnected
+        && cached.left?.isConnected
+        && cached.right?.isConnected
+    ) {
+        return cached;
+    }
+
+    mobileDrawerGestureElements = {
+        left:document.querySelector(".left"),
+        right:document.querySelector(".right"),
+        backdrop:document.getElementById("mobileShellBackdrop"),
+        center:document.querySelector(".center")
+    };
+    return mobileDrawerGestureElements;
+}
+
+function resetMobileDrawerGestureStyles() {
+    if (mobileDrawerGestureFrame) {
+        cancelAnimationFrame(mobileDrawerGestureFrame);
+        mobileDrawerGestureFrame = 0;
+    }
+    mobileDrawerGesturePending = null;
+
+    const { left, right, backdrop, center } = getMobileDrawerGestureElements();
+
+    [left, right, backdrop, center].forEach(element => {
+        if (!(element instanceof HTMLElement)) return;
+        element.style.removeProperty("transform");
+        element.style.removeProperty("opacity");
+        element.style.removeProperty("pointer-events");
+    });
+
+    document.body.classList.remove("mobile-drawer-dragging");
+}
+
 function closeMobileShellDrawers() {
     document.body.classList.remove("mobile-left-open", "mobile-tools-open");
+    resetMobileDrawerGestureStyles();
 }
 
 function openMobileShellDrawer(kind) {
     if (!isMobileAppShell()) return;
 
+    resetMobileDrawerGestureStyles();
     document.body.classList.remove("mobile-left-open", "mobile-tools-open");
     document.body.classList.add(
         kind === "tools" ? "mobile-tools-open" : "mobile-left-open"
     );
+}
+
+function paintMobileDrawerDragProgress(kind, progress) {
+    const p = Math.max(0, Math.min(1, Number(progress) || 0));
+    const { left, right, backdrop, center } = getMobileDrawerGestureElements();
+
+    document.body.classList.add("mobile-drawer-dragging");
+
+    if (kind === "left" && left instanceof HTMLElement) {
+        left.style.transform = `translate3d(${-104 + 104 * p}%,0,0)`;
+    }
+    if (kind === "tools" && right instanceof HTMLElement) {
+        right.style.transform = `translate3d(${104 - 104 * p}%,0,0)`;
+    }
+
+    if (backdrop instanceof HTMLElement) {
+        backdrop.style.opacity = String(p);
+        backdrop.style.pointerEvents = "none";
+    }
+
+    if (center instanceof HTMLElement) {
+        const direction = kind === "left" ? 1 : -1;
+        const offset = direction * p * 8;
+        center.style.transform = `translate3d(${offset}px,0,0)`;
+    }
+}
+
+function setMobileDrawerDragProgress(kind, progress) {
+    // touchmove 可能高于屏幕刷新率；每帧只提交一次 transform，避免主线程被
+    // 连续 style 写入拖住。
+    mobileDrawerGesturePending = { kind, progress };
+    if (mobileDrawerGestureFrame) return;
+
+    mobileDrawerGestureFrame = requestAnimationFrame(() => {
+        mobileDrawerGestureFrame = 0;
+        const pending = mobileDrawerGesturePending;
+        mobileDrawerGesturePending = null;
+        if (!pending) return;
+        paintMobileDrawerDragProgress(pending.kind, pending.progress);
+    });
+}
+
+function settleMobileDrawerGesture(kind, shouldOpen) {
+    const body = document.body;
+
+    body.classList.remove("mobile-drawer-dragging");
+    body.classList.remove("mobile-left-open", "mobile-tools-open");
+    if (shouldOpen) {
+        body.classList.add(kind === "tools" ? "mobile-tools-open" : "mobile-left-open");
+    }
+
+    // 保留手指结束瞬间的 inline transform 一帧，再交还给 CSS transition，
+    // 这样不会在 touchend 时突然跳一下。
+    requestAnimationFrame(() => {
+        requestAnimationFrame(resetMobileDrawerGestureStyles);
+    });
 }
 
 function refreshMobileConversationTitle() {
@@ -14930,76 +15033,412 @@ function installMobileSwipeNavigation() {
     const center = document.querySelector(".center");
     const left = document.querySelector(".left");
     const right = document.querySelector(".right");
+    const backdrop = document.getElementById("mobileShellBackdrop");
     if (!center) return;
 
-    const threshold = 72;
-    const maxDuration = 900;
+    const startSlop = 9;
+    const openThreshold = 0.30;
+    const closeThreshold = 0.72;
+    const fastVelocity = 0.48;
 
-    const bindSwipe = (element, onSwipe) => {
-        if (!element) return;
-        let start = null;
+    let drag = null;
 
-        element.addEventListener("touchstart", event => {
-            if (!isMobileAppShell() || event.touches.length !== 1) {
-                start = null;
-                return;
-            }
-            if (mobileOverlayIsOpen() || mobileSwipeBlockedTarget(event.target)) {
-                start = null;
-                return;
-            }
-            const touch = event.touches[0];
-            start = {
-                x: touch.clientX,
-                y: touch.clientY,
-                time: Date.now()
-            };
-        }, { passive:true });
-
-        element.addEventListener("touchend", event => {
-            if (!start || !isMobileAppShell()) {
-                start = null;
-                return;
-            }
-            const touch = event.changedTouches?.[0];
-            if (!touch) {
-                start = null;
-                return;
-            }
-
-            const dx = touch.clientX - start.x;
-            const dy = touch.clientY - start.y;
-            const elapsed = Date.now() - start.time;
-            start = null;
-
-            if (
-                elapsed > maxDuration
-                || Math.abs(dx) < threshold
-                || Math.abs(dx) < Math.abs(dy) * 1.25
-            ) {
-                return;
-            }
-
-            onSwipe(dx);
-        }, { passive:true });
+    const drawerWidth = kind => {
+        const element = kind === "left" ? left : right;
+        return Math.max(240, element?.getBoundingClientRect?.().width || window.innerWidth * 0.88);
     };
 
-    // 主页面：右滑打开左侧对话；左滑打开右侧学习工具。
-    bindSwipe(center, dx => {
-        if (document.body.classList.contains("mobile-left-open")
-            || document.body.classList.contains("mobile-tools-open")) {
+    const beginDrag = (event, source) => {
+        if (!isMobileAppShell() || event.touches.length !== 1) {
+            drag = null;
             return;
         }
-        openMobileShellDrawer(dx > 0 ? "left" : "tools");
-    });
 
-    // 抽屉也支持反向滑回去。
-    bindSwipe(left, dx => {
-        if (dx < 0) closeMobileShellDrawers();
-    });
-    bindSwipe(right, dx => {
-        if (dx > 0) closeMobileShellDrawers();
-    });
+        if (mobileOverlayIsOpen() || mobileSwipeBlockedTarget(event.target)) {
+            drag = null;
+            return;
+        }
+
+        const touch = event.touches[0];
+        const leftOpen = document.body.classList.contains("mobile-left-open");
+        const toolsOpen = document.body.classList.contains("mobile-tools-open");
+
+        let kind = null;
+        let opening = false;
+
+        if (source === "left" || (source === "backdrop" && leftOpen)) {
+            if (!leftOpen) return;
+            kind = "left";
+        } else if (source === "tools" || (source === "backdrop" && toolsOpen)) {
+            if (!toolsOpen) return;
+            kind = "tools";
+        } else if (source === "center") {
+            if (leftOpen || toolsOpen) return;
+            opening = true;
+        } else {
+            return;
+        }
+
+        drag = {
+            source,
+            kind,
+            opening,
+            locked:false,
+            cancelled:false,
+            startX:touch.clientX,
+            startY:touch.clientY,
+            lastX:touch.clientX,
+            lastTime:performance.now(),
+            startTime:performance.now(),
+            progress:opening ? 0 : 1,
+            // 已知抽屉在 touchstart 时只读一次布局；主界面打开方向在第一次
+            // 明确横向手势后再读一次，之后 touchmove 不再触发布局测量。
+            width:kind ? drawerWidth(kind) : 0
+        };
+    };
+
+    const moveDrag = event => {
+        if (!drag || drag.cancelled || event.touches.length !== 1) return;
+
+        const touch = event.touches[0];
+        const dx = touch.clientX - drag.startX;
+        const dy = touch.clientY - drag.startY;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+
+        if (!drag.locked) {
+            if (absX < startSlop && absY < startSlop) return;
+
+            // 纵向意图优先交给页面滚动，不抢手势。
+            if (absY > absX * 1.08) {
+                drag.cancelled = true;
+                drag = null;
+                return;
+            }
+
+            if (absX <= absY * 1.08) return;
+
+            if (drag.opening) {
+                drag.kind = dx >= 0 ? "left" : "tools";
+                drag.width = drawerWidth(drag.kind);
+            } else {
+                // 左抽屉只能向左收回，右抽屉只能向右收回。
+                const closingDirection = drag.kind === "left" ? dx < 0 : dx > 0;
+                if (!closingDirection) {
+                    drag.cancelled = true;
+                    drag = null;
+                    return;
+                }
+            }
+
+            drag.locked = true;
+        }
+
+        if (!drag.kind) return;
+        event.preventDefault();
+
+        const width = Math.max(1, drag.width || drawerWidth(drag.kind));
+        let progress;
+
+        if (drag.opening) {
+            progress = Math.abs(dx) / width;
+        } else if (drag.kind === "left") {
+            progress = 1 + dx / width;
+        } else {
+            progress = 1 - dx / width;
+        }
+
+        drag.progress = Math.max(0, Math.min(1, progress));
+        drag.lastX = touch.clientX;
+        drag.lastTime = performance.now();
+        setMobileDrawerDragProgress(drag.kind, drag.progress);
+    };
+
+    const endDrag = event => {
+        if (!drag) return;
+
+        const current = drag;
+        drag = null;
+
+        if (!current.locked || current.cancelled || !current.kind) {
+            resetMobileDrawerGestureStyles();
+            return;
+        }
+
+        const touch = event.changedTouches?.[0];
+        const endX = touch?.clientX ?? current.lastX;
+        const now = performance.now();
+        const dt = Math.max(1, now - current.lastTime);
+        const velocity = (endX - current.lastX) / dt;
+
+        let shouldOpen;
+        if (current.opening) {
+            const fastOpen = current.kind === "left"
+                ? velocity > fastVelocity
+                : velocity < -fastVelocity;
+            shouldOpen = current.progress >= openThreshold || fastOpen;
+        } else {
+            const fastClose = current.kind === "left"
+                ? velocity < -fastVelocity
+                : velocity > fastVelocity;
+            shouldOpen = current.progress > closeThreshold && !fastClose;
+        }
+
+        settleMobileDrawerGesture(current.kind, shouldOpen);
+    };
+
+    const cancelDrag = () => {
+        if (!drag) return;
+        const current = drag;
+        drag = null;
+        if (current.kind) {
+            settleMobileDrawerGesture(current.kind, !current.opening);
+        } else {
+            resetMobileDrawerGestureStyles();
+        }
+    };
+
+    const bindInteractive = (element, source) => {
+        if (!element) return;
+        element.addEventListener("touchstart", event => beginDrag(event, source), { passive:true });
+        element.addEventListener("touchmove", moveDrag, { passive:false });
+        element.addEventListener("touchend", endDrag, { passive:true });
+        element.addEventListener("touchcancel", cancelDrag, { passive:true });
+    };
+
+    bindInteractive(center, "center");
+    bindInteractive(left, "left");
+    bindInteractive(right, "tools");
+    bindInteractive(backdrop, "backdrop");
+
+    installMobileOverlaySwipeBack();
+}
+
+function getTopMobileGesturePage() {
+    if (!isMobileAppShell()) return null;
+
+    const graphModal = document.getElementById("knowledgeGraphModal");
+    if (
+        graphModal
+        && !graphModal.classList.contains("hidden")
+        && graphModal.classList.contains("graph-fullscreen-view")
+    ) {
+        return {
+            overlay:graphModal,
+            surface:graphModal.querySelector(".graph-modal-card") || graphModal,
+            close:() => setKnowledgeGraphFullscreenView(false)
+        };
+    }
+
+    const dialog = document.querySelector("dialog[open]");
+    if (dialog instanceof HTMLDialogElement) {
+        return {
+            overlay:dialog,
+            surface:dialog,
+            close:() => dialog.close()
+        };
+    }
+
+    const closers = new Map([
+        ["appearanceBackgroundViewer", closeAppearanceBackgroundViewer],
+        ["wrongSafeModal", closeWrongSafePreview],
+        ["wrongQuestionPickerModal", closeWrongQuestionPicker],
+        ["wrongEditModal", closeWrongEdit],
+        ["wrongBookModal", closeWrongBook],
+        ["learningReviewModal", closeLearningReview],
+        ["knowledgeGraphModal", closeKnowledgeGraph],
+        ["appearanceModal", closeAppearance]
+    ]);
+
+    const visible = [...document.querySelectorAll(".modal:not(.hidden)")].reverse();
+    for (const modal of visible) {
+        const close = closers.get(modal.id);
+        if (typeof close !== "function") continue;
+        return {
+            overlay:modal,
+            surface:modal.querySelector(".modal-card") || modal,
+            close
+        };
+    }
+
+    return null;
+}
+
+function installMobileOverlaySwipeBack() {
+    const edgeWidth = 34;
+    const startSlop = 8;
+    const completeDistance = 92;
+    const fastVelocity = 0.52;
+    let swipe = null;
+    let swipeFrame = 0;
+    let swipeVisual = null;
+
+    const cancelSwipeFrame = () => {
+        if (swipeFrame) {
+            cancelAnimationFrame(swipeFrame);
+            swipeFrame = 0;
+        }
+        swipeVisual = null;
+    };
+
+    const scheduleSwipeVisual = (surface, distance) => {
+        swipeVisual = { surface, distance };
+        if (swipeFrame) return;
+
+        swipeFrame = requestAnimationFrame(() => {
+            swipeFrame = 0;
+            const visual = swipeVisual;
+            swipeVisual = null;
+            if (!(visual?.surface instanceof HTMLElement)) return;
+            visual.surface.style.transition = "none";
+            visual.surface.style.transform = `translate3d(${visual.distance}px,0,0)`;
+        });
+    };
+
+    document.addEventListener("touchstart", event => {
+        if (!isMobileAppShell() || event.touches.length !== 1) {
+            swipe = null;
+            return;
+        }
+
+        const page = getTopMobileGesturePage();
+        if (!page) {
+            swipe = null;
+            return;
+        }
+
+        const touch = event.touches[0];
+        if (touch.clientX > edgeWidth) {
+            swipe = null;
+            return;
+        }
+
+        swipe = {
+            page,
+            startX:touch.clientX,
+            startY:touch.clientY,
+            lastX:touch.clientX,
+            lastTime:performance.now(),
+            locked:false,
+            progress:0,
+            width:Math.max(1, page.surface.getBoundingClientRect().width || window.innerWidth)
+        };
+    }, { passive:true, capture:true });
+
+    document.addEventListener("touchmove", event => {
+        if (!swipe || event.touches.length !== 1) return;
+
+        const touch = event.touches[0];
+        const dx = touch.clientX - swipe.startX;
+        const dy = touch.clientY - swipe.startY;
+
+        if (!swipe.locked) {
+            if (Math.abs(dx) < startSlop && Math.abs(dy) < startSlop) return;
+            if (dx <= 0 || Math.abs(dy) > Math.abs(dx) * 0.95) {
+                swipe = null;
+                return;
+            }
+            swipe.locked = true;
+        }
+
+        event.preventDefault();
+
+        const width = swipe.width;
+        const distance = Math.max(0, Math.min(width, dx));
+        const progress = Math.max(0, Math.min(1, distance / width));
+        swipe.progress = progress;
+        swipe.lastX = touch.clientX;
+        swipe.lastTime = performance.now();
+
+        // 只做合成层 transform，不在拖动过程中改整屏背景色/透明度，
+        // 避免 Fennec 上每帧触发大面积重绘。
+        scheduleSwipeVisual(swipe.page.surface, distance);
+    }, { passive:false, capture:true });
+
+    const finish = event => {
+        if (!swipe) return;
+        const current = swipe;
+        swipe = null;
+
+        const surface = current.page.surface;
+        const overlay = current.page.overlay;
+
+        if (!(surface instanceof HTMLElement) || !current.locked) {
+            cancelSwipeFrame();
+            if (surface instanceof HTMLElement) {
+                surface.style.removeProperty("transition");
+                surface.style.removeProperty("transform");
+            }
+            return;
+        }
+
+        const touch = event.changedTouches?.[0];
+        const endX = touch?.clientX ?? current.lastX;
+        const dt = Math.max(1, performance.now() - current.lastTime);
+        const velocity = (endX - current.lastX) / dt;
+        cancelSwipeFrame();
+        const width = current.width;
+        const distance = current.progress * width;
+        surface.style.transition = "none";
+        surface.style.transform = `translate3d(${distance}px,0,0)`;
+        const shouldClose = distance >= completeDistance
+            || current.progress >= 0.24
+            || velocity > fastVelocity;
+
+        surface.style.removeProperty("transition");
+
+        if (shouldClose) {
+            const animation = surface.animate(
+                [
+                    { transform:`translate3d(${distance}px,0,0)` },
+                    { transform:"translate3d(100%,0,0)" }
+                ],
+                {
+                    duration:Math.max(110, 190 - Math.min(70, velocity * 45)),
+                    easing:"cubic-bezier(.22,1,.36,1)",
+                    fill:"forwards"
+                }
+            );
+            animation.finished.catch(() => {}).then(() => {
+                surface.style.removeProperty("transform");
+                current.page.close();
+            });
+        } else {
+            const animation = surface.animate(
+                [
+                    { transform:`translate3d(${distance}px,0,0)` },
+                    { transform:"translate3d(0,0,0)" }
+                ],
+                {
+                    duration:180,
+                    easing:"cubic-bezier(.22,1,.36,1)"
+                }
+            );
+            animation.finished.catch(() => {}).then(() => {
+                surface.style.removeProperty("transform");
+            });
+        }
+    };
+
+    document.addEventListener("touchend", finish, { passive:true, capture:true });
+    document.addEventListener("touchcancel", finish, { passive:true, capture:true });
+}
+
+function animateMobileConversationSwitch() {
+    if (!isMobileAppShell()) return;
+    const chat = document.getElementById("chat");
+    if (!(chat instanceof HTMLElement) || typeof chat.animate !== "function") return;
+
+    chat.animate(
+        [
+            { opacity:0.72, transform:"translate3d(0,7px,0)" },
+            { opacity:1, transform:"translate3d(0,0,0)" }
+        ],
+        {
+            duration:210,
+            easing:"cubic-bezier(.22,1,.36,1)"
+        }
+    );
 }
 
 function initMobileAppShell() {
@@ -15481,7 +15920,8 @@ document.addEventListener(
         installRichSelectionCopy();
         initMobileAppShell();
         installMobileVisualViewportFix();
-        installMobileBackGuard();
+        // Fennec/Android 的系统返回键行为交给浏览器本身，不再污染 history。
+        // 页面内返回与切换统一交给手势和显式按钮。
         installMobileSwipeNavigation();
 
         const input = document.getElementById("text");
