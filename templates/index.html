@@ -5115,6 +5115,144 @@ body[data-appearance-theme="light"] .input input {
     to   { opacity:1; }
 }
 
+
+
+/* =========================================================
+   2026-10-05 v8：次级页面滚动 / 图谱纵向滑动 / 动画性能修复
+   ========================================================= */
+@media (max-width:1100px) {
+    /* Fennec 上整屏 opacity + display 离散过渡容易掉帧。
+       次级页面只做短距离 transform 合成动画，不做整屏淡入。 */
+    .modal {
+        transition:none !important;
+        opacity:1 !important;
+    }
+
+    .modal .modal-card {
+        transition:none !important;
+        opacity:1 !important;
+        will-change:auto !important;
+    }
+
+    .modal:not(.hidden) .modal-card {
+        animation:mobilePageEnterV8 .16s cubic-bezier(.22,1,.36,1) both;
+        will-change:transform;
+    }
+
+    .modal.hidden .modal-card {
+        animation:none !important;
+        transform:translate3d(0,0,0) !important;
+        opacity:1 !important;
+    }
+
+    .ocr-review-dialog[open] {
+        animation:mobilePageEnterV8 .16s cubic-bezier(.22,1,.36,1) both !important;
+    }
+
+    .ocr-review-dialog[open]::backdrop {
+        animation:none !important;
+    }
+
+    /* 所有次级页面的长列表都交给原生纵向惯性滚动，避免到边界时“粘住”。 */
+    #wrongBookList,
+    .wrong-picker-list,
+    .wrong-safe-body,
+    .wrong-edit-body,
+    .learning-review-body,
+    .appearance-body,
+    .graph-history-list,
+    .graph-detail-body {
+        -webkit-overflow-scrolling:touch;
+        overscroll-behavior-y:auto !important;
+        touch-action:pan-y;
+        scroll-behavior:auto !important;
+    }
+}
+
+@media (max-width:760px) {
+    /* 学习回顾只有右上角关闭按钮；正文直接吃满到底部。 */
+    #learningReviewModal .learning-review-card {
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+    }
+
+    #learningReviewModal .learning-review-body {
+        flex:1 1 auto;
+        min-height:0;
+        padding-bottom:max(18px, env(safe-area-inset-bottom)) !important;
+    }
+
+    /* 普通知识图谱只保留一个纵向滚动容器：knowledge-graph-layout。
+       旧版同时让布局、详情和图谱内部都能纵向滚，滑到下方时会发生滚动竞争。 */
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-layout {
+        overflow-x:hidden !important;
+        overflow-y:auto !important;
+        overscroll-behavior-x:none !important;
+        overscroll-behavior-y:auto !important;
+        -webkit-overflow-scrolling:touch;
+        touch-action:auto !important;
+        scroll-behavior:auto !important;
+        padding-bottom:max(24px, calc(env(safe-area-inset-bottom) + 12px)) !important;
+    }
+
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-main,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-canvas,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-side,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .graph-side-page,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .graph-detail-body,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .graph-history-list {
+        max-height:none !important;
+    }
+
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-main,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-canvas,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .knowledge-graph-side,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .graph-side-page {
+        height:auto !important;
+        min-height:0 !important;
+        overflow:visible !important;
+    }
+
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .graph-detail-body,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .graph-history-list {
+        height:auto !important;
+        min-height:0 !important;
+        overflow:visible !important;
+        touch-action:auto !important;
+        overscroll-behavior:auto !important;
+    }
+
+    /* 普通预览内部只横向滚动；上下滑动永远交给整页。
+       横向也改用浏览器原生滚动，不再由 JS 每帧改 scrollLeft。 */
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-viewport {
+        overflow-x:auto !important;
+        overflow-y:hidden !important;
+        overscroll-behavior-x:auto !important;
+        overscroll-behavior-y:auto !important;
+        touch-action:pan-x pan-y !important;
+        scroll-behavior:auto !important;
+    }
+
+    /* 完整查看仍由图谱自身接管二维拖动/缩放。 */
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-viewport {
+        touch-action:none !important;
+        overscroll-behavior:contain !important;
+    }
+
+    /* 完整查看底部控制条去掉实时模糊，降低移动 GPU 合成压力。 */
+    .kg-mobile-zoom-controls {
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+        background:var(--surface-2) !important;
+    }
+}
+
+@keyframes mobilePageEnterV8 {
+    from { transform:translate3d(10px,0,0); }
+    to   { transform:translate3d(0,0,0); }
+}
+
 </style>
 
 <script>
@@ -5353,11 +5491,6 @@ window.MathJax = {
         </div>
 
         <div id="learningReviewBody" class="learning-review-body"></div>
-
-        <div class="learning-review-actions">
-            
-            <button id="learningReviewDone" type="button">关闭</button>
-        </div>
     </div>
 </div>
 
@@ -5529,7 +5662,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-gesture-v7-perf-20261005a"></script>
+<script src="/static/script.js?v=phase4-mobile-v8-smooth-20261005"></script>
 
 </body>
 </html>
