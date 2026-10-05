@@ -15055,6 +15055,257 @@ function initMobileAppShell() {
     refreshMobileConversationTitle();
 }
 
+
+// -----------------------------
+// 移动端可视视口：修复软键盘遮住输入框
+// -----------------------------
+let mobileViewportSyncRaf = 0;
+
+function syncMobileVisualViewport() {
+    if (mobileViewportSyncRaf) {
+        cancelAnimationFrame(mobileViewportSyncRaf);
+    }
+
+    mobileViewportSyncRaf = requestAnimationFrame(() => {
+        mobileViewportSyncRaf = 0;
+
+        const root = document.documentElement;
+        if (!root) return;
+
+        if (!isMobileAppShell()) {
+            root.style.removeProperty("--app-visible-height");
+            document.body?.classList.remove("mobile-keyboard-open");
+            return;
+        }
+
+        const viewport = window.visualViewport;
+        const visibleHeight = Math.max(
+            320,
+            Math.round(viewport?.height || window.innerHeight || 0)
+        );
+        root.style.setProperty(
+            "--app-visible-height",
+            `${visibleHeight}px`
+        );
+
+        const layoutHeight = Math.max(
+            visibleHeight,
+            Math.round(window.innerHeight || visibleHeight)
+        );
+        const viewportTop = Math.max(
+            0,
+            Math.round(viewport?.offsetTop || 0)
+        );
+        const keyboardInset = Math.max(
+            0,
+            layoutHeight - visibleHeight - viewportTop
+        );
+        const keyboardOpen = keyboardInset > 110;
+
+        document.body?.classList.toggle(
+            "mobile-keyboard-open",
+            keyboardOpen
+        );
+
+        if (keyboardOpen) {
+            const text = document.getElementById("text");
+            const chat = document.getElementById("chat");
+            if (text && document.activeElement === text && chat) {
+                chat.scrollTop = chat.scrollHeight;
+            }
+        }
+    });
+}
+
+function installMobileVisualViewportFix() {
+    syncMobileVisualViewport();
+
+    window.addEventListener(
+        "resize",
+        syncMobileVisualViewport,
+        { passive:true }
+    );
+    window.addEventListener(
+        "orientationchange",
+        () => window.setTimeout(syncMobileVisualViewport, 80),
+        { passive:true }
+    );
+
+    const viewport = window.visualViewport;
+    viewport?.addEventListener(
+        "resize",
+        syncMobileVisualViewport,
+        { passive:true }
+    );
+    viewport?.addEventListener(
+        "scroll",
+        syncMobileVisualViewport,
+        { passive:true }
+    );
+
+    const text = document.getElementById("text");
+    if (text) {
+        text.addEventListener("focus", () => {
+            // 安卓键盘动画并非一次完成；几个轻量同步点覆盖首轮打开键盘。
+            syncMobileVisualViewport();
+            [60, 160, 320].forEach(delay => {
+                window.setTimeout(syncMobileVisualViewport, delay);
+            });
+        });
+        text.addEventListener("blur", () => {
+            [0, 120].forEach(delay => {
+                window.setTimeout(syncMobileVisualViewport, delay);
+            });
+        });
+    }
+}
+
+// -----------------------------
+// Android / 浏览器“返回”键：先返回站内状态，不再一按就离开网页
+// -----------------------------
+const MOBILE_HISTORY_ROOT = "__dm_tutor_mobile_root_v1";
+const MOBILE_HISTORY_GUARD = "__dm_tutor_mobile_guard_v1";
+let mobileBackGuardInstalled = false;
+let mobileBackExitUntil = 0;
+let mobileBackAllowExit = false;
+
+function mobileHistoryStateObject() {
+    const value = history.state;
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? { ...value }
+        : {};
+}
+
+function armMobileBackGuard() {
+    if (!isMobileAppShell() || mobileBackAllowExit) return;
+
+    const state = mobileHistoryStateObject();
+    if (state[MOBILE_HISTORY_GUARD]) return;
+
+    history.pushState(
+        { ...state, [MOBILE_HISTORY_GUARD]: true },
+        "",
+        location.href
+    );
+}
+
+function closeTopMobileLayerForBack() {
+    const graphModal = document.getElementById("knowledgeGraphModal");
+    if (
+        graphModal
+        && !graphModal.classList.contains("hidden")
+        && graphModal.classList.contains("graph-fullscreen-view")
+    ) {
+        setKnowledgeGraphFullscreenView(false);
+        return true;
+    }
+
+    const openDialog = document.querySelector("dialog[open]");
+    if (openDialog && typeof openDialog.close === "function") {
+        openDialog.close();
+        return true;
+    }
+
+    const modalClosers = [
+        ["appearanceBackgroundViewer", closeAppearanceBackgroundViewer],
+        ["wrongSafeModal", closeWrongSafePreview],
+        ["wrongQuestionPickerModal", closeWrongQuestionPicker],
+        ["wrongEditModal", closeWrongEdit],
+        ["wrongBookModal", closeWrongBook],
+        ["learningReviewModal", closeLearningReview],
+        ["knowledgeGraphModal", closeKnowledgeGraph],
+        ["appearanceModal", closeAppearance]
+    ];
+
+    for (const [id, close] of modalClosers) {
+        const modal = document.getElementById(id);
+        if (modal && !modal.classList.contains("hidden")) {
+            close();
+            return true;
+        }
+    }
+
+    if (
+        document.body.classList.contains("mobile-left-open")
+        || document.body.classList.contains("mobile-tools-open")
+    ) {
+        closeMobileShellDrawers();
+        return true;
+    }
+
+    const active = document.activeElement;
+    if (
+        active instanceof HTMLElement
+        && (
+            active.matches("input, textarea, select")
+            || active.isContentEditable
+        )
+    ) {
+        active.blur();
+        syncMobileVisualViewport();
+        return true;
+    }
+
+    return false;
+}
+
+function installMobileBackGuard() {
+    if (mobileBackGuardInstalled) return;
+    mobileBackGuardInstalled = true;
+
+    if (isMobileAppShell()) {
+        const state = mobileHistoryStateObject();
+        if (!state[MOBILE_HISTORY_ROOT] && !state[MOBILE_HISTORY_GUARD]) {
+            history.replaceState(
+                { ...state, [MOBILE_HISTORY_ROOT]: true },
+                "",
+                location.href
+            );
+        }
+        armMobileBackGuard();
+    }
+
+    window.addEventListener("popstate", () => {
+        if (!isMobileAppShell() || mobileBackAllowExit) return;
+
+        if (closeTopMobileLayerForBack()) {
+            mobileBackExitUntil = 0;
+            armMobileBackGuard();
+            return;
+        }
+
+        const now = Date.now();
+        if (now < mobileBackExitUntil) {
+            mobileBackExitUntil = 0;
+            mobileBackAllowExit = true;
+            // 当前已经从 guard 回到了 root，再退一次才真正离开本站。
+            window.setTimeout(() => history.back(), 0);
+            return;
+        }
+
+        mobileBackExitUntil = now + 1600;
+        showCopyToast("再按一次返回退出");
+        armMobileBackGuard();
+    });
+
+    window.addEventListener("pageshow", () => {
+        if (isMobileAppShell() && !mobileBackAllowExit) {
+            armMobileBackGuard();
+            syncMobileVisualViewport();
+        }
+    });
+
+    const media = window.matchMedia?.("(max-width: 1100px)");
+    media?.addEventListener?.("change", event => {
+        if (event.matches) {
+            mobileBackAllowExit = false;
+            mobileBackExitUntil = 0;
+            armMobileBackGuard();
+            syncMobileVisualViewport();
+        }
+    });
+}
+
 // -----------------------------
 // 全刷新
 // -----------------------------
@@ -15091,6 +15342,8 @@ document.addEventListener(
         initAppearanceSystem();
         installRichSelectionCopy();
         initMobileAppShell();
+        installMobileVisualViewportFix();
+        installMobileBackGuard();
         installMobileSwipeNavigation();
 
         const input = document.getElementById("text");
