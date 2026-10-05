@@ -3,6 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+/*
+ * Android 系统返回键的早期历史哨兵。
+ * 必须在主脚本和 DOMContentLoaded 之前建立，避免页面刚打开/首轮键盘弹出时
+ * 系统返回直接越过网页历史并离开站点。主脚本加载后会接管后续行为。
+ */
+(function () {
+    try {
+        if (!window.matchMedia || !window.matchMedia("(max-width: 1100px)").matches) return;
+
+        var ROOT = "__dm_tutor_mobile_root_v2";
+        var STEP = "__dm_tutor_mobile_guard_step_v2";
+        var current = history.state && typeof history.state === "object"
+            ? Object.assign({}, history.state)
+            : {};
+
+        if (!current[ROOT] && !current[STEP]) {
+            current[ROOT] = true;
+            history.replaceState(current, "", location.href);
+            history.pushState(Object.assign({}, current, { [STEP]: 1 }), "", location.href);
+            history.pushState(Object.assign({}, current, { [STEP]: 2 }), "", location.href);
+        }
+    } catch (_error) {
+        // 不让历史保护影响页面正常加载。
+    }
+})();
+</script>
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
 <title>离散数学智能辅学系统</title>
@@ -5367,7 +5394,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-shell-fix-20261005c"></script>
+<script src="/static/script.js?v=phase4-mobile-backguard-v4-20261005a"></script>
 
 </body>
 </html>
