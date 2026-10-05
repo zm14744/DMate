@@ -9,6 +9,21 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_WRONG_QUESTIONS = 80;
 const FALLBACK_API_CONTEXT_MESSAGES = 12;
 
+const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
+const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
+const CLOUD_SYNC_DEBOUNCE_MS = 900;
+let accountState = {
+    configured: null,
+    authenticated: false,
+    username: "",
+    revision: 0,
+    syncing: false,
+    status: ""
+};
+let cloudSyncTimer = 0;
+let cloudApplyingSnapshot = false;
+
+
 
 // =========================================================
 // 外观系统（仅视觉状态，不读写学习/会话数据）
@@ -144,6 +159,7 @@ function saveAppearanceSettings() {
     } catch (_error) {
         // 外观保存失败不应影响学习系统本身。
     }
+    scheduleCloudSync();
 }
 
 function resolveAppearanceTheme() {
@@ -751,6 +767,497 @@ let sessions = [];
 let currentId = null;
 let learningState = createEmptyLearningState();
 
+
+// =========================================================
+// 账号 + 云同步（用户名 / 密码）
+// =========================================================
+function readCloudSyncMeta() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(CLOUD_SYNC_META_KEY) || "null");
+        if (!parsed || typeof parsed !== "object") return {};
+        return parsed;
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeCloudSyncMeta(patch = {}) {
+    const next = {
+        ...readCloudSyncMeta(),
+        ...patch
+    };
+    try {
+        localStorage.setItem(CLOUD_SYNC_META_KEY, JSON.stringify(next));
+    } catch (_error) {
+        // 同步元信息失败不影响本地使用。
+    }
+    return next;
+}
+
+function clearCloudSyncMeta() {
+    try {
+        localStorage.removeItem(CLOUD_SYNC_META_KEY);
+    } catch (_error) {}
+}
+
+function collectCloudSnapshot() {
+    return {
+        schemaVersion: 1,
+        sessions: {
+            sessions,
+            currentId
+        },
+        learning: learningState,
+        appearance: appearanceSettings
+    };
+}
+
+function snapshotHasUserData(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return false;
+    const sessionList = Array.isArray(snapshot.sessions?.sessions)
+        ? snapshot.sessions.sessions
+        : [];
+    if (sessionList.some(item => Array.isArray(item?.messages) && item.messages.length)) {
+        return true;
+    }
+    const learning = snapshot.learning;
+    if (Array.isArray(learning?.events) && learning.events.length) return true;
+    if (Array.isArray(learning?.wrongQuestions) && learning.wrongQuestions.length) return true;
+    return false;
+}
+
+function backupLocalSnapshot(reason = "切换云端数据") {
+    const snapshot = collectCloudSnapshot();
+    if (!snapshotHasUserData(snapshot)) return;
+    try {
+        localStorage.setItem(
+            CLOUD_BACKUP_KEY,
+            JSON.stringify({
+                reason,
+                createdAt: Date.now(),
+                data: snapshot
+            })
+        );
+    } catch (_error) {
+        // 空间不足时只是不创建备份，不影响登录。
+    }
+}
+
+function applyCloudSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return false;
+    cloudApplyingSnapshot = true;
+
+    try {
+        const sessionData = snapshot.sessions;
+        if (sessionData && typeof sessionData === "object" && Array.isArray(sessionData.sessions)) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                sessions: sessionData.sessions,
+                currentId: sessionData.currentId ?? null
+            }));
+            loadState();
+        }
+
+        if (snapshot.learning && typeof snapshot.learning === "object") {
+            localStorage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(snapshot.learning));
+            loadLearningState();
+        }
+
+        if (snapshot.appearance && typeof snapshot.appearance === "object") {
+            appearanceSettings = normalizeAppearanceSettings(snapshot.appearance);
+            localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearanceSettings));
+            applyAppearanceSettings({ save:false });
+        }
+
+        renderAll();
+        refreshInputAvailability();
+        return true;
+    } catch (error) {
+        console.warn("应用云端数据失败：", error);
+        return false;
+    } finally {
+        cloudApplyingSnapshot = false;
+    }
+}
+
+function accountSyncText() {
+    if (!accountState.authenticated) return "";
+    if (accountState.syncing) return "同步中…";
+    const meta = readCloudSyncMeta();
+    if (meta.username === accountState.username && meta.dirty) {
+        return "等待同步";
+    }
+    return accountState.status || "已同步";
+}
+
+function renderAccountUi() {
+    const entry = document.getElementById("accountBtn");
+    const label = document.getElementById("accountEntryLabel");
+    const guest = document.getElementById("accountGuestView");
+    const user = document.getElementById("accountUserView");
+    const username = document.getElementById("accountCurrentUsername");
+    const syncState = document.getElementById("accountSyncState");
+    const login = document.getElementById("accountLogin");
+    const register = document.getElementById("accountRegister");
+
+    entry?.classList.toggle("is-authenticated", accountState.authenticated);
+    entry?.classList.toggle("is-syncing", accountState.syncing);
+
+    if (label) {
+        label.textContent = accountState.authenticated
+            ? accountState.username
+            : "登录 / 注册";
+    }
+
+    guest?.classList.toggle("hidden", accountState.authenticated);
+    user?.classList.toggle("hidden", !accountState.authenticated);
+
+    if (username) username.textContent = accountState.username;
+    if (syncState) syncState.textContent = accountSyncText();
+
+    const unavailable = accountState.configured === false;
+    if (login) login.disabled = unavailable || accountState.syncing;
+    if (register) register.disabled = unavailable || accountState.syncing;
+
+    if (unavailable) {
+        setAccountMessage("服务器还没有配置账号数据库。", true);
+    }
+}
+
+function setAccountMessage(message = "", isError = false) {
+    const box = document.getElementById("accountMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function openAccountModal() {
+    closeMobileShellDrawers();
+    const modal = document.getElementById("accountModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    renderAccountUi();
+}
+
+function closeAccountModal() {
+    const modal = document.getElementById("accountModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+    const password = document.getElementById("accountPassword");
+    if (password) password.value = "";
+    setAccountMessage("");
+}
+
+async function accountFetch(url, options = {}) {
+    const response = await fetch(url, {
+        credentials: "same-origin",
+        cache: "no-store",
+        ...options,
+        headers: {
+            ...(options.body ? { "Content-Type":"application/json" } : {}),
+            ...(options.headers || {})
+        }
+    });
+
+    let data = {};
+    try {
+        data = await response.json();
+    } catch (_error) {}
+
+    if (!response.ok && response.status !== 409) {
+        const error = new Error(data?.error || `请求失败（${response.status}）`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
+    }
+
+    return { response, data };
+}
+
+function scheduleCloudSync() {
+    if (cloudApplyingSnapshot) return;
+
+    const meta = readCloudSyncMeta();
+    if (meta.username) {
+        writeCloudSyncMeta({ dirty:true });
+    }
+
+    if (!accountState.authenticated) return;
+
+    if (cloudSyncTimer) {
+        clearTimeout(cloudSyncTimer);
+    }
+    cloudSyncTimer = window.setTimeout(() => {
+        cloudSyncTimer = 0;
+        pushCloudSnapshot(false);
+    }, CLOUD_SYNC_DEBOUNCE_MS);
+    renderAccountUi();
+}
+
+async function pushCloudSnapshot(force = false) {
+    if (!accountState.authenticated || accountState.syncing) return false;
+
+    const meta = readCloudSyncMeta();
+    const baseRevision = Number.isFinite(Number(meta.revision))
+        ? Number(meta.revision)
+        : Number(accountState.revision || 0);
+
+    accountState.syncing = true;
+    accountState.status = "同步中…";
+    renderAccountUi();
+
+    try {
+        const { response, data } = await accountFetch("/sync", {
+            method:"PUT",
+            body:JSON.stringify({
+                baseRevision,
+                force:Boolean(force),
+                data:collectCloudSnapshot()
+            })
+        });
+
+        if (response.status === 409 && data?.conflict) {
+            accountState.syncing = false;
+            const overwrite = window.confirm(
+                "云端数据已在其他设备更新。\n\n确定：用本设备数据覆盖云端\n取消：使用云端最新数据"
+            );
+
+            if (overwrite) {
+                accountState.revision = Number(data.revision || 0);
+                writeCloudSyncMeta({
+                    username:accountState.username,
+                    revision:accountState.revision,
+                    dirty:true
+                });
+                return await pushCloudSnapshot(true);
+            }
+
+            backupLocalSnapshot("同步冲突前的本机数据");
+            applyCloudSnapshot(data.data || {});
+            accountState.revision = Number(data.revision || 0);
+            accountState.status = "已同步";
+            writeCloudSyncMeta({
+                username:accountState.username,
+                revision:accountState.revision,
+                dirty:false
+            });
+            renderAccountUi();
+            showCopyToast("已加载云端最新数据");
+            return true;
+        }
+
+        accountState.revision = Number(data.revision || 0);
+        accountState.status = "已同步";
+        writeCloudSyncMeta({
+            username:accountState.username,
+            revision:accountState.revision,
+            dirty:false
+        });
+        return true;
+    } catch (error) {
+        console.warn("云同步失败：", error);
+        accountState.status = "离线，稍后自动同步";
+        writeCloudSyncMeta({
+            username:accountState.username,
+            revision:baseRevision,
+            dirty:true
+        });
+        return false;
+    } finally {
+        accountState.syncing = false;
+        renderAccountUi();
+    }
+}
+
+async function resolveInitialCloudSync(isNewAccount = false) {
+    if (!accountState.authenticated) return;
+
+    try {
+        const { data } = await accountFetch("/sync");
+        const cloudRevision = Number(data.revision || 0);
+        accountState.revision = cloudRevision;
+
+        if (isNewAccount || cloudRevision === 0) {
+            writeCloudSyncMeta({
+                username:accountState.username,
+                revision:cloudRevision,
+                dirty:true
+            });
+            await pushCloudSnapshot(true);
+            return;
+        }
+
+        const meta = readCloudSyncMeta();
+        const sameAccount = meta.username === accountState.username;
+        const localDirty = sameAccount && Boolean(meta.dirty);
+        const localRevision = sameAccount ? Number(meta.revision || 0) : -1;
+
+        if (!sameAccount) {
+            backupLocalSnapshot("登录后切换到云端数据");
+            applyCloudSnapshot(data.data || {});
+        } else if (localDirty && localRevision === cloudRevision) {
+            await pushCloudSnapshot(false);
+            return;
+        } else if (localDirty && localRevision !== cloudRevision) {
+            const overwrite = window.confirm(
+                "本设备和云端都有未合并的更新。\n\n确定：保留本设备并覆盖云端\n取消：使用云端数据"
+            );
+            if (overwrite) {
+                accountState.revision = cloudRevision;
+                writeCloudSyncMeta({ revision:cloudRevision, dirty:true });
+                await pushCloudSnapshot(true);
+                return;
+            }
+            backupLocalSnapshot("登录同步冲突前的本机数据");
+            applyCloudSnapshot(data.data || {});
+        } else if (cloudRevision > localRevision) {
+            applyCloudSnapshot(data.data || {});
+        }
+
+        writeCloudSyncMeta({
+            username:accountState.username,
+            revision:cloudRevision,
+            dirty:false
+        });
+        accountState.status = "已同步";
+        renderAccountUi();
+    } catch (error) {
+        console.warn("初始化云同步失败：", error);
+        accountState.status = "离线，稍后自动同步";
+        renderAccountUi();
+    }
+}
+
+async function submitAccountAuth(mode) {
+    if (accountState.syncing) return;
+
+    const usernameInput = document.getElementById("accountUsername");
+    const passwordInput = document.getElementById("accountPassword");
+    const username = usernameInput?.value?.trim() || "";
+    const password = passwordInput?.value || "";
+
+    if (!username || !password) {
+        setAccountMessage("请输入用户名和密码。", true);
+        return;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    setAccountMessage(mode === "register" ? "正在注册…" : "正在登录…");
+
+    try {
+        const { data } = await accountFetch(
+            mode === "register" ? "/auth/register" : "/auth/login",
+            {
+                method:"POST",
+                body:JSON.stringify({ username, password })
+            }
+        );
+
+        accountState.configured = data.configured !== false;
+        accountState.authenticated = true;
+        accountState.username = String(data.user?.username || username);
+        accountState.revision = Number(data.revision || 0);
+        accountState.status = "同步中…";
+        writeCloudSyncMeta({
+            username:accountState.username,
+            revision:accountState.revision,
+            dirty:mode === "register"
+        });
+
+        if (passwordInput) passwordInput.value = "";
+        setAccountMessage("");
+        accountState.syncing = false;
+        renderAccountUi();
+        await resolveInitialCloudSync(mode === "register");
+    } catch (error) {
+        accountState.syncing = false;
+        setAccountMessage(error?.message || "操作失败，请稍后再试。", true);
+        renderAccountUi();
+    }
+}
+
+async function logoutAccount() {
+    if (accountState.syncing) return;
+
+    const meta = readCloudSyncMeta();
+    if (meta.username === accountState.username && meta.dirty) {
+        await pushCloudSnapshot(false);
+    }
+
+    try {
+        await accountFetch("/auth/logout", {
+            method:"POST",
+            body:JSON.stringify({})
+        });
+    } catch (error) {
+        console.warn("退出登录请求失败：", error);
+    }
+
+    accountState.authenticated = false;
+    accountState.username = "";
+    accountState.revision = 0;
+    accountState.status = "";
+    accountState.syncing = false;
+    clearCloudSyncMeta();
+    renderAccountUi();
+    closeAccountModal();
+    showCopyToast("已退出登录");
+}
+
+async function initAccountSystem() {
+    const accountBtn = document.getElementById("accountBtn");
+    const accountClose = document.getElementById("accountClose");
+    const accountModal = document.getElementById("accountModal");
+    const accountLogin = document.getElementById("accountLogin");
+    const accountRegister = document.getElementById("accountRegister");
+    const accountLogout = document.getElementById("accountLogout");
+    const password = document.getElementById("accountPassword");
+
+    accountBtn?.addEventListener("click", openAccountModal);
+    accountClose?.addEventListener("click", closeAccountModal);
+    accountLogin?.addEventListener("click", () => submitAccountAuth("login"));
+    accountRegister?.addEventListener("click", () => submitAccountAuth("register"));
+    accountLogout?.addEventListener("click", logoutAccount);
+    accountModal?.addEventListener("click", event => {
+        if (event.target === accountModal) closeAccountModal();
+    });
+    password?.addEventListener("keydown", event => {
+        if (event.key === "Enter") submitAccountAuth("login");
+    });
+
+    window.addEventListener("online", () => {
+        const meta = readCloudSyncMeta();
+        if (accountState.authenticated && meta.dirty) {
+            pushCloudSnapshot(false);
+        }
+    }, { passive:true });
+
+    renderAccountUi();
+
+    try {
+        const { data } = await accountFetch("/auth/me");
+        accountState.configured = data.configured !== false;
+        accountState.authenticated = Boolean(data.authenticated);
+        accountState.username = accountState.authenticated
+            ? String(data.user?.username || "")
+            : "";
+        renderAccountUi();
+
+        if (accountState.authenticated) {
+            await resolveInitialCloudSync(false);
+        }
+    } catch (error) {
+        console.warn("读取账号状态失败：", error);
+        if (error?.status === 503) {
+            accountState.configured = false;
+        }
+        renderAccountUi();
+    }
+}
+
+
 let typingTimer = null;
 let typingFullText = "";
 let typingDiv = null;
@@ -1276,6 +1783,7 @@ function saveLearningState() {
     } catch (error) {
         console.warn("学习记录保存失败：", error);
     }
+    scheduleCloudSync();
 }
 
 function emptyKnowledgeRecord() {
@@ -6626,6 +7134,7 @@ function saveState() {
     } catch (error) {
         console.warn("本地会话保存失败：", error);
     }
+    scheduleCloudSync();
 }
 
 function loadState() {
@@ -15238,6 +15747,7 @@ function getTopMobileGesturePage() {
         ["wrongEditModal", closeWrongEdit],
         ["wrongBookModal", closeWrongBook],
         ["learningReviewModal", closeLearningReview],
+        ["accountModal", closeAccountModal],
         ["knowledgeGraphModal", closeKnowledgeGraph],
         ["appearanceModal", closeAppearance]
     ]);
@@ -16343,6 +16853,7 @@ document.addEventListener(
 
         renderAll();
         refreshInputAvailability();
+        initAccountSystem();
 
         // 兼容旧会话：如果之前 AI 出过题但没有保存 generatedQuestion /
         // generatedTeaching，启动后自动恢复最近真实题目并补分类。
