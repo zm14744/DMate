@@ -15161,13 +15161,14 @@ function installMobileVisualViewportFix() {
 }
 
 // -----------------------------
-// Android / 浏览器“返回”键：先返回站内状态，不再一按就离开网页
+// Android / 浏览器“返回”键：优先收键盘/关浮层，空闲时二次返回才离开
 // -----------------------------
-const MOBILE_HISTORY_ROOT = "__dm_tutor_mobile_root_v1";
-const MOBILE_HISTORY_GUARD = "__dm_tutor_mobile_guard_v1";
+const MOBILE_HISTORY_ROOT = "__dm_tutor_mobile_root_v2";
+const MOBILE_HISTORY_STEP = "__dm_tutor_mobile_guard_step_v2";
 let mobileBackGuardInstalled = false;
 let mobileBackExitUntil = 0;
 let mobileBackAllowExit = false;
+let mobileKeyboardFocusGraceUntil = 0;
 
 function mobileHistoryStateObject() {
     const value = history.state;
@@ -15176,20 +15177,100 @@ function mobileHistoryStateObject() {
         : {};
 }
 
-function armMobileBackGuard() {
+function mobileHistoryGuardStep() {
+    const step = Number(history.state?.[MOBILE_HISTORY_STEP]);
+    return Number.isFinite(step) ? step : 0;
+}
+
+function ensureMobileBackHistoryStack() {
     if (!isMobileAppShell() || mobileBackAllowExit) return;
 
-    const state = mobileHistoryStateObject();
-    if (state[MOBILE_HISTORY_GUARD]) return;
+    try {
+        const state = mobileHistoryStateObject();
+        const step = mobileHistoryGuardStep();
 
-    history.pushState(
-        { ...state, [MOBILE_HISTORY_GUARD]: true },
-        "",
-        location.href
+        // index.html 会尽可能早地先建立 root -> step1 -> step2。
+        // 这里同时做兜底，兼容旧缓存、热更新和从 bfcache 恢复。
+        if (!state[MOBILE_HISTORY_ROOT] && !step) {
+            const root = {
+                ...state,
+                [MOBILE_HISTORY_ROOT]: true
+            };
+            history.replaceState(root, "", location.href);
+            history.pushState(
+                { ...root, [MOBILE_HISTORY_STEP]: 1 },
+                "",
+                location.href
+            );
+            history.pushState(
+                { ...root, [MOBILE_HISTORY_STEP]: 2 },
+                "",
+                location.href
+            );
+            return;
+        }
+
+        if (step < 2) {
+            history.pushState(
+                {
+                    ...state,
+                    [MOBILE_HISTORY_ROOT]: true,
+                    [MOBILE_HISTORY_STEP]: 2
+                },
+                "",
+                location.href
+            );
+        }
+    } catch (_error) {
+        // History API 异常不能影响主界面。
+    }
+}
+
+function markMobileKeyboardFocusGrace() {
+    mobileKeyboardFocusGraceUntil = Date.now() + 700;
+}
+
+function mobileKeyboardLikelyActive() {
+    const active = document.activeElement;
+    const activeEditable = active instanceof HTMLElement && (
+        active.matches("input, textarea, select")
+        || active.isContentEditable
     );
+
+    if (activeEditable) return true;
+    if (Date.now() < mobileKeyboardFocusGraceUntil) return true;
+
+    const viewport = window.visualViewport;
+    if (!viewport) return false;
+
+    const hiddenHeight = Math.max(
+        0,
+        window.innerHeight - viewport.height - Math.max(0, viewport.offsetTop || 0)
+    );
+    return hiddenHeight > 120;
+}
+
+function dismissMobileKeyboardForBack() {
+    if (!mobileKeyboardLikelyActive()) return false;
+
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && typeof active.blur === "function") {
+        active.blur();
+    }
+
+    mobileKeyboardFocusGraceUntil = 0;
+    syncMobileVisualViewport();
+    window.setTimeout(syncMobileVisualViewport, 80);
+    window.setTimeout(syncMobileVisualViewport, 220);
+    return true;
 }
 
 function closeTopMobileLayerForBack() {
+    // 键盘优先级最高：安卓底部三角/下箭头首先只负责收键盘。
+    if (dismissMobileKeyboardForBack()) {
+        return true;
+    }
+
     const graphModal = document.getElementById("knowledgeGraphModal");
     if (
         graphModal
@@ -15233,19 +15314,6 @@ function closeTopMobileLayerForBack() {
         return true;
     }
 
-    const active = document.activeElement;
-    if (
-        active instanceof HTMLElement
-        && (
-            active.matches("input, textarea, select")
-            || active.isContentEditable
-        )
-    ) {
-        active.blur();
-        syncMobileVisualViewport();
-        return true;
-    }
-
     return false;
 }
 
@@ -15254,23 +15322,33 @@ function installMobileBackGuard() {
     mobileBackGuardInstalled = true;
 
     if (isMobileAppShell()) {
-        const state = mobileHistoryStateObject();
-        if (!state[MOBILE_HISTORY_ROOT] && !state[MOBILE_HISTORY_GUARD]) {
-            history.replaceState(
-                { ...state, [MOBILE_HISTORY_ROOT]: true },
-                "",
-                location.href
-            );
-        }
-        armMobileBackGuard();
+        ensureMobileBackHistoryStack();
     }
+
+    // 记录输入框刚刚仍处于键盘交互中。某些安卓浏览器会在 popstate
+    // 之前先把 activeElement 改成 body，因此不能只看 document.activeElement。
+    document.addEventListener("focusin", event => {
+        if (!(event.target instanceof Element)) return;
+        if (event.target.matches("input, textarea, select, [contenteditable='true']")) {
+            mobileKeyboardFocusGraceUntil = Date.now() + 60 * 60 * 1000;
+        }
+    });
+    document.addEventListener("focusout", event => {
+        if (!(event.target instanceof Element)) return;
+        if (event.target.matches("input, textarea, select, [contenteditable='true']")) {
+            markMobileKeyboardFocusGrace();
+        }
+    });
 
     window.addEventListener("popstate", () => {
         if (!isMobileAppShell() || mobileBackAllowExit) return;
 
+        // popstate 发生时已经退掉一个同页 history entry；无论下面做什么，
+        // 都先把保护层补回去，避免一次系统返回直接穿透到站外。
+        ensureMobileBackHistoryStack();
+
         if (closeTopMobileLayerForBack()) {
             mobileBackExitUntil = 0;
-            armMobileBackGuard();
             return;
         }
 
@@ -15278,19 +15356,35 @@ function installMobileBackGuard() {
         if (now < mobileBackExitUntil) {
             mobileBackExitUntil = 0;
             mobileBackAllowExit = true;
-            // 当前已经从 guard 回到了 root，再退一次才真正离开本站。
-            window.setTimeout(() => history.back(), 0);
+
+            // 当前仍位于本页的 guard 层。明确跨过本页的 root/guard，
+            // 第二次系统返回才允许离开；不再依赖单次 history.back() 的栈形状。
+            window.setTimeout(() => {
+                try {
+                    history.go(-3);
+                } catch (_error) {
+                    history.back();
+                }
+            }, 0);
             return;
         }
 
-        mobileBackExitUntil = now + 1600;
+        mobileBackExitUntil = now + 1800;
         showCopyToast("再按一次返回退出");
-        armMobileBackGuard();
+    });
+
+    // 极少数安卓浏览器在离站时不先发 popstate；用户已经与页面交互后，
+    // beforeunload 至少再提供一道浏览器级保护。浏览器是否展示确认框由其决定。
+    window.addEventListener("beforeunload", event => {
+        if (!isMobileAppShell() || mobileBackAllowExit) return;
+        event.preventDefault();
+        event.returnValue = "";
     });
 
     window.addEventListener("pageshow", () => {
         if (isMobileAppShell() && !mobileBackAllowExit) {
-            armMobileBackGuard();
+            mobileBackExitUntil = 0;
+            ensureMobileBackHistoryStack();
             syncMobileVisualViewport();
         }
     });
@@ -15300,7 +15394,7 @@ function installMobileBackGuard() {
         if (event.matches) {
             mobileBackAllowExit = false;
             mobileBackExitUntil = 0;
-            armMobileBackGuard();
+            ensureMobileBackHistoryStack();
             syncMobileVisualViewport();
         }
     });
