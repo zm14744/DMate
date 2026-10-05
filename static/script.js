@@ -15161,14 +15161,17 @@ function installMobileVisualViewportFix() {
 }
 
 // -----------------------------
-// Android / 浏览器“返回”键：优先收键盘/关浮层，空闲时二次返回才离开
+// Android / 浏览器“返回”键：
+// 历史保护必须由真实用户交互建立，避免 Firefox/Fennec 把启动阶段脚本
+// 创建的 history 条目当作“未交互历史”跳过。
 // -----------------------------
-const MOBILE_HISTORY_ROOT = "__dm_tutor_mobile_root_v2";
-const MOBILE_HISTORY_STEP = "__dm_tutor_mobile_guard_step_v2";
+const MOBILE_HISTORY_ROOT = "__dm_tutor_mobile_root_v3";
+const MOBILE_HISTORY_STEP = "__dm_tutor_mobile_guard_step_v3";
 let mobileBackGuardInstalled = false;
 let mobileBackExitUntil = 0;
 let mobileBackAllowExit = false;
 let mobileKeyboardFocusGraceUntil = 0;
+let mobileBackUserActivated = false;
 
 function mobileHistoryStateObject() {
     const value = history.state;
@@ -15182,32 +15185,48 @@ function mobileHistoryGuardStep() {
     return Number.isFinite(step) ? step : 0;
 }
 
-function ensureMobileBackHistoryStack() {
+function ensureMobileBackHistoryStack(fromUserGesture = false) {
     if (!isMobileAppShell() || mobileBackAllowExit) return;
 
     try {
-        const state = mobileHistoryStateObject();
-        const step = mobileHistoryGuardStep();
+        let state = mobileHistoryStateObject();
+        let step = mobileHistoryGuardStep();
 
-        // index.html 会尽可能早地先建立 root -> step1 -> step2。
-        // 这里同时做兜底，兼容旧缓存、热更新和从 bfcache 恢复。
+        // 页面加载阶段只给“当前真实页面”做 root 标记，不新增历史项。
+        // 新增 guard 必须等真实 pointer/touch/keydown 交互后再做。
         if (!state[MOBILE_HISTORY_ROOT] && !step) {
             const root = {
                 ...state,
-                [MOBILE_HISTORY_ROOT]: true
+                [MOBILE_HISTORY_ROOT]: true,
+                [MOBILE_HISTORY_STEP]: 0
             };
             history.replaceState(root, "", location.href);
-            history.pushState(
-                { ...root, [MOBILE_HISTORY_STEP]: 1 },
-                "",
-                location.href
-            );
-            history.pushState(
-                { ...root, [MOBILE_HISTORY_STEP]: 2 },
-                "",
-                location.href
-            );
+            state = root;
+            step = 0;
+        }
+
+        if (!fromUserGesture && !mobileBackUserActivated) {
             return;
+        }
+
+        if (fromUserGesture) {
+            mobileBackUserActivated = true;
+        }
+
+        // 在同一次真实用户操作里补足两层保护。这样打开抽屉、弹窗、
+        // 图谱完整查看后，Android 返回首先只会回到同一文档并触发 popstate。
+        if (step < 1) {
+            history.pushState(
+                {
+                    ...state,
+                    [MOBILE_HISTORY_ROOT]: true,
+                    [MOBILE_HISTORY_STEP]: 1
+                },
+                "",
+                location.href
+            );
+            state = mobileHistoryStateObject();
+            step = 1;
         }
 
         if (step < 2) {
@@ -15221,8 +15240,8 @@ function ensureMobileBackHistoryStack() {
                 location.href
             );
         }
-    } catch (_error) {
-        // History API 异常不能影响主界面。
+    } catch (error) {
+        console.warn("移动端返回保护建立失败：", error);
     }
 }
 
@@ -15266,7 +15285,6 @@ function dismissMobileKeyboardForBack() {
 }
 
 function closeTopMobileLayerForBack() {
-    // 键盘优先级最高：安卓底部三角/下箭头首先只负责收键盘。
     if (dismissMobileKeyboardForBack()) {
         return true;
     }
@@ -15322,15 +15340,39 @@ function installMobileBackGuard() {
     mobileBackGuardInstalled = true;
 
     if (isMobileAppShell()) {
-        ensureMobileBackHistoryStack();
+        // 这里只标 root，不在启动阶段 push guard。
+        ensureMobileBackHistoryStack(false);
     }
 
-    // 记录输入框刚刚仍处于键盘交互中。某些安卓浏览器会在 popstate
-    // 之前先把 activeElement 改成 body，因此不能只看 document.activeElement。
+    // 关键修复：在真实用户操作的同步事件里建立 history guard。
+    // Fennec/Firefox Android 可能不把页面启动阶段自动塞入的 history
+    // 当成可由系统 Back 正常遍历的用户导航；这里让 guard 与用户操作绑定。
+    const armFromUserGesture = () => {
+        if (!isMobileAppShell() || mobileBackAllowExit) return;
+        ensureMobileBackHistoryStack(true);
+    };
+
+    document.addEventListener("pointerdown", armFromUserGesture, {
+        capture: true,
+        passive: true
+    });
+    document.addEventListener("touchstart", armFromUserGesture, {
+        capture: true,
+        passive: true
+    });
+    document.addEventListener("click", armFromUserGesture, {
+        capture: true,
+        passive: true
+    });
+    document.addEventListener("keydown", armFromUserGesture, {
+        capture: true
+    });
+
     document.addEventListener("focusin", event => {
         if (!(event.target instanceof Element)) return;
         if (event.target.matches("input, textarea, select, [contenteditable='true']")) {
             mobileKeyboardFocusGraceUntil = Date.now() + 60 * 60 * 1000;
+            armFromUserGesture();
         }
     });
     document.addEventListener("focusout", event => {
@@ -15343,12 +15385,14 @@ function installMobileBackGuard() {
     window.addEventListener("popstate", () => {
         if (!isMobileAppShell() || mobileBackAllowExit) return;
 
-        // popstate 发生时已经退掉一个同页 history entry；无论下面做什么，
-        // 都先把保护层补回去，避免一次系统返回直接穿透到站外。
-        ensureMobileBackHistoryStack();
-
+        // Back 已经先退到同页的较低 guard。先处理 UI，再决定是否补回顶层。
+        // 不能一进 popstate 就 pushState，否则“第二次返回退出”会被刚补回的
+        // guard 再挡一次。
         if (closeTopMobileLayerForBack()) {
             mobileBackExitUntil = 0;
+            if (mobileBackUserActivated) {
+                ensureMobileBackHistoryStack(true);
+            }
             return;
         }
 
@@ -15357,11 +15401,13 @@ function installMobileBackGuard() {
             mobileBackExitUntil = 0;
             mobileBackAllowExit = true;
 
-            // 当前仍位于本页的 guard 层。明确跨过本页的 root/guard，
-            // 第二次系统返回才允许离开；不再依赖单次 history.back() 的栈形状。
+            // 此时通常位于 step1；跨过剩余 guard + 本页 root，回到浏览器
+            // 原来的上一页。若只剩 root，则退一层即可。
+            const step = mobileHistoryGuardStep();
+            const delta = -(Math.max(0, step) + 1);
             window.setTimeout(() => {
                 try {
-                    history.go(-3);
+                    history.go(delta);
                 } catch (_error) {
                     history.back();
                 }
@@ -15371,20 +15417,18 @@ function installMobileBackGuard() {
 
         mobileBackExitUntil = now + 1800;
         showCopyToast("再按一次返回退出");
+        if (mobileBackUserActivated) {
+            ensureMobileBackHistoryStack(true);
+        }
     });
 
-    // 极少数安卓浏览器在离站时不先发 popstate；用户已经与页面交互后，
-    // beforeunload 至少再提供一道浏览器级保护。浏览器是否展示确认框由其决定。
-    window.addEventListener("beforeunload", event => {
-        if (!isMobileAppShell() || mobileBackAllowExit) return;
-        event.preventDefault();
-        event.returnValue = "";
-    });
+    // beforeunload 在现代移动浏览器里不能作为可靠的 Android Back 拦截器，
+    // 因此不再依赖它。真正的保护来自“用户交互时建立的同页 history”。
 
     window.addEventListener("pageshow", () => {
         if (isMobileAppShell() && !mobileBackAllowExit) {
             mobileBackExitUntil = 0;
-            ensureMobileBackHistoryStack();
+            ensureMobileBackHistoryStack(false);
             syncMobileVisualViewport();
         }
     });
@@ -15394,7 +15438,7 @@ function installMobileBackGuard() {
         if (event.matches) {
             mobileBackAllowExit = false;
             mobileBackExitUntil = 0;
-            ensureMobileBackHistoryStack();
+            ensureMobileBackHistoryStack(false);
             syncMobileVisualViewport();
         }
     });
