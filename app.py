@@ -3,9 +3,11 @@ import json
 import re
 import threading
 import time
+from datetime import timedelta
 from collections import defaultdict, deque
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, session
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure
 from teaching import analyze_messages, analyze_question, extract_current_request
@@ -32,7 +34,89 @@ except Exception as exc:
 
 
 
+# -----------------------------
+# 账号数据库（可选；未配置时不影响游客模式）
+# -----------------------------
+PSYCOPG_AVAILABLE = False
+PSYCOPG_IMPORT_ERROR = None
+
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+    from psycopg.types.json import Jsonb
+    PSYCOPG_AVAILABLE = True
+except Exception as exc:
+    psycopg = None
+    dict_row = None
+    Jsonb = None
+    PSYCOPG_IMPORT_ERROR = repr(exc)
+    print(f"PostgreSQL 驱动不可用：{PSYCOPG_IMPORT_ERROR}")
+
+
+def _env_bool(name, default=False):
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() not in {
+        "0", "false", "no", "off", "disable", "disabled"
+    }
+
+
+def _build_database_dsn():
+    direct = (
+        os.environ.get("DATABASE_URL")
+        or os.environ.get("POSTGRES_CONNECTION_STRING")
+        or os.environ.get("POSTGRES_URL")
+        or ""
+    ).strip()
+    if direct:
+        return direct
+
+    host = (os.environ.get("PGHOST") or os.environ.get("POSTGRES_HOST") or "").strip()
+    port = (os.environ.get("PGPORT") or os.environ.get("POSTGRES_PORT") or "5432").strip()
+    dbname = (os.environ.get("PGDATABASE") or os.environ.get("POSTGRES_DATABASE") or "").strip()
+    user = (os.environ.get("PGUSER") or os.environ.get("POSTGRES_USERNAME") or "").strip()
+    password = (os.environ.get("PGPASSWORD") or os.environ.get("POSTGRES_PASSWORD") or "").strip()
+
+    if host and dbname and user and password:
+        return (
+            f"host={host} port={port} dbname={dbname} "
+            f"user={user} password={password}"
+        )
+    return ""
+
+
+AUTH_DATABASE_DSN = _build_database_dsn()
+AUTH_SECRET_KEY = (
+    os.environ.get("AUTH_SECRET_KEY")
+    or os.environ.get("SECRET_KEY")
+    or ""
+).strip()
+AUTH_CONFIGURED = bool(
+    PSYCOPG_AVAILABLE
+    and AUTH_DATABASE_DSN
+    and AUTH_SECRET_KEY
+)
+MAX_SYNC_JSON_BYTES = 5 * 1024 * 1024
+AUTH_RATE_LIMIT_WINDOW = 60
+AUTH_RATE_LIMIT_COUNT = 20
+_auth_schema_lock = threading.Lock()
+_auth_schema_ready = False
+_auth_rate_lock = threading.Lock()
+_auth_rate_history = defaultdict(deque)
+
+
 app = Flask(__name__)
+
+# 账号只使用服务器签名的 HttpOnly Cookie；前端 JS 不保存登录令牌。
+app.config.update(
+    SECRET_KEY=AUTH_SECRET_KEY or "auth-disabled-placeholder",
+    SESSION_COOKIE_NAME="dm_tutor_session",
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=_env_bool("SESSION_COOKIE_SECURE", True),
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+)
 
 
 # -----------------------------
@@ -246,6 +330,387 @@ def request_too_large(_error):
     return jsonify({
         "error": "图片过大，请上传 8MB 以内的图片。"
     }), 413
+
+
+
+
+# -----------------------------
+# 账号 / 云同步
+# -----------------------------
+def _auth_rate_allowed(route_name):
+    ip = _get_client_ip()
+    key = f"auth:{route_name}:{ip}"
+    now = time.time()
+
+    with _auth_rate_lock:
+        history = _auth_rate_history[key]
+        while history and now - history[0] > AUTH_RATE_LIMIT_WINDOW:
+            history.popleft()
+        if len(history) >= AUTH_RATE_LIMIT_COUNT:
+            return False
+        history.append(now)
+        return True
+
+
+def _auth_unavailable_response():
+    message = "账号系统尚未配置。请先连接 PostgreSQL，并设置 AUTH_SECRET_KEY。"
+    if not PSYCOPG_AVAILABLE:
+        message = "账号系统缺少 PostgreSQL 驱动，请更新 requirements.txt 后重新部署。"
+    return jsonify({
+        "ok": False,
+        "configured": False,
+        "error": message,
+    }), 503
+
+
+def _auth_connect():
+    if not AUTH_CONFIGURED:
+        raise RuntimeError("auth database is not configured")
+    return psycopg.connect(
+        AUTH_DATABASE_DSN,
+        connect_timeout=6,
+        row_factory=dict_row,
+    )
+
+
+def _ensure_auth_schema():
+    global _auth_schema_ready
+    if _auth_schema_ready:
+        return True
+    if not AUTH_CONFIGURED:
+        return False
+
+    with _auth_schema_lock:
+        if _auth_schema_ready:
+            return True
+        try:
+            with _auth_connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS dm_users (
+                            id BIGSERIAL PRIMARY KEY,
+                            username VARCHAR(32) NOT NULL,
+                            username_key VARCHAR(64) NOT NULL UNIQUE,
+                            password_hash TEXT NOT NULL,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        )
+                    """)
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS dm_user_data (
+                            user_id BIGINT PRIMARY KEY
+                                REFERENCES dm_users(id) ON DELETE CASCADE,
+                            data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                            revision BIGINT NOT NULL DEFAULT 0,
+                            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        )
+                    """)
+            _auth_schema_ready = True
+            return True
+        except Exception as exc:
+            print(f"账号数据库初始化失败：{repr(exc)}")
+            return False
+
+
+def _normalize_auth_credentials(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    username = str(payload.get("username") or "").strip()
+    password = str(payload.get("password") or "")
+
+    if not re.fullmatch(r"[\w.\-\u4e00-\u9fff]{2,32}", username, flags=re.UNICODE):
+        return None, None, "用户名需为 2–32 个字符，只使用文字、数字、下划线、点或短横线。"
+    if len(password) < 6 or len(password) > 128:
+        return None, None, "密码长度需为 6–128 个字符。"
+
+    return username, username.casefold(), None
+
+
+def _current_auth_user():
+    user_id = session.get("user_id")
+    if not isinstance(user_id, int):
+        return None
+    if not _ensure_auth_schema():
+        return None
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, username FROM dm_users WHERE id = %s",
+                    (user_id,),
+                )
+                return cur.fetchone()
+    except Exception as exc:
+        print(f"读取登录用户失败：{repr(exc)}")
+        return None
+
+
+def _sync_row_for_user(user_id):
+    with _auth_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO dm_user_data (user_id)
+                VALUES (%s)
+                ON CONFLICT (user_id) DO NOTHING
+                """,
+                (user_id,),
+            )
+            cur.execute(
+                """
+                SELECT data, revision, updated_at
+                FROM dm_user_data
+                WHERE user_id = %s
+                """,
+                (user_id,),
+            )
+            return cur.fetchone()
+
+
+@app.route("/auth/me", methods=["GET"])
+def auth_me():
+    if not AUTH_CONFIGURED:
+        return jsonify({
+            "ok": True,
+            "configured": False,
+            "authenticated": False,
+        })
+    if not _ensure_auth_schema():
+        return _auth_unavailable_response()
+
+    user = _current_auth_user()
+    if not user:
+        session.clear()
+        return jsonify({
+            "ok": True,
+            "configured": True,
+            "authenticated": False,
+        })
+
+    return jsonify({
+        "ok": True,
+        "configured": True,
+        "authenticated": True,
+        "user": {"username": user["username"]},
+    })
+
+
+@app.route("/auth/register", methods=["POST"])
+def auth_register():
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not _auth_rate_allowed("register"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    username, username_key, error = _normalize_auth_credentials(request.get_json(silent=True))
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    password = str((request.get_json(silent=True) or {}).get("password") or "")
+    password_hash = generate_password_hash(password, method="scrypt")
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO dm_users (username, username_key, password_hash)
+                    VALUES (%s, %s, %s)
+                    RETURNING id, username
+                    """,
+                    (username, username_key, password_hash),
+                )
+                user = cur.fetchone()
+                cur.execute(
+                    "INSERT INTO dm_user_data (user_id) VALUES (%s)",
+                    (user["id"],),
+                )
+    except Exception as exc:
+        if getattr(exc, "sqlstate", None) == "23505":
+            return jsonify({"ok": False, "error": "这个用户名已经被使用。"}), 409
+        print(f"注册失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "注册失败，请稍后再试。"}), 500
+
+    session.clear()
+    session["user_id"] = int(user["id"])
+    session.permanent = True
+    return jsonify({
+        "ok": True,
+        "configured": True,
+        "authenticated": True,
+        "user": {"username": user["username"]},
+        "revision": 0,
+    })
+
+
+@app.route("/auth/login", methods=["POST"])
+def auth_login():
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not _auth_rate_allowed("login"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    username, username_key, error = _normalize_auth_credentials(request.get_json(silent=True))
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    password = str((request.get_json(silent=True) or {}).get("password") or "")
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, username, password_hash
+                    FROM dm_users
+                    WHERE username_key = %s
+                    """,
+                    (username_key,),
+                )
+                user = cur.fetchone()
+    except Exception as exc:
+        print(f"登录查询失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "登录失败，请稍后再试。"}), 500
+
+    if not user or not check_password_hash(user["password_hash"], password):
+        return jsonify({"ok": False, "error": "用户名或密码不正确。"}), 401
+
+    session.clear()
+    session["user_id"] = int(user["id"])
+    session.permanent = True
+    return jsonify({
+        "ok": True,
+        "configured": True,
+        "authenticated": True,
+        "user": {"username": user["username"]},
+    })
+
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route("/sync", methods=["GET", "PUT"])
+def sync_user_data():
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+
+    user = _current_auth_user()
+    if not user:
+        return jsonify({"ok": False, "error": "请先登录。"}), 401
+
+    user_id = int(user["id"])
+
+    if request.method == "GET":
+        try:
+            row = _sync_row_for_user(user_id)
+        except Exception as exc:
+            print(f"读取云端数据失败：{repr(exc)}")
+            return jsonify({"ok": False, "error": "读取云端数据失败。"}), 500
+
+        return jsonify({
+            "ok": True,
+            "data": row["data"] or {},
+            "revision": int(row["revision"] or 0),
+            "updatedAt": row["updated_at"].isoformat() if row.get("updated_at") else None,
+        })
+
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    data = payload.get("data")
+    force = bool(payload.get("force"))
+
+    try:
+        base_revision = int(payload.get("baseRevision", 0))
+    except (TypeError, ValueError):
+        base_revision = -1
+
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "同步数据格式不正确。"}), 400
+    if base_revision < 0:
+        return jsonify({"ok": False, "error": "同步版本号不正确。"}), 400
+
+    try:
+        encoded = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    except Exception:
+        return jsonify({"ok": False, "error": "同步数据无法序列化。"}), 400
+
+    if len(encoded) > MAX_SYNC_JSON_BYTES:
+        return jsonify({"ok": False, "error": "同步数据过大，请先清理部分历史记录。"}), 413
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO dm_user_data (user_id)
+                    VALUES (%s)
+                    ON CONFLICT (user_id) DO NOTHING
+                    """,
+                    (user_id,),
+                )
+
+                if force:
+                    cur.execute(
+                        """
+                        UPDATE dm_user_data
+                        SET data = %s,
+                            revision = revision + 1,
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                        RETURNING revision, updated_at
+                        """,
+                        (Jsonb(data), user_id),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        UPDATE dm_user_data
+                        SET data = %s,
+                            revision = revision + 1,
+                            updated_at = NOW()
+                        WHERE user_id = %s AND revision = %s
+                        RETURNING revision, updated_at
+                        """,
+                        (Jsonb(data), user_id, base_revision),
+                    )
+
+                updated = cur.fetchone()
+
+                if not updated:
+                    cur.execute(
+                        """
+                        SELECT data, revision, updated_at
+                        FROM dm_user_data
+                        WHERE user_id = %s
+                        """,
+                        (user_id,),
+                    )
+                    cloud = cur.fetchone()
+                    conn.rollback()
+                    return jsonify({
+                        "ok": False,
+                        "conflict": True,
+                        "error": "云端数据已经被其他设备更新。",
+                        "data": cloud["data"] or {},
+                        "revision": int(cloud["revision"] or 0),
+                        "updatedAt": cloud["updated_at"].isoformat() if cloud.get("updated_at") else None,
+                    }), 409
+
+        return jsonify({
+            "ok": True,
+            "revision": int(updated["revision"]),
+            "updatedAt": updated["updated_at"].isoformat() if updated.get("updated_at") else None,
+        })
+    except Exception as exc:
+        print(f"写入云端数据失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "同步失败，请稍后再试。"}), 500
 
 
 @app.route("/")
