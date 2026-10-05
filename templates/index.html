@@ -5253,6 +5253,162 @@ body[data-appearance-theme="light"] .input input {
     to   { transform:translate3d(0,0,0); }
 }
 
+
+/* =========================================================
+   账号：只有用户名 + 密码；登录后自动云同步
+   ========================================================= */
+.account-entry {
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:.55em !important;
+    margin-top:8px;
+    margin-bottom:0;
+}
+
+.account-entry-dot {
+    width:.62em;
+    height:.62em;
+    flex:0 0 .62em;
+    border-radius:50%;
+    background:var(--text-subtle);
+    box-shadow:0 0 0 1px rgba(148,163,184,.18);
+}
+
+.account-entry.is-authenticated .account-entry-dot {
+    background:#22c55e;
+}
+
+.account-entry.is-syncing .account-entry-dot {
+    background:#f59e0b;
+}
+
+.account-card {
+    width:min(430px, calc(100vw - 28px));
+    max-width:430px;
+}
+
+.account-body {
+    padding:18px;
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
+}
+
+.account-field {
+    display:block;
+    margin-bottom:14px;
+}
+
+.account-field > span {
+    display:block;
+    margin-bottom:7px;
+    color:var(--text-secondary);
+    font-size:var(--font-sm);
+    font-weight:600;
+}
+
+.account-field input {
+    width:100%;
+    min-height:44px;
+    padding:10px 12px;
+    border:1px solid var(--border-strong);
+    border-radius:10px;
+    background:var(--surface-1);
+    color:var(--text-primary);
+    font:inherit;
+    outline:none;
+}
+
+.account-field input:focus {
+    border-color:var(--accent);
+}
+
+.account-actions {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:8px;
+}
+
+.account-actions button,
+.account-logout {
+    min-height:44px;
+    border:1px solid var(--border-strong);
+    border-radius:10px;
+    background:var(--surface-3);
+    color:var(--text-primary);
+    font:inherit;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.account-actions button.primary {
+    border-color:var(--accent);
+    background:var(--accent);
+    color:#fff;
+}
+
+.account-actions button:disabled,
+.account-logout:disabled {
+    opacity:.55;
+    cursor:default;
+}
+
+.account-message {
+    min-height:22px;
+    margin:2px 0 4px;
+    color:var(--accent-pale);
+    font-size:var(--font-sm);
+    line-height:1.5;
+}
+
+.account-message.error {
+    color:#fca5a5;
+}
+
+.account-hint {
+    margin-top:12px;
+    color:var(--text-subtle);
+    font-size:var(--font-xs);
+    line-height:1.55;
+}
+
+.account-user-name {
+    padding:18px 14px 7px;
+    text-align:center;
+    color:var(--text-strong);
+    font-size:1.25em;
+    font-weight:700;
+    word-break:break-all;
+}
+
+.account-sync-state {
+    margin-bottom:20px;
+    text-align:center;
+    color:var(--text-subtle);
+    font-size:var(--font-sm);
+}
+
+.account-logout {
+    width:100%;
+}
+
+@media (max-width:760px) {
+    .account-card {
+        width:100% !important;
+        max-width:100% !important;
+        height:var(--app-visible-height, 100dvh) !important;
+        max-height:var(--app-visible-height, 100dvh) !important;
+        border-radius:0 !important;
+    }
+
+    .account-body {
+        flex:1 1 auto;
+        min-height:0;
+        padding:18px 18px max(18px, env(safe-area-inset-bottom));
+    }
+}
+
 </style>
 
 <script>
@@ -5302,6 +5458,7 @@ window.MathJax = {
     </div>
     <button class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
+    <button id="accountBtn" class="btn account-entry" type="button"><span class="account-entry-dot" aria-hidden="true"></span><span id="accountEntryLabel">登录 / 注册</span></button>
     <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"></span><span>外观</span></button>
 </div>
 
@@ -5479,6 +5636,42 @@ window.MathJax = {
         </div>
         <div class="appearance-background-viewer-body">
             <img id="appearanceBackgroundViewerImage" alt="当前全局背景预览">
+        </div>
+    </div>
+</div>
+
+
+
+<div id="accountModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card account-card">
+        <div class="modal-head">
+            <div>账号</div>
+            <button id="accountClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
+        </div>
+
+        <div class="account-body">
+            <div id="accountGuestView">
+                <label class="account-field" for="accountUsername">
+                    <span>用户名</span>
+                    <input id="accountUsername" type="text" minlength="2" maxlength="32" autocomplete="username" spellcheck="false">
+                </label>
+                <label class="account-field" for="accountPassword">
+                    <span>密码</span>
+                    <input id="accountPassword" type="password" minlength="6" maxlength="128" autocomplete="current-password">
+                </label>
+                <div id="accountMessage" class="account-message" aria-live="polite"></div>
+                <div class="account-actions">
+                    <button id="accountLogin" type="button" class="primary">登录</button>
+                    <button id="accountRegister" type="button">注册</button>
+                </div>
+                <div class="account-hint">登录后，对话、错题本、学习记录和外观设置会自动同步。</div>
+            </div>
+
+            <div id="accountUserView" class="hidden">
+                <div class="account-user-name" id="accountCurrentUsername"></div>
+                <div class="account-sync-state" id="accountSyncState">已同步</div>
+                <button id="accountLogout" type="button" class="account-logout">退出登录</button>
+            </div>
         </div>
     </div>
 </div>
@@ -5662,7 +5855,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-v8-smooth-20261005"></script>
+<script src="/static/script.js?v=phase5-account-sync-v1-20261005"></script>
 
 </body>
 </html>
