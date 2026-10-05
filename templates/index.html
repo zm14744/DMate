@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>
 /*
- * Android / Firefox 移动端返回键说明：
- * 不在页面加载阶段主动 pushState。部分移动浏览器会忽略/跳过
- * “用户尚未交互时”脚本创建的历史项。真正的返回保护由主脚本在
- * 第一次 pointer/touch/keyboard 用户操作中同步建立。
+ * 移动端导航说明：Fennec/Android 的系统返回键保持浏览器原生行为。
+ * 页面内部切换统一使用显式按钮与横向手势，不再主动修改 history。
  */
 </script>
 <meta name="color-scheme" content="light dark">
@@ -4961,6 +4959,162 @@ body[data-appearance-theme="light"] .input input {
     }
 }
 
+
+
+/* =========================================================
+   2026-10-05 v6：移动端丝滑切页 + 全局手势
+   - 主聊天左右拖动实时跟手打开抽屉
+   - 抽屉反向拖动关闭
+   - 所有全屏弹层从左边缘右滑返回
+   - 不再依赖 Fennec/Android 系统返回键劫持
+   ========================================================= */
+@media (max-width:1100px) {
+    .center,
+    .left,
+    .right,
+    .mobile-shell-backdrop {
+        -webkit-backface-visibility:hidden;
+        backface-visibility:hidden;
+    }
+
+    .center {
+        will-change:transform;
+        transition:transform .28s cubic-bezier(.22,1,.36,1);
+        touch-action:pan-y;
+    }
+
+    .left,
+    .right {
+        will-change:transform;
+        transition:transform .30s cubic-bezier(.22,1,.36,1) !important;
+        touch-action:pan-y;
+    }
+
+    .mobile-shell-backdrop {
+        will-change:opacity;
+        transition:opacity .22s cubic-bezier(.22,1,.36,1) !important;
+        /* 全屏 backdrop-filter 在 Fennec/部分移动 GPU 上容易造成拖动掉帧。
+           遮罩只保留透明度合成，不做实时模糊。 */
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+    }
+
+    body.mobile-left-open .center {
+        transform:translate3d(8px,0,0);
+    }
+
+    body.mobile-tools-open .center {
+        transform:translate3d(-8px,0,0);
+    }
+
+    body.mobile-drawer-dragging .left,
+    body.mobile-drawer-dragging .right,
+    body.mobile-drawer-dragging .center,
+    body.mobile-drawer-dragging .mobile-shell-backdrop {
+        transition:none !important;
+    }
+
+    .mobile-topbar-button,
+    .mobile-drawer-close,
+    .learning-actions button,
+    .left > .btn,
+    .session {
+        -webkit-tap-highlight-color:transparent;
+        transition:
+            transform .14s ease,
+            background-color .18s ease,
+            border-color .18s ease,
+            opacity .18s ease !important;
+    }
+
+    .mobile-topbar-button:active,
+    .mobile-drawer-close:active,
+    .learning-actions button:active,
+    .left > .btn:active,
+    .session:active {
+        transform:scale(.975);
+    }
+
+    /* 弹窗/工具页进入时不再生硬闪现。支持离散 display transition 的
+       浏览器会连关闭一起过渡；不支持的浏览器仍保持原功能。 */
+    .modal {
+        opacity:1;
+        transition:
+            opacity .18s ease,
+            display .18s allow-discrete;
+        transition-behavior:allow-discrete;
+    }
+
+    .modal .modal-card {
+        opacity:1;
+        transform:translate3d(0,0,0);
+        transform-origin:center center;
+        will-change:transform,opacity;
+        transition:
+            transform .24s cubic-bezier(.22,1,.36,1),
+            opacity .18s ease,
+            display .18s allow-discrete;
+    }
+
+    .modal.hidden {
+        opacity:0;
+    }
+
+    .modal.hidden .modal-card {
+        opacity:0;
+        transform:translate3d(16px,0,0);
+    }
+
+    @starting-style {
+        .modal:not(.hidden) {
+            opacity:0;
+        }
+        .modal:not(.hidden) .modal-card {
+            opacity:0;
+            transform:translate3d(18px,0,0);
+        }
+    }
+
+    .ocr-review-dialog[open] {
+        animation:mobileDialogEnter .24s cubic-bezier(.22,1,.36,1);
+        will-change:transform,opacity;
+    }
+
+    .ocr-review-dialog[open]::backdrop {
+        animation:mobileBackdropEnter .18s ease;
+    }
+
+    /* 普通页面纵向滚动优先；只有明确横向移动后 JS 才接管手势。 */
+    .chat,
+    #sessions,
+    .right,
+    .wrong-list,
+    .learning-review-body,
+    .appearance-body,
+    .graph-side-page {
+        overscroll-behavior-y:contain;
+    }
+
+    /* 图谱自身的双指缩放/拖动规则优先于全局手势。 */
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-viewport {
+        touch-action:none !important;
+    }
+
+    /* v7 性能策略：手势过程中尽量只改变 transform/opacity，避免阴影、模糊、
+       尺寸和布局属性参与逐帧计算。 */
+}
+
+
+@keyframes mobileDialogEnter {
+    from { opacity:0; transform:translate3d(18px,0,0); }
+    to   { opacity:1; transform:translate3d(0,0,0); }
+}
+
+@keyframes mobileBackdropEnter {
+    from { opacity:0; }
+    to   { opacity:1; }
+}
+
 </style>
 
 <script>
@@ -5375,7 +5529,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase4-mobile-backguard-v5-usergesture-20261005a"></script>
+<script src="/static/script.js?v=phase4-mobile-gesture-v7-perf-20261005a"></script>
 
 </body>
 </html>
