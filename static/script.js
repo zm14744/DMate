@@ -12863,7 +12863,6 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     const baseHeight = Math.max(1, Number(stage.dataset.baseHeight) || stage.scrollHeight || 1);
     const modal = document.getElementById("knowledgeGraphModal");
     const pointers = new Map();
-    let previewDrag = null;
     let fullscreenPan = null;
     let pinch = null;
     let suppressClickUntil = 0;
@@ -12949,8 +12948,13 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     viewport.addEventListener("pointerdown", event => {
         if (event.pointerType === "mouse" && event.button !== 0) return;
 
-        pointers.set(event.pointerId, event);
         const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
+
+        // 普通预览完全交给浏览器原生滚动：横向滚图、纵向滚页面。
+        // 不再在 pointermove 中抢手势，Fennec/Android 上会明显顺滑很多。
+        if (!fullscreen) return;
+
+        pointers.set(event.pointerId, event);
 
         if (fullscreen) {
             try { viewport.setPointerCapture(event.pointerId); } catch (_error) {}
@@ -12981,17 +12985,6 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
             return;
         }
 
-        // 普通预览只准备“横向拖图”。纵向手势交给外层页面滚动，
-        // 这样手指落在图谱上时也能自然继续往下滑页面。
-        if (pointers.size === 1) {
-            previewDrag = {
-                pointerId: event.pointerId,
-                x: event.clientX,
-                y: event.clientY,
-                left: viewport.scrollLeft,
-                active: false
-            };
-        }
     }, { passive: false });
 
     viewport.addEventListener("pointermove", event => {
@@ -13038,30 +13031,11 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
             return;
         }
 
-        if (!fullscreen && previewDrag?.pointerId === event.pointerId) {
-            const dx = event.clientX - previewDrag.x;
-            const dy = event.clientY - previewDrag.y;
-
-            if (!previewDrag.active) {
-                if (Math.abs(dy) >= Math.abs(dx) || Math.abs(dx) < 8) {
-                    return;
-                }
-                previewDrag.active = true;
-                suppressClickUntil = performance.now() + 250;
-                try { viewport.setPointerCapture(event.pointerId); } catch (_error) {}
-            }
-
-            viewport.scrollLeft = previewDrag.left - dx;
-            event.preventDefault();
-        }
     }, { passive: false });
 
     const finishPointer = event => {
         pointers.delete(event.pointerId);
 
-        if (previewDrag?.pointerId === event.pointerId) {
-            previewDrag = null;
-        }
         if (fullscreenPan?.pointerId === event.pointerId) {
             fullscreenPan = null;
         }
@@ -13987,9 +13961,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         }
 
         button.addEventListener("click", () => {
-            knowledgeGraphSelectedNodeId = node.id;
-            knowledgeGraphSideMode = "detail";
-            renderKnowledgeGraph();
+            selectKnowledgeGraphNode(node.id, button);
         });
 
         stage.appendChild(button);
@@ -14230,9 +14202,7 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         group.addEventListener(
             "click",
             () => {
-                knowledgeGraphSelectedNodeId = node.id;
-                knowledgeGraphSideMode = "detail";
-                renderKnowledgeGraph();
+                selectKnowledgeGraphNode(node.id, group);
             }
         );
 
@@ -14580,6 +14550,28 @@ function renderKnowledgeGraphHistory() {
 
     renderMath(list);
 }
+
+function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
+    knowledgeGraphSelectedNodeId = nodeId;
+    knowledgeGraphSideMode = "detail";
+
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    if (canvas) {
+        canvas.querySelectorAll(
+            ".kg-mobile-node.selected, .kg-node-group.selected"
+        ).forEach(element => element.classList.remove("selected"));
+    }
+
+    const selected = sourceElement?.closest?.(
+        ".kg-mobile-node, .kg-node-group"
+    );
+    selected?.classList.add("selected");
+
+    // 只刷新右侧/下方详情，不重建全部节点和连线。
+    // 手机上点击节点时不会再出现整张图谱闪一下、卡一下。
+    renderKnowledgeGraphSide();
+}
+
 
 function renderKnowledgeGraphSide() {
     updateKnowledgeGraphSideTabs();
@@ -15313,6 +15305,11 @@ function installMobileOverlaySwipeBack() {
             return;
         }
 
+        // 如果刚打开页面就立刻滑回，先停掉进入动画，避免两个 transform 打架。
+        try {
+            page.surface.getAnimations?.().forEach(animation => animation.cancel());
+        } catch (_error) {}
+
         swipe = {
             page,
             startX:touch.clientX,
@@ -15932,7 +15929,6 @@ document.addEventListener(
         const wrongBookBtn = document.getElementById("wrongBookBtn");
         const learningReviewBtn = document.getElementById("learningReviewBtn");
         const learningReviewClose = document.getElementById("learningReviewClose");
-        const learningReviewDone = document.getElementById("learningReviewDone");
         const learningReviewModal = document.getElementById("learningReviewModal");
         const wrongBookClose = document.getElementById("wrongBookClose");
         const wrongBookModal = document.getElementById("wrongBookModal");
@@ -16057,12 +16053,6 @@ document.addEventListener(
             );
         }
 
-        if (learningReviewDone) {
-            learningReviewDone.addEventListener(
-                "click",
-                closeLearningReview
-            );
-        }
 
         if (learningReviewModal) {
             learningReviewModal.addEventListener(
