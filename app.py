@@ -116,6 +116,8 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=_env_bool("SESSION_COOKIE_SECURE", True),
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    # 普通浏览器关闭/重新打开后仍保持登录；用户持续使用时滚动续期。
+    SESSION_REFRESH_EACH_REQUEST=True,
 )
 
 
@@ -589,8 +591,75 @@ def auth_login():
 
 @app.route("/auth/logout", methods=["POST"])
 def auth_logout():
+    # 只退出当前浏览器；账号和云端学习数据仍然保留。
     session.clear()
     return jsonify({"ok": True})
+
+
+@app.route("/auth/delete-account", methods=["POST"])
+def auth_delete_account():
+    """
+    永久注销当前账号。
+
+    - 必须处于登录状态；
+    - 必须再次输入当前密码；
+    - 删除 dm_users 后，dm_user_data 通过 ON DELETE CASCADE 一并删除；
+    - 当前浏览器本地 localStorage/IndexedDB 不在服务器端删除。
+    """
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not _auth_rate_allowed("delete-account"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    user_id = session.get("user_id")
+    if not isinstance(user_id, int):
+        session.clear()
+        return jsonify({"ok": False, "error": "请先登录。"}), 401
+
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    password = str(payload.get("password") or "")
+    if not password:
+        return jsonify({"ok": False, "error": "请输入当前密码。"}), 400
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, username, password_hash
+                    FROM dm_users
+                    WHERE id = %s
+                    """,
+                    (user_id,),
+                )
+                user = cur.fetchone()
+
+                if not user:
+                    session.clear()
+                    return jsonify({"ok": False, "error": "账号不存在或已被注销。"}), 401
+
+                if not check_password_hash(user["password_hash"], password):
+                    return jsonify({"ok": False, "error": "密码不正确。"}), 401
+
+                cur.execute(
+                    "DELETE FROM dm_users WHERE id = %s RETURNING id",
+                    (user_id,),
+                )
+                deleted = cur.fetchone()
+                if not deleted:
+                    return jsonify({"ok": False, "error": "注销失败，请稍后再试。"}), 500
+    except Exception as exc:
+        print(f"注销账号失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "注销账号失败，请稍后再试。"}), 500
+
+    session.clear()
+    return jsonify({
+        "ok": True,
+        "deleted": True,
+    })
 
 
 @app.route("/sync", methods=["GET", "PUT"])
