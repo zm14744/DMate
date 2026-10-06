@@ -5331,7 +5331,9 @@ body[data-appearance-theme="light"] .input input {
 }
 
 .account-actions button,
-.account-logout {
+.account-logout,
+.account-delete,
+.account-delete-actions button {
     min-height:44px;
     border:1px solid var(--border-strong);
     border-radius:10px;
@@ -5349,7 +5351,9 @@ body[data-appearance-theme="light"] .input input {
 }
 
 .account-actions button:disabled,
-.account-logout:disabled {
+.account-logout:disabled,
+.account-delete:disabled,
+.account-delete-actions button:disabled {
     opacity:.55;
     cursor:default;
 }
@@ -5389,8 +5393,49 @@ body[data-appearance-theme="light"] .input input {
     font-size:var(--font-sm);
 }
 
-.account-logout {
+.account-logout,
+.account-delete {
     width:100%;
+}
+
+.account-delete {
+    margin-top:10px;
+    border-color:rgba(239,68,68,.46);
+    background:rgba(127,29,29,.18);
+    color:#fca5a5;
+}
+
+.account-delete-panel {
+    margin-top:14px;
+    padding:14px;
+    border:1px solid rgba(239,68,68,.34);
+    border-radius:12px;
+    background:rgba(127,29,29,.10);
+}
+
+.account-delete-title {
+    margin-bottom:6px;
+    color:#fecaca;
+    font-weight:700;
+}
+
+.account-delete-copy {
+    margin-bottom:12px;
+    color:var(--text-muted);
+    font-size:var(--font-xs);
+    line-height:1.55;
+}
+
+.account-delete-actions {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+.account-delete-actions .danger {
+    border-color:#dc2626;
+    background:#b91c1c;
+    color:#fff;
 }
 
 @media (max-width:760px) {
@@ -5670,7 +5715,25 @@ window.MathJax = {
             <div id="accountUserView" class="hidden">
                 <div class="account-user-name" id="accountCurrentUsername"></div>
                 <div class="account-sync-state" id="accountSyncState">已同步</div>
+
                 <button id="accountLogout" type="button" class="account-logout">退出登录</button>
+                <button id="accountDeleteOpen" type="button" class="account-delete">注销账号</button>
+
+                <div id="accountDeletePanel" class="account-delete-panel hidden">
+                    <div class="account-delete-title">永久注销账号</div>
+                    <div class="account-delete-copy">
+                        注销后，账号和云端同步数据都会永久删除；本设备当前的本地学习数据会保留。
+                    </div>
+                    <label class="account-field" for="accountDeletePassword">
+                        <span>再次输入当前密码</span>
+                        <input id="accountDeletePassword" type="password" minlength="6" maxlength="128" autocomplete="current-password">
+                    </label>
+                    <div id="accountDeleteMessage" class="account-message" aria-live="polite"></div>
+                    <div class="account-delete-actions">
+                        <button id="accountDeleteCancel" type="button">取消</button>
+                        <button id="accountDeleteConfirm" type="button" class="danger">永久注销</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -5855,7 +5918,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase5-account-sync-v1-20261005"></script>
+<script src="/static/script.js?v=phase5-account-sync-v2-20261006"></script>
 
 </body>
 </html>
