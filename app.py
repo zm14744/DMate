@@ -10,7 +10,7 @@ from flask import Flask, jsonify, render_template, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure
-from teaching import analyze_messages, analyze_question, extract_current_request
+from teaching import analyze_messages, analyze_question, extract_current_request, looks_like_exercise_request
 
 
 # -----------------------------
@@ -793,116 +793,6 @@ def home():
 
 
 
-def _looks_like_exercise_request(text):
-    """识别自然语言中的出题/继续练习请求，并过滤否定、复盘和功能讨论。"""
-    value = re.sub(r"\s+", "", str(text or "").strip())
-
-    if not value or len(value) > 140:
-        return False
-
-    # 明确拒绝出题：不允许被后面的“出题/难题”关键词反向误触发。
-    if re.search(
-        r"(?:不想(?:让你)?|不要|别|不用|无需|禁止|先别|暂时别|以后别|别再|不要再)"
-        r"(?:给我|帮我)?(?:再)?(?:出|生成|来|给|整|弄|安排|准备|考我|刷)"
-        r".{0,10}(?:题目|题|练习)?",
-        value,
-    ):
-        return False
-
-    # “出题功能有 bug / 我在讨论如何生成题目”属于元讨论，不是生成命令。
-    if re.search(
-        r"(?:讨论|解释|分析|研究|功能|bug|代码|逻辑|识别|接口|模式|机制)"
-        r".{0,14}(?:出题|生成题|题目生成|生成练习)"
-        r"|(?:出题|生成题|题目生成|生成练习).{0,14}"
-        r"(?:功能|bug|代码|逻辑|识别|接口|模式|机制)",
-        value,
-        flags=re.IGNORECASE,
-    ):
-        return False
-
-    # 先识别“换一个简单的 / 刚才太难了，再来个简单的”这类明确新动作。
-    replacement_or_level = bool(re.search(
-        r"(?:^|[，,。；;！!？?])(?:请|麻烦)?(?:给我|帮我)?"
-        r"(?:再|重新)?(?:换|来|出|给|整|弄)"
-        r"(?:个|道|一道|一个)?"
-        r"(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)"
-        r"(?:难度)?(?:点|一点|一些|点儿|的)?(?:题|练习)?(?:吧)?$",
-        value,
-    ))
-    if replacement_or_level:
-        return True
-
-    # 单纯复盘上一道生成题，不应触发“再生成一道”。
-    if re.search(
-        r"(?:刚才|之前|上次|前面|你刚).{0,14}"
-        r"(?:出(?:的)?|生成(?:的)?|给(?:我)?(?:的)?)"
-        r".{0,8}(?:题目|题|练习)",
-        value,
-    ):
-        return False
-
-    if re.match(r"^(?:为什么|怎么|如何).{0,40}(?:出(?:的)?|生成(?:的)?|给(?:我)?).{0,10}(?:题目|题|练习)", value):
-        return False
-
-    # 常见省略“题”字的自然命令。
-    if re.fullmatch(r"(?:请|麻烦)?(?:来)?考我(?:一下|下|几道?|一题|一道)?(?:吧)?", value):
-        return True
-    if re.fullmatch(r"(?:请|麻烦)?(?:陪我|让我|我想|想)?刷(?:几|一|两|二|\d+)?道?(?:题)?(?:吧)?", value):
-        return True
-    if re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|帮我)?(?:随机|随便|再|重新)?(?:来|出|整|弄)?"
-        r"(?:一个|一道|一题)(?:题)?(?:吧)?",
-        value,
-    ):
-        return True
-
-    # “来个简单的 / 给个难的 / 出个中等难度的”。
-    if re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|帮我)?(?:再|重新)?(?:换|来|出|给|整|弄)"
-        r"(?:个|道|一道|一个)?"
-        r"(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)"
-        r"(?:难度)?(?:点|一点|一些|点儿|的)?(?:题|练习)?(?:吧)?",
-        value,
-    ):
-        return True
-
-    # “我想练点图论 / 想刷点关系题”。
-    if re.fullmatch(
-        r"(?:我)?(?:想|想要|要)?(?:练|刷|考)(?:一下|点|些|几道?)?"
-        r"(?:谓词逻辑|命题逻辑|逻辑|数论|计数|组合|递推|图论|图|集合|关系|函数|代数|群|树|欧拉|哈密顿)"
-        r"(?:题|练习)?(?:吧)?",
-        value,
-    ):
-        return True
-
-    # 带“题/练习”的普通生成表达。避免把“出的题/生成的题”当命令。
-    if re.search(
-        r"(?:请|麻烦|能否|能不能|可以|可不可以|帮我|给我|让我|我要|我想要|我想|想要|想|再|重新|随机|随便|继续|现在)?"
-        r"(?:给我|帮我)?(?:再|重新|随机|随便|继续)?"
-        r"(?:来|出(?!的)|生成(?!的)|安排|准备|整|弄|抽)"
-        r".{0,12}(?:题目|题|练习)",
-        value,
-    ):
-        return True
-
-    if re.search(r"(?:给我|帮我).{0,10}(?:一道|一题|一个题|几道题|几题|题目|练习)", value):
-        return True
-
-    if re.search(
-        r"(?:想|要|想要|可以|能不能|帮我|让我).{0,10}(?:做|练|刷|考)"
-        r".{0,16}(?:题目|题|练习)",
-        value,
-    ):
-        return True
-
-    return bool(re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|帮我)?(?:下一道题|下一题|下一道|下一个题|"
-        r"再来一道|再来一题|再来一个|再来个|再来一个题|"
-        r"换一道题|换一个题|换个题|换一个|换一道|换一题)(?:吧|。|！|!)?",
-        value,
-    ))
-
-
 _EXERCISE_ANSWER_PATTERN = re.compile(
     r"\[\[WRONGBOOK_ANSWER\]\]([\s\S]*?)\[\[/WRONGBOOK_ANSWER\]\]",
     re.IGNORECASE
@@ -1261,7 +1151,7 @@ def chat():
     # 双保险：前端 request_kind 是强信号，但后端仍独立理解自然语言。
     # 因此用户换成“随便来一道 / 整个难题 / 考我一道”等说法时，
     # 即使前端某次没有命中，也不会退回普通聊天模式。
-    server_detected_exercise = _looks_like_exercise_request(
+    server_detected_exercise = looks_like_exercise_request(
         latest_action_for_exercise
     )
     effective_exercise_request = bool(
@@ -1286,6 +1176,8 @@ def chat():
         ):
             exercise_target_difficulty = reference_teaching["difficulty"]
         else:
+            # 最终版保持原有出题默认难度：未指定、也没有参照题时仍为“中等”。
+            # teaching.py 的题目难度识别增强不改变这个默认值。
             exercise_target_difficulty = "中等"
 
         teaching["mode"] = "exercise"
@@ -1337,7 +1229,7 @@ def chat():
         is_exercise_request = (
             effective_exercise_request
             or teaching.get("mode") == "exercise"
-            or _looks_like_exercise_request(
+            or looks_like_exercise_request(
                 latest_user_text
             )
         )
