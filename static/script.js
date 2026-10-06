@@ -11,7 +11,6 @@ const FALLBACK_API_CONTEXT_MESSAGES = 12;
 
 const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
 const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
-const RECOVERY_DEVICE_STORAGE_KEY = "discrete_math_ai_recovery_devices_v1";
 const CLOUD_SYNC_DEBOUNCE_MS = 900;
 let accountState = {
     configured: null,
@@ -875,79 +874,8 @@ function clearCloudSyncMeta() {
     } catch (_error) {}
 }
 
-function recoveryDeviceUsernameKey(username) {
-    return String(username || "").trim().toLocaleLowerCase();
-}
-
-function readRecoveryDeviceTokens() {
-    try {
-        const parsed = JSON.parse(
-            localStorage.getItem(RECOVERY_DEVICE_STORAGE_KEY) || "{}"
-        );
-        return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (_error) {
-        return {};
-    }
-}
-
-function getRecoveryDeviceToken(username) {
-    const key = recoveryDeviceUsernameKey(username);
-    if (!key) return "";
-    const tokens = readRecoveryDeviceTokens();
-    return typeof tokens[key] === "string" ? tokens[key] : "";
-}
-
-function saveRecoveryDeviceToken(username, token) {
-    const key = recoveryDeviceUsernameKey(username);
-    const value = String(token || "").trim();
-    if (!key || !value) return;
-    try {
-        const tokens = readRecoveryDeviceTokens();
-        tokens[key] = value;
-        localStorage.setItem(
-            RECOVERY_DEVICE_STORAGE_KEY,
-            JSON.stringify(tokens)
-        );
-    } catch (_error) {
-        // 本机恢复凭证保存失败不影响正常登录。
-    }
-}
-
-function removeRecoveryDeviceToken(username) {
-    const key = recoveryDeviceUsernameKey(username);
-    if (!key) return;
-    try {
-        const tokens = readRecoveryDeviceTokens();
-        delete tokens[key];
-        localStorage.setItem(
-            RECOVERY_DEVICE_STORAGE_KEY,
-            JSON.stringify(tokens)
-        );
-    } catch (_error) {}
-}
-
-async function ensureRecoveryDeviceToken() {
-    if (!accountState.authenticated || !accountState.username) return;
-    if (getRecoveryDeviceToken(accountState.username)) return;
-
-    try {
-        const { data } = await accountFetch("/auth/recovery-device", {
-            method:"POST",
-            body:JSON.stringify({})
-        });
-        if (data?.recoveryDeviceToken) {
-            saveRecoveryDeviceToken(
-                accountState.username,
-                data.recoveryDeviceToken
-            );
-        }
-    } catch (error) {
-        console.warn("本机恢复凭证初始化失败：", error);
-    }
-}
-
 function clearLoggedOutWorkspace() {
-    // 退出账号后只清空当前可见学习工作区；外观设置和本机恢复凭证保留。
+    // 退出账号后，游客工作区必须是全新的空白状态。外观设置仍保留。
     sessions = [];
     currentId = null;
     learningState = createEmptyLearningState();
@@ -971,6 +899,11 @@ function clearLoggedOutWorkspace() {
     wrongBookSort = "recent";
     knowledgeGraphHistoryMessageIndex = null;
     knowledgeGraphSelectedNodeId = "";
+
+    const sessionsBox = document.getElementById("sessions");
+    if (sessionsBox) sessionsBox.innerHTML = "";
+    const chat = document.getElementById("chat");
+    if (chat) chat.innerHTML = '<div class="empty-tip">暂无对话</div>';
 
     renderAll();
 }
@@ -1102,6 +1035,11 @@ function renderAccountUi() {
     }
 
     if (username) username.textContent = accountState.username;
+    if (recoveryOpen) {
+        recoveryOpen.textContent = accountState.hasRecoveryCode
+            ? "修改恢复码"
+            : "设置恢复码";
+    }
     if (syncState) syncState.textContent = accountSyncText();
 
     const unavailable = accountState.configured === false;
@@ -1185,54 +1123,26 @@ function setAccountRecoverPanel(open) {
 function setAccountRecoveryCodePanel(open) {
     const panel = document.getElementById("accountRecoveryCodePanel");
     const password = document.getElementById("accountRecoveryCurrentPassword");
-    const codeBox = document.getElementById("accountRecoveryCodeBox");
-    const codeValue = document.getElementById("accountRecoveryCodeValue");
+    const newCode = document.getElementById("accountRecoveryNewCode");
+    const confirmCode = document.getElementById("accountRecoveryNewCodeConfirm");
     panel?.classList.toggle("hidden", !open);
 
     if (!open) {
         if (password) password.value = "";
-        if (codeValue) codeValue.textContent = "";
-        codeBox?.classList.add("hidden");
+        if (newCode) newCode.value = "";
+        if (confirmCode) confirmCode.value = "";
         setAccountRecoveryCodeMessage("");
     } else {
         window.setTimeout(() => password?.focus(), 40);
     }
 }
 
-function revealAccountRecoveryCode(code, message = "请立即保存这枚恢复码。") {
-    const panel = document.getElementById("accountRecoveryCodePanel");
-    const codeBox = document.getElementById("accountRecoveryCodeBox");
-    const codeValue = document.getElementById("accountRecoveryCodeValue");
-    const password = document.getElementById("accountRecoveryCurrentPassword");
-
-    panel?.classList.remove("hidden");
-    if (codeValue) codeValue.textContent = String(code || "");
-    codeBox?.classList.toggle("hidden", !code);
-    if (password) password.value = "";
-    setAccountRecoveryCodeMessage(message, false);
-}
-
-async function copyAccountRecoveryCode() {
-    const code = document.getElementById("accountRecoveryCodeValue")?.textContent?.trim() || "";
+function revealRegistrationRecoveryCode(code) {
     if (!code) return;
-
-    try {
-        if (navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(code);
-        } else {
-            const area = document.createElement("textarea");
-            area.value = code;
-            area.style.position = "fixed";
-            area.style.opacity = "0";
-            document.body.appendChild(area);
-            area.select();
-            document.execCommand("copy");
-            area.remove();
-        }
-        showCopyToast("恢复码已复制");
-    } catch (_error) {
-        showCopyToast("复制失败，请手动保存恢复码");
-    }
+    window.alert(
+        "注册成功，你的恢复码是：\n\n" + code +
+        "\n\n请保存好。以后忘记密码时，可以用用户名和恢复码重置密码。登录后也可以输入当前密码自行修改恢复码。"
+    );
 }
 
 function setAccountDeleteMessage(message = "", isError = false) {
@@ -1477,12 +1387,6 @@ async function submitAccountAuth(mode) {
         accountState.authenticated = true;
         accountState.username = String(data.user?.username || username);
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
-        if (data.recoveryDeviceToken) {
-            saveRecoveryDeviceToken(
-                accountState.username,
-                data.recoveryDeviceToken
-            );
-        }
         accountState.revision = Number(data.revision || 0);
         accountState.status = "同步中…";
         writeCloudSyncMeta({
@@ -1503,10 +1407,7 @@ async function submitAccountAuth(mode) {
             showCopyToast("注册成功，已登录");
             if (data.recoveryCode) {
                 accountState.hasRecoveryCode = true;
-                revealAccountRecoveryCode(
-                    data.recoveryCode,
-                    "注册成功。恢复码用于换设备时重置密码，请妥善保存；本浏览器也已建立本机恢复凭证。"
-                );
+                revealRegistrationRecoveryCode(data.recoveryCode);
             }
         } else {
             showCopyToast("登录成功");
@@ -1524,35 +1425,48 @@ async function generateAccountRecoveryCode() {
     if (!accountState.authenticated || accountState.syncing) return;
 
     const passwordInput = document.getElementById("accountRecoveryCurrentPassword");
+    const newCodeInput = document.getElementById("accountRecoveryNewCode");
+    const confirmInput = document.getElementById("accountRecoveryNewCodeConfirm");
     const password = passwordInput?.value || "";
+    const newRecoveryCode = newCodeInput?.value?.trim() || "";
+    const confirmRecoveryCode = confirmInput?.value?.trim() || "";
+
     if (!password) {
         setAccountRecoveryCodeMessage("请输入当前密码。", true);
         passwordInput?.focus();
         return;
     }
+    if (newRecoveryCode.length < 8 || newRecoveryCode.length > 64) {
+        setAccountRecoveryCodeMessage("新恢复码需为 8–64 个字符。", true);
+        newCodeInput?.focus();
+        return;
+    }
+    if (newRecoveryCode !== confirmRecoveryCode) {
+        setAccountRecoveryCodeMessage("两次输入的恢复码不一致。", true);
+        confirmInput?.focus();
+        return;
+    }
 
     accountState.syncing = true;
-    accountState.status = "正在生成恢复码…";
-    setAccountRecoveryCodeMessage("正在生成…");
+    accountState.status = "正在修改恢复码…";
+    setAccountRecoveryCodeMessage("正在修改…");
     renderAccountUi();
 
     try {
         const { data } = await accountFetch("/auth/recovery-code", {
             method:"POST",
-            body:JSON.stringify({ password })
+            body:JSON.stringify({ password, newRecoveryCode })
         });
-        accountState.hasRecoveryCode = true;
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.syncing = false;
         accountState.status = "已同步";
+        setAccountRecoveryCodePanel(false);
         renderAccountUi();
-        revealAccountRecoveryCode(
-            data.recoveryCode,
-            "新的恢复码已生成。旧恢复码已失效，请立即保存。"
-        );
+        showCopyToast("恢复码已修改");
     } catch (error) {
         accountState.syncing = false;
         accountState.status = "";
-        setAccountRecoveryCodeMessage(error?.message || "生成恢复码失败，请稍后再试。", true);
+        setAccountRecoveryCodeMessage(error?.message || "修改恢复码失败，请稍后再试。", true);
         renderAccountUi();
     }
 }
@@ -1567,20 +1481,15 @@ async function recoverAccountPassword() {
 
     const username = usernameInput?.value?.trim() || "";
     const recoveryCode = codeInput?.value?.trim() || "";
-    const recoveryDeviceToken = getRecoveryDeviceToken(username);
     const newPassword = passwordInput?.value || "";
     const confirmPassword = confirmInput?.value || "";
 
-    if (!username || !newPassword || !confirmPassword) {
-        setAccountRecoverMessage("请把用户名和新密码填写完整。", true);
-        return;
-    }
-    if (!recoveryCode && !recoveryDeviceToken) {
-        setAccountRecoverMessage(
-            "这个浏览器没有该账号的本机凭证，请填写恢复码。",
-            true
-        );
-        codeInput?.focus();
+    if (!username || !recoveryCode || !newPassword || !confirmPassword) {
+        setAccountRecoverMessage("请把用户名、恢复码和新密码填写完整。", true);
+        if (!username) usernameInput?.focus();
+        else if (!recoveryCode) codeInput?.focus();
+        else if (!newPassword) passwordInput?.focus();
+        else confirmInput?.focus();
         return;
     }
     if (newPassword.length < 6 || newPassword.length > 128) {
@@ -1604,7 +1513,6 @@ async function recoverAccountPassword() {
             body:JSON.stringify({
                 username,
                 recoveryCode,
-                recoveryDeviceToken,
                 newPassword
             })
         });
@@ -1613,12 +1521,6 @@ async function recoverAccountPassword() {
         accountState.authenticated = true;
         accountState.username = String(data.user?.username || username);
         accountState.hasRecoveryCode = true;
-        if (data.recoveryDeviceToken) {
-            saveRecoveryDeviceToken(
-                accountState.username,
-                data.recoveryDeviceToken
-            );
-        }
         accountState.revision = 0;
         accountState.status = "同步中…";
         accountState.syncing = false;
@@ -1630,16 +1532,12 @@ async function recoverAccountPassword() {
 
         setAccountRecoverPanel(false);
         renderAccountUi();
-        revealAccountRecoveryCode(
-            data.recoveryCode,
-            "密码已重置并自动登录。旧恢复码已失效，请保存新的恢复码；本浏览器的恢复凭证也已更新。"
-        );
         showCopyToast("密码已重置，已登录");
         await resolveInitialCloudSync(false);
     } catch (error) {
         accountState.syncing = false;
         setAccountRecoverMessage(
-            error?.message || "重置密码失败，请检查验证信息。",
+            error?.message || "重置密码失败，请检查用户名和恢复码。",
             true
         );
         renderAccountUi();
@@ -1694,13 +1592,14 @@ async function logoutAccount() {
     clearLoggedOutWorkspace();
     renderAccountUi();
     closeAccountModal();
-    showCopyToast("已退出登录");
+
+    // 重新载入空白游客工作区，保证旧账号内容不会残留在页面上。
+    window.location.reload();
 }
 
 async function deleteAccount() {
     if (!accountState.authenticated || accountState.syncing) return;
 
-    const deletedUsername = accountState.username;
     const passwordInput = document.getElementById("accountDeletePassword");
     const password = passwordInput?.value || "";
     if (!password) {
@@ -1732,7 +1631,6 @@ async function deleteAccount() {
         return;
     }
 
-    removeRecoveryDeviceToken(deletedUsername);
     accountState.authenticated = false;
     accountState.username = "";
     accountState.hasRecoveryCode = false;
@@ -1763,8 +1661,8 @@ async function initAccountSystem() {
     const accountRecoveryCodeOpen = document.getElementById("accountRecoveryCodeOpen");
     const accountRecoveryCodeCancel = document.getElementById("accountRecoveryCodeCancel");
     const accountRecoveryCodeGenerate = document.getElementById("accountRecoveryCodeGenerate");
-    const accountRecoveryCodeCopyBtn = document.getElementById("accountRecoveryCodeCopyBtn");
     const accountRecoveryCurrentPassword = document.getElementById("accountRecoveryCurrentPassword");
+    const accountRecoveryNewCodeConfirm = document.getElementById("accountRecoveryNewCodeConfirm");
     const accountLogout = document.getElementById("accountLogout");
     const accountDeleteOpen = document.getElementById("accountDeleteOpen");
     const accountDeleteCancel = document.getElementById("accountDeleteCancel");
@@ -1785,8 +1683,10 @@ async function initAccountSystem() {
     accountRecoveryCodeOpen?.addEventListener("click", () => setAccountRecoveryCodePanel(true));
     accountRecoveryCodeCancel?.addEventListener("click", () => setAccountRecoveryCodePanel(false));
     accountRecoveryCodeGenerate?.addEventListener("click", generateAccountRecoveryCode);
-    accountRecoveryCodeCopyBtn?.addEventListener("click", copyAccountRecoveryCode);
     accountRecoveryCurrentPassword?.addEventListener("keydown", event => {
+        if (event.key === "Enter") document.getElementById("accountRecoveryNewCode")?.focus();
+    });
+    accountRecoveryNewCodeConfirm?.addEventListener("keydown", event => {
         if (event.key === "Enter") generateAccountRecoveryCode();
     });
     accountLogout?.addEventListener("click", logoutAccount);
@@ -1823,7 +1723,6 @@ async function initAccountSystem() {
         renderAccountUi();
 
         if (accountState.authenticated) {
-            await ensureRecoveryDeviceToken();
             await resolveInitialCloudSync(false);
         } else {
             const staleMeta = readCloudSyncMeta();
