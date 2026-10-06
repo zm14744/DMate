@@ -2181,6 +2181,13 @@ body[data-appearance-theme="light"] .msg-actions button {
     font-variant-numeric:tabular-nums;
 }
 
+.appearance-apply-hint {
+    padding:0 18px 10px;
+    color:var(--text-subtle);
+    font-size:var(--font-xs);
+    line-height:1.5;
+}
+
 .appearance-footer {
     display:flex;
     justify-content:space-between;
@@ -5673,9 +5680,10 @@ window.MathJax = {
             </div>
         </div>
 
+        <div class="appearance-apply-hint">更改会先预览，点击“应用”后才保存。</div>
         <div class="appearance-footer">
             <button id="appearanceReset" type="button">恢复默认</button>
-            <button id="appearanceDone" type="button" class="primary">完成</button>
+            <button id="appearanceDone" type="button" class="primary">应用</button>
         </div>
     </div>
 </div>
@@ -5809,7 +5817,6 @@ window.MathJax = {
         <div id="wrongQuestionPickerList" class="wrong-picker-list"></div>
 
         <div class="wrong-picker-actions">
-            <button id="wrongQuestionPickerCancel" type="button" class="secondary">取消</button>
             <button id="wrongQuestionPickerConfirm" type="button">加入所选题目</button>
         </div>
     </div>
@@ -5839,7 +5846,6 @@ window.MathJax = {
         </div>
 
         <div class="wrong-safe-actions">
-            <button id="wrongSafeCancel" type="button" class="secondary">取消</button>
             <button id="wrongSafeConfirm" type="button">确认加入错题本</button>
         </div>
     </div>
@@ -5864,7 +5870,6 @@ window.MathJax = {
         </div>
 
         <div class="wrong-edit-actions">
-            <button id="wrongEditCancel" type="button" class="secondary">取消</button>
             <button id="wrongEditSave" type="button">保存</button>
         </div>
     </div>
@@ -5927,7 +5932,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase5-account-sync-v3-20261006"></script>
+<script src="/static/script.js?v=final-audit-20261006"></script>
 
 </body>
 </html>
