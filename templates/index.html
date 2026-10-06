@@ -5405,6 +5405,15 @@ body[data-appearance-theme="light"] .input input {
     color:#fca5a5;
 }
 
+/* 账号界面自己的显隐必须明确生效：
+   - 注册/登录成功后隐藏登录表单、立即显示已登录视图；
+   - 永久注销确认区默认隐藏，只在点击“注销账号”后展开。 */
+#accountGuestView.hidden,
+#accountUserView.hidden,
+#accountDeletePanel.hidden {
+    display:none !important;
+}
+
 .account-delete-panel {
     margin-top:14px;
     padding:14px;
@@ -5918,7 +5927,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=phase5-account-sync-v2-20261006"></script>
+<script src="/static/script.js?v=phase5-account-sync-v3-20261006"></script>
 
 </body>
 </html>
