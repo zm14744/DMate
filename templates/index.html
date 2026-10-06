@@ -5760,10 +5760,10 @@ window.MathJax = {
             </div>
         </div>
 
-        <div class="appearance-apply-hint">更改会先预览，点击“应用”后才保存。</div>
+        <div class="appearance-apply-hint">更改会先预览，点击“确认”后才保存。</div>
         <div class="appearance-footer">
             <button id="appearanceReset" type="button">恢复默认</button>
-            <button id="appearanceDone" type="button" class="primary">应用</button>
+            <button id="appearanceDone" type="button" class="primary">确认</button>
         </div>
     </div>
 </div>
@@ -5810,17 +5810,17 @@ window.MathJax = {
                 <div class="account-hint">登录后，对话、错题本、学习记录和外观设置会自动同步。</div>
 
                 <div id="accountRecoverPanel" class="account-recovery-panel hidden">
-                    <div class="account-panel-title">找回密码</div>
+                    <div class="account-panel-title">重置密码</div>
                     <div class="account-panel-copy">
-                        使用用户名和恢复码重置密码。成功后会自动登录，并生成一枚新的恢复码，旧恢复码立即失效。
+                        这是密码重置，不会找回旧密码。恢复码可以留空：如果这是曾成功登录过该账号且没有清除网站数据的浏览器，系统会使用本机凭证验证；换设备或清除网站数据后，则必须填写恢复码。
                     </div>
                     <label class="account-field" for="accountRecoverUsername">
                         <span>用户名</span>
                         <input id="accountRecoverUsername" type="text" minlength="2" maxlength="32" autocomplete="username" spellcheck="false">
                     </label>
                     <label class="account-field" for="accountRecoverCode">
-                        <span>恢复码</span>
-                        <input id="accountRecoverCode" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="DM-XXXX-XXXX-XXXX-XXXX">
+                        <span>恢复码（可选）</span>
+                        <input id="accountRecoverCode" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="换设备时填写 DM-XXXX-XXXX-XXXX-XXXX">
                     </label>
                     <label class="account-field" for="accountRecoverPassword">
                         <span>新密码</span>
@@ -5833,7 +5833,7 @@ window.MathJax = {
                     <div id="accountRecoverMessage" class="account-message" aria-live="polite"></div>
                     <div class="account-panel-actions">
                         <button id="accountRecoverCancel" type="button">取消</button>
-                        <button id="accountRecoverConfirm" type="button" class="primary">重置密码</button>
+                        <button id="accountRecoverConfirm" type="button" class="primary">确认</button>
                     </div>
                 </div>
             </div>
@@ -5849,7 +5849,7 @@ window.MathJax = {
                 <div id="accountRecoveryCodePanel" class="account-recovery-code-panel hidden">
                     <div class="account-panel-title">恢复码</div>
                     <div id="accountRecoveryCodeCopy" class="account-panel-copy">
-                        恢复码用于忘记密码时重置账号。系统不会保存明文；如果原恢复码丢了，可以输入当前密码重新生成。
+                        恢复码用于换设备或浏览器数据被清除后的密码重置。系统不会保存明文；同一浏览器曾成功登录过时，即使忘了恢复码，也可以使用本机凭证重置密码。
                     </div>
                     <div id="accountRecoveryCodeBox" class="account-recovery-code-box hidden">
                         <code id="accountRecoveryCodeValue" class="account-recovery-code-value"></code>
@@ -6062,7 +6062,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=password-recovery-v1-20261006"></script>
+<script src="/static/script.js?v=password-recovery-v2-20261006"></script>
 
 </body>
 </html>
