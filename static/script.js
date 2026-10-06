@@ -11,6 +11,7 @@ const FALLBACK_API_CONTEXT_MESSAGES = 12;
 
 const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
 const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
+const RECOVERY_DEVICE_STORAGE_KEY = "discrete_math_ai_recovery_devices_v1";
 const CLOUD_SYNC_DEBOUNCE_MS = 900;
 let accountState = {
     configured: null,
@@ -362,7 +363,7 @@ async function discardAppearanceDraft() {
     appearanceDraftDirty = false;
     appearanceDraftOriginalSettings = null;
 
-    // 背景图片也回到 IndexedDB 中最后一次“应用”保存的版本。
+    // 背景图片也回到 IndexedDB 中最后一次“确认”保存的版本。
     await loadAppearanceBackground();
 }
 
@@ -410,7 +411,7 @@ async function applyAppearanceDraft() {
     appearanceDraftOriginalSettings = null;
 
     document.getElementById("appearanceModal")?.classList.add("hidden");
-    showCopyToast("外观设置已应用");
+    showCopyToast("外观设置已确认");
 }
 
 function openAppearanceDatabase() {
@@ -872,6 +873,106 @@ function clearCloudSyncMeta() {
     try {
         localStorage.removeItem(CLOUD_SYNC_META_KEY);
     } catch (_error) {}
+}
+
+function recoveryDeviceUsernameKey(username) {
+    return String(username || "").trim().toLocaleLowerCase();
+}
+
+function readRecoveryDeviceTokens() {
+    try {
+        const parsed = JSON.parse(
+            localStorage.getItem(RECOVERY_DEVICE_STORAGE_KEY) || "{}"
+        );
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function getRecoveryDeviceToken(username) {
+    const key = recoveryDeviceUsernameKey(username);
+    if (!key) return "";
+    const tokens = readRecoveryDeviceTokens();
+    return typeof tokens[key] === "string" ? tokens[key] : "";
+}
+
+function saveRecoveryDeviceToken(username, token) {
+    const key = recoveryDeviceUsernameKey(username);
+    const value = String(token || "").trim();
+    if (!key || !value) return;
+    try {
+        const tokens = readRecoveryDeviceTokens();
+        tokens[key] = value;
+        localStorage.setItem(
+            RECOVERY_DEVICE_STORAGE_KEY,
+            JSON.stringify(tokens)
+        );
+    } catch (_error) {
+        // 本机恢复凭证保存失败不影响正常登录。
+    }
+}
+
+function removeRecoveryDeviceToken(username) {
+    const key = recoveryDeviceUsernameKey(username);
+    if (!key) return;
+    try {
+        const tokens = readRecoveryDeviceTokens();
+        delete tokens[key];
+        localStorage.setItem(
+            RECOVERY_DEVICE_STORAGE_KEY,
+            JSON.stringify(tokens)
+        );
+    } catch (_error) {}
+}
+
+async function ensureRecoveryDeviceToken() {
+    if (!accountState.authenticated || !accountState.username) return;
+    if (getRecoveryDeviceToken(accountState.username)) return;
+
+    try {
+        const { data } = await accountFetch("/auth/recovery-device", {
+            method:"POST",
+            body:JSON.stringify({})
+        });
+        if (data?.recoveryDeviceToken) {
+            saveRecoveryDeviceToken(
+                accountState.username,
+                data.recoveryDeviceToken
+            );
+        }
+    } catch (error) {
+        console.warn("本机恢复凭证初始化失败：", error);
+    }
+}
+
+function clearLoggedOutWorkspace() {
+    // 退出账号后只清空当前可见学习工作区；外观设置和本机恢复凭证保留。
+    sessions = [];
+    currentId = null;
+    learningState = createEmptyLearningState();
+
+    try {
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({ sessions:[], currentId:null })
+        );
+        localStorage.setItem(
+            LEARNING_STORAGE_KEY,
+            JSON.stringify(learningState)
+        );
+    } catch (_error) {}
+
+    const input = document.getElementById("text");
+    if (input) input.value = "";
+
+    wrongBookFilter = "all";
+    wrongBookSearch = "";
+    wrongBookSort = "recent";
+    knowledgeGraphHistoryMessageIndex = null;
+    knowledgeGraphSelectedNodeId = "";
+
+    renderAll();
 }
 
 function collectCloudSnapshot() {
@@ -1376,6 +1477,12 @@ async function submitAccountAuth(mode) {
         accountState.authenticated = true;
         accountState.username = String(data.user?.username || username);
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        if (data.recoveryDeviceToken) {
+            saveRecoveryDeviceToken(
+                accountState.username,
+                data.recoveryDeviceToken
+            );
+        }
         accountState.revision = Number(data.revision || 0);
         accountState.status = "同步中…";
         writeCloudSyncMeta({
@@ -1398,7 +1505,7 @@ async function submitAccountAuth(mode) {
                 accountState.hasRecoveryCode = true;
                 revealAccountRecoveryCode(
                     data.recoveryCode,
-                    "注册成功。请保存恢复码；以后忘记密码时需要它。"
+                    "注册成功。恢复码用于换设备时重置密码，请妥善保存；本浏览器也已建立本机恢复凭证。"
                 );
             }
         } else {
@@ -1460,11 +1567,20 @@ async function recoverAccountPassword() {
 
     const username = usernameInput?.value?.trim() || "";
     const recoveryCode = codeInput?.value?.trim() || "";
+    const recoveryDeviceToken = getRecoveryDeviceToken(username);
     const newPassword = passwordInput?.value || "";
     const confirmPassword = confirmInput?.value || "";
 
-    if (!username || !recoveryCode || !newPassword || !confirmPassword) {
-        setAccountRecoverMessage("请把用户名、恢复码和新密码填写完整。", true);
+    if (!username || !newPassword || !confirmPassword) {
+        setAccountRecoverMessage("请把用户名和新密码填写完整。", true);
+        return;
+    }
+    if (!recoveryCode && !recoveryDeviceToken) {
+        setAccountRecoverMessage(
+            "这个浏览器没有该账号的本机凭证，请填写恢复码。",
+            true
+        );
+        codeInput?.focus();
         return;
     }
     if (newPassword.length < 6 || newPassword.length > 128) {
@@ -1488,6 +1604,7 @@ async function recoverAccountPassword() {
             body:JSON.stringify({
                 username,
                 recoveryCode,
+                recoveryDeviceToken,
                 newPassword
             })
         });
@@ -1496,6 +1613,12 @@ async function recoverAccountPassword() {
         accountState.authenticated = true;
         accountState.username = String(data.user?.username || username);
         accountState.hasRecoveryCode = true;
+        if (data.recoveryDeviceToken) {
+            saveRecoveryDeviceToken(
+                accountState.username,
+                data.recoveryDeviceToken
+            );
+        }
         accountState.revision = 0;
         accountState.status = "同步中…";
         accountState.syncing = false;
@@ -1509,13 +1632,16 @@ async function recoverAccountPassword() {
         renderAccountUi();
         revealAccountRecoveryCode(
             data.recoveryCode,
-            "密码已重置并自动登录。旧恢复码已经失效，请保存这枚新的恢复码。"
+            "密码已重置并自动登录。旧恢复码已失效，请保存新的恢复码；本浏览器的恢复凭证也已更新。"
         );
         showCopyToast("密码已重置，已登录");
         await resolveInitialCloudSync(false);
     } catch (error) {
         accountState.syncing = false;
-        setAccountRecoverMessage(error?.message || "重置密码失败，请检查恢复码。", true);
+        setAccountRecoverMessage(
+            error?.message || "重置密码失败，请检查验证信息。",
+            true
+        );
         renderAccountUi();
     }
 }
@@ -1527,7 +1653,7 @@ async function logoutAccount() {
     if (meta.username === accountState.username && meta.dirty) {
         const synced = await pushCloudSnapshot(false);
         if (!synced && !window.confirm(
-            "本设备还有尚未同步到云端的数据。\n\n仍然退出登录吗？本地数据会保留。"
+            "本设备还有尚未同步到云端的数据。\n\n仍然退出登录吗？退出后的页面会清空，当前内容只会保留一份本机备份。"
         )) {
             return;
         }
@@ -1550,6 +1676,9 @@ async function logoutAccount() {
         return;
     }
 
+    // 退出前留一份本机备份，但退出后的可见工作区必须为空。
+    backupLocalSnapshot("退出登录前的本机数据");
+
     accountState.authenticated = false;
     accountState.username = "";
     accountState.hasRecoveryCode = false;
@@ -1561,6 +1690,8 @@ async function logoutAccount() {
         clearTimeout(cloudSyncTimer);
         cloudSyncTimer = 0;
     }
+
+    clearLoggedOutWorkspace();
     renderAccountUi();
     closeAccountModal();
     showCopyToast("已退出登录");
@@ -1569,6 +1700,7 @@ async function logoutAccount() {
 async function deleteAccount() {
     if (!accountState.authenticated || accountState.syncing) return;
 
+    const deletedUsername = accountState.username;
     const passwordInput = document.getElementById("accountDeletePassword");
     const password = passwordInput?.value || "";
     if (!password) {
@@ -1600,6 +1732,7 @@ async function deleteAccount() {
         return;
     }
 
+    removeRecoveryDeviceToken(deletedUsername);
     accountState.authenticated = false;
     accountState.username = "";
     accountState.hasRecoveryCode = false;
@@ -1690,7 +1823,15 @@ async function initAccountSystem() {
         renderAccountUi();
 
         if (accountState.authenticated) {
+            await ensureRecoveryDeviceToken();
             await resolveInitialCloudSync(false);
+        } else {
+            const staleMeta = readCloudSyncMeta();
+            if (staleMeta.username) {
+                backupLocalSnapshot("登录状态失效前的本机数据");
+                clearCloudSyncMeta();
+                clearLoggedOutWorkspace();
+            }
         }
     } catch (error) {
         console.warn("读取账号状态失败：", error);
