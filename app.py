@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import secrets
 import threading
 import time
 from datetime import timedelta
@@ -394,9 +395,16 @@ def _ensure_auth_schema():
                             username VARCHAR(32) NOT NULL,
                             username_key VARCHAR(64) NOT NULL UNIQUE,
                             password_hash TEXT NOT NULL,
+                            recovery_code_hash TEXT,
+                            recovery_code_created_at TIMESTAMPTZ,
+                            auth_version BIGINT NOT NULL DEFAULT 1,
                             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                         )
                     """)
+                    # 兼容已经存在的账号表：部署后自动补列，不需要手工迁移数据库。
+                    cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS recovery_code_hash TEXT")
+                    cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS recovery_code_created_at TIMESTAMPTZ")
+                    cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS auth_version BIGINT NOT NULL DEFAULT 1")
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS dm_user_data (
                             user_id BIGINT PRIMARY KEY
@@ -411,6 +419,24 @@ def _ensure_auth_schema():
         except Exception as exc:
             print(f"账号数据库初始化失败：{repr(exc)}")
             return False
+
+
+RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def _new_recovery_code():
+    # 16 个无歧义字符约 80 bit 熵；DM 前缀便于用户识别。
+    raw = "".join(secrets.choice(RECOVERY_CODE_ALPHABET) for _ in range(16))
+    return "DM-" + "-".join(raw[index:index + 4] for index in range(0, 16, 4))
+
+
+def _normalize_recovery_code(value):
+    return re.sub(r"[^A-Za-z0-9]", "", str(value or "")).upper()
+
+
+def _valid_recovery_code(value):
+    normalized = _normalize_recovery_code(value)
+    return bool(re.fullmatch(r"DM[A-Z2-9]{16}", normalized))
 
 
 def _normalize_auth_credentials(payload):
@@ -437,10 +463,28 @@ def _current_auth_user():
         with _auth_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, username FROM dm_users WHERE id = %s",
+                    """
+                    SELECT id, username, recovery_code_hash, auth_version
+                    FROM dm_users
+                    WHERE id = %s
+                    """,
                     (user_id,),
                 )
-                return cur.fetchone()
+                user = cur.fetchone()
+                if not user:
+                    return None
+
+                current_version = int(user.get("auth_version") or 1)
+                session_version = session.get("auth_version")
+                if isinstance(session_version, int):
+                    if session_version != current_version:
+                        session.clear()
+                        return None
+                else:
+                    # 兼容本功能上线前签发的旧登录 Cookie。
+                    session["auth_version"] = current_version
+
+                return user
     except Exception as exc:
         print(f"读取登录用户失败：{repr(exc)}")
         return None
@@ -493,6 +537,7 @@ def auth_me():
         "configured": True,
         "authenticated": True,
         "user": {"username": user["username"]},
+        "hasRecoveryCode": bool(user.get("recovery_code_hash")),
     })
 
 
@@ -510,17 +555,25 @@ def auth_register():
         return jsonify({"ok": False, "error": error}), 400
     password = str((request.get_json(silent=True) or {}).get("password") or "")
     password_hash = generate_password_hash(password, method="scrypt")
+    recovery_code = _new_recovery_code()
+    recovery_code_hash = generate_password_hash(
+        _normalize_recovery_code(recovery_code),
+        method="scrypt",
+    )
 
     try:
         with _auth_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO dm_users (username, username_key, password_hash)
-                    VALUES (%s, %s, %s)
-                    RETURNING id, username
+                    INSERT INTO dm_users (
+                        username, username_key, password_hash,
+                        recovery_code_hash, recovery_code_created_at
+                    )
+                    VALUES (%s, %s, %s, %s, NOW())
+                    RETURNING id, username, auth_version
                     """,
-                    (username, username_key, password_hash),
+                    (username, username_key, password_hash, recovery_code_hash),
                 )
                 user = cur.fetchone()
                 cur.execute(
@@ -535,6 +588,7 @@ def auth_register():
 
     session.clear()
     session["user_id"] = int(user["id"])
+    session["auth_version"] = int(user.get("auth_version") or 1)
     session.permanent = True
     return jsonify({
         "ok": True,
@@ -542,6 +596,9 @@ def auth_register():
         "authenticated": True,
         "user": {"username": user["username"]},
         "revision": 0,
+        "hasRecoveryCode": True,
+        # 明文恢复码只在创建/重置时返回一次，数据库只保存 scrypt 哈希。
+        "recoveryCode": recovery_code,
     })
 
 
@@ -564,7 +621,7 @@ def auth_login():
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT id, username, password_hash
+                    SELECT id, username, password_hash, recovery_code_hash, auth_version
                     FROM dm_users
                     WHERE username_key = %s
                     """,
@@ -580,12 +637,157 @@ def auth_login():
 
     session.clear()
     session["user_id"] = int(user["id"])
+    session["auth_version"] = int(user.get("auth_version") or 1)
     session.permanent = True
     return jsonify({
         "ok": True,
         "configured": True,
         "authenticated": True,
         "user": {"username": user["username"]},
+        "hasRecoveryCode": bool(user.get("recovery_code_hash")),
+    })
+
+
+@app.route("/auth/recovery-code", methods=["POST"])
+def auth_recovery_code():
+    """已登录用户生成/重置恢复码；明文只返回这一次。"""
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not _auth_rate_allowed("recovery-code"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    user = _current_auth_user()
+    if not user:
+        session.clear()
+        return jsonify({"ok": False, "error": "请先登录。"}), 401
+
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    password = str(payload.get("password") or "")
+    if not password:
+        return jsonify({"ok": False, "error": "请输入当前密码。"}), 400
+
+    recovery_code = _new_recovery_code()
+    recovery_hash = generate_password_hash(
+        _normalize_recovery_code(recovery_code),
+        method="scrypt",
+    )
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT password_hash FROM dm_users WHERE id = %s",
+                    (int(user["id"]),),
+                )
+                row = cur.fetchone()
+                if not row or not check_password_hash(row["password_hash"], password):
+                    return jsonify({"ok": False, "error": "密码不正确。"}), 401
+
+                cur.execute(
+                    """
+                    UPDATE dm_users
+                    SET recovery_code_hash = %s,
+                        recovery_code_created_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (recovery_hash, int(user["id"])),
+                )
+    except Exception as exc:
+        print(f"生成恢复码失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "生成恢复码失败，请稍后再试。"}), 500
+
+    return jsonify({
+        "ok": True,
+        "hasRecoveryCode": True,
+        "recoveryCode": recovery_code,
+    })
+
+
+@app.route("/auth/recover-password", methods=["POST"])
+def auth_recover_password():
+    """使用用户名 + 恢复码重置密码；成功后自动登录并轮换恢复码。"""
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not _auth_rate_allowed("recover-password"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    username = str(payload.get("username") or "").strip()
+    recovery_code = str(payload.get("recoveryCode") or "")
+    new_password = str(payload.get("newPassword") or "")
+
+    if not re.fullmatch(r"[\w.\-\u4e00-\u9fff]{2,32}", username, flags=re.UNICODE):
+        return jsonify({"ok": False, "error": "请输入正确的用户名。"}), 400
+    if len(new_password) < 6 or len(new_password) > 128:
+        return jsonify({"ok": False, "error": "新密码长度需为 6–128 个字符。"}), 400
+    if not _valid_recovery_code(recovery_code):
+        return jsonify({"ok": False, "error": "用户名或恢复码不正确。"}), 401
+
+    normalized_code = _normalize_recovery_code(recovery_code)
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, username, recovery_code_hash, auth_version
+                    FROM dm_users
+                    WHERE username_key = %s
+                    """,
+                    (username.casefold(),),
+                )
+                user = cur.fetchone()
+
+                # 不区分“用户名不存在”和“恢复码错误”，避免暴露账号是否存在。
+                if (
+                    not user
+                    or not user.get("recovery_code_hash")
+                    or not check_password_hash(user["recovery_code_hash"], normalized_code)
+                ):
+                    return jsonify({"ok": False, "error": "用户名或恢复码不正确。"}), 401
+
+                new_recovery_code = _new_recovery_code()
+                new_recovery_hash = generate_password_hash(
+                    _normalize_recovery_code(new_recovery_code),
+                    method="scrypt",
+                )
+                new_password_hash = generate_password_hash(new_password, method="scrypt")
+
+                cur.execute(
+                    """
+                    UPDATE dm_users
+                    SET password_hash = %s,
+                        recovery_code_hash = %s,
+                        recovery_code_created_at = NOW(),
+                        auth_version = auth_version + 1
+                    WHERE id = %s
+                    RETURNING id, username, auth_version
+                    """,
+                    (new_password_hash, new_recovery_hash, int(user["id"])),
+                )
+                updated = cur.fetchone()
+    except Exception as exc:
+        print(f"恢复密码失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "恢复密码失败，请稍后再试。"}), 500
+
+    session.clear()
+    session["user_id"] = int(updated["id"])
+    session["auth_version"] = int(updated.get("auth_version") or 1)
+    session.permanent = True
+
+    return jsonify({
+        "ok": True,
+        "authenticated": True,
+        "user": {"username": updated["username"]},
+        "hasRecoveryCode": True,
+        # 原恢复码已经失效；这里返回新的恢复码，仍然只显示一次。
+        "recoveryCode": new_recovery_code,
     })
 
 
