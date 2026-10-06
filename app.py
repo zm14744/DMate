@@ -2,6 +2,7 @@ import os
 import json
 import re
 import secrets
+import hashlib
 import threading
 import time
 from datetime import timedelta
@@ -414,6 +415,20 @@ def _ensure_auth_schema():
                             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                         )
                     """)
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS dm_recovery_devices (
+                            id BIGSERIAL PRIMARY KEY,
+                            user_id BIGINT NOT NULL
+                                REFERENCES dm_users(id) ON DELETE CASCADE,
+                            token_hash CHAR(64) NOT NULL UNIQUE,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                            last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        )
+                    """)
+                    cur.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_dm_recovery_devices_user_id
+                        ON dm_recovery_devices(user_id)
+                    """)
             _auth_schema_ready = True
             return True
         except Exception as exc:
@@ -437,6 +452,75 @@ def _normalize_recovery_code(value):
 def _valid_recovery_code(value):
     normalized = _normalize_recovery_code(value)
     return bool(re.fullmatch(r"DM[A-Z2-9]{16}", normalized))
+
+
+RECOVERY_DEVICE_MAX_PER_USER = 8
+
+
+def _new_recovery_device_token():
+    # 高熵随机令牌只保存在用户浏览器；服务器只保存 SHA-256 摘要。
+    return "RD-" + secrets.token_urlsafe(32)
+
+
+def _recovery_device_token_hash(value):
+    token = str(value or "").strip()
+    if not token.startswith("RD-") or len(token) < 24 or len(token) > 128:
+        return ""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _issue_recovery_device_token(cur, user_id):
+    token = _new_recovery_device_token()
+    token_hash = _recovery_device_token_hash(token)
+    cur.execute(
+        """
+        INSERT INTO dm_recovery_devices (user_id, token_hash)
+        VALUES (%s, %s)
+        """,
+        (int(user_id), token_hash),
+    )
+    # 一个账号最多保留最近 8 个可信浏览器凭证，避免长期无限增长。
+    cur.execute(
+        """
+        DELETE FROM dm_recovery_devices
+        WHERE user_id = %s
+          AND id NOT IN (
+              SELECT id
+              FROM dm_recovery_devices
+              WHERE user_id = %s
+              ORDER BY last_used_at DESC, created_at DESC, id DESC
+              LIMIT %s
+          )
+        """,
+        (int(user_id), int(user_id), RECOVERY_DEVICE_MAX_PER_USER),
+    )
+    return token
+
+
+def _verify_recovery_device_token(cur, user_id, token):
+    token_hash = _recovery_device_token_hash(token)
+    if not token_hash:
+        return False
+    cur.execute(
+        """
+        SELECT id
+        FROM dm_recovery_devices
+        WHERE user_id = %s AND token_hash = %s
+        """,
+        (int(user_id), token_hash),
+    )
+    row = cur.fetchone()
+    if not row:
+        return False
+    cur.execute(
+        """
+        UPDATE dm_recovery_devices
+        SET last_used_at = NOW()
+        WHERE id = %s
+        """,
+        (int(row["id"]),),
+    )
+    return True
 
 
 def _normalize_auth_credentials(payload):
@@ -580,6 +664,9 @@ def auth_register():
                     "INSERT INTO dm_user_data (user_id) VALUES (%s)",
                     (user["id"],),
                 )
+                recovery_device_token = _issue_recovery_device_token(
+                    cur, user["id"]
+                )
     except Exception as exc:
         if getattr(exc, "sqlstate", None) == "23505":
             return jsonify({"ok": False, "error": "这个用户名已经被使用。"}), 409
@@ -599,6 +686,8 @@ def auth_register():
         "hasRecoveryCode": True,
         # 明文恢复码只在创建/重置时返回一次，数据库只保存 scrypt 哈希。
         "recoveryCode": recovery_code,
+        # 本机恢复凭证保存在浏览器 localStorage，退出登录时不删除。
+        "recoveryDeviceToken": recovery_device_token,
     })
 
 
@@ -628,12 +717,14 @@ def auth_login():
                     (username_key,),
                 )
                 user = cur.fetchone()
+                if not user or not check_password_hash(user["password_hash"], password):
+                    return jsonify({"ok": False, "error": "用户名或密码不正确。"}), 401
+                recovery_device_token = _issue_recovery_device_token(
+                    cur, user["id"]
+                )
     except Exception as exc:
         print(f"登录查询失败：{repr(exc)}")
         return jsonify({"ok": False, "error": "登录失败，请稍后再试。"}), 500
-
-    if not user or not check_password_hash(user["password_hash"], password):
-        return jsonify({"ok": False, "error": "用户名或密码不正确。"}), 401
 
     session.clear()
     session["user_id"] = int(user["id"])
@@ -645,6 +736,34 @@ def auth_login():
         "authenticated": True,
         "user": {"username": user["username"]},
         "hasRecoveryCode": bool(user.get("recovery_code_hash")),
+        "recoveryDeviceToken": recovery_device_token,
+    })
+
+
+@app.route("/auth/recovery-device", methods=["POST"])
+def auth_recovery_device():
+    """为当前已登录浏览器签发一枚本机恢复凭证。"""
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not _auth_rate_allowed("recovery-device"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+
+    user = _current_auth_user()
+    if not user:
+        session.clear()
+        return jsonify({"ok": False, "error": "请先登录。"}), 401
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                token = _issue_recovery_device_token(cur, int(user["id"]))
+    except Exception as exc:
+        print(f"生成本机恢复凭证失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "本机恢复凭证生成失败。"}), 500
+
+    return jsonify({
+        "ok": True,
+        "recoveryDeviceToken": token,
     })
 
 
@@ -708,7 +827,14 @@ def auth_recovery_code():
 
 @app.route("/auth/recover-password", methods=["POST"])
 def auth_recover_password():
-    """使用用户名 + 恢复码重置密码；成功后自动登录并轮换恢复码。"""
+    """
+    重置密码。身份验证支持二选一：
+    1. 用户名 + 恢复码；
+    2. 用户名 + 当前浏览器此前登录后保存的本机恢复凭证。
+
+    第二种方式解决“恢复码也忘了，但仍在曾经登录过的设备上”的情况。
+    如果恢复码丢失且浏览器站点数据也已清除，则没有安全的自动恢复依据。
+    """
     if not AUTH_CONFIGURED or not _ensure_auth_schema():
         return _auth_unavailable_response()
     if not _auth_rate_allowed("recover-password"):
@@ -720,16 +846,25 @@ def auth_recover_password():
     payload = payload if isinstance(payload, dict) else {}
     username = str(payload.get("username") or "").strip()
     recovery_code = str(payload.get("recoveryCode") or "")
+    recovery_device_token = str(payload.get("recoveryDeviceToken") or "")
     new_password = str(payload.get("newPassword") or "")
 
     if not re.fullmatch(r"[\w.\-\u4e00-\u9fff]{2,32}", username, flags=re.UNICODE):
         return jsonify({"ok": False, "error": "请输入正确的用户名。"}), 400
     if len(new_password) < 6 or len(new_password) > 128:
         return jsonify({"ok": False, "error": "新密码长度需为 6–128 个字符。"}), 400
-    if not _valid_recovery_code(recovery_code):
-        return jsonify({"ok": False, "error": "用户名或恢复码不正确。"}), 401
 
     normalized_code = _normalize_recovery_code(recovery_code)
+    code_supplied = bool(recovery_code.strip())
+    device_supplied = bool(recovery_device_token.strip())
+
+    if code_supplied and not _valid_recovery_code(recovery_code):
+        return jsonify({"ok": False, "error": "恢复码格式不正确。"}), 400
+    if not code_supplied and not device_supplied:
+        return jsonify({
+            "ok": False,
+            "error": "当前浏览器没有可用的本机凭证，请填写恢复码。",
+        }), 401
 
     try:
         with _auth_connect() as conn:
@@ -744,20 +879,32 @@ def auth_recover_password():
                 )
                 user = cur.fetchone()
 
-                # 不区分“用户名不存在”和“恢复码错误”，避免暴露账号是否存在。
-                if (
-                    not user
-                    or not user.get("recovery_code_hash")
-                    or not check_password_hash(user["recovery_code_hash"], normalized_code)
-                ):
-                    return jsonify({"ok": False, "error": "用户名或恢复码不正确。"}), 401
+                verified = False
+                if user and code_supplied and user.get("recovery_code_hash"):
+                    verified = check_password_hash(
+                        user["recovery_code_hash"], normalized_code
+                    )
+
+                if user and not verified and device_supplied:
+                    verified = _verify_recovery_device_token(
+                        cur, int(user["id"]), recovery_device_token
+                    )
+
+                # 不区分用户名不存在、恢复码错误或本机凭证失效。
+                if not user or not verified:
+                    return jsonify({
+                        "ok": False,
+                        "error": "无法验证账号身份。请检查恢复码，或在曾登录过且未清除站点数据的浏览器上重试。",
+                    }), 401
 
                 new_recovery_code = _new_recovery_code()
                 new_recovery_hash = generate_password_hash(
                     _normalize_recovery_code(new_recovery_code),
                     method="scrypt",
                 )
-                new_password_hash = generate_password_hash(new_password, method="scrypt")
+                new_password_hash = generate_password_hash(
+                    new_password, method="scrypt"
+                )
 
                 cur.execute(
                     """
@@ -772,9 +919,18 @@ def auth_recover_password():
                     (new_password_hash, new_recovery_hash, int(user["id"])),
                 )
                 updated = cur.fetchone()
+
+                # 密码重置后撤销旧浏览器恢复凭证，只给当前浏览器重新签发。
+                cur.execute(
+                    "DELETE FROM dm_recovery_devices WHERE user_id = %s",
+                    (int(user["id"]),),
+                )
+                new_device_token = _issue_recovery_device_token(
+                    cur, int(user["id"])
+                )
     except Exception as exc:
-        print(f"恢复密码失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "恢复密码失败，请稍后再试。"}), 500
+        print(f"重置密码失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "重置密码失败，请稍后再试。"}), 500
 
     session.clear()
     session["user_id"] = int(updated["id"])
@@ -786,8 +942,9 @@ def auth_recover_password():
         "authenticated": True,
         "user": {"username": updated["username"]},
         "hasRecoveryCode": True,
-        # 原恢复码已经失效；这里返回新的恢复码，仍然只显示一次。
+        # 原恢复码和旧本机凭证均已失效。
         "recoveryCode": new_recovery_code,
+        "recoveryDeviceToken": new_device_token,
     })
 
 
