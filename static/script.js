@@ -898,6 +898,10 @@ function renderAccountUi() {
     const syncState = document.getElementById("accountSyncState");
     const login = document.getElementById("accountLogin");
     const register = document.getElementById("accountRegister");
+    const logout = document.getElementById("accountLogout");
+    const deleteOpen = document.getElementById("accountDeleteOpen");
+    const deleteConfirm = document.getElementById("accountDeleteConfirm");
+    const deleteCancel = document.getElementById("accountDeleteCancel");
 
     entry?.classList.toggle("is-authenticated", accountState.authenticated);
     entry?.classList.toggle("is-syncing", accountState.syncing);
@@ -917,6 +921,10 @@ function renderAccountUi() {
     const unavailable = accountState.configured === false;
     if (login) login.disabled = unavailable || accountState.syncing;
     if (register) register.disabled = unavailable || accountState.syncing;
+    if (logout) logout.disabled = accountState.syncing;
+    if (deleteOpen) deleteOpen.disabled = accountState.syncing;
+    if (deleteConfirm) deleteConfirm.disabled = accountState.syncing;
+    if (deleteCancel) deleteCancel.disabled = accountState.syncing;
 
     if (unavailable) {
         setAccountMessage("服务器还没有配置账号数据库。", true);
@@ -939,6 +947,25 @@ function openAccountModal() {
     renderAccountUi();
 }
 
+function setAccountDeleteMessage(message = "", isError = false) {
+    const box = document.getElementById("accountDeleteMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountDeletePanel(open) {
+    const panel = document.getElementById("accountDeletePanel");
+    const password = document.getElementById("accountDeletePassword");
+    panel?.classList.toggle("hidden", !open);
+    if (!open) {
+        if (password) password.value = "";
+        setAccountDeleteMessage("");
+    } else {
+        window.setTimeout(() => password?.focus(), 40);
+    }
+}
+
 function closeAccountModal() {
     const modal = document.getElementById("accountModal");
     if (!modal) return;
@@ -946,6 +973,7 @@ function closeAccountModal() {
     modal.setAttribute("aria-hidden", "true");
     const password = document.getElementById("accountPassword");
     if (password) password.value = "";
+    setAccountDeletePanel(false);
     setAccountMessage("");
 }
 
@@ -1183,8 +1211,17 @@ async function logoutAccount() {
 
     const meta = readCloudSyncMeta();
     if (meta.username === accountState.username && meta.dirty) {
-        await pushCloudSnapshot(false);
+        const synced = await pushCloudSnapshot(false);
+        if (!synced && !window.confirm(
+            "本设备还有尚未同步到云端的数据。\n\n仍然退出登录吗？本地数据会保留。"
+        )) {
+            return;
+        }
     }
+
+    accountState.syncing = true;
+    accountState.status = "正在退出…";
+    renderAccountUi();
 
     try {
         await accountFetch("/auth/logout", {
@@ -1192,7 +1229,11 @@ async function logoutAccount() {
             body:JSON.stringify({})
         });
     } catch (error) {
-        console.warn("退出登录请求失败：", error);
+        accountState.syncing = false;
+        accountState.status = "退出失败";
+        setAccountMessage(error?.message || "退出登录失败，请检查网络后重试。", true);
+        renderAccountUi();
+        return;
     }
 
     accountState.authenticated = false;
@@ -1201,9 +1242,63 @@ async function logoutAccount() {
     accountState.status = "";
     accountState.syncing = false;
     clearCloudSyncMeta();
+    if (cloudSyncTimer) {
+        clearTimeout(cloudSyncTimer);
+        cloudSyncTimer = 0;
+    }
     renderAccountUi();
     closeAccountModal();
     showCopyToast("已退出登录");
+}
+
+async function deleteAccount() {
+    if (!accountState.authenticated || accountState.syncing) return;
+
+    const passwordInput = document.getElementById("accountDeletePassword");
+    const password = passwordInput?.value || "";
+    if (!password) {
+        setAccountDeleteMessage("请输入当前密码。", true);
+        passwordInput?.focus();
+        return;
+    }
+
+    const confirmed = window.confirm(
+        "确定永久注销这个账号吗？\n\n账号和云端同步数据都会被删除，此操作无法撤销。\n本设备当前的本地学习数据会保留。"
+    );
+    if (!confirmed) return;
+
+    accountState.syncing = true;
+    accountState.status = "正在注销…";
+    setAccountDeleteMessage("正在注销账号…");
+    renderAccountUi();
+
+    try {
+        await accountFetch("/auth/delete-account", {
+            method:"POST",
+            body:JSON.stringify({ password })
+        });
+    } catch (error) {
+        accountState.syncing = false;
+        accountState.status = "";
+        setAccountDeleteMessage(error?.message || "注销账号失败，请稍后再试。", true);
+        renderAccountUi();
+        return;
+    }
+
+    accountState.authenticated = false;
+    accountState.username = "";
+    accountState.revision = 0;
+    accountState.status = "";
+    accountState.syncing = false;
+    clearCloudSyncMeta();
+    if (cloudSyncTimer) {
+        clearTimeout(cloudSyncTimer);
+        cloudSyncTimer = 0;
+    }
+    setAccountDeletePanel(false);
+    renderAccountUi();
+    closeAccountModal();
+    showCopyToast("账号已注销，本机数据已保留");
 }
 
 async function initAccountSystem() {
@@ -1213,6 +1308,10 @@ async function initAccountSystem() {
     const accountLogin = document.getElementById("accountLogin");
     const accountRegister = document.getElementById("accountRegister");
     const accountLogout = document.getElementById("accountLogout");
+    const accountDeleteOpen = document.getElementById("accountDeleteOpen");
+    const accountDeleteCancel = document.getElementById("accountDeleteCancel");
+    const accountDeleteConfirm = document.getElementById("accountDeleteConfirm");
+    const accountDeletePassword = document.getElementById("accountDeletePassword");
     const password = document.getElementById("accountPassword");
 
     accountBtn?.addEventListener("click", openAccountModal);
@@ -1220,6 +1319,12 @@ async function initAccountSystem() {
     accountLogin?.addEventListener("click", () => submitAccountAuth("login"));
     accountRegister?.addEventListener("click", () => submitAccountAuth("register"));
     accountLogout?.addEventListener("click", logoutAccount);
+    accountDeleteOpen?.addEventListener("click", () => setAccountDeletePanel(true));
+    accountDeleteCancel?.addEventListener("click", () => setAccountDeletePanel(false));
+    accountDeleteConfirm?.addEventListener("click", deleteAccount);
+    accountDeletePassword?.addEventListener("keydown", event => {
+        if (event.key === "Enter") deleteAccount();
+    });
     accountModal?.addEventListener("click", event => {
         if (event.target === accountModal) closeAccountModal();
     });
