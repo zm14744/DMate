@@ -197,8 +197,7 @@ CATEGORY_RULES = {
         "keywords": [
             "排列", "组合", "排列数", "组合数", "二项式", "二项式定理", "鸽巢",
             "鸽巢原理", "抽屉原理", "容斥", "容斥原理", "计数", "加法原理",
-            "乘法原理", "多重集合", "生成函数", "斯特林数", "第一类斯特林数", "第二类斯特林数",
-            "卡特兰数", "catalan", "polya", "pólya", "波利亚", "伯恩赛德", "burnside", "项链着色", "轮换着色",
+            "乘法原理", "多重集合", "生成函数",
         ],
         "points": {
             "基本计数原理": ["计数", "加法原理", "乘法原理"],
@@ -207,21 +206,18 @@ CATEGORY_RULES = {
             "鸽巢原理": ["鸽巢", "鸽巢原理", "抽屉原理"],
             "容斥原理": ["容斥", "容斥原理"],
             "生成函数": ["生成函数"],
-            "经典计数数列": ["斯特林数", "第一类斯特林数", "第二类斯特林数", "卡特兰数", "catalan"],
-            "群作用计数": ["polya", "pólya", "波利亚", "伯恩赛德", "burnside", "项链着色", "轮换着色"],
         },
     },
     "递推关系": {
         "keywords": [
             "递推", "递推关系", "递归关系", "特征方程", "齐次递推",
-            "非齐次递推", "初始条件", "递推式", "斐波那契", "fibonacci",
+            "非齐次递推", "初始条件", "递推式",
         ],
         "points": {
             "递推关系建模": ["递推", "递推关系", "递归关系", "递推式"],
             "线性齐次递推": ["齐次递推", "特征方程"],
             "非齐次递推": ["非齐次递推"],
             "初始条件": ["初始条件"],
-            "斐波那契递推": ["斐波那契", "fibonacci"],
         },
     },
     "图论": {
@@ -234,7 +230,6 @@ CATEGORY_RULES = {
             "kruskal", "prim", "根树", "二叉树", "叶子", "割点", "割边", "桥", "生成森林",
             "支配集", "覆盖集", "独立集", "简单图", "图化", "可图化", "简单图化", "可简单图化",
             "havel", "hakimi", "havel-hakimi", "握手定理", "度数列", "图序列", "实现度序列",
-            "色多项式", "chromatic polynomial", "prüfer", "prufer", "hall定理", "霍尔定理",
         ],
         "points": {
             "图的基本概念": ["无向图", "有向图", "顶点", "边集", "度数", "度序列", "度数列", "图论", "邻接表", "简单图", "图化", "可图化", "简单图化", "可简单图化", "havel", "hakimi", "havel-hakimi", "握手定理", "实现度序列"],
@@ -246,11 +241,11 @@ CATEGORY_RULES = {
             "欧拉图": ["欧拉", "欧拉路", "欧拉通路", "欧拉回路"],
             "哈密顿图": ["哈密顿", "哈密顿路", "哈密顿通路", "哈密顿回路"],
             "最短路": ["最短路", "最短路径", "dijkstra"],
-            "图着色": ["着色", "色数", "色多项式", "chromatic polynomial"],
+            "图着色": ["着色", "色数"],
             "平面图": ["平面图", "欧拉公式"],
             "支配集、覆盖集与独立集": ["支配集", "覆盖集", "点覆盖", "边覆盖", "独立集"],
-            "图匹配": ["匹配", "完美匹配", "二部图匹配", "hall定理", "霍尔定理"],
-            "树的基本性质": ["树", "无向树", "叶子", "prüfer", "prufer"],
+            "图匹配": ["匹配", "完美匹配", "二部图匹配"],
+            "树的基本性质": ["树", "无向树", "叶子"],
             "根树": ["根树", "有根树", "二叉树"],
             "生成树": ["生成树", "生成森林"],
             "最小生成树": ["最小生成树", "kruskal", "prim"],
@@ -260,14 +255,14 @@ CATEGORY_RULES = {
     "代数结构": {
         "keywords": [
             "代数系统", "代数结构", "半群", "幺半群", "群", "子群", "循环群",
-            "陪集", "拉格朗日定理", "同态", "同构", "环", "域", "格", "格论", "构成格", "分配格", "有界格", "布尔代数",
+            "陪集", "拉格朗日定理", "同态", "同构", "环", "域", "格", "布尔代数",
         ],
         "points": {
             "代数系统": ["代数系统", "代数结构", "半群", "幺半群"],
             "群与子群": ["群", "子群", "循环群", "陪集", "拉格朗日定理"],
             "同态与同构": ["同态", "同构"],
             "环与域": ["环", "域"],
-            "格与布尔代数": ["格", "格论", "构成格", "分配格", "有界格", "布尔代数"],
+            "格与布尔代数": ["格", "布尔代数"],
         },
     },
 }
@@ -281,11 +276,6 @@ NO_SOLUTION_PATTERNS = [
 FULL_SOLUTION_PATTERNS = [
     "给我答案", "直接给答案", "直接答案", "完整解析", "完整解答", "详细解答",
     "完整过程", "直接解出来", "直接做出来", "告诉我最终答案", "最终答案", "把答案给我",
-]
-
-EXERCISE_PATTERNS = [
-    "出题", "生成练习题", "给我一道题", "给几道题", "练习题", "随机出题",
-    "复测题", "再测一道", "同知识点复测", "错题复测",
 ]
 
 CHECK_PATTERNS = [
@@ -596,6 +586,11 @@ def _looks_like_exercise_request_text(text):
         value,
     ))
 
+def looks_like_exercise_request(text):
+    """对外统一的出题请求判定，供 app.py 与 teaching.py 共用。"""
+    return _looks_like_exercise_request_text(text)
+
+
 def _looks_like_generated_exercise_text(text):
     value = str(text or "").strip()
 
@@ -663,10 +658,10 @@ def _detect_mode(latest_text):
     # 答案诊断应优先于出题请求；错题复测回答也依赖这个优先级。
     if _contains_any(text, CHECK_PATTERNS):
         return "check_answer"
-    if (
-        _looks_like_exercise_request_text(latest_text)
-        or _contains_any(text, EXERCISE_PATTERNS)
-    ):
+    # 出题模式只接受经过“否定/元讨论过滤”的完整判定。
+    # 不能再用“出题/练习题”裸子串兜底，否则
+    # “不要再给我出题了 / 出题功能为什么有 bug”会被反向误判成出题请求。
+    if looks_like_exercise_request(latest_text):
         return "exercise"
     if any(marker.lower() in text for marker in _INTERNAL_IMAGE_MARKERS):
         return "hint"
@@ -732,16 +727,51 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="综合题")
         score += 2
 
     # 常见需要连续算法/结构判断的任务。
-    if any(
+    multi_step_keywords = (
+        "同构", "欧拉通路", "欧拉回路", "哈密顿",
+        "最短路", "最小生成树", "传递闭包",
+        "主析取范式", "主合取范式", "前束范式",
+        "生成函数", "非齐次递推", "矩阵树定理",
+        "rsa", "线性同余", "同余方程",
+    )
+    has_multi_step_topic = any(
         keyword in normalized
-        for keyword in (
-            "同构", "欧拉通路", "欧拉回路", "哈密顿",
-            "最短路", "最小生成树", "传递闭包",
-            "主析取范式", "主合取范式", "前束范式",
-            "生成函数", "非齐次递推", "矩阵树定理",
-            "rsa",
-        )
-    ):
+        for keyword in multi_step_keywords
+    )
+    if has_multi_step_topic:
+        score += 1
+
+    # 旧版大量“求最短路 / 判断同构 / 求主范式”只得到 1 分，
+    # 最终仍被判成简单，导致 AI 不启用中等题的 high reasoning。
+    # 当高级主题同时出现明确求解动作时，再加 1 分，使它至少进入中等。
+    explicit_action = bool(re.search(
+        r"(?:求|计算|判断|判定|证明|构造|画出|写出|列出|找出|确定|给出|求解)",
+        normalized,
+    ))
+
+    if has_multi_step_topic and explicit_action:
+        score += 1
+
+    # 有些自然题干不会直接出现“非齐次递推/矩阵树定理”等大词，
+    # 但分类器已经可靠落到了这些知识点。用知识点作为第二信号，
+    # 只判断“是否属于典型多步任务”，不按知识点数量机械抬难度。
+    advanced_points = {
+        "关系闭包", "范式", "前束范式", "线性同余方程",
+        "RSA公钥密码", "生成函数", "非齐次递推",
+        "最短路", "最小生成树", "矩阵树定理",
+    }
+    has_advanced_point = any(point in advanced_points for point in points)
+    if has_advanced_point and not has_multi_step_topic:
+        score += 1
+        if explicit_action:
+            score += 1
+
+    # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
+    if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
+        score += 1
+    if re.search(r"(?:给出|写出|构造).{0,12}(?:同构)?映射", normalized):
+        score += 1
+    if re.search(r"(?:并|同时|再).{0,16}(?:画|构造|证明|给出|写出)", normalized):
         score += 1
 
     # 不按 knowledge_points 的数量直接抬难度。该列表会自动带出前置/相关点，
@@ -776,10 +806,31 @@ def _score_categories(text):
 
     for category, rule in CATEGORY_RULES.items():
         score = 0
-        for keyword in rule["keywords"]:
+
+        # 分类不仅看大类关键词，也使用各知识点自身的别名。
+        # 旧版只扫描 rule["keywords"]，会漏掉“色数 / 组合数 / 关系的幂”等
+        # 已经存在于 point 规则、却没有重复写进大类关键词的自然表达。
+        keywords = []
+        seen = set()
+        for keyword in rule.get("keywords", []):
+            if isinstance(keyword, str) and keyword not in seen:
+                seen.add(keyword)
+                keywords.append(keyword)
+        for point_keywords in (rule.get("points") or {}).values():
+            for keyword in point_keywords or []:
+                if isinstance(keyword, str) and keyword not in seen:
+                    seen.add(keyword)
+                    keywords.append(keyword)
+
+        for keyword in keywords:
             if keyword.lower() in normalized:
                 score += _keyword_weight(keyword)
         scores[category] = score
+
+    # 量词符号本身就是谓词逻辑的强信号，不能被“否定/公式”等
+    # 命题逻辑通用词压过去。
+    if "∀" in normalized or "∃" in normalized:
+        scores["谓词逻辑"] = scores.get("谓词逻辑", 0) + 8
 
     # “同构”同时存在于代数结构与图论语境。出现明确图语境时，
     # 应判作图论，不让“同构”这个单词把图同构误拉到代数结构。
@@ -795,19 +846,6 @@ def _score_categories(text):
             0,
             scores.get("代数结构", 0) - _keyword_weight("同构"),
         )
-
-    # 同一术语可能跨模块出现，按更具体的上下文修正。
-    # “生成函数”既属于组合工具，也常用于解递推；只要题干明确出现递推/数列语境，优先判递推关系。
-    if re.search(r"(?:递推|递归关系|递推式|斐波那契|fibonacci).{0,36}生成函数|生成函数.{0,36}(?:递推|递归关系|递推式|斐波那契|fibonacci)", normalized, re.IGNORECASE):
-        scores["递推关系"] = scores.get("递推关系", 0) + 10
-
-    # Pólya / Burnside 的着色是组合计数语境，不应被“着色”一词误拉到图论。
-    if re.search(r"polya|pólya|波利亚|伯恩赛德|burnside|项链着色|轮换着色", normalized, re.IGNORECASE):
-        scores["计数与组合"] = scores.get("计数与组合", 0) + 12
-
-    # “偏序集是否构成格”是在格/代数结构层面判断，不应仅因“偏序”落到关系分类。
-    if re.search(r"(?:偏序|偏序集).{0,24}(?:构成格|是格|为格|格论)|(?:构成格|是格|为格|格论).{0,24}(?:偏序|偏序集)", normalized):
-        scores["代数结构"] = scores.get("代数结构", 0) + 10
 
     return scores
 
@@ -829,11 +867,99 @@ def _extract_points(text, category):
             scored.append((hit_score, point))
 
     scored.sort(key=lambda item: (-item[0], item[1]))
-    return [point for _score, point in scored[:4]]
+    result = [point for _score, point in scored[:4]]
+    if result:
+        return result
+
+    compact = re.sub(r"\s+", "", normalized)
+
+    # 结构化兜底只在没有任何 point 关键词时启用。
+    if category == "命题逻辑" and re.search(r"(?:^|[^a-z])(?:cnf|dnf)(?:$|[^a-z])", normalized, flags=re.IGNORECASE):
+        return ["范式"]
+    if category == "谓词逻辑":
+        if "∀" in normalized or "∃" in normalized:
+            if "否定" in normalized:
+                return ["量词推理与否定", "量词"]
+            return ["量词"]
+        if re.search(r"(?:符号化|形式化|翻译成|写成).{0,20}(?:公式|逻辑式)?", compact):
+            return ["量词", "谓词与个体域"]
+    if category == "集合与关系":
+        if re.search(r"[A-Za-z](?:×|\\times|x)[A-Za-z]", compact):
+            return ["笛卡尔积与关系"]
+        if re.search(r"(?:^|[^a-z])r(?:\^\d+|[²³⁴⁵⁶⁷⁸⁹])", compact):
+            return ["关系运算"]
+    if category == "初等数论" and re.search(r"(?:φ|\\varphi|\\phi)\(?\d+", compact):
+        return ["欧拉定理与费马小定理"]
+    if category == "计数与组合":
+        if "生日相同" in compact or "生日一样" in compact:
+            return ["鸽巢原理"]
+        if re.search(r"(?:排成一排|排队|排列|从\d+.*(?:选|取)\d+|二进制串)", compact):
+            return ["排列与组合"]
+    if category == "递推关系" and re.search(r"a(?:_?\{?n\}?|ₙ)=", compact, flags=re.IGNORECASE):
+        # 常数项/额外项存在时按非齐次优先，否则至少能落到递推建模。
+        if re.search(r"a(?:_?\{?n\}?|ₙ)=.{0,80}a(?:_?\{?n[-−]\d+\}?|ₙ).*(?:[+−-]\d+|n)", compact, flags=re.IGNORECASE):
+            return ["非齐次递推"]
+        return ["递推关系建模"]
+    if category == "图论":
+        if "色数" in compact:
+            return ["图着色"]
+        if re.search(r"(?:^|[^a-z])(?:k|c|p)(?:_?\{?\d+\}?|_?n)(?:$|[^a-z])", normalized, flags=re.IGNORECASE):
+            return ["图的基本概念"]
+
+    return []
 
 
 def _recover_discrete_math_category(text, scores):
     normalized = _normalize(text)
+    compact = re.sub(r"\s+", "", normalized)
+
+    # 先补“教材词没有直接出现，但结构上高度明确”的自然表达/数学符号。
+    # 这些规则只在常规关键词完全没有命中时使用，不覆盖高置信度分类。
+    if re.search(r"(?:^|[^a-z])(?:cnf|dnf)(?:$|[^a-z])", normalized, flags=re.IGNORECASE):
+        return "命题逻辑"
+
+    if (
+        re.search(r"(?:符号化|形式化|翻译成(?:谓词|逻辑)?公式|写成(?:谓词|逻辑)?公式)", compact)
+        and re.search(r"(?:所有|任意|每个|存在|有的|至少一个|没有一个|任何)", compact)
+    ):
+        return "谓词逻辑"
+
+    # A×B / A\times B 这类纯符号集合题。
+    if (
+        re.search(r"[A-Za-z]\s*(?:×|\\times|x)\s*[A-Za-z]", normalized)
+        and ("{" in text or "集合" in normalized or "笛卡尔" in normalized)
+    ):
+        return "集合与关系"
+
+    # “求 R² / R^3”在离散数学语境中通常是关系的幂。
+    if re.search(r"(?:^|[^a-z])r\s*(?:\^\s*\d+|[²³⁴⁵⁶⁷⁸⁹])", normalized):
+        return "集合与关系"
+
+    # 欧拉函数常直接写成 φ(n) / \varphi(n)。
+    if re.search(r"(?:φ|\\varphi|\\phi)\s*\(\s*\d+", normalized):
+        return "初等数论"
+
+    # 常见自然语言计数题：不强迫用户必须写“排列/组合/鸽巢”术语。
+    if re.search(r"(?:本|个|名|人|物).{0,10}(?:不同).{0,10}(?:排成一排|排队|排列)", compact):
+        return "计数与组合"
+    if re.search(r"从\d+(?:名|个)?.{0,8}(?:中)?(?:选|挑|取)\d+(?:名|个)?", compact):
+        return "计数与组合"
+    if "生日相同" in compact or "生日一样" in compact:
+        return "计数与组合"
+    if re.search(r"二进制串.{0,18}(?:恰有|正好有|包含)\d+个?1", compact):
+        return "计数与组合"
+
+    # 没写“递推”二字，但式子本身已经是 a_n 与前项的递推关系。
+    if re.search(
+        r"a(?:_?\{?n\}?|ₙ)\s*=.{0,80}a(?:_?\{?n\s*[-−]\s*\d+\}?|ₙ[₋-]?\d*)",
+        compact,
+        flags=re.IGNORECASE,
+    ):
+        return "递推关系"
+
+    # K5 / K_5 / K_{5} / C_n / P_n 等标准图记号。
+    if re.search(r"(?:^|[^a-z])(?:k|c|p)\s*(?:_?\{?\d+\}?|_?n)(?:$|[^a-z])", normalized, flags=re.IGNORECASE):
+        return "图论"
 
     fallback_patterns = [
         ("图论", [
@@ -874,7 +1000,10 @@ def _classify_content(text):
             "related_categories": [],
             "knowledge_points": _extract_points(text, recovered) if recovered in CATEGORY_RULES else [],
             "confidence": "低" if recovered == "待识别" else "中",
-            "score": 0,
+            # recover 规则本身已经提供了结构证据。给明确恢复出的分类一个
+            # 最低有效分，使“什么是 / 如何 / 纯符号题”可以成为新的当前题，
+            # 而不是被继续绑定到上一道题。
+            "score": 0 if recovered == "待识别" else 1,
         }
 
     second_score = ordered[1][1] if len(ordered) > 1 else 0
@@ -1453,7 +1582,7 @@ def _looks_like_user_question_for_context(text):
     if not value:
         return False
 
-    if _is_question_navigation_followup(value) or _looks_like_exercise_request_text(value):
+    if _is_question_navigation_followup(value) or looks_like_exercise_request(value):
         return False
 
     if _detect_mode(value) == "check_answer":
