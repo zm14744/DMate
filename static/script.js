@@ -1138,11 +1138,50 @@ function setAccountRecoveryCodePanel(open) {
 }
 
 function revealRegistrationRecoveryCode(code) {
+    const value = String(code || "").trim();
+    if (!value) return;
+
+    const panel = document.getElementById("accountRegistrationRecoveryPanel");
+    const codeNode = document.getElementById("accountRegistrationRecoveryCodeValue");
+    if (codeNode) codeNode.textContent = value;
+    panel?.classList.remove("hidden");
+
+    // 注册后立即把可复制区域滚进视野；不用浏览器 alert，
+    // 避免恢复码无法选择/复制。
+    window.setTimeout(() => {
+        panel?.scrollIntoView({ behavior:"smooth", block:"nearest" });
+        codeNode?.focus({ preventScroll:true });
+    }, 40);
+}
+
+function clearRegistrationRecoveryCode() {
+    const panel = document.getElementById("accountRegistrationRecoveryPanel");
+    const codeNode = document.getElementById("accountRegistrationRecoveryCodeValue");
+    panel?.classList.add("hidden");
+    if (codeNode) codeNode.textContent = "";
+}
+
+async function copyRegistrationRecoveryCode() {
+    const codeNode = document.getElementById("accountRegistrationRecoveryCodeValue");
+    const code = String(codeNode?.textContent || "").trim();
     if (!code) return;
-    window.alert(
-        "注册成功，你的恢复码是：\n\n" + code +
-        "\n\n请保存好。以后忘记密码时，可以用用户名和恢复码重置密码。登录后也可以输入当前密码自行修改恢复码。"
-    );
+
+    const ok = await writeRichClipboard({ text:code, html:"" });
+    if (ok) {
+        showCopyToast("恢复码已复制");
+        return;
+    }
+
+    // 极老浏览器兜底：至少把文本选中，用户可以手动复制。
+    try {
+        const range = document.createRange();
+        range.selectNodeContents(codeNode);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        codeNode.focus();
+        showCopyToast("已选中恢复码，请手动复制");
+    } catch (_error) {}
 }
 
 function setAccountDeleteMessage(message = "", isError = false) {
@@ -1410,6 +1449,7 @@ async function submitAccountAuth(mode) {
                 revealRegistrationRecoveryCode(data.recoveryCode);
             }
         } else {
+            clearRegistrationRecoveryCode();
             showCopyToast("登录成功");
         }
 
@@ -1658,6 +1698,8 @@ async function initAccountSystem() {
     const accountRecoverCancel = document.getElementById("accountRecoverCancel");
     const accountRecoverConfirm = document.getElementById("accountRecoverConfirm");
     const accountRecoverPasswordConfirm = document.getElementById("accountRecoverPasswordConfirm");
+    const accountRegistrationRecoveryCopy = document.getElementById("accountRegistrationRecoveryCopy");
+    const accountRegistrationRecoveryDone = document.getElementById("accountRegistrationRecoveryDone");
     const accountRecoveryCodeOpen = document.getElementById("accountRecoveryCodeOpen");
     const accountRecoveryCodeCancel = document.getElementById("accountRecoveryCodeCancel");
     const accountRecoveryCodeGenerate = document.getElementById("accountRecoveryCodeGenerate");
@@ -1680,6 +1722,8 @@ async function initAccountSystem() {
     accountRecoverPasswordConfirm?.addEventListener("keydown", event => {
         if (event.key === "Enter") recoverAccountPassword();
     });
+    accountRegistrationRecoveryCopy?.addEventListener("click", copyRegistrationRecoveryCode);
+    accountRegistrationRecoveryDone?.addEventListener("click", clearRegistrationRecoveryCode);
     accountRecoveryCodeOpen?.addEventListener("click", () => setAccountRecoveryCodePanel(true));
     accountRecoveryCodeCancel?.addEventListener("click", () => setAccountRecoveryCodePanel(false));
     accountRecoveryCodeGenerate?.addEventListener("click", generateAccountRecoveryCode);
