@@ -4,6 +4,11 @@ import re
 import secrets
 import threading
 import time
+import smtplib
+import ssl
+import hmac
+import hashlib
+from email.message import EmailMessage
 from datetime import timedelta
 from collections import defaultdict, deque
 
@@ -98,9 +103,28 @@ AUTH_CONFIGURED = bool(
     and AUTH_DATABASE_DSN
     and AUTH_SECRET_KEY
 )
+
+SMTP_HOST = (os.environ.get("SMTP_HOST") or "smtp.qq.com").strip()
+try:
+    SMTP_PORT = int((os.environ.get("SMTP_PORT") or "465").strip())
+except (TypeError, ValueError):
+    SMTP_PORT = 465
+SMTP_USERNAME = (os.environ.get("SMTP_USERNAME") or "").strip()
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD") or ""
+SMTP_FROM_EMAIL = (os.environ.get("SMTP_FROM_EMAIL") or SMTP_USERNAME).strip()
+SMTP_FROM_NAME = (os.environ.get("SMTP_FROM_NAME") or "离散数学辅学系统").strip()
+SMTP_USE_SSL = _env_bool("SMTP_USE_SSL", True)
+EMAIL_DELIVERY_CONFIGURED = bool(
+    SMTP_HOST and SMTP_PORT and SMTP_USERNAME and SMTP_PASSWORD and SMTP_FROM_EMAIL
+)
+
 MAX_SYNC_JSON_BYTES = 5 * 1024 * 1024
 AUTH_RATE_LIMIT_WINDOW = 60
 AUTH_RATE_LIMIT_COUNT = 20
+EMAIL_CODE_TTL_SECONDS = 10 * 60
+EMAIL_CODE_RESEND_SECONDS = 60
+EMAIL_CODE_MAX_ATTEMPTS = 6
+EMAIL_CODE_MAX_PER_HOUR = 8
 _auth_schema_lock = threading.Lock()
 _auth_schema_ready = False
 _auth_rate_lock = threading.Lock()
@@ -394,6 +418,9 @@ def _ensure_auth_schema():
                             id BIGSERIAL PRIMARY KEY,
                             username VARCHAR(32) NOT NULL,
                             username_key VARCHAR(64) NOT NULL UNIQUE,
+                            email VARCHAR(254),
+                            email_key VARCHAR(254),
+                            email_verified_at TIMESTAMPTZ,
                             password_hash TEXT NOT NULL,
                             recovery_code_hash TEXT,
                             recovery_code_created_at TIMESTAMPTZ,
@@ -402,9 +429,17 @@ def _ensure_auth_schema():
                         )
                     """)
                     # 兼容已经存在的账号表：部署后自动补列，不需要手工迁移数据库。
+                    cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS email VARCHAR(254)")
+                    cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS email_key VARCHAR(254)")
+                    cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ")
                     cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS recovery_code_hash TEXT")
                     cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS recovery_code_created_at TIMESTAMPTZ")
                     cur.execute("ALTER TABLE dm_users ADD COLUMN IF NOT EXISTS auth_version BIGINT NOT NULL DEFAULT 1")
+                    cur.execute("""
+                        CREATE UNIQUE INDEX IF NOT EXISTS dm_users_email_key_unique
+                        ON dm_users(email_key)
+                        WHERE email_key IS NOT NULL
+                    """)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS dm_user_data (
                             user_id BIGINT PRIMARY KEY
@@ -414,6 +449,29 @@ def _ensure_auth_schema():
                             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                         )
                     """)
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS dm_email_codes (
+                            id BIGSERIAL PRIMARY KEY,
+                            purpose VARCHAR(16) NOT NULL,
+                            email VARCHAR(254) NOT NULL,
+                            email_key VARCHAR(254) NOT NULL,
+                            username_key VARCHAR(64),
+                            user_id BIGINT REFERENCES dm_users(id) ON DELETE CASCADE,
+                            code_digest VARCHAR(64) NOT NULL,
+                            attempts INTEGER NOT NULL DEFAULT 0,
+                            expires_at TIMESTAMPTZ NOT NULL,
+                            consumed_at TIMESTAMPTZ,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        )
+                    """)
+                    cur.execute("""
+                        CREATE INDEX IF NOT EXISTS dm_email_codes_lookup_idx
+                        ON dm_email_codes(purpose, email_key, created_at DESC)
+                    """)
+                    cur.execute("""
+                        CREATE INDEX IF NOT EXISTS dm_email_codes_user_idx
+                        ON dm_email_codes(user_id, created_at DESC)
+                    """)
             _auth_schema_ready = True
             return True
         except Exception as exc:
@@ -422,6 +480,7 @@ def _ensure_auth_schema():
 
 
 RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,189}\.[^@\s]{2,63}$")
 
 
 def _new_recovery_code():
@@ -462,17 +521,216 @@ def _recovery_code_matches(stored_hash, supplied):
         return False
 
 
-def _normalize_auth_credentials(payload):
-    payload = payload if isinstance(payload, dict) else {}
-    username = str(payload.get("username") or "").strip()
-    password = str(payload.get("password") or "")
-
+def _normalize_username(value):
+    username = str(value or "").strip()
     if not re.fullmatch(r"[\w.\-\u4e00-\u9fff]{2,32}", username, flags=re.UNICODE):
         return None, None, "用户名需为 2–32 个字符，只使用文字、数字、下划线、点或短横线。"
+    return username, username.casefold(), None
+
+
+def _normalize_email(value):
+    email = str(value or "").strip()
+    if len(email) > 254 or not EMAIL_RE.fullmatch(email):
+        return None, None, "请输入正确的邮箱地址。"
+    return email, email.casefold(), None
+
+
+def _normalize_auth_credentials(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    username, username_key, error = _normalize_username(payload.get("username"))
+    if error:
+        return None, None, error
+    password = str(payload.get("password") or "")
     if len(password) < 6 or len(password) > 128:
         return None, None, "密码长度需为 6–128 个字符。"
+    return username, username_key, None
 
-    return username, username.casefold(), None
+
+def _normalize_login_credentials(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    identifier = str(payload.get("identifier") or payload.get("username") or "").strip()
+    password = str(payload.get("password") or "")
+    if not identifier:
+        return None, None, None, "请输入用户名或邮箱。"
+    if len(password) < 6 or len(password) > 128:
+        return None, None, None, "密码长度需为 6–128 个字符。"
+
+    if "@" in identifier:
+        email, email_key, error = _normalize_email(identifier)
+        if error:
+            return None, None, None, "请输入正确的用户名或邮箱。"
+        return "email", email, email_key, None
+
+    username, username_key, error = _normalize_username(identifier)
+    if error:
+        return None, None, None, "请输入正确的用户名或邮箱。"
+    return "username", username, username_key, None
+
+
+def _email_code_digest(purpose, email_key, code):
+    payload = f"{purpose}|{email_key}|{code}".encode("utf-8")
+    return hmac.new(
+        AUTH_SECRET_KEY.encode("utf-8"),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _new_email_code():
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def _send_verification_email(email, code, purpose):
+    if not EMAIL_DELIVERY_CONFIGURED:
+        raise RuntimeError("email delivery is not configured")
+
+    purpose_title = {
+        "register": "注册",
+        "reset": "重置密码",
+        "bind": "绑定邮箱",
+    }.get(purpose, "邮箱验证")
+
+    msg = EmailMessage()
+    msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
+    msg["To"] = email
+    msg["Subject"] = f"离散数学辅学系统 - {purpose_title}验证码"
+    msg.set_content(
+        f"你的验证码是：{code}\n\n"
+        "验证码 10 分钟内有效。\n"
+        "如果不是你本人操作，请忽略这封邮件。\n\n"
+        "如果收件箱中没有看到邮件，请检查垃圾邮件箱。"
+    )
+
+    context = ssl.create_default_context()
+    if SMTP_USE_SSL:
+        with smtplib.SMTP_SSL(
+            SMTP_HOST,
+            SMTP_PORT,
+            context=context,
+            timeout=15,
+        ) as smtp:
+            smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+            smtp.send_message(msg)
+    else:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+            smtp.ehlo()
+            smtp.starttls(context=context)
+            smtp.ehlo()
+            smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+            smtp.send_message(msg)
+
+
+def _email_unavailable_response():
+    return jsonify({
+        "ok": False,
+        "emailConfigured": False,
+        "error": "邮箱验证码服务尚未配置，请检查 SMTP 环境变量。",
+    }), 503
+
+
+def _email_code_send_limit(cur, purpose, email_key, user_id=None):
+    params = [purpose, email_key]
+    user_clause = ""
+    if user_id is not None:
+        user_clause = " AND user_id = %s"
+        params.append(int(user_id))
+
+    cur.execute(
+        f"""
+        SELECT created_at
+        FROM dm_email_codes
+        WHERE purpose = %s AND email_key = %s{user_clause}
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        tuple(params),
+    )
+    latest = cur.fetchone()
+    if latest and latest.get("created_at"):
+        age = time.time() - latest["created_at"].timestamp()
+        if age < EMAIL_CODE_RESEND_SECONDS:
+            wait = max(1, int(EMAIL_CODE_RESEND_SECONDS - age + 0.999))
+            return False, f"请 {wait} 秒后再发送验证码。"
+
+    params = [purpose, email_key]
+    user_clause = ""
+    if user_id is not None:
+        user_clause = " AND user_id = %s"
+        params.append(int(user_id))
+    cur.execute(
+        f"""
+        SELECT COUNT(*) AS count
+        FROM dm_email_codes
+        WHERE purpose = %s
+          AND email_key = %s{user_clause}
+          AND created_at > NOW() - INTERVAL '1 hour'
+        """,
+        tuple(params),
+    )
+    count = int((cur.fetchone() or {}).get("count") or 0)
+    if count >= EMAIL_CODE_MAX_PER_HOUR:
+        return False, "验证码发送次数过多，请稍后再试。"
+    return True, None
+
+
+def _latest_email_code(cur, purpose, email_key, user_id=None, username_key=None):
+    clauses = [
+        "purpose = %s",
+        "email_key = %s",
+        "consumed_at IS NULL",
+    ]
+    params = [purpose, email_key]
+    if user_id is not None:
+        clauses.append("user_id = %s")
+        params.append(int(user_id))
+    elif purpose in {"reset", "bind"}:
+        clauses.append("user_id IS NULL")
+    if username_key is not None:
+        clauses.append("username_key = %s")
+        params.append(username_key)
+
+    cur.execute(
+        f"""
+        SELECT id, code_digest, attempts, expires_at
+        FROM dm_email_codes
+        WHERE {' AND '.join(clauses)}
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        tuple(params),
+    )
+    return cur.fetchone()
+
+
+def _verify_email_code(cur, purpose, email_key, supplied_code, user_id=None, username_key=None):
+    code = re.sub(r"\D", "", str(supplied_code or ""))
+    if len(code) != 6:
+        return None, "请输入 6 位邮箱验证码。"
+
+    row = _latest_email_code(
+        cur,
+        purpose,
+        email_key,
+        user_id=user_id,
+        username_key=username_key,
+    )
+    if not row:
+        return None, "请先发送邮箱验证码。"
+    if row.get("expires_at") and row["expires_at"].timestamp() < time.time():
+        return None, "验证码已过期，请重新发送。"
+    attempts = int(row.get("attempts") or 0)
+    if attempts >= EMAIL_CODE_MAX_ATTEMPTS:
+        return None, "验证码错误次数过多，请重新发送。"
+
+    expected = _email_code_digest(purpose, email_key, code)
+    if not hmac.compare_digest(str(row.get("code_digest") or ""), expected):
+        cur.execute(
+            "UPDATE dm_email_codes SET attempts = attempts + 1 WHERE id = %s",
+            (int(row["id"]),),
+        )
+        return None, "验证码不正确。"
+
+    return int(row["id"]), None
 
 
 def _current_auth_user():
@@ -487,7 +745,8 @@ def _current_auth_user():
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT id, username, recovery_code_hash, auth_version
+                    SELECT id, username, email, email_key, email_verified_at,
+                           recovery_code_hash, auth_version
                     FROM dm_users
                     WHERE id = %s
                     """,
@@ -541,6 +800,7 @@ def auth_me():
         return jsonify({
             "ok": True,
             "configured": False,
+            "emailConfigured": EMAIL_DELIVERY_CONFIGURED,
             "authenticated": False,
         })
     if not _ensure_auth_schema():
@@ -552,15 +812,138 @@ def auth_me():
         return jsonify({
             "ok": True,
             "configured": True,
+            "emailConfigured": EMAIL_DELIVERY_CONFIGURED,
             "authenticated": False,
         })
 
     return jsonify({
         "ok": True,
         "configured": True,
+        "emailConfigured": EMAIL_DELIVERY_CONFIGURED,
         "authenticated": True,
-        "user": {"username": user["username"]},
+        "user": {
+            "username": user["username"],
+            "email": user.get("email") or "",
+        },
         "hasRecoveryCode": bool(user.get("recovery_code_hash")),
+        "hasVerifiedEmail": bool(user.get("email_verified_at") and user.get("email")),
+    })
+
+
+@app.route("/auth/email/send-code", methods=["POST"])
+def auth_send_email_code():
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not EMAIL_DELIVERY_CONFIGURED:
+        return _email_unavailable_response()
+    if not _auth_rate_allowed("send-email-code"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    purpose = str(payload.get("purpose") or "").strip().lower()
+    email, email_key, error = _normalize_email(payload.get("email"))
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    if purpose not in {"register", "reset", "bind"}:
+        return jsonify({"ok": False, "error": "验证码用途不正确。"}), 400
+
+    user_id = None
+    username_key = None
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                # 清理过期很久的验证码记录，避免表无限增长。
+                cur.execute("""
+                    DELETE FROM dm_email_codes
+                    WHERE created_at < NOW() - INTERVAL '2 days'
+                       OR (consumed_at IS NOT NULL AND consumed_at < NOW() - INTERVAL '1 day')
+                """)
+
+                if purpose == "register":
+                    username, username_key, username_error = _normalize_username(payload.get("username"))
+                    if username_error:
+                        return jsonify({"ok": False, "error": username_error}), 400
+                    cur.execute(
+                        "SELECT 1 FROM dm_users WHERE username_key = %s",
+                        (username_key,),
+                    )
+                    if cur.fetchone():
+                        return jsonify({"ok": False, "error": "这个用户名已经被使用。"}), 409
+                    cur.execute(
+                        "SELECT 1 FROM dm_users WHERE email_key = %s",
+                        (email_key,),
+                    )
+                    if cur.fetchone():
+                        return jsonify({"ok": False, "error": "这个邮箱已经绑定了账号。"}), 409
+
+                elif purpose == "reset":
+                    cur.execute(
+                        "SELECT id FROM dm_users WHERE email_key = %s AND email_verified_at IS NOT NULL",
+                        (email_key,),
+                    )
+                    target = cur.fetchone()
+                    if not target:
+                        # 不暴露某个邮箱是否存在；前端统一提示检查邮箱/垃圾箱。
+                        return jsonify({
+                            "ok": True,
+                            "expiresIn": EMAIL_CODE_TTL_SECONDS,
+                            "resendAfter": EMAIL_CODE_RESEND_SECONDS,
+                        })
+                    user_id = int(target["id"])
+
+                else:  # bind
+                    user = _current_auth_user()
+                    if not user:
+                        session.clear()
+                        return jsonify({"ok": False, "error": "请先登录。"}), 401
+                    user_id = int(user["id"])
+                    cur.execute(
+                        "SELECT id FROM dm_users WHERE email_key = %s AND id <> %s",
+                        (email_key, user_id),
+                    )
+                    if cur.fetchone():
+                        return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号。"}), 409
+
+                allowed, limit_error = _email_code_send_limit(
+                    cur, purpose, email_key, user_id=user_id
+                )
+                if not allowed:
+                    return jsonify({"ok": False, "error": limit_error}), 429
+
+                code = _new_email_code()
+                digest = _email_code_digest(purpose, email_key, code)
+                cur.execute(
+                    """
+                    INSERT INTO dm_email_codes (
+                        purpose, email, email_key, username_key, user_id,
+                        code_digest, expires_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s,
+                            NOW() + (%s * INTERVAL '1 second'))
+                    """,
+                    (
+                        purpose,
+                        email,
+                        email_key,
+                        username_key,
+                        user_id,
+                        digest,
+                        EMAIL_CODE_TTL_SECONDS,
+                    ),
+                )
+                _send_verification_email(email, code, purpose)
+    except Exception as exc:
+        print(f"发送邮箱验证码失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "验证码发送失败，请稍后再试。"}), 502
+
+    return jsonify({
+        "ok": True,
+        "expiresIn": EMAIL_CODE_TTL_SECONDS,
+        "resendAfter": EMAIL_CODE_RESEND_SECONDS,
     })
 
 
@@ -568,15 +951,24 @@ def auth_me():
 def auth_register():
     if not AUTH_CONFIGURED or not _ensure_auth_schema():
         return _auth_unavailable_response()
+    if not EMAIL_DELIVERY_CONFIGURED:
+        return _email_unavailable_response()
     if not _auth_rate_allowed("register"):
         return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
     if not request.is_json:
         return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
 
-    username, username_key, error = _normalize_auth_credentials(request.get_json(silent=True))
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    username, username_key, error = _normalize_auth_credentials(payload)
     if error:
         return jsonify({"ok": False, "error": error}), 400
-    password = str((request.get_json(silent=True) or {}).get("password") or "")
+    email, email_key, email_error = _normalize_email(payload.get("email"))
+    if email_error:
+        return jsonify({"ok": False, "error": email_error}), 400
+    email_code = str(payload.get("emailCode") or "").strip()
+    password = str(payload.get("password") or "")
+
     password_hash = generate_password_hash(password, method="scrypt")
     recovery_code = _new_recovery_code()
     recovery_code_hash = generate_password_hash(
@@ -588,24 +980,58 @@ def auth_register():
         with _auth_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
+                    "SELECT 1 FROM dm_users WHERE username_key = %s",
+                    (username_key,),
+                )
+                if cur.fetchone():
+                    return jsonify({"ok": False, "error": "这个用户名已经被使用。"}), 409
+                cur.execute(
+                    "SELECT 1 FROM dm_users WHERE email_key = %s",
+                    (email_key,),
+                )
+                if cur.fetchone():
+                    return jsonify({"ok": False, "error": "这个邮箱已经绑定了账号。"}), 409
+
+                code_id, verify_error = _verify_email_code(
+                    cur,
+                    "register",
+                    email_key,
+                    email_code,
+                    username_key=username_key,
+                )
+                if verify_error:
+                    return jsonify({"ok": False, "error": verify_error}), 400
+
+                cur.execute(
                     """
                     INSERT INTO dm_users (
-                        username, username_key, password_hash,
-                        recovery_code_hash, recovery_code_created_at
+                        username, username_key, email, email_key, email_verified_at,
+                        password_hash, recovery_code_hash, recovery_code_created_at
                     )
-                    VALUES (%s, %s, %s, %s, NOW())
-                    RETURNING id, username, auth_version
+                    VALUES (%s, %s, %s, %s, NOW(), %s, %s, NOW())
+                    RETURNING id, username, email, auth_version
                     """,
-                    (username, username_key, password_hash, recovery_code_hash),
+                    (
+                        username,
+                        username_key,
+                        email,
+                        email_key,
+                        password_hash,
+                        recovery_code_hash,
+                    ),
                 )
                 user = cur.fetchone()
                 cur.execute(
                     "INSERT INTO dm_user_data (user_id) VALUES (%s)",
                     (user["id"],),
                 )
+                cur.execute(
+                    "UPDATE dm_email_codes SET consumed_at = NOW() WHERE id = %s",
+                    (code_id,),
+                )
     except Exception as exc:
         if getattr(exc, "sqlstate", None) == "23505":
-            return jsonify({"ok": False, "error": "这个用户名已经被使用。"}), 409
+            return jsonify({"ok": False, "error": "用户名或邮箱已经被使用。"}), 409
         print(f"注册失败：{repr(exc)}")
         return jsonify({"ok": False, "error": "注册失败，请稍后再试。"}), 500
 
@@ -616,10 +1042,15 @@ def auth_register():
     return jsonify({
         "ok": True,
         "configured": True,
+        "emailConfigured": EMAIL_DELIVERY_CONFIGURED,
         "authenticated": True,
-        "user": {"username": user["username"]},
+        "user": {
+            "username": user["username"],
+            "email": user.get("email") or email,
+        },
         "revision": 0,
         "hasRecoveryCode": True,
+        "hasVerifiedEmail": True,
         # 注册时赠送的明文恢复码只返回这一次，数据库只保存 scrypt 哈希。
         "recoveryCode": recovery_code,
     })
@@ -634,25 +1065,39 @@ def auth_login():
     if not request.is_json:
         return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
 
-    username, username_key, error = _normalize_auth_credentials(request.get_json(silent=True))
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    kind, identifier, identifier_key, error = _normalize_login_credentials(payload)
     if error:
         return jsonify({"ok": False, "error": error}), 400
-    password = str((request.get_json(silent=True) or {}).get("password") or "")
+    password = str(payload.get("password") or "")
 
     try:
         with _auth_connect() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT id, username, password_hash, recovery_code_hash, auth_version
-                    FROM dm_users
-                    WHERE username_key = %s
-                    """,
-                    (username_key,),
-                )
+                if kind == "email":
+                    cur.execute(
+                        """
+                        SELECT id, username, email, password_hash,
+                               recovery_code_hash, auth_version
+                        FROM dm_users
+                        WHERE email_key = %s
+                        """,
+                        (identifier_key,),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT id, username, email, password_hash,
+                               recovery_code_hash, auth_version
+                        FROM dm_users
+                        WHERE username_key = %s
+                        """,
+                        (identifier_key,),
+                    )
                 user = cur.fetchone()
                 if not user or not check_password_hash(user["password_hash"], password):
-                    return jsonify({"ok": False, "error": "用户名或密码不正确。"}), 401
+                    return jsonify({"ok": False, "error": "用户名/邮箱或密码不正确。"}), 401
     except Exception as exc:
         print(f"登录查询失败：{repr(exc)}")
         return jsonify({"ok": False, "error": "登录失败，请稍后再试。"}), 500
@@ -664,9 +1109,98 @@ def auth_login():
     return jsonify({
         "ok": True,
         "configured": True,
+        "emailConfigured": EMAIL_DELIVERY_CONFIGURED,
         "authenticated": True,
-        "user": {"username": user["username"]},
+        "user": {
+            "username": user["username"],
+            "email": user.get("email") or "",
+        },
         "hasRecoveryCode": bool(user.get("recovery_code_hash")),
+        "hasVerifiedEmail": bool(user.get("email")),
+    })
+
+
+@app.route("/auth/email/bind", methods=["POST"])
+def auth_bind_email():
+    """旧账号绑定邮箱，或已绑定账号更换邮箱。需要当前密码 + 邮箱验证码。"""
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not EMAIL_DELIVERY_CONFIGURED:
+        return _email_unavailable_response()
+    if not _auth_rate_allowed("bind-email"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    user = _current_auth_user()
+    if not user:
+        session.clear()
+        return jsonify({"ok": False, "error": "请先登录。"}), 401
+
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    password = str(payload.get("password") or "")
+    email, email_key, error = _normalize_email(payload.get("email"))
+    email_code = str(payload.get("emailCode") or "").strip()
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    if not password:
+        return jsonify({"ok": False, "error": "请输入当前密码。"}), 400
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT password_hash FROM dm_users WHERE id = %s",
+                    (int(user["id"]),),
+                )
+                row = cur.fetchone()
+                if not row or not check_password_hash(row["password_hash"], password):
+                    return jsonify({"ok": False, "error": "密码不正确。"}), 401
+
+                cur.execute(
+                    "SELECT id FROM dm_users WHERE email_key = %s AND id <> %s",
+                    (email_key, int(user["id"])),
+                )
+                if cur.fetchone():
+                    return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号。"}), 409
+
+                code_id, verify_error = _verify_email_code(
+                    cur,
+                    "bind",
+                    email_key,
+                    email_code,
+                    user_id=int(user["id"]),
+                )
+                if verify_error:
+                    return jsonify({"ok": False, "error": verify_error}), 400
+
+                cur.execute(
+                    """
+                    UPDATE dm_users
+                    SET email = %s,
+                        email_key = %s,
+                        email_verified_at = NOW()
+                    WHERE id = %s
+                    RETURNING email
+                    """,
+                    (email, email_key, int(user["id"])),
+                )
+                updated = cur.fetchone()
+                cur.execute(
+                    "UPDATE dm_email_codes SET consumed_at = NOW() WHERE id = %s",
+                    (code_id,),
+                )
+    except Exception as exc:
+        if getattr(exc, "sqlstate", None) == "23505":
+            return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号。"}), 409
+        print(f"绑定邮箱失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "绑定邮箱失败，请稍后再试。"}), 500
+
+    return jsonify({
+        "ok": True,
+        "email": updated.get("email") or email,
+        "hasVerifiedEmail": True,
     })
 
 
@@ -730,6 +1264,89 @@ def auth_recovery_code():
     })
 
 
+@app.route("/auth/recover-password-email", methods=["POST"])
+def auth_recover_password_email():
+    """使用已验证邮箱 + 6 位验证码重置密码。成功后自动登录。"""
+    if not AUTH_CONFIGURED or not _ensure_auth_schema():
+        return _auth_unavailable_response()
+    if not EMAIL_DELIVERY_CONFIGURED:
+        return _email_unavailable_response()
+    if not _auth_rate_allowed("recover-password-email"):
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+
+    payload = request.get_json(silent=True)
+    payload = payload if isinstance(payload, dict) else {}
+    email, email_key, error = _normalize_email(payload.get("email"))
+    email_code = str(payload.get("emailCode") or "").strip()
+    new_password = str(payload.get("newPassword") or "")
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    if len(new_password) < 6 or len(new_password) > 128:
+        return jsonify({"ok": False, "error": "新密码长度需为 6–128 个字符。"}), 400
+
+    try:
+        with _auth_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, username, email, recovery_code_hash, auth_version
+                    FROM dm_users
+                    WHERE email_key = %s AND email_verified_at IS NOT NULL
+                    """,
+                    (email_key,),
+                )
+                user = cur.fetchone()
+                if not user:
+                    return jsonify({"ok": False, "error": "邮箱或验证码不正确。"}), 401
+
+                code_id, verify_error = _verify_email_code(
+                    cur,
+                    "reset",
+                    email_key,
+                    email_code,
+                    user_id=int(user["id"]),
+                )
+                if verify_error:
+                    return jsonify({"ok": False, "error": verify_error}), 400
+
+                new_password_hash = generate_password_hash(new_password, method="scrypt")
+                cur.execute(
+                    """
+                    UPDATE dm_users
+                    SET password_hash = %s,
+                        auth_version = auth_version + 1
+                    WHERE id = %s
+                    RETURNING id, username, email, recovery_code_hash, auth_version
+                    """,
+                    (new_password_hash, int(user["id"])),
+                )
+                updated = cur.fetchone()
+                cur.execute(
+                    "UPDATE dm_email_codes SET consumed_at = NOW() WHERE id = %s",
+                    (code_id,),
+                )
+    except Exception as exc:
+        print(f"邮箱重置密码失败：{repr(exc)}")
+        return jsonify({"ok": False, "error": "重置密码失败，请稍后再试。"}), 500
+
+    session.clear()
+    session["user_id"] = int(updated["id"])
+    session["auth_version"] = int(updated.get("auth_version") or 1)
+    session.permanent = True
+    return jsonify({
+        "ok": True,
+        "authenticated": True,
+        "user": {
+            "username": updated["username"],
+            "email": updated.get("email") or email,
+        },
+        "hasRecoveryCode": bool(updated.get("recovery_code_hash")),
+        "hasVerifiedEmail": True,
+    })
+
+
 @app.route("/auth/recover-password", methods=["POST"])
 def auth_recover_password():
     """使用用户名 + 恢复码重置密码。不会找回旧密码。"""
@@ -758,7 +1375,7 @@ def auth_recover_password():
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT id, username, recovery_code_hash, auth_version
+                    SELECT id, username, email, recovery_code_hash, auth_version
                     FROM dm_users
                     WHERE username_key = %s
                     """,
@@ -783,7 +1400,7 @@ def auth_recover_password():
                     SET password_hash = %s,
                         auth_version = auth_version + 1
                     WHERE id = %s
-                    RETURNING id, username, auth_version
+                    RETURNING id, username, email, recovery_code_hash, auth_version
                     """,
                     (new_password_hash, int(user["id"])),
                 )
@@ -800,8 +1417,12 @@ def auth_recover_password():
     return jsonify({
         "ok": True,
         "authenticated": True,
-        "user": {"username": updated["username"]},
-        "hasRecoveryCode": True,
+        "user": {
+            "username": updated["username"],
+            "email": updated.get("email") or "",
+        },
+        "hasRecoveryCode": bool(updated.get("recovery_code_hash")),
+        "hasVerifiedEmail": bool(updated.get("email")),
     })
 
 
@@ -819,7 +1440,7 @@ def auth_delete_account():
 
     - 必须处于登录状态；
     - 必须再次输入当前密码；
-    - 删除 dm_users 后，dm_user_data 通过 ON DELETE CASCADE 一并删除；
+    - 删除 dm_users 后，dm_user_data / 已关联验证码通过 ON DELETE CASCADE 一并删除；
     - 当前浏览器本地 localStorage/IndexedDB 不在服务器端删除。
     """
     if not AUTH_CONFIGURED or not _ensure_auth_schema():
