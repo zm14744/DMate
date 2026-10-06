@@ -5439,8 +5439,7 @@ body[data-appearance-theme="light"] .input input {
 #accountUserView.hidden,
 #accountDeletePanel.hidden,
 #accountRecoverPanel.hidden,
-#accountRecoveryCodePanel.hidden,
-#accountRecoveryCodeBox.hidden {
+#accountRecoveryCodePanel.hidden {
     display:none !important;
 }
 
@@ -5812,15 +5811,15 @@ window.MathJax = {
                 <div id="accountRecoverPanel" class="account-recovery-panel hidden">
                     <div class="account-panel-title">重置密码</div>
                     <div class="account-panel-copy">
-                        这是密码重置，不会找回旧密码。恢复码可以留空：如果这是曾成功登录过该账号且没有清除网站数据的浏览器，系统会使用本机凭证验证；换设备或清除网站数据后，则必须填写恢复码。
+                        输入注册时获得或后来自己设置的恢复码，然后设置新密码。
                     </div>
                     <label class="account-field" for="accountRecoverUsername">
                         <span>用户名</span>
                         <input id="accountRecoverUsername" type="text" minlength="2" maxlength="32" autocomplete="username" spellcheck="false">
                     </label>
                     <label class="account-field" for="accountRecoverCode">
-                        <span>恢复码（可选）</span>
-                        <input id="accountRecoverCode" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="换设备时填写 DM-XXXX-XXXX-XXXX-XXXX">
+                        <span>恢复码</span>
+                        <input id="accountRecoverCode" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="输入你的恢复码">
                     </label>
                     <label class="account-field" for="accountRecoverPassword">
                         <span>新密码</span>
@@ -5842,27 +5841,31 @@ window.MathJax = {
                 <div class="account-user-name" id="accountCurrentUsername"></div>
                 <div class="account-sync-state" id="accountSyncState">已同步</div>
 
-                <button id="accountRecoveryCodeOpen" type="button" class="account-recovery-open">恢复码</button>
+                <button id="accountRecoveryCodeOpen" type="button" class="account-recovery-open">修改恢复码</button>
                 <button id="accountLogout" type="button" class="account-logout">退出登录</button>
                 <button id="accountDeleteOpen" type="button" class="account-delete">注销账号</button>
 
                 <div id="accountRecoveryCodePanel" class="account-recovery-code-panel hidden">
-                    <div class="account-panel-title">恢复码</div>
-                    <div id="accountRecoveryCodeCopy" class="account-panel-copy">
-                        恢复码用于换设备或浏览器数据被清除后的密码重置。系统不会保存明文；同一浏览器曾成功登录过时，即使忘了恢复码，也可以使用本机凭证重置密码。
-                    </div>
-                    <div id="accountRecoveryCodeBox" class="account-recovery-code-box hidden">
-                        <code id="accountRecoveryCodeValue" class="account-recovery-code-value"></code>
-                        <button id="accountRecoveryCodeCopyBtn" type="button" class="account-code-copy">复制恢复码</button>
+                    <div class="account-panel-title">修改恢复码</div>
+                    <div class="account-panel-copy">
+                        注册时系统会赠送一枚恢复码。登录后可以在这里自行修改；修改前必须验证当前密码。
                     </div>
                     <label class="account-field" for="accountRecoveryCurrentPassword">
                         <span>当前密码</span>
                         <input id="accountRecoveryCurrentPassword" type="password" minlength="6" maxlength="128" autocomplete="current-password">
                     </label>
+                    <label class="account-field" for="accountRecoveryNewCode">
+                        <span>新恢复码</span>
+                        <input id="accountRecoveryNewCode" type="text" minlength="8" maxlength="64" autocomplete="off" spellcheck="false" placeholder="8–64 个字符">
+                    </label>
+                    <label class="account-field" for="accountRecoveryNewCodeConfirm">
+                        <span>确认新恢复码</span>
+                        <input id="accountRecoveryNewCodeConfirm" type="text" minlength="8" maxlength="64" autocomplete="off" spellcheck="false">
+                    </label>
                     <div id="accountRecoveryCodeMessage" class="account-message" aria-live="polite"></div>
                     <div class="account-panel-actions">
                         <button id="accountRecoveryCodeCancel" type="button">取消</button>
-                        <button id="accountRecoveryCodeGenerate" type="button" class="primary">生成 / 重置恢复码</button>
+                        <button id="accountRecoveryCodeGenerate" type="button" class="primary">确认</button>
                     </div>
                 </div>
 
@@ -6062,7 +6065,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=password-recovery-v2-20261006"></script>
+<script src="/static/script.js?v=password-recovery-v3-20261006"></script>
 
 </body>
 </html>
