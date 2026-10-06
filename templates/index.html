@@ -5340,6 +5340,9 @@ body[data-appearance-theme="light"] .input input {
 .account-actions button,
 .account-forgot,
 .account-recovery-open,
+.account-email-open,
+.account-method-switch,
+.account-code-send,
 .account-logout,
 .account-delete,
 .account-delete-actions button,
@@ -5365,6 +5368,9 @@ body[data-appearance-theme="light"] .input input {
 .account-actions button:disabled,
 .account-forgot:disabled,
 .account-recovery-open:disabled,
+.account-email-open:disabled,
+.account-method-switch:disabled,
+.account-code-send:disabled,
 .account-logout:disabled,
 .account-delete:disabled,
 .account-delete-actions button:disabled,
@@ -5418,13 +5424,60 @@ body[data-appearance-theme="light"] .input input {
 }
 
 .account-recovery-open,
+.account-email-open,
 .account-logout,
 .account-delete {
     width:100%;
 }
 
-.account-recovery-open {
+.account-recovery-open,
+.account-email-open {
     margin-bottom:10px;
+}
+
+.account-current-email {
+    margin:-12px 0 18px;
+    text-align:center;
+    color:var(--text-muted);
+    font-size:var(--font-sm);
+    overflow-wrap:anywhere;
+}
+
+.account-method-switch {
+    width:100%;
+    margin-top:10px;
+    background:transparent;
+    color:var(--accent-pale);
+}
+
+.account-code-row {
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) auto;
+    gap:8px;
+    align-items:stretch;
+    margin-bottom:14px;
+}
+
+.account-code-row input {
+    min-width:0;
+    width:100%;
+    min-height:44px;
+    padding:10px 12px;
+    border:1px solid var(--border-strong);
+    border-radius:10px;
+    background:var(--surface-1);
+    color:var(--text-primary);
+    font:inherit;
+    outline:none;
+}
+
+.account-code-row input:focus {
+    border-color:var(--accent);
+}
+
+.account-code-send {
+    min-width:112px;
+    padding:0 12px;
 }
 
 .account-delete {
@@ -5440,13 +5493,19 @@ body[data-appearance-theme="light"] .input input {
 #accountGuestView.hidden,
 #accountUserView.hidden,
 #accountDeletePanel.hidden,
+#accountRegisterPanel.hidden,
+#accountEmailRecoverPanel.hidden,
 #accountRecoverPanel.hidden,
+#accountEmailBindPanel.hidden,
 #accountRecoveryCodePanel.hidden,
 #accountRegistrationRecoveryPanel.hidden {
     display:none !important;
 }
 
+.account-register-panel,
+.account-email-recovery-panel,
 .account-recovery-panel,
+.account-email-bind-panel,
 .account-recovery-code-panel,
 .account-registration-recovery-panel {
     margin-top:14px;
@@ -5549,6 +5608,15 @@ body[data-appearance-theme="light"] .input input {
 }
 
 @media (max-width:760px) {
+    .account-code-row {
+        grid-template-columns:minmax(0, 1fr) 108px;
+    }
+
+    .account-code-send {
+        min-width:0;
+        padding:0 8px;
+    }
+
     .account-card {
         width:100% !important;
         max-width:100% !important;
@@ -5808,8 +5876,8 @@ window.MathJax = {
         <div class="account-body">
             <div id="accountGuestView">
                 <label class="account-field" for="accountUsername">
-                    <span>用户名</span>
-                    <input id="accountUsername" type="text" minlength="2" maxlength="32" autocomplete="username" spellcheck="false">
+                    <span>用户名或邮箱</span>
+                    <input id="accountUsername" type="text" maxlength="254" autocomplete="username" spellcheck="false">
                 </label>
                 <label class="account-field" for="accountPassword">
                     <span>密码</span>
@@ -5823,8 +5891,75 @@ window.MathJax = {
                 <button id="accountForgotOpen" type="button" class="account-forgot">忘记密码</button>
                 <div class="account-hint">登录后，对话、错题本、学习记录和外观设置会自动同步。</div>
 
-                <div id="accountRecoverPanel" class="account-recovery-panel hidden">
+                <div id="accountRegisterPanel" class="account-register-panel hidden">
+                    <div class="account-panel-title">注册账号</div>
+                    <div class="account-panel-copy">
+                        使用用户名、邮箱和密码注册。验证码 10 分钟内有效；如果没收到，请检查垃圾邮件箱。
+                    </div>
+                    <label class="account-field" for="accountRegisterUsername">
+                        <span>用户名</span>
+                        <input id="accountRegisterUsername" type="text" minlength="2" maxlength="32" autocomplete="username" spellcheck="false">
+                    </label>
+                    <label class="account-field" for="accountRegisterEmail">
+                        <span>邮箱</span>
+                        <input id="accountRegisterEmail" type="email" maxlength="254" autocomplete="email" spellcheck="false">
+                    </label>
+                    <label class="account-field" for="accountRegisterPassword">
+                        <span>密码</span>
+                        <input id="accountRegisterPassword" type="password" minlength="6" maxlength="128" autocomplete="new-password">
+                    </label>
+                    <label class="account-field" for="accountRegisterPasswordConfirm">
+                        <span>确认密码</span>
+                        <input id="accountRegisterPasswordConfirm" type="password" minlength="6" maxlength="128" autocomplete="new-password">
+                    </label>
+                    <div class="account-field">
+                        <span>邮箱验证码</span>
+                        <div class="account-code-row">
+                            <input id="accountRegisterEmailCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位验证码">
+                            <button id="accountRegisterSendCode" type="button" class="account-code-send">发送验证码</button>
+                        </div>
+                    </div>
+                    <div id="accountRegisterMessage" class="account-message" aria-live="polite"></div>
+                    <div class="account-panel-actions">
+                        <button id="accountRegisterCancel" type="button">取消</button>
+                        <button id="accountRegisterConfirm" type="button" class="primary">确认</button>
+                    </div>
+                </div>
+
+                <div id="accountEmailRecoverPanel" class="account-email-recovery-panel hidden">
                     <div class="account-panel-title">重置密码</div>
+                    <div class="account-panel-copy">
+                        输入已绑定邮箱获取验证码，然后设置新密码。没收到验证码时请检查垃圾邮件箱。
+                    </div>
+                    <label class="account-field" for="accountEmailRecoverEmail">
+                        <span>邮箱</span>
+                        <input id="accountEmailRecoverEmail" type="email" maxlength="254" autocomplete="email" spellcheck="false">
+                    </label>
+                    <div class="account-field">
+                        <span>邮箱验证码</span>
+                        <div class="account-code-row">
+                            <input id="accountEmailRecoverCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位验证码">
+                            <button id="accountEmailRecoverSendCode" type="button" class="account-code-send">发送验证码</button>
+                        </div>
+                    </div>
+                    <label class="account-field" for="accountEmailRecoverPassword">
+                        <span>新密码</span>
+                        <input id="accountEmailRecoverPassword" type="password" minlength="6" maxlength="128" autocomplete="new-password">
+                    </label>
+                    <label class="account-field" for="accountEmailRecoverPasswordConfirm">
+                        <span>确认新密码</span>
+                        <input id="accountEmailRecoverPasswordConfirm" type="password" minlength="6" maxlength="128" autocomplete="new-password">
+                    </label>
+                    <div id="accountEmailRecoverMessage" class="account-message" aria-live="polite"></div>
+                    <div class="account-panel-actions">
+                        <button id="accountEmailRecoverCancel" type="button">取消</button>
+                        <button id="accountEmailRecoverConfirm" type="button" class="primary">确认</button>
+                    </div>
+                    <button id="accountUseRecoveryCode" type="button" class="account-method-switch">改用恢复码重置</button>
+                </div>
+
+                <div id="accountRecoverPanel" class="account-recovery-panel hidden">
+                    <div class="account-panel-title">使用恢复码重置密码</div>
                     <div class="account-panel-copy">
                         输入注册时获得或后来自己设置的恢复码，然后设置新密码。
                     </div>
@@ -5834,7 +5969,7 @@ window.MathJax = {
                     </label>
                     <label class="account-field" for="accountRecoverCode">
                         <span>恢复码</span>
-                        <input id="accountRecoverCode" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="输入你的恢复码">
+                        <input id="accountRecoverCode" type="text" maxlength="64" autocomplete="off" spellcheck="false" placeholder="输入你的恢复码">
                     </label>
                     <label class="account-field" for="accountRecoverPassword">
                         <span>新密码</span>
@@ -5849,11 +5984,13 @@ window.MathJax = {
                         <button id="accountRecoverCancel" type="button">取消</button>
                         <button id="accountRecoverConfirm" type="button" class="primary">确认</button>
                     </div>
+                    <button id="accountUseEmailRecover" type="button" class="account-method-switch">改用邮箱验证码重置</button>
                 </div>
             </div>
 
             <div id="accountUserView" class="hidden">
                 <div class="account-user-name" id="accountCurrentUsername"></div>
+                <div class="account-current-email" id="accountCurrentEmail">未绑定邮箱</div>
                 <div class="account-sync-state" id="accountSyncState">已同步</div>
 
                 <div id="accountRegistrationRecoveryPanel" class="account-registration-recovery-panel hidden" aria-live="polite">
@@ -5868,9 +6005,37 @@ window.MathJax = {
                     <button id="accountRegistrationRecoveryDone" type="button" class="account-registration-recovery-done">我已保存</button>
                 </div>
 
+                <button id="accountEmailBindOpen" type="button" class="account-email-open">绑定邮箱</button>
                 <button id="accountRecoveryCodeOpen" type="button" class="account-recovery-open">修改恢复码</button>
                 <button id="accountLogout" type="button" class="account-logout">退出登录</button>
                 <button id="accountDeleteOpen" type="button" class="account-delete">注销账号</button>
+
+                <div id="accountEmailBindPanel" class="account-email-bind-panel hidden">
+                    <div class="account-panel-title">绑定 / 更换邮箱</div>
+                    <div class="account-panel-copy">
+                        验证当前密码和新邮箱。验证码 10 分钟内有效；如果没收到，请检查垃圾邮件箱。
+                    </div>
+                    <label class="account-field" for="accountEmailBindPassword">
+                        <span>当前密码</span>
+                        <input id="accountEmailBindPassword" type="password" minlength="6" maxlength="128" autocomplete="current-password">
+                    </label>
+                    <label class="account-field" for="accountEmailBindEmail">
+                        <span>新邮箱</span>
+                        <input id="accountEmailBindEmail" type="email" maxlength="254" autocomplete="email" spellcheck="false">
+                    </label>
+                    <div class="account-field">
+                        <span>邮箱验证码</span>
+                        <div class="account-code-row">
+                            <input id="accountEmailBindCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位验证码">
+                            <button id="accountEmailBindSendCode" type="button" class="account-code-send">发送验证码</button>
+                        </div>
+                    </div>
+                    <div id="accountEmailBindMessage" class="account-message" aria-live="polite"></div>
+                    <div class="account-panel-actions">
+                        <button id="accountEmailBindCancel" type="button">取消</button>
+                        <button id="accountEmailBindConfirm" type="button" class="primary">确认</button>
+                    </div>
+                </div>
 
                 <div id="accountRecoveryCodePanel" class="account-recovery-code-panel hidden">
                     <div class="account-panel-title">修改恢复码</div>
@@ -6092,7 +6257,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=password-recovery-v4-copy-code-20261006"></script>
+<script src="/static/script.js?v=email-auth-v5-qq-smtp-20261007"></script>
 
 </body>
 </html>
