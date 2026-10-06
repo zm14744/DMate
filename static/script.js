@@ -16,6 +16,7 @@ let accountState = {
     configured: null,
     authenticated: false,
     username: "",
+    hasRecoveryCode: false,
     revision: 0,
     syncing: false,
     status: ""
@@ -972,6 +973,12 @@ function renderAccountUi() {
     const syncState = document.getElementById("accountSyncState");
     const login = document.getElementById("accountLogin");
     const register = document.getElementById("accountRegister");
+    const forgotOpen = document.getElementById("accountForgotOpen");
+    const recoveryOpen = document.getElementById("accountRecoveryCodeOpen");
+    const recoveryGenerate = document.getElementById("accountRecoveryCodeGenerate");
+    const recoveryCancel = document.getElementById("accountRecoveryCodeCancel");
+    const recoverConfirm = document.getElementById("accountRecoverConfirm");
+    const recoverCancel = document.getElementById("accountRecoverCancel");
     const logout = document.getElementById("accountLogout");
     const deleteOpen = document.getElementById("accountDeleteOpen");
     const deleteConfirm = document.getElementById("accountDeleteConfirm");
@@ -999,6 +1006,12 @@ function renderAccountUi() {
     const unavailable = accountState.configured === false;
     if (login) login.disabled = unavailable || accountState.syncing;
     if (register) register.disabled = unavailable || accountState.syncing;
+    if (forgotOpen) forgotOpen.disabled = unavailable || accountState.syncing;
+    if (recoveryOpen) recoveryOpen.disabled = accountState.syncing;
+    if (recoveryGenerate) recoveryGenerate.disabled = accountState.syncing;
+    if (recoveryCancel) recoveryCancel.disabled = accountState.syncing;
+    if (recoverConfirm) recoverConfirm.disabled = unavailable || accountState.syncing;
+    if (recoverCancel) recoverCancel.disabled = accountState.syncing;
     if (logout) logout.disabled = accountState.syncing;
     if (deleteOpen) deleteOpen.disabled = accountState.syncing;
     if (deleteConfirm) deleteConfirm.disabled = accountState.syncing;
@@ -1023,11 +1036,102 @@ function openAccountModal() {
 
     if (!accountState.authenticated) {
         setAccountDeletePanel(false);
+        setAccountRecoveryCodePanel(false);
+    } else {
+        setAccountRecoverPanel(false);
     }
 
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
     renderAccountUi();
+}
+
+function setAccountRecoverMessage(message = "", isError = false) {
+    const box = document.getElementById("accountRecoverMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountRecoveryCodeMessage(message = "", isError = false) {
+    const box = document.getElementById("accountRecoveryCodeMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountRecoverPanel(open) {
+    const panel = document.getElementById("accountRecoverPanel");
+    const username = document.getElementById("accountRecoverUsername");
+    const code = document.getElementById("accountRecoverCode");
+    const password = document.getElementById("accountRecoverPassword");
+    const confirmPassword = document.getElementById("accountRecoverPasswordConfirm");
+    panel?.classList.toggle("hidden", !open);
+
+    if (!open) {
+        if (code) code.value = "";
+        if (password) password.value = "";
+        if (confirmPassword) confirmPassword.value = "";
+        setAccountRecoverMessage("");
+        return;
+    }
+
+    const loginUsername = document.getElementById("accountUsername")?.value?.trim() || "";
+    if (username && !username.value) username.value = loginUsername;
+    window.setTimeout(() => (username?.value ? code : username)?.focus(), 40);
+}
+
+function setAccountRecoveryCodePanel(open) {
+    const panel = document.getElementById("accountRecoveryCodePanel");
+    const password = document.getElementById("accountRecoveryCurrentPassword");
+    const codeBox = document.getElementById("accountRecoveryCodeBox");
+    const codeValue = document.getElementById("accountRecoveryCodeValue");
+    panel?.classList.toggle("hidden", !open);
+
+    if (!open) {
+        if (password) password.value = "";
+        if (codeValue) codeValue.textContent = "";
+        codeBox?.classList.add("hidden");
+        setAccountRecoveryCodeMessage("");
+    } else {
+        window.setTimeout(() => password?.focus(), 40);
+    }
+}
+
+function revealAccountRecoveryCode(code, message = "请立即保存这枚恢复码。") {
+    const panel = document.getElementById("accountRecoveryCodePanel");
+    const codeBox = document.getElementById("accountRecoveryCodeBox");
+    const codeValue = document.getElementById("accountRecoveryCodeValue");
+    const password = document.getElementById("accountRecoveryCurrentPassword");
+
+    panel?.classList.remove("hidden");
+    if (codeValue) codeValue.textContent = String(code || "");
+    codeBox?.classList.toggle("hidden", !code);
+    if (password) password.value = "";
+    setAccountRecoveryCodeMessage(message, false);
+}
+
+async function copyAccountRecoveryCode() {
+    const code = document.getElementById("accountRecoveryCodeValue")?.textContent?.trim() || "";
+    if (!code) return;
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(code);
+        } else {
+            const area = document.createElement("textarea");
+            area.value = code;
+            area.style.position = "fixed";
+            area.style.opacity = "0";
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand("copy");
+            area.remove();
+        }
+        showCopyToast("恢复码已复制");
+    } catch (_error) {
+        showCopyToast("复制失败，请手动保存恢复码");
+    }
 }
 
 function setAccountDeleteMessage(message = "", isError = false) {
@@ -1056,6 +1160,8 @@ function closeAccountModal() {
     modal.setAttribute("aria-hidden", "true");
     const password = document.getElementById("accountPassword");
     if (password) password.value = "";
+    setAccountRecoverPanel(false);
+    setAccountRecoveryCodePanel(false);
     setAccountDeletePanel(false);
     setAccountMessage("");
 }
@@ -1269,6 +1375,7 @@ async function submitAccountAuth(mode) {
         accountState.configured = data.configured !== false;
         accountState.authenticated = true;
         accountState.username = String(data.user?.username || username);
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = Number(data.revision || 0);
         accountState.status = "同步中…";
         writeCloudSyncMeta({
@@ -1287,6 +1394,13 @@ async function submitAccountAuth(mode) {
         renderAccountUi();
         if (mode === "register") {
             showCopyToast("注册成功，已登录");
+            if (data.recoveryCode) {
+                accountState.hasRecoveryCode = true;
+                revealAccountRecoveryCode(
+                    data.recoveryCode,
+                    "注册成功。请保存恢复码；以后忘记密码时需要它。"
+                );
+            }
         } else {
             showCopyToast("登录成功");
         }
@@ -1295,6 +1409,113 @@ async function submitAccountAuth(mode) {
     } catch (error) {
         accountState.syncing = false;
         setAccountMessage(error?.message || "操作失败，请稍后再试。", true);
+        renderAccountUi();
+    }
+}
+
+async function generateAccountRecoveryCode() {
+    if (!accountState.authenticated || accountState.syncing) return;
+
+    const passwordInput = document.getElementById("accountRecoveryCurrentPassword");
+    const password = passwordInput?.value || "";
+    if (!password) {
+        setAccountRecoveryCodeMessage("请输入当前密码。", true);
+        passwordInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    accountState.status = "正在生成恢复码…";
+    setAccountRecoveryCodeMessage("正在生成…");
+    renderAccountUi();
+
+    try {
+        const { data } = await accountFetch("/auth/recovery-code", {
+            method:"POST",
+            body:JSON.stringify({ password })
+        });
+        accountState.hasRecoveryCode = true;
+        accountState.syncing = false;
+        accountState.status = "已同步";
+        renderAccountUi();
+        revealAccountRecoveryCode(
+            data.recoveryCode,
+            "新的恢复码已生成。旧恢复码已失效，请立即保存。"
+        );
+    } catch (error) {
+        accountState.syncing = false;
+        accountState.status = "";
+        setAccountRecoveryCodeMessage(error?.message || "生成恢复码失败，请稍后再试。", true);
+        renderAccountUi();
+    }
+}
+
+async function recoverAccountPassword() {
+    if (accountState.syncing) return;
+
+    const usernameInput = document.getElementById("accountRecoverUsername");
+    const codeInput = document.getElementById("accountRecoverCode");
+    const passwordInput = document.getElementById("accountRecoverPassword");
+    const confirmInput = document.getElementById("accountRecoverPasswordConfirm");
+
+    const username = usernameInput?.value?.trim() || "";
+    const recoveryCode = codeInput?.value?.trim() || "";
+    const newPassword = passwordInput?.value || "";
+    const confirmPassword = confirmInput?.value || "";
+
+    if (!username || !recoveryCode || !newPassword || !confirmPassword) {
+        setAccountRecoverMessage("请把用户名、恢复码和新密码填写完整。", true);
+        return;
+    }
+    if (newPassword.length < 6 || newPassword.length > 128) {
+        setAccountRecoverMessage("新密码长度需为 6–128 个字符。", true);
+        passwordInput?.focus();
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        setAccountRecoverMessage("两次输入的新密码不一致。", true);
+        confirmInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    setAccountRecoverMessage("正在重置密码…");
+
+    try {
+        const { data } = await accountFetch("/auth/recover-password", {
+            method:"POST",
+            body:JSON.stringify({
+                username,
+                recoveryCode,
+                newPassword
+            })
+        });
+
+        accountState.configured = true;
+        accountState.authenticated = true;
+        accountState.username = String(data.user?.username || username);
+        accountState.hasRecoveryCode = true;
+        accountState.revision = 0;
+        accountState.status = "同步中…";
+        accountState.syncing = false;
+        writeCloudSyncMeta({
+            username:accountState.username,
+            revision:0,
+            dirty:false
+        });
+
+        setAccountRecoverPanel(false);
+        renderAccountUi();
+        revealAccountRecoveryCode(
+            data.recoveryCode,
+            "密码已重置并自动登录。旧恢复码已经失效，请保存这枚新的恢复码。"
+        );
+        showCopyToast("密码已重置，已登录");
+        await resolveInitialCloudSync(false);
+    } catch (error) {
+        accountState.syncing = false;
+        setAccountRecoverMessage(error?.message || "重置密码失败，请检查恢复码。", true);
         renderAccountUi();
     }
 }
@@ -1331,6 +1552,7 @@ async function logoutAccount() {
 
     accountState.authenticated = false;
     accountState.username = "";
+    accountState.hasRecoveryCode = false;
     accountState.revision = 0;
     accountState.status = "";
     accountState.syncing = false;
@@ -1380,6 +1602,7 @@ async function deleteAccount() {
 
     accountState.authenticated = false;
     accountState.username = "";
+    accountState.hasRecoveryCode = false;
     accountState.revision = 0;
     accountState.status = "";
     accountState.syncing = false;
@@ -1400,6 +1623,15 @@ async function initAccountSystem() {
     const accountModal = document.getElementById("accountModal");
     const accountLogin = document.getElementById("accountLogin");
     const accountRegister = document.getElementById("accountRegister");
+    const accountForgotOpen = document.getElementById("accountForgotOpen");
+    const accountRecoverCancel = document.getElementById("accountRecoverCancel");
+    const accountRecoverConfirm = document.getElementById("accountRecoverConfirm");
+    const accountRecoverPasswordConfirm = document.getElementById("accountRecoverPasswordConfirm");
+    const accountRecoveryCodeOpen = document.getElementById("accountRecoveryCodeOpen");
+    const accountRecoveryCodeCancel = document.getElementById("accountRecoveryCodeCancel");
+    const accountRecoveryCodeGenerate = document.getElementById("accountRecoveryCodeGenerate");
+    const accountRecoveryCodeCopyBtn = document.getElementById("accountRecoveryCodeCopyBtn");
+    const accountRecoveryCurrentPassword = document.getElementById("accountRecoveryCurrentPassword");
     const accountLogout = document.getElementById("accountLogout");
     const accountDeleteOpen = document.getElementById("accountDeleteOpen");
     const accountDeleteCancel = document.getElementById("accountDeleteCancel");
@@ -1411,6 +1643,19 @@ async function initAccountSystem() {
     accountClose?.addEventListener("click", closeAccountModal);
     accountLogin?.addEventListener("click", () => submitAccountAuth("login"));
     accountRegister?.addEventListener("click", () => submitAccountAuth("register"));
+    accountForgotOpen?.addEventListener("click", () => setAccountRecoverPanel(true));
+    accountRecoverCancel?.addEventListener("click", () => setAccountRecoverPanel(false));
+    accountRecoverConfirm?.addEventListener("click", recoverAccountPassword);
+    accountRecoverPasswordConfirm?.addEventListener("keydown", event => {
+        if (event.key === "Enter") recoverAccountPassword();
+    });
+    accountRecoveryCodeOpen?.addEventListener("click", () => setAccountRecoveryCodePanel(true));
+    accountRecoveryCodeCancel?.addEventListener("click", () => setAccountRecoveryCodePanel(false));
+    accountRecoveryCodeGenerate?.addEventListener("click", generateAccountRecoveryCode);
+    accountRecoveryCodeCopyBtn?.addEventListener("click", copyAccountRecoveryCode);
+    accountRecoveryCurrentPassword?.addEventListener("keydown", event => {
+        if (event.key === "Enter") generateAccountRecoveryCode();
+    });
     accountLogout?.addEventListener("click", logoutAccount);
     accountDeleteOpen?.addEventListener("click", () => setAccountDeletePanel(true));
     accountDeleteCancel?.addEventListener("click", () => setAccountDeletePanel(false));
@@ -1441,6 +1686,7 @@ async function initAccountSystem() {
         accountState.username = accountState.authenticated
             ? String(data.user?.username || "")
             : "";
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         renderAccountUi();
 
         if (accountState.authenticated) {
