@@ -14,8 +14,10 @@ const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
 const CLOUD_SYNC_DEBOUNCE_MS = 900;
 let accountState = {
     configured: null,
+    emailConfigured: null,
     authenticated: false,
     username: "",
+    email: "",
     hasRecoveryCode: false,
     revision: 0,
     syncing: false,
@@ -998,16 +1000,45 @@ function accountSyncText() {
     return accountState.status || "已同步";
 }
 
+const emailCodeCooldowns = Object.create(null);
+let emailCodeCooldownTimer = 0;
+
+function startEmailCodeCooldown(key, seconds = 60) {
+    emailCodeCooldowns[key] = Date.now() + Math.max(1, Number(seconds || 60)) * 1000;
+    if (!emailCodeCooldownTimer) {
+        emailCodeCooldownTimer = window.setInterval(() => {
+            const now = Date.now();
+            const active = Object.values(emailCodeCooldowns).some(value => Number(value || 0) > now);
+            renderAccountUi();
+            if (!active) {
+                window.clearInterval(emailCodeCooldownTimer);
+                emailCodeCooldownTimer = 0;
+            }
+        }, 1000);
+    }
+    renderAccountUi();
+}
+
+function applyEmailCodeButtonState(button, key) {
+    if (!button) return;
+    const remaining = Math.max(0, Math.ceil((Number(emailCodeCooldowns[key] || 0) - Date.now()) / 1000));
+    const unavailable = accountState.configured === false || accountState.emailConfigured === false;
+    button.disabled = unavailable || accountState.syncing || remaining > 0;
+    button.textContent = remaining > 0 ? `${remaining} 秒后重发` : "发送验证码";
+}
+
 function renderAccountUi() {
     const entry = document.getElementById("accountBtn");
     const label = document.getElementById("accountEntryLabel");
     const guest = document.getElementById("accountGuestView");
     const user = document.getElementById("accountUserView");
     const username = document.getElementById("accountCurrentUsername");
+    const currentEmail = document.getElementById("accountCurrentEmail");
     const syncState = document.getElementById("accountSyncState");
     const login = document.getElementById("accountLogin");
     const register = document.getElementById("accountRegister");
     const forgotOpen = document.getElementById("accountForgotOpen");
+    const emailBindOpen = document.getElementById("accountEmailBindOpen");
     const recoveryOpen = document.getElementById("accountRecoveryCodeOpen");
     const recoveryGenerate = document.getElementById("accountRecoveryCodeGenerate");
     const recoveryCancel = document.getElementById("accountRecoveryCodeCancel");
@@ -1017,6 +1048,12 @@ function renderAccountUi() {
     const deleteOpen = document.getElementById("accountDeleteOpen");
     const deleteConfirm = document.getElementById("accountDeleteConfirm");
     const deleteCancel = document.getElementById("accountDeleteCancel");
+    const registerConfirm = document.getElementById("accountRegisterConfirm");
+    const registerCancel = document.getElementById("accountRegisterCancel");
+    const emailRecoverConfirm = document.getElementById("accountEmailRecoverConfirm");
+    const emailRecoverCancel = document.getElementById("accountEmailRecoverCancel");
+    const emailBindConfirm = document.getElementById("accountEmailBindConfirm");
+    const emailBindCancel = document.getElementById("accountEmailBindCancel");
 
     entry?.classList.toggle("is-authenticated", accountState.authenticated);
     entry?.classList.toggle("is-syncing", accountState.syncing);
@@ -1032,9 +1069,19 @@ function renderAccountUi() {
 
     if (!accountState.authenticated) {
         setAccountDeletePanel(false);
+        setAccountEmailBindPanel(false);
+        setAccountRecoveryCodePanel(false);
     }
 
     if (username) username.textContent = accountState.username;
+    if (currentEmail) {
+        currentEmail.textContent = accountState.email
+            ? `邮箱：${accountState.email}`
+            : "未绑定邮箱";
+    }
+    if (emailBindOpen) {
+        emailBindOpen.textContent = accountState.email ? "更换邮箱" : "绑定邮箱";
+    }
     if (recoveryOpen) {
         recoveryOpen.textContent = accountState.hasRecoveryCode
             ? "修改恢复码"
@@ -1043,21 +1090,35 @@ function renderAccountUi() {
     if (syncState) syncState.textContent = accountSyncText();
 
     const unavailable = accountState.configured === false;
+    const emailUnavailable = unavailable || accountState.emailConfigured === false;
     if (login) login.disabled = unavailable || accountState.syncing;
-    if (register) register.disabled = unavailable || accountState.syncing;
+    if (register) register.disabled = emailUnavailable || accountState.syncing;
     if (forgotOpen) forgotOpen.disabled = unavailable || accountState.syncing;
+    if (emailBindOpen) emailBindOpen.disabled = emailUnavailable || accountState.syncing;
     if (recoveryOpen) recoveryOpen.disabled = accountState.syncing;
     if (recoveryGenerate) recoveryGenerate.disabled = accountState.syncing;
     if (recoveryCancel) recoveryCancel.disabled = accountState.syncing;
     if (recoverConfirm) recoverConfirm.disabled = unavailable || accountState.syncing;
     if (recoverCancel) recoverCancel.disabled = accountState.syncing;
+    if (registerConfirm) registerConfirm.disabled = emailUnavailable || accountState.syncing;
+    if (registerCancel) registerCancel.disabled = accountState.syncing;
+    if (emailRecoverConfirm) emailRecoverConfirm.disabled = emailUnavailable || accountState.syncing;
+    if (emailRecoverCancel) emailRecoverCancel.disabled = accountState.syncing;
+    if (emailBindConfirm) emailBindConfirm.disabled = emailUnavailable || accountState.syncing;
+    if (emailBindCancel) emailBindCancel.disabled = accountState.syncing;
     if (logout) logout.disabled = accountState.syncing;
     if (deleteOpen) deleteOpen.disabled = accountState.syncing;
     if (deleteConfirm) deleteConfirm.disabled = accountState.syncing;
     if (deleteCancel) deleteCancel.disabled = accountState.syncing;
 
+    applyEmailCodeButtonState(document.getElementById("accountRegisterSendCode"), "register");
+    applyEmailCodeButtonState(document.getElementById("accountEmailRecoverSendCode"), "reset");
+    applyEmailCodeButtonState(document.getElementById("accountEmailBindSendCode"), "bind");
+
     if (unavailable) {
         setAccountMessage("服务器还没有配置账号数据库。", true);
+    } else if (accountState.emailConfigured === false && !accountState.authenticated) {
+        setAccountMessage("邮箱验证码服务尚未配置，暂时只能登录已有账号。", true);
     }
 }
 
@@ -1068,21 +1129,25 @@ function setAccountMessage(message = "", isError = false) {
     box.classList.toggle("error", Boolean(isError));
 }
 
-function openAccountModal() {
-    closeMobileShellDrawers();
-    const modal = document.getElementById("accountModal");
-    if (!modal) return;
+function setAccountRegisterMessage(message = "", isError = false) {
+    const box = document.getElementById("accountRegisterMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
 
-    if (!accountState.authenticated) {
-        setAccountDeletePanel(false);
-        setAccountRecoveryCodePanel(false);
-    } else {
-        setAccountRecoverPanel(false);
-    }
+function setAccountEmailRecoverMessage(message = "", isError = false) {
+    const box = document.getElementById("accountEmailRecoverMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
 
-    modal.classList.remove("hidden");
-    modal.setAttribute("aria-hidden", "false");
-    renderAccountUi();
+function setAccountEmailBindMessage(message = "", isError = false) {
+    const box = document.getElementById("accountEmailBindMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
 }
 
 function setAccountRecoverMessage(message = "", isError = false) {
@@ -1097,6 +1162,51 @@ function setAccountRecoveryCodeMessage(message = "", isError = false) {
     if (!box) return;
     box.textContent = String(message || "");
     box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountRegisterPanel(open) {
+    const panel = document.getElementById("accountRegisterPanel");
+    panel?.classList.toggle("hidden", !open);
+    if (!open) {
+        ["accountRegisterPassword", "accountRegisterPasswordConfirm", "accountRegisterEmailCode"].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.value = "";
+        });
+        setAccountRegisterMessage("");
+        return;
+    }
+
+    setAccountEmailRecoverPanel(false);
+    setAccountRecoverPanel(false);
+    const loginValue = document.getElementById("accountUsername")?.value?.trim() || "";
+    const username = document.getElementById("accountRegisterUsername");
+    const email = document.getElementById("accountRegisterEmail");
+    if (loginValue.includes("@")) {
+        if (email && !email.value) email.value = loginValue;
+    } else if (username && !username.value) {
+        username.value = loginValue;
+    }
+    window.setTimeout(() => (username?.value ? email : username)?.focus(), 40);
+}
+
+function setAccountEmailRecoverPanel(open) {
+    const panel = document.getElementById("accountEmailRecoverPanel");
+    panel?.classList.toggle("hidden", !open);
+    if (!open) {
+        ["accountEmailRecoverCode", "accountEmailRecoverPassword", "accountEmailRecoverPasswordConfirm"].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.value = "";
+        });
+        setAccountEmailRecoverMessage("");
+        return;
+    }
+
+    setAccountRegisterPanel(false);
+    setAccountRecoverPanel(false);
+    const loginValue = document.getElementById("accountUsername")?.value?.trim() || "";
+    const email = document.getElementById("accountEmailRecoverEmail");
+    if (email && !email.value && loginValue.includes("@")) email.value = loginValue;
+    window.setTimeout(() => email?.focus(), 40);
 }
 
 function setAccountRecoverPanel(open) {
@@ -1115,9 +1225,29 @@ function setAccountRecoverPanel(open) {
         return;
     }
 
+    setAccountRegisterPanel(false);
+    setAccountEmailRecoverPanel(false);
     const loginUsername = document.getElementById("accountUsername")?.value?.trim() || "";
-    if (username && !username.value) username.value = loginUsername;
+    if (username && !username.value && !loginUsername.includes("@")) username.value = loginUsername;
     window.setTimeout(() => (username?.value ? code : username)?.focus(), 40);
+}
+
+function setAccountEmailBindPanel(open) {
+    const panel = document.getElementById("accountEmailBindPanel");
+    panel?.classList.toggle("hidden", !open);
+    const password = document.getElementById("accountEmailBindPassword");
+    const email = document.getElementById("accountEmailBindEmail");
+    const code = document.getElementById("accountEmailBindCode");
+    if (!open) {
+        if (password) password.value = "";
+        if (code) code.value = "";
+        setAccountEmailBindMessage("");
+        return;
+    }
+    setAccountRecoveryCodePanel(false);
+    setAccountDeletePanel(false);
+    if (email) email.value = accountState.email || "";
+    window.setTimeout(() => password?.focus(), 40);
 }
 
 function setAccountRecoveryCodePanel(open) {
@@ -1133,8 +1263,30 @@ function setAccountRecoveryCodePanel(open) {
         if (confirmCode) confirmCode.value = "";
         setAccountRecoveryCodeMessage("");
     } else {
+        setAccountEmailBindPanel(false);
+        setAccountDeletePanel(false);
         window.setTimeout(() => password?.focus(), 40);
     }
+}
+
+function openAccountModal() {
+    closeMobileShellDrawers();
+    const modal = document.getElementById("accountModal");
+    if (!modal) return;
+
+    if (!accountState.authenticated) {
+        setAccountDeletePanel(false);
+        setAccountEmailBindPanel(false);
+        setAccountRecoveryCodePanel(false);
+    } else {
+        setAccountRegisterPanel(false);
+        setAccountEmailRecoverPanel(false);
+        setAccountRecoverPanel(false);
+    }
+
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    renderAccountUi();
 }
 
 function revealRegistrationRecoveryCode(code) {
@@ -1210,20 +1362,27 @@ function closeAccountModal() {
     modal.setAttribute("aria-hidden", "true");
     const password = document.getElementById("accountPassword");
     if (password) password.value = "";
+    setAccountRegisterPanel(false);
+    setAccountEmailRecoverPanel(false);
     setAccountRecoverPanel(false);
+    setAccountEmailBindPanel(false);
     setAccountRecoveryCodePanel(false);
     setAccountDeletePanel(false);
     setAccountMessage("");
 }
 
 async function accountFetch(url, options = {}) {
+    const allowConflict = Boolean(options.allowConflict);
+    const fetchOptions = { ...options };
+    delete fetchOptions.allowConflict;
+
     const response = await fetch(url, {
         credentials: "same-origin",
         cache: "no-store",
-        ...options,
+        ...fetchOptions,
         headers: {
-            ...(options.body ? { "Content-Type":"application/json" } : {}),
-            ...(options.headers || {})
+            ...(fetchOptions.body ? { "Content-Type":"application/json" } : {}),
+            ...(fetchOptions.headers || {})
         }
     });
 
@@ -1232,7 +1391,7 @@ async function accountFetch(url, options = {}) {
         data = await response.json();
     } catch (_error) {}
 
-    if (!response.ok && response.status !== 409) {
+    if (!response.ok && !(allowConflict && response.status === 409)) {
         const error = new Error(data?.error || `请求失败（${response.status}）`);
         error.status = response.status;
         error.data = data;
@@ -1277,6 +1436,7 @@ async function pushCloudSnapshot(force = false) {
     try {
         const { response, data } = await accountFetch("/sync", {
             method:"PUT",
+            allowConflict:true,
             body:JSON.stringify({
                 baseRevision,
                 force:Boolean(force),
@@ -1396,67 +1556,330 @@ async function resolveInitialCloudSync(isNewAccount = false) {
     }
 }
 
-async function submitAccountAuth(mode) {
+function looksLikeEmailAddress(value) {
+    const email = String(value || "").trim();
+    return email.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+}
+
+async function requestEmailCode({ purpose, email, username = "", messageSetter, cooldownKey }) {
+    if (!looksLikeEmailAddress(email)) {
+        messageSetter("请输入正确的邮箱地址。", true);
+        return false;
+    }
+    if (accountState.emailConfigured === false) {
+        messageSetter("邮箱验证码服务尚未配置。", true);
+        return false;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    messageSetter("正在发送验证码…");
+
+    try {
+        const { data } = await accountFetch("/auth/email/send-code", {
+            method:"POST",
+            body:JSON.stringify({ purpose, email, username })
+        });
+        accountState.syncing = false;
+        startEmailCodeCooldown(cooldownKey, Number(data.resendAfter || 60));
+        messageSetter("验证码已发送。没收到时请检查垃圾邮件箱。");
+        return true;
+    } catch (error) {
+        accountState.syncing = false;
+        messageSetter(error?.message || "验证码发送失败，请稍后再试。", true);
+        renderAccountUi();
+        return false;
+    }
+}
+
+async function submitAccountLogin() {
     if (accountState.syncing) return;
 
-    const usernameInput = document.getElementById("accountUsername");
+    const identifierInput = document.getElementById("accountUsername");
     const passwordInput = document.getElementById("accountPassword");
-    const username = usernameInput?.value?.trim() || "";
+    const identifier = identifierInput?.value?.trim() || "";
     const password = passwordInput?.value || "";
 
-    if (!username || !password) {
-        setAccountMessage("请输入用户名和密码。", true);
+    if (!identifier || !password) {
+        setAccountMessage("请输入用户名或邮箱和密码。", true);
         return;
     }
 
     accountState.syncing = true;
     renderAccountUi();
-    setAccountMessage(mode === "register" ? "正在注册…" : "正在登录…");
+    setAccountMessage("正在登录…");
 
     try {
-        const { data } = await accountFetch(
-            mode === "register" ? "/auth/register" : "/auth/login",
-            {
-                method:"POST",
-                body:JSON.stringify({ username, password })
-            }
-        );
+        const { data } = await accountFetch("/auth/login", {
+            method:"POST",
+            body:JSON.stringify({ identifier, password })
+        });
 
         accountState.configured = data.configured !== false;
+        accountState.emailConfigured = data.emailConfigured !== false;
         accountState.authenticated = true;
-        accountState.username = String(data.user?.username || username);
+        accountState.username = String(data.user?.username || identifier);
+        accountState.email = String(data.user?.email || "");
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = Number(data.revision || 0);
         accountState.status = "同步中…";
         writeCloudSyncMeta({
             username:accountState.username,
             revision:accountState.revision,
-            dirty:mode === "register"
+            dirty:false
         });
 
         if (passwordInput) passwordInput.value = "";
         setAccountMessage("");
         setAccountDeletePanel(false);
+        clearRegistrationRecoveryCode();
         accountState.syncing = false;
-
-        // 注册成功即已经由后端建立 Session，不需要再登录一次。
-        // 这里立即切到“已登录”视图，再在后台完成首次云同步。
         renderAccountUi();
-        if (mode === "register") {
-            showCopyToast("注册成功，已登录");
-            if (data.recoveryCode) {
-                accountState.hasRecoveryCode = true;
-                revealRegistrationRecoveryCode(data.recoveryCode);
-            }
-        } else {
-            clearRegistrationRecoveryCode();
-            showCopyToast("登录成功");
-        }
-
-        await resolveInitialCloudSync(mode === "register");
+        showCopyToast("登录成功");
+        await resolveInitialCloudSync(false);
     } catch (error) {
         accountState.syncing = false;
-        setAccountMessage(error?.message || "操作失败，请稍后再试。", true);
+        setAccountMessage(error?.message || "登录失败，请稍后再试。", true);
+        renderAccountUi();
+    }
+}
+
+async function sendRegisterEmailCode() {
+    const username = document.getElementById("accountRegisterUsername")?.value?.trim() || "";
+    const email = document.getElementById("accountRegisterEmail")?.value?.trim() || "";
+    if (!username) {
+        setAccountRegisterMessage("请输入用户名。", true);
+        document.getElementById("accountRegisterUsername")?.focus();
+        return;
+    }
+    await requestEmailCode({
+        purpose:"register",
+        email,
+        username,
+        messageSetter:setAccountRegisterMessage,
+        cooldownKey:"register"
+    });
+}
+
+async function submitAccountRegistration() {
+    if (accountState.syncing) return;
+
+    const usernameInput = document.getElementById("accountRegisterUsername");
+    const emailInput = document.getElementById("accountRegisterEmail");
+    const passwordInput = document.getElementById("accountRegisterPassword");
+    const confirmInput = document.getElementById("accountRegisterPasswordConfirm");
+    const codeInput = document.getElementById("accountRegisterEmailCode");
+
+    const username = usernameInput?.value?.trim() || "";
+    const email = emailInput?.value?.trim() || "";
+    const password = passwordInput?.value || "";
+    const confirmPassword = confirmInput?.value || "";
+    const emailCode = codeInput?.value?.trim() || "";
+
+    if (!username || !email || !password || !confirmPassword || !emailCode) {
+        setAccountRegisterMessage("请把用户名、邮箱、密码和验证码填写完整。", true);
+        if (!username) usernameInput?.focus();
+        else if (!email) emailInput?.focus();
+        else if (!password) passwordInput?.focus();
+        else if (!confirmPassword) confirmInput?.focus();
+        else codeInput?.focus();
+        return;
+    }
+    if (!looksLikeEmailAddress(email)) {
+        setAccountRegisterMessage("请输入正确的邮箱地址。", true);
+        emailInput?.focus();
+        return;
+    }
+    if (password.length < 6 || password.length > 128) {
+        setAccountRegisterMessage("密码长度需为 6–128 个字符。", true);
+        passwordInput?.focus();
+        return;
+    }
+    if (password !== confirmPassword) {
+        setAccountRegisterMessage("两次输入的密码不一致。", true);
+        confirmInput?.focus();
+        return;
+    }
+    if (!/^\d{6}$/.test(emailCode)) {
+        setAccountRegisterMessage("请输入 6 位邮箱验证码。", true);
+        codeInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    setAccountRegisterMessage("正在注册…");
+
+    try {
+        const { data } = await accountFetch("/auth/register", {
+            method:"POST",
+            body:JSON.stringify({ username, email, password, emailCode })
+        });
+
+        accountState.configured = data.configured !== false;
+        accountState.emailConfigured = data.emailConfigured !== false;
+        accountState.authenticated = true;
+        accountState.username = String(data.user?.username || username);
+        accountState.email = String(data.user?.email || email);
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        accountState.revision = Number(data.revision || 0);
+        accountState.status = "同步中…";
+        writeCloudSyncMeta({
+            username:accountState.username,
+            revision:accountState.revision,
+            dirty:true
+        });
+
+        if (passwordInput) passwordInput.value = "";
+        if (confirmInput) confirmInput.value = "";
+        if (codeInput) codeInput.value = "";
+        setAccountRegisterMessage("");
+        setAccountRegisterPanel(false);
+        accountState.syncing = false;
+        renderAccountUi();
+        showCopyToast("注册成功，已登录");
+        if (data.recoveryCode) {
+            accountState.hasRecoveryCode = true;
+            revealRegistrationRecoveryCode(data.recoveryCode);
+        }
+        await resolveInitialCloudSync(true);
+    } catch (error) {
+        accountState.syncing = false;
+        setAccountRegisterMessage(error?.message || "注册失败，请稍后再试。", true);
+        renderAccountUi();
+    }
+}
+
+async function sendPasswordResetEmailCode() {
+    const email = document.getElementById("accountEmailRecoverEmail")?.value?.trim() || "";
+    await requestEmailCode({
+        purpose:"reset",
+        email,
+        messageSetter:setAccountEmailRecoverMessage,
+        cooldownKey:"reset"
+    });
+}
+
+async function recoverAccountPasswordByEmail() {
+    if (accountState.syncing) return;
+
+    const emailInput = document.getElementById("accountEmailRecoverEmail");
+    const codeInput = document.getElementById("accountEmailRecoverCode");
+    const passwordInput = document.getElementById("accountEmailRecoverPassword");
+    const confirmInput = document.getElementById("accountEmailRecoverPasswordConfirm");
+    const email = emailInput?.value?.trim() || "";
+    const emailCode = codeInput?.value?.trim() || "";
+    const newPassword = passwordInput?.value || "";
+    const confirmPassword = confirmInput?.value || "";
+
+    if (!email || !emailCode || !newPassword || !confirmPassword) {
+        setAccountEmailRecoverMessage("请把邮箱、验证码和新密码填写完整。", true);
+        return;
+    }
+    if (!looksLikeEmailAddress(email)) {
+        setAccountEmailRecoverMessage("请输入正确的邮箱地址。", true);
+        emailInput?.focus();
+        return;
+    }
+    if (!/^\d{6}$/.test(emailCode)) {
+        setAccountEmailRecoverMessage("请输入 6 位邮箱验证码。", true);
+        codeInput?.focus();
+        return;
+    }
+    if (newPassword.length < 6 || newPassword.length > 128) {
+        setAccountEmailRecoverMessage("新密码长度需为 6–128 个字符。", true);
+        passwordInput?.focus();
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        setAccountEmailRecoverMessage("两次输入的新密码不一致。", true);
+        confirmInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    setAccountEmailRecoverMessage("正在重置密码…");
+
+    try {
+        const { data } = await accountFetch("/auth/recover-password-email", {
+            method:"POST",
+            body:JSON.stringify({ email, emailCode, newPassword })
+        });
+        accountState.configured = true;
+        accountState.authenticated = true;
+        accountState.username = String(data.user?.username || "");
+        accountState.email = String(data.user?.email || email);
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        accountState.revision = 0;
+        accountState.status = "同步中…";
+        accountState.syncing = false;
+        writeCloudSyncMeta({ username:accountState.username, revision:0, dirty:false });
+        setAccountEmailRecoverPanel(false);
+        renderAccountUi();
+        showCopyToast("密码已重置，已登录");
+        await resolveInitialCloudSync(false);
+    } catch (error) {
+        accountState.syncing = false;
+        setAccountEmailRecoverMessage(error?.message || "重置密码失败，请检查邮箱验证码。", true);
+        renderAccountUi();
+    }
+}
+
+async function sendBindEmailCode() {
+    const email = document.getElementById("accountEmailBindEmail")?.value?.trim() || "";
+    await requestEmailCode({
+        purpose:"bind",
+        email,
+        messageSetter:setAccountEmailBindMessage,
+        cooldownKey:"bind"
+    });
+}
+
+async function bindAccountEmail() {
+    if (!accountState.authenticated || accountState.syncing) return;
+    const passwordInput = document.getElementById("accountEmailBindPassword");
+    const emailInput = document.getElementById("accountEmailBindEmail");
+    const codeInput = document.getElementById("accountEmailBindCode");
+    const password = passwordInput?.value || "";
+    const email = emailInput?.value?.trim() || "";
+    const emailCode = codeInput?.value?.trim() || "";
+
+    if (!password || !email || !emailCode) {
+        setAccountEmailBindMessage("请把当前密码、新邮箱和验证码填写完整。", true);
+        return;
+    }
+    if (!looksLikeEmailAddress(email)) {
+        setAccountEmailBindMessage("请输入正确的邮箱地址。", true);
+        emailInput?.focus();
+        return;
+    }
+    if (!/^\d{6}$/.test(emailCode)) {
+        setAccountEmailBindMessage("请输入 6 位邮箱验证码。", true);
+        codeInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    accountState.status = "正在绑定邮箱…";
+    renderAccountUi();
+    setAccountEmailBindMessage("正在确认…");
+
+    try {
+        const { data } = await accountFetch("/auth/email/bind", {
+            method:"POST",
+            body:JSON.stringify({ password, email, emailCode })
+        });
+        accountState.email = String(data.email || email);
+        accountState.syncing = false;
+        accountState.status = "已同步";
+        setAccountEmailBindPanel(false);
+        renderAccountUi();
+        showCopyToast("邮箱已绑定");
+    } catch (error) {
+        accountState.syncing = false;
+        accountState.status = "";
+        setAccountEmailBindMessage(error?.message || "绑定邮箱失败，请稍后再试。", true);
         renderAccountUi();
     }
 }
@@ -1560,7 +1983,8 @@ async function recoverAccountPassword() {
         accountState.configured = true;
         accountState.authenticated = true;
         accountState.username = String(data.user?.username || username);
-        accountState.hasRecoveryCode = true;
+        accountState.email = String(data.user?.email || "");
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = 0;
         accountState.status = "同步中…";
         accountState.syncing = false;
@@ -1619,6 +2043,7 @@ async function logoutAccount() {
 
     accountState.authenticated = false;
     accountState.username = "";
+    accountState.email = "";
     accountState.hasRecoveryCode = false;
     accountState.revision = 0;
     accountState.status = "";
@@ -1673,6 +2098,7 @@ async function deleteAccount() {
 
     accountState.authenticated = false;
     accountState.username = "";
+    accountState.email = "";
     accountState.hasRecoveryCode = false;
     accountState.revision = 0;
     accountState.status = "";
@@ -1694,12 +2120,27 @@ async function initAccountSystem() {
     const accountModal = document.getElementById("accountModal");
     const accountLogin = document.getElementById("accountLogin");
     const accountRegister = document.getElementById("accountRegister");
+    const accountRegisterCancel = document.getElementById("accountRegisterCancel");
+    const accountRegisterConfirm = document.getElementById("accountRegisterConfirm");
+    const accountRegisterSendCode = document.getElementById("accountRegisterSendCode");
+    const accountRegisterPasswordConfirm = document.getElementById("accountRegisterPasswordConfirm");
     const accountForgotOpen = document.getElementById("accountForgotOpen");
+    const accountEmailRecoverCancel = document.getElementById("accountEmailRecoverCancel");
+    const accountEmailRecoverConfirm = document.getElementById("accountEmailRecoverConfirm");
+    const accountEmailRecoverSendCode = document.getElementById("accountEmailRecoverSendCode");
+    const accountEmailRecoverPasswordConfirm = document.getElementById("accountEmailRecoverPasswordConfirm");
+    const accountUseRecoveryCode = document.getElementById("accountUseRecoveryCode");
+    const accountUseEmailRecover = document.getElementById("accountUseEmailRecover");
     const accountRecoverCancel = document.getElementById("accountRecoverCancel");
     const accountRecoverConfirm = document.getElementById("accountRecoverConfirm");
     const accountRecoverPasswordConfirm = document.getElementById("accountRecoverPasswordConfirm");
     const accountRegistrationRecoveryCopy = document.getElementById("accountRegistrationRecoveryCopy");
     const accountRegistrationRecoveryDone = document.getElementById("accountRegistrationRecoveryDone");
+    const accountEmailBindOpen = document.getElementById("accountEmailBindOpen");
+    const accountEmailBindCancel = document.getElementById("accountEmailBindCancel");
+    const accountEmailBindConfirm = document.getElementById("accountEmailBindConfirm");
+    const accountEmailBindSendCode = document.getElementById("accountEmailBindSendCode");
+    const accountEmailBindCode = document.getElementById("accountEmailBindCode");
     const accountRecoveryCodeOpen = document.getElementById("accountRecoveryCodeOpen");
     const accountRecoveryCodeCancel = document.getElementById("accountRecoveryCodeCancel");
     const accountRecoveryCodeGenerate = document.getElementById("accountRecoveryCodeGenerate");
@@ -1714,9 +2155,28 @@ async function initAccountSystem() {
 
     accountBtn?.addEventListener("click", openAccountModal);
     accountClose?.addEventListener("click", closeAccountModal);
-    accountLogin?.addEventListener("click", () => submitAccountAuth("login"));
-    accountRegister?.addEventListener("click", () => submitAccountAuth("register"));
-    accountForgotOpen?.addEventListener("click", () => setAccountRecoverPanel(true));
+    accountLogin?.addEventListener("click", submitAccountLogin);
+    accountRegister?.addEventListener("click", () => setAccountRegisterPanel(true));
+    accountRegisterCancel?.addEventListener("click", () => setAccountRegisterPanel(false));
+    accountRegisterConfirm?.addEventListener("click", submitAccountRegistration);
+    accountRegisterSendCode?.addEventListener("click", sendRegisterEmailCode);
+    accountRegisterPasswordConfirm?.addEventListener("keydown", event => {
+        if (event.key === "Enter") document.getElementById("accountRegisterEmailCode")?.focus();
+    });
+    document.getElementById("accountRegisterEmailCode")?.addEventListener("keydown", event => {
+        if (event.key === "Enter") submitAccountRegistration();
+    });
+
+    accountForgotOpen?.addEventListener("click", () => setAccountEmailRecoverPanel(true));
+    accountEmailRecoverCancel?.addEventListener("click", () => setAccountEmailRecoverPanel(false));
+    accountEmailRecoverConfirm?.addEventListener("click", recoverAccountPasswordByEmail);
+    accountEmailRecoverSendCode?.addEventListener("click", sendPasswordResetEmailCode);
+    accountEmailRecoverPasswordConfirm?.addEventListener("keydown", event => {
+        if (event.key === "Enter") recoverAccountPasswordByEmail();
+    });
+    accountUseRecoveryCode?.addEventListener("click", () => setAccountRecoverPanel(true));
+    accountUseEmailRecover?.addEventListener("click", () => setAccountEmailRecoverPanel(true));
+
     accountRecoverCancel?.addEventListener("click", () => setAccountRecoverPanel(false));
     accountRecoverConfirm?.addEventListener("click", recoverAccountPassword);
     accountRecoverPasswordConfirm?.addEventListener("keydown", event => {
@@ -1724,6 +2184,15 @@ async function initAccountSystem() {
     });
     accountRegistrationRecoveryCopy?.addEventListener("click", copyRegistrationRecoveryCode);
     accountRegistrationRecoveryDone?.addEventListener("click", clearRegistrationRecoveryCode);
+
+    accountEmailBindOpen?.addEventListener("click", () => setAccountEmailBindPanel(true));
+    accountEmailBindCancel?.addEventListener("click", () => setAccountEmailBindPanel(false));
+    accountEmailBindConfirm?.addEventListener("click", bindAccountEmail);
+    accountEmailBindSendCode?.addEventListener("click", sendBindEmailCode);
+    accountEmailBindCode?.addEventListener("keydown", event => {
+        if (event.key === "Enter") bindAccountEmail();
+    });
+
     accountRecoveryCodeOpen?.addEventListener("click", () => setAccountRecoveryCodePanel(true));
     accountRecoveryCodeCancel?.addEventListener("click", () => setAccountRecoveryCodePanel(false));
     accountRecoveryCodeGenerate?.addEventListener("click", generateAccountRecoveryCode);
@@ -1744,7 +2213,7 @@ async function initAccountSystem() {
         if (event.target === accountModal) closeAccountModal();
     });
     password?.addEventListener("keydown", event => {
-        if (event.key === "Enter") submitAccountAuth("login");
+        if (event.key === "Enter") submitAccountLogin();
     });
 
     window.addEventListener("online", () => {
@@ -1759,9 +2228,13 @@ async function initAccountSystem() {
     try {
         const { data } = await accountFetch("/auth/me");
         accountState.configured = data.configured !== false;
+        accountState.emailConfigured = data.emailConfigured !== false;
         accountState.authenticated = Boolean(data.authenticated);
         accountState.username = accountState.authenticated
             ? String(data.user?.username || "")
+            : "";
+        accountState.email = accountState.authenticated
+            ? String(data.user?.email || "")
             : "";
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         renderAccountUi();
@@ -1784,6 +2257,7 @@ async function initAccountSystem() {
         renderAccountUi();
     }
 }
+
 
 
 let typingTimer = null;
