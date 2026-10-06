@@ -5344,7 +5344,8 @@ body[data-appearance-theme="light"] .input input {
 .account-delete,
 .account-delete-actions button,
 .account-panel-actions button,
-.account-code-copy {
+.account-code-copy,
+.account-registration-recovery-done {
     min-height:44px;
     border:1px solid var(--border-strong);
     border-radius:10px;
@@ -5368,7 +5369,8 @@ body[data-appearance-theme="light"] .input input {
 .account-delete:disabled,
 .account-delete-actions button:disabled,
 .account-panel-actions button:disabled,
-.account-code-copy:disabled {
+.account-code-copy:disabled,
+.account-registration-recovery-done:disabled {
     opacity:.55;
     cursor:default;
 }
@@ -5439,12 +5441,14 @@ body[data-appearance-theme="light"] .input input {
 #accountUserView.hidden,
 #accountDeletePanel.hidden,
 #accountRecoverPanel.hidden,
-#accountRecoveryCodePanel.hidden {
+#accountRecoveryCodePanel.hidden,
+#accountRegistrationRecoveryPanel.hidden {
     display:none !important;
 }
 
 .account-recovery-panel,
-.account-recovery-code-panel {
+.account-recovery-code-panel,
+.account-registration-recovery-panel {
     margin-top:14px;
     padding:14px;
     border:1px solid var(--border-strong);
@@ -5494,10 +5498,21 @@ body[data-appearance-theme="light"] .input input {
     font:700 1.02em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     letter-spacing:.04em;
     overflow-wrap:anywhere;
+    user-select:all;
+    -webkit-user-select:all;
+    cursor:text;
 }
 
 .account-code-copy {
     width:100%;
+}
+
+.account-registration-recovery-done {
+    width:100%;
+    margin-top:10px;
+    border-color:var(--accent);
+    background:var(--accent);
+    color:#fff;
 }
 
 .account-delete-panel {
@@ -5841,6 +5856,18 @@ window.MathJax = {
                 <div class="account-user-name" id="accountCurrentUsername"></div>
                 <div class="account-sync-state" id="accountSyncState">已同步</div>
 
+                <div id="accountRegistrationRecoveryPanel" class="account-registration-recovery-panel hidden" aria-live="polite">
+                    <div class="account-panel-title">注册成功，请保存恢复码</div>
+                    <div class="account-panel-copy">
+                        这枚恢复码以后用于重置密码。它只会在本次注册后显示；可以直接选中文字，也可以点击下面的“复制恢复码”。
+                    </div>
+                    <div class="account-recovery-code-box">
+                        <code id="accountRegistrationRecoveryCodeValue" class="account-recovery-code-value" tabindex="0"></code>
+                        <button id="accountRegistrationRecoveryCopy" type="button" class="account-code-copy">复制恢复码</button>
+                    </div>
+                    <button id="accountRegistrationRecoveryDone" type="button" class="account-registration-recovery-done">我已保存</button>
+                </div>
+
                 <button id="accountRecoveryCodeOpen" type="button" class="account-recovery-open">修改恢复码</button>
                 <button id="accountLogout" type="button" class="account-logout">退出登录</button>
                 <button id="accountDeleteOpen" type="button" class="account-delete">注销账号</button>
@@ -6065,7 +6092,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=password-recovery-v3-20261006"></script>
+<script src="/static/script.js?v=password-recovery-v4-copy-code-20261006"></script>
 
 </body>
 </html>
