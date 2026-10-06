@@ -915,6 +915,10 @@ function renderAccountUi() {
     guest?.classList.toggle("hidden", accountState.authenticated);
     user?.classList.toggle("hidden", !accountState.authenticated);
 
+    if (!accountState.authenticated) {
+        setAccountDeletePanel(false);
+    }
+
     if (username) username.textContent = accountState.username;
     if (syncState) syncState.textContent = accountSyncText();
 
@@ -942,6 +946,11 @@ function openAccountModal() {
     closeMobileShellDrawers();
     const modal = document.getElementById("accountModal");
     if (!modal) return;
+
+    if (!accountState.authenticated) {
+        setAccountDeletePanel(false);
+    }
+
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
     renderAccountUi();
@@ -1196,8 +1205,18 @@ async function submitAccountAuth(mode) {
 
         if (passwordInput) passwordInput.value = "";
         setAccountMessage("");
+        setAccountDeletePanel(false);
         accountState.syncing = false;
+
+        // 注册成功即已经由后端建立 Session，不需要再登录一次。
+        // 这里立即切到“已登录”视图，再在后台完成首次云同步。
         renderAccountUi();
+        if (mode === "register") {
+            showCopyToast("注册成功，已登录");
+        } else {
+            showCopyToast("登录成功");
+        }
+
         await resolveInitialCloudSync(mode === "register");
     } catch (error) {
         accountState.syncing = false;
