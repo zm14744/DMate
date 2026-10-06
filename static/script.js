@@ -74,9 +74,14 @@ const APPEARANCE_ACCENTS = Object.freeze({
 });
 
 let appearanceSettings = { ...APPEARANCE_DEFAULTS };
+let appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
 let appearanceBackgroundObjectUrl = "";
 let appearanceHasBackground = false;
 let appearanceSystemMedia = null;
+let appearanceDraftOriginalSettings = null;
+let appearanceBackgroundDraftMode = "unchanged"; // unchanged | set | remove
+let appearanceDraftBackgroundBlob = null;
+let appearanceDraftDirty = false;
 
 function clampAppearanceNumber(value, min, max, fallback) {
     const number = Number(value);
@@ -151,10 +156,14 @@ function loadAppearanceSettings() {
 }
 
 function saveAppearanceSettings() {
+    appearanceCommittedSettings = normalizeAppearanceSettings(
+        appearanceSettings
+    );
+
     try {
         localStorage.setItem(
             APPEARANCE_STORAGE_KEY,
-            JSON.stringify(appearanceSettings)
+            JSON.stringify(appearanceCommittedSettings)
         );
     } catch (_error) {
         // 外观保存失败不应影响学习系统本身。
@@ -266,7 +275,7 @@ function applyAppearanceSettings(options = {}) {
         appearanceSettings.backgroundFit
     );
 
-    if (options.save !== false) {
+    if (options.save === true) {
         saveAppearanceSettings();
     }
 
@@ -329,13 +338,78 @@ function syncAppearanceControls() {
     updateAppearanceBackgroundUi();
 }
 
+function beginAppearanceDraft() {
+    appearanceDraftOriginalSettings = {
+        ...normalizeAppearanceSettings(appearanceCommittedSettings)
+    };
+    appearanceSettings = { ...appearanceDraftOriginalSettings };
+    appearanceBackgroundDraftMode = "unchanged";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = false;
+}
+
+async function discardAppearanceDraft() {
+    appearanceSettings = {
+        ...normalizeAppearanceSettings(
+            appearanceDraftOriginalSettings || appearanceCommittedSettings
+        )
+    };
+    applyAppearanceSettings({ save:false });
+
+    appearanceBackgroundDraftMode = "unchanged";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = false;
+    appearanceDraftOriginalSettings = null;
+
+    // 背景图片也回到 IndexedDB 中最后一次“应用”保存的版本。
+    await loadAppearanceBackground();
+}
+
 function openAppearance() {
+    beginAppearanceDraft();
+    applyAppearanceSettings({ save:false });
     syncAppearanceControls();
     document.getElementById("appearanceModal")?.classList.remove("hidden");
 }
 
-function closeAppearance() {
+async function closeAppearance() {
+    const modal = document.getElementById("appearanceModal");
+    if (!modal || modal.classList.contains("hidden")) return;
+
+    // 先关界面，再在后台回滚预览，避免 IndexedDB 读取让关闭动作显得卡顿。
+    modal.classList.add("hidden");
+
+    if (appearanceDraftDirty) {
+        await discardAppearanceDraft();
+    } else {
+        appearanceDraftOriginalSettings = null;
+    }
+}
+
+async function applyAppearanceDraft() {
+    // 先保存背景，再提交文字/透明度等设置。只有这个入口会持久化。
+    try {
+        if (appearanceBackgroundDraftMode === "set") {
+            if (appearanceDraftBackgroundBlob instanceof Blob) {
+                await writeAppearanceBackgroundBlob(appearanceDraftBackgroundBlob);
+            }
+        } else if (appearanceBackgroundDraftMode === "remove") {
+            await deleteAppearanceBackgroundBlob();
+        }
+    } catch (_error) {
+        window.alert("背景图片保存失败，请重试。");
+        return;
+    }
+
+    saveAppearanceSettings();
+    appearanceSettings = { ...appearanceCommittedSettings };
+    appearanceBackgroundDraftMode = "unchanged";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = false;
+    appearanceDraftOriginalSettings = null;
+
     document.getElementById("appearanceModal")?.classList.add("hidden");
+    showCopyToast("外观设置已应用");
 }
 
 function openAppearanceDatabase() {
@@ -593,7 +667,9 @@ async function handleAppearanceBackgroundSelected(event) {
 
     try {
         const blob = await prepareAppearanceBackgroundBlob(file);
-        await writeAppearanceBackgroundBlob(blob);
+        appearanceBackgroundDraftMode = "set";
+        appearanceDraftBackgroundBlob = blob;
+        appearanceDraftDirty = true;
         setAppearanceBackgroundVisual(blob);
     } catch (_error) {
         window.alert("背景图片处理失败，请换一张 JPG、PNG 或 WebP 图片。");
@@ -602,29 +678,20 @@ async function handleAppearanceBackgroundSelected(event) {
 
 async function removeAppearanceBackground() {
     closeAppearanceBackgroundViewer();
-
-    try {
-        await deleteAppearanceBackgroundBlob();
-    } catch (_error) {
-        // 即使持久化删除失败，也先移除当前视觉背景，不影响主功能。
-    }
-
+    appearanceBackgroundDraftMode = "remove";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = true;
     clearAppearanceBackgroundVisual();
 }
 
 async function resetAppearance() {
     closeAppearanceBackgroundViewer();
     appearanceSettings = { ...APPEARANCE_DEFAULTS };
-    saveAppearanceSettings();
-
-    try {
-        await deleteAppearanceBackgroundBlob();
-    } catch (_error) {
-        // 无需阻断恢复默认。
-    }
-
+    appearanceBackgroundDraftMode = "remove";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = true;
     clearAppearanceBackgroundVisual();
-    applyAppearanceSettings({ save: false });
+    applyAppearanceSettings({ save:false });
 }
 
 function setupAppearanceSystemThemeListener() {
@@ -661,7 +728,7 @@ function bindAppearanceControls() {
 
     appearanceBtn?.addEventListener("click", openAppearance);
     appearanceClose?.addEventListener("click", closeAppearance);
-    appearanceDone?.addEventListener("click", closeAppearance);
+    appearanceDone?.addEventListener("click", applyAppearanceDraft);
     appearanceReset?.addEventListener("click", resetAppearance);
 
     appearanceModal?.addEventListener("click", event => {
@@ -689,28 +756,32 @@ function bindAppearanceControls() {
     document.querySelectorAll("[data-appearance-mode]").forEach(button => {
         button.addEventListener("click", () => {
             appearanceSettings.mode = button.dataset.appearanceMode;
-            applyAppearanceSettings();
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
         });
     });
 
     document.querySelectorAll("[data-appearance-accent]").forEach(button => {
         button.addEventListener("click", () => {
             appearanceSettings.accent = button.dataset.appearanceAccent;
-            applyAppearanceSettings();
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
         });
     });
 
     document.querySelectorAll("[data-appearance-font]").forEach(button => {
         button.addEventListener("click", () => {
             appearanceSettings.fontSize = button.dataset.appearanceFont;
-            applyAppearanceSettings();
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
         });
     });
 
     document.querySelectorAll("[data-appearance-fit]").forEach(button => {
         button.addEventListener("click", () => {
             appearanceSettings.backgroundFit = button.dataset.appearanceFit;
-            applyAppearanceSettings();
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
         });
     });
 
@@ -724,14 +795,16 @@ function bindAppearanceControls() {
     for (const [id, key] of sliders) {
         document.getElementById(id)?.addEventListener("input", event => {
             appearanceSettings[key] = Number(event.target.value);
-            applyAppearanceSettings();
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
         });
     }
 }
 
 function initAppearanceSystem() {
     appearanceSettings = loadAppearanceSettings();
-    applyAppearanceSettings({ save: false });
+    appearanceCommittedSettings = { ...appearanceSettings };
+    applyAppearanceSettings({ save:false });
     bindAppearanceControls();
     setupAppearanceSystemThemeListener();
     loadAppearanceBackground();
@@ -808,7 +881,7 @@ function collectCloudSnapshot() {
             currentId
         },
         learning: learningState,
-        appearance: appearanceSettings
+        appearance: normalizeAppearanceSettings(appearanceCommittedSettings)
     };
 }
 
@@ -863,8 +936,9 @@ function applyCloudSnapshot(snapshot) {
         }
 
         if (snapshot.appearance && typeof snapshot.appearance === "object") {
-            appearanceSettings = normalizeAppearanceSettings(snapshot.appearance);
-            localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearanceSettings));
+            appearanceCommittedSettings = normalizeAppearanceSettings(snapshot.appearance);
+            appearanceSettings = { ...appearanceCommittedSettings };
+            localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearanceCommittedSettings));
             applyAppearanceSettings({ save:false });
         }
 
@@ -2806,6 +2880,12 @@ function looksLikeActualLearningProblem(message) {
         return true;
     }
 
+    // 短而完整的自然学习问句也必须切换成新题，不能继续绑在上一题。
+    // 例如“什么是欧拉图？”“两个图同构吗？”“如何判断欧拉图？”。
+    if (looksLikeChatQuestionText(text)) {
+        return true;
+    }
+
     // 一般完整题目会比“换个写法/再提示一下”长很多。
     if (text.length >= 80) {
         return true;
@@ -4138,22 +4218,8 @@ function confirmWrongSafePreview() {
     const total = pendingWrongSafeItems.length;
 
     closeWrongSafePreview();
-
-    const button = document.getElementById(
-        "markWrongBtn"
-    );
-
-    if (button) {
-        const previous = button.textContent;
-        button.textContent = total > 1
-            ? `已记录 ${total} 道`
-            : "已记录";
-
-        setTimeout(() => {
-            button.textContent = previous;
-            renderLearningSummary();
-        }, 1000);
-    }
+    renderLearningSummary();
+    showCopyToast(total > 1 ? `已记录 ${total} 道错题` : "已加入错题本");
 }
 
 
@@ -4616,47 +4682,6 @@ function processLearningFromReply(
     renderLearningSummary();
 }
 
-function manualMarkCurrentWrong() {
-    const session = getCurrent();
-    if (!session) return;
-
-    const teaching = normalizeTeaching(
-        session.teaching
-    );
-
-    const questionInfo = currentLearningQuestion(
-        session,
-        teaching
-    );
-
-    if (!questionInfo) {
-        window.alert(
-            "当前还没有可加入错题本的题目。"
-        );
-        return;
-    }
-
-    const choices = splitQuestionBankText(
-        questionInfo.text
-    );
-
-    if (
-        choices.length
-        && openWrongQuestionPicker(
-            questionInfo,
-            choices
-        )
-    ) {
-        return;
-    }
-
-    openWrongSafePreview(
-        questionInfo
-    );
-}
-
-
-
 function learningReviewItemLabel(item) {
     if (!item || typeof item !== "object") {
         return "";
@@ -4929,7 +4954,6 @@ function formatLearningDate(timestamp) {
 
 function renderLearningSummary() {
     const box = document.getElementById("learningSummary");
-    const markButton = document.getElementById("markWrongBtn");
     const wrongButton = document.getElementById("wrongBookBtn");
 
     if (!box) return;
@@ -4955,15 +4979,6 @@ function renderLearningSummary() {
         wrongButton.textContent = `查看错题本 (${wrongCount})`;
     }
 
-    if (markButton) {
-        const session = getCurrent();
-        const teaching = normalizeTeaching(session?.teaching);
-
-        markButton.disabled = !(
-            session
-            && currentLearningQuestion(session, teaching)
-        );
-    }
 }
 
 
@@ -11119,8 +11134,15 @@ function looksLikeChatQuestionText(text) {
 
     if (
         /[？?]\s*$/.test(compact)
-        && /(命题|公式|集合|关系|函数|图|矩阵|树|通路|回路|欧拉|哈密顿|递推|组合|群|环|域)/.test(compact)
-        && compact.length >= 8
+        && /(命题|公式|集合|关系|函数|映射|图|同构|矩阵|树|通路|回路|欧拉|哈密顿|着色|色数|递推|数论|整除|同余|排列|组合|量词|范式|群|子群|环|域)/.test(compact)
+        && compact.length >= 5
+    ) {
+        return true;
+    }
+
+    if (
+        /^(?:什么是|为什么|为何|如何|怎样)/.test(compact)
+        && /(命题|集合|关系|函数|映射|图|同构|矩阵|树|欧拉|哈密顿|色数|递推|数论|整除|同余|排列|组合|量词|范式|群|子群|环|域)/.test(compact)
     ) {
         return true;
     }
@@ -16099,7 +16121,6 @@ function initMobileAppShell() {
 
     [
         "appearanceBtn",
-        "markWrongBtn",
         "wrongBookBtn",
         "knowledgeGraphBtn",
         "learningReviewBtn"
@@ -16231,290 +16252,6 @@ function installMobileVisualViewportFix() {
 }
 
 // -----------------------------
-// Android / 浏览器“返回”键：
-// 历史保护必须由真实用户交互建立，避免 Firefox/Fennec 把启动阶段脚本
-// 创建的 history 条目当作“未交互历史”跳过。
-// -----------------------------
-const MOBILE_HISTORY_ROOT = "__dm_tutor_mobile_root_v3";
-const MOBILE_HISTORY_STEP = "__dm_tutor_mobile_guard_step_v3";
-let mobileBackGuardInstalled = false;
-let mobileBackExitUntil = 0;
-let mobileBackAllowExit = false;
-let mobileKeyboardFocusGraceUntil = 0;
-let mobileBackUserActivated = false;
-
-function mobileHistoryStateObject() {
-    const value = history.state;
-    return value && typeof value === "object" && !Array.isArray(value)
-        ? { ...value }
-        : {};
-}
-
-function mobileHistoryGuardStep() {
-    const step = Number(history.state?.[MOBILE_HISTORY_STEP]);
-    return Number.isFinite(step) ? step : 0;
-}
-
-function ensureMobileBackHistoryStack(fromUserGesture = false) {
-    if (!isMobileAppShell() || mobileBackAllowExit) return;
-
-    try {
-        let state = mobileHistoryStateObject();
-        let step = mobileHistoryGuardStep();
-
-        // 页面加载阶段只给“当前真实页面”做 root 标记，不新增历史项。
-        // 新增 guard 必须等真实 pointer/touch/keydown 交互后再做。
-        if (!state[MOBILE_HISTORY_ROOT] && !step) {
-            const root = {
-                ...state,
-                [MOBILE_HISTORY_ROOT]: true,
-                [MOBILE_HISTORY_STEP]: 0
-            };
-            history.replaceState(root, "", location.href);
-            state = root;
-            step = 0;
-        }
-
-        if (!fromUserGesture && !mobileBackUserActivated) {
-            return;
-        }
-
-        if (fromUserGesture) {
-            mobileBackUserActivated = true;
-        }
-
-        // 在同一次真实用户操作里补足两层保护。这样打开抽屉、弹窗、
-        // 图谱完整查看后，Android 返回首先只会回到同一文档并触发 popstate。
-        if (step < 1) {
-            history.pushState(
-                {
-                    ...state,
-                    [MOBILE_HISTORY_ROOT]: true,
-                    [MOBILE_HISTORY_STEP]: 1
-                },
-                "",
-                location.href
-            );
-            state = mobileHistoryStateObject();
-            step = 1;
-        }
-
-        if (step < 2) {
-            history.pushState(
-                {
-                    ...state,
-                    [MOBILE_HISTORY_ROOT]: true,
-                    [MOBILE_HISTORY_STEP]: 2
-                },
-                "",
-                location.href
-            );
-        }
-    } catch (error) {
-        console.warn("移动端返回保护建立失败：", error);
-    }
-}
-
-function markMobileKeyboardFocusGrace() {
-    mobileKeyboardFocusGraceUntil = Date.now() + 700;
-}
-
-function mobileKeyboardLikelyActive() {
-    const active = document.activeElement;
-    const activeEditable = active instanceof HTMLElement && (
-        active.matches("input, textarea, select")
-        || active.isContentEditable
-    );
-
-    if (activeEditable) return true;
-    if (Date.now() < mobileKeyboardFocusGraceUntil) return true;
-
-    const viewport = window.visualViewport;
-    if (!viewport) return false;
-
-    const hiddenHeight = Math.max(
-        0,
-        window.innerHeight - viewport.height - Math.max(0, viewport.offsetTop || 0)
-    );
-    return hiddenHeight > 120;
-}
-
-function dismissMobileKeyboardForBack() {
-    if (!mobileKeyboardLikelyActive()) return false;
-
-    const active = document.activeElement;
-    if (active instanceof HTMLElement && typeof active.blur === "function") {
-        active.blur();
-    }
-
-    mobileKeyboardFocusGraceUntil = 0;
-    syncMobileVisualViewport();
-    window.setTimeout(syncMobileVisualViewport, 80);
-    window.setTimeout(syncMobileVisualViewport, 220);
-    return true;
-}
-
-function closeTopMobileLayerForBack() {
-    if (dismissMobileKeyboardForBack()) {
-        return true;
-    }
-
-    const graphModal = document.getElementById("knowledgeGraphModal");
-    if (
-        graphModal
-        && !graphModal.classList.contains("hidden")
-        && graphModal.classList.contains("graph-fullscreen-view")
-    ) {
-        setKnowledgeGraphFullscreenView(false);
-        return true;
-    }
-
-    const openDialog = document.querySelector("dialog[open]");
-    if (openDialog && typeof openDialog.close === "function") {
-        openDialog.close();
-        return true;
-    }
-
-    const modalClosers = [
-        ["appearanceBackgroundViewer", closeAppearanceBackgroundViewer],
-        ["wrongSafeModal", closeWrongSafePreview],
-        ["wrongQuestionPickerModal", closeWrongQuestionPicker],
-        ["wrongEditModal", closeWrongEdit],
-        ["wrongBookModal", closeWrongBook],
-        ["learningReviewModal", closeLearningReview],
-        ["knowledgeGraphModal", closeKnowledgeGraph],
-        ["appearanceModal", closeAppearance]
-    ];
-
-    for (const [id, close] of modalClosers) {
-        const modal = document.getElementById(id);
-        if (modal && !modal.classList.contains("hidden")) {
-            close();
-            return true;
-        }
-    }
-
-    if (
-        document.body.classList.contains("mobile-left-open")
-        || document.body.classList.contains("mobile-tools-open")
-    ) {
-        closeMobileShellDrawers();
-        return true;
-    }
-
-    return false;
-}
-
-function installMobileBackGuard() {
-    if (mobileBackGuardInstalled) return;
-    mobileBackGuardInstalled = true;
-
-    if (isMobileAppShell()) {
-        // 这里只标 root，不在启动阶段 push guard。
-        ensureMobileBackHistoryStack(false);
-    }
-
-    // 关键修复：在真实用户操作的同步事件里建立 history guard。
-    // Fennec/Firefox Android 可能不把页面启动阶段自动塞入的 history
-    // 当成可由系统 Back 正常遍历的用户导航；这里让 guard 与用户操作绑定。
-    const armFromUserGesture = () => {
-        if (!isMobileAppShell() || mobileBackAllowExit) return;
-        ensureMobileBackHistoryStack(true);
-    };
-
-    document.addEventListener("pointerdown", armFromUserGesture, {
-        capture: true,
-        passive: true
-    });
-    document.addEventListener("touchstart", armFromUserGesture, {
-        capture: true,
-        passive: true
-    });
-    document.addEventListener("click", armFromUserGesture, {
-        capture: true,
-        passive: true
-    });
-    document.addEventListener("keydown", armFromUserGesture, {
-        capture: true
-    });
-
-    document.addEventListener("focusin", event => {
-        if (!(event.target instanceof Element)) return;
-        if (event.target.matches("input, textarea, select, [contenteditable='true']")) {
-            mobileKeyboardFocusGraceUntil = Date.now() + 60 * 60 * 1000;
-            armFromUserGesture();
-        }
-    });
-    document.addEventListener("focusout", event => {
-        if (!(event.target instanceof Element)) return;
-        if (event.target.matches("input, textarea, select, [contenteditable='true']")) {
-            markMobileKeyboardFocusGrace();
-        }
-    });
-
-    window.addEventListener("popstate", () => {
-        if (!isMobileAppShell() || mobileBackAllowExit) return;
-
-        // Back 已经先退到同页的较低 guard。先处理 UI，再决定是否补回顶层。
-        // 不能一进 popstate 就 pushState，否则“第二次返回退出”会被刚补回的
-        // guard 再挡一次。
-        if (closeTopMobileLayerForBack()) {
-            mobileBackExitUntil = 0;
-            if (mobileBackUserActivated) {
-                ensureMobileBackHistoryStack(true);
-            }
-            return;
-        }
-
-        const now = Date.now();
-        if (now < mobileBackExitUntil) {
-            mobileBackExitUntil = 0;
-            mobileBackAllowExit = true;
-
-            // 此时通常位于 step1；跨过剩余 guard + 本页 root，回到浏览器
-            // 原来的上一页。若只剩 root，则退一层即可。
-            const step = mobileHistoryGuardStep();
-            const delta = -(Math.max(0, step) + 1);
-            window.setTimeout(() => {
-                try {
-                    history.go(delta);
-                } catch (_error) {
-                    history.back();
-                }
-            }, 0);
-            return;
-        }
-
-        mobileBackExitUntil = now + 1800;
-        showCopyToast("再按一次返回退出");
-        if (mobileBackUserActivated) {
-            ensureMobileBackHistoryStack(true);
-        }
-    });
-
-    // beforeunload 在现代移动浏览器里不能作为可靠的 Android Back 拦截器，
-    // 因此不再依赖它。真正的保护来自“用户交互时建立的同页 history”。
-
-    window.addEventListener("pageshow", () => {
-        if (isMobileAppShell() && !mobileBackAllowExit) {
-            mobileBackExitUntil = 0;
-            ensureMobileBackHistoryStack(false);
-            syncMobileVisualViewport();
-        }
-    });
-
-    const media = window.matchMedia?.("(max-width: 1100px)");
-    media?.addEventListener?.("change", event => {
-        if (event.matches) {
-            mobileBackAllowExit = false;
-            mobileBackExitUntil = 0;
-            ensureMobileBackHistoryStack(false);
-            syncMobileVisualViewport();
-        }
-    });
-}
-
-// -----------------------------
 // 全刷新
 // -----------------------------
 function renderAll() {
@@ -16559,7 +16296,6 @@ document.addEventListener(
         const chat = document.getElementById("chat");
         const imageBtn = document.getElementById("imageBtn");
         const imageInput = document.getElementById("imageInput");
-        const markWrongBtn = document.getElementById("markWrongBtn");
         const wrongBookBtn = document.getElementById("wrongBookBtn");
         const learningReviewBtn = document.getElementById("learningReviewBtn");
         const learningReviewClose = document.getElementById("learningReviewClose");
@@ -16572,15 +16308,12 @@ document.addEventListener(
         const wrongPdfBtn = document.getElementById("wrongPdfBtn");
         const wrongClearCompletedBtn = document.getElementById("wrongClearCompletedBtn");
         const wrongEditClose = document.getElementById("wrongEditClose");
-        const wrongEditCancel = document.getElementById("wrongEditCancel");
         const wrongEditSave = document.getElementById("wrongEditSave");
         const wrongEditModal = document.getElementById("wrongEditModal");
         const wrongQuestionPickerClose = document.getElementById("wrongQuestionPickerClose");
-        const wrongQuestionPickerCancel = document.getElementById("wrongQuestionPickerCancel");
         const wrongQuestionPickerConfirm = document.getElementById("wrongQuestionPickerConfirm");
         const wrongQuestionPickerModal = document.getElementById("wrongQuestionPickerModal");
         const wrongSafeClose = document.getElementById("wrongSafeClose");
-        const wrongSafeCancel = document.getElementById("wrongSafeCancel");
         const wrongSafeConfirm = document.getElementById("wrongSafeConfirm");
         const wrongSafeModal = document.getElementById("wrongSafeModal");
         const knowledgeGraphBtn = document.getElementById("knowledgeGraphBtn");
@@ -16659,12 +16392,6 @@ document.addEventListener(
             );
         }
 
-        if (markWrongBtn) {
-            markWrongBtn.addEventListener(
-                "click",
-                manualMarkCurrentWrong
-            );
-        }
 
         if (wrongBookBtn) {
             wrongBookBtn.addEventListener(
@@ -16780,12 +16507,6 @@ document.addEventListener(
             );
         }
 
-        if (wrongEditCancel) {
-            wrongEditCancel.addEventListener(
-                "click",
-                closeWrongEdit
-            );
-        }
 
         if (wrongEditSave) {
             wrongEditSave.addEventListener(
@@ -16812,12 +16533,6 @@ document.addEventListener(
             );
         }
 
-        if (wrongQuestionPickerCancel) {
-            wrongQuestionPickerCancel.addEventListener(
-                "click",
-                closeWrongQuestionPicker
-            );
-        }
 
         if (wrongQuestionPickerConfirm) {
             wrongQuestionPickerConfirm.addEventListener(
@@ -16844,12 +16559,6 @@ document.addEventListener(
             );
         }
 
-        if (wrongSafeCancel) {
-            wrongSafeCancel.addEventListener(
-                "click",
-                closeWrongSafePreview
-            );
-        }
 
         if (wrongSafeConfirm) {
             wrongSafeConfirm.addEventListener(
