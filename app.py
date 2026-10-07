@@ -1619,6 +1619,14 @@ def sync_user_data():
         return jsonify({"ok": False, "error": "同步失败，请稍后再试。"}), 500
 
 
+@app.route("/manifest.webmanifest")
+def web_app_manifest():
+    response = app.send_static_file("manifest.webmanifest")
+    response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
 @app.route("/service-worker.js")
 def service_worker():
     response = app.send_static_file("service-worker.js")
