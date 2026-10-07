@@ -17184,71 +17184,29 @@ function detectDmateBrowser() {
 
 function installGuideForCurrentPlatform() {
     const platform = detectDmateInstallPlatform();
-    const browser = detectDmateBrowser();
 
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"iOS / iPadOS 不提供网页里的直接安装弹窗，需要从系统分享菜单添加 DMate。",
-            steps:[
-                "点击浏览器的“分享”按钮。",
-                "在分享菜单中选择“添加到主屏幕”。",
-                "确认名称为 DMate，然后点击“添加”。"
-            ]
+            text:"点击浏览器的分享按钮，选择“添加到主屏幕”即可安装 DMate。",
+            steps:[]
         };
     }
 
     if (platform === "android") {
         return {
-            platform:"Android",
-            text: browser === "firefox"
-                ? "Firefox / Fennec 只有在浏览器识别为可安装 Web App 时才会显示“安装”；若菜单只有“添加到主屏幕”，那只是快捷方式。要获得真正独立的 PWA，请用 Chrome 或 Edge 打开同一地址。"
-                : "如果系统没有自动弹出安装窗口，可以从浏览器菜单手动安装。",
-            steps: browser === "firefox"
-                ? ["打开右上角菜单，先查看是否有“安装”。", "如果只有“添加到主屏幕”，请改用 Chrome 或 Edge。", "在 Chrome / Edge 中点击 DMate 顶部安装按钮并确认安装。"]
-                : ["打开浏览器右上角菜单。", "选择“安装应用”或“添加到主屏幕”。", "确认安装 DMate。"]
-        };
-    }
-
-    if (platform === "macos") {
-        return {
-            platform:"macOS",
-            text: browser === "safari"
-                ? "Safari 可以把 DMate 作为网页应用加入程序坞；Chrome / Edge 也可以安装为独立窗口。"
-                : "DMate 可以在 macOS 上安装为独立网页应用。",
-            steps: browser === "safari"
-                ? ["在 Safari 菜单中打开“文件”。", "选择“添加到程序坞”。", "确认添加 DMate。"]
-                : ["点击地址栏附近的安装图标，或打开浏览器菜单。", "选择“安装 DMate”。", "确认安装。"]
-        };
-    }
-
-    if (platform === "linux") {
-        return {
-            platform:"Linux（Ubuntu / Debian / Arch 等）",
-            text: browser === "firefox"
-                ? "Firefox 桌面版若没有独立 PWA 安装入口，请用 Chrome、Chromium 或 Edge 打开 DMate 后安装。"
-                : "Ubuntu、Debian、Arch 等发行版使用相同的 PWA 安装方式，主要取决于浏览器。",
-            steps: browser === "firefox"
-                ? ["安装或打开 Chrome、Chromium 或 Edge。", "访问同一个 DMate 地址。", "使用地址栏安装图标或菜单里的“安装 DMate”。"]
-                : ["点击地址栏附近的安装图标，或打开浏览器菜单。", "选择“安装 DMate”。", "确认后会生成独立应用入口。"]
-        };
-    }
-
-    if (platform === "windows") {
-        return {
-            platform:"Windows",
-            text:"Edge / Chrome 可以把 DMate 安装成独立桌面应用。",
-            steps:["点击地址栏附近的安装图标，或打开浏览器菜单。", "选择“安装 DMate”。", "确认安装。"]
+            platform:"手机 / 平板",
+            text:"打开浏览器菜单，选择“安装应用”“添加到主屏幕”或类似选项即可。不同浏览器名称可能略有不同。",
+            steps:[]
         };
     }
 
     return {
-        platform:"当前设备",
-        text:"如果浏览器没有弹出安装窗口，可以从浏览器菜单寻找“安装应用”或“添加到主屏幕”。",
-        steps:["打开浏览器菜单。", "寻找“安装应用”或“添加到主屏幕”。", "确认安装 DMate。"]
+        platform:"电脑",
+        text:"在浏览器地址栏或菜单中选择“安装应用”“安装 DMate”或类似选项即可。",
+        steps:[]
     };
 }
-
 function openDmateInstallHelp() {
     const modal = document.getElementById("installHelpModal");
     const platformEl = document.getElementById("installHelpPlatform");
@@ -17264,6 +17222,7 @@ function openDmateInstallHelp() {
         li.textContent = step;
         return li;
     }));
+    stepsEl.hidden = guide.steps.length === 0;
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
 }
@@ -17277,8 +17236,7 @@ function closeDmateInstallHelp() {
 
 function initPwaInstall() {
     const buttons = [
-        document.getElementById("installAppBtn"),
-        document.getElementById("mobileInstallBtn")
+        document.getElementById("installAppBtn")
     ].filter(Boolean);
     const close = document.getElementById("installHelpClose");
     const modal = document.getElementById("installHelpModal");
