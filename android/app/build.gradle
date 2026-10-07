@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+def releaseKeystore = System.getenv("DMATE_KEYSTORE_PATH")
+def hasReleaseSigning = releaseKeystore != null && !releaseKeystore.trim().isEmpty()
+
+android {
+    namespace 'app.dmate.client'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'app.dmate.client'
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName '1.0.0'
+
+        buildConfigField 'String', 'DMATE_URL', '"https://dmate.zeabur.app/"'
+        buildConfigField 'String', 'DMATE_USER_AGENT', '"DMateAndroid/1.0.0"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv("DMATE_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("DMATE_KEY_ALIAS")
+                keyPassword System.getenv("DMATE_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+        release {
+            minifyEnabled false
+            shrinkResources false
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
