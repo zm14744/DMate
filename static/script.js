@@ -17148,9 +17148,19 @@ function removeDeprecatedCopyControls() {
 }
 
 // -----------------------------
-// PWA：DMate Windows / macOS / Linux / Android / iOS 安装
+// 安装：Android 统一 APK；iOS / 桌面浏览器保留 Web App / PWA
 // -----------------------------
 let deferredPwaInstallPrompt = null;
+
+function dmateClientConfig() {
+    const config = window.DMATE_CLIENT_CONFIG || {};
+    const ua = navigator.userAgent || "";
+    return {
+        isAndroid: Boolean(config.isAndroid ?? /Android/i.test(ua)),
+        isAndroidApp: Boolean(config.isAndroidApp ?? /DMateAndroid\//i.test(ua)),
+        androidApkUrl: String(config.androidApkUrl || "").trim()
+    };
+}
 
 function isDmateStandalone() {
     return Boolean(
@@ -17173,30 +17183,24 @@ function detectDmateInstallPlatform() {
     return "other";
 }
 
-function detectDmateBrowser() {
-    const ua = navigator.userAgent || "";
-    if (/Edg\//i.test(ua)) return "edge";
-    if (/Firefox|Fennec/i.test(ua)) return "firefox";
-    if (/CriOS|Chrome|Chromium/i.test(ua)) return "chrome";
-    if (/Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg\//i.test(ua)) return "safari";
-    return "other";
-}
-
 function installGuideForCurrentPlatform() {
+    const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
 
-    if (platform === "ios") {
+    if (config.isAndroid) {
         return {
-            platform:"iPhone / iPad",
-            text:"点击浏览器的分享按钮，选择“添加到主屏幕”即可安装 DMate。",
+            platform:"Android",
+            text: config.androidApkUrl
+                ? "DMate 的 Android 版使用独立 APK，不再通过浏览器安装 PWA。"
+                : "DMate 的 Android 版使用独立 APK。正式 APK 下载地址尚未配置。",
             steps:[]
         };
     }
 
-    if (platform === "android") {
+    if (platform === "ios") {
         return {
-            platform:"手机 / 平板",
-            text:"打开浏览器菜单，选择“安装应用”“添加到主屏幕”或类似选项即可。不同浏览器名称可能略有不同。",
+            platform:"iPhone / iPad",
+            text:"在 Safari 中点击“分享”，选择“添加到主屏幕”即可。",
             steps:[]
         };
     }
@@ -17207,6 +17211,7 @@ function installGuideForCurrentPlatform() {
         steps:[]
     };
 }
+
 function openDmateInstallHelp() {
     const modal = document.getElementById("installHelpModal");
     const platformEl = document.getElementById("installHelpPlatform");
@@ -17235,22 +17240,42 @@ function closeDmateInstallHelp() {
 }
 
 function initPwaInstall() {
-    const buttons = [
-        document.getElementById("installAppBtn")
-    ].filter(Boolean);
+    const config = dmateClientConfig();
+    const button = document.getElementById("installAppBtn");
     const close = document.getElementById("installHelpClose");
     const modal = document.getElementById("installHelpModal");
+    if (!button) return;
 
     const syncButton = () => {
+        if (config.isAndroidApp) {
+            button.hidden = true;
+            button.setAttribute("aria-hidden", "true");
+            return;
+        }
+        if (config.isAndroid) {
+            button.hidden = false;
+            button.textContent = "下载 DMate APK";
+            button.setAttribute("aria-hidden", "false");
+            return;
+        }
         const installed = isDmateStandalone();
-        buttons.forEach(button => {
-            button.hidden = installed;
-            if (button.id === "installAppBtn") button.textContent = "安装 DMate";
-            button.setAttribute("aria-hidden", installed ? "true" : "false");
-        });
+        button.hidden = installed;
+        button.textContent = "安装 DMate";
+        button.setAttribute("aria-hidden", installed ? "true" : "false");
     };
 
     const requestInstall = async () => {
+        if (config.isAndroidApp) return;
+
+        if (config.isAndroid) {
+            if (config.androidApkUrl) {
+                window.location.assign(config.androidApkUrl);
+            } else {
+                openDmateInstallHelp();
+            }
+            return;
+        }
+
         if (isDmateStandalone()) {
             syncButton();
             return;
@@ -17262,12 +17287,8 @@ function initPwaInstall() {
             try {
                 await prompt.prompt();
                 const choice = await prompt.userChoice;
-                if (choice?.outcome === "accepted") {
-                    syncButton();
-                } else {
-                    deferredPwaInstallPrompt = prompt;
-                    syncButton();
-                }
+                if (choice?.outcome !== "accepted") deferredPwaInstallPrompt = prompt;
+                syncButton();
                 return;
             } catch (_error) {
                 deferredPwaInstallPrompt = prompt;
@@ -17281,13 +17302,17 @@ function initPwaInstall() {
     syncButton();
 
     window.addEventListener("beforeinstallprompt", event => {
+        // Android 明确不再走 PWA。阻止浏览器自己的安装提示，统一提供 APK。
+        if (config.isAndroid) {
+            event.preventDefault();
+            return;
+        }
         event.preventDefault();
         deferredPwaInstallPrompt = event;
         syncButton();
     });
 
-    buttons.forEach(button => button.addEventListener("click", requestInstall));
-
+    button.addEventListener("click", requestInstall);
     close?.addEventListener("click", closeDmateInstallHelp);
     modal?.addEventListener("click", event => {
         if (event.target === modal) closeDmateInstallHelp();
@@ -17310,6 +17335,16 @@ function initPwaInstall() {
 
 function registerDmateServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
+    const config = dmateClientConfig();
+
+    if (config.isAndroid) {
+        // Android 已切换为 APK 客户端，清掉以前可能安装/访问 PWA 留下的 Service Worker。
+        navigator.serviceWorker.getRegistrations?.()
+            .then(registrations => Promise.all(registrations.map(reg => reg.unregister())))
+            .catch(() => {});
+        return;
+    }
+
     window.addEventListener("load", () => {
         navigator.serviceWorker.register("/service-worker.js", { scope:"/" })
             .catch(error => console.warn("DMate PWA 注册失败：", error));
