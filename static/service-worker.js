@@ -1,8 +1,9 @@
-const CACHE_NAME = "dmate-shell-v6-20261007";
+const CACHE_NAME = "dmate-shell-v6-2-20261007";
 const SHELL_ASSETS = [
   "/",
   "/static/manifest.webmanifest",
   "/static/icons/favicon-32.png",
+  "/static/icons/favicon-128.png",
   "/static/icons/apple-touch-icon.png",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
