@@ -6494,6 +6494,57 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     }
 }
 
+
+
+/* =========================================================
+   DMate v6.11：自定义背景下的桌面输入区连续化
+   - 三种主题的输入承载区都直接透出同一张背景图，不再形成横向分隔带。
+   - 浅色主题不再被旧的强制白色背景覆盖；只保留真正的文本输入框为白色。
+   - 不改变移动端输入胶囊几何，也不改变无自定义背景时的桌面布局。
+   ========================================================= */
+@media (min-width:1101px) {
+    body.has-custom-background .center,
+    body.has-custom-background .chat,
+    body.has-custom-background .input-wrap,
+    body.has-custom-background .input {
+        border-top:0 !important;
+        border-bottom:0 !important;
+        outline:0 !important;
+        box-shadow:none !important;
+    }
+
+    /* 外层输入承载区完全透出壁纸，消除聊天区 / 输入区之间的横向色带。 */
+    body.has-custom-background .input-wrap,
+    body.has-custom-background .input {
+        background:transparent !important;
+        background-color:transparent !important;
+        background-image:none !important;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+    }
+
+    /* 浅色主题此前被强制白底规则盖住；这里仅让真正的输入框保持可读白底。 */
+    body[data-appearance-theme="light"].has-custom-background .input input {
+        background:rgba(255,255,255,.94) !important;
+        background-image:none !important;
+        border:1px solid rgba(203,213,225,.92) !important;
+        box-shadow:none !important;
+    }
+
+    /* 黑色 / 蓝色仍保留各自原有的真正输入框样式，仅移除外层分隔带。 */
+    body[data-appearance-theme="dark"].has-custom-background .input input {
+        background:#2f2f2f !important;
+        background-image:none !important;
+        border:1px solid #3a3a3a !important;
+        box-shadow:none !important;
+    }
+
+    body[data-appearance-theme="navy"].has-custom-background .input input {
+        background:rgba(var(--surface-3-rgb),.92) !important;
+        background-image:none !important;
+        box-shadow:none !important;
+    }
+}
 </style>
 
 <script>
