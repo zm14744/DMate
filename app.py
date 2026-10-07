@@ -138,6 +138,12 @@ EMAIL_DELIVERY_CONFIGURED = bool(BREVO_CONFIGURED or SMTP_CONFIGURED)
 # Android 客户端：Android 浏览器不再走 PWA；正式 APK 发布后把下载地址放到该环境变量。
 ANDROID_APK_URL = (os.environ.get("ANDROID_APK_URL") or "").strip()
 
+# 桌面客户端：Windows / macOS / Linux 统一使用 Tauri，不再依赖浏览器 PWA。
+DESKTOP_WINDOWS_URL = (os.environ.get("DESKTOP_WINDOWS_URL") or "").strip()
+DESKTOP_MACOS_URL = (os.environ.get("DESKTOP_MACOS_URL") or "").strip()
+DESKTOP_LINUX_DEB_URL = (os.environ.get("DESKTOP_LINUX_DEB_URL") or "").strip()
+DESKTOP_LINUX_APPIMAGE_URL = (os.environ.get("DESKTOP_LINUX_APPIMAGE_URL") or "").strip()
+
 MAX_SYNC_JSON_BYTES = 5 * 1024 * 1024
 AUTH_RATE_LIMIT_WINDOW = 60
 AUTH_RATE_LIMIT_COUNT = 20
@@ -1732,7 +1738,9 @@ def home():
     # APK 自己追加 DMateAndroid/<version> UA，可据此隐藏网页内的下载入口。
     user_agent = request.headers.get("User-Agent", "")
     is_android = bool(re.search(r"Android", user_agent, re.IGNORECASE))
+    is_ios = bool(re.search(r"iPhone|iPad|iPod|Macintosh.*Mobile", user_agent, re.IGNORECASE))
     is_dmate_android_app = bool(re.search(r"DMateAndroid/", user_agent, re.IGNORECASE))
+    is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
 
     # 首页直接注入与 teaching.py / app.py 共用的 knowledge_graph.json，
     # 避免前端再维护一份硬编码图谱而产生不同步。
@@ -1740,8 +1748,14 @@ def home():
         "index.html",
         knowledge_graph_data=KNOWLEDGE_GRAPH_DATA,
         is_android=is_android,
+        is_ios=is_ios,
         is_dmate_android_app=is_dmate_android_app,
+        is_dmate_desktop_app=is_dmate_desktop_app,
         android_apk_url=ANDROID_APK_URL,
+        desktop_windows_url=DESKTOP_WINDOWS_URL,
+        desktop_macos_url=DESKTOP_MACOS_URL,
+        desktop_linux_deb_url=DESKTOP_LINUX_DEB_URL,
+        desktop_linux_appimage_url=DESKTOP_LINUX_APPIMAGE_URL,
     )
 
 
