@@ -122,7 +122,7 @@ function normalizeAppearanceSettings(value) {
         : {};
 
     return {
-        mode: ["system", "light", "dark"].includes(source.mode)
+        mode: ["system", "light", "dark", "navy"].includes(source.mode)
             ? source.mode
             : APPEARANCE_DEFAULTS.mode,
         accent: Object.prototype.hasOwnProperty.call(
@@ -209,6 +209,10 @@ function resolveAppearanceTheme() {
         return "dark";
     }
 
+    if (appearanceSettings.mode === "navy") {
+        return "navy";
+    }
+
     try {
         return window.matchMedia("(prefers-color-scheme: light)").matches
             ? "light"
@@ -253,11 +257,11 @@ function applyAppearanceSettings(options = {}) {
             "content",
             theme === "light" ? "light" : "dark"
         );
+    const browserThemeColor = theme === "light"
+        ? "#f8fafc"
+        : (theme === "navy" ? "#0f172a" : "#212121");
     document.querySelector('meta[name="theme-color"]')
-        ?.setAttribute(
-            "content",
-            theme === "light" ? "#f8fafc" : "#0f172a"
-        );
+        ?.setAttribute("content", browserThemeColor);
     root.style.setProperty("--accent", accent.main);
     root.style.setProperty("--accent-rgb", accent.rgb);
     root.style.setProperty("--accent-deep", accent.deep);
