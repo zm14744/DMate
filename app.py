@@ -112,7 +112,7 @@ except (TypeError, ValueError):
 SMTP_USERNAME = (os.environ.get("SMTP_USERNAME") or "").strip()
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD") or ""
 SMTP_FROM_EMAIL = (os.environ.get("SMTP_FROM_EMAIL") or SMTP_USERNAME).strip()
-SMTP_FROM_NAME = (os.environ.get("SMTP_FROM_NAME") or "离散数学辅学系统").strip()
+SMTP_FROM_NAME = (os.environ.get("SMTP_FROM_NAME") or "DMate").strip()
 SMTP_USE_SSL = _env_bool("SMTP_USE_SSL", True)
 EMAIL_DELIVERY_CONFIGURED = bool(
     SMTP_HOST and SMTP_PORT and SMTP_USERNAME and SMTP_PASSWORD and SMTP_FROM_EMAIL
@@ -593,7 +593,7 @@ def _send_verification_email(email, code, purpose):
     msg = EmailMessage()
     msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
     msg["To"] = email
-    msg["Subject"] = f"离散数学辅学系统 - {purpose_title}验证码"
+    msg["Subject"] = f"DMate - {purpose_title}验证码"
     msg.set_content(
         f"你的验证码是：{code}\n\n"
         "验证码 10 分钟内有效。\n"
@@ -1617,6 +1617,14 @@ def sync_user_data():
     except Exception as exc:
         print(f"写入云端数据失败：{repr(exc)}")
         return jsonify({"ok": False, "error": "同步失败，请稍后再试。"}), 500
+
+
+@app.route("/service-worker.js")
+def service_worker():
+    response = app.send_static_file("service-worker.js")
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 
 @app.route("/")
