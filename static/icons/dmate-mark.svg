@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-label="DMate">
+  <rect width="1254" height="1254" fill="#000"/>
+  <g fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <!-- outer shell -->
+    <path d="M252 300 L488 189 L748 140 L1038 376 L1071 603 L1012 914 L690 1044 L456 1064 L199 807 L165 589 Z"/>
+    <!-- inner graph -->
+    <path d="M252 300 L302 352 L601 268 L748 140"/>
+    <path d="M302 352 L263 686 L199 807"/>
+    <path d="M601 268 L790 524 L1071 603"/>
+    <path d="M790 524 L563 786 L263 686"/>
+    <path d="M563 786 L690 1044"/>
+  </g>
+</svg>
