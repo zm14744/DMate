@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-3-20261007">
+<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-5-20261007">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6-2">
 <link rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-v6-2">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
@@ -5900,6 +5900,239 @@ body[data-appearance-theme="navy"] {
     background:#0f172a;
 }
 
+
+/* =========================================================
+   DMate v6.5：跨平台 PWA + GPT 式黑色主题修整
+   - 不再使用 Window Controls Overlay，避免 Windows/macOS/Linux 标题栏遮住页面。
+   - 黑色主题保留左右侧栏与中央工作区的深浅层级。
+   - 左下安装 / 登录 / 外观恢复清晰按钮外形。
+   - 所有弹窗遮罩改为中性黑，杜绝黑色主题打开弹窗时整页泛蓝。
+   ========================================================= */
+:root {
+    --modal-backdrop:rgba(15,23,42,.30);
+}
+:root[data-appearance-theme="dark"],
+body[data-appearance-theme="dark"] {
+    --modal-backdrop:rgba(0,0,0,.62);
+}
+:root[data-appearance-theme="navy"],
+body[data-appearance-theme="navy"] {
+    --modal-backdrop:rgba(0,0,0,.58);
+}
+
+.modal {
+    background:var(--modal-backdrop) !important;
+}
+.ocr-review-dialog::backdrop {
+    background:var(--modal-backdrop) !important;
+}
+
+/* GPT 式黑色：两侧更深，中央稍亮，输入框和浮层再高一级。 */
+body[data-appearance-theme="dark"]:not(.has-custom-background),
+body[data-appearance-theme="dark"]:not(.has-custom-background) .layout {
+    background:#212121 !important;
+}
+body[data-appearance-theme="dark"]:not(.has-custom-background) .left,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .right,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .mobile-topbar {
+    background:#171717 !important;
+}
+body[data-appearance-theme="dark"]:not(.has-custom-background) .center,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .chat,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .input {
+    background:#212121 !important;
+}
+body[data-appearance-theme="dark"] .left {
+    border-right:1px solid #242424;
+}
+body[data-appearance-theme="dark"] .right {
+    border-left:1px solid #242424;
+}
+
+/* 新对话与左下三个入口保留明确、统一的按钮轮廓。 */
+body[data-appearance-theme="dark"] .left > .btn,
+body[data-appearance-theme="dark"] #installAppBtn,
+body[data-appearance-theme="dark"] #accountBtn,
+body[data-appearance-theme="dark"] #appearanceBtn {
+    background:#242424 !important;
+    color:#f2f2f2 !important;
+    border:1px solid #303030 !important;
+    border-radius:10px !important;
+    box-shadow:none !important;
+}
+body[data-appearance-theme="dark"] .left > .btn:hover,
+body[data-appearance-theme="dark"] #installAppBtn:hover,
+body[data-appearance-theme="dark"] #accountBtn:hover,
+body[data-appearance-theme="dark"] #appearanceBtn:hover {
+    background:#2d2d2d !important;
+    border-color:#3b3b3b !important;
+}
+body[data-appearance-theme="dark"] .account-entry-dot {
+    background:#8a8a8a !important;
+}
+
+body[data-appearance-theme="dark"] .session {
+    background:transparent !important;
+    border-color:transparent !important;
+}
+body[data-appearance-theme="dark"] .session:hover {
+    background:#222222 !important;
+}
+body[data-appearance-theme="dark"] .session.active {
+    background:#292929 !important;
+    border-color:#343434 !important;
+    box-shadow:none !important;
+}
+
+body[data-appearance-theme="dark"] .right #info,
+body[data-appearance-theme="dark"] .right .learning-summary {
+    background:transparent !important;
+    color:#c8c8c8 !important;
+}
+body[data-appearance-theme="dark"] .learning-panel {
+    border-top-color:#2b2b2b !important;
+}
+body[data-appearance-theme="dark"] .learning-actions button {
+    background:#242424 !important;
+    color:#ededed !important;
+    border:1px solid #303030 !important;
+}
+body[data-appearance-theme="dark"] .learning-actions button:hover {
+    background:#2d2d2d !important;
+    border-color:#3b3b3b !important;
+}
+
+body[data-appearance-theme="dark"] .input {
+    padding:10px 12px 12px !important;
+}
+body[data-appearance-theme="dark"] .input input {
+    background:#2f2f2f !important;
+    color:#f2f2f2 !important;
+    border:1px solid #3a3a3a !important;
+    border-radius:14px !important;
+    box-shadow:none !important;
+}
+body[data-appearance-theme="dark"] .input input:hover {
+    border-color:#454545 !important;
+}
+body[data-appearance-theme="dark"] .input input:focus {
+    border-color:#565656 !important;
+    box-shadow:none !important;
+}
+body[data-appearance-theme="dark"] .ai {
+    background:transparent !important;
+}
+body[data-appearance-theme="dark"] .user {
+    background:#303030 !important;
+    color:#f5f5f5 !important;
+}
+body[data-appearance-theme="dark"] .msg-actions button {
+    background:#272727 !important;
+    border-color:#383838 !important;
+    color:#cfcfcf !important;
+}
+body[data-appearance-theme="dark"] .msg-actions button:hover {
+    background:#303030 !important;
+}
+
+body[data-appearance-theme="dark"] .modal-card,
+body[data-appearance-theme="dark"] .appearance-card,
+body[data-appearance-theme="dark"] .ocr-review-dialog {
+    background:#242424 !important;
+    border-color:#343434 !important;
+    color:#f1f1f1 !important;
+}
+body[data-appearance-theme="dark"] .modal-head {
+    border-bottom-color:#343434 !important;
+}
+body[data-appearance-theme="dark"] .appearance-section {
+    border-bottom-color:#343434 !important;
+}
+body[data-appearance-theme="dark"] .appearance-segmented button,
+body[data-appearance-theme="dark"] .appearance-background-actions button:not(.primary),
+body[data-appearance-theme="dark"] .appearance-footer button:not(.primary) {
+    background:#303030 !important;
+    color:#ededed !important;
+    border-color:#3c3c3c !important;
+}
+body[data-appearance-theme="dark"] .appearance-segmented button:hover,
+body[data-appearance-theme="dark"] .appearance-background-actions button:not(.primary):hover,
+body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover {
+    background:#383838 !important;
+}
+
+/* 跨平台安装说明：桌面为居中卡片，手机/iOS 为底部卡片。 */
+.install-help-card {
+    width:min(520px, calc(100vw - 32px));
+    max-height:min(680px, calc(100dvh - 48px));
+}
+.install-help-body {
+    padding:18px 20px 22px;
+    overflow:auto;
+    color:var(--text-primary);
+}
+.install-help-platform {
+    margin-bottom:10px;
+    font-weight:700;
+    font-size:1.02em;
+}
+.install-help-text {
+    color:var(--text-secondary);
+    line-height:1.65;
+}
+.install-help-steps {
+    margin:14px 0 0;
+    padding-left:1.45em;
+    line-height:1.75;
+}
+.install-help-note {
+    margin-top:16px;
+    padding:11px 12px;
+    border-radius:10px;
+    background:var(--surface-3);
+    color:var(--text-secondary);
+    font-size:var(--font-sm);
+    line-height:1.55;
+}
+
+@media (max-width:760px) {
+    #installHelpModal {
+        padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+        align-items:flex-end;
+        justify-content:center;
+    }
+    #installHelpModal .install-help-card {
+        width:100% !important;
+        max-width:100% !important;
+        height:auto !important;
+        min-height:0 !important;
+        max-height:min(78dvh, 620px) !important;
+        border:1px solid var(--border-strong) !important;
+        border-radius:18px !important;
+        box-shadow:0 22px 70px rgba(0,0,0,.38) !important;
+    }
+    #installAppBtn {
+        display:flex;
+    }
+}
+
+/* installed standalone app uses native titlebar/safe-area; page itself never draws under desktop window controls. */
+@media (display-mode: standalone) {
+    html, body, .layout {
+        max-width:100%;
+    }
+}
+
+/* 兼容仍缓存旧 manifest 的桌面安装版：如果浏览器暂时还以
+   window-controls-overlay 启动，至少先给系统按钮留出真实标题栏高度。 */
+@media (display-mode: window-controls-overlay) and (min-width:1101px) {
+    .layout {
+        height:100vh;
+        padding-top:env(titlebar-area-height, 0px);
+    }
+}
+
 </style>
 
 <script>
@@ -6145,6 +6378,22 @@ window.MathJax = {
 </div>
 
 
+
+
+<div id="installHelpModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card install-help-card" role="dialog" aria-modal="true" aria-labelledby="installHelpTitle">
+        <div class="modal-head">
+            <div id="installHelpTitle">安装 DMate</div>
+            <button id="installHelpClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
+        </div>
+        <div class="install-help-body">
+            <div id="installHelpPlatform" class="install-help-platform"></div>
+            <div id="installHelpText" class="install-help-text"></div>
+            <ol id="installHelpSteps" class="install-help-steps"></ol>
+            <div class="install-help-note">安装后仍使用同一个 DMate 账号；卸载 PWA 不会注销服务器账号。</div>
+        </div>
+    </div>
+</div>
 
 <div id="accountModal" class="modal hidden" aria-hidden="true">
     <div class="modal-card account-card">
@@ -6537,7 +6786,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-pwa-v6-4-20261007"></script>
+<script src="/static/script.js?v=dmate-pwa-v6-5-20261007"></script>
 
 </body>
 </html>
