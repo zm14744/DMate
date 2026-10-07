@@ -17202,13 +17202,11 @@ function installGuideForCurrentPlatform() {
         return {
             platform:"Android",
             text: browser === "firefox"
-                ? "当前浏览器没有提供直接安装弹窗时，可以从浏览器菜单添加到主屏幕。"
+                ? "Firefox / Fennec 只有在浏览器识别为可安装 Web App 时才会显示“安装”；若菜单只有“添加到主屏幕”，那只是快捷方式。要获得真正独立的 PWA，请用 Chrome 或 Edge 打开同一地址。"
                 : "如果系统没有自动弹出安装窗口，可以从浏览器菜单手动安装。",
-            steps:[
-                "打开浏览器右上角菜单。",
-                "选择“安装应用”或“添加到主屏幕”。",
-                "确认安装 DMate。"
-            ]
+            steps: browser === "firefox"
+                ? ["打开右上角菜单，先查看是否有“安装”。", "如果只有“添加到主屏幕”，请改用 Chrome 或 Edge。", "在 Chrome / Edge 中点击 DMate 顶部安装按钮并确认安装。"]
+                : ["打开浏览器右上角菜单。", "选择“安装应用”或“添加到主屏幕”。", "确认安装 DMate。"]
         };
     }
 
@@ -17278,27 +17276,25 @@ function closeDmateInstallHelp() {
 }
 
 function initPwaInstall() {
-    const button = document.getElementById("installAppBtn");
+    const buttons = [
+        document.getElementById("installAppBtn"),
+        document.getElementById("mobileInstallBtn")
+    ].filter(Boolean);
     const close = document.getElementById("installHelpClose");
     const modal = document.getElementById("installHelpModal");
 
     const syncButton = () => {
-        if (!button) return;
-        button.hidden = isDmateStandalone();
-        button.textContent = "安装 DMate";
+        const installed = isDmateStandalone();
+        buttons.forEach(button => {
+            button.hidden = installed;
+            if (button.id === "installAppBtn") button.textContent = "安装 DMate";
+            button.setAttribute("aria-hidden", installed ? "true" : "false");
+        });
     };
 
-    syncButton();
-
-    window.addEventListener("beforeinstallprompt", event => {
-        event.preventDefault();
-        deferredPwaInstallPrompt = event;
-        syncButton();
-    });
-
-    button?.addEventListener("click", async () => {
+    const requestInstall = async () => {
         if (isDmateStandalone()) {
-            button.hidden = true;
+            syncButton();
             return;
         }
 
@@ -17309,18 +17305,30 @@ function initPwaInstall() {
                 await prompt.prompt();
                 const choice = await prompt.userChoice;
                 if (choice?.outcome === "accepted") {
-                    button.hidden = true;
+                    syncButton();
                 } else {
+                    deferredPwaInstallPrompt = prompt;
                     syncButton();
                 }
                 return;
             } catch (_error) {
+                deferredPwaInstallPrompt = prompt;
                 syncButton();
             }
         }
 
         openDmateInstallHelp();
+    };
+
+    syncButton();
+
+    window.addEventListener("beforeinstallprompt", event => {
+        event.preventDefault();
+        deferredPwaInstallPrompt = event;
+        syncButton();
     });
+
+    buttons.forEach(button => button.addEventListener("click", requestInstall));
 
     close?.addEventListener("click", closeDmateInstallHelp);
     modal?.addEventListener("click", event => {
@@ -17334,7 +17342,7 @@ function initPwaInstall() {
 
     window.addEventListener("appinstalled", () => {
         deferredPwaInstallPrompt = null;
-        if (button) button.hidden = true;
+        syncButton();
         closeDmateInstallHelp();
         showCopyToast("DMate 已安装");
     });
