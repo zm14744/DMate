@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-shell-v6-12-20261007";
+const CACHE_NAME = "dmate-ios-webapp-v6-14-20261007";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -8,7 +8,7 @@ const SHELL_ASSETS = [
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/icon-maskable-512.png",
-  "/static/icons/dmate-mark.png"
+  "/static/icons/dmate-mark.svg"
 ];
 
 self.addEventListener("install", event => {
