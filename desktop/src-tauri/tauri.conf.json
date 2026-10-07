@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DMate",
+  "version": "1.0.0",
+  "identifier": "app.dmate.desktop",
+  "build": {
+    "frontendDist": "https://dmate.zeabur.app"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "enableGTKAppId": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "DMate",
+        "url": "https://dmate.zeabur.app",
+        "userAgent": "DMateDesktop/1.0.0",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 640,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "devtools": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": []
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Education",
+    "shortDescription": "离散数学智能辅学系统",
+    "longDescription": "DMate 是一个面向离散数学学习的智能辅学系统。",
+    "homepage": "https://dmate.zeabur.app",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "-"
+    }
+  }
+}
