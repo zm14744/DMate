@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-2-20261007">
+<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-3-20261007">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6-2">
 <link rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-v6-2">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
@@ -5731,7 +5731,10 @@ body[data-appearance-theme="light"] .input input {
 }
 
 /* =========================================================
-   DMate v6.2：新增 GPT 风格中性黑深色，并保留原深蓝主题
+   DMate v6.4：白色 / 黑色 / 蓝色三套主题。
+   黑色主题按 ChatGPT 式层级处理：
+   两侧更深，中间主工作区稍亮，输入框再提一层。
+   重点是“同属黑色系但有明确深浅”，而不是整页一块黑。
    ========================================================= */
 .appearance-segmented.modes {
     grid-template-columns:repeat(4, minmax(0, 1fr));
@@ -5749,20 +5752,20 @@ body[data-appearance-theme="dark"] {
     --surface-0-rgb:33,33,33;
     --surface-1:rgba(23,23,23,var(--panel-alpha));
     --surface-1-rgb:23,23,23;
-    --surface-2:rgba(42,42,42,var(--panel-alpha));
-    --surface-2-rgb:42,42,42;
+    --surface-2:rgba(38,38,38,var(--panel-alpha));
+    --surface-2-rgb:38,38,38;
     --surface-3:rgba(47,47,47,var(--panel-alpha));
     --surface-3-rgb:47,47,47;
-    --surface-4:rgba(58,58,58,var(--panel-alpha));
-    --surface-4-rgb:58,58,58;
-    --border-strong:#424242;
-    --border-mid:#4a4a4a;
-    --text-strong:#f7f7f8;
+    --surface-4:rgba(57,57,57,var(--panel-alpha));
+    --surface-4-rgb:57,57,57;
+    --border-strong:#303030;
+    --border-mid:#3a3a3a;
+    --text-strong:#f4f4f4;
     --text-primary:#ececec;
-    --text-secondary:#d1d1d1;
-    --text-muted:#a1a1aa;
-    --text-subtle:#737373;
-    --accent-text:#eff6ff;
+    --text-secondary:#c7c7c7;
+    --text-muted:#9a9a9a;
+    --text-subtle:#747474;
+    --accent-text:#f8fbff;
     --background-mask-rgb:0,0,0;
     color-scheme:dark;
 }
@@ -5791,13 +5794,112 @@ body[data-appearance-theme="navy"] {
     color-scheme:dark;
 }
 
+/* 黑色主题：左右侧栏更深，中间稍浅，输入框再亮一层。 */
 body[data-appearance-theme="dark"] {
     background:#212121;
+}
+
+body[data-appearance-theme="dark"]:not(.has-custom-background) .left,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .right {
+    background:#171717;
+}
+
+body[data-appearance-theme="dark"]:not(.has-custom-background) .center,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .chat,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
+    background:#212121;
+}
+
+/* 侧栏控件默认融入侧栏，只在悬停时显出层级。 */
+body[data-appearance-theme="dark"] .btn,
+body[data-appearance-theme="dark"] #installAppBtn,
+body[data-appearance-theme="dark"] #accountOpenBtn,
+body[data-appearance-theme="dark"] #appearanceOpenBtn {
+    background:transparent;
+    border-color:transparent;
+    box-shadow:none;
+}
+
+body[data-appearance-theme="dark"] .btn:hover,
+body[data-appearance-theme="dark"] #installAppBtn:hover,
+body[data-appearance-theme="dark"] #accountOpenBtn:hover,
+body[data-appearance-theme="dark"] #appearanceOpenBtn:hover {
+    background:#212121;
+}
+
+/* 会话项保持轻量，不再出现大块蓝色。 */
+body[data-appearance-theme="dark"] .session {
+    background:transparent;
+    border-color:transparent;
+    box-shadow:none;
+}
+
+body[data-appearance-theme="dark"] .session:hover {
+    background:#212121;
+}
+
+body[data-appearance-theme="dark"] .session.active {
+    background:#262626;
+    border-color:transparent;
+    box-shadow:none;
+}
+
+body[data-appearance-theme="dark"] .session.active span {
+    color:#f5f5f5;
+}
+
+/* 右栏功能按钮高于侧栏背景一级，但不做厚重灰砖。 */
+body[data-appearance-theme="dark"] .learning-actions button {
+    background:#212121;
+    border-color:transparent;
+}
+
+body[data-appearance-theme="dark"] .learning-actions button:hover {
+    background:#2a2a2a;
+}
+
+/* 底部区域和主工作区同色，输入框自身再提亮一层。 */
+body[data-appearance-theme="dark"]:not(.has-custom-background) .input {
+    background:#212121;
+    border-top:none;
+}
+
+body[data-appearance-theme="dark"] .input input {
+    background:#2f2f2f;
+    border-color:transparent;
+    border-radius:14px;
+    box-shadow:inset 0 0 0 1px #3a3a3a;
+}
+
+body[data-appearance-theme="dark"] .input input:hover {
+    box-shadow:inset 0 0 0 1px #454545;
+}
+
+body[data-appearance-theme="dark"] .input input:focus {
+    border-color:transparent;
+    box-shadow:inset 0 0 0 1px #565656;
+}
+
+body[data-appearance-theme="dark"] .ai {
+    background:#292929;
+}
+
+/* 弹窗继续用同一套中性黑层级。 */
+body[data-appearance-theme="dark"] .appearance-card,
+body[data-appearance-theme="dark"] .modal-card,
+body[data-appearance-theme="dark"] .ocr-review-dialog {
+    background:#212121;
+    border-color:#2f2f2f;
+}
+
+body[data-appearance-theme="dark"] .learning-panel {
+    border-top-color:#2a2a2a;
 }
 
 body[data-appearance-theme="navy"] {
     background:#0f172a;
 }
+
 </style>
 
 <script>
@@ -5947,9 +6049,9 @@ window.MathJax = {
                 <div class="appearance-section-title">显示模式</div>
                 <div class="appearance-segmented modes">
                     <button type="button" data-appearance-mode="system">跟随系统</button>
-                    <button type="button" data-appearance-mode="light">浅色</button>
-                    <button type="button" data-appearance-mode="dark">深色</button>
-                    <button type="button" data-appearance-mode="navy">深蓝</button>
+                    <button type="button" data-appearance-mode="light">白色</button>
+                    <button type="button" data-appearance-mode="dark">黑色</button>
+                    <button type="button" data-appearance-mode="navy">蓝色</button>
                 </div>
             </div>
 
@@ -6435,7 +6537,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-pwa-v6-2-20261007"></script>
+<script src="/static/script.js?v=dmate-pwa-v6-4-20261007"></script>
 
 </body>
 </html>
