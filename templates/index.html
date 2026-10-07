@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-20261007">
+<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-1-20261007">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
 <title>DMate - 离散数学智能辅学系统</title>
@@ -3948,7 +3948,7 @@ body[data-appearance-theme="light"] .kg-node-badge,
    2026-10-03 移动端第二轮：图谱 / 浅色 / 外观入口 / 手势视觉
    ========================================================= */
 
-/* 外观入口不再使用偏小的 Unicode 图标，改成和文字同字号的 CSS 半明半暗圆。 */
+/* 外观入口：使用几何中心严格对齐的 SVG 半明半暗圆，避免中线偏移。 */
 .appearance-entry {
     display:flex !important;
     align-items:center !important;
@@ -3956,25 +3956,30 @@ body[data-appearance-theme="light"] .kg-node-badge,
     gap:.55em !important;
 }
 .appearance-entry-icon {
-    position:relative;
-    display:inline-block;
-    width:1em;
-    height:1em;
-    flex:0 0 1em;
-    border:.12em solid currentColor;
-    border-radius:50%;
-    overflow:hidden;
-    vertical-align:-.08em;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:1.08em;
+    height:1.08em;
+    flex:0 0 1.08em;
     color:inherit;
 }
-.appearance-entry-icon::after {
-    content:"";
-    position:absolute;
-    top:-.12em;
-    right:-.12em;
-    bottom:-.12em;
-    width:55%;
-    background:currentColor;
+.appearance-entry-icon svg {
+    display:block;
+    width:100%;
+    height:100%;
+}
+
+/* 左侧底部三个入口统一留出 8px 间距，PWA 安装按钮显示时不会与相邻按钮贴合。 */
+.install-entry,
+.account-entry,
+.appearance-entry {
+    flex:0 0 auto;
+    min-height:46px;
+    margin-bottom:0 !important;
+}
+.install-entry {
+    margin-top:8px !important;
 }
 
 /* 显式 light-only：阻止部分安卓浏览器“强制网页深色”再次把浅色主题染黑。 */
@@ -5782,9 +5787,9 @@ window.MathJax = {
     </div>
     <button class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
+    <button id="installAppBtn" class="btn install-entry" type="button" hidden>安装 DMate</button>
     <button id="accountBtn" class="btn account-entry" type="button"><span class="account-entry-dot" aria-hidden="true"></span><span id="accountEntryLabel">登录 / 注册</span></button>
-    <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"></span><span>外观</span></button>
-    <button id="installAppBtn" class="btn" type="button" hidden>安装 DMate</button>
+    <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor"/></svg></span><span>外观</span></button>
 </div>
 
 <div class="center">
@@ -6359,7 +6364,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-pwa-v6-20261007"></script>
+<script src="/static/script.js?v=dmate-pwa-v6-1-20261007"></script>
 
 </body>
 </html>
