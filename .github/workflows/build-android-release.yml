@@ -1,0 +1,57 @@
+name: Build DMate Android Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: "platform-tools"
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle 9.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Restore release keystore
+        shell: bash
+        run: |
+          printf '%s' "${{ secrets.DMATE_ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/dmate-release.jks"
+          echo "DMATE_KEYSTORE_PATH=$RUNNER_TEMP/dmate-release.jks" >> "$GITHUB_ENV"
+          echo "DMATE_KEYSTORE_PASSWORD=${{ secrets.DMATE_ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "DMATE_KEY_ALIAS=${{ secrets.DMATE_ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+          echo "DMATE_KEY_PASSWORD=${{ secrets.DMATE_ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        working-directory: android
+        run: gradle assembleRelease --stacktrace
+
+      - name: Prepare release file
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/DMate.apk
+
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMate-release-apk
+          path: dist/DMate.apk
+          if-no-files-found: error
+          retention-days: 30
