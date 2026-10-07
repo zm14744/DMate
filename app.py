@@ -135,6 +135,9 @@ SMTP_CONFIGURED = bool(
 )
 EMAIL_DELIVERY_CONFIGURED = bool(BREVO_CONFIGURED or SMTP_CONFIGURED)
 
+# Android 客户端：Android 浏览器不再走 PWA；正式 APK 发布后把下载地址放到该环境变量。
+ANDROID_APK_URL = (os.environ.get("ANDROID_APK_URL") or "").strip()
+
 MAX_SYNC_JSON_BYTES = 5 * 1024 * 1024
 AUTH_RATE_LIMIT_WINDOW = 60
 AUTH_RATE_LIMIT_COUNT = 20
@@ -1725,11 +1728,20 @@ def service_worker():
 
 @app.route("/")
 def home():
+    # Android 浏览器不再暴露 PWA 安装入口：Android 统一使用独立 APK。
+    # APK 自己追加 DMateAndroid/<version> UA，可据此隐藏网页内的下载入口。
+    user_agent = request.headers.get("User-Agent", "")
+    is_android = bool(re.search(r"Android", user_agent, re.IGNORECASE))
+    is_dmate_android_app = bool(re.search(r"DMateAndroid/", user_agent, re.IGNORECASE))
+
     # 首页直接注入与 teaching.py / app.py 共用的 knowledge_graph.json，
     # 避免前端再维护一份硬编码图谱而产生不同步。
     return render_template(
         "index.html",
         knowledge_graph_data=KNOWLEDGE_GRAPH_DATA,
+        is_android=is_android,
+        is_dmate_android_app=is_dmate_android_app,
+        android_apk_url=ANDROID_APK_URL,
     )
 
 
