@@ -26,6 +26,25 @@ let accountState = {
 let cloudSyncTimer = 0;
 let cloudApplyingSnapshot = false;
 
+function shouldPersistClientState() {
+    // 游客模式完全临时：不把聊天、学习记录或外观写入持久存储。
+    // 已登录，或本机还保留着上一次已登录账号的同步标记时，才使用本地缓存。
+    if (accountState.authenticated) return true;
+    try {
+        const parsed = JSON.parse(localStorage.getItem(CLOUD_SYNC_META_KEY) || "null");
+        return Boolean(parsed && typeof parsed === "object" && parsed.username);
+    } catch (_error) {
+        return false;
+    }
+}
+
+function purgeGuestPersistentState() {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LEARNING_STORAGE_KEY);
+        localStorage.removeItem(APPEARANCE_STORAGE_KEY);
+    } catch (_error) {}
+}
 
 
 // =========================================================
@@ -39,7 +58,7 @@ const APPEARANCE_MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 const APPEARANCE_MAX_IMAGE_SIDE = 1920;
 
 const APPEARANCE_DEFAULTS = Object.freeze({
-    mode: "dark",
+    mode: "light",
     accent: "blue",
     fontSize: "standard",
     backgroundFit: "cover",
@@ -80,6 +99,7 @@ let appearanceSettings = { ...APPEARANCE_DEFAULTS };
 let appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
 let appearanceBackgroundObjectUrl = "";
 let appearanceHasBackground = false;
+let appearanceGuestCommittedBackgroundBlob = null;
 let appearanceSystemMedia = null;
 let appearanceDraftOriginalSettings = null;
 let appearanceBackgroundDraftMode = "unchanged"; // unchanged | set | remove
@@ -145,6 +165,10 @@ function normalizeAppearanceSettings(value) {
 }
 
 function loadAppearanceSettings() {
+    if (!shouldPersistClientState()) {
+        return { ...APPEARANCE_DEFAULTS };
+    }
+
     try {
         const raw = localStorage.getItem(APPEARANCE_STORAGE_KEY);
 
@@ -163,13 +187,15 @@ function saveAppearanceSettings() {
         appearanceSettings
     );
 
-    try {
-        localStorage.setItem(
-            APPEARANCE_STORAGE_KEY,
-            JSON.stringify(appearanceCommittedSettings)
-        );
-    } catch (_error) {
-        // 外观保存失败不应影响学习系统本身。
+    if (shouldPersistClientState()) {
+        try {
+            localStorage.setItem(
+                APPEARANCE_STORAGE_KEY,
+                JSON.stringify(appearanceCommittedSettings)
+            );
+        } catch (_error) {
+            // 外观保存失败不应影响学习系统本身。
+        }
     }
     scheduleCloudSync();
 }
@@ -188,7 +214,7 @@ function resolveAppearanceTheme() {
             ? "light"
             : "dark";
     } catch (_error) {
-        return "dark";
+        return "light";
     }
 }
 
@@ -226,6 +252,11 @@ function applyAppearanceSettings(options = {}) {
         ?.setAttribute(
             "content",
             theme === "light" ? "light" : "dark"
+        );
+    document.querySelector('meta[name="theme-color"]')
+        ?.setAttribute(
+            "content",
+            theme === "light" ? "#f8fafc" : "#0f172a"
         );
     root.style.setProperty("--accent", accent.main);
     root.style.setProperty("--accent-rgb", accent.rgb);
@@ -438,6 +469,10 @@ function openAppearanceDatabase() {
 }
 
 async function readAppearanceBackgroundBlob() {
+    if (!shouldPersistClientState()) {
+        return appearanceGuestCommittedBackgroundBlob;
+    }
+
     const db = await openAppearanceDatabase();
 
     try {
@@ -455,6 +490,11 @@ async function readAppearanceBackgroundBlob() {
 }
 
 async function writeAppearanceBackgroundBlob(blob) {
+    if (!shouldPersistClientState()) {
+        appearanceGuestCommittedBackgroundBlob = blob instanceof Blob ? blob : null;
+        return;
+    }
+
     const db = await openAppearanceDatabase();
 
     try {
@@ -474,6 +514,11 @@ async function writeAppearanceBackgroundBlob(blob) {
 }
 
 async function deleteAppearanceBackgroundBlob() {
+    if (!shouldPersistClientState()) {
+        appearanceGuestCommittedBackgroundBlob = null;
+        return;
+    }
+
     const db = await openAppearanceDatabase();
 
     try {
@@ -877,21 +922,17 @@ function clearCloudSyncMeta() {
 }
 
 function clearLoggedOutWorkspace() {
-    // 退出账号后，游客工作区必须是全新的空白状态。外观设置仍保留。
+    // 退出后进入真正的游客模式：页面清空，游客数据不落地。
     sessions = [];
     currentId = null;
     learningState = createEmptyLearningState();
+    purgeGuestPersistentState();
 
-    try {
-        localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({ sessions:[], currentId:null })
-        );
-        localStorage.setItem(
-            LEARNING_STORAGE_KEY,
-            JSON.stringify(learningState)
-        );
-    } catch (_error) {}
+    appearanceSettings = { ...APPEARANCE_DEFAULTS };
+    appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
+    appearanceGuestCommittedBackgroundBlob = null;
+    clearAppearanceBackgroundVisual();
+    applyAppearanceSettings({ save:false });
 
     const input = document.getElementById("text");
     if (input) input.value = "";
@@ -1500,6 +1541,9 @@ async function pushCloudSnapshot(force = false) {
 async function resolveInitialCloudSync(isNewAccount = false) {
     if (!accountState.authenticated) return;
 
+    // 自定义背景图片仍按设备保存；登录成功后再读取，游客不会继承它。
+    await loadAppearanceBackground();
+
     try {
         const { data } = await accountFetch("/sync");
         const cloudRevision = Number(data.revision || 0);
@@ -2074,7 +2118,7 @@ async function deleteAccount() {
     }
 
     const confirmed = window.confirm(
-        "确定永久注销这个账号吗？\n\n账号和云端同步数据都会被删除，此操作无法撤销。\n本设备当前的本地学习数据会保留。"
+        "确定永久注销这个账号吗？\n\n账号和云端同步数据都会被删除，此操作无法撤销。\n注销后页面会进入空白游客模式。"
     );
     if (!confirmed) return;
 
@@ -2109,9 +2153,11 @@ async function deleteAccount() {
         cloudSyncTimer = 0;
     }
     setAccountDeletePanel(false);
+    clearLoggedOutWorkspace();
     renderAccountUi();
     closeAccountModal();
-    showCopyToast("账号已注销，本机数据已保留");
+    showCopyToast("账号已注销");
+    window.location.reload();
 }
 
 async function initAccountSystem() {
@@ -2247,6 +2293,9 @@ async function initAccountSystem() {
                 backupLocalSnapshot("登录状态失效前的本机数据");
                 clearCloudSyncMeta();
                 clearLoggedOutWorkspace();
+            } else {
+                // 兼容旧版本曾经写入的游客 localStorage；从 v6 起游客不再持久化。
+                purgeGuestPersistentState();
             }
         }
     } catch (error) {
@@ -2759,6 +2808,11 @@ function normalizeLearningState(value) {
 }
 
 function loadLearningState() {
+    if (!shouldPersistClientState()) {
+        learningState = createEmptyLearningState();
+        return;
+    }
+
     try {
         const raw = localStorage.getItem(LEARNING_STORAGE_KEY);
 
@@ -2777,13 +2831,15 @@ function loadLearningState() {
 }
 
 function saveLearningState() {
-    try {
-        localStorage.setItem(
-            LEARNING_STORAGE_KEY,
-            JSON.stringify(learningState)
-        );
-    } catch (error) {
-        console.warn("学习记录保存失败：", error);
+    if (shouldPersistClientState()) {
+        try {
+            localStorage.setItem(
+                LEARNING_STORAGE_KEY,
+                JSON.stringify(learningState)
+            );
+        } catch (error) {
+            console.warn("学习记录保存失败：", error);
+        }
     }
     scheduleCloudSync();
 }
@@ -8066,21 +8122,25 @@ function getFriendlyInputSource(value) {
 // 本地持久化
 // -----------------------------
 function saveState() {
-    try {
-        localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-                sessions,
-                currentId
-            })
-        );
-    } catch (error) {
-        console.warn("本地会话保存失败：", error);
+    if (shouldPersistClientState()) {
+        try {
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify({
+                    sessions,
+                    currentId
+                })
+            );
+        } catch (error) {
+            console.warn("本地会话保存失败：", error);
+        }
     }
     scheduleCloudSync();
 }
 
 function loadState() {
+    if (!shouldPersistClientState()) return false;
+
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return false;
@@ -16448,7 +16508,7 @@ function refreshMobileConversationTitle() {
 
     const session = getCurrent();
     const name = typeof session?.name === "string" ? session.name.trim() : "";
-    title.textContent = name || "离散数学助手";
+    title.textContent = name || "DMate";
 }
 
 
@@ -17082,6 +17142,50 @@ function removeDeprecatedCopyControls() {
 }
 
 // -----------------------------
+// PWA：DMate 桌面 / 移动端安装
+// -----------------------------
+let deferredPwaInstallPrompt = null;
+
+function initPwaInstall() {
+    const button = document.getElementById("installAppBtn");
+
+    window.addEventListener("beforeinstallprompt", event => {
+        event.preventDefault();
+        deferredPwaInstallPrompt = event;
+        if (button) button.hidden = false;
+    });
+
+    button?.addEventListener("click", async () => {
+        if (!deferredPwaInstallPrompt) return;
+        const prompt = deferredPwaInstallPrompt;
+        deferredPwaInstallPrompt = null;
+        button.hidden = true;
+        try {
+            await prompt.prompt();
+            await prompt.userChoice;
+        } catch (_error) {}
+    });
+
+    window.addEventListener("appinstalled", () => {
+        deferredPwaInstallPrompt = null;
+        if (button) button.hidden = true;
+        showCopyToast("DMate 已安装");
+    });
+
+    if (window.matchMedia?.("(display-mode: standalone)")?.matches && button) {
+        button.hidden = true;
+    }
+}
+
+function registerDmateServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js", { scope:"/" })
+            .catch(error => console.warn("DMate PWA 注册失败：", error));
+    }, { once:true });
+}
+
+// -----------------------------
 // 初始化
 // -----------------------------
 document.addEventListener(
@@ -17089,6 +17193,8 @@ document.addEventListener(
     () => {
         removeDeprecatedCopyControls();
         initAppearanceSystem();
+        initPwaInstall();
+        registerDmateServiceWorker();
         installRichSelectionCopy();
         initMobileAppShell();
         installMobileVisualViewportFix();
@@ -17468,9 +17574,15 @@ document.addEventListener(
             );
         }
 
-        loadLearningState();
-
-        const restored = loadState();
+        let restored = false;
+        if (shouldPersistClientState()) {
+            loadLearningState();
+            restored = loadState();
+        } else {
+            learningState = createEmptyLearningState();
+            sessions = [];
+            currentId = null;
+        }
 
         if (!restored) {
             const id = makeSessionId();
