@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- DMate v1 只需要联网。没有存储、联系人、短信、电话、定位、悬浮窗、辅助功能、VPN、安装应用等权限。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="DMate"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.DMate"
+        android:usesCleartextTraffic="false">
+
+        <!-- Android 官方建议保持 WebView Safe Browsing 开启。 -->
+        <meta-data
+            android:name="android.webkit.WebView.EnableSafeBrowsing"
+            android:value="true" />
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|smallestScreenSize|uiMode"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="true"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
