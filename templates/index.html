@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-5-20261007">
+<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v6-6-20261007">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6-2">
 <link rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-v6-2">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
@@ -6133,6 +6133,141 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
     }
 }
 
+
+
+/* =========================================================
+   DMate v6.6：移动端输入框边界统一 + 更深黑色主题 + 移动端安装入口
+   ========================================================= */
+.mobile-topbar-start,
+.mobile-topbar-actions {
+    display:flex;
+    align-items:center;
+}
+.mobile-topbar-start { justify-content:flex-start; }
+.mobile-topbar-actions { justify-content:flex-end; gap:2px; }
+
+@media (max-width:1100px) {
+    .mobile-topbar {
+        grid-template-columns:84px minmax(0,1fr) 84px !important;
+    }
+    .mobile-install-button[hidden] { display:none !important; }
+    .mobile-install-button:not([hidden]) { display:inline-flex !important; }
+
+    /* 外层输入胶囊四边使用同一条边框；取消只向下的阴影和渐变，
+       避免出现“上边几乎没有、下边很重”的视觉不对称。 */
+    .input-wrap {
+        background-image:none !important;
+        box-shadow:none !important;
+    }
+    .input {
+        border-style:solid !important;
+        border-width:1px !important;
+        box-shadow:none !important;
+    }
+    .input input {
+        border:0 !important;
+        box-shadow:none !important;
+        background:transparent !important;
+    }
+
+    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
+        background:#eef3f8 !important;
+    }
+    body[data-appearance-theme="light"] .input {
+        background:#ffffff !important;
+        border-color:#cbd5e1 !important;
+    }
+    body[data-appearance-theme="light"] .input input {
+        background:transparent !important;
+        border:0 !important;
+    }
+
+    body[data-appearance-theme="navy"] .input {
+        border-color:rgba(148,163,184,.30) !important;
+        box-shadow:none !important;
+    }
+
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .mobile-topbar,
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .left,
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .right {
+        background:#080808 !important;
+    }
+    body[data-appearance-theme="dark"]:not(.has-custom-background),
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .layout,
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .center,
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .chat,
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
+        background:#101010 !important;
+    }
+    body[data-appearance-theme="dark"] .input {
+        background:#1b1b1b !important;
+        border-color:#343434 !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme="dark"] .input input,
+    body[data-appearance-theme="dark"] .input input:hover,
+    body[data-appearance-theme="dark"] .input input:focus {
+        background:transparent !important;
+        border:0 !important;
+        box-shadow:none !important;
+    }
+}
+
+/* 桌面端白色 / 蓝色：输入区域与聊天区域自然衔接，不再出现分界线。 */
+@media (min-width:1101px) {
+    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .input,
+    body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap,
+    body[data-appearance-theme="navy"]:not(.has-custom-background) .input {
+        border-top:0 !important;
+        box-shadow:none !important;
+    }
+}
+
+/* 黑色主题整体下压到接近 GPT 的真黑层级，同时保留两侧 / 中间差异。 */
+body[data-appearance-theme="dark"]:not(.has-custom-background),
+body[data-appearance-theme="dark"]:not(.has-custom-background) .layout {
+    background:#101010 !important;
+}
+body[data-appearance-theme="dark"]:not(.has-custom-background) .left,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .right,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .mobile-topbar {
+    background:#080808 !important;
+}
+body[data-appearance-theme="dark"]:not(.has-custom-background) .center,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .chat,
+body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
+    background:#101010 !important;
+}
+body[data-appearance-theme="dark"] .left { border-right-color:#1c1c1c !important; }
+body[data-appearance-theme="dark"] .right { border-left-color:#1c1c1c !important; }
+body[data-appearance-theme="dark"] .left > .btn,
+body[data-appearance-theme="dark"] #installAppBtn,
+body[data-appearance-theme="dark"] #accountBtn,
+body[data-appearance-theme="dark"] #appearanceBtn,
+body[data-appearance-theme="dark"] .learning-actions button {
+    background:#151515 !important;
+    border-color:#242424 !important;
+}
+body[data-appearance-theme="dark"] .left > .btn:hover,
+body[data-appearance-theme="dark"] #installAppBtn:hover,
+body[data-appearance-theme="dark"] #accountBtn:hover,
+body[data-appearance-theme="dark"] #appearanceBtn:hover,
+body[data-appearance-theme="dark"] .learning-actions button:hover {
+    background:#1d1d1d !important;
+    border-color:#303030 !important;
+}
+body[data-appearance-theme="dark"] .session.active {
+    background:#181818 !important;
+    border-color:#242424 !important;
+}
+body[data-appearance-theme="dark"] .modal-card,
+body[data-appearance-theme="dark"] .appearance-card,
+body[data-appearance-theme="dark"] .ocr-review-dialog {
+    background:#181818 !important;
+    border-color:#2a2a2a !important;
+}
+
 </style>
 
 <script>
@@ -6165,16 +6300,23 @@ window.MathJax = {
 <div class="layout">
 
 <div id="mobileTopbar" class="mobile-topbar" aria-label="移动端导航">
-    <button id="mobileNavBtn" class="mobile-topbar-button" type="button" aria-label="打开对话列表" title="对话列表">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-    </button>
+    <div class="mobile-topbar-start">
+        <button id="mobileNavBtn" class="mobile-topbar-button" type="button" aria-label="打开对话列表" title="对话列表">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+    </div>
     <div class="mobile-topbar-brand">
         <img class="mobile-dmate-mark" src="/static/icons/dmate-mark.png?v=dmate-v6" alt="" aria-hidden="true">
         <div id="mobileConversationTitle" class="mobile-topbar-title">DMate</div>
     </div>
-    <button id="mobileToolsBtn" class="mobile-topbar-button" type="button" aria-label="打开学习工具" title="学习工具">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h6M14 17h6"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="12" cy="17" r="2"/></svg>
-    </button>
+    <div class="mobile-topbar-actions">
+        <button id="mobileInstallBtn" class="mobile-topbar-button mobile-install-button" type="button" aria-label="安装 DMate" title="安装 DMate" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 16v3h14v-3"/></svg>
+        </button>
+        <button id="mobileToolsBtn" class="mobile-topbar-button" type="button" aria-label="打开学习工具" title="学习工具">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h6M14 17h6"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="12" cy="17" r="2"/></svg>
+        </button>
+    </div>
 </div>
 <div id="mobileShellBackdrop" class="mobile-shell-backdrop" aria-hidden="true"></div>
 
@@ -6786,7 +6928,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-pwa-v6-5-20261007"></script>
+<script src="/static/script.js?v=dmate-pwa-v6-6-20261007"></script>
 
 </body>
 </html>
