@@ -259,7 +259,7 @@ function applyAppearanceSettings(options = {}) {
         );
     const browserThemeColor = theme === "light"
         ? "#f8fafc"
-        : (theme === "navy" ? "#0f172a" : "#212121");
+        : (theme === "navy" ? "#0f172a" : "#171717");
     document.querySelector('meta[name="theme-color"]')
         ?.setAttribute("content", browserThemeColor);
     root.style.setProperty("--accent", accent.main);
@@ -16763,6 +16763,7 @@ function getTopMobileGesturePage() {
         ["learningReviewModal", closeLearningReview],
         ["accountModal", closeAccountModal],
         ["knowledgeGraphModal", closeKnowledgeGraph],
+        ["installHelpModal", closeDmateInstallHelp],
         ["appearanceModal", closeAppearance]
     ]);
 
@@ -16988,6 +16989,7 @@ function initMobileAppShell() {
     });
 
     [
+        "installAppBtn",
         "appearanceBtn",
         "wrongBookBtn",
         "knowledgeGraphBtn",
@@ -17146,39 +17148,198 @@ function removeDeprecatedCopyControls() {
 }
 
 // -----------------------------
-// PWA：DMate 桌面 / 移动端安装
+// PWA：DMate Windows / macOS / Linux / Android / iOS 安装
 // -----------------------------
 let deferredPwaInstallPrompt = null;
 
+function isDmateStandalone() {
+    return Boolean(
+        window.matchMedia?.("(display-mode: standalone)")?.matches
+        || window.matchMedia?.("(display-mode: fullscreen)")?.matches
+        || window.navigator?.standalone === true
+    );
+}
+
+function detectDmateInstallPlatform() {
+    const ua = navigator.userAgent || "";
+    const platform = navigator.platform || "";
+    const touchMac = /Mac/i.test(platform) && Number(navigator.maxTouchPoints || 0) > 1;
+
+    if (/iPhone|iPad|iPod/i.test(ua) || touchMac) return "ios";
+    if (/Android/i.test(ua)) return "android";
+    if (/Macintosh|Mac OS X/i.test(ua) || /Mac/i.test(platform)) return "macos";
+    if (/Windows/i.test(ua) || /Win/i.test(platform)) return "windows";
+    if (/Linux/i.test(ua) || /Linux/i.test(platform)) return "linux";
+    return "other";
+}
+
+function detectDmateBrowser() {
+    const ua = navigator.userAgent || "";
+    if (/Edg\//i.test(ua)) return "edge";
+    if (/Firefox|Fennec/i.test(ua)) return "firefox";
+    if (/CriOS|Chrome|Chromium/i.test(ua)) return "chrome";
+    if (/Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg\//i.test(ua)) return "safari";
+    return "other";
+}
+
+function installGuideForCurrentPlatform() {
+    const platform = detectDmateInstallPlatform();
+    const browser = detectDmateBrowser();
+
+    if (platform === "ios") {
+        return {
+            platform:"iPhone / iPad",
+            text:"iOS / iPadOS 不提供网页里的直接安装弹窗，需要从系统分享菜单添加 DMate。",
+            steps:[
+                "点击浏览器的“分享”按钮。",
+                "在分享菜单中选择“添加到主屏幕”。",
+                "确认名称为 DMate，然后点击“添加”。"
+            ]
+        };
+    }
+
+    if (platform === "android") {
+        return {
+            platform:"Android",
+            text: browser === "firefox"
+                ? "当前浏览器没有提供直接安装弹窗时，可以从浏览器菜单添加到主屏幕。"
+                : "如果系统没有自动弹出安装窗口，可以从浏览器菜单手动安装。",
+            steps:[
+                "打开浏览器右上角菜单。",
+                "选择“安装应用”或“添加到主屏幕”。",
+                "确认安装 DMate。"
+            ]
+        };
+    }
+
+    if (platform === "macos") {
+        return {
+            platform:"macOS",
+            text: browser === "safari"
+                ? "Safari 可以把 DMate 作为网页应用加入程序坞；Chrome / Edge 也可以安装为独立窗口。"
+                : "DMate 可以在 macOS 上安装为独立网页应用。",
+            steps: browser === "safari"
+                ? ["在 Safari 菜单中打开“文件”。", "选择“添加到程序坞”。", "确认添加 DMate。"]
+                : ["点击地址栏附近的安装图标，或打开浏览器菜单。", "选择“安装 DMate”。", "确认安装。"]
+        };
+    }
+
+    if (platform === "linux") {
+        return {
+            platform:"Linux（Ubuntu / Debian / Arch 等）",
+            text: browser === "firefox"
+                ? "Firefox 桌面版若没有独立 PWA 安装入口，请用 Chrome、Chromium 或 Edge 打开 DMate 后安装。"
+                : "Ubuntu、Debian、Arch 等发行版使用相同的 PWA 安装方式，主要取决于浏览器。",
+            steps: browser === "firefox"
+                ? ["安装或打开 Chrome、Chromium 或 Edge。", "访问同一个 DMate 地址。", "使用地址栏安装图标或菜单里的“安装 DMate”。"]
+                : ["点击地址栏附近的安装图标，或打开浏览器菜单。", "选择“安装 DMate”。", "确认后会生成独立应用入口。"]
+        };
+    }
+
+    if (platform === "windows") {
+        return {
+            platform:"Windows",
+            text:"Edge / Chrome 可以把 DMate 安装成独立桌面应用。",
+            steps:["点击地址栏附近的安装图标，或打开浏览器菜单。", "选择“安装 DMate”。", "确认安装。"]
+        };
+    }
+
+    return {
+        platform:"当前设备",
+        text:"如果浏览器没有弹出安装窗口，可以从浏览器菜单寻找“安装应用”或“添加到主屏幕”。",
+        steps:["打开浏览器菜单。", "寻找“安装应用”或“添加到主屏幕”。", "确认安装 DMate。"]
+    };
+}
+
+function openDmateInstallHelp() {
+    const modal = document.getElementById("installHelpModal");
+    const platformEl = document.getElementById("installHelpPlatform");
+    const textEl = document.getElementById("installHelpText");
+    const stepsEl = document.getElementById("installHelpSteps");
+    if (!modal || !platformEl || !textEl || !stepsEl) return;
+
+    const guide = installGuideForCurrentPlatform();
+    platformEl.textContent = guide.platform;
+    textEl.textContent = guide.text;
+    stepsEl.replaceChildren(...guide.steps.map(step => {
+        const li = document.createElement("li");
+        li.textContent = step;
+        return li;
+    }));
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+}
+
+function closeDmateInstallHelp() {
+    const modal = document.getElementById("installHelpModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+}
+
 function initPwaInstall() {
     const button = document.getElementById("installAppBtn");
+    const close = document.getElementById("installHelpClose");
+    const modal = document.getElementById("installHelpModal");
+
+    const syncButton = () => {
+        if (!button) return;
+        button.hidden = isDmateStandalone();
+        button.textContent = "安装 DMate";
+    };
+
+    syncButton();
 
     window.addEventListener("beforeinstallprompt", event => {
         event.preventDefault();
         deferredPwaInstallPrompt = event;
-        if (button) button.hidden = false;
+        syncButton();
     });
 
     button?.addEventListener("click", async () => {
-        if (!deferredPwaInstallPrompt) return;
-        const prompt = deferredPwaInstallPrompt;
-        deferredPwaInstallPrompt = null;
-        button.hidden = true;
-        try {
-            await prompt.prompt();
-            await prompt.userChoice;
-        } catch (_error) {}
+        if (isDmateStandalone()) {
+            button.hidden = true;
+            return;
+        }
+
+        if (deferredPwaInstallPrompt) {
+            const prompt = deferredPwaInstallPrompt;
+            deferredPwaInstallPrompt = null;
+            try {
+                await prompt.prompt();
+                const choice = await prompt.userChoice;
+                if (choice?.outcome === "accepted") {
+                    button.hidden = true;
+                } else {
+                    syncButton();
+                }
+                return;
+            } catch (_error) {
+                syncButton();
+            }
+        }
+
+        openDmateInstallHelp();
+    });
+
+    close?.addEventListener("click", closeDmateInstallHelp);
+    modal?.addEventListener("click", event => {
+        if (event.target === modal) closeDmateInstallHelp();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) {
+            closeDmateInstallHelp();
+        }
     });
 
     window.addEventListener("appinstalled", () => {
         deferredPwaInstallPrompt = null;
         if (button) button.hidden = true;
+        closeDmateInstallHelp();
         showCopyToast("DMate 已安装");
     });
 
-    if (window.matchMedia?.("(display-mode: standalone)")?.matches && button) {
-        button.hidden = true;
-    }
+    window.matchMedia?.("(display-mode: standalone)")?.addEventListener?.("change", syncButton);
 }
 
 function registerDmateServiceWorker() {
