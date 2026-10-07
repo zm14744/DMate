@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-shell-v6-7-20261007";
+const CACHE_NAME = "dmate-shell-v6-10-20261007";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
