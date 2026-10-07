@@ -14,11 +14,11 @@
 <meta name="theme-color" content="#f8fafc">
 <meta name="application-name" content="DMate">
 <meta name="description" content="DMate - 离散数学智能辅学系统">
-{% if not is_android %}<meta name="mobile-web-app-capable" content="yes">{% endif %}
+{% if is_ios %}<meta name="mobile-web-app-capable" content="yes">{% endif %}
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_android %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v6-12-20261007">{% endif %}
+{% if is_ios and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-ios-webapp-v6-13-20261007">{% endif %}
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6-2">
 <link rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-v6-2">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
@@ -6086,6 +6086,31 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
     padding-left:1.45em;
     line-height:1.75;
 }
+.install-help-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:14px;
+}
+.install-help-actions[hidden] { display:none !important; }
+.install-help-actions a {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:42px;
+    padding:0 16px;
+    border-radius:12px;
+    background:var(--accent, #3b82f6);
+    color:#fff;
+    text-decoration:none;
+    font-weight:700;
+}
+.install-help-actions a.secondary {
+    background:rgba(148,163,184,.18);
+    color:inherit;
+    border:1px solid rgba(148,163,184,.28);
+}
+
 .install-help-note {
     margin-top:16px;
     padding:11px 12px;
@@ -6569,12 +6594,18 @@ window.MathJax = {
 
 </head>
 
-<body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}">
+<body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
 <script>
 window.DMATE_CLIENT_CONFIG = {{ {
     "isAndroid": is_android,
+    "isIos": is_ios,
     "isAndroidApp": is_dmate_android_app,
-    "androidApkUrl": android_apk_url
+    "isDesktopApp": is_dmate_desktop_app,
+    "androidApkUrl": android_apk_url,
+    "desktopWindowsUrl": desktop_windows_url,
+    "desktopMacosUrl": desktop_macos_url,
+    "desktopLinuxDebUrl": desktop_linux_deb_url,
+    "desktopLinuxAppImageUrl": desktop_linux_appimage_url
 } | tojson }};
 </script>
 
@@ -6590,7 +6621,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         </button>
     </div>
     <div class="mobile-topbar-brand">
-        <img class="mobile-dmate-mark" src="/static/icons/dmate-mark.png?v=dmate-v6" alt="" aria-hidden="true">
+        <img class="mobile-dmate-mark" src="/static/icons/dmate-mark.svg?v=dmate-v6-14" alt="" aria-hidden="true">
         <div id="mobileConversationTitle" class="mobile-topbar-title">DMate</div>
     </div>
     <div class="mobile-topbar-actions">
@@ -6607,7 +6638,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <button id="mobileNavClose" class="mobile-drawer-close" type="button" aria-label="关闭对话列表">×</button>
     </div>
     <div class="dmate-brand" aria-label="DMate - 离散数学智能辅学系统">
-        <img class="dmate-brand-mark" src="/static/icons/dmate-mark.png?v=dmate-v6" alt="DMate 图标">
+        <img class="dmate-brand-mark" src="/static/icons/dmate-mark.svg?v=dmate-v6-14" alt="DMate 图标">
         <div class="dmate-brand-copy">
             <div class="dmate-brand-name">DMate</div>
             <div class="dmate-brand-subtitle">离散数学智能辅学系统</div>
@@ -6615,7 +6646,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
     <button class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
-    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or not is_android %} hidden{% endif %}>{% if is_android and not is_dmate_android_app %}下载 DMate APK{% else %}安装 DMate{% endif %}</button>
+    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app %} hidden{% endif %}>{% if is_android %}下载 DMate APK{% elif is_ios %}安装 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
     <button id="accountBtn" class="btn account-entry" type="button"><span class="account-entry-dot" aria-hidden="true"></span><span id="accountEntryLabel">登录 / 注册</span></button>
     <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor"/></svg></span><span>外观</span></button>
 </div>
@@ -6813,6 +6844,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div id="installHelpPlatform" class="install-help-platform"></div>
             <div id="installHelpText" class="install-help-text"></div>
             <ol id="installHelpSteps" class="install-help-steps"></ol>
+            <div id="installHelpActions" class="install-help-actions" hidden></div>
             <div class="install-help-note">安装后可像普通应用一样打开 DMate。</div>
         </div>
     </div>
@@ -7209,7 +7241,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-pwa-v6-8-20261007"></script>
+<script src="/static/script.js?v=dmate-desktop-v6-13-20261007"></script>
 
 </body>
 </html>
