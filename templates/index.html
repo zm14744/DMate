@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v6-7-20261007">
+<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v6-8-20261007">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6-2">
 <link rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-v6-2">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
@@ -6426,6 +6426,72 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     }
 }
 
+
+/* =========================================================
+   DMate v6.8：桌面输入区纠正
+   - 白色 / 蓝色：输入区外层与聊天区同色，去掉横向分隔感；保留桌面输入控件原形态。
+   - 黑色：撤销 v6.7 的桌面“移动端式胶囊”，恢复 v6.6 的桌面输入结构。
+   - 仅作用于桌面，不改变移动端已经统一好的输入框几何。
+   ========================================================= */
+@media (min-width:1101px) {
+    /* 白色：聊天区和整个输入承载区使用同一背景，只保留真正的文本输入框。 */
+    body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .input {
+        background:#eef3f8 !important;
+        background-image:none !important;
+        border-top:0 !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme="light"] .input input {
+        background:#ffffff !important;
+        border:1px solid #cbd5e1 !important;
+        border-radius:8px !important;
+        box-shadow:none !important;
+    }
+
+    /* 蓝色：同样把下方整条输入承载区并回聊天区，不改变桌面控件尺寸。 */
+    body[data-appearance-theme="navy"]:not(.has-custom-background) .input-wrap,
+    body[data-appearance-theme="navy"]:not(.has-custom-background) .input {
+        background:#0f172a !important;
+        background-image:none !important;
+        border-top:0 !important;
+        box-shadow:none !important;
+    }
+
+    /* 黑色：恢复 v6.6 的桌面结构——整行输入区 + 独立文本框，不再使用外层大胶囊。 */
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
+        background:#0d0d0d !important;
+        padding:0 !important;
+        border-top:0 !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme="dark"]:not(.has-custom-background) .input {
+        width:auto !important;
+        min-height:0 !important;
+        margin:0 !important;
+        padding:10px 12px 12px !important;
+        gap:8px !important;
+        border:0 !important;
+        border-radius:0 !important;
+        background:#212121 !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme="dark"] .input input,
+    body[data-appearance-theme="dark"] .input input:hover,
+    body[data-appearance-theme="dark"] .input input:focus {
+        background:#2f2f2f !important;
+        border:1px solid #3a3a3a !important;
+        border-radius:14px !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme="dark"] .input input:hover {
+        border-color:#454545 !important;
+    }
+    body[data-appearance-theme="dark"] .input input:focus {
+        border-color:#565656 !important;
+    }
+}
+
 </style>
 
 <script>
@@ -7083,7 +7149,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-pwa-v6-7-20261007"></script>
+<script src="/static/script.js?v=dmate-pwa-v6-8-20261007"></script>
 
 </body>
 </html>
