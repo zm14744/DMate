@@ -18,8 +18,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-1-20261007">
-<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6">
+<link rel="manifest" href="/static/manifest.webmanifest?v=dmate-pwa-v6-2-20261007">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6-2">
+<link rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-v6-2">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
 <title>DMate - 离散数学智能辅学系统</title>
 
@@ -5728,6 +5729,75 @@ body[data-appearance-theme="light"] .input input {
         white-space:normal;
     }
 }
+
+/* =========================================================
+   DMate v6.2：新增 GPT 风格中性黑深色，并保留原深蓝主题
+   ========================================================= */
+.appearance-segmented.modes {
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width:520px) {
+    .appearance-segmented.modes {
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+}
+
+:root[data-appearance-theme="dark"],
+body[data-appearance-theme="dark"] {
+    --surface-0:#212121;
+    --surface-0-rgb:33,33,33;
+    --surface-1:rgba(23,23,23,var(--panel-alpha));
+    --surface-1-rgb:23,23,23;
+    --surface-2:rgba(42,42,42,var(--panel-alpha));
+    --surface-2-rgb:42,42,42;
+    --surface-3:rgba(47,47,47,var(--panel-alpha));
+    --surface-3-rgb:47,47,47;
+    --surface-4:rgba(58,58,58,var(--panel-alpha));
+    --surface-4-rgb:58,58,58;
+    --border-strong:#424242;
+    --border-mid:#4a4a4a;
+    --text-strong:#f7f7f8;
+    --text-primary:#ececec;
+    --text-secondary:#d1d1d1;
+    --text-muted:#a1a1aa;
+    --text-subtle:#737373;
+    --accent-text:#eff6ff;
+    --background-mask-rgb:0,0,0;
+    color-scheme:dark;
+}
+
+:root[data-appearance-theme="navy"],
+body[data-appearance-theme="navy"] {
+    --surface-0:#0f172a;
+    --surface-0-rgb:15,23,42;
+    --surface-1:rgba(11,18,32,var(--panel-alpha));
+    --surface-1-rgb:11,18,32;
+    --surface-2:rgba(17,24,39,var(--panel-alpha));
+    --surface-2-rgb:17,24,39;
+    --surface-3:rgba(31,41,55,var(--panel-alpha));
+    --surface-3-rgb:31,41,55;
+    --surface-4:rgba(38,52,73,var(--panel-alpha));
+    --surface-4-rgb:38,52,73;
+    --border-strong:#334155;
+    --border-mid:#475569;
+    --text-strong:#f8fafc;
+    --text-primary:#e2e8f0;
+    --text-secondary:#cbd5e1;
+    --text-muted:#94a3b8;
+    --text-subtle:#64748b;
+    --accent-text:#eff6ff;
+    --background-mask-rgb:15,23,42;
+    color-scheme:dark;
+}
+
+body[data-appearance-theme="dark"] {
+    background:#212121;
+}
+
+body[data-appearance-theme="navy"] {
+    background:#0f172a;
+}
 </style>
 
 <script>
@@ -5875,10 +5945,11 @@ window.MathJax = {
         <div class="appearance-body">
             <div class="appearance-section">
                 <div class="appearance-section-title">显示模式</div>
-                <div class="appearance-segmented">
+                <div class="appearance-segmented modes">
                     <button type="button" data-appearance-mode="system">跟随系统</button>
                     <button type="button" data-appearance-mode="light">浅色</button>
                     <button type="button" data-appearance-mode="dark">深色</button>
+                    <button type="button" data-appearance-mode="navy">深蓝</button>
                 </div>
             </div>
 
@@ -6364,7 +6435,7 @@ window.MathJax = {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-pwa-v6-1-20261007"></script>
+<script src="/static/script.js?v=dmate-pwa-v6-2-20261007"></script>
 
 </body>
 </html>
