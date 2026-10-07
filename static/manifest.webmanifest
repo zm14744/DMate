@@ -7,7 +7,10 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "background_color": "#f8fafc",
   "theme_color": "#f8fafc",
   "orientation": "any",
@@ -30,5 +33,6 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "prefer_related_applications": false
 }
