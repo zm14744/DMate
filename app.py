@@ -7,6 +7,7 @@ import time
 import smtplib
 import ssl
 import hmac
+import requests
 import hashlib
 from email.message import EmailMessage
 from datetime import timedelta
@@ -104,6 +105,21 @@ AUTH_CONFIGURED = bool(
     and AUTH_SECRET_KEY
 )
 
+# 邮件发送：Brevo API 为主通道，原 QQ/SMTP 保留为自动备用通道。
+BREVO_API_KEY = (os.environ.get("BREVO_API_KEY") or "").strip()
+BREVO_SENDER_EMAIL = (
+    os.environ.get("BREVO_SENDER_EMAIL")
+    or os.environ.get("SMTP_FROM_EMAIL")
+    or ""
+).strip()
+BREVO_SENDER_NAME = (
+    os.environ.get("BREVO_SENDER_NAME")
+    or os.environ.get("SMTP_FROM_NAME")
+    or "DMate"
+).strip()
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+BREVO_CONFIGURED = bool(BREVO_API_KEY and BREVO_SENDER_EMAIL)
+
 SMTP_HOST = (os.environ.get("SMTP_HOST") or "smtp.qq.com").strip()
 try:
     SMTP_PORT = int((os.environ.get("SMTP_PORT") or "465").strip())
@@ -114,9 +130,10 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD") or ""
 SMTP_FROM_EMAIL = (os.environ.get("SMTP_FROM_EMAIL") or SMTP_USERNAME).strip()
 SMTP_FROM_NAME = (os.environ.get("SMTP_FROM_NAME") or "DMate").strip()
 SMTP_USE_SSL = _env_bool("SMTP_USE_SSL", True)
-EMAIL_DELIVERY_CONFIGURED = bool(
+SMTP_CONFIGURED = bool(
     SMTP_HOST and SMTP_PORT and SMTP_USERNAME and SMTP_PASSWORD and SMTP_FROM_EMAIL
 )
+EMAIL_DELIVERY_CONFIGURED = bool(BREVO_CONFIGURED or SMTP_CONFIGURED)
 
 MAX_SYNC_JSON_BYTES = 5 * 1024 * 1024
 AUTH_RATE_LIMIT_WINDOW = 60
@@ -580,26 +597,74 @@ def _new_email_code():
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
-def _send_verification_email(email, code, purpose):
-    if not EMAIL_DELIVERY_CONFIGURED:
-        raise RuntimeError("email delivery is not configured")
-
+def _verification_email_content(code, purpose):
     purpose_title = {
         "register": "注册",
         "reset": "重置密码",
         "bind": "绑定邮箱",
     }.get(purpose, "邮箱验证")
 
-    msg = EmailMessage()
-    msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
-    msg["To"] = email
-    msg["Subject"] = f"DMate - {purpose_title}验证码"
-    msg.set_content(
+    subject = f"DMate - {purpose_title}验证码"
+    text_content = (
         f"你的验证码是：{code}\n\n"
         "验证码 10 分钟内有效。\n"
         "如果不是你本人操作，请忽略这封邮件。\n\n"
         "如果收件箱中没有看到邮件，请检查垃圾邮件箱。"
     )
+    html_content = f"""<!doctype html>
+<html lang="zh-CN">
+  <body style="margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#111827;">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;">
+      <div style="font-size:22px;font-weight:700;margin-bottom:18px;">DMate</div>
+      <div style="font-size:15px;line-height:1.7;margin-bottom:12px;">你的{purpose_title}验证码是：</div>
+      <div style="font-size:32px;font-weight:700;letter-spacing:8px;margin:18px 0 22px;">{code}</div>
+      <div style="font-size:14px;line-height:1.7;color:#4b5563;">验证码 10 分钟内有效。如果不是你本人操作，请忽略这封邮件。</div>
+      <div style="font-size:13px;line-height:1.7;color:#6b7280;margin-top:18px;">未收到邮件时，请同时检查垃圾邮件箱。</div>
+    </div>
+  </body>
+</html>"""
+    return subject, text_content, html_content
+
+
+def _send_via_brevo(email, subject, text_content, html_content):
+    if not BREVO_CONFIGURED:
+        raise RuntimeError("Brevo is not configured")
+
+    response = requests.post(
+        BREVO_API_URL,
+        headers={
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+        },
+        json={
+            "sender": {
+                "name": BREVO_SENDER_NAME,
+                "email": BREVO_SENDER_EMAIL,
+            },
+            "to": [{"email": email}],
+            "subject": subject,
+            "textContent": text_content,
+            "htmlContent": html_content,
+        },
+        timeout=(5, 15),
+    )
+    if response.status_code < 200 or response.status_code >= 300:
+        body = (response.text or "").replace("\n", " ")[:500]
+        raise RuntimeError(
+            f"Brevo returned HTTP {response.status_code}: {body}"
+        )
+
+
+def _send_via_smtp(email, subject, text_content):
+    if not SMTP_CONFIGURED:
+        raise RuntimeError("SMTP fallback is not configured")
+
+    msg = EmailMessage()
+    msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
+    msg["To"] = email
+    msg["Subject"] = subject
+    msg.set_content(text_content)
 
     context = ssl.create_default_context()
     if SMTP_USE_SSL:
@@ -620,11 +685,34 @@ def _send_verification_email(email, code, purpose):
             smtp.send_message(msg)
 
 
+def _send_verification_email(email, code, purpose):
+    if not EMAIL_DELIVERY_CONFIGURED:
+        raise RuntimeError("email delivery is not configured")
+
+    subject, text_content, html_content = _verification_email_content(code, purpose)
+
+    # 主通道：Brevo。只有 Brevo 失败时才尝试原 QQ/SMTP。
+    if BREVO_CONFIGURED:
+        try:
+            _send_via_brevo(email, subject, text_content, html_content)
+            return "brevo"
+        except Exception as exc:
+            print(f"Brevo 邮件发送失败，准备尝试 SMTP 备用通道：{repr(exc)}")
+            if not SMTP_CONFIGURED:
+                raise
+
+    if SMTP_CONFIGURED:
+        _send_via_smtp(email, subject, text_content)
+        return "smtp"
+
+    raise RuntimeError("no email delivery provider is configured")
+
+
 def _email_unavailable_response():
     return jsonify({
         "ok": False,
         "emailConfigured": False,
-        "error": "邮箱验证码服务尚未配置，请检查 SMTP 环境变量。",
+        "error": "邮箱验证码服务尚未配置，请检查 Brevo 或 SMTP 环境变量。",
     }), 503
 
 
