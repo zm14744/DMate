@@ -1446,10 +1446,25 @@ $$
     elif reasoning_effort == "high":
         print("检测到中等题：启用 high 思考模式。")
 
+    # 出题的可见输出本身很短，没必要给到普通长解答同样大的输出预算。
+    # 保留原有 none/high/max 推理档位，只缩小“出题”场景的最大输出预算，
+    # 减少模型长时间思考后又输出一小道题的延迟。
+    exercise_mode = str((teaching_context or {}).get("mode", "")).strip() == "exercise"
+    exercise_max_tokens = None
+    if exercise_mode:
+        exercise_max_tokens = {
+            "none": 2600,
+            "high": 5000,
+            "max": 7000,
+        }.get(reasoning_effort, 5000)
+
+    effective_retries = 0 if (teaching_context or {}).get("_fast_exercise_retry") else retries
+
     result = _request_text_completion(
         api_messages,
-        retries=retries,
+        retries=effective_retries,
         reasoning_effort=reasoning_effort,
+        max_tokens=exercise_max_tokens,
     )
     if not result.get("ok"):
         return _failure(
