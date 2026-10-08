@@ -1431,6 +1431,9 @@ $$
         print("AI API 配置错误：LUXIN_API_KEY 与 DEEPSEEK_API_KEY 均未设置")
         return _failure("AI 服务尚未完成配置，请联系管理员。")
 
+    if (teaching_context or {}).get("mode") == "exercise":
+        retries = min(max(int(retries), 0), 1)
+
     clean_messages = _trim_messages(messages)
     if not clean_messages:
         return _failure("没有检测到有效的消息内容。")
