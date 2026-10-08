@@ -4751,25 +4751,59 @@ function completeQuestionTextFromChatMessage(
     return complete ? question : "";
 }
 
-function copyChatQuestionOnly(message, session, messageIndex) {
+function buildQuestionCopyElement(question) {
+    const root = document.createElement("div");
+    root.className = "ai-content";
+    root.innerHTML = markdownToHtml(prepareAiDisplayText(question));
+    return root;
+}
+
+async function prepareTypesetQuestionCopy(question) {
+    const root = buildQuestionCopyElement(question);
+    const holder = document.createElement("div");
+    holder.style.position = "absolute";
+    holder.style.top = "0";
+    holder.style.left = "-100000px";
+    holder.style.width = "860px";
+    holder.appendChild(root);
+    document.body.appendChild(holder);
+    try {
+        // Copy-only isolated node: never re-typeset or replace the live chat DOM.
+        if (window.MathJax?.typesetPromise) {
+            await window.MathJax.typesetPromise([root]);
+        }
+        return buildClipboardPayload(root);
+    } finally {
+        holder.remove();
+    }
+}
+
+async function copyChatQuestionOnly(message, session, messageIndex) {
     const question = completeQuestionTextFromChatMessage(
-        message,
-        session,
-        messageIndex
+        message, session, messageIndex
     );
+    if (!question) return false;
 
-    if (!question) return;
-
-    const payload = {
+    // The old implementation copied HTML generated from raw Markdown, containing
+    // unresolved $...$ rather than already-rendered MathJax formulas.
+    const pending = prepareTypesetQuestionCopy(question);
+    const fallback = {
         text: question,
         html: `<div class="ai-content">${markdownToHtml(
             prepareAiDisplayText(question)
         )}</div>`
     };
+    const ok = await writeRichClipboardWhenReady(pending, fallback);
+    if (ok) showCopyToast("题目已复制；微信请用复制图片");
+    return ok;
+}
 
-    writeRichClipboard(payload).then(ok => {
-        if (ok) showCopyToast("题目已复制");
-    });
+function copyChatQuestionAsImage(message, session, messageIndex) {
+    const question = completeQuestionTextFromChatMessage(
+        message, session, messageIndex
+    );
+    if (!question) return Promise.resolve(false);
+    return copyRenderedImageToClipboard(() => buildQuestionCopyElement(question));
 }
 
 function shouldShowChatCopyButton(message, session, messageIndex) {
@@ -7901,13 +7935,10 @@ function renderWrongBook() {
         const actions = document.createElement("div");
         actions.className = "wrong-actions";
 
-        const copyButton = document.createElement("button");
-        copyButton.type = "button";
-        copyButton.className = "secondary";
-        copyButton.textContent = "复制";
-        copyButton.title = "复制这道错题及当前已有内容；公式优先保留视觉渲染";
-        copyButton.onclick = () => copyRenderedNode(card);
-        actions.appendChild(copyButton);
+        actions.appendChild(createRichCopySplitButton(
+            () => copyRenderedNode(card),
+            () => copyRenderedImageToClipboard(() => card.cloneNode(true))
+        ));
 
         if (!item.analysis) {
             const analysisButton = document.createElement("button");
@@ -8721,6 +8752,36 @@ function showCopyToast(message = "已复制") {
     setTimeout(() => toast.remove(), 1200);
 }
 
+async function writeRichClipboardWhenReady(payloadPromise, fallback) {
+    // Start the clipboard write within the user gesture, even when MathJax
+    // typesetting the isolated copy node takes an asynchronous turn.
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+        try {
+            const richHtml = Promise.resolve(payloadPromise).then(payload =>
+                new Blob([String(payload.html || "")], { type: "text/html" })
+            );
+            const item = new ClipboardItem({
+                "text/plain": new Blob([String(fallback.text || "")], {
+                    type: "text/plain"
+                }),
+                "text/html": richHtml
+            });
+            await navigator.clipboard.write([item]);
+            return true;
+        } catch (error) {
+            console.warn("渲染后富文本复制失败，尝试普通复制：", error);
+        }
+    }
+
+    let payload = fallback;
+    try {
+        payload = await payloadPromise;
+    } catch (error) {
+        console.warn("题目复制专用公式渲染失败：", error);
+    }
+    return writeRichClipboard(payload);
+}
+
 async function writeRichClipboard(payload) {
     const text = String(payload?.text || "");
     const html = String(payload?.html || "");
@@ -8782,6 +8843,188 @@ async function copyRenderedNode(node, successText = "已复制") {
     if (ok) showCopyToast(successText);
     return ok;
 }
+
+// Cross-application visual copy: WeChat and some chat editors ignore text/html.
+// This is intentionally separate from normal rich text / granular selection.
+function createRenderedCopyStage(content) {
+    const stage = document.createElement("div");
+    stage.className = "dmate-image-copy-stage";
+    stage.style.position = "absolute";
+    stage.style.left = "0";
+    stage.style.top = `${Math.max(
+        document.documentElement.scrollHeight,
+        document.body?.scrollHeight || 0
+    ) + 100}px`;
+    stage.style.width = "min(860px, calc(100vw - 32px))";
+    stage.style.minWidth = "280px";
+    stage.style.padding = "22px 26px";
+    stage.style.boxSizing = "border-box";
+    stage.style.background = "#ffffff";
+    stage.style.color = "#111827";
+    stage.style.fontSize = "16px";
+    stage.style.lineHeight = "1.7";
+    stage.style.overflow = "visible";
+    stage.style.zIndex = "-2147483648";
+    stage.style.pointerEvents = "none";
+    stage.appendChild(content);
+    // Styles are applied to this export-only clone, not the visible content.
+    stripClipboardControls(stage);
+    flattenClipboardDetails(stage);
+    stage.querySelectorAll(".difficulty-badge").forEach(node => node.remove());
+    applyClipboardRichStyles(stage);
+    stage.querySelectorAll("*").forEach(node => {
+        if (node instanceof HTMLElement) {
+            node.style.setProperty("color", "#111827", "important");
+            node.style.setProperty("text-shadow", "none", "important");
+            node.style.setProperty("background", "transparent", "important");
+        }
+    });
+    document.body.appendChild(stage);
+    return stage;
+}
+
+async function renderContentAsPngBlob(makeContent) {
+    if (typeof window.html2canvas !== "function") {
+        throw new Error("图片渲染组件未加载");
+    }
+    const content = makeContent();
+    if (!content) throw new Error("没有可复制的内容");
+    const stage = createRenderedCopyStage(content);
+    try {
+        if (window.MathJax?.typesetPromise) {
+            // A clone can contain unrendered LaTeX from a generated question.
+            await window.MathJax.typesetPromise([stage]);
+        }
+        if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
+        // Reuse the tested PDF-only rasterizer, avoiding clipped SVG glyphs
+        // and duplicate assistive MathML when html2canvas takes a snapshot.
+        await rasterizeMathJaxSvgForPdf(stage);
+        const width = Math.ceil(stage.getBoundingClientRect().width);
+        const height = Math.ceil(stage.scrollHeight);
+        const scale = Math.max(0.6, Math.min(2, 4096 / width, 12000 / height));
+        const canvas = await window.html2canvas(stage, {
+            backgroundColor: "#ffffff",
+            scale,
+            width,
+            height,
+            windowWidth: Math.max(window.innerWidth, width),
+            windowHeight: Math.max(window.innerHeight, height),
+            useCORS: true,
+            logging: false
+        });
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+        if (!blob) throw new Error("无法生成 PNG");
+        return blob;
+    } finally {
+        stage.remove();
+    }
+}
+
+function downloadRenderedCopyPng(blob) {
+    if (!blob) return false;
+    const url = URL.createObjectURL(blob);
+    try {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "DMate-公式与题目.png";
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return true;
+    } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+}
+
+async function copyRenderedImageToClipboard(makeContent) {
+    // Promise<Blob> begins inside the click event to preserve clipboard
+    // activation on Chromium-based desktop and Android clients.
+    const pngPromise = renderContentAsPngBlob(makeContent);
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+        try {
+            await navigator.clipboard.write([new ClipboardItem({
+                "image/png": pngPromise
+            })]);
+            showCopyToast("图片已复制，可粘贴至微信等应用");
+            return true;
+        } catch (firstError) {
+            console.warn("图片剪贴板即时写入失败：", firstError);
+            try {
+                const blob = await pngPromise;
+                await navigator.clipboard.write([new ClipboardItem({
+                    "image/png": blob
+                })]);
+                showCopyToast("图片已复制，可粘贴至微信等应用");
+                return true;
+            } catch (secondError) {
+                console.warn("图片剪贴板写入失败：", secondError);
+            }
+        }
+    }
+    try {
+        if (downloadRenderedCopyPng(await pngPromise)) {
+            showCopyToast("无法直接复制图片，已下载 PNG");
+            return true;
+        }
+    } catch (error) {
+        console.warn("渲染复制图片失败：", error);
+    }
+    showCopyToast("图片复制失败，请重试");
+    return false;
+}
+
+function createRichCopySplitButton(onRichCopy, onImageCopy) {
+    const group = document.createElement("span");
+    group.className = "rich-copy-split";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "复制";
+    button.title = "复制可编辑文字与富文本；粘贴到微信保留公式请用右侧菜单";
+    button.addEventListener("click", onRichCopy);
+    group.appendChild(button);
+
+    const menuButton = document.createElement("button");
+    menuButton.type = "button";
+    menuButton.className = "rich-copy-options-trigger";
+    menuButton.textContent = "▾";
+    menuButton.title = "复制为图片（微信等聊天软件）";
+    menuButton.setAttribute("aria-label", "更多复制方式");
+    menuButton.setAttribute("aria-haspopup", "menu");
+    menuButton.setAttribute("aria-expanded", "false");
+    group.appendChild(menuButton);
+
+    const menu = document.createElement("span");
+    menu.className = "rich-copy-options-menu";
+    menu.hidden = true;
+    menu.setAttribute("role", "menu");
+    const imageButton = document.createElement("button");
+    imageButton.type = "button";
+    imageButton.textContent = "复制为图片（微信）";
+    imageButton.setAttribute("role", "menuitem");
+    imageButton.addEventListener("click", () => {
+        menu.hidden = true;
+        menuButton.setAttribute("aria-expanded", "false");
+        onImageCopy();
+    });
+    menu.appendChild(imageButton);
+    group.appendChild(menu);
+    menuButton.addEventListener("click", () => {
+        menu.hidden = !menu.hidden;
+        menuButton.setAttribute("aria-expanded", String(!menu.hidden));
+    });
+    return group;
+}
+
+// One global listener even when conversations are re-rendered many times.
+document.addEventListener("click", event => {
+    document.querySelectorAll(".rich-copy-options-menu:not([hidden])").forEach(menu => {
+        if (menu.parentElement?.contains(event.target)) return;
+        menu.hidden = true;
+        menu.parentElement?.querySelector(".rich-copy-options-trigger")
+            ?.setAttribute("aria-expanded", "false");
+    });
+});
 
 function effectiveElementBackground(element) {
     let current = element;
@@ -12722,16 +12965,10 @@ function renderChat() {
                 messageIndex
             )
         ) {
-            const copyButton = document.createElement("button");
-            copyButton.type = "button";
-            copyButton.textContent = "复制";
-            copyButton.title = "复制这道题目";
-            copyButton.onclick = () => copyChatQuestionOnly(
-                message,
-                session,
-                messageIndex
-            );
-            actions.appendChild(copyButton);
+            actions.appendChild(createRichCopySplitButton(
+                () => copyChatQuestionOnly(message, session, messageIndex),
+                () => copyChatQuestionAsImage(message, session, messageIndex)
+            ));
         }
 
         if (
