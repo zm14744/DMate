@@ -1987,6 +1987,13 @@ def _requested_exercise_difficulty(text):
                 if reserve:
                     protected.append(span)
 
+    # “不难”直接表达希望题目容易；“不太难/别太难”则按适中处理。
+    # 先保护整词，防止后续“难”单字规则反向识别成困难。
+    collect("简单", (
+        r"(?:^|[^太很更较])不难(?:的|题|一点|一些|吧|$)?",
+        r"(?:^|[^太很更较])没难度",
+    ), reserve=True)
+
     # 优先整体识别含否定/程度词的说法，避免截取里面的“难”“简单”。
     collect("中等", (
         r"(?:不要|别|不用|无需|不必|不想要|不想|不能|不太|不是很|不算|没那么|不那么|不怎么|别那么|不要那么)(?:给我|出|给|来|弄|搞|做)?(?:一?道|一个)?(?:太|这么|那么|很|特别)?难(?:的|题)?",
@@ -2335,12 +2342,23 @@ def chat():
             target_difficulty = teaching.get("exercise_target_difficulty")
             actual_difficulty = generated_teaching.get("difficulty")
 
-            if (
-                explicit_exercise_difficulty
-                and target_difficulty in ("简单", "中等", "困难")
+            # 只有用户明确要求难度，或默认中等却生成“困难”时，
+            # 才尝试一次纠偏。默认中等遇到简单题仍直接返回，
+            # 避免额外 API 消费，也不把启发式分档作为拒题硬门槛。
+            retry_for_difficulty = bool(
+                target_difficulty in ("简单", "中等", "困难")
                 and actual_difficulty in ("简单", "中等", "困难")
                 and actual_difficulty != target_difficulty
-            ):
+                and (
+                    explicit_exercise_difficulty
+                    or (
+                        not reference_teaching
+                        and target_difficulty == "中等"
+                        and actual_difficulty == "困难"
+                    )
+                )
+            )
+            if retry_for_difficulty:
                 matched_difficulty = False
 
                 for retry_index in range(1):
@@ -2348,9 +2366,10 @@ def chat():
                     retry_messages.append({
                         "role": "user",
                         "content": (
-                            "系统校验发现刚才生成题的实际难度与目标难度不一致。"
-                            f"请重新生成一道严格属于‘{target_difficulty}’难度的题。"
-                            "保持原来的知识点/参照题要求，但调整步骤数量、综合程度和计算量。"
+                            "上一道候选练习的步骤/综合程度与本次目标不够接近。"
+                            f"请换一题，目标为‘{target_difficulty}’难度。"
+                            "保持原来的学科/参照题核心知识点要求；简单题只考一个基础动作，"
+                            "中等题以适当的两三步推理为主，不叠加多道独立计算。"
                             "仍然严格遵守系统规定的【题目】与隐藏答案格式，不要解释这次重生成。"
                         ),
                     })
