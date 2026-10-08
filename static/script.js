@@ -10322,19 +10322,23 @@ function selectionTouchesMathJax(selection) {
 }
 
 function writeSelectionClipboard(event, payload) {
-    if (!payload?.text && !payload?.html) return false;
+    // 原生框选复制只写 text/plain。
+    // MathJax 的 SVG / HTML 一旦进入系统剪贴板，微信等聊天软件可能把每个公式
+    // 拆成独立的 .dat 附件。这里故意不写 text/html，也不写 image/*；
+    // 页面渲染、公式逐字形选择与“题目复制”按钮的智能复制完全不受影响。
+    if (!payload?.text) return false;
     if (!event.clipboardData) return false;
+
+    try {
+        event.clipboardData.clearData();
+    } catch (_error) {
+        // 某些 WebView 不允许 clearData；后续 setData 仍会覆盖文本类型。
+    }
 
     event.clipboardData.setData(
         "text/plain",
         String(payload.text || "")
     );
-    if (payload.html) {
-        event.clipboardData.setData(
-            "text/html",
-            String(payload.html)
-        );
-    }
     event.preventDefault();
     return true;
 }
@@ -10370,18 +10374,24 @@ function installRichSelectionCopy() {
             return;
         }
 
-        // 阶段一之前的原版对普通文字/列表/表格完全使用浏览器原生复制。
-        // 只有普通 DOM 选区真正跨过 MathJax 时才做公式增强。
-        if (!selectionTouchesMathJax(selection)) {
-            return;
+        // 不再让浏览器自行序列化任何 DMate 页面选区。
+        // 即使选区从普通文字开始、只擦过公式边界，Chromium 也可能把 MathJax SVG
+        // 作为富媒体对象放入剪贴板，微信随后会显示多个 .dat 文件。
+        // 因此所有非输入框原生选区统一走安全文本序列化：
+        // - 含公式：用 MathJax 的可访问表达式转成可读数学文本；
+        // - 纯文字：保留浏览器选中的文字和换行；
+        // - 绝不写入 SVG / HTML / image MIME。
+        let payload;
+        if (selectionTouchesMathJax(selection)) {
+            const fragment = cloneSelectionContentsForRichCopy(selection);
+            if (!fragment || !fragment.childNodes.length) return;
+            payload = buildNativeSelectionClipboardPayload(fragment);
+        } else {
+            payload = { text: String(selection.toString() || "") };
         }
 
-        const fragment = cloneSelectionContentsForRichCopy(selection);
-        if (!fragment || !fragment.childNodes.length) return;
-
-        const payload = buildNativeSelectionClipboardPayload(fragment);
         writeSelectionClipboard(event, payload);
-    });
+    }, true);
 }
 
 
