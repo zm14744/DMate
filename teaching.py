@@ -827,6 +827,35 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         if len({a or b for a, b in powers}) >= 2:
             score = max(score, 2)
 
+    # 截图回归：扩展欧几里得算法不是一次 gcd 计算。
+    # 当题目还要找到 gcd 的整数线性组合 / 贝祖系数时，至少有
+    # 欧几里得算法和回代两个步骤；不能按简短计算题直接判简单。
+    bezout_equation = bool(re.search(
+        r"(?<![0-9a-z_])\d+\s*[xy]\s*[+\-]\s*\d+\s*[xy]\s*=",
+        normalized,
+    ))
+    bezout_language = bool(re.search(
+        r"(?:整数\s*[xy]|整数解|贝祖|裴蜀|扩展欧几里得|线性组合)",
+        normalized,
+    ))
+    if bezout_equation and (
+        "gcd" in normalized or "最大公约数" in normalized or bezout_language
+    ):
+        score = max(score, 2)
+
+    # 一道题需要同时判定关系的多种性质，不能仅因数据规模小就标简单。
+    # 只判断其中一个性质的概念题仍保持原有规则。
+    relation_properties = {
+        label for label in ("自反性", "反自反性", "对称性", "反对称性", "传递性")
+        if label in normalized
+    }
+    if "反自反性" in relation_properties:
+        relation_properties.discard("自反性")
+    if "反对称性" in relation_properties:
+        relation_properties.discard("对称性")
+    if len(relation_properties) >= 3 and ("关系" in normalized or "r=" in normalized):
+        score = max(score, 2)
+
     # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
     if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
         score += 1
@@ -1991,6 +2020,8 @@ def teaching_prompt(context):
         ),
         "中等": (
             "目标难度严格为中等：围绕1到2个核心知识点，安排正常的多步判断或计算，通常控制在1到2个小问；"
+            "必须有实际的连续运算或综合判断，例如欧几里得算法加贝祖系数，或对关系判定数种不同性质；"
+            "不要只给一步即可直接计算的 gcd、集合元素列举等基础题。"
             "可以有少量综合，但不要同时堆叠3个以上独立任务，不要叠加证明、复杂构造和多个高阶考点。"
         ),
         "困难": (
