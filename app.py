@@ -2301,19 +2301,28 @@ def chat():
                         "teaching": teaching,
                     }), 502
 
-            # 生成后再按实际题干验一次难度。默认“随便出一道”目标就是中等；
-            # 若模型偶尔生成成简单/困难，自动重生成，不能把偏离目标的题直接展示。
+            # 只有用户【明确】指定了简单/中等/困难，才考虑二次生成。
+            # 没有明确指定难度时，“中等”只是给模型的生成偏好，不能变成
+            # 阻止题目交付的硬门槛。例如“出一道初级数论题”说的是学科，
+            # 并没有要求强制生成“中等难度题”。
+            # 注意：analyze_question 的三档难度只是启发式估计，不是权威判卷器。
             target_difficulty = teaching.get("exercise_target_difficulty")
             actual_difficulty = generated_teaching.get("difficulty")
 
             if (
-                target_difficulty in ("简单", "中等", "困难")
+                requested_difficulty
+                and target_difficulty in ("简单", "中等", "困难")
                 and actual_difficulty in ("简单", "中等", "困难")
                 and actual_difficulty != target_difficulty
             ):
                 matched_difficulty = False
+                difficulty_rank = {"简单": 0, "中等": 1, "困难": 2}
+                best_distance = abs(
+                    difficulty_rank[actual_difficulty] - difficulty_rank[target_difficulty]
+                )
 
-                for retry_index in range(2):
+                # 最多补试一次，避免连续昂贵的模型调用和长时间等待。
+                for retry_index in range(1):
                     retry_messages = list(cleaned)
                     retry_messages.append({
                         "role": "user",
@@ -2378,30 +2387,36 @@ def chat():
                         if not reference_ok:
                             continue
 
-                    if retry_teaching.get("difficulty") != target_difficulty:
+                    retry_difficulty = retry_teaching.get("difficulty")
+                    if retry_difficulty not in difficulty_rank:
                         continue
 
-                    reply = retry_reply
-                    generated_answer = retry_answer
-                    generated_question = retry_question
-                    generated_teaching = retry_teaching
-                    matched_difficulty = True
-                    print(
-                        f"练习难度已在第 {retry_index + 1} 次自动重生成后匹配："
-                        f"{target_difficulty}"
+                    distance = abs(
+                        difficulty_rank[retry_difficulty] - difficulty_rank[target_difficulty]
                     )
-                    break
+                    # 若补试结果更接近目标，才替换第一次已经可用的题目。
+                    if distance < best_distance:
+                        reply = retry_reply
+                        generated_answer = retry_answer
+                        generated_question = retry_question
+                        generated_teaching = retry_teaching
+                        best_distance = distance
+                    if distance == 0:
+                        matched_difficulty = True
+                        break
 
                 if not matched_difficulty:
-                    return jsonify({
-                        "error": (
-                            "连续生成的练习难度都偏离目标，已停止展示不匹配题目。"
-                            "请重新出题。"
-                        ),
-                        "teaching": teaching,
-                    }), 502
+                    # 生成器和启发式评分不一致时，必须保留有效题目，
+                    # 不能再把“重试失败”当成“题目不存在”。
+                    # 返回的 generated_teaching 始终记录真实估计难度，
+                    # 不为了凑目标把难度标签伪装成指定难度。
+                    print(
+                        "练习难度未完全匹配；保留最接近目标的有效题目："
+                        f"目标={target_difficulty}, "
+                        f"估计={generated_teaching.get('difficulty')}"
+                    )
 
-            # 只有题干、分类和目标难度都完成校验后，才把题目展示给前端。
+            # 题干和分类登记成功即可展示。难度估计不应使出题流程瘫痪。
             reply = (
                 "【题目】\n\n"
                 + generated_question
@@ -2415,6 +2430,12 @@ def chat():
 
         if generated_teaching:
             response["generated_teaching"] = generated_teaching
+
+        if is_exercise_request and generated_teaching and requested_difficulty:
+            response["exercise_difficulty_match"] = (
+                generated_teaching.get("difficulty")
+                == teaching.get("exercise_target_difficulty")
+            )
 
         if generated_question:
             response["generated_question"] = generated_question
