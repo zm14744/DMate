@@ -182,13 +182,15 @@ CATEGORY_RULES = {
             "数论",
             "整除", "素数", "质数", "合数", "因数", "约数", "最大公因数", "最大公约数",
             "最小公倍数", "欧几里得算法", "辗转相除", "同余", "模运算", "mod",
-            "线性同余", "一次同余", "欧拉函数", "欧拉定理", "费马小定理", "rsa", "公钥密码",
+            "线性同余", "一次同余", "模逆元", "模逆", "中国剩余定理", "孙子定理",
+            "crt", "欧拉函数", "欧拉定理", "费马小定理", "rsa", "公钥密码",
         ],
         "points": {
             "整除与素数": ["整除", "素数", "质数", "合数", "因数", "约数"],
             "最大公因数与欧几里得算法": ["最大公因数", "最大公约数", "最小公倍数", "欧几里得算法", "辗转相除", "gcd", "lcm"],
             "同余与模运算": ["同余", "模运算", "mod"],
             "线性同余方程": ["线性同余", "一次同余", "同余方程"],
+            "模逆与中国剩余定理": ["模逆元", "模逆", "中国剩余定理", "孙子定理", "crt"],
             "欧拉定理与费马小定理": ["欧拉函数", "欧拉定理", "费马小定理"],
             "RSA公钥密码": ["rsa", "公钥密码"],
         },
@@ -211,11 +213,11 @@ CATEGORY_RULES = {
     "递推关系": {
         "keywords": [
             "递推", "递推关系", "递归关系", "特征方程", "齐次递推",
-            "非齐次递推", "初始条件", "递推式",
+            "特征根", "非齐次递推", "初始条件", "递推式",
         ],
         "points": {
             "递推关系建模": ["递推", "递推关系", "递归关系", "递推式"],
-            "线性齐次递推": ["齐次递推", "特征方程"],
+            "线性齐次递推": ["齐次递推", "特征方程", "特征根"],
             "非齐次递推": ["非齐次递推"],
             "初始条件": ["初始条件"],
         },
@@ -225,6 +227,7 @@ CATEGORY_RULES = {
             "图论", "无向图", "有向图", "顶点", "边集", "邻接", "邻接矩阵", "邻接表",
             "关联矩阵", "度矩阵", "度数", "度序列", "路径", "回路", "圈", "连通", "连通分量",
             "欧拉", "哈密顿", "最短路", "dijkstra", "着色", "平面图", "匹配",
+            "二部图", "二分图", "二着色", "拓扑排序", "拓扑序", "拓扑序列", "有向无环图", "dag",
             "拉普拉斯矩阵", "laplacian", "树", "生成树", "最小生成树", "带权图", "权值",
             "矩阵树定理", "matrix-tree", "matrix tree", "kirchhoff", "基尔霍夫",
             "kruskal", "prim", "根树", "二叉树", "叶子", "割点", "割边", "桥", "生成森林",
@@ -233,6 +236,7 @@ CATEGORY_RULES = {
         ],
         "points": {
             "图的基本概念": ["无向图", "有向图", "顶点", "边集", "度数", "度序列", "度数列", "图论", "邻接表", "简单图", "图化", "可图化", "简单图化", "可简单图化", "havel", "hakimi", "havel-hakimi", "握手定理", "实现度序列"],
+            "图同构": ["图同构", "同构图", "顶点对应", "顶点映射", "保持邻接"],
             "邻接矩阵": ["邻接矩阵", "a^2", "tr(a^2)", "tr(a²)"],
             "图的矩阵表示": ["关联矩阵", "拉普拉斯矩阵", "laplacian", "度矩阵"],
             "路径与连通性": ["路径", "通路", "回路", "圈", "连通", "连通分量"],
@@ -243,6 +247,8 @@ CATEGORY_RULES = {
             "最短路": ["最短路", "最短路径", "dijkstra"],
             "图着色": ["着色", "色数"],
             "平面图": ["平面图", "欧拉公式"],
+            "二部图": ["二部图", "二分图", "二着色"],
+            "拓扑排序": ["拓扑排序", "拓扑序", "拓扑序列", "有向无环图", "dag"],
             "支配集、覆盖集与独立集": ["支配集", "覆盖集", "点覆盖", "边覆盖", "独立集"],
             "图匹配": ["匹配", "完美匹配", "二部图匹配"],
             "树的基本性质": ["树", "无向树", "叶子"],
@@ -255,10 +261,11 @@ CATEGORY_RULES = {
     "代数结构": {
         "keywords": [
             "代数系统", "代数结构", "半群", "幺半群", "群", "子群", "循环群",
-            "陪集", "拉格朗日定理", "同态", "同构", "环", "域", "格", "布尔代数",
+            "陪集", "拉格朗日定理", "同态", "同构", "二元运算", "封闭性", "结合律", "交换律",
+            "单位元", "幺元", "环", "域", "格", "布尔代数",
         ],
         "points": {
-            "代数系统": ["代数系统", "代数结构", "半群", "幺半群"],
+            "代数系统": ["代数系统", "代数结构", "半群", "幺半群", "二元运算", "封闭性", "结合律", "交换律", "单位元", "幺元"],
             "群与子群": ["群", "子群", "循环群", "陪集", "拉格朗日定理"],
             "同态与同构": ["同态", "同构"],
             "环与域": ["环", "域"],
@@ -304,6 +311,7 @@ _INTERNAL_IMAGE_MARKERS = (
 
 
 FOCUS_POINT_ALIASES = {
+    "图同构": ["图同构", "同构图", "顶点对应", "顶点映射", "保持邻接", "邻接关系"],
     "邻接矩阵": ["aij", "a_{ij}", "a_ij", "邻接矩阵", "矩阵a", "矩阵 a", "大括号"],
     "图的矩阵表示": ["拉普拉斯", "laplacian", "关联矩阵", "度矩阵", "矩阵表示"],
     "路径与连通性": ["通路", "路径", "回路", "长度为", "连通", "连通分量"],
@@ -315,6 +323,8 @@ FOCUS_POINT_ALIASES = {
     "最小生成树": ["最小生成树", "kruskal", "prim", "最小权"],
     "矩阵树定理": ["矩阵树", "matrix-tree", "kirchhoff", "基尔霍夫", "余子式"],
     "最短路": ["最短路", "最短路径", "dijkstra"],
+    "二部图": ["二部图", "二分图", "二着色"],
+    "拓扑排序": ["拓扑排序", "拓扑序", "拓扑序列", "有向无环图", "dag"],
     "根树": ["根树", "有根树", "二叉树"],
     "关系运算": ["关系运算", "逆关系", "复合关系", "关系的幂"],
     "关系性质": ["自反", "反自反", "对称", "反对称", "传递"],
@@ -334,12 +344,13 @@ FOCUS_POINT_ALIASES = {
     "最大公因数与欧几里得算法": ["最大公因数", "最大公约数", "gcd", "欧几里得", "辗转相除"],
     "同余与模运算": ["同余", "模运算", "mod"],
     "线性同余方程": ["线性同余", "一次同余", "同余方程"],
+    "模逆与中国剩余定理": ["模逆元", "模逆", "中国剩余定理", "孙子定理", "crt"],
     "欧拉定理与费马小定理": ["欧拉定理", "费马小定理", "欧拉函数"],
     "排列与组合": ["排列", "组合", "排列数", "组合数", "c(n", "a(n"],
     "鸽巢原理": ["鸽巢", "抽屉"],
     "容斥原理": ["容斥"],
     "生成函数": ["生成函数"],
-    "线性齐次递推": ["齐次递推", "特征方程"],
+    "线性齐次递推": ["齐次递推", "特征方程", "特征根"],
     "非齐次递推": ["非齐次递推", "特解"],
     "群与子群": ["子群", "循环群", "陪集", "拉格朗日"],
     "同态与同构": ["同态", "同构", "核", "像"],
@@ -679,18 +690,28 @@ def _detect_question_type(text, mode):
         return "概念题"
     if mode == "check_answer":
         return "答案检查"
+    if any(label in normalized for label in ("单选题", "多选题", "选择题")) or re.search(r"(?:请选择|选择正确|选择错误)", normalized):
+        return "选择题"
+    if "填空题" in normalized or re.search(r"(?:请)?填空|填入(?:适当|正确)?", normalized):
+        return "填空题"
     if "证明" in normalized:
         return "证明题"
+    if re.search(r"(?:画出|作图|绘制|画一|画一个|画一棵|画该|画这个)", normalized):
+        return "作图题"
+    if "构造" in normalized:
+        return "构造题"
     if "判断" in normalized or "是否" in normalized:
         return "判断题"
-    if any(keyword in normalized for keyword in (
-        "计算", "求", "写出", "列出", "det(", "行列式", "矩阵", "最短路", "生成树"
+    if re.match(r"^解(?!释)", normalized) or any(keyword in normalized for keyword in (
+        "计算", "求", "写出", "列出", "化为", "转换为", "det(", "行列式", "矩阵", "最短路", "生成树"
     )):
         return "计算题"
-    return "综合题"
+    # “综合题”容易让用户误以为系统识别失败。没有明确题型信号时，
+    # 使用中性的“一般题”，真正多小问/多任务的题仍可由难度与知识点体现综合度。
+    return "一般题"
 
 
-def _estimate_difficulty(text, knowledge_points=None, question_type="综合题"):
+def _estimate_difficulty(text, knowledge_points=None, question_type="一般题"):
     """
     轻量三档难度评级。
 
@@ -731,8 +752,9 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="综合题")
         "同构", "欧拉通路", "欧拉回路", "哈密顿",
         "最短路", "最小生成树", "传递闭包",
         "主析取范式", "主合取范式", "前束范式",
-        "生成函数", "非齐次递推", "矩阵树定理",
-        "rsa", "线性同余", "同余方程",
+        "生成函数", "特征方程", "特征根", "非齐次递推", "矩阵树定理",
+        "二部图", "二分图", "拓扑排序", "拓扑序列", "最大匹配", "色数", "消解",
+        "rsa", "线性同余", "同余方程", "模逆元", "中国剩余定理",
     )
     has_multi_step_topic = any(
         keyword in normalized
@@ -745,7 +767,7 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="综合题")
     # 最终仍被判成简单，导致 AI 不启用中等题的 high reasoning。
     # 当高级主题同时出现明确求解动作时，再加 1 分，使它至少进入中等。
     explicit_action = bool(re.search(
-        r"(?:求|计算|判断|判定|证明|构造|画出|写出|列出|找出|确定|给出|求解)",
+        r"(?:求|计算|判断|判定|证明|构造|画出|写出|列出|找出|确定|给出|求解|解答|化为|转换为|^解(?!释))",
         normalized,
     ))
 
@@ -757,8 +779,9 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="综合题")
     # 只判断“是否属于典型多步任务”，不按知识点数量机械抬难度。
     advanced_points = {
         "关系闭包", "范式", "前束范式", "线性同余方程",
-        "RSA公钥密码", "生成函数", "非齐次递推",
-        "最短路", "最小生成树", "矩阵树定理",
+        "模逆与中国剩余定理", "RSA公钥密码", "生成函数", "线性齐次递推", "非齐次递推",
+        "图同构", "欧拉图", "哈密顿图", "最短路", "最小生成树", "矩阵树定理",
+        "图匹配", "拓扑排序",
     }
     has_advanced_point = any(point in advanced_points for point in points)
     if has_advanced_point and not has_multi_step_topic:
@@ -868,6 +891,55 @@ def _extract_points(text, category):
 
     scored.sort(key=lambda item: (-item[0], item[1]))
     result = [point for _score, point in scored[:4]]
+
+    # “两个图是否同构”常只写“图 + 同构”，不会出现连续的“图同构”四个字。
+    # 分类器已经能借助图语境确认是图论，这里把它稳定登记为独立知识点，
+    # 避免右侧知识点和知识图谱只显示“图的基本概念”。
+    if category == "图论" and re.search(
+        r"(?:图|顶点|边|邻接|g\s*[_-]?\d+|图\s*\d+).{0,36}同构"
+        r"|同构.{0,36}(?:图|顶点|边|邻接|g\s*[_-]?\d+|图\s*\d+)",
+        normalized,
+        flags=re.IGNORECASE,
+    ):
+        result = ["图同构"] + [point for point in result if point != "图同构"]
+        result = result[:4]
+
+    # 公式型递推题往往不会写“齐次/非齐次”四个字，只给出 a_n 与前项关系。
+    # 先把 RHS 中所有“系数 × 前项”删除；若仍有常数/n/指数项等残余，
+    # 则按非齐次登记，否则按线性齐次登记。这样可直接覆盖常见教材写法。
+    if category == "递推关系":
+        recurrence_match = re.search(
+            r"a(?:_?\{?n\}?|ₙ)\s*=\s*([^\n，,；;]+)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if recurrence_match and re.search(
+            r"a(?:_?\{?n\s*[-−]\s*\d+\}?|ₙ[₋-]?\d*)",
+            recurrence_match.group(1),
+            flags=re.IGNORECASE,
+        ):
+            rhs = recurrence_match.group(1)
+            residual = re.sub(
+                r"[+\-−]?\s*(?:\d+(?:\.\d+)?\s*\*?\s*)?"
+                r"a(?:_?\{?n\s*[-−]\s*\d+\}?|ₙ[₋-]?\d*)",
+                "",
+                rhs,
+                flags=re.IGNORECASE,
+            )
+            residual = re.sub(r"[\s+\-−()]+", "", residual)
+            residual = re.sub(
+                r"(?:的)?(?:通项公式|通项|一般项|表达式)$",
+                "",
+                residual,
+            )
+            recurrence_point = "非齐次递推" if residual else "线性齐次递推"
+            result = [recurrence_point] + [
+                point
+                for point in result
+                if point not in ("线性齐次递推", "非齐次递推")
+            ]
+            result = result[:4]
+
     if result:
         return result
 
@@ -905,6 +977,12 @@ def _extract_points(text, category):
             return ["图着色"]
         if re.search(r"(?:^|[^a-z])(?:k|c|p)(?:_?\{?\d+\}?|_?n)(?:$|[^a-z])", normalized, flags=re.IGNORECASE):
             return ["图的基本概念"]
+    if category == "初等数论":
+        if re.search(r"(?:模|mod|同余).{0,16}逆元|逆元.{0,16}(?:模|mod|同余)", normalized, flags=re.IGNORECASE):
+            return ["模逆与中国剩余定理"]
+    if category == "代数结构":
+        if re.search(r"(?:运算|二元运算).{0,20}(?:结合|交换|封闭|单位元|幺元)|(?:结合律|交换律|封闭性)", normalized):
+            return ["代数系统"]
 
     return []
 
@@ -938,6 +1016,14 @@ def _recover_discrete_math_category(text, scores):
     # 欧拉函数常直接写成 φ(n) / \varphi(n)。
     if re.search(r"(?:φ|\\varphi|\\phi)\s*\(\s*\d+", normalized):
         return "初等数论"
+
+    # “3 模 7 的逆元”常不会写成“模逆元”这个连续术语。
+    if re.search(r"(?:模|mod|同余).{0,16}逆元|逆元.{0,16}(?:模|mod|同余)", normalized, flags=re.IGNORECASE):
+        return "初等数论"
+
+    # 代数系统性质题常只问“这个运算是否结合/封闭”，不出现“群/环”等名词。
+    if re.search(r"(?:运算|二元运算).{0,20}(?:结合|交换|封闭|单位元|幺元)|(?:结合律|交换律|封闭性)", normalized):
+        return "代数结构"
 
     # 常见自然语言计数题：不强迫用户必须写“排列/组合/鸽巢”术语。
     if re.search(r"(?:本|个|名|人|物).{0,10}(?:不同).{0,10}(?:排成一排|排队|排列)", compact):
@@ -1809,7 +1895,7 @@ def teaching_prompt(context):
     related = context.get("related_categories") or []
     points = context.get("knowledge_points") or []
     focus_points = context.get("focus_points") or []
-    question_type = context.get("question_type") or "综合题"
+    question_type = context.get("question_type") or "一般题"
     mode = context.get("mode") or "hint"
     mode_label = context.get("mode_label") or MODE_LABELS["hint"]
     confidence = context.get("confidence") or "低"
