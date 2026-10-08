@@ -2218,10 +2218,9 @@ body[data-appearance-theme="light"] .msg-actions button {
 }
 
 
-/* "复制"原功能保留，右侧菜单仅负责向不支持富文本的聊天软件复制 PNG。 */
-.rich-copy-split { display:inline-flex; align-items:center; position:relative; gap:2px; }
-.msg-actions .rich-copy-split button,
-.wrong-actions .rich-copy-split button {
+/* 一个复制按钮：由剪贴板同时提供可用格式，不改页面 MathJax。 */
+.msg-actions .rich-copy-smart,
+.wrong-actions .rich-copy-smart {
     font:inherit;
     font-size:var(--font-xxs);
     padding:3px 8px;
@@ -2231,22 +2230,6 @@ body[data-appearance-theme="light"] .msg-actions button {
     color:var(--text-secondary);
     cursor:pointer;
 }
-.rich-copy-split .rich-copy-options-trigger { min-width:22px; padding:3px 4px; }
-.rich-copy-split .rich-copy-options-menu {
-    position:absolute;
-    bottom:calc(100% + 6px);
-    right:0;
-    min-width:180px;
-    padding:5px;
-    border:1px solid var(--border-color, rgba(148,163,184,.4));
-    border-radius:8px;
-    background:var(--surface-2);
-    z-index:200;
-    box-shadow:0 8px 24px rgba(0,0,0,.2);
-}
-.rich-copy-split .rich-copy-options-menu[hidden] { display:none !important; }
-.msg-actions .rich-copy-options-menu button,
-.wrong-actions .rich-copy-options-menu button { width:100%; white-space:nowrap; text-align:left; }
 
 /* 第三阶段：富文本复制。只增强复制层，不改变 Markdown / MathJax 渲染。 */
 .panel-heading-row {
@@ -7318,7 +7301,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-copy-visual-20261008-1"></script>
+<script src="/static/script.js?v=dmate-copy-single-medium-speed-20261008-3"></script>
 
 </body>
 </html>
