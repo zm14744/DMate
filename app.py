@@ -1964,89 +1964,9 @@ def _clean_answer_only(text):
 
 
 def _requested_exercise_difficulty(text):
-    """提取用户对练习题的明确难度要求，不把学科名称当作难度。
-
-    未明确指定时返回空串，由出题流程沿用默认中等/参照题难度。
-    """
-    value = re.sub(r"\s+", "", str(text or "")).lower()
-    if not value:
-        return ""
-
-    matches = []
-    protected = []
-
-    def collect(difficulty, expressions, reserve=False):
-        for expression in expressions:
-            for match in re.finditer(expression, value):
-                span = match.span()
-                if not reserve and any(
-                    span[0] < end and span[1] > begin for begin, end in protected
-                ):
-                    continue
-                matches.append((span[0], span[1], difficulty))
-                if reserve:
-                    protected.append(span)
-
-    # “不难”不等于明确指定“简单”；按照产品默认难度理解为中等。
-    # 只有“简单/容易/入门”等直接要求才选择简单档。
-    # 先保护整词，防止后续“难”单字规则反向识别成困难。
-    collect("中等", (
-        r"(?:^|[^太很更较])不难(?:的|题|一点|一些|吧|$)?",
-        r"(?:^|[^太很更较])没难度",
-    ), reserve=True)
-
-    # 优先整体识别含否定/程度词的说法，避免截取里面的“难”“简单”。
-    collect("中等", (
-        r"(?:不要|别|不用|无需|不必|不想要|不想|不能|不太|不是很|不算|没那么|不那么|不怎么|别那么|不要那么)(?:给我|出|给|来|弄|搞|做)?(?:一?道|一个)?(?:太|这么|那么|很|特别)?难(?:的|题)?",
-        r"(?:不要|别|不用|无需|不必|不想要|不想|不能|不太|不是很|别那么|不要那么)(?:给我|出|给|来|弄|搞|做)?(?:一?道|一个)?(?:太|这么|那么|很|特别)?简单(?:的|题)?",
-        r"(?:稍微|稍稍|略微|略|有点|稍)(?:有)?(?:难|难度高)(?:一?点|一点儿|一些|些)?",
-        r"(?:比简单|比刚才|比上一题)(?:的题)?难(?:一?点|一点儿|一些|些)",
-        r"正常点|普通点",
-    ), reserve=True)
-
-    # “基础/初级/入门 + 学科或知识模块”描述的是学习范围，不等于点名要简单题。
-    # 例如“初级数论题”“基础图论题”“入门集合题”在没有其它难度词时都走默认中等。
-    for match in re.finditer(
-        r"(?:基础|初级|入门)(?:数论|图论|图|集合|关系|函数|映射|逻辑|命题逻辑|谓词逻辑|组合|计数|递推|代数|群|树)",
-        value,
-    ):
-        protected.append(match.span())
-
-    def is_negated(position):
-        prefix = value[max(0, position - 10):position]
-        return bool(re.search(
-            r"(?:不要|别|不用|无需|不想要|不想|不是|并非|非|不)(?:给我|出|给|来|要|弄|搞|做)?(?:一?道|一个)?(?:那么|这么|太|很|特别)?$",
-            prefix,
-        ))
-
-    pattern_groups = (
-        ("困难", (
-            r"最高难度|最难|困难|高难度?|挑战题|难题|难度高|有难度|"
-            r"有挑战性|更难(?:一?点|一点儿|一些|些)?|"
-            r"难(?:的|一?点|一点儿|一些|些)|复杂一点",
-        )),
-        ("中等", (
-            r"中等难度|中等|适中|普通难度|正常难度|"
-            r"一般难度|常规难度|适中一点|一般点",
-        )),
-        ("简单", (
-            r"低难度|简单|基础(?:题|练习|难度)?|入门|容易|轻松",
-        )),
-    )
-    for difficulty, expressions in pattern_groups:
-        for expression in expressions:
-            for match in re.finditer(expression, value):
-                begin, end = match.span()
-                if any(begin < right and end > left for left, right in protected):
-                    continue
-                if not is_negated(begin):
-                    matches.append((begin, end, difficulty))
-
-    if not matches:
-        return ""
-    # 如“不要太简单，出一道困难题”，最后一次明确要求优先。
-    matches.sort(key=lambda item: (item[0], item[1]))
-    return matches[-1][2]
+    """统一难度识别入口：本地词库 + 有边界的短词模糊纠错。"""
+    from exercise_language import requested_exercise_difficulty
+    return requested_exercise_difficulty(text)
 
 
 def _exercise_reference_matches(reference_teaching, generated_teaching):
@@ -2239,48 +2159,54 @@ def chat():
         )
 
     try:
+        # 出题的教学分类已经分析过完整历史；发送给模型的只保留最近上下文，
+        # 大幅减少长聊天中无关历史带来的输入延迟和误认前一题。
+        model_messages = cleaned[-6:] if effective_exercise_request else cleaned
         result = ask_ai(
-            cleaned,
+            model_messages,
             teaching_context=ai_teaching
         )
     except Exception as exc:
-        # app 层最后一道保险。把真实异常完整打到 Zeabur 日志，
-        # 同时对出题请求做一次轻量兜底，避免单次模型调用异常直接吞掉整次出题。
+        # 把真实异常完整打到服务器日志。若异常发生在调用本身，
+        # 仅允许再请求一次在线模型，不使用本地题库。
         import traceback
         print(f"/chat 调用 AI 模块异常：{repr(exc)}")
         traceback.print_exc()
         if effective_exercise_request:
             try:
-                fallback_context = dict(ai_teaching or {})
-                fallback_context["difficulty"] = (
+                retry_context = dict(ai_teaching or {})
+                retry_context["difficulty"] = (
                     "简单"
-                    if fallback_context.get("exercise_target_difficulty") == "简单"
+                    if retry_context.get("exercise_target_difficulty") == "简单"
                     else "中等"
                 )
                 result = ask_ai(
                     cleaned[-1:],
                     retries=0,
-                    teaching_context=fallback_context,
+                    teaching_context=retry_context,
                 )
-            except Exception as fallback_exc:
-                print(f"/chat 出题轻量兜底仍异常：{repr(fallback_exc)}")
+            except Exception as retry_exc:
+                print(f"/chat 在线 AI 重新尝试仍异常：{repr(retry_exc)}")
                 traceback.print_exc()
-                return jsonify({
-                    "error": "AI 服务暂时出现异常，请稍后重试。"
-                }), 500
+                result = {"ok": False, "error": "AI 模型连续调用失败，请稍后重试。"}
         else:
             return jsonify({
-                "error": "AI 服务暂时出现异常，请稍后重试。"
-            }), 500
+                "error": "AI 模型本次请求未能完成，请稍后重试；服务端日志保留了具体异常。",
+                "error_code": "AI_PROVIDER_EXCEPTION",
+            }), 503
 
     if not isinstance(result, dict):
-        print(
-            "AI 模块返回格式异常："
-            f"{type(result).__name__}"
-        )
+        print("AI 模块返回格式异常：", type(result).__name__)
+        # 非标准返回值直接报错，绝不用内置题目替代在线模型生成结果。
         return jsonify({
-            "error": "AI 服务返回格式异常，请稍后重试。"
-        }), 500
+            "error": "AI 服务返回格式异常，请稍后重试。",
+            "error_code": "AI_INVALID_RESPONSE",
+            "teaching": teaching,
+        }), 502
+
+    if (effective_exercise_request and result.get("ok") is True
+            and not str(result.get("reply") or "").strip()):
+        result = {"ok": False, "error": "AI 服务未返回有效题目。"}
 
     if result.get("ok") is True:
         reply = result.get("reply", "")
@@ -2486,7 +2412,7 @@ def chat():
                         f"目标={target_difficulty}，估计={actual_difficulty}"
                     )
 
-            # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
+            # 题干和参照知识点校验通过后即可展示；在线题如实返回分类器估计。
             reply = (
                 "【题目】\n\n"
                 + generated_question
