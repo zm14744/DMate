@@ -2494,7 +2494,7 @@ function normalizeTeaching(value) {
         focus_points: asTextList(value.focus_points).slice(0, 2),
         prerequisite_points: asTextList(value.prerequisite_points),
         knowledge_path: asTextList(value.knowledge_path),
-        question_type: asText(value.question_type) || "综合题",
+        question_type: asText(value.question_type) || "一般题",
         difficulty: ["简单", "中等", "困难"].includes(asText(value.difficulty))
             ? asText(value.difficulty)
             : "",
@@ -8045,11 +8045,15 @@ function getFriendlyQuestionType(value) {
     const text = String(value || "").trim();
 
     if (!text) {
-        return "综合问题";
+        return "一般问题";
     }
 
     if (text === "综合题") {
         return "综合问题";
+    }
+
+    if (text === "一般题") {
+        return "一般问题";
     }
 
     if (text === "出题请求") {
@@ -13099,7 +13103,7 @@ function getEffectiveSessionTeaching(session) {
                 knowledge_path: learningQuestion.knowledgePoints,
                 question_type: activeCandidate.role === "ai"
                     ? "练习题"
-                    : "综合题",
+                    : "一般题",
                 mode: activeCandidate.role === "ai"
                     ? "exercise"
                     : "hint",
@@ -13573,7 +13577,7 @@ function candidateTeachingSnapshot(
             knowledge_path: saved.knowledgePoints,
             question_type: candidate.role === "ai"
                 ? "练习题"
-                : "综合题",
+                : "一般题",
             difficulty: saved.difficulty || "",
             mode: candidate.role === "ai"
                 ? "exercise"
