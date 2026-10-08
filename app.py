@@ -1964,53 +1964,77 @@ def _clean_answer_only(text):
 
 
 def _requested_exercise_difficulty(text):
-    """
-    从自然语言出题请求中读取三档目标难度。
-    返回值严格只有：简单 / 中等 / 困难 / 空串。
+    """提取用户对练习题的明确难度要求，不把学科名称当作难度。
+
+    未明确指定时返回空串，由出题流程沿用默认中等/参照题难度。
     """
     value = re.sub(r"\s+", "", str(text or "")).lower()
     if not value:
         return ""
 
     matches = []
+    protected = []
 
-    # “别太难 / 不要太简单”表达的是希望回到常规中档。
-    for pattern in (
-        r"不要太难", r"别太难", r"不用太难", r"别那么难", r"不要那么难",
-        r"不要太简单", r"别太简单", r"不用太简单", r"正常点", r"普通点",
-    ):
-        for match in re.finditer(pattern, value):
-            matches.append((match.start(), "中等"))
-
-    patterns = (
-        ("困难", (
-            r"最高难度", r"最难", r"困难", r"高难", r"挑战题", r"难题",
-            r"难度高", r"有难度", r"难的", r"难一点", r"难一些", r"难点儿", r"复杂一点",
-        )),
-        ("中等", (
-            r"中等难度", r"中等", r"适中", r"普通难度", r"正常难度",
-            r"一般难度", r"常规难度", r"适中一点", r"一般点",
-        )),
-        ("简单", (
-            r"低难度", r"简单", r"基础", r"入门", r"容易", r"轻松",
-            r"简单一点", r"简单一些", r"容易一点", r"容易些", r"基础一点",
-        )),
-    )
-
-    for difficulty, expressions in patterns:
+    def collect(difficulty, expressions, reserve=False):
         for expression in expressions:
             for match in re.finditer(expression, value):
-                prefix = value[max(0, match.start() - 6):match.start()]
-                if re.search(r"(?:不要|别|不用|无需|不想要|不要太|别太)$", prefix):
+                span = match.span()
+                if not reserve and any(
+                    span[0] < end and span[1] > begin for begin, end in protected
+                ):
                     continue
-                matches.append((match.start(), difficulty))
+                matches.append((span[0], span[1], difficulty))
+                if reserve:
+                    protected.append(span)
+
+    # 优先整体识别含否定/程度词的说法，避免截取里面的“难”“简单”。
+    collect("中等", (
+        r"(?:不要|别|不用|无需|不必|不想要|不想|不能|不太|不是很|不算|没那么|不那么|不怎么|别那么|不要那么)(?:给我|出|给|来|弄|搞|做)?(?:一?道|一个)?(?:太|这么|那么|很|特别)?难(?:的|题)?",
+        r"(?:不要|别|不用|无需|不必|不想要|不想|不能|不太|不是很|别那么|不要那么)(?:给我|出|给|来|弄|搞|做)?(?:一?道|一个)?(?:太|这么|那么|很|特别)?简单(?:的|题)?",
+        r"(?:稍微|稍稍|略微|略|有点|稍)(?:有)?(?:难|难度高)(?:一?点|一点儿|一些|些)?",
+        r"(?:比简单|比刚才|比上一题)(?:的题)?难(?:一?点|一点儿|一些|些)",
+        r"正常点|普通点",
+    ), reserve=True)
+
+    # “基础数论/初级数论”是课程方向，不等于点名要“简单题”。
+    for match in re.finditer(r"(?:基础|初级)数论", value):
+        protected.append(match.span())
+
+    def is_negated(position):
+        prefix = value[max(0, position - 10):position]
+        return bool(re.search(
+            r"(?:不要|别|不用|无需|不想要|不想|不是|并非|非|不)(?:给我|出|给|来|要|弄|搞|做)?(?:一?道|一个)?(?:那么|这么|太|很|特别)?$",
+            prefix,
+        ))
+
+    pattern_groups = (
+        ("困难", (
+            r"最高难度|最难|困难|高难度?|挑战题|难题|难度高|有难度|"
+            r"有挑战性|更难(?:一?点|一点儿|一些|些)?|"
+            r"难(?:的|一?点|一点儿|一些|些)|复杂一点",
+        )),
+        ("中等", (
+            r"中等难度|中等|适中|普通难度|正常难度|"
+            r"一般难度|常规难度|适中一点|一般点",
+        )),
+        ("简单", (
+            r"低难度|简单|基础(?:题|练习|难度)?|入门|容易|轻松",
+        )),
+    )
+    for difficulty, expressions in pattern_groups:
+        for expression in expressions:
+            for match in re.finditer(expression, value):
+                begin, end = match.span()
+                if any(begin < right and end > left for left, right in protected):
+                    continue
+                if not is_negated(begin):
+                    matches.append((begin, end, difficulty))
 
     if not matches:
         return ""
-
-    # 若一句话先否定一种难度、后明确指定另一种，以最后的明确表达为准。
-    matches.sort(key=lambda item: item[0])
-    return matches[-1][1]
+    # 如“不要太简单，出一道困难题”，最后一次明确要求优先。
+    matches.sort(key=lambda item: (item[0], item[1]))
+    return matches[-1][2]
 
 
 def _exercise_reference_matches(reference_teaching, generated_teaching):
@@ -2170,11 +2194,15 @@ def chat():
         or server_detected_exercise
     )
 
+    # 明确难度要求与内部默认难度必须区分。内部默认只用于提示 AI，
+    # 不能作为拒绝正常生成题目的硬约束。
+    explicit_exercise_difficulty = ""
     if effective_exercise_request:
         teaching = dict(reference_teaching or teaching or {})
         requested_difficulty = _requested_exercise_difficulty(
             latest_action_for_exercise
         )
+        explicit_exercise_difficulty = requested_difficulty
 
         # 用户明确指定难度时严格按指定值；
         # “照这题再出一道”且未指定时继承参照题；
@@ -2301,27 +2329,20 @@ def chat():
                         "teaching": teaching,
                     }), 502
 
-            # 只有用户【明确】指定了简单/中等/困难，才考虑二次生成。
-            # 没有明确指定难度时，“中等”只是给模型的生成偏好，不能变成
-            # 阻止题目交付的硬门槛。例如“出一道初级数论题”说的是学科，
-            # 并没有要求强制生成“中等难度题”。
-            # 注意：analyze_question 的三档难度只是启发式估计，不是权威判卷器。
+            # 题目难度来自启发式估计，不是可作为拒题依据的数学判定。
+            # 未明确要求难度时（例如“出一道初级数论题”），直接接受有效题目；
+            # 用户明确要求难度时，最多尝试一次调整，但仍不能因估计不符吞掉题目。
             target_difficulty = teaching.get("exercise_target_difficulty")
             actual_difficulty = generated_teaching.get("difficulty")
 
             if (
-                requested_difficulty
+                explicit_exercise_difficulty
                 and target_difficulty in ("简单", "中等", "困难")
                 and actual_difficulty in ("简单", "中等", "困难")
                 and actual_difficulty != target_difficulty
             ):
                 matched_difficulty = False
-                difficulty_rank = {"简单": 0, "中等": 1, "困难": 2}
-                best_distance = abs(
-                    difficulty_rank[actual_difficulty] - difficulty_rank[target_difficulty]
-                )
 
-                # 最多补试一次，避免连续昂贵的模型调用和长时间等待。
                 for retry_index in range(1):
                     retry_messages = list(cleaned)
                     retry_messages.append({
@@ -2387,36 +2408,29 @@ def chat():
                         if not reference_ok:
                             continue
 
-                    retry_difficulty = retry_teaching.get("difficulty")
-                    if retry_difficulty not in difficulty_rank:
+                    if retry_teaching.get("difficulty") != target_difficulty:
                         continue
 
-                    distance = abs(
-                        difficulty_rank[retry_difficulty] - difficulty_rank[target_difficulty]
+                    reply = retry_reply
+                    generated_answer = retry_answer
+                    generated_question = retry_question
+                    generated_teaching = retry_teaching
+                    matched_difficulty = True
+                    print(
+                        f"练习难度已在第 {retry_index + 1} 次自动重生成后匹配："
+                        f"{target_difficulty}"
                     )
-                    # 若补试结果更接近目标，才替换第一次已经可用的题目。
-                    if distance < best_distance:
-                        reply = retry_reply
-                        generated_answer = retry_answer
-                        generated_question = retry_question
-                        generated_teaching = retry_teaching
-                        best_distance = distance
-                    if distance == 0:
-                        matched_difficulty = True
-                        break
+                    break
 
                 if not matched_difficulty:
-                    # 生成器和启发式评分不一致时，必须保留有效题目，
-                    # 不能再把“重试失败”当成“题目不存在”。
-                    # 返回的 generated_teaching 始终记录真实估计难度，
-                    # 不为了凑目标把难度标签伪装成指定难度。
+                    # 保留第一次通过题目/知识点校验的有效生成结果。
+                    # 分类器的难度只是参考，不能让“出题”变成反复重试的死循环。
                     print(
-                        "练习难度未完全匹配；保留最接近目标的有效题目："
-                        f"目标={target_difficulty}, "
-                        f"估计={generated_teaching.get('difficulty')}"
+                        "生成题难度估计与用户目标不同，保留有效题目："
+                        f"目标={target_difficulty}，估计={actual_difficulty}"
                     )
 
-            # 题干和分类登记成功即可展示。难度估计不应使出题流程瘫痪。
+            # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
             reply = (
                 "【题目】\n\n"
                 + generated_question
@@ -2430,12 +2444,6 @@ def chat():
 
         if generated_teaching:
             response["generated_teaching"] = generated_teaching
-
-        if is_exercise_request and generated_teaching and requested_difficulty:
-            response["exercise_difficulty_match"] = (
-                generated_teaching.get("difficulty")
-                == teaching.get("exercise_target_difficulty")
-            )
 
         if generated_question:
             response["generated_question"] = generated_question
