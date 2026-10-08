@@ -241,14 +241,22 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 - 每条边逐一核对两个端点；只有确实连接同一对顶点的两条边才叫重边。
 - 不要解题，不要给答案。
 
+【图片用途识别】
+- 同时判断这张图片是否包含待解答的离散数学题目（image_kind）。
+- exercise：有明确题目/小问；或者是用于图论题的独立图、无标签图、矩阵等可作为题目核对的数学结构，即使没有文字也选 exercise。
+- non_exercise：明确只是课件知识点、定义表、笔记、答案说明、普通照片、网页截图等，没有待求解的题目；不可凭空编造题干或小问。
+- uncertain：图片模糊、局部被裁剪，无法确信是否为题目；不要为了拦截而把纯图题误判为非题目。
+- 只根据原图判断，不要因为正文里有“设”“是”“证明方法”等说明性语句，就认定存在题目。
+
 请只返回一个 JSON 对象，不要 Markdown 代码块，不要额外解释：
 {
   "corrected_text": "校对后的完整题目文字",
   "visual_text": "图形结构描述；若没有需要补充的图形结构则为空字符串",
   "has_visual_structure": true,
+  "image_kind": "exercise",
   "uncertain_fields": ["看不清的位置和符号；若没有则返回空数组"]
 }
-其中 has_visual_structure 只能是 true 或 false。
+其中 has_visual_structure 只能是 true 或 false；image_kind 只能是 exercise、non_exercise、uncertain。
 """
 
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
@@ -1524,6 +1532,9 @@ def _extract_vision_json(content):
     corrected_text = data.get("corrected_text", "")
     visual_text = data.get("visual_text", "")
     raw_has_visual = data.get("has_visual_structure", bool(visual_text))
+    image_kind = data.get("image_kind", "uncertain")
+    if image_kind not in {"exercise", "non_exercise", "uncertain"}:
+        image_kind = "uncertain"
 
     if isinstance(raw_has_visual, bool):
         has_visual = raw_has_visual
@@ -1543,7 +1554,7 @@ def _extract_vision_json(content):
     # 截断会丢题目条件；异常长输出交由调用方重试/回退，不使用半道题。
     if len(corrected_text) > 5000 or len(visual_text) > 3000:
         return None
-    if not corrected_text and not visual_text:
+    if not corrected_text and not visual_text and image_kind != "non_exercise":
         return None
     uncertain_fields = data.get("uncertain_fields", [])
     if not isinstance(uncertain_fields, list):
@@ -1555,17 +1566,19 @@ def _extract_vision_json(content):
         "corrected_text": corrected_text,
         "visual_text": visual_text if bool(has_visual) else "",
         "has_visual_structure": bool(has_visual and visual_text),
+        "image_kind": image_kind,
         "uncertain_fields": uncertain_fields,
     }
 
 
-def _vision_success(corrected_text, visual_text, uncertain_fields=None):
+def _vision_success(corrected_text, visual_text, uncertain_fields=None, image_kind="uncertain"):
     return {
         "ok": True,
         # 保留 reply 字段，兼容已有 app.py / 旧代码。
         "reply": visual_text,
         "corrected_text": corrected_text,
         "visual_text": visual_text,
+        "image_kind": image_kind,
         "uncertain_fields": uncertain_fields or [],
     }
 
@@ -1803,6 +1816,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 corrected_text,
                 visual_text,
                 parsed["uncertain_fields"],
+                parsed["image_kind"],
             )
 
         except requests.exceptions.Timeout as exc:
