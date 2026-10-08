@@ -2227,19 +2227,51 @@ def chat():
         teaching["difficulty"] = exercise_target_difficulty
         teaching["exercise_target_difficulty"] = exercise_target_difficulty
 
+    # 出题只需要“设计一道符合目标难度的题”，不需要用与解困难题相同的 max 推理。
+    # 目标难度仍由 exercise_target_difficulty 严格写进教学提示；这里只单独控制模型思考强度：
+    # 简单题 -> none；中等/困难题 -> high。真正解困难题时仍保留原来的 max。
+    ai_teaching = teaching
+    if effective_exercise_request:
+        ai_teaching = dict(teaching or {})
+        target_for_generation = ai_teaching.get("exercise_target_difficulty") or "中等"
+        ai_teaching["difficulty"] = (
+            "简单" if target_for_generation == "简单" else "中等"
+        )
+
     try:
         result = ask_ai(
             cleaned,
-            teaching_context=teaching
+            teaching_context=ai_teaching
         )
     except Exception as exc:
-        # app 层最后一道保险。
-        print(
-            f"/chat 调用 AI 模块异常：{repr(exc)}"
-        )
-        return jsonify({
-            "error": "AI 服务暂时出现异常，请稍后重试。"
-        }), 500
+        # app 层最后一道保险。把真实异常完整打到 Zeabur 日志，
+        # 同时对出题请求做一次轻量兜底，避免单次模型调用异常直接吞掉整次出题。
+        import traceback
+        print(f"/chat 调用 AI 模块异常：{repr(exc)}")
+        traceback.print_exc()
+        if effective_exercise_request:
+            try:
+                fallback_context = dict(ai_teaching or {})
+                fallback_context["difficulty"] = (
+                    "简单"
+                    if fallback_context.get("exercise_target_difficulty") == "简单"
+                    else "中等"
+                )
+                result = ask_ai(
+                    cleaned[-1:],
+                    retries=0,
+                    teaching_context=fallback_context,
+                )
+            except Exception as fallback_exc:
+                print(f"/chat 出题轻量兜底仍异常：{repr(fallback_exc)}")
+                traceback.print_exc()
+                return jsonify({
+                    "error": "AI 服务暂时出现异常，请稍后重试。"
+                }), 500
+        else:
+            return jsonify({
+                "error": "AI 服务暂时出现异常，请稍后重试。"
+            }), 500
 
     if not isinstance(result, dict):
         print(
@@ -2370,9 +2402,8 @@ def chat():
                     retry_context = dict(teaching)
                     retry_context["exercise_target_difficulty"] = target_difficulty
                     retry_context["difficulty"] = (
-                        "中等" if target_difficulty == "困难" else "简单"
+                        "简单" if target_difficulty == "简单" else "中等"
                     )
-                    retry_context["_fast_exercise_retry"] = True
 
                     try:
                         retry_result = ask_ai(
