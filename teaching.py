@@ -789,6 +789,34 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         if explicit_action:
             score += 1
 
+    # 大指数取模不是直接计算大整数：通常需要快速幂、幂的周期、
+    # 费马小定理等。题干虽短，不能因此一律标为“简单”。
+    # 只匹配“明确出现底数^大指数 + 模/除数取余”的结构，避免把
+    # 普通幂运算、指数为 2 的基础计算或一般整数取余错误抬档。
+    power_match = re.search(
+        r"(?<![A-Za-z0-9_])(?P<base>\d+)\s*\^\s*(?:"
+        r"\{\s*(?P<braced>\d{2,12})\s*\}|"
+        r"\(\s*(?P<parenthesized>\d{2,12})\s*\)|"
+        r"(?P<plain>\d{2,12}))",
+        normalized,
+    )
+    mod_match = re.search(
+        r"(?:\bmod(?:ulo)?\s*\(?\s*|\\(?:pmod|bmod|mod)\s*\{?\s*|模\s*|除以?\s*)"
+        r"(?P<modulus>\d+)",
+        normalized,
+    )
+    if power_match and mod_match:
+        exponent = int(next(power_match.group(name) for name in
+                            ("braced", "parenthesized", "plain")
+                            if power_match.group(name) is not None))
+        base = int(power_match.group("base"))
+        modulus = int(mod_match.group("modulus"))
+        has_remainder_context = bool(re.search(
+            r"余数|取余|求余|余多少|模|mod|同余|\\pmod|\\bmod", normalized,
+        ))
+        if exponent >= 20 and modulus > 1 and base % modulus != 0 and has_remainder_context:
+            score = max(score, 2)
+
     # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
     if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
         score += 1
@@ -855,6 +883,11 @@ def _score_categories(text):
     if "∀" in normalized or "∃" in normalized:
         scores["谓词逻辑"] = scores.get("谓词逻辑", 0) + 8
 
+    # 自然中文“3^2024除以17所得余数”与“3^2024 mod 17”语义相同。
+    # 必须同时出现具体除数及余数语义，避免把泛泛的“除法”误判为数论。
+    if re.search(r"除以?\s*\d+.{0,16}(?:余数|余几|求余)", normalized):
+        scores["初等数论"] = scores.get("初等数论", 0) + 6
+
     # “同构”同时存在于代数结构与图论语境。出现明确图语境时，
     # 应判作图论，不让“同构”这个单词把图同构误拉到代数结构。
     graph_isomorphism = bool(re.search(
@@ -891,6 +924,12 @@ def _extract_points(text, category):
 
     scored.sort(key=lambda item: (-item[0], item[1]))
     result = [point for _score, point in scored[:4]]
+
+    if category == "初等数论" and re.search(
+        r"除以?\s*\d+.{0,16}(?:余数|余几|求余)", normalized
+    ) and "同余与模运算" not in result:
+        result.insert(0, "同余与模运算")
+        result = result[:4]
 
     # “两个图是否同构”常只写“图 + 同构”，不会出现连续的“图同构”四个字。
     # 分类器已经能借助图语境确认是图论，这里把它稳定登记为独立知识点，
