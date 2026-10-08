@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -249,6 +249,15 @@
       ]
     },
     {
+      "id": "number_inverse_crt",
+      "name": "模逆与中国剩余定理",
+      "category": "初等数论",
+      "prerequisites": [
+        "同余与模运算",
+        "最大公因数与欧几里得算法"
+      ]
+    },
+    {
       "id": "number_euler_fermat",
       "name": "欧拉定理与费马小定理",
       "category": "初等数论",
@@ -352,6 +361,14 @@
       "prerequisites": []
     },
     {
+      "id": "graph_isomorphism",
+      "name": "图同构",
+      "category": "图论",
+      "prerequisites": [
+        "图的基本概念"
+      ]
+    },
+    {
       "id": "graph_adjacency",
       "name": "邻接矩阵",
       "category": "图论",
@@ -435,6 +452,24 @@
       ]
     },
     {
+      "id": "graph_bipartite",
+      "name": "二部图",
+      "category": "图论",
+      "prerequisites": [
+        "图的基本概念",
+        "路径与连通性"
+      ]
+    },
+    {
+      "id": "graph_topological",
+      "name": "拓扑排序",
+      "category": "图论",
+      "prerequisites": [
+        "图的基本概念",
+        "路径与连通性"
+      ]
+    },
+    {
       "id": "graph_domination",
       "name": "支配集、覆盖集与独立集",
       "category": "图论",
@@ -447,7 +482,8 @@
       "name": "图匹配",
       "category": "图论",
       "prerequisites": [
-        "图的基本概念"
+        "图的基本概念",
+        "二部图"
       ]
     },
     {
