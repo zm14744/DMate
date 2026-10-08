@@ -1023,6 +1023,19 @@ def _provider_request_timeout(provider, reasoning_effort, default_timeout):
         return (6, 60)
     return (4, 10)
 
+# 每个工作线程独立保持文本 API 的 HTTP 连接；避免每次完成一次
+# 普通聊天或出题重试都重复 TLS 握手。Vision/OCR 请求路径不改。
+_TEXT_HTTP_LOCAL = threading.local()
+
+
+def _text_http_session():
+    session = getattr(_TEXT_HTTP_LOCAL, "session", None)
+    if session is None:
+        session = requests.Session()
+        _TEXT_HTTP_LOCAL.session = session
+    return session
+
+
 def _request_text_completion(
     messages,
     retries=2,
@@ -1086,12 +1099,15 @@ def _request_text_completion(
                     f"第 {attempt + 1}/{attempts} 次）"
                 )
 
-                response = requests.post(
+                call_start = time.monotonic()
+                response = _text_http_session().post(
                     provider["url"],
                     headers=headers,
                     json=payload,
                     timeout=provider_timeout,
                 )
+                elapsed = time.monotonic() - call_start
+                print(f"{provider['name']} API耗时 {elapsed:.2f}s；HTTP {response.status_code}")
                 last_status = response.status_code
 
                 if response.status_code in RETRYABLE_STATUS:
@@ -1194,7 +1210,7 @@ def _request_text_completion(
 
             except requests.exceptions.Timeout as exc:
                 last_error = exc
-                print(f"{provider['name']} 请求超时：{repr(exc)}")
+                print(f"{provider['name']} 请求超时（耗时 {time.monotonic() - call_start:.2f}s）：{repr(exc)}")
                 if provider.get("id") == "luxin":
                     _luxin_breaker_open("请求超时")
                 if attempt < attempts - 1:
