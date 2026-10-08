@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-ios-webapp-v6-14-20261007";
+const CACHE_NAME = "dmate-ios-webapp-v6-16-20261008";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
