@@ -6570,6 +6570,51 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         box-shadow:none !important;
     }
 }
+
+/* OCR in progress: remove image action from flex flow on both desktop and mobile. */
+#imageBtn[hidden], .input-wrap[data-busy-mode="ocr"] #imageBtn {
+    display:none !important;
+}
+.input #text { min-width:0; flex:1 1 0; }
+@media (max-width:760px) {
+    /* OCR dialog: scroll only the image/fields; action row stays at viewport bottom. */
+    .ocr-review-dialog[open] {
+        display:flex !important;
+        flex-direction:column !important;
+        overflow:hidden !important;
+        height:100dvh !important;
+        max-height:100dvh !important;
+        padding:0 !important;
+        box-sizing:border-box;
+    }
+    .ocr-review-scroll {
+        flex:1 1 auto;
+        min-height:0;
+        overflow-y:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+        padding:max(14px,env(safe-area-inset-top)) 16px 8px;
+    }
+    .ocr-review-actions {
+        position:relative !important;
+        bottom:auto !important;
+        flex:0 0 auto;
+        display:flex;
+        flex-wrap:nowrap !important;
+        gap:10px;
+        margin:0 !important;
+        padding:10px 16px max(12px,env(safe-area-inset-bottom)) !important;
+        border-top:1px solid var(--border-strong);
+        background:var(--surface-2) !important;
+        box-sizing:border-box;
+    }
+    .ocr-review-actions button {
+        flex:1 1 0 !important;
+        min-width:0;
+        min-height:44px;
+        white-space:normal;
+    }
+}
 </style>
 
 <script>
@@ -6701,7 +6746,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
 
 
-<dialog id="ocrReviewDialog" class="ocr-review-dialog" aria-labelledby="ocrReviewTitle" aria-describedby="ocrReviewHelp">
+<dialog id="ocrReviewDialog" class="ocr-review-dialog" aria-labelledby="ocrReviewTitle">
+    <div class="ocr-review-scroll">
     <h2 id="ocrReviewTitle">核对图片里的题目</h2>
     <div class="ocr-review-body">
         <div>
@@ -6717,7 +6763,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <textarea id="ocrReviewRequest" rows="3" spellcheck="false"></textarea>
         </div>
     </div>
-    <p id="ocrReviewError" role="alert"></p>
+    <p id="ocrReviewError" role="alert" aria-live="polite"></p>
+    </div>
     <div class="ocr-review-actions">
         <button id="ocrReviewCancel" type="button">取消</button>
         <button id="ocrReviewConfirm" class="primary" type="button">确认题目，开始讲解</button>
@@ -7241,7 +7288,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-desktop-v6-13-20261007"></script>
+<script src="/static/script.js?v=dmate-ocr-ui-20261008-2"></script>
 
 </body>
 </html>
