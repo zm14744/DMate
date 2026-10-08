@@ -2433,7 +2433,10 @@ function refreshInputAvailability() {
             ? "思考中…"
             : (busyMode === "answering" ? "回答中…" : "发送");
     }
-    if (imageBtn) imageBtn.disabled = hardBlocked || ocrReviewInProgress;
+    if (imageBtn) {
+        imageBtn.disabled = hardBlocked || ocrReviewInProgress;
+        imageBtn.hidden = Boolean(ocrReviewInProgress);
+    }
 
     if (inputWrap) {
         inputWrap.classList.toggle(
@@ -11694,7 +11697,11 @@ function reviewRecognizedQuestion(file, data) {
         dialog.addEventListener("close", finish);
         try {
             dialog.showModal();
-            question.focus();
+            // 手机上自动弹键盘会推挤核对页并使底部操作按钮跳动。
+            // 让用户主动点击题目文字再编辑；桌面端保留自动聚焦。
+            if (!window.matchMedia("(max-width: 760px)").matches) {
+                question.focus();
+            }
         } catch (exception) {
             cleanup();
             reject(exception);
