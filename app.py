@@ -2013,6 +2013,49 @@ def _requested_exercise_difficulty(text):
     return matches[-1][1]
 
 
+def _exercise_reference_matches(reference_teaching, generated_teaching):
+    """校验“同知识点出题”是否真的保持了参照题核心考点。
+
+    返回：(是否通过, 失败原因)。
+    分类未知时不凭空断言偏题；一旦两边都能识别出知识点，就要求至少有
+    一个核心知识点重合，避免“同为图论但从图同构漂到最短路”这类假匹配。
+    """
+    if not isinstance(reference_teaching, dict) or not isinstance(generated_teaching, dict):
+        return True, ""
+
+    expected_category = str(reference_teaching.get("category") or "").strip()
+    actual_category = str(generated_teaching.get("category") or "").strip()
+
+    if (
+        expected_category not in ("", "待识别")
+        and actual_category not in ("", "待识别", expected_category)
+    ):
+        return False, "生成的练习偏离了参照题所属模块。"
+
+    expected_points = {
+        str(item).strip()
+        for item in (
+            reference_teaching.get("focus_points")
+            or reference_teaching.get("knowledge_points")
+            or []
+        )
+        if str(item).strip()
+    }
+    actual_points = {
+        str(item).strip()
+        for item in (
+            (generated_teaching.get("focus_points") or [])
+            + (generated_teaching.get("knowledge_points") or [])
+        )
+        if str(item).strip()
+    }
+
+    if expected_points and actual_points and expected_points.isdisjoint(actual_points):
+        return False, "生成的练习偏离了参照题核心知识点。"
+
+    return True, ""
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     ip = _get_client_ip()
@@ -2248,11 +2291,13 @@ def chat():
             # 阻止已能明确分类的跨课程串题进入聊天和错题本。
             # 分类不能替代数学核验；分类未知时不据此断言模型出错。
             if reference_teaching:
-                expected = reference_teaching.get("category")
-                actual = generated_teaching.get("category")
-                if expected not in (None, "", "待识别") and actual not in (None, "", "待识别", expected):
+                reference_ok, reference_error = _exercise_reference_matches(
+                    reference_teaching,
+                    generated_teaching,
+                )
+                if not reference_ok:
                     return jsonify({
-                        "error": "生成的练习偏离了参照题的知识点，请重新生成。",
+                        "error": reference_error + "请重新生成。",
                         "teaching": teaching,
                     }), 502
 
@@ -2326,12 +2371,11 @@ def chat():
                         continue
 
                     if reference_teaching:
-                        expected = reference_teaching.get("category")
-                        retry_category = retry_teaching.get("category")
-                        if (
-                            expected not in (None, "", "待识别")
-                            and retry_category not in (None, "", "待识别", expected)
-                        ):
+                        reference_ok, _reference_error = _exercise_reference_matches(
+                            reference_teaching,
+                            retry_teaching,
+                        )
+                        if not reference_ok:
                             continue
 
                     if retry_teaching.get("difficulty") != target_difficulty:
