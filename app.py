@@ -2004,8 +2004,12 @@ def _requested_exercise_difficulty(text):
         r"正常点|普通点",
     ), reserve=True)
 
-    # “基础数论/初级数论”是课程方向，不等于点名要“简单题”。
-    for match in re.finditer(r"(?:基础|初级)数论", value):
+    # “基础/初级/入门 + 学科或知识模块”描述的是学习范围，不等于点名要简单题。
+    # 例如“初级数论题”“基础图论题”“入门集合题”在没有其它难度词时都走默认中等。
+    for match in re.finditer(
+        r"(?:基础|初级|入门)(?:数论|图论|图|集合|关系|函数|映射|逻辑|命题逻辑|谓词逻辑|组合|计数|递推|代数|群|树)",
+        value,
+    ):
         protected.append(match.span())
 
     def is_negated(position):
@@ -2347,22 +2351,33 @@ def chat():
                 matched_difficulty = False
 
                 for retry_index in range(1):
-                    retry_messages = list(cleaned)
+                    # 难度纠偏只保留当前动作/参照题，不再把整段聊天历史重新送一遍；
+                    # 同时把“思考强度”和“目标难度”解耦：系统提示仍严格要求目标难度，
+                    # 但纠偏请求使用低一级推理，避免一次出题因为第二轮 high/max 再等很久。
+                    retry_messages = list(cleaned[-1:])
                     retry_messages.append({
                         "role": "user",
                         "content": (
-                            "上一道候选练习的步骤/综合程度与本次目标不够接近。"
-                            f"请换一题，目标为‘{target_difficulty}’难度。"
-                            "保持原来的学科/参照题核心知识点要求；简单题只考一个基础动作，"
-                            "中等题以适当的两三步推理为主，不叠加多道独立计算。"
-                            "仍然严格遵守系统规定的【题目】与隐藏答案格式，不要解释这次重生成。"
+                            "上一道候选练习的实际步骤/综合程度与目标不匹配。"
+                            f"只重写题目，目标必须为‘{target_difficulty}’难度。"
+                            "保持当前学科和核心知识点；中等题必须有连续两三步推理，不能是一眼一步题；"
+                            "困难题必须有明显结构分析或非平凡计数/构造，不能只换大数字；"
+                            "简单题则保持单一基础动作。"
+                            "输出前在内部自检难度，不要写自检过程。"
+                            "仍严格使用【题目】和隐藏答案格式。"
                         ),
                     })
+                    retry_context = dict(teaching)
+                    retry_context["exercise_target_difficulty"] = target_difficulty
+                    retry_context["difficulty"] = (
+                        "中等" if target_difficulty == "困难" else "简单"
+                    )
+                    retry_context["_fast_exercise_retry"] = True
 
                     try:
                         retry_result = ask_ai(
                             retry_messages,
-                            teaching_context=teaching,
+                            teaching_context=retry_context,
                         )
                     except Exception as exc:
                         print(
