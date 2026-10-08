@@ -8493,7 +8493,10 @@ function copyMathLatex(mathContainer) {
     const alt = math?.getAttribute?.("alttext");
     if (alt && alt.trim()) return alt.trim();
 
-    const aria = mathContainer.getAttribute?.("aria-label");
+    // MathJax 3 SVG output may keep its accessible expression on the SVG
+    // rather than the outer mjx-container. This is a clipboard-only fallback.
+    const aria = mathContainer.getAttribute?.("aria-label")
+        || mathContainer.querySelector?.("svg[aria-label]")?.getAttribute("aria-label");
     if (aria && aria.trim()) return aria.trim();
 
     return "";
@@ -8607,6 +8610,7 @@ function readableMathClipboardText(source) {
     );
     value = value.replace(/\\[()\[\]]/g, "").replace(/\$\$|\$/g, "");
     value = value.replace(/\\([{}])/g, "$1");
+    value = value.replace(/⟨\s+/g, "⟨").replace(/\s+⟩/g, "⟩");
     return value;
 }
 
@@ -8783,6 +8787,63 @@ function buildClipboardPayload(node) {
         html: clipboardHtmlFromRoot(root)
     };
 }
+
+function clipboardSelectionSafeHtmlFromRoot(root) {
+    // Copying a native Range is not the same as pressing the DMate question
+    // copy button. Native Ctrl+C / context-menu Copy must never embed a
+    // data:image/svg+xml or MathJax SVG element: WeChat converts EACH one
+    // into an unreadable .dat attachment in the middle of the copied text.
+    const htmlRoot = root.cloneNode(true);
+    flattenClipboardDetails(htmlRoot);
+    stripClipboardControls(htmlRoot);
+    htmlRoot.querySelectorAll("mjx-container").forEach(container => {
+        const latex = copyMathLatex(container);
+        const visible = latex
+            ? readableMathClipboardText(latex)
+            : (container.getAttribute("aria-label") || container.textContent || "").trim();
+        const display = container.getAttribute("display") === "true";
+        const replacement = document.createElement(display ? "div" : "span");
+        replacement.textContent = visible;
+        if (display) {
+            replacement.style.textAlign = "center";
+            replacement.style.margin = "6px 0";
+        }
+        container.replaceWith(replacement);
+    });
+    // Even if the selection includes a piece of a MathJax subtree rather
+    // than its outer container, do not put image/SVG/object MIME payloads
+    // into the pasted HTML. Keep meaningful alt text where available.
+    htmlRoot.querySelectorAll(
+        "svg, img, picture, canvas, object, embed, iframe, video, audio, source, mjx-assistive-mml, .MJX_Assistive_MathML"
+    ).forEach(node => {
+        const alternative = node.getAttribute?.("alt")
+            || node.getAttribute?.("aria-label") || "";
+        node.replaceWith(document.createTextNode(
+            readableMathClipboardText(alternative)
+        ));
+    });
+    // Avoid hidden resource URLs on surviving HTML nodes as well.
+    htmlRoot.querySelectorAll("*").forEach(node => {
+        node.removeAttribute("src");
+        node.removeAttribute("srcset");
+        node.removeAttribute("poster");
+        node.removeAttribute("data");
+        node.removeAttribute("background");
+        const style = node.getAttribute("style") || "";
+        if (/url\s*\(/i.test(style)) node.removeAttribute("style");
+    });
+    applyClipboardRichStyles(htmlRoot);
+    return htmlRoot.innerHTML.trim();
+}
+
+function buildNativeSelectionClipboardPayload(node) {
+    const root = cloneClipboardRoot(node);
+    return {
+        text: clipboardPlainTextFromRoot(root),
+        html: clipboardSelectionSafeHtmlFromRoot(root)
+    };
+}
+
 
 function showCopyToast(message = "已复制") {
     document.querySelectorAll(".copy-toast").forEach(node => node.remove());
@@ -10026,10 +10087,14 @@ function partialMathSvgPayload(state) {
 }
 
 function buildGranularMathClipboardPayload(state, selection) {
-    const partial = partialMathSvgPayload(state);
-    if (!partial) {
-        return { text: mathSelectionPlainText(state), html: "" };
-    }
+    // Native partial MathJax selections are kept as selected characters,
+    // not SVG <img> attachments. The original per-glyph selection/highlight
+    // logic remains intact; only the clipboard serialization changes.
+    const selectedText = mathSelectionPlainText(state);
+    const partial = {
+        text: selectedText,
+        html: `<span>${escapeRawHtml(selectedText)}</span>`
+    };
 
     const direction = Number(state?.outsideDirection || 0);
 
@@ -10049,7 +10114,7 @@ function buildGranularMathClipboardPayload(state, selection) {
 
     try {
         const fragment = selection.getRangeAt(0).cloneContents();
-        nativePayload = buildClipboardPayload(fragment);
+        nativePayload = buildNativeSelectionClipboardPayload(fragment);
     } catch (_error) {
         // 外部文字范围复制失败时至少保留已经精确选中的公式部分。
     }
@@ -10314,7 +10379,7 @@ function installRichSelectionCopy() {
         const fragment = cloneSelectionContentsForRichCopy(selection);
         if (!fragment || !fragment.childNodes.length) return;
 
-        const payload = buildClipboardPayload(fragment);
+        const payload = buildNativeSelectionClipboardPayload(fragment);
         writeSelectionClipboard(event, payload);
     });
 }
