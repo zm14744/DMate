@@ -2,6 +2,8 @@ import json
 import re
 from pathlib import Path
 
+from exercise_language import normalize_generation_request
+
 
 MODE_LABELS = {
     "hint": "提示引导",
@@ -490,10 +492,18 @@ def _contains_any(text, patterns):
 
 def _looks_like_exercise_request_text(text):
     """识别自然语言中的出题/继续练习请求，并过滤否定、复盘和功能讨论。"""
-    value = re.sub(r"\s+", "", str(text or "").strip())
+    value = normalize_generation_request(text)
 
-    if not value or len(value) > 140:
+    if not value or len(value) > 180:
         return False
+
+    # “不要给我太难的题”否定的是难度，并不是拒绝出题；与“不要出题”区分。
+    if re.fullmatch(
+        r"(?:不要|别)(?:给我|来|整)?(?:太|很|那么|这么|过于)?"
+        r"(?:难|简单|容易|高难|困难)(?:一?点|一些|的)?(?:题目|题|练习)(?:吧|了)?",
+        value,
+    ):
+        return True
 
     # 明确拒绝出题：不允许被后面的“出题/难题”关键词反向误触发。
     if re.search(
@@ -527,9 +537,20 @@ def _looks_like_exercise_request_text(text):
     if replacement_or_level:
         return True
 
+    # 反馈旧题不等于发出新出题命令；无标点连写“太难了再来一道”仍视为新命令。
+    if re.search(r"(?:太难|太简单|做错|不满意|有问题)了?(?:再来|换|再出|重新出).{0,12}(?:一道|一题|个|题|练习|简单|困难|难|$)", value):
+        return True
+    if re.search(
+        r"(?:以前|先前|之前|上次|前几天|刚才|刚刚|你给我|你出的|你之前)"
+        r".{0,18}(?:出的|生成的|给我的|给的|题目|题|练习)"
+        r".{0,14}(?:太难|太简单|不好|不对|错了|有问题|难了|简单了|难|简单)",
+        value,
+    ) and not re.search(r"(?:[，,。;；！!]|了)(?:给我|帮我)?(?:再|重新|换|来|出).{0,14}(?:题|一道|一题|个|练习|简单|困难|难|$)", value):
+        return False
+
     # 单纯复盘上一道生成题，不应触发“再生成一道”。
     if re.search(
-        r"(?:刚才|之前|上次|前面|你刚).{0,14}"
+        r"(?:刚才|刚刚|以前|先前|前几天|之前|上次|前面|你刚).{0,14}"
         r"(?:出(?:的)?|生成(?:的)?|给(?:我)?(?:的)?)"
         r".{0,8}(?:题目|题|练习)",
         value,
@@ -590,10 +611,35 @@ def _looks_like_exercise_request_text(text):
     ):
         return True
 
-    return bool(re.fullmatch(
+    if re.fullmatch(
         r"(?:请|麻烦)?(?:给我|帮我)?(?:下一道题|下一题|下一道|下一个题|"
         r"再来一道|再来一题|再来一个|再来个|再来一个题|"
         r"换一道题|换一个题|换个题|换一个|换一道|换一题)(?:吧|。|！|!)?",
+        value,
+    ):
+        return True
+
+    # 用户漏字/输入法误选字后的口语命令；只做本地常数时间正则判断。
+    # 不把“这题很难”“怎么出题”这些点评/疑问误识为生成动作。
+    if re.search(
+        r"(?:给我|帮我|能否|能不能|可不可以|我要|我想|想|请|麻烦|再|重新)?"
+        r"(?:给我|帮我)?(?:布置|编|设计|拟|整|来|出|生成|安排|抽|挑|给)"
+        r".{0,22}(?:题目|习题|试题|练习题|道题|个题|一题|题|练习)",
+        value,
+    ):
+        return True
+    if re.fullmatch(
+        r"(?:请|麻烦)?(?:你)?(?:来|给我|帮我|让我)?(?:考考我|测测我|出题考我|刷刷题)"
+        r"(?:一下|几道|一题|一道|吧|呗|呀|啊|么|吗|！|!)*",
+        value,
+    ):
+        return True
+    # 允许不写“题”字的“来个烧脑的 / 来个很难的”，但必须有生成动词。
+    return bool(re.fullmatch(
+        r"(?:请|麻烦)?(?:给我|帮我)?(?:再|重新)?(?:换|来|出|整|弄|给)"
+        r"(?:个|道|一道|一个)?(?:特别|非常|相当|比较|稍微|超|很|更|最)?"
+        r"(?:简单|容易|入门|基础|中等|适中|困难|高难|难|烧脑|硬核|挑战|压轴|复杂)"
+        r"(?:一?点|一些|的|难度|题|练习|吧|呗|呀|啊)*",
         value,
     ))
 
