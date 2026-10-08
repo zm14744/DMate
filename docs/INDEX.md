@@ -10,6 +10,6 @@
 - [`AI_ASSISTED_DEVELOPMENT.md`](AI_ASSISTED_DEVELOPMENT.md)：GPT-5.6 Sol 辅助研发说明
 - [`THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md)：直接依赖、前端库与主要外部服务
 - [`TESTING.md`](TESTING.md)：当前版175项验收、旧版120项归档、历史32项检查与最新10项规则回归
-- [`DMate_当前版本_175项功能自测表_20261008.xlsx`](../DMate_当前版本_175项功能自测表_20261008.xlsx)：可直接填写的当前版175项自测Excel（总览/清单/规则回归/历史归档/填写说明）
+- [`DMate_175项功能自测.xlsx`](../DMate_175项功能自测.xlsx)：可直接填写的当前版175项自测Excel（总览/清单/规则回归/历史归档/填写说明）
 - [`REFERENCES.md`](REFERENCES.md)：权威资料与官方技术来源
 - [`CHANGELOG.md`](../CHANGELOG.md)：主要代码调整记录
