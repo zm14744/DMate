@@ -2494,6 +2494,7 @@ def chat():
                     try:
                         retry_result = ask_ai(
                             retry_messages,
+                            retries=0,  # 纠偏本身只有一次机会，禁止内部再重试拖长等待。
                             teaching_context=retry_context,
                         )
                     except Exception as exc:
