@@ -1987,9 +1987,10 @@ def _requested_exercise_difficulty(text):
                 if reserve:
                     protected.append(span)
 
-    # “不难”直接表达希望题目容易；“不太难/别太难”则按适中处理。
+    # “不难”不等于明确指定“简单”；按照产品默认难度理解为中等。
+    # 只有“简单/容易/入门”等直接要求才选择简单档。
     # 先保护整词，防止后续“难”单字规则反向识别成困难。
-    collect("简单", (
+    collect("中等", (
         r"(?:^|[^太很更较])不难(?:的|题|一点|一些|吧|$)?",
         r"(?:^|[^太很更较])没难度",
     ), reserve=True)
@@ -2211,19 +2212,10 @@ def chat():
         )
         explicit_exercise_difficulty = requested_difficulty
 
-        # 用户明确指定难度时严格按指定值；
-        # “照这题再出一道”且未指定时继承参照题；
-        # 独立的“出个题”默认中等，避免无条件生成困难题。
-        if requested_difficulty:
-            exercise_target_difficulty = requested_difficulty
-        elif reference_teaching and reference_teaching.get("difficulty") in (
-            "简单", "中等", "困难"
-        ):
-            exercise_target_difficulty = reference_teaching["difficulty"]
-        else:
-            # 最终版保持原有出题默认难度：未指定、也没有参照题时仍为“中等”。
-            # teaching.py 的题目难度识别增强不改变这个默认值。
-            exercise_target_difficulty = "中等"
+        # 所有出题入口（独立出题、同知识点复测）统一默认中等。
+        # 只有本轮用户明确点名简单/困难才覆盖；参照题只用于约束知识点，
+        # 不再隐式继承原题的难度。确实无法生成中等题时如实保留最接近的有效候选。
+        exercise_target_difficulty = requested_difficulty or "中等"
 
         teaching["mode"] = "exercise"
         teaching["mode_label"] = "练习出题"
@@ -2342,21 +2334,14 @@ def chat():
             target_difficulty = teaching.get("exercise_target_difficulty")
             actual_difficulty = generated_teaching.get("difficulty")
 
-            # 只有用户明确要求难度，或默认中等却生成“困难”时，
-            # 才尝试一次纠偏。默认中等遇到简单题仍直接返回，
-            # 避免额外 API 消费，也不把启发式分档作为拒题硬门槛。
+            # 默认目标是中等：明显偏简单和偏困难都应尝试纠偏一次。
+            # 否则“随便出一道题”几乎总会接受第一道简单题。
+            # 但评级属于估计，只尝试一次，不能因此丢弃已经生成的题目。
             retry_for_difficulty = bool(
                 target_difficulty in ("简单", "中等", "困难")
                 and actual_difficulty in ("简单", "中等", "困难")
                 and actual_difficulty != target_difficulty
-                and (
-                    explicit_exercise_difficulty
-                    or (
-                        not reference_teaching
-                        and target_difficulty == "中等"
-                        and actual_difficulty == "困难"
-                    )
-                )
+                # 同知识点复测也必须遵循默认中等；不允许跳过纠偏。
             )
             if retry_for_difficulty:
                 matched_difficulty = False
@@ -2427,18 +2412,24 @@ def chat():
                         if not reference_ok:
                             continue
 
-                    if retry_teaching.get("difficulty") != target_difficulty:
+                    retry_difficulty = retry_teaching.get("difficulty")
+                    if retry_difficulty not in ("简单", "中等", "困难"):
                         continue
 
-                    reply = retry_reply
-                    generated_answer = retry_answer
-                    generated_question = retry_question
-                    generated_teaching = retry_teaching
-                    matched_difficulty = True
-                    print(
-                        f"练习难度已在第 {retry_index + 1} 次自动重生成后匹配："
-                        f"{target_difficulty}"
-                    )
+                    rank = {"简单": 0, "中等": 1, "困难": 2}
+                    previous_gap = abs(rank.get(actual_difficulty, 1) - rank[target_difficulty])
+                    retry_gap = abs(rank[retry_difficulty] - rank[target_difficulty])
+                    # 第二题即使仍不完全匹配，只要确实更接近要求也优先使用。
+                    # 始终保留可用题目，不恢复早前会吞题的严格拦截。
+                    if retry_gap < previous_gap:
+                        reply = retry_reply
+                        generated_answer = retry_answer
+                        generated_question = retry_question
+                        generated_teaching = retry_teaching
+                        actual_difficulty = retry_difficulty
+                    matched_difficulty = retry_gap == 0
+                    if matched_difficulty:
+                        print(f"练习难度已在第 {retry_index + 1} 次纠偏后匹配：{target_difficulty}")
                     break
 
                 if not matched_difficulty:
