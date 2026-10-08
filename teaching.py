@@ -856,6 +856,26 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
     if len(relation_properties) >= 3 and ("关系" in normalized or "r=" in normalized):
         score = max(score, 2)
 
+    # 映射/函数的复合约束计数不是一步代入题。
+    # 例如“统计满足 f(f(x))=f(x) / f(f(x))=x 的映射个数”需要分析
+    # 不动点、像集或置换循环结构；即使集合只有 5 个元素，仍属于明显多步计数。
+    nested_function = bool(re.search(
+        r"[a-z]\s*\(\s*[a-z]\s*\(\s*[a-z]\s*\)\s*\)",
+        normalized,
+    ))
+    mapping_count = bool(
+        ("映射" in normalized or "函数" in normalized)
+        and re.search(r"(?:个数|多少(?:个)?|共有多少|计数|数量)", normalized)
+    )
+    if nested_function and mapping_count:
+        score = max(score, 3)
+        if subquestion_count >= 2 or re.search(
+            r"(?:f\s*\(\s*f\s*\([^)]*\)\s*\)\s*=\s*f\s*\(|"
+            r"f\s*\(\s*f\s*\([^)]*\)\s*\)\s*=\s*[a-z])",
+            normalized,
+        ):
+            score = max(score, 4)
+
     # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
     if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
         score += 1
@@ -2021,12 +2041,17 @@ def teaching_prompt(context):
         "中等": (
             "目标难度严格为中等：围绕1到2个核心知识点，安排正常的多步判断或计算，通常控制在1到2个小问；"
             "必须有实际的连续运算或综合判断，例如欧几里得算法加贝祖系数，或对关系判定数种不同性质；"
-            "不要只给一步即可直接计算的 gcd、集合元素列举等基础题。"
+            "不要只给一步即可直接计算的 gcd、集合元素列举、定义照抄、单次代入等基础题。"
             "可以有少量综合，但不要同时堆叠3个以上独立任务，不要叠加证明、复杂构造和多个高阶考点。"
+            "输出前必须在内部自检一次：若题目一眼即可一步完成则重新构造；若需要多个互不相关的独立任务则降低复杂度。"
+            "不要输出自检过程，只输出最终达到中等难度的题目。"
         ),
         "困难": (
-            "目标难度严格为困难：允许多步推理、结构判断或知识点组合，体现明显挑战性；"
+            "目标难度严格为困难：必须需要明显的多步推理、结构分析、非平凡计数/构造或两个紧密关联知识点的组合；"
+            "不能只靠换大数字、直接套定义、简单集合列举、单次 gcd/矩阵填写来冒充困难。"
             "但必须仍在当前离散数学知识范围内，不用偏题怪题制造假难度。"
+            "输出前在内部自检：如果一个熟练学生能用一两个直接步骤完成，就重新构造更有推理深度的题目；"
+            "不要输出自检过程，只输出最终困难题。"
         ),
     }[exercise_target_difficulty]
 
