@@ -2530,6 +2530,30 @@ def _ocr_math_tokens(text):
     return re.findall(r"[A-Za-z]\s*\d+|\d+(?:\.\d+)?", value)
 
 
+def _looks_like_non_question_ocr(text, visual_text):
+    """Only reject high-confidence knowledge notes if vision classification is unavailable.
+
+    A math graph without prose is deliberately NOT rejected here.
+    We don't use broad rules such as "no question mark" since actual exercises often
+    omit interrogatives or consist solely of a graph/matrix.
+    """
+    source = str(text or "").strip()
+    visual = str(visual_text or "").strip()
+    if not source or visual:
+        return False
+    if re.search(r"(?:求解?|计算|证明|试证|解答|作图|画出|写出|列出|判断|确定|求出|选择|填空|回答|思考题|例题|练习题|习题|[?？])", source):
+        return False
+    note_titles = re.search(
+        r"(?:知识点(?:总结|归纳|梳理)|课程(?:简介|大纲)|学习目标|教学目标|"
+        r"概念总结|定义与性质|运算表判别|性质汇总|本章小结|课堂笔记)",
+        source,
+    )
+    definition_bullets = sum(bool(re.search(rf"{word}[：:]", source)) for word in (
+        "封闭性", "交换律", "结合律", "幂等律", "单位元", "零元", "逆元", "定义", "性质"
+    ))
+    return bool(note_titles or definition_bullets >= 3)
+
+
 def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
     """Vision 是待核对候选。漏问时保留 OCR，数字变化明确列出。"""
     original = _numbered_ocr_questions(ocr_text)
@@ -2670,6 +2694,7 @@ def ocr():
 
         corrected_text = ""
         visual_text = ""
+        image_kind = "uncertain"
         vision_warning = None
         uncertain_fields = []
 
@@ -2677,6 +2702,7 @@ def ocr():
             isinstance(vision_result, dict)
             and vision_result.get("ok") is True
         ):
+            image_kind = vision_result.get("image_kind", "uncertain")
             corrected_text = str(
                 vision_result.get("corrected_text", "")
             ).strip()
@@ -2704,6 +2730,22 @@ def ocr():
         # 撤销若发生在 Vision 调用期间，结果也直接丢弃。
         if request_id and _take_ocr_cancelled(request_id):
             return jsonify({"cancelled": True})
+
+        # Vision 在原有同一次请求里判明为课件/笔记/照片时，不进入题目核对或 AI 解题。
+        # uncertain 必须留给核对流程，避免误杀无题干的纯图论图形。
+        if image_kind == "non_exercise":
+            return jsonify({
+                "error": "这张图片看起来不是待解答的数学题目。请上传题目图片；如果只是想讨论知识点，可以直接在聊天框输入问题。",
+                "not_a_question": True,
+            }), 422
+
+        if image_kind == "uncertain" and _looks_like_non_question_ocr(
+            corrected_text or ocr_text, visual_text
+        ):
+            return jsonify({
+                "error": "识别到的主要是知识点说明或笔记，不是待解答的题目。请上传题目图片。",
+                "not_a_question": True,
+            }), 422
 
         # 两路都没有拿到任何可用内容时才真正判定识别失败。
         if not ocr_text and not corrected_text and not visual_text:
