@@ -4786,24 +4786,22 @@ async function copyChatQuestionOnly(message, session, messageIndex) {
 
     // The old implementation copied HTML generated from raw Markdown, containing
     // unresolved $...$ rather than already-rendered MathJax formulas.
-    const pending = prepareTypesetQuestionCopy(question);
+    const hasFormula = containsMathForCopy(question);
+    const pending = hasFormula
+        ? Promise.resolve(null)
+        : prepareTypesetQuestionCopy(question);
     const fallback = {
-        text: question,
+        text: readableMathClipboardText(question),
         html: `<div class="ai-content">${markdownToHtml(
             prepareAiDisplayText(question)
         )}</div>`
     };
-    const ok = await writeRichClipboardWhenReady(pending, fallback);
-    if (ok) showCopyToast("题目已复制；微信请用复制图片");
-    return ok;
-}
-
-function copyChatQuestionAsImage(message, session, messageIndex) {
-    const question = completeQuestionTextFromChatMessage(
-        message, session, messageIndex
+    const ok = await writeSmartQuestionClipboard(
+        pending, fallback, () => buildQuestionCopyElement(question),
+        hasFormula
     );
-    if (!question) return Promise.resolve(false);
-    return copyRenderedImageToClipboard(() => buildQuestionCopyElement(question));
+    if (ok && !hasFormula) showCopyToast("题目已复制");
+    return ok;
 }
 
 function shouldShowChatCopyButton(message, session, messageIndex) {
@@ -7935,10 +7933,16 @@ function renderWrongBook() {
         const actions = document.createElement("div");
         actions.className = "wrong-actions";
 
-        actions.appendChild(createRichCopySplitButton(
-            () => copyRenderedNode(card),
-            () => copyRenderedImageToClipboard(() => card.cloneNode(true))
-        ));
+        actions.appendChild(createSmartCopyButton(async () => {
+            const payload = buildClipboardPayload(card);
+            const hasFormula = !!card.querySelector("mjx-container")
+                || containsMathForCopy(card.textContent);
+            const ok = await writeSmartQuestionClipboard(
+                Promise.resolve(payload), payload, () => card.cloneNode(true), hasFormula
+            );
+            if (ok && !hasFormula) showCopyToast("已复制");
+            return ok;
+        }));
 
         if (!item.analysis) {
             const analysisButton = document.createElement("button");
@@ -8563,7 +8567,7 @@ function replaceClipboardMathForPlain(root) {
         const latex = copyMathLatex(container);
         const display = container.getAttribute("display") === "true";
         const fallback = latex
-            ? (display ? `\n$$${latex}$$\n` : `$${latex}$`)
+            ? (display ? `\n${readableMathClipboardText(latex)}\n` : readableMathClipboardText(latex))
             : (container.textContent || "");
         container.replaceWith(document.createTextNode(fallback));
     });
@@ -8571,6 +8575,43 @@ function replaceClipboardMathForPlain(root) {
     root.querySelectorAll(
         "mjx-assistive-mml, .MJX_Assistive_MathML, [data-mjx-assistive-mml]"
     ).forEach(node => node.remove());
+}
+
+// 微信等只读取 text/plain 的粘贴框不能解释 LaTeX。
+// 这里仅处理剪贴板文本的常见数学语法；页面里的 MathJax DOM 完全不改。
+function readableMathClipboardText(source) {
+    let value = String(source || "");
+    const superDigits = {"0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","+":"⁺","-":"⁻","=":"⁼"};
+    const subDigits = {"0":"₀","1":"₁","2":"₂","3":"₃","4":"₄","5":"₅","6":"₆","7":"₇","8":"₈","9":"₉"};
+    value = value.replace(/\\(?:left|right)(?=[\s\[\](){}|]|$)/g, "");
+    value = value.replace(/\\(?:pmod|bmod)\s*\{\s*([^{}]+)\s*\}/g, " (mod $1)");
+    value = value.replace(/\\(?:pmod|bmod)\s+(\d+)/g, " (mod $1)");
+    value = value.replace(/\\(?:frac|dfrac|tfrac)\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "($1)/($2)");
+    value = value.replace(/\\(?:sqrt)\s*\{([^{}]+)\}/g, "√($1)");
+    const symbols = {
+        "gcd":"gcd", "langle":"⟨", "rangle":"⟩", "equiv":"≡",
+        "times":"×", "cdot":"·", "div":"÷", "leq":"≤", "geq":"≥",
+        "neq":"≠", "in":"∈", "notin":"∉", "subseteq":"⊆",
+        "subset":"⊂", "cup":"∪", "cap":"∩", "emptyset":"∅",
+        "forall":"∀", "exists":"∃", "to":"→", "rightarrow":"→",
+        "leftrightarrow":"↔", "land":"∧", "lor":"∨", "neg":"¬",
+        "infty":"∞", "pi":"π", "sum":"Σ", "prod":"Π", "mod":"mod",
+        "mathbb":"", "mathrm":"", "operatorname":"", "text":""
+    };
+    value = value.replace(/\\([A-Za-z]+)/g, (whole, name) => Object.hasOwn(symbols, name) ? symbols[name] : name);
+    value = value.replace(/\^\{([0-9+=\-]+)\}|\^([0-9])/g, (whole, group, digit) =>
+        [...(group || digit)].map(x => superDigits[x] || x).join("")
+    );
+    value = value.replace(/_\{([0-9]+)\}|_([0-9])/g, (whole, group, digit) =>
+        [...(group || digit)].map(x => subDigits[x] || x).join("")
+    );
+    value = value.replace(/\\[()\[\]]/g, "").replace(/\$\$|\$/g, "");
+    value = value.replace(/\\([{}])/g, "$1");
+    return value;
+}
+
+function containsMathForCopy(text) {
+    return /\$[^$\n]+\$|\$\$|\\\(|\\\[|\\(?:frac|gcd|equiv|times|pmod)|\^\{[^}]+\}|_\{[^}]+\}/.test(String(text || ""));
 }
 
 function replaceClipboardMathForHtml(root) {
@@ -8974,57 +9015,46 @@ async function copyRenderedImageToClipboard(makeContent) {
     return false;
 }
 
-function createRichCopySplitButton(onRichCopy, onImageCopy) {
-    const group = document.createElement("span");
-    group.className = "rich-copy-split";
+// One copy action only. Paste targets choose their supported clipboard format.
+function createSmartCopyButton(onCopy) {
     const button = document.createElement("button");
     button.type = "button";
+    button.className = "rich-copy-smart";
     button.textContent = "复制";
-    button.title = "复制可编辑文字与富文本；粘贴到微信保留公式请用右侧菜单";
-    button.addEventListener("click", onRichCopy);
-    group.appendChild(button);
-
-    const menuButton = document.createElement("button");
-    menuButton.type = "button";
-    menuButton.className = "rich-copy-options-trigger";
-    menuButton.textContent = "▾";
-    menuButton.title = "复制为图片（微信等聊天软件）";
-    menuButton.setAttribute("aria-label", "更多复制方式");
-    menuButton.setAttribute("aria-haspopup", "menu");
-    menuButton.setAttribute("aria-expanded", "false");
-    group.appendChild(menuButton);
-
-    const menu = document.createElement("span");
-    menu.className = "rich-copy-options-menu";
-    menu.hidden = true;
-    menu.setAttribute("role", "menu");
-    const imageButton = document.createElement("button");
-    imageButton.type = "button";
-    imageButton.textContent = "复制为图片（微信）";
-    imageButton.setAttribute("role", "menuitem");
-    imageButton.addEventListener("click", () => {
-        menu.hidden = true;
-        menuButton.setAttribute("aria-expanded", "false");
-        onImageCopy();
+    button.title = "复制题目：公式保留图片显示，普通文字保留文本格式";
+    button.addEventListener("click", () => {
+        Promise.resolve(onCopy()).catch(error => console.warn("复制失败：", error));
     });
-    menu.appendChild(imageButton);
-    group.appendChild(menu);
-    menuButton.addEventListener("click", () => {
-        menu.hidden = !menu.hidden;
-        menuButton.setAttribute("aria-expanded", String(!menu.hidden));
-    });
-    return group;
+    return button;
 }
 
-// One global listener even when conversations are re-rendered many times.
-document.addEventListener("click", event => {
-    document.querySelectorAll(".rich-copy-options-menu:not([hidden])").forEach(menu => {
-        if (menu.parentElement?.contains(event.target)) return;
-        menu.hidden = true;
-        menu.parentElement?.querySelector(".rich-copy-options-trigger")
-            ?.setAttribute("aria-expanded", "false");
-    });
-});
+// Only one copy button: a single PNG MIME for math, normal rich text for plain
+// questions. A webpage cannot detect which application will receive a paste.
+async function writeSmartQuestionClipboard(payloadPromise, fallback, makeContent, hasFormula) {
+    // 一个按钮，一个可预期的剪贴板内容。不能把 image/png、text/html、text/plain
+    // 同时放到同一 ClipboardItem：部分聊天软件会将内嵌公式粘贴成 .dat 附件。
+    // 网页无法知道未来的粘贴目标，所以只根据当前题目是否含有公式来选择格式。
+    if (hasFormula) {
+        // 数学题优先保真：整个题目写为一张 PNG（只有 image/png），
+        // 兼容不支持 MathJax/HTML 的微信类软件。绝不改动屏幕上的公式节点。
+        // 不启动无用的异步富文本渲染，避免复制时双重渲染拖慢响应。
+        Promise.resolve(payloadPromise).catch(() => {});
+        return copyRenderedImageToClipboard(makeContent);
+    }
+
+    // 普通文字题沿用原有富文本/纯文本复制。没有公式时无需截图。
+    const base = {
+        text: readableMathClipboardText(fallback?.text || ""),
+        html: String(fallback?.html || "")
+    };
+    return writeRichClipboardWhenReady(
+        Promise.resolve(payloadPromise).then(p => ({
+            ...p,
+            text: readableMathClipboardText(p?.text || base.text)
+        })),
+        base
+    );
+}
 
 function effectiveElementBackground(element) {
     let current = element;
@@ -12965,9 +12995,8 @@ function renderChat() {
                 messageIndex
             )
         ) {
-            actions.appendChild(createRichCopySplitButton(
-                () => copyChatQuestionOnly(message, session, messageIndex),
-                () => copyChatQuestionAsImage(message, session, messageIndex)
+            actions.appendChild(createSmartCopyButton(
+                () => copyChatQuestionOnly(message, session, messageIndex)
             ));
         }
 
