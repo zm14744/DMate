@@ -817,12 +817,26 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         if exponent >= 20 and modulus > 1 and base % modulus != 0 and has_remainder_context:
             score = max(score, 2)
 
+    # 关系幂题常只写 R²、R³，没有“复合关系”等自然语言关键字。
+    # 求两个不同的关系幂一般需要重复关系复合，不应一概判为简单。
+    if "关系" in normalized:
+        powers = re.findall(
+            r"(?<![a-z0-9_])r\s*(?:\^\s*\{?\s*(\d+)\s*\}?|([³⁴⁵⁶⁷⁸⁹]))",
+            normalized,
+        )
+        if len({a or b for a, b in powers}) >= 2:
+            score = max(score, 2)
+
     # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
     if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
         score += 1
     if re.search(r"(?:给出|写出|构造).{0,12}(?:同构)?映射", normalized):
         score += 1
-    if re.search(r"(?:并|同时|再).{0,16}(?:画|构造|证明|给出|写出)", normalized):
+    # 对多小问已加过难度分，不再因末尾“并写出全部解”等同一任务的
+    # 答案格式要求重复计分；单问里的额外独立任务仍可加分。
+    if subquestion_count < 2 and re.search(
+        r"(?:并|同时|再).{0,16}(?:画|构造|证明|给出|写出)", normalized
+    ):
         score += 1
 
     # 不按 knowledge_points 的数量直接抬难度。该列表会自动带出前置/相关点，
@@ -887,6 +901,14 @@ def _score_categories(text):
     # 必须同时出现具体除数及余数语义，避免把泛泛的“除法”误判为数论。
     if re.search(r"除以?\s*\d+.{0,16}(?:余数|余几|求余)", normalized):
         scores["初等数论"] = scores.get("初等数论", 0) + 6
+
+    # 题干常写“设 A 上的关系 R=...，求 R² 与 R³”，不能因为出现
+    # “集合 A”便只判成集合运算。R 的幂是关系复合/关系运算。
+    if "关系" in normalized and re.search(
+        r"(?<![a-z0-9_])r\s*(?:\^\s*\{?\s*\d+\s*\}?|[³⁴⁵⁶⁷⁸⁹])",
+        normalized,
+    ):
+        scores["集合与关系"] = scores.get("集合与关系", 0) + 5
 
     # “同构”同时存在于代数结构与图论语境。出现明确图语境时，
     # 应判作图论，不让“同构”这个单词把图同构误拉到代数结构。
@@ -978,6 +1000,14 @@ def _extract_points(text, category):
                 if point not in ("线性齐次递推", "非齐次递推")
             ]
             result = result[:4]
+
+    # 关系幂的符号型表达，优先归到“关系运算”，而不是“集合运算”。
+    if category == "集合与关系" and "关系" in normalized and re.search(
+        r"(?<![a-z0-9_])r\s*(?:\^\s*\{?\s*\d+\s*\}?|[³⁴⁵⁶⁷⁸⁹])",
+        normalized,
+    ):
+        result = ["关系运算"] + [point for point in result if point != "关系运算"]
+        result = result[:4]
 
     if result:
         return result
