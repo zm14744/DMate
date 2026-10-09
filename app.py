@@ -17,6 +17,7 @@ from flask import Flask, jsonify, render_template, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure
+from classification_semantic import classify_ambiguous_questions
 from teaching import (
     analyze_messages,
     analyze_question,
@@ -2674,6 +2675,7 @@ def analyze_questions_batch():
         }), 400
 
     results = []
+    fallback_entries = []
 
     for item in items[:80]:
         if isinstance(item, dict):
@@ -2702,6 +2704,17 @@ def analyze_questions_batch():
             "key": key,
             "teaching": teaching
         })
+        if teaching is not None:
+            fallback_entries.append((key, text[:6000], teaching))
+
+    # 可选 AI 语义复核只在错题本的后台批量补全启用；普通 /chat
+    # 依旧仅调用本地分类，不串行增加一次模型请求。
+    if data.get("semantic_fallback") is True and fallback_entries:
+        refined = classify_ambiguous_questions(fallback_entries)
+        for result in results:
+            better = refined.get(result["key"])
+            if better:
+                result["teaching"] = better
 
     return jsonify({
         "results": results
