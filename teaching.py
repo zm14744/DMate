@@ -2483,6 +2483,10 @@ def teaching_prompt(context):
         else (difficulty or "中等")
     )
 
+    retest_core_points = [
+        str(item).strip() for item in (context.get("retest_core_points") or [])
+        if str(item).strip()
+    ][:4]
     normalized_exercise_request = str(
         context.get("normalized_exercise_request") or ""
     ).strip()[:180]
@@ -2518,6 +2522,11 @@ def teaching_prompt(context):
             "不要输出自检过程，只输出最终困难题。"
         ),
     }[exercise_target_difficulty]
+    if retest_core_points and exercise_target_difficulty == "中等":
+        exercise_difficulty_instruction += (
+            "本次复测存在多个必须同时考查的核心考点；请减少数字规模、合并相互依赖的小问来控制整体难度，"
+            "不要机械地把多考点理解为必须出困难题，也不要遗漏任何一项。"
+        )
 
     mode_instruction = {
         "hint": (
@@ -2538,7 +2547,13 @@ def teaching_prompt(context):
                 if normalized_exercise_request else ""
             )
             + f"本次练习目标难度为{exercise_target_difficulty}。{exercise_difficulty_instruction}"
-            "如果请求附有【当前指向题目】，以这道题作为同知识点练习的唯一参照，"
+            + (
+                "本次是错题的多考点复测，以下考点每项均须在题干中得到实质考查："
+                + "、".join(retest_core_points) + "。可缩小数字或图规模控制在目标难度，"
+                "但不能只选其中一项，也不能仅在题干里提及而不实际考查。"
+                if retest_core_points else ""
+            )
+            + "如果请求附有【当前指向题目】，以这道题作为同知识点练习的唯一参照，"
             "保持其核心考点，变换条件或数值；不要取用会话里另一道题的考点，也不要回答原题。"
             "固定使用“【题目】”作为题干标题；标题前不要写“好的、给你一道题”等开场白。"
             "题目后绝对不要附提示、思路提示、解题思路、思路、关键点、引导问题、解题方向、答案、解析、"
