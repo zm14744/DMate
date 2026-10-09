@@ -2559,7 +2559,7 @@ function normalizeRetestSession(value) {
             ? value.targetPoints
                 .filter(item => typeof item === "string" && item.trim())
                 .map(item => item.trim())
-                .slice(0, 2)
+                .slice(0, 4)
             : [],
         referenceQuestion: typeof value.referenceQuestion === "string"
             ? value.referenceQuestion.trim().slice(0, 3000)
@@ -5283,17 +5283,19 @@ function wrongQuestionFingerprint(question) {
 }
 
 function wrongBookLearningPoints(entryOrQuestion) {
+    // 错题可能同时考多个核心知识点。旧版有 focusPoints 就直接丢弃
+    // knowledgePoints，导致复测只覆盖一项；这里合并去重，最多保留四项。
     const focus = Array.isArray(entryOrQuestion?.focusPoints)
-        ? entryOrQuestion.focusPoints.filter(Boolean)
-        : [];
-
-    if (focus.length) {
-        return focus.slice(0, 2);
-    }
-
-    return Array.isArray(entryOrQuestion?.knowledgePoints)
-        ? entryOrQuestion.knowledgePoints.filter(Boolean).slice(0, 4)
-        : [];
+        ? entryOrQuestion.focusPoints : [];
+    const knowledge = Array.isArray(entryOrQuestion?.knowledgePoints)
+        ? entryOrQuestion.knowledgePoints : [];
+    const merged = [...new Set([...focus, ...knowledge]
+        .filter(value => typeof value === "string" && value.trim())
+        .map(value => value.trim()))];
+    // 有具体考点时不把“图的基本概念”等宽泛前置标签当成必须复测的一问。
+    const generic = new Set(["图的基本概念"]);
+    const specific = merged.filter(point => !generic.has(point));
+    return (specific.length ? specific : merged).slice(0, 4);
 }
 
 function addWrongQuestion(questionInfo, feedback, source = "auto") {
@@ -6118,6 +6120,16 @@ function openWrongBook() {
     modal.classList.remove("hidden");
     void refreshWrongBookDifficulties();
 
+    // 新错题在加入时已自动准备答案；旧数据/断线后缺失答案的题目，
+    // 再次打开错题本时优先补一个，避免必须点“查看答案”才启动。
+    // 每次只补一题，不突然并发发起大量 AI 请求影响聊天速度。
+    const missingAnswer = getFilteredWrongBookItems().find(item =>
+        !item.referenceAnswer && !item.answer
+        && !wrongAnswerLoadingIds.has(item.id)
+        && !wrongAnswerQueue.includes(item.id)
+    );
+    if (missingAnswer) queueWrongQuestionAnswer(missingAnswer.id);
+
     const search = document.getElementById("wrongBookSearch");
     if (search) {
         search.value = wrongBookSearch;
@@ -6363,11 +6375,11 @@ function buildRetestPrompt(entry) {
         "【错题复测】",
         `请围绕知识点“${targetText}”生成 1 道新的离散数学复测题。`,
         "要求：",
-        "1. 与当前指向的原错题考查同一核心能力，但题面、数字或结构必须明显不同；",
-        "2. 难度与原题大致相当，不要故意变难；",
-        "3. 只给复测题目，不给答案、提示、解析或解题步骤；",
-        "4. 题目必须信息完整、可独立作答；",
-        "5. 不要回答原错题，只生成新的复测题。"
+        "1. 必须同时覆盖上面列出的全部核心知识点，不要只选其中一个；可安排相互关联的小问，但不能把原题原封不动重出；",
+        "2. 本次目标难度明确为中等，不继承原错题的难度标签；仅在原知识范围确实无法形成中等题时才允许就近调整档位，并如实标记；",
+        "3. 控制计算规模，让全部核心考点构成一份适中的综合复测，不靠堆砌无关小问增加难度；",
+        "4. 只给复测题目，不给答案、提示、解析或解题步骤（系统内部隐藏答案除外）；",
+        "5. 题目必须信息完整、可独立作答，不要回答原错题。"
     ].join("\n");
 }
 
@@ -6393,11 +6405,11 @@ function startWrongQuestionRetest(id) {
     const targetPoints = wrongBookLearningPoints(entry);
     const idValue = makeSessionId();
     const targetName = targetPoints.length
-        ? targetPoints[0]
+        ? targetPoints.join("、")
         : "错题";
 
     const visiblePrompt =
-        `给我一道“${targetName}”的同知识点复测题。`;
+        `给我一道包含“${targetName}”全部核心考点的中等难度复测题。`;
 
     const session = {
         id: idValue,
@@ -7552,10 +7564,16 @@ async function generateWrongQuestionAnswer(
             return false;
         }
 
-        entry.answer = extractAnswerOnlyText(
-            data.reply
-        ).slice(0, 3000);
-
+        const finalAnswer = extractAnswerOnlyText(data.reply).trim().slice(0, 3000);
+        // 模型失败文案不是“答案”；用户切换账号/清空错题期间的
+        // 旧异步请求也不能写回另一账号的学习状态。
+        if (!finalAnswer || /^(?:抱歉|AI\s*服务|网络连接失败|暂时无法生成|当前请求过于频繁)/i.test(finalAnswer)) {
+            return false;
+        }
+        if (!learningState.wrongQuestions.includes(entry)) {
+            return false;
+        }
+        entry.answer = finalAnswer;
         entry.answerUpdatedAt = Date.now();
         entry.updatedAt = Date.now();
 
@@ -7888,10 +7906,10 @@ function renderWrongBook() {
             || item.answer
         ) {
             answerSummary.textContent = "查看答案";
-        } else if (wrongAnswerLoadingIds.has(item.id)) {
-            answerSummary.textContent = "查看答案 · 正在准备";
+        } else if (wrongAnswerLoadingIds.has(item.id) || wrongAnswerQueue.includes(item.id)) {
+            answerSummary.textContent = "查看答案 · 自动准备中";
         } else {
-            answerSummary.textContent = "查看答案";
+            answerSummary.textContent = "查看答案 · 尚未生成";
         }
 
         const answerInner = document.createElement("div");
@@ -7908,9 +7926,11 @@ function renderWrongBook() {
                 visibleAnswer
             );
         } else {
-            answerInner.textContent = wrongAnswerLoadingIds.has(item.id)
-                ? "答案正在后台准备，请稍等。"
-                : "答案尚未准备，已重新加入生成队列。";
+            answerInner.textContent = (
+                wrongAnswerLoadingIds.has(item.id) || wrongAnswerQueue.includes(item.id)
+            )
+                ? "已自动请求生成最终答案，完成后会直接保存，无需手动点击生成。"
+                : "暂无可复用答案；展开后会自动请求生成并保存。";
         }
 
         answerDetails.appendChild(answerSummary);
@@ -11553,7 +11573,12 @@ async function requestAiReply(session) {
                     ? "exercise"
                     : "chat",
                 exercise_reference: retestReferenceQuestion
-                    ? { question: retestReferenceQuestion }
+                    ? {
+                        question: retestReferenceQuestion,
+                        core_points: Array.isArray(retestBeforeRequest?.targetPoints)
+                            ? retestBeforeRequest.targetPoints.slice(0, 4)
+                            : []
+                    }
                     : exerciseReference
                         ? { question: exerciseReference.text }
                         : undefined
