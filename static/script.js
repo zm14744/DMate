@@ -7968,13 +7968,8 @@ function renderWrongBook() {
             meta.appendChild(row);
         };
 
-        if (!isGenericTeachingCategory(item.category)) {
-            appendMetaRow("所属模块", item.category);
-        }
-        if (Array.isArray(item.relatedCategories) && item.relatedCategories.length) {
-            appendMetaRow("涉及模块", item.relatedCategories.join("、"));
-        }
-
+        // 模块分类仅用于后台学习记录、复测和知识图谱关联，
+        // 错题卡不额外展示所属模块或涉及模块。
         if (item.focusPoints.length) {
             appendMetaRow(
                 "本题难点",
@@ -13342,15 +13337,8 @@ function renderChat() {
             div.insertBefore(difficultyBadge, content);
         }
 
-        const questionModule = String(difficultyTeaching?.category || "").trim();
-        if (questionModule && questionModule !== "待识别" && questionModule !== "离散数学综合") {
-            const moduleBadge = document.createElement("div");
-            moduleBadge.className = "module-badge";
-            const extraModules = difficultyTeaching.related_categories || [];
-            moduleBadge.textContent = `所属模块：${questionModule}`
-                + (extraModules.length ? ` · 涉及：${extraModules.join("、")}` : "");
-            div.insertBefore(moduleBadge, content);
-        }
+        // 难度仍显示，但不向用户展示模块分类标签。
+        // generatedTeaching 的模块与相关知识点保留，供复测、错题与图谱使用。
 
         const actions = document.createElement("div");
         actions.className = "msg-actions";
@@ -16493,28 +16481,14 @@ function renderKnowledgeGraphSummary(context) {
                 : "本对话"
         );
 
-        if (context.categories?.length) {
-            addItem(
-                "涉及模块",
-                context.categories.join("、")
-            );
-        }
     } else if (knowledgeGraphScope === "history") {
         addItem(
             "查看范围",
             `历史第 ${context.historyOrder || "?"} 题`
         );
 
-        addItem(
-            "所属模块",
-            context.category || "暂未识别"
-        );
-    } else {
-        addItem(
-            "当前模块",
-            context.category || knowledgeGraphFilter || "暂未识别"
-        );
     }
+    // 图谱保留分类筛选功能，摘要不重复显示模块标签。
 
     const related = uniqueTextList(
         context.knowledgePoints || [],
@@ -16663,10 +16637,6 @@ function renderKnowledgeGraphHistory() {
         top.appendChild(number);
         top.appendChild(source);
 
-        const category = document.createElement("div");
-        category.className = "kg-history-category";
-        category.textContent = item.category;
-
         const preview = document.createElement("div");
         preview.className = "kg-history-preview ai-content";
         preview.innerHTML = markdownToHtml(
@@ -16713,7 +16683,6 @@ function renderKnowledgeGraphHistory() {
         actions.appendChild(locateButton);
 
         card.appendChild(top);
-        card.appendChild(category);
         card.appendChild(preview);
         card.appendChild(points);
         card.appendChild(actions);
@@ -16814,10 +16783,6 @@ function renderKnowledgeGraphDetail() {
 
     const subline = document.createElement("div");
     subline.className = "graph-detail-subline";
-
-    const category = document.createElement("span");
-    category.textContent = node.category;
-    subline.appendChild(category);
 
     if (node.level) {
         const level = document.createElement("span");
@@ -17012,11 +16977,7 @@ function renderInfo() {
     const teaching = getEffectiveSessionTeaching(session);
 
     if (teaching) {
-        lines.push(
-            "",
-            `学习内容：${getFriendlyCategory(teaching.category)}`
-        );
-
+        // 后台仍使用 teaching.category；右侧概览只展示具体学习要点。
         if (teaching.focus_points.length) {
             lines.push(
                 `本题难点：${teaching.focus_points.join("、")}`
