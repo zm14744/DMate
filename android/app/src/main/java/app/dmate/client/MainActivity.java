@@ -1,6 +1,28 @@
 package app.dmate.client;
 
 import android.annotation.TargetApi;
+import android.Manifest;
+import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.pm.PackageManager;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.media.MediaScannerConnection;
+import android.util.Base64;
+import androidx.webkit.WebMessageCompat;
+import androidx.webkit.JavaScriptReplyProxy;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
+import org.json.JSONObject;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
@@ -8,7 +30,6 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -26,11 +47,29 @@ import android.widget.Toast;
 
 public final class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 1001;
+    private static final int LEGACY_SAVE_PERMISSION_REQUEST = 1002;
+    private static final int MAX_PNG_BYTES = 20 * 1024 * 1024;
+    private static final byte[] PNG_MAGIC = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     private static final String HOME_URL = BuildConfig.DMATE_URL;
     private static final String HOME_HOST = "dmate.zeabur.app";
 
     private WebView webView;
     private ValueCallback<Uri[]> pendingFileCallback;
+    private final ExecutorService imageSaver = Executors.newSingleThreadExecutor();
+    private PendingSave pendingLegacySave;
+
+    private static final class PendingSave {
+        final String id;
+        final String filename;
+        final byte[] png;
+        final JavaScriptReplyProxy reply;
+        PendingSave(String id, String filename, byte[] png, JavaScriptReplyProxy reply) {
+            this.id = id;
+            this.filename = filename;
+            this.png = png;
+            this.reply = reply;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,11 +123,172 @@ public final class MainActivity extends Activity {
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, false);
 
+        installGallerySaveBridge();
         webView.setWebViewClient(new DmateWebViewClient());
         webView.setWebChromeClient(new DmateChromeClient());
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             openExternal(Uri.parse(url));
         });
+    }
+
+    /** Only the HTTPS DMate main frame may request saving a PNG to Photos. */
+    private void installGallerySaveBridge() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
+        WebViewCompat.addWebMessageListener(
+            webView,
+            "DMateGallery",
+            Collections.singleton("https://" + HOME_HOST),
+            (view, message, sourceOrigin, isMainFrame, replyProxy) -> {
+                if (!isMainFrame || view != webView ||
+                    !"https".equalsIgnoreCase(sourceOrigin.getScheme()) ||
+                    !HOME_HOST.equalsIgnoreCase(sourceOrigin.getHost()) ||
+                    message.getType() != WebMessageCompat.TYPE_STRING ||
+                    !isTrustedPage()) {
+                    return;
+                }
+                String raw = message.getData();
+                if (raw == null || raw.length() > MAX_PNG_BYTES * 4 / 3 + 4096) {
+                    sendGalleryReply(replyProxy, "", false, "图片过大，无法保存");
+                    return;
+                }
+                try {
+                    JSONObject request = new JSONObject(raw);
+                    String id = request.optString("id", "");
+                    String filename = request.optString("filename", "DMate-图片.png");
+                    String base64 = request.optString("base64", "");
+                    if (id.length() < 1 || id.length() > 128 || base64.isEmpty() ||
+                        base64.length() > MAX_PNG_BYTES * 4 / 3 + 1024) {
+                        sendGalleryReply(replyProxy, id, false, "图片数据不正确");
+                        return;
+                    }
+                    // Decode away from UI thread; never put 20 MiB PNG into Intent URLs.
+                    imageSaver.execute(() -> {
+                        try {
+                            byte[] png = Base64.decode(base64, Base64.DEFAULT);
+                            if (!isValidPng(png)) throw new IOException("图片不是有效 PNG 或文件过大");
+                            PendingSave save = new PendingSave(id, sanitizeFilename(filename), png, replyProxy);
+                            runOnUiThread(() -> beginGallerySave(save));
+                        } catch (Exception error) {
+                            runOnUiThread(() -> sendGalleryReply(replyProxy, id, false, "图片数据无效"));
+                        }
+                    });
+                } catch (Exception error) {
+                    sendGalleryReply(replyProxy, "", false, "无法解析图片保存请求");
+                }
+            }
+        );
+    }
+
+    private boolean isTrustedPage() {
+        if (webView == null || webView.getUrl() == null) return false;
+        Uri page = Uri.parse(webView.getUrl());
+        return "https".equalsIgnoreCase(page.getScheme()) &&
+            HOME_HOST.equalsIgnoreCase(page.getHost());
+    }
+
+    private static boolean isValidPng(byte[] bytes) {
+        if (bytes == null || bytes.length < PNG_MAGIC.length || bytes.length > MAX_PNG_BYTES) return false;
+        for (int i = 0; i < PNG_MAGIC.length; i++) {
+            if (bytes[i] != PNG_MAGIC[i]) return false;
+        }
+        return true;
+    }
+
+    private static String sanitizeFilename(String supplied) {
+        String filename = (supplied == null ? "" : supplied)
+            .replaceAll("[^a-zA-Z0-9\u4e00-\u9fa5._-]", "_");
+        if (filename.length() > 90) filename = filename.substring(0, 90);
+        if (!filename.toLowerCase(Locale.ROOT).endsWith(".png")) filename += ".png";
+        return "DMate-" + System.currentTimeMillis() + "-" + filename;
+    }
+
+    private void beginGallerySave(PendingSave save) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (pendingLegacySave != null) {
+                sendGalleryReply(save.reply, save.id, false, "请完成前一次图片保存");
+                return;
+            }
+            pendingLegacySave = save;
+            requestPermissions(new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, LEGACY_SAVE_PERMISSION_REQUEST);
+            return;
+        }
+        saveImageAsync(save);
+    }
+
+    private void saveImageAsync(PendingSave save) {
+        imageSaver.execute(() -> {
+            try {
+                storePngInGallery(save.png, save.filename);
+                runOnUiThread(() -> sendGalleryReply(save.reply, save.id, true, "图片已保存到相册 · DMate"));
+            } catch (Exception error) {
+                runOnUiThread(() -> sendGalleryReply(save.reply, save.id, false, "保存到相册失败，请检查可用空间"));
+            }
+        });
+    }
+
+    private void storePngInGallery(byte[] png, String filename) throws IOException {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentResolver resolver = getContentResolver();
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME, filename);
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+            values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/DMate");
+            values.put(MediaStore.Images.Media.IS_PENDING, 1);
+            Uri target = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (target == null) throw new IOException("无法创建相册文件");
+            boolean complete = false;
+            try {
+                try (OutputStream out = resolver.openOutputStream(target, "w")) {
+                    if (out == null) throw new IOException("无法写入相册");
+                    out.write(png);
+                    out.flush();
+                }
+                values.clear();
+                values.put(MediaStore.Images.Media.IS_PENDING, 0);
+                if (resolver.update(target, values, null, null) <= 0) {
+                    throw new IOException("相册未确认文件保存");
+                }
+                complete = true;
+            } finally {
+                if (!complete) resolver.delete(target, null, null);
+            }
+        } else {
+            File directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "DMate");
+            if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("无法创建图片文件夹");
+            File file = new File(directory, filename);
+            try (FileOutputStream out = new FileOutputStream(file)) {
+                out.write(png);
+                out.flush();
+            }
+            MediaScannerConnection.scanFile(this, new String[] {file.getAbsolutePath()}, new String[] {"image/png"}, null);
+        }
+    }
+
+    private void sendGalleryReply(JavaScriptReplyProxy reply, String id, boolean ok, String message) {
+        try {
+            JSONObject response = new JSONObject();
+            response.put("id", id);
+            response.put("ok", ok);
+            response.put("message", message);
+            reply.postMessage(response.toString());
+        } catch (Exception ignored) {
+            // The page might have navigated during a long save; do not crash.
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != LEGACY_SAVE_PERMISSION_REQUEST) return;
+        PendingSave save = pendingLegacySave;
+        pendingLegacySave = null;
+        if (save == null) return;
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            saveImageAsync(save);
+        } else {
+            sendGalleryReply(save.reply, save.id, false, "没有存储权限，无法保存到相册");
+        }
     }
 
     private final class DmateWebViewClient extends WebViewClient {
@@ -267,6 +467,7 @@ public final class MainActivity extends Activity {
             pendingFileCallback.onReceiveValue(null);
             pendingFileCallback = null;
         }
+        imageSaver.shutdown();
         if (webView != null) {
             webView.stopLoading();
             webView.setWebChromeClient(null);
