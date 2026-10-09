@@ -13257,8 +13257,9 @@ function renderChat() {
                 )
         );
 
-        // 复测的目标难度只用于后台生成与校验，不在聊天气泡标注。
-        if (difficultyTeaching?.difficulty && !session.retest) {
+        // 复测题和普通题一样显示实际分类难度；
+        // 仅显示绑定在这道题上的教学分析，不把后台目标难度写到出题指令上。
+        if (difficultyTeaching?.difficulty) {
             const difficultyBadge = document.createElement("div");
             difficultyBadge.className = "difficulty-badge";
             difficultyBadge.textContent = difficultyTeaching.difficulty;
