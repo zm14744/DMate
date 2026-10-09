@@ -2157,7 +2157,12 @@ def _exercise_reference_matches(reference_teaching, generated_teaching):
     ):
         return False, "生成的练习偏离了参照题所属模块。"
 
-    expected_points = {
+    required_points = {
+        str(item).strip()
+        for item in (reference_teaching.get("retest_core_points") or [])
+        if str(item).strip()
+    }
+    expected_points = required_points or {
         str(item).strip()
         for item in (
             reference_teaching.get("focus_points")
@@ -2175,7 +2180,13 @@ def _exercise_reference_matches(reference_teaching, generated_teaching):
         if str(item).strip()
     }
 
-    if expected_points and actual_points and expected_points.isdisjoint(actual_points):
+    # 错题本多考点复测是“全部核心考点”，不能只重合一项就放行。
+    # 无结构化复测范围的普通“同知识点”请求，保留此前至少一项交集的逻辑。
+    if required_points:
+        missing = sorted(required_points - actual_points)
+        if missing:
+            return False, "复测题遗漏核心知识点：" + "、".join(missing)
+    elif expected_points and actual_points and expected_points.isdisjoint(actual_points):
         return False, "生成的练习偏离了参照题核心知识点。"
 
     return True, ""
@@ -2273,6 +2284,16 @@ def chat():
             return jsonify({"error": "练习参照题格式不正确，请重新选择题目。"}), 400
         reference_text = reference["question"].strip()
         reference_teaching = analyze_question(reference_text)
+        # 错题复测由客户端携带保存的“全部核心考点”；不从原题的
+        # focus_points (通常只有前两项) 反推，避免遗漏其它知识点。
+        core_points = reference.get("core_points")
+        if isinstance(core_points, list) and isinstance(reference_teaching, dict):
+            filtered = list(dict.fromkeys(
+                point.strip() for point in core_points
+                if isinstance(point, str) and 0 < len(point.strip()) <= 40
+            ))[:4]
+            if filtered:
+                reference_teaching["retest_core_points"] = filtered
         # 无论客户端是否已打包锚点，后端都统一为一份参照题和一个当前动作。
         latest_user = next((item for item in reversed(cleaned) if item["role"] == "user"), None)
         if latest_user is None:
@@ -2319,6 +2340,11 @@ def chat():
         requested_difficulty = _requested_exercise_difficulty(
             normalized_action_for_exercise
         )
+        # 错题本按钮发起的复测，后端不再从旧题或长提示里猜难度。
+        # 目标固定中等；除非生成器确实无法在原考点范围构造中等题，
+        # 才按已有的单次纠偏机制保留最近的有效候选并告知偏差。
+        if reference_teaching and reference_teaching.get("retest_core_points"):
+            requested_difficulty = "中等"
         explicit_exercise_difficulty = requested_difficulty
 
         # 所有出题入口（独立出题、同知识点复测）统一默认中等。
@@ -2328,6 +2354,8 @@ def chat():
 
         teaching["mode"] = "exercise"
         teaching["mode_label"] = "练习出题"
+        if reference_teaching and reference_teaching.get("retest_core_points"):
+            teaching["retest_core_points"] = reference_teaching["retest_core_points"]
         teaching["question_type"] = teaching.get("question_type") or "出题请求"
         teaching["difficulty"] = exercise_target_difficulty
         teaching["exercise_target_difficulty"] = exercise_target_difficulty
