@@ -2218,7 +2218,7 @@ body[data-appearance-theme="light"] .msg-actions button {
 }
 
 
-/* 一个复制按钮：由剪贴板同时提供可用格式，不改页面 MathJax。 */
+/* 图片“复制”与每条聊天的双矩形文本复制：彼此功能独立。 */
 .msg-actions .rich-copy-smart,
 .wrong-actions .rich-copy-smart {
     font:inherit;
@@ -2230,6 +2230,20 @@ body[data-appearance-theme="light"] .msg-actions button {
     color:var(--text-secondary);
     cursor:pointer;
 }
+
+.msg-actions .chat-text-copy {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:29px;
+    min-width:29px;
+    min-height:27px;
+    padding:3px 5px;
+    vertical-align:middle;
+}
+.msg-actions .chat-text-copy svg { display:block; pointer-events:none; }
+.msg-actions .chat-text-copy:hover,
+.msg-actions .chat-text-copy:focus-visible { color:var(--text-primary); border-color:var(--accent); }
 
 /* 第三阶段：富文本复制。只增强复制层，不改变 Markdown / MathJax 渲染。 */
 .panel-heading-row {
@@ -7301,7 +7315,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-copy-difficulty-final-20261008-2"></script>
+<script src="/static/script.js?v=dmate-copy-text-image-retest-20261009"></script>
 
 </body>
 </html>
