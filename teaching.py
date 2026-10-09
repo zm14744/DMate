@@ -1263,6 +1263,46 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         if constrained_colours or subquestion_count >= 2:
             score = max(score, 4)
 
+    # 结构化枚举计数：不是因为有“图/个数”就判困难，而是同时要求
+    # 枚举一类数学结构，并逐步叠加独立限制。用于图、关系、映射等，
+    # 避免每次遇到新的综合计数题都靠补具体题干关键词。
+    counts_structures = bool(re.search(
+        r"(?:求|计算|统计|确定|问|写出).{0,72}(?:个数|数量|多少(?:个|种)|数目|种数|方案数|总数)"
+        r"|(?:多少(?:个|种)|个数|种数|方案数|数量).{0,16}(?:图|关系|映射|函数)",
+        normalized,
+    ))
+    # 区分“数符合条件的图”与“给定图中数顶点/边”：后者只是基础计算。
+    if "图" in normalized and not re.search(
+        r"图\s*[a-z]?\s*(?:的)?(?:个数|数量|种数|数目|方案数)"
+        r"|(?:几|多少)(?:个|种)(?:不同)?图", normalized,
+    ):
+        counts_structures = False
+    structures = bool(re.search(
+        r"(?:无向图|有向图|简单图|连通图|二分图|二部图|图g|"
+        r"关系r|关系|映射|函数|排列|组合|方案)", normalized,
+    ))
+    graph_constraints = {
+        "连通": bool(re.search(r"连通", normalized)),
+        "边数限制": bool(re.search(r"(?:恰|正好|刚好|至多|至少|恰有|共有|恰好).{0,8}(?:条)?边|\d+\s*条边", normalized)),
+        "二分": bool(re.search(r"二分图|二部图|二分", normalized)),
+        "结构约束": bool(re.search(r"无环|欧拉|哈密顿|正则图|平面图|完全匹配|度数限制|度序列", normalized)),
+    }
+    abstract_constraints = {
+        "性质": bool(re.search(r"自反|对称|反对称|传递|单射|满射|双射|幂等", normalized)),
+        "精确数目": bool(re.search(r"恰好|恰有|正好|至少|至多|只含|且仅|刚好", normalized)),
+        "附加条件": bool(re.search(r"同时|满足|并且|且|其中", normalized)),
+    }
+    active_constraints = (
+        sum(graph_constraints.values()) if "图" in normalized
+        else sum(abstract_constraints.values())
+    )
+    if counts_structures and structures and active_constraints >= 1:
+        score = max(score, 2)
+        # 多个子任务逐层加约束，或三个互不相同的条件下进行结构计数，
+        # 往往需要分类讨论、容斥或构造性推导，属于非平凡计数。
+        if active_constraints >= 2 and (subquestion_count >= 2 or active_constraints >= 3):
+            score = max(score, 4)
+
     # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
     if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
         score += 1
