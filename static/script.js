@@ -2521,6 +2521,7 @@ function normalizeTeaching(value) {
         category: asText(value.category) || "待识别",
         related_categories: asTextList(value.related_categories),
         knowledge_points: asTextList(value.knowledge_points),
+        related_knowledge_points: asTextList(value.related_knowledge_points),
         focus_points: asTextList(value.focus_points).slice(0, 2),
         prerequisite_points: asTextList(value.prerequisite_points),
         knowledge_path: asTextList(value.knowledge_path),
@@ -2531,6 +2532,7 @@ function normalizeTeaching(value) {
         mode: asText(value.mode) || "hint",
         mode_label: asText(value.mode_label) || "提示引导",
         confidence: asText(value.confidence) || "低",
+        classification_source: asText(value.classification_source),
         input_source: asText(value.input_source) || "文本输入"
     };
 }
@@ -2623,6 +2625,9 @@ function normalizeLearningQuestion(value) {
         category: typeof value.category === "string"
             ? value.category.trim()
             : "",
+        relatedCategories: Array.isArray(value.relatedCategories)
+            ? value.relatedCategories.filter(cat => typeof cat === "string" && cat.trim()).slice(0, 3)
+            : [],
         difficulty: ["简单", "中等", "困难"].includes(value.difficulty)
             ? value.difficulty
             : "",
@@ -2732,6 +2737,12 @@ function normalizeLearningState(value) {
                     category: typeof item.category === "string"
                         ? item.category.trim()
                         : "",
+                    relatedCategories: Array.isArray(item.relatedCategories)
+                        ? item.relatedCategories.filter(cat => typeof cat === "string" && cat.trim()).slice(0, 3)
+                        : [],
+                    classificationVersion: Number.isInteger(item.classificationVersion)
+                        ? Math.max(0, item.classificationVersion)
+                        : 0,
                     difficulty: ["简单", "中等", "困难"].includes(item.difficulty)
                         ? item.difficulty
                         : "",
@@ -3837,15 +3848,17 @@ function buildLearningQuestionFromSession(session, teaching, excludeLatest = fal
 
         return {
             text: questionText.slice(0, 3000),
-            knowledgePoints: Array.isArray(teaching?.knowledge_points)
-                ? teaching.knowledge_points.slice(0, 4)
-                : [],
+            knowledgePoints: [...new Set([
+                ...(teaching?.knowledge_points || []).slice(0, 3),
+                ...(teaching?.related_knowledge_points || []).slice(0, 2)
+            ])].slice(0, 4),
             focusPoints: Array.isArray(teaching?.focus_points)
                 ? teaching.focus_points.slice(0, 2)
                 : [],
             category: typeof teaching?.category === "string"
                 ? teaching.category
                 : "",
+            relatedCategories: teaching?.related_categories || [],
             difficulty: ["简单", "中等", "困难"].includes(teaching?.difficulty)
                 ? teaching.difficulty
                 : "",
@@ -5411,6 +5424,9 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
         knowledgePoints: info.knowledgePoints,
         focusPoints: info.focusPoints,
         category: info.category,
+        relatedCategories: info.relatedCategories || [],
+        // 新错题首次打开错题本也做统一后端复核；不盲信聊天中的初判。
+        classificationVersion: 0,
         difficulty: info.difficulty || "",
         feedback: compactFeedback(feedback),
         referenceAnswer: info.referenceAnswer || "",
@@ -5475,7 +5491,10 @@ function currentLearningQuestion(session, teaching) {
             // 当前题已经有实时分类时，以当前题为准，
             // 不再把上一道题的知识点继续混进来。
             knowledgePoints: livePoints.length
-                ? livePoints.slice(0, 4)
+                ? [...new Set([
+                    ...livePoints.slice(0, 3),
+                    ...(currentTeaching?.related_knowledge_points || []).slice(0, 2)
+                ])].slice(0, 4)
                 : saved.knowledgePoints,
             focusPoints: liveFocus.length
                 ? liveFocus.slice(0, 2)
@@ -5486,6 +5505,9 @@ function currentLearningQuestion(session, teaching) {
             )
                 ? currentTeaching.category
                 : saved.category,
+            relatedCategories: currentTeaching?.related_categories?.length
+                ? currentTeaching.related_categories
+                : (saved.relatedCategories || []),
             difficulty: currentTeaching?.difficulty
                 || saved.difficulty
                 || ""
@@ -5538,9 +5560,13 @@ function processLearningFromReply(
 
         session.learningQuestion = {
             text: generatedExercise || reply.trim().slice(0, 3000),
-            knowledgePoints: points.slice(0, 4),
+            knowledgePoints: [...new Set([
+                ...points.slice(0, 3),
+                ...(normalized.related_knowledge_points || []).slice(0, 2)
+            ])].slice(0, 4),
             focusPoints: normalized.focus_points.slice(0, 2),
             category: normalized.category,
+            relatedCategories: normalized.related_categories || [],
             difficulty: normalized.difficulty || "",
             source: "ai",
             referenceAnswer: String(
@@ -6141,44 +6167,81 @@ function updateWrongBookToolbar(allItems, visibleItems) {
     }
 }
 
-async function refreshWrongBookDifficulties() {
-    const missing = learningState.wrongQuestions.filter(
-        item => !["简单", "中等", "困难"].includes(item.difficulty)
-    );
-    if (!missing.length) return;
+let wrongBookClassificationInFlight = false;
+
+async function refreshWrongBookClassifications() {
+    if (wrongBookClassificationInFlight) return;
+    const stale = learningState.wrongQuestions.filter(item => (
+        Number(item.classificationVersion || 0) < 3
+        || isGenericTeachingCategory(item.category)
+        || !Array.isArray(item.knowledgePoints)
+        || !item.knowledgePoints.length
+        || !["简单", "中等", "困难"].includes(item.difficulty)
+    ));
+    if (!stale.length) return;
+    wrongBookClassificationInFlight = true;
 
     try {
-        const response = await fetch("/analyze-questions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                questions: missing.map(item => ({ key: item.id, text: item.question }))
-            })
-        });
-        if (!response.ok) return;
+        // /analyze-questions 每次最多处理 80 道；保留题目记录 ID，避免
+        // 跨设备同步或异步修改造成结果误写到另一道题。
+        for (let offset = 0; offset < stale.length; offset += 80) {
+            const batch = stale.slice(offset, offset + 80).map(item => ({
+                id: item.id,
+                question: item.question
+            }));
+            const response = await fetch("/analyze-questions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    questions: batch.map(item => ({ key: item.id, text: item.question })),
+                    semantic_fallback: true
+                })
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        const payload = await parseResponseJson(response);
-        const byId = new Map(
-            (payload?.results || []).map(item => [
+            const payload = await parseResponseJson(response);
+            const byId = new Map((payload?.results || []).map(item => [
                 String(item?.key || ""),
                 normalizeTeaching(item?.teaching)
-            ])
-        );
-        let changed = false;
-
-        for (const item of missing) {
-            const difficulty = byId.get(String(item.id))?.difficulty || "";
-            if (!["简单", "中等", "困难"].includes(difficulty)) continue;
-            item.difficulty = difficulty;
-            changed = true;
-        }
-
-        if (changed) {
-            saveLearningState();
-            renderWrongBook();
+            ]));
+            let changed = false;
+            for (const oldItem of batch) {
+                const item = learningState.wrongQuestions.find(q => q.id === oldItem.id);
+                // 期间如果用户编辑了题目，不用旧题干的识别结果覆盖新内容。
+                if (!item || item.question !== oldItem.question) continue;
+                const detected = byId.get(String(item.id));
+                if (!detected || isGenericTeachingCategory(detected.category)) continue;
+                item.category = detected.category;
+                item.relatedCategories = (detected.related_categories || []).slice(0, 3);
+                item.knowledgePoints = [...new Set([
+                    ...detected.knowledge_points.slice(0, 3),
+                    ...(detected.related_knowledge_points || []).slice(0, 2)
+                ])].slice(0, 4);
+                // 用户已有手动填写的“本题难点”时予以保留。
+                if (!Array.isArray(item.focusPoints) || !item.focusPoints.length) {
+                    item.focusPoints = detected.focus_points.slice(0, 2);
+                }
+                if (["简单", "中等", "困难"].includes(detected.difficulty)) {
+                    item.difficulty = detected.difficulty;
+                }
+                // 低可信本地判断仍允许下次打开错题本时重试语义复核；
+                // 避免模型暂时不可用就永久锁定错误分类。
+                const pendingReview = detected.classification_source !== "AI语义复核"
+                    && (detected.confidence === "低"
+                        || (detected.confidence === "中"
+                            && detected.related_categories.length >= 2));
+                item.classificationVersion = pendingReview ? 2 : 3;
+                changed = true;
+            }
+            if (changed) {
+                saveLearningState();
+                renderWrongBook();
+            }
         }
     } catch (error) {
-        console.warn("错题难度补齐失败：", error);
+        console.warn("错题模块与难度补齐失败：", error);
+    } finally {
+        wrongBookClassificationInFlight = false;
     }
 }
 
@@ -6189,7 +6252,7 @@ function openWrongBook() {
 
     renderWrongBook();
     modal.classList.remove("hidden");
-    void refreshWrongBookDifficulties();
+    void refreshWrongBookClassifications();
 
     // 新错题在加入时已自动准备答案；旧数据/断线后缺失答案的题目，
     // 再次打开错题本时优先补一个，避免必须点“查看答案”才启动。
@@ -6409,6 +6472,12 @@ function saveWrongEdit() {
         .filter(Boolean)
         .slice(0, 2);
 
+    if (entry.question !== question.slice(0, 3000)) {
+        entry.classificationVersion = 0;
+        entry.category = "待识别";
+        entry.relatedCategories = [];
+        entry.knowledgePoints = [];
+    }
     entry.question = question.slice(0, 3000);
     entry.focusPoints = focusPoints;
     entry.note = noteBox.value.trim().slice(0, 1500);
@@ -7898,6 +7967,13 @@ function renderWrongBook() {
             row.appendChild(valueNode);
             meta.appendChild(row);
         };
+
+        if (!isGenericTeachingCategory(item.category)) {
+            appendMetaRow("所属模块", item.category);
+        }
+        if (Array.isArray(item.relatedCategories) && item.relatedCategories.length) {
+            appendMetaRow("涉及模块", item.relatedCategories.join("、"));
+        }
 
         if (item.focusPoints.length) {
             appendMetaRow(
@@ -13266,6 +13342,16 @@ function renderChat() {
             div.insertBefore(difficultyBadge, content);
         }
 
+        const questionModule = String(difficultyTeaching?.category || "").trim();
+        if (questionModule && questionModule !== "待识别" && questionModule !== "离散数学综合") {
+            const moduleBadge = document.createElement("div");
+            moduleBadge.className = "module-badge";
+            const extraModules = difficultyTeaching.related_categories || [];
+            moduleBadge.textContent = `所属模块：${questionModule}`
+                + (extraModules.length ? ` · 涉及：${extraModules.join("、")}` : "");
+            div.insertBefore(moduleBadge, content);
+        }
+
         const actions = document.createElement("div");
         actions.className = "msg-actions";
 
@@ -13655,7 +13741,7 @@ function getEffectiveSessionTeaching(session) {
 
             return {
                 category: learningQuestion.category || "待识别",
-                related_categories: [],
+                related_categories: learningQuestion.relatedCategories || [],
                 knowledge_points: learningQuestion.knowledgePoints,
                 focus_points: learningQuestion.focusPoints,
                 prerequisite_points: [],
@@ -14129,7 +14215,7 @@ function candidateTeachingSnapshot(
     ) {
         return {
             category: saved.category || "待识别",
-            related_categories: [],
+            related_categories: saved.relatedCategories || [],
             knowledge_points: saved.knowledgePoints,
             focus_points: saved.focusPoints,
             prerequisite_points: [],
