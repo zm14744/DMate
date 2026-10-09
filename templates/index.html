@@ -2218,7 +2218,32 @@ body[data-appearance-theme="light"] .msg-actions button {
 }
 
 
-/* 图片“复制”与每条聊天的双矩形文本复制：彼此功能独立。 */
+
+/* 移动网页端的 PNG 预览：真实图片可长按，手动分享或下载；不伪称自动入相册。 */
+.dmate-png-save-dialog {
+    position:fixed;inset:0;z-index:2147483600;
+    background:rgba(0,0,0,.72);display:flex;align-items:center;
+    justify-content:center;padding:14px;box-sizing:border-box;
+}
+.dmate-png-save-panel {
+    box-sizing:border-box;width:min(550px,100%);max-height:92dvh;
+    display:flex;flex-direction:column;gap:12px;
+    border-radius:16px;padding:16px;background:var(--surface-1,#fff);
+    color:var(--text-primary,#111);box-shadow:0 16px 40px rgba(0,0,0,.25);
+}
+.dmate-png-save-panel p {margin:0;font-size:13px;line-height:1.5;color:var(--text-secondary,#666)}
+.dmate-png-save-preview {display:block;max-height:55dvh;min-height:90px;
+    width:100%;object-fit:contain;background:#fff;border-radius:8px;
+    -webkit-touch-callout:default;user-select:auto;-webkit-user-select:auto}
+.dmate-png-save-actions {display:flex;flex-wrap:wrap;gap:8px}
+.dmate-png-save-actions button,.dmate-png-save-actions a {
+    display:inline-flex;align-items:center;justify-content:center;flex:1 1 auto;
+    border-radius:8px;padding:9px 12px;background:var(--surface-3,#eee);
+    color:var(--text-primary,#111);border:1px solid var(--border,#ccc);
+    font:inherit;font-size:13px;text-decoration:none;cursor:pointer;
+}
+
+/* 图片形式复制与每条聊天的双矩形文本复制：彼此功能独立。 */
 .msg-actions .rich-copy-smart,
 .wrong-actions .rich-copy-smart {
     font:inherit;
@@ -7272,7 +7297,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <select id="knowledgeGraphCategory" aria-label="知识图谱分类"></select>
                 <button id="knowledgeGraphScopeBtn" type="button">查看本对话题目</button>
                 <button id="knowledgeGraphFocusBtn" type="button">查看完整模块</button>
-                <button id="knowledgeGraphCopyBtn" type="button" title="复制当前图谱；支持时优先写入高清图片">复制图谱</button>
+                <button id="knowledgeGraphCopyBtn" type="button" title="电脑复制图谱图片；Android 安装版保存到相册；手机网页可预览并保存">以图片形式复制</button>
             </div>
 
             <div class="graph-legend">
@@ -7315,7 +7340,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-copy-text-image-retest-20261009"></script>
+<script src="/static/script.js?v=dmate-gallery-image-save-20261009"></script>
 
 </body>
 </html>
