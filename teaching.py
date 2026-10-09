@@ -955,6 +955,29 @@ def _detect_question_type(text, mode):
     return "一般题"
 
 
+def _symmetry_counting_task(normalized):
+    """Identify orbit-counting problems by structure, not one isolated word.
+
+    Examples: bead necklaces modulo rotations/reflections, bracelets,
+    circular colourings modulo symmetry. No AI call and no math-text edits.
+    """
+    value = str(normalized or "")
+    subject = re.search(
+        r"项链|手链|珠串|珠子|串珠|环形|环状|圆环|圆周|圆桌|手镯|"
+        r"涂色|着色|染色|necklace|bracelet|colouring|coloring", value,
+        flags=re.IGNORECASE,
+    )
+    symmetry = re.search(
+        r"旋转|翻转|翻面|翻折|反射|镜像|对称|二面体|"
+        r"burnside|polya|pólya|波利亚|伯恩赛德|本质不同|等价", value,
+        flags=re.IGNORECASE,
+    )
+    count = re.search(
+        r"求|多少|几种|计数|数目|种数|共有|不同|方案|排法|着色数|涂色数", value,
+    )
+    return bool(subject and symmetry and count)
+
+
 def _estimate_difficulty(text, knowledge_points=None, question_type="一般题"):
     """
     轻量三档难度评级。
@@ -1199,6 +1222,18 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
     ):
         score = max(score, 4)
 
+    # 按旋转/反射等对称关系计数，需要按等价类（通常使用 Burnside/Polya）
+    # 分析，而不是普通排列。颜色次数等额外限制还需要再结合条件计数。
+    # 不因题面没有直接写“排列组合/伯恩赛德”就判成简单。
+    if _symmetry_counting_task(normalized):
+        score = max(score, 2)
+        constrained_colours = bool(re.search(
+            r"(?:至少|至多|恰好|正好|仅|必须|都要|均|每种|限制|次数|出现|"
+            r"不相邻|相邻|禁止|必须包含|其中.{0,18}次)", normalized
+        ))
+        if constrained_colours or subquestion_count >= 2:
+            score = max(score, 4)
+
     # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
     if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
         score += 1
@@ -1318,6 +1353,10 @@ def _extract_points(text, category):
 
     scored.sort(key=lambda item: (-item[0], item[1]))
     result = [point for _score, point in scored[:4]]
+
+    if category == "计数与组合" and _symmetry_counting_task(normalized):
+        result = ["排列与组合"] + [point for point in result if point != "排列与组合"]
+        result = result[:4]
 
     if category == "初等数论" and re.search(
         r"除以?\s*\d+.{0,16}(?:余数|余几|求余)", normalized
@@ -1533,6 +1572,17 @@ def _classify_content(text):
     scores = _score_categories(analysis_text)
     ordered = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     primary, top_score = ordered[0] if ordered else ("待识别", 0)
+
+    # Equivalent configurations of a necklace / circular colouring belong
+    # to counting, even when the problem never says “permutation/combination”.
+    if _symmetry_counting_task(_normalize(analysis_text)):
+        primary = "计数与组合"
+        top_score = max(top_score, 7)
+        ordered = sorted(
+            [(category, (7 if category == "计数与组合" else score))
+             for category, score in scores.items()],
+            key=lambda item: (-item[1], item[0]),
+        )
 
     if top_score <= 0:
         recovered = _recover_discrete_math_category(analysis_text, scores)
