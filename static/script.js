@@ -25,6 +25,8 @@ let accountState = {
 };
 let cloudSyncTimer = 0;
 let cloudApplyingSnapshot = false;
+// 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
+let cloudLocalChangeVersion = 0;
 
 function shouldPersistClientState() {
     // 游客模式完全临时：不把聊天、学习记录或外观写入持久存储。
@@ -1450,15 +1452,12 @@ function scheduleCloudSync() {
     if (cloudApplyingSnapshot) return;
 
     const meta = readCloudSyncMeta();
-    if (meta.username) {
-        writeCloudSyncMeta({ dirty:true });
-    }
-
+    if (meta.username) writeCloudSyncMeta({ dirty:true });
     if (!accountState.authenticated) return;
 
-    if (cloudSyncTimer) {
-        clearTimeout(cloudSyncTimer);
-    }
+    cloudLocalChangeVersion += 1;
+    // 修改可能发生在前一次网络上传进行中，不要漏掉后续同步。
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
     cloudSyncTimer = window.setTimeout(() => {
         cloudSyncTimer = 0;
         pushCloudSnapshot(false);
@@ -1474,18 +1473,21 @@ async function pushCloudSnapshot(force = false) {
         ? Number(meta.revision)
         : Number(accountState.revision || 0);
 
+    const submittedChangeVersion = cloudLocalChangeVersion;
+    let remoteSnapshotApplied = false;
     accountState.syncing = true;
     accountState.status = "同步中…";
     renderAccountUi();
 
     try {
+        const snapshotToSend = collectCloudSnapshot();
         const { response, data } = await accountFetch("/sync", {
             method:"PUT",
             allowConflict:true,
             body:JSON.stringify({
                 baseRevision,
                 force:Boolean(force),
-                data:collectCloudSnapshot()
+                data:snapshotToSend
             })
         });
 
@@ -1507,6 +1509,7 @@ async function pushCloudSnapshot(force = false) {
 
             backupLocalSnapshot("同步冲突前的本机数据");
             applyCloudSnapshot(data.data || {});
+            remoteSnapshotApplied = true;
             accountState.revision = Number(data.revision || 0);
             accountState.status = "已同步";
             writeCloudSyncMeta({
@@ -1520,11 +1523,12 @@ async function pushCloudSnapshot(force = false) {
         }
 
         accountState.revision = Number(data.revision || 0);
-        accountState.status = "已同步";
+        const hasNewLocalEdits = cloudLocalChangeVersion !== submittedChangeVersion;
+        accountState.status = hasNewLocalEdits ? "等待同步" : "已同步";
         writeCloudSyncMeta({
             username:accountState.username,
             revision:accountState.revision,
-            dirty:false
+            dirty:hasNewLocalEdits
         });
         return true;
     } catch (error) {
@@ -1538,6 +1542,17 @@ async function pushCloudSnapshot(force = false) {
         return false;
     } finally {
         accountState.syncing = false;
+        // 本次上传读的是旧快照。若期间又有改动，必须再上传一轮。
+        // 网络出错但没有新编辑时不忙等重试，等下次编辑/恢复网络再处理。
+        if (accountState.authenticated && !remoteSnapshotApplied
+                && cloudLocalChangeVersion !== submittedChangeVersion) {
+            writeCloudSyncMeta({ username:accountState.username, dirty:true });
+            if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+            cloudSyncTimer = window.setTimeout(() => {
+                cloudSyncTimer = 0;
+                pushCloudSnapshot(false);
+            }, CLOUD_SYNC_DEBOUNCE_MS);
+        }
         renderAccountUi();
     }
 }
@@ -1553,13 +1568,28 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         const cloudRevision = Number(data.revision || 0);
         accountState.revision = cloudRevision;
 
-        if (isNewAccount || cloudRevision === 0) {
+        const initialMeta = readCloudSyncMeta();
+        const initialSameAccount = initialMeta.username === accountState.username;
+        if (isNewAccount || (cloudRevision === 0 && initialSameAccount)) {
             writeCloudSyncMeta({
                 username:accountState.username,
                 revision:cloudRevision,
                 dirty:true
             });
-            await pushCloudSnapshot(true);
+            await pushCloudSnapshot(false);
+            return;
+        }
+        if (cloudRevision === 0) {
+            // 手机首次登录一个空账号时，不能上传此前别的账号/游客的本机数据。
+            backupLocalSnapshot("切换到新的空云账号");
+            applyCloudSnapshot({
+                sessions:{sessions:[], currentId:null},
+                learning:createEmptyLearningState(),
+                appearance:{...APPEARANCE_DEFAULTS}
+            });
+            writeCloudSyncMeta({username:accountState.username,revision:0,dirty:false});
+            accountState.status = "已同步";
+            renderAccountUi();
             return;
         }
 
@@ -1671,11 +1701,8 @@ async function submitAccountLogin() {
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = Number(data.revision || 0);
         accountState.status = "同步中…";
-        writeCloudSyncMeta({
-            username:accountState.username,
-            revision:accountState.revision,
-            dirty:false
-        });
+        // 不要在读取云端之前清空“本机有未同步编辑”的标记。
+        // resolveInitialCloudSync 会比较用户名/版本号并处理冲突。
 
         if (passwordInput) passwordInput.value = "";
         setAccountMessage("");
@@ -11682,6 +11709,13 @@ async function requestAiReply(session) {
                 { isError: true }
             );
             return;
+        }
+
+        // 已完成最多一次难度纠偏仍未达标时，明确告知用户，不能静默
+        // 把“估计中等”的题目伪装成已满足“困难”请求。
+        if (latestIsExerciseRequest && typeof data.exercise_generation_notice === "string"
+                && data.exercise_generation_notice.trim()) {
+            showCopyToast(data.exercise_generation_notice);
         }
 
         const retestHandled = processWrongQuestionRetestReply(
