@@ -1,6 +1,7 @@
 import json
 import re
 import unicodedata
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -1007,6 +1008,15 @@ def _symmetry_counting_task(normalized):
     return bool(subject and symmetry and count)
 
 
+def _constrained_binary_counting(text):
+    """同时支持「二进制串不含连续...」和「不含连续...的二进制串」。"""
+    normalized = _normalize(text)
+    return bool(
+        re.search(r"二进制串|01串|[01]串", normalized)
+        and re.search(r"(?:不含|不包含|不出现|禁止|不能出现|避免).{0,25}(?:连续|相邻|子串|模式)", normalized)
+    )
+
+
 def _estimate_difficulty(text, knowledge_points=None, question_type="一般题"):
     """
     轻量三档难度评级。
@@ -1303,6 +1313,10 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         if active_constraints >= 2 and (subquestion_count >= 2 or active_constraints >= 3):
             score = max(score, 4)
 
+    if _constrained_binary_counting(normalized):
+        # 禁止子串的变长计数通常要建状态或递推，不能按单步计数评为简单。
+        score = max(score, 2)
+
     # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
     if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
         score += 1
@@ -1320,6 +1334,17 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
 
     # 很短的概念/直接判断题保持简单，不因为术语本身被抬高。
     if question_type == "概念题" and len(normalized) <= 80:
+        score = min(score, 1)
+
+    # “列出 A×B、再求 |A×B|”虽然有两个小问，却都是同一个
+    # 笛卡尔积的基础操作，不应机械因两种动作就判中等。
+    if (
+        subquestion_count <= 2
+        and not has_multi_step_topic
+        and not has_advanced_point
+        and re.search(r"(?:写出|列出).{0,24}(?:[a-z]\s*×\s*[a-z]|\\times)", normalized)
+        and re.search(r"(?:求|计算).{0,12}\|\s*[a-z]\s*×\s*[a-z]\s*\|", normalized)
+    ):
         score = min(score, 1)
 
     if score >= 4:
@@ -1340,6 +1365,153 @@ def _keyword_weight(keyword):
         return 2
     return 1
 
+
+
+# 题目不一定直接写出“数论/组合/图论”等课程名称。
+# 先识别数学结构，再将其映射回既有的课程模块与知识图谱节点。
+# 这里全是高辨识度的模式：无法判断时应当保留待识别，不强塞“综合”。
+@lru_cache(maxsize=2048)
+def _structural_topic_evidence(text):
+    value = _normalize(text)
+    compact = re.sub(r"\s+", "", value)
+    matches = []
+
+    def add(category, point, *patterns):
+        if any(re.search(pattern, compact, re.IGNORECASE) for pattern in patterns):
+            matches.append((category, point))
+
+    # 幂取模/求余：覆盖自然中文、LaTeX、% 与标准同余写法。
+    add("初等数论", "同余与模运算",
+        r"(?:除以|被)\d+(?:所得|的|时|后)?(?:的)?(?:余数|余几|余多少|求余|取余)",
+        r"(?:余数|求余|取余|余多少).{0,45}(?:除以|模)\d+",
+        r"\\(?:pmod|bmod|mod)\{?\d+",
+        r"\bmod(?:ulo)?\(?\d+",
+        r"\d+\^\{?\d+\}?%\d+",
+        r"(?:\d+|[a-z])\s*≡.{0,55}(?:mod|模|\(mod|\\pmod)",
+        r"\d+(?:的|次)?(?:幂|次方|\^\{?\d+\}?).{0,24}(?:模\d+|除以\d+).{0,12}(?:余|结果)",
+        r"(?:模|对)\d+(?:取余|求余|的余数|取模)",
+    )
+    add("初等数论", "整除与素数",
+        r"(?:\d+|[a-z])\|(?:\d+|[a-z])",
+        r"(?:求|找|判断|列出).{0,22}(?:质因数|质数|素数|因子|因数|约数|整除)",
+    )
+    add("初等数论", "最大公因数与欧几里得算法",
+        r"(?:gcd|lcm)\s*\(", r"裴蜀|贝祖|扩展欧几里得|辗转相除",
+    )
+    add("初等数论", "欧拉定理与费马小定理",
+        r"(?:\\varphi|\\phi|φ|ϕ)\s*\(?\d+", r"欧拉函数|费马小定理",
+    )
+    add("集合与关系", "集合运算",
+        r"(?:[a-z]|\})\s*(?:∩|∪|\\cap|\\cup|⊆|⊂|\\subseteq|\\subset)\s*(?:[a-z]|\{)",
+        r"(?:幂集|求补集|对称差|求并集|求交集)",
+    )
+    add("集合与关系", "关系性质",
+        r"(?:关系r|二元关系|关系矩阵).{0,45}(?:自反|反自反|传递|对称)",
+    )
+    add("集合与关系", "偏序关系",
+        r"(?:哈斯图|hassediagram|偏序集|极大元|极小元|上界|下界|最小上界|最大下界)",
+    )
+    add("函数", "单射满射双射",
+        r"(?:单射|满射|双射|一一对应|双射映射)",
+    )
+    add("函数", "函数与映射",
+        r"[a-z]\s*:\s*[a-z]\s*(?:→|\\to|\\rightarrow)\s*[a-z]",
+    )
+    add("谓词逻辑", "量词",
+        r"∀|∃|\\forall|\\exists",
+    )
+    add("命题逻辑", "范式",
+        r"\bcnf\b|\bdnf\b|(?:主析取|主合取|极小项|极大项)",
+    )
+    add("计数与组合", "排列与组合",
+        r"(?:c|a)\s*\(?\d+\s*,\s*\d+\)?",
+        r"从\d+(?:名|个|种|件|人|本)?.{0,12}(?:中)?(?:选|挑|取)\d+(?:名|个|种|件|人|本)?",
+    )
+    add("计数与组合", "鸽巢原理",
+        r"(?:至少有|必有).{0,20}(?:相同|同一).{0,15}(?:抽屉|盒子|生日|余数)",
+    )
+    add("递推关系", "递推关系建模",
+        r"(?:a|f|t)_(?:\{?n\}?|n)=(?:(?![，。；]).){0,90}(?:a|f|t)_\{?n[-−]\d+\}?",
+        r"(?:fibonacci|斐波那契|递推数列|递归式)",
+    )
+    add("图论", "图的基本概念",
+        r"(?:顶点|结点|节点|度序列).{0,20}(?:边|度|图)",
+        r"(?:k|c|p)_?\{?\d+\}?(?:的|图|有|中)",
+    )
+    add("图论", "图同构",
+        r"(?:图|顶点|邻接).{0,45}同构|同构.{0,45}(?:图|顶点|邻接)",
+    )
+    add("图论", "邻接矩阵",
+        r"邻接矩阵|(?:a\^\{?\d+\}?).{0,28}(?:长度为\d+|通路数|路径数)",
+    )
+    add("图论", "欧拉图", r"欧拉(?:通路|路径|回路|路|图)")
+    add("图论", "哈密顿图", r"哈密顿(?:通路|路径|回路|路|图)")
+    add("图论", "最短路", r"(?:dijkstra|dijsktra|最短路径|最短路)")
+    add("图论", "最小生成树", r"(?:kruskal|prim算法|最小生成树)")
+    add("代数结构", "群与子群", r"(?:子群|循环群|陪集|群的阶|拉格朗日定理)")
+    add("代数结构", "代数系统", r"(?:封闭性|结合律|交换律|单位元|逆元).{0,20}(?:二元运算|运算\*|运算∘)")
+
+    # 不依赖教材关键词的语义结构：逻辑连接词 + 命题变元。
+    # 避免把函数 f:A→B、图的有向边误判为命题逻辑。
+    has_logic_variables = bool(re.search(r"(?<![a-z])(?:p|q|r)(?![a-z])", value))
+    logical_connectives = bool(re.search(
+        r"[∧∨¬↔⇒⇔⊕]|\\(?:land|lor|neg|lnot|leftrightarrow|implies|iff)\b|"
+        r"(?<![a-z])(?:p|q|r)\s*(?:→|->)\s*(?:p|q|r)(?![a-z])",
+        value,
+    ))
+    if has_logic_variables and logical_connectives and not re.search(r"[∀∃]|\\(?:forall|exists)", value):
+        matches.append(("命题逻辑", "逻辑联结词"))
+        if re.search(r"(?:重言|永真|等价|等值|恒真|等值式|↔|⇔|\\leftrightarrow)", value):
+            matches.append(("命题逻辑", "逻辑等价"))
+    if re.search(r"(?:重言式|矛盾式|永真式|永假式|可满足式|永真命题)", value):
+        matches.append(("命题逻辑", "命题与真值"))
+
+    # A×B 是离散数学中最常用的笛卡尔积记法；只认可大写集合名，
+    # 避免把一般的向量叉积误判为集合题。
+    if re.search(r"(?<![a-z])[a-z]\s*(?:×|\\times)\s*[a-z](?![a-z])", value, re.I) and re.search(
+        r"(?:写出|列出|元素|集合|关系|笛卡尔|有序对|a\s*×\s*b)", value, re.I
+    ):
+        matches.append(("集合与关系", "笛卡尔积与关系"))
+
+    # P(A) / 2^|A| 是幂集；P(x) 仅在有集合语境时才能算幂集。
+    if re.search(r"(?:幂集|power\s*set|(?:求|计算|写出).{0,20}p\([a-z]\))", value) and re.search(
+        r"(?:集合|子集|幂集|power\s*set|\{[^{}]*\})", value,
+    ):
+        matches.append(("集合与关系", "集合运算"))
+
+    # 鸽巢原理的自然语言：需保证/至少多少人/必有两人 同月、同天。
+    if re.search(r"(?:至少|最少|保证|确保|必然|必有).{0,32}(?:人|学生|同学|物品|球|袜子)", value) and re.search(
+        r"(?:同一|相同|一样|两人|两名|两件|两个|重复).{0,22}(?:月|月份|生日|颜色|抽屉|盒子)|"
+        r"(?:生日|月份|颜色|盒子).{0,25}(?:同一|相同|一样|两人|两名|重复)", value,
+    ):
+        matches.append(("计数与组合", "鸽巢原理"))
+    # 另一种句型：保证“有两人生日在同一月份”，主语在后。
+    if re.search(r"(?:保证|至少|最少).{0,28}(?:两人|两名).{0,25}(?:生日|月份|同月)", value):
+        matches.append(("计数与组合", "鸽巢原理"))
+
+    # 二进制串禁用相邻模式 => 有限状态/递推计数；不应默认当简单二项式题。
+    if re.search(r"(?:二进制|[01]串|01串|0-1串).{0,60}(?:不含|禁止|不出现|不能出现|不包含|避免).{0,22}(?:连续|相邻|子串|模式)", value) or re.search(
+        r"(?:不含|禁止|不出现|不包含).{0,30}(?:连续|相邻).{0,35}(?:二进制|01串|[01]串)", value,
+    ):
+        matches.append(("递推关系", "递推关系建模"))
+        matches.append(("计数与组合", "基本计数原理"))
+    if re.search(r"(?:长度为|长为|长度是|位数为)[a-z0-9]+.{0,25}(?:二进制串|01串|[01]串)", value) and re.search(
+        r"(?:个数|多少|数量|计数|方案)", value,
+    ):
+        matches.append(("计数与组合", "基本计数原理"))
+
+    # 奇偶性 / 整数整除的证明题。仅凭“证明”不能归为证明与归纳。
+    if re.search(r"(?:偶数|奇数|奇偶性|被\d+整除|整除|整数解)", value) and re.search(
+        r"(?:n\s*(?:\^\s*\{?\d+\}?|[²³])|所有整数|任意整数|恒为|必为|总为|总是)", value,
+    ):
+        matches.append(("初等数论", "整除与素数"))
+
+    # 以代数结构为问句中心。模 n 运算只是定义群/环的背景，不是主考数论。
+    if re.search(r"(?:构成|成为|是|满足|判断|证明).{0,25}(?:群|半群|子群|环|域|幺半群)|"
+                 r"(?:群|环|域).{0,25}(?:公理|封闭|逆元|单位元|结合)", value):
+        matches.append(("代数结构", "群与子群" if "群" in value else "代数系统"))
+
+    return list(dict.fromkeys(matches))
 
 def _score_categories(text):
     normalized = _normalize(text)
@@ -1367,6 +1539,10 @@ def _score_categories(text):
             if keyword.lower() in normalized:
                 score += _keyword_weight(keyword)
         scores[category] = score
+
+    # 题目型结构证据优先于简短的泛化词（如“树”“像”“群”）。
+    for category, _point in _structural_topic_evidence(text):
+        scores[category] = scores.get(category, 0) + 8
 
     # 量词符号本身就是谓词逻辑的强信号，不能被“否定/公式”等
     # 命题逻辑通用词压过去。
@@ -1401,6 +1577,32 @@ def _score_categories(text):
             scores.get("代数结构", 0) - _keyword_weight("同构"),
         )
 
+    # 分类目标优先于背景符号：例如“模4加法构成群”主模块是代数结构，
+    # “图的同构”主模块是图论，不被共用词和相关数学工具抢占。
+    algebra_goal = re.search(
+        r"(?:构成|成为|是否是|是不是|判断是否|证明.{0,8}是|满足).{0,20}(?:群|环|域|半群)"
+        r"|(?:群|环|域).{0,24}(?:公理|封闭性|结合律|逆元|单位元)", normalized,
+    )
+    if algebra_goal:
+        scores["代数结构"] = max(scores.get("代数结构", 0), max(scores.values(), default=0) + 7)
+        if not re.search(r"(?:求余|余数|同余方程|整除|素数|模逆元|费马|欧拉函数)", normalized):
+            scores["初等数论"] = min(scores.get("初等数论", 0), 2)
+
+    # 明确指定证明方法时，归纳/反证本身是主考点；递推式只是证明对象。
+    if re.search(r"(?:用|利用|采用|通过|使用).{0,6}(?:强归纳法|完全归纳法|数学归纳法|归纳法|反证法)", normalized):
+        scores["证明与归纳"] = max(scores.get("证明与归纳", 0), max(scores.values(), default=0) + 4)
+
+    # 公式重言式/命题等价属于命题逻辑；仅有“→”不能断言。
+    if re.search(r"(?:重言式|永真式|逻辑等价|等值式)", normalized) or (
+        re.search(r"[∧∨¬↔]|\\(?:land|lor|neg|leftrightarrow)", normalized)
+        and re.search(r"(?<![a-z])(?:p|q|r)(?![a-z])", normalized)
+    ):
+        scores["命题逻辑"] = max(scores.get("命题逻辑", 0), max(scores.values(), default=0) + 4)
+
+    # 递推计数的主模块是递推关系，但保留“计数与组合”为相关模块。
+    if _constrained_binary_counting(normalized):
+        scores["递推关系"] = max(scores.get("递推关系", 0), scores.get("计数与组合", 0) + 3)
+
     return scores
 
 
@@ -1422,6 +1624,13 @@ def _extract_points(text, category):
 
     scored.sort(key=lambda item: (-item[0], item[1]))
     result = [point for _score, point in scored[:4]]
+
+    # 公式/自然语言结构可以提供教材术语之外的具体知识点。
+    # 只插入当前已选择模块的节点，避免把别的模块混入知识图谱。
+    structural_points = [point for detected_category, point in _structural_topic_evidence(text)
+                         if detected_category == category]
+    if structural_points:
+        result = list(dict.fromkeys(structural_points + result))[:4]
 
     if category == "计数与组合" and _symmetry_counting_task(normalized):
         result = ["排列与组合"] + [point for point in result if point != "排列与组合"]
@@ -1668,11 +1877,15 @@ def _classify_content(text):
 
     second_score = ordered[1][1] if len(ordered) > 1 else 0
 
+    evidence_categories = {
+        category for category, _point in _structural_topic_evidence(analysis_text)
+    }
     related = [
         category
         for category, score in ordered[1:]
-        if score > 0 and score >= max(3, int(top_score * 0.55))
-    ][:2]
+        if (score >= max(4, int(top_score * 0.40))
+            and (category in evidence_categories or score >= max(6, int(top_score * 0.70))))
+    ][:3]
 
     if top_score >= 9 or (top_score >= 6 and top_score >= second_score + 3):
         confidence = "高"
@@ -1689,6 +1902,20 @@ def _classify_content(text):
         "score": top_score,
     }
 
+
+
+
+def classification_needs_semantic_fallback(teaching):
+    """有限度的高风险复核，不为正常高置信度题增加二次 AI 调用。"""
+    if not isinstance(teaching, dict):
+        return False
+    if teaching.get("category") == "待识别":
+        return True
+    # 冲突性证据且仅靠弱规则判定，交给后台语义分类判断。
+    return teaching.get("confidence") == "低" or (
+        teaching.get("confidence") == "中"
+        and len(teaching.get("related_categories") or []) >= 2
+    )
 
 def _is_image_input(text):
     lowered = str(text or "").lower()
@@ -1711,10 +1938,21 @@ def analyze_question(text):
 
     question_type = _detect_question_type(text, mode)
 
+    related_points = []
+    for related_category in classified["related_categories"]:
+        for point in _extract_points(text, related_category):
+            if point not in classified["knowledge_points"] and point not in related_points:
+                related_points.append(point)
+            if len(related_points) >= 3:
+                break
+        if len(related_points) >= 3:
+            break
+
     result = {
         "category": classified["category"],
         "related_categories": classified["related_categories"],
         "knowledge_points": classified["knowledge_points"],
+        "related_knowledge_points": related_points,
         "focus_points": focus_points,
         "question_type": question_type,
         "difficulty": _estimate_difficulty(
