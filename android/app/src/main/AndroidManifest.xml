@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- DMate v1 只需要联网。没有存储、联系人、短信、电话、定位、悬浮窗、辅助功能、VPN、安装应用等权限。 -->
+    <!-- Android 10+ 使用 MediaStore 保存至 Pictures/DMate，无需相册权限。Android 8/9 首次保存需存储授权。 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <application
         android:allowBackup="false"
