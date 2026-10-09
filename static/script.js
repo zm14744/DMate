@@ -4821,25 +4821,9 @@ async function copyChatQuestionOnly(message, session, messageIndex) {
         message, session, messageIndex
     );
     if (!question) return false;
-
-    // The old implementation copied HTML generated from raw Markdown, containing
-    // unresolved $...$ rather than already-rendered MathJax formulas.
-    const hasFormula = containsMathForCopy(question);
-    const pending = hasFormula
-        ? Promise.resolve(null)
-        : prepareTypesetQuestionCopy(question);
-    const fallback = {
-        text: readableMathClipboardText(question),
-        html: `<div class="ai-content">${markdownToHtml(
-            prepareAiDisplayText(question)
-        )}</div>`
-    };
-    const ok = await writeSmartQuestionClipboard(
-        pending, fallback, () => buildQuestionCopyElement(question),
-        hasFormula
-    );
-    if (ok && !hasFormula) showCopyToast("题目已复制");
-    return ok;
+    // “复制”始终代表视觉图片，跟题目是否包含公式无关。
+    // 纯文本复制由每条聊天都有的双矩形图标承担；不再混淆两种行为。
+    return copyRenderedImageToClipboard(() => buildQuestionCopyElement(question));
 }
 
 function shouldShowChatCopyButton(message, session, messageIndex) {
@@ -4850,6 +4834,93 @@ function shouldShowChatCopyButton(message, session, messageIndex) {
             messageIndex
         )
     );
+}
+
+// 任何一条聊天都能复制可编辑文本。只写 text/plain，杜绝 MathJax 的
+// SVG/HTML 被微信误识别为多个 .dat 附件；不修改页面的公式渲染或选区。
+async function copyChatMessageText(message, content) {
+    if (!message || !content) return false;
+    let text = "";
+    try {
+        text = clipboardPlainTextFromRoot(cloneClipboardRoot(content));
+    } catch (error) {
+        console.warn("提取已渲染聊天文本失败：", error);
+    }
+    text = String(text || readableMathClipboardText(message.text || "")).trim();
+    if (!text) {
+        showCopyToast("没有可复制的文本");
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            showCopyToast("已复制文本");
+            return true;
+        }
+    } catch (error) {
+        console.warn("文本剪贴板写入失败，尝试兼容复制：", error);
+    }
+
+    const selection = window.getSelection();
+    const oldRanges = [];
+    if (selection) {
+        for (let i = 0; i < selection.rangeCount; i += 1) {
+            oldRanges.push(selection.getRangeAt(i).cloneRange());
+        }
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.readOnly = true;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-100000px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    let ok = false;
+    try {
+        textarea.select();
+        ok = document.execCommand("copy");
+    } finally {
+        textarea.remove();
+        if (selection) {
+            selection.removeAllRanges();
+            oldRanges.forEach(range => selection.addRange(range));
+        }
+    }
+    showCopyToast(ok ? "已复制文本" : "无法访问剪贴板，请手动选择复制");
+    return ok;
+}
+
+function createChatTextCopyButton(onCopy) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "rich-copy-smart chat-text-copy";
+    button.title = "复制这条消息的可编辑文本";
+    button.setAttribute("aria-label", "复制文本");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.8");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    const back = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    back.setAttribute("x", "8"); back.setAttribute("y", "8");
+    back.setAttribute("width", "12"); back.setAttribute("height", "12");
+    back.setAttribute("rx", "2");
+    const front = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    front.setAttribute("d", "M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2");
+    svg.append(back, front);
+    button.appendChild(svg);
+    button.addEventListener("click", () => {
+        Promise.resolve(onCopy()).catch(error => {
+            console.warn("文本复制失败：", error);
+            showCopyToast("文本复制失败");
+        });
+    });
+    return button;
 }
 
 function recoverGeneratedQuestionFromAssistant(
@@ -6409,7 +6480,7 @@ function startWrongQuestionRetest(id) {
         : "错题";
 
     const visiblePrompt =
-        `给我一道包含“${targetName}”全部核心考点的中等难度复测题。`;
+        `给我一道包含“${targetName}”全部核心考点的复测题。`;
 
     const session = {
         id: idValue,
@@ -7991,16 +8062,9 @@ function renderWrongBook() {
         const actions = document.createElement("div");
         actions.className = "wrong-actions";
 
-        actions.appendChild(createSmartCopyButton(async () => {
-            const payload = buildClipboardPayload(card);
-            const hasFormula = !!card.querySelector("mjx-container")
-                || containsMathForCopy(card.textContent);
-            const ok = await writeSmartQuestionClipboard(
-                Promise.resolve(payload), payload, () => card.cloneNode(true), hasFormula
-            );
-            if (ok && !hasFormula) showCopyToast("已复制");
-            return ok;
-        }));
+        actions.appendChild(createSmartCopyButton(() =>
+            copyRenderedImageToClipboard(() => card.cloneNode(true))
+        ));
 
         if (!item.analysis) {
             const analysisButton = document.createElement("button");
@@ -9098,9 +9162,48 @@ function downloadRenderedCopyPng(blob) {
 }
 
 async function copyRenderedImageToClipboard(makeContent) {
-    // Promise<Blob> begins inside the click event to preserve clipboard
-    // activation on Chromium-based desktop and Android clients.
+    // Desktop: image/png ClipboardItem. Mobile browser: prefer native share/save
+    // sheet rather than a forced download confirmation. A website cannot silently
+    // write to Android/iOS Photos; that requires an installed native capability.
     const pngPromise = renderContentAsPngBlob(makeContent);
+    const isPhone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (isPhone) {
+        try {
+            const png = await pngPromise;
+            const file = typeof File === "function"
+                ? new File([png], "DMate-公式与题目.png", { type: "image/png" })
+                : null;
+            if (
+                file
+                &&
+                typeof navigator.share === "function"
+                && typeof navigator.canShare === "function"
+                && navigator.canShare({ files: [file] })
+            ) {
+                try {
+                    await navigator.share({ files: [file] });
+                    // The sharing target, not the web page, determines whether
+                    // the user saved, forwarded or cancelled the image.
+                    showCopyToast("已打开系统图片分享/保存界面");
+                    return true;
+                } catch (error) {
+                    if (error?.name === "AbortError") return false;
+                    console.warn("系统图片分享不可用，使用浏览器保存：", error);
+                }
+            }
+            if (downloadRenderedCopyPng(png)) {
+                showCopyToast("已发起图片保存，请按浏览器提示完成");
+                return true;
+            }
+        } catch (error) {
+            console.warn("手机端图片保存失败：", error);
+        }
+        showCopyToast("图片保存失败，请重试");
+        return false;
+    }
+
+    // Initiate clipboard write while desktop click activation is available.
     if (navigator.clipboard?.write && window.ClipboardItem) {
         try {
             await navigator.clipboard.write([new ClipboardItem({
@@ -9134,45 +9237,23 @@ async function copyRenderedImageToClipboard(makeContent) {
     return false;
 }
 
-// One copy action only. Paste targets choose their supported clipboard format.
+// The original word-labelled button always copies/saves an image.
 function createSmartCopyButton(onCopy) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "rich-copy-smart";
     button.textContent = "复制";
-    button.title = "复制题目：公式保留图片显示，普通文字保留文本格式";
+    button.title = "复制题目图片（手机端保存/分享）";
     button.addEventListener("click", () => {
         Promise.resolve(onCopy()).catch(error => console.warn("复制失败：", error));
     });
     return button;
 }
 
-// Only one copy button: a single PNG MIME for math, normal rich text for plain
-// questions. A webpage cannot detect which application will receive a paste.
+// Legacy entry point kept for existing cards; every question is now visual PNG.
 async function writeSmartQuestionClipboard(payloadPromise, fallback, makeContent, hasFormula) {
-    // 一个按钮，一个可预期的剪贴板内容。不能把 image/png、text/html、text/plain
-    // 同时放到同一 ClipboardItem：部分聊天软件会将内嵌公式粘贴成 .dat 附件。
-    // 网页无法知道未来的粘贴目标，所以只根据当前题目是否含有公式来选择格式。
-    if (hasFormula) {
-        // 数学题优先保真：整个题目写为一张 PNG（只有 image/png），
-        // 兼容不支持 MathJax/HTML 的微信类软件。绝不改动屏幕上的公式节点。
-        // 不启动无用的异步富文本渲染，避免复制时双重渲染拖慢响应。
-        Promise.resolve(payloadPromise).catch(() => {});
-        return copyRenderedImageToClipboard(makeContent);
-    }
-
-    // 普通文字题沿用原有富文本/纯文本复制。没有公式时无需截图。
-    const base = {
-        text: readableMathClipboardText(fallback?.text || ""),
-        html: String(fallback?.html || "")
-    };
-    return writeRichClipboardWhenReady(
-        Promise.resolve(payloadPromise).then(p => ({
-            ...p,
-            text: readableMathClipboardText(p?.text || base.text)
-        })),
-        base
-    );
+    Promise.resolve(payloadPromise).catch(() => {});
+    return copyRenderedImageToClipboard(makeContent);
 }
 
 function effectiveElementBackground(element) {
@@ -13123,7 +13204,8 @@ function renderChat() {
                 )
         );
 
-        if (difficultyTeaching?.difficulty) {
+        // 复测的目标难度只用于后台生成与校验，不在聊天气泡标注。
+        if (difficultyTeaching?.difficulty && !session.retest) {
             const difficultyBadge = document.createElement("div");
             difficultyBadge.className = "difficulty-badge";
             difficultyBadge.textContent = difficultyTeaching.difficulty;
@@ -13144,6 +13226,11 @@ function renderChat() {
                 () => copyChatQuestionOnly(message, session, messageIndex)
             ));
         }
+
+        // 双矩形按钮：每条聊天（用户/AI、题目/讲解/追问）均可复制文本。
+        actions.appendChild(createChatTextCopyButton(
+            () => copyChatMessageText(message, content)
+        ));
 
         if (
             shouldOfferWrongBookAction(
