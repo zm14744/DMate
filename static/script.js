@@ -9161,63 +9161,159 @@ function downloadRenderedCopyPng(blob) {
     }
 }
 
-async function copyRenderedImageToClipboard(makeContent) {
-    // Desktop: image/png ClipboardItem. Mobile browser: prefer native share/save
-    // sheet rather than a forced download confirmation. A website cannot silently
-    // write to Android/iOS Photos; that requires an installed native capability.
-    const pngPromise = renderContentAsPngBlob(makeContent);
-    const isPhone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")
-        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (isPhone) {
-        try {
-            const png = await pngPromise;
-            const file = typeof File === "function"
-                ? new File([png], "DMate-公式与题目.png", { type: "image/png" })
-                : null;
-            if (
-                file
-                &&
-                typeof navigator.share === "function"
-                && typeof navigator.canShare === "function"
-                && navigator.canShare({ files: [file] })
-            ) {
+// Android APK receives PNG over an origin-restricted WebView message channel.
+// The native side replies only after MediaStore has committed the image.
+async function savePngToAndroidGallery(blob, filename) {
+    const bridge = window.DMateGallery;
+    if (!bridge || typeof bridge.postMessage !== "function") return null;
+    if (!blob || blob.size > 20 * 1024 * 1024) {
+        return { ok: false, message: "图片超出安装版可保存的大小（20 MB）" };
+    }
+    const requestId = `png-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return new Promise(resolve => {
+        let completed = false;
+        const finish = result => {
+            if (completed) return;
+            completed = true;
+            clearTimeout(timer);
+            bridge.removeEventListener?.("message", onMessage);
+            if (bridge.onmessage === onMessage) bridge.onmessage = previousHandler;
+            resolve(result);
+        };
+        const onMessage = event => {
+            let response;
+            try { response = JSON.parse(event.data); } catch (_) { return; }
+            if (response?.id !== requestId) return;
+            finish({ ok: response.ok === true, message: String(response.message || "") });
+        };
+        const previousHandler = bridge.onmessage;
+        if (typeof bridge.addEventListener === "function") {
+            bridge.addEventListener("message", onMessage);
+        } else {
+            bridge.onmessage = event => {
+                onMessage(event);
+                if (typeof previousHandler === "function") previousHandler(event);
+            };
+        }
+        const timer = setTimeout(() => finish({ ok: false, message: "相册保存超时，请重试" }), 30000);
+        const reader = new FileReader();
+        reader.onerror = () => finish({ ok: false, message: "无法读取图片" });
+        reader.onload = () => {
+            if (completed) return;
+            try {
+                const base64 = String(reader.result || "").split(",")[1];
+                if (!base64) throw new Error("图片为空");
+                bridge.postMessage(JSON.stringify({ id: requestId, filename, base64 }));
+            } catch (error) {
+                finish({ ok: false, message: "无法发送图片至安装版" });
+            }
+        };
+        reader.readAsDataURL(blob);
+    });
+}
+
+// Websites cannot silently save into iOS/Android Photos. Present an actual
+// image that can be long-pressed, shared or downloaded by an explicit gesture.
+function showMobilePngSaveDialog(blob, filename) {
+    document.querySelector(".dmate-png-save-dialog")?.remove();
+    const url = URL.createObjectURL(blob);
+    const overlay = document.createElement("div");
+    overlay.className = "dmate-png-save-dialog";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "图片保存");
+    const panel = document.createElement("div");
+    panel.className = "dmate-png-save-panel";
+    const title = document.createElement("strong");
+    title.textContent = "图片已生成";
+    const tip = document.createElement("p");
+    tip.textContent = "网页无法直接写入手机相册。可以长按下方图片选择保存，或使用系统分享、下载图片。";
+    const preview = document.createElement("img");
+    preview.src = url;
+    preview.alt = "已生成的题目或知识图谱图片，长按可保存";
+    preview.className = "dmate-png-save-preview";
+    const actions = document.createElement("div");
+    actions.className = "dmate-png-save-actions";
+    const download = document.createElement("a");
+    download.href = url;
+    download.download = filename;
+    download.textContent = "下载 PNG";
+    download.setAttribute("role", "button");
+    download.addEventListener("click", () => showCopyToast("下载已发起，请查看浏览器下载记录"));
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "关闭";
+    const dismiss = () => {
+        if (!overlay.isConnected) return;
+        overlay.remove();
+        URL.revokeObjectURL(url);
+        document.removeEventListener("keydown", onEscape);
+    };
+    const onEscape = event => { if (event.key === "Escape") dismiss(); };
+    close.addEventListener("click", dismiss);
+    overlay.addEventListener("click", event => { if (event.target === overlay) dismiss(); });
+    actions.append(download);
+    if (typeof File === "function" && typeof navigator.share === "function") {
+        const file = new File([blob], filename, { type: "image/png" });
+        if (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] })) {
+            const share = document.createElement("button");
+            share.type = "button";
+            share.textContent = "系统分享/保存";
+            share.addEventListener("click", async () => {
                 try {
                     await navigator.share({ files: [file] });
-                    // The sharing target, not the web page, determines whether
-                    // the user saved, forwarded or cancelled the image.
-                    showCopyToast("已打开系统图片分享/保存界面");
-                    return true;
+                    showCopyToast("已打开系统分享操作，请选择保存位置");
                 } catch (error) {
-                    if (error?.name === "AbortError") return false;
-                    console.warn("系统图片分享不可用，使用浏览器保存：", error);
+                    if (error?.name !== "AbortError") showCopyToast("系统分享不可用，请长按图片保存");
                 }
-            }
-            if (downloadRenderedCopyPng(png)) {
-                showCopyToast("已发起图片保存，请按浏览器提示完成");
-                return true;
-            }
-        } catch (error) {
-            console.warn("手机端图片保存失败：", error);
+            });
+            actions.append(share);
         }
-        showCopyToast("图片保存失败，请重试");
-        return false;
     }
+    actions.append(close);
+    panel.append(title, tip, preview, actions);
+    overlay.append(panel);
+    document.body.append(overlay);
+    document.addEventListener("keydown", onEscape);
+    close.focus({ preventScroll: true });
+}
 
-    // Initiate clipboard write while desktop click activation is available.
+async function deliverRenderedPng(pngPromise, filename = "DMate-公式与题目.png") {
+    const isPhone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    // Prefer verified native album saving over sharing/downloading inside the APK.
+    if (window.DMateGallery?.postMessage) {
+        try {
+            const result = await savePngToAndroidGallery(await pngPromise, filename);
+            showCopyToast(result?.message || (result?.ok ? "已保存到相册" : "保存到相册失败"));
+            return Boolean(result?.ok);
+        } catch (error) {
+            console.warn("Android 原生保存异常：", error);
+            showCopyToast("保存到相册失败，请重试");
+            return false;
+        }
+    }
+    if (isPhone) {
+        try {
+            showMobilePngSaveDialog(await pngPromise, filename);
+            return true; // Preview opened, not a claim that Photos was modified.
+        } catch (error) {
+            console.warn("手机端图片预览失败：", error);
+            showCopyToast("生成图片失败，请重试");
+            return false;
+        }
+    }
+    // Keep the already-working Windows/Linux/macOS ClipboardItem path untouched.
     if (navigator.clipboard?.write && window.ClipboardItem) {
         try {
-            await navigator.clipboard.write([new ClipboardItem({
-                "image/png": pngPromise
-            })]);
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": pngPromise })]);
             showCopyToast("图片已复制，可粘贴至微信等应用");
             return true;
         } catch (firstError) {
             console.warn("图片剪贴板即时写入失败：", firstError);
             try {
                 const blob = await pngPromise;
-                await navigator.clipboard.write([new ClipboardItem({
-                    "image/png": blob
-                })]);
+                await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
                 showCopyToast("图片已复制，可粘贴至微信等应用");
                 return true;
             } catch (secondError) {
@@ -9227,7 +9323,7 @@ async function copyRenderedImageToClipboard(makeContent) {
     }
     try {
         if (downloadRenderedCopyPng(await pngPromise)) {
-            showCopyToast("无法直接复制图片，已下载 PNG");
+            showCopyToast("无法直接复制图片，已发起 PNG 下载");
             return true;
         }
     } catch (error) {
@@ -9237,13 +9333,18 @@ async function copyRenderedImageToClipboard(makeContent) {
     return false;
 }
 
+async function copyRenderedImageToClipboard(makeContent) {
+    return deliverRenderedPng(renderContentAsPngBlob(makeContent));
+}
+
 // The original word-labelled button always copies/saves an image.
 function createSmartCopyButton(onCopy) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "rich-copy-smart";
-    button.textContent = "复制";
-    button.title = "复制题目图片（手机端保存/分享）";
+    button.textContent = "以图片形式复制";
+    button.title = "电脑复制图片，Android 安装版保存到相册；手机网页可预览并保存";
+    button.setAttribute("aria-label", "以图片形式复制");
     button.addEventListener("click", () => {
         Promise.resolve(onCopy()).catch(error => console.warn("复制失败：", error));
     });
@@ -9523,55 +9624,7 @@ async function copyKnowledgeGraphVisual() {
         showCopyToast("当前没有可复制的图谱");
         return false;
     }
-
-    // 这里绝不再退化为文字。此前把 text/plain 同时塞进 ClipboardItem，
-    // 一些安卓浏览器/粘贴目标会优先取文字，看起来就像“复制图谱=复制文字”。
-    if (
-        navigator.clipboard?.write
-        && window.ClipboardItem
-        && (
-            typeof window.ClipboardItem.supports !== "function"
-            || window.ClipboardItem.supports("image/png")
-        )
-    ) {
-        try {
-            // Chromium 支持 Promise<Blob> 时，先在用户点击仍然有效的时刻
-            // 发起 write，避免等截图完成后丢失剪贴板权限。
-            const item = new ClipboardItem({
-                "image/png": pngPromise
-            });
-            await navigator.clipboard.write([item]);
-            showCopyToast("图谱图片已复制");
-            return true;
-        } catch (firstError) {
-            console.warn("图谱图片即时复制失败：", firstError);
-
-            // 某些浏览器不接受 Promise<Blob>，再用已经生成好的真实 Blob 试一次。
-            try {
-                const png = await pngPromise;
-                const item = new ClipboardItem({ "image/png": png });
-                await navigator.clipboard.write([item]);
-                showCopyToast("图谱图片已复制");
-                return true;
-            } catch (secondError) {
-                console.warn("图谱图片 Blob 复制失败：", secondError);
-            }
-        }
-    }
-
-    // 浏览器若根本禁止网页写图片剪贴板，就保存 PNG，而不是偷偷复制文字。
-    try {
-        const png = await pngPromise;
-        if (downloadKnowledgeGraphPng(png)) {
-            showCopyToast("浏览器不支持直接复制图片，已保存 PNG");
-            return true;
-        }
-    } catch (error) {
-        console.warn("图谱 PNG 生成失败：", error);
-    }
-
-    showCopyToast("图谱图片复制失败");
-    return false;
+    return deliverRenderedPng(pngPromise, `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`);
 }
 
 function selectionNodeElement(node) {
