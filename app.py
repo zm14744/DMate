@@ -1933,7 +1933,47 @@ def _extract_generated_question(reply):
         value
     ).strip()
 
-    return value[:6000]
+    value = value[:6000].strip()
+
+    # AI 返回“暂时无法出题”等拒绝/故障文字时，绝不能把它登记成题目。
+    # 标题【题目】本身不能证明内容是题目；必须同时有可执行的数学任务。
+    if len(value) < 7:
+        return ""
+    if re.search(
+        r"^(?:抱歉|对不起|很抱歉|无法|不能|暂时不能|暂时无法|出题失败|生成失败|"
+        r"没有可用题目|未能生成|目前没有|请稍后|请重试|服务异常|错误[:：]|error\b)",
+        value,
+        flags=re.IGNORECASE,
+    ):
+        return ""
+    if re.search(
+        r"(?:无法|不能|未能|暂时).{0,16}(?:生成|提供|给出|出).{0,8}(?:题目|练习题|题)"
+        r"|(?:请重新出题|请稍后重试|服务暂时不可用)",
+        value[:180],
+    ):
+        return ""
+    if re.search(r"^(?:好的|没问题|收到)[！!。，,\s]*$", value):
+        return ""
+    # 避免把用户的“出一道难题”命令回声、知识点介绍或闲聊存入错题本。
+    # 对纯符号、选择/填空、证明/构造、图论和自然语言题面均保留兼容。
+    has_action = bool(re.search(
+        r"(?:求|计算|证明|求证|判断|判定|确定|写出|列出|找出|求解|解出|"
+        r"构造|设计|画出|标出|绘制|给出|推导|枚举|统计|化简|转换|化为|填写|"
+        r"选择|选出|试问|问[:：]?|回答下列|回答以下|以下哪|下列哪|"
+        r"是否|多少(?:个|种|条|次)?|几种|几条|几人|有几|使得|满足)",
+        value,
+    ))
+    has_math_context = bool(re.search(
+        r"(?:集合|关系|函数|映射|图|树|顶点|边|整数|素数|质数|同余|"
+        r"整除|矩阵|代数|群|环|序列|数列|递推|排列|组合|计数|鸽巢|"
+        r"逻辑|真值|谓词|命题|元素|路径|回路|概率|算法|公式|方程|"
+        r"gcd|lcm|最短路|欧拉|哈密顿|\\[a-zA-Z]+|"
+        r"[A-Za-z]\s*(?:\^|_|=|∈|\()|\d+)",
+        value,
+    ))
+    if not (has_action and (has_math_context or len(value) >= 24)):
+        return ""
+    return value
 
 
 def _clean_answer_only(text):
@@ -2258,11 +2298,24 @@ def chat():
         or server_detected_exercise
     )
 
+    # 只对独立出题采用本轮请求。避免把几十轮历史题目交给模型，
+    # 造成串题、额外 token 和意外耗时。同知识点复测仍保留结构化参照题。
+    # 如果客户端显式提供参照题，前面已组装成单条带锚点的请求。
+    explicit_topic_teaching = None
+    if effective_exercise_request and not reference_teaching:
+        if normalized_action_for_exercise:
+            explicit_topic_teaching = analyze_question(normalized_action_for_exercise)
+        if latest_user_before_reference is not None:
+            cleaned = [{
+                "role": "user",
+                "content": latest_user_before_reference["content"],
+            }]
+
     # 明确难度要求与内部默认难度必须区分。内部默认只用于提示 AI，
     # 不能作为拒绝正常生成题目的硬约束。
     explicit_exercise_difficulty = ""
     if effective_exercise_request:
-        teaching = dict(reference_teaching or teaching or {})
+        teaching = dict(reference_teaching or explicit_topic_teaching or teaching or {})
         requested_difficulty = _requested_exercise_difficulty(
             normalized_action_for_exercise
         )
@@ -2395,183 +2448,154 @@ def chat():
         generated_question = ""
 
         if is_exercise_request:
-            visible_reply, generated_answer = _split_exercise_answer(
-                reply
+            # 一份候选题只能通过统一的校验后登记：
+            # 有真实可作答的题干、参照知识点相符、独立出题未偏离显式学科。
+            # 两次候选共用这套验证，避免错误提示/偏题内容绕过检查。
+            requested_category = str(
+                (explicit_topic_teaching or {}).get("category") or ""
+            ).strip()
+            requested_points = set(
+                str(item).strip() for item in
+                (explicit_topic_teaching or {}).get("knowledge_points", [])
+                if str(item).strip()
+            )
+            is_narrow_topic = bool(
+                requested_points
+                and requested_category not in ("", "待识别")
+                and not re.fullmatch(
+                    r"(?:出|来|给|考).{0,10}(?:离散数学|数论|图论|集合|逻辑|关系|函数|计数|递推|代数)(?:题|练习|题目)?",
+                    normalized_action_for_exercise or "",
+                )
+            )
+            # 广泛的“图论/数论”请求不要求命中某个具体前置知识点；
+            # 用户明确说了“邻接矩阵/同构/中国剩余定理”等才校验具体考点。
+            explicit_topic_terms = (
+                "邻接矩阵", "图同构", "中国剩余定理", "模逆", "前束范式",
+                "真值表", "欧拉", "哈密顿", "最短路", "最小生成树",
+                "关系矩阵", "关系的幂", "传递闭包", "二部图", "拓扑排序",
+                "生成函数", "鸽巢", "容斥", "数学归纳", "费马小定理",
+                "同余方程", "递推", "群同态", "置换", "函数复合",
+            )
+            is_narrow_topic = is_narrow_topic and any(
+                word in (normalized_action_for_exercise or "")
+                for word in explicit_topic_terms
             )
 
-            generated_answer = _clean_answer_only(
-                generated_answer
+            def evaluate(candidate_reply):
+                if not isinstance(candidate_reply, str):
+                    return None, "AI 没有返回题目文本"
+                visible, hidden_answer = _split_exercise_answer(candidate_reply)
+                question_text = _extract_generated_question(visible)
+                if not question_text:
+                    return None, "AI 返回的不是可作答的数学题"
+                try:
+                    info = analyze_question(question_text)
+                except Exception as analyze_exc:
+                    print("出题分析异常：", repr(analyze_exc))
+                    return None, "题目分析失败"
+                if not isinstance(info, dict):
+                    return None, "题目分类结果无效"
+                if reference_teaching:
+                    matches, reason = _exercise_reference_matches(reference_teaching, info)
+                    if not matches:
+                        return None, reason
+                if requested_category not in ("", "待识别"):
+                    generated_category = str(info.get("category") or "").strip()
+                    if generated_category not in ("", "待识别", requested_category):
+                        return None, "生成题偏离指定学科"
+                    if is_narrow_topic and generated_category == requested_category:
+                        generated_points = set(
+                            str(point).strip() for point in
+                            (info.get("focus_points") or []) + (info.get("knowledge_points") or [])
+                            if str(point).strip()
+                        )
+                        if generated_points and requested_points.isdisjoint(generated_points):
+                            return None, "生成题偏离指定知识点"
+                return {
+                    "reply": candidate_reply,
+                    "question": question_text,
+                    "answer": _clean_answer_only(hidden_answer),
+                    "teaching": info,
+                }, ""
+
+            first_candidate, first_error = evaluate(reply)
+            chosen_candidate = first_candidate
+            target_difficulty = teaching.get("exercise_target_difficulty") or "中等"
+            rank = {"简单": 0, "中等": 1, "困难": 2}
+
+            first_level = (first_candidate or {}).get("teaching", {}).get("difficulty")
+            # 纠偏与修补共用唯一的第二次生成机会。
+            needs_retry = not first_candidate or (
+                first_level in rank
+                and target_difficulty in rank
+                and first_level != target_difficulty
             )
+            if needs_retry:
+                reason = first_error or (
+                    f"首次候选难度估计为{first_level}，而目标为{target_difficulty}"
+                )
+                print("练习生成进行一次质量纠偏：", reason)
+                retry_messages = list(cleaned[-1:])
+                # 不要复用大段聊天历史；有参照题时保留前面准备好的带参照请求。
+                retry_messages.append({
+                    "role": "user",
+                    "content": (
+                        f"上一次生成没有通过题目检查：{reason}。"
+                        f"请重新设计一题符合{target_difficulty}难度的离散数学题。"
+                        "必须保持用户指定的学科/知识点及参照题的核心考点。"
+                        "困难题要有非平凡的结构分析或计数/证明，"
+                        "中等题应有紧密相关的两到三步推理，简单题只需基础操作。"
+                        "请先在内部自行验证题目可解、条件完整、答案一致，不展示自检。"
+                        "严格只输出【题目】题干及[[WRONGBOOK_ANSWER]]答案[[/WRONGBOOK_ANSWER]]。"
+                    ),
+                })
+                retry_context = dict(teaching)
+                retry_context["difficulty"] = (
+                    "简单" if target_difficulty == "简单" else "中等"
+                )
+                try:
+                    retry_result = ask_ai(
+                        retry_messages,
+                        retries=0,
+                        teaching_context=retry_context,
+                    )
+                except Exception as retry_exc:
+                    print("练习纠偏失败：", repr(retry_exc))
+                    retry_result = None
+                if isinstance(retry_result, dict) and retry_result.get("ok") is True:
+                    second_candidate, second_error = evaluate(retry_result.get("reply"))
+                    if second_candidate:
+                        second_level = second_candidate["teaching"].get("difficulty")
+                        if chosen_candidate is None:
+                            chosen_candidate = second_candidate
+                        elif second_level in rank and first_level in rank:
+                            if abs(rank[second_level] - rank[target_difficulty]) < abs(rank[first_level] - rank[target_difficulty]):
+                                chosen_candidate = second_candidate
+                    else:
+                        print("第二次练习未通过校验：", second_error)
 
-            generated_question = _extract_generated_question(
-                visible_reply
-            )
-
-            # 强元数据兜底：本轮既然明确是出题请求，就不允许出现
-            # “题目已经显示，但 generated_question 没登记”的状态。
-            # 如果模型没有按标题格式输出，直接把清理后的可见正文登记为题干。
-            if not generated_question:
-                generated_question = str(visible_reply or "").strip()[:6000]
-
-            if not generated_question:
+            if chosen_candidate is None:
+                # 不把拒绝出题、服务故障文案或跨学科内容登记为真实练习。
                 return jsonify({
-                    "error": "练习题生成结果缺少有效题干，请重新出题。",
-                    "teaching": teaching
+                    "error": (first_error + "请重新出题。") if first_error else "这次没有生成有效题目，请重新出题。",
+                    "teaching": teaching,
                 }), 502
 
-            try:
-                generated_teaching = analyze_question(
-                    generated_question
-                )
-            except Exception as exc:
-                print("AI 生成题知识识别失败：", repr(exc))
-                return jsonify({
-                    "error": "练习题已经生成，但题目登记失败，请重新出题。",
-                    "teaching": teaching
-                }), 500
-
-            if not isinstance(generated_teaching, dict):
-                return jsonify({
-                    "error": "练习题已经生成，但题目分类无效，请重新出题。",
-                    "teaching": teaching
-                }), 500
-
-            # 阻止已能明确分类的跨课程串题进入聊天和错题本。
-            # 分类不能替代数学核验；分类未知时不据此断言模型出错。
-            if reference_teaching:
-                reference_ok, reference_error = _exercise_reference_matches(
-                    reference_teaching,
-                    generated_teaching,
-                )
-                if not reference_ok:
-                    return jsonify({
-                        "error": reference_error + "请重新生成。",
-                        "teaching": teaching,
-                    }), 502
-
-            # 题目难度来自启发式估计，不是可作为拒题依据的数学判定。
-            # 未明确要求难度时（例如“出一道初级数论题”），直接接受有效题目；
-            # 用户明确要求难度时，最多尝试一次调整，但仍不能因估计不符吞掉题目。
-            target_difficulty = teaching.get("exercise_target_difficulty")
+            reply = chosen_candidate["reply"]
+            generated_question = chosen_candidate["question"]
+            generated_answer = chosen_candidate["answer"]
+            generated_teaching = chosen_candidate["teaching"]
             actual_difficulty = generated_teaching.get("difficulty")
-
-            # 默认目标是中等：明显偏简单和偏困难都应尝试纠偏一次。
-            # 否则“随便出一道题”几乎总会接受第一道简单题。
-            # 但评级属于估计，只尝试一次，不能因此丢弃已经生成的题目。
-            retry_for_difficulty = bool(
-                target_difficulty in ("简单", "中等", "困难")
-                and actual_difficulty in ("简单", "中等", "困难")
-                and actual_difficulty != target_difficulty
-                # 同知识点复测也必须遵循默认中等；不允许跳过纠偏。
-            )
-            if retry_for_difficulty:
-                matched_difficulty = False
-
-                for retry_index in range(1):
-                    # 难度纠偏只保留当前动作/参照题，不再把整段聊天历史重新送一遍；
-                    # 同时把“思考强度”和“目标难度”解耦：系统提示仍严格要求目标难度，
-                    # 纠偏只在第一次候选明显不符时发生：简单题仍用 none，
-                    # 中等/困难题统一用 high 做一次可靠纠偏；正常一次命中时没有额外延迟。
-                    retry_messages = list(cleaned[-1:])
-                    retry_messages.append({
-                        "role": "user",
-                        "content": (
-                            "上一道候选练习的实际步骤/综合程度与目标不匹配。"
-                            f"只重写题目，目标必须为‘{target_difficulty}’难度。"
-                            "保持当前学科和核心知识点；中等题必须有连续两三步推理，不能是一眼一步题；"
-                            "困难题必须有明显结构分析或非平凡计数/构造，不能只换大数字；"
-                            "简单题则保持单一基础动作。"
-                            "输出前在内部自检难度，不要写自检过程。"
-                            "仍严格使用【题目】和隐藏答案格式。"
-                        ),
-                    })
-                    retry_context = dict(teaching)
-                    retry_context["exercise_target_difficulty"] = target_difficulty
-                    retry_context["difficulty"] = (
-                        "简单" if target_difficulty == "简单" else "中等"
-                    )
-
-                    try:
-                        retry_result = ask_ai(
-                            retry_messages,
-                            retries=0,  # 纠偏本身只有一次机会，禁止内部再重试拖长等待。
-                            teaching_context=retry_context,
-                        )
-                    except Exception as exc:
-                        print(
-                            "练习难度自动重生成异常：",
-                            repr(exc),
-                        )
-                        break
-
-                    if not isinstance(retry_result, dict) or not retry_result.get("ok"):
-                        break
-
-                    retry_reply = retry_result.get("reply", "")
-                    if not isinstance(retry_reply, str) or not retry_reply.strip():
-                        continue
-
-                    retry_visible, retry_answer = _split_exercise_answer(
-                        retry_reply
-                    )
-                    retry_answer = _clean_answer_only(retry_answer)
-                    retry_question = _extract_generated_question(
-                        retry_visible
-                    )
-                    if not retry_question:
-                        retry_question = str(retry_visible or "").strip()[:6000]
-                    if not retry_question:
-                        continue
-
-                    try:
-                        retry_teaching = analyze_question(
-                            retry_question
-                        )
-                    except Exception as exc:
-                        print(
-                            "练习难度重生成后的题目分析失败：",
-                            repr(exc),
-                        )
-                        continue
-
-                    if not isinstance(retry_teaching, dict):
-                        continue
-
-                    if reference_teaching:
-                        reference_ok, _reference_error = _exercise_reference_matches(
-                            reference_teaching,
-                            retry_teaching,
-                        )
-                        if not reference_ok:
-                            continue
-
-                    retry_difficulty = retry_teaching.get("difficulty")
-                    if retry_difficulty not in ("简单", "中等", "困难"):
-                        continue
-
-                    rank = {"简单": 0, "中等": 1, "困难": 2}
-                    previous_gap = abs(rank.get(actual_difficulty, 1) - rank[target_difficulty])
-                    retry_gap = abs(rank[retry_difficulty] - rank[target_difficulty])
-                    # 第二题即使仍不完全匹配，只要确实更接近要求也优先使用。
-                    # 始终保留可用题目，不恢复早前会吞题的严格拦截。
-                    if retry_gap < previous_gap:
-                        reply = retry_reply
-                        generated_answer = retry_answer
-                        generated_question = retry_question
-                        generated_teaching = retry_teaching
-                        actual_difficulty = retry_difficulty
-                    matched_difficulty = retry_gap == 0
-                    if matched_difficulty:
-                        print(f"练习难度已在第 {retry_index + 1} 次纠偏后匹配：{target_difficulty}")
-                    break
-
-                if not matched_difficulty:
-                    # 保留第一次通过题目/知识点校验的有效生成结果。
-                    # 分类器的难度只是参考，不能让“出题”变成反复重试的死循环。
-                    print(
-                        "生成题难度估计与用户目标不同，保留有效题目："
-                        f"目标={target_difficulty}，估计={actual_difficulty}"
-                    )
+            if actual_difficulty != target_difficulty:
+                # 难度估计只是启发式，不能硬给简单题贴“困难”标签；
+                # 也不能无限制重试阻塞用户。把偏差以独立字段返回给前端。
+                print(f"生成题难度未完全匹配：目标={target_difficulty}，估计={actual_difficulty}")
+                generation_note = (
+                    f"目标为{target_difficulty}，当前题目估计为{actual_difficulty}；"
+                    "已尝试一次纠偏。"
+                )
+            else:
+                generation_note = ""
 
             # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
             reply = (
@@ -2587,6 +2611,9 @@ def chat():
 
         if generated_teaching:
             response["generated_teaching"] = generated_teaching
+
+        if is_exercise_request and generation_note:
+            response["exercise_generation_notice"] = generation_note
 
         if generated_question:
             response["generated_question"] = generated_question
