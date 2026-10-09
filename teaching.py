@@ -671,6 +671,14 @@ def normalize_user_request_text(text):
         value,
     )
 
+    # 输入法误字：“出一道很难得题目”中的“得”应作结构助词“的”。
+    # 限定为难度修饰语紧邻“题/题目”，不能把普通的“难得”一词全局改掉。
+    value = re.sub(
+        r"(很难|非常难|特别难|困难|高难)得(?=题目|题)",
+        r"\1的",
+        value,
+    )
+
     # 先长词后短词，避免“初级数论”被先拆成“数论”。
     for term in sorted(_REQUEST_FUZZY_TERMS, key=len, reverse=True):
         value = _fuzzy_replace_once(value, term)
@@ -1169,6 +1177,25 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         and re.search(r"(?:所有|全部|任意).{0,6}(?:点对|顶点对|两点)", normalized)
         and re.search(r"(?:负权|负边|负权边)", normalized)
         and re.search(r"(?:证明|说明|验证).{0,8}(?:正确|正确性|为何)", normalized)
+    ):
+        score = max(score, 4)
+
+    # 图谱分析 + 矩阵树定理是两类相互依赖的计算，不能仅凭“两小问”
+    # 把完整拉普拉斯谱与生成树计数的组合题判作普通中等题。
+    if (
+        re.search(r"拉普拉斯|laplacian", normalized)
+        and re.search(r"特征值|特征向量|谱", normalized)
+        and re.search(r"矩阵树定理|生成树", normalized)
+    ):
+        score = max(score, 4)
+
+    # 关系满足多个公理限制时，同时优化 |R| 并枚举所有极值配置，
+    # 涉及极值结构与非平凡计数；与仅检查自反/对称/传递性区别开。
+    if (
+        "关系" in normalized
+        and re.search(r"(?:最大值|最小值|最大|最小|最多|最少|极值)", normalized)
+        and re.search(r"(?:共有多少|多少个|个数|数量|计数|多少种|多少个关系)", normalized)
+        and re.search(r"(?:自反|对称|传递|反对称|等价关系|偏序)", normalized)
     ):
         score = max(score, 4)
 
