@@ -957,6 +957,11 @@ def _reasoning_effort_for_context(teaching_context):
             return override
     difficulty = str(context.get("difficulty", "")).strip()
     if difficulty == "困难":
+        # 生成题的参考答案已存在时，这轮只需严谨解释与复核；
+        # 避免 max 把整个输出预算耗在内部推理，导致有 reasoning 却无正文。
+        if (context.get("mode") == "full_solution"
+                and str(context.get("solution_reference_answer") or "").strip()):
+            return "high"
         return "max"
     if difficulty == "中等":
         return "high"
@@ -1065,6 +1070,7 @@ def _request_text_completion(
 
     last_status = None
     last_error = None
+    saw_empty_body = False
 
     for provider_index, provider in enumerate(providers):
         # 有后备线路时，优先线路只尝试一次：失败就立即切换，
@@ -1197,6 +1203,7 @@ def _request_text_completion(
                         f"reasoning_len="
                         f"{len(reasoning_content) if isinstance(reasoning_content, str) else 0}"
                     )
+                    saw_empty_body = True
                     if provider.get("id") == "luxin":
                         _luxin_breaker_open("返回正文为空")
                     break
@@ -1259,9 +1266,17 @@ def _request_text_completion(
                 f"{providers[provider_index + 1]['name']}。"
             )
 
+    if saw_empty_body:
+        return {
+            "ok": False,
+            "empty_body": True,
+            "error": "AI 只生成了内部推理，未输出解答正文。",
+        }
+
     if last_status is not None:
         return {
             "ok": False,
+            "status_code": last_status,
             "error": _friendly_http_error(last_status),
         }
 
@@ -1440,7 +1455,20 @@ $$
     if not clean_messages:
         return _failure("没有检测到有效的消息内容。")
 
-    system_content = SYSTEM_PROMPT + teaching_prompt(teaching_context)
+    context = teaching_context or {}
+    system_content = SYSTEM_PROMPT + teaching_prompt(context)
+    if context.get("mode") == "full_solution":
+        reference = str(context.get("solution_reference_answer") or "").strip()[:1200]
+        if reference:
+            # 参考答案源于出题时的本地缓存，未经独立证明，必须复核。
+            system_content += (
+                "\n【本题生成时保存的参考答案（可能有误，仅供交叉核对）】\n"
+                + reference + "\n【参考答案结束】\n"
+                "你必须独立推导并检查是否与参考答案一致。"
+                "如果发现参考答案错误，应明确纠正，不能迎合错误答案。"
+                "学生要求完整解析：逐小问给结论和必要证明或计算步骤，"
+                "最后输出清晰的最终答案，禁止只输出内部思考。"
+            )
     api_messages = [
         {"role": "system", "content": system_content}
     ] + clean_messages
@@ -1451,11 +1479,28 @@ $$
     elif reasoning_effort == "high":
         print("检测到中等题：启用 high 思考模式。")
 
+    is_full_solution = context.get("mode") == "full_solution"
+    # 普通聊天的旧重试策略不变；完整解答避免在 max/high 超时后再自动重复数轮。
     result = _request_text_completion(
         api_messages,
-        retries=retries,
+        retries=0 if is_full_solution else retries,
         reasoning_effort=reasoning_effort,
     )
+    if is_full_solution and not result.get("ok") and (
+        result.get("empty_body") or result.get("status_code") in (429, 500, 502, 503, 504)
+        or not result.get("status_code")
+    ):
+        # 只补救一次：关闭 thinking 以强制留下可呈现的正文。
+        print("完整解析首次无有效正文，尝试一次非思考模式恢复。")
+        fallback = _request_text_completion(
+            api_messages,
+            retries=0,
+            reasoning_effort="none",
+            max_tokens=min(MAX_OUTPUT_TOKENS, 4500),
+            timeout=(8, 45),
+        )
+        if fallback.get("ok"):
+            result = fallback
     if not result.get("ok"):
         return _failure(
             result.get("error")
@@ -1478,7 +1523,7 @@ $$
             api_messages,
             content,
             preferred_provider=provider_id,
-            reasoning_effort=reasoning_effort,
+            reasoning_effort="none" if is_full_solution else reasoning_effort,
         )
 
     content = _repair_common_latex_typos(content)
@@ -1489,7 +1534,7 @@ $$
             api_messages,
             content,
             preferred_provider=provider_id,
-            reasoning_effort=reasoning_effort,
+            reasoning_effort="none" if is_full_solution else reasoning_effort,
         )
 
         if regenerated:
