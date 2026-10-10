@@ -884,6 +884,7 @@ const wrongAnalysisLoadingIds = new Set();
 let knowledgeGraphData = null;
 let knowledgeGraphFilter = "";
 let knowledgeGraphViewMode = "focus";
+let knowledgeGraphDesktopScale = 1;
 let knowledgeGraphScope = "current";
 let knowledgeGraphSelectedNodeId = "";
 let knowledgeGraphHistoryMessageIndex = null;
@@ -15015,15 +15016,18 @@ function fillKnowledgeGraphCategoryOptions() {
         knowledgeGraphFilter = "全部";
     }
 
-    select.innerHTML = "";
-
-    for (const value of categories) {
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = value;
-        option.selected = value === knowledgeGraphFilter;
-        select.appendChild(option);
+    // 不在每次切换视图时重建 select，避免浏览器重新计算工具栏宽度。
+    const existing = [...select.options].map(option => option.value);
+    if (existing.length !== categories.length
+        || existing.some((value, index) => value !== categories[index])) {
+        select.replaceChildren(...categories.map(value => {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = value;
+            return option;
+        }));
     }
+    if (select.value !== knowledgeGraphFilter) select.value = knowledgeGraphFilter;
 }
 
 
@@ -15484,12 +15488,12 @@ function updateKnowledgeGraphScopeButton() {
     const button = document.getElementById("knowledgeGraphScopeBtn");
     const legend = document.getElementById("knowledgeGraphLegendRelated");
     if (button) {
-        button.textContent = "本题关联";
-        button.title = "只显示当前题目涉及的知识点及其直接前后联系";
+        button.textContent = "最近一题关联";
+        button.title = "显示当前正在讨论的最近一道题目，及其直接前置与后续知识";
         button.classList.toggle("active", knowledgeGraphViewMode === "focus");
         button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "focus"));
     }
-    if (legend) legend.textContent = "本题相关知识";
+    if (legend) legend.textContent = "最近一题相关知识";
 }
 
 // 两个固定含义的按钮，不再套用「当前/本对话」和「聚焦/完整」两层切换。
@@ -15689,7 +15693,7 @@ function updateKnowledgeGraphModeButton() {
     const button = document.getElementById("knowledgeGraphFocusBtn");
     if (!button) return;
     button.textContent = "全部知识";
-    button.title = "显示所有知识点及全部前置关系，可按模块单独筛选";
+    button.title = "显示完整知识图谱的全部节点与关系线；可使用模块下拉框筛选";
     button.classList.toggle("active", knowledgeGraphViewMode === "full");
     button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "full"));
 }
@@ -16227,6 +16231,63 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     });
 }
 
+// 桌面图谱始终按真实尺寸绘制，由独立画布处理缩放与二维滚动。
+// 改变缩放只更新 transform，不重新生成节点、关系线或知识点详情。
+function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const surface = canvas?.querySelector(".kg-desktop-zoom-surface");
+    const stage = surface?.querySelector(".kg-desktop-zoom-stage");
+    if (!canvas || !surface || !stage) return;
+
+    const baseWidth = Number(stage.dataset.baseWidth) || 1;
+    const baseHeight = Number(stage.dataset.baseHeight) || 1;
+    const previous = Number(surface.dataset.scale) || 1;
+    const next = Math.max(0.2, Math.min(2.5, Number(value) || 1));
+    const anchorX = keepCenter ? (canvas.scrollLeft + canvas.clientWidth / 2) / previous : 0;
+    const anchorY = keepCenter ? (canvas.scrollTop + canvas.clientHeight / 2) / previous : 0;
+
+    knowledgeGraphDesktopScale = next;
+    surface.dataset.scale = String(next);
+    surface.style.width = `${Math.ceil(baseWidth * next)}px`;
+    surface.style.height = `${Math.ceil(baseHeight * next)}px`;
+    stage.style.transform = `scale(${next})`;
+    if (keepCenter) {
+        canvas.scrollLeft = Math.max(0, anchorX * next - canvas.clientWidth / 2);
+        canvas.scrollTop = Math.max(0, anchorY * next - canvas.clientHeight / 2);
+    }
+    const label = document.getElementById("knowledgeGraphDesktopZoomLabel");
+    if (label) label.textContent = `${Math.round(next * 100)}%`;
+}
+
+function fitKnowledgeGraphDesktop() {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const stage = canvas?.querySelector(".kg-desktop-zoom-stage");
+    if (!canvas || !stage) return;
+    const width = Number(stage.dataset.baseWidth) || 1;
+    const height = Number(stage.dataset.baseHeight) || 1;
+    const fitted = Math.min(1, (canvas.clientWidth - 48) / width, (canvas.clientHeight - 48) / height);
+    setKnowledgeGraphDesktopScale(fitted, false);
+    canvas.scrollLeft = 0;
+    canvas.scrollTop = 0;
+}
+
+function installKnowledgeGraphDesktopZoom() {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const zoomOut = document.getElementById("knowledgeGraphDesktopZoomOut");
+    const zoomIn = document.getElementById("knowledgeGraphDesktopZoomIn");
+    const zoomFit = document.getElementById("knowledgeGraphDesktopZoomFit");
+    if (!canvas || !zoomOut || !zoomIn || !zoomFit || canvas.dataset.zoomWired === "1") return;
+    canvas.dataset.zoomWired = "1";
+    zoomOut.addEventListener("click", () => setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale / 1.2));
+    zoomIn.addEventListener("click", () => setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale * 1.2));
+    zoomFit.addEventListener("click", fitKnowledgeGraphDesktop);
+    canvas.addEventListener("wheel", event => {
+        if (!event.ctrlKey || !canvas.querySelector(".kg-desktop-zoom-stage")) return;
+        event.preventDefault();
+        setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale * (event.deltaY < 0 ? 1.12 : 0.89));
+    }, { passive: false });
+}
+
 function renderKnowledgeGraphSection(container, nodes, title, description, context) {
     const section = document.createElement("div");
     section.className = "kg-section";
@@ -16483,7 +16544,20 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         svg.appendChild(group);
     }
 
-    section.appendChild(svg);
+    // 注意不对 SVG 用 width:100%：整张大图会被压缩到容器宽度，文字小且滚动布局抖动。
+    const surface = document.createElement("div");
+    surface.className = "kg-desktop-zoom-surface";
+    const stage = document.createElement("div");
+    stage.className = "kg-desktop-zoom-stage";
+    stage.dataset.baseWidth = String(svgWidth);
+    stage.dataset.baseHeight = String(svgHeight);
+    stage.style.width = `${svgWidth}px`;
+    stage.style.height = `${svgHeight}px`;
+    svg.style.width = `${svgWidth}px`;
+    svg.style.height = `${svgHeight}px`;
+    stage.appendChild(svg);
+    surface.appendChild(stage);
+    section.appendChild(surface);
     container.appendChild(section);
 }
 
@@ -16936,8 +17010,6 @@ function renderKnowledgeGraph() {
     renderKnowledgeGraphSummary(context);
     knowledgeGraphPreparedPngPromise = null;
     knowledgeGraphPreparedPngKey = "";
-    canvas.innerHTML = "";
-
     if (!knowledgeGraphData.nodes.length) {
         canvas.innerHTML = (
             '<div class="kg-empty">知识图谱目前还是空的。</div>'
@@ -16982,7 +17054,7 @@ function renderKnowledgeGraph() {
                             )
                             : (
                                 visibleNodes.length < fullNodes.length
-                                    ? `本题关联 · ${visibleNodes.length} 个知识点`
+                                    ? `最近一题关联 · ${visibleNodes.length} 个知识点`
                                     : "当前没有可进一步收缩的题目上下文，显示当前模块。"
                             )
                     )
@@ -16996,9 +17068,11 @@ function renderKnowledgeGraph() {
 
     const mobileGraph = window.matchMedia?.("(max-width: 760px)")?.matches;
 
+    // 离线构造 DOM，完成后一次性替换，避免清空画布导致布局横跳。
+    const fragment = document.createDocumentFragment();
     if (mobileGraph) {
         renderMobileKnowledgeGraphSection(
-            canvas,
+            fragment,
             visibleNodes,
             knowledgeGraphFilter || "知识图谱",
             description,
@@ -17006,16 +17080,23 @@ function renderKnowledgeGraph() {
         );
     } else {
         renderKnowledgeGraphSection(
-            canvas,
+            fragment,
             visibleNodes,
             knowledgeGraphFilter || "知识图谱",
             description,
             context
         );
     }
+    canvas.replaceChildren(fragment);
+    if (!mobileGraph) {
+        setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale, false);
+        canvas.scrollLeft = 0;
+        canvas.scrollTop = 0;
+    }
 
     renderKnowledgeGraphSide();
-    scheduleKnowledgeGraphPngPreparation();
+    // 不预先生成高分辨率 PNG。只有点“以图片形式复制”才渲染，
+    // 否则每次切换模块会触发 html2canvas 占用主线程，并临时撑开页面宽度。
 }
 
 
@@ -18380,6 +18461,8 @@ document.addEventListener(
                 }
             );
         }
+
+        installKnowledgeGraphDesktopZoom();
 
         if (knowledgeGraphCategory) {
             knowledgeGraphCategory.addEventListener(
