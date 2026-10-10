@@ -1466,93 +1466,199 @@ function scheduleCloudSync() {
     renderAccountUi();
 }
 
-async function pushCloudSnapshot(force = false) {
+// 自动同步采用按 ID 合并 + 云端修订号 CAS，不再弹出“覆盖本地/云端”选择框。
+// 会话若在不同设备上从同一位置分叉，则保留两条分支，避免任何一边聊天记录丢失。
+function cloudMessageKey(message) {
+    return `${message?.role || ""}\u0000${message?.text || ""}`;
+}
+
+function mergeCloudMessage(left, right) {
+    const merged = { ...left, ...right };
+    // 旧设备的分析结果可能较少；不应抹掉已有的题目/参考答案。
+    for (const key of [
+        "generatedQuestion", "generatedAnswer", "generatedTeaching",
+        "questionTeaching", "apiText", "targetQuestionFingerprint"
+    ]) {
+        if (!merged[key] && left?.[key]) merged[key] = left[key];
+    }
+    return merged;
+}
+
+function cloudHash(value) {
+    const text = JSON.stringify(value);
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index++) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+}
+
+function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
+    const local = localSnapshot && typeof localSnapshot === "object" ? localSnapshot : {};
+    const remote = remoteSnapshot && typeof remoteSnapshot === "object" ? remoteSnapshot : {};
+    const localSessions = Array.isArray(local.sessions?.sessions) ? local.sessions.sessions : [];
+    const remoteSessions = Array.isArray(remote.sessions?.sessions) ? remote.sessions.sessions : [];
+    const resultSessions = remoteSessions.map(item => ({ ...item }));
+    const byId = new Map(resultSessions.map((item, index) => [String(item.id), index]));
+    const branchMap = new Map();
+
+    for (const localSession of localSessions) {
+        if (!localSession || localSession.id === undefined || localSession.id === null) continue;
+        const key = String(localSession.id);
+        if (!byId.has(key)) {
+            byId.set(key, resultSessions.length);
+            resultSessions.push(localSession);
+            continue;
+        }
+        const index = byId.get(key);
+        const cloudSession = resultSessions[index];
+        const localMessages = Array.isArray(localSession.messages) ? localSession.messages : [];
+        const cloudMessages = Array.isArray(cloudSession.messages) ? cloudSession.messages : [];
+        const shared = Math.min(localMessages.length, cloudMessages.length);
+        const prefixMatches = Array.from({length:shared}, (_, i) => i)
+            .every(i => cloudMessageKey(localMessages[i]) === cloudMessageKey(cloudMessages[i]));
+        if (prefixMatches) {
+            const longer = localMessages.length >= cloudMessages.length ? localMessages : cloudMessages;
+            resultSessions[index] = {
+                ...cloudSession,
+                ...localSession,
+                messages: longer.map((message, i) => (
+                    i < shared ? mergeCloudMessage(cloudMessages[i], localMessages[i]) : message
+                )),
+                // 某一边更长，通常表示该边新增了消息；以它的题目上下文为准。
+                teaching: (localMessages.length >= cloudMessages.length ? localSession : cloudSession).teaching,
+                learningQuestion: (localMessages.length >= cloudMessages.length ? localSession : cloudSession).learningQuestion,
+                retest: (localMessages.length >= cloudMessages.length ? localSession : cloudSession).retest
+            };
+        } else {
+            // 不同设备同时修改同一会话时，不应选择性丢弃另一端的消息。
+            // 用稳定分支 ID 避免再次合并时重复产生相同会话。
+            const suffix = cloudHash(localMessages.map(cloudMessageKey));
+            const branchId = `${key}-sync-${suffix}`;
+            const duplicate = resultSessions.some(item => (
+                String(item.id) === branchId
+                || (String(item.id).startsWith(`${key}-sync-`)
+                    && JSON.stringify(item.messages || []) === JSON.stringify(localMessages))
+            ));
+            if (!duplicate) {
+                resultSessions.push({ ...localSession, id:branchId, name:`${localSession.name || "对话"}（另一设备）` });
+            }
+            branchMap.set(key, branchId);
+        }
+    }
+
+    const localLearning = local.learning || {};
+    const remoteLearning = remote.learning || {};
+    const byEvent = new Map();
+    const remoteEvents = Array.isArray(remoteLearning.events) ? remoteLearning.events : [];
+    const localEvents = Array.isArray(localLearning.events) ? localLearning.events : [];
+    for (const event of [...remoteEvents, ...localEvents]) {
+        if (!event || !event.id) continue;
+        byEvent.set(String(event.id), event);
+    }
+    const byWrong = new Map();
+    const remoteWrong = Array.isArray(remoteLearning.wrongQuestions) ? remoteLearning.wrongQuestions : [];
+    const localWrong = Array.isArray(localLearning.wrongQuestions) ? localLearning.wrongQuestions : [];
+    for (const item of [...remoteWrong, ...localWrong]) {
+        if (!item || !item.id) continue;
+        const key = String(item.id);
+        const previous = byWrong.get(key);
+        if (!previous) {
+            byWrong.set(key, item);
+            continue;
+        }
+        const newer = Number(item.updatedAt || 0) >= Number(previous.updatedAt || 0) ? item : previous;
+        const older = newer === item ? previous : item;
+        const merged = { ...older, ...newer };
+        for (const field of ["question", "answer", "analysis", "referenceAnswer", "note", "feedback"]) {
+            if (!merged[field] && older[field]) merged[field] = older[field];
+        }
+        byWrong.set(key, merged);
+    }
+    const events = [...byEvent.values()]
+        .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))
+        .slice(-1000);
+    const wrongQuestions = [...byWrong.values()]
+        .sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0))
+        .slice(-MAX_WRONG_QUESTIONS);
+
+    const localId = local.sessions?.currentId;
+    const resolvedCurrentId = branchMap.get(String(localId)) || localId;
+    const currentId = resultSessions.some(item => String(item.id) === String(resolvedCurrentId))
+        ? resolvedCurrentId
+        : (resultSessions.some(item => String(item.id) === String(remote.sessions?.currentId))
+            ? remote.sessions.currentId : resultSessions[0]?.id ?? null);
+
+    return {
+        schemaVersion:1,
+        sessions:{sessions:resultSessions, currentId},
+        learning:{version:Math.max(8, Number(localLearning.version || 0), Number(remoteLearning.version || 0)),
+            events, wrongQuestions},
+        appearance: local.appearance || remote.appearance || {...APPEARANCE_DEFAULTS}
+    };
+}
+
+async function pushCloudSnapshot(_legacyForce = false) {
     if (!accountState.authenticated || accountState.syncing) return false;
 
     const meta = readCloudSyncMeta();
-    const baseRevision = Number.isFinite(Number(meta.revision))
-        ? Number(meta.revision)
-        : Number(accountState.revision || 0);
-
+    let revision = Number.isFinite(Number(meta.revision))
+        ? Number(meta.revision) : Number(accountState.revision || 0);
     const submittedChangeVersion = cloudLocalChangeVersion;
-    let remoteSnapshotApplied = false;
+    let snapshotToSend = collectCloudSnapshot();
+    let mergedWithRemote = false;
+    let successful = false;
     accountState.syncing = true;
     accountState.status = "同步中…";
     renderAccountUi();
 
     try {
-        const snapshotToSend = collectCloudSnapshot();
-        const { response, data } = await accountFetch("/sync", {
-            method:"PUT",
-            allowConflict:true,
-            body:JSON.stringify({
-                baseRevision,
-                force:Boolean(force),
-                data:snapshotToSend
-            })
-        });
-
-        if (response.status === 409 && data?.conflict) {
-            accountState.syncing = false;
-            const overwrite = window.confirm(
-                "云端数据已在其他设备更新。\n\n确定：用本设备数据覆盖云端\n取消：使用云端最新数据"
-            );
-
-            if (overwrite) {
-                accountState.revision = Number(data.revision || 0);
-                writeCloudSyncMeta({
-                    username:accountState.username,
-                    revision:accountState.revision,
-                    dirty:true
-                });
-                return await pushCloudSnapshot(true);
-            }
-
-            backupLocalSnapshot("同步冲突前的本机数据");
-            applyCloudSnapshot(data.data || {});
-            remoteSnapshotApplied = true;
-            accountState.revision = Number(data.revision || 0);
-            accountState.status = "已同步";
-            writeCloudSyncMeta({
-                username:accountState.username,
-                revision:accountState.revision,
-                dirty:false
+        for (let attempt = 0; attempt < 5; attempt++) {
+            // 永远不用 force=true；服务端按用户隔离并用版本号防止覆盖其它设备更新。
+            const {response, data} = await accountFetch("/sync", {
+                method:"PUT", allowConflict:true,
+                body:JSON.stringify({baseRevision:revision, force:false, data:snapshotToSend})
             });
-            renderAccountUi();
-            showCopyToast("已加载云端最新数据");
+            if (response.status === 409 && data?.conflict) {
+                backupLocalSnapshot("云同步自动合并前");
+                snapshotToSend = mergeCloudSnapshots(snapshotToSend, data.data || {});
+                revision = Number(data.revision || 0);
+                mergedWithRemote = true;
+                continue;
+            }
+            const latestRevision = Number(data.revision || 0);
+            const hadNewEdits = cloudLocalChangeVersion !== submittedChangeVersion;
+            if (mergedWithRemote || hadNewEdits) {
+                // 上传期间还在输入时，先合并当前编辑，再将下一轮增量继续同步。
+                const present = collectCloudSnapshot();
+                const merged = mergeCloudSnapshots(present, snapshotToSend);
+                applyCloudSnapshot(merged);
+            }
+            accountState.revision = latestRevision;
+            const dirty = hadNewEdits;
+            accountState.status = dirty ? "等待同步" : "已同步";
+            writeCloudSyncMeta({username:accountState.username, revision:latestRevision, dirty});
+            successful = true;
             return true;
         }
-
-        accountState.revision = Number(data.revision || 0);
-        const hasNewLocalEdits = cloudLocalChangeVersion !== submittedChangeVersion;
-        accountState.status = hasNewLocalEdits ? "等待同步" : "已同步";
-        writeCloudSyncMeta({
-            username:accountState.username,
-            revision:accountState.revision,
-            dirty:hasNewLocalEdits
-        });
-        return true;
+        throw new Error("云端更新频繁，稍后将自动再次合并");
     } catch (error) {
         console.warn("云同步失败：", error);
         accountState.status = "离线，稍后自动同步";
-        writeCloudSyncMeta({
-            username:accountState.username,
-            revision:baseRevision,
-            dirty:true
-        });
+        writeCloudSyncMeta({username:accountState.username, revision, dirty:true});
         return false;
     } finally {
         accountState.syncing = false;
-        // 本次上传读的是旧快照。若期间又有改动，必须再上传一轮。
-        // 网络出错但没有新编辑时不忙等重试，等下次编辑/恢复网络再处理。
-        if (accountState.authenticated && !remoteSnapshotApplied
-                && cloudLocalChangeVersion !== submittedChangeVersion) {
-            writeCloudSyncMeta({ username:accountState.username, dirty:true });
+        if (accountState.authenticated && (
+            cloudLocalChangeVersion !== submittedChangeVersion || !successful && mergedWithRemote
+        )) {
+            writeCloudSyncMeta({username:accountState.username, dirty:true});
             if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
             cloudSyncTimer = window.setTimeout(() => {
                 cloudSyncTimer = 0;
                 pushCloudSnapshot(false);
-            }, CLOUD_SYNC_DEBOUNCE_MS);
+            }, successful ? CLOUD_SYNC_DEBOUNCE_MS : 4000);
         }
         renderAccountUi();
     }
@@ -1606,17 +1712,14 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             await pushCloudSnapshot(false);
             return;
         } else if (localDirty && localRevision !== cloudRevision) {
-            const overwrite = window.confirm(
-                "本设备和云端都有未合并的更新。\n\n确定：保留本设备并覆盖云端\n取消：使用云端数据"
-            );
-            if (overwrite) {
-                accountState.revision = cloudRevision;
-                writeCloudSyncMeta({ revision:cloudRevision, dirty:true });
-                await pushCloudSnapshot(true);
-                return;
-            }
-            backupLocalSnapshot("登录同步冲突前的本机数据");
-            applyCloudSnapshot(data.data || {});
+            // 本设备与其它设备均有改动：自动合并，并用当前云端修订号安全上传。
+            // 不询问覆盖，也不抹掉任一端独立的聊天或错题。
+            backupLocalSnapshot("登录后自动合并同步前");
+            const merged = mergeCloudSnapshots(collectCloudSnapshot(), data.data || {});
+            applyCloudSnapshot(merged);
+            writeCloudSyncMeta({username:accountState.username, revision:cloudRevision, dirty:true});
+            await pushCloudSnapshot(false);
+            return;
         } else if (cloudRevision > localRevision) {
             applyCloudSnapshot(data.data || {});
         }
@@ -9459,10 +9562,38 @@ function buildKnowledgeGraphImageCopyTarget() {
     const canvas = document.getElementById("knowledgeGraphCanvas");
     if (!canvas) return null;
 
-    const mobileStage = canvas.querySelector?.(".kg-mobile-stage");
+    // 手机端默认只显示“完整查看”入口，不会预先创建 .kg-mobile-stage。
+    // 用户直接点复制时，在屏幕外临时构建同一份图谱，避免要求先点完整查看。
+    let temporaryHost = null;
+    let mobileStage = canvas.querySelector?.(".kg-mobile-stage");
     const svg = canvas.querySelector?.(".kg-svg");
+    if (!mobileStage && !svg && window.matchMedia?.("(max-width: 760px)")?.matches
+            && knowledgeGraphData?.nodes?.length) {
+        temporaryHost = document.createElement("div");
+        temporaryHost.className = "knowledge-graph-canvas kg-copy-temporary-host";
+        temporaryHost.style.cssText = "position:absolute;left:-10000px;top:0;width:360px;pointer-events:none;";
+        document.body.appendChild(temporaryHost);
+        try {
+            const context = getActiveKnowledgeContext();
+            const nodes = knowledgeGraphViewMode === "focus"
+                ? knowledgeGraphFocusedNodes(knowledgeGraphFilter, context)
+                : knowledgeGraphVisibleNodes(knowledgeGraphFilter);
+            renderMobileKnowledgeGraphSection(
+                temporaryHost, nodes, knowledgeGraphFilter || "知识图谱", "", context,
+                { forCopy: true }
+            );
+            mobileStage = temporaryHost.querySelector(".kg-mobile-stage");
+        } catch (error) {
+            console.warn("准备移动端图谱复制失败：", error);
+            temporaryHost.remove();
+            return null;
+        }
+    }
     const source = mobileStage || svg;
-    if (!source) return null;
+    if (!source) {
+        temporaryHost?.remove();
+        return null;
+    }
 
     let width = 1;
     let height = 1;
@@ -9566,6 +9697,7 @@ function buildKnowledgeGraphImageCopyTarget() {
 
     wrapper.appendChild(clone);
     document.body.appendChild(wrapper);
+    temporaryHost?.remove();
     return wrapper;
 }
 
@@ -9577,7 +9709,14 @@ function knowledgeGraphCopyKey() {
     const mobileStage = canvas?.querySelector?.(".kg-mobile-stage");
     const svg = canvas?.querySelector?.(".kg-svg");
     const source = mobileStage || svg;
-    if (!source) return "";
+    // 手机普通入口不创建图谱 DOM，但图谱数据仍在；缓存键使用数据与筛选状态。
+    if (!source) {
+        if (!window.matchMedia?.("(max-width: 760px)")?.matches
+                || !knowledgeGraphData?.nodes?.length) return "";
+        return [knowledgeGraphFilter || "全部", knowledgeGraphViewMode,
+            knowledgeGraphScope, knowledgeGraphData.nodes.length,
+            knowledgeGraphSelectedNodeId || ""].join("|");
+    }
 
     return [
         knowledgeGraphFilter || "全部",
@@ -9615,9 +9754,17 @@ async function renderKnowledgeGraphPngBlob() {
             || 1
         );
 
+        // 完整知识图谱很高；手机端限定导出总像素数，防止内存峰值过大。
+        const pixelBudget = window.matchMedia?.("(max-width: 760px)")?.matches
+            ? 12000000 : 32000000;
+        const exportScale = Math.min(
+            2,
+            window.devicePixelRatio || 1.5,
+            Math.sqrt(pixelBudget / Math.max(1, exportWidth * exportHeight))
+        );
         const renderedCanvas = await window.html2canvas(target, {
             backgroundColor: effectiveElementBackground(target),
-            scale: Math.min(2, window.devicePixelRatio || 1.5),
+            scale: exportScale,
             useCORS: true,
             logging: false,
             width: exportWidth,
@@ -9699,9 +9846,18 @@ function downloadKnowledgeGraphPng(blob) {
 }
 
 async function copyKnowledgeGraphVisual() {
+    // 不以 DOM 中是否存在图谱节点作为“有无知识图谱”的依据：
+    // 未进入完整查看时，移动端节点是故意不渲染的。
+    if (!knowledgeGraphData?.nodes?.length) {
+        try { await ensureKnowledgeGraphData(); } catch (_error) {}
+    }
+    if (!knowledgeGraphData?.nodes?.length) {
+        showCopyToast("知识图谱尚未加载完成，请稍后重试");
+        return false;
+    }
     const pngPromise = prepareKnowledgeGraphPng();
     if (!pngPromise) {
-        showCopyToast("当前没有可复制的图谱");
+        showCopyToast("图谱图片准备失败，请重试");
         return false;
     }
     return deliverRenderedPng(pngPromise, `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`);
@@ -15950,7 +16106,7 @@ function computeKnowledgeGraphLevels(nodes) {
     return memo;
 }
 
-function renderMobileKnowledgeGraphSection(container, nodes, title, description, context) {
+function renderMobileKnowledgeGraphSection(container, nodes, title, description, context, options = {}) {
     const section = document.createElement("div");
     section.className = "kg-section kg-mobile-section";
 
@@ -15983,7 +16139,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     });
     section.appendChild(expandButton);
 
-    if (!isExpanded) {
+    if (!isExpanded && !options.forCopy) {
         // 不再渲染非完整查看的小图：只保留进入原有完整查看的入口。
         section.classList.add("kg-mobile-entry-only");
         container.appendChild(section);
@@ -16208,6 +16364,8 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     section.appendChild(viewport);
     container.appendChild(section);
     updateMobileGraphEdgeEmphasis(section, knowledgeGraphSelectedNodeId);
+
+    if (options.forCopy) return;
 
     installMobileGraphInteraction(
         viewport,
