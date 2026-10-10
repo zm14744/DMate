@@ -379,6 +379,25 @@ def _repair_common_latex_typos(text):
     return repaired
 
 
+def _strip_markdown_code_for_math_checks(text):
+    """代码示例中的 $、下标、LaTeX 不属于数学公式渲染错误。"""
+    value = re.sub(r"```[\s\S]*?```", " ", str(text or ""))
+    return re.sub(r"`[^`\n]*`", " ", value)
+
+
+def _backslash_math_delimiters_balanced(text):
+    r"""与 $...$ 并行支持 MathJax 常用的 \( ... \) 和 \[ ... \]。"""
+    tokens = re.findall(r"\\[\(\)\[\]]", text)
+    stack = []
+    matches = {r"\)": r"\(", r"\]": r"\["}
+    for token in tokens:
+        if token in (r"\(", r"\["):
+            stack.append(token)
+        elif not stack or stack.pop() != matches[token]:
+            return False
+    return not stack
+
+
 def _math_delimiters_balanced(text):
     """
     检查 $...$ 与 $$...$$ 是否成对。
@@ -387,6 +406,7 @@ def _math_delimiters_balanced(text):
     if not isinstance(text, str):
         return False
 
+    text = _strip_markdown_code_for_math_checks(text)
     mode = None
     index = 0
     length = len(text)
@@ -477,16 +497,13 @@ def _has_naked_chinese_in_math(content):
 
 
 def _remove_math_for_plaintext_checks(text):
-    plain = re.sub(
-        r"\$\$[\s\S]*?\$\$",
-        "",
-        text
-    )
-    plain = re.sub(
-        r"\$(?!\$)(?:\\.|[^$\n])+\$",
-        "",
-        plain
-    )
+    # 支持两套同样合法的 MathJax 定界符，避免把 \(a_{ij}\)
+    # 等正确数学表达式误报为裸 LaTeX，再发起昂贵的重生成。
+    plain = _strip_markdown_code_for_math_checks(text)
+    plain = re.sub(r"\\\[[\s\S]*?\\\]", " ", plain)
+    plain = re.sub(r"\\\([\s\S]*?\\\)", " ", plain)
+    plain = re.sub(r"\$\$[\s\S]*?\$\$", " ", plain)
+    plain = re.sub(r"\$(?!\$)(?:\\.|[^$\n])+\$", " ", plain)
     return plain
 
 
@@ -501,18 +518,34 @@ def _looks_like_broken_math(text):
         r"\*\$",
     )
 
-    if any(re.search(pattern, text) for pattern in suspicious_patterns):
+    if any(re.search(pattern, _strip_markdown_code_for_math_checks(text))
+           for pattern in suspicious_patterns):
         return True
 
     if not _math_delimiters_balanced(text):
         return True
 
+    stripped = _strip_markdown_code_for_math_checks(text)
+    if not _backslash_math_delimiters_balanced(stripped):
+        return True
+
+    # begin/end 必须成对，但不要扫描 fenced code 块中的示例。
+    environments = re.findall(r"\\(begin|end)\{([A-Za-z*]+)\}", stripped)
+    env_stack = []
+    for kind, name in environments:
+        if kind == "begin":
+            env_stack.append(name)
+        elif not env_stack or env_stack.pop() != name:
+            return True
+    if env_stack:
+        return True
+
     # 分段定义被错误压成一行：
     # 例如 a_{ij}=\{1, 条件, 0, \text{否则}\}
     pseudo_piecewise = re.search(
-        r"=\s*\\?\{\s*[^$]{0,500}(?:否则|otherwise)[^$]{0,200}",
-        text,
-        flags=re.IGNORECASE | re.DOTALL
+        r"=\s*\\?\{[^$\n]{0,240}(?:否则|otherwise)[^$\n]{0,80}",
+        stripped,
+        flags=re.IGNORECASE
     )
 
     if pseudo_piecewise and r"\begin{cases}" not in text:
@@ -1188,10 +1221,14 @@ def _request_text_completion(
                         if isinstance(message, dict)
                         else None
                     )
+                    usage = result.get("usage") if isinstance(result.get("usage"), dict) else {}
                     print(
                         f"{provider['name']} 返回正文为空；"
                         f"reasoning_len="
-                        f"{len(reasoning_content) if isinstance(reasoning_content, str) else 0}"
+                        f"{len(reasoning_content) if isinstance(reasoning_content, str) else 0}；"
+                        f"finish_reason={choice.get('finish_reason')}；"
+                        f"completion_tokens={usage.get('completion_tokens', '未知')}；"
+                        f"token_limit={payload.get('max_tokens', '未指定')}"
                     )
                     saw_empty_body = True
                     if provider.get("id") == "luxin":
@@ -1483,11 +1520,22 @@ $$
     ):
         # 只补救一次：关闭 thinking 以强制留下可呈现的正文。
         print("完整解析首次无有效正文，尝试一次非思考模式恢复。")
+        # 首次 high 推理只返回 reasoning_content 时，明确要求恢复一份可展示的
+        # 最终解答（不是继续推理），避免再次用同一提示生成空正文。
+        recovery_messages = list(api_messages) + [{
+            "role": "user",
+            "content": (
+                "上一轮没有产生可展示的最终答案。现在请直接给出本题的最终解答正文，"
+                "逐小问给出结论、必要证明和验算；不要输出内部推理、过程说明或道歉。"
+                "使用规范数学公式并确保所有公式定界符闭合。"
+                "答案可以精炼，但不能省略关键推导。"
+            ),
+        }]
         fallback = _request_text_completion(
-            api_messages,
+            recovery_messages,
             retries=0,
             reasoning_effort="none",
-            max_tokens=min(MAX_OUTPUT_TOKENS, 4500),
+            max_tokens=min(MAX_OUTPUT_TOKENS, 5000),
             timeout=(8, 45),
         )
         if fallback.get("ok"):
@@ -1520,7 +1568,7 @@ $$
     content = _repair_common_latex_typos(content)
 
     if _looks_like_broken_math(content) and not is_exercise_generation:
-        print("检测到 AI 数学格式异常，尝试自动重生成。")
+        print("检测到无法由本地规则直接修复的数学格式异常，尝试一次重写。")
         regenerated = _regenerate_broken_math_answer(
             api_messages,
             content,
