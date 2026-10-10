@@ -14939,21 +14939,10 @@ function fillKnowledgeGraphCategoryOptions() {
 
     const baseCategories = getKnowledgeGraphCategories();
 
-    const categories = (
-        knowledgeGraphScope === "conversation"
-            ? ["全部", ...baseCategories]
-            : baseCategories
-    );
+    const categories = ["全部", ...baseCategories];
 
-    if (
-        !knowledgeGraphFilter
-        || !categories.includes(knowledgeGraphFilter)
-    ) {
-        knowledgeGraphFilter = (
-            knowledgeGraphScope === "conversation"
-                ? "全部"
-                : (baseCategories[0] || "")
-        );
+    if (!knowledgeGraphFilter || !categories.includes(knowledgeGraphFilter)) {
+        knowledgeGraphFilter = "全部";
     }
 
     select.innerHTML = "";
@@ -15321,7 +15310,8 @@ function openKnowledgeGraph() {
     if (!modal) return;
 
     modal.classList.remove("hidden");
-    setKnowledgeGraphFullscreenView(false);
+    // 手机只保留完整画布，不再进入一块需要二次放大的普通预览。
+    setKnowledgeGraphFullscreenView(Boolean(window.matchMedia?.("(max-width: 760px)")?.matches));
     renderKnowledgeGraphLoading(
         "知识图谱加载中…"
     );
@@ -15337,21 +15327,11 @@ function openKnowledgeGraph() {
             );
 
             const context = getCurrentKnowledgeContext();
-            const categories = getKnowledgeGraphCategories();
-
-            if (
-                context.category
-                && categories.includes(context.category)
-            ) {
-                knowledgeGraphFilter = context.category;
-                knowledgeGraphViewMode = "focus";
-            } else if (
-                !knowledgeGraphFilter
-                || !categories.includes(knowledgeGraphFilter)
-            ) {
-                knowledgeGraphFilter = categories[0] || "";
-                knowledgeGraphViewMode = "full";
-            }
+            // 有具体题目时突出题目相关，没有题目时直接显示全部知识。
+            knowledgeGraphFilter = "全部";
+            knowledgeGraphViewMode = (
+                context.focusPoints?.length || context.knowledgePoints?.length
+            ) ? "focus" : "full";
 
             fillKnowledgeGraphCategoryOptions();
             updateKnowledgeGraphScopeButton();
@@ -15422,49 +15402,37 @@ function setKnowledgeGraphFilter(value) {
 
     const context = getActiveKnowledgeContext();
 
-    // 当前题目模式下切换别的模块，默认展开完整模块。
-    // 本对话模式允许继续在某个模块内查看本对话涉及的知识。
-    if (
-        knowledgeGraphScope === "current"
-        && next !== context.category
-    ) {
-        knowledgeGraphViewMode = "full";
-    }
-
+    // 直接选模块就是浏览这个模块的全部知识，避免与“本题关联”混淆。
+    knowledgeGraphScope = "current";
+    knowledgeGraphViewMode = "full";
+    updateKnowledgeGraphScopeButton();
     updateKnowledgeGraphModeButton();
     renderKnowledgeGraph();
 }
 
 function updateKnowledgeGraphScopeButton() {
-    const button = document.getElementById(
-        "knowledgeGraphScopeBtn"
-    );
-    const legend = document.getElementById(
-        "knowledgeGraphLegendRelated"
-    );
-
+    const button = document.getElementById("knowledgeGraphScopeBtn");
+    const legend = document.getElementById("knowledgeGraphLegendRelated");
     if (button) {
-        if (knowledgeGraphScope === "conversation") {
-            button.textContent = "只看当前题目";
-            button.title = "切回当前最后一道题";
-        } else if (knowledgeGraphScope === "history") {
-            button.textContent = "回到当前题目";
-            button.title = "退出历史题查看，回到当前最后一道题";
-        } else {
-            button.textContent = "查看本对话题目";
-            button.title = "把本对话前面做过的题目一起汇总到图谱";
-        }
+        button.textContent = "本题关联";
+        button.title = "只显示当前题目涉及的知识点及其直接前后联系";
+        button.classList.toggle("active", knowledgeGraphViewMode === "focus");
+        button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "focus"));
     }
+    if (legend) legend.textContent = "本题相关知识";
+}
 
-    if (legend) {
-        if (knowledgeGraphScope === "conversation") {
-            legend.textContent = "本对话相关";
-        } else if (knowledgeGraphScope === "history") {
-            legend.textContent = "历史题相关";
-        } else {
-            legend.textContent = "本题相关";
-        }
-    }
+// 两个固定含义的按钮，不再套用「当前/本对话」和「聚焦/完整」两层切换。
+function selectKnowledgeGraphDisplayMode(mode) {
+    if (!knowledgeGraphData) return;
+    knowledgeGraphScope = "current";
+    knowledgeGraphHistoryMessageIndex = null;
+    knowledgeGraphViewMode = mode === "full" ? "full" : "focus";
+    // 视图与模块筛选互不干扰，切换按钮不清除用户选中的模块。
+    if (!knowledgeGraphFilter) knowledgeGraphFilter = "全部";
+    knowledgeGraphSelectedNodeId = "";
+    fillKnowledgeGraphCategoryOptions();
+    renderKnowledgeGraph();
 }
 
 
@@ -15648,35 +15616,12 @@ async function refreshKnowledgeHistoryPanel() {
 
 
 function updateKnowledgeGraphModeButton() {
-    const button = document.getElementById(
-        "knowledgeGraphFocusBtn"
-    );
-
+    const button = document.getElementById("knowledgeGraphFocusBtn");
     if (!button) return;
-
-    if (knowledgeGraphViewMode === "focus") {
-        if (knowledgeGraphScope === "conversation") {
-            button.textContent = "查看完整范围";
-            button.title = "展开当前筛选范围的全部知识点";
-        } else if (knowledgeGraphScope === "history") {
-            button.textContent = "查看完整模块";
-            button.title = "展开这道历史题所在模块的全部知识点";
-        } else {
-            button.textContent = "查看完整模块";
-            button.title = "展开当前模块的全部知识点";
-        }
-    } else {
-        if (knowledgeGraphScope === "conversation") {
-            button.textContent = "聚焦本对话";
-            button.title = "只显示本对话题目涉及的知识点";
-        } else if (knowledgeGraphScope === "history") {
-            button.textContent = "聚焦这道历史题";
-            button.title = "只显示这道历史题直接相关的知识点";
-        } else {
-            button.textContent = "聚焦当前题目";
-            button.title = "只显示与当前题目直接相关的知识点";
-        }
-    }
+    button.textContent = "全部知识";
+    button.title = "显示所有知识点及全部前置关系，可按模块单独筛选";
+    button.classList.toggle("active", knowledgeGraphViewMode === "full");
+    button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "full"));
 }
 
 
@@ -15945,22 +15890,8 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         section.appendChild(desc);
     }
 
-    const expandButton = document.createElement("button");
-    expandButton.type = "button";
-    expandButton.className = "kg-mobile-expand";
+    // 手机上从打开起就是完整查看，不再渲染“完整查看/退出完整查看”按钮。
     const graphModal = document.getElementById("knowledgeGraphModal");
-    const isExpanded = graphModal?.classList.contains("graph-fullscreen-view");
-    expandButton.textContent = isExpanded ? "退出完整查看" : "完整查看";
-    expandButton.setAttribute(
-        "aria-label",
-        isExpanded ? "退出知识图谱完整查看" : "完整查看知识图谱"
-    );
-    expandButton.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleKnowledgeGraphFullscreenView();
-    });
-    section.appendChild(expandButton);
 
     const zoomControls = document.createElement("div");
     zoomControls.className = "kg-mobile-zoom-controls";
@@ -16013,50 +15944,45 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     }
 
     const columnKeys = [...columns.keys()].sort((a, b) => a - b);
+    // 按前一层前置节点的重心排列同层知识点，减少线条在层间交叉。
+    const previousOrder = new Map();
+    const categoryOrder = new Map();
+    nodes.forEach(node => {
+        if (!categoryOrder.has(node.category)) categoryOrder.set(node.category, categoryOrder.size);
+    });
     for (const key of columnKeys) {
-        columns.get(key).sort(
-            (a, b) => orderMap.get(a.id) - orderMap.get(b.id)
-        );
+        const group = columns.get(key);
+        group.sort((a, b) => {
+            const average = node => {
+                const indexes = (node.prerequisites || [])
+                    .map(name => previousOrder.get(name)).filter(Number.isFinite);
+                return indexes.length
+                    ? indexes.reduce((sum, value) => sum + value, 0) / indexes.length
+                    : Number.POSITIVE_INFINITY;
+            };
+            return (categoryOrder.get(a.category) - categoryOrder.get(b.category))
+                || average(a) - average(b)
+                || orderMap.get(a.id) - orderMap.get(b.id);
+        });
+        group.forEach((node, index) => previousOrder.set(node.name, index));
     }
 
-    // 手机端节点使用普通 HTML，SVG 只负责画线。
-    // 这样避开部分安卓 WebView/浏览器 SVG <text> 不显示的问题。
-    const viewportWidth = Math.max(
-        280,
-        (container.clientWidth || window.innerWidth || 360) - 36
-    );
+    // 距离解决密集问题：左右预留足够走线通道，上下给弯曲关系留空间。
+    const viewportWidth = Math.max(280, (container.clientWidth || window.innerWidth || 360) - 20);
     const columnCount = Math.max(columnKeys.length, 1);
-    const marginX = 12;
-    const marginY = 14;
-    const gapX = columnCount <= 2 ? 24 : 16;
-    const gapY = 18;
-    const fittedNodeWidth = Math.floor(
-        (viewportWidth - marginX * 2 - gapX * Math.max(columnCount - 1, 0))
-        / Math.min(columnCount, 3)
-    );
-    const nodeWidth = columnCount <= 3
-        ? Math.max(92, Math.min(128, fittedNodeWidth))
-        : 108;
-    const nodeHeight = 64;
-    const maxRows = Math.max(
-        ...columnKeys.map(key => columns.get(key).length),
-        1
-    );
-    const stageWidth = Math.max(
-        viewportWidth,
-        marginX * 2
-        + columnCount * nodeWidth
-        + Math.max(columnCount - 1, 0) * gapX
-    );
-    const stageHeight = (
-        marginY * 2
-        + maxRows * nodeHeight
-        + Math.max(maxRows - 1, 0) * gapY
-    );
+    const marginX = 38;
+    const marginY = 48;
+    const gapX = 116;
+    const gapY = 60;
+    const nodeWidth = 144;
+    const nodeHeight = 76;
+    const maxRows = Math.max(...columnKeys.map(key => columns.get(key).length), 1);
+    const stageWidth = Math.max(viewportWidth, marginX * 2 + columnCount * nodeWidth + (columnCount - 1) * gapX);
+    const stageHeight = marginY * 2 + maxRows * nodeHeight + (maxRows - 1) * gapY;
 
     const viewport = document.createElement("div");
     viewport.className = "kg-mobile-viewport";
-    viewport.setAttribute("aria-label", "知识图谱预览，可上下左右滑动；点击节点查看全部直接关联");
+    viewport.setAttribute("aria-label", "完整知识图谱：单指拖动、双指缩放，所有知识关联线均可见");
 
     const zoomSurface = document.createElement("div");
     zoomSurface.className = "kg-mobile-zoom-surface";
@@ -16098,42 +16024,47 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     }
 
     const byName = new Map(nodes.map(node => [node.name, node]));
+    const edges = [];
+    const outgoing = new Map();
+    const incoming = new Map();
     for (const node of orderedNodes) {
-        const current = positions.get(node.id);
-        if (!current) continue;
-
-        const parents = (node.prerequisites || [])
-            .map(name => byName.get(name))
-            .filter(parent => parent && positions.has(parent.id));
-        // 首选同层距最近的前置节点作为主线，减少交叉与重叠。
-        const primaryId = parents.reduce((best, parent) => {
-            const pos = positions.get(parent.id);
-            const cost = Math.abs(current.y - pos.y)
-                + Math.abs(current.x - pos.x - nodeWidth) * 0.25;
-            return (!best || cost < best.cost)
-                ? { id:parent.id, cost } : best;
-        }, null)?.id;
-        // 完整知识图谱节点较多时只显示间隔排列的主干线；
-        // 点击任何节点会临时展开它的全部直接关联（包含隐藏的次级边）。
-        const sameLevelNodes = columns.get(levels.get(node.id) || 0) || [];
-        const showMainEdge = orderedNodes.length <= 24
-            || sameLevelNodes.indexOf(node) % 2 === 0;
-
-        for (const parent of parents) {
-            const previous = positions.get(parent.id);
-            const x1 = previous.x + nodeWidth;
-            const y1 = previous.y + nodeHeight / 2;
-            const x2 = current.x;
-            const y2 = current.y + nodeHeight / 2;
-            const midX = (x1 + x2) / 2;
-            const path = createSvgElement("path", {
-                class: "kg-mobile-edge" + (parent.id === primaryId && showMainEdge ? " is-primary" : " is-secondary"),
-                d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`,
-                "data-from": parent.id,
-                "data-to": node.id
-            });
-            edgeSvg.appendChild(path);
+        for (const prerequisiteName of node.prerequisites || []) {
+            const parent = byName.get(prerequisiteName);
+            if (!parent || !positions.has(parent.id) || !positions.has(node.id)) continue;
+            const edge = {from:parent.id, to:node.id};
+            edges.push(edge);
+            if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
+            if (!incoming.has(edge.to)) incoming.set(edge.to, []);
+            outgoing.get(edge.from).push(edge);
+            incoming.get(edge.to).push(edge);
         }
+    }
+    // 每条线分配自己的节点连接端口：全部保留，不再隐藏“次级关系”。
+    const distributePort = (index, count) => (index - (count - 1) / 2) *
+        Math.min(11, (nodeHeight - 18) / Math.max(count, 1));
+    for (const group of outgoing.values()) {
+        group.sort((a, b) => positions.get(a.to).y - positions.get(b.to).y);
+    }
+    for (const group of incoming.values()) {
+        group.sort((a, b) => positions.get(a.from).y - positions.get(b.from).y);
+    }
+    for (const edge of edges) {
+        const from = positions.get(edge.from);
+        const to = positions.get(edge.to);
+        const outGroup = outgoing.get(edge.from);
+        const inGroup = incoming.get(edge.to);
+        const x1 = from.x + nodeWidth;
+        const x2 = to.x;
+        const y1 = from.y + nodeHeight / 2 + distributePort(outGroup.indexOf(edge), outGroup.length);
+        const y2 = to.y + nodeHeight / 2 + distributePort(inGroup.indexOf(edge), inGroup.length);
+        const channel = Math.max(36, Math.abs(x2 - x1) * 0.42);
+        const path = createSvgElement("path", {
+            class:"kg-mobile-edge",
+            d:`M ${x1} ${y1} C ${x1 + channel} ${y1}, ${x2 - channel} ${y2}, ${x2} ${y2}`,
+            "data-from":edge.from,
+            "data-to":edge.to
+        });
+        edgeSvg.appendChild(path);
     }
 
     for (const node of orderedNodes) {
@@ -16214,13 +16145,14 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         viewport._kgFit?.();
     });
 
-    // 普通预览默认 100%；内容超出预览窗口时可沿两个方向原生滚动。
+    // 单一全屏视图：以可读尺寸打开；“适应”按钮仍可主动缩放全图。
     requestAnimationFrame(() => {
-        const overflow = Math.max(0, zoomSurface.scrollWidth - viewport.clientWidth);
-        if (overflow > 0) viewport.scrollLeft = Math.min(overflow / 2, nodeWidth / 2);
-
-        if (graphModal?.classList.contains("graph-fullscreen-view")) {
-            viewport._kgFit?.();
+        viewport._kgSetScale?.(0.85);
+        const active = positions.get(knowledgeGraphSelectedNodeId)
+            || positions.get(orderedNodes[0]?.id);
+        if (active) {
+            viewport.scrollLeft = Math.max(0, (active.x + nodeWidth / 2) * 0.85 - viewport.clientWidth / 2);
+            viewport.scrollTop = Math.max(0, (active.y + nodeHeight / 2) * 0.85 - viewport.clientHeight / 2);
         }
     });
 }
@@ -16741,8 +16673,7 @@ function renderKnowledgeGraphHistory() {
     renderMath(list);
 }
 
-// 移动端默认只画每个知识点一条主要前置关系，避免所有线重叠。
-// 轻触节点后显示它全部的直接前置和后续关系，不丢失原始关联数据。
+// 所有关系线始终存在，选中节点只改变相关线条的强调样式。
 function updateMobileGraphEdgeEmphasis(canvas, selectedNodeId) {
     if (!canvas) return;
     canvas.querySelectorAll(".kg-mobile-edge").forEach(edge => {
@@ -16981,15 +16912,15 @@ function renderKnowledgeGraph() {
                             )
                             : (
                                 visibleNodes.length < fullNodes.length
-                                    ? `已聚焦当前题目，只显示 ${visibleNodes.length} 个直接相关知识点。`
+                                    ? `本题关联 · ${visibleNodes.length} 个知识点`
                                     : "当前没有可进一步收缩的题目上下文，显示当前模块。"
                             )
                     )
             )
             : (
                 knowledgeGraphFilter === "全部"
-                    ? `完整知识图谱，共 ${fullNodes.length} 个知识点。`
-                    : `完整模块，共 ${fullNodes.length} 个知识点。`
+                    ? `全部知识 · ${fullNodes.length} 个知识点`
+                    : `本模块知识 · ${fullNodes.length} 个知识点`
             )
     );
 
@@ -18390,7 +18321,7 @@ document.addEventListener(
         if (knowledgeGraphScopeBtn) {
             knowledgeGraphScopeBtn.addEventListener(
                 "click",
-                toggleKnowledgeGraphScope
+                () => selectKnowledgeGraphDisplayMode("focus")
             );
         }
 
@@ -18419,7 +18350,7 @@ document.addEventListener(
         if (knowledgeGraphFocusBtn) {
             knowledgeGraphFocusBtn.addEventListener(
                 "click",
-                focusKnowledgeGraphOnCurrent
+                () => selectKnowledgeGraphDisplayMode("full")
             );
         }
 
