@@ -1093,7 +1093,9 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
     action_kinds = set(action_tokens)
     if len(action_kinds) >= 2:
         score = max(score, 2)
-    if len(action_kinds) >= 3 and subquestion_count >= 2:
+    # 三种不同动词并不意味着三个独立难点，例如“证明、求、说明”
+    # 可能只是两小问。至少三个真正分立的小问才追加一档分数。
+    if len(action_kinds) >= 3 and subquestion_count >= 3:
         score += 1
 
     # 中文题干常把“写邻接矩阵并求通路数”写成“写...并求...”，其中“写”没有“写出”二字。
@@ -1225,8 +1227,11 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
             score = max(score, 4)
 
     # 证明一个结构性结论后还要“利用/应用”它继续证明或判定，属于明显多阶段推理。
+    # “求最小值并说明理由”是普通答案要求，不等于多阶段困难证明。
+    # 只有再次证明、构造或使用前一个结论去推出新结论，才抬到困难。
     if question_type == "证明题" and re.search(
-        r"(?:并|再|然后|进而|从而).{0,12}(?:利用|应用|证明|推出|说明)",
+        r"(?:再|然后|进而|从而).{0,16}(?:利用|应用|证明|推出|推导|构造)"
+        r"|(?:并|再).{0,12}(?:证明|推导|构造)",
         normalized,
     ):
         score = max(score, 4)
@@ -1320,9 +1325,8 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         # 禁止子串的变长计数通常要建状态或递推，不能按单步计数评为简单。
         score = max(score, 2)
 
-    # 规模或额外输出要求会显著增加步骤，但不单靠长文本抬难度。
-    if re.search(r"(?:[7-9]|\d{2,})\s*(?:个)?顶点", normalized):
-        score += 1
+    # 规模不是推理深度：9 个或几十个顶点也可以只是基本度数计算。
+    # 不再把顶点数量机械叠加到“证明+两小问”上，造成错误的困难标签。
     if re.search(r"(?:给出|写出|构造).{0,12}(?:同构)?映射", normalized):
         score += 1
     # 对多小问已加过难度分，不再因末尾“并写出全部解”等同一任务的
@@ -1349,6 +1353,16 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         and re.search(r"(?:求|计算).{0,12}\|\s*[a-z]\s*×\s*[a-z]\s*\|", normalized)
     ):
         score = min(score, 1)
+
+    # 一步可完成的基础整除/奇偶证明虽然有“证明”字样，仍按简单题处理。
+    if (
+        subquestion_count == 0
+        and len(normalized) <= 85
+        and re.search(r"(?:n\s*\(?\s*n\s*[+＋]\s*1\s*\)?|n\s*\^\s*2\s*[+＋]\s*n)", normalized)
+        and re.search(r"偶数|被2整除", normalized)
+        and not re.search(r"极值|构造|当且仅当|充分必要|所有方案|证明.*并", normalized)
+    ):
+        return "简单"
 
     if score >= 4:
         return "困难"
