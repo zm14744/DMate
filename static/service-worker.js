@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-ios-webapp-v6-20-kg-contrast-scrollfix-20261010";
+const CACHE_NAME = "dmate-ios-webapp-v6-21-mobile-graph-email-20261010";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
