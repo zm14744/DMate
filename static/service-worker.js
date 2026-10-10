@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-ios-webapp-v6-22-solution-empty-fallback-20261010";
+const CACHE_NAME = "dmate-full-graph-spaced-all-edges-20261010";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
