@@ -2010,6 +2010,62 @@ def _clean_answer_only(text):
     return value[:cut_index].strip()
 
 
+def _exercise_problem_complete(question, answer):
+    """保守检查条件不全、多个小问却只有一个占位答案的情况。"""
+    text = str(question or "").strip()
+    value = str(answer or "").strip()
+    if not text or not value:
+        return False
+    # 仅拦截明确要求从具体图求数值，却没有提供任何图结构信息的题。
+    if (re.search(r"(?:求|计算|写出).{0,24}(?:最短路|最短路径|邻接矩阵|色多项式)", text)
+            and re.search(r"图\s*[A-Z]", text, flags=re.IGNORECASE)
+            and not re.search(r"边集|顶点集|边为|顶点为|相邻|邻接关系|完全图|圈图|环图|路径图|"
+                              r"有向图.*边|无向图.*边|矩阵为|\{\s*[v\d]", text)):
+        return False
+    items = re.findall(r"(?:^|\n)\s*[（(]\s*(\d+)\s*[)）]", text)
+    if len(set(items)) >= 2:
+        # 一整个综合题不能只返回一个整数当作三个小问的最终答案。
+        if re.fullmatch(r"[+-]?\d+(?:\.\d+)?", value):
+            return False
+    return True
+
+
+def _exercise_answer_valid(answer):
+    """错题本必须在首次展示前拿到非占位的隐藏答案。"""
+    value = _clean_answer_only(answer).strip()
+    if not value or len(value) > 2000:
+        return False
+    if re.fullmatch(
+        r"(?:最终答案|答案|略|无|待定|待填写|待计算|自行计算|自行求解|"
+        r"参见解析|见解析|请自行.*|无法确定|不知道|TODO|N/A|\?+)",
+        value, flags=re.IGNORECASE,
+    ):
+        return False
+    if "[[WRONGBOOK_ANSWER" in value:
+        return False
+    return True
+
+
+def _exercise_answer_simple_consistency(question, answer):
+    """只核查极窄且可精确计算的单问幂模题；其余题不猜测答案。"""
+    text = str(question or "")
+    value = str(answer or "").strip()
+    # 若有多小问/中国剩余/模运算的后续条件，则不做此种单问核验。
+    if re.search(r"[（(]\s*[1-9]\s*[)）]|中国剩余|费马|\n\s*\d+[.、]", text):
+        return True
+    match = re.search(
+        r"(?:求|计算)\s*(\d{1,10})\s*(?:\^|\*\*|\^\{)\s*(\d{1,10})\}?"
+        r"\s*(?:除以|\s*(?:mod|bmod)\s*|\\(?:mod|bmod)\s*)\s*(\d{1,10})",
+        text, flags=re.IGNORECASE,
+    )
+    if not match or not re.fullmatch(r"[+-]?\d+", value):
+        return True
+    a, b, modulus = (int(group) for group in match.groups())
+    if modulus <= 0:
+        return False
+    return int(value) % modulus == pow(a, b, modulus)
+
+
 def _requested_exercise_difficulty(text):
     """提取用户真正表达的练习难度，避免把知识范围词误当成难度。
 
@@ -2152,10 +2208,9 @@ def _exercise_reference_matches(reference_teaching, generated_teaching):
     expected_category = str(reference_teaching.get("category") or "").strip()
     actual_category = str(generated_teaching.get("category") or "").strip()
 
-    if (
-        expected_category not in ("", "待识别")
-        and actual_category not in ("", "待识别", expected_category)
-    ):
+    expected_categories = {expected_category, *(reference_teaching.get("related_categories") or [])} - {"", "待识别"}
+    actual_categories = {actual_category, *(generated_teaching.get("related_categories") or [])} - {"", "待识别"}
+    if expected_categories and actual_categories and expected_categories.isdisjoint(actual_categories):
         return False, "生成的练习偏离了参照题所属模块。"
 
     required_points = {
@@ -2344,7 +2399,7 @@ def chat():
         # 错题本按钮发起的复测，后端不再从旧题或长提示里猜难度。
         # 目标固定中等；除非生成器确实无法在原考点范围构造中等题，
         # 才按已有的单次纠偏机制保留最近的有效候选并告知偏差。
-        if reference_teaching and reference_teaching.get("retest_core_points"):
+        if reference_teaching and reference_teaching.get("retest_core_points") and not requested_difficulty:
             requested_difficulty = "中等"
         explicit_exercise_difficulty = requested_difficulty
 
@@ -2368,86 +2423,58 @@ def chat():
 
     # 出题只需要“设计一道符合目标难度的题”，不需要用与解困难题相同的 max 推理。
     # 目标难度仍由 exercise_target_difficulty 严格写进教学提示；这里只单独控制模型思考强度：
-    # 简单/中等题的“设计” -> none；困难题的“设计” -> high。
+    # 首次一律非思考快速生成；只有困难题首次不达标时才升级推理。
     # 真正解题时仍保留原来的中等=high、困难=max。
     ai_teaching = teaching
     if effective_exercise_request:
         ai_teaching = dict(teaching or {})
         target_for_generation = ai_teaching.get("exercise_target_difficulty") or "中等"
         # 题目生成与题目解答分开控制思考强度：
-        # 简单/中等题的“设计”用非思考模式，困难题才用 high；
+        # 首次练习生成统一用非思考模式；困难题质量不足时再限次升级 high；
         # 真正解题时仍保持中等=high、困难=max。
-        ai_teaching["difficulty"] = (
-            "中等" if target_for_generation == "困难" else "简单"
-        )
+        ai_teaching["generation_reasoning_effort"] = "none"
 
+    # 网络层零自动重试 + 质量层最多一次重生成：避免一次出题叠加
+    # 3 次 HTTP 重试、app 兜底、格式修补、难度纠偏导致几十秒到数分钟等待。
+    # 普通聊天继续使用原来的网络重试行为。
     try:
-        result = ask_ai(
-            cleaned,
-            teaching_context=ai_teaching
-        )
-    except Exception as exc:
-        # app 层最后一道保险。把真实异常完整打到 Zeabur 日志，
-        # 同时对出题请求做一次轻量兜底，避免单次模型调用异常直接吞掉整次出题。
-        import traceback
-        print(f"/chat 调用 AI 模块异常：{repr(exc)}")
-        traceback.print_exc()
         if effective_exercise_request:
-            try:
-                fallback_context = dict(ai_teaching or {})
-                fallback_context["difficulty"] = (
-                    "中等"
-                    if fallback_context.get("exercise_target_difficulty") == "困难"
-                    else "简单"
-                )
-                result = ask_ai(
-                    cleaned[-1:],
-                    retries=0,
-                    teaching_context=fallback_context,
-                )
-            except Exception as fallback_exc:
-                print(f"/chat 出题轻量兜底仍异常：{repr(fallback_exc)}")
-                traceback.print_exc()
-                return jsonify({
-                    "error": "AI 服务暂时出现异常，请稍后重试。"
-                }), 500
+            result = ask_ai(cleaned, retries=0, teaching_context=ai_teaching)
         else:
-            return jsonify({
-                "error": "AI 服务暂时出现异常，请稍后重试。"
-            }), 500
-
-    # ask_ai 的网络/HTTP 失败通常以 {ok: false} 返回，而不是抛异常。
-    # 仅对出题请求做一次“当前请求-only”的零重试兜底；正常情况下不会增加调用。
-    if (
-        effective_exercise_request
-        and isinstance(result, dict)
-        and result.get("ok") is not True
-    ):
-        try:
-            fallback_context = dict(ai_teaching or {})
-            fallback_context["difficulty"] = (
-                "中等"
-                if fallback_context.get("exercise_target_difficulty") == "困难"
-                else "简单"
-            )
-            fallback_result = ask_ai(
-                cleaned[-1:],
-                retries=0,
-                teaching_context=fallback_context,
-            )
-            if isinstance(fallback_result, dict) and fallback_result.get("ok") is True:
-                result = fallback_result
-        except Exception as fallback_exc:
-            print("/chat 出题失败结果兜底异常：", repr(fallback_exc))
+            # 普通聊天完全沿用此前的调用签名与重试逻辑。
+            result = ask_ai(cleaned, teaching_context=ai_teaching)
+    except Exception as exc:
+        print(f"/chat AI 首次请求异常：{repr(exc)}")
+        if not effective_exercise_request:
+            return jsonify({"error": "AI 服务暂时出现异常，请稍后重试。"}), 500
+        result = {"ok": False, "error": "AI 服务暂时出现异常"}
 
     if not isinstance(result, dict):
-        print(
-            "AI 模块返回格式异常："
-            f"{type(result).__name__}"
-        )
-        return jsonify({
-            "error": "AI 服务返回格式异常，请稍后重试。"
-        }), 500
+        print("AI 返回格式异常：", type(result).__name__)
+        result = {"ok": False, "error": "AI 服务返回格式异常"}
+
+    # 若首次网络请求失败或推理用完预算没有正文，也进入同一个二次候选，
+    # 而不是先调用若干次兜底后再单独做纠偏。
+    if effective_exercise_request and (not result.get("ok") or not str(result.get("reply") or "").strip()):
+        error_message = str(result.get("error") or "模型未返回正文")
+        print("练习首次生成失败，使用唯一一次轻量补救：", error_message)
+        fallback_context = dict(ai_teaching)
+        fallback_context["generation_reasoning_effort"] = "none"  # 只降低思考耗时，不降低出题目标
+        fallback_context["exercise_target_difficulty"] = teaching["exercise_target_difficulty"]
+        try:
+            result = ask_ai(cleaned[-1:], retries=0, teaching_context=fallback_context)
+        except Exception as fallback_exc:
+            print("练习轻量补救失败：", repr(fallback_exc))
+            result = {"ok": False, "error": "AI 服务暂时出现异常"}
+        if not isinstance(result, dict):
+            result = {"ok": False, "error": "AI 服务返回格式异常"}
+        # 无论补救是否成功，不再发起第三次请求。
+        generation_retry_used = True
+    else:
+        generation_retry_used = False
+
+    if not result.get("ok"):
+        return jsonify({"error": result.get("error") or "这次没有生成有效题目，请重试。"}), 503
 
     if result.get("ok") is True:
         reply = result.get("reply", "")
@@ -2517,6 +2544,11 @@ def chat():
                 question_text = _extract_generated_question(visible)
                 if not question_text:
                     return None, "AI 返回的不是可作答的数学题"
+                cleaned_answer = _clean_answer_only(hidden_answer)
+                if not _exercise_answer_valid(cleaned_answer):
+                    return None, "生成题目没有有效的隐藏答案"
+                if not _exercise_answer_simple_consistency(question_text, cleaned_answer):
+                    return None, "题目与隐藏答案不一致"
                 try:
                     info = analyze_question(question_text)
                 except Exception as analyze_exc:
@@ -2530,9 +2562,12 @@ def chat():
                         return None, reason
                 if requested_category not in ("", "待识别"):
                     generated_category = str(info.get("category") or "").strip()
-                    if generated_category not in ("", "待识别", requested_category):
+                    actual_categories = {generated_category, *(info.get("related_categories") or [])}
+                    if requested_category not in actual_categories and generated_category not in ("", "待识别"):
                         return None, "生成题偏离指定学科"
-                    if is_narrow_topic and generated_category == requested_category:
+                    if is_narrow_topic and generated_category in ("", "待识别"):
+                        return None, "生成题未能确认指定知识点"
+                    if is_narrow_topic and requested_category in actual_categories:
                         generated_points = set(
                             str(point).strip() for point in
                             (info.get("focus_points") or []) + (info.get("knowledge_points") or [])
@@ -2540,10 +2575,12 @@ def chat():
                         )
                         if generated_points and requested_points.isdisjoint(generated_points):
                             return None, "生成题偏离指定知识点"
+                if not _exercise_problem_complete(question_text, cleaned_answer):
+                    return None, "生成的题目条件不完整或隐藏答案缺少小问结果"
                 return {
                     "reply": candidate_reply,
                     "question": question_text,
-                    "answer": _clean_answer_only(hidden_answer),
+                    "answer": cleaned_answer,
                     "teaching": info,
                 }, ""
 
@@ -2559,7 +2596,7 @@ def chat():
                 and target_difficulty in rank
                 and first_level != target_difficulty
             )
-            if needs_retry:
+            if needs_retry and not generation_retry_used:
                 reason = first_error or (
                     f"首次候选难度估计为{first_level}，而目标为{target_difficulty}"
                 )
@@ -2578,10 +2615,13 @@ def chat():
                         "严格只输出【题目】题干及[[WRONGBOOK_ANSWER]]答案[[/WRONGBOOK_ANSWER]]。"
                     ),
                 })
-                retry_context = dict(teaching)
-                retry_context["difficulty"] = (
-                    "简单" if target_difficulty == "简单" else "中等"
+                retry_context = dict(ai_teaching)
+                # 初次快速出题如果有效但难度不够，困难题才尝试 high；
+                # 首次出现空正文/格式失败时保持非思考，避免再次空耗推理预算。
+                retry_context["generation_reasoning_effort"] = (
+                    "high" if target_difficulty == "困难" and first_candidate else "none"
                 )
+                retry_context["exercise_target_difficulty"] = target_difficulty
                 try:
                     retry_result = ask_ai(
                         retry_messages,
@@ -2610,21 +2650,23 @@ def chat():
                     "teaching": teaching,
                 }), 502
 
+            chosen_level = chosen_candidate["teaching"].get("difficulty")
+            if chosen_level != target_difficulty:
+                # 识别失败与知识点天然缺少某档难度，不能画等号。
+                # 用户明确选困难/简单时绝不能静默降级，默认中等亦不擅自
+                # 把“尝试两次仍未生成”当成知识点不能出中等题的证明。
+                print(f"练习候选仍未达到目标难度：目标={target_difficulty}，估计={chosen_level}")
+                return jsonify({
+                    "error": f"本次没有生成符合{target_difficulty}难度的题目，请重新出题。",
+                    "teaching": teaching,
+                }), 502
+
             reply = chosen_candidate["reply"]
             generated_question = chosen_candidate["question"]
             generated_answer = chosen_candidate["answer"]
             generated_teaching = chosen_candidate["teaching"]
             actual_difficulty = generated_teaching.get("difficulty")
-            if actual_difficulty != target_difficulty:
-                # 难度估计只是启发式，不能硬给简单题贴“困难”标签；
-                # 也不能无限制重试阻塞用户。把偏差以独立字段返回给前端。
-                print(f"生成题难度未完全匹配：目标={target_difficulty}，估计={actual_difficulty}")
-                generation_note = (
-                    f"目标为{target_difficulty}，当前题目估计为{actual_difficulty}；"
-                    "已尝试一次纠偏。"
-                )
-            else:
-                generation_note = ""
+            generation_note = ""  # 严格符合目标时才会走到这里
 
             # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
             reply = (
