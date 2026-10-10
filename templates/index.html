@@ -6868,6 +6868,52 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     .kg-desktop-zoom-controls { display:none !important; }
 }
 
+
+/* 手机图谱回归：保留原来的完整查看界面，仅移除非完整预览图。桌面图谱不受影响。 */
+@media (max-width:760px) {
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-entry-only {
+        position:relative;
+        box-sizing:border-box;
+        min-height:132px !important;
+        height:auto !important;
+        display:flex !important;
+        flex-direction:column !important;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+        overflow:visible !important;
+    }
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-entry-only .kg-section-title,
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-entry-only .kg-section-desc {
+        display:none !important;
+    }
+    #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-entry-only .kg-mobile-expand {
+        display:inline-flex !important;
+        position:static !important;
+        align-items:center;
+        justify-content:center;
+        min-height:44px;
+        min-width:148px;
+        font-size:15px;
+    }
+    /* 完整查看仍使用旧布局：标题、右上角退出按钮、画布和底部缩放工具。 */
+    #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar,
+    #knowledgeGraphModal.graph-fullscreen-view .graph-summary,
+    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-side {
+        display:none !important;
+    }
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-expand {
+        display:inline-flex !important;
+        align-items:center;
+        justify-content:center;
+        position:fixed !important;
+        top:max(58px, calc(env(safe-area-inset-top) + 52px));
+        right:10px;
+        z-index:1003;
+        min-height:36px;
+    }
+}
+
 </style>
 
 <script>
@@ -7547,7 +7593,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-desktop-graph-autofit-20261010"></script>
+<script src="/static/script.js?v=dmate-mobile-graph-fullview-entry-20261010"></script>
 
 </body>
 </html>
