@@ -2267,6 +2267,7 @@ def chat():
     messages = data.get("messages")
     request_kind = str(data.get("request_kind", "") or "").strip().lower()
     client_requires_exercise = request_kind == "exercise"
+    client_requests_solution = request_kind == "solution"
 
     if not isinstance(messages, list):
         return jsonify({
@@ -2362,6 +2363,38 @@ def chat():
         cleaned = [{"role": "user", "content": content}]
 
     teaching = analyze_messages(cleaned)
+    # 完整解析只在本轮用户明确请求时开启；不能通过请求参数
+    # 绕过学生“不要给答案”的明确指令。
+    current_instruction = extract_current_request(
+        next((item["content"] for item in reversed(cleaned)
+              if item["role"] == "user"), "")
+    )
+    explicit_solution = bool(
+        re.search(r"(?:给出|给我|直接给|告诉我|输出).{0,8}(?:答案|解析|解答)|"
+                  r"(?:完整|详细).{0,3}(?:解析|解答|过程)|答案.{0,3}(?:和|与|及).{0,3}解析", current_instruction)
+        and not re.search(r"不要|别给|不需要|不用|只给提示|别直接", current_instruction)
+    )
+    solution_mode = bool((client_requests_solution and explicit_solution)
+                         or (teaching or {}).get("mode") == "full_solution")
+    if solution_mode:
+        teaching = dict(teaching or {})
+        teaching["mode"] = "full_solution"
+        teaching["mode_label"] = "完整解析"
+
+    # 仅当本轮确实要求答案、客户端发送的题干与实际请求锚点一致时，
+    # 才使用这道生成题之前保存的参考答案；不查其他账号或会话。
+    solution_reference_answer = ""
+    if solution_mode and not client_requires_exercise:
+        ref = data.get("solution_reference")
+        if isinstance(ref, dict):
+            q = ref.get("question")
+            a = ref.get("answer")
+            if (isinstance(q, str) and isinstance(a, str)
+                    and 5 <= len(q.strip()) <= 6000
+                    and 0 < len(a.strip()) <= 1200
+                    and q.strip() in cleaned[-1]["content"]):
+                solution_reference_answer = a.strip()
+                teaching["solution_reference_answer"] = solution_reference_answer
 
     # 双保险：前端 request_kind 是强信号，但后端仍独立理解自然语言。
     # 因此用户换成“随便来一道 / 整个难题 / 考我一道”等说法时，
@@ -2474,6 +2507,19 @@ def chat():
         generation_retry_used = False
 
     if not result.get("ok"):
+        if solution_mode and solution_reference_answer and not effective_exercise_request:
+            # 失败时仍可展示出题时保存的最终答案，清楚说明缺少独立推导。
+            # 不声称有完整解析，也不静默伪造证明。
+            return jsonify({
+                "reply": (
+                    "本次完整解析没有成功生成。\n\n"
+                    "**出题时保存的参考答案（尚未独立复核）：**\n\n"
+                    + solution_reference_answer
+                    + "\n\n请稍后重试“给出答案和解析”以获取推导过程。"
+                ),
+                "solution_partial": True,
+                "teaching": {k: v for k, v in teaching.items() if k != "solution_reference_answer"},
+            })
         return jsonify({"error": result.get("error") or "这次没有生成有效题目，请重试。"}), 503
 
     if result.get("ok") is True:
@@ -2676,7 +2722,7 @@ def chat():
 
         response = {
             "reply": reply,
-            "teaching": teaching,
+            "teaching": {k: v for k, v in teaching.items() if k != "solution_reference_answer"},
             "generated_exercise": bool(is_exercise_request and generated_question)
         }
 
