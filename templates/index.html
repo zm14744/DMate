@@ -6721,6 +6721,88 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         white-space:normal;
     }
 }
+
+/* 2026-10-10：单一完整知识图谱，分开节点并保留每条关联线。 */
+.graph-toolbar-left button.active {
+    border-color:var(--accent) !important;
+    background:var(--accent-bg) !important;
+    color:var(--text-primary) !important;
+    font-weight:700;
+}
+.kg-mobile-edge,
+.kg-mobile-edge.is-secondary {
+    display:inline !important;
+    opacity:.74;
+    stroke-width:2.05;
+}
+.kg-mobile-edge.is-related {
+    opacity:1 !important;
+    stroke-width:3;
+}
+@media (max-width:760px) {
+    #knowledgeGraphModal:not(.hidden) { overflow:hidden !important; }
+    #knowledgeGraphModal .graph-modal-card {
+        height:var(--app-visible-height, 100dvh) !important;
+        max-height:var(--app-visible-height, 100dvh) !important;
+        display:flex !important;
+        flex-direction:column !important;
+    }
+    #knowledgeGraphModal.graph-fullscreen-view .graph-toolbar {
+        display:flex !important;
+        flex:0 0 auto !important;
+        padding:7px 9px !important;
+        max-height:142px;
+        overflow-y:auto !important;
+        gap:5px !important;
+    }
+    #knowledgeGraphModal .graph-toolbar-left {
+        width:100%;
+        display:grid !important;
+        grid-template-columns:1fr 1fr;
+        gap:6px !important;
+    }
+    #knowledgeGraphModal .graph-toolbar-left label { display:none !important; }
+    #knowledgeGraphModal .graph-toolbar-left select {
+        grid-column:1 / -1;
+        width:100%;
+        min-width:0;
+    }
+    #knowledgeGraphModal .graph-toolbar-left button {
+        min-width:0;
+        padding:7px 6px;
+        font-size:13px;
+    }
+    #knowledgeGraphModal #knowledgeGraphCopyBtn {
+        grid-column:1 / -1;
+    }
+    #knowledgeGraphModal .graph-legend,
+    #knowledgeGraphModal .graph-summary,
+    #knowledgeGraphModal .kg-mobile-expand {
+        display:none !important;
+    }
+    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-layout {
+        display:flex !important;
+        flex:1 1 auto !important;
+        height:0 !important;
+        min-height:0 !important;
+        overflow:hidden !important;
+    }
+    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-main,
+    #knowledgeGraphModal.graph-fullscreen-view .knowledge-graph-canvas,
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-section {
+        height:100% !important;
+        min-height:0 !important;
+        flex:1 1 auto !important;
+        overflow:hidden !important;
+    }
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-viewport {
+        flex:1 1 auto !important;
+        height:0 !important;
+        min-height:0 !important;
+        max-height:none !important;
+        touch-action:none !important;
+    }
+}
 </style>
 
 <script>
@@ -7349,8 +7431,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div class="graph-toolbar-left">
                 <label for="knowledgeGraphCategory">模块</label>
                 <select id="knowledgeGraphCategory" aria-label="知识图谱分类"></select>
-                <button id="knowledgeGraphScopeBtn" type="button">查看本对话题目</button>
-                <button id="knowledgeGraphFocusBtn" type="button">查看完整模块</button>
+                <button id="knowledgeGraphScopeBtn" type="button">本题关联</button>
+                <button id="knowledgeGraphFocusBtn" type="button">全部知识</button>
                 <button id="knowledgeGraphCopyBtn" type="button" title="电脑复制图谱图片；Android 安装版保存到相册；手机网页可预览并保存">以图片形式复制</button>
             </div>
 
@@ -7394,7 +7476,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-solution-empty-fallback-20261010"></script>
+<script src="/static/script.js?v=dmate-full-graph-spaced-all-edges-v1-20261010"></script>
 
 </body>
 </html>
