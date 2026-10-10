@@ -16259,13 +16259,26 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     if (label) label.textContent = `${Math.round(next * 100)}%`;
 }
 
+// 根据图谱形状选择适应策略：
+//   - 节点较少、图谱不高：完整放入可视区域。
+//   - “全部知识”这类高图：以可读宽度为主，允许在画布内纵向滚动。
+// 不按几十行节点的总高度去缩小整张图，否则右侧空白且文字无法阅读。
 function fitKnowledgeGraphDesktop() {
     const canvas = document.getElementById("knowledgeGraphCanvas");
     const stage = canvas?.querySelector(".kg-desktop-zoom-stage");
     if (!canvas || !stage) return;
     const width = Number(stage.dataset.baseWidth) || 1;
     const height = Number(stage.dataset.baseHeight) || 1;
-    const fitted = Math.min(1, (canvas.clientWidth - 48) / width, (canvas.clientHeight - 48) / height);
+    const availableWidth = Math.max(1, canvas.clientWidth - 64);
+    const availableHeight = Math.max(1, canvas.clientHeight - 104);
+    const widthScale = availableWidth / width;
+    const heightScale = availableHeight / height;
+    const isTall = heightScale < Math.min(widthScale, 1.15) * 0.72;
+    const preferred = isTall
+        ? Math.min(1.15, widthScale)
+        : Math.min(1.15, widthScale, heightScale);
+    // 极宽的图谱宁可局部横向滚动，也不能把节点文字缩至不可阅读。
+    const fitted = Math.max(0.65, preferred);
     setKnowledgeGraphDesktopScale(fitted, false);
     canvas.scrollLeft = 0;
     canvas.scrollTop = 0;
@@ -17089,9 +17102,9 @@ function renderKnowledgeGraph() {
     }
     canvas.replaceChildren(fragment);
     if (!mobileGraph) {
-        setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale, false);
-        canvas.scrollLeft = 0;
-        canvas.scrollTop = 0;
+        // 每次切换模块/最近一题关联/全部知识都自动重新适应，不继承上一张图的比例。
+        // SVG 已创建且容器仍可见，此处只做一次轻量尺寸计算，不重新绘图。
+        fitKnowledgeGraphDesktop();
     }
 
     renderKnowledgeGraphSide();
