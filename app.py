@@ -2526,15 +2526,16 @@ def chat():
             teaching["normalized_exercise_request"] = normalized_action_for_exercise
 
     # 出题只需要“设计一道符合目标难度的题”，不需要用与解困难题相同的 max 推理。
-    # 目标难度仍由 exercise_target_difficulty 严格写进教学提示；这里只单独控制模型思考强度：
-    # 首次一律非思考快速生成；只有困难题首次不达标时才升级推理。
+    # 目标难度仍由 exercise_target_difficulty 严格写进教学提示；模型思考强度
+    # 与题目难度分开。生成练习先快速设计并通过本地检查，不做无正文的长推理。
     # 真正解题时仍保留原来的中等=high、困难=max。
     ai_teaching = teaching
     if effective_exercise_request:
         ai_teaching = dict(teaching or {})
         target_for_generation = ai_teaching.get("exercise_target_difficulty") or "中等"
         # 题目生成与题目解答分开控制思考强度：
-        # 首次练习生成统一用非思考模式；困难题质量不足时再限次升级 high；
+        # 练习生成优先非思考，质量纠偏也优先重新设计具体题目，
+        # 避免困难题在 high 模式下长时间推理但最终正文为空。
         # 真正解题时仍保持中等=high、困难=max。
         ai_teaching["generation_reasoning_effort"] = "none"
 
@@ -2720,9 +2721,23 @@ def chat():
                 print("练习生成进行一次质量纠偏：", reason)
                 retry_messages = list(cleaned[-1:])
                 # 不要复用大段聊天历史；有参照题时保留前面准备好的带参照请求。
-                retry_messages.append({
-                    "role": "user",
-                    "content": (
+                # 纠偏仍是最多第二次模型请求。只有困难题使用新的定向纠偏：
+                # 不升级 high 思考，以避免消耗几十秒后仍没有可用正文。
+                if target_difficulty == "困难" and first_candidate:
+                    retry_content = (
+                        f"前次候选没有通过难度检查：{reason}。"
+                        "请保留我要求的学科、知识点和参照题核心考点，"
+                        "重新设计一题真正的困难题：要求非平凡的结构证明、"
+                        "分类讨论、极值分析、受约束计数或构造中的至少一种，"
+                        "并让至少两个步骤实质相互依赖。"
+                        "单小问题目本身也必须有真实的多阶段推理深度。"
+                        "不要只是加大数字、添加无关小问或改变难度标签。"
+                        "检查全部题目条件、可解性和隐藏答案准确性，不输出检查过程。"
+                        "严格只输出【题目】题干及[[WRONGBOOK_ANSWER]]答案[[/WRONGBOOK_ANSWER]]。"
+                    )
+                else:
+                    # 简单/中等以及首次无效的兜底提示保持原来的行为。
+                    retry_content = (
                         f"上一次生成没有通过题目检查：{reason}。"
                         f"请重新设计一题符合{target_difficulty}难度的离散数学题。"
                         "必须保持用户指定的学科/知识点及参照题的核心考点。"
@@ -2730,14 +2745,10 @@ def chat():
                         "中等题应有紧密相关的两到三步推理，简单题只需基础操作。"
                         "请先在内部自行验证题目可解、条件完整、答案一致，不展示自检。"
                         "严格只输出【题目】题干及[[WRONGBOOK_ANSWER]]答案[[/WRONGBOOK_ANSWER]]。"
-                    ),
-                })
+                    )
+                retry_messages.append({"role": "user", "content": retry_content})
                 retry_context = dict(ai_teaching)
-                # 初次快速出题如果有效但难度不够，困难题才尝试 high；
-                # 首次出现空正文/格式失败时保持非思考，避免再次空耗推理预算。
-                retry_context["generation_reasoning_effort"] = (
-                    "high" if target_difficulty == "困难" and first_candidate else "none"
-                )
+                retry_context["generation_reasoning_effort"] = "none"
                 retry_context["exercise_target_difficulty"] = target_difficulty
                 try:
                     retry_result = ask_ai(
