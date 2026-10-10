@@ -2248,6 +2248,41 @@ def _exercise_reference_matches(reference_teaching, generated_teaching):
     return True, ""
 
 
+def _requested_reasoning_effort(text):
+    """本轮显式要求模型思考档位，独立于题目难度分类。
+
+    仅匹配带有命令意味的短语；历史题干里提到 max/high 不触发。
+    """
+    value = re.sub(r"\s+", "", str(text or "").lower())
+    # 先排除单纯禁止某个档位的句子，避免“不要用 max”被当成启用 max。
+    patterns = {
+        "max": (
+            r"(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以|给我用)"
+            r".{0,8}(?:max|最高|最大)(?:思考|推理|强度|档|模式)?",
+            r"(?:max|最高|最大)(?:思考|推理|强度|档|模式)(?:来|去|处理|求解|解答|解析)",
+        ),
+        "high": (
+            r"(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以|给我用)"
+            r".{0,8}high(?:思考|推理|强度|档|模式)?",
+            r"high(?:思考|推理|强度|档|模式)(?:来|去|处理|求解|解答|解析)",
+        ),
+    }
+    matched = []
+    for effort, expressions in patterns.items():
+        for expr in expressions:
+            for hit in re.finditer(expr, value, re.I):
+                vicinity = value[max(0, hit.start()-10):hit.end()]
+                # 区分“你刚才用 high 而不是 max”（描述）和“现在改用 max”（命令）。
+                if re.search(r"(?:不要|别|不用|禁止|无需|不准|而不是|不是)(?:.{0,5})(?:max|high|最高|最大)", vicinity):
+                    continue
+                if re.search(r"(?:你刚才|刚才|之前|上次|先前|刚刚).{0,5}(?:用|使用)(?:high|max)", vicinity) and not re.search(r"请|现在|改用|换成|接下来|必须", vicinity):
+                    continue
+                matched.append((hit.end(), effort))
+    if not matched:
+        return ""
+    return max(matched)[1]
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     ip = _get_client_ip()
@@ -2395,6 +2430,42 @@ def chat():
                     and q.strip() in cleaned[-1]["content"]):
                 solution_reference_answer = a.strip()
                 teaching["solution_reference_answer"] = solution_reference_answer
+
+    # 题目难度优先采用前端明确指向的题目快照，不重新从追问语句
+    # 推测难度。只接受已包含在本轮用户消息中的同一题目锚点。
+    if not client_requires_exercise:
+        question_context = data.get("question_context")
+        if isinstance(question_context, dict):
+            pinned_question = str(question_context.get("question") or "").strip()
+            pinned_difficulty = str(question_context.get("difficulty") or "").strip()
+            current_user_content = next(
+                (item["content"] for item in reversed(cleaned)
+                 if item["role"] == "user"), ""
+            )
+            if (10 <= len(pinned_question) <= 6000
+                    and pinned_difficulty in ("简单", "中等", "困难")
+                    and "【当前指向题目】" in current_user_content
+                    and pinned_question in current_user_content):
+                teaching = dict(teaching or {})
+                teaching["difficulty"] = pinned_difficulty
+                print(f"当前题目难度采用题目快照：{pinned_difficulty}")
+
+        explicit_effort = _requested_reasoning_effort(current_instruction)
+        client_effort = str(data.get("reasoning_effort_override") or "").lower()
+        # 客户端的续用偏好只在它携带了有效题目锚点时接受。
+        has_pinned_question = bool(
+            isinstance(question_context, dict)
+            and isinstance(question_context.get("question"), str)
+            and "【当前指向题目】" in current_user_content
+            and question_context["question"].strip() in current_user_content
+        )
+        selected_effort = explicit_effort or (
+            client_effort if has_pinned_question and client_effort in ("high", "max") else ""
+        )
+        if selected_effort:
+            teaching = dict(teaching or {})
+            teaching["reasoning_effort_override"] = selected_effort
+            print(f"本轮使用明确指定的 {selected_effort} 思考档位。")
 
     # 双保险：前端 request_kind 是强信号，但后端仍独立理解自然语言。
     # 因此用户换成“随便来一道 / 整个难题 / 考我一道”等说法时，
