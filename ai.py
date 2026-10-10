@@ -115,15 +115,11 @@ MAX_HISTORY_MESSAGES = 32
 MAX_HISTORY_CHARS = 60000
 MAX_MESSAGE_CHARS = 6000
 MAX_OUTPUT_TOKENS = max(2000, min(6000, int(os.environ.get("DEEPSEEK_MAX_OUTPUT_TOKENS", "5000"))))
-# 中等题开启常规深度思考；困难题开启 max 思考。
-# 思考模式会消耗额外输出预算，因此分别预留更充足的 token。
+# 中等和困难统一采用 high 思考；max 不再对外开放。
+# high 模式仍需为最终解答保留足够输出预算。
 MEDIUM_MAX_OUTPUT_TOKENS = max(
     MAX_OUTPUT_TOKENS,
     min(12000, int(os.environ.get("MEDIUM_MAX_OUTPUT_TOKENS", "8000"))),
-)
-HARD_MAX_OUTPUT_TOKENS = max(
-    MEDIUM_MAX_OUTPUT_TOKENS,
-    min(20000, int(os.environ.get("HARD_MAX_OUTPUT_TOKENS", "12000"))),
 )
 MAX_CONTINUATION_ROUNDS = 1
 
@@ -951,37 +947,28 @@ if LUXIN_ENABLED and LUXIN_API_KEY and LUXIN_CIRCUIT_BREAKER:
 def _reasoning_effort_for_context(teaching_context):
     """生成题目单独控制推理预算；解题仍按难度决定思考强度。"""
     context = teaching_context or {}
-    # 明确指定的解题思考档位高于难度自动判断；与生成练习题分开。
+    # 只有 high 可以作为显式覆盖；历史记录携带 max 也无法启用。
     if context.get("mode") != "exercise":
         override = str(context.get("reasoning_effort_override") or "").lower()
-        if override in ("high", "max"):
-            return override
+        if override == "high":
+            return "high"
     if context.get("mode") == "exercise":
         override = context.get("generation_reasoning_effort")
-        if override in ("none", "high", "max"):
+        if override in ("none", "high"):
             return override
-    difficulty = str(context.get("difficulty", "")).strip()
-    if difficulty == "困难":
-        # 生成题的参考答案已存在时，这轮只需严谨解释与复核；
-        # 避免 max 把整个输出预算耗在内部推理，导致有 reasoning 却无正文。
-        if (context.get("mode") == "full_solution"
-                and str(context.get("solution_reference_answer") or "").strip()):
-            return "high"
-        return "max"
-    if difficulty == "中等":
-        return "high"
-    return "none"
+    return "high" if str(context.get("difficulty", "")).strip() in ("中等", "困难") else "none"
 
 
 def _build_text_payload(provider, messages, reasoning_effort="none", max_tokens=None):
     effort = str(reasoning_effort or "none").strip().lower()
-    if effort not in ("none", "high", "max"):
+    # 请求层最后一道保险：调用者即使直接传 max，也只能发 high。
+    if effort == "max":
+        effort = "high"
+    if effort not in ("none", "high"):
         effort = "none"
 
     if max_tokens is not None:
         token_limit = int(max_tokens)
-    elif effort == "max":
-        token_limit = HARD_MAX_OUTPUT_TOKENS
     elif effort == "high":
         token_limit = MEDIUM_MAX_OUTPUT_TOKENS
     else:
@@ -995,11 +982,9 @@ def _build_text_payload(provider, messages, reasoning_effort="none", max_tokens=
             "messages": messages,
             "stream": False,
         }
-        # 中等/困难题仍优先尝试赛事网关透传思考控制；若网关不支持，
-        # 当前 provider 会失败并立即切到原 DeepSeek，从而保证 high/max 不缩水。
-        if effort in ("high", "max"):
+        if effort == "high":
             payload["thinking"] = {"type": "enabled"}
-            payload["reasoning_effort"] = effort
+            payload["reasoning_effort"] = "high"
         return payload
 
     payload = {
@@ -1009,9 +994,9 @@ def _build_text_payload(provider, messages, reasoning_effort="none", max_tokens=
         "stream": False,
     }
 
-    if effort in ("high", "max"):
+    if effort == "high":
         payload["thinking"] = {"type": "enabled"}
-        payload["reasoning_effort"] = effort
+        payload["reasoning_effort"] = "high"
     else:
         payload["thinking"] = {"type": "disabled"}
 
@@ -1032,9 +1017,7 @@ def _provider_request_timeout(provider, reasoning_effort, default_timeout):
         return default_timeout
 
     effort = str(reasoning_effort or "none").strip().lower()
-    if effort == "max":
-        return (8, 120)
-    if effort == "high":
+    if effort in ("max", "high"):
         return (6, 60)
     return (4, 10)
 
@@ -1066,6 +1049,9 @@ def _request_text_completion(
     鲁信 Key 被撤销、额度不足、模型不可用、网络异常或返回格式异常时，
     自动切回原 DeepSeek，不让外部算力支援成为单点故障。
     """
+    # 即使上层意外传入旧版 max，也不得写入 provider 请求与日志。
+    if str(reasoning_effort or "").lower() == "max":
+        reasoning_effort = "high"
     providers = _text_provider_configs(preferred_provider)
     if not providers:
         return {
@@ -1106,7 +1092,6 @@ def _request_text_completion(
         for attempt in range(attempts):
             try:
                 mode_text = {
-                    "max": "max 思考",
                     "high": "high 思考",
                 }.get(reasoning_effort, "非思考")
                 print(
@@ -1434,7 +1419,7 @@ def ask_ai(messages, retries=2, teaching_context=None):
     """
     文本回答优先使用鲁信杯算力，异常时自动回退原 DeepSeek 路径。
 
-    简单请求关闭思考；中等题使用 high 思考；困难题使用 max 思考。
+    简单请求关闭思考；中等和困难题均使用 high 思考。
     鲁信优先，但简单请求若鲁信短时间无响应会快速回退原 DeepSeek。
     """
     if ASK_AI_MOCK:
@@ -1479,15 +1464,14 @@ $$
     ] + clean_messages
 
     reasoning_effort = _reasoning_effort_for_context(teaching_context)
-    if reasoning_effort in ("high", "max"):
-        # 不能把 high 等同于“检测到中等题”：困难题有缓存参考答案时也可能
-        # 自动选 high 做复核。难度与思考强度是两个独立字段。
+    if reasoning_effort == "high":
+        # high 同时用于中等与困难题；难度与思考强度是两个独立字段。
         detected_difficulty = str(context.get("difficulty") or "未确定")
         source = "用户指定" if context.get("reasoning_effort_override") else "自动选择"
         print(f"解题配置：题目难度={detected_difficulty}；思考强度={reasoning_effort}（{source}）。")
 
     is_full_solution = context.get("mode") == "full_solution"
-    # 普通聊天的旧重试策略不变；完整解答避免在 max/high 超时后再自动重复数轮。
+    # 普通聊天的旧重试策略不变；完整解答避免在 high 超时后自动重复数轮。
     result = _request_text_completion(
         api_messages,
         retries=0 if is_full_solution else retries,
