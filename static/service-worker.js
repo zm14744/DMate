@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-high-only-difficulty-audit-20261010";
+const CACHE_NAME = "dmate-webapp-native-graph-copy-tablet-20261010";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
