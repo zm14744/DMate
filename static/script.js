@@ -11761,6 +11761,23 @@ async function requestAiReply(session) {
             }
         }
 
+        const latestRawRequest = String(latestUserBeforeRequest?.text || "").trim();
+        const asksForFullSolution = (
+            /(?:给出|给我|直接给|告诉我|输出).{0,8}(?:答案|解析|解答)|(?:完整|详细).{0,3}(?:解析|解答|过程)|答案.{0,3}(?:和|与|及).{0,3}解析/.test(latestRawRequest)
+            && !/(?:不要|别给|不需要|不用|只给提示|别直接)/.test(latestRawRequest)
+            && !latestIsExerciseRequest
+            && !latestIsRetestGeneration
+            && !latestUserBeforeRequest?.isRetestAnswer
+        );
+        const targetGeneratedMessage = requestTargetCandidate?.role === "ai"
+            ? session.messages?.[requestTargetCandidate.index] : null;
+        const savedSolution = asksForFullSolution
+            ? String(targetGeneratedMessage?.generatedAnswer || "").trim()
+            : "";
+        const solutionReference = savedSolution && requestTargetCandidate?.text
+            ? { question: requestTargetCandidate.text, answer: savedSolution.slice(0, 1200) }
+            : undefined;
+
         const response = await fetch("/chat", {
             method: "POST",
             headers: {
@@ -11776,7 +11793,8 @@ async function requestAiReply(session) {
                 // 不再只靠自然语言二次猜测“这是不是出题”。
                 request_kind: latestIsExerciseRequest
                     ? "exercise"
-                    : "chat",
+                    : asksForFullSolution ? "solution" : "chat",
+                solution_reference: solutionReference,
                 exercise_reference: retestReferenceQuestion
                     ? {
                         question: retestReferenceQuestion,
