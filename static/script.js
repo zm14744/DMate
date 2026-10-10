@@ -8456,7 +8456,15 @@ function loadState() {
                 learningQuestion: normalizeLearningQuestion(
                     session.learningQuestion
                 ),
-                retest: normalizeRetestSession(session.retest)
+                retest: normalizeRetestSession(session.retest),
+                solverEffortPreference: (
+                    session.solverEffortPreference
+                    && typeof session.solverEffortPreference.fingerprint === "string"
+                    && ["max", "high"].includes(session.solverEffortPreference.effort)
+                ) ? {
+                    fingerprint: session.solverEffortPreference.fingerprint,
+                    effort: session.solverEffortPreference.effort
+                } : null
             });
         }
 
@@ -11778,6 +11786,43 @@ async function requestAiReply(session) {
             ? { question: requestTargetCandidate.text, answer: savedSolution.slice(0, 1200) }
             : undefined;
 
+        const pinnedTeaching = requestTargetCandidate
+            ? candidateTeachingSnapshot(session, requestTargetCandidate)
+            : null;
+        const pinnedDifficulty = ["简单", "中等", "困难"].includes(
+            pinnedTeaching?.difficulty
+        ) ? pinnedTeaching.difficulty : "";
+        const questionContext = requestTargetCandidate?.text && pinnedDifficulty
+            ? {
+                question: requestTargetCandidate.text,
+                difficulty: pinnedDifficulty
+            } : undefined;
+
+        // 同一道题中显式指定的 max/high 保留到后续追问；换题自动失效。
+        const instructionWithoutSpaces = latestRawRequest.replace(/\s+/g, "").toLowerCase();
+        const maxRequested = /(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以).{0,8}(?:max|最高|最大)(?:思考|推理|强度|档|模式)?|(?:max|最高|最大)(?:思考|推理|强度|档|模式)(?:来|去|处理|求解|解答|解析)/.test(instructionWithoutSpaces)
+            && !/(?:不要|别|不用|禁止|无需|不准).{0,5}(?:max|最高|最大)/.test(instructionWithoutSpaces);
+        const highRequested = !maxRequested
+            && /(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以).{0,8}high(?:思考|推理|强度|档|模式)?|high(?:思考|推理|强度|档|模式)(?:来|去|处理|求解|解答|解析)/.test(instructionWithoutSpaces)
+            && !/(?:不要|别|不用|禁止|无需|不准).{0,5}high/.test(instructionWithoutSpaces);
+        const preferenceFingerprint = requestTargetFingerprint || (
+            latestIsFreshQuestion
+                ? wrongQuestionFingerprint(
+                    extractQuestionOnlyFromMessage(latestUserBeforeRequest) || latestRawRequest
+                )
+                : ""
+        );
+        if ((maxRequested || highRequested) && preferenceFingerprint) {
+            session.solverEffortPreference = {
+                fingerprint: preferenceFingerprint,
+                effort: maxRequested ? "max" : "high"
+            };
+            saveState();
+        }
+        const preferredEffort = preferenceFingerprint
+            && session.solverEffortPreference?.fingerprint === preferenceFingerprint
+            ? session.solverEffortPreference.effort : undefined;
+
         const response = await fetch("/chat", {
             method: "POST",
             headers: {
@@ -11795,6 +11840,8 @@ async function requestAiReply(session) {
                     ? "exercise"
                     : asksForFullSolution ? "solution" : "chat",
                 solution_reference: solutionReference,
+                question_context: questionContext,
+                reasoning_effort_override: preferredEffort,
                 exercise_reference: retestReferenceQuestion
                     ? {
                         question: retestReferenceQuestion,
@@ -13030,6 +13077,8 @@ function showCurrentError(text) {
     );
 }
 
+let pendingBackgroundReplyRender = false;
+
 function startTyping(
     text,
     session,
@@ -13049,6 +13098,14 @@ function startTyping(
 
     if (typingTimer) {
         forceCompleteTyping();
+    }
+
+    // 后台标签页定时器可能被浏览器大幅降频；响应已到时直接完整落盘。
+    if (document.hidden) {
+        addAssistantMessage(session, text, meta);
+        saveState();
+        pendingBackgroundReplyRender = true;
+        return;
     }
 
     // 长回答继续逐字输出会等待几十秒，期间 LaTeX 只能以源码形式裸露。
@@ -13254,6 +13311,19 @@ function forceCompleteTyping() {
     lastTypingAutoScrollAt = 0;
 }
 
+
+// 页面进入后台时立即完成已收到内容的打字动画，避免恢复后继续排队显示。
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden && typingTimer) {
+        forceCompleteTyping();
+    } else if (!document.hidden && pendingBackgroundReplyRender) {
+        pendingBackgroundReplyRender = false;
+        renderChat();
+        renderSessions();
+        renderInfo();
+        refreshInputAvailability();
+    }
+});
 
 // -----------------------------
 // 渲染聊天
