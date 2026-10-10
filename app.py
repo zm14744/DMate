@@ -2257,8 +2257,11 @@ def _requested_reasoning_effort(text):
     # 先排除单纯禁止某个档位的句子，避免“不要用 max”被当成启用 max。
     patterns = {
         "max": (
+            # “出一道最高难度题”是题目难度，不是 max 思考指令。
             r"(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以|给我用)"
-            r".{0,8}(?:max|最高|最大)(?:思考|推理|强度|档|模式)?",
+            r".{0,8}max(?:思考|推理|强度|档|模式)?",
+            r"(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以|给我用)"
+            r".{0,8}(?:最高|最大)(?:思考|推理|强度|档|模式)",
             r"(?:max|最高|最大)(?:思考|推理|强度|档|模式)(?:来|去|处理|求解|解答|解析)",
         ),
         "high": (
@@ -2409,6 +2412,18 @@ def chat():
                   r"(?:完整|详细).{0,3}(?:解析|解答|过程)|答案.{0,3}(?:和|与|及).{0,3}解析", current_instruction)
         and not re.search(r"不要|别给|不需要|不用|只给提示|别直接", current_instruction)
     )
+    # max 已停用。用户明确要求 max 时立即如实告知，不悄悄用 high 冒充。
+    # 本轮询问以前是否使用 max、或者明确说“不要用 max”，不在此列。
+    if _requested_reasoning_effort(current_instruction) == "max":
+        return jsonify({
+            "reply": (
+                "DMate 当前不支持 max 思考强度。"
+                "中等和困难题的解答统一使用 high。"
+                "请不指定 max，直接提出题目或要求完整解析。"
+            ),
+            "unsupported_effort": "max",
+        })
+
     solution_mode = bool((client_requests_solution and explicit_solution)
                          or (teaching or {}).get("mode") == "full_solution")
     if solution_mode:
@@ -2446,9 +2461,17 @@ def chat():
                     and pinned_difficulty in ("简单", "中等", "困难")
                     and "【当前指向题目】" in current_user_content
                     and pinned_question in current_user_content):
+                # 客户端的题目难度标签可能由旧版分类器生成。
+                # 后端重新评估真实题干，不盲目相信旧标签。
+                fresh = analyze_question(pinned_question)
+                rechecked = (fresh or {}).get("difficulty")
+                selected = rechecked if rechecked in ("简单", "中等", "困难") else pinned_difficulty
                 teaching = dict(teaching or {})
-                teaching["difficulty"] = pinned_difficulty
-                print(f"当前题目难度采用题目快照：{pinned_difficulty}")
+                teaching["difficulty"] = selected
+                if selected != pinned_difficulty:
+                    print(f"修正旧题难度：标签={pinned_difficulty}，重新评估={selected}")
+                else:
+                    print(f"当前题目难度已复核：{selected}")
 
         explicit_effort = _requested_reasoning_effort(current_instruction)
         client_effort = str(data.get("reasoning_effort_override") or "").lower()
@@ -2459,8 +2482,8 @@ def chat():
             and "【当前指向题目】" in current_user_content
             and question_context["question"].strip() in current_user_content
         )
-        selected_effort = explicit_effort or (
-            client_effort if has_pinned_question and client_effort in ("high", "max") else ""
+        selected_effort = ("high" if explicit_effort == "high" else "") or (
+            "high" if has_pinned_question and client_effort == "high" else ""
         )
         if selected_effort:
             teaching = dict(teaching or {})
@@ -2528,7 +2551,7 @@ def chat():
     # 出题只需要“设计一道符合目标难度的题”，不需要用与解困难题相同的 max 推理。
     # 目标难度仍由 exercise_target_difficulty 严格写进教学提示；模型思考强度
     # 与题目难度分开。生成练习先快速设计并通过本地检查，不做无正文的长推理。
-    # 真正解题时仍保留原来的中等=high、困难=max。
+    # 真正解题时中等/困难统一采用 high。
     ai_teaching = teaching
     if effective_exercise_request:
         ai_teaching = dict(teaching or {})
@@ -2536,7 +2559,7 @@ def chat():
         # 题目生成与题目解答分开控制思考强度：
         # 练习生成优先非思考，质量纠偏也优先重新设计具体题目，
         # 避免困难题在 high 模式下长时间推理但最终正文为空。
-        # 真正解题时仍保持中等=high、困难=max。
+        # 真正解题时中等/困难均为 high。
         ai_teaching["generation_reasoning_effort"] = "none"
 
     # 网络层零自动重试 + 质量层最多一次重生成：避免一次出题叠加
