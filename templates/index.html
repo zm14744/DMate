@@ -4802,13 +4802,11 @@ body[data-appearance-theme="light"] .input input {
         height:clamp(230px, 42dvh, 360px);
         min-height:230px;
         max-height:360px;
-        overflow-x:auto;
-        overflow-y:hidden;
-        overscroll-behavior-x:contain;
-        overscroll-behavior-y:auto;
+        overflow:auto;
+        overscroll-behavior:contain;
         -webkit-overflow-scrolling:touch;
-        /* 普通预览由原生滚动优先；纵向滚页面，横向滚图谱。 */
-        touch-action:auto;
+        /* 非完整查看：预览区自己可以横向与纵向浏览整张图谱。 */
+        touch-action:pan-x pan-y;
         border-radius:10px;
         background:var(--kg-mobile-viewport-bg);
         scrollbar-gutter:stable both-edges;
@@ -4841,11 +4839,21 @@ body[data-appearance-theme="light"] .input input {
     .kg-mobile-edge {
         fill:none;
         stroke:var(--kg-mobile-edge-color);
-        stroke-width:2.6;
+        stroke-width:1.8;
         stroke-linecap:round;
         stroke-linejoin:round;
+        opacity:.62;
+        /* 大图缩放时 SVG filter 会触发昂贵的重绘；完全去掉。 */
+        filter:none !important;
+    }
+    .kg-mobile-edge.is-secondary {
+        display:none;
+    }
+    .kg-mobile-edge.is-related {
+        display:inline;
         opacity:1;
-        filter:drop-shadow(0 0 1px var(--kg-mobile-edge-shadow));
+        stroke-width:2.75;
+        stroke:var(--kg-mobile-edge-color);
     }
 
     .kg-mobile-node {
@@ -4984,6 +4992,10 @@ body[data-appearance-theme="light"] .input input {
         background:var(--surface-2);
     }
 
+    #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-stage {
+        will-change:transform;
+        backface-visibility:hidden;
+    }
     #knowledgeGraphModal.graph-fullscreen-view .kg-mobile-viewport {
         flex:1 1 auto !important;
         width:100% !important;
@@ -5325,10 +5337,10 @@ body[data-appearance-theme="light"] .input input {
        横向也改用浏览器原生滚动，不再由 JS 每帧改 scrollLeft。 */
     #knowledgeGraphModal:not(.graph-fullscreen-view) .kg-mobile-viewport {
         overflow-x:auto !important;
-        overflow-y:hidden !important;
-        overscroll-behavior-x:auto !important;
-        overscroll-behavior-y:auto !important;
-        touch-action:auto !important;
+        overflow-y:auto !important;
+        overscroll-behavior:contain !important;
+        -webkit-overflow-scrolling:touch;
+        touch-action:pan-x pan-y !important;
         scroll-behavior:auto !important;
     }
 
@@ -5720,6 +5732,25 @@ body[data-appearance-theme="light"] .input input {
         flex:1 1 auto;
         min-height:0;
         padding:18px 18px max(18px, env(safe-area-inset-bottom));
+        overscroll-behavior:contain;
+    }
+    /* 跟随安卓键盘出现后的真实可视视口；固定弹层不再留上方黑色空带。 */
+    #accountModal:not(.hidden) {
+        position:fixed !important;
+        top:var(--app-viewport-top, 0px) !important;
+        bottom:auto !important;
+        left:0 !important;
+        right:0 !important;
+        height:var(--app-visible-height, 100dvh) !important;
+        max-height:var(--app-visible-height, 100dvh) !important;
+        align-items:stretch !important;
+        padding:0 !important;
+        overflow:hidden !important;
+    }
+    #accountModal .account-card {
+        height:100% !important;
+        max-height:100% !important;
+        min-height:0 !important;
     }
 }
 
@@ -7363,7 +7394,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-knowledge-graph-contrast-scrollfix-20261010"></script>
+<script src="/static/script.js?v=dmate-mobile-graph-density-viewport-email-20261010"></script>
 
 </body>
 </html>
