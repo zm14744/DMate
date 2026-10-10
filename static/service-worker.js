@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-ios-webapp-v6-27-mobile-graph-copy-auto-merge-20261010";
+const CACHE_NAME = "dmate-webapp-high-only-difficulty-audit-20261010";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
