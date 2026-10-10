@@ -15374,6 +15374,8 @@ function toggleKnowledgeGraphFullscreenView() {
     setKnowledgeGraphFullscreenView(
         !modal.classList.contains("graph-fullscreen-view")
     );
+    // 预览状态只构造入口按钮，进入完整查看时再生成图谱，退出时释放图谱。
+    renderKnowledgeGraph();
 }
 
 function openKnowledgeGraph() {
@@ -15384,8 +15386,8 @@ function openKnowledgeGraph() {
     if (!modal) return;
 
     modal.classList.remove("hidden");
-    // 手机只保留完整画布，不再进入一块需要二次放大的普通预览。
-    setKnowledgeGraphFullscreenView(Boolean(window.matchMedia?.("(max-width: 760px)")?.matches));
+    // 手机保留“完整查看”入口：默认不显示小图，点击按钮才进入原有全屏画布。
+    setKnowledgeGraphFullscreenView(false);
     renderKnowledgeGraphLoading(
         "知识图谱加载中…"
     );
@@ -15964,8 +15966,29 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         section.appendChild(desc);
     }
 
-    // 手机上从打开起就是完整查看，不再渲染“完整查看/退出完整查看”按钮。
     const graphModal = document.getElementById("knowledgeGraphModal");
+    const isExpanded = graphModal?.classList.contains("graph-fullscreen-view");
+    const expandButton = document.createElement("button");
+    expandButton.type = "button";
+    expandButton.className = "kg-mobile-expand";
+    expandButton.textContent = isExpanded ? "退出完整查看" : "完整查看";
+    expandButton.setAttribute(
+        "aria-label",
+        isExpanded ? "退出知识图谱完整查看" : "完整查看知识图谱"
+    );
+    expandButton.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleKnowledgeGraphFullscreenView();
+    });
+    section.appendChild(expandButton);
+
+    if (!isExpanded) {
+        // 不再渲染非完整查看的小图：只保留进入原有完整查看的入口。
+        section.classList.add("kg-mobile-entry-only");
+        container.appendChild(section);
+        return;
+    }
 
     const zoomControls = document.createElement("div");
     zoomControls.className = "kg-mobile-zoom-controls";
