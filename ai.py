@@ -949,8 +949,13 @@ if LUXIN_ENABLED and LUXIN_API_KEY and LUXIN_CIRCUIT_BREAKER:
 
 
 def _reasoning_effort_for_context(teaching_context):
-    """按三档题目难度选择文本模型思考强度。"""
-    difficulty = str((teaching_context or {}).get("difficulty", "")).strip()
+    """生成题目单独控制推理预算；解题仍按难度决定思考强度。"""
+    context = teaching_context or {}
+    if context.get("mode") == "exercise":
+        override = context.get("generation_reasoning_effort")
+        if override in ("none", "high", "max"):
+            return override
+    difficulty = str(context.get("difficulty", "")).strip()
     if difficulty == "困难":
         return "max"
     if difficulty == "中等":
@@ -1461,7 +1466,13 @@ $$
     content = str(result.get("content", "") or "").strip()
     provider_id = result.get("provider_id")
 
+    # 练习出题由 /chat 统一限制为最多两次候选生成。不能在 AI 层暗中
+    # 自动续写/重生成，否则两次候选可能变成 4~6 次昂贵的网络调用。
+    is_exercise_generation = (teaching_context or {}).get("mode") == "exercise"
     if choice.get("finish_reason") == "length":
+        if is_exercise_generation:
+            print("练习生成输出截断，交由出题校验流程处理。")
+            return _failure("出题内容被截断，请重新生成。")
         print("检测到回答达到输出长度上限，自动继续生成。")
         content = _continue_truncated_answer(
             api_messages,
@@ -1472,7 +1483,7 @@ $$
 
     content = _repair_common_latex_typos(content)
 
-    if _looks_like_broken_math(content):
+    if _looks_like_broken_math(content) and not is_exercise_generation:
         print("检测到 AI 数学格式异常，尝试自动重生成。")
         regenerated = _regenerate_broken_math_answer(
             api_messages,
@@ -1491,6 +1502,10 @@ $$
             content = _fallback_math_to_readable_text(content)
             if not content:
                 return _failure("AI 服务没有生成有效回答，请重新发送。")
+
+    if is_exercise_generation and _looks_like_broken_math(content):
+        print("练习生成数学格式异常，交由受限出题纠偏处理。")
+        return _failure("生成题目的数学格式不完整，请重新生成。")
 
     print(
         f"AI 调用成功：{result.get('provider_name', '未知路径')} / "
