@@ -15022,11 +15022,11 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     const baseWidth = Math.max(1, Number(stage.dataset.baseWidth) || stage.scrollWidth || 1);
     const baseHeight = Math.max(1, Number(stage.dataset.baseHeight) || stage.scrollHeight || 1);
     const modal = document.getElementById("knowledgeGraphModal");
-    const layoutScroller = modal?.querySelector(".knowledge-graph-layout") || null;
     const pointers = new Map();
     let fullscreenPan = null;
-    let previewPan = null;
     let pinch = null;
+    let pinchFrame = 0;
+    let pendingPinch = null;
     let suppressClickUntil = 0;
 
     const currentScale = () => (
@@ -15112,18 +15112,9 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
 
         const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
 
-        if (!fullscreen) {
-            previewPan = {
-                pointerId: event.pointerId,
-                x: event.clientX,
-                y: event.clientY,
-                left: viewport.scrollLeft,
-                top: layoutScroller ? layoutScroller.scrollTop : 0,
-                axis: "",
-                moved: false
-            };
-            return;
-        }
+        // 普通图谱预览由原生滚动容器接管横向、纵向两轴；
+        // 不拦截 pointermove，以保留安卓浏览器的惯性与边界滚动。
+        if (!fullscreen) return;
 
         pointers.set(event.pointerId, event);
 
@@ -15161,34 +15152,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     viewport.addEventListener("pointermove", event => {
         const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
 
-        if (!fullscreen) {
-            if (!previewPan || previewPan.pointerId !== event.pointerId) return;
-
-            const dx = event.clientX - previewPan.x;
-            const dy = event.clientY - previewPan.y;
-
-            if (!previewPan.axis && Math.abs(dx) + Math.abs(dy) > 5) {
-                previewPan.axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
-            }
-
-            if (previewPan.axis === "x") {
-                previewPan.moved = true;
-                viewport.scrollLeft = previewPan.left - dx;
-                suppressClickUntil = performance.now() + 220;
-                event.preventDefault();
-                return;
-            }
-
-            if (previewPan.axis === "y" && layoutScroller) {
-                previewPan.moved = true;
-                layoutScroller.scrollTop = previewPan.top - dy;
-                suppressClickUntil = performance.now() + 220;
-                event.preventDefault();
-                return;
-            }
-
-            return;
-        }
+        if (!fullscreen) return;
 
         if (!pointers.has(event.pointerId)) return;
         pointers.set(event.pointerId, event);
@@ -15210,9 +15174,19 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
             const scale = clampMobileGraphScale(
                 pinch.scale * pointerDistance(a, b) / pinch.distance
             );
-            applyScale(scale);
-            viewport.scrollLeft = Math.max(0, pinch.contentX * scale - center.x);
-            viewport.scrollTop = Math.max(0, pinch.contentY * scale - center.y);
+            // 合并高频 pointermove：一帧只布局、缩放和定位一次。
+            pendingPinch = { scale, center, contentX:pinch.contentX, contentY:pinch.contentY };
+            if (!pinchFrame) {
+                pinchFrame = requestAnimationFrame(() => {
+                    pinchFrame = 0;
+                    const target = pendingPinch;
+                    pendingPinch = null;
+                    if (!target) return;
+                    applyScale(target.scale);
+                    viewport.scrollLeft = Math.max(0, target.contentX * target.scale - target.center.x);
+                    viewport.scrollTop = Math.max(0, target.contentY * target.scale - target.center.y);
+                });
+            }
             suppressClickUntil = performance.now() + 300;
             event.preventDefault();
             return;
@@ -15234,10 +15208,6 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     }, { passive: false });
 
     const finishPointer = event => {
-        if (previewPan?.pointerId === event.pointerId) {
-            previewPan = null;
-        }
-
         pointers.delete(event.pointerId);
 
         if (fullscreenPan?.pointerId === event.pointerId) {
@@ -15311,7 +15281,7 @@ function setKnowledgeGraphFullscreenView(enabled) {
             // 或用底部 +/- / 适应按钮调整。
             viewport._kgFit?.();
         } else {
-            // 回到普通预览时恢复 100%，预览只负责横向拖图，纵向手势交给页面。
+            // 回到普通预览时恢复 100%，预览内可双向滚动整张图谱。
             viewport._kgReset?.();
         }
     });
@@ -16068,6 +16038,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
 
     const viewport = document.createElement("div");
     viewport.className = "kg-mobile-viewport";
+    viewport.setAttribute("aria-label", "知识图谱预览，可上下左右滑动；点击节点查看全部直接关联");
 
     const zoomSurface = document.createElement("div");
     zoomSurface.className = "kg-mobile-zoom-surface";
@@ -16113,20 +16084,35 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         const current = positions.get(node.id);
         if (!current) continue;
 
-        for (const prerequisiteName of node.prerequisites || []) {
-            const previousNode = byName.get(prerequisiteName);
-            const previous = previousNode ? positions.get(previousNode.id) : null;
-            if (!previous) continue;
+        const parents = (node.prerequisites || [])
+            .map(name => byName.get(name))
+            .filter(parent => parent && positions.has(parent.id));
+        // 首选同层距最近的前置节点作为主线，减少交叉与重叠。
+        const primaryId = parents.reduce((best, parent) => {
+            const pos = positions.get(parent.id);
+            const cost = Math.abs(current.y - pos.y)
+                + Math.abs(current.x - pos.x - nodeWidth) * 0.25;
+            return (!best || cost < best.cost)
+                ? { id:parent.id, cost } : best;
+        }, null)?.id;
+        // 完整知识图谱节点较多时只显示间隔排列的主干线；
+        // 点击任何节点会临时展开它的全部直接关联（包含隐藏的次级边）。
+        const sameLevelNodes = columns.get(levels.get(node.id) || 0) || [];
+        const showMainEdge = orderedNodes.length <= 24
+            || sameLevelNodes.indexOf(node) % 2 === 0;
 
+        for (const parent of parents) {
+            const previous = positions.get(parent.id);
             const x1 = previous.x + nodeWidth;
             const y1 = previous.y + nodeHeight / 2;
             const x2 = current.x;
             const y2 = current.y + nodeHeight / 2;
             const midX = (x1 + x2) / 2;
-
             const path = createSvgElement("path", {
-                class: "kg-mobile-edge",
-                d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+                class: "kg-mobile-edge" + (parent.id === primaryId && showMainEdge ? " is-primary" : " is-secondary"),
+                d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`,
+                "data-from": parent.id,
+                "data-to": node.id
             });
             edgeSvg.appendChild(path);
         }
@@ -16175,6 +16161,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     viewport.appendChild(zoomSurface);
     section.appendChild(viewport);
     container.appendChild(section);
+    updateMobileGraphEdgeEmphasis(section, knowledgeGraphSelectedNodeId);
 
     installMobileGraphInteraction(
         viewport,
@@ -16209,7 +16196,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         viewport._kgFit?.();
     });
 
-    // 普通预览默认 100%。横向超出时可左右拖；上下滑动则由外层页面接管。
+    // 普通预览默认 100%；内容超出预览窗口时可沿两个方向原生滚动。
     requestAnimationFrame(() => {
         const overflow = Math.max(0, zoomSurface.scrollWidth - viewport.clientWidth);
         if (overflow > 0) viewport.scrollLeft = Math.min(overflow / 2, nodeWidth / 2);
@@ -16736,6 +16723,19 @@ function renderKnowledgeGraphHistory() {
     renderMath(list);
 }
 
+// 移动端默认只画每个知识点一条主要前置关系，避免所有线重叠。
+// 轻触节点后显示它全部的直接前置和后续关系，不丢失原始关联数据。
+function updateMobileGraphEdgeEmphasis(canvas, selectedNodeId) {
+    if (!canvas) return;
+    canvas.querySelectorAll(".kg-mobile-edge").forEach(edge => {
+        const related = Boolean(selectedNodeId) && (
+            edge.dataset.from === selectedNodeId
+            || edge.dataset.to === selectedNodeId
+        );
+        edge.classList.toggle("is-related", related);
+    });
+}
+
 function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
     knowledgeGraphSelectedNodeId = nodeId;
     knowledgeGraphSideMode = "detail";
@@ -16751,6 +16751,7 @@ function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
         ".kg-mobile-node, .kg-node-group"
     );
     selected?.classList.add("selected");
+    updateMobileGraphEdgeEmphasis(canvas, nodeId);
 
     // 只刷新右侧/下方详情，不重建全部节点和连线。
     // 手机上点击节点时不会再出现整张图谱闪一下、卡一下。
@@ -17689,18 +17690,23 @@ function syncMobileVisualViewport() {
 
         if (!isMobileAppShell()) {
             root.style.removeProperty("--app-visible-height");
+            root.style.removeProperty("--app-viewport-top");
             document.body?.classList.remove("mobile-keyboard-open");
             return;
         }
 
         const viewport = window.visualViewport;
         const visibleHeight = Math.max(
-            320,
+            1,
             Math.round(viewport?.height || window.innerHeight || 0)
         );
         root.style.setProperty(
             "--app-visible-height",
             `${visibleHeight}px`
+        );
+        root.style.setProperty(
+            "--app-viewport-top",
+            `${Math.max(0, Math.round(viewport?.offsetTop || 0))}px`
         );
 
         const layoutHeight = Math.max(
@@ -17732,6 +17738,22 @@ function syncMobileVisualViewport() {
     });
 }
 
+// 输入邮箱验证码时只滚动账号面板，不让整个 fixed 弹窗被浏览器顶出屏幕。
+function keepAccountFocusedFieldVisible() {
+    const modal = document.getElementById("accountModal");
+    const body = modal?.querySelector(".account-body");
+    const field = document.activeElement;
+    if (!modal || modal.classList.contains("hidden") || !body || !field
+        || !body.contains(field) || !field.matches("input, textarea")) return;
+    const input = field.getBoundingClientRect();
+    const box = body.getBoundingClientRect();
+    if (input.bottom > box.bottom - 14) {
+        body.scrollTop += input.bottom - box.bottom + 14;
+    } else if (input.top < box.top + 14) {
+        body.scrollTop -= box.top + 14 - input.top;
+    }
+}
+
 function installMobileVisualViewportFix() {
     syncMobileVisualViewport();
 
@@ -17757,6 +17779,19 @@ function installMobileVisualViewportFix() {
         syncMobileVisualViewport,
         { passive:true }
     );
+
+    const accountModal = document.getElementById("accountModal");
+    accountModal?.addEventListener("focusin", event => {
+        if (!event.target?.matches?.("input, textarea")) return;
+        syncMobileVisualViewport();
+        [70, 180, 360].forEach(delay => window.setTimeout(() => {
+            syncMobileVisualViewport();
+            keepAccountFocusedFieldVisible();
+        }, delay));
+    });
+    window.visualViewport?.addEventListener("resize", () => {
+        requestAnimationFrame(keepAccountFocusedFieldVisible);
+    }, { passive:true });
 
     const text = document.getElementById("text");
     if (text) {
