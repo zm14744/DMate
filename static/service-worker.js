@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-v6-kg-fullview-effort-background-20261010";
+const CACHE_NAME = "dmate-v6-graph-desktop-zoom-stability-20261010";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
