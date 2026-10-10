@@ -6824,6 +6824,8 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         overflow:visible;
         min-width:1px;
         min-height:1px;
+        /* 小图和适应后的图谱在可视画布内居中，不贴左边留一大块空白。 */
+        margin-inline:auto;
     }
     #knowledgeGraphModal .kg-desktop-zoom-stage {
         position:absolute;
@@ -7503,7 +7505,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <button type="button" id="knowledgeGraphDesktopZoomOut" title="缩小" aria-label="缩小图谱">−</button>
                 <span id="knowledgeGraphDesktopZoomLabel" aria-live="off">100%</span>
                 <button type="button" id="knowledgeGraphDesktopZoomIn" title="放大" aria-label="放大图谱">+</button>
-                <button type="button" id="knowledgeGraphDesktopZoomFit" title="适应整张图谱">适应</button>
+                <button type="button" id="knowledgeGraphDesktopZoomFit" title="智能适应：大图优先保证文字可读，可滚动查看全部节点">适应</button>
             </div>
             <div class="graph-legend">
                 <span id="knowledgeGraphLegendRelated" class="legend-item current">最近一题相关</span>
@@ -7545,7 +7547,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-desktop-graph-zoom-stability-20261010"></script>
+<script src="/static/script.js?v=dmate-desktop-graph-autofit-20261010"></script>
 
 </body>
 </html>
