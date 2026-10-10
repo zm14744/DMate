@@ -15022,8 +15022,10 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     const baseWidth = Math.max(1, Number(stage.dataset.baseWidth) || stage.scrollWidth || 1);
     const baseHeight = Math.max(1, Number(stage.dataset.baseHeight) || stage.scrollHeight || 1);
     const modal = document.getElementById("knowledgeGraphModal");
+    const layoutScroller = modal?.querySelector(".knowledge-graph-layout") || null;
     const pointers = new Map();
     let fullscreenPan = null;
+    let previewPan = null;
     let pinch = null;
     let suppressClickUntil = 0;
 
@@ -15110,9 +15112,18 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
 
         const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
 
-        // 普通预览完全交给浏览器原生滚动：横向滚图、纵向滚页面。
-        // 不再在 pointermove 中抢手势，Fennec/Android 上会明显顺滑很多。
-        if (!fullscreen) return;
+        if (!fullscreen) {
+            previewPan = {
+                pointerId: event.pointerId,
+                x: event.clientX,
+                y: event.clientY,
+                left: viewport.scrollLeft,
+                top: layoutScroller ? layoutScroller.scrollTop : 0,
+                axis: "",
+                moved: false
+            };
+            return;
+        }
 
         pointers.set(event.pointerId, event);
 
@@ -15148,10 +15159,39 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     }, { passive: false });
 
     viewport.addEventListener("pointermove", event => {
+        const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
+
+        if (!fullscreen) {
+            if (!previewPan || previewPan.pointerId !== event.pointerId) return;
+
+            const dx = event.clientX - previewPan.x;
+            const dy = event.clientY - previewPan.y;
+
+            if (!previewPan.axis && Math.abs(dx) + Math.abs(dy) > 5) {
+                previewPan.axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+            }
+
+            if (previewPan.axis === "x") {
+                previewPan.moved = true;
+                viewport.scrollLeft = previewPan.left - dx;
+                suppressClickUntil = performance.now() + 220;
+                event.preventDefault();
+                return;
+            }
+
+            if (previewPan.axis === "y" && layoutScroller) {
+                previewPan.moved = true;
+                layoutScroller.scrollTop = previewPan.top - dy;
+                suppressClickUntil = performance.now() + 220;
+                event.preventDefault();
+                return;
+            }
+
+            return;
+        }
+
         if (!pointers.has(event.pointerId)) return;
         pointers.set(event.pointerId, event);
-
-        const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
 
         if (fullscreen && pointers.size >= 2) {
             const [a, b] = [...pointers.values()].slice(0, 2);
@@ -15194,6 +15234,10 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     }, { passive: false });
 
     const finishPointer = event => {
+        if (previewPan?.pointerId === event.pointerId) {
+            previewPan = null;
+        }
+
         pointers.delete(event.pointerId);
 
         if (fullscreenPan?.pointerId === event.pointerId) {
