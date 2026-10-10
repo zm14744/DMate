@@ -9711,7 +9711,7 @@ function knowledgeGraphCopyKey() {
     const source = mobileStage || svg;
     // 手机普通入口不创建图谱 DOM，但图谱数据仍在；缓存键使用数据与筛选状态。
     if (!source) {
-        if (!window.matchMedia?.("(max-width: 760px)")?.matches
+        if (!shouldDrawKnowledgeGraphOffscreen()
                 || !knowledgeGraphData?.nodes?.length) return "";
         return [knowledgeGraphFilter || "全部", knowledgeGraphViewMode,
             knowledgeGraphScope, knowledgeGraphData.nodes.length,
@@ -9728,7 +9728,224 @@ function knowledgeGraphCopyKey() {
     ].join("|");
 }
 
+// Mobile and tablet export uses the knowledge model, not a cloned live DOM.
+// The live graph contains absolutely-positioned HTML buttons plus SVG edges;
+// html2canvas can move the buttons to the top while leaving the edges behind.
+// Keeping this painter completely off-DOM also prevents scroll jumps and
+// makes Android WebView/tablet exports independent of the fullscreen entry state.
+function shouldDrawKnowledgeGraphOffscreen() {
+    const ua = navigator.userAgent || "";
+    return /Android|iPhone|iPad|iPod/i.test(ua)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+        || Boolean(window.matchMedia?.("(max-width: 1100px)")?.matches);
+}
+
+function knowledgeGraphExportLayout(nodes) {
+    const levels = computeKnowledgeGraphLevels(nodes);
+    const columns = new Map();
+    const originalOrder = new Map(nodes.map((node, index) => [node.id, index]));
+    const categories = new Map();
+    nodes.forEach(node => {
+        if (!categories.has(node.category)) categories.set(node.category, categories.size);
+        const level = levels.get(node.id) || 0;
+        if (!columns.has(level)) columns.set(level, []);
+        columns.get(level).push(node);
+    });
+    const keys = [...columns.keys()].sort((a, b) => a - b);
+    const previousOrder = new Map();
+    for (const key of keys) {
+        const group = columns.get(key);
+        group.sort((a, b) => {
+            const mean = node => {
+                const matches = (node.prerequisites || [])
+                    .map(name => previousOrder.get(name)).filter(Number.isFinite);
+                return matches.length
+                    ? matches.reduce((total, index) => total + index, 0) / matches.length
+                    : Number.POSITIVE_INFINITY;
+            };
+            return (categories.get(a.category) - categories.get(b.category))
+                || mean(a) - mean(b)
+                || originalOrder.get(a.id) - originalOrder.get(b.id);
+        });
+        group.forEach((node, index) => previousOrder.set(node.name, index));
+    }
+
+    // Export dimensions are independent of viewport, orientation, browser zoom
+    // and the current zoom level of the fullscreen graph.
+    const cellWidth = 164;
+    const cellHeight = 78;
+    const spaceX = 100;
+    const spaceY = 34;
+    const marginX = 42;
+    const marginY = 42;
+    const maxRows = Math.max(1, ...keys.map(key => columns.get(key).length));
+    const width = 2 * marginX + keys.length * cellWidth + Math.max(0, keys.length - 1) * spaceX;
+    const height = 2 * marginY + maxRows * cellHeight + Math.max(0, maxRows - 1) * spaceY;
+    const positions = new Map();
+    keys.forEach((key, columnIndex) => {
+        const group = columns.get(key);
+        const total = group.length * cellHeight + Math.max(0, group.length - 1) * spaceY;
+        const startY = marginY + (height - marginY * 2 - total) / 2;
+        group.forEach((node, rowIndex) => {
+            positions.set(node.id, {
+                x: marginX + columnIndex * (cellWidth + spaceX),
+                y: startY + rowIndex * (cellHeight + spaceY)
+            });
+        });
+    });
+    const byName = new Map(nodes.map(node => [node.name, node]));
+    const edges = [];
+    const incoming = new Map();
+    const outgoing = new Map();
+    for (const node of nodes) {
+        for (const name of node.prerequisites || []) {
+            const from = byName.get(name);
+            if (!from || !positions.has(from.id) || !positions.has(node.id)) continue;
+            const edge = { from: from.id, to: node.id };
+            edges.push(edge);
+            if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
+            if (!incoming.has(edge.to)) incoming.set(edge.to, []);
+            outgoing.get(edge.from).push(edge);
+            incoming.get(edge.to).push(edge);
+        }
+    }
+    for (const group of outgoing.values()) {
+        group.sort((a, b) => positions.get(a.to).y - positions.get(b.to).y);
+    }
+    for (const group of incoming.values()) {
+        group.sort((a, b) => positions.get(a.from).y - positions.get(b.from).y);
+    }
+    return { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight };
+}
+
+function drawKnowledgeGraphRoundRect(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+function drawKnowledgeGraphWrappedLabel(ctx, label, centerX, centerY, maxWidth, maxLines) {
+    const glyphs = Array.from(String(label || ""));
+    const lines = [];
+    let current = "";
+    for (const glyph of glyphs) {
+        if (glyph === "\n") {
+            lines.push(current);
+            current = "";
+            continue;
+        }
+        const test = current + glyph;
+        if (current && ctx.measureText(test).width > maxWidth) {
+            lines.push(current);
+            current = glyph;
+        } else {
+            current = test;
+        }
+    }
+    if (current) lines.push(current);
+    if (lines.length > maxLines) {
+        lines.length = maxLines;
+        let last = lines[maxLines - 1];
+        while (last && ctx.measureText(last + "…").width > maxWidth) last = last.slice(0, -1);
+        lines[maxLines - 1] = last + "…";
+    }
+    const lineHeight = 20;
+    const firstY = centerY - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, index) => ctx.fillText(line, centerX, firstY + index * lineHeight, maxWidth));
+}
+
+async function renderKnowledgeGraphOffscreenPngBlob() {
+    const context = getActiveKnowledgeContext();
+    const nodes = knowledgeGraphViewMode === "focus"
+        ? knowledgeGraphFocusedNodes(knowledgeGraphFilter, context)
+        : knowledgeGraphVisibleNodes(knowledgeGraphFilter);
+    if (!nodes?.length) throw new Error("当前范围没有可复制的知识节点");
+    const layout = knowledgeGraphExportLayout(nodes);
+    const { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight } = layout;
+    const smallDevice = window.matchMedia?.("(max-width: 760px)")?.matches;
+    const pixelBudget = smallDevice ? 7000000 : 10000000;
+    // Render in a bounded pixel budget to avoid crashing mobile browsers.
+    const scale = Math.min(1.75, 8192 / Math.max(width, height),
+        Math.sqrt(pixelBudget / Math.max(1, width * height)));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("浏览器无法创建图谱绘图画布");
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, width, height);
+
+    // Every valid graph edge has both endpoints in positions; no dangling paths.
+    const port = (index, count) => (index - (count - 1) / 2)
+        * Math.min(10, (cellHeight - 22) / Math.max(count, 1));
+    ctx.strokeStyle = "#899bb5";
+    ctx.lineWidth = 2.15;
+    ctx.lineCap = "round";
+    for (const edge of edges) {
+        const start = positions.get(edge.from);
+        const end = positions.get(edge.to);
+        const outGroup = outgoing.get(edge.from);
+        const inGroup = incoming.get(edge.to);
+        const x1 = start.x + cellWidth;
+        const x2 = end.x;
+        const y1 = start.y + cellHeight / 2 + port(outGroup.indexOf(edge), outGroup.length);
+        const y2 = end.y + cellHeight / 2 + port(inGroup.indexOf(edge), inGroup.length);
+        const bend = Math.max(30, Math.abs(x2 - x1) * 0.42);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.bezierCurveTo(x1 + bend, y1, x2 - bend, y2, x2, y2);
+        ctx.stroke();
+    }
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const node of nodes) {
+        const pos = positions.get(node.id);
+        if (!pos) continue;
+        const state = knowledgeGraphNodeState(node.name, context);
+        drawKnowledgeGraphRoundRect(ctx, pos.x, pos.y, cellWidth, cellHeight, 11);
+        ctx.fillStyle = state.fill || "#111827";
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = state.stroke || "#64748b";
+        ctx.stroke();
+        const hasBadge = Boolean(state.badge);
+        ctx.font = '600 16px system-ui, "Microsoft YaHei", sans-serif';
+        ctx.fillStyle = "#ffffff";
+        drawKnowledgeGraphWrappedLabel(ctx, node.name, pos.x + cellWidth / 2,
+            pos.y + (hasBadge ? 32 : cellHeight / 2), cellWidth - 18, hasBadge ? 2 : 3);
+        if (hasBadge) {
+            ctx.font = '12px system-ui, "Microsoft YaHei", sans-serif';
+            ctx.fillStyle = "#e9d5ff";
+            ctx.fillText(state.badge, pos.x + cellWidth / 2, pos.y + cellHeight - 12);
+        }
+    }
+
+    return await new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+            // Do not retain a large backing canvas beyond encoding.
+            canvas.width = 0;
+            canvas.height = 0;
+            if (blob) resolve(blob);
+            else reject(new Error("图谱 PNG 编码失败"));
+        }, "image/png");
+    });
+}
+
 async function renderKnowledgeGraphPngBlob() {
+    if (shouldDrawKnowledgeGraphOffscreen()) {
+        return renderKnowledgeGraphOffscreenPngBlob();
+    }
     const target = buildKnowledgeGraphImageCopyTarget();
     if (!target) {
         throw new Error("没有可导出的图谱");
