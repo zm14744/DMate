@@ -951,6 +951,11 @@ if LUXIN_ENABLED and LUXIN_API_KEY and LUXIN_CIRCUIT_BREAKER:
 def _reasoning_effort_for_context(teaching_context):
     """生成题目单独控制推理预算；解题仍按难度决定思考强度。"""
     context = teaching_context or {}
+    # 明确指定的解题思考档位高于难度自动判断；与生成练习题分开。
+    if context.get("mode") != "exercise":
+        override = str(context.get("reasoning_effort_override") or "").lower()
+        if override in ("high", "max"):
+            return override
     if context.get("mode") == "exercise":
         override = context.get("generation_reasoning_effort")
         if override in ("none", "high", "max"):
@@ -1474,10 +1479,12 @@ $$
     ] + clean_messages
 
     reasoning_effort = _reasoning_effort_for_context(teaching_context)
-    if reasoning_effort == "max":
-        print("检测到困难题：启用 max 思考模式。")
-    elif reasoning_effort == "high":
-        print("检测到中等题：启用 high 思考模式。")
+    if reasoning_effort in ("high", "max"):
+        # 不能把 high 等同于“检测到中等题”：困难题有缓存参考答案时也可能
+        # 自动选 high 做复核。难度与思考强度是两个独立字段。
+        detected_difficulty = str(context.get("difficulty") or "未确定")
+        source = "用户指定" if context.get("reasoning_effort_override") else "自动选择"
+        print(f"解题配置：题目难度={detected_difficulty}；思考强度={reasoning_effort}（{source}）。")
 
     is_full_solution = context.get("mode") == "full_solution"
     # 普通聊天的旧重试策略不变；完整解答避免在 max/high 超时后再自动重复数轮。
