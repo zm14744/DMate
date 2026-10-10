@@ -8564,7 +8564,7 @@ function loadState() {
                 solverEffortPreference: (
                     session.solverEffortPreference
                     && typeof session.solverEffortPreference.fingerprint === "string"
-                    && ["max", "high"].includes(session.solverEffortPreference.effort)
+                    && session.solverEffortPreference.effort === "high"
                 ) ? {
                     fingerprint: session.solverEffortPreference.fingerprint,
                     effort: session.solverEffortPreference.effort
@@ -11955,7 +11955,7 @@ async function requestAiReply(session) {
                 difficulty: pinnedDifficulty
             } : undefined;
 
-        // 同一道题中显式指定的 max/high 保留到后续追问；换题自动失效。
+        // high 可以沿用到本题后续追问；max 已停用，旧偏好必须清理。
         const instructionWithoutSpaces = latestRawRequest.replace(/\s+/g, "").toLowerCase();
         const maxRequested = /(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以).{0,8}(?:max|最高|最大)(?:思考|推理|强度|档|模式)?|(?:max|最高|最大)(?:思考|推理|强度|档|模式)(?:来|去|处理|求解|解答|解析)/.test(instructionWithoutSpaces)
             && !/(?:不要|别|不用|禁止|无需|不准).{0,5}(?:max|最高|最大)/.test(instructionWithoutSpaces);
@@ -11969,16 +11969,20 @@ async function requestAiReply(session) {
                 )
                 : ""
         );
-        if ((maxRequested || highRequested) && preferenceFingerprint) {
+        if (session.solverEffortPreference?.effort === "max" || maxRequested) {
+            session.solverEffortPreference = null;
+            saveState();
+        } else if (highRequested && preferenceFingerprint) {
             session.solverEffortPreference = {
                 fingerprint: preferenceFingerprint,
-                effort: maxRequested ? "max" : "high"
+                effort: "high"
             };
             saveState();
         }
         const preferredEffort = preferenceFingerprint
             && session.solverEffortPreference?.fingerprint === preferenceFingerprint
-            ? session.solverEffortPreference.effort : undefined;
+            && session.solverEffortPreference?.effort === "high"
+            ? "high" : undefined;
 
         const response = await fetch("/chat", {
             method: "POST",
