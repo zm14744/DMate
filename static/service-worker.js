@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-v6-graph-desktop-autofit-20261010";
+const CACHE_NAME = "dmate-v6-mobile-fullview-entry-20261010";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
