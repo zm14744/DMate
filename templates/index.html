@@ -4777,6 +4777,25 @@ body[data-appearance-theme="light"] .input input {
         font-variant-numeric:tabular-nums;
     }
 
+    :root,
+    body {
+        --kg-mobile-edge-color:rgba(148,163,184,.92);
+        --kg-mobile-edge-shadow:rgba(15,23,42,.88);
+        --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb), .96);
+    }
+
+    body[data-appearance-theme="light"] {
+        --kg-mobile-edge-color:rgba(71,85,105,.92);
+        --kg-mobile-edge-shadow:rgba(255,255,255,.98);
+        --kg-mobile-viewport-bg:rgba(255,255,255,.98);
+    }
+
+    body.has-custom-background {
+        --kg-mobile-edge-color:rgba(226,232,240,.96);
+        --kg-mobile-edge-shadow:rgba(15,23,42,.96);
+        --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb), .94);
+    }
+
     .kg-mobile-viewport {
         width:100%;
         max-width:100%;
@@ -4788,10 +4807,10 @@ body[data-appearance-theme="light"] .input input {
         overscroll-behavior-x:contain;
         overscroll-behavior-y:auto;
         -webkit-overflow-scrolling:touch;
-        /* 普通预览把纵向手势留给外层页面。左右拖图由 JS 自己处理。 */
-        touch-action:pan-y;
+        /* 普通预览由原生滚动优先；纵向滚页面，横向滚图谱。 */
+        touch-action:auto;
         border-radius:10px;
-        background:var(--surface-0);
+        background:var(--kg-mobile-viewport-bg);
         scrollbar-gutter:stable both-edges;
     }
 
@@ -4821,9 +4840,12 @@ body[data-appearance-theme="light"] .input input {
 
     .kg-mobile-edge {
         fill:none;
-        stroke:var(--border-strong);
-        stroke-width:1.8;
-        opacity:.95;
+        stroke:var(--kg-mobile-edge-color);
+        stroke-width:2.6;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+        opacity:1;
+        filter:drop-shadow(0 0 1px var(--kg-mobile-edge-shadow));
     }
 
     .kg-mobile-node {
@@ -5306,7 +5328,7 @@ body[data-appearance-theme="light"] .input input {
         overflow-y:hidden !important;
         overscroll-behavior-x:auto !important;
         overscroll-behavior-y:auto !important;
-        touch-action:pan-x pan-y !important;
+        touch-action:auto !important;
         scroll-behavior:auto !important;
     }
 
@@ -7341,7 +7363,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-gallery-image-save-retest-badge-20261010-semantic-v4-hide-module"></script>
+<script src="/static/script.js?v=dmate-knowledge-graph-contrast-scrollfix-20261010"></script>
 
 </body>
 </html>
