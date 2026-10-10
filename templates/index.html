@@ -6803,6 +6803,69 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
         touch-action:none !important;
     }
 }
+
+/* 2026-10-10 桌面图谱：真实尺寸绘制，局部缩放、稳定滚动条，不缩整页。 */
+@media (min-width:761px) {
+    #knowledgeGraphModal .knowledge-graph-canvas {
+        scrollbar-gutter:stable;
+        overflow:auto;
+        overflow-anchor:none;
+        min-width:0;
+    }
+    #knowledgeGraphModal .kg-section {
+        box-sizing:border-box;
+        width:max-content;
+        min-width:100%;
+        max-width:none;
+        overflow:visible;
+    }
+    #knowledgeGraphModal .kg-desktop-zoom-surface {
+        position:relative;
+        overflow:visible;
+        min-width:1px;
+        min-height:1px;
+    }
+    #knowledgeGraphModal .kg-desktop-zoom-stage {
+        position:absolute;
+        top:0;
+        left:0;
+        transform-origin:0 0;
+    }
+    #knowledgeGraphModal .kg-desktop-zoom-stage > .kg-svg {
+        display:block;
+        max-width:none;
+        min-width:0;
+        overflow:visible;
+    }
+}
+.kg-desktop-zoom-controls {
+    display:flex;
+    flex:0 0 auto;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+}
+.kg-desktop-zoom-controls button {
+    min-width:34px;
+    padding:6px 9px;
+    color:var(--text-primary);
+    background:var(--surface-2);
+    border:1px solid var(--border-strong);
+    border-radius:8px;
+    font:inherit;
+    cursor:pointer;
+}
+.kg-desktop-zoom-controls span {
+    min-width:42px;
+    text-align:center;
+    font-size:12px;
+    color:var(--text-secondary);
+    font-variant-numeric:tabular-nums;
+}
+@media (max-width:760px) {
+    .kg-desktop-zoom-controls { display:none !important; }
+}
+
 </style>
 
 <script>
@@ -7431,13 +7494,19 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div class="graph-toolbar-left">
                 <label for="knowledgeGraphCategory">模块</label>
                 <select id="knowledgeGraphCategory" aria-label="知识图谱分类"></select>
-                <button id="knowledgeGraphScopeBtn" type="button">本题关联</button>
+                <button id="knowledgeGraphScopeBtn" type="button">最近一题关联</button>
                 <button id="knowledgeGraphFocusBtn" type="button">全部知识</button>
                 <button id="knowledgeGraphCopyBtn" type="button" title="电脑复制图谱图片；Android 安装版保存到相册；手机网页可预览并保存">以图片形式复制</button>
             </div>
 
+            <div id="knowledgeGraphDesktopZoom" class="kg-desktop-zoom-controls" aria-label="电脑图谱缩放">
+                <button type="button" id="knowledgeGraphDesktopZoomOut" title="缩小" aria-label="缩小图谱">−</button>
+                <span id="knowledgeGraphDesktopZoomLabel" aria-live="off">100%</span>
+                <button type="button" id="knowledgeGraphDesktopZoomIn" title="放大" aria-label="放大图谱">+</button>
+                <button type="button" id="knowledgeGraphDesktopZoomFit" title="适应整张图谱">适应</button>
+            </div>
             <div class="graph-legend">
-                <span id="knowledgeGraphLegendRelated" class="legend-item current">本题相关</span>
+                <span id="knowledgeGraphLegendRelated" class="legend-item current">最近一题相关</span>
                             </div>
         </div>
 
@@ -7476,7 +7545,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-difficulty-effort-background-20261010"></script>
+<script src="/static/script.js?v=dmate-desktop-graph-zoom-stability-20261010"></script>
 
 </body>
 </html>
