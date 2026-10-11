@@ -152,7 +152,7 @@ DESKTOP_MACOS_URL = (os.environ.get("DESKTOP_MACOS_URL") or "").strip()
 DESKTOP_LINUX_DEB_URL = (os.environ.get("DESKTOP_LINUX_DEB_URL") or "").strip()
 DESKTOP_LINUX_APPIMAGE_URL = (os.environ.get("DESKTOP_LINUX_APPIMAGE_URL") or "").strip()
 
-MAX_SYNC_JSON_BYTES = 5 * 1024 * 1024
+MAX_SYNC_JSON_BYTES = 12 * 1024 * 1024
 AUTH_RATE_LIMIT_WINDOW = 60
 AUTH_RATE_LIMIT_COUNT = 20
 EMAIL_CODE_TTL_SECONDS = 10 * 60
@@ -952,6 +952,48 @@ def _sync_row_for_user(user_id):
             return cur.fetchone()
 
 
+def _normalize_sync_part_names(raw_value):
+    if raw_value is None:
+        return []
+    if isinstance(raw_value, str):
+        values = raw_value.split(",")
+    elif isinstance(raw_value, (list, tuple, set)):
+        values = raw_value
+    else:
+        return []
+
+    allowed = ("sessions", "learning", "appearance")
+    result = []
+    seen = set()
+    for raw in values:
+        value = str(raw or "").strip()
+        if value in allowed and value not in seen:
+            seen.add(value)
+            result.append(value)
+    return result
+
+
+def _sync_manifest_from_data(data):
+    snapshot = data if isinstance(data, dict) else {}
+    manifest = {}
+    for key in ("sessions", "learning", "appearance"):
+        section = snapshot.get(key)
+        if section is None:
+            payload = b"null"
+        else:
+            payload = json.dumps(
+                section,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        manifest[key] = {
+            "hash": hashlib.sha256(payload).hexdigest(),
+            "bytes": len(payload),
+        }
+    return manifest
+
+
 @app.route("/auth/me", methods=["GET"])
 def auth_me():
     if not AUTH_CONFIGURED:
@@ -1671,16 +1713,11 @@ def sync_user_data():
     if request.method == "GET" and request.args.get("revisionOnly") == "1":
         # 轻量轮询：只查询修订号，避免频繁读取/传输整份学习快照。
         try:
-            with _auth_connect() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT revision FROM dm_user_data WHERE user_id = %s",
-                        (user_id,),
-                    )
-                    revision_row = cur.fetchone()
+            row = _sync_row_for_user(user_id)
             return jsonify({
                 "ok": True,
-                "revision": int(revision_row["revision"] or 0) if revision_row else 0,
+                "revision": int(row["revision"] or 0) if row else 0,
+                "parts": _sync_manifest_from_data(row["data"] or {}),
             })
         except Exception as exc:
             print(f"检查云端同步版本失败：{repr(exc)}")
@@ -1689,15 +1726,22 @@ def sync_user_data():
     if request.method == "GET":
         try:
             row = _sync_row_for_user(user_id)
+            requested_parts = _normalize_sync_part_names(
+                request.args.get("parts")
+            )
         except Exception as exc:
             print(f"读取云端数据失败：{repr(exc)}")
             return jsonify({"ok": False, "error": "读取云端数据失败。"}), 500
 
         return jsonify({
             "ok": True,
-            "data": row["data"] or {},
+            "data": ({
+                key: (row["data"] or {}).get(key)
+                for key in requested_parts
+            } if requested_parts else (row["data"] or {})),
             "revision": int(row["revision"] or 0),
             "updatedAt": row["updated_at"].isoformat() if row.get("updated_at") else None,
+            "parts": _sync_manifest_from_data(row["data"] or {}),
         })
 
     if not request.is_json:
@@ -1771,12 +1815,14 @@ def sync_user_data():
                         "data": cloud["data"] or {},
                         "revision": int(cloud["revision"] or 0),
                         "updatedAt": cloud["updated_at"].isoformat() if cloud.get("updated_at") else None,
+                        "parts": _sync_manifest_from_data(cloud["data"] or {}),
                     }), 409
 
         return jsonify({
             "ok": True,
             "revision": int(updated["revision"]),
             "updatedAt": updated["updated_at"].isoformat() if updated.get("updated_at") else None,
+            "parts": _sync_manifest_from_data(data),
         })
     except Exception as exc:
         print(f"写入云端数据失败：{repr(exc)}")
