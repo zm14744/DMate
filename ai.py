@@ -14,22 +14,6 @@ from PIL import Image, ImageOps
 from teaching import teaching_prompt
 
 
-def _env_flag(name, default=True):
-    value = os.environ.get(name)
-    if value is None:
-        return bool(default)
-    return str(value).strip().lower() not in {
-        "0", "false", "no", "off", "disable", "disabled"
-    }
-
-
-def _env_float(name, default, minimum, maximum):
-    try:
-        value = float(os.environ.get(name, default))
-    except (TypeError, ValueError):
-        value = float(default)
-    return max(float(minimum), min(float(maximum), value))
-
 DEEPSEEK_API_KEY = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
 DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_CHAT_MODEL = (
@@ -37,73 +21,8 @@ DEEPSEEK_CHAT_MODEL = (
     or "deepseek-flash"
 ).strip()
 
-# 鲁信杯算力：优先使用。接口按赛事给出的 OpenAI Chat Completions
-# 兼容格式调用。注意：赛事示例明确把模型写成 YOUR_MODEL_ID，因此这里
-# 不再擅自把官方 DeepSeek 的模型名当作鲁信平台模型 ID。
-#
-# 推荐配置：
-#   LUXIN_API_KEY=...
-#   LUXIN_MODEL_ID=鲁信平台实际显示的模型 ID
-#
-# 如果没有显式配置 LUXIN_MODEL_ID，会尝试一次 /v1/models 自动发现；
-# 发现失败就直接使用原 DeepSeek 兜底，不让鲁信配置拖死聊天。
-LUXIN_API_KEY = (os.environ.get("LUXIN_API_KEY") or "").strip()
-LUXIN_API_URL = (
-    os.environ.get(
-        "LUXIN_API_URL",
-        "https://www.tokensd.com.cn/v1/chat/completions",
-    )
-    or "https://www.tokensd.com.cn/v1/chat/completions"
-).strip()
-LUXIN_MODELS_URL = (
-    os.environ.get(
-        "LUXIN_MODELS_URL",
-        "https://www.tokensd.com.cn/v1/models",
-    )
-    or "https://www.tokensd.com.cn/v1/models"
-).strip()
-LUXIN_CHAT_MODEL = (os.environ.get("LUXIN_MODEL_ID") or "").strip()
-
-# 鲁信总开关与熔断。海外部署可以显式设置 LUXIN_ENABLED=0，
-# 此时请求路径与没有接鲁信时一样，完全不增加等待。
-LUXIN_ENABLED = _env_flag("LUXIN_ENABLED", True)
-LUXIN_CIRCUIT_BREAKER = _env_flag("LUXIN_CIRCUIT_BREAKER", True)
-LUXIN_CIRCUIT_COOLDOWN = _env_float(
-    "LUXIN_CIRCUIT_COOLDOWN_SECONDS", 600, 30, 3600
-)
-LUXIN_PROBE_CONNECT_TIMEOUT = _env_float(
-    "LUXIN_PROBE_CONNECT_TIMEOUT", 1.5, 0.3, 5
-)
-LUXIN_PROBE_READ_TIMEOUT = _env_float(
-    "LUXIN_PROBE_READ_TIMEOUT", 2.5, 0.5, 8
-)
-
-# 探测直接打到同一个 API 路径（使用 GET，不产生模型调用）。
-# 即使返回 401/405，也说明海外服务器已经成功连到该 API 网关；
-# 若网络层被国内访问限制拦住，则会在后台超时并打开熔断。
-_LUXIN_DEFAULT_HEALTH_URL = LUXIN_API_URL
-LUXIN_HEALTH_URL = (
-    os.environ.get("LUXIN_HEALTH_URL")
-    or _LUXIN_DEFAULT_HEALTH_URL
-).strip()
-
-_LUXIN_BREAKER_LOCK = threading.Lock()
-_LUXIN_BREAKER_STATE = (
-    "disabled"
-    if (not LUXIN_ENABLED or not LUXIN_API_KEY)
-    else ("closed" if not LUXIN_CIRCUIT_BREAKER else "unknown")
-)
-_LUXIN_BREAKER_OPEN_UNTIL = 0.0
-_LUXIN_PROBE_RUNNING = False
-_LUXIN_LAST_BREAKER_REASON = ""
-_LUXIN_SKIP_LOGGED = False
-
-_LUXIN_DISCOVERY_ATTEMPTED = False
-_LUXIN_DISCOVERED_MODEL = ""
-_LUXIN_MODEL_WARNING_SHOWN = False
-
-# 兼容原有 Vision 路径：图片识别仍走原来的 DeepSeek 接口，
-# 第二阶段已经稳定的 OCR/Vision 行为不因为接入鲁信算力而改变。
+# DMate text and image services use the configured DeepSeek endpoint only.
+# OCR/Vision 保持现有 DeepSeek 路径。
 API_KEY = DEEPSEEK_API_KEY
 API_URL = DEEPSEEK_API_URL
 
@@ -658,323 +577,17 @@ def _fallback_math_to_readable_text(text):
     return value.strip()
 
 
-def _luxin_model_rank(model_id):
-    """给 /v1/models 返回的模型做保守排序；无法判断时不乱选。"""
-    value = str(model_id or "").strip().lower()
-    if not value:
-        return -1
-
-    score = 0
-    if "deepseek" in value:
-        score += 40
-    if "4.1" in value or "v4.1" in value or "v41" in value:
-        score += 40
-    if "flash" in value:
-        score += 15
-    if "chat" in value:
-        score += 3
-    return score
-
-
-def _discover_luxin_model():
-    """
-    未设置 LUXIN_MODEL_ID 时只自动探测一次。
-
-    赛事示例要求 YOUR_MODEL_ID，但公开示例没有给出具体值。这里优先
-    使用 /v1/models；若接口不支持、鉴权失败或返回多个无法判断的模型，
-    宁可跳过鲁信走原 DeepSeek，也不再猜一个错误模型名反复请求。
-    """
-    global _LUXIN_DISCOVERY_ATTEMPTED
-    global _LUXIN_DISCOVERED_MODEL
-
-    if _LUXIN_DISCOVERY_ATTEMPTED:
-        return _LUXIN_DISCOVERED_MODEL
-
-    _LUXIN_DISCOVERY_ATTEMPTED = True
-    if not LUXIN_API_KEY:
-        return ""
-
-    headers = {"Authorization": f"Bearer {LUXIN_API_KEY}"}
-    try:
-        response = requests.get(
-            LUXIN_MODELS_URL,
-            headers=headers,
-            timeout=(2, 3),
-        )
-    except requests.exceptions.RequestException as exc:
-        print(f"鲁信模型列表访问失败：{type(exc).__name__}")
-        return ""
-    except Exception as exc:
-        print(f"鲁信模型列表探测异常：{type(exc).__name__}")
-        return ""
-
-    if not response.ok:
-        print(
-            "鲁信模型列表不可用："
-            f"HTTP {response.status_code}；请配置 LUXIN_MODEL_ID。"
-        )
-        return ""
-
-    try:
-        payload = response.json()
-    except ValueError:
-        print("鲁信模型列表不是有效 JSON；请配置 LUXIN_MODEL_ID。")
-        return ""
-
-    data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, list):
-        print("鲁信模型列表格式未知；请配置 LUXIN_MODEL_ID。")
-        return ""
-
-    ids = []
-    for item in data:
-        if isinstance(item, dict):
-            model_id = str(item.get("id") or "").strip()
-        else:
-            model_id = str(item or "").strip()
-        if model_id and model_id not in ids:
-            ids.append(model_id)
-
-    if not ids:
-        print("鲁信模型列表为空；请配置 LUXIN_MODEL_ID。")
-        return ""
-
-    if len(ids) == 1:
-        _LUXIN_DISCOVERED_MODEL = ids[0]
-    else:
-        ranked = sorted(
-            ((model_id, _luxin_model_rank(model_id)) for model_id in ids),
-            key=lambda pair: pair[1],
-            reverse=True,
-        )
-        best_id, best_score = ranked[0]
-        second_score = ranked[1][1] if len(ranked) > 1 else -1
-        # 只有“明显像 DeepSeek 4.1/Flash”且明显优于其它候选时才自动选。
-        if best_score >= 55 and best_score > second_score:
-            _LUXIN_DISCOVERED_MODEL = best_id
-        else:
-            preview = ", ".join(ids[:8])
-            print(
-                "鲁信返回多个模型但无法安全判断要用哪一个："
-                f"{preview}。请显式配置 LUXIN_MODEL_ID。"
-            )
-            return ""
-
-    print(f"鲁信自动发现模型：{_LUXIN_DISCOVERED_MODEL}")
-    return _LUXIN_DISCOVERED_MODEL
-
-
-def _resolved_luxin_model():
-    configured = str(LUXIN_CHAT_MODEL or "").strip()
-    if configured and configured.upper() != "YOUR_MODEL_ID":
-        return configured
-    return _discover_luxin_model()
-
-
-def _luxin_breaker_open(reason, cooldown=None):
-    """打开鲁信熔断；之后用户请求会直接走 DeepSeek，不等待鲁信。"""
-    global _LUXIN_BREAKER_STATE
-    global _LUXIN_BREAKER_OPEN_UNTIL
-    global _LUXIN_LAST_BREAKER_REASON
-    global _LUXIN_PROBE_RUNNING
-    global _LUXIN_SKIP_LOGGED
-
-    if not LUXIN_CIRCUIT_BREAKER:
-        return
-
-    wait_seconds = float(cooldown or LUXIN_CIRCUIT_COOLDOWN)
-    with _LUXIN_BREAKER_LOCK:
-        _LUXIN_BREAKER_STATE = "open"
-        _LUXIN_BREAKER_OPEN_UNTIL = time.monotonic() + max(1.0, wait_seconds)
-        _LUXIN_LAST_BREAKER_REASON = str(reason or "鲁信不可用")
-        _LUXIN_PROBE_RUNNING = False
-        _LUXIN_SKIP_LOGGED = False
-
-    print(
-        "鲁信熔断已开启："
-        f"{_LUXIN_LAST_BREAKER_REASON}；"
-        f"未来 {int(wait_seconds)} 秒用户请求直接走 DeepSeek。"
-    )
-
-
-def _luxin_breaker_close():
-    """后台探测或真实请求成功后恢复鲁信主线路。"""
-    global _LUXIN_BREAKER_STATE
-    global _LUXIN_BREAKER_OPEN_UNTIL
-    global _LUXIN_LAST_BREAKER_REASON
-    global _LUXIN_PROBE_RUNNING
-    global _LUXIN_SKIP_LOGGED
-
-    with _LUXIN_BREAKER_LOCK:
-        was_closed = _LUXIN_BREAKER_STATE == "closed"
-        _LUXIN_BREAKER_STATE = "closed"
-        _LUXIN_BREAKER_OPEN_UNTIL = 0.0
-        _LUXIN_LAST_BREAKER_REASON = ""
-        _LUXIN_PROBE_RUNNING = False
-        _LUXIN_SKIP_LOGGED = False
-
-    if not was_closed:
-        print("鲁信后台探测成功：熔断关闭，后续请求恢复优先使用鲁信。")
-
-
-def _luxin_probe_worker():
-    """后台探路。整个函数运行在 daemon 线程中，不占用用户请求时间。"""
-    global _LUXIN_PROBE_RUNNING
-
-    try:
-        # 这里只验证“服务器能不能连到鲁信站点”。任何 HTTP 状态码都说明
-        # TCP/TLS 已经建立；真正的鉴权、模型权限仍由正式请求验证。
-        requests.get(
-            LUXIN_HEALTH_URL,
-            timeout=(LUXIN_PROBE_CONNECT_TIMEOUT, LUXIN_PROBE_READ_TIMEOUT),
-            allow_redirects=False,
-        )
-
-        # 若没有显式模型 ID，把模型发现也放在后台完成，避免第一条聊天消息
-        # 为 /v1/models 额外等待。
-        if not str(LUXIN_CHAT_MODEL or "").strip():
-            model = _discover_luxin_model()
-            if not model:
-                _luxin_breaker_open("没有可用的鲁信模型 ID")
-                return
-
-        _luxin_breaker_close()
-
-    except requests.exceptions.RequestException as exc:
-        _luxin_breaker_open(
-            f"后台连接探测失败（{type(exc).__name__}）"
-        )
-    except Exception as exc:
-        _luxin_breaker_open(
-            f"后台探测异常（{type(exc).__name__}）"
-        )
-    finally:
-        with _LUXIN_BREAKER_LOCK:
-            _LUXIN_PROBE_RUNNING = False
-
-
-def _schedule_luxin_probe(force=False):
-    """需要时启动一次后台探测；绝不在当前聊天请求里同步等待。"""
-    global _LUXIN_BREAKER_STATE
-    global _LUXIN_PROBE_RUNNING
-
-    if not LUXIN_ENABLED or not LUXIN_API_KEY or not LUXIN_CIRCUIT_BREAKER:
-        return False
-
-    now = time.monotonic()
-    with _LUXIN_BREAKER_LOCK:
-        if _LUXIN_PROBE_RUNNING:
-            return False
-        if not force:
-            if _LUXIN_BREAKER_STATE == "closed":
-                return False
-            if (
-                _LUXIN_BREAKER_STATE == "open"
-                and now < _LUXIN_BREAKER_OPEN_UNTIL
-            ):
-                return False
-
-        _LUXIN_BREAKER_STATE = "probing"
-        _LUXIN_PROBE_RUNNING = True
-
-    threading.Thread(
-        target=_luxin_probe_worker,
-        name="luxin-health-probe",
-        daemon=True,
-    ).start()
-    return True
-
-
-def _luxin_ready_for_user_request():
-    """是否允许本次用户请求走鲁信；未知/探测/熔断状态一律直接跳过。"""
-    global _LUXIN_SKIP_LOGGED
-
-    if not LUXIN_ENABLED or not LUXIN_API_KEY:
-        return False
-    if not LUXIN_CIRCUIT_BREAKER:
-        return True
-
-    now = time.monotonic()
-    should_probe = False
-    with _LUXIN_BREAKER_LOCK:
-        state = _LUXIN_BREAKER_STATE
-        if state == "closed":
-            return True
-        if state == "unknown":
-            should_probe = True
-        elif state == "open" and now >= _LUXIN_BREAKER_OPEN_UNTIL:
-            should_probe = True
-
-        if not _LUXIN_SKIP_LOGGED:
-            _LUXIN_SKIP_LOGGED = True
-            if state == "open":
-                print("鲁信处于熔断冷却期：当前请求直接走 DeepSeek，不等待。")
-            else:
-                print("鲁信正在后台探测：当前请求直接走 DeepSeek，不等待。")
-
-    if should_probe:
-        _schedule_luxin_probe()
-    return False
-
-
-def _luxin_response_should_trip(status_code, reasoning_effort):
-    """判断 HTTP 错误是否应让整个鲁信线路进入熔断。"""
-    try:
-        status = int(status_code)
-    except (TypeError, ValueError):
-        return True
-
-    # 中等/困难的 400 可能只是赛事网关不认识 thinking 参数。
-    # 这种情况仍允许简单请求继续吃鲁信额度，不全局熔断。
-    effort = str(reasoning_effort or "none").strip().lower()
-    if status == 400 and effort in ("high", "max"):
-        return False
-
-    return status in {400, 401, 403, 404, 408, 409, 429} or status >= 500
-
-
 def _text_provider_configs(preferred_provider=None):
-    """返回文本模型调用顺序：鲁信优先，原 DeepSeek 永久保留为兜底。"""
-    global _LUXIN_MODEL_WARNING_SHOWN
-    providers = []
-
-    if LUXIN_API_KEY and _luxin_ready_for_user_request():
-        luxin_model = _resolved_luxin_model()
-        if luxin_model:
-            providers.append({
-                "id": "luxin",
-                "name": "鲁信算力",
-                "url": LUXIN_API_URL,
-                "api_key": LUXIN_API_KEY,
-                "model": luxin_model,
-            })
-        elif not _LUXIN_MODEL_WARNING_SHOWN:
-            _LUXIN_MODEL_WARNING_SHOWN = True
-            print(
-                "已配置 LUXIN_API_KEY，但没有可用的鲁信模型 ID。"
-                "请在环境变量中增加 LUXIN_MODEL_ID；当前自动使用原 DeepSeek 兜底。"
-            )
-
-    if DEEPSEEK_API_KEY:
-        providers.append({
-            "id": "deepseek",
-            "name": "DeepSeek",
-            "url": DEEPSEEK_API_URL,
-            "api_key": DEEPSEEK_API_KEY,
-            "model": DEEPSEEK_CHAT_MODEL,
-        })
-
-    if preferred_provider:
-        providers.sort(
-            key=lambda item: 0 if item["id"] == preferred_provider else 1
-        )
-
-    return providers
-
-
-# 模块加载完成后立即后台探测一次。不会阻塞启动，也不会让第一条聊天消息等待。
-if LUXIN_ENABLED and LUXIN_API_KEY and LUXIN_CIRCUIT_BREAKER:
-    _schedule_luxin_probe(force=True)
+    """The configured DeepSeek text provider; no third-party competition gateway."""
+    if not DEEPSEEK_API_KEY:
+        return []
+    return [{
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "url": DEEPSEEK_API_URL,
+        "api_key": DEEPSEEK_API_KEY,
+        "model": DEEPSEEK_CHAT_MODEL,
+    }]
 
 
 def _reasoning_effort_for_context(teaching_context):
@@ -1007,19 +620,6 @@ def _build_text_payload(provider, messages, reasoning_effort="none", max_tokens=
     else:
         token_limit = MAX_OUTPUT_TOKENS
 
-    # 鲁信示例只保证 OpenAI Chat Completions 的基础字段。
-    # 简单请求严格按示例发送，避免第三方网关因为 DeepSeek 私有字段直接 400。
-    if (provider or {}).get("id") == "luxin":
-        payload = {
-            "model": provider["model"],
-            "messages": messages,
-            "stream": False,
-        }
-        if effort == "high":
-            payload["thinking"] = {"type": "enabled"}
-            payload["reasoning_effort"] = "high"
-        return payload
-
     payload = {
         "model": provider["model"],
         "messages": messages,
@@ -1039,20 +639,9 @@ def _build_text_payload(provider, messages, reasoning_effort="none", max_tokens=
 
 
 def _provider_request_timeout(provider, reasoning_effort, default_timeout):
-    """
-    鲁信是优先算力，但不能让它的偶发卡顿拖住整个聊天。
+    """Keep the existing DeepSeek timeout and response handling."""
+    return default_timeout
 
-    非思考请求（例如“你好”）只给鲁信一个很短的响应窗口；
-    中等/困难题需要真正推理，因此保留更长时间。
-    原 DeepSeek 兜底继续沿用调用方原来的超时设置。
-    """
-    if (provider or {}).get("id") != "luxin":
-        return default_timeout
-
-    effort = str(reasoning_effort or "none").strip().lower()
-    if effort in ("max", "high"):
-        return (6, 60)
-    return (4, 10)
 
 # 每个工作线程独立保持文本 API 的 HTTP 连接；避免每次完成一次
 # 普通聊天或出题重试都重复 TLS 握手。Vision/OCR 请求路径不改。
@@ -1078,9 +667,7 @@ def _request_text_completion(
     """
     调用文本模型。
 
-    默认顺序：鲁信算力 -> 原 DeepSeek。
-    鲁信 Key 被撤销、额度不足、模型不可用、网络异常或返回格式异常时，
-    自动切回原 DeepSeek，不让外部算力支援成为单点故障。
+    通过 DeepSeek 完成文本请求，保留原有的错误处理、重试与思考强度策略。
     """
     # 即使上层意外传入旧版 max，也不得写入 provider 请求与日志。
     if str(reasoning_effort or "").lower() == "max":
@@ -1097,9 +684,7 @@ def _request_text_completion(
     saw_empty_body = False
 
     for provider_index, provider in enumerate(providers):
-        # 有后备线路时，优先线路只尝试一次：失败就立即切换，
-        # 避免“你好”这种简单请求因为鲁信卡顿被重复等待。
-        # 最后的兜底线路仍保留原有重试次数。
+        # 单一 DeepSeek 线路保留原有重试次数。
         is_last = provider_index == len(providers) - 1
         attempts = max(1, retries + 1)
         if not is_last:
@@ -1154,15 +739,6 @@ def _request_text_completion(
                         )
                         time.sleep(wait_seconds)
                         continue
-                    if (
-                        provider.get("id") == "luxin"
-                        and _luxin_response_should_trip(
-                            response.status_code, reasoning_effort
-                        )
-                    ):
-                        _luxin_breaker_open(
-                            f"HTTP {response.status_code}"
-                        )
                     break
 
                 if not response.ok:
@@ -1171,15 +747,6 @@ def _request_text_completion(
                         f"HTTP {response.status_code}；"
                         f"响应内容：{response.text[:500]}"
                     )
-                    if (
-                        provider.get("id") == "luxin"
-                        and _luxin_response_should_trip(
-                            response.status_code, reasoning_effort
-                        )
-                    ):
-                        _luxin_breaker_open(
-                            f"HTTP {response.status_code}"
-                        )
                     break
 
                 try:
@@ -1189,8 +756,6 @@ def _request_text_completion(
                     print(
                         f"{provider['name']} 返回内容解析失败：{repr(exc)}"
                     )
-                    if provider.get("id") == "luxin":
-                        _luxin_breaker_open("返回内容不是有效 JSON")
                     break
 
                 if "error" in result:
@@ -1198,8 +763,6 @@ def _request_text_completion(
                         f"{provider['name']} API 返回错误："
                         f"{result['error']}"
                     )
-                    if provider.get("id") == "luxin":
-                        _luxin_breaker_open("API 返回 error")
                     break
 
                 choices = result.get("choices")
@@ -1207,8 +770,6 @@ def _request_text_completion(
                     print(
                         f"{provider['name']} 返回缺少 choices：{result}"
                     )
-                    if provider.get("id") == "luxin":
-                        _luxin_breaker_open("返回缺少 choices")
                     break
 
                 choice = choices[0] if isinstance(choices[0], dict) else {}
@@ -1231,12 +792,8 @@ def _request_text_completion(
                         f"token_limit={payload.get('max_tokens', '未指定')}"
                     )
                     saw_empty_body = True
-                    if provider.get("id") == "luxin":
-                        _luxin_breaker_open("返回正文为空")
                     break
 
-                if provider.get("id") == "luxin":
-                    _luxin_breaker_close()
 
                 return {
                     "ok": True,
@@ -1250,8 +807,6 @@ def _request_text_completion(
             except requests.exceptions.Timeout as exc:
                 last_error = exc
                 print(f"{provider['name']} 请求超时（耗时 {time.monotonic() - call_start:.2f}s）：{repr(exc)}")
-                if provider.get("id") == "luxin":
-                    _luxin_breaker_open("请求超时")
                 if attempt < attempts - 1:
                     wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
                     time.sleep(wait_seconds)
@@ -1261,8 +816,6 @@ def _request_text_completion(
             except requests.exceptions.ConnectionError as exc:
                 last_error = exc
                 print(f"{provider['name']} 网络连接异常：{repr(exc)}")
-                if provider.get("id") == "luxin":
-                    _luxin_breaker_open("网络连接异常")
                 if attempt < attempts - 1:
                     wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
                     time.sleep(wait_seconds)
@@ -1272,19 +825,11 @@ def _request_text_completion(
             except requests.exceptions.RequestException as exc:
                 last_error = exc
                 print(f"{provider['name']} 请求异常：{repr(exc)}")
-                if provider.get("id") == "luxin":
-                    _luxin_breaker_open(
-                        f"请求异常（{type(exc).__name__}）"
-                    )
                 break
 
             except Exception as exc:
                 last_error = exc
                 print(f"{provider['name']} 未知异常：{repr(exc)}")
-                if provider.get("id") == "luxin":
-                    _luxin_breaker_open(
-                        f"未知异常（{type(exc).__name__}）"
-                    )
                 break
 
         if provider_index < len(providers) - 1:
@@ -1454,10 +999,8 @@ def _friendly_http_error(status_code):
 
 def ask_ai(messages, retries=2, teaching_context=None):
     """
-    文本回答优先使用鲁信杯算力，异常时自动回退原 DeepSeek 路径。
-
+    使用 DeepSeek 生成文本回复。
     简单请求关闭思考；中等和困难题均使用 high 思考。
-    鲁信优先，但简单请求若鲁信短时间无响应会快速回退原 DeepSeek。
     """
     if ASK_AI_MOCK:
         return _success("""这是一条模拟回复。
@@ -1474,8 +1017,8 @@ $$
 $$
 """)
 
-    if not (LUXIN_API_KEY or DEEPSEEK_API_KEY):
-        print("AI API 配置错误：LUXIN_API_KEY 与 DEEPSEEK_API_KEY 均未设置")
+    if not DEEPSEEK_API_KEY:
+        print("AI API 配置错误：DEEPSEEK_API_KEY 未设置")
         return _failure("AI 服务尚未完成配置，请联系管理员。")
 
     clean_messages = _trim_messages(messages)
