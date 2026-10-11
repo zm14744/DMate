@@ -10139,11 +10139,9 @@ function buildKnowledgeGraphImageCopyTarget() {
         document.body.appendChild(temporaryHost);
         try {
             const context = getActiveKnowledgeContext();
-            const nodes = knowledgeGraphViewMode === "focus"
-                ? knowledgeGraphFocusedNodes(knowledgeGraphFilter, context)
-                : knowledgeGraphVisibleNodes(knowledgeGraphFilter);
+            const nodes = knowledgeGraphDisplayedNodes(context);
             renderMobileKnowledgeGraphSection(
-                temporaryHost, nodes, knowledgeGraphFilter || "知识图谱", "", context,
+                temporaryHost, nodes, knowledgeGraphDisplayCategory(), "", context,
                 { forCopy: true }
             );
             mobileStage = temporaryHost.querySelector(".kg-mobile-stage");
@@ -10429,9 +10427,7 @@ function drawKnowledgeGraphWrappedLabel(ctx, label, centerX, centerY, maxWidth, 
 
 async function renderKnowledgeGraphOffscreenPngBlob() {
     const context = getActiveKnowledgeContext();
-    const nodes = knowledgeGraphViewMode === "focus"
-        ? knowledgeGraphFocusedNodes(knowledgeGraphFilter, context)
-        : knowledgeGraphVisibleNodes(knowledgeGraphFilter);
+    const nodes = knowledgeGraphDisplayedNodes(context);
     if (!nodes?.length) throw new Error("当前范围没有可复制的知识节点");
     const layout = knowledgeGraphExportLayout(nodes);
     const { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight } = layout;
@@ -16111,6 +16107,20 @@ async function openKnowledgeGraphCategoryPicker() {
 }
 
 
+
+// 视图筛选唯一入口：最近一题关联始终跨模块查找，全部知识才按模块筛选。
+// 画布、右侧关系详情和图片导出使用同一批可见节点，避免图中无线、右侧却列出节点。
+function knowledgeGraphDisplayCategory() {
+    return knowledgeGraphViewMode === "focus" ? "全部" : (knowledgeGraphFilter || "全部");
+}
+
+function knowledgeGraphDisplayedNodes(context = getActiveKnowledgeContext()) {
+    const category = knowledgeGraphDisplayCategory();
+    return knowledgeGraphViewMode === "focus"
+        ? knowledgeGraphFocusedNodes(category, context)
+        : knowledgeGraphVisibleNodes(category);
+}
+
 function findKnowledgeGraphNodeById(nodeId) {
     if (
         !knowledgeGraphData
@@ -18030,7 +18040,12 @@ function renderKnowledgeGraphDetail() {
         context
     );
 
-    const nextNodes = knowledgeGraphData.nodes
+    // 和当前画布使用同一批节点：仅列出实际能画出关系线的两端。
+    // 跨模块前置关系仍保存在完整数据中，选择「全部知识→全部」时完整显示。
+    const displayedNodes = knowledgeGraphDisplayedNodes(getActiveKnowledgeContext());
+    const namesOnCanvas = new Set(displayedNodes.map(item => item.name));
+    const visiblePrerequisites = node.prerequisites.filter(name => namesOnCanvas.has(name));
+    const nextNodes = displayedNodes
         .filter(item => item.prerequisites.includes(node.name))
         .map(item => item.name);
 
@@ -18065,10 +18080,17 @@ function renderKnowledgeGraphDetail() {
         label.textContent = labelText;
 
         const value = document.createElement("div");
-        value.className = "graph-detail-field-value";
-        value.textContent = values.length
-            ? values.join("、")
-            : emptyText;
+        value.className = "graph-detail-field-value graph-detail-term-list";
+        if (values.length) {
+            for (const name of values) {
+                const term = document.createElement("span");
+                term.className = "graph-detail-term";
+                term.textContent = name;
+                value.appendChild(term);
+            }
+        } else {
+            value.textContent = emptyText;
+        }
 
         field.appendChild(label);
         field.appendChild(value);
@@ -18076,15 +18098,15 @@ function renderKnowledgeGraphDetail() {
     };
 
     addDetailField(
-        "建议前置知识",
-        node.prerequisites,
-        "暂无建议前置"
+        "图中前置知识",
+        visiblePrerequisites,
+        "当前图中暂无前置"
     );
 
     addDetailField(
-        "直接后续知识",
+        "图中直接后续",
         nextNodes,
-        "暂无直接后续"
+        "当前图中暂无后续"
     );
 
     if (node.note) {
@@ -18114,6 +18136,8 @@ function renderKnowledgeGraph() {
         return;
     }
 
+    // 在两个模式下使用同一个属性控制桌面下拉框与移动端选择入口。
+    modal.dataset.graphView = knowledgeGraphViewMode === "focus" ? "focus" : "full";
     fillKnowledgeGraphCategoryOptions();
     updateKnowledgeGraphScopeButton();
     updateKnowledgeGraphModeButton();
@@ -18136,18 +18160,9 @@ function renderKnowledgeGraph() {
         return;
     }
 
-    const fullNodes = knowledgeGraphVisibleNodes(
-        knowledgeGraphFilter
-    );
-
-    const visibleNodes = (
-        knowledgeGraphViewMode === "focus"
-            ? knowledgeGraphFocusedNodes(
-                knowledgeGraphFilter,
-                context
-            )
-            : fullNodes
-    );
+    const displayCategory = knowledgeGraphDisplayCategory();
+    const fullNodes = knowledgeGraphVisibleNodes(displayCategory);
+    const visibleNodes = knowledgeGraphDisplayedNodes(context);
 
     ensureKnowledgeGraphSelection(
         visibleNodes,
@@ -18173,7 +18188,7 @@ function renderKnowledgeGraph() {
                             : (
                                 visibleNodes.length < fullNodes.length
                                     ? `最近一题关联 · ${visibleNodes.length} 个知识点`
-                                    : "当前没有可进一步收缩的题目上下文，显示当前模块。"
+                                    : "当前没有可进一步收缩的题目上下文，显示全部知识。"
                             )
                     )
             )
@@ -18192,7 +18207,7 @@ function renderKnowledgeGraph() {
         renderMobileKnowledgeGraphSection(
             fragment,
             visibleNodes,
-            knowledgeGraphFilter || "知识图谱",
+            displayCategory,
             description,
             context
         );
@@ -18200,7 +18215,7 @@ function renderKnowledgeGraph() {
         renderKnowledgeGraphSection(
             fragment,
             visibleNodes,
-            knowledgeGraphFilter || "知识图谱",
+            displayCategory,
             description,
             context
         );
