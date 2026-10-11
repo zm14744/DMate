@@ -3025,6 +3025,60 @@ const LONG_RESPONSE_DIRECT_RENDER_CHARS = 2200;
 
 const busySessionIds = new Set();
 const pendingAiStartSessionIds = new Set();
+// 每个会话独立跟踪正在执行的请求。取消后，晚到的服务端结果绝不能再落盘。
+const activeAiRequests = new Map();
+
+function throwIfAiRequestCancelled(request) {
+    if (request?.cancelled || request?.controller?.signal?.aborted) {
+        const error = new Error("AI request cancelled");
+        error.name = "AbortError";
+        throw error;
+    }
+}
+
+function discardTypingOutput() {
+    if (!typingTimer) return false;
+    clearInterval(typingTimer);
+    typingTimer = null;
+    typingDiv?.remove();
+    typingFullText = "";
+    typingDiv = null;
+    typingSessionId = null;
+    typingMeta = null;
+    typingAutoFollow = true;
+    typingScrollLockedByUser = false;
+    lastTypingAutoScrollAt = 0;
+    renderChat();
+    refreshInputAvailability();
+    return true;
+}
+
+function stopCurrentAiReply() {
+    const key = sessionBusyKey(currentId);
+    const request = activeAiRequests.get(key);
+    if (request) {
+        request.cancelled = true;
+        request.controller.abort();
+        activeAiRequests.delete(key);
+        busySessionIds.delete(key);
+        pendingAiStartSessionIds.delete(key);
+        // 中断时仍保留已发出的用户消息，方便手动删除并重新输入。
+        rollbackRetestAfterRequestFailure(request.session);
+    }
+    const stoppedTyping = isCurrentSessionTyping() ? discardTypingOutput() : false;
+    if (request || stoppedTyping) {
+        // 不强制弹出手机键盘；保持原滚动位置，方便用户删除刚发出的消息。
+        refreshInputAvailability();
+    }
+}
+
+function handleSendOrStop() {
+    if (isSessionBusy(currentId) || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) {
+        stopCurrentAiReply();
+        return;
+    }
+    send();
+}
 
 
 // -----------------------------
@@ -3121,10 +3175,12 @@ function refreshInputAvailability() {
         input.placeholder = placeholder;
     }
     if (sendBtn) {
-        sendBtn.disabled = hardBlocked || ocrReviewInProgress;
-        sendBtn.textContent = busyMode === "thinking"
-            ? "思考中…"
-            : (busyMode === "answering" ? "回答中…" : "发送");
+        const canStop = (waitingReply || typingNow) && !ocrReviewInProgress;
+        sendBtn.disabled = Boolean(ocrReviewInProgress);
+        sendBtn.textContent = canStop ? "停止" : "发送";
+        sendBtn.classList.toggle("ai-stop-button", canStop);
+        sendBtn.setAttribute("aria-label", canStop ? "停止当前 AI 回复" : "发送消息");
+        sendBtn.title = canStop ? "停止当前 AI 回复" : "发送";
     }
     if (imageBtn) {
         imageBtn.disabled = hardBlocked || ocrReviewInProgress;
@@ -12746,6 +12802,13 @@ async function requestAiReply(session) {
         requestTargetCandidate
     );
 
+    const requestKey = sessionBusyKey(session.id);
+    const activeRequest = {
+        session,
+        controller: new AbortController(),
+        cancelled: false
+    };
+    activeAiRequests.set(requestKey, activeRequest);
     setSessionBusy(session.id, true);
 
     try {
@@ -12762,6 +12825,7 @@ async function requestAiReply(session) {
                 requestTargetCandidate.text,
                 requestTargetCandidate.key
             );
+            throwIfAiRequestCancelled(activeRequest);
 
             if (targetTeaching) {
                 applyQuestionCandidateAsCurrent(
@@ -12774,6 +12838,7 @@ async function requestAiReply(session) {
             }
         }
 
+        throwIfAiRequestCancelled(activeRequest);
         const latestRawRequest = String(latestUserBeforeRequest?.text || "").trim();
         const asksForFullSolution = (
             /(?:给出|给我|直接给|告诉我|输出).{0,8}(?:答案|解析|解答)|(?:完整|详细).{0,3}(?:解析|解答|过程)|答案.{0,3}(?:和|与|及).{0,3}解析/.test(latestRawRequest)
@@ -12834,6 +12899,7 @@ async function requestAiReply(session) {
 
         const response = await fetch("/chat", {
             method: "POST",
+            signal: activeRequest.controller.signal,
             headers: {
                 "Content-Type": "application/json"
             },
@@ -12865,6 +12931,7 @@ async function requestAiReply(session) {
         });
 
         const data = await parseResponseJson(response);
+        throwIfAiRequestCancelled(activeRequest);
 
         let localGeneratedQuestion = sanitizeStoredWrongQuestionText(
             data.generated_question || ""
@@ -12902,6 +12969,7 @@ async function requestAiReply(session) {
                 localGeneratedQuestion,
                 "generated-current"
             );
+            throwIfAiRequestCancelled(activeRequest);
         }
 
         // 系统不变量：明确“出题”的本轮请求，只有在题干与题目分类都拿到后
@@ -13078,6 +13146,8 @@ async function requestAiReply(session) {
         }
 
     } catch (error) {
+        // 用户主动停止不是网络故障，不显示错误消息，也不保存迟到的回复。
+        if (activeRequest.cancelled || error?.name === "AbortError") return;
         console.error("聊天请求失败：", error);
 
         rollbackRetestAfterRequestFailure(session);
@@ -13089,7 +13159,11 @@ async function requestAiReply(session) {
         );
 
     } finally {
-        setSessionBusy(session.id, false);
+        // 旧请求晚结束时不能清除用户刚刚重新发起的新请求的忙碌状态。
+        if (activeAiRequests.get(requestKey) === activeRequest) {
+            activeAiRequests.delete(requestKey);
+            setSessionBusy(session.id, false);
+        }
     }
 }
 
