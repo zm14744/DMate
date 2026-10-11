@@ -11,7 +11,8 @@ import requests
 import hashlib
 from email.message import EmailMessage
 from datetime import timedelta
-from collections import defaultdict, deque
+from collections import defaultdict, deque, OrderedDict
+import ipaddress
 
 from flask import Flask, jsonify, render_template, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -263,7 +264,23 @@ _request_history = defaultdict(deque)
 # 图片识别撤销状态。当前部署使用单 worker + 多线程，进程内集合即可让
 # “撤销”请求在普通 OCR 与 Vision 两阶段之间生效。
 _ocr_cancel_lock = threading.Lock()
-_cancelled_ocr_requests = set()
+# Unmatched cancellation messages must not accumulate indefinitely.
+# The client uses unique request IDs; 120s covers normal OCR request startup.
+OCR_CANCEL_TTL_SECONDS = 120.0
+OCR_CANCEL_MAX_PENDING = 1024
+_cancelled_ocr_requests = OrderedDict()  # request ID -> monotonic expiration
+
+# Only trust forwarding headers when the directly-connected proxy is explicitly
+# configured. An arbitrary public client must never choose its own rate-limit IP.
+TRUSTED_PROXY_CIDRS = []
+for _cidr in (os.environ.get("TRUSTED_PROXY_CIDRS") or "").split(","):
+    if _cidr.strip():
+        try:
+            TRUSTED_PROXY_CIDRS.append(ipaddress.ip_network(_cidr.strip(), strict=False))
+        except ValueError:
+            print("忽略无效的 TRUSTED_PROXY_CIDRS 项。")
+
+RATE_LIMIT_MAX_IDENTITIES = 4096
 
 
 def _normalize_ocr_request_id(value):
@@ -275,13 +292,26 @@ def _normalize_ocr_request_id(value):
     return request_id
 
 
+def _trim_ocr_cancellations(now):
+    # OrderedDict preserves insertion order. Old IDs expire even when OCR
+    # cancellation notices arrive without a matching upload.
+    for key, expiry in list(_cancelled_ocr_requests.items()):
+        if expiry <= now:
+            _cancelled_ocr_requests.pop(key, None)
+    while len(_cancelled_ocr_requests) > OCR_CANCEL_MAX_PENDING:
+        _cancelled_ocr_requests.popitem(last=False)
+
+
 def _mark_ocr_cancelled(request_id):
     request_id = _normalize_ocr_request_id(request_id)
     if not request_id:
         return False
-
     with _ocr_cancel_lock:
-        _cancelled_ocr_requests.add(request_id)
+        now = time.monotonic()
+        _trim_ocr_cancellations(now)
+        _cancelled_ocr_requests.pop(request_id, None)
+        _cancelled_ocr_requests[request_id] = now + OCR_CANCEL_TTL_SECONDS
+        _trim_ocr_cancellations(now)
     return True
 
 
@@ -289,24 +319,43 @@ def _take_ocr_cancelled(request_id):
     request_id = _normalize_ocr_request_id(request_id)
     if not request_id:
         return False
-
     with _ocr_cancel_lock:
-        if request_id not in _cancelled_ocr_requests:
-            return False
-        _cancelled_ocr_requests.discard(request_id)
-        return True
+        now = time.monotonic()
+        _trim_ocr_cancellations(now)
+        return _cancelled_ocr_requests.pop(request_id, None) is not None
 
 
 def _get_client_ip():
-    forwarded = request.headers.get(
-        "X-Forwarded-For",
-        ""
-    ).strip()
+    remote = (request.remote_addr or "").strip()
+    try:
+        peer = ipaddress.ip_address(remote)
+    except ValueError:
+        return "unknown"
+    if not any(peer in network for network in TRUSTED_PROXY_CIDRS):
+        return str(peer)
 
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # Walk backwards over the trusted proxy chain. Never take the leftmost
+    # X-Forwarded-For value blindly: the client could have supplied it.
+    chain = (request.headers.get("X-Forwarded-For") or "").split(",")
+    for candidate in reversed(chain):
+        try:
+            address = ipaddress.ip_address(candidate.strip())
+        except ValueError:
+            return str(peer)
+        if not any(address in network for network in TRUSTED_PROXY_CIDRS):
+            return str(address)
+    return str(peer)
 
-    return request.remote_addr or "unknown"
+
+def _trim_rate_limit_identities(history_map, now, window):
+    # Bound the per-process rate-limit bookkeeping even under hostile traffic.
+    if len(history_map) <= RATE_LIMIT_MAX_IDENTITIES:
+        return
+    for key, history in list(history_map.items()):
+        if not history or now - history[-1] > window:
+            history_map.pop(key, None)
+    while len(history_map) > RATE_LIMIT_MAX_IDENTITIES:
+        history_map.pop(next(iter(history_map)))
 
 
 def _check_rate_limit(ip, route_name):
@@ -316,12 +365,15 @@ def _check_rate_limit(ip, route_name):
     - /ocr  每分钟最多 10 次
     """
     limit = (
-        RATE_LIMIT_CHAT
-        if route_name == "chat"
-        else RATE_LIMIT_OCR
+        RATE_LIMIT_CHAT if route_name == "chat" else
+        45 if route_name == "ocr_cancel" else RATE_LIMIT_OCR
     )
 
-    key = f"{route_name}:{ip}"
+    # A signed logged-in session gets its own quota. Without this, users
+    # behind the same hosted reverse proxy can exhaust each other's allowance.
+    account_id = session.get("user_id")
+    identity = f"user:{account_id}" if account_id else f"ip:{ip}"
+    key = f"{route_name}:{identity}"
     now = time.time()
 
     with _rate_lock:
@@ -337,6 +389,7 @@ def _check_rate_limit(ip, route_name):
             return False
 
         history.append(now)
+        _trim_rate_limit_identities(_request_history, now, RATE_LIMIT_WINDOW)
         return True
 
 
@@ -409,6 +462,7 @@ def _auth_rate_allowed(route_name):
         if len(history) >= AUTH_RATE_LIMIT_COUNT:
             return False
         history.append(now)
+        _trim_rate_limit_identities(_auth_rate_history, now, AUTH_RATE_LIMIT_WINDOW)
         return True
 
 
@@ -1652,7 +1706,8 @@ def sync_user_data():
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
     data = payload.get("data")
-    force = bool(payload.get("force"))
+    if payload.get("force"):
+        return jsonify({"ok": False, "error": "不支持强制覆盖云端数据，请合并后重试。"}), 400
 
     try:
         base_revision = int(payload.get("baseRevision", 0))
@@ -1684,30 +1739,17 @@ def sync_user_data():
                     (user_id,),
                 )
 
-                if force:
-                    cur.execute(
-                        """
-                        UPDATE dm_user_data
-                        SET data = %s,
-                            revision = revision + 1,
-                            updated_at = NOW()
-                        WHERE user_id = %s
-                        RETURNING revision, updated_at
-                        """,
-                        (Jsonb(data), user_id),
-                    )
-                else:
-                    cur.execute(
-                        """
-                        UPDATE dm_user_data
-                        SET data = %s,
-                            revision = revision + 1,
-                            updated_at = NOW()
-                        WHERE user_id = %s AND revision = %s
-                        RETURNING revision, updated_at
-                        """,
-                        (Jsonb(data), user_id, base_revision),
-                    )
+                cur.execute(
+                    """
+                    UPDATE dm_user_data
+                    SET data = %s,
+                        revision = revision + 1,
+                        updated_at = NOW()
+                    WHERE user_id = %s AND revision = %s
+                    RETURNING revision, updated_at
+                    """,
+                    (Jsonb(data), user_id, base_revision),
+                )
 
                 updated = cur.fetchone()
 
@@ -3001,6 +3043,8 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
 
 @app.route("/ocr/cancel", methods=["POST"])
 def cancel_ocr():
+    if not _check_rate_limit(_get_client_ip(), "ocr_cancel"):
+        return jsonify({"error": "撤销请求过于频繁，请稍后再试。"}), 429
     data = request.get_json(silent=True) or {}
     request_id = _normalize_ocr_request_id(data.get("request_id"))
 
