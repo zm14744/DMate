@@ -28,6 +28,56 @@
 * { box-sizing:border-box; }
 
 
+
+/* 聊天区域内的快捷定位：悬浮于输入框上方，不占据消息空间。 */
+.center { position:relative; }
+.chat-jump-controls {
+    position:absolute;
+    right:clamp(14px, 2vw, 28px);
+    bottom:calc(var(--dmate-chat-input-height, 80px) + 14px);
+    z-index:4;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    pointer-events:none;
+}
+.chat-jump-button {
+    pointer-events:auto;
+    display:grid;
+    place-items:center;
+    width:44px;
+    height:44px;
+    padding:0;
+    border:1px solid var(--border-strong, rgba(148,163,184,.36));
+    border-radius:50%;
+    background:var(--surface-2);
+    color:var(--text-primary);
+    box-shadow:0 5px 16px rgba(0,0,0,.18);
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+}
+.chat-jump-button[hidden] { display:none !important; }
+.chat-jump-button svg {
+    width:22px;
+    height:22px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:2;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+}
+.chat-jump-button:hover { background:var(--surface-3); }
+.chat-jump-button:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media (max-width:1100px) {
+    .chat-jump-controls {
+        right:max(14px, env(safe-area-inset-right));
+        bottom:calc(var(--dmate-chat-input-height, 80px) + 12px);
+    }
+    .chat-jump-button { width:42px; height:42px; }
+}
+
 /* 统一使用低存在感滚动条，避免浏览器默认白色轨道/箭头。 */
 * {
     scrollbar-width:thin;
@@ -6997,6 +7047,14 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
 <div class="center">
     <div id="chat" class="chat"></div>
+    <nav class="chat-jump-controls" aria-label="对话快速定位">
+        <button id="chatJumpTop" class="chat-jump-button" type="button" title="回到对话顶部" aria-label="回到对话顶部" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg>
+        </button>
+        <button id="chatJumpBottom" class="chat-jump-button" type="button" title="跳到对话底部" aria-label="跳到对话底部" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 10 6 6 6-6"/></svg>
+        </button>
+    </nav>
 
     <div class="input-wrap">
         <div class="input">
@@ -7593,7 +7651,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=native-graph-copy-tablet-20261010"></script>
+<script src="/static/script.js?v=chat-jump-controls-20261011"></script>
 
 </body>
 </html>
