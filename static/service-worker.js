@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-native-graph-copy-tablet-20261010";
+const CACHE_NAME = "dmate-webapp-chat-jump-controls-20261011";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
