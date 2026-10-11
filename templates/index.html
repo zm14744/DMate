@@ -145,7 +145,7 @@ body {
     margin-bottom:10px;
 }
 
-#sessions { flex:1; overflow-y:auto; }
+#sessions { flex:1; overflow-y:auto; overflow-anchor:none; }
 
 .session {
     display:flex;
@@ -7651,7 +7651,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=chat-jump-controls-20261011"></script>
+<script src="/static/script.js?v=session-delete-sync-tombstones-20261011"></script>
 
 </body>
 </html>
