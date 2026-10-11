@@ -534,6 +534,106 @@ body {
     outline-offset:3px;
 }
 
+.app-confirm-card {
+    width:min(440px, 92vw);
+}
+
+.app-confirm-body {
+    padding:18px 18px 8px;
+    color:var(--text-primary);
+    line-height:1.7;
+    white-space:pre-wrap;
+}
+
+.app-confirm-actions {
+    display:flex;
+    justify-content:flex-end;
+    gap:12px;
+    padding:0 18px 18px;
+}
+
+.app-confirm-actions button,
+.mobile-select-trigger,
+.mobile-choice-option {
+    font:inherit;
+}
+
+.mobile-select-trigger {
+    display:none;
+    min-height:42px;
+    padding:0 14px;
+    border-radius:12px;
+    border:1px solid var(--border-strong);
+    background:var(--surface-0);
+    color:var(--text-primary);
+    cursor:pointer;
+    white-space:nowrap;
+}
+
+.mobile-choice-card {
+    width:min(560px, 94vw);
+}
+
+.mobile-choice-intro {
+    padding:16px 18px 0;
+    color:var(--text-subtle);
+    line-height:1.6;
+}
+
+.mobile-choice-list {
+    padding:14px 14px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    overflow-y:auto;
+}
+
+.mobile-choice-option {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    min-height:56px;
+    padding:14px 16px;
+    border-radius:16px;
+    border:1px solid var(--border-strong);
+    background:var(--surface-0);
+    color:var(--text-primary);
+    text-align:left;
+    cursor:pointer;
+}
+
+.mobile-choice-option.active {
+    border-color:var(--accent);
+    background:rgba(59,130,246,.08);
+}
+
+.mobile-choice-option-text {
+    font-size:1rem;
+    line-height:1.45;
+}
+
+.mobile-choice-option-check {
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    border:2px solid color-mix(in srgb, var(--text-subtle) 72%, transparent);
+    position:relative;
+    flex:0 0 auto;
+}
+
+.mobile-choice-option.active .mobile-choice-option-check {
+    border-color:var(--accent);
+}
+
+.mobile-choice-option.active .mobile-choice-option-check::after {
+    content:"";
+    position:absolute;
+    inset:4px;
+    border-radius:50%;
+    background:var(--accent);
+}
+
 #wrongBookList {
     overflow-y:auto;
     padding:14px;
@@ -5260,6 +5360,27 @@ body[data-appearance-theme="light"] .input input {
         touch-action:none !important;
     }
 
+    .app-confirm-card,
+    .mobile-choice-card {
+        width:100%;
+        max-width:none;
+        border-radius:22px 22px 0 0;
+        border-left:none;
+        border-right:none;
+        border-bottom:none;
+        margin-top:auto;
+    }
+
+    .mobile-select-trigger {
+        display:inline-flex;
+        align-items:center;
+    }
+
+    #knowledgeGraphCategory,
+    label[for="knowledgeGraphCategory"] {
+        display:none !important;
+    }
+
     /* v7 性能策略：手势过程中尽量只改变 transform/opacity，避免阴影、模糊、
        尺寸和布局属性参与逐帧计算。 */
 }
@@ -7589,6 +7710,32 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 
+<div id="appConfirmModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle">
+        <div class="modal-head">
+            <div id="appConfirmTitle">请确认</div>
+            <button id="appConfirmClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
+        </div>
+        <div id="appConfirmBody" class="app-confirm-body"></div>
+        <div class="app-confirm-actions">
+            <button id="appConfirmCancel" type="button">取消</button>
+            <button id="appConfirmConfirm" type="button" class="danger">确定</button>
+        </div>
+    </div>
+</div>
+
+<div id="mobileChoiceModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card mobile-choice-card" role="dialog" aria-modal="true" aria-labelledby="mobileChoiceTitle">
+        <div class="modal-head">
+            <div id="mobileChoiceTitle">请选择</div>
+            <button id="mobileChoiceClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
+        </div>
+        <div id="mobileChoiceIntro" class="mobile-choice-intro hidden"></div>
+        <div id="mobileChoiceList" class="mobile-choice-list" role="radiogroup" aria-label="选项列表"></div>
+    </div>
+</div>
+
+
 <div id="knowledgeGraphModal" class="modal hidden">
     <div class="modal-card graph-modal-card">
         <div class="modal-head">
@@ -7600,6 +7747,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div class="graph-toolbar-left">
                 <label for="knowledgeGraphCategory">模块</label>
                 <select id="knowledgeGraphCategory" aria-label="知识图谱分类"></select>
+                <button id="knowledgeGraphCategoryTrigger" type="button" class="mobile-select-trigger" aria-haspopup="dialog">模块：全部</button>
                 <button id="knowledgeGraphScopeBtn" type="button">最近一题关联</button>
                 <button id="knowledgeGraphFocusBtn" type="button">全部知识</button>
                 <button id="knowledgeGraphCopyBtn" type="button" title="电脑复制图谱图片；Android 安装版保存到相册；手机网页可预览并保存">以图片形式复制</button>
