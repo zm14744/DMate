@@ -15,7 +15,7 @@ const ACCOUNT_LOGOUT_SIGNAL_KEY = "dmate_account_logout_signal_v1";
 // 故障排查备份只存于当前页面内存，退出/换账号后不可被下一位用户读取。
 let volatileCloudBackup = null;
 // 减少跨设备可见延迟；连续本机写入仍保留短暂防抖，避免每次打字都上传。
-const CLOUD_SYNC_DEBOUNCE_MS = 350;
+const CLOUD_SYNC_DEBOUNCE_MS = 200;
 let accountState = {
     configured: null,
     emailConfigured: null,
@@ -34,7 +34,7 @@ let cloudLocalChangeVersion = 0;
 // 只轮询云端修订号，版本变化时才读取完整快照；后台低频检查、切回前台立即检查。
 // 前台只检查修订号，云端没有变化时不下载完整快照。
 // 与后台 30 秒轮询区分，避免隐藏标签持续占用服务器连接。
-const CLOUD_LIVE_POLL_VISIBLE_MS = 1800;
+const CLOUD_LIVE_POLL_VISIBLE_MS = 1200;
 const CLOUD_LIVE_POLL_HIDDEN_MS = 30000;
 let cloudLivePollTimer = 0;
 let cloudLivePollInFlight = false;
