@@ -11040,6 +11040,77 @@ function installRichSelectionCopy() {
 }
 
 
+// 快捷跳转控件只观察 #chat 自身，不接管页面/图谱滚动。
+let chatJumpRefreshId = 0;
+
+function updateChatJumpControls() {
+    const chat = document.getElementById("chat");
+    const topButton = document.getElementById("chatJumpTop");
+    const bottomButton = document.getElementById("chatJumpBottom");
+    const center = chat?.closest(".center");
+    if (!chat || !topButton || !bottomButton || !center) return;
+
+    const inputWrap = center.querySelector(".input-wrap");
+    const inputHeight = inputWrap?.getBoundingClientRect().height || 80;
+    center.style.setProperty("--dmate-chat-input-height", `${Math.ceil(inputHeight)}px`);
+
+    const maxScroll = Math.max(0, chat.scrollHeight - chat.clientHeight);
+    const scrollTop = Math.max(0, Math.min(chat.scrollTop, maxScroll));
+    const canScroll = maxScroll > 50;
+    topButton.hidden = !canScroll || scrollTop <= 16;
+    bottomButton.hidden = !canScroll || (maxScroll - scrollTop) <= 16;
+}
+
+function queueChatJumpControlsUpdate() {
+    if (chatJumpRefreshId) return;
+    chatJumpRefreshId = requestAnimationFrame(() => {
+        chatJumpRefreshId = 0;
+        updateChatJumpControls();
+    });
+}
+
+function installChatJumpControls() {
+    const chat = document.getElementById("chat");
+    const topButton = document.getElementById("chatJumpTop");
+    const bottomButton = document.getElementById("chatJumpBottom");
+    if (!chat || !topButton || !bottomButton) return;
+
+    const navigate = toBottom => {
+        if (toBottom && typingTimer) {
+            typingScrollLockedByUser = false;
+            typingAutoFollow = true;
+            lastTypingAutoScrollAt = 0;
+        } else if (!toBottom) {
+            stopTypingAutoFollow();
+        }
+        const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+        chat.scrollTo({
+            top: toBottom ? chat.scrollHeight : 0,
+            behavior: reducedMotion ? "auto" : "smooth"
+        });
+        queueChatJumpControlsUpdate();
+    };
+    topButton.addEventListener("click", () => navigate(false));
+    bottomButton.addEventListener("click", () => navigate(true));
+    chat.addEventListener("scroll", queueChatJumpControlsUpdate, { passive:true });
+    window.addEventListener("resize", queueChatJumpControlsUpdate, { passive:true });
+    window.visualViewport?.addEventListener("resize", queueChatJumpControlsUpdate, { passive:true });
+    if (typeof ResizeObserver !== "undefined") {
+        const observer = new ResizeObserver(queueChatJumpControlsUpdate);
+        observer.observe(chat);
+        const inputWrap = chat.closest(".center")?.querySelector(".input-wrap");
+        if (inputWrap) observer.observe(inputWrap);
+    }
+    if (typeof MutationObserver !== "undefined") {
+        // 按帧合并变化：长回答/公式渲染期间不会反复触发布局。
+        new MutationObserver(queueChatJumpControlsUpdate).observe(chat, {
+            childList:true,
+            subtree:true
+        });
+    }
+    queueChatJumpControlsUpdate();
+}
+
 function isChatNearBottom(chat, threshold = 90) {
     if (!chat) return true;
 
@@ -13741,6 +13812,7 @@ function renderChat() {
         chat.innerHTML =
             '<div class="empty-tip">暂无对话</div>';
         lastRenderedChatSessionId = null;
+        queueChatJumpControlsUpdate();
         return;
     }
 
@@ -13883,6 +13955,7 @@ function renderChat() {
         chat.scrollTop = oldScrollTop;
     }
 
+    queueChatJumpControlsUpdate();
     renderMath(chat).then(() => {
         // 公式渲染会改变消息高度，必须在排版完成后再恢复一次位置。
         // 否则长公式/矩阵会把当前视口“顶”到上方。
@@ -13903,7 +13976,7 @@ function renderChat() {
             oldScrollTop,
             Math.max(0, chat.scrollHeight - chat.clientHeight)
         );
-    });
+    }).finally(queueChatJumpControlsUpdate);
 }
 
 
@@ -18602,6 +18675,8 @@ document.addEventListener(
         const wrongFilterButtons = document.querySelectorAll(
             "[data-wrong-filter]"
         );
+
+        installChatJumpControls();
 
         if (chat) {
             chat.addEventListener(
