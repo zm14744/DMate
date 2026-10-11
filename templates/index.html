@@ -7334,39 +7334,229 @@ body[data-appearance-theme="light"] #knowledgeGraphModal,
     opacity:1;
 }
 
-/* OCR 只显示红色撤销；AI 思考只显示红色圆形停止钮。 */
-#sendBtn[hidden], #imageBtn[hidden] { display:none !important; }
-#sendBtn.ai-stop-button,
-body[data-appearance-theme="light"] #sendBtn.ai-stop-button,
-body[data-appearance-theme="dark"] #sendBtn.ai-stop-button,
-body[data-appearance-theme="navy"] #sendBtn.ai-stop-button {
-    box-sizing:border-box !important;
+/* =========================================================
+   2026-10-12 外观统一修复：
+   - 三种主题统一外观弹窗与输入区几何；
+   - 浅色主题提升红/绿/白文本的对比度；
+   - 自定义背景下保持同一套半透明玻璃质感；
+   - 桌面与移动端共用一致的底部输入区形状。
+   ========================================================= */
+body[data-appearance-theme="light"] {
+    --dm-success-text:#15803d;
+    --dm-success-soft:rgba(21,128,61,.14);
+    --dm-danger-text:#b91c1c;
+    --dm-danger-soft:rgba(185,28,28,.12);
+    --dm-warning-text:#b45309;
+    --dm-warning-soft:rgba(180,83,9,.14);
+    --dm-frost-panel:rgba(255,255,255,.72);
+    --dm-frost-panel-strong:rgba(255,255,255,.84);
+    --dm-frost-border:rgba(148,163,184,.30);
+}
+
+body[data-appearance-theme="dark"] {
+    --dm-success-text:#86efac;
+    --dm-success-soft:rgba(134,239,172,.16);
+    --dm-danger-text:#fca5a5;
+    --dm-danger-soft:rgba(252,165,165,.13);
+    --dm-warning-text:#fbbf24;
+    --dm-warning-soft:rgba(251,191,36,.13);
+    --dm-frost-panel:rgba(24,24,27,.70);
+    --dm-frost-panel-strong:rgba(24,24,27,.80);
+    --dm-frost-border:rgba(82,82,91,.34);
+}
+
+body[data-appearance-theme="navy"] {
+    --dm-success-text:#86efac;
+    --dm-success-soft:rgba(134,239,172,.16);
+    --dm-danger-text:#fca5a5;
+    --dm-danger-soft:rgba(252,165,165,.13);
+    --dm-warning-text:#fbbf24;
+    --dm-warning-soft:rgba(251,191,36,.13);
+    --dm-frost-panel:rgba(15,23,42,.70);
+    --dm-frost-panel-strong:rgba(15,23,42,.80);
+    --dm-frost-border:rgba(96,165,250,.18);
+}
+
+/* 浅色主题下的绿色 / 红色 / 浅色文字全部改成可读配色。 */
+.wrong-status.corrected {
+    color:var(--dm-success-text) !important;
+}
+.wrong-status.passed {
+    color:var(--dm-success-text) !important;
+}
+.wrong-status.failed {
+    color:var(--dm-warning-text) !important;
+}
+.msg-actions button.danger,
+.wrong-tools .danger-tool,
+.wrong-actions button.danger,
+.account-delete-actions .danger,
+#appConfirmModal #appConfirmConfirm.danger {
+    color:var(--dm-danger-text) !important;
+}
+.account-entry.is-authenticated .account-entry-dot {
+    background:var(--dm-success-text) !important;
+    box-shadow:0 0 0 2px var(--dm-success-soft) !important;
+}
+
+/* 外观弹窗与其它模态统一成半透明玻璃卡片，三种主题几何一致。 */
+body[data-appearance-theme] .appearance-card,
+body[data-appearance-theme] .ocr-review-dialog,
+body[data-appearance-theme] .modal-card {
+    background:var(--dm-frost-panel-strong) !important;
+    background-image:none !important;
+    border:1px solid var(--dm-frost-border) !important;
+    backdrop-filter:blur(22px) saturate(155%);
+    -webkit-backdrop-filter:blur(22px) saturate(155%);
+    box-shadow:0 22px 56px rgba(0,0,0,.24) !important;
+}
+body[data-appearance-theme] .appearance-body,
+body[data-appearance-theme] .appearance-footer,
+body[data-appearance-theme] .appearance-section,
+body[data-appearance-theme] .appearance-background-preview,
+body[data-appearance-theme] .appearance-background-viewer-card,
+body[data-appearance-theme] .ocr-review-actions {
+    background:transparent !important;
+    background-image:none !important;
+    border-color:var(--dm-frost-border) !important;
+}
+body[data-appearance-theme] .appearance-segmented button,
+body[data-appearance-theme] .appearance-background-actions button:not(.primary),
+body[data-appearance-theme] .appearance-footer button:not(.primary) {
+    background:rgba(var(--surface-3-rgb),.78) !important;
+    background-image:none !important;
+    border-color:var(--dm-frost-border) !important;
+    color:var(--text-secondary) !important;
+}
+body[data-appearance-theme] .appearance-segmented button.active {
+    background:rgba(var(--accent-rgb),.18) !important;
+    background-image:none !important;
+    border-color:var(--accent) !important;
+    color:var(--text-primary) !important;
+}
+body[data-appearance-theme] .appearance-slider-row,
+body[data-appearance-theme] .appearance-slider-value,
+body[data-appearance-theme] .appearance-apply-hint,
+body[data-appearance-theme] .appearance-section-title {
+    color:var(--text-secondary) !important;
+    -webkit-text-fill-color:var(--text-secondary) !important;
+}
+
+/* 自定义背景时也保持同一套玻璃效果，不让浅色主题变成纯白板。 */
+body.has-custom-background[data-appearance-theme] .appearance-card,
+body.has-custom-background[data-appearance-theme] .ocr-review-dialog,
+body.has-custom-background[data-appearance-theme] .modal-card,
+body.has-custom-background[data-appearance-theme] .left,
+body.has-custom-background[data-appearance-theme] .right {
+    background:var(--dm-frost-panel) !important;
+}
+
+/* 统一桌面和移动端输入区的几何：同样的底部承载条 + 同样的输入胶囊。 */
+body[data-appearance-theme] .input-wrap {
+    position:relative;
+    z-index:5;
+    background:linear-gradient(
+        to bottom,
+        rgba(var(--surface-0-rgb),0) 0%,
+        rgba(var(--surface-0-rgb),.46) 18px,
+        rgba(var(--surface-0-rgb),.72) 100%
+    ) !important;
+}
+body.has-custom-background[data-appearance-theme] .input-wrap {
+    background:linear-gradient(
+        to bottom,
+        rgba(15,23,42,0) 0%,
+        rgba(15,23,42,.14) 18px,
+        rgba(15,23,42,.26) 100%
+    ) !important;
+}
+body[data-appearance-theme] .input {
+    width:min(100%, 980px);
+    margin:0 auto;
+    min-height:56px;
+    display:flex;
+    align-items:center;
+    gap:8px !important;
+    padding:6px !important;
+    border:1px solid var(--dm-frost-border) !important;
+    border-radius:24px !important;
+    background:var(--dm-frost-panel) !important;
+    background-image:none !important;
+    backdrop-filter:blur(18px) saturate(145%);
+    -webkit-backdrop-filter:blur(18px) saturate(145%);
+    box-shadow:0 12px 30px rgba(0,0,0,.18) !important;
+}
+body[data-appearance-theme] .input input,
+body[data-appearance-theme] .input input:hover,
+body[data-appearance-theme] .input input:focus {
+    flex:1 1 auto;
+    width:auto;
+    min-width:0;
+    height:44px !important;
+    min-height:44px !important;
+    padding:0 10px !important;
+    border:none !important;
+    border-radius:14px !important;
+    background:transparent !important;
+    background-image:none !important;
+    box-shadow:none !important;
+    color:var(--text-primary) !important;
+    -webkit-text-fill-color:var(--text-primary) !important;
+}
+body[data-appearance-theme] .input input::placeholder {
+    color:var(--text-muted) !important;
+    opacity:1;
+}
+body[data-appearance-theme] #imageBtn {
     flex:0 0 42px !important;
-    display:inline-flex !important;
     width:42px !important;
-    height:42px !important;
     min-width:42px !important;
-    max-width:42px !important;
+    height:42px !important;
     min-height:42px !important;
-    max-height:42px !important;
-    padding:0 !important;
     margin:0 !important;
+    padding:0 !important;
     border-radius:50% !important;
-    background:#ef4444 !important;
-    color:transparent !important;
-    align-items:center !important;
-    justify-content:center !important;
-    font-size:0 !important;
+    border:1px solid transparent !important;
+    background:rgba(var(--surface-3-rgb),.82) !important;
+    color:var(--text-primary) !important;
 }
-#sendBtn.ai-stop-button::before {
-    content:"";
-    width:13px;
-    height:13px;
-    border-radius:2px;
-    background:#ffffff;
-    display:block;
+body[data-appearance-theme] #sendBtn {
+    flex:0 0 auto !important;
+    min-width:80px;
+    height:42px !important;
+    min-height:42px !important;
+    margin:0 !important;
+    padding:0 16px !important;
+    border-radius:21px !important;
+    font-size:14px !important;
+    font-weight:650;
 }
-#sendBtn.ai-stop-button:hover {background:#dc2626 !important;}
+body[data-appearance-theme] #ocrCancelBtn {
+    flex:0 0 34px !important;
+    width:34px !important;
+    height:34px !important;
+    min-height:34px !important;
+    margin:0 2px !important;
+}
+
+/* 浅色主题的输入与状态按钮避免“白字浅底”问题。 */
+body[data-appearance-theme="light"] .input button.secondary,
+body[data-appearance-theme="light"] .msg-actions button,
+body[data-appearance-theme="light"] .appearance-background-actions button:not(.primary),
+body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
+    color:#334155 !important;
+}
+
+/* 手机与平板继续沿用相同几何，不再让浅色模式单独走另一套图形。 */
+@media (max-width:1100px) {
+    body[data-appearance-theme] .input-wrap {
+        width:100%;
+        padding:8px clamp(8px,2.5vw,18px) max(8px,env(safe-area-inset-bottom));
+    }
+    body[data-appearance-theme] .input {
+        width:min(100%, 820px);
+    }
+}
 
 </style>
 
@@ -8081,7 +8271,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-ocr-verified-stop-round-20261012"></script>
+<script src="/static/script.js?v=dmate-ocr-graph-contrast-routing-20261011"></script>
 
 </body>
 </html>
