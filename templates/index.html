@@ -7289,6 +7289,50 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     outline:2px solid var(--accent);
     outline-offset:3px;
 }
+/* Graph nodes always use dark fills, including in the light appearance.
+   Keep their labels light instead of inheriting the light page text palette. */
+#knowledgeGraphModal .kg-svg .kg-node-label,
+body[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-label,
+:root[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-label {
+    fill:#f8fafc !important;
+    color:#f8fafc !important;
+    paint-order:normal;
+}
+#knowledgeGraphModal .kg-svg .kg-node-badge,
+body[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-badge,
+:root[data-appearance-theme="light"] #knowledgeGraphModal .kg-svg .kg-node-badge {
+    fill:#e2e8f0 !important;
+    color:#e2e8f0 !important;
+}
+/* Use deliberate contrast on the graph, separate from generic dialog borders. */
+#knowledgeGraphModal { --kg-link-stroke:#8296b2; }
+body[data-appearance-theme="dark"] #knowledgeGraphModal,
+:root[data-appearance-theme="dark"] #knowledgeGraphModal {
+    --kg-link-stroke:#a3b5cf;
+}
+body[data-appearance-theme="light"] #knowledgeGraphModal,
+:root[data-appearance-theme="light"] #knowledgeGraphModal {
+    --kg-link-stroke:#788ca8;
+}
+#knowledgeGraphModal .kg-svg .kg-edge {
+    stroke:var(--kg-link-stroke) !important;
+    stroke-width:1.8;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    opacity:.88;
+}
+#knowledgeGraphModal .kg-mobile-edge,
+#knowledgeGraphModal .kg-mobile-edge.is-secondary {
+    display:inline !important;
+    stroke:var(--kg-link-stroke) !important;
+    stroke-width:2.1;
+    opacity:.83;
+}
+#knowledgeGraphModal .kg-mobile-edge.is-related {
+    stroke:var(--kg-link-stroke) !important;
+    stroke-width:3;
+    opacity:1;
+}
 </style>
 
 <script>
@@ -8002,7 +8046,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-stop-ai-response-20261011"></script>
+<script src="/static/script.js?v=dmate-ocr-graph-contrast-routing-20261011"></script>
 
 </body>
 </html>
