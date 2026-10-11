@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-stop-ai-response-20261011";
+const CACHE_NAME = "dmate-webapp-ocr-graph-contrast-routing-20261011";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
