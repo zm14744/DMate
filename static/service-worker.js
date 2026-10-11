@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-session-delete-sync-tombstones-20261011";
+const CACHE_NAME = "dmate-webapp-wrong-delete-account-privacy-knowledge-20261011";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
