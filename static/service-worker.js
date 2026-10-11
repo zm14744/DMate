@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-graph-menu-sync-atomic-20261011";
+const CACHE_NAME = "dmate-webapp-graph-relations-view-20261011";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
