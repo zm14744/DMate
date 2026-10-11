@@ -6,7 +6,8 @@ marked.setOptions({
 const STORAGE_KEY = "discrete_math_ai_sessions_v1";
 const LEARNING_STORAGE_KEY = "discrete_math_ai_learning_v1";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_WRONG_QUESTIONS = 80;
+const MAX_WRONG_QUESTIONS = 240;
+const MAX_LEARNING_EVENTS = 4000;
 const FALLBACK_API_CONTEXT_MESSAGES = 12;
 
 const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
@@ -31,6 +32,7 @@ let cloudSyncTimer = 0;
 let cloudApplyingSnapshot = false;
 // 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
 let cloudLocalChangeVersion = 0;
+let cloudSyncContextVersion = 0;
 // 只轮询云端修订号，版本变化时才读取完整快照；后台低频检查、切回前台立即检查。
 // 前台只检查修订号，云端没有变化时不下载完整快照。
 // 与后台 30 秒轮询区分，避免隐藏标签持续占用服务器连接。
@@ -41,6 +43,9 @@ let cloudLivePollInFlight = false;
 let cloudLivePollAbortController = null;
 let cloudLivePollGeneration = 0;
 let cloudLivePollEnabled = false;
+let appConfirmResolver = null;
+let mobileChoiceResolver = null;
+let mobileChoiceOptions = [];
 
 function shouldPersistClientState() {
     // 绝不能信任上次登录留下的 localStorage 元信息作为认证依据。
@@ -946,6 +951,58 @@ function clearCloudSyncMeta() {
     } catch (_error) {}
 }
 
+function bumpCloudSyncContext() {
+    cloudSyncContextVersion += 1;
+    return cloudSyncContextVersion;
+}
+
+function isCloudSyncContextValid(owner, contextVersion) {
+    return Boolean(
+        accountState.authenticated
+        && owner
+        && accountState.username === owner
+        && cloudSyncContextVersion === contextVersion
+    );
+}
+
+function normalizeCloudParts(value) {
+    const normalized = {};
+    if (!value || typeof value !== "object") return normalized;
+    for (const key of ["sessions", "learning", "appearance"]) {
+        const part = value[key];
+        if (!part || typeof part !== "object") continue;
+        const hash = typeof part.hash === "string" ? part.hash : "";
+        const bytes = Number(part.bytes || 0);
+        normalized[key] = {
+            hash,
+            bytes: Number.isFinite(bytes) && bytes >= 0 ? bytes : 0
+        };
+    }
+    return normalized;
+}
+
+function getCloudPartHashMap(parts) {
+    const normalized = normalizeCloudParts(parts);
+    return Object.fromEntries(
+        Object.entries(normalized).map(([key, value]) => [key, value.hash || ""])
+    );
+}
+
+function computeChangedCloudParts(serverParts, localPartHashes) {
+    const normalized = normalizeCloudParts(serverParts);
+    const localHashes = localPartHashes && typeof localPartHashes === "object"
+        ? localPartHashes
+        : {};
+    const changed = [];
+    for (const key of ["sessions", "learning", "appearance"]) {
+        if (!normalized[key]) continue;
+        if (normalized[key].hash !== String(localHashes[key] || "")) {
+            changed.push(key);
+        }
+    }
+    return changed;
+}
+
 function clearLoggedOutWorkspace() {
     // 退出后进入真正的游客模式：页面清空，游客数据不落地。
     sessions = [];
@@ -976,6 +1033,114 @@ function clearLoggedOutWorkspace() {
     if (chat) chat.innerHTML = '<div class="empty-tip">暂无对话</div>';
 
     renderAll();
+}
+
+function setAppConfirmOpen(open) {
+    const modal = document.getElementById("appConfirmModal");
+    if (!modal) return;
+    modal.classList.toggle("hidden", !open);
+    modal.setAttribute("aria-hidden", open ? "false" : "true");
+}
+
+function resolveAppConfirm(value) {
+    const resolver = appConfirmResolver;
+    appConfirmResolver = null;
+    setAppConfirmOpen(false);
+    if (typeof resolver === "function") resolver(Boolean(value));
+}
+
+function showAppConfirm(options = {}) {
+    const modal = document.getElementById("appConfirmModal");
+    const title = document.getElementById("appConfirmTitle");
+    const body = document.getElementById("appConfirmBody");
+    const cancelButton = document.getElementById("appConfirmCancel");
+    const confirmButton = document.getElementById("appConfirmConfirm");
+
+    if (!modal || !title || !body || !cancelButton || !confirmButton) {
+        return Promise.resolve(window.confirm(String(options.fallbackText || options.body || options.title || "请确认当前操作。")));
+    }
+
+    title.textContent = String(options.title || "请确认");
+    body.textContent = String(options.body || "确定继续吗？");
+    cancelButton.textContent = String(options.cancelText || "取消");
+    confirmButton.textContent = String(options.confirmText || "确定");
+    confirmButton.classList.toggle("danger", options.confirmTone === "danger");
+    confirmButton.classList.toggle("primary", options.confirmTone !== "danger");
+
+    if (appConfirmResolver) resolveAppConfirm(false);
+
+    setAppConfirmOpen(true);
+
+    return new Promise(resolve => {
+        appConfirmResolver = resolve;
+        requestAnimationFrame(() => confirmButton.focus?.());
+    });
+}
+
+function closeMobileChoiceModal() {
+    const modal = document.getElementById("mobileChoiceModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+    const resolver = mobileChoiceResolver;
+    mobileChoiceResolver = null;
+    mobileChoiceOptions = [];
+    if (typeof resolver === "function") resolver(null);
+}
+
+function selectMobileChoice(value) {
+    const resolver = mobileChoiceResolver;
+    mobileChoiceResolver = null;
+    const modal = document.getElementById("mobileChoiceModal");
+    if (modal) {
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+    }
+    const result = mobileChoiceOptions.find(item => item.value === value) || null;
+    mobileChoiceOptions = [];
+    if (typeof resolver === "function") resolver(result);
+}
+
+function openMobileChoiceModal({ title = "请选择", intro = "", options = [], value = "" } = {}) {
+    const modal = document.getElementById("mobileChoiceModal");
+    const titleEl = document.getElementById("mobileChoiceTitle");
+    const introEl = document.getElementById("mobileChoiceIntro");
+    const list = document.getElementById("mobileChoiceList");
+    if (!modal || !titleEl || !introEl || !list) {
+        return Promise.resolve(null);
+    }
+
+    titleEl.textContent = String(title || "请选择");
+    introEl.textContent = String(intro || "");
+    introEl.classList.toggle("hidden", !intro);
+    mobileChoiceOptions = Array.isArray(options) ? options.map(item => ({
+        value:String(item.value ?? ""),
+        label:String(item.label ?? item.value ?? "")
+    })) : [];
+
+    list.replaceChildren(...mobileChoiceOptions.map(item => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "mobile-choice-option";
+        if (item.value === value) button.classList.add("active");
+        button.setAttribute("role", "radio");
+        button.setAttribute("aria-checked", String(item.value === value));
+        button.innerHTML = `
+            <span class="mobile-choice-option-text">${escapeHtml(item.label)}</span>
+            <span class="mobile-choice-option-check" aria-hidden="true"></span>
+        `;
+        button.addEventListener("click", () => selectMobileChoice(item.value));
+        return button;
+    }));
+
+    if (mobileChoiceResolver) closeMobileChoiceModal();
+
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+
+    return new Promise(resolve => {
+        mobileChoiceResolver = resolve;
+    });
 }
 
 // 删除标记保留在同一账号的本地状态和云端快照中。
@@ -1597,6 +1762,7 @@ function cloudUiEditInProgress() {
 async function pullLatestCloudSnapshot() {
     if (!cloudLivePollEnabled || cloudLivePollInFlight || accountState.syncing || !accountState.authenticated) return false;
     const owner = accountState.username;
+    const contextVersion = cloudSyncContextVersion;
     const generation = cloudLivePollGeneration;
     let meta = readCloudSyncMeta();
     if (meta.username !== owner) {
@@ -1623,7 +1789,7 @@ async function pullLatestCloudSnapshot() {
     try {
         const {data:head} = await accountFetch("/sync?revisionOnly=1", controller ? {signal:controller.signal} : {});
         if (!cloudLivePollEnabled || generation !== cloudLivePollGeneration ||
-            !accountState.authenticated || accountState.username !== owner) return false;
+            !isCloudSyncContextValid(owner, contextVersion)) return false;
         meta = readCloudSyncMeta();
         // 此页面的实际修订号必须与其它标签共享的持久元信息分开。
         // 否则另一个标签改写 localStorage 后，本页面误以为已经拿到新数据。
@@ -1638,9 +1804,11 @@ async function pullLatestCloudSnapshot() {
         }
         if (meta.dirty || cloudLocalChangeVersion !== beforeEdit || accountState.syncing || cloudUiEditInProgress()) return false;
 
-        const {data:full} = await accountFetch("/sync", controller ? {signal:controller.signal} : {});
+        const changedParts = computeChangedCloudParts(head.parts, meta.sectionHashes);
+        const partQuery = changedParts.length ? `?parts=${encodeURIComponent(changedParts.join(","))}` : "";
+        const {data:full} = await accountFetch(`/sync${partQuery}`, controller ? {signal:controller.signal} : {});
         if (!cloudLivePollEnabled || generation !== cloudLivePollGeneration ||
-            !accountState.authenticated || accountState.username !== owner) return false;
+            !isCloudSyncContextValid(owner, contextVersion)) return false;
         meta = readCloudSyncMeta();
         if (meta.dirty || cloudLocalChangeVersion !== beforeEdit || accountState.syncing || cloudUiEditInProgress()) return false;
         const receivedRevision = Number(full.revision || 0);
@@ -1660,7 +1828,12 @@ async function pullLatestCloudSnapshot() {
         if (!applyCloudSnapshot(incoming)) return false;
         accountState.revision = receivedRevision;
         accountState.status = "已同步";
-        writeCloudSyncMeta({username:owner, revision:receivedRevision, dirty:false});
+        writeCloudSyncMeta({
+            username:owner,
+            revision:receivedRevision,
+            dirty:false,
+            sectionHashes:getCloudPartHashMap(full.parts || head.parts)
+        });
         renderAccountUi();
         return true;
     } catch (error) {
@@ -1818,7 +1991,7 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
     const events = [...byEvent.values()]
         .filter(event => !deletedSessionIdsMerged[String(event.sessionId)])
         .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))
-        .slice(-1000);
+        .slice(-MAX_LEARNING_EVENTS);
     const wrongQuestions = [...byWrong.values()]
         .sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0))
         .slice(-MAX_WRONG_QUESTIONS);
@@ -1843,6 +2016,8 @@ async function pushCloudSnapshot(_legacyForce = false) {
     if (!accountState.authenticated || accountState.syncing) return false;
 
     const meta = readCloudSyncMeta();
+    const owner = accountState.username;
+    const contextVersion = cloudSyncContextVersion;
     // 以当前标签实际读写过的修订号为准。localStorage 的 revision 可能
     // 被另一个标签提前更新，直接采用会绕过服务器的 409 冲突保护。
     let revision = Number(accountState.revision || 0);
@@ -1850,63 +2025,89 @@ async function pushCloudSnapshot(_legacyForce = false) {
     let snapshotToSend = collectCloudSnapshot();
     let mergedWithRemote = false;
     let successful = false;
+    let latestPartHashes = getCloudPartHashMap(meta.sectionHashes);
     accountState.syncing = true;
     accountState.status = "同步中…";
     renderAccountUi();
 
     try {
         for (let attempt = 0; attempt < 5; attempt++) {
+            if (!isCloudSyncContextValid(owner, contextVersion)) {
+                return false;
+            }
             // 永远不用 force=true；服务端按用户隔离并用版本号防止覆盖其它设备更新。
             const {response, data} = await accountFetch("/sync", {
                 method:"PUT", allowConflict:true,
                 body:JSON.stringify({baseRevision:revision, force:false, data:snapshotToSend})
             });
+            if (!isCloudSyncContextValid(owner, contextVersion)) {
+                return false;
+            }
             if (response.status === 409 && data?.conflict) {
                 backupLocalSnapshot("云同步自动合并前");
                 snapshotToSend = mergeCloudSnapshots(snapshotToSend, data.data || {});
                 revision = Number(data.revision || 0);
+                latestPartHashes = getCloudPartHashMap(data.parts);
                 mergedWithRemote = true;
                 continue;
             }
             const latestRevision = Number(data.revision || 0);
             const hadNewEdits = cloudLocalChangeVersion !== submittedChangeVersion;
+            latestPartHashes = getCloudPartHashMap(data.parts);
             if (mergedWithRemote || hadNewEdits) {
                 // 上传期间还在输入时，先合并当前编辑，再将下一轮增量继续同步。
                 const present = collectCloudSnapshot();
                 const merged = mergeCloudSnapshots(present, snapshotToSend);
+                if (!isCloudSyncContextValid(owner, contextVersion)) {
+                    return false;
+                }
                 applyCloudSnapshot(merged);
+            }
+            if (!isCloudSyncContextValid(owner, contextVersion)) {
+                return false;
             }
             accountState.revision = latestRevision;
             const dirty = hadNewEdits;
             accountState.status = dirty ? "等待同步" : "已同步";
-            writeCloudSyncMeta({username:accountState.username, revision:latestRevision, dirty});
+            writeCloudSyncMeta({
+                username:owner,
+                revision:latestRevision,
+                dirty,
+                sectionHashes:latestPartHashes
+            });
             successful = true;
             return true;
         }
         throw new Error("云端更新频繁，稍后将自动再次合并");
     } catch (error) {
         console.warn("云同步失败：", error);
-        accountState.status = "离线，稍后自动同步";
-        writeCloudSyncMeta({username:accountState.username, revision, dirty:true});
+        if (isCloudSyncContextValid(owner, contextVersion)) {
+            accountState.status = "离线，稍后自动同步";
+            writeCloudSyncMeta({username:owner, revision, dirty:true, sectionHashes:latestPartHashes});
+        }
         return false;
     } finally {
-        accountState.syncing = false;
-        if (accountState.authenticated && (
-            cloudLocalChangeVersion !== submittedChangeVersion || !successful && mergedWithRemote
-        )) {
-            writeCloudSyncMeta({username:accountState.username, dirty:true});
-            if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
-            cloudSyncTimer = window.setTimeout(() => {
-                cloudSyncTimer = 0;
-                pushCloudSnapshot(false);
-            }, successful ? CLOUD_SYNC_DEBOUNCE_MS : 4000);
+        if (isCloudSyncContextValid(owner, contextVersion)) {
+            accountState.syncing = false;
+            if (accountState.authenticated && (
+                cloudLocalChangeVersion !== submittedChangeVersion || !successful && mergedWithRemote
+            )) {
+                writeCloudSyncMeta({username:owner, dirty:true, sectionHashes:latestPartHashes});
+                if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+                cloudSyncTimer = window.setTimeout(() => {
+                    cloudSyncTimer = 0;
+                    pushCloudSnapshot(false);
+                }, successful ? CLOUD_SYNC_DEBOUNCE_MS : 4000);
+            }
+            renderAccountUi();
         }
-        renderAccountUi();
     }
 }
 
 async function resolveInitialCloudSync(isNewAccount = false) {
     if (!accountState.authenticated) return;
+    const owner = accountState.username;
+    const contextVersion = cloudSyncContextVersion;
 
     // 必须在服务器验证账号后，才读取属于这个账号的本机缓存。
     // 同浏览器切换另一个账号时不能显示、更不能上传前一账号的资料。
@@ -1939,19 +2140,23 @@ async function resolveInitialCloudSync(isNewAccount = false) {
 
     // 自定义背景图片仍按设备保存；登录成功后再读取，游客不会继承它。
     await loadAppearanceBackground();
+    if (!isCloudSyncContextValid(owner, contextVersion)) return;
 
     try {
         const { data } = await accountFetch("/sync");
+        if (!isCloudSyncContextValid(owner, contextVersion)) return;
         const cloudRevision = Number(data.revision || 0);
         accountState.revision = cloudRevision;
+        const partHashes = getCloudPartHashMap(data.parts);
 
         const initialMeta = readCloudSyncMeta();
-        const initialSameAccount = initialMeta.username === accountState.username;
+        const initialSameAccount = initialMeta.username === owner;
         if (isNewAccount || (cloudRevision === 0 && initialSameAccount)) {
             writeCloudSyncMeta({
-                username:accountState.username,
+                username:owner,
                 revision:cloudRevision,
-                dirty:true
+                dirty:true,
+                sectionHashes:partHashes
             });
             await pushCloudSnapshot(false);
             return;
@@ -1964,14 +2169,14 @@ async function resolveInitialCloudSync(isNewAccount = false) {
                 learning:createEmptyLearningState(),
                 appearance:{...APPEARANCE_DEFAULTS}
             });
-            writeCloudSyncMeta({username:accountState.username,revision:0,dirty:false});
+            writeCloudSyncMeta({username:owner,revision:0,dirty:false,sectionHashes:partHashes});
             accountState.status = "已同步";
             renderAccountUi();
             return;
         }
 
         const meta = readCloudSyncMeta();
-        const sameAccount = meta.username === accountState.username;
+        const sameAccount = meta.username === owner;
         const localDirty = sameAccount && Boolean(meta.dirty);
         const localRevision = sameAccount ? Number(meta.revision || 0) : -1;
 
@@ -1987,7 +2192,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             backupLocalSnapshot("登录后自动合并同步前");
             const merged = mergeCloudSnapshots(collectCloudSnapshot(), data.data || {});
             applyCloudSnapshot(merged);
-            writeCloudSyncMeta({username:accountState.username, revision:cloudRevision, dirty:true});
+            writeCloudSyncMeta({username:owner, revision:cloudRevision, dirty:true, sectionHashes:partHashes});
             await pushCloudSnapshot(false);
             return;
         } else if (!localDirty) {
@@ -1997,18 +2202,23 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         }
 
         writeCloudSyncMeta({
-            username:accountState.username,
+            username:owner,
             revision:cloudRevision,
-            dirty:false
+            dirty:false,
+            sectionHashes:partHashes
         });
         accountState.status = "已同步";
         renderAccountUi();
     } catch (error) {
         console.warn("初始化云同步失败：", error);
-        accountState.status = "离线，稍后自动同步";
-        renderAccountUi();
+        if (isCloudSyncContextValid(owner, contextVersion)) {
+            accountState.status = "离线，稍后自动同步";
+            renderAccountUi();
+        }
     } finally {
-        startCloudLivePolling();
+        if (isCloudSyncContextValid(owner, contextVersion)) {
+            startCloudLivePolling();
+        }
     }
 }
 
@@ -2079,6 +2289,7 @@ async function submitAccountLogin() {
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = Number(data.revision || 0);
         accountState.status = "同步中…";
+        bumpCloudSyncContext();
         // 不要在读取云端之前清空“本机有未同步编辑”的标记。
         // resolveInitialCloudSync 会比较用户名/版本号并处理冲突。
 
@@ -2177,6 +2388,7 @@ async function submitAccountRegistration() {
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = Number(data.revision || 0);
         accountState.status = "同步中…";
+        bumpCloudSyncContext();
         // 新账号应从空工作区开始，不把同浏览器上一个账号的缓存继承过来。
 
         if (passwordInput) passwordInput.value = "";
@@ -2262,8 +2474,9 @@ async function recoverAccountPasswordByEmail() {
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = 0;
         accountState.status = "同步中…";
+        bumpCloudSyncContext();
         accountState.syncing = false;
-        writeCloudSyncMeta({ username:accountState.username, revision:0, dirty:false });
+        writeCloudSyncMeta({ username:accountState.username, revision:0, dirty:false, sectionHashes:{} });
         setAccountEmailRecoverPanel(false);
         renderAccountUi();
         showCopyToast("密码已重置，已登录");
@@ -2436,11 +2649,13 @@ async function recoverAccountPassword() {
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = 0;
         accountState.status = "同步中…";
+        bumpCloudSyncContext();
         accountState.syncing = false;
         writeCloudSyncMeta({
             username:accountState.username,
             revision:0,
-            dirty:false
+            dirty:false,
+            sectionHashes:{}
         });
 
         setAccountRecoverPanel(false);
@@ -2472,6 +2687,7 @@ async function logoutAccount() {
 
     accountState.syncing = true;
     accountState.status = "正在退出…";
+    bumpCloudSyncContext();
     renderAccountUi();
 
     try {
@@ -2534,6 +2750,7 @@ async function deleteAccount() {
 
     accountState.syncing = true;
     accountState.status = "正在注销…";
+    bumpCloudSyncContext();
     setAccountDeleteMessage("正在注销账号…");
     renderAccountUi();
 
@@ -2681,6 +2898,7 @@ async function initAccountSystem() {
     window.addEventListener("storage", event => {
         if (event.key !== ACCOUNT_LOGOUT_SIGNAL_KEY || !event.newValue) return;
         stopCloudLivePolling();
+        bumpCloudSyncContext();
         accountState.authenticated = false;
         accountState.username = "";
         if (cloudSyncTimer) {
@@ -2719,6 +2937,7 @@ async function initAccountSystem() {
             ? String(data.user?.email || "")
             : "";
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        bumpCloudSyncContext();
         renderAccountUi();
 
         if (accountState.authenticated) {
@@ -3115,7 +3334,7 @@ function normalizeLearningState(value) {
                     : Date.now()
             }))
             .filter(event => event.type && event.points.length)
-            .slice(-1000);
+            .slice(-MAX_LEARNING_EVENTS);
     }
 
     if (Array.isArray(value.wrongQuestions)) {
@@ -3395,8 +3614,8 @@ function updateKnowledge(points, eventType, sessionId = null) {
         createdAt: now
     });
 
-    if (learningState.events.length > 1000) {
-        learningState.events = learningState.events.slice(-1000);
+    if (learningState.events.length > MAX_LEARNING_EVENTS) {
+        learningState.events = learningState.events.slice(-MAX_LEARNING_EVENTS);
     }
 
     rebuildKnowledge();
@@ -14391,12 +14610,17 @@ function renderSessions() {
             "删除这个对话"
         );
 
-        del.onclick = event => {
+        del.onclick = async event => {
             event.stopPropagation();
 
-            const confirmed = window.confirm(
-                "确定删除这段对话吗？\n\n这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留。"
-            );
+            const confirmed = await showAppConfirm({
+                title:"删除这段对话？",
+                body:"这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留。",
+                confirmText:"删除对话",
+                cancelText:"取消",
+                confirmTone:"danger",
+                fallbackText:"确定删除这段对话吗？\n\n这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留。"
+            });
 
             if (!confirmed) {
                 return;
@@ -15806,8 +16030,11 @@ function fillKnowledgeGraphCategoryOptions() {
     const select = document.getElementById(
         "knowledgeGraphCategory"
     );
+    const trigger = document.getElementById(
+        "knowledgeGraphCategoryTrigger"
+    );
 
-    if (!select || !knowledgeGraphData) return;
+    if (!knowledgeGraphData) return;
 
     const baseCategories = getKnowledgeGraphCategories();
 
@@ -15818,17 +16045,39 @@ function fillKnowledgeGraphCategoryOptions() {
     }
 
     // 不在每次切换视图时重建 select，避免浏览器重新计算工具栏宽度。
-    const existing = [...select.options].map(option => option.value);
-    if (existing.length !== categories.length
-        || existing.some((value, index) => value !== categories[index])) {
-        select.replaceChildren(...categories.map(value => {
-            const option = document.createElement("option");
-            option.value = value;
-            option.textContent = value;
-            return option;
-        }));
+    if (select) {
+        const existing = [...select.options].map(option => option.value);
+        if (existing.length !== categories.length
+            || existing.some((value, index) => value !== categories[index])) {
+            select.replaceChildren(...categories.map(value => {
+                const option = document.createElement("option");
+                option.value = value;
+                option.textContent = value;
+                return option;
+            }));
+        }
+        if (select.value !== knowledgeGraphFilter) select.value = knowledgeGraphFilter;
     }
-    if (select.value !== knowledgeGraphFilter) select.value = knowledgeGraphFilter;
+
+    if (trigger) {
+        trigger.textContent = `模块：${knowledgeGraphFilter}`;
+        trigger.setAttribute("aria-label", `当前知识图谱模块：${knowledgeGraphFilter}`);
+    }
+}
+
+async function openKnowledgeGraphCategoryPicker() {
+    if (!knowledgeGraphData) return;
+    fillKnowledgeGraphCategoryOptions();
+    const categories = ["全部", ...getKnowledgeGraphCategories()];
+    const choice = await openMobileChoiceModal({
+        title:"选择知识图谱模块",
+        intro:"在手机上用更清晰的列表样式切换模块。",
+        value:knowledgeGraphFilter || "全部",
+        options:categories.map(item => ({ value:item, label:item }))
+    });
+    if (choice?.value) {
+        setKnowledgeGraphFilter(choice.value);
+    }
 }
 
 
@@ -18349,6 +18598,8 @@ function getTopMobileGesturePage() {
     }
 
     const closers = new Map([
+        ["mobileChoiceModal", closeMobileChoiceModal],
+        ["appConfirmModal", () => resolveAppConfirm(false)],
         ["appearanceBackgroundViewer", closeAppearanceBackgroundViewer],
         ["wrongSafeModal", closeWrongSafePreview],
         ["wrongQuestionPickerModal", closeWrongQuestionPicker],
@@ -19018,11 +19269,18 @@ document.addEventListener(
         const knowledgeGraphClose = document.getElementById("knowledgeGraphClose");
         const knowledgeGraphModal = document.getElementById("knowledgeGraphModal");
         const knowledgeGraphCategory = document.getElementById("knowledgeGraphCategory");
+        const knowledgeGraphCategoryTrigger = document.getElementById("knowledgeGraphCategoryTrigger");
         const knowledgeGraphScopeBtn = document.getElementById("knowledgeGraphScopeBtn");
         const knowledgeGraphFocusBtn = document.getElementById("knowledgeGraphFocusBtn");
         const knowledgeGraphCopyBtn = document.getElementById("knowledgeGraphCopyBtn");
         const knowledgeGraphDetailTab = document.getElementById("knowledgeGraphDetailTab");
         const knowledgeGraphHistoryTab = document.getElementById("knowledgeGraphHistoryTab");
+        const appConfirmModal = document.getElementById("appConfirmModal");
+        const appConfirmClose = document.getElementById("appConfirmClose");
+        const appConfirmCancel = document.getElementById("appConfirmCancel");
+        const appConfirmConfirm = document.getElementById("appConfirmConfirm");
+        const mobileChoiceModal = document.getElementById("mobileChoiceModal");
+        const mobileChoiceClose = document.getElementById("mobileChoiceClose");
         const wrongFilterButtons = document.querySelectorAll(
             "[data-wrong-filter]"
         );
@@ -19312,6 +19570,13 @@ document.addEventListener(
             );
         }
 
+        if (knowledgeGraphCategoryTrigger) {
+            knowledgeGraphCategoryTrigger.addEventListener(
+                "click",
+                openKnowledgeGraphCategoryPicker
+            );
+        }
+
         if (knowledgeGraphScopeBtn) {
             knowledgeGraphScopeBtn.addEventListener(
                 "click",
@@ -19365,6 +19630,28 @@ document.addEventListener(
                 }
             );
         }
+
+        appConfirmClose?.addEventListener("click", () => resolveAppConfirm(false));
+        appConfirmCancel?.addEventListener("click", () => resolveAppConfirm(false));
+        appConfirmConfirm?.addEventListener("click", () => resolveAppConfirm(true));
+        appConfirmModal?.addEventListener("click", event => {
+            if (event.target === appConfirmModal) resolveAppConfirm(false);
+        });
+
+        mobileChoiceClose?.addEventListener("click", closeMobileChoiceModal);
+        mobileChoiceModal?.addEventListener("click", event => {
+            if (event.target === mobileChoiceModal) closeMobileChoiceModal();
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key !== "Escape") return;
+            if (!document.getElementById("appConfirmModal")?.classList.contains("hidden")) {
+                resolveAppConfirm(false);
+            }
+            if (!document.getElementById("mobileChoiceModal")?.classList.contains("hidden")) {
+                closeMobileChoiceModal();
+            }
+        });
 
         // 启动时始终显示空白工作区。不得根据 localStorage 中旧登录标记
         // 在 /auth/me 验证之前渲染任何历史聊天或错题。
