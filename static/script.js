@@ -14,7 +14,8 @@ const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
 const ACCOUNT_LOGOUT_SIGNAL_KEY = "dmate_account_logout_signal_v1";
 // 故障排查备份只存于当前页面内存，退出/换账号后不可被下一位用户读取。
 let volatileCloudBackup = null;
-const CLOUD_SYNC_DEBOUNCE_MS = 900;
+// 减少跨设备可见延迟；连续本机写入仍保留短暂防抖，避免每次打字都上传。
+const CLOUD_SYNC_DEBOUNCE_MS = 350;
 let accountState = {
     configured: null,
     emailConfigured: null,
@@ -31,7 +32,9 @@ let cloudApplyingSnapshot = false;
 // 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
 let cloudLocalChangeVersion = 0;
 // 只轮询云端修订号，版本变化时才读取完整快照；后台低频检查、切回前台立即检查。
-const CLOUD_LIVE_POLL_VISIBLE_MS = 5000;
+// 前台只检查修订号，云端没有变化时不下载完整快照。
+// 与后台 30 秒轮询区分，避免隐藏标签持续占用服务器连接。
+const CLOUD_LIVE_POLL_VISIBLE_MS = 1800;
 const CLOUD_LIVE_POLL_HIDDEN_MS = 30000;
 let cloudLivePollTimer = 0;
 let cloudLivePollInFlight = false;
@@ -1555,7 +1558,10 @@ function stopCloudLivePolling() {
 function scheduleCloudLivePoll(delayMs) {
     if (!cloudLivePollEnabled || !accountState.authenticated || !accountState.username) return;
     if (cloudLivePollTimer) window.clearTimeout(cloudLivePollTimer);
-    const defaultDelay = document.hidden ? CLOUD_LIVE_POLL_HIDDEN_MS : CLOUD_LIVE_POLL_VISIBLE_MS;
+    const normalDelay = document.hidden ? CLOUD_LIVE_POLL_HIDDEN_MS : CLOUD_LIVE_POLL_VISIBLE_MS;
+    // 网络或服务异常时放缓重试，切回页面、恢复网络仍会立刻检查。
+    const defaultDelay = accountState.status === "同步检查失败，自动重试中"
+        ? Math.max(normalDelay, 10000) : normalDelay;
     cloudLivePollTimer = window.setTimeout(async () => {
         cloudLivePollTimer = 0;
         try {
@@ -1573,7 +1579,7 @@ function startCloudLivePolling() {
         cloudLivePollEnabled = true;
         cloudLivePollGeneration += 1;
     }
-    scheduleCloudLivePoll(CLOUD_LIVE_POLL_VISIBLE_MS);
+    scheduleCloudLivePoll(document.hidden ? CLOUD_LIVE_POLL_HIDDEN_MS : CLOUD_LIVE_POLL_VISIBLE_MS);
 }
 
 function cloudUiEditInProgress() {
