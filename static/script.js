@@ -893,6 +893,8 @@ let knowledgeGraphLoading = false;
 
 let sessions = [];
 let currentId = null;
+// 同账号各端共享的会话删除记录；没有删除标记的按 ID 合并会把已删除会话带回来。
+let deletedSessionIds = Object.create(null);
 let learningState = createEmptyLearningState();
 
 
@@ -932,6 +934,7 @@ function clearLoggedOutWorkspace() {
     // 退出后进入真正的游客模式：页面清空，游客数据不落地。
     sessions = [];
     currentId = null;
+    deletedSessionIds = Object.create(null);
     learningState = createEmptyLearningState();
     purgeGuestPersistentState();
 
@@ -958,12 +961,40 @@ function clearLoggedOutWorkspace() {
     renderAll();
 }
 
+// 删除标记保留在同一账号的本地状态和云端快照中。
+// 不设置短期过期时间，否则离线设备中的旧会话会在标记过期后重新出现。
+function normalizeDeletedSessionIds(value) {
+    const normalized = Object.create(null);
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return normalized;
+    }
+    for (const [id, rawDeletedAt] of Object.entries(value)) {
+        const deletedAt = Number(rawDeletedAt);
+        if (id && Number.isFinite(deletedAt) && deletedAt > 0) {
+            normalized[id] = deletedAt;
+        }
+    }
+    return normalized;
+}
+
+function markSessionDeleted(sessionId) {
+    const key = String(sessionId ?? "");
+    if (!key) return;
+    deletedSessionIds[key] = Math.max(
+        Date.now(),
+        Number(deletedSessionIds[key]) || 0
+    );
+}
+
 function collectCloudSnapshot() {
     return {
         schemaVersion: 1,
         sessions: {
-            sessions,
-            currentId
+            sessions: sessions.filter(item => (
+                item && !deletedSessionIds[String(item.id)]
+            )),
+            currentId,
+            deletedSessionIds: { ...deletedSessionIds }
         },
         learning: learningState,
         appearance: normalizeAppearanceSettings(appearanceCommittedSettings)
@@ -1008,9 +1039,15 @@ function applyCloudSnapshot(snapshot) {
     try {
         const sessionData = snapshot.sessions;
         if (sessionData && typeof sessionData === "object" && Array.isArray(sessionData.sessions)) {
+            const incomingDeletions = normalizeDeletedSessionIds(
+                sessionData.deletedSessionIds
+            );
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                sessions: sessionData.sessions,
-                currentId: sessionData.currentId ?? null
+                sessions: sessionData.sessions.filter(item => (
+                    item && !incomingDeletions[String(item.id)]
+                )),
+                currentId: sessionData.currentId ?? null,
+                deletedSessionIds: incomingDeletions
             }));
             loadState();
         }
@@ -1497,8 +1534,22 @@ function cloudHash(value) {
 function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
     const local = localSnapshot && typeof localSnapshot === "object" ? localSnapshot : {};
     const remote = remoteSnapshot && typeof remoteSnapshot === "object" ? remoteSnapshot : {};
-    const localSessions = Array.isArray(local.sessions?.sessions) ? local.sessions.sessions : [];
-    const remoteSessions = Array.isArray(remote.sessions?.sessions) ? remote.sessions.sessions : [];
+    const localDeletions = normalizeDeletedSessionIds(local.sessions?.deletedSessionIds);
+    const remoteDeletions = normalizeDeletedSessionIds(remote.sessions?.deletedSessionIds);
+    const deletedSessionIdsMerged = Object.create(null);
+    for (const [id, at] of Object.entries(remoteDeletions)) {
+        deletedSessionIdsMerged[id] = at;
+    }
+    for (const [id, at] of Object.entries(localDeletions)) {
+        deletedSessionIdsMerged[id] = Math.max(at, deletedSessionIdsMerged[id] || 0);
+    }
+    const isDeleted = item => (
+        !item || Boolean(deletedSessionIdsMerged[String(item.id)])
+    );
+    const localSessions = (Array.isArray(local.sessions?.sessions) ? local.sessions.sessions : [])
+        .filter(item => !isDeleted(item));
+    const remoteSessions = (Array.isArray(remote.sessions?.sessions) ? remote.sessions.sessions : [])
+        .filter(item => !isDeleted(item));
     const resultSessions = remoteSessions.map(item => ({ ...item }));
     const byId = new Map(resultSessions.map((item, index) => [String(item.id), index]));
     const branchMap = new Map();
@@ -1576,7 +1627,10 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
         }
         byWrong.set(key, merged);
     }
+    // 删除对话会一并撤回其学习事件，不能在自动云合并时又把旧统计加回来。
+    // 错题本独立保存，仍按原规则保留。
     const events = [...byEvent.values()]
+        .filter(event => !deletedSessionIdsMerged[String(event.sessionId)])
         .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))
         .slice(-1000);
     const wrongQuestions = [...byWrong.values()]
@@ -1592,7 +1646,7 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
 
     return {
         schemaVersion:1,
-        sessions:{sessions:resultSessions, currentId},
+        sessions:{sessions:resultSessions, currentId, deletedSessionIds:deletedSessionIdsMerged},
         learning:{version:Math.max(8, Number(localLearning.version || 0), Number(remoteLearning.version || 0)),
             events, wrongQuestions},
         appearance: local.appearance || remote.appearance || {...APPEARANCE_DEFAULTS}
@@ -1690,7 +1744,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             // 手机首次登录一个空账号时，不能上传此前别的账号/游客的本机数据。
             backupLocalSnapshot("切换到新的空云账号");
             applyCloudSnapshot({
-                sessions:{sessions:[], currentId:null},
+                sessions:{sessions:[], currentId:null, deletedSessionIds:{}},
                 learning:createEmptyLearningState(),
                 appearance:{...APPEARANCE_DEFAULTS}
             });
@@ -2475,7 +2529,7 @@ function getCurrent() {
 function makeSessionId() {
     let id = Date.now();
 
-    while (sessions.some(s => s.id === id)) {
+    while (sessions.some(s => s.id === id) || deletedSessionIds[String(id)]) {
         id += 1;
     }
 
@@ -8471,7 +8525,8 @@ function saveState() {
                 STORAGE_KEY,
                 JSON.stringify({
                     sessions,
-                    currentId
+                    currentId,
+                    deletedSessionIds: { ...deletedSessionIds }
                 })
             );
         } catch (error) {
@@ -8493,9 +8548,11 @@ function loadState() {
             return false;
         }
 
+        deletedSessionIds = normalizeDeletedSessionIds(data.deletedSessionIds);
         const loadedSessions = [];
 
         for (const session of data.sessions) {
+            if (session && deletedSessionIds[String(session.id)]) continue;
             if (
                 !session
                 || typeof session !== "object"
@@ -13987,6 +14044,28 @@ function renderSessions() {
     const box = document.getElementById("sessions");
     if (!box) return;
 
+    // 保持列表的可见位置：连续删除时不应因为整列重建突然跳到别处。
+    // 优先锚定当前可见的会话；如果该会话被删，锚定下一条仍存在的会话。
+    const oldScrollTop = box.scrollTop;
+    const oldItems = [...box.children];
+    const boxTop = box.getBoundingClientRect().top;
+    const visibleIndex = oldItems.findIndex(item => (
+        item.getBoundingClientRect().bottom > boxTop + 1
+    ));
+    const anchorIndex = visibleIndex < 0 ? 0 : visibleIndex;
+    let anchorId = "";
+    let anchorOffset = 0;
+    for (let index = anchorIndex; index < oldItems.length; index++) {
+        const id = oldItems[index].dataset.sessionId || "";
+        if (id && sessions.some(item => String(item.id) === id)) {
+            anchorId = id;
+            anchorOffset = index === anchorIndex
+                ? oldItems[index].getBoundingClientRect().top - boxTop
+                : (oldItems[anchorIndex]?.getBoundingClientRect().top || boxTop) - boxTop;
+            break;
+        }
+    }
+
     refreshUnnamedSessionNames();
     box.innerHTML = "";
 
@@ -13996,6 +14075,7 @@ function renderSessions() {
         );
 
         const div = document.createElement("div");
+        div.dataset.sessionId = String(session.id);
         div.className = isCurrent
             ? "session active"
             : "session";
@@ -14072,12 +14152,15 @@ function renderSessions() {
                 session.id
             );
 
+            // 一次删除就记入本地和云端；自动合并不能把该 ID 复活。
+            markSessionDeleted(session.id);
+
             busySessionIds.delete(
                 sessionBusyKey(session.id)
             );
 
             sessions = sessions.filter(
-                item => item.id !== session.id
+                item => String(item.id) !== String(session.id)
             );
 
             if (currentId === session.id) {
@@ -14100,6 +14183,16 @@ function renderSessions() {
         div.appendChild(span);
         div.appendChild(del);
         box.appendChild(div);
+    }
+
+    const anchor = [...box.children].find(item => (
+        item.dataset.sessionId === anchorId
+    ));
+    if (anchor) {
+        const newOffset = anchor.getBoundingClientRect().top - box.getBoundingClientRect().top;
+        box.scrollTop += newOffset - anchorOffset;
+    } else {
+        box.scrollTop = Math.min(oldScrollTop, Math.max(0, box.scrollHeight - box.clientHeight));
     }
 }
 
@@ -19023,6 +19116,7 @@ document.addEventListener(
             learningState = createEmptyLearningState();
             sessions = [];
             currentId = null;
+            deletedSessionIds = Object.create(null);
         }
 
         if (!restored) {
