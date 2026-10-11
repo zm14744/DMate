@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-security-sync-fast-20261011";
+const CACHE_NAME = "dmate-webapp-modal-window-fix-20261011";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
