@@ -1522,9 +1522,15 @@ async function accountFetch(url, options = {}) {
 function scheduleCloudSync() {
     if (cloudApplyingSnapshot) return;
 
+    if (!accountState.authenticated || !accountState.username) return;
     const meta = readCloudSyncMeta();
-    if (meta.username) writeCloudSyncMeta({ dirty:true });
-    if (!accountState.authenticated) return;
+    if (meta.username === accountState.username) {
+        writeCloudSyncMeta({dirty:true});
+    } else {
+        // 首次云端载入失败时，也要把后续新增的对话登记成待同步数据。
+        // 不可因缺少 meta.username 就静默丢掉本端编辑或重试时清空工作区。
+        writeCloudSyncMeta({username:accountState.username,revision:Number(accountState.revision || 0),dirty:true});
+    }
 
     cloudLocalChangeVersion += 1;
     // 修改可能发生在前一次网络上传进行中，不要漏掉后续同步。
@@ -1587,7 +1593,13 @@ async function pullLatestCloudSnapshot() {
     const owner = accountState.username;
     const generation = cloudLivePollGeneration;
     let meta = readCloudSyncMeta();
-    if (meta.username !== owner) return false;
+    if (meta.username !== owner) {
+        // 首次 /sync 加载失败时可能没有写入账号元信息。不能让轮询永久停在这里。
+        // 当前工作区忙碌时延后恢复，避免登录态加载打断编辑。
+        if (cloudUiEditInProgress()) return false;
+        await resolveInitialCloudSync(false);
+        return false;
+    }
 
     if (meta.dirty) {
         // 本机有新增/删除操作时先上传并处理版本冲突，绝不被旧云端快照覆盖。
@@ -1607,9 +1619,17 @@ async function pullLatestCloudSnapshot() {
         if (!cloudLivePollEnabled || generation !== cloudLivePollGeneration ||
             !accountState.authenticated || accountState.username !== owner) return false;
         meta = readCloudSyncMeta();
-        const localRevision = Math.max(Number(meta.revision || 0), Number(accountState.revision || 0));
+        // 此页面的实际修订号必须与其它标签共享的持久元信息分开。
+        // 否则另一个标签改写 localStorage 后，本页面误以为已经拿到新数据。
+        const localRevision = Number(accountState.revision || 0);
         const serverRevision = Number(head.revision || 0);
-        if (serverRevision <= localRevision) return false;
+        if (serverRevision <= localRevision) {
+            if (accountState.status === "同步检查失败，自动重试中" && !meta.dirty) {
+                accountState.status = "已同步";
+                renderAccountUi();
+            }
+            return false;
+        }
         if (meta.dirty || cloudLocalChangeVersion !== beforeEdit || accountState.syncing || cloudUiEditInProgress()) return false;
 
         const {data:full} = await accountFetch("/sync", controller ? {signal:controller.signal} : {});
@@ -1618,7 +1638,7 @@ async function pullLatestCloudSnapshot() {
         meta = readCloudSyncMeta();
         if (meta.dirty || cloudLocalChangeVersion !== beforeEdit || accountState.syncing || cloudUiEditInProgress()) return false;
         const receivedRevision = Number(full.revision || 0);
-        if (receivedRevision <= Math.max(Number(meta.revision || 0), Number(accountState.revision || 0))) return false;
+        if (receivedRevision <= Number(accountState.revision || 0)) return false;
 
         // 当前选中的会话是本机导航状态，不应该被另一台设备的 currentId 抢走。
         const incoming = full.data && typeof full.data === "object" ? {...full.data} : {};
@@ -1639,7 +1659,11 @@ async function pullLatestCloudSnapshot() {
         return true;
     } catch (error) {
         console.warn("自动检查云端更新失败：", error);
-        // 网络短暂故障不弹窗，不覆盖本机；保持原同步状态等待重试。
+        // 网络故障不能被“已同步”的旧状态掩盖，保留旧数据等待下次重试。
+        if (cloudLivePollEnabled && accountState.authenticated && accountState.username === owner) {
+            accountState.status = "同步检查失败，自动重试中";
+            renderAccountUi();
+        }
         return false;
     } finally {
         if (timeoutId) window.clearTimeout(timeoutId);
@@ -1813,8 +1837,9 @@ async function pushCloudSnapshot(_legacyForce = false) {
     if (!accountState.authenticated || accountState.syncing) return false;
 
     const meta = readCloudSyncMeta();
-    let revision = Number.isFinite(Number(meta.revision))
-        ? Number(meta.revision) : Number(accountState.revision || 0);
+    // 以当前标签实际读写过的修订号为准。localStorage 的 revision 可能
+    // 被另一个标签提前更新，直接采用会绕过服务器的 409 冲突保护。
+    let revision = Number(accountState.revision || 0);
     const submittedChangeVersion = cloudLocalChangeVersion;
     let snapshotToSend = collectCloudSnapshot();
     let mergedWithRemote = false;
@@ -1959,7 +1984,9 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             writeCloudSyncMeta({username:accountState.username, revision:cloudRevision, dirty:true});
             await pushCloudSnapshot(false);
             return;
-        } else if (cloudRevision > localRevision) {
+        } else if (!localDirty) {
+            // 即使云端版本号与共享缓存相同，也必须实际把数据载入此页面。
+            // 否则首次打开、缓存损坏或另一标签改过 meta 时会一直显示旧列表。
             applyCloudSnapshot(data.data || {});
         }
 
