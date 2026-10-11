@@ -43,6 +43,9 @@ let cloudLivePollInFlight = false;
 let cloudLivePollAbortController = null;
 let cloudLivePollGeneration = 0;
 let cloudLivePollEnabled = false;
+// 哈希属于当前页面已实际应用的快照，不能直接相信其他标签写入的 localStorage。
+let cloudAppliedPartHashes = null;
+let cloudSyncCapacityRetryAt = 0;
 let appConfirmResolver = null;
 let mobileChoiceResolver = null;
 let mobileChoiceOptions = [];
@@ -952,6 +955,8 @@ function clearCloudSyncMeta() {
 }
 
 function bumpCloudSyncContext() {
+    cloudAppliedPartHashes = null;
+    cloudSyncCapacityRetryAt = 0;
     cloudSyncContextVersion += 1;
     return cloudSyncContextVersion;
 }
@@ -1053,16 +1058,14 @@ function showAppConfirm(options = {}) {
     const modal = document.getElementById("appConfirmModal");
     const title = document.getElementById("appConfirmTitle");
     const body = document.getElementById("appConfirmBody");
-    const cancelButton = document.getElementById("appConfirmCancel");
     const confirmButton = document.getElementById("appConfirmConfirm");
 
-    if (!modal || !title || !body || !cancelButton || !confirmButton) {
+    if (!modal || !title || !body || !confirmButton) {
         return Promise.resolve(window.confirm(String(options.fallbackText || options.body || options.title || "请确认当前操作。")));
     }
 
     title.textContent = String(options.title || "请确认");
     body.textContent = String(options.body || "确定继续吗？");
-    cancelButton.textContent = String(options.cancelText || "取消");
     confirmButton.textContent = String(options.confirmText || "确定");
     confirmButton.classList.toggle("danger", options.confirmTone === "danger");
     confirmButton.classList.toggle("primary", options.confirmTone !== "danger");
@@ -1110,6 +1113,8 @@ function openMobileChoiceModal({ title = "请选择", intro = "", options = [], 
         return Promise.resolve(null);
     }
 
+    // 若窗口已打开，先结束上一轮选择，避免清空刚生成的新选项。
+    if (mobileChoiceResolver) closeMobileChoiceModal();
     titleEl.textContent = String(title || "请选择");
     introEl.textContent = String(intro || "");
     introEl.classList.toggle("hidden", !intro);
@@ -1126,14 +1131,12 @@ function openMobileChoiceModal({ title = "请选择", intro = "", options = [], 
         button.setAttribute("role", "radio");
         button.setAttribute("aria-checked", String(item.value === value));
         button.innerHTML = `
-            <span class="mobile-choice-option-text">${escapeHtml(item.label)}</span>
+            <span class="mobile-choice-option-text">${escapeRawHtml(item.label)}</span>
             <span class="mobile-choice-option-check" aria-hidden="true"></span>
         `;
         button.addEventListener("click", () => selectMobileChoice(item.value));
         return button;
     }));
-
-    if (mobileChoiceResolver) closeMobileChoiceModal();
 
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
@@ -1280,6 +1283,9 @@ function accountSyncText() {
     if (!accountState.authenticated) return "";
     if (accountState.syncing) return "同步中…";
     const meta = readCloudSyncMeta();
+    if (accountState.status?.includes("容量已满") || accountState.status?.includes("存储空间不足")) {
+        return accountState.status;
+    }
     if (meta.username === accountState.username && meta.dirty) {
         return "等待同步";
     }
@@ -1689,6 +1695,8 @@ async function accountFetch(url, options = {}) {
 
 function scheduleCloudSync() {
     if (cloudApplyingSnapshot) return;
+    // 用户做出新的修改后，可以重新尝试之前超限的上传。
+    cloudSyncCapacityRetryAt = 0;
 
     if (!accountState.authenticated || !accountState.username) return;
     const meta = readCloudSyncMeta();
@@ -1766,16 +1774,15 @@ async function pullLatestCloudSnapshot() {
     const generation = cloudLivePollGeneration;
     let meta = readCloudSyncMeta();
     if (meta.username !== owner) {
-        // 首次 /sync 加载失败时可能没有写入账号元信息。不能让轮询永久停在这里。
-        // 当前工作区忙碌时延后恢复，避免登录态加载打断编辑。
+        // 首次读取失败后仍能恢复；账号未验证前不加载任何旧工作区。
         if (cloudUiEditInProgress()) return false;
         await resolveInitialCloudSync(false);
         return false;
     }
-
     if (meta.dirty) {
-        // 本机有新增/删除操作时先上传并处理版本冲突，绝不被旧云端快照覆盖。
-        if (!cloudSyncTimer) await pushCloudSnapshot(false);
+        if (Date.now() >= cloudSyncCapacityRetryAt && !cloudSyncTimer) {
+            await pushCloudSnapshot(false);
+        }
         return false;
     }
     if (cloudUiEditInProgress()) return false;
@@ -1784,62 +1791,85 @@ async function pullLatestCloudSnapshot() {
     const beforeEdit = cloudLocalChangeVersion;
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     cloudLivePollAbortController = controller;
-    // 断线时请求不能无限悬挂，防止定时拉取被永久堵塞。
     const timeoutId = controller ? window.setTimeout(() => controller.abort(), 12000) : 0;
+    const options = controller ? { signal:controller.signal, allowConflict:true } : { allowConflict:true };
+    const valid = () => cloudLivePollEnabled && generation === cloudLivePollGeneration &&
+        isCloudSyncContextValid(owner, contextVersion);
+    const safeToApply = () => valid() && !readCloudSyncMeta().dirty &&
+        cloudLocalChangeVersion === beforeEdit && !accountState.syncing && !cloudUiEditInProgress();
+
     try {
-        const {data:head} = await accountFetch("/sync?revisionOnly=1", controller ? {signal:controller.signal} : {});
-        if (!cloudLivePollEnabled || generation !== cloudLivePollGeneration ||
-            !isCloudSyncContextValid(owner, contextVersion)) return false;
-        meta = readCloudSyncMeta();
-        // 此页面的实际修订号必须与其它标签共享的持久元信息分开。
-        // 否则另一个标签改写 localStorage 后，本页面误以为已经拿到新数据。
-        const localRevision = Number(accountState.revision || 0);
-        const serverRevision = Number(head.revision || 0);
-        if (serverRevision <= localRevision) {
-            if (accountState.status === "同步检查失败，自动重试中" && !meta.dirty) {
+        // 版本可能在 manifest 与分段请求之间改变：最多重新获取 3 次。
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const { data:head } = await accountFetch("/sync?revisionOnly=1", options);
+            if (!valid()) return false;
+            const localRevision = Number(accountState.revision || 0);
+            const targetRevision = Number(head.revision || 0);
+            if (targetRevision <= localRevision) {
+                if (accountState.status === "同步检查失败，自动重试中" && !readCloudSyncMeta().dirty) {
+                    accountState.status = "已同步";
+                    renderAccountUi();
+                }
+                return false;
+            }
+            if (!safeToApply()) return false;
+
+            // 平时只读取 revision；确认有新版本后才查询 manifest。
+            const manifestQuery = `/sync?manifestOnly=1&expectedRevision=${targetRevision}`;
+            const {response:manifestResponse, data:manifest} = await accountFetch(manifestQuery, options);
+            if (!valid()) return false;
+            if (manifestResponse.status === 409 || Number(manifest.revision) !== targetRevision) continue;
+            if (!safeToApply()) return false;
+
+            const localHashes = cloudAppliedPartHashes;
+            const changedParts = localHashes
+                ? computeChangedCloudParts(manifest.parts, localHashes)
+                : ["sessions", "learning", "appearance"];
+            if (!changedParts.length && localHashes) {
+                // 全部分段内容均相同，只增加版本，不重复渲染页面。
+                accountState.revision = targetRevision;
                 accountState.status = "已同步";
+                writeCloudSyncMeta({ username:owner, revision:targetRevision,
+                    dirty:false, sectionHashes:getCloudPartHashMap(manifest.parts) });
                 renderAccountUi();
+                return true;
             }
-            return false;
-        }
-        if (meta.dirty || cloudLocalChangeVersion !== beforeEdit || accountState.syncing || cloudUiEditInProgress()) return false;
+            const sectionQuery = `/sync?expectedRevision=${targetRevision}&parts=${encodeURIComponent(changedParts.join(","))}`;
+            const { response, data:full } = await accountFetch(sectionQuery, options);
+            if (!valid()) return false;
+            if (response.status === 409 || Number(full.revision) !== targetRevision) continue;
+            if (!safeToApply()) return false;
 
-        const changedParts = computeChangedCloudParts(head.parts, meta.sectionHashes);
-        const partQuery = changedParts.length ? `?parts=${encodeURIComponent(changedParts.join(","))}` : "";
-        const {data:full} = await accountFetch(`/sync${partQuery}`, controller ? {signal:controller.signal} : {});
-        if (!cloudLivePollEnabled || generation !== cloudLivePollGeneration ||
-            !isCloudSyncContextValid(owner, contextVersion)) return false;
-        meta = readCloudSyncMeta();
-        if (meta.dirty || cloudLocalChangeVersion !== beforeEdit || accountState.syncing || cloudUiEditInProgress()) return false;
-        const receivedRevision = Number(full.revision || 0);
-        if (receivedRevision <= Number(accountState.revision || 0)) return false;
-
-        // 当前选中的会话是本机导航状态，不应该被另一台设备的 currentId 抢走。
-        const incoming = full.data && typeof full.data === "object" ? {...full.data} : {};
-        if (incoming.sessions && Array.isArray(incoming.sessions.sessions)) {
-            const selectedHere = currentId;
-            const remoteSessions = incoming.sessions.sessions;
-            const deleted = normalizeDeletedSessionIds(incoming.sessions.deletedSessionIds);
-            if (selectedHere != null && !deleted[String(selectedHere)] &&
-                remoteSessions.some(item => String(item.id) === String(selectedHere))) {
-                incoming.sessions = {...incoming.sessions, currentId:selectedHere};
+            // 当前会话属于本机导航状态，不让另一端抢走选中会话。
+            const incoming = full.data && typeof full.data === "object" ? { ...full.data } : {};
+            if (incoming.sessions && Array.isArray(incoming.sessions.sessions)) {
+                const selectedHere = currentId;
+                const remoteSessions = incoming.sessions.sessions;
+                const deleted = normalizeDeletedSessionIds(incoming.sessions.deletedSessionIds);
+                if (selectedHere != null && !deleted[String(selectedHere)] &&
+                    remoteSessions.some(item => String(item.id) === String(selectedHere))) {
+                    incoming.sessions = { ...incoming.sessions, currentId:selectedHere };
+                }
             }
+            if (!applyCloudSnapshot(incoming)) return false;
+            if (!valid()) return false;
+            cloudAppliedPartHashes = getCloudPartHashMap(full.parts || manifest.parts);
+            accountState.revision = targetRevision;
+            accountState.status = "已同步";
+            writeCloudSyncMeta({ username:owner, revision:targetRevision, dirty:false,
+                sectionHashes:cloudAppliedPartHashes });
+            renderAccountUi();
+            return true;
         }
-        if (!applyCloudSnapshot(incoming)) return false;
-        accountState.revision = receivedRevision;
-        accountState.status = "已同步";
-        writeCloudSyncMeta({
-            username:owner,
-            revision:receivedRevision,
-            dirty:false,
-            sectionHashes:getCloudPartHashMap(full.parts || head.parts)
-        });
-        renderAccountUi();
-        return true;
+        // 高频写入导致连续版本冲突：下一轮自动重新检查，不承认部分同步成功。
+        if (valid()) {
+            accountState.status = "云端正在更新，稍后自动同步";
+            renderAccountUi();
+        }
+        return false;
     } catch (error) {
         console.warn("自动检查云端更新失败：", error);
-        // 网络故障不能被“已同步”的旧状态掩盖，保留旧数据等待下次重试。
-        if (cloudLivePollEnabled && accountState.authenticated && accountState.username === owner) {
+        if (valid()) {
             accountState.status = "同步检查失败，自动重试中";
             renderAccountUi();
         }
@@ -1990,11 +2020,9 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
     // 错题本独立保存，仍按原规则保留。
     const events = [...byEvent.values()]
         .filter(event => !deletedSessionIdsMerged[String(event.sessionId)])
-        .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))
-        .slice(-MAX_LEARNING_EVENTS);
+        .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
     const wrongQuestions = [...byWrong.values()]
-        .sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0))
-        .slice(-MAX_WRONG_QUESTIONS);
+        .sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0));
 
     const localId = local.sessions?.currentId;
     const resolvedCurrentId = branchMap.get(String(localId)) || localId;
@@ -2067,6 +2095,7 @@ async function pushCloudSnapshot(_legacyForce = false) {
                 return false;
             }
             accountState.revision = latestRevision;
+            if (!hadNewEdits) cloudAppliedPartHashes = latestPartHashes;
             const dirty = hadNewEdits;
             accountState.status = dirty ? "等待同步" : "已同步";
             writeCloudSyncMeta({
@@ -2082,7 +2111,12 @@ async function pushCloudSnapshot(_legacyForce = false) {
     } catch (error) {
         console.warn("云同步失败：", error);
         if (isCloudSyncContextValid(owner, contextVersion)) {
-            accountState.status = "离线，稍后自动同步";
+            if (error?.status === 413) {
+                accountState.status = "云端容量已满，本机记录仍保留，请导出备份";
+                cloudSyncCapacityRetryAt = Date.now() + 60000;
+            } else {
+                accountState.status = "离线，稍后自动同步";
+            }
             writeCloudSyncMeta({username:owner, revision, dirty:true, sectionHashes:latestPartHashes});
         }
         return false;
@@ -2148,6 +2182,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         const cloudRevision = Number(data.revision || 0);
         accountState.revision = cloudRevision;
         const partHashes = getCloudPartHashMap(data.parts);
+        // 初始化拿到完整快照；只在确认工作区与云端一致后建立哈希基准。
 
         const initialMeta = readCloudSyncMeta();
         const initialSameAccount = initialMeta.username === owner;
@@ -2169,6 +2204,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
                 learning:createEmptyLearningState(),
                 appearance:{...APPEARANCE_DEFAULTS}
             });
+            cloudAppliedPartHashes = partHashes;
             writeCloudSyncMeta({username:owner,revision:0,dirty:false,sectionHashes:partHashes});
             accountState.status = "已同步";
             renderAccountUi();
@@ -2201,6 +2237,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             applyCloudSnapshot(data.data || {});
         }
 
+        cloudAppliedPartHashes = partHashes;
         writeCloudSyncMeta({
             username:owner,
             revision:cloudRevision,
@@ -3333,8 +3370,7 @@ function normalizeLearningState(value) {
                     ? event.createdAt
                     : Date.now()
             }))
-            .filter(event => event.type && event.points.length)
-            .slice(-MAX_LEARNING_EVENTS);
+            .filter(event => event.type && event.points.length);
     }
 
     if (Array.isArray(value.wrongQuestions)) {
@@ -3474,8 +3510,7 @@ function normalizeLearningState(value) {
                     item.question
                 )
             )
-            .sort((a, b) => a.updatedAt - b.updatedAt)
-            .slice(-MAX_WRONG_QUESTIONS);
+            .sort((a, b) => a.updatedAt - b.updatedAt);
     }
 
     state.knowledge = buildKnowledgeFromEvents(
@@ -3517,6 +3552,8 @@ function saveLearningState() {
             );
         } catch (error) {
             console.warn("学习记录保存失败：", error);
+            accountState.status = "本机存储空间不足，请及时导出学习数据备份";
+            renderAccountUi();
         }
     }
     scheduleCloudSync();
@@ -3614,10 +3651,7 @@ function updateKnowledge(points, eventType, sessionId = null) {
         createdAt: now
     });
 
-    if (learningState.events.length > MAX_LEARNING_EVENTS) {
-        learningState.events = learningState.events.slice(-MAX_LEARNING_EVENTS);
-    }
-
+    // 不再静默丢弃早期学习事件；超过软阈值仅可能影响云端容量。
     rebuildKnowledge();
     saveLearningState();
 }
@@ -6090,11 +6124,7 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
 
     learningState.wrongQuestions.push(entry);
 
-    if (learningState.wrongQuestions.length > MAX_WRONG_QUESTIONS) {
-        learningState.wrongQuestions = learningState.wrongQuestions
-            .slice(-MAX_WRONG_QUESTIONS);
-    }
-
+    // 不因数量上限删除用户早期错题；云端超限会报告并保留本机记录。
     saveLearningState();
 
     queueWrongQuestionAnswer(
@@ -19277,7 +19307,6 @@ document.addEventListener(
         const knowledgeGraphHistoryTab = document.getElementById("knowledgeGraphHistoryTab");
         const appConfirmModal = document.getElementById("appConfirmModal");
         const appConfirmClose = document.getElementById("appConfirmClose");
-        const appConfirmCancel = document.getElementById("appConfirmCancel");
         const appConfirmConfirm = document.getElementById("appConfirmConfirm");
         const mobileChoiceModal = document.getElementById("mobileChoiceModal");
         const mobileChoiceClose = document.getElementById("mobileChoiceClose");
@@ -19632,7 +19661,6 @@ document.addEventListener(
         }
 
         appConfirmClose?.addEventListener("click", () => resolveAppConfirm(false));
-        appConfirmCancel?.addEventListener("click", () => resolveAppConfirm(false));
         appConfirmConfirm?.addEventListener("click", () => resolveAppConfirm(true));
         appConfirmModal?.addEventListener("click", event => {
             if (event.target === appConfirmModal) resolveAppConfirm(false);
