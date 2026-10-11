@@ -356,6 +356,24 @@ body {
 }
 
 /* 图片识别中的撤销按钮：与会话删除按钮一致，使用纯红色圆点。 */
+/* AI 正在思考/输出时，将发送钮原位切换为可取消的停止钮。 */
+#sendBtn.ai-stop-button,
+body[data-appearance-theme="light"] #sendBtn.ai-stop-button,
+body[data-appearance-theme="dark"] #sendBtn.ai-stop-button {
+    background:#dc2626 !important;
+    color:#fff !important;
+    cursor:pointer !important;
+    opacity:1 !important;
+}
+#sendBtn.ai-stop-button:hover,
+body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
+    background:#b91c1c !important;
+}
+#sendBtn.ai-stop-button:focus-visible {
+    outline:2px solid var(--text-primary);
+    outline-offset:2px;
+}
+
 #ocrCancelBtn {
     flex:0 0 auto;
     width:30px;
@@ -7369,7 +7387,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <input id="imageInput" type="file" accept="image/*" hidden>
             <button id="imageBtn" type="button">图片识题</button>
             <button id="ocrCancelBtn" type="button" hidden aria-label="撤销图片识别" title="撤销图片识别"></button>
-            <button id="sendBtn" type="button" onclick="send()">发送</button>
+            <button id="sendBtn" type="button" onclick="handleSendOrStop()">发送</button>
         </div>
         <div id="inputLockHint" class="input-lock-hint hidden" aria-live="polite"></div>
     </div>
@@ -7984,7 +8002,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-graph-relations-view-20261011"></script>
+<script src="/static/script.js?v=dmate-stop-ai-response-20261011"></script>
 
 </body>
 </html>
