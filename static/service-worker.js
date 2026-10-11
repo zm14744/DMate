@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-live-cloud-sync-20261011";
+const CACHE_NAME = "dmate-webapp-live-sync-repair-20261011";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
