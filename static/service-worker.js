@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-ocr-graph-contrast-routing-20261011";
+const CACHE_NAME = "dmate-webapp-ocr-verified-stop-round-20261012";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
