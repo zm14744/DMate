@@ -10516,11 +10516,11 @@ async function renderKnowledgeGraphOffscreenPngBlob() {
         const x2 = end.x;
         const y1 = start.y + cellHeight / 2 + port(outGroup.indexOf(edge), outGroup.length);
         const y2 = end.y + cellHeight / 2 + port(inGroup.indexOf(edge), inGroup.length);
-        const bend = Math.max(30, Math.abs(x2 - x1) * 0.42);
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.bezierCurveTo(x1 + bend, y1, x2 - bend, y2, x2, y2);
-        ctx.stroke();
+        const route = routeKnowledgeGraphConnection(
+            edge.from, edge.to, {x:x1,y:y1}, {x:x2,y:y2},
+            positions, cellWidth, cellHeight, height
+        );
+        strokeKnowledgeGraphCanvasRoute(ctx, route);
     }
 
     ctx.textAlign = "center";
@@ -17114,6 +17114,109 @@ function computeKnowledgeGraphLevels(nodes) {
     return memo;
 }
 
+// Graph connections use a collision-free corridor when a direct curve would
+// cross an intermediate knowledge node. Shared by SVG, mobile view and PNG.
+function routeKnowledgeGraphConnection(fromId, toId, start, end, positions, nodeWidth, nodeHeight, stageHeight) {
+    const x1 = start.x, y1 = start.y, x2 = end.x, y2 = end.y;
+    const bend = Math.max(16, Math.abs(x2 - x1) * 0.42);
+    const obstacles = [];
+    for (const [id, pos] of positions) {
+        if (id === fromId || id === toId) continue;
+        obstacles.push({
+            left:pos.x - 5, right:pos.x + nodeWidth + 5,
+            top:pos.y - 5, bottom:pos.y + nodeHeight + 5
+        });
+    }
+    const inside = (x, y) => obstacles.some(r => x > r.left && x < r.right && y > r.top && y < r.bottom);
+    // Preserve the original smooth appearance for edges entirely in clear gaps.
+    let curveSafe = true;
+    for (let i = 1; i < 32; i++) {
+        const t = i / 32, u = 1 - t;
+        const cx = u*u*u*x1 + 3*u*u*t*(x1+bend) + 3*u*t*t*(x2-bend) + t*t*t*x2;
+        const cy = u*u*u*y1 + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y2;
+        if (inside(cx, cy)) { curveSafe = false; break; }
+    }
+    if (curveSafe) return {type:'curve', x1,y1,x2,y2,bend};
+
+    // Search the orthogonal passages between rows and columns. Travel inside
+    // inter-column gaps for vertical movement; pass a column only in row gaps.
+    const startX = Math.min(x1, x2), endX = Math.max(x1, x2);
+    const xs = [x1, x2];
+    const ys = [y1, y2, 11, Math.max(11, stageHeight - 11)];
+    for (const r of obstacles) {
+        for (const value of [r.left - 7, r.right + 7]) {
+            if (value > startX && value < endX) xs.push(value);
+        }
+        for (const value of [r.top - 7, r.bottom + 7]) {
+            if (value > 7 && value < stageHeight - 7) ys.push(value);
+        }
+    }
+    const sortedUnique = values => [...new Set(values.map(x => Math.round(x * 100) / 100))].sort((a,b)=>a-b);
+    const xx = sortedUnique(xs), yy = sortedUnique(ys);
+    const sx=xx.indexOf(x1), tx=xx.indexOf(x2), sy=yy.indexOf(y1), ty=yy.indexOf(y2);
+    const nx=xx.length, ny=yy.length;
+    const startNode=(sy*nx+sx)*3, targetNode=(ty*nx+tx);
+    const distances = new Float64Array(nx*ny*3).fill(Infinity);
+    const prior = new Int32Array(nx*ny*3).fill(-1);
+    const heap=[];
+    const push=(cost,id)=>{ let p=heap.length; heap.push({cost,id}); while(p){const q=(p-1)>>1;if(heap[q].cost<=cost)break;heap[p]=heap[q];p=q;}heap[p]={cost,id};};
+    const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){let p=0;while(2*p+1<heap.length){let q=2*p+1;if(q+1<heap.length&&heap[q+1].cost<heap[q].cost)q++;if(last.cost<=heap[q].cost)break;heap[p]=heap[q];p=q;}heap[p]=last;}return top;};
+    const isClear=(a,b,c,d)=>{
+        if (a===c) {const lo=Math.min(b,d),hi=Math.max(b,d);return !obstacles.some(r => a>r.left && a<r.right && hi>r.top && lo<r.bottom);}
+        const lo=Math.min(a,c),hi=Math.max(a,c);return !obstacles.some(r => b>r.top && b<r.bottom && hi>r.left && lo<r.right);
+    };
+    distances[startNode]=0;push(0,startNode);
+    let found=-1,expanded=0;
+    while(heap.length && expanded<50000){
+        const entry=pop(),id=entry.id;if(entry.cost>distances[id]+.001)continue;
+        expanded++;
+        const group=Math.floor(id/3),dir=id%3, xi=group%nx,yi=Math.floor(group/nx);
+        if(group===targetNode){found=id;break;}
+        for(const [dx,dy,nd] of [[-1,0,1],[1,0,1],[0,-1,2],[0,1,2]]){
+            const a=xi+dx,b=yi+dy;if(a<0||a>=nx||b<0||b>=ny)continue;
+            const ox=xx[xi],oy=yy[yi],ex=xx[a],ey=yy[b];
+            if(!isClear(ox,oy,ex,ey))continue;
+            const next=(b*nx+a)*3+nd;
+            const delta=Math.abs(ex-ox)+Math.abs(ey-oy);
+            // Penalise extra bends and backtracking, not the node count.
+            const cost=entry.cost+delta+(dir&&dir!==nd?22:0)+(dx<0?delta*.4:0);
+            if(cost>=distances[next]-.001)continue;
+            distances[next]=cost;prior[next]=id;push(cost,next);
+        }
+    }
+    let points=[];
+    if(found>=0){
+        for(let id=found;id>=0;id=prior[id]){const group=Math.floor(id/3);points.push([xx[group%nx],yy[Math.floor(group/nx)]]);}
+        points.reverse();
+        // Drop points which lie on the same straight corridor.
+        const simplified=[];
+        for(const p of points){const n=simplified.length;if(n>=2){const a=simplified[n-2],b=simplified[n-1];if((a[0]===b[0]&&b[0]===p[0])||(a[1]===b[1]&&b[1]===p[1])){simplified[n-1]=p;continue;}}simplified.push(p);}
+        points=simplified;
+    } else {
+        // Guaranteed escape corridor, beyond all nodes, but inside SVG height.
+        const topY=11, leftGap=Math.min(x2-8,x1+Math.max(10,(x2-x1)*.16));
+        const rightGap=Math.max(x1+8,x2-Math.max(10,(x2-x1)*.16));
+        points=[[x1,y1],[leftGap,y1],[leftGap,topY],[rightGap,topY],[rightGap,y2],[x2,y2]];
+    }
+    return {type:'polyline',points};
+}
+
+function knowledgeGraphRouteSvgD(route) {
+    if(route.type==='curve')return `M ${route.x1} ${route.y1} C ${route.x1+route.bend} ${route.y1}, ${route.x2-route.bend} ${route.y2}, ${route.x2} ${route.y2}`;
+    return route.points.map(([x,y],i)=>`${i?'L':'M'} ${x} ${y}`).join(' ');
+}
+
+function strokeKnowledgeGraphCanvasRoute(ctx,route){
+    ctx.beginPath();
+    if(route.type==='curve'){
+        ctx.moveTo(route.x1,route.y1);
+        ctx.bezierCurveTo(route.x1+route.bend,route.y1,route.x2-route.bend,route.y2,route.x2,route.y2);
+    } else {
+        route.points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
+    }
+    ctx.stroke();
+}
+
 function renderMobileKnowledgeGraphSection(container, nodes, title, description, context, options = {}) {
     const section = document.createElement("div");
     section.className = "kg-section kg-mobile-section";
@@ -17318,10 +17421,13 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         const x2 = to.x;
         const y1 = from.y + nodeHeight / 2 + distributePort(outGroup.indexOf(edge), outGroup.length);
         const y2 = to.y + nodeHeight / 2 + distributePort(inGroup.indexOf(edge), inGroup.length);
-        const channel = Math.max(36, Math.abs(x2 - x1) * 0.42);
+        const route = routeKnowledgeGraphConnection(
+            edge.from, edge.to, {x:x1,y:y1}, {x:x2,y:y2},
+            positions, nodeWidth, nodeHeight, stageHeight
+        );
         const path = createSvgElement("path", {
             class:"kg-mobile-edge",
-            d:`M ${x1} ${y1} C ${x1 + channel} ${y1}, ${x2 - channel} ${y2}, ${x2} ${y2}`,
+            d:knowledgeGraphRouteSvgD(route),
             "data-from":edge.from,
             "data-to":edge.to
         });
@@ -17645,11 +17751,13 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
             const y1 = previous.y + nodeHeight / 2;
             const x2 = current.x;
             const y2 = current.y + nodeHeight / 2;
-            const midX = (x1 + x2) / 2;
-
+            const route = routeKnowledgeGraphConnection(
+                previousNode.id, node.id, {x:x1,y:y1}, {x:x2,y:y2},
+                positions, nodeWidth, nodeHeight, svgHeight
+            );
             const path = createSvgElement("path", {
                 class: "kg-edge",
-                d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+                d: knowledgeGraphRouteSvgD(route)
             });
 
             svg.appendChild(path);
@@ -17696,13 +17804,11 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         const lines = splitKnowledgeGraphLabel(
             node.name
         );
-        const graphIsLight = document.documentElement?.dataset?.appearanceTheme === "light"
-            || document.body?.dataset?.appearanceTheme === "light";
         const text = createSvgElement("text", {
             class: "kg-node-label",
             x: nodeWidth / 2,
             y: 22,
-            fill: graphIsLight ? "#0f172a" : "#f8fafc",
+            fill: state.text || "#ffffff",
             "font-size": mobileGraphLayout ? 14 : 12,
             "font-weight": mobileGraphLayout ? 600 : 500,
             "text-anchor": "middle"
@@ -17735,7 +17841,7 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
                 class: "kg-node-badge",
                 x: nodeWidth / 2,
                 y: nodeHeight - 10,
-                fill: graphIsLight ? "#475569" : "#cbd5e1",
+                fill: "#e2e8f0",
                 "font-size": mobileGraphLayout ? 11 : 10,
                 "text-anchor": "middle"
             });
