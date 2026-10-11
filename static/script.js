@@ -11,6 +11,9 @@ const FALLBACK_API_CONTEXT_MESSAGES = 12;
 
 const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
 const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
+const ACCOUNT_LOGOUT_SIGNAL_KEY = "dmate_account_logout_signal_v1";
+// 故障排查备份只存于当前页面内存，退出/换账号后不可被下一位用户读取。
+let volatileCloudBackup = null;
 const CLOUD_SYNC_DEBOUNCE_MS = 900;
 let accountState = {
     configured: null,
@@ -29,15 +32,9 @@ let cloudApplyingSnapshot = false;
 let cloudLocalChangeVersion = 0;
 
 function shouldPersistClientState() {
-    // 游客模式完全临时：不把聊天、学习记录或外观写入持久存储。
-    // 已登录，或本机还保留着上一次已登录账号的同步标记时，才使用本地缓存。
-    if (accountState.authenticated) return true;
-    try {
-        const parsed = JSON.parse(localStorage.getItem(CLOUD_SYNC_META_KEY) || "null");
-        return Boolean(parsed && typeof parsed === "object" && parsed.username);
-    } catch (_error) {
-        return false;
-    }
+    // 绝不能信任上次登录留下的 localStorage 元信息作为认证依据。
+    // 只有 /auth/me 或登录接口验证成功后，才允许读取及写入学习缓存。
+    return Boolean(accountState.authenticated && accountState.username);
 }
 
 function purgeGuestPersistentState() {
@@ -45,6 +42,7 @@ function purgeGuestPersistentState() {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(LEARNING_STORAGE_KEY);
         localStorage.removeItem(APPEARANCE_STORAGE_KEY);
+        localStorage.removeItem(CLOUD_BACKUP_KEY);
     } catch (_error) {}
 }
 
@@ -627,16 +625,23 @@ function closeAppearanceBackgroundViewer() {
 }
 
 async function loadAppearanceBackground() {
+    // 未经服务器验证时，不展示上一个使用者保留在 IndexedDB 的图片。
+    if (!shouldPersistClientState()) {
+        clearAppearanceBackgroundVisual();
+        return;
+    }
+    const owner = accountState.username;
     try {
         const blob = await readAppearanceBackgroundBlob();
-
+        // 异步读取期间可能已退出或切换账号，绝不能把旧图片放到新页面。
+        if (!accountState.authenticated || accountState.username !== owner) return;
         if (blob instanceof Blob) {
             setAppearanceBackgroundVisual(blob);
         } else {
             clearAppearanceBackgroundVisual();
         }
     } catch (_error) {
-        clearAppearanceBackgroundVisual();
+        if (accountState.username === owner) clearAppearanceBackgroundVisual();
     }
 }
 
@@ -936,6 +941,7 @@ function clearLoggedOutWorkspace() {
     currentId = null;
     deletedSessionIds = Object.create(null);
     learningState = createEmptyLearningState();
+    volatileCloudBackup = null;
     purgeGuestPersistentState();
 
     appearanceSettings = { ...APPEARANCE_DEFAULTS };
@@ -977,6 +983,25 @@ function normalizeDeletedSessionIds(value) {
     return normalized;
 }
 
+function normalizeDeletedWrongQuestionIds(value) {
+    const normalized = Object.create(null);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return normalized;
+    for (const [id, rawAt] of Object.entries(value)) {
+        const deletedAt = Number(rawAt);
+        if (id && Number.isFinite(deletedAt) && deletedAt > 0) normalized[id] = deletedAt;
+    }
+    return normalized;
+}
+
+function markWrongQuestionDeleted(id) {
+    const key = String(id ?? "");
+    if (!key) return;
+    if (!learningState.deletedWrongQuestionIds) learningState.deletedWrongQuestionIds = Object.create(null);
+    learningState.deletedWrongQuestionIds[key] = Math.max(
+        Date.now(), Number(learningState.deletedWrongQuestionIds[key]) || 0
+    );
+}
+
 function markSessionDeleted(sessionId) {
     const key = String(sessionId ?? "");
     if (!key) return;
@@ -996,7 +1021,12 @@ function collectCloudSnapshot() {
             currentId,
             deletedSessionIds: { ...deletedSessionIds }
         },
-        learning: learningState,
+        learning: {
+            ...learningState,
+            wrongQuestions: (learningState.wrongQuestions || []).filter(item => (
+                item && !learningState.deletedWrongQuestionIds?.[String(item.id)]
+            ))
+        },
         appearance: normalizeAppearanceSettings(appearanceCommittedSettings)
     };
 }
@@ -1015,21 +1045,16 @@ function snapshotHasUserData(snapshot) {
     return false;
 }
 
-function backupLocalSnapshot(reason = "切换云端数据") {
+function backupLocalSnapshot(reason = "云同步前的临时备份") {
+    if (!accountState.authenticated) return;
     const snapshot = collectCloudSnapshot();
     if (!snapshotHasUserData(snapshot)) return;
-    try {
-        localStorage.setItem(
-            CLOUD_BACKUP_KEY,
-            JSON.stringify({
-                reason,
-                createdAt: Date.now(),
-                data: snapshot
-            })
-        );
-    } catch (_error) {
-        // 空间不足时只是不创建备份，不影响登录。
-    }
+    // 避免共享浏览器上的下一位用户通过本地存储读到前一个账号的资料。
+    volatileCloudBackup = { owner:accountState.username, reason, createdAt:Date.now(), data:snapshot };
+}
+
+function clearLegacyPersistentBackup() {
+    try { localStorage.removeItem(CLOUD_BACKUP_KEY); } catch (_error) {}
 }
 
 function applyCloudSnapshot(snapshot) {
@@ -1608,12 +1633,17 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
         if (!event || !event.id) continue;
         byEvent.set(String(event.id), event);
     }
+    const wrongDeletions = normalizeDeletedWrongQuestionIds(remoteLearning.deletedWrongQuestionIds);
+    for (const [id, at] of Object.entries(normalizeDeletedWrongQuestionIds(localLearning.deletedWrongQuestionIds))) {
+        wrongDeletions[id] = Math.max(at, wrongDeletions[id] || 0);
+    }
     const byWrong = new Map();
     const remoteWrong = Array.isArray(remoteLearning.wrongQuestions) ? remoteLearning.wrongQuestions : [];
     const localWrong = Array.isArray(localLearning.wrongQuestions) ? localLearning.wrongQuestions : [];
     for (const item of [...remoteWrong, ...localWrong]) {
         if (!item || !item.id) continue;
         const key = String(item.id);
+        if (wrongDeletions[key]) continue;
         const previous = byWrong.get(key);
         if (!previous) {
             byWrong.set(key, item);
@@ -1647,8 +1677,8 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
     return {
         schemaVersion:1,
         sessions:{sessions:resultSessions, currentId, deletedSessionIds:deletedSessionIdsMerged},
-        learning:{version:Math.max(8, Number(localLearning.version || 0), Number(remoteLearning.version || 0)),
-            events, wrongQuestions},
+        learning:{version:Math.max(9, Number(localLearning.version || 0), Number(remoteLearning.version || 0)),
+            events, wrongQuestions, deletedWrongQuestionIds:wrongDeletions},
         appearance: local.appearance || remote.appearance || {...APPEARANCE_DEFAULTS}
     };
 }
@@ -1720,6 +1750,35 @@ async function pushCloudSnapshot(_legacyForce = false) {
 
 async function resolveInitialCloudSync(isNewAccount = false) {
     if (!accountState.authenticated) return;
+
+    // 必须在服务器验证账号后，才读取属于这个账号的本机缓存。
+    // 同浏览器切换另一个账号时不能显示、更不能上传前一账号的资料。
+    const savedMeta = readCloudSyncMeta();
+    if (!isNewAccount && savedMeta.username === accountState.username) {
+        loadLearningState();
+        appearanceSettings = loadAppearanceSettings();
+        appearanceCommittedSettings = { ...appearanceSettings };
+        applyAppearanceSettings({ save:false });
+        if (!loadState()) {
+            sessions = [];
+            currentId = null;
+            deletedSessionIds = Object.create(null);
+        }
+    } else {
+        sessions = [];
+        currentId = null;
+        deletedSessionIds = Object.create(null);
+        learningState = createEmptyLearningState();
+        // 前一个账号的自定义背景属个人数据，不在下一账号沿用。
+        try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+        clearAppearanceBackgroundVisual();
+        appearanceSettings = { ...APPEARANCE_DEFAULTS };
+        appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
+        applyAppearanceSettings({ save:false });
+        purgeGuestPersistentState();
+        clearLegacyPersistentBackup();
+    }
+    renderAll();
 
     // 自定义背景图片仍按设备保存；登录成功后再读取，游客不会继承它。
     await loadAppearanceBackground();
@@ -1957,11 +2016,7 @@ async function submitAccountRegistration() {
         accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
         accountState.revision = Number(data.revision || 0);
         accountState.status = "同步中…";
-        writeCloudSyncMeta({
-            username:accountState.username,
-            revision:accountState.revision,
-            dirty:true
-        });
+        // 新账号应从空工作区开始，不把同浏览器上一个账号的缓存继承过来。
 
         if (passwordInput) passwordInput.value = "";
         if (confirmInput) confirmInput.value = "";
@@ -2248,7 +2303,7 @@ async function logoutAccount() {
     if (meta.username === accountState.username && meta.dirty) {
         const synced = await pushCloudSnapshot(false);
         if (!synced && !window.confirm(
-            "本设备还有尚未同步到云端的数据。\n\n仍然退出登录吗？退出后的页面会清空，当前内容只会保留一份本机备份。"
+            "本设备还有尚未同步到云端的数据。\n\n仍然退出吗？为保护账号隐私，退出将清除本地学习缓存，未同步的内容可能无法找回。"
         )) {
             return;
         }
@@ -2271,8 +2326,11 @@ async function logoutAccount() {
         return;
     }
 
-    // 退出前留一份本机备份，但退出后的可见工作区必须为空。
-    backupLocalSnapshot("退出登录前的本机数据");
+    // 同一浏览器的下一个访客不应读取当前账号的本机背景图片。
+    try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+    // 退出不留下可供其他使用者读取的学习快照或备份。
+    volatileCloudBackup = null;
+    clearLegacyPersistentBackup();
 
     accountState.authenticated = false;
     accountState.username = "";
@@ -2282,6 +2340,7 @@ async function logoutAccount() {
     accountState.status = "";
     accountState.syncing = false;
     clearCloudSyncMeta();
+    try { localStorage.setItem(ACCOUNT_LOGOUT_SIGNAL_KEY, String(Date.now())); } catch (_error) {}
     if (cloudSyncTimer) {
         clearTimeout(cloudSyncTimer);
         cloudSyncTimer = 0;
@@ -2329,6 +2388,9 @@ async function deleteAccount() {
         return;
     }
 
+    try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+    volatileCloudBackup = null;
+    clearLegacyPersistentBackup();
     accountState.authenticated = false;
     accountState.username = "";
     accountState.email = "";
@@ -2337,6 +2399,7 @@ async function deleteAccount() {
     accountState.status = "";
     accountState.syncing = false;
     clearCloudSyncMeta();
+    try { localStorage.setItem(ACCOUNT_LOGOUT_SIGNAL_KEY, String(Date.now())); } catch (_error) {}
     if (cloudSyncTimer) {
         clearTimeout(cloudSyncTimer);
         cloudSyncTimer = 0;
@@ -2451,6 +2514,20 @@ async function initAccountSystem() {
         if (event.key === "Enter") submitAccountLogin();
     });
 
+    // 同一浏览器其他标签退出/注销后，当前标签也应立即清空私人学习数据。
+    window.addEventListener("storage", event => {
+        if (event.key !== ACCOUNT_LOGOUT_SIGNAL_KEY || !event.newValue) return;
+        accountState.authenticated = false;
+        accountState.username = "";
+        if (cloudSyncTimer) {
+            clearTimeout(cloudSyncTimer);
+            cloudSyncTimer = 0;
+        }
+        clearCloudSyncMeta();
+        clearLoggedOutWorkspace();
+        window.location.reload();
+    });
+
     window.addEventListener("online", () => {
         const meta = readCloudSyncMeta();
         if (accountState.authenticated && meta.dirty) {
@@ -2477,15 +2554,20 @@ async function initAccountSystem() {
         if (accountState.authenticated) {
             await resolveInitialCloudSync(false);
         } else {
-            const staleMeta = readCloudSyncMeta();
-            if (staleMeta.username) {
-                backupLocalSnapshot("登录状态失效前的本机数据");
-                clearCloudSyncMeta();
-                clearLoggedOutWorkspace();
-            } else {
-                // 兼容旧版本曾经写入的游客 localStorage；从 v6 起游客不再持久化。
-                purgeGuestPersistentState();
-            }
+            // 无有效登录立即清除旧用户缓存；不因浏览器保留旧元信息而复现历史数据。
+            clearCloudSyncMeta();
+            clearLoggedOutWorkspace();
+            // 删除旧版本遗留的 IndexedDB 用户背景（不再给游客读取）。
+            try {
+                const db = await openAppearanceDatabase();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(APPEARANCE_DB_STORE, "readwrite");
+                    tx.objectStore(APPEARANCE_DB_STORE).delete(APPEARANCE_BACKGROUND_KEY);
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                db.close();
+            } catch (_error) {}
         }
     } catch (error) {
         console.warn("读取账号状态失败：", error);
@@ -2742,10 +2824,11 @@ function normalizeRetestSession(value) {
 
 function createEmptyLearningState() {
     return {
-        version: 8,
+        version: 9,
         knowledge: {},
         events: [],
-        wrongQuestions: []
+        wrongQuestions: [],
+        deletedWrongQuestionIds: Object.create(null)
     };
 }
 
@@ -2817,6 +2900,8 @@ function normalizeLearningState(value) {
     if (!value || typeof value !== "object") {
         return state;
     }
+
+    state.deletedWrongQuestionIds = normalizeDeletedWrongQuestionIds(value.deletedWrongQuestionIds);
 
     // v4 起学习统计改为“事件账本”。
     // v3 及更早只有总数，没有来源会话，无法在删除对话时准确回滚。
@@ -2994,6 +3079,7 @@ function normalizeLearningState(value) {
         // 错题本本身允许出现重复题目：每次记录都作为独立学习记录保留。
         // PDF 导出时会按题目内容单独去重，不影响这里的原始记录。
         state.wrongQuestions = normalizedWrong
+            .filter(item => !state.deletedWrongQuestionIds[String(item.id)])
             .filter(
                 item => !isClearlyNonQuestionWrongBookText(
                     item.question
@@ -6472,6 +6558,7 @@ function removeWrongQuestion(id) {
 
     if (!confirmed) return;
 
+    markWrongQuestionDeleted(id);
     learningState.wrongQuestions = learningState.wrongQuestions.filter(
         item => item.id !== id
     );
@@ -6501,6 +6588,7 @@ function clearCompletedWrongQuestions() {
         completed.map(item => item.id)
     );
 
+    for (const item of completed) markWrongQuestionDeleted(item.id);
     learningState.wrongQuestions = learningState.wrongQuestions.filter(
         item => !completedIds.has(item.id)
     );
@@ -19108,32 +19196,13 @@ document.addEventListener(
             );
         }
 
-        let restored = false;
-        if (shouldPersistClientState()) {
-            loadLearningState();
-            restored = loadState();
-        } else {
-            learningState = createEmptyLearningState();
-            sessions = [];
-            currentId = null;
-            deletedSessionIds = Object.create(null);
-        }
-
-        if (!restored) {
-            const id = makeSessionId();
-
-            sessions.push({
-                id,
-                name: "新对话",
-                messages: [],
-                teaching: null,
-                learningQuestion: null,
-                retest: null
-            });
-
-            currentId = id;
-            saveState();
-        }
+        // 启动时始终显示空白工作区。不得根据 localStorage 中旧登录标记
+        // 在 /auth/me 验证之前渲染任何历史聊天或错题。
+        sessions = [];
+        currentId = null;
+        deletedSessionIds = Object.create(null);
+        learningState = createEmptyLearningState();
+        clearLegacyPersistentBackup();
 
         renderAll();
         refreshInputAvailability();
