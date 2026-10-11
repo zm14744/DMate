@@ -153,6 +153,11 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 - 不要根据 OCR 的乱码猜出 22、86 之类的权值。
 - 如果是树、哈斯图、状态图、矩阵、真值表等，也要按结构描述。
 - 只写能从图中确认的信息；不确定的地方标“可能/不确定”。
+- 先数清每个图中的实心/空心顶点圆、孤立顶点，再逐条沿线追踪端点；不允许根据“看起来是三角形/星形”推断边数。
+- 对每一对顶点分别统计实际边数。两点之间若有一条直线和一条弧线，则只有这一对是二重边；其他边仍是单边。绝不能写成“三角形每条边都是平行边”，除非三对顶点确实各有两条边。
+- 图中的孤立圆点不与任何线相连就必须记为度数 0 的顶点，不能误认为文字句号、边端装饰，也不能凭空连边。
+- 对多图并列的情况，先判断是同一题下左右两个独立图，还是同一个图的多个不连通分量；以标签、间距和题目布局为依据，不确定就明确标记，不得猜测成一个连通图。
+- 每个图先列顶点位置、再列边（重边按重数列出），最后重新计算顶点度数并核对握手定理（度数和 = 2×边数，环计入两次）；不一致时自行逐边重查，仍不能确认的边标为不确定。
 - 每条边逐一核对两个端点；只有确实连接同一对顶点的两条边才叫重边。
 - 不要解题，不要给答案。
 
@@ -1282,6 +1287,14 @@ def _prepare_vision_images(image_bytes, review_regions=None):
             crops.append(original.crop(box))
         except (TypeError, ValueError, OverflowError):
             continue
+    # OCR may only find a tiny “(b)” caption and supply review regions around
+    # the caption while missing the actual graph above it. Preserve structural
+    # left/right crops for wide graph illustrations even when OCR found text.
+    if crops and width >= height * 1.28:
+        crops.extend([
+            original.crop((0, 0, math.ceil(width * 0.57), height)),
+            original.crop((math.floor(width * 0.43), 0, width, height)),
+        ])
     if not crops:
         if pure_visual_mode:
             # 纯图模式同时覆盖上下排列和左右排列；保留约 20% 重叠，
