@@ -1711,13 +1711,18 @@ def sync_user_data():
     user_id = int(user["id"])
 
     if request.method == "GET" and request.args.get("revisionOnly") == "1":
-        # 轻量轮询：只查询修订号，避免频繁读取/传输整份学习快照。
+        # 每 1.2 秒仅查询整数 revision；不能频繁读取整份 JSON 再哈希。
         try:
-            row = _sync_row_for_user(user_id)
+            with _auth_connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT revision FROM dm_user_data WHERE user_id = %s",
+                        (user_id,),
+                    )
+                    revision_row = cur.fetchone()
             return jsonify({
                 "ok": True,
-                "revision": int(row["revision"] or 0) if row else 0,
-                "parts": _sync_manifest_from_data(row["data"] or {}),
+                "revision": int(revision_row["revision"] or 0) if revision_row else 0,
             })
         except Exception as exc:
             print(f"检查云端同步版本失败：{repr(exc)}")
@@ -1726,12 +1731,28 @@ def sync_user_data():
     if request.method == "GET":
         try:
             row = _sync_row_for_user(user_id)
-            requested_parts = _normalize_sync_part_names(
-                request.args.get("parts")
-            )
+            requested_parts = _normalize_sync_part_names(request.args.get("parts"))
+            expected_raw = request.args.get("expectedRevision")
+            expected_revision = int(expected_raw) if expected_raw is not None else None
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "同步版本号无效。"}), 400
         except Exception as exc:
             print(f"读取云端数据失败：{repr(exc)}")
             return jsonify({"ok": False, "error": "读取云端数据失败。"}), 500
+
+        actual_revision = int(row["revision"] or 0)
+        # manifest 和分段查询都绑定某一版本。变化后返回冲突而不是回传
+        # 新版本号 + 老的请求分段，防止被误标为已完整同步。
+        if expected_revision is not None and expected_revision != actual_revision:
+            return jsonify({
+                "ok": False, "conflict": True,
+                "error": "查询期间云端数据已更新，请重新获取版本。",
+                "revision": actual_revision,
+            }), 409
+
+        manifest = _sync_manifest_from_data(row["data"] or {})
+        if request.args.get("manifestOnly") == "1":
+            return jsonify({"ok": True, "revision": actual_revision, "parts": manifest})
 
         return jsonify({
             "ok": True,
@@ -1739,9 +1760,9 @@ def sync_user_data():
                 key: (row["data"] or {}).get(key)
                 for key in requested_parts
             } if requested_parts else (row["data"] or {})),
-            "revision": int(row["revision"] or 0),
+            "revision": actual_revision,
             "updatedAt": row["updated_at"].isoformat() if row.get("updated_at") else None,
-            "parts": _sync_manifest_from_data(row["data"] or {}),
+            "parts": manifest,
         })
 
     if not request.is_json:
