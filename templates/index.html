@@ -7333,6 +7333,41 @@ body[data-appearance-theme="light"] #knowledgeGraphModal,
     stroke-width:3;
     opacity:1;
 }
+
+/* OCR 只显示红色撤销；AI 思考只显示红色圆形停止钮。 */
+#sendBtn[hidden], #imageBtn[hidden] { display:none !important; }
+#sendBtn.ai-stop-button,
+body[data-appearance-theme="light"] #sendBtn.ai-stop-button,
+body[data-appearance-theme="dark"] #sendBtn.ai-stop-button,
+body[data-appearance-theme="navy"] #sendBtn.ai-stop-button {
+    box-sizing:border-box !important;
+    flex:0 0 42px !important;
+    display:inline-flex !important;
+    width:42px !important;
+    height:42px !important;
+    min-width:42px !important;
+    max-width:42px !important;
+    min-height:42px !important;
+    max-height:42px !important;
+    padding:0 !important;
+    margin:0 !important;
+    border-radius:50% !important;
+    background:#ef4444 !important;
+    color:transparent !important;
+    align-items:center !important;
+    justify-content:center !important;
+    font-size:0 !important;
+}
+#sendBtn.ai-stop-button::before {
+    content:"";
+    width:13px;
+    height:13px;
+    border-radius:2px;
+    background:#ffffff;
+    display:block;
+}
+#sendBtn.ai-stop-button:hover {background:#dc2626 !important;}
+
 </style>
 
 <script>
@@ -8046,7 +8081,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-ocr-graph-contrast-routing-20261011"></script>
+<script src="/static/script.js?v=dmate-ocr-verified-stop-round-20261012"></script>
 
 </body>
 </html>
