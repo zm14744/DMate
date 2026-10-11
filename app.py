@@ -3085,6 +3085,30 @@ def _looks_like_non_question_ocr(text, visual_text):
     return bool(note_titles or definition_bullets >= 3)
 
 
+def _graph_numeric_facts(text):
+    """只提取明确的顶点/边数量，不将 v1、公式指数等误作规模。"""
+    source = str(text or "").translate(str.maketrans("０１２３４５６７８９", "0123456789"))
+    patterns = {
+        "顶点数": (
+            r"(?:顶点数|顶点个数)\s*(?:是|为|有|[:：=])\s*(\d{1,3})",
+            r"(?:共|有|包含|具有)?\s*(\d{1,3})\s*个?顶点",
+            r"顶点\s*(\d{1,3})\s*个",
+        ),
+        "边数": (
+            r"(?:边数|边的条数)\s*(?:是|为|有|[:：=])\s*(\d{1,3})",
+            r"(?:共|有|包含|具有)\s*(\d{1,3})\s*条边",
+        ),
+    }
+    facts = {}
+    for label, matchers in patterns.items():
+        matches = set()
+        for matcher in matchers:
+            matches.update(int(match.group(1)) for match in re.finditer(matcher, source))
+        if len(matches) == 1:
+            facts[label] = next(iter(matches))
+    return facts
+
+
 def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
     """Vision 是待核对候选。漏问时保留 OCR，数字变化明确列出。"""
     original = _numbered_ocr_questions(ocr_text)
@@ -3102,6 +3126,14 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
                 changes.append({"question": number, "ocr": "、".join(before), "vision": "、".join(after)})
         if changes:
             reasons.append("第 " + "、".join(x["question"] for x in changes) + " 问的数字或下标识别不一致，请对照原图。")
+    # 不依赖小问序号；纯单问题的“4 个顶点/5 个顶点”也必须核对。
+    original_facts = _graph_numeric_facts(ocr_text)
+    candidate_facts = _graph_numeric_facts(corrected_text)
+    for key in sorted(set(original_facts) & set(candidate_facts)):
+        before, after = original_facts[key], candidate_facts[key]
+        if before != after:
+            changes.append({"question": "题干", "field": key, "ocr": str(before), "vision": str(after)})
+            reasons.append(f"题干{key}存在识别冲突：普通 OCR 为 {before}，图像复核为 {after}，请对照原图。")
     for field in uncertain_fields or []:
         if isinstance(field, str) and field.strip():
             reasons.append(field.strip()[:240])
@@ -3212,7 +3244,7 @@ def ocr():
 
         try:
             vision_result = analyze_image_structure(
-                raw, review_regions=vision_regions
+                raw, ocr_text=ocr_text, review_regions=vision_regions
             )
         except Exception as exc:
             print(f"Vision 增强层异常：{type(exc).__name__}")
