@@ -30,6 +30,14 @@ let cloudSyncTimer = 0;
 let cloudApplyingSnapshot = false;
 // 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
 let cloudLocalChangeVersion = 0;
+// 只轮询云端修订号，版本变化时才读取完整快照；后台低频检查、切回前台立即检查。
+const CLOUD_LIVE_POLL_VISIBLE_MS = 5000;
+const CLOUD_LIVE_POLL_HIDDEN_MS = 30000;
+let cloudLivePollTimer = 0;
+let cloudLivePollInFlight = false;
+let cloudLivePollAbortController = null;
+let cloudLivePollGeneration = 0;
+let cloudLivePollEnabled = false;
 
 function shouldPersistClientState() {
     // 绝不能信任上次登录留下的 localStorage 元信息作为认证依据。
@@ -1528,6 +1536,124 @@ function scheduleCloudSync() {
     renderAccountUi();
 }
 
+// 对端提交成功后，本端无需切换对话或刷新页面即可检测并更新。
+// 绝不在正在编辑/回答时用云端快照直接重建当前页面；本地未同步的数据总是先走 CAS 合并。
+function stopCloudLivePolling() {
+    cloudLivePollAbortController?.abort();
+    cloudLivePollEnabled = false;
+    cloudLivePollGeneration += 1;
+    if (cloudLivePollTimer) window.clearTimeout(cloudLivePollTimer);
+    cloudLivePollTimer = 0;
+}
+
+function scheduleCloudLivePoll(delayMs) {
+    if (!cloudLivePollEnabled || !accountState.authenticated || !accountState.username) return;
+    if (cloudLivePollTimer) window.clearTimeout(cloudLivePollTimer);
+    const defaultDelay = document.hidden ? CLOUD_LIVE_POLL_HIDDEN_MS : CLOUD_LIVE_POLL_VISIBLE_MS;
+    cloudLivePollTimer = window.setTimeout(async () => {
+        cloudLivePollTimer = 0;
+        try {
+            await pullLatestCloudSnapshot();
+        } finally {
+            // 下一轮从上一轮结束后计时，网络拥塞时不累积请求。
+            scheduleCloudLivePoll();
+        }
+    }, Math.max(0, Number.isFinite(delayMs) ? delayMs : defaultDelay));
+}
+
+function startCloudLivePolling() {
+    if (!accountState.authenticated || !accountState.username) return;
+    if (!cloudLivePollEnabled) {
+        cloudLivePollEnabled = true;
+        cloudLivePollGeneration += 1;
+    }
+    scheduleCloudLivePoll(CLOUD_LIVE_POLL_VISIBLE_MS);
+}
+
+function cloudUiEditInProgress() {
+    // UI 锁定期间延迟拉取，防止刷新中断正在生成的回答、OCR 或用户编辑。
+    if (typeof busySessionIds !== "undefined" && busySessionIds.size) return true;
+    if (typeof pendingAiStartSessionIds !== "undefined" && pendingAiStartSessionIds.size) return true;
+    if (typeof typingTimer !== "undefined" && typingTimer) return true;
+    if (typeof ocrReviewInProgress !== "undefined" && ocrReviewInProgress) return true;
+    if (typeof wrongAnswerQueueBusy !== "undefined" && wrongAnswerQueueBusy) return true;
+    const focused = document.activeElement;
+    if (focused && focused.closest?.("#wrongEditModal:not(.hidden), #accountModal:not(.hidden)")) return true;
+    return false;
+}
+
+async function pullLatestCloudSnapshot() {
+    if (!cloudLivePollEnabled || cloudLivePollInFlight || accountState.syncing || !accountState.authenticated) return false;
+    const owner = accountState.username;
+    const generation = cloudLivePollGeneration;
+    let meta = readCloudSyncMeta();
+    if (meta.username !== owner) return false;
+
+    if (meta.dirty) {
+        // 本机有新增/删除操作时先上传并处理版本冲突，绝不被旧云端快照覆盖。
+        if (!cloudSyncTimer) await pushCloudSnapshot(false);
+        return false;
+    }
+    if (cloudUiEditInProgress()) return false;
+
+    cloudLivePollInFlight = true;
+    const beforeEdit = cloudLocalChangeVersion;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    cloudLivePollAbortController = controller;
+    // 断线时请求不能无限悬挂，防止定时拉取被永久堵塞。
+    const timeoutId = controller ? window.setTimeout(() => controller.abort(), 12000) : 0;
+    try {
+        const {data:head} = await accountFetch("/sync?revisionOnly=1", controller ? {signal:controller.signal} : {});
+        if (!cloudLivePollEnabled || generation !== cloudLivePollGeneration ||
+            !accountState.authenticated || accountState.username !== owner) return false;
+        meta = readCloudSyncMeta();
+        const localRevision = Math.max(Number(meta.revision || 0), Number(accountState.revision || 0));
+        const serverRevision = Number(head.revision || 0);
+        if (serverRevision <= localRevision) return false;
+        if (meta.dirty || cloudLocalChangeVersion !== beforeEdit || accountState.syncing || cloudUiEditInProgress()) return false;
+
+        const {data:full} = await accountFetch("/sync", controller ? {signal:controller.signal} : {});
+        if (!cloudLivePollEnabled || generation !== cloudLivePollGeneration ||
+            !accountState.authenticated || accountState.username !== owner) return false;
+        meta = readCloudSyncMeta();
+        if (meta.dirty || cloudLocalChangeVersion !== beforeEdit || accountState.syncing || cloudUiEditInProgress()) return false;
+        const receivedRevision = Number(full.revision || 0);
+        if (receivedRevision <= Math.max(Number(meta.revision || 0), Number(accountState.revision || 0))) return false;
+
+        // 当前选中的会话是本机导航状态，不应该被另一台设备的 currentId 抢走。
+        const incoming = full.data && typeof full.data === "object" ? {...full.data} : {};
+        if (incoming.sessions && Array.isArray(incoming.sessions.sessions)) {
+            const selectedHere = currentId;
+            const remoteSessions = incoming.sessions.sessions;
+            const deleted = normalizeDeletedSessionIds(incoming.sessions.deletedSessionIds);
+            if (selectedHere != null && !deleted[String(selectedHere)] &&
+                remoteSessions.some(item => String(item.id) === String(selectedHere))) {
+                incoming.sessions = {...incoming.sessions, currentId:selectedHere};
+            }
+        }
+        if (!applyCloudSnapshot(incoming)) return false;
+        accountState.revision = receivedRevision;
+        accountState.status = "已同步";
+        writeCloudSyncMeta({username:owner, revision:receivedRevision, dirty:false});
+        renderAccountUi();
+        return true;
+    } catch (error) {
+        console.warn("自动检查云端更新失败：", error);
+        // 网络短暂故障不弹窗，不覆盖本机；保持原同步状态等待重试。
+        return false;
+    } finally {
+        if (timeoutId) window.clearTimeout(timeoutId);
+        if (cloudLivePollAbortController === controller) cloudLivePollAbortController = null;
+        cloudLivePollInFlight = false;
+    }
+}
+
+function requestCloudLivePollNow() {
+    if (cloudLivePollEnabled && accountState.authenticated) {
+        scheduleCloudLivePoll(0);
+    }
+}
+
 // 自动同步采用按 ID 合并 + 云端修订号 CAS，不再弹出“覆盖本地/云端”选择框。
 // 会话若在不同设备上从同一位置分叉，则保留两条分支，避免任何一边聊天记录丢失。
 function cloudMessageKey(message) {
@@ -1848,6 +1974,8 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         console.warn("初始化云同步失败：", error);
         accountState.status = "离线，稍后自动同步";
         renderAccountUi();
+    } finally {
+        startCloudLivePolling();
     }
 }
 
@@ -2332,6 +2460,7 @@ async function logoutAccount() {
     volatileCloudBackup = null;
     clearLegacyPersistentBackup();
 
+    stopCloudLivePolling();
     accountState.authenticated = false;
     accountState.username = "";
     accountState.email = "";
@@ -2391,6 +2520,7 @@ async function deleteAccount() {
     try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
     volatileCloudBackup = null;
     clearLegacyPersistentBackup();
+    stopCloudLivePolling();
     accountState.authenticated = false;
     accountState.username = "";
     accountState.email = "";
@@ -2517,6 +2647,7 @@ async function initAccountSystem() {
     // 同一浏览器其他标签退出/注销后，当前标签也应立即清空私人学习数据。
     window.addEventListener("storage", event => {
         if (event.key !== ACCOUNT_LOGOUT_SIGNAL_KEY || !event.newValue) return;
+        stopCloudLivePolling();
         accountState.authenticated = false;
         accountState.username = "";
         if (cloudSyncTimer) {
@@ -2533,7 +2664,13 @@ async function initAccountSystem() {
         if (accountState.authenticated && meta.dirty) {
             pushCloudSnapshot(false);
         }
+        requestCloudLivePollNow();
     }, { passive:true });
+    window.addEventListener("focus", requestCloudLivePollNow, {passive:true});
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) requestCloudLivePollNow();
+        else if (cloudLivePollEnabled) scheduleCloudLivePoll(CLOUD_LIVE_POLL_HIDDEN_MS);
+    });
 
     renderAccountUi();
 
