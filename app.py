@@ -1614,6 +1614,24 @@ def sync_user_data():
 
     user_id = int(user["id"])
 
+    if request.method == "GET" and request.args.get("revisionOnly") == "1":
+        # 轻量轮询：只查询修订号，避免频繁读取/传输整份学习快照。
+        try:
+            with _auth_connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT revision FROM dm_user_data WHERE user_id = %s",
+                        (user_id,),
+                    )
+                    revision_row = cur.fetchone()
+            return jsonify({
+                "ok": True,
+                "revision": int(revision_row["revision"] or 0) if revision_row else 0,
+            })
+        except Exception as exc:
+            print(f"检查云端同步版本失败：{repr(exc)}")
+            return jsonify({"ok": False, "error": "检查云端版本失败。"}), 500
+
     if request.method == "GET":
         try:
             row = _sync_row_for_user(user_id)
