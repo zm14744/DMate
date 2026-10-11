@@ -109,8 +109,8 @@ def classify_ambiguous_questions(entries):
     if not _enabled():
         return {}
 
-    from ai import DEEPSEEK_API_KEY, LUXIN_API_KEY, _request_text_completion
-    if not (DEEPSEEK_API_KEY or LUXIN_API_KEY):
+    from ai import DEEPSEEK_API_KEY, _request_text_completion
+    if not DEEPSEEK_API_KEY:
         return {}
 
     chosen, response = [], {}
