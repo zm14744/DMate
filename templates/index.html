@@ -7225,6 +7225,52 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     to { opacity:1; transform:scale(1); }
 }
 
+
+/* 桌面只保留原生下拉框；手机和平板使用更易操作的自定义选择器。 */
+@media (min-width:1101px) {
+    #knowledgeGraphModal #knowledgeGraphCategoryTrigger { display:none !important; }
+}
+
+/* 图谱交互一致性：仅「全部知识」允许按模块筛选，手机/平板/桌面同步。 */
+#knowledgeGraphModal[data-graph-view="focus"] .graph-toolbar-left label[for="knowledgeGraphCategory"],
+#knowledgeGraphModal[data-graph-view="focus"] #knowledgeGraphCategory,
+#knowledgeGraphModal[data-graph-view="focus"] #knowledgeGraphCategoryTrigger {
+    display:none !important;
+}
+
+/* 将关系知识点独立呈现，名称里包含「、」时不会和条目分隔符混淆。 */
+#knowledgeGraphModal .graph-detail-term-list {
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+}
+#knowledgeGraphModal .graph-detail-term {
+    display:inline-block;
+    padding:3px 7px;
+    border:1px solid var(--border-strong);
+    border-radius:7px;
+    background:var(--surface-1);
+    color:var(--text-primary);
+    line-height:1.5;
+    overflow-wrap:anywhere;
+}
+
+/* 选中的节点用当前主题强调色突出边框，不能仅靠线条变粗来区分。 */
+#knowledgeGraphModal .kg-node-group.selected rect {
+    stroke:var(--accent) !important;
+    stroke-width:3.5px !important;
+    filter:drop-shadow(0 0 2px var(--accent));
+}
+#knowledgeGraphModal .kg-mobile-node.selected {
+    border-color:var(--accent) !important;
+    border-width:3px !important;
+    box-shadow:0 0 0 2px var(--accent-bg) !important;
+}
+#knowledgeGraphModal .kg-node-group:focus-visible rect,
+#knowledgeGraphModal .kg-mobile-node:focus-visible {
+    outline:2px solid var(--accent);
+    outline-offset:3px;
+}
 </style>
 
 <script>
@@ -7938,7 +7984,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-graph-menu-sync-atomic-20261011"></script>
+<script src="/static/script.js?v=dmate-graph-relations-view-20261011"></script>
 
 </body>
 </html>
