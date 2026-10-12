@@ -539,6 +539,7 @@ _REQUEST_EXACT_ALIASES = {
     "容斥园理": "容斥原理", "容拆原理": "容斥原理", "生成涵数": "生成函数",
     "递推关西": "递推关系", "递归关西": "递归关系", "特征防程": "特征方程",
     "布尔带数": "布尔代数", "代数结够": "代数结构",
+    "答安": "答案", "答按": "答案", "解习": "解析",
     "提目": "题目", "题慕": "题目", "练西": "练习", "练系": "练习",
     "南度": "难度", "男度": "难度", "不太南": "不太难", "不太男": "不太难",
     "不要太南": "不要太难", "不要太男": "不要太难", "非常南": "非常难", "特别南": "特别难",
@@ -621,6 +622,13 @@ def _fuzzy_replace_once(value, term):
             continue
         for start in range(0, len(value) - width + 1):
             piece = value[start:start + width]
+            # 已经识别成正确知识点的字符串不参加二次模糊替换。
+            # 如“哈密炖回路”先精确改为“哈密顿回路”，之后不能再被
+            # 泛化模糊匹配错改成“哈密顿图路”。
+            if any(known in value and start < value.find(known) + len(known)
+                   and start + width > value.find(known)
+                   for known in _REQUEST_FUZZY_TERMS if known != term):
+                continue
             # 数字、LaTeX、ASCII 变量不参加中文词纠错。
             if re.search(r"[0-9A-Za-z_\\{}$^]", piece):
                 continue
@@ -697,6 +705,11 @@ def _looks_like_exercise_request_text(text):
     if not value or len(value) > 180:
         return False
 
+    # Bare imperative “出题/生成题” is still an exercise request.
+    # Meta discussions and negations below continue to take precedence.
+    if re.fullmatch(r"(?:请|麻烦|给我|帮我)?(?:出题|生成题|出道题)(?:吧|呢)?", value):
+        return True
+
     # A learner may request a question using “给一道题” without “给我”.
     # Do not treat meta questions or existing-question explanations as generation.
     if re.match(r"^(?:只|仅)?(?:要|给|来|请给|请来)(?:我)?(?:一?道|一?个|一题)(?:简单|中等|困难|图论|数论|同构|离散数学)?(?:题|题目|练习)(?=$|[,，。;；]|并|和|与|附)", value):
@@ -706,7 +719,7 @@ def _looks_like_exercise_request_text(text):
     if re.search(
         r"(?:不想(?:让你)?|不要|别|不用|无需|禁止|先别|暂时别|以后别|别再|不要再)"
         r"(?:给我|帮我)?(?:再)?(?:出|生成|来|给|整|弄|安排|准备|考我|刷)"
-        r".{0,10}(?:题目|题|练习)?",
+        r".{0,10}(?:题目|题|练习)",
         value,
     ):
         return False
@@ -736,6 +749,9 @@ def _looks_like_exercise_request_text(text):
         value,
     ):
         return False
+
+    if re.match(r"^(?:请|麻烦|给我|帮我)?(?:出题|生成题|出道题)[,，;；].{0,90}$", value):
+        return True
 
     # “给我解释/检查/解答这道题”包含“给我 + 一道题”，但明显是在处理已有题目，
     # 不能被后面的宽泛生成规则误判为“再出一道”。
