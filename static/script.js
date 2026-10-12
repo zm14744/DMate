@@ -9245,57 +9245,33 @@ function escapeRawHtml(text) {
         .replace(/>/g, "&gt;");
 }
 
+// 用 Markdown 不会拆分的专用私有字符保存公式，只在解析本次消息期间使用。
+// 旧的 MATHPROTECTTOKEN 文本占位符容易泄漏到页面或被再次解析成公式。
 function protectMathForMarkdown(source) {
     const mathSegments = [];
-
+    const prefix = "\uE000DMATE_MATH_";
+    const suffix = "_END\uE001";
     const stash = match => {
-        const index = mathSegments.length;
-        mathSegments.push(match);
-        return `MATHPROTECTTOKEN${index}ENDTOKEN`;
+        const key = prefix + mathSegments.length + suffix;
+        mathSegments.push([key, match]);
+        return key;
     };
 
+    // 仅保护有效成对的定界符；换行公式优先于单行公式。
+    // 保留原始字符供 MathJax 使用，不把 LaTeX 提前转成 HTML。
     let protectedText = String(source ?? "");
-
-    // 在 marked 解析 Markdown 之前先藏起公式。
-    // 否则 _、*、\begin{cases} 等可能被 Markdown 当成强调语法。
-    protectedText = protectedText.replace(
-        /\$\$[\s\S]*?\$\$/g,
-        stash
-    );
-
-    protectedText = protectedText.replace(
-        /\\\[[\s\S]*?\\\]/g,
-        stash
-    );
-
-    protectedText = protectedText.replace(
-        /\\\([\s\S]*?\\\)/g,
-        stash
-    );
-
-    protectedText = protectedText.replace(
-        /\$(?!\$)(?:\\.|[^$\n])+\$/g,
-        stash
-    );
-
-    return {
-        protectedText,
-        mathSegments
-    };
+    protectedText = protectedText.replace(/\$\$[\s\S]*?\$\$/g, stash);
+    protectedText = protectedText.replace(/\\\[[\s\S]*?\\\]/g, stash);
+    protectedText = protectedText.replace(/\\\([\s\S]*?\\\)/g, stash);
+    protectedText = protectedText.replace(/(?<!\\)\$(?!\$)(?:\\.|[^$\n])+\$/g, stash);
+    return { protectedText, mathSegments };
 }
 
 function restoreMathAfterMarkdown(html, mathSegments) {
     let restored = String(html ?? "");
-
-    for (let index = 0; index < mathSegments.length; index += 1) {
-        const token = `MATHPROTECTTOKEN${index}ENDTOKEN`;
-        const safeMath = escapeRawHtml(mathSegments[index]);
-
-        restored = restored
-            .split(token)
-            .join(safeMath);
+    for (const [token, math] of mathSegments) {
+        restored = restored.split(token).join(escapeRawHtml(math));
     }
-
     return restored;
 }
 
@@ -9350,7 +9326,12 @@ function repairBareLatexTextSegment(segment) {
 }
 
 function prepareAiDisplayText(text) {
-    let value = String(text ?? "");
+    // 老会话中已损坏的占位符没有保留对应公式，无法凭空恢复原式。
+    // 显示明确提示而不是把内部字串当成数学式再次渲染。
+    let value = String(text ?? "").replace(
+        /MATHPROTECTTOKEN\d+ENDTOKEN/g,
+        "【原公式缺失，请重新生成该题】"
+    );
 
     if (!value) return "";
 
@@ -9372,12 +9353,17 @@ function prepareAiDisplayText(text) {
     );
 
     // 只修复数学定界符外的文本，避免破坏已经正确的 MathJax。
-    const parts = value.split(/(\$\$[\s\S]*?\$\$|\$[^$\n]*\$|```[\s\S]*?```|`[^`\n]*`)/g);
+    // $...$ 之外，\\(...\\) 和 \\ [...\\] 也属于完整的数学区域。
+    // 旧版漏掉这两种定界符，导致内部 \\geq 被改写成 $\\geq$，
+    // 原本正确的公式因此出现多余美元符号并渲染损坏。
+    const parts = value.split(/(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]*\$|```[\s\S]*?```|`[^`\n]*`)/g);
 
     return parts.map(part => {
         if (
             /^\$\$/.test(part)
             || /^\$/.test(part)
+            || /^\\\[/.test(part)
+            || /^\\\(/.test(part)
             || /^```/.test(part)
             || /^`/.test(part)
         ) {
@@ -9403,10 +9389,17 @@ function markdownToHtml(text) {
         ? window.DOMPurify.sanitize(rawHtml)
         : marked.parse(escapeRawHtml(protectedText));
 
-    return restoreMathAfterMarkdown(
-        safeHtml,
-        mathSegments
-    );
+    const result = restoreMathAfterMarkdown(safeHtml, mathSegments);
+    // 不能把内部占位符漏到用户界面。极少数解析器异常时，
+    // 宁可原样显示完整源码，也不能显示残缺公式或错误连接结果。
+    if (result.includes("\uE000DMATE_MATH_")
+        || /MATHPROTECTTOKEN\d+ENDTOKEN/.test(result)) {
+        console.warn("数学公式 Markdown 保护/还原异常，使用可读回退显示");
+        return '<div class="math-render-fallback" style="white-space:pre-wrap">'
+            + escapeRawHtml(source).replace(/MATHPROTECTTOKEN\d+ENDTOKEN/g,
+                "【原公式缺失，请重新生成该题】") + '</div>';
+    }
+    return result;
 }
 
 function renderMath(target) {
