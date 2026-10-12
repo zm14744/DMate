@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-input-state-light-contrast-20261012";
+const CACHE_NAME = "dmate-webapp-composite-graph-recheck-20261012";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
