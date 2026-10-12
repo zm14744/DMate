@@ -3178,14 +3178,14 @@ function refreshInputAvailability() {
         const canStop = (waitingReply || typingNow) && !ocrReviewInProgress;
         sendBtn.disabled = Boolean(ocrReviewInProgress);
         sendBtn.hidden = Boolean(ocrReviewInProgress);
-        sendBtn.textContent = canStop ? "" : "发送";
+        sendBtn.textContent = canStop ? "停止" : "发送";
         sendBtn.classList.toggle("ai-stop-button", canStop);
         sendBtn.setAttribute("aria-label", canStop ? "停止当前 AI 回复" : "发送消息");
         sendBtn.title = canStop ? "停止当前 AI 回复" : "发送";
     }
     if (imageBtn) {
         imageBtn.disabled = hardBlocked || ocrReviewInProgress;
-        imageBtn.hidden = Boolean(ocrReviewInProgress || hardBlocked);
+        imageBtn.hidden = Boolean(ocrReviewInProgress || waitingReply || typingNow);
     }
 
     if (inputWrap) {
