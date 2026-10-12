@@ -7703,6 +7703,37 @@ body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
     }
 }
 
+
+/* Unify busy-state controls across themes and mobile/desktop. Hidden always wins. */
+#sendBtn[hidden], #imageBtn[hidden], #ocrCancelBtn[hidden] { display:none !important; }
+body[data-appearance-theme] #sendBtn.ai-stop-button,
+body[data-appearance-theme] .input #sendBtn.ai-stop-button {
+    flex:0 0 42px !important;
+    width:42px !important; min-width:42px !important;
+    max-width:42px !important; height:42px !important;
+    min-height:42px !important;
+    padding:0 !important; margin:0 !important;
+    border-radius:50% !important;
+    background:#e53935 !important;
+    color:#fff !important;
+    font-size:0 !important;
+    position:relative;
+}
+body[data-appearance-theme] #sendBtn.ai-stop-button::after {
+    content:""; position:absolute; width:13px; height:13px;
+    background:#fff; border-radius:2px; left:50%; top:50%; transform:translate(-50%,-50%);
+}
+body[data-appearance-theme] #ocrCancelBtn:not([hidden]) {
+    flex:0 0 42px !important; width:42px !important;
+    min-width:42px !important; max-width:42px !important;
+    height:42px !important; min-height:42px !important;
+    margin:0 !important; border-radius:50% !important;
+    background:#e53935 !important;
+}
+.input-wrap[data-busy-mode="ocr"] #sendBtn,
+.input-wrap[data-busy-mode="thinking"] #imageBtn,
+.input-wrap[data-busy-mode="answering"] #imageBtn { display:none !important; }
+
 </style>
 
 <script>
@@ -8416,7 +8447,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-ocr-graph-contrast-routing-20261011"></script>
+<script src="/static/script.js?v=dmate-opencv-graph-composite-stop-20261012"></script>
 
 </body>
 </html>
