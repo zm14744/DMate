@@ -34,15 +34,15 @@ def _round_vertices(rgb):
             if circ >= .53:
                 found.append((float(centers[i][0]),float(centers[i][1]),float((ww+hh)/4),'red'))
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    circles = cv2.HoughCircles(cv2.medianBlur(gray,5), cv2.HOUGH_GRADIENT, 1.1, 16,
-                               param1=105, param2=12, minRadius=4, maxRadius=14)
+    circles = cv2.HoughCircles(cv2.medianBlur(gray,5), cv2.HOUGH_GRADIENT, 1.1, 18,
+                               param1=105, param2=18, minRadius=4, maxRadius=24)
     if circles is not None:
         for xx, yy, rr in circles[0]:
             x,y,r=int(round(xx)),int(round(yy)),int(round(rr))
             if x<r+2 or y<r+2 or x>=w-r-2 or y>=h-r-2:
                 continue
             # Reject white text interiors before attempting center correction.
-            if float(np.median(gray[y-2:y+3,x-2:x+3])) > 240:
+            if float(np.median(gray[y-2:y+3,x-2:x+3])) > 241:
                 continue
             # Hough centers can be offset by 2-4 pixels at crossings. Refine
             # against the distinctive soft-gray *interior*, not dark junctions.
@@ -55,8 +55,18 @@ def _round_vertices(rgb):
                     if not (184 <= median <= 222):continue
                     cost=abs(median-203)+.4*math.hypot(dx,dy)
                     if best is None or cost<best[0]:best=(cost,px,py)
-            if best and np.std(gray[y-r:y+r+1,x-r:x+r+1]) > 20:
-                found.append((float(best[1]),float(best[2]),float(rr),'gray'))
+            # Neutral gray markers in screenshots have bright centers (~229)
+            # and a darker rim. Shifting their centers towards a darker
+            # interior pixel is exactly what breaks diagonal endpoint tests.
+            center_median = float(np.median(gray[y-3:y+4, x-3:x+4]))
+            if 216 <= center_median <= 239:
+                candidate = (x, y)
+            elif best:
+                candidate = (best[1], best[2])
+            else:
+                continue
+            if np.std(gray[max(0,y-r):min(h,y+r+1),max(0,x-r):min(w,x+r+1)]) > 20:
+                found.append((float(candidate[0]),float(candidate[1]),float(rr),'gray'))
     # Deduplicate Hough detections and overlapping red/gray segmentation.
     found.sort(key=lambda p: (p[3]!='red',-p[2]))
     unique=[]
@@ -94,10 +104,41 @@ def _find_graph_boxes(vertices, gray):
     bands=[row for row in bands if len(row)>=(4 if vertices is grays else 1)]
     groups=[];current=[]
     for band in bands:
-        if current and band[0][1]-current[-1][1]>(140 if vertices is reds else 110):
+        if current and band[0][1]-current[-1][1]>(140 if vertices is reds else 215):
             groups.append(current);current=[]
         current.extend(band)
     if current:groups.append(current)
+    # Gray textbook dots often occupy two aligned rows much farther apart
+    # than headline glyphs. Pair the rows by x-coordinates, rather than
+    # chaining every apparent circle between the title and the diagrams.
+    if vertices is grays and len(grays) >= 8:
+        primary = [v for v in grays if v[2] >= 10]
+        paired_bands = []
+        for v in sorted(primary, key=lambda q: q[1]):
+            if not paired_bands or v[1] - paired_bands[-1][-1][1] > 19:
+                paired_bands.append([v])
+            else:
+                paired_bands[-1].append(v)
+        matches = []
+        for i, top in enumerate(paired_bands):
+            if len(top) < 3: continue
+            for bottom in paired_bands[i+1:]:
+                if len(bottom) < 3: continue
+                dy = float(np.median([v[1] for v in bottom]) - np.median([v[1] for v in top]))
+                if not 33 <= dy <= 245: continue
+                aligned = sum(any(abs(a[0]-b[0]) < 16 for b in bottom) for a in top)
+                if aligned >= 3 and aligned >= min(len(top), len(bottom)) * .65:
+                    matches.append((aligned, len(top)+len(bottom), top+bottom))
+        if matches:
+            # Most closely aligned rows are strong evidence of a graph strip.
+            # Retain non-overlapping pairs only for multi-slide screenshots.
+            matches.sort(reverse=True, key=lambda item:(item[0], item[1]))
+            selected=[]; seen=set()
+            for _, _, pair in matches:
+                keys={id(v) for v in pair}
+                if seen & keys:continue
+                selected.append(pair); seen.update(keys)
+            groups=selected
     output=[]
     for row in groups:
         if len(row)<4 or max(v[1] for v in row)-min(v[1] for v in row)<30:continue
@@ -158,8 +199,11 @@ def _edge_evidence(gray, a, b, all_nodes):
     ts=np.linspace(start,end,num)
     H,W=gray.shape
     best=(0.0,0.0)
-    for shift_a in (-2.,0.,2.):
-        for shift_b in (-2.,0.,2.):
+    # Slide diagrams often attach a line to the *edge* of a shaded dot,
+    # several pixels away from its detected geometric center.
+    shifts = (-10., -7., -4., -1., 2., 5., 8., 11.) if max(r1,r2) >= 12 else (-4.,-2.,0.,2.,4.)
+    for shift_a in shifts:
+        for shift_b in shifts:
             drift=shift_a+(shift_b-shift_a)*(ts/length)
             xx=x1+vx*ts-vy*drift
             yy=y1+vy*ts+vx*drift
@@ -257,13 +301,27 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
             for j in range(i+1,len(points)):
                 score,status=_edge_evidence(gray,points[i],points[j],points)
                 if status=='solid' or (status not in ('intermediate_vertex','too_close')
-                                       and score>=.35 and _hough_verified_edge(points[i],points[j],segments)):
+                                       and score>=.65 and _hough_verified_edge(points[i],points[j],segments)):
                     edges.append([i,j])
                 elif status=='uncertain' or (status=='partial' and score>=.66):
                     unsure.append({'vertices':[i,j], 'coverage':round(score,2)})
+        # Suppress OCR glyph constellations masquerading as an extra graph.
+        # Real sparse/disconnected drawings without enough pixel evidence
+        # fall back to Vision instead of inventing a third diagram.
+        if len(edges) < len(points)-1 and not unsure:
+            continue
         # If a circle-rich graph has too few verified edges, downgrade rather
         # than claim that it is a disconnected or empty graph.
-        confidence='high' if len(edges)>=max(2,len(points)-2) and not unsure else 'partial'
+        # A connected-looking subset of edges never proves the rest of the
+        # image has been recognized. Record absent-edge evidence separately;
+        # without strong evidence for EVERY pair, the graph remains partial.
+        # A high confidence assertion needs consistent circle geometry,
+        # no uncertain candidate, and all pairwise decisions supported.
+        reliable_nodes = len(points) >= 3 and len(points) <= 9 and all(
+            4 <= p[2] <= 22 for p in points
+        )
+        confidence = 'high' if (reliable_nodes and not unsure and len(edges) >= len(points)-1
+                               and len(edges) <= len(points)*(len(points)-1)//2) else 'partial'
         vertex_list=[{'id':f'v{i+1}','x':round(p[0]/rgb.shape[1],4),
                       'y':round(p[1]/rgb.shape[0],4), 'label':None} for i,p in enumerate(points)]
         matrix=[[0]*len(points) for _ in points]
