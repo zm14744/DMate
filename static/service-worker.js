@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-light-card-buttons-20261012e";
+const CACHE_NAME = "dmate-store-pwa-20261012";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
