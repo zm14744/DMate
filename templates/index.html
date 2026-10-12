@@ -5778,6 +5778,16 @@ body[data-appearance-theme="light"] .input input {
     background:rgba(127,29,29,.18);
     color:#fca5a5;
 }
+/* 浅色主题中危险操作也要有足够文字对比度；保持深色外观不变。 */
+body[data-appearance-theme="light"] #accountDeleteOpen.account-delete {
+    background:#fff1f2;
+    border-color:#ef4444;
+    color:#991b1b;
+    -webkit-text-fill-color:#991b1b;
+}
+body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
+    background:#ffe4e6;
+}
 
 /* 账号界面自己的显隐必须明确生效：
    - 注册/登录成功后隐藏登录表单、立即显示已登录视图；
@@ -8532,7 +8542,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-input-state-light-contrast-20261012"></script>
+<script src="/static/script.js?v=dmate-graph-composite-readable-20261012"></script>
 
 </body>
 </html>
