@@ -2471,82 +2471,130 @@ def _requested_reasoning_effort(text):
 
 
 def _parse_requested_outputs(instruction):
-    """Interpret the *current* instruction, not exercise history.
+    """Read independent output requests and their local negation/future scopes.
 
-    Returns whether an answer / worked solution should be disclosed NOW.
-    Negation scopes separately to answers and explanations. An explicit future
-    review promise is not a request to reveal the solution in this round.
+    Only the current *instruction* is inspected, never the old problem statement.
+    A prohibition on explaining must not suppress a separately requested answer,
+    and a promise to review later must not trigger immediate answer disclosure.
     """
-    text = re.sub(r"\s+", "", str(instruction or ""))
+    text = re.sub(r"\s+", "", normalize_user_request_text(instruction))
+    empty = {"answer": False, "explanation": False, "knowledge": False, "hints": False}
     if not text:
-        return {"answer": False, "explanation": False}
-    # Questions about the feature itself do not request a new answer.
-    if re.search(r"(?:出题|生成题).{0,12}(?:功能|代码|错误|bug|逻辑|机制|为什么|怎么不行)", text, flags=re.I) or re.search(r"(?:讲讲|讨论|解释).{0,30}(?:出题|生成题|出.{0,8}题).{0,20}(?:功能|为什么不行|问题|错误|bug)", text):
-        return {"answer": False, "explanation": False}
+        return empty
+    if re.search(
+        r"(?:出题|生成题).{0,12}(?:功能|代码|错误|bug|逻辑|机制|为什么|怎么不行)"
+        r"|(?:讲讲|讨论|解释).{0,30}(?:出题|生成题|出.{0,8}题).{0,20}"
+        r"(?:功能|为什么不行|问题|错误|bug)", text, re.I
+    ):
+        return empty
 
-    # When the learner will respond first, do not turn the future teacher
-    # action into an immediate answer disclosure.
-    future_only = bool(re.search(
-        r"(?:等我|待我|我(?:先|来|自己)?(?:做|答|解|完成)|做完后|答完后|之后|下次|稍后|晚点)"
-        r".{0,15}(?:再|才|后)(?:给|说|公布|批改|检查|评价|解释|讲|出)?.{0,12}"
-        r"(?:答案|解析|解答|结果|批改|检查|评价)|"
-        r"(?:先出题|先给题|先给我题|出题|出一道题).{0,18}(?:之后|再|然后|并)(?:批改|检查|点评)(?:我|我的)?(?:答案|回答)|"
-        r"(?:批改|检查|点评)(?:我接下来|我之后|我稍后|我的|我)?(?:的)?(?:回答|答案)",
-        text
-    ))
-    answer_negative = bool(re.search(
-        r"(?:不要|别|不用|无需|不需要|不必|禁止|暂不|先不|不给|别给|别出|不公布)"
-        r".{0,7}(?:参考答案|最终答案|正确答案|答案|回答|解答|结果|结论)|"
-        r"(?:只|仅)(?:给|要|需|出|生成)?(?:一道|一题|一个)?(?:题目|题干|练习|提示)(?:就行|即可|好了)?",
-        text
-    ))
-    explanation_negative = bool(re.search(
-        r"(?:不要|别|不用|无需|不需要|不必|禁止|暂不|先不|不给)"
-        r".{0,6}(?:解析|分析过程|解题过程|讲解|推导|证明过程|详细步骤|步骤|过程|思路|解释)|"
-        r"(?:只|仅)(?:要|给|需)?(?:最后|最终|参考)?答案",
-        text
-    ))
-    # These words refer to output *content*, not the nature of a problem.
-    # Avoid treating “出一道证明题” / “答案稍后给” as a current solution request.
-    explain_positive = bool(re.search(
-        r"(?:给出|给我|附上|附带|提供|输出|写出|展示|告诉我|同时|并|然后|再|顺便|一起)"
-        r".{0,15}(?:详细解析|完整解析|解题过程|解题步骤|解法|推导过程|证明过程|"
-        r"完整证明|详细步骤|步骤|过程|解析|讲解|推导|怎么做|为什么答案)|"
-        r"(?:并|然后|同时|顺便|再)(?:解释|讲解|解答|解出来|求解|自己做|做出来|证明|分析答案)"
-        r"|(?:答案|解答|结果).{0,5}(?:和|与|及)(?:完整|详细)?解析.{0,5}(?:都)?(?:给出|给我|附上|提供)|"
-        r"(?:并|然后|再|同时)(?:进行)?(?:判定|判断)(?:这道题|答案|结果)?|"
-        r"(?:连同|包含|包括)(?:答案和)?解析",
-        text
-    ))
-    answer_positive = bool(re.search(
-        r"(?:给出|给我|附上|附带|提供|输出|写出|展示|告诉我|同时|并|然后|再|顺便|一起)"
-        r".{0,15}(?:最终答案|参考答案|正确答案|完整答案|答案|回答|解答|结果|结论|解法)|"
-        r"(?:题目|出题|练习|题).{0,12}(?:和|与|及|以及|并|同时|然后)"
-        r".{0,12}(?:答案|回答|解析|解答|求解|证明|推导|解法|结果)|"
-        r"(?:同时|然后|并|再)(?:回答|解答|求解|证明|解出来|做出来)|"
-        r"(?:题目|出题).{0,6}(?:附|含|带)(?:参考|正确)?答案|"
-        r"(?:给|要|附|提供)(?:参考|最终|正确)?答案",
-        text
-    ))
-    knowledge = bool(re.search(
-        r"(?:并|同时|顺便|再|附|给出|列出|告诉我|分析|说明).{0,14}"
-        r"(?:涉及的?知识点|相关知识点|考点|知识点分析|知识点|对应模块)|"
-        r"(?:题目|出题).{0,8}(?:涉及|考查|对应)(?:什么|哪些)?(?:知识点|考点)",
-        text
-    ))
-    hints = bool(re.search(
-        r"(?:并|同时|顺便|再|附|给出|附上|提供|告诉我|只给|仅给)"
-        r".{0,12}(?:解题提示|关键提示|提示|初步思路|思考方向|思路)|"
-        r"(?:先|只)(?:给|说)(?:我)?(?:一?点|一些)?提示|"
-        r"(?:讲解|说明|告诉我).{0,8}(?:解题思路|思考方向|提示)",
-        text
-    )) and not bool(re.search(r"(?:不要|别|无需|不需要).{0,4}(?:提示|思路)",text))
-    if future_only:
-        return {"answer": False, "explanation": False, "knowledge": knowledge, "hints": hints}
-    explanation = bool(explain_positive and not explanation_negative and not answer_negative)
-    answer = bool((answer_positive or explanation) and not answer_negative)
-    return {"answer": answer, "explanation": explanation,
-            "knowledge": knowledge, "hints": hints and not explanation}
+    # Clause-level parsing matters: “答案现在给，解析等我做完再说” has
+    # two different temporal scopes. A blanket future/negative flag is wrong.
+    parts = [p for p in re.split(r"[，,。；;！!？?]|(?=但是|(?<!不)但(?=给|不|要|是))", text) if p]
+    result = dict(empty)
+    answer_term = r"(?:最终答案|参考答案|正确答案|完整答案|答案|回答|解答|结果|结论)"
+    solution_term = r"(?:详细解析|完整解析|解题过程|解题步骤|解法|推导过程|证明过程|完整证明|详细步骤|步骤|过程|解析|讲解|推导|求解过程)"
+    answer_negative = rf"(?:不要|别|不用|无需|不需要|不必|禁止|暂不|先不|不给|不公布|别给).{{0,7}}{answer_term}"
+    explanation_negative = rf"(?:不要|别|不用|无需|不需要|不必|禁止|暂不|先不|不给).{{0,7}}{solution_term}"
+    answer_positive = (
+        rf"(?:给出|给我|给|附上|附带|提供|输出|写出|展示|告诉我|告诉|公布|附|要|同时|并|然后|再|顺便|一起)"
+        rf".{{0,13}}{answer_term}|{answer_term}.{{0,6}}(?:现在给|立即给|一起给|直接给|也给|先给|给出|附上|发给我|都给)|"
+        rf"(?:题目|出题|练习|题).{{0,14}}(?:和|与|及|以及|并|同时|然后|附|带).{{0,12}}{answer_term}"
+    )
+    solution_positive = (
+        rf"(?:给出|给我|给|附上|附带|提供|输出|写出|展示|告诉我|告诉|同时|并|然后|再|顺便|一起|带上)"
+        rf".{{0,13}}{solution_term}|"
+        rf"(?:并|然后|同时|顺便|再)(?:完整)?(?:解释|讲解|解答|解出来|求解|做出来|证明|分析答案)|"
+        rf"(?:题目|出题|练习|题|答案|结果).{{0,12}}(?:和|与|及|以及|并|同时|附|带).{{0,10}}{solution_term}|"
+        rf"{solution_term}.{{0,5}}(?:也|一起|都)?(?:给出|给我|附上|提供|写出|要)"
+    )
+    future_prefix = r"(?:等我|待我|我(?:先|自己|来)?(?:做|答|解|完成)|答完|写完|做完|完成后|下次|以后|稍后|晚点)"
+
+    def deferred(clause, word_pattern):
+        return bool(
+            re.search(rf"{future_prefix}.{{0,18}}(?:再|才|后|然后).{{0,10}}{word_pattern}", clause)
+            or re.search(rf"{word_pattern}.{{0,10}}{future_prefix}.{{0,16}}(?:再|才|说|讲|给|公布|批改|检查|评价)", clause)
+            or re.search(rf"{word_pattern}.{{0,10}}(?:稍后|晚点|以后|下次)(?:再)?(?:给|说|讲|公布)", clause)
+        )
+
+    answer_is_forbidden = False
+    for part in parts:
+        # Only answer-related phrases trigger answer detection; do not infer
+        # an answer just because the student requested a "证明题".
+        neg_answer = bool(re.search(answer_negative, part)) or bool(re.search(
+            rf"{answer_term}.{{0,10}}(?:都不要|均不要|不用|不需要)", part
+        ))
+        neg_explain = bool(re.search(explanation_negative, part)) or bool(re.search(
+            rf"{solution_term}.{{0,10}}(?:都不要|均不要|不用|不需要)", part
+        ))
+        both_negative = bool(re.search(
+            r"(?:答案|回答|解析|步骤|过程).{0,10}(?:和|与|及).{0,10}"
+            r"(?:答案|回答|解析|步骤|过程).{0,5}(?:都不要|均不要)", part
+        ))
+        if both_negative:
+            neg_answer = neg_explain = True
+        only_problem = bool(re.search(
+            r"(?:只|仅)(?:给|要|需|出|生成)?(?:一道|一题|一个)?(?:题目|题干|练习)(?:就行|即可|好了)?$", part
+        ))
+        only_hint = bool(re.search(r"(?:只|仅)(?:给|要|需)(?:我)?(?:一些|一?点)?(?:提示|思路)", part))
+        only_answer = bool(re.search(r"(?:只|仅)(?:给|要|需)?(?:最后|最终|参考)?答案", part))
+
+        answer_now = bool(re.search(answer_positive, part))
+        explain_now = bool(re.search(solution_positive, part))
+        answer_later = deferred(part, answer_term) or bool(re.search(
+            r"(?:先出题|先给题|先给我题|出题|出一道题).{0,18}(?:之后|再|然后|并)"
+            r"(?:批改|检查|点评)(?:我|我的)?(?:答案|回答)", part
+        ))
+        explain_later = deferred(part, solution_term)
+        # “先出题，等我回答再批改” is a follow-up promise, not an answer.
+        review_later = bool(re.search(
+            r"(?:等我|待我|我先|我自己|我来|做完|答完|写完|之后|下次|稍后|晚点)"
+            r".{0,20}(?:再|才)(?:帮我|给我|替我)?(?:批改|检查|点评|评价)", part
+        ))
+
+        if neg_answer or only_problem or only_hint:
+            result["answer"] = False
+            if neg_answer:
+                answer_is_forbidden = True
+        elif answer_now and not answer_later and not review_later:
+            result["answer"] = True
+            answer_is_forbidden = False
+        if neg_explain or only_problem or only_hint or only_answer:
+            result["explanation"] = False
+        elif explain_now and not explain_later and not review_later:
+            result["explanation"] = True
+            # Complete solution implies disclosure of the answer unless a
+            # separate, explicit no-answer instruction forbids it.
+            if not neg_answer and not only_hint and not answer_is_forbidden:
+                result["answer"] = True
+
+        knowledge_positive = bool(re.search(
+            r"(?:并|同时|顺便|再|附|给出|列出|告诉我|分析|说明|带上|包含|提供)"
+            r".{0,14}(?:涉及的?知识点|相关知识点|考点|知识点分析|知识点|对应模块)|"
+            r"(?:题目|出题).{0,8}(?:涉及|考查|对应)(?:什么|哪些)?(?:知识点|考点)", part
+        ))
+        hint_positive = bool(re.search(
+            r"(?:并|同时|顺便|再|附|给出|附上|提供|告诉我|只给|仅给|带上|给我|给|来)"
+            r".{0,12}(?:解题提示|关键提示|提示|初步思路|思考方向|思路)|"
+            r"(?:先|只|仅)(?:给|说)(?:我)?(?:一?点|一些)?提示", part
+        ))
+        if re.search(r"(?:不要|别|无需|不需要|不用).{0,5}(?:知识点|考点)",part):
+            result["knowledge"] = False
+        elif knowledge_positive:
+            result["knowledge"] = True
+        if re.search(r"(?:不要|别|无需|不需要|不用).{0,5}(?:提示|思路)",part):
+            result["hints"] = False
+        elif hint_positive:
+            result["hints"] = True
+
+    # Do not disclose a final answer if the student explicitly prohibited it.
+    # “不要答案但给过程” becomes process guidance, not a solved exercise.
+    if answer_is_forbidden and result["explanation"]:
+        result["explanation"] = False
+        result["hints"] = True
+    if result["explanation"]:
+        result["hints"] = False
+    return result
 
 
 @app.route("/chat", methods=["POST"])
@@ -3117,8 +3165,11 @@ def chat():
                     except Exception as explain_exc:
                         print("综合出题解析降级：", type(explain_exc).__name__)
                         explained = {}
-                    if isinstance(explained, dict) and explained.get("ok") and str(explained.get("reply") or "").strip():
-                        answer_section += "\n\n【解析】\n\n" + str(explained["reply"]).strip()
+                    explanation_text = str(explained.get("reply") or "").strip() if isinstance(explained, dict) else ""
+                    explanation_text = _EXERCISE_ANSWER_PATTERN.sub("", explanation_text).strip()
+                    if (isinstance(explained, dict) and explained.get("ok") and explanation_text
+                            and not re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", explanation_text, re.I)):
+                        answer_section += "\n\n【解析】\n\n" + explanation_text
                     else:
                         answer_section += "\n\n解析暂时未能生成，已先保留出题时的参考答案。"
                 reply += "\n\n" + answer_section
@@ -3158,6 +3209,12 @@ def chat():
                     r"【(?:答案|最终答案|解析)】|\[\[WRONGBOOK_ANSWER|(?:最终|参考|正确)?答案\s*[:：为是]",
                     hint_text, flags=re.IGNORECASE
                 ))
+                # The model may disclose the exact stored solution without a
+                # heading. Reject a hint that reproduces that answer verbatim.
+                normalized_answer = re.sub(r"\s+", "", generated_answer)
+                normalized_hint = re.sub(r"\s+", "", hint_text)
+                if len(normalized_answer) >= 8 and normalized_answer in normalized_hint:
+                    appears_to_disclose_answer = True
                 if isinstance(hint_result, dict) and hint_result.get("ok") and hint_text and not appears_to_disclose_answer:
                     reply += "\n\n【提示】\n\n" + hint_text
                 else:
@@ -3496,7 +3553,7 @@ def ocr():
                 unknown = graph.get("uncertain_edges") or []
                 full = graph.get("confidence") == "high" and not unknown
                 all_complete = all_complete and full
-                lines = [f'G{index}：{len(vertices)} 个顶点，已核验 {len(edges)} 条直线边。']
+                lines = [f'G{index}：{len(vertices)} 个顶点，检测到 {len(edges)} 条直线边。']
                 if edges:
                     lines.append('边：' + '、'.join(
                         f'{edge[0]}—{edge[1]}' for edge in edges
@@ -3504,6 +3561,10 @@ def ocr():
                     ) + '。')
                 if unknown or not full:
                     lines.append('部分连接尚未确认，请结合原图核对，不能将未列出的边视为不存在。')
+                    if graph_cv.get('elapsed_ms') is not None and (
+                            graph.get('confidence') == 'partial'
+                            and not unknown and len(edges) < len(vertices)):
+                        lines.append('若图片较小或模糊，建议截取图形区域重新上传。')
                 readable.append('\n'.join(lines))
             summary = '\n\n'.join(readable)
             # 只在图形证据不完整时附加 Vision 的结构补充，避免两份
