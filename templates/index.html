@@ -7866,6 +7866,33 @@ body[data-appearance-theme="dark"].has-custom-background .user {
     color:#f8fafc !important;
 }
 
+
+
+/* 2026-10-12 修复：统一外观弹窗与账号弹窗的整块背景色 */
+body[data-appearance-theme] #appearanceModal .modal-head,
+body[data-appearance-theme] #appearanceModal .appearance-body,
+body[data-appearance-theme] #appearanceModal .appearance-apply-hint,
+body[data-appearance-theme] #appearanceModal .appearance-footer {
+    background:var(--dm-frost-panel-strong) !important;
+    background-image:none !important;
+}
+body[data-appearance-theme] #appearanceModal .appearance-apply-hint,
+body[data-appearance-theme] #appearanceModal .appearance-footer {
+    border-top:0 !important;
+}
+body[data-appearance-theme] #appearanceModal .appearance-apply-hint {
+    box-shadow:none !important;
+}
+body[data-appearance-theme] #accountModal .account-card,
+body[data-appearance-theme] #accountModal .modal-head,
+body[data-appearance-theme] #accountModal .account-body {
+    background:var(--dm-frost-panel-strong) !important;
+    background-image:none !important;
+}
+body[data-appearance-theme] #accountModal .modal-head {
+    border-bottom:1px solid var(--dm-frost-border) !important;
+}
+
 </style>
 
 <script>
@@ -8579,7 +8606,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-functions-audit-20261012"></script>
+<script src="/static/script.js?v=dmate-color-unify-20261012c"></script>
 
 </body>
 </html>
