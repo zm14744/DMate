@@ -1319,7 +1319,7 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
     # OCR may only find a tiny “(b)” caption and supply review regions around
     # the caption while missing the actual graph above it. Preserve structural
     # left/right crops for wide graph illustrations even when OCR found text.
-    if crops and width >= height * 1.28:
+    if crops and not graph_regions and width >= height * 1.28:
         crops.extend([
             original.crop((0, 0, math.ceil(width * 0.57), height)),
             original.crop((math.floor(width * 0.43), 0, width, height)),
@@ -1339,6 +1339,10 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
                 original.crop((0, 0, width, math.ceil(height * 0.6))),
                 original.crop((0, math.floor(height * 0.4), width, height)),
             ]
+    # A single full image plus at most four targeted crops bounds the number
+    # of paid Vision image inputs. Prefer complete graph regions over generic
+    # left/right halves and avoid sending duplicate overlapping crops.
+    crops = crops[:4]
     return [encode(original, 2200)] + [encode(crop, 1600, True) for crop in crops]
 
 
