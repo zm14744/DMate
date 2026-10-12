@@ -7893,6 +7893,27 @@ body[data-appearance-theme] #accountModal .modal-head {
     border-bottom:1px solid var(--dm-frost-border) !important;
 }
 
+
+
+/* 2026-10-12 修复：学习回顾/错题本弹窗背景统一 */
+body[data-appearance-theme] #learningReviewModal .learning-review-body,
+body[data-appearance-theme] #wrongBookModal .wrong-toolbar,
+body[data-appearance-theme] #wrongBookModal .wrong-tools,
+body[data-appearance-theme] #wrongBookModal #wrongBookList {
+    background:var(--dm-frost-panel-strong) !important;
+    background-image:none !important;
+}
+body[data-appearance-theme] #wrongBookModal .wrong-toolbar,
+body[data-appearance-theme] #wrongBookModal .wrong-tools {
+    border-bottom:1px solid var(--dm-frost-border) !important;
+}
+body[data-appearance-theme] #learningReviewModal .learning-review-section,
+body[data-appearance-theme] #wrongBookModal .wrong-card,
+body[data-appearance-theme] #wrongBookModal .wrong-empty {
+    background:var(--dm-frost-panel) !important;
+    background-image:none !important;
+}
+
 </style>
 
 <script>
@@ -8606,7 +8627,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-color-unify-20261012c"></script>
+<script src="/static/script.js?v=dmate-modal-pdf-fix-20261012d"></script>
 
 </body>
 </html>
