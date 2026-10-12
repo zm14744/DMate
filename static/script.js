@@ -600,14 +600,21 @@ function updateAppearanceBackgroundUi() {
     if (preview) {
         if (appearanceHasBackground && appearanceBackgroundObjectUrl) {
             preview.textContent = "";
-            preview.style.backgroundImage = `url("${appearanceBackgroundObjectUrl}")`;
+            preview.style.setProperty(
+                "background-image",
+                `url("${appearanceBackgroundObjectUrl}")`,
+                "important"
+            );
+            preview.style.setProperty("background-size", "cover", "important");
+            preview.style.setProperty("background-position", "center", "important");
+            preview.style.setProperty("background-repeat", "no-repeat", "important");
             preview.dataset.hasBackground = "true";
             preview.tabIndex = 0;
             preview.setAttribute("role", "button");
             preview.setAttribute("aria-label", "查看当前背景大图");
         } else {
             preview.textContent = "无背景";
-            preview.style.backgroundImage = "none";
+            preview.style.setProperty("background-image", "none", "important");
             preview.dataset.hasBackground = "false";
             preview.removeAttribute("tabindex");
             preview.removeAttribute("role");
