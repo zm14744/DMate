@@ -2142,6 +2142,46 @@ def _clean_answer_only(text):
     return value[:cut_index].strip()
 
 
+def _exercise_math_content_valid(question, answer):
+    """拒绝缺失公式占位符和明显自相矛盾的图论前提。
+
+    这里只做零成本、可确定的错误检查；它不是完整的数学证明器。
+    """
+    source = str(question or "") + "\n" + str(answer or "")
+    if re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", source, re.I):
+        return False
+    if re.search(r"(?:待补充|待填写|TODO|未生成|公式缺失|占位符|undefined|null)", source, re.I):
+        return False
+    # 在简单图里，不同边最多共享一个端点是定义的直接推论；
+    # 绝不等价于图无四圈。屏蔽这种有明确逻辑冲突的生成题。
+    if re.search(r"(?:简单无向图|无向简单图|简单图)", source):
+        # 必须出现“即/等价”等因果或等价说法才判错；如果题目另外
+        # 明确要求无四圈，虽然边共享限制冗余，但不是逻辑矛盾。
+        misconception = (
+            r"(?:任意|任何|所有)两条(?:不同|不相同|互异)?(?:的)?边"
+            r".{0,20}(?:最多|至多)(?:只)?有(?:一|1)个公共(?:顶点|端点)"
+            r".{0,12}(?:即|亦即|等价于|也就是说|意味着|因此)"
+            r".{0,15}(?:不含|没有|不存在|无)(?:长度为|长为)?"
+            r"[\s$\\]*(?:4|四).{0,6}(?:圈|环|回路)"
+        )
+        if re.search(misconception, source):
+            return False
+    # K4 自身含有长度为 4 的圈，不能用互不相交的 K4 构造无四圈图。
+    # 只拦截把 K4 当作“满足无四圈条件”的肯定性构造，不拦截反例讨论。
+    c4_forbidden = bool(re.search(
+        r"(?:不含|没有|不存在|无)(?:长度为|长为)?[\s$\\]*(?:4|四).{0,6}(?:圈|环|回路)",
+        str(question or "")
+    ))
+    k4_construction = bool(re.search(
+        r"(?:取|选择|构造|由|并图|并集|组[成合])[^。；\n]{0,55}K[_\s{}]*4|"
+        r"K[_\s{}]*4[^。；\n]{0,55}(?:不含|没有|不存在|无)[^。；\n]{0,8}(?:4|四).{0,6}(?:圈|环|回路)",
+        str(answer or ""), re.I
+    ))
+    if c4_forbidden and k4_construction:
+        return False
+    return True
+
+
 def _exercise_problem_complete(question, answer):
     """保守检查条件不全、多个小问却只有一个占位答案的情况。"""
     text = str(question or "").strip()
@@ -2156,10 +2196,13 @@ def _exercise_problem_complete(question, answer):
         return False
     items = re.findall(r"(?:^|\n)\s*[（(]\s*(\d+)\s*[)）]", text)
     if len(set(items)) >= 2:
-        # 一整个综合题不能只返回一个整数当作三个小问的最终答案。
+        # 多小问必须逐问给出实际答案；不能以一项数值或“略”蒙混过关。
         if re.fullmatch(r"[+-]?\d+(?:\.\d+)?", value):
             return False
-    return True
+        answered = set(re.findall(r"(?:^|\n)\s*[（(]\s*(\d+)\s*[)）]", value))
+        if not set(items).issubset(answered):
+            return False
+    return _exercise_math_content_valid(text, value)
 
 
 def _exercise_answer_valid(answer):
@@ -2174,6 +2217,15 @@ def _exercise_answer_valid(answer):
     ):
         return False
     if "[[WRONGBOOK_ANSWER" in value:
+        return False
+    # 模型会偶尔对含证明题返回“略（证明见解析）”，但此时系统其实
+    # 尚未验证证明。不能把这种占位答案存入错题本并公开显示为正确答案。
+    if re.search(
+        r"(?:^|[：:、。；;\s）)])(?:略|见解析|证明见解析|参见解析|待证|证明略|步骤略)"
+        r"(?:[（(]|[。；;\s]|$)", value, flags=re.I
+    ):
+        return False
+    if re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", value):
         return False
     return True
 
