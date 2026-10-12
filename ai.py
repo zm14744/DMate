@@ -61,6 +61,7 @@ SYSTEM_PROMPT = r"""你是离散数学智能辅学系统中的教学助手。
    - 题目的文字要求、编号、问法，以“题目文字”为主。
    - 图中的顶点、边、箭头、邻接关系、层次和二维结构，以“图形信息”为主。
    - 图形区域附近的 OCR 乱码、边名、顶点名重复内容已尽量清理；不要把残留的局部噪声当成关键冲突。
+   - 遇到【OpenCV 实际线迹检测】时，其中明确核验的端点与边优先于 Vision 的外形猜测；仅有部分已确认边时，绝不能认定“没列出来的边就不存在”。对冲突或不确定的连接，应明确提示核对，不得自行补边。
    - e1、e2、e3 这类写在边旁的符号默认是边的名称，不是权值；只有题目明确是带权图或图中存在清楚、独立的数值权重时，才按权值处理。
    - 图形信息中标记为“可能/不确定”的内容不能当作确定事实；如果不影响当前问题，就先忽略，不要因此中断教学。
    - 只有当两部分对“会直接改变答案的关键信息”给出相互矛盾、且都较可信的结果时，才请学生确认。
@@ -114,7 +115,7 @@ VISION_MODEL = os.environ.get(
     "DEEPSEEK_VISION_MODEL",
     "deepseek-flash"
 )
-VISION_MAX_OUTPUT_TOKENS = 4200
+VISION_MAX_OUTPUT_TOKENS = 3000
 VISION_ENABLED = os.environ.get(
     "VISION_ANALYSIS_ENABLED",
     "1"
@@ -141,7 +142,7 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 
 【visual_text 要求】
 - 图论优先确认：有向/无向、是否带权、顶点、边连接关系、箭头、自环、重边。
-- 如果图片明确给出独立编号的多个图（例如“图1”“图2”），分别描述；如果仅是同一张图的几个不连通分量（包括孤立点），不得擅自拆成不同图。确实无法判断是否属于一个图时在 uncertain_fields 写明。
+- 如果同一张图片里有两个或更多彼此分开的图，必须分别写成“图1”“图2”……，不要把它们合并成一个图。
 - 如果图中的顶点没有任何可读标签，不要因此放弃识别，也不要把“没有标签”当成不确定项。请为每张图独立创建临时顶点名，例如 G1_v1、G1_v2……和 G2_v1、G2_v2……。
 - 临时顶点编号按视觉位置保持稳定：优先从上到下扫描；处在同一高度带时从左到右。首次列出临时顶点时，用括号补充大致位置（如“左上、上中、右下”），随后逐条给出边。
 - 对无标签图，至少输出：每张图的顶点数、是否有向/带权、临时顶点及位置、完整可确认的边集合；若存在自环或重边要单独注明。这样后续系统即使没有原始顶点名，也能依据邻接结构继续推理。
@@ -159,9 +160,6 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 - 对多图并列的情况，先判断是同一题下左右两个独立图，还是同一个图的多个不连通分量；以标签、间距和题目布局为依据，不确定就明确标记，不得猜测成一个连通图。
 - 每个图先列顶点位置、再列边（重边按重数列出），最后重新计算顶点度数并核对握手定理（度数和 = 2×边数，环计入两次）；不一致时自行逐边重查，仍不能确认的边标为不确定。
 - 每条边逐一核对两个端点；只有确实连接同一对顶点的两条边才叫重边。
-- 对可以明确识别顶点和边的图论图形，请额外返回 graph_structures（不要只用自然语言写图），每张独立图形一个对象。顶点列表 vertices 使用 {"id":"G1_v1","position":"左上"}，edges 使用 {"from":"G1_v1","to":"G1_v2","multiplicity":2} 表示二重边，边名放 label、边权放 weight（不要混淆）；环以 from=to 表示；孤立点也要放在 vertices 内。vertex_count、edge_count 和 degrees 必须根据这些边表计算，不要凭外观猜测。directed 表示有向图；components 表示连通分量数（有向图按弱连通计数）。
-- 一幅图片里的多个连通分量如果属于同一个图，请写到同一 graph_structures 对象中；只有题目明确把它们分成“图1/图2”等不同图时才拆成多个对象；无法判断时在 uncertain_fields 中说明。
-- 如果一个端点或重边关系看不清，不能编造可验证的边表：graph_structures 用空数组，在 uncertain_fields 指出具体不确定的位置。
 - 不要解题，不要给答案。
 
 【图片用途识别】
@@ -177,11 +175,9 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
   "visual_text": "图形结构描述；若没有需要补充的图形结构则为空字符串",
   "has_visual_structure": true,
   "image_kind": "exercise",
-  "uncertain_fields": ["看不清的位置和符号；若没有则返回空数组"],
-  "graph_structures": [{"id":"图1","directed":false,"vertices":[{"id":"G1_v1","position":"左上"}],"edges":[],"vertex_count":1,"edge_count":0,"degrees":{"G1_v1":0},"components":1}]
+  "uncertain_fields": ["看不清的位置和符号；若没有则返回空数组"]
 }
 其中 has_visual_structure 只能是 true 或 false；image_kind 只能是 exercise、non_exercise、uncertain。
-graph_structures 只用于顶点和边能清楚确认的图论图形；非图论图片、图结构不清时返回 []。
 """
 
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
@@ -1170,153 +1166,6 @@ def _guess_image_mime(raw):
 
 
 
-def _validate_graph_structures(raw_graphs):
-    """验证视觉图的边表，而不把自相矛盾的顶点/边统计传给解题模型。
-
-    只能检查结构内部一致性；不能证明模型读出的边和原图一致。
-    """
-    if raw_graphs is None:
-        return [], None
-    if not isinstance(raw_graphs, list) or len(raw_graphs) > 8:
-        return [], "图结构格式不正确（graph_structures 必须是列表，最多 8 张图）。"
-    normalized = []
-    for index, graph in enumerate(raw_graphs):
-        if not isinstance(graph, dict):
-            return [], f"图{index + 1}不是有效的图结构对象。"
-        raw_vertices = graph.get("vertices")
-        raw_edges = graph.get("edges")
-        if not isinstance(raw_vertices, list) or not isinstance(raw_edges, list) or not raw_vertices:
-            return [], f"图{index + 1}缺少顶点或边表。"
-        if len(raw_vertices) > 100 or len(raw_edges) > 300:
-            return [], f"图{index + 1}规模超出结构校验范围。"
-        vertices = []
-        positions = {}
-        for item in raw_vertices:
-            if isinstance(item, str):
-                vertex_id, position = item.strip(), ""
-            elif isinstance(item, dict):
-                vertex_id = str(item.get("id", "")).strip()
-                position = str(item.get("position", "")).strip()[:40]
-            else:
-                return [], f"图{index + 1}顶点格式错误。"
-            if not vertex_id or len(vertex_id) > 48 or vertex_id in positions:
-                return [], f"图{index + 1}有重复或无效顶点名。"
-            vertices.append(vertex_id)
-            positions[vertex_id] = position
-        directed = graph.get("directed", False)
-        if not isinstance(directed, bool):
-            return [], f"图{index + 1}有向性不是布尔值。"
-        degrees = {vertex_id: 0 for vertex_id in vertices}
-        out_degrees = {vertex_id: 0 for vertex_id in vertices}
-        in_degrees = {vertex_id: 0 for vertex_id in vertices}
-        adjacency = {vertex_id: set() for vertex_id in vertices}
-        edges = []
-        edge_total = 0
-        for item in raw_edges:
-            if not isinstance(item, dict):
-                return [], f"图{index + 1}的边必须包含两个端点。"
-            source = str(item.get("from", "")).strip()
-            target = str(item.get("to", "")).strip()
-            number = item.get("multiplicity", 1)
-            if (source not in positions or target not in positions or
-                    type(number) is not int or not 1 <= number <= 20):
-                return [], f"图{index + 1}存在不存在的端点或非法重边数。"
-            edge_total += number
-            if edge_total > 600:
-                return [], f"图{index + 1}的边数量超出校验范围。"
-            degrees[source] += number
-            degrees[target] += number  # 环计算两次
-            out_degrees[source] += number
-            in_degrees[target] += number
-            adjacency[source].add(target)
-            adjacency[target].add(source)  # 连通分量按弱连通
-            edge_info = {"from": source, "to": target, "multiplicity": number}
-            if "weight" in item:
-                weight = item["weight"]
-                if not isinstance(weight, (str, int, float)) or len(str(weight)) > 30:
-                    return [], f"图{index + 1}的边权格式错误。"
-                edge_info["weight"] = str(weight)
-            if "label" in item:
-                label = item["label"]
-                if not isinstance(label, str) or len(label) > 32:
-                    return [], f"图{index + 1}的边名格式错误。"
-                edge_info["label"] = label
-            edges.append(edge_info)
-        for key, expected in (("vertex_count", len(vertices)), ("edge_count", edge_total)):
-            if key in graph and (type(graph[key]) is not int or graph[key] != expected):
-                return [], f"图{index + 1}的{key}与顶点边表不一致。"
-        reported_degrees = graph.get("degrees")
-        if reported_degrees is not None:
-            if (not isinstance(reported_degrees, dict) or
-                    set(reported_degrees) != set(vertices) or
-                    any(type(value) is not int or degrees[key] != value
-                        for key, value in reported_degrees.items())):
-                return [], f"图{index + 1}的度数与边表不一致。"
-        reported_isolated = graph.get("isolated_vertices")
-        isolated = [v for v in vertices if degrees[v] == 0]
-        if reported_isolated is not None and (
-            not isinstance(reported_isolated, list) or set(reported_isolated) != set(isolated)
-        ):
-            return [], f"图{index + 1}的孤立顶点和边表不一致。"
-        unseen = set(vertices)
-        component_count = 0
-        while unseen:
-            component_count += 1
-            todo = [unseen.pop()]
-            while todo:
-                for neighbor in adjacency[todo.pop()]:
-                    if neighbor in unseen:
-                        unseen.remove(neighbor)
-                        todo.append(neighbor)
-        if "components" in graph and (
-            type(graph["components"]) is not int or graph["components"] != component_count
-        ):
-            return [], f"图{index + 1}连通分量数与边表不一致。"
-        if sum(degrees.values()) != 2 * edge_total:
-            return [], f"图{index + 1}不满足握手定理。"
-        normalized.append({
-            "id": str(graph.get("id", f"图{index + 1}"))[:40],
-            "directed": directed,
-            "vertices": vertices,
-            "positions": positions,
-            "edges": edges,
-            "vertex_count": len(vertices),
-            "edge_count": edge_total,
-            "degrees": degrees,
-            "in_degrees": in_degrees,
-            "out_degrees": out_degrees,
-            "isolated_vertices": isolated,
-            "components": component_count,
-        })
-    return normalized, None
-
-
-def _render_validated_graphs(graphs):
-    sections = []
-    for graph in graphs:
-        names = "、".join(
-            f"{v}（{graph['positions'][v]}）" if graph["positions"][v] else v
-            for v in graph["vertices"]
-        )
-        edges = "、".join(
-            f"{edge['from']}{'→' if graph['directed'] else '—'}{edge['to']}"
-            + (f"（{edge['multiplicity']} 条平行边）" if edge['multiplicity'] > 1 else "")
-            + (f"（边名 {edge['label']}）" if "label" in edge else "")
-            + (f"（权值 {edge['weight']}）" if "weight" in edge else "")
-            for edge in graph["edges"]
-        ) or "无"
-        degrees = "、".join(f"{v}:{graph['degrees'][v]}" for v in graph["vertices"])
-        sections.append(
-            f"{graph['id']}：{'有向' if graph['directed'] else '无向'}图，"
-            f"{graph['vertex_count']} 个顶点、{graph['edge_count']} 条边、"
-            f"{graph['components']} 个弱连通分量。\n"
-            f"顶点：{names}。\n边（逐条列出，含重边）：{edges}。\n"
-            f"顶点度数：{degrees}。"
-            + (f"\n孤立顶点：{'、'.join(graph['isolated_vertices'])}。" if graph["isolated_vertices"] else "")
-        )
-    return "\n\n".join(sections)
-
-
 def _extract_vision_json(content):
     """从视觉模型输出中稳健提取 JSON。"""
     if not isinstance(content, str):
@@ -1367,40 +1216,15 @@ def _extract_vision_json(content):
     visual_text = visual_text.strip()
 
     # 截断会丢题目条件；异常长输出交由调用方重试/回退，不使用半道题。
-    if len(corrected_text) > 5000 or len(visual_text) > 8500:
+    if len(corrected_text) > 5000 or len(visual_text) > 3000:
         return None
-    if not corrected_text and not visual_text and not data.get("graph_structures") and image_kind != "non_exercise":
+    if not corrected_text and not visual_text and image_kind != "non_exercise":
         return None
     uncertain_fields = data.get("uncertain_fields", [])
     if not isinstance(uncertain_fields, list):
         return None
     uncertain_fields = [x.strip()[:240] for x in uncertain_fields[:12]
                         if isinstance(x, str) and x.strip()]
-
-    graphs, graph_error = _validate_graph_structures(data.get("graph_structures", []))
-    if graphs:
-        has_visual = True
-        if image_kind == "non_exercise" and not corrected_text:
-            # 纯图论图形不因缺少题干文字而被误挡在识题入口外。
-            image_kind = "exercise"
-    if graph_error:
-        has_visual = True
-        uncertain_fields.append(f"图结构一致性校验未通过：{graph_error} 请对照原图核实。")
-        # 失败时不能把未经验证的边数/度数当成确定结论。
-        visual_text = "【图结构待核对】" + visual_text
-    elif graphs:
-        # 用可计算的边表形成结构描述，避免原始自然语言中出现自相矛盾的边数。
-        # 无法在纯文本校验阶段证明这些边与原图对应，仍由用户对照原图核对。
-        formatted_graph = _render_validated_graphs(graphs)
-        if len(formatted_graph) + len(corrected_text) <= 5300:
-            visual_text = formatted_graph
-        else:
-            # 不能把过长边表静默截断，后续提交仍须保留完整的可读原图描述。
-            visual_text = visual_text or "图结构规模较大，请分区裁剪原图后重新识别。"
-            uncertain_fields.append("图结构边表过长，请分区裁剪图片确认完整连接关系。")
-        uncertain_fields.append("图形已通过边表与度数一致性检查，但连接位置仍需对照原图确认。")
-    elif visual_text and re.search(r"(?:无向图|有向图|重边|平行边|孤立顶点|顶点数|边集)", visual_text):
-        uncertain_fields.append("图形识别未提供可自动核验的顶点和边表，请核对顶点、重边与孤立点。")
 
     return {
         "corrected_text": corrected_text,
@@ -1423,7 +1247,7 @@ def _vision_success(corrected_text, visual_text, uncertain_fields=None, image_ki
     }
 
 
-def _prepare_vision_images(image_bytes, review_regions=None, force_graph_crops=False):
+def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None):
     """返回整图和局部放大 PNG；所有图片使用同一个 EXIF 方向。
 
     有 OCR 区域时优先放大题干；如果 review_regions 为 None，表示普通 OCR
@@ -1449,7 +1273,31 @@ def _prepare_vision_images(image_bytes, review_regions=None, force_graph_crops=F
 
     pure_visual_mode = review_regions is None
     crops = []
-    for region in (review_regions or [])[:4]:
+    if graph_regions and len(graph_regions)>4:
+        # Many textbook diagrams on two slides: use grouped row crops rather
+        # than sending a paid vision model 8-12 tiny duplicated pictures.
+        region_groups=[]
+        for box in sorted(graph_regions,key=lambda r:(r[1]+r[3])/2):
+            cy=(box[1]+box[3])/2
+            if not region_groups or cy-(region_groups[-1][-1][1]+region_groups[-1][-1][3])/2>.14:
+                region_groups.append([box])
+            else:region_groups[-1].append(box)
+        graph_regions=[(min(r[0] for r in group),min(r[1] for r in group),
+                        max(r[2] for r in group),max(r[3] for r in group))
+                       for group in region_groups[:3]]
+    # Full-image graph localization feeds targeted crops BEFORE OCR title crops.
+    # Expand outward to retain entire incident edges and vertex circles.
+    for region in (graph_regions or [])[:4]:
+        try:
+            x1,y1,x2,y2 = [float(v) for v in region]
+            if not (0 <= x1 < x2 <= 1 and 0 <= y1 < y2 <= 1):continue
+            margin_x=max(.013,(x2-x1)*.1)
+            margin_y=max(.015,(y2-y1)*.12)
+            box=(max(0,int((x1-margin_x)*width)),max(0,int((y1-margin_y)*height)),
+                 min(width,int((x2+margin_x)*width)),min(height,int((y2+margin_y)*height)))
+            if box[2]-box[0]>25 and box[3]-box[1]>25:crops.append(original.crop(box))
+        except (TypeError,ValueError,OverflowError):continue
+    for region in (review_regions or [])[:2]:
         try:
             if len(region) != 4:
                 continue
@@ -1464,10 +1312,18 @@ def _prepare_vision_images(image_bytes, review_regions=None, force_graph_crops=F
             crops.append(original.crop(box))
         except (TypeError, ValueError, OverflowError):
             continue
-    # 即使普通 OCR 仅发现 (b) 一类图片编号，也必须放大横向图形。
-    # 纯图模式保留原来的上下 + 左右四分幅，避免缩减既有识别覆盖范围。
+    # OCR may only find a tiny “(b)” caption and supply review regions around
+    # the caption while missing the actual graph above it. Preserve structural
+    # left/right crops for wide graph illustrations even when OCR found text.
+    if crops and width >= height * 1.28:
+        crops.extend([
+            original.crop((0, 0, math.ceil(width * 0.57), height)),
+            original.crop((math.floor(width * 0.43), 0, width, height)),
+        ])
     if not crops:
-        if pure_visual_mode or force_graph_crops:
+        if pure_visual_mode:
+            # 纯图模式同时覆盖上下排列和左右排列；保留约 20% 重叠，
+            # 避免恰好位于中线附近的顶点/边被裁断。
             crops = [
                 original.crop((0, 0, width, math.ceil(height * 0.6))),
                 original.crop((0, math.floor(height * 0.4), width, height)),
@@ -1479,21 +1335,10 @@ def _prepare_vision_images(image_bytes, review_regions=None, force_graph_crops=F
                 original.crop((0, 0, width, math.ceil(height * 0.6))),
                 original.crop((0, math.floor(height * 0.4), width, height)),
             ]
-    else:
-        if width >= height * 1.28 or force_graph_crops:
-            crops.extend([
-                original.crop((0, 0, math.ceil(width * 0.57), height)),
-                original.crop((math.floor(width * 0.43), 0, width, height)),
-            ])
-        if height >= width * 1.28 or force_graph_crops:
-            crops.extend([
-                original.crop((0, 0, width, math.ceil(height * 0.57))),
-                original.crop((0, math.floor(height * 0.43), width, height)),
-            ])
-    return [encode(original, 2200)] + [encode(crop, 1600, True) for crop in crops[:6]]
+    return [encode(original, 2200)] + [encode(crop, 1600, True) for crop in crops]
 
 
-def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=None):
+def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=None, opencv_graphs=None):
     """
     使用整图与局部放大图独立转录题干、解析图形结构。
     ocr_text 参数为兼容旧调用保留，不发送给视觉模型；由 app.py 比较两个结果。
@@ -1519,12 +1364,20 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
     try:
         image_urls = _prepare_vision_images(
             image_bytes, review_regions,
-            force_graph_crops=bool(ocr_text and re.fullmatch(r"\s*(?:图\s*)?[（(]?[a-dA-D][）)]?\s*", str(ocr_text))),
+            graph_regions=(opencv_graphs or {}).get("regions", [])
         )
     except Exception as exc:
         print(f"Vision 图片预处理失败：{type(exc).__name__}")
         return _failure("图片局部放大失败，已保留文字识别结果。")
     content_parts = [{"type": "text", "text": VISION_PROMPT}]
+    verified = (opencv_graphs or {}).get("graphs", [])
+    if verified:
+        content_parts.append({"type":"text", "text":(
+            "以下是 OpenCV 从实际像素线迹得到的候选图结构。只将经直线连续性检验的边视为已确认；"
+            "uncertain_edges 需结合原图与局部放大核对；不得根据图的外形擅自补边。"
+            "如果其它端点、弧线或重边不确定，应标注为不确定，不能覆盖已核验的连接。\n"
+            + json.dumps(verified, ensure_ascii=False)[:5500]
+        )})
     for index, data_url in enumerate(image_urls):
         content_parts.append({"type": "text", "text": "完整上传图片" if index == 0 else f"局部放大 {index}"})
         content_parts.append({"type": "image_url", "image_url": {"url": data_url, "detail": "high"}})
