@@ -2539,10 +2539,25 @@ def chat():
         next((item["content"] for item in reversed(cleaned)
               if item["role"] == "user"), "")
     )
-    explicit_solution = bool(
-        re.search(r"(?:给出|给我|直接给|告诉我|输出).{0,8}(?:答案|解析|解答)|"
-                  r"(?:完整|详细).{0,3}(?:解析|解答|过程)|答案.{0,3}(?:和|与|及).{0,3}解析", current_instruction)
-        and not re.search(r"不要|别给|不需要|不用|只给提示|别直接", current_instruction)
+    # “出一道困难题并给出回答”是【出题 + 显示答案】的复合请求。
+    # 不要把“不要太简单，给出答案”中的“不要”误当成拒绝答案。
+    answer_cue = re.search(
+        r"(?:给出|给我|直接给|附上|附带|提供|输出|告诉我|同时给|并给出|并回答)"
+        r".{0,12}(?:参考答案|最终答案|答案|解答|解析|解题过程|推导|证明|回答|结果)"
+        r"|(?:附|带|含|有)(?:参考)?答案"
+        r"|(?:完整|详细).{0,5}(?:解析|解答|过程|证明)"
+        r"|(?:题目|出题|练习|题).{0,12}(?:和|与|及|以及|并|同时|然后).{0,10}(?:答案|回答|解析|解答|求解|证明|推导)"
+        r"|(?:并|同时|然后).{0,3}(?:回答|解答|求解|证明|推导|讲解)(?:这道题|该题|它|结论|答案|结果|问题)?",
+        current_instruction
+    )
+    deny_answer = re.search(
+        r"(?:不要|别|不需要|无需|不用|禁止)(?:.{0,5})(?:答案|回答|解析|解答|证明|解题过程)"
+        r"|(?:只|仅)(?:需|要|给|出|生成).{0,5}(?:题目|题干)(?!.*(?:答案|回答|解析))",
+        current_instruction
+    )
+    explicit_solution = bool(answer_cue and not deny_answer)
+    explicit_explanation = bool(
+        explicit_solution and re.search(r"解析|过程|步骤|证明|推导|详细解答|完整解答|讲解", current_instruction)
     )
     # max 已停用。用户明确要求 max 时立即如实告知，不悄悄用 high 冒充。
     # 本轮询问以前是否使用 max、或者明确说“不要用 max”，不在此列。
@@ -2640,7 +2655,7 @@ def chat():
         effective_exercise_request and explicit_solution
     )
     exercise_explanation_requested = bool(
-        exercise_solution_requested and re.search(r"解析|过程|步骤|证明|讲解|解答", current_instruction)
+        explicit_explanation
     )
 
     # 只对独立出题采用本轮请求。避免把几十轮历史题目交给模型，
@@ -3309,24 +3324,39 @@ def ocr():
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
 
-        # OpenCV 的已核验边按其证据等级独立呈现；不确定连接不能补全。
-        # 后续教学模型使用的 visual_text 包含明确的顶点坐标及边表。
+        # 提供给学生的是清晰的邻接关系，而不是 JSON 坐标、矩阵及调试日志。
+        # 结构化 graph_structures 仍保留在 API 返回中供后端扩展。
         cv_graphs = graph_cv.get("graphs") or []
         if cv_graphs:
-            verified_sections = []
-            for graph in cv_graphs:
-                confirmed = graph.get("edges") or []
+            readable = []
+            all_complete = True
+            for index, graph in enumerate(cv_graphs, 1):
+                vertices = graph.get("vertices") or []
+                edges = graph.get("edges") or []
                 unknown = graph.get("uncertain_edges") or []
-                verified_sections.append(
-                    f'{graph["id"]}（OpenCV，{graph["confidence"]}置信度）：'
-                    f'已定位顶点及相对坐标={json.dumps(graph["vertices"], ensure_ascii=False)}；'
-                    f'经直线连续性核验的边={json.dumps(confirmed, ensure_ascii=False)}；'
-                    f'由已核验边构造的邻接矩阵={json.dumps(graph["adjacency_matrix"], ensure_ascii=False)}；'
-                    f'仍不确定的候选连接={json.dumps(unknown, ensure_ascii=False)}。'
-                    '请注意：列表中没有出现的连接不代表不存在；曲线、自环、重边、箭头由 Vision 复核。'
-                )
-            graph_text = "【OpenCV 实际线迹检测（仅确认可核验部分）】\n" + "\n".join(verified_sections)
-            visual_text = (graph_text + "\n【视觉补充】\n" + visual_text) if visual_text else graph_text
+                full = graph.get("confidence") == "high" and not unknown
+                all_complete = all_complete and full
+                lines = [f'G{index}：{len(vertices)} 个顶点，已识别 {len(edges)} 条边。']
+                if edges:
+                    lines.append('边：' + '、'.join(
+                        f'{edge[0]}—{edge[1]}' for edge in edges
+                        if isinstance(edge, list) and len(edge) == 2
+                    ) + '。')
+                if unknown or not full:
+                    lines.append('部分连接尚未确认，请结合原图核对，不能将未列出的边视为不存在。')
+                readable.append('\n'.join(lines))
+            summary = '\n\n'.join(readable)
+            # 只在图形证据不完整时附加 Vision 的结构补充，避免两份
+            # 边集合冲突并把用户核对框撑满。保留普通曲线/有向等补充。
+            if all_complete:
+                # Straight-edge detector does not support arcs, multiple
+                # edges, directions or weights: do not erase Vision evidence
+                # for those structures merely because a straight-edge subset
+                # looked complete.
+                special = bool(re.search(r"有向|箭头|自环|重边|带权|弧线|曲线|孤立|不确定|待核对", visual_text))
+                visual_text = summary + ('\n\n视觉补充（请核对）：\n' + visual_text if special else '')
+            else:
+                visual_text = summary + ('\n\n视觉补充（待核对）：\n' + visual_text if visual_text else '')
 
         # 撤销若发生在 Vision 调用期间，结果也直接丢弃。
         if request_id and _take_ocr_cancelled(request_id):
