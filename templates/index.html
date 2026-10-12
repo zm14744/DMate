@@ -7734,6 +7734,91 @@ body[data-appearance-theme] #ocrCancelBtn:not([hidden]) {
 .input-wrap[data-busy-mode="thinking"] #imageBtn,
 .input-wrap[data-busy-mode="answering"] #imageBtn { display:none !important; }
 
+
+/* 2026-10-12：三主题统一识图/停止按键与浅色可读性。 */
+/* 选中的考试知识点和文字复制按钮：浅色主题用深色，不再使用淡蓝或浅灰。 */
+body[data-appearance-theme="light"] .wrong-meta-row.focus .wrong-meta-label,
+body[data-appearance-theme="light"] .wrong-meta-row.focus .wrong-meta-value {
+    color:#1d4ed8 !important;
+    -webkit-text-fill-color:#1d4ed8 !important;
+}
+body[data-appearance-theme="light"] .wrong-meta-row:not(.focus) .wrong-meta-label {
+    color:#475569 !important;
+}
+body[data-appearance-theme="light"] .wrong-meta-row:not(.focus) .wrong-meta-value {
+    color:#334155 !important;
+}
+body[data-appearance-theme="light"] .wrong-actions .rich-copy-smart,
+body[data-appearance-theme="light"] .msg-actions .rich-copy-smart {
+    color:#334155 !important;
+    -webkit-text-fill-color:#334155 !important;
+    background:rgba(226,232,240,.90) !important;
+    border-color:#94a3b8 !important;
+}
+body[data-appearance-theme="light"] .wrong-actions .rich-copy-smart:disabled,
+body[data-appearance-theme="light"] .msg-actions .rich-copy-smart:disabled {
+    color:#475569 !important;
+    -webkit-text-fill-color:#475569 !important;
+    opacity:1 !important;
+}
+/* OCR / AI 锁定状态说明也是浅蓝字问题的一部分。 */
+body[data-appearance-theme="light"] .input-lock-hint {
+    color:#1d4ed8 !important;
+    -webkit-text-fill-color:#1d4ed8 !important;
+}
+body[data-appearance-theme="light"] .wrong-status.corrected,
+body[data-appearance-theme="light"] .wrong-status.passed {
+    color:#15803d !important;
+    -webkit-text-fill-color:#15803d !important;
+}
+body[data-appearance-theme="light"] .wrong-status:not(.corrected):not(.passed),
+body[data-appearance-theme="light"] .wrong-actions button.danger {
+    color:#b91c1c !important;
+    -webkit-text-fill-color:#b91c1c !important;
+}
+/* 识图与思考阶段使用相同的红色实心圆，没有白色方块。 */
+body[data-appearance-theme] .input-wrap #ocrCancelBtn:not([hidden]),
+body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button:not([hidden]) {
+    box-sizing:border-box !important;
+    flex:0 0 42px !important;
+    width:42px !important;
+    min-width:42px !important;
+    max-width:42px !important;
+    height:42px !important;
+    min-height:42px !important;
+    max-height:42px !important;
+    margin:0 2px !important;
+    padding:0 !important;
+    border:0 !important;
+    border-radius:50% !important;
+    background:#ef4444 !important;
+    background-image:none !important;
+    box-shadow:none !important;
+    opacity:1 !important;
+    font-size:0 !important;
+    position:relative;
+    cursor:pointer;
+}
+body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button::before,
+body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button::after {
+    content:none !important;
+    display:none !important;
+}
+body[data-appearance-theme] .input-wrap #ocrCancelBtn:hover,
+body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button:hover {
+    background:#dc2626 !important;
+}
+/* CSS 隐藏与 JS 的 hidden/inline 状态相互兜底。 */
+body[data-appearance-theme] .input-wrap[data-busy-mode="ocr"] #sendBtn,
+body[data-appearance-theme] .input-wrap[data-busy-mode="ocr"] #imageBtn,
+body[data-appearance-theme] .input-wrap[data-busy-mode="thinking"] #imageBtn,
+body[data-appearance-theme] .input-wrap[data-busy-mode="answering"] #imageBtn,
+body[data-appearance-theme] .input-wrap #sendBtn[hidden],
+body[data-appearance-theme] .input-wrap #imageBtn[hidden],
+body[data-appearance-theme] .input-wrap #ocrCancelBtn[hidden] {
+    display:none !important;
+}
+
 </style>
 
 <script>
@@ -8447,7 +8532,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-opencv-graph-composite-stop-20261012"></script>
+<script src="/static/script.js?v=dmate-input-state-light-contrast-20261012"></script>
 
 </body>
 </html>
