@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-functions-audit-20261012";
+const CACHE_NAME = "dmate-color-unify-20261012c";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
