@@ -2418,6 +2418,85 @@ def _requested_reasoning_effort(text):
     return max(matched)[1]
 
 
+def _parse_requested_outputs(instruction):
+    """Interpret the *current* instruction, not exercise history.
+
+    Returns whether an answer / worked solution should be disclosed NOW.
+    Negation scopes separately to answers and explanations. An explicit future
+    review promise is not a request to reveal the solution in this round.
+    """
+    text = re.sub(r"\s+", "", str(instruction or ""))
+    if not text:
+        return {"answer": False, "explanation": False}
+    # Questions about the feature itself do not request a new answer.
+    if re.search(r"(?:出题|生成题).{0,12}(?:功能|代码|错误|bug|逻辑|机制|为什么|怎么不行)", text, flags=re.I) or re.search(r"(?:讲讲|讨论|解释).{0,30}(?:出题|生成题|出.{0,8}题).{0,20}(?:功能|为什么不行|问题|错误|bug)", text):
+        return {"answer": False, "explanation": False}
+
+    # When the learner will respond first, do not turn the future teacher
+    # action into an immediate answer disclosure.
+    future_only = bool(re.search(
+        r"(?:等我|待我|我(?:先|来|自己)?(?:做|答|解|完成)|做完后|答完后|之后|下次|稍后|晚点)"
+        r".{0,15}(?:再|才|后)(?:给|说|公布|批改|检查|评价|解释|讲|出)?.{0,12}"
+        r"(?:答案|解析|解答|结果|批改|检查|评价)|"
+        r"(?:先出题|先给题|先给我题|出题|出一道题).{0,18}(?:之后|再|然后|并)(?:批改|检查|点评)(?:我|我的)?(?:答案|回答)|"
+        r"(?:批改|检查|点评)(?:我接下来|我之后|我稍后|我的|我)?(?:的)?(?:回答|答案)",
+        text
+    ))
+    answer_negative = bool(re.search(
+        r"(?:不要|别|不用|无需|不需要|不必|禁止|暂不|先不|不给|别给|别出|不公布)"
+        r".{0,7}(?:参考答案|最终答案|正确答案|答案|回答|解答|结果|结论)|"
+        r"(?:只|仅)(?:给|要|需|出|生成)?(?:一道|一题|一个)?(?:题目|题干|练习|提示)(?:就行|即可|好了)?",
+        text
+    ))
+    explanation_negative = bool(re.search(
+        r"(?:不要|别|不用|无需|不需要|不必|禁止|暂不|先不|不给)"
+        r".{0,6}(?:解析|分析过程|解题过程|讲解|推导|证明过程|详细步骤|步骤|过程|思路|解释)|"
+        r"(?:只|仅)(?:要|给|需)?(?:最后|最终|参考)?答案",
+        text
+    ))
+    # These words refer to output *content*, not the nature of a problem.
+    # Avoid treating “出一道证明题” / “答案稍后给” as a current solution request.
+    explain_positive = bool(re.search(
+        r"(?:给出|给我|附上|附带|提供|输出|写出|展示|告诉我|同时|并|然后|再|顺便|一起)"
+        r".{0,15}(?:详细解析|完整解析|解题过程|解题步骤|解法|推导过程|证明过程|"
+        r"完整证明|详细步骤|步骤|过程|解析|讲解|推导|怎么做|为什么答案)|"
+        r"(?:并|然后|同时|顺便|再)(?:解释|讲解|解答|解出来|求解|自己做|做出来|证明|分析答案)"
+        r"|(?:答案|解答|结果).{0,5}(?:和|与|及)(?:完整|详细)?解析.{0,5}(?:都)?(?:给出|给我|附上|提供)|"
+        r"(?:并|然后|再|同时)(?:进行)?(?:判定|判断)(?:这道题|答案|结果)?|"
+        r"(?:连同|包含|包括)(?:答案和)?解析",
+        text
+    ))
+    answer_positive = bool(re.search(
+        r"(?:给出|给我|附上|附带|提供|输出|写出|展示|告诉我|同时|并|然后|再|顺便|一起)"
+        r".{0,15}(?:最终答案|参考答案|正确答案|完整答案|答案|回答|解答|结果|结论|解法)|"
+        r"(?:题目|出题|练习|题).{0,12}(?:和|与|及|以及|并|同时|然后)"
+        r".{0,12}(?:答案|回答|解析|解答|求解|证明|推导|解法|结果)|"
+        r"(?:同时|然后|并|再)(?:回答|解答|求解|证明|解出来|做出来)|"
+        r"(?:题目|出题).{0,6}(?:附|含|带)(?:参考|正确)?答案|"
+        r"(?:给|要|附|提供)(?:参考|最终|正确)?答案",
+        text
+    ))
+    knowledge = bool(re.search(
+        r"(?:并|同时|顺便|再|附|给出|列出|告诉我|分析|说明).{0,14}"
+        r"(?:涉及的?知识点|相关知识点|考点|知识点分析|知识点|对应模块)|"
+        r"(?:题目|出题).{0,8}(?:涉及|考查|对应)(?:什么|哪些)?(?:知识点|考点)",
+        text
+    ))
+    hints = bool(re.search(
+        r"(?:并|同时|顺便|再|附|给出|附上|提供|告诉我|只给|仅给)"
+        r".{0,12}(?:解题提示|关键提示|提示|初步思路|思考方向|思路)|"
+        r"(?:先|只)(?:给|说)(?:我)?(?:一?点|一些)?提示|"
+        r"(?:讲解|说明|告诉我).{0,8}(?:解题思路|思考方向|提示)",
+        text
+    )) and not bool(re.search(r"(?:不要|别|无需|不需要).{0,4}(?:提示|思路)",text))
+    if future_only:
+        return {"answer": False, "explanation": False, "knowledge": knowledge, "hints": hints}
+    explanation = bool(explain_positive and not explanation_negative and not answer_negative)
+    answer = bool((answer_positive or explanation) and not answer_negative)
+    return {"answer": answer, "explanation": explanation,
+            "knowledge": knowledge, "hints": hints and not explanation}
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     ip = _get_client_ip()
@@ -2539,26 +2618,13 @@ def chat():
         next((item["content"] for item in reversed(cleaned)
               if item["role"] == "user"), "")
     )
-    # “出一道困难题并给出回答”是【出题 + 显示答案】的复合请求。
-    # 不要把“不要太简单，给出答案”中的“不要”误当成拒绝答案。
-    answer_cue = re.search(
-        r"(?:给出|给我|直接给|附上|附带|提供|输出|告诉我|同时给|并给出|并回答)"
-        r".{0,12}(?:参考答案|最终答案|答案|解答|解析|解题过程|推导|证明|回答|结果)"
-        r"|(?:附|带|含|有)(?:参考)?答案"
-        r"|(?:完整|详细).{0,5}(?:解析|解答|过程|证明)"
-        r"|(?:题目|出题|练习|题).{0,12}(?:和|与|及|以及|并|同时|然后).{0,10}(?:答案|回答|解析|解答|求解|证明|推导)"
-        r"|(?:并|同时|然后).{0,3}(?:回答|解答|求解|证明|推导|讲解)(?:这道题|该题|它|结论|答案|结果|问题)?",
-        current_instruction
-    )
-    deny_answer = re.search(
-        r"(?:不要|别|不需要|无需|不用|禁止)(?:.{0,5})(?:答案|回答|解析|解答|证明|解题过程)"
-        r"|(?:只|仅)(?:需|要|给|出|生成).{0,5}(?:题目|题干)(?!.*(?:答案|回答|解析))",
-        current_instruction
-    )
-    explicit_solution = bool(answer_cue and not deny_answer)
-    explicit_explanation = bool(
-        explicit_solution and re.search(r"解析|过程|步骤|证明|推导|详细解答|完整解答|讲解", current_instruction)
-    )
+    # Separate the two independent user intents: disclose the final answer,
+    # and show a worked solution. Negating one must NOT negate the other.
+    # In particular “给答案但不要解析” still requires the answer, while
+    # “出题后我来答，你再批改” must not reveal the answer immediately.
+    output_intent = _parse_requested_outputs(current_instruction)
+    explicit_solution = output_intent["answer"]
+    explicit_explanation = output_intent["explanation"]
     # max 已停用。用户明确要求 max 时立即如实告知，不悄悄用 high 冒充。
     # 本轮询问以前是否使用 max、或者明确说“不要用 max”，不在此列。
     if _requested_reasoning_effort(current_instruction) == "max":
@@ -2571,8 +2637,10 @@ def chat():
             "unsupported_effort": "max",
         })
 
-    solution_mode = bool((client_requests_solution and explicit_solution)
-                         or (teaching or {}).get("mode") == "full_solution")
+    solution_mode = bool(explicit_solution or (
+        (teaching or {}).get("mode") == "full_solution"
+        and not re.search(r"(?:不要|别|不用|无需|不需要).{0,5}(?:答案|解答)", current_instruction)
+    ))
     if solution_mode:
         teaching = dict(teaching or {})
         teaching["mode"] = "full_solution"
@@ -2655,7 +2723,7 @@ def chat():
         effective_exercise_request and explicit_solution
     )
     exercise_explanation_requested = bool(
-        explicit_explanation
+        effective_exercise_request and explicit_explanation
     )
 
     # 只对独立出题采用本轮请求。避免把几十轮历史题目交给模型，
@@ -3002,6 +3070,46 @@ def chat():
                     else:
                         answer_section += "\n\n解析暂时未能生成，已先保留出题时的参考答案。"
                 reply += "\n\n" + answer_section
+            if output_intent.get("knowledge"):
+                # Use freshly analyzed *generated question* metadata, rather
+                # than the instruction's topic list or stale previous question.
+                knowledge_points = list(dict.fromkeys(
+                    str(item).strip() for item in (
+                        (generated_teaching or {}).get("knowledge_points") or []
+                    ) + (
+                        (generated_teaching or {}).get("focus_points") or []
+                    ) if isinstance(item, str) and item.strip()
+                ))[:6]
+                if knowledge_points:
+                    reply += "\n\n【涉及知识点】\n\n" + "、".join(knowledge_points)
+                else:
+                    category = str((generated_teaching or {}).get("category") or "").strip()
+                    if category and category != "待识别":
+                        reply += "\n\n【涉及知识点】\n\n" + category
+            if output_intent.get("hints") and not exercise_explanation_requested:
+                hint_context = dict(generated_teaching or {})
+                hint_context["mode"] = "hint"
+                hint_context["mode_label"] = "提示引导"
+                try:
+                    hint_result = ask_ai([{"role": "user", "content": (
+                        "针对下面刚生成的练习题，给出两条具体、有用的解题提示，"
+                        "不得公布最终答案，不得完成证明或代替学生解题。\n"
+                        "【题目】\n" + generated_question
+                    )}], retries=0, teaching_context=hint_context)
+                except Exception as hint_exc:
+                    print("综合出题提示降级：", type(hint_exc).__name__)
+                    hint_result = {}
+                hint_text = str(hint_result.get("reply") or "").strip() if isinstance(hint_result, dict) else ""
+                # A hint request must never leak a final answer if the model
+                # ignores its instruction and outputs a solution instead.
+                appears_to_disclose_answer = bool(re.search(
+                    r"【(?:答案|最终答案|解析)】|\[\[WRONGBOOK_ANSWER|(?:最终|参考|正确)?答案\s*[:：为是]",
+                    hint_text, flags=re.IGNORECASE
+                ))
+                if isinstance(hint_result, dict) and hint_result.get("ok") and hint_text and not appears_to_disclose_answer:
+                    reply += "\n\n【提示】\n\n" + hint_text
+                else:
+                    reply += "\n\n【提示】\n\n暂时没能生成可靠的提示。"
 
         response = {
             "reply": reply,
@@ -3336,7 +3444,7 @@ def ocr():
                 unknown = graph.get("uncertain_edges") or []
                 full = graph.get("confidence") == "high" and not unknown
                 all_complete = all_complete and full
-                lines = [f'G{index}：{len(vertices)} 个顶点，已识别 {len(edges)} 条边。']
+                lines = [f'G{index}：{len(vertices)} 个顶点，已核验 {len(edges)} 条直线边。']
                 if edges:
                     lines.append('边：' + '、'.join(
                         f'{edge[0]}—{edge[1]}' for edge in edges
