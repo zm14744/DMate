@@ -697,6 +697,11 @@ def _looks_like_exercise_request_text(text):
     if not value or len(value) > 180:
         return False
 
+    # A learner may request a question using “给一道题” without “给我”.
+    # Do not treat meta questions or existing-question explanations as generation.
+    if re.match(r"^(?:只|仅)?(?:要|给|来|请给|请来)(?:我)?(?:一?道|一?个|一题)(?:简单|中等|困难|图论|数论|同构|离散数学)?(?:题|题目|练习)(?=$|[,，。;；]|并|和|与|附)", value):
+        return True
+
     # 明确拒绝出题：不允许被后面的“出题/难题”关键词反向误触发。
     if re.search(
         r"(?:不想(?:让你)?|不要|别|不用|无需|禁止|先别|暂时别|以后别|别再|不要再)"
