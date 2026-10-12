@@ -18,6 +18,11 @@ from flask import Flask, jsonify, render_template, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure
+try:
+    from graph_recognition import recognize_graphs
+except (ImportError, OSError) as _graph_import_error:
+    print(f"OpenCV 图结构模块不可用，保留原 Vision 识别：{_graph_import_error}")
+    recognize_graphs = None
 from classification_semantic import classify_ambiguous_questions
 from teaching import (
     analyze_messages,
@@ -2629,6 +2634,15 @@ def chat():
         or server_detected_exercise
     )
 
+    # 用户明确要求“出题并给答案/解析”时，必须执行复合任务。
+    # 不影响普通出题的隐藏答案和难度校验。
+    exercise_solution_requested = bool(
+        effective_exercise_request and explicit_solution
+    )
+    exercise_explanation_requested = bool(
+        exercise_solution_requested and re.search(r"解析|过程|步骤|证明|讲解|解答", current_instruction)
+    )
+
     # 只对独立出题采用本轮请求。避免把几十轮历史题目交给模型，
     # 造成串题、额外 token 和意外耗时。同知识点复测仍保留结构化参照题。
     # 如果客户端显式提供参照题，前面已组装成单条带锚点的请求。
@@ -2947,10 +2961,32 @@ def chat():
             generation_note = ""  # 严格符合目标时才会走到这里
 
             # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
-            reply = (
-                "【题目】\n\n"
-                + generated_question
-            )
+            reply = "【题目】\n\n" + generated_question
+            if exercise_solution_requested:
+                # The generation model supplies a private *final* answer, not a
+                # proof. For an explicit solution request, expose the checked
+                # answer; request a separate proof only when requested.
+                answer_section = "【答案】\n\n" + generated_answer
+                if exercise_explanation_requested:
+                    explain_context = dict(generated_teaching or {})
+                    explain_context["mode"] = "full_solution"
+                    explain_context["mode_label"] = "完整解析"
+                    explain_context["difficulty"] = actual_difficulty or "中等"
+                    try:
+                        explained = ask_ai([{"role":"user", "content":(
+                            "请独立求解下面的离散数学题，必须给出完整推导、最终答案，"
+                            "核对每个结果。若参考答案有误请纠正。\n"
+                            "【题目】\n" + generated_question +
+                            "\n【待核对参考答案】\n" + generated_answer
+                        )}], retries=0, teaching_context=explain_context)
+                    except Exception as explain_exc:
+                        print("综合出题解析降级：", type(explain_exc).__name__)
+                        explained = {}
+                    if isinstance(explained, dict) and explained.get("ok") and str(explained.get("reply") or "").strip():
+                        answer_section += "\n\n【解析】\n\n" + str(explained["reply"]).strip()
+                    else:
+                        answer_section += "\n\n解析暂时未能生成，已先保留出题时的参考答案。"
+                reply += "\n\n" + answer_section
 
         response = {
             "reply": reply,
@@ -3085,30 +3121,6 @@ def _looks_like_non_question_ocr(text, visual_text):
     return bool(note_titles or definition_bullets >= 3)
 
 
-def _graph_numeric_facts(text):
-    """只提取明确的顶点/边数量，不将 v1、公式指数等误作规模。"""
-    source = str(text or "").translate(str.maketrans("０１２３４５６７８９", "0123456789"))
-    patterns = {
-        "顶点数": (
-            r"(?:顶点数|顶点个数)\s*(?:是|为|有|[:：=])\s*(\d{1,3})",
-            r"(?:共|有|包含|具有)?\s*(\d{1,3})\s*个?顶点",
-            r"顶点\s*(\d{1,3})\s*个",
-        ),
-        "边数": (
-            r"(?:边数|边的条数)\s*(?:是|为|有|[:：=])\s*(\d{1,3})",
-            r"(?:共|有|包含|具有)\s*(\d{1,3})\s*条边",
-        ),
-    }
-    facts = {}
-    for label, matchers in patterns.items():
-        matches = set()
-        for matcher in matchers:
-            matches.update(int(match.group(1)) for match in re.finditer(matcher, source))
-        if len(matches) == 1:
-            facts[label] = next(iter(matches))
-    return facts
-
-
 def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
     """Vision 是待核对候选。漏问时保留 OCR，数字变化明确列出。"""
     original = _numbered_ocr_questions(ocr_text)
@@ -3126,14 +3138,6 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
                 changes.append({"question": number, "ocr": "、".join(before), "vision": "、".join(after)})
         if changes:
             reasons.append("第 " + "、".join(x["question"] for x in changes) + " 问的数字或下标识别不一致，请对照原图。")
-    # 不依赖小问序号；纯单问题的“4 个顶点/5 个顶点”也必须核对。
-    original_facts = _graph_numeric_facts(ocr_text)
-    candidate_facts = _graph_numeric_facts(corrected_text)
-    for key in sorted(set(original_facts) & set(candidate_facts)):
-        before, after = original_facts[key], candidate_facts[key]
-        if before != after:
-            changes.append({"question": "题干", "field": key, "ocr": str(before), "vision": str(after)})
-            reasons.append(f"题干{key}存在识别冲突：普通 OCR 为 {before}，图像复核为 {after}，请对照原图。")
     for field in uncertain_fields or []:
         if isinstance(field, str) and field.strip():
             reasons.append(field.strip()[:240])
@@ -3242,9 +3246,22 @@ def ocr():
             else None
         )
 
+        # CPU-only OpenCV graph recognition is opportunistic and bounded.
+        # Any uncertainty or failure leaves the original Vision/OCR fallback intact.
+        graph_cv = {'graphs': [], 'status': 'not_graph', 'regions': []}
+        possible_graph = (len(ocr_text) < 20 or bool(re.search(
+            r"图|顶点|边|连通|邻接|路径|欧拉|哈密顿|G[123₁₂₃]", ocr_text
+        )))
+        if possible_graph and recognize_graphs is not None:
+            try:
+                graph_cv = recognize_graphs(raw, text_hint=ocr_text,
+                                            allow_without_context=(len(ocr_text) < 20))
+            except Exception as cv_exc:
+                print(f"OpenCV 图结构识别降级：{type(cv_exc).__name__}")
+
         try:
             vision_result = analyze_image_structure(
-                raw, ocr_text=ocr_text, review_regions=vision_regions
+                raw, review_regions=vision_regions, opencv_graphs=graph_cv
             )
         except Exception as exc:
             print(f"Vision 增强层异常：{type(exc).__name__}")
@@ -3291,6 +3308,25 @@ def ocr():
                 vision_warning = (
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
+
+        # OpenCV 的已核验边按其证据等级独立呈现；不确定连接不能补全。
+        # 后续教学模型使用的 visual_text 包含明确的顶点坐标及边表。
+        cv_graphs = graph_cv.get("graphs") or []
+        if cv_graphs:
+            verified_sections = []
+            for graph in cv_graphs:
+                confirmed = graph.get("edges") or []
+                unknown = graph.get("uncertain_edges") or []
+                verified_sections.append(
+                    f'{graph["id"]}（OpenCV，{graph["confidence"]}置信度）：'
+                    f'已定位顶点及相对坐标={json.dumps(graph["vertices"], ensure_ascii=False)}；'
+                    f'经直线连续性核验的边={json.dumps(confirmed, ensure_ascii=False)}；'
+                    f'由已核验边构造的邻接矩阵={json.dumps(graph["adjacency_matrix"], ensure_ascii=False)}；'
+                    f'仍不确定的候选连接={json.dumps(unknown, ensure_ascii=False)}。'
+                    '请注意：列表中没有出现的连接不代表不存在；曲线、自环、重边、箭头由 Vision 复核。'
+                )
+            graph_text = "【OpenCV 实际线迹检测（仅确认可核验部分）】\n" + "\n".join(verified_sections)
+            visual_text = (graph_text + "\n【视觉补充】\n" + visual_text) if visual_text else graph_text
 
         # 撤销若发生在 Vision 调用期间，结果也直接丢弃。
         if request_id and _take_ocr_cancelled(request_id):
@@ -3340,6 +3376,8 @@ def ocr():
         return jsonify({
             "text": display_text,
             "visual_text": visual_text,
+            # 兼容旧客户端：新增字段不影响现有 text / visual_text 处理。
+            "graph_structures": cv_graphs,
             "raw_ocr_text": ocr_text,
             "review": review,
             "text_count": result.get(
