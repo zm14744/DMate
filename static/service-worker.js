@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-appearance-unify-20261012";
+const CACHE_NAME = "dmate-webapp-desktop-input-restored-20261012";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
