@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-modal-pdf-fix-20261012d";
+const CACHE_NAME = "dmate-light-card-buttons-20261012e";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
