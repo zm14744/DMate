@@ -7914,6 +7914,24 @@ body[data-appearance-theme] #wrongBookModal .wrong-empty {
     background-image:none !important;
 }
 
+
+/* 2026-10-12 小幅加深浅色主题卡片和错题本控件底色；不改字体颜色。 */
+body[data-appearance-theme="light"] #learningReviewModal .learning-review-section {
+    background-color:#edf2f7 !important;
+    background-image:none !important;
+}
+body[data-appearance-theme="light"] #wrongBookModal .wrong-filters button:not(.active),
+body[data-appearance-theme="light"] #wrongBookModal .wrong-tools input,
+body[data-appearance-theme="light"] #wrongBookModal .wrong-tools select,
+body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button {
+    background-color:#eaf0f7 !important;
+    background-image:none !important;
+}
+body[data-appearance-theme="light"] #wrongBookModal .wrong-filters button:not(.active):hover,
+body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button:hover {
+    background-color:#e0e8f2 !important;
+}
+
 </style>
 
 <script>
@@ -8627,7 +8645,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-modal-pdf-fix-20261012d"></script>
+<script src="/static/script.js?v=dmate-light-card-buttons-20261012e"></script>
 
 </body>
 </html>
