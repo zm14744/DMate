@@ -436,6 +436,10 @@ def _looks_like_broken_math(text):
     if not isinstance(text, str) or not text.strip():
         return True
 
+    # 这是前端临时标记，绝不允许模型把它当作数学内容输出。
+    if re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", text):
+        return True
+
     suspicious_patterns = (
         r"\\_\{",          # a\_{ij}
         r"\*\{[^}\n]+\}",  # a*{ij} / )*{5\times5}
