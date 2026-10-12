@@ -3174,26 +3174,41 @@ function refreshInputAvailability() {
         input.disabled = hardBlocked || ocrReviewInProgress;
         input.placeholder = placeholder;
     }
-    if (sendBtn) {
-        const canStop = (waitingReply || typingNow) && !ocrReviewInProgress;
-        sendBtn.disabled = Boolean(ocrReviewInProgress);
-        sendBtn.hidden = Boolean(ocrReviewInProgress);
-        sendBtn.textContent = canStop ? "停止" : "发送";
-        sendBtn.classList.toggle("ai-stop-button", canStop);
-        sendBtn.setAttribute("aria-label", canStop ? "停止当前 AI 回复" : "发送消息");
-        sendBtn.title = canStop ? "停止当前 AI 回复" : "发送";
-    }
-    if (imageBtn) {
-        imageBtn.disabled = hardBlocked || ocrReviewInProgress;
-        imageBtn.hidden = Boolean(ocrReviewInProgress || waitingReply || typingNow);
+    // 三种互斥输入状态以 JS + 样式双重保证，不依赖单个 CSS 选择器。
+    // OCR 阶段即便有异步重新渲染，也不能显示可发送的按钮。
+    const recognizing = Boolean(ocrReviewInProgress || ocrRequestInFlight);
+    const stoppingAllowed = !recognizing && Boolean(waitingReply || typingNow);
+    const visibleMode = recognizing ? "ocr" : stoppingAllowed ? "ai" : "idle";
+
+    function setInputControlVisible(element, visible) {
+        if (!element) return;
+        element.hidden = !visible;
+        element.setAttribute("aria-hidden", String(!visible));
+        // 覆盖主题里对 #sendBtn / #imageBtn 的多层 !important 规则。
+        element.style.setProperty("display", visible ? "" : "none", visible ? "" : "important");
     }
 
+    if (sendBtn) {
+        const sendVisible = visibleMode !== "ocr";
+        sendBtn.disabled = !sendVisible;
+        sendBtn.textContent = stoppingAllowed ? "停止" : "发送";
+        sendBtn.classList.toggle("ai-stop-button", stoppingAllowed);
+        sendBtn.setAttribute("aria-label", stoppingAllowed ? "停止当前 AI 回复" : "发送消息");
+        sendBtn.title = stoppingAllowed ? "停止当前 AI 回复" : "发送";
+        setInputControlVisible(sendBtn, sendVisible);
+    }
+    if (imageBtn) {
+        imageBtn.disabled = visibleMode !== "idle";
+        setInputControlVisible(imageBtn, visibleMode === "idle");
+    }
     if (inputWrap) {
-        inputWrap.classList.toggle(
-            "ai-input-busy",
-            busyMode === "thinking" || busyMode === "answering"
-        );
-        inputWrap.dataset.busyMode = busyMode;
+        inputWrap.classList.toggle("ai-input-busy", visibleMode === "ai");
+        // CSS 必须只依赖最终可见状态，避免等待 OCR/思考回调时闪现按钮。
+        inputWrap.dataset.busyMode = visibleMode === "ai" ? (typingNow ? "answering" : "thinking") : visibleMode;
+    }
+    if (ocrCancelBtn) {
+        ocrCancelBtn.disabled = !ocrRequestInFlight;
+        setInputControlVisible(ocrCancelBtn, recognizing && ocrRequestInFlight);
     }
 
     if (inputLockHint) {
@@ -3201,10 +3216,6 @@ function refreshInputAvailability() {
         inputLockHint.classList.toggle("hidden", !statusText);
     }
 
-    if (ocrCancelBtn) {
-        ocrCancelBtn.hidden = !ocrRequestInFlight;
-        ocrCancelBtn.disabled = !ocrRequestInFlight;
-    }
 }
 
 function setSessionBusy(sessionId, busy) {
