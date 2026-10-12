@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-webapp-composite-graph-recheck-20261012";
+const CACHE_NAME = "dmate-math-quality-fix-20261012-ui2";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
