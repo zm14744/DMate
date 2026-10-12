@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image, ImageOps
 
 MAX_SIDE = 1650
+MIN_RECOGNITION_SIDE = 1520
 MAX_CIRCLES = 100
 MAX_GRAPHS = 12
 
@@ -178,6 +179,50 @@ def _find_graph_boxes(vertices, gray):
     return output[:MAX_GRAPHS]
 
 
+def _fallback_graph_box(vertices, gray):
+    """Fallback for one small diagram with 3–9 reliable circular markers.
+
+    The normal layout splitter still handles full textbook pages. A one-graph
+    cropped picture may have only two vertices on a row and must not be lost.
+    This helper is used only when the primary multi-graph detector found nothing.
+    """
+    h, w = gray.shape
+    if not 3 <= len(vertices) <= 9:
+        return []
+    xs=[v[0] for v in vertices]; ys=[v[1] for v in vertices]
+    if max(xs)-min(xs) < 37 or max(ys)-min(ys) < 37:
+        return []
+    if max(xs)-min(xs) > .8*w or max(ys)-min(ys) > .8*h:
+        return []
+    x1=max(0,int(min(v[0]-v[2] for v in vertices)-12))
+    y1=max(0,int(min(v[1]-v[2] for v in vertices)-12))
+    x2=min(w,int(max(v[0]+v[2] for v in vertices)+12))
+    y2=min(h,int(max(v[1]+v[2] for v in vertices)+12))
+    return [(vertices,(x1,y1,x2,y2))]
+
+
+def _relaxed_colored_vertices(rgb):
+    """Catch larger solid-colour node markers; only a fallback on cropped art."""
+    hsv=cv2.cvtColor(rgb,cv2.COLOR_RGB2HSV)
+    mask=cv2.inRange(hsv,(0,105,75),(179,255,255))
+    n, lab, stats, centers=cv2.connectedComponentsWithStats(mask,8)
+    result=[]
+    for i in range(1,n):
+        x,y,w,h,area=stats[i]
+        if not (90 <= area <= 2100 and 11 <= w <= 52 and 11 <= h <= 52):
+            continue
+        if not .79 <= w / max(h,1) <= 1.26:
+            continue
+        patch=(lab[y:y+h,x:x+w]==i).astype(np.uint8)
+        contours,_=cv2.findContours(patch,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:continue
+        perimeter=cv2.arcLength(max(contours,key=cv2.contourArea),True)
+        circularity=4*math.pi*area/max(perimeter*perimeter,1)
+        if circularity>=.66 or (area / max(1, w*h)) >= .68:
+            result.append((float(centers[i,0]),float(centers[i,1]),float((w+h)/4),'red'))
+    return result[:MAX_CIRCLES]
+
+
 def _edge_evidence(gray, a, b, all_nodes):
     x1,y1,r1,_=a; x2,y2,r2,_=b
     length=math.hypot(x2-x1,y2-y1)
@@ -281,11 +326,22 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
     started=time.monotonic()
     with Image.open(io.BytesIO(image_bytes)) as im:
         im=ImageOps.exif_transpose(im).convert('RGB')
-        scale=min(1,MAX_SIDE/max(im.size))
-        if scale<1: im=im.resize((int(im.width*scale),int(im.height*scale)),Image.Resampling.LANCZOS)
+        longest=max(im.size)
+        scale=min(MAX_SIDE/longest, max(1.0, MIN_RECOGNITION_SIDE/longest), 2.0)
+        if abs(scale-1.0)>0.01:
+            im=im.resize((int(im.width*scale),int(im.height*scale)),Image.Resampling.LANCZOS)
         rgb=np.asarray(im)
     vs,gray=_round_vertices(rgb)
     boxes=_find_graph_boxes(vs,gray)
+    fallback=False
+    if not boxes:
+        candidates = _relaxed_colored_vertices(rgb)
+        # The original detector can already have found good neutral-gray nodes.
+        # Do not mix colour glyphs and gray vertices into a fictitious graph.
+        if len(vs) >= 3 and len(vs) <= 9:
+            candidates = vs
+        boxes = _fallback_graph_box(candidates, gray)
+        fallback=bool(boxes)
     graphs=[]
     for points,box in boxes:
         points=sorted(points,key=lambda p:(round(p[1]/22),p[0]))
@@ -303,12 +359,19 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
                 if status=='solid' or (status not in ('intermediate_vertex','too_close')
                                        and score>=.65 and _hough_verified_edge(points[i],points[j],segments)):
                     edges.append([i,j])
-                elif status=='uncertain' or (status=='partial' and score>=.66):
+                elif status=='uncertain' or (status=='partial' and score>=.30):
                     unsure.append({'vertices':[i,j], 'coverage':round(score,2)})
         # Suppress OCR glyph constellations masquerading as an extra graph.
         # Real sparse/disconnected drawings without enough pixel evidence
         # fall back to Vision instead of inventing a third diagram.
-        if len(edges) < len(points)-1 and not unsure:
+        if len(edges)<2:
+            # One accidental dark segment among decorative circles/glyphs is
+            # not enough to present an OCR UI screenshot as a math graph.
+            # Legitimate extremely sparse graphs fall back to Vision.
+            continue
+        if y1 > .83*gray.shape[0] and y2 > .9*gray.shape[0] and len(edges) < len(points)-1:
+            # A partial diagram below the viewport edge of a slide screenshot.
+            # Never present it as a ninth fully recovered graph.
             continue
         # If a circle-rich graph has too few verified edges, downgrade rather
         # than claim that it is a disconnected or empty graph.
@@ -320,7 +383,7 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
         reliable_nodes = len(points) >= 3 and len(points) <= 9 and all(
             4 <= p[2] <= 22 for p in points
         )
-        confidence = 'high' if (reliable_nodes and not unsure and len(edges) >= len(points)-1
+        confidence = 'high' if (reliable_nodes and not unsure and scale <= 1.65 and not fallback and len(edges) >= len(points)-1
                                and len(edges) <= len(points)*(len(points)-1)//2) else 'partial'
         vertex_list=[{'id':f'v{i+1}','x':round(p[0]/rgb.shape[1],4),
                       'y':round(p[1]/rgb.shape[0],4), 'label':None} for i,p in enumerate(points)]
@@ -337,5 +400,5 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
                        'bbox':[round(z/lim,4) for z,lim in zip(box,(rgb.shape[1],rgb.shape[0],rgb.shape[1],rgb.shape[0]))]})
     return {'status':'detected' if graphs else 'uncertain', 'graphs':graphs,
             'regions':[g['bbox'] for g in graphs],
-            'warning':'OpenCV 仅自动确认直线、可见圆点的无向简单边；交叉点不自动视为顶点；曲线、重边、环、箭头及不确定端点仍需 Vision 核对。',
+            'warning':'OpenCV 仅自动确认直线、可见圆点的无向简单边；交叉点不自动视为顶点；曲线、重边、环、箭头、稀疏图及低分辨率的连接仍需 Vision 核对。',
             'elapsed_ms':round((time.monotonic()-started)*1000,1)}
