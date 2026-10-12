@@ -7829,6 +7829,43 @@ body[data-appearance-theme] .input-wrap #ocrCancelBtn[hidden] {
     display:none !important;
 }
 
+
+
+/* 2026-10-12 修复：外观弹窗底部黑条、背景缩略图、黑色主题透明聊天框 */
+body[data-appearance-theme] .appearance-apply-hint,
+body[data-appearance-theme] .appearance-footer {
+    background:var(--dm-frost-panel-strong) !important;
+    background-image:none !important;
+}
+body[data-appearance-theme] .appearance-apply-hint {
+    border-top:1px solid var(--dm-frost-border) !important;
+    border-bottom:0 !important;
+    margin:0 !important;
+}
+body[data-appearance-theme] .appearance-footer {
+    border-top:0 !important;
+}
+body[data-appearance-theme] .appearance-background-preview[data-has-background="true"] {
+    color:transparent !important;
+    background-color:transparent !important;
+    background-size:cover !important;
+    background-position:center !important;
+    background-repeat:no-repeat !important;
+}
+body[data-appearance-theme="dark"] .ai,
+body[data-appearance-theme="dark"].has-custom-background .ai {
+    background:rgba(47,47,47,var(--bubble-alpha)) !important;
+    background-image:none !important;
+    color:#f2f2f2 !important;
+    -webkit-text-fill-color:#f2f2f2 !important;
+}
+body[data-appearance-theme="dark"] .user,
+body[data-appearance-theme="dark"].has-custom-background .user {
+    background:rgba(59,59,59,var(--bubble-alpha)) !important;
+    background-image:none !important;
+    color:#f8fafc !important;
+}
+
 </style>
 
 <script>
@@ -8542,7 +8579,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-composite-graph-recheck-20261012"></script>
+<script src="/static/script.js?v=dmate-ui-fix-20261012b"></script>
 
 </body>
 </html>
