@@ -6123,6 +6123,26 @@ function wrongQuestionFingerprint(question) {
         .slice(0, 1600);
 }
 
+function visibleWrongQuestionFingerprint(question) {
+    const raw = String(question || "");
+    const fast = wrongQuestionFingerprint(raw);
+
+    try {
+        const temp = document.createElement("div");
+        temp.innerHTML = markdownToHtml(raw);
+        const rendered = String(temp.textContent || temp.innerText || "")
+            .toLowerCase()
+            .replace(/[【】\[\]（）()，,。.!！?？:：;；"'“”‘’`]/g, "")
+            .replace(/[\\\[\]()]/g, "").replace(/\$+/g, "")
+            .replace(/\s+/g, "")
+            .slice(0, 2000);
+
+        return rendered || fast;
+    } catch (_error) {
+        return fast;
+    }
+}
+
 function wrongBookLearningPoints(entryOrQuestion) {
     // 错题可能同时考多个核心知识点。旧版有 focusPoints 就直接丢弃
     // knowledgePoints，导致复测只覆盖一项；这里合并去重，最多保留四项。
@@ -7472,21 +7492,39 @@ function rollbackRetestAfterRequestFailure(session) {
 }
 
 function dedupeWrongBookItemsForPdf(items) {
-    const seen = new Set();
+    const seen = new Map();
     const unique = [];
 
     for (const item of items || []) {
-        const fingerprint = wrongQuestionFingerprint(
-            item?.question
-        );
-        const key = fingerprint || `id:${item?.id || unique.length}`;
+        const fingerprints = [
+            visibleWrongQuestionFingerprint(item?.question),
+            wrongQuestionFingerprint(item?.question)
+        ].filter(Boolean);
+        const key = fingerprints[0] || `id:${item?.id || unique.length}`;
+        const existingIndex = fingerprints
+            .map(value => seen.get(value))
+            .find(index => Number.isInteger(index));
 
-        if (seen.has(key)) {
+        if (Number.isInteger(existingIndex)) {
+            const current = unique[existingIndex];
+            const currentUpdated = Number(current?.updatedAt || 0);
+            const nextUpdated = Number(item?.updatedAt || 0);
+
+            if (nextUpdated >= currentUpdated) {
+                unique[existingIndex] = item;
+            }
+
+            for (const value of fingerprints) {
+                seen.set(value, existingIndex);
+            }
             continue;
         }
 
-        seen.add(key);
+        const nextIndex = unique.length;
         unique.push(item);
+        for (const value of fingerprints) {
+            seen.set(value, nextIndex);
+        }
     }
 
     return unique;
