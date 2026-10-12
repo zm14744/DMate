@@ -7558,6 +7558,151 @@ body[data-appearance-theme="light"] .appearance-footer button:not(.primary) {
     }
 }
 
+
+/* =========================================================
+   2026-10-12 桌面输入区恢复（仅 >1100px）：
+   恢复桌面原来的通栏输入结构，去除上一版误加的大胶囊；
+   三种主题只换配色，不改变尺寸、间距、圆角和按钮形状。
+   手机/平板 <=1100px 的输入胶囊保持原样。
+   ========================================================= */
+@media (min-width:1101px) {
+    body[data-appearance-theme] .input-wrap,
+    body[data-appearance-theme]:not(.has-custom-background) .input-wrap,
+    body.has-custom-background[data-appearance-theme] .input-wrap {
+        width:100% !important;
+        padding:0 !important;
+        border:0 !important;
+        background:transparent !important;
+        background-image:none !important;
+        box-shadow:none !important;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+    }
+
+    body[data-appearance-theme] .input,
+    body[data-appearance-theme]:not(.has-custom-background) .input,
+    body.has-custom-background[data-appearance-theme] .input {
+        box-sizing:border-box !important;
+        width:100% !important;
+        max-width:none !important;
+        min-height:0 !important;
+        height:auto !important;
+        margin:0 !important;
+        padding:10px 12px 12px !important;
+        gap:8px !important;
+        border:0 !important;
+        border-radius:0 !important;
+        background:transparent !important;
+        background-image:none !important;
+        box-shadow:none !important;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+    }
+
+    body[data-appearance-theme] .input input,
+    body[data-appearance-theme] .input input:hover,
+    body[data-appearance-theme] .input input:focus,
+    body.has-custom-background[data-appearance-theme] .input input {
+        box-sizing:border-box !important;
+        flex:1 1 0 !important;
+        width:auto !important;
+        min-width:0 !important;
+        height:46px !important;
+        min-height:46px !important;
+        max-height:46px !important;
+        padding:0 14px !important;
+        border:1px solid var(--border-strong) !important;
+        border-radius:12px !important;
+        background:var(--surface-3) !important;
+        background-image:none !important;
+        color:var(--text-primary) !important;
+        -webkit-text-fill-color:var(--text-primary) !important;
+        box-shadow:none !important;
+        outline:none !important;
+    }
+
+    body[data-appearance-theme="light"] .input input,
+    body[data-appearance-theme="light"] .input input:hover,
+    body[data-appearance-theme="light"] .input input:focus,
+    body[data-appearance-theme="light"].has-custom-background .input input {
+        background:rgba(255,255,255,.94) !important;
+        border-color:#cbd5e1 !important;
+    }
+    body[data-appearance-theme="dark"] .input input,
+    body[data-appearance-theme="dark"] .input input:hover,
+    body[data-appearance-theme="dark"] .input input:focus,
+    body[data-appearance-theme="dark"].has-custom-background .input input {
+        background:rgba(47,47,47,.94) !important;
+        border-color:#3a3a3a !important;
+    }
+    body[data-appearance-theme="navy"] .input input,
+    body[data-appearance-theme="navy"] .input input:hover,
+    body[data-appearance-theme="navy"] .input input:focus,
+    body[data-appearance-theme="navy"].has-custom-background .input input {
+        background:rgba(var(--surface-3-rgb),.94) !important;
+        border-color:var(--border-strong) !important;
+    }
+    body[data-appearance-theme] .input input:focus {
+        border-color:var(--accent) !important;
+    }
+
+    body[data-appearance-theme] #imageBtn,
+    body[data-appearance-theme] #sendBtn:not(.ai-stop-button) {
+        box-sizing:border-box !important;
+        flex:0 0 auto !important;
+        width:auto !important;
+        min-width:0 !important;
+        height:46px !important;
+        min-height:46px !important;
+        max-height:46px !important;
+        margin:0 !important;
+        padding:0 17px !important;
+        border:0 !important;
+        border-radius:10px !important;
+        background:var(--accent) !important;
+        color:#fff !important;
+        -webkit-text-fill-color:#fff !important;
+        font-size:14px !important;
+        font-weight:650 !important;
+        line-height:1.2 !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme] #imageBtn::before {
+        content:none !important;
+        display:none !important;
+    }
+
+    /* 保留停止生成专用红色圆钮，不退回普通发送键。 */
+    body[data-appearance-theme] #sendBtn.ai-stop-button {
+        box-sizing:border-box !important;
+        flex:0 0 46px !important;
+        width:46px !important;
+        min-width:46px !important;
+        height:46px !important;
+        min-height:46px !important;
+        max-height:46px !important;
+        padding:0 !important;
+        border:0 !important;
+        border-radius:50% !important;
+        background:#dc2626 !important;
+        color:#fff !important;
+        -webkit-text-fill-color:#fff !important;
+        font-size:0 !important;
+        position:relative;
+    }
+    body[data-appearance-theme] #sendBtn.ai-stop-button::after {
+        content:"";
+        position:absolute;
+        left:50%;
+        top:50%;
+        width:13px;
+        height:13px;
+        transform:translate(-50%,-50%);
+        border-radius:2px;
+        background:#fff;
+    }
+}
+
 </style>
 
 <script>
