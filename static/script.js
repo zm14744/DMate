@@ -19497,21 +19497,26 @@ function initDmateInstall() {
 
 function registerDmateServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
-    const platform = detectDmateInstallPlatform();
     const config = dmateClientConfig();
 
-    // 仅 iOS 保留主屏幕 Web App。Android 和桌面端统一使用原生壳，清理旧 PWA 注册。
-    if (config.isAndroid || config.isAndroidApp || config.isDesktopApp || platform !== "ios") {
+    // 普通浏览器（包含微软商店 PWABuilder 检测的 Chromium）注册 SW。
+    // 现有 Android APK 和 Tauri 桌面壳仍保持原有行为，不启用网页 PWA 管理。
+    if (config.isAndroidApp || config.isDesktopApp) {
         navigator.serviceWorker.getRegistrations?.()
             .then(registrations => Promise.all(registrations.map(reg => reg.unregister())))
             .catch(() => {});
         return;
     }
 
-    window.addEventListener("load", () => {
+    const register = () => {
         navigator.serviceWorker.register("/service-worker.js", { scope:"/" })
-            .catch(error => console.warn("DMate iOS Web App 注册失败：", error));
-    }, { once:true });
+            .catch(error => console.warn("DMate Web App 注册失败：", error));
+    };
+    if (document.readyState === "complete") {
+        register();
+    } else {
+        window.addEventListener("load", register, { once:true });
+    }
 }
 
 // -----------------------------
