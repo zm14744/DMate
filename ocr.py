@@ -234,6 +234,22 @@ def _resize_if_needed(image):
     )
 
 
+def _enhance_faded_photo(image):
+    """仅在首轮文本证据不足时轻度提升局部对比度，不二值化损伤图线。"""
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    light, green, blue = cv2.split(lab)
+    enhanced = cv2.createCLAHE(clipLimit=1.8, tileGridSize=(8, 8)).apply(light)
+    return cv2.cvtColor(cv2.merge((enhanced, green, blue)), cv2.COLOR_LAB2BGR)
+
+
+def _ocr_text_strength(items):
+    """按可读中文和明确小问计分，过滤单纯顶点/边标签等图内噪声。"""
+    lines = [str(item.get("content") or "") for item in items]
+    useful = sum(min(len(re.findall(r"[\u4e00-\u9fff]", line)), 24) for line in lines)
+    questions = sum(bool(re.match(r"^\s*[（(]\s*\d+\s*[）)]", line)) for line in lines)
+    return useful + questions * 18
+
+
 def _review_regions(text_items, image_width, image_height):
     """用文字坐标定位题干，供 Vision 查看放大的局部；不传识别出的字符。
 
@@ -599,6 +615,15 @@ def recognize_image(image_data):
     try:
         with _inference_lock:
             text_items = _extract_text_items(image)
+            if _ocr_text_strength(text_items) < 28:
+                # 小尺寸、低对比度教材扫描图经常第一轮只识别 v1/e3。
+                # 至多追加一次文字 OCR，不重复耗时较长的公式识别。
+                try:
+                    enhanced_items = _extract_text_items(_enhance_faded_photo(image))
+                    if _ocr_text_strength(enhanced_items) > _ocr_text_strength(text_items):
+                        text_items = enhanced_items
+                except Exception as exc:
+                    print(f"低对比度文字 OCR 补救失败，保留首轮：{type(exc).__name__}")
 
             formula_items = []
             formula_warning = None
