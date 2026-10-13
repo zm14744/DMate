@@ -72,7 +72,7 @@ jobs:
           sha256sum "${snaps[0]}"
 
       - name: Upload and release Snap
-        uses: snapcore/action-publish@v1
+        uses: canonical/action-publish@v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
