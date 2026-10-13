@@ -180,3 +180,27 @@ curl https://dmate.zeabur.app/ready
 OCR 修复：验证识别中电脑“图片识题”和手机“＋”按钮隐藏、空间补位且撤销保留；手机核对窗口底部两按钮固定，长文本/图形区独立滚动；非题目课件/照片明确判定返回 422 而不进入解题；纯图论题或不确定图不被简单误杀。
 
 此前该修复轮次曾记录 **27 项离线回归通过**，仅代表当时执行的代码级测试，不代表真实 OCR、线上模型、跨设备和安装版全链路的人工验收。
+
+## 10. 2026-10-09—10-13 分发与 SEO 专项核验记录（新增）
+
+本节记录实际可追溯的构建/提交事件，不增加“个人自测总数”；旧的 175 项个人记录、27 项离线回归和历史 10/10 单元测试记录仍按原日期解释，不能冒充 10/13 重新独立执行。
+
+| 核验项目 | 当前证据/状态 | 仍需测试 |
+|---|---|---|
+| GitHub Snap 构建 | `build-snap.yml` 生成 `amd64` 包；GitHub Actions 构建成功 | Snap 安装、登录、OCR、文件导出、跨发行版兼容 |
+| Snap Store 初次发布 | Store 创建 Revision 1 发布 `edge`，随后 `promote-existing` 直接发布至 `stable`，日志成功 | 用户设备真实下载安装、沙盒文件/剪贴板权限 |
+| 重复上传保护 | 重复上传完全相同 Snap 触发 Store 唯一性错误；发布流程改为已有 revision 不重新上传 | 将来新版本号与修订号增长时的回归 |
+| iOS PWA 结构检查 | 代码包含 Manifest、Service Worker、Apple meta/icon、`standalone` | iPhone 实测登录、相机上传、剪贴板、图谱、滚动、离线退化 |
+| SEO 源码检查 | GitHub 模板新增 Bing/百度 meta、Description、H1、图片 Alt | Zeabur 生产 HTML 是否已切新版本、爬虫实际访问与索引 |
+| 百度站点与 URL | 百度站点所有权验证通过；首页 URL 已手动提交 | 百度爬取与收录时间、公开搜索展示 |
+| Bing | 站长后台出现 `Indexed successfully`，同日公开检索仍无结果；Site Scan 提交排队 | 重扫三个问题是否清零、搜索结果是否更新 |
+| Product Hunt / PWA 目录 | 表单与预约/应用详情页阶段 | 正式发布状态、公开可见性、截图和分类审核 |
+
+发布前的必要烟测：访问 `/health` 与 `/ready` → 开启网页和客户端 → 登录/注册 → 单轮 AI 出题与纠错 → OCR 实物图/纯图 → 错题复测和同步 → 数学复制/PNG/PDF → 小屏滚动/主题和文件选择。`workflow` 绿色并不替代这些端到端测试。
+
+## 11. 版本/商店审核状态核验边界
+
+- 已确认：**Snap Store `dmate` 1.0.0 Revision 1 / Stable 发布**。
+- 有构建配置但未证明全平台运行：Windows NSIS、macOS universal DMG、Linux DEB/AppImage、Android debug APK。
+- iOS Web App 已有技术配置，尚无正式 App Store IPA；Microsoft Store/Uptodown 以审核后台为准，暂不写“已上架”。
+- PWAStore 详情页展示、百度“链接提交成功”、Bing“Indexed successfully”各自仅说明对应流程节点，不能互相替代或当作稳定的公开流量证明。

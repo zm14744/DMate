@@ -186,3 +186,11 @@ Marked 用于 Markdown 解析；DOMPurify 负责进入 DOM 前的 HTML / MathML 
 ## 13. 学习画像边界
 
 知识图谱用于课程知识组织、建议前置知识和学习路径展示，不存储虚构“掌握度”。学习回顾依据真实会话与错题事件生成，不输出没有数据依据的能力百分比。
+
+## 14. 新增渠道的权限与凭据边界（2026-10-13）
+
+- **Snap Store 发布凭据**：`SNAPCRAFT_STORE_CREDENTIALS` 存储于 GitHub Actions Secret，不写入代码、公开文档或部署日志；仅面向发布动作授权。Snap 当前 `confinement: strict`，声明的网络、home、browser-support、音频播放和可移动媒体等 plugs 不等同于运行中全部权限无条件放行，需实机核对沙盒行为。
+- **PWA 与 iOS**：Service Worker 缓存公开页面外壳与静态资源；登录 Session 采用原有 Cookie 策略，不能把 PWA 安装视为新的独立身份系统。iOS Safari 的文件下载、相册保存、剪贴板、后台恢复能力受系统/WebKit 限制。
+- **跨平台分发**：商店发布不改变 `https://dmate.zeabur.app/` 的模型、账号和同步数据流；各端安装包下载地址和平台商店链接应指向官方项目渠道。
+- **网站收录**：Bing `msvalidate.01` 和百度 `baidu-site-verification` 属于站点所有权校验标识，可以公开放在 `<head>`；**它们不同于 API Key、数据库密码、Snap 上传授权凭据**。搜索索引可能公开网页标题/摘要，不得让用户私有学习资料进入可公开抓取的静态页面。
+- **许可边界**：仓库公开可读不代表所有代码和素材自然取得任意再分发授权；对外声明“开源”前应确认仓库的 LICENSE 及打包第三方版权声明。

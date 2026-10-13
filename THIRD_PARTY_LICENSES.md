@@ -57,3 +57,15 @@ DMate 使用 Brevo API 作为邮箱验证码主发送通道，SMTP 可作为备�
 项目材料保留第三方框架、模型、服务与库的名称、版本和来源，不把第三方基础能力表述为项目自主研发成果。
 
 分发第三方源代码或二进制内容时，应按对应许可证要求保留版权声明、许可证文本及 NOTICE 等适用内容。
+
+## 客户端分发与商店新增依赖（2026-10-13）
+
+| 技术 / 平台 | 用途 | 注意事项 |
+|---|---|---|
+| Tauri 2（Rust / 桌面 WebView） | Windows NSIS、macOS DMG、Linux DEB/AppImage；Snap 封装的原始桌面程序 | Tauri 及其 Rust crates 的许可、实际打包随附库和系统 WebView 依赖需在发布时按版本生成清单，**不能只凭本表覆盖全部间接依赖**。 |
+| Snapcraft + `core24` + GNOME 扩展 | 封装与在 Snap Store 发布 Linux AMD64 版 | Snap Store 分发遵循服务条款；`libwebkit2gtk-4.1-0` 等运行时依赖需按实际构建核对版权信息。 |
+| Android SDK / Android WebView | Android 原生 APK 包装 | Android SDK、嵌入/系统 WebView 的权利及发行条款按官方资料和最终打包清单核验。 |
+| Apple Safari / WebKit PWA | iOS 主屏幕 Web App | 非 IPA；浏览器/系统行为不等于项目再分发 WebKit 二进制。 |
+| PWAStore / Product Hunt / Uptodown / Microsoft Store | 展示与分发平台 | 提交/审核状态不改变项目源代码和第三方组件的许可证义务。 |
+
+截至本次文档整理，不能仅凭 GitHub 仓库公开可读就声称 DMate 源代码具有某一特定开源许可；若要对外使用“open source project”字样，应先确认仓库已明确提供相应许可证。

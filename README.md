@@ -21,16 +21,18 @@ DMate 是面向高校离散数学学习场景的 AI 智能辅学产品。系统�
 - 部署历程：Render → Zeabur
 - 当前服务器记录：Tencent Seoul 2C 4GB（2 核 CPU / 4 GB 内存）
 - 当前服务器费用记录：US$4/月；Zeabur 已初次开通 1 次、续费 1 次，共 **2 次付款**（按套餐标价粗略估算为 US$8，实际扣款以 Zeabur 账单为准）。
-- 截至 2026-10-08，DeepSeek API 后台显示 **累计消费 ¥101.96**、**充值余额 ¥8.03**；余额不是累计消费，均不等同于单用户运行成本。
-- **近期集中开发时间：2026-09-28 至 2026-10-08（含首尾共 11 个自然日）**。这是最近一轮持续迭代阶段，而不是项目最早开始开发的日期；更早的版本与开发记录仍应保留。
+- 截至 **2026-10-13**，DeepSeek API 后台截图显示 **累计消费 ¥103.65**、**充值余额 ¥16.34**；2026-10-08 的 ¥101.96 / ¥8.03 为先前历史快照。余额不等于累计支出，也不等于服务器费用或单用户成本。
+- **近期集中迭代与产品发布：2026-09-28—2026-10-13**（其中 9/28—10/8 为 11 天功能开发密集期，10/9—10/13 为 5 天多端发布、商店及 SEO 推进期），**不是项目启动日期**。
 
-## 近期开发历程（2026-09-28—2026-10-08）
+## 近期开发历程（2026-09-28—2026-10-13）
 
 本阶段持续推进产品能力与多端体验，重点包括：
 
 - **9 月 28 日—9 月末**：推进图片识题输入流程、图形结构核对、难度识别、错题与知识图谱相关交互，以及手机端适配。
 - **10 月上旬**：围绕账号注册登录、PostgreSQL 数据同步、跨设备使用、远程网页客户端、部署与移动端交互持续完善。
 - **截至 10 月 8 日**：集中排查 AI 练习生成及难度误判、同知识点复测、OCR 非题目图片处理和识别中按钮状态；完成相关离线回归、文档及测试记录整理。
+
+- **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；完善 iOS PWA 与 Linux 安装说明；推进 Product Hunt / PWAStore / Microsoft Store / Uptodown 分发申请及 Bing、百度验证、SEO 修复。各平台审核状态分别记录，不能一概称为成功上架。
 
 以上按**阶段**归纳，不等于每天都有独立发布或所有功能已完成线上验收。详细历史见 [`CHANGELOG.md`](CHANGELOG.md)。
 
@@ -208,6 +210,30 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 
 默认打开使用白色模式。游客外观不持久化；登录用户的外观参数可随账号同步，自定义背景图片本体仅在当前设备保存。
 
+## 下载、PWA 与商店分发（截至 2026-10-13）
+
+**网页版**：https://dmate.zeabur.app/ ，可以在兼容的现代浏览器中直接使用，不需要下载 Windows 或 Linux 安装包。**桌面/Android 客户端**：以系统 WebView 或 Tauri 窗口加载同一个在线站点，前端及后端功能在成功部署后通常可由远程更新获得，原生壳更新则需要重新打包。
+
+| 渠道 / 平台 | 截至 2026-10-13 的状态及边界 |
+|---|---|
+| Web（Zeabur） | `https://dmate.zeabur.app/` 为现行入口；旧地址 `discrete-math-tutor.zeabur.app` 已无法访问。服务器新部署应另行确认 Ready / Running。 |
+| Windows 桌面 | Tauri 2 / NSIS `.exe` 构建路径已配置；安装包的原生层变化需要重新构建。 |
+| macOS 桌面 | Tauri 2 / 通用架构 `.dmg` 构建路径已配置；签名、公证及终端验证情况需另核实。 |
+| Linux 桌面 | `.deb`（Debian / Ubuntu 系）、`.AppImage`（其他发行版按实际运行环境兼容），另有 Snap `amd64`。不等于全部发行版均实测。 |
+| Snap Store | `dmate` **1.0.0 / Revision 1 已通过 GitHub Actions 发布至 `stable`**；系统需支持 `snapd`，现有包只构建 AMD64；商店安装与不同发行版运行应继续测试。 |
+| Android | 独立 WebView APK 项目；Uptodown 等平台已提交，用户反馈仍在审核中，不能按正式上架计。 |
+| iPhone / iPad | Safari “添加到主屏幕”PWA：Manifest + Service Worker + `standalone` + Apple 图标和元标签；**不是原生 iOS IPA，也未在 Apple App Store 上架**。 |
+| Microsoft Store | PWA 包装/提交流程在推进；按用户截至本日反馈仍在审核，不能宣称已通过。 |
+| PWAStore | 已看到 DMate 应用详情页及 Install PWA 展示；独立的公开收录/审核状态需以平台可匿名访问和后台记录为准。 |
+| PWA Directory | 已准备提交资料；没有确认审核通过的记录，不写成已上架。 |
+| Product Hunt | 已填写/预约发布资料，用户计划 **2026-10-14** 发布；具体上线时刻以 Product Hunt 显示的时区和 Scheduled 状态为准，尚未发布。 |
+
+Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 的分流说明：Ubuntu/Debian/Mint 等可优先选择 DEB，Arch/Manjaro/Fedora/openSUSE 等可尝试 AppImage；启用 `snapd` 的发行版可以安装 Snap。只需要选择一种方式。**Snap 当前仅 AMD64**，不代表 ARM64 已发布；AppImage 可能需要 FUSE 等运行条件。Snap 安装示例：`sudo snap install dmate`。
+
+**iOS**：通过 Safari → 分享 → 添加到主屏幕安装 Web App。Manifest 已声明 `standalone`，并包含 Apple 专用主屏幕元信息和图标；AI、账号同步依赖网络，不宣称完全离线可用。
+
+**商店与 SEO 的验证边界**：Snap Revision 1 Stable 为已核实发布；Product Hunt 属于预约、百度属于站点验证和链接提交、Bing 站长后台索引与公开搜索可见性不完全一致；其他平台以其审核后台为准。无需将“提交”“收录”“通过审核”“可搜索到”混为同一状态。
+
 ## AI 运行链路
 
 文本回答代码支持两级提供方：
@@ -237,6 +263,10 @@ flowchart TD
 ```
 
 详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+## 网页搜索与分享基础（2026-10-13）
+
+首页已设置针对离散数学学习的 Meta Description，使用可识别的 H1 标题，并补足静态图片的 Alt 说明；GitHub HTML 已加入 Bing 与百度站点验证 meta 标签。旧域名 `discrete-math-tutor.zeabur.app` 目前不再可访问。`robots.txt`、`sitemap.xml` 与规范链接 canonical 尚未作为专项配置交付，不应误写为已配置。搜索引擎收录和排名由第三方决定，不承诺固定上线时间。
 
 ## 已安装客户端如何获得更新
 
@@ -342,7 +372,7 @@ jsPDF 2.5.2
 
 ## AI 辅助开发说明
 
-项目研发全过程使用 OpenAI ChatGPT GPT-5.6 Sol 进行辅助，包括产品需求、架构、代码生成与修改、故障排查、数学内容审校、测试设计与文档整理。项目负责人负责需求定义、功能取舍、代码整合、运行验证、部署与最终结果审查。
+项目研发过程中使用 ChatGPT 辅助，包括历史记录中的 GPT-5.6 Sol，以及近期用于 GitHub Actions、Snap、PWA 与 SEO 的 ChatGPT 辅助迭代；不同阶段模型不宜混为一个固定版本。项目负责人负责需求定义、功能取舍、代码整合、运行验证、部署与最终结果审查。
 
 生产运行时的基础文本与图像理解来自外部运行服务；ChatGPT GPT-5.6 Sol 属于研发辅助工具，不是 DMate 面向用户回答时的基础模型。
 

@@ -60,3 +60,21 @@ DMate 的具体文本 / Vision 模型名由服务端环境变量控制；文档�
 ## 许可证
 
 直接依赖与主要外部运行服务说明见 `THIRD_PARTY_LICENSES.md`。
+
+## 跨平台打包、PWA 与商店（2026-10-13 增补）
+
+- Tauri v2 配置：https://v2.tauri.app/reference/config/
+- Tauri Linux 分发：https://v2.tauri.app/distribute/
+- GitHub Actions 文档：https://docs.github.com/en/actions
+- Snapcraft 文档：https://documentation.ubuntu.com/snapcraft/stable/
+- Snap Store 安装主页：https://snapcraft.io/dmate
+- Web App Manifest（MDN）：https://developer.mozilla.org/en-US/docs/Web/Manifest
+- Service Worker API（MDN）：https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
+- Apple Web Apps：https://developer.apple.com/documentation/webkit
+- Microsoft Bing Webmaster Tools：https://www.bing.com/webmasters/
+- 百度搜索资源平台：https://ziyuan.baidu.com/
+- Product Hunt：https://www.producthunt.com/
+- PWAStore：https://www.pwastore.io/
+- PWA Directory：https://pwa.directory/
+
+以上为参考官方或平台入口，不表示相应商店审核均完成。

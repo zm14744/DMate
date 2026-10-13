@@ -1,11 +1,24 @@
+# 更新记录
+
+## 2026-10-09—2026-10-13：多平台分发、商店发布与网站收录（新增）
+
+这五天的工作重心由前期 AI 教学、OCR、账号与移动端能力迭代，转到**可安装客户端、应用商店分发、PWA 入口、用户获取与搜索引擎优化**。本阶段不是项目最初开发日期，也没有把先前的 175 项个人测试记录重新计算成新测试成果。
+
+- **跨平台发布与操作简化**：使用 GitHub Actions 统一构建 Tauri 桌面端：Windows NSIS、macOS DMG、Linux DEB / AppImage；Android 有独立 APK 构建流程。网页端根据用户系统显示对应安装说明，明确 `.deb`、AppImage、Snap 三种 Linux 途径及适用范围。
+- **Snap Store 正式渠道**：新增 `.github/workflows/build-snap.yml`、`snap/snapcraft.yaml`、`snap/gui/dmate.desktop`，GitHub 构建 `amd64` Snap；新增 `.github/workflows/publish-snap.yml`。第一次上传成功创建 `dmate` Revision 1 并发布 `edge`；重复上传完全相同包时出现唯一性错误；随后调整为 `promote-existing`，**直接把 Revision 1 发布到 `stable`**，从而避免重复上传。后续全新版本才使用 `upload-new-build`。`SNAPCRAFT_STORE_CREDENTIALS` 保存在 GitHub Actions Secret，文档不收录凭据。
+- **iOS PWA 与 Web 分发**：Manifest 的 `display=standalone`、图标、Apple Web App 元标签与 Service Worker 路由已配备，iOS 可经 Safari 添加到主屏幕；离线能力仅限部分缓存外壳，在线 AI 仍依赖网络。PWAStore 出现 DMate 详情页；PWA Directory 资料准备中；Product Hunt 预约发布，均按实际审核/可见性区别记录。
+- **其他商店**：微软商店 PWA 与 Uptodown 等上架申请处于提交/等待审核阶段，**不能将申请或排队状态表述为商店正式发布**。
+- **搜索引擎与域名**：现行域名为 `dmate.zeabur.app`，旧域名 `discrete-math-tutor.zeabur.app` 已不可访问；为 Bing 与百度添加 HTML 验证标签，百度已通过站点所有权验证并手工提交首页 URL。Bing 站长后台曾显示 `Indexed successfully`，但同日公开搜索未稳定显示结果；修复了首页 Meta Description、H1 标题与图片 Alt，并申请重新扫描。**验证、提交、索引和搜索结果展示是四个不同阶段**，不得混写。
+- **尚待完善**：截至本次文档修订，仓库未见专用 `robots.txt` / `sitemap.xml` / canonical 配置；这些是后续 SEO 工作，不应写成已完成。
+- **费用快照**：**2026-10-13 截图**：DeepSeek API 累计消费 **¥103.65 CNY**，充值余额 **¥16.34 CNY**。两者不是同一口径，余额不是支出；2026-10-08 的 ¥101.96 / ¥8.03 作为历史记录保留。
+- **部署原则**：上述 GitHub 提交不能代替 Zeabur 部署就绪、商店审核结果或真实设备兼容验收。新的网页功能由远程站点更新；客户端二进制/原生权限和包配置的变更仍需重新打包。
+
 ## 2026-10-08：产品能力文档核对与投入记录更新
 
 - 按现行前端实现补充**富文本复制、数学公式视觉保留与局部选中复制、知识图谱 PNG 复制、错题按题复制、聊天完整题目复制**的能力边界。
 - 对齐 175 项个人功能自测覆盖及 27 项离线回归测试的不同口径；不附带或链接独立测试工作簿。
 - 更新 DeepSeek API 截至当日累计消费 **¥101.96**、充值余额 **¥8.03**；记录 Zeabur 初次开通与一次续费、合计 **两次付款**。Zeabur 页面显示 US$4/月，估算金额与最终实际付款以账单为准。
 - 本次更新仅涉及 Markdown 说明文档，没有修改产品源代码、账号数据或安装包。
-
-# 更新记录
 
 ## 2026-09-28—2026-10-08：近期 11 天集中开发与迭代
 

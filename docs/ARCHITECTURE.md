@@ -321,3 +321,28 @@ gunicorn -w 1 --threads 2 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app
 - **iOS 主屏幕 Web App**：由 `static/service-worker.js` 管理网络优先缓存；离线 fallback 可能展示上一版。
 
 上述“随服务端生效”指部署成功之后的后续请求，不意味着尚未部署的本地修改会自动出现在用户设备上，也不是无条件实时推送到已打开的页面。
+
+## 17. 多平台远程页面与发行渠道（2026-10-13）
+
+```text
+浏览器 / iOS Safari PWA
+            │
+Tauri (Windows NSIS / macOS DMG / Linux DEB、AppImage、Snap)
+            │
+Android WebView APK
+            ▼
+https://dmate.zeabur.app/  ← Zeabur + Flask + PostgreSQL / AI 服务
+```
+
+所有这些客户端**使用远程网页业务层**，并非每种系统都复制一套独立的 AI 后端。区别主要在窗口、安装器、分发方式、操作系统权限与文件/剪贴板行为：
+
+- Windows / macOS / Linux：`desktop/src-tauri/tauri.conf.json` 使用 Tauri 2，产品版本 1.0.0；Github Actions 生成 NSIS、DMG、DEB/AppImage。
+- Linux Snap：构建 Tauri DEB 再以 `core24`、GNOME 扩展、`strict` 沙盒封装为 AMD64 Snap，Store Revision 1 已发布 `stable`；Snap 包更新与网页内容更新是两条独立渠道。
+- Android：`android/` 为 WebView 原生壳，有独立 debug APK Actions，正式签名与审核以实际渠道记录为准。
+- iOS：网页 Manifest + Service Worker + Apple meta/icon 可作为 Safari 主屏幕 PWA；不是 IPA / 原生商店程序。
+
+客户端没有自有 AI 推理核心，联网和 Zeabur / 运行时服务可用性是使用 AI 功能的必要条件。Service Worker 缓存以外壳资源为主，不能承诺全功能离线运行。
+
+## 18. 网站可发现性与搜索引擎（2026-10-13）
+
+首页 SEO/平台验证由 `templates/index.html` 承担（Description、H1、Alt、Bing/Baidu 校验标签）；Bing Site Scan/URL Inspection 与百度站点验证/手工提交属于外部索引流程，**不影响 Flask 业务路由、用户数据和模型选择**。旧子域名已经不能访问，应以 `https://dmate.zeabur.app/` 作为唯一公开入口。`robots.txt`、`sitemap.xml`、canonical 仍列为候选 SEO 改进，非当前已完成代码功能。

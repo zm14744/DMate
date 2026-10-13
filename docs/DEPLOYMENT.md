@@ -14,7 +14,7 @@
 - 当前在线域名：https://dmate.zeabur.app
 - 当前服务器记录：Tencent Seoul 2C 4GB
 - 当前服务器费用记录：US$4/月；Zeabur **首次开通一次、续费一次、共两次付款**。若每次均按页面标价 US$4 收取，则两次名义费用约 US$8；最终金额请以两笔实际账单为准。
-- 截至 2026-10-08，DeepSeek API 后台显示 **累计消费 ¥101.96**、**充值余额 ¥8.03**。余额与累计支出是不同指标，也不直接等于整个项目的总投入或单用户成本。
+- **2026-10-13 新截图**：DeepSeek API 累计消费 **¥103.65**、充值余额 **¥16.34**；2026-10-08 的 ¥101.96 / ¥8.03 保留为历史快照，两个指标不能相减解释为“本轮总投入”，也不包括 Zeabur 等服务。
 
 ## 2. Gunicorn
 
@@ -224,3 +224,34 @@ node --check static/script.js
 ### 2026-10-08 OCR 与移动端修复的部署检查
 
 本轮网页端更新涉及 `app.py`、`ai.py`、`templates/index.html`、`static/script.js`。更新 Zeabur 并刷新/重开客户端后，Windows/Tauri 与 Android/WebView 远程网页壳可获得相应网页功能，不必重新生成 EXE/MSI/APK；**原生安装包文件本身不会自动升级**。验证 OCR 识别时入口隐藏且布局补位、手机核对按钮固定底部及内容滚动、明显非题目图返回 422、纯图题仍允许核对。刷新后若页面仍旧，检查浏览器/WebView 缓存及服务器部署版本。
+
+## 10. 2026-10-13 多平台分发与 GitHub Actions
+
+当前仓库已有三个不同用途的 Actions 流程：
+
+| 流程 | 路径 | 职责 |
+|---|---|---|
+| Build DMate Desktop | `.github/workflows/build-desktop.yml` | Windows `nsis`、Linux `deb,appimage`、macOS `universal-apple-darwin dmg`；生成构建 Artifact，不等于应用商店发布。 |
+| Build DMate Android | `.github/workflows/build-android.yml` | 构建 Android **debug APK** Artifact；不等于已自动完成商店签名与正式发布。 |
+| Build DMate Snap (GitHub) | `.github/workflows/build-snap.yml` | Ubuntu 24.04 Runner 构建 Tauri DEB，再由 Snapcraft 打包 `dmate_1.0.0_amd64.snap`。 |
+| Publish DMate Snap to Snap Store | `.github/workflows/publish-snap.yml` | 使用 GitHub Secret 认证 Snap Store，已有修订选 `promote-existing`，全新构建才选 `upload-new-build`。 |
+
+`snap/snapcraft.yaml`：`name: dmate`，`version: 1.0.0`，`base: core24`，`confinement: strict`，平台 **amd64**，GNOME 扩展并带 WebKitGTK 4.1 运行依赖。2026-10-13 的发布日志显示 Revision 1 已正式发布到 `stable`：`Released 'dmate' revision 1 to channels: 'stable'`。重复上传完全相同 Snap 曾在 Store 唯一性校验处失败，因此现有 revision 应直接 `snapcraft release` 而非二次上传。
+
+安全约束：`SNAPCRAFT_STORE_CREDENTIALS` 只应放在 GitHub Actions Repository Secret，不可提交到仓库、放进 README 或公开日志；本机临时凭据使用后可删除。不能将 `workflow_dispatch` 的成功视为最新安装包一定上线，需要检查对应 Job 和 Store revision。
+
+## 11. PWA、iOS 与分发状态
+
+- Manifest：`static/manifest.webmanifest`，`id/start_url/scope` 均指向 `/`、`display: standalone`，含普通和 maskable 图标。
+- Service Worker：`static/service-worker.js`，从 `/service-worker.js` 同源路由注册；在线优先拉取资源，离线仅可能展示缓存外壳，不支持离线模型推理。
+- iOS：Safari 分享 → 添加到主屏幕；Apple Web App 元标签与 180×180 图标已配置；**没有 IPA 和 Apple App Store 正式发布**。
+- 商店：Snap Stable 已证实；Microsoft Store / Uptodown 等审核和 Product Hunt 预约需根据后台另行确认；PWAStore 已出现产品详情页，不代表所有目录都已经通过审核。
+- 旧域名 `discrete-math-tutor.zeabur.app` 当前不可访问，服务在 Zeabur 控制台仍可能叫 `discrete-math-tutor`。**服务名不是域名，绝不能为清除旧搜索结果而删除服务**。
+
+## 12. SEO 与部署验收
+
+2026-10-13 首页增加更完整的 Meta Description、DMate H1、图标 Alt 及 Bing / 百度站点验证元标签；百度站点验证已通过并提交 `https://dmate.zeabur.app/`；Bing 后台显示过索引成功，但公开搜索未稳定展示。索引成功不是保证排名，百度提交不是收录成功。
+
+部署后建议先在 Zeabur 确认新版容器 **Running / Ready**，再 `GET /health` 和 `GET /ready`，随后检查 `view-source:https://dmate.zeabur.app/` 中新 H1、验证标签是否实际生效。若源代码仍旧，优先排查部署与 Service Worker/浏览器缓存，不要仅凭 GitHub 提交成功即认为生产版本已更新。
+
+截至本次文档整理，未确认项目已单独配置 `robots.txt`、`sitemap.xml` 或 canonical，**这三项属于待办而非已完成**。

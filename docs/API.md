@@ -7,6 +7,8 @@
 | 方法 | 路径 | 作用 |
 |---|---|---|
 | GET | `/` | 主页面 |
+| GET | `/manifest.webmanifest` | PWA Manifest |
+| GET | `/service-worker.js` | PWA Service Worker |
 | POST | `/chat` | AI 教学对话、题目锚定、难度控制与生成题登记 |
 | POST | `/analyze-questions` | 批量规则化分析历史题目 |
 | POST | `/ocr` | OCR + Vision 图片题理解 |
@@ -28,6 +30,15 @@
 ## GET `/`
 
 返回 DMate 主页面，并注入知识图谱、平台识别状态及可选下载地址配置。
+
+## PWA 与静态元数据接口（2026-10-13）
+
+| 方法 | 路径 | 返回与用途 |
+|---|---|---|
+| GET | `/manifest.webmanifest` | Web App Manifest，包含名称、图标、`start_url`、`display: standalone`；`Content-Type: application/manifest+json`。 |
+| GET | `/service-worker.js` | 同源 Service Worker（`Service-Worker-Allowed: /`），服务在线优先和有限缓存外壳。 |
+
+`GET /` 已向模板注入 Android、Windows、macOS、Linux DEB、AppImage 的可选下载地址，前端另外提供 Snap Store 跳转。iOS 无原生安装包接口，Safari 主屏幕安装使用 Manifest / Apple 元信息。以上 GET 路由与 `/chat`、`/ocr` 等后端学习接口分属不同职责，**不应将 PWA 缓存误认为离线 AI 能力**。
 
 ## POST `/chat`
 
