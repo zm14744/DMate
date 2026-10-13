@@ -30,23 +30,25 @@
 
 **2026 年 9 月 28 日至 10 月 8 日**是 DMate 最近一轮持续开发、部署与测试的集中迭代期，共跨越 **11 个自然日**。在这段时间内，围绕 OCR 与图形理解、教学和难度控制、账号及云同步、移动端交互、Windows/Android 远程网页客户端、知识图谱、复制与导出、回归检查及说明文档进行完善。具体事项并非都在同一天完成；本区间也不是 DMate 的最初开发时间，早期项目记录不应被覆盖或改写。
 
-## 多平台发布与推广阶段（截至 2026-10-13）
+## 多平台发布与推广阶段（更新至 2026-10-14）
 
-| 渠道 / 平台 | 截至 2026-10-13 的状态及边界 |
+| 渠道 / 平台 | 2026-10-14 进度与说明 |
 |---|---|
-| Web（Zeabur） | `https://dmate.zeabur.app/` 为现行入口；旧地址 `discrete-math-tutor.zeabur.app` 已无法访问。服务器新部署应另行确认 Ready / Running。 |
-| Windows 桌面 | Tauri 2 / NSIS `.exe` 构建路径已配置；安装包的原生层变化需要重新构建。 |
-| macOS 桌面 | Tauri 2 / 通用架构 `.dmg` 构建路径已配置；签名、公证及终端验证情况需另核实。 |
-| Linux 桌面 | `.deb`（Debian / Ubuntu 系）、`.AppImage`（其他发行版按实际运行环境兼容），另有 Snap `amd64`。不等于全部发行版均实测。 |
-| Snap Store | `dmate` **1.0.0 / Revision 1 已通过 GitHub Actions 发布至 `stable`**；系统需支持 `snapd`，现有包只构建 AMD64；商店安装与不同发行版运行应继续测试。 |
-| Android | 独立 WebView APK 项目；Uptodown 等平台已提交，用户反馈仍在审核中，不能按正式上架计。 |
-| iPhone / iPad | Safari “添加到主屏幕”PWA：Manifest + Service Worker + `standalone` + Apple 图标和元标签；**不是原生 iOS IPA，也未在 Apple App Store 上架**。 |
-| Microsoft Store | PWA 包装/提交流程在推进；按用户截至本日反馈仍在审核，不能宣称已通过。 |
-| PWAStore | 已看到 DMate 应用详情页及 Install PWA 展示；独立的公开收录/审核状态需以平台可匿名访问和后台记录为准。 |
-| PWA Directory | 已准备提交资料；没有确认审核通过的记录，不写成已上架。 |
-| Product Hunt | 已填写/预约发布资料，用户计划 **2026-10-14** 发布；具体上线时刻以 Product Hunt 显示的时区和 Scheduled 状态为准，尚未发布。 |
+| Web（Zeabur） | 在线地址 [dmate.zeabur.app](https://dmate.zeabur.app/)；旧域名已停用。 |
+| GitHub Release | [v1.0.1](https://github.com/zm14744/DMate/releases/tag/v1.0.1) 提供 Windows、macOS、Linux、Android 安装包；各包内部版本及兼容性以实际构建为准。 |
+| Windows / macOS / Linux 桌面 | 已构建和提供 EXE、通用 DMG、DEB / AppImage；macOS 仍需核查 Apple 公证与真机安装。 |
+| **Snap Store** | **正式发布成功**：[`dmate` 1.0.0 / Revision 1 / Stable](https://snapcraft.io/dmate)，目前 AMD64；不要混同构建成功与商店发行成功。 |
+| **itch.io** | **开发者已将项目从 Draft 改为 Public**，页面公开展示并可下载 Windows EXE、Android APK、macOS DMG；尚未声明全部下载与安装场景逐一通过真机验收。 |
+| Android / Uptodown | WebView APK 继续通过 GitHub/itch.io 分发；**Uptodown 因单纯网页封装而拒绝**，不是审核中。 |
+| iPhone / iPad | Safari 主屏幕 PWA，并非 Apple App Store 原生 IPA。 |
+| Microsoft Store | 已提交，处于认证阶段；**尚未确认上架**。 |
+| PWAStore | 已有公开产品展示页与 Install PWA 入口；不是 Apple App Store。 |
+| PWA Directory | 申请**成功进入免费发布队列**，尚待排期上线；不能将受理邮件当作正式上架。 |
+| Bing 搜索 | **开发者已确认 DMate 可由公开搜索检索到**；此前的 Bing 站长后台亦出现索引成功状态；搜索排名与覆盖词不保证固定。 |
+| 百度搜索 | 已验证网站并提交入口，最新为**审核中/待进一步索引**，不能据提交断言完成收录。 |
+| Product Hunt | 历史资料已提交/预约，当前未取得新的公开上线确认。 |
 
-目前最可靠、已得到流程日志确认的商店发布里程碑是 **Snap Store Stable 版本 1.0.0 / Revision 1**。iOS 属于 Safari PWA 而非原生 IPA；Bing 的站长后台索引状态不代表公开搜索立刻能找到，新站百度已完成站点验证并提交网址。
+当前明确的公开软件分发成果包括 **Snap Store Stable** 与 **itch.io Public**；GitHub Release 可直接提供多平台安装包，PWAStore 已有安装入口。微软商店认证中、PWA Directory 排队、百度审核中、Uptodown 已拒绝，均与“公开发布成功”区分记录。Bing 公开搜索可见状态按开发者 2026-10-14 反馈记载，并非保证所有地区、所有关键词均可检索。
 
 ## 产品定位
 
@@ -90,6 +92,6 @@ DMate 面向高校离散数学学习场景，以自由式 AI 交互为入口，�
 
 开发过程使用 ChatGPT 辅助研发；2026-10-08 以前文档以 GPT-5.6 Sol 记录辅助工具，最近一轮又借助 ChatGPT 完成 GitHub Actions、Snap 发布、网页与 SEO 配置。项目负责人负责需求定义、方案决策、代码审阅、实际部署、测试与上架操作。
 
-## 交付版本边界（2026-10-13）
+## 历史交付版本边界（2026-10-13）
 
-本次源码基准是 GitHub `main` 提交 `296b3388`。随包文档补充和自测表文字修订属于**交付说明调整**；不表示已修改线上部署、运行中的模型、数据库结构或安装包。运行环境、发布核对事项和静态检查实绩分别参考 [`DEPLOYMENT.md`](DEPLOYMENT.md)、[`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) 与 [`TESTING.md`](TESTING.md)。
+2026-10-13 旧交付包的源码基准是 GitHub `main` 提交 `296b3388`，这不是当前 `main` HEAD。该快照随包文档补充和自测表文字修订属于**当时的交付说明调整**；不表示已修改线上部署、运行中的模型、数据库结构或安装包。后续 2026-10-14 的出题、OCR 修复和回归测试已进入当前仓库，请查看 `CHANGELOG.md` 与 `TESTING.md`。运行环境、发布核对事项和静态检查实绩分别参考 [`DEPLOYMENT.md`](DEPLOYMENT.md)、[`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) 与 [`TESTING.md`](TESTING.md)。
