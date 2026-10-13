@@ -37,14 +37,13 @@ DEEPSEEK_VISION_MODEL
 VISION_ANALYSIS_ENABLED
 DEEPSEEK_MAX_OUTPUT_TOKENS
 MEDIUM_MAX_OUTPUT_TOKENS
-HARD_MAX_OUTPUT_TOKENS
 ```
 
 代码当前默认：
 
 - `DEEPSEEK_CHAT_MODEL=deepseek-flash`
 - `DEEPSEEK_VISION_MODEL=deepseek-flash`
-- 普通 / 中等 / 困难的输出预算分别由三组 token 变量控制。
+- 普通回复使用 `DEEPSEEK_MAX_OUTPUT_TOKENS`；`high` 思考（解题中的中等与困难共用）使用 `MEDIUM_MAX_OUTPUT_TOKENS`。本源码不使用 `HARD_MAX_OUTPUT_TOKENS` / `max` 档。
 
 ### 可选鲁信文本通道
 
@@ -255,3 +254,15 @@ node --check static/script.js
 部署后建议先在 Zeabur 确认新版容器 **Running / Ready**，再 `GET /health` 和 `GET /ready`，随后检查 `view-source:https://dmate.zeabur.app/` 中新 H1、验证标签是否实际生效。若源代码仍旧，优先排查部署与 Service Worker/浏览器缓存，不要仅凭 GitHub 提交成功即认为生产版本已更新。
 
 截至本次文档整理，未确认项目已单独配置 `robots.txt`、`sitemap.xml` 或 canonical，**这三项属于待办而非已完成**。
+
+## 13. 建议的最小发布与回滚核对流程（2026-10-13 文档补充）
+
+1. **确认源版本**：记录 Git 提交 SHA、相关配置和数据库迁移范围；检查环境变量名称是否齐全，不在日志/截图中披露值。
+2. **部署后端与网页**：等待 Zeabur 完成构建并显示运行中，再分别检查 `/health` 与 `/ready`。OCR 可能需要额外初始化时间。
+3. **刷新远程客户端**：在桌面浏览器、Tauri、Android WebView 分别完全关闭并重开页面；对于缓存问题，先比较 HTTP 响应与实际脚本版本，不要通过删除服务来清除旧网址。
+4. **冒烟验证核心学习链**：至少核验一个文字题、一个含图图片题、一个一般出题、一个“出题并给答案”、一个错题复测、多知识点复测，以及数学公式复制和图谱打开。
+5. **账号状态检查**：注册或登录测试账号，在另一浏览器同步，触发一次冲突提示；确认退出后账号数据不混入游客会话。
+6. **按构建类型分发**：仅 Web/后端改动无需重打远程网页壳；Android/桌面原生代码和包元数据变化必须重构并安装验证。Snap 上传和 `stable` 渠道提升应分开操作。
+7. **失败时回滚**：回到已知正常的应用提交/镜像，确认 `/health`、`/ready` 和核心对话恢复。数据库 schema 改动需事先制定独立回滚方案；不可直接假设代码回滚等于数据回滚。
+
+**通过标准**：静态检查通过只是进入发布验收的前置条件；不能替代在线 API、OCR 真机、客户端和账户/数据库端到端验证。测试记录与当前未验证清单见 [`TESTING.md`](TESTING.md) 与 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)。
