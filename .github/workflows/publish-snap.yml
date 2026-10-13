@@ -3,8 +3,21 @@ name: Publish DMate Snap to Snap Store
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: Promote an existing revision or upload a genuinely new build
+        type: choice
+        options:
+          - promote-existing
+          - upload-new-build
+        required: true
+        default: promote-existing
+      revision:
+        description: Existing Snap Store revision (the first DMate revision is 1)
+        type: string
+        required: true
+        default: '1'
       channel:
-        description: Snap Store release channel (use edge for initial testing)
+        description: Target Snap Store channel
         type: choice
         options:
           - edge
@@ -32,7 +45,27 @@ jobs:
             exit 1
           fi
 
+      - name: Install Snapcraft for existing revision
+        if: inputs.operation == 'promote-existing'
+        run: sudo snap install snapcraft --classic
+
+      - name: Promote revision without re-uploading
+        if: inputs.operation == 'promote-existing'
+        shell: bash
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          REVISION: ${{ inputs.revision }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REVISION" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Revision must be a positive integer."
+            exit 1
+          fi
+          /snap/bin/snapcraft release dmate "$REVISION" "$CHANNEL"
+
       - name: Locate latest successful Snap build
+        if: inputs.operation == 'upload-new-build'
         id: source
         shell: bash
         env:
@@ -50,6 +83,7 @@ jobs:
           echo "Using Snap build run $run_id"
 
       - name: Download existing Snap artifact
+        if: inputs.operation == 'upload-new-build'
         uses: actions/download-artifact@v4
         with:
           name: DMate-linux-snap-amd64
@@ -58,6 +92,7 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Locate and verify Snap package
+        if: inputs.operation == 'upload-new-build'
         id: pkg
         shell: bash
         run: |
@@ -72,7 +107,8 @@ jobs:
           sha256sum "${snaps[0]}"
 
       - name: Upload and release Snap
-        uses: canonical/action-publish@v1
+        if: inputs.operation == 'upload-new-build'
+        uses: snapcore/action-publish@v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
