@@ -266,7 +266,3 @@ node --check static/script.js
 7. **失败时回滚**：回到已知正常的应用提交/镜像，确认 `/health`、`/ready` 和核心对话恢复。数据库 schema 改动需事先制定独立回滚方案；不可直接假设代码回滚等于数据回滚。
 
 **通过标准**：静态检查通过只是进入发布验收的前置条件；不能替代在线 API、OCR 真机、客户端和账户/数据库端到端验证。测试记录与当前未验证清单见 [`TESTING.md`](TESTING.md) 与 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)。
-
-## 2026-10-13 发布检查补充
-
-记录部署提交和数据库迁移、检查 `/health` 与 `/ready`，并验证文字题、图片 OCR、复合出题、跨设备同步与客户端。原生安装包变化须重新构建；数据库回滚需单独制定计划。参见 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)。

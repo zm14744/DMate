@@ -388,7 +388,3 @@ jsPDF 2.5.2
 - 主程序、数据库、敏感环境变量均未因生成此源码包而改变；本包不包含 API 密钥、线上数据库、商店认证或已编译的多平台安装包。
 
 完整验收顺序见 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)，具体验证边界见 [`docs/TESTING.md`](docs/TESTING.md)。
-
-## 文档审校与验证边界（2026-10-13）
-
-175 项自测状态是预填，不代表本轮独立实测。源码不包含历史 `tests/` 测试套件，10/10 自动测试不能直接复现；在线 AI、真实 OCR、云同步和安装包需另外测试。参见 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)。

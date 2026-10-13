@@ -27,6 +27,3 @@
 - **个人测试与发行验证分离**：`TESTING.md` 的新增第 10—11 节；不把商店发布或站长验证算作产品功能测试。
 - **安全与第三方版权**：`SECURITY_PRIVACY.md` 第 14 节及 `../THIRD_PARTY_LICENSES.md` 新增分发依赖说明。
 - **投入成本快照**：`PROJECT_INFO.md`（2026-10-13 DeepSeek 累计消费 ¥103.65、余额 ¥16.34）；10/8 旧值保留为历史。
-
-- [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)：发布前验收步骤
-- [`REVIEW_20261013.md`](REVIEW_20261013.md)：文档与自测表审校结论
