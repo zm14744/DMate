@@ -9,7 +9,9 @@
 - [`SECURITY_PRIVACY.md`](SECURITY_PRIVACY.md)：游客 / 登录数据、安全与第三方数据流
 - [`AI_ASSISTED_DEVELOPMENT.md`](AI_ASSISTED_DEVELOPMENT.md)：GPT-5.6 Sol 辅助研发说明
 - [`THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md)：直接依赖、前端库与主要外部服务
-- [`TESTING.md`](TESTING.md)：175项个人功能自测记录概况、27项最新离线回归、复制渲染专项验收与历史测试
+- [`TESTING.md`](TESTING.md)：175项自测默认状态、历史回归、2026-10-13 实际离线核验、未验证的端到端范围
+- [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)：发布前的核心学习、OCR、账号同步、桌面/移动端、回滚核对清单
+- [`REVIEW_20261013.md`](REVIEW_20261013.md)：说明文档与 175 项用例对照源码的审校与勘误
 - [`REFERENCES.md`](REFERENCES.md)：权威资料与官方技术来源
 - [`CHANGELOG.md`](../CHANGELOG.md)：主要代码调整记录
 
