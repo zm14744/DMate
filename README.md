@@ -22,9 +22,9 @@ DMate 是面向高校离散数学学习场景的 AI 智能辅学产品。系统�
 - 当前服务器记录：Tencent Seoul 2C 4GB（2 核 CPU / 4 GB 内存）
 - 当前服务器费用记录：US$4/月；Zeabur 已初次开通 1 次、续费 1 次，共 **2 次付款**（按套餐标价粗略估算为 US$8，实际扣款以 Zeabur 账单为准）。
 - 截至 **2026-10-13**，DeepSeek API 后台截图显示 **累计消费 ¥103.65**、**充值余额 ¥16.34**；2026-10-08 的 ¥101.96 / ¥8.03 为先前历史快照。余额不等于累计支出，也不等于服务器费用或单用户成本。
-- **近期集中迭代与产品发布：2026-09-28—2026-10-13**（其中 9/28—10/8 为 11 天功能开发密集期，10/9—10/13 为 5 天多端发布、商店及 SEO 推进期），**不是项目启动日期**。
+- **近期集中迭代与产品发布：2026-09-28—2026-10-14**（9/28—10/8 为功能开发密集期，10/9 起继续多端发行、商店申请及 SEO 工作），**不是项目启动日期**。
 
-## 近期开发历程（2026-09-28—2026-10-13）
+## 近期开发历程（2026-09-28—2026-10-14）
 
 本阶段持续推进产品能力与多端体验，重点包括：
 
@@ -32,7 +32,8 @@ DMate 是面向高校离散数学学习场景的 AI 智能辅学产品。系统�
 - **10 月上旬**：围绕账号注册登录、PostgreSQL 数据同步、跨设备使用、远程网页客户端、部署与移动端交互持续完善。
 - **截至 10 月 8 日**：集中排查 AI 练习生成及难度误判、同知识点复测、OCR 非题目图片处理和识别中按钮状态；完成相关离线回归、文档及测试记录整理。
 
-- **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；完善 iOS PWA 与 Linux 安装说明；推进 Product Hunt / PWAStore / Microsoft Store / Uptodown 分发申请及 Bing、百度验证、SEO 修复。各平台审核状态分别记录，不能一概称为成功上架。
+- **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；完善 iOS PWA 与 Linux 安装说明；推进 PWA、应用商店及搜索引擎收录。
+- **10 月 14 日**：补充错题复测与 OCR 容错修复；itch.io 项目已设为 Public，提供 macOS、Windows、Android 安装包；确认 PWA Directory 提交排队、Uptodown 审核拒绝，并据开发者反馈记录 Bing 公开搜索已可检索到 DMate。
 
 以上按**阶段**归纳，不等于每天都有独立发布或所有功能已完成线上验收。详细历史见 [`CHANGELOG.md`](CHANGELOG.md)。
 
@@ -210,29 +211,31 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 
 默认打开使用白色模式。游客外观不持久化；登录用户的外观参数可随账号同步，自定义背景图片本体仅在当前设备保存。
 
-## 下载、PWA 与商店分发（截至 2026-10-13）
+## 下载、PWA 与商店分发（截至 2026-10-14）
 
 **网页版**：https://dmate.zeabur.app/ ，可以在兼容的现代浏览器中直接使用，不需要下载 Windows 或 Linux 安装包。**桌面/Android 客户端**：以系统 WebView 或 Tauri 窗口加载同一个在线站点，前端及后端功能在成功部署后通常可由远程更新获得，原生壳更新则需要重新打包。
 
-| 渠道 / 平台 | 截至 2026-10-13 的状态及边界 |
+| 渠道 / 平台 | 截至 2026-10-14 的状态及边界 |
 |---|---|
-| Web（Zeabur） | `https://dmate.zeabur.app/` 为现行入口；旧地址 `discrete-math-tutor.zeabur.app` 已无法访问。服务器新部署应另行确认 Ready / Running。 |
-| Windows 桌面 | Tauri 2 / NSIS `.exe` 构建路径已配置；安装包的原生层变化需要重新构建。 |
-| macOS 桌面 | Tauri 2 / 通用架构 `.dmg` 构建路径已配置；签名、公证及终端验证情况需另核实。 |
-| Linux 桌面 | `.deb`（Debian / Ubuntu 系）、`.AppImage`（其他发行版按实际运行环境兼容），另有 Snap `amd64`。不等于全部发行版均实测。 |
-| Snap Store | `dmate` **1.0.0 / Revision 1 已通过 GitHub Actions 发布至 `stable`**；系统需支持 `snapd`，现有包只构建 AMD64；商店安装与不同发行版运行应继续测试。 |
-| Android | 独立 WebView APK 项目；Uptodown 等平台已提交，用户反馈仍在审核中，不能按正式上架计。 |
-| iPhone / iPad | Safari “添加到主屏幕”PWA：Manifest + Service Worker + `standalone` + Apple 图标和元标签；**不是原生 iOS IPA，也未在 Apple App Store 上架**。 |
-| Microsoft Store | PWA 包装/提交流程在推进；按用户截至本日反馈仍在审核，不能宣称已通过。 |
-| PWAStore | 已看到 DMate 应用详情页及 Install PWA 展示；独立的公开收录/审核状态需以平台可匿名访问和后台记录为准。 |
-| PWA Directory | 已准备提交资料；没有确认审核通过的记录，不写成已上架。 |
-| Product Hunt | 已填写/预约发布资料，用户计划 **2026-10-14** 发布；具体上线时刻以 Product Hunt 显示的时区和 Scheduled 状态为准，尚未发布。 |
+| Web（Zeabur） | [dmate.zeabur.app](https://dmate.zeabur.app/) 为现行入口；旧域名已停用。 |
+| GitHub Release | [v1.0.1](https://github.com/zm14744/DMate/releases/tag/v1.0.1) 提供 Windows EXE、macOS DMG、Linux DEB/AppImage 与 Android APK；Release 标签 1.0.1 不等于所有安装包内版本均为 1.0.1。 |
+| Windows / macOS / Linux 桌面 | Windows NSIS `.exe`、macOS 通用 `.dmg`、Linux `.deb` / `.AppImage` 已提供下载；安装兼容情况依平台分别核验。macOS 构建尚无已确认的正式 Apple 公证。 |
+| **Snap Store** | **已正式发布**：[dmate](https://snapcraft.io/dmate) **1.0.0，Revision 1，Stable**；当前发行包为 AMD64，需要 `snapd`；正式上架不代表所有 Linux 发行版已实机验收。 |
+| **itch.io** | **开发者确认项目已改为 Public（公开发布）**；项目页提供 macOS `DMate_1.0.0_universal.dmg`、Windows `DMate_1.0.0_x64-setup.exe` 和 Android `DMate.apk` 下载；仅确认上传与公开展示，未将所有平台安装体验写成已实测。 |
+| Android / Uptodown | Android WebView APK 可通过 GitHub Release 与 itch.io 分发；**Uptodown 申请已被拒绝**，理由为纯 WebView 封装没有额外原生功能，不应标为审核中或正式上架。 |
+| iPhone / iPad | Safari “添加到主屏幕”的 PWA；**不是原生 iOS IPA，也未在 Apple App Store 上架**。 |
+| Microsoft Store | PWA / MSIX 提交已进入**认证阶段**，尚未确认通过或上架。 |
+| PWAStore | 已有 DMate 应用展示页面和 **Install PWA** 入口；这与苹果官方 App Store 上架不同。 |
+| PWA Directory | 已**提交成功并进入免费发布队列**；邮件介绍通常约 7 天、中近期可能至 13 天，尚不应写成正式上架。 |
+| 百度搜索 | 已做站点验证及链接提交；用户提供的最新进度为**仍在审核/等待进一步收录结果**，不以提交替代稳定索引。 |
+| Bing 搜索 | **开发者确认公开搜索已可找到 DMate**；此前站长后台也显示过索引成功。检索展示可能受关键词、地区与索引更新影响，不代表固定排名。 |
+| Product Hunt | 先前已有预约/提交记录；截至当前对话没有新的正式发布确认，不写成已上架。 |
 
 Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 的分流说明：Ubuntu/Debian/Mint 等可优先选择 DEB，Arch/Manjaro/Fedora/openSUSE 等可尝试 AppImage；启用 `snapd` 的发行版可以安装 Snap。只需要选择一种方式。**Snap 当前仅 AMD64**，不代表 ARM64 已发布；AppImage 可能需要 FUSE 等运行条件。Snap 安装示例：`sudo snap install dmate`。
 
 **iOS**：通过 Safari → 分享 → 添加到主屏幕安装 Web App。Manifest 已声明 `standalone`，并包含 Apple 专用主屏幕元信息和图标；AI、账号同步依赖网络，不宣称完全离线可用。
 
-**商店与 SEO 的验证边界**：Snap Revision 1 Stable 为已核实发布；Product Hunt 属于预约、百度属于站点验证和链接提交、Bing 站长后台索引与公开搜索可见性不完全一致；其他平台以其审核后台为准。无需将“提交”“收录”“通过审核”“可搜索到”混为同一状态。
+**商店与 SEO 的验证边界**：Snap Revision 1 Stable 有发布日志支持，itch.io 已由开发者确认 Public，Bing 已由开发者确认公开搜索可见；PWA Directory 仍在发布队列，Microsoft Store 仍认证中，Uptodown 已拒绝，百度仍需等待审核/索引结果。提交、上架、可下载、可搜索、真实安装通过属于不同阶段。
 
 ## AI 运行链路
 
@@ -264,9 +267,9 @@ flowchart TD
 
 详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
-## 网页搜索与分享基础（2026-10-13）
+## 网页搜索与分享基础（更新至 2026-10-14）
 
-首页已设置针对离散数学学习的 Meta Description，使用可识别的 H1 标题，并补足静态图片的 Alt 说明；GitHub HTML 已加入 Bing 与百度站点验证 meta 标签。旧域名 `discrete-math-tutor.zeabur.app` 目前不再可访问。`robots.txt`、`sitemap.xml` 与规范链接 canonical 尚未作为专项配置交付，不应误写为已配置。搜索引擎收录和排名由第三方决定，不承诺固定上线时间。
+首页已设置针对离散数学学习的 Meta Description，使用可识别的 H1 标题，并补足静态图片的 Alt 说明；首页 HTML 已加入 Bing 与百度站点验证 meta 标签。**Bing 由开发者确认已能公开搜索到 DMate；百度站点及链接提交已完成，当前仍在审核/等待进一步收录反馈。**旧域名 `discrete-math-tutor.zeabur.app` 目前不再可访问。`robots.txt`、`sitemap.xml` 与规范链接 canonical 尚未作为专项配置交付，不应误写为已配置。搜索引擎收录和排名由第三方决定，不承诺固定上线时间。
 
 ## 已安装客户端如何获得更新
 
@@ -378,13 +381,13 @@ jsPDF 2.5.2
 
 详见 [`docs/AI_ASSISTED_DEVELOPMENT.md`](docs/AI_ASSISTED_DEVELOPMENT.md)。
 
-## 本次完整源码交付与验证口径（2026-10-13）
+## 历史完整源码交付与验证口径（2026-10-13 快照）
 
 交付用源码以 GitHub `main` 提交 `296b3388f0ee3e200078ef5e090454dd40f5b894` 为基准；**程序代码保持原样**，本次仅补齐说明文档与 175 项功能自测表中的版本/平台表述。压缩包中的 `docs/RELEASE_CHECKLIST.md` 增加操作级验收清单，`docs/TESTING.md` 对历史测试与这次确实执行的离线检查作了区分。
 
 - 当前源码可静态检查的 Python、JS 与 JSON 文件已通过对应语法/解析检查，但**未进行全部线上/真机功能测试**。
 - 附带 Excel 的 175 个“通过”是**预设测试状态**，J 列明确区分实际静态检查与待验证项目；不是 175 个已真实执行的结果；其中涉及 Android、iOS、安装包、商店、邮件、数据库和在线 AI 的项目必须在目标环境再次核验。
-- 随本次源码快照**没有 `tests/` 目录**，故 `unittest discover` 的历史“10/10”记录不能作为本次可复现的自动测试结果。
+- **仅对 2026-10-13 的旧源码快照而言**，当时没有 `tests/` 目录，历史“10/10”不能在那份快照中复现；**当前 GitHub main 已新增 `tests/test_retest_ocr_regression.py`，2026-10-14 的 5 项专项离线测试见下节和 `docs/TESTING.md`**。
 - 主程序、数据库、敏感环境变量均未因生成此源码包而改变；本包不包含 API 密钥、线上数据库、商店认证或已编译的多平台安装包。
 
 完整验收顺序见 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)，具体验证边界见 [`docs/TESTING.md`](docs/TESTING.md)。
