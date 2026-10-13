@@ -244,12 +244,15 @@ node --check static/script.js
 - Manifest：`static/manifest.webmanifest`，`id/start_url/scope` 均指向 `/`、`display: standalone`，含普通和 maskable 图标。
 - Service Worker：`static/service-worker.js`，从 `/service-worker.js` 同源路由注册；在线优先拉取资源，离线仅可能展示缓存外壳，不支持离线模型推理。
 - iOS：Safari 分享 → 添加到主屏幕；Apple Web App 元标签与 180×180 图标已配置；**没有 IPA 和 Apple App Store 正式发布**。
-- 商店：Snap Stable 已证实；Microsoft Store / Uptodown 等审核和 Product Hunt 预约需根据后台另行确认；PWAStore 已出现产品详情页，不代表所有目录都已经通过审核。
+- **Snap Store**：[dmate](https://snapcraft.io/dmate) **1.0.0 / Revision 1 已发布至 Stable**；发行渠道正式成功，与构建成功不同。
+- **itch.io**：开发者 2026-10-14 确认项目已设为 **Public**，公开提供 Windows `.exe`、macOS `.dmg` 和 Android `.apk`；具体客户端的代码签名、安装和原生更新仍按实际设备核验。
+- **PWAStore / PWA Directory**：前者有产品展示页与 Install PWA 入口；后者收到确认邮件并进入免费发布队列，尚不是正式上架。
+- **Microsoft Store / Uptodown / Product Hunt**：Microsoft Store 认证中；Uptodown 已因 WebView 仅封装网页而拒绝；Product Hunt 仅有此前预约或提交记录，尚缺当前公开发布确认。
 - 旧域名 `discrete-math-tutor.zeabur.app` 当前不可访问，服务在 Zeabur 控制台仍可能叫 `discrete-math-tutor`。**服务名不是域名，绝不能为清除旧搜索结果而删除服务**。
 
 ## 12. SEO 与部署验收
 
-2026-10-13 首页增加更完整的 Meta Description、DMate H1、图标 Alt 及 Bing / 百度站点验证元标签；百度站点验证已通过并提交 `https://dmate.zeabur.app/`；Bing 后台显示过索引成功，但公开搜索未稳定展示。索引成功不是保证排名，百度提交不是收录成功。
+2026-10-13 首页增加更完整的 Meta Description、DMate H1、图标 Alt 及 Bing / 百度站点验证元标签；百度站点验证已通过并提交 `https://dmate.zeabur.app/`。**2026-10-14 更新：开发者已确认 Bing 公开搜索能够找到 DMate**，此前站长后台也显示过索引成功；Bing 可检索并不保证持续排名或所有地区关键词可见。**百度目前仍在审核/等待进一步收录反馈**，链接提交不等于正式索引成功。
 
 部署后建议先在 Zeabur 确认新版容器 **Running / Ready**，再 `GET /health` 和 `GET /ready`，随后检查 `view-source:https://dmate.zeabur.app/` 中新 H1、验证标签是否实际生效。若源代码仍旧，优先排查部署与 Service Worker/浏览器缓存，不要仅凭 GitHub 提交成功即认为生产版本已更新。
 
