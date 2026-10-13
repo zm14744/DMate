@@ -16,7 +16,9 @@
 - [`CHANGELOG.md`](../CHANGELOG.md)：主要代码调整记录
 
 
-最新说明：OCR 非题目拦截和移动端交互见 [`API.md`](API.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)；部署与远程网页更新见 [`DEPLOYMENT.md`](DEPLOYMENT.md)；离线测试与未完成验收范围见 [`TESTING.md`](TESTING.md)。
+**当前进度（更新至 2026-10-14）**：itch.io 已由开发者确认 Public；Snap Store `dmate` 1.0.0 / Revision 1 已在 Stable 正式发行；Bing 已可公开检索到 DMate。PWA Directory 仍排队、Microsoft Store 认证中、百度审核/待索引、Uptodown 已拒。具体状态以 [`../README.md`](../README.md) 的分发表与 [`PROJECT_INFO.md`](PROJECT_INFO.md) 为准。
+
+最新功能说明：OCR 非题目拦截和移动端交互见 [`API.md`](API.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)；部署与远程网页更新见 [`DEPLOYMENT.md`](DEPLOYMENT.md)；离线测试与未完成验收范围见 [`TESTING.md`](TESTING.md)。
 
 ## 2026-10-13 文档增补导航
 
