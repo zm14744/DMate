@@ -19385,11 +19385,16 @@ function installGuideForCurrentPlatform() {
     }
     if (platform === "linux") {
         const actions = [];
-        if (config.desktopLinuxDebUrl) actions.push({ label:"下载 .deb", url:config.desktopLinuxDebUrl });
-        if (config.desktopLinuxAppImageUrl) actions.push({ label:"下载 AppImage", url:config.desktopLinuxAppImageUrl, secondary:Boolean(actions.length) });
+        if (config.desktopLinuxDebUrl) {
+            actions.push({ label:"下载 .deb（Ubuntu / Debian / Mint）", url:config.desktopLinuxDebUrl });
+        }
+        if (config.desktopLinuxAppImageUrl) {
+            actions.push({ label:"下载 AppImage（Arch / Fedora 等）", url:config.desktopLinuxAppImageUrl, secondary:Boolean(actions.length) });
+        }
+        actions.push({ label:"Snap Store（支持 Snap 的发行版）", url:"https://snapcraft.io/dmate", secondary:Boolean(actions.length) });
         return {
-            platform:"Linux",
-            text: actions.length ? "Ubuntu / Debian 推荐 .deb；Arch 等发行版可用 AppImage。" : "Linux 桌面版暂未发布。",
+            platform:"Linux（x86-64 / amd64）",
+            text:"按发行版选择一种安装方式即可，不需要全部下载：Ubuntu、Debian、Linux Mint 等优先选 .deb；Arch、Manjaro、Fedora、openSUSE 等可尝试 AppImage；已启用 snapd 的发行版可用 Snap Store 安装并接收更新。AppImage 可能需要 FUSE 等运行环境。",
             steps:[],
             actions
         };
