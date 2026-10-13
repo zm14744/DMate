@@ -1,0 +1,80 @@
+name: Publish DMate Snap to Snap Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Snap Store release channel (use edge for initial testing)
+        type: choice
+        options:
+          - edge
+          - beta
+          - candidate
+          - stable
+        required: true
+        default: edge
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check Snap Store credentials
+        shell: bash
+        env:
+          STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          if [[ -z "$STORE_CREDENTIALS" ]]; then
+            echo "::error::Add SNAPCRAFT_STORE_CREDENTIALS in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Locate latest successful Snap build
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/workflows/build-snap.yml/runs" \
+            -f branch=main -f status=success -f per_page=1 \
+            --jq '.workflow_runs[0].id // empty')"
+          if [[ -z "$run_id" ]]; then
+            echo "::error::No successful Build DMate Snap (GitHub) run on main."
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "Using Snap build run $run_id"
+
+      - name: Download existing Snap artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: DMate-linux-snap-amd64
+          path: snap-package
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Locate and verify Snap package
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' snaps < <(find snap-package -type f -name '*.snap' -print0)
+          if [[ ${#snaps[@]} -ne 1 ]]; then
+            echo "::error::Expected exactly one .snap in the downloaded artifact, found ${#snaps[@]}."
+            exit 1
+          fi
+          echo "snap=${snaps[0]}" >> "$GITHUB_OUTPUT"
+          ls -lh "${snaps[0]}"
+          sha256sum "${snaps[0]}"
+
+      - name: Upload and release Snap
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.pkg.outputs.snap }}
+          release: ${{ inputs.channel }}
