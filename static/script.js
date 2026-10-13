@@ -3307,6 +3307,8 @@ function normalizeRetestSession(value) {
         referenceQuestion: typeof value.referenceQuestion === "string"
             ? value.referenceQuestion.trim().slice(0, 3000)
             : "",
+        targetDifficulty: ["简单", "中等", "困难"].includes(value.targetDifficulty)
+            ? value.targetDifficulty : "",
         generatedQuestion: typeof value.generatedQuestion === "string"
             ? value.generatedQuestion.trim().slice(0, 3000)
             : "",
@@ -7276,6 +7278,9 @@ function saveWrongEdit() {
 
 function buildRetestPrompt(entry) {
     const target = wrongBookLearningPoints(entry);
+    // 错题难度只从保存的原题记录取；缺失时由后端重新分析原题。
+    const difficulty = ["简单", "中等", "困难"].includes(entry?.difficulty)
+        ? entry.difficulty : "";
     const targetText = target.length
         ? target.join("、")
         : (
@@ -7291,8 +7296,8 @@ function buildRetestPrompt(entry) {
         `请围绕知识点“${targetText}”生成 1 道新的离散数学复测题。`,
         "要求：",
         "1. 必须同时覆盖上面列出的全部核心知识点，不要只选其中一个；可安排相互关联的小问，但不能把原题原封不动重出；",
-        "2. 本次目标难度明确为中等，不继承原错题的难度标签；仅在原知识范围确实无法形成中等题时才允许就近调整档位，并如实标记；",
-        "3. 控制计算规模，让全部核心考点构成一份适中的综合复测，不靠堆砌无关小问增加难度；",
+        `2. 本次目标难度与原错题相同${difficulty ? `（${difficulty}）` : "（以系统复核的原题难度为准）"}；不要为了凑难度删掉考点；`,
+        "3. 控制计算规模，让全部核心考点构成一份紧密相关的复测，不靠堆砌无关小问增加难度；",
         "4. 只给复测题目，不给答案、提示、解析或解题步骤（系统内部隐藏答案除外）；",
         "5. 题目必须信息完整、可独立作答，不要回答原错题。"
     ].join("\n");
@@ -7323,6 +7328,8 @@ function startWrongQuestionRetest(id) {
         ? targetPoints.join("、")
         : "错题";
 
+    const targetDifficulty = ["简单", "中等", "困难"].includes(entry.difficulty)
+        ? entry.difficulty : "";
     const visiblePrompt =
         `给我一道包含“${targetName}”全部核心考点的复测题。`;
 
@@ -7342,6 +7349,7 @@ function startWrongQuestionRetest(id) {
             stage: "generating",
             targetPoints,
             referenceQuestion: entry.question,
+            targetDifficulty,
             generatedQuestion: "",
             generatedAnswer: "",
             startedAt: Date.now(),
@@ -12987,7 +12995,9 @@ async function requestAiReply(session) {
                         question: retestReferenceQuestion,
                         core_points: Array.isArray(retestBeforeRequest?.targetPoints)
                             ? retestBeforeRequest.targetPoints.slice(0, 4)
-                            : []
+                            : [],
+                        retest: true,
+                        difficulty: retestBeforeRequest?.targetDifficulty || ""
                     }
                     : exerciseReference
                         ? { question: exerciseReference.text }
