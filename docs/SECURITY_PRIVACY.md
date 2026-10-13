@@ -49,7 +49,7 @@ dm_email_codes
 
 `dm_users` 保存账号标识、已验证邮箱、密码哈希、恢复码哈希和 `auth_version`；`dm_user_data` 保存用户同步 JSONB 与 `revision`；`dm_email_codes` 保存邮箱验证码摘要、用途、过期时间、错误次数与消费时间。
 
-单次 `/sync` JSON 上限为 5 MiB。
+当前 `/sync` 对 `data` 序列化后的 JSON 设有 **12 MiB** 内部上限，但 Flask 全局 `MAX_CONTENT_LENGTH` 为 **8.5 MiB**，实际 HTTP 请求会优先受到全局限制（封装后 JSON 留给 `data` 的容量更小）。超过任一限制时应返回 HTTP 413，不应覆盖先前云端记录。应在后续代码维护时统一这两个阈值；服务端拒绝 `force=true`，并发修改采用冲突检测与前端自动合并。
 
 ## 3. 密码、恢复码与验证码
 
