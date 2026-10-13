@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=DMate
+Comment=离散数学智能辅学系统
+Exec=dmate
+Icon=${SNAP}/meta/gui/dmate.png
+Terminal=false
+Categories=Education;
+StartupWMClass=dmate-desktop

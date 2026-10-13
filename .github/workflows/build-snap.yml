@@ -1,0 +1,83 @@
+name: Build DMate Snap (GitHub)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snap:
+    name: Build Linux Snap (amd64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout DMate
+        uses: actions/checkout@v4
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libssl-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf xdg-utils libxdo-dev file
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './desktop/src-tauri -> target'
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version '^2' --locked
+
+      - name: Build Linux DEB from current source
+        working-directory: desktop
+        run: cargo tauri build --bundles deb
+
+      - name: Prepare Snap build inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find desktop/src-tauri/target -type f -path '*/release/bundle/deb/*.deb' -print)
+          if [[ ${#packages[@]} -ne 1 ]]; then
+            echo "Expected one Tauri Debian package; found ${#packages[@]}" >&2
+            printf '%s\n' "${packages[@]}" >&2
+            exit 1
+          fi
+          version="$(dpkg-deb --field "${packages[0]}" Version)"
+          arch="$(dpkg-deb --field "${packages[0]}" Architecture)"
+          test "$version" = "1.0.0"
+          test "$arch" = "amd64"
+          dpkg-deb --contents "${packages[0]}" | grep -q 'usr/bin/dmate-desktop'
+          cp "${packages[0]}" DMate_1.0.0_amd64.deb
+          # Use the checked-in Tauri icon; no separate image upload required.
+          mkdir -p snap/gui
+          cp desktop/src-tauri/icons/128x128@2x.png snap/gui/dmate.png
+          echo "DEB: ${packages[0]}"
+
+      - name: Build Snap on GitHub runner
+        id: snapcraft
+        uses: canonical/action-build@v1
+
+      - name: Check Snap output
+        shell: bash
+        env:
+          SNAP_PATH: ${{ steps.snapcraft.outputs.snap }}
+        run: |
+          set -euo pipefail
+          test -f "$SNAP_PATH"
+          ls -lh "$SNAP_PATH"
+          sha256sum "$SNAP_PATH"
+
+      - name: Save Snap for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMate-linux-snap-amd64
+          path: ${{ steps.snapcraft.outputs.snap }}
+          if-no-files-found: error
+          retention-days: 30

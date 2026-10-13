@@ -1,0 +1,37 @@
+name: dmate
+base: core24
+version: '1.0.0'
+title: DMate
+summary: AI-powered discrete mathematics learning assistant
+description: |
+  DMate helps students learn discrete mathematics with AI explanations,
+  practice generation, graph and image recognition, mistake review,
+  retesting, knowledge visualization, and learning-record synchronization.
+  An internet connection is required for online AI features.
+website: https://dmate.zeabur.app/
+icon: snap/gui/dmate.png
+grade: stable
+confinement: strict
+
+platforms:
+  amd64:
+
+apps:
+  dmate:
+    command: usr/bin/dmate-desktop
+    extensions: [gnome]
+    plugs:
+      - network
+      - home
+      - browser-support
+      - audio-playback
+      - removable-media
+
+parts:
+  dmate-binary:
+    plugin: dump
+    source: ./DMate_1.0.0_amd64.deb
+    source-type: deb
+    # Tauri uses WebKitGTK; the GNOME extension alone does not supply it.
+    stage-packages:
+      - libwebkit2gtk-4.1-0
