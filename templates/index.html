@@ -13,7 +13,7 @@
 <meta name="supported-color-schemes" content="light">
 <meta name="theme-color" content="#f8fafc">
 <meta name="application-name" content="DMate">
-<meta name="description" content="DMate - 离散数学智能辅学系统">
+<meta name="description" content="DMate 是面向大学生的离散数学 AI 智能辅学系统，支持题目图片识别、图论与离散数学解答、智能出题、错题管理、针对性复测、知识图谱和学习进度跨设备同步。无需安装即可在线学习，也提供 Windows、macOS、Linux 和 Android 客户端。">
 <meta name="msvalidate.01" content="8032784D58887350AB61D823FFE7933B" />
 <meta name="baidu-site-verification" content="codeva-486FjOU4sO" />
 {% if is_ios %}<meta name="mobile-web-app-capable" content="yes">{% endif %}
@@ -5986,6 +5986,7 @@ body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
 }
 
 .dmate-brand-name {
+    margin:0;
     color:var(--text-strong);
     font-size:1.08rem;
     font-weight:800;
@@ -7985,7 +7986,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         </button>
     </div>
     <div class="mobile-topbar-brand">
-        <img class="mobile-dmate-mark" src="/static/icons/dmate-mark.svg?v=dmate-v6-14" alt="" aria-hidden="true">
+        <img class="mobile-dmate-mark" src="/static/icons/dmate-mark.svg?v=dmate-v6-14" alt="DMate 应用图标">
         <div id="mobileConversationTitle" class="mobile-topbar-title">DMate</div>
     </div>
     <div class="mobile-topbar-actions">
@@ -8004,7 +8005,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
     <div class="dmate-brand" aria-label="DMate - 离散数学智能辅学系统">
         <img class="dmate-brand-mark" src="/static/icons/dmate-mark.svg?v=dmate-v6-14" alt="DMate 图标">
         <div class="dmate-brand-copy">
-            <div class="dmate-brand-name">DMate</div>
+            <h1 class="dmate-brand-name">DMate</h1>
             <div class="dmate-brand-subtitle">离散数学智能辅学系统</div>
         </div>
     </div>
