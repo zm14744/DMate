@@ -41,23 +41,11 @@ Target: https://github.com/AppImage/appimage.github.io/tree/master/data
 
 Official: https://github.com/AppImage/appimage.github.io
 
-## 3. AUR (Arch / Manjaro / Nyarch)
-
-Files: `aur/dmate-bin/PKGBUILD` and `aur/dmate-bin/.SRCINFO`.
-
-- Uses the official Debian release artifact with pinned hash. Only x86_64 is supplied; the PKGBUILD **does not** pretend the Windows binary or the AMD64 package supports ARM.
-- Declares GTK / WebKitGTK runtime dependencies present in the Arch package repositories.
-- `license=('unknown')` is used because the upstream repository currently has no verified software LICENSE. Decide and document the software license before broad third-party redistribution; if an SPDX license is added upstream, update PKGBUILD and .SRCINFO together.
-- These files are a packaging **candidate** until `makepkg --printsrcinfo` and `makepkg -si` are tested on Arch/Nyarch. Confirm the DEB payload installs `/usr/bin/dmate-desktop` and a valid desktop launcher.
-- AUR publication requires an account and registered SSH key. Use `git clone ssh://aur@aur.archlinux.org/dmate-bin.git`, copy the validated files, commit and push. Do not add binaries to the AUR Git repository.
-
-Official: https://wiki.archlinux.org/title/AUR_submission_guidelines
-
 ## Status
 
 - ✅ The existing upstream GitHub Release links and SHA-256 were verified from the GitHub Releases API.
 - ✅ Manifest source files prepared inside this repository.
-- ⏳ Independent local installation, WinGet manifest validation, AppImageHub CI and AUR package builds not yet completed.
-- ⏳ WinGet / AppImageHub upstream PRs and AUR SSH publication not yet performed.
+- ⏳ Independent local installation, WinGet manifest validation, and AppImageHub CI not yet completed.
+- ⏳ WinGet / AppImageHub upstream PRs not yet performed.
 
 These files do not alter the running Flask app or trigger Snap Store publication.
