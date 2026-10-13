@@ -2682,6 +2682,8 @@ def chat():
     # 同知识点出题的参照题由前端显式提交。只接收题干，分类由后端重新计算。
     reference = data.get("exercise_reference")
     reference_teaching = None
+    is_wrongbook_retest = False
+    original_retest_difficulty = ""
     if reference is not None:
         if (not client_requires_exercise or not isinstance(reference, dict)
                 or not isinstance(reference.get("question"), str)
@@ -2690,6 +2692,16 @@ def chat():
             return jsonify({"error": "练习参照题格式不正确，请重新选择题目。"}), 400
         reference_text = reference["question"].strip()
         reference_teaching = analyze_question(reference_text)
+        # 仅当确实来自错题本复测时才继承难度；普通同考点出题不受影响。
+        is_wrongbook_retest = reference.get("retest") is True
+        if is_wrongbook_retest:
+            saved_level = reference.get("difficulty")
+            inferred_level = (reference_teaching or {}).get("difficulty")
+            original_retest_difficulty = (
+                saved_level if saved_level in ("简单", "中等", "困难")
+                else inferred_level if inferred_level in ("简单", "中等", "困难")
+                else "中等"
+            )
         # 错题复测由客户端携带保存的“全部核心考点”；不从原题的
         # focus_points (通常只有前两项) 反推，避免遗漏其它知识点。
         core_points = reference.get("core_points")
@@ -2847,16 +2859,12 @@ def chat():
         requested_difficulty = _requested_exercise_difficulty(
             normalized_action_for_exercise
         )
-        # 错题本按钮发起的复测，后端不再从旧题或长提示里猜难度。
-        # 目标固定中等；除非生成器确实无法在原考点范围构造中等题，
-        # 才按已有的单次纠偏机制保留最近的有效候选并告知偏差。
-        if reference_teaching and reference_teaching.get("retest_core_points") and not requested_difficulty:
-            requested_difficulty = "中等"
+        # 错题复测：默认继承原错题保存的难度。仅用户在本轮明确下达
+        # “改出简单/困难”指令时覆盖；普通出题依旧默认中等。
+        # 复测提示中的“与原题相同”属于内部说明，不是一条改难度命令。
+        if is_wrongbook_retest:
+            requested_difficulty = original_retest_difficulty
         explicit_exercise_difficulty = requested_difficulty
-
-        # 所有出题入口（独立出题、同知识点复测）统一默认中等。
-        # 只有本轮用户明确点名简单/困难才覆盖；参照题只用于约束知识点，
-        # 不再隐式继承原题的难度。确实无法生成中等题时如实保留最接近的有效候选。
         exercise_target_difficulty = requested_difficulty or "中等"
 
         teaching["mode"] = "exercise"
@@ -3057,7 +3065,11 @@ def chat():
             first_level = (first_candidate or {}).get("teaching", {}).get("difficulty")
             # 纠偏与修补共用唯一的第二次生成机会。
             needs_retry = not first_candidate or (
-                first_level in rank
+                # 仅严格指定难度或错题复测在首次有效题偏档时再试一次。
+                # 普通“随便出一道题”有完整题与答案即可返回，避免
+                # 一个主观难度标签让生成耗时翻倍。
+                (is_wrongbook_retest or bool(explicit_exercise_difficulty))
+                and first_level in rank
                 and target_difficulty in rank
                 and first_level != target_difficulty
             )
@@ -3126,23 +3138,23 @@ def chat():
                 }), 502
 
             chosen_level = chosen_candidate["teaching"].get("difficulty")
+            # 本地分类器的难度是估计值，不是数学正确性证明。候选已通过
+            # 题干完整性、隐藏答案和参照考点校验时，不应仅因标签偏差
+            # 就丢弃有效题目。保留实际标签，同时向客户端回报差异。
             if chosen_level != target_difficulty:
-                # 识别失败与知识点天然缺少某档难度，不能画等号。
-                # 用户明确选困难/简单时绝不能静默降级，默认中等亦不擅自
-                # 把“尝试两次仍未生成”当成知识点不能出中等题的证明。
-                print(f"练习候选仍未达到目标难度：目标={target_difficulty}，估计={chosen_level}")
-                return jsonify({
-                    "error": f"本次没有生成符合{target_difficulty}难度的题目，请重新出题。",
-                    "teaching": teaching,
-                }), 502
+                print(f"练习有效但难度估计存在偏差：目标={target_difficulty}，实际={chosen_level}")
+                generation_note = (
+                    f"目标难度为{target_difficulty}，本次题目被估计为{chosen_level or '未确定'}；"
+                    "题目已保留，请按实际难度核对。"
+                )
+            else:
+                generation_note = ""
 
             reply = chosen_candidate["reply"]
             generated_question = chosen_candidate["question"]
             generated_answer = chosen_candidate["answer"]
             generated_teaching = chosen_candidate["teaching"]
             actual_difficulty = generated_teaching.get("difficulty")
-            generation_note = ""  # 严格符合目标时才会走到这里
-
             # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
             reply = "【题目】\n\n" + generated_question
             if exercise_solution_requested:
@@ -3353,6 +3365,22 @@ def _looks_like_non_question_ocr(text, visual_text):
     return bool(note_titles or definition_bullets >= 3)
 
 
+def _ocr_has_exercise_evidence(text):
+    """有明确题目小问时，不让偶发的 Vision 非题分类误杀 OCR 结果。
+
+    只匹配动作+数学对象或者连续小问，不能把普通笔记中的定义误认成题。
+    """
+    source = str(text or "")
+    numbered = len(set(re.findall(r"(?:^|\n)\s*[（(]\s*(\d{1,2})\s*[）)]", source)))
+    question_action = bool(re.search(
+        r"(?:回答(?:下列|以下)?问题|写出|求出|求|计算|判断|判定|证明|求证|列出|求解|画出)", source
+    ))
+    math_context = bool(re.search(
+        r"(?:图|邻接矩阵|顶点|边|通路|回路|同余|整除|集合|关系|函数|数论|矩阵|欧拉|代数|证明)", source
+    ))
+    return (numbered >= 2 and question_action) or (question_action and math_context and len(source) >= 18)
+
+
 def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
     """Vision 是待核对候选。漏问时保留 OCR，数字变化明确列出。"""
     original = _numbered_ocr_questions(ocr_text)
@@ -3457,10 +3485,14 @@ def ocr():
                     else "已就绪"
                 )
             except OCRError as exc:
-                # “完全无文字的图论图”会走到这里。不要直接 400，
-                # 改由 Vision 读取整图及上下/左右局部。
+                # 模糊纯图或文字识别失败均转交 Vision，不直接拒绝图片。
                 ocr_fallback_reason = str(exc)
                 print(f"普通 OCR 未得到可用文字，转纯图 Vision：{ocr_fallback_reason}")
+            except Exception as exc:
+                # 模型初始化/临时资源异常可能没有包装成 OCRError。
+                # OCR 与 Vision 相互隔离，单路失败不应杀掉整次图片请求。
+                ocr_fallback_reason = "普通文字识别暂时不可用"
+                print(f"文字 OCR 异常，改走 Vision 兜底：{type(exc).__name__}")
         else:
             ocr_fallback_reason = "普通文字 OCR 当前不可用"
 
@@ -3585,13 +3617,13 @@ def ocr():
 
         # Vision 在原有同一次请求里判明为课件/笔记/照片时，不进入题目核对或 AI 解题。
         # uncertain 必须留给核对流程，避免误杀无题干的纯图论图形。
-        if image_kind == "non_exercise":
+        if image_kind == "non_exercise" and not _ocr_has_exercise_evidence(ocr_text):
             return jsonify({
                 "error": "这张图片看起来不是待解答的数学题目。请上传题目图片；如果只是想讨论知识点，可以直接在聊天框输入问题。",
                 "not_a_question": True,
             }), 422
 
-        if image_kind == "uncertain" and _looks_like_non_question_ocr(
+        if image_kind == "uncertain" and not _ocr_has_exercise_evidence(ocr_text) and _looks_like_non_question_ocr(
             corrected_text or ocr_text, visual_text
         ):
             return jsonify({
