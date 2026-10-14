@@ -41,14 +41,14 @@
 | **itch.io** | **开发者已将项目从 Draft 改为 Public**，页面公开展示并可下载 Windows EXE、Android APK、macOS DMG；尚未声明全部下载与安装场景逐一通过真机验收。 |
 | Android / Uptodown | WebView APK 继续通过 GitHub/itch.io 分发；**Uptodown 因单纯网页封装而拒绝**，不是审核中。 |
 | iPhone / iPad | Safari 主屏幕 PWA，并非 Apple App Store 原生 IPA。 |
-| Microsoft Store | 已提交，处于认证阶段；**尚未确认上架**。 |
+| **Microsoft Store（微软商店）** | **2026-10-14 开发者确认：审核通过，DMate 已正式上架**；商店具体商品链接与商店包版本待补充，不能由上架直接推断所有设备安装成功。 |
 | PWAStore | 已有公开产品展示页与 Install PWA 入口；不是 Apple App Store。 |
 | PWA Directory | 申请**成功进入免费发布队列**，尚待排期上线；不能将受理邮件当作正式上架。 |
 | Bing 搜索 | **开发者已确认 DMate 可由公开搜索检索到**；此前的 Bing 站长后台亦出现索引成功状态；搜索排名与覆盖词不保证固定。 |
 | 百度搜索 | 已验证网站并提交入口，最新为**审核中/待进一步索引**，不能据提交断言完成收录。 |
 | Product Hunt | 历史资料已提交/预约，当前未取得新的公开上线确认。 |
 
-当前明确的公开软件分发成果包括 **Snap Store Stable** 与 **itch.io Public**；GitHub Release 可直接提供多平台安装包，PWAStore 已有安装入口。微软商店认证中、PWA Directory 排队、百度审核中、Uptodown 已拒绝，均与“公开发布成功”区分记录。Bing 公开搜索可见状态按开发者 2026-10-14 反馈记载，并非保证所有地区、所有关键词均可检索。
+当前明确的公开软件分发成果包括 **Microsoft Store 正式上架、Snap Store Stable 与 itch.io Public**；GitHub Release 可直接提供多平台安装包，PWAStore 已有安装入口。PWA Directory 排队、百度审核中、Uptodown 已拒绝，均与“公开发布成功”区分记录。Microsoft Store 的状态根据开发者 2026-10-14 最新反馈更新；Bing 公开搜索可见不保证所有地区、所有关键词均可检索。
 
 ## 产品定位
 
