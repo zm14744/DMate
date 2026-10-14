@@ -247,7 +247,8 @@ node --check static/script.js
 - **Snap Store**：[dmate](https://snapcraft.io/dmate) **1.0.0 / Revision 1 已发布至 Stable**；发行渠道正式成功，与构建成功不同。
 - **itch.io**：开发者 2026-10-14 确认项目已设为 **Public**，公开提供 Windows `.exe`、macOS `.dmg` 和 Android `.apk`；具体客户端的代码签名、安装和原生更新仍按实际设备核验。
 - **PWAStore / PWA Directory**：前者有产品展示页与 Install PWA 入口；后者收到确认邮件并进入免费发布队列，尚不是正式上架。
-- **Microsoft Store / Uptodown / Product Hunt**：Microsoft Store 认证中；Uptodown 已因 WebView 仅封装网页而拒绝；Product Hunt 仅有此前预约或提交记录，尚缺当前公开发布确认。
+- **Microsoft Store（微软商店）**：开发者于 **2026-10-14 确认 DMate 已通过微软商店认证并正式上架**，不是审核中。商店具体商品页 URL 与实际商店包版本尚待补充，仍需单独验收通过商店安装、启动与更新。
+- **Uptodown / Product Hunt**：Uptodown 已因 WebView 仅封装网页而拒绝；Product Hunt 仅有此前预约或提交记录，尚缺当前公开发布确认。
 - 旧域名 `discrete-math-tutor.zeabur.app` 当前不可访问，服务在 Zeabur 控制台仍可能叫 `discrete-math-tutor`。**服务名不是域名，绝不能为清除旧搜索结果而删除服务**。
 
 ## 12. SEO 与部署验收
