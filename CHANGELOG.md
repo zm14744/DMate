@@ -2,12 +2,18 @@
 
 > **历史快照说明**：2026-10-13 提交 `296b3388` 当时没有 `tests/` 目录；**当前 `main` 已有 `tests/test_retest_ocr_regression.py`**，其 5 项专项离线测试与历史“10/10”记录不是同一批。175 项 Excel 结果仍是预填而非全部实时验证，详见 [`docs/TESTING.md`](docs/TESTING.md)。
 
+## 2026-10-14：微软商店 Microsoft Store 正式上架（最新补充）
+
+- 开发者确认：**微软商店已通过 DMate 的认证审核，DMate 已在 Microsoft Store 正式上架**。此前文档中的“提交审核中”“认证中”属于本日较早的状态，不再代表最新进度。
+- 此次更新仅同步公开分发进展：保留 Snap Store 1.0.0 / Revision 1 / Stable 与 itch.io Public 的既有成果；PWAStore 有安装入口，PWA Directory 仍在排队，Uptodown 审核被拒，Bing 已可公开搜索到 DMate。
+- 未提供微软商店商品的准确 URL 和应用商店包版本，因此暂不填写猜测的商品编号，也不把上架成功冒充全部 Windows 真机安装和自动更新测试完成。
+
 ## 2026-10-14：公开发行渠道和搜索收录状态更新
 
 - **itch.io**：开发者已确认 DMate 项目由 Draft 切换为 **Public**，项目页显示 Windows `DMate_1.0.0_x64-setup.exe`、macOS `DMate_1.0.0_universal.dmg` 与 Android `DMate.apk` 下载入口。发布页面公开不等于安装包完成全部真机兼容验收。
 - **Snap Store**：再次确认已有 `dmate` **1.0.0 / Revision 1 / Stable** 正式发布记录，官方入口：https://snapcraft.io/dmate 。不是“仅构建成功”或“审核中”。
 - **搜索引擎**：开发者确认 **Bing 公开搜索已能找到 DMate**，在站长后台索引状态之外新增公开检索成果；百度的所有权验证和首页提交已完成，当前仍在审核/等待进一步收录反馈。搜索结果会因地区、关键词和刷新时间变化。
-- **其他平台**：PWAStore 有 DMate 展示页与 Install PWA 入口；PWA Directory 邮件确认提交成功并进入免费排队阶段；Microsoft Store 仍认证中；Uptodown 因 Android 仅 WebView 网页封装被拒；Product Hunt 只有此前预约/提交记录，暂无更新的公开发布确认。
+- **其他平台（本日早先状态，后续更新见上一节）**：PWAStore 有 DMate 展示页与 Install PWA 入口；PWA Directory 邮件确认提交成功并进入免费排队阶段；Microsoft Store 当时仍认证中，**但本日随后已通过并正式上架**；Uptodown 因 Android 仅 WebView 网页封装被拒；Product Hunt 只有此前预约/提交记录，暂无更新的公开发布确认。
 - **文档校准**：更新 README、项目概况、部署说明、测试记录及文档索引的当前状态；不触及产品源代码、数据库或应用安装包。历史日期段所述状态保留为历史，不代表 10 月 14 日的现状。
 
 ## 2026-10-13：当前交付快照规则勘误（以源码为准）
