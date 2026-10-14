@@ -33,7 +33,7 @@ DMate 是面向高校离散数学学习场景的 AI 智能辅学产品。系统�
 - **截至 10 月 8 日**：集中排查 AI 练习生成及难度误判、同知识点复测、OCR 非题目图片处理和识别中按钮状态；完成相关离线回归、文档及测试记录整理。
 
 - **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；完善 iOS PWA 与 Linux 安装说明；推进 PWA、应用商店及搜索引擎收录。
-- **10 月 14 日**：补充错题复测与 OCR 容错修复；itch.io 项目已设为 Public，提供 macOS、Windows、Android 安装包；确认 PWA Directory 提交排队、Uptodown 审核拒绝，并据开发者反馈记录 Bing 公开搜索已可检索到 DMate。
+- **10 月 14 日**：补充错题复测与 OCR 容错修复；itch.io 项目已设为 Public，提供 macOS、Windows、Android 安装包；**微软商店 Microsoft Store 审核通过，DMate 正式上架**；确认 PWA Directory 提交排队、Uptodown 审核拒绝，并据开发者反馈记录 Bing 公开搜索已可检索到 DMate。
 
 以上按**阶段**归纳，不等于每天都有独立发布或所有功能已完成线上验收。详细历史见 [`CHANGELOG.md`](CHANGELOG.md)。
 
@@ -224,7 +224,7 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 | **itch.io** | **开发者确认项目已改为 Public（公开发布）**；项目页提供 macOS `DMate_1.0.0_universal.dmg`、Windows `DMate_1.0.0_x64-setup.exe` 和 Android `DMate.apk` 下载；仅确认上传与公开展示，未将所有平台安装体验写成已实测。 |
 | Android / Uptodown | Android WebView APK 可通过 GitHub Release 与 itch.io 分发；**Uptodown 申请已被拒绝**，理由为纯 WebView 封装没有额外原生功能，不应标为审核中或正式上架。 |
 | iPhone / iPad | Safari “添加到主屏幕”的 PWA；**不是原生 iOS IPA，也未在 Apple App Store 上架**。 |
-| Microsoft Store | PWA / MSIX 提交已进入**认证阶段**，尚未确认通过或上架。 |
+| **Microsoft Store（微软商店）** | **开发者于 2026-10-14 确认 DMate 已通过认证并正式上架**。具体商品页 URL、商店包版本有待补充；正式上架不代表已在所有 Windows 设备上完成安装兼容性测试。 |
 | PWAStore | 已有 DMate 应用展示页面和 **Install PWA** 入口；这与苹果官方 App Store 上架不同。 |
 | PWA Directory | 已**提交成功并进入免费发布队列**；邮件介绍通常约 7 天、中近期可能至 13 天，尚不应写成正式上架。 |
 | 百度搜索 | 已做站点验证及链接提交；用户提供的最新进度为**仍在审核/等待进一步收录结果**，不以提交替代稳定索引。 |
@@ -235,7 +235,7 @@ Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcr
 
 **iOS**：通过 Safari → 分享 → 添加到主屏幕安装 Web App。Manifest 已声明 `standalone`，并包含 Apple 专用主屏幕元信息和图标；AI、账号同步依赖网络，不宣称完全离线可用。
 
-**商店与 SEO 的验证边界**：Snap Revision 1 Stable 有发布日志支持，itch.io 已由开发者确认 Public，Bing 已由开发者确认公开搜索可见；PWA Directory 仍在发布队列，Microsoft Store 仍认证中，Uptodown 已拒绝，百度仍需等待审核/索引结果。提交、上架、可下载、可搜索、真实安装通过属于不同阶段。
+**商店与 SEO 的验证边界**：**Microsoft Store 已由开发者确认审核通过并正式上架**；Snap Revision 1 Stable 有发布日志支持，itch.io 已由开发者确认 Public，Bing 已由开发者确认公开搜索可见；PWA Directory 仍在发布队列，Uptodown 已拒绝，百度仍需等待审核/索引结果。提交、上架、可下载、可搜索、真实安装通过属于不同阶段。
 
 ## AI 运行链路
 
