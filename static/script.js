@@ -14695,6 +14695,7 @@ function renderChat() {
 let mobileSessionTapTimer = 0;
 let mobileSessionTapId = "";
 let mobileSessionTapAt = 0;
+let mobileSessionLastTouchAt = 0;
 let lastSessionRenameAt = 0;
 function renameSession(session) {
     if (!session || Date.now() - lastSessionRenameAt < 400) return;
@@ -14791,16 +14792,14 @@ function renderSessions() {
             animateMobileConversationSwitch();
             if (isMobileAppShell()) closeMobileShellDrawers();
         };
-        span.onclick = event => {
-            if (!isMobileAppShell()) { selectSession(); return; }
-            // 手机上单击延迟执行：第二次点击优先进入重命名，不先关闭侧栏。
+        const handleSessionTap = () => {
             const now = Date.now();
             if (mobileSessionTapTimer && mobileSessionTapId === String(session.id)
-                && now - mobileSessionTapAt < 420) {
+                && now - mobileSessionTapAt <= 460) {
                 window.clearTimeout(mobileSessionTapTimer);
                 mobileSessionTapTimer = 0;
                 mobileSessionTapId = "";
-                event.preventDefault();
+                mobileSessionTapAt = 0;
                 renameSession(session);
                 return;
             }
@@ -14813,14 +14812,49 @@ function renderSessions() {
             mobileSessionTapTimer = window.setTimeout(() => {
                 mobileSessionTapTimer = 0;
                 mobileSessionTapId = "";
+                mobileSessionTapAt = 0;
                 selectSession();
-            }, 420);
+            }, 460);
+        };
+        // 手机 WebView / Safari 对 dblclick 支持不一致：用真实 touchend
+        // 检测双击，并阻止合成 click 让第一次触摸立即关闭会话抽屉。
+        let touchStart = null;
+        span.addEventListener("touchstart", event => {
+            if (!isMobileAppShell() || event.touches.length !== 1) return;
+            const t = event.touches[0];
+            touchStart = { x:t.clientX, y:t.clientY };
+        }, { passive:true });
+        span.addEventListener("touchmove", event => {
+            if (!touchStart || !event.touches.length) return;
+            const t = event.touches[0];
+            if (Math.hypot(t.clientX-touchStart.x, t.clientY-touchStart.y) > 12) {
+                touchStart = null;
+            }
+        }, { passive:true });
+        span.addEventListener("touchcancel", () => { touchStart = null; }, { passive:true });
+        span.addEventListener("touchend", event => {
+            if (!isMobileAppShell() || !touchStart || event.changedTouches.length !== 1) return;
+            const t = event.changedTouches[0];
+            const distance = Math.hypot(t.clientX-touchStart.x, t.clientY-touchStart.y);
+            touchStart = null;
+            if (distance > 12) return;
+            // 防止 iOS 双击缩放和随后浏览器合成的单击事件。
+            event.preventDefault();
+            mobileSessionLastTouchAt = Date.now();
+            handleSessionTap();
+        }, { passive:false });
+        span.onclick = () => {
+            if (!isMobileAppShell()) { selectSession(); return; }
+            if (Date.now() - mobileSessionLastTouchAt < 750) return;
+            // 鼠标、触控板或不触发 touch 事件的设备同样支持双击。
+            handleSessionTap();
         };
         span.ondblclick = event => {
             event.preventDefault();
             if (mobileSessionTapTimer) window.clearTimeout(mobileSessionTapTimer);
             mobileSessionTapTimer = 0;
             mobileSessionTapId = "";
+            mobileSessionTapAt = 0;
             renameSession(session);
         };
 
@@ -14887,21 +14921,6 @@ function renderSessions() {
         };
 
         div.appendChild(span);
-        if (isMobileAppShell()) {
-            const edit = document.createElement("button");
-            edit.type = "button";
-            edit.className = "session-rename";
-            edit.textContent = "改名";
-            edit.setAttribute("aria-label", "重命名这个对话");
-            edit.onclick = event => {
-                event.stopPropagation();
-                if (mobileSessionTapTimer) window.clearTimeout(mobileSessionTapTimer);
-                mobileSessionTapTimer = 0;
-                mobileSessionTapId = "";
-                renameSession(session);
-            };
-            div.appendChild(edit);
-        }
         div.appendChild(del);
         box.appendChild(div);
     }
@@ -19433,9 +19452,12 @@ function installGuideForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"iOS 当前提供的是 Safari 主屏幕 PWA，而非 App Store 原生 IPA。无需下载 APK 或 DMG。",
-            steps:["在 Safari 打开 DMate 网站。","点击“分享”→“添加到主屏幕”，然后从主屏幕打开 DMate。"],
-            actions:[{ label:"打开 DMate 官网", url:"https://dmate.zeabur.app/" }]
+            text:"DMate 已有 PWAStore 产品展示入口；iOS 使用 Safari 添加主屏幕的 PWA，并非 Apple App Store 的原生 IPA。",
+            steps:["可从 PWAStore 查找 DMate，或直接在 Safari 打开 DMate 官网。","在 Safari 点击“分享”→“添加到主屏幕”，从主屏幕打开 DMate。"],
+            actions:[
+                { label:"PWAStore（查找 DMate）", url:"https://www.pwastore.io/" },
+                { label:"DMate 官网（Safari 安装 PWA）", url:"https://dmate.zeabur.app/", secondary:true }
+            ]
         };
     }
     if (platform === "windows") {
@@ -19445,7 +19467,8 @@ function installGuideForCurrentPlatform() {
             steps:[],
             actions:[
                 { label:"Microsoft Store（官方商店）", url:"https://apps.microsoft.com/search?query=DMate" },
-                ...(config.desktopWindowsUrl ? [{ label:"下载 Windows 安装包（备用下载源）", url:config.desktopWindowsUrl, secondary:true }] : [])
+                { label:"itch.io（Windows EXE 下载页）", url:"https://zm14744.itch.io/dmate", secondary:true },
+                ...(config.desktopWindowsUrl ? [{ label:"Windows EXE（原下载地址）", url:config.desktopWindowsUrl, secondary:true }] : [])
             ]
         };
     }
