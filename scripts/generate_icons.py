@@ -87,32 +87,11 @@ def save_png(image, path):
 
 
 def save_ico(path):
-    sizes = [16, 24, 32, 48, 64, 128, 256]
-    file_map = {
-        16: "icon-16.png", 24: "icon-24.png", 32: "32x32.png",
-        48: "icon-48.png", 64: "icon-64.png", 128: "128x128.png",
-        256: "128x128@2x.png",
-    }
-    payloads, entries = [], []
-    offset = 6 + 16 * len(sizes)
-    for size in sizes:
-        image = Image.open(TAURI / file_map[size]).convert("RGBA")
-        buf = io.BytesIO()
-        image.save(buf, format="PNG", optimize=True)
-        data = buf.getvalue()
-        payloads.append(data)
-        entries.append(struct.pack(
-            "<BBBBHHII", 0 if size == 256 else size, 0 if size == 256 else size,
-            0, 0, 1, 32, len(data), offset
-        ))
-        offset += len(data)
-    with path.open("wb") as out:
-        out.write(struct.pack("<HHH", 0, 1, len(sizes)))
-        for entry in entries:
-            out.write(entry)
-        for payload in payloads:
-            out.write(payload)
-
+    # Use Pillow's standard multi-resolution ICO writer for maximum Tauri/Windows compatibility.
+    source = Image.open(TAURI / "icon.png").convert("RGBA")
+    source.save(path, format="ICO", sizes=[
+        (16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)
+    ])
 
 def main():
     STATIC.mkdir(parents=True, exist_ok=True)
