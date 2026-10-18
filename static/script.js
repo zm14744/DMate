@@ -19437,77 +19437,90 @@ function detectDmateInstallPlatform() {
 function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
+    // 国内用户反馈 Microsoft Store、Snap Store 和 PWAStore 更容易访问。
+    // 这些是“国内优先推荐”，不是对所有网络的免 VPN 保证。
+    const pwaStore = "https://www.pwastore.io/";
+    const itch = "https://zm14744.itch.io/dmate";
+    const webApp = "https://dmate.zeabur.app/";
+    const releases = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
 
     if (config.isAndroid) {
         return {
             platform:"Android",
-            text:"DMate 已发布 APK。优先尝试 itch.io 下载页面；如当前网络无法连接，也可尝试原安装包地址。是否免 VPN 取决于实际下载源及网络环境。",
-            steps:["下载 APK 后，从系统“下载/文件”中打开安装；微信内置浏览器可能限制 APK 下载，建议用系统浏览器。"],
+            text:"国内优先通过 PWAStore 查找 DMate 并安装网页应用（PWA）。无需下载 APK；如需原生 Android 安装包，保留 itch.io 和原下载地址作为海外/备用渠道。PWA 不等于 APK，是否能安装为独立应用取决于浏览器与系统。",
+            steps:["在 PWAStore 搜索 DMate，打开应用对应的网站。","在支持的浏览器中选择“安装应用”或“添加到主屏幕”；部分无 Google 服务的浏览器只会创建网页快捷方式。","若选择 APK，请在系统浏览器中下载，再从“下载/文件”打开安装，微信内可能拦截 APK。"],
             actions:[
-                { label:"itch.io（Android APK 下载页）", url:"https://zm14744.itch.io/dmate" },
-                ...(config.androidApkUrl ? [{ label:"Android APK（原下载地址）", url:config.androidApkUrl, secondary:true }] : [])
+                { label:"国内优先 · PWAStore（安装 PWA）", url:pwaStore },
+                { label:"DMate 官网（PWA）", url:webApp, secondary:true },
+                { label:"海外备用 · itch.io（APK）", url:itch, secondary:true },
+                ...(config.androidApkUrl ? [{ label:"备用 · APK 原下载地址", url:config.androidApkUrl, secondary:true }] : [])
             ]
         };
     }
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"DMate 已有 PWAStore 产品展示入口；iOS 使用 Safari 添加主屏幕的 PWA，并非 Apple App Store 的原生 IPA。",
-            steps:["可从 PWAStore 查找 DMate，或直接在 Safari 打开 DMate 官网。","在 Safari 点击“分享”→“添加到主屏幕”，从主屏幕打开 DMate。"],
+            text:"国内优先从 PWAStore 查找 DMate，使用 Safari 安装 PWA。当前没有原生 iOS IPA，也没有在 Apple App Store 发布；PWAStore 是网页应用目录而不是苹果商店。",
+            steps:["打开 PWAStore 搜索 DMate，进入对应网页；也可以直接打开 DMate 官网。","在 Safari 点击“分享”→“添加到主屏幕”，然后从主屏幕启动 DMate。"],
             actions:[
-                { label:"PWAStore（查找 DMate）", url:"https://www.pwastore.io/" },
-                { label:"DMate 官网（Safari 安装 PWA）", url:"https://dmate.zeabur.app/", secondary:true }
+                { label:"国内优先 · PWAStore（PWA）", url:pwaStore },
+                { label:"DMate 官网（Safari 安装）", url:webApp, secondary:true }
             ]
         };
     }
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text:"国内用户建议先尝试微软商店；若直接下载安装包提示网络失败，可能是下载源 GitHub/CDN 不可达。国内直连镜像须由管理员配置并验证后才能使用。",
+            text:"国内优先使用已上架的 Microsoft Store 安装 DMate；itch.io 和原 EXE 地址继续作为海外/备用下载渠道。备用站点在部分国内网络可能无法打开。",
             steps:[],
             actions:[
-                { label:"Microsoft Store（官方商店）", url:"https://apps.microsoft.com/search?query=DMate" },
-                { label:"itch.io（Windows EXE 下载页）", url:"https://zm14744.itch.io/dmate", secondary:true },
-                ...(config.desktopWindowsUrl ? [{ label:"Windows EXE（原下载地址）", url:config.desktopWindowsUrl, secondary:true }] : [])
+                { label:"国内优先 · Microsoft Store", url:"https://apps.microsoft.com/search?query=DMate" },
+                { label:"海外备用 · itch.io（EXE）", url:itch, secondary:true },
+                ...(config.desktopWindowsUrl ? [{ label:"备用 · Windows EXE 原下载地址", url:config.desktopWindowsUrl, secondary:true }] : [])
             ]
         };
     }
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"已发布 macOS 通用 DMG 安装包。可通过 itch.io 下载页面获取，原安装包地址作为备用。当前 DMG 尚无已确认的 Apple 公证，首次启动可能遇到 Gatekeeper 提示。",
-            steps:[],
+            text:"国内优先通过 PWAStore 使用 DMate 网页应用；macOS Safari 17 及以上版本可通过“文件→添加到程序坞”，Chrome/Edge 也可安装网页应用。需要独立 DMG 安装包时，可尝试 itch.io 或原下载地址（海外备用）；DMG 尚无已确认的 Apple 公证。",
+            steps:["从 PWAStore 搜索 DMate，打开对应网页，也可直接打开 DMate 官网。","Safari：文件→添加到程序坞；Chrome/Edge：使用浏览器中的“安装应用”功能。"],
             actions:[
-                { label:"itch.io（macOS DMG 下载页）", url:"https://zm14744.itch.io/dmate" },
-                ...(config.desktopMacosUrl ? [{ label:"macOS DMG（原下载地址）", url:config.desktopMacosUrl, secondary:true }] : [])
+                { label:"国内优先 · PWAStore（PWA）", url:pwaStore },
+                { label:"DMate 官网（安装 PWA）", url:webApp, secondary:true },
+                { label:"海外备用 · itch.io（DMG）", url:itch, secondary:true },
+                ...(config.desktopMacosUrl ? [{ label:"备用 · macOS DMG 原下载地址", url:config.desktopMacosUrl, secondary:true }] : [])
             ]
         };
     }
     if (platform === "linux") {
-        const actions = [];
+        const actions = [
+            { label:"国内优先 · Snap Store（需 snapd）", url:"https://snapcraft.io/dmate" }
+        ];
         if (config.desktopLinuxDebUrl) {
-            actions.push({ label:"下载 .deb（Ubuntu / Debian / Mint）", url:config.desktopLinuxDebUrl });
+            actions.push({ label:"备用 · 下载 DEB（Ubuntu / Debian / Mint）", url:config.desktopLinuxDebUrl, secondary:true });
         }
         if (config.desktopLinuxAppImageUrl) {
-            actions.push({ label:"下载 AppImage（Arch / Fedora 等）", url:config.desktopLinuxAppImageUrl, secondary:Boolean(actions.length) });
+            actions.push({ label:"备用 · 下载 AppImage", url:config.desktopLinuxAppImageUrl, secondary:true });
         }
-        actions.push({ label:"Snap Store（需 snapd）", url:"https://snapcraft.io/dmate", secondary:Boolean(actions.length) });
-        actions.push({ label:"GitHub Releases（DEB / AppImage 备用页）", url:"https://github.com/zm14744/DMate/releases/tag/v1.0.1", secondary:true });
+        actions.push({ label:"海外备用 · GitHub Releases", url:releases, secondary:true });
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"Ubuntu / Debian / Mint 可选择 DEB，其他桌面发行版可尝试 AppImage（可能需要 FUSE）；已安装 snapd 的设备也可使用 Snap Store。GitHub 和 Snap Store 在部分国内网络可能连接失败，暂不能宣称已实现免 VPN 下载。",
-            steps:[],
+            text:"国内优先使用已发布的 Snap Store 版本（安装前需要 snapd，支持 amd64）。Ubuntu/Debian/Mint 可选 DEB；其他发行版可尝试 AppImage（可能需要 FUSE）。下载源在国内的可达性视网络环境而定。",
+            steps:["已启用 snapd 的系统可执行：sudo snap install dmate","如果 snapd 不可用，请从备用渠道选择 DEB 或 AppImage；不需要全部安装。"],
             actions
         };
     }
     return {
         platform:"电脑",
-        text:"请选择对应系统的 DMate 桌面版。",
+        text:"请按系统选择：Windows 国内优先 Microsoft Store；Linux 优先 Snap Store；macOS 优先 PWAStore。网页应用与原生安装包属于不同的安装形式。",
         steps:[],
         actions:[
-            ...(config.desktopWindowsUrl ? [{ label:"Windows", url:config.desktopWindowsUrl }] : []),
-            ...(config.desktopMacosUrl ? [{ label:"macOS", url:config.desktopMacosUrl }] : []),
-            ...(config.desktopLinuxAppImageUrl ? [{ label:"Linux AppImage", url:config.desktopLinuxAppImageUrl }] : [])
+            { label:"国内优先 · Microsoft Store（Windows）", url:"https://apps.microsoft.com/search?query=DMate" },
+            { label:"国内优先 · Snap Store（Linux）", url:"https://snapcraft.io/dmate", secondary:true },
+            { label:"国内优先 · PWAStore（网页应用）", url:pwaStore, secondary:true },
+            { label:"海外备用 · itch.io（安装包）", url:itch, secondary:true },
+            { label:"海外备用 · GitHub Releases", url:releases, secondary:true }
         ]
     };
 }
@@ -19567,7 +19580,7 @@ function initDmateInstall() {
     const platform = detectDmateInstallPlatform();
     button.hidden = false;
     button.setAttribute("aria-hidden", "false");
-    if (platform === "android") button.textContent = "下载 DMate APK";
+    if (platform === "android") button.textContent = "安装 DMate（PWA / APK）";
     else if (platform === "ios") button.textContent = "安装 DMate";
     else button.textContent = "下载 DMate 桌面版";
 
@@ -19583,10 +19596,11 @@ function initDmateInstall() {
         if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) closeDmateInstallHelp();
     });
 
-    // Android 和电脑不再使用浏览器 PWA；阻止浏览器主动弹出安装提示。
-    window.addEventListener("beforeinstallprompt", event => {
-        event.preventDefault();
-    });
+    // 浏览器版允许 Android / macOS / Windows 的 PWA 安装入口正常工作。
+    // 已安装的 Android WebView 和桌面壳不显示安装入口，也不管理网页 PWA。
+    if (config.isAndroidApp || config.isDesktopApp) {
+        window.addEventListener("beforeinstallprompt", event => event.preventDefault());
+    }
 }
 
 function registerDmateServiceWorker() {
