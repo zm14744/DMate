@@ -148,7 +148,7 @@ SMTP_CONFIGURED = bool(
 )
 EMAIL_DELIVERY_CONFIGURED = bool(BREVO_CONFIGURED or SMTP_CONFIGURED)
 
-# Android 客户端：Android 浏览器不再走 PWA；正式 APK 发布后把下载地址放到该环境变量。
+# Android 安装版使用 APK；普通 Android 浏览器也可通过 PWAStore / 浏览器安装 PWA。
 ANDROID_APK_URL = (os.environ.get("ANDROID_APK_URL") or "").strip()
 
 # 桌面客户端：Windows / macOS / Linux 统一使用 Tauri，不再依赖浏览器 PWA。
@@ -1873,7 +1873,7 @@ def service_worker():
 
 @app.route("/")
 def home():
-    # Android 浏览器不再暴露 PWA 安装入口：Android 统一使用独立 APK。
+    # 普通 Android 浏览器提供 PWA 与 APK 选择；已安装的 APK 仍隐藏重复安装入口。
     # APK 自己追加 DMateAndroid/<version> UA，可据此隐藏网页内的下载入口。
     user_agent = request.headers.get("User-Agent", "")
     is_android = bool(re.search(r"Android", user_agent, re.IGNORECASE))
