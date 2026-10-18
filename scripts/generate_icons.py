@@ -55,26 +55,25 @@ def svg_mark(background=None, foreground="#fff", stroke=40, adaptive=False):
 </svg>'''
 
 
-def draw_mark(size, background=None, foreground=(255, 255, 255, 255), stroke_px=None):
-    """Supersampled RGBA rendering; background=None means truly transparent."""
+def draw_mark(size, background=None, foreground=(255, 255, 255, 255),
+              stroke_units=34, shadow=True):
+    """Render the original fine wireframe with 4x supersampling and antialiasing."""
     scale = 4
     side = size * scale
     fill = background if background is not None else (0, 0, 0, 0)
     image = Image.new("RGBA", (side, side), fill)
     draw = ImageDraw.Draw(image)
-    stroke_px = stroke_px if stroke_px is not None else max(1.35, size * 0.035)
-    line_width = max(1, round(stroke_px * scale))
 
     def scaled(points):
         return [(round(x * side / VIEWBOX), round(y * side / VIEWBOX)) for x, y in points]
 
+    line_width = max(1, round(stroke_units * side / VIEWBOX))
+    if shadow:
+        shadow_width = max(line_width + 1, round((stroke_units + 20) * side / VIEWBOX))
+        for points in PATHS:
+            draw.line(scaled(points), fill=(0, 0, 0, 112), width=shadow_width, joint="curve")
     for points in PATHS:
-        coords = scaled(points)
-        draw.line(coords, fill=foreground, width=line_width, joint="curve")
-        radius = line_width / 2
-        for x, y in coords:
-            draw.ellipse((round(x-radius), round(y-radius), round(x+radius), round(y+radius)),
-                         fill=foreground)
+        draw.line(scaled(points), fill=foreground, width=line_width, joint="curve")
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
@@ -98,11 +97,11 @@ def main():
     save_png(draw_mark(512, background=(0, 0, 0, 255)), STATIC / "icon-maskable-512.png")
 
     (STATIC / "dmate-mark.svg").write_text(
-        svg_mark("#000", "#fff", 40), encoding="utf-8"
+        svg_mark("#000", "#fff", 34), encoding="utf-8"
     )
     # Transparent white linework for browser tabs; no black square is baked in.
     (STATIC / "dmate-transparent.svg").write_text(
-        svg_mark(None, "#fff", 40), encoding="utf-8"
+        svg_mark(None, "#fff", 34), encoding="utf-8"
     )
 
     # Tauri desktop assets match the PWA artwork at every size.
@@ -123,23 +122,23 @@ def main():
 
     # Windows/browser favicon: white geometry on true transparency.
     for size, filename, stroke in [
-        (16, "favicon-16.png", 1.3),
-        (32, "favicon-32.png", 1.5),
-        (48, "favicon-48.png", 1.8),
-        (128, "favicon-128.png", 4.0),
+        (16, "favicon-16.png", 65),
+        (32, "favicon-32.png", 44),
+        (48, "favicon-48.png", 36),
+        (128, "favicon-128.png", 30),
     ]:
         save_png(draw_mark(size, background=None, foreground=(255, 255, 255, 255),
-                           stroke_px=stroke), STATIC / filename)
+                           stroke_units=stroke, shadow=False), STATIC / filename)
     save_ico(STATIC / "favicon-128.png", STATIC / "favicon.ico", [
         (16, 16), (32, 32), (48, 48), (64, 64), (128, 128)
     ])
 
     # Safari website favicon: light mode is white with black lines; dark mode is black with white lines.
     (STATIC / "dmate-favicon-mac-light.svg").write_text(
-        svg_mark("#fff", "#111827", 42), encoding="utf-8"
+        svg_mark("#fff", "#111827", 40), encoding="utf-8"
     )
     (STATIC / "dmate-favicon-mac-dark.svg").write_text(
-        svg_mark("#000", "#fff", 42), encoding="utf-8"
+        svg_mark("#000", "#fff", 40), encoding="utf-8"
     )
     (STATIC / "dmate-favicon-mac.svg").write_text(
         svg_mark(adaptive=True), encoding="utf-8"
@@ -147,7 +146,7 @@ def main():
 
     # Apple home-screen/PWA artwork intentionally matches the other app icons in both modes.
     for filename in ("apple-touch-mac-light.png", "apple-touch-mac-dark.png", "apple-touch-icon.png"):
-        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_px=6.3),
+        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=32, shadow=False),
                  STATIC / filename)
 
     summary = {}
