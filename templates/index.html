@@ -6435,6 +6435,11 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
         align-items:flex-end;
         justify-content:center;
     }
+    .install-help-native-button {
+        width:100%; margin:0 0 12px; padding:12px 16px; border:0; border-radius:12px;
+        background:#2563eb; color:#fff; font:inherit; font-weight:650; cursor:pointer;
+    }
+    .install-help-native-button[hidden] { display:none; }
     #installHelpModal .install-help-card {
         width:100% !important;
         max-width:100% !important;
@@ -8298,6 +8303,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <div class="install-help-body">
             <div id="installHelpPlatform" class="install-help-platform"></div>
             <div id="installHelpText" class="install-help-text"></div>
+            <button id="installHelpNativeButton" class="install-help-native-button" type="button" hidden>直接安装 DMate</button>
             <ol id="installHelpSteps" class="install-help-steps"></ol>
             <div id="installHelpActions" class="install-help-actions" hidden></div>
             <div class="install-help-note">安装后可像普通应用一样打开 DMate。</div>
@@ -8743,7 +8749,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-install-simple-20261018"></script>
+<script src="/static/script.js?v=dmate-no-pwastore-install-guides-20261018"></script>
 
 </body>
 </html>
