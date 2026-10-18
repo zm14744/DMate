@@ -1,12 +1,13 @@
-const CACHE_NAME = "dmate-unified-icon-v2-20261018";
+const CACHE_NAME = "dmate-tab-favicon-fix-v3-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/dmate-mark.svg",
-  "/static/icons/icon-192.png?v=dmate-unified-icon-20261018",
-  "/static/icons/icon-512.png?v=dmate-unified-icon-20261018"
+  "/static/icons/dmate-mark.svg?v=dmate-tab-favicon-fix-20261018",
+  "/static/icons/icon-192.png?v=dmate-tab-favicon-fix-20261018",
+  "/static/icons/icon-512.png?v=dmate-tab-favicon-fix-20261018"
 ];
 
 self.addEventListener("install", event => {
