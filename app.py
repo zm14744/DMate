@@ -14,7 +14,7 @@ from datetime import timedelta
 from collections import defaultdict, deque, OrderedDict
 import ipaddress
 
-from flask import Flask, jsonify, render_template, request, session
+from flask import Flask, jsonify, render_template, request, session, make_response
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure
@@ -1883,7 +1883,9 @@ def home():
 
     # 首页直接注入与 teaching.py / app.py 共用的 knowledge_graph.json，
     # 避免前端再维护一份硬编码图谱而产生不同步。
-    return render_template(
+    # 客户端通过远程网页获取新功能：不允许 WebView/PWA 缓存旧 HTML
+    # 和旧 script.js 版本号，否则新版交互即使上线也可能不生效。
+    response = make_response(render_template(
         "index.html",
         knowledge_graph_data=KNOWLEDGE_GRAPH_DATA,
         is_android=is_android,
@@ -1895,7 +1897,9 @@ def home():
         desktop_macos_url=DESKTOP_MACOS_URL,
         desktop_linux_deb_url=DESKTOP_LINUX_DEB_URL,
         desktop_linux_appimage_url=DESKTOP_LINUX_APPIMAGE_URL,
-    )
+    ))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return response
 
 
 
