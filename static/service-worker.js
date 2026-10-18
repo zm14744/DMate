@@ -2,9 +2,6 @@ const CACHE_NAME = "dmate-unified-icon-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
-  "/static/icons/favicon-32.png",
-  "/static/icons/favicon-128.png",
-  "/static/icons/apple-touch-icon.png",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/dmate-mark.svg",
