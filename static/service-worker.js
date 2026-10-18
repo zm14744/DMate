@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-pwastore-direct-links-20261018";
+const CACHE_NAME = "dmate-install-landing-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
