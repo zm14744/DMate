@@ -251,6 +251,18 @@ node --check static/script.js
 - **Uptodown / Product Hunt**：Uptodown 已因 WebView 仅封装网页而拒绝；Product Hunt 仅有此前预约或提交记录，尚缺当前公开发布确认。
 - 旧域名 `discrete-math-tutor.zeabur.app` 当前不可访问，服务在 Zeabur 控制台仍可能叫 `discrete-math-tutor`。**服务名不是域名，绝不能为清除旧搜索结果而删除服务**。
 
+### 国内安装入口的分流逻辑（2026-10-18）
+
+前端安装窗口按设备显示完整渠道与“国内优先”标记，推荐顺序基于开发者对国内可达性的反馈，而不是可达率测试承诺：
+
+- **Windows**：Microsoft Store 国内优先；itch.io 与原 EXE 地址为海外/备用方式。
+- **Linux AMD64**：Snap Store 国内优先（必须先有 `snapd`）；DEB、AppImage 和 GitHub Releases 作为备用。商店包有独立安全更新与修订版检查要求。
+- **Android**：PWAStore 国内优先，浏览器安装 PWA；原生 APK 通过 itch.io、原地址备用。Android 浏览器允许 PWA 安装提示，既有 Android WebView APK 不注册 PWA Service Worker。
+- **macOS**：PWAStore 国内优先；Safari（支持版本）可添加到程序坞，Chromium 浏览器可安装网页应用；DMG 通过 itch.io / 原链接提供，未确认 Apple 公证。
+- **iOS / iPadOS**：PWAStore 作为发现入口；打开 DMate 官网后由 Safari 添加到主屏幕；没有 Apple App Store IPA。
+
+以上商店是**下载/发现渠道**，不保证用户所在地能访问网页后端。PWAStore 提供的是 PWA，不是原生安装包；没有在仓库中添加猜测的商品详情地址，也没有改 Zeabur 下载环境变量。源代码变更部署后应从实际国内网络分别测试这些入口。
+
 ## 12. SEO 与部署验收
 
 2026-10-13 首页增加更完整的 Meta Description、DMate H1、图标 Alt 及 Bing / 百度站点验证元标签；百度站点验证已通过并提交 `https://dmate.zeabur.app/`。**2026-10-14 更新：开发者已确认 Bing 公开搜索能够找到 DMate**，此前站长后台也显示过索引成功；Bing 可检索并不保证持续排名或所有地区关键词可见。**百度目前仍在审核/等待进一步收录反馈**，链接提交不等于正式索引成功。
