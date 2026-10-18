@@ -224,8 +224,8 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 | **itch.io** | **开发者确认项目已改为 Public（公开发布）**；项目页提供 macOS `DMate_1.0.0_universal.dmg`、Windows `DMate_1.0.0_x64-setup.exe` 和 Android `DMate.apk` 下载；仅确认上传与公开展示，未将所有平台安装体验写成已实测。 |
 | Android / Uptodown | Android WebView APK 可通过 GitHub Release 与 itch.io 分发；**Uptodown 申请已被拒绝**，理由为纯 WebView 封装没有额外原生功能，不应标为审核中或正式上架。 |
 | iPhone / iPad | Safari “添加到主屏幕”的 PWA；**不是原生 iOS IPA，也未在 Apple App Store 上架**。 |
-| **Microsoft Store（微软商店）** | **开发者于 2026-10-14 确认 DMate 已通过认证并正式上架**。具体商品页 URL、商店包版本有待补充；正式上架不代表已在所有 Windows 设备上完成安装兼容性测试。 |
-| PWAStore | 已有 DMate 应用展示页面和 **Install PWA** 入口；这与苹果官方 App Store 上架不同。 |
+| **Microsoft Store（微软商店）** | [DMate 产品页](https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK)；开发者已确认正式上架。正式上架不代表已在所有 Windows 设备上完成安装兼容性测试。 |
+| PWAStore | [DMate 产品页](https://www.pwastore.io/app/dmate)；这是 PWA 目录，不是原生应用商店。第三方应用的 Install PWA 当前可能回退为打开 DMate 安装引导页。 |
 | PWA Directory | 已**提交成功并进入免费发布队列**；邮件介绍通常约 7 天、中近期可能至 13 天，尚不应写成正式上架。 |
 | 百度搜索 | 已做站点验证及链接提交；用户提供的最新进度为**仍在审核/等待进一步收录结果**，不以提交替代稳定索引。 |
 | Bing 搜索 | **开发者确认公开搜索已可找到 DMate**；此前站长后台也显示过索引成功。检索展示可能受关键词、地区与索引更新影响，不代表固定排名。 |
@@ -237,11 +237,11 @@ DMate 网页安装窗口保留所有公开发行渠道，并根据国内用户�
 
 | 系统 | 国内优先 | 其他公开渠道（海外/备用） | 安装形式说明 |
 |---|---|---|---|
-| Windows | [Microsoft Store](https://apps.microsoft.com/search?query=DMate)（已上架，搜索 DMate） | [itch.io](https://zm14744.itch.io/dmate)（EXE）、原 EXE 下载地址 / [GitHub Releases](https://github.com/zm14744/DMate/releases/tag/v1.0.1) | 商店安装或 Windows 安装程序 |
+| Windows | [Microsoft Store · DMate 产品页](https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK) | [itch.io](https://zm14744.itch.io/dmate)（EXE）、原 EXE 下载地址 / [GitHub Releases](https://github.com/zm14744/DMate/releases/tag/v1.0.1) | 商店安装或 Windows 安装程序 |
 | Linux（AMD64） | [Snap Store](https://snapcraft.io/dmate)（已上架，需要 snapd） | GitHub Releases / 原下载地址（DEB、AppImage） | Snap、DEB、AppImage 三选一；AppImage 可能需要 FUSE |
-| Android | [PWAStore](https://www.pwastore.io/)（搜索 DMate）、[官网](https://dmate.zeabur.app/)（浏览器安装） | itch.io（APK）、原 APK 下载地址 / GitHub Releases | **PWA 是浏览器网页应用，不是原生 APK**；缺少 Google 服务的部分浏览器仅可创建快捷方式 |
-| macOS | [PWAStore](https://www.pwastore.io/)（搜索 DMate）、官网（Safari / Chromium 安装网页应用） | itch.io（DMG）、原 DMG 下载地址 / GitHub Releases | **PWA 与 DMG 是两种不同安装形式**；当前 DMG 无已确认 Apple 公证 |
-| iOS / iPadOS | [PWAStore](https://www.pwastore.io/)（搜索 DMate）、官网 | Safari “分享 → 添加到主屏幕” | 仅提供 PWA，**没有 App Store 原生 IPA** |
+| Android | [PWAStore · DMate 产品页](https://www.pwastore.io/app/dmate)、[安装引导页](https://dmate.zeabur.app/install) | itch.io（APK）、原 APK 下载地址 / GitHub Releases | **PWA 是浏览器网页应用，不是原生 APK**；缺少 Google 服务的部分浏览器仅可创建快捷方式 |
+| macOS | [PWAStore · DMate 产品页](https://www.pwastore.io/app/dmate)、[安装引导页](https://dmate.zeabur.app/install)（Safari / Chromium） | itch.io（DMG）、原 DMG 下载地址 / GitHub Releases | **PWA 与 DMG 是两种不同安装形式**；当前 DMG 无已确认 Apple 公证 |
+| iOS / iPadOS | [PWAStore · DMate 产品页](https://www.pwastore.io/app/dmate)、[安装引导页](https://dmate.zeabur.app/install) | Safari “分享 → 添加到主屏幕” | 仅提供 PWA，**没有 App Store 原生 IPA** |
 
 **安装注意**：PWAStore 是应用发现目录，用户仍需在兼容浏览器打开 DMate 网站并完成 PWA 安装，应用的 AI、OCR 与账号同步功能依赖 DMate 在线服务。该目录本身不托管 APK / DMG，也不能替代官网连通性。itch.io、GitHub 在部分国内网络可能打不开；如需真正稳定的安装包直连，仍需实际验证的国内文件托管渠道。
 
