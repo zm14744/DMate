@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-install-landing-v2-20261018";
+const CACHE_NAME = "dmate-domestic-browser-guide-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
