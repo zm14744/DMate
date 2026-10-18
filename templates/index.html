@@ -7122,11 +7122,36 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 @media (max-width:1100px) {
  .session span { touch-action:manipulation; -webkit-user-select:none; user-select:none; }
 }
-.session-rename-card { width:min(440px,92vw); }
-.session-rename-body { padding:18px; }
-.session-rename-body input { display:block; width:100%; max-width:100%; min-width:0; box-sizing:border-box; min-height:44px; padding:10px 12px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-0); color:var(--text-primary); font:inherit; }
-.session-rename-actions { display:flex; gap:12px; justify-content:flex-end; margin-top:16px; }
-.session-rename-actions button { font:inherit; padding:9px 18px; border-radius:9px; border:1px solid var(--border-strong); color:var(--text-primary); background:var(--surface-3); cursor:pointer; }
+/* 重命名是轻量操作：无论网页还是安装版，都只显示紧凑内容卡片，不随全屏遮罩拉伸。 */
+.session-rename-card {
+    width:min(340px,calc(100vw - 32px)) !important;
+    flex:0 1 auto !important;
+    height:auto !important;
+    min-height:0 !important;
+    max-height:calc(100dvh - 32px) !important;
+    margin:0 auto !important;
+    overflow:hidden !important;
+}
+#sessionRenameModal .modal-head {
+    flex:0 0 auto !important;
+    min-height:52px !important;
+    padding:12px 16px !important;
+    font-size:18px !important;
+    line-height:1.25 !important;
+}
+.session-rename-body { flex:0 0 auto !important; padding:14px; }
+.session-rename-body input {
+    display:block; width:100%; max-width:100%; min-width:0;
+    box-sizing:border-box; min-height:42px; padding:9px 12px;
+    border:1px solid var(--border-strong); border-radius:9px;
+    background:var(--surface-0); color:var(--text-primary); font:inherit;
+}
+.session-rename-actions { display:flex; flex:0 0 auto !important; gap:8px; justify-content:flex-end; margin-top:12px; }
+.session-rename-actions button {
+    min-height:38px; font:inherit; padding:8px 16px; border-radius:9px;
+    border:1px solid var(--border-strong); color:var(--text-primary);
+    background:var(--surface-3); cursor:pointer;
+}
 .session-rename-actions .primary { background:var(--accent); color:#fff; }
 #sessionRenameModal { z-index:1400!important; }
 @media (max-width:1100px) {
@@ -7147,21 +7172,30 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
  }
  #sessionRenameModal .session-rename-card {
      display:flex!important;
-     width:min(320px,calc(100vw - 40px))!important;
+     flex:0 0 auto!important;
+     width:min(280px,calc(100vw - 32px))!important;
+     max-width:280px!important;
      height:auto!important;
      min-height:0!important;
-     max-height:calc(var(--rename-visible-height, 100dvh) - 24px)!important;
+     max-height:calc(var(--rename-visible-height, var(--app-visible-height, 100dvh)) - 32px)!important;
      margin:0!important;
-     border-radius:18px!important;
+     align-self:center!important;
+     border-radius:16px!important;
  }
- #sessionRenameModal .session-rename-body { padding:16px!important; }
+ #sessionRenameModal .modal-head {
+     min-height:48px!important;
+     padding:10px 14px!important;
+     font-size:18px!important;
+ }
+ #sessionRenameModal .session-rename-body { padding:12px!important; }
  #sessionRenameModal .session-rename-body input {
      width:100%!important;
      max-width:100%!important;
      min-width:0!important;
+     min-height:42px!important;
      font-size:16px!important;
  }
- #sessionRenameModal .session-rename-actions { margin-top:14px!important; }
+ #sessionRenameModal .session-rename-actions { margin-top:10px!important; }
 }
 /* 2026-10-11：仅修复小型操作弹窗，不覆盖其它全屏工具页。 */
 #appConfirmModal,
