@@ -20,7 +20,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v11-20261019">
+{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v12-20261019">
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
    这里只保存事件，不自动调用 prompt；只有用户点击自定义弹窗按钮时才会触发。 */
@@ -44,26 +44,26 @@
     });
 })();
 </script>{% endif %}
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v6-20261019">
-<link id="dmateFavicon48" rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-favicon-v6-20261019">
-<link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v7-20261019" media="not all">
-<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-favicon-v6-20261019">
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v4-20261019">
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v7-20261019">
+<link id="dmateFavicon48" rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-favicon-v7-20261019">
+<link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v8-20261019" media="not all">
+<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-favicon-v7-20261019">
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-pwa-unified-v12-20261019">
 <script>
-/* Safari 使用仓库中实际存在的固定配色 SVG；不引用仅在桌面构建时生成的 PNG。 */
+/* Safari 网站标签使用 PNG，深浅色切换时强制更换资源 URL。 */
 (function () {
     const ua = navigator.userAgent || "";
-    const isMacSafari = /Macintosh|Mac OS X/i.test(ua)
-        && /Safari/i.test(ua)
-        && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/i.test(ua);
-    if (!isMacSafari) return;
+    const isSafari = /Safari/i.test(ua)
+        && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS|DuckDuckGo/i.test(ua);
+    if (!isSafari) return;
 
     const scheme = window.matchMedia
         ? window.matchMedia("(prefers-color-scheme: dark)")
         : null;
+
     [
         "dmateFavicon16", "dmateFavicon", "dmateFavicon48",
-        "dmateFaviconSvg", "dmateShortcutFavicon"
+        "dmateFaviconSvg", "dmateShortcutFavicon", "dmateSafariFavicon"
     ].forEach(id => {
         const link = document.getElementById(id);
         if (link) link.remove();
@@ -72,14 +72,15 @@
     const safariFavicon = document.createElement("link");
     safariFavicon.id = "dmateSafariFavicon";
     safariFavicon.rel = "icon";
-    safariFavicon.type = "image/svg+xml";
-    safariFavicon.sizes = "any";
+    safariFavicon.type = "image/png";
+    safariFavicon.sizes = "256x256";
     document.head.appendChild(safariFavicon);
 
     function updateMacFavicon() {
         const variant = scheme && scheme.matches ? "dark" : "light";
-        safariFavicon.href = "/static/icons/dmate-favicon-mac-" + variant
-            + ".svg?v=mac-favicon-v7-20261019&mode=" + variant;
+        safariFavicon.href = "/static/icons/favicon-safari-" + variant
+            + ".png?v=mac-favicon-v8-20261019&mode=" + variant
+            + "&refresh=" + Date.now();
     }
 
     updateMacFavicon();

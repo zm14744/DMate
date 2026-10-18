@@ -29,7 +29,7 @@ def path_d(points):
     )
 
 
-def svg_mark(background=None, foreground="#fff", stroke=40, adaptive=False):
+def svg_mark(background=None, foreground="#fff", stroke=32, adaptive=False):
     paths = "\n    ".join(f'<path d="{path_d(points)}"/>' for points in PATHS)
     if adaptive:
         return f'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 1254 1254" role="img" aria-label="DMate">
@@ -42,7 +42,7 @@ def svg_mark(background=None, foreground="#fff", stroke=40, adaptive=False):
     }}
   </style>
   <rect class="icon-background" width="1254" height="1254"/>
-  <g class="icon-lines" fill="none" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+  <g class="icon-lines" fill="none" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
     {paths}
   </g>
 </svg>'''
@@ -56,7 +56,7 @@ def svg_mark(background=None, foreground="#fff", stroke=40, adaptive=False):
 
 
 def draw_mark(size, background=None, foreground=(255, 255, 255, 255),
-              stroke_units=40, shadow=True):
+              stroke_units=32, shadow=False):
     """Render the reference app icon with its original medium-weight wireframe."""
     scale = 4
     side = size * scale
@@ -97,11 +97,11 @@ def main():
     save_png(draw_mark(512, background=(0, 0, 0, 255)), STATIC / "icon-maskable-512.png")
 
     (STATIC / "dmate-mark.svg").write_text(
-        svg_mark("#000", "#fff", 34), encoding="utf-8"
+        svg_mark("#000", "#fff", 32), encoding="utf-8"
     )
     # Transparent white linework for browser tabs; no black square is baked in.
     (STATIC / "dmate-transparent.svg").write_text(
-        svg_mark(None, "#fff", 34), encoding="utf-8"
+        svg_mark(None, "#fff", 32), encoding="utf-8"
     )
 
     # Tauri desktop assets match the PWA artwork at every size.
@@ -129,25 +129,39 @@ def main():
     ]:
         save_png(draw_mark(size, background=None, foreground=(255, 255, 255, 255),
                            stroke_units=stroke, shadow=False), STATIC / filename)
-    save_ico(STATIC / "favicon-128.png", STATIC / "favicon.ico", [
+    save_ico(STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
+        STATIC / "favicon-safari-light.png", STATIC / "favicon-safari-dark.png", [
         (16, 16), (32, 32), (48, 48), (64, 64), (128, 128)
+    ])
+
+    # Separate opaque app shortcut icon: black tile + white wireframe.
+    save_ico(STATIC / "icon-512.png", STATIC / "favicon-app.ico", [
+        (16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)
     ])
 
     # Safari uses the fixed-color SVG variants committed with the web assets.
     # Safari website favicon: light mode is white with black lines; dark mode is black with white lines.
     (STATIC / "dmate-favicon-mac-light.svg").write_text(
-        svg_mark("#fff", "#111827", 34), encoding="utf-8"
+        svg_mark("#fff", "#111827", 32), encoding="utf-8"
     )
     (STATIC / "dmate-favicon-mac-dark.svg").write_text(
-        svg_mark("#000", "#fff", 34), encoding="utf-8"
+        svg_mark("#000", "#fff", 32), encoding="utf-8"
     )
     (STATIC / "dmate-favicon-mac.svg").write_text(
         svg_mark(adaptive=True), encoding="utf-8"
     )
 
+    # Safari dark/light favicons are raster PNGs for reliable theme switching.
+    save_png(draw_mark(256, background=(255, 255, 255, 255),
+                      foreground=(17, 24, 39, 255), stroke_units=32, shadow=False),
+             STATIC / "favicon-safari-light.png")
+    save_png(draw_mark(256, background=(0, 0, 0, 255),
+                      foreground=(255, 255, 255, 255), stroke_units=32, shadow=False),
+             STATIC / "favicon-safari-dark.png")
+
     # Apple home-screen/PWA artwork intentionally matches the other app icons in both modes.
     for filename in ("apple-touch-mac-light.png", "apple-touch-mac-dark.png", "apple-touch-icon.png"):
-        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=40, shadow=True),
+        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=32, shadow=False),
                  STATIC / filename)
 
     summary = {}

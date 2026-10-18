@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-pwa-unified-v11-20261019";
+const CACHE_NAME = "dmate-pwa-unified-v12-20261019";
 const SHELL_ASSETS = [
   "/",
   "/pwa/",
@@ -9,19 +9,22 @@ const SHELL_ASSETS = [
   "/static/icons/icon-maskable-512.png",
   "/static/icons/dmate-mark.svg",
   "/static/icons/dmate-transparent.svg",
-  "/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v7-20261019&mode=light",
-  "/static/icons/dmate-favicon-mac-dark.svg?v=mac-favicon-v7-20261019&mode=dark",
+  "/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v8-20261019&mode=light",
+  "/static/icons/dmate-favicon-mac-dark.svg?v=mac-favicon-v8-20261019&mode=dark",
   "/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v4-20261019",
+  "/static/icons/favicon-app.ico",
+  "/static/icons/favicon-safari-light.png?v=mac-favicon-v8-20261019&mode=light",
+  "/static/icons/favicon-safari-dark.png?v=mac-favicon-v8-20261019&mode=dark",
   "/static/icons/apple-touch-icon.png",
-  "/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v5-20261019",
-  "/static/icons/apple-touch-mac-dark.png?v=mac-touch-dark-v5-20261019",
+  "/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v6-20261019",
+  "/static/icons/apple-touch-mac-dark.png?v=mac-touch-dark-v6-20261019",
   "/static/icons/favicon-32.png",
-  "/static/icons/favicon-32.png?v=dmate-favicon-v6-20261019",
+  "/static/icons/favicon-32.png?v=dmate-favicon-v7-20261019",
   "/static/icons/favicon-128.png",
-  "/static/icons/favicon-128.png?v=dmate-favicon-v6-20261019",
-  "/static/icons/icon-192.png?v=dmate-pwa-unified-v11-20261019",
-  "/static/icons/icon-512.png?v=dmate-pwa-unified-v11-20261019",
-  "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v11-20261019"
+  "/static/icons/favicon-128.png?v=dmate-favicon-v7-20261019",
+  "/static/icons/icon-192.png?v=dmate-pwa-unified-v12-20261019",
+  "/static/icons/icon-512.png?v=dmate-pwa-unified-v12-20261019",
+  "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v12-20261019"
 ];
 
 self.addEventListener("install", event => {

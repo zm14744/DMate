@@ -1857,9 +1857,9 @@ def sync_user_data():
 
 @app.route("/favicon.ico")
 def favicon_ico():
-    """Serve an existing PNG fallback at the conventional favicon URL."""
-    response = app.send_static_file("icons/favicon-128.png")
-    response.headers["Content-Type"] = "image/png"
+    """Serve an opaque app icon for OS shortcuts; normal tabs use dedicated favicon links."""
+    response = app.send_static_file("icons/favicon-app.ico")
+    response.headers["Content-Type"] = "image/x-icon"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
