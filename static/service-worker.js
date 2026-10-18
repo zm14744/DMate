@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-unified-icon-20261018";
+const CACHE_NAME = "dmate-unified-icon-v2-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
