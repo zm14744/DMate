@@ -19484,7 +19484,7 @@ function detectDmateBrowserName() {
     if (/vivobrowser/i.test(ua)) return "vivo 浏览器";
     if (/honorbrowser/i.test(ua)) return "荣耀浏览器";
     if (/samsungbrowser/i.test(ua)) return "三星浏览器";
-    if (/edgios|edga|edg\\//i.test(ua)) return "Microsoft Edge";
+    if (/edgios|edga|edg\//i.test(ua)) return "Microsoft Edge";
     if (/fxios|firefox/i.test(ua)) return "Firefox";
     if (/crios|chrome/i.test(ua)) return "Chrome";
     if (/safari/i.test(ua)) return "Safari";
