@@ -231,7 +231,21 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 | Bing 搜索 | **开发者确认公开搜索已可找到 DMate**；此前站长后台也显示过索引成功。检索展示可能受关键词、地区与索引更新影响，不代表固定排名。 |
 | Product Hunt | 先前已有预约/提交记录；截至当前对话没有新的正式发布确认，不写成已上架。 |
 
-Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 的分流说明：Ubuntu/Debian/Mint 等可优先选择 DEB，Arch/Manjaro/Fedora/openSUSE 等可尝试 AppImage；启用 `snapd` 的发行版可以安装 Snap。只需要选择一种方式。**Snap 当前仅 AMD64**，不代表 ARM64 已发布；AppImage 可能需要 FUSE 等运行条件。Snap 安装示例：`sudo snap install dmate`。
+### 国内用户下载推荐（2026-10-18 更新）
+
+DMate 网页安装窗口保留所有公开发行渠道，并根据国内用户反馈将较易访问的商店放在前面；**“国内优先”是渠道建议，并非在所有运营商、地区和设备上保证无需 VPN**。
+
+| 系统 | 国内优先 | 其他公开渠道（海外/备用） | 安装形式说明 |
+|---|---|---|---|
+| Windows | [Microsoft Store](https://apps.microsoft.com/search?query=DMate)（已上架，搜索 DMate） | [itch.io](https://zm14744.itch.io/dmate)（EXE）、原 EXE 下载地址 / [GitHub Releases](https://github.com/zm14744/DMate/releases/tag/v1.0.1) | 商店安装或 Windows 安装程序 |
+| Linux（AMD64） | [Snap Store](https://snapcraft.io/dmate)（已上架，需要 snapd） | GitHub Releases / 原下载地址（DEB、AppImage） | Snap、DEB、AppImage 三选一；AppImage 可能需要 FUSE |
+| Android | [PWAStore](https://www.pwastore.io/)（搜索 DMate）、[官网](https://dmate.zeabur.app/)（浏览器安装） | itch.io（APK）、原 APK 下载地址 / GitHub Releases | **PWA 是浏览器网页应用，不是原生 APK**；缺少 Google 服务的部分浏览器仅可创建快捷方式 |
+| macOS | [PWAStore](https://www.pwastore.io/)（搜索 DMate）、官网（Safari / Chromium 安装网页应用） | itch.io（DMG）、原 DMG 下载地址 / GitHub Releases | **PWA 与 DMG 是两种不同安装形式**；当前 DMG 无已确认 Apple 公证 |
+| iOS / iPadOS | [PWAStore](https://www.pwastore.io/)（搜索 DMate）、官网 | Safari “分享 → 添加到主屏幕” | 仅提供 PWA，**没有 App Store 原生 IPA** |
+
+**安装注意**：PWAStore 是应用发现目录，用户仍需在兼容浏览器打开 DMate 网站并完成 PWA 安装，应用的 AI、OCR 与账号同步功能依赖 DMate 在线服务。该目录本身不托管 APK / DMG，也不能替代官网连通性。itch.io、GitHub 在部分国内网络可能打不开；如需真正稳定的安装包直连，仍需实际验证的国内文件托管渠道。
+
+Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 的分流说明：没有 snapd 的 Ubuntu/Debian/Mint 等可选择 DEB，Arch/Manjaro/Fedora/openSUSE 等可尝试 AppImage；启用 `snapd` 的发行版可以安装 Snap。只需要选择一种方式。**Snap 当前仅 AMD64**，不代表 ARM64 已发布；AppImage 可能需要 FUSE 等运行条件。Snap 安装示例：`sudo snap install dmate`。
 
 **iOS**：通过 Safari → 分享 → 添加到主屏幕安装 Web App。Manifest 已声明 `standalone`，并包含 Apple 专用主屏幕元信息和图标；AI、账号同步依赖网络，不宣称完全离线可用。
 
