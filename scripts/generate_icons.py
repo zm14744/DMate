@@ -133,6 +133,19 @@ def main():
         (16, 16), (32, 32), (48, 48), (64, 64), (128, 128)
     ])
 
+    # Safari favicons use real raster variants because Safari/WebKit may ignore
+    # prefers-color-scheme inside SVG favicons. The web tab switches these URLs via JS.
+    save_png(
+        draw_mark(256, background=(255, 255, 255, 255),
+                  foreground=(17, 24, 39, 255), stroke_units=34, shadow=False),
+        STATIC / "favicon-safari-light.png",
+    )
+    save_png(
+        draw_mark(256, background=(0, 0, 0, 255),
+                  foreground=(255, 255, 255, 255), stroke_units=34, shadow=False),
+        STATIC / "favicon-safari-dark.png",
+    )
+
     # Safari website favicon: light mode is white with black lines; dark mode is black with white lines.
     (STATIC / "dmate-favicon-mac-light.svg").write_text(
         svg_mark("#fff", "#111827", 40), encoding="utf-8"
@@ -154,6 +167,7 @@ def main():
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
         STATIC / "favicon-128.png", STATIC / "favicon.ico",
+        STATIC / "favicon-safari-light.png", STATIC / "favicon-safari-dark.png",
         STATIC / "dmate-favicon-mac-light.svg", STATIC / "dmate-favicon-mac-dark.svg",
         STATIC / "apple-touch-mac-light.png", STATIC / "apple-touch-mac-dark.png",
         TAURI / "32x32.png", TAURI / "128x128.png", TAURI / "128x128@2x.png",

@@ -1,6 +1,7 @@
-const CACHE_NAME = "dmate-pwa-unified-v9-20261019";
+const CACHE_NAME = "dmate-pwa-unified-v10-20261019";
 const SHELL_ASSETS = [
   "/",
+  "/pwa/",
   "/manifest.webmanifest",
   "/favicon.ico",
   "/static/icons/favicon.ico",
@@ -8,25 +9,27 @@ const SHELL_ASSETS = [
   "/static/icons/icon-512.png",
   "/static/icons/dmate-mark.svg",
   "/static/icons/dmate-transparent.svg",
-  "/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v5-20261019",
-  "/static/icons/dmate-favicon-mac-dark.svg?v=mac-favicon-v5-20261019",
+  "/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v6-20261019",
+  "/static/icons/dmate-favicon-mac-dark.svg?v=mac-favicon-v6-20261019",
   "/static/icons/apple-touch-icon.png",
   "/static/icons/dmate-transparent.svg",
   "/static/icons/favicon-16.png",
   "/static/icons/favicon-32.png",
   "/static/icons/favicon-48.png",
   "/static/icons/favicon-128.png",
-  "/static/icons/favicon-16.png?v=dmate-favicon-v4-20261019",
-  "/static/icons/favicon-32.png?v=dmate-favicon-v4-20261019",
-  "/static/icons/favicon-48.png?v=dmate-favicon-v4-20261019",
-  "/static/icons/favicon-128.png?v=dmate-favicon-v4-20261019",
+  "/static/icons/favicon-16.png?v=dmate-favicon-v5-20261019",
+  "/static/icons/favicon-32.png?v=dmate-favicon-v5-20261019",
+  "/static/icons/favicon-48.png?v=dmate-favicon-v5-20261019",
+  "/static/icons/favicon-safari-light.png?v=safari-favicon-v1-20261019",
+  "/static/icons/favicon-safari-dark.png?v=safari-favicon-v1-20261019",
+  "/static/icons/favicon-128.png?v=dmate-favicon-v5-20261019",
   "/static/icons/icon-maskable-512.png",
   "/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v4-20261019",
-  "/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v4-20261019",
-  "/static/icons/apple-touch-mac-dark.png?v=mac-touch-dark-v4-20261019",
-  "/static/icons/icon-192.png?v=dmate-pwa-unified-v9-20261019",
-  "/static/icons/icon-512.png?v=dmate-pwa-unified-v9-20261019",
-  "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v9-20261019"
+  "/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v5-20261019",
+  "/static/icons/apple-touch-mac-dark.png?v=mac-touch-dark-v5-20261019",
+  "/static/icons/icon-192.png?v=dmate-pwa-unified-v10-20261019",
+  "/static/icons/icon-512.png?v=dmate-pwa-unified-v10-20261019",
+  "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v10-20261019"
 ];
 
 self.addEventListener("install", event => {
@@ -54,7 +57,7 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  const cacheable = url.pathname === "/" || url.pathname.startsWith("/static/");
+  const cacheable = url.pathname === "/" || url.pathname === "/pwa/" || url.pathname.startsWith("/static/");
   if (!cacheable) return;
 
   event.respondWith((async () => {

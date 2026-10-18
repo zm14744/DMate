@@ -1919,6 +1919,12 @@ def home():
     return response
 
 
+@app.route("/pwa/")
+def pwa_home():
+    """Dedicated installed-PWA launch URL; keep the public website root outside its scope."""
+    return home()
+
+
 
 _EXERCISE_ANSWER_PATTERN = re.compile(
     r"\[\[WRONGBOOK_ANSWER\]\]([\s\S]*?)\[\[/WRONGBOOK_ANSWER\]\]",

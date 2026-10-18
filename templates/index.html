@@ -20,7 +20,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v9-20261019">
+{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v10-20261019">
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
    这里只保存事件，不自动调用 prompt；只有用户点击自定义弹窗按钮时才会触发。 */
@@ -51,7 +51,8 @@
 <link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-favicon-v4-20261019">
 <link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v4-20261019">
 <script>
-/* Safari/macOS：网页标签图标与 PWA 图标分开。网页标签随系统外观切换；PWA 图标保持统一黑底白线。 */
+/* Safari 网页标签单独使用 PNG 图标：WebKit 目前可能忽略 SVG favicon 内的深浅色媒体查询。
+   每次切换时更换独立 PNG URL 并移除竞争中的旧 favicon，避免一直显示旧的黑底白线。 */
 (function () {
     const ua = navigator.userAgent || "";
     const isMacSafari = /Macintosh|Mac OS X/i.test(ua)
@@ -59,44 +60,38 @@
         && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/i.test(ua);
     if (!isMacSafari) return;
 
-    const scheme = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
-    const lightIconUrl = "/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v5-20261019";
-    const darkIconUrl = "/static/icons/dmate-favicon-mac-dark.svg?v=mac-favicon-v5-20261019";
-    const iconIds = ["dmateFavicon16", "dmateFavicon", "dmateFavicon48",
-                     "dmateFaviconSvg", "dmateShortcutFavicon"];
+    const scheme = window.matchMedia
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+    const oldIconIds = [
+        "dmateFavicon16", "dmateFavicon", "dmateFavicon48",
+        "dmateFaviconSvg", "dmateShortcutFavicon"
+    ];
+    oldIconIds.forEach(id => {
+        const link = document.getElementById(id);
+        if (link) link.remove();
+    });
+
+    const safariFavicon = document.createElement("link");
+    safariFavicon.id = "dmateSafariFavicon";
+    safariFavicon.rel = "icon";
+    safariFavicon.type = "image/png";
+    safariFavicon.sizes = "256x256";
+    document.head.appendChild(safariFavicon);
 
     function updateMacFavicon() {
-        const iconUrl = scheme && scheme.matches ? darkIconUrl : lightIconUrl;
-        iconIds.forEach(id => {
-            const link = document.getElementById(id);
-            if (!link) return;
-            link.href = iconUrl;
-            link.type = "image/svg+xml";
-            link.removeAttribute("sizes");
-            link.media = "all";
-        });
-    }
-
-    const touchIcon = document.getElementById("dmateAppleTouchIcon");
-    function updateMacTouchIcon() {
-        if (!touchIcon) return;
         const variant = scheme && scheme.matches ? "dark" : "light";
-        touchIcon.href = "/static/icons/apple-touch-mac-" + variant + ".png?v=mac-touch-" + variant + "-v4-20261019";
-        touchIcon.sizes = "180x180";
+        // Unique URL makes Safari fetch the correct raster icon instead of reusing its cached favicon.
+        safariFavicon.href = "/static/icons/favicon-safari-" + variant
+            + ".png?v=safari-favicon-v1-20261019&mode=" + variant
+            + "&refresh=" + Date.now();
     }
 
     updateMacFavicon();
-    updateMacTouchIcon();
     if (scheme && scheme.addEventListener) {
-        scheme.addEventListener("change", () => {
-            updateMacFavicon();
-            updateMacTouchIcon();
-        });
+        scheme.addEventListener("change", updateMacFavicon);
     } else if (scheme && scheme.addListener) {
-        scheme.addListener(() => {
-            updateMacFavicon();
-            updateMacTouchIcon();
-        });
+        scheme.addListener(updateMacFavicon);
     }
 })();
 </script>
