@@ -14711,6 +14711,7 @@ function renameSession(session) {
     const close = () => {
         modal.classList.add("hidden");
         modal.setAttribute("aria-hidden", "true");
+        if (document.activeElement === input) input.blur();
     };
     const confirm = () => {
         const name = input.value.trim();
@@ -19243,6 +19244,8 @@ function initMobileAppShell() {
 // -----------------------------
 let mobileViewportSyncRaf = 0;
 
+let sessionRenameKeyboardOverlayActive = false;
+
 function syncMobileVisualViewport() {
     if (mobileViewportSyncRaf) {
         cancelAnimationFrame(mobileViewportSyncRaf);
@@ -19255,8 +19258,11 @@ function syncMobileVisualViewport() {
         if (!root) return;
 
         if (!isMobileAppShell()) {
+            sessionRenameKeyboardOverlayActive = false;
             root.style.removeProperty("--app-visible-height");
             root.style.removeProperty("--app-viewport-top");
+            root.style.removeProperty("--rename-visible-height");
+            root.style.removeProperty("--rename-viewport-top");
             document.body?.classList.remove("mobile-keyboard-open");
             return;
         }
@@ -19266,15 +19272,6 @@ function syncMobileVisualViewport() {
             1,
             Math.round(viewport?.height || window.innerHeight || 0)
         );
-        root.style.setProperty(
-            "--app-visible-height",
-            `${visibleHeight}px`
-        );
-        root.style.setProperty(
-            "--app-viewport-top",
-            `${Math.max(0, Math.round(viewport?.offsetTop || 0))}px`
-        );
-
         const layoutHeight = Math.max(
             visibleHeight,
             Math.round(window.innerHeight || visibleHeight)
@@ -19288,6 +19285,45 @@ function syncMobileVisualViewport() {
             layoutHeight - visibleHeight - viewportTop
         );
         const keyboardOpen = keyboardInset > 110;
+        const renameModal = document.getElementById("sessionRenameModal");
+        const renameInput = document.getElementById("sessionRenameInput");
+        const renameModalOpen = Boolean(
+            renameModal && !renameModal.classList.contains("hidden")
+        );
+        const renameInputFocused = Boolean(
+            renameModalOpen && renameInput && document.activeElement === renameInput
+        );
+
+        // 重命名输入框弹出系统键盘时，只调整重命名遮罩的可视区域。
+        // 不缩小整页布局，避免背景抽屉/聊天按钮跟着键盘一起跳动。
+        if (keyboardOpen && renameInputFocused) {
+            sessionRenameKeyboardOverlayActive = true;
+        }
+        if (keyboardOpen && sessionRenameKeyboardOverlayActive) {
+            if (renameModalOpen) {
+                root.style.setProperty("--rename-visible-height", `${visibleHeight}px`);
+                root.style.setProperty("--rename-viewport-top", `${viewportTop}px`);
+            } else {
+                root.style.removeProperty("--rename-visible-height");
+                root.style.removeProperty("--rename-viewport-top");
+            }
+            document.body?.classList.remove("mobile-keyboard-open");
+            return;
+        }
+
+        if (!keyboardOpen) {
+            sessionRenameKeyboardOverlayActive = false;
+        }
+        root.style.removeProperty("--rename-visible-height");
+        root.style.removeProperty("--rename-viewport-top");
+        root.style.setProperty(
+            "--app-visible-height",
+            `${visibleHeight}px`
+        );
+        root.style.setProperty(
+            "--app-viewport-top",
+            `${viewportTop}px`
+        );
 
         document.body?.classList.toggle(
             "mobile-keyboard-open",
