@@ -5,47 +5,32 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f8fafc">
   <meta name="description" content="安装 DMate 离散数学智能辅学系统。">
-  <link rel="manifest" href="/manifest.webmanifest?v=dmate-store-pwa-20261018">
-  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=dmate-safari-favicon-20261018">
-  <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
+  <link rel="manifest" href="/manifest.webmanifest?v=dmate-unified-icon-20261018">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=dmate-unified-icon-20261018">
+  <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192.png?v=dmate-unified-icon-20261018">
   <title>安装 DMate</title>
   <style>
     * { box-sizing:border-box; }
     body {
-      margin:0; min-height:100vh; min-height:100dvh; padding:24px;
+      margin:0; min-height:100vh; min-height:100dvh; padding:20px;
       display:grid; place-items:center; background:#f3f5f9; color:#172033;
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
     main {
-      width:min(100%,520px); padding:28px; border:1px solid #e0e5ed;
+      width:min(100%,480px); padding:26px; border:1px solid #e0e5ed;
       border-radius:22px; background:#fff; box-shadow:0 16px 44px rgba(15,23,42,.08);
     }
     .brand { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
-    .brand img { width:60px; height:60px; border-radius:15px; flex:0 0 auto; }
+    .brand img { width:60px; height:60px; border-radius:14px; flex:0 0 auto; }
     h1 { margin:0 0 5px; font-size:25px; line-height:1.2; }
     .subtitle { margin:0; color:#64748b; font-size:14px; }
-    .summary { margin:0 0 18px; line-height:1.6; color:#334155; }
-    button,.primary-link {
-      display:flex; width:100%; min-height:48px; align-items:center; justify-content:center;
+    .hint { margin:0 0 18px; color:#475569; font-size:16px; line-height:1.6; }
+    button {
+      display:flex; width:100%; min-height:52px; align-items:center; justify-content:center;
       padding:12px 16px; border:0; border-radius:12px; background:#2563eb; color:#fff;
-      font:inherit; font-weight:650; text-decoration:none; cursor:pointer;
+      font:inherit; font-weight:650; cursor:pointer;
     }
     button[hidden] { display:none; }
-    button.secondary {
-      margin-top:10px; background:#fff; color:#334155; border:1px solid #dbe3ef;
-      font-weight:550;
-    }
-    .hint { margin:14px 0 18px; color:#475569; font-size:14px; line-height:1.65; }
-    .copy-status { margin:8px 0 0; color:#2563eb; font-size:13px; line-height:1.5; }
-    .copy-status[hidden] { display:none; }
-    .channels { display:grid; gap:9px; margin-top:18px; }
-    .channels a {
-      display:flex; align-items:center; min-height:44px; padding:10px 13px;
-      border:1px solid #e2e8f0; border-radius:10px; color:#334155;
-      text-decoration:none; font-size:14px;
-    }
-    .channels a:hover { background:#f8fafc; }
-    .channels .web { justify-content:center; border-color:transparent; }
     @media (max-width:480px) {
       body { padding:14px; }
       main { padding:21px; border-radius:18px; }
@@ -57,23 +42,14 @@
 <body>
   <main>
     <div class="brand">
-      <img src="/static/icons/dmate-mark.svg?v=dmate-favicon-black-v2-20261018" alt="DMate 图标">
+      <img src="/static/icons/icon-192.png?v=dmate-unified-icon-20261018" alt="DMate 图标">
       <div>
         <h1>安装 DMate</h1>
         <p class="subtitle">离散数学智能辅学系统</p>
       </div>
     </div>
-    <p class="summary">按当前设备选择安装方式。</p>
     <button id="installNow" type="button" hidden>安装 DMate</button>
-    <p id="installHint" class="hint" aria-live="polite">正在检查浏览器安装支持……</p>
-    <button id="copyInstallUrl" class="secondary" type="button">复制 DMate 安装地址</button>
-    <p id="copyInstallStatus" class="copy-status" aria-live="polite" hidden></p>
-    <nav class="channels" aria-label="其他安装渠道">
-      <a href="https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&amp;gl=HK">Windows · Microsoft Store</a>
-      <a href="https://snapcraft.io/dmate">Linux · Snap Store</a>
-      <a href="https://zm14744.itch.io/dmate">其他安装包 · itch.io</a>
-      <a class="web" href="/">直接打开网页版</a>
-    </nav>
+    <p id="installHint" class="hint" aria-live="polite">正在检查安装支持……</p>
   </main>
   <script>
     let deferredInstallPrompt = null;
@@ -83,9 +59,7 @@
     const platform = navigator.platform || "";
     const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(platform) && Number(navigator.maxTouchPoints || 0) > 1);
     const isMacSafari = /Macintosh|Mac OS X/i.test(ua) && /Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua);
-    const isFirefoxAndroid = /Android/i.test(ua) && /Firefox/i.test(ua);
     const isAndroid = /Android/i.test(ua);
-    const isChromium = /Chrome|Chromium|Edg/i.test(ua);
     const browserName = (() => {
       if (/baiduboxapp|baidubrowser/i.test(ua)) return "百度浏览器";
       if (/quark/i.test(ua)) return "夸克浏览器";
@@ -103,73 +77,32 @@
       if (/fxios|firefox/i.test(ua)) return "Firefox";
       if (/crios|chrome/i.test(ua)) return "Chrome";
       if (/safari/i.test(ua)) return "Safari";
-      return isAndroid ? "Android 手机浏览器" : "当前浏览器";
+      return isAndroid ? "手机浏览器" : "当前浏览器";
     })();
 
     if (isIOS) {
-      if (/百度|夸克|微信|QQ|支付宝/.test(browserName)) {
-        installHint.textContent = browserName + "（iPhone / iPad）：打开分享菜单，若有“添加到主屏幕”可直接使用；如果没有，请选择“在 Safari 中打开”，再点 Safari 的“分享”→“添加到主屏幕”。";
-      } else {
-        installHint.textContent = "iPhone / iPad：在 Safari 中点“分享”→“添加到主屏幕”，并可开启“作为网页 App 打开”。";
-      }
+      installHint.textContent = /Safari/i.test(ua) && !/Chrome|CriOS|EdgiOS|FxiOS/i.test(ua)
+        ? "点 Safari 的“分享”→“添加到主屏幕”。"
+        : "请用 Safari 打开，再点“分享”→“添加到主屏幕”。";
     } else if (isMacSafari) {
-      installHint.textContent = "Mac Safari：菜单栏选择“文件”→“添加到程序坞”。";
-    } else if (isFirefoxAndroid) {
-      installHint.textContent = "Firefox / Fennec：菜单中选择“安装”或“添加到主屏幕”（若有）。部分版本只会创建快捷方式，不是 APK。";
+      installHint.textContent = "Safari 菜单栏选择“文件”→“添加到程序坞”。";
+    } else if (isAndroid && /micromessenger|alipayclient/i.test(ua)) {
+      installHint.textContent = browserName + "暂不支持直接安装，请在菜单中选择“在浏览器打开”。";
+    } else if (isAndroid && /Firefox/i.test(ua)) {
+      installHint.textContent = "打开 Firefox 菜单，选择“安装”或“添加到主屏幕”。";
     } else if (isAndroid) {
-      const browserTips = {
-        "百度浏览器": "打开菜单（“⋯”或更多），查找“添加到桌面/桌面快捷方式”；如果没有，尝试“在系统浏览器中打开”。",
-        "夸克浏览器": "打开菜单或分享面板，查找“添加到桌面/添加快捷方式”；若只有收藏功能，不能视为已安装 PWA。",
-        "UC 浏览器": "打开菜单或分享面板，查找“添加到桌面/快捷方式”；不同版本选项可能不同。",
-        "QQ 浏览器": "打开菜单或分享面板，查找“添加到桌面/添加快捷方式”；若没有安装选项，可用系统浏览器打开。",
-        "微信内置浏览器": "点右上角“⋯”，尝试“在浏览器打开”；微信内通常不能直接安装 PWA。",
-        "支付宝内置浏览器": "打开右上角菜单，尝试用系统浏览器打开，再查看安装选项。",
-        "小米浏览器": "打开菜单查找“添加到桌面/添加快捷方式”；只有快捷方式时仍会通过浏览器打开。",
-        "华为浏览器": "打开菜单“⋮”→“添加至桌面”；HarmonyOS 不同版本的菜单名称可能不同。",
-        "OPPO 浏览器": "打开菜单或分享面板，查找“添加到桌面/快捷方式”；不同机型与版本可能不同。",
-        "vivo 浏览器": "打开菜单或分享面板，查找“添加到桌面/快捷方式”；不同机型与版本可能不同。",
-        "荣耀浏览器": "打开菜单或分享面板，查找“添加到桌面/快捷方式”；不同系统版本可能不同。",
-        "三星浏览器": "打开菜单，选择“添加页面至”或“添加到主屏幕”；如果出现“安装应用”，可优先选择安装。",
-        "Android 手机浏览器": "打开浏览器菜单，查找“安装应用”“安装 DMate”或“添加到主屏幕”。"
-      };
-      installHint.textContent = browserName + "：" + (browserTips[browserName] || browserTips["Android 手机浏览器"]) + " 如果浏览器支持真正的 PWA 安装，本页会自动显示“安装 DMate”按钮。";
-    } else if (isChromium) {
-      installHint.textContent = browserName + "：如未出现安装按钮，请打开浏览器菜单，选择“安装 DMate”或“将此网站安装为应用”。";
+      installHint.textContent = "打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。";
+    } else if (/Chrome|Chromium|Edg\//i.test(ua)) {
+      installHint.textContent = "打开浏览器菜单，选择“安装 DMate”。";
     } else {
-      installHint.textContent = browserName + "：当前浏览器未提供可调用的安装提示。可尝试浏览器菜单中的“添加到桌面/主屏幕”；若没有该选项，请复制本页地址后用系统浏览器打开。";
+      installHint.textContent = "请在浏览器菜单中查找“安装应用”或“添加到主屏幕”。";
     }
-
-    const copyButton = document.getElementById("copyInstallUrl");
-    const copyStatus = document.getElementById("copyInstallStatus");
-    copyButton?.addEventListener("click", async () => {
-      const url = window.location.origin + "/install";
-      try {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(url);
-        } else {
-          const input = document.createElement("textarea");
-          input.value = url;
-          input.setAttribute("readonly", "");
-          input.style.position = "fixed";
-          input.style.opacity = "0";
-          document.body.appendChild(input);
-          input.select();
-          const copied = document.execCommand("copy");
-          input.remove();
-          if (!copied) throw new Error("copy failed");
-        }
-        copyStatus.textContent = "已复制安装地址。请在系统浏览器地址栏粘贴并打开。";
-      } catch (_error) {
-        copyStatus.textContent = "复制失败，请手动复制地址：" + url;
-      }
-      copyStatus.hidden = false;
-    });
 
     window.addEventListener("beforeinstallprompt", event => {
       event.preventDefault();
       deferredInstallPrompt = event;
       installButton.hidden = false;
-      installHint.textContent = "此浏览器支持直接安装，点击下方按钮并确认即可。";
+      installHint.textContent = "点击“安装 DMate”并确认即可。";
     });
 
     installButton.addEventListener("click", async () => {
@@ -180,8 +113,8 @@
       const choice = await promptEvent.userChoice.catch(() => null);
       installButton.hidden = true;
       installHint.textContent = choice && choice.outcome === "accepted"
-        ? "DMate 正在安装；完成后可从应用列表启动。"
-        : "安装未完成。如需重试，请打开浏览器菜单选择“安装 DMate”。";
+        ? "DMate 已开始安装。"
+        : "未完成安装，可在浏览器菜单中重试。";
     });
 
     window.addEventListener("appinstalled", () => {
