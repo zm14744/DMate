@@ -1,12 +1,17 @@
-const CACHE_NAME = "dmate-pwa-unified-v5-20261018";
+const CACHE_NAME = "dmate-pwa-unified-v6-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/dmate-mark.svg",
-  "/static/icons/icon-192.png?v=dmate-pwa-unified-v5-20261018",
-  "/static/icons/icon-512.png?v=dmate-pwa-unified-v5-20261018"
+  "/static/icons/icon-maskable-512.png",
+  "/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v2-20261018",
+  "/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v1-20261018",
+  "/static/icons/apple-touch-mac-dark.png?v=mac-touch-dark-v1-20261018",
+  "/static/icons/icon-192.png?v=dmate-pwa-unified-v6-20261018",
+  "/static/icons/icon-512.png?v=dmate-pwa-unified-v6-20261018",
+  "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v6-20261018"
 ];
 
 self.addEventListener("install", event => {

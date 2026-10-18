@@ -20,7 +20,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v5-20261018">
+{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v6-20261018">
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
    这里只保存事件，不自动调用 prompt；只有用户点击自定义弹窗按钮时才会触发。 */
@@ -44,18 +44,19 @@
     });
 })();
 </script>{% endif %}
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=dmate-pwa-unified-v5-20261018">
-<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/png" href="/static/icons/icon-192.png?v=dmate-pwa-unified-v5-20261018">
-<link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192.png?v=dmate-pwa-unified-v5-20261018">
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=dmate-pwa-unified-v6-20261018">
+<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/png" href="/static/icons/icon-192.png?v=dmate-pwa-unified-v6-20261018">
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192.png?v=dmate-pwa-unified-v6-20261018">
 <script>
-/* macOS Safari 使用白底黑线标签页图标；Windows 及其他浏览器保留原始图标颜色。 */
+/* Safari/macOS：标签页图标随系统深浅色切换；添加到程序坞时选用匹配当前外观的独立图标。 */
 (function () {
     const ua = navigator.userAgent || "";
     const isMacSafari = /Macintosh|Mac OS X/i.test(ua)
         && /Safari/i.test(ua)
         && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/i.test(ua);
     if (!isMacSafari) return;
-    const iconUrl = "/static/icons/dmate-favicon-mac.svg?v=mac-black-lines-20261018";
+
+    const iconUrl = "/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v2-20261018";
     ["dmateFavicon", "dmateShortcutFavicon"].forEach(id => {
         const link = document.getElementById(id);
         if (link) {
@@ -64,6 +65,17 @@
             link.removeAttribute("sizes");
         }
     });
+
+    const touchIcon = document.getElementById("dmateAppleTouchIcon");
+    const scheme = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+    function updateMacTouchIcon() {
+        if (!touchIcon) return;
+        const variant = scheme && scheme.matches ? "dark" : "light";
+        touchIcon.href = "/static/icons/apple-touch-mac-" + variant + ".png?v=mac-touch-" + variant + "-v1-20261018";
+        touchIcon.sizes = "180x180";
+    }
+    updateMacTouchIcon();
+    if (scheme && scheme.addEventListener) scheme.addEventListener("change", updateMacTouchIcon);
 })();
 </script>
 <title>DMate - 离散数学智能辅学系统</title>
