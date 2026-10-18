@@ -19522,7 +19522,7 @@ function installGuideForCurrentPlatform() {
         };
         return {
             platform:"Android · " + browserName,
-            text:"可安装网页应用，或下载 Android 安装包。",
+            text:"可通过下方渠道获取 Android 安装包。",
             steps:[],
             actions:[
                 { label:"APK 下载 · itch.io", url:itch, secondary:true },
@@ -19533,7 +19533,7 @@ function installGuideForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad · " + browserName,
-            text:"选择网页应用安装，或按需查看其他下载方式。",
+            text:"查看当前设备可用的安装方式。",
             steps:[],
             actions:[]
         };
@@ -19661,6 +19661,7 @@ function openDmateInstallHelp() {
     const stepsEl = document.getElementById("installHelpSteps");
     const actionsEl = document.getElementById("installHelpActions");
     const nativeButton = document.getElementById("installHelpNativeButton");
+    const noteEl = document.getElementById("installHelpNote");
     if (!modal || !platformEl || !textEl || !stepsEl || !actionsEl) return;
 
     const guide = installGuideForCurrentPlatform();
@@ -19669,6 +19670,7 @@ function openDmateInstallHelp() {
     dmatePwaInstructionsVisible = false;
 
     const canOfferPwa = Boolean(dmatePendingInstallPrompt || dmateCurrentPwaGuide);
+    if (noteEl) noteEl.hidden = !canOfferPwa;
     if (nativeButton) {
         nativeButton.hidden = !canOfferPwa;
         nativeButton.textContent = dmatePendingInstallPrompt ? "安装 PWA" : "PWA 安装说明";
