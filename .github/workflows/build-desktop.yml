@@ -2,6 +2,13 @@ name: Build DMate Desktop
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/generate_icons.py"
+      - "desktop/src-tauri/**"
+      - ".github/workflows/build-desktop.yml"
 
 jobs:
   build:
