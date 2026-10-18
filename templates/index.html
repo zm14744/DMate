@@ -20,7 +20,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v12-20261019">
+{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v13-20261019">
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
    这里只保存事件，不自动调用 prompt；只有用户点击自定义弹窗按钮时才会触发。 */
@@ -44,51 +44,33 @@
     });
 })();
 </script>{% endif %}
+{% if is_mac_safari %}
+<link id="dmateSafariLightFavicon" rel="icon" type="image/png" sizes="256x256" media="(prefers-color-scheme: light)" href="/static/icons/favicon-safari-light-v13.png">
+<link id="dmateSafariDarkFavicon" rel="icon" type="image/png" sizes="256x256" media="(prefers-color-scheme: dark)" href="/static/icons/favicon-safari-dark-v13.png">
+{% else %}
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v7-20261019">
 <link id="dmateFavicon48" rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-favicon-v7-20261019">
 <link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v8-20261019" media="not all">
 <link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-favicon-v7-20261019">
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-pwa-unified-v12-20261019">
+{% endif %}
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-pwa-unified-v13-20261019">
 <script>
-/* Safari 网站标签使用 PNG，深浅色切换时强制更换资源 URL。 */
+/* Safari: select one real PNG before the browser picks a stale placeholder. */
 (function () {
-    const ua = navigator.userAgent || "";
-    const isSafari = /Safari/i.test(ua)
-        && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS|DuckDuckGo/i.test(ua);
-    if (!isSafari) return;
-
-    const scheme = window.matchMedia
-        ? window.matchMedia("(prefers-color-scheme: dark)")
-        : null;
-
-    [
-        "dmateFavicon16", "dmateFavicon", "dmateFavicon48",
-        "dmateFaviconSvg", "dmateShortcutFavicon", "dmateSafariFavicon"
-    ].forEach(id => {
-        const link = document.getElementById(id);
-        if (link) link.remove();
-    });
-
-    const safariFavicon = document.createElement("link");
-    safariFavicon.id = "dmateSafariFavicon";
-    safariFavicon.rel = "icon";
-    safariFavicon.type = "image/png";
-    safariFavicon.sizes = "256x256";
-    document.head.appendChild(safariFavicon);
-
-    function updateMacFavicon() {
-        const variant = scheme && scheme.matches ? "dark" : "light";
-        safariFavicon.href = "/static/icons/favicon-safari-" + variant
-            + ".png?v=mac-favicon-v8-20261019&mode=" + variant
-            + "&refresh=" + Date.now();
+    const light = document.getElementById("dmateSafariLightFavicon");
+    const dark = document.getElementById("dmateSafariDarkFavicon");
+    if (!light || !dark) return;
+    const scheme = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+    function apply() {
+        const selected = scheme && scheme.matches ? dark : light;
+        const other = selected === dark ? light : dark;
+        other.media = "not all";
+        selected.media = "all";
+        selected.parentNode.appendChild(selected);
     }
-
-    updateMacFavicon();
-    if (scheme && scheme.addEventListener) {
-        scheme.addEventListener("change", updateMacFavicon);
-    } else if (scheme && scheme.addListener) {
-        scheme.addListener(updateMacFavicon);
-    }
+    apply();
+    if (scheme && scheme.addEventListener) scheme.addEventListener("change", apply);
+    else if (scheme && scheme.addListener) scheme.addListener(apply);
 })();
 </script>
 <title>DMate - 离散数学智能辅学系统</title>

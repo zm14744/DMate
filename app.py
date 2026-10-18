@@ -1895,6 +1895,9 @@ def home():
     user_agent = request.headers.get("User-Agent", "")
     is_android = bool(re.search(r"Android", user_agent, re.IGNORECASE))
     is_ios = bool(re.search(r"iPhone|iPad|iPod|Macintosh.*Mobile", user_agent, re.IGNORECASE))
+    is_mac_safari = bool(re.search(r"Macintosh|Mac OS X", user_agent, re.IGNORECASE)
+        and re.search(r"Safari/", user_agent, re.IGNORECASE)
+        and not re.search(r"Chrome/|Chromium/|CriOS/|Edg/|OPR/|Firefox/|FxiOS/", user_agent, re.IGNORECASE))
     is_dmate_android_app = bool(re.search(r"DMateAndroid/", user_agent, re.IGNORECASE))
     is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
 
@@ -1907,6 +1910,7 @@ def home():
         knowledge_graph_data=KNOWLEDGE_GRAPH_DATA,
         is_android=is_android,
         is_ios=is_ios,
+        is_mac_safari=is_mac_safari,
         is_dmate_android_app=is_dmate_android_app,
         is_dmate_desktop_app=is_dmate_desktop_app,
         android_apk_url=ANDROID_APK_URL,

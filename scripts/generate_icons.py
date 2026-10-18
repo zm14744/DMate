@@ -56,7 +56,7 @@ def svg_mark(background=None, foreground="#fff", stroke=32, adaptive=False):
 
 
 def draw_mark(size, background=None, foreground=(255, 255, 255, 255),
-              stroke_units=32, shadow=False):
+              stroke_units=23, shadow=False, figure_scale=1.0):
     """Render the reference app icon with its original medium-weight wireframe."""
     scale = 4
     side = size * scale
@@ -65,9 +65,11 @@ def draw_mark(size, background=None, foreground=(255, 255, 255, 255),
     draw = ImageDraw.Draw(image)
 
     def scaled(points):
-        return [(round(x * side / VIEWBOX), round(y * side / VIEWBOX)) for x, y in points]
+        return [(round((VIEWBOX / 2 + (x - VIEWBOX / 2) * figure_scale) * side / VIEWBOX),
+                 round((VIEWBOX / 2 + (y - VIEWBOX / 2) * figure_scale) * side / VIEWBOX))
+                for x, y in points]
 
-    line_width = max(1, round(stroke_units * side / VIEWBOX))
+    line_width = max(1, round(stroke_units * figure_scale * side / VIEWBOX))
     if shadow:
         shadow_width = max(line_width + 1, round((stroke_units + 20) * side / VIEWBOX))
         for points in PATHS:
@@ -94,7 +96,7 @@ def main():
     # PWA and installed desktop app share black tile + white geometry.
     for size, filename in [(192, "icon-192.png"), (512, "icon-512.png")]:
         save_png(draw_mark(size, background=(0, 0, 0, 255)), STATIC / filename)
-    save_png(draw_mark(512, background=(0, 0, 0, 255)), STATIC / "icon-maskable-512.png")
+    save_png(draw_mark(512, background=(0, 0, 0, 255), figure_scale=0.73), STATIC / "icon-maskable-512.png")
 
     (STATIC / "dmate-mark.svg").write_text(
         svg_mark("#000", "#fff", 32), encoding="utf-8"
@@ -150,17 +152,17 @@ def main():
         svg_mark(adaptive=True), encoding="utf-8"
     )
 
-    # Safari dark/light favicons are raster PNGs for reliable theme switching.
+    # Physical, versioned Safari images prevent cached empty/monochrome fallbacks.
     save_png(draw_mark(256, background=(255, 255, 255, 255),
-                      foreground=(17, 24, 39, 255), stroke_units=32, shadow=False),
-             STATIC / "favicon-safari-light.png")
+                      foreground=(17, 24, 39, 255), stroke_units=23, shadow=False),
+             STATIC / "favicon-safari-light-v13.png")
     save_png(draw_mark(256, background=(0, 0, 0, 255),
-                      foreground=(255, 255, 255, 255), stroke_units=32, shadow=False),
-             STATIC / "favicon-safari-dark.png")
+                      foreground=(255, 255, 255, 255), stroke_units=23, shadow=False),
+             STATIC / "favicon-safari-dark-v13.png")
 
     # Apple home-screen/PWA artwork intentionally matches the other app icons in both modes.
     for filename in ("apple-touch-mac-light.png", "apple-touch-mac-dark.png", "apple-touch-icon.png"):
-        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=32, shadow=False),
+        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=23, shadow=False),
                  STATIC / filename)
 
     summary = {}
@@ -168,7 +170,7 @@ def main():
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
         STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
-        STATIC / "favicon-safari-light.png", STATIC / "favicon-safari-dark.png",
+        STATIC / "favicon-safari-light-v13.png", STATIC / "favicon-safari-dark-v13.png",
         STATIC / "dmate-favicon-mac-light.svg", STATIC / "dmate-favicon-mac-dark.svg",
         STATIC / "apple-touch-mac-light.png", STATIC / "apple-touch-mac-dark.png",
         TAURI / "32x32.png", TAURI / "128x128.png", TAURI / "128x128@2x.png",
