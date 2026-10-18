@@ -1857,9 +1857,9 @@ def sync_user_data():
 
 @app.route("/favicon.ico")
 def favicon_ico():
-    """Serve the real DMate mark for browsers that request /favicon.ico implicitly."""
-    response = app.send_static_file("icons/icon-192.png")
-    response.headers["Content-Type"] = "image/png"
+    """Serve the transparent white-line browser favicon, not the black-tile PWA icon."""
+    response = app.send_static_file("icons/favicon.ico")
+    response.headers["Content-Type"] = "image/vnd.microsoft.icon"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 

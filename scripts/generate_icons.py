@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
-"""Generate crisp, platform-specific DMate icons from one geometric mark.
-
-Windows/PWA icons use a transparent canvas with a white wireframe and a subtle
-edge keyline. Browser favicons are rendered separately at their actual sizes.
-Safari receives an adaptive light/dark SVG and matching Apple touch icons.
-"""
+"""Generate consistent, high-resolution DMate app icons and browser favicons."""
 from __future__ import annotations
 
-import io
 import json
-import struct
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -17,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "static" / "icons"
 TAURI = ROOT / "desktop" / "src-tauri" / "icons"
 VIEWBOX = 1254
+
 OUTER = [(252, 300), (488, 189), (748, 140), (1038, 376), (1071, 603),
          (1012, 914), (690, 1044), (456, 1064), (199, 807), (165, 589), (252, 300)]
 INNER = [
@@ -35,8 +29,8 @@ def path_d(points):
     )
 
 
-def svg_mark(background=None, foreground="#fff", stroke=34, shadow=False, adaptive=False):
-    paths = "\n".join(f'<path d="{path_d(points)}"/>' for points in PATHS)
+def svg_mark(background=None, foreground="#fff", stroke=40, adaptive=False):
+    paths = "\n    ".join(f'<path d="{path_d(points)}"/>' for points in PATHS)
     if adaptive:
         return f'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 1254 1254" role="img" aria-label="DMate">
   <style>
@@ -48,108 +42,120 @@ def svg_mark(background=None, foreground="#fff", stroke=34, shadow=False, adapti
     }}
   </style>
   <rect class="icon-background" width="1254" height="1254"/>
-  <g class="icon-lines" fill="none" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">{paths}</g>
+  <g class="icon-lines" fill="none" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+    {paths}
+  </g>
 </svg>'''
     bg = "" if background is None else f'<rect width="1254" height="1254" fill="{background}"/>'
-    shadow_group = ""
-    if shadow:
-        shadow_group = f'<g fill="none" stroke="#000" stroke-opacity="0.42" stroke-width="54" stroke-linecap="round" stroke-linejoin="round">{paths}</g>'
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 1254 1254">
-  {bg}{shadow_group}
-  <g fill="none" stroke="{foreground}" stroke-width="{stroke}" stroke-linecap="round" stroke-linejoin="round">{paths}</g>
+  {bg}
+  <g fill="none" stroke="{foreground}" stroke-width="{stroke}" stroke-linecap="round" stroke-linejoin="round">
+    {paths}
+  </g>
 </svg>'''
 
 
-def draw_mark(size, background=None, foreground=(255, 255, 255, 255),
-              stroke_units=34, shadow=True):
-    # 4x supersampling keeps diagonals and small-size line joins crisp.
+def draw_mark(size, background=None, foreground=(255, 255, 255, 255), stroke_px=None):
+    """Supersampled RGBA rendering; background=None means truly transparent."""
     scale = 4
     side = size * scale
-    image = Image.new("RGBA", (side, side), background or (0, 0, 0, 0))
+    fill = background if background is not None else (0, 0, 0, 0)
+    image = Image.new("RGBA", (side, side), fill)
     draw = ImageDraw.Draw(image)
+    stroke_px = stroke_px if stroke_px is not None else max(1.35, size * 0.035)
+    line_width = max(1, round(stroke_px * scale))
 
     def scaled(points):
         return [(round(x * side / VIEWBOX), round(y * side / VIEWBOX)) for x, y in points]
 
-    line_width = max(1, round(stroke_units * side / VIEWBOX))
-    if shadow:
-        shadow_width = max(line_width + 1, round((stroke_units + 20) * side / VIEWBOX))
-        for points in PATHS:
-            draw.line(scaled(points), fill=(0, 0, 0, 112), width=shadow_width, joint="curve")
     for points in PATHS:
-        draw.line(scaled(points), fill=foreground, width=line_width, joint="curve")
+        coords = scaled(points)
+        draw.line(coords, fill=foreground, width=line_width, joint="curve")
+        radius = line_width / 2
+        for x, y in coords:
+            draw.ellipse((round(x-radius), round(y-radius), round(x+radius), round(y+radius)),
+                         fill=foreground)
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def save_png(image, path):
-    # Indexed PNGs keep geometric assets small while retaining transparent pixels.
-    image.quantize(colors=16, method=Image.Quantize.FASTOCTREE).save(path, optimize=True)
+    # Preserve RGBA transparency and antialiasing; avoid palette quantization blur.
+    image.save(path, format="PNG", optimize=True)
 
 
-def save_ico(path):
-    # Use Pillow's standard multi-resolution ICO writer for maximum Tauri/Windows compatibility.
-    source = Image.open(TAURI / "icon.png").convert("RGBA")
-    source.save(path, format="ICO", sizes=[
-        (16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)
-    ])
+def save_ico(source_path, target_path, sizes):
+    source = Image.open(source_path).convert("RGBA")
+    source.save(target_path, format="ICO", sizes=sizes)
+
 
 def main():
     STATIC.mkdir(parents=True, exist_ok=True)
     TAURI.mkdir(parents=True, exist_ok=True)
 
-    # Transparent white mark: no black square is baked into Windows or PWA icons.
-    transparent_svg = svg_mark(None, "#fff", 34, shadow=True)
-    (STATIC / "dmate-mark.svg").write_text(transparent_svg, encoding="utf-8")
-    (STATIC / "dmate-transparent.svg").write_text(transparent_svg, encoding="utf-8")
-
+    # PWA and installed desktop app share black tile + white geometry.
     for size, filename in [(192, "icon-192.png"), (512, "icon-512.png")]:
-        save_png(draw_mark(size), STATIC / filename)
-    # Keep the same geometry on Edge and Fennec instead of shipping different symbols.
-    save_png(draw_mark(512), STATIC / "icon-maskable-512.png")
+        save_png(draw_mark(size, background=(0, 0, 0, 255)), STATIC / filename)
+    save_png(draw_mark(512, background=(0, 0, 0, 255)), STATIC / "icon-maskable-512.png")
 
+    (STATIC / "dmate-mark.svg").write_text(
+        svg_mark("#000", "#fff", 40), encoding="utf-8"
+    )
+    # Transparent white linework for browser tabs; no black square is baked in.
+    (STATIC / "dmate-transparent.svg").write_text(
+        svg_mark(None, "#fff", 40), encoding="utf-8"
+    )
+
+    # Tauri desktop assets match the PWA artwork at every size.
     tauri_sizes = [
         (16, "icon-16.png"), (24, "icon-24.png"), (32, "32x32.png"),
         (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
         (256, "128x128@2x.png"), (512, "icon.png"),
     ]
     for size, filename in tauri_sizes:
-        save_png(draw_mark(size), TAURI / filename)
-    save_ico(TAURI / "icon.ico")
-
-    # macOS desktop app icon: a clean light tile with dark geometry.
-    mac_native = draw_mark(512, background=(255, 255, 255, 255),
-                           foreground=(17, 24, 39, 255), stroke_units=40, shadow=False)
+        save_png(draw_mark(size, background=(0, 0, 0, 255)), TAURI / filename)
+    save_ico(TAURI / "icon.png", TAURI / "icon.ico", [
+        (16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)
+    ])
     try:
-        mac_native.save(TAURI / "icon.icns", format="ICNS")
-    except Exception:
-        # Web/Safari icons remain generated even if an environment lacks ICNS encoding.
-        pass
+        Image.open(TAURI / "icon.png").save(TAURI / "icon.icns", format="ICNS")
+    except Exception as exc:
+        raise RuntimeError(f"Failed to generate macOS ICNS icon: {exc}") from exc
 
-    # Dedicated favicon files are rendered at target size, not scaled down from 192 px.
+    # Windows/browser favicon: white geometry on true transparency.
     for size, filename, stroke in [
-        (16, "favicon-16.png", 65), (32, "favicon-32.png", 44),
-        (48, "favicon-48.png", 36), (128, "favicon-128.png", 30),
+        (16, "favicon-16.png", 1.3),
+        (32, "favicon-32.png", 1.5),
+        (48, "favicon-48.png", 1.8),
+        (128, "favicon-128.png", 4.0),
     ]:
-        mark = draw_mark(size, background=(0, 0, 0, 255),
-                         foreground=(255, 255, 255, 255),
-                         stroke_units=stroke, shadow=False)
-        save_png(mark, STATIC / filename)
+        save_png(draw_mark(size, background=None, foreground=(255, 255, 255, 255),
+                           stroke_px=stroke), STATIC / filename)
+    save_ico(STATIC / "favicon-128.png", STATIC / "favicon.ico", [
+        (16, 16), (32, 32), (48, 48), (64, 64), (128, 128)
+    ])
 
-    (STATIC / "dmate-favicon-mac.svg").write_text(
-        svg_mark("#fff", "#111827", 40, shadow=False, adaptive=True), encoding="utf-8"
+    # Safari website favicon: light mode is white with black lines; dark mode is black with white lines.
+    (STATIC / "dmate-favicon-mac-light.svg").write_text(
+        svg_mark("#fff", "#111827", 42), encoding="utf-8"
     )
-    save_png(draw_mark(180, background=(255, 255, 255, 255),
-                       foreground=(17, 24, 39, 255), stroke_units=32, shadow=False),
-             STATIC / "apple-touch-mac-light.png")
-    save_png(draw_mark(180, background=(0, 0, 0, 255),
-                       foreground=(255, 255, 255, 255), stroke_units=32, shadow=False),
-             STATIC / "apple-touch-mac-dark.png")
+    (STATIC / "dmate-favicon-mac-dark.svg").write_text(
+        svg_mark("#000", "#fff", 42), encoding="utf-8"
+    )
+    (STATIC / "dmate-favicon-mac.svg").write_text(
+        svg_mark(adaptive=True), encoding="utf-8"
+    )
+
+    # Apple home-screen/PWA artwork intentionally matches the other app icons in both modes.
+    for filename in ("apple-touch-mac-light.png", "apple-touch-mac-dark.png", "apple-touch-icon.png"):
+        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_px=6.3),
+                 STATIC / filename)
 
     summary = {}
     for path in [
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
-        STATIC / "favicon-128.png", STATIC / "dmate-favicon-mac.svg",
+        STATIC / "favicon-128.png", STATIC / "favicon.ico",
+        STATIC / "dmate-favicon-mac-light.svg", STATIC / "dmate-favicon-mac-dark.svg",
         STATIC / "apple-touch-mac-light.png", STATIC / "apple-touch-mac-dark.png",
         TAURI / "32x32.png", TAURI / "128x128.png", TAURI / "128x128@2x.png",
         TAURI / "icon.png", TAURI / "icon.ico", TAURI / "icon.icns",
