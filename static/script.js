@@ -19422,17 +19422,20 @@ function installGuideForCurrentPlatform() {
     if (config.isAndroid) {
         return {
             platform:"Android",
-            text: config.androidApkUrl ? "下载完成后，请在系统“下载/文件”中打开 APK 安装。" : "Android 安装包暂未发布。",
-            steps:[],
-            actions: config.androidApkUrl ? [{ label:"下载 APK", url:config.androidApkUrl }] : []
+            text:"DMate 已发布 APK。优先尝试 itch.io 下载页面；如当前网络无法连接，也可尝试原安装包地址。是否免 VPN 取决于实际下载源及网络环境。",
+            steps:["下载 APK 后，从系统“下载/文件”中打开安装；微信内置浏览器可能限制 APK 下载，建议用系统浏览器。"],
+            actions:[
+                { label:"itch.io（Android APK 下载页）", url:"https://zm14744.itch.io/dmate" },
+                ...(config.androidApkUrl ? [{ label:"Android APK（原下载地址）", url:config.androidApkUrl, secondary:true }] : [])
+            ]
         };
     }
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"在 Safari 中点击“分享”，再选择“添加到主屏幕”。",
-            steps:[],
-            actions:[]
+            text:"iOS 当前提供的是 Safari 主屏幕 PWA，而非 App Store 原生 IPA。无需下载 APK 或 DMG。",
+            steps:["在 Safari 打开 DMate 网站。","点击“分享”→“添加到主屏幕”，然后从主屏幕打开 DMate。"],
+            actions:[{ label:"打开 DMate 官网", url:"https://dmate.zeabur.app/" }]
         };
     }
     if (platform === "windows") {
@@ -19449,9 +19452,12 @@ function installGuideForCurrentPlatform() {
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text: config.desktopMacosUrl ? "下载 DMate macOS 安装镜像。" : "macOS 桌面版暂未发布。",
+            text:"已发布 macOS 通用 DMG 安装包。可通过 itch.io 下载页面获取，原安装包地址作为备用。当前 DMG 尚无已确认的 Apple 公证，首次启动可能遇到 Gatekeeper 提示。",
             steps:[],
-            actions: config.desktopMacosUrl ? [{ label:"下载 macOS 版", url:config.desktopMacosUrl }] : []
+            actions:[
+                { label:"itch.io（macOS DMG 下载页）", url:"https://zm14744.itch.io/dmate" },
+                ...(config.desktopMacosUrl ? [{ label:"macOS DMG（原下载地址）", url:config.desktopMacosUrl, secondary:true }] : [])
+            ]
         };
     }
     if (platform === "linux") {
@@ -19462,10 +19468,11 @@ function installGuideForCurrentPlatform() {
         if (config.desktopLinuxAppImageUrl) {
             actions.push({ label:"下载 AppImage（Arch / Fedora 等）", url:config.desktopLinuxAppImageUrl, secondary:Boolean(actions.length) });
         }
-        actions.push({ label:"Snap Store（支持 Snap 的发行版）", url:"https://snapcraft.io/dmate", secondary:Boolean(actions.length) });
+        actions.push({ label:"Snap Store（需 snapd）", url:"https://snapcraft.io/dmate", secondary:Boolean(actions.length) });
+        actions.push({ label:"GitHub Releases（DEB / AppImage 备用页）", url:"https://github.com/zm14744/DMate/releases/tag/v1.0.1", secondary:true });
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"按发行版选择一种安装方式即可，不需要全部下载：Ubuntu、Debian、Linux Mint 等优先选 .deb；Arch、Manjaro、Fedora、openSUSE 等可尝试 AppImage；已启用 snapd 的发行版可用 Snap Store 安装并接收更新。AppImage 可能需要 FUSE 等运行环境。",
+            text:"Ubuntu / Debian / Mint 可选择 DEB，其他桌面发行版可尝试 AppImage（可能需要 FUSE）；已安装 snapd 的设备也可使用 Snap Store。GitHub 和 Snap Store 在部分国内网络可能连接失败，暂不能宣称已实现免 VPN 下载。",
             steps:[],
             actions
         };
@@ -19541,19 +19548,9 @@ function initDmateInstall() {
     else if (platform === "ios") button.textContent = "安装 DMate";
     else button.textContent = "下载 DMate 桌面版";
 
-    button.addEventListener("click", () => {
-        if (platform === "android" && config.androidApkUrl) {
-            window.location.assign(config.androidApkUrl);
-            return;
-        }
-        // Windows 优先呈现官方商店选项，让国内用户不必被自动跳往 GitHub。
-        if (platform === "windows") { openDmateInstallHelp(); return; }
-        if (platform === "macos" && config.desktopMacosUrl) {
-            window.location.assign(config.desktopMacosUrl);
-            return;
-        }
-        openDmateInstallHelp();
-    });
+    // 所有平台统一先展示安装选项，避免 Android/macOS 一键跳到
+    // 在国内可能不可达的 GitHub Releases 安装包下载链接。
+    button.addEventListener("click", openDmateInstallHelp);
 
     close?.addEventListener("click", closeDmateInstallHelp);
     modal?.addEventListener("click", event => {
