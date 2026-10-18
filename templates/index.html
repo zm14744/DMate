@@ -7117,6 +7117,19 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 }
 
 
+/* 手机双击会话改名：独立小弹窗，避免 WebView 原生 prompt 不兼容。 */
+.session-rename { flex:0 0 auto; border:1px solid var(--border-strong); border-radius:7px; padding:5px 7px; background:var(--surface-3); color:var(--text-primary); font:inherit; font-size:12px; cursor:pointer; }
+.session-rename-card { width:min(440px,92vw); }
+.session-rename-body { padding:18px; }
+.session-rename-body input { width:100%; box-sizing:border-box; min-height:44px; padding:10px 12px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-0); color:var(--text-primary); font:inherit; }
+.session-rename-actions { display:flex; gap:12px; justify-content:flex-end; margin-top:16px; }
+.session-rename-actions button { font:inherit; padding:9px 18px; border-radius:9px; border:1px solid var(--border-strong); color:var(--text-primary); background:var(--surface-3); cursor:pointer; }
+.session-rename-actions .primary { background:var(--accent); color:#fff; }
+#sessionRenameModal { z-index:1400!important; }
+@media (max-width:1100px) {
+ #sessionRenameModal:not(.hidden) { display:flex!important; align-items:center!important; justify-content:center!important; padding:16px!important; }
+ #sessionRenameModal .session-rename-card { display:flex!important; width:min(440px,calc(100vw - 32px))!important; height:auto!important; min-height:0!important; max-height:calc(100dvh - 48px)!important; margin:0!important; border-radius:18px!important; }
+}
 /* 2026-10-11：仅修复小型操作弹窗，不覆盖其它全屏工具页。 */
 #appConfirmModal,
 #mobileChoiceModal {
@@ -8559,6 +8572,22 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
 </div>
 
+
+<div id="sessionRenameModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card session-rename-card" role="dialog" aria-modal="true" aria-labelledby="sessionRenameTitle">
+        <div class="modal-head">
+            <div id="sessionRenameTitle">重命名对话</div>
+            <button id="sessionRenameClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
+        </div>
+        <div class="session-rename-body">
+            <input id="sessionRenameInput" type="text" maxlength="80" autocomplete="off" aria-label="新对话名称">
+            <div class="session-rename-actions">
+                <button id="sessionRenameCancel" type="button">取消</button>
+                <button id="sessionRenameSave" type="button" class="primary">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div id="appConfirmModal" class="modal hidden" aria-hidden="true">
     <div class="modal-card app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle">
