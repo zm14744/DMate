@@ -56,8 +56,8 @@ def svg_mark(background=None, foreground="#fff", stroke=40, adaptive=False):
 
 
 def draw_mark(size, background=None, foreground=(255, 255, 255, 255),
-              stroke_units=34, shadow=True):
-    """Render the original fine wireframe with 4x supersampling and antialiasing."""
+              stroke_units=40, shadow=True):
+    """Render the reference app icon with its original medium-weight wireframe."""
     scale = 4
     side = size * scale
     fill = background if background is not None else (0, 0, 0, 0)
@@ -147,7 +147,7 @@ def main():
 
     # Apple home-screen/PWA artwork intentionally matches the other app icons in both modes.
     for filename in ("apple-touch-mac-light.png", "apple-touch-mac-dark.png", "apple-touch-icon.png"):
-        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=32, shadow=False),
+        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=40, shadow=True),
                  STATIC / filename)
 
     summary = {}
