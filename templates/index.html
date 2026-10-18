@@ -7118,7 +7118,10 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 
 
 /* 手机双击会话改名：独立小弹窗，避免 WebView 原生 prompt 不兼容。 */
-.session-rename { flex:0 0 auto; border:1px solid var(--border-strong); border-radius:7px; padding:5px 7px; background:var(--surface-3); color:var(--text-primary); font:inherit; font-size:12px; cursor:pointer; }
+/* 手机仅通过双击会话名称重命名，不再增设额外按钮。 */
+@media (max-width:1100px) {
+ .session span { touch-action:manipulation; -webkit-user-select:none; user-select:none; }
+}
 .session-rename-card { width:min(440px,92vw); }
 .session-rename-body { padding:18px; }
 .session-rename-body input { width:100%; box-sizing:border-box; min-height:44px; padding:10px 12px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-0); color:var(--text-primary); font:inherit; }
@@ -8677,7 +8680,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-store-pwa-20261012"></script>
+<script src="/static/script.js?v=dmate-mobile-rename-20261018"></script>
 
 </body>
 </html>
