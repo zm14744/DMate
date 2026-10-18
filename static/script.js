@@ -19478,7 +19478,6 @@ function installGuideForCurrentPlatform() {
     const pwaStore = "https://www.pwastore.io/app/dmate";
     const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
     const itch = "https://zm14744.itch.io/dmate";
-    const webApp = "https://dmate.zeabur.app/";
     const releases = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
 
     if (config.isAndroid) {
