@@ -19491,7 +19491,7 @@ function detectDmateBrowserName() {
     return /Android/i.test(ua) ? "手机浏览器" : "当前浏览器";
 }
 
-let dmatePendingInstallPrompt = null;
+let dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt || null;
 
 function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
@@ -19603,6 +19603,14 @@ function dmatePwaSiteAndBrowserSupport() {
 
     const steps = [];
     if (platform === "android") {
+        // 只对已知提供“安装应用/添加到主屏幕”能力的浏览器显示 PWA 说明。
+        // 未识别浏览器或仅有普通网页浏览能力时，不展示误导性的 PWA 安装入口。
+        const supportedAndroidBrowsers = [
+            "Chrome", "Microsoft Edge", "Firefox", "三星浏览器",
+            "百度浏览器", "夸克浏览器", "UC 浏览器", "QQ 浏览器",
+            "小米浏览器", "华为浏览器", "OPPO 浏览器", "vivo 浏览器", "荣耀浏览器"
+        ];
+        if (!supportedAndroidBrowsers.includes(browser)) return null;
         const browserSteps = {
             "百度浏览器":"打开菜单，查找“添加到桌面”或“安装应用”。",
             "夸克浏览器":"打开菜单或分享面板，查找“添加到桌面”或“安装应用”。",
@@ -19623,6 +19631,7 @@ function dmatePwaSiteAndBrowserSupport() {
         return { platform, browser, text:"当前浏览器没有提供一键安装弹窗，可尝试从菜单添加网页应用。", steps };
     }
     if (platform === "ios") {
+        if (!["Safari", "Chrome", "Microsoft Edge", "Firefox"].includes(browser)) return null;
         steps.push(browser + "：打开“分享”菜单，查找“添加到主屏幕”。");
         steps.push("如果没有该选项，请在 Safari 中打开 DMate，再点“分享”→“添加到主屏幕”。");
         return { platform, browser, text:"iPhone / iPad 通常需要从分享菜单添加网页应用。", steps };
@@ -19664,6 +19673,10 @@ function openDmateInstallHelp() {
     const noteEl = document.getElementById("installHelpNote");
     if (!modal || !platformEl || !textEl || !stepsEl || !actionsEl) return;
 
+    // 兼容 beforeinstallprompt 早于主脚本初始化的情况。
+    if (!dmatePendingInstallPrompt && window.__dmatePendingInstallPrompt) {
+        dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt;
+    }
     const guide = installGuideForCurrentPlatform();
     dmateCurrentInstallGuide = guide;
     dmateCurrentPwaGuide = dmatePwaSiteAndBrowserSupport();
@@ -19704,9 +19717,13 @@ document.getElementById("installHelpNativeButton")?.addEventListener("click", as
     const platformEl = document.getElementById("installHelpPlatform");
     const textEl = document.getElementById("installHelpText");
     const stepsEl = document.getElementById("installHelpSteps");
+    if (!dmatePendingInstallPrompt && window.__dmatePendingInstallPrompt) {
+        dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt;
+    }
     if (dmatePendingInstallPrompt) {
         const promptEvent = dmatePendingInstallPrompt;
         dmatePendingInstallPrompt = null;
+        window.__dmatePendingInstallPrompt = null;
         if (nativeButton) {
             nativeButton.disabled = true;
             nativeButton.textContent = "正在打开安装确认…";
@@ -19790,6 +19807,7 @@ function initDmateInstall() {
     window.addEventListener("beforeinstallprompt", event => {
         event.preventDefault();
         dmatePendingInstallPrompt = event;
+        window.__dmatePendingInstallPrompt = event;
         const nativeButton = document.getElementById("installHelpNativeButton");
         if (nativeButton && !document.getElementById("installHelpModal")?.classList.contains("hidden")) {
             nativeButton.hidden = false;
@@ -19799,6 +19817,7 @@ function initDmateInstall() {
     });
     window.addEventListener("appinstalled", () => {
         dmatePendingInstallPrompt = null;
+        window.__dmatePendingInstallPrompt = null;
         button.textContent = "DMate 已安装";
         const nativeButton = document.getElementById("installHelpNativeButton");
         if (nativeButton) nativeButton.hidden = true;
