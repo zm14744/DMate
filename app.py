@@ -1874,7 +1874,9 @@ def service_worker():
 @app.route("/install")
 def install_page():
     """Compact installation page used by PWAStore's external-install fallback."""
-    return render_template("install.html")
+    response = make_response(render_template("install.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return response
 
 
 @app.route("/")
@@ -1883,7 +1885,9 @@ def home():
     # 将从 PWAStore 返回首页的访问导向专用安装页，提供浏览器安装提示。
     referrer = request.headers.get("Referer", "")
     if re.match(r"^https?://(?:www\.)?pwastore\.io(?:/|$)", referrer, re.IGNORECASE):
-        return redirect("/install", code=302)
+        response = redirect("/install", code=302)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        return response
 
     # 普通 Android 浏览器提供 PWA 与 APK 选择；已安装的 APK 仍隐藏重复安装入口。
     # APK 自己追加 DMateAndroid/<version> UA，可据此隐藏网页内的下载入口。
