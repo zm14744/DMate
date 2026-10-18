@@ -47,6 +47,7 @@
 <link id="dmateFavicon16" rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png?v=dmate-favicon-v2-20261018">
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v2-20261018">
 <link id="dmateFavicon48" rel="icon" type="image/png" sizes="48x48" href="/static/icons/favicon-48.png?v=dmate-favicon-v2-20261018">
+<link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v3-20261018">
 <link id="dmateShortcutFavicon" rel="shortcut icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v2-20261018">
 <link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v2-20261018">
 <script>
@@ -59,7 +60,7 @@
     if (!isMacSafari) return;
 
     const iconUrl = "/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v3-20261018";
-    ["dmateFavicon16", "dmateFavicon", "dmateFavicon48", "dmateShortcutFavicon"].forEach(id => {
+    ["dmateFavicon16", "dmateFavicon", "dmateFavicon48", "dmateFaviconSvg", "dmateShortcutFavicon"].forEach(id => {
         const link = document.getElementById(id);
         if (link) {
             link.href = iconUrl;
