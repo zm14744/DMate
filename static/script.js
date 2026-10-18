@@ -19483,11 +19483,10 @@ function installGuideForCurrentPlatform() {
     if (config.isAndroid) {
         return {
             platform:"Android",
-            text:"国内优先通过 PWAStore 查找 DMate 并安装网页应用（PWA）。无需下载 APK；如需原生 Android 安装包，保留 itch.io 和原下载地址作为海外/备用渠道。PWA 不等于 APK，是否能安装为独立应用取决于浏览器与系统。",
-            steps:["在 PWAStore 搜索 DMate，打开应用对应的网站。","在支持的浏览器中选择“安装应用”或“添加到主屏幕”；部分无 Google 服务的浏览器只会创建网页快捷方式。","若选择 APK，请在系统浏览器中下载，再从“下载/文件”打开安装，微信内可能拦截 APK。"],
+            text:"优先通过 PWAStore 打开 DMate；需要原生 APK 时，使用备用下载渠道。",
+            steps:["PWAStore 主要用于打开网页应用；Fennec/Firefox 可能只能添加快捷方式。","下载 APK 后，从系统“下载/文件”中打开安装。"],
             actions:[
                 { label:"国内优先 · PWAStore（安装 PWA）", url:pwaStore },
-                { label:"DMate 官网（PWA）", url:webApp, secondary:true },
                 { label:"海外备用 · itch.io（APK）", url:itch, secondary:true },
                 ...(config.androidApkUrl ? [{ label:"备用 · APK 原下载地址", url:config.androidApkUrl, secondary:true }] : [])
             ]
@@ -19496,11 +19495,10 @@ function installGuideForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"国内优先从 PWAStore 查找 DMate，使用 Safari 安装 PWA。当前没有原生 iOS IPA，也没有在 Apple App Store 发布；PWAStore 是网页应用目录而不是苹果商店。",
-            steps:["打开 PWAStore 搜索 DMate，进入对应网页；也可以直接打开 DMate 官网。","在 Safari 点击“分享”→“添加到主屏幕”，然后从主屏幕启动 DMate。"],
+            text:"优先通过 PWAStore 打开 DMate，再用 Safari 添加到主屏幕。暂无原生 iOS IPA。",
+            steps:["在 Safari 点击“分享”→“添加到主屏幕”。"],
             actions:[
                 { label:"国内优先 · PWAStore（PWA）", url:pwaStore },
-                { label:"DMate 官网（Safari 安装）", url:webApp, secondary:true }
             ]
         };
     }
@@ -19519,11 +19517,10 @@ function installGuideForCurrentPlatform() {
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"国内优先通过 PWAStore 使用 DMate 网页应用；macOS Safari 17 及以上版本可通过“文件→添加到程序坞”，Chrome/Edge 也可安装网页应用。需要独立 DMG 安装包时，可尝试 itch.io 或原下载地址（海外备用）；DMG 尚无已确认的 Apple 公证。",
-            steps:["从 PWAStore 搜索 DMate，打开对应网页，也可直接打开 DMate 官网。","Safari：文件→添加到程序坞；Chrome/Edge：使用浏览器中的“安装应用”功能。"],
+            text:"优先通过 PWAStore 打开 DMate；也可使用 Safari、Chrome 或 Edge 安装网页应用。独立 DMG 请查看备用渠道。",
+            steps:["Safari：文件→添加到程序坞；Chrome/Edge：选择“安装应用”。"],
             actions:[
                 { label:"国内优先 · PWAStore（PWA）", url:pwaStore },
-                { label:"DMate 官网（安装 PWA）", url:webApp, secondary:true },
                 { label:"海外备用 · itch.io（DMG）", url:itch, secondary:true },
                 ...(config.desktopMacosUrl ? [{ label:"备用 · macOS DMG 原下载地址", url:config.desktopMacosUrl, secondary:true }] : [])
             ]
@@ -19549,12 +19546,11 @@ function installGuideForCurrentPlatform() {
     }
     return {
         platform:"电脑",
-        text:"请按系统选择：Windows 国内优先 Microsoft Store；Linux 优先 Snap Store；macOS 优先 PWAStore。网页应用与原生安装包属于不同的安装形式。",
+        text:"选择对应系统的商店或备用安装包即可。",
         steps:[],
         actions:[
             { label:"国内优先 · Microsoft Store（Windows）", url:"https://apps.microsoft.com/search?query=DMate" },
             { label:"国内优先 · Snap Store（Linux）", url:"https://snapcraft.io/dmate", secondary:true },
-            { label:"国内优先 · PWAStore（网页应用）", url:pwaStore, secondary:true },
             { label:"海外备用 · itch.io（安装包）", url:itch, secondary:true },
             { label:"海外备用 · GitHub Releases", url:releases, secondary:true }
         ]
