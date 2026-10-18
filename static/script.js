@@ -19491,14 +19491,13 @@ function detectDmateBrowserName() {
     return /Android/i.test(ua) ? "手机浏览器" : "当前浏览器";
 }
 
+let dmatePendingInstallPrompt = null;
+
 function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
     const browserName = detectDmateBrowserName();
     const installGuideUrl = "https://dmate.zeabur.app/install";
-    // 国内用户反馈 Microsoft Store、Snap Store 和 PWAStore 更容易访问。
-    // 这些是“国内优先推荐”，不是对所有网络的免 VPN 保证。
-    const pwaStore = "https://www.pwastore.io/app/dmate";
     const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
     const itch = "https://zm14744.itch.io/dmate";
     const releases = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
@@ -19516,17 +19515,19 @@ function installGuideForCurrentPlatform() {
             "OPPO 浏览器":"菜单中查找“添加到桌面/快捷方式”。",
             "vivo 浏览器":"菜单中查找“添加到桌面/快捷方式”。",
             "荣耀浏览器":"菜单中查找“添加到桌面/快捷方式”。",
-            "三星浏览器":"菜单中查找“安装应用”或“添加到主屏幕”。"
+            "三星浏览器":"菜单中查找“安装应用”或“添加到主屏幕”。",
+            "Firefox":"Firefox / Fennec：打开菜单，选择“安装”或“添加到主屏幕”。",
+            "Microsoft Edge":"Edge：打开菜单，选择“添加到手机”或“添加到主屏幕”。",
+            "Chrome":"Chrome：打开右上角菜单，选择“安装应用”或“添加到主屏幕”。",
+            "Safari":"Safari：点击“分享”→“添加到主屏幕”。"
         };
         return {
             platform:"Android · " + browserName,
-            text:"按下面提示尝试安装 DMate。",
+            text:"按当前浏览器的菜单提示安装；若支持直接安装，也可使用下方按钮。",
             steps:[
-                browserSteps[browserName] || "打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。"
+                browserSteps[browserName] || "打开浏览器菜单，查找“安装应用”“安装 DMate”或“添加到主屏幕”。"
             ],
             actions:[
-                { label:"安装说明", url:installGuideUrl },
-                { label:"PWAStore · DMate 产品页", url:pwaStore },
                 { label:"APK 下载 · itch.io", url:itch, secondary:true },
                 ...(config.androidApkUrl ? [{ label:"备用 APK 下载", url:config.androidApkUrl, secondary:true }] : [])
             ]
@@ -19535,12 +19536,12 @@ function installGuideForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad · " + browserName,
-            text:"iPhone 上的百度、夸克等浏览器若提供“添加到主屏幕”，可以尝试使用；如果没有该选项，请在菜单中选择“在 Safari 中打开”，再添加到主屏幕。暂无原生 iOS IPA。",
-            steps:["Safari：点击“分享”→“添加到主屏幕”，并可开启“作为网页 App 打开”。","其他 iOS 浏览器：只有分享菜单确实提供添加选项时才可直接添加；最终表现受 iOS 版本与浏览器实现影响。"],
-            actions:[
-                { label:"安装引导页（iPhone / iPad）", url:installGuideUrl },
-                { label:"PWAStore · DMate 产品页", url:pwaStore }
-            ]
+            text:"按当前浏览器的分享菜单添加 DMate；如果没有该选项，请改用 Safari。",
+            steps:[
+                browserName + "：打开“分享”菜单，查找“添加到主屏幕”。",
+                "如果没有该选项：用 Safari 打开 DMate，点击“分享”→“添加到主屏幕”。"
+            ],
+            actions:[]
         };
     }
     if (platform === "windows") {
@@ -19558,11 +19559,10 @@ function installGuideForCurrentPlatform() {
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"PWAStore 提供应用详情页；Safari 可添加到程序坞，Chrome/Edge 可安装网页应用。DMG 见备用渠道。",
-            steps:["Safari：文件→添加到程序坞；Chrome/Edge：选择“安装应用”。"],
+            text:"选择浏览器提供的安装方式，或下载 macOS 安装包。",
+            steps:["Safari：菜单栏“文件”→“添加到程序坞”；Chrome/Edge：菜单中选择“安装 DMate”。"],
             actions:[
-                { label:"PWAStore · DMate 产品页", url:pwaStore },
-                { label:"海外备用 · itch.io（DMG）", url:itch, secondary:true },
+                { label:"macOS 安装包 · itch.io（DMG）", url:itch, secondary:true },
                 ...(config.desktopMacosUrl ? [{ label:"备用 · macOS DMG 原下载地址", url:config.desktopMacosUrl, secondary:true }] : [])
             ]
         };
@@ -19591,8 +19591,8 @@ function installGuideForCurrentPlatform() {
         steps:[],
         actions:[
             { label:"Microsoft Store · DMate 产品页", url:microsoftStore },
-            { label:"国内优先 · Snap Store（Linux）", url:"https://snapcraft.io/dmate", secondary:true },
-            { label:"海外备用 · itch.io（安装包）", url:itch, secondary:true },
+            { label:"Snap Store（Linux）", url:"https://snapcraft.io/dmate", secondary:true },
+            { label:"itch.io · 安装包", url:itch, secondary:true },
             { label:"海外备用 · GitHub Releases", url:releases, secondary:true }
         ]
     };
@@ -19604,9 +19604,11 @@ function openDmateInstallHelp() {
     const textEl = document.getElementById("installHelpText");
     const stepsEl = document.getElementById("installHelpSteps");
     const actionsEl = document.getElementById("installHelpActions");
+    const nativeButton = document.getElementById("installHelpNativeButton");
     if (!modal || !platformEl || !textEl || !stepsEl || !actionsEl) return;
 
     const guide = installGuideForCurrentPlatform();
+    if (nativeButton) nativeButton.hidden = !dmatePendingInstallPrompt;
     platformEl.textContent = guide.platform;
     textEl.textContent = guide.text;
     stepsEl.replaceChildren(...guide.steps.map(step => {
@@ -19629,6 +19631,20 @@ function openDmateInstallHelp() {
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
 }
+
+document.getElementById("installHelpNativeButton")?.addEventListener("click", async () => {
+    if (!dmatePendingInstallPrompt) return;
+    const promptEvent = dmatePendingInstallPrompt;
+    dmatePendingInstallPrompt = null;
+    const nativeButton = document.getElementById("installHelpNativeButton");
+    if (nativeButton) nativeButton.hidden = true;
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice.catch(() => null);
+    if (choice && choice.outcome === "accepted") {
+        const mainButton = document.getElementById("installAppBtn");
+        if (mainButton) mainButton.textContent = "DMate 已安装";
+    }
+});
 
 function closeDmateInstallHelp() {
     const modal = document.getElementById("installHelpModal");
@@ -19657,30 +19673,21 @@ function initDmateInstall() {
     else if (platform === "ios") button.textContent = "安装 DMate";
     else button.textContent = "下载 DMate 桌面版";
 
-    // 浏览器提供原生 PWA 安装提示时，主按钮直接触发安装；否则显示简短指引。
-    let deferredDmateInstallPrompt = null;
+    // 所有浏览器统一先显示安装指引；支持原生安装的浏览器会在弹窗内提供直接安装按钮。
     window.addEventListener("beforeinstallprompt", event => {
         event.preventDefault();
-        deferredDmateInstallPrompt = event;
+        dmatePendingInstallPrompt = event;
         button.textContent = "安装 DMate";
+        const nativeButton = document.getElementById("installHelpNativeButton");
+        if (nativeButton) nativeButton.hidden = false;
     });
     window.addEventListener("appinstalled", () => {
-        deferredDmateInstallPrompt = null;
+        dmatePendingInstallPrompt = null;
         button.textContent = "DMate 已安装";
+        const nativeButton = document.getElementById("installHelpNativeButton");
+        if (nativeButton) nativeButton.hidden = true;
     });
-    button.addEventListener("click", async () => {
-        if (!deferredDmateInstallPrompt) {
-            openDmateInstallHelp();
-            return;
-        }
-        const promptEvent = deferredDmateInstallPrompt;
-        deferredDmateInstallPrompt = null;
-        await promptEvent.prompt();
-        const choice = await promptEvent.userChoice.catch(() => null);
-        if (choice && choice.outcome === "accepted") {
-            button.textContent = "DMate 已安装";
-        }
-    });
+    button.addEventListener("click", openDmateInstallHelp);
 
     close?.addEventListener("click", closeDmateInstallHelp);
     modal?.addEventListener("click", event => {
