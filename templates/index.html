@@ -20,9 +20,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-store-pwa-20261012">{% endif %}
-<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-v6-2">
-<link rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-v6-2">
+{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-store-pwa-20261018">{% endif %}
+<link rel="icon" type="image/svg+xml" href="/static/icons/dmate-mark.svg?v=dmate-favicon-black-20261018">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-v6">
 <title>DMate - 离散数学智能辅学系统</title>
 
@@ -8743,7 +8742,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-rename-mobile-fix-20261018"></script>
+<script src="/static/script.js?v=dmate-pwastore-direct-links-20261018"></script>
 
 </body>
 </html>
