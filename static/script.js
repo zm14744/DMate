@@ -14814,7 +14814,7 @@ function renderSessions() {
                 mobileSessionTapTimer = 0;
                 mobileSessionTapId = "";
                 selectSession();
-            }, 320);
+            }, 420);
         };
         span.ondblclick = event => {
             event.preventDefault();
