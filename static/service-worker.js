@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-store-pwa-20261012";
+const CACHE_NAME = "dmate-mobile-rename-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
