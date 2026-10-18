@@ -14724,7 +14724,6 @@ function renameSession(session) {
         close();
     };
     submit.onclick = confirm;
-    document.getElementById("sessionRenameCancel").onclick = close;
     document.getElementById("sessionRenameClose").onclick = close;
     modal.onclick = event => { if (event.target === modal) close(); };
     input.onkeydown = event => {
