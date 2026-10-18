@@ -243,7 +243,7 @@ DMate 网页安装窗口保留所有公开发行渠道，并根据国内用户�
 | macOS | [PWAStore · DMate 产品页](https://www.pwastore.io/app/dmate)、[安装引导页](https://dmate.zeabur.app/install)（Safari / Chromium） | itch.io（DMG）、原 DMG 下载地址 / GitHub Releases | **PWA 与 DMG 是两种不同安装形式**；当前 DMG 无已确认 Apple 公证 |
 | iOS / iPadOS | [PWAStore · DMate 产品页](https://www.pwastore.io/app/dmate)、[安装引导页](https://dmate.zeabur.app/install) | Safari “分享 → 添加到主屏幕” | 仅提供 PWA，**没有 App Store 原生 IPA** |
 
-**安装注意**：PWAStore 是应用发现目录，用户仍需在兼容浏览器打开 DMate 网站并完成 PWA 安装，应用的 AI、OCR 与账号同步功能依赖 DMate 在线服务。该目录本身不托管 APK / DMG，也不能替代官网连通性。itch.io、GitHub 在部分国内网络可能打不开；如需真正稳定的安装包直连，仍需实际验证的国内文件托管渠道。
+**安装注意**：PWAStore 是应用发现目录，用户仍需在兼容浏览器打开 DMate 网站并完成 PWA 安装，应用的 AI、OCR 与账号同步功能依赖 DMate 在线服务。该目录本身不托管 APK / DMG，也不能替代官网连通性。itch.io、GitHub 在部分国内网络可能打不开；如需真正稳定的安装包直连，仍需实际验证的国内文件托管渠道。\n\n**手机浏览器兼容说明**：安装引导页会尝试识别百度、夸克、UC、QQ、微信/支付宝内置页、小米/华为/OPPO/vivo/荣耀/三星浏览器及通用 Android 浏览器，并提示可尝试的菜单入口。浏览器可能隐藏或更改 User-Agent，因此识别失败时会显示通用指引。只有浏览器实际触发原生 PWA 安装事件时，页面才显示一键“安装 DMate”按钮；其他浏览器需要在菜单中尝试“安装应用/添加到桌面”。如果只有“收藏/添加书签”，那只是收藏或快捷访问，不等于独立 PWA。iPhone/iPad 优先使用 Safari 的“分享 → 添加到主屏幕”；其他 iOS 浏览器能否添加以及最终运行方式，取决于系统版本与浏览器实现。
 
 Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 的分流说明：没有 snapd 的 Ubuntu/Debian/Mint 等可选择 DEB，Arch/Manjaro/Fedora/openSUSE 等可尝试 AppImage；启用 `snapd` 的发行版可以安装 Snap。只需要选择一种方式。**Snap 当前仅 AMD64**，不代表 ARM64 已发布；AppImage 可能需要 FUSE 等运行条件。Snap 安装示例：`sudo snap install dmate`。
 
