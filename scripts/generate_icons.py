@@ -129,8 +129,7 @@ def main():
     ]:
         save_png(draw_mark(size, background=None, foreground=(255, 255, 255, 255),
                            stroke_units=stroke, shadow=False), STATIC / filename)
-    save_ico(STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
-        STATIC / "favicon-safari-light.png", STATIC / "favicon-safari-dark.png", [
+    save_ico(STATIC / "favicon-128.png", STATIC / "favicon.ico", [
         (16, 16), (32, 32), (48, 48), (64, 64), (128, 128)
     ])
 
@@ -168,7 +167,8 @@ def main():
     for path in [
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
-        STATIC / "favicon-128.png", STATIC / "favicon.ico",
+        STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
+        STATIC / "favicon-safari-light.png", STATIC / "favicon-safari-dark.png",
         STATIC / "dmate-favicon-mac-light.svg", STATIC / "dmate-favicon-mac-dark.svg",
         STATIC / "apple-touch-mac-light.png", STATIC / "apple-touch-mac-dark.png",
         TAURI / "32x32.png", TAURI / "128x128.png", TAURI / "128x128@2x.png",
