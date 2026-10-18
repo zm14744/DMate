@@ -1855,6 +1855,15 @@ def sync_user_data():
         return jsonify({"ok": False, "error": "同步失败，请稍后再试。"}), 500
 
 
+@app.route("/favicon.ico")
+def favicon_ico():
+    """Serve the real DMate mark for browsers that request /favicon.ico implicitly."""
+    response = app.send_static_file("icons/icon-192.png")
+    response.headers["Content-Type"] = "image/png"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
 @app.route("/manifest.webmanifest")
 def web_app_manifest():
     response = app.send_static_file("manifest.webmanifest")
