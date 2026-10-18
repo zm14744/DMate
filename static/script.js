@@ -19470,9 +19470,32 @@ function detectDmateInstallPlatform() {
     return "other";
 }
 
+function detectDmateBrowserName() {
+    const ua = navigator.userAgent || "";
+    if (/baiduboxapp|baidubrowser/i.test(ua)) return "百度浏览器";
+    if (/quark/i.test(ua)) return "夸克浏览器";
+    if (/ucbrowser|ucweb/i.test(ua)) return "UC 浏览器";
+    if (/qqbrowser/i.test(ua)) return "QQ 浏览器";
+    if (/micromessenger/i.test(ua)) return "微信内置浏览器";
+    if (/alipayclient/i.test(ua)) return "支付宝内置浏览器";
+    if (/miuibrowser/i.test(ua)) return "小米浏览器";
+    if (/huaweibrowser/i.test(ua)) return "华为浏览器";
+    if (/heytapbrowser|oppobrowser/i.test(ua)) return "OPPO 浏览器";
+    if (/vivobrowser/i.test(ua)) return "vivo 浏览器";
+    if (/honorbrowser/i.test(ua)) return "荣耀浏览器";
+    if (/samsungbrowser/i.test(ua)) return "三星浏览器";
+    if (/edgios|edga|edg\\//i.test(ua)) return "Microsoft Edge";
+    if (/fxios|firefox/i.test(ua)) return "Firefox";
+    if (/crios|chrome/i.test(ua)) return "Chrome";
+    if (/safari/i.test(ua)) return "Safari";
+    return /Android/i.test(ua) ? "手机浏览器" : "当前浏览器";
+}
+
 function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
+    const browserName = detectDmateBrowserName();
+    const installGuideUrl = "https://dmate.zeabur.app/install";
     // 国内用户反馈 Microsoft Store、Snap Store 和 PWAStore 更容易访问。
     // 这些是“国内优先推荐”，不是对所有网络的免 VPN 保证。
     const pwaStore = "https://www.pwastore.io/app/dmate";
@@ -19481,11 +19504,29 @@ function installGuideForCurrentPlatform() {
     const releases = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
 
     if (config.isAndroid) {
+        const browserSteps = {
+            "百度浏览器":"百度浏览器：打开菜单（“⋯”或更多），查找“添加到桌面/桌面快捷方式”；没有时尝试“在系统浏览器中打开”。",
+            "夸克浏览器":"夸克浏览器：打开菜单或分享面板，查找“添加到桌面/添加快捷方式”；若只有收藏功能，不代表已安装 PWA。",
+            "UC 浏览器":"UC 浏览器：打开菜单或分享面板，查找“添加到桌面/快捷方式”；不同版本的选项可能不同。",
+            "QQ 浏览器":"QQ 浏览器：打开菜单或分享面板，查找“添加到桌面/添加快捷方式”；没有安装选项时尝试系统浏览器。",
+            "微信内置浏览器":"微信内置浏览器：点右上角“⋯”，尝试“在浏览器打开”；内置页通常不提供完整 PWA 安装。",
+            "支付宝内置浏览器":"支付宝内置浏览器：打开右上角菜单，尝试在系统浏览器打开，再查看安装选项。",
+            "小米浏览器":"小米浏览器：打开菜单查找“添加到桌面/添加快捷方式”；快捷方式仍可能通过浏览器打开。",
+            "华为浏览器":"华为浏览器：打开菜单查找“添加至桌面”；HarmonyOS 不同版本的菜单名称可能不同。",
+            "OPPO 浏览器":"OPPO 浏览器：打开菜单或分享面板，查找“添加到桌面/快捷方式”。",
+            "vivo 浏览器":"vivo 浏览器：打开菜单或分享面板，查找“添加到桌面/快捷方式”。",
+            "荣耀浏览器":"荣耀浏览器：打开菜单或分享面板，查找“添加到桌面/快捷方式”。",
+            "三星浏览器":"三星浏览器：打开菜单查找“添加到主屏幕”；如有“安装应用”则优先选择安装。"
+        };
         return {
-            platform:"Android",
-            text:"PWAStore 是应用目录，不直接提供 APK；需要安装包时请选择备用下载渠道。",
-            steps:["Fennec/Firefox 可添加主屏幕快捷方式，但不会因此下载 APK。","需要原生安装包时，从备用渠道下载 APK，再从系统“下载/文件”中安装。"],
+            platform:"Android · " + browserName,
+            text:"PWAStore 是应用目录，不直接提供 APK。此页面会按浏览器能力提供安装提示；能否独立安装 PWA 取决于浏览器、系统版本和安装条件。",
+            steps:[
+                browserSteps[browserName] || (browserName + "：打开浏览器菜单，查找“安装应用”“安装 DMate”或“添加到主屏幕”。"),
+                "若菜单只有“收藏/添加书签”，那通常只是收藏，不是桌面安装。需要原生 APK 时请使用备用下载渠道。"
+            ],
             actions:[
+                { label:"安装引导页（适配百度、夸克及手机浏览器）", url:installGuideUrl },
                 { label:"PWAStore · DMate 产品页", url:pwaStore },
                 { label:"海外备用 · itch.io（APK）", url:itch, secondary:true },
                 ...(config.androidApkUrl ? [{ label:"备用 · APK 原下载地址", url:config.androidApkUrl, secondary:true }] : [])
@@ -19494,11 +19535,12 @@ function installGuideForCurrentPlatform() {
     }
     if (platform === "ios") {
         return {
-            platform:"iPhone / iPad",
-            text:"PWAStore 提供应用详情页；iPhone 请用 Safari 添加到主屏幕。暂无原生 iOS IPA。",
-            steps:["在 Safari 点击“分享”→“添加到主屏幕”。"],
+            platform:"iPhone / iPad · " + browserName,
+            text:"iPhone 上的百度、夸克等浏览器若提供“添加到主屏幕”，可以尝试使用；如果没有该选项，请在菜单中选择“在 Safari 中打开”，再添加到主屏幕。暂无原生 iOS IPA。",
+            steps:["Safari：点击“分享”→“添加到主屏幕”，并可开启“作为网页 App 打开”。","其他 iOS 浏览器：只有分享菜单确实提供添加选项时才可直接添加；最终表现受 iOS 版本与浏览器实现影响。"],
             actions:[
-                { label:"PWAStore · DMate 产品页", url:pwaStore },
+                { label:"安装引导页（iPhone / iPad）", url:installGuideUrl },
+                { label:"PWAStore · DMate 产品页", url:pwaStore }
             ]
         };
     }
