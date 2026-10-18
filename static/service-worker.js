@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-download-guide-cleanup-20261018";
+const CACHE_NAME = "dmate-compact-rename-modal-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
