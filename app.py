@@ -1882,7 +1882,7 @@ def home():
     # PWAStore 当前对第三方 PWA 的 Install PWA 会回退为打开网站链接。
     # 将从 PWAStore 返回首页的访问导向专用安装页，提供浏览器安装提示。
     referrer = request.headers.get("Referer", "")
-    if re.match(r"^https?://(?:www\\.)?pwastore\\.io(?:/|$)", referrer, re.IGNORECASE):
+    if re.match(r"^https?://(?:www\.)?pwastore\.io(?:/|$)", referrer, re.IGNORECASE):
         return redirect("/install", code=302)
 
     # 普通 Android 浏览器提供 PWA 与 APK 选择；已安装的 APK 仍隐藏重复安装入口。
