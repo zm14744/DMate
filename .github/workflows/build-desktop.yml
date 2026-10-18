@@ -38,6 +38,11 @@ jobs:
             patchelf \
             xdg-utils
 
+      - name: Generate platform-specific icons
+        run: |
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          python scripts/generate_icons.py
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 

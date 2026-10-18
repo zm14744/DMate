@@ -1,17 +1,25 @@
-const CACHE_NAME = "dmate-pwa-unified-v6-20261018";
+const CACHE_NAME = "dmate-pwa-unified-v7-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/dmate-mark.svg",
+  "/static/icons/dmate-transparent.svg",
+  "/static/icons/favicon-16.png",
+  "/static/icons/favicon-32.png",
+  "/static/icons/favicon-48.png",
+  "/static/icons/favicon-128.png",
+  "/static/icons/favicon-16.png?v=dmate-favicon-v2-20261018",
+  "/static/icons/favicon-32.png?v=dmate-favicon-v2-20261018",
+  "/static/icons/favicon-48.png?v=dmate-favicon-v2-20261018",
   "/static/icons/icon-maskable-512.png",
-  "/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v2-20261018",
-  "/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v1-20261018",
-  "/static/icons/apple-touch-mac-dark.png?v=mac-touch-dark-v1-20261018",
-  "/static/icons/icon-192.png?v=dmate-pwa-unified-v6-20261018",
-  "/static/icons/icon-512.png?v=dmate-pwa-unified-v6-20261018",
-  "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v6-20261018"
+  "/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v3-20261018",
+  "/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v2-20261018",
+  "/static/icons/apple-touch-mac-dark.png?v=mac-touch-dark-v2-20261018",
+  "/static/icons/icon-192.png?v=dmate-pwa-unified-v7-20261018",
+  "/static/icons/icon-512.png?v=dmate-pwa-unified-v7-20261018",
+  "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v7-20261018"
 ];
 
 self.addEventListener("install", event => {
