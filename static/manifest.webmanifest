@@ -16,19 +16,19 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/static/icons/icon-192.png?v=dmate-pwa-unified-v10-20261019",
+      "src": "/static/icons/icon-192.png?v=dmate-pwa-unified-v11-20261019",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/static/icons/icon-512.png?v=dmate-pwa-unified-v10-20261019",
+      "src": "/static/icons/icon-512.png?v=dmate-pwa-unified-v11-20261019",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v10-20261019",
+      "src": "/static/icons/icon-maskable-512.png?v=dmate-pwa-unified-v11-20261019",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

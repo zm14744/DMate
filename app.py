@@ -1857,9 +1857,9 @@ def sync_user_data():
 
 @app.route("/favicon.ico")
 def favicon_ico():
-    """Serve the transparent white-line browser favicon, not the black-tile PWA icon."""
-    response = app.send_static_file("icons/favicon.ico")
-    response.headers["Content-Type"] = "image/vnd.microsoft.icon"
+    """Serve an existing PNG fallback at the conventional favicon URL."""
+    response = app.send_static_file("icons/favicon-128.png")
+    response.headers["Content-Type"] = "image/png"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
