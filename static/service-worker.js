@@ -1,12 +1,12 @@
-const CACHE_NAME = "dmate-one-icon-v4-20261018";
+const CACHE_NAME = "dmate-pwa-unified-v5-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/dmate-mark.svg",
-  "/static/icons/icon-192.png?v=dmate-one-icon-20261018",
-  "/static/icons/icon-512.png?v=dmate-one-icon-20261018"
+  "/static/icons/icon-192.png?v=dmate-pwa-unified-v5-20261018",
+  "/static/icons/icon-512.png?v=dmate-pwa-unified-v5-20261018"
 ];
 
 self.addEventListener("install", event => {
