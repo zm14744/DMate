@@ -19296,10 +19296,11 @@ function syncMobileVisualViewport() {
 
         // 重命名输入框弹出系统键盘时，只调整重命名遮罩的可视区域。
         // 不缩小整页布局，避免背景抽屉/聊天按钮跟着键盘一起跳动。
-        if (keyboardOpen && renameInputFocused) {
+        if (renameModalOpen && renameInputFocused) {
+            // 以输入框焦点为准，而不是依赖所有 Android WebView 都一致的键盘高度报告。
             sessionRenameKeyboardOverlayActive = true;
         }
-        if (keyboardOpen && sessionRenameKeyboardOverlayActive) {
+        if (sessionRenameKeyboardOverlayActive && (renameModalOpen || keyboardOpen)) {
             if (renameModalOpen) {
                 root.style.setProperty("--rename-visible-height", `${visibleHeight}px`);
                 root.style.setProperty("--rename-viewport-top", `${viewportTop}px`);
@@ -19311,7 +19312,7 @@ function syncMobileVisualViewport() {
             return;
         }
 
-        if (!keyboardOpen) {
+        if (!renameModalOpen && !keyboardOpen) {
             sessionRenameKeyboardOverlayActive = false;
         }
         root.style.removeProperty("--rename-visible-height");
