@@ -19497,7 +19497,6 @@ function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
     const browserName = detectDmateBrowserName();
-    const installGuideUrl = "https://dmate.zeabur.app/install";
     const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
     const itch = "https://zm14744.itch.io/dmate";
     const releases = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
