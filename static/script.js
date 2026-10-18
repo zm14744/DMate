@@ -14692,6 +14692,46 @@ function renderChat() {
 // -----------------------------
 // 会话列表
 // -----------------------------
+let mobileSessionTapTimer = 0;
+let mobileSessionTapId = "";
+let mobileSessionTapAt = 0;
+let lastSessionRenameAt = 0;
+function renameSession(session) {
+    if (!session || Date.now() - lastSessionRenameAt < 400) return;
+    lastSessionRenameAt = Date.now();
+    if (typingTimer) forceCompleteTyping();
+    const modal = document.getElementById("sessionRenameModal");
+    const input = document.getElementById("sessionRenameInput");
+    const submit = document.getElementById("sessionRenameSave");
+    if (!modal || !input || !submit) return;
+    input.value = session.name || "";
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    const close = () => {
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+    };
+    const confirm = () => {
+        const name = input.value.trim();
+        if (name) {
+            session.name = name.slice(0, 80);
+            saveState();
+            renderSessions();
+            renderInfo();
+            refreshMobileConversationTitle();
+        }
+        close();
+    };
+    submit.onclick = confirm;
+    document.getElementById("sessionRenameCancel").onclick = close;
+    document.getElementById("sessionRenameClose").onclick = close;
+    modal.onclick = event => { if (event.target === modal) close(); };
+    input.onkeydown = event => {
+        if (event.key === "Enter") { event.preventDefault(); confirm(); }
+        if (event.key === "Escape") close();
+    };
+    window.setTimeout(() => { input.focus(); input.select(); }, 40);
+}
 function renderSessions() {
     const box = document.getElementById("sessions");
     if (!box) return;
@@ -14743,36 +14783,45 @@ function renderSessions() {
         span.innerText = session.name;
         span.title = session.name;
 
-        span.onclick = () => {
-            if (typingTimer) {
-                forceCompleteTyping();
-            }
-
+        const selectSession = () => {
+            if (typingTimer) forceCompleteTyping();
             currentId = session.id;
             saveState();
             renderAll();
             animateMobileConversationSwitch();
+            if (isMobileAppShell()) closeMobileShellDrawers();
         };
-
-        span.ondblclick = () => {
-            if (typingTimer) {
-                forceCompleteTyping();
+        span.onclick = event => {
+            if (!isMobileAppShell()) { selectSession(); return; }
+            // 手机上单击延迟执行：第二次点击优先进入重命名，不先关闭侧栏。
+            const now = Date.now();
+            if (mobileSessionTapTimer && mobileSessionTapId === String(session.id)
+                && now - mobileSessionTapAt < 420) {
+                window.clearTimeout(mobileSessionTapTimer);
+                mobileSessionTapTimer = 0;
+                mobileSessionTapId = "";
+                event.preventDefault();
+                renameSession(session);
+                return;
             }
-
-            const name = prompt(
-                "修改名称：",
-                session.name
-            );
-
-            if (
-                typeof name === "string"
-                && name.trim()
-            ) {
-                session.name = name.trim();
-                saveState();
-                renderSessions();
-                renderInfo();
+            if (mobileSessionTapTimer) {
+                window.clearTimeout(mobileSessionTapTimer);
+                mobileSessionTapTimer = 0;
             }
+            mobileSessionTapId = String(session.id);
+            mobileSessionTapAt = now;
+            mobileSessionTapTimer = window.setTimeout(() => {
+                mobileSessionTapTimer = 0;
+                mobileSessionTapId = "";
+                selectSession();
+            }, 320);
+        };
+        span.ondblclick = event => {
+            event.preventDefault();
+            if (mobileSessionTapTimer) window.clearTimeout(mobileSessionTapTimer);
+            mobileSessionTapTimer = 0;
+            mobileSessionTapId = "";
+            renameSession(session);
         };
 
         const del = document.createElement("button");
@@ -14838,6 +14887,21 @@ function renderSessions() {
         };
 
         div.appendChild(span);
+        if (isMobileAppShell()) {
+            const edit = document.createElement("button");
+            edit.type = "button";
+            edit.className = "session-rename";
+            edit.textContent = "改名";
+            edit.setAttribute("aria-label", "重命名这个对话");
+            edit.onclick = event => {
+                event.stopPropagation();
+                if (mobileSessionTapTimer) window.clearTimeout(mobileSessionTapTimer);
+                mobileSessionTapTimer = 0;
+                mobileSessionTapId = "";
+                renameSession(session);
+            };
+            div.appendChild(edit);
+        }
         div.appendChild(del);
         box.appendChild(div);
     }
@@ -19123,12 +19187,6 @@ function initMobileAppShell() {
     toolsClose?.addEventListener("click", closeMobileShellDrawers);
     backdrop?.addEventListener("click", closeMobileShellDrawers);
 
-    sessionsBox?.addEventListener("click", event => {
-        if (event.target.closest(".session span")) {
-            closeMobileShellDrawers();
-        }
-    });
-
     newChatBtn?.addEventListener("click", () => {
         window.setTimeout(closeMobileShellDrawers, 0);
     });
@@ -19380,9 +19438,12 @@ function installGuideForCurrentPlatform() {
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text: config.desktopWindowsUrl ? "下载 DMate Windows 安装程序。" : "Windows 桌面版暂未发布。",
+            text:"国内用户建议先尝试微软商店；若直接下载安装包提示网络失败，可能是下载源 GitHub/CDN 不可达。国内直连镜像须由管理员配置并验证后才能使用。",
             steps:[],
-            actions: config.desktopWindowsUrl ? [{ label:"下载 Windows 版", url:config.desktopWindowsUrl }] : []
+            actions:[
+                { label:"Microsoft Store（官方商店）", url:"https://apps.microsoft.com/search?query=DMate" },
+                ...(config.desktopWindowsUrl ? [{ label:"下载 Windows 安装包（备用下载源）", url:config.desktopWindowsUrl, secondary:true }] : [])
+            ]
         };
     }
     if (platform === "macos") {
@@ -19485,10 +19546,8 @@ function initDmateInstall() {
             window.location.assign(config.androidApkUrl);
             return;
         }
-        if (platform === "windows" && config.desktopWindowsUrl) {
-            window.location.assign(config.desktopWindowsUrl);
-            return;
-        }
+        // Windows 优先呈现官方商店选项，让国内用户不必被自动跳往 GitHub。
+        if (platform === "windows") { openDmateInstallHelp(); return; }
         if (platform === "macos" && config.desktopMacosUrl) {
             window.location.assign(config.desktopMacosUrl);
             return;
