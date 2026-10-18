@@ -19505,31 +19505,30 @@ function installGuideForCurrentPlatform() {
 
     if (config.isAndroid) {
         const browserSteps = {
-            "百度浏览器":"百度浏览器：打开菜单（“⋯”或更多），查找“添加到桌面/桌面快捷方式”；没有时尝试“在系统浏览器中打开”。",
-            "夸克浏览器":"夸克浏览器：打开菜单或分享面板，查找“添加到桌面/添加快捷方式”；若只有收藏功能，不代表已安装 PWA。",
-            "UC 浏览器":"UC 浏览器：打开菜单或分享面板，查找“添加到桌面/快捷方式”；不同版本的选项可能不同。",
-            "QQ 浏览器":"QQ 浏览器：打开菜单或分享面板，查找“添加到桌面/添加快捷方式”；没有安装选项时尝试系统浏览器。",
-            "微信内置浏览器":"微信内置浏览器：点右上角“⋯”，尝试“在浏览器打开”；内置页通常不提供完整 PWA 安装。",
-            "支付宝内置浏览器":"支付宝内置浏览器：打开右上角菜单，尝试在系统浏览器打开，再查看安装选项。",
-            "小米浏览器":"小米浏览器：打开菜单查找“添加到桌面/添加快捷方式”；快捷方式仍可能通过浏览器打开。",
-            "华为浏览器":"华为浏览器：打开菜单查找“添加至桌面”；HarmonyOS 不同版本的菜单名称可能不同。",
-            "OPPO 浏览器":"OPPO 浏览器：打开菜单或分享面板，查找“添加到桌面/快捷方式”。",
-            "vivo 浏览器":"vivo 浏览器：打开菜单或分享面板，查找“添加到桌面/快捷方式”。",
-            "荣耀浏览器":"荣耀浏览器：打开菜单或分享面板，查找“添加到桌面/快捷方式”。",
-            "三星浏览器":"三星浏览器：打开菜单查找“添加到主屏幕”；如有“安装应用”则优先选择安装。"
+            "百度浏览器":"菜单中查找“添加到桌面”；没有则用系统浏览器打开。",
+            "夸克浏览器":"菜单或分享面板中查找“添加到桌面”。",
+            "UC 浏览器":"菜单中查找“添加到桌面/快捷方式”。",
+            "QQ 浏览器":"菜单中查找“添加到桌面”；没有则用系统浏览器打开。",
+            "微信内置浏览器":"点右上角“⋯”，选择“在浏览器打开”。",
+            "支付宝内置浏览器":"从菜单中选择用系统浏览器打开。",
+            "小米浏览器":"菜单中查找“添加到桌面/快捷方式”。",
+            "华为浏览器":"菜单中查找“添加至桌面”。",
+            "OPPO 浏览器":"菜单中查找“添加到桌面/快捷方式”。",
+            "vivo 浏览器":"菜单中查找“添加到桌面/快捷方式”。",
+            "荣耀浏览器":"菜单中查找“添加到桌面/快捷方式”。",
+            "三星浏览器":"菜单中查找“安装应用”或“添加到主屏幕”。"
         };
         return {
             platform:"Android · " + browserName,
-            text:"PWAStore 是应用目录，不直接提供 APK。此页面会按浏览器能力提供安装提示；能否独立安装 PWA 取决于浏览器、系统版本和安装条件。",
+            text:"按下面提示尝试安装 DMate。",
             steps:[
-                browserSteps[browserName] || (browserName + "：打开浏览器菜单，查找“安装应用”“安装 DMate”或“添加到主屏幕”。"),
-                "若菜单只有“收藏/添加书签”，那通常只是收藏，不是桌面安装。需要原生 APK 时请使用备用下载渠道。"
+                browserSteps[browserName] || "打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。"
             ],
             actions:[
-                { label:"安装引导页（适配百度、夸克及手机浏览器）", url:installGuideUrl },
+                { label:"安装说明", url:installGuideUrl },
                 { label:"PWAStore · DMate 产品页", url:pwaStore },
-                { label:"海外备用 · itch.io（APK）", url:itch, secondary:true },
-                ...(config.androidApkUrl ? [{ label:"备用 · APK 原下载地址", url:config.androidApkUrl, secondary:true }] : [])
+                { label:"APK 下载 · itch.io", url:itch, secondary:true },
+                ...(config.androidApkUrl ? [{ label:"备用 APK 下载", url:config.androidApkUrl, secondary:true }] : [])
             ]
         };
     }
@@ -19654,13 +19653,34 @@ function initDmateInstall() {
     const platform = detectDmateInstallPlatform();
     button.hidden = false;
     button.setAttribute("aria-hidden", "false");
-    if (platform === "android") button.textContent = "安装 DMate（PWA / APK）";
+    if (platform === "android") button.textContent = "安装 DMate";
     else if (platform === "ios") button.textContent = "安装 DMate";
     else button.textContent = "下载 DMate 桌面版";
 
-    // 所有平台统一先展示安装选项，避免 Android/macOS 一键跳到
-    // 在国内可能不可达的 GitHub Releases 安装包下载链接。
-    button.addEventListener("click", openDmateInstallHelp);
+    // 浏览器提供原生 PWA 安装提示时，主按钮直接触发安装；否则显示简短指引。
+    let deferredDmateInstallPrompt = null;
+    window.addEventListener("beforeinstallprompt", event => {
+        event.preventDefault();
+        deferredDmateInstallPrompt = event;
+        button.textContent = "安装 DMate";
+    });
+    window.addEventListener("appinstalled", () => {
+        deferredDmateInstallPrompt = null;
+        button.textContent = "DMate 已安装";
+    });
+    button.addEventListener("click", async () => {
+        if (!deferredDmateInstallPrompt) {
+            openDmateInstallHelp();
+            return;
+        }
+        const promptEvent = deferredDmateInstallPrompt;
+        deferredDmateInstallPrompt = null;
+        await promptEvent.prompt();
+        const choice = await promptEvent.userChoice.catch(() => null);
+        if (choice && choice.outcome === "accepted") {
+            button.textContent = "DMate 已安装";
+        }
+    });
 
     close?.addEventListener("click", closeDmateInstallHelp);
     modal?.addEventListener("click", event => {
