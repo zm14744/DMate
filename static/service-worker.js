@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-safari-favicon-20261018";
+const CACHE_NAME = "dmate-unified-icon-20261018";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -7,9 +7,9 @@ const SHELL_ASSETS = [
   "/static/icons/apple-touch-icon.png",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
-  "/static/icons/icon-maskable-512.png",
   "/static/icons/dmate-mark.svg",
-  "/static/icons/icon-192.png?v=dmate-safari-favicon-20261018"
+  "/static/icons/icon-192.png?v=dmate-unified-icon-20261018",
+  "/static/icons/icon-512.png?v=dmate-unified-icon-20261018"
 ];
 
 self.addEventListener("install", event => {
