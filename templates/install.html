@@ -102,11 +102,14 @@
 
     installButton.addEventListener("click", async () => {
       if (!deferredInstallPrompt) return;
-      deferredInstallPrompt.prompt();
-      await deferredInstallPrompt.userChoice.catch(() => null);
+      const promptEvent = deferredInstallPrompt;
       deferredInstallPrompt = null;
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice.catch(() => null);
       installButton.hidden = true;
-      installHint.textContent = "如果没有完成安装，请打开浏览器菜单选择“安装 DMate”。";
+      installHint.textContent = choice && choice.outcome === "accepted"
+        ? "DMate 正在安装；完成后可从应用列表启动。"
+        : "安装未完成。如需重试，请打开浏览器菜单选择“安装 DMate”。";
     });
 
     window.addEventListener("appinstalled", () => {
