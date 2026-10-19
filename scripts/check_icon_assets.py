@@ -2,6 +2,7 @@
 """Regressions: no theme-adaptive favicon, no bitmap-upscaled PWA/ICO/ICNS."""
 import json
 import struct
+import io
 import ast
 import os
 import re
@@ -125,6 +126,25 @@ def main():
     matches_vector(ICONS / "dmate-site-v35-64.png", 64, background=BLACK,
                    foreground=WHITE, rounded=True, stroke_units=STROKE)
     check_ico(ICONS / "dmate-site-v35.ico", (16, 24, 32, 48, 64, 128, 256))
+    # v36 improves tiny Bing favicon recognition only through geometry scale;
+    # compare every native-size ICO layer to the unchanged original stroke width.
+    matches_vector(ICONS / "dmate-site-v36-64.png", 64, background=BLACK,
+                   foreground=WHITE, rounded=True, stroke_units=STROKE,
+                   figure_scale=1.08)
+    check_ico(ICONS / "dmate-site-v36.ico", (16, 24, 32, 48, 64, 128, 256))
+    ico_data = (ICONS / "dmate-site-v36.ico").read_bytes()
+    scales = {16: 1.18, 24: 1.14, 32: 1.11, 48: 1.09,
+              64: 1.08, 128: 1.06, 256: 1.04}
+    for i in range(struct.unpack_from("<H", ico_data, 4)[0]):
+        w, h, _, _, _, _, length, offset = struct.unpack_from("<BBBBHHII", ico_data, 6 + 16 * i)
+        size = w or 256
+        assert (h or 256) == size
+        with Image.open(io.BytesIO(ico_data[offset:offset + length])) as layer:
+            actual_layer = layer.convert("RGBA")
+        expected_layer = draw_mark(size, background=BLACK, foreground=WHITE,
+                                   rounded=True, stroke_units=STROKE,
+                                   figure_scale=scales[size])
+        assert ImageChops.difference(actual_layer, expected_layer).getbbox() is None, size
     # Search favicon must stay thin, while the legacy Safari rendering is unchanged.
     assert ImageChops.difference(rgba(ICONS / "dmate-site-v35-64.png").convert("RGB"),
                                  rgba(ICONS / "dmate-site-v34-64.png").convert("RGB")).getbbox() is not None
@@ -218,8 +238,8 @@ def main():
     namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     assert [node.text for node in root_sitemap.findall(".//sm:loc", namespace)] == ["https://dmate.zeabur.app/"]
     assert '<link rel="canonical" href="https://dmate.zeabur.app/">' in html
-    assert 'send_static_file("icons/dmate-site-v35.ico")' in app_text
-    assert 'send_static_file("icons/dmate-site-v35-64.png")' in app_text
+    assert 'send_static_file("icons/dmate-site-v36.ico")' in app_text
+    assert 'send_static_file("icons/dmate-site-v36-64.png")' in app_text
     assert '{% if is_search_crawler %}' in html
     assert '<link rel="icon" type="image/x-icon" href="/favicon.ico">' in html
     assert '<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">' in html

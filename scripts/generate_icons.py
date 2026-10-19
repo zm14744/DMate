@@ -105,12 +105,14 @@ def render_png_bytes(size, background=BLACK, figure_scale=1.0, stroke_units=STRO
 
 
 def save_ico(path, sizes, background=BLACK, stroke_units=STROKE, foreground=WHITE,
-             rounded=False):
+             rounded=False, figure_scale=1.0, figure_scale_by_size=None):
     """Build ICO from independently vector-rendered PNGs at EACH exact size."""
     sizes = list(sizes)
+    figure_scale_by_size = figure_scale_by_size or {}
     payloads = [
-        render_png_bytes(size, background=background,
-                         stroke_units=stroke_units, foreground=foreground, rounded=rounded)
+        render_png_bytes(size, background=background, foreground=foreground,
+                         stroke_units=stroke_units, rounded=rounded,
+                         figure_scale=figure_scale_by_size.get(size, figure_scale))
         for size in sizes
     ]
     offset = 6 + 16 * len(sizes)
@@ -220,6 +222,21 @@ def main():
     save_ico(STATIC / "dmate-site-v35.ico", (16, 24, 32, 48, 64, 128, 256),
              background=BLACK, foreground=WHITE,
              stroke_units=STROKE, rounded=True)
+
+    # Bing/search favicon v36: BLACK rounded tile and original WHITE hairlines.
+    # Never increase STROKE; adjust only the geometry size at tiny resolutions.
+    save_png(draw_mark(64, background=BLACK, foreground=WHITE,
+                       rounded=True, stroke_units=STROKE, figure_scale=1.08),
+             STATIC / "dmate-site-v36-64.png")
+    save_ico(STATIC / "dmate-site-v36.ico",
+             (16, 24, 32, 48, 64, 128, 256),
+             background=BLACK, foreground=WHITE,
+             stroke_units=STROKE, rounded=True,
+             figure_scale=1.08,
+             figure_scale_by_size={
+                 16: 1.18, 24: 1.14, 32: 1.11, 48: 1.09,
+                 64: 1.08, 128: 1.06, 256: 1.04,
+             })
 
     # Apple's Home Screen app and the cross-platform PWA use the same artwork.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
