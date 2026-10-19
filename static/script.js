@@ -19497,7 +19497,7 @@ function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
     const browserName = detectDmateBrowserName();
-    const gitcode = "https://gitcode.com/zm14744/DMate";
+    const gitcode = "https://gitcode.com/zm14744/DMate/releases/v1.0.1";
     const releases = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
     const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
     const snap = "https://snapcraft.io/dmate";
