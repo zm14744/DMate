@@ -68,7 +68,7 @@
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
 {% elif is_mac_safari %}
 <!-- Static Safari icon: do NOT depend on WebKit accepting JS favicon changes. -->
-<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
+<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v34-64.png">
 {% elif is_android_browser %}
 <!-- Android: browser-specific favicon geometry compensation, native master unchanged. -->
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-32-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-32-v17.png{% endif %}">
@@ -81,9 +81,9 @@
 <meta name="msapplication-TileImage" content="/static/icons/windows-shortcut-192-v20.png">
 <meta name="msapplication-TileColor" content="#000000">
 {% else %}
-<!-- Default browsers and search bots use the clear sitewide DMate icon. -->
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
-<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+<!-- Existing non-search browser artwork remains untouched. -->
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v34-64.png">
+<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-site-v34.ico">
 {% endif %}
 <link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <title>DMate - 离散数学智能辅学系统</title>

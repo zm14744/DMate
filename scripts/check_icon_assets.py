@@ -8,7 +8,7 @@ import re
 from types import SimpleNamespace
 from pathlib import Path
 from PIL import Image, ImageChops
-from generate_icons import draw_mark, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK
+from generate_icons import draw_mark, STROKE, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "static" / "icons"
@@ -122,6 +122,14 @@ def main():
     matches_vector(ICONS / "dmate-site-v34-64.png", 64, background=BLACK,
                    foreground=WHITE, rounded=True, stroke_units=SAFARI_TAB_STROKE)
     check_ico(ICONS / "dmate-site-v34.ico", (16, 24, 32, 48, 64, 128, 256))
+    matches_vector(ICONS / "dmate-site-v35-64.png", 64, background=BLACK,
+                   foreground=WHITE, rounded=True, stroke_units=STROKE)
+    check_ico(ICONS / "dmate-site-v35.ico", (16, 24, 32, 48, 64, 128, 256))
+    # Search favicon must stay thin, while the legacy Safari rendering is unchanged.
+    assert ImageChops.difference(rgba(ICONS / "dmate-site-v35-64.png"),
+                                 rgba(ICONS / "dmate-site-v34-64.png")).getbbox() is not None
+    assert (ICONS / "dmate-site-v34-64.png").read_bytes() == (
+        ICONS / "dmate-safari-light-v32-64.png").read_bytes()
     assert rgba(ICONS / "favicon-32.png").getpixel((0, 0))[3] == 0
 
     check_ico(ICONS / "favicon.ico", (16, 32, 48, 64, 128))
@@ -198,10 +206,12 @@ def main():
     # Search bots get the same root-level branded favicon irrespective of their UA platform.
     app_text = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "is_search_crawler=is_search_crawler," in app_text
+    assert 'send_static_file("icons/dmate-site-v35.ico")' in app_text
+    assert 'send_static_file("icons/dmate-site-v35-64.png")' in app_text
     assert '{% if is_search_crawler %}' in html
     assert '<link rel="icon" type="image/x-icon" href="/favicon.ico">' in html
     assert '<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">' in html
-    assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">' in html
+    assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v34-64.png">' in html
     assert 'document.head.appendChild(icon)' not in html
     assert 'dmate-safari-" + theme' not in html
     assert '<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">' in html

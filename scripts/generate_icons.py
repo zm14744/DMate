@@ -202,14 +202,24 @@ def main():
             stroke_units=SAFARI_TAB_STROKE
         )
 
-    # Site-wide branded favicon for Bing, search engines, and static Safari tabs.
-    # All ICO resolutions are native vector renders, with a rounded black tile.
+    # Preserve v34 exactly for Safari and existing browser tabs. The earlier
+    # 78-unit strokes are deliberately NOT reused for the Bing/search favicon.
+    # Each ICO size is rendered independently from the original geometry.
     save_png(draw_mark(64, background=BLACK, foreground=WHITE,
                        rounded=True, stroke_units=SAFARI_TAB_STROKE),
              STATIC / "dmate-site-v34-64.png")
     save_ico(STATIC / "dmate-site-v34.ico", (16, 24, 32, 48, 64, 128, 256),
              background=BLACK, foreground=WHITE,
              stroke_units=SAFARI_TAB_STROKE, rounded=True)
+
+    # Bing/search branding: rounded BLACK tile, original thin WHITE geometry.
+    # STROKE=13 is the original DMate line weight; never thicken it to 78.
+    save_png(draw_mark(64, background=BLACK, foreground=WHITE,
+                       rounded=True, stroke_units=STROKE),
+             STATIC / "dmate-site-v35-64.png")
+    save_ico(STATIC / "dmate-site-v35.ico", (16, 24, 32, 48, 64, 128, 256),
+             background=BLACK, foreground=WHITE,
+             stroke_units=STROKE, rounded=True)
 
     # Apple's Home Screen app and the cross-platform PWA use the same artwork.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
