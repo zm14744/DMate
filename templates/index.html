@@ -32,7 +32,7 @@
         navigator.serviceWorker.getRegistrations().then(function (registrations) {
             return Promise.all(registrations.map(function (registration) {
                 var worker = registration.active || registration.waiting || registration.installing;
-                if (!worker || !/\\/service-worker\\.js(?:\\?|$)/.test(worker.scriptURL)) return false;
+                if (!worker || !worker.scriptURL.endsWith("/service-worker.js")) return false;
                 return registration.unregister();
             }));
         }).catch(function () {});
