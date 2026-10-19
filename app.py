@@ -151,7 +151,7 @@ EMAIL_DELIVERY_CONFIGURED = bool(BREVO_CONFIGURED or SMTP_CONFIGURED)
 # Android 安装版使用 APK；普通 Android 浏览器通过浏览器安装菜单添加网页应用。
 ANDROID_APK_URL = (os.environ.get("ANDROID_APK_URL") or "").strip()
 
-# 桌面客户端：Windows / macOS / Linux 统一使用 Tauri，不再依赖浏览器 PWA。
+# 桌面客户端：Windows / macOS / Linux 统一使用 Tauri，不再依赖网页安装。
 DESKTOP_WINDOWS_URL = (os.environ.get("DESKTOP_WINDOWS_URL") or "").strip()
 DESKTOP_MACOS_URL = (os.environ.get("DESKTOP_MACOS_URL") or "").strip()
 DESKTOP_LINUX_DEB_URL = (os.environ.get("DESKTOP_LINUX_DEB_URL") or "").strip()
@@ -1901,80 +1901,6 @@ def favicon_png_root():
     return response
 
 
-def _serve_dmate_manifest(filename):
-    """The same native DMate icon, corrected for Android browser launcher scaling."""
-    with open(os.path.join(app.static_folder, filename), "r", encoding="utf-8") as source:
-        manifest = json.load(source)
-    user_agent = request.headers.get("User-Agent", "")
-    variant = None
-    if re.search(r"Android", user_agent, re.IGNORECASE):
-        if re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE):
-            variant = "edge"
-        elif re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE):
-            variant = "fennec"
-    if variant:
-        for item in manifest.get("icons", []):
-            size = item.get("sizes", "").split("x")[0]
-            if item.get("purpose", "any") == "any" and size in {"192", "512"}:
-                item["src"] = f"/static/icons/android-{variant}-{size}-v21.png?v=dmate-native-vector-v22-20261019"
-    # Android ONLY: provide dedicated maskable artwork. Previously these
-    # entries were deleted, so launchers placed the square icon inside a
-    # white adaptive-icon frame. Desktop/iOS manifest output is unchanged.
-    if re.search(r"Android", user_agent, re.IGNORECASE) and not re.search(
-        r"DMateAndroid/|DMateDesktop/", user_agent, re.IGNORECASE
-    ):
-        manifest["icons"] = [
-            *[icon for icon in manifest.get("icons", [])
-              if "maskable" not in icon.get("purpose", "any").split()],
-            {
-                "src": "/static/icons/android-pwa-maskable-192-v24.png?v=android-maskable-v24-20261019",
-                "sizes": "192x192", "type": "image/png", "purpose": "maskable"
-            },
-            {
-                "src": "/static/icons/android-pwa-maskable-512-v24.png?v=android-maskable-v24-20261019",
-                "sizes": "512x512", "type": "image/png", "purpose": "maskable"
-            }
-        ]
-    response = make_response(json.dumps(manifest, ensure_ascii=False))
-    response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Vary"] = "User-Agent"
-    return response
-
-
-@app.route("/manifest.webmanifest")
-def web_app_manifest():
-    return _serve_dmate_manifest("manifest.webmanifest")
-
-
-@app.route("/manifest-mobile.webmanifest")
-def web_app_manifest_mobile():
-    """Compatibility manifest for Android browsers checking the current page scope.
-
-    QQ, Quark, UC, Baidu and several OEM browsers inspect the / homepage
-    itself when deciding whether to expose 'Add to home screen'. The standard
-    PWA manifest stays limited to /pwa/ so desktop Edge doesn't capture /.
-    """
-    return _serve_dmate_manifest("manifest-mobile.webmanifest")
-
-
-@app.route("/service-worker.js")
-def service_worker():
-    response = app.send_static_file("service-worker.js")
-    response.headers["Service-Worker-Allowed"] = "/"
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    return response
-
-
-@app.route("/install")
-def install_page():
-    """Compact installation page for browser-specific installation guidance."""
-    mobile_android = bool(re.search(r"Android", request.headers.get("User-Agent", ""), re.IGNORECASE))
-    response = make_response(render_template("install.html", is_android=mobile_android))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    return response
-
-
 @app.route("/DMate.mobileconfig")
 def ios_ipados_webclip_profile():
     """Public, optional iPhone/iPad Home Screen link; no device management.
@@ -2020,7 +1946,7 @@ def ios_ipados_webclip_profile():
 
 @app.route("/")
 def home():
-    # 普通 Android 浏览器提供网页安装指引与 APK 备用渠道；已安装的 APK 隐藏重复入口。
+    # 普通 Android 浏览器显示 APK 下载入口；已安装的 APK 隐藏重复入口。
     # APK 自己追加 DMateAndroid/<version> UA，可据此隐藏网页内的下载入口。
     user_agent = request.headers.get("User-Agent", "")
     is_android = bool(re.search(r"Android", user_agent, re.IGNORECASE))
@@ -2039,21 +1965,10 @@ def home():
         user_agent, re.IGNORECASE))
     is_android_edge = bool(is_android_browser and re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE))
     is_android_firefox = bool(is_android_browser and re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE))
-    # Some Android browsers only expose their add-to-desktop menu when the
-    # page being viewed (/) lies within the manifest's declared scope.
-    is_android_install_compat_browser = bool(
-        is_android_browser and re.search(
-            r"QQBrowser|MQQBrowser|Quark|UCBrowser|UCWEB|BaiduBrowser|"
-            r"baiduboxapp|MiuiBrowser|HuaweiBrowser|HeyTapBrowser|"
-            r"OPPOBrowser|VivoBrowser|HonorBrowser",
-            user_agent,
-            re.IGNORECASE,
-        )
-    )
 
     # 首页直接注入与 teaching.py / app.py 共用的 knowledge_graph.json，
     # 避免前端再维护一份硬编码图谱而产生不同步。
-    # 客户端通过远程网页获取新功能：不允许 WebView/PWA 缓存旧 HTML
+    # 客户端通过远程网页获取新功能：不允许 WebView 缓存旧 HTML
     # 和旧 script.js 版本号，否则新版交互即使上线也可能不生效。
     response = make_response(render_template(
         "index.html",
@@ -2066,7 +1981,6 @@ def home():
         is_windows_browser=is_windows_browser,
         is_android_edge=is_android_edge,
         is_android_firefox=is_android_firefox,
-        is_android_install_compat_browser=is_android_install_compat_browser,
         is_dmate_android_app=is_dmate_android_app,
         is_dmate_desktop_app=is_dmate_desktop_app,
         android_apk_url=ANDROID_APK_URL,
@@ -2077,12 +1991,6 @@ def home():
     ))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     return response
-
-
-@app.route("/pwa/")
-def pwa_home():
-    """Dedicated installed-PWA launch URL; keep the public website root outside its scope."""
-    return home()
 
 
 

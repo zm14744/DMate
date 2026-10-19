@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
-"""Regressions: no theme-adaptive favicon, no bitmap-upscaled PWA/ICO/ICNS."""
-import json
+"""Regressions: stable favicons and vector-rendered website/desktop icons."""
 import struct
 import io
-import ast
-import os
-import re
-from types import SimpleNamespace
 from pathlib import Path
 from PIL import Image, ImageChops
 from generate_icons import draw_mark, STROKE, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK
@@ -48,39 +43,12 @@ def check_ico(path, sizes):
 
 
 def main():
-    with Image.open(MASTER) as master:
-        assert master.size == (192, 192)
-        for filename in ("icon-192.png", "icon-192-app-v20.png"):
-            assert (ICONS / filename).read_bytes() == MASTER.read_bytes()
-
-    for filename in ("icon-512.png", "icon-512-app-v20.png"):
-        matches_vector(ICONS / filename, 512)
+        matches_vector(ICONS / "icon-512.png", 512)
 
     for browser, factor in (("edge", 0.95), ("fennec", 1.16)):
-        for size in (32, 192, 512):
+        for size in (32, 192):
             matches_vector(ICONS / f"android-{browser}-{size}-v21.png",
                            size, figure_scale=factor)
-
-    # Android-only PWA maskable artwork must be black edge-to-edge, with
-    # the white geometry inside the centered 80% safe circle. Prevent the
-    # missing-maskable regression that caused white launcher frames.
-    for size in (192, 512):
-        maskable = ICONS / f"android-pwa-maskable-{size}-v24.png"
-        matches_vector(maskable, size, figure_scale=0.82)
-        pixels = rgba(maskable)
-        for xy in ((0, 0), (size - 1, 0), (0, size - 1),
-                   (size - 1, size - 1), (size // 2, 0)):
-            assert pixels.getpixel(xy) == (0, 0, 0, 255), (
-                f"{maskable}: Android launcher background cannot be white/transparent"
-            )
-        # No visible linework may escape the 80%-diameter centered circle.
-        for x in range(size):
-            for y in range(size):
-                red, green, blue, _ = pixels.getpixel((x, y))
-                if max(red, green, blue) > 48:
-                    assert (x - (size - 1) / 2) ** 2 + (y - (size - 1) / 2) ** 2 <= (size * 0.4) ** 2, (
-                        f"{maskable}: foreground outside adaptive safe zone"
-                    )
 
     for size, filename in (
         (180, "apple-touch-icon.png"),
@@ -155,72 +123,15 @@ def main():
     check_ico(ICONS / "favicon.ico", (16, 32, 48, 64, 128))
     check_ico(ICONS / "windows-shortcut-black-v20.ico", (16, 24, 32, 48, 64, 128, 256))
     check_ico(DESKTOP / "icon.ico", (16, 24, 32, 48, 64, 128, 256))
+    for obsolete in (
+        "icon-192.png", "icon-192-app-v20.png", "icon-512-app-v20.png",
+        "android-pwa-maskable-192-v24.png", "android-pwa-maskable-512-v24.png",
+        "android-edge-512-v21.png", "android-fennec-512-v21.png",
+    ):
+        assert not (ICONS / obsolete).exists(), f"Obsolete web-PWA asset remains: {obsolete}"
     raw_icns = (DESKTOP / "icon.icns").read_bytes()
     assert raw_icns.startswith(b"icns")
     assert struct.unpack_from(">I", raw_icns, 4)[0] == len(raw_icns)
-
-    for manifest_file in ("manifest.webmanifest", "manifest-mobile.webmanifest"):
-        manifest = json.loads((ROOT / "static" / manifest_file).read_text(encoding="utf-8"))
-        assert manifest["start_url"] == "/pwa/"
-        assert len(manifest["icons"]) == 2
-        for record in manifest["icons"]:
-            assert record["purpose"] == "any"
-            assert (ROOT / record["src"].split("?")[0].lstrip("/")).is_file()
-    assert json.loads((ROOT / "static/manifest.webmanifest").read_text())["scope"] == "/pwa/"
-    assert json.loads((ROOT / "static/manifest-mobile.webmanifest").read_text())["scope"] == "/"
-
-    # Execute ONLY the Flask manifest helper in isolation, without importing
-    # the app's models/database. Verify the same desktop manifests still return
-    # EXACTLY the two existing icons; mobile Android gets two extra maskables.
-    app_source = ast.parse((ROOT / "app.py").read_text(encoding="utf-8"))
-    helper = next(node for node in app_source.body
-                  if isinstance(node, ast.FunctionDef)
-                  and node.name == "_serve_dmate_manifest")
-    module = ast.Module(body=[helper], type_ignores=[])
-    class FakeResponse:
-        def __init__(self, body):
-            self.body = body
-            self.headers = {}
-
-    def served_manifest(user_agent, file):
-        context = {
-            "os": os, "re": re, "json": json,
-            "app": SimpleNamespace(static_folder=str(ROOT / "static")),
-            "request": SimpleNamespace(headers={"User-Agent": user_agent}),
-            "make_response": FakeResponse
-        }
-        exec(compile(module, "isolated_manifest_helper", "exec"), context)
-        result = context["_serve_dmate_manifest"](file)
-        assert result.headers.get("Vary") == "User-Agent"
-        return json.loads(result.body)
-
-    desktop = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 Chrome/130.0 Edg/130.0"
-    )
-    mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0) Safari/605.1.15"
-    android = "Mozilla/5.0 (Linux; Android 14) Chrome/130.0"
-    fennec = "Mozilla/5.0 (Android 14; Mobile) Gecko/130.0 Fennec/130.0"
-    edge = "Mozilla/5.0 (Linux; Android 14) Chrome/130.0 EdgA/130.0"
-    for filename in ("manifest.webmanifest", "manifest-mobile.webmanifest"):
-        unchanged = json.loads((ROOT / "static" / filename).read_text(encoding="utf-8"))
-        for agent in (desktop, mac):
-            assert served_manifest(agent, filename) == unchanged, (
-                f"Non-mobile manifest changed: {filename}"
-            )
-        for agent in (android, fennec, edge):
-            mobile = served_manifest(agent, filename)
-            assert len(mobile["icons"]) == 4, (agent, filename)
-            maskables = [icon for icon in mobile["icons"]
-                         if icon["purpose"] == "maskable"]
-            assert {icon["sizes"] for icon in maskables} == {
-                "192x192", "512x512"
-            }, (agent, maskables)
-            for icon in maskables:
-                path = ROOT / icon["src"].split("?")[0].lstrip("/")
-                assert path.exists(), path
-        native_app = served_manifest(android + " DMateAndroid/1.0", filename)
-        assert native_app == unchanged, "Native Android APK should not receive PWA icon overrides"
 
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
     # Search bots get the same root-level branded favicon irrespective of their UA platform.
@@ -248,7 +159,7 @@ def main():
     assert 'dmate-safari-" + theme' not in html
     assert '<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">' in html
     assert "dmate-win-tab-v21" in html
-    print("PASS stable branded Safari/Bing favicon, root Apple icon, Android/Windows/PWA")
+    print("PASS stable branded Safari/Bing favicon, iOS WebClip icon, Android/Windows/desktop icons")
 
 
 if __name__ == "__main__":

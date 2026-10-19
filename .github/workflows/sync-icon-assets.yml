@@ -6,12 +6,9 @@ on:
     paths:
       - "scripts/generate_icons.py"
       - "scripts/check_icon_assets.py"
-      - "static/manifest.webmanifest"
-      - "static/manifest-mobile.webmanifest"
       - "templates/index.html"
       - "app.py"
       - "static/script.js"
-      - "scripts/test_pwa_install_support.cjs"
       - "scripts/test_install_dialog.cjs"
       - "scripts/test_ios_webclip.py"
       - ".github/workflows/sync-icon-assets.yml"
@@ -29,8 +26,6 @@ jobs:
           python scripts/check_icon_assets.py
       - name: Verify iOS and iPadOS Web Clip profile
         run: python scripts/test_ios_webclip.py
-      - name: Test PWA install gating
-        run: node scripts/test_pwa_install_support.cjs
       - name: Test download dialog links
         run: |
           node --check static/script.js
@@ -39,11 +34,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f static/icons/*.png static/icons/*.ico static/icons/*.svg
-          git add -f desktop/src-tauri/icons/*.png desktop/src-tauri/icons/*.ico desktop/src-tauri/icons/*.icns
+          git add -A -f -- static/icons desktop/src-tauri/icons
           if git diff --cached --quiet; then
             echo "Canonical icons unchanged"
           else
-            git commit -m "Sync generated DMate app and PWA icons"
+            git commit -m "Sync generated DMate icons"
             git push origin HEAD:main
           fi

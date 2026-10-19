@@ -22,47 +22,10 @@
 <meta name="description" content="DMate 是面向大学生的离散数学 AI 智能辅学系统，支持题目图片识别、图论与离散数学解答、智能出题、错题管理、针对性复测、知识图谱和学习进度跨设备同步。无需安装即可在线学习，也提供 Windows、macOS、Linux 和 Android 客户端。">
 <meta name="msvalidate.01" content="8032784D58887350AB61D823FFE7933B" />
 <meta name="baidu-site-verification" content="codeva-486FjOU4sO" />
-{% if is_ios %}<meta name="mobile-web-app-capable" content="yes">{% endif %}
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_dmate_android_app and not is_dmate_desktop_app %}
-{% if is_android_install_compat_browser %}
-<!-- QQ/Quark/UC/Baidu need the visited / page to be in manifest scope. -->
-<link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-maskable-v24-20261019">
-<meta name="mobile-web-app-capable" content="yes">
-{% else %}
-<link rel="manifest" href="/manifest.webmanifest?v={% if is_android_browser %}dmate-mobile-maskable-v24-20261019{% else %}dmate-pwa-v22-20261019{% endif %}">
-{% endif %}
-<script>
-/* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
-   这里只保存事件，不自动调用 prompt；只有用户点击自定义弹窗按钮时才会触发。 */
-(function () {
-    const ua = navigator.userAgent || "";
-    // Do not steal native install / add-to-desktop handling from browsers
-    // where the browser itself owns that menu entry.
-    window.__dmatePreferBrowserInstallMenu = /Android/i.test(ua) &&
-        /QQBrowser|MQQBrowser|Quark|UCBrowser|UCWEB|BaiduBrowser|baiduboxapp|MiuiBrowser|HuaweiBrowser|HeyTapBrowser|OPPOBrowser|VivoBrowser|HonorBrowser/i.test(ua);
-    if (window.__dmatePreferBrowserInstallMenu) return;
-    if (window.__dmateBeforeInstallPromptGuardInstalled) return;
-    window.__dmateBeforeInstallPromptGuardInstalled = true;
-    window.__dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt || null;
-    window.addEventListener("beforeinstallprompt", function (event) {
-        event.preventDefault();
-        window.__dmatePendingInstallPrompt = event;
-        const modal = document.getElementById("installHelpModal");
-        const button = document.getElementById("installHelpNativeButton");
-        if (modal && button && !modal.classList.contains("hidden")) {
-            button.hidden = false;
-            button.disabled = false;
-            button.textContent = "安装 PWA";
-        }
-    });
-    window.addEventListener("appinstalled", function () {
-        window.__dmatePendingInstallPrompt = null;
-    });
-})();
-</script>{% endif %}
+
 {% if is_search_crawler %}
 <!-- Bing and other search crawlers always receive the same stable, opaque DMate brand icon. -->
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -76,7 +39,7 @@
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-32-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-32-v17.png{% endif %}">
 <link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/{% if is_android_edge %}android-edge-192-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-192-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-192-v17.png{% endif %}">
 {% elif is_windows_browser %}
-<!-- Browser TAB is transparent white THIN linework. PWA/Start tiles use manifest. -->
+<!-- Browser tab uses transparent white thin linework; application icons are separate. -->
 <link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-transparent.svg?v=dmate-win-tab-v21-20261019">
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-win-tab-v21-20261019">
 <link rel="shortcut icon" type="image/x-icon" href="/static/icons/favicon.ico?v=dmate-win-tab-v21-20261019">
@@ -4258,7 +4221,7 @@ body[data-appearance-theme="light"] .kg-node-badge,
     height:100%;
 }
 
-/* 左侧底部三个入口统一留出 8px 间距，PWA 安装按钮显示时不会与相邻按钮贴合。 */
+/* 左侧底部三个入口统一留出 8px 间距，避免按钮彼此贴合。 */
 .install-entry,
 .account-entry,
 .appearance-entry {
@@ -6021,7 +5984,7 @@ body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
 
 
 
-/* DMate 品牌与 PWA 安装入口 */
+/* DMate 品牌与安装入口 */
 .dmate-brand {
     display:flex;
     align-items:center;
@@ -6274,7 +6237,7 @@ body[data-appearance-theme="navy"] {
 
 
 /* =========================================================
-   DMate v6.5：跨平台 PWA + GPT 式黑色主题修整
+   DMate v6.5：跨平台客户端 + GPT 式黑色主题修整
    - 不再使用 Window Controls Overlay，避免 Windows/macOS/Linux 标题栏遮住页面。
    - 黑色主题保留左右侧栏与中央工作区的深浅层级。
    - 左下安装 / 登录 / 外观恢复清晰按钮外形。
@@ -6520,24 +6483,6 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
         display:flex;
     }
 }
-
-/* installed standalone app uses native titlebar/safe-area; page itself never draws under desktop window controls. */
-@media (display-mode: standalone) {
-    html, body, .layout {
-        max-width:100%;
-    }
-}
-
-/* 兼容仍缓存旧 manifest 的桌面安装版：如果浏览器暂时还以
-   window-controls-overlay 启动，至少先给系统按钮留出真实标题栏高度。 */
-@media (display-mode: window-controls-overlay) and (min-width:1101px) {
-    .layout {
-        height:100vh;
-        padding-top:env(titlebar-area-height, 0px);
-    }
-}
-
-
 
 /* =========================================================
    DMate v6.6：移动端输入框边界统一 + 更深黑色主题 + 移动端安装入口
@@ -8162,7 +8107,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
     <button class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
-    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app %} hidden{% endif %}>{% if is_android %}安装 DMate（PWA / APK）{% elif is_ios %}安装 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
+    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app %} hidden{% endif %}>{% if is_android %}下载 DMate{% elif is_ios %}安装 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
     <button id="accountBtn" class="btn account-entry" type="button"><span class="account-entry-dot" aria-hidden="true"></span><span id="accountEntryLabel">登录 / 注册</span></button>
     <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor"/></svg></span><span>外观</span></button>
 </div>
@@ -8813,7 +8758,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-install-dialog-simple-v33-20261019"></script>
+<script src="/static/script.js?v=dmate-package-only-v34-20261019"></script>
 
 </body>
 </html>

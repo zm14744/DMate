@@ -148,28 +148,15 @@ def main():
     with Image.open(MASTER) as original:
         assert original.size == (192, 192), "Original Android installed icon changed"
 
-    # Keep the native 192px pixels exactly. All OTHER sizes are newly rendered
-    # from the original geometric coordinates; no enlargement of that PNG.
-    for name in ("icon-192.png", "icon-192-app-v20.png"):
-        shutil.copyfile(MASTER, STATIC / name)
-    for name in ("icon-512.png", "icon-512-app-v20.png"):
-        save_png(draw_mark(512), STATIC / name)
+    # Social preview: render directly from vector geometry, not an enlarged bitmap.
+    save_png(draw_mark(512), STATIC / "icon-512.png")
 
     # Direct path rendering: compensate for browsers' own app-icon crop/inset.
     # Line thickness stays fixed while the geometry size is adjusted.
     for browser, geometry_scale in (("edge", 0.95), ("fennec", 1.16)):
-        for size in (32, 192, 512):
+        for size in (32, 192):
             save_png(draw_mark(size, figure_scale=geometry_scale),
                      STATIC / f"android-{browser}-{size}-v21.png")
-
-    # Android PWA adaptive launcher icon: solid black fills the ENTIRE tile.
-    # Only the white geometry is inset inside the maskable 80%-diameter
-    # safe circle. Android applies the final launcher squircle/round mask.
-    # Never put a rounded black SQUARE inside a padded white tile.
-    # Generate each resolution from VECTOR PATHS at its real native size.
-    for size in (192, 512):
-        save_png(draw_mark(size, background=BLACK, figure_scale=0.82, rounded=False),
-                 STATIC / f"android-pwa-maskable-{size}-v24.png")
 
     for size, name in ((32, "mobile-favicon-32-v17.png"),
                        (192, "mobile-favicon-192-v17.png")):
@@ -238,7 +225,7 @@ def main():
                  64: 1.08, 128: 1.06, 256: 1.04,
              })
 
-    # Apple's Home Screen app and the cross-platform PWA use the same artwork.
+    # Apple WebClip uses a dedicated Home Screen icon.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
     for size, name in (
         (128, "windows-shortcut-128-v20.png"),
@@ -261,7 +248,7 @@ def main():
     save_ico(STATIC / "favicon-app.ico", icon_sizes)
     save_icns(TAURI / "icon.icns")
 
-    # Transparent WHITE linework for non-Safari website tabs, never for PWAs.
+    # Transparent white linework for browser tabs; application icons are generated separately.
     for size in (16, 32, 48, 128):
         save_png(draw_mark(size, background=None, stroke_units=TAB_STROKE),
                  STATIC / f"favicon-{size}.png")
@@ -271,7 +258,7 @@ def main():
     print(json.dumps({"status": "vector-only generation",
                       "mac_favicon": "light black tile/white lines; dark transparent white lines (PNG + ICO)",
                       "formats": ["SVG", "PNG", "ICO", "ICNS"],
-                      "platforms": ["PWA", "Android browser", "Windows", "macOS", "Linux"]},
+                      "platforms": ["iOS WebClip", "Android browser", "Windows", "macOS", "Linux"]},
                      ensure_ascii=False, indent=2))
 
 

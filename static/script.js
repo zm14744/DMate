@@ -19470,29 +19470,6 @@ function detectDmateInstallPlatform() {
     return "other";
 }
 
-function detectDmateBrowserName() {
-    const ua = navigator.userAgent || "";
-    if (/baiduboxapp|baidubrowser/i.test(ua)) return "百度浏览器";
-    if (/quark/i.test(ua)) return "夸克浏览器";
-    if (/ucbrowser|ucweb/i.test(ua)) return "UC 浏览器";
-    if (/qqbrowser/i.test(ua)) return "QQ 浏览器";
-    if (/micromessenger/i.test(ua)) return "微信内置浏览器";
-    if (/alipayclient/i.test(ua)) return "支付宝内置浏览器";
-    if (/miuibrowser/i.test(ua)) return "小米浏览器";
-    if (/huaweibrowser/i.test(ua)) return "华为浏览器";
-    if (/heytapbrowser|oppobrowser/i.test(ua)) return "OPPO 浏览器";
-    if (/vivobrowser/i.test(ua)) return "vivo 浏览器";
-    if (/honorbrowser/i.test(ua)) return "荣耀浏览器";
-    if (/samsungbrowser/i.test(ua)) return "三星浏览器";
-    if (/edgios|edga|edg\//i.test(ua)) return "Microsoft Edge";
-    if (/fxios|firefox|fennec/i.test(ua)) return "Firefox";
-    if (/crios|chrome/i.test(ua)) return "Chrome";
-    if (/safari/i.test(ua)) return "Safari";
-    return /Android/i.test(ua) ? "手机浏览器" : "当前浏览器";
-}
-
-let dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt || null;
-
 function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
@@ -19600,109 +19577,15 @@ function installGuideForCurrentPlatform() {
         ]
     };
 }
-function dmatePwaSiteAndBrowserSupport() {
-    // Manual instructions are ONLY for recognized browsers with an install /
-    // add-to-home menu. No standard Web API can inspect that native menu.
-    // Unknown, embedded and unsupported browsers must not get a PWA button.
-    const config = dmateClientConfig();
-    if (config.isAndroidApp || config.isDesktopApp || !window.isSecureContext) return null;
-    if (window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true) return null;
-    if (!document.querySelector('link[rel="manifest"]')) return null;
-    const ua = navigator.userAgent || "";
-    // In-app browsers / Android WebView may contain "Chrome" in their UA but
-    // do not necessarily provide a browser-owned installation menu.
-    if (/MicroMessenger|AlipayClient|FBAN|FBAV|Instagram|TikTok|Bytedance|DingTalk|Weibo|\bwv\b/i.test(ua)) return null;
-
-    const platform = detectDmateInstallPlatform();
-    const browser = detectDmateBrowserName();
-    const steps = [];
-
-    if (platform === "android") {
-        const nativeMenuSteps = {
-            "Firefox":"菜单 → 安装或添加到主屏幕。",
-            "Microsoft Edge":"菜单 → 安装应用或添加到主屏幕。",
-            "Chrome":"菜单 → 安装应用或添加到主屏幕。",
-            "三星浏览器":"菜单 → 安装应用或添加到主屏幕。",
-            "百度浏览器":"菜单 → 添加到桌面。",
-            "夸克浏览器":"工具箱或分享菜单 → 添加到桌面。",
-            "UC 浏览器":"工具箱 → 添加到桌面。",
-            "QQ 浏览器":"工具箱或分享菜单 → 添加到桌面。",
-            "小米浏览器":"菜单 → 添加到桌面。",
-            "华为浏览器":"菜单 → 添加到桌面。",
-            "OPPO 浏览器":"菜单 → 添加到桌面。",
-            "vivo 浏览器":"菜单 → 添加到桌面。",
-            "荣耀浏览器":"菜单 → 添加到桌面。"
-        };
-        const instruction = nativeMenuSteps[browser];
-        if (!instruction) return null;
-        // Chromium-based PWA install flow needs PWA APIs; Firefox and some
-        // domestic browsers can still create ordinary desktop shortcuts.
-        if (["Chrome", "Microsoft Edge", "三星浏览器"].includes(browser) &&
-            !("serviceWorker" in navigator)) return null;
-        steps.push(instruction);
-        return {platform, browser, text:"从浏览器菜单安装或添加到桌面。", steps};
-    }
-
-    if (platform === "ios") {
-        const ios = /OS (\d+)_(\d+)/i.exec(ua);
-        const modernIOS = ios && (Number(ios[1]) > 16 || (Number(ios[1]) === 16 && Number(ios[2]) >= 4));
-        if (browser !== "Safari" &&
-            !(modernIOS && ["Chrome", "Microsoft Edge", "Firefox"].includes(browser))) return null;
-        steps.push("分享 → 添加到主屏幕。");
-        return {platform, browser, text:"通过分享菜单添加到主屏幕。", steps};
-    }
-
-    if (platform === "macos") {
-        if (browser === "Safari") {
-            const version = /Version\/(\d+)/i.exec(ua);
-            if (!version || Number(version[1]) < 17) return null;
-            steps.push("Safari 菜单：文件 → 添加到程序坞。");
-        } else if (["Chrome", "Microsoft Edge"].includes(browser) && "serviceWorker" in navigator) {
-            steps.push("菜单 → 安装 DMate。");
-        } else {
-            return null;
-        }
-        return {platform, browser, text:"从浏览器菜单安装 DMate。", steps};
-    }
-
-    if (platform === "windows" || platform === "linux") {
-        if (!["Chrome", "Microsoft Edge"].includes(browser) || !("serviceWorker" in navigator)) return null;
-        steps.push("菜单 → 安装 DMate。");
-        return {platform, browser, text:"从浏览器菜单安装 DMate。", steps};
-    }
-
-    return null;
-}
-
-let dmateCurrentInstallGuide = null;
-let dmateCurrentPwaGuide = null;
-let dmatePwaInstructionsVisible = false;
-
 function openDmateInstallHelp() {
     const modal = document.getElementById("installHelpModal");
     const platformEl = document.getElementById("installHelpPlatform");
     const textEl = document.getElementById("installHelpText");
     const stepsEl = document.getElementById("installHelpSteps");
     const actionsEl = document.getElementById("installHelpActions");
-    const nativeButton = document.getElementById("installHelpNativeButton");
-    const noteEl = document.getElementById("installHelpNote");
     if (!modal || !platformEl || !textEl || !stepsEl || !actionsEl) return;
 
-    // 兼容 beforeinstallprompt 早于主脚本初始化的情况。
-    if (!dmatePendingInstallPrompt && window.__dmatePendingInstallPrompt) {
-        dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt;
-    }
     const guide = installGuideForCurrentPlatform();
-    dmateCurrentInstallGuide = guide;
-    dmateCurrentPwaGuide = dmatePwaSiteAndBrowserSupport();
-    dmatePwaInstructionsVisible = false;
-
-    const canOfferPwa = Boolean(dmatePendingInstallPrompt || dmateCurrentPwaGuide);
-    if (noteEl) noteEl.hidden = !canOfferPwa;
-    if (nativeButton) {
-        nativeButton.hidden = !canOfferPwa;
-        nativeButton.textContent = dmatePendingInstallPrompt ? "安装 PWA" : "安装说明";
-    }
     platformEl.textContent = guide.platform;
     textEl.textContent = guide.text;
     stepsEl.replaceChildren(...guide.steps.map(step => {
@@ -19725,71 +19608,6 @@ function openDmateInstallHelp() {
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
 }
-
-document.getElementById("installHelpNativeButton")?.addEventListener("click", async () => {
-    const nativeButton = document.getElementById("installHelpNativeButton");
-    const modal = document.getElementById("installHelpModal");
-    const platformEl = document.getElementById("installHelpPlatform");
-    const textEl = document.getElementById("installHelpText");
-    const stepsEl = document.getElementById("installHelpSteps");
-    if (!dmatePendingInstallPrompt && window.__dmatePendingInstallPrompt) {
-        dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt;
-    }
-    if (dmatePendingInstallPrompt) {
-        const promptEvent = dmatePendingInstallPrompt;
-        dmatePendingInstallPrompt = null;
-        window.__dmatePendingInstallPrompt = null;
-        if (nativeButton) {
-            nativeButton.disabled = true;
-            nativeButton.textContent = "请确认安装…";
-        }
-        try {
-            await promptEvent.prompt();
-            const choice = await promptEvent.userChoice.catch(() => null);
-            if (choice && choice.outcome === "accepted") {
-                const mainButton = document.getElementById("installAppBtn");
-                if (mainButton) mainButton.textContent = "已安装";
-                closeDmateInstallHelp();
-                return;
-            }
-        } finally {
-            if (nativeButton) nativeButton.disabled = false;
-        }
-        dmateCurrentPwaGuide = dmatePwaSiteAndBrowserSupport();
-        if (nativeButton) {
-            nativeButton.hidden = !dmateCurrentPwaGuide;
-            nativeButton.textContent = "安装说明";
-        }
-        return;
-    }
-    if (!dmateCurrentPwaGuide || !stepsEl || !textEl) return;
-
-    if (dmatePwaInstructionsVisible) {
-        const guide = dmateCurrentInstallGuide || installGuideForCurrentPlatform();
-        if (platformEl) platformEl.textContent = guide.platform;
-        textEl.textContent = guide.text;
-        stepsEl.replaceChildren(...guide.steps.map(step => {
-            const li = document.createElement("li");
-            li.textContent = step;
-            return li;
-        }));
-        stepsEl.hidden = guide.steps.length === 0;
-        dmatePwaInstructionsVisible = false;
-        if (nativeButton) nativeButton.textContent = "安装说明";
-        return;
-    }
-
-    if (platformEl) platformEl.textContent = dmateCurrentPwaGuide.platform + " · PWA";
-    textEl.textContent = dmateCurrentPwaGuide.text;
-    stepsEl.replaceChildren(...dmateCurrentPwaGuide.steps.map(step => {
-        const li = document.createElement("li");
-        li.textContent = step;
-        return li;
-    }));
-    stepsEl.hidden = dmateCurrentPwaGuide.steps.length === 0;
-    dmatePwaInstructionsVisible = true;
-    if (nativeButton) nativeButton.textContent = "返回下载";
-});
 
 function closeDmateInstallHelp() {
     const modal = document.getElementById("installHelpModal");
@@ -19814,32 +19632,10 @@ function initDmateInstall() {
     const platform = detectDmateInstallPlatform();
     button.hidden = false;
     button.setAttribute("aria-hidden", "false");
-    if (platform === "android") button.textContent = "安装 DMate";
+    if (platform === "android") button.textContent = "下载 DMate";
     else if (platform === "ios") button.textContent = "安装 DMate";
     else button.textContent = "下载 DMate 桌面版";
 
-    // 不自动弹出浏览器安装框：只拦截原生提示，留到自定义弹窗内由用户点击“安装 PWA”时触发。
-    window.addEventListener("beforeinstallprompt", event => {
-        // QQ/Quark and similar browsers must retain their own PWA install menu.
-        // preventDefault() here may suppress the browser's menu/install UI.
-        if (window.__dmatePreferBrowserInstallMenu) return;
-        event.preventDefault();
-        dmatePendingInstallPrompt = event;
-        window.__dmatePendingInstallPrompt = event;
-        const nativeButton = document.getElementById("installHelpNativeButton");
-        if (nativeButton && !document.getElementById("installHelpModal")?.classList.contains("hidden")) {
-            nativeButton.hidden = false;
-            nativeButton.disabled = false;
-            nativeButton.textContent = "安装 PWA";
-        }
-    });
-    window.addEventListener("appinstalled", () => {
-        dmatePendingInstallPrompt = null;
-        window.__dmatePendingInstallPrompt = null;
-        button.textContent = "DMate 已安装";
-        const nativeButton = document.getElementById("installHelpNativeButton");
-        if (nativeButton) nativeButton.hidden = true;
-    });
     button.addEventListener("click", openDmateInstallHelp);
 
     close?.addEventListener("click", closeDmateInstallHelp);
@@ -19850,35 +19646,6 @@ function initDmateInstall() {
         if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) closeDmateInstallHelp();
     });
 
-    // 浏览器版允许 Android / macOS / Windows 的 PWA 安装入口正常工作。
-    // 已安装的 Android WebView 和桌面壳不显示安装入口，也不管理网页 PWA。
-    if (config.isAndroidApp || config.isDesktopApp) {
-        window.addEventListener("beforeinstallprompt", event => event.preventDefault());
-    }
-}
-
-function registerDmateServiceWorker() {
-    if (!("serviceWorker" in navigator)) return;
-    const config = dmateClientConfig();
-
-    // 普通浏览器（包含微软商店 PWABuilder 检测的 Chromium）注册 SW。
-    // 现有 Android APK 和 Tauri 桌面壳仍保持原有行为，不启用网页 PWA 管理。
-    if (config.isAndroidApp || config.isDesktopApp) {
-        navigator.serviceWorker.getRegistrations?.()
-            .then(registrations => Promise.all(registrations.map(reg => reg.unregister())))
-            .catch(() => {});
-        return;
-    }
-
-    const register = () => {
-        navigator.serviceWorker.register("/service-worker.js", { scope:"/" })
-            .catch(error => console.warn("DMate Web App 注册失败：", error));
-    };
-    if (document.readyState === "complete") {
-        register();
-    } else {
-        window.addEventListener("load", register, { once:true });
-    }
 }
 
 // -----------------------------
@@ -19890,7 +19657,6 @@ document.addEventListener(
         removeDeprecatedCopyControls();
         initAppearanceSystem();
         initDmateInstall();
-        registerDmateServiceWorker();
         installRichSelectionCopy();
         initMobileAppShell();
         installMobileVisualViewportFix();
