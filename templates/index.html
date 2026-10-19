@@ -23,7 +23,7 @@
 <meta name="msvalidate.01" content="8032784D58887350AB61D823FFE7933B" />
 <meta name="baidu-site-verification" content="codeva-486FjOU4sO" />
 <script>
-/* 清理旧版网页应用残留；不注册新的 Service Worker。 */
+/* 仅清理历史版本遗留的 Service Worker 与缓存；不注册新的 Worker。 */
 (function () {
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
         navigator.serviceWorker.getRegistrations().then(function (registrations) {
@@ -6417,7 +6417,7 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
     background:#383838 !important;
 }
 
-/* 跨平台安装说明：桌面为居中卡片，手机/iOS 为底部卡片。 */
+/* 跨平台下载弹窗：桌面居中，手机底部弹出。 */
 .install-help-card {
     width:min(520px, calc(100vw - 32px));
     max-height:min(680px, calc(100dvh - 48px));
@@ -6435,11 +6435,6 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
 .install-help-text {
     color:var(--text-secondary);
     line-height:1.65;
-}
-.install-help-steps {
-    margin:14px 0 0;
-    padding-left:1.45em;
-    line-height:1.75;
 }
 .install-help-actions {
     display:flex;
@@ -6465,23 +6460,6 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
     color:inherit;
     border:1px solid rgba(148,163,184,.28);
 }
-
-.install-help-note {
-    margin-top:16px;
-    padding:11px 12px;
-    border-radius:10px;
-    background:var(--surface-3);
-    color:var(--text-secondary);
-    font-size:var(--font-sm);
-    line-height:1.55;
-}
-
-.install-help-native-button {
-    width:100%; margin:14px 0 0; padding:12px 16px; border:0; border-radius:12px;
-    background:#2563eb; color:#fff; font:inherit; font-weight:650; cursor:pointer;
-}
-.install-help-native-button[hidden] { display:none !important; }
-.install-help-native-button:disabled { opacity:.7; cursor:wait; }
 
 @media (max-width:760px) {
     #installHelpModal {
@@ -8078,8 +8056,6 @@ window.MathJax = {
 <body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
 <script>
 window.DMATE_CLIENT_CONFIG = {{ {
-    "isAndroid": is_android,
-    "isIos": is_ios,
     "isAndroidApp": is_dmate_android_app,
     "isDesktopApp": is_dmate_desktop_app,
     "androidApkUrl": android_apk_url,
@@ -8127,7 +8103,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
     <button class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
-    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app or is_ios %} hidden{% endif %}>{% if is_android %}下载 DMate{% elif is_ios %}安装 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
+    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app or is_ios %} hidden{% endif %}>{% if is_android %}下载 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
     <button id="accountBtn" class="btn account-entry" type="button"><span class="account-entry-dot" aria-hidden="true"></span><span id="accountEntryLabel">登录 / 注册</span></button>
     <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor"/></svg></span><span>外观</span></button>
 </div>
@@ -8334,7 +8310,6 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <div class="install-help-body">
             <div id="installHelpPlatform" class="install-help-platform"></div>
             <div id="installHelpText" class="install-help-text"></div>
-            <ol id="installHelpSteps" class="install-help-steps"></ol>
             <div id="installHelpActions" class="install-help-actions" hidden></div>
         </div>
     </div>
@@ -8778,7 +8753,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-package-only-v35-20261020"></script>
+<script src="/static/script.js?v=dmate-package-only-v36-20261020"></script>
 
 </body>
 </html>
