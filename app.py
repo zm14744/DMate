@@ -1898,7 +1898,7 @@ def _serve_dmate_manifest(filename):
                 "sizes": "512x512", "type": "image/png", "purpose": "maskable"
             }
         ]
-        response = make_response(json.dumps(manifest, ensure_ascii=False))
+    response = make_response(json.dumps(manifest, ensure_ascii=False))
     response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Vary"] = "User-Agent"
