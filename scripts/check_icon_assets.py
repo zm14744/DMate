@@ -2,6 +2,10 @@
 """Regressions: no theme-adaptive favicon, no bitmap-upscaled PWA/ICO/ICNS."""
 import json
 import struct
+import ast
+import os
+import re
+from types import SimpleNamespace
 from pathlib import Path
 from PIL import Image, ImageChops
 from generate_icons import draw_mark, TAB_STROKE
@@ -117,6 +121,59 @@ def main():
             assert (ROOT / record["src"].split("?")[0].lstrip("/")).is_file()
     assert json.loads((ROOT / "static/manifest.webmanifest").read_text())["scope"] == "/pwa/"
     assert json.loads((ROOT / "static/manifest-mobile.webmanifest").read_text())["scope"] == "/"
+
+    # Execute ONLY the Flask manifest helper in isolation, without importing
+    # the app's models/database. Verify the same desktop manifests still return
+    # EXACTLY the two existing icons; mobile Android gets two extra maskables.
+    app_source = ast.parse((ROOT / "app.py").read_text(encoding="utf-8"))
+    helper = next(node for node in app_source.body
+                  if isinstance(node, ast.FunctionDef)
+                  and node.name == "_serve_dmate_manifest")
+    module = ast.Module(body=[helper], type_ignores=[])
+    class FakeResponse:
+        def __init__(self, body):
+            self.body = body
+            self.headers = {}
+
+    def served_manifest(user_agent, file):
+        context = {
+            "os": os, "re": re, "json": json,
+            "app": SimpleNamespace(static_folder=str(ROOT / "static")),
+            "request": SimpleNamespace(headers={"User-Agent": user_agent}),
+            "make_response": FakeResponse
+        }
+        exec(compile(module, "isolated_manifest_helper", "exec"), context)
+        result = context["_serve_dmate_manifest"](file)
+        assert result.headers.get("Vary") == "User-Agent"
+        return json.loads(result.body)
+
+    desktop = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 Chrome/130.0 Edg/130.0"
+    )
+    mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0) Safari/605.1.15"
+    android = "Mozilla/5.0 (Linux; Android 14) Chrome/130.0"
+    fennec = "Mozilla/5.0 (Android 14; Mobile) Gecko/130.0 Fennec/130.0"
+    edge = "Mozilla/5.0 (Linux; Android 14) Chrome/130.0 EdgA/130.0"
+    for filename in ("manifest.webmanifest", "manifest-mobile.webmanifest"):
+        unchanged = json.loads((ROOT / "static" / filename).read_text(encoding="utf-8"))
+        for agent in (desktop, mac):
+            assert served_manifest(agent, filename) == unchanged, (
+                f"Non-mobile manifest changed: {filename}"
+            )
+        for agent in (android, fennec, edge):
+            mobile = served_manifest(agent, filename)
+            assert len(mobile["icons"]) == 4, (agent, filename)
+            maskables = [icon for icon in mobile["icons"]
+                         if icon["purpose"] == "maskable"]
+            assert {icon["sizes"] for icon in maskables} == {
+                "192x192", "512x512"
+            }, (agent, maskables)
+            for icon in maskables:
+                path = ROOT / icon["src"].split("?")[0].lstrip("/")
+                assert path.exists(), path
+        native_app = served_manifest(android + " DMateAndroid/1.0", filename)
+        assert native_app == unchanged, "Native Android APK should not receive PWA icon overrides"
 
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
     assert "dmate-favicon-mac.svg?v=dmate-fixed-v22" in html
