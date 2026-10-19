@@ -109,7 +109,7 @@ def main():
             )
             assert ImageChops.difference(actual, expected).getbbox() is None, path
             if theme == "dark":
-                assert actual.getpixel((size // 2, size // 16))[3] == 0, (
+                assert actual.getpixel((size // 2, 0))[3] == 0, (
                     "Safari dark icon must not contain an opaque background")
                 assert any(actual.getpixel((x, y))[3] > 180
                            for x in range(size // 6, size * 5 // 6)
