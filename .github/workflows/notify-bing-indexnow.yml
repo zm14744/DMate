@@ -13,34 +13,24 @@ permissions:
 
 jobs:
   notify-bing:
-    name: Notify Bing once site has deployed IndexNow key
+    name: Send DMate homepage update to Bing
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    timeout-minutes: 3
     steps:
-      - name: Wait for publicly accessible verification file
+      - name: Check public IndexNow key availability
         shell: bash
         run: |
           set -euo pipefail
           KEY="ba35d6e4c10db2df19bf4c02f7d99646"
           KEY_URL="https://dmate.zeabur.app/static/${KEY}.txt"
-          echo "Waiting for Zeabur deployment: ${KEY_URL}"
-          verified=0
-          for attempt in $(seq 1 30); do
-            payload="$(curl --silent --show-error --fail --location --max-time 15 "${KEY_URL}" || true)"
-            if [ "${payload}" = "${KEY}" ]; then
-              echo "IndexNow ownership file verified from public website."
-              verified=1
-              break
-            fi
-            echo "Key not live yet, attempt ${attempt}/30."
-            sleep 10
-          done
-          if [ "${verified}" -ne 1 ]; then
-            echo "::error::IndexNow key not reachable from the public site; request not sent."
-            exit 1
+          payload="$(curl --silent --show-error --fail --location --max-time 20 "${KEY_URL}" || true)"
+          if [ "${payload}" = "${KEY}" ]; then
+            echo "IndexNow key is publicly available."
+          else
+            echo "::warning::Key file is not available on deployed site; Bing may accept notification as pending (202) or reject until deployment."
           fi
 
-      - name: Send one IndexNow notification to Bing
+      - name: Submit homepage URL to Bing via IndexNow
         shell: bash
         run: |
           set -euo pipefail
@@ -58,7 +48,7 @@ jobs:
           cat "${response_file}"
           echo ""
           case "${http_code}" in
-            200) echo "IndexNow: URL notification accepted by Bing." ;;
-            202) echo "::warning::IndexNow accepted the request but key validation is pending." ;;
-            *) echo "::error::Bing did not accept the notification (HTTP ${http_code})."; exit 1 ;;
+            200) echo "Bing accepted the updated homepage notification." ;;
+            202) echo "::warning::Bing received the URL. Verification of the key is pending until the public file is online." ;;
+            *) echo "::error::Bing did not accept the IndexNow request (HTTP ${http_code})."; exit 1 ;;
           esac
