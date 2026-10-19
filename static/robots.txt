@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://dmate.zeabur.app/sitemap.xml

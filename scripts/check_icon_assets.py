@@ -206,6 +206,18 @@ def main():
     # Search bots get the same root-level branded favicon irrespective of their UA platform.
     app_text = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "is_search_crawler=is_search_crawler," in app_text
+    assert '@app.route("/robots.txt")' in app_text
+    assert '@app.route("/sitemap.xml")' in app_text
+    robots_text = (ROOT / "static/robots.txt").read_text(encoding="utf-8")
+    sitemap_text = (ROOT / "static/sitemap.xml").read_text(encoding="utf-8")
+    assert "User-agent: *" in robots_text
+    assert "Sitemap: https://dmate.zeabur.app/sitemap.xml" in robots_text
+    from xml.etree import ElementTree
+    root_sitemap = ElementTree.fromstring(sitemap_text)
+    assert root_sitemap.tag.endswith("urlset")
+    namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    assert [node.text for node in root_sitemap.findall(".//sm:loc", namespace)] == ["https://dmate.zeabur.app/"]
+    assert '<link rel="canonical" href="https://dmate.zeabur.app/">' in html
     assert 'send_static_file("icons/dmate-site-v35.ico")' in app_text
     assert 'send_static_file("icons/dmate-site-v35-64.png")' in app_text
     assert '{% if is_search_crawler %}' in html

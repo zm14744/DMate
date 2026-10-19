@@ -1855,6 +1855,24 @@ def sync_user_data():
         return jsonify({"ok": False, "error": "同步失败，请稍后再试。"}), 500
 
 
+@app.route("/robots.txt")
+def robots_txt():
+    """Expose public crawler guidance at the domain root."""
+    response = app.send_static_file("robots.txt")
+    response.headers["Content-Type"] = "text/plain; charset=utf-8"
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    """Serve the canonical public entry point to Baidu and other crawlers."""
+    response = app.send_static_file("sitemap.xml")
+    response.headers["Content-Type"] = "application/xml; charset=utf-8"
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
 @app.route("/favicon.ico")
 def favicon_ico():
     """A consistent, opaque DMate favicon for indexers and browser fallbacks."""
