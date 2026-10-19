@@ -32,8 +32,8 @@ DMate 是面向高校离散数学学习场景的 AI 智能辅学产品。系统�
 - **10 月上旬**：围绕账号注册登录、PostgreSQL 数据同步、跨设备使用、远程网页客户端、部署与移动端交互持续完善。
 - **截至 10 月 8 日**：集中排查 AI 练习生成及难度误判、同知识点复测、OCR 非题目图片处理和识别中按钮状态；完成相关离线回归、文档及测试记录整理。
 
-- **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；完善 iOS PWA 与 Linux 安装说明；推进 PWA、应用商店及搜索引擎收录。
-- **10 月 14 日**：补充错题复测与 OCR 容错修复；itch.io 项目已设为 Public，提供 macOS、Windows、Android 安装包；**微软商店 Microsoft Store 审核通过，DMate 正式上架**；确认 PWA Directory 提交排队、Uptodown 审核拒绝，并据开发者反馈记录 Bing 公开搜索已可检索到 DMate。
+- **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；完善 iOS 主屏幕 WebClip 与 Linux 安装说明；推进应用商店及搜索引擎收录。
+- **10 月 14 日**：补充错题复测与 OCR 容错修复；itch.io 项目已设为 Public，提供 macOS、Windows、Android 安装包；**微软商店 Microsoft Store 审核通过，DMate 正式上架**；记录此前的网页应用目录申请（后续不再作为当前发行渠道）、Uptodown 审核拒绝，并据开发者反馈记录 Bing 公开搜索已可检索到 DMate。
 
 以上按**阶段**归纳，不等于每天都有独立发布或所有功能已完成线上验收。详细历史见 [`CHANGELOG.md`](CHANGELOG.md)。
 
@@ -211,45 +211,41 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 
 默认打开使用白色模式。游客外观不持久化；登录用户的外观参数可随账号同步，自定义背景图片本体仅在当前设备保存。
 
-## 下载、PWA 与商店分发（截至 2026-10-14）
+## 下载与商店分发（更新至 2026-10-19）
 
-**网页版**：https://dmate.zeabur.app/ ，可以在兼容的现代浏览器中直接使用，不需要下载 Windows 或 Linux 安装包。**桌面/Android 客户端**：以系统 WebView 或 Tauri 窗口加载同一个在线站点，前端及后端功能在成功部署后通常可由远程更新获得，原生壳更新则需要重新打包。
+**网页版**：https://dmate.zeabur.app/ ，可以直接在线使用。Windows、macOS、Linux 和 Android 使用独立安装包；iPhone / iPad 通过 WebClip 描述文件添加官网入口。网页 AI、OCR、账号和同步功能均需要联网。
 
-| 渠道 / 平台 | 截至 2026-10-14 的状态及边界 |
+| 渠道 / 平台 | 当前状态与说明 |
 |---|---|
 | Web（Zeabur） | [dmate.zeabur.app](https://dmate.zeabur.app/) 为现行入口；旧域名已停用。 |
-| GitHub Release | [v1.0.1](https://github.com/zm14744/DMate/releases/tag/v1.0.1) 提供 Windows EXE、macOS DMG、Linux DEB/AppImage 与 Android APK；Release 标签 1.0.1 不等于所有安装包内版本均为 1.0.1。 |
-| Windows / macOS / Linux 桌面 | Windows NSIS `.exe`、macOS 通用 `.dmg`、Linux `.deb` / `.AppImage` 已提供下载；安装兼容情况依平台分别核验。macOS 构建尚无已确认的正式 Apple 公证。 |
-| **Snap Store** | **已正式发布**：[dmate](https://snapcraft.io/dmate) **1.0.0，Revision 1，Stable**；当前发行包为 AMD64，需要 `snapd`；正式上架不代表所有 Linux 发行版已实机验收。 |
-| **itch.io** | **开发者确认项目已改为 Public（公开发布）**；项目页提供 macOS `DMate_1.0.0_universal.dmg`、Windows `DMate_1.0.0_x64-setup.exe` 和 Android `DMate.apk` 下载；仅确认上传与公开展示，未将所有平台安装体验写成已实测。 |
-| Android / Uptodown | Android WebView APK 可通过 GitHub Release 与 itch.io 分发；**Uptodown 申请已被拒绝**，理由为纯 WebView 封装没有额外原生功能，不应标为审核中或正式上架。 |
-| iPhone / iPad | Safari “添加到主屏幕”的 PWA；**不是原生 iOS IPA，也未在 Apple App Store 上架**。 |
-| **Microsoft Store（微软商店）** | [DMate 产品页](https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK)；开发者已确认正式上架。正式上架不代表已在所有 Windows 设备上完成安装兼容性测试。 |
-| PWAStore | [DMate 产品页](https://www.pwastore.io/app/dmate)；这是 PWA 目录，不是原生应用商店。第三方应用的 Install PWA 当前可能回退为打开 DMate 安装引导页。 |
-| PWA Directory | 已**提交成功并进入免费发布队列**；邮件介绍通常约 7 天、中近期可能至 13 天，尚不应写成正式上架。 |
-| 百度搜索 | 已做站点验证及链接提交；用户提供的最新进度为**仍在审核/等待进一步收录结果**，不以提交替代稳定索引。 |
-| Bing 搜索 | **开发者确认公开搜索已可找到 DMate**；此前站长后台也显示过索引成功。检索展示可能受关键词、地区与索引更新影响，不代表固定排名。 |
-| Product Hunt | 先前已有预约/提交记录；截至当前对话没有新的正式发布确认，不写成已上架。 |
+| GitHub Release | [v1.0.1](https://github.com/zm14744/DMate/releases/tag/v1.0.1) 提供 Windows EXE、macOS DMG、Linux DEB / AppImage 与 Android APK。 |
+| Windows / macOS / Linux | 提供独立桌面安装包；macOS 构建尚无已确认的正式 Apple 公证。 |
+| **Snap Store** | [dmate](https://snapcraft.io/dmate) 1.0.0 / Revision 1 / Stable 已发布；当前为 AMD64，需要 `snapd`。 |
+| **itch.io** | [DMate 项目页](https://zm14744.itch.io/dmate) 已公开，提供 Windows EXE、macOS DMG 和 Android APK。 |
+| Android | 通过 GitCode、GitHub Release 或 itch.io 获取 APK；网页安装入口不提供 Android PWA。 |
+| iPhone / iPad | [下载 WebClip 描述文件](https://dmate.zeabur.app/DMate.mobileconfig)，将 DMate 官网添加到主屏幕。它是网页入口，不是原生 IPA 或 App Store 应用。 |
+| **Microsoft Store** | [DMate 产品页](https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK)；开发者已确认正式上架。 |
+| 百度搜索 | 已完成站点验证与首页提交，仍需等待爬取、索引及公开结果刷新。 |
+| Bing 搜索 | 已可在公开搜索中找到 DMate；图标与摘要更新仍受 Bing 抓取和缓存影响。 |
+| Uptodown / Product Hunt | Uptodown 曾因纯 WebView 封装被拒；Product Hunt 尚无新的正式公开发布确认。 |
 
-### 国内用户下载推荐（2026-10-18 更新）
+### 国内用户下载推荐
 
-DMate 网页安装窗口保留所有公开发行渠道，并根据国内用户反馈将较易访问的商店放在前面；**“国内优先”是渠道建议，并非在所有运营商、地区和设备上保证无需 VPN**。
+| 系统 | 优先入口 | 其他渠道 |
+|---|---|---|
+| Windows | Microsoft Store、GitCode EXE | GitHub Release、itch.io |
+| Linux（AMD64） | Snap Store | GitCode / GitHub 的 DEB、AppImage |
+| Android | GitCode APK | GitHub Release、itch.io |
+| macOS | GitCode DMG | GitHub Release、itch.io |
+| iOS / iPadOS | 官网 WebClip 描述文件 | GitCode 备用描述文件下载 |
 
-| 系统 | 国内优先 | 其他公开渠道（海外/备用） | 安装形式说明 |
-|---|---|---|---|
-| Windows | [Microsoft Store · DMate 产品页](https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK) | [itch.io](https://zm14744.itch.io/dmate)（EXE）、原 EXE 下载地址 / [GitHub Releases](https://github.com/zm14744/DMate/releases/tag/v1.0.1) | 商店安装或 Windows 安装程序 |
-| Linux（AMD64） | [Snap Store](https://snapcraft.io/dmate)（已上架，需要 snapd） | GitHub Releases / 原下载地址（DEB、AppImage） | Snap、DEB、AppImage 三选一；AppImage 可能需要 FUSE |
-| Android | [PWAStore · DMate 产品页](https://www.pwastore.io/app/dmate)、[安装引导页](https://dmate.zeabur.app/install) | itch.io（APK）、原 APK 下载地址 / GitHub Releases | **PWA 是浏览器网页应用，不是原生 APK**；缺少 Google 服务的部分浏览器仅可创建快捷方式 |
-| macOS | [PWAStore · DMate 产品页](https://www.pwastore.io/app/dmate)、[安装引导页](https://dmate.zeabur.app/install)（Safari / Chromium） | itch.io（DMG）、原 DMG 下载地址 / GitHub Releases | **PWA 与 DMG 是两种不同安装形式**；当前 DMG 无已确认 Apple 公证 |
-| iOS / iPadOS | [PWAStore · DMate 产品页](https://www.pwastore.io/app/dmate)、[安装引导页](https://dmate.zeabur.app/install) | Safari “分享 → 添加到主屏幕” | 仅提供 PWA，**没有 App Store 原生 IPA** |
+安装弹窗只列出平台安装包和应用商店入口。iOS 的 `.mobileconfig` 仅添加官网 WebClip，不安装设备管理、证书或 VPN，也不是原生 App。GitHub、GitCode、itch.io 的实际可达性可能因网络环境而异；商店上架或文件公开不等于所有设备均已完成实机安装验收。
 
-**安装注意**：PWAStore 是应用发现目录，用户仍需在兼容浏览器打开 DMate 网站并完成 PWA 安装，应用的 AI、OCR 与账号同步功能依赖 DMate 在线服务。该目录本身不托管 APK / DMG，也不能替代官网连通性。itch.io、GitHub 在部分国内网络可能打不开；如需真正稳定的安装包直连，仍需实际验证的国内文件托管渠道。\n\n**手机浏览器兼容说明**：安装引导页会尝试识别百度、夸克、UC、QQ、微信/支付宝内置页、小米/华为/OPPO/vivo/荣耀/三星浏览器及通用 Android 浏览器，并提示可尝试的菜单入口。浏览器可能隐藏或更改 User-Agent，因此识别失败时会显示通用指引。只有浏览器实际触发原生 PWA 安装事件时，页面才显示一键“安装 DMate”按钮；其他浏览器需要在菜单中尝试“安装应用/添加到桌面”。如果只有“收藏/添加书签”，那只是收藏或快捷访问，不等于独立 PWA。iPhone/iPad 优先使用 Safari 的“分享 → 添加到主屏幕”；其他 iOS 浏览器能否添加以及最终运行方式，取决于系统版本与浏览器实现。
+Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 三种途径：Ubuntu/Debian/Mint 可选 DEB，其他发行版可尝试 AppImage，已启用 `snapd` 的系统可安装 Snap。只需选择一种方式；Snap 当前仅 AMD64，AppImage 可能需要 FUSE。
 
-Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 的分流说明：没有 snapd 的 Ubuntu/Debian/Mint 等可选择 DEB，Arch/Manjaro/Fedora/openSUSE 等可尝试 AppImage；启用 `snapd` 的发行版可以安装 Snap。只需要选择一种方式。**Snap 当前仅 AMD64**，不代表 ARM64 已发布；AppImage 可能需要 FUSE 等运行条件。Snap 安装示例：`sudo snap install dmate`。
+**iOS / iPadOS**：通过 DMate WebClip 描述文件将官网添加到主屏幕。它只是网页入口，AI、OCR、账号和同步功能依赖网络；项目没有 Apple App Store 原生 IPA。
 
-**iOS**：通过 Safari → 分享 → 添加到主屏幕安装 Web App。Manifest 已声明 `standalone`，并包含 Apple 专用主屏幕元信息和图标；AI、账号同步依赖网络，不宣称完全离线可用。
-
-**商店与 SEO 的验证边界**：**Microsoft Store 已由开发者确认审核通过并正式上架**；Snap Revision 1 Stable 有发布日志支持，itch.io 已由开发者确认 Public，Bing 已由开发者确认公开搜索可见；PWA Directory 仍在发布队列，Uptodown 已拒绝，百度仍需等待审核/索引结果。提交、上架、可下载、可搜索、真实安装通过属于不同阶段。
+**商店与 SEO 的验证边界**：Microsoft Store 已由开发者确认正式上架；Snap Revision 1 Stable 有发布记录，itch.io 已公开发布，Bing 已可公开检索。提交、上架、可下载、可搜索、真实安装通过属于不同阶段。
 
 ## AI 运行链路
 
@@ -292,7 +288,7 @@ flowchart TD
 - **后端能力**（`app.py`、`teaching.py`、`knowledge_graph.json`）更新并成功部署到 Zeabur 后，已安装客户端的新请求会使用更新后的服务端逻辑；无需重新打包客户端。
 - **网页前端**（`static/script.js`、`templates/index.html` 等）更新并成功部署后，客户端重新加载远程页面即可获取新版；若旧资源还在缓存中，可关闭重开或刷新页面。
 - **原生壳**（Android Java / Manifest / Gradle、Tauri Rust / 配置 / 权限等）本身有变更时，需要重新构建、分发并安装新版本。当前工程**没有实现安装包二进制自动更新**；远程网页更新不等于安装包自动升级。
-- iOS 主屏幕 Web App 使用 Service Worker，在线时优先拉取网络内容、离线时可能使用旧缓存，因此新内容生效时间还受缓存与网络状况影响。
+- iOS / iPadOS 通过 `.mobileconfig` WebClip 添加官网入口；它打开在线网页，不提供离线 AI 能力。
 
 更详细的部署流程与更新边界见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)。
 
@@ -389,7 +385,7 @@ jsPDF 2.5.2
 
 ## AI 辅助开发说明
 
-项目研发过程中使用 ChatGPT 辅助，包括历史记录中的 GPT-5.6 Sol，以及近期用于 GitHub Actions、Snap、PWA 与 SEO 的 ChatGPT 辅助迭代；不同阶段模型不宜混为一个固定版本。项目负责人负责需求定义、功能取舍、代码整合、运行验证、部署与最终结果审查。
+项目研发过程中使用 ChatGPT 辅助，包括历史记录中的 GPT-5.6 Sol，以及近期用于 GitHub Actions、Snap、客户端分发与 SEO 的 ChatGPT 辅助迭代；不同阶段模型不宜混为一个固定版本。项目负责人负责需求定义、功能取舍、代码整合、运行验证、部署与最终结果审查。
 
 生产运行时的基础文本与图像理解来自外部运行服务；ChatGPT GPT-5.6 Sol 属于研发辅助工具，不是 DMate 面向用户回答时的基础模型。
 

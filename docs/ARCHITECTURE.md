@@ -318,14 +318,14 @@ gunicorn -w 1 --threads 2 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app
 - **服务器端**：修改并部署 `app.py` / `teaching.py` / `knowledge_graph.json` 后，新请求执行新的服务器逻辑；不需要重建原生客户端。
 - **远程前端**：桌面 Tauri 的 `frontendDist` 与窗口 URL 均指向 `https://dmate.zeabur.app`；Android `DMATE_URL` / WebView 同样指向远程站点。部署 `templates/index.html` 与 `static/script.js` 后，刷新或重启客户端获取新页面（受网络与缓存影响）。
 - **安装包自身**：Android 和桌面壳有代码、权限、版本、签名等变更时必须重新构建；目前没有安装包二进制自动升级组件。
-- **iOS 主屏幕 Web App**：由 `static/service-worker.js` 管理网络优先缓存；离线 fallback 可能展示上一版。
+- **iOS / iPadOS WebClip**：通过 `.mobileconfig` 将官网添加到主屏幕；它打开在线网页，不使用独立 Service Worker 缓存。
 
 上述“随服务端生效”指部署成功之后的后续请求，不意味着尚未部署的本地修改会自动出现在用户设备上，也不是无条件实时推送到已打开的页面。
 
 ## 17. 多平台远程页面与发行渠道（2026-10-13）
 
 ```text
-浏览器 / iOS Safari PWA
+浏览器 / iOS WebClip
             │
 Tauri (Windows NSIS / macOS DMG / Linux DEB、AppImage、Snap)
             │
@@ -339,9 +339,9 @@ https://dmate.zeabur.app/  ← Zeabur + Flask + PostgreSQL / AI 服务
 - Windows / macOS / Linux：`desktop/src-tauri/tauri.conf.json` 使用 Tauri 2，产品版本 1.0.0；Github Actions 生成 NSIS、DMG、DEB/AppImage。
 - Linux Snap：构建 Tauri DEB 再以 `core24`、GNOME 扩展、`strict` 沙盒封装为 AMD64 Snap，Store Revision 1 已发布 `stable`；Snap 包更新与网页内容更新是两条独立渠道。
 - Android：`android/` 为 WebView 原生壳，有独立 debug APK Actions，正式签名与审核以实际渠道记录为准。
-- iOS：网页 Manifest + Service Worker + Apple meta/icon 可作为 Safari 主屏幕 PWA；不是 IPA / 原生商店程序。
+- iOS：`.mobileconfig` 提供 Apple WebClip 主屏幕入口；不是 IPA / 原生商店程序。
 
-客户端没有自有 AI 推理核心，联网和 Zeabur / 运行时服务可用性是使用 AI 功能的必要条件。Service Worker 缓存以外壳资源为主，不能承诺全功能离线运行。
+客户端没有自有 AI 推理核心，联网和 Zeabur / 运行时服务可用性是使用 AI 功能的必要条件；WebClip 只是官网快捷入口，不提供离线 AI 能力。
 
 ## 18. 网站可发现性与搜索引擎（2026-10-13）
 
