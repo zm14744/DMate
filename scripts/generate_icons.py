@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -111,7 +112,11 @@ def main():
         (192, "icon-192.png"), (512, "icon-512.png"),
         (192, "icon-192-unified-v16.png"), (512, "icon-512-unified-v16.png"),
     ]:
-        save_png(from_installed_icon(size), STATIC / filename)
+        if size == 192:
+            # Byte-identical to the shipped Android installed-app launcher PNG.
+            shutil.copyfile(master_path, STATIC / filename)
+        else:
+            save_png(from_installed_icon(size), STATIC / filename)
 
     # Backward-compatible file only; no separate padding/zoom. New manifests
     # declare only "any" icons because maskable cropping varies by launcher.
