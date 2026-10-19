@@ -23,10 +23,10 @@
 {% if not is_dmate_android_app and not is_dmate_desktop_app %}
 {% if is_android_install_compat_browser %}
 <!-- QQ/Quark/UC/Baidu need the visited / page to be in manifest scope. -->
-<link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-compat-v22-20261019">
+<link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-maskable-v24-20261019">
 <meta name="mobile-web-app-capable" content="yes">
 {% else %}
-<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v22-20261019">
+<link rel="manifest" href="/manifest.webmanifest?v={% if is_android_browser %}dmate-mobile-maskable-v24-20261019{% else %}dmate-pwa-v22-20261019{% endif %}">
 {% endif %}
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。

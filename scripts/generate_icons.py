@@ -153,6 +153,15 @@ def main():
             save_png(draw_mark(size, figure_scale=geometry_scale),
                      STATIC / f"android-{browser}-{size}-v21.png")
 
+    # Android PWA adaptive launcher icon: solid black fills the ENTIRE tile.
+    # Only the white geometry is inset inside the maskable 80%-diameter
+    # safe circle. Android applies the final launcher squircle/round mask.
+    # Never put a rounded black SQUARE inside a padded white tile.
+    # Generate each resolution from VECTOR PATHS at its real native size.
+    for size in (192, 512):
+        save_png(draw_mark(size, background=BLACK, figure_scale=0.82, rounded=False),
+                 STATIC / f"android-pwa-maskable-{size}-v24.png")
+
     for size, name in ((32, "mobile-favicon-32-v17.png"),
                        (192, "mobile-favicon-192-v17.png")):
         if size == 192:

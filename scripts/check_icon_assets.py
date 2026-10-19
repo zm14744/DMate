@@ -56,6 +56,27 @@ def main():
             matches_vector(ICONS / f"android-{browser}-{size}-v21.png",
                            size, figure_scale=factor)
 
+    # Android-only PWA maskable artwork must be black edge-to-edge, with
+    # the white geometry inside the centered 80% safe circle. Prevent the
+    # missing-maskable regression that caused white launcher frames.
+    for size in (192, 512):
+        maskable = ICONS / f"android-pwa-maskable-{size}-v24.png"
+        matches_vector(maskable, size, figure_scale=0.82)
+        pixels = rgba(maskable)
+        for xy in ((0, 0), (size - 1, 0), (0, size - 1),
+                   (size - 1, size - 1), (size // 2, 0)):
+            assert pixels.getpixel(xy) == (0, 0, 0, 255), (
+                f"{maskable}: Android launcher background cannot be white/transparent"
+            )
+        # No visible linework may escape the 80%-diameter centered circle.
+        for x in range(size):
+            for y in range(size):
+                red, green, blue, _ = pixels.getpixel((x, y))
+                if max(red, green, blue) > 48:
+                    assert (x - (size - 1) / 2) ** 2 + (y - (size - 1) / 2) ** 2 <= (size * 0.4) ** 2, (
+                        f"{maskable}: foreground outside adaptive safe zone"
+                    )
+
     for size, filename in (
         (180, "apple-touch-icon.png"),
         (128, "windows-shortcut-128-v20.png"),

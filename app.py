@@ -1880,7 +1880,25 @@ def _serve_dmate_manifest(filename):
             size = item.get("sizes", "").split("x")[0]
             if item.get("purpose", "any") == "any" and size in {"192", "512"}:
                 item["src"] = f"/static/icons/android-{variant}-{size}-v21.png?v=dmate-native-vector-v22-20261019"
-    response = make_response(json.dumps(manifest, ensure_ascii=False))
+    # Android ONLY: provide dedicated maskable artwork. Previously these
+    # entries were deleted, so launchers placed the square icon inside a
+    # white adaptive-icon frame. Desktop/iOS manifest output is unchanged.
+    if re.search(r"Android", user_agent, re.IGNORECASE) and not re.search(
+        r"DMateAndroid/|DMateDesktop/", user_agent, re.IGNORECASE
+    ):
+        manifest["icons"] = [
+            *[icon for icon in manifest.get("icons", [])
+              if "maskable" not in icon.get("purpose", "any").split()],
+            {
+                "src": "/static/icons/android-pwa-maskable-192-v24.png?v=android-maskable-v24-20261019",
+                "sizes": "192x192", "type": "image/png", "purpose": "maskable"
+            },
+            {
+                "src": "/static/icons/android-pwa-maskable-512-v24.png?v=android-maskable-v24-20261019",
+                "sizes": "512x512", "type": "image/png", "purpose": "maskable"
+            }
+        ]
+        response = make_response(json.dumps(manifest, ensure_ascii=False))
     response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Vary"] = "User-Agent"
@@ -1914,7 +1932,8 @@ def service_worker():
 @app.route("/install")
 def install_page():
     """Compact installation page for browser-specific installation guidance."""
-    response = make_response(render_template("install.html"))
+    mobile_android = bool(re.search(r"Android", request.headers.get("User-Agent", ""), re.IGNORECASE))
+    response = make_response(render_template("install.html", is_android=mobile_android))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     return response
 
