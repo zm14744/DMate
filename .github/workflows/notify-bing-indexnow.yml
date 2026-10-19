@@ -15,19 +15,28 @@ jobs:
   notify-bing:
     name: Send DMate homepage update to Bing
     runs-on: ubuntu-22.04
-    timeout-minutes: 3
+    timeout-minutes: 15
     steps:
-      - name: Check public IndexNow key availability
+      - name: Wait for domain-root IndexNow key to become publicly accessible
         shell: bash
         run: |
           set -euo pipefail
           KEY="ba35d6e4c10db2df19bf4c02f7d99646"
-          KEY_URL="https://dmate.zeabur.app/static/${KEY}.txt"
-          payload="$(curl --silent --show-error --fail --location --max-time 20 "${KEY_URL}" || true)"
-          if [ "${payload}" = "${KEY}" ]; then
-            echo "IndexNow key is publicly available."
-          else
-            echo "::warning::Key file is not available on deployed site; Bing may accept notification as pending (202) or reject until deployment."
+          KEY_URL="https://dmate.zeabur.app/${KEY}.txt"
+          valid=0
+          for attempt in $(seq 1 72); do
+            payload="$(curl --silent --show-error --fail --location --max-time 15 "${KEY_URL}" || true)"
+            if [ "${payload}" = "${KEY}" ]; then
+              echo "Verified root-level ownership key online."
+              valid=1
+              break
+            fi
+            echo "Waiting for Zeabur deployment (${attempt}/72)."
+            sleep 10
+          done
+          if [ "${valid}" -ne 1 ]; then
+            echo "::error::Domain-root key still unavailable; IndexNow not submitted."
+            exit 1
           fi
 
       - name: Submit homepage URL to Bing via IndexNow
@@ -36,7 +45,7 @@ jobs:
           set -euo pipefail
           KEY="ba35d6e4c10db2df19bf4c02f7d99646"
           URL="https://dmate.zeabur.app/"
-          KEY_URL="https://dmate.zeabur.app/static/${KEY}.txt"
+          KEY_URL="https://dmate.zeabur.app/${KEY}.txt"
           response_file="$(mktemp)"
           http_code="$(curl --silent --show-error --location --max-time 30 \
             --get "https://www.bing.com/indexnow" \

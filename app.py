@@ -1855,6 +1855,15 @@ def sync_user_data():
         return jsonify({"ok": False, "error": "同步失败，请稍后再试。"}), 500
 
 
+@app.route("/ba35d6e4c10db2df19bf4c02f7d99646.txt")
+def indexnow_ownership_key():
+    """Expose the IndexNow ownership key at the host root, valid for homepage URLs."""
+    response = app.send_static_file("ba35d6e4c10db2df19bf4c02f7d99646.txt")
+    response.headers["Content-Type"] = "text/plain; charset=utf-8"
+    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
+    return response
+
+
 @app.route("/robots.txt")
 def robots_txt():
     """Expose public crawler guidance at the domain root."""
