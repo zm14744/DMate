@@ -116,7 +116,8 @@ def main():
                            for y in range(size // 6, size * 5 // 6)), (
                     "Safari dark white geometry missing")
             else:
-                assert actual.getpixel((size // 2, size // 16))[:3] == (0,0,0)
+                # Top center is background; inner geometry can cross y=size/16.
+                assert actual.getpixel((size // 2, 0))[:3] == (0, 0, 0)
         check_ico(ICONS / f"dmate-safari-{theme}-v32.ico", (16, 32, 48, 64, 128))
     assert rgba(ICONS / "favicon-32.png").getpixel((0, 0))[3] == 0
 
