@@ -2,6 +2,12 @@
 
 > **历史快照说明**：2026-10-13 提交 `296b3388` 当时没有 `tests/` 目录；**当前 `main` 已有 `tests/test_retest_ocr_regression.py`**，其 5 项专项离线测试与历史“10/10”记录不是同一批。175 项 Excel 结果仍是预填而非全部实时验证，详见 [`docs/TESTING.md`](docs/TESTING.md)。
 
+## 2026-10-20：下载弹窗与旧缓存清理修正
+
+- 下载弹窗标题统一为“下载 DMate”，内容只展示当前平台的安装包和对应应用商店入口；不再展示网页 PWA 安装说明、PWAStore 链接或 iOS WebClip 入口。
+- 加固旧版 Service Worker 清理：识别带查询参数的旧脚本 URL，删除旧版 `dmate-pwa-*` 缓存，并在清理后最多自动刷新一次，避免旧缓存继续显示已经移除的安装入口。
+- 修正安装弹窗回归测试，使其与当前下载渠道顺序、简化文案及 iOS 不显示下载入口的行为一致。
+
 ## 2026-10-19：移除网页 PWA 安装链路
 
 - 删除网页 Manifest、Service Worker、`/pwa/` 与 `/install` 安装引导页，以及 `beforeinstallprompt` / 安装说明按钮逻辑。
