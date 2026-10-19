@@ -78,13 +78,13 @@ const linuxActions = guide("linux").actions;
 assert.equal(linuxActions.at(-1).url, "https://snapcraft.io/dmate",
     "Snap Store must follow all Linux GitCode/GitHub packages");
 const labels = platform => guide(platform).actions.map(action => action.label);
-assert.deepEqual(labels("android"), ["GitCode · APK", "GitHub · APK", "itch.io"]);
-assert.deepEqual(labels("windows"), ["GitCode · EXE", "GitHub · EXE", "Microsoft Store", "itch.io"]);
-assert.deepEqual(labels("macos"), ["GitCode · DMG", "GitHub · DMG", "itch.io"]);
-assert.deepEqual(labels("linux"), [
+assert.equal(JSON.stringify(labels("android")), JSON.stringify(["GitCode · APK", "GitHub · APK", "itch.io"]));
+assert.equal(JSON.stringify(labels("windows")), JSON.stringify(["GitCode · EXE", "GitHub · EXE", "Microsoft Store", "itch.io"]));
+assert.equal(JSON.stringify(labels("macos")), JSON.stringify(["GitCode · DMG", "GitHub · DMG", "itch.io"]));
+assert.equal(JSON.stringify(labels("linux")), JSON.stringify([
     "GitCode · DEB", "GitHub · DEB", "GitCode · AppImage", "GitHub · AppImage", "Snap Store"
-]);
-assert.deepEqual(labels("ios"), ["下载描述文件", "GitCode 备用"]);
+]));
+assert.equal(JSON.stringify(labels("ios")), JSON.stringify(["下载描述文件", "GitCode 备用"]));
 assert.equal(guide("android").text, "选择下载渠道获取 APK。");
 assert.equal(guide("windows").text, "选择 EXE 安装包或 Microsoft Store。");
 assert.equal(guide("macos").text, "选择 DMG 安装包下载。");
