@@ -26,7 +26,7 @@
 <link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-compat-v19-20261019">
 <meta name="mobile-web-app-capable" content="yes">
 {% else %}
-<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v17-20261019">
+<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v20-20261019">
 {% endif %}
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
@@ -62,11 +62,20 @@
 <link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="180x180" href="/static/icons/safari-fixed-black-v18.png">
 <link rel="shortcut icon" type="image/png" href="/static/icons/safari-fixed-black-v18.png">
 {% elif is_android_browser %}
-<!-- Android browsers including QQ, Quark and Baidu often create home shortcuts
-     from favicon (not manifest). Use the same opaque black installed-app artwork. -->
+<!-- Android browsers use opaque installed-app icon for home shortcuts. -->
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/mobile-favicon-32-v17.png">
 <link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/mobile-favicon-192-v17.png">
 <link id="dmateShortcutFavicon" rel="shortcut icon" type="image/png" href="/static/icons/mobile-favicon-192-v17.png">
+{% elif is_windows_browser %}
+<!-- Tabs use a small transparent wireframe; large Windows shortcut and
+     Start assets always use the solid black rounded installed-app image. -->
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-tab-v20">
+<link id="dmateWindowsShortcut128" rel="icon" type="image/png" sizes="128x128" href="/static/icons/windows-shortcut-128-v20.png">
+<link id="dmateWindowsShortcut192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/windows-shortcut-192-v20.png">
+<link id="dmateWindowsShortcut256" rel="icon" type="image/png" sizes="256x256" href="/static/icons/windows-shortcut-256-v20.png">
+<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/static/icons/windows-shortcut-black-v20.ico">
+<meta name="msapplication-TileImage" content="/static/icons/windows-shortcut-192-v20.png">
+<meta name="msapplication-TileColor" content="#000000">
 {% else %}
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v7-20261019">
 <link id="dmateFavicon48" rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-favicon-v7-20261019">

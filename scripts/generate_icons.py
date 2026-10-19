@@ -175,6 +175,22 @@ def main():
     save_ico(STATIC / "icon-512.png", STATIC / "favicon-app.ico", [
         (16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)
     ])
+    # Windows Start/PWA/desktop shell icons: NEVER use transparent tab favicon.
+    for size, filename in [
+        (128, "windows-shortcut-128-v20.png"),
+        (192, "windows-shortcut-192-v20.png"),
+        (256, "windows-shortcut-256-v20.png"),
+    ]:
+        save_png(from_installed_icon(size), STATIC / filename)
+    save_ico(STATIC / "icon-512.png", STATIC / "windows-shortcut-black-v20.ico", [
+        (16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)
+    ])
+    # New filenames make installed browser apps re-request the corrected art.
+    for size, filename in [
+        (192, "icon-192-app-v20.png"), (512, "icon-512-app-v20.png")
+    ]:
+        save_png(from_installed_icon(size), STATIC / filename)
+
 
     # Safari uses the fixed-color SVG variants committed with the web assets.
     # Safari website favicon: light mode is white with black lines; dark mode is black with white lines.
@@ -213,6 +229,9 @@ def main():
         STATIC / "mobile-favicon-32-v17.png", STATIC / "mobile-favicon-192-v17.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
         STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
+        STATIC / "windows-shortcut-128-v20.png", STATIC / "windows-shortcut-192-v20.png",
+        STATIC / "windows-shortcut-256-v20.png", STATIC / "windows-shortcut-black-v20.ico",
+        STATIC / "icon-192-app-v20.png", STATIC / "icon-512-app-v20.png",
         STATIC / "favicon-safari-black-v15.png", STATIC / "apple-touch-icon-black-v15.png",
         STATIC / "dmate-favicon-mac-light.svg", STATIC / "dmate-favicon-mac-dark.svg",
         STATIC / "apple-touch-mac-light.png", STATIC / "apple-touch-mac-dark.png",

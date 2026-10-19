@@ -28,6 +28,6 @@ RUN python -m pip install --upgrade pip && \
 COPY . .
 
 # Regenerate sharp platform-specific icons as part of every production image build.
-RUN python scripts/generate_icons.py
+RUN python scripts/generate_icons.py && python scripts/check_icon_assets.py
 
 CMD ["sh", "-c", "gunicorn -w 1 --threads 2 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app"]

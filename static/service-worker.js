@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-pwa-unified-v19-20261019";
+const CACHE_NAME = "dmate-pwa-unified-v20-20261019";
 const SHELL_ASSETS = [
   "/",
   "/pwa/",
@@ -28,6 +28,12 @@ const SHELL_ASSETS = [
   "/static/icons/apple-touch-icon-unified-v16.png",
   "/static/icons/mobile-favicon-32-v17.png",
   "/static/icons/mobile-favicon-192-v17.png",
+  "/static/icons/windows-shortcut-128-v20.png",
+  "/static/icons/windows-shortcut-192-v20.png",
+  "/static/icons/windows-shortcut-256-v20.png",
+  "/static/icons/windows-shortcut-black-v20.ico",
+  "/static/icons/icon-192-app-v20.png",
+  "/static/icons/icon-512-app-v20.png",
   "/static/icons/icon-192.png?v=dmate-pwa-v17-20261019",
   "/static/icons/icon-512.png?v=dmate-pwa-v17-20261019",
   "/static/icons/icon-maskable-512.png?v=dmate-pwa-v17-20261019"

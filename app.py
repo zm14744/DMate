@@ -1915,6 +1915,7 @@ def home():
     is_dmate_android_app = bool(re.search(r"DMateAndroid/", user_agent, re.IGNORECASE))
     is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
     is_android_browser = is_android and not is_dmate_android_app
+    is_windows_browser = bool(re.search(r"Windows", user_agent, re.IGNORECASE) and not is_dmate_desktop_app)
     # Some Android browsers only expose their add-to-desktop menu when the
     # page being viewed (/) lies within the manifest's declared scope.
     is_android_install_compat_browser = bool(
@@ -1938,6 +1939,7 @@ def home():
         is_ios=is_ios,
         is_mac_safari=is_mac_safari,
         is_android_browser=is_android_browser,
+        is_windows_browser=is_windows_browser,
         is_android_install_compat_browser=is_android_install_compat_browser,
         is_dmate_android_app=is_dmate_android_app,
         is_dmate_desktop_app=is_dmate_desktop_app,
