@@ -219,7 +219,7 @@ node --check static/script.js
 
 **操作顺序**：提交变更 → Zeabur 部署完成 → 通过 `/health` 与 `/ready` 观察服务状态 → 在网页和已安装客户端各测试一轮重点功能。对本次产品能力变更，重点检查图同构、二部图、拓扑排序、模逆 / CRT、齐次与非齐次递推，以及同知识点出题是否偏题。本项目已有 175 项个人功能自测结果记录；部署新版时仍应针对本次实际改动复测 AI 出题、OCR、复制、账号同步与移动端交互，不能仅因既往记录为通过便视为新部署完成验收。
 
-请注意：**工程目前没有启用 Tauri 自动更新器或 Android APK 自动更新机制**。远程网页与后端可以不重装而获得更新，不代表安装包的原生代码会自动升级。`static/service-worker.js` 仅服务于 iOS 主屏幕网页应用，在线时网络优先，网络失败时可能显示旧缓存。
+请注意：**工程目前没有启用 Tauri 自动更新器或 Android APK 自动更新机制**。远程网页与后端可以不重装而获得更新，不代表安装包的原生代码会自动升级。iOS WebClip 打开的是在线官网，不提供独立离线缓存。
 
 
 ### 2026-10-08 OCR 与移动端修复的部署检查
@@ -241,35 +241,22 @@ node --check static/script.js
 
 安全约束：`SNAPCRAFT_STORE_CREDENTIALS` 只应放在 GitHub Actions Repository Secret，不可提交到仓库、放进 README 或公开日志；本机临时凭据使用后可删除。不能将 `workflow_dispatch` 的成功视为最新安装包一定上线，需要检查对应 Job 和 Store revision。
 
-## 11. PWA、iOS 与分发状态
+## 11. 多平台安装与分发（更新至 2026-10-19）
 
-- Manifest：`static/manifest.webmanifest`，`id/start_url/scope` 均指向 `/`、`display: standalone`，含普通和 maskable 图标。
-- Service Worker：`static/service-worker.js`，从 `/service-worker.js` 同源路由注册；在线优先拉取资源，离线仅可能展示缓存外壳，不支持离线模型推理。
-- iOS：Safari 分享 → 添加到主屏幕；Apple Web App 元标签与 180×180 图标已配置；**没有 IPA 和 Apple App Store 正式发布**。
-- **Snap Store**：[dmate](https://snapcraft.io/dmate) **1.0.0 / Revision 1 已发布至 Stable**；发行渠道正式成功，与构建成功不同。
-- **itch.io**：开发者 2026-10-14 确认项目已设为 **Public**，公开提供 Windows `.exe`、macOS `.dmg` 和 Android `.apk`；具体客户端的代码签名、安装和原生更新仍按实际设备核验。
-- **PWAStore / PWA Directory**：前者有产品展示页与 Install PWA 入口；后者收到确认邮件并进入免费发布队列，尚不是正式上架。
-- **Microsoft Store（微软商店）**：开发者于 **2026-10-14 确认 DMate 已通过微软商店认证并正式上架**，不是审核中。商店具体商品页 URL 与实际商店包版本尚待补充，仍需单独验收通过商店安装、启动与更新。
-- **Uptodown / Product Hunt**：Uptodown 已因 WebView 仅封装网页而拒绝；Product Hunt 仅有此前预约或提交记录，尚缺当前公开发布确认。
-- 旧域名 `discrete-math-tutor.zeabur.app` 当前不可访问，服务在 Zeabur 控制台仍可能叫 `discrete-math-tutor`。**服务名不是域名，绝不能为清除旧搜索结果而删除服务**。
+- **Windows**：使用 Tauri NSIS EXE；可通过 Microsoft Store、GitCode、GitHub Release 或 itch.io 获取。
+- **macOS**：使用通用 DMG；通过 GitCode、GitHub Release 或 itch.io 获取。当前尚无已确认的正式 Apple 公证。
+- **Linux AMD64**：提供 DEB、AppImage 与 [Snap Store](https://snapcraft.io/dmate)。Snap 需要 `snapd`，并且只确认 AMD64 发行。
+- **Android**：使用独立 WebView APK，通过 GitCode、GitHub Release 或 itch.io 分发。
+- **iPhone / iPad**：`GET /DMate.mobileconfig` 提供 Apple WebClip 描述文件，将官网添加到主屏幕；不提供原生 IPA，也不安装 MDM、证书或 VPN。
+- **网页安装流程**：旧的 Web App Manifest、Service Worker、`/pwa/` 与 `/install` 安装引导页已移除。网页安装弹窗只负责展示平台安装包和应用商店链接。
 
-### 国内安装入口的分流逻辑（2026-10-18）
-
-前端安装窗口按设备显示完整渠道与“国内优先”标记，推荐顺序基于开发者对国内可达性的反馈，而不是可达率测试承诺：
-
-- **Windows**：Microsoft Store 国内优先；itch.io 与原 EXE 地址为海外/备用方式。
-- **Linux AMD64**：Snap Store 国内优先（必须先有 `snapd`）；DEB、AppImage 和 GitHub Releases 作为备用。商店包有独立安全更新与修订版检查要求。
-- **Android**：PWAStore 国内优先，浏览器安装 PWA；原生 APK 通过 itch.io、原地址备用。Android 浏览器允许 PWA 安装提示，既有 Android WebView APK 不注册 PWA Service Worker。
-- **macOS**：PWAStore 国内优先；Safari（支持版本）可添加到程序坞，Chromium 浏览器可安装网页应用；DMG 通过 itch.io / 原链接提供，未确认 Apple 公证。
-- **iOS / iPadOS**：PWAStore 作为发现入口；打开 DMate 官网后由 Safari 添加到主屏幕；没有 Apple App Store IPA。
-
-以上商店是**下载/发现渠道**，不保证用户所在地能访问网页后端。PWAStore 提供的是 PWA，不是原生安装包；没有在仓库中添加猜测的商品详情地址，也没有改 Zeabur 下载环境变量。源代码变更部署后应从实际国内网络分别测试这些入口。
+商店发布、安装包可下载、设备实机安装与搜索结果收录是不同状态，应分别记录；不要将构建成功或申请受理表述为所有设备已通过验收。
 
 ## 12. SEO 与部署验收
 
 2026-10-13 首页增加更完整的 Meta Description、DMate H1、图标 Alt 及 Bing / 百度站点验证元标签；百度站点验证已通过并提交 `https://dmate.zeabur.app/`。**2026-10-14 更新：开发者已确认 Bing 公开搜索能够找到 DMate**，此前站长后台也显示过索引成功；Bing 可检索并不保证持续排名或所有地区关键词可见。**百度目前仍在审核/等待进一步收录反馈**，链接提交不等于正式索引成功。
 
-部署后建议先在 Zeabur 确认新版容器 **Running / Ready**，再 `GET /health` 和 `GET /ready`，随后检查 `view-source:https://dmate.zeabur.app/` 中新 H1、验证标签是否实际生效。若源代码仍旧，优先排查部署与 Service Worker/浏览器缓存，不要仅凭 GitHub 提交成功即认为生产版本已更新。
+部署后建议先在 Zeabur 确认新版容器 **Running / Ready**，再 `GET /health` 和 `GET /ready`，随后检查 `view-source:https://dmate.zeabur.app/` 中新 H1、验证标签是否实际生效。若源代码仍旧，优先排查 Zeabur 部署状态和浏览器 / WebView 缓存，不要仅凭 GitHub 提交成功即认为生产版本已更新。
 
 截至本次文档整理，未确认项目已单独配置 `robots.txt`、`sitemap.xml` 或 canonical，**这三项属于待办而非已完成**。
 

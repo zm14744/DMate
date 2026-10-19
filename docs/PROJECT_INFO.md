@@ -25,30 +25,27 @@
 
 ## 近期研发时间线
 
-> **补充记录（2026-10-13）**：9/28—10/8 的 11 天是集中功能开发阶段，后续 10/9—10/13 的五天继续推进客户端分发、PWA、Snap Store、应用商店发布申请与搜索引擎验证/SEO，不应因旧文档止于 10 月 8 日而忽略后续投入。
+> **补充记录（2026-10-13）**：9/28—10/8 的 11 天是集中功能开发阶段，后续 10/9—10/13 的五天继续推进客户端分发、iOS WebClip、Snap Store、应用商店发布申请与搜索引擎验证/SEO，不应因旧文档止于 10 月 8 日而忽略后续投入。
 
 
 **2026 年 9 月 28 日至 10 月 8 日**是 DMate 最近一轮持续开发、部署与测试的集中迭代期，共跨越 **11 个自然日**。在这段时间内，围绕 OCR 与图形理解、教学和难度控制、账号及云同步、移动端交互、Windows/Android 远程网页客户端、知识图谱、复制与导出、回归检查及说明文档进行完善。具体事项并非都在同一天完成；本区间也不是 DMate 的最初开发时间，早期项目记录不应被覆盖或改写。
 
-## 多平台发布与推广阶段（更新至 2026-10-14）
+## 多平台发布与推广阶段（更新至 2026-10-19）
 
-| 渠道 / 平台 | 2026-10-14 进度与说明 |
+| 渠道 / 平台 | 当前状态与说明 |
 |---|---|
-| Web（Zeabur） | 在线地址 [dmate.zeabur.app](https://dmate.zeabur.app/)；旧域名已停用。 |
-| GitHub Release | [v1.0.1](https://github.com/zm14744/DMate/releases/tag/v1.0.1) 提供 Windows、macOS、Linux、Android 安装包；各包内部版本及兼容性以实际构建为准。 |
-| Windows / macOS / Linux 桌面 | 已构建和提供 EXE、通用 DMG、DEB / AppImage；macOS 仍需核查 Apple 公证与真机安装。 |
-| **Snap Store** | **正式发布成功**：[`dmate` 1.0.0 / Revision 1 / Stable](https://snapcraft.io/dmate)，目前 AMD64；不要混同构建成功与商店发行成功。 |
-| **itch.io** | **开发者已将项目从 Draft 改为 Public**，页面公开展示并可下载 Windows EXE、Android APK、macOS DMG；尚未声明全部下载与安装场景逐一通过真机验收。 |
-| Android / Uptodown | WebView APK 继续通过 GitHub/itch.io 分发；**Uptodown 因单纯网页封装而拒绝**，不是审核中。 |
-| iPhone / iPad | Safari 主屏幕 PWA，并非 Apple App Store 原生 IPA。 |
-| **Microsoft Store（微软商店）** | **2026-10-14 开发者确认：审核通过，DMate 已正式上架**；商店具体商品链接与商店包版本待补充，不能由上架直接推断所有设备安装成功。 |
-| PWAStore | 已有公开产品展示页与 Install PWA 入口；不是 Apple App Store。 |
-| PWA Directory | 申请**成功进入免费发布队列**，尚待排期上线；不能将受理邮件当作正式上架。 |
-| Bing 搜索 | **开发者已确认 DMate 可由公开搜索检索到**；此前的 Bing 站长后台亦出现索引成功状态；搜索排名与覆盖词不保证固定。 |
-| 百度搜索 | 已验证网站并提交入口，最新为**审核中/待进一步索引**，不能据提交断言完成收录。 |
-| Product Hunt | 历史资料已提交/预约，当前未取得新的公开上线确认。 |
+| Web（Zeabur） | [dmate.zeabur.app](https://dmate.zeabur.app/) 为唯一现行在线入口。 |
+| GitHub Release | [v1.0.1](https://github.com/zm14744/DMate/releases/tag/v1.0.1) 提供 Windows、macOS、Linux、Android 安装包。 |
+| Windows / macOS / Linux | 已提供 EXE、通用 DMG、DEB / AppImage；macOS 尚无已确认的正式 Apple 公证。 |
+| **Snap Store** | [`dmate` 1.0.0 / Revision 1 / Stable](https://snapcraft.io/dmate) 已正式发布，当前 AMD64。 |
+| **itch.io** | 项目已设为 Public，提供 Windows EXE、Android APK、macOS DMG。 |
+| Android | 以独立 WebView APK 分发；Uptodown 因纯网页封装曾拒绝。 |
+| iPhone / iPad | 保留 `.mobileconfig` Apple WebClip 描述文件，添加官网入口到主屏幕；不是原生 IPA。 |
+| **Microsoft Store** | 开发者于 2026-10-14 确认审核通过并正式上架。 |
+| Bing / 百度 | Bing 已可公开检索；百度已验证站点并提交首页，仍需等待索引结果。 |
+| Product Hunt | 历史资料已提交/预约，尚无新的正式公开发布确认。 |
 
-当前明确的公开软件分发成果包括 **Microsoft Store 正式上架、Snap Store Stable 与 itch.io Public**；GitHub Release 可直接提供多平台安装包，PWAStore 已有安装入口。PWA Directory 排队、百度审核中、Uptodown 已拒绝，均与“公开发布成功”区分记录。Microsoft Store 的状态根据开发者 2026-10-14 最新反馈更新；Bing 公开搜索可见不保证所有地区、所有关键词均可检索。
+当前公开软件分发以 **Microsoft Store、Snap Store、itch.io、GitHub Release 与 iOS WebClip** 为准。安装包公开、商店上架、设备实机安装和搜索引擎索引是不同阶段，不应混为一谈。
 
 ## 产品定位
 
