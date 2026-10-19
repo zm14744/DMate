@@ -5,7 +5,7 @@
 ## 2026-10-19：移除网页 PWA 安装链路
 
 - 删除网页 Manifest、Service Worker、`/pwa/` 与 `/install` 安装引导页，以及 `beforeinstallprompt` / 安装说明按钮逻辑。
-- 清理仅供网页 PWA 使用的图标资源；安装弹窗仅保留平台安装包、商店链接与 iOS `.mobileconfig` WebClip 入口。
+- 清理仅供网页 PWA 使用的图标资源；安装弹窗仅保留平台安装包与对应应用商店链接，不再提供 PWA 安装说明、PWA 专用链接或 iOS WebClip 入口。
 - 首页保留一段旧 Service Worker 清理代码：仅用于注销历史注册并删除 `dmate-pwa-*` 缓存，不会注册新的 Worker。
 - 既有 PWAStore / PWA Directory 记录仅作为历史，不再作为当前分发渠道。
 
