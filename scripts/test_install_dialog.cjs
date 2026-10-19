@@ -4,8 +4,8 @@ const vm = require("node:vm");
 const assert = require("node:assert/strict");
 
 const js = fs.readFileSync("static/script.js", "utf8");
-const start = js.indexOf("function installGuideForCurrentPlatform()");
-const end = js.indexOf("\nfunction openDmateInstallHelp()", start);
+const start = js.indexOf("function downloadOptionsForCurrentPlatform()");
+const end = js.indexOf("\nfunction openDmateDownloadDialog()", start);
 assert(start >= 0 && end > start, "Install guide not found");
 const script = js.slice(start, end);
 
@@ -19,7 +19,7 @@ function guide(platform, urls={}) {
         detectDmateInstallPlatform:()=>platform
     };
     vm.runInNewContext(script, context);
-    return vm.runInNewContext("installGuideForCurrentPlatform()", context);
+    return vm.runInNewContext("downloadOptionsForCurrentPlatform()", context);
 }
 const urls=(p, config) => (guide(p, config)?.actions || []).map(x=>x.url);
 const gitcodeBase="https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/";
@@ -96,12 +96,12 @@ assert.equal(otherActions[2].url, "https://apps.microsoft.com/detail/9pk5td2w5m4
 assert.equal(otherActions[3].url, "https://snapcraft.io/dmate");
 
 const html=fs.readFileSync("templates/index.html","utf8");
-const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];
-assert(!modal.includes('id="installHelpNativeButton"'));
-assert(!modal.includes('id="installHelpNote"'));
+const modal=html.split('<div id="downloadModal"')[1].split('<div id="accountModal"')[0];
+assert(!modal.includes("installHelp"), "Download modal must not retain legacy install-help identifiers");
+
 assert(!/pwa|pwastore|webclip|mobileconfig|manifest/i.test(modal), "Download dialog must not expose PWA/WebClip links or instructions");
-assert(modal.includes('id="installHelpTitle">下载 DMate</div>'), "Dialog title should describe package downloads");
-assert(html.includes("dmate-package-only-v37-20261020"), "Install dialog JS cache key must change after legacy-worker cleanup");
+assert(modal.includes('id="downloadModalTitle">下载 DMate</div>'), "Dialog title should describe package downloads");
+assert(html.includes("dmate-package-only-v38-20261020"), "Install dialog JS cache key must change after legacy-worker cleanup");
 for(const platform of ["android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
@@ -109,9 +109,10 @@ for(const platform of ["android", "windows", "macos", "linux"]) {
            "Download dialog should link directly to platform installers");
 }
 const app = fs.readFileSync("app.py", "utf8");
+assert(!app.includes("浏览器安装菜单添加网页应用"), "Do not describe Android browser PWA installation");
 assert(!js.includes("beforeinstallprompt"));
 assert(!js.includes("appinstalled"));
-assert(!js.includes("installHelpNativeButton"));
+assert(!/installHelp|install-help/.test(js + html), "Old install-help identifiers must be removed");
 assert(!js.includes("dmatePwaSiteAndBrowserSupport"));
 assert(!js.includes("registerDmateServiceWorker"));
 assert(!html.includes('rel="manifest"'));
@@ -123,6 +124,7 @@ assert(!html.includes("DMate.mobileconfig"));
 assert(html.includes("navigator.serviceWorker.getRegistrations"), "Legacy worker cleanup must remain for old installs");
 assert(html.includes("scriptUrl.pathname"), "Legacy worker cleanup must tolerate query strings in worker URLs");
 assert(html.includes("window.location.reload()"), "Reload once after deleting stale PWA cache/worker");
+assert(html.includes("dmate-legacy-worker-cleanup-v2-reloaded"), "Legacy cache cleanup must get a fresh one-time reload key");
 assert(!html.includes("navigator.serviceWorker.register"), "Do not register a new worker");
 assert(!app.includes('@app.route("/manifest.webmanifest")'));
 assert(!app.includes('@app.route("/manifest-mobile.webmanifest")'));

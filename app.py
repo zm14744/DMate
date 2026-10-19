@@ -148,7 +148,7 @@ SMTP_CONFIGURED = bool(
 )
 EMAIL_DELIVERY_CONFIGURED = bool(BREVO_CONFIGURED or SMTP_CONFIGURED)
 
-# Android 安装版使用 APK；普通 Android 浏览器通过浏览器安装菜单添加网页应用。
+# Android 网页端仅提供 APK 下载入口；不再提供网页应用安装流程。
 ANDROID_APK_URL = (os.environ.get("ANDROID_APK_URL") or "").strip()
 
 # 桌面客户端：Windows / macOS / Linux 统一使用 Tauri，不再依赖网页安装。

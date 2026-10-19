@@ -18991,7 +18991,7 @@ function getTopMobileGesturePage() {
         ["learningReviewModal", closeLearningReview],
         ["accountModal", closeAccountModal],
         ["knowledgeGraphModal", closeKnowledgeGraph],
-        ["installHelpModal", closeDmateInstallHelp],
+        ["downloadModal", closeDmateDownloadDialog],
         ["appearanceModal", closeAppearance]
     ]);
 
@@ -19211,7 +19211,7 @@ function initMobileAppShell() {
     });
 
     [
-        "installAppBtn",
+        "downloadAppBtn",
         "appearanceBtn",
         "wrongBookBtn",
         "knowledgeGraphBtn",
@@ -19468,7 +19468,7 @@ function detectDmateInstallPlatform() {
     return "other";
 }
 
-function installGuideForCurrentPlatform() {
+function downloadOptionsForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
     const gitcodeRelease = "https://gitcode.com/zm14744/DMate/releases/v1.0.1";
@@ -19552,18 +19552,18 @@ function installGuideForCurrentPlatform() {
     };
 }
 
-function openDmateInstallHelp() {
-    const modal = document.getElementById("installHelpModal");
-    const platformEl = document.getElementById("installHelpPlatform");
-    const textEl = document.getElementById("installHelpText");
-    const actionsEl = document.getElementById("installHelpActions");
+function openDmateDownloadDialog() {
+    const modal = document.getElementById("downloadModal");
+    const platformEl = document.getElementById("downloadPlatform");
+    const textEl = document.getElementById("downloadDescription");
+    const actionsEl = document.getElementById("downloadActions");
     if (!modal || !platformEl || !textEl || !actionsEl) return;
 
-    const guide = installGuideForCurrentPlatform();
-    if (!guide) return;
-    platformEl.textContent = guide.platform;
-    textEl.textContent = guide.text;
-    actionsEl.replaceChildren(...guide.actions.map(action => {
+    const options = downloadOptionsForCurrentPlatform();
+    if (!options) return;
+    platformEl.textContent = options.platform;
+    textEl.textContent = options.text;
+    actionsEl.replaceChildren(...options.actions.map(action => {
         const link = document.createElement("a");
         link.href = action.url;
         link.textContent = action.label;
@@ -19577,18 +19577,18 @@ function openDmateInstallHelp() {
     modal.setAttribute("aria-hidden", "false");
 }
 
-function closeDmateInstallHelp() {
-    const modal = document.getElementById("installHelpModal");
+function closeDmateDownloadDialog() {
+    const modal = document.getElementById("downloadModal");
     if (!modal) return;
     modal.classList.add("hidden");
     modal.setAttribute("aria-hidden", "true");
 }
 
-function initDmateInstall() {
+function initDmateDownloadDialog() {
     const config = dmateClientConfig();
-    const button = document.getElementById("installAppBtn");
-    const close = document.getElementById("installHelpClose");
-    const modal = document.getElementById("installHelpModal");
+    const button = document.getElementById("downloadAppBtn");
+    const close = document.getElementById("downloadModalClose");
+    const modal = document.getElementById("downloadModal");
     if (!button) return;
 
     if (config.isAndroidApp || config.isDesktopApp) {
@@ -19608,14 +19608,14 @@ function initDmateInstall() {
     if (platform === "android") button.textContent = "下载 DMate";
     else button.textContent = "下载 DMate 桌面版";
 
-    button.addEventListener("click", openDmateInstallHelp);
+    button.addEventListener("click", openDmateDownloadDialog);
 
-    close?.addEventListener("click", closeDmateInstallHelp);
+    close?.addEventListener("click", closeDmateDownloadDialog);
     modal?.addEventListener("click", event => {
-        if (event.target === modal) closeDmateInstallHelp();
+        if (event.target === modal) closeDmateDownloadDialog();
     });
     document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) closeDmateInstallHelp();
+        if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) closeDmateDownloadDialog();
     });
 
 }
@@ -19628,7 +19628,7 @@ document.addEventListener(
     () => {
         removeDeprecatedCopyControls();
         initAppearanceSystem();
-        initDmateInstall();
+        initDmateDownloadDialog();
         installRichSelectionCopy();
         initMobileAppShell();
         installMobileVisualViewportFix();

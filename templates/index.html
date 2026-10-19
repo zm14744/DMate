@@ -23,9 +23,9 @@
 <meta name="msvalidate.01" content="8032784D58887350AB61D823FFE7933B" />
 <meta name="baidu-site-verification" content="codeva-486FjOU4sO" />
 <script>
-/* 迁移清理：注销旧版 DMate Service Worker、删除旧缓存；不再提供网页 PWA 安装功能。 */
+/* 仅迁移清理旧版 DMate Service Worker 与历史缓存；不注册新 Worker，也不提供网页应用安装功能。 */
 (function () {
-    var reloadKey = "dmate-legacy-worker-cleanup-reloaded";
+    var reloadKey = "dmate-legacy-worker-cleanup-v2-reloaded";
     var cleanupTasks = [];
 
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
@@ -4274,14 +4274,14 @@ body[data-appearance-theme="light"] .kg-node-badge,
 }
 
 /* 左侧底部三个入口统一留出 8px 间距，避免按钮彼此贴合。 */
-.install-entry,
+.download-entry,
 .account-entry,
 .appearance-entry {
     flex:0 0 auto;
     min-height:46px;
     margin-bottom:0 !important;
 }
-.install-entry {
+.download-entry {
     margin-top:8px !important;
 }
 
@@ -6096,11 +6096,11 @@ body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
     border-radius:7px;
 }
 
-#installAppBtn[hidden] {
+#downloadAppBtn[hidden] {
     display:none !important;
 }
 
-#installAppBtn {
+#downloadAppBtn {
     display:flex;
     align-items:center;
     justify-content:center;
@@ -6199,7 +6199,7 @@ body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
 
 /* 侧栏控件默认融入侧栏，只在悬停时显出层级。 */
 body[data-appearance-theme="dark"] .btn,
-body[data-appearance-theme="dark"] #installAppBtn,
+body[data-appearance-theme="dark"] #downloadAppBtn,
 body[data-appearance-theme="dark"] #accountOpenBtn,
 body[data-appearance-theme="dark"] #appearanceOpenBtn {
     background:transparent;
@@ -6208,7 +6208,7 @@ body[data-appearance-theme="dark"] #appearanceOpenBtn {
 }
 
 body[data-appearance-theme="dark"] .btn:hover,
-body[data-appearance-theme="dark"] #installAppBtn:hover,
+body[data-appearance-theme="dark"] #downloadAppBtn:hover,
 body[data-appearance-theme="dark"] #accountOpenBtn:hover,
 body[data-appearance-theme="dark"] #appearanceOpenBtn:hover {
     background:#212121;
@@ -6339,7 +6339,7 @@ body[data-appearance-theme="dark"] .right {
 
 /* 新对话与左下三个入口保留明确、统一的按钮轮廓。 */
 body[data-appearance-theme="dark"] .left > .btn,
-body[data-appearance-theme="dark"] #installAppBtn,
+body[data-appearance-theme="dark"] #downloadAppBtn,
 body[data-appearance-theme="dark"] #accountBtn,
 body[data-appearance-theme="dark"] #appearanceBtn {
     background:#242424 !important;
@@ -6349,7 +6349,7 @@ body[data-appearance-theme="dark"] #appearanceBtn {
     box-shadow:none !important;
 }
 body[data-appearance-theme="dark"] .left > .btn:hover,
-body[data-appearance-theme="dark"] #installAppBtn:hover,
+body[data-appearance-theme="dark"] #downloadAppBtn:hover,
 body[data-appearance-theme="dark"] #accountBtn:hover,
 body[data-appearance-theme="dark"] #appearanceBtn:hover {
     background:#2d2d2d !important;
@@ -6450,32 +6450,32 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
 }
 
 /* 跨平台下载弹窗：桌面居中，手机底部弹出。 */
-.install-help-card {
+.download-modal-card {
     width:min(520px, calc(100vw - 32px));
     max-height:min(680px, calc(100dvh - 48px));
 }
-.install-help-body {
+.download-modal-body {
     padding:18px 20px 22px;
     overflow:auto;
     color:var(--text-primary);
 }
-.install-help-platform {
+.download-platform {
     margin-bottom:10px;
     font-weight:700;
     font-size:1.02em;
 }
-.install-help-text {
+.download-description {
     color:var(--text-secondary);
     line-height:1.65;
 }
-.install-help-actions {
+.download-actions {
     display:flex;
     flex-wrap:wrap;
     gap:10px;
     margin-top:14px;
 }
-.install-help-actions[hidden] { display:none !important; }
-.install-help-actions a {
+.download-actions[hidden] { display:none !important; }
+.download-actions a {
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -6487,19 +6487,19 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
     text-decoration:none;
     font-weight:700;
 }
-.install-help-actions a.secondary {
+.download-actions a.secondary {
     background:rgba(148,163,184,.18);
     color:inherit;
     border:1px solid rgba(148,163,184,.28);
 }
 
 @media (max-width:760px) {
-    #installHelpModal {
+    #downloadModal {
         padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
         align-items:flex-end;
         justify-content:center;
     }
-    #installHelpModal .install-help-card {
+    #downloadModal .download-modal-card {
         width:100% !important;
         max-width:100% !important;
         height:auto !important;
@@ -6509,7 +6509,7 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
         border-radius:18px !important;
         box-shadow:0 22px 70px rgba(0,0,0,.38) !important;
     }
-    #installAppBtn {
+    #downloadAppBtn {
         display:flex;
     }
 }
@@ -6621,7 +6621,7 @@ body[data-appearance-theme="dark"]:not(.has-custom-background) .input-wrap {
 body[data-appearance-theme="dark"] .left { border-right-color:#1c1c1c !important; }
 body[data-appearance-theme="dark"] .right { border-left-color:#1c1c1c !important; }
 body[data-appearance-theme="dark"] .left > .btn,
-body[data-appearance-theme="dark"] #installAppBtn,
+body[data-appearance-theme="dark"] #downloadAppBtn,
 body[data-appearance-theme="dark"] #accountBtn,
 body[data-appearance-theme="dark"] #appearanceBtn,
 body[data-appearance-theme="dark"] .learning-actions button {
@@ -6629,7 +6629,7 @@ body[data-appearance-theme="dark"] .learning-actions button {
     border-color:#242424 !important;
 }
 body[data-appearance-theme="dark"] .left > .btn:hover,
-body[data-appearance-theme="dark"] #installAppBtn:hover,
+body[data-appearance-theme="dark"] #downloadAppBtn:hover,
 body[data-appearance-theme="dark"] #accountBtn:hover,
 body[data-appearance-theme="dark"] #appearanceBtn:hover,
 body[data-appearance-theme="dark"] .learning-actions button:hover {
@@ -8135,7 +8135,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
     <button class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
-    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app or is_ios %} hidden{% endif %}>{% if is_android %}下载 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
+    <button id="downloadAppBtn" class="btn download-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app or is_ios %} hidden{% endif %}>{% if is_android %}下载 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
     <button id="accountBtn" class="btn account-entry" type="button"><span class="account-entry-dot" aria-hidden="true"></span><span id="accountEntryLabel">登录 / 注册</span></button>
     <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor"/></svg></span><span>外观</span></button>
 </div>
@@ -8333,16 +8333,16 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
 
 
-<div id="installHelpModal" class="modal hidden" aria-hidden="true">
-    <div class="modal-card install-help-card" role="dialog" aria-modal="true" aria-labelledby="installHelpTitle">
+<div id="downloadModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card download-modal-card" role="dialog" aria-modal="true" aria-labelledby="downloadModalTitle">
         <div class="modal-head">
-            <div id="installHelpTitle">下载 DMate</div>
-            <button id="installHelpClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
+            <div id="downloadModalTitle">下载 DMate</div>
+            <button id="downloadModalClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
         </div>
-        <div class="install-help-body">
-            <div id="installHelpPlatform" class="install-help-platform"></div>
-            <div id="installHelpText" class="install-help-text"></div>
-            <div id="installHelpActions" class="install-help-actions" hidden></div>
+        <div class="download-modal-body">
+            <div id="downloadPlatform" class="download-platform"></div>
+            <div id="downloadDescription" class="download-description"></div>
+            <div id="downloadActions" class="download-actions" hidden></div>
         </div>
     </div>
 </div>
@@ -8785,7 +8785,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-package-only-v37-20261020"></script>
+<script src="/static/script.js?v=dmate-package-only-v38-20261020"></script>
 
 </body>
 </html>
