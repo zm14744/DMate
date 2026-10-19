@@ -9,7 +9,6 @@ from generate_icons import draw_mark, STROKE, TAB_STROKE, SAFARI_TAB_STROKE, WHI
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "static" / "icons"
 DESKTOP = ROOT / "desktop" / "src-tauri" / "icons"
-MASTER = ROOT / "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
 
 
 def rgba(path):

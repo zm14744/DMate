@@ -25,6 +25,29 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
+<script>
+/* 清理旧版网页应用残留；不注册新的 Service Worker。 */
+(function () {
+    if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+            return Promise.all(registrations.map(function (registration) {
+                var worker = registration.active || registration.waiting || registration.installing;
+                if (!worker || !/\\/service-worker\\.js(?:\\?|$)/.test(worker.scriptURL)) return false;
+                return registration.unregister();
+            }));
+        }).catch(function () {});
+    }
+    if ("caches" in window) {
+        window.caches.keys().then(function (keys) {
+            return Promise.all(keys.filter(function (key) {
+                return /^dmate-pwa-/i.test(key);
+            }).map(function (key) {
+                return window.caches.delete(key);
+            }));
+        }).catch(function () {});
+    }
+})();
+</script>
 
 {% if is_search_crawler %}
 <!-- Bing and other search crawlers always receive the same stable, opaque DMate brand icon. -->

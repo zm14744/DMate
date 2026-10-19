@@ -116,6 +116,8 @@ assert(!js.includes("registerDmateServiceWorker"));
 assert(!html.includes('rel="manifest"'));
 assert(!html.includes("PWA / APK"));
 assert(!html.includes("PWA 安装说明"));
+assert(html.includes("navigator.serviceWorker.getRegistrations"), "Legacy worker cleanup must remain for old installs");
+assert(!html.includes("navigator.serviceWorker.register"), "Do not register a new worker");
 assert(!app.includes('@app.route("/manifest.webmanifest")'));
 assert(!app.includes('@app.route("/manifest-mobile.webmanifest")'));
 assert(!app.includes('@app.route("/service-worker.js")'));
