@@ -19533,9 +19533,14 @@ function installGuideForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad · " + browserName,
-            text:"查看当前设备可用的安装方式。",
-            steps:[],
-            actions:[]
+            text:"下载 DMate 描述文件，在 iPhone 或 iPad 的“设置”中安装即可添加桌面入口；这是网页快捷方式，不是原生 IPA。",
+            steps:[
+                "请在 Safari 中下载并允许描述文件。",
+                "打开“设置”→“已下载描述文件”→“安装”。如果没有该选项，可检查“设置”→“通用”→“VPN 与设备管理”。"
+            ],
+            actions:[
+                { label:"下载 · iPhone / iPad 描述文件", url:"/DMate.mobileconfig" }
+            ]
         };
     }
     if (platform === "windows") {
