@@ -77,6 +77,18 @@ assert.equal(windowsActions.at(-1).url, itch, "Windows itch.io must be last");
 const linuxActions = guide("linux").actions;
 assert.equal(linuxActions.at(-1).url, "https://snapcraft.io/dmate",
     "Snap Store must follow all Linux GitCode/GitHub packages");
+const labels = platform => guide(platform).actions.map(action => action.label);
+assert.deepEqual(labels("android"), ["GitCode · APK", "GitHub · APK", "itch.io"]);
+assert.deepEqual(labels("windows"), ["GitCode · EXE", "GitHub · EXE", "Microsoft Store", "itch.io"]);
+assert.deepEqual(labels("macos"), ["GitCode · DMG", "GitHub · DMG", "itch.io"]);
+assert.deepEqual(labels("linux"), [
+    "GitCode · DEB", "GitHub · DEB", "GitCode · AppImage", "GitHub · AppImage", "Snap Store"
+]);
+assert.deepEqual(labels("ios"), ["下载描述文件", "GitCode 备用"]);
+assert.equal(guide("android").text, "选择下载渠道获取 APK。");
+assert.equal(guide("windows").text, "选择 EXE 安装包或 Microsoft Store。");
+assert.equal(guide("macos").text, "选择 DMG 安装包下载。");
+assert.equal(guide("linux").text, "Ubuntu/Debian 选 DEB；其他 Linux 可选 AppImage 或 Snap.");
 const otherActions = guide("other").actions;
 assert.equal(otherActions[0].label, "GitCode · 国内发行版");
 assert.equal(otherActions[1].label, "GitHub · 海外备用发行版",
@@ -88,7 +100,7 @@ const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];
 assert(!modal.includes('id="installHelpNativeButton"'));
 assert(!modal.includes('id="installHelpNote"'));
-assert(html.includes("dmate-install-links-stores-v32-20261019"), "Install dialog JS cache key must change when store links change");
+assert(html.includes("dmate-install-dialog-simple-v33-20261019"), "Install dialog JS cache key must change when dialog copy changes");
 for(const platform of ["android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
