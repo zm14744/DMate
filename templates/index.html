@@ -45,34 +45,15 @@
 })();
 </script>{% endif %}
 {% if is_mac_safari %}
-<link id="dmateSafariLightFavicon" rel="icon" type="image/png" sizes="256x256" media="(prefers-color-scheme: light)" href="/static/icons/favicon-safari-light-v14.png">
-<link id="dmateSafariDarkFavicon" rel="icon" type="image/png" sizes="256x256" media="(prefers-color-scheme: dark)" href="/static/icons/favicon-safari-dark-v14.png">
+<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="256x256" href="/static/icons/favicon-safari-black-v15.png?v=dmate-safari-icon-v15-20261019">
+<link rel="shortcut icon" type="image/png" href="/static/icons/favicon-safari-black-v15.png?v=dmate-safari-icon-v15-20261019">
 {% else %}
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v7-20261019">
 <link id="dmateFavicon48" rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-favicon-v7-20261019">
 <link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v8-20261019" media="not all">
 <link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-favicon-v7-20261019">
 {% endif %}
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-pwa-unified-v13-20261019">
-<script>
-/* Safari: select one real PNG before the browser picks a stale placeholder. */
-(function () {
-    const light = document.getElementById("dmateSafariLightFavicon");
-    const dark = document.getElementById("dmateSafariDarkFavicon");
-    if (!light || !dark) return;
-    const scheme = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
-    function apply() {
-        const selected = scheme && scheme.matches ? dark : light;
-        const other = selected === dark ? light : dark;
-        other.media = "not all";
-        selected.media = "all";
-        selected.parentNode.appendChild(selected);
-    }
-    apply();
-    if (scheme && scheme.addEventListener) scheme.addEventListener("change", apply);
-    else if (scheme && scheme.addListener) scheme.addListener(apply);
-})();
-</script>
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-black-v15.png?v=dmate-safari-icon-v15-20261019">
 <title>DMate - 离散数学智能辅学系统</title>
 
 <style>

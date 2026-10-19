@@ -152,23 +152,23 @@ def main():
         svg_mark(adaptive=True), encoding="utf-8"
     )
 
-    # Safari uses the same black tile + thin white geometry in both appearance modes.
-    for filename in ("favicon-safari-light-v14.png", "favicon-safari-dark-v14.png"):
-        save_png(draw_mark(256, background=(0, 0, 0, 255),
-                          foreground=(255, 255, 255, 255), stroke_units=23, shadow=False),
-                 STATIC / filename)
+    # Safari always uses one fixed icon, regardless of macOS appearance.
+    save_png(draw_mark(256, background=(0, 0, 0, 255),
+                      foreground=(255, 255, 255, 255), stroke_units=23, shadow=False),
+             STATIC / "favicon-safari-black-v15.png")
 
-    # Apple home-screen/PWA artwork intentionally matches the other app icons in both modes.
+    # Apple home-screen/PWA artwork intentionally matches the installed app icon.
     for filename in ("apple-touch-mac-light.png", "apple-touch-mac-dark.png", "apple-touch-icon.png"):
         save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=23, shadow=False),
                  STATIC / filename)
-
+    save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=23, shadow=False),
+             STATIC / "apple-touch-icon-black-v15.png")
     summary = {}
     for path in [
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
         STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
-        STATIC / "favicon-safari-light-v14.png", STATIC / "favicon-safari-dark-v14.png",
+        STATIC / "favicon-safari-black-v15.png", STATIC / "apple-touch-icon-black-v15.png",
         STATIC / "dmate-favicon-mac-light.svg", STATIC / "dmate-favicon-mac-dark.svg",
         STATIC / "apple-touch-mac-light.png", STATIC / "apple-touch-mac-dark.png",
         TAURI / "32x32.png", TAURI / "128x128.png", TAURI / "128x128@2x.png",
