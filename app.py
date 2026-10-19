@@ -1865,9 +1865,9 @@ def favicon_ico():
         and not re.search(r"Chrome/|Chromium/|CriOS/|Edg/|OPR/|Firefox/|FxiOS/",
                           agent, re.IGNORECASE)
     )
-    # The root favicon is only a fallback. JS updates the Safari tab icon
-    # for both appearances; root requests do not expose the macOS color scheme.
-    icon = "icons/dmate-safari-light-v30.ico" if mac_safari else "icons/favicon.ico"
+    # No OS appearance in request headers. Transparent white Safari fallback
+    # cannot trigger Safari's opaque-white tile over a black square.
+    icon = "icons/dmate-safari-dark-v32.ico" if mac_safari else "icons/favicon.ico"
     response = app.send_static_file(icon)
     response.headers["Content-Type"] = "image/x-icon"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"

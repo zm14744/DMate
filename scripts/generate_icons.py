@@ -179,23 +179,22 @@ def main():
         svg_mark(background=None, stroke=TAB_STROKE), encoding="utf-8"
     )
 
-    # Safari tab favicon follows the *OS Safari toolbar* appearance, not
-    # the application's three independent UI themes:
-    # light toolbar -> black tile/white strokes; dark toolbar -> white tile/black.
-    # Fixed opaque raster assets prevent SVG recoloring/inversion, and distinct
-    # filenames avoid Safari's persistent favicon cache reusing the old design.
+    # Keep the working light-mode black tile. In dark mode Safari can
+    # paint a pale background over DARK-FILLED favicons; use TRANSPARENT
+    # background with bright WHITE vector strokes instead. Fresh path versions
+    # avoid WebKit's per-site favicon database persisting the old icon.
     for theme, background, foreground in (
         ("light", BLACK, WHITE),
-        ("dark", WHITE, BLACK),
+        ("dark", None, WHITE),
     ):
         for size in (32, 64):
             save_png(
                 draw_mark(size, background=background, foreground=foreground,
-                          rounded=True, stroke_units=SAFARI_TAB_STROKE),
-                STATIC / f"dmate-safari-{theme}-v30-{size}.png"
+                          rounded=background is not None, stroke_units=SAFARI_TAB_STROKE),
+                STATIC / f"dmate-safari-{theme}-v32-{size}.png"
             )
         save_ico(
-            STATIC / f"dmate-safari-{theme}-v30.ico",
+            STATIC / f"dmate-safari-{theme}-v32.ico",
             (16, 32, 48, 64, 128),
             background=background, foreground=foreground,
             stroke_units=SAFARI_TAB_STROKE
@@ -232,7 +231,7 @@ def main():
              background=None, stroke_units=TAB_STROKE)
 
     print(json.dumps({"status": "vector-only generation",
-                      "mac_favicon": "auto switch: light mode black/white; dark mode white/black (PNG + ICO)",
+                      "mac_favicon": "light black tile/white lines; dark transparent white lines (PNG + ICO)",
                       "formats": ["SVG", "PNG", "ICO", "ICNS"],
                       "platforms": ["PWA", "Android browser", "Windows", "macOS", "Linux"]},
                      ensure_ascii=False, indent=2))

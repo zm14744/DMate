@@ -96,37 +96,28 @@ def main():
     ):
         matches_vector(DESKTOP / filename, size)
 
-    # macOS Safari uses separate crisp icon assets for both appearances.
-    # Verify pixel-exact vector rasterization and visible contrasting strokes.
+    # macOS light mode preserves a black tile; dark mode uses no tile at all.
     for theme, background, foreground in (
-        ("light", BLACK, WHITE),
-        ("dark", WHITE, BLACK),
+        ("light", BLACK, WHITE), ("dark", None, WHITE)
     ):
         for size in (32, 64):
-            path = ICONS / f"dmate-safari-{theme}-v30-{size}.png"
+            path = ICONS / f"dmate-safari-{theme}-v32-{size}.png"
             actual = rgba(path)
-            expected = draw_mark(size, background=background,
-                                 foreground=foreground, rounded=True,
-                                 stroke_units=SAFARI_TAB_STROKE)
-            assert ImageChops.difference(actual, expected).getbbox() is None, path
-            assert actual.getpixel((size // 2, size // 2))[3] == 255
-            # Geometric edges cross the center. Use a safe upper background spot.
-            background_pixel = actual.getpixel((size // 2, size // 16))[:3]
-            expected_bg = background[:3]
-            assert all(abs(int(a) - int(b)) < 22
-                       for a, b in zip(background_pixel, expected_bg)), (
-                f"Safari {theme} background inverted: {background_pixel}"
+            expected = draw_mark(
+                size, background=background, foreground=foreground,
+                rounded=background is not None, stroke_units=SAFARI_TAB_STROKE
             )
-            pixels = [
-                actual.getpixel((x, y))[:3]
-                for x in range(size // 6, size * 5 // 6)
-                for y in range(size // 6, size * 5 // 6)
-            ]
-            if theme == "light":
-                assert any(min(rgb) > 200 for rgb in pixels), "Light Safari lacks white lines"
+            assert ImageChops.difference(actual, expected).getbbox() is None, path
+            if theme == "dark":
+                assert actual.getpixel((size // 2, size // 16))[3] == 0, (
+                    "Safari dark icon must not contain an opaque background")
+                assert any(actual.getpixel((x, y))[3] > 180
+                           for x in range(size // 6, size * 5 // 6)
+                           for y in range(size // 6, size * 5 // 6)), (
+                    "Safari dark white geometry missing")
             else:
-                assert any(max(rgb) < 55 for rgb in pixels), "Dark Safari lacks black lines"
-        check_ico(ICONS / f"dmate-safari-{theme}-v30.ico", (16, 32, 48, 64, 128))
+                assert actual.getpixel((size // 2, size // 16))[:3] == (0,0,0)
+        check_ico(ICONS / f"dmate-safari-{theme}-v32.ico", (16, 32, 48, 64, 128))
     assert rgba(ICONS / "favicon-32.png").getpixel((0, 0))[3] == 0
 
     check_ico(ICONS / "favicon.ico", (16, 32, 48, 64, 128))
@@ -200,14 +191,15 @@ def main():
         assert native_app == unchanged, "Native Android APK should not receive PWA icon overrides"
 
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
-    assert "dmate-safari-light-v30-64.png" in html
-    assert "dmate-safari-dark-v30-64.png" not in html  # dynamic href, not fixed
+    assert 'icon.href = "/static/icons/dmate-safari-" + theme + "-v32-64.png";' in html
     assert 'const theme = appearance && appearance.matches ? "dark" : "light";' in html
+    assert 'document.head.appendChild(icon)' in html
+    assert 'current.replaceWith(icon)' in html
     assert 'appearance.addEventListener("change", updateSafariTabIcon)' in html
     assert 'appearance.addListener(updateSafariTabIcon)' in html
-    assert "dmate-safari-light-v30.ico" in html
+    assert 'dmate-safari-light-v30' not in html
     assert "dmate-win-tab-v21" in html
-    print("PASS adaptive macOS Safari light/dark favicons, Windows, Android, PWA, ICO and ICNS")
+    print("PASS macOS Safari dark transparent white icon, light black tile, Android/Windows/PWA")
 
 
 if __name__ == "__main__":

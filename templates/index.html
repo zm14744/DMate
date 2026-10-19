@@ -58,26 +58,28 @@
 })();
 </script>{% endif %}
 {% if is_mac_safari %}
-<!-- Safari adapts to macOS appearance: light toolbar -> black/white icon,
-     dark toolbar -> white/black. Assets are independent PNG/ICO (not SVG).
-     Only the Safari TAB favicon changes; PWA/native icons stay untouched. -->
-<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-safari-light-v30-64.png">
-<link id="dmateSafariFaviconFallback" rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-safari-light-v30.ico">
+<!-- Safari: select a single PNG favicon BEFORE first insertion using
+     macOS appearance. Dark mode uses transparent white linework to avoid
+     Safari auto-adding a pale square over dark-filled artwork. -->
 <script>
 (function () {
     const appearance = window.matchMedia
         ? window.matchMedia("(prefers-color-scheme: dark)")
         : null;
+    let selectedTheme = null;
     function updateSafariTabIcon() {
         const theme = appearance && appearance.matches ? "dark" : "light";
-        const icon = document.getElementById("dmateSafariFavicon");
-        const fallback = document.getElementById("dmateSafariFaviconFallback");
-        const png = "/static/icons/dmate-safari-" + theme + "-v30-64.png";
-        const ico = "/static/icons/dmate-safari-" + theme + "-v30.ico";
-        if (icon && icon.getAttribute("href") !== png) icon.setAttribute("href", png);
-        if (fallback && fallback.getAttribute("href") !== ico) {
-            fallback.setAttribute("href", ico);
-        }
+        if (theme === selectedTheme) return;
+        const icon = document.createElement("link");
+        icon.id = "dmateSafariFavicon";
+        icon.rel = "icon";
+        icon.type = "image/png";
+        icon.sizes = "64x64";
+        icon.href = "/static/icons/dmate-safari-" + theme + "-v32-64.png";
+        const current = document.getElementById("dmateSafariFavicon");
+        if (current) current.replaceWith(icon);
+        else document.head.appendChild(icon);
+        selectedTheme = theme;
     }
     updateSafariTabIcon();
     if (appearance) {
