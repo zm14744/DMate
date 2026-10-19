@@ -38,7 +38,7 @@
 - [ ] Windows Tauri：安装、启动、剪贴板、远程网页更新；若只更网页不应声称 EXE 本体自动升级。
 - [ ] Linux DEB / AppImage：在目标发行版分别安装/启动；Snap `amd64` 在具有 `snapd` 的目标环境验收，单独核实 Store 渠道。
 - [ ] Android：网络启动、文件/图片选择、系统返回键、底部输入框、图谱与复制体验；原生 APK 变化必须重构。
-- [ ] iPhone / iPad：测试 `.mobileconfig` WebClip 描述文件安装、图标与官网打开；确认不包含 MDM、证书或 VPN 负载。
+- [ ] iPhone / iPad：确认安装弹窗不显示 PWA/WebClip 入口，官网仍可通过浏览器正常访问。
 
 ## 6. 结论填写原则
 

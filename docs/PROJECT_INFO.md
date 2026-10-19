@@ -25,7 +25,7 @@
 
 ## 近期研发时间线
 
-> **补充记录（2026-10-13）**：9/28—10/8 的 11 天是集中功能开发阶段，后续 10/9—10/13 的五天继续推进客户端分发、iOS WebClip、Snap Store、应用商店发布申请与搜索引擎验证/SEO，不应因旧文档止于 10 月 8 日而忽略后续投入。
+> **补充记录（2026-10-13）**：9/28—10/8 的 11 天是集中功能开发阶段，后续 10/9—10/13 的五天继续推进客户端分发、曾测试的 iOS WebClip、Snap Store、应用商店发布申请与搜索引擎验证/SEO。iOS WebClip 与网页 PWA 安装链路现已移除。
 
 
 **2026 年 9 月 28 日至 10 月 8 日**是 DMate 最近一轮持续开发、部署与测试的集中迭代期，共跨越 **11 个自然日**。在这段时间内，围绕 OCR 与图形理解、教学和难度控制、账号及云同步、移动端交互、Windows/Android 远程网页客户端、知识图谱、复制与导出、回归检查及说明文档进行完善。具体事项并非都在同一天完成；本区间也不是 DMate 的最初开发时间，早期项目记录不应被覆盖或改写。
@@ -40,12 +40,12 @@
 | **Snap Store** | [`dmate` 1.0.0 / Revision 1 / Stable](https://snapcraft.io/dmate) 已正式发布，当前 AMD64。 |
 | **itch.io** | 项目已设为 Public，提供 Windows EXE、Android APK、macOS DMG。 |
 | Android | 以独立 WebView APK 分发；Uptodown 因纯网页封装曾拒绝。 |
-| iPhone / iPad | 保留 `.mobileconfig` Apple WebClip 描述文件，添加官网入口到主屏幕；不是原生 IPA。 |
+| iPhone / iPad | 通过浏览器直接访问官网；目前无独立安装包。 |
 | **Microsoft Store** | 开发者于 2026-10-14 确认审核通过并正式上架。 |
 | Bing / 百度 | Bing 已可公开检索；百度已验证站点并提交首页，仍需等待索引结果。 |
 | Product Hunt | 历史资料已提交/预约，尚无新的正式公开发布确认。 |
 
-当前公开软件分发以 **Microsoft Store、Snap Store、itch.io、GitHub Release 与 iOS WebClip** 为准。安装包公开、商店上架、设备实机安装和搜索引擎索引是不同阶段，不应混为一谈。
+当前公开软件分发以 **Microsoft Store、Snap Store、itch.io、GitCode 与 GitHub Release** 为准。iOS WebClip 与网页 PWA 安装入口已移除。安装包公开、商店上架、设备实机安装和搜索引擎索引是不同阶段，不应混为一谈。
 
 ## 产品定位
 

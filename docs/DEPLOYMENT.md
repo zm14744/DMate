@@ -247,8 +247,8 @@ node --check static/script.js
 - **macOS**：使用通用 DMG；通过 GitCode、GitHub Release 或 itch.io 获取。当前尚无已确认的正式 Apple 公证。
 - **Linux AMD64**：提供 DEB、AppImage 与 [Snap Store](https://snapcraft.io/dmate)。Snap 需要 `snapd`，并且只确认 AMD64 发行。
 - **Android**：使用独立 WebView APK，通过 GitCode、GitHub Release 或 itch.io 分发。
-- **iPhone / iPad**：`GET /DMate.mobileconfig` 提供 Apple WebClip 描述文件，将官网添加到主屏幕；不提供原生 IPA，也不安装 MDM、证书或 VPN。
-- **网页安装流程**：旧的 Web App Manifest、Service Worker、`/pwa/` 与 `/install` 安装引导页已移除。网页安装弹窗只负责展示平台安装包和应用商店链接。
+- **iPhone / iPad**：目前没有独立安装包，直接通过浏览器访问官网。旧的 `/DMate.mobileconfig` WebClip 路由已移除。
+- **网页安装流程**：Web App Manifest、Service Worker 注册、`/pwa/`、`/install`、PWA 安装说明和 iOS WebClip 安装入口均已移除。网页安装弹窗只展示平台安装包和应用商店链接；仅保留一次性清理旧版 Service Worker/缓存的兼容代码。
 
 商店发布、安装包可下载、设备实机安装与搜索结果收录是不同状态，应分别记录；不要将构建成功或申请受理表述为所有设备已通过验收。
 

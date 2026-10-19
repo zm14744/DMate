@@ -16,13 +16,13 @@
 - [`CHANGELOG.md`](../CHANGELOG.md)：主要代码调整记录
 
 
-**当前进度（更新至 2026-10-19）**：Microsoft Store 已正式上架；itch.io 已公开发布；Snap Store `dmate` 1.0.0 / Revision 1 已在 Stable；Bing 已可公开检索到 DMate。网页 PWA 安装链路已移除，iOS 保留 WebClip 描述文件入口；百度仍需等待索引，Uptodown 曾拒绝。具体状态以 [`../README.md`](../README.md) 与 [`PROJECT_INFO.md`](PROJECT_INFO.md) 为准。
+**当前进度（更新至 2026-10-20）**：Microsoft Store 已正式上架；itch.io 已公开发布；Snap Store `dmate` 1.0.0 / Revision 1 已在 Stable；Bing 已可公开检索到 DMate。网页 PWA 安装链路与 iOS WebClip 描述文件入口均已移除；iOS 通过浏览器访问官网。百度仍需等待索引，Uptodown 曾拒绝。具体状态以 [`../README.md`](../README.md) 与 [`PROJECT_INFO.md`](PROJECT_INFO.md) 为准。
 
 最新功能说明：OCR 非题目拦截和移动端交互见 [`API.md`](API.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)；部署与远程网页更新见 [`DEPLOYMENT.md`](DEPLOYMENT.md)；离线测试与未完成验收范围见 [`TESTING.md`](TESTING.md)。
 
 ## 2026-10-13 文档增补导航
 
-- **新一轮工作记录**：根目录 `CHANGELOG.md` 的“2026-10-09—2026-10-13”章节，包括 GitHub Actions、Snap Stable、iOS WebClip、商店/搜索引擎进展与最新 API 消费快照。
+- **新一轮工作记录**：根目录 `CHANGELOG.md` 的“2026-10-09—2026-10-13”章节，包括 GitHub Actions、Snap Stable、曾测试后移除的 iOS WebClip、商店/搜索引擎进展与最新 API 消费快照。
 - **用户功能/支持平台**：`../README.md` 的“下载与商店分发”；功能说明仍以原有“核心功能”章节为准。
 - **平台构建与认证**：`DEPLOYMENT.md` 的新增第 10—12 节；注意发布凭据只保存在 GitHub Actions Secret。
 - **浏览器/原生壳架构**：`ARCHITECTURE.md` 的新增第 17—18 节；接口补充见 `API.md`。

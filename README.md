@@ -32,7 +32,7 @@ DMate 是面向高校离散数学学习场景的 AI 智能辅学产品。系统�
 - **10 月上旬**：围绕账号注册登录、PostgreSQL 数据同步、跨设备使用、远程网页客户端、部署与移动端交互持续完善。
 - **截至 10 月 8 日**：集中排查 AI 练习生成及难度误判、同知识点复测、OCR 非题目图片处理和识别中按钮状态；完成相关离线回归、文档及测试记录整理。
 
-- **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；完善 iOS 主屏幕 WebClip 与 Linux 安装说明；推进应用商店及搜索引擎收录。
+- **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；曾测试 iOS WebClip，后续已随网页安装入口清理而移除。
 - **10 月 14 日**：补充错题复测与 OCR 容错修复；itch.io 项目已设为 Public，提供 macOS、Windows、Android 安装包；**微软商店 Microsoft Store 审核通过，DMate 正式上架**；记录此前的网页应用目录申请（后续不再作为当前发行渠道）、Uptodown 审核拒绝，并据开发者反馈记录 Bing 公开搜索已可检索到 DMate。
 
 以上按**阶段**归纳，不等于每天都有独立发布或所有功能已完成线上验收。详细历史见 [`CHANGELOG.md`](CHANGELOG.md)。
@@ -213,7 +213,7 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 
 ## 下载与商店分发（更新至 2026-10-19）
 
-**网页版**：https://dmate.zeabur.app/ ，可以直接在线使用。Windows、macOS、Linux 和 Android 使用独立安装包；iPhone / iPad 通过 WebClip 描述文件添加官网入口。网页 AI、OCR、账号和同步功能均需要联网。
+**网页版**：https://dmate.zeabur.app/ ，可以直接在线使用。Windows、macOS、Linux 和 Android 使用独立安装包；iPhone / iPad 直接通过浏览器访问网页。网页 AI、OCR、账号和同步功能均需要联网。
 
 | 渠道 / 平台 | 当前状态与说明 |
 |---|---|
@@ -222,8 +222,8 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 | Windows / macOS / Linux | 提供独立桌面安装包；macOS 构建尚无已确认的正式 Apple 公证。 |
 | **Snap Store** | [dmate](https://snapcraft.io/dmate) 1.0.0 / Revision 1 / Stable 已发布；当前为 AMD64，需要 `snapd`。 |
 | **itch.io** | [DMate 项目页](https://zm14744.itch.io/dmate) 已公开，提供 Windows EXE、macOS DMG 和 Android APK。 |
-| Android | 通过 GitCode、GitHub Release 或 itch.io 获取 APK；网页安装入口不提供 Android PWA。 |
-| iPhone / iPad | [下载 WebClip 描述文件](https://dmate.zeabur.app/DMate.mobileconfig)，将 DMate 官网添加到主屏幕。它是网页入口，不是原生 IPA 或 App Store 应用。 |
+| Android | 通过 GitCode、GitHub Release 或 itch.io 获取 APK。 |
+| iPhone / iPad | 直接通过浏览器访问网页版；目前没有原生 iOS 安装包。 |
 | **Microsoft Store** | [DMate 产品页](https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK)；开发者已确认正式上架。 |
 | 百度搜索 | 已完成站点验证与首页提交，仍需等待爬取、索引及公开结果刷新。 |
 | Bing 搜索 | 已可在公开搜索中找到 DMate；图标与摘要更新仍受 Bing 抓取和缓存影响。 |
@@ -237,13 +237,13 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 | Linux（AMD64） | Snap Store | GitCode / GitHub 的 DEB、AppImage |
 | Android | GitCode APK | GitHub Release、itch.io |
 | macOS | GitCode DMG | GitHub Release、itch.io |
-| iOS / iPadOS | 官网 WebClip 描述文件 | GitCode 备用描述文件下载 |
+| iOS / iPadOS | 浏览器直接访问官网 | 暂无独立安装包 |
 
-安装弹窗只列出平台安装包和应用商店入口。iOS 的 `.mobileconfig` 仅添加官网 WebClip，不安装设备管理、证书或 VPN，也不是原生 App。GitHub、GitCode、itch.io 的实际可达性可能因网络环境而异；商店上架或文件公开不等于所有设备均已完成实机安装验收。
+安装弹窗只列出平台安装包和应用商店入口；网页 PWA 安装引导与 iOS WebClip 描述文件均已移除。GitHub、GitCode、itch.io 的实际可达性可能因网络环境而异；商店上架或文件公开不等于所有设备均已完成实机安装验收。
 
 Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 三种途径：Ubuntu/Debian/Mint 可选 DEB，其他发行版可尝试 AppImage，已启用 `snapd` 的系统可安装 Snap。只需选择一种方式；Snap 当前仅 AMD64，AppImage 可能需要 FUSE。
 
-**iOS / iPadOS**：通过 DMate WebClip 描述文件将官网添加到主屏幕。它只是网页入口，AI、OCR、账号和同步功能依赖网络；项目没有 Apple App Store 原生 IPA。
+**iOS / iPadOS**：通过浏览器直接访问官网。项目目前没有 Apple App Store 原生 IPA。
 
 **商店与 SEO 的验证边界**：Microsoft Store 已由开发者确认正式上架；Snap Revision 1 Stable 有发布记录，itch.io 已公开发布，Bing 已可公开检索。提交、上架、可下载、可搜索、真实安装通过属于不同阶段。
 
@@ -288,7 +288,7 @@ flowchart TD
 - **后端能力**（`app.py`、`teaching.py`、`knowledge_graph.json`）更新并成功部署到 Zeabur 后，已安装客户端的新请求会使用更新后的服务端逻辑；无需重新打包客户端。
 - **网页前端**（`static/script.js`、`templates/index.html` 等）更新并成功部署后，客户端重新加载远程页面即可获取新版；若旧资源还在缓存中，可关闭重开或刷新页面。
 - **原生壳**（Android Java / Manifest / Gradle、Tauri Rust / 配置 / 权限等）本身有变更时，需要重新构建、分发并安装新版本。当前工程**没有实现安装包二进制自动更新**；远程网页更新不等于安装包自动升级。
-- iOS / iPadOS 通过 `.mobileconfig` WebClip 添加官网入口；它打开在线网页，不提供离线 AI 能力。
+- iOS / iPadOS 通过浏览器直接访问在线网页；目前没有独立安装包。
 
 更详细的部署流程与更新边界见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)。
 
