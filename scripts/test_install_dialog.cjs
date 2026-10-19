@@ -77,6 +77,12 @@ assert.equal(windowsActions.at(-1).url, itch, "Windows itch.io must be last");
 const linuxActions = guide("linux").actions;
 assert.equal(linuxActions.at(-1).url, "https://snapcraft.io/dmate",
     "Snap Store must follow all Linux GitCode/GitHub packages");
+const otherActions = guide("other").actions;
+assert.equal(otherActions[0].label, "GitCode · 国内发行版");
+assert.equal(otherActions[1].label, "GitHub · 海外备用发行版",
+    "Generic fallback must list GitHub before store options");
+assert.equal(otherActions[2].url, "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK");
+assert.equal(otherActions[3].url, "https://snapcraft.io/dmate");
 
 const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];

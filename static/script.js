@@ -19594,9 +19594,9 @@ function installGuideForCurrentPlatform() {
         steps:[],
         actions:[
             { label:"GitCode · 国内发行版", url:gitcodeRelease },
+            { label:"GitHub · 海外备用发行版", url:githubRelease, secondary:true },
             { label:"Microsoft Store（Windows）", url:microsoftStore, secondary:true },
-            { label:"Snap Store（Linux）", url:snap, secondary:true },
-            { label:"GitHub · 海外备用发行版", url:githubRelease, secondary:true }
+            { label:"Snap Store（Linux）", url:snap, secondary:true }
         ]
     };
 }
