@@ -105,8 +105,10 @@ def main():
                              rounded=True, stroke_units=SAFARI_TAB_STROKE)
         assert ImageChops.difference(actual, expected).getbbox() is None, path
         assert actual.getpixel((size // 2, size // 2))[3] == 255
-        assert min(actual.getpixel((size // 2, size // 2))[:3]) > 230, (
-            "Safari favicon center should remain light, not invert to black"
+        # Check a point in the actual background, outside the geometric paths.
+        # The exact center can be crossed by a black polyhedron edge.
+        assert min(actual.getpixel((size // 2, size // 16))[:3]) > 230, (
+            "Safari favicon background should remain light, not invert to black"
         )
         assert any(sum(actual.getpixel((x, y))[:3]) < 150
                    for x in range(size // 6, size * 5 // 6)
