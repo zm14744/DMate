@@ -12,6 +12,7 @@ on:
       - "app.py"
       - "static/script.js"
       - "scripts/test_pwa_install_support.cjs"
+      - "scripts/test_ios_webclip.py"
       - ".github/workflows/sync-icon-assets.yml"
 permissions:
   contents: write
@@ -25,6 +26,8 @@ jobs:
           python -m pip install --disable-pip-version-check Pillow==11.3.0
           python scripts/generate_icons.py
           python scripts/check_icon_assets.py
+      - name: Verify iOS and iPadOS Web Clip profile
+        run: python scripts/test_ios_webclip.py
       - name: Test PWA install gating
         run: node scripts/test_pwa_install_support.cjs
       - name: Commit canonical binaries
