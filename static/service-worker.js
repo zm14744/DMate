@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-pwa-unified-v17-20261019";
+const CACHE_NAME = "dmate-pwa-unified-v18-20261019";
 const SHELL_ASSETS = [
   "/",
   "/pwa/",
@@ -13,8 +13,8 @@ const SHELL_ASSETS = [
   "/static/icons/dmate-favicon-mac-dark.svg?v=mac-favicon-v8-20261019&mode=dark",
   "/static/icons/dmate-favicon-mac.svg?v=mac-adaptive-lines-v4-20261019",
   "/static/icons/favicon-app.ico",
-  "/static/icons/favicon-safari-black-v15.png",
-  "/static/icons/apple-touch-icon-black-v15.png",
+  "/static/icons/safari-fixed-black-v18.png",
+  "/static/icons/apple-touch-fixed-black-v18.png",
   "/static/icons/apple-touch-icon.png",
   "/static/icons/apple-touch-mac-light.png?v=mac-touch-light-v6-20261019",
   "/static/icons/apple-touch-mac-dark.png?v=mac-touch-dark-v6-20261019",

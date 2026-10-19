@@ -45,8 +45,9 @@
 })();
 </script>{% endif %}
 {% if is_mac_safari %}
-<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="256x256" href="/static/icons/favicon-safari-black-v15.png?v=dmate-safari-icon-v15-20261019">
-<link rel="shortcut icon" type="image/png" href="/static/icons/favicon-safari-black-v15.png?v=dmate-safari-icon-v15-20261019">
+<!-- Safari sees one fixed opaque black installed-app icon in BOTH appearances. -->
+<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="180x180" href="/static/icons/safari-fixed-black-v18.png">
+<link rel="shortcut icon" type="image/png" href="/static/icons/safari-fixed-black-v18.png">
 {% elif is_android_browser %}
 <!-- Android browsers including QQ, Quark and Baidu often create home shortcuts
      from favicon (not manifest). Use the same opaque black installed-app artwork. -->
@@ -59,7 +60,7 @@
 <link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v8-20261019" media="not all">
 <link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-favicon-v7-20261019">
 {% endif %}
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-unified-v16.png?v=dmate-pwa-unified-v16-20261019">
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="{% if is_mac_safari %}/static/icons/apple-touch-fixed-black-v18.png{% else %}/static/icons/apple-touch-icon-unified-v16.png?v=dmate-pwa-unified-v16-20261019{% endif %}">
 <title>DMate - 离散数学智能辅学系统</title>
 
 <style>

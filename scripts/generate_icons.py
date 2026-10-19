@@ -200,11 +200,16 @@ def main():
         "apple-touch-icon-unified-v16.png",
     ):
         save_png(from_installed_icon(180), STATIC / filename)
+    # Use the same fixed black background + thin white geometry for Safari
+    # favicon and Safari's installed-site icon, regardless of macOS theme.
+    for filename in ("safari-fixed-black-v18.png", "apple-touch-fixed-black-v18.png"):
+        save_png(from_installed_icon(180), STATIC / filename)
     summary = {}
     for path in [
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
         STATIC / "icon-192-unified-v16.png", STATIC / "icon-512-unified-v16.png",
         STATIC / "apple-touch-icon-unified-v16.png",
+        STATIC / "safari-fixed-black-v18.png", STATIC / "apple-touch-fixed-black-v18.png",
         STATIC / "mobile-favicon-32-v17.png", STATIC / "mobile-favicon-192-v17.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
         STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
