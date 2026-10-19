@@ -2,6 +2,13 @@
 
 > **历史快照说明**：2026-10-13 提交 `296b3388` 当时没有 `tests/` 目录；**当前 `main` 已有 `tests/test_retest_ocr_regression.py`**，其 5 项专项离线测试与历史“10/10”记录不是同一批。175 项 Excel 结果仍是预填而非全部实时验证，详见 [`docs/TESTING.md`](docs/TESTING.md)。
 
+## 2026-10-19：移除网页 PWA 安装链路
+
+- 删除网页 Manifest、Service Worker、`/pwa/` 与 `/install` 安装引导页，以及 `beforeinstallprompt` / 安装说明按钮逻辑。
+- 清理仅供网页 PWA 使用的图标资源；安装弹窗仅保留平台安装包、商店链接与 iOS `.mobileconfig` WebClip 入口。
+- 首页保留一段旧 Service Worker 清理代码：仅用于注销历史注册并删除 `dmate-pwa-*` 缓存，不会注册新的 Worker。
+- 既有 PWAStore / PWA Directory 记录仅作为历史，不再作为当前分发渠道。
+
 ## 2026-10-14：微软商店 Microsoft Store 正式上架（最新补充）
 
 - 开发者确认：**微软商店已通过 DMate 的认证审核，DMate 已在 Microsoft Store 正式上架**。此前文档中的“提交审核中”“认证中”属于本日较早的状态，不再代表最新进度。

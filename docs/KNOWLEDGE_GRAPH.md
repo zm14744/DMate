@@ -124,4 +124,4 @@
 
 ## 2026-10-13 文档与跨端边界更新
 
-经过近期多端打包/PWA/商店分发，知识图谱的业务数据仍由 `knowledge_graph.json` 驱动，**本文 10 模块、68 节点是所依据的既有知识版本**，此次文档更新没有增加节点或改变 prerequisite 依赖。Web、Android WebView、Tauri Linux/Windows/macOS 与 iOS Safari PWA 共享远程页面学习逻辑；手机/浏览器的缩放、图谱文字和 PNG 剪贴板体验需按对应设备检查，不能因为桌面版本能够复制图片就推断 iOS/所有 Linux 桌面均有相同剪贴板权限。
+经过近期多端打包、WebClip 与商店分发，知识图谱的业务数据仍由 `knowledge_graph.json` 驱动，**本文 10 模块、68 节点是所依据的既有知识版本**，此次文档更新没有增加节点或改变 prerequisite 依赖。Web、Android WebView、Tauri Linux/Windows/macOS 与 iOS Safari WebClip 共享远程页面学习逻辑；手机/浏览器的缩放、图谱文字和 PNG 剪贴板体验需按对应设备检查，不能因为桌面版本能够复制图片就推断 iOS/所有 Linux 桌面均有相同剪贴板权限。

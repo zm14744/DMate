@@ -5,8 +5,8 @@
 ## 1. 自动/离线检查
 
 - [ ] Python 6 个源文件能通过 `python -m py_compile app.py ai.py teaching.py ocr.py graph_recognition.py classification_semantic.py`。
-- [ ] `node --check static/script.js`、`node --check static/service-worker.js` 不报语法错误。
-- [ ] `knowledge_graph.json`、`static/manifest.webmanifest`、`desktop/src-tauri/tauri.conf.json` 可解析。
+- [ ] `node --check static/script.js` 不报语法错误。
+- [ ] `knowledge_graph.json`、`desktop/src-tauri/tauri.conf.json` 可解析。
 - [ ] 若以后补充 `tests/`，运行 `python -m unittest discover -s tests -p 'test_*.py' -v` 并保存完整日志；当前源快照**没有**该测试套件。
 
 ## 2. 在线服务与数据安全
@@ -38,7 +38,7 @@
 - [ ] Windows Tauri：安装、启动、剪贴板、远程网页更新；若只更网页不应声称 EXE 本体自动升级。
 - [ ] Linux DEB / AppImage：在目标发行版分别安装/启动；Snap `amd64` 在具有 `snapd` 的目标环境验收，单独核实 Store 渠道。
 - [ ] Android：网络启动、文件/图片选择、系统返回键、底部输入框、图谱与复制体验；原生 APK 变化必须重构。
-- [ ] iOS Safari：添加到主屏幕、PWA 图标、在线更新与离线缓存边界；不要把 PWA 称作 IPA 或 App Store 上架。
+- [ ] iPhone / iPad：测试 `.mobileconfig` WebClip 描述文件安装、图标与官网打开；确认不包含 MDM、证书或 VPN 负载。
 
 ## 6. 结论填写原则
 

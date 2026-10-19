@@ -192,11 +192,11 @@ OCR 修复：验证识别中电脑“图片识题”和手机“＋”按钮隐�
 | GitHub Snap 构建 | `build-snap.yml` 生成 `amd64` 包；GitHub Actions 构建成功 | Snap 安装、登录、OCR、文件导出、跨发行版兼容 |
 | Snap Store 初次发布 | Store 创建 Revision 1 发布 `edge`，随后 `promote-existing` 直接发布至 `stable`，日志成功 | 用户设备真实下载安装、沙盒文件/剪贴板权限 |
 | 重复上传保护 | 重复上传完全相同 Snap 触发 Store 唯一性错误；发布流程改为已有 revision 不重新上传 | 将来新版本号与修订号增长时的回归 |
-| iOS PWA 结构检查 | 代码包含 Manifest、Service Worker、Apple meta/icon、`standalone` | iPhone 实测登录、相机上传、剪贴板、图谱、滚动、离线退化 |
+| iOS WebClip 结构检查 | `scripts/test_ios_webclip.py` 检查单一 WebClip 负载、180×180 PNG 图标及 MIME | iPhone / iPad 实测描述文件安装、主屏幕图标与官网打开 |
 | SEO 源码检查 | GitHub 模板新增 Bing/百度 meta、Description、H1、图片 Alt | Zeabur 生产 HTML 是否已切新版本、爬虫实际访问与索引 |
 | 百度站点与 URL | 百度站点所有权验证通过；首页 URL 已手动提交 | 百度爬取与收录时间、公开搜索展示 |
 | Bing | 站长后台出现 `Indexed successfully`，同日公开检索仍无结果；Site Scan 提交排队 | 重扫三个问题是否清零、搜索结果是否更新 |
-| Product Hunt / PWA 目录 | 表单与预约/应用详情页阶段 | 正式发布状态、公开可见性、截图和分类审核 |
+| Product Hunt | 历史资料有提交 / 预约记录 | 正式发布状态、公开可见性、截图和分类审核 |
 
 发布前的必要烟测：访问 `/health` 与 `/ready` → 开启网页和客户端 → 登录/注册 → 单轮 AI 出题与纠错 → OCR 实物图/纯图 → 错题复测和同步 → 数学复制/PNG/PDF → 小屏滚动/主题和文件选择。`workflow` 绿色并不替代这些端到端测试。
 
@@ -204,8 +204,8 @@ OCR 修复：验证识别中电脑“图片识题”和手机“＋”按钮隐�
 
 - 已确认：**Snap Store `dmate` 1.0.0 Revision 1 / Stable 发布**。
 - 有构建配置但未证明全平台运行：Windows NSIS、macOS universal DMG、Linux DEB/AppImage、Android debug APK。
-- iOS Web App 已有技术配置，尚无正式 App Store IPA；Microsoft Store/Uptodown 以审核后台为准，暂不写“已上架”。
-- PWAStore 详情页展示、百度“链接提交成功”、Bing“Indexed successfully”各自仅说明对应流程节点，不能互相替代或当作稳定的公开流量证明。
+- iOS 仅提供 WebClip 官网入口，不是原生 IPA；Microsoft Store/Uptodown 以实际审核状态为准。
+- 百度“链接提交成功”、Bing“Indexed successfully”各自仅说明对应流程节点，不能互相替代或当作稳定的公开流量证明。
 
 ## 12. 2026-10-13 最终打包复核（本次实际执行）
 
@@ -219,7 +219,7 @@ OCR 修复：验证识别中电脑“图片识题”和手机“＋”按钮隐�
 | JSON 配置解析 | 3/3 通过 | 知识图谱、PWA Manifest、Tauri 配置文件 |
 | 175 项表格结构与预设值 | 175 项，K 列 175 个“通过” | 仅验证记录格式与预填状态，不验证业务结果 |
 
-**本次未执行**：实际 DeepSeek API 请求、在线 OCR/Vision 识别、邮件投递、PostgreSQL 双端同步、Android 返回键与图谱实机交互、Windows/Linux/macOS 安装、iOS PWA 离线体验、Snap Store 在线状态复核。因环境缺少相应服务/设备/密钥或无法访问外网，以上场景仍以真实设备人工验收为准。
+**本次未执行**：实际 DeepSeek API 请求、在线 OCR/Vision 识别、邮件投递、PostgreSQL 双端同步、Android 返回键与图谱实机交互、Windows/Linux/macOS 安装、iOS WebClip 描述文件实机安装、Snap Store 在线状态复核。因环境缺少相应服务/设备/密钥或无法访问外网，以上场景仍以真实设备人工验收为准。
 
 当前源码未提供可直接运行的 `tests/` 测试套件：若要恢复自动回归，建议新增可提交仓库的 `tests/`，至少覆盖知识点分类、出题模式、默认中等难度、同知识点复测校验与账号/sync 边界。发布前执行顺序及阻断条件见 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)。
 
@@ -253,8 +253,6 @@ node --check static/script.js
 | itch.io | 开发者确认项目已从 Draft 设置为 **Public**，页面显示 Windows EXE、Android APK、macOS DMG 三种下载文件 | 不等于全部文件在真实设备完成安装或安全签名/公证检查 |
 | Bing 搜索 | 开发者确认 **DMate 目前能在公开搜索结果中找到**；此前 Webmaster Tools 曾出现 `Indexed successfully` | 不代表各地区与关键词排名固定，也不构成访客数量证据 |
 | 百度 | 网站所有权验证与链接提交有历史记录，目前用户表示审核/索引仍在进行 | 提交成功不等于稳定可搜索 |
-| PWAStore | 产品页面出现与 Install PWA 入口已由界面截图佐证 | 不等于 Apple App Store 上架或 iOS 原生客户端 |
-| PWA Directory | 收到进入免费发布队列的确认邮件 | 不是最终收录或正式上线证明 |
 | Microsoft Store（微软商店） | **2026-10-14 开发者最新确认审核通过并正式上架**；此前认证中记录已过时 | 商店安装/启动/更新的不同 Windows 设备实测仍需另行完成 |
 | Uptodown | 审核拒绝通知明确指出纯 WebView 封装缺少额外原生能力 | 不能宣称已上线 Uptodown |
 
