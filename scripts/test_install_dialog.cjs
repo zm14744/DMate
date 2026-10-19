@@ -66,5 +66,11 @@ const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];
 assert(!modal.includes('id="installHelpNativeButton"'));
 assert(!modal.includes('id="installHelpNote"'));
-assert(html.includes("dmate-gitcode-github-install-v28-20261019"));
+assert(html.includes("dmate-install-links-no-all-files-v31-20261019"));
+for(const platform of ["android", "windows", "macos", "linux"]) {
+    assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
+           "Do not show a generic all-installers button on " + platform);
+    assert(!guide(platform).actions.some(a => a.url === "https://gitcode.com/zm14744/DMate/releases/v1.0.1"),
+           "Download dialog should link directly to platform installers");
+}
 console.log("PASS: GitCode direct primary, GitHub individual file fallback, stores, iOS profile, custom mirrors.");

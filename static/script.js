@@ -19525,7 +19525,6 @@ function installGuideForCurrentPlatform() {
         }
         return actions;
     }
-    const releaseLink = {label:"GitCode · 查看全部安装文件", url:gitcodeRelease, secondary:true};
 
     if (platform === "android") {
         return {
@@ -19533,8 +19532,7 @@ function installGuideForCurrentPlatform() {
             text:"优先从 GitCode 下载安装 APK，GitHub 下载链接同时保留，网络不通时可切换。",
             steps:[],
             actions:[
-                ...installers("DMate.apk", config.androidApkUrl, "APK"),
-                releaseLink
+                ...installers("DMate.apk", config.androidApkUrl, "APK")
             ]
         };
     }
@@ -19560,8 +19558,7 @@ function installGuideForCurrentPlatform() {
             steps:[],
             actions:[
                 ...installers("DMate_1.0.0_x64-setup.exe", config.desktopWindowsUrl, "Windows EXE"),
-                { label:"Microsoft Store · 微软商店", url:microsoftStore, secondary:true },
-                releaseLink
+                { label:"Microsoft Store · 微软商店", url:microsoftStore, secondary:true }
             ]
         };
     }
@@ -19571,8 +19568,7 @@ function installGuideForCurrentPlatform() {
             text:"优先通过 GitCode 下载 DMG，GitHub 安装包直链保留备用。",
             steps:[],
             actions:[
-                ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl, "macOS DMG"),
-                releaseLink
+                ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl, "macOS DMG")
             ]
         };
     }
