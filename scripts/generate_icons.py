@@ -96,19 +96,21 @@ def save_png(image, path):
 
 
 def render_png_bytes(size, background=BLACK, figure_scale=1.0, stroke_units=STROKE,
-                     foreground=WHITE):
+                     foreground=WHITE, rounded=False):
     with io.BytesIO() as buffer:
         save_png(draw_mark(size, background=background, foreground=foreground,
-                           figure_scale=figure_scale, stroke_units=stroke_units), buffer)
+                           figure_scale=figure_scale, stroke_units=stroke_units,
+                           rounded=rounded), buffer)
         return buffer.getvalue()
 
 
-def save_ico(path, sizes, background=BLACK, stroke_units=STROKE, foreground=WHITE):
+def save_ico(path, sizes, background=BLACK, stroke_units=STROKE, foreground=WHITE,
+             rounded=False):
     """Build ICO from independently vector-rendered PNGs at EACH exact size."""
     sizes = list(sizes)
     payloads = [
         render_png_bytes(size, background=background,
-                         stroke_units=stroke_units, foreground=foreground)
+                         stroke_units=stroke_units, foreground=foreground, rounded=rounded)
         for size in sizes
     ]
     offset = 6 + 16 * len(sizes)
@@ -199,6 +201,15 @@ def main():
             background=background, foreground=foreground,
             stroke_units=SAFARI_TAB_STROKE
         )
+
+    # Site-wide branded favicon for Bing, search engines, and static Safari tabs.
+    # All ICO resolutions are native vector renders, with a rounded black tile.
+    save_png(draw_mark(64, background=BLACK, foreground=WHITE,
+                       rounded=True, stroke_units=SAFARI_TAB_STROKE),
+             STATIC / "dmate-site-v34-64.png")
+    save_ico(STATIC / "dmate-site-v34.ico", (16, 24, 32, 48, 64, 128, 256),
+             background=BLACK, foreground=WHITE,
+             stroke_units=SAFARI_TAB_STROKE, rounded=True)
 
     # Apple's Home Screen app and the cross-platform PWA use the same artwork.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")

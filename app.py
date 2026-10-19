@@ -1857,21 +1857,29 @@ def sync_user_data():
 
 @app.route("/favicon.ico")
 def favicon_ico():
-    """Safari-specific root fallback; unchanged transparent icon for other browsers."""
-    agent = request.headers.get("User-Agent", "")
-    mac_safari = bool(
-        re.search(r"Macintosh|Mac OS X", agent, re.IGNORECASE)
-        and re.search(r"Safari/", agent, re.IGNORECASE)
-        and not re.search(r"Chrome/|Chromium/|CriOS/|Edg/|OPR/|Firefox/|FxiOS/",
-                          agent, re.IGNORECASE)
-    )
-    # No OS appearance in request headers. Transparent white Safari fallback
-    # cannot trigger Safari's opaque-white tile over a black square.
-    icon = "icons/dmate-safari-dark-v32.ico" if mac_safari else "icons/favicon.ico"
-    response = app.send_static_file(icon)
+    """A consistent, opaque DMate favicon for indexers and browser fallbacks."""
+    response = app.send_static_file("icons/dmate-site-v34.ico")
     response.headers["Content-Type"] = "image/x-icon"
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Vary"] = "User-Agent"
+    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
+    return response
+
+
+@app.route("/apple-touch-icon.png")
+@app.route("/apple-touch-icon-precomposed.png")
+def apple_touch_icon_root():
+    """Standard root Apple icon URLs use the existing app icon artwork."""
+    response = app.send_static_file("icons/apple-touch-icon.png")
+    response.headers["Content-Type"] = "image/png"
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
+@app.route("/favicon-64.png")
+def favicon_png_root():
+    """Search bots and Safari can fetch the same clearly branded PNG."""
+    response = app.send_static_file("icons/dmate-site-v34-64.png")
+    response.headers["Content-Type"] = "image/png"
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return response
 
 

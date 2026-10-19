@@ -119,6 +119,9 @@ def main():
                 # Top center is background; inner geometry can cross y=size/16.
                 assert actual.getpixel((size // 2, 0))[:3] == (0, 0, 0)
         check_ico(ICONS / f"dmate-safari-{theme}-v32.ico", (16, 32, 48, 64, 128))
+    matches_vector(ICONS / "dmate-site-v34-64.png", 64, background=BLACK,
+                   foreground=WHITE, rounded=True, stroke_units=SAFARI_TAB_STROKE)
+    check_ico(ICONS / "dmate-site-v34.ico", (16, 24, 32, 48, 64, 128, 256))
     assert rgba(ICONS / "favicon-32.png").getpixel((0, 0))[3] == 0
 
     check_ico(ICONS / "favicon.ico", (16, 32, 48, 64, 128))
@@ -192,15 +195,12 @@ def main():
         assert native_app == unchanged, "Native Android APK should not receive PWA icon overrides"
 
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
-    assert 'icon.href = "/static/icons/dmate-safari-" + theme + "-v32-64.png";' in html
-    assert 'const theme = appearance && appearance.matches ? "dark" : "light";' in html
-    assert 'document.head.appendChild(icon)' in html
-    assert 'current.replaceWith(icon)' in html
-    assert 'appearance.addEventListener("change", updateSafariTabIcon)' in html
-    assert 'appearance.addListener(updateSafariTabIcon)' in html
-    assert 'dmate-safari-light-v30' not in html
+    assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">' in html
+    assert 'document.head.appendChild(icon)' not in html
+    assert 'dmate-safari-" + theme' not in html
+    assert '<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">' in html
     assert "dmate-win-tab-v21" in html
-    print("PASS macOS Safari dark transparent white icon, light black tile, Android/Windows/PWA")
+    print("PASS stable branded Safari/Bing favicon, root Apple icon, Android/Windows/PWA")
 
 
 if __name__ == "__main__":
