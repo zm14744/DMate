@@ -129,7 +129,9 @@ PORT
 
 ### 可选分发地址
 
-当前代码还读取 Android / 桌面客户端的下载 URL 环境变量。这些变量只影响下载入口，不影响 DMate 核心学习功能：
+安装弹窗默认使用 GitCode 的 `v1.0.1` 下载接口作为国内主链接，并保留 GitHub 对应安装包的独立下载直链作为海外备用。Microsoft Store、Snap Store 和 iPhone/iPad 描述文件仍保留。
+
+以下环境变量只用于覆盖首选下载源，不影响 DMate 核心学习功能；若未填写，默认使用 GitCode。如果旧值仍是 `https://github.com/zm14744/DMate/releases/...`，前端会自动将其识别为 GitHub 备用链接，不会盖过 GitCode 主链接。
 
 ```text
 ANDROID_APK_URL

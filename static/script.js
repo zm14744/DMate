@@ -19496,107 +19496,107 @@ let dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt || null;
 function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
-    const browserName = detectDmateBrowserName();
-    const gitcode = "https://gitcode.com/zm14744/DMate/releases/v1.0.1";
-    const releases = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
+    const gitcodeRelease = "https://gitcode.com/zm14744/DMate/releases/v1.0.1";
+    const gitcodeDownloadBase = "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/";
+    const githubRelease = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
+    const githubDownloadBase = "https://github.com/zm14744/DMate/releases/latest/download/";
     const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
     const snap = "https://snapcraft.io/dmate";
 
-    // 只有用户在 Zeabur 配置真实的安装包链接后，才展示「直接下载」。
-    // GitCode 仓库是没有配置直链时的国内发行版入口，不冒充文件直链。
-    const direct = (label, url) => url ? [{ label, url }] : [];
-    const gitcodeFallback = (hasDirect) => ({
-        label:"GitCode · 查看国内发行版",
-        url:gitcode,
-        secondary:Boolean(hasDirect)
-    });
+    // The known public GitCode release is the domestic default. Legacy
+    // GitHub values in Zeabur must never displace it: they are backups.
+    // A future non-GitHub mirror configured via Zeabur can override it.
+    function installers(filename, configuredUrl, displayName) {
+        const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(filename) + "/download";
+        const githubUrl = githubDownloadBase + encodeURIComponent(filename);
+        const configured = String(configuredUrl || "").trim();
+        const oldGithubEnv = /^https:\/\/github\.com\/zm14744\/DMate\/releases\//i.test(configured);
+        const primaryUrl = configured && !oldGithubEnv ? configured : gitcodeUrl;
+        const firstLabel = primaryUrl === gitcodeUrl
+            ? "国内优先 · GitCode " + displayName
+            : "直接下载 · " + displayName;
+        const actions = [{ label:firstLabel, url:primaryUrl }];
+        if (primaryUrl !== gitcodeUrl) {
+            actions.push({ label:"GitCode · 国内备用 " + displayName, url:gitcodeUrl, secondary:true });
+        }
+        const actualGithub = oldGithubEnv ? configured : githubUrl;
+        if (actualGithub !== primaryUrl && actualGithub !== gitcodeUrl) {
+            actions.push({ label:"GitHub · 海外备用 " + displayName, url:actualGithub, secondary:true });
+        }
+        return actions;
+    }
+    const releaseLink = {label:"GitCode · 查看全部安装文件", url:gitcodeRelease, secondary:true};
 
     if (platform === "android") {
         return {
             platform:"Android",
-            text:config.androidApkUrl
-                ? "选择 APK 下载安装。已配置安装包直链，也可以从 GitCode 发行版获取。"
-                : "从 GitCode 发行版下载 APK 安装包。下载前不需要安装 PWA。",
+            text:"优先从 GitCode 下载安装 APK，GitHub 下载链接同时保留，网络不通时可切换。",
             steps:[],
             actions:[
-                ...direct("下载 Android 安装包（APK）", config.androidApkUrl),
-                gitcodeFallback(config.androidApkUrl),
-                { label:"GitHub · 海外备用下载", url:releases, secondary:true }
+                ...installers("DMate.apk", config.androidApkUrl, "APK"),
+                releaseLink
             ]
         };
     }
-
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"下载描述文件后，从系统设置中安装 DMate 主屏幕入口。这是网页快捷方式，并非原生 IPA。",
+            text:"下载描述文件后，从系统设置安装 DMate 主屏幕入口。它是网页快捷方式，不是原生 IPA。",
             steps:[
                 "在 Safari 中下载描述文件并允许下载。",
-                "前往“设置”→“已下载描述文件”→“安装”；如果没有该项，可查看“通用”→“VPN 与设备管理”。"
+                "前往“设置”→“已下载描述文件”→“安装”；如未显示，可检查“通用”→“VPN 与设备管理”。"
             ],
             actions:[
-                { label:"下载 iPhone / iPad 描述文件", url:"/DMate.mobileconfig" }
+                { label:"下载 iPhone / iPad 描述文件", url:"/DMate.mobileconfig" },
+                { label:"GitCode · 描述文件备用下载", url:gitcodeDownloadBase +
+                    "DMate-iPhone-iPad.mobileconfig/download", secondary:true }
             ]
         };
     }
-
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text:config.desktopWindowsUrl
-                ? "可直接下载 Windows 安装程序，也可通过 Microsoft Store 安装。"
-                : "推荐通过 Microsoft Store 安装；也可前往 GitCode 发行版下载 EXE。",
+            text:"优先通过 GitCode 下载 EXE，也可通过 Microsoft Store 安装；GitHub 直链保留备用。",
             steps:[],
             actions:[
-                ...direct("下载 Windows 安装程序（EXE）", config.desktopWindowsUrl),
-                { label:"Microsoft Store · 官方商店", url:microsoftStore,
-                  secondary:Boolean(config.desktopWindowsUrl) },
-                gitcodeFallback(config.desktopWindowsUrl),
-                { label:"GitHub · 海外备用下载", url:releases, secondary:true }
+                ...installers("DMate_1.0.0_x64-setup.exe", config.desktopWindowsUrl, "Windows EXE"),
+                { label:"Microsoft Store · 微软商店", url:microsoftStore, secondary:true },
+                releaseLink
             ]
         };
     }
-
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:config.desktopMacosUrl
-                ? "下载 DMG 安装包，打开后按提示安装。"
-                : "在 GitCode 发行版中下载适用于 macOS 的 DMG 安装包。",
+            text:"优先通过 GitCode 下载 DMG，GitHub 安装包直链保留备用。",
             steps:[],
             actions:[
-                ...direct("下载 macOS 安装包（DMG）", config.desktopMacosUrl),
-                gitcodeFallback(config.desktopMacosUrl),
-                { label:"GitHub · 海外备用下载", url:releases, secondary:true }
+                ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl, "macOS DMG"),
+                releaseLink
             ]
         };
     }
-
     if (platform === "linux") {
-        const hasDirect = Boolean(config.desktopLinuxDebUrl || config.desktopLinuxAppImageUrl);
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"Debian、Ubuntu 和 Mint 请选择 DEB；其他发行版可尝试 AppImage，也可以使用 Snap Store。",
+            text:"Debian、Ubuntu、Mint 请选择 DEB；其他发行版可尝试 AppImage 或 Snap。",
             steps:["已安装 snapd 的系统可执行：sudo snap install dmate"],
             actions:[
-                ...direct("下载 Linux DEB 安装包", config.desktopLinuxDebUrl),
-                ...direct("下载 Linux AppImage", config.desktopLinuxAppImageUrl),
-                { label:"Snap Store · 官方商店", url:snap, secondary:hasDirect },
-                gitcodeFallback(hasDirect),
-                { label:"GitHub · 海外备用下载", url:releases, secondary:true }
+                ...installers("DMate_1.0.0_amd64.deb", config.desktopLinuxDebUrl, "Linux DEB"),
+                ...installers("DMate_1.0.0_amd64.AppImage", config.desktopLinuxAppImageUrl, "Linux AppImage"),
+                { label:"Snap Store · Snap 商店", url:snap, secondary:true }
             ]
         };
     }
-
     return {
         platform:"桌面系统",
-        text:"请选择适合当前操作系统的客户端安装渠道。",
+        text:"请选择当前设备支持的安装包或应用商店。",
         steps:[],
         actions:[
-            { label:"GitCode · 国内发行版", url:gitcode },
+            { label:"GitCode · 国内发行版", url:gitcodeRelease },
             { label:"Microsoft Store（Windows）", url:microsoftStore, secondary:true },
             { label:"Snap Store（Linux）", url:snap, secondary:true },
-            { label:"GitHub · 海外备用下载", url:releases, secondary:true }
+            { label:"GitHub · 海外备用发行版", url:githubRelease, secondary:true }
         ]
     };
 }

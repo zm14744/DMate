@@ -16,37 +16,55 @@ function guide(platform, urls={}) {
     };
     const context={
         dmateClientConfig:()=>config,
-        detectDmateInstallPlatform:()=>platform,
-        detectDmateBrowserName:()=>"Test Browser"
+        detectDmateInstallPlatform:()=>platform
     };
     vm.runInNewContext(script, context);
     return vm.runInNewContext("installGuideForCurrentPlatform()", context);
 }
-const direct=(g)=>g.actions.map(x=>x.url);
-const apk="https://example.invalid/DMate.apk";
-const exe="https://example.invalid/DMate.exe";
-const dmg="https://example.invalid/DMate.dmg";
-const deb="https://example.invalid/DMate.deb";
-const appimage="https://example.invalid/DMate.AppImage";
-const gitcode="https://gitcode.com/zm14744/DMate/releases/v1.0.1";
-const gAndroid=guide("android",{androidApkUrl:apk});
-assert.equal(direct(gAndroid)[0],apk);
-assert(direct(gAndroid).includes(gitcode));
-assert.equal(direct(guide("android"))[0],gitcode);
-assert.equal(direct(guide("windows",{desktopWindowsUrl:exe}))[0],exe);
-assert(direct(guide("windows")).some(x=>x.includes("apps.microsoft.com")));
-assert.equal(direct(guide("macos",{desktopMacosUrl:dmg}))[0],dmg);
-const gLinux=guide("linux",{desktopLinuxDebUrl:deb,desktopLinuxAppImageUrl:appimage});
-assert.equal(direct(gLinux)[0],deb);
-assert.equal(direct(gLinux)[1],appimage);
-assert(direct(guide("linux")).some(x=>x.includes("snapcraft.io")));
-assert.equal(direct(guide("ios"))[0],"/DMate.mobileconfig");
-assert(!guide("ios").actions.some(x=>/\.ipa$/i.test(x.url)));
-// The Web installation popup is now about downloads, not PWA instructions.
-// Keep the rest of the site PWA code untouched.
+const urls=(p, config) => guide(p, config).actions.map(x=>x.url);
+const gitcodeBase="https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/";
+const githubBase="https://github.com/zm14744/DMate/releases/latest/download/";
+const file={
+    android:"DMate.apk",
+    windows:"DMate_1.0.0_x64-setup.exe",
+    macos:"DMate_1.0.0_universal.dmg",
+    deb:"DMate_1.0.0_amd64.deb",
+    appimage:"DMate_1.0.0_amd64.AppImage"
+};
+const envKey={
+    android:"androidApkUrl",
+    windows:"desktopWindowsUrl",
+    macos:"desktopMacosUrl"
+};
+for(const platform of ["android","windows","macos"]){
+    const name=file[platform];
+    const gitcode=gitcodeBase+name+"/download";
+    const github=githubBase+name;
+    const legacy={ [envKey[platform]]: github };
+    assert.equal(urls(platform)[0],gitcode,"GitCode primary without env");
+    assert.equal(urls(platform,legacy)[0],gitcode,"Legacy GitHub env must not displace GitCode");
+    assert(urls(platform,legacy).includes(github),"GitHub direct backup preserved");
+    assert.equal(urls(platform,{[envKey[platform]]:gitcode})[0],gitcode);
+}
+const linuxURLs=urls("linux",{
+    desktopLinuxDebUrl:githubBase+file.deb,
+    desktopLinuxAppImageUrl:githubBase+file.appimage
+});
+assert.equal(linuxURLs[0],gitcodeBase+file.deb+"/download");
+assert.equal(linuxURLs[1],githubBase+file.deb);
+assert.equal(linuxURLs[2],gitcodeBase+file.appimage+"/download");
+assert.equal(linuxURLs[3],githubBase+file.appimage);
+assert(linuxURLs.some(x=>x.includes("snapcraft.io")));
+const custom="https://mirror.example/DMate.apk";
+assert.equal(urls("android",{androidApkUrl:custom})[0],custom,"Custom mirror still supported");
+assert(urls("android",{androidApkUrl:custom}).includes(gitcodeBase+file.android+"/download"));
+assert(urls("android",{androidApkUrl:custom}).includes(githubBase+file.android));
+assert.equal(urls("ios")[0],"/DMate.mobileconfig");
+assert.equal(urls("ios")[1],gitcodeBase+"DMate-iPhone-iPad.mobileconfig/download");
+assert(!urls("ios").some(x=>/\.ipa$/i.test(x)));
 const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];
 assert(!modal.includes('id="installHelpNativeButton"'));
 assert(!modal.includes('id="installHelpNote"'));
-assert(html.includes("dmate-gitcode-releases-v27-20261019"));
-console.log("PASS: correct installers and fallbacks on all five platforms; PWA controls absent from download modal.");
+assert(html.includes("dmate-gitcode-github-install-v28-20261019"));
+console.log("PASS: GitCode direct primary, GitHub individual file fallback, stores, iOS profile, custom mirrors.");
