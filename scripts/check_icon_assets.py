@@ -195,6 +195,12 @@ def main():
         assert native_app == unchanged, "Native Android APK should not receive PWA icon overrides"
 
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    # Search bots get the same root-level branded favicon irrespective of their UA platform.
+    app_text = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "is_search_crawler=is_search_crawler," in app_text
+    assert '{% if is_search_crawler %}' in html
+    assert '<link rel="icon" type="image/x-icon" href="/favicon.ico">' in html
+    assert '<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">' in html
     assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">' in html
     assert 'document.head.appendChild(icon)' not in html
     assert 'dmate-safari-" + theme' not in html
