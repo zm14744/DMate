@@ -19440,14 +19440,12 @@ function removeDeprecatedCopyControls() {
 }
 
 // -----------------------------
-// 安装：Android = APK；电脑 = Tauri；iOS = Safari 主屏幕 Web App
+// 下载：Android 提供 APK；桌面系统提供安装包与商店入口；iOS 不显示下载入口
 // -----------------------------
 function dmateClientConfig() {
     const config = window.DMATE_CLIENT_CONFIG || {};
     const ua = navigator.userAgent || "";
     return {
-        isAndroid: Boolean(config.isAndroid ?? /Android/i.test(ua)),
-        isIos: Boolean(config.isIos ?? /iPhone|iPad|iPod/i.test(ua)),
         isAndroidApp: Boolean(config.isAndroidApp ?? /DMateAndroid\//i.test(ua)),
         isDesktopApp: Boolean(config.isDesktopApp ?? /DMateDesktop\//i.test(ua)),
         androidApkUrl: String(config.androidApkUrl || "").trim(),
@@ -19481,53 +19479,39 @@ function installGuideForCurrentPlatform() {
     const snap = "https://snapcraft.io/dmate";
     const itch = "https://zm14744.itch.io/dmate";
 
-    // The known public GitCode release is the domestic default. Legacy
-    // GitHub values in Zeabur must never displace it: they are backups.
-    // A future non-GitHub mirror configured via Zeabur can override it.
+    // 下载按钮固定按 GitCode、GitHub 排列；额外配置的镜像放在其后。
     function installers(filename, configuredUrl, displayName) {
         const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(filename) + "/download";
         const githubUrl = githubDownloadBase + encodeURIComponent(filename);
         const configured = String(configuredUrl || "").trim();
-        const oldGithubEnv = /^https:\/\/github\.com\/zm14744\/DMate\/releases\//i.test(configured);
-        const primaryUrl = configured && !oldGithubEnv ? configured : gitcodeUrl;
-        const firstLabel = primaryUrl === gitcodeUrl
-            ? "GitCode · " + displayName
-            : "下载 · " + displayName;
-        const actions = [{ label:firstLabel, url:primaryUrl }];
-        if (primaryUrl !== gitcodeUrl) {
-            actions.push({ label:"GitCode · " + displayName, url:gitcodeUrl, secondary:true });
-        }
-        const actualGithub = oldGithubEnv ? configured : githubUrl;
-        if (actualGithub !== primaryUrl && actualGithub !== gitcodeUrl) {
-            actions.push({ label:"GitHub · " + displayName, url:actualGithub, secondary:true });
+        const configuredIsGithub = /^https:\/\/github\.com\/zm14744\/DMate\/releases\//i.test(configured);
+        const configuredIsGitcode = /^https:\/\/(?:api\.)?gitcode\.com\//i.test(configured);
+        const actions = [
+            { label:"GitCode · " + displayName, url:configuredIsGitcode ? configured : gitcodeUrl },
+            { label:"GitHub · " + displayName, url:configuredIsGithub ? configured : githubUrl, secondary:true }
+        ];
+        if (configured && !configuredIsGithub && !configuredIsGitcode
+                && configured !== gitcodeUrl && configured !== githubUrl) {
+            actions.push({ label:"备用 · " + displayName, url:configured, secondary:true });
         }
         return actions;
     }
 
+    if (platform === "ios") return null;
     if (platform === "android") {
         return {
             platform:"Android",
-            text:"选择下载渠道获取 APK。",
-            steps:[],
+            text:"选择 APK 下载源。",
             actions:[
                 ...installers("DMate.apk", config.androidApkUrl, "APK"),
                 { label:"itch.io", url:itch, secondary:true }
             ]
         };
     }
-    if (platform === "ios") {
-        return {
-            platform:"iPhone / iPad",
-            text:"直接在浏览器中使用 DMate。",
-            steps:[],
-            actions:[]
-        };
-    }
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text:"选择 EXE 安装包或 Microsoft Store。",
-            steps:[],
+            text:"选择安装包下载源或应用商店。",
             actions:[
                 ...installers("DMate_1.0.0_x64-setup.exe", config.desktopWindowsUrl, "EXE"),
                 { label:"Microsoft Store", url:microsoftStore, secondary:true },
@@ -19538,8 +19522,7 @@ function installGuideForCurrentPlatform() {
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"选择 DMG 安装包下载。",
-            steps:[],
+            text:"选择 DMG 下载源。",
             actions:[
                 ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl, "DMG"),
                 { label:"itch.io", url:itch, secondary:true }
@@ -19549,8 +19532,7 @@ function installGuideForCurrentPlatform() {
     if (platform === "linux") {
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"Ubuntu/Debian 选 DEB；其他 Linux 可选 AppImage 或 Snap。",
-            steps:["已安装 snapd 的系统可执行：sudo snap install dmate"],
+            text:"Ubuntu/Debian 用 DEB；其他发行版可选 AppImage 或 Snap。",
             actions:[
                 ...installers("DMate_1.0.0_amd64.deb", config.desktopLinuxDebUrl, "DEB"),
                 ...installers("DMate_1.0.0_amd64.AppImage", config.desktopLinuxAppImageUrl, "AppImage"),
@@ -19560,8 +19542,7 @@ function installGuideForCurrentPlatform() {
     }
     return {
         platform:"桌面系统",
-        text:"选择下载渠道或应用商店。",
-        steps:[],
+        text:"选择下载渠道。",
         actions:[
             { label:"GitCode · 发行版", url:gitcodeRelease },
             { label:"GitHub · 发行版", url:githubRelease, secondary:true },
@@ -19570,24 +19551,18 @@ function installGuideForCurrentPlatform() {
         ]
     };
 }
+
 function openDmateInstallHelp() {
     const modal = document.getElementById("installHelpModal");
     const platformEl = document.getElementById("installHelpPlatform");
     const textEl = document.getElementById("installHelpText");
-    const stepsEl = document.getElementById("installHelpSteps");
     const actionsEl = document.getElementById("installHelpActions");
-    if (!modal || !platformEl || !textEl || !stepsEl || !actionsEl) return;
+    if (!modal || !platformEl || !textEl || !actionsEl) return;
 
     const guide = installGuideForCurrentPlatform();
+    if (!guide) return;
     platformEl.textContent = guide.platform;
     textEl.textContent = guide.text;
-    stepsEl.replaceChildren(...guide.steps.map(step => {
-        const li = document.createElement("li");
-        li.textContent = step;
-        return li;
-    }));
-    stepsEl.hidden = guide.steps.length === 0;
-
     actionsEl.replaceChildren(...guide.actions.map(action => {
         const link = document.createElement("a");
         link.href = action.url;
@@ -19631,7 +19606,6 @@ function initDmateInstall() {
     button.hidden = false;
     button.setAttribute("aria-hidden", "false");
     if (platform === "android") button.textContent = "下载 DMate";
-    else if (platform === "ios") button.textContent = "安装 DMate";
     else button.textContent = "下载 DMate 桌面版";
 
     button.addEventListener("click", openDmateInstallHelp);
