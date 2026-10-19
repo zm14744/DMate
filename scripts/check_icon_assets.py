@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Guard against transparent Windows shortcuts and mismatched PWA/install icons."""
+"""Regressions: no theme-adaptive favicon, no bitmap-upscaled PWA/ICO/ICNS."""
 import json
+import struct
 from pathlib import Path
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageChops
+from generate_icons import draw_mark
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "static" / "icons"
@@ -10,83 +12,96 @@ DESKTOP = ROOT / "desktop" / "src-tauri" / "icons"
 MASTER = ROOT / "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
 
 
-def rgba(file):
-    with Image.open(file) as im:
-        return im.convert("RGBA")
+def rgba(path):
+    with Image.open(path) as image:
+        return image.convert("RGBA")
 
 
-def verify_master_copy(file, size, master):
-    image = rgba(file)
-    assert image.size == (size, size), f"{file}: wrong pixel dimensions"
-    desired = master.resize((size, size), Image.Resampling.LANCZOS)
-    assert ImageChops.difference(image, desired).getbbox() is None, (
-        f"{file}: does not match original DMate installed app icon"
+def matches_vector(path, size, **options):
+    actual = rgba(path)
+    expected = draw_mark(size, **options)
+    assert actual.size == (size, size), f"Unexpected resolution: {path}"
+    assert ImageChops.difference(actual.convert("RGB"), expected.convert("RGB")).getbbox() is None, (
+        f"Not vector-rendered at native resolution: {path}"
     )
-    print("OK", file.relative_to(ROOT))
+
+
+def check_ico(path, sizes):
+    # Individual sizes inside ICO are real native-size PNG payloads.
+    data = path.read_bytes()
+    assert data[:4] == bytes([0, 0, 1, 0])
+    count = struct.unpack_from("<H", data, 4)[0]
+    found = set()
+    for i in range(count):
+        width, height, _, _, _, _, length, offset = struct.unpack_from("<BBBBHHII", data, 6 + 16 * i)
+        size = width or 256
+        assert (height or 256) == size
+        with Image.open(__import__("io").BytesIO(data[offset:offset + length])) as bitmap:
+            assert bitmap.size == (size, size)
+        found.add(size)
+    assert set(sizes).issubset(found), (path, found)
 
 
 def main():
-    master = rgba(MASTER)
-    assert master.size == (192, 192), "Android installed-app icon changed shape"
-    for filename, size in (
-        ("icon-192-app-v20.png", 192),
-        ("icon-512-app-v20.png", 512),
-        ("windows-shortcut-128-v20.png", 128),
-        ("windows-shortcut-192-v20.png", 192),
-        ("windows-shortcut-256-v20.png", 256),
-    ):
-        verify_master_copy(ICONS / filename, size, master)
-    verify_master_copy(DESKTOP / "icon.png", 512, master)
+    with Image.open(MASTER) as master:
+        assert master.size == (192, 192)
+        for filename in ("icon-192.png", "icon-192-app-v20.png"):
+            assert (ICONS / filename).read_bytes() == MASTER.read_bytes()
 
-    with Image.open(ICONS / "windows-shortcut-black-v20.ico") as ico:
-        required = {(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)}
-        assert required.issubset(ico.ico.sizes()), "Windows shortcut ICO is missing sizes"
+    for filename in ("icon-512.png", "icon-512-app-v20.png"):
+        matches_vector(ICONS / filename, 512)
 
-    # Verify the compensated linework, not an enlarged/padded full black tile.
-    def ink_box(filename):
-        im = rgba(ICONS / filename)
-        return ImageOps.grayscale(im.convert("RGB")).point(
-            lambda value: 255 if value >= 100 else 0
-        ).getbbox()
-
-    master_box = ImageOps.grayscale(master.convert("RGB")).point(
-        lambda value: 255 if value >= 100 else 0
-    ).getbbox()
-    for name in ("edge", "fennec"):
+    for browser, factor in (("edge", 0.95), ("fennec", 1.16)):
         for size in (32, 192, 512):
-            file = ICONS / f"android-{name}-{size}-v21.png"
-            assert rgba(file).size == (size, size), file
-            assert rgba(file).getpixel((0, 0))[3] == 255, file
-    edge_box = ink_box("android-edge-192-v21.png")
-    fennec_box = ink_box("android-fennec-192-v21.png")
-    assert (edge_box[2] - edge_box[0]) < (master_box[2] - master_box[0]), "Edge lines must be smaller"
-    assert (fennec_box[2] - fennec_box[0]) > (master_box[2] - master_box[0]), "Fennec lines must be larger"
+            matches_vector(ICONS / f"android-{browser}-{size}-v21.png",
+                           size, figure_scale=factor)
 
-    # Website browser tab stays a separate transparent thin-line icon.
-    assert 'stroke-width="23"' in (ICONS / "dmate-transparent.svg").read_text()
-    mac_svg = (ICONS / "dmate-favicon-mac.svg").read_text()
-    assert '<rect' not in mac_svg, "Mac favicon must not bake in a white background"
-    assert 'stroke-width="23"' in mac_svg
+    for size, filename in (
+        (180, "apple-touch-icon.png"),
+        (128, "windows-shortcut-128-v20.png"),
+        (192, "windows-shortcut-192-v20.png"),
+        (256, "windows-shortcut-256-v20.png"),
+    ):
+        matches_vector(ICONS / filename, size)
+
+    for size, filename in (
+        (16, "icon-16.png"), (24, "icon-24.png"), (32, "32x32.png"),
+        (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
+        (256, "128x128@2x.png"), (512, "icon.png"),
+    ):
+        matches_vector(DESKTOP / filename, size)
+
+    matches_vector(ICONS / "dmate-favicon-mac.png", 256, rounded=True)
+    mac_svg = (ICONS / "dmate-favicon-mac.svg").read_text(encoding="utf-8")
+    assert '<rect width="1254" height="1254" rx="190" ry="190" fill="#000"/>' in mac_svg
+    assert 'stroke="#fff"' in mac_svg and 'stroke-width="23"' in mac_svg
+    assert "prefers-color-scheme" not in mac_svg and "<style" not in mac_svg
+    assert "media=" not in mac_svg
     assert not (ICONS / "dmate-favicon-mac-light.svg").exists()
-
     assert rgba(ICONS / "favicon-32.png").getpixel((0, 0))[3] == 0
 
-    manifest = json.loads((ROOT / "static" / "manifest.webmanifest").read_text(encoding="utf-8"))
-    assert manifest["scope"] == "/pwa/" and manifest["start_url"] == "/pwa/", (
-        "Do not reintroduce normal website links launching the installed PWA"
-    )
-    for icon in manifest["icons"]:
-        path = ROOT / icon["src"].split("?")[0].lstrip("/")
-        assert path.is_file(), f"Missing PWA image: {path}"
-    assert len(manifest["icons"]) == 2 and all(
-        icon["purpose"] == "any" for icon in manifest["icons"]
-    ), "Do not bring back maskable / double-cropped launcher icons"
-    mobile_manifest = json.loads((ROOT / "static" / "manifest-mobile.webmanifest").read_text(encoding="utf-8"))
-    assert mobile_manifest["scope"] == "/", "QQ/Quark menu must retain homepage scope"
-    index_html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    assert 'dmate-win-tab-v21' in index_html
-    assert "windows-shortcut-128-v20.png\">" not in index_html, "Large black tile cannot be browser favicon"
-    print("OK Android launcher compensation, thin Windows tabs, adaptive Mac, and compatible PWA scopes")
+    check_ico(ICONS / "favicon.ico", (16, 32, 48, 64, 128))
+    check_ico(ICONS / "windows-shortcut-black-v20.ico", (16, 24, 32, 48, 64, 128, 256))
+    check_ico(DESKTOP / "icon.ico", (16, 24, 32, 48, 64, 128, 256))
+    raw_icns = (DESKTOP / "icon.icns").read_bytes()
+    assert raw_icns.startswith(b"icns")
+    assert struct.unpack_from(">I", raw_icns, 4)[0] == len(raw_icns)
+
+    for manifest_file in ("manifest.webmanifest", "manifest-mobile.webmanifest"):
+        manifest = json.loads((ROOT / "static" / manifest_file).read_text(encoding="utf-8"))
+        assert manifest["start_url"] == "/pwa/"
+        assert len(manifest["icons"]) == 2
+        for record in manifest["icons"]:
+            assert record["purpose"] == "any"
+            assert (ROOT / record["src"].split("?")[0].lstrip("/")).is_file()
+    assert json.loads((ROOT / "static/manifest.webmanifest").read_text())["scope"] == "/pwa/"
+    assert json.loads((ROOT / "static/manifest-mobile.webmanifest").read_text())["scope"] == "/"
+
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    assert "dmate-favicon-mac.svg?v=dmate-fixed-v22" in html
+    assert "dmate-favicon-mac.png?v=dmate-fixed-v22" in html
+    assert "dmate-win-tab-v21" in html
+    print("PASS vector sharpness + theme-invariant Safari + PWA + ICO + ICNS")
 
 
 if __name__ == "__main__":

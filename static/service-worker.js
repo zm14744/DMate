@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-pwa-icons-v21-20261019";
+const CACHE_NAME = "dmate-pwa-icons-v22-20261019";
 const SHELL_ASSETS = [
   "/",
   "/pwa/",
@@ -6,19 +6,20 @@ const SHELL_ASSETS = [
   "/manifest-mobile.webmanifest",
   "/favicon.ico",
   "/static/icons/dmate-transparent.svg",
-  "/static/icons/dmate-favicon-mac.svg?v=dmate-tab-v21-20261019",
+  "/static/icons/dmate-favicon-mac.svg?v=dmate-fixed-v22-20261019",
+  "/static/icons/dmate-favicon-mac.png?v=dmate-fixed-v22-20261019",
   "/static/icons/favicon-32.png?v=dmate-tab-v21-20261019",
   "/static/icons/icon-192.png",
-  "/static/icons/icon-512.png",
-  "/static/icons/apple-touch-icon.png",
+  "/static/icons/icon-512.png?v=dmate-native-vector-v22-20261019",
+  "/static/icons/apple-touch-icon.png?v=dmate-app-v22-20261019",
   "/static/icons/windows-shortcut-192-v20.png",
   "/static/icons/mobile-favicon-32-v17.png",
   "/static/icons/mobile-favicon-192-v17.png",
   "/static/icons/android-edge-32-v21.png",
-  "/static/icons/android-edge-192-v21.png",
-  "/static/icons/android-edge-512-v21.png",
+  "/static/icons/android-edge-192-v21.png?v=dmate-vector-v22",
+  "/static/icons/android-edge-512-v21.png?v=dmate-vector-v22",
   "/static/icons/android-fennec-32-v21.png",
-  "/static/icons/android-fennec-192-v21.png",
+  "/static/icons/android-fennec-192-v21.png?v=dmate-vector-v22",
   "/static/icons/android-fennec-512-v21.png"
 ];
 

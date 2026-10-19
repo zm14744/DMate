@@ -16,13 +16,13 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/static/icons/icon-192-app-v20.png",
+      "src": "/static/icons/icon-192-app-v20.png?v=dmate-native-vector-v22-20261019",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/static/icons/icon-512-app-v20.png",
+      "src": "/static/icons/icon-512-app-v20.png?v=dmate-native-vector-v22-20261019",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"

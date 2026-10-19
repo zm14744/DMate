@@ -23,10 +23,10 @@
 {% if not is_dmate_android_app and not is_dmate_desktop_app %}
 {% if is_android_install_compat_browser %}
 <!-- QQ/Quark/UC/Baidu need the visited / page to be in manifest scope. -->
-<link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-compat-v21-20261019">
+<link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-compat-v22-20261019">
 <meta name="mobile-web-app-capable" content="yes">
 {% else %}
-<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v21-20261019">
+<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v22-20261019">
 {% endif %}
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
@@ -58,12 +58,14 @@
 })();
 </script>{% endif %}
 {% if is_mac_safari %}
-<!-- Safari tab: adaptive thin geometry, transparent background; never a white square. -->
-<link id="dmateSafariFavicon" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac.svg?v=dmate-tab-v21-20261019">
+<!-- Safari: exact same solid-black thin-line icon in light and dark tabs.
+     Both formats are drawn independently from source paths, never upscaled PNGs. -->
+<link rel="icon" type="image/png" sizes="256x256" href="/static/icons/dmate-favicon-mac.png?v=dmate-fixed-v22-20261019">
+<link id="dmateSafariFavicon" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac.svg?v=dmate-fixed-v22-20261019">
 {% elif is_android_browser %}
 <!-- Android: browser-specific favicon geometry compensation, native master unchanged. -->
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png{% elif is_android_firefox %}android-fennec-32-v21.png{% else %}mobile-favicon-32-v17.png{% endif %}">
-<link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/{% if is_android_edge %}android-edge-192-v21.png{% elif is_android_firefox %}android-fennec-192-v21.png{% else %}mobile-favicon-192-v17.png{% endif %}">
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-32-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-32-v17.png{% endif %}">
+<link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/{% if is_android_edge %}android-edge-192-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-192-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-192-v17.png{% endif %}">
 {% elif is_windows_browser %}
 <!-- Browser TAB is transparent white THIN linework. PWA/Start tiles use manifest. -->
 <link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-transparent.svg?v=dmate-win-tab-v21-20261019">
@@ -76,7 +78,7 @@
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-tab-v21-20261019">
 <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-tab-v21-20261019">
 {% endif %}
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-app-v21-20261019">
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-app-v22-20261019">
 <title>DMate - 离散数学智能辅学系统</title>
 
 <style>
