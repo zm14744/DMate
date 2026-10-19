@@ -179,23 +179,27 @@ def main():
         svg_mark(background=None, stroke=TAB_STROKE), encoding="utf-8"
     )
 
-    # Safari's ordinary compact TAB icon is not a pinned-tab mask.
-    # Its dark tab toolbar may create a pale background for dark favicons.
-    # Use opaque pale/white tile + BLACK readable strokes rather than
-    # a black tile with subpixel white strokes. PNG/ICO are intentionally
-    # preferred to SVG; some Safari versions apply special SVG treatment.
-    # NEW FILENAMES avoid Safari's per-origin persistent favicon cache.
-    for size in (32, 64):
-        save_png(
-            draw_mark(size, background=WHITE, foreground=BLACK,
-                      rounded=True, stroke_units=SAFARI_TAB_STROKE),
-            STATIC / f"dmate-safari-ink-v29-{size}.png"
+    # Safari tab favicon follows the *OS Safari toolbar* appearance, not
+    # the application's three independent UI themes:
+    # light toolbar -> black tile/white strokes; dark toolbar -> white tile/black.
+    # Fixed opaque raster assets prevent SVG recoloring/inversion, and distinct
+    # filenames avoid Safari's persistent favicon cache reusing the old design.
+    for theme, background, foreground in (
+        ("light", BLACK, WHITE),
+        ("dark", WHITE, BLACK),
+    ):
+        for size in (32, 64):
+            save_png(
+                draw_mark(size, background=background, foreground=foreground,
+                          rounded=True, stroke_units=SAFARI_TAB_STROKE),
+                STATIC / f"dmate-safari-{theme}-v30-{size}.png"
+            )
+        save_ico(
+            STATIC / f"dmate-safari-{theme}-v30.ico",
+            (16, 32, 48, 64, 128),
+            background=background, foreground=foreground,
+            stroke_units=SAFARI_TAB_STROKE
         )
-    save_ico(
-        STATIC / "dmate-safari-ink-v29.ico",
-        (16, 32, 48, 64, 128),
-        background=WHITE, foreground=BLACK, stroke_units=SAFARI_TAB_STROKE
-    )
 
     # Apple's Home Screen app and the cross-platform PWA use the same artwork.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
@@ -228,7 +232,7 @@ def main():
              background=None, stroke_units=TAB_STROKE)
 
     print(json.dumps({"status": "vector-only generation",
-                      "mac_favicon": "white tile, readable black geometric strokes (PNG + ICO)",
+                      "mac_favicon": "auto switch: light mode black/white; dark mode white/black (PNG + ICO)",
                       "formats": ["SVG", "PNG", "ICO", "ICNS"],
                       "platforms": ["PWA", "Android browser", "Windows", "macOS", "Linux"]},
                      ensure_ascii=False, indent=2))

@@ -96,26 +96,37 @@ def main():
     ):
         matches_vector(DESKTOP / filename, size)
 
-    # Safari gets a pale tile with high-contrast black geometric strokes.
-    # The Windows/Android transparency and PWA imagery are unaffected.
-    for size in (32, 64):
-        path = ICONS / f"dmate-safari-ink-v29-{size}.png"
-        actual = rgba(path)
-        expected = draw_mark(size, background=WHITE, foreground=BLACK,
-                             rounded=True, stroke_units=SAFARI_TAB_STROKE)
-        assert ImageChops.difference(actual, expected).getbbox() is None, path
-        assert actual.getpixel((size // 2, size // 2))[3] == 255
-        # Check a point in the actual background, outside the geometric paths.
-        # The exact center can be crossed by a black polyhedron edge.
-        assert min(actual.getpixel((size // 2, size // 16))[:3]) > 230, (
-            "Safari favicon background should remain light, not invert to black"
-        )
-        assert any(sum(actual.getpixel((x, y))[:3]) < 150
-                   for x in range(size // 6, size * 5 // 6)
-                   for y in range(size // 6, size * 5 // 6)), (
-            "Safari geometry has no visible dark strokes"
-        )
-    check_ico(ICONS / "dmate-safari-ink-v29.ico", (16, 32, 48, 64, 128))
+    # macOS Safari uses separate crisp icon assets for both appearances.
+    # Verify pixel-exact vector rasterization and visible contrasting strokes.
+    for theme, background, foreground in (
+        ("light", BLACK, WHITE),
+        ("dark", WHITE, BLACK),
+    ):
+        for size in (32, 64):
+            path = ICONS / f"dmate-safari-{theme}-v30-{size}.png"
+            actual = rgba(path)
+            expected = draw_mark(size, background=background,
+                                 foreground=foreground, rounded=True,
+                                 stroke_units=SAFARI_TAB_STROKE)
+            assert ImageChops.difference(actual, expected).getbbox() is None, path
+            assert actual.getpixel((size // 2, size // 2))[3] == 255
+            # Geometric edges cross the center. Use a safe upper background spot.
+            background_pixel = actual.getpixel((size // 2, size // 16))[:3]
+            expected_bg = background[:3]
+            assert all(abs(int(a) - int(b)) < 22
+                       for a, b in zip(background_pixel, expected_bg)), (
+                f"Safari {theme} background inverted: {background_pixel}"
+            )
+            pixels = [
+                actual.getpixel((x, y))[:3]
+                for x in range(size // 6, size * 5 // 6)
+                for y in range(size // 6, size * 5 // 6)
+            ]
+            if theme == "light":
+                assert any(min(rgb) > 200 for rgb in pixels), "Light Safari lacks white lines"
+            else:
+                assert any(max(rgb) < 55 for rgb in pixels), "Dark Safari lacks black lines"
+        check_ico(ICONS / f"dmate-safari-{theme}-v30.ico", (16, 32, 48, 64, 128))
     assert rgba(ICONS / "favicon-32.png").getpixel((0, 0))[3] == 0
 
     check_ico(ICONS / "favicon.ico", (16, 32, 48, 64, 128))
@@ -189,12 +200,14 @@ def main():
         assert native_app == unchanged, "Native Android APK should not receive PWA icon overrides"
 
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
-    assert "dmate-safari-ink-v29-32.png" in html
-    assert "dmate-safari-ink-v29-64.png" in html
-    assert "dmate-safari-ink-v29.ico" in html
-    assert 'dmate-favicon-mac.svg' not in html
+    assert "dmate-safari-light-v30-64.png" in html
+    assert "dmate-safari-dark-v30-64.png" not in html  # dynamic href, not fixed
+    assert 'const theme = appearance && appearance.matches ? "dark" : "light";' in html
+    assert 'appearance.addEventListener("change", updateSafariTabIcon)' in html
+    assert 'appearance.addListener(updateSafariTabIcon)' in html
+    assert "dmate-safari-light-v30.ico" in html
     assert "dmate-win-tab-v21" in html
-    print("PASS Safari high-contrast black ink favicon, other tabs, PWA, ICO and ICNS")
+    print("PASS adaptive macOS Safari light/dark favicons, Windows, Android, PWA, ICO and ICNS")
 
 
 if __name__ == "__main__":

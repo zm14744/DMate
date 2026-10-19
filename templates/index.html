@@ -58,12 +58,37 @@
 })();
 </script>{% endif %}
 {% if is_mac_safari %}
-<!-- macOS Safari ordinary tabs: use RASTER artwork with dark geometric lines
-     on a pale tile. The old black SVG was rendered as a low-contrast pale
-     squircle in Safari. Use new filenames to bypass Safari favicon cache. -->
-<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/dmate-safari-ink-v29-32.png">
-<link rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-safari-ink-v29-64.png">
-<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-safari-ink-v29.ico">
+<!-- Safari adapts to macOS appearance: light toolbar -> black/white icon,
+     dark toolbar -> white/black. Assets are independent PNG/ICO (not SVG).
+     Only the Safari TAB favicon changes; PWA/native icons stay untouched. -->
+<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-safari-light-v30-64.png">
+<link id="dmateSafariFaviconFallback" rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-safari-light-v30.ico">
+<script>
+(function () {
+    const appearance = window.matchMedia
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+    function updateSafariTabIcon() {
+        const theme = appearance && appearance.matches ? "dark" : "light";
+        const icon = document.getElementById("dmateSafariFavicon");
+        const fallback = document.getElementById("dmateSafariFaviconFallback");
+        const png = "/static/icons/dmate-safari-" + theme + "-v30-64.png";
+        const ico = "/static/icons/dmate-safari-" + theme + "-v30.ico";
+        if (icon && icon.getAttribute("href") !== png) icon.setAttribute("href", png);
+        if (fallback && fallback.getAttribute("href") !== ico) {
+            fallback.setAttribute("href", ico);
+        }
+    }
+    updateSafariTabIcon();
+    if (appearance) {
+        if (appearance.addEventListener) {
+            appearance.addEventListener("change", updateSafariTabIcon);
+        } else if (appearance.addListener) {
+            appearance.addListener(updateSafariTabIcon);
+        }
+    }
+})();
+</script>
 {% elif is_android_browser %}
 <!-- Android: browser-specific favicon geometry compensation, native master unchanged. -->
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-32-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-32-v17.png{% endif %}">
