@@ -2014,6 +2014,11 @@ def home():
     is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
     is_android_browser = is_android and not is_dmate_android_app
     is_windows_browser = bool(re.search(r"Windows", user_agent, re.IGNORECASE) and not is_dmate_desktop_app)
+    # Search engines must see the public branded favicon even if a crawler UA
+    # happens to include Windows/Android/Safari tokens. Browser icons stay intact.
+    is_search_crawler = bool(re.search(
+        r"bingbot|adidxbot|BingPreview|Googlebot|Google-InspectionTool|DuckDuckBot|YandexBot|Baiduspider|Sogou|Bytespider|PetalBot",
+        user_agent, re.IGNORECASE))
     is_android_edge = bool(is_android_browser and re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE))
     is_android_firefox = bool(is_android_browser and re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE))
     # Some Android browsers only expose their add-to-desktop menu when the
@@ -2038,6 +2043,7 @@ def home():
         is_android=is_android,
         is_ios=is_ios,
         is_mac_safari=is_mac_safari,
+        is_search_crawler=is_search_crawler,
         is_android_browser=is_android_browser,
         is_windows_browser=is_windows_browser,
         is_android_edge=is_android_edge,
