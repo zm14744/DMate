@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "static" / "icons"
@@ -35,15 +35,12 @@ def svg_mark(background=None, foreground="#fff", stroke=32, adaptive=False):
     if adaptive:
         return f'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 1254 1254" role="img" aria-label="DMate">
   <style>
-    .icon-background {{ fill: #fff; }}
     .icon-lines {{ stroke: #111827; }}
     @media (prefers-color-scheme: dark) {{
-      .icon-background {{ fill: #000; }}
       .icon-lines {{ stroke: #fff; }}
     }}
   </style>
-  <rect class="icon-background" width="1254" height="1254"/>
-  <g class="icon-lines" fill="none" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+  <g class="icon-lines" fill="none" stroke-width="23" stroke-linecap="round" stroke-linejoin="round">
     {paths}
   </g>
 </svg>'''
@@ -78,6 +75,27 @@ def draw_mark(size, background=None, foreground=(255, 255, 255, 255),
     for points in PATHS:
         draw.line(scaled(points), fill=foreground, width=line_width, joint="curve")
     return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def compensated_android_icon(size, figure_scale, master):
+    """Keep the exact native icon's black tile and stroke shapes; compensate
+    for launchers that magnify (Edge) or inset (Firefox/Fennec) the linework.
+    Scaling occurs *inside* the tile, never by padding a complete square icon.
+    """
+    reference = master.resize((size, size), Image.Resampling.LANCZOS)
+    ink_mask = ImageOps.grayscale(reference.convert("RGB"))
+    ink = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+    ink.putalpha(ink_mask)
+    scaled_side = round(size * figure_scale)
+    resized_ink = ink.resize((scaled_side, scaled_side), Image.Resampling.LANCZOS)
+    tile = Image.new("RGBA", (size, size), (0, 0, 0, 255))
+    if scaled_side <= size:
+        offset = (size - scaled_side) // 2
+        tile.alpha_composite(resized_ink, (offset, offset))
+    else:
+        offset = (scaled_side - size) // 2
+        tile.alpha_composite(resized_ink.crop((offset, offset, offset + size, offset + size)))
+    return tile
 
 
 def save_png(image, path):
@@ -118,6 +136,14 @@ def main():
         else:
             save_png(from_installed_icon(size), STATIC / filename)
 
+    # Per-browser Android PWA illustrations. Native APK itself remains unchanged.
+    # Browser launcher masks, not a new icon design, cause the screenshot's
+    # Edge icon to be too large and Fennec's too small.
+    for browser, figure_scale in (("edge", 0.89), ("fennec", 1.16)):
+        for size in (32, 192, 512):
+            save_png(compensated_android_icon(size, figure_scale, canonical_icon),
+                     STATIC / f"android-{browser}-{size}-v21.png")
+
     # Android adaptive icon: same original artwork with an opaque black canvas.
     # Launcher maskable icons are cropped to the central safe region; its black
     # border is NOT a white tile. Shrink the master inside the full black canvas
@@ -135,11 +161,11 @@ def main():
         save_png(from_installed_icon(size), STATIC / filename)
 
     (STATIC / "dmate-mark.svg").write_text(
-        svg_mark("#000", "#fff", 32), encoding="utf-8"
+        svg_mark("#000", "#fff", 23), encoding="utf-8"
     )
     # Transparent white linework for browser tabs; no black square is baked in.
     (STATIC / "dmate-transparent.svg").write_text(
-        svg_mark(None, "#fff", 32), encoding="utf-8"
+        svg_mark(None, "#fff", 23), encoding="utf-8"
     )
 
     # Tauri desktop assets match the PWA artwork at every size.
@@ -159,14 +185,12 @@ def main():
         raise RuntimeError(f"Failed to generate macOS ICNS icon: {exc}") from exc
 
     # Windows/browser favicon: white geometry on true transparency.
-    for size, filename, stroke in [
-        (16, "favicon-16.png", 65),
-        (32, "favicon-32.png", 44),
-        (48, "favicon-48.png", 36),
-        (128, "favicon-128.png", 30),
+    for size, filename in [
+        (16, "favicon-16.png"), (32, "favicon-32.png"),
+        (48, "favicon-48.png"), (128, "favicon-128.png"),
     ]:
         save_png(draw_mark(size, background=None, foreground=(255, 255, 255, 255),
-                           stroke_units=stroke, shadow=False), STATIC / filename)
+                           stroke_units=23, shadow=False), STATIC / filename)
     save_ico(STATIC / "favicon-128.png", STATIC / "favicon.ico", [
         (16, 16), (32, 32), (48, 48), (64, 64), (128, 128)
     ])
@@ -192,49 +216,26 @@ def main():
         save_png(from_installed_icon(size), STATIC / filename)
 
 
-    # Safari uses the fixed-color SVG variants committed with the web assets.
-    # Safari website favicon: light mode is white with black lines; dark mode is black with white lines.
-    (STATIC / "dmate-favicon-mac-light.svg").write_text(
-        svg_mark("#fff", "#111827", 32), encoding="utf-8"
-    )
-    (STATIC / "dmate-favicon-mac-dark.svg").write_text(
-        svg_mark("#000", "#fff", 32), encoding="utf-8"
-    )
+    # Safari *tab* needs adaptive linework with no baked-in white/black tile.
+    # Installed Apple PWA keeps exactly the Android master black app artwork.
     (STATIC / "dmate-favicon-mac.svg").write_text(
         svg_mark(adaptive=True), encoding="utf-8"
     )
-
-    # Safari always uses one fixed icon, regardless of macOS appearance.
-    save_png(draw_mark(256, background=(0, 0, 0, 255),
-                      foreground=(255, 255, 255, 255), stroke_units=23, shadow=False),
-             STATIC / "favicon-safari-black-v15.png")
-
-    # Apple PWA and Mac Dock icon use the same installed-app master.
-    for filename in (
-        "apple-touch-mac-light.png", "apple-touch-mac-dark.png",
-        "apple-touch-icon.png", "apple-touch-icon-black-v15.png",
-        "apple-touch-icon-unified-v16.png",
-    ):
-        save_png(from_installed_icon(180), STATIC / filename)
-    # Use the same fixed black background + thin white geometry for Safari
-    # favicon and Safari's installed-site icon, regardless of macOS theme.
-    for filename in ("safari-fixed-black-v18.png", "apple-touch-fixed-black-v18.png"):
-        save_png(from_installed_icon(180), STATIC / filename)
+    save_png(from_installed_icon(180), STATIC / "apple-touch-icon.png")
     summary = {}
     for path in [
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
         STATIC / "icon-192-unified-v16.png", STATIC / "icon-512-unified-v16.png",
-        STATIC / "apple-touch-icon-unified-v16.png",
-        STATIC / "safari-fixed-black-v18.png", STATIC / "apple-touch-fixed-black-v18.png",
+        STATIC / "apple-touch-icon.png",
         STATIC / "mobile-favicon-32-v17.png", STATIC / "mobile-favicon-192-v17.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
         STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
         STATIC / "windows-shortcut-128-v20.png", STATIC / "windows-shortcut-192-v20.png",
         STATIC / "windows-shortcut-256-v20.png", STATIC / "windows-shortcut-black-v20.ico",
         STATIC / "icon-192-app-v20.png", STATIC / "icon-512-app-v20.png",
-        STATIC / "favicon-safari-black-v15.png", STATIC / "apple-touch-icon-black-v15.png",
-        STATIC / "dmate-favicon-mac-light.svg", STATIC / "dmate-favicon-mac-dark.svg",
-        STATIC / "apple-touch-mac-light.png", STATIC / "apple-touch-mac-dark.png",
+        STATIC / "dmate-favicon-mac.svg",
+        *[STATIC / f"android-{browser}-{size}-v21.png"
+          for browser in ("edge", "fennec") for size in (32, 192, 512)],
         TAURI / "32x32.png", TAURI / "128x128.png", TAURI / "128x128@2x.png",
         TAURI / "icon.png", TAURI / "icon.ico", TAURI / "icon.icns",
     ]:

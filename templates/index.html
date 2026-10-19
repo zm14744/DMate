@@ -23,10 +23,10 @@
 {% if not is_dmate_android_app and not is_dmate_desktop_app %}
 {% if is_android_install_compat_browser %}
 <!-- QQ/Quark/UC/Baidu need the visited / page to be in manifest scope. -->
-<link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-compat-v19-20261019">
+<link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-compat-v21-20261019">
 <meta name="mobile-web-app-capable" content="yes">
 {% else %}
-<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v20-20261019">
+<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v21-20261019">
 {% endif %}
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
@@ -58,31 +58,25 @@
 })();
 </script>{% endif %}
 {% if is_mac_safari %}
-<!-- Safari sees one fixed opaque black installed-app icon in BOTH appearances. -->
-<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="180x180" href="/static/icons/safari-fixed-black-v18.png">
-<link rel="shortcut icon" type="image/png" href="/static/icons/safari-fixed-black-v18.png">
+<!-- Safari tab: adaptive thin geometry, transparent background; never a white square. -->
+<link id="dmateSafariFavicon" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac.svg?v=dmate-tab-v21-20261019">
 {% elif is_android_browser %}
-<!-- Android browsers use opaque installed-app icon for home shortcuts. -->
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/mobile-favicon-32-v17.png">
-<link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/mobile-favicon-192-v17.png">
-<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/png" href="/static/icons/mobile-favicon-192-v17.png">
+<!-- Android: browser-specific favicon geometry compensation, native master unchanged. -->
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png{% elif is_android_firefox %}android-fennec-32-v21.png{% else %}mobile-favicon-32-v17.png{% endif %}">
+<link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/{% if is_android_edge %}android-edge-192-v21.png{% elif is_android_firefox %}android-fennec-192-v21.png{% else %}mobile-favicon-192-v17.png{% endif %}">
 {% elif is_windows_browser %}
-<!-- Tabs use a small transparent wireframe; large Windows shortcut and
-     Start assets always use the solid black rounded installed-app image. -->
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-tab-v20">
-<link id="dmateWindowsShortcut128" rel="icon" type="image/png" sizes="128x128" href="/static/icons/windows-shortcut-128-v20.png">
-<link id="dmateWindowsShortcut192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/windows-shortcut-192-v20.png">
-<link id="dmateWindowsShortcut256" rel="icon" type="image/png" sizes="256x256" href="/static/icons/windows-shortcut-256-v20.png">
-<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/static/icons/windows-shortcut-black-v20.ico">
+<!-- Browser TAB is transparent white THIN linework. PWA/Start tiles use manifest. -->
+<link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-transparent.svg?v=dmate-win-tab-v21-20261019">
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-win-tab-v21-20261019">
+<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-win-tab-v21-20261019">
 <meta name="msapplication-TileImage" content="/static/icons/windows-shortcut-192-v20.png">
 <meta name="msapplication-TileColor" content="#000000">
 {% else %}
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v7-20261019">
-<link id="dmateFavicon48" rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-favicon-v7-20261019">
-<link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac-light.svg?v=mac-favicon-v8-20261019" media="not all">
-<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-favicon-v7-20261019">
+<link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" href="/static/icons/dmate-transparent.svg?v=dmate-tab-v21-20261019">
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-tab-v21-20261019">
+<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=dmate-tab-v21-20261019">
 {% endif %}
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="{% if is_mac_safari %}/static/icons/apple-touch-fixed-black-v18.png{% else %}/static/icons/apple-touch-icon-unified-v16.png?v=dmate-pwa-unified-v16-20261019{% endif %}">
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=dmate-app-v21-20261019">
 <title>DMate - 离散数学智能辅学系统</title>
 
 <style>

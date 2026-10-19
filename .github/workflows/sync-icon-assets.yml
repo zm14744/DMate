@@ -6,6 +6,10 @@ on:
     paths:
       - "scripts/generate_icons.py"
       - "scripts/check_icon_assets.py"
+      - "static/manifest.webmanifest"
+      - "static/manifest-mobile.webmanifest"
+      - "templates/index.html"
+      - "app.py"
       - ".github/workflows/sync-icon-assets.yml"
 permissions:
   contents: write

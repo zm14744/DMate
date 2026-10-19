@@ -1857,19 +1857,39 @@ def sync_user_data():
 
 @app.route("/favicon.ico")
 def favicon_ico():
-    """Serve an opaque app icon for OS shortcuts; normal tabs use dedicated favicon links."""
-    response = app.send_static_file("icons/favicon-app.ico")
+    """Default website/favicon fallback is transparent THIN linework, not an app tile."""
+    response = app.send_static_file("icons/favicon.ico")
     response.headers["Content-Type"] = "image/x-icon"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
-@app.route("/manifest.webmanifest")
-def web_app_manifest():
-    response = app.send_static_file("manifest.webmanifest")
+def _serve_dmate_manifest(filename):
+    """The same native DMate icon, corrected for Android browser launcher scaling."""
+    with open(os.path.join(app.static_folder, filename), "r", encoding="utf-8") as source:
+        manifest = json.load(source)
+    user_agent = request.headers.get("User-Agent", "")
+    variant = None
+    if re.search(r"Android", user_agent, re.IGNORECASE):
+        if re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE):
+            variant = "edge"
+        elif re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE):
+            variant = "fennec"
+    if variant:
+        for item in manifest.get("icons", []):
+            size = item.get("sizes", "").split("x")[0]
+            if item.get("purpose", "any") == "any" and size in {"192", "512"}:
+                item["src"] = f"/static/icons/android-{variant}-{size}-v21.png"
+    response = make_response(json.dumps(manifest, ensure_ascii=False))
     response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Vary"] = "User-Agent"
     return response
+
+
+@app.route("/manifest.webmanifest")
+def web_app_manifest():
+    return _serve_dmate_manifest("manifest.webmanifest")
 
 
 @app.route("/manifest-mobile.webmanifest")
@@ -1880,10 +1900,7 @@ def web_app_manifest_mobile():
     itself when deciding whether to expose 'Add to home screen'. The standard
     PWA manifest stays limited to /pwa/ so desktop Edge doesn't capture /.
     """
-    response = app.send_static_file("manifest-mobile.webmanifest")
-    response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    return response
+    return _serve_dmate_manifest("manifest-mobile.webmanifest")
 
 
 @app.route("/service-worker.js")
@@ -1916,6 +1933,8 @@ def home():
     is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
     is_android_browser = is_android and not is_dmate_android_app
     is_windows_browser = bool(re.search(r"Windows", user_agent, re.IGNORECASE) and not is_dmate_desktop_app)
+    is_android_edge = bool(is_android_browser and re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE))
+    is_android_firefox = bool(is_android_browser and re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE))
     # Some Android browsers only expose their add-to-desktop menu when the
     # page being viewed (/) lies within the manifest's declared scope.
     is_android_install_compat_browser = bool(
@@ -1940,6 +1959,8 @@ def home():
         is_mac_safari=is_mac_safari,
         is_android_browser=is_android_browser,
         is_windows_browser=is_windows_browser,
+        is_android_edge=is_android_edge,
+        is_android_firefox=is_android_firefox,
         is_android_install_compat_browser=is_android_install_compat_browser,
         is_dmate_android_app=is_dmate_android_app,
         is_dmate_desktop_app=is_dmate_desktop_app,
