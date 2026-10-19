@@ -112,6 +112,23 @@ def main():
                                    rounded=True, stroke_units=STROKE,
                                    figure_scale=scales[size])
         assert ImageChops.difference(actual_layer, expected_layer).getbbox() is None, size
+    # v37 uses the same original geometry/stroke but higher supersampling for small favicon layers.
+    matches_vector(ICONS / "dmate-site-v37-64.png", 64, background=BLACK,
+                   foreground=WHITE, rounded=True, stroke_units=STROKE,
+                   figure_scale=1.08, oversample_factor=16)
+    check_ico(ICONS / "dmate-site-v37.ico", (16, 24, 32, 48, 64, 128, 256))
+    ico_data_v37 = (ICONS / "dmate-site-v37.ico").read_bytes()
+    for i in range(struct.unpack_from("<H", ico_data_v37, 4)[0]):
+        w, h, _, _, _, _, length, offset = struct.unpack_from("<BBBBHHII", ico_data_v37, 6 + 16 * i)
+        size = w or 256
+        assert (h or 256) == size
+        with Image.open(io.BytesIO(ico_data_v37[offset:offset + length])) as layer:
+            actual_layer = layer.convert("RGBA")
+        expected_layer = draw_mark(size, background=BLACK, foreground=WHITE,
+                                   rounded=True, stroke_units=STROKE,
+                                   figure_scale=scales[size], oversample_factor=16)
+        assert ImageChops.difference(actual_layer, expected_layer).getbbox() is None, ("v37", size)
+
     # Search favicon must stay thin, while the legacy Safari rendering is unchanged.
     assert ImageChops.difference(rgba(ICONS / "dmate-site-v35-64.png").convert("RGB"),
                                  rgba(ICONS / "dmate-site-v34-64.png").convert("RGB")).getbbox() is not None
@@ -148,11 +165,11 @@ def main():
     namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     assert [node.text for node in root_sitemap.findall(".//sm:loc", namespace)] == ["https://dmate.zeabur.app/"]
     assert '<link rel="canonical" href="https://dmate.zeabur.app/">' in html
-    assert 'send_static_file("icons/dmate-site-v36.ico")' in app_text
-    assert 'send_static_file("icons/dmate-site-v36-64.png")' in app_text
+    assert 'send_static_file("icons/dmate-site-v37.ico")' in app_text
+    assert 'send_static_file("icons/dmate-site-v37-64.png")' in app_text
     assert '{% if is_search_crawler %}' in html
-    assert '<link rel="icon" type="image/x-icon" href="/favicon.ico">' in html
-    assert '<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">' in html
+    assert '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-bing-v37-20261020">' in html
+    assert '<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=dmate-bing-v37-20261020">' in html
     assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v36-64.png?v=dmate-safari-v36-20261019">' in html
     assert 'document.head.appendChild(icon)' not in html
     assert 'dmate-safari-" + theme' not in html

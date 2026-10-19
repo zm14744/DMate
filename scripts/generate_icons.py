@@ -60,14 +60,19 @@ def svg_mark(background=None, foreground="#fff", stroke=STROKE, corner_radius=0)
 
 
 def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=STROKE,
-              figure_scale=1.0, rounded=False):
+              figure_scale=1.0, rounded=False, oversample_factor=None):
     """Rasterize vector coordinates directly at native size with supersampling.
 
     figure_scale modifies only geometric coordinates BEFORE rasterization.
     It never stretches or resamples an existing bitmap, and line width does
     not become thick/thin when a browser's launcher needs size compensation.
     """
-    oversample = 4 if size >= 128 else 8
+    if size >= 128:
+        oversample = 4
+    elif oversample_factor is None:
+        oversample = 8
+    else:
+        oversample = max(8, int(oversample_factor))
     side = size * oversample
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
@@ -96,23 +101,25 @@ def save_png(image, path):
 
 
 def render_png_bytes(size, background=BLACK, figure_scale=1.0, stroke_units=STROKE,
-                     foreground=WHITE, rounded=False):
+                     foreground=WHITE, rounded=False, oversample_factor=None):
     with io.BytesIO() as buffer:
         save_png(draw_mark(size, background=background, foreground=foreground,
                            figure_scale=figure_scale, stroke_units=stroke_units,
-                           rounded=rounded), buffer)
+                           rounded=rounded, oversample_factor=oversample_factor), buffer)
         return buffer.getvalue()
 
 
 def save_ico(path, sizes, background=BLACK, stroke_units=STROKE, foreground=WHITE,
-             rounded=False, figure_scale=1.0, figure_scale_by_size=None):
+             rounded=False, figure_scale=1.0, figure_scale_by_size=None,
+             oversample_factor=None):
     """Build ICO from independently vector-rendered PNGs at EACH exact size."""
     sizes = list(sizes)
     figure_scale_by_size = figure_scale_by_size or {}
     payloads = [
         render_png_bytes(size, background=background, foreground=foreground,
                          stroke_units=stroke_units, rounded=rounded,
-                         figure_scale=figure_scale_by_size.get(size, figure_scale))
+                         figure_scale=figure_scale_by_size.get(size, figure_scale),
+                         oversample_factor=oversample_factor)
         for size in sizes
     ]
     offset = 6 + 16 * len(sizes)
@@ -224,6 +231,23 @@ def main():
                  16: 1.18, 24: 1.14, 32: 1.11, 48: 1.09,
                  64: 1.08, 128: 1.06, 256: 1.04,
              })
+
+    # Bing/search favicon v37: preserve the exact original DMate mark and line width.
+    # Higher supersampling improves subpixel hairline rendering; STROKE remains 13.
+    save_png(draw_mark(64, background=BLACK, foreground=WHITE,
+                       rounded=True, stroke_units=STROKE, figure_scale=1.08,
+                       oversample_factor=16),
+             STATIC / "dmate-site-v37-64.png")
+    save_ico(STATIC / "dmate-site-v37.ico",
+             (16, 24, 32, 48, 64, 128, 256),
+             background=BLACK, foreground=WHITE,
+             stroke_units=STROKE, rounded=True,
+             figure_scale=1.08,
+             figure_scale_by_size={
+                 16: 1.18, 24: 1.14, 32: 1.11, 48: 1.09,
+                 64: 1.08, 128: 1.06, 256: 1.04,
+             },
+             oversample_factor=16)
 
     # iOS Safari uses the Apple touch icon for site bookmarks and Home Screen shortcuts.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
