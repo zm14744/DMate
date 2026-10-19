@@ -23,26 +23,58 @@
 <meta name="msvalidate.01" content="8032784D58887350AB61D823FFE7933B" />
 <meta name="baidu-site-verification" content="codeva-486FjOU4sO" />
 <script>
-/* 仅清理历史版本遗留的 Service Worker 与缓存；不注册新的 Worker。 */
+/* 迁移清理：注销旧版 DMate Service Worker、删除旧缓存；不再提供网页 PWA 安装功能。 */
 (function () {
+    var reloadKey = "dmate-legacy-worker-cleanup-reloaded";
+    var cleanupTasks = [];
+
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
-        navigator.serviceWorker.getRegistrations().then(function (registrations) {
-            return Promise.all(registrations.map(function (registration) {
-                var worker = registration.active || registration.waiting || registration.installing;
-                if (!worker || !worker.scriptURL.endsWith("/service-worker.js")) return false;
+        cleanupTasks.push(navigator.serviceWorker.getRegistrations().then(function (registrations) {
+            var legacyRegistrations = registrations.filter(function (registration) {
+                return [registration.active, registration.waiting, registration.installing].some(function (worker) {
+                    if (!worker) return false;
+                    try {
+                        var scriptUrl = new URL(worker.scriptURL, window.location.href);
+                        return scriptUrl.origin === window.location.origin
+                            && /(?:^|\\/)service-worker\\.js$/i.test(scriptUrl.pathname);
+                    } catch (_) {
+                        return false;
+                    }
+                });
+            });
+            return Promise.all(legacyRegistrations.map(function (registration) {
                 return registration.unregister();
-            }));
-        }).catch(function () {});
+            })).then(function (results) {
+                return results.some(Boolean);
+            });
+        }).catch(function () {
+            return false;
+        }));
     }
-    if ("caches" in window) {
-        window.caches.keys().then(function (keys) {
-            return Promise.all(keys.filter(function (key) {
+
+    if ("caches" in window && window.caches.keys) {
+        cleanupTasks.push(window.caches.keys().then(function (keys) {
+            var legacyKeys = keys.filter(function (key) {
                 return /^dmate-pwa-/i.test(key);
-            }).map(function (key) {
+            });
+            return Promise.all(legacyKeys.map(function (key) {
                 return window.caches.delete(key);
-            }));
-        }).catch(function () {});
+            })).then(function (results) {
+                return results.some(Boolean);
+            });
+        }).catch(function () {
+            return false;
+        }));
     }
+
+    Promise.all(cleanupTasks).then(function (results) {
+        if (!results.some(Boolean)) return;
+        try {
+            if (window.sessionStorage.getItem(reloadKey) === "1") return;
+            window.sessionStorage.setItem(reloadKey, "1");
+            window.location.reload();
+        } catch (_) {}
+    }).catch(function () {});
 })();
 </script>
 
@@ -8304,7 +8336,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <div id="installHelpModal" class="modal hidden" aria-hidden="true">
     <div class="modal-card install-help-card" role="dialog" aria-modal="true" aria-labelledby="installHelpTitle">
         <div class="modal-head">
-            <div id="installHelpTitle">安装 DMate</div>
+            <div id="installHelpTitle">下载 DMate</div>
             <button id="installHelpClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
         </div>
         <div class="install-help-body">
@@ -8753,7 +8785,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-package-only-v36-20261020"></script>
+<script src="/static/script.js?v=dmate-package-only-v37-20261020"></script>
 
 </body>
 </html>
