@@ -21,7 +21,7 @@ function guide(platform, urls={}) {
     vm.runInNewContext(script, context);
     return vm.runInNewContext("installGuideForCurrentPlatform()", context);
 }
-const urls=(p, config) => guide(p, config).actions.map(x=>x.url);
+const urls=(p, config) => (guide(p, config)?.actions || []).map(x=>x.url);
 const gitcodeBase="https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/";
 const githubBase="https://github.com/zm14744/DMate/releases/latest/download/";
 const file={
@@ -56,9 +56,10 @@ assert.equal(linuxURLs[2],gitcodeBase+file.appimage+"/download");
 assert.equal(linuxURLs[3],githubBase+file.appimage);
 assert(linuxURLs.some(x=>x.includes("snapcraft.io")));
 const custom="https://mirror.example/DMate.apk";
-assert.equal(urls("android",{androidApkUrl:custom})[0],custom,"Custom mirror still supported");
-assert(urls("android",{androidApkUrl:custom}).includes(gitcodeBase+file.android+"/download"));
-assert(urls("android",{androidApkUrl:custom}).includes(githubBase+file.android));
+const customURLs=urls("android",{androidApkUrl:custom});
+assert.equal(customURLs[0],gitcodeBase+file.android+"/download","GitCode remains first");
+assert.equal(customURLs[1],githubBase+file.android,"GitHub remains second");
+assert(customURLs.includes(custom),"Custom mirror remains available after primary channels");
 assert.equal(urls("ios").length, 0, "iOS must not show removed PWA/WebClip install links");
 
 // itch.io and official store links must follow platform-specific GitCode/GitHub downloads.
@@ -75,7 +76,7 @@ assert.equal(windowsActions.at(-1).url, itch, "Windows itch.io must be last");
 const linuxActions = guide("linux").actions;
 assert.equal(linuxActions.at(-1).url, "https://snapcraft.io/dmate",
     "Snap Store must follow all Linux GitCode/GitHub packages");
-const labels = platform => guide(platform).actions.map(action => action.label);
+const labels = platform => (guide(platform)?.actions || []).map(action => action.label);
 assert.equal(JSON.stringify(labels("android")), JSON.stringify(["GitCode · APK", "GitHub · APK", "itch.io"]));
 assert.equal(JSON.stringify(labels("windows")), JSON.stringify(["GitCode · EXE", "GitHub · EXE", "Microsoft Store", "itch.io"]));
 assert.equal(JSON.stringify(labels("macos")), JSON.stringify(["GitCode · DMG", "GitHub · DMG", "itch.io"]));
@@ -83,13 +84,13 @@ assert.equal(JSON.stringify(labels("linux")), JSON.stringify([
     "GitCode · DEB", "GitHub · DEB", "GitCode · AppImage", "GitHub · AppImage", "Snap Store"
 ]));
 assert.equal(JSON.stringify(labels("ios")), JSON.stringify([]));
-assert.equal(guide("android").text, "选择下载渠道获取 APK。");
-assert.equal(guide("windows").text, "选择 EXE 安装包或 Microsoft Store。");
-assert.equal(guide("macos").text, "选择 DMG 安装包下载。");
-assert.equal(guide("linux").text, "Ubuntu/Debian 选 DEB；其他 Linux 可选 AppImage 或 Snap.");
+assert.equal(guide("android").text, "选择 APK 下载源。");
+assert.equal(guide("windows").text, "选择安装包下载源或应用商店。");
+assert.equal(guide("macos").text, "选择 DMG 下载源。");
+assert.equal(guide("linux").text, "Ubuntu/Debian 用 DEB；其他发行版可选 AppImage 或 Snap。");
 const otherActions = guide("other").actions;
-assert.equal(otherActions[0].label, "GitCode · 国内发行版");
-assert.equal(otherActions[1].label, "GitHub · 海外备用发行版",
+assert.equal(otherActions[0].label, "GitCode · 发行版");
+assert.equal(otherActions[1].label, "GitHub · 发行版",
     "Generic fallback must list GitHub before store options");
 assert.equal(otherActions[2].url, "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK");
 assert.equal(otherActions[3].url, "https://snapcraft.io/dmate");
@@ -98,7 +99,9 @@ const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];
 assert(!modal.includes('id="installHelpNativeButton"'));
 assert(!modal.includes('id="installHelpNote"'));
-assert(html.includes("dmate-package-only-v35-20261020"), "Install dialog JS cache key must change after PWA cleanup");
+assert(!/pwa|pwastore|webclip|mobileconfig|manifest/i.test(modal), "Download dialog must not expose PWA/WebClip links or instructions");
+assert(modal.includes('id="installHelpTitle">下载 DMate</div>'), "Dialog title should describe package downloads");
+assert(html.includes("dmate-package-only-v37-20261020"), "Install dialog JS cache key must change after legacy-worker cleanup");
 for(const platform of ["android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
@@ -118,6 +121,8 @@ assert(!html.includes("apple-mobile-web-app-capable"));
 assert(!html.includes("apple-mobile-web-app-title"));
 assert(!html.includes("DMate.mobileconfig"));
 assert(html.includes("navigator.serviceWorker.getRegistrations"), "Legacy worker cleanup must remain for old installs");
+assert(html.includes("scriptUrl.pathname"), "Legacy worker cleanup must tolerate query strings in worker URLs");
+assert(html.includes("window.location.reload()"), "Reload once after deleting stale PWA cache/worker");
 assert(!html.includes("navigator.serviceWorker.register"), "Do not register a new worker");
 assert(!app.includes('@app.route("/manifest.webmanifest")'));
 assert(!app.includes('@app.route("/manifest-mobile.webmanifest")'));
