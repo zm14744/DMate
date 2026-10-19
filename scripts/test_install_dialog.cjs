@@ -62,6 +62,22 @@ assert(urls("android",{androidApkUrl:custom}).includes(githubBase+file.android))
 assert.equal(urls("ios")[0],"/DMate.mobileconfig");
 assert.equal(urls("ios")[1],gitcodeBase+"DMate-iPhone-iPad.mobileconfig/download");
 assert(!urls("ios").some(x=>/\.ipa$/i.test(x)));
+
+// itch.io and official store links must follow platform-specific GitCode/GitHub downloads.
+const itch = "https://zm14744.itch.io/dmate";
+for (const platform of ["android", "macos"]) {
+    const actions = guide(platform).actions;
+    assert.equal(actions.at(-1).url, itch, platform + " itch.io must follow GitCode/GitHub");
+    assert.match(actions.at(-1).label, /itch\.io/);
+}
+const windowsActions = guide("windows").actions;
+assert.equal(windowsActions.at(-2).url, "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK",
+    "Microsoft Store must follow GitCode/GitHub downloads");
+assert.equal(windowsActions.at(-1).url, itch, "Windows itch.io must be last");
+const linuxActions = guide("linux").actions;
+assert.equal(linuxActions.at(-1).url, "https://snapcraft.io/dmate",
+    "Snap Store must follow all Linux GitCode/GitHub packages");
+
 const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];
 assert(!modal.includes('id="installHelpNativeButton"'));

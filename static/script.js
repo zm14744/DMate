@@ -19502,6 +19502,7 @@ function installGuideForCurrentPlatform() {
     const githubDownloadBase = "https://github.com/zm14744/DMate/releases/latest/download/";
     const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
     const snap = "https://snapcraft.io/dmate";
+    const itch = "https://zm14744.itch.io/dmate";
 
     // The known public GitCode release is the domestic default. Legacy
     // GitHub values in Zeabur must never displace it: they are backups.
@@ -19529,10 +19530,11 @@ function installGuideForCurrentPlatform() {
     if (platform === "android") {
         return {
             platform:"Android",
-            text:"优先从 GitCode 下载安装 APK，GitHub 下载链接同时保留，网络不通时可切换。",
+            text:"优先通过 GitCode 下载 APK，GitHub 与 itch.io 提供备用下载。",
             steps:[],
             actions:[
-                ...installers("DMate.apk", config.androidApkUrl, "APK")
+                ...installers("DMate.apk", config.androidApkUrl, "APK"),
+                { label:"itch.io · 海外备用 APK", url:itch, secondary:true }
             ]
         };
     }
@@ -19554,21 +19556,23 @@ function installGuideForCurrentPlatform() {
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text:"优先通过 GitCode 下载 EXE，也可通过 Microsoft Store 安装；GitHub 直链保留备用。",
+            text:"优先通过 GitCode 下载 EXE；GitHub、Microsoft Store 和 itch.io 均可备用。",
             steps:[],
             actions:[
                 ...installers("DMate_1.0.0_x64-setup.exe", config.desktopWindowsUrl, "Windows EXE"),
-                { label:"Microsoft Store · 微软商店", url:microsoftStore, secondary:true }
+                { label:"Microsoft Store · 微软商店", url:microsoftStore, secondary:true },
+                { label:"itch.io · 海外备用 EXE", url:itch, secondary:true }
             ]
         };
     }
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"优先通过 GitCode 下载 DMG，GitHub 安装包直链保留备用。",
+            text:"优先通过 GitCode 下载 DMG，GitHub 与 itch.io 提供备用下载。",
             steps:[],
             actions:[
-                ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl, "macOS DMG")
+                ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl, "macOS DMG"),
+                { label:"itch.io · 海外备用 DMG", url:itch, secondary:true }
             ]
         };
     }
