@@ -62,7 +62,11 @@
     });
 })();
 </script>{% endif %}
-{% if is_mac_safari %}
+{% if is_search_crawler %}
+<!-- Bing and other search crawlers always receive the same stable, opaque DMate brand icon. -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
+{% elif is_mac_safari %}
 <!-- Static Safari icon: do NOT depend on WebKit accepting JS favicon changes. -->
 <link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
 {% elif is_android_browser %}
