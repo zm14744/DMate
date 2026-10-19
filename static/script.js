@@ -19485,7 +19485,7 @@ function detectDmateBrowserName() {
     if (/honorbrowser/i.test(ua)) return "荣耀浏览器";
     if (/samsungbrowser/i.test(ua)) return "三星浏览器";
     if (/edgios|edga|edg\//i.test(ua)) return "Microsoft Edge";
-    if (/fxios|firefox/i.test(ua)) return "Firefox";
+    if (/fxios|firefox|fennec/i.test(ua)) return "Firefox";
     if (/crios|chrome/i.test(ua)) return "Chrome";
     if (/safari/i.test(ua)) return "Safari";
     return /Android/i.test(ua) ? "手机浏览器" : "当前浏览器";
@@ -19593,73 +19593,76 @@ function installGuideForCurrentPlatform() {
 }
 
 function dmatePwaSiteAndBrowserSupport() {
-    // "Add to Home Screen" can create a normal shortcut even if this browser
-    // does not expose Service Worker or Chromium beforeinstallprompt APIs.
-    if (!window.isSecureContext) return null;
+    // Manual instructions are ONLY for recognized browsers with an install /
+    // add-to-home menu. No standard Web API can inspect that native menu.
+    // Unknown, embedded and unsupported browsers must not get a PWA button.
+    const config = dmateClientConfig();
+    if (config.isAndroidApp || config.isDesktopApp || !window.isSecureContext) return null;
     if (window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true) return null;
+    if (!document.querySelector('link[rel="manifest"]')) return null;
+    const ua = navigator.userAgent || "";
+    // In-app browsers / Android WebView may contain "Chrome" in their UA but
+    // do not necessarily provide a browser-owned installation menu.
+    if (/MicroMessenger|AlipayClient|FBAN|FBAV|Instagram|TikTok|Bytedance|DingTalk|Weibo|\bwv\b/i.test(ua)) return null;
 
     const platform = detectDmateInstallPlatform();
     const browser = detectDmateBrowserName();
-    if (platform !== "android" &&
-        (!("serviceWorker" in navigator) || !document.querySelector('link[rel="manifest"]'))) return null;
-    if (browser === "微信内置浏览器" || browser === "支付宝内置浏览器") return null;
-
     const steps = [];
+
     if (platform === "android") {
-        // 只对已知提供“安装应用/添加到主屏幕”能力的浏览器显示 PWA 说明。
-        // 未识别浏览器或仅有普通网页浏览能力时，不展示误导性的 PWA 安装入口。
-        const supportedAndroidBrowsers = [
-            "Chrome", "Microsoft Edge", "Firefox", "三星浏览器",
-            "百度浏览器", "夸克浏览器", "UC 浏览器", "QQ 浏览器",
-            "小米浏览器", "华为浏览器", "OPPO 浏览器", "vivo 浏览器", "荣耀浏览器"
-        ];
-        if (!supportedAndroidBrowsers.includes(browser)) return null;
-        const browserSteps = {
-            "百度浏览器":"先打开底部菜单或更多工具，查找“添加到桌面/桌面快捷方式”。没有该项时，此版本可能不支持创建桌面快捷方式；可复制网址，在 Edge、Chrome 或系统浏览器打开后安装。",
-            "夸克浏览器":"先打开底部菜单→工具箱/更多工具，或分享面板，查找“添加到桌面/桌面快捷方式”。如该版本没有此项，请改用 Edge、Chrome 或系统浏览器打开 DMate。",
-            "UC 浏览器":"打开菜单→工具箱/更多工具，查找“添加到桌面/桌面快捷方式”；若没有该选项，改用支持安装的浏览器。",
-            "QQ 浏览器":"打开底部菜单→工具箱/更多工具，或分享菜单，查找“添加到桌面/桌面快捷方式”。如果这一版本没有该项，可复制网址到 Edge、Chrome 或系统浏览器安装。",
-            "小米浏览器":"打开菜单，查找“添加到桌面/快捷方式”。",
-            "华为浏览器":"打开菜单，查找“添加至桌面”或“安装应用”。",
-            "OPPO 浏览器":"打开菜单，查找“添加到桌面/快捷方式”。",
-            "vivo 浏览器":"打开菜单，查找“添加到桌面/快捷方式”。",
-            "荣耀浏览器":"打开菜单，查找“添加到桌面/快捷方式”。",
-            "三星浏览器":"打开菜单，选择“安装应用”或“添加到主屏幕”。",
+        const nativeMenuSteps = {
             "Firefox":"打开 Firefox / Fennec 菜单，选择“安装”或“添加到主屏幕”。",
-            "Microsoft Edge":"打开 Edge 菜单，选择“安装”或“添加到手机”。",
+            "Microsoft Edge":"打开 Edge 菜单，选择“安装应用”或“添加到主屏幕”。",
             "Chrome":"打开 Chrome 菜单，选择“安装应用”或“添加到主屏幕”。",
-            "手机浏览器":"打开浏览器菜单，查找“安装应用”或“添加到主屏幕”。"
+            "三星浏览器":"打开三星浏览器菜单，选择“安装应用”或“添加到主屏幕”。",
+            "百度浏览器":"打开百度浏览器菜单或更多工具，选择“添加到桌面”。",
+            "夸克浏览器":"打开夸克菜单的工具箱或分享面板，选择“添加到桌面”。",
+            "UC 浏览器":"打开 UC 浏览器菜单的工具箱，选择“添加到桌面”。",
+            "QQ 浏览器":"打开 QQ 浏览器菜单的工具箱或分享面板，选择“添加到桌面”。",
+            "小米浏览器":"打开小米浏览器菜单，选择“添加到桌面”。",
+            "华为浏览器":"打开华为浏览器菜单，选择“添加至桌面”。",
+            "OPPO 浏览器":"打开 OPPO 浏览器菜单，选择“添加到桌面”。",
+            "vivo 浏览器":"打开 vivo 浏览器菜单，选择“添加到桌面”。",
+            "荣耀浏览器":"打开荣耀浏览器菜单，选择“添加到桌面”。"
         };
-        steps.push(browserSteps[browser] || "打开浏览器菜单，查找“安装应用”或“添加到主屏幕”。");
-        steps.push("如果安装菜单缺失，请确认浏览器具有“创建桌面快捷方式”权限；部分版本已移除这个入口，网页本身无法强制弹出。可复制网址 https://dmate.zeabur.app/ 到支持安装的浏览器，或在 DMate 安装弹窗中选择 Android APK。");
-        return { platform, browser, text:"若当前浏览器不支持直接弹出安装确认，请按以下步骤尝试添加桌面快捷方式。", steps };
+        const instruction = nativeMenuSteps[browser];
+        if (!instruction) return null;
+        // Chromium-based PWA install flow needs PWA APIs; Firefox and some
+        // domestic browsers can still create ordinary desktop shortcuts.
+        if (["Chrome", "Microsoft Edge", "三星浏览器"].includes(browser) &&
+            !("serviceWorker" in navigator)) return null;
+        steps.push(instruction);
+        return {platform, browser, text:"当前浏览器可以通过菜单安装或添加桌面快捷方式。", steps};
     }
+
     if (platform === "ios") {
-        if (!["Safari", "Chrome", "Microsoft Edge", "Firefox"].includes(browser)) return null;
-        steps.push(browser + "：打开“分享”菜单，查找“添加到主屏幕”。");
-        steps.push("如果没有该选项，请在 Safari 中打开 DMate，再点“分享”→“添加到主屏幕”。");
-        return { platform, browser, text:"iPhone / iPad 通常需要从分享菜单添加网页应用。", steps };
+        const ios = /OS (\d+)_(\d+)/i.exec(ua);
+        const modernIOS = ios && (Number(ios[1]) > 16 || (Number(ios[1]) === 16 && Number(ios[2]) >= 4));
+        if (browser !== "Safari" &&
+            !(modernIOS && ["Chrome", "Microsoft Edge", "Firefox"].includes(browser))) return null;
+        steps.push("打开浏览器分享菜单，选择“添加到主屏幕”。");
+        return {platform, browser, text:"请通过分享菜单将 DMate 添加到主屏幕。", steps};
     }
-    if (platform === "windows") {
-        if (!["Chrome", "Microsoft Edge"].includes(browser)) return null;
-        steps.push(browser + "：打开浏览器菜单，选择“安装 DMate”或“安装此网站为应用”。");
-        return { platform, browser, text:"当前浏览器未提供一键安装弹窗，可从菜单安装网页应用。", steps };
-    }
+
     if (platform === "macos") {
         if (browser === "Safari") {
-            steps.push("Safari：在菜单栏选择“文件”→“添加到程序坞”。");
-        } else if (["Chrome", "Microsoft Edge"].includes(browser)) {
-            steps.push(browser + "：打开浏览器菜单，选择“安装 DMate”或“安装此网站为应用”。");
+            const version = /Version\/(\d+)/i.exec(ua);
+            if (!version || Number(version[1]) < 17) return null;
+            steps.push("打开 Safari 菜单栏，选择“文件”→“添加到程序坞”。");
+        } else if (["Chrome", "Microsoft Edge"].includes(browser) && "serviceWorker" in navigator) {
+            steps.push("打开浏览器菜单，选择“安装 DMate”或“安装此网站为应用”。");
         } else {
             return null;
         }
-        return { platform, browser, text:"当前浏览器未提供一键安装弹窗，可使用浏览器的网页应用安装功能。", steps };
+        return {platform, browser, text:"请通过浏览器的安装菜单添加 DMate。", steps};
     }
-    if (platform === "linux") {
-        if (!["Chrome", "Microsoft Edge"].includes(browser)) return null;
-        steps.push(browser + "：打开浏览器菜单，选择“安装 DMate”或“安装此网站为应用”。");
-        return { platform, browser, text:"当前浏览器未提供一键安装弹窗，可从菜单安装网页应用。", steps };
+
+    if (platform === "windows" || platform === "linux") {
+        if (!["Chrome", "Microsoft Edge"].includes(browser) || !("serviceWorker" in navigator)) return null;
+        steps.push("打开浏览器菜单，选择“安装 DMate”或“安装此网站为应用”。");
+        return {platform, browser, text:"请通过浏览器菜单安装 DMate。", steps};
     }
+
     return null;
 }
 
