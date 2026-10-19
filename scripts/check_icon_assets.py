@@ -243,7 +243,8 @@ def main():
     assert '{% if is_search_crawler %}' in html
     assert '<link rel="icon" type="image/x-icon" href="/favicon.ico">' in html
     assert '<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">' in html
-    assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v34-64.png">' in html
+    assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v36-64.png?v=dmate-safari-v36-20261019">' in html
+    assert "href=\"/static/icons/dmate-site-v34-64.png\"" not in html
     assert 'document.head.appendChild(icon)' not in html
     assert 'dmate-safari-" + theme' not in html
     assert '<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">' in html

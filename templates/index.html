@@ -69,7 +69,8 @@
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
 {% elif is_mac_safari %}
 <!-- Static Safari icon: do NOT depend on WebKit accepting JS favicon changes. -->
-<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v34-64.png">
+<!-- Safari uses the same fixed black tile and thin white geometry in light and dark appearance. Versioned URL bypasses the old WebKit favicon cache. -->
+<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v36-64.png?v=dmate-safari-v36-20261019">
 {% elif is_android_browser %}
 <!-- Android: browser-specific favicon geometry compensation, native master unchanged. -->
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-32-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-32-v17.png{% endif %}">
