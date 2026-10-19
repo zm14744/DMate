@@ -1857,10 +1857,19 @@ def sync_user_data():
 
 @app.route("/favicon.ico")
 def favicon_ico():
-    """Default website/favicon fallback is transparent THIN linework, not an app tile."""
-    response = app.send_static_file("icons/favicon.ico")
+    """Safari-specific root fallback; unchanged transparent icon for other browsers."""
+    agent = request.headers.get("User-Agent", "")
+    mac_safari = bool(
+        re.search(r"Macintosh|Mac OS X", agent, re.IGNORECASE)
+        and re.search(r"Safari/", agent, re.IGNORECASE)
+        and not re.search(r"Chrome/|Chromium/|CriOS/|Edg/|OPR/|Firefox/|FxiOS/",
+                          agent, re.IGNORECASE)
+    )
+    icon = "icons/dmate-safari-ink-v29.ico" if mac_safari else "icons/favicon.ico"
+    response = app.send_static_file(icon)
     response.headers["Content-Type"] = "image/x-icon"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Vary"] = "User-Agent"
     return response
 
 

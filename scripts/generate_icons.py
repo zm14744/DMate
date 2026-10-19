@@ -19,7 +19,8 @@ TAURI = ROOT / "desktop" / "src-tauri" / "icons"
 MASTER = ROOT / "android" / "app" / "src" / "main" / "res" / "mipmap-xxxhdpi" / "ic_launcher.png"
 VIEWBOX = 1254
 STROKE = 13  # Original installed Android icon uses ~2px hairline at 192px
-TAB_STROKE = 23  # Browser tabs are tiny; retain visibly fine lines at 16-32px
+TAB_STROKE = 23  # Other browser tabs keep existing white hairline artwork.
+SAFARI_TAB_STROKE = 78  # At 16–24 CSS px the black strokes must stay readable.
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
 
@@ -94,18 +95,22 @@ def save_png(image, path):
     image.save(path, "PNG", optimize=True)
 
 
-def render_png_bytes(size, background=BLACK, figure_scale=1.0, stroke_units=STROKE):
+def render_png_bytes(size, background=BLACK, figure_scale=1.0, stroke_units=STROKE,
+                     foreground=WHITE):
     with io.BytesIO() as buffer:
-        save_png(draw_mark(size, background=background, figure_scale=figure_scale,
-                           stroke_units=stroke_units), buffer)
+        save_png(draw_mark(size, background=background, foreground=foreground,
+                           figure_scale=figure_scale, stroke_units=stroke_units), buffer)
         return buffer.getvalue()
 
 
-def save_ico(path, sizes, background=BLACK, stroke_units=STROKE):
+def save_ico(path, sizes, background=BLACK, stroke_units=STROKE, foreground=WHITE):
     """Build ICO from independently vector-rendered PNGs at EACH exact size."""
     sizes = list(sizes)
-    payloads = [render_png_bytes(size, background=background, stroke_units=stroke_units)
-                for size in sizes]
+    payloads = [
+        render_png_bytes(size, background=background,
+                         stroke_units=stroke_units, foreground=foreground)
+        for size in sizes
+    ]
     offset = 6 + 16 * len(sizes)
     out = io.BytesIO()
     out.write(struct.pack("<HHH", 0, 1, len(sizes)))
@@ -174,12 +179,23 @@ def main():
         svg_mark(background=None, stroke=TAB_STROKE), encoding="utf-8"
     )
 
-    # Safari browser TAB: a single fixed-color rounded black tile at ANY theme.
-    # Its SVG remains sharp at every screen density and is never inverted.
-    (STATIC / "dmate-favicon-mac.svg").write_text(
-        svg_mark("#000", "#fff", TAB_STROKE, corner_radius=190), encoding="utf-8"
+    # Safari's ordinary compact TAB icon is not a pinned-tab mask.
+    # Its dark tab toolbar may create a pale background for dark favicons.
+    # Use opaque pale/white tile + BLACK readable strokes rather than
+    # a black tile with subpixel white strokes. PNG/ICO are intentionally
+    # preferred to SVG; some Safari versions apply special SVG treatment.
+    # NEW FILENAMES avoid Safari's per-origin persistent favicon cache.
+    for size in (32, 64):
+        save_png(
+            draw_mark(size, background=WHITE, foreground=BLACK,
+                      rounded=True, stroke_units=SAFARI_TAB_STROKE),
+            STATIC / f"dmate-safari-ink-v29-{size}.png"
+        )
+    save_ico(
+        STATIC / "dmate-safari-ink-v29.ico",
+        (16, 32, 48, 64, 128),
+        background=WHITE, foreground=BLACK, stroke_units=SAFARI_TAB_STROKE
     )
-    save_png(draw_mark(256, rounded=True, stroke_units=TAB_STROKE), STATIC / "dmate-favicon-mac.png")
 
     # Apple's Home Screen app and the cross-platform PWA use the same artwork.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
@@ -212,7 +228,7 @@ def main():
              background=None, stroke_units=TAB_STROKE)
 
     print(json.dumps({"status": "vector-only generation",
-                      "mac_favicon": "fixed black tile, white thin lines",
+                      "mac_favicon": "white tile, readable black geometric strokes (PNG + ICO)",
                       "formats": ["SVG", "PNG", "ICO", "ICNS"],
                       "platforms": ["PWA", "Android browser", "Windows", "macOS", "Linux"]},
                      ensure_ascii=False, indent=2))

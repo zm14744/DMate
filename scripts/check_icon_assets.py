@@ -8,7 +8,7 @@ import re
 from types import SimpleNamespace
 from pathlib import Path
 from PIL import Image, ImageChops
-from generate_icons import draw_mark, TAB_STROKE
+from generate_icons import draw_mark, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "static" / "icons"
@@ -96,13 +96,24 @@ def main():
     ):
         matches_vector(DESKTOP / filename, size)
 
-    matches_vector(ICONS / "dmate-favicon-mac.png", 256, rounded=True, stroke_units=TAB_STROKE)
-    mac_svg = (ICONS / "dmate-favicon-mac.svg").read_text(encoding="utf-8")
-    assert '<rect width="1254" height="1254" rx="190" ry="190" fill="#000"/>' in mac_svg
-    assert 'stroke="#fff"' in mac_svg and 'stroke-width="23"' in mac_svg
-    assert "prefers-color-scheme" not in mac_svg and "<style" not in mac_svg
-    assert "media=" not in mac_svg
-    assert not (ICONS / "dmate-favicon-mac-light.svg").exists()
+    # Safari gets a pale tile with high-contrast black geometric strokes.
+    # The Windows/Android transparency and PWA imagery are unaffected.
+    for size in (32, 64):
+        path = ICONS / f"dmate-safari-ink-v29-{size}.png"
+        actual = rgba(path)
+        expected = draw_mark(size, background=WHITE, foreground=BLACK,
+                             rounded=True, stroke_units=SAFARI_TAB_STROKE)
+        assert ImageChops.difference(actual, expected).getbbox() is None, path
+        assert actual.getpixel((size // 2, size // 2))[3] == 255
+        assert min(actual.getpixel((size // 2, size // 2))[:3]) > 230, (
+            "Safari favicon center should remain light, not invert to black"
+        )
+        assert any(sum(actual.getpixel((x, y))[:3]) < 150
+                   for x in range(size // 6, size * 5 // 6)
+                   for y in range(size // 6, size * 5 // 6)), (
+            "Safari geometry has no visible dark strokes"
+        )
+    check_ico(ICONS / "dmate-safari-ink-v29.ico", (16, 32, 48, 64, 128))
     assert rgba(ICONS / "favicon-32.png").getpixel((0, 0))[3] == 0
 
     check_ico(ICONS / "favicon.ico", (16, 32, 48, 64, 128))
@@ -176,10 +187,12 @@ def main():
         assert native_app == unchanged, "Native Android APK should not receive PWA icon overrides"
 
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
-    assert "dmate-favicon-mac.svg?v=dmate-fixed-v22" in html
-    assert "dmate-favicon-mac.png?v=dmate-fixed-v22" in html
+    assert "dmate-safari-ink-v29-32.png" in html
+    assert "dmate-safari-ink-v29-64.png" in html
+    assert "dmate-safari-ink-v29.ico" in html
+    assert 'dmate-favicon-mac.svg' not in html
     assert "dmate-win-tab-v21" in html
-    print("PASS vector sharpness + theme-invariant Safari + PWA + ICO + ICNS")
+    print("PASS Safari high-contrast black ink favicon, other tabs, PWA, ICO and ICNS")
 
 
 if __name__ == "__main__":

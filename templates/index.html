@@ -58,10 +58,12 @@
 })();
 </script>{% endif %}
 {% if is_mac_safari %}
-<!-- Safari: exact same solid-black thin-line icon in light and dark tabs.
-     Both formats are drawn independently from source paths, never upscaled PNGs. -->
-<link rel="icon" type="image/png" sizes="256x256" href="/static/icons/dmate-favicon-mac.png?v=dmate-fixed-v22-20261019">
-<link id="dmateSafariFavicon" rel="icon" type="image/svg+xml" href="/static/icons/dmate-favicon-mac.svg?v=dmate-fixed-v22-20261019">
+<!-- macOS Safari ordinary tabs: use RASTER artwork with dark geometric lines
+     on a pale tile. The old black SVG was rendered as a low-contrast pale
+     squircle in Safari. Use new filenames to bypass Safari favicon cache. -->
+<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/dmate-safari-ink-v29-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-safari-ink-v29-64.png">
+<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-safari-ink-v29.ico">
 {% elif is_android_browser %}
 <!-- Android: browser-specific favicon geometry compensation, native master unchanged. -->
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-32-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-32-v17.png{% endif %}">
