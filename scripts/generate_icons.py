@@ -94,16 +94,18 @@ def save_png(image, path):
     image.save(path, "PNG", optimize=True)
 
 
-def render_png_bytes(size, background=BLACK, figure_scale=1.0):
+def render_png_bytes(size, background=BLACK, figure_scale=1.0, stroke_units=STROKE):
     with io.BytesIO() as buffer:
-        save_png(draw_mark(size, background=background, figure_scale=figure_scale), buffer)
+        save_png(draw_mark(size, background=background, figure_scale=figure_scale,
+                           stroke_units=stroke_units), buffer)
         return buffer.getvalue()
 
 
-def save_ico(path, sizes, background=BLACK):
+def save_ico(path, sizes, background=BLACK, stroke_units=STROKE):
     """Build ICO from independently vector-rendered PNGs at EACH exact size."""
     sizes = list(sizes)
-    payloads = [render_png_bytes(size, background=background) for size in sizes]
+    payloads = [render_png_bytes(size, background=background, stroke_units=stroke_units)
+                for size in sizes]
     offset = 6 + 16 * len(sizes)
     out = io.BytesIO()
     out.write(struct.pack("<HHH", 0, 1, len(sizes)))
@@ -160,7 +162,7 @@ def main():
 
     (STATIC / "dmate-mark.svg").write_text(svg_mark("#000"), encoding="utf-8")
     (STATIC / "dmate-transparent.svg").write_text(
-        svg_mark(background=None), encoding="utf-8"
+        svg_mark(background=None, stroke=TAB_STROKE), encoding="utf-8"
     )
 
     # Safari browser TAB: a single fixed-color rounded black tile at ANY theme.
@@ -195,8 +197,10 @@ def main():
 
     # Transparent WHITE linework for non-Safari website tabs, never for PWAs.
     for size in (16, 32, 48, 128):
-        save_png(draw_mark(size, background=None), STATIC / f"favicon-{size}.png")
-    save_ico(STATIC / "favicon.ico", (16, 32, 48, 64, 128), background=None)
+        save_png(draw_mark(size, background=None, stroke_units=TAB_STROKE),
+                 STATIC / f"favicon-{size}.png")
+    save_ico(STATIC / "favicon.ico", (16, 32, 48, 64, 128),
+             background=None, stroke_units=TAB_STROKE)
 
     print(json.dumps({"status": "vector-only generation",
                       "mac_favicon": "fixed black tile, white thin lines",
