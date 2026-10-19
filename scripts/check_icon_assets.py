@@ -126,8 +126,8 @@ def main():
                    foreground=WHITE, rounded=True, stroke_units=STROKE)
     check_ico(ICONS / "dmate-site-v35.ico", (16, 24, 32, 48, 64, 128, 256))
     # Search favicon must stay thin, while the legacy Safari rendering is unchanged.
-    assert ImageChops.difference(rgba(ICONS / "dmate-site-v35-64.png"),
-                                 rgba(ICONS / "dmate-site-v34-64.png")).getbbox() is not None
+    assert ImageChops.difference(rgba(ICONS / "dmate-site-v35-64.png").convert("RGB"),
+                                 rgba(ICONS / "dmate-site-v34-64.png").convert("RGB")).getbbox() is not None
     assert (ICONS / "dmate-site-v34-64.png").read_bytes() == (
         ICONS / "dmate-safari-light-v32-64.png").read_bytes()
     assert rgba(ICONS / "favicon-32.png").getpixel((0, 0))[3] == 0
