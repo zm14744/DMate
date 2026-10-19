@@ -1901,49 +1901,6 @@ def favicon_png_root():
     return response
 
 
-@app.route("/DMate.mobileconfig")
-def ios_ipados_webclip_profile():
-    """Public, optional iPhone/iPad Home Screen link; no device management.
-
-    The profile contains only one Apple WebClip payload. It never enrolls MDM,
-    installs certificates, adds a VPN, or modifies device restrictions.
-    """
-    import plistlib
-    import uuid
-
-    icon_path = os.path.join(app.static_folder, "icons", "apple-touch-icon.png")
-    with open(icon_path, "rb") as icon_file:
-        icon_png = icon_file.read()
-    # Distinct stable identifiers let the same profile serve both iOS/iPadOS.
-    namespace = uuid.NAMESPACE_DNS
-    profile = {
-        "PayloadType": "Configuration",
-        "PayloadVersion": 1,
-        "PayloadIdentifier": "app.dmate.zeabur.webclip.profile",
-        "PayloadUUID": str(uuid.uuid5(namespace, "dmate.zeabur.app/webclip/profile")).upper(),
-        "PayloadDisplayName": "DMate",
-        "PayloadDescription": "在 iPhone 或 iPad 主屏幕添加 DMate 网页入口。不包含设备管理、证书、VPN 或限制。",
-        "PayloadOrganization": "DMate",
-        "PayloadContent": [
-            {
-                "PayloadType": "com.apple.webClip.managed",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": "app.dmate.zeabur.webclip",
-                "PayloadUUID": str(uuid.uuid5(namespace, "dmate.zeabur.app/webclip")).upper(),
-                "Label": "DMate",
-                "URL": "https://dmate.zeabur.app/",
-                "Icon": icon_png,
-            }
-        ],
-    }
-    response = make_response(plistlib.dumps(profile, fmt=plistlib.FMT_XML, sort_keys=False))
-    response.headers["Content-Type"] = "application/x-apple-aspen-config"
-    response.headers["Content-Disposition"] = 'attachment; filename="DMate-iPhone-iPad.mobileconfig"'
-    response.headers["Cache-Control"] = "public, max-age=3600"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    return response
-
-
 @app.route("/")
 def home():
     # 普通 Android 浏览器显示 APK 下载入口；已安装的 APK 隐藏重复入口。

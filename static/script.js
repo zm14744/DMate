@@ -19518,16 +19518,9 @@ function installGuideForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"下载描述文件，到设置中安装网页入口（非原生 App）。",
-            steps:[
-                "在 Safari 下载描述文件。",
-                "设置 → 已下载描述文件 → 安装；找不到时查看“VPN 与设备管理”。"
-            ],
-            actions:[
-                { label:"下载描述文件", url:"/DMate.mobileconfig" },
-                { label:"GitCode 备用", url:gitcodeDownloadBase +
-                    "DMate-iPhone-iPad.mobileconfig/download", secondary:true }
-            ]
+            text:"直接在浏览器中使用 DMate。",
+            steps:[],
+            actions:[]
         };
     }
     if (platform === "windows") {
@@ -19630,6 +19623,11 @@ function initDmateInstall() {
     }
 
     const platform = detectDmateInstallPlatform();
+    if (platform === "ios") {
+        button.hidden = true;
+        button.setAttribute("aria-hidden", "true");
+        return;
+    }
     button.hidden = false;
     button.setAttribute("aria-hidden", "false");
     if (platform === "android") button.textContent = "下载 DMate";

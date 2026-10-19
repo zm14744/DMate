@@ -22,9 +22,6 @@
 <meta name="description" content="DMate 是面向大学生的离散数学 AI 智能辅学系统，支持题目图片识别、图论与离散数学解答、智能出题、错题管理、针对性复测、知识图谱和学习进度跨设备同步。无需安装即可在线学习，也提供 Windows、macOS、Linux 和 Android 客户端。">
 <meta name="msvalidate.01" content="8032784D58887350AB61D823FFE7933B" />
 <meta name="baidu-site-verification" content="codeva-486FjOU4sO" />
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="DMate">
 <script>
 /* 清理旧版网页应用残留；不注册新的 Service Worker。 */
 (function () {
@@ -8130,7 +8127,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
     <button class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
-    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app %} hidden{% endif %}>{% if is_android %}下载 DMate{% elif is_ios %}安装 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
+    <button id="installAppBtn" class="btn install-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app or is_ios %} hidden{% endif %}>{% if is_android %}下载 DMate{% elif is_ios %}安装 DMate{% else %}下载 DMate 桌面版{% endif %}</button>
     <button id="accountBtn" class="btn account-entry" type="button"><span class="account-entry-dot" aria-hidden="true"></span><span id="accountEntryLabel">登录 / 注册</span></button>
     <button id="appearanceBtn" class="btn appearance-entry" type="button"><span class="appearance-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor"/></svg></span><span>外观</span></button>
 </div>
@@ -8781,7 +8778,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-package-only-v34-20261019"></script>
+<script src="/static/script.js?v=dmate-package-only-v35-20261020"></script>
 
 </body>
 </html>

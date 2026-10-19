@@ -59,9 +59,7 @@ const custom="https://mirror.example/DMate.apk";
 assert.equal(urls("android",{androidApkUrl:custom})[0],custom,"Custom mirror still supported");
 assert(urls("android",{androidApkUrl:custom}).includes(gitcodeBase+file.android+"/download"));
 assert(urls("android",{androidApkUrl:custom}).includes(githubBase+file.android));
-assert.equal(urls("ios")[0],"/DMate.mobileconfig");
-assert.equal(urls("ios")[1],gitcodeBase+"DMate-iPhone-iPad.mobileconfig/download");
-assert(!urls("ios").some(x=>/\.ipa$/i.test(x)));
+assert.equal(urls("ios").length, 0, "iOS must not show removed PWA/WebClip install links");
 
 // itch.io and official store links must follow platform-specific GitCode/GitHub downloads.
 const itch = "https://zm14744.itch.io/dmate";
@@ -84,7 +82,7 @@ assert.equal(JSON.stringify(labels("macos")), JSON.stringify(["GitCode · DMG", 
 assert.equal(JSON.stringify(labels("linux")), JSON.stringify([
     "GitCode · DEB", "GitHub · DEB", "GitCode · AppImage", "GitHub · AppImage", "Snap Store"
 ]));
-assert.equal(JSON.stringify(labels("ios")), JSON.stringify(["下载描述文件", "GitCode 备用"]));
+assert.equal(JSON.stringify(labels("ios")), JSON.stringify([]));
 assert.equal(guide("android").text, "选择下载渠道获取 APK。");
 assert.equal(guide("windows").text, "选择 EXE 安装包或 Microsoft Store。");
 assert.equal(guide("macos").text, "选择 DMG 安装包下载。");
@@ -100,7 +98,7 @@ const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];
 assert(!modal.includes('id="installHelpNativeButton"'));
 assert(!modal.includes('id="installHelpNote"'));
-assert(html.includes("dmate-package-only-v34-20261019"), "Install dialog JS cache key must change after PWA removal");
+assert(html.includes("dmate-package-only-v35-20261020"), "Install dialog JS cache key must change after PWA cleanup");
 for(const platform of ["android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
@@ -116,12 +114,16 @@ assert(!js.includes("registerDmateServiceWorker"));
 assert(!html.includes('rel="manifest"'));
 assert(!html.includes("PWA / APK"));
 assert(!html.includes("PWA 安装说明"));
+assert(!html.includes("apple-mobile-web-app-capable"));
+assert(!html.includes("apple-mobile-web-app-title"));
+assert(!html.includes("DMate.mobileconfig"));
 assert(html.includes("navigator.serviceWorker.getRegistrations"), "Legacy worker cleanup must remain for old installs");
 assert(!html.includes("navigator.serviceWorker.register"), "Do not register a new worker");
 assert(!app.includes('@app.route("/manifest.webmanifest")'));
 assert(!app.includes('@app.route("/manifest-mobile.webmanifest")'));
 assert(!app.includes('@app.route("/service-worker.js")'));
 assert(!app.includes('@app.route("/install")'));
+assert(!app.includes('@app.route("/DMate.mobileconfig")'));
 assert(!app.includes('@app.route("/pwa/")'));
 for (const obsolete of [
     "templates/install.html",
