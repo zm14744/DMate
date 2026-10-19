@@ -1872,6 +1872,20 @@ def web_app_manifest():
     return response
 
 
+@app.route("/manifest-mobile.webmanifest")
+def web_app_manifest_mobile():
+    """Compatibility manifest for Android browsers checking the current page scope.
+
+    QQ, Quark, UC, Baidu and several OEM browsers inspect the / homepage
+    itself when deciding whether to expose 'Add to home screen'. The standard
+    PWA manifest stays limited to /pwa/ so desktop Edge doesn't capture /.
+    """
+    response = app.send_static_file("manifest-mobile.webmanifest")
+    response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
 @app.route("/service-worker.js")
 def service_worker():
     response = app.send_static_file("service-worker.js")
@@ -1901,6 +1915,17 @@ def home():
     is_dmate_android_app = bool(re.search(r"DMateAndroid/", user_agent, re.IGNORECASE))
     is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
     is_android_browser = is_android and not is_dmate_android_app
+    # Some Android browsers only expose their add-to-desktop menu when the
+    # page being viewed (/) lies within the manifest's declared scope.
+    is_android_install_compat_browser = bool(
+        is_android_browser and re.search(
+            r"QQBrowser|MQQBrowser|Quark|UCBrowser|UCWEB|BaiduBrowser|"
+            r"baiduboxapp|MiuiBrowser|HuaweiBrowser|HeyTapBrowser|"
+            r"OPPOBrowser|VivoBrowser|HonorBrowser",
+            user_agent,
+            re.IGNORECASE,
+        )
+    )
 
     # 首页直接注入与 teaching.py / app.py 共用的 knowledge_graph.json，
     # 避免前端再维护一份硬编码图谱而产生不同步。
@@ -1913,6 +1938,7 @@ def home():
         is_ios=is_ios,
         is_mac_safari=is_mac_safari,
         is_android_browser=is_android_browser,
+        is_android_install_compat_browser=is_android_install_compat_browser,
         is_dmate_android_app=is_dmate_android_app,
         is_dmate_desktop_app=is_dmate_desktop_app,
         android_apk_url=ANDROID_APK_URL,

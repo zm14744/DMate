@@ -20,11 +20,24 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v17-20261019">
+{% if not is_dmate_android_app and not is_dmate_desktop_app %}
+{% if is_android_install_compat_browser %}
+<!-- QQ/Quark/UC/Baidu need the visited / page to be in manifest scope. -->
+<link rel="manifest" href="/manifest-mobile.webmanifest?v=mobile-install-compat-v19-20261019">
+<meta name="mobile-web-app-capable" content="yes">
+{% else %}
+<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v17-20261019">
+{% endif %}
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
    这里只保存事件，不自动调用 prompt；只有用户点击自定义弹窗按钮时才会触发。 */
 (function () {
+    const ua = navigator.userAgent || "";
+    // Do not steal native install / add-to-desktop handling from browsers
+    // where the browser itself owns that menu entry.
+    window.__dmatePreferBrowserInstallMenu = /Android/i.test(ua) &&
+        /QQBrowser|MQQBrowser|Quark|UCBrowser|UCWEB|BaiduBrowser|baiduboxapp|MiuiBrowser|HuaweiBrowser|HeyTapBrowser|OPPOBrowser|VivoBrowser|HonorBrowser/i.test(ua);
+    if (window.__dmatePreferBrowserInstallMenu) return;
     if (window.__dmateBeforeInstallPromptGuardInstalled) return;
     window.__dmateBeforeInstallPromptGuardInstalled = true;
     window.__dmatePendingInstallPrompt = window.__dmatePendingInstallPrompt || null;
@@ -8788,7 +8801,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-pwa-install-guide-v17-20261019"></script>
+<script src="/static/script.js?v=dmate-pwa-install-native-v19-20261019"></script>
 
 </body>
 </html>

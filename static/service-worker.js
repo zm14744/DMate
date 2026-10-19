@@ -1,8 +1,9 @@
-const CACHE_NAME = "dmate-pwa-unified-v18-20261019";
+const CACHE_NAME = "dmate-pwa-unified-v19-20261019";
 const SHELL_ASSETS = [
   "/",
   "/pwa/",
   "/manifest.webmanifest",
+  "/manifest-mobile.webmanifest",
   "/favicon.ico",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",

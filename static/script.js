@@ -19809,6 +19809,9 @@ function initDmateInstall() {
 
     // 不自动弹出浏览器安装框：只拦截原生提示，留到自定义弹窗内由用户点击“安装 PWA”时触发。
     window.addEventListener("beforeinstallprompt", event => {
+        // QQ/Quark and similar browsers must retain their own PWA install menu.
+        // preventDefault() here may suppress the browser's menu/install UI.
+        if (window.__dmatePreferBrowserInstallMenu) return;
         event.preventDefault();
         dmatePendingInstallPrompt = event;
         window.__dmatePendingInstallPrompt = event;
