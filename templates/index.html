@@ -36,7 +36,7 @@
                     try {
                         var scriptUrl = new URL(worker.scriptURL, window.location.href);
                         return scriptUrl.origin === window.location.origin
-                            && /(?:^|\\/)service-worker\\.js$/i.test(scriptUrl.pathname);
+                            && scriptUrl.pathname.endsWith("/service-worker.js");
                     } catch (_) {
                         return false;
                     }
