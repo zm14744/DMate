@@ -1,4 +1,4 @@
-const CACHE_NAME = "dmate-pwa-unified-v16-20261019";
+const CACHE_NAME = "dmate-pwa-unified-v17-20261019";
 const SHELL_ASSETS = [
   "/",
   "/pwa/",
@@ -24,7 +24,12 @@ const SHELL_ASSETS = [
   "/static/icons/favicon-128.png?v=dmate-favicon-v7-20261019",
   "/static/icons/icon-192-unified-v16.png",
   "/static/icons/icon-512-unified-v16.png",
-  "/static/icons/apple-touch-icon-unified-v16.png"
+  "/static/icons/apple-touch-icon-unified-v16.png",
+  "/static/icons/mobile-favicon-32-v17.png",
+  "/static/icons/mobile-favicon-192-v17.png",
+  "/static/icons/icon-192.png?v=dmate-pwa-v17-20261019",
+  "/static/icons/icon-512.png?v=dmate-pwa-v17-20261019",
+  "/static/icons/icon-maskable-512.png?v=dmate-pwa-v17-20261019"
 ];
 
 self.addEventListener("install", event => {

@@ -1900,6 +1900,7 @@ def home():
         and not re.search(r"Chrome/|Chromium/|CriOS/|Edg/|OPR/|Firefox/|FxiOS/", user_agent, re.IGNORECASE))
     is_dmate_android_app = bool(re.search(r"DMateAndroid/", user_agent, re.IGNORECASE))
     is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
+    is_android_browser = is_android and not is_dmate_android_app
 
     # 首页直接注入与 teaching.py / app.py 共用的 knowledge_graph.json，
     # 避免前端再维护一份硬编码图谱而产生不同步。
@@ -1911,6 +1912,7 @@ def home():
         is_android=is_android,
         is_ios=is_ios,
         is_mac_safari=is_mac_safari,
+        is_android_browser=is_android_browser,
         is_dmate_android_app=is_dmate_android_app,
         is_dmate_desktop_app=is_dmate_desktop_app,
         android_apk_url=ANDROID_APK_URL,

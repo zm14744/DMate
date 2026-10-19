@@ -19593,12 +19593,15 @@ function installGuideForCurrentPlatform() {
 }
 
 function dmatePwaSiteAndBrowserSupport() {
-    if (!window.isSecureContext || !("serviceWorker" in navigator)) return null;
-    if (!document.querySelector('link[rel="manifest"]')) return null;
+    // "Add to Home Screen" can create a normal shortcut even if this browser
+    // does not expose Service Worker or Chromium beforeinstallprompt APIs.
+    if (!window.isSecureContext) return null;
     if (window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true) return null;
 
     const platform = detectDmateInstallPlatform();
     const browser = detectDmateBrowserName();
+    if (platform !== "android" &&
+        (!("serviceWorker" in navigator) || !document.querySelector('link[rel="manifest"]'))) return null;
     if (browser === "微信内置浏览器" || browser === "支付宝内置浏览器") return null;
 
     const steps = [];
@@ -19612,10 +19615,10 @@ function dmatePwaSiteAndBrowserSupport() {
         ];
         if (!supportedAndroidBrowsers.includes(browser)) return null;
         const browserSteps = {
-            "百度浏览器":"打开菜单，查找“添加到桌面”或“安装应用”。",
-            "夸克浏览器":"打开菜单或分享面板，查找“添加到桌面”或“安装应用”。",
-            "UC 浏览器":"打开菜单，查找“添加到桌面/快捷方式”。",
-            "QQ 浏览器":"打开菜单，查找“添加到桌面”或“安装应用”。",
+            "百度浏览器":"先打开底部菜单或更多工具，查找“添加到桌面/桌面快捷方式”。没有该项时，此版本可能不支持创建桌面快捷方式；可复制网址，在 Edge、Chrome 或系统浏览器打开后安装。",
+            "夸克浏览器":"先打开底部菜单→工具箱/更多工具，或分享面板，查找“添加到桌面/桌面快捷方式”。如该版本没有此项，请改用 Edge、Chrome 或系统浏览器打开 DMate。",
+            "UC 浏览器":"打开菜单→工具箱/更多工具，查找“添加到桌面/桌面快捷方式”；若没有该选项，改用支持安装的浏览器。",
+            "QQ 浏览器":"打开底部菜单→工具箱/更多工具，或分享菜单，查找“添加到桌面/桌面快捷方式”。如果这一版本没有该项，可复制网址到 Edge、Chrome 或系统浏览器安装。",
             "小米浏览器":"打开菜单，查找“添加到桌面/快捷方式”。",
             "华为浏览器":"打开菜单，查找“添加至桌面”或“安装应用”。",
             "OPPO 浏览器":"打开菜单，查找“添加到桌面/快捷方式”。",
@@ -19628,7 +19631,8 @@ function dmatePwaSiteAndBrowserSupport() {
             "手机浏览器":"打开浏览器菜单，查找“安装应用”或“添加到主屏幕”。"
         };
         steps.push(browserSteps[browser] || "打开浏览器菜单，查找“安装应用”或“添加到主屏幕”。");
-        return { platform, browser, text:"当前浏览器没有提供一键安装弹窗，可尝试从菜单添加网页应用。", steps };
+        steps.push("如果安装菜单缺失，请确认浏览器具有“创建桌面快捷方式”权限；部分版本已移除这个入口，网页本身无法强制弹出。可复制网址 https://dmate.zeabur.app/ 到支持安装的浏览器，或在 DMate 安装弹窗中选择 Android APK。");
+        return { platform, browser, text:"若当前浏览器不支持直接弹出安装确认，请按以下步骤尝试添加桌面快捷方式。", steps };
     }
     if (platform === "ios") {
         if (!["Safari", "Chrome", "Microsoft Edge", "Firefox"].includes(browser)) return null;

@@ -20,7 +20,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="DMate">
-{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-unified-v16-20261019">
+{% if not is_dmate_android_app and not is_dmate_desktop_app %}<link rel="manifest" href="/manifest.webmanifest?v=dmate-pwa-v17-20261019">
 <script>
 /* 必须在大型主脚本加载前拦截 Chromium 安装事件，避免原生提示抢先遮住 DMate 安装弹窗。
    这里只保存事件，不自动调用 prompt；只有用户点击自定义弹窗按钮时才会触发。 */
@@ -47,6 +47,12 @@
 {% if is_mac_safari %}
 <link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="256x256" href="/static/icons/favicon-safari-black-v15.png?v=dmate-safari-icon-v15-20261019">
 <link rel="shortcut icon" type="image/png" href="/static/icons/favicon-safari-black-v15.png?v=dmate-safari-icon-v15-20261019">
+{% elif is_android_browser %}
+<!-- Android browsers including QQ, Quark and Baidu often create home shortcuts
+     from favicon (not manifest). Use the same opaque black installed-app artwork. -->
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/mobile-favicon-32-v17.png">
+<link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/mobile-favicon-192-v17.png">
+<link id="dmateShortcutFavicon" rel="shortcut icon" type="image/png" href="/static/icons/mobile-favicon-192-v17.png">
 {% else %}
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=dmate-favicon-v7-20261019">
 <link id="dmateFavicon48" rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png?v=dmate-favicon-v7-20261019">
@@ -8781,7 +8787,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-install-modal-user-triggered-v4-20261018"></script>
+<script src="/static/script.js?v=dmate-pwa-install-guide-v17-20261019"></script>
 
 </body>
 </html>

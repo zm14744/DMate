@@ -118,9 +118,21 @@ def main():
         else:
             save_png(from_installed_icon(size), STATIC / filename)
 
-    # Backward-compatible file only; no separate padding/zoom. New manifests
-    # declare only "any" icons because maskable cropping varies by launcher.
-    save_png(from_installed_icon(512), STATIC / "icon-maskable-512.png")
+    # Android adaptive icon: same original artwork with an opaque black canvas.
+    # Launcher maskable icons are cropped to the central safe region; its black
+    # border is NOT a white tile. Shrink the master inside the full black canvas
+    # so the OS crop restores the intended apparent geometry size and stroke.
+    maskable = Image.new("RGBA", (512, 512), (0, 0, 0, 255))
+    inset_size = 410  # ~80% central safe area, before launcher mask/crop.
+    inner = from_installed_icon(inset_size)
+    maskable.alpha_composite(inner, ((512 - inset_size) // 2, (512 - inset_size) // 2))
+    save_png(maskable, STATIC / "icon-maskable-512.png")
+
+    # Some Android browsers create desktop shortcuts from favicon rather than
+    # the Web Manifest. Give them opaque versions of the SAME installed-app icon.
+    for size, filename in [(32, "mobile-favicon-32-v17.png"),
+                           (192, "mobile-favicon-192-v17.png")]:
+        save_png(from_installed_icon(size), STATIC / filename)
 
     (STATIC / "dmate-mark.svg").write_text(
         svg_mark("#000", "#fff", 32), encoding="utf-8"
@@ -193,6 +205,7 @@ def main():
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
         STATIC / "icon-192-unified-v16.png", STATIC / "icon-512-unified-v16.png",
         STATIC / "apple-touch-icon-unified-v16.png",
+        STATIC / "mobile-favicon-32-v17.png", STATIC / "mobile-favicon-192-v17.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
         STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
         STATIC / "favicon-safari-black-v15.png", STATIC / "apple-touch-icon-black-v15.png",
