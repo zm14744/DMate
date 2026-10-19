@@ -225,7 +225,7 @@ def main():
                  64: 1.08, 128: 1.06, 256: 1.04,
              })
 
-    # Apple WebClip uses a dedicated Home Screen icon.
+    # iOS Safari uses the Apple touch icon for site bookmarks and Home Screen shortcuts.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
     for size, name in (
         (128, "windows-shortcut-128-v20.png"),
@@ -258,7 +258,7 @@ def main():
     print(json.dumps({"status": "vector-only generation",
                       "mac_favicon": "light black tile/white lines; dark transparent white lines (PNG + ICO)",
                       "formats": ["SVG", "PNG", "ICO", "ICNS"],
-                      "platforms": ["iOS WebClip", "Android browser", "Windows", "macOS", "Linux"]},
+                      "platforms": ["iOS Safari", "Android browser", "Windows", "macOS", "Linux"]},
                      ensure_ascii=False, indent=2))
 
 

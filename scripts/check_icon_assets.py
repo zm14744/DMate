@@ -42,7 +42,7 @@ def check_ico(path, sizes):
 
 
 def main():
-        matches_vector(ICONS / "icon-512.png", 512)
+    matches_vector(ICONS / "icon-512.png", 512)
 
     for browser, factor in (("edge", 0.95), ("fennec", 1.16)):
         for size in (32, 192):
@@ -158,7 +158,7 @@ def main():
     assert 'dmate-safari-" + theme' not in html
     assert '<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">' in html
     assert "dmate-win-tab-v21" in html
-    print("PASS stable branded Safari/Bing favicon, iOS WebClip icon, Android/Windows/desktop icons")
+    print("PASS stable branded Safari/Bing favicon, iOS Safari touch icon, Android/Windows/desktop icons")
 
 
 if __name__ == "__main__":

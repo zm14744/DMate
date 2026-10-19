@@ -110,6 +110,7 @@ for(const platform of ["android", "windows", "macos", "linux"]) {
 }
 const app = fs.readFileSync("app.py", "utf8");
 assert(!app.includes("浏览器安装菜单添加网页应用"), "Do not describe Android browser PWA installation");
+assert(!app.includes("ios_ipados_webclip_profile"), "Obsolete iOS WebClip handler must be removed");
 assert(!js.includes("beforeinstallprompt"));
 assert(!js.includes("appinstalled"));
 assert(!/installHelp|install-help/.test(js + html), "Old install-help identifiers must be removed");
@@ -137,7 +138,8 @@ for (const obsolete of [
     "static/manifest.webmanifest",
     "static/manifest-mobile.webmanifest",
     "static/service-worker.js",
-    "scripts/test_pwa_install_support.cjs"
+    "scripts/test_pwa_install_support.cjs",
+    "scripts/test_ios_webclip.py"
 ]) assert(!fs.existsSync(obsolete), "Obsolete PWA file remains: " + obsolete);
 
 console.log("PASS: package-only install dialog; no PWA prompt, manifest, worker, or install guide.");
