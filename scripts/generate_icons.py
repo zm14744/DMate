@@ -93,10 +93,29 @@ def main():
     STATIC.mkdir(parents=True, exist_ok=True)
     TAURI.mkdir(parents=True, exist_ok=True)
 
-    # PWA and installed desktop app share black tile + white geometry.
-    for size, filename in [(192, "icon-192.png"), (512, "icon-512.png")]:
-        save_png(draw_mark(size, background=(0, 0, 0, 255)), STATIC / filename)
-    save_png(draw_mark(512, background=(0, 0, 0, 255), figure_scale=0.73), STATIC / "icon-maskable-512.png")
+    # The installed Android app artwork is the single master for all platforms.
+    # Never redraw or independently pad PWA geometry: Android launchers scale
+    # maskable icons and will otherwise change their apparent line width.
+    master_path = ROOT / "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
+    with Image.open(master_path) as source:
+        canonical_icon = source.convert("RGBA")
+    if canonical_icon.size != (192, 192):
+        raise RuntimeError("Expected 192x192 installed-app icon")
+
+    def from_installed_icon(size):
+        if size == 192:
+            return canonical_icon.copy()
+        return canonical_icon.resize((size, size), Image.Resampling.LANCZOS)
+
+    for size, filename in [
+        (192, "icon-192.png"), (512, "icon-512.png"),
+        (192, "icon-192-unified-v16.png"), (512, "icon-512-unified-v16.png"),
+    ]:
+        save_png(from_installed_icon(size), STATIC / filename)
+
+    # Backward-compatible file only; no separate padding/zoom. New manifests
+    # declare only "any" icons because maskable cropping varies by launcher.
+    save_png(from_installed_icon(512), STATIC / "icon-maskable-512.png")
 
     (STATIC / "dmate-mark.svg").write_text(
         svg_mark("#000", "#fff", 32), encoding="utf-8"
@@ -113,7 +132,7 @@ def main():
         (256, "128x128@2x.png"), (512, "icon.png"),
     ]
     for size, filename in tauri_sizes:
-        save_png(draw_mark(size, background=(0, 0, 0, 255)), TAURI / filename)
+        save_png(from_installed_icon(size), TAURI / filename)
     save_ico(TAURI / "icon.png", TAURI / "icon.ico", [
         (16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)
     ])
@@ -157,15 +176,18 @@ def main():
                       foreground=(255, 255, 255, 255), stroke_units=23, shadow=False),
              STATIC / "favicon-safari-black-v15.png")
 
-    # Apple home-screen/PWA artwork intentionally matches the installed app icon.
-    for filename in ("apple-touch-mac-light.png", "apple-touch-mac-dark.png", "apple-touch-icon.png"):
-        save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=23, shadow=False),
-                 STATIC / filename)
-    save_png(draw_mark(180, background=(0, 0, 0, 255), stroke_units=23, shadow=False),
-             STATIC / "apple-touch-icon-black-v15.png")
+    # Apple PWA and Mac Dock icon use the same installed-app master.
+    for filename in (
+        "apple-touch-mac-light.png", "apple-touch-mac-dark.png",
+        "apple-touch-icon.png", "apple-touch-icon-black-v15.png",
+        "apple-touch-icon-unified-v16.png",
+    ):
+        save_png(from_installed_icon(180), STATIC / filename)
     summary = {}
     for path in [
         STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
+        STATIC / "icon-192-unified-v16.png", STATIC / "icon-512-unified-v16.png",
+        STATIC / "apple-touch-icon-unified-v16.png",
         STATIC / "favicon-16.png", STATIC / "favicon-32.png", STATIC / "favicon-48.png",
         STATIC / "favicon-128.png", STATIC / "favicon.ico", STATIC / "favicon-app.ico",
         STATIC / "favicon-safari-black-v15.png", STATIC / "apple-touch-icon-black-v15.png",
