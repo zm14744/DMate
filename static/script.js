@@ -19497,111 +19497,109 @@ function installGuideForCurrentPlatform() {
     const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
     const browserName = detectDmateBrowserName();
-    const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
-    const itch = "https://zm14744.itch.io/dmate";
+    const gitcode = "https://gitcode.com/zm14744/DMate";
     const releases = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
+    const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
+    const snap = "https://snapcraft.io/dmate";
 
-    if (config.isAndroid) {
-        const browserSteps = {
-            "百度浏览器":"菜单中查找“添加到桌面”；没有则用系统浏览器打开。",
-            "夸克浏览器":"菜单或分享面板中查找“添加到桌面”。",
-            "UC 浏览器":"菜单中查找“添加到桌面/快捷方式”。",
-            "QQ 浏览器":"菜单中查找“添加到桌面”；没有则用系统浏览器打开。",
-            "微信内置浏览器":"点右上角“⋯”，选择“在浏览器打开”。",
-            "支付宝内置浏览器":"从菜单中选择用系统浏览器打开。",
-            "小米浏览器":"菜单中查找“添加到桌面/快捷方式”。",
-            "华为浏览器":"菜单中查找“添加至桌面”。",
-            "OPPO 浏览器":"菜单中查找“添加到桌面/快捷方式”。",
-            "vivo 浏览器":"菜单中查找“添加到桌面/快捷方式”。",
-            "荣耀浏览器":"菜单中查找“添加到桌面/快捷方式”。",
-            "三星浏览器":"菜单中查找“安装应用”或“添加到主屏幕”。",
-            "Firefox":"Firefox / Fennec：打开菜单，选择“安装”或“添加到主屏幕”。",
-            "Microsoft Edge":"Edge：打开菜单，选择“添加到手机”或“添加到主屏幕”。",
-            "Chrome":"Chrome：打开右上角菜单，选择“安装应用”或“添加到主屏幕”。",
-            "Safari":"Safari：点击“分享”→“添加到主屏幕”。"
-        };
+    // 只有用户在 Zeabur 配置真实的安装包链接后，才展示「直接下载」。
+    // GitCode 仓库是没有配置直链时的国内发行版入口，不冒充文件直链。
+    const direct = (label, url) => url ? [{ label, url }] : [];
+    const gitcodeFallback = (hasDirect) => ({
+        label:"GitCode · 查看国内发行版",
+        url:gitcode,
+        secondary:Boolean(hasDirect)
+    });
+
+    if (platform === "android") {
         return {
-            platform:"Android · " + browserName,
-            text:"可通过下方渠道获取 Android 安装包。",
+            platform:"Android",
+            text:config.androidApkUrl
+                ? "选择 APK 下载安装。已配置安装包直链，也可以从 GitCode 发行版获取。"
+                : "从 GitCode 发行版下载 APK 安装包。下载前不需要安装 PWA。",
             steps:[],
             actions:[
-                ...(config.androidApkUrl ? [{ label:"直接下载 · Android APK", url:config.androidApkUrl }] : []),
-                { label:"海外备用 · itch.io（APK）", url:itch, secondary:Boolean(config.androidApkUrl) }
+                ...direct("下载 Android 安装包（APK）", config.androidApkUrl),
+                gitcodeFallback(config.androidApkUrl),
+                { label:"GitHub · 海外备用下载", url:releases, secondary:true }
             ]
         };
     }
+
     if (platform === "ios") {
         return {
-            platform:"iPhone / iPad · " + browserName,
-            text:"下载 DMate 描述文件，在 iPhone 或 iPad 的“设置”中安装即可添加桌面入口；这是网页快捷方式，不是原生 IPA。",
+            platform:"iPhone / iPad",
+            text:"下载描述文件后，从系统设置中安装 DMate 主屏幕入口。这是网页快捷方式，并非原生 IPA。",
             steps:[
-                "请在 Safari 中下载并允许描述文件。",
-                "打开“设置”→“已下载描述文件”→“安装”。如果没有该选项，可检查“设置”→“通用”→“VPN 与设备管理”。"
+                "在 Safari 中下载描述文件并允许下载。",
+                "前往“设置”→“已下载描述文件”→“安装”；如果没有该项，可查看“通用”→“VPN 与设备管理”。"
             ],
             actions:[
-                { label:"下载 · iPhone / iPad 描述文件", url:"/DMate.mobileconfig" }
+                { label:"下载 iPhone / iPad 描述文件", url:"/DMate.mobileconfig" }
             ]
         };
     }
+
     if (platform === "windows") {
         return {
             platform:"Windows",
             text:config.desktopWindowsUrl
-                ? "可直接下载安装包，Microsoft Store 与 itch.io 保留为其他渠道。"
-                : "可通过 Microsoft Store 安装 DMate；海外 itch.io 可作为备用渠道。",
+                ? "可直接下载 Windows 安装程序，也可通过 Microsoft Store 安装。"
+                : "推荐通过 Microsoft Store 安装；也可前往 GitCode 发行版下载 EXE。",
             steps:[],
             actions:[
-                ...(config.desktopWindowsUrl ? [{ label:"直接下载 · Windows EXE", url:config.desktopWindowsUrl }] : []),
-                { label:"Microsoft Store · DMate", url:microsoftStore, secondary:Boolean(config.desktopWindowsUrl) },
-                { label:"海外备用 · itch.io（EXE）", url:itch, secondary:true }
+                ...direct("下载 Windows 安装程序（EXE）", config.desktopWindowsUrl),
+                { label:"Microsoft Store · 官方商店", url:microsoftStore,
+                  secondary:Boolean(config.desktopWindowsUrl) },
+                gitcodeFallback(config.desktopWindowsUrl),
+                { label:"GitHub · 海外备用下载", url:releases, secondary:true }
             ]
         };
     }
+
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"请选择 macOS 安装包下载渠道。",
+            text:config.desktopMacosUrl
+                ? "下载 DMG 安装包，打开后按提示安装。"
+                : "在 GitCode 发行版中下载适用于 macOS 的 DMG 安装包。",
             steps:[],
             actions:[
-                ...(config.desktopMacosUrl ? [{ label:"直接下载 · macOS DMG", url:config.desktopMacosUrl }] : []),
-                { label:"海外备用 · itch.io（DMG）", url:itch, secondary:Boolean(config.desktopMacosUrl) }
+                ...direct("下载 macOS 安装包（DMG）", config.desktopMacosUrl),
+                gitcodeFallback(config.desktopMacosUrl),
+                { label:"GitHub · 海外备用下载", url:releases, secondary:true }
             ]
         };
     }
+
     if (platform === "linux") {
-        const actions = [];
-        if (config.desktopLinuxDebUrl) {
-            actions.push({ label:"直接下载 · DEB（Debian / Ubuntu / Mint）", url:config.desktopLinuxDebUrl });
-        }
-        if (config.desktopLinuxAppImageUrl) {
-            actions.push({ label:"直接下载 · AppImage", url:config.desktopLinuxAppImageUrl });
-        }
-        actions.push({
-            label:"Snap Store（需 snapd）",
-            url:"https://snapcraft.io/dmate",
-            secondary:Boolean(config.desktopLinuxDebUrl || config.desktopLinuxAppImageUrl)
-        });
-        actions.push({ label:"海外备用 · GitHub Releases", url:releases, secondary:true });
+        const hasDirect = Boolean(config.desktopLinuxDebUrl || config.desktopLinuxAppImageUrl);
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"请选择对应发行版的安装方式：Ubuntu/Debian/Mint 可下载 DEB，其他发行版可尝试 AppImage 或 Snap。",
-            steps:["Snap 安装命令：sudo snap install dmate"],
-            actions
+            text:"Debian、Ubuntu 和 Mint 请选择 DEB；其他发行版可尝试 AppImage，也可以使用 Snap Store。",
+            steps:["已安装 snapd 的系统可执行：sudo snap install dmate"],
+            actions:[
+                ...direct("下载 Linux DEB 安装包", config.desktopLinuxDebUrl),
+                ...direct("下载 Linux AppImage", config.desktopLinuxAppImageUrl),
+                { label:"Snap Store · 官方商店", url:snap, secondary:hasDirect },
+                gitcodeFallback(hasDirect),
+                { label:"GitHub · 海外备用下载", url:releases, secondary:true }
+            ]
         };
     }
+
     return {
-        platform:"电脑",
-        text:"选择对应系统的商店或备用安装包即可。",
+        platform:"桌面系统",
+        text:"请选择适合当前操作系统的客户端安装渠道。",
         steps:[],
         actions:[
-            { label:"Microsoft Store · DMate 产品页", url:microsoftStore },
-            { label:"Snap Store（Linux）", url:"https://snapcraft.io/dmate", secondary:true },
-            { label:"itch.io · 安装包", url:itch, secondary:true },
-            { label:"海外备用 · GitHub Releases", url:releases, secondary:true }
+            { label:"GitCode · 国内发行版", url:gitcode },
+            { label:"Microsoft Store（Windows）", url:microsoftStore, secondary:true },
+            { label:"Snap Store（Linux）", url:snap, secondary:true },
+            { label:"GitHub · 海外备用下载", url:releases, secondary:true }
         ]
     };
 }
-
 function dmatePwaSiteAndBrowserSupport() {
     // Manual instructions are ONLY for recognized browsers with an install /
     // add-to-home menu. No standard Web API can inspect that native menu.
