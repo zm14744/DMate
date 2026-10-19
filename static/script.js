@@ -19525,8 +19525,8 @@ function installGuideForCurrentPlatform() {
             text:"可通过下方渠道获取 Android 安装包。",
             steps:[],
             actions:[
-                { label:"APK 下载 · itch.io", url:itch, secondary:true },
-                ...(config.androidApkUrl ? [{ label:"备用 APK 下载", url:config.androidApkUrl, secondary:true }] : [])
+                ...(config.androidApkUrl ? [{ label:"直接下载 · Android APK", url:config.androidApkUrl }] : []),
+                { label:"海外备用 · itch.io（APK）", url:itch, secondary:Boolean(config.androidApkUrl) }
             ]
         };
     }
@@ -19541,41 +19541,46 @@ function installGuideForCurrentPlatform() {
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text:"国内优先使用已上架的 Microsoft Store 安装 DMate；itch.io 和原 EXE 地址继续作为海外/备用下载渠道。备用站点在部分国内网络可能无法打开。",
+            text:config.desktopWindowsUrl
+                ? "可直接下载安装包，Microsoft Store 与 itch.io 保留为其他渠道。"
+                : "可通过 Microsoft Store 安装 DMate；海外 itch.io 可作为备用渠道。",
             steps:[],
             actions:[
-                { label:"国内优先 · Microsoft Store", url:microsoftStore },
-                { label:"海外备用 · itch.io（EXE）", url:itch, secondary:true },
-                ...(config.desktopWindowsUrl ? [{ label:"备用 · Windows EXE 原下载地址", url:config.desktopWindowsUrl, secondary:true }] : [])
+                ...(config.desktopWindowsUrl ? [{ label:"直接下载 · Windows EXE", url:config.desktopWindowsUrl }] : []),
+                { label:"Microsoft Store · DMate", url:microsoftStore, secondary:Boolean(config.desktopWindowsUrl) },
+                { label:"海外备用 · itch.io（EXE）", url:itch, secondary:true }
             ]
         };
     }
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"选择 macOS 安装包，或使用支持的浏览器安装网页应用。",
+            text:"请选择 macOS 安装包下载渠道。",
             steps:[],
             actions:[
-                { label:"macOS 安装包 · itch.io（DMG）", url:itch, secondary:true },
-                ...(config.desktopMacosUrl ? [{ label:"备用 · macOS DMG 原下载地址", url:config.desktopMacosUrl, secondary:true }] : [])
+                ...(config.desktopMacosUrl ? [{ label:"直接下载 · macOS DMG", url:config.desktopMacosUrl }] : []),
+                { label:"海外备用 · itch.io（DMG）", url:itch, secondary:Boolean(config.desktopMacosUrl) }
             ]
         };
     }
     if (platform === "linux") {
-        const actions = [
-            { label:"国内优先 · Snap Store（需 snapd）", url:"https://snapcraft.io/dmate" }
-        ];
+        const actions = [];
         if (config.desktopLinuxDebUrl) {
-            actions.push({ label:"备用 · 下载 DEB（Ubuntu / Debian / Mint）", url:config.desktopLinuxDebUrl, secondary:true });
+            actions.push({ label:"直接下载 · DEB（Debian / Ubuntu / Mint）", url:config.desktopLinuxDebUrl });
         }
         if (config.desktopLinuxAppImageUrl) {
-            actions.push({ label:"备用 · 下载 AppImage", url:config.desktopLinuxAppImageUrl, secondary:true });
+            actions.push({ label:"直接下载 · AppImage", url:config.desktopLinuxAppImageUrl });
         }
+        actions.push({
+            label:"Snap Store（需 snapd）",
+            url:"https://snapcraft.io/dmate",
+            secondary:Boolean(config.desktopLinuxDebUrl || config.desktopLinuxAppImageUrl)
+        });
         actions.push({ label:"海外备用 · GitHub Releases", url:releases, secondary:true });
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"国内优先使用已发布的 Snap Store 版本（安装前需要 snapd，支持 amd64）。Ubuntu/Debian/Mint 可选 DEB；其他发行版可尝试 AppImage（可能需要 FUSE）。下载源在国内的可达性视网络环境而定。",
-            steps:["已启用 snapd 的系统可执行：sudo snap install dmate","如果 snapd 不可用，请从备用渠道选择 DEB 或 AppImage；不需要全部安装。"],
+            text:"请选择对应发行版的安装方式：Ubuntu/Debian/Mint 可下载 DEB，其他发行版可尝试 AppImage 或 Snap。",
+            steps:["Snap 安装命令：sudo snap install dmate"],
             actions
         };
     }
