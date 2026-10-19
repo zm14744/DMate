@@ -88,7 +88,7 @@ const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="installHelpModal"')[1].split('<div id="accountModal"')[0];
 assert(!modal.includes('id="installHelpNativeButton"'));
 assert(!modal.includes('id="installHelpNote"'));
-assert(html.includes("dmate-install-links-no-all-files-v31-20261019"));
+assert(html.includes("dmate-install-links-stores-v32-20261019"), "Install dialog JS cache key must change when store links change");
 for(const platform of ["android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
