@@ -139,20 +139,10 @@ def main():
     # Per-browser Android PWA illustrations. Native APK itself remains unchanged.
     # Browser launcher masks, not a new icon design, cause the screenshot's
     # Edge icon to be too large and Fennec's too small.
-    for browser, figure_scale in (("edge", 0.89), ("fennec", 1.16)):
+    for browser, figure_scale in (("edge", 0.95), ("fennec", 1.16)):
         for size in (32, 192, 512):
             save_png(compensated_android_icon(size, figure_scale, canonical_icon),
                      STATIC / f"android-{browser}-{size}-v21.png")
-
-    # Android adaptive icon: same original artwork with an opaque black canvas.
-    # Launcher maskable icons are cropped to the central safe region; its black
-    # border is NOT a white tile. Shrink the master inside the full black canvas
-    # so the OS crop restores the intended apparent geometry size and stroke.
-    maskable = Image.new("RGBA", (512, 512), (0, 0, 0, 255))
-    inset_size = 410  # ~80% central safe area, before launcher mask/crop.
-    inner = from_installed_icon(inset_size)
-    maskable.alpha_composite(inner, ((512 - inset_size) // 2, (512 - inset_size) // 2))
-    save_png(maskable, STATIC / "icon-maskable-512.png")
 
     # Some Android browsers create desktop shortcuts from favicon rather than
     # the Web Manifest. Give them opaque versions of the SAME installed-app icon.
@@ -224,7 +214,7 @@ def main():
     save_png(from_installed_icon(180), STATIC / "apple-touch-icon.png")
     summary = {}
     for path in [
-        STATIC / "icon-192.png", STATIC / "icon-512.png", STATIC / "icon-maskable-512.png",
+        STATIC / "icon-192.png", STATIC / "icon-512.png",
         STATIC / "icon-192-unified-v16.png", STATIC / "icon-512-unified-v16.png",
         STATIC / "apple-touch-icon.png",
         STATIC / "mobile-favicon-32-v17.png", STATIC / "mobile-favicon-192-v17.png",
