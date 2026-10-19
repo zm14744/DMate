@@ -1879,7 +1879,7 @@ def _serve_dmate_manifest(filename):
         for item in manifest.get("icons", []):
             size = item.get("sizes", "").split("x")[0]
             if item.get("purpose", "any") == "any" and size in {"192", "512"}:
-                item["src"] = f"/static/icons/android-{variant}-{size}-v21.png"
+                item["src"] = f"/static/icons/android-{variant}-{size}-v21.png?v=dmate-native-vector-v22-20261019"
     response = make_response(json.dumps(manifest, ensure_ascii=False))
     response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"

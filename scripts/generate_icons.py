@@ -18,7 +18,8 @@ STATIC = ROOT / "static" / "icons"
 TAURI = ROOT / "desktop" / "src-tauri" / "icons"
 MASTER = ROOT / "android" / "app" / "src" / "main" / "res" / "mipmap-xxxhdpi" / "ic_launcher.png"
 VIEWBOX = 1254
-STROKE = 23
+STROKE = 13  # Original installed Android icon uses ~2px hairline at 192px
+TAB_STROKE = 23  # Browser tabs are tiny; retain visibly fine lines at 16-32px
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
 
@@ -165,9 +166,9 @@ def main():
     # Safari browser TAB: a single fixed-color rounded black tile at ANY theme.
     # Its SVG remains sharp at every screen density and is never inverted.
     (STATIC / "dmate-favicon-mac.svg").write_text(
-        svg_mark("#000", "#fff", STROKE, corner_radius=190), encoding="utf-8"
+        svg_mark("#000", "#fff", TAB_STROKE, corner_radius=190), encoding="utf-8"
     )
-    save_png(draw_mark(256, rounded=True), STATIC / "dmate-favicon-mac.png")
+    save_png(draw_mark(256, rounded=True, stroke_units=TAB_STROKE), STATIC / "dmate-favicon-mac.png")
 
     # Apple's Home Screen app and the cross-platform PWA use the same artwork.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")

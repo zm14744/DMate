@@ -4,7 +4,7 @@ import json
 import struct
 from pathlib import Path
 from PIL import Image, ImageChops
-from generate_icons import draw_mark
+from generate_icons import draw_mark, TAB_STROKE
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "static" / "icons"
@@ -71,7 +71,7 @@ def main():
     ):
         matches_vector(DESKTOP / filename, size)
 
-    matches_vector(ICONS / "dmate-favicon-mac.png", 256, rounded=True)
+    matches_vector(ICONS / "dmate-favicon-mac.png", 256, rounded=True, stroke_units=TAB_STROKE)
     mac_svg = (ICONS / "dmate-favicon-mac.svg").read_text(encoding="utf-8")
     assert '<rect width="1254" height="1254" rx="190" ry="190" fill="#000"/>' in mac_svg
     assert 'stroke="#fff"' in mac_svg and 'stroke-width="23"' in mac_svg
