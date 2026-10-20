@@ -101,6 +101,14 @@ class GraphIntegrityTests(unittest.TestCase):
                "edges":[list(e) for e in ("uv","vw","wu","xy","yz","zx","ux","vy","wz")]}
         self.assertIsNone(exact_isomorphism(left,right))
 
+    def test_explicit_current_subquestion_not_hijacked(self):
+        multi=GOLD + "\n11. What is the clique number?\n【我的要求】\n只解第11题团数"
+        self.assertEqual(answer_graph_isomorphism(multi),"")
+        uncertain=FLAG + "\n" + multi
+        self.assertIn("不能可靠计算",answer_graph_isomorphism(uncertain))
+        self.assertEqual(answer_graph_isomorphism(
+            uncertain.replace("只解第11题团数","只解第12题的谓词逻辑")),"")
+
     def test_ordinary_non_graph_math_does_not_get_overridden(self):
         self.assertEqual(answer_graph_isomorphism("求解 18x≡7 mod 311"),"")
         self.assertEqual(answer_graph_isomorphism("图片中只有谓词公式"),"")
