@@ -94,10 +94,40 @@ CASES=[
                  "边：v-w,v-x,v-y,v-z,w-y,w-z,x-y,x-z,y-z。")),
 ]
 
+
+# Brazil: authentic original illustrated exercise images from an academic
+# discrete-math course, not reconstructed by code or taken from an AI drawing.
+BR_BASE="https://pessoal.dainf.ct.utfpr.edu.br/zatesko/"
+CASES += [
+ dict(id="BR_UTFPR_ISO1",country="巴西",uni="巴西巴拉那联邦技术大学",kind="离散数学原始图同构习题",
+      url=BR_BASE+"riso1.png",image_kind="png",
+      ask='原图左右两张无标号无向图是否同构？第一行仅输出JSON：{"result":true或false}，然后说明为何。',
+      gold=False,mode="boolean"),
+ dict(id="BR_UTFPR_ISO2",country="巴西",uni="巴西巴拉那联邦技术大学",kind="离散数学原始图同构习题",
+      url=BR_BASE+"riso2.png",image_kind="png",
+      ask='原图左右两张无标号无向图是否同构？第一行仅输出JSON：{"result":true或false}，然后说明中心交叉处是否为顶点。',
+      gold=True,mode="boolean"),
+ dict(id="BR_UTFPR_BIPARTITE",country="巴西",uni="巴西巴拉那联邦技术大学",kind="离散数学图论习题",
+      url=BR_BASE+"g1.png",image_kind="png",
+      ask='原图G是不是二部图？第一行仅输出JSON：{"result":true或false}，然后给出奇环或二着色。',
+      gold=False,mode="boolean"),
+]
+
 def fetch_pdf_image(sess,c,cache,scale=2.6):
     import pymupdf
     from PIL import Image
     link=c["url"]
+    if c.get("image_kind")=="png":
+        from PIL import Image
+        res=sess.get(link,timeout=(14,50),
+                     headers={"User-Agent":"Mozilla/5.0 (compatible; DMate University Research)"})
+        res.raise_for_status()
+        with Image.open(io.BytesIO(res.content)) as original:
+            im=original.convert("RGB")
+            if im.width<100 or im.height<100:raise ValueError("source is too small")
+            out=io.BytesIO()
+            im.save(out,format="PNG",optimize=True)
+            return out.getvalue(),im.size
     if link not in cache:
         res=sess.get(link,timeout=(14,90),
           headers={"User-Agent":"Mozilla/5.0 (compatible; DMate University Research)"})
