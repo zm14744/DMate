@@ -57,6 +57,30 @@ class GraphIntegrityTests(unittest.TestCase):
         self.assertNotIn("不同构",answer)
         self.assertIn(OK_MARKER,corrected)
 
+    def test_actual_live_curly_edge_notation_parses_and_is_flagged(self):
+        live = """Are the two graphs below isomorphic?
+【图形信息】
+图1（左图）：无向图。顶点集合：{a, b, c, d, e}。顶点位置：c在上方。边集合：{b,c}, {c,d}, {b,d}, {b,e}, {a,d}, {a,e}, {a,b}, {d,e}, {a,c}。顶点度数：a:3。
+图2（右图）：无向图。顶点集合：{v, w, x, y, z}。顶点位置：z在中心。边集合：{w,y}, {w,z}, {w,x}, {v,z}, {v,y}, {v,x}, {x,y}, {w,v}。顶点度数：v:4。
+"""
+        parsed=parse_diagrams(live)
+        self.assertEqual(set(parsed),{1,2})
+        self.assertEqual([len(parsed[i]["edges"]) for i in (1,2)],[9,8])
+        text,warnings,verified=review_graph_transcriptions(live,AUDIT)
+        self.assertFalse(verified)
+        self.assertIn(FLAG,text)
+        self.assertTrue(warnings)
+
+    def test_verified_graph_has_no_untrusted_degree_prose(self):
+        corrected,warnings,verified=review_graph_transcriptions(
+            GOLD.split("【图形信息】")[1].replace("边连接关系为", "边连接关系为"),
+            AUDIT
+        )
+        self.assertTrue(verified)
+        self.assertNotIn("顶点度数",corrected)
+        self.assertIn("图2（G2）",corrected)
+        self.assertIn("v-y",corrected)
+
     def test_audit_incomplete_never_asserts_edges(self):
         for variant in (
             [dict(AUDIT[0],complete=False),AUDIT[1]],
