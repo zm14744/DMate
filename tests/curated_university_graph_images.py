@@ -66,6 +66,58 @@ CASES=[
 ]
 
 UNCERTAIN=re.compile(r"图形结构待核对|需要.*核对|无法.*确定|无法.*准确识别|不能.*确定|识别.*不确定|图.*不清晰")
+
+def verify_known_topology(case_id, visual_text, answer):
+    """Gold checks independent of answer-marker optimism.
+
+    Only flag mathematically definite mistakes proved by the original scanned
+    image. A successful keyword check NEVER asserts every edge was correct.
+    """
+    from graph_answer_integrity import (
+        FIGURE_VERTEX_COUNT, _primary_directed_graphs,
+        detect_count_inconsistency,
+    )
+    vision=str(visual_text or "")
+    reply=str(answer or "")
+    if case_id=="HKUST_PETERSEN" and detect_count_inconsistency(vision):
+        return "OCR_CONTRADICTORY_EDGE_LIST"
+    if case_id=="MIT05_P3":
+        raw=re.findall(r"\{\s*([A-H])\s*,\s*([A-H])\s*\}",vision)
+        if raw:
+            observed={"".join(sorted((a,b))) for a,b in raw}
+            expected={"AB","BC","BH","CD","CE","DE","EF","EH","FG"}
+            if observed!=expected:
+                return "OCR_WRONG_EDGE_LIST"
+    if case_id=="STANFORD_TREE6":
+        counts=FIGURE_VERTEX_COUNT.findall(vision)
+        if len(counts)>=3 and any(int(n)!=6 for i,n in counts):
+            return "OCR_WRONG_VERTEX_COUNT"
+        if not UNCERTAIN.search(reply):
+            if re.search(r"(?:只有|仅有)\s*(?:图?\s*3|1\s*棵)|"
+                         r"(?:共有|最终答案|答案为|结论).{0,55}?(?:1|2)\s*"
+                         r"(?:棵|个).{0,16}(?:同构|树)",reply,re.S):
+                return "CONFIRMED_WRONG_TREE_COUNT"
+    if case_id=="NJU_DIRECTED":
+        graphs=_primary_directed_graphs(vision)
+        if graphs and 2 in graphs:
+            group_a=set("agdc")
+            group_b=set("bfe")
+            # The original second drawing has two independent components.
+            if any((a in group_a and b in group_b) or
+                   (a in group_b and b in group_a)
+                   for a,b in graphs[2]):
+                return "OCR_WRONG_DIRECTED_EDGES"
+        # Both old live runs explicitly declared figure 2 weakly connected;
+        # the original figure is NOT connected even when ignoring arrows.
+        if (re.search(r"三幅图.{0,30}都.{0,15}弱连通",reply,re.S)
+            or re.search(r"(?m)^\|\s*\(?2\)?\s*\|\s*(?:否|不是|不)\s*\|\s*(?:是|弱连通)\s*\|",reply)):
+            return "CONFIRMED_WRONG_CONNECTIVITY"
+    if case_id=="INDIA_BITMESRA_ISO" and re.search(r"不同构|非同构|不是同构",reply):
+        return "CONFIRMED_WRONG_ISOMORPHISM"
+    return ""
+
+
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--base",default=os.environ.get("DMATE_BENCH_URL","https://dmate.zeabur.app"))
@@ -115,6 +167,11 @@ def main():
                     row["verdict"]="GOLD_TOKENS_PRESENT_NEEDS_EDGE_REVIEW"
                 else:
                     row["verdict"]="ANSWER_SUSPECT_REVIEW"
+                if answer_status==200:
+                    independent_verdict=verify_known_topology(c["id"],row["visual_text"],reply)
+                    if independent_verdict:
+                        row["verdict"]=independent_verdict
+                        row["gold_error"]="Math/vision contradiction independently verified against original diagram"
                 if c["id"]=="INDIA_BITMESRA_ISO" and answer_status==200:
                     if re.search(r"不同构|非同构|不是同构",reply):
                         row["verdict"]="CONFIRMED_WRONG_ISOMORPHISM"
@@ -141,7 +198,7 @@ def main():
     print("CURATED_COUNTS",json.dumps(counts,ensure_ascii=False),flush=True)
     failures=[r["id"] for r in out["cases"] if r["verdict"] in
              ("OCR_HTTP_FAILURE","ANSWER_HTTP_FAILURE","SOURCE_OR_RUNTIME_FAILURE",
-              "CONFIRMED_WRONG_NUMERIC_CLAIM","CONFIRMED_WRONG_ISOMORPHISM","CONFIRMED_WRONG_GRAPH_VERTEX_COUNT","ANSWER_SUSPECT_REVIEW")]
+              "CONFIRMED_WRONG_NUMERIC_CLAIM","CONFIRMED_WRONG_ISOMORPHISM","CONFIRMED_WRONG_GRAPH_VERTEX_COUNT","CONFIRMED_WRONG_CONNECTIVITY","CONFIRMED_WRONG_TREE_COUNT","OCR_WRONG_EDGE_LIST","OCR_WRONG_VERTEX_COUNT","OCR_WRONG_DIRECTED_EDGES","OCR_CONTRADICTORY_EDGE_LIST","ANSWER_SUSPECT_REVIEW")]
     print("CURATED_FAILURES",failures,flush=True)
     return 1 if failures else 0
 if __name__=="__main__":
