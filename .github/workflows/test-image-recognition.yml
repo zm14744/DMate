@@ -12,6 +12,7 @@ on:
       - "teaching.py"
       - "tests/test_university_solution_intent.py"
       - "tests/test_chat_http_regression.py"
+      - "tests/test_historical_university_failures.py"
       - "tests/test_graph_exact_solver.py"
       - "tests/test_graph_answer_integrity.py"
       - "tests/test_curated_university_graph_grade.py"
@@ -41,6 +42,7 @@ on:
       - "teaching.py"
       - "tests/test_university_solution_intent.py"
       - "tests/test_chat_http_regression.py"
+      - "tests/test_historical_university_failures.py"
       - "tests/test_graph_exact_solver.py"
       - "tests/test_graph_answer_integrity.py"
       - "tests/test_curated_university_graph_grade.py"
@@ -82,6 +84,7 @@ jobs:
           python -m unittest discover -s tests -p "test_graph_exact_solver.py" -v
           python -m unittest discover -s tests -p "test_university_solution_intent.py" -v
           python -m unittest discover -s tests -p "test_chat_http_regression.py" -v
+          python -m unittest discover -s tests -p "test_historical_university_failures.py" -v
           python -m unittest discover -s tests -p "test_curated_university_graph_grade.py" -v
           python -m unittest discover -s tests -p "test_graph_vision_audit.py" -v
           python -m unittest discover -s tests -p "test_math_answer_guard.py" -v
