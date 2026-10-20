@@ -135,6 +135,44 @@ class UniversityGraphAnswerBoundaryTests(unittest.TestCase):
         self.assertEqual(issues,[])
         self.assertEqual(normalized,vision)
 
+    def test_mit_original_crossing_edges_impossible_odd_degree_sum(self):
+        from graph_answer_integrity import detect_named_graph_degree_inconsistency
+        vision=("图1无向图，8个顶点。"
+                "各顶点的连接关系（边）为：A-B、A-C、B-C、B-H、C-D、"
+                "C-E、D-E、E-F、E-H、F-G。"
+                "各顶点的度数分别为：A:2，B:3，C:3，D:2，E:4，F:2，G:1，H:2。")
+        issue=detect_named_graph_degree_inconsistency(vision)
+        self.assertIsNotNone(issue)
+        self.assertIn("19",issue)
+
+    def test_named_graph_consistent_degrees_not_blocked(self):
+        from graph_answer_integrity import detect_named_graph_degree_inconsistency
+        vision=("连接关系（边）为：A-B、B-C、B-H、C-D、C-E、D-E、E-F、E-H、F-G。"
+                "各顶点的度数分别为：A:1，B:3，C:3，D:2，E:4，F:2，G:1，H:2。")
+        self.assertIsNone(detect_named_graph_degree_inconsistency(vision))
+
+    def test_degree_claim_matches_even_sum_but_not_actual_edge_list(self):
+        from graph_answer_integrity import detect_named_graph_degree_inconsistency
+        vision=("边集合：A-B、B-C、B-H、C-D、C-E、D-E、E-F、E-H、F-G。"
+                "各顶点的度数分别为：A:2，B:2，C:3，D:2，E:4，F:2，G:1，H:2。")
+        issue=detect_named_graph_degree_inconsistency(vision)
+        self.assertIsNotNone(issue)
+        self.assertIn("度",issue)
+
+    def test_stanford_scanned_exam_must_not_create_different_quiz(self):
+        from graph_answer_integrity import is_scanned_graph_solution_request
+        text=("【题目文字】\\n六张六顶点树的原图\\n"
+              "【图形信息】\\n"+FLAG+
+              "\\n【我的要求】\\n图中有几棵互不同构的六顶点树？")
+        self.assertTrue(is_scanned_graph_solution_request(text))
+        self.assertTrue(is_scanned_graph_solution_request(
+            "【题目文字】\\n图1\\n【图形信息】\\n图的边\\n"
+            "【我的要求】\\n请判断连通性并给答案"))
+        self.assertFalse(is_scanned_graph_solution_request(
+            "【题目文字】\\n图1\\n【图形信息】\\n图的边\\n"
+            "【我的要求】\\n根据这个图再出一道题目并提供答案"))
+        self.assertFalse(is_scanned_graph_solution_request("请出一道图论题"))
+
     def test_directed_independent_incomplete_never_trusted(self):
         q="图(1)：有向图，含2个顶点a、b。有向边为：a→b。"
         data=[{"index":1,"directed":True,"vertices":["a","b"],
