@@ -93,7 +93,7 @@ def image_examples():
        "page":0,"crop":(.08,.48,.92,.72),"expected_tokens":["证明","简单图"],
        "description":"GraphPS1 Problem 2: graph degree proof"},
       {"id":"CNIMG02","school":"南京大学","source":NJU_LOGIC,
-       "page":0,"crop":(.12,.56,.93,.80),"expected_tokens":["命题","等价"],
+       "page":1,"crop":(.12,.06,.93,.27),"expected_tokens":["命题","等价"],
        "description":"HW1 Problem 3: propositional equivalence"},
       {"id":"CNIMG03","school":"南京大学","source":NJU_SET,
        "page":2,"crop":(.10,.48,.94,.85),"expected_tokens":["512","1024"],
@@ -128,6 +128,8 @@ def main():
     parser.add_argument("--slice",default="all",help="all, missed8, or chinese")
     parser.add_argument("--limit",type=int,default=0)
     parser.add_argument("--images",action="store_true")
+    parser.add_argument("--images-only",action="store_true")
+    parser.add_argument("--start-index",type=int,default=0)
     parser.add_argument("--require-current",action="store_true")
     parser.add_argument("--strict",action="store_true")
     args=parser.parse_args()
@@ -154,6 +156,10 @@ def main():
     ]
     chinese=[(*case[:6],case[6]) for case in CHINESE_CASES]
     selected=old if args.slice=="missed8" else chinese if args.slice=="chinese" else old+chinese
+    if args.images_only:
+        selected=[]
+    else:
+        selected=selected[args.start_index:]
     if args.limit:
         selected=selected[:args.limit]
     for i,(id,school,topic,prompt,checks,source,original_id) in enumerate(selected):
