@@ -6,6 +6,8 @@ on:
       - "graph_recognition.py"
       - "graph_recognition_v2.py"
       - "graph_consistency.py"
+      - "graph_integrity.py"
+      - "tests/test_graph_integrity.py"
       - "tests/test_graph_consistency.py"
       - "ocr.py"
       - "ai.py"
@@ -17,6 +19,8 @@ on:
       - "graph_recognition.py"
       - "graph_recognition_v2.py"
       - "graph_consistency.py"
+      - "graph_integrity.py"
+      - "tests/test_graph_integrity.py"
       - "tests/test_graph_consistency.py"
       - "ocr.py"
       - "ai.py"
@@ -36,8 +40,9 @@ jobs:
       - name: Install CPU-only image test dependencies
         run: python -m pip install "numpy<2" "Pillow>=10,<12" "opencv-python-headless==4.10.0.84"
       - name: Compile image pipeline
-        run: python -m py_compile graph_recognition.py graph_recognition_v2.py graph_consistency.py ocr.py ai.py app.py
+        run: python -m py_compile graph_recognition.py graph_recognition_v2.py graph_consistency.py graph_integrity.py ocr.py ai.py app.py
       - name: Run graph crossing and blur regressions
         run: |
           python -m unittest discover -s tests -p "test_graph_recognition_v2.py" -v
           python -m unittest discover -s tests -p "test_graph_consistency.py" -v
+          python -m unittest discover -s tests -p "test_graph_integrity.py" -v
