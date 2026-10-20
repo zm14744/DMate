@@ -32,15 +32,14 @@ jobs:
           python tests/university_discrete_benchmark.py \
             --max-chat 0 --timeout 90 --delay 2 --only-image I03 --strict --require-graph-audit-version \
             --output university_benchmark_results.json
-      - name: Broad real-server answer diagnostic (recognition bypassed)
+      - name: Broad real-server answer benchmark (28 questions, throttled)
         if: always()
-        continue-on-error: true
         env:
           PYTHONPATH: .
           DMATE_BENCH_URL: https://dmate.zeabur.app
         run: |
           python tests/university_discrete_benchmark.py \
-            --extended --max-chat 28 --timeout 45 --delay 0 --skip-images \
+            --extended --max-chat 28 --timeout 45 --delay 5 --skip-images --strict \
             --output university_benchmark_answers.json
       - name: Upload answer and recognition evidence
         if: always()
