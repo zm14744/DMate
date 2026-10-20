@@ -1,11 +1,6 @@
 name: University OCR versus Reasoning Benchmark
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "tests/university_image_answer_benchmark.py"
-      - ".github/workflows/university-ocr-reasoning-benchmark.yml"
 permissions:
   contents: read
 jobs:
