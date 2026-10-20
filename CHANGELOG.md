@@ -5,6 +5,7 @@
 - 实际从 GitHub Graphviz 样例渲染 15 类外部图，原始和缩小模糊、低对比度共最多 45 个变体；记录基于 Graphviz 真实节点/边数的覆盖情况，不能将 CI 运行成功等同于识别正确。
 - 对空心圆节点、彩色/异形图降低 CV 误报确定性的风险；扩大径向多节点布局的支持范围，并补充 Petersen 图交叉线和 15 顶点径向图测试。
 - 尊重 Wikimedia 访问限制，暂停 CI 每次推送时批量请求其图片。
+- Vision 复核提示补充彩色/空心/异形节点、弧线/箭头/平行边及无 CV 候选时的独立读图规则；外部 Graphviz 复杂原图仍未达到完整边集准确，不能把 OpenCV 局部输出视为已经全部识别。
 
 ## 2026-10-20：恢复 iOS 发布版描述文件入口
 - 经 GitHub Releases API 核对，v1.0.1 实际包含 DMate-iPhone-iPad.mobileconfig；恢复 iPhone/iPad 下载弹窗中的 GitHub 描述文件直链与 GitCode 发行版页面入口。
