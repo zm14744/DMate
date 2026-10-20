@@ -26,13 +26,15 @@ jobs:
           DMATE_BENCH_URL: https://dmate.zeabur.app
         run: |
           python tests/university_discrete_benchmark.py \
-            --max-chat 0 --timeout 90 --delay 2 \
+            --max-chat 0 --timeout 90 --delay 2 --only-image I03 \
             --output university_benchmark_results.json
       - name: Upload answer and recognition evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: university-discrete-benchmark-results
-          path: university_benchmark_results.json
+          path: |
+            university_benchmark_results.json
+            university_exam_image_samples/*.png
           if-no-files-found: warn
           retention-days: 30
