@@ -1,14 +1,12 @@
 name: University Discrete Mathematics Benchmark
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/university-discrete-benchmark.yml"
-      - "graph_integrity.py"
-      - "ai.py"
-      - "app.py"
-      - "tests/university_discrete_benchmark.py"
+# Real external OCR/LLM calls are expensive and rate limited. Do NOT run
+# complete university suites on every app.py/ai.py/graph fix commit:
+# concurrent runs previously caused HTTP 429/500 on the public service.
+concurrency:
+  group: dmate-production-math-benchmarks
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
@@ -39,7 +37,7 @@ jobs:
           DMATE_BENCH_URL: https://dmate.zeabur.app
         run: |
           python tests/university_discrete_benchmark.py \
-            --extended --max-chat 28 --timeout 45 --delay 5 --skip-images --strict \
+            --extended --max-chat 28 --timeout 100 --delay 12 --skip-images --strict \
             --output university_benchmark_answers.json
       - name: Upload answer and recognition evidence
         if: always()
