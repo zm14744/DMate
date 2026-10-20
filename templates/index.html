@@ -8075,6 +8075,23 @@ body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button:hover {
     background-color:#e0e8f2 !important;
 }
 
+
+/* OCR 核对页：紧凑原生圆点单选，沿用当前明暗主题。 */
+.ocr-question-choice {
+    display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px;
+    margin:14px 0 4px; padding:10px 0 0;
+    border:0; border-top:1px solid var(--border-strong);
+    color:var(--text-primary);
+}
+.ocr-question-choice legend { padding:0 4px 0 0; font-weight:600; }
+.ocr-question-choice label {
+    display:inline-flex; align-items:center; gap:6px; margin:0;
+    font-weight:400; cursor:pointer;
+}
+.ocr-question-choice input[type="radio"] {
+    width:16px; height:16px; margin:0; accent-color:var(--accent);
+}
+
 </style>
 
 <script>
@@ -8234,6 +8251,11 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <textarea id="ocrReviewGraph" rows="4" spellcheck="false"></textarea>
             <label for="ocrReviewRequest">本次要求（可选）</label>
             <textarea id="ocrReviewRequest" rows="3" spellcheck="false"></textarea>
+            <fieldset class="ocr-question-choice">
+                <legend>识别内容是否为题目？</legend>
+                <label><input type="radio" name="ocrQuestionType" value="question" checked><span>是题目</span></label>
+                <label><input type="radio" name="ocrQuestionType" value="other"><span>非题目</span></label>
+            </fieldset>
         </div>
     </div>
     <p id="ocrReviewError" role="alert" aria-live="polite"></p>
