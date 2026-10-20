@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/historical-university-fixes-live.yml"
+      - "app.py"
+      - "graph_answer_integrity.py"
+      - "tests/test_historical_university_failures.py"
 permissions:
   contents: read
 jobs:
