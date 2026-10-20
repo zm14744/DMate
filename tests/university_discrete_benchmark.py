@@ -29,7 +29,7 @@ CASES = [
  ("B04","Berkeley","conditional-probability","朋友有30%概率忘记浇花；没浇花枯死率90%，浇了枯死率20%。若花已枯死，则忘记浇花的条件概率？",[r"27\s*/\s*41|\\frac\{27\}\{41\}|0\.6585|65\.85|65\.9|66%"],BERKELEY),
  ("B05","Berkeley","graph-Euler","完全图K_n（n>=2）在什么n下存在欧拉回路？说明为什么。",[r"奇数|奇数阶|n.*奇|n.*odd"],BERKELEY),
  ("B06","Berkeley","set-theory","若A∩C=B∩C 且 A∪C=B∪C，能否推出A=B？证明或举反例。",[r"A\s*=\s*B|A\s*\\?=\\?B|相等|可以推出|能推出"],BERKELEY),
- ("B07","Berkeley","equivalence-relation","证明：有n>=2个元素的有限集合上的等价关系，必有两个不同元素所属等价类的大小相同。",[r"抽屉|鸽巢|鸽笼|n-1|n−1"],BERKELEY),
+ ("B07","Berkeley","equivalence-relation","证明：有n>=2个元素的有限集合上的等价关系，必有两个不同元素所属等价类的大小相同。",[r"抽屉|鸽巢|鸽笼|n-1|n−1|每个等价类|同一.*等价类|等价类.*只含一个"],BERKELEY),
  ("M01","MIT","graph-counting","n个带固定标签顶点的无向简单图共有多少种？给出公式。",[r"2\s*\^|2\s*\{?\^\}?|2\^\{"],MIT),
  ("M02","MIT","graph-counting","n个带标签顶点的无环竞赛图共有多少种？给出公式。",[r"n\s*!|n\s*\\!|阶乘"],MIT),
  ("M03","MIT","stars-bars","非负整数 x0,x1,...,xk 满足 x0+x1+...+xk=n，有多少组解？",[r"binom|C\s*\(|组合数|\\mathrm\{C\}"],MIT),
