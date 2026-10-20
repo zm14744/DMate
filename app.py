@@ -3768,7 +3768,8 @@ def ocr():
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
-        "status": "ok"
+        "status": "ok",
+        "graph_integrity_version": "2026-10-20-independent-edge-audit-v2",
     })
 
 
