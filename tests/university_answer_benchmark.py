@@ -41,6 +41,10 @@ def extract(reply):
 
 def parse_number(raw):
     t=raw.replace("$","").replace(" ","").replace("，",",").strip()
+    if t.startswith(r"\(") and t.endswith(r"\)"):
+        t=t[2:-2]
+    elif t.startswith(r"\[") and t.endswith(r"\]"):
+        t=t[2:-2]
     t=re.sub(r"\\boxed\{([^{}]*)\}",r"\1",t)
     latex=re.fullmatch(r"\\frac\{(-?\d+)\}\{(\d+)\}",t)
     if latex:
