@@ -21,6 +21,7 @@ from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
 from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, FLAG as GRAPH_UNCERTAIN_FLAG
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
+from answer_context_guard import missing_previous_problem
 try:
     from graph_recognition import recognize_graphs
 except (ImportError, OSError) as _graph_import_error:
@@ -2735,6 +2736,14 @@ def chat():
     if not cleaned:
         return jsonify({
             "error": "没有检测到有效消息内容。"
+        }), 400
+
+    # A single message referring to absent data from "the previous problem"
+    # must not invent probabilities/graph edges in an imaginary history.
+    if missing_previous_problem(cleaned):
+        return jsonify({
+            "error": "当前消息提到了上一题的条件，但这次请求中没有该题的完整信息。请把已知条件一并发来，避免根据猜测得到错误答案。",
+            "missing_question_context": True,
         }), 400
 
     latest_user_before_reference = next(
