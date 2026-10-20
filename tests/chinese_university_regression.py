@@ -82,6 +82,41 @@ def heuristic_valid(reply, patterns):
     return bool(value.strip()) and all(re.search(p, value, re.I|re.S) for p in patterns)
 
 
+def semantic_gold_guard(case_id, answer):
+    """Additional semantic checks for previous *actual* false green cases.
+
+    This is deliberately strict about explicit contradictions. Passing still
+    does not certify a proof; failing is a concrete reason to investigate.
+    """
+    text=str(answer or "")
+    if case_id == "NJL03":
+        # A/B/C/D exactly two, with the three published conditions.
+        # Valid sets AC, AD, BD only. Do not accept a stray intermediate '3'.
+        if re.search(r"(?:最终|结论|因此|综上|共有|一共).{0,60}?(?:4\s*种|四种)|\\boxed\{\s*4\s*\}",text):
+            return False,"incorrect final count 4; correct count is 3"
+        canonical=re.search(r"(?:最终|结论|因此|综上|共有|一共|答案).{0,75}?(?:3\s*种|三种)|\\boxed\{\s*3\s*\}",text)
+        if not canonical:
+            return False,"correct final count of 3 not confirmed"
+        if re.search(r"(?:有效|符合|可行|答案|最终).{0,35}?\bCD\b",text,re.I):
+            return False,"invalid CD included in valid final combinations"
+    if case_id == "NJL02":
+        if re.search(r"\\neg\s*p.{0,90}(?:不能|无法).{0,18}(?:推出|推得|得到).{0,18}\\neg\s*q",text,re.S):
+            return False,"invalid negation of contrapositive"
+        if len(re.findall(r"(?:^|\n)\s*(?:[（(]?[234][)）.、]|第[234]问)",text))>=1:
+            return False,"invented unrelated extra subquestion"
+    if case_id == "SJ06":
+        if re.search(r"自反性\s*(?:不成立|不满足|缺失)",text):
+            return False,"incorrectly claimed non-reflexive"
+        if re.search(r"对称性\s*(?:不成立|不满足|缺失)",text):
+            return False,"incorrectly claimed non-symmetric"
+    if case_id == "X06":
+        if re.search(r"(?:不|非)逻辑等价|不等价|非等价",text):
+            return False,"wrong implication equivalence claim"
+        if re.search(r"(?<![A-Za-z])r(?![A-Za-z])",text):
+            return False,"introduced extraneous variable r"
+    return True,"no known contradictory conclusion"
+
+
 def call_with_retry(sess, base, question, timeout, pause, attempts=3):
     for idx in range(attempts):
         try:
@@ -189,12 +224,14 @@ def main():
         try:
             status,result=call_with_retry(sess,base,prompt,args.timeout,args.delay)
             answer=str(result.get("reply",""))
-            outcome=("TOKEN_MATCH_PROOF_REVIEW" if status==200 and heuristic_valid(answer,checks)
+            gold_ok,gold_note=semantic_gold_guard(id,answer)
+            outcome=("TOKEN_MATCH_PROOF_REVIEW" if status==200 and heuristic_valid(answer,checks) and gold_ok
                      else "SUSPECT" if status==200 and answer.strip()
                      else "HTTP_FAILURE")
             row={"id":id,"school":school,"module":topic,"source":source,
                  "original_question":original_id,"prompt":prompt,"status":status,
-                 "verdict":outcome,"gold_markers":checks,"answer":answer,
+                 "verdict":outcome,"gold_markers":checks,
+                 "semantic_gold_ok":gold_ok,"semantic_gold_note":gold_note,"answer":answer,
                  "error":result.get("error")}
         except Exception as exc:
             row={"id":id,"school":school,"module":topic,"verdict":"HTTP_FAILURE",
