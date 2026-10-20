@@ -60,6 +60,19 @@ class GraphRecognitionTests(unittest.TestCase):
         self.check_exact(make_sheet().resize((900, 438)))
         self.check_exact(make_sheet().filter(ImageFilter.GaussianBlur(1.1)))
 
+    def test_actual_pixel_candidate_reconciles_wrong_g3(self):
+        from graph_consistency import reconcile_vision_edges, analyze_labeled_graphs
+        from test_graph_consistency import WRONG_G3
+        cv_graphs = detect(make_sheet())["graphs"]
+        self.assertEqual(len(cv_graphs), 4)
+        self.assertTrue(all(g["confidence"] == "high" for g in cv_graphs), cv_graphs)
+        corrected, issues = reconcile_vision_edges(WRONG_G3, cv_graphs)
+        self.assertEqual(len(issues), 1, issues)
+        graphs = analyze_labeled_graphs(corrected)
+        self.assertEqual(set(graphs[3]["edges"]),
+            {("a","b"),("a","c"),("a","d"),("b","e"),("c","f"),("d","e")})
+        self.assertFalse(graphs[3]["tree"])
+
     def test_low_contrast(self):
         self.check_exact(ImageEnhance.Contrast(make_sheet()).enhance(.5))
 
