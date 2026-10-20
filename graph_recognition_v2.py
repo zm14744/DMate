@@ -204,7 +204,13 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
     try:
         with Image.open(io.BytesIO(image_bytes)) as source:
             img = ImageOps.exif_transpose(source).convert("RGB")
-            scale = min(2., MAX_SIDE/max(img.size)) if max(img.size) < MAX_SIDE else MAX_SIDE/max(img.size)
+            # Enlarging a medium-resolution image to 1700px thickens its
+            # incident strokes and merges black node disks with the edges.
+            # Resize only genuinely tiny inputs; keep textbook scans near
+            # native resolution to preserve endpoint geometry.
+            longest = max(img.size)
+            scale = (min(2.0, 1100/longest) if longest < 700
+                     else 1.0 if longest <= MAX_SIDE else MAX_SIDE/longest)
             if abs(scale-1.) > .025:
                 img = img.resize((max(1, int(img.width*scale)),
                                   max(1, int(img.height*scale))), Image.Resampling.LANCZOS)
