@@ -211,7 +211,13 @@ def answer_graph_isomorphism(user_text):
             if FLAG in text and graph_request.search(request):
                 return ("当前图像的边连接关系仍有冲突，不能可靠计算该图的性质。"
                         "请先在识别核对界面确认图中所有边，再重新解题。")
-            return ""
+            numbered_questions = re.findall(r"(?m)^\s*\d{1,2}\s*[.．、]\s*\S+", text)
+            generic_answer = bool(re.search(r"直接|解答|答案|求解|解析", request))
+            # A single photographed isomorphism question with "直接给答案"
+            # is still eligible for deterministic verification. On a multi-part
+            # exam, generic requests must not discard answers to other parts.
+            if not (generic_answer and len(numbered_questions) <= 1):
+                return ""
     if not re.search(r"同构|isomorph", text, re.I):
         return ""
     if FLAG in text:
