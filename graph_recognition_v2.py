@@ -75,7 +75,9 @@ def _select_figure_rows(dots):
             rows[-1].append(v)
     valid = [row for row in rows if len(row) >= 3]
     if not valid:
-        if 3 <= len(dots) <= 10:
+        # Circular, radial and two-ring textbook graphs often have no row
+        # containing three aligned vertices; do not reject 11–24 node figures.
+        if 3 <= len(dots) <= 24:
             ys = [p[1] for p in dots]
             xs = [p[0] for p in dots]
             if max(ys)-min(ys) > max(30, 4*size) and max(xs)-min(xs) > max(30, 4*size):
@@ -118,7 +120,7 @@ def _split_boxes(nodes, gray):
     bins.append(current)
     found = []
     for group in bins:
-        if len(group) < 3 or len(group) > 16:
+        if len(group) < 3 or len(group) > 24:
             continue
         gys = [p[1] for p in group]
         if max(gys)-min(gys) < max(27, 3*radius):
@@ -249,7 +251,7 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
     background_noise = float(np.median(np.abs(gray.astype(np.int16)-255)))
     graphs = []
     for group, box in boxes:
-        if len(group) > 12:
+        if len(group) > 24:
             continue
         band = max(12, float(np.median([p[2] for p in group]))*1.7)
         rows = []

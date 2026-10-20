@@ -32,6 +32,6 @@ jobs:
           python -m pip install "numpy<2" "Pillow>=10,<12" "opencv-python-headless==4.10.0.84" "requests>=2.31" "cairosvg>=2.7"
       - name: Render and test 15 public Graphviz diagrams in three conditions
         run: python scripts/benchmark_public_dot_graphs.py
-      - name: Audit 26 Wikimedia diagrams when external service permits
-        continue-on-error: true
-        run: python scripts/benchmark_public_graph_images.py --min-downloaded 0
+      # Wikimedia rate-limits shared runners with HTTP 429. Do not hammer
+      # Commons on every push. The 26-source catalog remains in the repository
+      # for occasional manual auditing when permitted.

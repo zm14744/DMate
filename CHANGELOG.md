@@ -1,5 +1,11 @@
 # 更新记录
 
+## 2026-10-20：真实公开图形基准与复杂布局保护
+- 收集 26 张 Wikimedia Commons 公共图形资料的来源；自动抓取受服务端 HTTP 429 限制，不将下载失败计作识别成功。
+- 实际从 GitHub Graphviz 样例渲染 15 类外部图，原始和缩小模糊、低对比度共最多 45 个变体；记录基于 Graphviz 真实节点/边数的覆盖情况，不能将 CI 运行成功等同于识别正确。
+- 对空心圆节点、彩色/异形图降低 CV 误报确定性的风险；扩大径向多节点布局的支持范围，并补充 Petersen 图交叉线和 15 顶点径向图测试。
+- 尊重 Wikimedia 访问限制，暂停 CI 每次推送时批量请求其图片。
+
 ## 2026-10-20：恢复 iOS 发布版描述文件入口
 - 经 GitHub Releases API 核对，v1.0.1 实际包含 DMate-iPhone-iPad.mobileconfig；恢复 iPhone/iPad 下载弹窗中的 GitHub 描述文件直链与 GitCode 发行版页面入口。
 - iOS 描述文件作为已发布的独立下载项，不恢复已删除的 PWA 安装弹窗、Service Worker 或本地 mobileconfig 路由。

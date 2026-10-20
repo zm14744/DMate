@@ -110,6 +110,48 @@ class GraphRecognitionTests(unittest.TestCase):
         result = detect(image)
         self.assertTrue(all(g["confidence"] != "high" for g in result.get("graphs") or []))
 
+    def test_petersen_10_vertex_nonplanar_crossings(self):
+        # Canonical 10-vertex / 15-edge Petersen topology, drawn with many
+        # crossings but NO dots at the crossings (public mathematical graph).
+        import math
+        image = Image.new("RGB", (820, 820), "white")
+        draw = ImageDraw.Draw(image)
+        outer = [(-math.pi/2+2*math.pi*i/5, 270) for i in range(5)]
+        inner = [(-math.pi/2+2*math.pi*i/5, 125) for i in range(5)]
+        pts = [(410+r*math.cos(a), 410+r*math.sin(a)) for a,r in outer+inner]
+        segments = set()
+        for i in range(5):
+            segments.add(tuple(sorted((i,(i+1)%5))))
+            segments.add(tuple(sorted((i,i+5))))
+            segments.add(tuple(sorted((i+5,((i+2)%5)+5))))
+        for a,b in sorted(segments):
+            draw.line([pts[a],pts[b]],fill=(18,18,18),width=3)
+        for x,y in pts:
+            draw.ellipse((x-9,y-9,x+9,y+9),fill=(8,8,8))
+        g = detect(image)["graphs"]
+        self.assertEqual(len(g),1,g)
+        self.assertEqual(len(g[0]["vertices"]),10,g)
+        self.assertEqual(len(g[0]["edges"]),15,g)
+        self.assertEqual(len(g[0]["uncertain_edges"]),0,g)
+
+    def test_radial_15_node_irregular_layout(self):
+        # More than 10 points, with no row of three vertices; current
+        # recognition must not discard radial drawings at the row filter.
+        import math
+        image = Image.new("RGB",(920,920),"white")
+        draw=ImageDraw.Draw(image)
+        pts=[(460+330*math.cos((2*math.pi*i/15)+.15*i/15),
+              460+330*math.sin((2*math.pi*i/15)+.15*i/15))
+             for i in range(15)]
+        for i in range(15):
+            draw.line([pts[i],pts[(i+1)%15]],fill=(18,18,18),width=3)
+        for x,y in pts:
+            draw.ellipse((x-8,y-8,x+8,y+8),fill=(8,8,8))
+        gs=detect(image)["graphs"]
+        self.assertTrue(gs,"Radial source should yield one graph candidate")
+        self.assertEqual(len(gs[0]["vertices"]),15,gs)
+        self.assertGreaterEqual(len(gs[0]["edges"]),12,gs)
+
     def test_strong_blur_downgrades_not_invents(self):
         detected = detect(make_sheet().filter(ImageFilter.GaussianBlur(2.7)))
         self.assertTrue(all(g["confidence"] != "high" for g in detected["graphs"]))
