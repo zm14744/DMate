@@ -258,10 +258,17 @@ def single_undirected_named_edges(vision_text):
         pairs.append(tuple(sorted((u,v))))
     if len(pairs)<1 or len(pairs)>75 or len(set(pairs))!=len(pairs):
         return None
-    vertices=set(v for edge in pairs for v in edge)
-    if not 2<=len(vertices)<=12:
+    edge_endpoints=set(v for edge in pairs for v in edge)
+    # Exact isolated vertices matter for diameter, trees and Euler graphs.
+    # Only include them if the source explicitly lists each vertex. Do NOT
+    # guess from '共8个顶点' when no labels were successfully transcribed.
+    explicit=re.search(
+        r"顶点(?:集合)?\s*[：:]\s*([A-Z](?:\s*[、，,]\s*[A-Z]){1,11})",
+        text[:match.start()],re.I
+    )
+    vertices={v.upper() for v in re.findall(r"[A-Z]",explicit.group(1),re.I)} if explicit else edge_endpoints
+    if not 2<=len(vertices)<=12 or not edge_endpoints.issubset(vertices):
         return None
-    # If a cardinality is stated, do not pretend isolated vertices are absent.
     n=re.search(r"(?:共|包含|含|有)\s*(\d+)\s*个顶点",text[:match.start()])
     if n and int(n.group(1))!=len(vertices):
         return None
