@@ -28,7 +28,7 @@ WATERLOO="https://cemc.uwaterloo.ca/sites/default/files/documents/2024/Grade78_2
 # Gold facts were checked against original rendered page, not Vision guesses.
 CASES=[
  dict(id="CN_SJTU_EULER3",country="中国",uni="上海交通大学",kind="带参考解答的课程作业",
-      url=SJTU,page=0,box=[.10,.202,.92,.437],
+      url=SJTU,page=0,box=[.10,.202,.92,.382],
       ask='只根据图片中的三个图(a)(b)(c)判断哪些是欧拉图。第一行仅输出JSON：{"a":true或false,"b":true或false,"c":true或false}，下一行简要解释。',
       gold={"a":True,"b":False,"c":False},mode="boolean_map"),
  dict(id="CN_NJU_EULER3",country="中国",uni="南京大学",kind="正式课程作业",
