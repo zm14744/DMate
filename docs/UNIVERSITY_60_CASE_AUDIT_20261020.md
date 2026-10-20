@@ -48,6 +48,12 @@
 - tests/test_math_answer_guard.py 与 tests/test_answer_context_guard.py 持续防回归。对应 CI：https://github.com/zm14744/DMate/actions/runs/39410358814 及其更新版。
 - tests/test_university_oracles.py 独立复算部分 gold，防止错误高校答案反过来污染软件。
 
+### 4.1 Zeabur 最新版部署验收（未通过）
+
+运行 https://github.com/zm14744/DMate/actions/runs/39410542441 连续 **26 次** HTTP 健康检查，线上 /health 的 answer_verification_version 均为 null；预期应为 2026-10-20-count-and-context-guard-v3。说明目前**不能核实线上已经同步此次答案纠错代码**。即使先前 graph_integrity_version 检查通过，也只能证明较早的图结构模块已经上线。
+
+因此上面“已修复”指 **GitHub 主分支代码及自动化回归测试**，不是声称当前 Zeabur 在线用户已经使用这些修改。需在 Zeabur 的 DMate 服务选择最新 GitHub main 版本重新部署并查看部署日志，然后再以 /health 和原始两道 MIT 错题作线上验收。此次不需要新增环境变量。
+
 ## 5. 测试层次和剩余风险
 
 不同阶段要独立看：原卷OCR/数学符号 -> 必要数学条件人工审校 -> 完全正确文字下解题 -> OCR结果下解题 -> 最终答案独立判分 -> 证明逻辑是否正确。识别成功、HTTP200、某次答案正确、CI绿色均不代表所有阶段完全正确。
