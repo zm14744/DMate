@@ -113,6 +113,22 @@ CASES += [
       gold=False,mode="boolean"),
 ]
 
+
+# Switzerland (ETH Zürich): originally drawn course lecture figures.
+# Slide 1: genuine multigraph with two pairs of parallel curved edges.
+# Slide 9: all eight labeled 3-vertex graphs, four isomorphism classes.
+ETH="https://ti.inf.ethz.ch/ew/courses/GT06/lectures/PDF/lecture01.pdf"
+CASES += [
+ dict(id="CH_ETH_MULTIGRAPH",country="瑞士",uni="苏黎世联邦理工学院",kind="课程讲义原始带图",
+      url=ETH,page=0,box=[.27,.53,.77,.89],
+      ask='只分析裁剪图片下方4个标注I₁、S₁、S₂、I₂的顶点与实线。图中共有几个顶点和几条边（平行的弧线要分别计数）？第一行只输出JSON：{"vertices":整数,"edges":整数}，后面解释。',
+      gold={"vertices":4,"edges":7},mode="numeric_map"),
+ dict(id="CH_ETH_ISO_CLASSES",country="瑞士",uni="苏黎世联邦理工学院",kind="课程讲义原始带图",
+      url=ETH,page=8,box=[.14,.19,.88,.81],
+      ask='原图中列出了由1、2、3三个顶点组成的八个不同的简单图。忽略顶点标签并按图同构合并，共有几个不同的同构类？请给出结论数字并列出4类典型图。',
+      gold=4,mode="numeric"),
+]
+
 def fetch_pdf_image(sess,c,cache,scale=2.6):
     import pymupdf
     from PIL import Image
