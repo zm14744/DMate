@@ -16,8 +16,8 @@ PS7="https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-20
 EXAMS=[
     {"id":"MIT7-1b","page":0,"box":[.10,.33,.93,.50],"tokens":["20","6"],"section":"1b"},
     {"id":"MIT7-2a","page":0,"box":[.10,.63,.92,.70],"tokens":["BANANARAMA"],"section":"2a"},
-    {"id":"MIT7-2d","page":0,"box":[.10,.79,.92,.95],"tokens":["100","8"],"section":"2d"},
-    {"id":"MIT7-2g","page":1,"box":[.10,.22,.91,.38],"tokens":["15","0","1","2","3"],"section":"2g"},
+    {"id":"MIT7-2d","page":0,"box":[.10,.72,.92,.96],"tokens":["100","8"],"section":"2d"},
+    {"id":"MIT7-2g","page":1,"box":[.10,.16,.91,.38],"tokens":["15","0","1","2","3"],"section":"2g"},
     {"id":"MIT7-2h","page":1,"box":[.10,.36,.91,.59],"tokens":["300","3","5"],"section":"2h"}
 ]
 
@@ -65,9 +65,19 @@ def main():
             plain=re.sub(r"\s+","",record["ocr_text"]+"\n"+record["ocr_graph"]).lower()
             record["critical_token_checks"]={t:t.lower() in plain for t in row["tokens"]}
             record["ocr_critical_match"]=r.status_code==200 and all(record["critical_token_checks"].values())
+            semantic=record["ocr_text"].lower()
+            required={
+                "MIT7-1b":("adjacent","相邻"),
+                "MIT7-2d":("natural","nonnegative","自然数","非负"),
+                "MIT7-2g":("15","fifteen"),
+            }.get(row["id"])
+            if required and not any(token in semantic for token in required):
+                record["ocr_critical_match"]=False
+                record["ocr_semantic_warning"]="关键计数条件没有完整识别，不能认定OCR正确"
+            record["ocr_critical_match_note"]="数值及关键语义初筛，不等于经人工逐字核对"
             # Always test independently transcribed gold: this is the user's
             # priority case where recognition is known correct but solving fails.
-            suffix="\n请独立解答。末行只能写【结果】整数，不要在结果后写其他字符。"
+            suffix="\n请直接给出最终答案及必要的完整推导，不要只给提示。末行只能写【结果】整数，不要在结果后写其他字符。"
             status,reply,error=ask(s,base,c["question"]+suffix,95)
             record["gold_text_http"]=status
             record["gold_text_reply"]=reply[:5000]
@@ -77,7 +87,14 @@ def main():
                 # This is a distinct end-to-end image -> text -> answer path.
                 # Do not claim OCR fully correct from partial critical tokens.
                 parsed=(record["ocr_text"]+"\n"+record["ocr_graph"]).strip()
-                status,reply,error=ask(s,base,parsed+suffix,95)
+                selected={
+                    "MIT7-1b":"只解Problem 1的(b)小问：选6本书不相邻的方案数。",
+                    "MIT7-2a":"只解Problem 2的(a)小问：BANANARAMA字母排列数。",
+                    "MIT7-2d":"只解Problem 2的(d)小问：8个非负整数变量和为100。",
+                    "MIT7-2g":"只解Problem 2的(g)小问：15个位置选择0到3处。",
+                    "MIT7-2h":"只解Problem 2的(h)小问：300天中至少被2、3、5之一整除。",
+                }[row["id"]]
+                status,reply,error=ask(s,base,parsed+"\n【我的要求】"+selected+suffix,95)
                 record["image_answer_http"]=status
                 record["image_answer_reply"]=reply[:5000]
                 record["image_answer_verdict"]=judge(c,reply)[0] if status==200 else "REQUEST_FAILED"
