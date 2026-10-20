@@ -249,6 +249,65 @@ def verify_finite_relation(question):
     return "\n".join(pieces)
 
 
+def verify_powerset_symmetric_difference(question):
+    """Exact finite-set cardinality algebra. Handles OCR/LaTeX representations.
+
+    |A Δ B|=|A|+|B|-2|A∩B|; only enter when every given
+    cardinality is explicitly verified and exponentiation is integral.
+    """
+    q=_active_question(question)
+    if not q:
+        return None
+    q=q.replace("，",",").replace(" ", "").replace(r"\left","").replace(r"\right","")
+    q=q.replace(r"\oplus","⊕").replace(r"\triangle","△").replace(r"\Delta","△")
+    a=re.search(r"\|A\|\s*=\s*(\d+)",q,re.I)
+    b=re.search(r"\|P\(B\)\|\s*=\s*(\d+)",q,re.I)
+    d=re.search(r"\|P\(A\)\|\s*=\s*(\d+)",q,re.I)
+    xor=re.search(r"\|P\(A[△⊕]B\)\|\s*=\s*(\d+)",q,re.I)
+    # Typical wording includes both |P(B)| and |P(A△B)|,
+    # but no standalone |P(A)|. Do not select a spurious one.
+    if not (a and b and xor) or d:
+        return None
+    total_a=int(a.group(1));power_b=int(b.group(1));power_xor=int(xor.group(1))
+    def log_power(n):
+        return n.bit_length()-1 if n>0 and n&(n-1)==0 else None
+    total_b=log_power(power_b)
+    symdiff=log_power(power_xor)
+    if total_b is None or symdiff is None or total_a>10000:
+        return None
+    inter_num=total_a+total_b-symdiff
+    if inter_num<0 or inter_num%2:
+        return "题目给出的集合基数不一致：无法得到合法的整数交集大小，请先核对题干数字。"
+    intersection=inter_num//2
+    if intersection>min(total_a,total_b):
+        return "题目给出的集合基数不一致：推得的交集大小超过原集合大小，请核对原题。"
+    union=total_a+total_b-intersection
+    minus_a=total_a-intersection
+    minus_b=total_b-intersection
+    result={
+        "B":total_b,"A∩B":intersection,
+        "A∪B":union,"A\\B":minus_a,"B\\A":minus_b,
+    }
+    request=str(question).rsplit("【我的要求】",1)[-1] if "【我的要求】" in str(question) else q
+    # If student asks just one subexpression, show only that subanswer.
+    # The model must not substitute a different problem.
+    normalized=request.replace(" ", "").replace(r"\cap","∩").replace(r"\cup","∪")
+    names=[name for name in ("A∩B","A∪B","A\\B","B\\A")
+           if name in normalized]
+    if names and len(names)==1:
+        key=names[0]
+        answer_line=f"最终答案：$|{key}|={result[key]}$。"
+    else:
+        answer_line=("最终答案："
+                     + "，".join(f"$|{key}|={value}$" for key,value in result.items())+"。")
+    steps=(f"因为 $|P(B)|=2^{{|B|}}={power_b}$，所以 $|B|={total_b}$；"
+           f"因为 $|P(A\\triangle B)|=2^{{|A\\triangle B|}}={power_xor}$，"
+           f"所以 $|A\\triangle B|={symdiff}$。\n"
+           f"由 $|A\\triangle B|=|A|+|B|-2|A\\cap B|$，"
+           f"得 $|A\\cap B|=({total_a}+{total_b}-{symdiff})/2={intersection}$。")
+    return steps+"\n"+answer_line
+
+
 def verify_exact_question(question, reply=None):
     """Return proof-quality deterministic answer for supported *whole* questions.
 
@@ -262,6 +321,7 @@ def verify_exact_question(question, reply=None):
         verify_proposition_equivalence,
         verify_only_if_symbolization,
         verify_finite_relation,
+        verify_powerset_symmetric_difference,
     ):
         verified=verifier(question)
         if verified is not None:
