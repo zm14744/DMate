@@ -13,6 +13,7 @@ class UniversityOracleTests(unittest.TestCase):
         self.assertEqual(gold(cs["MIT7-2g"]),sum(math.comb(15,k) for k in range(4)))
         self.assertEqual(gold(cs["MIT7-2h"]),sum(
             1 for i in range(1,301) if any(i%d==0 for d in (2,3,5))))
+        self.assertEqual(gold(cs["C-7c"]),pow(4,5,21))
         self.assertEqual(gold(cs["B-4"]),
             math.comb(52,5)-math.comb(40,5)-12*math.comb(40,4))
         self.assertEqual(gold(cs["B-6"]),math.comb(103,3))
@@ -44,6 +45,7 @@ class UniversityOracleTests(unittest.TestCase):
         self.assertEqual(judge(c,"【结果】26,075,972,546")[0],
                          "ANSWER_MATCH_NEEDS_PROOF_REVIEW")
         self.assertEqual(parse_number(r"\frac{27}{41}"),fractions.Fraction(27,41))
+        self.assertEqual(parse_number(r"\frac34"),fractions.Fraction(3,4))
         self.assertEqual(parse_number("27/41"),fractions.Fraction(27,41))
     def test_correct_mathjax_final_fraction_is_valid(self):
         by=self.cases
