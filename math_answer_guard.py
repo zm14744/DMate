@@ -14,9 +14,31 @@ ENGLISH = re.compile(r"(?P<n>\d{1,3})\s+books.{0,200}?(?:select(?:ing)?|choos(?:
 NEGATIVE = re.compile(r"不相邻|不连续|互不相邻|任意两本不相邻|no\s+two\s+adjacent|non[- ]adjacent", re.I)
 ANSWER_DEMAND = re.compile(r"给出.*答案|直接.*(?:答案|解答|结果)|求.*(?:多少|方式|方案)|【结果】|完整解析|最终答案|how\s+many", re.I)
 
+def _only_other_subquestion(question, target):
+    """Avoid solving (b) if an exam image contains (a)+(b) but asks only (a).
+
+    Only act when the request section is explicit and unambiguous.
+    """
+    q=str(question or "")
+    if "【我的要求】" not in q:
+        return False
+    request=q.rsplit("【我的要求】",1)[1]
+    if not re.search(r"只解|仅解|只回答|仅回答|只做",request):
+        return False
+    part_a=bool(re.search(r"[（(]\s*a\s*[）)]|第\s*1\s*(?:小?题|问)",request,re.I))
+    part_b=bool(re.search(r"[（(]\s*b\s*[）)]|第\s*2\s*(?:小?题|问)",request,re.I))
+    if target=="books":
+        return part_a and not part_b
+    if target=="letters":
+        return part_b and not part_a
+    return False
+
+
 def separate_selection_value(question):
     """Return number of ways to pick k out of n ordered books nonadjacently."""
     q=str(question or "")
+    if _only_other_subquestion(q, "books"):
+        return None
     if not NEGATIVE.search(q):
         return None
     m=CHINESE.search(q) or ENGLISH.search(q)
@@ -34,6 +56,8 @@ def _letter_arrangement_value(question):
     never infer the word from an OCR guess or from an answer.
     """
     q=str(question or "")
+    if _only_other_subquestion(q, "letters"):
+        return None
     if not re.search(r"(?:letters?|字母|单词)", q, re.I):
         return None
     if not re.search(r"(?:arrang|permut|different ways|排列|全排列|不同排列)", q, re.I):
@@ -66,7 +90,17 @@ def audit_letter_arrangement_answer(question, reply):
     word,counts,result=parsed
     observed=int(matches[-1].group(1).replace(",",""))
     if observed==result:
-        return raw
+        normalized=re.sub(r"\\[()\[\]]", "", raw).replace("$","")
+        claimed_lengths=[
+            int(n) for n in re.findall(
+                r"(?:共有|一共|共计)\s*(\d{1,2})\s*个字母",normalized
+            )
+        ]
+        factorials=[int(n) for n in re.findall(r"\b(\d{1,2})!",normalized)]
+        if all(n==len(word) for n in claimed_lengths) and all(n<=len(word) for n in factorials):
+            return raw
+        # Even when the final answer is right, an impossible claimed word
+        # length or factorial is a wrong proof and must be replaced.
     factors="×".join(f"{n}!" for n in sorted(counts.values(), reverse=True) if n>1)
     denominator=factors or "1"
     return (f"独立复核字母数与重复次数：{word} 共 {len(word)} 个字母，"
