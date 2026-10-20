@@ -50,6 +50,29 @@ class HistoricalUniversityFailureTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertNotIn("其他不是",result)
 
+    def test_generic_button_request_cannot_bypass_uncertain_ocr_graph(self):
+        scanned=("【题目文字】\\n判断图1和图2是否强连通\\n"
+                 "【图形信息】\\n"+FLAG+"\\n未确认所有箭头")
+        for request in (
+            "请直接给出最终答案并简要解释。",
+            "给出答案",
+            "请解答这道题",
+            "完整解析",
+        ):
+            with self.subTest(request=request):
+                guarded=protect_uncertain_graph_answer(
+                    scanned+"\\n【我的要求】\\n"+request,
+                    "图1、图2都是强连通图。",
+                )
+                self.assertIsNotNone(guarded)
+                self.assertNotIn("都是强连通",guarded)
+
+    def test_unrelated_algebra_subquestion_still_allowed(self):
+        text=("【题目文字】\\n本卷还包含代数小问\\n"
+              "【图形信息】\\n"+FLAG+
+              "\\n【我的要求】\\n只解无关的代数小问：2+2等于几？")
+        self.assertIsNone(protect_uncertain_graph_answer(text,"4"))
+
     def test_stanford_uncertain_six_trees_do_not_generate_another_problem(self):
         text=("【题目文字】\n六个六顶点树图\n【图形信息】\n"+FLAG
               +"\n【我的要求】\n判断有几棵不同构的六顶点树")
