@@ -102,6 +102,8 @@ def main():
         images=[
           ("I01","Cornell CS2800 2016 final: relation directed graph",CORNELL,4,(.12,.09,.88,.32)),
           ("I02","Berkeley Math55 2019 final: modular arithmetic/recurrence notation",BERKELEY,0,(.11,.09,.91,.45)),
+          ("I03","Cornell CS2800 original 2016 exam Q10: crossing-line graph isomorphism","https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",1,(.11,.17,.90,.4)),
+          ("I04","Cornell CS2800 original 2016 exam Q14: DFA transition diagram","https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",1,(.16,.50,.86,.69)),
         ]
         for id,caption,url,page,box in images:
             try:
@@ -118,6 +120,16 @@ def main():
             except Exception as e:
                 row={"id":id,"caption":caption,"source":url,
                      "verdict":"REQUEST_FAILED","error":repr(e)}
+            if id=="I03" and row.get("http")==200:
+                try:
+                    recognized=(row.get("text","")+"\n"+row.get("visual_text","")).strip()
+                    chat_http,chat_result=post_chat(session,base,
+                        "下面是从高校真题图片识别的题干与图形信息，请判定两个图是否同构，并依据实际邻接关系和度数解释。\n"+recognized,
+                        opts.timeout)
+                    row["followup_chat_http"]=chat_http
+                    row["followup_chat_reply"]=str(chat_result.get("reply",""))[:4000]
+                except Exception as e:
+                    row["followup_error"]=repr(e)
             data["images"].append(row)
             print("IMAGE",id,row["verdict"],row.get("http",""),str(row.get("error",""))[:100],flush=True)
             time.sleep(opts.delay)
