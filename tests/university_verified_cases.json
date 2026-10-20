@@ -439,7 +439,7 @@
       "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
       "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
       "topic": "Bayes公式",
-      "question": "在上一题的条件下，已知花死亡，朋友忘记浇花的条件概率是多少？请用最简分数。",
+      "question": "朋友有0.3概率忘记浇花；没浇水时花死亡率0.9，浇水时死亡率0.2。已知花死亡，朋友忘记浇花的条件概率是多少？请用最简分数。",
       "oracle": {
         "kind": "fraction",
         "value": "27/41"
