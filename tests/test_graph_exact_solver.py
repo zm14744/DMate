@@ -65,6 +65,19 @@ class ExactCertifiedGraphTests(unittest.TestCase):
         self.assertIn("存在欧拉回路",solve_certified_graph(c4))
         self.assertIn("没有欧拉回路",solve_certified_graph(path))
 
+    def test_isolated_vertex_not_dropped_from_audited_graph(self):
+        from graph_answer_integrity import single_undirected_named_edges
+        statement=("图1为无向图，共4个顶点，顶点：A、B、C、D。"
+                   "边集合：A-B、B-C、C-A。")
+        parsed=single_undirected_named_edges(statement)
+        self.assertEqual(set(parsed["vertices"]),set("ABCD"))
+        q=("【题目文字】\\n请判断该无向图是否为欧拉图。\\n"
+           "【图形信息】\\n【图形边集已二次核对】\\n"+statement+
+           "\\n【我的要求】\\n该图是不是欧拉图，是否有欧拉回路？")
+        reply=solve_certified_graph(q)
+        self.assertIn("不属于欧拉图",reply)
+        self.assertIn("孤立顶点",reply)
+
     def test_nju_all_three_original_directed_structures(self):
         q=("【题目文字】\n判断图(1)(2)(3)是否强连通，如果不是再判断弱连通。\n"
            "【图形信息】\n"+NJU_CERT+
