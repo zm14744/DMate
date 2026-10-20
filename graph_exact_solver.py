@@ -104,7 +104,11 @@ def _chromatic_number(stats):
             return dict(color)
         v=order[pos]
         forbidden={color[n] for n in adj[v] if n in color}
-        for c in range(k):
+        # Colors are interchangeable. Only reuse an existing color or
+        # introduce ONE new color at a time; without this symmetry pruning,
+        # a 12-vertex complete graph can enumerate ~11! useless permutations.
+        next_color=max(color.values(),default=-1)+1
+        for c in range(min(k,next_color+1)):
             if c in forbidden:
                 continue
             color[v]=c
