@@ -1,0 +1,39 @@
+name: Global University Graph Image Benchmark
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/global-graph-image-benchmark.yml"
+permissions:
+  contents: read
+jobs:
+  original-diagrams:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PDF and image dependencies
+        run: python -m pip install "requests>=2.31,<3" "Pillow>=10,<12" "PyMuPDF>=1.24,<2"
+      - name: Verify benchmark code
+        run: python -m py_compile tests/global_graph_image_benchmark.py
+      - name: Test actual global university PDF page images against deployed DMate
+        run: |
+          python tests/global_graph_image_benchmark.py \
+            --delay 12 --timeout 110 \
+            --output global_graph_image_results.json
+      - name: Upload every source image and OCR answer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: global-university-original-graph-images
+          path: |
+            global_graph_image_results.json
+            global_graph_image_samples/*.png
+          retention-days: 30
+          if-no-files-found: warn
