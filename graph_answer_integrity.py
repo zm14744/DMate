@@ -362,14 +362,9 @@ def protect_uncertain_graph_answer(question, reply):
             r"非图形|不用看图|不依赖图",request,re.I
         ):
             return None
-        if not re.fullmatch(
-            r"[\s\W]*(?:请|麻烦|帮我|直接|现在|只要|先|把|这道题|本题|"
-            r"给出|说出|告诉我|写出|完整|详细|最终|"
-            r"求解|解答|做|计算|答案|解析|步骤|结果|理由|"
-            r"得出|讲解|并|和|以及|一下|就行|即可|吧|好|的){2,32}"
-            r"[\s\W]*",
-            request,re.I
-        ):
+        if (len(request.strip()) > 64
+            or not re.search(r"解答|求解|答案|解析|回答|结果|计算|讲解|说明",request)
+            or re.search(r"代数|集合|逻辑|无关|独立|另一题|[0-9]\s*[+*/=]",request)):
             return None
     return ("这道题依赖图中的实际顶点和边，而当前图片的图形结构尚未核对完整。"
             "直接据此给出当前问题的确定结论，可能导致计算或推理错误。"
