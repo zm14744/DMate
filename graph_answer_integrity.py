@@ -18,7 +18,7 @@ FLAG="【图形结构待核对】"
 
 DIR_HEAD=re.compile(
     r"图\s*[（(]\s*(\d+)\s*[）)]\s*[：:].{0,200}?"
-    r"(?:有向边|弧|边的方向)\s*(?:为|包括|是)?[：:]",
+    r"(?:有向边|弧|边的方向|边)\s*(?:为|包括|是|有)?[：:]",
     re.S,
 )
 DIRECTIONAL_EDGE=re.compile(r"(?<![a-zA-Z0-9])([a-z])\s*(?:→|->|⇒)\s*([a-z])(?![a-zA-Z0-9])",re.I)
@@ -130,6 +130,41 @@ def review_directed_graphs(primary_text, independently_read):
     if issues:
         return FLAG+"\n独立两次逐箭头转录不一致，无法可靠计算强连通或弱连通。",issues,False
     return "\n".join(verified),[],True
+
+
+
+FIGURE_VERTEX_COUNT = re.compile(
+    r"图\s*(\d+)\s*[（(][^\n]{0,95}?(?:有|含|共)?\s*(\d+)\s*个顶点",
+    re.I
+)
+
+
+def review_multi_graph_counts(primary_text, independent_graphs):
+    """Independently compare black-dot counts across >=3 separate diagrams."""
+    match=FIGURE_VERTEX_COUNT.findall(str(primary_text or ""))
+    first={int(i):int(n) for i,n in match}
+    if len(match)<3 or len(first)!=len(match) or not isinstance(independent_graphs,list):
+        return FLAG+"\n多图的逐图顶点数量未能独立确认。",["多个图形的顶点数没有得到双重确认。"],False
+    second={}
+    for g in independent_graphs:
+        if not isinstance(g,dict) or g.get("complete") is not True:
+            return FLAG+"\n部分图形的顶点仍不清楚。",["局部图顶点数独立复核不完整。"],False
+        try:
+            idx=int(g["index"])
+            count=int(g["vertex_count"])
+            edge_count=int(g["edge_count"])
+        except (KeyError,TypeError,ValueError):
+            return FLAG+"\n复核结果缺少必要数量。",["多图核验缺少顶点数或边数。"],False
+        if idx in second or count<1 or count>100 or edge_count<0:
+            return FLAG+"\n复核结果存在重复或无效的图形数量。",["多图复核结果格式无效。"],False
+        second[idx]=(count,edge_count)
+    if set(first)!=set(second):
+        return FLAG+"\n首次识别与独立复核的图数不一致。",["多个图形的识别编号不一致。"],False
+    issues=[f"图{i}顶点数不一致：首次识别{first[i]}，再次识别{second[i][0]}"
+            for i in sorted(first) if first[i]!=second[i][0]]
+    if issues:
+        return FLAG+"\n两次独立图片识别的顶点数量存在冲突，不能可靠判断图的同构与树。",issues,False
+    return primary_text,[],True
 
 
 def protect_uncertain_graph_answer(question, reply):
