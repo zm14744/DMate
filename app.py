@@ -18,7 +18,7 @@ from flask import Flask, jsonify, render_template, request, session, make_respon
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
-from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, FLAG as GRAPH_UNCERTAIN_FLAG
+from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, contains_two_labeled_undirected_diagrams, FLAG as GRAPH_UNCERTAIN_FLAG
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
@@ -3674,8 +3674,14 @@ def ocr():
         # Never let a failed/mismatching read trigger a confident answer.
         graph_review_issues = []
         question_text = (ocr_text + "\n" + corrected_text)
-        if (image_kind != "non_exercise" and
-                re.search(r"同构|isomorph", question_text, re.IGNORECASE)):
+        # Some university sheets consist ONLY of two graph drawings and
+        # vertex labels; OCR may never output the word "isomorphic".
+        # Those images still need independent edge review before a graph
+        # isomorphism conclusion is offered.
+        two_graph_diagram = contains_two_labeled_undirected_diagrams(visual_text)
+        if (image_kind != "non_exercise" and (
+                re.search(r"同构|isomorph", question_text, re.IGNORECASE)
+                or two_graph_diagram)):
             audited = verify_graph_image_independently(raw)
             if audited.get("ok"):
                 visual_text, graph_review_issues, _ = review_graph_transcriptions(
