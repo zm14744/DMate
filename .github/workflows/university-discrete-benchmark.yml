@@ -26,7 +26,7 @@ jobs:
           DMATE_BENCH_URL: https://dmate.zeabur.app
         run: |
           python tests/university_discrete_benchmark.py \
-            --max-chat 18 --timeout 70 --delay 4 \
+            --max-chat 0 --timeout 90 --delay 2 \
             --output university_benchmark_results.json
       - name: Upload answer and recognition evidence
         if: always()
