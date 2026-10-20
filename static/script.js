@@ -7097,9 +7097,13 @@ function openWrongRetestReview(id) {
         list.appendChild(row);
     }
     modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
 }
 function closeWrongRetestReview() {
-    document.getElementById("wrongRetestReviewModal")?.classList.add("hidden");
+    const modal = document.getElementById("wrongRetestReviewModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
 }
 
 function markWrongQuestionCorrected(id) {
