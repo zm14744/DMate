@@ -91,13 +91,19 @@ def image_examples():
     return [
       {"id":"CNIMG01","school":"南京大学","source":NJU_GRAPH,
        "page":0,"crop":(.08,.48,.92,.72),"expected_tokens":["证明","简单图"],
-       "description":"GraphPS1 Problem 2: graph degree proof"},
+       "description":"GraphPS1 Problem 2: graph degree proof",
+       "solve_request":"只回答图中Problem2的真假，并给出证明，不要回答其他问题。",
+       "answer_tokens":[r"成立|正确|真命题|不可能|不能存在"]},
       {"id":"CNIMG02","school":"南京大学","source":NJU_LOGIC,
        "page":1,"crop":(.12,.06,.93,.27),"expected_tokens":["命题","等价"],
-       "description":"HW1 Problem 3: propositional equivalence"},
+       "description":"HW1 Problem 3: propositional equivalence",
+       "solve_request":"只解Problem3，判断两个公式是否逻辑等价并证明。",
+       "answer_tokens":[r"逻辑等价|是等价|等价的|等值"]},
       {"id":"CNIMG03","school":"南京大学","source":NJU_SET,
        "page":2,"crop":(.10,.48,.94,.85),"expected_tokens":["512","1024"],
-       "description":"HW2 Problem 6: powerset symmetric difference"},
+       "description":"HW2 Problem 6: powerset symmetric difference",
+       "solve_request":"只解第6题：求 |A∩B|，给出最终数值并说明计算依据。",
+       "answer_tokens":[r"(?<!\d)2(?!\d)|两个"]},
     ]
 
 
@@ -205,6 +211,27 @@ def main():
                 row["verdict"]=("OCR_TOKENS_MATCH_NEEDS_REVIEW"
                                 if response.status_code==200 and all(row["tokens_present"].values())
                                 else "OCR_SUSPECT_OR_FAILED")
+                if row["verdict"]=="OCR_TOKENS_MATCH_NEEDS_REVIEW":
+                    # A separate end-to-end answer call uses exactly what the OCR
+                    # returned, rather than a manually corrected question.
+                    question=("【题目文字】\n"+text+"\n【图形信息】\n"+visual+
+                              "\n【我的要求】\n"+example["solve_request"])
+                    try:
+                        chat_status,chat_body=call_with_retry(
+                            sess,base,question,args.timeout,args.delay)
+                        answer=str(chat_body.get("reply",""))
+                        row["answer_status"]=chat_status
+                        row["answer"]=answer
+                        row["solution_verdict"]=(
+                            "ANSWER_MARKER_MATCH_NEEDS_PROOF_REVIEW"
+                            if chat_status==200 and heuristic_valid(answer,example["answer_tokens"])
+                            else "ANSWER_SUSPECT" if chat_status==200 and answer.strip()
+                            else "ANSWER_REQUEST_FAILED")
+                    except Exception as exc:
+                        row["solution_verdict"]="ANSWER_REQUEST_FAILED"
+                        row["answer_error"]=repr(exc)
+                else:
+                    row["solution_verdict"]="NOT_TESTED_OCR_NOT_CONFIRMED"
             except Exception as exc:
                 row["verdict"]="OCR_SUSPECT_OR_FAILED"
                 row["error"]=repr(exc)
@@ -218,7 +245,11 @@ def main():
                           "OCR_TOKENS_MATCH_NEEDS_REVIEW","OCR_SUSPECT_OR_FAILED")}
     print("FINAL_COUNTS",json.dumps(summary,ensure_ascii=False),flush=True)
     print("ARTIFACT",args.output,flush=True)
-    if args.strict and (summary["SUSPECT"] or summary["HTTP_FAILURE"] or summary["OCR_SUSPECT_OR_FAILED"]):
+    image_answer_failures=[row["id"] for row in output["images"]
+                           if row.get("solution_verdict") in ("ANSWER_SUSPECT","ANSWER_REQUEST_FAILED")]
+    print("IMAGE_ANSWER_FAILURES",image_answer_failures,flush=True)
+    if args.strict and (summary["SUSPECT"] or summary["HTTP_FAILURE"] or
+                        summary["OCR_SUSPECT_OR_FAILED"] or image_answer_failures):
         return 1
     return 0
 
