@@ -14,6 +14,38 @@ ENGLISH = re.compile(r"(?P<n>\d{1,3})\s+books.{0,200}?(?:select(?:ing)?|choos(?:
 NEGATIVE = re.compile(r"不相邻|不连续|互不相邻|任意两本不相邻|no\s+two\s+adjacent|non[- ]adjacent", re.I)
 ANSWER_DEMAND = re.compile(r"给出.*答案|直接.*(?:答案|解答|结果)|求.*(?:多少|方式|方案)|【结果】|完整解析|最终答案|how\s+many", re.I)
 
+def _last_answer_integer(text):
+    """Recognize an explicit LAST-LINE integer result without reading proof digits.
+
+    In normal DMate chats users do not ask for a benchmark result marker.
+    Support final '答案：5005', '共有 5005 种', and '...=5005' in addition to
+    benchmark replies. Keep all intermediate working out of scope.
+    """
+    value=str(text or "")
+    matches=list(ANSWER_LINE.finditer(value))
+    if matches:
+        return int(matches[-1].group(1).replace(",",""))
+    lines=[line.strip() for line in value.splitlines() if line.strip()]
+    if not lines:
+        return None
+    last=lines[-1]
+    clean=re.sub(r"\\(?:\(|\)|\[|\])", "", last)
+    clean=re.sub(r"\\boxed\{\s*([0-9,]+)\s*\}", r"\1", clean)
+    clean=re.sub(r"[$*]", "", clean).replace(chr(96),"").strip()
+    patterns=(
+        r"(?:最终答案|答案|一共有|共有|总数|方案数|方法数|排列数)"
+        r".{0,50}?(?:为|是|=|：|:)\s*([0-9][0-9,]*)\s*(?:种|个|项|种方法)?[。.\s]*$",
+        r"(?:因此|所以|故|计算得).{0,65}?(?:=|为|是|共(?:有)?)\s*"
+        r"([0-9][0-9,]*)\s*(?:种|个|项|种方法)?[。.\s]*$",
+        r"^\s*(?:=.*?|=)\s*([0-9][0-9,]*)\s*[。.\s]*$",
+    )
+    for pattern in patterns:
+        found=re.search(pattern,clean)
+        if found:
+            return int(found.group(1).replace(",",""))
+    return None
+
+
 def _only_other_subquestion(question, target):
     """Avoid solving (b) if an exam image contains (a)+(b) but asks only (a).
 
@@ -84,11 +116,10 @@ def audit_letter_arrangement_answer(question, reply):
     parsed=_letter_arrangement_value(question)
     if parsed is None or not ANSWER_DEMAND.search(question):
         return raw
-    matches=list(ANSWER_LINE.finditer(raw))
-    if not matches:
+    observed=_last_answer_integer(raw)
+    if observed is None:
         return raw
     word,counts,result=parsed
-    observed=int(matches[-1].group(1).replace(",",""))
     if observed==result:
         normalized=re.sub(r"\\[()\[\]]", "", raw).replace("$","")
         claimed_lengths=[
@@ -121,11 +152,10 @@ def audit_explicit_count_answer(question, reply):
         return audit_letter_arrangement_answer(question, text)
     if not ANSWER_DEMAND.search(question):
         return text
-    match=list(ANSWER_LINE.finditer(text))
-    if not match:
+    observed=_last_answer_integer(text)
+    if observed is None:
         return text  # do not inject a full solution into a hint
     n,k,expected=parsed
-    observed=int(match[-1].group(1).replace(",",""))
     if observed==expected:
         return text
     proof=(f"独立计数核验：从连续排列的 {n} 本书选 {k} 本，"
