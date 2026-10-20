@@ -13,7 +13,7 @@ concurrency:
 jobs:
   live-diagnostic:
     runs-on: ubuntu-22.04
-    timeout-minutes: 8
+    timeout-minutes: 13
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,9 +41,24 @@ jobs:
               try:data=json.loads(raw)
               except ValueError:data={"body":raw[:1400]}
               return status,data
-          status,health=call("/health")
+          # A healthy /health endpoint once coexisted with universal
+          # /chat HTTP500. Wait specifically for the corrected handler, not
+          # merely for any working web process or the old graph version.
+          needed="2026-10-20-current-user-initialized-for-all-chat-requests"
+          for attempt in range(19):
+              status,health=call("/health")
+              print("DEPLOY_VERSION",attempt+1,status,
+                    health.get("chat_route_fix_version"),flush=True)
+              if status==200 and health.get("chat_route_fix_version")==needed:
+                  break
+              if attempt<18:time.sleep(20)
           report["health"]={"status":status,"data":health}
           print("REAL_LIVE_HEALTH",status,json.dumps(health,ensure_ascii=False),flush=True)
+          if health.get("chat_route_fix_version")!=needed:
+              print("CHAT_500_HOTFIX_NOT_DEPLOYED",flush=True)
+              pathlib.Path("live_math_diagnostic.json").write_text(
+                  json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+              sys.exit(2)
           cases=[
               ("MIT_X06_LOGIC",
                "请直接给出最终答案并简要解释。命题 (p→q) 与 (¬p∨q) 是否逻辑等价？"),
