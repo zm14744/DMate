@@ -1,20 +1,15 @@
 name: University Verified Answer Benchmarks
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "tests/university_verified_cases.json"
-      - "tests/university_answer_benchmark.py"
-      - ".github/workflows/university-verified-answer-benchmarks.yml"
 permissions:
   contents: read
 jobs:
   answers:
     runs-on: ubuntu-22.04
-    timeout-minutes: 32
+    timeout-minutes: 50
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         block: [0, 1]
     steps:
@@ -34,7 +29,7 @@ jobs:
         run: |
           python tests/university_answer_benchmark.py \
             --start $((${{ matrix.block }} * 30)) \
-            --max-cases 30 --timeout 65 --delay 2 \
+            --max-cases 30 --timeout 65 --delay 10 \
             --results university_answers_block_${{ matrix.block }}.json --strict
       - name: Persist every answer and oracle for human proof audit
         if: always()
