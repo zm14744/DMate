@@ -1,0 +1,43 @@
+name: Curated Elite University Diagram Graph Regression
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/curated-elite-graph-regression.yml"
+permissions:
+  contents: read
+concurrency:
+  group: curated-elite-graph-diagrams
+  cancel-in-progress: false
+jobs:
+  real-original-figure:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: .
+      DMATE_BENCH_URL: https://dmate.zeabur.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PDF and live OCR dependencies
+        run: python -m pip install "requests>=2.31,<3" "Pillow>=10,<12" "PyMuPDF>=1.24,<2"
+      - name: Compile curated original-diagram test
+        run: python -m py_compile tests/curated_university_graph_images.py
+      - name: Send actual MIT Stanford HKUST NJU Edinburgh images to DMate
+        run: |
+          python tests/curated_university_graph_images.py \
+            --delay 13 --timeout 105 \
+            --output elite_university_diagram_results.json
+      - name: Upload uncensored image, OCR, answer and comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: elite-university-graph-figure-evidence
+          path: |
+            elite_university_diagram_results.json
+            curated_university_graph_samples/*.png
+          if-no-files-found: warn
+          retention-days: 30
