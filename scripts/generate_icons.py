@@ -115,9 +115,29 @@ def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=STROKE,
         for points, face_color in BING_FACETS:
             draw.polygon(coords(points), fill=face_color)
     line_width = max(1, round(stroke_units * side / VIEWBOX))
-    for index, points in enumerate(PATHS):
-        color = stroke_palette[index] if stroke_palette is not None else foreground
-        draw.line(coords(points), fill=color, width=line_width, joint="curve")
+    if facets:
+        # A 13-unit line occupies only ~0.17 source-independent pixels at 16px.
+        # Correct its LANCZOS subpixel luminance after rasterization without
+        # changing the vector stroke width or any original vertex coordinates.
+        ink = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        pen = ImageDraw.Draw(ink)
+        for index, points in enumerate(PATHS):
+            color = stroke_palette[index] if stroke_palette is not None else foreground
+            pen.line(coords(points), fill=color, width=line_width, joint="curve")
+        reduced = ink.resize((size, size), Image.Resampling.LANCZOS)
+        if size <= 32:
+            exponent = 0.53 if size <= 24 else 0.70
+            alpha = reduced.getchannel("A").point(
+                lambda value: 0 if value < 12 else min(
+                    255, round(255 * ((value / 255.0) ** exponent))
+                )
+            )
+            reduced.putalpha(alpha)
+        return Image.alpha_composite(
+            canvas.resize((size, size), Image.Resampling.LANCZOS), reduced
+        )
+    for points in PATHS:
+        draw.line(coords(points), fill=foreground, width=line_width, joint="curve")
     return canvas.resize((size, size), Image.Resampling.LANCZOS)
 
 
@@ -289,6 +309,20 @@ def main():
                            stroke_palette=BING_STROKES),
                  STATIC / f"dmate-site-v38-{size}.png")
     save_ico(STATIC / "dmate-site-v38.ico",
+             (16, 24, 32, 48, 64, 128, 256),
+             background=BLACK, stroke_units=STROKE, rounded=True,
+             figure_scale_by_size=bing_scales, oversample_factor=16,
+             facets=True, stroke_palette=BING_STROKES)
+
+    # v39 preserves v38's geometry/palette/facets, but lifts only the
+    # anti-aliased subpixel brightness at 16/24/32px for desktop Bing SERP.
+    for size in (16, 32, 64):
+        save_png(draw_mark(size, background=BLACK, rounded=True,
+                           stroke_units=STROKE, figure_scale=bing_scales[size],
+                           oversample_factor=16, facets=True,
+                           stroke_palette=BING_STROKES),
+                 STATIC / f"dmate-site-v39-{size}.png")
+    save_ico(STATIC / "dmate-site-v39.ico",
              (16, 24, 32, 48, 64, 128, 256),
              background=BLACK, stroke_units=STROKE, rounded=True,
              figure_scale_by_size=bing_scales, oversample_factor=16,

@@ -2,7 +2,7 @@
 
 ## 2026-10-20：Bing 桌面搜索图标层次与 macOS 公证流程
 
-- 搜索引擎 favicon v38：保留 DMate 原始多面体全部顶点坐标和 STROKE=13，新增搜索专用黑底暗面分层与不加粗的白/灰白/浅蓝灰线条层次；新建 16/32/64 PNG 与各尺寸原生 ICO 层，旧移动端、Safari 和安装版图标资源不改动。
+- 搜索引擎 favicon v39：保留 DMate 原始多面体全部顶点坐标和 STROKE=13，新增搜索专用黑底暗面分层与不加粗的白/灰白/浅蓝灰线条层次；为 16/24/32px 桌面搜索图标额外校准抗锯齿子像素亮度，提供 16/32/64 PNG 与各尺寸原生 ICO 层，旧移动端、Safari 和安装版图标资源不改动。
 - 根路径 favicon 和爬虫 head 切换 v38 版本 URL，供 Bing 下次正常抓取；搜索结果什么时候变更由 Bing 控制，不能冒充已重新索引。
 - 删除 Tauri macOS 强制 ad-hoc `signingIdentity: "-"`；桌面 GitHub Actions 在 Apple Developer ID 六项 Secret 完整时导入证书、执行签名与公证，并用 codesign、spctl、stapler 校验。未配置凭据则仅生成明确标记的未公证测试包，不会假装已解决 Gatekeeper；原 Release DMG 保持不变。
 
