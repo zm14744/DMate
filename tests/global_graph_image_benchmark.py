@@ -14,7 +14,7 @@ from university_discrete_benchmark import pdf_crop, post_image, post_chat
 SOURCES=[
  {"id":"US_CORNELL_ISO","country":"美国","institution":"Cornell University",
   "type":"original final exam","url":"https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",
-  "page":1,"box":[.11,.17,.90,.40],"topic":"crossing-edge graph isomorphism",
+  "page":1,"box":[.11,.177,.90,.372],"topic":"crossing-edge graph isomorphism",
   "gold":"ISOMORPHIC"},
  {"id":"US_CORNELL_DFA","country":"美国","institution":"Cornell University",
   "type":"original final exam","url":"https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",
