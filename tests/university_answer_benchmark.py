@@ -141,8 +141,12 @@ def main():
     report["summary"]=summary
     output.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
     print("SUMMARY",summary,flush=True)
-    if o.strict and summary["ANSWER_WRONG"]:
-        sys.exit(1)
+    if o.strict:
+        if summary["ANSWER_WRONG"]:
+            sys.exit(1)
+        if summary["REQUEST_FAILED"] or summary["FORMAT_UNSCORABLE"]:
+            print("INCONCLUSIVE: some cases were not scored, not a mathematics pass",flush=True)
+            sys.exit(2)
 
 if __name__=="__main__":
     main()
