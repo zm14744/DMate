@@ -1662,22 +1662,41 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
         with Image.open(io.BytesIO(image_bytes)) as original:
             image = ImageOps.exif_transpose(original).convert("RGB")
         width, height = image.size
-        # Keep the original and add two overlapping, legible crops for common
-        # side-by-side exam figures. Do not crop away curves above/beside nodes.
+        # Always retain the original entire picture, and send overlapping
+        # close-ups of each *actual graph region*. Prior NJU three-arrow
+        # figures were tiny in an almost-square 1048×1170 worksheet: neither
+        # the old wide nor portrait branch added ANY enlargement. Aizu's
+        # vertically stacked two graphs had the same near-square issue.
         crops = [image]
-        if width >= height * 1.3:
+        if directed and 0.65 <= width / height <= 1.40:
+            # A university worksheet often has 3 numbered arrow figures in
+            # one horizontal row amid heading and unrelated proof exercises.
+            # Include the full central band AND overlapping thirds so every
+            # arrowhead can be followed to its precise dot.
+            top = round(height * .25)
+            bottom = round(height * .78)
+            crops.append(image.crop((0, top, width, bottom)))
+            for left, right in ((0, .40), (.30, .70), (.60, 1)):
+                crops.append(image.crop((
+                    round(left * width), top, round(right * width), bottom
+                )))
+        elif width >= height * 1.3:
             crops.extend([
                 image.crop((0, 0, math.ceil(width * .60), height)),
                 image.crop((math.floor(width * .40), 0, width, height)),
             ])
-        elif height >= width * 1.15:
-            # Original university figures are also stacked vertically,
-            # e.g. two visually different drawings of the same graph.
-            # Show each entire drawing at higher resolution while keeping
-            # 20% overlap so vertices/curves on the boundary are not cut.
+        elif height >= width:
+            # Include borderline portrait sources such as Aizu's 402x453
+            # two-graph isomorphism sheet; previously 1.15 was too strict,
+            # silently skipping BOTH magnified diagrams.
             crops.extend([
                 image.crop((0, 0, width, math.ceil(height * .60))),
                 image.crop((0, math.floor(height * .40), width, height)),
+            ])
+        else:
+            crops.extend([
+                image.crop((0, 0, math.ceil(width * .60), height)),
+                image.crop((math.floor(width * .40), 0, width, height)),
             ])
         def encode(im, max_side):
             factor = min(2.4, max_side / max(im.size))
