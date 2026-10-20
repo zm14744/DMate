@@ -3826,10 +3826,26 @@ def ocr():
                 raw, retries=0, count_only=True
             )
             if multigraph_audit.get("ok"):
-                visual_text, multigraph_issues, _ = review_multi_graph_counts(
+                visual_text, multigraph_issues, count_verified = review_multi_graph_counts(
                     visual_text, multigraph_audit.get("graphs")
                 )
                 graph_review_issues.extend(multigraph_issues)
+                # The Stanford six-tree regression proved that matching dot
+                # counts alone do NOT certify tree isomorphism or edge sets.
+                # Until each pictured topology is independently confirmed,
+                # do not produce a confident classification merely because
+                # there are six six-vertex drawings.
+                if (count_verified and re.search(
+                        r"同构|isomorph|图的分类|是否相同|互不相同",
+                        question_text, re.I
+                    )):
+                    visual_text = GRAPH_UNCERTAIN_FLAG + (
+                        "\n多幅图的顶点数已核对，但各图完整边集和同构类"
+                        "没有独立核实，不能据此给出确定的图同构数量。"
+                    )
+                    graph_review_issues.append(
+                        "多幅图的点数复核不足以证明不同构；请确认各图的完整边连接。"
+                    )
             else:
                 graph_review_issues.append(
                     "多幅图的顶点数独立复核未完成，不能确认每幅图的结构。"
