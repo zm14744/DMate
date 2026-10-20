@@ -45,7 +45,9 @@ class GraphConsistencyTests(unittest.TestCase):
         bad="""下列图中，哪些是树？
 图1（G1）：顶点6个，边：a-b,b-c,c-d。
 图2（G2）：顶点a、b、c、d。边：a-b,b-c。"""
-        self.assertEqual(analyze_labeled_graphs(bad),{})
+        self.assertEqual(list(analyze_labeled_graphs(bad)), [2])
+        self.assertEqual(analyze_labeled_graphs(bad)[2]["components"], 2)
+        self.assertFalse(analyze_labeled_graphs(bad)[2]["tree"])
         self.assertEqual(summarize_tree_question(bad),"")
 
     def test_multigraph_not_coerced_to_simple_tree(self):
