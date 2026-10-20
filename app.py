@@ -3960,6 +3960,7 @@ def health():
         "graph_image_audit_version": "2026-10-20-v4-independent-directed-and-multigraph-vertex-audit",
         "graph_answer_integrity_version": "2026-10-20-v1-fail-closed-university-diagrams",
         "single_graph_dual_edge_audit_version": "2026-10-20-v1-standalone-edge-compare-and-quiz-boundary",
+        "chat_route_fix_version": "2026-10-20-current-user-initialized-for-all-chat-requests",
         "answer_verification_version": "2026-10-20-count-and-context-guard-v3",
     })
 
