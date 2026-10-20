@@ -87,6 +87,15 @@ class GraphRecognitionTests(unittest.TestCase):
                 self.check_exact(image)
 
 
+    def test_colored_slide_heading_does_not_damage_blurry_black_graphs(self):
+        image = make_sheet().filter(ImageFilter.GaussianBlur(1.1))
+        painter = ImageDraw.Draw(image)
+        # A textbook slide may have a large colored heading above black dots.
+        # Heading chroma must not force an unsuitable image-wide transform.
+        painter.rectangle((25, 5, 280, 85), fill=(35, 42, 167))
+        painter.rectangle((370, 5, 780, 85), fill=(43, 60, 175))
+        self.check_exact(image)
+
     def test_strong_blur_downgrades_not_invents(self):
         detected = detect(make_sheet().filter(ImageFilter.GaussianBlur(2.7)))
         self.assertTrue(all(g["confidence"] != "high" for g in detected["graphs"]))

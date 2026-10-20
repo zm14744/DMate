@@ -214,8 +214,20 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
     chroma = rgb_i.max(axis=2) - rgb_i.min(axis=2)
     background = np.median(rgb_i.reshape(-1, 3)[::max(1, rgb.shape[0]*rgb.shape[1]//45000)], axis=0)
     deviation = np.max(np.abs(rgb_i - background[None, None, :]), axis=2)
-    chromatic_ink_fraction = float(np.mean((chroma > 35) & (deviation > 48)))
-    use_color_contrast = chromatic_ink_fraction > .002 or float(np.median(raw_gray)) < 145
+    colored_pixels = (chroma > 35) & (deviation > 48)
+    raw_dots = _select_figure_rows(_candidate_dots(raw_gray, cutoff=105))
+    if len(raw_dots) >= 3:
+        # A blue slide heading above a BLACK graph is not evidence that
+        # the graph itself needs chromatic enhancement. Measure the ink
+        # around the actual dots, not throughout the whole page.
+        x1 = max(0, int(min(v[0]-v[2] for v in raw_dots)-15))
+        x2 = min(rgb.shape[1], int(max(v[0]+v[2] for v in raw_dots)+16))
+        y1 = max(0, int(min(v[1]-v[2] for v in raw_dots)-15))
+        y2 = min(rgb.shape[0], int(max(v[1]+v[2] for v in raw_dots)+16))
+        color_fraction = float(colored_pixels[y1:y2, x1:x2].mean()) if x2>x1 and y2>y1 else 0.
+    else:
+        color_fraction = float(colored_pixels.mean())
+    use_color_contrast = color_fraction > .002 or float(np.median(raw_gray)) < 145
     gray = _contrast_gray(rgb) if use_color_contrast else raw_gray
     low = float(np.percentile(gray, 1))
     high = float(np.percentile(gray, 82))
@@ -223,6 +235,10 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
     dots = _select_figure_rows(_candidate_dots(gray, cutoff=105))
     if len(dots) < 3 and cutoff > 110:
         dots = _select_figure_rows(_candidate_dots(gray, cutoff=cutoff))
+    # Prefer node centers actually visible in the unmodified scan if
+    # normalization causes some blurred circles to merge with their lines.
+    if len(raw_dots) > len(dots) and float(np.median(raw_gray)) >= 145:
+        dots = raw_dots
     if len(dots) < 3:
         return {"status": "uncertain", "graphs": [], "regions": []}
     boxes = _split_boxes(dots, gray)
