@@ -64,12 +64,12 @@ def check_local():
 def post_chat(sess,base,question,timeout):
     r=sess.post(base+"/chat",json={"messages":[{"role":"user","content":"请直接给出最终答案并简要解释。"+question}]},timeout=timeout)
     try: result=r.json()
-    except ValueError: result={"raw":r.text[:200]}
+    except ValueError: result={"error":f"HTTP {r.status_code}: "+r.text[:400], "raw":r.text[:400]}
     return r.status_code,result
 def post_image(sess,base,image_bytes,timeout):
     r=sess.post(base+"/ocr",files={"image":("university_exam.png",image_bytes,"image/png")},timeout=timeout)
     try: result=r.json()
-    except ValueError: result={"raw":r.text[:200]}
+    except ValueError: result={"error":f"HTTP {r.status_code}: "+r.text[:400], "raw":r.text[:400]}
     return r.status_code,result
 def pdf_crop(sess,url,page,box):
     from PIL import Image
