@@ -28,7 +28,7 @@ WATERLOO="https://cemc.uwaterloo.ca/sites/default/files/documents/2024/Grade78_2
 # Gold facts were checked against original rendered page, not Vision guesses.
 CASES=[
  dict(id="CN_SJTU_EULER3",country="中国",uni="上海交通大学",kind="带参考解答的课程作业",
-      url=SJTU,page=0,box=[.10,.202,.92,.365],
+      url=SJTU,page=0,box=[.075,.203,.935,.405],
       ask='只根据图片中的三个图(a)(b)(c)判断哪些是欧拉图。第一行仅输出JSON：{"a":true或false,"b":true或false,"c":true或false}，下一行简要解释。',
       gold={"a":True,"b":False,"c":False},mode="boolean_map"),
  dict(id="CN_NJU_EULER3",country="中国",uni="南京大学",kind="正式课程作业",
@@ -85,7 +85,7 @@ CASES=[
       ask='原图为无向带权图。求最小生成树的总权重，以及非同构的最小生成树数量。第一行仅输出JSON：{"weight":整数,"count":整数}，后面说明。',
       gold={"weight":19,"count":5},mode="numeric_map"),
  dict(id="US_CORNELL_ISO",country="美国",uni="康奈尔大学",kind="原始期末考试试题",
-      url=CORNELL,page=1,box=[.11,.17,.90,.4],
+      url=CORNELL,page=1,box=[.11,.177,.90,.372],
       ask='原图第10题中两张无向图是否同构？第一行仅输出JSON：{"result":true或false}，随后给出映射并对照实际边集。',
       gold=True,mode="boolean",
       canonical=("图1（左图）：无向图，顶点 a、b、c、d、e。"
