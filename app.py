@@ -22,6 +22,7 @@ from graph_integrity import review_graph_transcriptions, answer_graph_isomorphis
 from graph_answer_integrity import (detect_count_inconsistency, review_directed_graphs,
     protect_uncertain_graph_answer, review_multi_graph_counts,
     detect_named_graph_degree_inconsistency, is_scanned_graph_solution_request,
+    single_undirected_named_edges, review_single_undirected_graph,
     FIGURE_VERTEX_COUNT)
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
@@ -3732,6 +3733,30 @@ def ocr():
                 graph_review_issues = [
                     "复杂图形逐边复核没有完成；请核对顶点间的弧线、交叉线和黑色实心点。"
                 ]
+
+        # Single labeled crossing-edge graphs were not covered by the
+        # two-graph isomorphism auditor. A real MIT A-H source was repeatedly
+        # transcribed with nonexistent A-C/B-D edges, producing incorrect
+        # diameter and colour-count answers. Independently audit the FULL
+        # original picture before allowing those calculations.
+        if image_kind != "non_exercise" and GRAPH_UNCERTAIN_FLAG not in visual_text:
+            single_graph_claim = single_undirected_named_edges(visual_text)
+            if single_graph_claim is not None:
+                independent_single = verify_graph_image_independently(
+                    raw, retries=0, single=True
+                )
+                if independent_single.get("ok"):
+                    visual_text, single_issues, _ = review_single_undirected_graph(
+                        visual_text, independent_single.get("graphs")
+                    )
+                    graph_review_issues.extend(single_issues)
+                else:
+                    graph_review_issues.append(
+                        "单幅有字母顶点的图未能独立逐边确认，请核对原图端点与交叉线。"
+                    )
+                    visual_text = GRAPH_UNCERTAIN_FLAG + (
+                        "\n单幅图的边集独立复核未完成，不能可靠计算直径、色数或邻接关系。"
+                    )
 
         # Another real MIT eight-vertex examination diagram contained a
         # spurious A-C edge and an impossible *odd* sum of degrees in Vision.
