@@ -18,7 +18,7 @@ from flask import Flask, jsonify, render_template, request, session, make_respon
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
-from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, contains_two_labeled_undirected_diagrams, FLAG as GRAPH_UNCERTAIN_FLAG
+from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, contains_two_labeled_undirected_diagrams, has_critical_edge_or_arrow_uncertainty, FLAG as GRAPH_UNCERTAIN_FLAG
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
@@ -3693,6 +3693,18 @@ def ocr():
                 graph_review_issues = [
                     "复杂图形逐边复核没有完成；请核对顶点间的弧线、交叉线和黑色实心点。"
                 ]
+
+        # Do not certify directed Euler circuits if even the image model
+        # explicitly says some arrow directions or edge endpoints cannot be
+        # determined. An incorrect yes/no conclusion is worse than abstention.
+        if (image_kind != "non_exercise" and
+                re.search(r"欧拉|Euler", question_text, re.I) and
+                has_critical_edge_or_arrow_uncertainty(visual_text) and
+                GRAPH_UNCERTAIN_FLAG not in visual_text):
+            graph_review_issues.append(
+                "图中有向边的箭头或端点尚未确认，不能可靠判断欧拉回路；请对照原图核对。"
+            )
+            visual_text = GRAPH_UNCERTAIN_FLAG + "\n" + visual_text
 
         if cv_graphs and not visual_text and image_kind != "non_exercise":
             readable = []
