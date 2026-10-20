@@ -78,6 +78,7 @@ def main():
     ap.add_argument("--output",default="university_benchmark_results.json")
     ap.add_argument("--skip-images",action="store_true")
     ap.add_argument("--only-image",action="append",default=[])
+    ap.add_argument("--strict",action="store_true",help="Fail CI when live university benchmark exposes a confirmed wrong answer or request failure")
     opts=ap.parse_args()
     check_local()
     base=opts.base.rstrip("/")
@@ -133,7 +134,20 @@ def main():
                         "下面是从高校真题图片识别的题干与图形信息，请判定两个图是否同构，并依据实际邻接关系和度数解释。\n"+recognized,
                         opts.timeout)
                     row["followup_chat_http"]=chat_http
-                    row["followup_chat_reply"]=str(chat_result.get("reply",""))[:4000]
+                    answer=str(chat_result.get("reply",""))
+                    row["followup_chat_reply"]=answer[:4000]
+                    if chat_http!=200 or not answer.strip():
+                        row["verdict"]="REQUEST_FAILED"
+                    elif re.search(r"不同构|非同构|不是同构",answer):
+                        # Cornell 2016 Spring final Q10 is definitively isomorphic:
+                        # a->v,b->z,c->w,d->y,e->x (each of its nine edges maps).
+                        row["verdict"]="ANSWER_WRONG"
+                        row["gold_answer"]="同构"
+                    elif re.search(r"同构",answer):
+                        row["verdict"]="RECOGNITION_NEEDS_REVIEW"
+                        row["gold_answer"]="同构"
+                    else:
+                        row["verdict"]="ANSWER_SUSPECT"
                 except Exception as e:
                     row["followup_error"]=repr(e)
             data["images"].append(row)
@@ -142,6 +156,12 @@ def main():
     data["completed_utc"]=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())
     Path(opts.output).write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
     print("COUNTS:",{v:sum(x["verdict"]==v for x in data["cases"]+data["images"])
-                     for v in ["NEEDS_REVIEW","ANSWER_SUSPECT","REQUEST_FAILED"]},flush=True)
+                     for v in ["NEEDS_REVIEW","RECOGNITION_NEEDS_REVIEW","ANSWER_WRONG","ANSWER_SUSPECT","REQUEST_FAILED"]},flush=True)
     print("OUTPUT",opts.output)
+    if opts.strict:
+        failures=[(x["id"],x["verdict"]) for x in data["cases"]+data["images"]
+                  if x["verdict"] in ("ANSWER_WRONG","ANSWER_SUSPECT","REQUEST_FAILED")]
+        if failures:
+            print("UNIVERSITY BENCHMARK FAILED",failures,flush=True)
+            sys.exit(1)
 if __name__=="__main__":main()
