@@ -46,9 +46,11 @@ def parse_number(raw):
     elif t.startswith(r"\[") and t.endswith(r"\]"):
         t=t[2:-2]
     t=re.sub(r"\\boxed\{([^{}]*)\}",r"\1",t)
-    latex=re.fullmatch(r"\\frac\{(-?\d+)\}\{(\d+)\}",t)
+    latex=re.fullmatch(r"\\frac(?:\{(-?\d+)\}|(-?\d))(?:\{(\d+)\}|(\d))",t)
     if latex:
-        return Fraction(int(latex.group(1)),int(latex.group(2)))
+        a=latex.group(1) or latex.group(2)
+        b=latex.group(3) or latex.group(4)
+        return Fraction(int(a),int(b))
     if re.fullmatch(r"-?\d{1,3}(?:,\d{3})+",t):
         t=t.replace(",","")
     if re.fullmatch(r"-?\d+(?:\.\d+)?(?:/-?\d+(?:\.\d+)?)?",t):
