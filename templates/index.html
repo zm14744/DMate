@@ -8629,14 +8629,13 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <div class="wrong-filters">
                     <button type="button" data-wrong-filter="pending">待处理</button>
                     <button type="button" data-wrong-filter="corrected">已订正</button>
-                    <button type="button" data-wrong-filter="passed">已通过复测</button>
                 </div>
             </div>
         </div>
 
         <div class="wrong-tools">
             <div class="wrong-search-wrap">
-                <input id="wrongBookSearch" type="search" placeholder="搜索题目、知识点、难点或笔记" autocomplete="off">
+                <input id="wrongBookSearch" type="search" placeholder="搜索" autocomplete="off">
                 <button id="wrongBookSearchClear" class="wrong-search-clear hidden" type="button" aria-label="清空搜索" title="清空搜索"></button>
             </div>
             <select id="wrongBookSort" aria-label="错题排序">
@@ -8645,7 +8644,6 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <option value="oldest">最早更新</option>
             </select>
             <button id="wrongPdfBtn" type="button" title="导出当前筛选结果为 PDF">导出 PDF</button>
-            <button id="wrongClearCompletedBtn" type="button" class="danger-tool">清理已完成</button>
         </div>
 
         <div id="wrongBookList"></div>
