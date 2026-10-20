@@ -20,6 +20,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
 from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, FLAG as GRAPH_UNCERTAIN_FLAG
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
+from math_answer_guard import audit_explicit_count_answer
 try:
     from graph_recognition import recognize_graphs
 except (ImportError, OSError) as _graph_import_error:
@@ -3035,6 +3036,14 @@ def chat():
                 derived_tree_answer = summarize_tree_question(latest_graph_text)
                 if derived_tree_answer:
                     reply = "依据题目列出的顶点与边集逐图计算：\n\n" + derived_tree_answer
+
+        if not effective_exercise_request and cleaned and isinstance(reply, str):
+            latest_math_request = next(
+                (m["content"] for m in reversed(cleaned) if m.get("role") == "user"), ""
+            )
+            # Explicit final-answer requests: verify an exact count against a
+            # closed-form combinatorial formula before showing it to the user.
+            reply = audit_explicit_count_answer(latest_math_request, reply)
 
         if not isinstance(reply, str) or not reply.strip():
             return jsonify({
