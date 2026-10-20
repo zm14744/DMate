@@ -1,0 +1,67 @@
+name: Global University Graph Diagram OCR and Reasoning
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/global-graph-diagram-benchmark.yml"
+concurrency:
+  group: global-university-graph-ocr
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  real-diagram-benchmark:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 38
+    env:
+      PYTHONPATH: .
+      DMATE_BENCH_URL: https://dmate.zeabur.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated PDF imaging dependencies
+        run: python -m pip install "requests>=2.31,<3" "Pillow>=10,<12" "PyMuPDF>=1.24,<2"
+      - name: Compile benchmark
+        run: python -m py_compile tests/global_graph_picture_benchmark.py
+      - name: Live international original graph diagrams against DMate
+        run: |
+          python tests/global_graph_picture_benchmark.py \
+            --pause 8 --timeout 90 \
+            --output global_graph_picture_results.json
+      - name: Summarize substantive errors without hiding unscorable cases
+        if: always()
+        run: |
+          python - <<'PY'
+          import json,pathlib,collections,sys
+          p=pathlib.Path("global_graph_picture_results.json")
+          if not p.exists():
+              print("NO_RESULTS",flush=True)
+              sys.exit(1)
+          out=json.loads(p.read_text(encoding="utf-8"))
+          counts=collections.Counter(c.get("status") for c in out.get("cases",[]))
+          for c in out.get("cases",[]):
+              print("RESULT",c["id"],c.get("status"),"image_ocr",c.get("recognition_verdict"),
+                    "gold_text",c.get("gold_text_status"),flush=True)
+          print("SUMMARY",dict(counts),flush=True)
+          failures=[c["id"] for c in out.get("cases",[])
+                    if c.get("status") in ("SOURCE_FAILED","OCR_FAILED","ANSWER_WRONG","ANSWER_REQUEST_FAILED")
+                    or c.get("gold_text_status")=="ANSWER_WRONG"]
+          if failures:
+              print("FAILED_SOURCE_OCR_OR_MATH",failures,flush=True)
+              sys.exit(1)
+          if counts.get("ANSWER_UNSCORABLE",0):
+              print("WARNING: unscorable model answers require human review",flush=True)
+          PY
+      - name: Upload original university figures and full answers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: international-original-graph-ocr-reasoning-evidence
+          path: |
+            global_graph_picture_results.json
+            global_graph_original_crops/*.png
+          retention-days: 30
+          if-no-files-found: warn
