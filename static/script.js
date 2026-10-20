@@ -8720,6 +8720,13 @@ function renderWrongBook() {
         date.textContent = formatLearningDate(item.updatedAt);
 
         top.appendChild(status);
+        const manualPasses = Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0));
+        if (item.corrected && manualPasses > 0) {
+            const passTimes = document.createElement("span");
+            passTimes.className = "wrong-status passed";
+            passTimes.textContent = `已通过复测 ${manualPasses} 次`;
+            top.appendChild(passTimes);
+        }
         top.appendChild(date);
 
         const difficulty = ["简单", "中等", "困难"].includes(item.difficulty)
@@ -8929,14 +8936,6 @@ function renderWrongBook() {
             );
 
             analysisBox.appendChild(analysisDetails);
-        }
-
-        const manualPasses = Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0));
-        if (item.corrected && manualPasses > 0) {
-            const passTimes = document.createElement("span");
-            passTimes.className = "wrong-status passed";
-            passTimes.textContent = `已通过复测 ${manualPasses} 次`;
-            top.appendChild(passTimes);
         }
 
         const actions = document.createElement("div");
