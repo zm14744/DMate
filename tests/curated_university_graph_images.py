@@ -57,12 +57,12 @@ CASES=[
   question="判断原图第1题中的三幅有向图是否强连通；不强连通的再判断是否弱连通。逐图列出依据，不能忽略箭头方向。",
   gold_note="Figure 1 weakly but not strongly connected; 2 neither weak nor strong (separate components); 3 weakly but not strongly connected",
   markers=[r"强连通|强连接",r"弱连通|弱连接"]),
- dict(id="EDINBURGH_CLIQUES",institution="University of Edinburgh",country="UK",origin="2022 tutorial 2 solutions Exercise 2 Figure 1 undirected graphical model",
-  url="https://www.inf.ed.ac.uk/teaching/courses/pmr/21-22/assets/tutorials/tutorial02-sol.pdf",
-  page=1,box=(.075,.02,.93,.58),
-  question="按图1求无向图的全部最大团（maximal cliques）。只给出顶点集合以及必要解释。",
-  gold_note="Four maximal cliques {x1,x2,x4}, {x1,x3,x4}, {x3,x4,x5}, {x4,x5,x6}",
-  markers=[r"x_?\{?1\}?",r"x_?\{?4\}?",r"x_?\{?6\}?"]),
+ dict(id="CAMBRIDGE_K6",institution="University of Cambridge",country="UK",origin="Compiler Optimisation Lecture 6 Graph colouring demonstration, page 8, not exam",
+  url="https://www.cl.cam.ac.uk/teaching/2223/OptComp/slides/lecture06.pdf",
+  page=7,box=(.075,.13,.95,.94),
+  question="只依据图中的六个彩色圆点和全部黑色边（不是依靠颜色图例）判断图共有几个顶点、几条边、色数是多少。交叉线段没有圆点时不是顶点。",
+  gold_note="A drawing of complete graph K6: 6 vertices, 15 edges, chromatic number 6. Lecture illustration, not an exam.",
+  markers=[r"(?<!\\d)6(?!\\d)|六",r"(?<!\\d)15(?!\\d)|十五",r"K_?\\{?6\\}?|完全图|色数"]),
 ]
 
 UNCERTAIN=re.compile(r"图形结构待核对|需要.*核对|无法.*确定|无法.*准确识别|不能.*确定|识别.*不确定|图.*不清晰")
