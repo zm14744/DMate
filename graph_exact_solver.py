@@ -227,7 +227,11 @@ def solve_certified_graph(question, llm_reply=None):
         edge_component=not used or len(_reachable(stats["adj"],min(used)) & used)==len(used)
         odd=sorted(v for v in degrees if degrees[v]%2)
         if edge_component and len(odd)==0:
-            lines.append("所有非孤立顶点属于同一连通分量且度数均为偶数，因此存在欧拉回路。")
+            if stats["connected"]:
+                lines.append("图连通且所有顶点度数均为偶数，因此是欧拉图，存在欧拉回路。")
+            else:
+                lines.append("所有非孤立顶点构成一个连通分量且度数为偶数，故存在覆盖全部边的欧拉闭迹；"
+                             "但图含孤立顶点、整体不连通，按要求全图连通的定义不属于欧拉图。")
         elif edge_component and len(odd)==2:
             lines.append(f"奇度顶点为 {'、'.join(odd)}，恰有两个，只有欧拉通路而没有欧拉回路；因此不是欧拉图。")
         else:
