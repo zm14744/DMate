@@ -511,7 +511,7 @@
       "question": "1至500的整数中，至少能被2、3、5之一整除的有多少个？",
       "oracle": {
         "kind": "integer",
-        "value": "367"
+        "value": "366"
       },
       "category": "derived_variant"
     },
@@ -599,7 +599,7 @@
       "question": "求17x≡5(mod31)在0≤x<31时的解。",
       "oracle": {
         "kind": "integer",
-        "value": "13"
+        "value": "24"
       },
       "category": "derived_variant"
     },
