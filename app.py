@@ -24,6 +24,7 @@ from graph_answer_integrity import (detect_count_inconsistency, review_directed_
     detect_named_graph_degree_inconsistency, is_scanned_graph_solution_request,
     single_undirected_named_edges, review_single_undirected_graph,
     FIGURE_VERTEX_COUNT)
+from graph_exact_solver import solve_certified_graph
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
@@ -3088,6 +3089,13 @@ def chat():
             final_graph_guard = protect_uncertain_graph_answer(original_image_request, reply)
             if final_graph_guard is not None:
                 reply = final_graph_guard
+            else:
+                # This solves the *same original verified graph* by exact finite
+                # algorithms. It never uses an unresolved image or rewrites a
+                # mathematical task into an unrelated exercise.
+                verified_graph_result = solve_certified_graph(original_image_request, reply)
+                if verified_graph_result is not None:
+                    reply = verified_graph_result
 
         if not isinstance(reply, str) or not reply.strip():
             return jsonify({
