@@ -167,6 +167,86 @@ def review_multi_graph_counts(primary_text, independent_graphs):
     return primary_text,[],True
 
 
+
+_NAMED_EDGE=re.compile(
+    r"(?<![A-Za-z0-9])([A-Z])\s*[-—–]\s*([A-Z])(?![A-Za-z0-9])"
+)
+_NAMED_DEGREE=re.compile(
+    r"(?<![A-Za-z0-9])([A-Z])\s*[:：]\s*(\d{1,2})(?!\d)"
+)
+
+
+def detect_named_graph_degree_inconsistency(vision_text):
+    """Check literal OCR graph claims against the handshake lemma and edge list.
+
+    The original MIT problem-set A-H image was read as ten edges (including
+    nonexistent A-C), plus degrees A2 B3 C3 D2 E4 F2 G1 H2 whose sum is
+    *odd*. A confidence assertion in prose cannot override arithmetic.
+    This generic invariant catches the unsupported answer before solving.
+    """
+    text=str(vision_text or "")
+    m=re.search(r"各顶点(?:的)?度数(?:分别)?为\s*[：:]\s*([^\n。]{8,450})",text)
+    if not m:
+        return None
+    entries=_NAMED_DEGREE.findall(m.group(1))
+    if len(entries)<3 or len({a for a,b in entries})!=len(entries):
+        return None
+    stated={a:int(b) for a,b in entries}
+    summed=sum(stated.values())
+    if summed%2:
+        return (f"图结构转录不一致：列出的顶点度数之和为 {summed}（奇数）；"
+                "无向图度数总和必为偶数，请逐边核对原图。")
+    edge_clause=re.search(
+        r"(?:连接关系[（(]边[）)]|连接关系|边集合|边集)\s*(?:为|是)?\s*[：:]\s*"
+        r"([^\n。]{12,1500})",text
+    )
+    if not edge_clause:
+        return None
+    edges=_NAMED_EDGE.findall(edge_clause.group(1))
+    if len(edges)<3 or any(a==b for a,b in edges):
+        return None
+    pairs={tuple(sorted(pair)) for pair in edges}
+    if len(pairs)!=len(edges):
+        return "图结构转录不一致：边列表重复，请核对是否为真正的重边。"
+    actual={v:0 for v in stated}
+    for u,v in pairs:
+        if u not in actual or v not in actual:
+            return "图结构转录不一致：边列表包含度数表以外的顶点。"
+        actual[u]+=1
+        actual[v]+=1
+    discrepancies={v:(stated[v],actual[v]) for v in stated if stated[v]!=actual[v]}
+    if discrepancies:
+        return "图结构转录不一致：边表与顶点度数矛盾：" + repr(discrepancies) + "。"
+    return None
+
+
+def is_scanned_graph_solution_request(user_content):
+    """A scanned question to SOLVE must never be treated as 'generate a quiz'.
+
+    A real Stanford six-tree upload was sent in 【题目文字】/【图形信息】
+    wrappers. The exercise classifier incorrectly generated a different
+    problem and even exposed its own hidden answer. Only an explicit new
+    generation request within 【我的要求】 should enter the quiz generator.
+    """
+    text=str(user_content or "")
+    if "【题目文字】" not in text or "【我的要求】" not in text:
+        return False
+    request=text.rsplit("【我的要求】",1)[-1].strip()
+    if not request:
+        return False
+    if re.search(
+        r"(?:出|编|设计|生成|创作|命制).{0,14}(?:题目|习题|练习|试题|题)"
+        r"|(?:给我|来).{0,6}(?:一道|几道).{0,10}(?:题|练习)",
+        request,re.I
+    ):
+        return False
+    return bool(re.search(
+        r"判断|求|计算|解答|证明|解析|识别|数出|是否|几棵|多少|"
+        r"给出|写出|答案|同构|连通|着色|色数|直径|图",
+        request,re.I
+    ))
+
+
 def protect_uncertain_graph_answer(question, reply):
     """Suppress an irrelevant or definitive LLM answer to unresolved image.
 
