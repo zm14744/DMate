@@ -8,8 +8,8 @@ import math
 import re
 
 ANSWER_LINE = re.compile(r"(?m)^\s*【结果】\s*([0-9][0-9,]*)\s*[。.\s]*$")
-CHINESE = re.compile(r"(?P<n>\d{1,3})\s*本.{0,85}?(?:选|选择|取|挑)\s*(?P<k>\d{1,3})\s*本", re.S)
-ENGLISH = re.compile(r"(?P<n>\d{1,3})\s+books.{0,200}?(?:select|choos(?:e|ing))\s*(?P<k>\d{1,3})\b",re.I|re.S)
+CHINESE = re.compile(r"(?P<n>\d{1,3})\s*本.{0,85}?(?:选|选择|取|挑)(?:出|中)?\s*(?P<k>\d{1,3})\s*本", re.S)
+ENGLISH = re.compile(r"(?P<n>\d{1,3})\s+books.{0,200}?(?:select(?:ing)?|choos(?:e|ing))\s*(?P<k>\d{1,3})\b",re.I|re.S)
 NEGATIVE = re.compile(r"不相邻|不连续|互不相邻|任意两本不相邻|no\s+two\s+adjacent|non[- ]adjacent", re.I)
 ANSWER_DEMAND = re.compile(r"给出.*答案|直接.*(?:答案|解答|结果)|求.*(?:多少|方式|方案)|【结果】|完整解析|最终答案|how\s+many", re.I)
 
