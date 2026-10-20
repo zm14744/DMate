@@ -18,6 +18,7 @@ from flask import Flask, jsonify, render_template, request, session, make_respon
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure
+from graph_consistency import reconcile_vision_edges, summarize_tree_question
 try:
     from graph_recognition import recognize_graphs
 except (ImportError, OSError) as _graph_import_error:
@@ -3019,6 +3020,16 @@ def chat():
 
     if result.get("ok") is True:
         reply = result.get("reply", "")
+        # Use deterministic connectivity and edge counts when the user gives
+        # a COMPLETE set of labeled graphs. Never let the final tree selection
+        # disagree with the explicit graph structure.
+        if not effective_exercise_request and cleaned:
+            latest_graph_text = next(
+                (m["content"] for m in reversed(cleaned) if m.get("role") == "user"), ""
+            )
+            derived_tree_answer = summarize_tree_question(latest_graph_text)
+            if derived_tree_answer:
+                reply = "依据题目列出的顶点与边集逐图计算：\n\n" + derived_tree_answer
 
         if not isinstance(reply, str) or not reply.strip():
             return jsonify({
@@ -3619,6 +3630,13 @@ def ocr():
         # independently read by Vision. CV topology remains in graph_structures
         # and is supplied as pixel evidence to Vision during the same request.
         cv_graphs = graph_cv.get("graphs") or []
+        alignment_warnings = []
+        if cv_graphs and visual_text and image_kind != "non_exercise":
+            # Strict pixel geometry + explicit a-f labels only. In all other
+            # arrangements Vision is preserved and no labels are guessed.
+            visual_text, alignment_warnings = reconcile_vision_edges(
+                visual_text, cv_graphs
+            )
         if cv_graphs and not visual_text and image_kind != "non_exercise":
             readable = []
             for index, graph in enumerate(cv_graphs, 1):
@@ -3671,7 +3689,7 @@ def ocr():
                 "error": message + " 请尝试重新拍摄、裁剪，或提高图形与背景的对比度。"
             }), 400
 
-        warnings = []
+        warnings = list(alignment_warnings)
         if result.get("warning"):
             warnings.append(str(result.get("warning")))
         if ocr_fallback_reason and (corrected_text or visual_text):
