@@ -205,9 +205,18 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
             rgb = np.asarray(img)
     except (OSError, ValueError):
         return {"status": "uncertain", "graphs": [], "regions": []}
-    # Colour-invariant intensity is shared by vertex, line and whitespace checks.
-    # A chromatic red/yellow/blue line may be invisible to a gray-only detector.
-    gray = _contrast_gray(rgb)
+    # Preserve the proven gray-scale detector for monochrome textbook images.
+    # Contrast normalization widens antialiased monochrome strokes and can
+    # swallow a circle into its incident lines in blurry photos. Activate it
+    # only when chromatic ink or dark/inverted background requires it.
+    raw_gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    rgb_i = rgb.astype(np.int16)
+    chroma = rgb_i.max(axis=2) - rgb_i.min(axis=2)
+    background = np.median(rgb_i.reshape(-1, 3)[::max(1, rgb.shape[0]*rgb.shape[1]//45000)], axis=0)
+    deviation = np.max(np.abs(rgb_i - background[None, None, :]), axis=2)
+    chromatic_ink_fraction = float(np.mean((chroma > 35) & (deviation > 48)))
+    use_color_contrast = chromatic_ink_fraction > .002 or float(np.median(raw_gray)) < 145
+    gray = _contrast_gray(rgb) if use_color_contrast else raw_gray
     low = float(np.percentile(gray, 1))
     high = float(np.percentile(gray, 82))
     cutoff = int(np.clip(low+.24*(high-low), 105, 190))
@@ -218,7 +227,7 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
         return {"status": "uncertain", "graphs": [], "regions": []}
     boxes = _split_boxes(dots, gray)
     edge_cutoff = int(np.clip(low+.63*(high-low), 180, 225))
-    sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    sharpness = float(cv2.Laplacian(raw_gray, cv2.CV_64F).var())
     # Complex photograph backgrounds may produce fake ink. Downgrade them
     # instead of presenting an exact topology to the student.
     background_noise = float(np.median(np.abs(gray.astype(np.int16)-255)))
