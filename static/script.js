@@ -14127,11 +14127,18 @@ function markChatMessageAsWrong(sessionId, messageIndex) {
 }
 
 function hideGeneratedExerciseKnowledgePoints(raw) {
-    // 仅调整 AI 出题气泡的可见正文，保留原始消息和知识点分类用于复测与图谱。
-    return String(raw || "").replace(
-        /(?:^|\n)\s*(?:【|\[|#+\s*)\s*(?:涉及知识点|所涉知识点|知识点)\s*(?:】|\]|[：:])[^\n]*(?:\n(?!\s*(?:【|\[|#+\s*|\d+[.、]|[（(]\d+[）)]))[^\n]*)*/g,
-        ""
-    ).replace(/\n{3,}/g, "\n\n").trim();
+    // 仅隐藏 AI 出题中的“涉及知识点”说明，不修改保存的题干与知识标签。
+    const text = String(raw || "");
+    return text.split("\n").filter((line, index, lines) => {
+        if (/^\s*(?:【(?:涉及知识点|所涉知识点|知识点)】|\[(?:涉及知识点|所涉知识点|知识点)\]|#{1,6}\s*(?:涉及知识点|所涉知识点|知识点))\s*[:：]?\s*/.test(line)) {
+            return false;
+        }
+        // 标题下一行若只是知识点罗列，则一起隐藏，绝不删除含求解语义的题干。
+        const prev = String(lines[index - 1] || "");
+        return !(/^\s*(?:【(?:涉及知识点|所涉知识点|知识点)】|\[(?:涉及知识点|所涉知识点|知识点)\]|#{1,6}\s*(?:涉及知识点|所涉知识点|知识点))\s*$/.test(prev)
+            && line.trim().length <= 70
+            && !/[。？?]|(?:求|证明|判断|计算|写出|已知|设|下列)/.test(line));
+    }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 async function deleteChatMessage(sessionId, messageIndex) {
