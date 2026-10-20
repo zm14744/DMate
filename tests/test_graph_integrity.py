@@ -116,7 +116,7 @@ class GraphIntegrityTests(unittest.TestCase):
         verified=GOLD.replace("【图形信息】","【图形信息】\n"+OK_MARKER)
         self.assertIn("两图同构",answer_graph_isomorphism(
             verified + "\n【我的要求】\n直接给出最终答案"))
-        multiple=verified + "\n11. What is the clique number?\n【我的要求】\n直接给出最终答案"
+        multiple="10. " + verified + "\n11. What is the clique number?\n【我的要求】\n直接给出最终答案"
         self.assertEqual(answer_graph_isomorphism(multiple),"")
 
     def test_ordinary_non_graph_math_does_not_get_overridden(self):
