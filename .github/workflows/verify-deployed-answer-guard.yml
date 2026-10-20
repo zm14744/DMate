@@ -1,0 +1,36 @@
+name: Deployed DMate Answer Guard Verification
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app.py"
+      - ".github/workflows/verify-deployed-answer-guard.yml"
+permissions:
+  contents: read
+jobs:
+  live-health:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 6
+    steps:
+      - name: Wait for verified production code version without using paid AI
+        run: |
+          python - <<'PY'
+          import json, time, urllib.request, sys
+          url="https://dmate.zeabur.app/health"
+          expected="2026-10-20-count-and-context-guard-v3"
+          for attempt in range(26):
+              try:
+                  with urllib.request.urlopen(url,timeout=8) as resp:
+                      payload=json.loads(resp.read().decode("utf-8"))
+                  deployed=payload.get("answer_verification_version")
+                  print("HEALTH_CHECK",attempt+1,"production_version=",deployed,flush=True)
+                  if deployed==expected:
+                      print("ANSWER_GUARD_DEPLOYED_VERIFIED",expected,flush=True)
+                      sys.exit(0)
+              except Exception as exc:
+                  print("HEALTH_CHECK_ERROR",type(exc).__name__,flush=True)
+              time.sleep(8)
+          print("ERROR: latest answer guard is not verifiably deployed",flush=True)
+          sys.exit(2)
+          PY
