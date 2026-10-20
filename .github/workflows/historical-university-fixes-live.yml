@@ -8,6 +8,9 @@ on:
       - "app.py"
       - "graph_answer_integrity.py"
       - "tests/test_historical_university_failures.py"
+concurrency:
+  group: historical-university-live-repair
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -31,7 +34,8 @@ jobs:
           data=requests.get("https://dmate.zeabur.app/health",timeout=20).json()
           print("ACTUAL_LIVE_VERSIONS",json.dumps(data,ensure_ascii=False),flush=True)
           expected={"chat_route_fix_version":"2026-10-20-current-user-initialized-for-all-chat-requests",
-                    "single_graph_dual_edge_audit_version":"2026-10-20-v1-standalone-edge-compare-and-quiz-boundary"}
+                    "single_graph_dual_edge_audit_version":"2026-10-20-v1-standalone-edge-compare-and-quiz-boundary",
+                    "historical_university_repairs_version":"2026-10-20-v2-generic-ocr-hold-and-multitree-topology"}
           mismatch={k:{"want":v,"got":data.get(k)} for k,v in expected.items() if data.get(k)!=v}
           if mismatch:
               print("OLD_OR_INCOMPLETE_ZEABUR_DEPLOYMENT",json.dumps(mismatch),flush=True)
