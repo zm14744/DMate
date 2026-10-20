@@ -64,6 +64,31 @@ def main():
     ):
         matches_vector(DESKTOP / filename, size)
 
+    # Desktop website sidebar brand must have 1x, 2x and 3x independently
+    # rasterized images; do not change mobile SVG nor Bing search favicon.
+    for px, gamma in ((38, 0.55), (76, 0.72), (114, 0.83)):
+        matches_vector(ICONS / f"dmate-brand-desktop-v41-{px}.png",
+                       px, background=BLACK, foreground=WHITE,
+                       stroke_units=STROKE, rounded=False,
+                       oversample_factor=16, facets=True,
+                       stroke_palette=[WHITE] * 6, coverage_gamma=gamma)
+        with Image.open(ICONS / f"dmate-brand-desktop-v41-{px}.png") as image:
+            rgb = image.convert("RGB")
+            assert all(r == g == b for r, g, b in rgb.getdata()), "Brand mark must stay black and white"
+            assert rgb.getpixel((px//2, px//2))[0] == 0, "Unfilled center must stay black"
+        baseline = draw_mark(px, background=BLACK, foreground=WHITE,
+                             stroke_units=STROKE, rounded=False,
+                             oversample_factor=16, facets=True,
+                             stroke_palette=[WHITE] * 6)
+        assert sum(rgba(ICONS / f"dmate-brand-desktop-v41-{px}.png").convert("L").getdata()) > sum(baseline.convert("L").getdata()), (
+            px, "Desktop brand must be visibly brighter than uncorrected hairlines"
+        )
+    template = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    assert 'media="(min-width:1101px)"' in template
+    assert 'src="/static/icons/dmate-mark.svg?v=dmate-v6-14"' in template, "Mobile keeps the original SVG"
+    for px in (38, 76, 114):
+        assert f"/static/icons/dmate-brand-desktop-v41-{px}.png" in template
+
     # macOS light mode preserves a black tile; dark mode uses no tile at all.
     for theme, background, foreground in (
         ("light", BLACK, WHITE), ("dark", None, WHITE)

@@ -8129,7 +8129,14 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <button id="mobileNavClose" class="mobile-drawer-close" type="button" aria-label="关闭对话列表">×</button>
     </div>
     <div class="dmate-brand" aria-label="DMate - 离散数学智能辅学系统">
-        <img class="dmate-brand-mark" src="/static/icons/dmate-mark.svg?v=dmate-v6-14" alt="DMate 图标">
+        <picture>
+            <source media="(min-width:1101px)" type="image/png"
+                    srcset="/static/icons/dmate-brand-desktop-v41-38.png 1x,
+                            /static/icons/dmate-brand-desktop-v41-76.png 2x,
+                            /static/icons/dmate-brand-desktop-v41-114.png 3x">
+            <img class="dmate-brand-mark" src="/static/icons/dmate-mark.svg?v=dmate-v6-14"
+                 width="38" height="38" alt="DMate 图标">
+        </picture>
         <div class="dmate-brand-copy">
             <h1 class="dmate-brand-name">DMate</h1>
             <div class="dmate-brand-subtitle">离散数学智能辅学系统</div>

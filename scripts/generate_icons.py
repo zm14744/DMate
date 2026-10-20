@@ -81,7 +81,7 @@ def svg_mark(background=None, foreground="#fff", stroke=STROKE, corner_radius=0)
 
 def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=STROKE,
               figure_scale=1.0, rounded=False, oversample_factor=None,
-              facets=False, stroke_palette=None):
+              facets=False, stroke_palette=None, coverage_gamma=None):
     """Rasterize vector coordinates directly at native size with supersampling.
 
     figure_scale modifies only geometric coordinates BEFORE rasterization.
@@ -127,8 +127,9 @@ def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=STROKE,
             color = stroke_palette[index] if stroke_palette is not None else foreground
             pen.line(coords(points), fill=color, width=line_width, joint="curve")
         reduced = ink.resize((size, size), Image.Resampling.LANCZOS)
-        if size <= 32:
-            exponent = 0.53 if size <= 24 else 0.70
+        if size <= 32 or coverage_gamma is not None:
+            exponent = (coverage_gamma if coverage_gamma is not None
+                        else (0.53 if size <= 24 else 0.70))
             alpha = reduced.getchannel("A").point(
                 lambda value: 0 if value < 12 else min(
                     255, round(255 * ((value / 255.0) ** exponent))
@@ -348,6 +349,21 @@ def main():
              stroke_units=STROKE, rounded=True,
              figure_scale_by_size=bing_scales, oversample_factor=16,
              facets=True, stroke_palette=[WHITE] * len(PATHS))
+
+    # Desktop WEBSITE sidebar/header brand. The shared dmate-mark.svg stroke
+    # is 13/1254 * 38 = 0.39 CSS px at desktop size: in 1x rasterization
+    # its #fff ink turns dim gray from subpixel coverage. Render independent
+    # DPR=1/2/3 assets directly from the SAME geometry and SAME thin stroke,
+    # then lift subpixel luminance only (not path width or black face fill).
+    # Mobile sidebar/header remain on the original SVG. No favicon changes.
+    brand_densities = ((1, 38, 0.55), (2, 76, 0.72), (3, 114, 0.83))
+    for density, pixels, exponent in brand_densities:
+        save_png(draw_mark(pixels, background=BLACK, foreground=WHITE,
+                           stroke_units=STROKE, rounded=False,
+                           oversample_factor=16, facets=True,
+                           stroke_palette=[WHITE] * len(PATHS),
+                           coverage_gamma=exponent),
+                 STATIC / f"dmate-brand-desktop-v41-{pixels}.png")
 
     # iOS Safari uses the Apple touch icon for site bookmarks and Home Screen shortcuts.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
