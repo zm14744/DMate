@@ -2,7 +2,7 @@
 import unittest
 from graph_integrity import (
     parse_diagrams, exact_isomorphism, answer_graph_isomorphism,
-    review_graph_transcriptions, contains_two_labeled_undirected_diagrams, FLAG, OK_MARKER,
+    review_graph_transcriptions, contains_two_labeled_undirected_diagrams, has_critical_edge_or_arrow_uncertainty, FLAG, OK_MARKER,
 )
 
 GOLD = """Are the two graphs below isomorphic? 请判断是否同构并给出双射。
@@ -80,6 +80,14 @@ class GraphIntegrityTests(unittest.TestCase):
         self.assertNotIn("顶点度数",corrected)
         self.assertIn("图2（G2）",corrected)
         self.assertIn("v-y",corrected)
+
+    def test_sjtu_euler_arrow_ambiguity_is_not_a_certified_graph(self):
+        visual=("图(a)：无向图10个顶点。\n"
+                "图(b)：无向图11个顶点。\n"
+                "图(c)：有向图10个顶点。箭头方向难以全部确认，但可看到几条边。")
+        self.assertTrue(has_critical_edge_or_arrow_uncertainty(visual))
+        self.assertFalse(has_critical_edge_or_arrow_uncertainty(
+            "图(a)：所有箭头方向和边端点已确认，入度和出度均为2。"))
 
     def test_two_graph_picture_without_ocr_question_is_audited(self):
         aizu_description = (
