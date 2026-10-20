@@ -96,6 +96,20 @@ class GraphRecognitionTests(unittest.TestCase):
         painter.rectangle((370, 5, 780, 85), fill=(43, 60, 175))
         self.check_exact(image)
 
+    def test_hollow_node_graphs_do_not_claim_full_certainty(self):
+        # Many public Graphviz diagrams use unfilled rings and arrows.
+        # Partial visual evidence must not be advertised as exact topology.
+        image = Image.new("RGB", (450, 450), "white")
+        draw = ImageDraw.Draw(image)
+        points = [(70, 80), (360, 80), (70, 360), (360, 360)]
+        for i,j in [(0,1),(0,2),(1,3),(2,3)]:
+            draw.line([points[i], points[j]], fill=(30, 30, 30), width=3)
+        for x,y in points:
+            draw.ellipse((x-18, y-18, x+18, y+18),
+                         outline=(18, 18, 18), width=4)
+        result = detect(image)
+        self.assertTrue(all(g["confidence"] != "high" for g in result.get("graphs") or []))
+
     def test_strong_blur_downgrades_not_invents(self):
         detected = detect(make_sheet().filter(ImageFilter.GaussianBlur(2.7)))
         self.assertTrue(all(g["confidence"] != "high" for g in detected["graphs"]))

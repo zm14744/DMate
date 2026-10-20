@@ -36,14 +36,31 @@ def _round_vertices(rgb):
                 found.append((float(centers[i][0]),float(centers[i][1]),float((ww+hh)/4),'red'))
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     circles = cv2.HoughCircles(cv2.medianBlur(gray,5), cv2.HOUGH_GRADIENT, 1.1, 18,
-                               param1=105, param2=18, minRadius=4, maxRadius=24)
+                               param1=105, param2=18, minRadius=4,
+                               maxRadius=min(48, max(24, min(h,w)//18)))
     if circles is not None:
         for xx, yy, rr in circles[0]:
             x,y,r=int(round(xx)),int(round(yy)),int(round(rr))
             if x<r+2 or y<r+2 or x>=w-r-2 or y>=h-r-2:
                 continue
-            # Reject white text interiors before attempting center correction.
-            if float(np.median(gray[y-2:y+3,x-2:x+3])) > 241:
+            # Hollow circles are genuine vertices in many Graphviz/textbook
+            # drawings. A white center alone cannot exclude them: verify the
+            # surrounding continuous dark ring before treating it as a node.
+            center_brightness = float(np.median(gray[y-2:y+3,x-2:x+3]))
+            is_hollow = False
+            if center_brightness > 241 and r >= 7:
+                angles = np.linspace(0, 2*np.pi, 36, endpoint=False)
+                xx_ring = np.clip(np.rint(x+r*np.cos(angles)).astype(int),0,w-1)
+                yy_ring = np.clip(np.rint(y+r*np.sin(angles)).astype(int),0,h-1)
+                xx_outer = np.clip(np.rint(x+(r+4)*np.cos(angles)).astype(int),0,w-1)
+                yy_outer = np.clip(np.rint(y+(r+4)*np.sin(angles)).astype(int),0,h-1)
+                inside = gray[yy_ring,xx_ring]
+                outside = gray[yy_outer,xx_outer]
+                is_hollow = (float(np.mean(inside < 140)) >= .60
+                             and float(np.mean(outside)) - float(np.mean(inside)) >= 35)
+                if not is_hollow:
+                    continue
+            elif center_brightness > 241:
                 continue
             # Hough centers can be offset by 2-4 pixels at crossings. Refine
             # against the distinctive soft-gray *interior*, not dark junctions.
@@ -60,14 +77,15 @@ def _round_vertices(rgb):
             # and a darker rim. Shifting their centers towards a darker
             # interior pixel is exactly what breaks diagonal endpoint tests.
             center_median = float(np.median(gray[y-3:y+4, x-3:x+4]))
-            if 216 <= center_median <= 239:
+            if is_hollow or 216 <= center_median <= 239:
                 candidate = (x, y)
             elif best:
                 candidate = (best[1], best[2])
             else:
                 continue
             if np.std(gray[max(0,y-r):min(h,y+r+1),max(0,x-r):min(w,x+r+1)]) > 20:
-                found.append((float(candidate[0]),float(candidate[1]),float(rr),'gray'))
+                found.append((float(candidate[0]),float(candidate[1]),float(rr),
+                              'outline' if is_hollow else 'gray'))
     # Deduplicate Hough detections and overlapping red/gray segmentation.
     found.sort(key=lambda p: (p[3]!='red',-p[2]))
     unique=[]
@@ -396,8 +414,19 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
         reliable_nodes = len(points) >= 3 and len(points) <= 9 and all(
             4 <= p[2] <= 22 for p in points
         )
-        confidence = 'high' if (reliable_nodes and not unsure and scale <= 1.65 and not fallback and len(edges) >= len(points)-1
-                               and len(edges) <= len(points)*(len(points)-1)//2) else 'partial'
+        # Colorful/outlined nodes and graphviz layouts may carry curved,
+        # directed or parallel edges that the straight-line detector misses.
+        # Do not promote a plausible subset into a certain complete graph.
+        colorful = bool(np.mean(
+            np.max(rgb[y1:y2,x1:x2],axis=2).astype(np.int16)
+            - np.min(rgb[y1:y2,x1:x2],axis=2).astype(np.int16) > 28) > .005)
+        known_simple_markers = all(p[3] == 'gray' for p in points)
+        confidence = 'high' if (
+            reliable_nodes and known_simple_markers and not colorful
+            and not unsure and scale <= 1.65 and not fallback
+            and len(edges) >= len(points)-1
+            and len(edges) <= len(points)*(len(points)-1)//2
+        ) else 'partial'
         vertex_list=[{'id':f'v{i+1}','x':round(p[0]/rgb.shape[1],4),
                       'y':round(p[1]/rgb.shape[0],4), 'label':None} for i,p in enumerate(points)]
         matrix=[[0]*len(points) for _ in points]

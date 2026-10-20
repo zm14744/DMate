@@ -54,7 +54,10 @@ def fetch_source(session, owner, ref, path):
 def normalize_dot(data):
     # Gallery snippets intentionally omit outer digraph { } for web demos.
     cleaned=data.lstrip()
-    if not re.match(r"^(?:strict\s+)?(?:digraph|graph)\s+(?:[^\s{]+\s*)?\{",cleaned):
+    # Ignore leading comments; quoted graph names and anonymous graphs are valid.
+    # Regex used only to decide whether the gallery sample needs a wrapper.
+    if not re.search(r"^\s*(?:strict\s+)?(?:digraph|graph)(?:\s+\"[^\"]+\"|\s+[\w.\-]+)?\s*\{",
+                     cleaned, flags=re.MULTILINE):
         kind="graph" if "--" in cleaned and "->" not in cleaned else "digraph"
         return f"{kind} G {{\n{data}\n}}\n"
     return data
