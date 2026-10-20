@@ -23,6 +23,22 @@ UNCERTAIN = re.compile(r"不确定|待核对|未确认|可能|仅确认|候选�
 
 
 
+def has_critical_edge_or_arrow_uncertainty(visual_text):
+    """Explicit vision uncertainty about directed-arrow or edge endpoints.
+
+    Graph-theoretic predicates depending on those directions cannot be
+    certified using guesses, e.g. directed Euler circuits.
+    """
+    text=str(visual_text or "")
+    return bool(re.search(
+        r"(?:箭头(?:方向)?|方向|边(?:的)?(?:端点|连接)|自环|重边)"
+        r"[^。\n]{0,42}(?:难以(?:全部)?确认|无法(?:全部)?确认|不确定|模糊|不清楚|待核对|无法区分)"
+        r"|(?:难以(?:全部)?确认|无法(?:全部)?确认|不确定|不清楚)"
+        r"[^。\n]{0,35}(?:箭头|方向|端点|连接)",
+        text,re.I
+    ))
+
+
 def contains_two_labeled_undirected_diagrams(visual_text):
     """Image-only comparison pages require independent graph auditing.
 
