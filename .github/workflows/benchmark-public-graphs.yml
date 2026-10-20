@@ -7,11 +7,15 @@ on:
     paths:
       - "scripts/benchmark_public_graph_images.py"
       - "scripts/benchmark_public_dot_graphs.py"
+      - "graph_recognition.py"
+      - "graph_recognition_v2.py"
       - ".github/workflows/benchmark-public-graphs.yml"
   pull_request:
     paths:
       - "scripts/benchmark_public_graph_images.py"
       - "scripts/benchmark_public_dot_graphs.py"
+      - "graph_recognition.py"
+      - "graph_recognition_v2.py"
       - ".github/workflows/benchmark-public-graphs.yml"
 
 permissions:
