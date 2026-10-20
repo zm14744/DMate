@@ -8,14 +8,18 @@ import re
 
 HEADER = re.compile(r"图\s*([1-9]\d*)\s*(?:[（(][^（）()\n]{0,28}[）)])?\s*[:：]", re.I)
 EDGE_START = re.compile(r"(?:边连接关系|边集合|边集|边包括|边为|边)\s*(?:为|包括)?\s*[:：]", re.I)
-EDGE = re.compile(r"(?<![a-zA-Z])([a-z])\s*[-—–－−]\s*([a-z])(?![a-zA-Z])", re.I)
-CURLY_EDGE = re.compile(r"\{\s*([a-z])\s*[,，]\s*([a-z])\s*\}", re.I)
+# Real Aizu University isomorphism diagrams label one graph a..h and the
+# other 1..8. Limiting parser and independent audit to [a-z] silently made
+# valid numeric-labeled diagrams impossible to confirm.
+LABEL = r"(?:[a-z]|\\d{1,2})"
+EDGE = re.compile(r"(?<![a-zA-Z0-9])("+LABEL+r")\s*[-—–－−]\s*("+LABEL+r")(?![a-zA-Z0-9])", re.I)
+CURLY_EDGE = re.compile(r"\{\s*("+LABEL+r")\s*[,，]\s*("+LABEL+r")\s*\}", re.I)
 VERTEX_SET = re.compile(
-    r"顶点集合\s*[:：]\s*\{\s*([a-z](?:\s*[,，、]\s*[a-z]){1,15})\s*\}", re.I
+    r"顶点集合\s*[:：]\s*\{\s*(("+LABEL+r")(?:\s*[,，、]\s*"+LABEL+r"){1,15})\s*\}", re.I
 )
 VERTEX_START = re.compile(
     r"(?:顶点标签分别为|顶点标签为|顶点分别为|顶点为|标签分别为|标签为|标签|顶点)"
-    r"\s*[:：]?\s*([a-z](?:\s*[,，、]\s*[a-z]){1,15})", re.I
+    r"\s*[:：]?\s*(("+LABEL+r")(?:\s*[,，、]\s*"+LABEL+r"){1,15})", re.I
 )
 FLAG = "【图形结构待核对】"
 OK_MARKER = "【图形边集已二次核对】"
@@ -80,7 +84,7 @@ def parse_diagrams(text):
         e_match = EDGE_START.search(part)
         if not v_match or not e_match:
             continue
-        labels = re.findall(r"[a-z]", v_match.group(1).lower())
+        labels = re.findall(LABEL, v_match.group(1).lower(), re.I)
         if len(labels) < 2 or len(set(labels)) != len(labels):
             continue
         edge_clause = re.split(r"[。；;\n（(]", part[e_match.end():], maxsplit=1)[0]
@@ -104,9 +108,12 @@ def _audit_dict(item):
     if (not isinstance(vertices, list) or not isinstance(edges, list) or
             not (2 <= len(vertices) <= 12) or len(set(vertices)) != len(vertices)):
         return None
-    if any(not isinstance(x, str) or not re.fullmatch(r"[a-z]", x, re.I) for x in vertices):
+    if any(not isinstance(x, str) or not re.fullmatch(LABEL, x, re.I) for x in vertices):
         return None
     if len(edges) > 75:
+        return None
+    vertices = [x.lower() for x in vertices]
+    if len(set(vertices)) != len(vertices):
         return None
     canonical = []
     for pair in edges:
