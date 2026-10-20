@@ -81,6 +81,25 @@ class MathAnswerGuardTests(unittest.TestCase):
                "\n【我的要求】只解(a)题，给出最终答案【结果】")
         self.assertEqual(audit_explicit_count_answer(books,answer),answer)
 
+    def test_normal_user_answers_without_benchmark_marker(self):
+        books="从20本排列的书中选出6本，任意两本不相邻，求多少种选择？"
+        result=audit_explicit_count_answer(
+            books,"根据组合数得出结果。\n因此共有 **2002** 种方法。")
+        self.assertIn("【结果】5005",result)
+        letters=("BANANARAMA 的字母可进行多少种不同排列？"
+                 "请直接给出最终答案。")
+        result=audit_explicit_count_answer(
+            letters,"共有10个字母，但错误算成11!。\n最终答案：**166320**。")
+        self.assertIn("【结果】15120",result)
+        self.assertNotIn("166320",result)
+    def test_no_proof_digit_mining(self):
+        q="从20本书选出6本且不相邻，求方案数。"
+        only_intermediate=("使用组合数求解。\n"
+                           "计算需要先知道15个位置如何选6个。\n"
+                           "下一步继续计算。")
+        self.assertEqual(audit_explicit_count_answer(q,only_intermediate),
+                         only_intermediate)
+
     def test_zero_options(self):
         q="5本书按顺序放，选出4本且互不相邻，有多少种选择？"
         self.assertEqual(separate_selection_value(q),(5,4,0))
