@@ -134,7 +134,7 @@ def main():
         images=[
           ("I01","Cornell CS2800 2016 final: relation directed graph",CORNELL,4,(.12,.09,.88,.32)),
           ("I02","Berkeley Math55 2019 final: modular arithmetic/recurrence notation",BERKELEY,0,(.11,.09,.91,.45)),
-          ("I03","Cornell CS2800 original 2016 exam Q10: crossing-line graph isomorphism","https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",1,(.11,.17,.90,.4)),
+          ("I03","Cornell CS2800 original 2016 exam Q10: crossing-line graph isomorphism","https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",1,(.11,.177,.90,.372)),
           ("I04","Cornell CS2800 original 2016 exam Q14: DFA transition diagram","https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",1,(.16,.50,.86,.69)),
         ]
         for id,caption,url,page,box in images:
