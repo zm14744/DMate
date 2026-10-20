@@ -50,7 +50,7 @@ CASES=[
   page=0,box=(.255,.71,.81,.845),
   question="只看第6(a)题两张图：分别写出顶点及边的数量，判断是否同构，并给出一一对应。右图两条对角线的交叉点没有实心点，不是顶点。",
   gold_note="Two drawings of K4; each has exactly 4 vertices and 6 edges, isomorphic",
-  markers=[r"同构",r"(?<!\\d)4(?!\\d)|四个",r"(?<!\\d)6(?!\\d)|六条"]),
+  markers=[r"同构",r"(?<!\d)4(?!\d)|四个",r"(?<!\d)6(?!\d)|六条"]),
  dict(id="NJU_DIRECTED",institution="Nanjing University",country="China",origin="2019 Discrete Mathematics GraphPS3 Problem 1, actual directed figures",
   url="https://cs.nju.edu.cn/shiyh/DM2019/parts/GraphPS3.pdf",
   page=0,box=(.06,.025,.94,.72),
@@ -62,7 +62,7 @@ CASES=[
   page=7,box=(.075,.13,.95,.94),
   question="只依据图中的六个彩色圆点和全部黑色边（不是依靠颜色图例）判断图共有几个顶点、几条边、色数是多少。交叉线段没有圆点时不是顶点。",
   gold_note="A drawing of complete graph K6: 6 vertices, 15 edges, chromatic number 6. Lecture illustration, not an exam.",
-  markers=[r"(?<!\\d)6(?!\\d)|六",r"(?<!\\d)15(?!\\d)|十五",r"K_?\\{?6\\}?|完全图|色数"]),
+  markers=[r"(?<!\d)6(?!\d)|六",r"(?<!\d)15(?!\d)|十五",r"K_?\{?6\}?|完全图|色数"]),
 ]
 
 UNCERTAIN=re.compile(r"图形结构待核对|需要.*核对|无法.*确定|无法.*准确识别|不能.*确定|识别.*不确定|图.*不清晰")
