@@ -3550,6 +3550,8 @@ function normalizeLearningState(value) {
                     retestCount: Math.max(0, Number(item.retestCount) || 0),
                     retestPassCount: Math.max(0, Number(item.retestPassCount) || 0),
                     manualRetestPassCount: Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0)),
+                    passedRetestSessionIds: Array.isArray(item.passedRetestSessionIds)
+                        ? [...new Set(item.passedRetestSessionIds.map(String))] : [],
                     retestFailCount: Math.max(0, Number(item.retestFailCount) || 0),
                     retestPassed: Boolean(item.retestPassed),
                     retestPassedAt: Number.isFinite(item.retestPassedAt)
@@ -6230,6 +6232,7 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
         retestCount: 0,
         retestPassCount: 0,
         manualRetestPassCount: 0,
+        passedRetestSessionIds: [],
         retestFailCount: 0,
         retestPassed: false,
         retestPassedAt: null,
@@ -7042,14 +7045,61 @@ function closeWrongBook() {
     modal.classList.add("hidden");
 }
 
-function markWrongQuestionRetestPassed(id) {
+function getWrongRetestSessions(item) {
+    return sessions.filter(session => {
+        const retest = normalizeRetestSession(session.retest);
+        return retest && String(retest.wrongQuestionId) === String(item.id)
+            && Boolean(retest.generatedQuestion);
+    }).sort((a, b) => (a.retest?.startedAt || 0) - (b.retest?.startedAt || 0));
+}
+
+function openWrongRetestReview(id) {
     const item = learningState.wrongQuestions.find(entry => entry.id === id);
-    if (!item || !item.corrected) return;
-    item.manualRetestPassCount = Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0)) + 1;
-    item.updatedAt = Date.now();
-    saveLearningState();
-    renderLearningSummary();
-    renderWrongBook();
+    const modal = document.getElementById("wrongRetestReviewModal");
+    const list = document.getElementById("wrongRetestReviewList");
+    if (!item || !modal || !list) return;
+    list.replaceChildren();
+    const history = getWrongRetestSessions(item);
+    const selected = new Set((item.passedRetestSessionIds || []).map(String));
+    if (!history.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "暂无复测题。请先点击“再测一道”，完成出题后即可在这里查看并勾选。";
+        list.appendChild(empty);
+    }
+    for (const [index, session] of history.entries()) {
+        const row = document.createElement("label");
+        row.className = "wrong-retest-review-row";
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        check.className = "wrong-retest-review-check";
+        check.checked = selected.has(String(session.id));
+        check.setAttribute("aria-label", `第 ${index + 1} 次复测是否通过`);
+        const body = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = `第 ${index + 1} 次复测`;
+        const question = document.createElement("div");
+        question.className = "wrong-retest-review-question";
+        question.innerHTML = markdownToHtml(session.retest.generatedQuestion);
+        body.append(title, question);
+        check.addEventListener("change", () => {
+            const current = learningState.wrongQuestions.find(entry => entry.id === id);
+            if (!current) return;
+            const ids = new Set((current.passedRetestSessionIds || []).map(String));
+            if (check.checked) ids.add(String(session.id));
+            else ids.delete(String(session.id));
+            current.passedRetestSessionIds = [...ids];
+            current.manualRetestPassCount = ids.size;
+            current.updatedAt = Date.now();
+            saveLearningState();
+            renderWrongBook();
+        });
+        row.append(check, body);
+        list.appendChild(row);
+    }
+    modal.classList.remove("hidden");
+}
+function closeWrongRetestReview() {
+    document.getElementById("wrongRetestReviewModal")?.classList.add("hidden");
 }
 
 function markWrongQuestionCorrected(id) {
@@ -8720,8 +8770,8 @@ function renderWrongBook() {
         date.textContent = formatLearningDate(item.updatedAt);
 
         top.appendChild(status);
-        const manualPasses = Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0));
-        if (item.corrected && manualPasses > 0) {
+        const manualPasses = Array.isArray(item.passedRetestSessionIds) ? item.passedRetestSessionIds.length : 0;
+        if (manualPasses > 0) {
             const passTimes = document.createElement("span");
             passTimes.className = "wrong-status passed";
             passTimes.textContent = `已通过复测 ${manualPasses} 次`;
@@ -8991,15 +9041,13 @@ function renderWrongBook() {
         );
         actions.appendChild(retestButton);
 
-        if (item.corrected) {
-            const passButton = document.createElement("button");
-            passButton.type = "button";
-            passButton.className = "secondary";
-            passButton.textContent = "通过复测";
-            passButton.title = "每手动确认通过一次，计数增加一次";
-            passButton.onclick = () => markWrongQuestionRetestPassed(item.id);
-            actions.appendChild(passButton);
-        }
+        const passButton = document.createElement("button");
+        passButton.type = "button";
+        passButton.className = "secondary";
+        passButton.textContent = "查看复测";
+        passButton.title = "查看每一次复测题并选择通过记录";
+        passButton.onclick = () => openWrongRetestReview(item.id);
+        actions.appendChild(passButton);
 
         const editButton = document.createElement("button");
         editButton.type = "button";
