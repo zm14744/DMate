@@ -19,7 +19,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
 from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, contains_two_labeled_undirected_diagrams, has_critical_edge_or_arrow_uncertainty, FLAG as GRAPH_UNCERTAIN_FLAG
-from graph_answer_integrity import detect_count_inconsistency, review_directed_graphs, protect_uncertain_graph_answer
+from graph_answer_integrity import detect_count_inconsistency, review_directed_graphs, protect_uncertain_graph_answer, review_multi_graph_counts, FIGURE_VERTEX_COUNT
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
@@ -3734,6 +3734,28 @@ def ocr():
                 )
                 visual_text = GRAPH_UNCERTAIN_FLAG + (
                     "\n有向图的逐箭头复核没有成功，不能可靠判断强连通或弱连通。"
+                )
+
+        # Stanford's genuinely unlabeled six-tree diagrams triggered an
+        # inconsistent first Vision count (8/5/6/5/7/8). A second picture-only
+        # read counts the actual dots in each separate drawing. A disagreement
+        # forces manual confirmation rather than AI answering a made-up tree.
+        if (image_kind != "non_exercise" and GRAPH_UNCERTAIN_FLAG not in visual_text
+                and len(FIGURE_VERTEX_COUNT.findall(visual_text)) >= 4):
+            multigraph_audit = verify_graph_image_independently(
+                raw, retries=0, count_only=True
+            )
+            if multigraph_audit.get("ok"):
+                visual_text, multigraph_issues, _ = review_multi_graph_counts(
+                    visual_text, multigraph_audit.get("graphs")
+                )
+                graph_review_issues.extend(multigraph_issues)
+            else:
+                graph_review_issues.append(
+                    "多幅图的顶点数独立复核未完成，不能确认每幅图的结构。"
+                )
+                visual_text = GRAPH_UNCERTAIN_FLAG + (
+                    "\n多图的实心顶点及边数未独立确认，不能据此推断同构或树。"
                 )
 
         # Do not certify directed Euler circuits if even the image model
