@@ -75,19 +75,26 @@ def verify_known_topology(case_id, visual_text, answer):
     """
     from graph_answer_integrity import (
         FIGURE_VERTEX_COUNT, _primary_directed_graphs,
-        detect_count_inconsistency,
+        detect_count_inconsistency, single_undirected_named_edges, FLAG,
     )
     vision=str(visual_text or "")
     reply=str(answer or "")
     if case_id=="HKUST_PETERSEN" and detect_count_inconsistency(vision):
         return "OCR_CONTRADICTORY_EDGE_LIST"
     if case_id=="MIT05_P3":
-        raw=re.findall(r"\{\s*([A-H])\s*,\s*([A-H])\s*\}",vision)
-        if raw:
-            observed={"".join(sorted((a,b))) for a,b in raw}
-            expected={"AB","BC","BH","CD","CE","DE","EF","EH","FG"}
-            if observed!=expected:
-                return "OCR_WRONG_EDGE_LIST"
+        if FLAG in vision:
+            return ""  # A correctly flagged uncertain drawing is not a math error.
+        canonical=single_undirected_named_edges(vision)
+        if canonical is not None:
+            observed={"".join(pair) for pair in canonical["edges"]}
+        else:
+            raw=re.findall(r"\{\s*([A-H])\s*,\s*([A-H])\s*\}",vision)
+            observed={"".join(sorted((a,b))) for a,b in raw} if raw else None
+        expected={"AB","BC","BH","CD","CE","DE","EF","EH","FG"}
+        if observed is None:
+            return "OCR_TOPOLOGY_UNVERIFIED"
+        if observed!=expected:
+            return "OCR_WRONG_EDGE_LIST"
     if case_id=="STANFORD_TREE6":
         counts=FIGURE_VERTEX_COUNT.findall(vision)
         if len(counts)>=3 and any(int(n)!=6 for i,n in counts):
@@ -207,7 +214,7 @@ def main():
     print("CURATED_COUNTS",json.dumps(counts,ensure_ascii=False),flush=True)
     failures=[r["id"] for r in out["cases"] if r["verdict"] in
              ("OCR_HTTP_FAILURE","ANSWER_HTTP_FAILURE","SOURCE_OR_RUNTIME_FAILURE",
-              "CONFIRMED_WRONG_NUMERIC_CLAIM","CONFIRMED_WRONG_ISOMORPHISM","CONFIRMED_WRONG_GRAPH_VERTEX_COUNT","CONFIRMED_WRONG_CONNECTIVITY","CONFIRMED_WRONG_TREE_COUNT","OCR_WRONG_EDGE_LIST","OCR_WRONG_VERTEX_COUNT","OCR_WRONG_DIRECTED_EDGES","OCR_CONTRADICTORY_EDGE_LIST","ANSWER_SUSPECT_REVIEW")]
+              "CONFIRMED_WRONG_NUMERIC_CLAIM","CONFIRMED_WRONG_ISOMORPHISM","CONFIRMED_WRONG_GRAPH_VERTEX_COUNT","CONFIRMED_WRONG_CONNECTIVITY","CONFIRMED_WRONG_TREE_COUNT","OCR_WRONG_EDGE_LIST","OCR_TOPOLOGY_UNVERIFIED","OCR_WRONG_VERTEX_COUNT","OCR_WRONG_DIRECTED_EDGES","OCR_CONTRADICTORY_EDGE_LIST","ANSWER_SUSPECT_REVIEW")]
     print("CURATED_FAILURES",failures,flush=True)
     if not deployed_current:
         print("DEPLOYMENT_OUTDATED: v4 not live",flush=True)
