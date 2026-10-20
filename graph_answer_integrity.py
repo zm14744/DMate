@@ -352,7 +352,25 @@ def protect_uncertain_graph_answer(question, reply):
         return None
     request=q.rsplit("【我的要求】",1)[-1] if "【我的要求】" in q else q.rsplit("【当前指向题目】",1)[-1]
     if not SENSITIVE.search(request):
-        return None
+        # A real user may upload a directed graph, then simply press
+        # "给出答案" or "直接解析" without repeating "graph"/"连通".
+        # Previously this skipped the guard and could confidently solve
+        # the wrong arrows. Only allow *generic current-image solving*;
+        # an explicitly independent algebra/logic sub-question stays usable.
+        if re.search(
+            r"无关|独立小问|另[一个道]|只解.*(?:代数|集合|逻辑|数论|计数)|"
+            r"非图形|不用看图|不依赖图",request,re.I
+        ):
+            return None
+        if not re.fullmatch(
+            r"[\s\W]*(?:请|麻烦|帮我|直接|现在|只要|先|把|这道题|本题|"
+            r"给出|说出|告诉我|写出|完整|详细|最终|"
+            r"求解|解答|做|计算|答案|解析|步骤|结果|理由|"
+            r"得出|讲解|并|和|以及|一下|就行|即可|吧|好|的){2,32}"
+            r"[\s\W]*",
+            request,re.I
+        ):
+            return None
     return ("这道题依赖图中的实际顶点和边，而当前图片的图形结构尚未核对完整。"
             "直接据此给出当前问题的确定结论，可能导致计算或推理错误。"
             "请先在识别核对界面确认每条边及箭头方向，或上传更清晰、"
