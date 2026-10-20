@@ -1627,7 +1627,17 @@ DIRECTED_GRAPH_AUDIT_PROMPT = """你是独立的高校图论有向图图像逐�
 {"graphs":[{"index":1,"directed":true,"vertices":["a","b"],"edges":[["a","b"]],"complete":true}]}
 请按原图全部编号逐一列出；不要输出问题答案。"""
 
-def verify_graph_image_independently(image_bytes, retries=1, directed=False):
+MULTI_GRAPH_VERTEX_AUDIT_PROMPT = """你是第二位独立逐点审图员，不得读取其他模型生成的结构或利用题目要求猜出答案。
+你会看到包含多幅互相独立的图论图形的原图及放大图，例如 Stanford 六种无标号树。
+请为每一幅图按从左到右、从上到下的排列（图1、图2……），认真数出实际画出的顶点实心或空心小圆点个数与连续边笔画数。
+顶点文字、线段交叉点（无实心圆）、线段折点不算新增顶点。不得根据“题目写六顶点”就让每张图有六个点；必须数画面。
+若图形局部被遮挡、圆点不清或边界被裁切，complete=false，不猜数值。
+仅输出严格 JSON 结构，不解释题目，不给图论结论：
+{"graphs":[{"index":1,"vertex_count":6,"edge_count":5,"complete":true}]}
+每幅图一个条目，不漏图，不把同一局部放大再当一张新图。"""
+
+
+def verify_graph_image_independently(image_bytes, retries=1, directed=False, count_only=False):
     """A second *independent* image-model read for complex graph topology.
 
     Used for graph-isomorphism diagrams and independently checked directed
@@ -1671,7 +1681,9 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False):
     except Exception as exc:
         print("逐边核验图片准备失败：", type(exc).__name__)
         return {"ok": False, "error": "无法放大图形"}
-    content = [{"type":"text", "text":DIRECTED_GRAPH_AUDIT_PROMPT if directed else GRAPH_AUDIT_PROMPT}]
+    audit_prompt = (MULTI_GRAPH_VERTEX_AUDIT_PROMPT if count_only else
+                    DIRECTED_GRAPH_AUDIT_PROMPT if directed else GRAPH_AUDIT_PROMPT)
+    content = [{"type":"text", "text":audit_prompt}]
     for number, url in enumerate(images):
         content.extend([
             {"type":"text","text":"完整图像" if number == 0 else f"放大图形区域 {number}"},
