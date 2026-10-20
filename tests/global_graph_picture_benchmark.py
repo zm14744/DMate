@@ -28,12 +28,12 @@ WATERLOO="https://cemc.uwaterloo.ca/sites/default/files/documents/2024/Grade78_2
 # Gold facts were checked against original rendered page, not Vision guesses.
 CASES=[
  dict(id="CN_SJTU_EULER3",country="中国",uni="上海交通大学",kind="带参考解答的课程作业",
-      url=SJTU,page=0,box=[.10,.202,.92,.382],
+      url=SJTU,page=0,box=[.10,.202,.92,.365],
       ask='只根据图片中的三个图(a)(b)(c)判断哪些是欧拉图。第一行仅输出JSON：{"a":true或false,"b":true或false,"c":true或false}，下一行简要解释。',
       gold={"a":True,"b":False,"c":False},mode="boolean_map"),
  dict(id="CN_NJU_EULER3",country="中国",uni="南京大学",kind="正式课程作业",
       url=NJU,page=0,box=[.09,.13,.91,.53],
-      ask='根据图中三个图(1)(2)(3)，哪些图有欧拉回路？请逐图说明理由。',
+      ask='根据图中两个有向图(1)(2)，哪些图有欧拉回路？请逐图说明理由。',
       gold=None,mode="manual_review"),
  dict(id="AU_UNSW_SIMPLE5",country="澳大利亚",uni="新南威尔士大学",kind="课程练习",
       url=UNSW,page=41,box=[.10,.07,.93,.30],
@@ -52,14 +52,14 @@ CASES=[
       ask='图b是二部图吗？第一行仅输出JSON：{"result":true或false}，第二行简述奇环证据。',
       gold=False,mode="boolean"),
  dict(id="AU_UNSW_ISO_A",country="澳大利亚",uni="新南威尔士大学",kind="课程练习",
-      url=UNSW,page=43,box=[.10,.515,.94,.722],
+      url=UNSW,page=43,box=[.10,.515,.94,.675],
       ask='判断图15(a)的两张图G1、G2是否同构。第一行仅输出JSON：{"result":true或false}，然后给出一组顶点映射或反证。',
       gold=True,mode="boolean",
       # 依据原图手工逐边独立记录：
       canonical=("图1（左图）：无向图，顶点 a、b、c、d、e。边：a-b,a-d,a-c,b-e,d-e,d-c,c-e。"
                  "图2（右图）：无向图，顶点 x、y、z、t、u。边：x-y,y-z,z-u,u-t,t-x,x-z,y-t。")),
  dict(id="AU_UNSW_ISO_B",country="澳大利亚",uni="新南威尔士大学",kind="课程练习",
-      url=UNSW,page=43,box=[.10,.718,.94,.902],
+      url=UNSW,page=43,box=[.10,.675,.94,.870],
       ask='判断图15(b)的两张图G1、G2是否同构。第一行仅输出JSON：{"result":true或false}，然后证明。',
       gold=False,mode="boolean",
       canonical=("图1（左图）：无向图，顶点 a、b、c、d、e、f。边：a-b,b-e,b-c,b-d,e-d,d-c,c-f。"
@@ -182,7 +182,10 @@ def bool_from_text(text):
     # Distinguish negation, avoid treating "isomorphic" in a negative phrase
     # as proof of a positive answer. If both appear, abstain.
     no=bool(re.search(r"不同构|非同构|不是同构|非二部图|不是二部图|非偶图|不属于二部图|not\s+(?:a\s+)?(?:bipartite|isomorphic)|不满足二部|存在奇环",head,re.I))
-    yes=bool(re.search(r"(?<!不)(?<!非)同构|是二部图|二分图|bipartite|isomorphic|不存在奇环|无奇环",head,re.I))
+    clean=re.sub(r"(?:不|非|不是|并非)同构|non[- ]?isomorphic|not\s+isomorphic|"
+                 r"not\s+(?:a\s+)?bipartite|非二部图|不是二部图",
+                 " ",head,flags=re.I)
+    yes=bool(re.search(r"(?<!不)(?<!非)同构|是二部图|二分图|bipartite|isomorphic|不存在奇环|无奇环",clean,re.I))
     return False if no and not yes else True if yes and not no else None
 
 
@@ -190,6 +193,15 @@ def score_answer(c,answer):
     """Scoring is strict; if uncertain, REVIEW instead of a fake PASS."""
     mode=c["mode"];gold=c["gold"]
     if mode=="manual_review":return "NEEDS_HUMAN_REVIEW",{}
+    # Never award correctness for a refusal/uncertain edge map just because
+    # the text mentions 'isomorphic' or 'bipartite'.
+    uncertain=re.search(
+        r"图形结构待核对|无法可靠判断|暂不能.*判断|不能据此判断|"
+        r"原始识别.*复核.*冲突|无法核对.*连接|需要.*核对.*(?:边|图)|"
+        r"尚未确认|无法确定.*(?:同构|二部|欧拉)|无法直接判断",
+        str(answer),re.I)
+    if uncertain:
+        return "ANSWER_ABSTAINS_NEEDS_REVIEW", {"reason":"graph structure is not verified"}
     obj=extract_object(answer)
     if mode=="boolean":
         guess=obj.get("result") if isinstance(obj,dict) else None
