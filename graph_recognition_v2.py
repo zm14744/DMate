@@ -74,14 +74,18 @@ def _select_figure_rows(dots):
         else:
             rows[-1].append(v)
     valid = [row for row in rows if len(row) >= 3]
+    # Three aligned dots in one row are a useful text-filter heuristic, NOT
+    # a reason to discard the other 12 dots of a circular / Petersen drawing.
+    # Keep the full geometric cloud when it is well spread on both axes.
+    if 3 <= len(dots) <= 24:
+        ys = [p[1] for p in dots]
+        xs = [p[0] for p in dots]
+        broad = (max(ys)-min(ys) > max(30, 4*size)
+                 and max(xs)-min(xs) > max(30, 4*size))
+        selected = sum(map(len, valid))
+        if broad and selected < len(dots)*.9:
+            return dots
     if not valid:
-        # Circular, radial and two-ring textbook graphs often have no row
-        # containing three aligned vertices; do not reject 11–24 node figures.
-        if 3 <= len(dots) <= 24:
-            ys = [p[1] for p in dots]
-            xs = [p[0] for p in dots]
-            if max(ys)-min(ys) > max(30, 4*size) and max(xs)-min(xs) > max(30, 4*size):
-                return dots
         return []
     return [v for row in valid for v in row]
 
@@ -280,7 +284,7 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
         for i, j in edges:
             matrix[i][j] = matrix[j][i] = 1
         # Severe blur and incomplete vertex coverage must not be presented as certainty.
-        complete = (len(group) >= 5 and not uncertain and len(edges) >= 2
+        complete = (5 <= len(group) <= 8 and not uncertain and len(edges) >= 2
                     and sharpness >= 7 and background_noise < 22)
         graphs.append({"id": f"图{len(graphs)+1}", "directed": "unknown",
                        "vertices": vertex_list, "vertex_count": len(group),
