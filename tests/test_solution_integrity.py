@@ -82,19 +82,19 @@ class SolutionIntegrityTests(unittest.TestCase):
            "\n【图形信息】\n\n【我的要求】\n只解第6题：求 |A∩B|，给出最终数值并说明计算依据。")
         out=verify_exact_question(q,"【答案】\n$|A\\cap B|=4$")
         self.assertIsNotNone(out)
-        self.assertIn(r"|A\cap B|=2",out)
+        self.assertIn("|A∩B|=2",out)
         self.assertNotIn("=4",out)
         self.assertIn("512",out)
         self.assertIn("1024",out)
     def test_nju_set_other_cardinalities(self):
         q="已知 |A|=5, |P(B)|=512, |P(A△B)|=1024，求|A∩B|和|A∪B|。"
         answer=verify_exact_question(q)
-        self.assertIn(r"|A\cap B|=2",answer)
-        self.assertIn(r"|A\cup B|=12",answer)
+        self.assertIn("|A∩B|=2",answer)
+        self.assertIn("|A∪B|=12",answer)
     def test_set_numeric_variation_and_invalid_power_abstain(self):
         q="已知 |A|=3, |P(B)|=16, |P(A△B)|=8，求 |A∩B|。"
         out=verify_exact_question(q)
-        self.assertIn(r"|A\cap B|=2",out)
+        self.assertIn("|A∩B|=2",out)
         self.assertIsNone(verify_exact_question(q.replace("16","15")))
 
     def test_unrelated_problems_not_rewritten(self):
