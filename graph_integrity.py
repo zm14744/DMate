@@ -126,7 +126,19 @@ def review_graph_transcriptions(vision_text, audited_graphs):
                 "暂不据此判断同构或计算度数。", [f"图形逐边复核冲突：{detail}。"], False)
     if UNCERTAIN.search(vision_text):
         return FLAG + "\n图形结构含不确定的连接，需要对照原图核实。", ["边集仍存在不确定信息。"], False
-    return OK_MARKER + "\n" + vision_text, [], True
+    # Do not retain prose degrees from Vision. The observed Cornell OCR once
+    # listed nine edges while stating degrees inconsistent with those edges.
+    # Keep only audited graph facts so the answer step cannot reuse hallucinated
+    # degree summaries or confused line-shape commentary.
+    standardized = []
+    for no in sorted(secondary):
+        row = secondary[no]
+        verts = "、".join(row["vertices"])
+        edges = "、".join("-".join(p) for p in sorted(row["edges"]))
+        standardized.append(
+            f"图{no}（G{no}）：无向图，顶点 {verts}。边：{edges}。"
+        )
+    return OK_MARKER + "\n" + "\n".join(standardized), [], True
 
 
 def exact_isomorphism(left, right):
