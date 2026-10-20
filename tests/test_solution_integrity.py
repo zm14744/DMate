@@ -26,7 +26,8 @@ class SolutionIntegrityTests(unittest.TestCase):
     def test_trip_variant_recomputed_not_memorized(self):
         question=("A、B、C、D中选3人出差。若A去，则C和D中至少去1人；"
                   "B和C不能同时去；C去则D不去。共有多少种符合条件的选派？")
-        self.assertIn("0 种",verify_finite_selection(question))
+        self.assertIn("**1 种**",verify_finite_selection(question))
+        self.assertIn("ABD",verify_finite_selection(question))
 
     def test_trip_extra_constraint_abstains(self):
         q=NJU.replace("共有多少种符合条件的选派？","另外B去则A不去。共有多少种符合条件的选派？")
