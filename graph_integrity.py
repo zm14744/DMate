@@ -9,6 +9,10 @@ import re
 HEADER = re.compile(r"图\s*([1-9]\d*)\s*(?:[（(][^（）()\n]{0,28}[）)])?\s*[:：]", re.I)
 EDGE_START = re.compile(r"(?:边连接关系|边集合|边集|边包括|边为|边)\s*(?:为|包括)?\s*[:：]", re.I)
 EDGE = re.compile(r"(?<![a-zA-Z])([a-z])\s*[-—–－−]\s*([a-z])(?![a-zA-Z])", re.I)
+CURLY_EDGE = re.compile(r"\{\s*([a-z])\s*[,，]\s*([a-z])\s*\}", re.I)
+VERTEX_SET = re.compile(
+    r"顶点集合\s*[:：]\s*\{\s*([a-z](?:\s*[,，、]\s*[a-z]){1,15})\s*\}", re.I
+)
 VERTEX_START = re.compile(
     r"(?:顶点标签分别为|顶点标签为|顶点分别为|顶点为|标签分别为|标签为|标签|顶点)"
     r"\s*[:：]?\s*([a-z](?:\s*[,，、]\s*[a-z]){1,15})", re.I
@@ -35,7 +39,7 @@ def parse_diagrams(text):
         part = text[match.end():matches[i + 1].start() if i + 1 < len(matches) else len(text)]
         if "有向图" in part[:40] or "无向图" not in part[:40]:
             continue
-        v_match = VERTEX_START.search(part)
+        v_match = VERTEX_START.search(part) or VERTEX_SET.search(part)
         e_match = EDGE_START.search(part)
         if not v_match or not e_match:
             continue
@@ -44,7 +48,8 @@ def parse_diagrams(text):
             continue
         edge_clause = re.split(r"[。；;\n（(]", part[e_match.end():], maxsplit=1)[0]
         pairs = [_normal_edge(a, b) for a, b in EDGE.findall(edge_clause)]
-        residue = EDGE.sub("", edge_clause)
+        pairs += [_normal_edge(a, b) for a, b in CURLY_EDGE.findall(edge_clause)]
+        residue = CURLY_EDGE.sub("", EDGE.sub("", edge_clause))
         # Accept only commas/list separators, never guess what unexplained text means.
         if not pairs or re.search(r"[a-zA-Z0-9]", residue):
             continue
