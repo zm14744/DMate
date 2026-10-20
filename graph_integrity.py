@@ -190,6 +190,18 @@ def answer_graph_isomorphism(user_text):
     Return '' for unrelated tasks, a careful hold for uncertain image graphs.
     """
     text = str(user_text or "")
+    # Multi-part scanned exams may contain an isomorphism question in the
+    # original printed page while the student is asking about another item.
+    # Never hijack the explicit current request merely because Q10 says
+    # "isomorphic" somewhere above Q11.
+    graph_request = re.compile(r"同构|isomorph|团数|极大团|欧拉|哈密顿|连通|边集|度数|树", re.I)
+    if "【我的要求】" in text:
+        request = text.rsplit("【我的要求】", 1)[1]
+        if not re.search(r"同构|isomorph|第\s*10\s*题|全部|所有|整张", request, re.I):
+            if FLAG in text and graph_request.search(request):
+                return ("当前图像的边连接关系仍有冲突，不能可靠计算该图的性质。"
+                        "请先在识别核对界面确认图中所有边，再重新解题。")
+            return ""
     if not re.search(r"同构|isomorph", text, re.I):
         return ""
     if FLAG in text:
