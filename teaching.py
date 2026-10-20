@@ -705,6 +705,20 @@ def _looks_like_exercise_request_text(text):
     if not value or len(value) > 180:
         return False
 
+    # Real MIT/Columbia/NJU exam regression: "请直接给出最终答案并简要解释。命题..."
+    # used to trigger the broad "出...题" generator regex because 给出+命题
+    # look like 出题. Treat an already supplied mathematical question as an
+    # answer request. "出一道题并给出答案" still enters the quiz generator.
+    if re.match(
+        r"^(?:请|麻烦)?(?:直接)?(?:给出(?:最终|完整|正确)?答案|"
+        r"告诉我(?:最终|正确)?答案|解答|求解|判断)",
+        value
+    ) and not re.search(
+        r"(?<!给)(?:出|编|设计|生成|创作).{0,15}(?:一道|几道|道题|题目|练习题)",
+        value
+    ):
+        return False
+
     # Bare imperative “出题/生成题” is still an exercise request.
     # Meta discussions and negations below continue to take precedence.
     if re.fullmatch(r"(?:请|麻烦|给我|帮我)?(?:出题|生成题|出道题)(?:吧|呢)?", value):
