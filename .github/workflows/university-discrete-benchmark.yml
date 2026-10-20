@@ -8,6 +8,7 @@ on:
       - "graph_integrity.py"
       - "ai.py"
       - "app.py"
+      - "tests/university_discrete_benchmark.py"
 permissions:
   contents: read
 jobs:
@@ -31,6 +32,16 @@ jobs:
           python tests/university_discrete_benchmark.py \
             --max-chat 0 --timeout 90 --delay 2 --only-image I03 --strict --require-graph-audit-version \
             --output university_benchmark_results.json
+      - name: Broad real-server answer diagnostic (recognition bypassed)
+        if: always()
+        continue-on-error: true
+        env:
+          PYTHONPATH: .
+          DMATE_BENCH_URL: https://dmate.zeabur.app
+        run: |
+          python tests/university_discrete_benchmark.py \
+            --extended --max-chat 28 --timeout 45 --delay 0 --skip-images \
+            --output university_benchmark_answers.json
       - name: Upload answer and recognition evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -38,6 +49,7 @@ jobs:
           name: university-discrete-benchmark-results
           path: |
             university_benchmark_results.json
+            university_benchmark_answers.json
             university_exam_image_samples/*.png
           if-no-files-found: warn
           retention-days: 30
