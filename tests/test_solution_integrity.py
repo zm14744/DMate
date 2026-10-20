@@ -74,6 +74,29 @@ class SolutionIntegrityTests(unittest.TestCase):
         self.assertIn("传递性：不成立",out)
         self.assertIn("∉R",out)
 
+    def test_original_nju_ocr_exact_but_model_returned_4(self):
+        q=("【题目文字】\n第 6 题\n设 A, B 为有限集合。"
+           "记 P(S) 为集合 S 的幂集，A ⊕ B 为 A 与 B 的对称差。"
+           "已知 |A|=5，|P(B)|=512，|P(A ⊕ B)|=1024。"
+           "求 |B|、|A∩B|、|A∪B|、|A\\B| 和 |B\\A|。"
+           "\n【图形信息】\n\n【我的要求】\n只解第6题：求 |A∩B|，给出最终数值并说明计算依据。")
+        out=verify_exact_question(q,"【答案】\n$|A\\cap B|=4$")
+        self.assertIsNotNone(out)
+        self.assertIn(r"|A\cap B|=2",out)
+        self.assertNotIn("=4",out)
+        self.assertIn("512",out)
+        self.assertIn("1024",out)
+    def test_nju_set_other_cardinalities(self):
+        q="已知 |A|=5, |P(B)|=512, |P(A△B)|=1024，求|A∩B|和|A∪B|。"
+        answer=verify_exact_question(q)
+        self.assertIn(r"|A\cap B|=2",answer)
+        self.assertIn(r"|A\cup B|=12",answer)
+    def test_set_numeric_variation_and_invalid_power_abstain(self):
+        q="已知 |A|=3, |P(B)|=16, |P(A△B)|=8，求 |A∩B|。"
+        out=verify_exact_question(q)
+        self.assertIn(r"|A\cap B|=2",out)
+        self.assertIsNone(verify_exact_question(q.replace("16","15")))
+
     def test_unrelated_problems_not_rewritten(self):
         self.assertIsNone(verify_exact_question("求K5的度序列。"))
         self.assertIsNone(verify_exact_question("任意有限群G，请证明拉格朗日定理。"))
