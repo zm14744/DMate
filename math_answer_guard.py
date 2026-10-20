@@ -6,6 +6,7 @@ and prompt-only tutoring must not be overridden.
 """
 import math
 import re
+from collections import Counter
 
 ANSWER_LINE = re.compile(r"(?m)^\s*【结果】\s*([0-9][0-9,]*)\s*[。.\s]*$")
 CHINESE = re.compile(r"(?P<n>\d{1,3})\s*本.{0,85}?(?:选|选择|取|挑)(?:出|中)?\s*(?P<k>\d{1,3})\s*本", re.S)
@@ -26,6 +27,54 @@ def separate_selection_value(question):
         return None
     return n,k,math.comb(n-k+1,k) if n-k+1>=k else 0
 
+def _letter_arrangement_value(question):
+    """Exact permutations of ONE visually confirmed all-caps English word.
+
+    Abstain on ambiguous inputs, multiple words, or constrained permutations;
+    never infer the word from an OCR guess or from an answer.
+    """
+    q=str(question or "")
+    if not re.search(r"(?:letters?|字母|单词)", q, re.I):
+        return None
+    if not re.search(r"(?:arrang|permut|different ways|排列|全排列|不同排列)", q, re.I):
+        return None
+    # E.g. 'BANANARAMA'; avoid choosing a word from an unrelated paragraph
+    # containing multiple upper-case labels such as graph vertex lists.
+    words=re.findall(r"(?<![A-Za-z])([A-Z]{4,24})(?![A-Za-z])", q)
+    candidates=set(words)-{"OCR", "TRUE", "FALSE"}
+    if len(candidates)!=1:
+        return None
+    word=candidates.pop()
+    # Other requirements, such as adjacent identical letters or fixed
+    # placements, make the usual multiset formula inapplicable.
+    if re.search(r"相邻|不得相邻|not\s+adjacent|fixed\s+position|首字母|元音", q, re.I):
+        return None
+    counts=Counter(word)
+    result=math.factorial(len(word))//math.prod(math.factorial(n) for n in counts.values())
+    return word,counts,result
+
+
+def audit_letter_arrangement_answer(question, reply):
+    """Correct 11!-for-10-letters errors in explicit complete solutions."""
+    raw=str(reply or "")
+    parsed=_letter_arrangement_value(question)
+    if parsed is None or not ANSWER_DEMAND.search(question):
+        return raw
+    matches=list(ANSWER_LINE.finditer(raw))
+    if not matches:
+        return raw
+    word,counts,result=parsed
+    observed=int(matches[-1].group(1).replace(",",""))
+    if observed==result:
+        return raw
+    factors="×".join(f"{n}!" for n in sorted(counts.values(), reverse=True) if n>1)
+    denominator=factors or "1"
+    return (f"独立复核字母数与重复次数：{word} 共 {len(word)} 个字母，"
+            + "，".join(f"{symbol} 出现 {n} 次" for symbol,n in sorted(counts.items()))
+            + f"。不同排列的数量应为 {len(word)}!÷({denominator})={result}。"
+            + f"\n【结果】{result}")
+
+
 def audit_explicit_count_answer(question, reply):
     """Return original reply when unsure; correct proven wrong standalone count.
 
@@ -34,7 +83,9 @@ def audit_explicit_count_answer(question, reply):
     """
     text=str(reply or "")
     parsed=separate_selection_value(question)
-    if not parsed or not ANSWER_DEMAND.search(question):
+    if not parsed:
+        return audit_letter_arrangement_answer(question, text)
+    if not ANSWER_DEMAND.search(question):
         return text
     match=list(ANSWER_LINE.finditer(text))
     if not match:
