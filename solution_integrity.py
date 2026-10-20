@@ -24,6 +24,7 @@ def _active_question(question):
         return ""
     if NO_ANSWER.search(question):
         return ""
+    text=re.sub(r"^(?:请直接给出最终答案并简要解释|请给出答案并说明理由|直接给出答案并解析)[。.!！]?\s*", "", text)
     return text
 
 
@@ -184,7 +185,7 @@ def _selection_parse(question):
     for _,_,(start,end) in matched:
         for p in range(start,end):residue[p]=" "
     rest="".join(residue)
-    rest=re.sub(r"共有多少种符合条件的选派[？?]?|共有多少种(?:方案|选派)[？?]?|[。；;，,\s？?]+", "",rest)
+    rest=re.sub(r"共有多少种符合条件的选派[？?]?|共有多少种(?:方案|选派)[？?]?|出差|[。；;，,\s？?]+", "",rest)
     if rest:
         return None
     if any(name not in people for _,names,_ in matched for name in names):
