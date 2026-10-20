@@ -58,7 +58,7 @@ CHINESE_CASES = [
  ("NJL07","南京大学","函数单射满射","实数到实数的函数f(x)=x²是否双射？给出理由。",[r"不是双射|非双射|不为双射|不是单射|不是满射"],NJU_SET,"第9题(3)"),
  ("NJL08","南京大学","函数单射满射","实数到实数的函数 f(x)=2x+1 是否双射？",[r"是双射|为双射|双射函数|既是单射又是满射"],NJU_SET,"第9题(1)"),
  ("NJL09","南京大学","函数单射满射","实数到实数的函数 f(x)=x³ 是否双射？",[r"是双射|为双射|双射函数|既是单射又是满射"],NJU_SET,"第9题(2)"),
- ("NJL10","南京大学","函数单射满射","实数到实数的函数 f(x)=x²/(1+x²) 是否是满射？给出值域。",[r"不是满射|不满射|非满射|不为满射",r"0|\\[0"],NJU_SET,"第9题(4)"),
+ ("NJL10","南京大学","函数单射满射","实数到实数的函数 f(x)=x²/(1+x²) 是否是满射？给出值域。",[r"不是满射|不满射|非满射|不为满射",r"(?<!\d)0(?!\d)|\[0"],NJU_SET,"第9题(4)"),
 ]
 
 # Stable machine-readable gold examples; human review remains necessary
@@ -78,7 +78,8 @@ USTC_CASES = [
 ]
 
 def heuristic_valid(reply, patterns):
-    return bool(reply.strip()) and all(re.search(p, reply, re.I|re.S) for p in patterns)
+    value=str(reply or "")
+    return bool(value.strip()) and all(re.search(p, value, re.I|re.S) for p in patterns)
 
 
 def call_with_retry(sess, base, question, timeout, pause, attempts=3):
