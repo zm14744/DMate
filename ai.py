@@ -1619,11 +1619,19 @@ GRAPH_AUDIT_PROMPT = """你是图论原始图片的第二名独立逐边核验�
 """
 
 
-def verify_graph_image_independently(image_bytes, retries=1):
+DIRECTED_GRAPH_AUDIT_PROMPT = """你是独立的高校图论有向图图像逐箭头核验员。必须只看原始图片及局部放大图，不使用其他模型转录。
+图片可能有图(1)、图(2)、图(3)等多张独立的有向图。请逐图辨认所有顶点标签、每一条有向边的准确起点和箭头尖端。
+尤其：图与图之间空白处绝对不存在跨图连接；两条线交叉且没有实心顶点时不可虚构节点；箭头尖端决定边的方向。
+不能根据“理应连通”补边；不要用连通性的结论倒推图。看不清任何关键箭头或端点时将该图 complete 设为 false。
+只返回 JSON 且格式严格为：
+{"graphs":[{"index":1,"directed":true,"vertices":["a","b"],"edges":[["a","b"]],"complete":true}]}
+请按原图全部编号逐一列出；不要输出问题答案。"""
+
+def verify_graph_image_independently(image_bytes, retries=1, directed=False):
     """A second *independent* image-model read for complex graph topology.
 
-    Used only for graph-isomorphism image questions where the initial generic
-    Vision read cannot safely certify curve endpoints and black-dot crossings.
+    Used for graph-isomorphism diagrams and independently checked directed
+    connectivity diagrams, where Vision can misread arrowheads or crossings.
     Failure is explicit and never interpreted as agreement.
     """
     if not VISION_ENABLED or not API_KEY:
@@ -1663,7 +1671,7 @@ def verify_graph_image_independently(image_bytes, retries=1):
     except Exception as exc:
         print("逐边核验图片准备失败：", type(exc).__name__)
         return {"ok": False, "error": "无法放大图形"}
-    content = [{"type":"text", "text":GRAPH_AUDIT_PROMPT}]
+    content = [{"type":"text", "text":DIRECTED_GRAPH_AUDIT_PROMPT if directed else GRAPH_AUDIT_PROMPT}]
     for number, url in enumerate(images):
         content.extend([
             {"type":"text","text":"完整图像" if number == 0 else f"放大图形区域 {number}"},
