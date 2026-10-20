@@ -9,6 +9,8 @@ on:
       - "graph_integrity.py"
       - "graph_answer_integrity.py"
       - "graph_exact_solver.py"
+      - "teaching.py"
+      - "tests/test_university_solution_intent.py"
       - "tests/test_graph_exact_solver.py"
       - "tests/test_graph_answer_integrity.py"
       - "tests/test_curated_university_graph_grade.py"
@@ -35,6 +37,8 @@ on:
       - "graph_integrity.py"
       - "graph_answer_integrity.py"
       - "graph_exact_solver.py"
+      - "teaching.py"
+      - "tests/test_university_solution_intent.py"
       - "tests/test_graph_exact_solver.py"
       - "tests/test_graph_answer_integrity.py"
       - "tests/test_curated_university_graph_grade.py"
@@ -66,7 +70,7 @@ jobs:
       - name: Install CPU-only image test dependencies
         run: python -m pip install "numpy<2" "Pillow>=10,<12" "opencv-python-headless==4.10.0.84" "requests>=2.31,<3"
       - name: Compile image pipeline
-        run: python -m py_compile graph_recognition.py graph_recognition_v2.py graph_consistency.py graph_integrity.py graph_answer_integrity.py graph_exact_solver.py math_answer_guard.py solution_integrity.py answer_context_guard.py ocr.py ai.py app.py
+        run: python -m py_compile graph_recognition.py graph_recognition_v2.py graph_consistency.py graph_integrity.py graph_answer_integrity.py graph_exact_solver.py math_answer_guard.py solution_integrity.py answer_context_guard.py ocr.py ai.py app.py teaching.py
       - name: Run graph crossing and blur regressions
         run: |
           python -m unittest discover -s tests -p "test_graph_recognition_v2.py" -v
@@ -74,6 +78,7 @@ jobs:
           python -m unittest discover -s tests -p "test_graph_integrity.py" -v
           python -m unittest discover -s tests -p "test_graph_answer_integrity.py" -v
           python -m unittest discover -s tests -p "test_graph_exact_solver.py" -v
+          python -m unittest discover -s tests -p "test_university_solution_intent.py" -v
           python -m unittest discover -s tests -p "test_curated_university_graph_grade.py" -v
           python -m unittest discover -s tests -p "test_graph_vision_audit.py" -v
           python -m unittest discover -s tests -p "test_math_answer_guard.py" -v
