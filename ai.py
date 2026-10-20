@@ -1642,6 +1642,15 @@ def verify_graph_image_independently(image_bytes, retries=1):
                 image.crop((0, 0, math.ceil(width * .60), height)),
                 image.crop((math.floor(width * .40), 0, width, height)),
             ])
+        elif height >= width * 1.15:
+            # Original university figures are also stacked vertically,
+            # e.g. two visually different drawings of the same graph.
+            # Show each entire drawing at higher resolution while keeping
+            # 20% overlap so vertices/curves on the boundary are not cut.
+            crops.extend([
+                image.crop((0, 0, width, math.ceil(height * .60))),
+                image.crop((0, math.floor(height * .40), width, height)),
+            ])
         def encode(im, max_side):
             factor = min(2.4, max_side / max(im.size))
             if factor != 1:
