@@ -3549,6 +3549,7 @@ function normalizeLearningState(value) {
                         : null,
                     retestCount: Math.max(0, Number(item.retestCount) || 0),
                     retestPassCount: Math.max(0, Number(item.retestPassCount) || 0),
+                    manualRetestPassCount: Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0)),
                     retestFailCount: Math.max(0, Number(item.retestFailCount) || 0),
                     retestPassed: Boolean(item.retestPassed),
                     retestPassedAt: Number.isFinite(item.retestPassedAt)
@@ -6228,6 +6229,7 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
         correctedAt: null,
         retestCount: 0,
         retestPassCount: 0,
+        manualRetestPassCount: 0,
         retestFailCount: 0,
         retestPassed: false,
         retestPassedAt: null,
@@ -6778,14 +6780,10 @@ function renderLearningSummary() {
         .filter(item => !item.corrected)
         .sort((a, b) => b.updatedAt - a.updatedAt);
     const pendingCount = pendingWrong.length;
-    const passedCount = learningState.wrongQuestions
-        .filter(item => item.retestPassed)
-        .length;
-
     const lines = [];
 
     lines.push(
-        `错题本：${wrongCount} 道，待订正 ${pendingCount} 道，已通过复测 ${passedCount} 道`
+        `错题本：${wrongCount} 道，待订正 ${pendingCount} 道`
     );
 
     box.innerText = lines.join("\n");
@@ -6798,7 +6796,7 @@ function renderLearningSummary() {
 
 
 function setWrongBookFilter(filter) {
-    if (!["pending", "corrected", "passed"].includes(filter)) {
+    if (!["pending", "corrected"].includes(filter)) {
         return;
     }
 
@@ -6832,14 +6830,6 @@ function setWrongBookSort(value) {
 }
 
 function wrongBookStatus(item) {
-    if (item.retestPassed) {
-        return {
-            key: "passed",
-            text: "已通过复测",
-            className: "passed"
-        };
-    }
-
     if (item.corrected) {
         return {
             key: "corrected",
@@ -6924,17 +6914,13 @@ function updateWrongBookToolbar(allItems, visibleItems) {
     const corrected = allItems.filter(
         item => wrongBookStatus(item).key === "corrected"
     ).length;
-    const passed = allItems.filter(
-        item => wrongBookStatus(item).key === "passed"
-    ).length;
-
     if (stats) {
         const visibleText = visibleItems.length === total
             ? ""
             : ` · 当前显示 ${visibleItems.length} 道`;
 
         stats.textContent =
-            `共 ${total} 道 · 待处理 ${pending} · 已订正 ${corrected} · 已通过复测 ${passed}${visibleText}`;
+            `共 ${total} 道 · 待处理 ${pending} · 已订正 ${corrected}${visibleText}`;
     }
 
     for (const button of filterButtons) {
@@ -7054,6 +7040,16 @@ function closeWrongBook() {
     if (!modal) return;
 
     modal.classList.add("hidden");
+}
+
+function markWrongQuestionRetestPassed(id) {
+    const item = learningState.wrongQuestions.find(entry => entry.id === id);
+    if (!item || !item.corrected) return;
+    item.manualRetestPassCount = Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0)) + 1;
+    item.updatedAt = Date.now();
+    saveLearningState();
+    renderLearningSummary();
+    renderWrongBook();
 }
 
 function markWrongQuestionCorrected(id) {
@@ -8693,9 +8689,9 @@ function renderWrongBook() {
         } else if (wrongBookFilter === "pending") {
             empty.textContent = "目前没有待处理的错题。";
         } else if (wrongBookFilter === "corrected") {
-            empty.textContent = "目前没有已完成订正但未通过复测的错题。";
+            empty.textContent = "目前没有已完成订正的错题。";
         } else {
-            empty.textContent = "目前还没有已通过复测的错题。";
+            empty.textContent = "没有符合条件的错题。";
         }
 
         list.appendChild(empty);
@@ -8935,6 +8931,14 @@ function renderWrongBook() {
             analysisBox.appendChild(analysisDetails);
         }
 
+        const manualPasses = Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0));
+        if (item.corrected && manualPasses > 0) {
+            const passTimes = document.createElement("span");
+            passTimes.className = "wrong-status passed";
+            passTimes.textContent = `已通过复测 ${manualPasses} 次`;
+            top.appendChild(passTimes);
+        }
+
         const actions = document.createElement("div");
         actions.className = "wrong-actions";
 
@@ -8988,22 +8992,14 @@ function renderWrongBook() {
         );
         actions.appendChild(retestButton);
 
-        const hasRetestSession = (
-            item.lastRetestSessionId !== null
-            && sessions.some(
-                session => String(session.id) === String(item.lastRetestSessionId)
-            )
-        );
-
-        if (hasRetestSession) {
-            const retestHistoryButton = document.createElement("button");
-            retestHistoryButton.type = "button";
-            retestHistoryButton.className = "secondary";
-            retestHistoryButton.textContent = "查看最近复测";
-            retestHistoryButton.onclick = () => (
-                openWrongRetestSession(item.id)
-            );
-            actions.appendChild(retestHistoryButton);
+        if (item.corrected) {
+            const passButton = document.createElement("button");
+            passButton.type = "button";
+            passButton.className = "secondary";
+            passButton.textContent = "通过复测";
+            passButton.title = "每手动确认通过一次，计数增加一次";
+            passButton.onclick = () => markWrongQuestionRetestPassed(item.id);
+            actions.appendChild(passButton);
         }
 
         const editButton = document.createElement("button");
