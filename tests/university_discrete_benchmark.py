@@ -79,11 +79,25 @@ def main():
     ap.add_argument("--skip-images",action="store_true")
     ap.add_argument("--only-image",action="append",default=[])
     ap.add_argument("--strict",action="store_true",help="Fail CI when live university benchmark exposes a confirmed wrong answer or request failure")
+    ap.add_argument("--require-graph-audit-version",action="store_true")
     opts=ap.parse_args()
     check_local()
     base=opts.base.rstrip("/")
     data={"target":base,"started_utc":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),"purpose":"university exam verification, no fake mocks","cases":[],"images":[]}
     session=requests.Session()
+    expected="2026-10-20-independent-edge-audit-v2"
+    try:
+        health=session.get(base+"/health", timeout=12).json()
+    except Exception as exc:
+        health={"error":repr(exc)}
+    actual=health.get("graph_integrity_version")
+    data["deployment_version"]=actual
+    data["expected_deployment_version"]=expected
+    if opts.require_graph_audit_version and actual != expected:
+        data["deployment_status"]="OUTDATED_OR_UNKNOWN"
+        Path(opts.output).write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
+        print("DEPLOYMENT_OUTDATED: running online server is not verified as graph-audit-v2:",health,flush=True)
+        sys.exit(2)
     for id,school,topic,prompt,checks,source in CASES[:opts.max_chat]:
         try:
             status,result=post_chat(session,base,prompt,opts.timeout)
