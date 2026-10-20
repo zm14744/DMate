@@ -7945,9 +7945,21 @@ body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button::after {
     content:none !important;
     display:none !important;
 }
-body[data-appearance-theme] .input-wrap #ocrCancelBtn:hover,
-body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button:hover {
-    background:#dc2626 !important;
+/* 触屏浏览器可能在点击后长时间保留 :hover，从而把同一种红色圆钮
+   显示成深浅不一。仅真正支持鼠标悬停时才显示深红色反馈。 */
+@media (hover:hover) and (pointer:fine) {
+    body[data-appearance-theme] .input-wrap #ocrCancelBtn:hover,
+    body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button:hover {
+        background:#dc2626 !important;
+    }
+}
+/* 移动设备无论是否残留触摸 hover，识图撤销与 AI 停止都保持 #ef4444。
+   这里用比旧规则更高的特异性，防止深红色规则覆盖。 */
+@media (hover:none), (pointer:coarse) {
+    body[data-appearance-theme] .input-wrap #ocrCancelBtn:not([hidden]):hover,
+    body[data-appearance-theme] .input-wrap #sendBtn.ai-stop-button:not([hidden]):hover {
+        background:#ef4444 !important;
+    }
 }
 /* CSS 隐藏与 JS 的 hidden/inline 状态相互兜底。 */
 body[data-appearance-theme] .input-wrap[data-busy-mode="ocr"] #sendBtn,
