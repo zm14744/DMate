@@ -60,7 +60,9 @@ const customURLs=urls("android",{androidApkUrl:custom});
 assert.equal(customURLs[0],gitcodeBase+file.android+"/download","GitCode remains first");
 assert.equal(customURLs[1],githubBase+file.android,"GitHub remains second");
 assert(customURLs.includes(custom),"Custom mirror remains available after primary channels");
-assert.equal(urls("ios").length, 0, "iOS must not show removed PWA/WebClip install links");
+assert.equal(urls("ios")[0],
+ "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate-iPhone-iPad.mobileconfig",
+ "iOS published profile must be available from its real GitHub release");
 
 // itch.io and official store links must follow platform-specific GitCode/GitHub downloads.
 const itch = "https://zm14744.itch.io/dmate";
@@ -83,7 +85,7 @@ assert.equal(JSON.stringify(labels("macos")), JSON.stringify(["GitCode · DMG", 
 assert.equal(JSON.stringify(labels("linux")), JSON.stringify([
     "GitCode · DEB", "GitHub · DEB", "GitCode · AppImage", "GitHub · AppImage", "Snap Store"
 ]));
-assert.equal(JSON.stringify(labels("ios")), JSON.stringify([]));
+assert.equal(JSON.stringify(labels("ios")), JSON.stringify(["GitHub · 描述文件","GitCode · 发行版"]));
 assert.equal(guide("android").text, "选择 APK 下载源。");
 assert.equal(guide("windows").text, "选择安装包下载源或应用商店。");
 assert.equal(guide("macos").text, "选择 DMG 下载源。");
@@ -158,8 +160,11 @@ assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (X11; Linux x86_64) Firef
 assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Linux; Android 9; QQBrowser/12.0)","Linux armv8l",
  {legacyDOM:true}).links), JSON.stringify(["GitCode · APK","GitHub · APK","itch.io"]),
  "Legacy Android DOM without replaceChildren must still open the dialog");
-assert.equal(simulateClick("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)","iPhone").hidden,true,
- "iOS has no supported native package, so do not revive removed PWA links");
+assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)","iPhone").links),
+ JSON.stringify(["GitHub · 描述文件","GitCode · 发行版"]));
+assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Macintosh; Intel Mac OS X) Mobile/15E148","MacIntel",
+ {touchPoints:5}).links), JSON.stringify(["GitHub · 描述文件","GitCode · 发行版"]),
+ "iPadOS desktop-like user agent must offer the iOS release profile");
 assert.equal(simulateClick("Mozilla/5.0 (Linux; Android 14) DMateAndroid/1.0","Linux armv8l").hidden,true,
  "Installed Android app should not show duplicate downloads");
 assert.equal(simulateClick("Mozilla/5.0 (Windows NT 10.0) DMateDesktop/1.0","Win32").hidden,true,
@@ -171,12 +176,12 @@ assert(!modal.includes("installHelp"), "Download modal must not retain legacy in
 
 assert(!/pwa|pwastore|webclip|mobileconfig|manifest/i.test(modal), "Download dialog must not expose PWA/WebClip links or instructions");
 assert(modal.includes('id="downloadModalTitle">下载 DMate</div>'), "Dialog title should describe package downloads");
-assert(html.includes("dmate-download-fix-v40-20261020"), "Cache key must update after dialog runtime fix");
-for(const platform of ["android", "windows", "macos", "linux"]) {
+assert(html.includes("dmate-ios-profile-v41-20261020"), "Cache key must update after restoring iOS profile");
+for(const platform of ["ios", "android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
     assert(!guide(platform).actions.some(a => a.url === "https://gitcode.com/zm14744/DMate/releases/v1.0.1"),
-           "Download dialog should link directly to platform installers");
+           "Download dialog should not regress to a generic release page in place of platform installers");
 }
 const app = fs.readFileSync("app.py", "utf8");
 assert(!app.includes("浏览器安装菜单添加网页应用"), "Do not describe Android browser PWA installation");
@@ -191,7 +196,7 @@ assert(!html.includes("PWA / APK"));
 assert(!html.includes("PWA 安装说明"));
 assert(!html.includes("apple-mobile-web-app-capable"));
 assert(!html.includes("apple-mobile-web-app-title"));
-assert(!html.includes("DMate.mobileconfig"));
+assert(!html.includes("DMate.mobileconfig"), "Do not revive old local profile route; use released GitHub asset");
 assert(html.includes("navigator.serviceWorker.getRegistrations"), "Legacy worker cleanup must remain for old installs");
 assert(html.includes("scriptUrl.pathname"), "Legacy worker cleanup must tolerate query strings in worker URLs");
 assert(html.includes("window.location.reload()"), "Reload once after deleting stale PWA cache/worker");
@@ -212,4 +217,4 @@ for (const obsolete of [
     "scripts/test_ios_webclip.py"
 ]) assert(!fs.existsSync(obsolete), "Obsolete PWA file remains: " + obsolete);
 
-console.log("PASS: package-only install dialog; no PWA prompt, manifest, worker, or install guide.");
+console.log("PASS: released iOS profile + platform-specific installer dialog; no PWA prompts, manifest or worker.");

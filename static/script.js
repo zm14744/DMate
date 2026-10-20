@@ -19440,7 +19440,7 @@ function removeDeprecatedCopyControls() {
 }
 
 // -----------------------------
-// 下载：Android 提供 APK；桌面系统提供安装包与商店入口；iOS 不显示下载入口
+// 下载：iOS 提供发行版描述文件；Android 提供 APK；桌面系统提供安装包与商店入口
 // -----------------------------
 function dmateClientConfig() {
     const config = window.DMATE_CLIENT_CONFIG || {};
@@ -19497,7 +19497,19 @@ function downloadOptionsForCurrentPlatform() {
         return actions;
     }
 
-    if (platform === "ios") return null;
+    if (platform === "ios") {
+        // The file is confirmed in the published GitHub v1.0.1 release.
+        // GitCode is an optional release page, not a fabricated direct asset.
+        return {
+            platform:"iPhone / iPad",
+            text:"下载描述文件后，在 iOS 设置中确认安装。",
+            actions:[
+                { label:"GitHub · 描述文件",
+                  url:"https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate-iPhone-iPad.mobileconfig" },
+                { label:"GitCode · 发行版", url:gitcodeRelease, secondary:true }
+            ]
+        };
+    }
     if (platform === "android") {
         return {
             platform:"Android",
@@ -19608,14 +19620,9 @@ function initDmateDownloadDialog() {
     }
 
     const platform = detectDmateInstallPlatform();
-    if (platform === "ios") {
-        button.hidden = true;
-        button.setAttribute("aria-hidden", "true");
-        return;
-    }
     button.hidden = false;
     button.setAttribute("aria-hidden", "false");
-    if (platform === "android") button.textContent = "下载 DMate";
+    if (platform === "android" || platform === "ios") button.textContent = "下载 DMate";
     else button.textContent = "下载 DMate 桌面版";
 
     button.addEventListener("click", openDmateDownloadDialog);

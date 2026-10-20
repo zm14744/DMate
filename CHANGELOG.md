@@ -1,5 +1,9 @@
 # 更新记录
 
+## 2026-10-20：恢复 iOS 发布版描述文件入口
+- 经 GitHub Releases API 核对，v1.0.1 实际包含 DMate-iPhone-iPad.mobileconfig；恢复 iPhone/iPad 下载弹窗中的 GitHub 描述文件直链与 GitCode 发行版页面入口。
+- iOS 描述文件作为已发布的独立下载项，不恢复已删除的 PWA 安装弹窗、Service Worker 或本地 mobileconfig 路由。
+
 ## 2026-10-20：下载弹窗和出题展示修复
 
 - 修复下载弹窗残留的 `guide` 未定义导致点击崩溃；增加 Android、Windows、macOS、Linux 四端打开/关闭真实点击流程回归测试，并保留 iOS 不显示无效下载入口；兼容缺少 `replaceChildren()` 的旧 Android WebView。
