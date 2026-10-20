@@ -18,6 +18,9 @@ import sys
 import time
 from urllib.parse import quote
 
+# Keep script runnable from both GitHub Actions and a local checkout.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import requests
 from PIL import Image, ImageFilter, ImageOps
 from graph_recognition import recognize_graphs

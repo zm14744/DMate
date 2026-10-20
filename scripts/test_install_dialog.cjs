@@ -180,8 +180,16 @@ assert(html.includes("dmate-ios-profile-v41-20261020"), "Cache key must update a
 for(const platform of ["ios", "android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
-    assert(!guide(platform).actions.some(a => a.url === "https://gitcode.com/zm14744/DMate/releases/v1.0.1"),
-           "Download dialog should not regress to a generic release page in place of platform installers");
+    if (platform !== "ios") {
+        assert(!guide(platform).actions.some(a => a.url === "https://gitcode.com/zm14744/DMate/releases/v1.0.1"),
+               "Desktop/Android must continue to use direct installers");
+    } else {
+        // The genuine GitHub mobileconfig is direct; the GitCode entry is
+        // honestly labeled as a release *page*, not an unverified direct file.
+        assert.equal(guide("ios").actions[0].label, "GitHub · 描述文件");
+        assert.match(guide("ios").actions[0].url, /DMate-iPhone-iPad\.mobileconfig$/);
+        assert.equal(guide("ios").actions[1].label, "GitCode · 发行版");
+    }
 }
 const app = fs.readFileSync("app.py", "utf8");
 assert(!app.includes("浏览器安装菜单添加网页应用"), "Do not describe Android browser PWA installation");
