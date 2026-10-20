@@ -1591,3 +1591,110 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
         "图形结构理解暂时不可用，已保留文字识别结果。"
     )
 
+
+
+GRAPH_AUDIT_PROMPT = """你是图论原始图片的第二名独立逐边核验员。只看所附原图和放大图，
+不得使用其他模型已经给出的边集，不要推理解题结果。只核验图片中两个有标签的无向图。
+必须按顶点位置先辨认标签，再对每一条笔画像素沿线追踪到实际两个端点。
+
+重点：
+- 两条直线在空白处交叉但没有实心圆点时，继续沿原来的斜率追踪；
+  交叉处有实心黑点才是独立顶点，原斜线应当拆成两条边。
+- 一条外部弧线要分别追踪两端：弧线经过某个顶点附近不等于从该顶点出发。
+- 不要把经过左上点旁边的弧线当成左上点→右上点，需看它到底连左下或右下。
+- 不要把直线和外部弧线误算成重边；只有两条线确实有相同端点才是重边。
+- 顶点标签贴在圆点旁，请先建立圆点与字母的对应关系，不能按字母阅读顺序猜边。
+- 边数必须实际数线条得到，不得因为你猜想两图同构而修改边集。
+- 若一条边的端点无法完全确认，complete 必须 false，不许猜测边名。
+- 不要输出图同构或其他问题答案，也不允许依据两个图应当同构来补造边。
+- 只包含题干/说明文字而没有两幅完整无向图时不造图，graphs 设为空数组。
+
+严格输出 JSON 对象，且仅此对象：
+{"graphs":[
+ {"index":1,"directed":false,"vertices":["a","b"],"edges":[["a","b"]],"complete":true},
+ {"index":2,"directed":false,"vertices":["v","w"],"edges":[["v","w"]],"complete":true}
+]}
+若无法识别完整边集，使用 complete:false 和仅确认的边；不能用近似边凑齐。
+"""
+
+
+def verify_graph_image_independently(image_bytes, retries=1):
+    """A second *independent* image-model read for complex graph topology.
+
+    Used only for graph-isomorphism image questions where the initial generic
+    Vision read cannot safely certify curve endpoints and black-dot crossings.
+    Failure is explicit and never interpreted as agreement.
+    """
+    if not VISION_ENABLED or not API_KEY:
+        return {"ok": False, "error": "图形逐边复核不可用"}
+    if _guess_image_mime(image_bytes) is None:
+        return {"ok": False, "error": "不支持的图片格式"}
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as original:
+            image = ImageOps.exif_transpose(original).convert("RGB")
+        width, height = image.size
+        # Keep the original and add two overlapping, legible crops for common
+        # side-by-side exam figures. Do not crop away curves above/beside nodes.
+        crops = [image]
+        if width >= height * 1.3:
+            crops.extend([
+                image.crop((0, 0, math.ceil(width * .60), height)),
+                image.crop((math.floor(width * .40), 0, width, height)),
+            ])
+        def encode(im, max_side):
+            factor = min(2.4, max_side / max(im.size))
+            if factor != 1:
+                im = im.resize((round(im.width * factor), round(im.height * factor)),
+                               Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            im.save(out, format="PNG")
+            return "data:image/png;base64," + base64.b64encode(out.getvalue()).decode("ascii")
+        images = [encode(im, 1800) for im in crops]
+    except Exception as exc:
+        print("逐边核验图片准备失败：", type(exc).__name__)
+        return {"ok": False, "error": "无法放大图形"}
+    content = [{"type":"text", "text":GRAPH_AUDIT_PROMPT}]
+    for number, url in enumerate(images):
+        content.extend([
+            {"type":"text","text":"完整图像" if number == 0 else f"放大图形区域 {number}"},
+            {"type":"image_url","image_url":{"url":url,"detail":"high"}},
+        ])
+    payload = {
+        "model": VISION_MODEL,
+        "messages": [{"role":"user","content":content}],
+        "thinking":{"type":"disabled"},
+        "max_tokens": min(2400, VISION_MAX_OUTPUT_TOKENS),
+        "stream":False,
+    }
+    headers={"Authorization":f"Bearer {API_KEY}", "Content-Type":"application/json"}
+    for attempt in range(max(1, retries + 1)):
+        try:
+            response=requests.post(API_URL, headers=headers, json=payload, timeout=(10,75))
+            if not response.ok:
+                if response.status_code in RETRYABLE_STATUS and attempt < retries:
+                    time.sleep(1)
+                    continue
+                return {"ok":False,"error":f"图形复核服务 HTTP {response.status_code}"}
+            choices=response.json().get("choices") or []
+            message=choices[0].get("message") if choices else None
+            text=message.get("content") if isinstance(message,dict) else None
+            if not isinstance(text,str) or not text.strip():
+                if attempt < retries:
+                    continue
+                return {"ok":False,"error":"图形复核未输出结构"}
+            match=re.search(r"\{[\s\S]*\}", text.strip())
+            if not match:
+                return {"ok":False,"error":"图形复核结果不是 JSON"}
+            data=json.loads(match.group(0))
+            graphs=data.get("graphs")
+            if not isinstance(graphs,list):
+                return {"ok":False,"error":"图形复核未输出列表"}
+            return {"ok":True,"graphs":graphs}
+        except (requests.exceptions.Timeout,requests.exceptions.ConnectionError) as exc:
+            if attempt < retries:
+                continue
+            return {"ok":False,"error":f"图形复核网络异常：{type(exc).__name__}"}
+        except Exception as exc:
+            print("独立逐边复核异常：",repr(exc))
+            return {"ok":False,"error":"图形复核失败"}
+    return {"ok":False,"error":"图形复核失败"}
