@@ -63,6 +63,30 @@ class GraphRecognitionTests(unittest.TestCase):
     def test_low_contrast(self):
         self.check_exact(ImageEnhance.Contrast(make_sheet()).enhance(.5))
 
+    def test_colored_ink_on_varied_backgrounds(self):
+        # Includes blue/red/green/orange/yellow nodes and strokes, as well as
+        # inverted dark schemes and pastel lines with low grayscale contrast.
+        samples = [
+            ((255, 255, 255), [(35, 84, 210), (205, 43, 57), (19, 155, 86), (185, 80, 150)],
+             [(65, 120, 205), (35, 160, 108), (220, 96, 50), (35, 85, 178)]),
+            ((25, 29, 44), [(235, 205, 65), (241, 115, 150), (105, 228, 225), (245, 242, 230)],
+             [(220, 198, 92), (120, 220, 200), (234, 170, 190), (230, 233, 235)]),
+            ((246, 244, 231), [(145, 43, 165), (18, 125, 203), (66, 106, 40), (200, 87, 14)],
+             [(135, 70, 145), (48, 142, 211), (75, 130, 75), (200, 100, 65)]),
+        ]
+        for bg, nodes, lines in samples:
+            with self.subTest(background=bg):
+                image = Image.new("RGB", (1480, 720), bg)
+                painter = ImageDraw.Draw(image)
+                for index, edges in enumerate(EDGES):
+                    points = [(30 + index*360 + x, 70 + y) for x, y in NODES]
+                    for a, b in edges:
+                        painter.line([points[a], points[b]], fill=lines[index], width=3)
+                    for x, y in points:
+                        painter.ellipse((x-8, y-8, x+8, y+8), fill=nodes[index])
+                self.check_exact(image)
+
+
     def test_strong_blur_downgrades_not_invents(self):
         detected = detect(make_sheet().filter(ImageFilter.GaussianBlur(2.7)))
         self.assertTrue(all(g["confidence"] != "high" for g in detected["graphs"]))

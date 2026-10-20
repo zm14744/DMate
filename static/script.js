@@ -19571,8 +19571,11 @@ function openDmateDownloadDialog() {
         if (action.secondary) link.classList.add("secondary");
         return link;
     }));
-    actionsEl.hidden = guide.actions.length === 0;
+    actionsEl.hidden = options.actions.length === 0;
 
+    // Close the mobile navigation drawer before presenting the fixed dialog.
+    // The modal stays outside the drawer so its backdrop never inherits transforms.
+    if (typeof closeMobileShellDrawers === "function") closeMobileShellDrawers();
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
 }

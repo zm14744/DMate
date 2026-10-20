@@ -16,6 +16,19 @@ MAX_SIDE = 1700
 MAX_GRAPHS = 12
 
 
+def _contrast_gray(rgb):
+    """Detect light/dark, chromatic and mixed-colour ink against a flat background.
+
+    Unlike raw grayscale thresholding, yellow/blue strokes survive even when
+    their grayscale intensity is close to the page. Dark-mode diagrams work
+    without a special inversion branch. Never synthesize missing lines.
+    """
+    sample = rgb.reshape(-1, 3)[::max(1, rgb.shape[0]*rgb.shape[1]//45000)]
+    background = np.median(sample, axis=0)
+    delta = np.max(np.abs(rgb.astype(np.float32) - background[None, None, :]), axis=2)
+    return (255 - np.minimum(255, delta * 2.2)).astype(np.uint8)
+
+
 def _candidate_dots(gray, *, cutoff=105):
     """Opening removes thin strokes before identifying genuine filled disks."""
     h, w = gray.shape
@@ -192,7 +205,9 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
             rgb = np.asarray(img)
     except (OSError, ValueError):
         return {"status": "uncertain", "graphs": [], "regions": []}
-    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    # Colour-invariant intensity is shared by vertex, line and whitespace checks.
+    # A chromatic red/yellow/blue line may be invisible to a gray-only detector.
+    gray = _contrast_gray(rgb)
     low = float(np.percentile(gray, 1))
     high = float(np.percentile(gray, 82))
     cutoff = int(np.clip(low+.24*(high-low), 105, 190))
@@ -204,6 +219,9 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
     boxes = _split_boxes(dots, gray)
     edge_cutoff = int(np.clip(low+.63*(high-low), 180, 225))
     sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    # Complex photograph backgrounds may produce fake ink. Downgrade them
+    # instead of presenting an exact topology to the student.
+    background_noise = float(np.median(np.abs(gray.astype(np.int16)-255)))
     graphs = []
     for group, box in boxes:
         if len(group) > 12:
@@ -235,7 +253,8 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
         for i, j in edges:
             matrix[i][j] = matrix[j][i] = 1
         # Severe blur and incomplete vertex coverage must not be presented as certainty.
-        complete = len(group) >= 5 and not uncertain and len(edges) >= 2 and sharpness >= 7
+        complete = (len(group) >= 5 and not uncertain and len(edges) >= 2
+                    and sharpness >= 7 and background_noise < 22)
         graphs.append({"id": f"图{len(graphs)+1}", "directed": "unknown",
                        "vertices": vertex_list, "vertex_count": len(group),
                        "edges": [[f"v{i+1}", f"v{j+1}"] for i, j in edges],

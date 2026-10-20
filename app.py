@@ -3253,36 +3253,10 @@ def chat():
                     category = str((generated_teaching or {}).get("category") or "").strip()
                     if category and category != "待识别":
                         reply += "\n\n【涉及知识点】\n\n" + category
-            if output_intent.get("hints") and not exercise_explanation_requested:
-                hint_context = dict(generated_teaching or {})
-                hint_context["mode"] = "hint"
-                hint_context["mode_label"] = "提示引导"
-                try:
-                    hint_result = ask_ai([{"role": "user", "content": (
-                        "针对下面刚生成的练习题，给出两条具体、有用的解题提示，"
-                        "不得公布最终答案，不得完成证明或代替学生解题。\n"
-                        "【题目】\n" + generated_question
-                    )}], retries=0, teaching_context=hint_context)
-                except Exception as hint_exc:
-                    print("综合出题提示降级：", type(hint_exc).__name__)
-                    hint_result = {}
-                hint_text = str(hint_result.get("reply") or "").strip() if isinstance(hint_result, dict) else ""
-                # A hint request must never leak a final answer if the model
-                # ignores its instruction and outputs a solution instead.
-                appears_to_disclose_answer = bool(re.search(
-                    r"【(?:答案|最终答案|解析)】|\[\[WRONGBOOK_ANSWER|(?:最终|参考|正确)?答案\s*[:：为是]",
-                    hint_text, flags=re.IGNORECASE
-                ))
-                # The model may disclose the exact stored solution without a
-                # heading. Reject a hint that reproduces that answer verbatim.
-                normalized_answer = re.sub(r"\s+", "", generated_answer)
-                normalized_hint = re.sub(r"\s+", "", hint_text)
-                if len(normalized_answer) >= 8 and normalized_answer in normalized_hint:
-                    appears_to_disclose_answer = True
-                if isinstance(hint_result, dict) and hint_result.get("ok") and hint_text and not appears_to_disclose_answer:
-                    reply += "\n\n【提示】\n\n" + hint_text
-                else:
-                    reply += "\n\n【提示】\n\n暂时没能生成可靠的提示。"
+            # A newly generated exercise is presented as a question, never as
+            # automatic hints. Later, separate requests for help still use the
+            # normal hint tutoring flow. Answers/explanations explicitly asked
+            # for in this same turn remain supported.
 
         response = {
             "reply": reply,

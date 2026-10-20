@@ -95,13 +95,78 @@ assert.equal(otherActions[1].label, "GitHub · 发行版",
 assert.equal(otherActions[2].url, "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK");
 assert.equal(otherActions[3].url, "https://snapcraft.io/dmate");
 
+
+// Execute real dialog entry points against a minimal DOM for every platform.
+// Previous tests checked URL lists but missed a ReferenceError in click handling.
+const downloadStart = js.indexOf("function dmateClientConfig()");
+const downloadEnd = js.indexOf("\n// -----------------------------\n// 初始化", downloadStart);
+assert(downloadStart >= 0 && downloadEnd > downloadStart, "Download runtime missing");
+const downloadRuntime = js.slice(downloadStart, downloadEnd);
+function simulateClick(userAgent, navigatorPlatform, opts={}) {
+    const handlers = {};
+    const elements = new Map();
+    const makeElement = id => ({
+        id, hidden:false, textContent:"", href:"", rel:"", children:[],
+        attributes:{}, style:{},
+        classList:{
+            classes:new Set(id === "downloadModal" ? ["hidden"] : []),
+            add(c){this.classes.add(c);}, remove(c){this.classes.delete(c);},
+            contains(c){return this.classes.has(c);}
+        },
+        addEventListener(name, fn){handlers[id+":"+name]=fn;},
+        setAttribute(name, value){this.attributes[name]=value;},
+        replaceChildren(...children){this.children=children;}
+    });
+    for (const id of ["downloadAppBtn","downloadModalClose","downloadModal",
+                     "downloadPlatform","downloadDescription","downloadActions"]) {
+        elements.set(id, makeElement(id));
+    }
+    let drawerClosed=0;
+    const ctx = {
+        navigator:{userAgent,platform:navigatorPlatform,maxTouchPoints:opts.touchPoints||0},
+        window:{DMATE_CLIENT_CONFIG:opts.config||{}},
+        document:{
+            getElementById:id=>elements.get(id),
+            createElement:()=>makeElement("link"),
+            addEventListener:(name,fn)=>{handlers["document:"+name]=fn;}
+        },
+        closeMobileShellDrawers:()=>{drawerClosed++;}
+    };
+    vm.runInNewContext(downloadRuntime,ctx);
+    vm.runInNewContext("initDmateDownloadDialog()",ctx);
+    const button=elements.get("downloadAppBtn");
+    if (button.hidden) return {hidden:true,links:[],drawerClosed};
+    assert.equal(typeof handlers["downloadAppBtn:click"],"function","Button must bind a click handler");
+    handlers["downloadAppBtn:click"]({target:button});
+    const modal=elements.get("downloadModal");
+    assert.equal(modal.classList.contains("hidden"),false,"Click must open modal");
+    assert.equal(modal.attributes["aria-hidden"],"false");
+    const action=elements.get("downloadActions");
+    assert.equal(action.hidden,false,"Platform downloads should be shown");
+    assert(drawerClosed>0,"Mobile drawer should close when opening download dialog");
+    assert(action.children.every(link=>link.href.startsWith("https://")),"Every link must be valid HTTPS");
+    handlers["downloadModalClose:click"]({});
+    assert.equal(modal.classList.contains("hidden"),true,"Close button must close modal");
+    return {hidden:false,links:action.children.map(e=>e.textContent),drawerClosed};
+}
+assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Linux; Android 14) Chrome/131.0.0.0","Linux armv8l").links), JSON.stringify(["GitCode · APK","GitHub · APK","itch.io"]));
+assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Windows NT 10.0) Chrome/131.0","Win32").links), JSON.stringify(["GitCode · EXE","GitHub · EXE","Microsoft Store","itch.io"]));
+assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Macintosh; Intel Mac OS X) Safari/605","MacIntel").links), JSON.stringify(["GitCode · DMG","GitHub · DMG","itch.io"]));
+assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (X11; Linux x86_64) Firefox/131","Linux x86_64").links), JSON.stringify(["GitCode · DEB","GitHub · DEB","GitCode · AppImage","GitHub · AppImage","Snap Store"]));
+assert.equal(simulateClick("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)","iPhone").hidden,true,
+ "iOS has no supported native package, so do not revive removed PWA links");
+assert.equal(simulateClick("Mozilla/5.0 (Linux; Android 14) DMateAndroid/1.0","Linux armv8l").hidden,true,
+ "Installed Android app should not show duplicate downloads");
+assert.equal(simulateClick("Mozilla/5.0 (Windows NT 10.0) DMateDesktop/1.0","Win32").hidden,true,
+ "Installed desktop app should not show duplicate downloads");
+
 const html=fs.readFileSync("templates/index.html","utf8");
 const modal=html.split('<div id="downloadModal"')[1].split('<div id="accountModal"')[0];
 assert(!modal.includes("installHelp"), "Download modal must not retain legacy install-help identifiers");
 
 assert(!/pwa|pwastore|webclip|mobileconfig|manifest/i.test(modal), "Download dialog must not expose PWA/WebClip links or instructions");
 assert(modal.includes('id="downloadModalTitle">下载 DMate</div>'), "Dialog title should describe package downloads");
-assert(html.includes("dmate-package-only-v38-20261020"), "Install dialog JS cache key must change after legacy-worker cleanup");
+assert(html.includes("dmate-download-fix-v39-20261020"), "Cache key must update after dialog runtime fix");
 for(const platform of ["android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
