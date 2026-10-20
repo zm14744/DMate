@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "scripts/generate_icons.py"
+      - "scripts/check_icon_assets.py"
       - "desktop/src-tauri/**"
       - ".github/workflows/build-desktop.yml"
 
@@ -68,11 +69,95 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
 
+      # SigningIdentity is intentionally NOT hard-coded to "-" in tauri.conf.
+      # Any half-configured developer setup must fail; only a complete Apple
+      # signing/notarization configuration can produce distributable DMGs.
+      - name: Prepare Developer ID signing for macOS
+        if: matrix.name == 'macos'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$APPLE_CERTIFICATE" && -z "$APPLE_CERTIFICATE_PASSWORD" &&
+                -z "$APPLE_SIGNING_IDENTITY" && -z "$APPLE_ID" &&
+                -z "$APPLE_PASSWORD" && -z "$APPLE_TEAM_ID" ]]; then
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "DMATE_MACOS_SIGNED=false" >> "$GITHUB_ENV"
+            echo "::warning::Apple credentials missing. Generating an ad-hoc signed TEST build, not a notarized public release."
+            exit 0
+          fi
+          for key in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!key}" ]]; then
+              echo "::error::Incomplete macOS Apple signing configuration: missing $key. Do not ship unverified DMG."
+              exit 1
+            fi
+          done
+          if [[ "$APPLE_SIGNING_IDENTITY" != "Developer ID Application:"* ]]; then
+            echo "::error::Use a Developer ID Application identity, not Apple Development or ad-hoc signing."
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/dmate-signing.keychain-db"
+          pass="$(openssl rand -hex 24)"
+          cert="$RUNNER_TEMP/dmate-developer-id.p12"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 -D > "$cert"
+          security create-keychain -p "$pass" "$keychain"
+          security unlock-keychain -p "$pass" "$keychain"
+          security set-keychain-settings -t 3600 -u "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security import "$cert" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$keychain"
+          rm -f "$cert"
+          security find-identity -v -p codesigning "$keychain" | grep -F "$APPLE_SIGNING_IDENTITY" >/dev/null
+          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          echo "DMATE_MACOS_SIGNED=true" >> "$GITHUB_ENV"
+
       - name: Build DMate
         working-directory: desktop
+        env:
+          # APPLE_SIGNING_IDENTITY is set by the previous step on macOS.
+          # Tauri v2 automatically signs and notarizes when the credentials
+          # are complete; app-specific password, never the Apple ID password.
+          APPLE_ID: ${{ matrix.name == 'macos' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ matrix.name == 'macos' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.name == 'macos' && secrets.APPLE_TEAM_ID || '' }}
         run: cargo tauri build ${{ matrix.args }}
 
-      - name: Upload installers
+      - name: Verify macOS Developer ID signature and Apple notarization
+        if: matrix.name == 'macos' && env.DMATE_MACOS_SIGNED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apps=(desktop/src-tauri/target/**/release/bundle/macos/*.app)
+          dmgs=(desktop/src-tauri/target/**/release/bundle/dmg/*.dmg)
+          if (( ${#apps[@]} == 0 || ${#dmgs[@]} == 0 )); then
+            echo "::error::Tauri did not create the expected .app and .dmg outputs"
+            exit 1
+          fi
+          for app in "${apps[@]}"; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+            xcrun stapler validate "$app"
+          done
+          for dmg in "${dmgs[@]}"; do
+            xcrun stapler validate "$dmg"
+          done
+          echo "✅ DMate macOS Developer ID signature and notarization verified." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Warn about unsigned test-only macOS artifact
+        if: matrix.name == 'macos' && env.DMATE_MACOS_SIGNED != 'true'
+        shell: bash
+        run: |
+          echo "⚠️ DMate macOS DMG is AD-HOC SIGNED, NOT notarized. Gatekeeper may block it. Do NOT publish as a normal user download." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Windows/Linux installers
+        if: matrix.name != 'macos'
         uses: actions/upload-artifact@v4
         with:
           name: DMate-${{ matrix.name }}
@@ -80,6 +165,23 @@ jobs:
             desktop/src-tauri/target/**/release/bundle/nsis/*.exe
             desktop/src-tauri/target/**/release/bundle/deb/*.deb
             desktop/src-tauri/target/**/release/bundle/appimage/*.AppImage
-            desktop/src-tauri/target/**/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload verified signed macOS DMG
+        if: matrix.name == 'macos' && env.DMATE_MACOS_SIGNED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMate-macos-SIGNED-NOTARIZED
+          path: desktop/src-tauri/target/**/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload unsigned macOS test build only
+        if: matrix.name == 'macos' && env.DMATE_MACOS_SIGNED != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMate-macos-UNSIGNED-TEST-ONLY
+          path: desktop/src-tauri/target/**/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 7

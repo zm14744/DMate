@@ -36,6 +36,26 @@ INNER = [
 ]
 PATHS = [OUTER, *INNER]
 
+# Search-result-specific faceted light hierarchy. The DMate vertex coordinates,
+# path order and STROKE=13 are untouched. These very dark face fills make the
+# existing white hairlines stand out on Bing's tiny desktop favicon.
+BING_FACETS = [
+    ([(252,300),(488,189),(748,140),(601,268),(302,352)], (22,30,43,255)),
+    ([(252,300),(302,352),(263,686),(199,807),(165,589)], (13,21,33,255)),
+    ([(601,268),(748,140),(1038,376),(1071,603),(790,524)], (27,37,54,255)),
+    ([(302,352),(601,268),(790,524),(563,786),(263,686)], (20,31,47,255)),
+    ([(263,686),(563,786),(690,1044),(456,1064),(199,807)], (14,24,38,255)),
+    ([(790,524),(1071,603),(1012,914),(690,1044),(563,786)], (17,27,42,255)),
+]
+BING_STROKES = [
+    (255,255,255,255), # outer silhouette
+    (234,243,255,255), # upper inner geometry
+    (183,204,226,255), # receding left
+    (247,251,255,255), # prominent right ridge
+    (218,231,246,255), # central diagonal
+    (174,195,219,255), # receding lower structure
+]
+
 
 def path_d(points):
     return "M" + str(points[0][0]) + " " + str(points[0][1]) + " " + " ".join(
@@ -60,7 +80,8 @@ def svg_mark(background=None, foreground="#fff", stroke=STROKE, corner_radius=0)
 
 
 def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=STROKE,
-              figure_scale=1.0, rounded=False, oversample_factor=None):
+              figure_scale=1.0, rounded=False, oversample_factor=None,
+              facets=False, stroke_palette=None):
     """Rasterize vector coordinates directly at native size with supersampling.
 
     figure_scale modifies only geometric coordinates BEFORE rasterization.
@@ -90,9 +111,13 @@ def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=STROKE,
             for x, y in points
         ]
 
+    if facets:
+        for points, face_color in BING_FACETS:
+            draw.polygon(coords(points), fill=face_color)
     line_width = max(1, round(stroke_units * side / VIEWBOX))
-    for points in PATHS:
-        draw.line(coords(points), fill=foreground, width=line_width, joint="curve")
+    for index, points in enumerate(PATHS):
+        color = stroke_palette[index] if stroke_palette is not None else foreground
+        draw.line(coords(points), fill=color, width=line_width, joint="curve")
     return canvas.resize((size, size), Image.Resampling.LANCZOS)
 
 
@@ -101,17 +126,19 @@ def save_png(image, path):
 
 
 def render_png_bytes(size, background=BLACK, figure_scale=1.0, stroke_units=STROKE,
-                     foreground=WHITE, rounded=False, oversample_factor=None):
+                     foreground=WHITE, rounded=False, oversample_factor=None,
+                     facets=False, stroke_palette=None):
     with io.BytesIO() as buffer:
         save_png(draw_mark(size, background=background, foreground=foreground,
                            figure_scale=figure_scale, stroke_units=stroke_units,
-                           rounded=rounded, oversample_factor=oversample_factor), buffer)
+                           rounded=rounded, oversample_factor=oversample_factor,
+                           facets=facets, stroke_palette=stroke_palette), buffer)
         return buffer.getvalue()
 
 
 def save_ico(path, sizes, background=BLACK, stroke_units=STROKE, foreground=WHITE,
              rounded=False, figure_scale=1.0, figure_scale_by_size=None,
-             oversample_factor=None):
+             oversample_factor=None, facets=False, stroke_palette=None):
     """Build ICO from independently vector-rendered PNGs at EACH exact size."""
     sizes = list(sizes)
     figure_scale_by_size = figure_scale_by_size or {}
@@ -119,7 +146,8 @@ def save_ico(path, sizes, background=BLACK, stroke_units=STROKE, foreground=WHIT
         render_png_bytes(size, background=background, foreground=foreground,
                          stroke_units=stroke_units, rounded=rounded,
                          figure_scale=figure_scale_by_size.get(size, figure_scale),
-                         oversample_factor=oversample_factor)
+                         oversample_factor=oversample_factor, facets=facets,
+                         stroke_palette=stroke_palette)
         for size in sizes
     ]
     offset = 6 + 16 * len(sizes)
@@ -248,6 +276,23 @@ def main():
                  64: 1.08, 128: 1.06, 256: 1.04,
              },
              oversample_factor=16)
+
+    # Search favicon v38 only: brighter leading ridges and distinct white/gray
+    # line-depth hierarchy plus low-contrast facets; no thicker strokes. All
+    # mobile/browser/app launch icons remain byte-identical to the old build.
+    bing_scales = {16: 1.18, 24: 1.14, 32: 1.11, 48: 1.09,
+                   64: 1.08, 128: 1.06, 256: 1.04}
+    for size in (16, 32, 64):
+        save_png(draw_mark(size, background=BLACK, rounded=True,
+                           stroke_units=STROKE, figure_scale=bing_scales[size],
+                           oversample_factor=16, facets=True,
+                           stroke_palette=BING_STROKES),
+                 STATIC / f"dmate-site-v38-{size}.png")
+    save_ico(STATIC / "dmate-site-v38.ico",
+             (16, 24, 32, 48, 64, 128, 256),
+             background=BLACK, stroke_units=STROKE, rounded=True,
+             figure_scale_by_size=bing_scales, oversample_factor=16,
+             facets=True, stroke_palette=BING_STROKES)
 
     # iOS Safari uses the Apple touch icon for site bookmarks and Home Screen shortcuts.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")

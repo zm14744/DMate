@@ -219,7 +219,7 @@ MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 M
 |---|---|
 | Web（Zeabur） | [dmate.zeabur.app](https://dmate.zeabur.app/) 为现行入口；旧域名已停用。 |
 | GitHub Release | [v1.0.1](https://github.com/zm14744/DMate/releases/tag/v1.0.1) 提供 Windows EXE、macOS DMG、Linux DEB / AppImage 与 Android APK。 |
-| Windows / macOS / Linux | 提供独立桌面安装包；macOS 构建尚无已确认的正式 Apple 公证。 |
+| Windows / macOS / Linux | 提供独立桌面安装包；macOS 已加入可选 Developer ID 签名及公证的验证流程，未配置 Apple 凭据时生成的包仍为未公证测试版。参见 [macOS 发布说明](docs/MACOS_DISTRIBUTION.md)。 |
 | **Snap Store** | [dmate](https://snapcraft.io/dmate) 1.0.0 / Revision 1 / Stable 已发布；当前为 AMD64，需要 `snapd`。 |
 | **itch.io** | [DMate 项目页](https://zm14744.itch.io/dmate) 已公开，提供 Windows EXE、macOS DMG 和 Android APK。 |
 | Android | 通过 GitCode、GitHub Release 或 itch.io 获取 APK。 |

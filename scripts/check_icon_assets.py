@@ -4,7 +4,7 @@ import struct
 import io
 from pathlib import Path
 from PIL import Image, ImageChops
-from generate_icons import draw_mark, STROKE, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK
+from generate_icons import draw_mark, STROKE, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK, BING_STROKES, BING_FACETS
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "static" / "icons"
@@ -129,6 +129,33 @@ def main():
                                    figure_scale=scales[size], oversample_factor=16)
         assert ImageChops.difference(actual_layer, expected_layer).getbbox() is None, ("v37", size)
 
+    # Bing desktop favicon has the unchanged 13-unit path width with
+    # explicitly different stroke brightness and subtle interior face shades.
+    # Every ICO layer must match freshly vector-rendered pixels, not an upscale.
+    assert STROKE == 13
+    assert len(BING_STROKES) == len(BING_FACETS) == len((0,1,2,3,4,5))
+    assert len({rgb[:3] for rgb in BING_STROKES}) >= 4
+    v38scales = {16:1.18, 24:1.14, 32:1.11, 48:1.09,
+                 64:1.08, 128:1.06, 256:1.04}
+    for tiny in (16,32,64):
+        matches_vector(ICONS / f"dmate-site-v38-{tiny}.png", tiny,
+                       background=BLACK, rounded=True, stroke_units=STROKE,
+                       figure_scale=v38scales[tiny], oversample_factor=16,
+                       facets=True, stroke_palette=BING_STROKES)
+    check_ico(ICONS / "dmate-site-v38.ico", (16,24,32,48,64,128,256))
+    ico_v38 = (ICONS / "dmate-site-v38.ico").read_bytes()
+    for i in range(struct.unpack_from("<H", ico_v38, 4)[0]):
+        w,h,_,_,_,_,length,offset = struct.unpack_from("<BBBBHHII", ico_v38, 6+16*i)
+        size = w or 256
+        assert (h or 256) == size
+        with Image.open(io.BytesIO(ico_v38[offset:offset+length])) as layer:
+            observed = layer.convert("RGBA")
+        expected = draw_mark(size, background=BLACK, stroke_units=STROKE,
+                             rounded=True, figure_scale=v38scales[size],
+                             oversample_factor=16, facets=True,
+                             stroke_palette=BING_STROKES)
+        assert ImageChops.difference(observed, expected).getbbox() is None, ("v38", size)
+
     # Search favicon must stay thin, while the legacy Safari rendering is unchanged.
     assert ImageChops.difference(rgba(ICONS / "dmate-site-v35-64.png").convert("RGB"),
                                  rgba(ICONS / "dmate-site-v34-64.png").convert("RGB")).getbbox() is not None
@@ -165,11 +192,14 @@ def main():
     namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     assert [node.text for node in root_sitemap.findall(".//sm:loc", namespace)] == ["https://dmate.zeabur.app/"]
     assert '<link rel="canonical" href="https://dmate.zeabur.app/">' in html
-    assert 'send_static_file("icons/dmate-site-v37.ico")' in app_text
-    assert 'send_static_file("icons/dmate-site-v37-64.png")' in app_text
+    assert 'send_static_file("icons/dmate-site-v38.ico")' in app_text
+    assert 'send_static_file("icons/dmate-site-v38-64.png")' in app_text
+    assert 'send_static_file("icons/dmate-site-v38-32.png")' in app_text
+    assert 'send_static_file("icons/dmate-site-v38-16.png")' in app_text
     assert '{% if is_search_crawler %}' in html
-    assert '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-bing-v37-20261020">' in html
-    assert '<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=dmate-bing-v37-20261020">' in html
+    assert '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-bing-v38-20261020">' in html
+    for pixel in (16,32,64):
+        assert f'<link rel="icon" type="image/png" sizes="{pixel}x{pixel}" href="/favicon-{pixel}.png?v=dmate-bing-v38-20261020">' in html
     assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v36-64.png?v=dmate-safari-v36-20261019">' in html
     assert 'document.head.appendChild(icon)' not in html
     assert 'dmate-safari-" + theme' not in html

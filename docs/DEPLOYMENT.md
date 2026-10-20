@@ -244,7 +244,7 @@ node --check static/script.js
 ## 11. 多平台安装与分发（更新至 2026-10-19）
 
 - **Windows**：使用 Tauri NSIS EXE；可通过 Microsoft Store、GitCode、GitHub Release 或 itch.io 获取。
-- **macOS**：使用通用 DMG；通过 GitCode、GitHub Release 或 itch.io 获取。当前尚无已确认的正式 Apple 公证。
+- **macOS**：通用 DMG 的 CI 已区分开发测试版与正式公证版。只有设置六项 Apple Developer Secret 且签名/公证校验成功后才上传 `DMate-macos-SIGNED-NOTARIZED`；否则标记为 `DMate-macos-UNSIGNED-TEST-ONLY`。旧 GitHub Release / GitCode / itch.io DMG 不会被自动替换；详情见 [macOS 签名与公证](MACOS_DISTRIBUTION.md)。
 - **Linux AMD64**：提供 DEB、AppImage 与 [Snap Store](https://snapcraft.io/dmate)。Snap 需要 `snapd`，并且只确认 AMD64 发行。
 - **Android**：使用独立 WebView APK，通过 GitCode、GitHub Release 或 itch.io 分发。
 - **iPhone / iPad**：目前没有独立安装包，直接通过浏览器访问官网。旧的 `/DMate.mobileconfig` WebClip 路由已移除。

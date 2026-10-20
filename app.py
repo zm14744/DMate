@@ -1876,7 +1876,7 @@ def sitemap_xml():
 @app.route("/favicon.ico")
 def favicon_ico():
     """A consistent, opaque DMate favicon for indexers and browser fallbacks."""
-    response = app.send_static_file("icons/dmate-site-v37.ico")
+    response = app.send_static_file("icons/dmate-site-v38.ico")
     response.headers["Content-Type"] = "image/x-icon"
     response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return response
@@ -1892,10 +1892,26 @@ def apple_touch_icon_root():
     return response
 
 
+@app.route("/favicon-16.png")
+def favicon_png_16_root():
+    response = app.send_static_file("icons/dmate-site-v38-16.png")
+    response.headers["Content-Type"] = "image/png"
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
+@app.route("/favicon-32.png")
+def favicon_png_32_root():
+    response = app.send_static_file("icons/dmate-site-v38-32.png")
+    response.headers["Content-Type"] = "image/png"
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
 @app.route("/favicon-64.png")
 def favicon_png_root():
     """Search bots and Safari can fetch the same clearly branded PNG."""
-    response = app.send_static_file("icons/dmate-site-v37-64.png")
+    response = app.send_static_file("icons/dmate-site-v38-64.png")
     response.headers["Content-Type"] = "image/png"
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response
