@@ -19563,15 +19563,22 @@ function openDmateDownloadDialog() {
     if (!options) return;
     platformEl.textContent = options.platform;
     textEl.textContent = options.text;
-    actionsEl.replaceChildren(...options.actions.map(action => {
+    const downloadLinks = options.actions.map(action => {
         const link = document.createElement("a");
         link.href = action.url;
         link.textContent = action.label;
         link.rel = "noopener";
         if (action.secondary) link.classList.add("secondary");
         return link;
-    }));
-    actionsEl.hidden = options.actions.length === 0;
+    });
+    // Some older Android WebViews still lack replaceChildren().
+    if (typeof actionsEl.replaceChildren === "function") {
+        actionsEl.replaceChildren(...downloadLinks);
+    } else {
+        actionsEl.textContent = "";
+        downloadLinks.forEach(link => actionsEl.appendChild(link));
+    }
+    actionsEl.hidden = downloadLinks.length === 0;
 
     // Close the mobile navigation drawer before presenting the fixed dialog.
     // The modal stays outside the drawer so its backdrop never inherits transforms.

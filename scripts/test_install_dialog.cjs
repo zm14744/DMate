@@ -115,12 +115,14 @@ function simulateClick(userAgent, navigatorPlatform, opts={}) {
         },
         addEventListener(name, fn){handlers[id+":"+name]=fn;},
         setAttribute(name, value){this.attributes[name]=value;},
-        replaceChildren(...children){this.children=children;}
+        replaceChildren(...children){this.children=children;},
+        appendChild(child){this.children.push(child);}
     });
     for (const id of ["downloadAppBtn","downloadModalClose","downloadModal",
                      "downloadPlatform","downloadDescription","downloadActions"]) {
         elements.set(id, makeElement(id));
     }
+    if (opts.legacyDOM) elements.get("downloadActions").replaceChildren = undefined;
     let drawerClosed=0;
     const ctx = {
         navigator:{userAgent,platform:navigatorPlatform,maxTouchPoints:opts.touchPoints||0},
@@ -153,6 +155,9 @@ assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Linux; Android 14) Chrom
 assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Windows NT 10.0) Chrome/131.0","Win32").links), JSON.stringify(["GitCode · EXE","GitHub · EXE","Microsoft Store","itch.io"]));
 assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Macintosh; Intel Mac OS X) Safari/605","MacIntel").links), JSON.stringify(["GitCode · DMG","GitHub · DMG","itch.io"]));
 assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (X11; Linux x86_64) Firefox/131","Linux x86_64").links), JSON.stringify(["GitCode · DEB","GitHub · DEB","GitCode · AppImage","GitHub · AppImage","Snap Store"]));
+assert.equal(JSON.stringify(simulateClick("Mozilla/5.0 (Linux; Android 9; QQBrowser/12.0)","Linux armv8l",
+ {legacyDOM:true}).links), JSON.stringify(["GitCode · APK","GitHub · APK","itch.io"]),
+ "Legacy Android DOM without replaceChildren must still open the dialog");
 assert.equal(simulateClick("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)","iPhone").hidden,true,
  "iOS has no supported native package, so do not revive removed PWA links");
 assert.equal(simulateClick("Mozilla/5.0 (Linux; Android 14) DMateAndroid/1.0","Linux armv8l").hidden,true,
@@ -166,7 +171,7 @@ assert(!modal.includes("installHelp"), "Download modal must not retain legacy in
 
 assert(!/pwa|pwastore|webclip|mobileconfig|manifest/i.test(modal), "Download dialog must not expose PWA/WebClip links or instructions");
 assert(modal.includes('id="downloadModalTitle">下载 DMate</div>'), "Dialog title should describe package downloads");
-assert(html.includes("dmate-download-fix-v39-20261020"), "Cache key must update after dialog runtime fix");
+assert(html.includes("dmate-download-fix-v40-20261020"), "Cache key must update after dialog runtime fix");
 for(const platform of ["android", "windows", "macos", "linux"]) {
     assert(!guide(platform).actions.some(a => /查看全部安装文件|查看所有安装文件/.test(a.label)),
            "Do not show a generic all-installers button on " + platform);
