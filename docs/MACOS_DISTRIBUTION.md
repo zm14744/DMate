@@ -15,7 +15,7 @@ Apple Developer Program 中的 **Developer ID Application** 证书应导出包�
 | `APPLE_PASSWORD` | Apple 账号生成的**应用专用密码**，不是账户登录密码 |
 | `APPLE_TEAM_ID` | 10 位 Apple Developer Team ID |
 
-本仓库不持有这些证书或 Apple 凭据，不能自动替拥有者完成 Apple Developer 注册和公证。所有 6 个 Secret 填写齐全之后，构建工作流会创建临时 Keychain、导入证书，执行 `cargo tauri build --target universal-apple-darwin --bundles dmg`。Tauri 使用上述环境变量自动签名和公证，流水线随后分别使用 `codesign --verify`、`spctl --assess`、`xcrun stapler validate` 验证应用与 DMG。验证失败不会上传任何标称正式公证的安装包。
+本仓库不持有这些证书或 Apple 凭据，不能自动替拥有者完成 Apple Developer 注册和公证。所有 6 个 Secret 填写齐全之后，构建工作流会创建临时 Keychain、导入证书，执行 `cargo tauri build --target universal-apple-darwin --bundles dmg`。Tauri 使用上述环境变量自动签名和公证，流水线随后以 `codesign --verify`、`spctl --assess`、`xcrun stapler validate` 检查公证后的应用，并额外使用 `xcrun notarytool submit` 公证最终 DMG、`xcrun stapler staple` 附加磁盘映像票据，再验证 DMG 能通过 Gatekeeper；只有全套步骤成功才上传正式 artifact。验证失败不会上传任何标称正式公证的安装包。
 
 - 6 个 Secret **全部未设置**：仍能生成 `DMate-macos-UNSIGNED-TEST-ONLY` 测试用安装包，但是 Gatekeeper 仍可能警告，**不得作为无需手动放行的正式版宣传或替换 GitHub Release**。
 - Secret **仅设置一部分**：macOS 构建直接失败，避免混淆。

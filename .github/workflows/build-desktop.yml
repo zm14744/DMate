@@ -141,9 +141,13 @@ jobs:
           APPLE_SIGNING_IDENTITY: "-"
         run: cargo tauri build ${{ matrix.args }}
 
-      - name: Verify macOS Developer ID signature and Apple notarization
+      - name: Verify and notarize macOS app plus distributable DMG
         if: matrix.name == 'macos' && env.DMATE_MACOS_SIGNED == 'true'
         shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -159,9 +163,15 @@ jobs:
             xcrun stapler validate "$app"
           done
           for dmg in "${dmgs[@]}"; do
+            # Tauri notarizes the .app first. Notarize the distributable disk
+            # image separately so Gatekeeper can validate the DMG itself.
+            xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+            xcrun stapler staple "$dmg"
             xcrun stapler validate "$dmg"
+            spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
           done
-          echo "✅ DMate macOS Developer ID signature and notarization verified." >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ DMate macOS app and DMG both signed and Apple-notarized." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Warn about unsigned test-only macOS artifact
         if: matrix.name == 'macos' && env.DMATE_MACOS_SIGNED != 'true'
