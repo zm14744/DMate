@@ -63,6 +63,20 @@ CHINESE_CASES = [
 
 # Stable machine-readable gold examples; human review remains necessary
 # for formal proofs and whether explanations introduce false claims.
+
+USTC = "https://faculty.ustc.edu.cn/_resources/group1/M00/00/47/wKhJFGT1pGSAfHlvAE0oo3Ug_0I994.pdf"
+# USTC course slides include the *examples* (not historical finals). The
+# propositions and numerical answers have independently verified gold facts.
+USTC_CASES = [
+ ("UST01","中国科学技术大学","嵌套量词","论域是所有实数，Q(x,y)表示x+y=0。命题∃y∀x Q(x,y)是真还是假？解释原因。",[r"假|不成立|为假|false|错误"],USTC,"课程讲义第112页"),
+ ("UST02","中国科学技术大学","嵌套量词","论域是所有实数，Q(x,y)表示x+y=0。命题∀x∃y Q(x,y)是真还是假？给出y的取法。",[r"真|成立|为真|true|正确",r"[-−]x|负x|相反数"],USTC,"课程讲义第112页"),
+ ("UST03","中国科学技术大学","模运算证明","证明：如果整数n不能被2或3整除，则n²−1能被24整除。",[r"24|二十四"],USTC,"课程讲义第146页"),
+ ("UST04","中国科学技术大学","模运算反证","证明整数方程x²+3y²=8没有整数解，给出一个模3的理由。",[r"模.?3|mod\s*3|余数|平方",r"无整数解|不存在整数解|不可能|无解"],USTC,"课程讲义第146页"),
+ ("UST05","中国科学技术大学","立方数分解","给出整数1729的两组不同的正整数立方和表示（列出四个底数）。",[r"(?<!\d)1(?!\d)|1\^3|1³",r"(?<!\d)12(?!\d)|12\^3|12³",r"(?<!\d)9(?!\d)|9\^3|9³",r"(?<!\d)10(?!\d)|10\^3|10³"],USTC,"课程讲义第148页"),
+ ("UST06","中国科学技术大学","反例构造","多项式f(n)=n²−n+41是否对每个正整数n都产生素数？请给出一个反例n。",[r"(?<!\d)41(?!\d)|n\s*=\s*41",r"合数|不是素数|不总是|反例"],USTC,"课程讲义第154页"),
+ ("UST07","中国科学技术大学","棋盘染色","标准8×8国际象棋棋盘去掉两个对角的角格后，能否用31块1×2骨牌完全铺满？给出染色理由。",[r"不能|不可能|无法|铺不满|不可",r"黑|白|颜色|染色"],USTC,"课程讲义第153页"),
+]
+
 def heuristic_valid(reply, patterns):
     return bool(reply.strip()) and all(re.search(p, reply, re.I|re.S) for p in patterns)
 
@@ -161,7 +175,9 @@ def main():
         ("X03","X04","X05","X06","X07","X08","X09","X10")
     ]
     chinese=[(*case[:6],case[6]) for case in CHINESE_CASES]
-    selected=old if args.slice=="missed8" else chinese if args.slice=="chinese" else old+chinese
+    selected=(old if args.slice=="missed8" else
+              [(*case[:6],case[6]) for case in USTC_CASES] if args.slice=="ustc" else
+              chinese if args.slice=="chinese" else old+chinese)
     if args.images_only:
         selected=[]
     else:
