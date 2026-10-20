@@ -45,6 +45,12 @@ CASES=[
   question="请分别识别从左到右三张图，求各图的顶点数与边数；不要将图中线条交叉当作新顶点。",
   gold_note="Octahedron 6 vertices 12 edges; dodecahedron 20 vertices 30 edges; icosahedron 12 vertices 30 edges",
   markers=[r"八面体|Octahedron",r"十二面体|Dodecahedron",r"二十面体|Icosahedron"]),
+ dict(id="INDIA_BITMESRA_ISO",institution="Birla Institute of Technology Mesra",country="India",origin="2018 IT3021 end-semester exam Q6(a), real paired graph drawings",
+  url="https://bitmesra.ac.in/UploadedDocuments/adminexam/files/MO2018%20QP/IT3021-DISCRETE%20MATHEMATICS%20AND%20GRAPH%20THEORY%20%28END_MO2018%29.pdf",
+  page=0,box=(.255,.71,.81,.845),
+  question="只看第6(a)题两张图：分别写出顶点及边的数量，判断是否同构，并给出一一对应。右图两条对角线的交叉点没有实心点，不是顶点。",
+  gold_note="Two drawings of K4; each has exactly 4 vertices and 6 edges, isomorphic",
+  markers=[r"同构",r"(?<!\\d)4(?!\\d)|四个",r"(?<!\\d)6(?!\\d)|六条"]),
  dict(id="NJU_DIRECTED",institution="Nanjing University",country="China",origin="2019 Discrete Mathematics GraphPS3 Problem 1, actual directed figures",
   url="https://cs.nju.edu.cn/shiyh/DM2019/parts/GraphPS3.pdf",
   page=0,box=(.06,.025,.94,.72),
@@ -109,6 +115,12 @@ def main():
                     row["verdict"]="GOLD_TOKENS_PRESENT_NEEDS_EDGE_REVIEW"
                 else:
                     row["verdict"]="ANSWER_SUSPECT_REVIEW"
+                if c["id"]=="INDIA_BITMESRA_ISO" and answer_status==200:
+                    if re.search(r"不同构|非同构|不是同构",reply):
+                        row["verdict"]="CONFIRMED_WRONG_ISOMORPHISM"
+                    # A claim of an extra node at an unlabeled crossing is wrong.
+                    if re.search(r"(?:5|五)\\s*(?:个)?\\s*顶点|(?:顶点|节点).*?(?:5|五)\\s*个",reply):
+                        row["verdict"]="CONFIRMED_WRONG_GRAPH_VERTEX_COUNT"
                 if c["id"]=="MIT05_P3" and answer_status==200:
                     # Automated check: do not mark wrong just for differing wording.
                     row["known_graph_gold"]=c["visual_gold"]
@@ -129,7 +141,7 @@ def main():
     print("CURATED_COUNTS",json.dumps(counts,ensure_ascii=False),flush=True)
     failures=[r["id"] for r in out["cases"] if r["verdict"] in
              ("OCR_HTTP_FAILURE","ANSWER_HTTP_FAILURE","SOURCE_OR_RUNTIME_FAILURE",
-              "CONFIRMED_WRONG_NUMERIC_CLAIM","ANSWER_SUSPECT_REVIEW")]
+              "CONFIRMED_WRONG_NUMERIC_CLAIM","CONFIRMED_WRONG_ISOMORPHISM","CONFIRMED_WRONG_GRAPH_VERTEX_COUNT","ANSWER_SUSPECT_REVIEW")]
     print("CURATED_FAILURES",failures,flush=True)
     return 1 if failures else 0
 if __name__=="__main__":
