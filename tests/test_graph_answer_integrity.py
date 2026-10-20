@@ -101,6 +101,40 @@ class UniversityGraphAnswerBoundaryTests(unittest.TestCase):
         self.assertIn("【有向边已独立核对】",normalized)
         self.assertIn("c→d",normalized)
 
+    def test_nju_second_read_accepts_edge_includes_caption_but_not_wrong_edges(self):
+        q=("图(1)：有向图，顶点 a、b。有向边包括：a→b。"
+           "\n图(2)：有向图，顶点 a、b。有向边包括：a→b、b→a。")
+        data=[graph(1,"ab",[("a","b")]),graph(2,"ab",[("a","b"),("b","a")])]
+        normalized,issues,ok=review_directed_graphs(q,data)
+        self.assertTrue(ok, issues)
+        self.assertIn("图(2)",normalized)
+
+    def test_stanford_independent_dot_counts_detect_wrong_six_trees(self):
+        from graph_answer_integrity import review_multi_graph_counts
+        vision=("图1（六边形轮廓，8个顶点）：边集为(v1,v2)。\n"
+                "图2（5个顶点）：边集为(v1,v2)。\n"
+                "图3（6个顶点）：边集为(v1,v2)。\n"
+                "图4（5个顶点）：边集为(v1,v2)。\n"
+                "图5（7个顶点）：边集为(v1,v2)。\n"
+                "图6（8个顶点）：边集为(v1,v2)。")
+        audit=[{"index":i,"vertex_count":6,"edge_count":5,"complete":True}
+               for i in range(1,7)]
+        normalized,issues,ok=review_multi_graph_counts(vision,audit)
+        self.assertFalse(ok)
+        self.assertIn(FLAG,normalized)
+        self.assertTrue(any("图1" in issue for issue in issues))
+        self.assertTrue(any("图6" in issue for issue in issues))
+
+    def test_stanford_counts_agree_when_images_match(self):
+        from graph_answer_integrity import review_multi_graph_counts
+        vision="\n".join(f"图{i}（含6个顶点）：边集为(v1,v2)。" for i in range(1,5))
+        audit=[{"index":i,"vertex_count":6,"edge_count":5,"complete":True}
+               for i in range(1,5)]
+        normalized,issues,ok=review_multi_graph_counts(vision,audit)
+        self.assertTrue(ok)
+        self.assertEqual(issues,[])
+        self.assertEqual(normalized,vision)
+
     def test_directed_independent_incomplete_never_trusted(self):
         q="图(1)：有向图，含2个顶点a、b。有向边为：a→b。"
         data=[{"index":1,"directed":True,"vertices":["a","b"],
