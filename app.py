@@ -17,7 +17,8 @@ import ipaddress
 from flask import Flask, jsonify, render_template, request, session, make_response, redirect
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from ai import ask_ai, analyze_image_structure
+from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
+from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, FLAG as GRAPH_UNCERTAIN_FLAG
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 try:
     from graph_recognition import recognize_graphs
@@ -3027,9 +3028,13 @@ def chat():
             latest_graph_text = next(
                 (m["content"] for m in reversed(cleaned) if m.get("role") == "user"), ""
             )
-            derived_tree_answer = summarize_tree_question(latest_graph_text)
-            if derived_tree_answer:
-                reply = "依据题目列出的顶点与边集逐图计算：\n\n" + derived_tree_answer
+            graph_isomorphism_answer = answer_graph_isomorphism(latest_graph_text)
+            if graph_isomorphism_answer:
+                reply = graph_isomorphism_answer
+            else:
+                derived_tree_answer = summarize_tree_question(latest_graph_text)
+                if derived_tree_answer:
+                    reply = "依据题目列出的顶点与边集逐图计算：\n\n" + derived_tree_answer
 
         if not isinstance(reply, str) or not reply.strip():
             return jsonify({
@@ -3637,6 +3642,27 @@ def ocr():
             visual_text, alignment_warnings = reconcile_vision_edges(
                 visual_text, cv_graphs
             )
+        # On genuine isomorphism exam screenshots, the original generic Vision
+        # result is NOT safe as a complete edge list: curved arcs are easily
+        # assigned to the wrong endpoints and crossings can be mistaken for
+        # marked vertices. Run a second independent image-only edge audit.
+        # Never let a failed/mismatching read trigger a confident answer.
+        graph_review_issues = []
+        question_text = (ocr_text + "\n" + corrected_text)
+        if (image_kind != "non_exercise" and
+                re.search(r"同构|isomorph", question_text, re.IGNORECASE)):
+            audited = verify_graph_image_independently(raw)
+            if audited.get("ok"):
+                visual_text, graph_review_issues, _ = review_graph_transcriptions(
+                    visual_text, audited.get("graphs")
+                )
+            else:
+                visual_text = (GRAPH_UNCERTAIN_FLAG +
+                               "\n复杂图形的独立逐边复核未完成，暂不能据此判断同构。")
+                graph_review_issues = [
+                    "复杂图形逐边复核没有完成；请核对顶点间的弧线、交叉线和黑色实心点。"
+                ]
+
         if cv_graphs and not visual_text and image_kind != "non_exercise":
             readable = []
             for index, graph in enumerate(cv_graphs, 1):
@@ -3689,7 +3715,7 @@ def ocr():
                 "error": message + " 请尝试重新拍摄、裁剪，或提高图形与背景的对比度。"
             }), 400
 
-        warnings = list(alignment_warnings)
+        warnings = list(alignment_warnings) + list(graph_review_issues)
         if result.get("warning"):
             warnings.append(str(result.get("warning")))
         if ocr_fallback_reason and (corrected_text or visual_text):
@@ -3702,6 +3728,9 @@ def ocr():
         display_text, review = _prepare_ocr_review(
             ocr_text, corrected_text, uncertain_fields
         )
+        if graph_review_issues and isinstance(review, dict):
+            review["required"] = True
+            review["reasons"] = list(review.get("reasons") or []) + graph_review_issues
 
         return jsonify({
             "text": display_text,
