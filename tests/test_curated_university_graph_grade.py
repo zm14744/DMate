@@ -39,6 +39,20 @@ class DiagramGoldVerdictTests(unittest.TestCase):
         vision="无向图，边集合：{A,B},{B,C},{B,H},{C,D},{C,E},{D,E},{E,F},{E,H},{F,G}"
         self.assertEqual(verify_known_topology("MIT05_P3",vision,"直径=5，色数=3"),"")
 
+    def test_mit_wrong_hyphen_edge_list_is_detected(self):
+        text=("图1无向图，共8个顶点。边集合：A-B、A-C、B-C、B-H、"
+              "C-D、C-E、D-E、E-F、E-H、F-G。")
+        self.assertEqual(verify_known_topology("MIT05_P3",text,"直径=4，色数=3"),
+                         "OCR_WRONG_EDGE_LIST")
+
+    def test_mit_no_edge_list_is_not_a_pass(self):
+        self.assertEqual(verify_known_topology("MIT05_P3","只检测到8个顶点","直径=5，色数=3"),
+                         "OCR_TOPOLOGY_UNVERIFIED")
+
+    def test_mit_uncertain_is_not_wrong_math(self):
+        from graph_answer_integrity import FLAG
+        self.assertEqual(verify_known_topology("MIT05_P3",FLAG+"图形逐边核验冲突","需要核对"),"")
+
     def test_mit_spurious_edge_is_not_a_pass(self):
         vision="无向图，边集合：{A,B},{B,C},{B,H},{C,D},{C,E},{D,E},{E,F},{E,H},{F,G},{A,H}"
         self.assertEqual(verify_known_topology("MIT05_P3",vision,"直径=5，色数=3"),
