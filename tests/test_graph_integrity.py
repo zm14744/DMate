@@ -101,6 +101,42 @@ class GraphIntegrityTests(unittest.TestCase):
         self.assertFalse(contains_two_labeled_undirected_diagrams(
             aizu_description.replace("图2（无向图）","图3（无向图）")))
 
+    def test_real_aizu_mixed_letters_and_digits_supported(self):
+        # Japanese Aizu's original two diagrams label one graph a..h and
+        # the other 1..8; prior code rejected all numeric vertex identifiers.
+        original=(
+            "图1（上图）：无向图，顶点 a、b、c、d。边：a-b、b-c、c-d、d-a。\\n"
+            "图2（下图）：无向图，顶点 1、2、3、4。边：1-2、2-3、3-4、4-1。"
+        )
+        parsed=parse_diagrams(original)
+        self.assertEqual(set(parsed),{1,2})
+        self.assertEqual(set(parsed[2]["vertices"]),set("1234"))
+        audit=[
+            {"index":1,"directed":False,"complete":True,
+             "vertices":["a","b","c","d"],
+             "edges":[["a","b"],["b","c"],["c","d"],["d","a"]]},
+            {"index":2,"directed":False,"complete":True,
+             "vertices":["1","2","3","4"],
+             "edges":[["1","2"],["2","3"],["3","4"],["4","1"]]},
+        ]
+        clean,warnings,ok=review_graph_transcriptions(original,audit)
+        self.assertTrue(ok,(clean,warnings))
+        self.assertIn(OK_MARKER,clean)
+        self.assertIn("1-2",clean)
+        self.assertIsInstance(exact_isomorphism(parsed[1],parsed[2]),dict)
+
+    def test_case_insensitive_audit_accepts_original_uppercase_vertex_labels(self):
+        g={"vertices":["A","B","C","D"],
+           "edges":[["A","B"],["B","C"],["C","D"]]}
+        self.assertIsInstance(exact_isomorphism(
+            g,{"vertices":list("abcd"),"edges":[["a","b"],["b","c"],["c","d"]]}),dict)
+
+    def test_mixed_number_label_has_no_fabricated_endpoint(self):
+        wrong={"vertices":["1","2","3","4"],
+               "edges":[["1","2"],["2","3"],["3","5"]]}
+        correct={"vertices":list("abcd"),"edges":[["a","b"],["b","c"],["c","d"]]}
+        self.assertEqual(exact_isomorphism(wrong,correct),"unknown")
+
     def test_audit_incomplete_never_asserts_edges(self):
         for variant in (
             [dict(AUDIT[0],complete=False),AUDIT[1]],
