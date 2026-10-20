@@ -2,6 +2,10 @@
 
 当前 `knowledge_graph.json` 包含 **10 个模块、68 个知识节点**。图谱用于教学提示、建议前置知识提醒和学习状态关联；`prerequisites` 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含。图谱不记录学生掌握度。
 
+## 高校课程题目验证与学术来源证据
+
+- **[DMate 高校课程题目验证与知识图谱学术来源说明](UNIVERSITY_BENCHMARK_AND_KNOWLEDGE_SOURCES.md)**：含中外高校公开题目逐项测试记录、原始题源、参考答案、GitHub Actions 链接和斯坦福等复杂图形识别的真实局限。
+
 ## 权威依据
 
 - 高等教育出版社《离散数学（第3版）》：https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=658daaba74ce561611bd9a4f
