@@ -14126,6 +14126,14 @@ function markChatMessageAsWrong(sessionId, messageIndex) {
     );
 }
 
+function hideGeneratedExerciseKnowledgePoints(raw) {
+    // 仅调整 AI 出题气泡的可见正文，保留原始消息和知识点分类用于复测与图谱。
+    return String(raw || "").replace(
+        /(?:^|\n)\s*(?:【|\[|#+\s*)\s*(?:涉及知识点|所涉知识点|知识点)\s*(?:】|\]|[：:])[^\n]*(?:\n(?!\s*(?:【|\[|#+\s*|\d+[.、]|[（(]\d+[）)]))[^\n]*)*/g,
+        ""
+    ).replace(/\n{3,}/g, "\n\n").trim();
+}
+
 async function deleteChatMessage(sessionId, messageIndex) {
     const session = sessions.find(
         item => String(item.id) === String(sessionId)
@@ -14139,9 +14147,12 @@ async function deleteChatMessage(sessionId, messageIndex) {
         return;
     }
 
-    const confirmed = window.confirm(
-        "删除这条消息吗？\n\n只删除聊天中的这条消息；已经加入错题本的内容不会被删除。"
-    );
+    const confirmed = await showAppConfirm({
+        title: "删除消息",
+        body: "确定删除这条聊天消息吗？已加入错题本的内容不会被删除。",
+        confirmText: "删除",
+        confirmTone: "danger"
+    });
 
     if (!confirmed) return;
 
@@ -14584,7 +14595,9 @@ function renderChat() {
         } else {
             content.innerHTML =
                 `<div class="ai-content">${markdownToHtml(
-                    prepareAiDisplayText(message.text)
+                    message.generatedExercise
+                        ? hideGeneratedExerciseKnowledgePoints(prepareAiDisplayText(message.text))
+                        : prepareAiDisplayText(message.text)
                 )}</div>`;
         }
 
