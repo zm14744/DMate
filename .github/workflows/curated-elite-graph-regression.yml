@@ -6,6 +6,9 @@ on:
     paths:
       - ".github/workflows/curated-elite-graph-regression.yml"
       - "tests/curated_university_graph_images.py"
+      - "graph_answer_integrity.py"
+      - "app.py"
+      - "ai.py"
 permissions:
   contents: read
 concurrency:
