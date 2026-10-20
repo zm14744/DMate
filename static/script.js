@@ -4486,6 +4486,10 @@ function isRecordableOcrQuestionMessage(message) {
         return false;
     }
 
+    // 用户在 OCR 核对页的明确选择优先于启发式题干识别。
+    if (message.ocrIsQuestion === true) return true;
+    if (message.ocrIsQuestion === false) return false;
+
     const printed = extractOcrPrintedQuestionText(message.text);
     if (printed) {
         return Boolean(
@@ -9225,6 +9229,8 @@ function loadState() {
                     role: message.role,
                     text,
                     source: message.source === "ocr" ? "ocr" : undefined,
+                    ocrIsQuestion: typeof message.ocrIsQuestion === "boolean"
+                        ? message.ocrIsQuestion : undefined,
                     apiText: typeof message.apiText === "string"
                         ? message.apiText
                         : undefined,
@@ -13473,6 +13479,18 @@ function cancelImageRecognition() {
     refreshInputAvailability();
 }
 
+function formatOcrGraphForReview(raw) {
+    // 只做格式整理，不删除边集、顶点、重数等数学数据。
+    // 保留用户手动编辑后的原始精确信息供模型与题目历史使用。
+    let text = String(raw || "").trim();
+    if (!text) return "";
+    text = text.replace(/(图\\s*[1-9][0-9]*\\s*[（(]\\s*G[0-9]+\\s*[）)]\\s*的边集为[：:]?)/g, "\\n$1")
+        .replace(/(图\\s*[1-9][0-9]*\\s*[（(]\\s*G[0-9]+\\s*[）)]\\s*的边集为[：:]?)/g, "\\n$1")
+        .replace(/\\n{3,}/g, "\\n\\n")
+        .trim();
+    return text;
+}
+
 function reviewRecognizedQuestion(file, data) {
     const dialog = document.getElementById("ocrReviewDialog");
     const preview = document.getElementById("ocrReviewImage");
@@ -13494,7 +13512,12 @@ function reviewRecognizedQuestion(file, data) {
         preview.style.width = "100%";
         if (zoom) zoom.value = "100";
         question.value = typeof data.text === "string" ? data.text.trim() : "";
-        graph.value = typeof data.visual_text === "string" ? data.visual_text.trim() : "";
+        graph.value = typeof data.visual_text === "string"
+            ? formatOcrGraphForReview(data.visual_text) : "";
+        const questionRadios = Array.from(dialog.querySelectorAll('input[name="ocrQuestionType"]'));
+        const inferredQuestion = Boolean(question.value.trim() || /(?:求|判断|证明|是否|哪些|几个)/.test(graph.value));
+        const initialRadio = questionRadios.find(radio => radio.value === (inferredQuestion ? "question" : "other"));
+        if (initialRadio) initialRadio.checked = true;
 
         // 本轮要求只在图片核对界面填写，不从主聊天框继承。
         requestText.value = "";
@@ -13534,7 +13557,10 @@ function reviewRecognizedQuestion(file, data) {
                 error.textContent = "题目和本次要求合计过长，请适当精简后再发送。";
                 return;
             }
-            result = { text, visualText, userRequest };
+            result = {
+                text, visualText, userRequest,
+                ocrIsQuestion: dialog.querySelector('input[name="ocrQuestionType"]:checked')?.value === "question"
+            };
             dialog.close();
         };
         confirm.addEventListener("click", submit);
@@ -13666,7 +13692,7 @@ async function handleImageSelected(event) {
         // 这里不再自动删除题干片段，避免把真实条件当成图形噪声删掉。
         const reviewed = await reviewRecognizedQuestion(file, data);
         if (!reviewed || !sessions.some(item => item.id === session.id)) return;
-        const { text, visualText, userRequest } = reviewed;
+        const { text, visualText, userRequest, ocrIsQuestion } = reviewed;
 
         const questionParts = [];
 
@@ -13704,6 +13730,7 @@ async function handleImageSelected(event) {
             role: "user",
             text: combinedText,
             source: "ocr",
+            ocrIsQuestion,
             apiText
         });
 
