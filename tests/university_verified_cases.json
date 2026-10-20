@@ -1,0 +1,706 @@
+{
+  "version": 1,
+  "provenance": "Official course exam/problem-set question paraphrases are distinguished from derived parameter variants; not verbatim transcripts.",
+  "cases": [
+    {
+      "id": "MIT7-1b",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "组合计数",
+      "question": "20本按顺序排放的书，选出6本且任意两本不相邻，一共有多少种选择？",
+      "oracle": {
+        "kind": "integer",
+        "value": "5005"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-2a",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "重复排列",
+      "question": "单词BANANARAMA的10个字母可形成多少个不同排列？",
+      "oracle": {
+        "kind": "integer",
+        "value": "15120"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-2d",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "隔板法",
+      "question": "非负整数x1至x8满足x1+x2+...+x8=100，一共有多少个有序解？",
+      "oracle": {
+        "kind": "binomial",
+        "value": "107,7"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-2g",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "组合计数",
+      "question": "15个有序位置，一次选择0、1、2或3个不同位置，选择组合总数？",
+      "oracle": {
+        "kind": "integer",
+        "value": "576"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-2h",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "容斥原理",
+      "question": "1至300的整数中，能被2或3或5整除的整数共有多少个？",
+      "oracle": {
+        "kind": "integer",
+        "value": "220"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-3c",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "抽屉原理",
+      "question": "从整数中任选30个不同的整数，是否保证有两个整数的差或者和可以被51整除？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-4a",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "组合计数",
+      "question": "七颗不同颜色的六面骰子同时掷出，出现7个面值两两不同的方法数是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "0"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-4b",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "组合计数",
+      "question": "七颗彼此可区分六面骰子，要求恰好两个骰子为6，剩下五颗恰好分别是1至5，多少种结果？",
+      "oracle": {
+        "kind": "integer",
+        "value": "2520"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-4c",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "重复计数",
+      "question": "7颗不同颜色六面骰中，恰有一个面值出现2次、其余5个面值各出现一次，多少种结果？",
+      "oracle": {
+        "kind": "integer",
+        "value": "15120"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-4d",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "排列组合",
+      "question": "7颗可区分六面骰，恰好出现3种点数且频数分别为3、2、2，结果数是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "12600"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT7-5g",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/908f6c3c87842d1a47ded755a8a6f843_ps7sol.pdf",
+      "topic": "错排与概率",
+      "question": "n个元素随机排列，随着n增大，所有元素均不在原位置的概率趋于哪个常数？要求6位小数。",
+      "oracle": {
+        "kind": "decimal",
+        "value": "0.367879"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT4-3a",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/56bb1f08b01137f2c65762752c629b20_ps4sol.pdf",
+      "topic": "图的直径",
+      "question": "无向图顶点为A,B,C,D,E,F,G,H，边为AB,BC,BH,CD,CE,DE,EF,EH,FG。图的直径是几？",
+      "oracle": {
+        "kind": "integer",
+        "value": "5"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT4-3b",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/56bb1f08b01137f2c65762752c629b20_ps4sol.pdf",
+      "topic": "图着色",
+      "question": "无向图顶点为A,B,C,D,E,F,G,H，边为AB,BC,BH,CD,CE,DE,EF,EH,FG。最小色数是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "3"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT4-4a",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/56bb1f08b01137f2c65762752c629b20_ps4sol.pdf",
+      "topic": "图的连通性",
+      "question": "无向简单图每个顶点都至少与另一个顶点相邻，但整个图不连通。满足条件的最少顶点数是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "4"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT4-5a",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/56bb1f08b01137f2c65762752c629b20_ps4sol.pdf",
+      "topic": "平面图",
+      "question": "对于一个至少具有3个顶点的简单平面图，是否必存在至少一个度数不超过5的顶点？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT4-5b",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/56bb1f08b01137f2c65762752c629b20_ps4sol.pdf",
+      "topic": "平面图着色",
+      "question": "是否任意有限简单平面图都能用不超过6种颜色进行合法顶点着色？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT4-3c",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/56bb1f08b01137f2c65762752c629b20_ps4sol.pdf",
+      "topic": "路径与直径",
+      "question": "设无向连通图每个顶点到同一个固定顶点v的最短距离都不超过n。图的直径必不超过2n吗？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT4-1a",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/56bb1f08b01137f2c65762752c629b20_ps4sol.pdf",
+      "topic": "函数复合",
+      "question": "若f:A到B及g:B到C均为双射，那么g∘f一定为双射吗？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "MIT4-1c",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "solution": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/56bb1f08b01137f2c65762752c629b20_ps4sol.pdf",
+      "topic": "等价关系",
+      "question": "无向简单图的图同构关系（在所有有限简单图上）是否具有自反性、对称性、传递性？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-2a",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "数学归纳法",
+      "question": "已知对所有自然数k，P(k)→P(k+2)。能否保证P(n)对所有自然数n成立？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "否"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-2b",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "数学归纳法",
+      "question": "已知对所有自然数k，P(k)→P(k+2)；且P(1)成立。是否必有每个非负整数n都满足P(2n+1)？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-2c",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "数学归纳法",
+      "question": "只知道对所有自然数k，P(k)→P(k+2)。是否能必然推出所有偶数n满足P(n)？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "否"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-5a",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "期望",
+      "question": "一枚硬币每次正面概率0.6，独立抛100次，正面出现次数期望是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "60"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-5b",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "Markov不等式",
+      "question": "抛100次独立硬币，每次正面概率0.6，Y为正面次数。Markov不等式对P(Y≥80)给出的上界是多少？",
+      "oracle": {
+        "kind": "fraction",
+        "value": "3/4"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-5c",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "方差",
+      "question": "一枚硬币正面概率0.6，单次伯努利随机变量的方差是多少？",
+      "oracle": {
+        "kind": "decimal",
+        "value": "0.24"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-5d",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "方差",
+      "question": "正面概率0.6，100次独立硬币正面次数的方差是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "24"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-5e",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "Chebyshev不等式",
+      "question": "正面概率0.6，100次独立硬币，Y为正面次数。Chebyshev不等式对偏差至少20的事件P(|Y−60|≥20)给出的上界是多少？",
+      "oracle": {
+        "kind": "decimal",
+        "value": "0.06"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-7a",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "RSA",
+      "question": "RSA模数21且公开指数5，私钥指数d取0≤d<12且5d≡1(mod12)，求d。",
+      "oracle": {
+        "kind": "integer",
+        "value": "5"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-7c",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "RSA",
+      "question": "模数21，RSA公开指数5，收到密文4，已知私钥指数5，则原始明文是什么？",
+      "oracle": {
+        "kind": "integer",
+        "value": "4"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-12a",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "欧拉通路",
+      "question": "是否可能沿立方体骨架的每一条边恰好行走一次（起点和终点可以不同）？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "否"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "C-3",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "solution": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "最大公约数",
+      "question": "斐波那契变体f0=f1=1，fn+2=fn+1+fn，对所有n，gcd(fn,fn+1)是否等于1？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-1a",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "线性同余",
+      "question": "已知1=121×18−7×311，求18x≡7(mod311)在0≤x<311范围内的唯一整数解。",
+      "oracle": {
+        "kind": "integer",
+        "value": "225"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-1b",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "模运算",
+      "question": "线性同余18x≡7(mod311)在模311意义下有几个不同的解？",
+      "oracle": {
+        "kind": "integer",
+        "value": "1"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-3",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "几何分布期望",
+      "question": "反复掷公平六面骰直到出现两种不同点数，包含第一次掷出，所需掷骰次数期望是多少？",
+      "oracle": {
+        "kind": "fraction",
+        "value": "11/5"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-4",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "组合概率",
+      "question": "从52张标准扑克牌中无序抽5张，至少有2张J/Q/K人头牌的手牌共有多少种？（不是概率）",
+      "oracle": {
+        "kind": "integer",
+        "value": "844272"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-5a",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "全概率公式",
+      "question": "朋友有0.3概率忘记浇花，没浇水时花死亡率0.9，浇水时死亡率0.2。花死亡概率是多少？",
+      "oracle": {
+        "kind": "decimal",
+        "value": "0.41"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-5b",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "Bayes公式",
+      "question": "在上一题的条件下，已知花死亡，朋友忘记浇花的条件概率是多少？请用最简分数。",
+      "oracle": {
+        "kind": "fraction",
+        "value": "27/41"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-6",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "隔板法",
+      "question": "(x+y+z+w)^100 合并同类项后，共有多少个不同单项式？",
+      "oracle": {
+        "kind": "integer",
+        "value": "176851"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-7",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "等价关系",
+      "question": "任意含至少2个元素的有限集合上的等价关系，是否必存在不同元素，它们的等价类大小相同？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "B-9b",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "solution": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "集合恒等式",
+      "question": "集合A,B,C满足A∩C=B∩C且A∪C=B∪C，是否一定A=B？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "official_paraphrase"
+    },
+    {
+      "id": "V01",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "topic": "变式-间隔计数",
+      "question": "把17本按顺序排放的书中选出5本且两两不相邻，选择方式有几种？",
+      "oracle": {
+        "kind": "integer",
+        "value": "1287"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V02",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "topic": "变式-间隔计数",
+      "question": "把12本书中选出4本且两两不相邻，选择方式有几种？",
+      "oracle": {
+        "kind": "integer",
+        "value": "126"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V03",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "topic": "变式-容斥",
+      "question": "1至500的整数中，至少能被2、3、5之一整除的有多少个？",
+      "oracle": {
+        "kind": "integer",
+        "value": "367"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V04",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "topic": "变式-隔板法",
+      "question": "非负整数x1到x5之和为10，共有几组有序解？",
+      "oracle": {
+        "kind": "integer",
+        "value": "1001"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V05",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "topic": "变式-隔板法",
+      "question": "正整数x1到x5之和为10，共有几组有序解？",
+      "oracle": {
+        "kind": "integer",
+        "value": "126"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V06",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "topic": "变式-错排",
+      "question": "5个人各有一顶不同的帽子，随机排帽子且无人拿自己帽子，有多少种分配方式？",
+      "oracle": {
+        "kind": "integer",
+        "value": "44"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V07",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "变式-独立方差",
+      "question": "正面概率0.3，独立抛200次硬币，正面次数方差是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "42"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V08",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "变式-Markov",
+      "question": "非负随机变量均值为12，Markov不等式对P(X≥48)给出的上界是多少？",
+      "oracle": {
+        "kind": "fraction",
+        "value": "1/4"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V09",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "变式-Chebyshev",
+      "question": "随机变量均值10、方差16，Chebyshev不等式对P(|X−10|≥8)给出的上界？",
+      "oracle": {
+        "kind": "fraction",
+        "value": "1/4"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V10",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "变式-Bayes",
+      "question": "误诊率：疾病先验0.02，真阳性0.95，假阳性0.05，已知检测阳性患病概率？写最简分数。",
+      "oracle": {
+        "kind": "fraction",
+        "value": "19/68"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V11",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "变式-同余",
+      "question": "求17x≡5(mod31)在0≤x<31时的解。",
+      "oracle": {
+        "kind": "integer",
+        "value": "13"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V12",
+      "source": "https://math.berkeley.edu/~ribet/55/final_sols.pdf",
+      "topic": "变式-组合",
+      "question": "展开(x+y+z)^20并合并同类项，共有多少项？",
+      "oracle": {
+        "kind": "integer",
+        "value": "231"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V13",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "topic": "变式-图直径",
+      "question": "路径图P_11有11个顶点，最长最短路长度（直径）为多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "10"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V14",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "topic": "变式-图着色",
+      "question": "轮图W_6（一个中心顶点和5个环上顶点）最小色数为多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "4"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V15",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "topic": "变式-连通",
+      "question": "无向图顶点a,b,c,d,e,f，边ab,bc,ca,de,ef,fd。图中连通分量数是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "2"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V16",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "topic": "变式-树",
+      "question": "无向图顶点a,b,c,d,e，边ab,bc,cd,de。它是树吗？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "是"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V17",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+      "topic": "变式-树",
+      "question": "无向图顶点a,b,c,d,e，边ab,bc,ca,de。它是树吗？",
+      "oracle": {
+        "kind": "boolean",
+        "value": "否"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V18",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "topic": "变式-计数",
+      "question": "6位可区分二元序列中恰有3个1的序列数？",
+      "oracle": {
+        "kind": "integer",
+        "value": "20"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V19",
+      "source": "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/4791b8cd8b7a492119f5b67497490bcb_ps7.pdf",
+      "topic": "变式-图计数",
+      "question": "固定4个带标签顶点的简单无向图允许自环，每条无向边、自环至多出现一次，总图数？",
+      "oracle": {
+        "kind": "integer",
+        "value": "1024"
+      },
+      "category": "derived_variant"
+    },
+    {
+      "id": "V20",
+      "source": "https://www.cs.cornell.edu/courses/cs2802/2020fa/2800finalsol-16fa.pdf",
+      "topic": "变式-初等数论",
+      "question": "gcd(987,610)是多少？",
+      "oracle": {
+        "kind": "integer",
+        "value": "1"
+      },
+      "category": "derived_variant"
+    }
+  ]
+}
