@@ -6,6 +6,8 @@ the broad 出...题 generator pattern. This checks general discrete-math tasks
 and explicitly requested new exercises separately.
 """
 import unittest
+import ast
+from pathlib import Path
 from teaching import looks_like_exercise_request
 from graph_answer_integrity import is_scanned_graph_solution_request
 
@@ -35,6 +37,25 @@ class UniversitySolutionIntentTests(unittest.TestCase):
             "给我一道题",
         ]:
             self.assertTrue(looks_like_exercise_request(request),request)
+
+    def test_chat_user_text_initialized_before_request_kind_classification(self):
+        # This caught a real production-wide HTML HTTP500, not an OCR error.
+        # The current user question must be initialized on the ordinary route
+        # even when the frontend sends NO question_context (usual REST calls).
+        source=Path(__file__).resolve().parents[1].joinpath("app.py").read_text(encoding="utf-8")
+        module=ast.parse(source)
+        fn=next(x for x in module.body if isinstance(x,ast.FunctionDef) and x.name=="chat")
+        direct={
+            target.id:i
+            for i,node in enumerate(fn.body)
+            if isinstance(node,ast.Assign)
+            for target in node.targets
+            if isinstance(target,ast.Name)
+            for _ in [0]
+        }
+        self.assertIn("current_user_content",direct)
+        self.assertIn("server_detected_exercise",direct)
+        self.assertLess(direct["current_user_content"],direct["server_detected_exercise"])
 
     def test_original_nju_image_not_quiz(self):
         text=("【题目文字】\n判断图是否有欧拉回路。\n"
