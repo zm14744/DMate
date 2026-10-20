@@ -22,6 +22,27 @@ OK_MARKER = "【图形边集已二次核对】"
 UNCERTAIN = re.compile(r"不确定|待核对|未确认|可能|仅确认|候选边|部分边|partial", re.I)
 
 
+
+def contains_two_labeled_undirected_diagrams(visual_text):
+    """Image-only comparison pages require independent graph auditing.
+
+    An illustration titled 'isomorphic graphs' may supply only vertex labels
+    as OCR text, so the absence of 'isomorphic' in OCR text is not evidence
+    that the diagram is unrelated to graph isomorphism.
+    """
+    text=str(visual_text or "")
+    sections=list(re.finditer(r"(?:^|\n)\s*图\s*([12])\s*[（(:：]",text,re.I))
+    if len(sections)!=2 or [x.group(1) for x in sections]!=["1","2"]:
+        return False
+    for i,m in enumerate(sections):
+        chunk=text[m.start():sections[i+1].start() if i+1<len(sections) else len(text)]
+        if not re.search(r"无向图|undirected",chunk[:100],re.I):
+            return False
+        if not re.search(r"顶点|vertices|边(?:集合|集|连接|关系)",chunk,re.I):
+            return False
+    return True
+
+
 def _normal_edge(a, b):
     return tuple(sorted((a.lower(), b.lower())))
 
