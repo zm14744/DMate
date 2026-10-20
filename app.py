@@ -3653,6 +3653,16 @@ def ocr():
 
             if visual_text == "未发现需要补充的图形结构。":
                 visual_text = ""
+            # Pure graph figures are useful mathematical input even when
+            # they have no question text. HKUST polyhedra images used to
+            # return 422 incorrectly. Do not accept unrelated photos/notes.
+            graph_visual_evidence = (
+                bool(graph_cv.get("graphs") or [])
+                or bool(re.search(r"(?i)(?:Petersen|八面体|十二面体|二十面体|多面体).{0,120}(?:顶点|边|图)",visual_text))
+                or bool(re.search(r"(?s)(?:顶点.{0,120}?(?:边|连线)|图[一二三四五六七八九十1-9].{0,150}?(?:边集|顶点))",visual_text))
+            )
+            if image_kind == "non_exercise" and graph_visual_evidence:
+                image_kind = "uncertain"
             uncertain_fields = vision_result.get("uncertain_fields", [])
             if not isinstance(uncertain_fields, list):
                 uncertain_fields = []
