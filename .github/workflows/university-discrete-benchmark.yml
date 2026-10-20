@@ -22,6 +22,7 @@ jobs:
         run: python -m py_compile tests/university_discrete_benchmark.py graph_consistency.py ai.py app.py
       - name: Test live university cases against deployed DMate
         env:
+          PYTHONPATH: .
           DMATE_BENCH_URL: https://dmate.zeabur.app
         run: |
           python tests/university_discrete_benchmark.py \
