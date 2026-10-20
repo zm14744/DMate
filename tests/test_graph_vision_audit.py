@@ -53,6 +53,21 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         self.assertEqual(sum(row["type"]=="image_url" for row in contents),3)
         self.assertIn("不得使用其他模型已经给出的边集", contents[0]["text"])
 
+    def test_vertical_original_two_graphs_are_both_zoomed(self):
+        tall=Image.new("RGB",(330,570),"white")
+        output=io.BytesIO()
+        tall.save(output,format="PNG")
+        packets=[]
+        def fake_post(url,headers,json,timeout):
+            packets.append(json)
+            return _Response(200,GRAPH_RESPONSE)
+        with patch.object(ai,"API_KEY","test_only_key"),patch.object(ai,"VISION_ENABLED",True),patch.object(ai.requests,"post",side_effect=fake_post):
+            out=ai.verify_graph_image_independently(output.getvalue(),retries=0)
+        self.assertTrue(out["ok"])
+        frames=[item for item in packets[0]["messages"][0]["content"]
+                if item["type"]=="image_url"]
+        self.assertEqual(len(frames),3)
+
     def test_service_failure_yields_no_provisional_graph(self):
         with patch.object(ai,"API_KEY","test_only_key"),patch.object(ai,"VISION_ENABLED",True),patch.object(ai.requests,"post",return_value=_Response(502)):
             out=ai.verify_graph_image_independently(sample_image(),retries=0)
