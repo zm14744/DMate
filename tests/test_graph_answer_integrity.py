@@ -164,7 +164,8 @@ class UniversityGraphAnswerBoundaryTests(unittest.TestCase):
                   "edges":[list(x) for x in ("AB","BC","BH","CD","CE","DE","EF","EH","FG")]}]
         result,issues,ok=review_single_undirected_graph(gold,audited)
         self.assertTrue(ok)
-        self.assertEqual(result,gold)
+        self.assertIn('【图形边集已二次核对】',result)
+        self.assertIn(gold,result)
         self.assertEqual(issues,[])
 
     def test_no_single_graph_pass_when_second_audit_missing(self):
