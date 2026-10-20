@@ -346,9 +346,10 @@
       "question": "模数21，RSA公开指数5，收到密文4，已知私钥指数5，则原始明文是什么？",
       "oracle": {
         "kind": "integer",
-        "value": "4"
+        "value": "16"
       },
-      "category": "official_paraphrase"
+      "category": "official_paraphrase",
+      "reference_note": "Cornell 2016 Fall CS2800 exam published solution writes 4, but makes arithmetic error treating (4^2)^2 as 64. Independent exact pow(4,5,21)=16; oracle corrected and must not inherit erroneous key."
     },
     {
       "id": "C-12a",
