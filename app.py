@@ -19,7 +19,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
 from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, contains_two_labeled_undirected_diagrams, has_critical_edge_or_arrow_uncertainty, FLAG as GRAPH_UNCERTAIN_FLAG
-from graph_answer_integrity import detect_count_inconsistency, review_directed_graphs, protect_uncertain_graph_answer, review_multi_graph_counts, FIGURE_VERTEX_COUNT
+from graph_answer_integrity import (detect_count_inconsistency, review_directed_graphs,
+    protect_uncertain_graph_answer, review_multi_graph_counts,
+    detect_named_graph_degree_inconsistency, is_scanned_graph_solution_request,
+    FIGURE_VERTEX_COUNT)
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
@@ -2910,6 +2913,11 @@ def chat():
         or (teaching or {}).get("mode") == "exercise"
         or server_detected_exercise
     )
+    # An uploaded original image is a question to SOLVE, not a request to
+    # invent a new practice question. Only the explicit instruction section
+    # may authorize generation. Do not classify OCR boilerplate as intent.
+    if is_scanned_graph_solution_request(current_user_content):
+        effective_exercise_request = False
 
     # 用户明确要求“出题并给答案/解析”时，必须执行复合任务。
     # 不影响普通出题的隐藏答案和难度校验。
@@ -3069,6 +3077,17 @@ def chat():
             if protected_reply is not None:
                 reply = protected_reply
 
+        # This final safety boundary MUST ALSO run for solve requests that
+        # the teaching/exercise classifier mislabels. Previously the whole
+        # guard was accidentally inside "if not effective_exercise_request".
+        if cleaned and isinstance(reply, str):
+            original_image_request = next(
+                (m["content"] for m in reversed(cleaned) if m.get("role") == "user"), ""
+            )
+            final_graph_guard = protect_uncertain_graph_answer(original_image_request, reply)
+            if final_graph_guard is not None:
+                reply = final_graph_guard
+
         if not isinstance(reply, str) or not reply.strip():
             return jsonify({
                 "error": "AI 服务没有生成有效回答，请重新发送。"
@@ -3090,6 +3109,8 @@ def chat():
                 latest_user_text
             )
         )
+        if is_scanned_graph_solution_request(latest_user_text):
+            is_exercise_request = False
 
         generated_question = ""
 
@@ -3711,6 +3732,16 @@ def ocr():
                 graph_review_issues = [
                     "复杂图形逐边复核没有完成；请核对顶点间的弧线、交叉线和黑色实心点。"
                 ]
+
+        # Another real MIT eight-vertex examination diagram contained a
+        # spurious A-C edge and an impossible *odd* sum of degrees in Vision.
+        # Invariants in a single graph transcription must not be ignored when
+        # the language model later offers a plausible-looking shortest path.
+        if image_kind != "non_exercise" and GRAPH_UNCERTAIN_FLAG not in visual_text:
+            degree_issue = detect_named_graph_degree_inconsistency(visual_text)
+            if degree_issue:
+                graph_review_issues.append(degree_issue)
+                visual_text = GRAPH_UNCERTAIN_FLAG + "\n" + visual_text
 
         # A real HKUST Petersen university image exposed an internally
         # contradictory Vision transcript: it declared 15 edges but wrote
