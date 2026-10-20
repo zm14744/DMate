@@ -256,10 +256,10 @@ def single_undirected_named_edges(vision_text):
         if not u or not v or u==v:
             return None
         pairs.append(tuple(sorted((u,v))))
-    if len(pairs)<4 or len(pairs)>75 or len(set(pairs))!=len(pairs):
+    if len(pairs)<1 or len(pairs)>75 or len(set(pairs))!=len(pairs):
         return None
     vertices=set(v for edge in pairs for v in edge)
-    if not 4<=len(vertices)<=12:
+    if not 2<=len(vertices)<=12:
         return None
     # If a cardinality is stated, do not pretend isolated vertices are absent.
     n=re.search(r"(?:共|包含|含|有)\s*(\d+)\s*个顶点",text[:match.start()])
