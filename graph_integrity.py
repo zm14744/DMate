@@ -164,7 +164,16 @@ def exact_isomorphism(left, right):
     # Most constrained vertices first; adjacency checks prune candidate mappings.
     order = sorted(va, key=lambda x: (-len(av[x]), x))
     mapping, used = {}, set()
+    states = 0
+    exceeded = False
     def search(i):
+        nonlocal states, exceeded
+        states += 1
+        # Bound adversarial symmetric cases. Budget exhaustion must return
+        # "unknown", never be misreported as mathematical non-isomorphism.
+        if states > 250000:
+            exceeded = True
+            return None
         if i == len(order):
             return dict(mapping)
         x = order[i]
@@ -181,7 +190,8 @@ def exact_isomorphism(left, right):
             used.remove(y)
             del mapping[x]
         return None
-    return search(0)
+    result = search(0)
+    return "unknown" if result is None and exceeded else result
 
 
 def answer_graph_isomorphism(user_text):
