@@ -127,7 +127,16 @@ def main():
     ap.add_argument("--only",action="append",default=[])
     opts=ap.parse_args()
     session=requests.Session()
-    out={"purpose":"real university graphs with verifiable topology, not synthetic",
+    expected="2026-10-20-v4-independent-directed-and-multigraph-vertex-audit"
+    try:
+        health=session.get(opts.base.rstrip("/")+"/health",timeout=12).json()
+        deployed_version=health.get("graph_image_audit_version")
+    except Exception:
+        deployed_version=None
+    deployed_current=(deployed_version==expected)
+    print("LIVE_GRAPH_VERSION",deployed_version,deployed_current,flush=True)
+    out={"expected_version":expected,"deployed_version":deployed_version,"deployment_verified":deployed_current,
+         "purpose":"real university graphs with verifiable topology, not synthetic",
          "started_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),"cases":[]}
     dest=Path("curated_university_graph_samples")
     dest.mkdir(exist_ok=True)
@@ -200,6 +209,9 @@ def main():
              ("OCR_HTTP_FAILURE","ANSWER_HTTP_FAILURE","SOURCE_OR_RUNTIME_FAILURE",
               "CONFIRMED_WRONG_NUMERIC_CLAIM","CONFIRMED_WRONG_ISOMORPHISM","CONFIRMED_WRONG_GRAPH_VERTEX_COUNT","CONFIRMED_WRONG_CONNECTIVITY","CONFIRMED_WRONG_TREE_COUNT","OCR_WRONG_EDGE_LIST","OCR_WRONG_VERTEX_COUNT","OCR_WRONG_DIRECTED_EDGES","OCR_CONTRADICTORY_EDGE_LIST","ANSWER_SUSPECT_REVIEW")]
     print("CURATED_FAILURES",failures,flush=True)
+    if not deployed_current:
+        print("DEPLOYMENT_OUTDATED: v4 not live",flush=True)
+        return 2
     return 1 if failures else 0
 if __name__=="__main__":
     raise SystemExit(main())
