@@ -299,7 +299,10 @@ def review_single_undirected_graph(primary_text, independently_read):
                 "在确认原图之前不能据此计算直径、色数或连通性。"), [
                     "单幅图原始识别与独立逐边复核存在冲突。"
                 ],False
-    return primary_text,[],True
+    # Both independent pixel reads agree on every explicitly listed edge.
+    # This is not absolute image ground truth, but authorizes deterministic
+    # calculations instead of another language-model guess.
+    return "【图形边集已二次核对】\n"+str(primary_text),[],True
 
 
 
