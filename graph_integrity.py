@@ -11,7 +11,7 @@ EDGE_START = re.compile(r"(?:边连接关系|边集合|边集|边包括|边为|�
 # Real Aizu University isomorphism diagrams label one graph a..h and the
 # other 1..8. Limiting parser and independent audit to [a-z] silently made
 # valid numeric-labeled diagrams impossible to confirm.
-LABEL = r"(?:[a-z]|\\d{1,2})"
+LABEL = r"(?:[a-z]|\d{1,2})"
 EDGE = re.compile(r"(?<![a-zA-Z0-9])("+LABEL+r")\s*[-—–－−]\s*("+LABEL+r")(?![a-zA-Z0-9])", re.I)
 CURLY_EDGE = re.compile(r"\{\s*("+LABEL+r")\s*[,，]\s*("+LABEL+r")\s*\}", re.I)
 VERTEX_SET = re.compile(
