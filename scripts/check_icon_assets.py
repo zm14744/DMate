@@ -176,6 +176,37 @@ def main():
                              stroke_palette=BING_STROKES)
         assert ImageChops.difference(observed, expected).getbbox() is None, ("v39", size)
 
+    # v40 must NEVER color a polygon face. All non-transparent RGB values
+    # are grayscale: black background/interior with only bright white edges.
+    v40_palette = [WHITE] * 6
+    for tiny in (16,32,64):
+        matches_vector(ICONS / f"dmate-site-v40-{tiny}.png", tiny,
+                       background=BLACK, foreground=WHITE, rounded=True,
+                       stroke_units=STROKE, figure_scale=v38scales[tiny],
+                       oversample_factor=16, facets=True,
+                       stroke_palette=v40_palette)
+    check_ico(ICONS / "dmate-site-v40.ico", (16,24,32,48,64,128,256))
+    v40_ico = (ICONS / "dmate-site-v40.ico").read_bytes()
+    for i in range(struct.unpack_from("<H", v40_ico, 4)[0]):
+        w,h,_,_,_,_,length,offset = struct.unpack_from("<BBBBHHII", v40_ico, 6+16*i)
+        size=w or 256
+        assert (h or 256)==size
+        with Image.open(io.BytesIO(v40_ico[offset:offset+length])) as layer:
+            observed=layer.convert("RGBA")
+        expected=draw_mark(size, background=BLACK, foreground=WHITE,
+                           stroke_units=STROKE, rounded=True,
+                           figure_scale=v38scales[size], oversample_factor=16,
+                           facets=True, stroke_palette=v40_palette)
+        assert ImageChops.difference(observed, expected).getbbox() is None, ("v40",size)
+    for file in [ICONS / f"dmate-site-v40-{s}.png" for s in (16,32,64)]:
+        with Image.open(file) as im:
+            rgb=im.convert("RGB")
+            assert all(r==g==b for r,g,b in rgb.getdata()), f"Colored faces found in {file}"
+            size=im.size[0]
+            # The center and off-line face areas must be black, not tinted.
+            assert max(rgb.getpixel((size//2,size//2))) <= 8, ("Center is not black", file)
+    assert STROKE == 13
+
     # Search favicon must stay thin, while the legacy Safari rendering is unchanged.
     assert ImageChops.difference(rgba(ICONS / "dmate-site-v35-64.png").convert("RGB"),
                                  rgba(ICONS / "dmate-site-v34-64.png").convert("RGB")).getbbox() is not None
@@ -212,14 +243,14 @@ def main():
     namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     assert [node.text for node in root_sitemap.findall(".//sm:loc", namespace)] == ["https://dmate.zeabur.app/"]
     assert '<link rel="canonical" href="https://dmate.zeabur.app/">' in html
-    assert 'send_static_file("icons/dmate-site-v39.ico")' in app_text
-    assert 'send_static_file("icons/dmate-site-v39-64.png")' in app_text
-    assert 'send_static_file("icons/dmate-site-v39-32.png")' in app_text
-    assert 'send_static_file("icons/dmate-site-v39-16.png")' in app_text
+    assert 'send_static_file("icons/dmate-site-v40.ico")' in app_text
+    assert 'send_static_file("icons/dmate-site-v40-64.png")' in app_text
+    assert 'send_static_file("icons/dmate-site-v40-32.png")' in app_text
+    assert 'send_static_file("icons/dmate-site-v40-16.png")' in app_text
     assert '{% if is_search_crawler %}' in html
-    assert '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-bing-v39-20261020">' in html
+    assert '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-bing-v40-20261020">' in html
     for pixel in (16,32,64):
-        assert f'<link rel="icon" type="image/png" sizes="{pixel}x{pixel}" href="/favicon-{pixel}.png?v=dmate-bing-v39-20261020">' in html
+        assert f'<link rel="icon" type="image/png" sizes="{pixel}x{pixel}" href="/favicon-{pixel}.png?v=dmate-bing-v40-20261020">' in html
     assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v36-64.png?v=dmate-safari-v36-20261019">' in html
     assert 'document.head.appendChild(icon)' not in html
     assert 'dmate-safari-" + theme' not in html

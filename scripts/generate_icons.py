@@ -111,7 +111,9 @@ def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=STROKE,
             for x, y in points
         ]
 
-    if facets:
+    # Facet fills are LEGACY v38/v39 ONLY. v40 passes the pure WHITE palette
+    # to the antialias branch but must leave every face solid black.
+    if facets and stroke_palette != [WHITE] * len(PATHS):
         for points, face_color in BING_FACETS:
             draw.polygon(coords(points), fill=face_color)
     line_width = max(1, round(stroke_units * side / VIEWBOX))
@@ -327,6 +329,25 @@ def main():
              background=BLACK, stroke_units=STROKE, rounded=True,
              figure_scale_by_size=bing_scales, oversample_factor=16,
              facets=True, stroke_palette=BING_STROKES)
+
+    # v40 — Bing DESKTOP search favicon ONLY.
+    # Pure white original wireframe (#fff), and pure black interior/background.
+    # No polygons, coloured facets, gradients, glow or thicker strokes.
+    # The existing subpixel alpha correction is applied to 16/24/32px to
+    # lift perceived brightness without changing the 13-unit vector width.
+    for size in (16, 32, 64):
+        save_png(draw_mark(size, background=BLACK, foreground=WHITE,
+                           stroke_units=STROKE, rounded=True,
+                           figure_scale=bing_scales[size], oversample_factor=16,
+                           facets=True, stroke_palette=[WHITE] * len(PATHS),
+                           ),
+                 STATIC / f"dmate-site-v40-{size}.png")
+    save_ico(STATIC / "dmate-site-v40.ico",
+             (16, 24, 32, 48, 64, 128, 256),
+             background=BLACK, foreground=WHITE,
+             stroke_units=STROKE, rounded=True,
+             figure_scale_by_size=bing_scales, oversample_factor=16,
+             facets=True, stroke_palette=[WHITE] * len(PATHS))
 
     # iOS Safari uses the Apple touch icon for site bookmarks and Home Screen shortcuts.
     save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
