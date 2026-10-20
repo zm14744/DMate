@@ -9,9 +9,6 @@ concurrency:
   cancel-in-progress: false
 permissions:
   contents: read
-concurrency:
-  group: curated-elite-graph-diagrams
-  cancel-in-progress: false
 jobs:
   real-original-figure:
     runs-on: ubuntu-22.04
