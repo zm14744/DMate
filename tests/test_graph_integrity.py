@@ -109,6 +109,16 @@ class GraphIntegrityTests(unittest.TestCase):
         self.assertEqual(answer_graph_isomorphism(
             uncertain.replace("只解第11题团数","只解第12题的谓词逻辑")),"")
 
+    def test_single_graph_image_generic_answer_request(self):
+        text=GOLD + "\n【我的要求】\n直接给出最终答案"
+        # Input is still image-sourced, so it must be independently verified.
+        self.assertEqual(answer_graph_isomorphism(text),"")
+        verified=GOLD.replace("【图形信息】","【图形信息】\n"+OK_MARKER)
+        self.assertIn("两图同构",answer_graph_isomorphism(
+            verified + "\n【我的要求】\n直接给出最终答案"))
+        multiple=verified + "\n11. What is the clique number?\n【我的要求】\n直接给出最终答案"
+        self.assertEqual(answer_graph_isomorphism(multiple),"")
+
     def test_ordinary_non_graph_math_does_not_get_overridden(self):
         self.assertEqual(answer_graph_isomorphism("求解 18x≡7 mod 311"),"")
         self.assertEqual(answer_graph_isomorphism("图片中只有谓词公式"),"")
