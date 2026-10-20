@@ -77,6 +77,7 @@ def main():
     ap.add_argument("--delay",type=int,default=5)
     ap.add_argument("--output",default="university_benchmark_results.json")
     ap.add_argument("--skip-images",action="store_true")
+    ap.add_argument("--only-image",action="append",default=[])
     opts=ap.parse_args()
     check_local()
     base=opts.base.rstrip("/")
@@ -106,8 +107,13 @@ def main():
           ("I04","Cornell CS2800 original 2016 exam Q14: DFA transition diagram","https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",1,(.16,.50,.86,.69)),
         ]
         for id,caption,url,page,box in images:
+            if opts.only_image and id not in opts.only_image:
+                continue
             try:
                 raw=pdf_crop(session,url,page,box)
+                sample_dir=Path("university_exam_image_samples")
+                sample_dir.mkdir(exist_ok=True)
+                (sample_dir/(id+".png")).write_bytes(raw)
                 status,result=post_image(session,base,raw,opts.timeout)
                 # Preserve image output and review fields for human graph-edge verification.
                 row={"id":id,"caption":caption,"source":url,"http":status,
