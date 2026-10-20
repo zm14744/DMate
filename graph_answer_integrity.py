@@ -220,6 +220,89 @@ def detect_named_graph_degree_inconsistency(vision_text):
     return None
 
 
+
+
+_SINGLE_UPPER_EDGE=re.compile(
+    r"(?<![A-Za-z0-9])([A-Z])\s*[-—–]\s*([A-Z])(?![A-Za-z0-9])"
+    r"|\{\s*([A-Z])\s*[,，]\s*([A-Z])\s*\}"
+)
+
+
+def single_undirected_named_edges(vision_text):
+    """Parse one labelled undirected graph as pairs without assuming completeness.
+
+    Returns None if no *unambiguous single* graph edge listing can be found.
+    User's literal A-H topology is never inferred from geometry or a known
+    textbook exercise. Missing a second graph image is not evidence it is absent.
+    """
+    text=str(vision_text or "")
+    if FLAG in text or "有向图" in text:
+        return None
+    if re.search(r"图\s*[（(]?\s*[2-9]\s*[）)]?\s*[（(:：]",text):
+        return None
+    match=re.search(
+        r"(?:各顶点的连接关系[（(]边[）)]|各顶点的连接关系|"
+        r"连接关系[（(]边[）)]|连接关系|边集合|边集)\s*(?:为|是)?\s*[：:]\s*"
+        r"([^\n。]{10,1500})",
+        text
+    )
+    if not match:
+        return None
+    segment=match.group(1)
+    pairs=[]
+    for item in _SINGLE_UPPER_EDGE.finditer(segment):
+        a,b,c,d=item.groups()
+        u,v=(a,b) if a else (c,d)
+        if not u or not v or u==v:
+            return None
+        pairs.append(tuple(sorted((u,v))))
+    if len(pairs)<4 or len(pairs)>75 or len(set(pairs))!=len(pairs):
+        return None
+    vertices=set(v for edge in pairs for v in edge)
+    if not 4<=len(vertices)<=12:
+        return None
+    # If a cardinality is stated, do not pretend isolated vertices are absent.
+    n=re.search(r"(?:共|包含|含|有)\s*(\d+)\s*个顶点",text[:match.start()])
+    if n and int(n.group(1))!=len(vertices):
+        return None
+    return {"vertices":sorted(vertices),"edges":set(pairs)}
+
+
+def review_single_undirected_graph(primary_text, independently_read):
+    """Require two independently drawn full edge sets to match exactly.
+
+    A second independent AI read still is not ground truth, but disagreement
+    reveals an unsafe hallucination. Do not pick a convenient answer.
+    """
+    initial=single_undirected_named_edges(primary_text)
+    if initial is None:
+        return FLAG+"\n单幅图的初次边集未能完整解析。",["单图边集未经核实。"],False
+    if not isinstance(independently_read,list) or len(independently_read)!=1:
+        return FLAG+"\n第二次审图未得到恰好一张图。",["独立图数与初次结果不匹配。"],False
+    row=independently_read[0]
+    if not isinstance(row,dict) or row.get("complete") is not True or row.get("directed") is not False:
+        return FLAG+"\n独立审图未确认全部连接端点。",["第二次图结构复核不完整。"],False
+    try:
+        vertices=[str(x).strip().upper() for x in row["vertices"]]
+        listed=[tuple(sorted((str(u).upper(),str(v).upper()))) for u,v in row["edges"]]
+    except (KeyError,TypeError,ValueError):
+        return FLAG+"\n独立审图的顶点或边字段无效。",["第二次审图格式异常。"],False
+    if (len(vertices)!=len(set(vertices)) or set(vertices)!=set(initial["vertices"])
+        or len(listed)!=len(set(listed)) or any(u==v or u not in vertices or v not in vertices for u,v in listed)):
+        return FLAG+"\n单图审图结果的顶点集合或边有效性不一致。",["顶点或边集二次复核不一致。"],False
+    other=set(listed)
+    if other!=initial["edges"]:
+        missing=sorted(other-initial["edges"])
+        extra=sorted(initial["edges"]-other)
+        return (FLAG+"\n同一张图的两次独立逐边识别不一致，"
+                f"首次识别独有边 {extra}；二次识别独有边 {missing}。"
+                "在确认原图之前不能据此计算直径、色数或连通性。"), [
+                    "单幅图原始识别与独立逐边复核存在冲突。"
+                ],False
+    return primary_text,[],True
+
+
+
 def is_scanned_graph_solution_request(user_content):
     """A scanned question to SOLVE must never be treated as 'generate a quiz'.
 
