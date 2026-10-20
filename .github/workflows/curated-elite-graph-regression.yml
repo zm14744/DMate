@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/curated-elite-graph-regression.yml"
+      - "tests/curated_university_graph_images.py"
 permissions:
   contents: read
 concurrency:
