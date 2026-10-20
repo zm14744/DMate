@@ -1637,7 +1637,16 @@ MULTI_GRAPH_VERTEX_AUDIT_PROMPT = """你是第二位独立逐点审图员，不�
 每幅图一个条目，不漏图，不把同一局部放大再当一张新图。"""
 
 
-def verify_graph_image_independently(image_bytes, retries=1, directed=False, count_only=False):
+SINGLE_LABELLED_GRAPH_AUDIT_PROMPT = """你是第二名独立的图论原图逐边审查员。只根据上传的完整原图与放大图，不读取任何其他模型已生成的顶点表或边表。
+本次图片主要有且只有一张带 A、B、C 等字母标签的无向图。请先锁定原图所有圆点与对应标签，再逐条沿笔画连续追踪每一条边到两端。
+特别注意斜线交叉点如果没有黑色圆点绝非新顶点；连续直线要按原本走向跟踪，不可在交点转向；靠近另外顶点但实际并未连接的线不能凭位置添加新边。
+例如 A—B 的笔画不等于 A—C；只有从 A 点实际延伸到 C 点的线才可写 A—C，不能因几何上靠近 C 就补造边。
+先独立确认所有原始顶点，再列出完整无向边集；任何顶点或边的端点不清楚请将 complete=false，禁止猜测，也禁止根据题目想要的直径或色数倒推出边。
+严格只输出以下 JSON 对象，不要任何自然语言：
+{"graphs":[{"index":1,"directed":false,"vertices":["A","B"],"edges":[["A","B"]],"complete":true}]}
+如果图片没有恰好一张完整的带字母无向图，graphs设为空数组。"""
+
+def verify_graph_image_independently(image_bytes, retries=1, directed=False, count_only=False, single=False):
     """A second *independent* image-model read for complex graph topology.
 
     Used for graph-isomorphism diagrams and independently checked directed
@@ -1682,6 +1691,7 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
         print("逐边核验图片准备失败：", type(exc).__name__)
         return {"ok": False, "error": "无法放大图形"}
     audit_prompt = (MULTI_GRAPH_VERTEX_AUDIT_PROMPT if count_only else
+                    SINGLE_LABELLED_GRAPH_AUDIT_PROMPT if single else
                     DIRECTED_GRAPH_AUDIT_PROMPT if directed else GRAPH_AUDIT_PROMPT)
     content = [{"type":"text", "text":audit_prompt}]
     for number, url in enumerate(images):
