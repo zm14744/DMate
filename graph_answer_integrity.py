@@ -146,6 +146,6 @@ def protect_uncertain_graph_answer(question, reply):
     if not SENSITIVE.search(request):
         return None
     return ("这道题依赖图中的实际顶点和边，而当前图片的图形结构尚未核对完整。"
-            "直接据此判断连通性、同构、度数、树或着色等可能得到错误结果。"
+            "直接据此给出当前问题的确定结论，可能导致计算或推理错误。"
             "请先在识别核对界面确认每条边及箭头方向，或上传更清晰、"
             "只包含该图的截图；在核对完成前不能给出确定的数学结论。")
