@@ -45,6 +45,19 @@ class UniversityOracleTests(unittest.TestCase):
                          "ANSWER_MATCH_NEEDS_PROOF_REVIEW")
         self.assertEqual(parse_number(r"\frac{27}{41}"),fractions.Fraction(27,41))
         self.assertEqual(parse_number("27/41"),fractions.Fraction(27,41))
+    def test_correct_mathjax_final_fraction_is_valid(self):
+        by=self.cases
+        correct=r"【结果】\(\frac{27}{41}\)"
+        self.assertEqual(judge(by["B-5b"],correct)[0],
+                         "ANSWER_MATCH_NEEDS_PROOF_REVIEW")
+        self.assertEqual(judge(by["B-5a"],r"【结果】\(\frac{41}{100}\)")[0],
+                         "ANSWER_MATCH_NEEDS_PROOF_REVIEW")
+
+    def test_no_unresolved_previous_question_in_standalone_bank(self):
+        for c in self.cases.values():
+            self.assertNotIn("上一题",c["question"],
+              "A standalone test may not depend on previous API context: "+c["id"])
+
     def test_all_source_categories_disjoint(self):
         self.assertEqual(sum(c["category"]=="official_paraphrase"
                              for c in self.cases.values()),40)
