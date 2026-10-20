@@ -9,7 +9,7 @@ import io
 import math
 import threading
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
 from teaching import teaching_prompt
 
@@ -160,6 +160,13 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 - 对多图并列的情况，先判断是同一题下左右两个独立图，还是同一个图的多个不连通分量；以标签、间距和题目布局为依据，不确定就明确标记，不得猜测成一个连通图。
 - 每个图先列顶点位置、再列边（重边按重数列出），最后重新计算顶点度数并核对握手定理（度数和 = 2×边数，环计入两次）；不一致时自行逐边重查，仍不能确认的边标为不确定。
 - 每条边逐一核对两个端点；只有确实连接同一对顶点的两条边才叫重边。
+- 对黑色实心点的教材图，先逐一数出所有黑点，再沿连续线迹从一个黑点追到另一个黑点。
+- 斜线相互交叉而交点没有实心点时，应继续沿原来斜率前进，不能在交叉处转向、换线或添加连接。
+- 对每个独立图先建立“可见黑点位置 → a/b/c 等文字标签”的对应关系；文字靠近哪个点需要核对，不能只按阅读顺序猜字母。
+- 严格按每条线实际落到的终点确认边，禁止按图形外观补足 n-1 条边；不连通图也可能是有效的完整识别结果。
+- 最后核对各图的顶点数、实线边数、每个顶点相接的线条数；握手定理只能检查内部计数，无法证明识别出的边确实存在。
+- 局部放大图是同一原图的放大或适度增强，增强可能制造伪影。原图端点看不清时写入 uncertain_fields，不能凭增强图片“补画”边。
+- OpenCV 候选图中的 v1/v2 是按图像位置给的临时编号，并非真实 a/b 标签；先用位置核对标签，再核对候选连接。如与可见原图不符，不得照抄 OpenCV。
 - 不要解题，不要给答案。
 
 【图片用途识别】
@@ -1275,6 +1282,15 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
         encoded = base64.b64encode(output.getvalue()).decode("ascii")
         return "data:image/png;base64," + encoded
 
+    def enhance_crop(image):
+        # The original full image is always sent unchanged. Only a bounded
+        # crop gets slight contrast + unsharp-mask to help read faint labels.
+        # Unlike thresholding this does not erase thin graph lines.
+        if min(image.size) < 40:
+            return image
+        enhanced = ImageEnhance.Contrast(image).enhance(1.12)
+        return enhanced.filter(ImageFilter.UnsharpMask(radius=1.0, percent=95, threshold=2))
+
     pure_visual_mode = review_regions is None
     crops = []
     if graph_regions and len(graph_regions)>4:
@@ -1319,7 +1335,7 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
     # OCR may only find a tiny “(b)” caption and supply review regions around
     # the caption while missing the actual graph above it. Preserve structural
     # left/right crops for wide graph illustrations even when OCR found text.
-    if crops and not graph_regions and width >= height * 1.28:
+    if crops and len(graph_regions or []) < 3 and width >= height * 1.28:
         crops.extend([
             original.crop((0, 0, math.ceil(width * 0.57), height)),
             original.crop((math.floor(width * 0.43), 0, width, height)),
@@ -1343,7 +1359,7 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
     # of paid Vision image inputs. Prefer complete graph regions over generic
     # left/right halves and avoid sending duplicate overlapping crops.
     crops = crops[:4]
-    return [encode(original, 2200)] + [encode(crop, 1600, True) for crop in crops]
+    return [encode(original, 2200)] + [encode(enhance_crop(crop), 1600, True) for crop in crops]
 
 
 def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=None, opencv_graphs=None):
@@ -1381,9 +1397,10 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
     verified = (opencv_graphs or {}).get("graphs", [])
     if verified:
         content_parts.append({"type":"text", "text":(
-            "以下是 OpenCV 从实际像素线迹得到的候选图结构。只将经直线连续性检验的边视为已确认；"
-            "uncertain_edges 需结合原图与局部放大核对；不得根据图的外形擅自补边。"
-            "如果其它端点、弧线或重边不确定，应标注为不确定，不能覆盖已核验的连接。\n"
+            "以下是 OpenCV 从实心圆点及连续像素线迹得到的位置候选，不是已经识别出的顶点字母。"
+            "先用每个顶点的归一化 x/y 位置匹配原图的 a/b/c 等标签，再逐线确认边。"
+            "交叉点无实心圆点时不得换线或添加顶点；不要为了满足树的 n-1 条边而补边。"
+            "confidence=partial 或 uncertain_edges 不得作为确定结论；若原图与候选矛盾，以原图为准。\n"
             + json.dumps(verified, ensure_ascii=False)[:5500]
         )})
     for index, data_url in enumerate(image_urls):

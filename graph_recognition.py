@@ -321,9 +321,22 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
     are called confirmed; borderline edges are listed separately for Vision review.
     Unsupported loops, curves, arrows and hand-drawn vertices remain *unknown*.
     """
-    if not allow_without_context and not any(k in str(text_hint) for k in ('图','顶点','边','连通','邻接','路径','矩阵','欧拉','哈密顿','G₁','G1','G2','G3')):
+    if not allow_without_context and not any(k in str(text_hint) for k in ('图','顶点','边','树','连通','邻接','路径','矩阵','欧拉','哈密顿','G₁','G1','G2','G3','G4')):
         return {'graphs':[], 'status':'not_graph', 'regions':[]}
     started=time.monotonic()
+    # The original Hough detector favors softly shaded/colored nodes. Prefer
+    # filled-black-dot recognition for ordinary textbook graph drawings.
+    # Failure never disables the existing detector or paid Vision fallback.
+    try:
+        from graph_recognition_v2 import recognize_filled_graphs
+        filled_result = recognize_filled_graphs(
+            image_bytes, allow_without_context=allow_without_context, text_hint=text_hint
+        )
+        if filled_result.get('graphs'):
+            filled_result['elapsed_ms'] = round((time.monotonic()-started)*1000, 1)
+            return filled_result
+    except (cv2.error, ValueError, TypeError, OSError) as exc:
+        print(f"实心点图结构检测降级：{type(exc).__name__}")
     with Image.open(io.BytesIO(image_bytes)) as im:
         im=ImageOps.exif_transpose(im).convert('RGB')
         longest=max(im.size)

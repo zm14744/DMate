@@ -242,6 +242,16 @@ def _enhance_faded_photo(image):
     return cv2.cvtColor(cv2.merge((enhanced, green, blue)), cv2.COLOR_LAB2BGR)
 
 
+def _enhance_soft_photo(image):
+    """Mild unsharp mask for a failed OCR pass on blurred phone photographs.
+
+    Never threshold or invent text; keep the original pass if OCR confidence
+    does not improve.
+    """
+    blurred = cv2.GaussianBlur(image, (0, 0), 1.0)
+    return cv2.addWeighted(image, 1.65, blurred, -.65, 0)
+
+
 def _ocr_text_strength(items):
     """按可读中文和明确小问计分，过滤单纯顶点/边标签等图内噪声。"""
     lines = [str(item.get("content") or "") for item in items]
@@ -624,6 +634,19 @@ def recognize_image(image_data):
                         text_items = enhanced_items
                 except Exception as exc:
                     print(f"低对比度文字 OCR 补救失败，保留首轮：{type(exc).__name__}")
+                # Only one further bounded pass when the image is demonstrably
+                # soft and both prior passes failed to recover meaningful text.
+                if _ocr_text_strength(text_items) < 10:
+                    sampled = cv2.resize(image, (min(720, image.shape[1]),
+                        max(1, round(image.shape[0]*min(720, image.shape[1])/image.shape[1]))))
+                    gray_sample = cv2.cvtColor(sampled, cv2.COLOR_BGR2GRAY)
+                    if cv2.Laplacian(gray_sample, cv2.CV_64F).var() < 42:
+                        try:
+                            sharpened = _extract_text_items(_enhance_soft_photo(image))
+                            if _ocr_text_strength(sharpened) > _ocr_text_strength(text_items):
+                                text_items = sharpened
+                        except Exception as exc:
+                            print(f"模糊文字 OCR 补救失败：{type(exc).__name__}")
 
             formula_items = []
             formula_warning = None

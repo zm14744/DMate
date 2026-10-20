@@ -3566,7 +3566,7 @@ def ocr():
         # Any uncertainty or failure leaves the original Vision/OCR fallback intact.
         graph_cv = {'graphs': [], 'status': 'not_graph', 'regions': []}
         possible_graph = (len(ocr_text) < 20 or bool(re.search(
-            r"图|顶点|边|连通|邻接|路径|欧拉|哈密顿|G[123₁₂₃]", ocr_text
+            r"图|顶点|边|树|连通|邻接|路径|欧拉|哈密顿|G[1234₁₂₃₄]", ocr_text
         )))
         if possible_graph and recognize_graphs is not None:
             try:
@@ -3625,43 +3625,30 @@ def ocr():
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
 
-        # 提供给学生的是清晰的邻接关系，而不是 JSON 坐标、矩阵及调试日志。
-        # 结构化 graph_structures 仍保留在 API 返回中供后端扩展。
+        # Never let provisional OpenCV v1/v2 numbering overwrite real labels
+        # independently read by Vision. CV topology remains in graph_structures
+        # and is supplied as pixel evidence to Vision during the same request.
         cv_graphs = graph_cv.get("graphs") or []
-        if cv_graphs:
+        if cv_graphs and not visual_text and image_kind != "non_exercise":
             readable = []
-            all_complete = True
             for index, graph in enumerate(cv_graphs, 1):
                 vertices = graph.get("vertices") or []
                 edges = graph.get("edges") or []
-                unknown = graph.get("uncertain_edges") or []
-                full = graph.get("confidence") == "high" and not unknown
-                all_complete = all_complete and full
-                lines = [f'G{index}：{len(vertices)} 个顶点，检测到 {len(edges)} 条直线边。']
+                unsure = graph.get("uncertain_edges") or []
+                lines = [
+                    f"G{index}（临时顶点编号）：检测到 {len(vertices)} 个黑点，"
+                    f"{len(edges)} 条有像素依据的直线候选边。"
+                ]
                 if edges:
-                    lines.append('边：' + '、'.join(
-                        f'{edge[0]}—{edge[1]}' for edge in edges
+                    lines.append("候选边：" + "、".join(
+                        f"{edge[0]}—{edge[1]}" for edge in edges
                         if isinstance(edge, list) and len(edge) == 2
-                    ) + '。')
-                if unknown or not full:
-                    lines.append('部分连接尚未确认，请结合原图核对，不能将未列出的边视为不存在。')
-                    if graph_cv.get('elapsed_ms') is not None and (
-                            graph.get('confidence') == 'partial'
-                            and not unknown and len(edges) < len(vertices)):
-                        lines.append('若图片较小或模糊，建议截取图形区域重新上传。')
-                readable.append('\n'.join(lines))
-            summary = '\n\n'.join(readable)
-            # 只在图形证据不完整时附加 Vision 的结构补充，避免两份
-            # 边集合冲突并把用户核对框撑满。保留普通曲线/有向等补充。
-            if all_complete:
-                # Straight-edge detector does not support arcs, multiple
-                # edges, directions or weights: do not erase Vision evidence
-                # for those structures merely because a straight-edge subset
-                # looked complete.
-                special = bool(re.search(r"有向|箭头|自环|重边|带权|弧线|曲线|孤立|不确定|待核对", visual_text))
-                visual_text = summary + ('\n\n视觉补充（请核对）：\n' + visual_text if special else '')
-            else:
-                visual_text = summary + ('\n\n视觉补充（待核对）：\n' + visual_text if visual_text else '')
+                    ) + "。")
+                if unsure or graph.get("confidence") != "high":
+                    lines.append("部分连接尚未确认，未列出的边不代表不存在；请核对原图。")
+                lines.append("v1/v2 等编号按图中位置排序，不等同于原有字母标签。")
+                readable.append("\n".join(lines))
+            visual_text = "\n\n".join(readable)
 
         # 撤销若发生在 Vision 调用期间，结果也直接丢弃。
         if request_id and _take_ocr_cancelled(request_id):
