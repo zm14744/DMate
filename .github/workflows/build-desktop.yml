@@ -117,15 +117,28 @@ jobs:
           echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
           echo "DMATE_MACOS_SIGNED=true" >> "$GITHUB_ENV"
 
-      - name: Build DMate
+      - name: Build DMate for Windows/Linux
+        if: matrix.name != 'macos'
+        working-directory: desktop
+        run: cargo tauri build ${{ matrix.args }}
+
+      - name: Build and notarize DMate for macOS
+        if: matrix.name == 'macos' && env.DMATE_MACOS_SIGNED == 'true'
         working-directory: desktop
         env:
-          # APPLE_SIGNING_IDENTITY is set by the previous step on macOS.
-          # Tauri v2 automatically signs and notarizes when the credentials
-          # are complete; app-specific password, never the Apple ID password.
-          APPLE_ID: ${{ matrix.name == 'macos' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.name == 'macos' && secrets.APPLE_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.name == 'macos' && secrets.APPLE_TEAM_ID || '' }}
+          # Tauri v2 signs and notarizes only when FULL Apple credentials exist.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: cargo tauri build ${{ matrix.args }}
+
+      - name: Build ad-hoc macOS TEST only
+        if: matrix.name == 'macos' && env.DMATE_MACOS_SIGNED != 'true'
+        working-directory: desktop
+        env:
+          # Do not even define empty APPLE_ID/PASSWORD/TEAM_ID variables here.
+          # Tauri otherwise attempts notarization with empty team credentials.
+          APPLE_SIGNING_IDENTITY: "-"
         run: cargo tauri build ${{ matrix.args }}
 
       - name: Verify macOS Developer ID signature and Apple notarization
