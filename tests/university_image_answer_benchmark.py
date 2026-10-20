@@ -108,6 +108,17 @@ def main():
               "IMAGE_ANSWER",record.get("image_answer_verdict"),flush=True)
         time.sleep(2)
     report["completed"]=time.time()
+    report["summary"] = {
+        "ocr_http_ok": sum(c.get("ocr_http")==200 for c in report["cases"]),
+        "ocr_critical_token_match": sum(c.get("ocr_critical_match") is True for c in report["cases"]),
+        "gold_text_answer_wrong": sum(c.get("gold_text_verdict")=="ANSWER_WRONG" for c in report["cases"]),
+        "image_answer_wrong": sum(c.get("image_answer_verdict")=="ANSWER_WRONG" for c in report["cases"]),
+        "image_answer_unscorable": sum(c.get("image_answer_verdict") in (None,"FORMAT_UNSCORABLE","REQUEST_FAILED") for c in report["cases"]),
+    }
     path.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+    print("OCR_DIFFERENTIAL_SUMMARY",report["summary"],flush=True)
+    if report["summary"]["gold_text_answer_wrong"] or report["summary"]["image_answer_wrong"]:
+        print("CONFIRMED WRONG MATHEMATICAL RESULT; investigate OCR and reasoning separately",flush=True)
+        sys.exit(1)
 if __name__=="__main__":
     main()
