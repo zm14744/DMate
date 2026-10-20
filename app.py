@@ -2907,6 +2907,12 @@ def chat():
     # 双保险：前端 request_kind 是强信号，但后端仍独立理解自然语言。
     # 因此用户换成“随便来一道 / 整个难题 / 考我一道”等说法时，
     # 即使前端某次没有命中，也不会退回普通聊天模式。
+    # Every /chat request needs its current question. Previously this local
+    # was initialized ONLY when a client supplied question_context; ordinary
+    # requests then hit UnboundLocalError here and returned HTML HTTP 500.
+    current_user_content = next(
+        (item["content"] for item in reversed(cleaned) if item.get("role") == "user"), ""
+    )
     server_detected_exercise = looks_like_exercise_request(
         normalized_action_for_exercise
     )
