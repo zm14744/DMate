@@ -13480,13 +13480,20 @@ function cancelImageRecognition() {
 }
 
 function formatOcrGraphForReview(raw) {
-    // 只做格式整理，不删除边集、顶点、重数等数学数据。
-    // 保留用户手动编辑后的原始精确信息供模型与题目历史使用。
+    // 整理描述布局，但绝不猜测或删除边集、顶点数据。
     let text = String(raw || "").trim();
     if (!text) return "";
-    text = text.replace(/(图\\s*[1-9][0-9]*\\s*[（(]\\s*G[0-9]+\\s*[）)]\\s*的边集为[：:]?)/g, "\\n$1")
-        .replace(/(图\\s*[1-9][0-9]*\\s*[（(]\\s*G[0-9]+\\s*[）)]\\s*的边集为[：:]?)/g, "\\n$1")
-        .replace(/\\n{3,}/g, "\\n\\n")
+    text = text
+        .replace(/图中共有\s*(\d+)\s*个独立的无向图[，,]\s*分别标记为\s*/g,
+            "无向图数量：$1；编号：")
+        .replace(/每个图均有\s*(\d+)\s*个顶点[，,]/g,
+            "\n每图顶点数：$1。\n")
+        .replace(/位置分别标记为/g, "顶点位置：")
+        .replace(/图\s*(\d+)\s*[（(]\s*(G\d+)\s*[）)]\s*的边集为\s*[：:]/g,
+            "\n$2（图$1）边集：")
+        .replace(/图\s*(\d+)\s*[（(]\s*(G\d+)\s*[）)]\s*的边集为/g,
+            "\n$2（图$1）边集：")
+        .replace(/\n{3,}/g, "\n\n")
         .trim();
     return text;
 }
