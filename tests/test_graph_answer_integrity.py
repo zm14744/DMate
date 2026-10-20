@@ -135,6 +135,47 @@ class UniversityGraphAnswerBoundaryTests(unittest.TestCase):
         self.assertEqual(issues,[])
         self.assertEqual(normalized,vision)
 
+    def test_real_mit_crossing_single_graph_second_read_detects_spurious_edges(self):
+        from graph_answer_integrity import (
+            single_undirected_named_edges, review_single_undirected_graph,
+        )
+        wrong=("图1为无向无权重图，共8个顶点：A、B、C、D、E、F、G、H。"
+               "边集合：{A,B}, {A,C}, {B,C}, {B,D}, {B,E},"
+               " {C,D}, {C,E}, {D,E}, {E,F}, {E,H}, {F,G}。")
+        primary=single_undirected_named_edges(wrong)
+        self.assertIsNotNone(primary)
+        self.assertIn(("A","C"),primary["edges"])
+        true_edges=["AB","BC","BH","CD","CE","DE","EF","EH","FG"]
+        independent=[{"index":1,"directed":False,"complete":True,
+                      "vertices":list("ABCDEFGH"),
+                      "edges":[list(e) for e in true_edges]}]
+        result,issues,ok=review_single_undirected_graph(wrong,independent)
+        self.assertFalse(ok)
+        self.assertIn(FLAG,result)
+        self.assertTrue(issues)
+        self.assertIn("单幅图",issues[0])
+
+    def test_true_mit_single_graph_agreement_allowed(self):
+        from graph_answer_integrity import review_single_undirected_graph
+        gold=("图1无向图，共8个顶点。边集合：A-B、B-C、B-H、C-D、"
+              "C-E、D-E、E-F、E-H、F-G。")
+        audited=[{"index":1,"directed":False,"complete":True,
+                  "vertices":list("ABCDEFGH"),
+                  "edges":[list(x) for x in ("AB","BC","BH","CD","CE","DE","EF","EH","FG")]}]
+        result,issues,ok=review_single_undirected_graph(gold,audited)
+        self.assertTrue(ok)
+        self.assertEqual(result,gold)
+        self.assertEqual(issues,[])
+
+    def test_no_single_graph_pass_when_second_audit_missing(self):
+        from graph_answer_integrity import review_single_undirected_graph
+        primary="图1无向图，共5个顶点。边集合：A-B、B-C、C-D、D-E。"
+        for audited in ([],[{"index":1,"directed":False,"complete":False,
+                            "vertices":list("ABCDE"),"edges":[]}]):
+            result,issues,ok=review_single_undirected_graph(primary,audited)
+            self.assertFalse(ok)
+            self.assertIn(FLAG,result)
+
     def test_mit_original_crossing_edges_impossible_odd_degree_sum(self):
         from graph_answer_integrity import detect_named_graph_degree_inconsistency
         vision=("图1无向图，8个顶点。"
