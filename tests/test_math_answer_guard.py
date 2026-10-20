@@ -62,6 +62,25 @@ class MathAnswerGuardTests(unittest.TestCase):
         self.assertEqual(audit_explicit_count_answer(
             "单词BANANARAMA中相同的字母不得相邻，求排列数【结果】",original),original)
 
+    def test_correct_final_but_false_letter_count_is_rewritten(self):
+        q=("Problem 2 (a): letters in popular band BANANARAMA may "
+           "be arranged in how many different ways? 请给出最终答案【结果】")
+        false_proof=("BANANARAMA 共有 \(11\) 个字母，"
+                     "所以 11! / (5! × 2!)=15120。\n【结果】15120")
+        out=audit_explicit_count_answer(q,false_proof)
+        self.assertIn("共 10 个字母",out)
+        self.assertNotIn("11!",out)
+        self.assertIn("【结果】15120",out)
+    def test_scanned_exam_other_selected_part_must_not_be_overridden(self):
+        q=("Problem 2 (a) rearrange the letters of BANANARAMA; "
+           "(b) count paths in 3D grid.\n【我的要求】只解(b)题，给出最终答案【结果】")
+        answer="【结果】123"
+        self.assertEqual(audit_explicit_count_answer(q,answer),answer)
+        books=("20本书选出6本互不相邻。"
+               "(a) 证明选取与01串双射。(b)求选取总数。"
+               "\n【我的要求】只解(a)题，给出最终答案【结果】")
+        self.assertEqual(audit_explicit_count_answer(books,answer),answer)
+
     def test_zero_options(self):
         q="5本书按顺序放，选出4本且互不相邻，有多少种选择？"
         self.assertEqual(separate_selection_value(q),(5,4,0))
