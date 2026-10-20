@@ -35,6 +35,20 @@ CASES = [
  ("M03","MIT","stars-bars","非负整数 x0,x1,...,xk 满足 x0+x1+...+xk=n，有多少组解？",[r"binom|C\s*\(|组合数|\\mathrm\{C\}"],MIT),
  ("M04","MIT","graph-degree","证明任意n>=2的有限连通无向简单图中，必有两个顶点度数相同。",[r"n-1|n−1|抽屉|鸽巢|鸽笼"],MIT),
 ]
+# Additional independent university-style answer checks. The prompts are
+# exact mathematical instances; do not treat keyword matches as proof.
+EXTRA_CASES = [
+ ("X01","Columbia","induction","求和：1+2+4+...+2^(n-1)，n为正整数。",[r"2\^\{?n\}?\s*[-−]\s*1|2ⁿ\s*[-−]\s*1"],"https://www.cs.columbia.edu/~amoretti/3203/Practice%20Exam%201.pdf"),
+ ("X02","Columbia","euclid","用扩展欧几里得算法求整数x,y使44x+17y=1。",[r"44",r"17"],"https://www.cs.columbia.edu/~amoretti/3203/Practice%20Exam%201.pdf"),
+ ("X03","Columbia","function","设S=R\\{1}, f:S→R, f(x)=(x+1)/(x-1)。f是否满射到R？",[r"不满射|非满射|不是满射|不可能取|无法取|取不到",r"1"],"https://www.cs.columbia.edu/~amoretti/3203/Practice%20Exam%201.pdf"),
+ ("X04","MIT","combinatorics","从8个互不相同的人中选3人组成委员会，共有多少种？",[r"(?<!\\d)56(?!\\d)"],"https://ocw.mit.edu/courses/18-314-combinatorial-analysis-fall-2014/pages/exams/"),
+ ("X05","MIT","graph","完全二分图K(3,3)是否存在欧拉回路？",[r"不存在|没有|不能|不具备"],"https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/resources/exam-solutions/"),
+ ("X06","MIT","logic","命题 (p→q) 与 (¬p∨q) 是否逻辑等价？",[r"等价"],"https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/resources/exam-solutions/"),
+ ("X07","MIT","probability","独立公平硬币投掷10次，恰好5次正面的概率是多少？",[r"63\\s*/\\s*256|0\\.246|252\\s*/\\s*1024"],"https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/resources/exam-solutions/"),
+ ("X08","Cambridge","relations","集合{1,2,3}上的等价关系共有多少个？",[r"(?<!\\d)5(?!\\d)"],"https://www.cl.cam.ac.uk/teaching/exams/pastpapers/t-DiscreteMathematics.html"),
+ ("X09","Cambridge","graph","路径P5有多少条边？",[r"(?<!\\d)4(?!\\d)"],"https://www.cl.cam.ac.uk/teaching/exams/pastpapers/t-DiscreteMathematics.html"),
+ ("X10","MIT","counting","5个不同元素的集合共有多少个子集？",[r"(?<!\\d)32(?!\\d)"],"https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/resources/exam-solutions/"),
+]
 GRAPH_TEXT = """下列无向简单图中哪些是树？请直接给答案。
 图1（G1）：顶点 a、b、c、d，边：a-b,b-c,c-d。
 图2（G2）：顶点 a、b、c、d，边：a-b,b-c,c-a。
@@ -73,6 +87,7 @@ def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--base",default=os.getenv("DMATE_BENCH_URL","https://dmate.zeabur.app"))
     ap.add_argument("--max-chat",type=int,default=18)
+    ap.add_argument("--extended",action="store_true",help="Include additional independently verifiable university-style problems")
     ap.add_argument("--timeout",type=int,default=105)
     ap.add_argument("--delay",type=int,default=5)
     ap.add_argument("--output",default="university_benchmark_results.json")
@@ -98,7 +113,8 @@ def main():
         Path(opts.output).write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
         print("DEPLOYMENT_OUTDATED: running online server is not verified as graph-audit-v2:",health,flush=True)
         sys.exit(2)
-    for id,school,topic,prompt,checks,source in CASES[:opts.max_chat]:
+    selected=(CASES+EXTRA_CASES if opts.extended else CASES)[:opts.max_chat]
+    for id,school,topic,prompt,checks,source in selected:
         try:
             status,result=post_chat(session,base,prompt,opts.timeout)
             reply=str(result.get("reply",""))
