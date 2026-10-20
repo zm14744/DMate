@@ -3887,7 +3887,8 @@ def health():
     return jsonify({
         "status": "ok",
         "graph_integrity_version": "2026-10-20-independent-edge-audit-v2",
-        "graph_image_audit_version": "2026-10-20-v3-diagram-only-and-arrow-uncertainty",
+        "graph_image_audit_version": "2026-10-20-v4-independent-directed-and-multigraph-vertex-audit",
+        "graph_answer_integrity_version": "2026-10-20-v1-fail-closed-university-diagrams",
         "answer_verification_version": "2026-10-20-count-and-context-guard-v3",
     })
 
