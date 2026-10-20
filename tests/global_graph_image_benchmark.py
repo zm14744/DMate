@@ -19,18 +19,15 @@ SOURCES=[
  {"id":"US_CORNELL_DFA","country":"美国","institution":"Cornell University",
   "type":"original final exam","url":"https://www.cs.cornell.edu/courses/cs2800/2016fa/handouts/2800final-16sp.pdf",
   "page":1,"box":[.16,.50,.86,.69],"topic":"directed state-transition graph"},
- {"id":"CN_NJU_GRAPH","country":"中国","institution":"Nanjing University",
-  "type":"original graph-theory homework","url":"https://cs.nju.edu.cn/_upload/tpl/01/53/339/template339/DM2019/parts/GraphPS1.pdf",
-  "page":0,"box":[.04,.03,.96,.96],"topic":"graph degree sequences and graph theory"},
- {"id":"IN_UTU_GRAPH","country":"印度","institution":"Uka Tarsadia University",
-  "type":"university question bank","url":"https://www.utu.ac.in/DMathematics/download/2017-18/Documents/Sem5/QB_060090503.pdf",
-  "page":0,"box":[.04,.03,.96,.96],"topic":"diagrammed graph subgraph/isomorphism"},
- {"id":"IN_ANNA_EXAM","country":"印度","institution":"Anna University exam paper hosted by JIT",
-  "type":"original university question paper","url":"https://jit.ac.in/files/coe/University_Question_Papers/00_S%26H/R2021/Sem_03/MA3354/MA3354%20-%20Discrete%20Mathematics_R2021%20-%202023%20Nov.pdf",
-  "page":0,"box":[.03,.03,.97,.97],"topic":"discrete math graph exam"},
+ {"id":"CN_NJU_DIRECTED","country":"中国","institution":"Nanjing University",
+  "type":"2019 original directed graph homework","url":"https://cs.nju.edu.cn/shiyh/DM2019/parts/GraphPS3.pdf",
+  "page":0,"box":[.06,.025,.94,.72],"topic":"original three arrow diagrams strong/weak connectivity"},
+ {"id":"IN_BITMESRA_K4","country":"印度","institution":"Birla Institute of Technology Mesra",
+  "type":"2018 original end-semester exam Q6a","url":"https://bitmesra.ac.in/UploadedDocuments/adminexam/files/MO2018%20QP/IT3021-DISCRETE%20MATHEMATICS%20AND%20GRAPH%20THEORY%20%28END_MO2018%29.pdf",
+  "page":0,"box":[.255,.71,.81,.845],"topic":"two K4 drawings graph isomorphism with crossing"},
  {"id":"US_MIT_GRAPH","country":"美国","institution":"Massachusetts Institute of Technology",
-  "type":"graph-theory problem set","url":"https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/resources/ps4/",
-  "page":0,"box":[.03,.03,.97,.97],"topic":"graph theory problem set"},
+  "type":"2005 6.042J original graph problem-set 4 Q3","url":"https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2005/587366ef0ee07f57ed41715559224224_ps4.pdf",
+  "page":1,"box":[.19,.065,.82,.29],"topic":"eight-vertex crossed-edges graph diameter and chromatic number"},
 ]
 def main():
     p=argparse.ArgumentParser()
@@ -48,16 +45,7 @@ def main():
         row=dict(case)
         try:
             url=row["url"]
-            # MIT OCW resource page is not PDF; resolve link via HTML.
-            if "ocw.mit.edu" in url and not url.endswith(".pdf"):
-                html=session.get(url,timeout=45)
-                html.raise_for_status()
-                links=re.findall(r'href="([^"]+\.pdf(?:\?[^"]*)?)"',html.text,re.I)
-                if not links:
-                    raise ValueError("No direct PDF found in MIT resource page")
-                from urllib.parse import urljoin
-                url=urljoin(url,links[0].replace("&amp;","&"))
-                row["resolved_pdf"]=url
+            # Every source above is a vetted direct PDF URL, not an HTML listing.
             raw=pdf_crop(session,url,row["page"],row["box"])
             row["sha256"]=hashlib.sha256(raw).hexdigest()
             (sample_dir/(row["id"]+".png")).write_bytes(raw)
