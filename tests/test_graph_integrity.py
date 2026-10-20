@@ -2,7 +2,7 @@
 import unittest
 from graph_integrity import (
     parse_diagrams, exact_isomorphism, answer_graph_isomorphism,
-    review_graph_transcriptions, FLAG, OK_MARKER,
+    review_graph_transcriptions, contains_two_labeled_undirected_diagrams, FLAG, OK_MARKER,
 )
 
 GOLD = """Are the two graphs below isomorphic? 请判断是否同构并给出双射。
@@ -80,6 +80,18 @@ class GraphIntegrityTests(unittest.TestCase):
         self.assertNotIn("顶点度数",corrected)
         self.assertIn("图2（G2）",corrected)
         self.assertIn("v-y",corrected)
+
+    def test_two_graph_picture_without_ocr_question_is_audited(self):
+        aizu_description = (
+            "图1（无向图）：顶点为空心圆点，共8个顶点，标签a、b、c、d、e、f、g、h。"
+            "边集合为：{a,g}, {a,e}, {b,f}, {b,h}, {c,e}, {c,h}。"
+            "\n图2（无向图）：顶点共8个，标签1、2、3、4、5、6、7、8。"
+            "边集合为：{1,2}, {1,6}, {7,4}。")
+        self.assertTrue(contains_two_labeled_undirected_diagrams(aizu_description))
+        self.assertFalse(contains_two_labeled_undirected_diagrams(
+            aizu_description.replace("图2（无向图）","图2（有向图）")))
+        self.assertFalse(contains_two_labeled_undirected_diagrams(
+            aizu_description.replace("图2（无向图）","图3（无向图）")))
 
     def test_audit_incomplete_never_asserts_edges(self):
         for variant in (
