@@ -41,7 +41,7 @@ CASES=[
       gold=None,mode="manual_review"), # do not falsely assert ambiguously drawn curves
  dict(id="AU_UNSW_STAR4",country="澳大利亚",uni="新南威尔士大学",kind="课程练习",
       url=UNSW,page=41,box=[.29,.675,.77,.83],
-      ask="图中的无向简单图 G 一共有多少个顶点、多少条边、多少棵生成树？分别给出三个数值。",
+      ask='图中的无向简单图 G 一共有多少个顶点、多少条边、多少棵生成树？第一行仅输出JSON：{"vertices":整数,"edges":整数,"spanning_trees":整数}，下一行解释。',
       gold={"vertices":4,"edges":3,"spanning_trees":1},mode="numeric_map"),
  dict(id="AU_UNSW_BIP_A",country="澳大利亚",uni="新南威尔士大学",kind="课程练习",
       url=UNSW,page=42,box=[.085,.13,.49,.31],
