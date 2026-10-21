@@ -9,6 +9,36 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_WRONG_QUESTIONS = 240;
 const MAX_LEARNING_EVENTS = 4000;
 const FALLBACK_API_CONTEXT_MESSAGES = 12;
+const MANUAL_QUESTION_MODE_KEY = "dmate_manual_question_mode_tab_v1";
+let manualQuestionMode = false;
+
+function initManualQuestionMode() {
+    // 仅保存当前浏览器标签页的输入偏好，不混入账号或 AI 回复数据。
+    try { manualQuestionMode = sessionStorage.getItem(MANUAL_QUESTION_MODE_KEY) === "question"; }
+    catch (_error) { manualQuestionMode = false; }
+    const container = document.getElementById("manualQuestionMode");
+    if (!container) return;
+    const updateUi = () => {
+        for (const button of container.querySelectorAll("[data-manual-question]")) {
+            const selected = (button.dataset.manualQuestion === "yes") === manualQuestionMode;
+            button.setAttribute("aria-pressed", String(selected));
+        }
+    };
+    for (const button of container.querySelectorAll("[data-manual-question]")) {
+        button.addEventListener("click", () => {
+            manualQuestionMode = button.dataset.manualQuestion === "yes";
+            try {
+                sessionStorage.setItem(
+                    MANUAL_QUESTION_MODE_KEY,
+                    manualQuestionMode ? "question" : "chat"
+                );
+            } catch (_error) {}
+            updateUi();
+        });
+    }
+    updateUi();
+}
+
 
 const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
 const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
@@ -5152,7 +5182,8 @@ function shouldOfferWrongBookAction(
         // 普通手动输入和粘贴始终是聊天内容，不自动标为错题。
         // OCR 是否为题目由核对页决定，AI 出题走下方独立分支。
         return message.source === "ocr"
-            && isRecordableOcrQuestionMessage(message);
+            ? isRecordableOcrQuestionMessage(message)
+            : message.manualIsQuestion === true;
     }
 
     if (message.role === "ai") {
@@ -5524,10 +5555,12 @@ function completeQuestionTextFromChatMessage(
             : "";
     }
 
-    // 题目专用图片复制仅提供给已确认的 OCR 题目；手打仍有普通文本复制。
-    if (message.role !== "user"
-        || message.source !== "ocr"
-        || !isRecordableOcrQuestionMessage(message)) {
+    // 用户明确选“是题目”时，也允许使用原有的题目图片复制。
+    if (message.role !== "user" || !(
+        message.source === "ocr"
+            ? isRecordableOcrQuestionMessage(message)
+            : message.manualIsQuestion === true
+    )) {
         return "";
     }
 
@@ -9342,6 +9375,8 @@ function loadState() {
                     source: message.source === "ocr" ? "ocr" : undefined,
                     ocrIsQuestion: typeof message.ocrIsQuestion === "boolean"
                         ? message.ocrIsQuestion : undefined,
+                    manualIsQuestion: typeof message.manualIsQuestion === "boolean"
+                        ? message.manualIsQuestion : undefined,
                     apiText: typeof message.apiText === "string"
                         ? message.apiText
                         : undefined,
@@ -12819,10 +12854,11 @@ function attachTeachingSnapshotToLatestQuestion(
             return;
         }
 
-        // 仅对经 OCR 核对确认的题目绑定难度标识；
-        // 普通手打/粘贴仍允许 AI 分析，但不赋予可见的题目身份。
+        // 只对 OCR 确认的题目或用户在输入框明确选择的题目显示难度。
+        // AI 讲解和 AI 出题的消息处理保持不变。
         if (message.source === "ocr"
-            && isRecordableOcrQuestionMessage(message)) {
+            ? isRecordableOcrQuestionMessage(message)
+            : message.manualIsQuestion === true) {
             message.questionTeaching = normalized;
         }
         return;
@@ -13365,7 +13401,9 @@ function send() {
 
     const message = {
         role: "user",
-        text
+        text,
+        // 发送时固定选择，不受之后切换输入模式的影响。
+        manualIsQuestion: manualQuestionMode
     };
 
     const retest = normalizeRetestSession(session.retest);
@@ -13405,6 +13443,24 @@ function send() {
     }
 
     session.messages.push(message);
+
+    // 用户明确标为题目时，独立请求现有知识/难度分类器；不改 AI 回复。
+    // 避免 AI 失败或较慢时题目难度始终空白。
+    if (message.manualIsQuestion === true
+        && !message.isRetestAnswer
+        && !isExerciseRequestText(text)) {
+        analyzeSingleQuestionTeaching(text, "manual-" + Date.now()).then(teaching => {
+            if (!teaching || !session.messages.includes(message)
+                || message.manualIsQuestion !== true) return;
+            // 以原有模型返回的有效难度为准；不通过文字长度猜难度。
+            message.questionTeaching = teaching;
+            saveState();
+            if (getCurrent()?.id === session.id) {
+                renderChat();
+                renderInfo();
+            }
+        });
+    }
 
     // “上一道题 / 第一题 / 第二题”都属于明确的题目导航。
     // 在请求发出前先切换 current learningQuestion，右侧信息和后端上下文
@@ -14740,8 +14796,9 @@ function renderChat() {
         const difficultyTeaching = normalizeTeaching(
             message.role === "user"
                 ? (
-                    message.source === "ocr"
-                    && isRecordableOcrQuestionMessage(message)
+                    (message.source === "ocr"
+                        ? isRecordableOcrQuestionMessage(message)
+                        : message.manualIsQuestion === true)
                         ? message.questionTeaching
                         : null
                 )
@@ -19831,6 +19888,7 @@ document.addEventListener(
         removeDeprecatedCopyControls();
         initAppearanceSystem();
         initDmateDownloadDialog();
+        initManualQuestionMode();
         installRichSelectionCopy();
         initMobileAppShell();
         installMobileVisualViewportFix();
