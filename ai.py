@@ -169,7 +169,7 @@ VISION_ENABLED = os.environ.get(
 ).strip().lower() not in {"0", "false", "off", "no"}
 
 GRAPH_TEXT_HINT_RE = re.compile(
-    r"图论|顶点|边集|边数|连通|邻接|同构|欧拉|哈密顿|有向图|无向图|生成树|树的|度数|入度|出度|"
+    r"图论|顶点|边集|边数|连通|邻接|同构|欧拉|哈密顿|有向图|无向图|生成树|树|森林|回路|度数|入度|出度|"
     r"\b(?:graphs?|vertices?|edges?|trees?|isomorph(?:ism|ic)?|adjacency|"
     r"euler(?:ian)?|hamilton(?:ian)?|degree|connected|directed|undirected|cycle|path)\b",
     re.IGNORECASE,
