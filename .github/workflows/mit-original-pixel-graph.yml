@@ -1,0 +1,35 @@
+name: MIT Original Crossing Graph - Pixel Topology
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mit-original-pixel-graph.yml"
+      - "tests/original_mit_eight_node_graph.py"
+permissions:
+  contents: read
+jobs:
+  verify-real-mit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: .:tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install source PDF and CPU vision dependencies
+        run: python -m pip install "numpy<2" "Pillow>=10,<12" "opencv-python-headless==4.10.0.84" "requests>=2.31,<3" "PyMuPDF>=1.24,<2"
+      - name: Read actual MIT eight-black-dot picture and check all nine edges
+        run: python tests/original_mit_eight_node_graph.py
+      - name: Preserve original cropped diagram and real pixel graph result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mit-original-8-vertex-9-edge-image-proof
+          path: |
+            mit_ps4_original_graph.png
+            mit_ps4_graph_result.json
+          retention-days: 30
+          if-no-files-found: warn
