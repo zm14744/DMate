@@ -21,13 +21,34 @@ DEEPSEEK_CHAT_MODEL = (
     or "deepseek-flash"
 ).strip()
 
-# Text tutoring stays on DeepSeek / Luxin; graph-image Vision uses one Qwen provider.
-# Do not silently fall back to Qwen Vision when the DashScope key is missing.
-API_KEY = (os.environ.get("DASHSCOPE_API_KEY") or "").strip()
-API_URL = (
-    os.environ.get("DASHSCOPE_VISION_API_URL")
-    or "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+# Text tutoring stays on DeepSeek / Luxin; graph-image Vision uses Qwen3-VL-Plus.
+# Accept both the vision-specific key and the standard DashScope key name.
+API_KEY = (
+    os.environ.get("DASHSCOPE_API_KEY")
+    or os.environ.get("DASHSCOPE_VISION_API_KEY")
+    or ""
 ).strip()
+
+
+def _normalize_vision_api_url(value):
+    """Accept either an OpenAI-compatible base URL or a full chat-completions URL."""
+    url = str(value or "").strip().rstrip("/")
+    if not url:
+        url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    if url.endswith("/chat/completions"):
+        return url
+    if url.endswith("/compatible-mode/v1") or url.endswith("/v1"):
+        return f"{url}/chat/completions"
+    return url
+
+
+_CONFIGURED_VISION_API_URL = (
+    os.environ.get("DASHSCOPE_VISION_API_URL")
+    or os.environ.get("QWEN_VISION_API_URL")
+    or os.environ.get("DASHSCOPE_API_URL")
+    or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+)
+API_URL = _normalize_vision_api_url(_CONFIGURED_VISION_API_URL)
 
 # 调试模式：True 时返回模拟回复，不调用真实 API
 ASK_AI_MOCK = False
@@ -114,10 +135,16 @@ SYSTEM_PROMPT = r"""你是离散数学智能辅学系统中的教学助手。
 
 
 
-# 图像理解模型：独立读取题干并解析图形结构，不直接解题。
-# A single, thinking-only vision model. Do not share the text-model route.
-VISION_MODEL = "qwen3-vl-235b-a22b-thinking"
-# Includes reasoning tokens; the old 3000-token budget often truncated JSON.
+# 图像理解模型：与百炼模型广场中选择的 Qwen3-VL-Plus 保持一致。
+# 模型广场 OpenAI 兼容示例使用的模型 ID 是 qwen3-vl-plus。
+VISION_MODEL = "qwen3-vl-plus"
+VISION_ENABLE_THINKING = (
+    os.environ.get("QWEN_VISION_ENABLE_THINKING", "false")
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+# 输出预算保留足够空间容纳结构化 JSON；默认按模型示例关闭思考模式。
 VISION_MAX_OUTPUT_TOKENS = max(
     4096, min(16384, int(os.environ.get("QWEN_VISION_MAX_OUTPUT_TOKENS", "16000")))
 )
@@ -1963,21 +1990,23 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 "content": content_parts
             }
         ],
-        # This thinking-only model cannot disable reasoning. Bound its internal
-        # reasoning and stream chunks so the connection stays alive.
-        "enable_thinking": True,
-        "thinking_budget": VISION_THINKING_BUDGET,
+        # Match the Qwen3-VL-Plus API example: thinking is off by default.
+        "enable_thinking": VISION_ENABLE_THINKING,
         "temperature": 0.1,
         "max_tokens": VISION_MAX_OUTPUT_TOKENS,
         "stream": True
     }
+    if VISION_ENABLE_THINKING:
+        payload["thinking_budget"] = VISION_THINKING_BUDGET
 
     total_attempts = max(1, retries + 1)
 
     for attempt in range(total_attempts):
         try:
             print(
-                f"正在调用 Qwen Vision（第 {attempt + 1}/{total_attempts} 次）"
+                f"正在调用 Qwen Vision（第 {attempt + 1}/{total_attempts} 次）；"
+                f"model={VISION_MODEL}；endpoint={API_URL}；"
+                f"thinking={VISION_ENABLE_THINKING}"
             )
 
             status_code, response_text, result = _request_qwen_completion(
@@ -2289,12 +2318,13 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
     payload = {
         "model": VISION_MODEL,
         "messages": [{"role":"user","content":content}],
-        "enable_thinking": True,
-        "thinking_budget": VISION_THINKING_BUDGET,
+        "enable_thinking": VISION_ENABLE_THINKING,
         "temperature": 0.1,
         "max_tokens": VISION_MAX_OUTPUT_TOKENS,
         "stream":True,
     }
+    if VISION_ENABLE_THINKING:
+        payload["thinking_budget"] = VISION_THINKING_BUDGET
     headers={"Authorization":f"Bearer {API_KEY}", "Content-Type":"application/json"}
     for attempt in range(max(1, retries + 1)):
         try:
