@@ -237,7 +237,7 @@ def _load_knowledge_graph():
         return {
             "version": 1,
             "title": "离散数学知识图谱",
-            "description": "知识图谱暂时不可用。",
+            "description": "知识图谱暂时不可用",
             "nodes": []
         }
 
@@ -457,7 +457,7 @@ if OCR_AVAILABLE:
 @app.errorhandler(413)
 def request_too_large(_error):
     return jsonify({
-        "error": "图片过大，请上传 8MB 以内的图片。"
+        "error": "图片过大，请上传 8MB 以内的图片"
     }), 413
 
 
@@ -483,9 +483,9 @@ def _auth_rate_allowed(route_name):
 
 
 def _auth_unavailable_response():
-    message = "账号系统尚未配置。请先连接 PostgreSQL，并设置 AUTH_SECRET_KEY。"
+    message = "账号系统尚未配置。请先连接 PostgreSQL，并设置 AUTH_SECRET_KEY"
     if not PSYCOPG_AVAILABLE:
-        message = "账号系统缺少 PostgreSQL 驱动，请更新 requirements.txt 后重新部署。"
+        message = "账号系统缺少 PostgreSQL 驱动，请更新 requirements.txt 后重新部署"
     return jsonify({
         "ok": False,
         "configured": False,
@@ -627,7 +627,7 @@ def _recovery_code_matches(stored_hash, supplied):
 def _normalize_username(value):
     username = str(value or "").strip()
     if not re.fullmatch(r"[\w.\-\u4e00-\u9fff]{2,32}", username, flags=re.UNICODE):
-        return None, None, "用户名需为 2–32 个字符，只使用文字、数字、下划线、点或短横线。"
+        return None, None, "用户名需为 2–32 个字符，只使用文字、数字、下划线、点或短横线"
     return username, username.casefold(), None
 
 
@@ -654,19 +654,19 @@ def _normalize_login_credentials(payload):
     identifier = str(payload.get("identifier") or payload.get("username") or "").strip()
     password = str(payload.get("password") or "")
     if not identifier:
-        return None, None, None, "请输入用户名或邮箱。"
+        return None, None, None, "请输入用户名或邮箱"
     if len(password) < 6 or len(password) > 128:
-        return None, None, None, "密码长度需为 6–128 个字符。"
+        return None, None, None, "密码长度需为 6–128 个字符"
 
     if "@" in identifier:
         email, email_key, error = _normalize_email(identifier)
         if error:
-            return None, None, None, "请输入正确的用户名或邮箱。"
+            return None, None, None, "请输入正确的用户名或邮箱"
         return "email", email, email_key, None
 
     username, username_key, error = _normalize_username(identifier)
     if error:
-        return None, None, None, "请输入正确的用户名或邮箱。"
+        return None, None, None, "请输入正确的用户名或邮箱"
     return "username", username, username_key, None
 
 
@@ -798,7 +798,7 @@ def _email_unavailable_response():
     return jsonify({
         "ok": False,
         "emailConfigured": False,
-        "error": "邮箱验证码服务尚未配置，请检查 Brevo 或 SMTP 环境变量。",
+        "error": "邮箱验证码服务尚未配置，请检查 Brevo 或 SMTP 环境变量",
     }), 503
 
 
@@ -824,7 +824,7 @@ def _email_code_send_limit(cur, purpose, email_key, user_id=None):
         age = time.time() - latest["created_at"].timestamp()
         if age < EMAIL_CODE_RESEND_SECONDS:
             wait = max(1, int(EMAIL_CODE_RESEND_SECONDS - age + 0.999))
-            return False, f"请 {wait} 秒后再发送验证码。"
+            return False, f"请 {wait} 秒后再发送验证码"
 
     params = [purpose, email_key]
     user_clause = ""
@@ -843,7 +843,7 @@ def _email_code_send_limit(cur, purpose, email_key, user_id=None):
     )
     count = int((cur.fetchone() or {}).get("count") or 0)
     if count >= EMAIL_CODE_MAX_PER_HOUR:
-        return False, "验证码发送次数过多，请稍后再试。"
+        return False, "验证码发送次数过多，请稍后再试"
     return True, None
 
 
@@ -879,7 +879,7 @@ def _latest_email_code(cur, purpose, email_key, user_id=None, username_key=None)
 def _verify_email_code(cur, purpose, email_key, supplied_code, user_id=None, username_key=None):
     code = re.sub(r"\D", "", str(supplied_code or ""))
     if len(code) != 6:
-        return None, "请输入 6 位邮箱验证码。"
+        return None, "请输入 6 位邮箱验证码"
 
     row = _latest_email_code(
         cur,
@@ -889,12 +889,12 @@ def _verify_email_code(cur, purpose, email_key, supplied_code, user_id=None, use
         username_key=username_key,
     )
     if not row:
-        return None, "请先发送邮箱验证码。"
+        return None, "请先发送邮箱验证码"
     if row.get("expires_at") and row["expires_at"].timestamp() < time.time():
-        return None, "验证码已过期，请重新发送。"
+        return None, "验证码已过期，请重新发送"
     attempts = int(row.get("attempts") or 0)
     if attempts >= EMAIL_CODE_MAX_ATTEMPTS:
-        return None, "验证码错误次数过多，请重新发送。"
+        return None, "验证码错误次数过多，请重新发送"
 
     expected = _email_code_digest(purpose, email_key, code)
     if not hmac.compare_digest(str(row.get("code_digest") or ""), expected):
@@ -902,7 +902,7 @@ def _verify_email_code(cur, purpose, email_key, supplied_code, user_id=None, use
             "UPDATE dm_email_codes SET attempts = attempts + 1 WHERE id = %s",
             (int(row["id"]),),
         )
-        return None, "验证码不正确。"
+        return None, "验证码不正确"
 
     return int(row["id"]), None
 
@@ -1053,9 +1053,9 @@ def auth_send_email_code():
     if not EMAIL_DELIVERY_CONFIGURED:
         return _email_unavailable_response()
     if not _auth_rate_allowed("send-email-code"):
-        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试"}), 429
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
@@ -1064,7 +1064,7 @@ def auth_send_email_code():
     if error:
         return jsonify({"ok": False, "error": error}), 400
     if purpose not in {"register", "reset", "bind"}:
-        return jsonify({"ok": False, "error": "验证码用途不正确。"}), 400
+        return jsonify({"ok": False, "error": "验证码用途不正确"}), 400
 
     user_id = None
     username_key = None
@@ -1115,14 +1115,14 @@ def auth_send_email_code():
                     user = _current_auth_user()
                     if not user:
                         session.clear()
-                        return jsonify({"ok": False, "error": "请先登录。"}), 401
+                        return jsonify({"ok": False, "error": "请先登录"}), 401
                     user_id = int(user["id"])
                     cur.execute(
                         "SELECT id FROM dm_users WHERE email_key = %s AND id <> %s",
                         (email_key, user_id),
                     )
                     if cur.fetchone():
-                        return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号。"}), 409
+                        return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号"}), 409
 
                 allowed, limit_error = _email_code_send_limit(
                     cur, purpose, email_key, user_id=user_id
@@ -1154,7 +1154,7 @@ def auth_send_email_code():
                 _send_verification_email(email, code, purpose)
     except Exception as exc:
         print(f"发送邮箱验证码失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "验证码发送失败，请稍后再试。"}), 502
+        return jsonify({"ok": False, "error": "验证码发送失败，请稍后再试"}), 502
 
     return jsonify({
         "ok": True,
@@ -1170,9 +1170,9 @@ def auth_register():
     if not EMAIL_DELIVERY_CONFIGURED:
         return _email_unavailable_response()
     if not _auth_rate_allowed("register"):
-        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试"}), 429
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
@@ -1249,7 +1249,7 @@ def auth_register():
         if getattr(exc, "sqlstate", None) == "23505":
             return jsonify({"ok": False, "error": "用户名或邮箱已经被使用"}), 409
         print(f"注册失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "注册失败，请稍后再试。"}), 500
+        return jsonify({"ok": False, "error": "注册失败，请稍后再试"}), 500
 
     session.clear()
     session["user_id"] = int(user["id"])
@@ -1277,9 +1277,9 @@ def auth_login():
     if not AUTH_CONFIGURED or not _ensure_auth_schema():
         return _auth_unavailable_response()
     if not _auth_rate_allowed("login"):
-        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试"}), 429
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
@@ -1313,10 +1313,10 @@ def auth_login():
                     )
                 user = cur.fetchone()
                 if not user or not check_password_hash(user["password_hash"], password):
-                    return jsonify({"ok": False, "error": "用户名/邮箱或密码不正确。"}), 401
+                    return jsonify({"ok": False, "error": "用户名/邮箱或密码不正确"}), 401
     except Exception as exc:
         print(f"登录查询失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "登录失败，请稍后再试。"}), 500
+        return jsonify({"ok": False, "error": "登录失败，请稍后再试"}), 500
 
     session.clear()
     session["user_id"] = int(user["id"])
@@ -1344,14 +1344,14 @@ def auth_bind_email():
     if not EMAIL_DELIVERY_CONFIGURED:
         return _email_unavailable_response()
     if not _auth_rate_allowed("bind-email"):
-        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试"}), 429
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     user = _current_auth_user()
     if not user:
         session.clear()
-        return jsonify({"ok": False, "error": "请先登录。"}), 401
+        return jsonify({"ok": False, "error": "请先登录"}), 401
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
@@ -1361,7 +1361,7 @@ def auth_bind_email():
     if error:
         return jsonify({"ok": False, "error": error}), 400
     if not password:
-        return jsonify({"ok": False, "error": "请输入当前密码。"}), 400
+        return jsonify({"ok": False, "error": "请输入当前密码"}), 400
 
     try:
         with _auth_connect() as conn:
@@ -1372,14 +1372,14 @@ def auth_bind_email():
                 )
                 row = cur.fetchone()
                 if not row or not check_password_hash(row["password_hash"], password):
-                    return jsonify({"ok": False, "error": "密码不正确。"}), 401
+                    return jsonify({"ok": False, "error": "密码不正确"}), 401
 
                 cur.execute(
                     "SELECT id FROM dm_users WHERE email_key = %s AND id <> %s",
                     (email_key, int(user["id"])),
                 )
                 if cur.fetchone():
-                    return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号。"}), 409
+                    return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号"}), 409
 
                 code_id, verify_error = _verify_email_code(
                     cur,
@@ -1409,9 +1409,9 @@ def auth_bind_email():
                 )
     except Exception as exc:
         if getattr(exc, "sqlstate", None) == "23505":
-            return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号。"}), 409
+            return jsonify({"ok": False, "error": "这个邮箱已经绑定了其他账号"}), 409
         print(f"绑定邮箱失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "绑定邮箱失败，请稍后再试。"}), 500
+        return jsonify({"ok": False, "error": "绑定邮箱失败，请稍后再试"}), 500
 
     return jsonify({
         "ok": True,
@@ -1426,14 +1426,14 @@ def auth_recovery_code():
     if not AUTH_CONFIGURED or not _ensure_auth_schema():
         return _auth_unavailable_response()
     if not _auth_rate_allowed("recovery-code"):
-        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试"}), 429
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     user = _current_auth_user()
     if not user:
         session.clear()
-        return jsonify({"ok": False, "error": "请先登录。"}), 401
+        return jsonify({"ok": False, "error": "请先登录"}), 401
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
@@ -1441,11 +1441,11 @@ def auth_recovery_code():
     new_recovery_code = _normalize_recovery_secret(payload.get("newRecoveryCode"))
 
     if not password:
-        return jsonify({"ok": False, "error": "请输入当前密码。"}), 400
+        return jsonify({"ok": False, "error": "请输入当前密码"}), 400
     if not _valid_custom_recovery_code(new_recovery_code):
         return jsonify({
             "ok": False,
-            "error": "新恢复码需为 8–64 个字符，且不能包含控制字符。",
+            "error": "新恢复码需为 8–64 个字符，且不能包含控制字符",
         }), 400
 
     recovery_hash = generate_password_hash(new_recovery_code, method="scrypt")
@@ -1459,7 +1459,7 @@ def auth_recovery_code():
                 )
                 row = cur.fetchone()
                 if not row or not check_password_hash(row["password_hash"], password):
-                    return jsonify({"ok": False, "error": "密码不正确。"}), 401
+                    return jsonify({"ok": False, "error": "密码不正确"}), 401
 
                 cur.execute(
                     """
@@ -1472,7 +1472,7 @@ def auth_recovery_code():
                 )
     except Exception as exc:
         print(f"修改恢复码失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "修改恢复码失败，请稍后再试。"}), 500
+        return jsonify({"ok": False, "error": "修改恢复码失败，请稍后再试"}), 500
 
     return jsonify({
         "ok": True,
@@ -1488,9 +1488,9 @@ def auth_recover_password_email():
     if not EMAIL_DELIVERY_CONFIGURED:
         return _email_unavailable_response()
     if not _auth_rate_allowed("recover-password-email"):
-        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试"}), 429
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
@@ -1516,7 +1516,7 @@ def auth_recover_password_email():
                 )
                 user = cur.fetchone()
                 if not user:
-                    return jsonify({"ok": False, "error": "邮箱或验证码不正确。"}), 401
+                    return jsonify({"ok": False, "error": "邮箱或验证码不正确"}), 401
 
                 code_id, verify_error = _verify_email_code(
                     cur,
@@ -1546,7 +1546,7 @@ def auth_recover_password_email():
                 )
     except Exception as exc:
         print(f"邮箱重置密码失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "重置密码失败，请稍后再试。"}), 500
+        return jsonify({"ok": False, "error": "重置密码失败，请稍后再试"}), 500
 
     session.clear()
     session["user_id"] = int(updated["id"])
@@ -1570,9 +1570,9 @@ def auth_recover_password():
     if not AUTH_CONFIGURED or not _ensure_auth_schema():
         return _auth_unavailable_response()
     if not _auth_rate_allowed("recover-password"):
-        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试"}), 429
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
@@ -1581,9 +1581,9 @@ def auth_recover_password():
     new_password = str(payload.get("newPassword") or "")
 
     if not re.fullmatch(r"[\w.\-\u4e00-\u9fff]{2,32}", username, flags=re.UNICODE):
-        return jsonify({"ok": False, "error": "请输入正确的用户名。"}), 400
+        return jsonify({"ok": False, "error": "请输入正确的用户名"}), 400
     if not recovery_code:
-        return jsonify({"ok": False, "error": "请输入恢复码。"}), 400
+        return jsonify({"ok": False, "error": "请输入恢复码"}), 400
     if len(new_password) < 8 or len(new_password) > 128:
         message = "新密码不能少于 8 位" if len(new_password) < 8 else "新密码不能超过 128 位"
         return jsonify({"ok": False, "error": message}), 400
@@ -1606,7 +1606,7 @@ def auth_recover_password():
                 ):
                     return jsonify({
                         "ok": False,
-                        "error": "用户名或恢复码不正确。",
+                        "error": "用户名或恢复码不正确",
                     }), 401
 
                 new_password_hash = generate_password_hash(
@@ -1625,7 +1625,7 @@ def auth_recover_password():
                 updated = cur.fetchone()
     except Exception as exc:
         print(f"重置密码失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "重置密码失败，请稍后再试。"}), 500
+        return jsonify({"ok": False, "error": "重置密码失败，请稍后再试"}), 500
 
     session.clear()
     session["user_id"] = int(updated["id"])
@@ -1664,20 +1664,20 @@ def auth_delete_account():
     if not AUTH_CONFIGURED or not _ensure_auth_schema():
         return _auth_unavailable_response()
     if not _auth_rate_allowed("delete-account"):
-        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试。"}), 429
+        return jsonify({"ok": False, "error": "操作过于频繁，请稍后再试"}), 429
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     user_id = session.get("user_id")
     if not isinstance(user_id, int):
         session.clear()
-        return jsonify({"ok": False, "error": "请先登录。"}), 401
+        return jsonify({"ok": False, "error": "请先登录"}), 401
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
     password = str(payload.get("password") or "")
     if not password:
-        return jsonify({"ok": False, "error": "请输入当前密码。"}), 400
+        return jsonify({"ok": False, "error": "请输入当前密码"}), 400
 
     try:
         with _auth_connect() as conn:
@@ -1694,10 +1694,10 @@ def auth_delete_account():
 
                 if not user:
                     session.clear()
-                    return jsonify({"ok": False, "error": "账号不存在或已被注销。"}), 401
+                    return jsonify({"ok": False, "error": "账号不存在或已被注销"}), 401
 
                 if not check_password_hash(user["password_hash"], password):
-                    return jsonify({"ok": False, "error": "密码不正确。"}), 401
+                    return jsonify({"ok": False, "error": "密码不正确"}), 401
 
                 cur.execute(
                     "DELETE FROM dm_users WHERE id = %s RETURNING id",
@@ -1705,10 +1705,10 @@ def auth_delete_account():
                 )
                 deleted = cur.fetchone()
                 if not deleted:
-                    return jsonify({"ok": False, "error": "注销失败，请稍后再试。"}), 500
+                    return jsonify({"ok": False, "error": "注销失败，请稍后再试"}), 500
     except Exception as exc:
         print(f"注销账号失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "注销账号失败，请稍后再试。"}), 500
+        return jsonify({"ok": False, "error": "注销账号失败，请稍后再试"}), 500
 
     session.clear()
     return jsonify({
@@ -1724,7 +1724,7 @@ def sync_user_data():
 
     user = _current_auth_user()
     if not user:
-        return jsonify({"ok": False, "error": "请先登录。"}), 401
+        return jsonify({"ok": False, "error": "请先登录"}), 401
 
     user_id = int(user["id"])
 
@@ -1744,7 +1744,7 @@ def sync_user_data():
             })
         except Exception as exc:
             print(f"检查云端同步版本失败：{repr(exc)}")
-            return jsonify({"ok": False, "error": "检查云端版本失败。"}), 500
+            return jsonify({"ok": False, "error": "检查云端版本失败"}), 500
 
     if request.method == "GET":
         try:
@@ -1753,10 +1753,10 @@ def sync_user_data():
             expected_raw = request.args.get("expectedRevision")
             expected_revision = int(expected_raw) if expected_raw is not None else None
         except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "同步版本号无效。"}), 400
+            return jsonify({"ok": False, "error": "同步版本号无效"}), 400
         except Exception as exc:
             print(f"读取云端数据失败：{repr(exc)}")
-            return jsonify({"ok": False, "error": "读取云端数据失败。"}), 500
+            return jsonify({"ok": False, "error": "读取云端数据失败"}), 500
 
         actual_revision = int(row["revision"] or 0)
         # manifest 和分段查询都绑定某一版本。变化后返回冲突而不是回传
@@ -1764,7 +1764,7 @@ def sync_user_data():
         if expected_revision is not None and expected_revision != actual_revision:
             return jsonify({
                 "ok": False, "conflict": True,
-                "error": "查询期间云端数据已更新，请重新获取版本。",
+                "error": "查询期间云端数据已更新，请重新获取版本",
                 "revision": actual_revision,
             }), 409
 
@@ -1784,13 +1784,13 @@ def sync_user_data():
         })
 
     if not request.is_json:
-        return jsonify({"ok": False, "error": "请求格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
     data = payload.get("data")
     if payload.get("force"):
-        return jsonify({"ok": False, "error": "不支持强制覆盖云端数据，请合并后重试。"}), 400
+        return jsonify({"ok": False, "error": "不支持强制覆盖云端数据，请合并后重试"}), 400
 
     try:
         base_revision = int(payload.get("baseRevision", 0))
@@ -1798,17 +1798,17 @@ def sync_user_data():
         base_revision = -1
 
     if not isinstance(data, dict):
-        return jsonify({"ok": False, "error": "同步数据格式不正确。"}), 400
+        return jsonify({"ok": False, "error": "同步数据格式不正确"}), 400
     if base_revision < 0:
-        return jsonify({"ok": False, "error": "同步版本号不正确。"}), 400
+        return jsonify({"ok": False, "error": "同步版本号不正确"}), 400
 
     try:
         encoded = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     except Exception:
-        return jsonify({"ok": False, "error": "同步数据无法序列化。"}), 400
+        return jsonify({"ok": False, "error": "同步数据无法序列化"}), 400
 
     if len(encoded) > MAX_SYNC_JSON_BYTES:
-        return jsonify({"ok": False, "error": "同步数据过大，请先清理部分历史记录。"}), 413
+        return jsonify({"ok": False, "error": "同步数据过大，请先清理部分历史记录"}), 413
 
     try:
         with _auth_connect() as conn:
@@ -1850,7 +1850,7 @@ def sync_user_data():
                     return jsonify({
                         "ok": False,
                         "conflict": True,
-                        "error": "云端数据已经被其他设备更新。",
+                        "error": "云端数据已经被其他设备更新",
                         "data": cloud["data"] or {},
                         "revision": int(cloud["revision"] or 0),
                         "updatedAt": cloud["updated_at"].isoformat() if cloud.get("updated_at") else None,
@@ -1865,7 +1865,7 @@ def sync_user_data():
         })
     except Exception as exc:
         print(f"写入云端数据失败：{repr(exc)}")
-        return jsonify({"ok": False, "error": "同步失败，请稍后再试。"}), 500
+        return jsonify({"ok": False, "error": "同步失败，请稍后再试"}), 500
 
 
 @app.route("/robots.txt")
@@ -2672,14 +2672,14 @@ def chat():
 
     if not _check_rate_limit(ip, "chat"):
         return jsonify({
-            "error": "当前请求过于频繁，请稍后再试。"
+            "error": "当前请求过于频繁，请稍后再试"
         }), 429
 
     data = request.get_json(silent=True)
 
     if not isinstance(data, dict):
         return jsonify({
-            "error": "请求格式不正确，请检查提交内容。"
+            "error": "请求格式不正确，请检查提交内容"
         }), 400
 
     messages = data.get("messages")
@@ -2689,7 +2689,7 @@ def chat():
 
     if not isinstance(messages, list):
         return jsonify({
-            "error": "消息格式不正确，请重新发送。"
+            "error": "消息格式不正确，请重新发送"
         }), 400
 
     if len(messages) > MAX_MESSAGES_PER_REQUEST:
@@ -2732,14 +2732,14 @@ def chat():
 
     if not cleaned:
         return jsonify({
-            "error": "没有检测到有效消息内容。"
+            "error": "没有检测到有效消息内容"
         }), 400
 
     # A single message referring to absent data from "the previous problem"
     # must not invent probabilities/graph edges in an imaginary history.
     if missing_previous_problem(cleaned):
         return jsonify({
-            "error": "当前消息提到了上一题的条件，但这次请求中没有该题的完整信息。请把已知条件一并发来，避免根据猜测得到错误答案。",
+            "error": "当前消息提到了上一题的条件，但这次请求中没有该题的完整信息。请把已知条件一并发来，避免根据猜测得到错误答案",
             "missing_question_context": True,
         }), 400
 
@@ -2766,7 +2766,7 @@ def chat():
                 or not isinstance(reference.get("question"), str)
                 or not reference["question"].strip()
                 or len(reference["question"]) > MAX_MESSAGE_CHARS):
-            return jsonify({"error": "练习参照题格式不正确，请重新选择题目。"}), 400
+            return jsonify({"error": "练习参照题格式不正确，请重新选择题目"}), 400
         reference_text = reference["question"].strip()
         reference_teaching = analyze_question(reference_text)
         # 仅当确实来自错题本复测时才继承难度；普通同考点出题不受影响。
@@ -2792,12 +2792,12 @@ def chat():
         # 无论客户端是否已打包锚点，后端都统一为一份参照题和一个当前动作。
         latest_user = next((item for item in reversed(cleaned) if item["role"] == "user"), None)
         if latest_user is None:
-            return jsonify({"error": "缺少本次出题请求。"}), 400
+            return jsonify({"error": "缺少本次出题请求"}), 400
         latest_action = extract_current_request(latest_user["content"])
         content = ("【当前指向题目】\n" + reference_text + "\n【当前指向题目结束】\n"
                    "【本轮唯一需要执行的用户请求】\n" + latest_action + "\n【本轮请求结束】")
         if len(content) > MAX_MESSAGE_CHARS:
-            return jsonify({"error": "参照题和出题要求过长，请精简后重试。"}), 400
+            return jsonify({"error": "参照题和出题要求过长，请精简后重试"}), 400
         cleaned = [{"role": "user", "content": content}]
 
     teaching = analyze_messages(cleaned)
@@ -2994,7 +2994,7 @@ def chat():
     except Exception as exc:
         print(f"/chat AI 首次请求异常：{repr(exc)}")
         if not effective_exercise_request:
-            return jsonify({"error": "AI 服务暂时出现异常，请稍后重试。"}), 500
+            return jsonify({"error": "AI 服务暂时出现异常，请稍后重试"}), 500
         result = {"ok": False, "error": "AI 服务暂时出现异常"}
 
     if not isinstance(result, dict):
@@ -3035,7 +3035,7 @@ def chat():
                 "solution_partial": True,
                 "teaching": {k: v for k, v in teaching.items() if k != "solution_reference_answer"},
             })
-        return jsonify({"error": result.get("error") or "这次没有生成有效题目，请重试。"}), 503
+        return jsonify({"error": result.get("error") or "这次没有生成有效题目，请重试"}), 503
 
     if result.get("ok") is True:
         reply = result.get("reply", "")
@@ -3095,7 +3095,7 @@ def chat():
 
         if not isinstance(reply, str) or not reply.strip():
             return jsonify({
-                "error": "AI 服务没有生成有效回答，请重新发送。"
+                "error": "AI 服务没有生成有效回答，请重新发送"
             }), 502
 
         generated_answer = ""
@@ -3276,7 +3276,7 @@ def chat():
             if chosen_candidate is None:
                 # 不把拒绝出题、服务故障文案或跨学科内容登记为真实练习。
                 return jsonify({
-                    "error": (first_error + "请重新出题。") if first_error else "这次没有生成有效题目，请重新出题。",
+                    "error": (first_error + "请重新出题") if first_error else "这次没有生成有效题目，请重新出题",
                     "teaching": teaching,
                 }), 502
 
@@ -3388,7 +3388,7 @@ def analyze_questions_batch():
 
     if not isinstance(items, list):
         return jsonify({
-            "error": "题目列表格式不正确。"
+            "error": "题目列表格式不正确"
         }), 400
 
     results = []
@@ -3524,12 +3524,12 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
 @app.route("/ocr/cancel", methods=["POST"])
 def cancel_ocr():
     if not _check_rate_limit(_get_client_ip(), "ocr_cancel"):
-        return jsonify({"error": "撤销请求过于频繁，请稍后再试。"}), 429
+        return jsonify({"error": "撤销请求过于频繁，请稍后再试"}), 429
     data = request.get_json(silent=True) or {}
     request_id = _normalize_ocr_request_id(data.get("request_id"))
 
     if not request_id:
-        return jsonify({"error": "撤销请求无效。"}), 400
+        return jsonify({"error": "撤销请求无效"}), 400
 
     _mark_ocr_cancelled(request_id)
     return jsonify({"cancelled": True})
@@ -3543,7 +3543,7 @@ def ocr():
 
     if not _check_rate_limit(ip, "ocr"):
         return jsonify({
-            "error": "图片识别请求过于频繁，请稍后再试。"
+            "error": "图片识别请求过于频繁，请稍后再试"
         }), 429
 
     request_id = _normalize_ocr_request_id(
@@ -3561,19 +3561,19 @@ def ocr():
 
     if uploaded is None:
         return jsonify({
-            "error": "没有检测到图片，请重新上传。"
+            "error": "没有检测到图片，请重新上传"
         }), 400
 
     raw = uploaded.read()
 
     if not raw:
         return jsonify({
-            "error": "图片内容为空，请重新上传。"
+            "error": "图片内容为空，请重新上传"
         }), 400
 
     if len(raw) > MAX_IMAGE_BYTES:
         return jsonify({
-            "error": "图片过大，请上传 8MB 以内的图片。"
+            "error": "图片过大，请上传 8MB 以内的图片"
         }), 413
 
     try:
@@ -3648,7 +3648,7 @@ def ocr():
             print(f"Vision 增强层异常：{type(exc).__name__}")
             vision_result = {
                 "ok": False,
-                "error": "图片复核暂时不可用。"
+                "error": "图片复核暂时不可用"
             }
 
         # 撤销若发生在 Vision 调用期间，模型返回后立即丢弃结果。
@@ -3885,7 +3885,7 @@ def ocr():
         # uncertain 必须留给核对流程，避免误杀无题干的纯图论图形。
         if image_kind == "non_exercise" and not _ocr_has_exercise_evidence(ocr_text):
             return jsonify({
-                "error": "这张图片看起来不是待解答的数学题目。请上传题目图片；如果只是想讨论知识点，可以直接在聊天框输入问题。",
+                "error": "这张图片看起来不是待解答的数学题目。请上传题目图片；如果只是想讨论知识点，可以直接在聊天框输入问题",
                 "not_a_question": True,
             }), 422
 
@@ -3893,7 +3893,7 @@ def ocr():
             corrected_text or ocr_text, visual_text
         ):
             return jsonify({
-                "error": "识别到的主要是知识点说明或笔记，不是待解答的题目。请上传题目图片。",
+                "error": "识别到的主要是知识点说明或笔记，不是待解答的题目。请上传题目图片",
                 "not_a_question": True,
             }), 422
 
@@ -3905,7 +3905,7 @@ def ocr():
                 or "没有识别到有效的题目内容。"
             )
             return jsonify({
-                "error": message + " 请尝试重新拍摄、裁剪，或提高图形与背景的对比度。"
+                "error": message + " 请尝试重新拍摄、裁剪，或提高图形与背景的对比度"
             }), 400
 
         warnings = list(alignment_warnings) + list(graph_review_issues)
@@ -3954,7 +3954,7 @@ def ocr():
             f"/ocr 接口异常：{repr(exc)}"
         )
         return jsonify({
-            "error": "题目识别暂时失败，请稍后重试。"
+            "error": "题目识别暂时失败，请稍后重试"
         }), 500
 
 
