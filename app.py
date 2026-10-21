@@ -3723,9 +3723,15 @@ def ocr():
         # CPU-only OpenCV graph recognition is opportunistic and bounded.
         # Any uncertainty or failure leaves the original Vision/OCR fallback intact.
         graph_cv = {'graphs': [], 'status': 'not_graph', 'regions': []}
-        possible_graph = (len(ocr_text) < 20 or bool(re.search(
-            r"图|顶点|边|树|连通|邻接|路径|欧拉|哈密顿|G[1234₁₂₃₄]", ocr_text
-        )))
+        possible_graph = (
+            len(ocr_text) < 20
+            or bool(re.search(
+                r"图|顶点|边|树|连通|邻接|路径|欧拉|哈密顿|G[1-9₁₂₃₄₅₆₇₈₉]|"
+                r"\b(?:graphs?|vertices?|edges?|trees?|isomorph(?:ism|ic)?|adjacency|"
+                r"euler(?:ian)?|hamilton(?:ian)?|degree|connected|directed|undirected|cycle|path)\b",
+                ocr_text, re.I
+            ))
+        )
         if possible_graph and recognize_graphs is not None:
             try:
                 graph_cv = recognize_graphs(raw, text_hint=ocr_text,
@@ -3735,7 +3741,8 @@ def ocr():
 
         try:
             vision_result = analyze_image_structure(
-                raw, review_regions=vision_regions, opencv_graphs=graph_cv
+                raw, ocr_text=ocr_text, review_regions=vision_regions,
+                opencv_graphs=graph_cv
             )
         except Exception as exc:
             print(f"Vision 增强层异常：{type(exc).__name__}")
