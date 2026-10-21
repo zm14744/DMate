@@ -21,10 +21,13 @@ DEEPSEEK_CHAT_MODEL = (
     or "deepseek-flash"
 ).strip()
 
-# DMate text and image services use the configured DeepSeek endpoint only.
-# OCR/Vision 保持现有 DeepSeek 路径。
-API_KEY = DEEPSEEK_API_KEY
-API_URL = DEEPSEEK_API_URL
+# Text tutoring stays on DeepSeek / Luxin; graph-image Vision uses one Qwen provider.
+# Do not silently fall back to Qwen Vision when the DashScope key is missing.
+API_KEY = (os.environ.get("DASHSCOPE_API_KEY") or "").strip()
+API_URL = (
+    os.environ.get("DASHSCOPE_VISION_API_URL")
+    or "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+).strip()
 
 # 调试模式：True 时返回模拟回复，不调用真实 API
 ASK_AI_MOCK = False
@@ -112,11 +115,12 @@ SYSTEM_PROMPT = r"""你是离散数学智能辅学系统中的教学助手。
 
 
 # 图像理解模型：独立读取题干并解析图形结构，不直接解题。
-VISION_MODEL = os.environ.get(
-    "DEEPSEEK_VISION_MODEL",
-    "deepseek-flash"
+# A single, thinking-only vision model. Do not share the text-model route.
+VISION_MODEL = "qwen3-vl-235b-a22b-thinking"
+# Includes reasoning tokens; the old 3000-token budget often truncated JSON.
+VISION_MAX_OUTPUT_TOKENS = max(
+    4096, min(16384, int(os.environ.get("QWEN_VISION_MAX_OUTPUT_TOKENS", "12000")))
 )
-VISION_MAX_OUTPUT_TOKENS = 3000
 VISION_ENABLED = os.environ.get(
     "VISION_ANALYSIS_ENABLED",
     "1"
@@ -1168,7 +1172,7 @@ $$
     return _success(content)
 
 def _guess_image_mime(raw):
-    """根据文件头判断 DeepSeek Vision 支持的图片 MIME。"""
+    """根据文件头判断 Qwen Vision 支持的图片 MIME。"""
     if not isinstance(raw, (bytes, bytearray)) or not raw:
         return None
 
@@ -1489,7 +1493,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
         return _failure("图形理解功能当前已关闭。")
 
     if not API_KEY:
-        print("DeepSeek Vision 配置错误：未设置 DEEPSEEK_API_KEY")
+        print("Qwen Vision 配置错误：未设置 DASHSCOPE_API_KEY")
         return _failure("图形理解服务尚未完成配置。")
 
     if not isinstance(image_bytes, (bytes, bytearray)) or not image_bytes:
@@ -1534,11 +1538,9 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 "content": content_parts
             }
         ],
-        # 图形结构提取是短输出任务，不需要思考模式。
-        # DeepSeek Chat Completions 默认会开启 thinking；
-        # 显式关闭可避免输出预算被 reasoning_content 占用，
-        # 最终 content 为空的情况。
-        "thinking": {"type": "disabled"},
+        # Qwen3-VL-235B-A22B-Thinking cannot disable reasoning.
+        # Reasoning tokens count towards max_tokens and billed output.
+        "enable_thinking": True,
         "max_tokens": VISION_MAX_OUTPUT_TOKENS,
         "stream": False
     }
@@ -1548,21 +1550,21 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
     for attempt in range(total_attempts):
         try:
             print(
-                f"正在调用 DeepSeek Vision（第 {attempt + 1}/{total_attempts} 次）"
+                f"正在调用 Qwen Vision（第 {attempt + 1}/{total_attempts} 次）"
             )
 
             response = requests.post(
                 API_URL,
                 headers=headers,
                 json=payload,
-                timeout=(10, 90)
+                timeout=(10, 120)
             )
 
             if response.status_code in RETRYABLE_STATUS:
                 if attempt < total_attempts - 1:
                     wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
                     print(
-                        f"DeepSeek Vision 暂时不可用，HTTP {response.status_code}，"
+                        f"Qwen Vision 暂时不可用，HTTP {response.status_code}，"
                         f"{wait_seconds:.1f} 秒后重试"
                     )
                     time.sleep(wait_seconds)
@@ -1574,7 +1576,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
 
             if not response.ok:
                 print(
-                    f"DeepSeek Vision 请求失败：HTTP {response.status_code}；"
+                    f"Qwen Vision 请求失败：HTTP {response.status_code}；"
                     f"响应内容：{response.text[:500]}"
                 )
                 return _failure(
@@ -1584,14 +1586,14 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
             try:
                 result = response.json()
             except ValueError as exc:
-                print(f"DeepSeek Vision 返回解析失败：{repr(exc)}")
+                print(f"Qwen Vision 返回解析失败：{repr(exc)}")
                 return _failure(
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
 
             choices = result.get("choices")
             if not choices:
-                print(f"DeepSeek Vision 返回缺少 choices：{result}")
+                print(f"Qwen Vision 返回缺少 choices：{result}")
                 return _failure(
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
@@ -1613,7 +1615,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 usage = result.get("usage")
 
                 print(
-                    "DeepSeek Vision 返回空内容："
+                    "Qwen Vision 返回空内容："
                     f"finish_reason={finish_reason!r}；"
                     f"reasoning_len={reasoning_len}；"
                     f"usage={usage!r}"
@@ -1634,7 +1636,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
 
             if parsed is None:
                 print(
-                    "DeepSeek Vision 返回内容不是有效 JSON："
+                    "Qwen Vision 返回内容不是有效 JSON："
                     f"{content[:500]!r}"
                 )
 
@@ -1653,7 +1655,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
 
             # 校对文字为空时不强行覆盖 OCR；app.py 会自动回退原 OCR。
             print(
-                "DeepSeek Vision 调用成功："
+                "Qwen Vision 调用成功："
                 f"corrected_text={len(corrected_text)} chars；"
                 f"visual_text={len(visual_text)} chars"
             )
@@ -1666,7 +1668,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
             )
 
         except requests.exceptions.Timeout as exc:
-            print(f"DeepSeek Vision 请求超时：{repr(exc)}")
+            print(f"Qwen Vision 请求超时：{repr(exc)}")
             if attempt < total_attempts - 1:
                 time.sleep((2 ** attempt) + random.uniform(0, 0.4))
                 continue
@@ -1675,7 +1677,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
             )
 
         except requests.exceptions.ConnectionError as exc:
-            print(f"DeepSeek Vision 网络连接异常：{repr(exc)}")
+            print(f"Qwen Vision 网络连接异常：{repr(exc)}")
             if attempt < total_attempts - 1:
                 time.sleep((2 ** attempt) + random.uniform(0, 0.4))
                 continue
@@ -1684,13 +1686,13 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
             )
 
         except requests.exceptions.RequestException as exc:
-            print(f"DeepSeek Vision 请求异常：{repr(exc)}")
+            print(f"Qwen Vision 请求异常：{repr(exc)}")
             return _failure(
                 "图形结构理解请求失败，已保留文字识别结果。"
             )
 
         except Exception as exc:
-            print(f"DeepSeek Vision 未知异常：{repr(exc)}")
+            print(f"Qwen Vision 未知异常：{repr(exc)}")
             return _failure(
                 "图形结构理解暂时出现异常，已保留文字识别结果。"
             )
@@ -1859,14 +1861,14 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
     payload = {
         "model": VISION_MODEL,
         "messages": [{"role":"user","content":content}],
-        "thinking":{"type":"disabled"},
-        "max_tokens": min(2400, VISION_MAX_OUTPUT_TOKENS),
+        "enable_thinking": True,
+        "max_tokens": VISION_MAX_OUTPUT_TOKENS,
         "stream":False,
     }
     headers={"Authorization":f"Bearer {API_KEY}", "Content-Type":"application/json"}
     for attempt in range(max(1, retries + 1)):
         try:
-            response=requests.post(API_URL, headers=headers, json=payload, timeout=(10,75))
+            response=requests.post(API_URL, headers=headers, json=payload, timeout=(10,120))
             if not response.ok:
                 if response.status_code in RETRYABLE_STATUS and attempt < retries:
                     time.sleep(1)

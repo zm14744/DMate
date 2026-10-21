@@ -48,10 +48,38 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         self.assertEqual(len(out["graphs"]),2)
         self.assertEqual(len(received),1)
         payload=received[0]
-        self.assertEqual(payload["thinking"]["type"],"disabled")
+        self.assertEqual(payload["model"], "qwen3-vl-235b-a22b-thinking")
+        self.assertTrue(payload["enable_thinking"])
+        self.assertNotIn("thinking", payload)
+        self.assertEqual(payload["max_tokens"], ai.VISION_MAX_OUTPUT_TOKENS)
         contents=payload["messages"][0]["content"]
         self.assertEqual(sum(row["type"]=="image_url" for row in contents),3)
         self.assertIn("不得使用其他模型已经给出的边集", contents[0]["text"])
+
+    def test_primary_vision_uses_qwen_without_changing_text_provider(self):
+        sent = []
+        url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+        def fake_post(url_arg, headers, json, timeout):
+            sent.append((url_arg, headers, json))
+            return _Response(200, {
+                "corrected_text": "判断该图是否为树",
+                "visual_text": "图1：顶点 a、b；边：a-b。",
+                "has_visual_structure": True,
+                "image_kind": "exercise",
+                "uncertain_fields": []
+            })
+        with patch.object(ai, "API_KEY", "qwen_test_key"), \
+             patch.object(ai, "API_URL", url), \
+             patch.object(ai, "VISION_ENABLED", True), \
+             patch.object(ai.requests, "post", side_effect=fake_post):
+            result = ai.analyze_image_structure(sample_image(), retries=0)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(sent[0][0], url)
+        self.assertEqual(sent[0][1]["Authorization"], "Bearer qwen_test_key")
+        self.assertEqual(sent[0][2]["model"], "qwen3-vl-235b-a22b-thinking")
+        self.assertTrue(sent[0][2]["enable_thinking"])
+        self.assertNotIn("thinking", sent[0][2])
+        self.assertEqual(ai.VISION_MODEL, "qwen3-vl-235b-a22b-thinking")
 
     def test_vertical_original_two_graphs_are_both_zoomed(self):
         tall=Image.new("RGB",(330,570),"white")

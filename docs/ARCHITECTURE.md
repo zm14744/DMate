@@ -21,7 +21,7 @@ flowchart LR
     T --> KG["knowledge_graph.json"]
     A --> TXT["文本模型路由\n鲁信可选 → DeepSeek兜底"]
     A --> OCR["PaddleOCR"]
-    A --> VIS["DeepSeek Vision"]
+    A --> VIS["Qwen3-VL-235B-A22B-Thinking"]
     A --> DB["PostgreSQL\n账号 + 云同步"]
     A --> MAIL["Brevo API / SMTP\n邮箱验证码"]
 ```
@@ -90,7 +90,7 @@ DeepSeek Chat Completions（兜底）
 - 熔断冷却；
 - 失败自动切换 DeepSeek。
 
-Vision 不走该文本切换链，继续使用独立 DeepSeek Vision 路径。
+Vision 不走该文本切换链，独立使用阿里云百炼 Qwen3-VL-235B-A22B-Thinking。
 
 ## 5. 上下文管理
 
@@ -156,7 +156,7 @@ OCR 模型：
 → EXIF方向处理 + 图像预处理
 → PaddleOCR文字
 → FormulaNet公式
-→ DeepSeek Vision校对与图形结构解析
+→ Qwen3-VL-235B-A22B-Thinking 校对与图形结构解析
 → Vision 在原调用中标识 exercise / non_exercise / uncertain
 → 明确非题目返回 422、不进入 AI 解题；不确定和纯图题保留核对
 → corrected text + visual text

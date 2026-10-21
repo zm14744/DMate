@@ -33,7 +33,9 @@ gunicorn -w 1 --threads 2 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app
 ```text
 DEEPSEEK_API_KEY
 DEEPSEEK_CHAT_MODEL
-DEEPSEEK_VISION_MODEL
+DASHSCOPE_API_KEY
+DASHSCOPE_VISION_API_URL
+QWEN_VISION_MAX_OUTPUT_TOKENS
 VISION_ANALYSIS_ENABLED
 DEEPSEEK_MAX_OUTPUT_TOKENS
 MEDIUM_MAX_OUTPUT_TOKENS
@@ -41,8 +43,12 @@ MEDIUM_MAX_OUTPUT_TOKENS
 
 代码当前默认：
 
-- `DEEPSEEK_CHAT_MODEL=deepseek-flash`
-- `DEEPSEEK_VISION_MODEL=deepseek-flash`
+- `DEEPSEEK_CHAT_MODEL=deepseek-flash`（数学解题仍使用 DeepSeek / 可选鲁信路由）
+- 图片视觉理解固定使用 `qwen3-vl-235b-a22b-thinking`，包括独立逐边复核；不使用 DeepSeek Vision 作为备用
+- `DASHSCOPE_API_KEY` 必填，Zeabur 环境变量中设置，严禁写入 GitHub 或客户端
+- `DASHSCOPE_VISION_API_URL` 可选，默认北京地域兼容接口 `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`；若使用其他地域，需填写对应地域 URL 并使用该地域的 Key
+- `QWEN_VISION_MAX_OUTPUT_TOKENS=12000` 可选；包含思考 Token，较高上限会增加成本
+- 缺少百炼 Key 时，视觉识别无法运行；仍保留 PaddleOCR 文字识别降级，但不悄悄调用 DeepSeek Vision。部署后需实际测试 /ocr
 - 普通回复使用 `DEEPSEEK_MAX_OUTPUT_TOKENS`；`high` 思考（解题中的中等与困难共用）使用 `MEDIUM_MAX_OUTPUT_TOKENS`。本源码不使用 `HARD_MAX_OUTPUT_TOKENS` / `max` 档。
 
 ### 可选鲁信文本通道
