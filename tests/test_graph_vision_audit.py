@@ -68,6 +68,36 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
                 if item["type"]=="image_url"]
         self.assertEqual(len(frames),3)
 
+    def test_four_panel_independent_edge_audit_sends_separate_magnified_crops(self):
+        packets = []
+        original = Image.new("RGB", (1200, 480), "white")
+        out = io.BytesIO()
+        original.save(out, format="PNG")
+
+        def fake_post(url, headers, json, timeout):
+            packets.append(json)
+            return _Response(200, {
+                "graphs": [
+                    {"index": i, "directed": False,
+                     "vertices": list("abcdef"),
+                     "edges": [["a", "c"], ["b", "e"]],
+                     "complete": True}
+                    for i in range(1, 5)
+                ]
+            })
+
+        with patch.object(ai, "API_KEY", "test_only_key"), \
+                patch.object(ai, "VISION_ENABLED", True), \
+                patch.object(ai.requests, "post", side_effect=fake_post):
+            result = ai.verify_graph_image_independently(
+                out.getvalue(), retries=0, multi_edges=True, panel_count=4
+            )
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(len(result["graphs"]), 4)
+        content = packets[0]["messages"][0]["content"]
+        self.assertEqual(sum(piece["type"] == "image_url" for piece in content), 5)
+        self.assertIn("不得额外构造", content[0]["text"])
+
     def test_service_failure_yields_no_provisional_graph(self):
         with patch.object(ai,"API_KEY","test_only_key"),patch.object(ai,"VISION_ENABLED",True),patch.object(ai.requests,"post",return_value=_Response(502)):
             out=ai.verify_graph_image_independently(sample_image(),retries=0)
