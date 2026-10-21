@@ -241,7 +241,7 @@ class GraphRecognitionTests(unittest.TestCase):
         )
         curved = clean.copy()
         ImageDraw.Draw(curved).line(
-            [(45, 55), (75, 90), (115, 100), (160, 90), (210, 55)],
+            [(45, 55), (80, 110), (120, 180), (210, 220), (300, 245), (375, 265)],
             fill=(18, 18, 18), width=3
         )
         curved_fraction = _unexplained_ink_fraction(

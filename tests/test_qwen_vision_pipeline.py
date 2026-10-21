@@ -65,6 +65,31 @@ class QwenVisionPipelineTests(unittest.TestCase):
         self.assertEqual(good["corrected_text"], "题干")
         self.assertTrue(good["has_visual_structure"])
 
+    def test_analyze_uses_streaming_and_a_separate_reasoning_budget(self):
+        image_bytes = b"\x89PNG\r\n\x1a\n" + b"test"
+        model_output = json.dumps({
+            "corrected_text": "题干",
+            "visual_text": "",
+            "has_visual_structure": False,
+            "image_kind": "exercise",
+            "uncertain_fields": [],
+        }, ensure_ascii=False)
+        normalized = {"choices": [{
+            "message": {"content": model_output},
+            "finish_reason": "stop",
+        }]}
+        with patch.object(ai, "API_KEY", "test-key"), \
+             patch.object(ai, "_prepare_vision_images", return_value=["data:image/png;base64,AA=="]), \
+             patch.object(ai, "_request_qwen_completion", return_value=(200, "", normalized)) as request:
+            result = ai.analyze_image_structure(image_bytes, retries=0)
+        self.assertTrue(result["ok"])
+        payload = request.call_args.args[0]
+        self.assertTrue(payload["stream"])
+        self.assertTrue(payload["enable_thinking"])
+        self.assertEqual(payload["thinking_budget"], ai.VISION_THINKING_BUDGET)
+        self.assertLessEqual(payload["thinking_budget"], payload["max_tokens"] - 2048)
+        self.assertEqual(payload["temperature"], 0.1)
+
     def test_opencv_hints_are_valid_bounded_json_not_mid_string_slices(self):
         graphs = [{
             "id": "G1", "vertex_count": 3,
