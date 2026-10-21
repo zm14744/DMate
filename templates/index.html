@@ -8194,7 +8194,8 @@ body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button:hover {
 }
 
 
-/* 手动输入是否为题目：常驻在输入框左上角，不影响 OCR 与 AI 消息。 */
+/* 手动输入题目选择：放在输入框外侧上方，不占输入空间。 */
+.input-wrap { position:relative; overflow:visible; }
 .input .manual-question-composer {
     position:relative;
     flex:1 1 0;
@@ -8213,11 +8214,11 @@ body[data-appearance-theme] .input .manual-question-composer > #text:focus {
     height:58px !important;
     min-height:58px !important;
     max-height:58px !important;
-    padding:19px 12px 0 !important;
+    padding:0 12px !important;
 }
-.input .manual-question-mode {
+.input-wrap > .manual-question-mode {
     position:absolute;
-    top:3px;
+    top:-25px;
     left:12px;
     z-index:2;
     display:flex;
@@ -8229,7 +8230,7 @@ body[data-appearance-theme] .input .manual-question-composer > #text:focus {
     line-height:16px;
     color:var(--text-muted);
 }
-body[data-appearance-theme] .input .manual-question-mode .manual-question-choice {
+body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question-choice {
     box-sizing:border-box !important;
     display:inline-flex !important;
     align-items:center;
@@ -8254,7 +8255,7 @@ body[data-appearance-theme] .input .manual-question-mode .manual-question-choice
     line-height:16px !important;
     cursor:pointer;
 }
-.input .manual-question-choice .manual-question-dot {
+.input-wrap > .manual-question-mode .manual-question-choice .manual-question-dot {
     display:inline-block;
     box-sizing:border-box;
     flex:none;
@@ -8263,14 +8264,14 @@ body[data-appearance-theme] .input .manual-question-mode .manual-question-choice
     border:1.4px solid var(--text-muted);
     border-radius:50%;
 }
-.input .manual-question-choice[aria-pressed="true"] .manual-question-dot {
+.input-wrap > .manual-question-mode .manual-question-choice[aria-pressed="true"] .manual-question-dot {
     border:3.4px solid var(--accent);
 }
-body[data-appearance-theme] .input .manual-question-mode .manual-question-choice[aria-pressed="true"] {
+body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question-choice[aria-pressed="true"] {
     color:var(--text-primary) !important;
     -webkit-text-fill-color:var(--text-primary) !important;
 }
-.input .manual-question-mode .manual-question-choice:focus-visible {
+.input-wrap > .manual-question-mode .manual-question-choice:focus-visible {
     outline:2px solid var(--accent) !important;
     outline-offset:1px;
 }
@@ -8284,10 +8285,10 @@ body[data-appearance-theme] .input .manual-question-mode .manual-question-choice
         height:42px !important;
         min-height:42px !important;
         max-height:42px !important;
-        padding:17px 8px 0 !important;
+        padding:0 8px !important;
     }
-    .input .manual-question-mode {
-        top:0;
+    .input-wrap > .manual-question-mode {
+        top:-22px;
         left:8px;
         gap:6px;
         font-size:10px;
@@ -8392,13 +8393,13 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </nav>
 
     <div class="input-wrap">
+        <div id="manualQuestionMode" class="manual-question-mode" role="group" aria-label="手动输入是否为题目">
+            <span class="manual-question-mode-label">题目</span>
+            <button type="button" class="manual-question-choice" data-manual-question="yes" aria-pressed="false" title="本条作为题目，自动识别难度"><span class="manual-question-dot" aria-hidden="true"></span>是</button>
+            <button type="button" class="manual-question-choice" data-manual-question="no" aria-pressed="true" title="本条作为普通聊天"><span class="manual-question-dot" aria-hidden="true"></span>否</button>
+        </div>
         <div class="input">
             <div class="manual-question-composer">
-                <div id="manualQuestionMode" class="manual-question-mode" role="group" aria-label="手动输入是否为题目">
-                    <span class="manual-question-mode-label">题目</span>
-                    <button type="button" class="manual-question-choice" data-manual-question="yes" aria-pressed="false" title="本条作为题目，自动识别难度"><span class="manual-question-dot" aria-hidden="true"></span>是</button>
-                    <button type="button" class="manual-question-choice" data-manual-question="no" aria-pressed="true" title="本条作为普通聊天"><span class="manual-question-dot" aria-hidden="true"></span>否</button>
-                </div>
                 <input id="text" type="text" placeholder="" autocomplete="off">
             </div>
             <input id="imageInput" type="file" accept="image/*" hidden>
