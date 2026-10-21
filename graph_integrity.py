@@ -51,8 +51,16 @@ def contains_two_labeled_undirected_diagrams(visual_text):
     that the diagram is unrelated to graph isomorphism.
     """
     text=str(visual_text or "")
-    sections=list(re.finditer(r"(?:^|\n)\s*图\s*([12])\s*[（(:：]",text,re.I))
+    # The old [12] matcher silently ignored 图3/图4, so a four-diagram
+    # "which are trees?" slide was misrouted to the two-graph isomorphism
+    # audit. Its four-image response then failed the len==2 check and erased
+    # the otherwise useful graph transcription.
+    sections=list(re.finditer(r"(?:^|\n)\s*图\s*([1-9]\d*)\s*[（(:：]",text,re.I))
     if len(sections)!=2 or [x.group(1) for x in sections]!=["1","2"]:
+        return False
+    # Some transcriptions title extra figures G3/G4 instead of 图3/图4.
+    # Do not run a two-graph-only review if any further figure is named.
+    if re.search(r"(?i)(?:^|\n)\s*G\s*_?\s*\\?\{?[3-9]\d*\}?\s*[（(:：]", text):
         return False
     for i,m in enumerate(sections):
         chunk=text[m.start():sections[i+1].start() if i+1<len(sections) else len(text)]
