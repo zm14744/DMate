@@ -2273,7 +2273,7 @@ function looksLikeEmailAddress(value) {
 
 async function requestEmailCode({ purpose, email, username = "", messageSetter, cooldownKey }) {
     if (!looksLikeEmailAddress(email)) {
-        messageSetter("请输入正确的邮箱地址。", true);
+        messageSetter("请输入正确的邮箱地址", true);
         return false;
     }
     if (accountState.emailConfigured === false) {
@@ -2292,7 +2292,7 @@ async function requestEmailCode({ purpose, email, username = "", messageSetter, 
         });
         accountState.syncing = false;
         startEmailCodeCooldown(cooldownKey, Number(data.resendAfter || 60));
-        messageSetter("验证码已发送。没收到时请检查垃圾邮件箱。");
+        messageSetter("验证码已发送，没收到时请检查垃圾邮件箱");
         return true;
     } catch (error) {
         accountState.syncing = false;
@@ -2394,12 +2394,12 @@ async function submitAccountRegistration() {
         return;
     }
     if (!looksLikeEmailAddress(email)) {
-        setAccountRegisterMessage("请输入正确的邮箱地址。", true);
+        setAccountRegisterMessage("请输入正确的邮箱地址", true);
         emailInput?.focus();
         return;
     }
-    if (password.length < 6 || password.length > 128) {
-        setAccountRegisterMessage("密码长度需为 6–128 个字符。", true);
+    if (password.length < 8 || password.length > 128) {
+        setAccountRegisterMessage(password.length < 8 ? "密码不能少于 8 位" : "密码不能超过 128 位", true);
         passwordInput?.focus();
         return;
     }
@@ -2482,7 +2482,7 @@ async function recoverAccountPasswordByEmail() {
         return;
     }
     if (!looksLikeEmailAddress(email)) {
-        setAccountEmailRecoverMessage("请输入正确的邮箱地址。", true);
+        setAccountEmailRecoverMessage("请输入正确的邮箱地址", true);
         emailInput?.focus();
         return;
     }
@@ -2491,8 +2491,8 @@ async function recoverAccountPasswordByEmail() {
         codeInput?.focus();
         return;
     }
-    if (newPassword.length < 6 || newPassword.length > 128) {
-        setAccountEmailRecoverMessage("新密码长度需为 6–128 个字符。", true);
+    if (newPassword.length < 8 || newPassword.length > 128) {
+        setAccountEmailRecoverMessage(newPassword.length < 8 ? "新密码不能少于 8 位" : "新密码不能超过 128 位", true);
         passwordInput?.focus();
         return;
     }
@@ -2556,7 +2556,7 @@ async function bindAccountEmail() {
         return;
     }
     if (!looksLikeEmailAddress(email)) {
-        setAccountEmailBindMessage("请输入正确的邮箱地址。", true);
+        setAccountEmailBindMessage("请输入正确的邮箱地址", true);
         emailInput?.focus();
         return;
     }
@@ -2661,8 +2661,8 @@ async function recoverAccountPassword() {
         else confirmInput?.focus();
         return;
     }
-    if (newPassword.length < 6 || newPassword.length > 128) {
-        setAccountRecoverMessage("新密码长度需为 6–128 个字符。", true);
+    if (newPassword.length < 8 || newPassword.length > 128) {
+        setAccountRecoverMessage(newPassword.length < 8 ? "新密码不能少于 8 位" : "新密码不能超过 128 位", true);
         passwordInput?.focus();
         return;
     }
