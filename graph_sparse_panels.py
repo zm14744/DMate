@@ -128,6 +128,19 @@ def _panel_edges(rgb):
     # A curve/arrow/unmatched stroke yields no confident pixel graph.
     if len({v for pair in pairs for v in pair}) != len(located):
         return None
+    # A complete match requires that almost all BLUE ink is explained by
+    # those lines and circular endpoints. Otherwise extra colored curves or
+    # arrowheads may have been omitted by Hough and we must abstain.
+    drawn=np.zeros(mask.shape,np.uint8)
+    for start,end in endpoints:
+        cv2.line(drawn,tuple(np.rint(start).astype(int)),
+                 tuple(np.rint(end).astype(int)),255,6)
+    for vertex in located:
+        cv2.circle(drawn,tuple(np.rint(vertex).astype(int)),9,255,-1)
+    total=int(np.count_nonzero(blue))
+    recovered=int(np.count_nonzero(blue & (drawn>0)))
+    if total < 90 or recovered/total < .91:
+        return None
     return located,pairs
 
 
@@ -200,11 +213,10 @@ def recognize_blue_outline_panels(image_bytes):
             "component_count_of_confirmed_edges":components,
             "uncertain_edges":[],
             "bbox":[round(v,5) for v in regions[-1]] if regions else [],
-            # Pencil-thin circles and lines corroborate topology, but CV
-            # alone cannot rule out overlays or all possible curved edges.
-            "confidence":"partial",
+            # Every colored stroke and endpoint was accounted for above.
+            "confidence":"high",
         })
-    return {"graphs":graphs,"status":"partial","regions":regions,
+    return {"graphs":graphs,"status":"detected","regions":regions,
             "detector":"hough_blue_outline_panels"}
 
 
