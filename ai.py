@@ -165,6 +165,8 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 - 对多图并列的情况，先判断是同一题下左右两个独立图，还是同一个图的多个不连通分量；以标签、间距和题目布局为依据，不确定就明确标记，不得猜测成一个连通图。
 - 每个图先列顶点位置、再列边（重边按重数列出），最后重新计算顶点度数并核对握手定理（度数和 = 2×边数，环计入两次）；不一致时自行逐边重查，仍不能确认的边标为不确定。
 - 每条边逐一核对两个端点；只有确实连接同一对顶点的两条边才叫重边。
+- 边 a-b 与 b-a 在无向简单图中完全相同；不要把反向写法列成两条边，也不要同时宣称“无重边”和给出重复边。输出前对每张图的无向边集合去重，检查“共 N 条边”是否等于唯一边数。
+- 两条斜线交叉不是新顶点，也不是新边。必须确认实际从 b 出发的线是否真的落在 f 上；不得因为 b-e 与 a-f 相交就额外写出 b-f。
 - 对黑色实心点的教材图，先逐一数出所有黑点，再沿连续线迹从一个黑点追到另一个黑点。
 - 斜线相互交叉而交点没有实心点时，应继续沿原来斜率前进，不能在交叉处转向、换线或添加连接。
 - 对每个独立图先建立“可见黑点位置 → a/b/c 等文字标签”的对应关系；文字靠近哪个点需要核对，不能只按阅读顺序猜字母。
@@ -1347,6 +1349,17 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
             original.crop((0, 0, math.ceil(width * 0.57), height)),
             original.crop((math.floor(width * 0.43), 0, width, height)),
         ])
+    # Four diagrams in one landscape textbook row need four *separate*
+    # magnified columns. OCR review regions often cover only the title,
+    # while generic top/bottom crops shrink the edge crossings too much.
+    # The full original is still always sent as the first image.
+    if width >= height * 2.1 and len(graph_regions or []) < 3:
+        crops = [
+            original.crop((
+                max(0, round(width * (i / 4 - .018))), 0,
+                min(width, round(width * ((i + 1) / 4 + .018))), height
+            )) for i in range(4)
+        ]
     if not crops:
         if pure_visual_mode:
             # 纯图模式同时覆盖上下排列和左右排列；保留约 20% 重叠，
@@ -1628,6 +1641,16 @@ DIRECTED_GRAPH_AUDIT_PROMPT = """你是独立的高校图论有向图图像逐�
 {"graphs":[{"index":1,"directed":true,"vertices":["a","b"],"edges":[["a","b"]],"complete":true}]}
 请按原图全部编号逐一列出；不要输出问题答案。"""
 
+MULTI_LABELLED_GRAPH_EDGE_AUDIT_PROMPT = """你是图论教材中三至六幅并列无向图的独立逐边审查员。只看原图和局部放大，不读取第一次 OCR 的边集，不解答题目。
+请先找到每个完整独立图 G1、G2、G3……，逐图数黑点，核对每个点对应的 a、b、c、d、e、f 等原始标签。
+对每条线从起点沿连续像素追踪至终点：交叉处没有实心黑点必须直行，不得换线；例如 b-e 和 a-f 相交不能额外构造 b-f。
+无向边 a-b 和 b-a 是同一条，简单图禁止重复列出。不要为了使图“像树”而增删边。
+一张图的边数必须等于去重后的边列表长度，全部顶点必须明确。无法确认关键端点就设置 complete=false，不猜测。
+按原图从左到右排序，一幅图一个对象。只返回 JSON：
+{"graphs":[{"index":1,"directed":false,"vertices":["a","b","c","d","e","f"],"edges":[["a","c"],["b","c"]],"complete":true}]}
+若不存在三至六幅各有可读标签的完整无向图，graphs 返回空数组；不要虚构边。"""
+
+
 MULTI_GRAPH_VERTEX_AUDIT_PROMPT = """你是第二位独立逐点审图员，不得读取其他模型生成的结构或利用题目要求猜出答案。
 你会看到包含多幅互相独立的图论图形的原图及放大图，例如 Stanford 六种无标号树。
 请为每一幅图按从左到右、从上到下的排列（图1、图2……），认真数出实际画出的顶点实心或空心小圆点个数与连续边笔画数。
@@ -1647,7 +1670,7 @@ SINGLE_LABELLED_GRAPH_AUDIT_PROMPT = """你是第二名独立的图论原图逐�
 {"graphs":[{"index":1,"directed":false,"vertices":["A","B"],"edges":[["A","B"]],"complete":true}]}
 如果图片没有恰好一张完整的带字母无向图，graphs设为空数组。"""
 
-def verify_graph_image_independently(image_bytes, retries=1, directed=False, count_only=False, single=False):
+def verify_graph_image_independently(image_bytes, retries=1, directed=False, count_only=False, single=False, multi_edges=False):
     """A second *independent* image-model read for complex graph topology.
 
     Used for graph-isomorphism diagrams and independently checked directed
@@ -1668,7 +1691,15 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
         # the old wide nor portrait branch added ANY enlargement. Aizu's
         # vertically stacked two graphs had the same near-square issue.
         crops = [image]
-        if directed and 0.65 <= width / height <= 1.40:
+        if multi_edges and width >= height * 1.85:
+            # One cropped image per diagram: no ambiguous crossing in a
+            # neighbouring figure can be mistaken for a local edge.
+            for i in range(4):
+                crops.append(image.crop((
+                    max(0, round(width * (i / 4 - .02))), 0,
+                    min(width, round(width * ((i + 1) / 4 + .02))), height
+                )))
+        elif directed and 0.65 <= width / height <= 1.40:
             # A university worksheet often has 3 numbered arrow figures in
             # one horizontal row amid heading and unrelated proof exercises.
             # Include the full central band AND overlapping thirds so every
@@ -1710,7 +1741,8 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
     except Exception as exc:
         print("逐边核验图片准备失败：", type(exc).__name__)
         return {"ok": False, "error": "无法放大图形"}
-    audit_prompt = (MULTI_GRAPH_VERTEX_AUDIT_PROMPT if count_only else
+    audit_prompt = (MULTI_LABELLED_GRAPH_EDGE_AUDIT_PROMPT if multi_edges else
+                    MULTI_GRAPH_VERTEX_AUDIT_PROMPT if count_only else
                     SINGLE_LABELLED_GRAPH_AUDIT_PROMPT if single else
                     DIRECTED_GRAPH_AUDIT_PROMPT if directed else GRAPH_AUDIT_PROMPT)
     content = [{"type":"text", "text":audit_prompt}]
