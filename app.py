@@ -2557,7 +2557,7 @@ def _parse_requested_outputs(instruction):
     and a promise to review later must not trigger immediate answer disclosure.
     """
     text = re.sub(r"\s+", "", normalize_user_request_text(instruction))
-    empty = {"answer": False, "explanation": False, "knowledge": False, "hints": False}
+    empty = {"answer": False, "explanation": False, "knowledge": False}
     if not text:
         return empty
     if re.search(
@@ -2652,27 +2652,15 @@ def _parse_requested_outputs(instruction):
             r".{0,14}(?:涉及的?知识点|相关知识点|考点|知识点分析|知识点|对应模块)|"
             r"(?:题目|出题).{0,8}(?:涉及|考查|对应)(?:什么|哪些)?(?:知识点|考点)", part
         ))
-        hint_positive = bool(re.search(
-            r"(?:并|同时|顺便|再|附|给出|附上|提供|告诉我|只给|仅给|带上|给我|给|来)"
-            r".{0,12}(?:解题提示|关键提示|提示|初步思路|思考方向|思路)|"
-            r"(?:先|只|仅)(?:给|说)(?:我)?(?:一?点|一些)?提示", part
-        ))
         if re.search(r"(?:不要|别|无需|不需要|不用).{0,5}(?:知识点|考点)",part):
             result["knowledge"] = False
         elif knowledge_positive:
             result["knowledge"] = True
-        if re.search(r"(?:不要|别|无需|不需要|不用).{0,5}(?:提示|思路)",part):
-            result["hints"] = False
-        elif hint_positive:
-            result["hints"] = True
 
     # Do not disclose a final answer if the student explicitly prohibited it.
     # “不要答案但给过程” becomes process guidance, not a solved exercise.
     if answer_is_forbidden and result["explanation"]:
         result["explanation"] = False
-        result["hints"] = True
-    if result["explanation"]:
-        result["hints"] = False
     return result
 
 
