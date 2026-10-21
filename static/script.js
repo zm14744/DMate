@@ -7118,7 +7118,7 @@ function formatRetestDetailParagraphs(text) {
         if (!fence) {
             const markers = line.match(/\$\$|\\\[|\\\]/g) || [];
             for (const token of markers) {
-                if (token === "$") mathBlock = !mathBlock;
+                if (token.charCodeAt(0) === 36) mathBlock = !mathBlock;
                 else if (token === "\\[") mathBlock = true;
                 else if (token === "\\]") mathBlock = false;
             }
