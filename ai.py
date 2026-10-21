@@ -1878,8 +1878,11 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
                 original.crop((0, math.floor(height * 0.4), width, height)),
             ]
     # Keep paid Vision inputs bounded: one full image plus at most three
-    # supplementary crops. The full image always preserves the whole problem.
-    crops = crops[:3]
+    # supplementary crops. If there are more candidate crops, sample across
+    # the image rather than always dropping the rightmost/bottommost diagrams.
+    if len(crops) > 3:
+        sample_indices = sorted({0, (len(crops) - 1) // 2, len(crops) - 1})
+        crops = [crops[index] for index in sample_indices]
     return [encode(original, 2200)] + [encode(enhance_crop(crop), 1600, True) for crop in crops]
 
 
@@ -2012,7 +2015,8 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
             print(
                 f"正在调用 Qwen Vision（第 {attempt + 1}/{total_attempts} 次）；"
                 f"model={VISION_MODEL}；endpoint={API_URL}；"
-                f"thinking={VISION_ENABLE_THINKING}"
+                f"thinking={VISION_ENABLE_THINKING}；"
+                f"images={len(image_urls)}；max_tokens={payload['max_tokens']}"
             )
 
             status_code, response_text, result = _request_qwen_completion(
@@ -2259,7 +2263,15 @@ def verify_graph_image_independently(image_bytes, retries=0, directed=False, cou
         if count_only and len(grid_crops) >= 2:
             crops.extend(grid_crops[:4])
         elif (multi_edges and len(grid_crops) == max(3, min(6, int(panel_count)))):
-            crops.extend(grid_crops)
+            # For 5-6 panels, use evenly distributed close-ups plus the full
+            # image; the full image still contains every panel.
+            if len(grid_crops) > 4:
+                sample_indices = sorted({
+                    round(i * (len(grid_crops) - 1) / 3) for i in range(4)
+                })
+                crops.extend(grid_crops[index] for index in sample_indices)
+            else:
+                crops.extend(grid_crops)
         elif multi_edges and width >= height * 1.85:
             # Split 3-6 figure rows at their real panel count; fixed quarters
             # can cut a three/six-figure drawing through the middle of an edge.
@@ -2315,6 +2327,8 @@ def verify_graph_image_independently(image_bytes, retries=0, directed=False, cou
                     MULTI_GRAPH_VERTEX_AUDIT_PROMPT if count_only else
                     SINGLE_LABELLED_GRAPH_AUDIT_PROMPT if single else
                     DIRECTED_GRAPH_AUDIT_PROMPT if directed else GRAPH_AUDIT_PROMPT)
+    audit_mode = ("multi_edges" if multi_edges else "count_only" if count_only else
+                  "single" if single else "directed" if directed else "undirected")
     content = [{"type":"text", "text":audit_prompt}]
     for number, url in enumerate(images):
         content.extend([
@@ -2334,6 +2348,10 @@ def verify_graph_image_independently(image_bytes, retries=0, directed=False, cou
     headers={"Authorization":f"Bearer {API_KEY}", "Content-Type":"application/json"}
     for attempt in range(max(1, retries + 1)):
         try:
+            print(
+                f"Qwen Vision 独立复核请求：mode={audit_mode}；"
+                f"images={len(images)}；max_tokens={payload['max_tokens']}"
+            )
             status_code, response_text, result = _request_qwen_completion(
                 payload, headers, timeout=(10, 120)
             )
