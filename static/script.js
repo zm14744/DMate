@@ -6376,7 +6376,9 @@ function processLearningFromReply(
 
     const isSubstantiveQuestion = Boolean(
         latest
-        && looksLikeActualLearningProblem(latest)
+        && (latest.source === "ocr"
+            ? isRecordableOcrQuestionMessage(latest)
+            : latest.manualIsQuestion === true)
         && normalized.mode !== "check_answer"
         && normalized.mode !== "exercise"
     );
@@ -15480,6 +15482,12 @@ function looksLikeFormalStudyQuestionForHistory(
         return isRecordableOcrQuestionMessage(message);
     }
 
+    // 手动输入题目身份完全由用户在发送时的选择决定。
+    // 仅影响题目历史，不修改 AI 讲解/回答的识别路径。
+    if (message?.role === "user") {
+        return message.manualIsQuestion === true;
+    }
+
     if (/【(?:题目|练习题|题目文字)】/.test(value)) {
         return true;
     }
@@ -15551,16 +15559,13 @@ function collectConversationQuestionCandidates(session) {
             if (message.isRetestAnswer) {
                 continue;
             }
-
-            if (
-                message.source !== "ocr"
-                && isConversationControlOnly(
-                    message.text
-                )
-            ) {
+            if (message.source === "ocr") {
+                if (!isRecordableOcrQuestionMessage(message)) continue;
+            } else if (message.manualIsQuestion !== true) {
                 continue;
             }
 
+            // 手动标记的短题也属于题目；不再用一般追问规则否决。
             question = extractQuestionOnlyFromMessage(
                 message
             );
