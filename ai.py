@@ -34,7 +34,10 @@ def _normalize_vision_api_url(value):
     """Accept either an OpenAI-compatible base URL or a full chat-completions URL."""
     url = str(value or "").strip().rstrip("/")
     if not url:
-        url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        # Default to the exact Beijing MaaS endpoint shown in the user's
+        # Qwen3-VL-Plus console example. This keeps DASHSCOPE_API_KEY as the
+        # only required environment variable.
+        url = "https://ws-vh8am794i98a2gxt.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
     if url.endswith("/chat/completions"):
         return url
     if url.endswith("/compatible-mode/v1") or url.endswith("/v1"):
@@ -46,7 +49,7 @@ _CONFIGURED_VISION_API_URL = (
     os.environ.get("DASHSCOPE_VISION_API_URL")
     or os.environ.get("QWEN_VISION_API_URL")
     or os.environ.get("DASHSCOPE_API_URL")
-    or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    or "https://ws-vh8am794i98a2gxt.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
 )
 API_URL = _normalize_vision_api_url(_CONFIGURED_VISION_API_URL)
 
