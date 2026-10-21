@@ -303,8 +303,8 @@ def _merge_text_ocr_passes(original, variant):
             if overlap > best_overlap:
                 best_i, best_overlap = i, overlap
         if best_i is None or best_overlap < 0.32:
-            if float(candidate.get("score", 0)) >= 0.88:
-                merged.append(candidate)
+            # Never append enhanced-only regions to a successful original pass:
+            # small offsets can otherwise duplicate whole lines.
             continue
         old = merged[best_i]
         before, after = str(old.get("content", "")), str(candidate.get("content", ""))
@@ -314,7 +314,11 @@ def _merge_text_ocr_passes(original, variant):
             re.search(r"[vVeEＧG][₀-₉0-9]", before + after)
             or re.search(r"\d", before + after)
         )
-        advantage = 0.14 if math_change else 0.07
+        # Numeric changes are meaning-changing, and score alone cannot prove
+        # that 3/5 (or 6/8) is correct. Leave them to original-vs-Vision review.
+        if math_change:
+            continue
+        advantage = 0.12
         if float(candidate.get("score", 0)) >= float(old.get("score", 0)) + advantage:
             merged[best_i] = candidate
     return merged
