@@ -96,7 +96,7 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         self.assertEqual(len(result["graphs"]), 4)
         content = packets[0]["messages"][0]["content"]
         self.assertEqual(sum(piece["type"] == "image_url" for piece in content), 5)
-        self.assertIn("不得额外构造", content[0]["text"])
+        self.assertIn("不能额外构造", content[0]["text"])
 
     def test_service_failure_yields_no_provisional_graph(self):
         with patch.object(ai,"API_KEY","test_only_key"),patch.object(ai,"VISION_ENABLED",True),patch.object(ai.requests,"post",return_value=_Response(502)):
