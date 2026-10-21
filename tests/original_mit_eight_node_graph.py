@@ -88,7 +88,7 @@ def main():
         {"summary":summary,"graph_structures":graphs},ensure_ascii=False,indent=2
     ))
     assert summary["topology_matches_original_gold"], summary
-    assert result.get("detector")=="hough_filled_black_disk_single", summary
+    assert result.get("detector")=="black_disk_chord_pixel", summary
 
 
 if __name__=="__main__":
