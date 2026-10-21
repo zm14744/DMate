@@ -5,6 +5,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 from graph_recognition import recognize_graphs
+from graph_recognition_v2 import _unexplained_ink_fraction
+import numpy as np
 
 NODES = [(30, 60), (240, 60), (30, 290), (240, 290), (30, 520), (240, 520)]
 EDGES = [
@@ -221,6 +223,33 @@ class GraphRecognitionTests(unittest.TestCase):
         self.assertTrue(gs,"Radial source should yield one graph candidate")
         self.assertEqual(len(gs[0]["vertices"]),15,gs)
         self.assertGreaterEqual(len(gs[0]["edges"]),12,gs)
+
+    def test_unexplained_curved_stroke_blocks_high_confidence(self):
+        clean = Image.new("RGB", (420, 320), "white")
+        draw = ImageDraw.Draw(clean)
+        points = [(45, 55), (210, 55), (375, 55), (45, 265), (210, 265), (375, 265)]
+        edges = [(0, 1), (1, 2), (0, 3), (3, 4), (4, 5)]
+        for a, b in edges:
+            draw.line((points[a], points[b]), fill=(18, 18, 18), width=3)
+        group = []
+        for x, y in points:
+            draw.ellipse((x-8, y-8, x+8, y+8), fill=(8, 8, 8))
+            group.append((x, y, 8, "gray"))
+        box = (25, 35, 395, 285)
+        clean_fraction = _unexplained_ink_fraction(
+            np.asarray(clean.convert("L")), group, box, edges, 180
+        )
+        curved = clean.copy()
+        ImageDraw.Draw(curved).line(
+            [(45, 55), (75, 18), (115, 8), (160, 18), (210, 55)],
+            fill=(18, 18, 18), width=3
+        )
+        curved_fraction = _unexplained_ink_fraction(
+            np.asarray(curved.convert("L")), group, box, edges, 180
+        )
+        self.assertLess(clean_fraction, 0.08, clean_fraction)
+        self.assertGreater(curved_fraction, clean_fraction + 0.05, curved_fraction)
+        self.assertGreater(curved_fraction, 0.12, curved_fraction)
 
     def test_strong_blur_downgrades_not_invents(self):
         detected = detect(make_sheet().filter(ImageFilter.GaussianBlur(2.7)))

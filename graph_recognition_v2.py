@@ -221,6 +221,29 @@ def _edge_score(gray, a, b, all_nodes, dark_cutoff=180):
                              "uncertain" if best[0] >= .60 and best[1] >= .35 else "absent")
 
 
+def _unexplained_ink_fraction(gray, group, box, edges, dark_cutoff):
+    """Estimate ink outside detected vertex disks and confirmed straight edges."""
+    x1, y1, x2, y2 = map(int, box)
+    roi = gray[y1:y2, x1:x2]
+    if roi.size == 0:
+        return 1.0
+    ink = roi < int(dark_cutoff)
+    total_ink = int(np.count_nonzero(ink))
+    if total_ink == 0:
+        return 1.0
+    covered = np.zeros(roi.shape, dtype=np.uint8)
+    for node in group:
+        x, y = int(round(node[0] - x1)), int(round(node[1] - y1))
+        cv2.circle(covered, (x, y), max(3, int(round(node[2])) + 4), 255, -1)
+    for i, j in edges:
+        first, second = group[i], group[j]
+        a = (int(round(first[0] - x1)), int(round(first[1] - y1)))
+        b = (int(round(second[0] - x1)), int(round(second[1] - y1)))
+        thickness = max(3, int(round(min(first[2], second[2]) * .55)))
+        cv2.line(covered, a, b, 255, thickness)
+    return int(np.count_nonzero(ink & (covered == 0))) / float(total_ink)
+
+
 def _components(n, edges):
     roots = list(range(n))
     def find(i):
@@ -334,9 +357,16 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
         matrix = [[0]*len(group) for _ in group]
         for i, j in edges:
             matrix[i][j] = matrix[j][i] = 1
-        # Severe blur and incomplete vertex coverage must not be presented as certainty.
-        complete = (5 <= len(group) <= 8 and not uncertain and len(edges) >= 2
-                    and sharpness >= 7 and background_noise < 22)
+        # Only clean simple straight-edge drawings can receive high confidence.
+        # Curves, loops, arrows, labels or missed strokes remain unexplained ink.
+        unexplained_ink = _unexplained_ink_fraction(
+            gray, group, box, edges, edge_cutoff
+        )
+        complete = (
+            5 <= len(group) <= 8 and not uncertain and len(edges) >= 2
+            and sharpness >= 7 and background_noise < 22
+            and unexplained_ink <= .12
+        )
         graphs.append({"id": f"图{len(graphs)+1}", "directed": "unknown",
                        "vertices": vertex_list, "vertex_count": len(group),
                        "edges": [[f"v{i+1}", f"v{j+1}"] for i, j in edges],
@@ -345,6 +375,7 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
                        "component_count_of_confirmed_edges": _components(len(group), edges),
                        "uncertain_edges": [[f"v{i+1}", f"v{j+1}"] for i, j in uncertain],
                        "confidence": "high" if complete else "partial",
+                        "unexplained_ink_fraction": round(unexplained_ink, 3),
                        "bbox": [round(v/lim, 4) for v, lim in zip(
                            box, (gray.shape[1], gray.shape[0], gray.shape[1], gray.shape[0]))]})
     return {"status": "detected" if graphs else "uncertain", "graphs": graphs,
