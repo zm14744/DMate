@@ -177,10 +177,15 @@ GRAPH_TEXT_HINT_RE = re.compile(
 
 
 def _is_graph_vision_task(ocr_text, opencv_graphs):
-    """Use existing OCR/context and actual CV candidates to route graph tasks only."""
-    if isinstance(opencv_graphs, dict) and (opencv_graphs.get("graphs") or []):
+    """Route explicit graph questions and near-textless CV-confirmed graph figures only."""
+    text = str(ocr_text or "").strip()
+    if GRAPH_TEXT_HINT_RE.search(text):
         return True
-    return bool(GRAPH_TEXT_HINT_RE.search(str(ocr_text or "")))
+    graphs = opencv_graphs.get("graphs") or [] if isinstance(opencv_graphs, dict) else []
+    # A graph candidate alone is not enough when a long question may concern
+    # geometry or another diagram type. For pure figures with almost no OCR,
+    # the pixel detector is useful evidence that the graph-only path is needed.
+    return bool(graphs) and len(text) < 20
 
 
 GRAPH_TOPOLOGY_PROMPT = """你只负责从图像恢复离散数学图的结构，不负责转录题干、校正整段文字或解题。
