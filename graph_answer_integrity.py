@@ -133,6 +133,129 @@ def review_directed_graphs(primary_text, independently_read):
 
 
 
+
+# A first-pass vision transcript can look plausible while containing invented
+# crossing edges or repeated undirected edges. For 3+ labelled diagrams, audit
+# each actual unordered edge pair, not only the vertex/edge totals.
+_PANEL_HEADER = re.compile(
+    r"(?mi)^\s*(?:(?:图\s*)?G\s*_?\{?([1-9]\d*)\}?|"
+    r"图\s*([1-9]\d*)(?:\s*[（(][^）)\n]*[）)])?)\s*[：:]"
+)
+_PANEL_VERTICES = re.compile(
+    r"顶点(?:集合|标签(?:分别)?)?\s*(?:为|是|分别为)?\s*[:：]?\s*"
+    r"\{?\s*([a-zA-Z](?:\s*[,，、]\s*[a-zA-Z]){2,})", re.I
+)
+_PANEL_EDGE_START = re.compile(
+    r"(?:边连接关系|边集合|边集|边为|边包括|边)\s*(?:为|包括)?\s*[:：]?", re.I
+)
+_PANEL_EDGE = re.compile(
+    r"(?<![a-zA-Z0-9])([a-zA-Z])\s*[-—–－−]\s*([a-zA-Z])(?![a-zA-Z0-9])"
+)
+
+
+def parse_labeled_multi_panels(text):
+    """Read explicitly written vertices and edges from 3+ labeled diagrams.
+
+    Never infer edges from a diagram title, expected tree shape, or counts.
+    Unknown/incomplete formatting returns {}, not fabricated graph records.
+    """
+    source = str(text or "")
+    headers = list(_PANEL_HEADER.finditer(source))
+    if not 3 <= len(headers) <= 8:
+        return {}
+    parsed = {}
+    for pos, heading in enumerate(headers):
+        index = int(heading.group(1) or heading.group(2))
+        if index in parsed:
+            return {}
+        body = source[heading.end():headers[pos + 1].start() if pos + 1 < len(headers) else len(source)]
+        vm = _PANEL_VERTICES.search(body)
+        em = _PANEL_EDGE_START.search(body)
+        if not vm or not em:
+            return {}
+        labels = [a.lower() for a in re.findall(r"[a-zA-Z]", vm.group(1))]
+        edge_line = re.split(r"[。；;\n]", body[em.end():], maxsplit=1)[0]
+        edges = [tuple(sorted((u.lower(), v.lower())))
+                 for u, v in _PANEL_EDGE.findall(edge_line)]
+        if len(labels) < 3 or len(set(labels)) != len(labels) or not edges:
+            return {}
+        raw_count = re.search(r"(?:共|共有|计)\s*(\d+)\s*条(?:边|无向边)", body)
+        duplicate_edges = [edge for edge, count in Counter(edges).items() if count > 1]
+        issues = []
+        if duplicate_edges:
+            issues.append(f"G{index} 重复列出无向边：" +
+                          "、".join("-".join(p) for p in duplicate_edges))
+        if any(u == v for u, v in edges):
+            # A genuine self-loop must be explicitly depicted, not silently
+            # erased; labeled simple-graph review cannot certify this case.
+            issues.append(f"G{index} 含自环，需要核对原图")
+        if any(u not in labels or v not in labels for u, v in edges):
+            issues.append(f"G{index} 的边端点不在顶点表内")
+        if raw_count and int(raw_count.group(1)) != len(set(edges)):
+            issues.append(f"G{index} 宣称的边数与去重后的边集不一致")
+        parsed[index] = {"vertices": labels, "edges": edges, "issues": issues}
+    return parsed
+
+
+def review_labeled_multi_panels(initial_text, audited_graphs):
+    """Cross-check all labeled diagrams with independent image-only edges.
+
+    Any disagreement is a review result, not a license to adopt whichever
+    text yields a nicer tree/isomorphism answer.
+    """
+    original = str(initial_text or "").strip()
+    primary = parse_labeled_multi_panels(original)
+    if not primary:
+        return FLAG + "\n多图边集格式或顶点标签不完整，无法逐图核验。\n" + original, [
+            "首轮图结构无法解析成完整的逐图边集。"
+        ], False
+    issues = [issue for record in primary.values() for issue in record["issues"]]
+    independent = {}
+    if not isinstance(audited_graphs, list):
+        audited_graphs = []
+    for row in audited_graphs:
+        if not isinstance(row, dict) or row.get("complete") is not True or row.get("directed") is not False:
+            issues.append("独立复核存在未确认的图形或边方向")
+            continue
+        try:
+            idx = int(row["index"])
+            labels = [str(v).lower() for v in row["vertices"]]
+            raw_edges = row["edges"]
+            edges = [tuple(sorted((str(e[0]).lower(), str(e[1]).lower()))) for e in raw_edges
+                     if isinstance(e, (tuple, list)) and len(e) == 2]
+        except (ValueError, KeyError, TypeError):
+            issues.append("独立复核缺少必要的图形结构")
+            continue
+        if (idx in independent or len(labels) < 3 or len(set(labels)) != len(labels)
+                or len(edges) != len(raw_edges) or len(set(edges)) != len(edges)
+                or any(a not in labels or b not in labels or a == b for a, b in edges)):
+            issues.append(f"G{idx} 的独立边集无效或含重边")
+            continue
+        independent[idx] = {"vertices": labels, "edges": edges}
+    if set(primary) != set(independent):
+        issues.append("首次识别与独立复核的图形数量或编号不一致")
+    for idx in sorted(set(primary) & set(independent)):
+        before, after = primary[idx], independent[idx]
+        if set(before["vertices"]) != set(after["vertices"]):
+            issues.append(f"G{idx} 的顶点表与独立复核不一致")
+        if Counter(before["edges"]) != Counter(after["edges"]):
+            issues.append(f"G{idx} 的边连接与独立复核不一致")
+    if issues:
+        # Preserve the user's ability to edit what the model saw; however the
+        # global uncertainty marker prevents downstream answers being certified.
+        return (FLAG + "\n" + "；".join(dict.fromkeys(issues)) +
+                "\n【首次识别候选，须对照原图校正】\n" + original), issues, False
+    standardized = []
+    for idx in sorted(independent):
+        row = independent[idx]
+        standardized.append(
+            f"图{idx}（G{idx}）：无向图，顶点 " +
+            "、".join(row["vertices"]) + "。边：" +
+            "、".join("-".join(edge) for edge in sorted(row["edges"])) + "。"
+        )
+    return "【多图边集已二次核对】\n" + "\n".join(standardized), [], True
+
+
 FIGURE_VERTEX_COUNT = re.compile(
     r"图\s*(\d+)\s*[（(][^\n]{0,95}?(?:有|含|共)?\s*(\d+)\s*个顶点",
     re.I
