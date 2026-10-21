@@ -3739,11 +3739,21 @@ def ocr():
         # The two-graph auditor cannot validate a sheet containing 3+ graphs.
         # In particular, four diagrams asking "which are trees?" must NOT
         # lose their complete Vision transcript to a two-graph format error.
-        multi_panel = bool(re.search(
-            r"(?im)(?:^|\\n)\\s*(?:图\\s*[3-9]\\d*|G\\s*_?\\{?[3-9]\\d*\\}?)\\s*[（(:：]",
-            visual_text
-        )) or len(cv_graphs) >= 3
         iso_request = bool(re.search(r"同构|isomorph", question_text, re.I))
+        # Prefer figure captions seen by Vision/OCR. CV region counts by
+        # themselves can split a two-graph drawing into several fragments;
+        # never bypass its independent audit on that weak signal alone.
+        extra_figure_label = bool(re.search(
+            r"(?i)(?<![A-Za-z0-9])(?:图\s*[3-9]\d*|G\s*_?\{?[3-9]\d*\}?)(?=\s*[（(:：、，。\s])",
+            visual_text + "\n" + question_text
+        ))
+        tree_or_multi_question = bool(re.search(
+            r"哪些|哪几|下列|多幅|多个|几幅|是否为树|是树|森林",
+            question_text
+        ))
+        multi_panel = extra_figure_label or (
+            not iso_request and len(cv_graphs) >= 3 and tree_or_multi_question
+        )
         # Preserve auditing for genuinely two-graph isomorphism questions,
         # including layouts Vision could not format as two clean paragraphs.
         # Never apply the two-graph schema to four-figure comparisons.
