@@ -109,6 +109,26 @@ def structure_evidence(output):
 def canonical_edge_check(source, visual):
     """Exact topology match ONLY for independently curated labeled edge lists."""
     gold = source.get("canonical")
+    if not gold and source.get("visual_gold"):
+        from graph_integrity import parse_diagrams
+        # A handful of original university figures have independently
+        # transcribed vertex+edge gold even though the source has no
+        # complete two-diagram canonical prose (e.g. MIT's crossed graph).
+        independent = source["visual_gold"]
+        observed = parse_diagrams(visual)
+        if len(observed) != 1:
+            return "EDGE_LIST_NOT_PARSEABLE"
+        actual = next(iter(observed.values()))
+        vertices = {v.lower() for v in independent["vertices"]}
+        expected = {
+            tuple(sorted((e[0].lower(),e[1].lower())))
+            for e in independent["edges"]
+        }
+        return ("EXACT_EDGE_GOLD_MATCH"
+                if set(actual["vertices"]) == vertices
+                and set(actual["edges"]) == expected
+                and len(actual["edges"]) == len(expected)
+                else "EDGE_LIST_MISMATCH")
     if not gold:
         return "NO_INDEPENDENT_EDGE_GOLD"
     from graph_integrity import parse_diagrams
@@ -145,13 +165,16 @@ def assess(row, output, http):
     if exact == "EXACT_EDGE_GOLD_MATCH":
         return "EXACT_EDGE_GOLD_MATCH"
     if row["expected_graph_count"] is not None:
-        # Machine CV split counts are provisional, and prose captions alone
-        # are NOT an exact topology oracle.
-        seen = row["cv_evidence"]["count"]
-        if seen is not None and seen != row["expected_graph_count"]:
-            return "CV_PANEL_COUNT_MISMATCH"
-        if seen is None:
-            return "PANEL_SPLIT_UNVERIFIED"
+        expected = row["expected_graph_count"]
+        cv_count = row["cv_evidence"]["count"]
+        vision_captions = row.get("caption_numbers") or []
+        # CV is *opportunistic* pixel evidence, not the deployed Vision
+        # parser. A missing black-dot CV detection does not mean that a
+        # drawn four-panel graph was not transcribed in Vision.
+        if len(vision_captions) != expected:
+            return "VISION_PANEL_SPLIT_UNVERIFIED"
+        if cv_count != expected:
+            return "VISION_PANELS_PRESENT_CV_INCOMPLETE_EDGE_GOLD_MISSING"
     return "GRAPH_READ_EDGES_REQUIRE_GOLD"
 
 
@@ -161,6 +184,7 @@ def main():
     ap.add_argument("--base", default="https://dmate.zeabur.app")
     ap.add_argument("--output", default="")
     ap.add_argument("--delay", type=float, default=8)
+    ap.add_argument("--only", action="append", default=[], help="Retest these saved original case IDs")
     ap.add_argument("--timeout", type=int, default=115)
     args = ap.parse_args()
 
@@ -191,6 +215,12 @@ def main():
         "cases": [],
     }
     rows = collect(args.batch)
+    if args.only:
+        wanted = set(args.only)
+        rows = [row for row in rows if row["id"] in wanted]
+        missing = wanted - {row["id"] for row in rows}
+        if missing:
+            raise SystemExit("Unknown IDs for %s: %r" % (args.batch, sorted(missing)))
     cache = {}
     for i, source in enumerate(rows):
         case_id = source["id"]
