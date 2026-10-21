@@ -66,6 +66,18 @@ class OCRImagePipelineTests(unittest.TestCase):
         self.assertTrue(conflict)
         self.assertEqual(merged[0]["content"], "v5")
 
+    def test_large_uncertain_image_uses_native_tile_recovery(self):
+        source = np.full((1600, 3000, 3), 255, dtype=np.uint8)
+        item = {"type": "text", "content": "v3", "box": [20, 20, 48, 42], "score": .70}
+        with patch.object(ocr, "load_models"), \
+             patch.object(ocr, "_decode_image", return_value=source), \
+             patch.object(ocr, "_extract_text_items", return_value=[item]), \
+             patch.object(ocr, "_native_tile_text_items", return_value=[]) as tile_pass:
+            result = ocr.recognize_image(b"test image bytes")
+        tile_pass.assert_called_once()
+        self.assertIn("v3", result["text"])
+        self.assertIsInstance(result["review_regions"], list)
+
     def test_native_tile_coordinates_map_back_to_resized_full_page(self):
         source = np.zeros((1500, 5000, 3), dtype=np.uint8)
         target_shape = (660, 2200, 3)
