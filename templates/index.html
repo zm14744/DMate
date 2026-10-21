@@ -251,8 +251,8 @@ body {
 
 .session.active {
     background:var(--accent-bg);
-    border-color:var(--accent);
-    box-shadow:inset 3px 0 0 var(--accent-soft);
+    border-color:transparent;
+    box-shadow:none;
 }
 
 .session span {
@@ -8383,6 +8383,21 @@ body[data-appearance-theme="light"] .left #sessions .session.active,
 :root[data-appearance-theme="light"] .left #sessions .session.active {
     border-color:transparent !important;
     box-shadow:none !important;
+}
+
+/* All themes: selected conversation is one uninterrupted rounded card.
+   Preserve the selected background color, remove the separate left accent
+   stripe and outer outline without changing the red delete button. */
+.left #sessions .session.active {
+    border:1px solid transparent !important;
+    box-shadow:none !important;
+    outline:none !important;
+    transform:none !important;
+}
+.left #sessions .session.active::before,
+.left #sessions .session.active::after {
+    content:none !important;
+    display:none !important;
 }
 
 /* The question selector is outside the field; no extra input height is needed.
