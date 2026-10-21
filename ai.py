@@ -1827,7 +1827,7 @@ def _diagram_grid_crops(image, *, individual=False, with_boxes=False):
     return output
 
 
-def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None):
+def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None, *, graph_only_mode=False):
     """返回整图和局部放大 PNG；所有图片使用同一个 EXIF 方向。
 
     有 OCR 区域时优先放大题干；如果 review_regions 为 None，表示普通 OCR
@@ -1837,6 +1837,9 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
     with Image.open(io.BytesIO(image_bytes)) as source:
         original = ImageOps.exif_transpose(source).convert("RGB")
     width, height = original.size
+    if graph_only_mode:
+        # Graph-only calls should spend image tokens on topology, not OCR title crops.
+        review_regions = None
 
     def encode(image, max_side, enlarge=False):
         longest = max(image.size)
@@ -1944,11 +1947,23 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
                 original.crop((0, 0, width, math.ceil(height * 0.6))),
                 original.crop((0, math.floor(height * 0.4), width, height)),
             ]
-    # Keep paid Vision inputs bounded: one full image plus at most three
-    # supplementary crops. If there are more candidate crops, sample across
-    # the image rather than always dropping the rightmost/bottommost diagrams.
-    if len(crops) > 3:
-        sample_indices = sorted({0, (len(crops) - 1) // 2, len(crops) - 1})
+    # Keep ordinary image analysis at three supplementary crops. Graph-only
+    # requests may keep four when the detector found four distinct graph regions
+    # or the source is a very wide multi-panel sheet; never silently omit panel 3
+    # from the explicit four-column crop path above.
+    max_crops = 4 if graph_only_mode and (
+        len(graph_regions or []) >= 4 or width >= height * 2.1
+    ) else 3
+    if len(crops) > max_crops:
+        if max_crops == 4:
+            sample_indices = sorted({
+                0,
+                round((len(crops) - 1) / 3),
+                round(2 * (len(crops) - 1) / 3),
+                len(crops) - 1,
+            })
+        else:
+            sample_indices = sorted({0, (len(crops) - 1) // 2, len(crops) - 1})
         crops = [crops[index] for index in sample_indices]
     return [encode(original, 2200)] + [encode(enhance_crop(crop), 1600, True) for crop in crops]
 
@@ -2036,8 +2051,10 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
 
     try:
         image_urls = _prepare_vision_images(
-            image_bytes, review_regions,
-            graph_regions=(opencv_graphs or {}).get("regions", [])
+            image_bytes,
+            None if graph_only_mode else review_regions,
+            graph_regions=(opencv_graphs or {}).get("regions", []),
+            graph_only_mode=graph_only_mode,
         )
     except Exception as exc:
         print(f"Vision 图片预处理失败：{type(exc).__name__}")
