@@ -39,7 +39,7 @@ class _Response:
 class GraphImageAuditBoundaryTests(unittest.TestCase):
     def test_specialized_image_read_is_separate_and_well_formed(self):
         received=[]
-        def fake_post(url,headers,json,timeout):
+        def fake_post(url,headers,json,timeout,stream=False,**kwargs):
             received.append(json)
             return _Response(200,GRAPH_RESPONSE)
         with patch.object(ai,"API_KEY","test_only_key"),patch.object(ai,"VISION_ENABLED",True),patch.object(ai.requests,"post",side_effect=fake_post):
@@ -50,6 +50,8 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         payload=received[0]
         self.assertEqual(payload["model"], "qwen3-vl-235b-a22b-thinking")
         self.assertTrue(payload["enable_thinking"])
+        self.assertTrue(payload["stream"])
+        self.assertEqual(payload["thinking_budget"], ai.VISION_THINKING_BUDGET)
         self.assertNotIn("thinking", payload)
         self.assertEqual(payload["max_tokens"], ai.VISION_MAX_OUTPUT_TOKENS)
         contents=payload["messages"][0]["content"]
@@ -59,7 +61,7 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
     def test_primary_vision_uses_qwen_without_changing_text_provider(self):
         sent = []
         url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-        def fake_post(url_arg, headers, json, timeout):
+        def fake_post(url_arg, headers, json, timeout, stream=False, **kwargs):
             sent.append((url_arg, headers, json))
             return _Response(200, {
                 "corrected_text": "判断该图是否为树",
@@ -78,6 +80,8 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         self.assertEqual(sent[0][1]["Authorization"], "Bearer qwen_test_key")
         self.assertEqual(sent[0][2]["model"], "qwen3-vl-235b-a22b-thinking")
         self.assertTrue(sent[0][2]["enable_thinking"])
+        self.assertTrue(sent[0][2]["stream"])
+        self.assertEqual(sent[0][2]["thinking_budget"], ai.VISION_THINKING_BUDGET)
         self.assertNotIn("thinking", sent[0][2])
         self.assertEqual(ai.VISION_MODEL, "qwen3-vl-235b-a22b-thinking")
 
@@ -86,7 +90,7 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         output=io.BytesIO()
         tall.save(output,format="PNG")
         packets=[]
-        def fake_post(url,headers,json,timeout):
+        def fake_post(url,headers,json,timeout,stream=False,**kwargs):
             packets.append(json)
             return _Response(200,GRAPH_RESPONSE)
         with patch.object(ai,"API_KEY","test_only_key"),patch.object(ai,"VISION_ENABLED",True),patch.object(ai.requests,"post",side_effect=fake_post):
@@ -102,7 +106,7 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         out = io.BytesIO()
         original.save(out, format="PNG")
 
-        def fake_post(url, headers, json, timeout):
+        def fake_post(url, headers, json, timeout, stream=False, **kwargs):
             packets.append(json)
             return _Response(200, {
                 "graphs": [
@@ -155,7 +159,7 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(len(prepared), 4)
         sent = []
-        def fake_post(url, headers, json, timeout):
+        def fake_post(url, headers, json, timeout, stream=False, **kwargs):
             sent.append(json)
             return _Response(200, {
                 "graphs": [
