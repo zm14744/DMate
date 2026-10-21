@@ -355,6 +355,19 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
             return filled_result
     except (cv2.error, ValueError, TypeError, OSError) as exc:
         print(f"实心点图结构检测降级：{type(exc).__name__}")
+    # Filled-dot detectors cannot see thin blue outlines in many genuine
+    # university tree sheets. Only accept a complete six-panel positional
+    # reconstruction if every blue line is independently attached to two
+    # observed circular endpoints. Never apply this to black/red arrow images.
+    try:
+        from graph_sparse_panels import recognize_blue_outline_panels
+        outline_result=recognize_blue_outline_panels(image_bytes)
+        if outline_result.get('graphs'):
+            outline_result['elapsed_ms']=round((time.monotonic()-started)*1000,1)
+            return outline_result
+    except (cv2.error, ValueError, TypeError, OSError) as exc:
+        print(f"空心圆细线图识别降级：{type(exc).__name__}")
+
     with Image.open(io.BytesIO(image_bytes)) as im:
         im=ImageOps.exif_transpose(im).convert('RGB')
         longest=max(im.size)
