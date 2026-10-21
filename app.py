@@ -3758,7 +3758,9 @@ def ocr():
         # including layouts Vision could not format as two clean paragraphs.
         # Never apply the two-graph schema to four-figure comparisons.
         if (image_kind != "non_exercise" and not multi_panel and (
-                iso_request or two_graph_diagram)):
+                iso_request or (
+                    two_graph_diagram and not _ocr_has_exercise_evidence(question_text)
+                ))):
             audited = verify_graph_image_independently(raw)
             if audited.get("ok"):
                 initial_graph_text = visual_text
