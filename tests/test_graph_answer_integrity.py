@@ -8,7 +8,8 @@ import unittest
 
 from graph_answer_integrity import (
     FLAG, detect_count_inconsistency, review_directed_graphs,
-    protect_uncertain_graph_answer,
+    protect_uncertain_graph_answer, parse_labeled_multi_panels,
+    review_labeled_multi_panels,
 )
 
 NJU_PRIMARY = (
@@ -232,6 +233,75 @@ class UniversityGraphAnswerBoundaryTests(unittest.TestCase):
                 "edges":edges,"complete":True}])
             self.assertFalse(ok)
             self.assertIn(FLAG,normalized)
+
+
+class FourPanelTextbookGraphRegression(unittest.TestCase):
+    # Genuine 2026-10-21 four-panel tree drawing (not a fabricated
+    # topological example); crossings are NOT junctions.
+    CORRECT = "\n".join((
+        "图 G1：顶点 a,b,c,d,e,f。边为：a-c、b-c、c-d、c-f、e-f。共5条边。",
+        "图 G2：顶点 a,b,c,d,e,f。边为：a-c、a-f、b-e、d-f、e-f。共5条边。",
+        "图 G3：顶点 a,b,c,d,e,f。边为：a-b、a-c、a-d、b-e、c-f、d-e。共6条边。",
+        "图 G4：顶点 a,b,c,d,e,f。边为：a-f、b-d、b-e、c-e。共4条边.",
+    ))
+    AUDIT = [
+        {"index":1, "directed":False, "complete":True,
+         "vertices":list("abcdef"),
+         "edges":[["a","c"],["b","c"],["c","d"],["c","f"],["e","f"]]},
+        {"index":2, "directed":False, "complete":True,
+         "vertices":list("abcdef"),
+         "edges":[["a","c"],["a","f"],["b","e"],["d","f"],["e","f"]]},
+        {"index":3, "directed":False, "complete":True,
+         "vertices":list("abcdef"),
+         "edges":[["a","b"],["a","c"],["a","d"],["b","e"],["c","f"],["d","e"]]},
+        {"index":4, "directed":False, "complete":True,
+         "vertices":list("abcdef"),
+         "edges":[["a","f"],["b","d"],["b","e"],["c","e"]]},
+    ]
+
+    def test_correct_four_diagram_edges_verify_without_rewriting_labels(self):
+        parsed = parse_labeled_multi_panels(self.CORRECT)
+        self.assertEqual(set(parsed), {1, 2, 3, 4})
+        self.assertEqual([len(parsed[i]["edges"]) for i in range(1, 5)], [5, 5, 6, 4])
+        reviewed, issues, ok = review_labeled_multi_panels(self.CORRECT, self.AUDIT)
+        self.assertTrue(ok, issues)
+        self.assertIn("G3", reviewed)
+        self.assertIn("b-e", reviewed)
+        self.assertNotIn(FLAG, reviewed)
+
+    def test_original_false_b_f_edge_must_be_flagged(self):
+        flawed = self.CORRECT.replace(
+            "a-f、b-e、d-f", "a-f、b-e、b-f、d-f"
+        ).replace("共5条边。", "共6条边。", 1)
+        checked, issues, ok = review_labeled_multi_panels(flawed, self.AUDIT)
+        self.assertFalse(ok)
+        self.assertIn(FLAG, checked)
+        self.assertTrue(any("G2" in issue for issue in issues), issues)
+
+    def test_reversed_d_e_duplicate_is_a_single_undirected_edge(self):
+        flawed = self.CORRECT.replace(
+            "b-e、c-f、d-e。共6条边", "b-e、c-f、d-e、e-d。共7条边"
+        )
+        parsed = parse_labeled_multi_panels(flawed)
+        self.assertTrue(any("重复" in issue for issue in parsed[3]["issues"]))
+        checked, issues, ok = review_labeled_multi_panels(flawed, self.AUDIT)
+        self.assertFalse(ok)
+        self.assertIn(FLAG, checked)
+        self.assertTrue(any("重复" in issue for issue in issues), issues)
+
+    def test_incomplete_second_read_never_certifies_edges(self):
+        incomplete = [dict(self.AUDIT[0], complete=False), *self.AUDIT[1:]]
+        checked, issues, ok = review_labeled_multi_panels(self.CORRECT, incomplete)
+        self.assertFalse(ok)
+        self.assertIn(FLAG, checked)
+        self.assertTrue(issues)
+
+    def test_two_graph_cornell_format_does_not_enter_four_panel_validator(self):
+        self.assertEqual(parse_labeled_multi_panels(
+            "图1（G1）：无向图，顶点 a、b、c。边：a-b、b-c。\n"
+            "图2（G2）：无向图，顶点 a、b、c。边：a-b、b-c。"
+        ), {})
+
 
 if __name__=="__main__":
     unittest.main()
