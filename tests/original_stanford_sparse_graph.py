@@ -85,6 +85,7 @@ def main():
     print("STANFORD_ORIGINAL_PIXEL_GRAPH",json.dumps(summary,ensure_ascii=False),flush=True)
     Path("stanford_original_graph_result.json").write_text(
         json.dumps({"summary":summary,"graphs":graphs},ensure_ascii=False,indent=2))
+    assert result.get("detector")=="hough_blue_outline_panels", summary
     assert len(graphs)==6, summary
     assert summary["vertices"]==[6]*6, summary
     assert summary["edges"]==[5]*6, summary
