@@ -169,22 +169,33 @@ def recognize_blue_outline_panels(image_bytes):
             tuple(sorted((old_to_new[a],old_to_new[b])))
             for a,b in edges
         })
+        matrix=[[0]*len(vertices) for _ in vertices]
+        root=list(range(len(vertices)))
+        def find(node):
+            while root[node] != node:
+                node=root[node]
+            return node
+        for a,b in normalized_edges:
+            matrix[a][b]=matrix[b][a]=1
+            root[find(a)]=find(b)
+        components=len({find(i) for i in range(len(vertices))})
+        region=(box[0]/width,box[1]/height,box[2]/width,box[3]/height)
+        regions.append(region)
         graphs.append({
             "id":f"图{index}",
             "directed":"unknown",
             "vertices":vertices,
             "vertex_count":len(vertices),
             "edges":[[f"v{a+1}",f"v{b+1}"] for a,b in normalized_edges],
-            "edge_count":len(normalized_edges),
+            "confirmed_edge_count":len(normalized_edges),
+            "adjacency_matrix":matrix,
+            "component_count_of_confirmed_edges":components,
             "uncertain_edges":[],
+            "bbox":[round(v,5) for v in regions[-1]] if regions else [],
             # Pencil-thin circles and lines corroborate topology, but CV
             # alone cannot rule out overlays or all possible curved edges.
             "confidence":"partial",
         })
-        regions.append((
-            box[0]/width,box[1]/height,
-            box[2]/width,box[3]/height
-        ))
     return {"graphs":graphs,"status":"partial","regions":regions,
             "detector":"hough_blue_outline_panels"}
 
