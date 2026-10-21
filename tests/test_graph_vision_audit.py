@@ -98,6 +98,54 @@ class GraphImageAuditBoundaryTests(unittest.TestCase):
         self.assertEqual(sum(piece["type"] == "image_url" for piece in content), 5)
         self.assertIn("不能额外构造", content[0]["text"])
 
+    def test_two_row_three_column_graphs_use_full_panel_crops(self):
+        # The genuine Stanford tree source is a 907x566 3x2 graphic;
+        # full-height thirds preserve the entire line structure while the
+        # old arbitrary 60%-height crop cut across separate drawings.
+        from PIL import ImageDraw
+        image = Image.new("RGB", (907, 566), "white")
+        draw = ImageDraw.Draw(image)
+        for row_y in (80, 345):
+            for col_x in (100, 355, 610):
+                pts = [(col_x, row_y+40), (col_x+98, row_y),
+                       (col_x+190, row_y+40), (col_x+190, row_y+150),
+                       (col_x+98, row_y+185), (col_x, row_y+150)]
+                for a, b in ((0,1),(1,2),(2,3),(3,4),(4,5)):
+                    draw.line((*pts[a],*pts[b]), fill=(60,86,156), width=2)
+                for x,y in pts:
+                    draw.ellipse((x-3,y-3,x+3,y+3),fill=(44,68,117))
+        strips = ai._diagram_grid_crops(image)
+        self.assertEqual(len(strips), 3)
+        self.assertTrue(all(crop.height == 566 for crop in strips))
+        single = ai._diagram_grid_crops(image, individual=True)
+        self.assertEqual(len(single), 6)
+        self.assertTrue(all(crop.height < 400 for crop in single))
+        raw = io.BytesIO()
+        image.save(raw, format="PNG")
+        prepared = ai._prepare_vision_images(
+            raw.getvalue(), review_regions=[], graph_regions=[]
+        )
+        self.assertEqual(len(prepared), 4)
+        sent = []
+        def fake_post(url, headers, json, timeout):
+            sent.append(json)
+            return _Response(200, {
+                "graphs": [
+                    {"index": i, "vertex_count": 6,
+                     "edge_count": 5, "complete": True}
+                    for i in range(1, 7)
+                ]
+            })
+        with patch.object(ai,"API_KEY","test_only_key"), \
+                patch.object(ai,"VISION_ENABLED",True), \
+                patch.object(ai.requests,"post",side_effect=fake_post):
+            audited = ai.verify_graph_image_independently(
+                raw.getvalue(), retries=0, count_only=True
+            )
+        self.assertTrue(audited["ok"])
+        self.assertEqual(len(sent[0]["messages"][0]["content"]), 15)
+        self.assertEqual(len(audited["graphs"]), 6)
+
     def test_service_failure_yields_no_provisional_graph(self):
         with patch.object(ai,"API_KEY","test_only_key"),patch.object(ai,"VISION_ENABLED",True),patch.object(ai.requests,"post",return_value=_Response(502)):
             out=ai.verify_graph_image_independently(sample_image(),retries=0)
