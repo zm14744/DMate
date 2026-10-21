@@ -35,7 +35,7 @@ jobs:
         run: |
           python - <<'PY'
           import requests, time
-          target="2026-10-21-pixel-preserving-multipanel-edge-v1"
+          target="2026-10-21-hough-blue-outline-cv-v3"
           for attempt in range(16):
               try:
                   data=requests.get("https://dmate.zeabur.app/health",timeout=15).json()
@@ -48,7 +48,7 @@ jobs:
                   print("DEPLOYMENT_ERROR",type(exc).__name__,flush=True)
               if attempt < 15: time.sleep(20)
           else:
-              print("DEPLOYMENT_NOT_VERIFIED: all results are labeled as potentially outdated",flush=True)
+              raise SystemExit("DEPLOYMENT_NOT_VERIFIED: refuse to grade old graph version")
           PY
       - name: Submit every original image for graph split and edge OCR
         run: |
@@ -60,7 +60,7 @@ jobs:
         if: always()
         run: |
           python - <<'PY'
-          import json, pathlib
+          import json, pathlib, sys
           for f in sorted(pathlib.Path(".").glob("graph_topology_*.json")):
               data=json.loads(f.read_text())
               rows=data.get("cases",[])
@@ -77,6 +77,10 @@ jobs:
                                 "EDGE_LIST_MISMATCH"}:
                       failures.append(row.get("id"))
               print("FAILED_OR_UNVERIFIED_RAW_IMAGES",failures,flush=True)
+              # Do not return green for a batch with confirmed source,
+              # image, panel or exact-edge mismatch failures.
+              if failures:
+                  sys.exit(1)
           PY
       - name: Upload original image crops plus complete raw OCR output
         if: always()
