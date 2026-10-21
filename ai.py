@@ -1714,11 +1714,13 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 "content": content_parts
             }
         ],
-        # Qwen3-VL-235B-A22B-Thinking cannot disable reasoning.
-        # Reasoning tokens count towards max_tokens and billed output.
+        # This thinking-only model cannot disable reasoning. Bound its internal
+        # reasoning and stream chunks so the connection stays alive.
         "enable_thinking": True,
+        "thinking_budget": VISION_THINKING_BUDGET,
+        "temperature": 0.1,
         "max_tokens": VISION_MAX_OUTPUT_TOKENS,
-        "stream": False
+        "stream": True
     }
 
     total_attempts = max(1, retries + 1)
@@ -1729,18 +1731,15 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 f"正在调用 Qwen Vision（第 {attempt + 1}/{total_attempts} 次）"
             )
 
-            response = requests.post(
-                API_URL,
-                headers=headers,
-                json=payload,
-                timeout=(10, 120)
+            status_code, response_text, result = _request_qwen_completion(
+                payload, headers, timeout=(10, 120)
             )
 
-            if response.status_code in RETRYABLE_STATUS:
+            if status_code in RETRYABLE_STATUS:
                 if attempt < total_attempts - 1:
                     wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
                     print(
-                        f"Qwen Vision 暂时不可用，HTTP {response.status_code}，"
+                        f"Qwen Vision 暂时不可用，HTTP {status_code}，"
                         f"{wait_seconds:.1f} 秒后重试"
                     )
                     time.sleep(wait_seconds)
@@ -1750,19 +1749,17 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
 
-            if not response.ok:
+            if status_code < 200 or status_code >= 300:
                 print(
-                    f"Qwen Vision 请求失败：HTTP {response.status_code}；"
-                    f"响应内容：{response.text[:500]}"
+                    f"Qwen Vision 请求失败：HTTP {status_code}；"
+                    f"响应内容：{response_text[:500]}"
                 )
                 return _failure(
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
 
-            try:
-                result = response.json()
-            except ValueError as exc:
-                print(f"Qwen Vision 返回解析失败：{repr(exc)}")
+            if not isinstance(result, dict):
+                print("Qwen Vision 流式响应未能解析为有效结果")
                 return _failure(
                     "图形结构理解暂时不可用，已保留文字识别结果。"
                 )
@@ -1819,6 +1816,11 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 # 结构化结果很关键。第一次格式异常时自动再试一次，
                 # 避免把一坨 JSON/自然语言直接显示给学生。
                 if attempt < total_attempts - 1:
+                    # Length-truncated thinking responses need a larger final budget.
+                    if choice.get("finish_reason") == "length":
+                        payload["max_tokens"] = min(
+                            16384, max(int(payload.get("max_tokens", 12000)) + 2048, 16384)
+                        )
                     time.sleep((2 ** attempt) + random.uniform(0, 0.4))
                     continue
 
@@ -2038,29 +2040,34 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
         "model": VISION_MODEL,
         "messages": [{"role":"user","content":content}],
         "enable_thinking": True,
+        "thinking_budget": VISION_THINKING_BUDGET,
+        "temperature": 0.1,
         "max_tokens": VISION_MAX_OUTPUT_TOKENS,
-        "stream":False,
+        "stream":True,
     }
     headers={"Authorization":f"Bearer {API_KEY}", "Content-Type":"application/json"}
     for attempt in range(max(1, retries + 1)):
         try:
-            response=requests.post(API_URL, headers=headers, json=payload, timeout=(10,120))
-            if not response.ok:
-                if response.status_code in RETRYABLE_STATUS and attempt < retries:
+            status_code, response_text, result = _request_qwen_completion(
+                payload, headers, timeout=(10, 120)
+            )
+            if status_code < 200 or status_code >= 300:
+                if status_code in RETRYABLE_STATUS and attempt < retries:
                     time.sleep(1)
                     continue
-                return {"ok":False,"error":f"图形复核服务 HTTP {response.status_code}"}
-            choices=response.json().get("choices") or []
+                return {"ok":False,"error":f"图形复核服务 HTTP {status_code}"}
+            if not isinstance(result, dict):
+                return {"ok":False,"error":"图形复核响应无法解析"}
+            choices=result.get("choices") or []
             message=choices[0].get("message") if choices else None
             text=message.get("content") if isinstance(message,dict) else None
             if not isinstance(text,str) or not text.strip():
                 if attempt < retries:
                     continue
                 return {"ok":False,"error":"图形复核未输出结构"}
-            match=re.search(r"\{[\s\S]*\}", text.strip())
-            if not match:
+            data=_extract_first_json_object(text)
+            if not isinstance(data, dict):
                 return {"ok":False,"error":"图形复核结果不是 JSON"}
-            data=json.loads(match.group(0))
             graphs=data.get("graphs")
             if not isinstance(graphs,list):
                 return {"ok":False,"error":"图形复核未输出列表"}
