@@ -7125,10 +7125,12 @@ function openWrongRetestReview(id) {
         ["answer","analysis"].forEach(kind => {
             if (record[kind]) {
                 const details = document.createElement("details");
+                details.className = kind === "answer" ? "wrong-answer-details" : "wrong-analysis-details";
                 const summary = document.createElement("summary");
+                summary.className = kind === "answer" ? "wrong-answer-summary" : "wrong-analysis-summary";
                 summary.textContent = kind === "answer" ? "查看答案" : "查看解析";
                 const content = document.createElement("div");
-                content.className = "wrong-retest-review-detail";
+                content.className = kind === "answer" ? "wrong-answer-inner wrong-retest-review-detail" : "wrong-analysis-body wrong-retest-review-detail";
                 content.innerHTML = markdownToHtml(record[kind]);
                 details.append(summary,content);
                 body.append(details);
