@@ -7094,6 +7094,39 @@ async function generateRetestDetail(itemId, recordId, kind) {
     finally { if (button) button.disabled = false; }
 }
 
+function formatRetestDetailParagraphs(text) {
+    // 复测答案沿用错题本 Markdown/CSS，只有编号小问间缺少段落空行时补齐。
+    // 不修改原答案，且不在代码块或独立数学块内插入空行。
+    const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    const result = [];
+    let fence = "";
+    let mathBlock = false;
+    for (const line of lines) {
+        const stripped = line.trim();
+        const fenceMatch = stripped.match(/^(\x60{3,}|~{3,})/);
+        const nextNumberedPart = /^(?:[（(]\d{1,2}[）)]|[1-9]\d*[、.．])\s*\S/.test(stripped);
+        if (!fence && !mathBlock && !fenceMatch && nextNumberedPart
+            && result.length && result[result.length - 1].trim()) {
+            result.push("");
+        }
+        result.push(line);
+        if (fenceMatch) {
+            const token = fenceMatch[1];
+            if (!fence) fence = token;
+            else if (fence[0] === token[0] && token.length >= fence.length) fence = "";
+        }
+        if (!fence) {
+            const markers = line.match(/\$\$|\\\[|\\\]/g) || [];
+            for (const token of markers) {
+                if (token === "$") mathBlock = !mathBlock;
+                else if (token === "\\[") mathBlock = true;
+                else if (token === "\\]") mathBlock = false;
+            }
+        }
+    }
+    return result.join("\n");
+}
+
 function openWrongRetestReview(id) {
     const item = learningState.wrongQuestions.find(entry => entry.id === id);
     const modal = document.getElementById("wrongRetestReviewModal");
@@ -7131,7 +7164,7 @@ function openWrongRetestReview(id) {
                 summary.textContent = kind === "answer" ? "查看答案" : "查看解析";
                 const content = document.createElement("div");
                 content.className = kind === "answer" ? "wrong-answer-inner wrong-retest-review-detail" : "wrong-analysis-body wrong-retest-review-detail";
-                content.innerHTML = markdownToHtml(record[kind]);
+                content.innerHTML = markdownToHtml(formatRetestDetailParagraphs(record[kind]));
                 details.append(summary,content);
                 body.append(details);
             } else {
