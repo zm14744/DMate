@@ -9624,8 +9624,32 @@ function prepareAiDisplayText(text) {
 }
 
 
+function normalizeSimpleProseNumberMath(text) {
+    // Standalone numerals inside Chinese prose should look like the
+    // neighbouring ordinary digits, not like a separately scrollable
+    // MathJax SVG. Do not modify formulas or fenced/inline code.
+    return String(text ?? "")
+        .split(/(\`\`\`[\s\S]*?\`\`\`|\`[^\`\n]*\`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g)
+        .map(segment => {
+            if (/^(?:\`\`\`|\`|\$\$|\\\[)/.test(segment)) return segment;
+            return segment.replace(
+                /(\\\(\s*(\d{1,4})\s*\\\)|(?<!\$)\$(\d{1,4})\$(?!\$))/g,
+                (match, _wrapped, parenNumber, dollarNumber, index, entire) => {
+                    const left = entire.slice(Math.max(0, index - 6), index);
+                    const right = entire.slice(index + match.length, index + match.length + 6);
+                    // Avoid altering intentionally isolated inline math.
+                    if (!/[\u4e00-\u9fff]\s*$/.test(left)
+                        && !/^\s*[\u4e00-\u9fff]/.test(right)) {
+                        return match;
+                    }
+                    return parenNumber || dollarNumber;
+                }
+            );
+        }).join("");
+}
+
 function markdownToHtml(text) {
-    const source = String(text ?? "");
+    const source = normalizeSimpleProseNumberMath(text);
 
     const {
         protectedText,
@@ -19031,7 +19055,9 @@ function mobileSwipeBlockedTarget(target) {
         "button",
         "a",
         "[contenteditable='true']",
-        "mjx-container",
+        // Inline MathJax text is no longer an independent horizontal scroll
+        // target; allow swiping across it to open the navigation drawers.
+        'mjx-container[display="true"]',
         ".knowledge-graph-canvas",
         ".kg-history-preview",
         ".wrong-question",
@@ -19056,10 +19082,10 @@ function installMobileSwipeNavigation() {
     const backdrop = document.getElementById("mobileShellBackdrop");
     if (!center) return;
 
-    const startSlop = 9;
-    const openThreshold = 0.30;
-    const closeThreshold = 0.72;
-    const fastVelocity = 0.48;
+    const startSlop = 6;
+    const openThreshold = 0.21;
+    const closeThreshold = 0.82;
+    const fastVelocity = 0.36;
 
     let drag = null;
 
@@ -19130,13 +19156,13 @@ function installMobileSwipeNavigation() {
             if (absX < startSlop && absY < startSlop) return;
 
             // 纵向意图优先交给页面滚动，不抢手势。
-            if (absY > absX * 1.08) {
+            if (absY > absX * 1.16) {
                 drag.cancelled = true;
                 drag = null;
                 return;
             }
 
-            if (absX <= absY * 1.08) return;
+            if (absX <= absY * 1.04) return;
 
             if (drag.opening) {
                 drag.kind = dx >= 0 ? "left" : "tools";
@@ -19188,8 +19214,10 @@ function installMobileSwipeNavigation() {
         const touch = event.changedTouches?.[0];
         const endX = touch?.clientX ?? current.lastX;
         const now = performance.now();
-        const dt = Math.max(1, now - current.lastTime);
-        const velocity = (endX - current.lastX) / dt;
+        // Use the entire gesture, not just the time since the last touchmove:
+        // Android can batch touchmove events and make the old speed unstable.
+        const dt = Math.max(1, now - current.startTime);
+        const velocity = (endX - current.startX) / dt;
 
         let shouldOpen;
         if (current.opening) {
@@ -19289,10 +19317,10 @@ function getTopMobileGesturePage() {
 }
 
 function installMobileOverlaySwipeBack() {
-    const edgeWidth = 34;
-    const startSlop = 8;
-    const completeDistance = 92;
-    const fastVelocity = 0.52;
+    const edgeWidth = 46;
+    const startSlop = 6;
+    const completeDistance = 72;
+    const fastVelocity = 0.40;
     let swipe = null;
     let swipeFrame = 0;
     let swipeVisual = null;
