@@ -1,4 +1,5 @@
 import io
+import math
 import os
 import re
 import threading
@@ -32,6 +33,11 @@ MAX_IMAGE_SIDE = 2200
 SMALL_IMAGE_SIDE = 1000
 SMALL_IMAGE_TARGET_SIDE = 1400
 MAX_UPSCALE = 3.0
+# Only run native-resolution recovery for large images when the first pass
+# suggests small/uncertain text. Four overlapping tiles is the hard CPU bound.
+NATIVE_TILE_TRIGGER_SIDE = 2600
+NATIVE_TILE_MAX_COUNT = 4
+NATIVE_TILE_OVERLAP = 0.09
 MIN_TEXT_SCORE = 0.45
 FORMULA_RETRY_SECONDS = 300
 
@@ -322,6 +328,150 @@ def _merge_text_ocr_passes(original, variant):
         if float(candidate.get("score", 0)) >= float(old.get("score", 0)) + advantage:
             merged[best_i] = candidate
     return merged
+
+
+def _ocr_tile_boxes(width, height):
+    """Return at most four overlapping native-resolution regions for large pages.
+
+    Whole-page downscaling protects memory, but can erase small subscripts and
+    vertex/edge labels. This bounded fallback restores local detail only when
+    the caller has already detected a reason to review the OCR.
+    """
+    width, height = int(width), int(height)
+    if min(width, height) <= 0 or max(width, height) <= NATIVE_TILE_TRIGGER_SIDE:
+        return []
+
+    max_side = float(MAX_IMAGE_SIDE)
+    if width > max_side * 1.15 and height > max_side * 1.15:
+        columns, rows = 2, 2
+    elif width >= height:
+        columns = min(NATIVE_TILE_MAX_COUNT, max(2, int(math.ceil(width / (max_side * .92)))))
+        rows = 1
+    else:
+        columns = 1
+        rows = min(NATIVE_TILE_MAX_COUNT, max(2, int(math.ceil(height / (max_side * .92)))))
+
+    def intervals(length, count):
+        cell = length / float(count)
+        overlap = cell * NATIVE_TILE_OVERLAP
+        result = []
+        for index in range(count):
+            start = max(0, int(math.floor(index * cell - (overlap if index else 0))))
+            end = min(length, int(math.ceil((index + 1) * cell + (overlap if index < count - 1 else 0))))
+            if end > start:
+                result.append((start, end))
+        return result
+
+    xs, ys = intervals(width, columns), intervals(height, rows)
+    boxes = [(x1, y1, x2, y2) for y1, y2 in ys for x1, x2 in xs]
+    return boxes[:NATIVE_TILE_MAX_COUNT]
+
+
+def _native_tile_text_items(source_image, target_shape):
+    """Recognize large-page tiles and map their boxes to the whole-page OCR scale."""
+    source_height, source_width = source_image.shape[:2]
+    target_height, target_width = target_shape[:2]
+    output = []
+    for x1, y1, x2, y2 in _ocr_tile_boxes(source_width, source_height):
+        tile = source_image[y1:y2, x1:x2]
+        if tile.size == 0:
+            continue
+        processed = _resize_if_needed(tile)
+        local_items = _extract_text_items(processed)
+        tile_scale_x = (x2 - x1) / float(max(1, processed.shape[1]))
+        tile_scale_y = (y2 - y1) / float(max(1, processed.shape[0]))
+        page_scale_x = target_width / float(max(1, source_width))
+        page_scale_y = target_height / float(max(1, source_height))
+        for item in local_items:
+            box = item.get("box")
+            if not box or len(box) != 4:
+                continue
+            mapped = [
+                (x1 + float(box[0]) * tile_scale_x) * page_scale_x,
+                (y1 + float(box[1]) * tile_scale_y) * page_scale_y,
+                (x1 + float(box[2]) * tile_scale_x) * page_scale_x,
+                (y1 + float(box[3]) * tile_scale_y) * page_scale_y,
+            ]
+            mapped[0] = max(0.0, min(float(target_width), mapped[0]))
+            mapped[1] = max(0.0, min(float(target_height), mapped[1]))
+            mapped[2] = max(mapped[0], min(float(target_width), mapped[2]))
+            mapped[3] = max(mapped[1], min(float(target_height), mapped[3]))
+            candidate = dict(item)
+            candidate["box"] = mapped
+            candidate["native_tile"] = True
+            output.append(candidate)
+    return output
+
+
+def _box_iou(box_a, box_b):
+    ax1, ay1, ax2, ay2 = map(float, box_a)
+    bx1, by1, bx2, by2 = map(float, box_b)
+    ix = max(0.0, min(ax2, bx2) - max(ax1, bx1))
+    iy = max(0.0, min(ay2, by2) - max(ay1, by1))
+    intersection = ix * iy
+    area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+    union = area_a + area_b - intersection
+    return intersection / union if union > 0 else 0.0
+
+
+def _merge_native_tile_items(original, candidates):
+    """Add missed native-resolution text and conservatively reconcile duplicates.
+
+    Unlike contrast/sharpen passes, native tiles contain real extra source
+    pixels. A stronger tile read may replace a conflicting token, but a numeric
+    or graph-label disagreement is surfaced as a warning for Vision/user review.
+    """
+    merged = [dict(item) for item in (original or [])]
+    critical_conflict = False
+    math_pattern = re.compile(r"(?:[vVeEＧG][₀-₉0-9]|[0-9]|[=<>≤≥∈∩∪∧∨→↔±×÷])")
+    for candidate in candidates or []:
+        content = re.sub(r"\s+", "", str(candidate.get("content") or ""))
+        score = float(candidate.get("score", 0.0))
+        box = candidate.get("box")
+        if not content or not box or len(box) != 4 or score < 0.58:
+            continue
+        if len(content) == 1 and not re.search(r"[\u4e00-\u9fff0-9vVeE]", content):
+            continue
+
+        best_index, best_value = None, 0.0
+        cx, cy = (box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0
+        ch = max(1.0, box[3] - box[1])
+        for index, old in enumerate(merged):
+            old_box = old.get("box") or []
+            if len(old_box) != 4:
+                continue
+            iou = _box_iou(box, old_box)
+            ox, oy = (old_box[0] + old_box[2]) / 2.0, (old_box[1] + old_box[3]) / 2.0
+            oh = max(1.0, old_box[3] - old_box[1])
+            close = abs(cy - oy) <= max(9.0, .65 * max(ch, oh)) and abs(cx - ox) <= max(24.0, .55 * max(box[2]-box[0], old_box[2]-old_box[0]))
+            value = max(iou, .30 if close else 0.0)
+            if value > best_value:
+                best_index, best_value = index, value
+
+        candidate_copy = dict(candidate)
+        candidate_copy["content"] = str(candidate.get("content") or "").strip()
+        if best_index is None or best_value < .22:
+            # Require a plausible full text token; ignore isolated dot/noise hits.
+            if len(content) >= 2 or re.search(r"[\u4e00-\u9fff0-9]", content):
+                merged.append(candidate_copy)
+            continue
+
+        old = merged[best_index]
+        old_content = re.sub(r"\s+", "", str(old.get("content") or ""))
+        old_score = float(old.get("score", 0.0))
+        if content == old_content:
+            if score > old_score:
+                merged[best_index] = candidate_copy
+            continue
+
+        critical = bool(math_pattern.search(content + old_content))
+        if critical:
+            critical_conflict = True
+        advantage = score - old_score
+        if advantage >= (0.15 if critical else 0.10):
+            merged[best_index] = candidate_copy
+    return merged, critical_conflict
 
 
 def _review_regions(text_items, image_width, image_height):
@@ -683,9 +833,10 @@ def recognize_image(image_data):
     # 公式模型失败由 load_models() 内部自动降级。
     load_models()
 
-    image = _decode_image(image_data)
-    image = _resize_if_needed(image)
+    source_image = _decode_image(image_data)
+    image = _resize_if_needed(source_image)
 
+    tile_conflicts = False
     try:
         with _inference_lock:
             text_items = _extract_text_items(image)
@@ -721,6 +872,29 @@ def recognize_image(image_data):
                         text_items = _merge_text_ocr_passes(text_items, sharpened)
                     except Exception as exc:
                         print(f"模糊文字 OCR 补救失败：{type(exc).__name__}")
+
+            # Recheck large originals at native resolution only when small or
+            # mathematically sensitive text remains uncertain after the bounded
+            # contrast/sharpen passes. Keep the standard full-page pass first.
+            strength = _ocr_text_strength(text_items)
+            relevant_heights = [
+                max(1.0, float(item["box"][3] - item["box"][1]))
+                for item in text_items
+                if len(str(item.get("content") or "")) >= 2
+                or re.search(r"[vVeEＧG][₀-₉0-9]|[0-9]", str(item.get("content") or ""))
+            ]
+            median_text_height = float(np.median(relevant_heights)) if relevant_heights else 99.0
+            native_tile_needed = (
+                max(source_image.shape[:2]) > NATIVE_TILE_TRIGGER_SIDE
+                and (strength < 45 or _math_line_risk(text_items) or median_text_height < 13.0)
+            )
+            if native_tile_needed:
+                try:
+                    tile_items = _native_tile_text_items(source_image, image.shape)
+                    text_items, tile_conflicts = _merge_native_tile_items(text_items, tile_items)
+                    print(f"高分辨率 OCR 局部复核：{len(tile_items)} 个候选，关键符号冲突={tile_conflicts}")
+                except Exception as exc:
+                    print(f"高分辨率 OCR 局部复核失败：{type(exc).__name__}")
 
             formula_items = []
             formula_warning = None
@@ -764,11 +938,17 @@ def recognize_image(image_data):
                 "请尝试重新拍摄或裁剪图片。"
             )
 
+        warnings = []
+        if formula_warning:
+            warnings.append(formula_warning)
+        if tile_conflicts:
+            warnings.append("高分辨率局部识别与整图识别在数字或数学符号上存在差异，请核对。")
+
         return {
             "text": text,
             "text_count": len(text_items),
             "formula_count": len(formula_items),
-            "warning": formula_warning,
+            "warning": "；".join(warnings) if warnings else None,
             "review_regions": review_regions,
         }
 
