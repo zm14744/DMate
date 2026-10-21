@@ -6836,6 +6836,12 @@ function setWrongBookSort(value) {
     }
 
     wrongBookSort = value;
+    const nativeSort = document.getElementById("wrongBookSort");
+    if (nativeSort) nativeSort.value = value;
+    const mobileTrigger = document.getElementById("wrongBookSortTrigger");
+    if (mobileTrigger && nativeSort) {
+        mobileTrigger.textContent = nativeSort.selectedOptions[0]?.textContent?.trim() || "最近更新";
+    }
     renderWrongBook();
 }
 
@@ -6939,6 +6945,12 @@ function updateWrongBookToolbar(allItems, visibleItems) {
             "active",
             value === wrongBookFilter
         );
+    }
+    const sortSelect = document.getElementById("wrongBookSort");
+    const sortTrigger = document.getElementById("wrongBookSortTrigger");
+    if (sortSelect) sortSelect.value = wrongBookSort;
+    if (sortTrigger && sortSelect) {
+        sortTrigger.textContent = sortSelect.selectedOptions[0]?.textContent?.trim() || "最近更新";
     }
 }
 
@@ -7230,19 +7242,24 @@ function markWrongQuestionCorrected(id) {
     renderWrongBook();
 }
 
+let wrongRemoveConfirmationBusy = false;
 async function removeWrongQuestion(id) {
-    const entry = learningState.wrongQuestions.find(
-        item => item.id === id
-    );
-
+    if (wrongRemoveConfirmationBusy) return;
+    const entry = learningState.wrongQuestions.find(item => item.id === id);
     if (!entry) return;
 
-    const confirmed = await showAppConfirm({
-        title: "移出错题本",
-        body: "确定要把这道题移出错题本吗？这不会删除原聊天",
-        confirmText: "移出",
-        confirmTone: "danger"
-    });
+    wrongRemoveConfirmationBusy = true;
+    let confirmed = false;
+    try {
+        confirmed = await showAppConfirm({
+            title: "移出错题本",
+            body: "确定要把这道题移出错题本吗？这不会删除原聊天",
+            confirmText: "移出",
+            confirmTone: "danger"
+        });
+    } finally {
+        wrongRemoveConfirmationBusy = false;
+    }
     if (!confirmed) return;
     // The user may have changed the list while the dialog was open.
     if (!learningState.wrongQuestions.some(item => item.id === id)) return;
@@ -9170,9 +9187,13 @@ function renderWrongBook() {
         removeButton.type = "button";
         removeButton.className = "secondary danger";
         removeButton.textContent = "移出错题本";
-        removeButton.onclick = () => (
-            removeWrongQuestion(item.id)
-        );
+        removeButton.onclick = event => {
+            event.preventDefault();
+            event.stopPropagation();
+            // Defer opening until the originating mobile click is complete.
+            // Otherwise its trailing synthetic click can dismiss the new overlay.
+            window.setTimeout(() => { void removeWrongQuestion(item.id); }, 0);
+        };
         actions.appendChild(removeButton);
 
         card.appendChild(top);
@@ -20108,22 +20129,26 @@ document.addEventListener(
                 "change",
                 event => setWrongBookSort(event.target.value)
             );
-            // Reuse the same mobile selection dialog as the knowledge graph.
-            // Keep the native select on desktop and as a fallback.
-            wrongBookSortBox.addEventListener("pointerdown", async event => {
-                if (!window.matchMedia("(max-width: 1100px)").matches) return;
-                if (!document.getElementById("mobileChoiceModal")) return;
+        }
+        const wrongBookSortTrigger = document.getElementById("wrongBookSortTrigger");
+        if (wrongBookSortTrigger && wrongBookSortBox) {
+            wrongBookSortTrigger.addEventListener("click", async event => {
                 event.preventDefault();
-                const selected = await openMobileChoiceModal({
-                    title: "排序方式",
-                    options: Array.from(wrongBookSortBox.options).map(item => ({
-                        value: item.value, label: item.textContent.trim()
-                    })),
-                    value: wrongBookSortBox.value
-                });
-                if (!selected) return;
-                wrongBookSortBox.value = selected.value;
-                setWrongBookSort(selected.value);
+                event.stopPropagation();
+                if (wrongBookSortTrigger.dataset.opening === "true") return;
+                wrongBookSortTrigger.dataset.opening = "true";
+                try {
+                    const selected = await openMobileChoiceModal({
+                        title: "排序方式",
+                        options: Array.from(wrongBookSortBox.options).map(item => ({
+                            value: item.value, label: item.textContent.trim()
+                        })),
+                        value: wrongBookSortBox.value
+                    });
+                    if (selected) setWrongBookSort(selected.value);
+                } finally {
+                    delete wrongBookSortTrigger.dataset.opening;
+                }
             });
         }
 
@@ -20316,12 +20341,15 @@ document.addEventListener(
 
         appConfirmClose?.addEventListener("click", () => resolveAppConfirm(false));
         appConfirmConfirm?.addEventListener("click", () => resolveAppConfirm(true));
-        appConfirmModal?.addEventListener("click", event => {
+        // A pointerdown on the *already-open* backdrop is a new gesture.
+        // Do not close on click: mobile synthetic clicks can land on the newly
+        // created backdrop after the click which originally opened this modal.
+        appConfirmModal?.addEventListener("pointerdown", event => {
             if (event.target === appConfirmModal) resolveAppConfirm(false);
         });
 
         mobileChoiceClose?.addEventListener("click", closeMobileChoiceModal);
-        mobileChoiceModal?.addEventListener("click", event => {
+        mobileChoiceModal?.addEventListener("pointerdown", event => {
             if (event.target === mobileChoiceModal) closeMobileChoiceModal();
         });
 
