@@ -9624,32 +9624,8 @@ function prepareAiDisplayText(text) {
 }
 
 
-function normalizeSimpleProseNumberMath(text) {
-    // Standalone numerals inside Chinese prose should look like the
-    // neighbouring ordinary digits, not like a separately scrollable
-    // MathJax SVG. Do not modify formulas or fenced/inline code.
-    return String(text ?? "")
-        .split(/(\`\`\`[\s\S]*?\`\`\`|\`[^\`\n]*\`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g)
-        .map(segment => {
-            if (/^(?:\`\`\`|\`|\$\$|\\\[)/.test(segment)) return segment;
-            return segment.replace(
-                /(\\\(\s*(\d{1,4})\s*\\\)|(?<!\$)\$(\d{1,4})\$(?!\$))/g,
-                (match, _wrapped, parenNumber, dollarNumber, index, entire) => {
-                    const left = entire.slice(Math.max(0, index - 6), index);
-                    const right = entire.slice(index + match.length, index + match.length + 6);
-                    // Avoid altering intentionally isolated inline math.
-                    if (!/[\u4e00-\u9fff]\s*$/.test(left)
-                        && !/^\s*[\u4e00-\u9fff]/.test(right)) {
-                        return match;
-                    }
-                    return parenNumber || dollarNumber;
-                }
-            );
-        }).join("");
-}
-
 function markdownToHtml(text) {
-    const source = normalizeSimpleProseNumberMath(text);
+    const source = String(text ?? "");
 
     const {
         protectedText,
