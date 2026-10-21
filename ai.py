@@ -168,6 +168,66 @@ VISION_ENABLED = os.environ.get(
     "1"
 ).strip().lower() not in {"0", "false", "off", "no"}
 
+GRAPH_TEXT_HINT_RE = re.compile(
+    r"图论|顶点|边集|边数|连通|邻接|同构|欧拉|哈密顿|有向图|无向图|生成树|树的|度数|入度|出度|"
+    r"\b(?:graphs?|vertices?|edges?|trees?|isomorph(?:ism|ic)?|adjacency|"
+    r"euler(?:ian)?|hamilton(?:ian)?|degree|connected|directed|undirected|cycle|path)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_graph_vision_task(ocr_text, opencv_graphs):
+    """Use existing OCR/context and actual CV candidates to route graph tasks only."""
+    if isinstance(opencv_graphs, dict) and (opencv_graphs.get("graphs") or []):
+        return True
+    return bool(GRAPH_TEXT_HINT_RE.search(str(ocr_text or "")))
+
+
+GRAPH_TOPOLOGY_PROMPT = """你只负责从图像恢复离散数学图的结构，不负责转录题干、校正整段文字或解题。
+第一张图是完整原图，后续图是同一原图的局部放大，不是新题。请把每幅独立图恢复为顶点与边的结构化记录。
+
+识别规则：
+1. 每幅独立图分别编号 G1、G2……；不能把相邻子图合并，也不能把同一图的局部放大当成新图。
+2. 先逐一确定顶点，再逐条追踪边的两个真实端点。顶点有可读标签时保留原标签；无标签时使用 G1_v1、G1_v2 等临时名称，并保持同一图内编号稳定。
+3. x、y 是相对于完整原图的 0～1 归一化坐标；无法可靠定位时用 null。
+4. 交叉处没有顶点标记或明确连接时，不得新增顶点，也不得在交叉处转弯换线；沿原线方向追踪到真实端点。交叉处确有节点时，才按实际连接拆分边。
+5. 曲线、弧线和折线必须沿整条线追踪到真实端点。线条只是经过某个顶点附近，不等于与该顶点连接。
+6. 有向边的方向由箭头尖端决定；无法看清箭头时，将该边列为 uncertain_edges，不得猜方向。
+7. 每条平行边、自环都要单独记录。自环的 from 与 to 相同；两条不同笔画即使端点相同，也只有在原图确实画出两条边时才记录为重边。
+8. e1、e2 等写在线旁的符号是边名，不是权值。只有明确标在边上的数值才记为 weight。
+9. OpenCV 提供的顶点、边和位置只是像素候选，不是事实。只有在原图中能核实的边才能进入 edges；不得为了凑成树、三角形、完全图或预期答案而补边。
+10. 保留孤立顶点与不连通分量。顶点表中的每个 ID 必须唯一；每条边的 from、to 都必须引用该图已有的顶点。
+11. complete 只有在顶点集合和全部边都能从图中确认时才为 true。存在漏看风险、端点歧义、箭头方向歧义或图像裁切时必须为 false，并说明原因。
+12. 不要重复抄录题干文字。corrected_text 固定返回空字符串；文字识别结果由独立 OCR 流程保留。visual_text 只简短概述图结构，结构不完整时明确说明待核对。
+13. 图形确实存在但边集不完整时，仍返回已确认的顶点和边；不要因为无法确认全部边而编造完整图。
+
+只返回一个 JSON 对象，不要 Markdown 代码块：
+{
+  "corrected_text": "",
+  "visual_text": "简短的图结构说明；无法确认时说明待核对",
+  "has_visual_structure": true,
+  "image_kind": "exercise",
+  "uncertain_fields": [],
+  "graph_data": [
+    {
+      "id": "G1",
+      "directed": false,
+      "weighted": false,
+      "multigraph": false,
+      "vertices": [
+        {"id": "a", "label": "a", "x": 0.12, "y": 0.24},
+        {"id": "b", "label": "b", "x": 0.46, "y": 0.51}
+      ],
+      "edges": [
+        {"from": "a", "to": "b", "edge_label": null, "weight": null}
+      ],
+      "uncertain_edges": [],
+      "complete": true
+    }
+  ]
+}
+directed、weighted、multigraph 必须是 true、false 或 "unknown"。如果没有识别到图，graph_data 返回空数组，image_kind 返回 "uncertain"；不得把没有识别成功伪装成“图中没有边”。"""
+
 VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结构解析器”。
 
 第一张图是用户上传的完整图片，后续图片是同一张图的局部放大，不是新题。
@@ -1943,7 +2003,7 @@ def _compact_opencv_graph_hints(graphs, max_chars=5000):
 def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=None, opencv_graphs=None):
     """
     使用整图与局部放大图独立转录题干、解析图形结构。
-    ocr_text 参数为兼容旧调用保留，不发送给视觉模型；由 app.py 比较两个结果。
+    ocr_text 仅用于判断是否进入图论专用识别路径；图论任务不再要求视觉模型重复转录题干。非图论图片继续使用原通用提示词。
 
     这是 OCR 的增强层：
     - OCR 失败不依赖这里；
@@ -1964,6 +2024,9 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
     if not mime:
         return _failure("该图片格式暂不支持图形理解，请使用 JPG、PNG、GIF 或 WebP。")
 
+    graph_only_mode = _is_graph_vision_task(ocr_text, opencv_graphs)
+    vision_prompt = GRAPH_TOPOLOGY_PROMPT if graph_only_mode else VISION_PROMPT
+
     try:
         image_urls = _prepare_vision_images(
             image_bytes, review_regions,
@@ -1972,7 +2035,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
     except Exception as exc:
         print(f"Vision 图片预处理失败：{type(exc).__name__}")
         return _failure("图片局部放大失败，已保留文字识别结果。")
-    content_parts = [{"type": "text", "text": VISION_PROMPT}]
+    content_parts = [{"type": "text", "text": vision_prompt}]
     verified = (opencv_graphs or {}).get("graphs", [])
     if verified:
         content_parts.append({"type":"text", "text":(
@@ -2015,7 +2078,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
         try:
             print(
                 f"正在调用 Qwen Vision（第 {attempt + 1}/{total_attempts} 次）；"
-                f"model={VISION_MODEL}；endpoint={API_URL}；"
+                f"mode={'graph-only' if graph_only_mode else 'general'}；model={VISION_MODEL}；endpoint={API_URL}；"
                 f"thinking={VISION_ENABLE_THINKING}；"
                 f"images={len(image_urls)}；max_tokens={payload['max_tokens']}"
             )
