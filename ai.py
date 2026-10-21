@@ -1268,6 +1268,90 @@ def _vision_success(corrected_text, visual_text, uncertain_fields=None, image_ki
     }
 
 
+def _diagram_grid_crops(image, *, individual=False):
+    """Find genuinely blank gutters between textbook graph panels.
+
+    This supplies magnified *image evidence*, not a claimed topology. Require
+    blank columns across the whole drawing; regular point layouts alone are
+    not enough to assert that a figure contains several separate graphs.
+    Six-tree sheets are commonly 3 columns x 2 rows; cutting at 60% height
+    truncates incident edges and causes the model to invent closing strokes.
+    """
+    width, height = image.size
+    if width < 240 or height < 180:
+        return []
+    scaled = image.convert("L")
+    factor = min(1.0, 650.0 / max(width, height))
+    if factor < 1:
+        scaled = scaled.resize(
+            (max(1, int(width * factor)), max(1, int(height * factor))),
+            Image.Resampling.BILINEAR
+        )
+    w, h = scaled.size
+    pixels = scaled.load()
+    col_ink = [0] * w
+    row_ink = [0] * h
+    for y in range(h):
+        for x in range(w):
+            if pixels[x, y] < 205:
+                col_ink[x] += 1
+                row_ink[y] += 1
+
+    def blank_gutters(counts, transverse, n, limit):
+        threshold = max(1, int(transverse * .004))
+        shortest = max(7, int(n * .027))
+        runs = []
+        begin = None
+        for pos in range(n + 1):
+            empty = pos < n and counts[pos] <= threshold
+            if empty and begin is None:
+                begin = pos
+            elif not empty and begin is not None:
+                if (pos - begin >= shortest
+                        and begin >= int(n * .09)
+                        and pos <= int(n * .91)):
+                    runs.append((begin, pos))
+                begin = None
+        # Prefer actual broad panel gutters to tiny blank slots in lettering.
+        return sorted(runs, key=lambda pair: pair[1]-pair[0], reverse=True)[:limit]
+
+    x_gaps = blank_gutters(col_ink, h, w, 3)
+    if not x_gaps:
+        return []
+    x_cuts = sorted(round((a+b)/2 * width/w) for a, b in x_gaps)
+    columns = len(x_cuts) + 1
+    # This detector only supplies crops for ordinary 2/3/4-column arrangements.
+    if columns not in (2, 3, 4):
+        return []
+    y_gaps = blank_gutters(row_ink, w, h, 1)
+    y_cuts = [round((a+b)/2 * height/h) for a, b in y_gaps]
+    # Only use separate row crops when a substantial horizontal gutter
+    # truly separates panels. Otherwise group complete columns.
+    x_edges = [0, *x_cuts, width]
+    y_edges = [0, *y_cuts, height]
+    if individual and len(y_edges) == 3:
+        boxes = [
+            (x_edges[i], y_edges[j], x_edges[i+1], y_edges[j+1])
+            for j in range(2) for i in range(columns)
+        ]
+    else:
+        boxes = [
+            (x_edges[i], 0, x_edges[i+1], height)
+            for i in range(columns)
+        ]
+    # A small margin into the otherwise empty gutter never touches another
+    # graph but avoids losing vertex circles exactly on a panel boundary.
+    output = []
+    for left, top, right, bottom in boxes:
+        margin_x = min(12, max(3, int(width * .007)))
+        margin_y = min(12, max(3, int(height * .007)))
+        box = (max(0,left-margin_x), max(0,top-margin_y),
+               min(width,right+margin_x), min(height,bottom+margin_y))
+        if box[2]-box[0] >= 65 and box[3]-box[1] >= 65:
+            output.append(image.crop(box))
+    return output
+
+
 def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None):
     """返回整图和局部放大 PNG；所有图片使用同一个 EXIF 方向。
 
@@ -1342,6 +1426,12 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
             crops.append(original.crop(box))
         except (TypeError, ValueError, OverflowError):
             continue
+    # Prefer whitespace-demarcated columns over the old arbitrary top/bottom
+    # cuts. A Stanford 3x2 tree slide must keep all six diagrams intact.
+    if len(graph_regions or []) < 2:
+        panel_crops = _diagram_grid_crops(original)
+        if len(panel_crops) >= 2:
+            crops = panel_crops[:4]
     # OCR may only find a tiny “(b)” caption and supply review regions around
     # the caption while missing the actual graph above it. Preserve structural
     # left/right crops for wide graph illustrations even when OCR found text.
@@ -1655,6 +1745,7 @@ MULTI_LABELLED_GRAPH_EDGE_AUDIT_PROMPT = """你是图论教材中三至六幅并
 MULTI_GRAPH_VERTEX_AUDIT_PROMPT = """你是第二位独立逐点审图员，不得读取其他模型生成的结构或利用题目要求猜出答案。
 你会看到包含多幅互相独立的图论图形的原图及放大图，例如 Stanford 六种无标号树。
 请为每一幅图按从左到右、从上到下的排列（图1、图2……），认真数出实际画出的顶点实心或空心小圆点个数与连续边笔画数。
+若有多个上下排列的图，先在整图里确定每幅图的边界，局部放大图仅用于核实该边界里的线段。顶点处的一条线必须沿线连续延伸到另一真实顶点才算一条边。六点树图常有开放的两端，不能凭视觉对称或轮廓把末端自动闭合成第六条边。
 顶点文字、线段交叉点（无实心圆）、线段折点不算新增顶点。不得根据“题目写六顶点”就让每张图有六个点；必须数画面。
 若图形局部被遮挡、圆点不清或边界被裁切，complete=false，不猜数值。
 仅输出严格 JSON 结构，不解释题目，不给图论结论：
@@ -1692,7 +1783,16 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
         # the old wide nor portrait branch added ANY enlargement. Aizu's
         # vertically stacked two graphs had the same near-square issue.
         crops = [image]
-        if multi_edges and width >= height * 1.85:
+        grid_crops = _diagram_grid_crops(
+            image, individual=(count_only or multi_edges)
+        )
+        if (count_only and len(grid_crops) >= 4):
+            # Independent full-panel crops, not 60%-height slices; essential
+            # for six Stanford unlabeled trees in two rows.
+            crops.extend(grid_crops[:8])
+        elif (multi_edges and len(grid_crops) == max(3, min(6, int(panel_count)))):
+            crops.extend(grid_crops)
+        elif multi_edges and width >= height * 1.85:
             # Split 3-6 figure rows at their real panel count; fixed quarters
             # can cut a three/six-figure drawing through the middle of an edge.
             count = max(3, min(6, int(panel_count)))
