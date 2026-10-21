@@ -3520,7 +3520,7 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
             # transcription, mark the contested symbols and let the user edit.
             conflicting = {x["question"] for x in changes}
             parts = list(re.finditer(
-                r"(?m)^\\s*(?:[（(]\\s*(\\d{1,2})\\s*[）)]|([0-9]{1,2})[.．、])\\s*",
+                r"(?m)^\s*(?:[（(]\s*(\d{1,2})\s*[）)]|([0-9]{1,2})[.．、])\s*",
                 corrected_text
             ))
             for match in reversed(parts):
