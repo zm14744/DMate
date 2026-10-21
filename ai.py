@@ -148,8 +148,11 @@ VISION_ENABLE_THINKING = (
     in {"1", "true", "yes", "on"}
 )
 # 输出预算保留足够空间容纳结构化 JSON；默认按模型示例关闭思考模式。
+# Keep vision output bounded by default; long free-form output burns tokens and
+# does not improve graph transcription. The hard cap also prevents an old env
+# value from silently restoring a 16k-token budget.
 VISION_MAX_OUTPUT_TOKENS = max(
-    4096, min(16384, int(os.environ.get("QWEN_VISION_MAX_OUTPUT_TOKENS", "16000")))
+    4096, min(6000, int(os.environ.get("QWEN_VISION_MAX_OUTPUT_TOKENS", "6000")))
 )
 # Bound internal reasoning separately so the final JSON has a usable token budget.
 VISION_THINKING_BUDGET = max(
@@ -1874,10 +1877,9 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
                 original.crop((0, 0, width, math.ceil(height * 0.6))),
                 original.crop((0, math.floor(height * 0.4), width, height)),
             ]
-    # A single full image plus at most four targeted crops bounds the number
-    # of paid Vision image inputs. Prefer complete graph regions over generic
-    # left/right halves and avoid sending duplicate overlapping crops.
-    crops = crops[:4]
+    # Keep paid Vision inputs bounded: one full image plus at most three
+    # supplementary crops. The full image always preserves the whole problem.
+    crops = crops[:3]
     return [encode(original, 2200)] + [encode(enhance_crop(crop), 1600, True) for crop in crops]
 
 
@@ -1935,7 +1937,7 @@ def _compact_opencv_graph_hints(graphs, max_chars=5000):
     return {"graphs": compact_graphs, "omitted_graphs": max(0, len(graphs or []) - len(compact_graphs))}
 
 
-def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=None, opencv_graphs=None):
+def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=None, opencv_graphs=None):
     """
     使用整图与局部放大图独立转录题干、解析图形结构。
     ocr_text 参数为兼容旧调用保留，不发送给视觉模型；由 app.py 比较两个结果。
@@ -2098,10 +2100,11 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 # 结构化结果很关键。第一次格式异常时自动再试一次，
                 # 避免把一坨 JSON/自然语言直接显示给学生。
                 if attempt < total_attempts - 1:
-                    # Length-truncated thinking responses need a larger final budget.
+                    # If a caller explicitly enables a retry, raise the budget only
+                    # modestly; never jump from the normal budget straight to 16k.
                     if choice.get("finish_reason") == "length":
                         payload["max_tokens"] = min(
-                            16384, max(int(payload.get("max_tokens", 12000)) + 2048, 16384)
+                            8000, max(int(payload.get("max_tokens", 6000)) + 1000, 6000)
                         )
                     time.sleep((2 ** attempt) + random.uniform(0, 0.4))
                     continue
@@ -2117,7 +2120,8 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
             print(
                 "Qwen Vision 调用成功："
                 f"corrected_text={len(corrected_text)} chars；"
-                f"visual_text={len(visual_text)} chars"
+                f"visual_text={len(visual_text)} chars；"
+                f"usage={result.get('usage')!r}"
             )
 
             return _vision_success(
@@ -2228,7 +2232,7 @@ SINGLE_LABELLED_GRAPH_AUDIT_PROMPT = """你是第二名独立的图论原图逐�
 {"graphs":[{"index":1,"directed":false,"vertices":["A","B"],"edges":[["A","B"]],"complete":true}]}
 如果图片没有恰好一张完整的带字母无向图，graphs设为空数组。"""
 
-def verify_graph_image_independently(image_bytes, retries=1, directed=False, count_only=False, single=False, multi_edges=False, panel_count=4):
+def verify_graph_image_independently(image_bytes, retries=0, directed=False, count_only=False, single=False, multi_edges=False, panel_count=4):
     """A second *independent* image-model read for complex graph topology.
 
     Used for graph-isomorphism diagrams and independently checked directed
@@ -2249,13 +2253,11 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
         # the old wide nor portrait branch added ANY enlargement. Aizu's
         # vertically stacked two graphs had the same near-square issue.
         crops = [image]
-        grid_crops = _diagram_grid_crops(
-            image, individual=(count_only or multi_edges)
-        )
-        if (count_only and len(grid_crops) >= 4):
-            # Independent full-panel crops, not 60%-height slices; essential
-            # for six Stanford unlabeled trees in two rows.
-            crops.extend(grid_crops[:8])
+        # Count-only audits group vertically stacked panels by column, so a
+        # six-figure 3x2 sheet needs at most three close-ups rather than six.
+        grid_crops = _diagram_grid_crops(image, individual=multi_edges)
+        if count_only and len(grid_crops) >= 2:
+            crops.extend(grid_crops[:4])
         elif (multi_edges and len(grid_crops) == max(3, min(6, int(panel_count)))):
             crops.extend(grid_crops)
         elif multi_edges and width >= height * 1.85:
@@ -2355,6 +2357,7 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
             graphs=data.get("graphs")
             if not isinstance(graphs,list):
                 return {"ok":False,"error":"图形复核未输出列表"}
+            print(f"Qwen Vision 独立复核成功：usage={result.get('usage')!r}")
             return {"ok":True,"graphs":graphs}
         except (requests.exceptions.Timeout,requests.exceptions.ConnectionError) as exc:
             if attempt < retries:
