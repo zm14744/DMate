@@ -260,6 +260,66 @@ def _ocr_text_strength(items):
     return useful + questions * 18
 
 
+def _math_line_risk(items):
+    """Detect weak mathematical labels even when most Chinese text was read well.
+
+    A clear paragraph must not conceal an uncertain v_5/v_3 or e_6/e_8.
+    """
+    relevant = [
+        item for item in items
+        if re.search(r"(?:[vVeEＧG][₀-₉0-9]|[（(]\s*[1-9]\s*[）)]|长度|结点|顶点|回路|通路|矩阵)", str(item.get("content", "")))
+    ]
+    if not relevant:
+        return False
+    return any(float(item.get("score", 1.0)) < 0.93 for item in relevant)
+
+
+def _merge_text_ocr_passes(original, variant):
+    """Match OCR lines by geometry rather than replacing a full good pass.
+
+    Require clearly stronger confidence before modifying mathematical tokens;
+    an enhanced image alone is not evidence that its digits are correct.
+    """
+    if not original:
+        return variant
+    merged = [dict(item) for item in original]
+    for candidate in variant:
+        box = candidate.get("box")
+        if not box:
+            continue
+        cx = (box[0] + box[2]) / 2
+        cy = (box[1] + box[3]) / 2
+        best_i, best_overlap = None, 0.0
+        for i, old in enumerate(merged):
+            old_box = old.get("box") or []
+            if len(old_box) < 4:
+                continue
+            ox = (old_box[0] + old_box[2]) / 2
+            oy = (old_box[1] + old_box[3]) / 2
+            margin_y = max(10, (old_box[3]-old_box[1]) * 0.8)
+            if abs(cy-oy) > margin_y or abs(cx-ox) > max(30, (old_box[2]-old_box[0])*0.65):
+                continue
+            overlap = _intersection_ratio(box, old_box)
+            if overlap > best_overlap:
+                best_i, best_overlap = i, overlap
+        if best_i is None or best_overlap < 0.32:
+            if float(candidate.get("score", 0)) >= 0.88:
+                merged.append(candidate)
+            continue
+        old = merged[best_i]
+        before, after = str(old.get("content", "")), str(candidate.get("content", ""))
+        if before == after:
+            continue
+        math_change = bool(
+            re.search(r"[vVeEＧG][₀-₉0-9]", before + after)
+            or re.search(r"\d", before + after)
+        )
+        advantage = 0.14 if math_change else 0.07
+        if float(candidate.get("score", 0)) >= float(old.get("score", 0)) + advantage:
+            merged[best_i] = candidate
+    return merged
+
+
 def _review_regions(text_items, image_width, image_height):
     """用文字坐标定位题干，供 Vision 查看放大的局部；不传识别出的字符。
 
@@ -625,28 +685,38 @@ def recognize_image(image_data):
     try:
         with _inference_lock:
             text_items = _extract_text_items(image)
-            if _ocr_text_strength(text_items) < 28:
-                # 小尺寸、低对比度教材扫描图经常第一轮只识别 v1/e3。
-                # 至多追加一次文字 OCR，不重复耗时较长的公式识别。
+            # OCR can read the full paragraph yet confuse a tiny vertex index.
+            # Assess local confidence/blur as well as global text completeness.
+            strength = _ocr_text_strength(text_items)
+            sample_width = min(720, image.shape[1])
+            sampled = cv2.resize(
+                image, (sample_width, max(1, round(image.shape[0] * sample_width / image.shape[1])))
+            )
+            blur_score = cv2.Laplacian(
+                cv2.cvtColor(sampled, cv2.COLOR_BGR2GRAY), cv2.CV_64F
+            ).var()
+            has_math_indices = any(re.search(
+                r"[vVeEＧG][₀-₉0-9]|长度|结点|顶点|回路|通路",
+                str(item.get("content", ""))
+            ) for item in text_items)
+            needs_review = (
+                strength < 28 or _math_line_risk(text_items)
+                or (blur_score < 85 and has_math_indices)
+            )
+            if needs_review:
+                # Exactly one additional contrast pass for useful but blurry text.
                 try:
                     enhanced_items = _extract_text_items(_enhance_faded_photo(image))
-                    if _ocr_text_strength(enhanced_items) > _ocr_text_strength(text_items):
-                        text_items = enhanced_items
+                    text_items = _merge_text_ocr_passes(text_items, enhanced_items)
                 except Exception as exc:
-                    print(f"低对比度文字 OCR 补救失败，保留首轮：{type(exc).__name__}")
-                # Only one further bounded pass when the image is demonstrably
-                # soft and both prior passes failed to recover meaningful text.
-                if _ocr_text_strength(text_items) < 10:
-                    sampled = cv2.resize(image, (min(720, image.shape[1]),
-                        max(1, round(image.shape[0]*min(720, image.shape[1])/image.shape[1]))))
-                    gray_sample = cv2.cvtColor(sampled, cv2.COLOR_BGR2GRAY)
-                    if cv2.Laplacian(gray_sample, cv2.CV_64F).var() < 42:
-                        try:
-                            sharpened = _extract_text_items(_enhance_soft_photo(image))
-                            if _ocr_text_strength(sharpened) > _ocr_text_strength(text_items):
-                                text_items = sharpened
-                        except Exception as exc:
-                            print(f"模糊文字 OCR 补救失败：{type(exc).__name__}")
+                    print(f"文字 OCR 对比度补救失败：{type(exc).__name__}")
+                # Sharpen only very soft photos, bounded to one extra pass.
+                if blur_score < 42 and (strength < 28 or has_math_indices):
+                    try:
+                        sharpened = _extract_text_items(_enhance_soft_photo(image))
+                        text_items = _merge_text_ocr_passes(text_items, sharpened)
+                    except Exception as exc:
+                        print(f"模糊文字 OCR 补救失败：{type(exc).__name__}")
 
             formula_items = []
             formula_warning = None
