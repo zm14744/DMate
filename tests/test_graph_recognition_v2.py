@@ -56,6 +56,31 @@ class GraphRecognitionTests(unittest.TestCase):
     def test_black_dots_four_graphs_and_crossings(self):
         self.check_exact(make_sheet())
 
+    def test_tall_phone_screenshot_retains_small_graph_dots(self):
+        # A real 931x2048 OCR-review screenshot of this same four-graph
+        # problem lost nine of the 24 tiny black dots when the CPU detector
+        # unconditionally reduced the long side to 1700px.
+        # Recreate the resolution, graph positions and distracting glyph-like
+        # dots without storing any user's private screenshot in the repository.
+        canvas = Image.new("RGB", (931, 2048), "white")
+        painter = ImageDraw.Draw(canvas)
+        # Multiple headline rows have black circular glyph fragments.
+        # They must not be merged into the actual three-row graph strip.
+        for i in range(8):
+            x = 65 + i*72
+            painter.ellipse((x-4, 195, x+4, 203), fill=(16, 16, 16))
+            painter.ellipse((x-4, 224, x+4, 232), fill=(16, 16, 16))
+        points = [(0, 0), (120, 0), (0, 132), (120, 132),
+                  (0, 264), (120, 264)]
+        for index, edge_list in enumerate(EDGES):
+            offset_x = (88, 281, 474, 667)[index]
+            located = [(offset_x+x, 303+y) for x, y in points]
+            for a, b in edge_list:
+                painter.line((located[a], located[b]), fill=(30, 30, 30), width=2)
+            for x, y in located:
+                painter.ellipse((x-5, y-5, x+5, y+5), fill=(5, 5, 5))
+        self.check_exact(canvas)
+
     def test_resized_and_mildly_blurred(self):
         self.check_exact(make_sheet().resize((900, 438)))
         self.check_exact(make_sheet().filter(ImageFilter.GaussianBlur(1.1)))
