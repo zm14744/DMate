@@ -3499,23 +3499,67 @@ def _ocr_has_exercise_evidence(text):
     return (numbered >= 2 and question_action) or (question_action and math_context and len(source) >= 18)
 
 
+def _numbered_ocr_question_blocks(text):
+    """Return the preamble and complete numbered-question blocks from an OCR string."""
+    source = str(text or "")
+    matches = list(re.finditer(
+        r"(?m)^\s*(?:[（(]\s*(\d{1,2})\s*[）)]|([0-9]{1,2})[.．、])\s*",
+        source,
+    ))
+    if not matches:
+        return source.strip(), {}
+    prefix = source[:matches[0].start()].strip()
+    blocks = {}
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(source)
+        number = match.group(1) or match.group(2)
+        blocks[number] = source[match.start():end].strip()
+    return prefix, blocks
+
+
 def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
-    """Vision 是待核对候选。漏问时保留 OCR，数字变化明确列出。"""
+    """Keep useful Vision corrections while restoring any numbered question it omitted."""
     original = _numbered_ocr_questions(ocr_text)
     candidate = _numbered_ocr_questions(corrected_text)
     missing = sorted(set(original) - set(candidate), key=int) if corrected_text else []
     reasons = []
     changes = []
+
     if missing:
-        reasons.append("另一份识别结果缺少第 " + "、".join(missing) + " 问，已保留原文字结果。")
-        corrected_text = ""
-    else:
-        for number in sorted(set(original) & set(candidate), key=int):
-            before, after = _ocr_math_tokens(original[number]), _ocr_math_tokens(candidate[number])
-            if before != after:
-                changes.append({"question": number, "ocr": "、".join(before), "vision": "、".join(after)})
-        if changes:
-            reasons.append("第 " + "、".join(x["question"] for x in changes) + " 问的数字或下标识别不一致，请对照原图。")
+        reasons.append(
+            "视觉校正结果缺少第 " + "、".join(missing)
+            + " 问，已从原 OCR 补回缺失小问；其余校正仍需对照原图。"
+        )
+        if candidate:
+            original_prefix, original_blocks = _numbered_ocr_question_blocks(ocr_text)
+            candidate_prefix, candidate_blocks = _numbered_ocr_question_blocks(corrected_text)
+            for number in missing:
+                if number in original_blocks:
+                    candidate_blocks[number] = original_blocks[number]
+            merged_blocks = [
+                candidate_blocks[number]
+                for number in sorted(candidate_blocks, key=int)
+            ]
+            prefix = candidate_prefix or original_prefix
+            corrected_text = "\n".join(
+                part for part in [prefix, *merged_blocks] if part
+            ).strip()
+        else:
+            # If Vision returned no usable numbered-question structure at all,
+            # retain the complete OCR result rather than guessing how to merge it.
+            corrected_text = ""
+
+    candidate = _numbered_ocr_questions(corrected_text)
+    for number in sorted(set(original) & set(candidate), key=int):
+        before, after = _ocr_math_tokens(original[number]), _ocr_math_tokens(candidate[number])
+        if before != after:
+            changes.append({"question": number, "ocr": "、".join(before), "vision": "、".join(after)})
+    if changes:
+        reasons.append(
+            "第 " + "、".join(x["question"] for x in changes)
+            + " 问的数字或下标识别不一致，请对照原图。"
+        )
+
     for field in uncertain_fields or []:
         if isinstance(field, str) and field.strip():
             reasons.append(field.strip()[:240])
