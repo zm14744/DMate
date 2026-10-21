@@ -173,7 +173,10 @@ def reconcile_vision_edges(visual_text, opencv_graphs):
         if len(confirmed) != len(cv_edges):
             continue
         seen = set(vision_edges)
-        if seen == confirmed:
+        # A repeated undirected edge such as d-e plus e-d is still a
+        # transcription error even when its UNIQUE set matches the pixels.
+        # Never let a duplicate silently survive a perfect-set shortcut.
+        if seen == confirmed and len(vision_edges) == len(seen):
             continue
         # Preserve the same labels but supply the geometrically confirmed
         # connections. Only this narrowly-checked six-dot case is correctable.
