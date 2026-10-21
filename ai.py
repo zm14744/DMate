@@ -119,7 +119,16 @@ SYSTEM_PROMPT = r"""你是离散数学智能辅学系统中的教学助手。
 VISION_MODEL = "qwen3-vl-235b-a22b-thinking"
 # Includes reasoning tokens; the old 3000-token budget often truncated JSON.
 VISION_MAX_OUTPUT_TOKENS = max(
-    4096, min(16384, int(os.environ.get("QWEN_VISION_MAX_OUTPUT_TOKENS", "12000")))
+    4096, min(16384, int(os.environ.get("QWEN_VISION_MAX_OUTPUT_TOKENS", "16000")))
+)
+# Bound internal reasoning separately so the final JSON has a usable token budget.
+VISION_THINKING_BUDGET = max(
+    1024,
+    min(
+        8192,
+        int(os.environ.get("QWEN_VISION_THINKING_BUDGET", "6000")),
+        VISION_MAX_OUTPUT_TOKENS - 2048,
+    ),
 )
 VISION_ENABLED = os.environ.get(
     "VISION_ANALYSIS_ENABLED",
@@ -1191,6 +1200,133 @@ def _guess_image_mime(raw):
 
 
 
+def _request_qwen_completion(payload, headers, timeout=(10, 120)):
+    """Call DashScope in SSE mode and reconstruct the OpenAI-compatible result."""
+    request_payload = dict(payload)
+    request_payload["stream"] = True
+    response = requests.post(
+        API_URL, headers=headers, json=request_payload,
+        timeout=timeout, stream=True
+    )
+    try:
+        status_code = int(getattr(response, "status_code", 0) or 0)
+        ok = bool(getattr(response, "ok", 200 <= status_code < 300))
+        if not ok:
+            return status_code, str(getattr(response, "text", "") or ""), None
+
+        # Compatibility path for mocked responses and gateways ignoring stream=true.
+        if not callable(getattr(response, "iter_lines", None)):
+            try:
+                return status_code, "", response.json()
+            except Exception:
+                return status_code, "", None
+
+        content_parts, reasoning_parts = [], []
+        finish_reason, usage = None, None
+        saw_event = False
+        for raw_line in response.iter_lines(decode_unicode=True):
+            if raw_line is None:
+                continue
+            line = raw_line.decode("utf-8", errors="replace").strip() if isinstance(raw_line, bytes) else str(raw_line).strip()
+            if not line or line.startswith(":") or not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            if not data:
+                continue
+            try:
+                chunk = json.loads(data)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if not isinstance(chunk, dict):
+                continue
+            saw_event = True
+            if isinstance(chunk.get("usage"), dict):
+                usage = chunk["usage"]
+            for choice in chunk.get("choices") or []:
+                if not isinstance(choice, dict):
+                    continue
+                delta = choice.get("delta") or {}
+                if not isinstance(delta, dict):
+                    delta = {}
+                piece = delta.get("content")
+                if isinstance(piece, str):
+                    content_parts.append(piece)
+                elif isinstance(piece, list):
+                    for part in piece:
+                        if isinstance(part, dict) and isinstance(part.get("text"), str):
+                            content_parts.append(part["text"])
+                reasoning = delta.get("reasoning_content")
+                if isinstance(reasoning, str):
+                    reasoning_parts.append(reasoning)
+                if choice.get("finish_reason") is not None:
+                    finish_reason = choice.get("finish_reason")
+
+        if not saw_event:
+            try:
+                data = response.json()
+                if isinstance(data, dict) and data.get("choices"):
+                    return status_code, "", data
+            except Exception:
+                pass
+        normalized = {
+            "choices": [{
+                "message": {
+                    "content": "".join(content_parts),
+                    "reasoning_content": "".join(reasoning_parts),
+                },
+                "finish_reason": finish_reason,
+            }],
+            "usage": usage or {},
+        }
+        return status_code, "", normalized
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+
+
+def _extract_first_json_object(content):
+    """Extract the first balanced JSON object without breaking on braces in strings."""
+    if not isinstance(content, str):
+        return None
+    text = content.strip()
+    fence = chr(96) * 3
+    if text.startswith(fence):
+        text = re.sub(r"^" + re.escape(fence) + r"(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*" + re.escape(fence) + r"$", "", text)
+    for start, char in enumerate(text):
+        if char != "{":
+            continue
+        depth, in_string, escaped = 0, False, False
+        for end in range(start, len(text)):
+            current = text[end]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif current == "\\":
+                    escaped = True
+                elif current == '"':
+                    in_string = False
+                continue
+            if current == '"':
+                in_string = True
+            elif current == "{":
+                depth += 1
+            elif current == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        parsed = json.loads(text[start:end + 1])
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        break
+                    if isinstance(parsed, dict):
+                        return parsed
+                    break
+    return None
+
+
 def _extract_vision_json(content):
     """从视觉模型输出中稳健提取 JSON。"""
     if not isinstance(content, str):
@@ -1200,21 +1336,7 @@ def _extract_vision_json(content):
     if not text:
         return None
 
-    # 兼容模型偶尔包一层 ```json ... ```
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"\s*```$", "", text)
-
-    first = text.find("{")
-    last = text.rfind("}")
-    if first < 0 or last <= first:
-        return None
-
-    try:
-        data = json.loads(text[first:last + 1])
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return None
-
+    data = _extract_first_json_object(text)
     if not isinstance(data, dict):
         return None
 
@@ -1480,6 +1602,60 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
     return [encode(original, 2200)] + [encode(enhance_crop(crop), 1600, True) for crop in crops]
 
 
+def _compact_opencv_graph_hints(graphs, max_chars=5000):
+    """Keep valid, position-aware OpenCV evidence instead of slicing arbitrary JSON."""
+    compact_graphs = []
+    for graph in (graphs or [])[:12]:
+        if not isinstance(graph, dict):
+            continue
+        vertices = []
+        for vertex in (graph.get("vertices") or [])[:32]:
+            if not isinstance(vertex, dict):
+                continue
+            try:
+                vertices.append({
+                    "id": str(vertex.get("id", "")),
+                    "x": round(float(vertex["x"]), 4),
+                    "y": round(float(vertex["y"]), 4),
+                    "label": vertex.get("label"),
+                })
+            except (KeyError, TypeError, ValueError):
+                continue
+        edges = [
+            [str(edge[0]), str(edge[1])]
+            for edge in (graph.get("edges") or [])[:64]
+            if isinstance(edge, (list, tuple)) and len(edge) == 2
+        ]
+        uncertain = [
+            [str(edge[0]), str(edge[1])]
+            for edge in (graph.get("uncertain_edges") or [])[:48]
+            if isinstance(edge, (list, tuple)) and len(edge) == 2
+        ]
+        item = {
+            "id": str(graph.get("id", "")),
+            "vertex_count": int(graph.get("vertex_count", len(vertices)) or len(vertices)),
+            "vertices": vertices,
+            "edges": edges,
+            "uncertain_edges": uncertain,
+            "confidence": str(graph.get("confidence", "unknown")),
+            "detector_agreement": str(graph.get("detector_agreement", "unknown")),
+            "bbox": graph.get("bbox"),
+        }
+        candidate = compact_graphs + [item]
+        payload = {"graphs": candidate, "omitted_graphs": max(0, len(graphs or []) - len(candidate))}
+        if len(json.dumps(payload, ensure_ascii=False)) > max_chars:
+            item["edges"] = edges[:24]
+            item["uncertain_edges"] = uncertain[:16]
+            payload = {
+                "graphs": compact_graphs + [item],
+                "omitted_graphs": max(0, len(graphs or []) - len(compact_graphs) - 1),
+            }
+            if len(json.dumps(payload, ensure_ascii=False)) > max_chars:
+                break
+        compact_graphs.append(item)
+    return {"graphs": compact_graphs, "omitted_graphs": max(0, len(graphs or []) - len(compact_graphs))}
+
+
 def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=None, opencv_graphs=None):
     """
     使用整图与局部放大图独立转录题干、解析图形结构。
@@ -1519,7 +1695,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
             "先用每个顶点的归一化 x/y 位置匹配原图的 a/b/c 等标签，再逐线确认边。"
             "交叉点无实心圆点时不得换线或添加顶点；不要为了满足树的 n-1 条边而补边。"
             "confidence=partial 或 uncertain_edges 不得作为确定结论；若原图与候选矛盾，以原图为准。\n"
-            + json.dumps(verified, ensure_ascii=False)[:5500]
+            + json.dumps(_compact_opencv_graph_hints(verified), ensure_ascii=False)
         )})
     for index, data_url in enumerate(image_urls):
         content_parts.append({"type": "text", "text": "完整上传图片" if index == 0 else f"局部放大 {index}"})
