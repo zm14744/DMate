@@ -7136,8 +7136,9 @@ function openWrongRetestReview(id) {
     const history = getWrongRetestSessions(item);
     const selected = new Set((item.passedRetestSessionIds || []).map(String));
     if (!history.length) {
-        const empty = document.createElement("p");
-        empty.textContent = "暂无复测题，请先点击“再测一道”。";
+        const empty = document.createElement("div");
+        empty.className = "learning-review-empty";
+        empty.textContent = "无";
         list.appendChild(empty);
     }
     history.forEach((record,index) => {
