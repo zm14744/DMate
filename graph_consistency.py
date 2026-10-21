@@ -10,15 +10,21 @@ from __future__ import annotations
 
 import re
 
-SECTION = re.compile(r"图\s*([1-9]\d*)\s*(?:[（(]\s*G\s*\1\s*[）)])?\s*[:：]")
-EDGE_FIELD = re.compile(r"(?:边集|边集合|边)\s*[:：]\s*([^\n。；;]+)", re.I)
+SECTION = re.compile(
+    r"(?:图\s*(?:G\s*_?\{?\s*([1-9]\d*)\}?|([1-9]\d*))"
+    r"|(?<![a-zA-Z])G\s*_?\{?([1-9]\d*)\}?)"
+    r"\s*(?:[（(][^）)\n]{0,28}[）)])?\s*[:：]", re.I
+)
+EDGE_FIELD = re.compile(
+    r"(?:边集合|边集|边)\s*(?:为|包括)?\s*[:：]\s*([^\n。；;]+)", re.I
+)
 SINGLE_EDGE = re.compile(r"([a-z])\s*[-—–－−]\s*([a-z])", re.I)
 VERTEX_TAGS = re.compile(r"(?:标签|顶点)\s*[:：]?\s*((?:[a-z]\s*[,，、\s]\s*){2,}[a-z])", re.I)
 
 
 def _parts(text):
     matches = list(SECTION.finditer(str(text or "")))
-    return [(int(m.group(1)), m.end(), matches[i+1].start() if i+1 < len(matches) else len(text))
+    return [(int(next(g for g in m.groups() if g is not None)), m.end(), matches[i+1].start() if i+1 < len(matches) else len(text))
             for i, m in enumerate(matches)]
 
 
