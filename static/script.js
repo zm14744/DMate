@@ -213,19 +213,29 @@ function normalizeAppearanceSettings(value) {
     };
 }
 
+function appearanceLocalStorageKey() {
+    // Each signed-in account has a private appearance preference on this
+    // browser; no visual preference is sent in a cloud snapshot.
+    return APPEARANCE_STORAGE_KEY + "::" + encodeURIComponent(accountState.username || "");
+}
+
 function loadAppearanceSettings() {
     if (!shouldPersistClientState()) {
         return { ...APPEARANCE_DEFAULTS };
     }
 
     try {
-        const raw = localStorage.getItem(APPEARANCE_STORAGE_KEY);
-
-        if (!raw) {
-            return { ...APPEARANCE_DEFAULTS };
+        const key = appearanceLocalStorageKey();
+        let raw = localStorage.getItem(key);
+        // Migrate existing local settings only if they belonged to this same
+        // verified account before this change.
+        if (!raw && readCloudSyncMeta().username === accountState.username) {
+            raw = localStorage.getItem(APPEARANCE_STORAGE_KEY);
+            if (raw) localStorage.setItem(key, raw);
         }
-
-        return normalizeAppearanceSettings(JSON.parse(raw));
+        return raw
+            ? normalizeAppearanceSettings(JSON.parse(raw))
+            : { ...APPEARANCE_DEFAULTS };
     } catch (_error) {
         return { ...APPEARANCE_DEFAULTS };
     }
@@ -239,14 +249,15 @@ function saveAppearanceSettings() {
     if (shouldPersistClientState()) {
         try {
             localStorage.setItem(
-                APPEARANCE_STORAGE_KEY,
+                appearanceLocalStorageKey(),
                 JSON.stringify(appearanceCommittedSettings)
             );
+            localStorage.removeItem(APPEARANCE_STORAGE_KEY);
         } catch (_error) {
             // 外观保存失败不应影响学习系统本身。
         }
     }
-    scheduleCloudSync();
+    // No cloud sync: this is deliberately a device-local preference.
 }
 
 function resolveAppearanceTheme() {
@@ -1010,7 +1021,7 @@ function isCloudSyncContextValid(owner, contextVersion) {
 function normalizeCloudParts(value) {
     const normalized = {};
     if (!value || typeof value !== "object") return normalized;
-    for (const key of ["sessions", "learning", "appearance"]) {
+    for (const key of ["sessions", "learning"]) {
         const part = value[key];
         if (!part || typeof part !== "object") continue;
         const hash = typeof part.hash === "string" ? part.hash : "";
@@ -1036,7 +1047,7 @@ function computeChangedCloudParts(serverParts, localPartHashes) {
         ? localPartHashes
         : {};
     const changed = [];
-    for (const key of ["sessions", "learning", "appearance"]) {
+    for (const key of ["sessions", "learning"]) {
         if (!normalized[key]) continue;
         if (normalized[key].hash !== String(localHashes[key] || "")) {
             changed.push(key);
@@ -1242,8 +1253,7 @@ function collectCloudSnapshot() {
             wrongQuestions: (learningState.wrongQuestions || []).filter(item => (
                 item && !learningState.deletedWrongQuestionIds?.[String(item.id)]
             ))
-        },
-        appearance: normalizeAppearanceSettings(appearanceCommittedSettings)
+        }
     };
 }
 
@@ -1298,12 +1308,7 @@ function applyCloudSnapshot(snapshot) {
             loadLearningState();
         }
 
-        if (snapshot.appearance && typeof snapshot.appearance === "object") {
-            appearanceCommittedSettings = normalizeAppearanceSettings(snapshot.appearance);
-            appearanceSettings = { ...appearanceCommittedSettings };
-            localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearanceCommittedSettings));
-            applyAppearanceSettings({ save:false });
-        }
+        // Do not override this device's appearance with older cloud values.
 
         renderAll();
         refreshInputAvailability();
@@ -1861,7 +1866,7 @@ async function pullLatestCloudSnapshot() {
             const localHashes = cloudAppliedPartHashes;
             const changedParts = localHashes
                 ? computeChangedCloudParts(manifest.parts, localHashes)
-                : ["sessions", "learning", "appearance"];
+                : ["sessions", "learning"];
             if (!changedParts.length && localHashes) {
                 // 全部分段内容均相同，只增加版本，不重复渲染页面。
                 accountState.revision = targetRevision;
@@ -2073,7 +2078,6 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
         sessions:{sessions:resultSessions, currentId, deletedSessionIds:deletedSessionIdsMerged},
         learning:{version:Math.max(9, Number(localLearning.version || 0), Number(remoteLearning.version || 0)),
             events, wrongQuestions, deletedWrongQuestionIds:wrongDeletions},
-        appearance: local.appearance || remote.appearance || {...APPEARANCE_DEFAULTS}
     };
 }
 
@@ -2201,10 +2205,11 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         // 前一个账号的自定义背景属个人数据，不在下一账号沿用。
         try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
         clearAppearanceBackgroundVisual();
-        appearanceSettings = { ...APPEARANCE_DEFAULTS };
-        appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
-        applyAppearanceSettings({ save:false });
         purgeGuestPersistentState();
+        // A new account on this browser gets only its own local appearance.
+        appearanceSettings = loadAppearanceSettings();
+        appearanceCommittedSettings = { ...appearanceSettings };
+        applyAppearanceSettings({ save:false });
         clearLegacyPersistentBackup();
     }
     renderAll();
@@ -2238,8 +2243,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             backupLocalSnapshot("切换到新的空云账号");
             applyCloudSnapshot({
                 sessions:{sessions:[], currentId:null, deletedSessionIds:{}},
-                learning:createEmptyLearningState(),
-                appearance:{...APPEARANCE_DEFAULTS}
+                learning:createEmptyLearningState()
             });
             cloudAppliedPartHashes = partHashes;
             writeCloudSyncMeta({username:owner,revision:0,dirty:false,sectionHashes:partHashes});
