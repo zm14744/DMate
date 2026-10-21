@@ -8295,6 +8295,42 @@ body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question
     }
 }
 
+/* Composer: field and actions share the same vertical centre. */
+.input { align-items:center !important; }
+.input .manual-question-composer { align-self:center; }
+.input .manual-question-composer > #text { vertical-align:middle; }
+.input > #imageBtn, .input > #sendBtn, .input > #ocrCancelBtn { align-self:center !important; }
+
+/* Search clear: resist generic modal button sizing on mobile. */
+#wrongBookModal .wrong-tools .wrong-search-wrap .wrong-search-clear {
+    position:absolute !important;
+    inset:auto 12px auto auto !important;
+    top:50% !important;
+    transform:translateY(-50%) !important;
+    box-sizing:border-box !important;
+    display:block;
+    flex:none !important;
+    width:18px !important;
+    min-width:18px !important;
+    max-width:18px !important;
+    height:18px !important;
+    min-height:18px !important;
+    max-height:18px !important;
+    padding:0 !important;
+    margin:0 !important;
+    border:0 !important;
+    border-radius:50% !important;
+    aspect-ratio:1 / 1;
+}
+#wrongBookModal .wrong-tools .wrong-search-wrap .wrong-search-clear.hidden { display:none !important; }
+@media(max-width:1100px) {
+  #wrongBookModal .wrong-tools .wrong-search-wrap .wrong-search-clear {
+    width:18px !important; height:18px !important;
+    min-width:18px !important; min-height:18px !important;
+    max-width:18px !important; max-height:18px !important;
+  }
+}
+
 </style>
 
 <script>
