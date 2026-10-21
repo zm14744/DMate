@@ -98,7 +98,7 @@ class GraphConsistencyTests(unittest.TestCase):
             for edges in cv_edges
         ]
         import re
-        text = re.sub(r"图([1-4])（G[1-4]）", r"图 G\\1", CORRECT)
+        text = re.sub(r"图([1-4])（G[1-4]）", r"图 G\1", CORRECT)
         text = text.replace("。边：", "。边为：")
         text = text.replace("a-c,a-f,b-e,d-f,e-f",
                             "a-c,a-f,b-e,b-f,d-f,e-f")
