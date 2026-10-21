@@ -3521,6 +3521,19 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
     return corrected_text or ocr_text, {"required": True, "reasons": reasons, "critical_changes": changes}
 
 
+def _retain_unverified_graph_candidate(failure_text, initial_text):
+    """Keep a readable first pass for manual repair without certifying edges.
+
+    The failure marker is retained so the downstream solver must abstain.
+    """
+    failure = str(failure_text or "").strip()
+    first = str(initial_text or "").strip()
+    if not first or first in failure:
+        return failure
+    return (failure + "\n【首次识别的图形候选，尚未经独立核对】\n"
+            + first[:2900])
+
+
 @app.route("/ocr/cancel", methods=["POST"])
 def cancel_ocr():
     if not _check_rate_limit(_get_client_ip(), "ocr_cancel"):
@@ -3723,17 +3736,35 @@ def ocr():
         # Those images still need independent edge review before a graph
         # isomorphism conclusion is offered.
         two_graph_diagram = contains_two_labeled_undirected_diagrams(visual_text)
-        if (image_kind != "non_exercise" and (
-                re.search(r"同构|isomorph", question_text, re.IGNORECASE)
-                or two_graph_diagram)):
+        # The two-graph auditor cannot validate a sheet containing 3+ graphs.
+        # In particular, four diagrams asking "which are trees?" must NOT
+        # lose their complete Vision transcript to a two-graph format error.
+        multi_panel = bool(re.search(
+            r"(?im)(?:^|\\n)\\s*(?:图\\s*[3-9]\\d*|G\\s*_?\\{?[3-9]\\d*\\}?)\\s*[（(:：]",
+            visual_text
+        )) or len(cv_graphs) >= 3
+        iso_request = bool(re.search(r"同构|isomorph", question_text, re.I))
+        # Only run this audit on actual two-diagram comparisons, or when a
+        # graph-only figure has precisely two labelled drawings.
+        if (image_kind != "non_exercise" and not multi_panel and (
+                (iso_request and two_graph_diagram) or
+                (two_graph_diagram and not _ocr_has_exercise_evidence(question_text)))):
             audited = verify_graph_image_independently(raw)
             if audited.get("ok"):
+                initial_graph_text = visual_text
                 visual_text, graph_review_issues, _ = review_graph_transcriptions(
                     visual_text, audited.get("graphs")
                 )
+                if GRAPH_UNCERTAIN_FLAG in visual_text:
+                    visual_text = _retain_unverified_graph_candidate(
+                        visual_text, initial_graph_text
+                    )
             else:
-                visual_text = (GRAPH_UNCERTAIN_FLAG +
-                               "\n复杂图形的独立逐边复核未完成，暂不能据此判断同构。")
+                visual_text = _retain_unverified_graph_candidate(
+                    GRAPH_UNCERTAIN_FLAG +
+                    "\n复杂图形的独立逐边复核未完成，暂不能据此判断同构。",
+                    visual_text
+                )
                 graph_review_issues = [
                     "复杂图形逐边复核没有完成；请核对顶点间的弧线、交叉线和黑色实心点。"
                 ]
@@ -3816,9 +3847,14 @@ def ocr():
                 raw, retries=0, count_only=True
             )
             if multigraph_audit.get("ok"):
+                first_graph_text = visual_text
                 visual_text, multigraph_issues, count_verified = review_multi_graph_counts(
                     visual_text, multigraph_audit.get("graphs")
                 )
+                if GRAPH_UNCERTAIN_FLAG in visual_text:
+                    visual_text = _retain_unverified_graph_candidate(
+                        visual_text, first_graph_text
+                    )
                 graph_review_issues.extend(multigraph_issues)
                 # The Stanford six-tree regression proved that matching dot
                 # counts alone do NOT certify tree isomorphism or edge sets.
@@ -3840,8 +3876,10 @@ def ocr():
                 graph_review_issues.append(
                     "多幅图的顶点数独立复核未完成，不能确认每幅图的结构。"
                 )
-                visual_text = GRAPH_UNCERTAIN_FLAG + (
-                    "\n多图的实心顶点及边数未独立确认，不能据此推断同构或树。"
+                visual_text = _retain_unverified_graph_candidate(
+                    GRAPH_UNCERTAIN_FLAG +
+                    "\n多图的实心顶点及边数未独立确认，不能据此推断同构或树。",
+                    visual_text
                 )
 
         # Do not certify directed Euler circuits if even the image model
