@@ -371,31 +371,44 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
     except (cv2.error, ValueError, TypeError, OSError) as exc:
         print(f"空心圆多图识别降级：{type(exc).__name__}")
 
-    # The original Hough detector favors softly shaded/colored nodes. Prefer
-    # filled-black-dot recognition for ordinary textbook graph drawings.
-    # Failure never disables the existing detector or paid Vision fallback.
+    # Verify graph vertices and chords with two independent CPU methods.
+    # Previously ANY nonempty filled-dot result immediately returned, even
+    # if a stronger original-pixel detector would have found missing edges.
+    # A matched single-graph conflict is now explicitly partial rather than
+    # claiming a provably complete edge set.  Multi-panel output is preserved.
+    filled_result = None
     try:
         from graph_recognition_v2 import recognize_filled_graphs
         filled_result = recognize_filled_graphs(
-            image_bytes, allow_without_context=allow_without_context, text_hint=text_hint
+            image_bytes,
+            # English graph questions also pass the top-level context gate;
+            # the v2 detector's older Chinese-only gate must not reject them.
+            allow_without_context=True,
+            text_hint=text_hint
         )
-        if filled_result.get('graphs'):
-            filled_result['elapsed_ms'] = round((time.monotonic()-started)*1000, 1)
+        if len(filled_result.get("graphs") or []) >= 2:
+            filled_result["elapsed_ms"] = round((time.monotonic()-started)*1000, 1)
             return filled_result
     except (cv2.error, ValueError, TypeError, OSError) as exc:
         print(f"实心点图结构检测降级：{type(exc).__name__}")
-    # Strict disk-first recognition tests the original straight chord between
-    # *two real disks* (not Hough line fragments). This is essential in MIT's
-    # eight-node crossing diagram: Hough edges can end prematurely at a
-    # crossing even though no vertex is there.
+    # Independent full-resolution disk-to-disk pixel chord detector; compare
+    # vertex locations before comparing edge IDs, because numbering differs.
     try:
         from graph_black_disks import recognize_black_disk_graph
-        disk_chords=recognize_black_disk_graph(image_bytes)
+        disk_chords = recognize_black_disk_graph(image_bytes)
+        if filled_result and filled_result.get("graphs") and disk_chords.get("graphs"):
+            from graph_detector_consensus import reconcile_pixel_detectors
+            filled_result = reconcile_pixel_detectors(filled_result, disk_chords)
+            filled_result["elapsed_ms"] = round((time.monotonic()-started)*1000, 1)
+            return filled_result
         if disk_chords.get("graphs"):
-            disk_chords["elapsed_ms"]=round((time.monotonic()-started)*1000,1)
+            disk_chords["elapsed_ms"] = round((time.monotonic()-started)*1000, 1)
             return disk_chords
     except (cv2.error, ValueError, TypeError, OSError) as exc:
         print(f"黑色顶点原像素线段检测降级：{type(exc).__name__}")
+    if filled_result and filled_result.get("graphs"):
+        filled_result["elapsed_ms"] = round((time.monotonic()-started)*1000, 1)
+        return filled_result
 
     # If the filled-circle detector returned no usable topology, recover
     # real black-dot straight edges by endpoint-to-circle Hough tracing.
