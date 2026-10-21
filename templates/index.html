@@ -8130,6 +8130,47 @@ body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button:hover {
  .wrong-retest-review-card { width:calc(100vw - 20px); max-height:88dvh; }
 }
 
+
+/* 复测题阅读窗口：公式、长题、答案与解析均在内部滚动。 */
+#wrongRetestReviewModal:not(.hidden) { z-index:1400; }
+#wrongRetestReviewModal .wrong-retest-review-card {
+    box-sizing:border-box; width:min(760px,calc(100vw - 28px));
+    max-height:min(86dvh,900px); overflow:hidden;
+}
+#wrongRetestReviewModal .wrong-retest-review-list {
+    flex:1 1 auto; min-height:0; overflow:auto;
+    overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+}
+#wrongRetestReviewModal .wrong-retest-review-row { min-width:0; }
+#wrongRetestReviewModal .wrong-retest-review-row > div { min-width:0; }
+#wrongRetestReviewModal .wrong-retest-review-question,
+#wrongRetestReviewModal .wrong-retest-review-detail {
+    overflow-wrap:anywhere; overflow-x:auto; max-width:100%;
+}
+#wrongRetestReviewModal .wrong-retest-review-row button {
+    margin:12px 9px 0 0; padding:8px 12px;
+    background:var(--surface-3); color:var(--text-primary);
+    border:1px solid var(--border-strong); border-radius:8px; cursor:pointer;
+}
+#wrongRetestReviewModal .wrong-retest-review-row details {
+    margin-top:12px; border:1px solid var(--border-strong);
+    border-radius:8px; padding:10px;
+}
+#wrongRetestReviewModal .wrong-retest-review-row summary { cursor:pointer; font-weight:600; }
+@media(max-width:760px) {
+    #wrongRetestReviewModal:not(.hidden) {
+        display:flex; align-items:center; justify-content:center;
+        padding:10px; box-sizing:border-box;
+    }
+    #wrongRetestReviewModal .wrong-retest-review-card {
+        position:relative; inset:auto; flex:0 1 auto;
+        width:100%; max-width:100%; height:auto; max-height:calc(100dvh - 20px);
+        margin:0; border-radius:14px;
+    }
+    #wrongRetestReviewModal .wrong-retest-review-list { padding:12px 14px 18px; }
+    #wrongRetestReviewModal .wrong-retest-review-row { gap:10px; padding:14px 0; }
+}
+
 </style>
 
 <script>
