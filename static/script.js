@@ -454,7 +454,7 @@ async function applyAppearanceDraft() {
             await deleteAppearanceBackgroundBlob();
         }
     } catch (_error) {
-        window.alert("背景图片保存失败，请重试。");
+        window.alert("背景图片保存失败，请重试");
         return;
     }
 
@@ -757,7 +757,7 @@ async function handleAppearanceBackgroundSelected(event) {
         appearanceDraftDirty = true;
         setAppearanceBackgroundVisual(blob);
     } catch (_error) {
-        window.alert("背景图片处理失败，请换一张 JPG、PNG 或 WebP 图片。");
+        window.alert("背景图片处理失败，请换一张 JPG、PNG 或 WebP 图片");
     }
 }
 
@@ -1068,7 +1068,7 @@ function showAppConfirm(options = {}) {
     const confirmButton = document.getElementById("appConfirmConfirm");
 
     if (!modal || !title || !body || !confirmButton) {
-        return Promise.resolve(window.confirm(String(options.fallbackText || options.body || options.title || "请确认当前操作。")));
+        return Promise.resolve(window.confirm(String(options.fallbackText || options.body || options.title || "请确认当前操作")));
     }
 
     title.textContent = String(options.title || "请确认");
@@ -1415,9 +1415,9 @@ function renderAccountUi() {
     applyEmailCodeButtonState(document.getElementById("accountEmailBindSendCode"), "bind");
 
     if (unavailable) {
-        setAccountMessage("服务器还没有配置账号数据库。", true);
+        setAccountMessage("服务器还没有配置账号数据库", true);
     } else if (accountState.emailConfigured === false && !accountState.authenticated) {
-        setAccountMessage("邮箱验证码服务尚未配置，暂时只能登录已有账号。", true);
+        setAccountMessage("邮箱验证码服务尚未配置，暂时只能登录已有账号", true);
     }
 }
 
@@ -2277,7 +2277,7 @@ async function requestEmailCode({ purpose, email, username = "", messageSetter, 
         return false;
     }
     if (accountState.emailConfigured === false) {
-        messageSetter("邮箱验证码服务尚未配置。", true);
+        messageSetter("邮箱验证码服务尚未配置", true);
         return false;
     }
 
@@ -2296,7 +2296,7 @@ async function requestEmailCode({ purpose, email, username = "", messageSetter, 
         return true;
     } catch (error) {
         accountState.syncing = false;
-        messageSetter(error?.message || "验证码发送失败，请稍后再试。", true);
+        messageSetter(error?.message || "验证码发送失败，请稍后再试", true);
         renderAccountUi();
         return false;
     }
@@ -2311,7 +2311,7 @@ async function submitAccountLogin() {
     const password = passwordInput?.value || "";
 
     if (!identifier || !password) {
-        setAccountMessage("请输入用户名或邮箱和密码。", true);
+        setAccountMessage("请输入用户名或邮箱和密码", true);
         return;
     }
 
@@ -2347,7 +2347,7 @@ async function submitAccountLogin() {
         await resolveInitialCloudSync(false);
     } catch (error) {
         accountState.syncing = false;
-        setAccountMessage(error?.message || "登录失败，请稍后再试。", true);
+        setAccountMessage(error?.message || "登录失败，请稍后再试", true);
         renderAccountUi();
     }
 }
@@ -2356,7 +2356,7 @@ async function sendRegisterEmailCode() {
     const username = document.getElementById("accountRegisterUsername")?.value?.trim() || "";
     const email = document.getElementById("accountRegisterEmail")?.value?.trim() || "";
     if (!username) {
-        setAccountRegisterMessage("请输入用户名。", true);
+        setAccountRegisterMessage("请输入用户名", true);
         document.getElementById("accountRegisterUsername")?.focus();
         return;
     }
@@ -2385,7 +2385,7 @@ async function submitAccountRegistration() {
     const emailCode = codeInput?.value?.trim() || "";
 
     if (!username || !email || !password || !confirmPassword || !emailCode) {
-        setAccountRegisterMessage("请把用户名、邮箱、密码和验证码填写完整。", true);
+        setAccountRegisterMessage("请把用户名、邮箱、密码和验证码填写完整", true);
         if (!username) usernameInput?.focus();
         else if (!email) emailInput?.focus();
         else if (!password) passwordInput?.focus();
@@ -2404,12 +2404,12 @@ async function submitAccountRegistration() {
         return;
     }
     if (password !== confirmPassword) {
-        setAccountRegisterMessage("两次输入的密码不一致。", true);
+        setAccountRegisterMessage("两次输入的密码不一致", true);
         confirmInput?.focus();
         return;
     }
     if (!/^\d{6}$/.test(emailCode)) {
-        setAccountRegisterMessage("请输入 6 位邮箱验证码。", true);
+        setAccountRegisterMessage("请输入 6 位邮箱验证码", true);
         codeInput?.focus();
         return;
     }
@@ -2450,7 +2450,7 @@ async function submitAccountRegistration() {
         await resolveInitialCloudSync(true);
     } catch (error) {
         accountState.syncing = false;
-        setAccountRegisterMessage(error?.message || "注册失败，请稍后再试。", true);
+        setAccountRegisterMessage(error?.message || "注册失败，请稍后再试", true);
         renderAccountUi();
     }
 }
@@ -2478,7 +2478,7 @@ async function recoverAccountPasswordByEmail() {
     const confirmPassword = confirmInput?.value || "";
 
     if (!email || !emailCode || !newPassword || !confirmPassword) {
-        setAccountEmailRecoverMessage("请把邮箱、验证码和新密码填写完整。", true);
+        setAccountEmailRecoverMessage("请把邮箱、验证码和新密码填写完整", true);
         return;
     }
     if (!looksLikeEmailAddress(email)) {
@@ -2487,7 +2487,7 @@ async function recoverAccountPasswordByEmail() {
         return;
     }
     if (!/^\d{6}$/.test(emailCode)) {
-        setAccountEmailRecoverMessage("请输入 6 位邮箱验证码。", true);
+        setAccountEmailRecoverMessage("请输入 6 位邮箱验证码", true);
         codeInput?.focus();
         return;
     }
@@ -2497,7 +2497,7 @@ async function recoverAccountPasswordByEmail() {
         return;
     }
     if (newPassword !== confirmPassword) {
-        setAccountEmailRecoverMessage("两次输入的新密码不一致。", true);
+        setAccountEmailRecoverMessage("两次输入的新密码不一致", true);
         confirmInput?.focus();
         return;
     }
@@ -2527,7 +2527,7 @@ async function recoverAccountPasswordByEmail() {
         await resolveInitialCloudSync(false);
     } catch (error) {
         accountState.syncing = false;
-        setAccountEmailRecoverMessage(error?.message || "重置密码失败，请检查邮箱验证码。", true);
+        setAccountEmailRecoverMessage(error?.message || "重置密码失败，请检查邮箱验证码", true);
         renderAccountUi();
     }
 }
@@ -2552,7 +2552,7 @@ async function bindAccountEmail() {
     const emailCode = codeInput?.value?.trim() || "";
 
     if (!password || !email || !emailCode) {
-        setAccountEmailBindMessage("请把当前密码、新邮箱和验证码填写完整。", true);
+        setAccountEmailBindMessage("请把当前密码、新邮箱和验证码填写完整", true);
         return;
     }
     if (!looksLikeEmailAddress(email)) {
@@ -2561,7 +2561,7 @@ async function bindAccountEmail() {
         return;
     }
     if (!/^\d{6}$/.test(emailCode)) {
-        setAccountEmailBindMessage("请输入 6 位邮箱验证码。", true);
+        setAccountEmailBindMessage("请输入 6 位邮箱验证码", true);
         codeInput?.focus();
         return;
     }
@@ -2585,7 +2585,7 @@ async function bindAccountEmail() {
     } catch (error) {
         accountState.syncing = false;
         accountState.status = "";
-        setAccountEmailBindMessage(error?.message || "绑定邮箱失败，请稍后再试。", true);
+        setAccountEmailBindMessage(error?.message || "绑定邮箱失败，请稍后再试", true);
         renderAccountUi();
     }
 }
@@ -2601,17 +2601,17 @@ async function generateAccountRecoveryCode() {
     const confirmRecoveryCode = confirmInput?.value?.trim() || "";
 
     if (!password) {
-        setAccountRecoveryCodeMessage("请输入当前密码。", true);
+        setAccountRecoveryCodeMessage("请输入当前密码", true);
         passwordInput?.focus();
         return;
     }
     if (newRecoveryCode.length < 8 || newRecoveryCode.length > 64) {
-        setAccountRecoveryCodeMessage("新恢复码需为 8–64 个字符。", true);
+        setAccountRecoveryCodeMessage("新恢复码需为 8–64 个字符", true);
         newCodeInput?.focus();
         return;
     }
     if (newRecoveryCode !== confirmRecoveryCode) {
-        setAccountRecoveryCodeMessage("两次输入的恢复码不一致。", true);
+        setAccountRecoveryCodeMessage("两次输入的恢复码不一致", true);
         confirmInput?.focus();
         return;
     }
@@ -2635,7 +2635,7 @@ async function generateAccountRecoveryCode() {
     } catch (error) {
         accountState.syncing = false;
         accountState.status = "";
-        setAccountRecoveryCodeMessage(error?.message || "修改恢复码失败，请稍后再试。", true);
+        setAccountRecoveryCodeMessage(error?.message || "修改恢复码失败，请稍后再试", true);
         renderAccountUi();
     }
 }
@@ -2654,7 +2654,7 @@ async function recoverAccountPassword() {
     const confirmPassword = confirmInput?.value || "";
 
     if (!username || !recoveryCode || !newPassword || !confirmPassword) {
-        setAccountRecoverMessage("请把用户名、恢复码和新密码填写完整。", true);
+        setAccountRecoverMessage("请把用户名、恢复码和新密码填写完整", true);
         if (!username) usernameInput?.focus();
         else if (!recoveryCode) codeInput?.focus();
         else if (!newPassword) passwordInput?.focus();
@@ -2667,7 +2667,7 @@ async function recoverAccountPassword() {
         return;
     }
     if (newPassword !== confirmPassword) {
-        setAccountRecoverMessage("两次输入的新密码不一致。", true);
+        setAccountRecoverMessage("两次输入的新密码不一致", true);
         confirmInput?.focus();
         return;
     }
@@ -2709,7 +2709,7 @@ async function recoverAccountPassword() {
     } catch (error) {
         accountState.syncing = false;
         setAccountRecoverMessage(
-            error?.message || "重置密码失败，请检查用户名和恢复码。",
+            error?.message || "重置密码失败，请检查用户名和恢复码",
             true
         );
         renderAccountUi();
@@ -2723,7 +2723,7 @@ async function logoutAccount() {
     if (meta.username === accountState.username && meta.dirty) {
         const synced = await pushCloudSnapshot(false);
         if (!synced && !window.confirm(
-            "本设备还有尚未同步到云端的数据。\n\n仍然退出吗？为保护账号隐私，退出将清除本地学习缓存，未同步的内容可能无法找回。"
+            "本设备还有尚未同步到云端的数据。\n\n仍然退出吗？为保护账号隐私，退出将清除本地学习缓存，未同步的内容可能无法找回"
         )) {
             return;
         }
@@ -2742,7 +2742,7 @@ async function logoutAccount() {
     } catch (error) {
         accountState.syncing = false;
         accountState.status = "退出失败";
-        setAccountMessage(error?.message || "退出登录失败，请检查网络后重试。", true);
+        setAccountMessage(error?.message || "退出登录失败，请检查网络后重试", true);
         renderAccountUi();
         return;
     }
@@ -2782,13 +2782,13 @@ async function deleteAccount() {
     const passwordInput = document.getElementById("accountDeletePassword");
     const password = passwordInput?.value || "";
     if (!password) {
-        setAccountDeleteMessage("请输入当前密码。", true);
+        setAccountDeleteMessage("请输入当前密码", true);
         passwordInput?.focus();
         return;
     }
 
     const confirmed = window.confirm(
-        "确定永久注销这个账号吗？\n\n账号和云端同步数据都会被删除，此操作无法撤销。\n注销后页面会进入空白游客模式。"
+        "确定永久注销这个账号吗？\n\n账号和云端同步数据都会被删除，此操作无法撤销。\n注销后页面会进入空白游客模式"
     );
     if (!confirmed) return;
 
@@ -2806,7 +2806,7 @@ async function deleteAccount() {
     } catch (error) {
         accountState.syncing = false;
         accountState.status = "";
-        setAccountDeleteMessage(error?.message || "注销账号失败，请稍后再试。", true);
+        setAccountDeleteMessage(error?.message || "注销账号失败，请稍后再试", true);
         renderAccountUi();
         return;
     }
@@ -3164,15 +3164,15 @@ function refreshInputAvailability() {
     let busyMode = "";
 
     if (ocrReviewInProgress) {
-        statusText = "图片识别中，主输入框已锁定。";
+        statusText = "图片识别中，主输入框已锁定";
         placeholder = "图片识别中…";
         busyMode = "ocr";
     } else if (typingNow) {
-        statusText = "AI 正在回答，当前输入框已锁定。";
+        statusText = "AI 正在回答，当前输入框已锁定";
         placeholder = "AI 正在回答…";
         busyMode = "answering";
     } else if (waitingReply) {
-        statusText = "AI 正在思考，当前输入框已锁定。";
+        statusText = "AI 正在思考，当前输入框已锁定";
         placeholder = "AI 正在思考…";
         busyMode = "thinking";
     }
@@ -5866,7 +5866,7 @@ function openWrongSafePreview(items) {
 
     if (!pendingWrongSafeItems.length) {
         window.alert(
-            "没有提取到可保存的题目内容。"
+            "没有提取到可保存的题目内容"
         );
         return false;
     }
@@ -5927,7 +5927,7 @@ function renderWrongSafePreview() {
         );
 
         source.textContent = (
-            `来源：${sourceLabel}。只有编辑框中的内容会进入错题本。`
+            `来源：${sourceLabel}。只有编辑框中的内容会进入错题本`
         );
     }
 
@@ -5978,7 +5978,7 @@ function confirmWrongSafePreview() {
 
     if (!text) {
         window.alert(
-            "题目不能为空。请保留题目正文，或者取消本次加入。"
+            "题目不能为空。请保留题目正文，或者取消本次加入"
         );
         return;
     }
@@ -6014,7 +6014,7 @@ function confirmWrongSafePreview() {
 function addQuestionInfoToWrongBook(questionInfo) {
     const result = addWrongQuestion(
         questionInfo,
-        "这道题已加入错题本。",
+        "这道题已加入错题本",
         "manual"
     );
 
@@ -6037,7 +6037,7 @@ function confirmWrongQuestionPicker() {
     ];
 
     if (!checked.length) {
-        window.alert("请至少选择一道题。");
+        window.alert("请至少选择一道题");
         return;
     }
 
@@ -6471,7 +6471,7 @@ function processLearningFromReply(
             const added = addWrongQuestion(
                 questionInfo,
                 selfReportsWrong
-                    ? "你明确表示这道题做错了，建议完成订正后再标记为已订正。"
+                    ? "你明确表示这道题做错了，建议完成订正后再标记为已订正"
                     : reply,
                 "auto"
             );
@@ -7233,7 +7233,7 @@ function removeWrongQuestion(id) {
     if (!entry) return;
 
     const confirmed = window.confirm(
-        "确定要把这道题移出错题本吗？这不会删除原聊天。"
+        "确定要把这道题移出错题本吗？这不会删除原聊天"
     );
 
     if (!confirmed) return;
@@ -7254,12 +7254,12 @@ function clearCompletedWrongQuestions() {
     );
 
     if (!completed.length) {
-        window.alert("目前没有可以清理的已完成错题。");
+        window.alert("目前没有可以清理的已完成错题");
         return;
     }
 
     const confirmed = window.confirm(
-        `确定移出 ${completed.length} 道已完成的错题吗？原聊天不会被删除。`
+        `确定移出 ${completed.length} 道已完成的错题吗？原聊天不会被删除`
     );
 
     if (!confirmed) return;
@@ -7375,7 +7375,7 @@ function saveWrongEdit() {
     const question = questionBox.value.trim();
 
     if (!question) {
-        window.alert("题目内容不能为空。");
+        window.alert("题目内容不能为空");
         return;
     }
 
@@ -7388,7 +7388,7 @@ function saveWrongEdit() {
     );
 
     if (duplicate) {
-        window.alert("错题本里已经有这道题了，请不要重复保存。");
+        window.alert("错题本里已经有这道题了，请不要重复保存");
         return;
     }
 
@@ -7467,7 +7467,7 @@ function startWrongQuestionRetest(id) {
     if (!entry) return;
 
     if (!entry.corrected && !entry.retestPassed) {
-        window.alert("请先完成这道错题的订正，再进行复测。");
+        window.alert("请先完成这道错题的订正，再进行复测");
         return;
     }
 
@@ -8199,7 +8199,7 @@ async function exportWrongBookPdf() {
     const items = getFilteredWrongBookItems();
 
     if (!items.length) {
-        window.alert("当前没有可以导出的错题。");
+        window.alert("当前没有可以导出的错题");
         return;
     }
 
@@ -8208,7 +8208,7 @@ async function exportWrongBookPdf() {
         || !window.jspdf?.jsPDF
     ) {
         window.alert(
-            "PDF 组件加载失败，请刷新页面后重试。"
+            "PDF 组件加载失败，请刷新页面后重试"
         );
         return;
     }
@@ -8397,7 +8397,7 @@ async function exportWrongBookPdf() {
         console.error("错题本 PDF 导出失败：", error);
 
         window.alert(
-            "PDF 生成失败，请刷新页面后重试。"
+            "PDF 生成失败，请刷新页面后重试"
         );
     } finally {
         exportElement?.remove();
@@ -8650,7 +8650,7 @@ async function generateWrongQuestionAnswer(
             if (!silent) {
                 window.alert(
                     data.error
-                    || "答案生成失败，请稍后重试。"
+                    || "答案生成失败，请稍后重试"
                 );
             }
             return false;
@@ -8678,7 +8678,7 @@ async function generateWrongQuestionAnswer(
 
         if (!silent) {
             window.alert(
-                "网络连接失败，暂时无法生成答案。"
+                "网络连接失败，暂时无法生成答案"
             );
         }
 
@@ -8770,7 +8770,7 @@ async function generateWrongQuestionAnalysis(id) {
         ) {
             window.alert(
                 data.error
-                || "解析生成失败，请稍后重试。"
+                || "解析生成失败，请稍后重试"
             );
             return;
         }
@@ -8790,7 +8790,7 @@ async function generateWrongQuestionAnalysis(id) {
     } catch (error) {
         console.error("错题解析生成失败：", error);
         window.alert(
-            "网络连接失败，暂时无法生成解析。"
+            "网络连接失败，暂时无法生成解析"
         );
     } finally {
         wrongAnalysisLoadingIds.delete(id);
@@ -8834,15 +8834,15 @@ function renderWrongBook() {
         empty.className = "wrong-empty";
 
         if (!allItems.length) {
-            empty.textContent = "错题本还是空的。";
+            empty.textContent = "错题本还是空的";
         } else if (wrongBookSearch) {
-            empty.textContent = "没有找到匹配的错题。";
+            empty.textContent = "没有找到匹配的错题";
         } else if (wrongBookFilter === "pending") {
-            empty.textContent = "目前没有待处理的错题。";
+            empty.textContent = "目前没有待处理的错题";
         } else if (wrongBookFilter === "corrected") {
-            empty.textContent = "目前没有已完成订正的错题。";
+            empty.textContent = "目前没有已完成订正的错题";
         } else {
-            empty.textContent = "没有符合条件的错题。";
+            empty.textContent = "没有符合条件的错题";
         }
 
         list.appendChild(empty);
@@ -9030,8 +9030,8 @@ function renderWrongBook() {
             answerInner.textContent = (
                 wrongAnswerLoadingIds.has(item.id) || wrongAnswerQueue.includes(item.id)
             )
-                ? "已自动请求生成最终答案，完成后会直接保存，无需手动点击生成。"
-                : "暂无可复用答案；展开后会自动请求生成并保存。";
+                ? "已自动请求生成最终答案，完成后会直接保存，无需手动点击生成"
+                : "暂无可复用答案；展开后会自动请求生成并保存";
         }
 
         answerDetails.appendChild(answerSummary);
@@ -10253,7 +10253,7 @@ function showMobilePngSaveDialog(blob, filename) {
     const title = document.createElement("strong");
     title.textContent = "图片已生成";
     const tip = document.createElement("p");
-    tip.textContent = "网页无法直接写入手机相册。可以长按下方图片选择保存，或使用系统分享、下载图片。";
+    tip.textContent = "网页无法直接写入手机相册。可以长按下方图片选择保存，或使用系统分享、下载图片";
     const preview = document.createElement("img");
     preview.src = url;
     preview.alt = "已生成的题目或知识图谱图片，长按可保存";
@@ -12538,7 +12538,7 @@ function questionNavigationFailureMessage(session, text) {
     const count = candidates.length;
 
     if (!count) {
-        return "当前会话还没有识别到可引用的题目，请先输入或生成一道题。";
+        return "当前会话还没有识别到可引用的题目，请先输入或生成一道题";
     }
 
     const structural = structuralQuestionReference(text);
@@ -12563,27 +12563,27 @@ function questionNavigationFailureMessage(session, text) {
         const targetPosition = basePosition + structural.offset;
 
         if (targetPosition < 0) {
-            return "前面已经没有更早的题目了；当前指代已经到第一道已识别题。";
+            return "前面已经没有更早的题目了；当前指代已经到第一道已识别题";
         }
 
         if (targetPosition >= count) {
-            return "后面还没有可切换的已识别题目；当前指代已经到最后一道题。";
+            return "后面还没有可切换的已识别题目；当前指代已经到最后一道题";
         }
     }
 
     if (structural?.kind === "ordinal") {
-        return `当前会话共识别到 ${count} 道题，找不到第 ${structural.ordinal} 题。`;
+        return `当前会话共识别到 ${count} 道题，找不到第 ${structural.ordinal} 题`;
     }
 
     if (structural?.kind === "reverse_ordinal") {
-        return `当前会话共识别到 ${count} 道题，找不到倒数第 ${structural.ordinal} 题。`;
+        return `当前会话共识别到 ${count} 道题，找不到倒数第 ${structural.ordinal} 题`;
     }
 
     if (namedQuestionTopicReference(text)) {
-        return "没找到你指的那一道主题题目。可以改说“第2题”“上一道题”“下一道题”或更具体的知识点名称。";
+        return "没找到你指的那一道主题题目。可以改说“第2题”“上一道题”“下一道题”或更具体的知识点名称";
     }
 
-    return "没找到你指的那一道题。可以改说“第2题”“上一道题”“下一道题”“最后一道题”或具体知识点名称。";
+    return "没找到你指的那一道题。可以改说“第2题”“上一道题”“下一道题”“最后一道题”或具体知识点名称";
 }
 
 function buildTargetQuestionApiText(userText, candidate) {
@@ -12801,19 +12801,19 @@ async function parseResponseJson(response) {
 
 function fallbackHttpError(status) {
     if (status === 400) {
-        return "请求内容有误，请检查后重新发送。";
+        return "请求内容有误，请检查后重新发送";
     }
     if (status === 413) {
-        return "上传内容过大，请重新选择。";
+        return "上传内容过大，请重新选择";
     }
     if (status === 429) {
-        return "当前请求过于频繁，请稍后再试。";
+        return "当前请求过于频繁，请稍后再试";
     }
     if (status >= 500) {
-        return "服务暂时不可用，请稍后重试。";
+        return "服务暂时不可用，请稍后重试";
     }
 
-    return "请求失败，请稍后重试。";
+    return "请求失败，请稍后重试";
 }
 
 function attachTeachingSnapshotToLatestQuestion(
@@ -12995,7 +12995,7 @@ async function requestAiReply(session) {
     ) {
         showAssistantMessage(
             session,
-            "还没找到要参照的题目。你可以说“第一道题 / 上一道题 / 数论那道题”，也可以直接说明要练习的知识点。",
+            "还没找到要参照的题目。你可以说“第一道题 / 上一道题 / 数论那道题”，也可以直接说明要练习的知识点",
             { isError: true }
         );
         return;
@@ -13008,7 +13008,7 @@ async function requestAiReply(session) {
         rollbackRetestAfterRequestFailure(session);
         showAssistantMessage(
             session,
-            "复测原题已经丢失，请回到错题本重新发起复测。",
+            "复测原题已经丢失，请回到错题本重新发起复测",
             { isError: true }
         );
         return;
@@ -13212,7 +13212,7 @@ async function requestAiReply(session) {
             rollbackRetestAfterRequestFailure(session);
             showAssistantMessage(
                 session,
-                "练习题生成结果未完成题目登记，请重新出题。",
+                "练习题生成结果未完成题目登记，请重新出题",
                 { isError: true }
             );
             return;
@@ -13302,7 +13302,7 @@ async function requestAiReply(session) {
 
             showAssistantMessage(
                 session,
-                "AI 服务没有返回有效内容，请重新发送。",
+                "AI 服务没有返回有效内容，请重新发送",
                 { isError: true }
             );
             return;
@@ -13379,7 +13379,7 @@ async function requestAiReply(session) {
 
         showAssistantMessage(
             session,
-            "网络连接失败，请检查网络后重试。",
+            "网络连接失败，请检查网络后重试",
             { isError: true }
         );
 
@@ -13653,7 +13653,7 @@ function reviewRecognizedQuestion(file, data) {
     const cancel = document.getElementById("ocrReviewCancel");
     const zoom = document.getElementById("ocrReviewZoom");
     if (!dialog || !preview || !question || !graph || !requestText || !confirm || !cancel) {
-        throw new Error("图片核对界面未加载，请刷新页面。");
+        throw new Error("图片核对界面未加载，请刷新页面");
     }
 
     return new Promise((resolve, reject) => {
@@ -13696,16 +13696,16 @@ function reviewRecognizedQuestion(file, data) {
             const visualText = graph.value.trim();
             const userRequest = requestText.value.trim();
             if (!text && !visualText) {
-                error.textContent = "请至少保留题目文字或图形信息。";
+                error.textContent = "请至少保留题目文字或图形信息";
                 graph.focus();
                 return;
             }
             if (/\[(?:待核对|不清楚)\]/.test(text + visualText)) {
-                error.textContent = "请对照原图补全标为“待核对”的内容；看不清时可以取消并重新上传。";
+                error.textContent = "请对照原图补全标为“待核对”的内容；看不清时可以取消并重新上传";
                 return;
             }
             if (text.length + visualText.length + userRequest.length > 5600) {
-                error.textContent = "题目和本次要求合计过长，请适当精简后再发送。";
+                error.textContent = "题目和本次要求合计过长，请适当精简后再发送";
                 return;
             }
             result = {
@@ -13772,14 +13772,14 @@ async function handleImageSelected(event) {
         && !file.type.startsWith("image/")
     ) {
         showCurrentError(
-            "请选择有效的图片文件。"
+            "请选择有效的图片文件"
         );
         return;
     }
 
     if (file.size > MAX_IMAGE_BYTES) {
         showCurrentError(
-            "图片过大，请上传 8MB 以内的图片。"
+            "图片过大，请上传 8MB 以内的图片"
         );
         return;
     }
@@ -13833,7 +13833,7 @@ async function handleImageSelected(event) {
         if (!data.text && !data.visual_text) {
             showAssistantMessage(
                 session,
-                "没有识别到有效的题目内容，请重新拍摄或裁剪图片。",
+                "没有识别到有效的题目内容，请重新拍摄或裁剪图片",
                 { isError: true }
             );
             return;
@@ -13906,7 +13906,7 @@ async function handleImageSelected(event) {
 
         showAssistantMessage(
             session,
-            "图片识别请求失败，请检查网络后重试。",
+            "图片识别请求失败，请检查网络后重试",
             { isError: true }
         );
         return;
@@ -14251,7 +14251,7 @@ function markChatMessageAsWrong(sessionId, messageIndex) {
 
     if (!questionInfo || !questionInfo.text) {
         window.alert(
-            "没有从这条内容中提取到有效题目。你可以先把题目单独发一条消息，再加入错题本。"
+            "没有从这条内容中提取到有效题目。你可以先把题目单独发一条消息，再加入错题本"
         );
         return;
     }
@@ -14334,7 +14334,7 @@ async function deleteChatMessage(sessionId, messageIndex) {
 
     const confirmed = await showAppConfirm({
         title: "删除消息",
-        body: "确定删除这条聊天消息吗？已加入错题本的内容不会被删除。",
+        body: "确定删除这条聊天消息吗？已加入错题本的内容不会被删除",
         confirmText: "删除",
         confirmTone: "danger"
     });
@@ -15100,11 +15100,11 @@ function renderSessions() {
 
             const confirmed = await showAppConfirm({
                 title:"删除这段对话？",
-                body:"这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留。",
+                body:"这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留",
                 confirmText:"删除对话",
                 cancelText:"取消",
                 confirmTone:"danger",
-                fallbackText:"确定删除这段对话吗？\n\n这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留。"
+                fallbackText:"确定删除这段对话吗？\n\n这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留"
             });
 
             if (!confirmed) {
@@ -15270,7 +15270,7 @@ async function ensureKnowledgeGraphData() {
             !knowledgeGraphData
             || !knowledgeGraphData.nodes.length
         ) {
-            throw new Error("知识图谱数据为空。");
+            throw new Error("知识图谱数据为空");
         }
 
         return knowledgeGraphData;
@@ -15927,7 +15927,7 @@ async function analyzeSingleQuestionTeaching(
         if (!response.ok) {
             throw new Error(
                 payload?.error
-                || "题目知识识别失败。"
+                || "题目知识识别失败"
             );
         }
 
@@ -16000,7 +16000,7 @@ async function ensureActiveQuestionAfterHistoryChange(
         if (!response.ok) {
             throw new Error(
                 payload?.error
-                || "题目知识识别失败。"
+                || "题目知识识别失败"
             );
         }
 
@@ -16079,7 +16079,7 @@ async function refreshConversationKnowledgeIndex(
         if (!response.ok) {
             throw new Error(
                 payload?.error
-                || "历史题目知识识别失败。"
+                || "历史题目知识识别失败"
             );
         }
     } catch (error) {
@@ -16564,7 +16564,7 @@ async function openKnowledgeGraphCategoryPicker() {
     const categories = ["全部", ...getKnowledgeGraphCategories()];
     const choice = await openMobileChoiceModal({
         title:"选择知识图谱模块",
-        intro:"在手机上用更清晰的列表样式切换模块。",
+        intro:"在手机上用更清晰的列表样式切换模块",
         value:knowledgeGraphFilter || "全部",
         options:categories.map(item => ({ value:item, label:item }))
     });
@@ -16973,7 +16973,7 @@ function openKnowledgeGraph() {
         })
         .catch(() => {
             renderKnowledgeGraphLoading(
-                "知识图谱暂时加载失败，请稍后重试。"
+                "知识图谱暂时加载失败，请稍后重试"
             );
         });
 }
@@ -17007,7 +17007,7 @@ function renderKnowledgeGraphLoading(message) {
 
     if (summary) {
         summary.textContent = (
-            "这里可以查看当前题目，也可以汇总本对话前面做过的题目。"
+            "这里可以查看当前题目，也可以汇总本对话前面做过的题目"
         );
     }
 
@@ -17021,7 +17021,7 @@ function renderKnowledgeGraphLoading(message) {
 
     if (detail) {
         detail.textContent = (
-            "点击左侧节点后，这里会显示相关知识和你的学习记录。"
+            "点击左侧节点后，这里会显示相关知识和你的学习记录"
         );
     }
 }
@@ -17130,7 +17130,7 @@ function focusKnowledgeGraphOnHistoryQuestion(
 
     if (!item) {
         window.alert(
-            "这道历史题暂时无法定位，请重新整理历史记录。"
+            "这道历史题暂时无法定位，请重新整理历史记录"
         );
         return;
     }
@@ -17681,7 +17681,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     if (!nodes.length) {
         const empty = document.createElement("div");
         empty.className = "kg-empty";
-        empty.textContent = "这个分类下暂时没有可显示的节点。";
+        empty.textContent = "这个分类下暂时没有可显示的节点";
         section.appendChild(empty);
         container.appendChild(section);
         return;
@@ -18008,7 +18008,7 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
     if (!nodes.length) {
         const empty = document.createElement("div");
         empty.className = "kg-empty";
-        empty.textContent = "这个分类下暂时没有可显示的节点。";
+        empty.textContent = "这个分类下暂时没有可显示的节点";
         section.appendChild(empty);
         container.appendChild(section);
         return;
@@ -18408,8 +18408,8 @@ function renderKnowledgeGraphHistory() {
     const text = document.createElement("div");
     text.className = "kg-history-head-text";
     text.textContent = history.length
-        ? `本对话识别到 ${history.length} 道题。`
-        : "本对话暂时没有识别到题目。";
+        ? `本对话识别到 ${history.length} 道题`
+        : "本对话暂时没有识别到题目";
 
     const refresh = document.createElement("button");
     refresh.type = "button";
@@ -18430,7 +18430,7 @@ function renderKnowledgeGraphHistory() {
         const empty = document.createElement("div");
         empty.className = "graph-detail-empty";
         empty.textContent = (
-            "如果刚刚才发送题目，可以等 AI 回复完成后再点“重新整理”。"
+            "如果刚刚才发送题目，可以等 AI 回复完成后再点“重新整理”"
         );
         list.appendChild(empty);
         return;
@@ -18748,20 +18748,20 @@ function renderKnowledgeGraph() {
                 knowledgeGraphScope === "conversation"
                     ? (
                         visibleNodes.length
-                            ? `已汇总本对话前面题目，只显示 ${visibleNodes.length} 个相关知识点。`
-                            : "本对话暂时没有可汇总的知识点。"
+                            ? `已汇总本对话前面题目，只显示 ${visibleNodes.length} 个相关知识点`
+                            : "本对话暂时没有可汇总的知识点"
                     )
                     : (
                         knowledgeGraphScope === "history"
                             ? (
                                 visibleNodes.length
-                                    ? `正在查看历史第 ${context.historyOrder || "?"} 题，只显示 ${visibleNodes.length} 个相关知识点。`
-                                    : "这道历史题暂时没有识别到可显示的知识点。"
+                                    ? `正在查看历史第 ${context.historyOrder || "?"} 题，只显示 ${visibleNodes.length} 个相关知识点`
+                                    : "这道历史题暂时没有识别到可显示的知识点"
                             )
                             : (
                                 visibleNodes.length < fullNodes.length
                                     ? `最近一题关联 · ${visibleNodes.length} 个知识点`
-                                    : "当前没有可进一步收缩的题目上下文，显示全部知识。"
+                                    : "当前没有可进一步收缩的题目上下文，显示全部知识"
                             )
                     )
             )
@@ -19737,7 +19737,7 @@ function downloadOptionsForCurrentPlatform() {
         // GitCode is an optional release page, not a fabricated direct asset.
         return {
             platform:"iPhone / iPad",
-            text:"下载描述文件后，在 iOS 设置中确认安装。",
+            text:"下载描述文件后，在 iOS 设置中确认安装",
             actions:[
                 { label:"GitHub · 描述文件",
                   url:"https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate-iPhone-iPad.mobileconfig" },
@@ -19748,7 +19748,7 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "android") {
         return {
             platform:"Android",
-            text:"选择 APK 下载源。",
+            text:"选择 APK 下载源",
             actions:[
                 ...installers("DMate.apk", config.androidApkUrl, "APK"),
                 { label:"itch.io", url:itch, secondary:true }
@@ -19758,7 +19758,7 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text:"选择安装包下载源或应用商店。",
+            text:"选择安装包下载源或应用商店",
             actions:[
                 ...installers("DMate_1.0.0_x64-setup.exe", config.desktopWindowsUrl, "EXE"),
                 { label:"Microsoft Store", url:microsoftStore, secondary:true },
@@ -19769,7 +19769,7 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"选择 DMG 下载源。",
+            text:"选择 DMG 下载源",
             actions:[
                 ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl, "DMG"),
                 { label:"itch.io", url:itch, secondary:true }
@@ -19779,7 +19779,7 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "linux") {
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"Ubuntu/Debian 用 DEB；其他发行版可选 AppImage 或 Snap。",
+            text:"Ubuntu/Debian 用 DEB；其他发行版可选 AppImage 或 Snap",
             actions:[
                 ...installers("DMate_1.0.0_amd64.deb", config.desktopLinuxDebUrl, "DEB"),
                 ...installers("DMate_1.0.0_amd64.AppImage", config.desktopLinuxAppImageUrl, "AppImage"),
@@ -19789,7 +19789,7 @@ function downloadOptionsForCurrentPlatform() {
     }
     return {
         platform:"桌面系统",
-        text:"选择下载渠道。",
+        text:"选择下载渠道",
         actions:[
             { label:"GitCode · 发行版", url:gitcodeRelease },
             { label:"GitHub · 发行版", url:githubRelease, secondary:true },
