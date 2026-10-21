@@ -8152,11 +8152,33 @@ body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button:hover {
     background:var(--surface-3); color:var(--text-primary);
     border:1px solid var(--border-strong); border-radius:8px; cursor:pointer;
 }
-#wrongRetestReviewModal .wrong-retest-review-row details {
-    margin-top:12px; border:1px solid var(--border-strong);
-    border-radius:8px; padding:10px;
+/* 直接继承错题本的答案/解析容器与标题规格，不再额外覆盖 padding 和字体。 */
+#wrongRetestReviewModal .wrong-retest-review-row .wrong-answer-details,
+#wrongRetestReviewModal .wrong-retest-review-row .wrong-analysis-details {
+    margin-top:10px;
+    border:1px solid var(--surface-4);
+    border-radius:9px;
+    padding:0;
+    background:var(--surface-1);
+    overflow:hidden;
 }
-#wrongRetestReviewModal .wrong-retest-review-row summary { cursor:pointer; font-weight:600; }
+#wrongRetestReviewModal .wrong-retest-review-row .wrong-answer-summary,
+#wrongRetestReviewModal .wrong-retest-review-row .wrong-analysis-summary {
+    padding:10px 12px;
+    font-size:var(--font-small);
+    font-weight:600;
+    color:var(--text-secondary);
+    cursor:pointer;
+}
+#wrongRetestReviewModal .wrong-retest-review-row .wrong-answer-inner,
+#wrongRetestReviewModal .wrong-retest-review-row .wrong-analysis-body {
+    padding:12px;
+    font-size:var(--font-small);
+    line-height:1.68;
+    color:var(--text-secondary);
+    white-space:normal;
+    word-break:break-word;
+}
 @media(max-width:760px) {
     #wrongRetestReviewModal:not(.hidden) {
         display:flex; align-items:center; justify-content:center;
