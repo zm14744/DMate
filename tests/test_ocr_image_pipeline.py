@@ -3,6 +3,7 @@ import importlib
 import sys
 import types
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -69,7 +70,7 @@ class OCRImagePipelineTests(unittest.TestCase):
         source = np.zeros((1500, 5000, 3), dtype=np.uint8)
         target_shape = (660, 2200, 3)
         candidate = {"type": "text", "content": "v1", "box": [100, 100, 140, 120], "score": .9}
-        with unittest.mock.patch.object(ocr, "_resize_if_needed", side_effect=lambda image: image), \
+        with patch.object(ocr, "_resize_if_needed", side_effect=lambda image: image), \
              unittest.mock.patch.object(ocr, "_extract_text_items", return_value=[candidate]):
             mapped = ocr._native_tile_text_items(source, target_shape)
         self.assertEqual(len(mapped), 3)

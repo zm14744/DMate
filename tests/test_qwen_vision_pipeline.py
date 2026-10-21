@@ -27,8 +27,8 @@ class QwenVisionPipelineTests(unittest.TestCase):
         response = FakeStreamingResponse([
             "data: " + json.dumps({"choices": [{"delta": {"reasoning_content": "check "}, "finish_reason": None}]}),
             "data: " + json.dumps({"choices": [{"delta": {"reasoning_content": "edges"}, "finish_reason": None}]}),
-            "data: " + json.dumps({"choices": [{"delta": {"content": "{\\"corrected_text\\":"}, "finish_reason": None}]}),
-            "data: " + json.dumps({"choices": [{"delta": {"content": "\\"题目\\",\\"visual_text\\":\\"\\",\\"has_visual_structure\\":false,\\"image_kind\\":\\"exercise\\",\\"uncertain_fields\\":[]}"}, "finish_reason": None}]}),
+            "data: " + json.dumps({"choices": [{"delta": {"content": '{"corrected_text":'}, "finish_reason": None}]}),
+            "data: " + json.dumps({"choices": [{"delta": {"content": '"题目","visual_text":"","has_visual_structure":false,"image_kind":"exercise","uncertain_fields":[]}'}, "finish_reason": None}]}),
             "data: " + json.dumps({"choices": [{"delta": {}, "finish_reason": "stop"}], "usage": {"completion_tokens": 42}}),
             "data: [DONE]",
         ])
