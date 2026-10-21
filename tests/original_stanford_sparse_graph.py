@@ -103,6 +103,7 @@ def main():
     assert result.get("detector")=="hough_blue_outline_panels", summary
     assert len(graphs)==6, summary
     assert summary["vertices"]==[6]*6, summary
+    assert summary["confidence"]==["high"]*6, summary
     assert summary["edges"]==[5]*6, summary
     assert summary["pairwise_nonisomorphic"], summary
 
