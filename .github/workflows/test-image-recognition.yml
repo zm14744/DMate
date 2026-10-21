@@ -32,6 +32,8 @@ on:
       - "app.py"
       - "tests/test_graph_recognition_v2.py"
       - "tests/test_graph_detector_consensus.py"
+      - "tests/test_ocr_image_pipeline.py"
+      - "tests/test_qwen_vision_pipeline.py"
       - ".github/workflows/test-image-recognition.yml"
   pull_request:
     paths:
@@ -64,6 +66,8 @@ on:
       - "app.py"
       - "tests/test_graph_recognition_v2.py"
       - "tests/test_graph_detector_consensus.py"
+      - "tests/test_ocr_image_pipeline.py"
+      - "tests/test_qwen_vision_pipeline.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -83,6 +87,8 @@ jobs:
         run: |
           python -m unittest discover -s tests -p "test_graph_recognition_v2.py" -v
           python -m unittest discover -s tests -p "test_graph_detector_consensus.py" -v
+          python -m unittest discover -s tests -p "test_ocr_image_pipeline.py" -v
+          python -m unittest discover -s tests -p "test_qwen_vision_pipeline.py" -v
           python -m unittest discover -s tests -p "test_graph_consistency.py" -v
           python -m unittest discover -s tests -p "test_graph_integrity.py" -v
           python -m unittest discover -s tests -p "test_graph_answer_integrity.py" -v
