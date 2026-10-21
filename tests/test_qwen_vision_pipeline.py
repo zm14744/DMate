@@ -90,6 +90,91 @@ class QwenVisionPipelineTests(unittest.TestCase):
         self.assertLessEqual(payload["thinking_budget"], payload["max_tokens"] - 2048)
         self.assertEqual(payload["temperature"], 0.1)
 
+    def test_structured_graph_data_preserves_loops_parallel_arcs_and_isolated_vertices(self):
+        payload = {
+            "corrected_text": "",
+            "visual_text": "错误的自然语言描述：星形图，中心 x。",
+            "has_visual_structure": True,
+            "image_kind": "exercise",
+            "uncertain_fields": [],
+            "graph_data": [{
+                "id": "G1",
+                "directed": True,
+                "weighted": False,
+                "multigraph": True,
+                "vertices": [
+                    {"id": "a", "label": "a", "x": .1, "y": .2},
+                    {"id": "b", "label": "b", "x": .5, "y": .4},
+                    {"id": "c", "label": "c", "x": .8, "y": .8},
+                ],
+                "edges": [
+                    {"from": "a", "to": "a", "edge_label": "e1", "weight": None},
+                    {"from": "a", "to": "b", "edge_label": "e2", "weight": None},
+                    {"from": "b", "to": "a", "edge_label": "e3", "weight": None},
+                    {"from": "a", "to": "b", "edge_label": "e4", "weight": None},
+                ],
+                "uncertain_edges": [],
+                "complete": True,
+            }],
+        }
+        parsed = ai._extract_vision_json(json.dumps(payload, ensure_ascii=False))
+        self.assertIsNotNone(parsed)
+        visual = parsed["visual_text"]
+        self.assertNotIn("星形图", visual)
+        self.assertIn("a→a（自环", visual)
+        self.assertEqual(visual.count("a→b"), 2)
+        self.assertIn("b→a", visual)
+        self.assertIn("孤立顶点：c", visual)
+        self.assertIn("共 4 条边", visual)
+        self.assertNotIn("【图形结构待核对】", visual)
+        self.assertEqual(len(parsed["graph_data"][0]["edges"]), 4)
+
+    def test_bad_edge_endpoint_is_demoted_to_uncertainty(self):
+        payload = {
+            "corrected_text": "",
+            "visual_text": "模型称图中有 a-b。",
+            "has_visual_structure": True,
+            "image_kind": "exercise",
+            "uncertain_fields": [],
+            "graph_data": [{
+                "id": "G1", "directed": False, "weighted": False,
+                "multigraph": False,
+                "vertices": [{"id": "a", "label": "a", "x": .2, "y": .2},
+                             {"id": "b", "label": "b", "x": .8, "y": .8}],
+                "edges": [{"from": "a", "to": "z", "edge_label": None, "weight": None}],
+                "uncertain_edges": [], "complete": True,
+            }],
+        }
+        parsed = ai._extract_vision_json(json.dumps(payload, ensure_ascii=False))
+        self.assertIsNotNone(parsed)
+        self.assertIn("【图形结构待核对】", parsed["visual_text"])
+        self.assertIn("端点不在顶点表中", parsed["visual_text"])
+        self.assertNotIn("a-b", parsed["visual_text"])
+        self.assertFalse(parsed["graph_data"][0]["complete"])
+        self.assertEqual(parsed["graph_data"][0]["edges"], [])
+
+    def test_incomplete_graph_data_never_claims_total_edge_count(self):
+        payload = {
+            "corrected_text": "判断图的连通性",
+            "visual_text": "",
+            "has_visual_structure": True,
+            "image_kind": "exercise",
+            "uncertain_fields": [],
+            "graph_data": [{
+                "id": "G2", "directed": False, "weighted": False,
+                "multigraph": False,
+                "vertices": ["a", "b", "c"],
+                "edges": [{"from": "a", "to": "b", "edge_label": None, "weight": None}],
+                "uncertain_edges": ["b-c 的端点被遮挡"],
+                "complete": False,
+            }],
+        }
+        parsed = ai._extract_vision_json(json.dumps(payload, ensure_ascii=False))
+        self.assertIsNotNone(parsed)
+        self.assertIn("【图形结构待核对】", parsed["visual_text"])
+        self.assertIn("当前已确认 1 条边；总边数待核对", parsed["visual_text"])
+        self.assertNotIn("共 1 条边", parsed["visual_text"])
+
     def test_opencv_hints_are_valid_bounded_json_not_mid_string_slices(self):
         graphs = [{
             "id": "G1", "vertex_count": 3,
