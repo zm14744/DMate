@@ -3744,11 +3744,11 @@ def ocr():
             visual_text
         )) or len(cv_graphs) >= 3
         iso_request = bool(re.search(r"同构|isomorph", question_text, re.I))
-        # Only run this audit on actual two-diagram comparisons, or when a
-        # graph-only figure has precisely two labelled drawings.
+        # Preserve auditing for genuinely two-graph isomorphism questions,
+        # including layouts Vision could not format as two clean paragraphs.
+        # Never apply the two-graph schema to four-figure comparisons.
         if (image_kind != "non_exercise" and not multi_panel and (
-                (iso_request and two_graph_diagram) or
-                (two_graph_diagram and not _ocr_has_exercise_evidence(question_text)))):
+                iso_request or two_graph_diagram)):
             audited = verify_graph_image_independently(raw)
             if audited.get("ok"):
                 initial_graph_text = visual_text
