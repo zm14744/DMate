@@ -79,6 +79,40 @@ class GraphConsistencyTests(unittest.TestCase):
         self.assertEqual([s["tree"] for _,s in sorted(analyze_labeled_graphs(updated).items())],
                          [True,True,False,False])
 
+    def test_real_four_graph_caption_and_duplicate_edge_are_pixel_corrected(self):
+        # Actual failure format: 图 G2：... 边为：... ; the old parser
+        # only understood 图2（G2）：... 边：... and never ran CV correction.
+        cv_edges = [
+            [(0, 2), (1, 2), (2, 3), (2, 5), (4, 5)],
+            [(0, 2), (0, 5), (1, 4), (3, 5), (4, 5)],
+            [(0, 1), (0, 2), (0, 3), (1, 4), (2, 5), (3, 4)],
+            [(0, 5), (1, 3), (1, 4), (2, 4)]
+        ]
+        coords = [(.1, .1), (.8, .1), (.1, .48), (.8, .48),
+                  (.1, .9), (.8, .9)]
+        graphs = [
+            {"confidence": "high", "uncertain_edges": [],
+             "vertices": [{"id": f"v{i+1}", "x": x, "y": y}
+                          for i, (x, y) in enumerate(coords)],
+             "edges": [[f"v{a+1}", f"v{b+1}"] for a, b in edges]}
+            for edges in cv_edges
+        ]
+        import re
+        text = re.sub(r"图([1-4])（G[1-4]）", r"图 G\\1", CORRECT)
+        text = text.replace("。边：", "。边为：")
+        text = text.replace("a-c,a-f,b-e,d-f,e-f",
+                            "a-c,a-f,b-e,b-f,d-f,e-f")
+        text = text.replace("a-b,a-c,a-d,b-e,c-f,d-e",
+                            "a-b,a-c,a-d,b-e,c-f,d-e,e-d")
+        checked, warnings = reconcile_vision_edges(text, graphs)
+        self.assertEqual(len(warnings), 2, warnings)
+        actual = analyze_labeled_graphs(checked)
+        self.assertEqual(set(actual), {1, 2, 3, 4})
+        self.assertEqual([actual[i]["edge_count"] for i in range(1, 5)],
+                         [5, 5, 6, 4])
+        self.assertNotIn(("b", "f"), actual[2]["edges"])
+        self.assertEqual(actual[3]["edges"].count(("d", "e")), 1)
+
     def test_partial_or_irregular_geometry_does_not_override_vision(self):
         base={"confidence":"partial","uncertain_edges":[],
              "vertices":[{"id":f"v{i+1}","x":i/7,"y":i/7} for i in range(6)],
