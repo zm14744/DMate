@@ -68,6 +68,24 @@ def same_graph_unlabelled(graph):
 def main():
     image=cropped_original()
     Path("mit_ps4_original_graph.png").write_bytes(image)
+    from graph_black_disks import recognize_black_disk_graph, _black_disk_centers, _solid_chord
+    import numpy as np
+    import cv2
+    with Image.open(io.BytesIO(image)) as original:
+        arr=np.asarray(original.convert("RGB"))
+    gray=cv2.cvtColor(arr,cv2.COLOR_RGB2GRAY)
+    dots=_black_disk_centers(gray)
+    ambiguous=[]
+    direct=[]
+    for i in range(len(dots)):
+        for j in range(i+1,len(dots)):
+            coverage, local=_solid_chord(gray,dots[i],dots[j],dots)
+            if coverage>=.945 and local>=.81:
+                direct.append((i,j))
+            elif coverage>=.60 and local>=.38:
+                ambiguous.append((i,j,round(coverage,3),round(local,3)))
+    print("MIT_DIAG_BLACK_DISKS", len(dots),"EDGES",len(direct),"AMBIGUOUS",ambiguous,flush=True)
+    print("MIT_DIAG_NEW_RECOGNIZER",recognize_black_disk_graph(image).get("status"),flush=True)
     result=recognize_graphs(
         image,text_hint="graph problem eight vertices diameter colour"
     )
