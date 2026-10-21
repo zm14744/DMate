@@ -81,6 +81,38 @@ class GraphRecognitionTests(unittest.TestCase):
                 painter.ellipse((x-5, y-5, x+5, y+5), fill=(5, 5, 5))
         self.check_exact(canvas)
 
+    def test_six_blue_outline_trees_from_separate_pixel_strokes(self):
+        from graph_sparse_panels import recognize_blue_outline_panels
+        canvas=Image.new("RGB",(907,566),"white")
+        draw=ImageDraw.Draw(canvas)
+        offsets=[(0,0),(256,0),(512,0),(0,254),(256,254),(512,254)]
+        # Distinct six-vertex trees: no synthetic "five-edge shortcut" in
+        # the detector, every graph has five independently drawn strokes.
+        patterns=[
+            [(0,1),(1,2),(2,3),(3,4),(4,5)],
+            [(0,1),(1,2),(2,3),(3,4),(1,5)],
+            [(0,1),(1,2),(2,3),(1,4),(4,5)],
+            [(0,1),(1,2),(1,4),(4,5),(4,3)],
+            [(0,1),(1,2),(1,4),(1,5),(4,3)],
+            [(0,1),(1,2),(1,3),(1,4),(1,5)],
+        ]
+        local=[(108,110),(206,54),(304,110),
+               (304,220),(206,272),(108,220)]
+        for (x_off,y_off),pairs in zip(offsets,patterns):
+            pts=[(x+x_off,y+y_off) for x,y in local]
+            for a,b in pairs:
+                draw.line((pts[a],pts[b]),fill=(163,179,203),width=2)
+            for x,y in pts:
+                draw.ellipse((x-3,y-3,x+3,y+3),outline=(95,118,159),width=1)
+        raw=io.BytesIO()
+        canvas.save(raw,format="PNG")
+        outcome=recognize_blue_outline_panels(raw.getvalue())
+        self.assertEqual(len(outcome["graphs"]),6,outcome)
+        for graph in outcome["graphs"]:
+            self.assertEqual(graph["vertex_count"],6,graph)
+            self.assertEqual(graph["confirmed_edge_count"],5,graph)
+            self.assertEqual(len(graph["adjacency_matrix"]),6)
+
     def test_resized_and_mildly_blurred(self):
         self.check_exact(make_sheet().resize((900, 438)))
         self.check_exact(make_sheet().filter(ImageFilter.GaussianBlur(1.1)))
