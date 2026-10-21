@@ -8201,7 +8201,7 @@ body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button:hover {
     flex:1 1 0;
     min-width:0;
     width:0;
-    height:58px;
+    height:46px;
 }
 body[data-appearance-theme] .input .manual-question-composer > #text,
 body[data-appearance-theme] .input .manual-question-composer > #text:hover,
@@ -8211,9 +8211,9 @@ body[data-appearance-theme] .input .manual-question-composer > #text:focus {
     width:100% !important;
     max-width:100% !important;
     min-width:0 !important;
-    height:58px !important;
-    min-height:58px !important;
-    max-height:58px !important;
+    height:46px !important;
+    min-height:46px !important;
+    max-height:46px !important;
     padding:0 12px !important;
 }
 .input-wrap > .manual-question-mode {
@@ -8364,6 +8364,60 @@ body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question
         border-right:2px solid currentColor;
         border-bottom:2px solid currentColor;
         transform:rotate(45deg);
+    }
+}
+
+/* 2026-10-21: light mobile drawer matches dark mode's borderless session list.
+   Do not remove the outlined 'new conversation' or footer action buttons. */
+body[data-appearance-theme="light"] .left #sessions .session,
+:root[data-appearance-theme="light"] .left #sessions .session {
+    border-color:transparent !important;
+    box-shadow:none !important;
+}
+body[data-appearance-theme="light"] .left #sessions .session:not(.active),
+:root[data-appearance-theme="light"] .left #sessions .session:not(.active) {
+    background:transparent !important;
+    background-image:none !important;
+}
+body[data-appearance-theme="light"] .left #sessions .session.active,
+:root[data-appearance-theme="light"] .left #sessions .session.active {
+    border-color:transparent !important;
+    box-shadow:none !important;
+}
+
+/* The question selector is outside the field; no extra input height is needed.
+   Exactly match the desktop field and the two adjacent action buttons. */
+@media(min-width:1101px) {
+    .input .manual-question-composer {
+        height:46px !important;
+        min-height:46px !important;
+        max-height:46px !important;
+    }
+    body[data-appearance-theme] .input .manual-question-composer > #text,
+    body[data-appearance-theme] .input .manual-question-composer > #text:hover,
+    body[data-appearance-theme] .input .manual-question-composer > #text:focus {
+        height:46px !important;
+        min-height:46px !important;
+        max-height:46px !important;
+    }
+    body[data-appearance-theme] .input > #imageBtn,
+    body[data-appearance-theme] .input > #sendBtn,
+    body[data-appearance-theme] .input > #sendBtn.ai-stop-button {
+        height:46px !important;
+        min-height:46px !important;
+        max-height:46px !important;
+        align-self:center !important;
+    }
+}
+/* Mobile input layout remains at 42px including the standard send buttons. */
+@media(max-width:1100px) {
+    body[data-appearance-theme] .input .manual-question-composer,
+    body[data-appearance-theme] .input .manual-question-composer > #text,
+    body[data-appearance-theme] .input .manual-question-composer > #text:hover,
+    body[data-appearance-theme] .input .manual-question-composer > #text:focus {
+        height:42px !important;
+        min-height:42px !important;
+        max-height:42px !important;
     }
 }
 
