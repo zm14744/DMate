@@ -181,7 +181,9 @@ def _is_graph_vision_task(ocr_text, opencv_graphs):
     text = str(ocr_text or "").strip()
     if GRAPH_TEXT_HINT_RE.search(text):
         return True
-    graphs = opencv_graphs.get("graphs") or [] if isinstance(opencv_graphs, dict) else []
+    graphs = []
+    if isinstance(opencv_graphs, dict):
+        graphs = opencv_graphs.get("graphs") or []
     # A graph candidate alone is not enough when a long question may concern
     # geometry or another diagram type. For pure figures with almost no OCR,
     # the pixel detector is useful evidence that the graph-only path is needed.
