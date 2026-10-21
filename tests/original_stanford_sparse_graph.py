@@ -65,6 +65,8 @@ def isomorphic(a,b):
 def main():
     original=image_from_official_pdf()
     Path("stanford_original_6trees.png").write_bytes(original)
+    with Image.open(io.BytesIO(original)) as image:
+        print("STANFORD_OFFICIAL_RENDER",image.size,flush=True)
     from graph_sparse_panels import recognize_blue_outline_panels, _panel_edges
     from ai import _diagram_grid_crops
     import numpy as np
