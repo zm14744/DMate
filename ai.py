@@ -1942,10 +1942,11 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
     - Vision 失败也不会让已经成功的 OCR 整体失败。
     """
     if not VISION_ENABLED:
+        print("Qwen Vision 已跳过：VISION_ANALYSIS_ENABLED 当前关闭。")
         return _failure("图形理解功能当前已关闭。")
 
     if not API_KEY:
-        print("Qwen Vision 配置错误：未设置 DASHSCOPE_API_KEY")
+        print("Qwen Vision 已跳过：未设置 DASHSCOPE_API_KEY / DASHSCOPE_VISION_API_KEY。")
         return _failure("图形理解服务尚未完成配置。")
 
     if not isinstance(image_bytes, (bytes, bytearray)) or not image_bytes:
