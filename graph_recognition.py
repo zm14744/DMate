@@ -342,6 +342,19 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
     if not allow_without_context and not any(k in str(text_hint) for k in ('图','顶点','边','树','连通','邻接','路径','矩阵','欧拉','哈密顿','G₁','G1','G2','G3','G4')):
         return {'graphs':[], 'status':'not_graph', 'regions':[]}
     started=time.monotonic()
+    # A page with six thin-blue outline graphs can trick the black-dot
+    # detector into returning ONE accidental 8-vertex blob at high confidence.
+    # A complete multi-panel circle+stroke match must take precedence over
+    # that false positive (it never guesses missing figures or edges).
+    try:
+        from graph_sparse_panels import recognize_blue_outline_panels
+        outline_result=recognize_blue_outline_panels(image_bytes)
+        if len(outline_result.get("graphs") or []) >= 4:
+            outline_result["elapsed_ms"]=round((time.monotonic()-started)*1000,1)
+            return outline_result
+    except (cv2.error, ValueError, TypeError, OSError) as exc:
+        print(f"空心圆多图识别降级：{type(exc).__name__}")
+
     # The original Hough detector favors softly shaded/colored nodes. Prefer
     # filled-black-dot recognition for ordinary textbook graph drawings.
     # Failure never disables the existing detector or paid Vision fallback.
@@ -355,19 +368,6 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
             return filled_result
     except (cv2.error, ValueError, TypeError, OSError) as exc:
         print(f"实心点图结构检测降级：{type(exc).__name__}")
-    # Filled-dot detectors cannot see thin blue outlines in many genuine
-    # university tree sheets. Only accept a complete six-panel positional
-    # reconstruction if every blue line is independently attached to two
-    # observed circular endpoints. Never apply this to black/red arrow images.
-    try:
-        from graph_sparse_panels import recognize_blue_outline_panels
-        outline_result=recognize_blue_outline_panels(image_bytes)
-        if outline_result.get('graphs'):
-            outline_result['elapsed_ms']=round((time.monotonic()-started)*1000,1)
-            return outline_result
-    except (cv2.error, ValueError, TypeError, OSError) as exc:
-        print(f"空心圆细线图识别降级：{type(exc).__name__}")
-
     with Image.open(io.BytesIO(image_bytes)) as im:
         im=ImageOps.exif_transpose(im).convert('RGB')
         longest=max(im.size)
