@@ -13,6 +13,7 @@ that does not depend on an uncertain graph diagram.
 """
 from __future__ import annotations
 import re
+from collections import Counter
 
 FLAG="【图形结构待核对】"
 
