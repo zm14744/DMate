@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import math
+import re
 import time
 from collections import defaultdict
 
@@ -339,7 +340,22 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
     are called confirmed; borderline edges are listed separately for Vision review.
     Unsupported loops, curves, arrows and hand-drawn vertices remain *unknown*.
     """
-    if not allow_without_context and not any(k in str(text_hint) for k in ('图','顶点','边','树','连通','邻接','路径','矩阵','欧拉','哈密顿','G₁','G1','G2','G3','G4')):
+    hint = str(text_hint or "")
+    # University originals often provide English graph questions, or a
+    # drawing with labels but no Chinese OCR tokens. Do not discard their
+    # real pixel topology before running either black-disc detector.
+    # A false-positive hint alone cannot fabricate a graph: the detector
+    # still requires actual dark disks and uninterrupted physical edges.
+    chinese_context = any(k in hint for k in (
+        '图','顶点','边','树','连通','邻接','路径','矩阵','欧拉','哈密顿',
+        'G₁','G1','G2','G3','G4'
+    ))
+    english_context = bool(re.search(
+        r"\b(?:graph|graphs|vertices|vertex|edges|"
+        r"tree|trees|isomorphism|isomorphic|diameter|"
+        r"hamiltonian|eulerian|adjacency)\b", hint, re.I
+    ))
+    if not allow_without_context and not (chinese_context or english_context):
         return {'graphs':[], 'status':'not_graph', 'regions':[]}
     started=time.monotonic()
     # A page with six thin-blue outline graphs can trick the black-dot
