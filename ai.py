@@ -190,6 +190,15 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 - 问哪些图是树时，必须由每个图的边集计算连通分量，且连通并有 n-1 条边才是树。不连通时即使边数满足 n-1 也不是树；正文结论和最后答案必须一致。
 - 局部放大图是同一原图的放大或适度增强，增强可能制造伪影。原图端点看不清时写入 uncertain_fields，不能凭增强图片“补画”边。
 - OpenCV 候选图中的 v1/v2 是按图像位置给的临时编号，并非真实 a/b 标签；先用位置核对标签，再核对候选连接。如与可见原图不符，不得照抄 OpenCV。
+- 每幅图都必须额外生成 graph_data 结构化记录，不能只给自然语言描述。graph_data 是逐顶点、逐边的规范记录；visual_text 由系统根据有效记录重新整理，因此不必在 visual_text 中重复大段边表。
+- graph_data 每个元素必须包含：id、directed、weighted、multigraph、vertices、edges、uncertain_edges、complete。
+- directed、weighted、multigraph 必须分别为 true、false 或 "unknown"；不能确定方向/权值/重边时用 "unknown"，不要猜。
+- vertices 是对象数组，每项包含 id、label、x、y。id 必须在该图内唯一；有真实标签就用真实标签；没有标签就用 G1_v1、G1_v2 等临时名。x、y 是相对完整原图的 0 到 1 归一化坐标，看不清时用 null。
+- edges 是对象数组，每条可确认的可见边单独一项，字段为 from、to、edge_label、weight。from/to 必须引用 vertices 中已有的 id；普通无权边的 weight 为 null；e1、e2 等边名写入 edge_label，绝不能误作权值。
+- 自环用 from 与 to 相同表示。重边/平行边必须分别保留为多条 edge 记录；反向有向弧 a→b 与 b→a 是两条不同边，不得合并。不要按唯一端点对去重真实多重边。
+- uncertain_edges 只列无法确认端点、方向或重数的边及原因；不确定的边不能混入已确认 edges。complete 只有在该图的顶点与所有边均已确认时才为 true。
+- 如果图片没有图形，graph_data 返回空数组。如果图形存在但结构不完整，仍返回已确认的 vertices/edges，并将 complete 设为 false。
+
 - 不要解题，不要给答案。
 
 【图片用途识别】
@@ -205,7 +214,24 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
   "visual_text": "图形结构描述；若没有需要补充的图形结构则为空字符串",
   "has_visual_structure": true,
   "image_kind": "exercise",
-  "uncertain_fields": ["看不清的位置和符号；若没有则返回空数组"]
+  "uncertain_fields": ["看不清的位置和符号；若没有则返回空数组"],
+  "graph_data": [
+    {
+      "id": "G1",
+      "directed": false,
+      "weighted": false,
+      "multigraph": false,
+      "vertices": [
+        {"id": "a", "label": "a", "x": 0.12, "y": 0.24},
+        {"id": "b", "label": "b", "x": 0.46, "y": 0.51}
+      ],
+      "edges": [
+        {"from": "a", "to": "b", "edge_label": null, "weight": null}
+      ],
+      "uncertain_edges": [],
+      "complete": true
+    }
+  ]
 }
 其中 has_visual_structure 只能是 true 或 false；image_kind 只能是 exercise、non_exercise、uncertain。
 """
@@ -1327,6 +1353,215 @@ def _extract_first_json_object(content):
     return None
 
 
+def _normalize_graph_data(raw_graphs):
+    """Validate Qwen's per-graph edge table; never promote malformed edges to facts."""
+    if not isinstance(raw_graphs, list):
+        return None
+    if not raw_graphs:
+        return []
+    normalized = []
+    for graph_index, source in enumerate(raw_graphs[:12], 1):
+        if not isinstance(source, dict):
+            return None
+        raw_vertices = source.get("vertices")
+        raw_edges = source.get("edges", [])
+        if not isinstance(raw_vertices, list) or not raw_vertices or len(raw_vertices) > 100:
+            return None
+        if not isinstance(raw_edges, list) or len(raw_edges) > 300:
+            return None
+
+        def graph_kind(value, kind):
+            if isinstance(value, bool):
+                return value
+            text = str(value or "").strip().lower()
+            true_values = {
+                "directed": {"directed", "有向", "有向图", "true", "yes"},
+                "weighted": {"weighted", "带权", "有权", "true", "yes"},
+                "multigraph": {"multigraph", "multi", "多重图", "有重边", "true", "yes"},
+            }
+            false_values = {
+                "directed": {"undirected", "无向", "无向图", "false", "no"},
+                "weighted": {"unweighted", "无权", "不带权", "false", "no"},
+                "multigraph": {"simple", "simple graph", "简单图", "无重边", "false", "no"},
+            }
+            if text in true_values[kind]:
+                return True
+            if text in false_values[kind]:
+                return False
+            return "unknown"
+
+        directed = graph_kind(source.get("directed"), "directed")
+        weighted = graph_kind(source.get("weighted"), "weighted")
+        multigraph = graph_kind(source.get("multigraph"), "multigraph")
+        graph_id = str(source.get("id") or f"G{graph_index}").strip()[:48] or f"G{graph_index}"
+
+        vertices, vertex_ids = [], set()
+        for vertex_index, raw_vertex in enumerate(raw_vertices, 1):
+            if isinstance(raw_vertex, str):
+                vertex_id = raw_vertex.strip()
+                label = vertex_id
+                x = y = None
+            elif isinstance(raw_vertex, dict):
+                vertex_id = str(raw_vertex.get("id") or raw_vertex.get("label") or "").strip()
+                label_value = raw_vertex.get("label")
+                label = str(label_value).strip() if label_value is not None and str(label_value).strip() else None
+                def coord(value):
+                    try:
+                        number = float(value)
+                    except (TypeError, ValueError, OverflowError):
+                        return None
+                    return round(number, 5) if math.isfinite(number) and 0 <= number <= 1 else None
+                x, y = coord(raw_vertex.get("x")), coord(raw_vertex.get("y"))
+            else:
+                return None
+            if not vertex_id or vertex_id in vertex_ids:
+                return None
+            vertex_ids.add(vertex_id)
+            vertices.append({"id": vertex_id, "label": label, "x": x, "y": y})
+
+        complete_value = source.get("complete", False)
+        complete = complete_value is True or (
+            isinstance(complete_value, str) and complete_value.strip().lower() in {"true", "yes"}
+        )
+        uncertainties = []
+        for item in (source.get("uncertain_edges") or [])[:80] if isinstance(source.get("uncertain_edges", []), list) else []:
+            if isinstance(item, dict):
+                a = str(item.get("from") or "").strip()
+                b = str(item.get("to") or "").strip()
+                reason = str(item.get("reason") or "端点待核对").strip()
+                uncertainties.append(f"{a}→{b}（{reason}）" if a and b else reason[:160])
+            elif isinstance(item, str) and item.strip():
+                uncertainties.append(item.strip()[:160])
+            else:
+                uncertainties.append("存在无法解析的待核对边")
+
+        edges = []
+        for raw_edge in raw_edges:
+            if not isinstance(raw_edge, dict):
+                complete = False
+                uncertainties.append(f"无法解析的边记录：{str(raw_edge)[:80]}")
+                continue
+            a = str(raw_edge.get("from") or raw_edge.get("source") or "").strip()
+            b = str(raw_edge.get("to") or raw_edge.get("target") or "").strip()
+            if a not in vertex_ids or b not in vertex_ids:
+                complete = False
+                uncertainties.append(f"{a or '?'}→{b or '?'}（端点不在顶点表中）")
+                continue
+            label_value = raw_edge.get("edge_label", raw_edge.get("label"))
+            edge_label = str(label_value).strip()[:48] if label_value is not None and str(label_value).strip() else None
+            weight_value = raw_edge.get("weight")
+            weight = None
+            if isinstance(weight_value, (int, float)) and not isinstance(weight_value, bool) and math.isfinite(float(weight_value)):
+                weight = int(weight_value) if float(weight_value).is_integer() else round(float(weight_value), 6)
+            elif isinstance(weight_value, str) and re.fullmatch(r"\s*-?\d+(?:\.\d+)?\s*", weight_value):
+                number = float(weight_value)
+                weight = int(number) if number.is_integer() else round(number, 6)
+            edges.append({"from": a, "to": b, "edge_label": edge_label, "weight": weight})
+
+        pair_counts = {}
+        for edge in edges:
+            a, b = edge["from"], edge["to"]
+            key = (a, b) if directed is True else tuple(sorted((a, b)))
+            pair_counts[key] = pair_counts.get(key, 0) + 1
+        if multigraph is not True:
+            duplicates = [key for key, count in pair_counts.items() if count > 1]
+            if duplicates:
+                complete = False
+                uncertainties.append("相同端点出现多条边记录，需确认是否为重边")
+        if directed == "unknown":
+            complete = False
+            uncertainties.append("有向/无向属性待核对")
+        if weighted is True and any(edge["weight"] is None for edge in edges):
+            complete = False
+            uncertainties.append("部分边权未确认")
+        if weighted == "unknown":
+            complete = False
+            uncertainties.append("是否带权待核对")
+        if multigraph == "unknown" and any(count > 1 for count in pair_counts.values()):
+            complete = False
+            uncertainties.append("重边情况待核对")
+        if uncertainties:
+            complete = False
+
+        normalized.append({
+            "id": graph_id,
+            "directed": directed,
+            "weighted": weighted,
+            "multigraph": multigraph,
+            "vertices": vertices,
+            "edges": edges,
+            "uncertain_edges": list(dict.fromkeys(uncertainties))[:80],
+            "complete": bool(complete),
+        })
+    return normalized
+
+
+def _format_graph_data(graphs):
+    """Render validated graph data into a count-consistent visual description."""
+    if not graphs:
+        return ""
+    lines, needs_review = [], False
+    for graph_index, graph in enumerate(graphs, 1):
+        graph_id = graph["id"]
+        directed, weighted, multigraph = graph["directed"], graph["weighted"], graph["multigraph"]
+        if directed is True:
+            graph_type, connector = "有向图", "→"
+        elif directed is False:
+            graph_type, connector = "无向图", "-"
+        else:
+            graph_type, connector = "方向待核对的图", "—"
+        weighted_text = "带权" if weighted is True else "无权" if weighted is False else "权值属性待核对"
+        multi_text = "多重图" if multigraph is True else "简单图" if multigraph is False else "重边情况待核对"
+        vertices = [vertex["id"] for vertex in graph["vertices"]]
+        vertex_set = set(vertices)
+        incident = {endpoint for edge in graph["edges"] for endpoint in (edge["from"], edge["to"])}
+        isolated = [vertex for vertex in vertices if vertex not in incident]
+
+        pair_counts, pair_seen = {}, {}
+        for edge in graph["edges"]:
+            a, b = edge["from"], edge["to"]
+            key = (a, b) if directed is True else tuple(sorted((a, b)))
+            pair_counts[key] = pair_counts.get(key, 0) + 1
+        edge_texts = []
+        for edge in graph["edges"]:
+            a, b = edge["from"], edge["to"]
+            label = f"{a}{connector}{b}"
+            extras = []
+            if a == b:
+                extras.append("自环")
+            if edge.get("edge_label"):
+                extras.append(f"边名 {edge['edge_label']}")
+            if edge.get("weight") is not None:
+                extras.append(f"权值 {edge['weight']}")
+            key = (a, b) if directed is True else tuple(sorted((a, b)))
+            if pair_counts.get(key, 0) > 1:
+                pair_seen[key] = pair_seen.get(key, 0) + 1
+                extras.append(f"平行边 {pair_seen[key]}/{pair_counts[key]}")
+            if extras:
+                label += "（" + "，".join(extras) + "）"
+            edge_texts.append(label)
+
+        line = f"图{graph_index}（{graph_id}）：{graph_type}，{weighted_text}，{multi_text}。"
+        line += "顶点：" + "、".join(vertices) + "。"
+        if isolated:
+            line += "孤立顶点：" + "、".join(isolated) + "。"
+        if edge_texts:
+            line += "边：" + "、".join(edge_texts) + "。"
+        if graph["complete"] and not graph["uncertain_edges"]:
+            line += f"共 {len(graph['edges'])} 条边。"
+        else:
+            line += f"当前已确认 {len(graph['edges'])} 条边；总边数待核对。"
+            needs_review = True
+        if graph["uncertain_edges"]:
+            line += "待核对项：" + "；".join(graph["uncertain_edges"][:8]) + "。"
+            needs_review = True
+        if directed == "unknown" or weighted == "unknown" or multigraph == "unknown":
+            needs_review = True
+        lines.append(line)
+    text = "\n".join(lines)
+    return ("【图形结构待核对】\n" + text) if needs_review else text
+
+
 def _extract_vision_json(content):
     """从视觉模型输出中稳健提取 JSON。"""
     if not isinstance(content, str):
@@ -1342,7 +1577,8 @@ def _extract_vision_json(content):
 
     corrected_text = data.get("corrected_text", "")
     visual_text = data.get("visual_text", "")
-    raw_has_visual = data.get("has_visual_structure", bool(visual_text))
+    graph_data = _normalize_graph_data(data.get("graph_data"))
+    raw_has_visual = data.get("has_visual_structure", bool(visual_text) or bool(graph_data))
     image_kind = data.get("image_kind", "uncertain")
     if image_kind not in {"exercise", "non_exercise", "uncertain"}:
         image_kind = "uncertain"
@@ -1362,9 +1598,15 @@ def _extract_vision_json(content):
     corrected_text = corrected_text.strip()
     visual_text = visual_text.strip()
 
-    # 截断会丢题目条件；异常长输出交由调用方重试/回退，不使用半道题。
+    # Truncated question text is unsafe. Graph prose can be rebuilt from a
+    # validated edge table; the raw model prose remains a fallback.
     if len(corrected_text) > 5000 or len(visual_text) > 3000:
         return None
+    if graph_data:
+        canonical_visual = _format_graph_data(graph_data)
+        if canonical_visual and len(canonical_visual) <= 6000:
+            visual_text = canonical_visual
+            has_visual = True
     if not corrected_text and not visual_text and image_kind != "non_exercise":
         return None
     uncertain_fields = data.get("uncertain_fields", [])
@@ -1379,10 +1621,11 @@ def _extract_vision_json(content):
         "has_visual_structure": bool(has_visual and visual_text),
         "image_kind": image_kind,
         "uncertain_fields": uncertain_fields,
+        "graph_data": graph_data,
     }
 
 
-def _vision_success(corrected_text, visual_text, uncertain_fields=None, image_kind="uncertain"):
+def _vision_success(corrected_text, visual_text, uncertain_fields=None, image_kind="uncertain", graph_data=None):
     return {
         "ok": True,
         # 保留 reply 字段，兼容已有 app.py / 旧代码。
@@ -1391,6 +1634,7 @@ def _vision_success(corrected_text, visual_text, uncertain_fields=None, image_ki
         "visual_text": visual_text,
         "image_kind": image_kind,
         "uncertain_fields": uncertain_fields or [],
+        "graph_data": graph_data or [],
     }
 
 
@@ -1843,6 +2087,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 visual_text,
                 parsed["uncertain_fields"],
                 parsed["image_kind"],
+                parsed.get("graph_data"),
             )
 
         except requests.exceptions.Timeout as exc:
