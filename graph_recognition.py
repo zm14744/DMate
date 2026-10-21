@@ -368,6 +368,19 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
             return filled_result
     except (cv2.error, ValueError, TypeError, OSError) as exc:
         print(f"实心点图结构检测降级：{type(exc).__name__}")
+    # Strict disk-first recognition tests the original straight chord between
+    # *two real disks* (not Hough line fragments). This is essential in MIT's
+    # eight-node crossing diagram: Hough edges can end prematurely at a
+    # crossing even though no vertex is there.
+    try:
+        from graph_black_disks import recognize_black_disk_graph
+        disk_chords=recognize_black_disk_graph(image_bytes)
+        if disk_chords.get("graphs"):
+            disk_chords["elapsed_ms"]=round((time.monotonic()-started)*1000,1)
+            return disk_chords
+    except (cv2.error, ValueError, TypeError, OSError) as exc:
+        print(f"黑色顶点原像素线段检测降级：{type(exc).__name__}")
+
     # If the filled-circle detector returned no usable topology, recover
     # real black-dot straight edges by endpoint-to-circle Hough tracing.
     # This does not overwrite successful v2 graphs or guess printed labels.
