@@ -1598,15 +1598,20 @@ def _extract_vision_json(content):
     corrected_text = corrected_text.strip()
     visual_text = visual_text.strip()
 
-    # Truncated question text is unsafe. Graph prose can be rebuilt from a
-    # validated edge table; the raw model prose remains a fallback.
-    if len(corrected_text) > 5000 or len(visual_text) > 3000:
+    # Truncated question text is unsafe. If a valid edge table is present,
+    # the system rebuilds graph prose from it instead of trusting a long
+    # free-form description.
+    if len(corrected_text) > 5000:
         return None
     if graph_data:
         canonical_visual = _format_graph_data(graph_data)
         if canonical_visual and len(canonical_visual) <= 6000:
             visual_text = canonical_visual
             has_visual = True
+        elif len(visual_text) > 3000:
+            return None
+    elif len(visual_text) > 3000:
+        return None
     if not corrected_text and not visual_text and image_kind != "non_exercise":
         return None
     uncertain_fields = data.get("uncertain_fields", [])
