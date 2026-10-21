@@ -24,7 +24,7 @@ jobs:
         run: |
           python - <<'PY'
           import time,requests,sys
-          expected="2026-10-21-grid-panel-crops-v2"
+          expected="2026-10-21-hough-blue-outline-cv-v3"
           for i in range(20):
               try:
                   r=requests.get("https://dmate.zeabur.app/health",timeout=10).json()
