@@ -148,6 +148,7 @@ VISION_PROMPT = """你是离散数学题目的“图片文字校对 + 图形结�
 - 多个相邻的复杂图（K_5、K_{3,3}、Petersen、状态机、有向多重图等）需依照图例/边界独立编号，不能把不同图的局部线条组合成一张图。
 - 若 OpenCV 未检测到图或只给出 partial/unknown，意味着 CPU 几何识别证据不足，不代表图不存在；仍然独立用完整原图及局部图判断。无法确认边时只标出待核对，不补造边。
 - 如果同一张图片里有两个或更多彼此分开的图，必须分别写成“图1”“图2”……，不要把它们合并成一个图。
+- 对包含三幅及以上有 a/b/c 等明确顶点标签的无向图，请为每幅图单独成行，固定格式为“图1（G1）：无向图，顶点 a、b、c、...。边：a-b、b-c、...。共 N 条边。”；编号和标签按原图，不要把四幅图合并成一段泛泛的位置描述。N 必须等于该行不同无向边的实际条数，且同一无向边只列一次。
 - 如果图中的顶点没有任何可读标签，不要因此放弃识别，也不要把“没有标签”当成不确定项。请为每张图独立创建临时顶点名，例如 G1_v1、G1_v2……和 G2_v1、G2_v2……。
 - 临时顶点编号按视觉位置保持稳定：优先从上到下扫描；处在同一高度带时从左到右。首次列出临时顶点时，用括号补充大致位置（如“左上、上中、右下”），随后逐条给出边。
 - 对无标签图，至少输出：每张图的顶点数、是否有向/带权、临时顶点及位置、完整可确认的边集合；若存在自环或重边要单独注明。这样后续系统即使没有原始顶点名，也能依据邻接结构继续推理。
@@ -1670,7 +1671,7 @@ SINGLE_LABELLED_GRAPH_AUDIT_PROMPT = """你是第二名独立的图论原图逐�
 {"graphs":[{"index":1,"directed":false,"vertices":["A","B"],"edges":[["A","B"]],"complete":true}]}
 如果图片没有恰好一张完整的带字母无向图，graphs设为空数组。"""
 
-def verify_graph_image_independently(image_bytes, retries=1, directed=False, count_only=False, single=False, multi_edges=False):
+def verify_graph_image_independently(image_bytes, retries=1, directed=False, count_only=False, single=False, multi_edges=False, panel_count=4):
     """A second *independent* image-model read for complex graph topology.
 
     Used for graph-isomorphism diagrams and independently checked directed
@@ -1692,12 +1693,13 @@ def verify_graph_image_independently(image_bytes, retries=1, directed=False, cou
         # vertically stacked two graphs had the same near-square issue.
         crops = [image]
         if multi_edges and width >= height * 1.85:
-            # One cropped image per diagram: no ambiguous crossing in a
-            # neighbouring figure can be mistaken for a local edge.
-            for i in range(4):
+            # Split 3-6 figure rows at their real panel count; fixed quarters
+            # can cut a three/six-figure drawing through the middle of an edge.
+            count = max(3, min(6, int(panel_count)))
+            for i in range(count):
                 crops.append(image.crop((
-                    max(0, round(width * (i / 4 - .02))), 0,
-                    min(width, round(width * ((i + 1) / 4 + .02))), height
+                    max(0, round(width * (i / count - .018))), 0,
+                    min(width, round(width * ((i + 1) / count + .018))), height
                 )))
         elif directed and 0.65 <= width / height <= 1.40:
             # A university worksheet often has 3 numbered arrow figures in
