@@ -3782,10 +3782,21 @@ def ocr():
         # Read every edge independently and require pairwise agreement.
         # This is additive: unlabelled multi-figure sheets retain their
         # existing black-dot/count-only audit below.
+        # Run at most one paid independent Vision audit per uploaded image.
+        # Previously a multi-edge audit could be followed by a redundant
+        # vertex-count audit, sending the same source image to Qwen again.
+        graph_audit_attempted = False
+        directed_hint_text = ocr_text + "\n" + corrected_text + "\n" + visual_text
+        directed_question_hint = bool(re.search(
+            r"强连通|弱连通|强连接|弱连接|有向图|有向边|箭头|strongly connected|weakly connected",
+            directed_hint_text, re.I
+        ))
         candidate_panels = parse_labeled_multi_panels(visual_text)
         if (image_kind != "non_exercise"
+                and not directed_question_hint
                 and GRAPH_UNCERTAIN_FLAG not in visual_text
                 and len(candidate_panels) >= 3):
+            graph_audit_attempted = True
             graph_audit = verify_graph_image_independently(
                 raw, retries=0, multi_edges=True, panel_count=len(candidate_panels)
             )
@@ -3830,11 +3841,13 @@ def ocr():
         # Preserve auditing for genuinely two-graph isomorphism questions,
         # including layouts Vision could not format as two clean paragraphs.
         # Never apply the two-graph schema to four-figure comparisons.
-        if (image_kind != "non_exercise" and not multi_panel and (
-                iso_request or (
-                    two_graph_diagram and not _ocr_has_exercise_evidence(question_text)
-                ))):
-            audited = verify_graph_image_independently(raw)
+        if (image_kind != "non_exercise" and not graph_audit_attempted
+                and not multi_panel and (
+                    iso_request or (
+                        two_graph_diagram and not _ocr_has_exercise_evidence(question_text)
+                    ))):
+            graph_audit_attempted = True
+            audited = verify_graph_image_independently(raw, retries=0)
             if audited.get("ok"):
                 initial_graph_text = visual_text
                 visual_text, graph_review_issues, _ = review_graph_transcriptions(
@@ -3859,9 +3872,11 @@ def ocr():
         # transcribed with nonexistent A-C/B-D edges, producing incorrect
         # diameter and colour-count answers. Independently audit the FULL
         # original picture before allowing those calculations.
-        if image_kind != "non_exercise" and GRAPH_UNCERTAIN_FLAG not in visual_text:
+        if (image_kind != "non_exercise" and not graph_audit_attempted
+                and GRAPH_UNCERTAIN_FLAG not in visual_text):
             single_graph_claim = single_undirected_named_edges(visual_text)
             if single_graph_claim is not None:
+                graph_audit_attempted = True
                 independent_single = verify_graph_image_independently(
                     raw, retries=0, single=True
                 )
@@ -3902,10 +3917,11 @@ def ocr():
         # reversals and invented between-component edges. Independently
         # trace arrowheads in a second image-only read before computing
         # strong/weak connectivity. Disagreement must force review.
-        if (image_kind != "non_exercise" and
-                re.search(r"强连通|弱连通|强连接|弱连接|strongly connected|weakly connected",question_text,re.I) and
-                re.search(r"有向图|有向边|箭头|→|->",visual_text) and
-                GRAPH_UNCERTAIN_FLAG not in visual_text):
+        if (image_kind != "non_exercise" and not graph_audit_attempted
+                and re.search(r"强连通|弱连通|强连接|弱连接|strongly connected|weakly connected",question_text,re.I)
+                and re.search(r"有向图|有向边|箭头|→|->",visual_text)
+                and GRAPH_UNCERTAIN_FLAG not in visual_text):
+            graph_audit_attempted = True
             independently_audited = verify_graph_image_independently(
                 raw, retries=0, directed=True
             )
@@ -3926,9 +3942,11 @@ def ocr():
         # inconsistent first Vision count (8/5/6/5/7/8). A second picture-only
         # read counts the actual dots in each separate drawing. A disagreement
         # forces manual confirmation rather than AI answering a made-up tree.
-        if (image_kind != "non_exercise" and not strict_pixel_panels
+        if (image_kind != "non_exercise" and not graph_audit_attempted
+                and not strict_pixel_panels
                 and GRAPH_UNCERTAIN_FLAG not in visual_text
                 and len(FIGURE_VERTEX_COUNT.findall(visual_text)) >= 4):
+            graph_audit_attempted = True
             multigraph_audit = verify_graph_image_independently(
                 raw, retries=0, count_only=True
             )
