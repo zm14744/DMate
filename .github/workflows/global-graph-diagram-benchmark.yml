@@ -5,6 +5,25 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/global-graph-diagram-benchmark.yml"
+      - "ai.py"
+      - "ocr.py"
+      - "graph_recognition.py"
+      - "graph_recognition_v2.py"
+      - "graph_detector_consensus.py"
+      - "graph_consistency.py"
+      - "graph_integrity.py"
+      - "tests/global_graph_picture_benchmark.py"
+  pull_request:
+    paths:
+      - ".github/workflows/global-graph-diagram-benchmark.yml"
+      - "ai.py"
+      - "ocr.py"
+      - "graph_recognition.py"
+      - "graph_recognition_v2.py"
+      - "graph_detector_consensus.py"
+      - "graph_consistency.py"
+      - "graph_integrity.py"
+      - "tests/global_graph_picture_benchmark.py"
 concurrency:
   group: global-university-graph-ocr
   cancel-in-progress: false
