@@ -365,7 +365,7 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
         complete = (
             5 <= len(group) <= 8 and not uncertain and len(edges) >= 2
             and sharpness >= 7 and background_noise < 22
-            and unexplained_ink <= .12
+            and unexplained_ink <= .10
         )
         graphs.append({"id": f"图{len(graphs)+1}", "directed": "unknown",
                        "vertices": vertex_list, "vertex_count": len(group),

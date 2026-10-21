@@ -241,7 +241,7 @@ class GraphRecognitionTests(unittest.TestCase):
         )
         curved = clean.copy()
         ImageDraw.Draw(curved).line(
-            [(45, 55), (75, 90), (115, 100), (160, 90), (210, 55)],
+            [(45, 55), (80, 110), (120, 180), (210, 220), (300, 245), (375, 265)],
             fill=(18, 18, 18), width=3
         )
         curved_fraction = _unexplained_ink_fraction(
@@ -249,7 +249,7 @@ class GraphRecognitionTests(unittest.TestCase):
         )
         self.assertLess(clean_fraction, 0.08, clean_fraction)
         self.assertGreater(curved_fraction, clean_fraction + 0.05, curved_fraction)
-        self.assertGreater(curved_fraction, 0.12, curved_fraction)
+        self.assertGreater(curved_fraction, 0.10, curved_fraction)
 
     def test_strong_blur_downgrades_not_invents(self):
         detected = detect(make_sheet().filter(ImageFilter.GaussianBlur(2.7)))
