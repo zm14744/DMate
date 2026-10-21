@@ -218,7 +218,7 @@ def _load_knowledge_graph():
             data = json.load(file)
 
         if not isinstance(data, dict):
-            raise ValueError("知识图谱文件格式不正确。")
+            raise ValueError("知识图谱文件格式不正确")
 
         data.setdefault("version", 1)
         data.setdefault("title", "离散数学知识图谱")
@@ -2721,7 +2721,7 @@ def chat():
             return jsonify({
                 "error": (
                     "单条消息过长，请控制在 "
-                    f"{MAX_MESSAGE_CHARS} 个字符以内。"
+                    f"{MAX_MESSAGE_CHARS} 个字符以内"
                 )
             }), 400
 
@@ -2819,9 +2819,9 @@ def chat():
     if _requested_reasoning_effort(current_instruction) == "max":
         return jsonify({
             "reply": (
-                "DMate 当前不支持 max 思考强度。"
-                "中等和困难题的解答统一使用 high。"
-                "请不指定 max，直接提出题目或要求完整解析。"
+                "DMate 当前不支持 max 思考强度"
+                "中等和困难题的解答统一使用 high"
+                "请不指定 max，直接提出题目或要求完整解析"
             ),
             "unsupported_effort": "max",
         })
@@ -3030,7 +3030,7 @@ def chat():
                     "本次完整解析没有成功生成。\n\n"
                     "**出题时保存的参考答案（尚未独立复核）：**\n\n"
                     + solution_reference_answer
-                    + "\n\n请稍后重试“给出答案和解析”以获取推导过程。"
+                    + "\n\n请稍后重试“给出答案和解析”以获取推导过程"
                 ),
                 "solution_partial": True,
                 "teaching": {k: v for k, v in teaching.items() if k != "solution_reference_answer"},
@@ -3288,7 +3288,7 @@ def chat():
                 print(f"练习有效但难度估计存在偏差：目标={target_difficulty}，实际={chosen_level}")
                 generation_note = (
                     f"目标难度为{target_difficulty}，本次题目被估计为{chosen_level or '未确定'}；"
-                    "题目已保留，请按实际难度核对。"
+                    "题目已保留，请按实际难度核对"
                 )
             else:
                 generation_note = ""
@@ -3326,7 +3326,7 @@ def chat():
                             and not re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", explanation_text, re.I)):
                         answer_section += "\n\n【解析】\n\n" + explanation_text
                     else:
-                        answer_section += "\n\n解析暂时未能生成，已先保留出题时的参考答案。"
+                        answer_section += "\n\n解析暂时未能生成，已先保留出题时的参考答案"
                 reply += "\n\n" + answer_section
             if output_intent.get("knowledge"):
                 # Use freshly analyzed *generated question* metadata, rather
@@ -3371,7 +3371,7 @@ def chat():
 
     error = result.get(
         "error",
-        "AI 服务暂时不可用，请稍后重试。"
+        "AI 服务暂时不可用，请稍后重试"
     )
 
     return jsonify({
@@ -3902,7 +3902,7 @@ def ocr():
             message = (
                 vision_warning
                 or ocr_fallback_reason
-                or "没有识别到有效的题目内容。"
+                or "没有识别到有效的题目内容"
             )
             return jsonify({
                 "error": message + " 请尝试重新拍摄、裁剪，或提高图形与背景的对比度"
