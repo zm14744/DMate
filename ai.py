@@ -2003,7 +2003,8 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
         "enable_thinking": VISION_ENABLE_THINKING,
         "temperature": 0.1,
         "max_tokens": VISION_MAX_OUTPUT_TOKENS,
-        "stream": True
+        "stream": True,
+        "stream_options": {"include_usage": True}
     }
     if VISION_ENABLE_THINKING:
         payload["thinking_budget"] = VISION_THINKING_BUDGET
@@ -2342,6 +2343,7 @@ def verify_graph_image_independently(image_bytes, retries=0, directed=False, cou
         "temperature": 0.1,
         "max_tokens": VISION_MAX_OUTPUT_TOKENS,
         "stream":True,
+        "stream_options":{"include_usage":True},
     }
     if VISION_ENABLE_THINKING:
         payload["thinking_budget"] = VISION_THINKING_BUDGET
