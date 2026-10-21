@@ -1,0 +1,35 @@
+name: Stanford Original Tree Image - Pixel Topology
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/stanford-original-pixel-graph.yml"
+      - "tests/original_stanford_sparse_graph.py"
+permissions:
+  contents: read
+jobs:
+  verify-real-original:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: .:tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install CV and original PDF image tools
+        run: python -m pip install "numpy<2" "Pillow>=10,<12" "opencv-python-headless==4.10.0.84" "requests>=2.31,<3" "PyMuPDF>=1.24,<2"
+      - name: Recognize Stanford's original six different six-vertex trees from pixels
+        run: python tests/original_stanford_sparse_graph.py
+      - name: Upload exact original figure and independently detected edge sets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stanford-original-six-tree-pixel-verification
+          path: |
+            stanford_original_6trees.png
+            stanford_original_graph_result.json
+          retention-days: 30
+          if-no-files-found: warn
