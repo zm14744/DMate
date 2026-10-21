@@ -3550,6 +3550,7 @@ function normalizeLearningState(value) {
                     retestCount: Math.max(0, Number(item.retestCount) || 0),
                     retestPassCount: Math.max(0, Number(item.retestPassCount) || 0),
                     manualRetestPassCount: Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0)),
+                    retestRecords: Array.isArray(item.retestRecords) ? item.retestRecords.filter(x => x && x.id && x.question).map(x => ({id:String(x.id),question:String(x.question).slice(0,3000),answer:String(x.answer || "").slice(0,8000),analysis:String(x.analysis || "").slice(0,8000),createdAt:Number(x.createdAt)||0})) : [],
                     passedRetestSessionIds: Array.isArray(item.passedRetestSessionIds)
                         ? [...new Set(item.passedRetestSessionIds.map(String))] : [],
                     retestFailCount: Math.max(0, Number(item.retestFailCount) || 0),
@@ -6233,6 +6234,7 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
         retestPassCount: 0,
         manualRetestPassCount: 0,
         passedRetestSessionIds: [],
+        retestRecords: [],
         retestFailCount: 0,
         retestPassed: false,
         retestPassedAt: null,
@@ -7045,12 +7047,51 @@ function closeWrongBook() {
     modal.classList.add("hidden");
 }
 
+
+function persistRetestRecord(item, session) {
+    const retest = normalizeRetestSession(session && session.retest);
+    if (!item || !retest || !retest.generatedQuestion) return false;
+    if (!Array.isArray(item.retestRecords)) item.retestRecords = [];
+    const id = String(session.id);
+    const previous = item.retestRecords.find(x => x.id === id);
+    if (previous) {
+        if (!previous.answer && retest.generatedAnswer) previous.answer = retest.generatedAnswer;
+        return false;
+    }
+    item.retestRecords.push({id:id, question:retest.generatedQuestion, answer:retest.generatedAnswer || "", analysis:"", createdAt:retest.startedAt || Date.now()});
+    return true;
+}
+
 function getWrongRetestSessions(item) {
-    return sessions.filter(session => {
-        const retest = normalizeRetestSession(session.retest);
-        return retest && String(retest.wrongQuestionId) === String(item.id)
-            && Boolean(retest.generatedQuestion);
-    }).sort((a, b) => (a.retest?.startedAt || 0) - (b.retest?.startedAt || 0));
+    let changed = false;
+    sessions.forEach(session => {
+        if (session.retest && String(session.retest.wrongQuestionId) === String(item.id)) {
+            changed = persistRetestRecord(item, session) || changed;
+        }
+    });
+    if (changed) saveLearningState();
+    return [...(item.retestRecords || [])].sort((a,b) => a.createdAt - b.createdAt);
+}
+
+async function generateRetestDetail(itemId, recordId, kind) {
+    const item = learningState.wrongQuestions.find(x => x.id === itemId);
+    const record = item && item.retestRecords.find(x => x.id === recordId);
+    if (!record || record[kind]) return;
+    const request = kind === "answer"
+        ? "请准确解答以下离散数学题目，给出最终答案和必要推导，公式使用标准 $...$ 或 $$...$$：\n" + record.question
+        : "请为以下离散数学题目给出完整的分步骤解析与易错点，公式使用标准 $...$ 或 $$...$$：\n" + record.question + "\n参考答案：\n" + (record.answer || "请自行推导");
+    const button = document.getElementById("retest-gen-" + recordId + "-" + kind);
+    if (button) { button.disabled = true; button.textContent = "生成中…"; }
+    try {
+        const response = await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[{role:"user",content:request}]})});
+        const data = await parseResponseJson(response);
+        if (!response.ok || data.error || !data.reply || !data.reply.trim()) throw new Error(data.error || "生成失败");
+        record[kind] = data.reply.trim().slice(0,8000);
+        item.updatedAt = Date.now();
+        saveLearningState();
+        openWrongRetestReview(itemId);
+    } catch (error) { window.alert(error.message || "生成失败，请重试"); }
+    finally { if (button) button.disabled = false; }
 }
 
 function openWrongRetestReview(id) {
@@ -7063,41 +7104,59 @@ function openWrongRetestReview(id) {
     const selected = new Set((item.passedRetestSessionIds || []).map(String));
     if (!history.length) {
         const empty = document.createElement("p");
-        empty.textContent = "暂无复测题。请先点击“再测一道”，完成出题后即可在这里查看并勾选。";
+        empty.textContent = "暂无复测题，请先点击“再测一道”。";
         list.appendChild(empty);
     }
-    for (const [index, session] of history.entries()) {
-        const row = document.createElement("label");
+    history.forEach((record,index) => {
+        const row = document.createElement("div");
         row.className = "wrong-retest-review-row";
         const check = document.createElement("input");
         check.type = "checkbox";
         check.className = "wrong-retest-review-check";
-        check.checked = selected.has(String(session.id));
-        check.setAttribute("aria-label", `第 ${index + 1} 次复测是否通过`);
+        check.checked = selected.has(record.id);
+        check.setAttribute("aria-label","第 " + (index+1) + " 次复测是否通过");
         const body = document.createElement("div");
         const title = document.createElement("strong");
-        title.textContent = `第 ${index + 1} 次复测`;
+        title.textContent = "第 " + (index+1) + " 次复测";
         const question = document.createElement("div");
         question.className = "wrong-retest-review-question";
-        question.innerHTML = markdownToHtml(session.retest.generatedQuestion);
-        body.append(title, question);
-        check.addEventListener("change", () => {
-            const current = learningState.wrongQuestions.find(entry => entry.id === id);
-            if (!current) return;
-            const ids = new Set((current.passedRetestSessionIds || []).map(String));
-            if (check.checked) ids.add(String(session.id));
-            else ids.delete(String(session.id));
-            current.passedRetestSessionIds = [...ids];
-            current.manualRetestPassCount = ids.size;
-            current.updatedAt = Date.now();
+        question.innerHTML = markdownToHtml(record.question);
+        body.append(title,question);
+        ["answer","analysis"].forEach(kind => {
+            if (record[kind]) {
+                const details = document.createElement("details");
+                const summary = document.createElement("summary");
+                summary.textContent = kind === "answer" ? "查看答案" : "查看解析";
+                const content = document.createElement("div");
+                content.className = "wrong-retest-review-detail";
+                content.innerHTML = markdownToHtml(record[kind]);
+                details.append(summary,content);
+                body.append(details);
+            } else {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "secondary";
+                btn.id = "retest-gen-" + record.id + "-" + kind;
+                btn.textContent = kind === "answer" ? "提供答案" : "生成解析";
+                btn.onclick = () => generateRetestDetail(id,record.id,kind);
+                body.append(btn);
+            }
+        });
+        check.addEventListener("change",() => {
+            const ids = new Set((item.passedRetestSessionIds || []).map(String));
+            if (check.checked) ids.add(record.id); else ids.delete(record.id);
+            item.passedRetestSessionIds = [...ids];
+            item.manualRetestPassCount = ids.size;
+            item.updatedAt = Date.now();
             saveLearningState();
             renderWrongBook();
         });
-        row.append(check, body);
-        list.appendChild(row);
-    }
+        row.append(check,body);
+        list.append(row);
+    });
     modal.classList.remove("hidden");
-    modal.setAttribute("aria-hidden", "false");
+    modal.setAttribute("aria-hidden","false");
+    renderMath(list);
 }
 function closeWrongRetestReview() {
     const modal = document.getElementById("wrongRetestReviewModal");
@@ -7469,6 +7528,8 @@ function processWrongQuestionRetestReply(
             .slice(0, 1200);
         retest.stage = "awaiting_answer";
         session.retest = retest;
+        persistRetestRecord(entry, session);
+        saveLearningState();
 
         saveState();
         return true;
