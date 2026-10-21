@@ -144,6 +144,14 @@ def recognize_blue_outline_panels(image_bytes):
     width,height=original.size
     if not (600 <= width <= 2400 and 380 <= height <= 1700):
         return {"graphs":[],"status":"unsupported","regions":[]}
+    # A 2x PDF rasterization shrinks ~3px hollow vertex rings into
+    # 1-2px anti-aliased marks. At 1.8x, both HoughCircles and endpoints
+    # are again recoverable; keep native 900px+ originals untouched.
+    if width < 800:
+        original=original.resize((
+            round(width*1.8),round(height*1.8)
+        ),Image.Resampling.LANCZOS)
+        width,height=original.size
     candidates=_diagram_grid_crops(original,individual=True,with_boxes=True)
     if len(candidates) != 6:
         return {"graphs":[],"status":"unsupported","regions":[]}
