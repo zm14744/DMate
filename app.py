@@ -634,7 +634,7 @@ def _normalize_username(value):
 def _normalize_email(value):
     email = str(value or "").strip()
     if len(email) > 254 or not EMAIL_RE.fullmatch(email):
-        return None, None, "请输入正确的邮箱地址。"
+        return None, None, "请输入正确的邮箱地址"
     return email, email.casefold(), None
 
 
@@ -644,8 +644,8 @@ def _normalize_auth_credentials(payload):
     if error:
         return None, None, error
     password = str(payload.get("password") or "")
-    if len(password) < 6 or len(password) > 128:
-        return None, None, "密码长度需为 6–128 个字符。"
+    if len(password) < 8 or len(password) > 128:
+        return None, None, "密码不能少于 8 位" if len(password) < 8 else "密码不能超过 128 位"
     return username, username_key, None
 
 
@@ -1088,13 +1088,13 @@ def auth_send_email_code():
                         (username_key,),
                     )
                     if cur.fetchone():
-                        return jsonify({"ok": False, "error": "这个用户名已经被使用。"}), 409
+                        return jsonify({"ok": False, "error": "这个用户名已经被使用"}), 409
                     cur.execute(
                         "SELECT 1 FROM dm_users WHERE email_key = %s",
                         (email_key,),
                     )
                     if cur.fetchone():
-                        return jsonify({"ok": False, "error": "这个邮箱已经绑定了账号。"}), 409
+                        return jsonify({"ok": False, "error": "这个邮箱已经绑定了账号"}), 409
 
                 elif purpose == "reset":
                     cur.execute(
@@ -1200,13 +1200,13 @@ def auth_register():
                     (username_key,),
                 )
                 if cur.fetchone():
-                    return jsonify({"ok": False, "error": "这个用户名已经被使用。"}), 409
+                    return jsonify({"ok": False, "error": "这个用户名已经被使用"}), 409
                 cur.execute(
                     "SELECT 1 FROM dm_users WHERE email_key = %s",
                     (email_key,),
                 )
                 if cur.fetchone():
-                    return jsonify({"ok": False, "error": "这个邮箱已经绑定了账号。"}), 409
+                    return jsonify({"ok": False, "error": "这个邮箱已经绑定了账号"}), 409
 
                 code_id, verify_error = _verify_email_code(
                     cur,
@@ -1247,7 +1247,7 @@ def auth_register():
                 )
     except Exception as exc:
         if getattr(exc, "sqlstate", None) == "23505":
-            return jsonify({"ok": False, "error": "用户名或邮箱已经被使用。"}), 409
+            return jsonify({"ok": False, "error": "用户名或邮箱已经被使用"}), 409
         print(f"注册失败：{repr(exc)}")
         return jsonify({"ok": False, "error": "注册失败，请稍后再试。"}), 500
 
@@ -1499,8 +1499,9 @@ def auth_recover_password_email():
     new_password = str(payload.get("newPassword") or "")
     if error:
         return jsonify({"ok": False, "error": error}), 400
-    if len(new_password) < 6 or len(new_password) > 128:
-        return jsonify({"ok": False, "error": "新密码长度需为 6–128 个字符。"}), 400
+    if len(new_password) < 8 or len(new_password) > 128:
+        message = "新密码不能少于 8 位" if len(new_password) < 8 else "新密码不能超过 128 位"
+        return jsonify({"ok": False, "error": message}), 400
 
     try:
         with _auth_connect() as conn:
@@ -1583,8 +1584,9 @@ def auth_recover_password():
         return jsonify({"ok": False, "error": "请输入正确的用户名。"}), 400
     if not recovery_code:
         return jsonify({"ok": False, "error": "请输入恢复码。"}), 400
-    if len(new_password) < 6 or len(new_password) > 128:
-        return jsonify({"ok": False, "error": "新密码长度需为 6–128 个字符。"}), 400
+    if len(new_password) < 8 or len(new_password) > 128:
+        message = "新密码不能少于 8 位" if len(new_password) < 8 else "新密码不能超过 128 位"
+        return jsonify({"ok": False, "error": message}), 400
 
     try:
         with _auth_connect() as conn:
