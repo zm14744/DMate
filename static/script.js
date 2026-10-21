@@ -15050,6 +15050,14 @@ function renderSessions() {
                 forceCompleteTyping();
             }
 
+            // 删除聊天前保存复测题快照；复测记录与聊天会话分别管理。
+            const relatedRetest = learningState.wrongQuestions.find(item =>
+                String(item.id) === String(session.retest?.wrongQuestionId)
+            );
+            if (relatedRetest && persistRetestRecord(relatedRetest, session)) {
+                saveLearningState();
+            }
+
             removeLearningEventsForSession(
                 session.id
             );
