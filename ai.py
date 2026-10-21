@@ -1428,14 +1428,17 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
             continue
     # Prefer whitespace-demarcated columns over the old arbitrary top/bottom
     # cuts. A Stanford 3x2 tree slide must keep all six diagrams intact.
+    panel_detected = False
     if len(graph_regions or []) < 2:
         panel_crops = _diagram_grid_crops(original)
         if len(panel_crops) >= 2:
             crops = panel_crops[:4]
+            panel_detected = True
     # OCR may only find a tiny “(b)” caption and supply review regions around
     # the caption while missing the actual graph above it. Preserve structural
     # left/right crops for wide graph illustrations even when OCR found text.
-    if crops and len(graph_regions or []) < 3 and width >= height * 1.28:
+    if (not panel_detected and crops
+            and len(graph_regions or []) < 3 and width >= height * 1.28):
         crops.extend([
             original.crop((0, 0, math.ceil(width * 0.57), height)),
             original.crop((math.floor(width * 0.43), 0, width, height)),
@@ -1444,7 +1447,7 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
     # magnified columns. OCR review regions often cover only the title,
     # while generic top/bottom crops shrink the edge crossings too much.
     # The full original is still always sent as the first image.
-    if width >= height * 2.1 and len(graph_regions or []) < 3:
+    if not panel_detected and width >= height * 2.1 and len(graph_regions or []) < 3:
         crops = [
             original.crop((
                 max(0, round(width * (i / 4 - .018))), 0,
