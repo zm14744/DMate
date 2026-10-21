@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import math
+from itertools import combinations
 
 import cv2
 import numpy as np
@@ -74,6 +75,41 @@ def _select_figure_rows(dots):
         else:
             rows[-1].append(v)
     valid = [row for row in rows if len(row) >= 3]
+    # In a screenshot of several 2-column/3-row graphs, each graph row
+    # contains only two vertices, but the entire strip has >=4 on each
+    # of THREE evenly spaced rows. Headlines often create many circular
+    # glyphs; select the complete aligned ink triplet before splitting
+    # panels. A generic "valid rows" filter included those glyphs and
+    # merged the first three diagrams into one spurious 18+ node graph.
+    # This strict strip detector is optional: uneven/curved layouts still
+    # use the original generic detector below.
+    if len(dots) >= 12:
+        candidate_rows = [row for row in rows if len(row) >= 4]
+        strongest = None
+        for triple in combinations(candidate_rows, 3):
+            y = [float(np.median([v[1] for v in row])) for row in triple]
+            gap_a, gap_b = y[1]-y[0], y[2]-y[1]
+            if min(gap_a, gap_b) < max(25, 5*size):
+                continue
+            if max(gap_a, gap_b)/min(gap_a, gap_b) > 1.38:
+                continue
+            minimum = min(len(row) for row in triple)
+            maximum = max(len(row) for row in triple)
+            if maximum > 1.4 * minimum:
+                continue
+            tolerance = max(10, 2.2*size)
+            matched = sum(
+                all(any(abs(node[0]-other[0]) < tolerance for other in row)
+                    for row in triple[1:])
+                for node in triple[0]
+            )
+            if matched < max(4, math.ceil(.65*minimum)):
+                continue
+            quality = (matched, minimum, sum(map(len, triple)))
+            if strongest is None or quality > strongest[0]:
+                strongest = (quality, triple)
+        if strongest is not None:
+            return [node for row in strongest[1] for node in row]
     # Three aligned dots in one row are a useful text-filter heuristic, NOT
     # a reason to discard the other 12 dots of a circular / Petersen drawing.
     # Keep the full geometric cloud when it is well spread on both axes.
@@ -209,8 +245,17 @@ def recognize_filled_graphs(image_bytes, *, text_hint="", allow_without_context=
             # Resize only genuinely tiny inputs; keep textbook scans near
             # native resolution to preserve endpoint geometry.
             longest = max(img.size)
+            # Preserve small filled dots in tall mobile screenshots:
+            # 931x2048 -> 773x1700 lost nine of 24 actual node markers.
+            # A moderately tall 2MP page is safe at native resolution;
+            # still bound genuinely enormous uploads to avoid CPU overload.
+            native_page_safe = (
+                longest <= 3200
+                and img.width * img.height <= 3_500_000
+                and min(img.size) <= 1500
+            )
             scale = (min(2.0, 1100/longest) if longest < 700
-                     else 1.0 if longest <= MAX_SIDE else MAX_SIDE/longest)
+                     else 1.0 if native_page_safe else MAX_SIDE/longest)
             if abs(scale-1.) > .025:
                 img = img.resize((max(1, int(img.width*scale)),
                                   max(1, int(img.height*scale))), Image.Resampling.LANCZOS)
