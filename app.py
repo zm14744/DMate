@@ -3522,6 +3522,41 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
     return corrected_text or ocr_text, {"required": True, "reasons": reasons, "critical_changes": changes}
 
 
+def _describe_verified_outline_panels(graphs):
+    """Use only strictly closed, pixel-traced hollow-circle panel graphs.
+
+    Temporary v1/v2 IDs are never promoted to original printed vertex names.
+    This deliberately does not accept general OpenCV partial candidates.
+    """
+    if len(graphs) != 6 or any(
+        not isinstance(graph, dict) or graph.get("confidence") != "high"
+        or graph.get("uncertain_edges") or not graph.get("vertices")
+        or graph.get("confirmed_edge_count") != len(graph.get("edges") or [])
+        for graph in graphs
+    ):
+        return ""
+    parts = ["【图形像素逐边核验：临时顶点编号，不代表原图标签】"]
+    for index, graph in enumerate(graphs, 1):
+        verts=graph["vertices"]
+        edges=graph["edges"]
+        names=[str(v["id"]) for v in verts]
+        if len(set(names)) != len(names) or any(
+            len(edge)!=2 or edge[0] not in names or edge[1] not in names
+            for edge in edges
+        ):
+            return ""
+        positions="、".join(
+            "%s(%.3f,%.3f)" % (v["id"],v["x"],v["y"])
+            for v in verts
+        )
+        pairs="、".join(str(a)+"-"+str(b) for a,b in edges)
+        parts.append(
+            f"图{index}（无向图）：共{len(verts)}个顶点、{len(edges)}条边。"
+            f"顶点位置：{positions}。边：{pairs}。"
+        )
+    return "\n".join(parts)
+
+
 def _retain_unverified_graph_candidate(failure_text, initial_text):
     """Keep a readable first pass for manual repair without certifying edges.
 
@@ -3719,9 +3754,20 @@ def ocr():
         # and is supplied as pixel evidence to Vision during the same request.
         cv_graphs = graph_cv.get("graphs") or []
         alignment_warnings = []
-        if cv_graphs and visual_text and image_kind != "non_exercise":
-            # Strict pixel geometry + explicit a-f labels only. In all other
-            # arrangements Vision is preserved and no labels are guessed.
+        verified_outline_text = (
+            _describe_verified_outline_panels(cv_graphs)
+            if graph_cv.get("detector") == "hough_blue_outline_panels"
+            else ""
+        )
+        strict_pixel_panels = bool(verified_outline_text)
+        if strict_pixel_panels and image_kind != "non_exercise":
+            # Some real Stanford six-tree figures were hallucinated into
+            # six-edge cycles by Vision despite the original five strokes.
+            # Here every circle and >91% of blue ink are mapped to actual
+            # Hough line endpoints, so use real pixel topology, not a model's
+            # guessed closing edge. Other graph styles keep their old audits.
+            visual_text = verified_outline_text
+        elif cv_graphs and visual_text and image_kind != "non_exercise":
             visual_text, alignment_warnings = reconcile_vision_edges(
                 visual_text, cv_graphs
             )
@@ -3880,7 +3926,8 @@ def ocr():
         # inconsistent first Vision count (8/5/6/5/7/8). A second picture-only
         # read counts the actual dots in each separate drawing. A disagreement
         # forces manual confirmation rather than AI answering a made-up tree.
-        if (image_kind != "non_exercise" and GRAPH_UNCERTAIN_FLAG not in visual_text
+        if (image_kind != "non_exercise" and not strict_pixel_panels
+                and GRAPH_UNCERTAIN_FLAG not in visual_text
                 and len(FIGURE_VERTEX_COUNT.findall(visual_text)) >= 4):
             multigraph_audit = verify_graph_image_independently(
                 raw, retries=0, count_only=True
