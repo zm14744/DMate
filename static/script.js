@@ -7230,18 +7230,22 @@ function markWrongQuestionCorrected(id) {
     renderWrongBook();
 }
 
-function removeWrongQuestion(id) {
+async function removeWrongQuestion(id) {
     const entry = learningState.wrongQuestions.find(
         item => item.id === id
     );
 
     if (!entry) return;
 
-    const confirmed = window.confirm(
-        "确定要把这道题移出错题本吗？这不会删除原聊天"
-    );
-
+    const confirmed = await showAppConfirm({
+        title: "移出错题本",
+        body: "确定要把这道题移出错题本吗？这不会删除原聊天",
+        confirmText: "移出",
+        confirmTone: "danger"
+    });
     if (!confirmed) return;
+    // The user may have changed the list while the dialog was open.
+    if (!learningState.wrongQuestions.some(item => item.id === id)) return;
 
     markWrongQuestionDeleted(id);
     learningState.wrongQuestions = learningState.wrongQuestions.filter(
@@ -20104,6 +20108,23 @@ document.addEventListener(
                 "change",
                 event => setWrongBookSort(event.target.value)
             );
+            // Reuse the same mobile selection dialog as the knowledge graph.
+            // Keep the native select on desktop and as a fallback.
+            wrongBookSortBox.addEventListener("pointerdown", async event => {
+                if (!window.matchMedia("(max-width: 1100px)").matches) return;
+                if (!document.getElementById("mobileChoiceModal")) return;
+                event.preventDefault();
+                const selected = await openMobileChoiceModal({
+                    title: "排序方式",
+                    options: Array.from(wrongBookSortBox.options).map(item => ({
+                        value: item.value, label: item.textContent.trim()
+                    })),
+                    value: wrongBookSortBox.value
+                });
+                if (!selected) return;
+                wrongBookSortBox.value = selected.value;
+                setWrongBookSort(selected.value);
+            });
         }
 
         if (wrongPdfBtn) {
