@@ -3515,6 +3515,26 @@ def _prepare_ocr_review(ocr_text, corrected_text, uncertain_fields=None):
                 changes.append({"question": number, "ocr": "、".join(before), "vision": "、".join(after)})
         if changes:
             reasons.append("第 " + "、".join(x["question"] for x in changes) + " 问的数字或下标识别不一致，请对照原图。")
+            # Never silently accept a confident-looking Vision guess over a
+            # conflicting OCR reading. Preserve the original per-question
+            # transcription, mark the contested symbols and let the user edit.
+            conflicting = {x["question"] for x in changes}
+            parts = list(re.finditer(
+                r"(?m)^\\s*(?:[（(]\\s*(\\d{1,2})\\s*[）)]|([0-9]{1,2})[.．、])\\s*",
+                corrected_text
+            ))
+            for match in reversed(parts):
+                number = match.group(1) or match.group(2)
+                if number not in conflicting:
+                    continue
+                stop = next((m.start() for m in parts if m.start() > match.start()), len(corrected_text))
+                original_line = original.get(number, "")
+                if original_line:
+                    corrected_text = (
+                        corrected_text[:match.end()] + original_line
+                        + " [数字或下标待核对]"
+                        + corrected_text[stop:]
+                    )
     for field in uncertain_fields or []:
         if isinstance(field, str) and field.strip():
             reasons.append(field.strip()[:240])
