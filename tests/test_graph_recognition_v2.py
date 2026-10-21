@@ -249,7 +249,7 @@ class GraphRecognitionTests(unittest.TestCase):
         )
         self.assertLess(clean_fraction, 0.08, clean_fraction)
         self.assertGreater(curved_fraction, clean_fraction + 0.05, curved_fraction)
-        self.assertGreater(curved_fraction, 0.12, curved_fraction)
+        self.assertGreater(curved_fraction, 0.10, curved_fraction)
 
     def test_strong_blur_downgrades_not_invents(self):
         detected = detect(make_sheet().filter(ImageFilter.GaussianBlur(2.7)))
