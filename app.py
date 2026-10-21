@@ -23,6 +23,7 @@ from graph_answer_integrity import (detect_count_inconsistency, review_directed_
     protect_uncertain_graph_answer, review_multi_graph_counts,
     detect_named_graph_degree_inconsistency, is_scanned_graph_solution_request,
     single_undirected_named_edges, review_single_undirected_graph,
+    parse_labeled_multi_panels, review_labeled_multi_panels,
     FIGURE_VERTEX_COUNT)
 from graph_exact_solver import solve_certified_graph
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
@@ -3730,6 +3731,32 @@ def ocr():
         # marked vertices. Run a second independent image-only edge audit.
         # Never let a failed/mismatching read trigger a confident answer.
         graph_review_issues = []
+        # Labeled 3+ figure slides were previously audited only by vertex
+        # counts, so an invented crossing edge (b-f instead of b-e) passed.
+        # Read every edge independently and require pairwise agreement.
+        # This is additive: unlabelled multi-figure sheets retain their
+        # existing black-dot/count-only audit below.
+        candidate_panels = parse_labeled_multi_panels(visual_text)
+        if (image_kind != "non_exercise"
+                and GRAPH_UNCERTAIN_FLAG not in visual_text
+                and len(candidate_panels) >= 3):
+            graph_audit = verify_graph_image_independently(
+                raw, retries=0, multi_edges=True
+            )
+            if graph_audit.get("ok"):
+                visual_text, edge_warnings, _ = review_labeled_multi_panels(
+                    visual_text, graph_audit.get("graphs")
+                )
+                graph_review_issues.extend(edge_warnings)
+            else:
+                graph_review_issues.append(
+                    "多幅图的完整边集未能独立复核，不能据此判定哪些是树。"
+                )
+                visual_text = _retain_unverified_graph_candidate(
+                    GRAPH_UNCERTAIN_FLAG +
+                    "\n多图逐边核验暂不可用，原始边集仅供人工核对。",
+                    visual_text
+                )
         question_text = (ocr_text + "\n" + corrected_text)
         # Some university sheets consist ONLY of two graph drawings and
         # vertex labels; OCR may never output the word "isomorphic".
