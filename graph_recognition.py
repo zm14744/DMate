@@ -368,6 +368,18 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
             return filled_result
     except (cv2.error, ValueError, TypeError, OSError) as exc:
         print(f"实心点图结构检测降级：{type(exc).__name__}")
+    # If the filled-circle detector returned no usable topology, recover
+    # real black-dot straight edges by endpoint-to-circle Hough tracing.
+    # This does not overwrite successful v2 graphs or guess printed labels.
+    try:
+        from graph_black_disk_trace import recognize_black_disk_edges
+        disk_result=recognize_black_disk_edges(image_bytes)
+        if disk_result.get("graphs"):
+            disk_result["elapsed_ms"]=round((time.monotonic()-started)*1000,1)
+            return disk_result
+    except (cv2.error,ValueError,TypeError,OSError) as exc:
+        print(f"黑色实心顶点逐边检测降级：{type(exc).__name__}")
+
     with Image.open(io.BytesIO(image_bytes)) as im:
         im=ImageOps.exif_transpose(im).convert('RGB')
         longest=max(im.size)
