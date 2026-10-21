@@ -14241,19 +14241,48 @@ function markChatMessageAsWrong(sessionId, messageIndex) {
     );
 }
 
-function hideGeneratedExerciseKnowledgePoints(raw) {
-    // 仅隐藏 AI 出题中的“涉及知识点”说明，不修改保存的题干与知识标签。
-    const text = String(raw || "");
-    return text.split("\n").filter((line, index, lines) => {
-        if (/^\s*(?:【(?:涉及知识点|所涉知识点|知识点)】|\[(?:涉及知识点|所涉知识点|知识点)\]|#{1,6}\s*(?:涉及知识点|所涉知识点|知识点))\s*[:：]?\s*/.test(line)) {
-            return false;
+function hideGeneratedExerciseKnowledgePoints(raw, teaching = null) {
+    // 仅改变生成题目的可见内容，原始题目与知识点信息保持不变。
+    // 特别处理服务端返回“【涉及知识点】\n集合运算”但标题被提前移除的旧消息。
+    const lines = String(raw || "").split("\n");
+    const normalized = normalizeTeaching(teaching);
+    const labels = new Set(["集合运算"]);
+    const addLabel = value => {
+        if (typeof value === "string" && value.trim()) labels.add(value.trim());
+    };
+    addLabel(normalized?.category);
+    (normalized?.knowledge_points || []).forEach(addLabel);
+    (normalized?.focus_points || []).forEach(addLabel);
+
+    const heading = /^\s*(?:#{1,6}\s*)?(?:【\s*(?:涉及知识点|所涉知识点|知识点)\s*】|\[\s*(?:涉及知识点|所涉知识点|知识点)\s*\]|(?:涉及知识点|所涉知识点|知识点)\s*[:：])\s*(.*)$/;
+    const output = [];
+    let skipLabelLine = false;
+    for (const line of lines) {
+        const trimmed = line.trim().replace(/^\*\*(.*?)\*\*$/, "$1").trim();
+        const match = trimmed.match(heading);
+        if (match) {
+            skipLabelLine = !match[1].trim();
+            continue;
         }
-        // 标题下一行若只是知识点罗列，则一起隐藏，绝不删除含求解语义的题干。
-        const prev = String(lines[index - 1] || "");
-        return !(/^\s*(?:【(?:涉及知识点|所涉知识点|知识点)】|\[(?:涉及知识点|所涉知识点|知识点)\]|#{1,6}\s*(?:涉及知识点|所涉知识点|知识点))\s*$/.test(prev)
-            && line.trim().length <= 70
-            && !/[。？?]|(?:求|证明|判断|计算|写出|已知|设|下列)/.test(line));
-    }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+        if (skipLabelLine && !trimmed) continue;
+        if (skipLabelLine && !/[。？?]|(?:求|证明|判断|计算|写出|已知|设|下列)/.test(trimmed)
+            && trimmed.length <= 70) {
+            skipLabelLine = false;
+            continue;
+        }
+        skipLabelLine = false;
+        output.push(line);
+    }
+    // 只移除结尾独立的知识点标签，不能误删题干中的条件或小问。
+    while (output.length && !output[output.length - 1].trim()) output.pop();
+    while (output.length) {
+        const last = output[output.length - 1].trim()
+            .replace(/^\*\*(.*?)\*\*$/, "$1").trim();
+        if (!labels.has(last)) break;
+        output.pop();
+        while (output.length && !output[output.length - 1].trim()) output.pop();
+    }
+    return output.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 async function deleteChatMessage(sessionId, messageIndex) {
@@ -14718,7 +14747,7 @@ function renderChat() {
             content.innerHTML =
                 `<div class="ai-content">${markdownToHtml(
                     message.generatedExercise
-                        ? hideGeneratedExerciseKnowledgePoints(prepareAiDisplayText(message.text))
+                        ? hideGeneratedExerciseKnowledgePoints(prepareAiDisplayText(message.text), message.generatedTeaching)
                         : prepareAiDisplayText(message.text)
                 )}</div>`;
         }
