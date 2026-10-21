@@ -5524,7 +5524,10 @@ function completeQuestionTextFromChatMessage(
     if (
         isExerciseRequestText(message.text)
         || isConversationControlOnly(message.text)
-        || isShortLearningFollowUp(message.text)
+        || (
+            isShortLearningFollowUp(message.text)
+            && !(message.role === "user" && message.manualIsQuestion === true)
+        )
     ) {
         return "";
     }
