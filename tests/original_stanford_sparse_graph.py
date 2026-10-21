@@ -65,6 +65,19 @@ def isomorphic(a,b):
 def main():
     original=image_from_official_pdf()
     Path("stanford_original_6trees.png").write_bytes(original)
+    from graph_sparse_panels import recognize_blue_outline_panels, _panel_edges
+    from ai import _diagram_grid_crops
+    import numpy as np
+    with Image.open(io.BytesIO(original)) as im:
+        panels = _diagram_grid_crops(im.convert("RGB"), individual=True, with_boxes=True)
+    print("STANFORD_GRID", [(crop.size,box) for crop,box in panels],flush=True)
+    print("STANFORD_PANEL_EDGE_READS",[
+        None if (read:=_panel_edges(np.asarray(crop))) is None else
+        (len(read[0]),len(read[1])) for crop,box in panels
+    ],flush=True)
+    standalone=recognize_blue_outline_panels(original)
+    print("STANFORD_STANDALONE",standalone.get("status"),
+          len(standalone.get("graphs") or []),flush=True)
     result=recognize_graphs(original, text_hint="六个无标号树图的完整图形结构")
     graphs=result.get("graphs") or []
     summary={
