@@ -101,6 +101,28 @@ class GraphIntegrityTests(unittest.TestCase):
         self.assertFalse(contains_two_labeled_undirected_diagrams(
             aizu_description.replace("图2（无向图）","图3（无向图）")))
 
+    def test_four_tree_diagrams_never_enter_two_diagram_audit(self):
+        # Regression: the old [12] expression saw only 图1 and 图2,
+        # silently skipped 图3/图4, and replaced their entire OCR with
+        # "图形识别结果未能逐图核对".
+        shared = "：无向图，顶点标签为a、b、c、d、e、f。边连接关系为：a-c、b-c、c-d、c-f、e-f。"
+        four = "\n".join(
+            "图{}（G{}）".format(i, i) + shared
+            for i in range(1, 5)
+        )
+        self.assertEqual(set(parse_diagrams(four)), {1, 2, 3, 4})
+        self.assertFalse(contains_two_labeled_undirected_diagrams(four))
+
+    def test_g3_heading_cannot_be_ignored_in_two_diagram_detection(self):
+        two = (
+            "图1（G1）：无向图，顶点a、b。边：a-b。\n"
+            "图2（G2）：无向图，顶点a、b。边：a-b。"
+        )
+        self.assertTrue(contains_two_labeled_undirected_diagrams(two))
+        self.assertFalse(contains_two_labeled_undirected_diagrams(
+            two + "\nG3（另一个无向图）：顶点a、b。边：a-b。"
+        ))
+
     def test_real_aizu_mixed_letters_and_digits_supported(self):
         # Japanese Aizu's original two diagrams label one graph a..h and
         # the other 1..8; prior code rejected all numeric vertex identifiers.
