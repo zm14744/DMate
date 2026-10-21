@@ -1933,9 +1933,22 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None,
             )) for i in range(4)
         ]
     if not crops:
-        if pure_visual_mode:
-            # 纯图模式同时覆盖上下排列和左右排列；保留约 20% 重叠，
-            # 避免恰好位于中线附近的顶点/边被裁断。
+        if pure_visual_mode and graph_only_mode:
+            # Graph-only mode uses overlapping full-height columns for landscape
+            # sheets and full-width rows for portrait sheets. This covers both
+            # panels without spending image tokens on redundant quadrant crops.
+            if width >= height:
+                crops = [
+                    original.crop((0, 0, math.ceil(width * 0.6), height)),
+                    original.crop((math.floor(width * 0.4), 0, width, height)),
+                ]
+            else:
+                crops = [
+                    original.crop((0, 0, width, math.ceil(height * 0.6))),
+                    original.crop((0, math.floor(height * 0.4), width, height)),
+                ]
+        elif pure_visual_mode:
+            # Preserve the existing general-image path unchanged.
             crops = [
                 original.crop((0, 0, width, math.ceil(height * 0.6))),
                 original.crop((0, math.floor(height * 0.4), width, height)),
