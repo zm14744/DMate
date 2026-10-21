@@ -4088,7 +4088,7 @@ def health():
         "status": "ok",
         "graph_integrity_version": "2026-10-20-independent-edge-audit-v2",
         "graph_image_audit_version": "2026-10-20-v4-independent-directed-and-multigraph-vertex-audit",
-        "graph_topology_revision": "2026-10-21-grid-panel-crops-v2",
+        "graph_topology_revision": "2026-10-21-hough-blue-outline-cv-v3",
         "graph_answer_integrity_version": "2026-10-20-v1-fail-closed-university-diagrams",
         "single_graph_dual_edge_audit_version": "2026-10-20-v1-standalone-edge-compare-and-quiz-boundary",
         "chat_route_fix_version": "2026-10-20-current-user-initialized-for-all-chat-requests",
