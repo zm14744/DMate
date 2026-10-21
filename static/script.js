@@ -5149,31 +5149,10 @@ function shouldOfferWrongBookAction(
             return false;
         }
 
-        if (message.source === "ocr") {
-            return isRecordableOcrQuestionMessage(message);
-        }
-
-        if (isConversationControlOnly(message.text)) {
-            return false;
-        }
-
-        const extracted = sanitizeStoredWrongQuestionText(
-            extractQuestionOnlyFromMessage(message)
-        );
-
-        if (!extracted) {
-            return false;
-        }
-
-        // 用户消息必须本身像一道完整学习题，不能因为“提到了集合/图论”
-        // 就出现“记为错题”。例如“刚刚那道集合题还是不会”属于追问。
-        return Boolean(
-            looksLikeChatQuestionText(extracted)
-            || looksLikeFormalStudyQuestionForHistory(
-                extracted,
-                message
-            )
-        );
+        // 普通手动输入和粘贴始终是聊天内容，不自动标为错题。
+        // OCR 是否为题目由核对页决定，AI 出题走下方独立分支。
+        return message.source === "ocr"
+            && isRecordableOcrQuestionMessage(message);
     }
 
     if (message.role === "ai") {
@@ -5545,28 +5524,16 @@ function completeQuestionTextFromChatMessage(
             : "";
     }
 
-    // 用户自己输入、粘贴或 OCR 得到的完整题目都允许复制。
-    question = sanitizeStoredWrongQuestionText(
-        extractQuestionOnlyFromMessage(message)
-    );
-    if (!question) return "";
-
-    if (message.source === "ocr") {
-        return isRecordableOcrQuestionMessage(message)
-            ? question
-            : "";
+    // 题目专用图片复制仅提供给已确认的 OCR 题目；手打仍有普通文本复制。
+    if (message.role !== "user"
+        || message.source !== "ocr"
+        || !isRecordableOcrQuestionMessage(message)) {
+        return "";
     }
 
-    const complete = Boolean(
-        looksLikeChatQuestionText(question)
-        || looksLikeFormalStudyQuestionForHistory(question, message)
-        || (
-            hasExplicitQuestionHeading(message.text)
-            && looksLikeQuestionPayload(question)
-        )
+    return sanitizeStoredWrongQuestionText(
+        extractQuestionOnlyFromMessage(message)
     );
-
-    return complete ? question : "";
 }
 
 function buildQuestionCopyElement(question) {
@@ -12852,31 +12819,13 @@ function attachTeachingSnapshotToLatestQuestion(
             return;
         }
 
-        const question = extractQuestionOnlyFromMessage(
-            message
-        );
-
-        if (message.source === "ocr") {
-            if (isRecordableOcrQuestionMessage(message)) {
-                message.questionTeaching = normalized;
-            }
-            return;
-        }
-
-        if (
-            question
-            && looksLikeQuestionPayload(question)
-            && !isConversationControlOnly(message.text)
-        ) {
+        // 仅对经 OCR 核对确认的题目绑定难度标识；
+        // 普通手打/粘贴仍允许 AI 分析，但不赋予可见的题目身份。
+        if (message.source === "ocr"
+            && isRecordableOcrQuestionMessage(message)) {
             message.questionTeaching = normalized;
-            return;
         }
-
-        // 最近用户消息只是“不会做/继续”等追问时，
-        // 不把这个 follow-up 错当成一道新题。
-        if (isConversationControlOnly(message.text)) {
-            return;
-        }
+        return;
     }
 }
 
@@ -14791,9 +14740,10 @@ function renderChat() {
         const difficultyTeaching = normalizeTeaching(
             message.role === "user"
                 ? (
-                    isExerciseRequestText(message.text)
-                        ? null
-                        : message.questionTeaching
+                    message.source === "ocr"
+                    && isRecordableOcrQuestionMessage(message)
+                        ? message.questionTeaching
+                        : null
                 )
                 : (
                     message.generatedExercise
