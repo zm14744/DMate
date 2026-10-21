@@ -8436,6 +8436,31 @@ body[data-appearance-theme="light"] .left #sessions .session.active,
     }
 }
 
+/* Inline mathematical SVG can expose a tiny horizontal scrollbar/thumb under
+   simple numerals on Android. Keep scrolling for genuinely long formulas,
+   but never paint that scrollbar in chat, answers or wrong-book content. */
+@media(max-width:1100px) {
+    .msg-content mjx-container:not([display="true"]),
+    .wrong-question mjx-container:not([display="true"]),
+    .wrong-feedback-body mjx-container:not([display="true"]),
+    .wrong-answer-body mjx-container:not([display="true"]),
+    .wrong-solution-body mjx-container:not([display="true"]),
+    .wrong-analysis-body mjx-container:not([display="true"]) {
+        scrollbar-width:none !important;
+        -ms-overflow-style:none !important;
+    }
+    .msg-content mjx-container:not([display="true"])::-webkit-scrollbar,
+    .wrong-question mjx-container:not([display="true"])::-webkit-scrollbar,
+    .wrong-feedback-body mjx-container:not([display="true"])::-webkit-scrollbar,
+    .wrong-answer-body mjx-container:not([display="true"])::-webkit-scrollbar,
+    .wrong-solution-body mjx-container:not([display="true"])::-webkit-scrollbar,
+    .wrong-analysis-body mjx-container:not([display="true"])::-webkit-scrollbar {
+        display:none !important;
+        width:0 !important;
+        height:0 !important;
+    }
+}
+
 </style>
 
 <script>
@@ -9185,7 +9210,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-device-appearance-v44-20261021"></script>
+<script src="/static/script.js?v=dmate-math-swipe-v45-20261021"></script>
 
 </body>
 </html>
