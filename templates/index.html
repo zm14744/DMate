@@ -8331,6 +8331,42 @@ body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question
   }
 }
 
+/* Mobile wrong-book sorting uses the existing modal choice list, not a
+   native select whose pointerdown can reopen/close the overlay mid-tap. */
+#wrongBookSortTrigger { display:none !important; }
+@media(max-width:1100px) {
+    #wrongBookModal #wrongBookSort { display:none !important; }
+    #wrongBookModal #wrongBookSortTrigger {
+        display:inline-flex !important;
+        align-items:center !important;
+        justify-content:space-between !important;
+        gap:8px;
+        box-sizing:border-box !important;
+        width:100% !important;
+        min-width:0 !important;
+        min-height:46px !important;
+        height:46px !important;
+        padding:8px 12px !important;
+        border:1px solid var(--border-strong) !important;
+        border-radius:8px !important;
+        color:var(--text-primary) !important;
+        background:var(--surface-2) !important;
+        text-align:left !important;
+        white-space:nowrap;
+    }
+    #wrongBookModal #wrongBookSortTrigger::after {
+        content:"";
+        display:block;
+        flex:0 0 8px;
+        width:8px;
+        height:8px;
+        margin:0 3px 4px 6px;
+        border-right:2px solid currentColor;
+        border-bottom:2px solid currentColor;
+        transform:rotate(45deg);
+    }
+}
+
 </style>
 
 <script>
@@ -8886,6 +8922,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <option value="mistakes">错误次数最多</option>
                 <option value="oldest">最早更新</option>
             </select>
+            <button id="wrongBookSortTrigger" type="button" aria-label="错题排序，选择排序方式" aria-haspopup="dialog" aria-controls="mobileChoiceModal">最近更新</button>
             <button id="wrongPdfBtn" type="button" title="导出当前筛选结果为 PDF">导出 PDF</button>
         </div>
 
