@@ -1268,7 +1268,7 @@ def _vision_success(corrected_text, visual_text, uncertain_fields=None, image_ki
     }
 
 
-def _diagram_grid_crops(image, *, individual=False):
+def _diagram_grid_crops(image, *, individual=False, with_boxes=False):
     """Find genuinely blank gutters between textbook graph panels.
 
     This supplies magnified *image evidence*, not a claimed topology. Require
@@ -1348,7 +1348,7 @@ def _diagram_grid_crops(image, *, individual=False):
         box = (max(0,left-margin_x), max(0,top-margin_y),
                min(width,right+margin_x), min(height,bottom+margin_y))
         if box[2]-box[0] >= 65 and box[3]-box[1] >= 65:
-            output.append(image.crop(box))
+            output.append((image.crop(box), box) if with_boxes else image.crop(box))
     return output
 
 
@@ -1429,7 +1429,7 @@ def _prepare_vision_images(image_bytes, review_regions=None, graph_regions=None)
     # Prefer whitespace-demarcated columns over the old arbitrary top/bottom
     # cuts. A Stanford 3x2 tree slide must keep all six diagrams intact.
     panel_detected = False
-    if len(graph_regions or []) < 2:
+    if len(graph_regions or []) < 4:
         panel_crops = _diagram_grid_crops(original)
         if len(panel_crops) >= 2:
             crops = panel_crops[:4]
