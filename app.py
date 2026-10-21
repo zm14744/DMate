@@ -3741,7 +3741,7 @@ def ocr():
                 and GRAPH_UNCERTAIN_FLAG not in visual_text
                 and len(candidate_panels) >= 3):
             graph_audit = verify_graph_image_independently(
-                raw, retries=0, multi_edges=True
+                raw, retries=0, multi_edges=True, panel_count=len(candidate_panels)
             )
             if graph_audit.get("ok"):
                 visual_text, edge_warnings, _ = review_labeled_multi_panels(
