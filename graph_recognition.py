@@ -407,6 +407,20 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
     except (cv2.error, ValueError, TypeError, OSError) as exc:
         print(f"黑色顶点原像素线段检测降级：{type(exc).__name__}")
     if filled_result and filled_result.get("graphs"):
+        # A lone detector must never certify a complete diagram simply
+        # because its Hough/line-coverage heuristics found no uncertain edges.
+        # Public Graphviz tests exposed false 'high' claims on small, blurred
+        # label-heavy pictures. Multi-panel validated detections retain their
+        # existing behavior; strict disk-backed single-graph consensus already
+        # returned above.
+        if len(filled_result["graphs"]) == 1 and filled_result["graphs"][0].get("confidence") == "high":
+            filled_result["graphs"][0]["confidence"] = "partial"
+            filled_result["graphs"][0]["detector_agreement"] = "unverified"
+            filled_result["status"] = "partial"
+            filled_result["warning"] = (
+                (filled_result.get("warning") or "") +
+                " 单幅图只有一种像素识别方法支持，不能断言顶点和边已完整恢复。"
+            ).strip()
         filled_result["elapsed_ms"] = round((time.monotonic()-started)*1000, 1)
         return filled_result
 

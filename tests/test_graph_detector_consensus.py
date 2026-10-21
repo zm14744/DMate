@@ -101,6 +101,23 @@ class DetectorConsensusTests(unittest.TestCase):
         self.assertEqual(got["status"], "partial")
         self.assertEqual(len(got["graphs"][0]["uncertain_edges"]), 2)
 
+    def test_single_unverified_pixel_graph_is_not_promoted_to_high(self):
+        first = result(graph(["v1", "v2", "v3", "v4"], POINTS,
+                             [(0, 1), (0, 2), (1, 3)]))
+        data = io.BytesIO()
+        Image.new("RGB", (500, 500), "white").save(data, "PNG")
+        with patch("graph_sparse_panels.recognize_blue_outline_panels",
+                   return_value={"status": "unsupported", "graphs": [], "regions": []}), \
+             patch("graph_recognition_v2.recognize_filled_graphs", return_value=first), \
+             patch("graph_black_disks.recognize_black_disk_graph",
+                   return_value={"status": "uncertain", "graphs": [], "regions": []}):
+            got = recognize_graphs(data.getvalue(), text_hint="图论")
+        self.assertEqual(got["status"], "partial")
+        self.assertEqual(got["graphs"][0]["confidence"], "partial")
+        self.assertEqual(got["graphs"][0]["detector_agreement"], "unverified")
+        self.assertEqual(got["graphs"][0]["confirmed_edge_count"], 3)
+        self.assertEqual(len(got["graphs"][0]["edges"]), 3)
+
     def test_multi_panel_keeps_existing_fast_path(self):
         first = result(graph(["v1", "v2", "v3", "v4"], POINTS, [(0, 1)]))
         first["graphs"].append(first["graphs"][0].copy())

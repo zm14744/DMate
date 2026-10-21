@@ -112,12 +112,21 @@ def run():
             item["small_blurred"]=check_image(small.filter(ImageFilter.GaussianBlur(.8)))
             item["low_contrast"]=check_image(ImageEnhance.Contrast(full).enhance(.65))
             item["status"]="tested"
-            # Ground truth count is valid for a *single detected whole graph*.
-            result=item["normal"]
-            item["exact_counts"]=bool(result["graph_count"]==1 and
-                result["vertices"][0]==truth[0] and result["edges"][0]==truth[1])
-            item["unsafe_high"]=bool(not item["exact_counts"] and
-                "high" in result["confidence"])
+            # Audit every rendered variant; checking normal-only can hide
+            # false high-confidence claims created by resizing or blur.
+            variants = ("normal", "small_blurred", "low_contrast")
+            item["variant_exact_counts"] = {}
+            item["unsafe_high_variants"] = []
+            for name in variants:
+                result = item[name]
+                exact = bool(result["graph_count"] == 1 and
+                             result["vertices"][0] == truth[0] and
+                             result["edges"][0] == truth[1])
+                item["variant_exact_counts"][name] = exact
+                if not exact and "high" in result["confidence"]:
+                    item["unsafe_high_variants"].append(name)
+            item["exact_counts"] = item["variant_exact_counts"]["normal"]
+            item["unsafe_high"] = "normal" in item["unsafe_high_variants"]
         except Exception as e:
             item["status"]="failed"
             item["error"]=f"{type(e).__name__}: {str(e)[:260]}"
@@ -128,8 +137,9 @@ def run():
              "variants_tested":3*len(succeeded),
              "exact_counts_normal":sum(x.get("exact_counts",False) for x in succeeded),
              "unsafe_high":sum(x.get("unsafe_high",False) for x in succeeded),
+              "unsafe_high_all_variants":sum(len(x.get("unsafe_high_variants",[])) for x in succeeded),
              "failures":len(SOURCES)-len(succeeded),
-             "note":"Pure OpenCV, not full online DeepSeek Vision; many graph styles intentionally unsupported."}
+             "note":"Pure OpenCV only: no remote Qwen Vision; many graph styles intentionally unsupported. Successful CI does not imply graph accuracy."}
     print("GITHUB_DIAGRAM_SUMMARY "+json.dumps(summary,ensure_ascii=False),flush=True)
     step=os.environ.get("GITHUB_STEP_SUMMARY")
     if step:
@@ -138,7 +148,8 @@ def run():
             out.write(f"Downloaded and rendered: {len(succeeded)}/{len(SOURCES)}; "
                       f"image variants: {3*len(succeeded)}; "
                       f"exact graph counts: {summary['exact_counts_normal']}/{len(succeeded)}; "
-                      f"wrong high-confidence cases: {summary['unsafe_high']}.\n\n")
+                      f"wrong high-confidence cases (normal only): {summary['unsafe_high']}; "
+                       f"all variants: {summary['unsafe_high_all_variants']}.\n\n")
             out.write("OpenCV counts only; no end-to-end Vision inference.\n\n")
             out.write("| Real source | Ground-truth nodes/edges | Detected nodes/edges | Confidence | Exact |\n|---|---|---|---|---|\n")
             for row in report:
