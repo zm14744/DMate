@@ -2039,7 +2039,7 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
     verified = (opencv_graphs or {}).get("graphs", [])
     if verified:
         content_parts.append({"type":"text", "text":(
-            "以下是 OpenCV 从实心圆点及连续像素线迹得到的位置候选，不是已经识别出的顶点字母。"
+            "以下是 OpenCV 从图像像素提取的顶点位置与边候选，不是确定真值，也不是已经识别出的真实顶点标签；必须逐项对照原图核实。"
             "先用每个顶点的归一化 x/y 位置匹配原图的 a/b/c 等标签，再逐线确认边。"
             "交叉点无实心圆点时不得换线或添加顶点；不要为了满足树的 n-1 条边而补边。"
             "confidence=partial 或 uncertain_edges 不得作为确定结论；若原图与候选矛盾，以原图为准。\n"
