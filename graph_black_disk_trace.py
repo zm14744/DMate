@@ -58,7 +58,7 @@ def recognize_black_disk_edges(image_bytes):
     if hough is None:
         return {"graphs":[],"status":"partial","regions":[]}
     normalized=[]
-    for row in hough[:,0]:
+    for row in np.asarray(hough).reshape(-1,4):
         p=np.asarray(row,dtype=float).reshape(2,2)
         vector=p[1]-p[0]
         distance=float(np.linalg.norm(vector))
