@@ -1,0 +1,116 @@
+{
+  "title": "Original OUC graph pictures with previous correct graph interpretation but flawed prose",
+  "cases": [
+    {
+      "id": "ouc_connectivity_G_H_F_K5",
+      "image": "180506.png",
+      "source_sha256": "4223433f6893e82ff476b642d772b39a74278d7d692eda3d62755a1bc26edcaf",
+      "expected": {},
+      "independent_truth": {
+        "graphs": [
+          {
+            "id": "G",
+            "name": "K1,5",
+            "vertices": 6,
+            "edges": 5,
+            "vertex_connectivity": 1
+          },
+          {
+            "id": "H",
+            "name": "C6",
+            "vertices": 6,
+            "edges": 6,
+            "vertex_connectivity": 2
+          },
+          {
+            "id": "F",
+            "name": "W6",
+            "vertices": 6,
+            "edges": 10,
+            "vertex_connectivity": 3
+          },
+          {
+            "id": "K5",
+            "name": "K5",
+            "vertices": 5,
+            "edges": 10,
+            "vertex_connectivity": 4
+          }
+        ],
+        "question": "例：κ(G)=__, κ(H)=__, κ(F)=__, κ(K5)=__。"
+      }
+    },
+    {
+      "id": "ouc_graph_operations_six_panels",
+      "image": "181309.png",
+      "source_sha256": "1dba1c9624c7a866397c00c659a38e4d3a679779c1adb848eed74e1fa944d526",
+      "expected": {},
+      "independent_truth": {
+        "base_edge_labels": {
+          "e1": [
+            "v1",
+            "v5"
+          ],
+          "e2": [
+            "v5",
+            "v4"
+          ],
+          "e3": [
+            "v4",
+            "v3"
+          ],
+          "e4": [
+            "v3",
+            "v2"
+          ],
+          "e5": [
+            "v1",
+            "v2"
+          ],
+          "e6": [
+            "v1",
+            "v4"
+          ],
+          "e7": [
+            "v1",
+            "v3"
+          ]
+        },
+        "graphs": [
+          {
+            "id": "G",
+            "vertices": 5,
+            "edges": 7
+          },
+          {
+            "id": "G-e5",
+            "vertices": 5,
+            "edges": 6
+          },
+          {
+            "id": "G-{e1,e4}",
+            "vertices": 5,
+            "edges": 5
+          },
+          {
+            "id": "G-v5",
+            "vertices": 4,
+            "edges": 5
+          },
+          {
+            "id": "G-{v4,v5}",
+            "vertices": 3,
+            "edges": 3
+          },
+          {
+            "id": "G/e5",
+            "vertices": 4,
+            "edges": 6,
+            "multigraph": true,
+            "parallel_edge_pair": "v1/v2 contracted node to v3, e4 and e7"
+          }
+        ]
+      }
+    }
+  ]
+}

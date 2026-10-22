@@ -1,0 +1,77 @@
+name: OUC Two Original PNG Live OCR Review
+
+on:
+  push:
+    branches:
+      - test/ouc-2-real-image-review-20261022
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-image-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Playwright and Chromium
+        run: |
+          python -m pip install playwright==1.55.0 Pillow==11.3.0
+          python -m playwright install --with-deps chromium
+      - name: Verify two byte-identical original screenshots
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          reference = {
+              "180506.png": "4223433f6893e82ff476b642d772b39a74278d7d692eda3d62755a1bc26edcaf",
+              "181309.png": "1dba1c9624c7a866397c00c659a38e4d3a679779c1adb848eed74e1fa944d526",
+          }
+          for name, expected in reference.items():
+              path = Path("tests/fixtures/original_ouc_20261021") / name
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"Wrong original image {name}: {actual}")
+              print("ORIGINAL_VERIFIED", name, actual, "bytes", path.stat().st_size)
+          PY
+      - name: Upload real screenshots through Playwright and capture live /ocr and popup
+        run: |
+          python tests/ocr_regression.py             --mode live             --cases tests/fixtures/ouc_two_language_review_20261022.json             --image-dir tests/fixtures/original_ouc_20261021             --limit 2             --timeout 330             --output artifacts/ouc-two-real-review
+      - name: Print genuine OCR output and popup wording
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("artifacts/ouc-two-real-review/report.json")
+          if not p.exists():
+              print("NO_REPORT"); raise SystemExit(0)
+          report = json.loads(p.read_text())
+          for row in report["cases"]:
+              print("\n========= REAL IMAGE:", row["id"], "=========")
+              print("HTTP:", row.get("ocr_http_status"), "OPERATIONAL:", row.get("operational_ok"))
+              print("ERROR:", row.get("operational_error", ""))
+              source = p.parent / (row["id"] + "-ocr-response.json")
+              if source.exists():
+                  raw = json.loads(source.read_text())
+                  print("ACTUAL_OCR_TEXT:", str(raw.get("text", ""))[:4000])
+                  print("ACTUAL_VISUAL_TEXT:", str(raw.get("visual_text", ""))[:9000])
+                  print("STRUCTURED_GRAPHS:", json.dumps(raw.get("graph_display_data"), ensure_ascii=False)[:10000])
+                  print("VISION_USED:", raw.get("vision_used"), "WARNINGS:", raw.get("warning"))
+              rendered = row.get("rendered") or {}
+              print("ACTUAL_POPUP_QUESTION:", str(rendered.get("question", ""))[:4000])
+              print("ACTUAL_POPUP_GRAPH:", str(rendered.get("graph", ""))[:9000])
+              print("SCREENSHOTS:", row.get("screenshots"))
+          PY
+      - name: Preserve actual responses and popup screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ouc-two-original-ocr-evidence
+          path: artifacts/ouc-two-real-review/
+          retention-days: 7
+          if-no-files-found: warn
