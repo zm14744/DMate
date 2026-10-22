@@ -88,7 +88,8 @@ def local_layout(raw,cache):
     return {**result,'benchmark_cache_hit':False}
 
 
-def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_model=GLM_MODEL):
+def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_model=GLM_MODEL,
+            vision_seconds=155,call_seconds=45):
     provider=VisionProvider(provider_name,model=glm_model if provider_name=='glm' else None,
                             thinking=thinking,retries=retries,capture=True)
     record={'provider':provider_name,'model':provider.model,'thinking':thinking,'experiment':experiment,
@@ -102,8 +103,9 @@ def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_mo
             mime=_guess_image_mime(raw)
             if mime is None:raise ValueError('Unsupported original image')
             url=f'data:{mime};base64,'+base64.b64encode(raw).decode()
-            result=provider(RAW_PROMPT,[url],Budget(seconds=155,calls=retries+1))
-        else:result=recognize_staged(raw,layout=layout or [],provider=provider)
+            result=provider(RAW_PROMPT,[url],Budget(seconds=vision_seconds,calls=retries+1,call_seconds=call_seconds))
+        else:result=recognize_staged(raw,layout=layout or [],provider=provider,
+                                     budget=Budget(seconds=vision_seconds,calls=7,call_seconds=call_seconds))
         record['raw_result']=result
         graphs=result.get('graphs')
         if not isinstance(graphs,list):raise ValueError('Invalid graph envelope')
@@ -254,6 +256,8 @@ def main():
     parser.add_argument('--experiments',choices=['raw','staged','both'],default='both')
     parser.add_argument('--providers',default='glm,qwen');parser.add_argument('--thinking',choices=['off','on','both'],default='off')
     parser.add_argument('--glm-model',choices=[GLM_MODEL,GLM_PAID_MODEL],default=GLM_MODEL)
+    parser.add_argument('--vision-timeout',type=int,choices=[155,300],default=155)
+    parser.add_argument('--call-timeout',type=int,choices=[45,90],default=45)
     parser.add_argument('--case-ids');parser.add_argument('--repeats',type=int,default=1)
     parser.add_argument('--retries',type=int,default=1);parser.add_argument('--layout-cache')
     parser.add_argument('--resume',action='store_true');parser.add_argument('--inventory-only',action='store_true')
@@ -309,6 +313,7 @@ def main():
                     for provider in order:
                         identity={'case_id':case['id'],'sha256':case['sha256'],'repeat':repeat+1,
                                   'model':VisionProvider(provider,model=args.glm_model if provider=='glm' else None).model,
+                                  'time_budget':{'total_seconds':args.vision_timeout,'per_call_seconds':args.call_timeout,'max_requests':7 if experiment=='staged' else args.retries+1},
                                   'experiment':experiment,'thinking':thinking,'provider':provider,'code_sha256':code_hash,
                                   'layout_sha256':layout_hash if experiment=='staged' else None,
                                   'category':case.get('category'),
@@ -328,7 +333,7 @@ def main():
                             else:
                                 if experiment=='staged' and preprocess_error:
                                     record={'model':model,'status':'local_preprocessing_failed','requests':[],'actual_request_count':0,'seconds':0.}
-                                else:record=execute(raw,provider,experiment,thinking,layout=(prepared or {}).get('layout',{}).get('regions',[]),retries=args.retries,glm_model=args.glm_model)
+                                else:record=execute(raw,provider,experiment,thinking,layout=(prepared or {}).get('layout',{}).get('regions',[]),retries=args.retries,glm_model=args.glm_model,vision_seconds=args.vision_timeout,call_seconds=args.call_timeout)
                             record.update(identity,fingerprint=fingerprint)
                             truth=case['truth']
                             record['metrics']=(compare_graphs(truth.get('graphs',[]),record['raw_result']['graphs'],reference_status=truth.get('reference_status','unverified'))

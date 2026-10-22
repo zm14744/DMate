@@ -105,11 +105,12 @@ def test_both_providers_execute_the_same_node_edge_trace_review_pipeline(name,mo
                                     'decisions':[{'id':c['id'],'visible':True,'direction':'undirected'}
                                                  for j in jobs for c in j['candidates']]}]})
     provider=VisionProvider(name,transport=request,capture=True)
+    supplied_budget=Budget(seconds=300,call_seconds=90)
     with patch('ai.API_KEY','qwen-test'),patch('ai.VISION_ENABLED',True),patch(
             'graph_line_tracer.attach_line_evidence',side_effect=lambda raw,result:result) as trace:
-        result=recognize_staged(original.getvalue(),provider=provider)
+        result=recognize_staged(original.getvalue(),provider=provider,budget=supplied_budget)
     assert len(seen)==3 and trace.call_count==1 and len(result['graphs'][0]['edges'])==1
-    assert result['calls_remaining']==4 and len(provider.observations)==3
+    assert result['calls_remaining']==4 and supplied_budget.remaining==4 and len(provider.observations)==3
 
 
 def test_parallel_instances_are_not_deduplicated_in_precision_recall():
@@ -201,3 +202,25 @@ def test_paid_glm_is_explicit_and_flash_cannot_masquerade_as_paid(monkeypatch):
     provider=VisionProvider('glm',model=GLM_PAID_MODEL,transport=lambda *a,**k:response({'graphs':[]},GLM_MODEL))
     with pytest.raises(VisionError,match='model_mismatch'):provider('JSON',[URL],Budget())
     with pytest.raises(ValueError):VisionProvider('qwen',model=GLM_PAID_MODEL)
+
+
+@pytest.mark.parametrize('raw,valid',[
+    ('\n{"graphs":[]}\n``',True),
+    ('```json\n{"graphs":[]}\n```',True),
+    ('{"graphs":[{"edges":[]} ]\n``',False),
+    ('Explanation {"graphs":[]}\n``',False),
+])
+def test_only_outer_formatting_is_normalized_never_inner_json(raw,valid,monkeypatch):
+    monkeypatch.setenv('ZHIPU_API_KEY','test')
+    provider=VisionProvider('glm',transport=lambda *a,**k:(200,'',{
+        'choices':[{'message':{'content':raw},'finish_reason':'stop'}]}))
+    if valid:assert provider('JSON',[URL],Budget())=={'graphs':[]}
+    else:
+        with pytest.raises(VisionError,match='invalid_output'):provider('JSON',[URL],Budget())
+
+
+def test_long_benchmark_budget_does_not_change_production_defaults():
+    assert Budget().take()==45
+    longer=Budget(seconds=300,calls=1,call_seconds=90)
+    assert longer.take()==90
+    with pytest.raises(TimeoutError):longer.take()

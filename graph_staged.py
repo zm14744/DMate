@@ -52,13 +52,14 @@ inventory_complete仅在全部真实顶点和边均已列出且方向权值确�
 
 
 class Budget:
-    def __init__(self, seconds=155, calls=7):
+    def __init__(self, seconds=155, calls=7, call_seconds=45):
         self.deadline=time.monotonic()+seconds; self.remaining=calls; self.metrics=[]
+        self.call_seconds=call_seconds
     def take(self):
         seconds=self.deadline-time.monotonic()
         if self.remaining<=0 or seconds<3: raise TimeoutError('vision_budget')
         self.remaining-=1
-        return min(45,seconds)
+        return min(self.call_seconds,seconds)
 
 
 def _data_url(image):
@@ -268,10 +269,10 @@ def merge_node_reads(graph, reads):
     return graph
 
 
-def recognize_staged(image_bytes, *, layout=None, call=None, provider=None):
+def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budget=None):
     """Return canonical graphs; failures are explicit and never crash /ocr."""
     if call is not None and provider is not None: raise ValueError('Choose call or provider')
-    budget=Budget(); ask=call or provider or _call; diagnostics=[]
+    budget=budget or Budget(); ask=call or provider or _call; diagnostics=[]
     with Image.open(io.BytesIO(image_bytes)) as original:
         if original.width*original.height>16_000_000: raise ValueError('image_pixel_budget')
         image=ImageOps.exif_transpose(original).convert('RGB')

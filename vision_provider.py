@@ -139,13 +139,18 @@ class VisionProvider:
                     raise VisionError('model_mismatch')
                 if choice.get('finish_reason')=='length':raise VisionError('truncated_output')
                 if not isinstance(raw,str):raise VisionError('invalid_output')
-                cleaned=re.sub(r'^```(?:json)?\s*|\s*```$','',raw.strip(),flags=re.IGNORECASE)
+                # Some vision responses append two backticks to an otherwise
+                # complete JSON object. Remove formatting only, then validate
+                # the ENTIRE root; never salvage an inner/truncated fragment.
+                cleaned=re.sub(r'^`{1,3}(?:json)?\s*|\s*`{1,3}$','',raw.strip(),flags=re.IGNORECASE)
                 parsed=json.loads(cleaned,parse_constant=_invalid_json_constant)
                 if not isinstance(parsed,dict):raise VisionError('invalid_output')
                 metric['status']=200
                 return parsed
-            except (requests.RequestException,TimeoutError):
+            except (requests.RequestException,TimeoutError) as exc:
                 error=VisionError('transport_failed');metric['status']='transport_failed'
+                metric['exception_type']=type(exc).__name__
+                metric['confirmed_timeout']=True if isinstance(exc,(requests.Timeout,TimeoutError)) else None
             except (ValueError,TypeError,KeyError,IndexError,AttributeError):
                 error=VisionError('invalid_output');metric['status']='invalid_output'
             except VisionError as exc:
