@@ -71,12 +71,60 @@ def build_one(which, target):
     im.save(target, optimize=True)
 
 
+def draw_visual_review_recreation(which, target):
+    """Draw new math-only diagrams matching the independently read graph structures.
+
+    These are recreated test figures, NOT pixel-identical copies of coursework.
+    """
+    im = Image.new("RGB", (1350, 700), "#ffffff")
+    d = ImageDraw.Draw(im)
+    if which == "reviewed_directed5":
+        d.text((70, 40), "Directed graph: determine the seven arcs.", fill="#111111", font=font(34))
+        p = {"v1": (240, 230), "v2": (240, 480), "v3": (660, 480),
+             "v4": (660, 230), "v5": (1080, 230)}
+        edges = (("v4", "v1"), ("v1", "v2"), ("v2", "v3"),
+                 ("v2", "v4"), ("v3", "v4"), ("v3", "v5"), ("v4", "v5"))
+        for a, b in edges:
+            d.line((p[a], p[b]), fill="#111111", width=6)
+            draw_arrow(d, p[b], p[a])
+        for label, point in p.items():
+            draw_node(d, point, label, font(25))
+    elif which == "reviewed_three_graphs":
+        d.text((72, 35), "Compare the edge sets of G1, G2 and G3.", fill="#111111", font=font(34))
+        all_edges = (
+            (("T1","B1"),("T1","B2"),("T1","B3"),("T2","B1"),("T2","B2"),
+             ("T2","B3"),("T3","B1"),("T3","B2"),("T3","B3")),
+            (("T1","B1"),("T1","B2"),("T1","B3"),("T2","B2"),("T2","B3"),
+             ("T3","B2"),("T3","B3")),
+            (("T1","T2"),("T2","T3"),("B1","B2"),("B2","B3"),("T1","B1"),
+             ("T2","B2"),("T3","B3"),("T1","B2"),("T2","B3"),("T3","B1")),
+        )
+        for index, base in enumerate((215, 670, 1125)):
+            p = {f"T{i}": (base+(i-2)*118, 230) for i in range(1,4)}
+            p.update({f"B{i}": (base+(i-2)*118, 440) for i in range(1,4)})
+            for a,b in all_edges[index]:
+                d.line((p[a], p[b]), fill="#111111", width=5)
+            for point in p.values():
+                x,y=point
+                d.ellipse((x-19,y-19,x+19,y+19), fill="#ffffff",
+                          outline="#111111", width=5)
+            d.text((base-25, 530), f"G{index+1}", fill="#111111", font=font(35))
+    else:
+        raise ValueError(which)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    im.save(target, optimize=True)
+
+
 def generate(output_dir):
     base = Path(output_dir)
     paths = {}
     for which in ("directed","parallel","simple"):
         dest = base / f"{which}.png"
         build_one(which,dest)
+        paths[which] = dest
+    for which in ("reviewed_directed5", "reviewed_three_graphs"):
+        dest = base / f"{which}.png"
+        draw_visual_review_recreation(which, dest)
         paths[which] = dest
     return paths
 
