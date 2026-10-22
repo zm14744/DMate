@@ -345,9 +345,15 @@ def _graph_candidates(rgb, graph):
     result = []
     for variants in path_variants.values():
         result.extend(variants)
-    return sorted(
+    ordered = sorted(
         result, key=lambda x: (-x['score'], x['from'], x['to'])
     )[:MAX_TRACES_PER_GRAPH]
+    variants = {}
+    for entry in ordered:
+        pair = tuple(sorted((entry['from'], entry['to'])))
+        entry['path_variant'] = variants.get(pair, 0)
+        variants[pair] = entry['path_variant'] + 1
+    return ordered
 
 
 def attach_line_evidence(image_bytes, cv_result):
