@@ -215,6 +215,8 @@ def merge_node_reads(graph, reads):
     Endpoint equality alone never deduplicates parallel equal-weight edges.
     """
     edges=[]; covered=set(); ids={v['id'] for v in graph['vertices']}
+    positions={v['id']:(v['x'],v['y']) for v in graph['vertices']
+               if v.get('x') is not None and v.get('y') is not None}
     for read in reads:
         if not isinstance(read, dict): continue
         vertex=read.get('vertex')
@@ -225,6 +227,19 @@ def merge_node_reads(graph, reads):
             a,b=raw.get('from'),raw.get('to')
             if a not in ids or b not in ids or vertex not in (a,b): continue
             edge=copy.deepcopy(raw); edge['path']=path_points(edge.get('path'))
+            alignment=None
+            if edge['path'] and a in positions and b in positions:
+                path=edge['path'];u,v=positions[a],positions[b]
+                distance=lambda p,q:((p[0]-q[0])**2+(p[1]-q[1])**2)**.5
+                choices=[(u,v),(v,u)]
+                start,end=min(choices,key=lambda pair:distance(path[0],pair[0])+distance(path[-1],pair[1]))
+                # Qwen's path coordinates are often coarser than its labelled
+                # endpoints. Align only bounded endpoint drift; keep a path
+                # ending on a different real vertex rejected by TRACE/RELATE.
+                drift=max(distance(path[0],start),distance(path[-1],end))
+                if 1e-5<drift<=.16:
+                    alignment={'source':'endpoint_alignment','observed_endpoints':[path[0],path[-1]]}
+                    edge['path']=[list(start)]+path[1:-1]+[list(end)]
             # A read can contain several distinct, very close parallel strokes.
             # Only match an observation from the OTHER endpoint, one-to-one.
             same=[e for e in edges if {e['from'],e['to']}=={a,b} and e['path'] and edge['path']
@@ -245,6 +260,7 @@ def merge_node_reads(graph, reads):
                     e['weight']=None
                 continue
             edge['id']=f'e{len(edges)+1}'; edge['status']='pending'; edge['evidence']=[evidence]
+            if alignment: edge['evidence'].append(alignment)
             edges.append(edge)
     graph=copy.deepcopy(graph); graph['edges']=edges[:300]
     graph['node_complete']=bool(graph.get('node_complete') is True and covered==ids)
@@ -310,6 +326,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
     traced=attach_line_evidence(image_bytes,{'graphs':graphs})
     panels={p['id']:p['paths'] for p in traced.get('line_path_evidence',[])}
     output=[recover_relations(g,panels.get(g['id'],[])) for g in graphs]
+    initial_candidates={g['id']:copy.deepcopy(output[i]['_candidates']) for i,g in enumerate(graphs)}
+    reviews_by_graph={}
     # Two bounded REVIEW calls must cover later panels as well as G1/G2.
     # Previously e.g. textbook panel (d) never reached visual review at all.
     width=max(1,(len(graphs)+1)//2)
@@ -352,9 +370,44 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
                 allowed=allowed_by_graph.get(graph['id'],set())
                 decisions={d['id']:d for d in (current.get('decisions') or [])
                            if isinstance(d,dict) and d.get('id') in allowed}
+                reviews_by_graph[graph['id']]=decisions
                 graph['inventory_reviewed']=bool(current.get('inventory_complete') is True
                     and allowed and set(decisions)==allowed and len(output[index]['_candidates'])<=48)
                 output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions)
         except (ValueError,RuntimeError,TimeoutError): diagnostics.append('local_review_failed')
+    if len(graphs)==1:
+        # One panel uses only one of the two reserved local reviews. Spend the
+        # remaining review on a narrow original-pixel crop of arrow conflicts.
+        # Do not flip edges solely because OpenCV disagrees with the VLM.
+        graph=graphs[0];related=output[0]
+        conflicts={e['id']:e for e in related['_candidates'] if any(
+            isinstance(v,dict) and v.get('source')=='direction_conflict' for v in e['evidence'])}
+        candidates=[]
+        for candidate in initial_candidates[graph['id']]:
+            if candidate['id'] in conflicts:
+                candidate['evidence']=conflicts[candidate['id']]['evidence']
+                candidates.append(candidate)
+        candidates=candidates[:8]
+        points=[p for c in candidates for p in c['path']]
+        if points:
+            left=max(0,round(min(p[0] for p in points)*image.width)-35)
+            top=max(0,round(min(p[1] for p in points)*image.height)-35)
+            right=min(image.width,round(max(p[0] for p in points)*image.width)+35)
+            bottom=min(image.height,round(max(p[1] for p in points)*image.height)+35)
+            if right>left and bottom>top:
+                try:
+                    payload={'graph_id':graph['id'],'vertices':graph['vertices'],'candidates':candidates}
+                    verified=ask(REVIEW_PROMPT+'\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。'
+                        +'沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。仅返回decisions列表。\n'
+                        +json.dumps(payload,ensure_ascii=False),[url,_data_url(image.crop((left,top,right,bottom)))],budget)
+                    changes=verified.get('decisions')
+                    if changes is None and isinstance(verified.get('graphs'),list):
+                        changes=next((r.get('decisions',[]) for r in verified['graphs']
+                                      if isinstance(r,dict) and r.get('graph_id')==graph['id']),[])
+                    allowed={c['id'] for c in candidates}
+                    review=dict(reviews_by_graph.get(graph['id'],{}))
+                    review.update({d['id']:d for d in (changes or []) if isinstance(d,dict) and d.get('id') in allowed})
+                    output[0]=recover_relations(graph,panels.get(graph['id'],[]),review=review)
+                except (ValueError,RuntimeError,TimeoutError): diagnostics.append('focused_arrow_review_failed')
     return {'graphs':output,'diagnostics':diagnostics,'calls_remaining':budget.remaining,
             'remote_metrics':budget.metrics}

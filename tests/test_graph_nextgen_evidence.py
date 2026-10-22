@@ -158,3 +158,42 @@ def test_path_to_a_different_vertex_cannot_be_accepted_by_generic_review():
     actual=recover_relations(g,[],review={'e1':{'visible':True,'direction':'undirected'}})
     assert actual['edges']==[]
     assert actual['relation_audit'][0]['endpoint_mismatch']
+
+
+def test_coarse_path_coordinates_align_to_fixed_nodes_without_changing_edge():
+    value=edge(path=[[.17,.5],[.5,.5],[.83,.5]])
+    result=merge_node_reads(record(),[{'vertex':'a','edges':[value]}])
+    actual=result['edges'][0]
+    assert (actual['from'],actual['to'])==('a','b')
+    assert actual['path']==[[.1,.5],[.5,.5],[.9,.5]]
+    assert any(e.get('source')=='endpoint_alignment' for e in actual['evidence'])
+
+
+def test_single_graph_arrow_conflict_gets_second_focused_visual_review():
+    import io
+    import json
+    from PIL import Image
+    from unittest.mock import patch
+    from graph_staged import recognize_staged
+    image=io.BytesIO();Image.new('RGB',(160,100),'white').save(image,format='PNG')
+    g=record(directed=True);calls=[]
+    def ask(prompt,images,budget):
+        calls.append(prompt)
+        if 'NODE 阶段' in prompt:return {'graphs':[g]}
+        if 'EDGE 阶段' in prompt:
+            return {'reads':[{'graph_id':'G','vertex':v,'complete':True,'edges':[edge(direction='forward')]}
+                             for v in ('a','b')]}
+        if len(calls)==3:
+            return {'decisions':[{'id':'e1','visible':True,'direction':'forward'}],'inventory_complete':True}
+        assert len(images)==2 and '局部裁图' in prompt
+        return {'decisions':[{'id':'e1','visible':True,'direction':'reverse'}]}
+    def trace(raw,result):
+        result['line_path_evidence']=[{'id':'G','paths':[
+            {'from':'a','to':'b','path':[[.1,.5],[.9,.5]],'score':1.,
+             'arrow_candidate':{'from':'b','to':'a','score':.8,'candidate_only':True}}]}]
+        return result
+    with patch('graph_line_tracer.attach_line_evidence',side_effect=trace):
+        actual=recognize_staged(image.getvalue(),call=ask)['graphs'][0]
+    assert len(calls)==4
+    assert (actual['edges'][0]['from'],actual['edges'][0]['to'])==('b','a')
+    assert actual['edges'][0]['status']=='accepted'
