@@ -115,8 +115,17 @@ def _follow(skel, points, source_i, start, radius, max_steps):
     previous, current = (sx, sy), start
     path, visited = [current], {current}
     turns, ambiguity = 0.0, 0
+    max_excursion = 0.0
     for _ in range(max_steps):
         cx, cy = current
+        source_distance = math.hypot(cx - sx, cy - sy)
+        max_excursion = max(max_excursion, source_distance)
+        # A circular node rim is not a self-loop. Only an external ink
+        # excursion that returns to the marked node can suggest a loop.
+        if (len(path) >= max(16, 5 * radius)
+                and max_excursion >= 2.8 * radius
+                and source_distance <= radius + 4):
+            return source_i, path, turns, ambiguity
         arrivals = [
             (math.hypot(cx - vx, cy - vy), i)
             for i, (_, vx, vy) in enumerate(points)
@@ -199,6 +208,7 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                 continue
             samples = max(15, min(250, round(length * 0.9)))
             hits = 0
+            missing_run = max_missing_run = 0
             for step in range(samples):
                 t = 0.09 + 0.82 * (step + 0.5) / samples
                 mx, my = ax + t * dx, ay + t * dy
@@ -210,8 +220,13 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                         found = True
                         break
                 hits += int(found)
+                missing_run = 0 if found else missing_run + 1
+                max_missing_run = max(max_missing_run, missing_run)
             coverage = hits / samples
-            if coverage < 0.83:
+            # Average ink coverage alone can connect unrelated aligned lines.
+            # A long missing segment is evidence against an actual edge.
+            largest_gap_px = max_missing_run * length / samples
+            if coverage < 0.83 or largest_gap_px > max(6, min(16, length * 0.045)):
                 continue
             candidates.append({
                 'from': local[i][0], 'to': local[j][0],
@@ -239,7 +254,9 @@ def _graph_candidates(rgb, graph):
     ]
     median_sep = float(np.median(nearest))
     radius = max(3, min(13, round(median_sep * 0.12)))
-    margin = max(16, round(median_sep * 0.33))
+    # Small crops clipped real outer arcs and self-loops. Retain enough
+    # space beyond the vertex hull without scanning the entire text page.
+    margin = max(34, min(120, round(median_sep * 0.62)))
     min_x = max(0, min(p[1] for p in points) - margin)
     max_x = min(w, max(p[1] for p in points) + margin + 1)
     min_y = max(0, min(p[2] for p in points) - margin)
@@ -260,7 +277,7 @@ def _graph_candidates(rgb, graph):
             target, path, turns, ambiguity = _follow(
                 skel, local, source, start, radius, max_steps
             )
-            if target is None or target == source:
+            if target is None:
                 continue
             a, b = sorted((source, target))
             key = (a, b)
@@ -285,7 +302,9 @@ def _graph_candidates(rgb, graph):
                 'straightness': round(separation / max(length, 1), 3),
                 'score': round(score, 3),
                 'needs_review': True,
-                'method': 'opencv_skeleton_tangent_trace',
+                'method': ('opencv_skeleton_loop_trace'
+                           if source == target else 'opencv_skeleton_tangent_trace'),
+                'loop_candidate': source == target,
             }
             if (key not in best_by_pair
                     or score > best_by_pair[key]['score']):
