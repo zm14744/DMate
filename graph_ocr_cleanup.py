@@ -55,4 +55,13 @@ def clean_graph_question_text(text, *, has_graph=False):
     return "\n".join(retained).strip()
 
 
-__all__ = ["clean_graph_question_text"]
+def ocr_is_label_dominated(text):
+    """Identify an OCR dump of graph labels, not an actual prose question."""
+    lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+    if len(lines) < 4 or any(_EXERCISE.search(line) for line in lines):
+        return False
+    count = sum(bool(_LABEL.fullmatch(line)) for line in lines)
+    return count >= 4 and count * 10 >= len(lines) * 6
+
+
+__all__ = ["clean_graph_question_text", "ocr_is_label_dominated"]
