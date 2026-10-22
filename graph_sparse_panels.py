@@ -32,7 +32,7 @@ def _panel_edges(rgb):
     if candidates is None:
         return None
     normalized = []
-    for line in candidates[:,0]:
+    for line in np.asarray(candidates).reshape(-1,4):
         points=np.asarray(line, dtype=float).reshape(2,2)
         delta=points[1]-points[0]
         length=float(np.linalg.norm(delta))
