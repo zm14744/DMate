@@ -273,8 +273,10 @@ def main():
              'graph_arrow_evidence.py','graph_black_disks.py','graph_recognition.py','ocr_runtime.py','ocr_worker.py',
              'ocr_layout.py','requirements.txt','ai.py','vision_provider.py','graph_ab_metrics.py','scripts/benchmark_graph_vision.py']
     code_hash=sha(b''.join((repo/p).read_bytes() for p in tracked))
+    try:source_commit=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD'],text=True).strip()
+    except (OSError,subprocess.CalledProcessError):source_commit=os.environ.get('DMATE_BENCHMARK_COMMIT')
     metadata={'started_at':datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(),
-              'source_commit':subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD'],text=True).strip(),
+              'source_commit':source_commit,
               'code_sha256':code_hash,'resource_limits':limits,'question_original_count':len(cases),
               'provided_file_count':manifest.get('provided_file_count'),'deduplicated':duplicates,
               'prompt_templates_sha256':sha((RAW_PROMPT+NODE_PROMPT+EDGE_PROMPT+REVIEW_PROMPT).encode()),
