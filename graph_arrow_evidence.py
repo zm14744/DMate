@@ -82,18 +82,28 @@ def annotate_arrow_candidates(rgb, graph, paths, radius):
             continue
     if len(vertices) < 2:
         return paths
-    # Remove circular interiors and rims: they otherwise imitate arrow wings.
+    # Crop around this mathematical graph: captions and adjacent diagrams
+    # must not create arrowheads, nor should each panel scan the whole page.
+    border = max(32, round(radius*5))
+    x1 = max(0, int(min(x for x,y in vertices.values()))-border)
+    x2 = min(w, int(max(x for x,y in vertices.values()))+border+1)
+    y1 = max(0, int(min(y for x,y in vertices.values()))-border)
+    y2 = min(h, int(max(y for x,y in vertices.values()))+border+1)
+    if x2-x1 < 20 or y2-y1 < 20:
+        return paths
     from graph_line_tracer import _foreground
-    mask = _foreground(rgb)
-    for x, y in vertices.values():
-        cv2.circle(mask, (round(x), round(y)), max(3, round(radius * 1.18)), 0, -1)
-    segments = cv2.HoughLinesP(
-        cv2.Canny(mask, 50, 145), 1, np.pi/360, threshold=7,
-        minLineLength=max(4, round(radius*0.45)), maxLineGap=3,
+    mask = _foreground(rgb[y1:y2, x1:x2])
+    for x,y in vertices.values():
+        cv2.circle(mask, (round(x)-x1,round(y)-y1),
+                   max(3,round(radius*1.18)),0,-1)
+    segments=cv2.HoughLinesP(
+        cv2.Canny(mask,50,145),1,np.pi/360,threshold=7,
+        minLineLength=max(4,round(radius*.45)),maxLineGap=3,
     )
     if segments is None:
         return paths
-    lines = [tuple(map(float, line)) for line in segments[:, 0][:850]]
+    lines=[(float(ax+x1),float(ay+y1),float(bx+x1),float(by+y1))
+           for ax,ay,bx,by in segments[:,0][:850]]
     for path in paths:
         a, b = str(path.get("from","")), str(path.get("to",""))
         if a not in vertices or b not in vertices or a == b:
