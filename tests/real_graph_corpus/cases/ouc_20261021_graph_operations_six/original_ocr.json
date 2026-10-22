@@ -1,0 +1,448 @@
+{
+  "text": "V1\nV1\nes\nes\n45\ne6\ne1\nV2\n45\ne6\ne1\nV2\n45\ne6\ne1\n47\nen\nex\ne2\nex\ne2\nes\n43\ne3\n43\nA\ne3\n43\nG\nG\n-e5\nG−{e1, e{4}\nV1\nV1\nes\nes\ne1\ne6\ne1\nV2\ne1\n47\n45\ne6\ne1\nex\nex\nex\nen\ne3\ne3\n3\nG−[v4} v{s}\nG\\",
+  "visual_text": "【图形结构待核对】\n图1（G1）：无向图，无权，简单图。顶点：v1、v2、v3、v4、v5。边：v1-v2（边名 e5）、v1-v3（边名 e7）、v1-v4（边名 e1）、v1-v5（边名 e6）、v2-v3（边名 e4）、v3-v4（边名 e3）、v4-v5（边名 e2）。共 7 条边。\n图2（G2）：无向图，无权，简单图。顶点：v1、v2、v3、v4、v5。边：v1-v3（边名 e7）、v1-v4（边名 e1）、v1-v5（边名 e6）、v2-v3（边名 e4）、v3-v4（边名 e3）、v4-v5（边名 e2）。共 6 条边。\n图3（G3）：无向图，无权，简单图。顶点：v1、v2、v3、v4、v5。孤立顶点：v2。边：v1-v3（边名 e7）、v1-v5（边名 e6）、v3-v4（边名 e3）、v4-v5（边名 e2）。共 4 条边。\n图4（G4）：无向图，无权，简单图。顶点：v1、v2、v3、v4。边：v1-v2（边名 e5）、v1-v3（边名 e7）、v1-v4（边名 e1）、v2-v3（边名 e4）、v3-v4（边名 e3）。共 5 条边。\n图5（G5）：无向图，无权，简单图。顶点：v1、v2、v3。边：v1-v2（边名 e5）、v1-v3（边名 e7）、v2-v3（边名 e4）。共 3 条边。\n图6（G6）：无向图，无权，简单图。顶点：v1、v2、v3、v4、v5。边：v1-v2（边名 e5）、v1-v3（边名 e7）、v1-v4（边名 e1）、v1-v5（边名 e6）、v2-v3（边名 e4）、v3-v4（边名 e3）、v4-v5（边名 e2）。当前已确认 7 条边；总边数待核对。待核对项：标注与图形矛盾。",
+  "graph_display_data": [
+    {
+      "complete": true,
+      "directed": false,
+      "edges": [
+        {
+          "edge_label": "e5",
+          "from": "v1",
+          "to": "v2",
+          "weight": null
+        },
+        {
+          "edge_label": "e7",
+          "from": "v1",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e1",
+          "from": "v1",
+          "to": "v4",
+          "weight": null
+        },
+        {
+          "edge_label": "e6",
+          "from": "v1",
+          "to": "v5",
+          "weight": null
+        },
+        {
+          "edge_label": "e4",
+          "from": "v2",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e3",
+          "from": "v3",
+          "to": "v4",
+          "weight": null
+        },
+        {
+          "edge_label": "e2",
+          "from": "v4",
+          "to": "v5",
+          "weight": null
+        }
+      ],
+      "id": "G1",
+      "multigraph": false,
+      "uncertain_edges": [],
+      "vertices": [
+        {
+          "id": "v1",
+          "label": "v1",
+          "x": 0.5,
+          "y": 0.1
+        },
+        {
+          "id": "v2",
+          "label": "v2",
+          "x": 0.8,
+          "y": 0.3
+        },
+        {
+          "id": "v3",
+          "label": "v3",
+          "x": 0.7,
+          "y": 0.6
+        },
+        {
+          "id": "v4",
+          "label": "v4",
+          "x": 0.3,
+          "y": 0.6
+        },
+        {
+          "id": "v5",
+          "label": "v5",
+          "x": 0.2,
+          "y": 0.3
+        }
+      ],
+      "weighted": false
+    },
+    {
+      "complete": true,
+      "directed": false,
+      "edges": [
+        {
+          "edge_label": "e7",
+          "from": "v1",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e1",
+          "from": "v1",
+          "to": "v4",
+          "weight": null
+        },
+        {
+          "edge_label": "e6",
+          "from": "v1",
+          "to": "v5",
+          "weight": null
+        },
+        {
+          "edge_label": "e4",
+          "from": "v2",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e3",
+          "from": "v3",
+          "to": "v4",
+          "weight": null
+        },
+        {
+          "edge_label": "e2",
+          "from": "v4",
+          "to": "v5",
+          "weight": null
+        }
+      ],
+      "id": "G2",
+      "multigraph": false,
+      "uncertain_edges": [],
+      "vertices": [
+        {
+          "id": "v1",
+          "label": "v1",
+          "x": 0.5,
+          "y": 0.1
+        },
+        {
+          "id": "v2",
+          "label": "v2",
+          "x": 0.8,
+          "y": 0.3
+        },
+        {
+          "id": "v3",
+          "label": "v3",
+          "x": 0.7,
+          "y": 0.6
+        },
+        {
+          "id": "v4",
+          "label": "v4",
+          "x": 0.3,
+          "y": 0.6
+        },
+        {
+          "id": "v5",
+          "label": "v5",
+          "x": 0.2,
+          "y": 0.3
+        }
+      ],
+      "weighted": false
+    },
+    {
+      "complete": true,
+      "directed": false,
+      "edges": [
+        {
+          "edge_label": "e7",
+          "from": "v1",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e6",
+          "from": "v1",
+          "to": "v5",
+          "weight": null
+        },
+        {
+          "edge_label": "e3",
+          "from": "v3",
+          "to": "v4",
+          "weight": null
+        },
+        {
+          "edge_label": "e2",
+          "from": "v4",
+          "to": "v5",
+          "weight": null
+        }
+      ],
+      "id": "G3",
+      "multigraph": false,
+      "uncertain_edges": [],
+      "vertices": [
+        {
+          "id": "v1",
+          "label": "v1",
+          "x": 0.5,
+          "y": 0.1
+        },
+        {
+          "id": "v2",
+          "label": "v2",
+          "x": 0.8,
+          "y": 0.3
+        },
+        {
+          "id": "v3",
+          "label": "v3",
+          "x": 0.7,
+          "y": 0.6
+        },
+        {
+          "id": "v4",
+          "label": "v4",
+          "x": 0.3,
+          "y": 0.6
+        },
+        {
+          "id": "v5",
+          "label": "v5",
+          "x": 0.2,
+          "y": 0.3
+        }
+      ],
+      "weighted": false
+    },
+    {
+      "complete": true,
+      "directed": false,
+      "edges": [
+        {
+          "edge_label": "e5",
+          "from": "v1",
+          "to": "v2",
+          "weight": null
+        },
+        {
+          "edge_label": "e7",
+          "from": "v1",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e1",
+          "from": "v1",
+          "to": "v4",
+          "weight": null
+        },
+        {
+          "edge_label": "e4",
+          "from": "v2",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e3",
+          "from": "v3",
+          "to": "v4",
+          "weight": null
+        }
+      ],
+      "id": "G4",
+      "multigraph": false,
+      "uncertain_edges": [],
+      "vertices": [
+        {
+          "id": "v1",
+          "label": "v1",
+          "x": 0.5,
+          "y": 0.1
+        },
+        {
+          "id": "v2",
+          "label": "v2",
+          "x": 0.8,
+          "y": 0.3
+        },
+        {
+          "id": "v3",
+          "label": "v3",
+          "x": 0.7,
+          "y": 0.6
+        },
+        {
+          "id": "v4",
+          "label": "v4",
+          "x": 0.3,
+          "y": 0.6
+        }
+      ],
+      "weighted": false
+    },
+    {
+      "complete": true,
+      "directed": false,
+      "edges": [
+        {
+          "edge_label": "e5",
+          "from": "v1",
+          "to": "v2",
+          "weight": null
+        },
+        {
+          "edge_label": "e7",
+          "from": "v1",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e4",
+          "from": "v2",
+          "to": "v3",
+          "weight": null
+        }
+      ],
+      "id": "G5",
+      "multigraph": false,
+      "uncertain_edges": [],
+      "vertices": [
+        {
+          "id": "v1",
+          "label": "v1",
+          "x": 0.5,
+          "y": 0.1
+        },
+        {
+          "id": "v2",
+          "label": "v2",
+          "x": 0.8,
+          "y": 0.3
+        },
+        {
+          "id": "v3",
+          "label": "v3",
+          "x": 0.7,
+          "y": 0.6
+        }
+      ],
+      "weighted": false
+    },
+    {
+      "complete": false,
+      "directed": false,
+      "edges": [
+        {
+          "edge_label": "e5",
+          "from": "v1",
+          "to": "v2",
+          "weight": null
+        },
+        {
+          "edge_label": "e7",
+          "from": "v1",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e1",
+          "from": "v1",
+          "to": "v4",
+          "weight": null
+        },
+        {
+          "edge_label": "e6",
+          "from": "v1",
+          "to": "v5",
+          "weight": null
+        },
+        {
+          "edge_label": "e4",
+          "from": "v2",
+          "to": "v3",
+          "weight": null
+        },
+        {
+          "edge_label": "e3",
+          "from": "v3",
+          "to": "v4",
+          "weight": null
+        },
+        {
+          "edge_label": "e2",
+          "from": "v4",
+          "to": "v5",
+          "weight": null
+        }
+      ],
+      "id": "G6",
+      "multigraph": false,
+      "uncertain_edges": [
+        "标注与图形矛盾"
+      ],
+      "vertices": [
+        {
+          "id": "v1",
+          "label": "v1",
+          "x": 0.5,
+          "y": 0.1
+        },
+        {
+          "id": "v2",
+          "label": "v2",
+          "x": 0.8,
+          "y": 0.3
+        },
+        {
+          "id": "v3",
+          "label": "v3",
+          "x": 0.7,
+          "y": 0.6
+        },
+        {
+          "id": "v4",
+          "label": "v4",
+          "x": 0.3,
+          "y": 0.6
+        },
+        {
+          "id": "v5",
+          "label": "v5",
+          "x": 0.2,
+          "y": 0.3
+        }
+      ],
+      "weighted": false
+    }
+  ],
+  "graph_display_version": "2026-10-22-fixed-graph-layout-v1",
+  "graph_structures": [],
+  "raw_ocr_text": "V1\nV1\nes\nes\n45\ne6\ne1\nV2\n45\ne6\ne1\nV2\n45\ne6\ne1\n47\nen\nex\ne2\nex\ne2\nes\n43\ne3\n43\nA\ne3\n43\nG\nG\n-e5\nG−{e1, e{4}\nV1\nV1\nes\nes\ne1\ne6\ne1\nV2\ne1\n47\n45\ne6\ne1\nex\nex\nex\nen\ne3\ne3\n3\nG−[v4} v{s}\nG\\",
+  "review": {
+    "critical_changes": [],
+    "reasons": [
+      "图6中符号 'G\\e5' 的操作含义与图形表现不一致：图形仍含边e5（v1-v2），但标注为G\\e5；若为边收缩，应出现新顶点并移除v1/v2之一，而图中仍为5个顶点；因此边e5是否实际存在或是否已收缩为不确定；建议核对原题定义。"
+    ],
+    "required": true
+  },
+  "text_count": 54,
+  "formula_count": 0,
+  "vision_used": true,
+  "warning": null
+}

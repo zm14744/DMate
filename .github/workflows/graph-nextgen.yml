@@ -65,6 +65,8 @@ jobs:
       DEEPSEEK_API_KEY: ${{ secrets.DMATE_TEST_DEEPSEEK_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - name: Require complete original conversation corpus before full regression
+        run: python scripts/graph_corpus.py validate --full
       - name: Require explicit test secrets; never silently mock a real API test
         run: test -n "$DASHSCOPE_API_KEY" && test -n "$DEEPSEEK_API_KEY"
       - uses: actions/setup-python@v5

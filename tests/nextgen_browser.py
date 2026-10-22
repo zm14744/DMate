@@ -63,7 +63,23 @@ def main():
     args=parser.parse_args()
     if urlsplit(args.base_url).hostname not in ('127.0.0.1','localhost'): raise SystemExit('Only an isolated local branch server is allowed')
     out=Path(args.output);out.mkdir(parents=True,exist_ok=True)
-    cases=json.loads(Path('tests/fixtures/ouc_two_originals_gold.json').read_text())['cases']
+    if args.mode=='live':
+        from scripts.graph_corpus import validate_corpus,safe_child
+        manifest_path=Path('tests/real_graph_corpus/manifest.json').resolve()
+        issues=validate_corpus(manifest_path,full=True)
+        if issues:
+            (out/'report.json').write_text(json.dumps({'mode':'live','status':'blocked_missing_original_corpus',
+                'recognition_accuracy_test':False,'issues':issues},ensure_ascii=False,indent=2))
+            print('Full regression blocked: original conversation corpus has not been completely imported')
+            return 2
+        corpus=json.loads(manifest_path.read_text());cases=[]
+        for row in corpus['cases']:
+            truth=json.loads(safe_child(manifest_path.parent,row['ground_truth']).read_text())
+            cases.append({'id':row['id'],'image':str(safe_child(manifest_path.parent,row['image'])),
+                          'source_sha256':row['sha256'],'expected':truth['expected'],
+                          **({'expected_question_text':truth['expected_question_text']} if 'expected_question_text' in truth else {})})
+    else:
+        cases=json.loads(Path('tests/fixtures/ouc_two_originals_gold.json').read_text())['cases']
     server=None; log=None
     if args.mode=='contract':
         env=os.environ.copy();env.update(DMATE_GRAPH_NEXTGEN='1',PORT=str(urlsplit(args.base_url).port or 8080),

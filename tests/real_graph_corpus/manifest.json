@@ -1,0 +1,90 @@
+{
+  "schema": "dmate.real-corpus/1",
+  "scope": "all_user_conversation_graph_originals",
+  "enumeration_complete": false,
+  "expected_case_count": null,
+  "expected_batch_ids": [],
+  "cases": [
+    {
+      "id": "ouc_20261021_star_cycle_wheel_k5",
+      "batch_id": null,
+      "institution": "中国海洋大学",
+      "source_kind": "user_original_repository",
+      "conversation_id": null,
+      "message_id": null,
+      "original_filename": "180506.png",
+      "image": "cases/ouc_20261021_star_cycle_wheel_k5/original.png",
+      "sha256": "4223433f6893e82ff476b642d772b39a74278d7d692eda3d62755a1bc26edcaf",
+      "original_ocr": "cases/ouc_20261021_star_cycle_wheel_k5/original_ocr.json",
+      "ground_truth": "cases/ouc_20261021_star_cycle_wheel_k5/ground_truth.json",
+      "ground_truth_independently_reviewed": true,
+      "evaluation": "cases/ouc_20261021_star_cycle_wheel_k5/evaluation.json",
+      "original_dialog": "cases/ouc_20261021_star_cycle_wheel_k5/original_dialog.png",
+      "original_capture": "cases/ouc_20261021_star_cycle_wheel_k5/original_capture.json",
+      "original_result_source": "https://github.com/zm14744/DMate/actions/runs/39739842459",
+      "original_result_timestamp": "2026-10-22T07:21:24.034151+00:00"
+    },
+    {
+      "id": "ouc_20261021_graph_operations_six",
+      "batch_id": null,
+      "institution": "中国海洋大学",
+      "source_kind": "user_original_repository",
+      "conversation_id": null,
+      "message_id": null,
+      "original_filename": "181309.png",
+      "image": "cases/ouc_20261021_graph_operations_six/original.png",
+      "sha256": "1dba1c9624c7a866397c00c659a38e4d3a679779c1adb848eed74e1fa944d526",
+      "original_ocr": "cases/ouc_20261021_graph_operations_six/original_ocr.json",
+      "ground_truth": "cases/ouc_20261021_graph_operations_six/ground_truth.json",
+      "ground_truth_independently_reviewed": true,
+      "evaluation": "cases/ouc_20261021_graph_operations_six/evaluation.json",
+      "original_dialog": "cases/ouc_20261021_graph_operations_six/original_dialog.png",
+      "original_capture": "cases/ouc_20261021_graph_operations_six/original_capture.json",
+      "original_result_source": "https://github.com/zm14744/DMate/actions/runs/39739842459",
+      "original_result_timestamp": "2026-10-22T07:21:24.034151+00:00"
+    }
+  ],
+  "missing_materials": [
+    {
+      "group": "中国海洋大学其他课件原图",
+      "status": "conversation_originals_not_imported",
+      "examples": [
+        "180441",
+        "180525",
+        "180744",
+        "181000",
+        "181229"
+      ]
+    },
+    {
+      "group": "国内外高校图论原图及实际识别结果",
+      "status": "conversation_originals_not_imported",
+      "examples": [
+        "斯坦福六树",
+        "MIT八顶点及四图",
+        "康奈尔",
+        "港科大",
+        "会津大学",
+        "南京大学",
+        "上海交通大学"
+      ]
+    },
+    {
+      "group": "北京大学出版社教材实拍及多批带权图",
+      "status": "conversation_originals_not_imported",
+      "examples": [
+        "10.8(b)",
+        "10.10",
+        "11.18/11.19",
+        "13.11",
+        "14.21至14.28",
+        "(a)至(d)"
+      ]
+    },
+    {
+      "group": "十批完整逐图清单与原始对话消息对应关系",
+      "status": "inventory_not_accessible",
+      "exact_total": null
+    }
+  ]
+}

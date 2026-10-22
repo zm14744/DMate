@@ -1,0 +1,28 @@
+{
+  "id": "ouc_connectivity_G_H_F_K5",
+  "source_image": "180506.png",
+  "mode": "live",
+  "steps": [
+    "opened_homepage",
+    "received_ocr_json",
+    "captured_actual_review_dialog",
+    "cancelled_before_ai_solver"
+  ],
+  "comparisons": [],
+  "page_errors": [],
+  "http_errors": [],
+  "screenshots": [
+    "ouc_connectivity_G_H_F_K5-ocr-review.png"
+  ],
+  "ocr_http_status": 200,
+  "ocr_seconds": 27.93,
+  "rendered": {
+    "question": "Extra close brace or missing open brace\nExtra close brace or missing open brace\n\n7\nG\nH\nF\nK5\n课堂测试一",
+    "graph": "未识别到内容",
+    "mathjax_svg_count": 1,
+    "question_type": "question"
+  },
+  "operational_ok": true,
+  "semantic_status": "not_configured",
+  "source_sha256": "4223433f6893e82ff476b642d772b39a74278d7d692eda3d62755a1bc26edcaf"
+}
