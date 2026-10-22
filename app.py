@@ -3746,7 +3746,9 @@ def ocr():
             try:
                 graph_cv = recognize_graphs(raw, text_hint=ocr_text,
                                             allow_without_context=(len(ocr_text) < 20))
-                if attach_line_evidence is not None and graph_cv.get("graphs"):
+                if (_env_bool("GRAPH_PATH_EVIDENCE_ENABLED", True)
+                        and attach_line_evidence is not None
+                        and graph_cv.get("graphs")):
                     graph_cv = attach_line_evidence(raw, graph_cv)
             except Exception as cv_exc:
                 print(f"OpenCV 图结构识别降级：{type(cv_exc).__name__}")
