@@ -178,6 +178,44 @@ def _sample_path(path, width, height):
     ]
 
 
+
+def _route_signature(candidate, pointmap, width, height):
+    """Nine arc-length samples, oriented by the source vertex."""
+    path = candidate.get("path") or []
+    if len(path) < 2: return []
+    try:
+        coords = [(float(q[0])*(width-1), float(q[1])*(height-1)) for q in path]
+    except (TypeError, ValueError, IndexError):
+        return []
+    source = pointmap.get(str(candidate.get("from")))
+    if source is None: return []
+    if math.dist(coords[0],source) > math.dist(coords[-1],source): coords.reverse()
+    lengths = [0.0]
+    for a,b in zip(coords,coords[1:]):
+        lengths.append(lengths[-1]+math.dist(a,b))
+    if lengths[-1]<4: return []
+    samples=[]
+    for t in [i/10 for i in range(1,10)]:
+        distance=t*lengths[-1]
+        for i in range(1,len(lengths)):
+            if lengths[i]>=distance:
+                ratio=(distance-lengths[i-1])/max(1e-5,lengths[i]-lengths[i-1])
+                samples.append((
+                    coords[i-1][0]*(1-ratio)+coords[i][0]*ratio,
+                    coords[i-1][1]*(1-ratio)+coords[i][1]*ratio
+                ))
+                break
+    return samples
+
+
+def _same_ink_route(candidate,existing,pointmap,width,height,radius):
+    """Group reverse traversals but not distinct straight/curved strokes."""
+    a=_route_signature(candidate,pointmap,width,height)
+    b=_route_signature(existing,pointmap,width,height)
+    return (len(a)==len(b)==9 and
+            sorted(math.dist(x,y) for x,y in zip(a,b))[-3] <= max(5.5,radius*1.25))
+
+
 def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
     """Independently propose only high-coverage straight strokes.
 
@@ -330,32 +368,23 @@ def _graph_candidates(rgb, graph):
     path_variants = {}
     indices = {name: i for i, (name, _, _) in enumerate(local)}
 
-    def midpoint(candidate):
-        samples = candidate.get('path') or []
-        if not samples:
-            return (0.0, 0.0)
-        lo, hi = (len(samples) - 1) // 2, len(samples) // 2
-        middle = ((samples[lo][0] + samples[hi][0]) / 2,
-                  (samples[lo][1] + samples[hi][1]) / 2)
-        return (middle[0] * (w - 1), middle[1] * (h - 1))
+    node_pixels = {name:(x,y) for name,x,y in points}
 
     def keep_candidate(candidate):
-        pair = tuple(sorted((indices[candidate['from']],
-                             indices[candidate['to']])))
-        variants = path_variants.setdefault(pair, [])
-        center = midpoint(candidate)
-        for index, old in enumerate(variants):
-            if math.dist(center, midpoint(old)) <= max(8, radius * 2.2):
-                if candidate['score'] > old['score']:
-                    variants[index] = candidate
+        pair = tuple(sorted((indices[candidate["from"]],
+                             indices[candidate["to"]])))
+        variants=path_variants.setdefault(pair,[])
+        for index,old in enumerate(variants):
+            if _same_ink_route(candidate,old,node_pixels,w,h,radius):
+                if candidate["score"]>old["score"]: variants[index]=candidate
                 return
-        if len(variants) < 3:
+        # Variants are candidate strokes, not certified multiplicity.
+        if len(variants)<6:
             variants.append(candidate)
         else:
-            weakest = min(range(len(variants)),
-                          key=lambda i: variants[i]['score'])
-            if candidate['score'] > variants[weakest]['score']:
-                variants[weakest] = candidate
+            weakest=min(range(len(variants)),key=lambda i:variants[i]["score"])
+            if candidate["score"]>variants[weakest]["score"]:
+                variants[weakest]=candidate
 
     max_steps = min(
         1600, max(50, round(2.4 * (max_x - min_x + max_y - min_y)))
@@ -432,6 +461,20 @@ def attach_line_evidence(image_bytes, cv_result):
                 continue
             traces = _graph_candidates(rgb, graph)
             if traces:
+                # The arrow result is evidence, not an accepted direction.
+                try:
+                    from graph_arrow_evidence import annotate_arrow_candidates
+                    nodes = _vertices(graph, rgb.shape[1], rgb.shape[0])
+                    if len(nodes) >= 2:
+                        distances = [
+                            min(math.hypot(x-xx,y-yy) for j,(_,xx,yy)
+                                in enumerate(nodes) if j != i)
+                            for i,(_,x,y) in enumerate(nodes)
+                        ]
+                        radius=max(3,min(13,round(float(np.median(distances))*.12)))
+                        annotate_arrow_candidates(rgb,graph,traces,radius)
+                except (ImportError,TypeError,ValueError,cv2.error) as arrow_exc:
+                    print(f"箭头候选检测降级：{type(arrow_exc).__name__}")
                 candidates.append({
                     'id': str(graph.get('id', '')),
                     'paths': traces,
