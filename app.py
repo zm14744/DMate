@@ -3921,9 +3921,10 @@ def ocr():
             audited = verify_graph_image_independently(raw, retries=0)
             if audited.get("ok"):
                 initial_graph_text = visual_text
-                visual_text, graph_review_issues, _ = review_graph_transcriptions(
+                visual_text, iso_audit_issues, _ = review_graph_transcriptions(
                     visual_text, audited.get("graphs")
                 )
+                graph_review_issues.extend(iso_audit_issues)
                 if GRAPH_UNCERTAIN_FLAG in visual_text:
                     visual_text = _retain_unverified_graph_candidate(
                         visual_text, initial_graph_text
@@ -3934,9 +3935,9 @@ def ocr():
                     "\n复杂图形的独立逐边复核未完成，暂不能据此判断同构。",
                     visual_text
                 )
-                graph_review_issues = [
+                graph_review_issues.append(
                     "复杂图形逐边复核没有完成；请核对顶点间的弧线、交叉线和黑色实心点。"
-                ]
+                )
 
         # Single labeled crossing-edge graphs were not covered by the
         # two-graph isomorphism auditor. A real MIT A-H source was repeatedly
