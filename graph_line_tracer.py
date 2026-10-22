@@ -146,6 +146,20 @@ def _follow(skel, points, source_i, start, radius, max_steps):
                 continue
             if (px, py) in visited or skel[py, px] == 0:
                 continue
+            # NEIGHBORS permits short two-pixel advances to traverse curves.
+            # An advance must pass through at least one actual ink pixel:
+            # do not teleport over a one-pixel white gap onto a crossing edge.
+            if abs(ox) > 1 or abs(oy) > 1:
+                ix, iy = (1 if ox > 0 else -1 if ox < 0 else 0), (
+                    1 if oy > 0 else -1 if oy < 0 else 0
+                )
+                intermediate = ((cx+ix,cy+iy), (cx+ix,cy), (cx,cy+iy))
+                if not any(
+                    0 <= mx < skel.shape[1] and 0 <= my < skel.shape[0]
+                    and skel[my,mx] != 0
+                    for mx,my in intermediate
+                ):
+                    continue
             vx, vy = px - cx, py - cy
             cosine = (vx * dx + vy * dy) / (math.hypot(vx, vy) * norm)
             if cosine < -0.1:
