@@ -222,12 +222,62 @@ def _route_signature(candidate, pointmap, width, height):
     return samples
 
 
+def _route_polyline_pixels(candidate, width, height):
+    try:
+        return [(float(p[0])*(width-1), float(p[1])*(height-1))
+                for p in candidate.get('path', [])]
+    except (TypeError, ValueError, IndexError):
+        return []
+
+
+def _point_polyline_distance(point, line):
+    best = float('inf')
+    for a, b in zip(line, line[1:]):
+        dx, dy = b[0]-a[0], b[1]-a[1]
+        div = dx*dx+dy*dy
+        if div <= 1e-6:
+            continue
+        t = max(0.0,min(1.0,((point[0]-a[0])*dx+(point[1]-a[1])*dy)/div))
+        best=min(best, math.hypot(point[0]-a[0]-t*dx,point[1]-a[1]-t*dy))
+    return best
+
+
 def _same_ink_route(candidate,existing,pointmap,width,height,radius):
-    """Group reverse traversals but not distinct straight/curved strokes."""
+    """Deduplicate reverse/partial traces; do not merge nearby parallel strokes.
+
+    A Hough segment may cover only the middle 70% of a skeleton trace. That
+    is one stroke, not two parallel edges; normalized-length comparison alone
+    misclassifies it as a second route. Conversely two genuine curved arcs
+    may be close at their ends but have separate ink through the middle.
+    """
     a=_route_signature(candidate,pointmap,width,height)
     b=_route_signature(existing,pointmap,width,height)
-    return (len(a)==len(b)==9 and
-            sorted(math.dist(x,y) for x,y in zip(a,b))[-3] <= max(5.5,radius*1.25))
+    gap=max(2.4,min(4.0,radius*0.48))
+    if len(a)==len(b)==9:
+        inner=[math.dist(x,y) for x,y in zip(a[2:7],b[2:7])]
+        if max(inner)<=gap and sum(inner)/len(inner)<=gap*.75:
+            return True
+    first=_route_polyline_pixels(candidate,width,height)
+    second=_route_polyline_pixels(existing,width,height)
+    if len(first)<2 or len(second)<2:
+        return False
+    def route_length(route):
+        return sum(math.dist(x,y) for x,y in zip(route,route[1:]))
+    short,long=sorted((first,second),key=route_length)
+    distance=route_length(short)
+    start=pointmap.get(str(candidate.get('from')))
+    end=pointmap.get(str(candidate.get('to')))
+    if start is None or end is None or distance < .55*math.dist(start,end):
+        return False
+    # Require a substantial common ink corridor, not shared endpoints.
+    hits=0
+    samples=0
+    for a,b in zip(short,short[1:]):
+        for t in (.25,.5,.75):
+            q=(a[0]*(1-t)+b[0]*t,a[1]*(1-t)+b[1]*t)
+            hits+=_point_polyline_distance(q,long)<=gap
+            samples+=1
+    return samples>=3 and hits/samples>=.88
 
 
 def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
