@@ -16,6 +16,7 @@ on:
       - 'graph_arrow_evidence.py'
       - 'graph_line_tracer.py'
       - 'tests/test_graph_pixel_geometry.py'
+      - 'tests/test_graph_pixel_image.py'
       - '.github/workflows/graph-integrity-unit.yml'
   workflow_dispatch:
 
@@ -40,6 +41,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_graph_ocr_cleanup.py' -v
           python -m unittest discover -s tests -p 'test_graph_vision_routing.py' -v
           python -m unittest discover -s tests -p 'test_graph_pixel_geometry.py' -v
+          python -m unittest discover -s tests -p 'test_graph_pixel_image.py' -v
       - name: Browser script syntax check
         run: |
           node --check static/script.js
