@@ -13780,11 +13780,8 @@ function reviewRecognizedQuestion(file, data) {
             void renderMath(question).then(() => {
                 if (dialog.open) return renderMath(graph);
             });
-            // Do not pop up a keyboard on mobile. On desktop the optional
-            // instructions are the only editable field in this dialog.
-            if (!window.matchMedia("(max-width: 760px)").matches) {
-                requestText.focus();
-            }
+            // Keep the dialog at its top after opening; the user can scroll
+            // through the rendered results or select optional instructions.
         } catch (exception) {
             cleanup();
             reject(exception);
