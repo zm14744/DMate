@@ -268,7 +268,38 @@ def _graph_candidates(rgb, graph):
     # Erase only already-detected vertex interiors, not line crossings.
     for _, x, y in local:
         cv2.circle(skel, (x, y), max(1, radius - 2), 0, -1)
-    best_by_pair = {}
+    # Preserve genuinely different routes between the same pair of vertices.
+    # Duplicate forward/reverse traces of one stroke must NOT become multiedges.
+    path_variants = {}
+    indices = {name: i for i, (name, _, _) in enumerate(local)}
+
+    def midpoint(candidate):
+        samples = candidate.get('path') or []
+        if not samples:
+            return (0.0, 0.0)
+        lo, hi = (len(samples) - 1) // 2, len(samples) // 2
+        middle = ((samples[lo][0] + samples[hi][0]) / 2,
+                  (samples[lo][1] + samples[hi][1]) / 2)
+        return (middle[0] * (w - 1), middle[1] * (h - 1))
+
+    def keep_candidate(candidate):
+        pair = tuple(sorted((indices[candidate['from']],
+                             indices[candidate['to']])))
+        variants = path_variants.setdefault(pair, [])
+        center = midpoint(candidate)
+        for index, old in enumerate(variants):
+            if math.dist(center, midpoint(old)) <= max(8, radius * 2.2):
+                if candidate['score'] > old['score']:
+                    variants[index] = candidate
+                return
+        if len(variants) < 3:
+            variants.append(candidate)
+        else:
+            weakest = min(range(len(variants)),
+                          key=lambda i: variants[i]['score'])
+            if candidate['score'] > variants[weakest]['score']:
+                variants[weakest] = candidate
+
     max_steps = min(
         1600, max(50, round(2.4 * (max_x - min_x + max_y - min_y)))
     )
@@ -280,7 +311,6 @@ def _graph_candidates(rgb, graph):
             if target is None:
                 continue
             a, b = sorted((source, target))
-            key = (a, b)
             separation = math.hypot(
                 local[a][1] - local[b][1],
                 local[a][2] - local[b][2],
@@ -306,22 +336,17 @@ def _graph_candidates(rgb, graph):
                            if source == target else 'opencv_skeleton_tangent_trace'),
                 'loop_candidate': source == target,
             }
-            if (key not in best_by_pair
-                    or score > best_by_pair[key]['score']):
-                best_by_pair[key] = candidate
-    # Independent straight-line coverage complements broken skeleton routes.
+            keep_candidate(candidate)
+
     for candidate in _straight_stroke_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
             radius, w, h):
-        indexes = {name: i for i, (name, _, _) in enumerate(local)}
-        key = tuple(sorted((indexes[candidate['from']],
-                            indexes[candidate['to']])))
-        if (key not in best_by_pair
-                or candidate['score'] > best_by_pair[key]['score']):
-            best_by_pair[key] = candidate
+        keep_candidate(candidate)
+    result = []
+    for variants in path_variants.values():
+        result.extend(variants)
     return sorted(
-        best_by_pair.values(),
-        key=lambda x: (-x['score'], x['from'], x['to']),
+        result, key=lambda x: (-x['score'], x['from'], x['to'])
     )[:MAX_TRACES_PER_GRAPH]
 
 
