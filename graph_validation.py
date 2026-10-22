@@ -33,9 +33,14 @@ def audit_graph_records(graphs):
         actual = cls()
         actual.add_nodes_from(ids)
         seen = set()
+        has_edge_weights = False
+        missing_edge_weights = False
         for edge in edges:
             if isinstance(edge, dict):
                 u, v = str(edge.get('from')), str(edge.get('to'))
+                weight = edge.get('weight')
+                has_edge_weights |= weight is not None and str(weight).strip() != ''
+                missing_edge_weights |= weight is None or str(weight).strip() == ''
             elif isinstance(edge, (list, tuple)) and len(edge) == 2:
                 u, v = str(edge[0]), str(edge[1])
             else:
@@ -51,6 +56,12 @@ def audit_graph_records(graphs):
             actual.add_edge(u, v)
         if graph.get('complete') is True and graph.get('uncertain_edges'):
             issues.append(f'{name}标记完整，却仍有待核对边')
+        # A numbered edge label is not a numerical weight. Check only the
+        # explicit weight fields here: never infer graph topology from text.
+        if graph.get('weighted') is False and has_edge_weights:
+            issues.append(f'{name}标记无权图，但边表包含权值')
+        if graph.get('weighted') is True and missing_edge_weights:
+            issues.append(f'{name}标记带权图，但部分边缺少权值')
         if graph.get('multigraph') is False and any(u == v for u, v in actual.edges()):
             issues.append(f'{name}声明为简单图，但存在自环')
         if isinstance(graph.get('vertex_count'), int) and graph['vertex_count'] != actual.number_of_nodes():
