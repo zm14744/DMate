@@ -46,10 +46,13 @@ except (ImportError, OSError) as _validate_import_error:
     print(f"图结构校验模块不可用，保留原识别：{_validate_import_error}")
     audit_graph_records = None
 try:
-    from graph_evidence_fusion import compare_pixel_vision
+    from graph_evidence_fusion import (
+        compare_pixel_vision, review_direction_and_multiplicity,
+    )
 except (ImportError, OSError) as _fusion_import_error:
     print(f"图像边集证据融合模块不可用，保留原识别：{_fusion_import_error}")
     compare_pixel_vision = None
+    review_direction_and_multiplicity = None
 from classification_semantic import classify_ambiguous_questions
 from teaching import (
     analyze_messages,
@@ -3862,6 +3865,11 @@ def ocr():
                 fusion_issues = compare_pixel_vision(
                     graph_cv, vision_result.get("graph_data") or []
                 )
+                if review_direction_and_multiplicity is not None:
+                    fusion_issues.extend(review_direction_and_multiplicity(
+                        graph_cv, vision_result.get("graph_data") or []
+                    ))
+                fusion_issues = list(dict.fromkeys(fusion_issues))[:12]
                 graph_review_issues.extend(fusion_issues)
             except (TypeError, ValueError, KeyError) as fusion_exc:
                 print(f"图论边集证据核对降级：{type(fusion_exc).__name__}")
@@ -4208,7 +4216,7 @@ def health():
         "graph_topology_revision": "2026-10-21-hough-blue-outline-cv-v3",
         "graph_vision_routing_version": "2026-10-22-graph-only-topology-v1",
         "graph_path_evidence_version": "2026-10-22-skeleton-curve-loop-multiedge-v2",
-        "graph_evidence_fusion_version": "2026-10-22-aligned-panel-edge-audit-v1",
+        "graph_evidence_fusion_version": "2026-10-22-direction-multiplicity-alignment-v2",
         "graph_answer_integrity_version": "2026-10-20-v1-fail-closed-university-diagrams",
         "single_graph_dual_edge_audit_version": "2026-10-20-v1-standalone-edge-compare-and-quiz-boundary",
         "chat_route_fix_version": "2026-10-20-current-user-initialized-for-all-chat-requests",
