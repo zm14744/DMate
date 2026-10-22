@@ -2091,6 +2091,8 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
                 content_parts.append({"type": "text", "text": (
                     "以下是 OpenCV 沿真实线迹追踪得到的候选边路径，不是确定边。"
                     "每条记录只有在原图可核实两个端点及线条连续性时才可以进入最终边集。"
+                    "相同端点的不同 path_variant 仅表示独立走线候选；"
+                    "只有原图实际存在多条独立线迹才可认定平行边。"
                     "交叉处没有顶点时应直行，不得转弯换线；低质量候选应忽略。\n"
                     + json.dumps(path_hints, ensure_ascii=False)
                 )})
