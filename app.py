@@ -4174,9 +4174,26 @@ def ocr():
             review["required"] = True
             review["reasons"] = list(review.get("reasons") or []) + graph_review_issues
 
+        # The canonical graph table is only safe to render when the final
+        # displayed description still agrees with the original normalized
+        # Qwen transcription. Independent audits may replace the text; never
+        # display a stale first-pass edge table in that case.
+        graph_display_data = []
+        if (isinstance(vision_result, dict)
+                and vision_result.get("ok") is True
+                and not graph_review_issues
+                and not alignment_warnings):
+            source_graphs = vision_result.get("graph_data")
+            source_visual = str(vision_result.get("visual_text") or "").strip()
+            if (isinstance(source_graphs, list) and source_graphs
+                    and source_visual and visual_text.strip() == source_visual):
+                graph_display_data = source_graphs[:12]
+
         return jsonify({
             "text": display_text,
             "visual_text": visual_text,
+            "graph_display_data": graph_display_data,
+            "graph_display_version": "2026-10-22-fixed-graph-layout-v1",
             # 兼容旧客户端：新增字段不影响现有 text / visual_text 处理。
             "graph_structures": cv_graphs,
             "raw_ocr_text": ocr_text,
