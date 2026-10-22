@@ -171,11 +171,12 @@ def test_review_grouping_keeps_every_candidate_identity_without_asserting_multip
 def test_incomplete_json_envelope_never_salvages_a_single_inner_edge():
     from unittest.mock import patch
     from graph_staged import _call, Budget
+    from vision_provider import VisionError
     result={'choices':[{'message':{'content':'{"edges":[{"id":"r1","from":"a","to":"b"}'},
                         'finish_reason':'stop'}]}
     with patch('ai.API_KEY','test-only'),patch('ai.VISION_ENABLED',True),patch(
             'ai._request_qwen_completion',return_value=(200,'',result)) as request:
-        with pytest.raises(ValueError): _call('Return JSON',[],Budget())
+        with pytest.raises(VisionError,match='invalid_output'): _call('Return JSON',[],Budget())
     assert request.call_args.args[0]['response_format']=={'type':'json_object'}
 
 

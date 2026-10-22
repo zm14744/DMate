@@ -5,9 +5,7 @@ import copy
 import io
 import json
 import math
-import re
 import time
-import requests
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 from graph_schema import canonical_graph, path_points
 from graph_relation import recover_relations, route_overlap
@@ -199,38 +197,8 @@ def _review_job(graph,candidates):
 
 
 def _call(prompt, images, budget):
-    import ai
-    if not ai.API_KEY or not ai.VISION_ENABLED: raise RuntimeError('qwen_unavailable')
-    timeout=budget.take()
-    started=time.monotonic()
-    content=[{'type':'text','text':prompt}]+[
-        {'type':'image_url','image_url':{'url':url,'detail':'high'}} for url in images[:2]]
-    try:
-        status,_,result=ai._request_qwen_completion(
-        {'model':'qwen3-vl-plus','messages':[{'role':'user','content':content}],
-         'response_format':{'type':'json_object'},
-         'enable_thinking':False,'temperature':0,'max_tokens':6500},
-        {'Authorization':f'Bearer {ai.API_KEY}','Content-Type':'application/json'},
-        timeout=(min(8,timeout),timeout),wall_deadline=time.monotonic()+timeout)
-    except (requests.RequestException,TimeoutError) as exc:
-        budget.metrics.append({'seconds':round(time.monotonic()-started,3),'status':'transport_failed'})
-        raise RuntimeError('qwen_transport_failed') from exc
-    if status!=200 or not isinstance(result,dict):
-        budget.metrics.append({'seconds':round(time.monotonic()-started,3),'status':status})
-        raise RuntimeError('qwen_request_failed_http_'+str(status))
-    choice=(result.get('choices') or [{}])[0]
-    raw=(choice.get('message') or {}).get('content','')
-    budget.metrics.append({'seconds':round(time.monotonic()-started,3),'status':status,
-                           'finish_reason':choice.get('finish_reason'),'content_chars':len(raw),
-                           'usage':result.get('usage',{})})
-    if choice.get('finish_reason')=='length': raise ValueError('truncated_json')
-    # Never salvage an inner edge object from an invalid/truncated envelope.
-    # That used to look like a successful empty EDGE read and drop all edges.
-    if not isinstance(raw,str): raise ValueError('invalid_json')
-    raw=re.sub(r'^```(?:json)?\s*|\s*```$', '', raw.strip(), flags=re.IGNORECASE)
-    parsed=json.loads(raw)
-    if not isinstance(parsed,dict): raise ValueError('invalid_json')
-    return parsed
+    from vision_provider import qwen_call
+    return qwen_call(prompt, images, budget)
 
 
 def merge_node_reads(graph, reads):
@@ -300,9 +268,10 @@ def merge_node_reads(graph, reads):
     return graph
 
 
-def recognize_staged(image_bytes, *, layout=None, call=None):
+def recognize_staged(image_bytes, *, layout=None, call=None, provider=None):
     """Return canonical graphs; failures are explicit and never crash /ocr."""
-    budget=Budget(); ask=call or _call; diagnostics=[]
+    if call is not None and provider is not None: raise ValueError('Choose call or provider')
+    budget=Budget(); ask=call or provider or _call; diagnostics=[]
     with Image.open(io.BytesIO(image_bytes)) as original:
         if original.width*original.height>16_000_000: raise ValueError('image_pixel_budget')
         image=ImageOps.exif_transpose(original).convert('RGB')

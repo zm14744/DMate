@@ -7,9 +7,9 @@ from ocr_correction import correct_text
 from ocr_layout import partition_text
 
 
-def recognize_graph_document(raw,text_result):
+def recognize_graph_document(raw,text_result,*,vision_provider=None):
     layout=text_result.get('layout') or {}
-    result=recognize_staged(raw,layout=layout.get('regions',[]))
+    result=recognize_staged(raw,layout=layout.get('regions',[]),provider=vision_provider)
     graphs=result['graphs']
     if not graphs: return None
     text=text_result.get('text') or ''

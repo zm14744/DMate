@@ -1360,6 +1360,7 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
 
         content_parts, reasoning_parts = [], []
         finish_reason, usage = None, None
+        returned_model, system_fingerprint = None, None
         saw_event = False
         for raw_line in response.iter_lines(decode_unicode=True):
             if wall_deadline is not None and time.monotonic() > wall_deadline:
@@ -1381,6 +1382,8 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
             if not isinstance(chunk, dict):
                 continue
             saw_event = True
+            returned_model = chunk.get("model") or returned_model
+            system_fingerprint = chunk.get("system_fingerprint") or system_fingerprint
             if isinstance(chunk.get("usage"), dict):
                 usage = chunk["usage"]
             for choice in chunk.get("choices") or []:
@@ -1418,6 +1421,8 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
                 "finish_reason": finish_reason,
             }],
             "usage": usage or {},
+            "model": returned_model,
+            "system_fingerprint": system_fingerprint,
         }
         return status_code, "", normalized
     finally:
