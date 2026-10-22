@@ -2083,6 +2083,20 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
             "confidence=partial 或 uncertain_edges 不得作为确定结论；若原图与候选矛盾，以原图为准。\n"
             + json.dumps(_compact_opencv_graph_hints(verified), ensure_ascii=False)
         )})
+    if graph_only_mode and (opencv_graphs or {}).get("line_path_evidence"):
+        try:
+            from graph_structure import compact_line_evidence
+            path_hints = compact_line_evidence(opencv_graphs)
+            if path_hints:
+                content_parts.append({"type": "text", "text": (
+                    "以下是 OpenCV 沿真实线迹追踪得到的候选边路径，不是确定边。"
+                    "每条记录只有在原图可核实两个端点及线条连续性时才可以进入最终边集。"
+                    "交叉处没有顶点时应直行，不得转弯换线；低质量候选应忽略。\n"
+                    + json.dumps(path_hints, ensure_ascii=False)
+                )})
+        except (ImportError, TypeError, ValueError) as path_exc:
+            print(f"图路径证据传递降级：{type(path_exc).__name__}")
+
     for index, data_url in enumerate(image_urls):
         content_parts.append({"type": "text", "text": "完整上传图片" if index == 0 else f"局部放大 {index}"})
         content_parts.append({"type": "image_url", "image_url": {"url": data_url, "detail": "high"}})
