@@ -13,6 +13,9 @@ on:
       - 'tests/test_graph_vision_routing.py'
       - 'tests/graph_display_regression.js'
       - 'ocr.py'
+      - 'graph_arrow_evidence.py'
+      - 'graph_line_tracer.py'
+      - 'tests/test_graph_pixel_geometry.py'
       - '.github/workflows/graph-integrity-unit.yml'
   workflow_dispatch:
 
@@ -29,13 +32,14 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install minimal dependencies
-        run: python -m pip install Pillow requests networkx
+        run: python -m pip install Pillow requests networkx numpy opencv-python-headless
       - name: Python syntax check
-        run: python -m py_compile graph_ocr_cleanup.py graph_validation.py ai.py app.py ocr.py
+        run: python -m py_compile graph_ocr_cleanup.py graph_validation.py ai.py app.py ocr.py graph_arrow_evidence.py graph_line_tracer.py
       - name: Run graph invariants and OCR routing tests (no AI calls)
         run: |
           python -m unittest discover -s tests -p 'test_graph_ocr_cleanup.py' -v
           python -m unittest discover -s tests -p 'test_graph_vision_routing.py' -v
+          python -m unittest discover -s tests -p 'test_graph_pixel_geometry.py' -v
       - name: Browser script syntax check
         run: |
           node --check static/script.js
