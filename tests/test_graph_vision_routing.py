@@ -48,9 +48,11 @@ class GraphVisionRoutingTests(unittest.TestCase):
     def test_selected_vision_model_is_unchanged(self):
         self.assertEqual(VISION_MODEL, "qwen3-vl-plus")
 
-    def test_graph_prompt_does_not_ask_for_duplicate_ocr(self):
-        self.assertIn('"corrected_text": ""', GRAPH_TOPOLOGY_PROMPT)
-        self.assertIn("不负责转录题干", GRAPH_TOPOLOGY_PROMPT)
+    def test_graph_prompt_extracts_only_external_question_prose(self):
+        self.assertIn('"corrected_text":', GRAPH_TOPOLOGY_PROMPT)
+        self.assertIn("图形外的完整题目正文", GRAPH_TOPOLOGY_PROMPT)
+        self.assertIn("图号", GRAPH_TOPOLOGY_PROMPT)
+        self.assertIn("背面透印", GRAPH_TOPOLOGY_PROMPT)
 
 
 if __name__ == "__main__":
