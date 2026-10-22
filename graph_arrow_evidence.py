@@ -155,7 +155,7 @@ def annotate_arrow_candidates(rgb, graph, paths, radius):
     if segments is None:
         return paths
     lines=[(float(ax+x1),float(ay+y1),float(bx+x1),float(by+y1))
-           for ax,ay,bx,by in segments[:,0][:850]]
+           for ax,ay,bx,by in np.asarray(segments).reshape(-1,4)[:850]]
     for path in paths:
         a, b = str(path.get("from","")), str(path.get("to",""))
         if a not in vertices or b not in vertices or a == b:
