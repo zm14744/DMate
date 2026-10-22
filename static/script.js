@@ -13704,8 +13704,34 @@ function formatStructuredGraphReview(graphs) {
         numeric: true, sensitivity: "base"
     });
     const lines = [];
-    for (let index = 0; index < graphs.length; index++) {
-        const graph = graphs[index];
+    const graphPosition = graph => {
+        const coords = (graph.vertices || []).filter(v =>
+            v && Number.isFinite(Number(v.x)) && Number.isFinite(Number(v.y))
+            && v.x !== null && v.y !== null
+            && Number(v.x) >= 0 && Number(v.x) <= 1
+            && Number(v.y) >= 0 && Number(v.y) <= 1
+        );
+        if (coords.length < 2 || coords.length !== graph.vertices.length) return null;
+        return {
+            x: coords.reduce((sum, v) => sum + Number(v.x), 0) / coords.length,
+            y: coords.reduce((sum, v) => sum + Number(v.y), 0) / coords.length
+        };
+    };
+    const sortedGraphs = graphs.slice();
+    if (sortedGraphs.length > 1 && sortedGraphs.every(g =>
+        g && Array.isArray(g.vertices) && graphPosition(g) !== null)) {
+        // Coordinate order is a better fallback for a 2x2 textbook panel:
+        // sort rows top to bottom, then panels left to right inside a row.
+        sortedGraphs.sort((a, b) => {
+            const pa = graphPosition(a), pb = graphPosition(b);
+            return Math.abs(pa.y - pb.y) > 0.12
+                ? pa.y - pb.y : pa.x - pb.x || pa.y - pb.y;
+        });
+    } else if (sortedGraphs.every(g => /^G[1-9]\d*$/.test(String(g?.id || "")))) {
+        sortedGraphs.sort((a, b) => compare(a.id, b.id));
+    }
+    for (let index = 0; index < sortedGraphs.length; index++) {
+        const graph = sortedGraphs[index];
         if (!graph || !Array.isArray(graph.vertices) || !graph.vertices.length
             || !Array.isArray(graph.edges)) return "";
         const vertices = [];
