@@ -53,6 +53,7 @@ except (ImportError, OSError) as _fusion_import_error:
     print(f"图像边集证据融合模块不可用，保留原识别：{_fusion_import_error}")
     compare_pixel_vision = None
     review_direction_and_multiplicity = None
+from graph_ocr_cleanup import clean_graph_question_text
 from classification_semantic import classify_ambiguous_questions
 from teaching import (
     analyze_messages,
@@ -4170,6 +4171,17 @@ def ocr():
         display_text, review = _prepare_ocr_review(
             ocr_text, corrected_text, uncertain_fields
         )
+        # Graph labels/numeric edge weights frequently flood plain OCR. This
+        # modifies only the question prose, never graph_data or raw_ocr_text.
+        graph_records = (
+            vision_result.get("graph_data") or []
+            if isinstance(vision_result, dict) and vision_result.get("ok")
+            else []
+        )
+        graph_evidence = bool(cv_graphs or graph_records)
+        display_text = clean_graph_question_text(
+            display_text, has_graph=graph_evidence
+        )
         if graph_review_issues and isinstance(review, dict):
             review["required"] = True
             review["reasons"] = list(review.get("reasons") or []) + graph_review_issues
@@ -4193,7 +4205,7 @@ def ocr():
             "text": display_text,
             "visual_text": visual_text,
             "graph_display_data": graph_display_data,
-            "graph_display_version": "2026-10-22-fixed-graph-layout-v1",
+            "graph_display_version": "2026-10-22-graph-ocr-integrity-v2",
             # 兼容旧客户端：新增字段不影响现有 text / visual_text 处理。
             "graph_structures": cv_graphs,
             "raw_ocr_text": ocr_text,
