@@ -29,6 +29,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/ocr-regression.yml
+      - tests/ocr_regression.py
 
 permissions:
   contents: read
