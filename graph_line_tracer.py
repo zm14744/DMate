@@ -242,6 +242,60 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
     return candidates
 
 
+def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+    """Match real visible Hough stroke endpoints to marked node *rims*.
+
+    Center-to-center coverage fails for lines attached off-center to circles.
+    This function never manufactures vertices or certified graph edges.
+    """
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    _, mask = cv2.threshold(gray, 216, 255, cv2.THRESH_BINARY_INV)
+    edges = cv2.Canny(mask, 55, 145)
+    segments = cv2.HoughLinesP(edges, 1, math.pi / 720, threshold=18,
+                               minLineLength=24, maxLineGap=7)
+    if segments is None:
+        return []
+    output = []
+    for x1, y1, x2, y2 in segments[:, 0][:400]:
+        length = math.hypot(float(x2-x1), float(y2-y1))
+        if length < max(24, radius * 2.5):
+            continue
+        nearest = []
+        for xx, yy in ((x1, y1), (x2, y2)):
+            dist, number = min((math.hypot(float(xx)-vx, float(yy)-vy), i)
+                               for i, (_, vx, vy) in enumerate(local))
+            nearest.append((dist, number))
+        (d1, i), (d2, j) = nearest
+        if i == j or max(d1, d2) > max(9.0, radius * 1.45):
+            continue
+        center_distance = math.hypot(local[i][1]-local[j][1],local[i][2]-local[j][2])
+        if length < 0.63 * center_distance:
+            continue
+        crosses_node = False
+        for k,(_,vx,vy) in enumerate(local):
+            if k in (i,j):
+                continue
+            projection = ((vx-x1)*(x2-x1)+(vy-y1)*(y2-y1))/(length*length)
+            distance = abs((vx-x1)*(y2-y1)-(vy-y1)*(x2-x1))/length
+            if 0.08 < projection < 0.92 and distance < radius*.83:
+                crosses_node = True
+                break
+        if crosses_node:
+            continue
+        a,b=sorted((i,j))
+        confidence = max(0.1, 0.92 - 0.20*(d1+d2)/max(2*radius,1))
+        output.append({
+            'from':local[a][0], 'to':local[b][0],
+            'path':[[round((x1+x_off)/max(full_w-1,1),4),
+                     round((y1+y_off)/max(full_h-1,1),4)],
+                    [round((x2+x_off)/max(full_w-1,1),4),
+                     round((y2+y_off)/max(full_h-1,1),4)]],
+            'pixel_length':round(length), 'score':round(confidence,3),
+            'needs_review':True, 'method':'opencv_hough_rim_endpoint',
+        })
+    return output
+
+
 def _graph_candidates(rgb, graph):
     h, w = rgb.shape[:2]
     points = _vertices(graph, w, h)
@@ -339,6 +393,12 @@ def _graph_candidates(rgb, graph):
             keep_candidate(candidate)
 
     for candidate in _straight_stroke_candidates(
+            rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
+            radius, w, h):
+        keep_candidate(candidate)
+    # A long edge can terminate on a circular node rim away from the line
+    # joining the two node centers; Hough endpoints recover these cases.
+    for candidate in _hough_endpoint_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
             radius, w, h):
         keep_candidate(candidate)
