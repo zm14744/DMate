@@ -70,3 +70,23 @@
 ## 当前修复范围
 
 本次独立 PR 只处理明确可证实的 OCR/展示/结构属性处理问题及图论识别提示，**没有**声称上述全部原图恢复已经达标。复杂几何算法仍需独立修复与真实图片回归，不能用模拟结果替代。
+
+
+## 2026-10-22 开源拓扑方法研究与本次核心算法修复
+
+研究资料与方案选择：
+- OGR (https://jgaa.info/index.php/jgaa/article/view/paper303)：重点处理实际边与顶点的连接和无标记交叉处的连续性。
+- FlowExtract (https://github.com/aixpert-rug/FlowExtract)：检测箭头尖端并反向追线。本轮对照发现 DMate 原代码只在顶点附近搜索箭头，漏掉大量中途箭头。
+- extract-raster-network (https://github.com/danvk/extract-raster-network)：骨架化、路径追踪、多条平行路径与自环；借鉴实际墨迹走线计数。
+- NEFI (https://nefi.mpi-inf.mpg.de/guide.php)：其文档明确指出骨架化会自动收缩部分二度顶点，DMate 应保留实际绘制节点作为切断边的依据。
+- VisAdj (https://github.com/Jiahao-Xie-86/VisAdj)：候选边 + 线图推理可作训练方向，但大型视觉网络不宜直接加入 CPU 服务。
+- diagram2drawio (https://github.com/radiukpavlo/diagram2drawio)：文字遮罩、形状识别、箭尖提取与调试结果分层有参考价值。
+
+本次没有复制外部项目代码，针对 DMate 已有 OpenCV 模块独立实现：
+1. graph_arrow_evidence.py：沿完整线迹寻找中途箭尖，两侧短翼须和边的局部切线方向对应；只形成箭头候选，不强行认定边方向。
+2. graph_line_tracer.py：解决同一条真实线在 Hough 检测与骨架路径中重复记录的问题，并补充曲线真实像素覆盖检测。
+3. 弧线额外加入横截面的白色间隔判定，避免同一条粗弧线被两个拟合模板误算成两条平行边。
+4. 五个 OpenCV 图形模块使用统一的 HoughLinesP 数组展平，避免实际输入形状变化时抛异常。
+5. tests/test_graph_pixel_geometry.py、tests/test_graph_pixel_image.py、tests/test_graph_pixel_topology.py 进行完整的方向、交叉、中心节点分割、直线＋弧线精确重数等像素测试。
+
+验收界限：这些测试是代码和生成像素图测试，**不是**用户真实教材原图的线上 /ocr + Playwright 回归。尚不能宣称几十张失败照片全部修复。
