@@ -76,6 +76,14 @@ def exercise(browser, url, output_dir, mode):
                   (el.textContent && !el.textContent.includes('加载中')));
             }""", timeout=12000)
         screenshot(name)
+        if is_mobile and name == "knowledge-graph":
+            expand = page.locator("#knowledgeGraphModal .kg-mobile-expand")
+            expand.wait_for(state="visible", timeout=10000)
+            expand.click()
+            page.locator("#knowledgeGraphModal.graph-fullscreen-view").wait_for(state="visible", timeout=10000)
+            page.locator("#knowledgeGraphCanvas .kg-mobile-stage").wait_for(state="visible", timeout=12000)
+            screenshot("knowledge-graph-fullscreen")
+            page.locator("#knowledgeGraphModal .kg-mobile-expand").click()
         page.locator(close_button).click(timeout=10000)
         page.locator(modal).wait_for(state="hidden", timeout=10000)
 
