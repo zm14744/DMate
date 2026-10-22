@@ -12,4 +12,8 @@ assert(text.includes('e1：')&&text.includes('e2：'));
 assert(text.includes('权值：0')&&text.includes('方向未确定')&&text.includes('部分内容未识别完整'));
 assert(text.includes('A')&&text.includes('B')&&text.includes('孤立顶点'));
 for(const bad of ['SECRET_DIAGNOSTIC','图形结构待核对','首次识别的图形候选','结构化边表尚未核实','多图边集已二次核对'])assert(!text.includes(bad));
+const numbered=render([{...g,vertices:[{id:'v1',label:'v₁'},{id:'v2',label:'v12'}],
+ edges:[{id:'pixel_17',from:'v1',to:'v2',direction:'forward',status:'accepted'}]}]);
+assert(numbered.includes('\\(v_{1}\\)') && numbered.includes('\\(v_{12}\\)'));
+assert(numbered.includes('e1：') && !numbered.includes('pixel_17'));
 console.log('Canonical graph card checks passed');

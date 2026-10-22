@@ -32,6 +32,8 @@ def semantic_graph_equal(want,got):
             network.add_node(str(v['id']),label=str(v.get('label') or v['id']))
         for e in g.get('edges',[]):
             if not expected and e.get('direction')=='unknown': return None
+            if not expected and e.get('direction') not in (None, 'forward' if want.get('directed') is True else 'undirected'):
+                return None
             if e.get('from') not in network or e.get('to') not in network: return None
             network.add_edge(e['from'],e['to'],weight=str(e.get('weight')),edge_label=str(e.get('edge_label')))
         return network
@@ -60,13 +62,20 @@ def grade(case,response,record):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--mode',choices=['contract','live'],required=True)
     parser.add_argument('--base-url',default='http://127.0.0.1:8080');parser.add_argument('--output',required=True)
+    parser.add_argument('--manifest',default='tests/real_graph_corpus/manifest.json',
+                        help='May point to a private corpus outside the checkout')
+    parser.add_argument('--case-ids',help='Comma-separated original case IDs; omitted means all cases')
+    parser.add_argument('--capture-only',action='store_true',
+                        help='Collect actual JSON/dialog before complete independent annotation; never grades accuracy')
+    parser.add_argument('--browser-executable',help='Use an existing Chromium installation')
+    parser.add_argument('--cdn-cache',help='Optional TLS-verified cache of pinned public CDN scripts; never intercepts /ocr')
     args=parser.parse_args()
     if urlsplit(args.base_url).hostname not in ('127.0.0.1','localhost'): raise SystemExit('Only an isolated local branch server is allowed')
     out=Path(args.output);out.mkdir(parents=True,exist_ok=True)
     if args.mode=='live':
         from scripts.graph_corpus import validate_corpus,safe_child
-        manifest_path=Path('tests/real_graph_corpus/manifest.json').resolve()
-        issues=validate_corpus(manifest_path,full=True)
+        manifest_path=Path(args.manifest).resolve()
+        issues=validate_corpus(manifest_path,full=not args.capture_only,require_results=False)
         if issues:
             (out/'report.json').write_text(json.dumps({'mode':'live','status':'blocked_missing_original_corpus',
                 'recognition_accuracy_test':False,'issues':issues},ensure_ascii=False,indent=2))
@@ -74,19 +83,25 @@ def main():
             return 2
         corpus=json.loads(manifest_path.read_text());cases=[]
         for row in corpus['cases']:
-            truth=json.loads(safe_child(manifest_path.parent,row['ground_truth']).read_text())
+            truth={} if args.capture_only else json.loads(safe_child(manifest_path.parent,row['ground_truth']).read_text())
             cases.append({'id':row['id'],'image':str(safe_child(manifest_path.parent,row['image'])),
-                          'source_sha256':row['sha256'],'expected':truth['expected'],
+                          'source_sha256':row['sha256'],'expected':truth.get('expected',{}),
                           **({'expected_question_text':truth['expected_question_text']} if 'expected_question_text' in truth else {})})
     else:
         cases=json.loads(Path('tests/fixtures/ouc_two_originals_gold.json').read_text())['cases']
+    if args.case_ids:
+        selected=set(args.case_ids.split(','))
+        if selected-{case['id'] for case in cases}: raise SystemExit('Unknown case ID')
+        cases=[case for case in cases if case['id'] in selected]
+    if not cases: raise SystemExit('No original cases selected')
     server=None; log=None
     if args.mode=='contract':
         env=os.environ.copy();env.update(DMATE_GRAPH_NEXTGEN='1',PORT=str(urlsplit(args.base_url).port or 8080),
                                          DASHSCOPE_API_KEY='',DASHSCOPE_VISION_API_KEY='',DEEPSEEK_API_KEY='')
         log=(out/'server.log').open('w')
         server=subprocess.Popen([sys.executable,'app.py'],env=env,stdout=log,stderr=log)
-    report={'mode':args.mode,'recognition_accuracy_test':args.mode=='live','cases':[]}
+    report={'mode':args.mode,'recognition_accuracy_test':args.mode=='live' and not args.capture_only,
+            'capture_only':args.capture_only,'cases':[]}
     try:
         for _ in range(80):
             try:
@@ -95,7 +110,7 @@ def main():
             time.sleep(.5)
         else: raise RuntimeError('branch server not ready')
         with sync_playwright() as p:
-            browser=p.chromium.launch(headless=True)
+            browser=p.chromium.launch(headless=True,**({'executable_path':args.browser_executable} if args.browser_executable else {}))
             for case in cases:
                 image=Path('tests/fixtures/original_ouc_20261021')/case['image']
                 digest=hashlib.sha256(image.read_bytes()).hexdigest()
@@ -111,16 +126,18 @@ def main():
                     input_case['mock_text']='核对图形：\\(\\kappa(G)\\)'
                     input_case['mock_visual']='contract fixture, not recognition result'
                 record=run_case(browser,input_case,args.base_url,image,out,
-                                'mock' if args.mode=='contract' else 'live',False,290)
+                                'mock' if args.mode=='contract' else 'live',False,290,cdn_cache=args.cdn_cache)
                 record['source_sha256']=digest
-                if args.mode=='live':
+                if args.mode=='live' and not args.capture_only:
                     response_path=out/(case['id']+'-ocr-response.json')
                     response=json.loads(response_path.read_text()) if response_path.exists() else {}
                     record['six_dimensions']=grade(case,response,record)
-                else:
+                elif args.mode=='contract':
                     visible=(record.get('rendered') or {}).get('graph','')
                     record['contract_ok']=bool(record['operational_ok'] and visible and not any(x in visible for x in BANNED))
                     record['semantic_status']='NOT_AN_ACCURACY_TEST'
+                else:
+                    record['semantic_status']='UNVERIFIED_CAPTURE_ONLY'
                 report['cases'].append(record)
             browser.close()
     finally:
@@ -128,6 +145,7 @@ def main():
         if log: log.close()
         (out/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
     if args.mode=='contract': return 0 if all(r.get('contract_ok') for r in report['cases']) else 1
+    if args.capture_only: return 0 if all(r.get('operational_ok') for r in report['cases']) else 1
     # Missing text/formula annotation and manual UI review are acceptance blockers.
     return 0 if all(all(v=='通过' for v in r['six_dimensions'].values()) for r in report['cases']) else 2
 

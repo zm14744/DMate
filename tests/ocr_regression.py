@@ -154,15 +154,20 @@ def topology_comparison(actual_graphs, expected, question, visual):
     return checks
 
 
-def run_case(browser, case, url, image_path, output, mode, solve, timeout_seconds):
+def run_case(browser, case, url, image_path, output, mode, solve, timeout_seconds, *, cdn_cache=None):
     context = browser.new_context(viewport={"width": 1440, "height": 900},
                                   locale="zh-CN", color_scheme="light")
+    if cdn_cache is not None:
+        from browser_assets import install_verified_cdn_routes
+        install_verified_cdn_routes(context, cdn_cache)
     context.tracing.start(screenshots=True, snapshots=True, sources=True)
     page = context.new_page()
     cid = re.sub(r"[^A-Za-z0-9_-]", "_", str(case["id"]))[:80]
     record = {"id": cid, "source_image": image_path.name, "mode": mode,
               "steps": [], "comparisons": [], "page_errors": [], "http_errors": [],
               "screenshots": []}
+    if cdn_cache is not None:
+        record['cdn_delivery'] = 'pinned_assets_via_verified_https_cache'
     page.on("pageerror", lambda exc: record["page_errors"].append(str(exc)[:1200]))
 
     def shot(suffix):
@@ -211,7 +216,8 @@ def run_case(browser, case, url, image_path, output, mode, solve, timeout_second
         data = {k: raw_response.get(k) for k in (
             "text", "visual_text", "graph_display_data", "graph_display_version",
             "graph_structures", "raw_ocr_text", "review", "text_count",
-            "formula_count", "vision_used", "warning", "error", "cancelled"
+            "formula_count", "vision_used", "warning", "error", "cancelled",
+            "diagnostics", "recognition_status"
         ) if k in raw_response}
         (output / (cid + "-ocr-response.json")).write_text(
             json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

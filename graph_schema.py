@@ -47,7 +47,7 @@ def canonical_graph(source, index=1):
     for k in ('directed', 'weighted', 'multigraph'):
         v = source.get(k)
         graph[k] = v if isinstance(v, bool) else 'unknown'
-    for key in ('bbox', 'node_complete', 'inventory_reviewed'):
+    for key in ('bbox', 'node_complete', 'inventory_reviewed', 'node_position_evidence'):
         if key in source:
             graph[key] = copy.deepcopy(source[key])
     raw_nodes = source.get('vertices')
@@ -125,3 +125,38 @@ def display_graph(graph):
                                       'multiplicity', 'parallel_count', 'style', 'color', 'status') if k in e}
                     for e in graph['edges']]
     return out
+
+
+def describe_graphs(graphs):
+    """Describe the SAME edge records as the cards; never infer graph names.
+
+    This is solver input, so incomplete evidence keeps the existing guard
+    marker. The UI renders display_graph instead of these internal markers.
+    """
+    lines = []
+    for graph in graphs:
+        labels = {v['id']: v.get('label') or v['id'] for v in graph['vertices']}
+        edges = []
+        incident = set()
+        for edge in graph['edges']:
+            incident.update((edge['from'], edge['to']))
+            connector = {'forward': '→', 'undirected': '—'}.get(edge['direction'], '?')
+            attrs = []
+            if edge['from'] == edge['to']: attrs.append('自环')
+            if edge.get('edge_label') is not None: attrs.append('边名 '+str(edge['edge_label']))
+            if edge.get('weight') is not None: attrs.append('权值 '+str(edge['weight']))
+            if edge.get('style') in ('dashed', 'dotted'):
+                attrs.append('虚线' if edge['style'] == 'dashed' else '点线')
+            if edge['direction'] == 'unknown': attrs.append('方向未确定')
+            if edge['status'] != 'accepted': attrs.append('待确认')
+            suffix = '（'+'，'.join(attrs)+'）' if attrs else ''
+            edges.append(f"{edge['id']}: {labels[edge['from']]}{connector}{labels[edge['to']]}{suffix}")
+        isolated = [labels[v['id']] for v in graph['vertices'] if v['id'] not in incident
+                    and (graph['complete'] or v.get('isolated_confirmed'))]
+        kind = '有向图' if graph['directed'] is True else '无向图' if graph['directed'] is False else '方向未确定'
+        line = f"{graph['name']}：{kind}。顶点："+'、'.join(labels.values())+'。'
+        if isolated: line += '孤立顶点：'+'、'.join(isolated)+'。'
+        line += f"边（{'共' if graph['complete'] else '暂录'}{len(edges)}条）："+'；'.join(edges)+'。'
+        lines.append(line)
+    text = '\n\n'.join(lines)
+    return ('【图形结构待核对】\n'+text) if any(not g['complete'] for g in graphs) else text

@@ -13688,8 +13688,11 @@ function ocrReviewPlain(value) {
 }
 
 function ocrReviewLatexLabel(value) {
-    const label = String(value ?? "").trim();
+    const label = String(value ?? "").trim().replace(/[₀-₉]/g, digit =>
+        String("₀₁₂₃₄₅₆₇₈₉".indexOf(digit)));
     if (!/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)?$/.test(label)) return null;
+    const numbered = /^([A-Za-z]+)([0-9]+)$/.exec(label);
+    if (numbered) return numbered[1]+"_{"+numbered[2]+"}";
     return label.replace(/_([A-Za-z0-9]+)/g, "_{$1}");
 }
 
@@ -13714,7 +13717,7 @@ function formatCanonicalGraphReview(graphs) {
         const isolated=nodes.filter(v=>!incident.has(String(v.id)) && (g.complete===true || v.isolated_confirmed===true));
         if(isolated.length)lines.push("**孤立顶点：** "+isolated.map(v=>label(v.id)).join("、"));
         lines.push("**边（"+(g.complete===true?"":"暂录 ")+edges.length+" 条）：**");
-        for(const e of edges) {
+        for(const [edgeIndex,e] of edges.entries()) {
             const arrow=e.direction==="forward"?" → ":e.direction==="undirected"?" — ":" ? ";
             const attrs=[];
             if(e.edge_label)attrs.push("边名："+ocrReviewPlain(e.edge_label));
@@ -13724,7 +13727,8 @@ function formatCanonicalGraphReview(graphs) {
             if(e.style==="dotted")attrs.push("点线");
             if(e.direction==="unknown")attrs.push("方向未确定");
             if(e.status!=="accepted")attrs.push("待确认");
-            lines.push("- "+ocrReviewPlain(e.id)+"："+label(e.from)+arrow+label(e.to)+
+            // Stable per-card identities; detector source IDs stay in JSON.
+            lines.push("- e"+(edgeIndex+1)+"："+label(e.from)+arrow+label(e.to)+
                 (attrs.length?"（"+attrs.join("，")+"）":""));
         }
         if(!edges.length)lines.push("—");

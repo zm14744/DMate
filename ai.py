@@ -1613,6 +1613,9 @@ def _format_graph_data(graphs):
     """Render validated graph data into a count-consistent visual description."""
     if not graphs:
         return ""
+    if all(g.get('schema_version') == 'dmate.graph/1' for g in graphs):
+        from graph_schema import describe_graphs
+        return describe_graphs(graphs)
     lines, needs_review = [], False
     for graph_index, graph in enumerate(graphs, 1):
         graph_id = graph["id"]

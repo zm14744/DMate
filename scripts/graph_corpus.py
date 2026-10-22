@@ -85,7 +85,7 @@ def import_index(index_path,destination):
     return manifest
 
 
-def validate_corpus(manifest_path,*,full=False):
+def validate_corpus(manifest_path,*,full=False,require_results=True):
     manifest_path=Path(manifest_path).resolve(); root=manifest_path.parent
     data=json.loads(manifest_path.read_text());issues=[];seen=set();batches=set()
     cases=data.get('cases') or []
@@ -111,7 +111,9 @@ def validate_corpus(manifest_path,*,full=False):
                 if value.get('status') not in STATUSES: issues.append(str(cid)+': missing dimension '+dimension)
         except (ValueError,KeyError,OSError): issues.append(str(cid)+': missing original/evaluation file')
         if full:
-            for field in ('original_ocr','ground_truth'):
+            # A new real capture must not require its OCR output beforehand.
+            # Historical acceptance keeps the original result requirement.
+            for field in (('original_ocr','ground_truth') if require_results else ('ground_truth',)):
                 try: safe_child(root,row[field])
                 except (ValueError,KeyError,TypeError): issues.append(str(cid)+': missing '+field)
             if row.get('ground_truth_independently_reviewed') is not True:

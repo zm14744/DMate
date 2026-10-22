@@ -45,6 +45,17 @@ def _intermediate_nodes(path,edge,nodes,radius=.009):
             and any(math.dist(p,(v['x'],v['y']))<radius for p in samples[4:-4])]
 
 
+def _wrong_path_endpoints(edge,nodes,tolerance=.06):
+    by_id={v['id']:v for v in nodes}
+    a,b=by_id[edge['from']],by_id[edge['to']]
+    if not edge['path'] or any(v.get(k) is None for v in (a,b) for k in ('x','y')):
+        return False
+    u,v=(a['x'],a['y']),(b['x'],b['y'])
+    first,last=edge['path'][0],edge['path'][-1]
+    return min(max(math.dist(first,u),math.dist(last,v)),
+               max(math.dist(first,v),math.dist(last,u)))>tolerance
+
+
 def recover_relations(graph,traces,*,review=None):
     """Reselect competing routes after new evidence, preserving rejected audit.
 
@@ -78,7 +89,11 @@ def recover_relations(graph,traces,*,review=None):
             candidates.append(c)
         c['_pixel']=max(c['_pixel'],min(1.,max(0.,float(trace.get('score',0)))))
         c['evidence'].append({'source':'pixels','method':trace.get('method'),'score':trace.get('score')})
-        if trace.get('arrow_candidate'): c['_arrow']=trace['arrow_candidate']
+        if trace.get('arrow_candidate'):
+            c['_arrow']=trace['arrow_candidate']
+            # Review payloads must receive arrow evidence too. Private _arrow
+            # fields alone were stripped before the Qwen REVIEW request.
+            c['evidence'].append({'source':'arrow_pixels',**trace['arrow_candidate']})
         if trace.get('arrow_ambiguous'): c['_arrow_ambiguous']=True
     candidates=candidates[:MAX_CANDIDATES]
     used=set()
@@ -88,6 +103,8 @@ def recover_relations(graph,traces,*,review=None):
     scores=[]; conflicts=defaultdict(list)
     for i,c in enumerate(candidates):
         c['_blocked']=bool(_intermediate_nodes(c['path'],c,nodes)) if c['path'] else False
+        c['_endpoint_mismatch']=_wrong_path_endpoints(c,nodes)
+        c['_blocked'] |= c['_endpoint_mismatch']
         reciprocal=len({e.get('vertex') for e in c['evidence'] if isinstance(e,dict)
                         and e.get('source')=='node_read' and e.get('vertex') in (c['from'],c['to'])})>=2
         score=.25*int(c['_visual'])+.55*c['_pixel']+.18*int(reciprocal)
@@ -105,8 +122,13 @@ def recover_relations(graph,traces,*,review=None):
                 if key in decision: c[key]=decision[key]
         arrow=c.get('_arrow')
         if arrow and c['direction']=='forward' and (arrow['from'],arrow['to'])!=(c['from'],c['to']):
-            if decision.get('visible') is not True: c['direction']='unknown'; score-=.10
-        if c.get('_arrow_ambiguous') and decision.get('visible') is not True: c['direction']='unknown'
+            # A generic visual "visible" decision cannot erase contradictory
+            # arrow pixels. Preserve both observations and keep direction open.
+            c['evidence'].append({'source':'direction_conflict','visual_from':c['from'],
+                                  'visual_to':c['to'],'pixel_from':arrow['from'],'pixel_to':arrow['to']})
+            c['direction']='unknown'; score-=.10
+        if c.get('_arrow_ambiguous') and graph['directed'] is not False and decision.get('visible') is not True:
+            c['direction']='unknown'
         if c['_blocked']: score=-1.
         scores.append(score)
         for j,old in enumerate(candidates[:i]):
@@ -132,6 +154,7 @@ def recover_relations(graph,traces,*,review=None):
         audit.append({'id':c['id'],'status':status,'score':round(scores[i],4),
                       'conflicts':[candidates[j]['id'] for j in conflicts[i]],
                       'blocked_by_vertex':c['_blocked'],'path':c['path'],'evidence':c['evidence']})
+        audit[-1]['endpoint_mismatch']=c['_endpoint_mismatch']
         if status=='rejected': continue
         unresolved |= status=='pending'; c['status']=status
         edges.append({k:v for k,v in c.items() if not k.startswith('_')})

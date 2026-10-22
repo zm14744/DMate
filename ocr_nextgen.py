@@ -40,7 +40,7 @@ def recognize_graph_document(raw,text_result):
     return {'text':corrected,'visual_text':visual,
             'graph_display_data':[display_graph(g) for g in graphs],
             'graph_structures':graphs,'raw_ocr_text':text,
-            'graph_display_version':'2026-10-22-staged-graph-v1',
+            'graph_display_version':'2026-10-22-staged-graph-evidence-v4',
             'review':{'required':incomplete,'reasons':[]},
             'text_count':text_result.get('text_count',0),'formula_count':0,
             'vision_used':True,'warning':None,
@@ -48,4 +48,5 @@ def recognize_graph_document(raw,text_result):
             'diagnostics':{'resource_metrics':text_result.get('resource_metrics',[]),
                            'layout_status':layout.get('status','unavailable'),
                            'correction':correction,'validation':issues,
-                           'stages':result['diagnostics']}}
+                           'stages':result['diagnostics'],
+                           'remote_metrics':result.get('remote_metrics',[])}}

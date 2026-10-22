@@ -414,6 +414,18 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h)
     return output
 
 
+def _corridor_hits(ink, xs, ys, ux, uy):
+    """Out-of-image corridor samples contain no evidence (never wrap/clip)."""
+    height, width = ink.shape
+    hits = np.zeros(xs.shape, dtype=bool)
+    for off in (-2., -1., 0., 1., 2.):
+        xx = np.rint(xs + off * ux).astype(int)
+        yy = np.rint(ys + off * uy).astype(int)
+        valid = (xx >= 0) & (xx < width) & (yy >= 0) & (yy < height)
+        hits[valid] |= ink[yy[valid], xx[valid]]
+    return hits
+
+
 def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
     """Detect an independently ink-backed arch between already known vertices.
 
@@ -500,11 +512,7 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
                                 break
                         if forbidden:
                             continue
-                        hits=np.zeros(ts.shape,dtype=bool)
-                        for off in (-2.,-1.,0.,1.,2.):
-                            xx=np.rint(xs+off*ux).astype(int)
-                            yy=np.rint(ys+off*uy).astype(int)
-                            hits |= ink[yy,xx]
+                        hits = _corridor_hits(ink, xs, ys, ux, uy)
                         coverage=float(hits.mean())
                         if coverage<.87:
                             continue
