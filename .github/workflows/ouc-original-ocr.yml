@@ -1,10 +1,6 @@
 name: DMate Original OUC Image OCR Review
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/ouc-original-ocr.yml"
   workflow_dispatch:
 
 permissions:
