@@ -4182,7 +4182,7 @@ def ocr():
             else []
         )
         graph_evidence = bool(
-            cv_graphs or graph_records or (
+            cv_graphs or graph_records or ocr_is_label_dominated(ocr_text) or (
                 image_kind != "non_exercise"
                 and re.search(r"顶点|边集|边连接|图\s*\d|G[1-9]", visual_text, re.I)
             )
