@@ -116,23 +116,35 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
     node=ask(NODE_PROMPT+'\n版面区域候选（不能把每个区域自动当一幅图）：'+json.dumps(layout or [],ensure_ascii=False),[url],budget)
     raw_graphs=node.get('graphs')
     if not isinstance(raw_graphs,list) or len(raw_graphs)>8: raise ValueError('invalid_node_inventory')
-    graphs=[]; edge_calls=0
+    graphs=[]
     for n,raw in enumerate(raw_graphs,1):
+        if not isinstance(raw,dict): raise ValueError('invalid_graph')
         raw=dict(raw); raw['edges']=[]; raw['complete']=False
-        graph=canonical_graph(raw,n); reads=[]
-        vertices=graph['vertices']
-        for start in range(0,len(vertices),12):
-            if edge_calls>=4:
-                diagnostics.append('edge_budget_exhausted'); break
-            edge_calls+=1
-            focus=[v['id'] for v in vertices[start:start+12]]
-            try:
-                result=ask(EDGE_PROMPT+'\n'+json.dumps({'graph':graph,'focus_vertices':focus},ensure_ascii=False),[url],budget)
-                batch=result.get('reads') or []
-                reads.extend(r for r in batch if isinstance(r,dict) and r.get('vertex') in focus)
-            except (ValueError,RuntimeError,TimeoutError):
-                diagnostics.append('edge_read_failed'); break
-        graphs.append(merge_node_reads(graph,reads))
+        graphs.append(canonical_graph(raw,n))
+    if len({g['id'] for g in graphs}) != len(graphs): raise ValueError('duplicate_graph_id')
+    # Batch focus vertices across graph boundaries. Six small figures must not
+    # exhaust a four-call budget merely because they occupy six panels.
+    focus=[(i,v['id']) for i,g in enumerate(graphs) for v in g['vertices']]
+    reads_by_graph={g['id']:[] for g in graphs}
+    for offset in range(0,min(len(focus),48),12):
+        batch=focus[offset:offset+12]
+        requests_by_graph={}
+        for index,vertex in batch:
+            requests_by_graph.setdefault(index,[]).append(vertex)
+        jobs=[{'graph':graphs[i],'focus_vertices':vertices} for i,vertices in requests_by_graph.items()]
+        try:
+            response=ask(EDGE_PROMPT+'\n对以下每幅图分别逐顶点读取，每条reads记录必须增加graph_id，不可跨图连接：\n'
+                         +json.dumps({'requests':jobs},ensure_ascii=False),[url],budget)
+            allowed={graphs[i]['id']:set(vertices) for i,vertices in requests_by_graph.items()}
+            for r in (response.get('reads') or [])[:48]:
+                if not isinstance(r,dict): continue
+                gid=r.get('graph_id')
+                if gid is None and len(allowed)==1: gid=next(iter(allowed))
+                if gid in allowed and r.get('vertex') in allowed[gid]: reads_by_graph[gid].append(r)
+        except (ValueError,RuntimeError,TimeoutError):
+            diagnostics.append('edge_read_failed'); break
+    if len(focus)>48: diagnostics.append('edge_budget_exhausted')
+    graphs=[merge_node_reads(g,reads_by_graph[g['id']]) for g in graphs]
     from graph_line_tracer import attach_line_evidence
     traced=attach_line_evidence(image_bytes,{'graphs':graphs})
     panels={p['id']:p['paths'] for p in traced.get('line_path_evidence',[])}

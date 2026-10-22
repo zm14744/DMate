@@ -85,8 +85,7 @@ def canonical_graph(source, index=1):
         edge_ids.add(eid)
         direction = item.get('direction')
         if direction not in ('forward', 'undirected', 'unknown'):
-            direction = 'forward' if graph['directed'] is True else (
-                'undirected' if graph['directed'] is False else 'unknown')
+            direction = 'undirected' if graph['directed'] is False else 'unknown'
         weight = item.get('weight')
         if isinstance(weight, bool) or not isinstance(weight, (str, int, float)):
             weight = None

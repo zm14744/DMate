@@ -31,9 +31,14 @@ def main():
             health.append({'ok':response.status_code==200,'seconds':time.monotonic()-begin})
             stop.wait(.25)
     thread=threading.Thread(target=probe,daemon=True);thread.start()
-    rows=[]
+    rows=[]; preparation=None
     try:
         images=sorted(Path('tests/fixtures/original_ouc_20261021').glob('*.png'))
+        # Explicit maintenance-only cache preparation; never hidden in HTTP
+        # timing and never concurrent with another local-model worker.
+        prepare_start=time.monotonic()
+        prepared=recognize_image(images[0].read_bytes(),prepare_cache=True)
+        preparation={'seconds':time.monotonic()-prepare_start,'stages':prepared['resource_metrics']}
         for iteration in range(2):
             for path in images:
                 raw=path.read_bytes(); start=time.monotonic()
@@ -47,7 +52,7 @@ def main():
         stop.set();thread.join(timeout=2)
         peak_path=Path('/sys/fs/cgroup/memory.peak')
         report={'kind':'resource_measurement_not_accuracy','cpu_limit':2,'memory_limit_bytes':4*1024**3,
-                'loading':'sequential_fresh_processes','co_resident_tested':False,
+                'loading':'sequential_fresh_processes','co_resident_tested':False,'cache_preparation':preparation,
                 'container_peak_bytes':int(peak_path.read_text()) if peak_path.exists() else None,
                 'requests':rows,'model_success_rate':sum(r['models_succeeded'] for r in rows)/max(1,len(rows)),
                 'health_probe_count':len(health),'health_success':all(h['ok'] for h in health),
@@ -55,6 +60,7 @@ def main():
         out=Path(args.output);out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2))
         print(json.dumps(report,indent=2))
     # A successful fallback is not successful model inference.
+    if not preparation or not all(m['status']=='ok' for m in preparation['stages']): return 2
     if not rows or not all(r['models_succeeded'] for r in rows) or not report['health_success']: return 2
     return 0
 

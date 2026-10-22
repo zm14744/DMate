@@ -97,6 +97,7 @@ def recover_relations(graph,traces,*,review=None):
             score=max(score,.92)
             c['evidence'].append({'source':'local_review','visible':True})
             direction=decision.get('direction')
+            if direction=='unknown': c['direction']='unknown'
             if direction in ('forward','reverse','undirected'):
                 if direction=='reverse': c['from'],c['to']=c['to'],c['from']
                 c['direction']='forward' if direction!='undirected' else 'undirected'

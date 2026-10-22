@@ -145,3 +145,40 @@ def test_worker_native_failure_is_safe():
         result,metric=run_worker('test','unused',Path(folder)/'out.json',
                                  command=[sys.executable,'-c','raise SystemExit(7)'])
     assert result is None and metric['status']=='worker_failed'
+
+
+def test_six_panels_share_vertex_batch_budget_without_losing_last_panels():
+    from graph_staged import recognize_staged
+    source=Path(__file__).parent/'fixtures/original_ouc_20261021/181309.png'
+    graphs=[graph(id=f'G{i}',node_complete=True) for i in range(1,7)]
+    calls=[]
+    def ask(prompt,images,budget):
+        calls.append(prompt)
+        if len(calls)==1: return {'graphs':graphs}
+        jobs=json.loads(prompt[prompt.index('{"requests":'):])['requests']
+        return {'reads':[{'graph_id':job['graph']['id'],'vertex':v,'complete':True,'edges':[]}
+                         for job in jobs for v in job['focus_vertices']]}
+    with patch('graph_line_tracer.attach_line_evidence',side_effect=lambda raw,value:value):
+        result=recognize_staged(source.read_bytes(),call=ask)
+    assert len(calls)==2 and len(result['graphs'])==6
+    assert all(g['node_complete'] for g in result['graphs'])
+    assert all(not g['complete'] for g in result['graphs'])
+
+
+def test_directed_edges_without_individual_direction_stay_unknown():
+    e=edge();del e['direction']
+    actual=canonical_graph(graph([e],directed=True))
+    assert actual['edges'][0]['direction']=='unknown'
+
+
+def test_dashed_line_is_a_candidate_not_gap_filled_topology():
+    import cv2
+    import numpy as np
+    from graph_line_tracer import _straight_stroke_candidates
+    image=np.full((100,260,3),255,dtype=np.uint8)
+    for x in range(20,241,20): cv2.line(image,(x,50),(min(x+9,240),50),(0,0,0),2)
+    paths=_straight_stroke_candidates(image,[('a',20,50),('b',240,50)],0,0,4,260,100)
+    assert len(paths)==1 and paths[0]['style']=='dashed' and paths[0]['needs_review']
+    image[:]=255
+    cv2.line(image,(20,50),(70,50),(0,0,0),2);cv2.line(image,(190,50),(240,50),(0,0,0),2)
+    assert not _straight_stroke_candidates(image,[('a',20,50),('b',240,50)],0,0,4,260,100)

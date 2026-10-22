@@ -47,4 +47,11 @@ def main():
     Path(output_path).write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8')
 
 
-if __name__=='__main__': main()
+if __name__=='__main__':
+    try:
+        main()
+    except Exception as exc:
+        # No image text or credentials in operational errors.
+        Path(sys.argv[3]).write_text(json.dumps({'worker_error':type(exc).__name__}))
+        raise SystemExit(2)
+
