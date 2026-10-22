@@ -73,7 +73,8 @@ def topology_comparison(actual_graphs, expected, question, visual):
 
     actual_vertices = sorted(str(v.get("id", "")).strip() for v in graph.get("vertices", [])
                              if isinstance(v, dict))
-    want_vertices = sorted(str(v) for v in expected_graph.get("vertices", []))
+    want_vertices = sorted(str(v.get("id", "") if isinstance(v, dict) else v).strip()
+                           for v in expected_graph.get("vertices", []))
     check("vertices", actual_vertices == want_vertices,
           "expected=%s, actual=%s" % (want_vertices, actual_vertices))
 
