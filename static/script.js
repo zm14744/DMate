@@ -13681,6 +13681,18 @@ function formatOcrGraphForReview(raw) {
     return text;
 }
 
+// OCR review displays recognized content as MathJax, without editable fields.
+// Only "本次要求" remains editable; recognized text is passed through unchanged.
+function renderOcrReviewResult(element, source) {
+    const value = String(source || "").trim();
+    if (!value) {
+        element.innerHTML = '<span class="ocr-review-empty">未识别到内容</span>';
+        return;
+    }
+    // Reuse the existing safe Markdown/LaTeX pipeline, including HTML sanitizing.
+    element.innerHTML = markdownToHtml(value);
+}
+
 function reviewRecognizedQuestion(file, data) {
     const dialog = document.getElementById("ocrReviewDialog");
     const preview = document.getElementById("ocrReviewImage");
@@ -13701,11 +13713,13 @@ function reviewRecognizedQuestion(file, data) {
         preview.src = imageUrl;
         preview.style.width = "100%";
         if (zoom) zoom.value = "100";
-        question.value = typeof data.text === "string" ? data.text.trim() : "";
-        graph.value = typeof data.visual_text === "string"
+        const recognizedText = typeof data.text === "string" ? data.text.trim() : "";
+        const recognizedGraph = typeof data.visual_text === "string"
             ? formatOcrGraphForReview(data.visual_text) : "";
+        renderOcrReviewResult(question, recognizedText);
+        renderOcrReviewResult(graph, recognizedGraph);
         const questionRadios = Array.from(dialog.querySelectorAll('input[name="ocrQuestionType"]'));
-        const inferredQuestion = Boolean(question.value.trim() || /(?:求|判断|证明|是否|哪些|几个)/.test(graph.value));
+        const inferredQuestion = Boolean(recognizedText || /(?:求|判断|证明|是否|哪些|几个)/.test(recognizedGraph));
         const initialRadio = questionRadios.find(radio => radio.value === (inferredQuestion ? "question" : "other"));
         if (initialRadio) initialRadio.checked = true;
 
@@ -13721,8 +13735,12 @@ function reviewRecognizedQuestion(file, data) {
             if (zoom) zoom.removeEventListener("input", resizePreview);
             preview.removeAttribute("src");
             URL.revokeObjectURL(imageUrl);
-            question.value = "";
-            graph.value = "";
+            // Release MathJax references before clearing rendered DOM.
+            if (window.MathJax?.typesetClear) {
+                window.MathJax.typesetClear([question, graph]);
+            }
+            question.replaceChildren();
+            graph.replaceChildren();
             requestText.value = "";
         };
         const finish = () => {
@@ -13731,12 +13749,11 @@ function reviewRecognizedQuestion(file, data) {
         };
         const dismiss = () => dialog.close();
         const submit = () => {
-            const text = question.value.trim();
-            const visualText = graph.value.trim();
+            const text = recognizedText;
+            const visualText = recognizedGraph;
             const userRequest = requestText.value.trim();
             if (!text && !visualText) {
-                error.textContent = "请至少保留题目文字或图形信息";
-                graph.focus();
+                error.textContent = "没有识别到题目文字或图形信息，请重新上传图片";
                 return;
             }
             if (/\[(?:待核对|不清楚)\]/.test(text + visualText)) {
@@ -13759,10 +13776,15 @@ function reviewRecognizedQuestion(file, data) {
         dialog.addEventListener("close", finish);
         try {
             dialog.showModal();
-            // 手机上自动弹键盘会推挤核对页并使底部操作按钮跳动。
-            // 让用户主动点击题目文字再编辑；桌面端保留自动聚焦。
+            // MathJax needs a visible container to lay out formulas correctly.
+            // Use the site's existing renderer: no additional model or API call.
+            void renderMath(question).then(() => {
+                if (dialog.open) return renderMath(graph);
+            });
+            // Do not pop up a keyboard on mobile. On desktop the optional
+            // instructions are the only editable field in this dialog.
             if (!window.matchMedia("(max-width: 760px)").matches) {
-                question.focus();
+                requestText.focus();
             }
         } catch (exception) {
             cleanup();
