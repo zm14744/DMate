@@ -1,67 +1,104 @@
-"""Filter standalone graph labels from OCR *question prose*, not from graph data.
+"""Presentation-only selection of exercise prose for graph photographs.
 
-This is a presentation-only filter for images positively identified as graphs.
-It deliberately does not infer any missing exercise text or edge topology.
+Question OCR and the mathematical graph payload must be independent. Never
+alter graph edges, the source OCR audit trail, or AI safety decisions here.
 """
 from __future__ import annotations
-
 import re
 
-# Single vertex/edge names, small OCR scraps, and empty-circle glyphs are not
-# independent question text. Preserve figure captions and full questions.
-_LABEL = re.compile(
-    r"(?:[a-zA-Z](?:[_-]?[0-9]{1,2})?|[uv][0-9]{1,2}|"
-    r"[eE][0-9]{1,2}|[gG][0-9]{1,2}|[0-9]{1,3}|"
-    r"[○●□☐◯√+\-–—.()（）]+|[a-zA-Z]{2,4}[0-9]{0,2})",
-    re.I,
-)
+# These standalone labels belong to the drawing, not to its question sentence.
+_VERTEX = re.compile(r"(?:[A-Za-z](?:_?[0-9]{1,3})?|[A-Za-z]_[A-Za-z0-9]{1,8}|[A-Za-z]{1,3}[0-9]{1,3}|[uUvVeE][₀-₉]+)")
 _FIGURE = re.compile(
-    r"^(?:(?:图|图号)\s*[0-9０-９]+(?:\s*[.．]\s*[0-9０-９]+)?"
-    r"|fig(?:ure)?\s*[0-9]+(?:\s*[:：].*)?"
-    r"|problem\s*[0-9]+|课堂测试.{0,8}|课后作业.{0,8})\s*[:：]?$",
-    re.I,
+    r"(?:(?:图|图号)\\s*[0-9０-９]+(?:\\s*[.．]\\s*[0-9０-９]+)?"
+    r"|(?:fig(?:ure)?|图)\\s*[:：]?\\s*[0-9]+"
+    r"|G\\s*_?\\s*[0-9]+"
+    r"|[（(]\\s*[a-zA-Z0-9]{1,2}\\s*[）)])", re.I
 )
+_SUBFIGURE = re.compile(r"^(?:\\(\\s*[a-zA-Z0-9]\\s*\\)|（\\s*[a-zA-Z0-9]\\s*）)$")
+_FIGURE_LINE = re.compile(
+    r"^(?:(?:图|图号)\\s*[0-9０-９]+(?:\\s*[.．]\\s*[0-9０-９]+)?"
+    r"|figure\\s*[0-9]+"
+    r"|G\\s*_?\\s*[0-9]+(?:\\s*[（(]\\s*[a-zA-Z0-9]+\\s*[）)])?)\\s*[:：]?$", re.I
+)
+_EDGE_NUMBER = re.compile(r"^(?:[0-9０-９]+(?:\\.[0-9]+)?|[○●□☐◯]+|[√\\'.,+_\\-–—\\s]+)$")
 _EXERCISE = re.compile(
     r"求|判断|证明|证实|计算|哪些|哪一个|下列|是否|图中|连通|同构|欧拉|"
-    r"哈密顿|生成树|基本回路|路径|度数|矩阵|"
-    r"determin|prove|find|which|isomorph|euler|graph\s+(?:is|are)",
+    r"哈密顿|生成树|基本回路|路径|度数|矩阵|题|课堂测试|课后作业|"
+    r"determin|prove|find|which|isomorph|euler|graph\\s+(?:is|are)|problem\\s*\\d+",
     re.I,
 )
+_SENTENCE = re.compile(r"[。？！?：:；;，,]|[a-zA-Z]+\\s+[a-zA-Z]+", re.I)
+_METADATA = re.compile(
+    r"^(?:【.*?(?:核对|候选|识别).*?】|"
+    r"识别说明.*|状态\\s*[:：].*|首次识别.*|\\[.*?(?:待核对|识别不清楚).*?\\])$", re.I
+)
+
+
+def _lines(text):
+    return [s.strip() for s in str(text or "").replace("\\r", "\\n").splitlines()
+            if s.strip()]
+
+
+def _is_diagram_label(line):
+    source = str(line).strip()
+    if _FIGURE_LINE.fullmatch(source) or _SUBFIGURE.fullmatch(source):
+        return True
+    if _VERTEX.fullmatch(source) or _EDGE_NUMBER.fullmatch(source):
+        return True
+    # OCR may insert spaces between standalone graph labels ("v 1", "e 4").
+    compact = re.sub(r"\\s+", "", source)
+    return bool(_VERTEX.fullmatch(compact) or _EDGE_NUMBER.fullmatch(compact))
+
+
+def _is_prose(line):
+    return bool(_EXERCISE.search(line) or
+                (len(line) >= 12 and _SENTENCE.search(line) and
+                 not re.match(r"^(?:[A-Za-z0-9_\\s,，.．]+)$", line)))
 
 
 def clean_graph_question_text(text, *, has_graph=False):
-    """Keep credible question prose/captions; omit obvious isolated OCR labels.
+    """Remove graph-only labels/captions; retain meaningful exercise sentences.
 
-    Use only after graph evidence has been established independently; non-graph
-    uploads are unchanged. This cannot repair incorrectly recognized prose.
+    Conservative when text is not graph-related. No labels are removed from
+    within actual prose; e.g. "求 G1 中 v2 的度" stays intact.
     """
     source = str(text or "").strip()
     if not has_graph or not source:
         return source
-    lines = [line.strip() for line in source.replace("\r", "\n").split("\n") if line.strip()]
-    label_lines = sum(bool(_LABEL.fullmatch(line)) for line in lines)
-    # On a real paragraph, a solitary variable/number may be part of a formula.
-    # Require sustained evidence of a graph-label dump before filtering.
-    if label_lines < 3:
-        return source
+    rows = _lines(source)
+    kept = []
+    for line in rows:
+        if _METADATA.fullmatch(line) or _is_diagram_label(line):
+            continue
+        if _is_prose(line):
+            kept.append(line)
+            continue
+        # Long English math context can be genuine question prose.
+        # Short OCR scraps (including reversed-page characters) are not.
+        if len(line) >= 24 and (
+            len(re.findall(r"[\\u4e00-\\u9fff]", line)) >= 8 or
+            len(line.split()) >= 4
+        ) and _SENTENCE.search(line):
+            kept.append(line)
+    return "\\n".join(kept).strip()
 
-    retained = []
-    for line in lines:
-        if _FIGURE.fullmatch(line) or _EXERCISE.search(line):
-            retained.append(line)
-        elif not _LABEL.fullmatch(line):
-            # Unrecognized prose is left intact: no fabricated corrections.
-            retained.append(line)
-    return "\n".join(retained).strip()
+
+def select_graph_question_text(ocr_text, corrected_text, *, has_graph=False):
+    """Prefer image-grounded *question-only* Vision read, not a whole-page OCR dump."""
+    if not has_graph:
+        return str(corrected_text or ocr_text or "").strip()
+    corrected = clean_graph_question_text(corrected_text, has_graph=True)
+    if corrected:
+        return corrected
+    return clean_graph_question_text(ocr_text, has_graph=True)
 
 
 def ocr_is_label_dominated(text):
-    """Identify an OCR dump of graph labels, not an actual prose question."""
-    lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+    lines = _lines(text)
     if len(lines) < 4 or any(_EXERCISE.search(line) for line in lines):
         return False
-    count = sum(bool(_LABEL.fullmatch(line)) for line in lines)
-    return count >= 4 and count * 10 >= len(lines) * 6
+    label_count = sum(_is_diagram_label(s) for s in lines)
+    return label_count >= 3 and label_count * 10 >= 5 * len(lines)
 
 
-__all__ = ["clean_graph_question_text", "ocr_is_label_dominated"]
+__all__ = ["clean_graph_question_text", "select_graph_question_text", "ocr_is_label_dominated"]
