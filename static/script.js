@@ -13718,17 +13718,17 @@ function formatStructuredGraphReview(graphs) {
         };
     };
     const sortedGraphs = graphs.slice();
-    if (sortedGraphs.length > 1 && sortedGraphs.every(g =>
+    if (sortedGraphs.every(g => /^G[1-9]\d*$/.test(String(g?.id || "")))) {
+        // The model may return per-figure coordinates. Trust numbered graph
+        // IDs before coordinates so G1,G2,G3,G4 keep the original order.
+        sortedGraphs.sort((a, b) => compare(a.id, b.id));
+    } else if (sortedGraphs.length > 1 && sortedGraphs.every(g =>
         g && Array.isArray(g.vertices) && graphPosition(g) !== null)) {
-        // Coordinate order is a better fallback for a 2x2 textbook panel:
-        // sort rows top to bottom, then panels left to right inside a row.
         sortedGraphs.sort((a, b) => {
             const pa = graphPosition(a), pb = graphPosition(b);
             return Math.abs(pa.y - pb.y) > 0.12
                 ? pa.y - pb.y : pa.x - pb.x || pa.y - pb.y;
         });
-    } else if (sortedGraphs.every(g => /^G[1-9]\d*$/.test(String(g?.id || "")))) {
-        sortedGraphs.sort((a, b) => compare(a.id, b.id));
     }
     for (let index = 0; index < sortedGraphs.length; index++) {
         const graph = sortedGraphs[index];
