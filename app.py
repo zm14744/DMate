@@ -3855,12 +3855,14 @@ def ocr():
                 )
             except Exception as graph_check_exc:
                 print(f"图结构一致性校验降级：{type(graph_check_exc).__name__}")
+        fusion_issues = []
         if (compare_pixel_vision is not None and isinstance(vision_result, dict)
                 and vision_result.get("ok") and cv_graphs):
             try:
-                graph_review_issues.extend(compare_pixel_vision(
+                fusion_issues = compare_pixel_vision(
                     graph_cv, vision_result.get("graph_data") or []
-                ))
+                )
+                graph_review_issues.extend(fusion_issues)
             except (TypeError, ValueError, KeyError) as fusion_exc:
                 print(f"图论边集证据核对降级：{type(fusion_exc).__name__}")
 
@@ -4137,6 +4139,15 @@ def ocr():
             return jsonify({
                 "error": message + " 请尝试重新拍摄、裁剪，或提高图形与背景的对比度"
             }), 400
+
+        # Do not conceal a verified pixel-vs-vision disagreement in
+        # server-only warnings. The review dialog is read-only; show the
+        # unresolved discrepancy alongside the recognized graph description.
+        # This does NOT promote OpenCV candidates into confirmed edges.
+        if fusion_issues and image_kind != "non_exercise":
+            notice = "【图形边集待核对】" + "；".join(fusion_issues)
+            if notice not in visual_text:
+                visual_text = (visual_text + "\\n" + notice).strip()
 
         warnings = list(alignment_warnings) + list(graph_review_issues)
         if result.get("warning"):
