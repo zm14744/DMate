@@ -401,6 +401,114 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h)
     return output
 
 
+def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+    """Detect an independently ink-backed arch between already known vertices.
+
+    A contour may be almost semicircular; a straight Hough line has no chance
+    of recovering it. Test semicircle, sine and quadratic arc profiles with
+    both bend signs. This contributes evidence, NOT an accepted graph edge.
+    """
+    if len(local) > 14:
+        return []
+    ink = (_foreground(rgb) > 0)
+    height, width = ink.shape
+    output = []
+    for i in range(len(local)):
+        for j in range(i+1, len(local)):
+            _, ax, ay = local[i]
+            _, bx, by = local[j]
+            dx, dy = bx-ax, by-ay
+            distance = math.hypot(dx, dy)
+            if distance < max(45.0, 5.0*radius):
+                continue
+            ux, uy = -dy/distance, dx/distance
+            # No candidate should be inferred if the supposed arc goes
+            # through a *marked* intermediate vertex.
+            ts = np.linspace(.045,.955,min(180,max(52,round(distance*.85))))
+            base_x = ax + ts*dx
+            base_y = ay + ts*dy
+            best_routes = []
+            for sign in (-1,1):
+                max_bend = min(.72*distance, max(width,height)*.63)
+                step = max(3., min(7.,distance*.027))
+                amplitudes = np.arange(max(2.0*radius,.115*distance),
+                                       max_bend+step/2,step)
+                for profile in ("elliptical", "quadratic", "sine"):
+                    if profile == "elliptical":
+                        shape = np.sqrt(np.maximum(0.,1.-(2.*ts-1.)**2))
+                    elif profile == "quadratic":
+                        shape = 4.*ts*(1.-ts)
+                    else:
+                        shape = np.sin(np.pi*ts)
+                    for amplitude in amplitudes:
+                        bend = sign * amplitude * shape
+                        xs = base_x + ux*bend
+                        ys = base_y + uy*bend
+                        if (xs.min()<2 or ys.min()<2 or
+                                xs.max()>=width-2 or ys.max()>=height-2):
+                            continue
+                        forbidden = False
+                        for k,(_,vx,vy) in enumerate(local):
+                            if k in (i,j):continue
+                            d2 = (xs-vx)**2+(ys-vy)**2
+                            if np.any(d2[(ts>.12)&(ts<.88)]<(radius*.8)**2):
+                                forbidden=True
+                                break
+                        if forbidden:
+                            continue
+                        hits=np.zeros(ts.shape,dtype=bool)
+                        for off in (-2.,-1.,0.,1.,2.):
+                            xx=np.rint(xs+off*ux).astype(int)
+                            yy=np.rint(ys+off*uy).astype(int)
+                            hits |= ink[yy,xx]
+                        coverage=float(hits.mean())
+                        if coverage<.87:
+                            continue
+                        if min(float(chunk.mean()) for chunk in np.array_split(hits,5))<.75:
+                            continue
+                        missing = np.flatnonzero(np.r_[True,hits,True])
+                        largest_run=int(max(np.diff(missing)-1, default=0))
+                        if largest_run > max(5,round(.04*len(ts))):
+                            continue
+                        # Use a shorter initial point to anchor near a node
+                        # rim, preserving the actually observed stroke shape.
+                        path=[]
+                        for t in np.linspace(0.025,.975,10):
+                            if profile == "elliptical":
+                                h=math.sqrt(max(0.,1.-(2.*t-1.)**2))
+                            elif profile == "quadratic":
+                                h=4.*t*(1.-t)
+                            else:
+                                h=math.sin(math.pi*t)
+                            x=ax+t*dx+ux*sign*amplitude*h+x_off
+                            y=ay+t*dy+uy*sign*amplitude*h+y_off
+                            path.append([round(x/max(full_w-1,1),4),
+                                         round(y/max(full_h-1,1),4)])
+                        best_routes.append({
+                            'from':local[i][0], 'to':local[j][0],
+                            'path':path,'pixel_length':round(distance*(1+amplitude/distance)),
+                            'score':round(coverage,3),'needs_review':True,
+                            'method':'opencv_curved_ink_template',
+                            'bend':round(sign*amplitude,1),
+                        })
+            # Keep distinct ink corridors (parallel arches), not redundant
+            # profile fits of a single arc.
+            selected=[]
+            for candidate in sorted(best_routes,key=lambda z:-z['score']):
+                if not any(abs(candidate['bend']-old['bend'])<
+                           max(5.,radius*.72) and
+                           _same_ink_route(candidate,old,{
+                               local[i][0]:(ax+x_off,ay+y_off),
+                               local[j][0]:(bx+x_off,by+y_off)},
+                               full_w,full_h,radius)
+                           for old in selected):
+                    selected.append(candidate)
+                if len(selected)>=4:
+                    break
+            output.extend(selected)
+    return output
+
+
 def _graph_candidates(rgb, graph):
     h, w = rgb.shape[:2]
     points = _vertices(graph, w, h)
@@ -495,6 +603,12 @@ def _graph_candidates(rgb, graph):
     # A long edge can terminate on a circular node rim away from the line
     # joining the two node centers; Hough endpoints recover these cases.
     for candidate in _hough_endpoint_candidates(
+            rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
+            radius, w, h):
+        keep_candidate(candidate)
+    # Add paths around genuinely curved independent ink corridors, including
+    # a straight+arc parallel pair which skeleton's greedy walker may miss.
+    for candidate in _curved_stroke_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
             radius, w, h):
         keep_candidate(candidate)
