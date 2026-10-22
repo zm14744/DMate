@@ -13752,11 +13752,11 @@ function formatStructuredGraphReview(graphs) {
         }
         vertices.sort(compare);
         const directed = graph.directed;
-        const kind = directed === true ? "有向图" : directed === false ? "无向图" : "方向待核对";
+        const kind = directed === true ? "有向图" : directed === false ? "无向图" : "";
         const weightKind = graph.weighted === true ? "带权" :
-            graph.weighted === false ? "无权" : "权值待核对";
+            graph.weighted === false ? "无权" : "";
         let multiKind = graph.multigraph === true ? "多重图" :
-            graph.multigraph === false ? "简单图" : "重边待核对";
+            graph.multigraph === false ? "简单图" : "";
         const groups = new Map();
         const endpointPairs = new Set();
         let inconsistentSimple = false;
@@ -13782,7 +13782,7 @@ function formatStructuredGraphReview(graphs) {
             else groups.set(key, { a, b, edgeLabel, weight, count: 1 });
         }
         if (graph.multigraph === false && inconsistentSimple) {
-            multiKind = "图类型待核对（边表含自环或重复端点）";
+            multiKind = "";
         }
         const sortedEdges = [...groups.values()].sort((a, b) =>
             compare(a.a, b.a) || compare(a.b, b.b) ||
@@ -13801,6 +13801,10 @@ function formatStructuredGraphReview(graphs) {
             return relation + (edge.count > 1 ? " × " + edge.count : "") + extras;
         });
         const graphId = String(graph.id || ("G" + (index + 1))).trim();
+        // Simplify only visibly rendered temporary identifiers, never the
+        // underlying vertex IDs used for AI calculations.
+        const compactId = id => String(id).replace(
+            new RegExp("^" + graphId.replace(/[.*+?^\\$\\{\\}()|[\\]\\\\]/g, "\\\\        const graphId = String(graph.id || ("G" + (index + 1))).trim();
         lines.push("### 图 " + (index + 1) + "（" + ocrReviewLabel(graphId) + "）");
         lines.push("**类型：** " + kind + " · " + weightKind + " · " + multiKind);
         lines.push("**顶点（" + vertices.length + "）：** " + vertices.map(ocrReviewLabel).join("、"));
@@ -13819,7 +13823,31 @@ function formatStructuredGraphReview(graphs) {
             ? graph.uncertain_edges.filter(Boolean).slice(0, 12) : [];
         lines.push("**状态：** " + (graph.complete === true && !pending.length && !(graph.multigraph === false && inconsistentSimple)
             ? "结构已列出（仍需以原图核对）" : "待核对（现有边表不代表全部边）"));
-        if (pending.length) lines.push("**待核对：** " + pending.map(ocrReviewPlain).join("；"));
+        if (pending.length) lines.push("**待核对：** " + pending.map(ocrReviewPlain).join("；"));") + "_(v[0-9]+)$", "i"), "$1"
+        );
+        const visibleLabel = id => ocrReviewLabel(compactId(id));
+        const visibleEdges = sortedEdges.map(edge => {
+            const a = compactId(edge.a), b = compactId(edge.b);
+            const la = ocrReviewLatexLabel(a), lb = ocrReviewLatexLabel(b);
+            const relation = la !== null && lb !== null
+                ? "\\(" + la + (directed === true ? "\\\\to{}" : "-") + lb + "\\)"
+                : visibleLabel(a) + (directed === true ? " → " : "—") + visibleLabel(b);
+            const metadata = [];
+            if (edge.edgeLabel) metadata.push("边名：" + ocrReviewPlain(edge.edgeLabel));
+            if (edge.weight) metadata.push("权：" + ocrReviewPlain(edge.weight));
+            return relation + (edge.count > 1 ? " × " + edge.count : "") +
+                (metadata.length ? "（" + metadata.join("，") + "）" : "");
+        });
+        lines.push("### 图 " + (index + 1) + "（" + ocrReviewLabel(graphId) + "）");
+        const attrs = [kind, weightKind, multiKind].filter(Boolean);
+        if (attrs.length) lines.push("**类型：** " + attrs.join(" · "));
+        lines.push("**顶点（" + vertices.length + "）：** " + vertices.map(visibleLabel).join("、"));
+        const isolated = vertices.filter(id => !incident.has(id));
+        if (graph.complete === true && isolated.length) {
+            lines.push("**孤立顶点：** " + isolated.map(visibleLabel).join("、"));
+        }
+        lines.push("**边（" + (graph.complete === true ? "" : "暂录 ") + graph.edges.length + " 条）：** " +
+            (visibleEdges.length ? visibleEdges.join("、") : "—"));
         if (index < graphs.length - 1) lines.push("---");
     }
     return lines.join("\n\n");
@@ -13830,9 +13858,10 @@ function formatOcrReviewGraphDisplay(graphs, visualText) {
     // has not changed the first-pass canonical graph table.
     const structured = formatStructuredGraphReview(graphs);
     if (structured) return structured;
-    const fallback = String(visualText || "").replace(/\r\n?/g, "\n")
-        .replace(/\n{3,}/g, "\n\n").trim();
-    return fallback ? "**识别说明（结构化边表尚未核实）**\n\n" + fallback : "";
+    // Never leak audit-internal prose, pixel coordinates or old-format status
+    // markers into the user-facing graph panel. Internal visualText remains
+    // available to the AI guard, separately from the graph card.
+    return String(visualText || "").trim() ? "图形结构暂无可展示的边表" : "";
 }
 
 // OCR review displays recognized content as MathJax, without editable fields.
@@ -13874,8 +13903,7 @@ function reviewRecognizedQuestion(file, data) {
         const displayGraph = formatOcrReviewGraphDisplay(
             data.graph_display_data, recognizedGraph
         );
-        renderOcrReviewResult(question,
-            recognizedText || (displayGraph ? "未识别到独立题干，请查看图形信息" : ""));
+        renderOcrReviewResult(question, recognizedText);
         renderOcrReviewResult(graph, displayGraph);
         const questionRadios = Array.from(dialog.querySelectorAll('input[name="ocrQuestionType"]'));
         const inferredQuestion = Boolean(recognizedText || /(?:求|判断|证明|是否|哪些|几个)/.test(recognizedGraph));
@@ -13885,8 +13913,7 @@ function reviewRecognizedQuestion(file, data) {
         // 本轮要求只在图片核对界面填写，不从主聊天框继承。
         requestText.value = "";
         // This result is read-only; uncertain text can be addressed in instructions.
-        error.textContent = /\[(?:待核对|不清楚)\]/.test(recognizedText + recognizedGraph)
-            ? "识别结果含待核对内容，可在“本次要求”中补充说明" : "";
+        error.textContent = "";
 
         const resizePreview = () => { preview.style.width = `${zoom.value}%`; };
         const cleanup = () => {
@@ -13911,7 +13938,7 @@ function reviewRecognizedQuestion(file, data) {
         const dismiss = () => dialog.close();
         const submit = () => {
             const text = recognizedText;
-            const visualText = recognizedGraph;
+            const visualText = displayGraph;
             const userRequest = requestText.value.trim();
             if (!text && !visualText) {
                 error.textContent = "没有识别到题目文字或图形信息，请重新上传图片";
@@ -13922,7 +13949,7 @@ function reviewRecognizedQuestion(file, data) {
                 return;
             }
             result = {
-                text, visualText, userRequest,
+                text, visualText, analysisVisualText: recognizedGraph, userRequest,
                 ocrIsQuestion: dialog.querySelector('input[name="ocrQuestionType"]:checked')?.value === "question"
             };
             dialog.close();
@@ -14058,7 +14085,7 @@ async function handleImageSelected(event) {
         // 这里不再自动删除题干片段，避免把真实条件当成图形噪声删掉。
         const reviewed = await reviewRecognizedQuestion(file, data);
         if (!reviewed || !sessions.some(item => item.id === session.id)) return;
-        const { text, visualText, userRequest, ocrIsQuestion } = reviewed;
+        const { text, visualText, analysisVisualText, userRequest, ocrIsQuestion } = reviewed;
 
         const questionParts = [];
 
@@ -14071,6 +14098,13 @@ async function handleImageSelected(event) {
         }
 
         const questionText = questionParts.join("\n\n");
+        // The visible chat contains only the student-readable graph card.
+        // The original audit transcript (and its safety markers) remains in
+        // the API-only question so uncertain edges cannot become certified.
+        const internalParts = [];
+        if (text) internalParts.push(`【题目文字】\n${text}`);
+        if (analysisVisualText) internalParts.push(`【图形信息】\n${analysisVisualText}`);
+        const internalQuestionText = internalParts.join("\n\n");
         const displayParts = [questionText];
 
         if (userRequest) {
@@ -14081,7 +14115,7 @@ async function handleImageSelected(event) {
         const apiText = userRequest
             ? [
                 "【当前指向题目】",
-                questionText,
+                internalQuestionText,
                 "【当前指向题目结束】",
                 "",
                 "【本轮唯一需要执行的用户请求】",
@@ -14090,7 +14124,7 @@ async function handleImageSelected(event) {
                 "",
                 "只回答上面的本轮最新请求。题目正文只作为本轮题目背景，不要把要求混入题干。"
             ].join("\n")
-            : undefined;
+            : internalQuestionText;
 
         session.messages.push({
             role: "user",
