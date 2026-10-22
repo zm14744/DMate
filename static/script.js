@@ -13748,7 +13748,7 @@ function formatStructuredGraphReview(graphs) {
             const la = ocrReviewLatexLabel(edge.a);
             const lb = ocrReviewLatexLabel(edge.b);
             const relation = la !== null && lb !== null
-                ? "\\(" + la + (directed === true ? "\\to" : "-") + lb + "\\)"
+                ? "\\(" + la + (directed === true ? "\\to{}" : "-") + lb + "\\)"
                 : ocrReviewLabel(edge.a) + (directed === true ? " → " : "—") +
                   ocrReviewLabel(edge.b);
             const metadata = [];
@@ -13758,7 +13758,7 @@ function formatStructuredGraphReview(graphs) {
             return relation + (edge.count > 1 ? " × " + edge.count : "") + extras;
         });
         const graphId = String(graph.id || ("G" + (index + 1))).trim();
-        lines.push("### 图 " + (index + 1) + "（" + ocrReviewPlain(graphId) + "）");
+        lines.push("### 图 " + (index + 1) + "（" + ocrReviewLabel(graphId) + "）");
         lines.push("**类型：** " + kind + " · " + weightKind + " · " + multiKind);
         lines.push("**顶点（" + vertices.length + "）：** " + vertices.map(ocrReviewLabel).join("、"));
         const isolated = vertices.filter(id => !incident.has(id));
@@ -13780,7 +13780,8 @@ function formatOcrReviewGraphDisplay(graphs, visualText) {
     // has not changed the first-pass canonical graph table.
     const structured = formatStructuredGraphReview(graphs);
     if (structured) return structured;
-    const fallback = formatOcrGraphForReview(visualText);
+    const fallback = String(visualText || "").replace(/\r\n?/g, "\n")
+        .replace(/\n{3,}/g, "\n\n").trim();
     return fallback ? "**识别说明（结构化边表尚未核实）**\n\n" + fallback : "";
 }
 
