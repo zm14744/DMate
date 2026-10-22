@@ -238,31 +238,38 @@
             "edges": [
               {
                 "from": "v1",
-                "to": "v5"
+                "to": "v5",
+                "edge_label": "e1"
               },
               {
                 "from": "v5",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e2"
               },
               {
                 "from": "v4",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e3"
               },
               {
                 "from": "v3",
-                "to": "v2"
+                "to": "v2",
+                "edge_label": "e4"
               },
               {
                 "from": "v1",
-                "to": "v2"
+                "to": "v2",
+                "edge_label": "e5"
               },
               {
                 "from": "v1",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e6"
               },
               {
                 "from": "v1",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e7"
               }
             ],
             "vertex_count": 5,
@@ -285,27 +292,33 @@
             "edges": [
               {
                 "from": "v1",
-                "to": "v5"
+                "to": "v5",
+                "edge_label": "e1"
               },
               {
                 "from": "v5",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e2"
               },
               {
                 "from": "v4",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e3"
               },
               {
                 "from": "v3",
-                "to": "v2"
+                "to": "v2",
+                "edge_label": "e4"
               },
               {
                 "from": "v1",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e6"
               },
               {
                 "from": "v1",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e7"
               }
             ],
             "vertex_count": 5,
@@ -328,23 +341,28 @@
             "edges": [
               {
                 "from": "v5",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e2"
               },
               {
                 "from": "v4",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e3"
               },
               {
                 "from": "v1",
-                "to": "v2"
+                "to": "v2",
+                "edge_label": "e5"
               },
               {
                 "from": "v1",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e6"
               },
               {
                 "from": "v1",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e7"
               }
             ],
             "vertex_count": 5,
@@ -366,23 +384,28 @@
             "edges": [
               {
                 "from": "v4",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e3"
               },
               {
                 "from": "v3",
-                "to": "v2"
+                "to": "v2",
+                "edge_label": "e4"
               },
               {
                 "from": "v1",
-                "to": "v2"
+                "to": "v2",
+                "edge_label": "e5"
               },
               {
                 "from": "v1",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e6"
               },
               {
                 "from": "v1",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e7"
               }
             ],
             "vertex_count": 4,
@@ -403,15 +426,18 @@
             "edges": [
               {
                 "from": "v3",
-                "to": "v2"
+                "to": "v2",
+                "edge_label": "e4"
               },
               {
                 "from": "v1",
-                "to": "v2"
+                "to": "v2",
+                "edge_label": "e5"
               },
               {
                 "from": "v1",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e7"
               }
             ],
             "vertex_count": 3,
@@ -433,27 +459,33 @@
             "edges": [
               {
                 "from": "v1",
-                "to": "v5"
+                "to": "v5",
+                "edge_label": "e1"
               },
               {
                 "from": "v5",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e2"
               },
               {
                 "from": "v4",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e3"
               },
               {
                 "from": "v1",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e4"
               },
               {
                 "from": "v1",
-                "to": "v4"
+                "to": "v4",
+                "edge_label": "e6"
               },
               {
                 "from": "v1",
-                "to": "v3"
+                "to": "v3",
+                "edge_label": "e7"
               }
             ],
             "vertex_count": 4,

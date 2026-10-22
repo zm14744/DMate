@@ -40,32 +40,6 @@ def read_edges(graph, labels=None):
 
 
 def equivalent_unlabeled(want, got):
-    """Exact small-graph isomorphism including loops and parallel-edge counts."""
-    wv = [normalized(v) for v in want["vertices"]]
-    gv = [normalized(x.get("id") if isinstance(x, dict) else x)
-          for x in got.get("vertices", [])]
-    if len(wv) != len(gv) or len(set(gv)) != len(gv) or len(wv) > 8:
-        return False
-    we = read_edges(want)
-    ge = read_edges(got)
-    if sum(we.values()) != sum(ge.values()):
-        return False
-    wd = Counter(v for edge, multiplicity in we.items() for v in edge for _ in range(multiplicity))
-    gd = Counter(v for edge, multiplicity in ge.items() for v in edge for _ in range(multiplicity))
-    if sorted(wd.get(v, 0) for v in wv) != sorted(gd.get(v, 0) for v in gv):
-        return False
-    for perm in permutations(gv):
-        mapping = dict(zip(gv, perm))
-        if all(we.get(key, 0) == ge.get(tuple(sorted((mapping[key[0]], mapping[key[1]]))), 0)
-               for key in we) and all(
-                   ge.get(key, 0) == we.get(tuple(sorted((perm.index(key[0]) < len(wv) and wv[perm.index(key[0])], wv[perm.index(key[1])]))), 0)
-                   for key in ge
-               ):
-            return True
-    return False
-
-
-def equivalent_unlabeled(want, got):
     wv = [normalized(v) for v in want["vertices"]]
     gv = [normalized(x.get("id") if isinstance(x, dict) else x)
           for x in got.get("vertices", [])]
@@ -95,7 +69,9 @@ def equivalent_unlabeled(want, got):
 
 
 def position_sort(graphs):
-    """Sort 2x2 or 3x2 textbook panels top-down and then left-right."""
+    """Trust explicit G1/G2/... panel numbers before unreliable model coordinates."""
+    if graphs and all(isinstance(g, dict) and re.fullmatch(r"G[1-9]\d*", str(g.get("id") or "")) for g in graphs):
+        return sorted(graphs, key=lambda g: int(str(g["id"])[1:]))
     pos = []
     for graph in graphs:
         vv = graph.get("vertices") if isinstance(graph, dict) else []
@@ -158,6 +134,32 @@ def judge_case(case, actual, capture):
                   [[*edge, count] for edge, count in sorted(read_edges(w).items())],
                   [[*edge, count] for edge, count in sorted(read_edges(g).items())],
                   read_edges(w) == read_edges(g))
+            missing = read_edges(w) - read_edges(g)
+            extra = read_edges(g) - read_edges(w)
+            if missing:
+                checks.append({"name": prefix + ".missing_edges", "result": "FAIL",
+                    "expected": "all real edges present",
+                    "actual": [[*edge, n] for edge, n in sorted(missing.items())]})
+            if extra:
+                checks.append({"name": prefix + ".invented_edges", "result": "FAIL",
+                    "expected": "no invented edges",
+                    "actual": [[*edge, n] for edge, n in sorted(extra.items())]})
+            def labels_edges(item):
+                rows = []
+                for edge in item.get("edges", []):
+                    if not isinstance(edge, dict):
+                        continue
+                    label = normalized(edge.get("edge_label"))
+                    if label:
+                        a, b = normalized(edge.get("from")), normalized(edge.get("to"))
+                        if item.get("directed") is False:
+                            a, b = sorted((a, b))
+                        rows.append([label, a, b])
+                return sorted(rows)
+            reference_labels = labels_edges(w)
+            if reference_labels:
+                check(prefix + ".edge_labels",
+                      reference_labels, labels_edges(g))
         if g.get("complete") is not True or g.get("uncertain_edges"):
             checks.append({"name": prefix + ".completeness", "result": "UNVERIFIED",
                            "expected": "complete edge list", "actual": {
