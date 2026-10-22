@@ -66,6 +66,11 @@ def topology_comparison(actual_graphs, expected, question, visual):
         check("graph_id", False, "Expected graph id %r not found" % graph_id)
         return checks
 
+    # Even a single-graph image can be mislabelled (G2 -> G1).
+    # Never silently treat a matching edge set as proof of a matching graph ID.
+    if graph_id:
+        check("graph_id", str(graph.get("id", "")).strip().casefold() == graph_id.casefold(),
+              "expected=%r, actual=%r" % (graph_id, graph.get("id")))
     directed = expected_graph.get("directed")
     actual_directed = graph.get("directed")
     check("directed", actual_directed is directed,
