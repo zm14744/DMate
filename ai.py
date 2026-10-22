@@ -204,7 +204,7 @@ GRAPH_TOPOLOGY_PROMPT = """你只负责从图像恢复离散数学图的结构�
 8. e1、e2 等写在线旁的符号是边名，不是权值。只有明确标在边上的数值才记为 weight。
 属性判断：清楚可见箭头时按箭头判断有向边；普通无箭头线条按无向边，除非图面明确表达有向关系。没有清晰边权时按无权图；没有可见平行边时按简单图。只有图面本身无法判断时才使用 "unknown"。
 9. OpenCV 提供的顶点、边和位置只是像素候选，不是事实。只有在原图中能核实的边才能进入 edges；不得为了凑成树、三角形、完全图或预期答案而补边。
-10. 保留孤立顶点与不连通分量。顶点表中的每个 ID 必须唯一；每条边的 from、to 都必须引用该图已有的顶点。
+10. 保留孤立顶点与不连通分量。顶点表中的每个 ID 必须唯一；每条边的 from、to 都必须引用该图已有的顶点。圆点位于线段中段也可能是独立顶点，必须逐点核实。对于多幅删边、删点、缩边结果，分别核对各自的顶点与边；缩边应保留不同原边产生的重边；e1/e6 等边名必须对应真实线迹，严禁交换。
 11. complete 只有在顶点集合和全部边都能从图中确认时才为 true。存在漏看风险、端点歧义、箭头方向歧义或图像裁切时必须为 false，并说明原因。
 12. 不要重复抄录题干文字。corrected_text 固定返回空字符串；文字识别结果由独立 OCR 流程保留。visual_text 只简短概述图结构，结构不完整时明确说明待核对。
 13. 图形确实存在但边集不完整时，仍返回已确认的顶点和边；不要因为无法确认全部边而编造完整图。
@@ -2039,7 +2039,7 @@ def _compact_opencv_graph_hints(graphs, max_chars=5000):
     return {"graphs": compact_graphs, "omitted_graphs": max(0, len(graphs or []) - len(compact_graphs))}
 
 
-def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=None, opencv_graphs=None):
+def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=None, opencv_graphs=None):
     """
     使用整图与局部放大图独立转录题干、解析图形结构。
     ocr_text 仅用于判断是否进入图论专用识别路径；图论任务不再要求视觉模型重复转录题干。非图论图片继续使用原通用提示词。
@@ -2107,6 +2107,26 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
     for index, data_url in enumerate(image_urls):
         content_parts.append({"type": "text", "text": "完整上传图片" if index == 0 else f"局部放大 {index}"})
         content_parts.append({"type": "image_url", "image_url": {"url": data_url, "detail": "high"}})
+
+    # Independent color-circle evidence is a *candidate*, not graph topology.
+    red_vertex_groups = []
+    try:
+        from graph_colored_vertices import red_circle_panel_counts
+        red_vertex_groups = red_circle_panel_counts(image_bytes)
+        if red_vertex_groups:
+            evidence = [
+                {"x_center": g["x_center"], "pixel_vertex_candidates": g["vertex_count"]}
+                for g in red_vertex_groups
+            ]
+            content_parts.append({"type": "text", "text":
+                "OpenCV 从原始像素独立检测的红色圆形顶点候选，按原图从左到右：" +
+                json.dumps(evidence, ensure_ascii=False) +
+                "。这些不是确认的边集或图形真值，可能混入其他圆点。"
+                "请逐个核对原图顶点，尤其别把线段中段的圆形节点省略；"
+                "如果图形顶点数与候选不一致，请重新逐点核对。"
+            })
+    except (ImportError, ValueError, TypeError, OSError) as exc:
+        print(f"红色圆形顶点像素复核不可用：{type(exc).__name__}")
 
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -2251,12 +2271,29 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=0, review_regions=
                 f"usage={result.get('usage')!r}"
             )
 
+            graph_data = parsed.get("graph_data")
+            if red_vertex_groups and isinstance(graph_data, list) and len(graph_data) == len(red_vertex_groups):
+                disagreement = False
+                for pixels, graph in zip(red_vertex_groups, graph_data):
+                    if not isinstance(graph, dict):
+                        continue
+                    observed = len(graph.get("vertices") or [])
+                    candidate = int(pixels["vertex_count"])
+                    if observed != candidate:
+                        disagreement = True
+                        graph["complete"] = False
+                        graph.setdefault("uncertain_edges", []).append(
+                            f"像素检出的彩色圆形顶点候选数 {candidate} 与图中已记录的 {observed} 个不一致，请核对原图"
+                        )
+                if disagreement:
+                    visual_text = _format_graph_data(graph_data)
+                    print("颜色圆形像素证据与视觉顶点数冲突，降级为待核对")
             return _vision_success(
                 corrected_text,
                 visual_text,
                 parsed["uncertain_fields"],
                 parsed["image_kind"],
-                parsed.get("graph_data"),
+                graph_data,
             )
 
         except requests.exceptions.Timeout as exc:
