@@ -8,12 +8,6 @@ import re
 
 # These standalone labels belong to the drawing, not to its question sentence.
 _VERTEX = re.compile(r"(?:[A-Za-z](?:_?[0-9]{1,3})?|[A-Za-z]_[A-Za-z0-9]{1,8}|[A-Za-z]{1,3}[0-9]{1,3}|[uUvVeE][₀-₉]+)")
-_FIGURE = re.compile(
-    r"(?:(?:图|图号)\s*[0-9０-９]+(?:\s*[.．]\s*[0-9０-９]+)?"
-    r"|(?:fig(?:ure)?|图)\s*[:：]?\s*[0-9]+"
-    r"|G\s*_?\s*[0-9]+"
-    r"|[（(]\s*[a-zA-Z0-9]{1,2}\s*[）)])", re.I
-)
 _SUBFIGURE = re.compile(r"^(?:\(\s*[a-zA-Z0-9]\s*\)|（\s*[a-zA-Z0-9]\s*）)$")
 _FIGURE_LINE = re.compile(
     r"^(?:(?:图|图号)\s*[0-9０-９]+(?:\s*[.．]\s*[0-9０-９]+)?"
@@ -51,9 +45,10 @@ def _is_diagram_label(line):
 
 
 def _is_prose(line):
-    return bool(_EXERCISE.search(line) or
-                (len(line) >= 12 and _SENTENCE.search(line) and
-                 not re.match(r"^(?:[A-Za-z0-9_\s,，.．]+)$", line)))
+    return bool(_EXERCISE.search(line) or re.match(
+        r"^(?:例\s*[:：]|例题|设|已知|给定|若|如果|请|其中|条件|"
+        r"Suppose|Let\s+|Given\s+)", line, re.I
+    ))
 
 
 def clean_graph_question_text(text, *, has_graph=False):
@@ -73,12 +68,12 @@ def clean_graph_question_text(text, *, has_graph=False):
         if _is_prose(line):
             kept.append(line)
             continue
-        # Long English math context can be genuine question prose.
-        # Short OCR scraps (including reversed-page characters) are not.
-        if len(line) >= 24 and (
-            len(re.findall(r"[\u4e00-\u9fff]", line)) >= 8 or
-            len(line.split()) >= 4
-        ) and _SENTENCE.search(line):
+        # Mathematical continuations lack an exercise verb. Only keep them
+        # when attached to already recognized exercise prose.
+        if kept and (
+            re.search(r"[Δδκλ∑∀∃⊆∈∪∩→=+\-]", line)
+            or (len(line) > 15 and re.match(r"^(?:其中|并且|且|以及|满足|已知)", line))
+        ):
             kept.append(line)
     return "\n".join(kept).strip()
 
