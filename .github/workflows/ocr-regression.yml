@@ -9,6 +9,12 @@ on:
         options: [mock, live]
         default: mock
         required: true
+      case_set:
+        description: "baseline=original generated tests, recreated=assistant visually reviewed graph structures"
+        type: choice
+        options: [baseline, recreated]
+        default: baseline
+        required: true
       case_limit:
         description: "Number of independent graph examples"
         type: choice
@@ -31,6 +37,7 @@ on:
       - tests/ocr_regression.py
       - tests/fixtures/generate_graph_ocr.py
       - tests/fixtures/graph_ocr_cases.json
+      - tests/fixtures/recreated_visual_review_cases.json
 
 permissions:
   contents: read
@@ -56,11 +63,14 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Free mocked OCR capture and strict comparison
         run: python tests/ocr_regression.py --mode mock --limit 3 --strict --output artifacts/ocr-mock
+      - name: Free visually reviewed multi-graph comparison
+        run: python tests/ocr_regression.py --mode mock --cases tests/fixtures/recreated_visual_review_cases.json --limit 2 --strict --output artifacts/ocr-reviewed-mock
       - name: Live OCR capture and graph comparison
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'live' }}
         shell: bash
         env:
           CASE_LIMIT: ${{ inputs.case_limit }}
+          CASE_FILE: ${{ inputs.case_set == 'recreated' && 'tests/fixtures/recreated_visual_review_cases.json' || 'tests/fixtures/graph_ocr_cases.json' }}
           STRICT: ${{ inputs.strict }}
           SOLVE: ${{ inputs.solve }}
         run: |
@@ -69,7 +79,7 @@ jobs:
             echo "::error::Paid AI solver is limited to two questions per run"
             exit 1
           fi
-          args=(--mode live --limit "$CASE_LIMIT" --timeout 240 --output artifacts/ocr-live)
+          args=(--mode live --cases "$CASE_FILE" --limit "$CASE_LIMIT" --timeout 240 --output artifacts/ocr-live)
           if [[ "$STRICT" == "true" ]]; then args+=(--strict); fi
           if [[ "$SOLVE" == "true" ]]; then args+=(--solve); fi
           python tests/ocr_regression.py "${args[@]}"
@@ -79,6 +89,14 @@ jobs:
         with:
           name: dmate-ocr-mock
           path: artifacts/ocr-mock/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload visually reviewed comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmate-ocr-reviewed-mock
+          path: artifacts/ocr-reviewed-mock/
           retention-days: 7
           if-no-files-found: warn
       - name: Upload live OCR results and comparison
