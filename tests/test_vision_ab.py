@@ -44,6 +44,7 @@ def test_provider_native_parameters_and_equivalent_image_bytes(thinking):
     assert qwen['messages'][0]['content'][1]['image_url']['url']==URL
     assert qwen['messages'][0]['content'][0]==glm['messages'][0]['content'][0]
     assert ('response_format' in qwen) is (not thinking)
+    assert ('response_format' in glm) is (not thinking)
 
 
 def test_rate_limit_retry_is_bounded_counted_and_does_not_log_keys(monkeypatch):
@@ -185,6 +186,7 @@ def test_actual_usage_reporting_never_estimates_failed_request_tokens():
     result=operational_totals(rows)
     assert result['total_tokens']==130 and result['usage_reported_requests']==1
     assert result['attempted_requests']==2 and result['request_success_rate']==.5
+    assert result['http_success_rate']==.5
     assert result['mean_request_seconds']==5
     assert operational_totals([{'requests':[{'status':'transport_failed'}]}])['total_tokens'] is None
 

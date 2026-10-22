@@ -143,6 +143,8 @@ def operational_totals(rows):
             if any(isinstance(r.get('usage',{}).get(field),int) for r in requests) else None for field in usage_fields}
     totals.update(usage_reported_requests=sum(isinstance(r.get('usage',{}).get('total_tokens'),int) for r in requests),
                   attempted_requests=len(requests), successful_requests=sum(r.get('status')==200 for r in requests),
+                  http_successful_requests=sum(r.get('http_status')==200 for r in requests),
+                  http_success_rate=sum(r.get('http_status')==200 for r in requests)/len(requests) if requests else None,
                   request_success_rate=sum(r.get('status')==200 for r in requests)/len(requests) if requests else None,
                   mean_request_seconds=sum(r.get('seconds',0) for r in requests)/len(requests) if requests else None,
                   mean_case_seconds=sum(r.get('seconds',0) for r in rows)/len(rows) if rows else None,
@@ -197,7 +199,7 @@ def write_reports(out,records,metadata):
     summary,paired=summarize(records)
     report={**metadata,'summary':summary,'paired_scores':paired,'records':records,'recommendation':'pending_actual_paired_review'}
     (out/'comparison.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
-    fields=['case_id','sha256','category','reference_status','experiment','thinking','repeat','provider','model','returned_model_versions','status','actual_request_count','seconds','http_429_count','request_http_statuses','request_error_counts','prompt_tokens','completion_tokens','total_tokens','usage_reported_requests','successful_requests','request_success_rate','mean_request_seconds',
+    fields=['case_id','sha256','category','reference_status','experiment','thinking','repeat','provider','model','returned_model_versions','status','actual_request_count','seconds','http_429_count','request_http_statuses','request_error_counts','prompt_tokens','completion_tokens','total_tokens','usage_reported_requests','successful_requests','http_successful_requests','http_success_rate','request_success_rate','mean_request_seconds',
             'expected_vertices','actual_vertices','vertex_tp','missing_vertices','extra_vertices','expected_edges','actual_edges','edge_tp','missing_edges','extra_edges','wrong_endpoint_instances',
             'precision','recall','f1','direction_accuracy','direction_recall','parallel_count_accuracy','weight_match_accuracy','weight_recall',
             'figure_count_correct','figure_order_correct','whole_structure_correct']
@@ -225,10 +227,10 @@ def write_reports(out,records,metadata):
     for r in summary:
         lines.append(f"|{r['experiment']}/{r['thinking']}/{r['provider']}|{r['vertex_tp']}/{r['missing_vertices']}/{r['extra_vertices']}|{r['direction_correct']}/{r['direction_trials']}|{r['parallel_correct']}/{r['parallel_trials']}|{r['weights_correct']}/{r['weight_trials']}|{r['figure_count_correct']}/{r['scored_count']}|{r['figure_order_correct']}/{r['figure_order_verified']}|")
     lines+=['','## 请求稳定性、耗时与实际Token','',
-            '|模型/实验/思考|请求成功/全部|案例完成率|平均单请求秒|平均单图秒|输入/输出/总Token|Token报告覆盖请求|',
+            '|模型/实验/思考|HTTP200/全部（可解析JSON）|案例完成率|平均单请求秒|平均单图秒|输入/输出/总Token|Token报告覆盖请求|',
             '|---|---|---|---|---|---|---|']
     for r in summary:
-        lines.append(f"|{r['provider']}/{r['experiment']}/{r['thinking']}|{r['successful_requests']}/{r['attempted_requests']}|{r['completed_case_rate']}|{r['mean_request_seconds']}|{r['mean_case_seconds']}|{r['prompt_tokens']}/{r['completion_tokens']}/{r['total_tokens']}|{r['usage_reported_requests']}/{r['attempted_requests']}|")
+        lines.append(f"|{r['provider']}/{r['experiment']}/{r['thinking']}|{r['http_successful_requests']}/{r['attempted_requests']}（{r['successful_requests']}）|{r['completed_case_rate']}|{r['mean_request_seconds']}|{r['mean_case_seconds']}|{r['prompt_tokens']}/{r['completion_tokens']}/{r['total_tokens']}|{r['usage_reported_requests']}/{r['attempted_requests']}|")
     lines+=['','Token仅累加API实际返回值；未报告用量的失败请求为空，不估算为零。完成率和所有失败同时呈现。','', '## 逐图成绩','',
             '|原图|模型|运行状态|顶点正确/漏/多|边集P/R/F1|整图正确|', '|---|---|---|---|---|---|']
     for r in records:

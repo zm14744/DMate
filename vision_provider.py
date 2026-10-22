@@ -106,6 +106,7 @@ class VisionProvider:
             # Zhipu's SDK treats temperature=0 as do_sample=False, not a valid
             # raw API temperature. Omit temperature when sampling is disabled.
             payload.update(thinking={'type':'enabled' if self.thinking else 'disabled'},do_sample=False)
+            if not self.thinking:payload['response_format']={'type':'json_object'}
         return payload
 
     def __call__(self,prompt,images,budget):

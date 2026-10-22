@@ -48,4 +48,4 @@
 
 ## Flash / Qwen 第一阶段
 
-新增可注入视觉 Provider，生产仍显式选择Qwen；GLM仅使用 glm-4.6v-flash。测试协议见 [GRAPH_VISION_AB.md](GRAPH_VISION_AB.md)。本次同图配对真实成绩保存在仓库外；此前单模型回归和机制测试不作为A/B成绩。
+新增可注入视觉 Provider，生产仍显式选择Qwen；GLM测试模型由命令显式选择。用户在Flash频繁429后已授权使用 glm-4.6v 付费完整版进行正式同图对比；Flash历史记录单独保留。测试协议见 [GRAPH_VISION_AB.md](GRAPH_VISION_AB.md)。本次同图配对真实成绩保存在仓库外；此前单模型回归和机制测试不作为A/B成绩。
