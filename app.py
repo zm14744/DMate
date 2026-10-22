@@ -45,6 +45,11 @@ try:
 except (ImportError, OSError) as _validate_import_error:
     print(f"图结构校验模块不可用，保留原识别：{_validate_import_error}")
     audit_graph_records = None
+try:
+    from graph_evidence_fusion import compare_pixel_vision
+except (ImportError, OSError) as _fusion_import_error:
+    print(f"图像边集证据融合模块不可用，保留原识别：{_fusion_import_error}")
+    compare_pixel_vision = None
 from classification_semantic import classify_ambiguous_questions
 from teaching import (
     analyze_messages,
@@ -3850,6 +3855,15 @@ def ocr():
                 )
             except Exception as graph_check_exc:
                 print(f"图结构一致性校验降级：{type(graph_check_exc).__name__}")
+        if (compare_pixel_vision is not None and isinstance(vision_result, dict)
+                and vision_result.get("ok") and cv_graphs):
+            try:
+                graph_review_issues.extend(compare_pixel_vision(
+                    graph_cv, vision_result.get("graph_data") or []
+                ))
+            except (TypeError, ValueError, KeyError) as fusion_exc:
+                print(f"图论边集证据核对降级：{type(fusion_exc).__name__}")
+
         # Labeled 3+ figure slides were previously audited only by vertex
         # counts, so an invented crossing edge (b-f instead of b-e) passed.
         # Read every edge independently and require pairwise agreement.
