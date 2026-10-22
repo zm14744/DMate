@@ -185,4 +185,81 @@ def compare_pixel_vision(cv_result, vision_graphs):
     return issues[:MAX_GRAPHS]
 
 
-__all__ = ["compare_pixel_vision"]
+
+def review_direction_and_multiplicity(cv_result, vision_graphs):
+    """Compare directional and parallel path *hints* after safe node alignment.
+
+    A geometrical path candidate is never automatically counted as a true edge.
+    Every issue is advisory; unaligned panels are ignored rather than guessed.
+    """
+    if not isinstance(cv_result,dict) or not isinstance(vision_graphs,list):
+        return []
+    pixel_graphs=cv_result.get("graphs") or []
+    evidence=cv_result.get("line_path_evidence") or []
+    issues=[]
+    used=set()
+    for pixel in pixel_graphs[:MAX_GRAPHS]:
+        if not isinstance(pixel,dict): continue
+        points=_points(pixel)
+        if points is None: continue
+        candidates=[]
+        for index, vision in enumerate(vision_graphs[:MAX_GRAPHS]):
+            if index in used or not isinstance(vision,dict):continue
+            other=_points(vision)
+            if other is None:continue
+            mapping=_mapping(points,other)
+            if mapping is not None:candidates.append((index,vision,mapping))
+        if len(candidates)!=1:continue
+        index,vision,mapping=candidates[0]
+        used.add(index)
+        panels=[p for p in evidence if
+                isinstance(p,dict) and str(p.get("id"))==str(pixel.get("id"))]
+        if len(panels)!=1:continue
+        panel=panels[0]
+        directional=set()
+        pair_counts={}
+        for edge in vision.get("edges") or []:
+            if not isinstance(edge,dict):continue
+            a=str(edge.get("from") or edge.get("source") or "")
+            b=str(edge.get("to") or edge.get("target") or "")
+            directional.add((a,b))
+            pair=tuple(sorted((a,b)))
+            pair_counts[pair]=pair_counts.get(pair,0)+1
+        path_groups={}
+        arrow_seen=set()
+        name=str(pixel.get("id") or "图")
+        for path in panel.get("paths") or []:
+            if not isinstance(path,dict):continue
+            a,b=str(path.get("from","")),str(path.get("to",""))
+            a,b=mapping.get(a),mapping.get(b)
+            if not a or not b:continue
+            pair=tuple(sorted((a,b)))
+            variant=path.get("path_variant",0)
+            path_groups.setdefault(pair,set()).add(str(variant))
+            hint=path.get("arrow_candidate")
+            if not isinstance(hint,dict):continue
+            source=mapping.get(str(hint.get("from","")))
+            target=mapping.get(str(hint.get("to","")))
+            if not source or not target:continue
+            key=(source,target)
+            if key in arrow_seen:continue
+            arrow_seen.add(key)
+            if vision.get("directed") is True:
+                if (target,source) in directional and key not in directional:
+                    issues.append(f"{name}：像素箭头候选为 {source}→{target}，"
+                                  f"但视觉识别仅给出反方向，请核对箭头尖端")
+            elif vision.get("directed") is False:
+                issues.append(f"{name}：像素检测存在 {source}→{target} 箭头候选，"
+                              "但视觉结果判为无向图，请核对")
+        for pair,variants in sorted(path_groups.items()):
+            if len(variants)<2:continue
+            count=pair_counts.get(pair,0)
+            if count!=len(variants):
+                issues.append(f"{name}：{pair[0]}-{pair[1]} 有 "
+                              f"{len(variants)} 条不同走线候选，视觉边表记录 "
+                              f"{count} 条；候选重数需要逐线核对")
+        if len(issues)>=MAX_GRAPHS:break
+    return list(dict.fromkeys(issues))[:MAX_GRAPHS]
+
+
+__all__ = ["compare_pixel_vision","review_direction_and_multiplicity"]
