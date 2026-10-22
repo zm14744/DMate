@@ -13700,103 +13700,95 @@ function ocrReviewLabel(value) {
 
 function formatStructuredGraphReview(graphs) {
     if (!Array.isArray(graphs) || !graphs.length || graphs.length > 12) return "";
-    const compare = (a, b) => String(a).localeCompare(String(b), "zh-CN", {
-        numeric: true, sensitivity: "base"
-    });
-    const lines = [];
-    const graphPosition = graph => {
-        const coords = (graph.vertices || []).filter(v =>
-            v && Number.isFinite(Number(v.x)) && Number.isFinite(Number(v.y))
-            && v.x !== null && v.y !== null
-            && Number(v.x) >= 0 && Number(v.x) <= 1
-            && Number(v.y) >= 0 && Number(v.y) <= 1
-        );
-        if (coords.length < 2 || coords.length !== graph.vertices.length) return null;
-        return {
-            x: coords.reduce((sum, v) => sum + Number(v.x), 0) / coords.length,
-            y: coords.reduce((sum, v) => sum + Number(v.y), 0) / coords.length
-        };
+    const cmp = (a, b) => String(a).localeCompare(String(b), "zh-CN", {numeric:true, sensitivity:"base"});
+    const center = graph => {
+        const vs = (graph.vertices || []).filter(v =>
+            v && v.x != null && v.y != null &&
+            Number.isFinite(Number(v.x)) && Number.isFinite(Number(v.y)) &&
+            Number(v.x) >= 0 && Number(v.x) <= 1 &&
+            Number(v.y) >= 0 && Number(v.y) <= 1);
+        return vs.length === (graph.vertices || []).length && vs.length ?
+            {x:vs.reduce((n,v)=>n+Number(v.x),0)/vs.length,
+             y:vs.reduce((n,v)=>n+Number(v.y),0)/vs.length} : null;
     };
-    const sortedGraphs = graphs.slice();
-    if (sortedGraphs.every(g => /^G[1-9]\d*$/.test(String(g?.id || "")))) {
-        // The model may return per-figure coordinates. Trust numbered graph
-        // IDs before coordinates so G1,G2,G3,G4 keep the original order.
-        sortedGraphs.sort((a, b) => compare(a.id, b.id));
-    } else if (sortedGraphs.length > 1 && sortedGraphs.every(g =>
-        g && Array.isArray(g.vertices) && graphPosition(g) !== null)) {
-        sortedGraphs.sort((a, b) => {
-            const pa = graphPosition(a), pb = graphPosition(b);
-            return Math.abs(pa.y - pb.y) > 0.12
-                ? pa.y - pb.y : pa.x - pb.x || pa.y - pb.y;
+    const ordered = graphs.slice();
+    const cs = ordered.map(center);
+    if (ordered.length > 1 && cs.every(Boolean) && (
+        Math.max(...cs.map(p=>p.x)) - Math.min(...cs.map(p=>p.x)) > 0.12 ||
+        Math.max(...cs.map(p=>p.y)) - Math.min(...cs.map(p=>p.y)) > 0.12)) {
+        ordered.sort((a,b) => {
+            const pa=center(a), pb=center(b);
+            return Math.abs(pa.y-pb.y) > 0.12 ? pa.y-pb.y : pa.x-pb.x || pa.y-pb.y;
         });
+    } else if (ordered.every(g => /^G[1-9]\d*$/i.test(String(g?.id || "")))) {
+        ordered.sort((a,b)=>cmp(a.id,b.id));
     }
-    for (let index = 0; index < sortedGraphs.length; index++) {
-        const graph = sortedGraphs[index];
-        if (!graph || !Array.isArray(graph.vertices) || !graph.vertices.length
-            || !Array.isArray(graph.edges)) return "";
-        const vertices = [];
-        const vertexSet = new Set();
-        for (const raw of graph.vertices) {
-            if (!raw || typeof raw !== "object") return "";
-            const id = String(raw.id ?? "").trim();
-            if (!id || vertexSet.has(id)) return "";
-            vertexSet.add(id);
-            vertices.push(id);
+    const lines=[];
+    for (let index=0;index<ordered.length;index++) {
+        const graph=ordered[index];
+        if (!graph || !Array.isArray(graph.vertices) || !graph.vertices.length ||
+            !Array.isArray(graph.edges)) return "";
+        const graphId=String(graph.id || "G"+(index+1)).trim();
+        const ids=[];
+        const seen=new Set();
+        for(const node of graph.vertices) {
+            if(!node || typeof node!=="object") return "";
+            const id=String(node.id ?? "").trim();
+            if(!id || seen.has(id)) return "";
+            seen.add(id);
+            ids.push(id);
         }
-        vertices.sort(compare);
-        const directed = graph.directed;
-        const kind = directed === true ? "有向图" : directed === false ? "无向图" : "方向待核对";
-        const weightKind = graph.weighted === true ? "带权" :
-            graph.weighted === false ? "无权" : "权值待核对";
-        const multiKind = graph.multigraph === true ? "多重图" :
-            graph.multigraph === false ? "简单图" : "重边待核对";
-        const groups = new Map();
-        const incident = new Set();
-        for (const edge of graph.edges) {
-            if (!edge || typeof edge !== "object") return "";
-            let a = String(edge.from ?? "").trim();
-            let b = String(edge.to ?? "").trim();
-            if (!vertexSet.has(a) || !vertexSet.has(b)) return "";
-            incident.add(a);
-            incident.add(b);
-            if (directed !== true && compare(a, b) > 0) [a, b] = [b, a];
-            const edgeLabel = edge.edge_label == null ? "" : String(edge.edge_label).trim();
-            const weight = edge.weight == null ? "" : String(edge.weight).trim();
-            const key = JSON.stringify([a, b, edgeLabel, weight]);
-            const previous = groups.get(key);
-            if (previous) previous.count++;
-            else groups.set(key, { a, b, edgeLabel, weight, count: 1 });
+        ids.sort(cmp);
+        const compact = id => {
+            const match=String(id).match(/^G\d+_(v\d+)$/i);
+            return match && /^G\d+$/i.test(graphId) ? match[1] : String(id);
+        };
+        const label=id=>ocrReviewLabel(compact(id));
+        const kind=graph.directed===true?"有向图":graph.directed===false?"无向图":"";
+        const weightKind=graph.weighted===true?"带权":graph.weighted===false?"无权":"";
+        let multiKind=graph.multigraph===true?"多重图":graph.multigraph===false?"简单图":"";
+        const pairs=new Map();
+        const incident=new Set();
+        const endpointPairs=new Set();
+        let conflictingType=false;
+        for(const edge of graph.edges) {
+            if(!edge || typeof edge!=="object") return "";
+            let a=String(edge.from ?? "").trim(),b=String(edge.to ?? "").trim();
+            if(!seen.has(a)||!seen.has(b)) return "";
+            incident.add(a);incident.add(b);
+            if(graph.directed!==true && cmp(a,b)>0) [a,b]=[b,a];
+            const endpointKey=JSON.stringify([a,b]);
+            if(a===b||endpointPairs.has(endpointKey))conflictingType=true;
+            endpointPairs.add(endpointKey);
+            const edgeLabel=edge.edge_label==null?"":String(edge.edge_label).trim();
+            const weight=edge.weight==null?"":String(edge.weight).trim();
+            const key=JSON.stringify([a,b,edgeLabel,weight]);
+            if(pairs.has(key))pairs.get(key).count++;
+            else pairs.set(key,{a,b,edgeLabel,weight,count:1});
         }
-        const sortedEdges = [...groups.values()].sort((a, b) =>
-            compare(a.a, b.a) || compare(a.b, b.b) ||
-            compare(a.edgeLabel, b.edgeLabel) || compare(a.weight, b.weight));
-        const edgeDescriptions = sortedEdges.map(edge => {
-            const la = ocrReviewLatexLabel(edge.a);
-            const lb = ocrReviewLatexLabel(edge.b);
-            const relation = la !== null && lb !== null
-                ? "\\(" + la + (directed === true ? "\\to{}" : "-") + lb + "\\)"
-                : ocrReviewLabel(edge.a) + (directed === true ? " → " : "—") +
-                  ocrReviewLabel(edge.b);
-            const metadata = [];
-            if (edge.edgeLabel) metadata.push("边名：" + ocrReviewPlain(edge.edgeLabel));
-            if (edge.weight) metadata.push("权：" + ocrReviewPlain(edge.weight));
-            const extras = metadata.length ? "（" + metadata.join("，") + "）" : "";
-            return relation + (edge.count > 1 ? " × " + edge.count : "") + extras;
+        if(graph.multigraph===false&&conflictingType)multiKind="";
+        const edges=[...pairs.values()].sort((a,b)=>cmp(a.a,b.a)||cmp(a.b,b.b)||cmp(a.edgeLabel,b.edgeLabel)||cmp(a.weight,b.weight));
+        const rendered=edges.map(e=>{
+            const a=compact(e.a),b=compact(e.b);
+            const la=ocrReviewLatexLabel(a),lb=ocrReviewLatexLabel(b);
+            const relation=la!==null&&lb!==null?
+                "\\("+la+(graph.directed===true?"\\to{}":"-")+lb+"\\)":
+                label(e.a)+(graph.directed===true?" → ":"—")+label(e.b);
+            const attrs=[];
+            if(e.edgeLabel)attrs.push("边名："+ocrReviewPlain(e.edgeLabel));
+            if(e.weight)attrs.push("权："+ocrReviewPlain(e.weight));
+            return relation+(e.count>1?" × "+e.count:"")+(attrs.length?"（"+attrs.join("，")+"）":"");
         });
-        const graphId = String(graph.id || ("G" + (index + 1))).trim();
-        lines.push("### 图 " + (index + 1) + "（" + ocrReviewLabel(graphId) + "）");
-        lines.push("**类型：** " + kind + " · " + weightKind + " · " + multiKind);
-        lines.push("**顶点（" + vertices.length + "）：** " + vertices.map(ocrReviewLabel).join("、"));
-        const isolated = vertices.filter(id => !incident.has(id));
-        if (isolated.length) lines.push("**孤立顶点：** " + isolated.map(ocrReviewLabel).join("、"));
-        lines.push("**边（已记录 " + graph.edges.length + " 条）：** " +
-            (edgeDescriptions.length ? edgeDescriptions.join("、") : "未记录可确认的边"));
-        const pending = Array.isArray(graph.uncertain_edges)
-            ? graph.uncertain_edges.filter(Boolean).slice(0, 12) : [];
-        lines.push("**状态：** " + (graph.complete === true && !pending.length
-            ? "结构已列出（仍需以原图核对）" : "待核对（现有边表不代表全部边）"));
-        if (pending.length) lines.push("**待核对：** " + pending.map(ocrReviewPlain).join("；"));
-        if (index < graphs.length - 1) lines.push("---");
+        lines.push("### 图 "+(index+1)+"（"+ocrReviewLabel(graphId)+"）");
+        const props=[kind,weightKind,multiKind].filter(Boolean);
+        if(props.length)lines.push("**类型：** "+props.join(" · "));
+        lines.push("**顶点（"+ids.length+"）：** "+ids.map(label).join("、"));
+        const isolated=ids.filter(id=>!incident.has(id));
+        if(graph.complete===true&&isolated.length)
+            lines.push("**孤立顶点：** "+isolated.map(label).join("、"));
+        lines.push("**边（"+(graph.complete===true?"":"暂录 ")+graph.edges.length+" 条）：** "+
+            (rendered.length?rendered.join("、"):"—"));
+        if(index<ordered.length-1)lines.push("---");
     }
     return lines.join("\n\n");
 }
@@ -13806,9 +13798,10 @@ function formatOcrReviewGraphDisplay(graphs, visualText) {
     // has not changed the first-pass canonical graph table.
     const structured = formatStructuredGraphReview(graphs);
     if (structured) return structured;
-    const fallback = String(visualText || "").replace(/\r\n?/g, "\n")
-        .replace(/\n{3,}/g, "\n\n").trim();
-    return fallback ? "**识别说明（结构化边表尚未核实）**\n\n" + fallback : "";
+    // Never leak audit-internal prose, pixel coordinates or old-format status
+    // markers into the user-facing graph panel. Internal visualText remains
+    // available to the AI guard, separately from the graph card.
+    return String(visualText || "").trim() ? "图形结构暂无可展示的边表" : "";
 }
 
 // OCR review displays recognized content as MathJax, without editable fields.
@@ -13860,8 +13853,7 @@ function reviewRecognizedQuestion(file, data) {
         // 本轮要求只在图片核对界面填写，不从主聊天框继承。
         requestText.value = "";
         // This result is read-only; uncertain text can be addressed in instructions.
-        error.textContent = /\[(?:待核对|不清楚)\]/.test(recognizedText + recognizedGraph)
-            ? "识别结果含待核对内容，可在“本次要求”中补充说明" : "";
+        error.textContent = "";
 
         const resizePreview = () => { preview.style.width = `${zoom.value}%`; };
         const cleanup = () => {
@@ -13886,7 +13878,7 @@ function reviewRecognizedQuestion(file, data) {
         const dismiss = () => dialog.close();
         const submit = () => {
             const text = recognizedText;
-            const visualText = recognizedGraph;
+            const visualText = displayGraph;
             const userRequest = requestText.value.trim();
             if (!text && !visualText) {
                 error.textContent = "没有识别到题目文字或图形信息，请重新上传图片";
@@ -13897,7 +13889,7 @@ function reviewRecognizedQuestion(file, data) {
                 return;
             }
             result = {
-                text, visualText, userRequest,
+                text, visualText, analysisVisualText: recognizedGraph, userRequest,
                 ocrIsQuestion: dialog.querySelector('input[name="ocrQuestionType"]:checked')?.value === "question"
             };
             dialog.close();
@@ -14033,7 +14025,7 @@ async function handleImageSelected(event) {
         // 这里不再自动删除题干片段，避免把真实条件当成图形噪声删掉。
         const reviewed = await reviewRecognizedQuestion(file, data);
         if (!reviewed || !sessions.some(item => item.id === session.id)) return;
-        const { text, visualText, userRequest, ocrIsQuestion } = reviewed;
+        const { text, visualText, analysisVisualText, userRequest, ocrIsQuestion } = reviewed;
 
         const questionParts = [];
 
@@ -14046,6 +14038,13 @@ async function handleImageSelected(event) {
         }
 
         const questionText = questionParts.join("\n\n");
+        // The visible chat contains only the student-readable graph card.
+        // The original audit transcript (and its safety markers) remains in
+        // the API-only question so uncertain edges cannot become certified.
+        const internalParts = [];
+        if (text) internalParts.push(`【题目文字】\n${text}`);
+        if (analysisVisualText) internalParts.push(`【图形信息】\n${analysisVisualText}`);
+        const internalQuestionText = internalParts.join("\n\n");
         const displayParts = [questionText];
 
         if (userRequest) {
@@ -14056,7 +14055,7 @@ async function handleImageSelected(event) {
         const apiText = userRequest
             ? [
                 "【当前指向题目】",
-                questionText,
+                internalQuestionText,
                 "【当前指向题目结束】",
                 "",
                 "【本轮唯一需要执行的用户请求】",
@@ -14065,7 +14064,7 @@ async function handleImageSelected(event) {
                 "",
                 "只回答上面的本轮最新请求。题目正文只作为本轮题目背景，不要把要求混入题干。"
             ].join("\n")
-            : undefined;
+            : internalQuestionText;
 
         session.messages.push({
             role: "user",

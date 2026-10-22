@@ -814,6 +814,48 @@ def _compose_markdown(items, image_width):
     return "\n".join(parts).strip()
 
 
+def _front_side_text_items(items, image):
+    """Conservative photo bleed-through filter for a SECONDARY OCR text view.
+
+    Evaluate the original (non-enhanced) grayscale pixels. Strong front-side
+    printing is normally locally darker than faint reverse-side ink. Never
+    mutate the normal OCR result and never process graph pixels with this mask.
+    """
+    if not items or image is None:
+        return items
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+    rows = []
+    for item in items:
+        if item.get("type") != "text":
+            rows.append((item, None))
+            continue
+        try:
+            x1,y1,x2,y2 = [int(round(float(v))) for v in item["box"]]
+            x1=max(0,min(gray.shape[1]-1,x1))
+            x2=max(0,min(gray.shape[1],x2))
+            y1=max(0,min(gray.shape[0]-1,y1))
+            y2=max(0,min(gray.shape[0],y2))
+            patch=gray[y1:y2,x1:x2]
+            if patch.size < 25:
+                rows.append((item, None))
+                continue
+            contrast=float(np.percentile(patch,90)-np.percentile(patch,10))
+            rows.append((item,contrast))
+        except (TypeError,ValueError,KeyError):
+            rows.append((item,None))
+    strong=[c for item,c in rows if c is not None and c >= 32
+            and float(item.get("score",0)) >= 0.62]
+    # Do not apply when the image has no reliable readable front-side text.
+    if len(strong) < 2:
+        return items
+    threshold=max(20.0,min(42.0,float(np.median(strong))*0.53))
+    visible=[item for item,c in rows if
+             c is None or c>=threshold or (
+                 c>=threshold*0.72 and float(item.get("score",0)) >= 0.84)]
+    # Do not silently erase an entire question from low-contrast photographs.
+    return visible if len(visible)>=2 else items
+
+
 def recognize_image(image_data):
     """
     OCR 主入口。
@@ -931,6 +973,12 @@ def recognize_image(image_data):
             all_items,
             image.shape[1]
         )
+        # Independent OCR-only view: suppress faint back-page impressions
+        # without changing the original OCR audit or graph recognition image.
+        front_text = _compose_markdown(
+            _front_side_text_items(text_items, image) + formula_items,
+            image.shape[1]
+        )
 
         if not text:
             raise OCRError(
@@ -946,6 +994,7 @@ def recognize_image(image_data):
 
         return {
             "text": text,
+            "front_text": front_text,
             "text_count": len(text_items),
             "formula_count": len(formula_items),
             "warning": "；".join(warnings) if warnings else None,

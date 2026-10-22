@@ -1,4 +1,5 @@
 import os
+import copy
 import json
 import re
 import secrets
@@ -53,6 +54,7 @@ except (ImportError, OSError) as _fusion_import_error:
     print(f"图像边集证据融合模块不可用，保留原识别：{_fusion_import_error}")
     compare_pixel_vision = None
     review_direction_and_multiplicity = None
+from graph_ocr_cleanup import clean_graph_question_text, select_graph_question_text, ocr_is_label_dominated
 from classification_semantic import classify_ambiguous_questions
 from teaching import (
     analyze_messages,
@@ -3741,8 +3743,10 @@ def ocr():
         # CPU-only OpenCV graph recognition is opportunistic and bounded.
         # Any uncertainty or failure leaves the original Vision/OCR fallback intact.
         graph_cv = {'graphs': [], 'status': 'not_graph', 'regions': []}
+        label_only_ocr = ocr_is_label_dominated(ocr_text)
         possible_graph = (
             len(ocr_text) < 20
+            or label_only_ocr
             or bool(re.search(
                 r"图|顶点|边|树|连通|邻接|路径|欧拉|哈密顿|G[1-9₁₂₃₄₅₆₇₈₉]|"
                 r"\b(?:graphs?|vertices?|edges?|trees?|isomorph(?:ism|ic)?|adjacency|"
@@ -3753,7 +3757,7 @@ def ocr():
         if possible_graph and recognize_graphs is not None:
             try:
                 graph_cv = recognize_graphs(raw, text_hint=ocr_text,
-                                            allow_without_context=(len(ocr_text) < 20))
+                                            allow_without_context=(len(ocr_text) < 20 or label_only_ocr))
                 if (_env_bool("GRAPH_PATH_EVIDENCE_ENABLED", True)
                         and attach_line_evidence is not None
                         and graph_cv.get("graphs")):
@@ -4170,30 +4174,88 @@ def ocr():
         display_text, review = _prepare_ocr_review(
             ocr_text, corrected_text, uncertain_fields
         )
+        # Graph labels/numeric edge weights frequently flood plain OCR. This
+        # modifies only the question prose, never graph_data or raw_ocr_text.
+        graph_records = (
+            vision_result.get("graph_data") or []
+            if isinstance(vision_result, dict) and vision_result.get("ok")
+            else []
+        )
+        graph_evidence = bool(
+            cv_graphs or graph_records or ocr_is_label_dominated(ocr_text) or (
+                image_kind != "non_exercise"
+                and re.search(r"顶点|边集|边连接|图\s*\d|G[1-9]", visual_text, re.I)
+            )
+        )
+        if graph_evidence:
+            # Prefer original-image high-contrast OCR on book photographs.
+            # If it contains no genuine prose, keep the full OCR as a guarded
+            # fallback, while never leaking raw labels into the question field.
+            front_candidate = clean_graph_question_text(
+                result.get("front_text") or "", has_graph=True
+            )
+            display_text = select_graph_question_text(
+                front_candidate or ocr_text, corrected_text, has_graph=True
+            )
         if graph_review_issues and isinstance(review, dict):
             review["required"] = True
             review["reasons"] = list(review.get("reasons") or []) + graph_review_issues
 
-        # The canonical graph table is only safe to render when the final
-        # displayed description still agrees with the original normalized
-        # Qwen transcription. Independent audits may replace the text; never
-        # display a stale first-pass edge table in that case.
+        # The student-facing graph card is a stable STRUCTURED representation.
+        # Original visual_text (including any internal uncertain markers) is
+        # unchanged for the AI safety guards. Never mix model audit prose or CV
+        # debug positions into the graph card.
         graph_display_data = []
-        if (isinstance(vision_result, dict)
-                and vision_result.get("ok") is True
-                and not graph_review_issues
-                and not alignment_warnings):
-            source_graphs = vision_result.get("graph_data")
-            source_visual = str(vision_result.get("visual_text") or "").strip()
-            if (isinstance(source_graphs, list) and source_graphs
-                    and source_visual and visual_text.strip() == source_visual):
-                graph_display_data = source_graphs[:12]
+        source_graphs = (
+            vision_result.get("graph_data") or []
+            if isinstance(vision_result, dict) and vision_result.get("ok") is True
+            else []
+        )
+        if strict_pixel_panels:
+            for idx, graph in enumerate(cv_graphs[:12], 1):
+                vertices = graph.get("vertices") or []
+                edges = graph.get("edges") or []
+                graph_display_data.append({
+                    "id": graph.get("id") or f"G{idx}",
+                    "vertices": vertices,
+                    "edges": [
+                        {"from": pair[0], "to": pair[1]}
+                        for pair in edges if isinstance(pair, (list, tuple)) and len(pair) == 2
+                    ],
+                    "directed": False, "weighted": False, "multigraph": False,
+                    "complete": True,
+                    "uncertain_edges": [],
+                })
+        elif isinstance(source_graphs, list) and source_graphs:
+            graph_display_data = copy.deepcopy(source_graphs[:12])
+            # An unsuccessful independent read does not destroy useful
+            # candidate edges, but it does preclude any claim of completeness.
+            if (graph_review_issues or alignment_warnings
+                    or GRAPH_UNCERTAIN_FLAG in visual_text):
+                for graph in graph_display_data:
+                    if isinstance(graph, dict):
+                        graph["complete"] = False
+        elif isinstance(cv_graphs, list) and cv_graphs:
+            for idx, graph in enumerate(cv_graphs[:12], 1):
+                vertices = graph.get("vertices") or []
+                edges = graph.get("edges") or []
+                graph_display_data.append({
+                    "id": graph.get("id") or f"G{idx}",
+                    "vertices": vertices,
+                    "edges": [
+                        {"from": pair[0], "to": pair[1]}
+                        for pair in edges if isinstance(pair, (list, tuple)) and len(pair) == 2
+                    ],
+                    "directed": graph.get("directed", "unknown"),
+                    "weighted": "unknown", "multigraph": "unknown",
+                    "complete": False, "uncertain_edges": [],
+                })
 
         return jsonify({
             "text": display_text,
             "visual_text": visual_text,
             "graph_display_data": graph_display_data,
-            "graph_display_version": "2026-10-22-fixed-graph-layout-v1",
+            "graph_display_version": "2026-10-22-question-graph-separation-v3",
             # 兼容旧客户端：新增字段不影响现有 text / visual_text 处理。
             "graph_structures": cv_graphs,
             "raw_ocr_text": ocr_text,

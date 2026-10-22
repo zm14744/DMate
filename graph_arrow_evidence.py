@@ -65,6 +65,58 @@ def _endpoint_tangent(path, node, default):
     return (vx/length, vy/length) if length > 5 else default
 
 
+def _segment_projection(point, a, b):
+    """Distance, projection and the oriented tangent of a polyline segment."""
+    dx, dy = b[0]-a[0], b[1]-a[1]
+    length_sq = dx*dx + dy*dy
+    if length_sq < 1e-5:
+        return float('inf'), 0.0, (0.0, 0.0)
+    t = max(0.0, min(1.0, ((point[0]-a[0])*dx+(point[1]-a[1])*dy)/length_sq))
+    distance = math.hypot(point[0]-a[0]-dx*t, point[1]-a[1]-dy*t)
+    norm = math.sqrt(length_sq)
+    return distance, t, (dx/norm, dy/norm)
+
+
+def _interior_arrow_score(segments, coords, start, end, radius):
+    """Locate wing pairs along an actual connector rather than only at its end."""
+    if len(coords) < 2 or not segments:
+        return 0.0
+    route = list(coords)
+    if math.dist(route[0], start) > math.dist(route[-1], start):
+        route.reverse()
+    lengths = [math.dist(a, b) for a, b in zip(route, route[1:])]
+    total = sum(lengths)
+    if total < max(25.0, radius*5):
+        return 0.0
+    tips = {}
+    step = max(3, radius//2)
+    for x1,y1,x2,y2 in segments:
+        # Arrow apexes are often Hough segment endpoints on the ink stroke.
+        for tip in ((x1,y1),(x2,y2)):
+            if min(math.dist(tip, start), math.dist(tip,end)) < max(2.5*radius,9):
+                continue
+            advance = 0.0
+            best = None
+            for i,(a, b) in enumerate(zip(route, route[1:])):
+                dist, t, tangent = _segment_projection(tip,a,b)
+                progress=(advance+t*lengths[i])/total
+                if 0.08 < progress < 0.92 and (best is None or dist < best[0]):
+                    best = (dist,tangent)
+                advance += lengths[i]
+            if best is None or best[0] > max(4.5, radius*0.85):
+                continue
+            key=(round(tip[0]/step),round(tip[1]/step))
+            if key not in tips or best[0] < tips[key][0]:
+                tips[key]=(best[0],tip,best[1])
+    # The sample budget bounds runtime on dense scanned pages.
+    best_score = 0.0
+    for _,tip,direction in sorted(tips.values(),key=lambda item:item[0])[:36]:
+        best_score=max(best_score,_paired_wings(segments,tip,direction,radius))
+        if best_score >= 0.78:
+            break
+    return best_score
+
+
 def annotate_arrow_candidates(rgb, graph, paths, radius):
     """Add geometric arrow hints to line candidates; never alter actual edges."""
     if not paths or not graph.get("vertices"):
@@ -103,7 +155,7 @@ def annotate_arrow_candidates(rgb, graph, paths, radius):
     if segments is None:
         return paths
     lines=[(float(ax+x1),float(ay+y1),float(bx+x1),float(by+y1))
-           for ax,ay,bx,by in segments[:,0][:850]]
+           for ax,ay,bx,by in np.asarray(segments).reshape(-1,4)[:850]]
     for path in paths:
         a, b = str(path.get("from","")), str(path.get("to",""))
         if a not in vertices or b not in vertices or a == b:
@@ -122,7 +174,10 @@ def annotate_arrow_candidates(rgb, graph, paths, radius):
                 if isinstance(p, (tuple,list)) and len(p) == 2
             ]
             direction = _endpoint_tangent(coords, (tx,ty), direction)
-            best = 0.0
+            best = _interior_arrow_score(
+                lines, coords, (sx,sy), (tx,ty), radius
+            )
+            # The near-rim detector remains for endpoint arrowheads.
             for d in np.linspace(max(radius*1.15,4),
                                  radius+max(6,radius*.9), 8):
                 tip = (tx-d*direction[0], ty-d*direction[1])
