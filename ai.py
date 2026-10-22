@@ -12,6 +12,7 @@ import threading
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
 from teaching import teaching_prompt
+from graph_ocr_cleanup import ocr_is_label_dominated
 
 
 DEEPSEEK_API_KEY = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
@@ -187,7 +188,7 @@ def _is_graph_vision_task(ocr_text, opencv_graphs):
     # A graph candidate alone is not enough when a long question may concern
     # geometry or another diagram type. For pure figures with almost no OCR,
     # the pixel detector is useful evidence that the graph-only path is needed.
-    return bool(graphs) and len(text) < 20
+    return bool(graphs) and (len(text) < 20 or ocr_is_label_dominated(text))
 
 
 GRAPH_TOPOLOGY_PROMPT = """你只负责从图像恢复离散数学图的结构，不负责转录题干、校正整段文字或解题。
@@ -208,6 +209,10 @@ GRAPH_TOPOLOGY_PROMPT = """你只负责从图像恢复离散数学图的结构�
 11. complete 只有在顶点集合和全部边都能从图中确认时才为 true。存在漏看风险、端点歧义、箭头方向歧义或图像裁切时必须为 false，并说明原因。
 12. 不要重复抄录题干文字。corrected_text 固定返回空字符串；文字识别结果由独立 OCR 流程保留。visual_text 只简短概述图结构，结构不完整时明确说明待核对。
 13. 图形确实存在但边集不完整时，仍返回已确认的顶点和边；不要因为无法确认全部边而编造完整图。
+14. 必须先区分“同一幅图的多个连通分量”和“题目中的多幅独立图”。孤立顶点、非连通的两部分即使间隔较远，只要同属一个图号或同一图框，仍放入同一个 graph_data；按原图从左到右、从上到下排列独立图形，不能按模型识别顺序任意重排。
+15. 边旁的纯数字（1、2、4、12 等）在带权图题目中表示 weight，绝不是边名。e1、e2 等才是典型 edge_label。权值须逐条关联到实际两端的同一笔画，不能因为数值相同而关联两条不同的边。带权图的 weighted=true，数字边权保留在每条独立边的 weight 中。
+16. 一条边的中途若经过有明确节点标记的圆点，须在该节点拆成不同边；两条线在无节点处交叉则各自继续直行。虚线也可能是真实边，不得一律过滤；若颜色或线型说明生成树或弦，请保留这种区别。
+17. 完整边集无法确认时 complete=false；不要把暂时没有确认连接的点称为孤立顶点，除非原图明确画出没有任何边与之相接。
 
 只返回一个 JSON 对象，不要 Markdown 代码块：
 {
