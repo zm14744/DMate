@@ -2125,7 +2125,8 @@ def analyze_image_structure(image_bytes, ocr_text="", retries=1, review_regions=
                 "请逐个核对原图顶点，尤其别把线段中段的圆形节点省略；"
                 "如果图形顶点数与候选不一致，请重新逐点核对。"
             })
-    except (ImportError, ValueError, TypeError, OSError) as exc:
+    except Exception as exc:
+        # Pixel evidence is optional; unsupported decoders must never crash OCR.
         print(f"红色圆形顶点像素复核不可用：{type(exc).__name__}")
 
     headers = {

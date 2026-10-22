@@ -40,6 +40,20 @@ jobs:
               assert actual==case['source_sha256'], f'Original PNG bytes changed: {name}'
               print('ORIGINAL_PNG_VERIFIED',name,'SHA256',actual,flush=True)
           PY
+      - name: Verify independent OpenCV red-dot counts before paying for OCR
+        run: |
+          python -m pip install --disable-pip-version-check "numpy<2" opencv-python-headless==4.10.0.84
+          python - <<'PY'
+          from pathlib import Path
+          from graph_colored_vertices import red_circle_panel_counts
+          path = Path("tests/fixtures/original_ouc_20261021")
+          photo1 = red_circle_panel_counts((path/"180506.png").read_bytes())
+          photo2 = red_circle_panel_counts((path/"181309.png").read_bytes())
+          print("INDEPENDENT_REDDOT_COUNTS", [g["vertex_count"] for g in photo1])
+          assert [g["vertex_count"] for g in photo1] == [6, 6, 6, 5]
+          assert not photo2
+          print("REDDOT_PIXEL_EVIDENCE_TEST_PASS")
+          PY
       - name: Install Playwright and Chromium for actual DMate image input
         run: |
           python -m pip install --disable-pip-version-check playwright==1.55.0 Pillow==11.3.0
