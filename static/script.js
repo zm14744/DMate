@@ -13689,8 +13689,9 @@ function renderOcrReviewResult(element, source) {
         element.innerHTML = '<span class="ocr-review-empty">未识别到内容</span>';
         return;
     }
-    // Reuse the existing safe Markdown/LaTeX pipeline, including HTML sanitizing.
-    element.innerHTML = markdownToHtml(value);
+    // Reuse the site's bare-LaTeX repair and sanitized MathJax display pipeline.
+    // Display normalization never changes the OCR text submitted to the model.
+    element.innerHTML = markdownToHtml(prepareAiDisplayText(value));
 }
 
 function reviewRecognizedQuestion(file, data) {
