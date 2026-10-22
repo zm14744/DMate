@@ -326,8 +326,8 @@ def main():
         browser = p.chromium.launch(headless=True)
         for case in cases:
             image = case.get("image", "")
-            image_path = generated[image.removesuffix(".png")] if image in (
-                "directed.png", "parallel.png", "simple.png") else Path(args.image_dir) / image
+            image_key = Path(image).stem
+            image_path = generated[image_key] if image == image_key + ".png" and image_key in generated else Path(args.image_dir) / image
             if not image_path.is_file():
                 report["cases"].append({"id": case.get("id"), "operational_ok": False,
                                         "operational_error": "Fixture not found: " + str(image_path),
