@@ -249,7 +249,10 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h)
     This function never manufactures vertices or certified graph edges.
     """
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    _, mask = cv2.threshold(gray, 216, 255, cv2.THRESH_BINARY_INV)
+    if float(np.median(gray)) < 105:
+        mask = _foreground(rgb)
+    else:
+        _, mask = cv2.threshold(gray, 216, 255, cv2.THRESH_BINARY_INV)
     edges = cv2.Canny(mask, 55, 145)
     segments = cv2.HoughLinesP(edges, 1, math.pi / 720, threshold=18,
                                minLineLength=24, maxLineGap=7)
