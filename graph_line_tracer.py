@@ -20,11 +20,30 @@ NEIGHBORS = tuple((dy, dx) for dy in range(-2, 3) for dx in range(-2, 3)
                   if 0 < dx * dx + dy * dy <= 5)
 
 
+def _paper_gray(rgb):
+    """Flatten illumination on mid-tone paper; preserve white/dark screens.
+
+    Absolute gray<210 turns brown textbook photos almost entirely into ink.
+    Dividing by a smooth illumination field separates dark front-side strokes
+    from broad shadows and faint print-through without drawing any new lines.
+    """
+    gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY)
+    if not 105<=float(np.median(gray))<235:
+        return None
+    sigma=max(8,min(21,min(gray.shape)/20))
+    background=cv2.GaussianBlur(gray,(0,0),sigma)
+    return cv2.divide(gray,np.maximum(background,1),scale=255)
+
+
 def _foreground(rgb):
     """Preserve both dark and saturated colour strokes on light pages."""
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    if float(np.median(gray)) < 105:
+    paper=_paper_gray(rgb)
+    if paper is not None:
+        cutoff,_=cv2.threshold(paper,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        ink=(paper<=min(180,cutoff)).astype('uint8')*255
+    elif float(np.median(gray)) < 105:
         # White/coloured graph strokes on a dark teaching slide.
         ink = ((gray > 155) | ((hsv[:, :, 1] > 80) &
                                (hsv[:, :, 2] > 85))).astype('uint8') * 255
@@ -242,7 +261,7 @@ def _point_polyline_distance(point, line):
     return best
 
 
-def _same_ink_route(candidate,existing,pointmap,width,height,radius):
+def _same_ink_route(candidate,existing,pointmap,width,height,radius,*,ink=None,offset=(0,0)):
     """Deduplicate reverse/partial traces; do not merge nearby parallel strokes.
 
     A Hough segment may cover only the middle 70% of a skeleton trace. That
@@ -257,6 +276,24 @@ def _same_ink_route(candidate,existing,pointmap,width,height,radius):
         inner=[math.dist(x,y) for x,y in zip(a[2:7],b[2:7])]
         if max(inner)<=gap and sum(inner)/len(inner)<=gap*.75:
             return True
+        if ink is not None and max(inner)<=max(12.,radius*1.7):
+            # Arrowhead wings and thick node rims can displace a skeleton a
+            # few pixels from the straight detector. They are one ink ridge.
+            # Genuine close parallel strokes must retain a white corridor at
+            # multiple interior cross-sections, not just near their endpoints.
+            separated=0; inspected=0
+            for q,z in zip(a[2:7],b[2:7]):
+                distance=math.dist(q,z)
+                if distance<2.5:continue
+                samples=np.rint(np.linspace(q,z,max(5,round(distance*2)))).astype(int)
+                samples[:,0]-=offset[0];samples[:,1]-=offset[1]
+                valid=((samples[:,0]>=0)&(samples[:,0]<ink.shape[1])&
+                       (samples[:,1]>=0)&(samples[:,1]<ink.shape[0]))
+                if not valid.all():continue
+                row=ink[samples[:,1],samples[:,0]]>0
+                inspected+=1
+                if float((~row).mean())>.40:separated+=1
+            if inspected>=3 and separated<2:return True
     first=_route_polyline_pixels(candidate,width,height)
     second=_route_polyline_pixels(existing,width,height)
     if len(first)<2 or len(second)<2:
@@ -364,7 +401,10 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h)
     This function never manufactures vertices or certified graph edges.
     """
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    if float(np.median(gray)) < 105:
+    paper=_paper_gray(rgb)
+    if paper is not None:
+        mask=_foreground(rgb)
+    elif float(np.median(gray)) < 105:
         mask = _foreground(rgb)
     else:
         _, mask = cv2.threshold(gray, 216, 255, cv2.THRESH_BINARY_INV)
@@ -595,7 +635,8 @@ def _graph_candidates(rgb, graph):
             pass
     if min(max_x - min_x, max_y - min_y) < 14:
         return []
-    skel = _thin(_foreground(rgb[min_y:max_y, min_x:max_x]))
+    ink_mask=_foreground(rgb[min_y:max_y, min_x:max_x])
+    skel = _thin(ink_mask)
     local = [(label, x - min_x, y - min_y) for label, x, y in points]
     # Erase only already-detected vertex interiors, not line crossings.
     for _, x, y in local:
@@ -612,7 +653,7 @@ def _graph_candidates(rgb, graph):
                              indices[candidate["to"]])))
         variants=path_variants.setdefault(pair,[])
         for index,old in enumerate(variants):
-            if _same_ink_route(candidate,old,node_pixels,w,h,radius):
+            if _same_ink_route(candidate,old,node_pixels,w,h,radius,ink=ink_mask,offset=(min_x,min_y)):
                 if candidate["score"]>old["score"]: variants[index]=candidate
                 return
         # Variants are candidate strokes, not certified multiplicity.

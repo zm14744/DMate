@@ -122,6 +122,7 @@ def test_review_batches_cover_fourth_panel_and_scope_edge_ids():
                                'complete': True, 'edges': [edge()]}
                               for j in jobs for v in j['focus_vertices']]}
         review_ids.extend(j['graph_id'] for j in jobs)
+        assert all(j['directed'] is False and j['weighted'] is False for j in jobs)
         return {'graphs': [{'graph_id': j['graph_id'], 'inventory_complete': True,
                             'decisions': [{'id': c['id'], 'visible': True, 'direction': 'undirected'}
                                           for c in j['candidates']]} for j in jobs]}
@@ -167,6 +168,68 @@ def test_coarse_path_coordinates_align_to_fixed_nodes_without_changing_edge():
     assert (actual['from'],actual['to'])==('a','b')
     assert actual['path']==[[.1,.5],[.5,.5],[.9,.5]]
     assert any(e.get('source')=='endpoint_alignment' for e in actual['evidence'])
+
+
+def test_route_interior_moves_with_coarse_endpoint_alignment():
+    value=edge(path=[[.17,.57],[.5,.57],[.83,.57]])
+    result=merge_node_reads(record(),[{'vertex':'a','edges':[value]}])
+    actual=result['edges'][0]
+    assert actual['path'][1]==pytest.approx([.5,.5])
+    original=next(e for e in actual['evidence'] if e.get('source')=='endpoint_alignment')
+    assert original['observed_path']==value['path']
+
+
+def test_graph_type_and_edge_direction_conflict_is_not_accepted():
+    result=canonical_graph(record([edge(direction='forward',status='accepted')],complete=True))
+    assert result['edges'][0]['direction']=='unknown'
+    assert result['edges'][0]['status']=='pending' and not result['complete']
+    assert any(e.get('source')=='graph_direction_conflict' for e in result['edges'][0]['evidence'])
+
+
+@pytest.mark.parametrize('invalid_review', [False, True])
+def test_marker_inventory_disagreement_requires_visual_node_review(invalid_review):
+    import io
+    import json
+    from PIL import Image
+    from unittest.mock import patch
+    from graph_staged import recognize_staged
+    image=io.BytesIO();Image.new('RGB',(160,100),'white').save(image,format='PNG')
+    initial=record(bbox=[0,0,1,1]);node_calls=[]
+    def refine(image, graphs, *, candidate_sink=None):
+        if candidate_sink is not None:
+            candidate_sink.extend([{'x':.1,'y':.5},{'x':.9,'y':.5},{'x':.5,'y':.1}])
+        return graphs
+    def ask(prompt,images,budget):
+        if 'NODE 阶段' in prompt:
+            node_calls.append(prompt)
+            if len(node_calls)==1:return {'graphs':[initial]}
+            payload=json.loads(prompt[prompt.index('{"current_graphs":'):])
+            # Pixel candidates do not silently become vertices before review.
+            assert len(payload['current_graphs'][0]['vertices'])==2
+            revised=copy.deepcopy(initial)
+            if invalid_review:revised['id']='wrong_panel'
+            else:revised['vertices'].append({'id':'c','label':'C','x':.5,'y':.1})
+            return {'graphs':[revised]}
+        jobs=json.loads(prompt[prompt.index('{"requests":'):])['requests']
+        if 'EDGE 阶段' in prompt:
+            return {'reads':[{'graph_id':'G','vertex':v,'complete':True,
+                              'edges':[edge()] if v in ('a','b') else []}
+                             for j in jobs for v in j['focus_vertices']]}
+        return {'graphs':[{'graph_id':'G','inventory_complete':True,
+                           'decisions':[{'id':c['id'],'visible':True,'direction':'undirected'}
+                                        for j in jobs for c in j['candidates']]}]}
+    with patch('graph_staged.refine_node_positions',side_effect=refine),patch(
+            'graph_line_tracer.attach_line_evidence',side_effect=lambda raw,result:result):
+        actual=recognize_staged(image.getvalue(),call=ask)
+    g=actual['graphs'][0]
+    assert len(node_calls)==2 and len(g['vertices'])==(2 if invalid_review else 3)
+    if invalid_review:
+        assert not g['node_complete'] and not g['complete']
+        assert g['node_review']['status']=='failed'
+        assert 'node_inventory_review_failed' in actual['diagnostics']
+    else:
+        assert g['node_review']=={'initial_vertex_count':2,'reviewed_vertex_count':3}
+        assert 'node_inventory_rechecked' in actual['diagnostics']
 
 
 def test_single_graph_arrow_conflict_gets_second_focused_visual_review():

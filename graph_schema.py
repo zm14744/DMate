@@ -47,7 +47,7 @@ def canonical_graph(source, index=1):
     for k in ('directed', 'weighted', 'multigraph'):
         v = source.get(k)
         graph[k] = v if isinstance(v, bool) else 'unknown'
-    for key in ('bbox', 'node_complete', 'inventory_reviewed', 'node_position_evidence'):
+    for key in ('bbox', 'node_complete', 'inventory_reviewed', 'node_position_evidence', 'node_review'):
         if key in source:
             graph[key] = copy.deepcopy(source[key])
     raw_nodes = source.get('vertices')
@@ -104,6 +104,12 @@ def canonical_graph(source, index=1):
                 'status': item.get('status') if item.get('status') in ('accepted', 'pending') else 'pending'}
         evidence = item.get('evidence')
         edge['evidence'] = copy.deepcopy(evidence[:12]) if isinstance(evidence, list) else []
+        if ((graph['directed'] is False and direction == 'forward')
+                or (graph['directed'] is True and direction == 'undirected')):
+            edge['evidence'].append({'source':'graph_direction_conflict',
+                                     'observed_direction':direction,'graph_directed':graph['directed']})
+            edge['direction']='unknown'
+            edge['status']='pending'
         graph['edges'].append(edge)
     pair_counts = Counter(tuple(sorted((e['from'], e['to']))) for e in graph['edges'])
     for e in graph['edges']:

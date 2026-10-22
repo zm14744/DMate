@@ -40,6 +40,7 @@ REVIEW_PROMPT = '''复核所附图形和指定候选线迹，逐条核对端点�
 "weight":null,"edge_label":null}],"inventory_complete":false}。
 visible=false仅表示这条候选不是实际边，模糊时不要强行决定。reverse表示相对该候选from/to反向。
 forward严格表示候选from→to，reverse表示候选to→from；不是相对path采样点或focus顶点。
+无向图的无箭头线必须写undirected；forward不能表示“确认原方向/原样保留”。按每幅图的directed属性检查。
 evidence中arrow_pixels是候选箭头像素证据，先在原图核对其尖端再定方向；冲突未解时写unknown。
 inventory_complete仅在全部真实顶点和边均已列出且方向权值确定时为true；漏边不得伪装完整。
 只能复核列出的ID，禁止按数学模板补边。裁剪图坐标不能改变原图归一化坐标。'''
@@ -61,7 +62,7 @@ def _data_url(image):
     return 'data:image/jpeg;base64,'+base64.b64encode(out.getvalue()).decode('ascii')
 
 
-def refine_node_positions(image, graphs):
+def refine_node_positions(image, graphs, *, candidate_sink=None):
     """Anchor an existing inventory to unambiguous circular pixel markers.
 
     Never add/remove/relabel vertices. Global one-to-one assignment prevents
@@ -75,7 +76,9 @@ def refine_node_positions(image, graphs):
     from graph_recognition import _round_vertices
     picture=image.copy(); picture.thumbnail((1600,1600))
     rgb=cv2.cvtColor(np.asarray(picture),cv2.COLOR_RGB2BGR)
-    circles,gray=_round_vertices(rgb)
+    from graph_line_tracer import _paper_gray
+    paper=_paper_gray(rgb)
+    circles,gray=_round_vertices(rgb if paper is None else cv2.cvtColor(paper,cv2.COLOR_GRAY2BGR))
     # Hollow nodes at junctions often have an inked centre and were rejected
     # by the legacy detector. Keep extra Hough rings as position candidates;
     # require near-continuous circular ink below before using any of them.
@@ -111,6 +114,8 @@ def refine_node_positions(image, graphs):
         if any((x-p[0])**2+(y-p[1])**2 < max(r,p[2])**2 for p in found): continue
         found.append((x,y,r,kind))
     points=[(x/max(width-1,1),y/max(height-1,1)) for x,y,_,_ in found[:160]]
+    if candidate_sink is not None:
+        candidate_sink.extend({'x':x,'y':y} for x,y in points)
     nodes=[(gi,vi,v) for gi,g in enumerate(graphs) for vi,v in enumerate(g['vertices'])]
     if len(nodes)>80: return graphs  # Leave oversized inventories to the existing budget gate.
     bounds={}
@@ -238,8 +243,16 @@ def merge_node_reads(graph, reads):
                 # ending on a different real vertex rejected by TRACE/RELATE.
                 drift=max(distance(path[0],start),distance(path[-1],end))
                 if 1e-5<drift<=.16:
-                    alignment={'source':'endpoint_alignment','observed_endpoints':[path[0],path[-1]]}
-                    edge['path']=[list(start)]+path[1:-1]+[list(end)]
+                    alignment={'source':'endpoint_alignment','observed_endpoints':[path[0],path[-1]],
+                               'observed_path':copy.deepcopy(path)}
+                    lengths=[distance(p,q) for p,q in zip(path,path[1:])]
+                    total=sum(lengths);advance=0.;aligned=[]
+                    for i,p in enumerate(path):
+                        t=advance/total if total else i/max(1,len(path)-1)
+                        aligned.append([p[k]+(1-t)*(start[k]-path[0][k])+t*(end[k]-path[-1][k]) for k in (0,1)])
+                        if i<len(lengths):advance+=lengths[i]
+                    aligned[0],aligned[-1]=list(start),list(end)
+                    edge['path']=aligned
             # A read can contain several distinct, very close parallel strokes.
             # Only match an observation from the OTHER endpoint, one-to-one.
             same=[e for e in edges if {e['from'],e['to']}=={a,b} and e['path'] and edge['path']
@@ -275,7 +288,18 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
         if original.width*original.height>16_000_000: raise ValueError('image_pixel_budget')
         image=ImageOps.exif_transpose(original).convert('RGB')
     url=_data_url(image)
-    node=ask(NODE_PROMPT+'\n版面区域候选（不能把每个区域自动当一幅图）：'+json.dumps(layout or [],ensure_ascii=False),[url],budget)
+    # The first image remains the exact uploaded scene. A second, explicitly
+    # auxiliary illumination view helps distinguish ink from paper/print-through.
+    import cv2
+    import numpy as np
+    from graph_line_tracer import _paper_gray
+    small=image.copy();small.thumbnail((1600,1600))
+    paper=_paper_gray(cv2.cvtColor(np.asarray(small),cv2.COLOR_RGB2BGR))
+    node_urls=[url]
+    if paper is not None:node_urls.append(_data_url(Image.fromarray(paper).convert('RGB')))
+    node=ask(NODE_PROMPT+'\n若有第二张，它只是同一原图的光照归一化辅图，不是第二道题。'
+        +'浅色透印、桌面与阴影不是顶点或边；仍需对照第一张原图。'
+        +'\n版面区域候选（不能把每个区域自动当一幅图）：'+json.dumps(layout or [],ensure_ascii=False),node_urls,budget)
     raw_graphs=node.get('graphs')
     if not isinstance(raw_graphs,list) or len(raw_graphs)>8: raise ValueError('invalid_node_inventory')
     graphs=[]
@@ -284,7 +308,43 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
         raw=dict(raw); raw['edges']=[]; raw['complete']=False
         graphs.append(canonical_graph(raw,n))
     if len({g['id'] for g in graphs}) != len(graphs): raise ValueError('duplicate_graph_id')
-    graphs=refine_node_positions(image,graphs)
+    markers=[]
+    graphs=refine_node_positions(image,graphs,candidate_sink=markers)
+    review_jobs=[]
+    for graph in graphs:
+        box=graph.get('bbox')
+        if not isinstance(box,list) or len(box)!=4:continue
+        try:a,b,c,d=map(float,box)
+        except (TypeError,ValueError):continue
+        candidates=[p for p in markers if a-.01<=p['x']<=c+.01 and b-.01<=p['y']<=d+.01]
+        count=len(graph['vertices'])
+        if (3<=len(candidates)<=80 and len(candidates)!=count
+                and max(len(candidates),count)<=2*min(len(candidates),count)):
+            review_jobs.append({'graph':graph,'marker_candidates':candidates})
+    if review_jobs:
+        try:
+            reviewed=ask(NODE_PROMPT+'\n本轮复核初次NODE清单。圆点候选与初次顶点数不一致，但候选也可能是字母。'
+                +'逐点看原图，不能把候选数量当标准答案，不能按图名/度数补点。'
+                +'返回第一轮相同的所有graph ID；只在有原图证据时修正顶点，模糊则node_complete=false。\n'
+                +json.dumps({'current_graphs':graphs,'conflicting_inventories':review_jobs},ensure_ascii=False),node_urls,budget)
+            replacements=reviewed.get('graphs')
+            if not isinstance(replacements,list) or len(replacements)!=len(graphs):raise ValueError('invalid_node_review')
+            replacements={g.get('id'):g for g in replacements if isinstance(g,dict)}
+            if set(replacements)!={g['id'] for g in graphs}:raise ValueError('invalid_node_review_ids')
+            updated=[]
+            for i,g in enumerate(graphs,1):
+                raw=dict(replacements[g['id']]);raw['edges']=[];raw['complete']=False
+                revised=canonical_graph(raw,i)
+                revised['node_review']={'initial_vertex_count':len(g['vertices']),
+                                         'reviewed_vertex_count':len(revised['vertices'])}
+                updated.append(revised)
+            graphs=refine_node_positions(image,updated)
+            diagnostics.append('node_inventory_rechecked')
+        except (ValueError,RuntimeError,TimeoutError):
+            diagnostics.append('node_inventory_review_failed')
+            for job in review_jobs:
+                job['graph']['node_complete']=False
+                job['graph']['node_review']={'status':'failed','reason':'marker_inventory_disagreement'}
     id_context=_node_id_context(image,graphs)
     # Batch focus vertices across graph boundaries. Six small figures must not
     # exhaust a four-call budget merely because they occupy six panels.
@@ -343,7 +403,9 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
             if len(related['_candidates'])>48: diagnostics.append('review_candidate_budget_exhausted')
             if not candidates: continue
             allowed_by_graph[graph['id']]={e['id'] for e in candidates}
-            payload={'graph_id':graph['id'],'vertices':graph['vertices'],'candidates':candidates}
+            payload={'graph_id':graph['id'],'directed':graph['directed'],
+                     'weighted':graph['weighted'],'multigraph':graph['multigraph'],
+                     'vertices':graph['vertices'],'candidates':candidates}
             jobs.append(payload)
         if not jobs: continue
         urls=[url]
@@ -396,7 +458,9 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
             bottom=min(image.height,round(max(p[1] for p in points)*image.height)+35)
             if right>left and bottom>top:
                 try:
-                    payload={'graph_id':graph['id'],'vertices':graph['vertices'],'candidates':candidates}
+                    payload={'graph_id':graph['id'],'directed':graph['directed'],
+                             'weighted':graph['weighted'],'multigraph':graph['multigraph'],
+                             'vertices':graph['vertices'],'candidates':candidates}
                     verified=ask(REVIEW_PROMPT+'\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。'
                         +'沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。仅返回decisions列表。\n'
                         +json.dumps(payload,ensure_ascii=False),[url,_data_url(image.crop((left,top,right,bottom)))],budget)

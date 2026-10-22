@@ -129,6 +129,11 @@ def recover_relations(graph,traces,*,review=None):
             c['direction']='unknown'; score-=.10
         if c.get('_arrow_ambiguous') and graph['directed'] is not False and decision.get('visible') is not True:
             c['direction']='unknown'
+        if ((graph['directed'] is False and c['direction']=='forward')
+                or (graph['directed'] is True and c['direction']=='undirected')):
+            c['evidence'].append({'source':'graph_direction_conflict','observed_direction':c['direction'],
+                                  'graph_directed':graph['directed']})
+            c['direction']='unknown'
         if c['_blocked']: score=-1.
         scores.append(score)
         for j,old in enumerate(candidates[:i]):
