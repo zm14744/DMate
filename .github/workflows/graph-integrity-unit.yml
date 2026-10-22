@@ -20,6 +20,7 @@ on:
       - 'graph_sparse_panels.py'
       - 'tests/test_graph_pixel_geometry.py'
       - 'tests/test_graph_pixel_image.py'
+      - 'tests/test_graph_pixel_topology.py'
       - '.github/workflows/graph-integrity-unit.yml'
   workflow_dispatch:
 
@@ -45,6 +46,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_graph_vision_routing.py' -v
           python -m unittest discover -s tests -p 'test_graph_pixel_geometry.py' -v
           python -m unittest discover -s tests -p 'test_graph_pixel_image.py' -v
+          python -m unittest discover -s tests -p 'test_graph_pixel_topology.py' -v
       - name: Browser script syntax check
         run: |
           node --check static/script.js
