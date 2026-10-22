@@ -13681,6 +13681,109 @@ function formatOcrGraphForReview(raw) {
     return text;
 }
 
+// Deterministic, display-only Chinese graph transcription.
+// The original Qwen result remains unchanged when sent to the AI solver.
+function ocrReviewPlain(value) {
+    return String(value ?? "").replace(/([\\\x60*_{}\[\]()#+!|])/g, "\\$1").trim();
+}
+
+function ocrReviewLatexLabel(value) {
+    const label = String(value ?? "").trim();
+    if (!/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)?$/.test(label)) return null;
+    return label.replace(/_([A-Za-z0-9]+)/g, "_{$1}");
+}
+
+function ocrReviewLabel(value) {
+    const latex = ocrReviewLatexLabel(value);
+    return latex === null ? ocrReviewPlain(value) : "\\(" + latex + "\\)";
+}
+
+function formatStructuredGraphReview(graphs) {
+    if (!Array.isArray(graphs) || !graphs.length || graphs.length > 12) return "";
+    const compare = (a, b) => String(a).localeCompare(String(b), "zh-CN", {
+        numeric: true, sensitivity: "base"
+    });
+    const lines = [];
+    for (let index = 0; index < graphs.length; index++) {
+        const graph = graphs[index];
+        if (!graph || !Array.isArray(graph.vertices) || !graph.vertices.length
+            || !Array.isArray(graph.edges)) return "";
+        const vertices = [];
+        const vertexSet = new Set();
+        for (const raw of graph.vertices) {
+            if (!raw || typeof raw !== "object") return "";
+            const id = String(raw.id ?? "").trim();
+            if (!id || vertexSet.has(id)) return "";
+            vertexSet.add(id);
+            vertices.push(id);
+        }
+        vertices.sort(compare);
+        const directed = graph.directed;
+        const kind = directed === true ? "有向图" : directed === false ? "无向图" : "方向待核对";
+        const weightKind = graph.weighted === true ? "带权" :
+            graph.weighted === false ? "无权" : "权值待核对";
+        const multiKind = graph.multigraph === true ? "多重图" :
+            graph.multigraph === false ? "简单图" : "重边待核对";
+        const groups = new Map();
+        const incident = new Set();
+        for (const edge of graph.edges) {
+            if (!edge || typeof edge !== "object") return "";
+            let a = String(edge.from ?? "").trim();
+            let b = String(edge.to ?? "").trim();
+            if (!vertexSet.has(a) || !vertexSet.has(b)) return "";
+            incident.add(a);
+            incident.add(b);
+            if (directed !== true && compare(a, b) > 0) [a, b] = [b, a];
+            const edgeLabel = edge.edge_label == null ? "" : String(edge.edge_label).trim();
+            const weight = edge.weight == null ? "" : String(edge.weight).trim();
+            const key = JSON.stringify([a, b, edgeLabel, weight]);
+            const previous = groups.get(key);
+            if (previous) previous.count++;
+            else groups.set(key, { a, b, edgeLabel, weight, count: 1 });
+        }
+        const sortedEdges = [...groups.values()].sort((a, b) =>
+            compare(a.a, b.a) || compare(a.b, b.b) ||
+            compare(a.edgeLabel, b.edgeLabel) || compare(a.weight, b.weight));
+        const edgeDescriptions = sortedEdges.map(edge => {
+            const la = ocrReviewLatexLabel(edge.a);
+            const lb = ocrReviewLatexLabel(edge.b);
+            const relation = la !== null && lb !== null
+                ? "\\(" + la + (directed === true ? "\\to" : "-") + lb + "\\)"
+                : ocrReviewLabel(edge.a) + (directed === true ? " → " : "—") +
+                  ocrReviewLabel(edge.b);
+            const metadata = [];
+            if (edge.edgeLabel) metadata.push("边名：" + ocrReviewPlain(edge.edgeLabel));
+            if (edge.weight) metadata.push("权：" + ocrReviewPlain(edge.weight));
+            const extras = metadata.length ? "（" + metadata.join("，") + "）" : "";
+            return relation + (edge.count > 1 ? " × " + edge.count : "") + extras;
+        });
+        const graphId = String(graph.id || ("G" + (index + 1))).trim();
+        lines.push("### 图 " + (index + 1) + "（" + ocrReviewPlain(graphId) + "）");
+        lines.push("**类型：** " + kind + " · " + weightKind + " · " + multiKind);
+        lines.push("**顶点（" + vertices.length + "）：** " + vertices.map(ocrReviewLabel).join("、"));
+        const isolated = vertices.filter(id => !incident.has(id));
+        if (isolated.length) lines.push("**孤立顶点：** " + isolated.map(ocrReviewLabel).join("、"));
+        lines.push("**边（已记录 " + graph.edges.length + " 条）：** " +
+            (edgeDescriptions.length ? edgeDescriptions.join("、") : "未记录可确认的边"));
+        const pending = Array.isArray(graph.uncertain_edges)
+            ? graph.uncertain_edges.filter(Boolean).slice(0, 12) : [];
+        lines.push("**状态：** " + (graph.complete === true && !pending.length
+            ? "结构已列出（仍需以原图核对）" : "待核对（现有边表不代表全部边）"));
+        if (pending.length) lines.push("**待核对：** " + pending.map(ocrReviewPlain).join("；"));
+        if (index < graphs.length - 1) lines.push("---");
+    }
+    return lines.join("\n\n");
+}
+
+function formatOcrReviewGraphDisplay(graphs, visualText) {
+    // Backend exposes graph_display_data only when the final textual audit
+    // has not changed the first-pass canonical graph table.
+    const structured = formatStructuredGraphReview(graphs);
+    if (structured) return structured;
+    const fallback = formatOcrGraphForReview(visualText);
+    return fallback ? "**识别说明（结构化边表尚未核实）**\n\n" + fallback : "";
+}
+
 // OCR review displays recognized content as MathJax, without editable fields.
 // Only "本次要求" remains editable; recognized text is passed through unchanged.
 function renderOcrReviewResult(element, source) {
@@ -13716,9 +13819,12 @@ function reviewRecognizedQuestion(file, data) {
         if (zoom) zoom.value = "100";
         const recognizedText = typeof data.text === "string" ? data.text.trim() : "";
         const recognizedGraph = typeof data.visual_text === "string"
-            ? formatOcrGraphForReview(data.visual_text) : "";
+            ? data.visual_text.trim() : "";
+        const displayGraph = formatOcrReviewGraphDisplay(
+            data.graph_display_data, recognizedGraph
+        );
         renderOcrReviewResult(question, recognizedText);
-        renderOcrReviewResult(graph, recognizedGraph);
+        renderOcrReviewResult(graph, displayGraph);
         const questionRadios = Array.from(dialog.querySelectorAll('input[name="ocrQuestionType"]'));
         const inferredQuestion = Boolean(recognizedText || /(?:求|判断|证明|是否|哪些|几个)/.test(recognizedGraph));
         const initialRadio = questionRadios.find(radio => radio.value === (inferredQuestion ? "question" : "other"));
