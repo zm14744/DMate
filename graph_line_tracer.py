@@ -82,7 +82,7 @@ def _vertices(graph, width, height):
         except (ValueError, TypeError, KeyError):
             return []
     ids = [v[0] for v in points]
-    if not 2 <= len(points) <= MAX_VERTICES or len(set(ids)) != len(ids):
+    if not 1 <= len(points) <= MAX_VERTICES or len(set(ids)) != len(ids):
         return []
     return points
 
@@ -310,6 +310,7 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                 continue
             samples = max(15, min(250, round(length * 0.9)))
             hits = 0
+            pattern = []
             missing_run = max_missing_run = 0
             for step in range(samples):
                 t = 0.09 + 0.82 * (step + 0.5) / samples
@@ -322,13 +323,24 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                         found = True
                         break
                 hits += int(found)
+                pattern.append(found)
                 missing_run = 0 if found else missing_run + 1
                 max_missing_run = max(max_missing_run, missing_run)
             coverage = hits / samples
             # Average ink coverage alone can connect unrelated aligned lines.
             # A long missing segment is evidence against an actual edge.
             largest_gap_px = max_missing_run * length / samples
-            if coverage < 0.83 or largest_gap_px > max(6, min(16, length * 0.045)):
+            continuous = coverage >= .83 and largest_gap_px <= max(6,min(16,length*.045))
+            # Dashed paths need repeated bounded gaps, not one long white gap
+            # between unrelated collinear strokes. Still only a candidate.
+            runs=[]
+            for hit in pattern:
+                if runs and runs[-1][0] == hit: runs[-1][1] += 1
+                else: runs.append([hit,1])
+            gaps=[n for hit,n in runs[1:-1] if not hit]
+            dashed = (.40 <= coverage < .90 and len(gaps)>=3 and
+                      max(gaps)/max(1,min(gaps))<=2.5 and largest_gap_px<=min(20,length*.13))
+            if not continuous and not dashed:
                 continue
             candidates.append({
                 'from': local[i][0], 'to': local[j][0],
@@ -337,7 +349,8 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                          [round((bx + x_off) / max(full_w - 1, 1), 4),
                           round((by + y_off) / max(full_h - 1, 1), 4)]],
                 'pixel_length': round(length),
-                'score': round(coverage, 3),
+                'score': round(coverage if continuous else min(.80,coverage+.18), 3),
+                'style': 'solid' if continuous else 'dashed',
                 'needs_review': True,
                 'method': 'opencv_straight_line_coverage',
             })
@@ -548,8 +561,8 @@ def _graph_candidates(rgb, graph):
     if not points:
         return []
     nearest = [
-        min(math.hypot(x - a, y - b)
-            for j, (_, a, b) in enumerate(points) if j != i)
+        min((math.hypot(x - a, y - b)
+            for j, (_, a, b) in enumerate(points) if j != i), default=80.0)
         for i, (_, x, y) in enumerate(points)
     ]
     median_sep = float(np.median(nearest))
@@ -561,6 +574,17 @@ def _graph_candidates(rgb, graph):
     max_x = min(w, max(p[1] for p in points) + margin + 1)
     min_y = max(0, min(p[2] for p in points) - margin)
     max_y = min(h, max(p[2] for p in points) + margin + 1)
+    # Explicit figure bounds retain outer arcs beyond the vertex hull. They
+    # must contain all known vertices; components are not used for splitting.
+    box = graph.get('bbox')
+    if isinstance(box, list) and len(box) == 4:
+        try:
+            a,b,c,d = map(float,box)
+            if (0 <= a < c <= 1 and 0 <= b < d <= 1 and
+                    all(a <= x/max(w-1,1) <= c and b <= y/max(h-1,1) <= d for _,x,y in points)):
+                min_x,min_y,max_x,max_y = int(a*w),int(b*h),min(w,math.ceil(c*w)),min(h,math.ceil(d*h))
+        except (TypeError,ValueError):
+            pass
     if min(max_x - min_x, max_y - min_y) < 14:
         return []
     skel = _thin(_foreground(rgb[min_y:max_y, min_x:max_x]))

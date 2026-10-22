@@ -72,7 +72,10 @@ OCR_AVAILABLE = False
 OCR_IMPORT_ERROR = None
 
 try:
-    from ocr import OCRError, load_models, recognize_image
+    if os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1":
+        from ocr_runtime import OCRError, load_models, recognize_image
+    else:
+        from ocr import OCRError, load_models, recognize_image
     OCR_AVAILABLE = True
 except Exception as exc:
     OCR_IMPORT_ERROR = repr(exc)
@@ -468,7 +471,7 @@ def _warm_ocr_models():
         )
 
 
-if OCR_AVAILABLE:
+if OCR_AVAILABLE and os.environ.get("DMATE_GRAPH_NEXTGEN", "0") != "1":
     threading.Thread(
         target=_warm_ocr_models,
         daemon=True
@@ -3689,6 +3692,7 @@ def ocr():
             "error": "图片过大，请上传 8MB 以内的图片"
         }), 413
 
+    ocr_started = time.monotonic()
     try:
         result = {
             "text": "",
@@ -3754,6 +3758,23 @@ def ocr():
                 ocr_text, re.I
             ))
         )
+        # Preview the new pipeline only on the independent development flag.
+        # A failed stage falls back to the existing Qwen/CV path below.
+        if (os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1"
+                and (possible_graph or any(r.get("role") == "figure"
+                    for r in (result.get("layout") or {}).get("regions", [])))):
+            try:
+                from ocr_nextgen import recognize_graph_document
+                nextgen = recognize_graph_document(raw, result)
+                if nextgen is not None:
+                    if request_id and _take_ocr_cancelled(request_id):
+                        return jsonify({"cancelled": True})
+                    return jsonify(nextgen)
+            except Exception as nextgen_exc:
+                print(f"分阶段图识别回退：{type(nextgen_exc).__name__}")
+                if time.monotonic() - ocr_started > 110:
+                    return jsonify({"error": "本次图片识别未完成，请裁剪图形后重试。"}), 503
+
         if possible_graph and recognize_graphs is not None:
             try:
                 graph_cv = recognize_graphs(raw, text_hint=ocr_text,
@@ -3768,7 +3789,8 @@ def ocr():
         try:
             vision_result = analyze_image_structure(
                 raw, ocr_text=ocr_text, review_regions=vision_regions,
-                opencv_graphs=graph_cv
+                opencv_graphs=graph_cv,
+                retries=0 if os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1" else 1
             )
         except Exception as exc:
             print(f"Vision 增强层异常：{type(exc).__name__}")

@@ -1337,7 +1337,7 @@ def _guess_image_mime(raw):
 
 
 
-def _request_qwen_completion(payload, headers, timeout=(10, 120)):
+def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=None):
     """Call DashScope in SSE mode and reconstruct the OpenAI-compatible result."""
     request_payload = dict(payload)
     request_payload["stream"] = True
@@ -1362,6 +1362,8 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120)):
         finish_reason, usage = None, None
         saw_event = False
         for raw_line in response.iter_lines(decode_unicode=True):
+            if wall_deadline is not None and time.monotonic() > wall_deadline:
+                raise TimeoutError("vision_wall_deadline")
             if raw_line is None:
                 continue
             line = raw_line.decode("utf-8", errors="replace").strip() if isinstance(raw_line, bytes) else str(raw_line).strip()
