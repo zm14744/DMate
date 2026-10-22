@@ -46,9 +46,19 @@ def compact_line_evidence(cv_result, *, max_graphs=8, max_per_graph=18, max_char
             if not isinstance(trace, dict):
                 continue
             pair = _pair(trace)
-            if pair is None or pair in seen:
+            if pair is None:
                 continue
-            seen.add(pair)
+            # The tracer can preserve multiple truly distinct strokes with
+            # identical endpoints. Only skip duplicate path variants.
+            variant = trace.get("path_variant", 0)
+            try:
+                variant = max(0, min(5, int(variant)))
+            except (ValueError, TypeError):
+                variant = 0
+            unique = (pair, variant)
+            if unique in seen:
+                continue
+            seen.add(unique)
             try:
                 score = float(trace.get("score", 0))
             except (TypeError, ValueError, OverflowError):
@@ -70,6 +80,7 @@ def compact_line_evidence(cv_result, *, max_graphs=8, max_per_graph=18, max_char
             novel = pair not in confirmed.get(graph_id, set())
             items.append((not novel, -score, {
                 "from": pair[0], "to": pair[1],
+                "path_variant": variant,
                 "path_samples": coords,
                 "pixel_score": round(score, 3),
                 "new_candidate": novel,
