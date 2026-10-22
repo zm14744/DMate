@@ -187,3 +187,13 @@ def test_actual_usage_reporting_never_estimates_failed_request_tokens():
     assert result['attempted_requests']==2 and result['request_success_rate']==.5
     assert result['mean_request_seconds']==5
     assert operational_totals([{'requests':[{'status':'transport_failed'}]}])['total_tokens'] is None
+
+
+def test_paid_glm_is_explicit_and_flash_cannot_masquerade_as_paid(monkeypatch):
+    from vision_provider import GLM_PAID_MODEL
+    assert VisionProvider('glm').model=='glm-4.6v-flash'
+    assert VisionProvider('glm',model=GLM_PAID_MODEL).payload('JSON',[URL])['model']=='glm-4.6v'
+    monkeypatch.setenv('ZHIPU_API_KEY','test')
+    provider=VisionProvider('glm',model=GLM_PAID_MODEL,transport=lambda *a,**k:response({'graphs':[]},GLM_MODEL))
+    with pytest.raises(VisionError,match='model_mismatch'):provider('JSON',[URL],Budget())
+    with pytest.raises(ValueError):VisionProvider('qwen',model=GLM_PAID_MODEL)

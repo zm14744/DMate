@@ -23,7 +23,7 @@ from graph_ab_metrics import compare_graphs,prf
 from graph_schema import canonical_graph
 from graph_staged import Budget,recognize_staged,NODE_PROMPT,EDGE_PROMPT,REVIEW_PROMPT
 from graph_validation import audit_graph_records
-from vision_provider import VisionProvider,VisionError
+from vision_provider import VisionProvider,VisionError,GLM_MODEL,GLM_PAID_MODEL
 
 RAW_PROMPT='''独立读取这张图论原图，不解题，不依靠图名、常见模板或度数补点补边。
 只返回JSON：{"graphs":[{"id":"G1","name":"原图图号或G1","directed":false,"weighted":false,
@@ -88,8 +88,9 @@ def local_layout(raw,cache):
     return {**result,'benchmark_cache_hit':False}
 
 
-def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1):
-    provider=VisionProvider(provider_name,thinking=thinking,retries=retries,capture=True)
+def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_model=GLM_MODEL):
+    provider=VisionProvider(provider_name,model=glm_model if provider_name=='glm' else None,
+                            thinking=thinking,retries=retries,capture=True)
     record={'provider':provider_name,'model':provider.model,'thinking':thinking,'experiment':experiment,
             'started_at':datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(),
             'status':'not_run_missing_key','requests':[],'actual_request_count':0,'seconds':0.,'http_429_count':0}
@@ -207,7 +208,8 @@ def write_reports(out,records,metadata):
     errors=[{k:r.get(k) for k in ('case_id','sha256','provider','model','thinking','experiment','repeat','status','requests','metrics')}
             for r in records if r['status']!='success' or not r.get('metrics',{}).get('whole_structure_correct')]
     (out/'per-image-errors.json').write_text(json.dumps(errors,ensure_ascii=False,indent=2))
-    lines=['# GLM-4.6V-Flash / Qwen3-VL-Plus 原图实测','',
+    models=sorted({r.get('model','unknown') for r in records})
+    lines=['# '+' / '.join(models)+' 原图实测','',
            '实验A为相同原始文件字节、同一提示词的直接识别；实验B使用相同现有拓扑流程、版面缓存和裁图规则。两模型从不读取对方答案。',
            '关闭/开启思考分别统计。请求失败、限流、超时、未执行和不完整人工真值均逐行保留，准确率为空；不混作错边。',
            '边集P/R/F1包含端点、方向和独立边重数；整图完全正确还要求权值、边名、线型和顶点身份。方向准确率以已匹配端点的有向边实例为分母，同时报告方向召回率。',
@@ -249,6 +251,7 @@ def main():
     parser.add_argument('--manifest',required=True);parser.add_argument('--output',required=True)
     parser.add_argument('--experiments',choices=['raw','staged','both'],default='both')
     parser.add_argument('--providers',default='glm,qwen');parser.add_argument('--thinking',choices=['off','on','both'],default='off')
+    parser.add_argument('--glm-model',choices=[GLM_MODEL,GLM_PAID_MODEL],default=GLM_MODEL)
     parser.add_argument('--case-ids');parser.add_argument('--repeats',type=int,default=1)
     parser.add_argument('--retries',type=int,default=1);parser.add_argument('--layout-cache')
     parser.add_argument('--resume',action='store_true');parser.add_argument('--inventory-only',action='store_true')
@@ -303,6 +306,7 @@ def main():
                     order=providers if (case_number+repeat)%2==0 else providers[::-1]
                     for provider in order:
                         identity={'case_id':case['id'],'sha256':case['sha256'],'repeat':repeat+1,
+                                  'model':VisionProvider(provider,model=args.glm_model if provider=='glm' else None).model,
                                   'experiment':experiment,'thinking':thinking,'provider':provider,'code_sha256':code_hash,
                                   'layout_sha256':layout_hash if experiment=='staged' else None,
                                   'category':case.get('category'),
@@ -314,7 +318,7 @@ def main():
                             record=json.loads(target.read_text())
                             if record.get('fingerprint')!=fingerprint:raise ValueError('Resume protocol/source mismatch')
                         else:
-                            model=VisionProvider(provider).model
+                            model=identity['model']
                             available=VisionProvider(provider).available()
                             if args.inventory_only or not available:
                                 record={'model':model,'status':'not_run_inventory_only' if args.inventory_only else 'not_run_missing_key',
@@ -322,7 +326,7 @@ def main():
                             else:
                                 if experiment=='staged' and preprocess_error:
                                     record={'model':model,'status':'local_preprocessing_failed','requests':[],'actual_request_count':0,'seconds':0.}
-                                else:record=execute(raw,provider,experiment,thinking,layout=(prepared or {}).get('layout',{}).get('regions',[]),retries=args.retries)
+                                else:record=execute(raw,provider,experiment,thinking,layout=(prepared or {}).get('layout',{}).get('regions',[]),retries=args.retries,glm_model=args.glm_model)
                             record.update(identity,fingerprint=fingerprint)
                             truth=case['truth']
                             record['metrics']=(compare_graphs(truth.get('graphs',[]),record['raw_result']['graphs'],reference_status=truth.get('reference_status','unverified'))

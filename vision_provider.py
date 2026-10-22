@@ -14,6 +14,7 @@ import time
 import requests
 
 GLM_MODEL='glm-4.6v-flash'
+GLM_PAID_MODEL='glm-4.6v'
 GLM_URL='https://open.bigmodel.cn/api/paas/v4/chat/completions'
 QWEN_MODEL='qwen3-vl-plus'
 
@@ -71,11 +72,13 @@ def _glm_request(payload,headers,timeout,wall_deadline):
 
 
 class VisionProvider:
-    def __init__(self,name='qwen',*,thinking=False,retries=0,capture=False,transport=None,sleep=time.sleep):
+    def __init__(self,name='qwen',*,model=None,thinking=False,retries=0,capture=False,transport=None,sleep=time.sleep):
         if name not in ('qwen','glm'):raise ValueError('Unsupported vision provider')
         if type(thinking) is not bool:raise ValueError('thinking must be explicit boolean')
         if type(retries) is not int or not 0<=retries<=2:raise ValueError('retry limit is 0..2')
-        self.name=name;self.model=QWEN_MODEL if name=='qwen' else GLM_MODEL
+        allowed=(QWEN_MODEL,) if name=='qwen' else (GLM_MODEL,GLM_PAID_MODEL)
+        self.name=name;self.model=model or allowed[0]
+        if self.model not in allowed:raise ValueError('Unsupported provider model')
         self.thinking=thinking;self.retries=retries;self.capture=capture
         self.transport=transport;self.sleep=sleep;self.observations=[]
         self.logical_calls=0
@@ -129,7 +132,9 @@ class VisionProvider:
                 raw=(choice.get('message') or {}).get('content','')
                 metric.update(finish_reason=choice.get('finish_reason'),usage=result.get('usage') or {},
                               returned_model=result.get('model'),system_fingerprint=result.get('system_fingerprint'))
-                if result.get('model') and not str(result['model']).lower().startswith(self.model):
+                returned=str(result.get('model') or '').lower()
+                if returned and (not returned.startswith(self.model) or
+                        self.model==GLM_PAID_MODEL and returned.startswith(GLM_MODEL)):
                     raise VisionError('model_mismatch')
                 if choice.get('finish_reason')=='length':raise VisionError('truncated_output')
                 if not isinstance(raw,str):raise VisionError('invalid_output')
