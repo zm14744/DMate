@@ -35,6 +35,16 @@ try:
 except (ImportError, OSError) as _graph_import_error:
     print(f"OpenCV 图结构模块不可用，保留原 Vision 识别：{_graph_import_error}")
     recognize_graphs = None
+try:
+    from graph_line_tracer import attach_line_evidence
+except (ImportError, OSError) as _trace_import_error:
+    print(f"图论线条追踪模块不可用，保留原识别：{_trace_import_error}")
+    attach_line_evidence = None
+try:
+    from graph_validation import audit_graph_records
+except (ImportError, OSError) as _validate_import_error:
+    print(f"图结构校验模块不可用，保留原识别：{_validate_import_error}")
+    audit_graph_records = None
 from classification_semantic import classify_ambiguous_questions
 from teaching import (
     analyze_messages,
@@ -3736,6 +3746,8 @@ def ocr():
             try:
                 graph_cv = recognize_graphs(raw, text_hint=ocr_text,
                                             allow_without_context=(len(ocr_text) < 20))
+                if attach_line_evidence is not None and graph_cv.get("graphs"):
+                    graph_cv = attach_line_evidence(raw, graph_cv)
             except Exception as cv_exc:
                 print(f"OpenCV 图结构识别降级：{type(cv_exc).__name__}")
 
@@ -3828,6 +3840,14 @@ def ocr():
         # marked vertices. Run a second independent image-only edge audit.
         # Never let a failed/mismatching read trigger a confident answer.
         graph_review_issues = []
+        if (audit_graph_records is not None and isinstance(vision_result, dict)
+                and vision_result.get("ok")):
+            try:
+                graph_review_issues = audit_graph_records(
+                    vision_result.get("graph_data") or []
+                )
+            except Exception as graph_check_exc:
+                print(f"图结构一致性校验降级：{type(graph_check_exc).__name__}")
         # Labeled 3+ figure slides were previously audited only by vertex
         # counts, so an invented crossing edge (b-f instead of b-e) passed.
         # Read every edge independently and require pairwise agreement.
@@ -4159,6 +4179,7 @@ def health():
         "graph_image_audit_version": "2026-10-20-v4-independent-directed-and-multigraph-vertex-audit",
         "graph_topology_revision": "2026-10-21-hough-blue-outline-cv-v3",
         "graph_vision_routing_version": "2026-10-22-graph-only-topology-v1",
+        "graph_path_evidence_version": "2026-10-22-skeleton-tracer-v1",
         "graph_answer_integrity_version": "2026-10-20-v1-fail-closed-university-diagrams",
         "single_graph_dual_edge_audit_version": "2026-10-20-v1-standalone-edge-compare-and-quiz-boundary",
         "chat_route_fix_version": "2026-10-20-current-user-initialized-for-all-chat-requests",
