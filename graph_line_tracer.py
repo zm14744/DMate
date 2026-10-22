@@ -361,7 +361,7 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h)
     if segments is None:
         return []
     output = []
-    for x1, y1, x2, y2 in segments[:, 0][:400]:
+    for x1, y1, x2, y2 in np.asarray(segments).reshape(-1, 4)[:400]:
         length = math.hypot(float(x2-x1), float(y2-y1))
         if length < max(24, radius * 2.5):
             continue
