@@ -59,7 +59,7 @@ jobs:
         if: ${{ github.event_name == 'push' || inputs.mode == 'live' }}
         shell: bash
         env:
-          CASE_LIMIT: ${{ github.event_name == 'push' && '1' || inputs.case_limit }}
+          CASE_LIMIT: ${{ github.event_name == 'push' && '3' || inputs.case_limit }}
           STRICT: ${{ github.event_name == 'push' && 'true' || inputs.strict }}
           SOLVE: ${{ inputs.solve }}
         run: |
