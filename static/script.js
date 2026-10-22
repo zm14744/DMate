@@ -13748,9 +13748,11 @@ function formatStructuredGraphReview(graphs) {
         const kind = directed === true ? "有向图" : directed === false ? "无向图" : "方向待核对";
         const weightKind = graph.weighted === true ? "带权" :
             graph.weighted === false ? "无权" : "权值待核对";
-        const multiKind = graph.multigraph === true ? "多重图" :
+        let multiKind = graph.multigraph === true ? "多重图" :
             graph.multigraph === false ? "简单图" : "重边待核对";
         const groups = new Map();
+        const endpointPairs = new Set();
+        let inconsistentSimple = false;
         const incident = new Set();
         for (const edge of graph.edges) {
             if (!edge || typeof edge !== "object") return "";
@@ -13760,12 +13762,20 @@ function formatStructuredGraphReview(graphs) {
             incident.add(a);
             incident.add(b);
             if (directed !== true && compare(a, b) > 0) [a, b] = [b, a];
+            // Endpoint multiplicity is independent of edge labels and weights.
+            // Opposite arcs in a digraph are not duplicates.
+            const pair = JSON.stringify([a, b]);
+            if (a === b || endpointPairs.has(pair)) inconsistentSimple = true;
+            endpointPairs.add(pair);
             const edgeLabel = edge.edge_label == null ? "" : String(edge.edge_label).trim();
             const weight = edge.weight == null ? "" : String(edge.weight).trim();
             const key = JSON.stringify([a, b, edgeLabel, weight]);
             const previous = groups.get(key);
             if (previous) previous.count++;
             else groups.set(key, { a, b, edgeLabel, weight, count: 1 });
+        }
+        if (graph.multigraph === false && inconsistentSimple) {
+            multiKind = "图类型待核对（边表含自环或重复端点）";
         }
         const sortedEdges = [...groups.values()].sort((a, b) =>
             compare(a.a, b.a) || compare(a.b, b.b) ||
@@ -13788,12 +13798,19 @@ function formatStructuredGraphReview(graphs) {
         lines.push("**类型：** " + kind + " · " + weightKind + " · " + multiKind);
         lines.push("**顶点（" + vertices.length + "）：** " + vertices.map(ocrReviewLabel).join("、"));
         const isolated = vertices.filter(id => !incident.has(id));
-        if (isolated.length) lines.push("**孤立顶点：** " + isolated.map(ocrReviewLabel).join("、"));
+        // Missing/uncertain edges do not prove a vertex is isolated. A graph
+        // with zero *confirmed* edges is not an edgeless graph.
+        if (graph.complete === true && isolated.length) {
+            lines.push("**孤立顶点：** " + isolated.map(ocrReviewLabel).join("、"));
+        } else if (graph.complete !== true && isolated.length) {
+            lines.push("**尚未确认连接的顶点：** " +
+                isolated.map(ocrReviewLabel).join("、") + "（不能据此判断为孤立顶点）");
+        }
         lines.push("**边（已记录 " + graph.edges.length + " 条）：** " +
             (edgeDescriptions.length ? edgeDescriptions.join("、") : "未记录可确认的边"));
         const pending = Array.isArray(graph.uncertain_edges)
             ? graph.uncertain_edges.filter(Boolean).slice(0, 12) : [];
-        lines.push("**状态：** " + (graph.complete === true && !pending.length
+        lines.push("**状态：** " + (graph.complete === true && !pending.length && !inconsistentSimple
             ? "结构已列出（仍需以原图核对）" : "待核对（现有边表不代表全部边）"));
         if (pending.length) lines.push("**待核对：** " + pending.map(ocrReviewPlain).join("；"));
         if (index < graphs.length - 1) lines.push("---");
@@ -13850,7 +13867,8 @@ function reviewRecognizedQuestion(file, data) {
         const displayGraph = formatOcrReviewGraphDisplay(
             data.graph_display_data, recognizedGraph
         );
-        renderOcrReviewResult(question, recognizedText);
+        renderOcrReviewResult(question,
+            recognizedText || (displayGraph ? "未识别到独立题干，请查看图形信息" : ""));
         renderOcrReviewResult(graph, displayGraph);
         const questionRadios = Array.from(dialog.querySelectorAll('input[name="ocrQuestionType"]'));
         const inferredQuestion = Boolean(recognizedText || /(?:求|判断|证明|是否|哪些|几个)/.test(recognizedGraph));
