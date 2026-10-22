@@ -42,6 +42,11 @@ def compact_line_evidence(cv_result, *, max_graphs=8, max_per_graph=18, max_char
         graph_id = str(panel.get("id") or "")
         items = []
         seen = set()
+        route_counts = {}
+        for trace in panel.get("paths") or []:
+            pair = _pair(trace)
+            if pair is not None:
+                route_counts[pair] = route_counts.get(pair, 0) + 1
         for trace in panel.get("paths") or []:
             if not isinstance(trace, dict):
                 continue
@@ -78,14 +83,29 @@ def compact_line_evidence(cv_result, *, max_graphs=8, max_per_graph=18, max_char
             if len(coords) > 6:
                 coords = [coords[round(i * (len(coords) - 1) / 5)] for i in range(6)]
             novel = pair not in confirmed.get(graph_id, set())
-            items.append((not novel, -score, {
+            has_multiple = route_counts.get(pair, 0) >= 2
+            note = {
                 "from": pair[0], "to": pair[1],
                 "path_variant": variant,
                 "path_samples": coords,
                 "pixel_score": round(score, 3),
+                "possible_parallel_strokes": min(6, route_counts.get(pair, 1)),
                 "new_candidate": novel,
                 "candidate_only": True,
-            }))
+            }
+            arrow = trace.get("arrow_candidate")
+            if isinstance(arrow, dict):
+                if {str(arrow.get("from")), str(arrow.get("to"))} == set(pair):
+                    note["arrow_hint"] = {
+                        "from": str(arrow["from"]),
+                        "to": str(arrow["to"]),
+                        "candidate_only": True,
+                    }
+            if trace.get("arrow_ambiguous") is True:
+                note["arrow_ambiguous"] = True
+            # Directional evidence and possible parallel paths come first.
+            rank = 0 if ("arrow_hint" in note or has_multiple) else (1 if novel else 2)
+            items.append((rank, -score, note))
         items.sort(key=lambda row: (row[0], row[1]))
         if items:
             panels.append({"id": graph_id, "items": [row[2] for row in items[:max_per_graph]]})
