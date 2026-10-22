@@ -11,15 +11,16 @@ from graph_schema import canonical_graph, path_points
 from graph_relation import recover_relations, route_overlap
 
 NODE_PROMPT = '''只做图论图片 NODE 阶段，不解题，不列边。仅返回 JSON：
-{"graphs":[{"id":"G1","name":"原图图号或G1","bbox":[0,0,1,1],
-"directed":"unknown","weighted":"unknown","multigraph":"unknown","node_complete":true,
-"vertices":[{"id":"v1","label":"原标签或null","x":0.2,"y":0.4,"isolated_confirmed":false}]}]}。
+{"graphs":[{"id":"G1","name":"G1","bbox":[0,0,1,1],
+"directed":false,"weighted":false,"multigraph":false,"node_complete":true,
+"vertices":[{"id":"v1","label":null,"x":0.2,"y":0.4,"isolated_confirmed":false}]}]}。
 坐标相对于完整图片归一化，原点是图片左上角，x向右增大，y向下增大。
 先读原有标签再定位圆点；已有v1等标签不得按扫描次序重新编号，不得旋转、翻转坐标。
 独立检查所有实心、空心、彩色、中间和孤立顶点。
 同时依据原图确认类型：有箭头则directed=true，确认没有箭头才false；
 线旁数字是权值时weighted=true，e1等边名不是权值；有独立平行线迹或自环则multigraph=true。
-类型示例中的unknown不是默认结论，不得照抄；看不清时保留unknown。
+示例仅说明字段，不是图片的答案。三个类型字段须独立观察后填写true/false；看不清时保留字符串unknown并说明证据不足，不得把任何示例值当默认结论。
+name使用真实可见图号，没有图号才用G1等编号；label使用真实标签，没有标签必须为null，不能写说明性占位词。
 每个顶点必须对应一个真实标记/明确端点，不按标签序列补缺号，不将权值、图号、文字笔画当新顶点。
 无标记交叉不是顶点。无标签统一v1、v2编号。保留真实标签。
 同一个图号/图框里的所有连通分量和孤立点属于同一图，不按连通性拆图。
@@ -33,6 +34,7 @@ EDGE_PROMPT = '''执行 EDGE 阶段，仅逐一检查 focus_vertices 的每个�
 "reads":[{"graph_id":"G1","vertex":"v1","complete":true,"edge_ids":["r1"]}]}。
 同一实际线迹在当前批次的edges只列一次，各顶点用edge_ids引用；平行边使用不同ID。
 path给出相对于完整图片的至少2个、至多8个实际线迹采样点；曲线包含中段，不用端点直线代替。
+path首点必须是from的真实顶点坐标，末点必须是to的真实顶点坐标；中间再采样弯曲线迹。箭头附近的短线段不能代替整条边，也不能只列中段而遗漏两个端点。
 每条平行线分别记录，边中途和端点附近的箭头分别查看。方向未知写unknown，不由环或模板推断。
 from/to表示真实箭尾/箭头端点，不表示当前focus顶点到邻居：读到入边也必须保持真实方向。
 同一线迹从两端读取时from/to应相同；反向平行弧是不同边，不合并。边名e1不是权值1。
