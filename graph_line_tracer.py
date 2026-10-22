@@ -24,8 +24,13 @@ def _foreground(rgb):
     """Preserve both dark and saturated colour strokes on light pages."""
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    ink = ((gray < 210) | ((hsv[:, :, 1] > 80) &
-                          (hsv[:, :, 2] < 245))).astype('uint8') * 255
+    if float(np.median(gray)) < 105:
+        # White/coloured graph strokes on a dark teaching slide.
+        ink = ((gray > 155) | ((hsv[:, :, 1] > 80) &
+                               (hsv[:, :, 2] > 85))).astype('uint8') * 255
+    else:
+        ink = ((gray < 210) | ((hsv[:, :, 1] > 80) &
+                               (hsv[:, :, 2] < 245))).astype('uint8') * 255
     components, labels, stats, _ = cv2.connectedComponentsWithStats(ink, 8)
     for k in range(1, components):
         if stats[k, cv2.CC_STAT_AREA] <= 2:
