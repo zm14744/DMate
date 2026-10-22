@@ -13700,155 +13700,95 @@ function ocrReviewLabel(value) {
 
 function formatStructuredGraphReview(graphs) {
     if (!Array.isArray(graphs) || !graphs.length || graphs.length > 12) return "";
-    const compare = (a, b) => String(a).localeCompare(String(b), "zh-CN", {
-        numeric: true, sensitivity: "base"
-    });
-    const lines = [];
-    const graphPosition = graph => {
-        const coords = (graph.vertices || []).filter(v =>
-            v && Number.isFinite(Number(v.x)) && Number.isFinite(Number(v.y))
-            && v.x !== null && v.y !== null
-            && Number(v.x) >= 0 && Number(v.x) <= 1
-            && Number(v.y) >= 0 && Number(v.y) <= 1
-        );
-        if (coords.length < 2 || coords.length !== graph.vertices.length) return null;
-        return {
-            x: coords.reduce((sum, v) => sum + Number(v.x), 0) / coords.length,
-            y: coords.reduce((sum, v) => sum + Number(v.y), 0) / coords.length
-        };
+    const cmp = (a, b) => String(a).localeCompare(String(b), "zh-CN", {numeric:true, sensitivity:"base"});
+    const center = graph => {
+        const vs = (graph.vertices || []).filter(v =>
+            v && v.x != null && v.y != null &&
+            Number.isFinite(Number(v.x)) && Number.isFinite(Number(v.y)) &&
+            Number(v.x) >= 0 && Number(v.x) <= 1 &&
+            Number(v.y) >= 0 && Number(v.y) <= 1);
+        return vs.length === (graph.vertices || []).length && vs.length ?
+            {x:vs.reduce((n,v)=>n+Number(v.x),0)/vs.length,
+             y:vs.reduce((n,v)=>n+Number(v.y),0)/vs.length} : null;
     };
-    const sortedGraphs = graphs.slice();
-    const positioned = sortedGraphs.length > 1 && sortedGraphs.every(g =>
-        g && Array.isArray(g.vertices) && graphPosition(g) !== null);
-    // When Qwen returns complete, original-image coordinates, spatial reading
-    // order is stronger evidence than arbitrary G1/G2 labels. Otherwise keep
-    // the explicit panel numbering rather than guessing from local crop coords.
-    const centers = positioned ? sortedGraphs.map(graphPosition) : [];
-    const spatialSpread = positioned && (
-        Math.max(...centers.map(p => p.x)) - Math.min(...centers.map(p => p.x)) > 0.12 ||
-        Math.max(...centers.map(p => p.y)) - Math.min(...centers.map(p => p.y)) > 0.12
-    );
-    if (spatialSpread) {
-        sortedGraphs.sort((a, b) => {
-            const pa = graphPosition(a), pb = graphPosition(b);
-            return Math.abs(pa.y - pb.y) > 0.12
-                ? pa.y - pb.y : pa.x - pb.x || pa.y - pb.y;
+    const ordered = graphs.slice();
+    const cs = ordered.map(center);
+    if (ordered.length > 1 && cs.every(Boolean) && (
+        Math.max(...cs.map(p=>p.x)) - Math.min(...cs.map(p=>p.x)) > 0.12 ||
+        Math.max(...cs.map(p=>p.y)) - Math.min(...cs.map(p=>p.y)) > 0.12)) {
+        ordered.sort((a,b) => {
+            const pa=center(a), pb=center(b);
+            return Math.abs(pa.y-pb.y) > 0.12 ? pa.y-pb.y : pa.x-pb.x || pa.y-pb.y;
         });
-    } else if (sortedGraphs.every(g => /^G[1-9]\d*$/.test(String(g?.id || "")))) {
-        sortedGraphs.sort((a, b) => compare(a.id, b.id));
+    } else if (ordered.every(g => /^G[1-9]\d*$/i.test(String(g?.id || "")))) {
+        ordered.sort((a,b)=>cmp(a.id,b.id));
     }
-    for (let index = 0; index < sortedGraphs.length; index++) {
-        const graph = sortedGraphs[index];
-        if (!graph || !Array.isArray(graph.vertices) || !graph.vertices.length
-            || !Array.isArray(graph.edges)) return "";
-        const vertices = [];
-        const vertexSet = new Set();
-        for (const raw of graph.vertices) {
-            if (!raw || typeof raw !== "object") return "";
-            const id = String(raw.id ?? "").trim();
-            if (!id || vertexSet.has(id)) return "";
-            vertexSet.add(id);
-            vertices.push(id);
+    const lines=[];
+    for (let index=0;index<ordered.length;index++) {
+        const graph=ordered[index];
+        if (!graph || !Array.isArray(graph.vertices) || !graph.vertices.length ||
+            !Array.isArray(graph.edges)) return "";
+        const graphId=String(graph.id || "G"+(index+1)).trim();
+        const ids=[];
+        const seen=new Set();
+        for(const node of graph.vertices) {
+            if(!node || typeof node!=="object") return "";
+            const id=String(node.id ?? "").trim();
+            if(!id || seen.has(id)) return "";
+            seen.add(id);
+            ids.push(id);
         }
-        vertices.sort(compare);
-        const directed = graph.directed;
-        const kind = directed === true ? "有向图" : directed === false ? "无向图" : "";
-        const weightKind = graph.weighted === true ? "带权" :
-            graph.weighted === false ? "无权" : "";
-        let multiKind = graph.multigraph === true ? "多重图" :
-            graph.multigraph === false ? "简单图" : "";
-        const groups = new Map();
-        const endpointPairs = new Set();
-        let inconsistentSimple = false;
-        const incident = new Set();
-        for (const edge of graph.edges) {
-            if (!edge || typeof edge !== "object") return "";
-            let a = String(edge.from ?? "").trim();
-            let b = String(edge.to ?? "").trim();
-            if (!vertexSet.has(a) || !vertexSet.has(b)) return "";
-            incident.add(a);
-            incident.add(b);
-            if (directed !== true && compare(a, b) > 0) [a, b] = [b, a];
-            // Endpoint multiplicity is independent of edge labels and weights.
-            // Opposite arcs in a digraph are not duplicates.
-            const pair = JSON.stringify([a, b]);
-            if (a === b || endpointPairs.has(pair)) inconsistentSimple = true;
-            endpointPairs.add(pair);
-            const edgeLabel = edge.edge_label == null ? "" : String(edge.edge_label).trim();
-            const weight = edge.weight == null ? "" : String(edge.weight).trim();
-            const key = JSON.stringify([a, b, edgeLabel, weight]);
-            const previous = groups.get(key);
-            if (previous) previous.count++;
-            else groups.set(key, { a, b, edgeLabel, weight, count: 1 });
+        ids.sort(cmp);
+        const compact = id => {
+            const match=String(id).match(/^G\d+_(v\d+)$/i);
+            return match && /^G\d+$/i.test(graphId) ? match[1] : String(id);
+        };
+        const label=id=>ocrReviewLabel(compact(id));
+        const kind=graph.directed===true?"有向图":graph.directed===false?"无向图":"";
+        const weightKind=graph.weighted===true?"带权":graph.weighted===false?"无权":"";
+        let multiKind=graph.multigraph===true?"多重图":graph.multigraph===false?"简单图":"";
+        const pairs=new Map();
+        const incident=new Set();
+        const endpointPairs=new Set();
+        let conflictingType=false;
+        for(const edge of graph.edges) {
+            if(!edge || typeof edge!=="object") return "";
+            let a=String(edge.from ?? "").trim(),b=String(edge.to ?? "").trim();
+            if(!seen.has(a)||!seen.has(b)) return "";
+            incident.add(a);incident.add(b);
+            if(graph.directed!==true && cmp(a,b)>0) [a,b]=[b,a];
+            const endpointKey=JSON.stringify([a,b]);
+            if(a===b||endpointPairs.has(endpointKey))conflictingType=true;
+            endpointPairs.add(endpointKey);
+            const edgeLabel=edge.edge_label==null?"":String(edge.edge_label).trim();
+            const weight=edge.weight==null?"":String(edge.weight).trim();
+            const key=JSON.stringify([a,b,edgeLabel,weight]);
+            if(pairs.has(key))pairs.get(key).count++;
+            else pairs.set(key,{a,b,edgeLabel,weight,count:1});
         }
-        if (graph.multigraph === false && inconsistentSimple) {
-            multiKind = "";
-        }
-        const sortedEdges = [...groups.values()].sort((a, b) =>
-            compare(a.a, b.a) || compare(a.b, b.b) ||
-            compare(a.edgeLabel, b.edgeLabel) || compare(a.weight, b.weight));
-        const edgeDescriptions = sortedEdges.map(edge => {
-            const la = ocrReviewLatexLabel(edge.a);
-            const lb = ocrReviewLatexLabel(edge.b);
-            const relation = la !== null && lb !== null
-                ? "\\(" + la + (directed === true ? "\\to{}" : "-") + lb + "\\)"
-                : ocrReviewLabel(edge.a) + (directed === true ? " → " : "—") +
-                  ocrReviewLabel(edge.b);
-            const metadata = [];
-            if (edge.edgeLabel) metadata.push("边名：" + ocrReviewPlain(edge.edgeLabel));
-            if (edge.weight) metadata.push("权：" + ocrReviewPlain(edge.weight));
-            const extras = metadata.length ? "（" + metadata.join("，") + "）" : "";
-            return relation + (edge.count > 1 ? " × " + edge.count : "") + extras;
+        if(graph.multigraph===false&&conflictingType)multiKind="";
+        const edges=[...pairs.values()].sort((a,b)=>cmp(a.a,b.a)||cmp(a.b,b.b)||cmp(a.edgeLabel,b.edgeLabel)||cmp(a.weight,b.weight));
+        const rendered=edges.map(e=>{
+            const a=compact(e.a),b=compact(e.b);
+            const la=ocrReviewLatexLabel(a),lb=ocrReviewLatexLabel(b);
+            const relation=la!==null&&lb!==null?
+                "\\("+la+(graph.directed===true?"\\to{}":"-")+lb+"\\)":
+                label(e.a)+(graph.directed===true?" → ":"—")+label(e.b);
+            const attrs=[];
+            if(e.edgeLabel)attrs.push("边名："+ocrReviewPlain(e.edgeLabel));
+            if(e.weight)attrs.push("权："+ocrReviewPlain(e.weight));
+            return relation+(e.count>1?" × "+e.count:"")+(attrs.length?"（"+attrs.join("，")+"）":"");
         });
-        const graphId = String(graph.id || ("G" + (index + 1))).trim();
-        // Simplify only visibly rendered temporary identifiers, never the
-        // underlying vertex IDs used for AI calculations.
-        const compactId = id => String(id).replace(
-            new RegExp("^" + graphId.replace(/[.*+?^\\$\\{\\}()|[\\]\\\\]/g, "\\\\        const graphId = String(graph.id || ("G" + (index + 1))).trim();
-        lines.push("### 图 " + (index + 1) + "（" + ocrReviewLabel(graphId) + "）");
-        lines.push("**类型：** " + kind + " · " + weightKind + " · " + multiKind);
-        lines.push("**顶点（" + vertices.length + "）：** " + vertices.map(ocrReviewLabel).join("、"));
-        const isolated = vertices.filter(id => !incident.has(id));
-        // Missing/uncertain edges do not prove a vertex is isolated. A graph
-        // with zero *confirmed* edges is not an edgeless graph.
-        if (graph.complete === true && isolated.length) {
-            lines.push("**孤立顶点：** " + isolated.map(ocrReviewLabel).join("、"));
-        } else if (graph.complete !== true && isolated.length) {
-            lines.push("**尚未确认连接的顶点：** " +
-                isolated.map(ocrReviewLabel).join("、") + "（不能据此判断为孤立顶点）");
-        }
-        lines.push("**边（已记录 " + graph.edges.length + " 条）：** " +
-            (edgeDescriptions.length ? edgeDescriptions.join("、") : "未记录可确认的边"));
-        const pending = Array.isArray(graph.uncertain_edges)
-            ? graph.uncertain_edges.filter(Boolean).slice(0, 12) : [];
-        lines.push("**状态：** " + (graph.complete === true && !pending.length && !(graph.multigraph === false && inconsistentSimple)
-            ? "结构已列出（仍需以原图核对）" : "待核对（现有边表不代表全部边）"));
-        if (pending.length) lines.push("**待核对：** " + pending.map(ocrReviewPlain).join("；"));") + "_(v[0-9]+)$", "i"), "$1"
-        );
-        const visibleLabel = id => ocrReviewLabel(compactId(id));
-        const visibleEdges = sortedEdges.map(edge => {
-            const a = compactId(edge.a), b = compactId(edge.b);
-            const la = ocrReviewLatexLabel(a), lb = ocrReviewLatexLabel(b);
-            const relation = la !== null && lb !== null
-                ? "\\(" + la + (directed === true ? "\\\\to{}" : "-") + lb + "\\)"
-                : visibleLabel(a) + (directed === true ? " → " : "—") + visibleLabel(b);
-            const metadata = [];
-            if (edge.edgeLabel) metadata.push("边名：" + ocrReviewPlain(edge.edgeLabel));
-            if (edge.weight) metadata.push("权：" + ocrReviewPlain(edge.weight));
-            return relation + (edge.count > 1 ? " × " + edge.count : "") +
-                (metadata.length ? "（" + metadata.join("，") + "）" : "");
-        });
-        lines.push("### 图 " + (index + 1) + "（" + ocrReviewLabel(graphId) + "）");
-        const attrs = [kind, weightKind, multiKind].filter(Boolean);
-        if (attrs.length) lines.push("**类型：** " + attrs.join(" · "));
-        lines.push("**顶点（" + vertices.length + "）：** " + vertices.map(visibleLabel).join("、"));
-        const isolated = vertices.filter(id => !incident.has(id));
-        if (graph.complete === true && isolated.length) {
-            lines.push("**孤立顶点：** " + isolated.map(visibleLabel).join("、"));
-        }
-        lines.push("**边（" + (graph.complete === true ? "" : "暂录 ") + graph.edges.length + " 条）：** " +
-            (visibleEdges.length ? visibleEdges.join("、") : "—"));
-        if (index < graphs.length - 1) lines.push("---");
+        lines.push("### 图 "+(index+1)+"（"+ocrReviewLabel(graphId)+"）");
+        const props=[kind,weightKind,multiKind].filter(Boolean);
+        if(props.length)lines.push("**类型：** "+props.join(" · "));
+        lines.push("**顶点（"+ids.length+"）：** "+ids.map(label).join("、"));
+        const isolated=ids.filter(id=>!incident.has(id));
+        if(graph.complete===true&&isolated.length)
+            lines.push("**孤立顶点：** "+isolated.map(label).join("、"));
+        lines.push("**边（"+(graph.complete===true?"":"暂录 ")+graph.edges.length+" 条）：** "+
+            (rendered.length?rendered.join("、"):"—"));
+        if(index<ordered.length-1)lines.push("---");
     }
     return lines.join("\n\n");
 }
