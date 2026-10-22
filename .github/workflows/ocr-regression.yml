@@ -1,0 +1,89 @@
+name: DMate OCR Regression (Playwright)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "mock=no API charges; live=real OCR/model requests"
+        type: choice
+        options: [mock, live]
+        default: mock
+        required: true
+      case_limit:
+        description: "Number of independent graph examples"
+        type: choice
+        options: ['1', '2', '3']
+        default: '1'
+        required: true
+      strict:
+        description: "Fail when topology is wrong or unverified"
+        type: boolean
+        default: true
+      solve:
+        description: "After OCR, call the paid AI solver (max 2 cases)"
+        type: boolean
+        default: false
+  # Initial one-time end-to-end confirmation. Remove this push trigger
+  # after verifying the live result; future paid runs must be manual.
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/ocr-regression.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dmate-ocr-regression
+  cancel-in-progress: false
+
+jobs:
+  graph-ocr:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Playwright, Pillow and Chromium
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.55.0 Pillow==11.3.0
+          python -m playwright install --with-deps chromium
+      - name: Free mocked OCR capture and strict comparison
+        run: python tests/ocr_regression.py --mode mock --limit 3 --strict --output artifacts/ocr-mock
+      - name: Live OCR capture and graph comparison
+        if: ${{ github.event_name == 'push' || inputs.mode == 'live' }}
+        shell: bash
+        env:
+          CASE_LIMIT: ${{ github.event_name == 'push' && '1' || inputs.case_limit }}
+          STRICT: ${{ github.event_name == 'push' && 'true' || inputs.strict }}
+          SOLVE: ${{ inputs.solve }}
+        run: |
+          set -euo pipefail
+          if [[ "$SOLVE" == "true" && "$CASE_LIMIT" -gt 2 ]]; then
+            echo "::error::Paid AI solver is limited to two questions per run"
+            exit 1
+          fi
+          args=(--mode live --limit "$CASE_LIMIT" --timeout 240 --output artifacts/ocr-live)
+          if [[ "$STRICT" == "true" ]]; then args+=(--strict); fi
+          if [[ "$SOLVE" == "true" ]]; then args+=(--solve); fi
+          python tests/ocr_regression.py "${args[@]}"
+      - name: Upload mocked test traces and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmate-ocr-mock
+          path: artifacts/ocr-mock/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload live OCR results and comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmate-ocr-live
+          path: artifacts/ocr-live/
+          retention-days: 7
+          if-no-files-found: ignore
