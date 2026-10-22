@@ -133,6 +133,41 @@ def test_review_batches_cover_fourth_panel_and_scope_edge_ids():
     assert all(g['complete'] for g in actual['graphs'])
 
 
+def test_dense_multi_panel_reads_use_smaller_batches_within_remote_budget():
+    import io
+    import json
+    from PIL import Image
+    from unittest.mock import patch
+    from graph_staged import recognize_staged
+    image=io.BytesIO();Image.new('RGB',(160,100),'white').save(image,format='PNG')
+    panels=[record(id=f'G{i}',vertices=[{'id':f'v{k}','x':k/10,'y':.5}
+                                     for k in range(1,7)]) for i in range(1,4)]
+    batches=[]
+    def ask(prompt,images,budget):
+        budget.take()
+        if 'NODE 阶段' in prompt:return {'graphs':panels}
+        assert 'EDGE 阶段' in prompt
+        jobs=json.loads(prompt[prompt.index('{"requests":'):])['requests']
+        vertices=[(j['graph']['id'],v) for j in jobs for v in j['focus_vertices']]
+        batches.append(vertices)
+        return {'reads':[{'graph_id':gid,'vertex':v,'complete':True,'edges':[]} for gid,v in vertices]}
+    with patch('graph_line_tracer.attach_line_evidence',side_effect=lambda raw,result:result):
+        actual=recognize_staged(image.getvalue(),call=ask)
+    assert [len(batch) for batch in batches]==[6,6,6]
+    assert len({vertex for batch in batches for vertex in batch})==18
+    assert actual['calls_remaining']==3 and not actual['diagnostics']
+
+
+def test_review_grouping_keeps_every_candidate_identity_without_asserting_multiplicity():
+    from graph_staged import _review_job
+    candidates=[edge(),edge(id='pixel_1'),edge(id='e2',**{'from':'b','to':'a'})]
+    before=copy.deepcopy(candidates)
+    job=_review_job(record(directed=True),candidates)
+    assert job['endpoint_groups']==[{'vertices':['a','b'],'candidate_ids':['e1','pixel_1','e2']}]
+    assert 'multiplicity' not in job['endpoint_groups'][0]
+    assert candidates==before and job['directed'] is True
+
+
 def test_incomplete_json_envelope_never_salvages_a_single_inner_edge():
     from unittest.mock import patch
     from graph_staged import _call, Budget

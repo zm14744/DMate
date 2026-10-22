@@ -4,6 +4,7 @@ import base64
 import copy
 import io
 import json
+import math
 import re
 import time
 import requests
@@ -13,11 +14,15 @@ from graph_relation import recover_relations, route_overlap
 
 NODE_PROMPT = '''只做图论图片 NODE 阶段，不解题，不列边。仅返回 JSON：
 {"graphs":[{"id":"G1","name":"原图图号或G1","bbox":[0,0,1,1],
-"directed":false,"weighted":false,"multigraph":false,"node_complete":true,
+"directed":"unknown","weighted":"unknown","multigraph":"unknown","node_complete":true,
 "vertices":[{"id":"v1","label":"原标签或null","x":0.2,"y":0.4,"isolated_confirmed":false}]}]}。
 坐标相对于完整图片归一化，原点是图片左上角，x向右增大，y向下增大。
 先读原有标签再定位圆点；已有v1等标签不得按扫描次序重新编号，不得旋转、翻转坐标。
 独立检查所有实心、空心、彩色、中间和孤立顶点。
+同时依据原图确认类型：有箭头则directed=true，确认没有箭头才false；
+线旁数字是权值时weighted=true，e1等边名不是权值；有独立平行线迹或自环则multigraph=true。
+类型示例中的unknown不是默认结论，不得照抄；看不清时保留unknown。
+每个顶点必须对应一个真实标记/明确端点，不按标签序列补缺号，不将权值、图号、文字笔画当新顶点。
 无标记交叉不是顶点。无标签统一v1、v2编号。保留真实标签。
 同一个图号/图框里的所有连通分量和孤立点属于同一图，不按连通性拆图。
 只按真实图号、图框和版面证据分图，按原图从上到下、同一行从左到右排序。
@@ -41,6 +46,8 @@ REVIEW_PROMPT = '''复核所附图形和指定候选线迹，逐条核对端点�
 visible=false仅表示这条候选不是实际边，模糊时不要强行决定。reverse表示相对该候选from/to反向。
 forward严格表示候选from→to，reverse表示候选to→from；不是相对path采样点或focus顶点。
 无向图的无箭头线必须写undirected；forward不能表示“确认原方向/原样保留”。按每幅图的directed属性检查。
+endpoint_groups只是共享端点的候选索引，不是真实重数。逐组沿原图区分每条独立笔画：
+同一笔画被EDGE和像素重复提议时只确认一个候选；不同平行笔画必须分别确认，不能优先保留EDGE而否认额外真实像素线迹。
 evidence中arrow_pixels是候选箭头像素证据，先在原图核对其尖端再定方向；冲突未解时写unknown。
 inventory_complete仅在全部真实顶点和边均已列出且方向权值确定时为true；漏边不得伪装完整。
 只能复核列出的ID，禁止按数学模板补边。裁剪图坐标不能改变原图归一化坐标。'''
@@ -177,6 +184,18 @@ def _node_id_context(image,graphs):
             draw.rectangle((tx,ty,tx+width,ty+height),fill='white',outline='#c00000')
             draw.text((tx+2,ty+2-box[1]),tag,font=font,fill='#c00000')
     return _data_url(tagged)
+
+
+def _review_job(graph,candidates):
+    groups={}
+    for edge in candidates:
+        pair=tuple(sorted((edge['from'],edge['to'])))
+        groups.setdefault(pair,[]).append(edge['id'])
+    return {'graph_id':graph['id'],'directed':graph['directed'],
+            'weighted':graph['weighted'],'multigraph':graph['multigraph'],
+            'vertices':graph['vertices'],'candidates':candidates,
+            'endpoint_groups':[{'vertices':list(pair),'candidate_ids':ids}
+                               for pair,ids in groups.items()]}
 
 
 def _call(prompt, images, budget):
@@ -350,8 +369,15 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
     # exhaust a four-call budget merely because they occupy six panels.
     focus=[(i,v['id']) for i,g in enumerate(graphs) for v in g['vertices']]
     reads_by_graph={g['id']:[] for g in graphs}
-    for offset in range(0,min(len(focus),48),12):
-        batch=focus[offset:offset+12]
+    # Dense twelve-vertex reads exceeded the per-call deadline on real uploads,
+    # discarding a whole batch before REVIEW. Spread work across the available
+    # EDGE calls while reserving both multi-panel reviews and the seven-call cap.
+    planned=min(len(focus),48)
+    edge_calls=max(1,min(4,math.ceil(planned/8),budget.remaining-2))
+    batch_size=min(12,max(1,math.ceil(planned/edge_calls)))
+    edge_limit=min(planned,batch_size*edge_calls)
+    for offset in range(0,edge_limit,batch_size):
+        batch=focus[offset:min(offset+batch_size,edge_limit)]
         requests_by_graph={}
         for index,vertex in batch:
             requests_by_graph.setdefault(index,[]).append(vertex)
@@ -380,7 +406,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
                     reads_by_graph[gid].append(r)
         except (ValueError,RuntimeError,TimeoutError) as exc:
             diagnostics.append('edge_read_failed:'+str(exc)[:80]); break
-    if len(focus)>48: diagnostics.append('edge_budget_exhausted')
+    if len(focus)>edge_limit: diagnostics.append('edge_budget_exhausted')
     graphs=[merge_node_reads(g,reads_by_graph[g['id']]) for g in graphs]
     from graph_line_tracer import attach_line_evidence
     traced=attach_line_evidence(image_bytes,{'graphs':graphs})
@@ -403,9 +429,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
             if len(related['_candidates'])>48: diagnostics.append('review_candidate_budget_exhausted')
             if not candidates: continue
             allowed_by_graph[graph['id']]={e['id'] for e in candidates}
-            payload={'graph_id':graph['id'],'directed':graph['directed'],
-                     'weighted':graph['weighted'],'multigraph':graph['multigraph'],
-                     'vertices':graph['vertices'],'candidates':candidates}
+            payload=_review_job(graph,candidates)
             jobs.append(payload)
         if not jobs: continue
         urls=[url]
@@ -458,9 +482,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None):
             bottom=min(image.height,round(max(p[1] for p in points)*image.height)+35)
             if right>left and bottom>top:
                 try:
-                    payload={'graph_id':graph['id'],'directed':graph['directed'],
-                             'weighted':graph['weighted'],'multigraph':graph['multigraph'],
-                             'vertices':graph['vertices'],'candidates':candidates}
+                    payload=_review_job(graph,candidates)
                     verified=ask(REVIEW_PROMPT+'\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。'
                         +'沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。仅返回decisions列表。\n'
                         +json.dumps(payload,ensure_ascii=False),[url,_data_url(image.crop((left,top,right,bottom)))],budget)

@@ -160,7 +160,7 @@ def test_six_panels_share_vertex_batch_budget_without_losing_last_panels():
                          for job in jobs for v in job['focus_vertices']]}
     with patch('graph_line_tracer.attach_line_evidence',side_effect=lambda raw,value:value):
         result=recognize_staged(source.read_bytes(),call=ask)
-    assert len(calls)==2 and len(result['graphs'])==6
+    assert len(calls)==3 and len(result['graphs'])==6
     assert all(g['node_complete'] for g in result['graphs'])
     assert all(not g['complete'] for g in result['graphs'])
 
