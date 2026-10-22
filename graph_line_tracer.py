@@ -413,6 +413,37 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
     ink = (_foreground(rgb) > 0)
     height, width = ink.shape
     output = []
+
+    def independently_separated_ink(first, second):
+        # Two fitted curves separated by only a few pixels may represent
+        # the SAME thick ink stroke. Preserve both only when a white corridor
+        # genuinely separates two dark ridges at several interior positions.
+        separated = 0
+        for k in (3, 4, 5, 6):
+            qa, qb = first['path'][k], second['path'][k]
+            x1 = float(qa[0])*(full_w-1)-x_off
+            y1 = float(qa[1])*(full_h-1)-y_off
+            x2 = float(qb[0])*(full_w-1)-x_off
+            y2 = float(qb[1])*(full_h-1)-y_off
+            gap = math.hypot(x2-x1,y2-y1)
+            if gap < 4.0:
+                continue
+            samples = []
+            for t in np.linspace(0.,1.,max(7,round(gap*2))):
+                xx,yy = round(x1+t*(x2-x1)),round(y1+t*(y2-y1))
+                if not (0<=xx<width and 0<=yy<height):
+                    break
+                samples.append(bool(ink[yy,xx]))
+            if len(samples)<7 or not samples[0] or not samples[-1]:
+                continue
+            longest=0
+            streak=0
+            for dark in samples:
+                streak=0 if dark else streak+1
+                longest=max(longest,streak)
+            separated += int(longest>=2)
+        return separated>=2
+
     for i in range(len(local)):
         for j in range(i+1, len(local)):
             _, ax, ay = local[i]
@@ -495,13 +526,15 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
             # profile fits of a single arc.
             selected=[]
             for candidate in sorted(best_routes,key=lambda z:-z['score']):
-                if not any(abs(candidate['bend']-old['bend'])<
-                           max(5.,radius*.72) and
-                           _same_ink_route(candidate,old,{
-                               local[i][0]:(ax+x_off,ay+y_off),
-                               local[j][0]:(bx+x_off,by+y_off)},
-                               full_w,full_h,radius)
-                           for old in selected):
+                if not any(
+                        (abs(candidate['bend']-old['bend'])<
+                         max(5.,radius*.72) and
+                         not independently_separated_ink(candidate,old))
+                        or _same_ink_route(candidate,old,{
+                            local[i][0]:(ax+x_off,ay+y_off),
+                            local[j][0]:(bx+x_off,by+y_off)},
+                            full_w,full_h,radius)
+                        for old in selected):
                     selected.append(candidate)
                 if len(selected)>=4:
                     break
