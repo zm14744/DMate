@@ -23,10 +23,10 @@ jobs:
           python -m pip install --disable-pip-version-check Pillow==11.3.0
           python scripts/generate_icons.py
           python scripts/check_icon_assets.py
-      - name: Test download dialog links
+      - name: Check front-end script and graph review rendering
         run: |
           node --check static/script.js
-          node scripts/test_install_dialog.cjs
+          node tests/graph_display_regression.js
       - name: Commit canonical binaries
         run: |
           git config user.name "github-actions[bot]"
