@@ -599,6 +599,17 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
 .ocr-review-rendered mjx-container { max-width:100%; overflow-x:auto; overflow-y:hidden; }
 .ocr-review-rendered mjx-container[display="true"] { margin:.7em 0; }
 .ocr-review-rendered pre { max-width:100%; overflow-x:auto; white-space:pre-wrap; }
+.ocr-review-rendered h3 {
+    margin:1em 0 .55em; font-size:1.02em; font-weight:650;
+    line-height:1.5; overflow-wrap:anywhere;
+}
+.ocr-review-rendered h3:first-child { margin-top:0; }
+.ocr-review-rendered hr {
+    border:0; border-top:1px solid var(--border-strong);
+    margin:1.1em 0;
+}
+.ocr-review-rendered strong { font-weight:650; }
+#ocrReviewQuestion p { white-space:pre-wrap; }
 .ocr-review-rendered .ocr-review-empty { color:var(--text-subtle); }
 .ocr-review-rendered:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 @media(max-width:760px) { .ocr-review-rendered { max-height:28vh; } }
@@ -9227,7 +9238,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/script.js?v=dmate-math-render-restore-v46-20261021"></script>
+<script src="/static/script.js?v=dmate-ocr-review-fixed-layout-v47-20261022"></script>
 
 </body>
 </html>
