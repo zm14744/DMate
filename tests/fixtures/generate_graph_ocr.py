@@ -52,9 +52,15 @@ def build_one(which, target):
             d.line((p[a],p[b]), fill="#111111", width=thick)
             draw_arrow(d, p[b], p[a])
     elif which == "parallel":
-        # Multiple truly distinct visible A--B curves, not overlapping lines.
-        d.arc((310, 145, 815, 440), start=185, end=355, fill="#111111", width=thick)
-        d.arc((310, 172, 815, 475), start=5, end=175, fill="#111111", width=thick)
+        # Two clearly separated parallel curved edges with endpoints at A and B.
+        for control_y in (165, 430):
+            pts = []
+            for t in range(101):
+                u = t / 100.0
+                x = (1-u)**2*p["A"][0] + 2*(1-u)*u*562 + u*u*p["B"][0]
+                y = (1-u)**2*p["A"][1] + 2*(1-u)*u*control_y + u*u*p["B"][1]
+                pts.append((x,y))
+            d.line(pts, fill="#111111", width=thick, joint="curve")
         d.line((p["B"],p["C"]), fill="#111111", width=thick)
     else:
         for a,b in (("A","B"),("B","C"),("A","C")):
