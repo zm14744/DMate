@@ -53,7 +53,7 @@ class PixelTopologyTests(unittest.TestCase):
         cand=self.evidence(im,[("a",40,145),("b",210,145)])
         routes=[c for c in cand if
                 tuple(sorted((c["from"],c["to"])))==("a","b") and c["score"]>=.55]
-        self.assertGreaterEqual(len(routes),2,"Real multiedge not recovered: "+str(cand))
+        self.assertEqual(len(routes),2,"Exactly one straight and one arc should remain: "+str(cand))
 
 
 if __name__=="__main__":
