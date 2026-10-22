@@ -1,0 +1,44 @@
+name: DMate Browser Smoke (Playwright)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - tests/browser_smoke.py
+      - .github/workflows/browser-smoke.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dmate-browser-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Playwright and Chromium
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Test deployed DMate (no AI requests)
+        env:
+          DMATE_TEST_URL: https://dmate.zeabur.app/
+        run: python tests/browser_smoke.py
+      - name: Upload screenshots, diagnostics and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmate-playwright-browser-smoke
+          path: artifacts/browser-smoke/
+          retention-days: 7
+          if-no-files-found: warn
