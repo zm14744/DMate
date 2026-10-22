@@ -23,13 +23,14 @@ on:
         description: "After OCR, call the paid AI solver (max 2 cases)"
         type: boolean
         default: false
-  # Initial one-time end-to-end confirmation. Remove this push trigger
-  # after verifying the live result; future paid runs must be manual.
+  # Push only runs free mocked tests. Real model calls require manual dispatch.
   push:
     branches: [main]
     paths:
       - .github/workflows/ocr-regression.yml
       - tests/ocr_regression.py
+      - tests/fixtures/generate_graph_ocr.py
+      - tests/fixtures/graph_ocr_cases.json
 
 permissions:
   contents: read
@@ -56,11 +57,11 @@ jobs:
       - name: Free mocked OCR capture and strict comparison
         run: python tests/ocr_regression.py --mode mock --limit 3 --strict --output artifacts/ocr-mock
       - name: Live OCR capture and graph comparison
-        if: ${{ github.event_name == 'push' || inputs.mode == 'live' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'live' }}
         shell: bash
         env:
-          CASE_LIMIT: ${{ github.event_name == 'push' && '3' || inputs.case_limit }}
-          STRICT: ${{ github.event_name == 'push' && 'true' || inputs.strict }}
+          CASE_LIMIT: ${{ inputs.case_limit }}
+          STRICT: ${{ inputs.strict }}
           SOLVE: ${{ inputs.solve }}
         run: |
           set -euo pipefail
