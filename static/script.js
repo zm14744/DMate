@@ -13725,7 +13725,9 @@ function reviewRecognizedQuestion(file, data) {
 
         // 本轮要求只在图片核对界面填写，不从主聊天框继承。
         requestText.value = "";
-        error.textContent = "";
+        // This result is read-only; uncertain text can be addressed in instructions.
+        error.textContent = /\[(?:待核对|不清楚)\]/.test(recognizedText + recognizedGraph)
+            ? "识别结果含待核对内容，可在“本次要求”中补充说明" : "";
 
         const resizePreview = () => { preview.style.width = `${zoom.value}%`; };
         const cleanup = () => {
@@ -13754,10 +13756,6 @@ function reviewRecognizedQuestion(file, data) {
             const userRequest = requestText.value.trim();
             if (!text && !visualText) {
                 error.textContent = "没有识别到题目文字或图形信息，请重新上传图片";
-                return;
-            }
-            if (/\[(?:待核对|不清楚)\]/.test(text + visualText)) {
-                error.textContent = "请对照原图补全标为“待核对”的内容；看不清时可以取消并重新上传";
                 return;
             }
             if (text.length + visualText.length + userRequest.length > 5600) {
