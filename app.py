@@ -4184,7 +4184,7 @@ def ocr():
         graph_evidence = bool(
             cv_graphs or graph_records or (
                 image_kind != "non_exercise"
-                and re.search(r"顶点|边集|边连接|图\\s*\\d|G[1-9]", visual_text, re.I)
+                and re.search(r"顶点|边集|边连接|图\s*\d|G[1-9]", visual_text, re.I)
             )
         )
         if graph_evidence:
