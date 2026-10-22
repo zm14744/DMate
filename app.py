@@ -53,7 +53,7 @@ except (ImportError, OSError) as _fusion_import_error:
     print(f"图像边集证据融合模块不可用，保留原识别：{_fusion_import_error}")
     compare_pixel_vision = None
     review_direction_and_multiplicity = None
-from graph_ocr_cleanup import clean_graph_question_text
+from graph_ocr_cleanup import clean_graph_question_text, ocr_is_label_dominated
 from classification_semantic import classify_ambiguous_questions
 from teaching import (
     analyze_messages,
@@ -3742,8 +3742,10 @@ def ocr():
         # CPU-only OpenCV graph recognition is opportunistic and bounded.
         # Any uncertainty or failure leaves the original Vision/OCR fallback intact.
         graph_cv = {'graphs': [], 'status': 'not_graph', 'regions': []}
+        label_only_ocr = ocr_is_label_dominated(ocr_text)
         possible_graph = (
             len(ocr_text) < 20
+            or label_only_ocr
             or bool(re.search(
                 r"图|顶点|边|树|连通|邻接|路径|欧拉|哈密顿|G[1-9₁₂₃₄₅₆₇₈₉]|"
                 r"\b(?:graphs?|vertices?|edges?|trees?|isomorph(?:ism|ic)?|adjacency|"
@@ -3754,7 +3756,7 @@ def ocr():
         if possible_graph and recognize_graphs is not None:
             try:
                 graph_cv = recognize_graphs(raw, text_hint=ocr_text,
-                                            allow_without_context=(len(ocr_text) < 20))
+                                            allow_without_context=(len(ocr_text) < 20 or label_only_ocr))
                 if (_env_bool("GRAPH_PATH_EVIDENCE_ENABLED", True)
                         and attach_line_evidence is not None
                         and graph_cv.get("graphs")):
