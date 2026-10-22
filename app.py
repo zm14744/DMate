@@ -4147,7 +4147,7 @@ def ocr():
         if fusion_issues and image_kind != "non_exercise":
             notice = "【图形边集待核对】" + "；".join(fusion_issues)
             if notice not in visual_text:
-                visual_text = (visual_text + "\\n" + notice).strip()
+                visual_text = (visual_text + "\n" + notice).strip()
 
         warnings = list(alignment_warnings) + list(graph_review_issues)
         if result.get("warning"):
