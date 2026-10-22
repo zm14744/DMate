@@ -13817,7 +13817,7 @@ function formatStructuredGraphReview(graphs) {
             (edgeDescriptions.length ? edgeDescriptions.join("、") : "未记录可确认的边"));
         const pending = Array.isArray(graph.uncertain_edges)
             ? graph.uncertain_edges.filter(Boolean).slice(0, 12) : [];
-        lines.push("**状态：** " + (graph.complete === true && !pending.length && !inconsistentSimple
+        lines.push("**状态：** " + (graph.complete === true && !pending.length && !(graph.multigraph === false && inconsistentSimple)
             ? "结构已列出（仍需以原图核对）" : "待核对（现有边表不代表全部边）"));
         if (pending.length) lines.push("**待核对：** " + pending.map(ocrReviewPlain).join("；"));
         if (index < graphs.length - 1) lines.push("---");
