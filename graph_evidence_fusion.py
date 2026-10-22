@@ -90,11 +90,16 @@ def _edges(graph, mapping=None):
     return pairs
 
 
-def _can_compare(pixel, vision):
+def _can_compare(pixel, vision, *, strong_panel=False):
     if (pixel.get("directed") is True or vision.get("directed") is not False
             or pixel.get("multigraph") is True or vision.get("multigraph") is not False):
         return False
-    if pixel.get("detector_agreement") != "matching":
+    # A strict pixel-complete blue-outline panel is a second supported source
+    # of strong edge evidence; ordinary single-detector results stay advisory.
+    if strong_panel:
+        if pixel.get("confidence") != "high":
+            return False
+    elif pixel.get("detector_agreement") != "matching":
         return False
     if pixel.get("uncertain_edges"):
         return False
@@ -103,46 +108,81 @@ def _can_compare(pixel, vision):
     return True
 
 
-def compare_pixel_vision(cv_result, vision_graphs):
-    """Return bounded textual issues; do not alter either graph or manufacture edges.
-
-    Current scope deliberately excludes multi-panel matching, directed graphs,
-    missing coordinate tables, self-loops and disputed CV edges.
-    """
-    if not isinstance(cv_result, dict) or not isinstance(vision_graphs, list):
-        return []
-    cv_graphs = cv_result.get("graphs") or []
-    if len(cv_graphs) != 1 or len(vision_graphs) != 1:
-        return []
-    pixel, vision = cv_graphs[0], vision_graphs[0]
-    if not isinstance(pixel, dict) or not isinstance(vision, dict):
-        return []
-    if not _can_compare(pixel, vision):
-        return []
-    p_nodes, v_nodes = _points(pixel), _points(vision)
-    if p_nodes is None or v_nodes is None:
-        return []
-    mapping = _mapping(p_nodes, v_nodes)
-    if mapping is None:
-        return []
+def _describe_disagreement(pixel, vision, mapping):
     cv_edges = _edges(pixel, mapping)
     vl_edges = _edges(vision)
     if cv_edges is None or vl_edges is None:
         return []
-    diff = sorted(cv_edges ^ vl_edges)
-    if not diff:
+    if cv_edges == vl_edges:
         return []
     from_pixels = cv_edges - vl_edges
     from_model = vl_edges - cv_edges
+
     def brief(values):
         return "、".join(f"{a}-{b}" for a, b in sorted(values)[:MAX_DIFFS])
-    parts = []
+
+    sections = []
     if from_pixels:
-        parts.append("像素检测存在而视觉模型未确认：" + brief(from_pixels))
+        sections.append("像素检测存在而视觉模型未确认：" + brief(from_pixels))
     if from_model:
-        parts.append("视觉模型存在而像素检测未确认：" + brief(from_model))
-    return ["OpenCV 与 Qwen 逐边结果存在分歧（仅供复核，不能直接判定任一方错误）：" +
-            "；".join(parts)]
+        sections.append("视觉模型存在而像素检测未确认：" + brief(from_model))
+    return sections
+
+
+def compare_pixel_vision(cv_result, vision_graphs):
+    """Compare conservatively; no candidate is automatically promoted to truth.
+
+    Multi-panel alignment is allowed only for the strict complete blue-outline
+    detector and only when every compared graph has a unique coordinate match.
+    """
+    if not isinstance(cv_result, dict) or not isinstance(vision_graphs, list):
+        return []
+    cv_graphs = cv_result.get("graphs") or []
+    if not cv_graphs or not vision_graphs:
+        return []
+    pixel_panels = cv_result.get("detector") == "hough_blue_outline_panels"
+    if not pixel_panels and not (len(cv_graphs) == len(vision_graphs) == 1):
+        return []
+    if len(cv_graphs) > MAX_GRAPHS or len(vision_graphs) > MAX_GRAPHS:
+        return []
+
+    matches = []
+    used_vision = set()
+    for pixel in cv_graphs:
+        if not isinstance(pixel, dict):
+            continue
+        p_nodes = _points(pixel)
+        if p_nodes is None:
+            continue
+        possibilities = []
+        for i, vision in enumerate(vision_graphs):
+            if i in used_vision or not isinstance(vision, dict):
+                continue
+            if not _can_compare(pixel, vision, strong_panel=pixel_panels):
+                continue
+            v_nodes = _points(vision)
+            if v_nodes is None:
+                continue
+            mapping = _mapping(p_nodes, v_nodes)
+            if mapping is not None:
+                possibilities.append((i, vision, mapping))
+        # One-to-one match is necessary. Never align panels merely by order.
+        if len(possibilities) != 1:
+            continue
+        i, vision, mapping = possibilities[0]
+        used_vision.add(i)
+        matches.append((pixel, vision, mapping))
+
+    issues = []
+    for pixel, vision, mapping in matches:
+        details = _describe_disagreement(pixel, vision, mapping)
+        if details:
+            name = str(pixel.get("id") or "图")
+            issues.append(
+                f"{name}：OpenCV 与 Qwen 的连接关系有分歧（均须对照原图核对）："
+                + "；".join(details)
+            )
+    return issues[:MAX_GRAPHS]
 
 
 __all__ = ["compare_pixel_vision"]
