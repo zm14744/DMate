@@ -41,3 +41,25 @@ python tests/ocr_regression.py --mode live --limit 1 --solve
 可用 `--cases tests/fixtures/graph_ocr_cases.json` 传入用户自己的 JSON 清单；图片字段写文件实际路径，生成样例可以直接写 `directed.png` 等。把预期顶点、边、方向和重边个数写进 `expected.graph` 字段。如果服务器响应错误或超时，报告会明确标注，不会冒充通过。
 
 说明：`--strict` 将 `failed` 或 `unverified` 拓扑比对视为失败。默认无 `--strict` 时，命令以接口可用性为准，仍在报告中分别标注 `operational_ok` 和 `semantic_status`。OCR 识别算法和 UI 业务代码均未因此改动。
+
+
+## 独立读图 → DMate 识别 → 人工核对
+
+最重要的验证原则是：先让审查者直接看**原图**并记录 `expected.graphs` 中的顶点、边、方向及重边数量，再由 Playwright 上传**完全相同的图片**，最后人工审查 `*-ocr-response.json`、`*-ocr-review.png` 和自动差异报告。模型生成的 `visual_text` 永远不能作为自己的标准答案。
+
+已独立看图登记的两张中国海洋大学课件截图（只有文本结构、图片哈希，不上传原始课件图片）：
+`tests/fixtures/ouc_manual_visual_ground_truth_20261021.json`。涵盖五顶点七弧有向图，以及 G1/G2/G3 三幅各六顶点的无向图（分别 9、7、10 条边）。这些记录来自直接观察用户原图，而非 DMate 的输出；实际图片 SHA256 必须与记录相符。
+
+另外生成了两张**数学结构相同、但像素不同的原创重绘图**，可在 GitHub Actions 的 `case_set=recreated` 下运行。它们只用于模型拓扑能力的可重复对照；**重绘图通过，不等于原图通过**。
+
+要对原始课件截图进行真正的线上复测，必须确保 GitHub Runner 或本地 Playwright 环境能够访问原始 PNG。原图默认不提交到公开 GitHub。可在有网络的本机解压用户保存的原图归档，再运行：
+
+```bash
+python tests/ocr_regression.py --mode live \
+  --cases tests/fixtures/ouc_manual_visual_ground_truth_20261021.json \
+  --image-dir "/path/to/extracted/测试" --limit 2 --strict
+```
+
+此命令按 SHA256 校验上传的原图，按独立标注逐图对比。多分图边集比对需要图像识别结果提供能区分六个顶点相对位置的坐标；如果坐标缺失或视觉模型连接失败，结果必须标为 `unverified`，交由人工逐边审查，不能冒充通过。
+
+GitHub Actions 本身只能访问其工作空间中的文件；**不能读取 ChatGPT 私有文件库**。若不公开上传原图，就需要在能访问用户原图的本地环境运行 Playwright，或者另外提供经授权且受保护的临时文件传输途径。
