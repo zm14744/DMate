@@ -4181,10 +4181,22 @@ def ocr():
             if isinstance(vision_result, dict) and vision_result.get("ok")
             else []
         )
-        graph_evidence = bool(cv_graphs or graph_records)
-        display_text = select_graph_question_text(
-            ocr_text, corrected_text, has_graph=graph_evidence
-        ) if graph_evidence else display_text
+        graph_evidence = bool(
+            cv_graphs or graph_records or (
+                image_kind != "non_exercise"
+                and re.search(r"顶点|边集|边连接|图\\s*\\d|G[1-9]", visual_text, re.I)
+            )
+        )
+        if graph_evidence:
+            # Prefer original-image high-contrast OCR on book photographs.
+            # If it contains no genuine prose, keep the full OCR as a guarded
+            # fallback, while never leaking raw labels into the question field.
+            front_candidate = clean_graph_question_text(
+                result.get("front_text") or "", has_graph=True
+            )
+            display_text = select_graph_question_text(
+                front_candidate or ocr_text, corrected_text, has_graph=True
+            )
         if graph_review_issues and isinstance(review, dict):
             review["required"] = True
             review["reasons"] = list(review.get("reasons") or []) + graph_review_issues
