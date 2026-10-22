@@ -464,7 +464,7 @@ def recognize_graphs(image_bytes, *, allow_without_context=False, text_hint=''):
                                       threshold=15,minLineLength=22,maxLineGap=7)
         segments=[]
         if segments_raw is not None:
-            segments=[(u+x1,v+y1,w+x1,z+y1) for u,v,w,z in segments_raw[:,0]]
+            segments=[(u+x1,v+y1,w+x1,z+y1) for u,v,w,z in np.asarray(segments_raw).reshape(-1,4)]
         for i in range(len(points)):
             for j in range(i+1,len(points)):
                 score,status=_edge_evidence(gray,points[i],points[j],points)
