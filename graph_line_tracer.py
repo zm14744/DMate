@@ -169,6 +169,64 @@ def _sample_path(path, width, height):
     ]
 
 
+def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+    """Independently propose only high-coverage straight strokes.
+
+    A crossing alone cannot satisfy the coverage test. A confirmed node
+    between two endpoints blocks an apparent long edge.
+    """
+    ink = _foreground(rgb) > 0
+    height, width = ink.shape
+    candidates = []
+    for i in range(len(local)):
+        for j in range(i + 1, len(local)):
+            _, ax, ay = local[i]
+            _, bx, by = local[j]
+            dx, dy = bx - ax, by - ay
+            length = math.hypot(dx, dy)
+            if length < 16:
+                continue
+            crossing_node = False
+            for k, (_, px, py) in enumerate(local):
+                if k in (i, j):
+                    continue
+                t = ((px - ax) * dx + (py - ay) * dy) / (length * length)
+                side = abs((px - ax) * dy - (py - ay) * dx) / length
+                if 0.08 < t < 0.92 and side <= radius * 0.8:
+                    crossing_node = True
+                    break
+            if crossing_node:
+                continue
+            samples = max(15, min(250, round(length * 0.9)))
+            hits = 0
+            for step in range(samples):
+                t = 0.09 + 0.82 * (step + 0.5) / samples
+                mx, my = ax + t * dx, ay + t * dy
+                ux, uy = -dy / length, dx / length
+                found = False
+                for offset in (-3.0, -1.5, 0, 1.5, 3.0):
+                    x, y = round(mx + offset * ux), round(my + offset * uy)
+                    if 0 <= x < width and 0 <= y < height and ink[y, x]:
+                        found = True
+                        break
+                hits += int(found)
+            coverage = hits / samples
+            if coverage < 0.83:
+                continue
+            candidates.append({
+                'from': local[i][0], 'to': local[j][0],
+                'path': [[round((ax + x_off) / max(full_w - 1, 1), 4),
+                          round((ay + y_off) / max(full_h - 1, 1), 4)],
+                         [round((bx + x_off) / max(full_w - 1, 1), 4),
+                          round((by + y_off) / max(full_h - 1, 1), 4)]],
+                'pixel_length': round(length),
+                'score': round(coverage, 3),
+                'needs_review': True,
+                'method': 'opencv_straight_line_coverage',
+            })
+    return candidates
+
+
 def _graph_candidates(rgb, graph):
     h, w = rgb.shape[:2]
     points = _vertices(graph, w, h)
@@ -232,6 +290,16 @@ def _graph_candidates(rgb, graph):
             if (key not in best_by_pair
                     or score > best_by_pair[key]['score']):
                 best_by_pair[key] = candidate
+    # Independent straight-line coverage complements broken skeleton routes.
+    for candidate in _straight_stroke_candidates(
+            rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
+            radius, w, h):
+        indexes = {name: i for i, (name, _, _) in enumerate(local)}
+        key = tuple(sorted((indexes[candidate['from']],
+                            indexes[candidate['to']])))
+        if (key not in best_by_pair
+                or candidate['score'] > best_by_pair[key]['score']):
+            best_by_pair[key] = candidate
     return sorted(
         best_by_pair.values(),
         key=lambda x: (-x['score'], x['from'], x['to']),
