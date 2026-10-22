@@ -182,12 +182,14 @@ def test_actual_usage_reporting_never_estimates_failed_request_tokens():
     from scripts.benchmark_graph_vision import operational_totals
     rows=[{'status':'success','seconds':10,'requests':[
         {'status':'http_error','http_status':429,'seconds':1},
-        {'status':200,'seconds':9,'usage':{'prompt_tokens':100,'completion_tokens':30,'total_tokens':130}}]}]
+        {'status':200,'http_status':200,'seconds':9,'usage':{'prompt_tokens':100,'completion_tokens':30,'total_tokens':130}}]}]
     result=operational_totals(rows)
     assert result['total_tokens']==130 and result['usage_reported_requests']==1
     assert result['attempted_requests']==2 and result['request_success_rate']==.5
     assert result['http_success_rate']==.5
     assert result['mean_request_seconds']==5
+    invalid=operational_totals([{'requests':[{'status':'invalid_output','http_status':200}]}])
+    assert invalid['http_success_rate']==1 and invalid['request_success_rate']==0
     assert operational_totals([{'requests':[{'status':'transport_failed'}]}])['total_tokens'] is None
 
 
