@@ -38,6 +38,7 @@ def scene(*, weighted=True, directed=False, arrow=None):
         'weighted': weighted, 'multigraph': True, 'node_complete': True,
         'vertices': [{'id': 'a', 'x': .1, 'y': .5}, {'id': 'b', 'x': .9, 'y': .5}],
         'edges': [{'id': 'e1', 'from': 'a', 'to': 'b', 'path': path,
+            'style': 'solid',
             'direction': 'forward' if directed else 'undirected', 'weight': None,
             'evidence': [{'source': 'node_read', 'vertex': v} for v in ('a', 'b')]}]}
     trace = {'from': 'a', 'to': 'b', 'path': path, 'score': 1, 'method': 'unit_fixture'}
@@ -165,10 +166,38 @@ def test_unknown_candidate_ids_reject_entire_specialist_response():
     assert reviewer.events[-1]['status'] == 'failed'
 
 
+def test_compact_qwen_ignores_empty_paths_styles_and_unknown_observations():
+    g, image, ctx = scene(weighted=False, directed=True)
+    response = type_observation(decisions=[{'id': 'e1', 'visible': True,
+        'direction': 'undirected', 'path': [], 'style': 'unknown', 'weight': 99}])
+    out = TopologyReview(Provider('qwen', response)).apply([g], image, Budget(), context=ctx)
+    assert out[0]['edges'][0]['path'] == g['edges'][0]['path']
+    assert out[0]['edges'][0]['style'] == 'solid' and out[0]['edges'][0]['weight'] is None
+    response = type_observation(directed='unknown', decisions=[{'id': 'e1',
+        'visible': None, 'direction': 'unknown'}])
+    out = TopologyReview(Provider('qwen', response)).apply([g], image, Budget(), context=ctx)
+    assert out[0] == g
+
+
 def test_glm_weighted_panels_stay_on_primary_and_cannot_be_replaced_by_qwen():
     g, image, ctx = scene()
     p = Provider('qwen', type_observation())
     assert TopologyReview(p).apply([g], image, Budget(), context=ctx) == [g] and not p.calls
+
+
+def test_qwen_visible_true_cannot_certify_an_unsupported_curve():
+    _, image, ctx = scene(weighted=False, directed=True)
+    source = ctx['G1']['graph']
+    source['edges'].append({'id': 'e2', 'from': 'a', 'to': 'b', 'direction': 'forward',
+        'path': [[.1, .5], [.5, .8], [.9, .5]], 'style': 'solid'})
+    g = recover_relations(source, ctx['G1']['traces'])
+    assert next(e for e in g['edges'] if e['id'] == 'e2')['status'] == 'pending'
+    response = type_observation(directed=True, decisions=[
+        {'id': eid, 'visible': True, 'direction': 'forward'} for eid in ('e1', 'e2')])
+    reviewer = TopologyReview(Provider('qwen', response))
+    out = reviewer.apply([g], image, Budget(), context=ctx)
+    assert next(e for e in out[0]['edges'] if e['id'] == 'e2')['status'] == 'pending'
+    assert reviewer.events[-1]['unsupported_new_routes_retained'] == ['e2']
 
 
 def test_primary_roles_and_glm_effort_must_be_explicit_before_image_or_api():
