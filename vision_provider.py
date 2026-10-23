@@ -38,6 +38,7 @@ def image_digest(url):
 
 def _glm_request(payload,headers,timeout,wall_deadline):
     response=requests.post(GLM_URL,headers=headers,json=payload,timeout=timeout,stream=True)
+    text=[];finish=None;usage={};model=None;fingerprint=None;reasoning_chars=0;size=0;is_sse=False
     try:
         if response.status_code!=200:
             code=None
@@ -49,7 +50,7 @@ def _glm_request(payload,headers,timeout,wall_deadline):
         if 'text/event-stream' not in response.headers.get('Content-Type',''):
             return 200,'',response.json()
         response.encoding='utf-8'  # SSE is UTF-8 even without a charset header.
-        text=[];finish=None;usage={};model=None;fingerprint=None;reasoning_chars=0;size=0
+        is_sse=True
         for line in response.iter_lines(decode_unicode=True):
             if time.monotonic()>wall_deadline:raise TimeoutError('vision_wall_deadline')
             if isinstance(line,bytes):line=line.decode('utf-8')
@@ -69,6 +70,14 @@ def _glm_request(payload,headers,timeout,wall_deadline):
         return 200,'',{'model':model,'system_fingerprint':fingerprint,'usage':usage,
                       'reasoning_chars':reasoning_chars,
                       'choices':[{'message':{'content':''.join(text)},'finish_reason':finish}]}
+    except (requests.RequestException,TimeoutError) as exc:
+        if is_sse:
+            # Audit evidence only. The caller still reports transport failure
+            # and must never parse a partial stream as a completed graph.
+            exc.vision_partial_result={'http_status':response.status_code,'partial_stream':True,
+                'content':''.join(text),'model':model,'system_fingerprint':fingerprint,
+                'usage':usage,'reasoning_chars':reasoning_chars,'finish_reason':finish}
+        raise
     finally:response.close()
 
 
@@ -160,6 +169,7 @@ class VisionProvider:
                 if returned and (not (returned==self.model or returned.startswith(self.model+'-')) or
                         self.model==GLM_PAID_MODEL and returned.startswith(GLM_MODEL)):
                     raise VisionError('model_mismatch')
+                if choice.get('finish_reason')=='network_error':raise VisionError('upstream_network_error')
                 if choice.get('finish_reason')=='length':raise VisionError('truncated_output')
                 if not isinstance(raw,str):raise VisionError('invalid_output')
                 if not raw.strip() and metric['reasoning_chars']:
@@ -176,6 +186,13 @@ class VisionProvider:
                 error=VisionError('transport_failed');metric['status']='transport_failed'
                 metric['exception_type']=type(exc).__name__
                 metric['confirmed_timeout']=True if isinstance(exc,(requests.Timeout,TimeoutError)) else None
+                partial=getattr(exc,'vision_partial_result',None)
+                if isinstance(partial,dict) and partial.get('partial_stream') is True:
+                    raw=partial.get('content')
+                    metric.update(http_status=partial.get('http_status'),partial_stream=True,
+                        returned_model=partial.get('model'),system_fingerprint=partial.get('system_fingerprint'),
+                        usage=partial.get('usage') or {},reasoning_chars=partial.get('reasoning_chars'),
+                        finish_reason=partial.get('finish_reason'))
             except (ValueError,TypeError,KeyError,IndexError,AttributeError):
                 error=VisionError('invalid_output');metric['status']='invalid_output'
             except VisionError as exc:
