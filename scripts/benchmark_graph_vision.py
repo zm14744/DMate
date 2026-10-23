@@ -24,7 +24,7 @@ from graph_schema import canonical_graph
 from graph_staged import Budget,recognize_staged,NODE_PROMPT,EDGE_PROMPT,REVIEW_PROMPT
 from graph_validation import audit_graph_records
 from vision_provider import VisionProvider,VisionError,GLM_MODEL,GLM_PAID_MODEL
-from graph_glm_adapter import PROFILE as GLM_PROFILE, EDGE_PROMPT as GLM_EDGE_PROMPT, REVIEW_PROMPT as GLM_REVIEW_PROMPT, MARKER_PROMPT as GLM_MARKER_PROMPT
+from graph_glm_adapter import PROFILE as GLM_PROFILE, STABLE_PROFILE, STABLE_REVIEW_HINT, EDGE_PROMPT as GLM_EDGE_PROMPT, REVIEW_PROMPT as GLM_REVIEW_PROMPT, MARKER_PROMPT as GLM_MARKER_PROMPT
 
 RAW_PROMPT='''独立读取这张图论原图，不解题，不依靠图名、常见模板或度数补点补边。
 只返回JSON：{"graphs":[{"id":"G1","name":"原图图号或G1","directed":false,"weighted":false,
@@ -89,6 +89,12 @@ def local_layout(raw,cache):
     return {**result,'benchmark_cache_hit':False}
 
 
+def adaptation_profile(provider,experiment,mode):
+    if mode not in ('baseline','native','experimental'):raise ValueError('Unknown GLM adapter')
+    if provider!='glm' or experiment!='staged' or mode=='baseline':return 'baseline'
+    return GLM_PROFILE if mode=='experimental' else STABLE_PROFILE
+
+
 def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_model=GLM_MODEL,
             vision_seconds=155,call_seconds=45,glm_adapter='native'):
     provider=VisionProvider(provider_name,model=glm_model if provider_name=='glm' else None,
@@ -96,7 +102,7 @@ def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_mo
     record={'provider':provider_name,'model':provider.model,'thinking':thinking,'experiment':experiment,
             'started_at':datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(),
             'status':'not_run_missing_key','requests':[],'actual_request_count':0,'seconds':0.,'http_429_count':0}
-    record['adaptation_profile']=GLM_PROFILE if provider_name=='glm' and experiment=='staged' and glm_adapter=='native' else 'baseline'
+    record['adaptation_profile']=adaptation_profile(provider_name,experiment,glm_adapter)
     if not provider.available():return record
     start=time.monotonic()
     try:
@@ -108,7 +114,7 @@ def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_mo
             result=provider(RAW_PROMPT,[url],Budget(seconds=vision_seconds,calls=retries+1,call_seconds=call_seconds))
         else:result=recognize_staged(raw,layout=layout or [],provider=provider,
                                      budget=Budget(seconds=vision_seconds,calls=7,call_seconds=call_seconds),
-                                     glm_adapter=glm_adapter=='native')
+                                     glm_adapter='experimental' if glm_adapter=='experimental' else glm_adapter=='native')
         record['raw_result']=result
         graphs=result.get('graphs')
         if not isinstance(graphs,list):raise ValueError('Invalid graph envelope')
@@ -259,8 +265,8 @@ def main():
     parser.add_argument('--experiments',choices=['raw','staged','both'],default='both')
     parser.add_argument('--providers',default='glm,qwen');parser.add_argument('--thinking',choices=['off','on','both'],default='off')
     parser.add_argument('--glm-model',choices=[GLM_MODEL,GLM_PAID_MODEL],default=GLM_MODEL)
-    parser.add_argument('--glm-adapter',choices=['baseline','native'],default='native',
-                        help='GLM-only integration profile; baseline reproduces the shared contract')
+    parser.add_argument('--glm-adapter',choices=['baseline','native','experimental'],default='native',
+                        help='native keeps V2; experimental selects V6; baseline uses the shared contract')
     parser.add_argument('--vision-timeout',type=int,choices=[155,300],default=155)
     parser.add_argument('--call-timeout',type=int,choices=[45,90],default=45)
     parser.add_argument('--case-ids');parser.add_argument('--repeats',type=int,default=1)
@@ -293,8 +299,8 @@ def main():
               'source_commit':source_commit,
               'code_sha256':code_hash,'resource_limits':limits,'question_original_count':len(cases),
               'provided_file_count':manifest.get('provided_file_count'),'deduplicated':duplicates,
-              'prompt_templates_sha256':sha((RAW_PROMPT+NODE_PROMPT+EDGE_PROMPT+REVIEW_PROMPT+GLM_EDGE_PROMPT+GLM_REVIEW_PROMPT+GLM_MARKER_PROMPT).encode()),
-              'glm_adaptation_profile':GLM_PROFILE if args.glm_adapter=='native' else 'baseline',
+              'prompt_templates_sha256':sha((RAW_PROMPT+NODE_PROMPT+EDGE_PROMPT+REVIEW_PROMPT+GLM_EDGE_PROMPT+GLM_REVIEW_PROMPT+GLM_MARKER_PROMPT+STABLE_REVIEW_HINT).encode()),
+              'glm_adaptation_profile':adaptation_profile('glm','staged',args.glm_adapter),
               'inventory_only':args.inventory_only,'preprocessing_by_case':[]}
     records=[];cache=Path(args.layout_cache).resolve() if args.layout_cache else out/'layout-cache'
     for case_number,case in enumerate(cases):
@@ -321,7 +327,7 @@ def main():
                                   'model':VisionProvider(provider,model=args.glm_model if provider=='glm' else None).model,
                                   'time_budget':{'total_seconds':args.vision_timeout,'per_call_seconds':args.call_timeout,'max_requests':7 if experiment=='staged' else args.retries+1},
                                   'experiment':experiment,'thinking':thinking,'provider':provider,'code_sha256':code_hash,
-                                  'adaptation_profile':GLM_PROFILE if provider=='glm' and experiment=='staged' and args.glm_adapter=='native' else 'baseline',
+                                  'adaptation_profile':adaptation_profile(provider,experiment,args.glm_adapter),
                                   'layout_sha256':layout_hash if experiment=='staged' else None,
                                   'category':case.get('category'),
                                   'reference_status':case['truth'].get('reference_status','unverified'),

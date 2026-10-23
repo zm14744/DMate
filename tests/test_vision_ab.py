@@ -111,7 +111,7 @@ def test_both_providers_execute_the_same_node_edge_trace_review_pipeline(name,mo
         result=recognize_staged(original.getvalue(),provider=provider,budget=supplied_budget)
     assert len(seen)==3 and trace.call_count==1 and len(result['graphs'][0]['edges'])==1
     assert result['calls_remaining']==4 and supplied_budget.remaining==4 and len(provider.observations)==3
-    assert any(d.startswith('vision_adapter:glm-') for d in result['diagnostics']) is (name=='glm')
+    assert ('vision_adapter:glm-native-v2' in result['diagnostics']) is (name=='glm')
     from graph_staged import EDGE_PROMPT
     assert seen[1].startswith(EDGE_PROMPT) is (name=='qwen')
 
@@ -144,10 +144,20 @@ def test_native_missing_review_decisions_use_only_available_second_pass(calls,mo
     provider=VisionProvider('glm',model='glm-4.6v',transport=request,capture=True)
     with patch('graph_line_tracer.attach_line_evidence',side_effect=lambda raw,result:result):
         result=recognize_staged(original.getvalue(),provider=provider,
-                                budget=Budget(seconds=300,calls=calls,call_seconds=90))
+                                budget=Budget(seconds=300,calls=calls,call_seconds=90),glm_adapter='experimental')
     assert len(provider.observations)==calls and result['calls_remaining']==0
     assert 'glm_review_missing_candidates:1' in result['diagnostics']
     assert len(result['graphs'][0]['edges'])==(1 if calls==3 else 0)
+
+
+def test_failed_experiment_is_opt_in_and_not_the_default_native_profile():
+    from scripts.benchmark_graph_vision import adaptation_profile
+    assert adaptation_profile('glm','staged','native')=='glm-native-v2'
+    assert adaptation_profile('glm','staged','experimental')=='glm-native-v6'
+    assert adaptation_profile('glm','staged','baseline')=='baseline'
+    assert adaptation_profile('qwen','staged','experimental')=='baseline'
+    assert adaptation_profile('glm','raw','experimental')=='baseline'
+    with pytest.raises(ValueError):adaptation_profile('glm','staged','typo')
 
 
 def test_wrong_direction_and_weight_have_separate_instance_metrics():

@@ -300,10 +300,16 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
     if call is not None and provider is not None: raise ValueError('Choose call or provider')
     budget=budget or Budget(); ask=call or provider or _call; diagnostics=[]
     adapted=bool(glm_adapter and getattr(provider,'name',None)=='glm')
+    experimental=bool(adapted and glm_adapter=='experimental')
     edge_prompt,review_prompt=EDGE_PROMPT,REVIEW_PROMPT
     if adapted:
-        from graph_glm_adapter import EDGE_PROMPT as edge_prompt, REVIEW_PROMPT as review_prompt, PROFILE
-        diagnostics.append('vision_adapter:'+PROFILE)
+        from graph_glm_adapter import EDGE_PROMPT as edge_prompt, STABLE_REVIEW_HINT, STABLE_PROFILE
+        if experimental:
+            from graph_glm_adapter import REVIEW_PROMPT as review_prompt, PROFILE
+            diagnostics.append('vision_adapter:'+PROFILE)
+        else:
+            review_prompt+=STABLE_REVIEW_HINT
+            diagnostics.append('vision_adapter:'+STABLE_PROFILE)
     with Image.open(io.BytesIO(image_bytes)) as original:
         if original.width*original.height>16_000_000: raise ValueError('image_pixel_budget')
         image=ImageOps.exif_transpose(original).convert('RGB')
@@ -329,7 +335,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         graphs.append(canonical_graph(raw,n))
     if len({g['id'] for g in graphs}) != len(graphs): raise ValueError('duplicate_graph_id')
     markers=[]
-    anchor_options={'partial':True} if adapted else {}
+    anchor_options={'partial':True} if experimental else {}
     graphs=refine_node_positions(image,graphs,candidate_sink=markers,**anchor_options)
     review_jobs=[]
     for graph in graphs:
@@ -366,7 +372,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             for job in review_jobs:
                 job['graph']['node_complete']=False
                 job['graph']['node_review']={'status':'failed','reason':'marker_inventory_disagreement'}
-    if adapted and 3<=len(markers)<=160:
+    if experimental and 3<=len(markers)<=160:
         from graph_glm_adapter import (MARKER_PROMPT,marker_inventory,needs_marker_grounding,
                                        marker_overlay,apply_marker_grounding)
         if needs_marker_grounding(graphs):
@@ -399,7 +405,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         for index,vertex in batch:
             requests_by_graph.setdefault(index,[]).append(vertex)
         jobs=[{'graph':graphs[i],'focus_vertices':vertices} for i,vertices in requests_by_graph.items()]
-        if adapted:
+        if experimental:
             # Recognition audits stay in the result; they are not extra visual
             # facts or instructions for the next EDGE pass.
             for job in jobs:
@@ -463,7 +469,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             if len(related['_candidates'])>48: diagnostics.append('review_candidate_budget_exhausted')
             if not candidates: continue
             allowed_by_graph[graph['id']]={e['id'] for e in candidates}
-            if adapted:
+            if experimental:
                 from graph_glm_adapter import compact_review_job
                 payload=compact_review_job(graph,candidates,image.size)
             else:payload=_review_job(graph,candidates)
@@ -481,11 +487,11 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 except (ValueError,TypeError): pass
         try:
             envelope=('\n返回扁平decisions列表，每条含graph_id；completed_graph_ids只列全部核实的图。\n'
-                      if adapted else '\n对每幅图分别返回 {"graphs":[{"graph_id":"G1",'
+                      if experimental else '\n对每幅图分别返回 {"graphs":[{"graph_id":"G1",'
                       '"decisions":[],"inventory_complete":false}]}，ID仅在本图内有效。\n')
             verified=ask(review_prompt+envelope
                 +json.dumps({'requests':jobs},ensure_ascii=False),urls,budget)
-            if adapted:
+            if experimental:
                 from graph_glm_adapter import unpack_reviews
                 reviewed=unpack_reviews(verified,single_graph_id=jobs[0]['graph_id'] if len(jobs)==1 else None)
             else:reviewed=verified.get('graphs')
@@ -498,7 +504,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 allowed=allowed_by_graph.get(graph['id'],set())
                 decisions={d['id']:d for d in (current.get('decisions') or [])
                            if isinstance(d,dict) and d.get('id') in allowed}
-                if adapted:
+                if experimental:
                     missing=sum('path' not in d or 'style' not in d for d in decisions.values())
                     if missing:diagnostics.append(f'glm_review_fields_missing:{missing}')
                     omitted=allowed-set(decisions)
@@ -512,7 +518,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     graphs[index]=graph
                 output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions)
         except (ValueError,RuntimeError,TimeoutError): diagnostics.append('local_review_failed')
-    if len(graphs)==1 and (not adapted or budget.remaining>0):
+    if len(graphs)==1 and (not experimental or budget.remaining>0):
         # One panel uses only one of the two reserved local reviews. Spend the
         # remaining review on a narrow original-pixel crop of arrow conflicts.
         # Do not flip edges solely because OpenCV disagrees with the VLM.
@@ -520,23 +526,23 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         conflicts={e['id']:e for e in related['_candidates'] if any(
             isinstance(v,dict) and v.get('source')=='direction_conflict' for v in e['evidence'])}
         missing_ids=({e['id'] for e in initial_candidates[graph['id']]}
-                     -set(reviews_by_graph.get(graph['id'],{}))) if adapted else set()
+                     -set(reviews_by_graph.get(graph['id'],{}))) if experimental else set()
         candidates=[]
         for candidate in initial_candidates[graph['id']]:
             if candidate['id'] in conflicts or candidate['id'] in missing_ids:
                 if candidate['id'] in conflicts:
                     candidate['evidence']=conflicts[candidate['id']]['evidence']
                 candidates.append(candidate)
-        candidates=candidates[:24 if adapted else 8]
+        candidates=candidates[:24 if experimental else 8]
         points=[p for c in candidates for p in c['path']]
-        if points or (adapted and candidates):
+        if points or (experimental and candidates):
             left,top,right,bottom=0,0,image.width,image.height
             if points:
                 left=max(0,round(min(p[0] for p in points)*image.width)-35)
                 top=max(0,round(min(p[1] for p in points)*image.height)-35)
                 right=min(image.width,round(max(p[0] for p in points)*image.width)+35)
                 bottom=min(image.height,round(max(p[1] for p in points)*image.height)+35)
-            elif adapted:
+            elif experimental:
                 try:
                     a,b,c,d=map(float,graph.get('bbox',[]))
                     if 0<=a<c<=1 and 0<=b<d<=1:
@@ -544,7 +550,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 except (TypeError,ValueError):pass
             if right>left and bottom>top:
                 try:
-                    if adapted:
+                    if experimental:
                         from graph_glm_adapter import compact_review_job
                         payload=compact_review_job(graph,candidates,image.size)
                         payload['previously_selected']=[{key:e.get(key) for key in
@@ -554,9 +560,9 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     purpose=('\n本轮核对上轮遗漏候选及箭头冲突，第二张是同一原图的局部裁图。'
                         '每个候选ID都须判定。previously_selected只是上轮选择，不是标准答案；'
                         '同一笔画已有确认ID时，其他重复ID必须明确否定，不能遗漏。'
-                        if adapted else '\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。')
+                        if experimental else '\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。')
                     detail=('沿真实独立笔画核对端点、重数与箭头，不把可达通路当单边。无箭头线写undirected。'
-                            if adapted else '沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。')
+                            if experimental else '沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。')
                     verified=ask(review_prompt+purpose+detail+'仅返回decisions列表。\n'
                         +json.dumps(payload,ensure_ascii=False),[url,_data_url(image.crop((left,top,right,bottom)))],budget)
                     changes=verified.get('decisions')
@@ -566,7 +572,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     allowed={c['id'] for c in candidates}
                     review=dict(reviews_by_graph.get(graph['id'],{}))
                     review.update({d['id']:d for d in (changes or []) if isinstance(d,dict) and d.get('id') in allowed
-                                   and (not adapted or d.get('graph_id',graph['id'])==graph['id'])})
+                                   and (not experimental or d.get('graph_id',graph['id'])==graph['id'])})
                     if adapted:
                         from graph_glm_adapter import receive_review_routes
                         graph=receive_review_routes(graph,review,glm_ink)

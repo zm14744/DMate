@@ -11,6 +11,18 @@ from graph_schema import path_points
 from graph_relation import _samples, _wrong_path_endpoints, _intermediate_nodes
 
 PROFILE = 'glm-native-v6'
+STABLE_PROFILE = 'glm-native-v2'
+
+STABLE_REVIEW_HINT = '''\nGLM复核补充：先独立沿原图的真实笔画核对候选端点，再确认visible。
+路径坐标不准确与实际没有这条边是两件事；仅坐标不准不能作为visible=false的依据。
+visible=true不能跳过像素证据校验。不要因候选列表中有两个相反方向就假定双向。
+无向线direction=undirected；只在实际看见箭头时选forward/reverse。
+带权边逐条读原图数字；看不清写null，禁止从上一条边或候选顺序推测。
+如果确认visible=true，但候选path为空、仅中段或位置明显不符，在该decision增加path字段：
+path是完整原图归一化坐标的2至8个真实线迹点，首尾用固定顶点表中的端点坐标，曲线须有弯曲中段。
+例如字段形状为"path":[[0.1,0.2],[0.2,0.3]]，示例坐标不是答案。
+不要用端点直线代替真实弧线，不确定则不给path，保留待确认。
+系统会独立核对原图墨迹连续性；visible=true本身不能绕过该校验。'''
 
 MARKER_PROMPT = '''执行 NODE 阶段的圆点ID坐标复核，不读边、不解题。第一张始终是原图；第二张只给OpenCV圆点候选加了m1等辅助编号。
 候选可能包含文字圆圈，同一圆点附近也可能有多次检测；只能对照原图确认真实顶点。
