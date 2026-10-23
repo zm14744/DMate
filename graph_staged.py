@@ -204,12 +204,12 @@ def _call(prompt, images, budget):
     return qwen_call(prompt, images, budget)
 
 
-def merge_node_reads(graph, reads):
+def merge_node_reads(graph, reads, *, shared_observations=False):
     """Fuse reciprocal reads only when their actual paths overlap.
 
     Endpoint equality alone never deduplicates parallel equal-weight edges.
     """
-    edges=[]; covered=set(); ids={v['id'] for v in graph['vertices']}
+    edges=[]; covered=set(); observations={}; ids={v['id'] for v in graph['vertices']}
     positions={v['id']:(v['x'],v['y']) for v in graph['vertices']
                if v.get('x') is not None and v.get('y') is not None}
     for read in reads:
@@ -222,6 +222,13 @@ def merge_node_reads(graph, reads):
             a,b=raw.get('from'),raw.get('to')
             if a not in ids or b not in ids or vertex not in (a,b): continue
             edge=copy.deepcopy(raw); edge['path']=path_points(edge.get('path'))
+            observation=raw.get('_observation_id') if shared_observations else None
+            evidence={'source':'node_read','vertex':vertex}
+            if observation:
+                evidence['observation_id']=observation
+                if observation in observations:
+                    observations[observation]['evidence'].append(evidence)
+                    continue
             alignment=None
             if edge['path'] and a in positions and b in positions:
                 path=edge['path'];u,v=positions[a],positions[b]
@@ -246,13 +253,15 @@ def merge_node_reads(graph, reads):
             # A read can contain several distinct, very close parallel strokes.
             # Only match an observation from the OTHER endpoint, one-to-one.
             same=[e for e in edges if {e['from'],e['to']}=={a,b} and e['path'] and edge['path']
+                  and (not observation or not e.get('_observation_id')
+                       or e['_observation_id'][0]!=observation[0])
                   and vertex not in {v.get('vertex') for v in e['evidence'] if isinstance(v,dict)}
                   and not (e.get('edge_label') is not None and edge.get('edge_label') is not None
                            and e['edge_label'] != edge['edge_label'])
                   and route_overlap(e['path'],edge['path'])>=.75]
-            evidence={'source':'node_read','vertex':vertex}
             if len(same)==1:
                 e=same[0]; e['evidence'].append(evidence)
+                if observation: observations[observation]=e
                 if e.get('direction')=='forward' and edge.get('direction')=='forward' and (a,b)!=(e['from'],e['to']):
                     e['direction']='unknown'
                 if e.get('weight') is None:
@@ -265,16 +274,24 @@ def merge_node_reads(graph, reads):
             edge['id']=f'e{len(edges)+1}'; edge['status']='pending'; edge['evidence']=[evidence]
             if alignment: edge['evidence'].append(alignment)
             edges.append(edge)
+            if observation: observations[observation]=edge
     graph=copy.deepcopy(graph); graph['edges']=edges[:300]
     graph['node_complete']=bool(graph.get('node_complete') is True and covered==ids)
     if len(edges)>300: graph['node_complete']=False
     return graph
 
 
-def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budget=None):
+def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budget=None,
+                     glm_adapter=True):
     """Return canonical graphs; failures are explicit and never crash /ocr."""
     if call is not None and provider is not None: raise ValueError('Choose call or provider')
     budget=budget or Budget(); ask=call or provider or _call; diagnostics=[]
+    adapted=bool(glm_adapter and getattr(provider,'name',None)=='glm')
+    edge_prompt,review_prompt=EDGE_PROMPT,REVIEW_PROMPT
+    if adapted:
+        from graph_glm_adapter import EDGE_PROMPT as edge_prompt, REVIEW_HINT, PROFILE
+        review_prompt+=REVIEW_HINT
+        diagnostics.append('vision_adapter:'+PROFILE)
     with Image.open(io.BytesIO(image_bytes)) as original:
         if original.width*original.height>16_000_000: raise ValueError('image_pixel_budget')
         image=ImageOps.exif_transpose(original).convert('RGB')
@@ -355,7 +372,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             requests_by_graph.setdefault(index,[]).append(vertex)
         jobs=[{'graph':graphs[i],'focus_vertices':vertices} for i,vertices in requests_by_graph.items()]
         try:
-            response=ask(EDGE_PROMPT+'\n第一张是原图；第二张红框是辅助NODE编号，只帮助对齐固定ID，不是题目文字/顶点/边。'
+            response=ask(edge_prompt+'\n第一张是原图；第二张红框是辅助NODE编号，只帮助对齐固定ID，不是题目文字/顶点/边。'
                          +'所有真实箭头、边、权值仍只以第一张原始像素为准。'
                          +'\n对以下每幅图分别逐顶点读取，每条reads记录必须增加graph_id，不可跨图连接：\n'
                          +json.dumps({'requests':jobs},ensure_ascii=False),[url,id_context],budget)
@@ -364,6 +381,11 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             shared={}
             for edge in (response.get('edges') or [])[:192]:
                 if isinstance(edge,dict) and edge.get('graph_id') in allowed and edge.get('id'):
+                    if adapted:
+                        edge=dict(edge)
+                        key=(edge['graph_id'],edge['id'])
+                        if key in shared: raise ValueError('duplicate_edge_observation_id')
+                        edge['_observation_id']=(offset,edge['graph_id'],edge['id'])
                     shared[(edge['graph_id'],edge['id'])]=edge
             for r in (response.get('reads') or [])[:48]:
                 if not isinstance(r,dict): continue
@@ -379,10 +401,13 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         except (ValueError,RuntimeError,TimeoutError) as exc:
             diagnostics.append('edge_read_failed:'+str(exc)[:80]); break
     if len(focus)>edge_limit: diagnostics.append('edge_budget_exhausted')
-    graphs=[merge_node_reads(g,reads_by_graph[g['id']]) for g in graphs]
+    graphs=[merge_node_reads(g,reads_by_graph[g['id']],shared_observations=adapted) for g in graphs]
     from graph_line_tracer import attach_line_evidence
     traced=attach_line_evidence(image_bytes,{'graphs':graphs})
     panels={p['id']:p['paths'] for p in traced.get('line_path_evidence',[])}
+    if adapted:
+        from graph_glm_adapter import bind_pixel_routes
+        graphs=[bind_pixel_routes(g,panels.get(g['id'],[])) for g in graphs]
     output=[recover_relations(g,panels.get(g['id'],[])) for g in graphs]
     initial_candidates={g['id']:copy.deepcopy(output[i]['_candidates']) for i,g in enumerate(graphs)}
     reviews_by_graph={}
@@ -415,7 +440,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                                                           int(x2*image.width),int(y2*image.height)))))
                 except (ValueError,TypeError): pass
         try:
-            verified=ask(REVIEW_PROMPT+'\n对每幅图分别返回 {"graphs":[{"graph_id":"G1",'
+            verified=ask(review_prompt+'\n对每幅图分别返回 {"graphs":[{"graph_id":"G1",'
                 '"decisions":[],"inventory_complete":false}]}，ID仅在本图内有效。\n'
                 +json.dumps({'requests':jobs},ensure_ascii=False),urls,budget)
             reviewed=verified.get('graphs')
@@ -455,7 +480,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             if right>left and bottom>top:
                 try:
                     payload=_review_job(graph,candidates)
-                    verified=ask(REVIEW_PROMPT+'\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。'
+                    verified=ask(review_prompt+'\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。'
                         +'沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。仅返回decisions列表。\n'
                         +json.dumps(payload,ensure_ascii=False),[url,_data_url(image.crop((left,top,right,bottom)))],budget)
                     changes=verified.get('decisions')

@@ -111,6 +111,9 @@ def test_both_providers_execute_the_same_node_edge_trace_review_pipeline(name,mo
         result=recognize_staged(original.getvalue(),provider=provider,budget=supplied_budget)
     assert len(seen)==3 and trace.call_count==1 and len(result['graphs'][0]['edges'])==1
     assert result['calls_remaining']==4 and supplied_budget.remaining==4 and len(provider.observations)==3
+    assert any(d.startswith('vision_adapter:glm-') for d in result['diagnostics']) is (name=='glm')
+    from graph_staged import EDGE_PROMPT
+    assert seen[1].startswith(EDGE_PROMPT) is (name=='qwen')
 
 
 def test_parallel_instances_are_not_deduplicated_in_precision_recall():
