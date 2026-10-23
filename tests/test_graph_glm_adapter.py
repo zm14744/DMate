@@ -2,6 +2,7 @@
 import copy
 import pytest
 from graph_glm_adapter import bind_pixel_routes, receive_review_routes, partial_marker_anchors, compact_review_job, unpack_reviews
+from graph_glm_adapter import apply_marker_grounding, marker_inventory, needs_marker_grounding
 from graph_staged import merge_node_reads
 from graph_relation import recover_relations
 
@@ -164,3 +165,33 @@ def test_unscoped_flat_decision_cannot_be_assigned_to_a_multi_panel_job():
 def test_nested_legacy_reviews_remain_compatible_without_answer_mutation():
     raw={'graphs':[{'graph_id':'G1','decisions':[],'inventory_complete':False}]}
     assert unpack_reviews(raw)==raw['graphs']
+
+
+def test_marker_selection_corrects_large_drift_without_adding_or_relabelling_vertices():
+    g=graph([]);g['vertices'][0]['label']='A';g['vertices'][1]['label']='B'
+    markers=[{'id':'m1','x':.2,'y':.2},{'id':'m2','x':.8,'y':.8}]
+    response={'assignments':[{'graph_id':'G1','vertex_id':'a','marker_id':'m1'},
+                             {'graph_id':'G1','vertex_id':'b','marker_id':'m2'}]}
+    result=apply_marker_grounding([g],markers,response)[0]
+    assert [(v['id'],v['label']) for v in result['vertices']]==[('a','A'),('b','B')]
+    assert [(v['x'],v['y']) for v in result['vertices']]==[(.2,.2),(.8,.8)]
+    assert g['vertices'][0]['x']==.1
+    assert result['node_review']['marker_grounding']=='complete'
+    assert not needs_marker_grounding([result])
+
+
+@pytest.mark.parametrize('second_id,second_x', [('m1',.8),('m2',.205),('missing',.8)])
+def test_duplicate_unknown_or_coincident_markers_cannot_complete_a_panel(second_id,second_x):
+    g=graph([])
+    markers=[{'id':'m1','x':.2,'y':.2},{'id':'m2','x':second_x,'y':.2}]
+    response={'assignments':[{'graph_id':'G1','vertex_id':'a','marker_id':'m1'},
+                             {'graph_id':'G1','vertex_id':'b','marker_id':second_id},
+                             {'graph_id':'G1','vertex_id':'invented','marker_id':'m2'}]}
+    result=apply_marker_grounding([g],markers,response)[0]
+    assert result['vertices']==g['vertices'] and not result['node_complete']
+    assert result['node_review']['marker_grounding']=='unresolved'
+
+
+def test_marker_inventory_collapses_duplicate_detections_not_actual_vertices():
+    actual=marker_inventory([{'x':.2,'y':.2},{'x':.205,'y':.204},{'x':.8,'y':.8}])
+    assert actual==[{'id':'m1','x':.2,'y':.2},{'id':'m2','x':.8,'y':.8}]

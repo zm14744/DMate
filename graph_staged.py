@@ -366,6 +366,21 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             for job in review_jobs:
                 job['graph']['node_complete']=False
                 job['graph']['node_review']={'status':'failed','reason':'marker_inventory_disagreement'}
+    if adapted and 3<=len(markers)<=160:
+        from graph_glm_adapter import (MARKER_PROMPT,marker_inventory,needs_marker_grounding,
+                                       marker_overlay,apply_marker_grounding)
+        if needs_marker_grounding(graphs):
+            candidates=marker_inventory(markers)
+            try:
+                payload={'graphs':[{'graph_id':g['id'],'bbox':g.get('bbox'),
+                                    'vertices':g['vertices']} for g in graphs],
+                         'marker_candidates':candidates}
+                grounded=ask(MARKER_PROMPT+'\n'+json.dumps(payload,ensure_ascii=False),
+                             [url,_data_url(marker_overlay(image,candidates))],budget)
+                graphs=apply_marker_grounding(graphs,candidates,grounded)
+                diagnostics.append('glm_marker_grounding_reviewed')
+            except (ValueError,RuntimeError,TimeoutError):
+                diagnostics.append('glm_marker_grounding_failed')
     id_context=_node_id_context(image,graphs)
     # Batch focus vertices across graph boundaries. Six small figures must not
     # exhaust a four-call budget merely because they occupy six panels.
@@ -384,6 +399,13 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         for index,vertex in batch:
             requests_by_graph.setdefault(index,[]).append(vertex)
         jobs=[{'graph':graphs[i],'focus_vertices':vertices} for i,vertices in requests_by_graph.items()]
+        if adapted:
+            # Recognition audits stay in the result; they are not extra visual
+            # facts or instructions for the next EDGE pass.
+            for job in jobs:
+                g=job['graph']
+                job['graph']={key:g.get(key) for key in
+                              ('id','name','bbox','directed','weighted','multigraph','vertices')}
         try:
             response=ask(edge_prompt+'\n第一张是原图；第二张红框是辅助NODE编号，只帮助对齐固定ID，不是题目文字/顶点/边。'
                          +'所有真实箭头、边、权值仍只以第一张原始像素为准。'
