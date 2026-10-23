@@ -10,7 +10,7 @@ import math
 from graph_schema import path_points
 from graph_relation import _samples, _wrong_path_endpoints, _intermediate_nodes
 
-PROFILE = 'glm-native-v5'
+PROFILE = 'glm-native-v6'
 
 MARKER_PROMPT = '''执行 NODE 阶段的圆点ID坐标复核，不读边、不解题。第一张始终是原图；第二张只给OpenCV圆点候选加了m1等辅助编号。
 候选可能包含文字圆圈，同一圆点附近也可能有多次检测；只能对照原图确认真实顶点。
@@ -132,6 +132,8 @@ REVIEW_PROMPT = '''执行图论 REVIEW 阶段，只复核所列候选，不解�
 {"decisions":[{"graph_id":"G1","id":"已有ID","visible":true,"direction":"unknown","weight":null,
 "edge_label":null,"style":"unknown","path":[[0.1,0.2],[0.9,0.8]]}],"completed_graph_ids":[]}。
 输出为扁平decisions列表，每条必须有所属graph_id，不使用嵌套graphs格式；图间候选ID可能相同。
+每个请求candidate ID必须恰好返回一条decision，不得只列确认项或省略不确定项。
+visible表示两端之间存在这一条独立边，不是存在由多条边拼成的通路。未标记交叉处沿原笔画，不得拐向另一条线。
 每条decision都必须包含path和style字段。确认visible=true时沿原图提供完整真实路径；
 已有path若正确可原样返回，若为空、仅中段或位置错误，重新沿原图补交。
 path使用完整原图归一化坐标的2至8点，首尾用该候选两端顶点坐标，曲线优先6至8点。
@@ -142,6 +144,7 @@ geometry给出原图尺寸和坐标系；第二张若为裁图只用于放大观
 逐条读数字权值到weight，边名写edge_label；不能把e1当权值1；未读清写null。
 style只取solid/dashed/dotted/unknown，必须看实际笔画，不复制候选默认值。
 同笔画的视觉/像素重复提议只确认一个ID；实际独立的平行笔画分别确认，不能按端点去重。
+重复提议的其余ID须明确visible=false，不得通过省略这些ID代替判定；看不清时明确visible=null。
 路径坐标不准不等于实际无边。visible=false只用于确认不存在该独立笔画；模糊写null。
 像素箭头证据仍需对照原图，不能用候选顺序、数学模板或度数补答案。
 只有顶点/边/方向/权值都已核全才将该graph_id加入completed_graph_ids；否则不加入。

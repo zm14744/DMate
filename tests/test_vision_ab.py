@@ -125,6 +125,31 @@ def test_parallel_instances_are_not_deduplicated_in_precision_recall():
     assert score['parallel_count_accuracy']==0 and not score['whole_structure_correct']
 
 
+@pytest.mark.parametrize('calls',[3,4])
+def test_native_missing_review_decisions_use_only_available_second_pass(calls,monkeypatch):
+    monkeypatch.setenv('ZHIPU_API_KEY','glm-unit-test')
+    original=io.BytesIO();Image.new('RGB',(160,100),'white').save(original,format='PNG')
+    review_calls=[]
+    def request(payload,*args,**kwargs):
+        prompt=payload['messages'][0]['content'][0]['text']
+        if 'NODE 阶段' in prompt:return response({'graphs':[graph([])]})
+        if 'EDGE 阶段' in prompt:
+            return response({'edges':[edge(id='r1',graph_id='G1')],
+                'reads':[{'graph_id':'G1','vertex':v,'complete':True,'edge_ids':['r1']} for v in ('a','b')]})
+        review_calls.append(prompt)
+        if len(review_calls)==1:return response({'decisions':[],'completed_graph_ids':[]})
+        assert '上轮遗漏候选' in prompt
+        return response({'decisions':[{'graph_id':'G1','id':'e1','visible':False,
+                                      'direction':'undirected','style':'unknown','path':[]}]})
+    provider=VisionProvider('glm',model='glm-4.6v',transport=request,capture=True)
+    with patch('graph_line_tracer.attach_line_evidence',side_effect=lambda raw,result:result):
+        result=recognize_staged(original.getvalue(),provider=provider,
+                                budget=Budget(seconds=300,calls=calls,call_seconds=90))
+    assert len(provider.observations)==calls and result['calls_remaining']==0
+    assert 'glm_review_missing_candidates:1' in result['diagnostics']
+    assert len(result['graphs'][0]['edges'])==(1 if calls==3 else 0)
+
+
 def test_wrong_direction_and_weight_have_separate_instance_metrics():
     want=graph([edge(direction='forward',weight=6),edge(id='e2',direction='forward',weight=8)],directed=True,weighted=True)
     got=graph([edge(direction='forward',weight=9),edge(id='e2',direction='forward',**{'from':'b','to':'a'},weight=8)],directed=True,weighted=True)

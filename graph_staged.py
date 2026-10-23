@@ -501,6 +501,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 if adapted:
                     missing=sum('path' not in d or 'style' not in d for d in decisions.values())
                     if missing:diagnostics.append(f'glm_review_fields_missing:{missing}')
+                    omitted=allowed-set(decisions)
+                    if omitted:diagnostics.append(f'glm_review_missing_candidates:{len(omitted)}')
                 reviews_by_graph[graph['id']]=decisions
                 graph['inventory_reviewed']=bool(current.get('inventory_complete') is True
                     and allowed and set(decisions)==allowed and len(output[index]['_candidates'])<=48)
@@ -510,33 +512,52 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     graphs[index]=graph
                 output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions)
         except (ValueError,RuntimeError,TimeoutError): diagnostics.append('local_review_failed')
-    if len(graphs)==1:
+    if len(graphs)==1 and (not adapted or budget.remaining>0):
         # One panel uses only one of the two reserved local reviews. Spend the
         # remaining review on a narrow original-pixel crop of arrow conflicts.
         # Do not flip edges solely because OpenCV disagrees with the VLM.
         graph=graphs[0];related=output[0]
         conflicts={e['id']:e for e in related['_candidates'] if any(
             isinstance(v,dict) and v.get('source')=='direction_conflict' for v in e['evidence'])}
+        missing_ids=({e['id'] for e in initial_candidates[graph['id']]}
+                     -set(reviews_by_graph.get(graph['id'],{}))) if adapted else set()
         candidates=[]
         for candidate in initial_candidates[graph['id']]:
-            if candidate['id'] in conflicts:
-                candidate['evidence']=conflicts[candidate['id']]['evidence']
+            if candidate['id'] in conflicts or candidate['id'] in missing_ids:
+                if candidate['id'] in conflicts:
+                    candidate['evidence']=conflicts[candidate['id']]['evidence']
                 candidates.append(candidate)
-        candidates=candidates[:8]
+        candidates=candidates[:24 if adapted else 8]
         points=[p for c in candidates for p in c['path']]
-        if points:
-            left=max(0,round(min(p[0] for p in points)*image.width)-35)
-            top=max(0,round(min(p[1] for p in points)*image.height)-35)
-            right=min(image.width,round(max(p[0] for p in points)*image.width)+35)
-            bottom=min(image.height,round(max(p[1] for p in points)*image.height)+35)
+        if points or (adapted and candidates):
+            left,top,right,bottom=0,0,image.width,image.height
+            if points:
+                left=max(0,round(min(p[0] for p in points)*image.width)-35)
+                top=max(0,round(min(p[1] for p in points)*image.height)-35)
+                right=min(image.width,round(max(p[0] for p in points)*image.width)+35)
+                bottom=min(image.height,round(max(p[1] for p in points)*image.height)+35)
+            elif adapted:
+                try:
+                    a,b,c,d=map(float,graph.get('bbox',[]))
+                    if 0<=a<c<=1 and 0<=b<d<=1:
+                        left,top,right,bottom=int(a*image.width),int(b*image.height),int(c*image.width),int(d*image.height)
+                except (TypeError,ValueError):pass
             if right>left and bottom>top:
                 try:
                     if adapted:
                         from graph_glm_adapter import compact_review_job
                         payload=compact_review_job(graph,candidates,image.size)
+                        payload['previously_selected']=[{key:e.get(key) for key in
+                            ('id','from','to','direction','weight','path')}
+                            for e in related['edges'] if e['status']=='accepted']
                     else:payload=_review_job(graph,candidates)
-                    verified=ask(review_prompt+'\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。'
-                        +'沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。仅返回decisions列表。\n'
+                    purpose=('\n本轮核对上轮遗漏候选及箭头冲突，第二张是同一原图的局部裁图。'
+                        '每个候选ID都须判定。previously_selected只是上轮选择，不是标准答案；'
+                        '同一笔画已有确认ID时，其他重复ID必须明确否定，不能遗漏。'
+                        if adapted else '\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。')
+                    detail=('沿真实独立笔画核对端点、重数与箭头，不把可达通路当单边。无箭头线写undirected。'
+                            if adapted else '沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。')
+                    verified=ask(review_prompt+purpose+detail+'仅返回decisions列表。\n'
                         +json.dumps(payload,ensure_ascii=False),[url,_data_url(image.crop((left,top,right,bottom)))],budget)
                     changes=verified.get('decisions')
                     if changes is None and isinstance(verified.get('graphs'),list):
@@ -544,7 +565,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                                       if isinstance(r,dict) and r.get('graph_id')==graph['id']),[])
                     allowed={c['id'] for c in candidates}
                     review=dict(reviews_by_graph.get(graph['id'],{}))
-                    review.update({d['id']:d for d in (changes or []) if isinstance(d,dict) and d.get('id') in allowed})
+                    review.update({d['id']:d for d in (changes or []) if isinstance(d,dict) and d.get('id') in allowed
+                                   and (not adapted or d.get('graph_id',graph['id'])==graph['id'])})
                     if adapted:
                         from graph_glm_adapter import receive_review_routes
                         graph=receive_review_routes(graph,review,glm_ink)
