@@ -66,7 +66,13 @@ def recover_relations(graph,traces,*,review=None):
     graph=canonical_graph(graph)
     nodes=graph['vertices']; ids={v['id'] for v in nodes}; candidates=[]
     for edge in graph['edges']:
-        c=copy.deepcopy(edge); c['_visual']=True; c['_pixel']=0.; candidates.append(c)
+        c=copy.deepcopy(edge)
+        sources={e.get('source') for e in c.get('evidence',[]) if isinstance(e,dict)}
+        # Carried TRACE candidates retain their provenance through REVIEW.
+        # They must not acquire visual confidence merely by entering this list.
+        c['_visual']=not ('pixels' in sources and not sources.intersection(
+            {'node_read','qwen_review_new_stroke','qwen_image_read'}))
+        c['_pixel']=0.; candidates.append(c)
     for ti,trace in enumerate(traces[:MAX_CANDIDATES]):
         if trace.get('from') not in ids or trace.get('to') not in ids: continue
         path=path_points(trace.get('path'))

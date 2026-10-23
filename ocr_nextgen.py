@@ -1,5 +1,6 @@
 """Opt-in orchestration; original /ocr stays available as a fallback."""
 from __future__ import annotations
+import os
 from graph_schema import display_graph
 from graph_staged import recognize_staged
 from graph_validation import audit_graph_records
@@ -9,7 +10,8 @@ from ocr_layout import partition_text
 
 def recognize_graph_document(raw,text_result,*,vision_provider=None):
     layout=text_result.get('layout') or {}
-    result=recognize_staged(raw,layout=layout.get('regions',[]),provider=vision_provider)
+    result=recognize_staged(raw,layout=layout.get('regions',[]),provider=vision_provider,
+                           audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1')
     graphs=result['graphs']
     if not graphs: return None
     text=text_result.get('text') or ''
@@ -40,7 +42,7 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None):
     return {'text':corrected,'visual_text':visual,
             'graph_display_data':[display_graph(g) for g in graphs],
             'graph_structures':graphs,'raw_ocr_text':text,
-            'graph_display_version':'2026-10-23-qwen-distinct-stroke-v12',
+            'graph_display_version':'2026-10-23-qwen-stage-integrity-v13',
             'review':{'required':incomplete,'reasons':[]},
             'text_count':text_result.get('text_count',0),'formula_count':0,
             'vision_used':True,'warning':None,
@@ -49,4 +51,5 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None):
                            'layout_status':layout.get('status','unavailable'),
                            'correction':correction,'validation':issues,
                            'stages':result['diagnostics'],
-                           'remote_metrics':result.get('remote_metrics',[])}}
+                           'remote_metrics':result.get('remote_metrics',[]),
+                           **({'stage_audit':result['stage_audit']} if 'stage_audit' in result else {})}}

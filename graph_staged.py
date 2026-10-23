@@ -108,8 +108,12 @@ def refine_node_positions(image, graphs, *, candidate_sink=None, partial=False):
                 and 4*np.pi*hull_area/max(perimeter**2,1)>=.82):
             circles.append((x+bw/2,y+bh/2,(bw+bh)/4,'colored_disk'))
     found=[]; height,width=rgb.shape[:2]
+    clean_paper = float(np.mean(gray > 245)) > .85
     for x,y,r,kind in circles:
-        if r<5: continue
+        # The strict filled-disk detector already validates these tiny marks.
+        # A second 5px cutoff discarded every real vertex in clean diagrams.
+        minimum = 3.5 if kind == 'black_disk' and clean_paper else 5
+        if r<minimum: continue
         angles=np.linspace(0,2*np.pi,64,endpoint=False)
         xx=np.clip(np.rint(x+r*.93*np.cos(angles)).astype(int),0,width-1)
         yy=np.clip(np.rint(y+r*.93*np.sin(angles)).astype(int),0,height-1)
@@ -295,7 +299,7 @@ def merge_node_reads(graph, reads, *, shared_observations=False):
 
 
 def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budget=None,
-                     glm_adapter=True, review_router=None, specialist=None):
+                     glm_adapter=True, review_router=None, specialist=None, audit=False):
     """Return canonical graphs; failures are explicit and never crash /ocr."""
     if call is not None and provider is not None: raise ValueError('Choose call or provider')
     if review_router is not None and getattr(provider,'name',None)!='qwen':
@@ -304,7 +308,25 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         if review_router is not None or call is not None:
             raise ValueError('Choose one explicit specialist experiment')
         specialist.validate_primary(provider)
-    budget=budget or Budget(); ask=call or provider or _call; diagnostics=[]
+    budget=budget or Budget(); remote=call or provider or _call; diagnostics=[]
+    events=[]
+    def emit(stage, **values):
+        if audit:events.append({'stage':stage, **copy.deepcopy(values)})
+    def ask(prompt, images, budget):
+        stage=('NODE.marker' if '圆点ID坐标复核' in prompt else
+               'NODE.review' if '本轮复核初次NODE' in prompt else
+               'NODE' if 'NODE 阶段' in prompt else
+               'EDGE' if '执行 EDGE 阶段' in prompt else 'REVIEW')
+        before=budget.remaining
+        try:
+            response=remote(prompt, images, budget)
+            emit(stage+'.response', response=response, calls_before=before,
+                 calls_after=budget.remaining)
+            return response
+        except (ValueError,RuntimeError,TimeoutError) as exc:
+            emit(stage+'.failed', error=str(exc)[:80], calls_before=before,
+                 calls_after=budget.remaining)
+            raise
     adapted=bool(glm_adapter and getattr(provider,'name',None)=='glm')
     qwen_profile=(not adapted and getattr(provider,'name','qwen')=='qwen'
                   and review_router is None and specialist is None)
@@ -352,6 +374,15 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
     markers=[]
     anchor_options={'partial':True} if experimental or qwen_profile else {}
     graphs=refine_node_positions(image,graphs,candidate_sink=markers,**anchor_options)
+    emit('NODE.aligned', graphs=graphs, markers=markers)
+    node_aux_used=0
+    def node_review_allowed():
+        count=min(48,sum(len(g['vertices']) for g in graphs))
+        # Required EDGE coverage takes priority over optional NODE passes.
+        reserved=math.ceil(count/12)+min(2,len(graphs))
+        return (not qwen_profile or
+                (node_aux_used<1 and budget.remaining>reserved
+                 and budget.deadline-time.monotonic()>6))
     review_jobs=[]
     for graph in graphs:
         box=graph.get('bbox')
@@ -363,7 +394,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         if (3<=len(candidates)<=80 and len(candidates)!=count
                 and max(len(candidates),count)<=2*min(len(candidates),count)):
             review_jobs.append({'graph':graph,'marker_candidates':candidates})
-    if review_jobs:
+    if review_jobs and node_review_allowed():
+        node_aux_used+=1
         try:
             reviewed=ask(NODE_PROMPT+'\n本轮复核初次NODE清单。圆点候选与初次顶点数不一致，但候选也可能是字母。'
                 +'逐点看原图，不能把候选数量当标准答案，不能按图名/度数补点。'
@@ -387,10 +419,13 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             for job in review_jobs:
                 job['graph']['node_complete']=False
                 job['graph']['node_review']={'status':'failed','reason':'marker_inventory_disagreement'}
+    elif review_jobs:
+        diagnostics.append('node_inventory_review_deferred_for_edges')
     if (experimental or qwen_profile) and 3<=len(markers)<=160:
         from graph_glm_adapter import (MARKER_PROMPT,marker_inventory,needs_marker_grounding,
                                        marker_overlay,apply_marker_grounding)
-        if needs_marker_grounding(graphs):
+        if needs_marker_grounding(graphs) and node_review_allowed():
+            node_aux_used+=1
             candidates=marker_inventory(markers)
             try:
                 payload={'graphs':[{'graph_id':g['id'],'bbox':g.get('bbox'),
@@ -416,15 +451,24 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
     # discarding a whole batch before REVIEW. Spread work across the available
     # EDGE calls while reserving both multi-panel reviews and the seven-call cap.
     planned=min(len(focus),48)
-    edge_calls=max(1,min(4,math.ceil(planned/8),budget.remaining-2))
+    reviews_reserved=min(2,len(graphs))
+    minimum_calls=math.ceil(planned/12)
+    available=max(0,budget.remaining-reviews_reserved)
+    if available<minimum_calls:
+        available=min(budget.remaining,minimum_calls)
+    edge_calls=max(1,min(4,max(minimum_calls,math.ceil(planned/8)),available))
     batch_size=min(12,max(1,math.ceil(planned/edge_calls)))
     edge_limit=min(planned,batch_size*edge_calls)
+    emit('EDGE.plan', focus=focus, edge_limit=edge_limit,
+         batch_size=batch_size, calls_available=budget.remaining)
     for offset in range(0,edge_limit,batch_size):
         batch=focus[offset:min(offset+batch_size,edge_limit)]
         requests_by_graph={}
         for index,vertex in batch:
             requests_by_graph.setdefault(index,[]).append(vertex)
         jobs=[{'graph':graphs[i],'focus_vertices':vertices} for i,vertices in requests_by_graph.items()]
+        emit('EDGE.batch', offset=offset,
+             requests=[{'graph_id':j['graph']['id'],'vertices':j['focus_vertices']} for j in jobs])
         if experimental:
             # Recognition audits stay in the result; they are not extra visual
             # facts or instructions for the next EDGE pass.
@@ -460,12 +504,16 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                         if len(r['edges'])!=len(keys): r['complete']=False
                     reads_by_graph[gid].append(r)
         except (ValueError,RuntimeError,TimeoutError) as exc:
-            diagnostics.append('edge_read_failed:'+str(exc)[:80]); break
+            diagnostics.append('edge_read_failed:'+str(exc)[:80])
+            # Do not retry this batch, or abandon unrelated later vertices.
+            if budget.remaining<=0 or budget.deadline-time.monotonic()<3:break
     if len(focus)>edge_limit: diagnostics.append('edge_budget_exhausted')
     graphs=[merge_node_reads(g,reads_by_graph[g['id']],shared_observations=adapted or qwen_profile) for g in graphs]
+    emit('EDGE.merged', graphs=graphs)
     from graph_line_tracer import attach_line_evidence
     traced=attach_line_evidence(image_bytes,{'graphs':graphs})
     panels={p['id']:p['paths'] for p in traced.get('line_path_evidence',[])}
+    emit('TRACE', panels=panels)
     if adapted:
         from graph_glm_adapter import bind_pixel_routes
         graphs=[bind_pixel_routes(g,panels.get(g['id'],[])) for g in graphs]
@@ -475,6 +523,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         from graph_glm_adapter import review_route_ink
         qwen_ink=review_route_ink(image)
     output=[recover_relations(g,panels.get(g['id'],[])) for g in graphs]
+    emit('RELATE.initial', graphs=output)
     initial_candidates={g['id']:copy.deepcopy(output[i]['_candidates']) for i,g in enumerate(graphs)}
     reviews_by_graph={}
     specialist_context={}
@@ -544,6 +593,11 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     and allowed and set(decisions)==allowed and len(output[index]['_candidates'])<=48)
                 if qwen_profile:
                     from graph_qwen_review import receive_qwen_review
+                    # REVIEW addresses TRACE IDs too. Keeping only EDGE rows
+                    # silently discarded path repairs for pixel candidates and
+                    # allowed additional_edges to recount their existing ink.
+                    graph=copy.deepcopy(graph)
+                    graph['edges']=copy.deepcopy(initial_candidates[graph['id']])
                     graph,decisions,notes=receive_qwen_review(
                         graph,decisions,current.get('additional_edges'),qwen_ink,
                         traces=panels.get(graph['id'],[]))
@@ -552,6 +606,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                         graph['inventory_reviewed']=False
                     graphs[index]=graph
                     reviews_by_graph[graph['id']]=decisions
+                    initial_candidates[graph['id']]=copy.deepcopy(graph['edges'])
                 if adapted or routed:
                     from graph_glm_adapter import receive_review_routes
                     if routed:
@@ -560,6 +615,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     graph=receive_review_routes(graph,decisions,glm_ink)
                     graphs[index]=graph
                 output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions)
+                emit('RELATE.reviewed', graph_id=graph['id'], graph=output[index])
                 if specialist is not None:
                     specialist_context[graph['id']]={'graph':copy.deepcopy(graph),
                         'traces':copy.deepcopy(panels.get(graph['id'],[])),
@@ -653,6 +709,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         output=specialist.apply(output,image,budget,context=specialist_context,primary_ok=primary_ok)
     result={'graphs':output,'diagnostics':diagnostics,'calls_remaining':budget.remaining,
             'remote_metrics':budget.metrics}
+    if audit:result['stage_audit']=events
     if review_router is not None:
         result['hybrid_review_events']=copy.deepcopy(review_router.events)
     if specialist is not None:
