@@ -3,11 +3,11 @@ import copy
 import math
 
 import numpy as np
-from PIL import Image,ImageDraw
+from PIL import Image,ImageDraw,ImageFont
 
 from graph_line_tracer import _sample_path
 from graph_qwen_geometry import (anchor_inventory,connected_ring_markers,
-    guard_local_decisions,exclude_unmeasured_proposals)
+    guard_local_decisions,exclude_unmeasured_proposals,locate_missing_weight_regions)
 from graph_schema import canonical_graph
 
 
@@ -122,3 +122,25 @@ def test_same_continuous_ink_is_not_a_second_independent_instance():
     result,notes=exclude_unmeasured_proposals(g,ink)
     assert [e['id'] for e in result['edges']]==['real']
     assert result['node_review']['unsupported_edge_proposals'][0]['reason']=='no_independent_measured_instance'
+
+
+def test_missing_weight_crop_isolates_nearest_text_instead_of_neighbouring_value():
+    from graph_qwen_simple import select_crop,review_job
+    from graph_relation import recover_relations
+    im=Image.new('RGB',(400,400),'white');draw=ImageDraw.Draw(im)
+    draw.line((100,100,300,300),fill='black',width=3)
+    font=ImageFont.load_default(size=28)
+    draw.text((195,155),'2',fill='black',font=font)
+    draw.text((195,260),'4',fill='black',font=font)
+    g=canonical_graph({'id':'G','weighted':True,'directed':False,'bbox':[0,0,1,1],
+        'vertices':[{'id':'a','x':.25,'y':.25},{'id':'b','x':.75,'y':.75}],
+        'edges':[{'id':'edge','from':'a','to':'b','direction':'undirected',
+                  'path':[[.25,.25],[.75,.75]],'weight':None,'style':'solid'}]})
+    result=recover_relations(g,[])
+    locate_missing_weight_regions(im,result)
+    plan=select_crop(im.size,[g],[result])
+    assert plan['reason']=='measured_weight_region'
+    x,y,right,bottom=plan['rect']
+    assert right-x<128 and bottom-y<128 and bottom<250
+    job=review_job(g,result['_candidates'],plan['rect'],im.size,focus_id='edge')
+    assert job['candidates'][0]['allowed_fields']==['weight']

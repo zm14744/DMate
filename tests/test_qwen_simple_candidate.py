@@ -91,7 +91,7 @@ def test_weight_window_cannot_delete_or_reorient_a_partially_visible_edge():
                                     'bbox': [.49, .49, .51, .51]})
     job = review_job(g, g['edges'], (400, 400, 600, 600), (1001, 1001))
     assert len(job['candidates']) == 1
-    assert job['candidates'][0]['allowed_fields'] == ['weight', 'edge_label']
+    assert job['candidates'][0]['allowed_fields'] == ['weight']
     assert len(job['candidates'][0]['weight_bbox']) == 4
     assert not job['full_inventory_in_crop']
     response = {'coordinate_space': 'crop_1000', 'graph_id': 'G',
@@ -128,7 +128,7 @@ def test_missing_weight_focus_cannot_rewrite_other_edges_or_remove_a_stroke():
     g['weighted']=True;g['edges'][1]['weight']=4
     job=review_job(g,g['edges'],(0,0,400,250),(400,250),focus_id='upper')
     assert job['review_mode']=='missing_weight' and len(job['candidates'])==1
-    assert job['candidates'][0]['allowed_fields']==['weight','edge_label']
+    assert job['candidates'][0]['allowed_fields']==['weight']
     assert not job['full_inventory_in_crop']
     response={'coordinate_space':'crop_1000','graph_id':'G',
               'decisions':[{'id':'upper','weight':2}], 'additional_edges':[]}
@@ -305,6 +305,6 @@ def test_explicit_candidate_uses_unified_display_and_existing_text_correction():
     assert candidate.call_count == 1
     staged.assert_not_called()
     text.assert_called_once_with('source')
-    assert result['graph_display_version'] == 'qwen-simple-candidate-v4'
+    assert result['graph_display_version'] == 'qwen-simple-candidate-v5'
     assert [e['id'] for e in result['graph_display_data'][0]['edges']] == ['upper', 'lower']
     assert result['text'] == 'unchanged text'

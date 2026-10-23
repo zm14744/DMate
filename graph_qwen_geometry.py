@@ -283,3 +283,57 @@ def mark_review_conflicts(graph):
         if a['id'] in ids:a.update(status='pending',review_conflict=True)
     if ids:graph['complete']=False
     return graph
+
+
+def locate_missing_weight_regions(image, graph):
+    """Locate isolated text beside a measured stroke, without reading its value.
+
+    Mid-stroke projection excludes endpoint/subscript labels. Ambiguous glyph
+    regions abstain. The vision model still reads the actual original pixels.
+    """
+    import cv2
+    import numpy as np
+    from graph_line_tracer import _foreground
+    rgb=cv2.cvtColor(np.asarray(image),cv2.COLOR_RGB2BGR)
+    count,_,stats,centers=cv2.connectedComponentsWithStats(_foreground(rgb),8)
+    width,height=image.size
+    for e in graph['_candidates']:
+        if e['weight'] is not None or not e['path']:continue
+        route=np.asarray(e['path'])*[width-1,height-1]
+        lengths=np.linalg.norm(np.diff(route,axis=0),axis=1);total=float(lengths.sum())
+        if total<60:continue
+        candidates=[]
+        for i in range(1,count):
+            x,y,bw,bh,area=map(int,stats[i])
+            if not (4<=bw<=70 and 8<=bh<=65 and 15<=area<=1500):continue
+            best=None;advance=0.
+            for a,b,length in zip(route,route[1:],lengths):
+                if length==0:continue
+                t=float(np.clip(np.dot(centers[i]-a,b-a)/(length*length),0,1))
+                distance=float(np.linalg.norm(centers[i]-(a+t*(b-a))))
+                trial=(distance,(advance+t*length)/total)
+                if best is None or trial<best:best=trial
+                advance+=length
+            distance,along=best
+            if .25<=along<=.75 and distance<=max(18,bh*1.5):
+                candidates.append((distance/bh,i,distance))
+        candidates.sort()
+        if not candidates:continue
+        if len(candidates)>1 and candidates[1][0]-candidates[0][0]<.3:
+            i,j=candidates[0][1],candidates[1][1]
+            x,y,bw,bh,_=map(int,stats[i]);qx,qy,qw,qh,_=map(int,stats[j])
+            gap=max(0,qx-(x+bw-1),x-(qx+qw-1))
+            if gap>bh*.65 or abs(float(centers[j][1])-float(centers[i][1]))>bh*.25:continue
+        _,i,distance=candidates[0];x,y,bw,bh,_=map(int,stats[i]);a,b,c,d=x,y,x+bw-1,y+bh-1
+        # Include adjacent digits/signs on the same baseline, never another
+        # distant edge's number. Do not interpret a multi-digit weight here.
+        for j in range(1,count):
+            if j==i:continue
+            qx,qy,qw,qh,area=map(int,stats[j])
+            gap=max(0,qx-c,a-(qx+qw-1))
+            if (2<=qw<=70 and 2<=qh<=65 and 4<=area<=1500 and gap<=bh*.65
+                    and abs(float(centers[j][1])-float(centers[i][1]))<=bh*.25):
+                a,b,c,d=min(a,qx),min(b,qy),max(c,qx+qw-1),max(d,qy+qh-1)
+        e['evidence'].append({'source':'pixel_attribute_region','field':'weight',
+            'bbox':[a/(width-1),b/(height-1),c/(width-1),d/(height-1)],
+            'method':'isolated_text_near_measured_stroke','distance_pixels':round(distance,3)})

@@ -58,8 +58,11 @@ inventory_complete仅在full_inventory_in_crop=true且全部候选核对完毕�
 
 
 def _weight_box(edge):
-    return next((e['bbox'] for e in edge.get('evidence', []) if isinstance(e, dict)
-                 and e.get('source') == 'qwen_attribute_region' and e.get('field') == 'weight'), None)
+    for source in ('pixel_attribute_region','qwen_attribute_region'):
+        box=next((e['bbox'] for e in edge.get('evidence', []) if isinstance(e, dict)
+                  and e.get('source')==source and e.get('field')=='weight'),None)
+        if box is not None:return box
+    return None
 
 
 def select_crop(image_size, graphs, related):
@@ -84,6 +87,14 @@ def select_crop(image_size, graphs, related):
                 points = [positions[e['from']], positions[e['to']]]
             xs = [p[0]*(width-1) for p in points]
             ys = [p[1]*(height-1) for p in points]
+            measured_region=weight_box is not None and any(p.get('source')=='pixel_attribute_region'
+                for p in e['evidence'] if isinstance(p,dict))
+            if measured_region:
+                pad=max(8,min(16,round((max(ys)-min(ys))*.4)))
+                rect=(max(0,math.floor(min(xs))-pad),max(0,math.floor(min(ys))-pad),
+                      min(width,math.ceil(max(xs))+pad+1),min(height,math.ceil(max(ys))+pad+1))
+                choices.append((score,index,e['id'],rect,'measured_weight_region'))
+                continue
             # Attribute windows preserve tiny text. Route windows include both
             # endpoints when possible, including exterior arcs and parallel ink.
             cw = min(width, 1280, max(512, math.ceil(max(xs)-min(xs))+96))
@@ -120,9 +131,9 @@ def review_job(graph, candidates, rect, image_size, *, focus_id=None):
         weight_visible = wb and contains(bounds, wb[:2]) and contains(bounds, wb[2:])
         if not full and not weight_visible:
             continue
-        fields = ['weight', 'edge_label']
+        fields = ['weight']
         if full and attribute_focus is None:
-            fields += ['visible', 'direction', 'path', 'style']
+            fields += ['edge_label','visible', 'direction', 'path', 'style']
         item = {key: copy.deepcopy(e.get(key)) for key in
                 ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'style')}
         preview=e['path']
@@ -243,7 +254,8 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         graphs = decode_inventory(ask('INVENTORY', INVENTORY_PROMPT, [overview]))
         emit('INVENTORY.decoded', graphs=graphs)
         from graph_qwen_geometry import (anchor_inventory, bind_measured_routes,
-            guard_local_decisions, exclude_unmeasured_proposals, mark_review_conflicts)
+            guard_local_decisions, exclude_unmeasured_proposals, mark_review_conflicts,
+            locate_missing_weight_regions)
         graphs = anchor_inventory(image, graphs, refiner=refine_node_positions)
         for g in graphs:
             diagnostics.extend(_node_ambiguities(g, image.size))
@@ -260,6 +272,8 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             diagnostics.extend(notes)
         emit('EDGE.measured',graphs=graphs)
         output = [recover_relations(g, panels.get(g['id'], [])) for g in graphs]
+        for g in output:
+            if g['weighted'] is True:locate_missing_weight_regions(image,g)
         emit('RELATE.initial', graphs=output)
         plan = select_crop(image.size, graphs, output)
         if plan:
@@ -276,8 +290,8 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     image.crop(plan['rect']).save(crop, format='PNG')
                     local_url = 'data:image/png;base64,'+base64.b64encode(crop.getvalue()).decode()
                     budget.call_seconds = min(budget.call_seconds, 45)
-                    scope=('\n本次review_mode=missing_weight，仅核对指定候选缺失的weight/edge_label，'
-                           '路径只用于定位，decisions不能含visible/direction/path/style，additional_edges必须为空。\n'
+                    scope=('\n本次review_mode=missing_weight，第二张是从原图定位的权值文字区域。'
+                           '只将该区域的数值填入weight，不能填写edge_label/visible/direction/path/style，additional_edges必须为空。\n'
                            if job['review_mode']=='missing_weight' else '\n')
                     response = ask('REVIEW', REVIEW_PROMPT+scope+json.dumps({'requests': [job]}, ensure_ascii=False),
                                    [overview, local_url])
