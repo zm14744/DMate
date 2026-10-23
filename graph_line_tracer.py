@@ -323,13 +323,13 @@ def _same_ink_route(candidate,existing,pointmap,width,height,radius,*,ink=None,o
     return samples>=3 and hits/samples>=.88
 
 
-def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,ink_mask=None):
     """Independently propose only high-coverage straight strokes.
 
     A crossing alone cannot satisfy the coverage test. A confirmed node
     between two endpoints blocks an apparent long edge.
     """
-    ink = _foreground(rgb) > 0
+    ink = (_foreground(rgb) if ink_mask is None else ink_mask) > 0
     height, width = ink.shape
     candidates = []
     for i in range(len(local)):
@@ -400,7 +400,7 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
     return candidates
 
 
-def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,gray_cutoff=216):
+def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,gray_cutoff=216,ink_mask=None):
     """Match real visible Hough stroke endpoints to marked node *rims*.
 
     Center-to-center coverage fails for lines attached off-center to circles.
@@ -408,7 +408,9 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,
     """
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     paper=_paper_gray(rgb)
-    if paper is not None:
+    if ink_mask is not None:
+        mask=ink_mask
+    elif paper is not None:
         mask=_foreground(rgb)
     elif float(np.median(gray)) < 105:
         mask = _foreground(rgb)
@@ -472,7 +474,7 @@ def _corridor_hits(ink, xs, ys, ux, uy):
     return hits
 
 
-def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,ink_mask=None):
     """Detect an independently ink-backed arch between already known vertices.
 
     A contour may be almost semicircular; a straight Hough line has no chance
@@ -481,7 +483,7 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
     """
     if len(local) > 14:
         return []
-    ink = (_foreground(rgb) > 0)
+    ink = ((_foreground(rgb) if ink_mask is None else ink_mask) > 0)
     height, width = ink.shape
     output = []
 
@@ -609,7 +611,7 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
     return output
 
 
-def _graph_candidates(rgb, graph, *, dense_paths=False):
+def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False):
     h, w = rgb.shape[:2]
     points = _vertices(graph, w, h)
     if not points:
@@ -641,7 +643,9 @@ def _graph_candidates(rgb, graph, *, dense_paths=False):
             pass
     if min(max_x - min_x, max_y - min_y) < 14:
         return []
-    ink_mask=_foreground(rgb[min_y:max_y, min_x:max_x])
+    photo_mask=(_foreground(rgb)[min_y:max_y,min_x:max_x]
+                if consistent_paper and _paper_gray(rgb) is not None else None)
+    ink_mask=photo_mask if photo_mask is not None else _foreground(rgb[min_y:max_y, min_x:max_x])
     skel = _thin(ink_mask)
     local = [(label, x - min_x, y - min_y) for label, x, y in points]
     # Erase only already-detected vertex interiors, not line crossings.
@@ -712,19 +716,19 @@ def _graph_candidates(rgb, graph, *, dense_paths=False):
 
     for candidate in _straight_stroke_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h):
+            radius, w, h,ink_mask=photo_mask):
         keep_candidate(candidate)
     # A long edge can terminate on a circular node rim away from the line
     # joining the two node centers; Hough endpoints recover these cases.
     for candidate in _hough_endpoint_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h):
+            radius, w, h,ink_mask=photo_mask):
         keep_candidate(candidate)
     # Add paths around genuinely curved independent ink corridors, including
     # a straight+arc parallel pair which skeleton's greedy walker may miss.
     for candidate in _curved_stroke_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h):
+            radius, w, h,ink_mask=photo_mask):
         keep_candidate(candidate)
     result = []
     for variants in path_variants.values():
@@ -740,7 +744,7 @@ def _graph_candidates(rgb, graph, *, dense_paths=False):
     return ordered
 
 
-def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False):
+def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False,consistent_paper=False):
     """Add trace evidence without modifying verified edges or node labels."""
     if not isinstance(cv_result, dict) or not cv_result.get('graphs'):
         return cv_result
@@ -751,7 +755,7 @@ def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False):
         for graph in (cv_result.get('graphs') or [])[:MAX_GRAPHS]:
             if not isinstance(graph, dict):
                 continue
-            traces = _graph_candidates(rgb, graph,dense_paths=dense_paths)
+            traces = _graph_candidates(rgb, graph,dense_paths=dense_paths,consistent_paper=consistent_paper)
             if traces:
                 # The arrow result is evidence, not an accepted direction.
                 try:

@@ -229,7 +229,7 @@ def _node_ambiguities(graph, image_size):
 
 
 def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=False, repair_inventory=True,
-                     native_marker_first=True):
+                     native_marker_first=True,native_hollow_first=False):
     """At most two Qwen attempts, zero retries; measured text when supported."""
     if provider is not None and (getattr(provider, 'name', 'qwen') != 'qwen'
             or getattr(provider, 'model', QWEN_MODEL) != QWEN_MODEL or getattr(provider, 'retries', 0) != 0):
@@ -282,15 +282,21 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         try:
             from graph_qwen_components import native_first_context
             first_context=native_first_context(image) if native_marker_first else None
+            if first_context is None and native_marker_first:
+                from graph_qwen_ring_markers import photo_first_context
+                first_context=photo_first_context(image)
+            if first_context is None and native_hollow_first:
+                from graph_qwen_ring_markers import hollow_first_context
+                first_context=hollow_first_context(image)
             if first_context is not None:
                 from graph_qwen_marker_inventory import MARKER_INVENTORY_PROMPT,decode_marker_inventory
-                emit('INVENTORY.native_markers',markers=first_context['markers'])
+                emit('INVENTORY.native_markers',markers=first_context['markers'],context_source=first_context.get('source'))
                 initial=ask('INVENTORY',MARKER_INVENTORY_PROMPT+'\n'+json.dumps(
                     {'marker_candidates':[p['id'] for p in first_context['markers']]}),
                     [overview,_data_url(first_context['image'])])
                 graphs=decode_marker_inventory(initial,first_context,image.size)
                 marker_plan=first_context
-                diagnostics.append('native_shaded_marker_first_candidate')
+                diagnostics.append('native_hollow_marker_first_candidate' if first_context.get('source')=='native_hollow_components' else 'native_shaded_marker_first_candidate')
             else:
                 initial=ask('INVENTORY',INVENTORY_PROMPT,[overview])
                 graphs=decode_inventory(initial)
@@ -399,33 +405,60 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             diagnostics.extend(_node_ambiguities(g, image.size))
         emit('NODE.anchored', graphs=graphs)
         from graph_line_tracer import attach_line_evidence
-        traced = attach_line_evidence(raw, {'graphs': graphs},dense_paths=True)
+        traced = attach_line_evidence(raw, {'graphs': graphs},dense_paths=True,consistent_paper=True)
         panels = {p['id']: p['paths'] for p in traced.get('line_path_evidence', [])}
         from graph_qwen_geometry import supplement_rim_traces
         panels=supplement_rim_traces(image,graphs,panels)
         emit('TRACE', panels=panels)
         from graph_glm_adapter import review_route_ink  # CPU-only original ink.
         ink = review_route_ink(image)
-        from graph_qwen_geometry import validate_curve_tangents,coalesce_ink_routes,validate_trace_junctions,validate_trace_markers,trim_native_rim_paths
+        from graph_qwen_geometry import validate_curve_tangents,coalesce_ink_routes,validate_trace_junctions,validate_trace_markers,trim_native_rim_paths,exclude_composite_loops
         for gid,paths in panels.items():
             native_graph=next(g for g in graphs if g['id']==gid)
+            from graph_qwen_boundary_paths import boundary_paths
+            exterior=boundary_paths(ink,native_graph,image.size)
+            paths=paths+exterior
             paths=trim_native_rim_paths(paths,native_graph,image.size)
             strict_rings=bool(native_graph.get('node_position_evidence')) and all(p.get('marker_profile')=='native_hollow_size_consensus' for p in native_graph['node_position_evidence'])
             panels[gid],notes=validate_curve_tangents(paths,ink,strict_native_continuity=strict_rings)
-            panels[gid],junction_notes=validate_trace_junctions(panels[gid],ink)
+            regions=[]
+            if exterior:
+                scale=min(ink.shape[1]/image.width,ink.shape[0]/image.height)
+                radii={p['vertex']:p.get('radius_pixels',0)*scale for p in native_graph['node_position_evidence']}
+                regions=[(v['x']*(ink.shape[1]-1),v['y']*(ink.shape[0]-1),radii[v['id']]) for v in native_graph['vertices']]
+            panels[gid],junction_notes=validate_trace_junctions(panels[gid],ink,acute_crossings=bool(exterior),node_regions=regions)
             panels[gid],marker_notes=validate_trace_markers(panels[gid],next(g for g in graphs if g['id']==gid),image.size)
+            panels[gid],loop_notes=exclude_composite_loops(panels[gid],native_graph,ink,image.size)
             panels[gid]=coalesce_ink_routes(panels[gid],ink)
-            diagnostics.extend(notes+junction_notes+marker_notes)
+            diagnostics.extend(notes+junction_notes+marker_notes+loop_notes)
         emit('TRACE.validated',panels=panels)
         graphs = [bind_measured_routes(g, panels.get(g['id'], []), ink) for g in graphs]
         for i,g in enumerate(graphs):
             graphs[i],notes=exclude_unmeasured_proposals(g,ink)
             diagnostics.extend(notes)
         emit('EDGE.measured',graphs=graphs)
-        output = [recover_relations(g, panels.get(g['id'], [])) for g in graphs]
+        from graph_qwen_geometry import preserve_curve_certificates
+        output = [preserve_curve_certificates(recover_relations(g, panels.get(g['id'], [])),panels.get(g['id'], [])) for g in graphs]
         for g in output:
             if g['weighted'] is True:locate_missing_weight_regions(image,g)
         emit('RELATE.initial', graphs=output)
+        from graph_qwen_figure_review import prepare_figure_review,apply_figure_review,FIGURE_PROMPT
+        native_figure=prepare_figure_review(image,output) if budget.remaining else None
+        if native_figure is not None:
+            emit('FIGURE_REVIEW.plan',**{k:v for k,v in native_figure.items() if k not in ('graphs','image_url')})
+            budget.call_seconds=min(budget.call_seconds,45)
+            try:
+                response=ask('FIGURE_REVIEW',FIGURE_PROMPT+'\n'+json.dumps({'requests':{
+                    'graph_id':native_figure['graph_id'],'vertices':native_figure['vertices'],
+                    'text':[{'key':p['key'],'kind':p['kind']} for p in native_figure['items']]}},ensure_ascii=False),
+                    [overview,native_figure['image_url']])
+                output,notes=apply_figure_review(native_figure,response)
+                diagnostics.extend(notes+['complete_native_collinear_figure_review'])
+                emit('FIGURE_REVIEW.applied',graphs=output)
+            except (ValueError,RuntimeError,TimeoutError) as exc:
+                diagnostics.append('single_review_failed:'+type(exc).__name__)
+                emit('FIGURE_REVIEW.rejected',reason=str(exc)[:80])
+            return finish(output)
         from graph_qwen_arrows import prepare_arrows,apply_arrows,apply_native_arrows,arrow_subset,ARROW_PROMPT
         arrow_batch=prepare_arrows(image,output)
         unresolved_heads=[]
@@ -445,8 +478,11 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             prompt=LOCAL_TEXT_PROMPT+'\n'+json.dumps({'requests':requests},ensure_ascii=False)
             if unresolved_heads:
                 arrow_batch=arrow_subset(image,arrow_batch,unresolved_heads,output)
-                images.append(arrow_batch['image_url'])
-                prompt+='\n第三张是独立箭头局部表，其key只在arrows中使用，与第二张readings的key分开。'+ARROW_PROMPT.replace('第一张为原图上下文，第二张为从原图裁剪的箭头局部表格。','').replace('第二张','第三张')
+                from graph_qwen_local_text import pack_uncertainty_sheets
+                packed=pack_uncertainty_sheets(local_text,arrow_batch)
+                images=[overview,packed['image_url']]
+                emit('LOCAL_TEXT.combined_sheet',**{k:v for k,v in packed.items() if k!='image_url'})
+                prompt+='\n第二张分为上部TEXT文字表与下部ARROWS箭头表；两表key各自独立，只在对应readings/arrows字段使用。'+ARROW_PROMPT.replace('第一张为原图上下文，第二张为从原图裁剪的箭头局部表格。','').replace('第二张','第二张下部ARROWS表')
                 prompt+='\n合并为唯一JSON对象 {"readings":[{"key":"A","text":"原图文字"}],"arrows":[{"key":"A","tip":"left"}]}。箭头requests='+json.dumps([{'key':item['key']} for item in unresolved_heads])
             try:
                 response=ask('LOCAL_TEXT',prompt,images)

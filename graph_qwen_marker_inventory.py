@@ -55,6 +55,8 @@ def decode_marker_inventory(response,context,image_size):
             g['vertices'].append({'id':mid,'label':attribute(label),'x':p['x'],'y':p['y']})
             evidence.append({'source':'qwen_recovery_marker_selection','vertex':mid,
                 'marker_id':mid,'pixel_position':[p['x'],p['y']]})
+            if context.get('source')=='native_hollow_components':
+                evidence[-1].update(radius_pixels=p['radius_pixels'],marker_profile=p['marker_profile'])
         points=[[v['x'],v['y']] for v in g['vertices']]
         nearest=[min((math.hypot((x-a)*(width-1),(y-b)*(height-1))
             for j,(a,b) in enumerate(points) if j!=i),default=60.) for i,(x,y) in enumerate(points)]
@@ -63,6 +65,13 @@ def decode_marker_inventory(response,context,image_size):
             max(0,min(y for x,y in points)-margin/(height-1)),
             min(1,max(x for x,y in points)+margin/(width-1)),
             min(1,max(y for x,y in points)+margin/(height-1))]
+        if context.get('source')=='native_hollow_components':
+            boxes=[pool[v['id']]['component_bbox'] for v in g['vertices'] if pool[v['id']].get('component_bbox')]
+            if boxes:
+                g['bbox']=[max(0,min(g['bbox'][0],min(b[0] for b in boxes)-8/(width-1))),
+                    max(0,min(g['bbox'][1],min(b[1] for b in boxes)-8/(height-1))),
+                    min(1,max(g['bbox'][2],max(b[2] for b in boxes)+8/(width-1))),
+                    min(1,max(g['bbox'][3],max(b[3] for b in boxes)+8/(height-1)))]
         for i,row in enumerate(edges):
             if not isinstance(row,list) or len(row)!=6:raise ValueError('invalid_marker_edge_row')
             a,b,direction,weight,label,style=row

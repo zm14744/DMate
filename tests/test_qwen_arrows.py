@@ -103,3 +103,22 @@ def test_small_arrow_touching_coloured_node_keeps_its_own_tip():
     output,weak=apply_native_arrows(plan)
     assert not weak and output[0]['edges'][0]['from']=='a'
     assert output[0]['edges'][0]['edge_label']=='s'
+
+
+def test_open_wings_touching_hollow_node_resolve_the_tip_and_preserve_edge_name():
+    from graph_qwen_open_arrows import prepare_open_arrows
+    image=Image.new('RGB',(300,160),'white');draw=ImageDraw.Draw(image)
+    draw.line((50,70,230,70),fill='black',width=2)
+    draw.line([(209,64),(220,70),(209,76)],fill='black',width=2)
+    for x in (50,230):draw.ellipse((x-8,62,x+8,78),fill='white',outline='black',width=3)
+    graph=canonical_graph({'id':'G','directed':True,'weighted':False,
+        'vertices':[{'id':'a','x':50/299,'y':70/159},{'id':'b','x':230/299,'y':70/159}],
+        'edges':[{'id':'e','from':'b','to':'a','direction':'forward','edge_label':'s',
+                  'path':[[230/299,70/159],[50/299,70/159]]}]})
+    graph['node_position_evidence']=[{'vertex':v['id'],'radius_pixels':8,
+        'source':'native_circle','marker_profile':'native_hollow_size_consensus'} for v in graph['vertices']]
+    plan=prepare_open_arrows(image,[graph]);assert plan is not None
+    output,weak=apply_native_arrows(plan)
+    assert not weak and output[0]['edges'][0]['from']=='a'
+    assert output[0]['edges'][0]['edge_label']=='s'
+    assert output[0]['edges'][0]['evidence'][-1]['source']=='native_open_arrow_wings'

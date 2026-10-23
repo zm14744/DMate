@@ -91,6 +91,18 @@ def measured_graph():
     return g,ink
 
 
+def test_style_certificate_rejects_dash_gaps_hidden_by_route_tolerance():
+    import cv2
+    from graph_qwen_geometry import strict_solid_ink
+    path=[[.1,.5],[.9,.5]]
+    solid=np.zeros((101,201),dtype='uint8');solid[49:52,20:181]=255
+    dashed=solid.copy();dashed[:,98:102]=0
+    assert strict_solid_ink(path,solid)
+    distance=cv2.distanceTransform(np.uint8(dashed==0),cv2.DIST_L2,3)
+    assert distance[50,20:181].max()<3.5
+    assert not strict_solid_ink(path,dashed)
+
+
 def test_denial_of_measured_stroke_remains_a_recorded_conflict():
     g,ink=measured_graph()
     decisions,notes=guard_local_decisions(g,{'real':{'visible':False,'direction':'forward'}},ink)

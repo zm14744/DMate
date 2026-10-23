@@ -10,6 +10,21 @@ from graph_qwen_coordinates import graph_name
 LOCAL_TEXT_PROMPT=EDGE_TEXT_PROMPT+'\nkind=figure_name 时完整抄写图名和运算符、集合、下标；原图斜杠与反斜杠必须区分，不替换成理论中的其他记法。'
 
 
+def pack_uncertainty_sheets(text_plan,arrow_plan):
+    """Keep both native sheets inside the provider's two-image transport."""
+    texts=Image.open(io.BytesIO(base64.b64decode(text_plan['image_url'].split(',',1)[1]))).convert('RGB')
+    arrows=Image.open(io.BytesIO(base64.b64decode(arrow_plan['image_url'].split(',',1)[1]))).convert('RGB')
+    width=max(texts.width,arrows.width);height=texts.height+arrows.height+64
+    if width*height>8_000_000:raise ValueError('combined_uncertainty_sheet_budget')
+    sheet=Image.new('RGB',(width,height),'white');draw=ImageDraw.Draw(sheet);font=ImageFont.load_default(size=20)
+    draw.text((8,5),'TEXT / readings',fill='black',font=font);sheet.paste(texts,(0,32))
+    bottom=texts.height+32;draw.text((8,bottom+5),'ARROWS / arrows',fill='black',font=font);sheet.paste(arrows,(0,bottom+32))
+    stream=io.BytesIO();sheet.save(stream,format='PNG')
+    return {'image_url':'data:image/png;base64,'+base64.b64encode(stream.getvalue()).decode(),
+            'sheet_size':list(sheet.size),'text_region':[0,32,texts.width,texts.height+32],
+            'arrow_region':[0,bottom+32,arrows.width,height]}
+
+
 def prepare_local_text(image,graphs,*,force=False):
     if (not graphs or any(type(g['directed']) is not bool or g['weighted'] is not False for g in graphs)
             or (not force and not any(e['edge_label'] is None for g in graphs for e in g['edges']))):
@@ -21,8 +36,10 @@ def prepare_local_text(image,graphs,*,force=False):
         anchors=g.get('node_position_evidence',[])
         if len(anchors)!=len(g['vertices']) or any('partial' in p['source'] for p in anchors):return None
         if not g['edges'] or any(not e['path'] for e in g['edges']):return None
-        glyphs=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True,
-            node_radii={p['vertex']:p['radius_pixels'] for p in anchors if p.get('radius_pixels')})
+        radii={p['vertex']:p['radius_pixels'] for p in anchors if p.get('radius_pixels')}
+        glyphs=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True,node_radii=radii)
+        separated=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True,node_radii=radii,
+            line_paths=[e['path'] for e in g['edges']])
         matching=nx.Graph();costs={}
         for ei,edge in enumerate(g['edges']):
             for ti,glyph in enumerate(glyphs):
@@ -50,8 +67,9 @@ def prepare_local_text(image,graphs,*,force=False):
             # Recheck edge text in that affected figure, without re-reading
             # already grounded node labels or touching other figures.
             if g['edges'][ei]['edge_label'] is not None and not rebind:continue
-            x,y,r,bottom=glyphs[ti]['box']
-            if glyphs[ti]['parts']==1:
+            glyph=_refine_touching_glyph(glyphs[ti],separated)
+            x,y,r,bottom=glyph['box']
+            if glyph['parts']==1:
                 # A thin subscript can be a separate fragment; the letter may
                 # itself touch the diagram stroke. Preserve the native word
                 # neighbourhood instead of presenting an isolated digit.
@@ -59,7 +77,8 @@ def prepare_local_text(image,graphs,*,force=False):
                 x-=math.ceil(h*1.6);r+=math.ceil(h*.9)
                 y-=math.ceil(h*1.2);bottom+=math.ceil(h*.4)
             items.append({'key':_key(len(items)),'kind':'edge_label','graph_index':gi,
-                'id':g['edges'][ei]['id'],'rect':[max(0,x-2),max(0,y-2),min(width,r+2),min(height,bottom+2)]})
+                'id':g['edges'][ei]['id'],'rect':[max(0,x-2),max(0,y-2),min(width,r+2),min(height,bottom+2)],
+                'native_line_separated':bool(glyph.get('native_line_separated'))})
     # Keep the complete native name around its measured marker, including
     # thin subscripts which connected-component cleanup can discard.
     for gi,g in enumerate(graphs):
@@ -94,6 +113,19 @@ def prepare_local_text(image,graphs,*,force=False):
         sheet.paste(crop,(x+(cell_width-crop.width)//2,y+25+(132-crop.height)//2))
     stream=io.BytesIO();sheet.save(stream,format='PNG')
     return {'graphs':graphs,'items':items+caption_items,'image_url':'data:image/png;base64,'+base64.b64encode(stream.getvalue()).decode(),'sheet_size':list(sheet.size)}
+
+
+def _refine_touching_glyph(original,separated):
+    """Expand only an assigned partial word; keep global glyph matching stable."""
+    if original['parts']!=1:return original
+    x,y,r,b=original['box'];candidates=[]
+    for glyph in separated:
+        a,top,c,d=glyph['box']
+        overlap=max(0,min(c,r)-max(a,x))*max(0,min(d,b)-max(top,y))
+        if (d-top)>1.3*(b-y) and overlap>=.5*min((c-a)*(d-top),(r-x)*(b-y)):
+            candidates.append(glyph)
+    if len(candidates)!=1:return original
+    return {**candidates[0],'native_line_separated':True}
 
 
 def _caption_items(image,graphs,offset):

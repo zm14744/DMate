@@ -172,20 +172,43 @@ def coalesce_ink_routes(traces,ink):
     return retained
 
 
-def validate_trace_junctions(traces,ink):
+def validate_trace_junctions(traces,ink,*,acute_crossings=False,node_regions=None):
     """A skeleton may continue through a crossing, but cannot turn onto its other line."""
     import cv2
     import numpy as np
     from graph_relation import _samples
     height,width=ink.shape
     distance=cv2.distanceTransform((ink==0).astype('uint8'),cv2.DIST_L2,3)
+    native_labels=None;native_pixels=None
+    if acute_crossings:
+        _,native_labels=cv2.distanceTransformWithLabels(np.uint8(ink==0),cv2.DIST_L2,5,labelType=cv2.DIST_LABEL_PIXEL)
+        native_pixels=np.argwhere(ink>0)[:,::-1]
+    def four_arms(joint,extended=False):
+        reach=68 if extended else 28
+        x,y=np.rint(joint).astype(int);left,top=max(0,x-reach),max(0,y-reach)
+        right,bottom=min(width,x+reach+1),min(height,y+reach+1);patch=np.uint8(ink[top:bottom,left:right]>0)
+        _,components=cv2.connectedComponents(patch,8);cx,cy=x-left,y-top
+        near=components[max(0,cy-2):cy+3,max(0,cx-2):cx+3].ravel();near=near[near>0]
+        if not len(near):return False
+        root=int(np.bincount(near).argmax());yy,xx=np.ogrid[top:bottom,left:right]
+        radius=np.sqrt((xx-joint[0])**2+(yy-joint[1])**2)
+        safe=min((math.hypot(joint[0]-nx,joint[1]-ny)-nr-3 for nx,ny,nr in (node_regions or [])),default=float('inf'))
+        for r in ((10,16,24,40,64) if extended else (10,16,24)):
+            if r+2>safe:continue
+            ring=np.uint8((components==root)&(radius>=r-1.5)&(radius<=r+1.5))
+            count,_,stats,_=cv2.connectedComponentsWithStats(ring,8)
+            if sum(int(stats[i,cv2.CC_STAT_AREA])>=3 for i in range(1,count))>=4:return True
+        return False
     kept=[];notes=[]
     for trace in traces:
-        if trace.get('method') not in ('opencv_skeleton_tangent_trace','opencv_curved_ink_template'):
+        if trace.get('method') not in ('opencv_skeleton_tangent_trace','opencv_curved_ink_template','opencv_native_boundary_trace') and not (acute_crossings and trace.get('method')=='opencv_skeleton_loop_trace'):
             kept.append(trace);continue
         route=np.asarray(trace['path'])*[width-1,height-1]
         length=float(np.linalg.norm(np.diff(route,axis=0),axis=1).sum())
         points=np.asarray(_samples(route.tolist(),min(800,max(32,round(length/2)))))
+        if native_labels is not None and trace.get('method')=='opencv_curved_ink_template':
+            at=np.rint(points).astype('int32');at[:,0]=np.clip(at[:,0],0,width-1);at[:,1]=np.clip(at[:,1],0,height-1)
+            points=native_pixels[native_labels[at[:,1],at[:,0]]-1].astype(float)
         blocked=False
         for i in range(8,len(points)-8):
             q=points[i];incoming=points[i-2]-points[i-6];outgoing=points[i+6]-points[i+2]
@@ -193,12 +216,15 @@ def validate_trace_junctions(traces,ink):
             incoming/=np.linalg.norm(incoming)
             outgoing/=np.linalg.norm(outgoing)
             cosine=float(incoming@outgoing)
-            if not -.5<cosine<.8:continue
+            if not (-1.0001 if acute_crossings else -.5)<cosine<(.97 if acute_crossings else .8):continue
             # The skeleton rounds a crossing by a few pixels. Intersect the
             # two approach tangents outside that rounding before testing arms.
-            joint=points[i-2]+incoming*np.linalg.solve(
-                np.column_stack((incoming,-outgoing)),points[i+2]-points[i-2])[0]
+            if acute_crossings and cosine<-.8:joint=q
+            else:
+                joint=points[i-2]+incoming*np.linalg.solve(
+                    np.column_stack((incoming,-outgoing)),points[i+2]-points[i-2])[0]
             if np.linalg.norm(joint-q)>8:continue
+            if any(math.hypot(joint[0]-x,joint[1]-y)<=radius+(30 if acute_crossings else 15) for x,y,radius in (node_regions or [])):continue
             # Both unused straight continuations must be real ink, beyond
             # the thick crossing centre. A genuine corner has neither arm.
             supports=[]
@@ -207,10 +233,40 @@ def validate_trace_junctions(traces,ink):
                 if ((at<0).any() or (at[:,0]>=width).any() or (at[:,1]>=height).any()):
                     supports.append(False);continue
                 supports.append(float(np.mean(distance[at[:,1],at[:,0]]<=1.5))>=.75)
-            if all(supports):blocked=True;break
+            if all(supports) and (not acute_crossings or four_arms(joint,extended=cosine<-.8)):blocked=True;break
         if blocked:
             notes.append('crossing_turn_rejected:'+trace['from']+':'+trace['to'])
         else:kept.append(trace)
+    return kept,notes
+
+
+def exclude_composite_loops(traces,graph,ink,image_size):
+    """A tour of existing straight strokes and node rims is not a new loop."""
+    import numpy as np
+    import cv2
+    anchors=graph.get('node_position_evidence',[])
+    if len(anchors)!=len(graph['vertices']) or not all(p.get('marker_profile')=='native_hollow_size_consensus' for p in anchors):return traces,[]
+    height,width=ink.shape;mask=np.zeros_like(ink)
+    for trace in traces:
+        if trace['from']==trace['to'] or trace.get('method') not in ('opencv_straight_line_coverage','opencv_hough_rim_endpoint'):continue
+        cv2.polylines(mask,[np.rint(np.asarray(trace['path'])*[width-1,height-1]).astype('int32')],False,255,3)
+    if not mask.any():return traces,[]
+    radii={p['vertex']:p['radius_pixels']*min(width/image_size[0],height/image_size[1])+2 for p in anchors}
+    for v in graph['vertices']:
+        cv2.circle(mask,(round(v['x']*(width-1)),round(v['y']*(height-1))),math.ceil(radii[v['id']]),255,-1)
+    distance=cv2.distanceTransform(np.uint8(mask==0),cv2.DIST_L2,3)
+    from graph_relation import _samples
+    kept=[];notes=[]
+    for trace in traces:
+        if trace['from']==trace['to'] and trace.get('method')=='opencv_skeleton_loop_trace':
+            points=np.rint(np.asarray(_samples(trace['path'],120))*[width-1,height-1]).astype('int32')
+            if float(np.mean(distance[points[:,1],points[:,0]]<=2.5))>=.98:
+                notes.append('composite_straight_loop_rejected:'+trace['from']);continue
+            regions=[(v['x']*(width-1),v['y']*(height-1),radii[v['id']]) for v in graph['vertices']]
+            valid,crossing_notes=validate_trace_junctions([trace],ink,acute_crossings=True,node_regions=regions)
+            if not valid:
+                notes.extend(crossing_notes);continue
+        kept.append(trace)
     return kept,notes
 
 
@@ -477,6 +533,7 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
                 'node_position': [v['x'], v['y']], 'pixel_position': [p['x'], p['y']],
                 'radius_pixels':p.get('radius_pixels'),
                 'marker_profile':p.get('marker_profile'),
+                'component_bbox':p.get('component_bbox'),
                 'exact_inventory_count': True, 'alternative_cost_margin_min': .015})
             v['x'], v['y'] = p['x'], p['y']
         offset += len(g['vertices'])
@@ -515,6 +572,12 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
                      max(0., min(b, min(p[1] for p in points)-margin/(height-1))),
                      min(1., max(c, max(p[0] for p in points)+margin/(width-1))),
                      min(1., max(d, max(p[1] for p in points)+margin/(height-1)))]
+        boxes=[p['component_bbox'] for p in observations if p.get('component_bbox')]
+        if boxes:
+            g['bbox']=[max(0,min(g['bbox'][0],min(b[0] for b in boxes)-8/(width-1))),
+                max(0,min(g['bbox'][1],min(b[1] for b in boxes)-8/(height-1))),
+                min(1,max(g['bbox'][2],max(b[2] for b in boxes)+8/(width-1))),
+                min(1,max(g['bbox'][3],max(b[3] for b in boxes)+8/(height-1)))]
     return graphs
 
 
@@ -560,12 +623,43 @@ def bind_measured_routes(graph, traces, ink):
             e = edges[a[1]]
             trace, path, proof = choices[b[1]]
             e['path'] = copy.deepcopy(path)
+            if e['style'] in ('dashed','dotted') and trace.get('style')=='solid' and strict_solid_ink(path,ink):
+                e['evidence'].append({'source':'native_contiguous_stroke_style',
+                    'prior_style':e['style'],'raw_native_gap_pixels':0})
+                e['style']='solid'
             if e['style'] == 'unknown' and trace.get('style') in ('solid', 'dashed', 'dotted'):
                 e['style'] = trace['style']
             e['evidence'].append({'source': 'measured_route_binding', 'method': trace.get('method'),
                                  **proof,'trace_method':trace.get('method'),
                                  'measurement_tolerance_pixels':3.5 if trace.get('method')=='opencv_straight_line_coverage' else 2.5,
                                  'trace_path':copy.deepcopy(trace['path'])})
+    return graph
+
+
+def strict_solid_ink(path,ink):
+    """Certify raw continuous ink; the wider route corridor can fill dash gaps."""
+    import cv2,numpy as np
+    from graph_relation import _samples
+    height,width=ink.shape;route=np.asarray(path)*[width-1,height-1]
+    length=float(np.linalg.norm(np.diff(route,axis=0),axis=1).sum())
+    if not 16<=length<=1000:return False
+    samples=np.rint(np.asarray(_samples(route.tolist(),max(80,math.ceil(length*2))))).astype('int32')
+    trim=max(2,round(len(samples)*.07));samples=samples[trim:-trim]
+    if not len(samples) or (samples<0).any() or (samples[:,0]>=width).any() or (samples[:,1]>=height).any():return False
+    distance=cv2.distanceTransform(np.uint8(ink==0),cv2.DIST_L2,3)
+    return bool(np.all(distance[samples[:,1],samples[:,0]]<=.75))
+
+
+def preserve_curve_certificates(graph,traces):
+    """Do not lose strict native curve support when RELATE creates an edge ID."""
+    for edge in graph['edges']:
+        exact=[t for t in traces if {t['from'],t['to']}=={edge['from'],edge['to']}
+               and t['path']==edge['path'] and t.get('method')=='opencv_curved_ink_template'
+               and t.get('tangent_alignment',0)>=.99 and t.get('score',0)>=.99]
+        if len(exact)==1:
+            edge['evidence'].append({'source':'native_curve_certificate',
+                'method':exact[0]['method'],'tangent_alignment':exact[0]['tangent_alignment'],
+                'native_coverage_score':exact[0]['score']})
     return graph
 
 

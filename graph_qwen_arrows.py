@@ -17,7 +17,11 @@ def _head_taper(gray,rect,tangent):
 
 def prepare_arrows(image,graphs):
  prepared=_prepare_arrows(image,graphs)
- return prepared if prepared is not None else _prepare_arrows(image,graphs,small=True)
+ if prepared is not None:return prepared
+ prepared=_prepare_arrows(image,graphs,small=True)
+ if prepared is not None:return prepared
+ from graph_qwen_open_arrows import prepare_open_arrows
+ return prepare_open_arrows(image,graphs)
 
 
 def _prepare_arrows(image,graphs,*,small=False):
@@ -47,6 +51,8 @@ def _prepare_arrows(image,graphs,*,small=False):
      hue=int(hsv[y,x,0]);difference=np.abs(hsv[:,:,0].astype('int16')-hue)
      same=(np.minimum(difference,180-difference)<=10)&(hsv[:,:,1]>85)
      dark[same&((xx-x)**2+(yy-y)**2<=(radius*1.4)**2)]=0
+    elif proof_radius and any(p.get('marker_profile')=='native_hollow_size_consensus' and p['vertex']==v['id'] for p in g.get('node_position_evidence',[])):
+     cv2.circle(dark,(x,y),math.ceil(proof_radius+1),0,-1)
  opening=3 if small else 7
  opened=cv2.morphologyEx(dark,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(opening,opening)))
  n,labels,stats,centers=cv2.connectedComponentsWithStats(opened,8)
@@ -134,12 +140,18 @@ def apply_native_arrows(prepared):
   if not item.get('axis_resolved'):
    unresolved.append(item);continue
   graph=graphs[item['graph_index']];edge=next(e for e in graph['edges'] if e['id']==item['id'])
-  proof={'source':'native_arrow_head_axis_asymmetry','region':item['rect'],
-         'axis_skew':item['axis_skew'],'axis_centroid_bias':item['axis_centroid_bias'],
-         'native_taper_correlation':item.get('native_taper_correlation'),
-         'native_taper_slope':item.get('native_taper_slope'),
-         'prior_from':edge['from'],'prior_to':edge['to'],'prior_direction':edge['direction']}
-  if item['axis_skew']<0:edge['from'],edge['to']=edge['to'],edge['from']
+  if item.get('native_open_wings'):
+   proof={'source':'native_open_arrow_wings','region':item['rect'],
+          'native_open_wings':item['native_open_wings']}
+   reverse=item['native_reverse']
+  else:
+   proof={'source':'native_arrow_head_axis_asymmetry','region':item['rect'],
+          'axis_skew':item['axis_skew'],'axis_centroid_bias':item['axis_centroid_bias'],
+          'native_taper_correlation':item.get('native_taper_correlation'),
+          'native_taper_slope':item.get('native_taper_slope')}
+   reverse=item['axis_skew']<0
+  proof.update(prior_from=edge['from'],prior_to=edge['to'],prior_direction=edge['direction'])
+  if reverse:edge['from'],edge['to']=edge['to'],edge['from']
   edge['direction']='forward';source=next(v for v in graph['vertices'] if v['id']==edge['from'])
   if math.dist(edge['path'][0],(source['x'],source['y']))>math.dist(edge['path'][-1],(source['x'],source['y'])):
    edge['path']=edge['path'][::-1]

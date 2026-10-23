@@ -39,6 +39,8 @@ def ring_markers(image):
         points.append({'x':moments['m10']/moments['m00']/(image.width-1),
             'y':moments['m01']/moments['m00']/(image.height-1),
             'radius_pixels':max(width,height)/2+3,
+            'component_bbox':[px/(image.width-1),py/(image.height-1),
+                min(1,(px+pw)/(image.width-1)),min(1,(py+ph)/(image.height-1))],
             'component':parent if connected else 'isolated_ring_'+str(i),
             'isolated_circle_candidate':bool(isolated),'marker_profile':'native_hollow_size_consensus'})
     if not points:return []
@@ -70,3 +72,38 @@ def attach_isolated_frames(points,graphs,image_size):
         ownership[p['component']]=distances[0][1]
     return [{**p,'original_native_component':p['component'],
              'component':ownership.get(p['component'],p['component'])} for p in points]
+
+
+def hollow_first_context(image):
+    """Controlled coordinate-free first-read context for separated ring figures."""
+    from collections import defaultdict
+    from graph_qwen_components import ordered_components
+    from graph_glm_adapter import marker_overlay
+    points=ring_markers(image);groups=defaultdict(list)
+    if not 4<=len(points)<=48 or any(p.get('isolated_circle_candidate') for p in points):return None
+    for p in points:groups[p['component']].append(p)
+    if not 2<=len(groups)<=8 or any(len(ps)<3 for ps in groups.values()):return None
+    order=ordered_components(groups,min_extent=0)
+    if order is None:return None
+    pool=[]
+    for i in range(len(groups)):
+        for p in sorted(groups[order[i]],key=lambda p:(p['y'],p['x'])):
+            pool.append({**p,'id':f'p{len(pool)+1}'})
+    return {'source':'native_hollow_components','markers':pool,'strong_markers':pool,
+            'image':marker_overlay(image,pool)}
+
+
+def photo_first_context(image):
+    """Avoid verbose coordinate output on well separated multi-figure photos."""
+    from graph_line_tracer import _paper_gray
+    if _paper_gray(np.asarray(image)) is None:return None
+    context=hollow_first_context(image)
+    if context is None or len({p['component'] for p in context['markers']})<3:return None
+    points=context['markers'];width,height=image.size
+    for i,p in enumerate(points):
+        for q in points[i+1:]:
+            distance=math.hypot((p['x']-q['x'])*(width-1),(p['y']-q['y'])*(height-1))
+            # Touching printed letter counters are not a safe first-read pool.
+            if distance<2*(p['radius_pixels']+q['radius_pixels']):return None
+    context['automatic_photo_context']=True
+    return context

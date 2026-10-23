@@ -35,11 +35,11 @@ def assign_components(graphs,groups,*,equal_counts=False):
     return assigned
 
 
-def ordered_components(groups):
+def ordered_components(groups,*,min_extent=.03):
     """A provisional reading order requires physically separate figure hulls."""
     boxes={key:(min(p['x'] for p in ps),min(p['y'] for p in ps),
                 max(p['x'] for p in ps),max(p['y'] for p in ps)) for key,ps in groups.items()}
-    if any(c-a<.03 or d-b<.03 for a,b,c,d in boxes.values()):return None
+    if any(c-a<min_extent or d-b<min_extent for a,b,c,d in boxes.values()):return None
     rows=[]
     for key,(a,b,c,d) in sorted(boxes.items(),key=lambda item:(item[1][1]+item[1][3])/2):
         for row in rows:
@@ -71,6 +71,12 @@ def reconcile_component_inventory(image,graphs):
             for g in graphs)):
         return graphs,[]
     points=gradient_markers(image);groups=defaultdict(list)
+    hollow_repair=False
+    if not points:
+        from graph_qwen_ring_markers import ring_markers
+        rings=ring_markers(image)
+        if len(rings)>sum(len(g['vertices']) for g in graphs):
+            points=rings;hollow_repair=True
     if not points or len(points)>48 or any('component' not in p for p in points):return graphs,[]
     for p in points:groups[p['component']].append(p)
     if len(groups)!=len(graphs) or any(len(ps)<3 for ps in groups.values()):return graphs,[]
@@ -82,6 +88,7 @@ def reconcile_component_inventory(image,graphs):
     ink=_foreground(np.asarray(image))
     depth=cv2.distanceTransform(ink,cv2.DIST_L2,3)
     width,height=image.size;output=[];notes=['component_frame_reading_order_provisional'] if provisional else []
+    if hollow_repair:notes.append('native_hollow_component_count_repair')
     for i,old in enumerate(graphs):
         ps=sorted(groups[assigned[i]],key=lambda p:(p['y'],p['x']))
         normalized=[]
@@ -123,10 +130,14 @@ def reconcile_component_inventory(image,graphs):
                 used.add(vid)
             g['vertices'].append({'id':vid,'label':label,'x':p['x'],'y':p['y']})
             proof.append({'source':'component_circle_inventory','vertex':vid,
-                'pixel_position':[p['x'],p['y']],'native_component':p['component']})
+                'pixel_position':[p['x'],p['y']],'native_component':p['component'],
+                'radius_pixels':p.get('radius_pixels'),'marker_profile':p.get('marker_profile')})
         retained={v['id'] for v in g['vertices']}
         g['edges']=[e for e in g['edges'] if e['from'] in retained and e['to'] in retained]
         g.setdefault('node_review',{})['observed_vertices']=copy.deepcopy(old['vertices'])
+        if hollow_repair and any(v['label'] is not None for v in old['vertices']) and (
+                len(selected)!=len(old['vertices']) or len(ps)!=len(old['vertices'])):
+            g['node_review']['component_label_rebinding']=True
         g['node_review']['component_inventory_observations']={'before':len(old['vertices']),
             'measured':len(ps),'frame_reading_order_provisional':provisional,'discarded_edge_proposals':[e for e in old['edges'] if e not in g['edges']]}
         separation=[min((math.hypot((p['x']-q['x'])*(width-1),(p['y']-q['y'])*(height-1))
@@ -136,6 +147,12 @@ def reconcile_component_inventory(image,graphs):
             max(0,min(p['y'] for p in ps)-margin/(height-1)),
             min(1,max(p['x'] for p in ps)+margin/(width-1)),
             min(1,max(p['y'] for p in ps)+margin/(height-1))]
+        boxes=[p['component_bbox'] for p in ps if p.get('component_bbox')]
+        if boxes:
+            g['bbox']=[max(0,min(g['bbox'][0],min(b[0] for b in boxes)-8/(width-1))),
+                max(0,min(g['bbox'][1],min(b[1] for b in boxes)-8/(height-1))),
+                min(1,max(g['bbox'][2],max(b[2] for b in boxes)+8/(width-1))),
+                min(1,max(g['bbox'][3],max(b[3] for b in boxes)+8/(height-1)))]
         g['node_position_evidence']=proof;g['node_complete']=False;g['complete']=False
         _rebase_refined_paths([g],[old]);output.append(canonical_graph(g))
         if len(old['vertices'])!=len(ps):

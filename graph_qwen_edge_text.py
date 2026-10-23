@@ -29,9 +29,16 @@ def _projection(point,path,size):
     return best
 
 
-def _glyphs(image,bbox,nodes,*,join_scripts=False,node_radii=None):
+def _glyphs(image,bbox,nodes,*,join_scripts=False,node_radii=None,line_paths=None):
     hsv=cv2.cvtColor(np.asarray(image),cv2.COLOR_RGB2HSV)
     mask=cv2.inRange(hsv,(0,0,0),(179,75,155))
+    if line_paths:
+        # This mask proposes crop bounds only. Qwen receives unmodified native
+        # pixels, including digits whose ink physically touches the stroke.
+        for path in line_paths:
+            if len(path)>1:
+                line=np.rint(np.asarray(path)*[image.width-1,image.height-1]).astype('int32')
+                cv2.polylines(mask,[line],False,0,3)
     n,labels,stats,centers=cv2.connectedComponentsWithStats(mask,8)
     width,height=image.size;a,b,c,d=bbox
     small=[]
