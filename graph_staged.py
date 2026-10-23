@@ -295,11 +295,15 @@ def merge_node_reads(graph, reads, *, shared_observations=False):
 
 
 def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budget=None,
-                     glm_adapter=True, review_router=None):
+                     glm_adapter=True, review_router=None, specialist=None):
     """Return canonical graphs; failures are explicit and never crash /ocr."""
     if call is not None and provider is not None: raise ValueError('Choose call or provider')
     if review_router is not None and getattr(provider,'name',None)!='qwen':
         raise ValueError('Hybrid review requires an explicit Qwen primary provider')
+    if specialist is not None:
+        if review_router is not None or call is not None:
+            raise ValueError('Choose one explicit specialist experiment')
+        specialist.validate_primary(provider)
     budget=budget or Budget(); ask=call or provider or _call; diagnostics=[]
     adapted=bool(glm_adapter and getattr(provider,'name',None)=='glm')
     experimental=bool(adapted and glm_adapter=='experimental')
@@ -459,6 +463,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
     output=[recover_relations(g,panels.get(g['id'],[])) for g in graphs]
     initial_candidates={g['id']:copy.deepcopy(output[i]['_candidates']) for i,g in enumerate(graphs)}
     reviews_by_graph={}
+    specialist_context={}
     # Two bounded REVIEW calls must cover later panels as well as G1/G2.
     # Previously e.g. textbook panel (d) never reached visual review at all.
     width=max(1,(len(graphs)+1)//2)
@@ -528,6 +533,10 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     graph=receive_review_routes(graph,decisions,glm_ink)
                     graphs[index]=graph
                 output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions)
+                if specialist is not None:
+                    specialist_context[graph['id']]={'graph':copy.deepcopy(graph),
+                        'traces':copy.deepcopy(panels.get(graph['id'],[])),
+                        'review':copy.deepcopy(decisions)}
         except (ValueError,RuntimeError,TimeoutError): diagnostics.append('local_review_failed')
     if len(graphs)==1 and (not experimental or budget.remaining>0):
         # One panel uses only one of the two reserved local reviews. Spend the
@@ -588,9 +597,20 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                         from graph_glm_adapter import receive_review_routes
                         graph=receive_review_routes(graph,review,glm_ink)
                     output[0]=recover_relations(graph,panels.get(graph['id'],[]),review=review)
+                    if specialist is not None:
+                        specialist_context[graph['id']]={'graph':copy.deepcopy(graph),
+                            'traces':copy.deepcopy(panels.get(graph['id'],[])),
+                            'review':copy.deepcopy(review)}
                 except (ValueError,RuntimeError,TimeoutError): diagnostics.append('focused_arrow_review_failed')
+    if specialist is not None:
+        primary_ok=(not any(m.get('status')!=200 for m in budget.metrics)
+            and not any(d.startswith(('edge_read_failed:', 'local_review_failed',
+                'focused_arrow_review_failed', 'node_inventory_review_failed')) for d in diagnostics))
+        output=specialist.apply(output,image,budget,context=specialist_context,primary_ok=primary_ok)
     result={'graphs':output,'diagnostics':diagnostics,'calls_remaining':budget.remaining,
             'remote_metrics':budget.metrics}
     if review_router is not None:
         result['hybrid_review_events']=copy.deepcopy(review_router.events)
+    if specialist is not None:
+        result['specialist_events']=copy.deepcopy(specialist.events)
     return result
