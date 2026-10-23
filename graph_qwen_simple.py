@@ -278,13 +278,65 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         image = image.convert('RGB')
         overview = _data_url(image)
         marker_plan=None
-        initial=ask('INVENTORY',INVENTORY_PROMPT,[overview])
-        graphs=decode_inventory(initial)
+        try:
+            initial=ask('INVENTORY',INVENTORY_PROMPT,[overview])
+            graphs=decode_inventory(initial)
+        except (ValueError,RuntimeError) as exc:
+            # Only complete-output protocol failures are recoverable here.
+            # HTTP, identity, credentials, timeout and budget errors propagate.
+            from vision_provider import VisionError
+            recoverable=(isinstance(exc,ValueError) or
+                isinstance(exc,VisionError) and exc.kind in ('invalid_output','truncated_output'))
+            if not recoverable or not budget.remaining:raise
+            emit('INVENTORY.invalid',reason=str(exc)[:80])
+            budget.call_seconds=min(budget.call_seconds,45)
+            from graph_qwen_markers import marker_context
+            recovery_context=marker_context(image)
+            if recovery_context and 4<=len(recovery_context['strong_markers'])<=48:
+                from graph_qwen_marker_inventory import MARKER_INVENTORY_PROMPT,decode_marker_inventory
+                prompt=MARKER_INVENTORY_PROMPT+'\n'+json.dumps(
+                    {'marker_candidates':[p['id'] for p in recovery_context['markers']]})
+                recovered=ask('INVENTORY_RECOVERY',prompt,[overview,_data_url(recovery_context['image'])])
+                graphs=decode_marker_inventory(recovered,recovery_context,image.size)
+                marker_plan=recovery_context
+                diagnostics.append('bounded_marker_inventory_recovery')
+            else:
+                from graph_qwen_compact import COMPACT_PROMPT,expand_compact_inventory
+                recovered=ask('INVENTORY_RECOVERY',COMPACT_PROMPT,[overview])
+                initial=expand_compact_inventory(recovered)
+                graphs=decode_inventory(initial)
+                diagnostics.append('bounded_compact_inventory_recovery')
         emit('INVENTORY.initial_decoded',graphs=graphs)
+        if marker_plan is not None:
+            from graph_qwen_marker_inventory import recover_component_markers
+            graphs,notes=recover_component_markers(image,graphs,marker_plan)
+            diagnostics.extend(notes)
+            emit('NODE.component_recovery',graphs=graphs)
+        from graph_qwen_pixel_inventory import measured_anonymous_panels
+        pixel_panels=measured_anonymous_panels(raw,graphs)
+        if pixel_panels is not None:
+            diagnostics.append('complete_native_blue_endpoint_inventory')
+            emit('PIXEL_INVENTORY.applied',graphs=pixel_panels)
+            return finish(pixel_panels)
         if (repair_inventory and budget.remaining and len(graphs)==1
                 and graphs[0]['directed'] is False and graphs[0]['weighted'] is False):
             from graph_qwen_markers import marker_context,needs_inventory_repair,MARKER_HINT
             context=marker_context(image)
+            from graph_qwen_edge_text import (prepare_edge_text_inventory,
+                apply_edge_text_inventory,EDGE_TEXT_PROMPT)
+            edge_text=prepare_edge_text_inventory(raw,image,graphs,context=context)
+            if edge_text is not None:
+                emit('EDGE_TEXT.plan',graphs=edge_text['graphs'],items=edge_text['items'],
+                     sheet_size=edge_text['sheet_size'])
+                budget.call_seconds=min(budget.call_seconds,45)
+                requests=[{k:item[k] for k in ('key','kind')} for item in edge_text['items']]
+                response=ask('EDGE_TEXT',EDGE_TEXT_PROMPT+'\n'+json.dumps({'requests':requests},ensure_ascii=False),
+                    [overview,edge_text['image_url']])
+                output=apply_edge_text_inventory(edge_text,response)
+                diagnostics.extend(edge_text['diagnostics'])
+                diagnostics.append('measured_colored_panels_edge_text_batch')
+                emit('EDGE_TEXT.applied',graphs=output)
+                return finish(output)
             if needs_inventory_repair(graphs,context):
                 emit('INVENTORY_REPAIR.plan',markers=context['markers'],
                      initial_vertex_counts=[len(g['vertices']) for g in graphs],
@@ -330,10 +382,12 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         emit('TRACE', panels=panels)
         from graph_glm_adapter import review_route_ink  # CPU-only original ink.
         ink = review_route_ink(image)
-        from graph_qwen_geometry import validate_curve_tangents
+        from graph_qwen_geometry import validate_curve_tangents,coalesce_ink_routes,validate_trace_junctions
         for gid,paths in panels.items():
             panels[gid],notes=validate_curve_tangents(paths,ink)
-            diagnostics.extend(notes)
+            panels[gid],junction_notes=validate_trace_junctions(panels[gid],ink)
+            panels[gid]=coalesce_ink_routes(panels[gid],ink)
+            diagnostics.extend(notes+junction_notes)
         emit('TRACE.validated',panels=panels)
         graphs = [bind_measured_routes(g, panels.get(g['id'], []), ink) for g in graphs]
         for i,g in enumerate(graphs):

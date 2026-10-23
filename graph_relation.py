@@ -78,8 +78,13 @@ def recover_relations(graph,traces,*,review=None):
         path=path_points(trace.get('path'))
         if not path: continue
         pair={trace['from'],trace['to']}
-        matches=[c for c in candidates if {c['from'],c['to']}==pair and c['path']
-                 and route_overlap(c['path'],path)>=.70]
+        # Binding may extend a trace from the node rim to its centre. Keep its
+        # identity even when those endpoint segments lower symmetric overlap.
+        bound=[c for c in candidates if {c['from'],c['to']}==pair and any(
+            p.get('source')=='measured_route_binding' and p.get('trace_path')==path
+            for p in c['evidence'] if isinstance(p,dict))]
+        matches=bound or [c for c in candidates if {c['from'],c['to']}==pair and c['path']
+                         and route_overlap(c['path'],path)>=.70]
         no_path=[c for c in candidates if {c['from'],c['to']}==pair and not c['path']]
         same_pair=[c for c in candidates if {c['from'],c['to']}==pair]
         pair_traces=[t for t in traces if {t.get('from'),t.get('to')}==pair]

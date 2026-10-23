@@ -286,7 +286,7 @@ def review_route_ink(image):
     return _foreground(np.asarray(picture))
 
 
-def _ink_support(path, ink, style, *, distance=None, source='glm'):
+def _ink_support(path, ink, style, *, distance=None, source='glm', tolerance_pixels=2.5):
     import cv2
     import numpy as np
     height,width=ink.shape
@@ -301,7 +301,7 @@ def _ink_support(path, ink, style, *, distance=None, source='glm'):
     # Hollow node interiors are not white gaps in the connecting stroke.
     trim=max(2,round(len(points)*.07));points=points[trim:-trim]
     hits=[distance[min(height-1,round(p[1])),
-                   min(width-1,round(p[0]))]<=2.5 for p in points]
+                   min(width-1,round(p[0]))]<=tolerance_pixels for p in points]
     runs=[]
     for hit in hits:
         if runs and runs[-1][0]==hit:runs[-1][1]+=1

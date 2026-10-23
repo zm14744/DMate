@@ -80,6 +80,130 @@ def connected_ring_markers(image):
     return points
 
 
+def coalesce_ink_routes(traces,ink):
+    """Merge detections of one ink ridge, retaining real white-separated arcs."""
+    import cv2
+    import numpy as np
+    from graph_relation import _samples
+    height,width=ink.shape
+    distance,labels=cv2.distanceTransformWithLabels((ink==0).astype('uint8'),
+        cv2.DIST_L2,5,labelType=cv2.DIST_LABEL_PIXEL)
+    pixels=np.argwhere(ink>0)[:,::-1]
+    if not len(pixels):return traces
+    from graph_glm_adapter import _ink_support
+    def quality(trace):
+        proof=_ink_support(trace['path'],ink,trace.get('style'),distance=distance,source='qwen')
+        if proof and proof['continuous'] and trace.get('style','unknown')=='unknown':
+            trace['style']='solid'
+        return (bool(proof and proof['continuous']),trace.get('score',0))
+    def on_ink(point):
+        at=np.rint(point).astype(int);at=np.clip(at,[0,0],[width-1,height-1])
+        if distance[at[1],at[0]]>6:return None
+        return pixels[labels[at[1],at[0]]-1]
+    def same_ridge(first,second):
+        line=np.asarray(second['path'])*[width-1,height-1]
+        origins=line[:-1];vectors=np.diff(line,axis=0)
+        lengths=np.sum(vectors*vectors,axis=1)
+        shared=0;inspected=0
+        for point in _samples(first['path'],48)[5:-5]:
+            point=np.asarray(point)*[width-1,height-1]
+            t=np.clip(np.sum((point-origins)*vectors,axis=1)/np.maximum(lengths,1e-12),0,1)
+            projected=origins+t[:,None]*vectors
+            best=projected[np.argmin(np.sum((projected-point)**2,axis=1))]
+            if np.linalg.norm(best-point)>12:return False
+            a,b=on_ink(point),on_ink(best)
+            if a is None or b is None:continue
+            inspected+=1
+            cross=np.rint(np.linspace(a,b,max(3,round(np.linalg.norm(a-b)*2)))).astype(int)
+            # Distinct close parallel strokes have an actual white corridor;
+            # rounded/clipped endpoints are omitted above.
+            white=ink[cross[:,1],cross[:,0]]==0
+            if np.mean(white)<=.25:shared+=1
+        return inspected>=32 and shared/inspected>=.9
+    retained=[]
+    for trace in traces:
+        quality(trace)
+        pair={trace['from'],trace['to']}
+        for index,old in enumerate(retained):
+            if pair!={old['from'],old['to']}:continue
+            if same_ridge(trace,old) and same_ridge(old,trace):
+                winner,duplicate=(trace,old) if quality(trace)>quality(old) else (old,trace)
+                winner=copy.deepcopy(winner)
+                winner.setdefault('same_ink_observations',[]).append(copy.deepcopy(duplicate))
+                retained[index]=winner
+                break
+        else:retained.append(trace)
+    return retained
+
+
+def validate_trace_junctions(traces,ink):
+    """A skeleton may continue through a crossing, but cannot turn onto its other line."""
+    import cv2
+    import numpy as np
+    from graph_relation import _samples
+    height,width=ink.shape
+    distance=cv2.distanceTransform((ink==0).astype('uint8'),cv2.DIST_L2,3)
+    kept=[];notes=[]
+    for trace in traces:
+        if trace.get('method') not in ('opencv_skeleton_tangent_trace','opencv_curved_ink_template'):
+            kept.append(trace);continue
+        route=np.asarray(trace['path'])*[width-1,height-1]
+        length=float(np.linalg.norm(np.diff(route,axis=0),axis=1).sum())
+        points=np.asarray(_samples(route.tolist(),min(800,max(32,round(length/2)))))
+        blocked=False
+        for i in range(8,len(points)-8):
+            q=points[i];incoming=points[i-2]-points[i-6];outgoing=points[i+6]-points[i+2]
+            if min(np.linalg.norm(incoming),np.linalg.norm(outgoing))<1:continue
+            incoming/=np.linalg.norm(incoming)
+            outgoing/=np.linalg.norm(outgoing)
+            cosine=float(incoming@outgoing)
+            if not -.5<cosine<.8:continue
+            # The skeleton rounds a crossing by a few pixels. Intersect the
+            # two approach tangents outside that rounding before testing arms.
+            joint=points[i-2]+incoming*np.linalg.solve(
+                np.column_stack((incoming,-outgoing)),points[i+2]-points[i-2])[0]
+            if np.linalg.norm(joint-q)>8:continue
+            # Both unused straight continuations must be real ink, beyond
+            # the thick crossing centre. A genuine corner has neither arm.
+            supports=[]
+            for direction in (incoming,-outgoing):
+                at=np.rint(joint+np.asarray([7,9,11,13])[:,None]*direction).astype(int)
+                if ((at<0).any() or (at[:,0]>=width).any() or (at[:,1]>=height).any()):
+                    supports.append(False);continue
+                supports.append(float(np.mean(distance[at[:,1],at[:,0]]<=1.5))>=.75)
+            if all(supports):blocked=True;break
+        if blocked:
+            notes.append('crossing_turn_rejected:'+trace['from']+':'+trace['to'])
+        else:kept.append(trace)
+    return kept,notes
+
+
+def _rebase_refined_paths(graphs, before):
+    """A marker movement must move the attached proposal endpoints as well."""
+    for graph,old in zip(graphs,before):
+        previous={v['id']:[v['x'],v['y']] for v in old['vertices']}
+        current={v['id']:[v['x'],v['y']] for v in graph['vertices']}
+        for edge in graph['edges']:
+            path=edge['path']
+            if not path:continue
+            a,b=previous[edge['from']],previous[edge['to']]
+            u,v=current[edge['from']],current[edge['to']]
+            if a==u and b==v:continue
+            if math.dist(path[0],a)+math.dist(path[-1],b)>math.dist(path[0],b)+math.dist(path[-1],a):
+                a,b,u,v=b,a,v,u
+            lengths=[math.dist(x,y) for x,y in zip(path,path[1:])]
+            total=sum(lengths);advance=0.;shifted=[]
+            for k,p in enumerate(path):
+                t=advance/total if total else k/max(1,len(path)-1)
+                shifted.append([p[c]+(1-t)*(u[c]-a[c])+t*(v[c]-b[c]) for c in (0,1)])
+                if k<len(lengths):advance+=lengths[k]
+            if all(0<=c<=1 for p in shifted for c in p):
+                edge['evidence'].append({'source':'marker_frame_rebase',
+                    'observed_path':copy.deepcopy(path),'alignment':'panel_or_partial'})
+                edge['path']=shifted
+    return graphs
+
+
 def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
     """Use exact marker counts and a separated global assignment, or abstain.
 
@@ -87,6 +211,9 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
     bounds caused the observed all-but-one partial anchoring failure.
     """
     probe = copy.deepcopy(graphs)
+    before = copy.deepcopy(graphs)
+    def fallback():
+        return _rebase_refined_paths(refiner(image,graphs,partial=True),before)
     for g in probe:
         g.pop('bbox', None)
     markers = []
@@ -94,14 +221,23 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
     nodes = [v for g in graphs for v in g['vertices']]
     rings=connected_ring_markers(image)
     if len(rings)==len(nodes):markers=rings
+    from graph_qwen_gradient_markers import gradient_markers
+    shaded=gradient_markers(image)
+    if len(shaded)==len(nodes) and shaded:markers=shaded
     if len(markers) != len(nodes) or len(nodes) > 48:
-        return refiner(image, graphs, partial=True)
+        return fallback()
     # With a complete connected-ring inventory, remove per-panel scale/offset
     # from the matching cost. Coarse VL coordinates on the textbook displaced
     # every node in the same direction, giving nearly tied raw-distance sums.
     groups=defaultdict(list)
     for p in markers:
         if 'component' in p:groups[p['component']].append(p)
+    if len(graphs)==1 and not any(len(ps)==len(nodes) for ps in groups.values()):
+        # A coarse full-image response can use only part of the available
+        # coordinate range. Exact one-panel marker counts still permit a
+        # unique order-preserving affine frame, as for connected rings.
+        markers=[{**p,'component':'single_panel_frame'} for p in markers]
+        groups={'single_panel_frame':markers}
     owners={}; priors={}; used=set(); offset=0
     for g in graphs:
         eligible=[(key,ps) for key,ps in groups.items() if key not in used and len(ps)==len(g['vertices'])]
@@ -143,7 +279,7 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
         return True
     best = nx.min_weight_matching(assignment)
     if len(best) != len(nodes) or not order_ok(best):
-        return refiner(image, graphs, partial=True)
+        return fallback()
     cost = sum(assignment[a][b]['weight'] for a, b in best)
     # A near-equivalent full matching is unresolved, not a license to relabel
     # two actual markers. Check the runner-up without factorial enumeration.
@@ -155,7 +291,7 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
                      and sum(assignment[u][v]['weight'] for u, v in other)-cost < .015)
         assignment.add_edge(a, b, weight=weight)
         if ambiguous:
-            return refiner(image, graphs, partial=True)
+            return fallback()
     selected = {}
     for a, b in best:
         if a[0] == 'p':
@@ -228,7 +364,10 @@ def bind_measured_routes(graph, traces, ink):
         if math.dist(path[0], a)+math.dist(path[-1], b) > math.dist(path[0], b)+math.dist(path[-1], a):
             a, b = b, a
         path = [a]+path+[b]
-        proof = _ink_support(path, ink, trace.get('style'), source='qwen')
+        # The independent straight detector samples a +/-3px corridor. Using
+        # 2.5px here discarded its genuine thin diagonal (99.5% coverage).
+        tolerance=3.5 if trace.get('method')=='opencv_straight_line_coverage' else 2.5
+        proof = _ink_support(path, ink, trace.get('style'), source='qwen',tolerance_pixels=tolerance)
         if proof is not None and not _intermediate_nodes(path, trace, graph['vertices']):
             if trace.get('style') not in ('solid','dashed','dotted') and proof['continuous']:
                 trace['style']='solid'
@@ -251,7 +390,10 @@ def bind_measured_routes(graph, traces, ink):
             e['path'] = copy.deepcopy(path)
             if e['style'] == 'unknown' and trace.get('style') in ('solid', 'dashed', 'dotted'):
                 e['style'] = trace['style']
-            e['evidence'].append({'source': 'measured_route_binding', 'method': trace.get('method'), **proof})
+            e['evidence'].append({'source': 'measured_route_binding', 'method': trace.get('method'),
+                                 **proof,'trace_method':trace.get('method'),
+                                 'measurement_tolerance_pixels':3.5 if trace.get('method')=='opencv_straight_line_coverage' else 2.5,
+                                 'trace_path':copy.deepcopy(trace['path'])})
     return graph
 
 
@@ -268,7 +410,10 @@ def guard_local_decisions(graph, decisions, ink):
         d=decisions.get(e['id'],{})
         sources={p.get('source') for p in e['evidence'] if isinstance(p,dict)}
         measured=bool(sources.intersection({'pixels','measured_route_binding'}))
-        proof=(_ink_support(e['path'],ink,e['style'],source='qwen') if measured and e['path']
+        tolerance=3.5 if any(p.get('source')=='measured_route_binding'
+            and p.get('trace_method')=='opencv_straight_line_coverage'
+            for p in e['evidence'] if isinstance(p,dict)) else 2.5
+        proof=(_ink_support(e['path'],ink,e['style'],source='qwen',tolerance_pixels=tolerance) if measured and e['path']
                and not _wrong_path_endpoints(e,graph['vertices'])
                and not _intermediate_nodes(e['path'],e,graph['vertices']) else None)
         if proof is not None and d.get('visible') is True and d.get('path'):

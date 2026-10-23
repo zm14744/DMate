@@ -276,7 +276,7 @@ def test_direction_correction_changes_only_the_named_edge_instance():
     assert edges[0]['evidence'][0]['observed_from'] == 'a'
 
 
-def test_actual_adapter_failure_retains_raw_audit_and_token_metrics_without_fallback(monkeypatch):
+def test_two_failed_protocol_reads_retain_both_usage_records_without_legacy_fallback(monkeypatch):
     from ocr_nextgen import recognize_graph_document
     monkeypatch.setattr('ai.API_KEY', 'offline-test-key')
     monkeypatch.setattr('ai.VISION_ENABLED', True)
@@ -290,11 +290,12 @@ def test_actual_adapter_failure_retains_raw_audit_and_token_metrics_without_fall
     with patch('ocr_nextgen.correct_text') as text, patch('ocr_nextgen.recognize_staged') as staged:
         result = recognize_graph_document(picture(), {}, vision_provider=provider,
                                           graph_pipeline='qwen-simple-candidate')
-    assert len(requests) == 1 and result['error']
+    assert len(requests) == 2 and result['error']
     text.assert_not_called()
     staged.assert_not_called()
     metric = result['diagnostics']['remote_metrics'][0]
     assert metric['output_error'] == 'root_not_object' and metric['usage']['total_tokens'] == 7
+    assert sum(m['usage']['total_tokens'] for m in result['diagnostics']['remote_metrics'])==14
     observed = result['diagnostics']['stage_audit'][0]['observations'][0]
     assert observed['raw_content'] == '[]'
     assert 'offline-test-key' not in json.dumps(result)
@@ -306,7 +307,7 @@ def test_default_orchestration_selects_validated_pipeline_without_staged_fallbac
             'graph_qwen_simple.recognize_simple',side_effect=RuntimeError('offline')) as candidate:
         result = recognize_graph_document(picture(), {})
     assert result['error'] and candidate.call_count == 1
-    assert result['graph_display_version']=='qwen-simple-candidate-v8'
+    assert result['graph_display_version']=='qwen-simple-candidate-v15'
     assert candidate.call_args.kwargs['budget'].remaining==2
     staged.assert_not_called()
 
@@ -322,6 +323,6 @@ def test_explicit_candidate_uses_unified_display_and_existing_text_correction():
     assert candidate.call_count == 1
     staged.assert_not_called()
     text.assert_called_once_with('source')
-    assert result['graph_display_version'] == 'qwen-simple-candidate-v8'
+    assert result['graph_display_version'] == 'qwen-simple-candidate-v15'
     assert [e['id'] for e in result['graph_display_data'][0]['edges']] == ['upper', 'lower']
     assert result['text'] == 'unchanged text'

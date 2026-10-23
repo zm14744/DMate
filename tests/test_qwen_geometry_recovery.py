@@ -198,3 +198,53 @@ def test_missing_weight_crop_isolates_nearest_text_instead_of_neighbouring_value
     assert right-x<128 and bottom-y<128 and bottom<250
     job=review_job(g,result['_candidates'],plan['rect'],im.size,focus_id='edge')
     assert job['candidates'][0]['allowed_fields']==['weight']
+
+
+def test_partial_marker_movement_rebases_edge_proposals_without_label_changes():
+    from graph_qwen_geometry import _rebase_refined_paths
+    before=[make_graph()];after=copy.deepcopy(before)
+    after[0]['vertices'][0].update(x=.15,y=.45)
+    result=_rebase_refined_paths(after,before)[0]
+    assert result['edges'][0]['path']==[[.15,.45],[.7,.4]]
+    assert [v['label'] for v in result['vertices']]==['a','b']
+    assert result['edges'][0]['evidence'][-1]['observed_path']==[[.05,.4],[.7,.4]]
+
+
+def test_common_ink_ridge_merges_detectors_but_not_white_separated_parallel_paths():
+    import cv2
+    from graph_qwen_geometry import coalesce_ink_routes
+    ink=np.zeros((200,400),dtype='uint8')
+    cv2.line(ink,(60,100),(340,100),255,7)
+    cv2.line(ink,(60,112),(340,112),255,3)
+    traces=[{'from':'a','to':'b','path':[[.15,y/199],[.85,y/199]],
+             'score':score} for y,score in [(100,.99),(103,.5),(112,.9)]]
+    result=coalesce_ink_routes(traces,ink)
+    assert len(result)==2
+    assert result[0]['score']==.99
+    assert result[0]['same_ink_observations'][0]['score']==.5
+    assert result[1]['path']==traces[2]['path']
+
+
+def test_bound_rim_trace_does_not_reappear_as_new_edge_after_endpoint_extension():
+    from graph_relation import recover_relations
+    graph=make_graph();trace=[[.1,.43],[.65,.43]]
+    graph['edges'][0]['path']=[[.05,.4]]+trace+[[.7,.4]]
+    graph['edges'][0]['evidence'].append({'source':'measured_route_binding','trace_path':trace})
+    result=recover_relations(graph,[{'from':'a','to':'b','path':trace,'score':.99}])
+    assert len(result['edges'])==1 and result['edges'][0]['id']=='ab'
+
+
+def test_trace_cannot_switch_lines_at_crossing_but_can_follow_a_real_corner():
+    import cv2
+    from graph_qwen_geometry import validate_trace_junctions
+    trace={'from':'a','to':'b','method':'opencv_skeleton_tangent_trace',
+           'path':[[50/299,50/299],[150/299,150/299],[50/299,250/299]]}
+    corner=np.zeros((300,300),dtype='uint8')
+    cv2.line(corner,(50,50),(150,150),255,3)
+    cv2.line(corner,(150,150),(50,250),255,3)
+    assert validate_trace_junctions([trace],corner)==([trace],[])
+    crossing=corner.copy()
+    cv2.line(crossing,(150,150),(250,250),255,3)
+    cv2.line(crossing,(150,150),(250,50),255,3)
+    kept,notes=validate_trace_junctions([trace],crossing)
+    assert not kept and notes==['crossing_turn_rejected:a:b']

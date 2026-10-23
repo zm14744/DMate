@@ -39,12 +39,14 @@ def marker_context(image):
                 colored.append({'x':(x+w/2)/(image.width-1),'y':(y+h/2)/(image.height-1)})
     detected=[]
     refine_node_positions(image,[],partial=True,candidate_sink=detected)
-    pool=marker_inventory(colored+connected_ring_markers(image)+detected)
+    from graph_qwen_gradient_markers import gradient_markers
+    shaded=gradient_markers(image)
+    pool=marker_inventory(colored+shaded+connected_ring_markers(image)+detected)
     if len(pool)<3:return None
     for point in pool:point['id']='p'+point['id'][1:]
     from graph_black_disks import _black_disk_centers
     gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY)
-    solid=colored+[{'x':x/(image.width-1),'y':y/(image.height-1)}
+    solid=colored+shaded+[{'x':x/(image.width-1),'y':y/(image.height-1)}
                    for x,y,_,_ in _black_disk_centers(gray)]
     strong=[]
     for point in marker_inventory(solid):
