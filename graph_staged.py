@@ -70,7 +70,7 @@ def _data_url(image):
     return 'data:image/jpeg;base64,'+base64.b64encode(out.getvalue()).decode('ascii')
 
 
-def refine_node_positions(image, graphs, *, candidate_sink=None):
+def refine_node_positions(image, graphs, *, candidate_sink=None, partial=False):
     """Anchor an existing inventory to unambiguous circular pixel markers.
 
     Never add/remove/relabel vertices. Global one-to-one assignment prevents
@@ -156,15 +156,28 @@ def refine_node_positions(image, graphs, *, candidate_sink=None):
     for gi,g in enumerate(graphs):
         indices=[i for i,(group,_,_) in enumerate(nodes) if group==gi]
         # Partial anchoring can distort a connector. Require this entire panel.
-        if not indices or any(i not in assignments for i in indices): continue
+        if not indices:continue
+        partial_panel=any(i not in assignments for i in indices)
+        selected={i:assignments[i] for i in indices if i in assignments}
+        if partial_panel:
+            if not partial:continue
+            from graph_glm_adapter import partial_marker_anchors
+            eligible=[j for j in range(len(points)) if gi not in bounds or owners.get(j)==gi]
+            local=partial_marker_anchors([nodes[i][2] for i in indices],[points[j] for j in eligible])
+            selected={indices[i]:eligible[j] for i,j in local.items()}
+            if not selected:continue
         observations=[]
-        for i in indices:
-            v=nodes[i][2];x,y=points[assignments[i]]
-            observations.append({'vertex':v['id'],'source':'circular_pixel_marker',
+        for i,j in selected.items():
+            v=nodes[i][2];x,y=points[j]
+            observations.append({'vertex':v['id'],'source':'circular_pixel_marker_partial' if partial_panel else 'circular_pixel_marker',
                                  'node_position':[v['x'],v['y']],
                                  'pixel_position':[round(x,5),round(y,5)]})
             v['x'],v['y']=round(x,5),round(y,5)
         g['node_position_evidence']=observations
+        if partial_panel:
+            previous=g.get('node_review')
+            g['node_review']={**(previous if isinstance(previous,dict) else {}),'position_alignment':'partial',
+                              'position_unanchored':[nodes[i][2]['id'] for i in indices if i not in selected]}
     return graphs
 
 
@@ -289,8 +302,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
     adapted=bool(glm_adapter and getattr(provider,'name',None)=='glm')
     edge_prompt,review_prompt=EDGE_PROMPT,REVIEW_PROMPT
     if adapted:
-        from graph_glm_adapter import EDGE_PROMPT as edge_prompt, REVIEW_HINT, PROFILE
-        review_prompt+=REVIEW_HINT
+        from graph_glm_adapter import EDGE_PROMPT as edge_prompt, REVIEW_PROMPT as review_prompt, PROFILE
         diagnostics.append('vision_adapter:'+PROFILE)
     with Image.open(io.BytesIO(image_bytes)) as original:
         if original.width*original.height>16_000_000: raise ValueError('image_pixel_budget')
@@ -317,7 +329,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         graphs.append(canonical_graph(raw,n))
     if len({g['id'] for g in graphs}) != len(graphs): raise ValueError('duplicate_graph_id')
     markers=[]
-    graphs=refine_node_positions(image,graphs,candidate_sink=markers)
+    anchor_options={'partial':True} if adapted else {}
+    graphs=refine_node_positions(image,graphs,candidate_sink=markers,**anchor_options)
     review_jobs=[]
     for graph in graphs:
         box=graph.get('bbox')
@@ -346,7 +359,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 revised['node_review']={'initial_vertex_count':len(g['vertices']),
                                          'reviewed_vertex_count':len(revised['vertices'])}
                 updated.append(revised)
-            graphs=refine_node_positions(image,updated)
+            graphs=refine_node_positions(image,updated,**anchor_options)
             diagnostics.append('node_inventory_rechecked')
         except (ValueError,RuntimeError,TimeoutError):
             diagnostics.append('node_inventory_review_failed')
@@ -428,7 +441,10 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             if len(related['_candidates'])>48: diagnostics.append('review_candidate_budget_exhausted')
             if not candidates: continue
             allowed_by_graph[graph['id']]={e['id'] for e in candidates}
-            payload=_review_job(graph,candidates)
+            if adapted:
+                from graph_glm_adapter import compact_review_job
+                payload=compact_review_job(graph,candidates,image.size)
+            else:payload=_review_job(graph,candidates)
             jobs.append(payload)
         if not jobs: continue
         urls=[url]
@@ -455,6 +471,9 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 allowed=allowed_by_graph.get(graph['id'],set())
                 decisions={d['id']:d for d in (current.get('decisions') or [])
                            if isinstance(d,dict) and d.get('id') in allowed}
+                if adapted:
+                    missing=sum('path' not in d or 'style' not in d for d in decisions.values())
+                    if missing:diagnostics.append(f'glm_review_fields_missing:{missing}')
                 reviews_by_graph[graph['id']]=decisions
                 graph['inventory_reviewed']=bool(current.get('inventory_complete') is True
                     and allowed and set(decisions)==allowed and len(output[index]['_candidates'])<=48)
@@ -485,7 +504,10 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             bottom=min(image.height,round(max(p[1] for p in points)*image.height)+35)
             if right>left and bottom>top:
                 try:
-                    payload=_review_job(graph,candidates)
+                    if adapted:
+                        from graph_glm_adapter import compact_review_job
+                        payload=compact_review_job(graph,candidates,image.size)
+                    else:payload=_review_job(graph,candidates)
                     verified=ask(review_prompt+'\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。'
                         +'沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。仅返回decisions列表。\n'
                         +json.dumps(payload,ensure_ascii=False),[url,_data_url(image.crop((left,top,right,bottom)))],budget)

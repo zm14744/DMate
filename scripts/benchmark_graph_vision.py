@@ -24,7 +24,7 @@ from graph_schema import canonical_graph
 from graph_staged import Budget,recognize_staged,NODE_PROMPT,EDGE_PROMPT,REVIEW_PROMPT
 from graph_validation import audit_graph_records
 from vision_provider import VisionProvider,VisionError,GLM_MODEL,GLM_PAID_MODEL
-from graph_glm_adapter import PROFILE as GLM_PROFILE, EDGE_PROMPT as GLM_EDGE_PROMPT, REVIEW_HINT as GLM_REVIEW_HINT
+from graph_glm_adapter import PROFILE as GLM_PROFILE, EDGE_PROMPT as GLM_EDGE_PROMPT, REVIEW_PROMPT as GLM_REVIEW_PROMPT
 
 RAW_PROMPT='''独立读取这张图论原图，不解题，不依靠图名、常见模板或度数补点补边。
 只返回JSON：{"graphs":[{"id":"G1","name":"原图图号或G1","directed":false,"weighted":false,
@@ -293,7 +293,7 @@ def main():
               'source_commit':source_commit,
               'code_sha256':code_hash,'resource_limits':limits,'question_original_count':len(cases),
               'provided_file_count':manifest.get('provided_file_count'),'deduplicated':duplicates,
-              'prompt_templates_sha256':sha((RAW_PROMPT+NODE_PROMPT+EDGE_PROMPT+REVIEW_PROMPT+GLM_EDGE_PROMPT+GLM_REVIEW_HINT).encode()),
+              'prompt_templates_sha256':sha((RAW_PROMPT+NODE_PROMPT+EDGE_PROMPT+REVIEW_PROMPT+GLM_EDGE_PROMPT+GLM_REVIEW_PROMPT).encode()),
               'glm_adaptation_profile':GLM_PROFILE if args.glm_adapter=='native' else 'baseline',
               'inventory_only':args.inventory_only,'preprocessing_by_case':[]}
     records=[];cache=Path(args.layout_cache).resolve() if args.layout_cache else out/'layout-cache'

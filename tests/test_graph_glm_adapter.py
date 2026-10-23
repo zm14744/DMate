@@ -1,7 +1,7 @@
 """Evidence-contract regressions, not claims of real OCR accuracy."""
 import copy
 import pytest
-from graph_glm_adapter import bind_pixel_routes, receive_review_routes
+from graph_glm_adapter import bind_pixel_routes, receive_review_routes, partial_marker_anchors, compact_review_job
 from graph_staged import merge_node_reads
 from graph_relation import recover_relations
 
@@ -114,3 +114,32 @@ def test_review_route_sampling_uses_pixels_on_a_wide_non_square_image():
     decisions={'e1':{'visible':True,'path':[[.1,.5],[.5,.2],[.9,.5]]}}
     repaired=receive_review_routes(graph([edge(path=[])]),decisions,ink)
     assert repaired['edges'][0]['evidence'][-1]['source']=='glm_review_route_verified'
+
+
+def test_partial_anchors_move_only_close_unambiguous_existing_vertices():
+    vertices=[{'id':'a','x':.1,'y':.5},{'id':'b','x':.8,'y':.8}]
+    before=copy.deepcopy(vertices)
+    assert partial_marker_anchors(vertices,[(.11,.5),(.4,.3)])=={0:0}
+    assert vertices==before
+
+
+@pytest.mark.parametrize('vertices,points',[
+    ([{'x':.1,'y':.5}],[(.09,.5),(.11,.5)]),
+    ([{'x':.1,'y':.5},{'x':.11,'y':.5}],[(.105,.5)]),
+    ([{'x':.1,'y':.5}],[(.2,.5)]),
+])
+def test_partial_anchors_reject_ambiguous_or_large_coordinate_changes(vertices,points):
+    assert partial_marker_anchors(vertices,points)=={}
+
+
+def test_compact_review_keeps_pixel_arrow_proof_and_explicit_geometry():
+    candidate=edge(path=[])
+    candidate['evidence']=[{'source':'node_read','vertex':'a'},
+                           {'source':'arrow_pixels','from':'a','to':'b','score':.9}]
+    g=graph([candidate]);g['bbox']=[0,0,1,1]
+    job=compact_review_job(g,[candidate],(801,201))
+    assert job['geometry']['original_size']==[801,201]
+    assert job['geometry']['coordinate_space']=='original_image_normalized'
+    assert job['candidates'][0]['needs_path']
+    assert job['candidates'][0]['evidence']==[candidate['evidence'][1]]
+    assert candidate['evidence'][0]['source']=='node_read'
