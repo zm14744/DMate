@@ -20,7 +20,8 @@ def test_always_thinking_is_explicit_and_cannot_silently_be_marked_off():
     assert payload['thinking']=={'type':'enabled'} and payload['reasoning_effort']=='low'
     assert payload['do_sample'] is False and payload['stream'] is True
     assert payload['messages'][0]['content'][1]['image_url']=={'url':URL.split(',',1)[1]}
-    assert not {'enable_thinking','thinking_budget','stream_options','temperature','response_format'}&payload.keys()
+    assert payload['response_format']=={'type':'json_object'}
+    assert not {'enable_thinking','thinking_budget','stream_options','temperature'}&payload.keys()
 
 
 @pytest.mark.parametrize('effort',['low','high','max'])
@@ -57,7 +58,7 @@ def test_no_substitution_with_flashx_paid_or_unidentified_model(returned,valid,m
 
 
 def test_profile_keeps_stable_topology_contract_not_v6():
-    assert adaptation_profile('glm','staged','native',GLM_53_FLASH_MODEL)=='glm53-native-v1'
+    assert adaptation_profile('glm','staged','native',GLM_53_FLASH_MODEL)=='glm53-native-v2'
     assert adaptation_profile('glm','raw','native',GLM_53_FLASH_MODEL)=='baseline'
     with pytest.raises(ValueError):adaptation_profile('glm','staged','experimental',GLM_53_FLASH_MODEL)
 

@@ -72,12 +72,15 @@ usage、请求错误、输入 SHA、全部预测边及仅 accepted 边的辅助�
 官方模型目录和真实接口反馈，不冒称完整文档已读取。
 
 新配置强制显式开启思考，默认effort低档，拒绝对旧GLM/Qwen误传该参数。
+已通过真实教材照片验证GLM 5.3可在开启思考时使用response_format=json_object。
+早期没有JSON模式时会在根JSON之后追加说明，严格解析失败；不截取内层对象伪装成功。
+新协议使用GLM支持的JSON模式；Qwen思考开启的请求不照搬此字段。
 不传Qwen专属enable_thinking/detail/stream_options，也不将开启思考标为关闭。
 记录实际reasoning_chars、完整usage及返回模型；拒绝FlashX/付费版/无模型身份替代。
 思考Token已包含在completion_tokens时不能再次加总。费用不得套用旧glm-4.6v单价，
 未取得5.3 Flash可靠单价前只列真实用量，人民币费用标为未核实。
 
-独立新适配 `glm53-native-v1` 复用已验证V2的观察ID、唯一像素线绑定和原图墨迹检查，
+独立新适配 `glm53-native-v2` 复用已验证V2的观察ID、唯一像素线绑定和原图墨迹检查，
 保留NODE→EDGE→TRACE→RELATE→REVIEW，不启用退步的V6圆点实验，也不混用Qwen答案。
 先小批量验证，再以同一批原图和独立真值做raw/staged，思考模式单独分组：
 

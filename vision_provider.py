@@ -119,7 +119,11 @@ class VisionProvider:
             # Zhipu's SDK treats temperature=0 as do_sample=False, not a valid
             # raw API temperature. Omit temperature when sampling is disabled.
             payload.update(thinking={'type':'enabled' if self.thinking else 'disabled'},do_sample=False)
-            if self.model==GLM_53_FLASH_MODEL:payload['reasoning_effort']=self.reasoning_effort
+            if self.model==GLM_53_FLASH_MODEL:
+                payload['reasoning_effort']=self.reasoning_effort
+                # Verified on original photos: GLM 5.3 accepts JSON mode while
+                # thinking is enabled. Qwen's thinking payload is different.
+                payload['response_format']={'type':'json_object'}
             if not self.thinking:payload['response_format']={'type':'json_object'}
         return payload
 
