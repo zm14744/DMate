@@ -295,9 +295,11 @@ def merge_node_reads(graph, reads, *, shared_observations=False):
 
 
 def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budget=None,
-                     glm_adapter=True):
+                     glm_adapter=True, review_router=None):
     """Return canonical graphs; failures are explicit and never crash /ocr."""
     if call is not None and provider is not None: raise ValueError('Choose call or provider')
+    if review_router is not None and getattr(provider,'name',None)!='qwen':
+        raise ValueError('Hybrid review requires an explicit Qwen primary provider')
     budget=budget or Budget(); ask=call or provider or _call; diagnostics=[]
     adapted=bool(glm_adapter and getattr(provider,'name',None)=='glm')
     experimental=bool(adapted and glm_adapter=='experimental')
@@ -489,7 +491,10 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             envelope=('\n返回扁平decisions列表，每条含graph_id；completed_graph_ids只列全部核实的图。\n'
                       if experimental else '\n对每幅图分别返回 {"graphs":[{"graph_id":"G1",'
                       '"decisions":[],"inventory_complete":false}]}，ID仅在本图内有效。\n')
-            verified=ask(review_prompt+envelope
+            routed=bool(review_router is not None and review_router.select(jobs,output,budget))
+            review_ask=review_router if routed else ask
+            if routed:diagnostics.append('hybrid_glm_review_replaced_slot')
+            verified=review_ask(review_prompt+envelope
                 +json.dumps({'requests':jobs},ensure_ascii=False),urls,budget)
             if experimental:
                 from graph_glm_adapter import unpack_reviews
@@ -512,8 +517,11 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 reviews_by_graph[graph['id']]=decisions
                 graph['inventory_reviewed']=bool(current.get('inventory_complete') is True
                     and allowed and set(decisions)==allowed and len(output[index]['_candidates'])<=48)
-                if adapted:
+                if adapted or routed:
                     from graph_glm_adapter import receive_review_routes
+                    if routed:
+                        from graph_glm_adapter import review_route_ink
+                        glm_ink=review_route_ink(image)
                     graph=receive_review_routes(graph,decisions,glm_ink)
                     graphs[index]=graph
                 output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions)
@@ -578,5 +586,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                         graph=receive_review_routes(graph,review,glm_ink)
                     output[0]=recover_relations(graph,panels.get(graph['id'],[]),review=review)
                 except (ValueError,RuntimeError,TimeoutError): diagnostics.append('focused_arrow_review_failed')
-    return {'graphs':output,'diagnostics':diagnostics,'calls_remaining':budget.remaining,
+    result={'graphs':output,'diagnostics':diagnostics,'calls_remaining':budget.remaining,
             'remote_metrics':budget.metrics}
+    if review_router is not None:
+        result['hybrid_review_events']=copy.deepcopy(review_router.events)
+    return result

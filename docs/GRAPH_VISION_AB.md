@@ -35,3 +35,31 @@ V5 (`glm-native-v5`) 在坐标锚定不足或顶点近乎重叠时，增加一�
 V6 (`glm-native-v6`) 明确要求每个候选ID都有判定，重复笔画的额外ID须返回false，不能只列确认项；边的独立线迹与多边拼成的通路严格区分。单图预留复核在剩余预算内同时覆盖遗漏项和箭头冲突，不依据省略自动删除候选，预算用尽仍保留pending。多图判定继续以graph_id隔离，Qwen旧流程不改。V5中真实边全部验证但早期未核重复观察仍留在edges的案例单独保存，不能拿accepted分数替换候选分数冒充整图全对。
 
 本轮V6的5张成功同图配对F1低于V2，故默认 `--glm-adapter native` 恢复为 `glm-native-v2`，新流程仅通过 `--glm-adapter experimental`（Python `glm_adapter='experimental'`）显式启用。`baseline`仍是旧共享契约，Qwen默认不变。六张历史响应的离线回放验证默认V2与6562c17的提示、输入图片SHA和输出逐项相同；这是兼容性机制检查，不是新增真实识别成绩。V6实测源提交为947864a，当时native指向V6；复现实验应检出该提交或使用experimental的新输出目录，不能用当前native覆盖旧指纹。
+# 限时混合复核实验（显式启用）
+
+`scripts/benchmark_graph_hybrid.py` 对相同原图分别真实运行单 Qwen 与
+Qwen 主识别、GLM 局部复核。两条件各自调用真实 NODE/EDGE，不回放或复用另一条件的
+模型输出；版面缓存和独立人工真值相同，模型不读取真值。执行顺序逐图交替。
+
+两条件保留生产大小的 155 秒、最多 7 次请求、Qwen 单次 45 秒预算。
+`HybridReview` 仅在方向、平行候选、权值或线迹冲突出现时，最多**替换一次**原有
+REVIEW 调用；候选总数最多 24，付费 `glm-4.6v` 关闭思考、限时 25 秒、零重试。
+没有新增串行调用，也不会失败后再追加 Qwen 重试。其他阶段和后续复核继续 Qwen。
+GLM 提交的新路径仍须通过原图墨迹与几何校验，不能绕过 RELATE。
+没有环境变量自动切换，网站调用未启用该实验。
+
+运行时需要两种密钥及 2 CPU / 4 GiB 受限容器。将原图、真值、输出目录保存在仓库外：
+
+```sh
+python -B scripts/benchmark_graph_hybrid.py \
+  --manifest /private/ab-manifest.json --output /private/hybrid-run \
+  --layout-cache /private/layout-cache --case-ids CASE1,CASE2
+```
+
+`--stop-after 2` 先执行预声明样本的前两张；之后同协议 `--resume` 继续，原结果不覆盖。
+预设时间目标：全部尝试的平均模块耗时不超过单 Qwen 的 1.2 倍，同时检查最大耗时、
+完成率和准确率；不能以失败或限流的快速返回宣称提速。记录每阶段原始响应、模型版本、
+usage、请求错误、输入 SHA、全部预测边及仅 accepted 边的辅助评分。失败单列、不给漏边分。
+本工具仅覆盖真实拓扑模块；完整 `/ocr`、文字校正与 Playwright 验收须另外执行。
+小样本独立 NODE/EDGE 可能波动，不能把全部成绩差值直接归因于局部复核模型。
+
