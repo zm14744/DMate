@@ -285,13 +285,15 @@ def test_actual_adapter_failure_retains_raw_audit_and_token_metrics_without_fall
     assert 'offline-test-key' not in json.dumps(result)
 
 
-def test_default_orchestration_does_not_select_candidate():
+def test_default_orchestration_selects_validated_pipeline_without_staged_fallback():
     from ocr_nextgen import recognize_graph_document
-    with patch('ocr_nextgen.recognize_staged', side_effect=RuntimeError('offline')) as staged, patch(
-            'graph_qwen_simple.recognize_simple') as candidate:
+    with patch('ocr_nextgen.recognize_staged') as staged, patch(
+            'graph_qwen_simple.recognize_simple',side_effect=RuntimeError('offline')) as candidate:
         result = recognize_graph_document(picture(), {})
-    assert result['error'] and staged.call_count == 1
-    candidate.assert_not_called()
+    assert result['error'] and candidate.call_count == 1
+    assert result['graph_display_version']=='qwen-simple-candidate-v6'
+    assert candidate.call_args.kwargs['budget'].remaining==2
+    staged.assert_not_called()
 
 
 def test_explicit_candidate_uses_unified_display_and_existing_text_correction():

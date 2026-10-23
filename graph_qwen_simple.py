@@ -1,4 +1,4 @@
-"""Isolated two-call Qwen candidate. Never selected by production configuration.
+"""Two-call Qwen recognizer behind the existing graph-nextgen application gate.
 
 Local tests establish protocol/geometry behavior, not image recognition accuracy.
 """
@@ -224,7 +224,7 @@ def _node_ambiguities(graph, image_size):
 
 
 def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=False):
-    """Explicitly invoked candidate; at most two Qwen attempts, zero retries."""
+    """At most two Qwen attempts, zero retries; measured text when supported."""
     if provider is not None and (getattr(provider, 'name', 'qwen') != 'qwen'
             or getattr(provider, 'model', QWEN_MODEL) != QWEN_MODEL or getattr(provider, 'retries', 0) != 0):
         raise ValueError('qwen_simple_requires_fixed_provider_without_retries')

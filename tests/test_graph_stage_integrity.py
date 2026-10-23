@@ -110,7 +110,7 @@ def test_failed_node_returns_error_instead_of_starting_legacy_vision():
         kw['budget'].take();kw['budget'].metrics.append({'provider':'qwen','status':'transport_failed'})
         raise RuntimeError('transport_failed')
     with patch('ocr_nextgen.recognize_staged',side_effect=fail),patch('ocr_nextgen.correct_text') as text:
-        result=recognize_graph_document(png(),{})
+        result=recognize_graph_document(png(),{},graph_pipeline='staged')
     assert result is not None and result['error']
     assert result['diagnostics']['stages']==['graph_pipeline_failed']
     assert len(result['diagnostics']['remote_metrics'])==1

@@ -1,4 +1,4 @@
-"""Opt-in orchestration; original /ocr stays available as a fallback."""
+"""Graph-nextgen orchestration; spent graph budgets never start old vision."""
 from __future__ import annotations
 import os
 from graph_schema import display_graph
@@ -8,9 +8,9 @@ from ocr_correction import correct_text
 from ocr_layout import partition_text
 
 
-def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeline='staged'):
-    # Internal experiment hook only: no request field or environment variable
-    # can switch production away from the retained staged implementation.
+def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeline='qwen-simple-candidate'):
+    # Validated branch default; staged remains an explicit code-level rollback.
+    # The app's existing graph-nextgen gate and production environment are unchanged.
     if graph_pipeline not in ('staged','qwen-simple-candidate'):
         raise ValueError('Unknown graph pipeline')
     engine=recognize_staged
