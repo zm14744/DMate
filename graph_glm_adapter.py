@@ -10,7 +10,7 @@ import math
 from graph_schema import path_points
 from graph_relation import _samples, _wrong_path_endpoints, _intermediate_nodes
 
-PROFILE = 'glm-native-v1'
+PROFILE = 'glm-native-v2'
 
 EDGE_PROMPT = '''执行 EDGE 阶段：读原图中的图论连接关系，不解题。仅输出合法JSON。
 先在第一张原图看清一条线的两个真实端点，再读取箭头、权值，最后记录你能定位的线迹坐标。
@@ -39,6 +39,11 @@ REVIEW_HINT = '''\nGLM复核补充：先独立沿原图的真实笔画核对候�
 visible=true不能跳过像素证据校验。不要因候选列表中有两个相反方向就假定双向。
 无向线direction=undirected；只在实际看见箭头时选forward/reverse。
 带权边逐条读原图数字；看不清写null，禁止从上一条边或候选顺序推测。'''
+REVIEW_HINT += '''\n如果确认visible=true，但候选path为空、仅中段或位置明显不符，在该decision增加path字段：
+path是完整原图归一化坐标的2至8个真实线迹点，首尾用固定顶点表中的端点坐标，曲线须有弯曲中段。
+例如字段形状为"path":[[0.1,0.2],[0.2,0.3]]，示例坐标不是答案。
+不要用端点直线代替真实弧线，不确定则不给path，保留待确认。
+系统会独立核对原图墨迹连续性；visible=true本身不能绕过该校验。'''
 
 
 def _coverage(fragment, route):
@@ -95,4 +100,74 @@ def bind_pixel_routes(graph, traces):
             'trace_method':traces[j].get('method'), 'trace_score':traces[j].get('score'),
             'fragment_coverage':coverage})
         edge['path'] = route
+    return graph
+
+
+def review_route_ink(image):
+    """Reuse the existing foreground extractor in bounded image dimensions."""
+    import numpy as np
+    from graph_line_tracer import _foreground
+    picture=image.copy();picture.thumbnail((1600,1600))
+    return _foreground(np.asarray(picture))
+
+
+def _ink_support(path, ink, style, *, distance=None):
+    import cv2
+    import numpy as np
+    height,width=ink.shape
+    length=sum(math.hypot((a[0]-b[0])*(width-1),(a[1]-b[1])*(height-1))
+               for a,b in zip(path,path[1:]))
+    if length<16:return None
+    # Distance to actual foreground, never a painted/synthetic connector.
+    if distance is None:
+        distance=cv2.distanceTransform((ink==0).astype('uint8'),cv2.DIST_L2,3)
+    points=_samples(path,min(1200,max(40,round(length))))
+    # Hollow node interiors are not white gaps in the connecting stroke.
+    trim=max(2,round(len(points)*.07));points=points[trim:-trim]
+    hits=[distance[min(height-1,round(p[1]*(height-1))),
+                   min(width-1,round(p[0]*(width-1)))]<=2.5 for p in points]
+    runs=[]
+    for hit in hits:
+        if runs and runs[-1][0]==hit:runs[-1][1]+=1
+        else:runs.append([hit,1])
+    coverage=sum(hits)/len(hits)
+    gaps=[count for hit,count in runs if not hit]
+    gap=max(gaps,default=0)*length/max(1,len(points)+2*trim)
+    continuous=coverage>=.86 and gap<=max(6,min(12,length*.04))
+    dashed=(style in ('dashed','dotted') and .4<=coverage<.90
+            and len(gaps)>=3 and max(gaps)/max(1,min(gaps))<=2.5
+            and gap<=min(20,length*.13))
+    return {'coverage':round(coverage,4),'largest_gap_pixels':round(gap,2),
+            'method':'glm_review_original_ink','continuous':bool(continuous),
+            'dashed':bool(dashed)} if continuous or dashed else None
+
+
+def receive_review_routes(graph, decisions, ink):
+    """Receive corrections only for existing IDs, with independent ink proof.
+
+    No new edge/vertex, endpoint, arrow or numeric attribute is supplied here.
+    Normal RELATE conflicts and uncertainty rules still apply afterwards.
+    """
+    graph=copy.deepcopy(graph)
+    distance=None
+    for edge in graph['edges']:
+        decision=decisions.get(edge['id'],{})
+        route=path_points(decision.get('path'))
+        if decision.get('visible') is not True or not route or len(route)>8:
+            continue
+        candidate={**edge,'path':route}
+        if (_wrong_path_endpoints(candidate,graph['vertices'],tolerance=.02)
+                or _intermediate_nodes(route,candidate,graph['vertices'])):
+            edge['evidence'].append({'source':'glm_review_route_rejected','reason':'geometry'})
+            continue
+        if distance is None:
+            import cv2
+            distance=cv2.distanceTransform((ink==0).astype('uint8'),cv2.DIST_L2,3)
+        proof=_ink_support(route,ink,decision.get('style',edge.get('style')),distance=distance)
+        if proof is None:
+            edge['evidence'].append({'source':'glm_review_route_rejected','reason':'ink_gap'})
+            continue
+        edge['evidence'].append({'source':'glm_review_route_verified',
+            'observed_path':copy.deepcopy(edge.get('path',[])),**proof})
+        edge['path']=route
     return graph

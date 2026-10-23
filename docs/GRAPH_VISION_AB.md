@@ -2,7 +2,7 @@
 
 生产默认仍为 Qwen3-VL-Plus；配置 ZHIPU_API_KEY 不会改变默认模型。Provider 支持显式选择 glm-4.6v-flash 或 glm-4.6v；两者不能自动切换。付费模型只用于用户已授权的对比运行。沿用 PP-DocLayoutV3、PP-OCRv6 Small、DeepSeek 与原有拓扑恢复算法。
 
-正式付费对比使用 `scripts/benchmark_graph_vision.py --glm-model glm-4.6v --experiments staged --thinking off --retries 0`。先2张原图验证，再扩大同一批样本；Flash结果保留作补充。同图的两种 Provider 共享原图、预处理版面结果、提示词、裁图规则、NODE→EDGE→TRACE→全局关系→复核和 NetworkX 检查，固定 155 秒/7 次调用，每次最多45秒，失败重试计入总调用预算。串行执行，交替模型先后顺序。关闭思考的结果不与开启思考混合。
+历史共享契约的正式付费对比可用 `scripts/benchmark_graph_vision.py --glm-model glm-4.6v --glm-adapter baseline --experiments staged --thinking off --retries 0` 复现。先2张原图验证，再扩大同一批样本；Flash结果保留作补充。同图的两种 Provider 共享原图、预处理版面结果、提示词、裁图规则、NODE→EDGE→TRACE→全局关系→复核和 NetworkX 检查，固定 155 秒/7 次调用，每次最多45秒，失败重试计入总调用预算。串行执行，交替模型先后顺序。关闭思考的结果不与开启思考混合。
 
 运行时必须在总计2CPU/4GiB cgroup 内。通过环境变量注入 ZHIPU_API_KEY、DASHSCOPE_API_KEY；日志不含密钥。Qwen 使用自己的 enable_thinking、stream_options；GLM 使用 thinking.type、do_sample 和官方支持的图片编码。两者在关闭思考时均启用原生 response_format=json_object；付费GLM已用原图真实请求验证此参数。早期未启用此参数的结果单独保存，不与正式结果混合。HTTP成功与输出可解析率分别统计。保存实际请求、耗时、API返回Token及未报告用量的覆盖范围；失败请求Token不估算为零。
 
@@ -20,6 +20,8 @@
 
 ## GLM 单独适配复测
 
-`--glm-adapter native`（新默认）仅对显式注入的 GLM Provider 使用 `glm-native-v1` 契约：简化 EDGE 提示，区分连接关系和坐标观察；按同批共享观察 ID 合并重复引用，保留不同 ID 的平行笔画；不完整坐标只有与唯一高置信 OpenCV 线迹双向唯一匹配时才补全。原坐标和补全来源保存在 evidence，端点、方向、权值不由适配器修改，原有交叉点与端点校验仍生效。Qwen 的提示、默认调用路径、时限和生产配置不变。
+`--glm-adapter native`（新默认）仅对显式注入的 GLM Provider 使用 `glm-native-v2` 契约：简化 EDGE 提示，区分连接关系和坐标观察；按同批共享观察 ID 合并重复引用，保留不同 ID 的平行笔画；不完整坐标只有与唯一高置信 OpenCV 线迹双向唯一匹配时才补全。原坐标和补全来源保存在 evidence，端点、方向、权值不由适配器修改，原有交叉点与端点校验仍生效。GLM的REVIEW还可以为已有候选ID补交完整路径，只有端点/中间顶点检查及原图墨迹覆盖、连续空白段检查通过后才接收；不创建边，不凭visible=true认证路径。原坐标与接受/拒绝原因保留。Qwen 的提示、默认调用路径、时限和生产配置不变。
 
 `--glm-adapter baseline` 保留旧共享契约，便于复现。配置和代码哈希进入条件指纹，旧结果不会被覆盖或冒充适配后的结果。原始视觉实验不启用适配。单独复测使用 `--providers glm --glm-model glm-4.6v --glm-adapter native --experiments staged --thinking off --retries 0 --vision-timeout 300 --call-timeout 90`，先小批量再扩到先前固定原图。参考结构不进入提示词，适配前后比较须核对原图、版面和真值哈希；GLM 专用提示与旧版已不同，因此不是重新进行等价提示词的双模型能力排名。
+
+适配首轮 `glm-native-v1` 的候选边F1提升，但很多边没有完整路径而保持pending。V2针对这一已记录限制增加上述复核路径接收；两版真实结果分目录保留，不能混合挑选每图最优。主表沿用原评分（含pending预测边）；报告同时列出仅accepted边的辅助分数，避免将候选识别等同于证据已经验证。

@@ -408,6 +408,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
     if adapted:
         from graph_glm_adapter import bind_pixel_routes
         graphs=[bind_pixel_routes(g,panels.get(g['id'],[])) for g in graphs]
+        from graph_glm_adapter import review_route_ink
+        glm_ink=review_route_ink(image)
     output=[recover_relations(g,panels.get(g['id'],[])) for g in graphs]
     initial_candidates={g['id']:copy.deepcopy(output[i]['_candidates']) for i,g in enumerate(graphs)}
     reviews_by_graph={}
@@ -456,6 +458,10 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 reviews_by_graph[graph['id']]=decisions
                 graph['inventory_reviewed']=bool(current.get('inventory_complete') is True
                     and allowed and set(decisions)==allowed and len(output[index]['_candidates'])<=48)
+                if adapted:
+                    from graph_glm_adapter import receive_review_routes
+                    graph=receive_review_routes(graph,decisions,glm_ink)
+                    graphs[index]=graph
                 output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions)
         except (ValueError,RuntimeError,TimeoutError): diagnostics.append('local_review_failed')
     if len(graphs)==1:
@@ -490,6 +496,9 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     allowed={c['id'] for c in candidates}
                     review=dict(reviews_by_graph.get(graph['id'],{}))
                     review.update({d['id']:d for d in (changes or []) if isinstance(d,dict) and d.get('id') in allowed})
+                    if adapted:
+                        from graph_glm_adapter import receive_review_routes
+                        graph=receive_review_routes(graph,review,glm_ink)
                     output[0]=recover_relations(graph,panels.get(graph['id'],[]),review=review)
                 except (ValueError,RuntimeError,TimeoutError): diagnostics.append('focused_arrow_review_failed')
     return {'graphs':output,'diagnostics':diagnostics,'calls_remaining':budget.remaining,

@@ -1,7 +1,7 @@
 """Evidence-contract regressions, not claims of real OCR accuracy."""
 import copy
 import pytest
-from graph_glm_adapter import bind_pixel_routes
+from graph_glm_adapter import bind_pixel_routes, receive_review_routes
 from graph_staged import merge_node_reads
 from graph_relation import recover_relations
 
@@ -75,3 +75,32 @@ def test_distinct_ids_in_same_batch_do_not_collapse_close_parallel_paths():
           {**edge('r2',[[.1,.501],[.9,.501]]),'_observation_id':(0,'G1','r2')}]
     reads=[{'vertex':v,'complete':True,'edges':[r]} for v,r in zip(('a','b'),raws)]
     assert len(merge_node_reads(graph([]),reads,shared_observations=True)['edges'])==2
+
+
+def test_review_can_supply_a_full_route_only_when_real_ink_supports_it():
+    import numpy as np
+    import cv2
+    ink=np.zeros((201,401),dtype='uint8');cv2.line(ink,(40,100),(360,100),255,2)
+    original=graph([edge(path=[])])
+    decisions={'e1':{'visible':True,'direction':'forward','path':[[.1,.5],[.9,.5]]}}
+    repaired=receive_review_routes(original,decisions,ink)
+    assert repaired['edges'][0]['path']==[[.1,.5],[.9,.5]] and original['edges'][0]['path']==[]
+    assert repaired['edges'][0]['evidence'][-1]['source']=='glm_review_route_verified'
+    result=recover_relations(repaired,[],review=decisions)
+    assert result['edges'][0]['status']=='accepted'
+    # One long white gap cannot become a connector through visual confirmation.
+    ink[:,170:230]=0
+    rejected=receive_review_routes(original,decisions,ink)
+    assert rejected['edges'][0]['path']==[]
+    assert rejected['edges'][0]['evidence'][-1]['reason']=='ink_gap'
+
+
+def test_review_cannot_create_an_edge_or_bypass_real_intermediate_vertices():
+    import numpy as np
+    ink=np.ones((201,401),dtype='uint8')*255
+    original=graph([edge(path=[])]);original['vertices'].append({'id':'c','x':.5,'y':.5})
+    decisions={'e1':{'visible':True,'path':[[.1,.5],[.9,.5]]},
+               'new_id':{'visible':True,'path':[[.1,.5],[.9,.5]]}}
+    result=receive_review_routes(original,decisions,ink)
+    assert len(result['edges'])==1 and result['edges'][0]['path']==[]
+    assert result['edges'][0]['evidence'][-1]['reason']=='geometry'
