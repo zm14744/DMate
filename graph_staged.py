@@ -458,10 +458,15 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                                                           int(x2*image.width),int(y2*image.height)))))
                 except (ValueError,TypeError): pass
         try:
-            verified=ask(review_prompt+'\n对每幅图分别返回 {"graphs":[{"graph_id":"G1",'
-                '"decisions":[],"inventory_complete":false}]}，ID仅在本图内有效。\n'
+            envelope=('\n返回扁平decisions列表，每条含graph_id；completed_graph_ids只列全部核实的图。\n'
+                      if adapted else '\n对每幅图分别返回 {"graphs":[{"graph_id":"G1",'
+                      '"decisions":[],"inventory_complete":false}]}，ID仅在本图内有效。\n')
+            verified=ask(review_prompt+envelope
                 +json.dumps({'requests':jobs},ensure_ascii=False),urls,budget)
-            reviewed=verified.get('graphs')
+            if adapted:
+                from graph_glm_adapter import unpack_reviews
+                reviewed=unpack_reviews(verified,single_graph_id=jobs[0]['graph_id'] if len(jobs)==1 else None)
+            else:reviewed=verified.get('graphs')
             # Retain the single-panel response contract for existing clients.
             if reviewed is None and len(jobs)==1:
                 reviewed=[dict(verified,graph_id=jobs[0]['graph_id'])]

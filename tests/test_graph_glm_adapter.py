@@ -1,7 +1,7 @@
 """Evidence-contract regressions, not claims of real OCR accuracy."""
 import copy
 import pytest
-from graph_glm_adapter import bind_pixel_routes, receive_review_routes, partial_marker_anchors, compact_review_job
+from graph_glm_adapter import bind_pixel_routes, receive_review_routes, partial_marker_anchors, compact_review_job, unpack_reviews
 from graph_staged import merge_node_reads
 from graph_relation import recover_relations
 
@@ -143,3 +143,24 @@ def test_compact_review_keeps_pixel_arrow_proof_and_explicit_geometry():
     assert job['candidates'][0]['needs_path']
     assert job['candidates'][0]['evidence']==[candidate['evidence'][1]]
     assert candidate['evidence'][0]['source']=='node_read'
+
+
+def test_flat_review_ids_are_scoped_to_their_actual_panels():
+    raw={'decisions':[{'graph_id':'G1','id':'e1','visible':True},
+                      {'graph_id':'G2','id':'e1','visible':False}],
+         'completed_graph_ids':['G2']}
+    groups={g['graph_id']:g for g in unpack_reviews(raw)}
+    assert groups['G1']['decisions'][0]['visible'] is True
+    assert groups['G2']['decisions'][0]['visible'] is False
+    assert not groups['G1']['inventory_complete'] and groups['G2']['inventory_complete']
+
+
+def test_unscoped_flat_decision_cannot_be_assigned_to_a_multi_panel_job():
+    raw={'decisions':[{'id':'e1','visible':True}]}
+    assert unpack_reviews(raw)==[]
+    assert unpack_reviews(raw,single_graph_id='G1')[0]['graph_id']=='G1'
+
+
+def test_nested_legacy_reviews_remain_compatible_without_answer_mutation():
+    raw={'graphs':[{'graph_id':'G1','decisions':[],'inventory_complete':False}]}
+    assert unpack_reviews(raw)==raw['graphs']
