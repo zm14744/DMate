@@ -24,7 +24,7 @@ def gradient_markers(image,*,include_uniform=False,highlight=False):
   shaded=40<=np.median(values)<=(235 if highlight else 210) and np.std(values)>=(16 if highlight else 18) and np.percentile(values,75)-np.percentile(values,25)>=25
   if not shaded and not np.median(values)<80:continue
   if shaded:gradient.append((bw+bh)/4)
-  points.append({'x':cx/(w-1),'y':cy/(h-1),'radius_pixels':(bw+bh)/4,'median':float(np.median(values)),'std':float(np.std(values))})
+  points.append({'x':cx/(w-1),'y':cy/(h-1),'radius_pixels':(bw+bh)/4,'median':float(np.median(values)),'std':float(np.std(values)),'marker_profile':'native_filled_disk'})
  if len(gradient)<4:
   if not include_uniform or len(points)<4:return []
   common=float(np.median([p['radius_pixels'] for p in points]))

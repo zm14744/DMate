@@ -406,9 +406,12 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         emit('TRACE', panels=panels)
         from graph_glm_adapter import review_route_ink  # CPU-only original ink.
         ink = review_route_ink(image)
-        from graph_qwen_geometry import validate_curve_tangents,coalesce_ink_routes,validate_trace_junctions,validate_trace_markers
+        from graph_qwen_geometry import validate_curve_tangents,coalesce_ink_routes,validate_trace_junctions,validate_trace_markers,trim_native_rim_paths
         for gid,paths in panels.items():
-            panels[gid],notes=validate_curve_tangents(paths,ink)
+            native_graph=next(g for g in graphs if g['id']==gid)
+            paths=trim_native_rim_paths(paths,native_graph,image.size)
+            strict_rings=bool(native_graph.get('node_position_evidence')) and all(p.get('marker_profile')=='native_hollow_size_consensus' for p in native_graph['node_position_evidence'])
+            panels[gid],notes=validate_curve_tangents(paths,ink,strict_native_continuity=strict_rings)
             panels[gid],junction_notes=validate_trace_junctions(panels[gid],ink)
             panels[gid],marker_notes=validate_trace_markers(panels[gid],next(g for g in graphs if g['id']==gid),image.size)
             panels[gid]=coalesce_ink_routes(panels[gid],ink)

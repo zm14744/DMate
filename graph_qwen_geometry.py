@@ -12,7 +12,7 @@ import networkx as nx
 from graph_staged import refine_node_positions
 
 
-def validate_curve_tangents(traces, ink):
+def validate_curve_tangents(traces, ink,*,strict_native_continuity=False):
     """Reject synthetic arcs that turn between crossing straight strokes.
 
     Pixel continuity alone accepted a false inner Petersen arc. Test the
@@ -32,8 +32,9 @@ def validate_curve_tangents(traces, ink):
     # strokes. It needs ink beyond the union of independently traced lines.
     straight_mask=np.zeros_like(ink)
     for t in traces:
-        if t.get('method') not in ('opencv_straight_line_coverage','opencv_skeleton_tangent_trace'):continue
+        if t.get('method') not in ('opencv_straight_line_coverage','opencv_skeleton_tangent_trace','opencv_hough_rim_endpoint'):continue
         line=np.asarray(t.get('path',[]))*[width-1,height-1]
+        if t.get('native_rim_observed_path') is not None:line=line[1:-1]
         if len(line)<2:continue
         vector=line[-1]-line[0];length=float(np.linalg.norm(vector))
         if length<20:continue
@@ -55,6 +56,18 @@ def validate_curve_tangents(traces, ink):
             notes.append('curve_explained_by_straight_ink:'+trace['from']+':'+trace['to'])
             continue
         nearest=original[labels[at[:,1],at[:,0]]-1][:,::-1]
+        if strict_native_continuity:
+            disconnected=False
+            for a,b in zip(nearest[8:-9],nearest[9:-8]):
+                count=int(np.max(np.abs(a-b)))+1
+                connector=np.rint(np.linspace(a,b,count)).astype('int32');run=0
+                for x,y in connector:
+                    run=run+1 if ink[y,x]==0 else 0
+                    if run>=3:disconnected=True;break
+                if disconnected:break
+            if disconnected:
+                notes.append('curve_native_gap_rejected:'+trace['from']+':'+trace['to'])
+                continue
         # A caption's filled colour rectangle supplies ink in every tangent
         # direction, but is not a thin connecting stroke.
         depth=thickness[nearest[8:-8,1],nearest[8:-8,0]]
@@ -201,6 +214,40 @@ def validate_trace_junctions(traces,ink):
     return kept,notes
 
 
+def trim_native_rim_paths(traces,graph,image_size):
+    """A walk around a measured node rim is not a second edge stroke."""
+    import numpy as np
+    anchors={p['vertex']:p for p in graph.get('node_position_evidence',[])}
+    nodes={v['id']:v for v in graph['vertices']};width,height=image_size
+    output=[]
+    for trace in traces:
+        if trace.get('method')!='opencv_skeleton_tangent_trace':output.append(trace);continue
+        a,b=anchors.get(trace['from'],{}),anchors.get(trace['to'],{})
+        if not all(p.get('marker_profile')=='native_hollow_size_consensus' for p in (a,b)):
+            output.append(trace);continue
+        route=np.asarray(trace['path'])*[width-1,height-1]
+        source=np.array([nodes[trace['from']]['x']*(width-1),nodes[trace['from']]['y']*(height-1)])
+        target=np.array([nodes[trace['to']]['x']*(width-1),nodes[trace['to']]['y']*(height-1)])
+        if np.linalg.norm(route[0]-source)>np.linalg.norm(route[-1]-source):route=route[::-1]
+        def clip_start(line,center,radius):
+            for i,point in enumerate(line):
+                if np.linalg.norm(point-center)<=radius:continue
+                if i==0:return line
+                origin=line[i-1];vector=point-origin;offset=origin-center
+                aa=float(vector@vector);bb=2*float(offset@vector);cc=float(offset@offset)-radius*radius
+                if aa<=1e-9:return line[i:]
+                t=(-bb+math.sqrt(max(0,bb*bb-4*aa*cc)))/(2*aa)
+                return np.vstack((origin+np.clip(t,0,1)*vector,line[i:]))
+            return np.empty((0,2))
+        body=clip_start(route,source,a['radius_pixels']+3)
+        body=clip_start(body[::-1],target,b['radius_pixels']+3)[::-1]
+        if len(body)<2:output.append(trace);continue
+        trimmed=[source]+list(body)+[target]
+        updated=copy.deepcopy(trace);updated['native_rim_observed_path']=updated['path']
+        updated['path']=(np.asarray(trimmed)/[width-1,height-1]).tolist();output.append(updated)
+    return output
+
+
 def validate_trace_markers(traces,graph,image_size):
     """An observed node rim splits a stroke even when the fit skirts its centre."""
     import numpy as np
@@ -245,7 +292,8 @@ def supplement_rim_traces(image,graphs,panels):
         # This supplement addresses arrow-end gaps or disks larger than the
         # legacy 13 px rim estimate. Ordinary undirected nodes use the original
         # tracer; extra threshold fragments must not duplicate known strokes.
-        if graph['directed'] is not True and radius<=13:continue
+        large_filled=any(p.get('marker_profile')=='native_filled_disk' and p.get('radius_pixels',0)>13 for p in anchors)
+        if graph['directed'] is not True and not large_filled:continue
         margin=max(34,min(120,round(float(np.median(separation))*.62)))
         left=max(0,min(x for _,x,y in points)-margin);top=max(0,min(y for _,x,y in points)-margin)
         right=min(width,max(x for _,x,y in points)+margin+1);bottom=min(height,max(y for _,x,y in points)+margin+1)
@@ -312,6 +360,10 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
         markers=[{'x':x/(image.width-1),'y':y/(image.height-1),'radius_pixels':r} for x,y,r,_ in black]
     rings=connected_ring_markers(image)
     if len(rings)==len(nodes):markers=rings
+    else:
+        from graph_qwen_ring_markers import ring_markers
+        scaled_rings=ring_markers(image)
+        if len(scaled_rings)==len(nodes):markers=scaled_rings
     from graph_qwen_gradient_markers import gradient_markers
     shaded=gradient_markers(image)
     if len(shaded)==len(nodes) and shaded:markers=shaded
@@ -337,6 +389,9 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
                 markers.append({**point,'component':int(components[y,x])})
     if len(markers) != len(nodes) or len(nodes) > 48:
         return fallback()
+    if any(p.get('isolated_circle_candidate') for p in markers):
+        from graph_qwen_ring_markers import attach_isolated_frames
+        markers=attach_isolated_frames(markers,graphs,image.size)
     # With a complete connected-ring inventory, remove per-panel scale/offset
     # from the matching cost. Coarse VL coordinates on the textbook displaced
     # every node in the same direction, giving nearly tied raw-distance sums.
@@ -421,6 +476,7 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
             observations.append({'source': 'circular_pixel_marker_global_unique', 'vertex': v['id'],
                 'node_position': [v['x'], v['y']], 'pixel_position': [p['x'], p['y']],
                 'radius_pixels':p.get('radius_pixels'),
+                'marker_profile':p.get('marker_profile'),
                 'exact_inventory_count': True, 'alternative_cost_margin_min': .015})
             v['x'], v['y'] = p['x'], p['y']
         offset += len(g['vertices'])
