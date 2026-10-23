@@ -121,11 +121,12 @@ def _ink_support(path, ink, style, *, distance=None):
     # Distance to actual foreground, never a painted/synthetic connector.
     if distance is None:
         distance=cv2.distanceTransform((ink==0).astype('uint8'),cv2.DIST_L2,3)
-    points=_samples(path,min(1200,max(40,round(length))))
+    pixel_route=[(x*(width-1),y*(height-1)) for x,y in path]
+    points=_samples(pixel_route,min(1200,max(40,round(length))))
     # Hollow node interiors are not white gaps in the connecting stroke.
     trim=max(2,round(len(points)*.07));points=points[trim:-trim]
-    hits=[distance[min(height-1,round(p[1]*(height-1))),
-                   min(width-1,round(p[0]*(width-1)))]<=2.5 for p in points]
+    hits=[distance[min(height-1,round(p[1])),
+                   min(width-1,round(p[0]))]<=2.5 for p in points]
     runs=[]
     for hit in hits:
         if runs and runs[-1][0]==hit:runs[-1][1]+=1

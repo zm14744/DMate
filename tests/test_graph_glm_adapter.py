@@ -104,3 +104,13 @@ def test_review_cannot_create_an_edge_or_bypass_real_intermediate_vertices():
     result=receive_review_routes(original,decisions,ink)
     assert len(result['edges'])==1 and result['edges'][0]['path']==[]
     assert result['edges'][0]['evidence'][-1]['reason']=='geometry'
+
+
+def test_review_route_sampling_uses_pixels_on_a_wide_non_square_image():
+    import numpy as np
+    import cv2
+    ink=np.zeros((81,801),dtype='uint8')
+    cv2.polylines(ink,[np.array([[80,40],[400,16],[720,40]])],False,255,2)
+    decisions={'e1':{'visible':True,'path':[[.1,.5],[.5,.2],[.9,.5]]}}
+    repaired=receive_review_routes(graph([edge(path=[])]),decisions,ink)
+    assert repaired['edges'][0]['evidence'][-1]['source']=='glm_review_route_verified'
