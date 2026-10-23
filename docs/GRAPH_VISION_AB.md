@@ -1,6 +1,6 @@
 # 私有原图视觉 A/B 测试
 
-生产默认仍为 Qwen3-VL-Plus；配置 ZHIPU_API_KEY 不会改变默认模型。Provider 支持显式选择 glm-4.6v-flash 或 glm-4.6v；两者不能自动切换。付费模型只用于用户已授权的对比运行。沿用 PP-DocLayoutV3、PP-OCRv6 Small、DeepSeek 与原有拓扑恢复算法。
+生产默认仍为 Qwen3-VL-Plus；配置 ZHIPU_API_KEY 不会改变默认模型。Provider 支持显式选择 glm-4.6v-flash、glm-4.6v 或 glm-5.3-flash，不自动切换。模型只用于用户已授权的对比运行。沿用 PP-DocLayoutV3、PP-OCRv6 Small、DeepSeek 与原有拓扑恢复算法。
 
 历史共享契约的正式付费对比可用 `scripts/benchmark_graph_vision.py --glm-model glm-4.6v --glm-adapter baseline --experiments staged --thinking off --retries 0` 复现。先2张原图验证，再扩大同一批样本；Flash结果保留作补充。同图的两种 Provider 共享原图、预处理版面结果、提示词、裁图规则、NODE→EDGE→TRACE→全局关系→复核和 NetworkX 检查，固定 155 秒/7 次调用，每次最多45秒，失败重试计入总调用预算。串行执行，交替模型先后顺序。关闭思考的结果不与开启思考混合。
 
@@ -62,4 +62,34 @@ python -B scripts/benchmark_graph_hybrid.py \
 usage、请求错误、输入 SHA、全部预测边及仅 accepted 边的辅助评分。失败单列、不给漏边分。
 本工具仅覆盖真实拓扑模块；完整 `/ocr`、文字校正与 Playwright 验收须另外执行。
 小样本独立 NODE/EDGE 可能波动，不能把全部成绩差值直接归因于局部复核模型。
+
+## GLM-5.3-Flash 独立模型适配
+
+官方 `/api/paas/v4/models` 目录确认模型ID为 `glm-5.3-flash`，不是 `glm-5.3-flashx`
+或付费 `glm-5.3`。真实原图请求表明该模型**始终思考**：关闭时返回400/1210，
+提示使用low/high/max。已成功验证 `thinking.type=enabled`、`reasoning_effort=low`、
+`do_sample=false`，原图base64图像输入及SSE响应。文档站在当前网络不可达，以上依据
+官方模型目录和真实接口反馈，不冒称完整文档已读取。
+
+新配置强制显式开启思考，默认effort低档，拒绝对旧GLM/Qwen误传该参数。
+不传Qwen专属enable_thinking/detail/stream_options，也不将开启思考标为关闭。
+记录实际reasoning_chars、完整usage及返回模型；拒绝FlashX/付费版/无模型身份替代。
+思考Token已包含在completion_tokens时不能再次加总。费用不得套用旧glm-4.6v单价，
+未取得5.3 Flash可靠单价前只列真实用量，人民币费用标为未核实。
+
+独立新适配 `glm53-native-v1` 复用已验证V2的观察ID、唯一像素线绑定和原图墨迹检查，
+保留NODE→EDGE→TRACE→RELATE→REVIEW，不启用退步的V6圆点实验，也不混用Qwen答案。
+先小批量验证，再以同一批原图和独立真值做raw/staged，思考模式单独分组：
+
+```sh
+python -B scripts/benchmark_graph_vision.py \
+  --manifest /private/ab-manifest.json --output /private/glm53-on \
+  --providers glm,qwen --glm-model glm-5.3-flash --glm-reasoning-effort low \
+  --thinking on --experiments both --retries 0 --vision-timeout 155 --call-timeout 45 \
+  --layout-cache /private/layout-cache --case-ids CASE1,CASE2
+```
+
+两者开启思考的成绩与Qwen生产关闭思考参考必须分列。GLM为low，Qwen为服务默认思考档，
+不声称内部推理计算量相同。关闭GLM 5.3思考会在本地配置阶段报错，不发无效API请求。
+生产默认、混合复核实验模型、其他学习功能及Zeabur部署均未更改。
 

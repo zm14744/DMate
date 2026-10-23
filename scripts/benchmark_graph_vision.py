@@ -23,8 +23,8 @@ from graph_ab_metrics import compare_graphs,prf
 from graph_schema import canonical_graph
 from graph_staged import Budget,recognize_staged,NODE_PROMPT,EDGE_PROMPT,REVIEW_PROMPT
 from graph_validation import audit_graph_records
-from vision_provider import VisionProvider,VisionError,GLM_MODEL,GLM_PAID_MODEL
-from graph_glm_adapter import PROFILE as GLM_PROFILE, STABLE_PROFILE, STABLE_REVIEW_HINT, EDGE_PROMPT as GLM_EDGE_PROMPT, REVIEW_PROMPT as GLM_REVIEW_PROMPT, MARKER_PROMPT as GLM_MARKER_PROMPT
+from vision_provider import VisionProvider,VisionError,GLM_MODEL,GLM_PAID_MODEL,GLM_53_FLASH_MODEL
+from graph_glm_adapter import PROFILE as GLM_PROFILE, STABLE_PROFILE, GLM_53_PROFILE, STABLE_REVIEW_HINT, EDGE_PROMPT as GLM_EDGE_PROMPT, REVIEW_PROMPT as GLM_REVIEW_PROMPT, MARKER_PROMPT as GLM_MARKER_PROMPT
 
 RAW_PROMPT='''独立读取这张图论原图，不解题，不依靠图名、常见模板或度数补点补边。
 只返回JSON：{"graphs":[{"id":"G1","name":"原图图号或G1","directed":false,"weighted":false,
@@ -89,20 +89,25 @@ def local_layout(raw,cache):
     return {**result,'benchmark_cache_hit':False}
 
 
-def adaptation_profile(provider,experiment,mode):
+def adaptation_profile(provider,experiment,mode,model=None):
     if mode not in ('baseline','native','experimental'):raise ValueError('Unknown GLM adapter')
     if provider!='glm' or experiment!='staged' or mode=='baseline':return 'baseline'
+    if model==GLM_53_FLASH_MODEL:
+        if mode=='experimental':raise ValueError('GLM 5.3 uses stable topology contract, not experimental V6')
+        return GLM_53_PROFILE
     return GLM_PROFILE if mode=='experimental' else STABLE_PROFILE
 
 
 def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_model=GLM_MODEL,
-            vision_seconds=155,call_seconds=45,glm_adapter='native'):
+            vision_seconds=155,call_seconds=45,glm_adapter='native',glm_reasoning_effort=None):
     provider=VisionProvider(provider_name,model=glm_model if provider_name=='glm' else None,
-                            thinking=thinking,retries=retries,capture=True)
+                            thinking=thinking,reasoning_effort=glm_reasoning_effort if provider_name=='glm' else None,
+                            retries=retries,capture=True)
     record={'provider':provider_name,'model':provider.model,'thinking':thinking,'experiment':experiment,
             'started_at':datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(),
             'status':'not_run_missing_key','requests':[],'actual_request_count':0,'seconds':0.,'http_429_count':0}
-    record['adaptation_profile']=adaptation_profile(provider_name,experiment,glm_adapter)
+    record['reasoning_effort']=provider.reasoning_effort
+    record['adaptation_profile']=adaptation_profile(provider_name,experiment,glm_adapter,provider.model)
     if not provider.available():return record
     start=time.monotonic()
     try:
@@ -210,7 +215,7 @@ def write_reports(out,records,metadata):
     summary,paired=summarize(records)
     report={**metadata,'summary':summary,'paired_scores':paired,'records':records,'recommendation':'pending_actual_paired_review'}
     (out/'comparison.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
-    fields=['case_id','sha256','category','reference_status','experiment','thinking','repeat','provider','model','returned_model_versions','status','actual_request_count','seconds','http_429_count','request_http_statuses','request_error_counts','prompt_tokens','completion_tokens','total_tokens','usage_reported_requests','successful_requests','http_successful_requests','http_success_rate','request_success_rate','mean_request_seconds',
+    fields=['case_id','sha256','category','reference_status','experiment','thinking','reasoning_effort','adaptation_profile','repeat','provider','model','returned_model_versions','status','actual_request_count','seconds','http_429_count','request_http_statuses','request_error_counts','prompt_tokens','completion_tokens','total_tokens','usage_reported_requests','successful_requests','http_successful_requests','http_success_rate','request_success_rate','mean_request_seconds',
             'expected_vertices','actual_vertices','vertex_tp','missing_vertices','extra_vertices','expected_edges','actual_edges','edge_tp','missing_edges','extra_edges','wrong_endpoint_instances',
             'precision','recall','f1','direction_accuracy','direction_recall','parallel_count_accuracy','weight_match_accuracy','weight_recall',
             'figure_count_correct','figure_order_correct','whole_structure_correct']
@@ -264,7 +269,8 @@ def main():
     parser.add_argument('--manifest',required=True);parser.add_argument('--output',required=True)
     parser.add_argument('--experiments',choices=['raw','staged','both'],default='both')
     parser.add_argument('--providers',default='glm,qwen');parser.add_argument('--thinking',choices=['off','on','both'],default='off')
-    parser.add_argument('--glm-model',choices=[GLM_MODEL,GLM_PAID_MODEL],default=GLM_MODEL)
+    parser.add_argument('--glm-model',choices=[GLM_MODEL,GLM_PAID_MODEL,GLM_53_FLASH_MODEL],default=GLM_MODEL)
+    parser.add_argument('--glm-reasoning-effort',choices=['low','high','max'])
     parser.add_argument('--glm-adapter',choices=['baseline','native','experimental'],default='native',
                         help='native keeps V2; experimental selects V6; baseline uses the shared contract')
     parser.add_argument('--vision-timeout',type=int,choices=[155,300],default=155)
@@ -278,6 +284,11 @@ def main():
     if not 0<=args.retries<=2:parser.error('retries must be 0..2')
     providers=args.providers.split(',')
     if len(set(providers))!=len(providers) or any(p not in ('glm','qwen') for p in providers):parser.error('providers must be glm,qwen')
+    if 'glm' in providers:
+        if args.glm_model==GLM_53_FLASH_MODEL:
+            if args.thinking!='on':parser.error('glm-5.3-flash is always-thinking; use --thinking on (default effort low)')
+            if args.glm_adapter=='experimental':parser.error('Use the stable native adapter for GLM 5.3')
+        elif args.glm_reasoning_effort is not None:parser.error('--glm-reasoning-effort requires glm-5.3-flash')
     manifest,cases,duplicates=load_corpus(args.manifest)
     if args.case_ids:
         selected=set(args.case_ids.split(','))
@@ -300,7 +311,8 @@ def main():
               'code_sha256':code_hash,'resource_limits':limits,'question_original_count':len(cases),
               'provided_file_count':manifest.get('provided_file_count'),'deduplicated':duplicates,
               'prompt_templates_sha256':sha((RAW_PROMPT+NODE_PROMPT+EDGE_PROMPT+REVIEW_PROMPT+GLM_EDGE_PROMPT+GLM_REVIEW_PROMPT+GLM_MARKER_PROMPT+STABLE_REVIEW_HINT).encode()),
-              'glm_adaptation_profile':adaptation_profile('glm','staged',args.glm_adapter),
+              'glm_adaptation_profile':adaptation_profile('glm','staged',args.glm_adapter,args.glm_model),
+              'glm_reasoning_effort':(args.glm_reasoning_effort or 'low') if args.glm_model==GLM_53_FLASH_MODEL else None,
               'inventory_only':args.inventory_only,'preprocessing_by_case':[]}
     records=[];cache=Path(args.layout_cache).resolve() if args.layout_cache else out/'layout-cache'
     for case_number,case in enumerate(cases):
@@ -324,10 +336,12 @@ def main():
                     order=providers if (case_number+repeat)%2==0 else providers[::-1]
                     for provider in order:
                         identity={'case_id':case['id'],'sha256':case['sha256'],'repeat':repeat+1,
-                                  'model':VisionProvider(provider,model=args.glm_model if provider=='glm' else None).model,
+                                  'model':VisionProvider(provider,model=args.glm_model if provider=='glm' else None,
+                                                         thinking=thinking,reasoning_effort=args.glm_reasoning_effort if provider=='glm' else None).model,
                                   'time_budget':{'total_seconds':args.vision_timeout,'per_call_seconds':args.call_timeout,'max_requests':7 if experiment=='staged' else args.retries+1},
                                   'experiment':experiment,'thinking':thinking,'provider':provider,'code_sha256':code_hash,
-                                  'adaptation_profile':adaptation_profile(provider,experiment,args.glm_adapter),
+                                  'adaptation_profile':adaptation_profile(provider,experiment,args.glm_adapter,args.glm_model if provider=='glm' else None),
+                                  'reasoning_effort':(args.glm_reasoning_effort or 'low') if provider=='glm' and args.glm_model==GLM_53_FLASH_MODEL else None,
                                   'layout_sha256':layout_hash if experiment=='staged' else None,
                                   'category':case.get('category'),
                                   'reference_status':case['truth'].get('reference_status','unverified'),
@@ -346,7 +360,7 @@ def main():
                             else:
                                 if experiment=='staged' and preprocess_error:
                                     record={'model':model,'status':'local_preprocessing_failed','requests':[],'actual_request_count':0,'seconds':0.}
-                                else:record=execute(raw,provider,experiment,thinking,layout=(prepared or {}).get('layout',{}).get('regions',[]),retries=args.retries,glm_model=args.glm_model,vision_seconds=args.vision_timeout,call_seconds=args.call_timeout,glm_adapter=args.glm_adapter)
+                                else:record=execute(raw,provider,experiment,thinking,layout=(prepared or {}).get('layout',{}).get('regions',[]),retries=args.retries,glm_model=args.glm_model,vision_seconds=args.vision_timeout,call_seconds=args.call_timeout,glm_adapter=args.glm_adapter,glm_reasoning_effort=args.glm_reasoning_effort)
                             record.update(identity,fingerprint=fingerprint)
                             truth=case['truth']
                             record['metrics']=(compare_graphs(truth.get('graphs',[]),record['raw_result']['graphs'],reference_status=truth.get('reference_status','unverified'))

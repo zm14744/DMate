@@ -12,6 +12,7 @@ from graph_relation import _samples, _wrong_path_endpoints, _intermediate_nodes
 
 PROFILE = 'glm-native-v6'
 STABLE_PROFILE = 'glm-native-v2'
+GLM_53_PROFILE = 'glm53-native-v1'
 
 STABLE_REVIEW_HINT = '''\nGLM复核补充：先独立沿原图的真实笔画核对候选端点，再确认visible。
 路径坐标不准确与实际没有这条边是两件事；仅坐标不准不能作为visible=false的依据。

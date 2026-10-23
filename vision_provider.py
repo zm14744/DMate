@@ -15,6 +15,7 @@ import requests
 
 GLM_MODEL='glm-4.6v-flash'
 GLM_PAID_MODEL='glm-4.6v'
+GLM_53_FLASH_MODEL='glm-5.3-flash'
 GLM_URL='https://open.bigmodel.cn/api/paas/v4/chat/completions'
 QWEN_MODEL='qwen3-vl-plus'
 
@@ -72,13 +73,20 @@ def _glm_request(payload,headers,timeout,wall_deadline):
 
 
 class VisionProvider:
-    def __init__(self,name='qwen',*,model=None,thinking=False,retries=0,capture=False,transport=None,sleep=time.sleep):
+    def __init__(self,name='qwen',*,model=None,thinking=False,reasoning_effort=None,retries=0,capture=False,transport=None,sleep=time.sleep):
         if name not in ('qwen','glm'):raise ValueError('Unsupported vision provider')
         if type(thinking) is not bool:raise ValueError('thinking must be explicit boolean')
         if type(retries) is not int or not 0<=retries<=2:raise ValueError('retry limit is 0..2')
-        allowed=(QWEN_MODEL,) if name=='qwen' else (GLM_MODEL,GLM_PAID_MODEL)
+        allowed=(QWEN_MODEL,) if name=='qwen' else (GLM_MODEL,GLM_PAID_MODEL,GLM_53_FLASH_MODEL)
         self.name=name;self.model=model or allowed[0]
         if self.model not in allowed:raise ValueError('Unsupported provider model')
+        if self.model==GLM_53_FLASH_MODEL:
+            if not thinking:raise ValueError('glm-5.3-flash requires thinking=True; thinking cannot be disabled')
+            reasoning_effort=reasoning_effort or 'low'
+            if reasoning_effort not in ('low','high','max'):raise ValueError('GLM 5.3 reasoning effort must be low/high/max')
+        elif reasoning_effort is not None:
+            raise ValueError('reasoning_effort is supported only for glm-5.3-flash')
+        self.reasoning_effort=reasoning_effort
         self.thinking=thinking;self.retries=retries;self.capture=capture
         self.transport=transport;self.sleep=sleep;self.observations=[]
         self.logical_calls=0
@@ -106,6 +114,7 @@ class VisionProvider:
             # Zhipu's SDK treats temperature=0 as do_sample=False, not a valid
             # raw API temperature. Omit temperature when sampling is disabled.
             payload.update(thinking={'type':'enabled' if self.thinking else 'disabled'},do_sample=False)
+            if self.model==GLM_53_FLASH_MODEL:payload['reasoning_effort']=self.reasoning_effort
             if not self.thinking:payload['response_format']={'type':'json_object'}
         return payload
 
@@ -120,6 +129,7 @@ class VisionProvider:
         for attempt in range(self.retries+1):
             timeout=budget.take();started=time.monotonic();status=None;raw=None;error=None
             metric={'provider':self.name,'model':self.model,'thinking':self.thinking,
+                    'reasoning_effort':self.reasoning_effort,
                     'started_at_unix':time.time(),
                     'logical_call':self.logical_calls,'attempt':attempt+1,'prompt_sha256':hashlib.sha256(prompt.encode()).hexdigest(),
                     'image_sha256':[image_digest(url) for url in images[:2]]}
@@ -132,9 +142,12 @@ class VisionProvider:
                 choice=(result.get('choices') or [{}])[0]
                 raw=(choice.get('message') or {}).get('content','')
                 metric.update(finish_reason=choice.get('finish_reason'),usage=result.get('usage') or {},
-                              returned_model=result.get('model'),system_fingerprint=result.get('system_fingerprint'))
+                              returned_model=result.get('model'),system_fingerprint=result.get('system_fingerprint'),
+                              reasoning_chars=result.get('reasoning_chars',len((choice.get('message') or {}).get('reasoning_content') or '')))
                 returned=str(result.get('model') or '').lower()
-                if returned and (not returned.startswith(self.model) or
+                if self.model==GLM_53_FLASH_MODEL and not returned:
+                    raise VisionError('model_identity_unverified')
+                if returned and (not (returned==self.model or returned.startswith(self.model+'-')) or
                         self.model==GLM_PAID_MODEL and returned.startswith(GLM_MODEL)):
                     raise VisionError('model_mismatch')
                 if choice.get('finish_reason')=='length':raise VisionError('truncated_output')

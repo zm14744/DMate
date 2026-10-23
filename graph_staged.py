@@ -311,7 +311,10 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             diagnostics.append('vision_adapter:'+PROFILE)
         else:
             review_prompt+=STABLE_REVIEW_HINT
-            diagnostics.append('vision_adapter:'+STABLE_PROFILE)
+            from vision_provider import GLM_53_FLASH_MODEL
+            from graph_glm_adapter import GLM_53_PROFILE
+            profile=GLM_53_PROFILE if getattr(provider,'model',None)==GLM_53_FLASH_MODEL else STABLE_PROFILE
+            diagnostics.append('vision_adapter:'+profile)
     with Image.open(io.BytesIO(image_bytes)) as original:
         if original.width*original.height>16_000_000: raise ValueError('image_pixel_budget')
         image=ImageOps.exif_transpose(original).convert('RGB')
