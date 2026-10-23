@@ -400,7 +400,7 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
     return candidates
 
 
-def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,gray_cutoff=216):
     """Match real visible Hough stroke endpoints to marked node *rims*.
 
     Center-to-center coverage fails for lines attached off-center to circles.
@@ -413,7 +413,7 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h)
     elif float(np.median(gray)) < 105:
         mask = _foreground(rgb)
     else:
-        _, mask = cv2.threshold(gray, 216, 255, cv2.THRESH_BINARY_INV)
+        _, mask = cv2.threshold(gray, gray_cutoff, 255, cv2.THRESH_BINARY_INV)
     edges = cv2.Canny(mask, 55, 145)
     segments = cv2.HoughLinesP(edges, 1, math.pi / 720, threshold=18,
                                minLineLength=24, maxLineGap=7)

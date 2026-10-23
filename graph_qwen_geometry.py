@@ -227,6 +227,43 @@ def validate_trace_markers(traces,graph,image_size):
     return kept,notes
 
 
+def supplement_rim_traces(image,graphs,panels):
+    """Retain native rim segments fragmented by a single threshold's aliasing."""
+    import numpy as np
+    from graph_line_tracer import _hough_endpoint_candidates,_vertices
+    rgb=np.asarray(image);width,height=image.size
+    for graph in graphs:
+        anchors=graph.get('node_position_evidence',[])
+        if len(anchors)!=len(graph['vertices']) or any('partial' in p['source'] for p in anchors):continue
+        points=_vertices(graph,width,height)
+        if len(points)<2:continue
+        separation=[min(math.hypot(x-a,y-b) for j,(_,a,b) in enumerate(points) if j!=i)
+                    for i,(_,x,y) in enumerate(points)]
+        radius=max(3,min(13,round(float(np.median(separation))*.12)))
+        native_radii=[p['radius_pixels'] for p in anchors if p.get('radius_pixels')]
+        if native_radii:radius=max(radius,float(np.median(native_radii)))
+        # This supplement addresses arrow-end gaps or disks larger than the
+        # legacy 13 px rim estimate. Ordinary undirected nodes use the original
+        # tracer; extra threshold fragments must not duplicate known strokes.
+        if graph['directed'] is not True and radius<=13:continue
+        margin=max(34,min(120,round(float(np.median(separation))*.62)))
+        left=max(0,min(x for _,x,y in points)-margin);top=max(0,min(y for _,x,y in points)-margin)
+        right=min(width,max(x for _,x,y in points)+margin+1);bottom=min(height,max(y for _,x,y in points)+margin+1)
+        local=[(key,x-left,y-top) for key,x,y in points]
+        existing={tuple(sorted((t['from'],t['to']))) for t in panels.get(graph['id'],[])}
+        additional={}
+        for cutoff in (160,210):
+            observed=_hough_endpoint_candidates(rgb[top:bottom,left:right],local,left,top,radius,width,height,gray_cutoff=cutoff)
+            for trace in observed:
+                pair=tuple(sorted((trace['from'],trace['to'])))
+                if pair in existing:continue
+                trace['native_gray_cutoff']=cutoff
+                if pair not in additional or trace['pixel_length']>additional[pair]['pixel_length']:
+                    additional[pair]=trace
+        panels.setdefault(graph['id'],[]).extend(additional.values())
+    return panels
+
+
 def _rebase_refined_paths(graphs, before):
     """A marker movement must move the attached proposal endpoints as well."""
     for graph,old in zip(graphs,before):
@@ -279,8 +316,25 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
     shaded=gradient_markers(image)
     if len(shaded)==len(nodes) and shaded:markers=shaded
     if len(markers)!=len(nodes):
+        highlights=gradient_markers(image,highlight=True)
+        if len(highlights)==len(nodes):markers=highlights
+    if len(markers)!=len(nodes):
         filled=gradient_markers(image,include_uniform=True)
         if len(filled)==len(nodes):markers=filled
+    if len(markers)!=len(nodes):
+        # Saturated circles joined to same-colour strokes can disappear from
+        # the broad Hough pool. The existing hue-separated detector measures
+        # their cores without confusing nearby black letter shapes with nodes.
+        from graph_qwen_markers import marker_context
+        context=marker_context(image)
+        strong=context['strong_markers'] if context else []
+        if len(strong)==len(nodes):
+            from graph_line_tracer import _foreground
+            _,components=cv2.connectedComponents(_foreground(np.asarray(image)),8)
+            markers=[]
+            for point in strong:
+                x,y=round(point['x']*(image.width-1)),round(point['y']*(image.height-1))
+                markers.append({**point,'component':int(components[y,x])})
     if len(markers) != len(nodes) or len(nodes) > 48:
         return fallback()
     # With a complete connected-ring inventory, remove per-panel scale/offset

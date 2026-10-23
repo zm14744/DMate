@@ -87,3 +87,19 @@ def test_self_loop_does_not_block_other_heads_and_keeps_its_attributes():
     graphs[0]['edges'].append(loop);plan=prepare_arrows(image,graphs[:1]);output,weak=apply_native_arrows(plan)
     assert not weak and len(output[0]['edges'])==2
     assert output[0]['edges'][1]==loop
+
+
+def test_small_arrow_touching_coloured_node_keeps_its_own_tip():
+    image=Image.new('RGB',(300,160),'white');draw=ImageDraw.Draw(image)
+    draw.line((50,70,230,70),fill='gray',width=1)
+    draw.polygon([(222,70),(211,64),(211,76)],fill='black')
+    for x in (50,230):draw.ellipse((x-8,62,x+8,78),fill='#5588bb')
+    graph=canonical_graph({'id':'G','directed':True,'weighted':False,
+        'vertices':[{'id':'a','x':50/299,'y':70/159},{'id':'b','x':230/299,'y':70/159}],
+        'edges':[{'id':'e','from':'b','to':'a','direction':'forward','edge_label':'s',
+                  'path':[[230/299,70/159],[50/299,70/159]]}]})
+    graph['node_position_evidence']=[{'vertex':v['id'],'source':'native_circle','radius_pixels':8} for v in graph['vertices']]
+    plan=prepare_arrows(image,[graph]);assert plan is not None
+    output,weak=apply_native_arrows(plan)
+    assert not weak and output[0]['edges'][0]['from']=='a'
+    assert output[0]['edges'][0]['edge_label']=='s'

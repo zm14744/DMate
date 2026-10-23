@@ -16,6 +16,11 @@ def _head_taper(gray,rect,tangent):
  return float(np.corrcoef(position,width)[0,1]),float(np.polyfit(position,width,1)[0]),len(position)
 
 def prepare_arrows(image,graphs):
+ prepared=_prepare_arrows(image,graphs)
+ return prepared if prepared is not None else _prepare_arrows(image,graphs,small=True)
+
+
+def _prepare_arrows(image,graphs,*,small=False):
  directed=[(i,g) for i,g in enumerate(graphs) if g['directed'] is True]
  if not directed or any(g['weighted'] is not False or len(g.get('node_position_evidence',[]))!=len(g['vertices']) or any('partial' in p['source'] for p in g.get('node_position_evidence',[])) for _,g in directed):return None
  # Loop orientation cannot change its endpoints. Keep its original attributes;
@@ -23,24 +28,51 @@ def prepare_arrows(image,graphs):
  targets=[(gi,g,e) for gi,g in directed for e in g['edges'] if e['from']!=e['to']]
  if not 1<=len(targets)<=48 or any(not e['path'] for _,_,e in targets):return None
  rgb=np.asarray(image);gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY);h,w=gray.shape
- opened=cv2.morphologyEx(np.uint8(gray<130)*255,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7)))
+ dark=np.uint8(gray<130)*255
+ node_clearances={}
+ if small:
+  hsv=cv2.cvtColor(rgb,cv2.COLOR_RGB2HSV)
+  dark|=cv2.inRange(hsv,(0,85,60),(179,255,255))
+  # A black arrow tip can touch a coloured node. Remove only that measured
+  # node's hue so opening does not merge its head into the filled disk.
+  depth=cv2.distanceTransform(dark,cv2.DIST_L2,3)
+  yy,xx=np.ogrid[:h,:w]
+  for g in graphs:
+   for v in g['vertices']:
+    x,y=round(v['x']*(w-1)),round(v['y']*(h-1))
+    radius=max(4,float(depth[y,x])+2)
+    proof_radius=next((p.get('radius_pixels') for p in g.get('node_position_evidence',[]) if p['vertex']==v['id']),None)
+    node_clearances[x,y]=max(5,proof_radius+1 if proof_radius else radius)
+    if hsv[y,x,1]>85:
+     hue=int(hsv[y,x,0]);difference=np.abs(hsv[:,:,0].astype('int16')-hue)
+     same=(np.minimum(difference,180-difference)<=10)&(hsv[:,:,1]>85)
+     dark[same&((xx-x)**2+(yy-y)**2<=(radius*1.4)**2)]=0
+ opening=3 if small else 7
+ opened=cv2.morphologyEx(dark,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(opening,opening)))
  n,labels,stats,centers=cv2.connectedComponentsWithStats(opened,8)
  nodes=[(v['x']*(w-1),v['y']*(h-1)) for g in graphs for v in g['vertices']]
  blobs=[]
  for i in range(1,n):
   x,y,bw,bh,area=map(int,stats[i]);cx,cy=centers[i]
-  if not(6<=bw<=70 and 6<=bh<=70 and 25<=area<=2000):continue
-  if min(math.hypot(cx-px,cy-py) for px,py in nodes)<25:continue
+  minimum=4 if small else 6
+  if not(minimum<=bw<=70 and minimum<=bh<=70 and (12 if small else 25)<=area<=2000):continue
+  if any(math.hypot(cx-px,cy-py)<(node_clearances.get((round(px),round(py)),12) if small else 25) for px,py in nodes):continue
   contour=max(cv2.findContours(np.uint8(labels[y:y+bh,x:x+bw]==i),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)[0],key=cv2.contourArea)
   perimeter=cv2.arcLength(contour,True)
   vertices=cv2.approxPolyDP(contour,.075*perimeter,True)
   if not 3<=len(vertices)<=5:continue
   blobs.append({'center':[float(cx),float(cy)],'rect':[x,y,x+bw,y+bh],'component':i})
  matching=nx.Graph();costs={}
+ routes=[]
+ for _,g,e in targets:
+  ps={v['id']:[v['x'],v['y']] for v in g['vertices']};route=list(e['path'])
+  if math.dist(route[0],ps[e['from']])>math.dist(route[-1],ps[e['from']]):route=route[::-1]
+  routes.append([ps[e['from']]]+route+[ps[e['to']]])
  for ti,(_,g,e) in enumerate(targets):
   for bi,blob in enumerate(blobs):
-   projection=_projection(blob['center'],e['path'],image.size)
-   if projection and .09<=projection[1]<=.91 and projection[0]<=7:
+   projection=_projection(blob['center'],routes[ti],image.size)
+   low,high=(.03,.97) if small else (.09,.91)
+   if projection and low<=projection[1]<=high and projection[0]<=7:
     matching.add_edge(('e',ti),('b',bi),weight=projection[0]);costs[ti,bi]=projection[0]
  relevant={bi for _,bi in costs}
  if relevant:
@@ -62,7 +94,7 @@ def prepare_arrows(image,graphs):
   gi,g,e=targets[ti];blob=blobs[bi]
   other=[cost for (t,c),cost in costs.items() if t==ti and c!=bi]
   if other and min(other)-costs[ti,bi]<3:return None
-  route=np.asarray(e['path'])*[w-1,h-1];source=next(v for v in g['vertices'] if v['id']==e['from']);start=np.array([source['x']*(w-1),source['y']*(h-1)])
+  route=np.asarray(routes[ti])*[w-1,h-1];source=next(v for v in g['vertices'] if v['id']==e['from']);start=np.array([source['x']*(w-1),source['y']*(h-1)])
   if np.linalg.norm(route[0]-start)>np.linalg.norm(route[-1]-start):route=route[::-1]
   vectors=np.diff(route,axis=0);origins=route[:-1];lengths=np.sum(vectors*vectors,axis=1)
   t=np.clip(np.sum((np.array(blob['center'])-origins)*vectors,axis=1)/np.maximum(lengths,1e-9),0,1)
@@ -83,7 +115,7 @@ def prepare_arrows(image,graphs):
   items.append({'key':_key(len(items)),'graph_index':gi,'id':e['id'],'rect':rect,'tangent':tangent.tolist(),
                 'head_center':blob['center'],'axis_skew':skew,'axis_centroid_bias':bias,
                 'native_taper_correlation':taper,'native_taper_slope':taper_slope,
-                'native_taper_bins':taper_bins,'axis_resolved':bool(resolved)})
+                'native_taper_bins':taper_bins,'native_opening_pixels':opening,'axis_resolved':bool(resolved)})
  columns=min(8,len(items));sheet=Image.new('RGB',(columns*160,math.ceil(len(items)/columns)*160),'white');draw=ImageDraw.Draw(sheet);font=ImageFont.load_default(size=18)
  for i,item in enumerate(items):
   x,y=i%columns*160,i//columns*160;draw.rectangle((x,y,x+159,y+23),fill='#dddddd');draw.text((x+6,y+2),item['key'],font=font,fill='black');crop=image.crop(item['rect']);zoom=max(1,min(3,148//crop.width,128//crop.height))

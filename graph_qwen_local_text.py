@@ -17,10 +17,12 @@ def prepare_local_text(image,graphs,*,force=False):
     items=[];width,height=image.size
     for gi,g in enumerate(graphs):
         if not any(e['edge_label'] is None for e in g['edges']):continue
+        rebind=bool(g.get('node_review',{}).get('unsupported_edge_proposals')) and any(e['edge_label'] is not None for e in g['edges'])
         anchors=g.get('node_position_evidence',[])
         if len(anchors)!=len(g['vertices']) or any('partial' in p['source'] for p in anchors):return None
         if not g['edges'] or any(not e['path'] for e in g['edges']):return None
-        glyphs=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True)
+        glyphs=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True,
+            node_radii={p['vertex']:p['radius_pixels'] for p in anchors if p.get('radius_pixels')})
         matching=nx.Graph();costs={}
         for ei,edge in enumerate(g['edges']):
             for ti,glyph in enumerate(glyphs):
@@ -31,14 +33,23 @@ def prepare_local_text(image,graphs,*,force=False):
                     score=distance/max(10,h);matching.add_edge(('e',ei),('t',ti),weight=score);costs[ei,ti]=score
         best=nx.min_weight_matching(matching)
         if len(best)!=len(g['edges']):return None
+        total=sum(matching[a][b]['weight'] for a,b in best)
+        for a,b in best:
+            cost=matching[a][b]['weight'];matching.remove_edge(a,b)
+            alternative=nx.min_weight_matching(matching)
+            ambiguous=(len(alternative)==len(g['edges']) and
+                sum(matching[u][v]['weight'] for u,v in alternative)-total<.15)
+            matching.add_edge(a,b,weight=cost)
+            if ambiguous:return None
         pairs=[]
         for a,b in best:
             if a[0]=='t':a,b=b,a
             pairs.append((a[1],b[1]))
         for ei,ti in sorted(pairs):
-            if g['edges'][ei]['edge_label'] is not None:continue
-            others=[cost for (e,t),cost in costs.items() if e==ei and t!=ti]
-            if others and min(others)-costs[ei,ti]<.15:return None
+            # A rejected model stroke can leave its name on another route.
+            # Recheck edge text in that affected figure, without re-reading
+            # already grounded node labels or touching other figures.
+            if g['edges'][ei]['edge_label'] is not None and not rebind:continue
             x,y,r,bottom=glyphs[ti]['box']
             if glyphs[ti]['parts']==1:
                 # A thin subscript can be a separate fragment; the letter may

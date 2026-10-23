@@ -29,7 +29,7 @@ def _projection(point,path,size):
     return best
 
 
-def _glyphs(image,bbox,nodes,*,join_scripts=False):
+def _glyphs(image,bbox,nodes,*,join_scripts=False,node_radii=None):
     hsv=cv2.cvtColor(np.asarray(image),cv2.COLOR_RGB2HSV)
     mask=cv2.inRange(hsv,(0,0,0),(179,75,155))
     n,labels,stats,centers=cv2.connectedComponentsWithStats(mask,8)
@@ -41,7 +41,7 @@ def _glyphs(image,bbox,nodes,*,join_scripts=False):
                 and (6 if join_scripts else 20)<=area<=1800):continue
         cx,cy=centers[i]
         if not(a<=cx/(width-1)<=c and b<=cy/(height-1)<=d):continue
-        if min(math.hypot(cx-v['x']*(width-1),cy-v['y']*(height-1)) for v in nodes)<28:continue
+        if any(math.hypot(cx-v['x']*(width-1),cy-v['y']*(height-1))<max(28,(node_radii or {}).get(v['id'],0)*2.5) for v in nodes):continue
         small.append({'ids':[i],'box':[x,y,x+w,y+h]})
     # Join an actual dot and a narrow stem (i/j); do not merge dashed strokes.
     used=set();groups=[]
@@ -64,7 +64,7 @@ def _glyphs(image,bbox,nodes,*,join_scripts=False):
                 for j,other in enumerate(groups):
                     if i==j or j in used:continue
                     xx,yy,rr,bb=other['box'];ww,hh=rr-xx,bb-yy
-                    if (6<=hh<=h*.8 and ww<=hh*.85 and -.25*h<=xx-r<=.55*h
+                    if (6<=hh<=h*.98 and ww<=hh*.85 and -.25*h<=xx-r<=.55*h
                             and yy>=y+h*.1 and b-h*.25<=bb<=b+h*.7):
                         choices.append((abs(xx-r)+abs(bb-b),j,other))
             if choices:

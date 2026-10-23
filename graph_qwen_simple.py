@@ -401,6 +401,8 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         from graph_line_tracer import attach_line_evidence
         traced = attach_line_evidence(raw, {'graphs': graphs},dense_paths=True)
         panels = {p['id']: p['paths'] for p in traced.get('line_path_evidence', [])}
+        from graph_qwen_geometry import supplement_rim_traces
+        panels=supplement_rim_traces(image,graphs,panels)
         emit('TRACE', panels=panels)
         from graph_glm_adapter import review_route_ink  # CPU-only original ink.
         ink = review_route_ink(image)

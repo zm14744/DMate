@@ -6,10 +6,11 @@ import cv2
 import numpy as np
 import math
 
-def gradient_markers(image,*,include_uniform=False):
+def gradient_markers(image,*,include_uniform=False,highlight=False):
  """Observe similarly sized shaded disks; thin strokes and small arrows abstain."""
  rgb=np.asarray(image);gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY);h,w=gray.shape
- opened=cv2.morphologyEx(np.uint8(gray<230)*255,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(13,13)))
+ opening=9 if highlight else 13
+ opened=cv2.morphologyEx(np.uint8(gray<230)*255,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(opening,opening)))
  count,labels,stats,centers=cv2.connectedComponentsWithStats(opened,8)
  points=[];gradient=[]
  for i in range(1,count):
@@ -20,7 +21,7 @@ def gradient_markers(image,*,include_uniform=False):
   yy,xx=np.ogrid[y:y+bh,x:x+bw];core=((xx-cx)/(bw*.3))**2+((yy-cy)/(bh*.3))**2<=1
   values=gray[y:y+bh,x:x+bw][core]
   if np.mean(np.ptp(rgb[y:y+bh,x:x+bw][core].astype(float),axis=1))>20:continue
-  shaded=40<=np.median(values)<=210 and np.std(values)>=18 and np.percentile(values,75)-np.percentile(values,25)>=25
+  shaded=40<=np.median(values)<=(235 if highlight else 210) and np.std(values)>=(16 if highlight else 18) and np.percentile(values,75)-np.percentile(values,25)>=25
   if not shaded and not np.median(values)<80:continue
   if shaded:gradient.append((bw+bh)/4)
   points.append({'x':cx/(w-1),'y':cy/(h-1),'radius_pixels':(bw+bh)/4,'median':float(np.median(values)),'std':float(np.std(values))})
