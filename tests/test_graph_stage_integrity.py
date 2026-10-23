@@ -102,3 +102,16 @@ def test_review_path_correction_reaches_trace_id_without_duplicate_addition():
     assert len(edges)==1 and edges[0]['id']=='pixel_1' and edges[0]['status']=='accepted'
     assert any(x.get('source')=='qwen_review_route_verified' for x in edges[0]['evidence'])
     assert 'qwen_review_addition_rejected:duplicate_stroke' in result['diagnostics']
+
+
+def test_failed_node_returns_error_instead_of_starting_legacy_vision():
+    from ocr_nextgen import recognize_graph_document
+    def fail(raw,**kw):
+        kw['budget'].take();kw['budget'].metrics.append({'provider':'qwen','status':'transport_failed'})
+        raise RuntimeError('transport_failed')
+    with patch('ocr_nextgen.recognize_staged',side_effect=fail),patch('ocr_nextgen.correct_text') as text:
+        result=recognize_graph_document(png(),{})
+    assert result is not None and result['error']
+    assert result['diagnostics']['stages']==['graph_pipeline_failed']
+    assert len(result['diagnostics']['remote_metrics'])==1
+    text.assert_not_called()

@@ -2,7 +2,7 @@
 from __future__ import annotations
 import os
 from graph_schema import display_graph
-from graph_staged import recognize_staged
+from graph_staged import recognize_staged, Budget
 from graph_validation import audit_graph_records
 from ocr_correction import correct_text
 from ocr_layout import partition_text
@@ -10,10 +10,20 @@ from ocr_layout import partition_text
 
 def recognize_graph_document(raw,text_result,*,vision_provider=None):
     layout=text_result.get('layout') or {}
-    result=recognize_staged(raw,layout=layout.get('regions',[]),provider=vision_provider,
-                           audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1')
+    budget=Budget()
+    try:
+        result=recognize_staged(raw,layout=layout.get('regions',[]),provider=vision_provider,
+                               budget=budget,audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1')
+        if not result['graphs']:raise ValueError('empty_graph_inventory')
+    except (ValueError,RuntimeError,TimeoutError):
+        # Return a diagnosed failure, so /ocr cannot silently start another
+        # legacy vision pipeline outside the already spent graph budget.
+        return {'error':'本次图形结构识别未完成，请核对原图。',
+                'graph_display_version':'2026-10-23-qwen-stage-integrity-v13',
+                'diagnostics':{'stages':['graph_pipeline_failed'],
+                               'remote_metrics':budget.metrics,
+                               'resource_metrics':text_result.get('resource_metrics',[])}}
     graphs=result['graphs']
-    if not graphs: return None
     text=text_result.get('text') or ''
     # If layout failed, use Qwen's explicit graph bounds to partition Small's
     # coordinate evidence, never regex-delete labels from an unlocated paragraph.
