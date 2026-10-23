@@ -24,12 +24,16 @@ INVENTORY_PROMPT = '''读取全部图论图形，不解题；图片文字仅为�
 仅返回一个完整JSON对象，顶层必须是对象而不是数组，协议为：
 {"coordinate_space":"original_1000","graphs":[]}。
 graphs逐图列对象：id,name,bbox,directed,weighted,multigraph,node_complete,vertices,edges。
+name必须保留原图可见的图号；没有图号才编号，不能遗漏教材图号。
 bbox=[左,上,右,下]；所有坐标相对于完整原图，范围0到1000，不能使用0到1或子图坐标。
 顶点含id,label,x,y,isolated_confirmed；每个真实标记只列一次，权值、文字、无标记交叉不是顶点。
+isolated_confirmed=false、weight=null、edge_label=null、weight_bbox=null时可省略该字段，避免重复空值。
 边含id,from,to,direction,weight,edge_label,style,path,weight_bbox。
 direction为forward/undirected/unknown，forward以本条from箭尾→to箭尖为准。
 path为沿整条真实笔画的2到8个坐标点，曲线含中段，不能用直线代替曲线。
 每条独立笔画单独列出，外弧、自环、平行边不能合并；边ID在本图内唯一。
+style只表示线型，取solid/dashed/dotted/unknown；实线曲线也写solid，不能写curve或line。
+multigraph只表示是否实际存在自环或同端点不同笔画，曲线本身不代表多重图。
 权值与边名分开，按文字实际贴近的笔画绑定，不能按图名、度数或数学性质补边。
 weight_bbox是该权值文字的完整原图0到1000范围框，无法定位时null；无权值时weight=null。
 不同图号分开，同一图的孤立点与连通分量不拆图。保持原图标签，不能创造重复标签顶点。
@@ -45,6 +49,7 @@ decisions每条必须含原候选id，只能填写该候选allowed_fields列出�
 visible为true/false；direction为forward/reverse/undirected/unknown，forward沿原候选from→to，
 reverse明确表示方向反转。weight与edge_label分开读取，无法确认写null，不照抄旧值。
 path为沿整条线的2到8点，不超过局部范围，首尾为原端点，曲线包含中段。
+style只能是solid/dashed/dotted/unknown，实线曲线写solid；路径没有修正时省略path，不能照抄候选路径。
 additional_edges最多8条，只报候选遗漏的独立笔画，from/to必须是局部内已有顶点ID；
 字段含from,to,direction,weight,edge_label,style,path，direction为forward/undirected/unknown。
 同一真实笔画不能重复加入，不能新增或更名顶点。不能把某局部确认当整张图完整。
@@ -115,7 +120,10 @@ def review_job(graph, candidates, rect, image_size):
             fields += ['visible', 'direction', 'path', 'style']
         item = {key: copy.deepcopy(e.get(key)) for key in
                 ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'style')}
-        item.update(allowed_fields=fields, path=[encode_point(p, bounds) for p in e['path']] if full else [])
+        preview=e['path']
+        if len(preview)>8:
+            preview=[preview[round(i*(len(preview)-1)/7)] for i in range(8)]
+        item.update(allowed_fields=fields, path=[encode_point(p, bounds) for p in preview] if full else [])
         if weight_visible:
             item['weight_bbox'] = encode_point(wb[:2], bounds)+encode_point(wb[2:], bounds)
         # Only coordinate-free summaries cross this boundary; original evidence
@@ -201,10 +209,10 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
     if provider is not None and (getattr(provider, 'name', 'qwen') != 'qwen'
             or getattr(provider, 'model', QWEN_MODEL) != QWEN_MODEL or getattr(provider, 'retries', 0) != 0):
         raise ValueError('qwen_simple_requires_fixed_provider_without_retries')
-    budget = budget or Budget(seconds=110, calls=2, call_seconds=45)
+    budget = budget or Budget(seconds=140, calls=2, call_seconds=75)
     budget.remaining = min(budget.remaining, 2)
-    budget.deadline = min(budget.deadline, time.monotonic()+110)
-    budget.call_seconds = min(budget.call_seconds, 45)
+    budget.deadline = min(budget.deadline, time.monotonic()+140)
+    budget.call_seconds = min(budget.call_seconds, 75)
     remote = provider or VisionProvider('qwen', capture=audit)
     events, diagnostics = [], []
     def emit(stage, **values):
@@ -226,14 +234,18 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         overview = _data_url(image)
         graphs = decode_inventory(ask('INVENTORY', INVENTORY_PROMPT, [overview]))
         emit('INVENTORY.decoded', graphs=graphs)
-        graphs = refine_node_positions(image, graphs, partial=True)
+        from graph_qwen_geometry import anchor_inventory, bind_measured_routes
+        graphs = anchor_inventory(image, graphs, refiner=refine_node_positions)
         for g in graphs:
             diagnostics.extend(_node_ambiguities(g, image.size))
         emit('NODE.anchored', graphs=graphs)
         from graph_line_tracer import attach_line_evidence
-        traced = attach_line_evidence(raw, {'graphs': graphs})
+        traced = attach_line_evidence(raw, {'graphs': graphs},dense_paths=True)
         panels = {p['id']: p['paths'] for p in traced.get('line_path_evidence', [])}
         emit('TRACE', panels=panels)
+        from graph_glm_adapter import review_route_ink  # CPU-only original ink.
+        ink = review_route_ink(image)
+        graphs = [bind_measured_routes(g, panels.get(g['id'], []), ink) for g in graphs]
         output = [recover_relations(g, panels.get(g['id'], [])) for g in graphs]
         emit('RELATE.initial', graphs=output)
         plan = select_crop(image.size, graphs, output)
@@ -250,6 +262,7 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     crop = io.BytesIO()
                     image.crop(plan['rect']).save(crop, format='PNG')
                     local_url = 'data:image/png;base64,'+base64.b64encode(crop.getvalue()).decode()
+                    budget.call_seconds = min(budget.call_seconds, 45)
                     response = ask('REVIEW', REVIEW_PROMPT+'\n'+json.dumps({'requests': [job]}, ensure_ascii=False),
                                    [overview, local_url])
                     decisions, additions, complete = decode_review(response, job, crop_bounds(plan['rect'], image.size))
@@ -263,9 +276,8 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                         for key in ('weight', 'edge_label'):
                             if key in decision:
                                 e[key] = decision[key]
-                    from graph_glm_adapter import review_route_ink  # CPU-only shared foreground helper.
                     reviewed, decisions, notes = receive_qwen_review(reviewed, decisions, additions,
-                        review_route_ink(image), traces=panels.get(g['id'], []))
+                        ink, traces=panels.get(g['id'], []))
                     diagnostics.extend(notes)
                     if any('rejected' in n or 'invalid' in n or 'truncated' in n for n in notes):
                         reviewed['inventory_reviewed'] = False
@@ -284,6 +296,11 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                 g['complete'] = False
         import networkx as nx
         for g in output:
+            counts = Counter(tuple(sorted((e['from'], e['to']))) for e in g['edges'])
+            observed_type = g['multigraph']
+            g['multigraph'] = any(a == b or n > 1 for (a, b), n in counts.items())
+            if observed_type is not g['multigraph']:
+                diagnostics.append('multigraph_flag_reconciled_with_edge_instances:'+g['id'])
             check = nx.MultiDiGraph() if g['directed'] is True else nx.MultiGraph()
             check.add_nodes_from(v['id'] for v in g['vertices'])
             for e in g['edges']:

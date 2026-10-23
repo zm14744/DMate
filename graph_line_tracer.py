@@ -199,8 +199,14 @@ def _follow(skel, points, source_i, start, radius, max_steps):
     return None, path, turns, ambiguity
 
 
-def _sample_path(path, width, height):
-    selected = (
+def _sample_path(path, width, height, *, max_error=None):
+    if max_error is not None and len(path)>10:
+        # Candidate-only option: ten uniform samples cut across thin exterior
+        # arcs and then fail the independent ink check. Keep pixel geometry.
+        points=np.asarray(path,dtype=np.float32).reshape((-1,1,2))
+        selected=cv2.approxPolyDP(points,max_error,False).reshape((-1,2)).tolist()
+        if len(selected)>128:return []  # Abstain instead of erasing geometry.
+    else:selected = (
         path if len(path) <= 10
         else [path[round(i * (len(path) - 1) / 9)] for i in range(10)]
     )
@@ -603,7 +609,7 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
     return output
 
 
-def _graph_candidates(rgb, graph):
+def _graph_candidates(rgb, graph, *, dense_paths=False):
     h, w = rgb.shape[:2]
     points = _vertices(graph, w, h)
     if not points:
@@ -691,7 +697,8 @@ def _graph_candidates(rgb, graph):
                 'from': local[a][0],
                 'to': local[b][0],
                 'path': _sample_path(
-                    [(x + min_x, y + min_y) for x, y in path], w, h),
+                    [(x + min_x, y + min_y) for x, y in path], w, h,
+                    max_error=.6 if dense_paths else None),
                 'pixel_length': length,
                 'straightness': round(separation / max(length, 1), 3),
                 'score': round(score, 3),
@@ -700,6 +707,7 @@ def _graph_candidates(rgb, graph):
                            if source == target else 'opencv_skeleton_tangent_trace'),
                 'loop_candidate': source == target,
             }
+            if not candidate['path']:continue
             keep_candidate(candidate)
 
     for candidate in _straight_stroke_candidates(
@@ -732,7 +740,7 @@ def _graph_candidates(rgb, graph):
     return ordered
 
 
-def attach_line_evidence(image_bytes, cv_result):
+def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False):
     """Add trace evidence without modifying verified edges or node labels."""
     if not isinstance(cv_result, dict) or not cv_result.get('graphs'):
         return cv_result
@@ -743,7 +751,7 @@ def attach_line_evidence(image_bytes, cv_result):
         for graph in (cv_result.get('graphs') or [])[:MAX_GRAPHS]:
             if not isinstance(graph, dict):
                 continue
-            traces = _graph_candidates(rgb, graph)
+            traces = _graph_candidates(rgb, graph,dense_paths=dense_paths)
             if traces:
                 # The arrow result is evidence, not an accepted direction.
                 try:

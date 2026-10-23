@@ -18,9 +18,9 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
     if graph_pipeline=='qwen-simple-candidate':
         from graph_qwen_simple import recognize_simple
         engine=recognize_simple
-        version='qwen-simple-candidate-v2'
+        version='qwen-simple-candidate-v3'
     layout=text_result.get('layout') or {}
-    budget=Budget()
+    budget=Budget(seconds=140,calls=2,call_seconds=75) if graph_pipeline=='qwen-simple-candidate' else Budget()
     try:
         result=engine(raw,layout=layout.get('regions',[]),provider=vision_provider,
                                budget=budget,audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1')

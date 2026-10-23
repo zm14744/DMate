@@ -289,6 +289,6 @@ def test_explicit_candidate_uses_unified_display_and_existing_text_correction():
     assert candidate.call_count == 1
     staged.assert_not_called()
     text.assert_called_once_with('source')
-    assert result['graph_display_version'] == 'qwen-simple-candidate-v2'
+    assert result['graph_display_version'] == 'qwen-simple-candidate-v3'
     assert [e['id'] for e in result['graph_display_data'][0]['edges']] == ['upper', 'lower']
     assert result['text'] == 'unchanged text'
