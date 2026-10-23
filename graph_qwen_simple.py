@@ -76,6 +76,8 @@ def select_crop(image_size, graphs, related):
                      + 2 * (counts[tuple(sorted((e['from'], e['to'])))] > 1)
                      + 3 * bool(audit['endpoint_mismatch'] or audit['conflicts'])
                      + 6 * bool(weight_box))
+            if g['weighted'] is True and e['weight'] is None:
+                score+=12  # A measured stroke without a bound value needs the local read first.
             points = ([weight_box[:2], weight_box[2:]] if weight_box else e.get('path'))
             if not points:
                 positions = {v['id']: [v['x'], v['y']] for v in g['vertices']}
@@ -96,7 +98,7 @@ def select_crop(image_size, graphs, related):
     return {'graph_index': index, 'target_id': eid, 'rect': rect, 'reason': reason, 'risk_score': score}
 
 
-def review_job(graph, candidates, rect, image_size):
+def review_job(graph, candidates, rect, image_size, *, focus_id=None):
     bounds = crop_bounds(rect, image_size)
     vertices = []
     for v in graph['vertices']:
@@ -107,8 +109,11 @@ def review_job(graph, candidates, rect, image_size):
             item['x'], item['y'] = encode_point(p, bounds)
         vertices.append(item)
     inside = {v['id'] for v in vertices if v['in_crop']}
+    attribute_focus=next((e['id'] for e in candidates if e['id']==focus_id
+                          and graph['weighted'] is True and e['weight'] is None),None)
     jobs = []
     for e in candidates:
+        if attribute_focus is not None and e['id']!=attribute_focus:continue
         full = (bool(e['path']) and e['from'] in inside and e['to'] in inside
                 and all(contains(bounds, p) for p in e['path']))
         wb = _weight_box(e)
@@ -116,7 +121,7 @@ def review_job(graph, candidates, rect, image_size):
         if not full and not weight_visible:
             continue
         fields = ['weight', 'edge_label']
-        if full:
+        if full and attribute_focus is None:
             fields += ['visible', 'direction', 'path', 'style']
         item = {key: copy.deepcopy(e.get(key)) for key in
                 ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'style')}
@@ -141,6 +146,7 @@ def review_job(graph, candidates, rect, image_size):
             and len(inside) == len(vertices))
     return {'graph_id': graph['id'], 'coordinate_space': CROP_SPACE, 'vertices': vertices,
             'candidates': jobs[:48], 'full_inventory_in_crop': full,
+            'review_mode':'missing_weight' if attribute_focus is not None else 'geometry',
             'directed': graph['directed'], 'weighted': graph['weighted'], 'multigraph': graph['multigraph']}
 
 
@@ -173,6 +179,8 @@ def decode_review(response, job, bounds):
                 d[key] = attribute(d[key])
         decisions[eid] = d
     decoded = []
+    if additions and job.get('review_mode')=='missing_weight':
+        raise ValueError('qwen_local_scope_violation')
     inside = {v['id'] for v in job['vertices'] if v['in_crop']}
     for value in additions:
         if (not isinstance(value, dict) or not isinstance(value.get('from'), str)
@@ -234,7 +242,8 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         overview = _data_url(image)
         graphs = decode_inventory(ask('INVENTORY', INVENTORY_PROMPT, [overview]))
         emit('INVENTORY.decoded', graphs=graphs)
-        from graph_qwen_geometry import anchor_inventory, bind_measured_routes
+        from graph_qwen_geometry import (anchor_inventory, bind_measured_routes,
+            guard_local_decisions, exclude_unmeasured_proposals, mark_review_conflicts)
         graphs = anchor_inventory(image, graphs, refiner=refine_node_positions)
         for g in graphs:
             diagnostics.extend(_node_ambiguities(g, image.size))
@@ -246,6 +255,10 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         from graph_glm_adapter import review_route_ink  # CPU-only original ink.
         ink = review_route_ink(image)
         graphs = [bind_measured_routes(g, panels.get(g['id'], []), ink) for g in graphs]
+        for i,g in enumerate(graphs):
+            graphs[i],notes=exclude_unmeasured_proposals(g,ink)
+            diagnostics.extend(notes)
+        emit('EDGE.measured',graphs=graphs)
         output = [recover_relations(g, panels.get(g['id'], [])) for g in graphs]
         emit('RELATE.initial', graphs=output)
         plan = select_crop(image.size, graphs, output)
@@ -253,7 +266,7 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             index = plan['graph_index']
             g = graphs[index]
             candidates = output[index]['_candidates']
-            job = review_job(g, candidates, plan['rect'], image.size)
+            job = review_job(g, candidates, plan['rect'], image.size,focus_id=plan['target_id'])
             emit('REVIEW.plan', plan=plan, job=job)
             if job['candidates']:
                 try:
@@ -263,12 +276,18 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     image.crop(plan['rect']).save(crop, format='PNG')
                     local_url = 'data:image/png;base64,'+base64.b64encode(crop.getvalue()).decode()
                     budget.call_seconds = min(budget.call_seconds, 45)
-                    response = ask('REVIEW', REVIEW_PROMPT+'\n'+json.dumps({'requests': [job]}, ensure_ascii=False),
+                    scope=('\n本次review_mode=missing_weight，仅核对指定候选缺失的weight/edge_label，'
+                           '路径只用于定位，decisions不能含visible/direction/path/style，additional_edges必须为空。\n'
+                           if job['review_mode']=='missing_weight' else '\n')
+                    response = ask('REVIEW', REVIEW_PROMPT+scope+json.dumps({'requests': [job]}, ensure_ascii=False),
                                    [overview, local_url])
                     decisions, additions, complete = decode_review(response, job, crop_bounds(plan['rect'], image.size))
                     reviewed = copy.deepcopy(g)
                     reviewed['edges'] = copy.deepcopy(candidates)
                     reviewed['inventory_reviewed'] = complete
+                    decisions,conflicts=guard_local_decisions(reviewed,decisions,ink)
+                    diagnostics.extend(conflicts)
+                    if conflicts:reviewed['inventory_reviewed']=False
                     for e in reviewed['edges']:
                         decision = decisions.get(e['id'], {})
                         if decision:
@@ -281,7 +300,7 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     diagnostics.extend(notes)
                     if any('rejected' in n or 'invalid' in n or 'truncated' in n for n in notes):
                         reviewed['inventory_reviewed'] = False
-                    output[index] = recover_relations(reviewed, panels.get(g['id'], []), review=decisions)
+                    output[index] = mark_review_conflicts(recover_relations(reviewed, panels.get(g['id'], []), review=decisions))
                     emit('RELATE.reviewed', graph_id=g['id'], graph=output[index])
                 except (ValueError, RuntimeError, TimeoutError) as exc:
                     diagnostics.append('single_review_failed:'+type(exc).__name__)

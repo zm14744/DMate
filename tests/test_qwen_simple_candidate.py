@@ -123,6 +123,22 @@ def test_model_panel_box_does_not_certify_missing_outside_ink():
     assert len(job['candidates']) == 2 and not job['full_inventory_in_crop']
 
 
+def test_missing_weight_focus_cannot_rewrite_other_edges_or_remove_a_stroke():
+    g=decode_inventory(inventory())[0]
+    g['weighted']=True;g['edges'][1]['weight']=4
+    job=review_job(g,g['edges'],(0,0,400,250),(400,250),focus_id='upper')
+    assert job['review_mode']=='missing_weight' and len(job['candidates'])==1
+    assert job['candidates'][0]['allowed_fields']==['weight','edge_label']
+    assert not job['full_inventory_in_crop']
+    response={'coordinate_space':'crop_1000','graph_id':'G',
+              'decisions':[{'id':'upper','weight':2}], 'additional_edges':[]}
+    decisions,_,complete=decode_review(response,job,[0,0,1,1])
+    assert decisions['upper']['weight']==2 and not complete
+    response['decisions'][0]['visible']=False
+    with pytest.raises(ValueError,match='scope_violation'):
+        decode_review(response,job,[0,0,1,1])
+
+
 def test_two_call_candidate_keeps_parallel_identity_and_original_crop_pixels():
     seen = []
     raw = picture()
@@ -289,6 +305,6 @@ def test_explicit_candidate_uses_unified_display_and_existing_text_correction():
     assert candidate.call_count == 1
     staged.assert_not_called()
     text.assert_called_once_with('source')
-    assert result['graph_display_version'] == 'qwen-simple-candidate-v3'
+    assert result['graph_display_version'] == 'qwen-simple-candidate-v4'
     assert [e['id'] for e in result['graph_display_data'][0]['edges']] == ['upper', 'lower']
     assert result['text'] == 'unchanged text'
