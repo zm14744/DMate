@@ -20,7 +20,7 @@ def test_always_thinking_is_explicit_and_cannot_silently_be_marked_off():
     assert payload['thinking']=={'type':'enabled'} and payload['reasoning_effort']=='low'
     assert payload['do_sample'] is False and payload['stream'] is True
     assert payload['messages'][0]['content'][1]['image_url']=={'url':URL.split(',',1)[1]}
-    assert not {'enable_thinking','stream_options','temperature','response_format'}&payload.keys()
+    assert not {'enable_thinking','thinking_budget','stream_options','temperature','response_format'}&payload.keys()
 
 
 @pytest.mark.parametrize('effort',['low','high','max'])
@@ -67,3 +67,26 @@ def test_benchmark_rejects_off_mode_before_loading_private_files_or_calling_api(
                                    '--glm-model',GLM_53_FLASH_MODEL,'--thinking','off'])
     with pytest.raises(SystemExit) as result:main()
     assert result.value.code==2 and 'always-thinking' in capsys.readouterr().err
+
+
+def test_qwen_budget_is_explicit_and_does_not_change_off_or_glm_requests():
+    p=VisionProvider('qwen',thinking=True,thinking_budget=1024)
+    assert p.payload('JSON',[URL])['thinking_budget']==1024
+    assert 'thinking_budget' not in VisionProvider('qwen').payload('JSON',[URL])
+    with pytest.raises(ValueError):VisionProvider('qwen',thinking_budget=1024)
+    with pytest.raises(ValueError):VisionProvider('glm',thinking=True,thinking_budget=1024)
+
+
+@pytest.mark.parametrize('budget',[True,0,255,4097,1024.5])
+def test_invalid_qwen_budgets_fail_before_api(budget):
+    with pytest.raises(ValueError):VisionProvider('qwen',thinking=True,thinking_budget=budget)
+
+
+def test_reasoning_only_is_not_parsed_as_an_answer(monkeypatch):
+    monkeypatch.setenv('ZHIPU_API_KEY','test-only')
+    response={'model':GLM_53_FLASH_MODEL,'reasoning_chars':100,
+              'choices':[{'message':{'content':''},'finish_reason':'stop'}]}
+    p=VisionProvider('glm',model=GLM_53_FLASH_MODEL,thinking=True,capture=True,
+                     transport=lambda *a,**kw:(200,'',response))
+    with pytest.raises(VisionError,match='reasoning_only_output'):p('JSON',[URL],Budget())
+    assert p.observations[0]['status']=='reasoning_only_output'

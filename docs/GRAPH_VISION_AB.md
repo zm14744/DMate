@@ -85,11 +85,15 @@ usage、请求错误、输入 SHA、全部预测边及仅 accepted 边的辅助�
 python -B scripts/benchmark_graph_vision.py \
   --manifest /private/ab-manifest.json --output /private/glm53-on \
   --providers glm,qwen --glm-model glm-5.3-flash --glm-reasoning-effort low \
+  --qwen-thinking-budget 1024 \
   --thinking on --experiments both --retries 0 --vision-timeout 155 --call-timeout 45 \
   --layout-cache /private/layout-cache --case-ids CASE1,CASE2
 ```
 
-两者开启思考的成绩与Qwen生产关闭思考参考必须分列。GLM为low，Qwen为服务默认思考档，
-不声称内部推理计算量相同。关闭GLM 5.3思考会在本地配置阶段报错，不发无效API请求。
+两者开启思考的成绩与Qwen生产关闭思考参考必须分列。GLM为low，Qwen为显式1024思考预算，
+不声称内部推理计算量相同。Qwen预算字段仅在显式选择时发送，关闭思考的生产请求不变。
+首轮默认Qwen思考预算曾返回只有reasoning、没有最终JSON；不从思考文本提取答案，保留该
+失败，再单独验证显式1024预算下的原图NODE成功。两种协议的成绩不能混用；新协议从头
+建立独立结果目录，费用包含失败。关闭GLM 5.3思考会在本地配置阶段报错，不发无效API请求。
 生产默认、混合复核实验模型、其他学习功能及Zeabur部署均未更改。
 

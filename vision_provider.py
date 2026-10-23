@@ -73,7 +73,7 @@ def _glm_request(payload,headers,timeout,wall_deadline):
 
 
 class VisionProvider:
-    def __init__(self,name='qwen',*,model=None,thinking=False,reasoning_effort=None,retries=0,capture=False,transport=None,sleep=time.sleep):
+    def __init__(self,name='qwen',*,model=None,thinking=False,reasoning_effort=None,thinking_budget=None,retries=0,capture=False,transport=None,sleep=time.sleep):
         if name not in ('qwen','glm'):raise ValueError('Unsupported vision provider')
         if type(thinking) is not bool:raise ValueError('thinking must be explicit boolean')
         if type(retries) is not int or not 0<=retries<=2:raise ValueError('retry limit is 0..2')
@@ -87,6 +87,10 @@ class VisionProvider:
         elif reasoning_effort is not None:
             raise ValueError('reasoning_effort is supported only for glm-5.3-flash')
         self.reasoning_effort=reasoning_effort
+        if thinking_budget is not None and (name!='qwen' or not thinking
+                or type(thinking_budget) is not int or not 256<=thinking_budget<=4096):
+            raise ValueError('thinking_budget requires Qwen thinking on, integer 256..4096')
+        self.thinking_budget=thinking_budget
         self.thinking=thinking;self.retries=retries;self.capture=capture
         self.transport=transport;self.sleep=sleep;self.observations=[]
         self.logical_calls=0
@@ -109,6 +113,7 @@ class VisionProvider:
         if self.name=='qwen':
             payload.update(enable_thinking=self.thinking,temperature=0,
                            stream_options={'include_usage':True})
+            if self.thinking_budget is not None:payload['thinking_budget']=self.thinking_budget
             if not self.thinking:payload['response_format']={'type':'json_object'}
         else:
             # Zhipu's SDK treats temperature=0 as do_sample=False, not a valid
@@ -130,6 +135,7 @@ class VisionProvider:
             timeout=budget.take();started=time.monotonic();status=None;raw=None;error=None
             metric={'provider':self.name,'model':self.model,'thinking':self.thinking,
                     'reasoning_effort':self.reasoning_effort,
+                    'thinking_budget':self.thinking_budget,
                     'started_at_unix':time.time(),
                     'logical_call':self.logical_calls,'attempt':attempt+1,'prompt_sha256':hashlib.sha256(prompt.encode()).hexdigest(),
                     'image_sha256':[image_digest(url) for url in images[:2]]}
@@ -152,6 +158,8 @@ class VisionProvider:
                     raise VisionError('model_mismatch')
                 if choice.get('finish_reason')=='length':raise VisionError('truncated_output')
                 if not isinstance(raw,str):raise VisionError('invalid_output')
+                if not raw.strip() and metric['reasoning_chars']:
+                    raise VisionError('reasoning_only_output')
                 # Some vision responses append two backticks to an otherwise
                 # complete JSON object. Remove formatting only, then validate
                 # the ENTIRE root; never salvage an inner/truncated fragment.

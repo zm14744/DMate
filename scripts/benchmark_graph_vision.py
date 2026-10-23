@@ -99,14 +99,16 @@ def adaptation_profile(provider,experiment,mode,model=None):
 
 
 def execute(raw,provider_name,experiment,thinking,*,layout=None,retries=1,glm_model=GLM_MODEL,
-            vision_seconds=155,call_seconds=45,glm_adapter='native',glm_reasoning_effort=None):
+            vision_seconds=155,call_seconds=45,glm_adapter='native',glm_reasoning_effort=None,qwen_thinking_budget=None):
     provider=VisionProvider(provider_name,model=glm_model if provider_name=='glm' else None,
                             thinking=thinking,reasoning_effort=glm_reasoning_effort if provider_name=='glm' else None,
+                            thinking_budget=qwen_thinking_budget if provider_name=='qwen' and thinking else None,
                             retries=retries,capture=True)
     record={'provider':provider_name,'model':provider.model,'thinking':thinking,'experiment':experiment,
             'started_at':datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(),
             'status':'not_run_missing_key','requests':[],'actual_request_count':0,'seconds':0.,'http_429_count':0}
     record['reasoning_effort']=provider.reasoning_effort
+    record['thinking_budget']=provider.thinking_budget
     record['adaptation_profile']=adaptation_profile(provider_name,experiment,glm_adapter,provider.model)
     if not provider.available():return record
     start=time.monotonic()
@@ -215,7 +217,7 @@ def write_reports(out,records,metadata):
     summary,paired=summarize(records)
     report={**metadata,'summary':summary,'paired_scores':paired,'records':records,'recommendation':'pending_actual_paired_review'}
     (out/'comparison.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
-    fields=['case_id','sha256','category','reference_status','experiment','thinking','reasoning_effort','adaptation_profile','repeat','provider','model','returned_model_versions','status','actual_request_count','seconds','http_429_count','request_http_statuses','request_error_counts','prompt_tokens','completion_tokens','total_tokens','usage_reported_requests','successful_requests','http_successful_requests','http_success_rate','request_success_rate','mean_request_seconds',
+    fields=['case_id','sha256','category','reference_status','experiment','thinking','reasoning_effort','thinking_budget','adaptation_profile','repeat','provider','model','returned_model_versions','status','actual_request_count','seconds','http_429_count','request_http_statuses','request_error_counts','prompt_tokens','completion_tokens','total_tokens','usage_reported_requests','successful_requests','http_successful_requests','http_success_rate','request_success_rate','mean_request_seconds',
             'expected_vertices','actual_vertices','vertex_tp','missing_vertices','extra_vertices','expected_edges','actual_edges','edge_tp','missing_edges','extra_edges','wrong_endpoint_instances',
             'precision','recall','f1','direction_accuracy','direction_recall','parallel_count_accuracy','weight_match_accuracy','weight_recall',
             'figure_count_correct','figure_order_correct','whole_structure_correct']
@@ -271,6 +273,7 @@ def main():
     parser.add_argument('--providers',default='glm,qwen');parser.add_argument('--thinking',choices=['off','on','both'],default='off')
     parser.add_argument('--glm-model',choices=[GLM_MODEL,GLM_PAID_MODEL,GLM_53_FLASH_MODEL],default=GLM_MODEL)
     parser.add_argument('--glm-reasoning-effort',choices=['low','high','max'])
+    parser.add_argument('--qwen-thinking-budget',type=int,help='Explicit 256..4096 token budget, only for thinking-on Qwen rows')
     parser.add_argument('--glm-adapter',choices=['baseline','native','experimental'],default='native',
                         help='native keeps V2; experimental selects V6; baseline uses the shared contract')
     parser.add_argument('--vision-timeout',type=int,choices=[155,300],default=155)
@@ -284,6 +287,8 @@ def main():
     if not 0<=args.retries<=2:parser.error('retries must be 0..2')
     providers=args.providers.split(',')
     if len(set(providers))!=len(providers) or any(p not in ('glm','qwen') for p in providers):parser.error('providers must be glm,qwen')
+    if args.qwen_thinking_budget is not None and ('qwen' not in providers or args.thinking=='off'
+            or not 256<=args.qwen_thinking_budget<=4096):parser.error('--qwen-thinking-budget needs thinking-on Qwen and 256..4096')
     if 'glm' in providers:
         if args.glm_model==GLM_53_FLASH_MODEL:
             if args.thinking!='on':parser.error('glm-5.3-flash is always-thinking; use --thinking on (default effort low)')
@@ -313,6 +318,7 @@ def main():
               'prompt_templates_sha256':sha((RAW_PROMPT+NODE_PROMPT+EDGE_PROMPT+REVIEW_PROMPT+GLM_EDGE_PROMPT+GLM_REVIEW_PROMPT+GLM_MARKER_PROMPT+STABLE_REVIEW_HINT).encode()),
               'glm_adaptation_profile':adaptation_profile('glm','staged',args.glm_adapter,args.glm_model),
               'glm_reasoning_effort':(args.glm_reasoning_effort or 'low') if args.glm_model==GLM_53_FLASH_MODEL else None,
+              'qwen_thinking_budget':args.qwen_thinking_budget,
               'inventory_only':args.inventory_only,'preprocessing_by_case':[]}
     records=[];cache=Path(args.layout_cache).resolve() if args.layout_cache else out/'layout-cache'
     for case_number,case in enumerate(cases):
@@ -337,11 +343,13 @@ def main():
                     for provider in order:
                         identity={'case_id':case['id'],'sha256':case['sha256'],'repeat':repeat+1,
                                   'model':VisionProvider(provider,model=args.glm_model if provider=='glm' else None,
-                                                         thinking=thinking,reasoning_effort=args.glm_reasoning_effort if provider=='glm' else None).model,
+                                                         thinking=thinking,reasoning_effort=args.glm_reasoning_effort if provider=='glm' else None,
+                                                         thinking_budget=args.qwen_thinking_budget if provider=='qwen' and thinking else None).model,
                                   'time_budget':{'total_seconds':args.vision_timeout,'per_call_seconds':args.call_timeout,'max_requests':7 if experiment=='staged' else args.retries+1},
                                   'experiment':experiment,'thinking':thinking,'provider':provider,'code_sha256':code_hash,
                                   'adaptation_profile':adaptation_profile(provider,experiment,args.glm_adapter,args.glm_model if provider=='glm' else None),
                                   'reasoning_effort':(args.glm_reasoning_effort or 'low') if provider=='glm' and args.glm_model==GLM_53_FLASH_MODEL else None,
+                                  'thinking_budget':args.qwen_thinking_budget if provider=='qwen' and thinking else None,
                                   'layout_sha256':layout_hash if experiment=='staged' else None,
                                   'category':case.get('category'),
                                   'reference_status':case['truth'].get('reference_status','unverified'),
@@ -360,7 +368,7 @@ def main():
                             else:
                                 if experiment=='staged' and preprocess_error:
                                     record={'model':model,'status':'local_preprocessing_failed','requests':[],'actual_request_count':0,'seconds':0.}
-                                else:record=execute(raw,provider,experiment,thinking,layout=(prepared or {}).get('layout',{}).get('regions',[]),retries=args.retries,glm_model=args.glm_model,vision_seconds=args.vision_timeout,call_seconds=args.call_timeout,glm_adapter=args.glm_adapter,glm_reasoning_effort=args.glm_reasoning_effort)
+                                else:record=execute(raw,provider,experiment,thinking,layout=(prepared or {}).get('layout',{}).get('regions',[]),retries=args.retries,glm_model=args.glm_model,vision_seconds=args.vision_timeout,call_seconds=args.call_timeout,glm_adapter=args.glm_adapter,glm_reasoning_effort=args.glm_reasoning_effort,qwen_thinking_budget=args.qwen_thinking_budget)
                             record.update(identity,fingerprint=fingerprint)
                             truth=case['truth']
                             record['metrics']=(compare_graphs(truth.get('graphs',[]),record['raw_result']['graphs'],reference_status=truth.get('reference_status','unverified'))
