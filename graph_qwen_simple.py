@@ -245,6 +245,27 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         except (ValueError, RuntimeError, TimeoutError) as exc:
             emit(stage+'.failed', kind=type(exc).__name__, observations=getattr(remote, 'observations', []))
             raise
+    def finish(output):
+        from graph_validation import audit_graph_records
+        issues=audit_graph_records(output)
+        diagnostics.extend(issues)
+        if issues:
+            for g in output:g['complete']=False
+        import networkx as nx
+        for g in output:
+            counts=Counter(tuple(sorted((e['from'],e['to']))) for e in g['edges'])
+            observed_type=g['multigraph']
+            g['multigraph']=any(a==b or n>1 for (a,b),n in counts.items())
+            if observed_type is not g['multigraph']:
+                diagnostics.append('multigraph_flag_reconciled_with_edge_instances:'+g['id'])
+            check=nx.MultiDiGraph() if g['directed'] is True else nx.MultiGraph()
+            check.add_nodes_from(v['id'] for v in g['vertices'])
+            for e in g['edges']:check.add_edge(e['from'],e['to'],key=e['id'])
+            if check.number_of_nodes()!=len(g['vertices']) or check.number_of_edges()!=len(g['edges']):
+                g['complete']=False;diagnostics.append('single_identity_check_failed')
+        result={'graphs':output,'diagnostics':diagnostics,'calls_remaining':budget.remaining,'remote_metrics':budget.metrics}
+        if audit:result['stage_audit']=events
+        return result
     try:
         image = ImageOps.exif_transpose(Image.open(io.BytesIO(raw)))
         if image.width*image.height > 16_000_000 or min(image.size) < 2:
@@ -253,6 +274,18 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         overview = _data_url(image)
         graphs = decode_inventory(ask('INVENTORY', INVENTORY_PROMPT, [overview]))
         emit('INVENTORY.decoded', graphs=graphs)
+        from graph_qwen_text_inventory import prepare_text_inventory,apply_text_inventory,TEXT_PROMPT
+        prepared=prepare_text_inventory(raw,image,graphs)
+        if prepared is not None:
+            emit('TEXT.plan',items=prepared['items'],graphs=prepared['graphs'],sheet_size=prepared['sheet_size'])
+            budget.call_seconds=min(budget.call_seconds,45)
+            requests=[{k:item[k] for k in ('key','kind')} for item in prepared['items']]
+            response=ask('TEXT_REVIEW',TEXT_PROMPT+'\n'+json.dumps({'requests':requests},ensure_ascii=False),
+                         [overview,prepared['image_url']])
+            output=apply_text_inventory(prepared,response)
+            emit('TEXT.applied',graphs=output)
+            diagnostics.append('measured_hollow_panels_text_batch')
+            return finish(output)
         from graph_qwen_geometry import (anchor_inventory, bind_measured_routes,
             guard_local_decisions, exclude_unmeasured_proposals, mark_review_conflicts,
             locate_missing_weight_regions)
@@ -321,31 +354,7 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     emit('REVIEW.rejected', reason=str(exc)[:80])
             else:
                 diagnostics.append('single_review_no_full_route_or_attribute_region')
-        from graph_validation import audit_graph_records
-        issues = audit_graph_records(output)
-        diagnostics.extend(issues)
-        if issues:
-            for g in output:
-                g['complete'] = False
-        import networkx as nx
-        for g in output:
-            counts = Counter(tuple(sorted((e['from'], e['to']))) for e in g['edges'])
-            observed_type = g['multigraph']
-            g['multigraph'] = any(a == b or n > 1 for (a, b), n in counts.items())
-            if observed_type is not g['multigraph']:
-                diagnostics.append('multigraph_flag_reconciled_with_edge_instances:'+g['id'])
-            check = nx.MultiDiGraph() if g['directed'] is True else nx.MultiGraph()
-            check.add_nodes_from(v['id'] for v in g['vertices'])
-            for e in g['edges']:
-                check.add_edge(e['from'], e['to'], key=e['id'])
-            if check.number_of_nodes() != len(g['vertices']) or check.number_of_edges() != len(g['edges']):
-                g['complete'] = False
-                diagnostics.append('single_identity_check_failed')
-        result = {'graphs': output, 'diagnostics': diagnostics, 'calls_remaining': budget.remaining,
-                  'remote_metrics': budget.metrics}
-        if audit:
-            result['stage_audit'] = events
-        return result
+        return finish(output)
     except (ValueError, RuntimeError, TimeoutError) as exc:
         if audit:
             emit('PIPELINE.failed', kind=type(exc).__name__, reason=str(exc)[:80])

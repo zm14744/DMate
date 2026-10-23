@@ -35,7 +35,8 @@ def connected_ring_markers(image):
                 or not 4<=area<=300 or 4*np.pi*area/max(perimeter*perimeter,1)<.55
                 or pw<80 or ph<50):continue
         moments=cv2.moments(c)
-        points.append({'component':parent,'x':moments['m10']/moments['m00']/(image.width-1),
+        points.append({'component':parent,'radius_pixels':max(width,height)/2+3,
+                       'x':moments['m10']/moments['m00']/(image.width-1),
                        'y':moments['m01']/moments['m00']/(image.height-1)})
     return points
 
