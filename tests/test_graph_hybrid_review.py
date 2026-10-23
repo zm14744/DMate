@@ -87,3 +87,19 @@ def test_failed_glm_review_is_not_retried_or_replaced_with_an_extra_qwen_call():
     assert 'local_review_failed' in result['diagnostics']
     assert result['graphs'][0]['edges'][0]['direction']=='unknown'
     assert result['hybrid_review_events'][0]['routed'] is True
+
+
+def test_report_keeps_failed_requests_and_does_not_turn_them_into_accuracy_errors(tmp_path):
+    import json
+    from scripts.benchmark_graph_hybrid import write_reports
+    rows=[{'case_id':'original','condition':c,'status':'transport_failed','seconds':25.,
+           'requests':[{'status':'transport_failed','seconds':25.,'error':'transport_failed'}],
+           'metrics':{'status':'not_scored_operational_failure'}} for c in ('qwen','hybrid')]
+    write_reports(tmp_path,rows,{'latency_target_ratio':1.2})
+    report=json.loads((tmp_path/'comparison.json').read_text())
+    assert report['paired_case_ids']==[]
+    for c in ('qwen','hybrid'):
+        assert report['all_attempts'][c]['accuracy']['scored']==0
+        assert report['all_attempts'][c]['accuracy']['edge_set'] is None
+        assert report['all_attempts'][c]['operations']['attempted_requests']==1
+        assert report['all_attempts'][c]['operations']['mean_case_seconds']==25
