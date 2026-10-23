@@ -248,3 +248,11 @@ def test_trace_cannot_switch_lines_at_crossing_but_can_follow_a_real_corner():
     cv2.line(crossing,(150,150),(250,50),255,3)
     kept,notes=validate_trace_junctions([trace],crossing)
     assert not kept and notes==['crossing_turn_rejected:a:b']
+
+
+def test_filled_caption_ink_is_not_a_curved_stroke_even_with_perfect_tangent_coverage():
+    ink=np.full((220,400),255,dtype='uint8')
+    trace={'from':'a','to':'b','method':'opencv_curved_ink_template',
+           'path':[[.2,.5],[.5,.7],[.8,.5]]}
+    kept,notes=validate_curve_tangents([trace],ink)
+    assert not kept and notes==['curve_filled_region_rejected:a:b']

@@ -29,7 +29,7 @@ def _projection(point,path,size):
     return best
 
 
-def _glyphs(image,bbox,nodes):
+def _glyphs(image,bbox,nodes,*,join_scripts=False):
     hsv=cv2.cvtColor(np.asarray(image),cv2.COLOR_RGB2HSV)
     mask=cv2.inRange(hsv,(0,0,0),(179,75,155))
     n,labels,stats,centers=cv2.connectedComponentsWithStats(mask,8)
@@ -37,7 +37,8 @@ def _glyphs(image,bbox,nodes):
     small=[]
     for i in range(1,n):
         x,y,w,h,area=map(int,stats[i])
-        if not(3<=w<=70 and 6<=h<=70 and 20<=area<=1800):continue
+        if not((1 if join_scripts else 3)<=w<=70 and 6<=h<=70
+                and (6 if join_scripts else 20)<=area<=1800):continue
         cx,cy=centers[i]
         if not(a<=cx/(width-1)<=c and b<=cy/(height-1)<=d):continue
         if min(math.hypot(cx-v['x']*(width-1),cy-v['y']*(height-1)) for v in nodes)<28:continue
@@ -54,6 +55,24 @@ def _glyphs(image,bbox,nodes):
                 if 20<hh<60 and ww/hh<.3 and abs((x+right-xx-rr)/2)<3 and 0<=yy-bottom<=10:
                     ids+=other['ids'];box=[min(x,xx),min(y,yy),max(right,rr),max(bottom,bb)];used.add(j);break
         groups.append({'ids':ids,'box':box})
+    if join_scripts:
+        joined=[];used=set()
+        for i,group in sorted(enumerate(groups),key=lambda p:-(p[1]['box'][3]-p[1]['box'][1])):
+            if i in used:continue
+            x,y,r,b=group['box'];h=b-y;choices=[]
+            if h>=15:
+                for j,other in enumerate(groups):
+                    if i==j or j in used:continue
+                    xx,yy,rr,bb=other['box'];ww,hh=rr-xx,bb-yy
+                    if (6<=hh<=h*.8 and ww<=hh*.85 and -.25*h<=xx-r<=.55*h
+                            and yy>=y+h*.1 and b-h*.25<=bb<=b+h*.7):
+                        choices.append((abs(xx-r)+abs(bb-b),j,other))
+            if choices:
+                _,j,other=min(choices);xx,yy,rr,bb=other['box'];used.add(j)
+                group={'ids':group['ids']+other['ids'],
+                       'box':[min(x,xx),min(y,yy),max(r,rr),max(b,bb)]}
+            joined.append(group)
+        groups=joined
     candidates=[]
     for group in groups:
         x,y,r,b=group['box'];w,h=r-x,b-y
@@ -63,7 +82,8 @@ def _glyphs(image,bbox,nodes):
         if coords is None:continue
         hull=cv2.convexHull(coords);filled=np.zeros_like(pixels);cv2.fillConvexPoly(filled,hull,1);area=int(filled.sum())
         if area<=0 or pixels.sum()/area>=.9:continue
-        candidates.append({'box':[x,y,r,b],'center':[(x+r)/2,(y+b)/2]})
+        candidates.append({'box':[x,y,r,b],'center':[(x+r)/2,(y+b)/2],
+                           'parts':len(group['ids'])})
     return candidates
 
 

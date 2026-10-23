@@ -54,3 +54,10 @@ def test_omitted_anonymous_disk_requires_native_connection_to_one_selected_figur
     assert len(graphs[0]['edges'])==2 and not graphs[0]['node_complete']
     assert notes==['measured_component_node_recovery:G:p3']
     assert graphs[0]['bbox'][3]>200/299
+
+
+def test_graph_name_normalizes_math_minus_and_preserves_literal_slash_direction():
+    raw=response();raw['graphs'][0]['name']='G−{e₁,e₄}'
+    assert decode_marker_inventory(raw,context(),(500,300))[0]['name']=='G-{e₁,e₄}'
+    raw['graphs'][0]['name']='G\\e5'
+    assert decode_marker_inventory(raw,context(),(500,300))[0]['name']=='G\\e5'

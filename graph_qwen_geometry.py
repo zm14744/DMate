@@ -25,6 +25,7 @@ def validate_curve_tangents(traces, ink):
     from graph_relation import _samples
     distance,labels=cv2.distanceTransformWithLabels((ink==0).astype('uint8'),
         cv2.DIST_L2,5,labelType=cv2.DIST_LABEL_PIXEL)
+    thickness=cv2.distanceTransform((ink>0).astype('uint8'),cv2.DIST_L2,3)
     original=np.argwhere(ink>0);height,width=ink.shape
     if not len(original):return [],['curve_validation_no_ink']
     retained=[];notes=[]
@@ -38,6 +39,12 @@ def validate_curve_tangents(traces, ink):
         at=np.rint(points[1:-1]).astype(int)
         at[:,0]=np.clip(at[:,0],0,width-1);at[:,1]=np.clip(at[:,1],0,height-1)
         nearest=original[labels[at[:,1],at[:,0]]-1][:,::-1]
+        # A caption's filled colour rectangle supplies ink in every tangent
+        # direction, but is not a thin connecting stroke.
+        depth=thickness[nearest[8:-8,1],nearest[8:-8,0]]
+        if float(np.mean(depth>8))>.15:
+            notes.append('curve_filled_region_rejected:'+trace['from']+':'+trace['to'])
+            continue
         sides=[]
         for offset in (-8,8):
             sample=np.rint(nearest+tangents*offset).astype(int)
@@ -238,9 +245,13 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
         # unique order-preserving affine frame, as for connected rings.
         markers=[{**p,'component':'single_panel_frame'} for p in markers]
         groups={'single_panel_frame':markers}
+    from graph_qwen_components import assign_components
+    component_assignment=assign_components(graphs,groups,equal_counts=True)
     owners={}; priors={}; used=set(); offset=0
-    for g in graphs:
+    for gi,g in enumerate(graphs):
         eligible=[(key,ps) for key,ps in groups.items() if key not in used and len(ps)==len(g['vertices'])]
+        if component_assignment is not None:
+            key=component_assignment[gi];eligible=[(key,groups[key])]
         if len(eligible)==1:
             key,ps=eligible[0];used.add(key)
             for i,v in enumerate(g['vertices'],offset):

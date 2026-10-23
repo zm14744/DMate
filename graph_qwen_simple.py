@@ -228,7 +228,8 @@ def _node_ambiguities(graph, image_size):
     return issues
 
 
-def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=False, repair_inventory=True):
+def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=False, repair_inventory=True,
+                     native_marker_first=True):
     """At most two Qwen attempts, zero retries; measured text when supported."""
     if provider is not None and (getattr(provider, 'name', 'qwen') != 'qwen'
             or getattr(provider, 'model', QWEN_MODEL) != QWEN_MODEL or getattr(provider, 'retries', 0) != 0):
@@ -279,8 +280,20 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         overview = _data_url(image)
         marker_plan=None
         try:
-            initial=ask('INVENTORY',INVENTORY_PROMPT,[overview])
-            graphs=decode_inventory(initial)
+            from graph_qwen_components import native_first_context
+            first_context=native_first_context(image) if native_marker_first else None
+            if first_context is not None:
+                from graph_qwen_marker_inventory import MARKER_INVENTORY_PROMPT,decode_marker_inventory
+                emit('INVENTORY.native_markers',markers=first_context['markers'])
+                initial=ask('INVENTORY',MARKER_INVENTORY_PROMPT+'\n'+json.dumps(
+                    {'marker_candidates':[p['id'] for p in first_context['markers']]}),
+                    [overview,_data_url(first_context['image'])])
+                graphs=decode_marker_inventory(initial,first_context,image.size)
+                marker_plan=first_context
+                diagnostics.append('native_shaded_marker_first_candidate')
+            else:
+                initial=ask('INVENTORY',INVENTORY_PROMPT,[overview])
+                graphs=decode_inventory(initial)
         except (ValueError,RuntimeError) as exc:
             # Only complete-output protocol failures are recoverable here.
             # HTTP, identity, credentials, timeout and budget errors propagate.
@@ -371,7 +384,16 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         from graph_qwen_geometry import (anchor_inventory, bind_measured_routes,
             guard_local_decisions, exclude_unmeasured_proposals, mark_review_conflicts,
             locate_missing_weight_regions)
-        if not (marker_plan and all(len(g.get('node_position_evidence',[]))==len(g['vertices']) for g in graphs)):
+        from graph_qwen_components import reconcile_component_inventory
+        graphs,component_notes=reconcile_component_inventory(image,graphs)
+        diagnostics.extend(component_notes)
+        if component_notes:emit('NODE.component_inventory',graphs=graphs)
+        measured_sources={'component_circle_inventory','qwen_initial_marker_selection',
+                          'qwen_recovery_marker_selection','measured_component_node_recovery'}
+        fully_measured=all(len(g.get('node_position_evidence',[]))==len(g['vertices'])
+            and all(p.get('source') in measured_sources for p in g.get('node_position_evidence',[]))
+            for g in graphs)
+        if not fully_measured:
             graphs = anchor_inventory(image, graphs, refiner=refine_node_positions)
         for g in graphs:
             diagnostics.extend(_node_ambiguities(g, image.size))
@@ -398,6 +420,47 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         for g in output:
             if g['weighted'] is True:locate_missing_weight_regions(image,g)
         emit('RELATE.initial', graphs=output)
+        from graph_qwen_local_text import prepare_local_text,apply_local_text,LOCAL_TEXT_PROMPT
+        local_text=prepare_local_text(image,output,force=(marker_plan or {}).get('source')=='native_shaded_components') if budget.remaining else None
+        if local_text is not None:
+            emit('LOCAL_TEXT.plan',items=local_text['items'],sheet_size=local_text['sheet_size'])
+            budget.call_seconds=min(budget.call_seconds,45)
+            requests=[{k:item[k] for k in ('key','kind')} for item in local_text['items']]
+            try:
+                response=ask('LOCAL_TEXT',LOCAL_TEXT_PROMPT+'\n'+json.dumps({'requests':requests},ensure_ascii=False),
+                    [overview,local_text['image_url']])
+                output=apply_local_text(local_text,response)
+                diagnostics.append('measured_multifigure_edge_text_batch')
+                emit('LOCAL_TEXT.applied',graphs=output)
+            except (ValueError,RuntimeError,TimeoutError) as exc:
+                diagnostics.append('single_text_batch_failed:'+type(exc).__name__)
+                emit('LOCAL_TEXT.rejected',reason=str(exc)[:80])
+            return finish(output)
+        from graph_qwen_arrows import prepare_arrows,apply_arrows,apply_native_arrows,arrow_subset,ARROW_PROMPT
+        arrow_batch=prepare_arrows(image,output)
+        if arrow_batch is not None:
+            emit('ARROW_GLYPHS.plan',items=arrow_batch['items'],sheet_size=arrow_batch['sheet_size'])
+            output,unresolved_heads=apply_native_arrows(arrow_batch)
+            emit('ARROW_PIXELS.applied',graphs=output,unresolved_keys=[item['key'] for item in unresolved_heads])
+            if not unresolved_heads:
+                diagnostics.append('measured_multifigure_native_arrow_geometry')
+                return finish(output)
+            if not budget.remaining:
+                diagnostics.append('native_arrow_unresolved_after_call_budget')
+                return finish(output)
+            arrow_batch=arrow_subset(image,arrow_batch,unresolved_heads,output)
+            budget.call_seconds=min(budget.call_seconds,45)
+            try:
+                response=ask('ARROW_GLYPHS',ARROW_PROMPT+'\n'+json.dumps(
+                    {'requests':[{'key':item['key']} for item in arrow_batch['items']]}),
+                    [overview,arrow_batch['image_url']])
+                output,notes=apply_arrows(arrow_batch,response)
+                diagnostics.extend(notes+['measured_multifigure_native_arrow_batch'])
+                emit('ARROW_GLYPHS.applied',graphs=output)
+            except (ValueError,RuntimeError,TimeoutError) as exc:
+                diagnostics.append('single_arrow_batch_failed:'+type(exc).__name__)
+                emit('ARROW_GLYPHS.rejected',reason=str(exc)[:80])
+            return finish(output)
         plan = select_crop(image.size, graphs, output)
         if plan and budget.remaining:
             index = plan['graph_index']

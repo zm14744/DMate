@@ -9,6 +9,11 @@ ORIGINAL_SPACE = 'original_1000'
 CROP_SPACE = 'crop_1000'
 
 
+def graph_name(value):
+    """Canonical text spelling of the mathematical minus, without changing operators."""
+    return str(value).replace('\u2212','-')
+
+
 def scalar(value):
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError('invalid_qwen_coordinate')
@@ -83,7 +88,7 @@ def decode_inventory(response):
         node_count += len(vertices)
         if node_count > 48:
             raise ValueError('qwen_vertex_budget')
-        g = {'id': gid, 'name': raw.get('name', gid), 'bbox': box(raw.get('bbox')),
+        g = {'id': gid, 'name': graph_name(raw.get('name') or gid), 'bbox': box(raw.get('bbox')),
              'node_complete': raw.get('node_complete') is True, 'vertices': [], 'edges': []}
         for key in ('directed', 'weighted', 'multigraph'):
             value = raw.get(key)

@@ -1,6 +1,6 @@
 """Coordinate-free recovery using explicit measured marker references."""
 import math
-from graph_qwen_coordinates import identifier,attribute
+from graph_qwen_coordinates import identifier,attribute,graph_name
 from graph_schema import canonical_graph
 
 
@@ -37,7 +37,7 @@ def decode_marker_inventory(response,context,image_size):
         if not isinstance(vertices,list) or not 1<=len(vertices)<=48:
             raise ValueError('invalid_marker_vertices')
         if not isinstance(edges,list) or len(edges)>96:raise ValueError('invalid_marker_edges')
-        g={'id':gid,'name':raw.get('name',gid),'vertices':[],'edges':[],
+        g={'id':gid,'name':graph_name(raw.get('name') or gid),'vertices':[],'edges':[],
            'node_complete':raw.get('node_complete') is True,'complete':False}
         for key in ('directed','weighted','multigraph'):
             value=raw.get(key)

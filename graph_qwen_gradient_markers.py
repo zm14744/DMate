@@ -28,7 +28,9 @@ def gradient_markers(image):
  common=float(np.median(gradient))
  selected=[p for p in points if .8*common<=p['radius_pixels']<=1.5*common]
  from graph_line_tracer import _foreground
- ink=_foreground(cv2.cvtColor(rgb,cv2.COLOR_RGB2BGR))
+ # The lighter highlight on a filled marker is still visible original ink.
+ # Keep it when grouping the already measured shaded circles with their lines.
+ ink=_foreground(rgb) | (np.uint8(gray<230)*255)
  _,components,component_stats,_=cv2.connectedComponentsWithStats(ink,8)
  for point in selected:
   xx,yy=round(point['x']*(w-1)),round(point['y']*(h-1));pad=max(3,round(point['radius_pixels']*.4))
