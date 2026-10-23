@@ -103,6 +103,21 @@ def test_weight_window_cannot_delete_or_reorient_a_partially_visible_edge():
     assert decisions['upper']['weight'] == 7 and not complete
 
 
+def test_nullable_review_path_means_no_correction_without_discarding_other_decisions():
+    g=decode_inventory(inventory())[0]
+    job=review_job(g,g['edges'],(0,0,400,250),(400,250))
+    response={'coordinate_space':'crop_1000','graph_id':'G',
+        'decisions':[{'id':'upper','visible':False,'path':None},
+                     {'id':'lower','visible':True,'direction':'undirected'}],
+        'additional_edges':[],'inventory_complete':False}
+    decisions,additions,complete=decode_review(response,job,[0,0,1,1])
+    assert decisions['upper']=={'id':'upper','visible':False}
+    assert decisions['lower']['visible'] is True and not additions and not complete
+    response['decisions'][0]['path']=[[0,0],[1001,1000]]
+    with pytest.raises(ValueError,match='invalid_qwen_coordinate'):
+        decode_review(response,job,[0,0,1,1])
+
+
 def test_located_weight_uses_native_local_window_instead_of_resizing_whole_panel():
     g = decode_inventory(inventory())[0]
     g['weighted'] = True
@@ -291,7 +306,7 @@ def test_default_orchestration_selects_validated_pipeline_without_staged_fallbac
             'graph_qwen_simple.recognize_simple',side_effect=RuntimeError('offline')) as candidate:
         result = recognize_graph_document(picture(), {})
     assert result['error'] and candidate.call_count == 1
-    assert result['graph_display_version']=='qwen-simple-candidate-v6'
+    assert result['graph_display_version']=='qwen-simple-candidate-v8'
     assert candidate.call_args.kwargs['budget'].remaining==2
     staged.assert_not_called()
 
@@ -307,6 +322,6 @@ def test_explicit_candidate_uses_unified_display_and_existing_text_correction():
     assert candidate.call_count == 1
     staged.assert_not_called()
     text.assert_called_once_with('source')
-    assert result['graph_display_version'] == 'qwen-simple-candidate-v6'
+    assert result['graph_display_version'] == 'qwen-simple-candidate-v8'
     assert [e['id'] for e in result['graph_display_data'][0]['edges']] == ['upper', 'lower']
     assert result['text'] == 'unchanged text'

@@ -12,6 +12,45 @@ import networkx as nx
 from graph_staged import refine_node_positions
 
 
+def validate_curve_tangents(traces, ink):
+    """Reject synthetic arcs that turn between crossing straight strokes.
+
+    Pixel continuity alone accepted a false inner Petersen arc. Test the
+    proposed local tangent against original ink on BOTH sides of each sample,
+    after recentering on actual ink. No graph template or degree rule is used.
+    """
+    if not any(t.get('method')=='opencv_curved_ink_template' for t in traces):return traces,[]
+    import cv2
+    import numpy as np
+    from graph_relation import _samples
+    distance,labels=cv2.distanceTransformWithLabels((ink==0).astype('uint8'),
+        cv2.DIST_L2,5,labelType=cv2.DIST_LABEL_PIXEL)
+    original=np.argwhere(ink>0);height,width=ink.shape
+    if not len(original):return [],['curve_validation_no_ink']
+    retained=[];notes=[]
+    for trace in traces:
+        if trace.get('method')!='opencv_curved_ink_template':retained.append(trace);continue
+        path=[[x*(width-1),y*(height-1)] for x,y in trace.get('path',[])]
+        points=np.asarray(_samples(path,80))
+        if points.shape!=(80,2):continue
+        tangents=points[2:]-points[:-2]
+        tangents/=np.maximum(np.linalg.norm(tangents,axis=1),1e-9)[:,None]
+        at=np.rint(points[1:-1]).astype(int)
+        at[:,0]=np.clip(at[:,0],0,width-1);at[:,1]=np.clip(at[:,1],0,height-1)
+        nearest=original[labels[at[:,1],at[:,0]]-1][:,::-1]
+        sides=[]
+        for offset in (-8,8):
+            sample=np.rint(nearest+tangents*offset).astype(int)
+            sample[:,0]=np.clip(sample[:,0],0,width-1);sample[:,1]=np.clip(sample[:,1],0,height-1)
+            sides.append(distance[sample[:,1],sample[:,0]])
+        alignment=float(np.mean(np.maximum(*sides)[8:-8]<=1.5))
+        if alignment<.85:
+            notes.append('curve_tangent_rejected:'+trace['from']+':'+trace['to'])
+        else:
+            trace=copy.deepcopy(trace);trace['tangent_alignment']=round(alignment,4);retained.append(trace)
+    return retained,notes
+
+
 def connected_ring_markers(image):
     """Holes in large ink components distinguish junction rings from text.
 
@@ -232,6 +271,14 @@ def guard_local_decisions(graph, decisions, ink):
         proof=(_ink_support(e['path'],ink,e['style'],source='qwen') if measured and e['path']
                and not _wrong_path_endpoints(e,graph['vertices'])
                and not _intermediate_nodes(e['path'],e,graph['vertices']) else None)
+        if proof is not None and d.get('visible') is True and d.get('path'):
+            # A coarse review polyline is an observation of this edge, not a
+            # new stroke identity. Replacing the measured path caused TRACE
+            # to reinsert the original stroke under a second ID on real OCR.
+            e['evidence'].append({'source':'qwen_review_measured_path_retained',
+                                  'observed_path':copy.deepcopy(d['path']),
+                                  'independent_ink':proof})
+            d.pop('path')
         if d.get('visible') is False and proof is not None:
             e['evidence'].append({'source':'qwen_geometry_conflict','field':'visible',
                                   'reported':False,'independent_ink':proof})

@@ -7,7 +7,8 @@ from PIL import Image,ImageDraw,ImageFont
 
 from graph_line_tracer import _sample_path
 from graph_qwen_geometry import (anchor_inventory,connected_ring_markers,
-    guard_local_decisions,exclude_unmeasured_proposals,locate_missing_weight_regions)
+    guard_local_decisions,exclude_unmeasured_proposals,locate_missing_weight_regions,
+    validate_curve_tangents)
 from graph_schema import canonical_graph
 
 
@@ -102,6 +103,59 @@ def test_negative_visual_review_is_respected_without_independent_route_evidence(
     g,ink=measured_graph();g['edges'][0]['evidence']=[{'source':'qwen_image_read'}]
     decisions,notes=guard_local_decisions(g,{'real':{'visible':False}},ink)
     assert decisions['real']['visible'] is False and not notes
+
+
+def test_review_polyline_keeps_measured_stroke_identity_during_relation_replay():
+    from graph_qwen_review import receive_qwen_review
+    from graph_relation import recover_relations
+    g,ink=measured_graph()
+    # Both polylines are supported by the thick original ink but their offset
+    # exceeds RELATE's matching tolerance; replacing the path used to append
+    # the same measured trace again as an independent parallel edge.
+    ink[97:104,80:321]=255
+    decision={'real':{'visible':True,'path':[[.2,.516],[.8,.516]]}}
+    decisions,_=guard_local_decisions(g,decision,ink)
+    observed=[p for p in g['edges'][0]['evidence'] if p['source']=='qwen_review_measured_path_retained']
+    assert observed[0]['observed_path']==decision['real']['path']
+    assert 'path' not in decisions['real']
+    graph,decisions,_=receive_qwen_review(g,decisions,[],ink)
+    traces=[{'from':'a','to':'b','path':[[.2,.5],[.8,.5]],'style':'solid','score':.95,'method':'measured'}]
+    result=recover_relations(graph,traces,review=decisions)
+    assert len(result['edges'])==1 and result['edges'][0]['id']=='real'
+
+
+def test_review_path_without_independent_ink_keeps_its_correction():
+    g,ink=measured_graph();g['edges'][0]['evidence']=[{'source':'qwen_image_read'}]
+    correction={'real':{'visible':True,'path':[[.2,.5],[.8,.5]]}}
+    decisions,notes=guard_local_decisions(g,correction,ink)
+    assert decisions==correction and not notes
+
+
+def test_continuous_ink_at_a_sharp_join_does_not_certify_a_synthetic_arc():
+    import cv2
+    from graph_glm_adapter import _ink_support
+    ink=np.zeros((150,180),dtype='uint8')
+    cv2.polylines(ink,[np.array([[50,104],[85,80],[120,104]])],False,255,3)
+    xs=np.linspace(50,120,10)
+    path=[[x/179,(104-22*(1-((x-85)/35)**2))/149] for x in xs]
+    # Old continuity alone approved the two different straight strokes.
+    assert _ink_support(path,ink,'solid',source='qwen') is not None
+    traces,notes=validate_curve_tangents([{'from':'a','to':'b','path':path,
+        'method':'opencv_curved_ink_template'}],ink)
+    assert not traces and notes==['curve_tangent_rejected:a:b']
+
+
+def test_tangent_validation_keeps_two_distinct_real_parallel_arcs():
+    import cv2
+    ink=np.zeros((220,400),dtype='uint8');traces=[]
+    for height in (-45,45):
+        xs=np.linspace(80,320,120)
+        points=np.array([[x,110+height*(1-((x-200)/120)**2)] for x in xs])
+        cv2.polylines(ink,[np.rint(points).astype(int)],False,255,3)
+        traces.append({'from':'a','to':'b','path':[[x/399,y/219] for x,y in points[::10]],
+                       'method':'opencv_curved_ink_template'})
+    kept,notes=validate_curve_tangents(traces,ink)
+    assert len(kept)==2 and not notes
 
 
 def test_unsupported_proposal_is_audited_instead_of_becoming_a_public_edge():

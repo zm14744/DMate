@@ -9,7 +9,7 @@ from ocr_layout import partition_text
 
 
 def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeline='qwen-simple-candidate'):
-    # Validated branch default; staged remains an explicit code-level rollback.
+    # Bounded branch default; staged remains an explicit code-level rollback.
     # The app's existing graph-nextgen gate and production environment are unchanged.
     if graph_pipeline not in ('staged','qwen-simple-candidate'):
         raise ValueError('Unknown graph pipeline')
@@ -18,9 +18,9 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
     if graph_pipeline=='qwen-simple-candidate':
         from graph_qwen_simple import recognize_simple
         engine=recognize_simple
-        version='qwen-simple-candidate-v6'
+        version='qwen-simple-candidate-v8'
     layout=text_result.get('layout') or {}
-    budget=Budget(seconds=140,calls=2,call_seconds=75) if graph_pipeline=='qwen-simple-candidate' else Budget()
+    budget=Budget(seconds=140,calls=2,call_seconds=75) if graph_pipeline!='staged' else Budget()
     try:
         result=engine(raw,layout=layout.get('regions',[]),provider=vision_provider,
                                budget=budget,audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1')

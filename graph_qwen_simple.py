@@ -184,7 +184,12 @@ def decode_review(response, job, bounds):
         if 'style' in d and d['style'] not in ('solid', 'dashed', 'dotted', 'unknown'):
             raise ValueError('invalid_qwen_local_style')
         if 'path' in d:
-            d['path'] = route(d['path'], bounds)
+            if d['path'] is None:
+                # The field is optional: null supplies no correction. A
+                # negative visibility decision commonly has no path at all.
+                d.pop('path')
+            else:
+                d['path'] = route(d['path'], bounds)
         for key in ('weight', 'edge_label'):
             if key in d:
                 d[key] = attribute(d[key])
@@ -223,7 +228,7 @@ def _node_ambiguities(graph, image_size):
     return issues
 
 
-def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=False):
+def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=False, repair_inventory=True):
     """At most two Qwen attempts, zero retries; measured text when supported."""
     if provider is not None and (getattr(provider, 'name', 'qwen') != 'qwen'
             or getattr(provider, 'model', QWEN_MODEL) != QWEN_MODEL or getattr(provider, 'retries', 0) != 0):
@@ -272,10 +277,35 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             raise ValueError('qwen_simple_image_budget')
         image = image.convert('RGB')
         overview = _data_url(image)
-        graphs = decode_inventory(ask('INVENTORY', INVENTORY_PROMPT, [overview]))
+        marker_plan=None
+        initial=ask('INVENTORY',INVENTORY_PROMPT,[overview])
+        graphs=decode_inventory(initial)
+        emit('INVENTORY.initial_decoded',graphs=graphs)
+        if (repair_inventory and budget.remaining and len(graphs)==1
+                and graphs[0]['directed'] is False and graphs[0]['weighted'] is False):
+            from graph_qwen_markers import marker_context,needs_inventory_repair,MARKER_HINT
+            context=marker_context(image)
+            if needs_inventory_repair(graphs,context):
+                emit('INVENTORY_REPAIR.plan',markers=context['markers'],
+                     initial_vertex_counts=[len(g['vertices']) for g in graphs],
+                     strong_marker_count=len(context['strong_markers']))
+                budget.call_seconds=min(budget.call_seconds,45)
+                repair_prompt=INVENTORY_PROMPT+MARKER_HINT+'\n'+json.dumps({'marker_candidates':[
+                    {'id':p['id'],'x':round(p['x']*1000,2),'y':round(p['y']*1000,2)}
+                    for p in context['markers']]},ensure_ascii=False)
+                try:
+                    repaired=ask('INVENTORY_REPAIR',repair_prompt,[overview,_data_url(context['image'])])
+                    from graph_qwen_markers import ground_selected_markers
+                    updated=ground_selected_markers(decode_inventory(repaired),repaired,
+                        context['markers'],image_size=image.size)
+                    graphs=updated;initial=repaired;marker_plan=context
+                    diagnostics.append('measured_inventory_repair_used_second_call')
+                except (ValueError,RuntimeError,TimeoutError) as exc:
+                    diagnostics.append('inventory_repair_failed:'+type(exc).__name__)
+                    emit('INVENTORY_REPAIR.rejected',reason=str(exc)[:80])
         emit('INVENTORY.decoded', graphs=graphs)
         from graph_qwen_text_inventory import prepare_text_inventory,apply_text_inventory,TEXT_PROMPT
-        prepared=prepare_text_inventory(raw,image,graphs)
+        prepared=prepare_text_inventory(raw,image,graphs) if budget.remaining else None
         if prepared is not None:
             emit('TEXT.plan',items=prepared['items'],graphs=prepared['graphs'],sheet_size=prepared['sheet_size'])
             budget.call_seconds=min(budget.call_seconds,45)
@@ -289,7 +319,8 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         from graph_qwen_geometry import (anchor_inventory, bind_measured_routes,
             guard_local_decisions, exclude_unmeasured_proposals, mark_review_conflicts,
             locate_missing_weight_regions)
-        graphs = anchor_inventory(image, graphs, refiner=refine_node_positions)
+        if not (marker_plan and all(len(g.get('node_position_evidence',[]))==len(g['vertices']) for g in graphs)):
+            graphs = anchor_inventory(image, graphs, refiner=refine_node_positions)
         for g in graphs:
             diagnostics.extend(_node_ambiguities(g, image.size))
         emit('NODE.anchored', graphs=graphs)
@@ -299,6 +330,11 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         emit('TRACE', panels=panels)
         from graph_glm_adapter import review_route_ink  # CPU-only original ink.
         ink = review_route_ink(image)
+        from graph_qwen_geometry import validate_curve_tangents
+        for gid,paths in panels.items():
+            panels[gid],notes=validate_curve_tangents(paths,ink)
+            diagnostics.extend(notes)
+        emit('TRACE.validated',panels=panels)
         graphs = [bind_measured_routes(g, panels.get(g['id'], []), ink) for g in graphs]
         for i,g in enumerate(graphs):
             graphs[i],notes=exclude_unmeasured_proposals(g,ink)
@@ -309,7 +345,7 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             if g['weighted'] is True:locate_missing_weight_regions(image,g)
         emit('RELATE.initial', graphs=output)
         plan = select_crop(image.size, graphs, output)
-        if plan:
+        if plan and budget.remaining:
             index = plan['graph_index']
             g = graphs[index]
             candidates = output[index]['_candidates']
