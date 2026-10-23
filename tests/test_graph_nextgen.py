@@ -158,7 +158,9 @@ def test_six_panels_share_vertex_batch_budget_without_losing_last_panels():
         jobs=json.loads(prompt[prompt.index('{"requests":'):])['requests']
         return {'reads':[{'graph_id':job['graph']['id'],'vertex':v,'complete':True,'edges':[]}
                          for job in jobs for v in job['focus_vertices']]}
-    with patch('graph_line_tracer.attach_line_evidence',side_effect=lambda raw,value:value):
+    # This test exercises shared EDGE batching, not marker-ID grounding.
+    with patch('graph_staged.refine_node_positions',side_effect=lambda image,graphs,**kw:graphs), \
+         patch('graph_line_tracer.attach_line_evidence',side_effect=lambda raw,value:value):
         result=recognize_staged(source.read_bytes(),call=ask)
     assert len(calls)==3 and len(result['graphs'])==6
     assert all(g['node_complete'] for g in result['graphs'])

@@ -71,7 +71,7 @@ def marker_overlay(image, markers):
     return tagged
 
 
-def apply_marker_grounding(graphs, markers, response):
+def apply_marker_grounding(graphs, markers, response, *, source='glm'):
     """A full one-to-one VLM selection, not nearest-coordinate snapping."""
     graphs=copy.deepcopy(graphs);points={p['id']:p for p in markers}
     allowed={g['id']:{v['id'] for v in g['vertices']} for g in graphs};mapping={};uses={};bad=set()
@@ -110,7 +110,7 @@ def apply_marker_grounding(graphs, markers, response):
         observations=[]
         for v in nodes:
             p=points[mapping[(gid,v['id'])]]
-            observations.append({'source':'glm_marker_id_grounding','vertex':v['id'],'marker_id':p['id'],
+            observations.append({'source':source+'_marker_id_grounding','vertex':v['id'],'marker_id':p['id'],
                                  'node_position':[v.get('x'),v.get('y')],'pixel_position':[p['x'],p['y']]})
             v['x'],v['y']=p['x'],p['y']
         graph['node_position_evidence']=observations
@@ -286,7 +286,7 @@ def review_route_ink(image):
     return _foreground(np.asarray(picture))
 
 
-def _ink_support(path, ink, style, *, distance=None):
+def _ink_support(path, ink, style, *, distance=None, source='glm'):
     import cv2
     import numpy as np
     height,width=ink.shape
@@ -314,11 +314,11 @@ def _ink_support(path, ink, style, *, distance=None):
             and len(gaps)>=3 and max(gaps)/max(1,min(gaps))<=2.5
             and gap<=min(20,length*.13))
     return {'coverage':round(coverage,4),'largest_gap_pixels':round(gap,2),
-            'method':'glm_review_original_ink','continuous':bool(continuous),
+            'method':source+'_review_original_ink','continuous':bool(continuous),
             'dashed':bool(dashed)} if continuous or dashed else None
 
 
-def receive_review_routes(graph, decisions, ink):
+def receive_review_routes(graph, decisions, ink, *, source='glm'):
     """Receive corrections only for existing IDs, with independent ink proof.
 
     No new edge/vertex, endpoint, arrow or numeric attribute is supplied here.
@@ -334,16 +334,16 @@ def receive_review_routes(graph, decisions, ink):
         candidate={**edge,'path':route}
         if (_wrong_path_endpoints(candidate,graph['vertices'],tolerance=.02)
                 or _intermediate_nodes(route,candidate,graph['vertices'])):
-            edge['evidence'].append({'source':'glm_review_route_rejected','reason':'geometry'})
+            edge['evidence'].append({'source':source+'_review_route_rejected','reason':'geometry'})
             continue
         if distance is None:
             import cv2
             distance=cv2.distanceTransform((ink==0).astype('uint8'),cv2.DIST_L2,3)
-        proof=_ink_support(route,ink,decision.get('style',edge.get('style')),distance=distance)
+        proof=_ink_support(route,ink,decision.get('style',edge.get('style')),distance=distance,source=source)
         if proof is None:
-            edge['evidence'].append({'source':'glm_review_route_rejected','reason':'ink_gap'})
+            edge['evidence'].append({'source':source+'_review_route_rejected','reason':'ink_gap'})
             continue
-        edge['evidence'].append({'source':'glm_review_route_verified',
+        edge['evidence'].append({'source':source+'_review_route_verified',
             'observed_path':copy.deepcopy(edge.get('path',[])),**proof})
         edge['path']=route
     return graph

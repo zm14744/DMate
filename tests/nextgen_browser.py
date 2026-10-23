@@ -51,12 +51,13 @@ def grade(case,response,record):
     visible=(record.get('rendered') or {}).get('graph','')
     equal=len(actual)==len(expected) and all(semantic_graph_equal(w,g) for w,g in zip(expected,actual))
     exact=case.get('expected_question_text')
-    return {'点和边':'通过' if equal else '不通过',
+    verified=case.get('reference_status','complete')=='complete'
+    return {'点和边':('通过' if equal else '不通过') if verified else '无法核实',
             '题目文字':('通过' if response.get('text','')==exact else '不通过') if exact is not None else '无法核实',
             '数学公式及界面渲染':'部分通过' if record.get('operational_ok') else '不通过',
-            '图形描述':'部分通过' if equal and visible else '不通过',
+            '图形描述':('部分通过' if equal and visible else '不通过') if verified else '无法核实',
             '描述统一':'通过' if visible and not any(w in visible for w in BANNED) else '不通过',
-            '图形分隔':'通过' if equal else '不通过'}
+            '图形分隔':('通过' if equal else '不通过') if verified else '无法核实'}
 
 
 def main():
@@ -86,6 +87,7 @@ def main():
             truth={} if args.capture_only else json.loads(safe_child(manifest_path.parent,row['ground_truth']).read_text())
             cases.append({'id':row['id'],'image':str(safe_child(manifest_path.parent,row['image'])),
                           'source_sha256':row['sha256'],'expected':truth.get('expected',{}),
+                          'reference_status':truth.get('reference_status','complete' if truth else 'unverified'),
                           **({'expected_question_text':truth['expected_question_text']} if 'expected_question_text' in truth else {})})
     else:
         cases=json.loads(Path('tests/fixtures/ouc_two_originals_gold.json').read_text())['cases']

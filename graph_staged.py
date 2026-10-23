@@ -306,8 +306,14 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         specialist.validate_primary(provider)
     budget=budget or Budget(); ask=call or provider or _call; diagnostics=[]
     adapted=bool(glm_adapter and getattr(provider,'name',None)=='glm')
+    qwen_profile=(not adapted and getattr(provider,'name','qwen')=='qwen'
+                  and review_router is None and specialist is None)
     experimental=bool(adapted and glm_adapter=='experimental')
     edge_prompt,review_prompt=EDGE_PROMPT,REVIEW_PROMPT
+    if qwen_profile:
+        from graph_qwen_review import REVIEW_HINT
+        review_prompt=review_prompt.replace('只能复核列出的ID，禁止按数学模板补边。',
+            'decisions只能复核列出的ID；新增笔画须遵守以下additional_edges契约。')+REVIEW_HINT
     if adapted:
         from graph_glm_adapter import EDGE_PROMPT as edge_prompt, STABLE_REVIEW_HINT, STABLE_PROFILE
         if experimental:
@@ -344,7 +350,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         graphs.append(canonical_graph(raw,n))
     if len({g['id'] for g in graphs}) != len(graphs): raise ValueError('duplicate_graph_id')
     markers=[]
-    anchor_options={'partial':True} if experimental else {}
+    anchor_options={'partial':True} if experimental or qwen_profile else {}
     graphs=refine_node_positions(image,graphs,candidate_sink=markers,**anchor_options)
     review_jobs=[]
     for graph in graphs:
@@ -381,7 +387,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             for job in review_jobs:
                 job['graph']['node_complete']=False
                 job['graph']['node_review']={'status':'failed','reason':'marker_inventory_disagreement'}
-    if experimental and 3<=len(markers)<=160:
+    if (experimental or qwen_profile) and 3<=len(markers)<=160:
         from graph_glm_adapter import (MARKER_PROMPT,marker_inventory,needs_marker_grounding,
                                        marker_overlay,apply_marker_grounding)
         if needs_marker_grounding(graphs):
@@ -392,10 +398,15 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                          'marker_candidates':candidates}
                 grounded=ask(MARKER_PROMPT+'\n'+json.dumps(payload,ensure_ascii=False),
                              [url,_data_url(marker_overlay(image,candidates))],budget)
-                graphs=apply_marker_grounding(graphs,candidates,grounded)
-                diagnostics.append('glm_marker_grounding_reviewed')
+                graphs=apply_marker_grounding(graphs,candidates,grounded,
+                    **({'source':'qwen'} if qwen_profile else {}))
+                diagnostics.append(('qwen' if qwen_profile else 'glm')+'_marker_grounding_reviewed')
             except (ValueError,RuntimeError,TimeoutError):
-                diagnostics.append('glm_marker_grounding_failed')
+                diagnostics.append(('qwen' if qwen_profile else 'glm')+'_marker_grounding_failed')
+                if qwen_profile:
+                    for graph in graphs:
+                        if needs_marker_grounding([graph]):
+                            graph['node_complete']=False
     id_context=_node_id_context(image,graphs)
     # Batch focus vertices across graph boundaries. Six small figures must not
     # exhaust a four-call budget merely because they occupy six panels.
@@ -431,7 +442,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             shared={}
             for edge in (response.get('edges') or [])[:192]:
                 if isinstance(edge,dict) and edge.get('graph_id') in allowed and edge.get('id'):
-                    if adapted:
+                    if adapted or qwen_profile:
                         edge=dict(edge)
                         key=(edge['graph_id'],edge['id'])
                         if key in shared: raise ValueError('duplicate_edge_observation_id')
@@ -451,7 +462,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         except (ValueError,RuntimeError,TimeoutError) as exc:
             diagnostics.append('edge_read_failed:'+str(exc)[:80]); break
     if len(focus)>edge_limit: diagnostics.append('edge_budget_exhausted')
-    graphs=[merge_node_reads(g,reads_by_graph[g['id']],shared_observations=adapted) for g in graphs]
+    graphs=[merge_node_reads(g,reads_by_graph[g['id']],shared_observations=adapted or qwen_profile) for g in graphs]
     from graph_line_tracer import attach_line_evidence
     traced=attach_line_evidence(image_bytes,{'graphs':graphs})
     panels={p['id']:p['paths'] for p in traced.get('line_path_evidence',[])}
@@ -460,6 +471,9 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         graphs=[bind_pixel_routes(g,panels.get(g['id'],[])) for g in graphs]
         from graph_glm_adapter import review_route_ink
         glm_ink=review_route_ink(image)
+    elif qwen_profile:
+        from graph_glm_adapter import review_route_ink
+        qwen_ink=review_route_ink(image)
     output=[recover_relations(g,panels.get(g['id'],[])) for g in graphs]
     initial_candidates={g['id']:copy.deepcopy(output[i]['_candidates']) for i,g in enumerate(graphs)}
     reviews_by_graph={}
@@ -480,6 +494,9 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             if not candidates: continue
             allowed_by_graph[graph['id']]={e['id'] for e in candidates}
             if experimental:
+                from graph_glm_adapter import compact_review_job
+                payload=compact_review_job(graph,candidates,image.size)
+            elif qwen_profile:
                 from graph_glm_adapter import compact_review_job
                 payload=compact_review_job(graph,candidates,image.size)
             else:payload=_review_job(graph,candidates)
@@ -525,6 +542,16 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                 reviews_by_graph[graph['id']]=decisions
                 graph['inventory_reviewed']=bool(current.get('inventory_complete') is True
                     and allowed and set(decisions)==allowed and len(output[index]['_candidates'])<=48)
+                if qwen_profile:
+                    from graph_qwen_review import receive_qwen_review
+                    graph,decisions,notes=receive_qwen_review(
+                        graph,decisions,current.get('additional_edges'),qwen_ink,
+                        traces=panels.get(graph['id'],[]))
+                    diagnostics.extend(notes)
+                    if any('rejected' in n or 'invalid' in n or 'truncated' in n for n in notes):
+                        graph['inventory_reviewed']=False
+                    graphs[index]=graph
+                    reviews_by_graph[graph['id']]=decisions
                 if adapted or routed:
                     from graph_glm_adapter import receive_review_routes
                     if routed:
@@ -545,13 +572,23 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         graph=graphs[0];related=output[0]
         conflicts={e['id']:e for e in related['_candidates'] if any(
             isinstance(v,dict) and v.get('source')=='direction_conflict' for v in e['evidence'])}
+        # REVIEW can itself leave an arrow/weight unresolved without producing
+        # a pixel-direction conflict. Those observations need the same bounded
+        # original-image close-up; otherwise the reserved slot is never used.
+        unresolved={e['id']:e for e in related['edges']
+            if ((graph['directed'] is True and e['direction']=='unknown')
+                or (graph['weighted'] is True and e['weight'] is None))} if qwen_profile else {}
         missing_ids=({e['id'] for e in initial_candidates[graph['id']]}
                      -set(reviews_by_graph.get(graph['id'],{}))) if experimental else set()
         candidates=[]
         for candidate in initial_candidates[graph['id']]:
-            if candidate['id'] in conflicts or candidate['id'] in missing_ids:
-                if candidate['id'] in conflicts:
-                    candidate['evidence']=conflicts[candidate['id']]['evidence']
+            if candidate['id'] in conflicts or candidate['id'] in unresolved or candidate['id'] in missing_ids:
+                # Retain the candidate's original endpoint order: forward and
+                # reverse in both reviews must refer to the same from/to pair.
+                candidate=copy.deepcopy(candidate)
+                current=conflicts.get(candidate['id']) or unresolved.get(candidate['id'])
+                if current:
+                    candidate['evidence']=copy.deepcopy(current['evidence'])
                 candidates.append(candidate)
         candidates=candidates[:24 if experimental else 8]
         points=[p for c in candidates for p in c['path']]
@@ -576,11 +613,15 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                         payload['previously_selected']=[{key:e.get(key) for key in
                             ('id','from','to','direction','weight','path')}
                             for e in related['edges'] if e['status']=='accepted']
+                    elif qwen_profile:
+                        from graph_glm_adapter import compact_review_job
+                        payload=compact_review_job(graph,candidates,image.size)
                     else:payload=_review_job(graph,candidates)
                     purpose=('\n本轮核对上轮遗漏候选及箭头冲突，第二张是同一原图的局部裁图。'
                         '每个候选ID都须判定。previously_selected只是上轮选择，不是标准答案；'
                         '同一笔画已有确认ID时，其他重复ID必须明确否定，不能遗漏。'
-                        if experimental else '\n本轮只解决指定边的箭头冲突，第二张是同一原图的局部裁图。')
+                        if experimental else '\n本轮只解决指定边未确定的箭头或权值，第二张是同一原图的局部裁图。'
+                        '再次沿原始笔画看箭尖与数字；没有充分像素证据则继续unknown/null。')
                     detail=('沿真实独立笔画核对端点、重数与箭头，不把可达通路当单边。无箭头线写undirected。'
                             if experimental else '沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。')
                     verified=ask(review_prompt+purpose+detail+'仅返回decisions列表。\n'
@@ -596,6 +637,9 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     if adapted:
                         from graph_glm_adapter import receive_review_routes
                         graph=receive_review_routes(graph,review,glm_ink)
+                    elif qwen_profile:
+                        from graph_glm_adapter import receive_review_routes
+                        graph=receive_review_routes(graph,review,qwen_ink,source='qwen')
                     output[0]=recover_relations(graph,panels.get(graph['id'],[]),review=review)
                     if specialist is not None:
                         specialist_context[graph['id']]={'graph':copy.deepcopy(graph),

@@ -231,7 +231,7 @@ def test_marker_inventory_disagreement_requires_visual_node_review(invalid_revie
     from graph_staged import recognize_staged
     image=io.BytesIO();Image.new('RGB',(160,100),'white').save(image,format='PNG')
     initial=record(bbox=[0,0,1,1]);node_calls=[]
-    def refine(image, graphs, *, candidate_sink=None):
+    def refine(image, graphs, *, candidate_sink=None, partial=False):
         if candidate_sink is not None:
             candidate_sink.extend([{'x':.1,'y':.5},{'x':.9,'y':.5},{'x':.5,'y':.1}])
         return graphs
@@ -255,6 +255,7 @@ def test_marker_inventory_disagreement_requires_visual_node_review(invalid_revie
                            'decisions':[{'id':c['id'],'visible':True,'direction':'undirected'}
                                         for j in jobs for c in j['candidates']]}]}
     with patch('graph_staged.refine_node_positions',side_effect=refine),patch(
+            'graph_glm_adapter.needs_marker_grounding',return_value=False),patch(
             'graph_line_tracer.attach_line_evidence',side_effect=lambda raw,result:result):
         actual=recognize_staged(image.getvalue(),call=ask)
     g=actual['graphs'][0]

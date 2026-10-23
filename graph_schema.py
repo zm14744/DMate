@@ -50,6 +50,8 @@ def canonical_graph(source, index=1):
     for key in ('bbox', 'node_complete', 'inventory_reviewed', 'node_position_evidence', 'node_review'):
         if key in source:
             graph[key] = copy.deepcopy(source[key])
+    if isinstance(source.get('qwen_review_audit'), list):
+        graph['qwen_review_audit']=copy.deepcopy(source['qwen_review_audit'][:24])
     raw_nodes = source.get('vertices')
     raw_edges = source.get('edges', [])
     if not isinstance(raw_nodes, list) or not 1 <= len(raw_nodes) <= 100:
