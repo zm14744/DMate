@@ -69,3 +69,5 @@ v13 固定源为 `22acd47`；随后 `1423432` 只补失败停止保护，由机�
 两轮每轮只测试这三张，分别使用2CPU/4GiB应用容器，零重试；未重跑44图，测试容器已停止，不再扩大付费测试。
 
 私有证据在 `/workspace/.dmate/qwen-emergency`：`baseline-evaluation.json`、`staged-evaluation.json`、`simple-evaluation.json`、`stage-diagnosis.json`，以及两轮原始JSON、实际浏览器截图/trace和源快照。未公开上传原图。
+
+后续仅做了[公开资料复核、架构核实和离线输出诊断](GRAPH_QWEN_RESEARCH.md)，没有新增付费请求或准确率结果，也没有启用简化候选。

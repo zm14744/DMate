@@ -171,15 +171,29 @@ class VisionProvider:
                     raise VisionError('model_mismatch')
                 if choice.get('finish_reason')=='network_error':raise VisionError('upstream_network_error')
                 if choice.get('finish_reason')=='length':raise VisionError('truncated_output')
-                if not isinstance(raw,str):raise VisionError('invalid_output')
+                if not isinstance(raw,str):
+                    metric['output_error']='content_not_string'
+                    raise VisionError('invalid_output')
                 if not raw.strip() and metric['reasoning_chars']:
                     raise VisionError('reasoning_only_output')
                 # Some vision responses append two backticks to an otherwise
                 # complete JSON object. Remove formatting only, then validate
                 # the ENTIRE root; never salvage an inner/truncated fragment.
                 cleaned=re.sub(r'^`{1,3}(?:json)?\s*|\s*`{1,3}$','',raw.strip(),flags=re.IGNORECASE)
-                parsed=json.loads(cleaned,parse_constant=_invalid_json_constant)
-                if not isinstance(parsed,dict):raise VisionError('invalid_output')
+                try:
+                    parsed=json.loads(cleaned,parse_constant=_invalid_json_constant)
+                except json.JSONDecodeError as exc:
+                    # Positions are enough to locate a captured failure without
+                    # copying private model text into ordinary request metrics.
+                    metric.update(output_error='json_syntax',json_error={
+                        'line':exc.lineno,'column':exc.colno,'position':exc.pos})
+                    raise VisionError('invalid_output') from exc
+                except ValueError as exc:
+                    metric['output_error']='non_finite_json_number'
+                    raise VisionError('invalid_output') from exc
+                if not isinstance(parsed,dict):
+                    metric.update(output_error='root_not_object',json_root_type=type(parsed).__name__)
+                    raise VisionError('invalid_output')
                 metric['status']=200
                 return parsed
             except (requests.RequestException,TimeoutError) as exc:
