@@ -101,3 +101,24 @@ def test_multigraph_type_alone_does_not_duplicate_reciprocal_edge_reads():
         budget=Budget();result=recognize_staged(image.getvalue(),call=ask,budget=budget)
     assert batches==[['v1','v2','v3','v4','v5']]
     assert budget.remaining==5 and result['graphs'][0]['node_complete']
+
+
+def test_review_cannot_count_a_measured_stroke_again_with_an_offset_vlm_path():
+    g=graph()
+    g['edges']=[{'id':'already_seen','from':'a','to':'b','direction':'undirected',
+                 'path':[[.15,.5],[.5,.49],[.85,.5]],'style':'solid','evidence':[]}]
+    image=Image.new('RGB',(500,400),'white')
+    ImageDraw.Draw(image).line([(75,200),(425,200)],fill='black',width=3)
+    result,decisions,notes=receive_qwen_review(g,{},[stroke([[.15,.5],[.85,.5]])],review_route_ink(image))
+    assert [e['id'] for e in result['edges']]==['already_seen'] and not decisions
+    assert notes==['qwen_review_addition_rejected:duplicate_stroke']
+    assert result['qwen_review_audit'][0]['existing_id']=='already_seen'
+
+
+def test_a_second_review_proposal_cannot_recount_the_first_stroke():
+    image=Image.new('RGB',(500,400),'white')
+    ImageDraw.Draw(image).line([(75,200),(425,200)],fill='black',width=3)
+    proposal=stroke([[.15,.5],[.85,.5]])
+    result,decisions,notes=receive_qwen_review(graph(),{},[proposal,copy.deepcopy(proposal)],review_route_ink(image))
+    assert len(result['edges'])==len(decisions)==1
+    assert 'qwen_review_addition_rejected:duplicate_stroke' in notes

@@ -94,6 +94,19 @@ def receive_qwen_review(graph, decisions, additions, ink, *, traces=()):
             audit.append({'status':'rejected','reason':'ink_gap','from':raw['from'],
                           'to':raw['to'],'path':copy.deepcopy(route)})
             continue
+        # Visible ink does not establish a second stroke. Existing VLM paths
+        # can be offset from the measured rim/center line; keep one identity
+        # when both full routes occupy the same endpoint-compatible corridor.
+        duplicate = next((edge for edge in graph['edges']
+                          if {edge.get('from'), edge.get('to')} == {raw['from'], raw['to']}
+                          and path_points(edge.get('path'))
+                          and route_overlap(route, path_points(edge['path']), tolerance=.025) >= .85), None)
+        if duplicate is not None:
+            diagnostics.append('qwen_review_addition_rejected:duplicate_stroke')
+            audit.append({'status':'rejected','reason':'duplicate_stroke',
+                          'existing_id':duplicate['id'],'from':raw['from'],
+                          'to':raw['to'],'path':copy.deepcopy(route)})
+            continue
         n = 1
         while f'qwen_review_{n}' in edge_ids:
             n += 1
