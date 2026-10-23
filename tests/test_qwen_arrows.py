@@ -47,9 +47,12 @@ def test_arrow_batch_requires_exact_scoped_keys_and_physical_tip_enum(arrows):
     assert graphs==before
 
 
-def test_single_panel_and_weighted_panels_remain_outside_the_arrow_batch_profile():
-    _,graphs=scene()
-    assert prepare_arrows(None,graphs[:1]) is None
+def test_single_panel_heads_are_measured_and_weighted_panels_abstain():
+    image,graphs=scene()
+    plan=prepare_arrows(image,graphs[:1])
+    assert plan is not None and len(plan["items"])==1
+    output,weak=apply_native_arrows(plan)
+    assert not weak and output[0]["edges"][0]["from"]=="b"
     graphs[0]['weighted']=True
     assert prepare_arrows(None,graphs) is None
 
@@ -77,3 +80,10 @@ def test_a_weak_native_head_keeps_its_direction_open_for_local_review():
     output,weak=apply_native_arrows(plan)
     assert [item['key'] for item in weak]==[plan['items'][0]['key']]
     assert output[plan['items'][0]['graph_index']]['edges'][0]['direction']=='unknown'
+
+
+def test_self_loop_does_not_block_other_heads_and_keeps_its_attributes():
+    image,graphs=scene();loop=copy.deepcopy(graphs[0]['edges'][0]);loop.update(id='loop',to='a',edge_label='x',direction='forward')
+    graphs[0]['edges'].append(loop);plan=prepare_arrows(image,graphs[:1]);output,weak=apply_native_arrows(plan)
+    assert not weak and len(output[0]['edges'])==2
+    assert output[0]['edges'][1]==loop

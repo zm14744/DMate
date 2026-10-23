@@ -256,3 +256,40 @@ def test_filled_caption_ink_is_not_a_curved_stroke_even_with_perfect_tangent_cov
            'path':[[.2,.5],[.5,.7],[.8,.5]]}
     kept,notes=validate_curve_tangents([trace],ink)
     assert not kept and notes==['curve_filled_region_rejected:a:b']
+
+
+def test_complete_solid_disk_inventory_overrides_noisy_glyph_candidates():
+    im=Image.new('RGB',(600,400),'white');draw=ImageDraw.Draw(im)
+    measured=[(100,100),(350,100),(100,300),(350,300)]
+    draw.rectangle((100,100,350,300),outline='black',width=3)
+    for x,y in measured:draw.ellipse((x-12,y-12,x+12,y+12),fill='black')
+    draw.text((460,60),'OOO',fill='black')
+    g=canonical_graph({'id':'G','bbox':[0,0,1,1],'node_review':{},'vertices':[{'id':str(i),'x':x/599*.8,'y':y/399*.8} for i,(x,y) in enumerate(measured)]})
+    def noisy_refiner(image,graphs,*,candidate_sink=None,**kw):
+        if candidate_sink is not None:candidate_sink.extend([{'x':.9,'y':.2}]*7)
+        return graphs
+    result=anchor_inventory(im,[g],refiner=noisy_refiner)[0]
+    assert len(result['node_position_evidence'])==4
+    assert all(math.hypot(v['x']*599-x,v['y']*399-y)<2 for v,(x,y) in zip(result['vertices'],measured))
+
+
+def test_fitted_curve_cannot_round_two_already_measured_straight_strokes():
+    im=Image.new('L',(301,201),0);draw=ImageDraw.Draw(im)
+    draw.line([(40,40),(160,40),(160,160)],fill=255,width=3)
+    ink=np.asarray(im)
+    traces=[{'from':'a','to':'b','method':'opencv_straight_line_coverage','path':[[40/300,40/200],[160/300,40/200]]},
+            {'from':'b','to':'c','method':'opencv_straight_line_coverage','path':[[160/300,40/200],[160/300,160/200]]},
+            {'from':'a','to':'c','method':'opencv_curved_ink_template','path':[[40/300,40/200],[160/300,40/200],[160/300,160/200]]}]
+    retained,notes=validate_curve_tangents(traces,ink)
+    assert retained==traces[:2] and notes==['curve_explained_by_straight_ink:a:c']
+
+
+def test_trace_cannot_pass_along_a_measured_intermediate_ring_rim():
+    from graph_qwen_geometry import validate_trace_markers
+    g=canonical_graph({'id':'G','vertices':[{'id':'a','x':.1,'y':.5},{'id':'b','x':.9,'y':.5},{'id':'c','x':.5,'y':.5}]})
+    g['node_position_evidence']=[{'vertex':v['id'],'source':'measured_ring','radius_pixels':10} for v in g['vertices']]
+    trace={'from':'a','to':'b','path':[[.1,.5],[.5,.545],[.9,.5]]}
+    kept,notes=validate_trace_markers([trace],g,(201,201))
+    assert not kept and notes==['native_marker_rim_crossed:a:b']
+    g['node_position_evidence'][2]['radius_pixels']=None
+    assert validate_trace_markers([trace],g,(201,201))[0]==[trace]

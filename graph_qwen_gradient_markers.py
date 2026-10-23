@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import math
 
-def gradient_markers(image):
+def gradient_markers(image,*,include_uniform=False):
  """Observe similarly sized shaded disks; thin strokes and small arrows abstain."""
  rgb=np.asarray(image);gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY);h,w=gray.shape
  opened=cv2.morphologyEx(np.uint8(gray<230)*255,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(13,13)))
@@ -24,9 +24,12 @@ def gradient_markers(image):
   if not shaded and not np.median(values)<80:continue
   if shaded:gradient.append((bw+bh)/4)
   points.append({'x':cx/(w-1),'y':cy/(h-1),'radius_pixels':(bw+bh)/4,'median':float(np.median(values)),'std':float(np.std(values))})
- if len(gradient)<4:return []
- common=float(np.median(gradient))
+ if len(gradient)<4:
+  if not include_uniform or len(points)<4:return []
+  common=float(np.median([p['radius_pixels'] for p in points]))
+ else:common=float(np.median(gradient))
  selected=[p for p in points if .8*common<=p['radius_pixels']<=1.5*common]
+ if len(gradient)<4 and len(selected)<max(4,len(points)*.85):return []
  from graph_line_tracer import _foreground
  # The lighter highlight on a filled marker is still visible original ink.
  # Keep it when grouping the already measured shaded circles with their lines.

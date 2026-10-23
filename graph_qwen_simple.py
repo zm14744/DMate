@@ -404,12 +404,13 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         emit('TRACE', panels=panels)
         from graph_glm_adapter import review_route_ink  # CPU-only original ink.
         ink = review_route_ink(image)
-        from graph_qwen_geometry import validate_curve_tangents,coalesce_ink_routes,validate_trace_junctions
+        from graph_qwen_geometry import validate_curve_tangents,coalesce_ink_routes,validate_trace_junctions,validate_trace_markers
         for gid,paths in panels.items():
             panels[gid],notes=validate_curve_tangents(paths,ink)
             panels[gid],junction_notes=validate_trace_junctions(panels[gid],ink)
+            panels[gid],marker_notes=validate_trace_markers(panels[gid],next(g for g in graphs if g['id']==gid),image.size)
             panels[gid]=coalesce_ink_routes(panels[gid],ink)
-            diagnostics.extend(notes+junction_notes)
+            diagnostics.extend(notes+junction_notes+marker_notes)
         emit('TRACE.validated',panels=panels)
         graphs = [bind_measured_routes(g, panels.get(g['id'], []), ink) for g in graphs]
         for i,g in enumerate(graphs):
@@ -420,31 +421,43 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         for g in output:
             if g['weighted'] is True:locate_missing_weight_regions(image,g)
         emit('RELATE.initial', graphs=output)
-        from graph_qwen_local_text import prepare_local_text,apply_local_text,LOCAL_TEXT_PROMPT
-        local_text=prepare_local_text(image,output,force=(marker_plan or {}).get('source')=='native_shaded_components') if budget.remaining else None
-        if local_text is not None:
-            emit('LOCAL_TEXT.plan',items=local_text['items'],sheet_size=local_text['sheet_size'])
-            budget.call_seconds=min(budget.call_seconds,45)
-            requests=[{k:item[k] for k in ('key','kind')} for item in local_text['items']]
-            try:
-                response=ask('LOCAL_TEXT',LOCAL_TEXT_PROMPT+'\n'+json.dumps({'requests':requests},ensure_ascii=False),
-                    [overview,local_text['image_url']])
-                output=apply_local_text(local_text,response)
-                diagnostics.append('measured_multifigure_edge_text_batch')
-                emit('LOCAL_TEXT.applied',graphs=output)
-            except (ValueError,RuntimeError,TimeoutError) as exc:
-                diagnostics.append('single_text_batch_failed:'+type(exc).__name__)
-                emit('LOCAL_TEXT.rejected',reason=str(exc)[:80])
-            return finish(output)
         from graph_qwen_arrows import prepare_arrows,apply_arrows,apply_native_arrows,arrow_subset,ARROW_PROMPT
         arrow_batch=prepare_arrows(image,output)
+        unresolved_heads=[]
         if arrow_batch is not None:
             emit('ARROW_GLYPHS.plan',items=arrow_batch['items'],sheet_size=arrow_batch['sheet_size'])
             output,unresolved_heads=apply_native_arrows(arrow_batch)
             emit('ARROW_PIXELS.applied',graphs=output,unresolved_keys=[item['key'] for item in unresolved_heads])
             if not unresolved_heads:
                 diagnostics.append('measured_multifigure_native_arrow_geometry')
-                return finish(output)
+        from graph_qwen_local_text import prepare_local_text,apply_local_text,LOCAL_TEXT_PROMPT
+        local_text=prepare_local_text(image,output,force=(marker_plan or {}).get('source')=='native_shaded_components') if budget.remaining else None
+        if local_text is not None:
+            emit('LOCAL_TEXT.plan',items=local_text['items'],sheet_size=local_text['sheet_size'])
+            budget.call_seconds=min(budget.call_seconds,45)
+            requests=[{k:item[k] for k in ('key','kind')} for item in local_text['items']]
+            images=[overview,local_text['image_url']]
+            prompt=LOCAL_TEXT_PROMPT+'\n'+json.dumps({'requests':requests},ensure_ascii=False)
+            if unresolved_heads:
+                arrow_batch=arrow_subset(image,arrow_batch,unresolved_heads,output)
+                images.append(arrow_batch['image_url'])
+                prompt+='\n第三张是独立箭头局部表，其key只在arrows中使用，与第二张readings的key分开。'+ARROW_PROMPT.replace('第一张为原图上下文，第二张为从原图裁剪的箭头局部表格。','').replace('第二张','第三张')
+                prompt+='\n合并为唯一JSON对象 {"readings":[{"key":"A","text":"原图文字"}],"arrows":[{"key":"A","tip":"left"}]}。箭头requests='+json.dumps([{'key':item['key']} for item in unresolved_heads])
+            try:
+                response=ask('LOCAL_TEXT',prompt,images)
+                updated=apply_local_text(local_text,response)
+                if unresolved_heads:
+                    updated,notes=apply_arrows({**arrow_batch,'graphs':updated},response)
+                    diagnostics.extend(notes)
+                output=updated
+                diagnostics.append('measured_multifigure_edge_text_batch')
+                emit('LOCAL_TEXT.applied',graphs=output)
+            except (ValueError,RuntimeError,TimeoutError) as exc:
+                diagnostics.append('single_text_batch_failed:'+type(exc).__name__)
+                emit('LOCAL_TEXT.rejected',reason=str(exc)[:80])
+            return finish(output)
+        if arrow_batch is not None:
+            if not unresolved_heads:return finish(output)
             if not budget.remaining:
                 diagnostics.append('native_arrow_unresolved_after_call_budget')
                 return finish(output)

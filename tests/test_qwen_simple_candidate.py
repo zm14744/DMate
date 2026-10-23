@@ -307,7 +307,7 @@ def test_default_orchestration_selects_validated_pipeline_without_staged_fallbac
             'graph_qwen_simple.recognize_simple',side_effect=RuntimeError('offline')) as candidate:
         result = recognize_graph_document(picture(), {})
     assert result['error'] and candidate.call_count == 1
-    assert result['graph_display_version']=='qwen-simple-candidate-v22'
+    assert result['graph_display_version']=='qwen-simple-candidate-v24'
     assert candidate.call_args.kwargs['budget'].remaining==2
     staged.assert_not_called()
 
@@ -323,6 +323,6 @@ def test_explicit_candidate_uses_unified_display_and_existing_text_correction():
     assert candidate.call_count == 1
     staged.assert_not_called()
     text.assert_called_once_with('source')
-    assert result['graph_display_version'] == 'qwen-simple-candidate-v22'
+    assert result['graph_display_version'] == 'qwen-simple-candidate-v24'
     assert [e['id'] for e in result['graph_display_data'][0]['edges']] == ['upper', 'lower']
     assert result['text'] == 'unchanged text'

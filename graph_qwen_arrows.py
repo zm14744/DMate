@@ -5,11 +5,23 @@ from PIL import Image,ImageDraw,ImageFont
 from graph_qwen_text_inventory import _key
 from graph_qwen_edge_text import _projection
 
+def _head_taper(gray,rect,tangent):
+ """Measure narrowing of the original head, before opening rounds its tip."""
+ x,y,r,b=rect;yy,xx=np.where(gray[y:b,x:r]<130)
+ if not len(xx):return 0.,0.,0
+ axis=np.column_stack((xx+x,yy+y))@tangent
+ counts=np.bincount(np.rint(axis-axis.min()).astype(int))
+ thick=counts>=.55*max(counts);position=np.arange(len(counts))[thick];width=counts[thick]
+ if len(position)<6 or np.std(width)==0:return 0.,0.,len(position)
+ return float(np.corrcoef(position,width)[0,1]),float(np.polyfit(position,width,1)[0]),len(position)
+
 def prepare_arrows(image,graphs):
  directed=[(i,g) for i,g in enumerate(graphs) if g['directed'] is True]
- if len(directed)<2 or any(g['weighted'] is not False or len(g.get('node_position_evidence',[]))!=len(g['vertices']) or any('partial' in p['source'] for p in g.get('node_position_evidence',[])) for _,g in directed):return None
- targets=[(gi,g,e) for gi,g in directed for e in g['edges']]
- if not 1<=len(targets)<=48 or any(not e['path'] or e['from']==e['to'] for _,_,e in targets):return None
+ if not directed or any(g['weighted'] is not False or len(g.get('node_position_evidence',[]))!=len(g['vertices']) or any('partial' in p['source'] for p in g.get('node_position_evidence',[])) for _,g in directed):return None
+ # Loop orientation cannot change its endpoints. Keep its original attributes;
+ # it must not prevent independent heads on the other strokes being measured.
+ targets=[(gi,g,e) for gi,g in directed for e in g['edges'] if e['from']!=e['to']]
+ if not 1<=len(targets)<=48 or any(not e['path'] for _,_,e in targets):return None
  rgb=np.asarray(image);gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY);h,w=gray.shape
  opened=cv2.morphologyEx(np.uint8(gray<130)*255,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7)))
  n,labels,stats,centers=cv2.connectedComponentsWithStats(opened,8)
@@ -60,9 +72,18 @@ def prepare_arrows(image,graphs):
   skew=float(np.mean(centered**3)/max(float(np.mean(centered*centered))**1.5,1e-9))
   bias=float((projected.mean()-(projected.max()+projected.min())/2)/max(float(np.ptp(projected)),1e-9))
   resolved=abs(skew)>=.15 and abs(bias)>=.02 and skew*bias<0
+  taper,taper_slope,taper_bins=_head_taper(gray,blob['rect'],tangent)
+  # Opening can round a small real arrow into an almost symmetric blob.
+  # Recover only when its original silhouette narrows consistently toward
+  # the same tip as both independent blob moment signs.
+  taper_resolved=(abs(taper)>=.6 and abs(taper_slope)>=.25 and taper_bins>=6
+                  and abs(skew)>.04 and skew*taper<0 and skew*bias<0)
+  resolved=resolved or taper_resolved
   x,y,r,bottom=blob['rect'];pad=max(10,round(max(r-x,bottom-y)*.65));rect=[max(0,x-pad),max(0,y-pad),min(w,r+pad),min(h,bottom+pad)]
   items.append({'key':_key(len(items)),'graph_index':gi,'id':e['id'],'rect':rect,'tangent':tangent.tolist(),
-                'head_center':blob['center'],'axis_skew':skew,'axis_centroid_bias':bias,'axis_resolved':bool(resolved)})
+                'head_center':blob['center'],'axis_skew':skew,'axis_centroid_bias':bias,
+                'native_taper_correlation':taper,'native_taper_slope':taper_slope,
+                'native_taper_bins':taper_bins,'axis_resolved':bool(resolved)})
  columns=min(8,len(items));sheet=Image.new('RGB',(columns*160,math.ceil(len(items)/columns)*160),'white');draw=ImageDraw.Draw(sheet);font=ImageFont.load_default(size=18)
  for i,item in enumerate(items):
   x,y=i%columns*160,i//columns*160;draw.rectangle((x,y,x+159,y+23),fill='#dddddd');draw.text((x+6,y+2),item['key'],font=font,fill='black');crop=image.crop(item['rect']);zoom=max(1,min(3,148//crop.width,128//crop.height))
@@ -83,6 +104,8 @@ def apply_native_arrows(prepared):
   graph=graphs[item['graph_index']];edge=next(e for e in graph['edges'] if e['id']==item['id'])
   proof={'source':'native_arrow_head_axis_asymmetry','region':item['rect'],
          'axis_skew':item['axis_skew'],'axis_centroid_bias':item['axis_centroid_bias'],
+         'native_taper_correlation':item.get('native_taper_correlation'),
+         'native_taper_slope':item.get('native_taper_slope'),
          'prior_from':edge['from'],'prior_to':edge['to'],'prior_direction':edge['direction']}
   if item['axis_skew']<0:edge['from'],edge['to']=edge['to'],edge['from']
   edge['direction']='forward';source=next(v for v in graph['vertices'] if v['id']==edge['from'])

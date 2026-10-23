@@ -11,7 +11,7 @@ LOCAL_TEXT_PROMPT=EDGE_TEXT_PROMPT+'\nkind=figure_name 时完整抄写图名和�
 
 
 def prepare_local_text(image,graphs,*,force=False):
-    if (not graphs or any(g['directed'] is not False or g['weighted'] is not False for g in graphs)
+    if (not graphs or any(type(g['directed']) is not bool or g['weighted'] is not False for g in graphs)
             or (not force and not any(e['edge_label'] is None for g in graphs for e in g['edges']))):
         return None
     items=[];width,height=image.size
