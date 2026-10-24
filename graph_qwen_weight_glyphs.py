@@ -123,6 +123,7 @@ def prepare_weight_glyphs(image,graphs):
             pad=2 if refined else 4
             items.append({'key':f't{gi}_{len(items)}','kind':'glyph','graph_index':gi,
                 'rect':[max(0,x-pad),max(0,y-pad),min(width,r+pad),min(height,b+pad)],'centre':centre,'glyph_height':height_glyph,
+                'native_route_ink_distance95':float(np.quantile(route_distance[yy+y,xx+x],.95)),
                 **({'native_dash_component_excluded':True} if refined else {})})
     if not items or len(items)>96:return None
     columns=min(8,len(items));sheet=Image.new('RGB',(columns*160,math.ceil(len(items)/columns)*160),'white')
@@ -137,6 +138,31 @@ def prepare_weight_glyphs(image,graphs):
     data=io.BytesIO();sheet.save(data,format='PNG')
     return {'graphs':graphs,'items':items,'image_size':image.size,'sheet_size':list(sheet.size),
             'image_url':'data:image/png;base64,'+base64.b64encode(data.getvalue()).decode()}
+
+
+def _certified_head_glyph(graph,glyph,image_size):
+    """Do not bind a numeral read from an already measured arrow's ink.
+
+    A head's rectangle can also contain a real adjacent weight. Require the
+    candidate's original ink to stay within the measured shaft/head envelope,
+    as well as lying on that route and substantially inside its head region.
+    """
+    if graph['directed'] is not True or 'native_route_ink_distance95' not in glyph:return False
+    x,y,r,b=glyph['rect'];area=(r-x)*(b-y)
+    if area<=0:return False
+    for edge in graph['edges']:
+        projected=_projection(glyph['centre'],edge['path'],image_size) if edge['path'] else None
+        if not projected or projected[0]>.25*glyph['glyph_height']:continue
+        for proof in edge.get('evidence',[]):
+            if proof.get('source')!='native_connected_ink_width_taper':continue
+            region=proof.get('region');ramp=proof.get('native_width_ramp',{})
+            widths=ramp.get('connected_ink_widths',[])
+            if not region or not widths or ramp.get('relative_margin',0)<.35:continue
+            a,c,d,f=region;cx,cy=glyph['centre']
+            overlap=max(0,min(r,d)-max(x,a))*max(0,min(b,f)-max(y,c))
+            if not (a<=cx<=d and c<=cy<=f and overlap>=area*.7):continue
+            if glyph['native_route_ink_distance95']<=max(6,max(widths)/2+1):return True
+    return False
 
 
 def apply_weight_glyphs(prepared,response):
@@ -162,6 +188,8 @@ def apply_weight_glyphs(prepared,response):
                 number=Decimal(text.replace('−','-')) if text else None
                 if number is None or not number.is_finite() or not -128<=number.adjusted()<=128:continue
             except InvalidOperation:continue
+            if _certified_head_glyph(g,item,prepared['image_size']):
+                notes.append(f'weight_glyph_is_certified_head:{g["id"]}:{item["key"]}');continue
             glyphs.append({**item,'number':int(number) if number==number.to_integral_value() else float(number),'literal_text':text})
         matching=nx.Graph()
         for ei,e in enumerate(g['edges']):

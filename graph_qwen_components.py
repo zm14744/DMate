@@ -179,11 +179,21 @@ def native_first_context(image):
     if broad is None:return None
     rgb=np.asarray(image);gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY)
     _,components=cv2.connectedComponents(_foreground(rgb)|(np.uint8(gray<230)*255),8)
+    shaded_only=all(p.get('std',0)>=18 for p in points)
+    common_radius=float(np.median([p['radius_pixels'] for p in points]))
+    opened=cv2.morphologyEx(np.uint8(gray<230)*255,cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(13,13)))
+    _,head_labels,head_stats,_=cv2.connectedComponentsWithStats(opened,8)
+    rejected_heads=[]
     width,height=image.size;other=defaultdict(list)
     for p in broad['strong_markers']:
         if any(math.dist((p['x'],p['y']),(q['x'],q['y']))<.012 for q in points):continue
         x,y=round(p['x']*(width-1)),round(p['y']*(height-1));key=int(components[y,x])
-        if key in groups:return None
+        if key in groups:
+            if shaded_only and _small_flat_asymmetric_blob(gray,head_labels,head_stats,x,y,common_radius):
+                rejected_heads.append({'x':p['x'],'y':p['y'],'source':'flat_small_asymmetric_ink_inside_shaded_figure'})
+                continue
+            return None
         other[key].append(p)
     for key,ps in other.items():
         if key and len(ps)>=3 and ((max(p['x'] for p in ps)-min(p['x'] for p in ps))*width>50
@@ -193,4 +203,24 @@ def native_first_context(image):
         for p in sorted(groups[order[i]],key=lambda p:(p['y'],p['x'])):
             pool.append({**p,'id':f'p{len(pool)+1}'})
     return {'markers':pool,'strong_markers':pool,'image':marker_overlay(image,pool),
-            'source':'native_shaded_components'}
+            'source':'native_shaded_components',
+            **({'native_small_flat_head_rejections':rejected_heads} if rejected_heads else {})}
+
+
+def _small_flat_asymmetric_blob(gray,labels,stats,x,y,reference_radius):
+    """Small flat triangular heads must not veto large shaded-circle frames."""
+    import numpy as np
+    key=int(labels[y,x])
+    if not key:return False
+    left,top,width,height,area=map(int,stats[key])
+    if not (12<=width<=65 and 12<=height<=65 and (width+height)/4<reference_radius*.8):return False
+    core=gray[max(0,y-3):y+4,max(0,x-3):x+4]
+    if not core.size or np.median(core)>=60 or np.std(core)>10:return False
+    yy,xx=np.where(labels[top:top+height,left:left+width]==key)
+    if len(xx)<20:return False
+    xy=np.column_stack((xx,yy));maximum=0.
+    for angle in np.linspace(0,np.pi,16,endpoint=False):
+        projected=xy@np.array([np.cos(angle),np.sin(angle)]);centered=projected-projected.mean()
+        skew=abs(float(np.mean(centered**3)/max(float(np.mean(centered*centered))**1.5,1e-9)))
+        maximum=max(maximum,skew)
+    return maximum>=.1

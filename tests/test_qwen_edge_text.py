@@ -46,3 +46,27 @@ def test_directed_weighted_and_multipanel_inputs_abstain_before_pixel_processing
         other=copy.deepcopy(graph);other[key]=True
         assert prepare_edge_text_inventory(b'',None,[other]) is None
     assert prepare_edge_text_inventory(b'',None,[graph,graph]) is None
+
+
+def test_lowered_script_can_match_lowercase_x_height_without_splitting_one_word():
+    from PIL import Image,ImageDraw,ImageFont
+    from graph_qwen_edge_text import _glyphs
+    image=Image.new('RGB',(220,120),'white');draw=ImageDraw.Draw(image)
+    draw.text((40,30),'e',font=ImageFont.truetype('DejaVuSans.ttf',34),fill='black',anchor='lt')
+    draw.text((62,40),'3',font=ImageFont.truetype('DejaVuSans.ttf',26),fill='black',anchor='lt')
+    ordinary=_glyphs(image,[0,0,1,1],[],join_scripts=True)
+    repaired=_glyphs(image,[0,0,1,1],[],join_scripts=True,allow_equal_scripts=True)
+    assert len(ordinary)==2
+    assert len(repaired)==1 and repaired[0]['parts']==2
+    assert repaired[0]['box'][0]<=ordinary[0]['box'][0]
+    assert repaired[0]['box'][2]>=ordinary[1]['box'][2]
+
+
+def test_equal_height_neighbour_on_the_same_baseline_is_not_a_lowered_script():
+    from PIL import Image,ImageDraw,ImageFont
+    from graph_qwen_edge_text import _glyphs
+    image=Image.new('RGB',(220,120),'white');draw=ImageDraw.Draw(image)
+    draw.text((40,30),'e',font=ImageFont.truetype('DejaVuSans.ttf',34),fill='black',anchor='lt')
+    draw.text((62,30),'3',font=ImageFont.truetype('DejaVuSans.ttf',26),fill='black',anchor='lt')
+    glyphs=_glyphs(image,[0,0,1,1],[],join_scripts=True,allow_equal_scripts=True)
+    assert len(glyphs)==2 and all(g['parts']==1 for g in glyphs)

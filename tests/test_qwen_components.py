@@ -68,3 +68,23 @@ def test_a_smaller_filled_arrowhead_is_not_kept_as_a_shaded_disk_vertex():
     output,notes=reconcile_component_inventory(image,graphs)
     assert [len(g['vertices']) for g in output]==[4,5]
     assert len(notes)==2
+
+
+def test_flat_blob_filter_preserves_a_small_round_vertex():
+    import cv2
+    from graph_qwen_components import _small_flat_asymmetric_blob
+    image=Image.new('L',(90,90),255)
+    ImageDraw.Draw(image).ellipse((32,32,58,58),fill=0)
+    gray=np.asarray(image)
+    _,labels,stats,_=cv2.connectedComponentsWithStats(np.uint8(gray<230)*255,8)
+    assert not _small_flat_asymmetric_blob(gray,labels,stats,45,45,24)
+
+
+def test_flat_blob_filter_recognizes_a_small_asymmetric_head():
+    import cv2
+    from graph_qwen_components import _small_flat_asymmetric_blob
+    image=Image.new('L',(90,90),255)
+    ImageDraw.Draw(image).polygon([(45,27),(30,57),(60,57)],fill=0)
+    gray=np.asarray(image)
+    _,labels,stats,_=cv2.connectedComponentsWithStats(np.uint8(gray<230)*255,8)
+    assert _small_flat_asymmetric_blob(gray,labels,stats,45,47,24)

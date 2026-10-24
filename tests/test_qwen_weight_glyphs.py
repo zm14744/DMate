@@ -48,3 +48,23 @@ def test_one_glyph_cannot_supply_two_separate_edge_instances():
     graphs,notes=apply_weight_glyphs(prepared,{'readings':[{'key':'top','text':7}]})
     assert [e['weight'] for e in graphs[0]['edges']]==[111,222]
     assert any('ambiguous' in x for x in notes)
+
+
+def test_a_certified_arrowhead_cannot_steal_a_correct_adjacent_weight():
+    prepared=plan();graph=prepared['graphs'][0];graph['directed']=True
+    graph['edges']=graph['edges'][:1];edge=graph['edges'][0]
+    edge['evidence']=[{'source':'native_connected_ink_width_taper','region':[180,45,220,75],
+        'native_width_ramp':{'relative_margin':.8,'connected_ink_widths':[4,10,8,6,4]}}]
+    prepared['items']=[
+        {'key':'head','kind':'glyph','graph_index':0,'centre':[200,60],'glyph_height':20,
+         'rect':[190,50,210,70],'native_route_ink_distance95':5},
+        {'key':'weight','kind':'glyph','graph_index':0,'centre':[200,48],'glyph_height':20,
+         'rect':[190,38,210,58],'native_route_ink_distance95':20}]
+    graphs,notes=apply_weight_glyphs(prepared,{'readings':[{'key':'head','text':'2'},{'key':'weight','text':'3'}]})
+    assert graphs[0]['edges'][0]['weight']==3
+    assert 'weight_glyph_is_certified_head:g:head' in notes
+    # A model's assertion of a head is insufficient to discard original text.
+    edge['evidence']=[]
+    graphs,notes=apply_weight_glyphs(prepared,{'readings':[{'key':'head','text':'2'},{'key':'weight','text':'3'}]})
+    assert graphs[0]['edges'][0]['weight']==2
+    assert not any('certified_head' in n for n in notes)

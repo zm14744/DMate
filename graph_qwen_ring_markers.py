@@ -218,7 +218,19 @@ def photo_first_context(image):
     from graph_line_tracer import _paper_gray
     if _paper_gray(np.asarray(image)) is None:return None
     context=hollow_first_context(image)
-    if context is None or len({p['component'] for p in context['markers']})<3:return None
+    if context is None:return None
+    if len({p['component'] for p in context['markers']})<3:
+        # A counted-out printed counter supplies positive native evidence for
+        # a complete two-figure pool. Use measured IDs before VL can omit a
+        # named node and displace both figures with coarse coordinates.
+        selected=refine_surplus_rings(image,context['markers'],None)
+        if selected is None:return None
+        from collections import Counter
+        counts=Counter(p['component'] for p in selected)
+        if len(counts)!=2 or min(counts.values())<3:return None
+        from graph_glm_adapter import marker_overlay
+        context.update(markers=selected,strong_markers=selected,image=marker_overlay(image,selected),
+                       core_inventory=True,native_two_figure_counter_filter=True)
     points=context['markers'];width,height=image.size
     close=any(math.hypot((p['x']-q['x'])*(width-1),(p['y']-q['y'])*(height-1))<2*(p['radius_pixels']+q['radius_pixels'])
               for i,p in enumerate(points) for q in points[i+1:])

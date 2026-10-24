@@ -25,6 +25,46 @@ def pack_uncertainty_sheets(text_plan,arrow_plan):
             'arrow_region':[0,bottom+32,arrows.width,height]}
 
 
+def _match_edge_glyphs(image,graph,glyphs):
+    matching=nx.Graph()
+    for ei,edge in enumerate(graph['edges']):
+        for ti,glyph in enumerate(glyphs):
+            projected=_projection(glyph['center'],edge['path'],image.size)
+            if projected is None:continue
+            distance,along=projected;h=glyph['box'][3]-glyph['box'][1]
+            if .15<=along<=.85 and distance<=max(28,h*1.5):
+                matching.add_edge(('e',ei),('t',ti),weight=distance/max(10,h))
+    best=nx.min_weight_matching(matching)
+    if len(best)!=len(graph['edges']):return None
+    total=sum(matching[a][b]['weight'] for a,b in best)
+    for a,b in best:
+        cost=matching[a][b]['weight'];matching.remove_edge(a,b)
+        alternative=nx.min_weight_matching(matching)
+        ambiguous=(len(alternative)==len(graph['edges']) and sum(matching[u][v]['weight'] for u,v in alternative)-total<.15)
+        matching.add_edge(a,b,weight=cost)
+        if ambiguous:return None
+    pairs=[]
+    for a,b in best:
+        if a[0]=='t':a,b=b,a
+        pairs.append((a[1],b[1]))
+    return pairs
+
+
+def _assigned_script_fragments(glyphs,pairs):
+    """Two edge reads must not consume the body and subscript of ONE word."""
+    selected=[glyphs[ti] for _,ti in pairs]
+    for body in selected:
+        if body['parts']!=1:continue
+        x,y,r,b=body['box'];h=b-y
+        if h<15:continue
+        for script in selected:
+            if script is body or script['parts']!=1:continue
+            xx,yy,rr,bb=script['box'];hh=bb-yy
+            if (h*.98<hh<=h*1.1 and rr-xx<=hh*.85 and -.25*h<=xx-r<=.55*h
+                    and yy>=y+h*.1 and b+h*.2<=bb<=b+h*.7):return True
+    return False
+
+
 def prepare_local_text(image,graphs,*,force=False):
     if (not graphs or any(type(g['directed']) is not bool or g['weighted'] is not False for g in graphs)
             or (not force and not any(e['edge_label'] is None for g in graphs for e in g['edges']))):
@@ -41,28 +81,16 @@ def prepare_local_text(image,graphs,*,force=False):
         glyphs=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True,node_radii=radii)
         separated=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True,node_radii=radii,
             line_paths=[e['path'] for e in g['edges']])
-        matching=nx.Graph();costs={}
-        for ei,edge in enumerate(g['edges']):
-            for ti,glyph in enumerate(glyphs):
-                projected=_projection(glyph['center'],edge['path'],image.size)
-                if projected is None:continue
-                distance,along=projected;h=glyph['box'][3]-glyph['box'][1]
-                if .15<=along<=.85 and distance<=max(28,h*1.5):
-                    score=distance/max(10,h);matching.add_edge(('e',ei),('t',ti),weight=score);costs[ei,ti]=score
-        best=nx.min_weight_matching(matching)
-        if len(best)!=len(g['edges']):return None
-        total=sum(matching[a][b]['weight'] for a,b in best)
-        for a,b in best:
-            cost=matching[a][b]['weight'];matching.remove_edge(a,b)
-            alternative=nx.min_weight_matching(matching)
-            ambiguous=(len(alternative)==len(g['edges']) and
-                sum(matching[u][v]['weight'] for u,v in alternative)-total<.15)
-            matching.add_edge(a,b,weight=cost)
-            if ambiguous:return None
-        pairs=[]
-        for a,b in best:
-            if a[0]=='t':a,b=b,a
-            pairs.append((a[1],b[1]))
+        pairs=_match_edge_glyphs(image,g,glyphs)
+        if pairs is None:return None
+        repaired=False
+        if _assigned_script_fragments(glyphs,pairs):
+            alternate=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True,node_radii=radii,allow_equal_scripts=True)
+            alternate_pairs=_match_edge_glyphs(image,g,alternate)
+            if alternate_pairs is not None and not _assigned_script_fragments(alternate,alternate_pairs):
+                glyphs=alternate;pairs=alternate_pairs;repaired=True
+                separated=_glyphs(image,g['bbox'],g['vertices'],join_scripts=True,node_radii=radii,
+                    line_paths=[e['path'] for e in g['edges']],allow_equal_scripts=True)
         for ei,ti in sorted(pairs):
             # A rejected model stroke can leave its name on another route.
             # Recheck edge text in that affected figure, without re-reading
@@ -79,7 +107,8 @@ def prepare_local_text(image,graphs,*,force=False):
                 y-=math.ceil(h*1.2);bottom+=math.ceil(h*.4)
             items.append({'key':_key(len(items)),'kind':'edge_label','graph_index':gi,
                 'id':g['edges'][ei]['id'],'rect':[max(0,x-2),max(0,y-2),min(width,r+2),min(height,bottom+2)],
-                'native_line_separated':bool(glyph.get('native_line_separated'))})
+                'native_line_separated':bool(glyph.get('native_line_separated')),
+                **({'native_competing_script_fragments_repaired':True} if repaired else {})})
     # Keep the complete native name around its measured marker, including
     # thin subscripts which connected-component cleanup can discard.
     for gi,g in enumerate(graphs):

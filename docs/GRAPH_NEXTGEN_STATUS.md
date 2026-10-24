@@ -1,6 +1,6 @@
 # DMate 图论 OCR 开发与测试记录（2026-10-22）
 
-> 最新验收范围已由用户排除两张不完整原图，变为 21＋21 张。两批首轮严格整图仅 4/21、0/21，尚未达到 42/42；历史三图逐图通过和下方旧架构、旧模型对比不代表当前整批达标。视觉固定 Qwen3-VL-Plus，DeepSeek 不变。最新分组与结果见 [两批验收](GRAPH_QWEN_BATCHES.md)。
+> 当前保留21＋21张，最新逐图真实结果按原参考39/42，三处独立原图复核后42/42。冻结版本初验39/42，后三张真实失败经定向修复复测通过；并非新版本单轮全量42/42。视觉固定Qwen3-VL-Plus，DeepSeek不变。详见[最新逐图实测](GRAPH_QWEN_TARGETED_ACCEPTANCE.md)；下方旧架构与模型对比仅为历史。
 
 
 开发分支：`codex/graph-ocr-nextgen-20261022`。草稿 PR：https://github.com/zm14744/DMate/pull/5 。未合并 main，未部署 Zeabur，未修改生产数据库。

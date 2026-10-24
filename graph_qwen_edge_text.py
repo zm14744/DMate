@@ -29,7 +29,7 @@ def _projection(point,path,size):
     return best
 
 
-def _glyphs(image,bbox,nodes,*,join_scripts=False,node_radii=None,line_paths=None):
+def _glyphs(image,bbox,nodes,*,join_scripts=False,node_radii=None,line_paths=None,allow_equal_scripts=False):
     hsv=cv2.cvtColor(np.asarray(image),cv2.COLOR_RGB2HSV)
     mask=cv2.inRange(hsv,(0,0,0),(179,75,155))
     if line_paths:
@@ -71,7 +71,8 @@ def _glyphs(image,bbox,nodes,*,join_scripts=False,node_radii=None,line_paths=Non
                 for j,other in enumerate(groups):
                     if i==j or j in used:continue
                     xx,yy,rr,bb=other['box'];ww,hh=rr-xx,bb-yy
-                    if (6<=hh<=h*.98 and ww<=hh*.85 and -.25*h<=xx-r<=.55*h
+                    same_height_script=(allow_equal_scripts and h*.98<hh<=h*1.1 and bb>=b+h*.2)
+                    if (6<=hh and (hh<=h*.98 or same_height_script) and ww<=hh*.85 and -.25*h<=xx-r<=.55*h
                             and yy>=y+h*.1 and b-h*.25<=bb<=b+h*.7):
                         choices.append((abs(xx-r)+abs(bb-b),j,other))
             if choices:
