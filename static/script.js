@@ -13688,8 +13688,11 @@ function ocrReviewPlain(value) {
 }
 
 function ocrReviewLatexLabel(value) {
-    const label = String(value ?? "").trim();
+    const label = String(value ?? "").trim().replace(/[₀-₉]/g, digit =>
+        String("₀₁₂₃₄₅₆₇₈₉".indexOf(digit)));
     if (!/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)?$/.test(label)) return null;
+    const numbered = /^([A-Za-z]+)([0-9]+)$/.exec(label);
+    if (numbered) return numbered[1]+"_{"+numbered[2]+"}";
     return label.replace(/_([A-Za-z0-9]+)/g, "_{$1}");
 }
 
@@ -13698,7 +13701,44 @@ function ocrReviewLabel(value) {
     return latex === null ? ocrReviewPlain(value) : "\\(" + latex + "\\)";
 }
 
+function formatCanonicalGraphReview(graphs) {
+    const lines=[];
+    for (let i=0;i<graphs.length;i++) {
+        const g=graphs[i], nodes=g.vertices || [], edges=g.edges || [];
+        const labels=new Map(nodes.map(v=>[String(v.id),v.label || v.id]));
+        const label=id=>ocrReviewLabel(labels.get(String(id)) || id);
+        const properties=[g.directed===true?"有向图":g.directed===false?"无向图":"方向未确定",
+            g.weighted===true?"带权":"",g.multigraph===true?"多重图":""].filter(Boolean);
+        lines.push("### 图 "+(i+1)+"（"+ocrReviewPlain(g.name || g.id)+"）");
+        lines.push("**类型：** "+properties.join(" · "));
+        if(g.complete!==true)lines.push("部分内容未识别完整，请对照原图确认。");
+        lines.push("**顶点（"+nodes.length+"）：** "+nodes.map(v=>label(v.id)).join("、"));
+        const incident=new Set(edges.flatMap(e=>[String(e.from),String(e.to)]));
+        const isolated=nodes.filter(v=>!incident.has(String(v.id)) && (g.complete===true || v.isolated_confirmed===true));
+        if(isolated.length)lines.push("**孤立顶点：** "+isolated.map(v=>label(v.id)).join("、"));
+        lines.push("**边（"+(g.complete===true?"":"暂录 ")+edges.length+" 条）：**");
+        for(const [edgeIndex,e] of edges.entries()) {
+            const arrow=e.direction==="forward"?" → ":e.direction==="undirected"?" — ":" ? ";
+            const attrs=[];
+            if(e.edge_label)attrs.push("边名："+ocrReviewPlain(e.edge_label));
+            if(e.weight!==null && e.weight!==undefined)attrs.push("权值："+ocrReviewPlain(e.weight));
+            if(e.parallel_count>1)attrs.push("同端点共 "+e.parallel_count+" 条");
+            if(e.style==="dashed")attrs.push("虚线");
+            if(e.style==="dotted")attrs.push("点线");
+            if(e.direction==="unknown")attrs.push("方向未确定");
+            if(e.status!=="accepted")attrs.push("待确认");
+            // Stable per-card identities; detector source IDs stay in JSON.
+            lines.push("- e"+(edgeIndex+1)+"："+label(e.from)+arrow+label(e.to)+
+                (attrs.length?"（"+attrs.join("，")+"）":""));
+        }
+        if(!edges.length)lines.push("—");
+        if(i<graphs.length-1)lines.push("---");
+    }
+    return lines.join("\n\n");
+}
+
 function formatStructuredGraphReview(graphs) {
+    if(Array.isArray(graphs) && graphs.length && graphs.length<=12 && graphs.every(g=>g && g.schema_version==="dmate.graph/1")) return formatCanonicalGraphReview(graphs);
     if (!Array.isArray(graphs) || !graphs.length || graphs.length > 12) return "";
     const cmp = (a, b) => String(a).localeCompare(String(b), "zh-CN", {numeric:true, sensitivity:"base"});
     const center = graph => {

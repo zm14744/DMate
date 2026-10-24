@@ -1,0 +1,67 @@
+{
+  "case_id": "ouc_20261021_star_cycle_wheel_k5",
+  "original_sha256": "4223433f6893e82ff476b642d772b39a74278d7d692eda3d62755a1bc26edcaf",
+  "dimensions": {
+    "graph_accuracy": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "未提供四幅图的结构"
+    },
+    "question_text": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "图内标签进入题干，原题公式或文字损坏"
+    },
+    "formula_rendering": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "实际弹窗报 Extra close brace or missing open brace"
+    },
+    "description_accuracy": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "图形信息为空"
+    },
+    "description_uniformity": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "图形卡片缺失"
+    },
+    "figure_separation": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "四幅图未分出"
+    }
+  },
+  "scope": "historical baseline, not current branch"
+}

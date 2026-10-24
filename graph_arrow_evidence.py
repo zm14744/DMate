@@ -117,6 +117,67 @@ def _interior_arrow_score(segments, coords, start, end, radius):
     return best_score
 
 
+def _filled_arrow_profile(mask, coords, radius):
+    """Find a bilateral triangular taper along the observed connector.
+
+    Filled lecture-slide arrows often yield only a long shaft in Hough, so
+    paired short wings are absent. A crossing has two comparable shoulders;
+    a filled arrow has an abrupt base and a longer narrowing tip. This remains
+    advisory image evidence, never a topology/direction decision by itself.
+    """
+    from graph_relation import _samples
+    h, w = mask.shape
+    length = sum(math.dist(a,b) for a,b in zip(coords,coords[1:]))
+    if length < 25: return None
+    count = min(640,max(32,round(length)))
+    points = np.asarray(_samples(coords,count))
+    if len(points)<10: return None
+    tangents = np.gradient(points,axis=0)
+    norms=np.linalg.norm(tangents,axis=1)
+    tangents=tangents/np.maximum(norms[:,None],1e-6)
+    normals=np.column_stack((-tangents[:,1],tangents[:,0]))
+    span=max(10,min(36,round(radius*3)))
+    offsets=np.arange(-span,span+1)
+    samples=np.rint(points[:,None,:]+normals[:,None,:]*offsets[None,:,None]).astype(int)
+    valid=((samples[:,:,0]>=0)&(samples[:,:,0]<w)&(samples[:,:,1]>=0)&(samples[:,:,1]<h))
+    bits=np.zeros(valid.shape,dtype=bool)
+    bits[valid]=mask[samples[:,:,1][valid],samples[:,:,0][valid]]>0
+    widths=[]; balance=[]
+    for row in bits:
+        choices=[j for j in range(max(0,span-3),min(len(row),span+4)) if row[j]]
+        if not choices: widths.append(0);balance.append(0);continue
+        center=min(choices,key=lambda j:abs(j-span));left=right=center
+        while left>0 and row[left-1]: left-=1
+        while right<len(row)-1 and row[right+1]: right+=1
+        widths.append(right-left+1)
+        balance.append(min(center-left,right-center)/max(1,right-left))
+    widths=np.asarray(widths,dtype=float)
+    margin=max(4,round(count*max(2*radius,8)/length))
+    interior=widths[margin:count-margin]
+    positive=interior[interior>0]
+    if len(positive)<10: return None
+    baseline=float(np.median(positive))
+    high=widths>max(baseline+3,baseline*1.5)
+    groups=np.flatnonzero(np.diff(np.r_[False,high,False])).reshape(-1,2)
+    results=[]
+    for start,stop in groups:
+        if start<margin or stop>count-margin or not 4<=stop-start<=max(45,count*.35): continue
+        peak=start+int(np.argmax(widths[start:stop]));height=widths[peak]
+        if height<baseline+7 or balance[peak]<.18: continue
+        left,right=peak-start+1,stop-peak
+        if right>=5 and left<=max(3,right*.4):
+            taper=widths[peak:stop];direction=1
+        elif left>=5 and right<=max(3,left*.4):
+            taper=widths[start:peak+1][::-1];direction=-1
+        else: continue
+        if np.mean(np.diff(taper)<=1)<.8 or taper[-1]>height-(height-baseline)*.45: continue
+        results.append((direction,.80))
+    directions={d for d,_ in results}
+    if len(directions)!=1: return None
+    return {'orientation':next(iter(directions)),'score':max(s for _,s in results),
+            'method':'opencv_bilateral_filled_arrow_taper'}
+
+
 def annotate_arrow_candidates(rgb, graph, paths, radius):
     """Add geometric arrow hints to line candidates; never alter actual edges."""
     if not paths or not graph.get("vertices"):
@@ -152,13 +213,22 @@ def annotate_arrow_candidates(rgb, graph, paths, radius):
         cv2.Canny(mask,50,145),1,np.pi/360,threshold=7,
         minLineLength=max(4,round(radius*.45)),maxLineGap=3,
     )
-    if segments is None:
-        return paths
-    lines=[(float(ax+x1),float(ay+y1),float(bx+x1),float(by+y1))
+    lines=[] if segments is None else [(float(ax+x1),float(ay+y1),float(bx+x1),float(by+y1))
            for ax,ay,bx,by in np.asarray(segments).reshape(-1,4)[:850]]
     for path in paths:
         a, b = str(path.get("from","")), str(path.get("to",""))
         if a not in vertices or b not in vertices or a == b:
+            continue
+        coords=[(p[0]*(w-1)-x1,p[1]*(h-1)-y1) for p in path.get('path',[])
+                if isinstance(p,(list,tuple)) and len(p)==2]
+        profile=_filled_arrow_profile(mask,coords,radius)
+        if profile:
+            starts_at_a=math.dist((coords[0][0]+x1,coords[0][1]+y1),vertices[a])<=math.dist(
+                (coords[-1][0]+x1,coords[-1][1]+y1),vertices[a])
+            forward=starts_at_a == (profile['orientation']==1)
+            source,target=(a,b) if forward else (b,a)
+            path['arrow_candidate']={'from':source,'to':target,'score':profile['score'],
+                                     'method':profile['method'],'candidate_only':True}
             continue
         scores = {}
         for source, target in ((a,b), (b,a)):

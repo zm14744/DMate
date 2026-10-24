@@ -1,0 +1,128 @@
+{
+  "scope": "42 original images, 21 per batch after two user exclusions",
+  "original_scope": 44,
+  "excluded_by_user": [
+    "img_47_1f5aaa36",
+    "img_34_e61ccfec"
+  ],
+  "feature_counts": {
+    "directed": [
+      8,
+      8
+    ],
+    "weighted": [
+      3,
+      2
+    ],
+    "multigraph": [
+      6,
+      6
+    ],
+    "self_loop": [
+      3,
+      3
+    ],
+    "multiple_panels": [
+      15,
+      15
+    ],
+    "four_or_more_panels": [
+      4,
+      5
+    ],
+    "photograph": [
+      5,
+      6
+    ],
+    "partial_reference": [
+      0,
+      0
+    ],
+    "directed_weighted": [
+      1,
+      1
+    ],
+    "undirected_weighted": [
+      2,
+      1
+    ],
+    "single_undirected_unweighted": [
+      4,
+      3
+    ],
+    "dense_25_or_more_edges": [
+      7,
+      8
+    ],
+    "source_01_中海洋_课件原图": [
+      12,
+      11
+    ],
+    "source_02_高校_九张历史问题原图": [
+      4,
+      4
+    ],
+    "source_03_教材_11张实拍原图": [
+      5,
+      5
+    ],
+    "source_04_补充_原始图论题图": [
+      0,
+      1
+    ]
+  },
+  "batches": [
+    {
+      "id": "1",
+      "ids": [
+        "img_02_71977ad8",
+        "img_05_6e4b6985",
+        "img_11_97073a06",
+        "img_21_e9daeeb2",
+        "img_35_35dd7867",
+        "img_45_cdc6753c",
+        "img_17_39e038de",
+        "img_18_de175eaf",
+        "img_19_0e9e6ab3",
+        "img_36_4bf6cb88",
+        "img_41_2b56fbbe",
+        "img_43_d1cf2de4",
+        "img_49_040ad83c",
+        "img_52_ed81693f",
+        "img_22_f6b8df88",
+        "img_23_3414b2be",
+        "img_29_3164d820",
+        "img_31_e308a23a",
+        "img_32_32c156c6",
+        "img_42_4f19cbf8",
+        "img_51_7b4563f2"
+      ]
+    },
+    {
+      "id": "2",
+      "ids": [
+        "img_01_e75525b4",
+        "img_07_6a597b97",
+        "img_09_a3165196",
+        "img_20_3183ec43",
+        "img_38_21ac8699",
+        "img_44_5363fd7b",
+        "img_14_d522f301",
+        "img_25_d76c5538",
+        "img_28_7eac23fc",
+        "img_30_ad6abf47",
+        "img_37_a807f9a1",
+        "img_39_14d8f556",
+        "img_46_c62d198a",
+        "img_24_bcd44ca8",
+        "img_26_4223433f",
+        "img_27_1dba1c96",
+        "img_33_9de1dc5f",
+        "img_40_8fa97025",
+        "img_48_040fc92c",
+        "img_50_7a05926e",
+        "img_53_a74c517f"
+      ]
+    }
+  ]
+}

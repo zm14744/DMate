@@ -24,7 +24,7 @@ const rendered = funcs.formatOcrReviewGraphDisplay(
 );
 assert(rendered.includes("顶点（2）"));
 assert(rendered.includes("边（暂录 1 条）"));
-assert(rendered.includes("v1") && rendered.includes("v2"));
+assert(rendered.includes("v_{1}") && rendered.includes("v_{2}"));
 for (const unwanted of [
     "图形结构待核对","结构已列出","待核对","首次识别",
     "识别说明","二次核对","0.111","0.222","尚未确认连接的顶点","状态："

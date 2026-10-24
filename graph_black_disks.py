@@ -18,14 +18,13 @@ import numpy as np
 from PIL import Image, ImageOps
 
 
-def _black_disk_centers(gray):
+def _black_disk_centers(gray, *, opening_size=None):
     h, w = gray.shape
     if min(h, w) < 100:
         return []
     dark = np.uint8(gray < 105) * 255
-    kernel = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE, (7, 7) if max(h, w) >= 580 else (5, 5)
-    )
+    size=opening_size or (7 if max(h,w)>=580 else 5)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(size,size))
     opened = cv2.morphologyEx(dark, cv2.MORPH_OPEN, kernel)
     count, labels, stats, centers = cv2.connectedComponentsWithStats(opened, 8)
     candidates = []

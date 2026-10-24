@@ -20,11 +20,30 @@ NEIGHBORS = tuple((dy, dx) for dy in range(-2, 3) for dx in range(-2, 3)
                   if 0 < dx * dx + dy * dy <= 5)
 
 
+def _paper_gray(rgb):
+    """Flatten illumination on mid-tone paper; preserve white/dark screens.
+
+    Absolute gray<210 turns brown textbook photos almost entirely into ink.
+    Dividing by a smooth illumination field separates dark front-side strokes
+    from broad shadows and faint print-through without drawing any new lines.
+    """
+    gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY)
+    if not 105<=float(np.median(gray))<235:
+        return None
+    sigma=max(8,min(21,min(gray.shape)/20))
+    background=cv2.GaussianBlur(gray,(0,0),sigma)
+    return cv2.divide(gray,np.maximum(background,1),scale=255)
+
+
 def _foreground(rgb):
     """Preserve both dark and saturated colour strokes on light pages."""
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    if float(np.median(gray)) < 105:
+    paper=_paper_gray(rgb)
+    if paper is not None:
+        cutoff,_=cv2.threshold(paper,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        ink=(paper<=min(180,cutoff)).astype('uint8')*255
+    elif float(np.median(gray)) < 105:
         # White/coloured graph strokes on a dark teaching slide.
         ink = ((gray > 155) | ((hsv[:, :, 1] > 80) &
                                (hsv[:, :, 2] > 85))).astype('uint8') * 255
@@ -82,7 +101,7 @@ def _vertices(graph, width, height):
         except (ValueError, TypeError, KeyError):
             return []
     ids = [v[0] for v in points]
-    if not 2 <= len(points) <= MAX_VERTICES or len(set(ids)) != len(ids):
+    if not 1 <= len(points) <= MAX_VERTICES or len(set(ids)) != len(ids):
         return []
     return points
 
@@ -180,8 +199,14 @@ def _follow(skel, points, source_i, start, radius, max_steps):
     return None, path, turns, ambiguity
 
 
-def _sample_path(path, width, height):
-    selected = (
+def _sample_path(path, width, height, *, max_error=None):
+    if max_error is not None and len(path)>10:
+        # Candidate-only option: ten uniform samples cut across thin exterior
+        # arcs and then fail the independent ink check. Keep pixel geometry.
+        points=np.asarray(path,dtype=np.float32).reshape((-1,1,2))
+        selected=cv2.approxPolyDP(points,max_error,False).reshape((-1,2)).tolist()
+        if len(selected)>128:return []  # Abstain instead of erasing geometry.
+    else:selected = (
         path if len(path) <= 10
         else [path[round(i * (len(path) - 1) / 9)] for i in range(10)]
     )
@@ -242,7 +267,7 @@ def _point_polyline_distance(point, line):
     return best
 
 
-def _same_ink_route(candidate,existing,pointmap,width,height,radius):
+def _same_ink_route(candidate,existing,pointmap,width,height,radius,*,ink=None,offset=(0,0)):
     """Deduplicate reverse/partial traces; do not merge nearby parallel strokes.
 
     A Hough segment may cover only the middle 70% of a skeleton trace. That
@@ -257,6 +282,24 @@ def _same_ink_route(candidate,existing,pointmap,width,height,radius):
         inner=[math.dist(x,y) for x,y in zip(a[2:7],b[2:7])]
         if max(inner)<=gap and sum(inner)/len(inner)<=gap*.75:
             return True
+        if ink is not None and max(inner)<=max(12.,radius*1.7):
+            # Arrowhead wings and thick node rims can displace a skeleton a
+            # few pixels from the straight detector. They are one ink ridge.
+            # Genuine close parallel strokes must retain a white corridor at
+            # multiple interior cross-sections, not just near their endpoints.
+            separated=0; inspected=0
+            for q,z in zip(a[2:7],b[2:7]):
+                distance=math.dist(q,z)
+                if distance<2.5:continue
+                samples=np.rint(np.linspace(q,z,max(5,round(distance*2)))).astype(int)
+                samples[:,0]-=offset[0];samples[:,1]-=offset[1]
+                valid=((samples[:,0]>=0)&(samples[:,0]<ink.shape[1])&
+                       (samples[:,1]>=0)&(samples[:,1]<ink.shape[0]))
+                if not valid.all():continue
+                row=ink[samples[:,1],samples[:,0]]>0
+                inspected+=1
+                if float((~row).mean())>.40:separated+=1
+            if inspected>=3 and separated<2:return True
     first=_route_polyline_pixels(candidate,width,height)
     second=_route_polyline_pixels(existing,width,height)
     if len(first)<2 or len(second)<2:
@@ -280,13 +323,13 @@ def _same_ink_route(candidate,existing,pointmap,width,height,radius):
     return samples>=3 and hits/samples>=.88
 
 
-def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,ink_mask=None):
     """Independently propose only high-coverage straight strokes.
 
     A crossing alone cannot satisfy the coverage test. A confirmed node
     between two endpoints blocks an apparent long edge.
     """
-    ink = _foreground(rgb) > 0
+    ink = (_foreground(rgb) if ink_mask is None else ink_mask) > 0
     height, width = ink.shape
     candidates = []
     for i in range(len(local)):
@@ -310,6 +353,7 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                 continue
             samples = max(15, min(250, round(length * 0.9)))
             hits = 0
+            pattern = []
             missing_run = max_missing_run = 0
             for step in range(samples):
                 t = 0.09 + 0.82 * (step + 0.5) / samples
@@ -322,13 +366,24 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                         found = True
                         break
                 hits += int(found)
+                pattern.append(found)
                 missing_run = 0 if found else missing_run + 1
                 max_missing_run = max(max_missing_run, missing_run)
             coverage = hits / samples
             # Average ink coverage alone can connect unrelated aligned lines.
             # A long missing segment is evidence against an actual edge.
             largest_gap_px = max_missing_run * length / samples
-            if coverage < 0.83 or largest_gap_px > max(6, min(16, length * 0.045)):
+            continuous = coverage >= .83 and largest_gap_px <= max(6,min(16,length*.045))
+            # Dashed paths need repeated bounded gaps, not one long white gap
+            # between unrelated collinear strokes. Still only a candidate.
+            runs=[]
+            for hit in pattern:
+                if runs and runs[-1][0] == hit: runs[-1][1] += 1
+                else: runs.append([hit,1])
+            gaps=[n for hit,n in runs[1:-1] if not hit]
+            dashed = (.40 <= coverage < .90 and len(gaps)>=3 and
+                      max(gaps)/max(1,min(gaps))<=2.5 and largest_gap_px<=min(20,length*.13))
+            if not continuous and not dashed:
                 continue
             candidates.append({
                 'from': local[i][0], 'to': local[j][0],
@@ -337,24 +392,30 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                          [round((bx + x_off) / max(full_w - 1, 1), 4),
                           round((by + y_off) / max(full_h - 1, 1), 4)]],
                 'pixel_length': round(length),
-                'score': round(coverage, 3),
+                'score': round(coverage if continuous else min(.80,coverage+.18), 3),
+                'style': 'solid' if continuous else 'dashed',
                 'needs_review': True,
                 'method': 'opencv_straight_line_coverage',
             })
     return candidates
 
 
-def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,gray_cutoff=216,ink_mask=None):
     """Match real visible Hough stroke endpoints to marked node *rims*.
 
     Center-to-center coverage fails for lines attached off-center to circles.
     This function never manufactures vertices or certified graph edges.
     """
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    if float(np.median(gray)) < 105:
+    paper=_paper_gray(rgb)
+    if ink_mask is not None:
+        mask=ink_mask
+    elif paper is not None:
+        mask=_foreground(rgb)
+    elif float(np.median(gray)) < 105:
         mask = _foreground(rgb)
     else:
-        _, mask = cv2.threshold(gray, 216, 255, cv2.THRESH_BINARY_INV)
+        _, mask = cv2.threshold(gray, gray_cutoff, 255, cv2.THRESH_BINARY_INV)
     edges = cv2.Canny(mask, 55, 145)
     segments = cv2.HoughLinesP(edges, 1, math.pi / 720, threshold=18,
                                minLineLength=24, maxLineGap=7)
@@ -401,7 +462,19 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h)
     return output
 
 
-def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
+def _corridor_hits(ink, xs, ys, ux, uy):
+    """Out-of-image corridor samples contain no evidence (never wrap/clip)."""
+    height, width = ink.shape
+    hits = np.zeros(xs.shape, dtype=bool)
+    for off in (-2., -1., 0., 1., 2.):
+        xx = np.rint(xs + off * ux).astype(int)
+        yy = np.rint(ys + off * uy).astype(int)
+        valid = (xx >= 0) & (xx < width) & (yy >= 0) & (yy < height)
+        hits[valid] |= ink[yy[valid], xx[valid]]
+    return hits
+
+
+def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,ink_mask=None):
     """Detect an independently ink-backed arch between already known vertices.
 
     A contour may be almost semicircular; a straight Hough line has no chance
@@ -410,7 +483,7 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
     """
     if len(local) > 14:
         return []
-    ink = (_foreground(rgb) > 0)
+    ink = ((_foreground(rgb) if ink_mask is None else ink_mask) > 0)
     height, width = ink.shape
     output = []
 
@@ -487,11 +560,7 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
                                 break
                         if forbidden:
                             continue
-                        hits=np.zeros(ts.shape,dtype=bool)
-                        for off in (-2.,-1.,0.,1.,2.):
-                            xx=np.rint(xs+off*ux).astype(int)
-                            yy=np.rint(ys+off*uy).astype(int)
-                            hits |= ink[yy,xx]
+                        hits = _corridor_hits(ink, xs, ys, ux, uy)
                         coverage=float(hits.mean())
                         if coverage<.87:
                             continue
@@ -542,18 +611,37 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h):
     return output
 
 
-def _graph_candidates(rgb, graph):
+def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,marker_scale=1.):
     h, w = rgb.shape[:2]
     points = _vertices(graph, w, h)
     if not points:
         return []
     nearest = [
-        min(math.hypot(x - a, y - b)
-            for j, (_, a, b) in enumerate(points) if j != i)
+        min((math.hypot(x - a, y - b)
+            for j, (_, a, b) in enumerate(points) if j != i), default=80.0)
         for i, (_, x, y) in enumerate(points)
     ]
     median_sep = float(np.median(nearest))
     radius = max(3, min(13, round(median_sep * 0.12)))
+    proof={p['vertex']:p for p in graph.get('node_position_evidence',[])}
+    native_radii={}
+    if graph.get('node_review',{}).get('native_disk_core_size_recovery') and len(proof)==len(points):
+        native_radii={key:p['radius_pixels']*marker_scale for key,p in proof.items()}
+        radius=round(float(np.median(list(native_radii.values()))))
+    if (graph.get('directed') is False and graph.get('weighted') is False and len(points)>=4
+            and len(proof)==len(points) and all(p.get('marker_profile')=='native_hollow_size_consensus'
+            and p.get('radius_pixels',0)*marker_scale>=15 for p in proof.values())):
+        from graph_qwen_ring_markers import native_rim_profile
+        native_ink=_foreground(rgb)
+        for node in graph['vertices']:
+            p=proof[node['id']];r=p['radius_pixels']*marker_scale
+            rim=native_rim_profile(native_ink,{**node,'radius_pixels':r})
+            if rim and rim['relative_median_deviation']<=.15 and r<=rim['radius_pixels']<=r*2:
+                p['native_external_rim']=rim;p['radius_pixels']=rim['radius_pixels']/marker_scale
+                r=rim['radius_pixels']
+            native_radii[node['id']]=r
+        radius=round(float(np.median(list(native_radii.values()))))
+        graph.setdefault('node_review',{})['native_full_marker_rims']=True
     # Small crops clipped real outer arcs and self-loops. Retain enough
     # space beyond the vertex hull without scanning the entire text page.
     margin = max(34, min(120, round(median_sep * 0.62)))
@@ -561,13 +649,28 @@ def _graph_candidates(rgb, graph):
     max_x = min(w, max(p[1] for p in points) + margin + 1)
     min_y = max(0, min(p[2] for p in points) - margin)
     max_y = min(h, max(p[2] for p in points) + margin + 1)
+    # Explicit figure bounds retain outer arcs beyond the vertex hull. They
+    # must contain all known vertices; components are not used for splitting.
+    box = graph.get('bbox')
+    if isinstance(box, list) and len(box) == 4:
+        try:
+            a,b,c,d = map(float,box)
+            if (0 <= a < c <= 1 and 0 <= b < d <= 1 and
+                    all(a <= x/max(w-1,1) <= c and b <= y/max(h-1,1) <= d for _,x,y in points)):
+                min_x,min_y,max_x,max_y = int(a*w),int(b*h),min(w,math.ceil(c*w)),min(h,math.ceil(d*h))
+        except (TypeError,ValueError):
+            pass
     if min(max_x - min_x, max_y - min_y) < 14:
         return []
-    skel = _thin(_foreground(rgb[min_y:max_y, min_x:max_x]))
+    photo_mask=(_foreground(rgb)[min_y:max_y,min_x:max_x]
+                if consistent_paper and _paper_gray(rgb) is not None else None)
+    ink_mask=photo_mask if photo_mask is not None else _foreground(rgb[min_y:max_y, min_x:max_x])
+    skel = _thin(ink_mask)
     local = [(label, x - min_x, y - min_y) for label, x, y in points]
     # Erase only already-detected vertex interiors, not line crossings.
-    for _, x, y in local:
-        cv2.circle(skel, (x, y), max(1, radius - 2), 0, -1)
+    for name, x, y in local:
+        clearance=math.ceil(native_radii[name])+1 if native_radii else max(1,radius-2)
+        cv2.circle(skel, (x, y), clearance, 0, -1)
     # Preserve genuinely different routes between the same pair of vertices.
     # Duplicate forward/reverse traces of one stroke must NOT become multiedges.
     path_variants = {}
@@ -580,7 +683,7 @@ def _graph_candidates(rgb, graph):
                              indices[candidate["to"]])))
         variants=path_variants.setdefault(pair,[])
         for index,old in enumerate(variants):
-            if _same_ink_route(candidate,old,node_pixels,w,h,radius):
+            if _same_ink_route(candidate,old,node_pixels,w,h,radius,ink=ink_mask,offset=(min_x,min_y)):
                 if candidate["score"]>old["score"]: variants[index]=candidate
                 return
         # Variants are candidate strokes, not certified multiplicity.
@@ -618,7 +721,8 @@ def _graph_candidates(rgb, graph):
                 'from': local[a][0],
                 'to': local[b][0],
                 'path': _sample_path(
-                    [(x + min_x, y + min_y) for x, y in path], w, h),
+                    [(x + min_x, y + min_y) for x, y in path], w, h,
+                    max_error=.6 if dense_paths else None),
                 'pixel_length': length,
                 'straightness': round(separation / max(length, 1), 3),
                 'score': round(score, 3),
@@ -627,23 +731,24 @@ def _graph_candidates(rgb, graph):
                            if source == target else 'opencv_skeleton_tangent_trace'),
                 'loop_candidate': source == target,
             }
+            if not candidate['path']:continue
             keep_candidate(candidate)
 
     for candidate in _straight_stroke_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h):
+            radius, w, h,ink_mask=photo_mask):
         keep_candidate(candidate)
     # A long edge can terminate on a circular node rim away from the line
     # joining the two node centers; Hough endpoints recover these cases.
     for candidate in _hough_endpoint_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h):
+            radius, w, h,ink_mask=photo_mask):
         keep_candidate(candidate)
     # Add paths around genuinely curved independent ink corridors, including
     # a straight+arc parallel pair which skeleton's greedy walker may miss.
     for candidate in _curved_stroke_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h):
+            radius, w, h,ink_mask=photo_mask):
         keep_candidate(candidate)
     result = []
     for variants in path_variants.values():
@@ -659,18 +764,21 @@ def _graph_candidates(rgb, graph):
     return ordered
 
 
-def attach_line_evidence(image_bytes, cv_result):
+def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False,consistent_paper=False):
     """Add trace evidence without modifying verified edges or node labels."""
     if not isinstance(cv_result, dict) or not cv_result.get('graphs'):
         return cv_result
     try:
         rgb = _decode(image_bytes)
+        with Image.open(io.BytesIO(image_bytes)) as source:
+            native_size=ImageOps.exif_transpose(source).size
+        marker_scale=min(rgb.shape[1]/native_size[0],rgb.shape[0]/native_size[1])
         result = dict(cv_result)
         candidates = []
         for graph in (cv_result.get('graphs') or [])[:MAX_GRAPHS]:
             if not isinstance(graph, dict):
                 continue
-            traces = _graph_candidates(rgb, graph)
+            traces = _graph_candidates(rgb, graph,dense_paths=dense_paths,consistent_paper=consistent_paper,marker_scale=marker_scale)
             if traces:
                 # The arrow result is evidence, not an accepted direction.
                 try:

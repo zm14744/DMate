@@ -1337,7 +1337,7 @@ def _guess_image_mime(raw):
 
 
 
-def _request_qwen_completion(payload, headers, timeout=(10, 120)):
+def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=None):
     """Call DashScope in SSE mode and reconstruct the OpenAI-compatible result."""
     request_payload = dict(payload)
     request_payload["stream"] = True
@@ -1360,8 +1360,11 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120)):
 
         content_parts, reasoning_parts = [], []
         finish_reason, usage = None, None
+        returned_model, system_fingerprint = None, None
         saw_event = False
         for raw_line in response.iter_lines(decode_unicode=True):
+            if wall_deadline is not None and time.monotonic() > wall_deadline:
+                raise TimeoutError("vision_wall_deadline")
             if raw_line is None:
                 continue
             line = raw_line.decode("utf-8", errors="replace").strip() if isinstance(raw_line, bytes) else str(raw_line).strip()
@@ -1379,6 +1382,8 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120)):
             if not isinstance(chunk, dict):
                 continue
             saw_event = True
+            returned_model = chunk.get("model") or returned_model
+            system_fingerprint = chunk.get("system_fingerprint") or system_fingerprint
             if isinstance(chunk.get("usage"), dict):
                 usage = chunk["usage"]
             for choice in chunk.get("choices") or []:
@@ -1416,6 +1421,8 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120)):
                 "finish_reason": finish_reason,
             }],
             "usage": usage or {},
+            "model": returned_model,
+            "system_fingerprint": system_fingerprint,
         }
         return status_code, "", normalized
     finally:
@@ -1611,6 +1618,9 @@ def _format_graph_data(graphs):
     """Render validated graph data into a count-consistent visual description."""
     if not graphs:
         return ""
+    if all(g.get('schema_version') == 'dmate.graph/1' for g in graphs):
+        from graph_schema import describe_graphs
+        return describe_graphs(graphs)
     lines, needs_review = [], False
     for graph_index, graph in enumerate(graphs, 1):
         graph_id = graph["id"]
