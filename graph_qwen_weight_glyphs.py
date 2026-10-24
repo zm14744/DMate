@@ -109,8 +109,10 @@ def prepare_weight_glyphs(image,graphs):
             yy,xx=np.where(ink[y:b,x:r]>0)
             if len(xx)<6:continue
             # A leftover stripe of an already measured edge is not a word.
-            if np.mean(route_distance[yy+y,xx+x]<=5)>=.95:continue
+            on_stroke=float(np.mean(route_distance[yy+y,xx+x]<=5))
+            if on_stroke>=.95:continue
             spread=np.linalg.eigvalsh(np.cov(np.column_stack((xx,yy)),rowvar=False))
+            if on_stroke>=.9 and spread[1]>=5*max(spread[0],.1):continue
             if spread[0]/max(spread[1],1)<.015:continue
             near=[]
             for e in g['edges']:

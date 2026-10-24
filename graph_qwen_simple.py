@@ -450,7 +450,7 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             from graph_qwen_dashes import dashed_photo_paths
             from graph_line_tracer import _paper_gray
             import numpy as np
-            dashes=dashed_photo_paths(ink,graphs,graphs.index(native_graph),image.size) if _paper_gray(np.asarray(image)) is not None else []
+            dashes=dashed_photo_paths(ink,graphs,graphs.index(native_graph),image.size,paths) if _paper_gray(np.asarray(image)) is not None else []
             paths=paths+exterior+cubics+dashes
             if dashes:
                 points=[point for trace in dashes for point in trace['path']]

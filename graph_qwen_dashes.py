@@ -1,11 +1,13 @@
 """Interrupted strokes: bridged proposals, original-pixel dash certificates."""
-import copy,heapq,math
+import heapq,itertools,math
 import cv2
 import numpy as np
 from graph_relation import _samples
 
 
 def dash_support(path,ink):
+    from graph_qwen_geometry import connected_fine_ink
+    if connected_fine_ink(path,ink):return None
     height,width=ink.shape;route=np.asarray(path)*[width-1,height-1]
     length=float(np.linalg.norm(np.diff(route,axis=0),axis=1).sum())
     if not 40<=length<=2200:return None
@@ -45,12 +47,19 @@ def _window(graphs,index):
     return left,top,right,bottom
 
 
-def dashed_photo_paths(ink,graphs,index,image_size):
+def dashed_photo_paths(ink,graphs,index,image_size,existing_paths=()):
     graph=graphs[index]
     if graph.get('weighted') is not True or graph.get('directed') is not False:return []
     proof={p['vertex']:p for p in graph.get('node_position_evidence',[])}
     if len(proof)!=len(graph['vertices']) or any(p.get('marker_profile')!='native_hollow_size_consensus' or not p.get('radius_pixels') for p in proof.values()):return []
-    pairs={tuple(sorted((e['from'],e['to']))) for e in graph['edges'] if e['style'] in ('dashed','dotted') and e['from']!=e['to']}
+    # First require independent interrupted-stroke evidence in this figure.
+    # Otherwise text fragments near crossing solid lines can mimic dash gaps.
+    if not any(t.get('style') in ('dashed','dotted') for t in existing_paths):return []
+    # Model line types and omissions are observations, never a gate on which
+    # measured node pair may have an actual interrupted stroke.
+    pairs=set(itertools.combinations(sorted(proof),2))
+    solid_pairs={tuple(sorted((t['from'],t['to']))) for t in existing_paths if t.get('style')=='solid'}
+    pairs-=solid_pairs
     if not pairs or len(pairs)>16:return []
     height,width=ink.shape;scale=min(width/image_size[0],height/image_size[1])
     positions={v['id']:(round(v['x']*(width-1)),round(v['y']*(height-1))) for v in graph['vertices']}
