@@ -77,6 +77,10 @@ def prepare_text_inventory(raw,image,observed):
     if all(len(g.get('node_position_evidence',[]))==len(g['vertices']) and
            all(p.get('source') in ('qwen_recovery_marker_selection','measured_component_node_recovery') for p in g['node_position_evidence'])
            for g in observed):return None
+    from graph_qwen_ring_markers import ring_markers,refine_surplus_rings
+    strict=ring_markers(image)
+    if refine_surplus_rings(image,strict,sum(len(g['vertices']) for g in observed)) is not None:
+        return None  # Keep the semantic nodes; the main measured route binds literal text.
     groups=defaultdict(list)
     for p in connected_ring_markers(image):groups[p['component']].append(p)
     if len(groups)!=len(observed) or not all(3<=len(v)<=30 for v in groups.values()):return None

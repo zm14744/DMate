@@ -611,7 +611,7 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*
     return output
 
 
-def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False):
+def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,marker_scale=1.):
     h, w = rgb.shape[:2]
     points = _vertices(graph, w, h)
     if not points:
@@ -623,6 +623,25 @@ def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False):
     ]
     median_sep = float(np.median(nearest))
     radius = max(3, min(13, round(median_sep * 0.12)))
+    proof={p['vertex']:p for p in graph.get('node_position_evidence',[])}
+    native_radii={}
+    if graph.get('node_review',{}).get('native_disk_core_size_recovery') and len(proof)==len(points):
+        native_radii={key:p['radius_pixels']*marker_scale for key,p in proof.items()}
+        radius=round(float(np.median(list(native_radii.values()))))
+    if (graph.get('directed') is False and graph.get('weighted') is False and len(points)>=4
+            and len(proof)==len(points) and all(p.get('marker_profile')=='native_hollow_size_consensus'
+            and p.get('radius_pixels',0)*marker_scale>=15 for p in proof.values())):
+        from graph_qwen_ring_markers import native_rim_profile
+        native_ink=_foreground(rgb)
+        for node in graph['vertices']:
+            p=proof[node['id']];r=p['radius_pixels']*marker_scale
+            rim=native_rim_profile(native_ink,{**node,'radius_pixels':r})
+            if rim and rim['relative_median_deviation']<=.15 and r<=rim['radius_pixels']<=r*2:
+                p['native_external_rim']=rim;p['radius_pixels']=rim['radius_pixels']/marker_scale
+                r=rim['radius_pixels']
+            native_radii[node['id']]=r
+        radius=round(float(np.median(list(native_radii.values()))))
+        graph.setdefault('node_review',{})['native_full_marker_rims']=True
     # Small crops clipped real outer arcs and self-loops. Retain enough
     # space beyond the vertex hull without scanning the entire text page.
     margin = max(34, min(120, round(median_sep * 0.62)))
@@ -649,8 +668,9 @@ def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False):
     skel = _thin(ink_mask)
     local = [(label, x - min_x, y - min_y) for label, x, y in points]
     # Erase only already-detected vertex interiors, not line crossings.
-    for _, x, y in local:
-        cv2.circle(skel, (x, y), max(1, radius - 2), 0, -1)
+    for name, x, y in local:
+        clearance=math.ceil(native_radii[name])+1 if native_radii else max(1,radius-2)
+        cv2.circle(skel, (x, y), clearance, 0, -1)
     # Preserve genuinely different routes between the same pair of vertices.
     # Duplicate forward/reverse traces of one stroke must NOT become multiedges.
     path_variants = {}
@@ -750,12 +770,15 @@ def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False,consistent
         return cv_result
     try:
         rgb = _decode(image_bytes)
+        with Image.open(io.BytesIO(image_bytes)) as source:
+            native_size=ImageOps.exif_transpose(source).size
+        marker_scale=min(rgb.shape[1]/native_size[0],rgb.shape[0]/native_size[1])
         result = dict(cv_result)
         candidates = []
         for graph in (cv_result.get('graphs') or [])[:MAX_GRAPHS]:
             if not isinstance(graph, dict):
                 continue
-            traces = _graph_candidates(rgb, graph,dense_paths=dense_paths,consistent_paper=consistent_paper)
+            traces = _graph_candidates(rgb, graph,dense_paths=dense_paths,consistent_paper=consistent_paper,marker_scale=marker_scale)
             if traces:
                 # The arrow result is evidence, not an accepted direction.
                 try:

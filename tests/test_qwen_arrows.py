@@ -82,6 +82,24 @@ def test_a_weak_native_head_keeps_its_direction_open_for_local_review():
     assert output[plan['items'][0]['graph_index']]['edges'][0]['direction']=='unknown'
 
 
+def test_measurements_of_one_head_cannot_certify_two_different_edge_instances():
+    from graph_qwen_arrows import _merge_head_scales
+    item={'graph_index':0,'id':'first','head_center':[100,80],'axis_resolved':True,'axis_skew':.3}
+    other={**item,'id':'second','head_center':[101,80]}
+    large={'items':[item]};small={'items':[other]};before=copy.deepcopy((large,small))
+    result=_merge_head_scales(large,small)
+    assert len(result)==2 and all(not p['axis_resolved'] and p['shared_native_head_conflict'] for p in result)
+    assert (large,small)==before
+
+
+def test_contradicting_scales_keep_the_same_edge_unresolved():
+    from graph_qwen_arrows import _merge_head_scales
+    item={'graph_index':0,'id':'edge','head_center':[100,80],'axis_resolved':True,'axis_skew':.3}
+    result=_merge_head_scales({'items':[item]},{'items':[{**item,'axis_skew':-.3}]})
+    assert len(result)==1 and result[0]['id']=='edge'
+    assert not result[0]['axis_resolved'] and result[0]['scale_direction_conflict']
+
+
 def test_self_loop_does_not_block_other_heads_and_keeps_its_attributes():
     image,graphs=scene();loop=copy.deepcopy(graphs[0]['edges'][0]);loop.update(id='loop',to='a',edge_label='x',direction='forward')
     graphs[0]['edges'].append(loop);plan=prepare_arrows(image,graphs[:1]);output,weak=apply_native_arrows(plan)
@@ -122,3 +140,25 @@ def test_open_wings_touching_hollow_node_resolve_the_tip_and_preserve_edge_name(
     assert not weak and output[0]['edges'][0]['from']=='a'
     assert output[0]['edges'][0]['edge_label']=='s'
     assert output[0]['edges'][0]['evidence'][-1]['source']=='native_open_arrow_wings'
+
+
+def test_weighted_native_crop_preserves_every_instance_and_uses_connected_taper():
+    from graph_qwen_arrows import prepare_weighted_arrows
+    image=Image.new('RGB',(501,201),(185,180,170));draw=ImageDraw.Draw(image)
+    draw.line((50,100,450,100),fill='black',width=3)
+    draw.polygon([(220,100),(250,92),(250,108)],fill='black')
+    graph=canonical_graph({'id':'G','directed':True,'weighted':True,
+        'vertices':[{'id':'a','x':.1,'y':.5},{'id':'b','x':.9,'y':.5}],
+        'edges':[{'id':'physical','from':'a','to':'b','direction':'unknown','weight':7,
+                  'path':[[.1,.5],[.9,.5]]}]})
+    graph['node_position_evidence']=[{'vertex':k,'source':'measured','radius_pixels':11,
+        'marker_profile':'native_hollow_size_consensus'} for k in ('a','b')]
+    before=copy.deepcopy(graph);plan=prepare_weighted_arrows(image,[graph])
+    assert graph==before and plan is not None
+    assert [(p['id'],p['axis_resolved']) for p in plan['items']]==[('physical',True)]
+    native,unresolved=apply_native_arrows(plan)
+    assert not unresolved and native[0]['edges'][0]['from']=='b'
+    assert native[0]['edges'][0]['evidence'][-1]['source']=='native_connected_ink_width_taper'
+    result,notes=apply_arrows(plan,{'arrows':[{'key':plan['items'][0]['key'],'tip':'left'}]})
+    assert not notes and len(result[0]['edges'])==1
+    assert (result[0]['edges'][0]['from'],result[0]['edges'][0]['to'],result[0]['edges'][0]['weight'])==('b','a',7)

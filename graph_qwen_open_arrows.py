@@ -5,13 +5,13 @@ import numpy as np
 from graph_qwen_text_inventory import _key
 
 
-def _endpoint_wings(distance,node,other,path,radius,size):
+def _endpoint_wings(distance,node,other,path,radius,size,*,filled=False):
     width,height=size;line=np.asarray(path)*[width-1,height-1]
     if np.linalg.norm(line[0]-node)>np.linalg.norm(line[-1]-node):line=line[::-1]
     along=next((p for p in line if np.linalg.norm(p-node)>radius+14),other)
     tangent=along-node;tangent/=max(float(np.linalg.norm(tangent)),1e-9)
     normal=np.array([-tangent[1],tangent[0]]);best=(-1,None)
-    for advance in np.arange(max(1,radius-3),radius+17,1):
+    for advance in np.arange(radius+2 if filled else max(1,radius-3),radius+17,1):
         for offset in (-2,0,2):
             tip=node+tangent*advance+normal*offset
             for degrees in (25,35,45,55):
@@ -28,12 +28,13 @@ def _endpoint_wings(distance,node,other,path,radius,size):
     return best
 
 
-def prepare_open_arrows(image,graphs):
+def prepare_open_arrows(image,graphs,*,allow_filled=False):
     directed=[(i,g) for i,g in enumerate(graphs) if g['directed'] is True]
     if not directed or any(g['weighted'] is not False for _,g in directed):return None
     for _,g in directed:
         proof=g.get('node_position_evidence',[])
-        if len(proof)!=len(g['vertices']) or any(p.get('marker_profile')!='native_hollow_size_consensus' or not p.get('radius_pixels') for p in proof):return None
+        allowed=('native_hollow_size_consensus','native_filled_disk') if allow_filled else ('native_hollow_size_consensus',)
+        if len(proof)!=len(g['vertices']) or any(p.get('marker_profile') not in allowed or not p.get('radius_pixels') for p in proof):return None
     targets=[(i,g,e) for i,g in directed for e in g['edges'] if e['from']!=e['to']]
     if not 1<=len(targets)<=48 or any(not e['path'] for _,_,e in targets):return None
     from graph_line_tracer import _foreground
@@ -47,9 +48,10 @@ def prepare_open_arrows(image,graphs):
     for gi,g,e in targets:
         positions={v['id']:np.array([v['x']*(width-1),v['y']*(height-1)]) for v in g['vertices']}
         radii={p['vertex']:p['radius_pixels'] for p in g['node_position_evidence']}
+        filled={p['vertex']:p.get('marker_profile')=='native_filled_disk' for p in g['node_position_evidence']}
         a,b=positions[e['from']],positions[e['to']]
-        from_read=_endpoint_wings(distance,a,b,e['path'],radii[e['from']],image.size)
-        to_read=_endpoint_wings(distance,b,a,e['path'],radii[e['to']],image.size)
+        from_read=_endpoint_wings(distance,a,b,e['path'],radii[e['from']],image.size,filled=filled[e['from']])
+        to_read=_endpoint_wings(distance,b,a,e['path'],radii[e['to']],image.size,filled=filled[e['to']])
         resolved=max(from_read[0],to_read[0])>=.875 and abs(from_read[0]-to_read[0])>=.25
         chosen=from_read if from_read[0]>to_read[0] else to_read
         tip=chosen[1]['tip'];x,y=map(round,tip);tangent=(b-a)/max(float(np.linalg.norm(b-a)),1e-9)

@@ -394,6 +394,48 @@ def _rebase_refined_paths(graphs, before):
     return graphs
 
 
+def recover_native_inventory(image,response):
+    """Keep valid semantic observations only when native geometry replaces ALL.
+
+    An overlong or out-of-frame model path must not spend the last call on
+    regenerating an otherwise usable inventory. The strict decoder remains
+    unchanged; this recovery requires complete, uniquely assigned real circles.
+    """
+    from graph_qwen_coordinates import decode_inventory
+    if not isinstance(response,dict) or response.get('coordinate_space')!='original_1000':return None
+    raw=response.get('graphs')
+    if not isinstance(raw,list) or not raw or any(not isinstance(g,dict) or g.get('weighted') is not True for g in raw):return None
+    value=copy.deepcopy(response)
+    try:
+        nodes=[v for g in value['graphs'] for v in g['vertices']]
+        if not nodes or len(nodes)>48:return None
+        for v in nodes:
+            if any(isinstance(v[k],bool) or not isinstance(v[k],(int,float)) or not math.isfinite(v[k]) or not 0<=v[k]<=2000 for k in ('x','y')):return None
+        scale=[max(1000,max(v[k] for v in nodes)) for k in ('x','y')]
+        for g in value['graphs']:
+            g['bbox']=[a*1000/scale[i%2] for i,a in enumerate(g['bbox'])]
+            for v in g['vertices']:
+                for i,k in enumerate(('x','y')):v[k]*=1000/scale[i]
+            positions={v['id']:[v['x'],v['y']] for v in g['vertices']}
+            for e in g['edges']:
+                e['path']=[positions[e['from']],positions[e['to']]]
+                e['weight_bbox']=None
+        graphs=decode_inventory(value)
+        for g in graphs:
+            for e in g['edges']:
+                e['path']=[]
+                for proof in e['evidence']:
+                    if proof.get('source')=='qwen_image_read':
+                        proof['source']='qwen_semantic_inventory_without_geometry';proof['observed_path']=[]
+        graphs=anchor_inventory(image,graphs)
+    except (ValueError,TypeError,KeyError,OverflowError):return None
+    if any(len(g.get('node_position_evidence',[]))!=len(g['vertices']) or any(
+            p.get('source')!='circular_pixel_marker_global_unique' or p.get('marker_profile')!='native_hollow_size_consensus'
+            for p in g.get('node_position_evidence',[])) for g in graphs):return None
+    for g in graphs:g['node_review']['native_geometry_protocol_recovery']=True
+    return graphs
+
+
 def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
     """Use exact marker counts and a separated global assignment, or abstain.
 
@@ -416,9 +458,15 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
         markers=[{'x':x/(image.width-1),'y':y/(image.height-1),'radius_pixels':r} for x,y,r,_ in black]
     rings=connected_ring_markers(image)
     if len(rings)==len(nodes):markers=rings
-    else:
-        from graph_qwen_ring_markers import ring_markers
+    if len(rings)!=len(nodes) or all(g['weighted'] is True for g in graphs):
+        from graph_qwen_ring_markers import ring_markers,refine_surplus_rings,complete_ring_subset
         scaled_rings=ring_markers(image)
+        if len(scaled_rings)<len(nodes):
+            completed=complete_ring_subset(image,scaled_rings,rings,len(nodes))
+            if completed is not None:scaled_rings=completed
+        if all(g['weighted'] is True for g in graphs) and len(scaled_rings)>len(nodes):
+            selected=refine_surplus_rings(image,scaled_rings,len(nodes))
+            if selected is not None:scaled_rings=selected
         if len(scaled_rings)==len(nodes):markers=scaled_rings
     from graph_qwen_gradient_markers import gradient_markers
     shaded=gradient_markers(image)
@@ -551,14 +599,18 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
                 'radius_pixels':p.get('radius_pixels'),
                 'marker_profile':p.get('marker_profile'),
                 'component_bbox':p.get('component_bbox'),
+                **{k:p[k] for k in ('native_pool_size_before_filter','native_external_radius_pixels') if k in p},
                 'exact_inventory_count': True, 'alternative_cost_margin_min': .015})
             v['x'], v['y'] = p['x'], p['y']
         offset += len(g['vertices'])
         g['node_position_evidence'] = observations
         g['node_review']['position_alignment'] = 'exact_inventory_global_unique'
+        rejected=next((p['native_rejected_holes'] for p in markers if p.get('native_rejected_holes')),None)
+        if rejected:g['node_review']['rejected_native_holes']=copy.deepcopy(rejected)
         positions = {v['id']: [v['x'], v['y']] for v in g['vertices']}
         for e in g['edges']:
             path = e['path']
+            if not path:continue
             a, b = old_positions[e['from']], old_positions[e['to']]
             if math.dist(path[0], a)+math.dist(path[-1], b) > math.dist(path[0], b)+math.dist(path[-1], a):
                 a, b = b, a
@@ -598,7 +650,7 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
     return graphs
 
 
-def bind_measured_routes(graph, traces, ink):
+def bind_measured_routes(graph, traces, ink, *, fine_ink=None):
     """Keep identities; bind only unweighted, unlabeled instances to real ink.
 
     Never transfer a weight between different paths of a parallel pair. The
@@ -612,6 +664,8 @@ def bind_measured_routes(graph, traces, ink):
         by_pair[tuple(sorted((e['from'], e['to'])))].append(e)
     for trace in traces:
         path = copy.deepcopy(trace['path'])
+        if fine_ink is not None and trace.get('style') in ('dashed','dotted') and connected_fine_ink(path,fine_ink):
+            trace['native_prior_style']=trace['style'];trace['style']='solid'
         a, b = nodes[trace['from']], nodes[trace['to']]
         if math.dist(path[0], a)+math.dist(path[-1], b) > math.dist(path[0], b)+math.dist(path[-1], a):
             a, b = b, a
@@ -620,6 +674,9 @@ def bind_measured_routes(graph, traces, ink):
         # 2.5px here discarded its genuine thin diagonal (99.5% coverage).
         tolerance=3.5 if trace.get('method')=='opencv_straight_line_coverage' else 2.5
         proof = _ink_support(path, ink, trace.get('style'), source='qwen',tolerance_pixels=tolerance)
+        if proof is None and trace.get('native_dash_certificate'):
+            from graph_qwen_dashes import dash_support
+            proof=dash_support(path,ink)
         if proof is not None and not _intermediate_nodes(path, trace, graph['vertices']):
             if trace.get('style') not in ('solid','dashed','dotted') and proof['continuous']:
                 trace['style']='solid'
@@ -640,9 +697,14 @@ def bind_measured_routes(graph, traces, ink):
             e = edges[a[1]]
             trace, path, proof = choices[b[1]]
             e['path'] = copy.deepcopy(path)
-            if e['style'] in ('dashed','dotted') and trace.get('style')=='solid' and strict_solid_ink(path,ink):
+            if trace.get('native_dash_certificate'):
+                e['evidence'].append({'source':'original_native_repeated_gaps',
+                    'prior_style':e['style'],**copy.deepcopy(trace['native_dash_certificate'])})
+                e['style']=trace['style']
+            fine_continuous=fine_ink is not None and connected_fine_ink(path,fine_ink)
+            if e['style'] in ('dashed','dotted') and trace.get('style')=='solid' and (strict_solid_ink(path,ink) or fine_continuous):
                 e['evidence'].append({'source':'native_contiguous_stroke_style',
-                    'prior_style':e['style'],'raw_native_gap_pixels':0})
+                    'prior_style':e['style'],'raw_native_gap_pixels':0,'fine_antialias_pixels':bool(fine_continuous)})
                 e['style']='solid'
             if e['style'] == 'unknown' and trace.get('style') in ('solid', 'dashed', 'dotted'):
                 e['style'] = trace['style']
@@ -651,6 +713,25 @@ def bind_measured_routes(graph, traces, ink):
                                  'measurement_tolerance_pixels':3.5 if trace.get('method')=='opencv_straight_line_coverage' else 2.5,
                                  'trace_path':copy.deepcopy(trace['path'])})
     return graph
+
+
+def connected_fine_ink(path,ink):
+    """An actual connected antialiased ridge, inside a three-pixel corridor."""
+    import cv2,numpy as np
+    from graph_relation import _samples
+    height,width=ink.shape;route=np.asarray(path)*[width-1,height-1]
+    length=float(np.linalg.norm(np.diff(route,axis=0),axis=1).sum())
+    if not 16<=length<=1000:return False
+    points=np.asarray(_samples(route.tolist(),max(80,math.ceil(length*2))))
+    trim=max(2,round(len(points)*.07));points=points[trim:-trim]
+    if not len(points):return False
+    mask=np.zeros_like(ink);cv2.polylines(mask,[np.rint(points).astype('int32')],False,255,3)
+    _,components=cv2.connectedComponents(np.uint8((ink>0)&(mask>0)),8)
+    ends=[]
+    for x,y in np.rint(points[[0,-1]]).astype('int32'):
+        values=components[max(0,y-2):min(height,y+3),max(0,x-2):min(width,x+3)]
+        ends.append(set(int(v) for v in values.ravel() if v))
+    return bool(ends[0]&ends[1])
 
 
 def strict_solid_ink(path,ink):

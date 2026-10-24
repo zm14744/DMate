@@ -38,6 +38,16 @@ def test_exact_separated_marker_inventory_recovers_out_of_bounds_vertex():
     assert all(e['source']!='node_read' for e in anchored['edges'][0]['evidence'])
 
 
+def test_coordinate_free_edge_is_preserved_while_anchoring_its_vertices():
+    graph=make_graph();graph['edges'][0]['path']=[]
+    def measured(image,graphs,*,candidate_sink=None,**kw):
+        if candidate_sink is not None:candidate_sink.extend([{'x':.25,'y':.5},{'x':.9,'y':.5}])
+        return graphs
+    result=anchor_inventory(Image.new('RGB',(1000,500),'white'),[graph],refiner=measured)[0]
+    assert result['edges'][0]['id']=='ab' and result['edges'][0]['path']==[]
+    assert [v['x'] for v in result['vertices']]==[.25,.9]
+
+
 def test_equally_good_assignment_is_not_used_to_swap_node_labels():
     g=make_graph()
     g['vertices'][0].update(x=.5,y=.5)
@@ -322,3 +332,39 @@ def test_trace_cannot_pass_along_a_measured_intermediate_ring_rim():
     assert not kept and notes==['native_marker_rim_crossed:a:b']
     g['node_position_evidence'][2]['radius_pixels']=None
     assert validate_trace_markers([trace],g,(201,201))[0]==[trace]
+
+
+def protocol_recovery_scene():
+    image=Image.new('RGB',(501,301),(185,180,170));draw=ImageDraw.Draw(image)
+    points=[(100,60),(400,60),(250,240)]
+    draw.line(points+[points[0]],fill='black',width=3)
+    for x,y in points:draw.ellipse((x-12,y-12,x+12,y+12),fill=(185,180,170),outline='black',width=3)
+    response={'coordinate_space':'original_1000','graphs':[{'id':'G','name':'G','bbox':[0,0,1000,1000],
+        'directed':True,'weighted':True,'multigraph':False,'node_complete':True,
+        'vertices':[{'id':str(i),'label':chr(97+i),'x':x*2.4,'y':y/300*1000} for i,(x,y) in enumerate(points)],
+        'edges':[{'id':'ab','from':'0','to':'1','direction':'forward','weight':7,'style':'solid',
+                  'path':[[240,200]]*10}]}]}
+    return image,response
+
+
+def test_bad_model_geometry_is_recovered_only_with_every_native_vertex():
+    from graph_qwen_geometry import recover_native_inventory
+    from graph_qwen_coordinates import decode_inventory
+    import pytest
+    image,response=protocol_recovery_scene();before=copy.deepcopy(response)
+    with pytest.raises(ValueError):decode_inventory(response)
+    graphs=recover_native_inventory(image,response)
+    assert graphs is not None and response==before
+    assert [(v['label'],round(v['x'],2),round(v['y'],2)) for v in graphs[0]['vertices']]==[
+        ('a',.2,.2),('b',.8,.2),('c',.5,.8)]
+    edge=graphs[0]['edges'][0]
+    assert (edge['id'],edge['from'],edge['to'],edge['weight'],edge['path'])==('ab','0','1',7,[])
+    assert all(p['source']=='circular_pixel_marker_global_unique' for p in graphs[0]['node_position_evidence'])
+
+
+def test_native_geometry_recovery_cannot_hide_semantic_errors_or_missing_circles():
+    from graph_qwen_geometry import recover_native_inventory
+    image,response=protocol_recovery_scene();bad=copy.deepcopy(response)
+    bad['graphs'][0]['edges'][0]['to']='invented'
+    assert recover_native_inventory(image,bad) is None
+    assert recover_native_inventory(Image.new('RGB',image.size,'white'),response) is None

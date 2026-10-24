@@ -31,6 +31,7 @@ def prepare_local_text(image,graphs,*,force=False):
         return None
     items=[];width,height=image.size
     for gi,g in enumerate(graphs):
+        if g.get('node_review',{}).get('native_candidate_missing_labels'):continue
         if not any(e['edge_label'] is None for e in g['edges']):continue
         rebind=bool(g.get('node_review',{}).get('unsupported_edge_proposals')) and any(e['edge_label'] is not None for e in g['edges'])
         anchors=g.get('node_position_evidence',[])

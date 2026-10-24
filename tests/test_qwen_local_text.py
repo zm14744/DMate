@@ -68,3 +68,22 @@ def test_touching_word_expansion_preserves_existing_full_word_and_ambiguity():
     assert result['box']==complete['box'] and result['native_line_separated']
     assert _refine_touching_glyph(complete,[unrelated]) is complete
     assert _refine_touching_glyph(partial,[complete,dict(complete)]) is partial
+
+
+def test_missing_native_node_name_is_read_without_replacing_grounded_names():
+    from PIL import Image,ImageDraw
+    from graph_qwen_local_text import prepare_local_text
+    image=Image.new('RGB',(400,160),'white');draw=ImageDraw.Draw(image)
+    draw.line((60,80,330,80),fill='black',width=1)
+    for x,label in ((60,'a'),(330,'b')):
+        draw.ellipse((x-5,75,x+5,85),fill='black');draw.text((x-3,60),label,fill='black')
+    graph=canonical_graph({'id':'g','directed':True,'weighted':False,'bbox':[0,0,1,1],
+        'vertices':[{'id':'x','label':'a','x':60/399,'y':80/159},
+                    {'id':'y','label':None,'x':330/399,'y':80/159}],
+        'edges':[{'id':'e','from':'x','to':'y','direction':'forward','path':[[60/399,80/159],[330/399,80/159]]}]})
+    graph['node_review']={'native_candidate_missing_labels':True}
+    plan=prepare_local_text(image,[graph])
+    assert [(x['kind'],x['id']) for x in plan['items']]==[('vertex_label','y')]
+    output=apply_local_text(plan,{'readings':[{'key':'A','text':'b'}]})
+    assert [v['label'] for v in output[0]['vertices']]==['a','b']
+    assert output[0]['edges'][0]==graph['edges'][0]

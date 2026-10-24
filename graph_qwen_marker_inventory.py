@@ -113,7 +113,7 @@ def recover_component_markers(image,graphs,context):
         key=component(point)
         if len(owners.get(key,()))!=1:continue
         i=next(iter(owners[key]));g=graphs[i]
-        if counts[i][key]<2 or any(v['label'] is not None for v in g['vertices']):continue
+        if counts[i][key]<2 or (not context.get('core_inventory') and any(v['label'] is not None for v in g['vertices'])):continue
         if sum(len(g['vertices']) for g in graphs)>=48:break
         v={'id':point['id'],'label':None,'x':point['x'],'y':point['y'],
            'isolated_confirmed':False}

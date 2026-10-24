@@ -45,6 +45,15 @@ def test_pale_sphere_interiors_are_not_hollow_markers():
     assert not ring_markers(image)
 
 
+def test_two_close_real_rings_are_not_merged_as_one_attachment_hole():
+    import numpy as np
+    from graph_qwen_ring_markers import _nearby_hole_fragments
+    image=Image.new('L',(160,120),0);draw=ImageDraw.Draw(image)
+    for x in (60,83):draw.ellipse((x-12,48,x+12,72),fill=255);draw.ellipse((x-5,55,x+5,65),fill=0)
+    points=[{'x':x/159,'y':60/119,'radius_pixels':10} for x in (60,83)]
+    assert _nearby_hole_fragments(points,np.asarray(image))==points
+
+
 def test_endpoint_ring_laps_do_not_create_a_second_stroke_instance():
     import numpy as np
     from graph_schema import canonical_graph

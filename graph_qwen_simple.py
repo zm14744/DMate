@@ -291,6 +291,9 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             if first_context is None and native_marker_first and native_disk_first:
                 from graph_qwen_disk_markers import disk_first_context
                 first_context=disk_first_context(image)
+            if first_context is None and native_marker_first and native_disk_first:
+                from graph_qwen_disk_markers import core_first_context
+                first_context=core_first_context(image)
             if first_context is None and native_broad_disk_first:
                 from graph_qwen_disk_markers import candidate_disk_context
                 first_context=candidate_disk_context(image)
@@ -305,7 +308,15 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                 diagnostics.append('native_disk_marker_first_candidate' if first_context.get('source') in ('native_small_filled_components','native_candidate_disk_components') else 'native_hollow_marker_first_candidate' if first_context.get('source')=='native_hollow_components' else 'native_shaded_marker_first_candidate')
             else:
                 initial=ask('INVENTORY',INVENTORY_PROMPT,[overview])
-                graphs=decode_inventory(initial)
+                try:
+                    graphs=decode_inventory(initial)
+                except ValueError as error:
+                    if str(error) not in ('invalid_qwen_path','invalid_qwen_coordinate','invalid_qwen_box'):raise
+                    from graph_qwen_geometry import recover_native_inventory
+                    graphs=recover_native_inventory(image,initial)
+                    if graphs is None:raise
+                    diagnostics.append('complete_native_geometry_protocol_recovery_without_call')
+                    emit('INVENTORY.native_geometry_recovery',reason=str(error),graphs=graphs)
         except (ValueError,RuntimeError) as exc:
             # Only complete-output protocol failures are recoverable here.
             # HTTP, identity, credentials, timeout and budget errors propagate.
@@ -337,6 +348,10 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             graphs,notes=recover_component_markers(image,graphs,marker_plan)
             diagnostics.extend(notes)
             emit('NODE.component_recovery',graphs=graphs)
+        from graph_qwen_disk_markers import reanchor_candidate_disks
+        graphs,reanchor_notes=reanchor_candidate_disks(image,graphs,marker_plan)
+        diagnostics.extend(reanchor_notes)
+        if reanchor_notes:emit('NODE.native_disk_core_reanchor',graphs=graphs)
         from graph_qwen_pixel_inventory import measured_anonymous_panels
         pixel_panels=measured_anonymous_panels(raw,graphs)
         if pixel_panels is not None:
@@ -401,7 +416,8 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         diagnostics.extend(component_notes)
         if component_notes:emit('NODE.component_inventory',graphs=graphs)
         measured_sources={'component_circle_inventory','qwen_initial_marker_selection',
-                          'qwen_recovery_marker_selection','measured_component_node_recovery'}
+                          'qwen_recovery_marker_selection','measured_component_node_recovery',
+                          'circular_pixel_marker_global_unique'}
         fully_measured=all(len(g.get('node_position_evidence',[]))==len(g['vertices'])
             and all(p.get('source') in measured_sources for p in g.get('node_position_evidence',[]))
             for g in graphs)
@@ -418,27 +434,44 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         emit('TRACE', panels=panels)
         from graph_glm_adapter import review_route_ink  # CPU-only original ink.
         ink = review_route_ink(image)
+        import cv2,numpy as np
+        gray=cv2.cvtColor(np.asarray(image),cv2.COLOR_RGB2GRAY)
+        fine_ink=None
+        if float(np.median(gray))>=245:
+            fine_ink=np.uint8(gray<248)*255
+            if fine_ink.shape!=ink.shape:fine_ink=cv2.resize(fine_ink,(ink.shape[1],ink.shape[0]),interpolation=cv2.INTER_NEAREST)
         from graph_qwen_geometry import validate_curve_tangents,coalesce_ink_routes,validate_trace_junctions,validate_trace_markers,trim_native_rim_paths,exclude_composite_loops
         for gid,paths in panels.items():
             native_graph=next(g for g in graphs if g['id']==gid)
             from graph_qwen_boundary_paths import boundary_paths
             exterior=boundary_paths(ink,native_graph,image.size)
-            paths=paths+exterior
+            from graph_qwen_native_curves import native_cubic_paths
+            cubics=native_cubic_paths(ink,native_graph,image.size)
+            from graph_qwen_dashes import dashed_photo_paths
+            from graph_line_tracer import _paper_gray
+            import numpy as np
+            dashes=dashed_photo_paths(ink,graphs,graphs.index(native_graph),image.size) if _paper_gray(np.asarray(image)) is not None else []
+            paths=paths+exterior+cubics+dashes
+            if dashes:
+                points=[point for trace in dashes for point in trace['path']]
+                a,b,c,d=native_graph['bbox'];native_graph['bbox']=[min(a,min(p[0] for p in points)),min(b,min(p[1] for p in points)),
+                    max(c,max(p[0] for p in points)),max(d,max(p[1] for p in points))]
             paths=trim_native_rim_paths(paths,native_graph,image.size)
             strict_rings=bool(native_graph.get('node_position_evidence')) and all(p.get('marker_profile')=='native_hollow_size_consensus' for p in native_graph['node_position_evidence'])
             panels[gid],notes=validate_curve_tangents(paths,ink,strict_native_continuity=strict_rings)
             regions=[]
-            if exterior:
+            native_large=bool(native_graph.get('node_review',{}).get('native_full_marker_rims'))
+            if exterior or native_large:
                 scale=min(ink.shape[1]/image.width,ink.shape[0]/image.height)
                 radii={p['vertex']:p.get('radius_pixels',0)*scale for p in native_graph['node_position_evidence']}
                 regions=[(v['x']*(ink.shape[1]-1),v['y']*(ink.shape[0]-1),radii[v['id']]) for v in native_graph['vertices']]
-            panels[gid],junction_notes=validate_trace_junctions(panels[gid],ink,acute_crossings=bool(exterior),node_regions=regions)
+            panels[gid],junction_notes=validate_trace_junctions(panels[gid],ink,acute_crossings=bool(exterior) or native_large,node_regions=regions)
             panels[gid],marker_notes=validate_trace_markers(panels[gid],next(g for g in graphs if g['id']==gid),image.size)
             panels[gid],loop_notes=exclude_composite_loops(panels[gid],native_graph,ink,image.size)
             panels[gid]=coalesce_ink_routes(panels[gid],ink)
             diagnostics.extend(notes+junction_notes+marker_notes+loop_notes)
         emit('TRACE.validated',panels=panels)
-        graphs = [bind_measured_routes(g, panels.get(g['id'], []), ink) for g in graphs]
+        graphs = [bind_measured_routes(g, panels.get(g['id'], []), ink,fine_ink=fine_ink) for g in graphs]
         for i,g in enumerate(graphs):
             graphs[i],notes=exclude_unmeasured_proposals(g,ink)
             diagnostics.extend(notes)
@@ -448,6 +481,41 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         for g in output:
             if g['weighted'] is True:locate_missing_weight_regions(image,g)
         emit('RELATE.initial', graphs=output)
+        if budget.remaining:
+            from graph_qwen_weight_glyphs import prepare_weight_glyphs,apply_weight_glyphs,WEIGHT_GLYPH_PROMPT
+            weighted_text=prepare_weight_glyphs(image,output)
+            if weighted_text is not None:
+                emit('WEIGHT_GLYPHS.plan',items=weighted_text['items'],sheet_size=weighted_text['sheet_size'])
+                from graph_qwen_arrows import prepare_weighted_arrows,apply_native_arrows,apply_arrows,arrow_subset,ARROW_PROMPT
+                weight_arrows=prepare_weighted_arrows(image,output)
+                if weight_arrows is not None:
+                    output,uncertain_weight_heads=apply_native_arrows(weight_arrows)
+                    weighted_text['graphs']=output
+                    emit('WEIGHT_ARROW_PIXELS.applied',graphs=output,items=weight_arrows['items'])
+                    weight_arrows=arrow_subset(image,weight_arrows,uncertain_weight_heads,output) if uncertain_weight_heads else None
+                images=[overview,weighted_text['image_url']]
+                prompt=WEIGHT_GLYPH_PROMPT+'\n'+json.dumps({'requests':[
+                    {'key':p['key'],'kind':p['kind']} for p in weighted_text['items']]},ensure_ascii=False)
+                if weight_arrows is not None:
+                    from graph_qwen_local_text import pack_uncertainty_sheets
+                    packed=pack_uncertainty_sheets(weighted_text,weight_arrows)
+                    images=[overview,packed['image_url']]
+                    emit('WEIGHT_GLYPHS.arrow_plan',items=weight_arrows['items'],sheet_size=packed['sheet_size'])
+                    prompt+='\n第二张上部 TEXT 是文字表，下部 ARROWS 是箭头表，两组 key 独立。'+ARROW_PROMPT.replace('第一张为原图上下文，第二张为从原图裁剪的箭头局部表格。','').replace('第二张','第二张下部 ARROWS')
+                    prompt+='\n合并为唯一JSON对象 {"readings":[{"key":"对应文字key","text":"实际文字"}],"arrows":[{"key":"对应箭头key","tip":"left"}]}。箭头requests='+json.dumps([{'key':p['key']} for p in weight_arrows['items']])
+                budget.call_seconds=min(budget.call_seconds,45)
+                try:
+                    response=ask('WEIGHT_GLYPHS',prompt,images)
+                    output,notes=apply_weight_glyphs(weighted_text,response)
+                    diagnostics.extend(notes+['native_weight_literal_read_and_unique_binding'])
+                    if weight_arrows is not None:
+                        output,notes=apply_arrows({**weight_arrows,'graphs':output},response)
+                        diagnostics.extend(notes)
+                    emit('WEIGHT_GLYPHS.applied',graphs=output)
+                except (ValueError,RuntimeError,TimeoutError) as exc:
+                    diagnostics.append('single_text_batch_failed:'+type(exc).__name__)
+                    emit('WEIGHT_GLYPHS.rejected',reason=str(exc)[:80])
+                return finish(output)
         from graph_qwen_figure_review import prepare_figure_review,apply_figure_review,FIGURE_PROMPT
         native_figure=prepare_figure_review(image,output) if budget.remaining else None
         if native_figure is not None:
