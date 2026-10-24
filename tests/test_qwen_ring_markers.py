@@ -23,6 +23,20 @@ def test_solid_disks_and_unmarked_crossings_do_not_create_hollow_markers():
     assert not ring_markers(image)
 
 
+def test_a_stroke_splitting_one_white_centre_does_not_erase_its_ring():
+    image=Image.new('RGB',(420,300),'white');draw=ImageDraw.Draw(image)
+    nodes=[(70,70),(330,70),(70,230),(330,230)]
+    draw.rectangle((70,70,330,230),outline='black',width=3)
+    draw.line((nodes[0],nodes[3]),fill='black',width=2)
+    draw.line((nodes[1],nodes[2]),fill='black',width=2)
+    for x,y in nodes:draw.ellipse((x-12,y-12,x+12,y+12),fill='white',outline='black',width=4)
+    draw.line((310,230,330,230,330,210),fill='black',width=4)
+    points=ring_markers(image)
+    assert len(points)==4
+    assert any('native_fragmented_ring_rim' in p for p in points)
+    assert all(min((p['x']*419-x)**2+(p['y']*299-y)**2 for x,y in nodes)<5 for p in points)
+
+
 def test_pale_sphere_interiors_are_not_hollow_markers():
     image=Image.new('RGB',(400,240),'white');draw=ImageDraw.Draw(image)
     draw.rectangle((70,60,300,180),outline='black',width=3)

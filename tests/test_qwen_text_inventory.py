@@ -41,3 +41,12 @@ def test_unordered_text_reads_bind_to_measured_ids_without_rewriting_geometry():
 def test_duplicate_unknown_missing_or_nonfinite_readings_are_not_accepted(readings):
     with pytest.raises(ValueError):
         apply_text_inventory(prepared(),{'readings':readings})
+
+
+def test_explicit_native_selection_is_not_rebuilt_from_all_text_holes(monkeypatch):
+    import graph_qwen_text_inventory as module
+    graph=prepared()['graphs'][0]
+    graph['node_position_evidence']=[{'vertex':v['id'],'source':'qwen_recovery_marker_selection'} for v in graph['vertices']]
+    def unexpected(_):raise AssertionError('discarded explicit marker selection')
+    monkeypatch.setattr(module,'connected_ring_markers',unexpected)
+    assert module.prepare_text_inventory(b'',None,[graph]) is None

@@ -45,7 +45,40 @@ def ring_markers(image):
             'isolated_circle_candidate':bool(isolated),'marker_profile':'native_hollow_size_consensus'})
     if not points:return []
     common=float(np.median([p['radius_pixels'] for p in points]))
-    return [p for p in points if .7*common<=p['radius_pixels']<=1.4*common]
+    points=[p for p in points if .7*common<=p['radius_pixels']<=1.4*common]
+    if paper is None:
+        points=_fragmented_rings(gray,contours,points,common)
+    return points
+
+
+def _fragmented_rings(gray,contours,points,common):
+    """A crossing stroke can split a true white centre into non-round holes."""
+    from collections import Counter
+    height,width=gray.shape;counts=Counter(p['component'] for p in points)
+    parents=[key for key,n in counts.items() if isinstance(key,int) and n>=3]
+    if not parents:return points
+    circles=cv2.HoughCircles(gray,cv2.HOUGH_GRADIENT,1,max(6,common),param1=100,param2=10,
+        minRadius=max(3,round(common*.6)),maxRadius=math.ceil(common*1.4))
+    if circles is None:return points
+    angles=np.linspace(0,2*np.pi,96,endpoint=False);output=list(points)
+    for xx,yy,rr in circles[0]:
+        x,y,r=map(float,(xx,yy,rr))
+        if any(math.hypot(x-p['x']*(width-1),y-p['y']*(height-1))<common*1.5 for p in output):continue
+        owners=[key for key in parents if cv2.pointPolygonTest(contours[key],(x,y),False)>=0]
+        if len(owners)!=1:continue
+        samples=[]
+        for factor in (.35,.95,1.45):
+            xs=np.clip(np.rint(x+r*factor*np.cos(angles)).astype('int32'),0,width-1)
+            ys=np.clip(np.rint(y+r*factor*np.sin(angles)).astype('int32'),0,height-1)
+            samples.append(float(np.mean(gray[ys,xs]<180)))
+        # This repair is for a centre split by actual intrusion. An entirely
+        # empty circular-looking face between several edges is not a marker.
+        if samples[1]<.8 or not .15<=samples[0]<=.6 or samples[2]>.5:continue
+        parent=owners[0];prior=next(p for p in points if p['component']==parent)
+        output.append({'x':x/(width-1),'y':y/(height-1),'radius_pixels':r,'component':parent,
+            'component_bbox':prior['component_bbox'],'marker_profile':'native_hollow_size_consensus',
+            'isolated_circle_candidate':False,'native_fragmented_ring_rim':samples})
+    return output
 
 
 def attach_isolated_frames(points,graphs,image_size):

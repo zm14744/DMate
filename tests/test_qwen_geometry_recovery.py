@@ -51,6 +51,23 @@ def test_equally_good_assignment_is_not_used_to_swap_node_labels():
     assert 'node_position_evidence' not in result
 
 
+def test_figure_disk_inventory_excludes_large_heading_ink_and_keeps_isolate():
+    image=Image.new('RGB',(1000,700),'white');draw=ImageDraw.Draw(image)
+    points=[(200,300),(500,300),(800,300),(200,550),(500,550),(800,550)]
+    draw.line(points[:3],fill='black',width=3)
+    draw.line((points[0],points[3],points[4],points[1]),fill='black',width=3)
+    for x,y in points:draw.ellipse((x-12,y-12,x+12,y+12),fill='black')
+    for x in (150,450,750):draw.ellipse((x-25,65,x+25,115),fill='black')
+    graph=canonical_graph({'id':'g','bbox':[.1,.35,.9,.9],
+        'vertices':[{'id':str(i),'x':x/999,'y':y/699} for i,(x,y) in enumerate(points)]})
+    graph['node_review']={}
+    def abstain(image,graphs,**kw):return graphs
+    result=anchor_inventory(image,[graph],refiner=abstain)[0]
+    assert len(result['node_position_evidence'])==6
+    assert all(p['source']=='circular_pixel_marker_global_unique' for p in result['node_position_evidence'])
+    assert all(math.dist((v['x']*999,v['y']*699),p)<1 for v,p in zip(result['vertices'],points))
+
+
 def test_dense_opt_in_preserves_thin_arc_which_ten_samples_cut_across():
     path=[(300+200*math.cos(t),240-200*math.sin(t)) for t in np.linspace(math.pi,0,1000)]
     legacy=_sample_path(path,600,300)

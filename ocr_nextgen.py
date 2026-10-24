@@ -18,24 +18,34 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
     if graph_pipeline=='qwen-simple-candidate':
         from graph_qwen_simple import recognize_simple
         engine=recognize_simple
-        version='qwen-simple-candidate-v34'
+        version='qwen-simple-candidate-v40'
     layout=text_result.get('layout') or {}
     budget=Budget(seconds=140,calls=2,call_seconds=75) if graph_pipeline!='staged' else Budget()
     try:
         result=engine(raw,layout=layout.get('regions',[]),provider=vision_provider,
                                budget=budget,audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1')
         if not result['graphs']:raise ValueError('empty_graph_inventory')
-    except (ValueError,RuntimeError,TimeoutError) as exc:
+    except Exception as exc:
         # Return a diagnosed failure, so /ocr cannot silently start another
         # legacy vision pipeline outside the already spent graph budget.
-        return {'error':'本次图形结构识别未完成，请核对原图。',
-                'graph_display_version':version,
-                'diagnostics':{'stages':['graph_pipeline_failed'],
-                               'remote_metrics':budget.metrics,
-                               'resource_metrics':text_result.get('resource_metrics',[]),
-                               **({'stage_audit':exc.graph_stage_audit} if
-                                  os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1'
-                                  and hasattr(exc,'graph_stage_audit') else {})}}
+        return _failed_graph_result(exc,version,budget,text_result)
+    try:
+        return _render_graph_result(raw,text_result,result,version,layout)
+    except Exception as exc:
+        return _failed_graph_result(exc,version,budget,text_result,stage_audit=result.get('stage_audit'))
+
+
+def _failed_graph_result(exc,version,budget,text_result,*,stage_audit=None):
+    failure={'error':'本次图形结构识别未完成，请核对原图。','graph_display_version':version,
+        'diagnostics':{'stages':['graph_pipeline_failed'],'failure_kind':type(exc).__name__,
+            'remote_metrics':budget.metrics,'resource_metrics':text_result.get('resource_metrics',[])}}
+    evidence=getattr(exc,'graph_stage_audit',stage_audit)
+    if os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1' and evidence is not None:
+        failure['diagnostics']['stage_audit']=evidence
+    return failure
+
+
+def _render_graph_result(raw,text_result,result,version,layout):
     graphs=result['graphs']
     text=text_result.get('text') or ''
     # If layout failed, use Qwen's explicit graph bounds to partition Small's

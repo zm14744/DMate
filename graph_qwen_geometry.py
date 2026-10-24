@@ -429,6 +429,23 @@ def anchor_inventory(image, graphs, *, refiner=refine_node_positions):
     if len(markers)!=len(nodes):
         filled=gradient_markers(image,include_uniform=True)
         if len(filled)==len(nodes):markers=filled
+    if len(markers)!=len(nodes) and len(graphs)==1:
+        # Large headings can dominate a global disk-size consensus. Use the
+        # observed figure window only when its COMPLETE disk count matches;
+        # attached thin strokes may need opening scaled to the measured disks.
+        a,b,c,d=graphs[0]['bbox'];left=max(0,math.floor(a*(image.width-1)))
+        top=max(0,math.floor(b*(image.height-1)));right=min(image.width,math.ceil(c*(image.width-1))+1)
+        bottom=min(image.height,math.ceil(d*(image.height-1))+1)
+        gray=cv2.cvtColor(np.asarray(image),cv2.COLOR_RGB2GRAY)
+        local=_black_disk_centers(gray[top:bottom,left:right])
+        if local and len(local)!=len(nodes):
+            radius=float(np.median([p[2] for p in local]));size=max(3,round(radius*.75))
+            size+=1-size%2
+            local=_black_disk_centers(gray[top:bottom,left:right],opening_size=size)
+        if len(local)==len(nodes):
+            markers=[{'x':(x+left)/(image.width-1),'y':(y+top)/(image.height-1),
+                'radius_pixels':r,'marker_profile':'native_filled_disk',
+                'native_region':[left,top,right,bottom]} for x,y,r,_ in local]
     if len(markers)!=len(nodes):
         # Saturated circles joined to same-colour strokes can disappear from
         # the broad Hough pool. The existing hue-separated detector measures

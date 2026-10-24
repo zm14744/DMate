@@ -71,6 +71,12 @@ def prepare_text_inventory(raw,image,observed):
     if not observed or any(g['weighted'] is not True or g['directed'] is not False
                            or any(v['isolated_confirmed'] for v in g['vertices']) for g in observed):
         return None
+    # An explicit native marker selection already separates real circles from
+    # round text counters. Rebuilding from every hole would put rejected glyphs
+    # back into the graph and discard the model's measured vertex identities.
+    if all(len(g.get('node_position_evidence',[]))==len(g['vertices']) and
+           all(p.get('source') in ('qwen_recovery_marker_selection','measured_component_node_recovery') for p in g['node_position_evidence'])
+           for g in observed):return None
     groups=defaultdict(list)
     for p in connected_ring_markers(image):groups[p['component']].append(p)
     if len(groups)!=len(observed) or not all(3<=len(v)<=30 for v in groups.values()):return None

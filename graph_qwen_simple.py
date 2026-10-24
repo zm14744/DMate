@@ -229,7 +229,7 @@ def _node_ambiguities(graph, image_size):
 
 
 def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=False, repair_inventory=True,
-                     native_marker_first=True,native_hollow_first=False):
+                     native_marker_first=True,native_hollow_first=False,native_disk_first=True,native_broad_disk_first=False):
     """At most two Qwen attempts, zero retries; measured text when supported."""
     if provider is not None and (getattr(provider, 'name', 'qwen') != 'qwen'
             or getattr(provider, 'model', QWEN_MODEL) != QWEN_MODEL or getattr(provider, 'retries', 0) != 0):
@@ -288,6 +288,12 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             if first_context is None and native_hollow_first:
                 from graph_qwen_ring_markers import hollow_first_context
                 first_context=hollow_first_context(image)
+            if first_context is None and native_marker_first and native_disk_first:
+                from graph_qwen_disk_markers import disk_first_context
+                first_context=disk_first_context(image)
+            if first_context is None and native_broad_disk_first:
+                from graph_qwen_disk_markers import candidate_disk_context
+                first_context=candidate_disk_context(image)
             if first_context is not None:
                 from graph_qwen_marker_inventory import MARKER_INVENTORY_PROMPT,decode_marker_inventory
                 emit('INVENTORY.native_markers',markers=first_context['markers'],context_source=first_context.get('source'))
@@ -296,7 +302,7 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     [overview,_data_url(first_context['image'])])
                 graphs=decode_marker_inventory(initial,first_context,image.size)
                 marker_plan=first_context
-                diagnostics.append('native_hollow_marker_first_candidate' if first_context.get('source')=='native_hollow_components' else 'native_shaded_marker_first_candidate')
+                diagnostics.append('native_disk_marker_first_candidate' if first_context.get('source') in ('native_small_filled_components','native_candidate_disk_components') else 'native_hollow_marker_first_candidate' if first_context.get('source')=='native_hollow_components' else 'native_shaded_marker_first_candidate')
             else:
                 initial=ask('INVENTORY',INVENTORY_PROMPT,[overview])
                 graphs=decode_inventory(initial)
@@ -562,7 +568,7 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
             else:
                 diagnostics.append('single_review_no_full_route_or_attribute_region')
         return finish(output)
-    except (ValueError, RuntimeError, TimeoutError) as exc:
+    except Exception as exc:
         if audit:
             emit('PIPELINE.failed', kind=type(exc).__name__, reason=str(exc)[:80])
             exc.graph_stage_audit = events
