@@ -217,6 +217,31 @@ def _call(prompt, images, budget):
     return qwen_call(prompt, images, budget)
 
 
+def _review_decisions(rows, allowed, graph_id):
+    """An ID alone, or last-wins duplicates, never certifies an inventory."""
+    if not isinstance(rows,list):
+        return {},False
+    decisions={}; seen=set(); invalid=set(); complete=True
+    for row in rows:
+        if not isinstance(row,dict):
+            complete=False; continue
+        eid=row.get('id')
+        if not isinstance(eid,str) or eid not in allowed:
+            complete=False; continue
+        if eid in seen:
+            invalid.add(eid); complete=False; continue
+        seen.add(eid)
+        if (row.get('graph_id',graph_id)!=graph_id
+                or type(row.get('visible')) is not bool
+                or (row['visible'] and row.get('direction') not in
+                    ('forward','reverse','undirected','unknown'))):
+            invalid.add(eid); complete=False; continue
+        decisions[eid]=row
+    for eid in invalid:
+        decisions.pop(eid,None)
+    return decisions,bool(complete and allowed and set(decisions)==allowed)
+
+
 def merge_node_reads(graph, reads, *, shared_observations=False):
     """Fuse reciprocal reads only when their actual paths overlap.
 
@@ -476,6 +501,14 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         qwen_ink=review_route_ink(image)
     output=[recover_relations(g,panels.get(g['id'],[])) for g in graphs]
     initial_candidates={g['id']:copy.deepcopy(output[i]['_candidates']) for i,g in enumerate(graphs)}
+    candidate_evidence={}
+    if qwen_profile:
+        for i,graph in enumerate(graphs):
+            # Include pixel-only candidates in path corrections and keep the
+            # ID/from/to contract fixed across both review passes. Preserve
+            # their pixel origin so freezing never upgrades them to VLM reads.
+            graph['edges']=copy.deepcopy(initial_candidates[graph['id']])
+            candidate_evidence[graph['id']]=output[i]['_candidate_evidence']
     reviews_by_graph={}
     specialist_context={}
     # Two bounded REVIEW calls must cover later panels as well as G1/G2.
@@ -528,12 +561,17 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             # Retain the single-panel response contract for existing clients.
             if reviewed is None and len(jobs)==1:
                 reviewed=[dict(verified,graph_id=jobs[0]['graph_id'])]
-            by_id={r.get('graph_id'):r for r in (reviewed or []) if isinstance(r,dict)}
+            by_id={}; duplicate_graphs=set()
+            for row in reviewed if isinstance(reviewed,list) else []:
+                if not isinstance(row,dict) or not isinstance(row.get('graph_id'),str): continue
+                gid=row['graph_id']
+                if gid in by_id: duplicate_graphs.add(gid)
+                by_id[gid]=row
+            for gid in duplicate_graphs: by_id.pop(gid,None)
             for index in indices:
                 graph=graphs[index]; current=by_id.get(graph['id'],{})
                 allowed=allowed_by_graph.get(graph['id'],set())
-                decisions={d['id']:d for d in (current.get('decisions') or [])
-                           if isinstance(d,dict) and d.get('id') in allowed}
+                decisions,decisions_complete=_review_decisions(current.get('decisions'),allowed,graph['id'])
                 if experimental:
                     missing=sum('path' not in d or 'style' not in d for d in decisions.values())
                     if missing:diagnostics.append(f'glm_review_fields_missing:{missing}')
@@ -541,7 +579,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                     if omitted:diagnostics.append(f'glm_review_missing_candidates:{len(omitted)}')
                 reviews_by_graph[graph['id']]=decisions
                 graph['inventory_reviewed']=bool(current.get('inventory_complete') is True
-                    and allowed and set(decisions)==allowed and len(output[index]['_candidates'])<=48)
+                    and decisions_complete and len(output[index]['_candidates'])<=48)
                 if qwen_profile:
                     from graph_qwen_review import receive_qwen_review
                     graph,decisions,notes=receive_qwen_review(
@@ -559,7 +597,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                         glm_ink=review_route_ink(image)
                     graph=receive_review_routes(graph,decisions,glm_ink)
                     graphs[index]=graph
-                output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions)
+                output[index]=recover_relations(graph,panels.get(graph['id'],[]),review=decisions,
+                    candidate_evidence=candidate_evidence.get(graph['id']))
                 if specialist is not None:
                     specialist_context[graph['id']]={'graph':copy.deepcopy(graph),
                         'traces':copy.deepcopy(panels.get(graph['id'],[])),
@@ -578,11 +617,39 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
         unresolved={e['id']:e for e in related['edges']
             if ((graph['directed'] is True and e['direction']=='unknown')
                 or (graph['weighted'] is True and e['weight'] is None))} if qwen_profile else {}
+        stroke_pairs=set()
+        if qwen_profile and not graph.get('inventory_reviewed'):
+            # Use the spare review for measured strokes the first review
+            # discarded without a selected route in the same ink corridor.
+            # Include ALL competing identities for a pair, not just a request
+            # to accept the rejected candidate. Pixel evidence is not an answer.
+            from graph_relation import _intermediate_nodes, _wrong_path_endpoints
+            selected=[e for e in related['edges'] if e['status']=='accepted']
+            for edge in graph['edges']:
+                origin=candidate_evidence[graph['id']].get(edge['id'],{})
+                decision=reviews_by_graph.get(graph['id'],{}).get(edge['id'],{})
+                if (origin.get('_pixel',0)<.8 or decision.get('visible') is not False
+                        or not edge['path'] or _wrong_path_endpoints(edge,graph['vertices'])
+                        or _intermediate_nodes(edge['path'],edge,graph['vertices'])): continue
+                pair=frozenset((edge['from'],edge['to']))
+                if not any(frozenset((e['from'],e['to']))==pair and e['path']
+                           and route_overlap(edge['path'],e['path'],tolerance=.025)>=.85 for e in selected):
+                    stroke_pairs.add(pair)
         missing_ids=({e['id'] for e in initial_candidates[graph['id']]}
                      -set(reviews_by_graph.get(graph['id'],{}))) if experimental else set()
         candidates=[]
-        for candidate in initial_candidates[graph['id']]:
-            if candidate['id'] in conflicts or candidate['id'] in unresolved or candidate['id'] in missing_ids:
+        focus_source=graph['edges'] if qwen_profile else initial_candidates[graph['id']]
+        # Prioritize the most ambiguous endpoint groups and admit each group
+        # whole. An oversized union must not discard every eligible group.
+        groups=[(pair,{e['id'] for e in focus_source
+                       if frozenset((e['from'],e['to']))==pair}) for pair in stroke_pairs]
+        stroke_pairs=set(); focus_ids=set()
+        for pair,ids in sorted(groups,key=lambda item:(-len(item[1]),sorted(item[0]))):
+            if len(ids | focus_ids | set(conflicts) | set(unresolved))<=8:
+                stroke_pairs.add(pair); focus_ids.update(ids)
+        for candidate in focus_source:
+            if (candidate['id'] in conflicts or candidate['id'] in unresolved
+                    or candidate['id'] in missing_ids or candidate['id'] in focus_ids):
                 # Retain the candidate's original endpoint order: forward and
                 # reverse in both reviews must refer to the same from/to pair.
                 candidate=copy.deepcopy(candidate)
@@ -624,6 +691,13 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                         '再次沿原始笔画看箭尖与数字；没有充分像素证据则继续unknown/null。')
                     detail=('沿真实独立笔画核对端点、重数与箭头，不把可达通路当单边。无箭头线写undirected。'
                             if experimental else '沿实际线迹找尖端；不要根据候选from/to排列顺序猜方向。')
+                    if stroke_pairs:
+                        purpose=('\n本轮复核同端点候选的真实独立笔画，第二张是同一原图的局部裁图。'
+                            '候选同时包含上轮保留和否定的线。沿原图逐条核对，每个ID恰好返回一条decision。'
+                            '相同笔画只保留一个ID；不同笔画保留各自ID。像素候选可能错误，不预设任何条数。'
+                            'visible=true时提供沿真实整条笔画的path和style，首尾使用固定顶点坐标。'
+                            '坐标仍属于完整原图。无法确认则visible=null；禁止按图名或数学性质补边。')
+                        diagnostics.append('focused_stroke_review')
                     verified=ask(review_prompt+purpose+detail+'仅返回decisions列表。\n'
                         +json.dumps(payload,ensure_ascii=False),[url,_data_url(image.crop((left,top,right,bottom)))],budget)
                     changes=verified.get('decisions')
@@ -632,15 +706,27 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
                                       if isinstance(r,dict) and r.get('graph_id')==graph['id']),[])
                     allowed={c['id'] for c in candidates}
                     review=dict(reviews_by_graph.get(graph['id'],{}))
-                    review.update({d['id']:d for d in (changes or []) if isinstance(d,dict) and d.get('id') in allowed
-                                   and (not experimental or d.get('graph_id',graph['id'])==graph['id'])})
+                    changed,changes_complete=_review_decisions(changes,allowed,graph['id'])
+                    if qwen_profile:
+                        from graph_glm_adapter import receive_review_routes
+                        graph=receive_review_routes(graph,changed,qwen_ink,source='qwen')
+                        if stroke_pairs:
+                            by_edge={e['id']:e for e in graph['edges']}
+                            for eid in focus_ids & set(changed):
+                                decision=changed[eid]; edge=by_edge[eid]
+                                route=path_points(decision.get('path'))
+                                evidence=edge.get('evidence') or [{}]
+                                if decision['visible'] and (not route or edge['path']!=route
+                                        or evidence[-1].get('source')!='qwen_review_route_verified'):
+                                    changed.pop(eid); changes_complete=False
+                                    diagnostics.append('focused_stroke_unverified_path')
+                    review.update(changed)
+                    if not changes_complete: graph['inventory_reviewed']=False
                     if adapted:
                         from graph_glm_adapter import receive_review_routes
                         graph=receive_review_routes(graph,review,glm_ink)
-                    elif qwen_profile:
-                        from graph_glm_adapter import receive_review_routes
-                        graph=receive_review_routes(graph,review,qwen_ink,source='qwen')
-                    output[0]=recover_relations(graph,panels.get(graph['id'],[]),review=review)
+                    output[0]=recover_relations(graph,panels.get(graph['id'],[]),review=review,
+                        candidate_evidence=candidate_evidence.get(graph['id']))
                     if specialist is not None:
                         specialist_context[graph['id']]={'graph':copy.deepcopy(graph),
                             'traces':copy.deepcopy(panels.get(graph['id'],[])),

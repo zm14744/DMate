@@ -329,7 +329,10 @@ def receive_review_routes(graph, decisions, ink, *, source='glm'):
     for edge in graph['edges']:
         decision=decisions.get(edge['id'],{})
         route=path_points(decision.get('path'))
-        if decision.get('visible') is not True or not route or len(route)>8:
+        # path_points already bounds the route to 128 points. A review may
+        # retain a measured CV polyline (often 10+ points); rejecting it solely
+        # for exceeding the prompt's suggested 8 points loses valid ink proof.
+        if decision.get('visible') is not True or not route:
             continue
         candidate={**edge,'path':route}
         if (_wrong_path_endpoints(candidate,graph['vertices'],tolerance=.02)
