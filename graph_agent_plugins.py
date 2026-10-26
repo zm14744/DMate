@@ -20,19 +20,20 @@ _ROLES = ('page_vertices', 'body_text', 'connections', 'attributes', 'structure_
 def build_image_tools(document, text_result, layout, budget):
     """The context holds pixels; JSON tools expose only measured results/refs."""
     from graph_evidence_pipeline import apply_topology, collect_candidates
-    from graph_marker_grounding import ground_nodes
+    from graph_marker_grounding import ground_nodes, marker_proposals
     from graph_panel_context import layout_hints
     from graph_review_views import build_review_sheet
-    from graph_text_evidence import reconcile_text, text_hints
+    from graph_text_evidence import text_hints
+    from graph_agent_roles import reconcile_role_text
 
     context = ToolContext(source_sha256=budget.source_sha256,
                           data={'document': document, 'text_result': text_result or {},
-                                'layout': layout or [], 'images': {}},
+                                'layout': layout or [], 'images': {}, 'marker_cache': {}},
                           deadline_monotonic=budget.deadline)
     registry = ToolRegistry()
 
     def register(name, description, schema, roles, handler, *, timeout=15):
-        registry.register(ToolSpec(name=name, version='2026-10-26-v1',
+        registry.register(ToolSpec(name=name, version='2026-10-26-v2',
             description=description, input_schema=schema, output_schema=_OBJECT,
             allowed_roles=tuple(roles), source_required=True, timeout_seconds=timeout), handler)
 
@@ -45,8 +46,29 @@ def build_image_tools(document, text_result, layout, budget):
     register('image.local_evidence', 'Read the existing local OCR and layout evidence, without reloading models.',
              _EMPTY, _ROLES, local_evidence)
 
+    def marker_hints(args, *, context):
+        proposals = marker_proposals(document)
+        context.data['marker_cache']['proposals'] = proposals
+        return {'version': proposals['version'], 'source_sha256': context.source_sha256,
+                'coordinate_space': 'original_1000', 'proposal_only': True,
+                'candidates': [{'id': row['id'], 'x': round(row['x']*1000, 3),
+                                'y': round(row['y']*1000, 3), 'kind': row['kind'],
+                                'radius_x': round(row['radius_pixels']/max(document.work_size[0]-1, 1)*1000, 3),
+                                'radius_y': round(row['radius_pixels']/max(document.work_size[1]-1, 1)*1000, 3),
+                                'confidence': round(row['confidence'], 4),
+                                'evidence_source': row['evidence'].get('source'),
+                                'advisory_only': row.get('advisory_only', False),
+                                'advisory_reason': row.get('advisory_reason'),
+                                'connected_stroke': row['connected_stroke']}
+                               for row in proposals['items']],
+                'limits': copy.deepcopy(proposals['limits'])}
+
+    register('image.marker_proposals', 'Measure bounded original-pixel marker hypotheses before visual vertex inventory.',
+             _EMPTY, ('page_vertices',), marker_hints)
+
     def markers(args, *, context):
-        graphs = ground_nodes(document, copy.deepcopy(args['graphs']))
+        graphs = ground_nodes(document, copy.deepcopy(args['graphs']),
+                              proposals=context.data['marker_cache'].get('proposals'))
         return {'graphs': graphs, 'proposal_only': True}
 
     register('image.marker_grounding', 'Attach existing vertex identities to unique original-pixel markers.',
@@ -102,7 +124,7 @@ def build_image_tools(document, text_result, layout, budget):
              ('connections', 'attributes', 'structure_review'), validate, timeout=25)
 
     def reconcile(args, *, context):
-        body, complete, audit = reconcile_text(args['first'], args['reviewed'],
+        body, complete, audit = reconcile_role_text(args['first'], args['reviewed'],
                          context.data['hints'], context.data['draft_graphs'])
         return {'body_text': body, 'body_complete': complete, 'body_audit': audit}
 

@@ -9,7 +9,7 @@ import pytest
 from graph_agent_roles import (
     RoleProtocolError, build_solver_input, decode_body_response,
     decode_review_response, decode_targeted_review, merge_attribute_response,
-    merge_body_response, validate_connection_response,
+    merge_body_response, reconcile_role_text, validate_connection_response,
 )
 
 
@@ -533,3 +533,248 @@ def test_whole_panel_box_cannot_authorize_an_attribute_rewrite():
     row.update(attributes={'weight': 9}, evidence=proof([v*1000 for v in g['bbox']]))
     with pytest.raises(RoleProtocolError, match='attribute_evidence_not_localized'):
         merge_attribute_response([g], response, revision=4)
+
+
+def test_located_regions_are_the_single_body_source_without_redundant_fields():
+    local = {'items': [], 'issues': [], 'local_status': 'unavailable'}
+    response = body_response('(1) 求 v₃ 的通路。\n(2) 计算 x²。', local=local)
+    response.pop('body_text'); response.pop('text_review')
+    original = copy.deepcopy(response)
+    result = decode_body_response(response, hints=local, revision=4)
+    assert response == original
+    assert result['body_complete'] and result['body_text'] == response['regions'][0]['text']
+    assert result['text_review']['text'] == result['body_text']
+    assert result['text_review']['regions'] == []
+    response.pop('body_complete')
+    with pytest.raises(RoleProtocolError, match='invalid_body_transcription'):
+        decode_body_response(response, hints=local, revision=4)
+
+
+@pytest.mark.parametrize('markup', [r'求 $v_3$ 并计算 \(x^2\)。', r'求 \[v_{3}\] 并计算 $$x^{2}$$。'])
+def test_body_format_equivalence_preserves_raw_region_spelling_and_indices(markup):
+    local = hints(markup)
+    response = body_response('求 v₃ 并计算 x²。', local=local)
+    response['body_text'] = markup
+    response['text_review'] = {'text': markup, 'regions': [{'id': 't1', 'role': 'body'}]}
+    result = decode_body_response(response, hints=local, revision=4)
+    assert result['body_complete'] and result['body_text'] == '求 v₃ 并计算 x²。'
+    assert result['text_review']['text'] == result['body_text']
+    assert result['text_review']['regions'][0]['text'] == markup
+    assert result['audit']['reconciliation']['conflicts'] == []
+
+
+@pytest.mark.parametrize(('canonical', 'redundant'), [
+    ('v₃', 'v3'), ('v₃', 'v₅'), ('v₁₂', 'v_12'), ('x²', 'x2'),
+    ('至少三条边', '至多三条边'), ('α≤β', 'α<β'), ('v₃', 'V₃'),
+])
+def test_substantive_or_ambiguous_format_differences_cannot_be_hidden_in_redundancy(canonical, redundant):
+    response = body_response(canonical, local={'items': []})
+    response['body_text'] = redundant
+    with pytest.raises(RoleProtocolError, match='body_regions_do_not_cover_transcription') as caught:
+        decode_body_response(response, hints={'items': []}, revision=4)
+    assert caught.value.audit['expected']['region_text'] == canonical
+    assert caught.value.audit['actual']['body_text'] == redundant
+
+
+def test_omitted_hint_text_requires_unique_unchanged_fragment_and_all_hint_ids():
+    local = hints('x²')
+    response = body_response('计算 x²。', local=local)
+    response.pop('body_text')
+    response['text_review'] = {'regions': [{'id': 't1', 'role': 'body'}]}
+    assert decode_body_response(response, hints=local, revision=4)['body_complete']
+    for text in ('计算 x³。', '计算 x²，然后比较 x²。'):
+        response['regions'][0]['text'] = text
+        with pytest.raises(RoleProtocolError, match='body_fragment_text_not_derivable') as caught:
+            decode_body_response(response, hints=local, revision=4)
+        assert caught.value.audit['hint_id'] == 't1'
+    response['text_review']['regions'] = []
+    with pytest.raises(RoleProtocolError, match='text_review_regions_incomplete'):
+        decode_body_response(response, hints=local, revision=4)
+
+
+def test_overlapping_body_fragments_are_not_a_unique_omitted_text_match():
+    local = hints('aa')
+    response = body_response('aaa', local=local)
+    response['text_review']['regions'][0].pop('text')
+    with pytest.raises(RoleProtocolError, match='body_fragment_text_not_derivable') as caught:
+        decode_body_response(response, hints=local, revision=4)
+    assert caught.value.audit['match_count'] == 'multiple'
+
+
+def test_body_fragment_rejection_keeps_bounded_expected_actual_context():
+    local = hints('求 v₅')
+    response = body_response('题干' * 1000, local=local)
+    response['text_review']['regions'][0]['text'] = '求 v₅'
+    with pytest.raises(RoleProtocolError, match='body_fragment_not_in_text') as caught:
+        decode_body_response(response, hints=local, revision=4)
+    audit = caught.value.audit
+    assert audit['hint_id'] == 't1' and audit['actual']['text'] == '求 v₅'
+    assert audit['expected_hint']['bbox'] == local['items'][0]['bbox']
+    assert len(audit['expected']['body_text']) <= 160
+    assert audit['accepted'] is False
+
+
+def test_raw_previous_body_without_redundancy_cannot_be_silently_deleted():
+    local = {'items': []}
+    previous = body_response('不能凭空删除的小问', local=local)
+    previous.pop('body_text'); previous.pop('text_review')
+    response = body_response('', local=local)
+    with pytest.raises(RoleProtocolError, match='original_evidence_missing'):
+        decode_body_response(response, hints=local, previous=previous, revision=4)
+
+
+def test_format_reconciliation_keeps_original_output_and_still_flags_real_change():
+    first = {'body_text': '求 v₃', 'body_complete': True}
+    second = {'text_review': {'text': r'求 $v_3$', 'complete': True,
+                             'regions': [{'id': 't1', 'role': 'body', 'text': r'求 \(v_{3}\)'}]}}
+    local = hints('求 v₃')
+    originals = copy.deepcopy((first, second, local))
+    text, complete, audit = reconcile_role_text(first, second, local, [graph()])
+    assert complete and text == second['text_review']['text'] and audit['conflicts'] == []
+    assert audit['region_decisions'][0]['text'] == second['text_review']['regions'][0]['text']
+    assert (first, second, local) == originals
+    second['text_review']['text'] = '求 v₅'
+    second['text_review']['regions'][0]['text'] = '求 v₅'
+    _, complete, audit = reconcile_role_text(first, second, local, [graph()])
+    assert not complete and 'unexplained_visual_text_change' in audit['issues']
+
+
+def test_independent_final_body_review_uses_same_format_gate_without_losing_proof():
+    response, regions, local = observed_body_review()
+    regions[0]['text'] = '(1) 求 v₃。'
+    response['body_region_review'][0]['text'] = r'(1) 求 $v_3$。'
+    response['text_review']['text'] = '\n'.join(r['text'] for r in regions)
+    checked = decode_review_response(response, [graph()], body_complete=True,
+                                     hints=local, body_regions=regions, revision=4)
+    assert checked['verdict'] == 'accept'
+    response['body_region_review'][0].update(text='(1) 求 v₅。', reason='实际下标不同')
+    response['text_review']['text'] = response['text_review']['text'].replace('v₃', 'v₅')
+    with pytest.raises(RoleProtocolError, match='original_evidence_missing'):
+        decode_review_response(response, [graph()], body_complete=True,
+                               hints=local, body_regions=regions, revision=4)
+
+
+def test_independent_edge_can_omit_a_candidate_binding_without_changing_endpoint_gate():
+    g = graph()
+    candidate = {**copy.deepcopy(g['edges'][0]), 'id': 'px_1', 'from': 'a', 'to': 'a'}
+    proposals = {'G1': [candidate]}
+    response = connection_response([g], candidates=proposals)
+    result = validate_connection_response(response, [g], proposals, revision=4)
+    assert result['graphs'][0]['edges'][0]['id'] == 'e1'
+    assert 'candidate_id' not in result['graphs'][0]['edges'][0]
+    response['graphs'][0]['edges'][0]['candidate_id'] = 'px_1'
+    with pytest.raises(RoleProtocolError, match='changed_candidate_endpoints') as caught:
+        validate_connection_response(response, [g], proposals, revision=4)
+    audit = caught.value.audit
+    assert (audit['graph_id'], audit['edge_id'], audit['candidate_id']) == ('G1', 'e1', 'px_1')
+    assert audit['expected'] == {'from': 'a', 'to': 'a'}
+    assert audit['actual'] == {'from': 'a', 'to': 'b'}
+
+
+def test_empty_previous_inventory_cannot_retire_rejected_proposal_or_candidate_id():
+    g = graph(edges=False)
+    response = connection_response([g])
+    response['graphs'][0]['retired_edges'] = [
+        {'id': 'uncommitted_edge', 'reason': '上次失败提案中出现', 'evidence': proof()}]
+    with pytest.raises(RoleProtocolError, match='unknown_or_duplicate_retired_edge') as caught:
+        validate_connection_response(response, [g], {}, revision=4)
+    audit = caught.value.audit
+    assert audit['graph_id'] == 'G1' and audit['edge_id'] == 'uncommitted_edge'
+    assert audit['expected_retirable_ids'] == [] and audit['expected_count'] == 0
+    response['graphs'][0].pop('retired_edges')
+    assert validate_connection_response(response, [g], {}, revision=4)['graphs'][0]['edges'] == []
+
+
+def test_unknown_candidate_reference_is_a_role_error_with_targeted_ids():
+    g = graph(); response = connection_response([g])
+    response['graphs'][0]['edges'][0]['candidate_id'] = 'unknown_candidate'
+    with pytest.raises(RoleProtocolError, match='unknown_candidate_reference') as caught:
+        validate_connection_response(response, [g], {}, revision=4)
+    assert caught.value.audit['candidate_id'] == 'unknown_candidate'
+    assert caught.value.audit['edge_id'] == 'e1' and caught.value.audit['expected_count'] == 0
+
+
+@pytest.mark.parametrize('color', [None, True, 3, {}, '', 'x'*33, 'red\nblue'])
+def test_connections_reject_invalid_optional_color_with_edge_identity(color):
+    g = graph(); response = connection_response([g])
+    response['graphs'][0]['edges'][0]['color'] = color
+    with pytest.raises(RoleProtocolError, match='invalid_connection_color') as caught:
+        validate_connection_response(response, [g], {}, revision=4)
+    assert caught.value.audit['graph_id'] == 'G1' and caught.value.audit['edge_id'] == 'e1'
+
+
+def position_review_response(*, verdict='confirmed', cropped=False):
+    g = graph()
+    if cropped:
+        g['vertices'][0]['x'] = .1004
+    response = review_response([g])
+    vertex = g['vertices'][0]
+    point = [round(vertex['x']*1000), round(vertex['y']*1000)]
+    bounds = [100, 485, 118, 515] if cropped else [185, 485, 215, 515]
+    response['graphs'][0]['vertex_position_review'] = [
+        {'id': 'a', 'position': point, 'verdict': verdict,
+         'evidence': proof(bounds, '边界处可见裁切标记，保留该位置；邻近细线不能证明完整圆轮廓')}]
+    return g, response, [{'graph_id': 'G1', 'vertex_ids': ['a']}]
+
+
+def test_visual_position_review_accepts_locally_readable_cropped_marker_without_moving_it():
+    g, response, checks = position_review_response(cropped=True)
+    g['vertices'][0]['pixel_marker_status'] = 'not_detected'
+    original = copy.deepcopy(g)
+    checked = decode_review_response(response, [g], body_complete=True, hints=hints(),
+                                     revision=4, position_checks=checks)
+    assert checked['verdict'] == 'accept' and g == original
+    observed = checked['audit']['position_checks'][0]
+    assert observed['vertex_id'] == 'a' and observed['verdict'] == 'confirmed'
+    assert observed['source'] == 'independent_visual_position_review'
+    assert g['vertices'][0]['pixel_marker_status'] == 'not_detected'
+
+
+@pytest.mark.parametrize(('mutation', 'code'), [
+    ('omit', 'vertex_position_review_incomplete'), ('duplicate', 'vertex_position_review_duplicate_id'),
+    ('unknown', 'vertex_position_review_unknown_id'), ('other_known', 'vertex_position_review_unknown_id'),
+    ('old_coordinate', 'reviewed_position_changed'), ('other_point', 'position_evidence_does_not_contain_vertex'),
+    ('whole_page', 'position_evidence_wrong_panel'), ('whole_panel', 'position_evidence_not_localized'),
+    ('invalid_verdict', 'invalid_position_review_verdict'),
+])
+def test_position_review_rejects_false_or_incomplete_coverage(mutation, code):
+    g, response, checks = position_review_response()
+    rows = response['graphs'][0]['vertex_position_review']; row = rows[0]
+    if mutation == 'omit': rows.clear()
+    if mutation == 'duplicate': rows.append(copy.deepcopy(row))
+    if mutation == 'unknown': row['id'] = 'invented'
+    if mutation == 'other_known': row['id'] = 'b'
+    if mutation == 'old_coordinate': row['position'][0] -= 1
+    if mutation == 'other_point': row['evidence'] = proof([785, 485, 815, 515])
+    if mutation == 'whole_page': row['evidence'] = proof([0, 0, 1000, 1000])
+    if mutation == 'whole_panel': row['evidence'] = proof([100, 200, 900, 900])
+    if mutation == 'invalid_verdict': row['verdict'] = 'looks_ok'
+    with pytest.raises(RoleProtocolError, match=code) as caught:
+        decode_review_response(response, [g], body_complete=True, hints=hints(),
+                               revision=4, position_checks=checks)
+    assert caught.value.audit['graph_id'] == 'G1'
+
+
+@pytest.mark.parametrize('verdict', ['uncertain', 'needs_revision'])
+def test_unresolved_position_review_keeps_specific_reason_and_routes_to_page_role(verdict):
+    g, response, checks = position_review_response(verdict=verdict)
+    original = copy.deepcopy(g)
+    checked = decode_review_response(response, [g], body_complete=True, hints=hints(),
+                                     revision=4, position_checks=checks)
+    assert checked['verdict'] == 'needs_review' and not checked['audit']['accepted'] and g == original
+    issue = next(i for i in checked['issues'] if i['kind'] == 'vertex_position_' + verdict)
+    assert issue['target_role'] == 'page_vertices' and issue['graph_id'] == 'G1'
+    assert issue['vertex_ids'] == ['a'] and issue['id'].startswith('position_review_')
+    assert issue['reason'] == response['graphs'][0]['vertex_position_review'][0]['evidence']['reason']
+    assert issue['evidence']['bbox'] == [185, 485, 215, 515]
+
+
+def test_default_review_needs_no_position_rows_and_confirmation_cannot_mask_other_failures():
+    g = graph(); response = review_response([g])
+    checked = decode_review_response(response, [g], body_complete=True, hints=hints(), revision=4)
+    assert checked['verdict'] == 'accept' and checked['audit']['position_checks'] == []
+    g, response, checks = position_review_response()
+    g['complete'] = False
+    checked = decode_review_response(response, [g], body_complete=True, hints=hints(),
+                                     revision=4, position_checks=checks)
+    assert checked['verdict'] == 'needs_review'
