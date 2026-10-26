@@ -157,11 +157,12 @@ class _MetricSink:
 
 
 class _RoleBudget:
-    def __init__(self, ledger, role, revision, invocation, output_tokens):
+    def __init__(self, ledger, role, revision, invocation, output_tokens, reserve_seconds=0):
         self.ledger = ledger
         self.role = role
         self.revision = revision
-        self.deadline = ledger.deadline
+        self.reserve_seconds = reserve_seconds
+        self.deadline = ledger.deadline - reserve_seconds
         self.call_seconds = ledger.call_seconds
         self.connect_seconds = min(20, ledger.call_seconds)
         self.output_tokens = output_tokens
@@ -175,7 +176,8 @@ class _RoleBudget:
         return self.ledger.remaining
 
     def take(self):
-        return self.ledger.take(self.role)
+        self.ledger.check(minimum=self.reserve_seconds + 3)
+        return min(self.ledger.take(self.role), self.deadline - time.monotonic())
 
 
 class RoleRunner:
@@ -199,8 +201,11 @@ class RoleRunner:
         return remote
 
     def call(self, role, prompt, request, images, *, revision=0, output_tokens=12000,
-             response_identity=True):
-        self.budget.check(minimum=3)
+             response_identity=True, reserve_seconds=0):
+        if (type(reserve_seconds) not in (int, float) or not math.isfinite(reserve_seconds)
+                or reserve_seconds < 0):
+            raise ValueError('invalid_role_time_reserve')
+        self.budget.check(minimum=reserve_seconds + 3)
         with self._lock:
             invocation = self._invocations.get(role, 0) + 1
             self._invocations[role] = invocation
@@ -225,11 +230,11 @@ class RoleRunner:
         if hasattr(remote, 'available') and not remote.available():
             raise VisionError('missing_key')
         for recovery in range(2):
-            self.budget.check(minimum=3)
-            acquired = self.budget._remote_slots.acquire(timeout=max(.01, self.budget.deadline-time.monotonic()))
+            self.budget.check(minimum=reserve_seconds + 3)
+            acquired = self.budget._remote_slots.acquire(timeout=max(.01, self.budget.deadline-reserve_seconds-time.monotonic()))
             if not acquired:
                 raise TimeoutError('agent_remote_slot_deadline')
-            attempt_budget = _RoleBudget(self.budget, role, revision, invocation, output_tokens)
+            attempt_budget = _RoleBudget(self.budget, role, revision, invocation, output_tokens, reserve_seconds)
             try:
                 result = remote(full_prompt, images, attempt_budget)
                 if not isinstance(result, dict):

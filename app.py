@@ -360,6 +360,11 @@ def _with_local_ocr_execution(response, execution):
     diagnostics = dict(response.get("diagnostics") or {})
     diagnostics["local_ocr"] = copy.deepcopy(execution)
     response["diagnostics"] = diagnostics
+    if (execution.get("required") is False
+            and execution.get("mode") == "skipped_for_semantic_reader"):
+        # The semantic reader owns both the text and graph verdict. An
+        # intentionally absent Paddle hint is neither a success nor a failure.
+        return response
     if execution.get("text_succeeded") is True:
         return response
     text_evidence = dict(diagnostics.get("text_evidence") or {})
@@ -393,6 +398,67 @@ def _graph_route_failure(kind, local_result, execution):
                         "legacy_vision_started": False,
                         "resource_metrics": local_result.get("resource_metrics", [])},
     }, execution)
+
+
+def _semantic_ocr_selected():
+    return (os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1"
+            and active_pipeline() == "agent-tools")
+
+
+def _semantic_local_result():
+    """Explicitly skip optional Paddle hints; retain the original image path."""
+    stages = {name: {"status": "skipped", "reason": "semantic_visual_reader",
+                     "worker_started": False}
+              for name in ("layout", "text", "formula")}
+    result = {"text": "", "text_count": 0, "formula_count": 0,
+              "warning": None, "review_regions": None,
+              "layout": {"status": "skipped", "regions": [],
+                         "reason": "semantic_visual_reader"},
+              "resource_metrics": [{"stage": name, **copy.deepcopy(status)}
+                                   for name, status in stages.items()]}
+    execution = {"available": OCR_AVAILABLE, "required": False,
+                 "mode": "skipped_for_semantic_reader", "text_succeeded": False,
+                 "stages": stages}
+    return result, execution
+
+
+def _record_semantic_execution(execution, status):
+    """Keep local-worker readiness distinct from the selected remote route."""
+    global _ocr_ready, _ocr_status, _ocr_stages
+    with _ocr_health_lock:
+        _ocr_ready = False  # No local text worker has run in this route.
+        _ocr_status = "本地文字与版面识别已跳过（由视觉模型读取原图）"
+        _ocr_stages = copy.deepcopy(execution.get("stages") or {})
+        _ocr_stages["semantic"] = {"status": status, "pipeline": "agent-tools"}
+
+
+def _run_graph_ocr_route(raw, result, local_execution, request_id, deadline, *, pipeline):
+    """One selected graph route owns its failures and remote budget."""
+    semantic = local_execution.get("mode") == "skipped_for_semantic_reader"
+    try:
+        from ocr_nextgen import recognize_graph_document
+        nextgen = recognize_graph_document(raw, result, graph_pipeline=pipeline,
+                    task_id=request_id or None, request_deadline=deadline,
+                    cancelled=(lambda: _ocr_is_cancelled(request_id)))
+        if (not isinstance(nextgen, dict)
+                or nextgen.get("recognition_status") not in ("complete", "partial", "failed", "not_graph")):
+            raise ValueError("invalid_graph_pipeline_result")
+        if request_id and _take_ocr_cancelled(request_id):
+            if semantic:
+                _record_semantic_execution(local_execution, "cancelled")
+            return jsonify({"cancelled": True})
+        if semantic:
+            _record_semantic_execution(local_execution, nextgen["recognition_status"])
+        return jsonify(_with_local_ocr_execution(nextgen, local_execution))
+    except Exception as nextgen_exc:
+        print(f"分阶段图识别未完成：{type(nextgen_exc).__name__}")
+        if request_id and _take_ocr_cancelled(request_id):
+            if semantic:
+                _record_semantic_execution(local_execution, "cancelled")
+            return jsonify({"cancelled": True})
+        if semantic:
+            _record_semantic_execution(local_execution, "failed")
+        return jsonify(_graph_route_failure(type(nextgen_exc).__name__, result, local_execution)), 503
 
 _rate_lock = threading.Lock()
 _request_history = defaultdict(deque)
@@ -3802,6 +3868,16 @@ def ocr():
 
     recognition_deadline = time.monotonic() + 285
     try:
+        if _semantic_ocr_selected():
+            # Semantic extraction reads the full original document itself.
+            # Do not spend the request budget booting layout/text models for
+            # optional hints before starting the actual visual readers.
+            result, local_execution = _semantic_local_result()
+            if request_id and _take_ocr_cancelled(request_id):
+                return jsonify({"cancelled": True})
+            _record_semantic_execution(local_execution, "running")
+            return _run_graph_ocr_route(raw, result, local_execution, request_id,
+                                       recognition_deadline, pipeline="agent-tools")
         result = {
             "text": "",
             "text_count": 0,
@@ -3875,23 +3951,8 @@ def ocr():
         if (os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1"
                 and (possible_graph or any(r.get("role") == "figure"
                     for r in (result.get("layout") or {}).get("regions", [])))):
-            try:
-                from ocr_nextgen import recognize_graph_document
-                nextgen = recognize_graph_document(raw, result, graph_pipeline=active_pipeline(),
-                            task_id=request_id or None,
-                            request_deadline=recognition_deadline,
-                            cancelled=(lambda: _ocr_is_cancelled(request_id)))
-                if (not isinstance(nextgen, dict)
-                        or nextgen.get("recognition_status") not in ("complete", "partial", "failed", "not_graph")):
-                    raise ValueError("invalid_graph_pipeline_result")
-                if request_id and _take_ocr_cancelled(request_id):
-                    return jsonify({"cancelled": True})
-                return jsonify(_with_local_ocr_execution(nextgen, local_execution))
-            except Exception as nextgen_exc:
-                print(f"分阶段图识别未完成：{type(nextgen_exc).__name__}")
-                if request_id and _take_ocr_cancelled(request_id):
-                    return jsonify({"cancelled": True})
-                return jsonify(_graph_route_failure(type(nextgen_exc).__name__, result, local_execution)), 503
+            return _run_graph_ocr_route(raw, result, local_execution, request_id,
+                                       recognition_deadline, pipeline=active_pipeline())
 
         if possible_graph and recognize_graphs is not None:
             try:
@@ -4450,8 +4511,14 @@ def health():
 @app.route("/ready", methods=["GET"])
 def ready():
     with _ocr_health_lock:
+        semantic = _semantic_ocr_selected()
+        semantic_status = (_ocr_stages.get("semantic") or {}).get("status", "not_run")
         state = {"web": "正常", "ocr_available": OCR_AVAILABLE,
                  "ocr_ready": _ocr_ready, "ocr_status": _ocr_status,
+                 "recognition_mode": "semantic_visual" if semantic else "local_ocr_then_vision",
+                 "local_ocr_required": not semantic,
+                 "recognition_ready": (semantic_status in ("complete", "partial")
+                                       if semantic else _ocr_ready),
                  "graph_nextgen_enabled": os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1",
                  "graph_nextgen_version": active_pipeline_version(),
                  "graph_nextgen_engine": active_pipeline(),
