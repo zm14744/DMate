@@ -65,6 +65,19 @@ def post_image(client):
                        content_type='multipart/form-data')
 
 
+@pytest.mark.parametrize('flag', ['0', '1'])
+def test_deployment_identity_exposes_pipeline_selection_without_model_calls(application, monkeypatch, flag):
+    _, client, _ = application
+    from graph_pipeline_version import EVIDENCE_PIPELINE_VERSION
+    monkeypatch.setenv('DMATE_GRAPH_NEXTGEN', flag)
+    for route in ('/health', '/ready'):
+        response = client.get(route)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['graph_nextgen_enabled'] is (flag == '1')
+        assert data['graph_nextgen_version'] == EVIDENCE_PIPELINE_VERSION
+
+
 @pytest.mark.parametrize('status', ['memory_limit', 'memory_admission_rejected', 'timeout',
                                    'worker_failed', 'cache_unavailable', 'unknown'])
 def test_returned_text_worker_failure_never_becomes_formula_degradation(application, monkeypatch, status):
