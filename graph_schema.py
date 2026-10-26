@@ -7,6 +7,13 @@ from collections import Counter
 SCHEMA_VERSION = 'dmate.graph/1'
 
 
+def parallel_key(edge):
+    """Parallel arcs share direction; reciprocal arcs are distinct classes."""
+    a, b = edge['from'], edge['to']
+    direction = edge.get('direction', 'unknown')
+    return (direction, a, b) if direction == 'forward' else (direction, *sorted((a, b)))
+
+
 def unit(value):
     if isinstance(value, bool):
         return None
@@ -47,7 +54,8 @@ def canonical_graph(source, index=1):
     for k in ('directed', 'weighted', 'multigraph'):
         v = source.get(k)
         graph[k] = v if isinstance(v, bool) else 'unknown'
-    for key in ('bbox', 'node_complete', 'inventory_reviewed', 'node_position_evidence', 'node_review'):
+    for key in ('bbox', 'node_complete', 'inventory_reviewed', 'node_position_evidence', 'node_review',
+                'panel_revision_audit', 'node_geometry_evidence', 'candidate_trace_diagnostics'):
         if key in source:
             graph[key] = copy.deepcopy(source[key])
     if isinstance(source.get('qwen_review_audit'), list):
@@ -113,9 +121,9 @@ def canonical_graph(source, index=1):
             edge['direction']='unknown'
             edge['status']='pending'
         graph['edges'].append(edge)
-    pair_counts = Counter(tuple(sorted((e['from'], e['to']))) for e in graph['edges'])
+    pair_counts = Counter(parallel_key(e) for e in graph['edges'])
     for e in graph['edges']:
-        e['parallel_count'] = pair_counts[tuple(sorted((e['from'], e['to'])))]
+        e['parallel_count'] = pair_counts[parallel_key(e)]
     graph['uncertain_edges'] += [str(x)[:240] for x in (source.get('uncertain_edges') or [])[:80]]
     if (graph['uncertain_edges'] or any(e['direction'] == 'unknown' or e['status'] != 'accepted' for e in graph['edges'])
             or any(graph[k] == 'unknown' for k in ('directed', 'weighted', 'multigraph'))):

@@ -13684,7 +13684,14 @@ function formatOcrGraphForReview(raw) {
 // Deterministic, display-only Chinese graph transcription.
 // The original Qwen result remains unchanged when sent to the AI solver.
 function ocrReviewPlain(value) {
-    return String(value ?? "").replace(/([\\\x60*_{}\[\]()#+!|])/g, "\\$1").trim();
+    // These values are literal labels, not HTML or Markdown from the model.
+    // Escape Markdown first so an original entity (for example &lt;) remains
+    // literal too. This display copy never changes the underlying graph data.
+    return String(value ?? "").replace(/([\\\x60*_{}#+!|])/g, "\\$1")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        // Backslash-escaped brackets/parentheses are also MathJax delimiters.
+        // Entities keep these literal through both Markdown and math parsing.
+        .replace(/[\[\]()]/g, character => "&#" + character.charCodeAt(0) + ";").trim();
 }
 
 function ocrReviewLatexLabel(value) {
@@ -13844,6 +13851,24 @@ function formatOcrReviewGraphDisplay(graphs, visualText) {
     return String(visualText || "").trim() ? "图形结构暂无可展示的边表" : "";
 }
 
+function ocrReviewStatusText(data) {
+    // The document can need review even when every graph is complete: the
+    // question transcription has its own completeness evidence.
+    const result = data && typeof data === "object" ? data : {};
+    const review = result.review && typeof result.review === "object" ? result.review : {};
+    const reasons = Array.isArray(review.reasons) ? [...new Set(review.reasons
+        .filter(value => typeof value === "string").map(value => value.trim()).filter(Boolean))] : [];
+    const warning = typeof result.warning === "string" ? result.warning.trim() : "";
+    const status = String(result.recognition_status || "").toLowerCase();
+    const incomplete = ["partial", "failed", "incomplete", "uncertain", "needs_review", "review_required"].includes(status)
+        || result.diagnostics?.text_evidence?.complete === false;
+    if (review.required !== true && !incomplete && !warning) return "";
+    // Backend warnings commonly repeat review.reasons. Show one document
+    // notice, and use legacy warning text when structured reasons are absent.
+    const detail = reasons.length ? reasons.join(" ") : warning;
+    return "识别结果待核对：" + (detail || "部分内容尚未完整确定，请对照原图确认。");
+}
+
 // OCR review displays recognized content as MathJax, without editable fields.
 // Only "本次要求" remains editable; recognized text is passed through unchanged.
 function renderOcrReviewResult(element, source) {
@@ -13875,6 +13900,10 @@ function reviewRecognizedQuestion(file, data) {
         const imageUrl = URL.createObjectURL(file);
         let result = null;
         preview.src = imageUrl;
+        // The recognizer composites alpha onto white before reading pixels.
+        // Use the same background for transparent originals in every theme;
+        // the uploaded File and its original bytes are unchanged.
+        preview.style.backgroundColor = "#fff";
         preview.style.width = "100%";
         if (zoom) zoom.value = "100";
         const recognizedText = typeof data.text === "string" ? data.text.trim() : "";
@@ -13893,7 +13922,9 @@ function reviewRecognizedQuestion(file, data) {
         // 本轮要求只在图片核对界面填写，不从主聊天框继承。
         requestText.value = "";
         // This result is read-only; uncertain text can be addressed in instructions.
-        error.textContent = "";
+        // textContent keeps review reasons literal, including old responses
+        // that only provide warning. Missing legacy status fields stay quiet.
+        error.textContent = ocrReviewStatusText(data);
 
         const resizePreview = () => { preview.style.width = `${zoom.value}%`; };
         const cleanup = () => {

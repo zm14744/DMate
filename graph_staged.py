@@ -70,7 +70,7 @@ def _data_url(image):
     return 'data:image/jpeg;base64,'+base64.b64encode(out.getvalue()).decode('ascii')
 
 
-def refine_node_positions(image, graphs, *, candidate_sink=None, partial=False):
+def refine_node_positions(image, graphs, *, candidate_sink=None, partial=False, max_shift_pixels=None):
     """Anchor an existing inventory to unambiguous circular pixel markers.
 
     Never add/remove/relabel vertices. Global one-to-one assignment prevents
@@ -85,7 +85,7 @@ def refine_node_positions(image, graphs, *, candidate_sink=None, partial=False):
     picture=image.copy(); picture.thumbnail((1600,1600))
     rgb=cv2.cvtColor(np.asarray(picture),cv2.COLOR_RGB2BGR)
     from graph_line_tracer import _paper_gray
-    paper=_paper_gray(rgb)
+    paper=_paper_gray(np.asarray(picture))
     circles,gray=_round_vertices(rgb if paper is None else cv2.cvtColor(paper,cv2.COLOR_GRAY2BGR))
     # Hollow nodes at junctions often have an inked centre and were rejected
     # by the legacy detector. Keep extra Hough rings as position candidates;
@@ -150,7 +150,8 @@ def refine_node_positions(image, graphs, *, candidate_sink=None, partial=False):
         for j,(x,y) in enumerate(points):
             if gi in bounds and owners.get(j)!=gi: continue
             distance=((v['x']-x)**2+(v['y']-y)**2)**.5
-            if distance<=.16:
+            pixel_distance=math.hypot((v['x']-x)*(width-1),(v['y']-y)*(height-1))
+            if distance<=.16 and (max_shift_pixels is None or pixel_distance<=max_shift_pixels):
                 relations.add_edge(('v',i),('p',j),weight=distance)
     matches=nx.min_weight_matching(relations)
     assignments={}
@@ -169,6 +170,11 @@ def refine_node_positions(image, graphs, *, candidate_sink=None, partial=False):
             eligible=[j for j in range(len(points)) if gi not in bounds or owners.get(j)==gi]
             local=partial_marker_anchors([nodes[i][2] for i in indices],[points[j] for j in eligible])
             selected={indices[i]:eligible[j] for i,j in local.items()}
+            if not selected:continue
+        if max_shift_pixels is not None:
+            selected={i:j for i,j in selected.items()
+                      if math.hypot((nodes[i][2]['x']-points[j][0])*(width-1),
+                                    (nodes[i][2]['y']-points[j][1])*(height-1))<=max_shift_pixels}
             if not selected:continue
         observations=[]
         for i,j in selected.items():
@@ -372,9 +378,8 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
             from graph_glm_adapter import GLM_53_PROFILE
             profile=GLM_53_PROFILE if getattr(provider,'model',None)==GLM_53_FLASH_MODEL else STABLE_PROFILE
             diagnostics.append('vision_adapter:'+profile)
-    with Image.open(io.BytesIO(image_bytes)) as original:
-        if original.width*original.height>16_000_000: raise ValueError('image_pixel_budget')
-        image=ImageOps.exif_transpose(original).convert('RGB')
+    from image_evidence import decode_document_image
+    image=decode_document_image(image_bytes)
     url=_data_url(image)
     # The first image remains the exact uploaded scene. A second, explicitly
     # auxiliary illumination view helps distinguish ink from paper/print-through.
@@ -382,7 +387,7 @@ def recognize_staged(image_bytes, *, layout=None, call=None, provider=None, budg
     import numpy as np
     from graph_line_tracer import _paper_gray
     small=image.copy();small.thumbnail((1600,1600))
-    paper=_paper_gray(cv2.cvtColor(np.asarray(small),cv2.COLOR_RGB2BGR))
+    paper=_paper_gray(np.asarray(small))
     node_urls=[url]
     if paper is not None:node_urls.append(_data_url(Image.fromarray(paper).convert('RGB')))
     node=ask(NODE_PROMPT+'\n若有第二张，它只是同一原图的光照归一化辅图，不是第二道题。'

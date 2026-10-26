@@ -6,7 +6,6 @@ justifies it. Uses stdlib + existing Pillow; no new production dependency.
 """
 from __future__ import annotations
 import fcntl
-import io
 import json
 import os
 from pathlib import Path
@@ -15,7 +14,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from PIL import Image, ImageOps
 
 MAX_RSS=1600*1024*1024
 CGROUP_RESERVE=768*1024*1024
@@ -25,17 +23,109 @@ MAX_PIXELS=16_000_000
 class OCRError(Exception): pass
 
 
+class ModelCacheError(OCRError):
+    """No writable model cache; deliberately excludes local paths from errors."""
+
+
+def _probe_cache_directory(path):
+    """Probe real writes, including PaddleX's independently mounted subdirs.
+
+    os.access() alone is insufficient for read-only mounts and some container
+    ACLs. These names follow paddlex/utils/cache.py and official_models.py.
+    Only a newly created, empty probe file is removed.
+    """
+    for folder in (path, *(path/name for name in ('official_models','func_ret','locks','temp'))):
+        folder.mkdir(parents=True,exist_ok=True,mode=0o700)
+        with tempfile.NamedTemporaryFile(prefix='.dmate-probe-',dir=folder) as probe:
+            probe.write(b'1')
+            probe.flush()
+
+
+def configure_model_cache(env):
+    """Choose a writable PaddleX cache before any Paddle/PaddleOCR import.
+
+    PADDLE_PDX_CACHE_HOME is PaddleX's supported override. Preserve a usable
+    explicit setting, then try DMate's own cache root and a user-specific temp
+    cache. Neither HOME nor CODEX_HOME is modified. Return non-path diagnostics.
+    """
+    candidates=[]
+    if env.get('PADDLE_PDX_CACHE_HOME'):
+        candidates.append(('paddlex_configured',Path(env['PADDLE_PDX_CACHE_HOME']).expanduser()))
+    if env.get('DMATE_MODEL_CACHE_DIR'):
+        candidates.append(('dmate_configured',Path(env['DMATE_MODEL_CACHE_DIR']).expanduser()/'paddlex'))
+    if env.get('XDG_CACHE_HOME'):
+        candidates.append(('xdg_dmate',Path(env['XDG_CACHE_HOME']).expanduser()/'dmate'/'paddlex'))
+    uid=str(os.getuid()) if hasattr(os,'getuid') else 'current-user'
+    fallback=Path(tempfile.gettempdir())/f'dmate-model-cache-{uid}'
+    candidates.append(('temporary',fallback/'paddlex'))
+    failed=0; seen=set()
+    for source,path in candidates:
+        path=path.absolute()
+        if str(path) in seen: continue
+        seen.add(str(path))
+        try:
+            if source=='temporary':
+                # Do not follow a shared /tmp name owned by another user.
+                if fallback.is_symlink(): raise PermissionError('unsafe_cache_root')
+                fallback.mkdir(parents=True,exist_ok=True,mode=0o700)
+                if hasattr(os,'getuid') and fallback.stat().st_uid!=os.getuid():
+                    raise PermissionError('unsafe_cache_owner')
+            _probe_cache_directory(path)
+        except (OSError,ValueError):
+            failed+=1
+            continue
+        env['PADDLE_PDX_CACHE_HOME']=str(path)
+        env.setdefault('PADDLE_PDX_MODEL_SOURCE','BOS')
+        return {'source':source,'fallback':bool(failed),'status':'ready'}
+    raise ModelCacheError('model_cache_unavailable')
+
+
 def load_models():
     # Do not preload a model in the web process (or claim readiness).
     return {'text_ready':False,'formula_ready':False,'lazy':True}
 
 
+def _reclaimable_file_bytes(values,inactive_key):
+    """Conservative file-cache allowance from Linux memory.stat types.
+
+    Kernel documentation distinguishes file (including shmem), file_mapped,
+    file_dirty and file_writeback from the active/inactive LRU *list* counters:
+    https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files
+    Subtract protected categories even when they overlap: that underestimates
+    reclaimable cache rather than treating mapped/dirty/tmpfs pages as free.
+    No slab or anonymous memory is discounted. On older/incomplete stats retain
+    the former inactive-file fallback, with invalid/negative counters ignored.
+    """
+    fields=('file','shmem','file_mapped','file_dirty','file_writeback')
+    try:
+        counters=[int(values[key]) for key in fields]
+        if all(value>=0 for value in counters):
+            return max(0,counters[0]-sum(counters[1:]))
+    except (KeyError,TypeError,ValueError):
+        pass
+    try:
+        return max(0,int(values.get(inactive_key,0)))
+    except (TypeError,ValueError):
+        return 0
+
+
 def cgroup_memory():
-    for used,limit in (('/sys/fs/cgroup/memory.current','/sys/fs/cgroup/memory.max'),
-                       ('/sys/fs/cgroup/memory/memory.usage_in_bytes','/sys/fs/cgroup/memory/memory.limit_in_bytes')):
+    for used,limit,stats,key in (('/sys/fs/cgroup/memory.current','/sys/fs/cgroup/memory.max',
+                                  '/sys/fs/cgroup/memory.stat','inactive_file'),
+                                 ('/sys/fs/cgroup/memory/memory.usage_in_bytes','/sys/fs/cgroup/memory/memory.limit_in_bytes',
+                                  '/sys/fs/cgroup/memory/memory.stat','total_inactive_file')):
         try:
             a,b=Path(used).read_text().strip(),Path(limit).read_text().strip()
-            return int(a),min(int(b),4*1024**3) if b!='max' else 4*1024**3
+            current=int(a)
+            try:
+                values=dict(line.split() for line in Path(stats).read_text().splitlines())
+                # Clean, unmapped cached model files remain reclaimable even
+                # after repeated reads move them to active_file. Charging that
+                # cache as live model memory eventually rejects every image.
+                current=max(0,current-_reclaimable_file_bytes(values,key))
+            except (OSError,ValueError):
+                pass
+            return current,min(int(b),4*1024**3) if b!='max' else 4*1024**3
         except (OSError,ValueError): pass
     return None
 
@@ -53,43 +143,79 @@ def child_rss(pid):
 
 def run_worker(stage,image_path,output_path,*,layout_path=None,timeout=55,command=None):
     """Poll RSS/cgroup headroom, kill entire process group on timeout/pressure."""
-    metric={'stage':stage,'peak_rss_bytes':0,'seconds':0.,'status':'failed'}
-    start=time.monotonic(); proc=None
+    from ocr_worker_audit import audit_path,read_audit
+    metric={'stage':stage,'peak_rss_bytes':0,'rss_observed':False,'seconds':0.,'status':'failed'}
+    start=time.monotonic(); proc=None; phase_peaks={}
+    sidecar=audit_path(output_path)
     state=cgroup_memory()
     if state and state[1]-state[0]<CGROUP_RESERVE+MAX_RSS:
-        metric['status']='memory_admission_rejected'; return None,metric
+        metric.update(status='memory_admission_rejected',error_kind='memory_admission_rejected',
+                      memory_admission={'working_set_bytes':state[0],'budget_bytes':state[1],
+                                        'required_headroom_bytes':CGROUP_RESERVE+MAX_RSS})
+        return None,metric
     env={k:v for k,v in os.environ.items() if not k.endswith('API_KEY')}
     for key in ('OMP_NUM_THREADS','MKL_NUM_THREADS','OPENBLAS_NUM_THREADS','NUMEXPR_NUM_THREADS'):
         env[key]='1'
     env['DMATE_FORMULA_ENABLED']='0'
+    try:
+        metric['model_cache']=configure_model_cache(env)
+    except ModelCacheError:
+        metric.update(status='cache_unavailable',error_type='ModelCacheError',error_kind='model_cache_unavailable')
+        metric['seconds']=round(time.monotonic()-start,3)
+        return None,metric
     cmd=command or [sys.executable,str(Path(__file__).with_name('ocr_worker.py')),stage,str(image_path),str(output_path)]
     if layout_path and command is None: cmd.append(str(layout_path))
     try:
         proc=subprocess.Popen(cmd,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
         while proc.poll() is None:
             rss=child_rss(proc.pid); metric['peak_rss_bytes']=max(rss,metric['peak_rss_bytes'])
+            metric['rss_observed']=metric['rss_observed'] or rss>0
+            audit=read_audit(sidecar)
+            current=(audit or {}).get('current',{'phase':'startup','pass_index':0})
+            phase=current['phase']; pass_index=current.get('pass_index',0)
+            key=(phase,pass_index)
+            observed=phase_peaks.setdefault(key,{'phase':phase,'pass_index':pass_index,
+                'pass_kind':current.get('pass_kind'),'peak_rss_bytes':0,'rss_observed':False,'samples':0})
+            observed['peak_rss_bytes']=max(observed['peak_rss_bytes'],rss)
+            observed['rss_observed']=observed['rss_observed'] or rss>0
+            observed['samples']+=1
             state=cgroup_memory()
             if rss>MAX_RSS or (state and state[0]>state[1]-CGROUP_RESERVE):
-                metric['status']='memory_limit'; break
+                metric.update(status='memory_limit',phase=phase,pass_index=pass_index,
+                              limit_reason='worker_rss' if rss>MAX_RSS else 'cgroup_headroom')
+                if state: metric['memory_at_termination']={'working_set_bytes':state[0],'budget_bytes':state[1]}
+                break
             if time.monotonic()-start>timeout:
-                metric['status']='timeout'; break
+                metric.update(status='timeout',phase=phase,pass_index=pass_index,limit_reason='wall_time'); break
             time.sleep(.05)
         if proc.poll() is None:
             os.killpg(proc.pid,signal.SIGKILL); proc.wait(timeout=3)
         elif proc.returncode==0 and Path(output_path).exists() and Path(output_path).stat().st_size<4*1024**2:
             result=json.loads(Path(output_path).read_text())
+            if not isinstance(result,dict) or 'worker_error' in result:
+                raise ValueError('invalid_worker_result')
             metric['status']='ok'; return result,metric
         else:
             metric['status']='worker_failed'
             if Path(output_path).is_file() and Path(output_path).stat().st_size < 1024:
                 try:
-                    metric['error_type']=str(json.loads(Path(output_path).read_text()).get('worker_error',''))[:80]
+                    failure=json.loads(Path(output_path).read_text())
+                    if isinstance(failure,dict):
+                        for source,target in (('worker_error','error_type'),('error_kind','error_kind'),('phase','phase')):
+                            value=failure.get(source)
+                            if isinstance(value,str) and value.replace('_','').isalnum():
+                                metric[target]=value[:80]
                 except (OSError,ValueError): pass
+            if 'error_kind' not in metric:
+                metric['error_kind']='native_worker_failure' if proc.returncode and proc.returncode<0 else 'worker_failed'
     except (OSError,ValueError,subprocess.SubprocessError): metric['status']='worker_failed'
     finally:
         if proc is not None and proc.poll() is None:
             os.killpg(proc.pid,signal.SIGKILL); proc.wait()
         metric['seconds']=round(time.monotonic()-start,3)
+        metric['phase_peaks']=list(phase_peaks.values())
+        audit=read_audit(sidecar)
+        if audit is not None: metric['audit']=audit
     return None,metric
 
 
@@ -102,17 +228,32 @@ def recognize_image(raw, *, prepare_cache=False):
         except BlockingIOError: raise OCRError('图片识别繁忙，请稍后重试。') from None
         try:
             with tempfile.TemporaryDirectory(prefix='dmate-ocr-') as folder:
-                root=Path(folder); image_path=root/'image.png'
-                with Image.open(io.BytesIO(raw)) as original:
-                    if original.width*original.height>MAX_PIXELS: raise OCRError('图片分辨率过大，请裁剪题目后重试。')
-                    image=ImageOps.exif_transpose(original).convert('RGB'); image.thumbnail((2200,2200)); image.save(image_path)
-                layout,lm=run_worker('layout',image_path,root/'layout.json',timeout=180 if prepare_cache else 45); metrics.append(lm)
+                root=Path(folder); text_path=root/'canonical.png'; layout_image_path=root/'layout.png'
+                from image_evidence import decode_document_image
+                try:
+                    image=decode_document_image(raw,max_pixels=MAX_PIXELS)
+                except (ValueError,TypeError):
+                    raise OCRError('图片无法读取或分辨率过大，请检查图片后重试') from None
+                canonical_size=list(image.size)
+                # The detector budgets its own intermediate tensor. Preserve
+                # all canonical source pixels for recognition crops instead
+                # of feeding both models the layout thumbnail.
+                image.save(text_path)
+                layout_image=image.copy(); layout_image.thumbnail((2200,2200))
+                layout_size=list(layout_image.size); layout_image.save(layout_image_path)
+                image.close(); layout_image.close()
+                layout,lm=run_worker('layout',layout_image_path,root/'layout.json',timeout=180 if prepare_cache else 45); metrics.append(lm)
                 if layout is None: layout={'regions':[],'status':'unavailable'}
                 (root/'layout.json').write_text(json.dumps(layout))
-                text,tm=run_worker('text',image_path,root/'text.json',layout_path=root/'layout.json',timeout=180 if prepare_cache else 65); metrics.append(tm)
+                text,tm=run_worker('text',text_path,root/'text.json',layout_path=root/'layout.json',timeout=180 if prepare_cache else 65); metrics.append(tm)
                 if text is None:
                     text={'text':'','front_text':'','text_count':0,'formula_count':0,'review_regions':[],'warning':'题目文字未能完整识别'}
                 text['layout']=layout; text['resource_metrics']=metrics
+                text['image_views']={'canonical_size':canonical_size,'layout_size':layout_size,
+                    'text_size':canonical_size,'layout_coordinate_space':'canonical_normalized_0_1',
+                    'text_coordinate_space':'canonical_image_pixels',
+                    'layout_to_canonical_scale':[canonical_size[0]/layout_size[0],canonical_size[1]/layout_size[1]],
+                    'text_to_original_1000_scale':[1000/canonical_size[0],1000/canonical_size[1]]}
                 if layout.get('status')!='ok': text['layout_degraded']=True
                 return text
         finally: fcntl.flock(lock,fcntl.LOCK_UN)

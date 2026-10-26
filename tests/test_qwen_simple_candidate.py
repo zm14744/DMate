@@ -301,11 +301,11 @@ def test_two_failed_protocol_reads_retain_both_usage_records_without_legacy_fall
     assert 'offline-test-key' not in json.dumps(result)
 
 
-def test_default_orchestration_selects_validated_pipeline_without_staged_fallback():
+def test_explicit_previous_pipeline_without_staged_fallback():
     from ocr_nextgen import recognize_graph_document
     with patch('ocr_nextgen.recognize_staged') as staged, patch(
             'graph_qwen_simple.recognize_simple',side_effect=RuntimeError('offline')) as candidate:
-        result = recognize_graph_document(picture(), {})
+        result = recognize_graph_document(picture(), {}, graph_pipeline='qwen-simple-candidate')
     assert result['error'] and candidate.call_count == 1
     assert result['graph_display_version']=='qwen-simple-candidate-v59'
     assert candidate.call_args.kwargs['budget'].remaining==2
@@ -319,7 +319,7 @@ def test_unexpected_engine_error_keeps_usage_and_cannot_escape_to_legacy():
         raise KeyError('missing_intermediate_evidence')
     with patch('graph_qwen_simple.recognize_simple',side_effect=broken) as engine, patch(
             'ocr_nextgen.correct_text') as text, patch('ocr_nextgen.recognize_staged') as staged:
-        result=recognize_graph_document(picture(),{})
+        result=recognize_graph_document(picture(),{},graph_pipeline='qwen-simple-candidate')
     assert result['error'] and engine.call_count==1
     assert result['diagnostics']['failure_kind']=='KeyError'
     assert result['diagnostics']['remote_metrics'][0]['usage']['total_tokens']==7
@@ -332,7 +332,7 @@ def test_postprocessing_error_cannot_escape_after_model_budget_is_spent():
     with patch('graph_qwen_simple.recognize_simple',return_value={
             'graphs':[graph],'diagnostics':[]}) as engine, patch('ocr_nextgen.correct_text',return_value=('',{})), patch(
             'ai._format_graph_data',side_effect=KeyError('missing_render_field')):
-        result=recognize_graph_document(picture(),{})
+        result=recognize_graph_document(picture(),{},graph_pipeline='qwen-simple-candidate')
     assert result['error'] and result['diagnostics']['failure_kind']=='KeyError'
     assert engine.call_count==1 and 'graph_structures' not in result
 

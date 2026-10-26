@@ -273,10 +273,10 @@ def recognize_simple(raw, *, layout=None, provider=None, budget=None, audit=Fals
         if audit:result['stage_audit']=events
         return result
     try:
-        image = ImageOps.exif_transpose(Image.open(io.BytesIO(raw)))
-        if image.width*image.height > 16_000_000 or min(image.size) < 2:
+        from image_evidence import decode_document_image
+        image = decode_document_image(raw)
+        if min(image.size) < 2:
             raise ValueError('qwen_simple_image_budget')
-        image = image.convert('RGB')
         overview = _data_url(image)
         marker_plan=None
         try:

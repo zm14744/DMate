@@ -12,6 +12,10 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
+from graph_node_geometry import (boundary_distance, circle_geometry, contains_points,
+                                 ray_entry, scaled_geometry)
+from graph_connector_geometry import outlined_arrow_candidates, same_outlined_instance
+
 MAX_SIDE = 1600
 MAX_GRAPHS = 10
 MAX_VERTICES = 30
@@ -74,8 +78,8 @@ def _thin(ink):
 
 
 def _decode(image_bytes):
-    with Image.open(io.BytesIO(image_bytes)) as im:
-        rgb = np.asarray(ImageOps.exif_transpose(im).convert('RGB'))
+    from image_evidence import decode_document_image
+    rgb = np.asarray(decode_document_image(image_bytes))
     height, width = rgb.shape[:2]
     scale = min(1.0, MAX_SIDE / max(width, height))
     if scale < 1.0:
@@ -106,11 +110,29 @@ def _vertices(graph, width, height):
     return points
 
 
-def _unique_seeds(skel, points, vertex_index, radius):
+def _unique_seeds(skel, points, vertex_index, radius, *, sectors=24, geometry=None):
     _, x0, y0 = points[vertex_index]
     h, w = skel.shape
     candidates = {}
-    outer = max(4, radius + 5)
+    outer = max(4, math.ceil(radius) + (10 if geometry else 5))
+    if geometry:
+        x0, y0 = geometry['center_pixels']
+        outer = math.ceil(max(geometry['semiaxes_pixels']))+10
+        left, right = max(1, math.floor(x0-outer)), min(w-1, math.ceil(x0+outer+1))
+        top, bottom = max(1, math.floor(y0-outer)), min(h-1, math.ceil(y0+outer+1))
+        yy, xx = np.nonzero(skel[top:bottom, left:right])
+        coords = np.column_stack((xx+left, yy+top))
+        distances = boundary_distance(coords, geometry)
+        for (x, y), distance in zip(coords, distances):
+            if not .3 <= distance <= 9.:
+                continue
+            band = int(distance > 4.5)
+            sector = round((math.atan2(y-y0, x-x0)+math.pi)/(2*math.pi)*sectors) % sectors
+            key = (band, sector)
+            error = abs(distance-(6. if band else 2.))
+            if key not in candidates or error < candidates[key][0]:
+                candidates[key] = (error, (int(x), int(y)))
+        return [value[1] for _, value in sorted(candidates.items())]
     for y in range(max(1, y0 - outer), min(h - 1, y0 + outer + 1)):
         for x in range(max(1, x0 - outer), min(w - 1, x0 + outer + 1)):
             if skel[y, x] != 255:
@@ -120,17 +142,18 @@ def _unique_seeds(skel, points, vertex_index, radius):
                 continue
             sector = round(
                 (math.atan2(y - y0, x - x0) + math.pi)
-                / (2 * math.pi) * 24
-            ) % 24
+                / (2 * math.pi) * sectors
+            ) % sectors
             err = abs(distance - radius - 1.0)
             if sector not in candidates or err < candidates[sector][0]:
                 candidates[sector] = (err, (x, y))
     return [v[1] for _, v in sorted(candidates.items())]
 
 
-def _follow(skel, points, source_i, start, radius, max_steps):
+def _follow(skel, points, source_i, start, radius, max_steps, *, node_radii=None, node_geometry=None):
     """Trace ink while favouring tangent continuity at unmarked crossings."""
-    _, sx, sy = points[source_i]
+    source_name, sx, sy = points[source_i]
+    source_radius = node_radii.get(source_name, radius) if node_radii else radius
     previous, current = (sx, sy), start
     path, visited = [current], {current}
     turns, ambiguity = 0.0, 0
@@ -141,16 +164,31 @@ def _follow(skel, points, source_i, start, radius, max_steps):
         max_excursion = max(max_excursion, source_distance)
         # A circular node rim is not a self-loop. Only an external ink
         # excursion that returns to the marked node can suggest a loop.
-        if (len(path) >= max(16, 5 * radius)
-                and max_excursion >= 2.8 * radius
-                and source_distance <= radius + 4):
+        loop_steps = max(16, (3 if node_radii else 5) * source_radius)
+        loop_excursion = (max(source_radius+8, source_radius*1.8)
+                          if node_radii else 2.8*source_radius)
+        if (len(path) >= loop_steps
+                and max_excursion >= loop_excursion
+                and source_distance <= source_radius + 4):
             return source_i, path, turns, ambiguity
         arrivals = [
             (math.hypot(cx - vx, cy - vy), i)
             for i, (_, vx, vy) in enumerate(points)
             if i != source_i
         ]
-        if arrivals:
+        if node_radii and len(path) >= 3:
+            # A large target's rim can be reached before a closer small
+            # target's centre. Test each target against its OWN footprint.
+            reached = []
+            for d, i in arrivals:
+                geometry = (node_geometry or {}).get(points[i][0])
+                gap = (float(boundary_distance(current, geometry)) if geometry else
+                       d-node_radii.get(points[i][0], radius))
+                if gap <= 4:
+                    reached.append((gap, d, i))
+            if reached:
+                return min(reached)[2], path, turns, ambiguity
+        elif arrivals:
             d, target = min(arrivals)
             if d <= radius + 4 and len(path) >= 3:
                 return target, path, turns, ambiguity
@@ -267,7 +305,7 @@ def _point_polyline_distance(point, line):
     return best
 
 
-def _same_ink_route(candidate,existing,pointmap,width,height,radius,*,ink=None,offset=(0,0)):
+def _same_ink_route(candidate,existing,pointmap,width,height,radius,*,ink=None,offset=(0,0),node_geometry=None):
     """Deduplicate reverse/partial traces; do not merge nearby parallel strokes.
 
     A Hough segment may cover only the middle 70% of a skeleton trace. That
@@ -275,6 +313,77 @@ def _same_ink_route(candidate,existing,pointmap,width,height,radius,*,ink=None,o
     misclassifies it as a second route. Conversely two genuine curved arcs
     may be close at their ends but have separate ink through the middle.
     """
+    first_meta=candidate.get('connector_evidence') or {}
+    second_meta=existing.get('connector_evidence') or {}
+    first_outline=first_meta.get('kind')=='outlined_arrow'
+    second_outline=second_meta.get('kind')=='outlined_arrow'
+    if first_outline or second_outline:
+        if first_outline and second_outline:
+            return (same_outlined_instance(first_meta,second_meta,ink,(width,height),offset=offset)
+                    if ink is not None else False)
+        else:
+            meta,other=(first_meta,existing) if first_outline else (second_meta,candidate)
+            for side in range(2):
+                wall=meta.get('shaft_boundaries',[])
+                shoulders=meta.get('shoulders',[])
+                flanks=meta.get('head_flanks',[])
+                if min(len(wall),len(shoulders),len(flanks))!=2:return False
+                path=[wall[side][0],wall[side][1],shoulders[side][1],flanks[side][1]]
+                constituent={'from':candidate['from'],'to':candidate['to'],'path':path}
+                if _same_ink_route(other,constituent,pointmap,width,height,radius,
+                                   ink=ink,offset=offset,node_geometry=node_geometry):
+                    return True
+            return False
+    if ink is not None:
+        # Route identity is measured outside node bodies. Equal endpoints or
+        # two nearby centrelines are not enough: a white corridor preserves
+        # independent parallel arcs, even at small raster separation.
+        def samples(entry):
+            points=np.asarray(_route_polyline_pixels(entry,width,height),float)
+            if len(points)<2:return np.empty((0,2))
+            lengths=np.r_[0.,np.cumsum(np.linalg.norm(np.diff(points,axis=0),axis=1))]
+            if lengths[-1]<2:return np.empty((0,2))
+            values=np.linspace(0.,lengths[-1],128)
+            route=np.stack([np.interp(values,lengths,points[:,axis]) for axis in range(2)],axis=1)
+            if node_geometry:
+                keep=np.ones(len(route),bool)
+                for name in {entry.get('from'),entry.get('to')}:
+                    if name in node_geometry:
+                        keep &= ~contains_points(route,node_geometry[name],margin=2.)
+                route=route[keep]
+            else:
+                route=route[10:-10]
+            route=route-np.asarray(offset)
+            # Canny/Hough centres may be on a white neighbour of the same
+            # ridge. Project only a tiny offset; actual ink pixels stay put.
+            projected=[]
+            for point in route:
+                x,y=np.rint(point).astype(int)
+                if 0<=x<ink.shape[1] and 0<=y<ink.shape[0] and ink[y,x]:
+                    projected.append(point);continue
+                lo_x,hi_x=max(0,x-2),min(ink.shape[1],x+3)
+                lo_y,hi_y=max(0,y-2),min(ink.shape[0],y+3)
+                yy,xx=np.nonzero(ink[lo_y:hi_y,lo_x:hi_x])
+                if len(xx):
+                    neighbours=np.column_stack([xx+lo_x,yy+lo_y])
+                    nearest=neighbours[np.argmin(np.linalg.norm(neighbours-point,axis=1))]
+                    projected.append(nearest if np.linalg.norm(nearest-point)<=2.4 else point)
+                else:projected.append(point)
+            return np.asarray(projected)
+        a,b=samples(candidate),samples(existing)
+        if min(len(a),len(b))<6:return False
+        distances=np.linalg.norm(a[:,None,:]-b[None,:,:],axis=2)
+        def corridor(source,target,dist):
+            nearest=target[np.argmin(dist,axis=1)]
+            bridge=source[:,None,:]+(nearest-source)[:,None,:]*np.linspace(0,1,13)[None,:,None]
+            xy=np.rint(bridge).astype(int)
+            valid=((xy[:,:,0]>=0)&(xy[:,:,0]<ink.shape[1])&
+                   (xy[:,:,1]>=0)&(xy[:,:,1]<ink.shape[0]))
+            x=np.clip(xy[:,:,0],0,ink.shape[1]-1);y=np.clip(xy[:,:,1],0,ink.shape[0]-1)
+            fraction=np.mean((ink[y,x]>0)&valid,axis=1)
+            return float(np.mean((np.min(dist,axis=1)<=12.)&(fraction>=.90)))
+        forward,backward=corridor(a,b,distances),corridor(b,a,distances.T)
+        return min(forward,backward)>=.88
     a=_route_signature(candidate,pointmap,width,height)
     b=_route_signature(existing,pointmap,width,height)
     gap=max(2.4,min(4.0,radius*0.48))
@@ -323,7 +432,7 @@ def _same_ink_route(candidate,existing,pointmap,width,height,radius,*,ink=None,o
     return samples>=3 and hits/samples>=.88
 
 
-def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,ink_mask=None):
+def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,ink_mask=None,node_radii=None):
     """Independently propose only high-coverage straight strokes.
 
     A crossing alone cannot satisfy the coverage test. A confirmed node
@@ -340,31 +449,44 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
             length = math.hypot(dx, dy)
             if length < 16:
                 continue
+            if node_radii:
+                start = (node_radii.get(local[i][0], radius)+2)/length
+                end = 1-(node_radii.get(local[j][0], radius)+2)/length
+                if (end-start)*length < 6:
+                    continue
+                visible_length = (end-start)*length
+            else:
+                start, end, visible_length = .09, .91, length
             crossing_node = False
-            for k, (_, px, py) in enumerate(local):
+            for k, (name, px, py) in enumerate(local):
                 if k in (i, j):
                     continue
                 t = ((px - ax) * dx + (py - ay) * dy) / (length * length)
                 side = abs((px - ax) * dy - (py - ay) * dx) / length
-                if 0.08 < t < 0.92 and side <= radius * 0.8:
+                crossing_radius = node_radii.get(name, radius) if node_radii else radius
+                lo, hi = (start, end) if node_radii else (.08, .92)
+                if lo < t < hi and side <= crossing_radius * 0.8:
                     crossing_node = True
                     break
             if crossing_node:
                 continue
-            samples = max(15, min(250, round(length * 0.9)))
+            samples = max(15, min(250, round(visible_length * 0.9)))
             hits = 0
             pattern = []
+            offsets=(-3.0,-1.5,0.,1.5,3.0)
+            offset_hits=[0]*len(offsets)
             missing_run = max_missing_run = 0
             for step in range(samples):
-                t = 0.09 + 0.82 * (step + 0.5) / samples
+                t = (start + (end-start) * (step + 0.5) / samples if node_radii
+                     else .09 + .82 * (step + .5) / samples)
                 mx, my = ax + t * dx, ay + t * dy
                 ux, uy = -dy / length, dx / length
                 found = False
-                for offset in (-3.0, -1.5, 0, 1.5, 3.0):
+                for offset_index,offset in enumerate(offsets):
                     x, y = round(mx + offset * ux), round(my + offset * uy)
                     if 0 <= x < width and 0 <= y < height and ink[y, x]:
                         found = True
-                        break
+                        offset_hits[offset_index]+=1
                 hits += int(found)
                 pattern.append(found)
                 missing_run = 0 if found else missing_run + 1
@@ -372,8 +494,8 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
             coverage = hits / samples
             # Average ink coverage alone can connect unrelated aligned lines.
             # A long missing segment is evidence against an actual edge.
-            largest_gap_px = max_missing_run * length / samples
-            continuous = coverage >= .83 and largest_gap_px <= max(6,min(16,length*.045))
+            largest_gap_px = max_missing_run * visible_length / samples
+            continuous = coverage >= .83 and largest_gap_px <= max(6,min(16,visible_length*.045))
             # Dashed paths need repeated bounded gaps, not one long white gap
             # between unrelated collinear strokes. Still only a candidate.
             runs=[]
@@ -381,26 +503,46 @@ def _straight_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h
                 if runs and runs[-1][0] == hit: runs[-1][1] += 1
                 else: runs.append([hit,1])
             gaps=[n for hit,n in runs[1:-1] if not hit]
-            dashed = (.40 <= coverage < .90 and len(gaps)>=3 and
-                      max(gaps)/max(1,min(gaps))<=2.5 and largest_gap_px<=min(20,length*.13))
+            # A port crop can leave a short residual end gap. Complete
+            # interior intervals establish cadence; the maximum gap remains
+            # bounded so unrelated collinear fragments do not become edges.
+            middle_gaps = gaps[1:-1] if len(gaps) >= 5 else gaps
+            typical_gap = float(np.median(middle_gaps)) if middle_gaps else 0.
+            consistent = (sum(.4*typical_gap <= n <= 2.5*typical_gap for n in middle_gaps)
+                          >= max(3, math.ceil(len(middle_gaps)*.8))) if typical_gap else False
+            dashed = (.40 <= coverage < .90 and len(gaps)>=3 and consistent and
+                      max(gaps)<=max(2., 2.5*typical_gap) and
+                      largest_gap_px<=min(20,visible_length*.13))
             if not continuous and not dashed:
                 continue
+            best_offset=max(range(len(offsets)),key=lambda k:(offset_hits[k],-abs(offsets[k])))
+            shift=(offsets[best_offset] if node_radii and
+                   offset_hits[best_offset]-offset_hits[2]>=samples*.12 else 0.)
+            route_coverage=offset_hits[best_offset]/samples if node_radii else coverage
+            proposal_score=(min(coverage,route_coverage+.02) if continuous else min(.80,coverage+.18))
+            start_point=(ax+shift*ux,ay+shift*uy)
+            end_point=(bx+shift*ux,by+shift*uy)
             candidates.append({
                 'from': local[i][0], 'to': local[j][0],
-                'path': [[round((ax + x_off) / max(full_w - 1, 1), 4),
-                          round((ay + y_off) / max(full_h - 1, 1), 4)],
-                         [round((bx + x_off) / max(full_w - 1, 1), 4),
-                          round((by + y_off) / max(full_h - 1, 1), 4)]],
+                'path': [[round((start_point[0] + x_off) / max(full_w - 1, 1), 4),
+                          round((start_point[1] + y_off) / max(full_h - 1, 1), 4)],
+                         [round((end_point[0] + x_off) / max(full_w - 1, 1), 4),
+                          round((end_point[1] + y_off) / max(full_h - 1, 1), 4)]],
                 'pixel_length': round(length),
-                'score': round(coverage if continuous else min(.80,coverage+.18), 3),
+                'score': round(proposal_score, 3),
                 'style': 'solid' if continuous else 'dashed',
                 'needs_review': True,
                 'method': 'opencv_straight_line_coverage',
+                'connector_evidence': {'kind': 'stroke_chain',
+                                       'gap_pattern': 'repeated_bounded' if dashed and not continuous else 'continuous',
+                                       'complete_interior_gap_count': len(middle_gaps),
+                                       'observed_ridge_offset_pixels': shift,
+                                       'proposal_only': True},
             })
     return candidates
 
 
-def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,gray_cutoff=216,ink_mask=None):
+def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,gray_cutoff=216,ink_mask=None,node_radii=None,node_geometry=None):
     """Match real visible Hough stroke endpoints to marked node *rims*.
 
     Center-to-center coverage fails for lines attached off-center to circles.
@@ -421,43 +563,81 @@ def _hough_endpoint_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,
                                minLineLength=24, maxLineGap=7)
     if segments is None:
         return []
+    distance_to_ink = cv2.distanceTransform(np.uint8(mask == 0), cv2.DIST_L2, 3)
     output = []
     for x1, y1, x2, y2 in np.asarray(segments).reshape(-1, 4)[:400]:
         length = math.hypot(float(x2-x1), float(y2-y1))
-        if length < max(24, radius * 2.5):
+        if length < (24 if node_radii else max(24, radius * 2.5)):
             continue
         nearest = []
-        for xx, yy in ((x1, y1), (x2, y2)):
-            dist, number = min((math.hypot(float(xx)-vx, float(yy)-vy), i)
-                               for i, (_, vx, vy) in enumerate(local))
+        route_ends = []
+        axis = np.asarray([float(x2-x1), float(y2-y1)])/length
+        for endpoint_index, (xx, yy) in enumerate(((x1, y1), (x2, y2))):
+            if node_radii:
+                choices = []
+                for i, (name, vx, vy) in enumerate(local):
+                    r = node_radii.get(name, radius)
+                    distance = math.hypot(float(xx)-vx, float(yy)-vy)
+                    geometry = (node_geometry or {}).get(name) or circle_geometry((vx, vy), r)
+                    port = ray_entry((xx, yy), axis*(-1 if endpoint_index == 0 else 1), geometry, margin=2.)
+                    if port is None:
+                        continue
+                    gap = float(np.linalg.norm(port-[xx, yy]))
+                    if gap > max(12., min(32., r*2.+8.)):
+                        continue
+                    # A line body may end at an arrowhead base. Associate its
+                    # end with a node only through an independently inked
+                    # continuation and a ray/footprint intersection.
+                    bridge = np.rint(np.linspace((xx, yy), port, max(4, math.ceil(gap)))).astype(int)
+                    valid = ((bridge[:, 0] >= 0) & (bridge[:, 0] < mask.shape[1]) &
+                             (bridge[:, 1] >= 0) & (bridge[:, 1] < mask.shape[0]))
+                    if not valid.all() or np.mean(distance_to_ink[bridge[:, 1], bridge[:, 0]] <= 2.4) < .75:
+                        continue
+                    choices.append((gap, distance, i, port))
+                if not choices:
+                    break
+                _, dist, number, port = min(choices, key=lambda row: row[:3])
+                route_ends.append(port)
+            else:
+                dist, number = min((math.hypot(float(xx)-vx, float(yy)-vy), i)
+                                   for i, (_, vx, vy) in enumerate(local))
+                route_ends.append(np.asarray([xx, yy]))
             nearest.append((dist, number))
+        if len(nearest) != 2:
+            continue
         (d1, i), (d2, j) = nearest
-        if i == j or max(d1, d2) > max(9.0, radius * 1.45):
+        if i == j or (not node_radii and max(d1, d2) > max(9.0, radius * 1.45)):
             continue
         center_distance = math.hypot(local[i][1]-local[j][1],local[i][2]-local[j][2])
-        if length < 0.63 * center_distance:
+        r1 = node_radii.get(local[i][0], radius) if node_radii else radius
+        r2 = node_radii.get(local[j][0], radius) if node_radii else radius
+        visible_distance = max(12., center_distance-r1-r2) if node_radii else center_distance
+        if length < 0.63 * visible_distance:
             continue
         crosses_node = False
-        for k,(_,vx,vy) in enumerate(local):
+        for k,(name,vx,vy) in enumerate(local):
             if k in (i,j):
                 continue
             projection = ((vx-x1)*(x2-x1)+(vy-y1)*(y2-y1))/(length*length)
             distance = abs((vx-x1)*(y2-y1)-(vy-y1)*(x2-x1))/length
-            if 0.08 < projection < 0.92 and distance < radius*.83:
+            crossing_radius = node_radii.get(name, radius) if node_radii else radius
+            if 0.08 < projection < 0.92 and distance < crossing_radius*.83:
                 crosses_node = True
                 break
         if crosses_node:
             continue
         a,b=sorted((i,j))
-        confidence = max(0.1, 0.92 - 0.20*(d1+d2)/max(2*radius,1))
+        endpoint_error = abs(d1-r1)+abs(d2-r2) if node_radii else d1+d2
+        confidence = max(0.1, 0.92 - 0.20*endpoint_error/max(r1+r2,1))
         output.append({
             'from':local[a][0], 'to':local[b][0],
-            'path':[[round((x1+x_off)/max(full_w-1,1),4),
-                     round((y1+y_off)/max(full_h-1,1),4)],
-                    [round((x2+x_off)/max(full_w-1,1),4),
-                     round((y2+y_off)/max(full_h-1,1),4)]],
+            'path':[[round((float(p[0])+x_off)/max(full_w-1,1),4),
+                     round((float(p[1])+y_off)/max(full_h-1,1),4)]
+                    for p in (route_ends[0], (x1,y1), (x2,y2), route_ends[1])],
             'pixel_length':round(length), 'score':round(confidence,3),
             'needs_review':True, 'method':'opencv_hough_rim_endpoint',
+            'connector_evidence': {'kind': 'stroke_chain', 'attachment': 'ink_to_footprint_ray',
+                                   'proposal_only': True},
         })
     return output
 
@@ -474,7 +654,30 @@ def _corridor_hits(ink, xs, ys, ux, uy):
     return hits
 
 
-def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,ink_mask=None):
+def _curve_pattern(ink, xs, ys, outside, ux, uy):
+    hits=_corridor_hits(ink,xs[outside],ys[outside],ux,uy)
+    coverage=float(hits.mean())
+    missing=np.flatnonzero(np.r_[True,hits,True])
+    largest_run=int(max(np.diff(missing)-1,default=0))
+    continuous=(coverage>=.87 and min(float(chunk.mean()) for chunk in np.array_split(hits,5))>=.75
+                and largest_run<=max(5,round(.04*len(xs))))
+    runs=[]
+    for hit in hits:
+        if runs and runs[-1][0]==bool(hit):runs[-1][1]+=1
+        else:runs.append([bool(hit),1])
+    gaps=[n for hit,n in runs[1:-1] if not hit]
+    middle=gaps[1:-1] if len(gaps)>=5 else gaps
+    typical=float(np.median(middle)) if middle else 0.
+    curve_length=float(np.sum(np.hypot(np.diff(xs[outside]),np.diff(ys[outside]))))
+    gap_pixels=largest_run*curve_length/max(1,len(hits))
+    dashed=(.40<=coverage<.90 and len(gaps)>=3 and typical>0 and
+            sum(.4*typical<=n<=2.5*typical for n in middle)>=max(3,math.ceil(len(middle)*.8)) and
+            max(gaps)<=max(2.,2.5*typical) and gap_pixels<=min(20.,curve_length*.13) and
+            min(float(chunk.mean()) for chunk in np.array_split(hits,5))>=.25)
+    return coverage,continuous,dashed,middle
+
+
+def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*,ink_mask=None,node_radii=None,node_geometry=None,diagnostics=None):
     """Detect an independently ink-backed arch between already known vertices.
 
     A contour may be almost semicircular; a straight Hough line has no chance
@@ -482,10 +685,19 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*
     both bend signs. This contributes evidence, NOT an accepted graph edge.
     """
     if len(local) > 14:
+        if diagnostics is not None:
+            diagnostics.append({'kind':'curve_template_node_limit','nodes':len(local),'limit':14,'skipped':True})
         return []
     ink = ((_foreground(rgb) if ink_mask is None else ink_mask) > 0)
     height, width = ink.shape
     output = []
+    refinement_counts=[]
+    capped_route_pairs=[]
+    # A coarse amplitude grid may change phase with marker size. Rank a
+    # bounded local fit by the actual ridge, not by a dilated corridor that
+    # can score 1.0 while the returned centreline still misses the stroke.
+    outside_distance=(cv2.distanceTransform(np.uint8(~ink),cv2.DIST_L2,3) if node_radii else None)
+    inside_distance=(cv2.distanceTransform(np.uint8(ink),cv2.DIST_L2,3) if node_radii else None)
 
     def independently_separated_ink(first, second):
         # Two fitted curves separated by only a few pixels may represent
@@ -525,6 +737,8 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*
             distance = math.hypot(dx, dy)
             if distance < max(45.0, 5.0*radius):
                 continue
+            first_radius = node_radii.get(local[i][0], radius) if node_radii else radius
+            second_radius = node_radii.get(local[j][0], radius) if node_radii else radius
             ux, uy = -dy/distance, dx/distance
             # No candidate should be inferred if the supposed arc goes
             # through a *marked* intermediate vertex.
@@ -532,10 +746,13 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*
             base_x = ax + ts*dx
             base_y = ay + ts*dy
             best_routes = []
+            refinement_count=0
             for sign in (-1,1):
                 max_bend = min(.72*distance, max(width,height)*.63)
                 step = max(3., min(7.,distance*.027))
-                amplitudes = np.arange(max(2.0*radius,.115*distance),
+                minimum_bend=(max(3.,min(radius,first_radius,second_radius)*.8,.045*distance)
+                              if node_radii else max(2.0*radius,.115*distance))
+                amplitudes = np.arange(minimum_bend,
                                        max_bend+step/2,step)
                 for profile in ("elliptical", "quadratic", "sine"):
                     if profile == "elliptical":
@@ -551,24 +768,68 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*
                         if (xs.min()<2 or ys.min()<2 or
                                 xs.max()>=width-2 or ys.max()>=height-2):
                             continue
+                        outside = (((xs-ax)**2+(ys-ay)**2 > (first_radius+2)**2) &
+                                   ((xs-bx)**2+(ys-by)**2 > (second_radius+2)**2)
+                                   if node_radii else np.ones(len(ts), bool))
+                        if np.count_nonzero(outside) < 12:
+                            continue
                         forbidden = False
-                        for k,(_,vx,vy) in enumerate(local):
+                        for k,(name,vx,vy) in enumerate(local):
                             if k in (i,j):continue
                             d2 = (xs-vx)**2+(ys-vy)**2
-                            if np.any(d2[(ts>.12)&(ts<.88)]<(radius*.8)**2):
+                            crossing_radius = node_radii.get(name, radius) if node_radii else radius
+                            if np.any(d2[(ts>.12)&(ts<.88)&outside]<(crossing_radius*.8)**2):
                                 forbidden=True
                                 break
                         if forbidden:
                             continue
-                        hits = _corridor_hits(ink, xs, ys, ux, uy)
-                        coverage=float(hits.mean())
-                        if coverage<.87:
-                            continue
-                        if min(float(chunk.mean()) for chunk in np.array_split(hits,5))<.75:
-                            continue
-                        missing = np.flatnonzero(np.r_[True,hits,True])
-                        largest_run=int(max(np.diff(missing)-1, default=0))
-                        if largest_run > max(5,round(.04*len(ts))):
+                        coverage,continuous,dashed,middle=_curve_pattern(ink,xs,ys,outside,ux,uy)
+                        if not continuous and not dashed:
+                            if not node_radii or refinement_count>=24:
+                                continue
+                            # This only seeds a local fit. A thin rotated arc
+                            # can lie halfway between coarse amplitudes and
+                            # miss the narrow corridor entirely. Every fitted
+                            # result must still pass the normal pattern gate.
+                            xx=np.rint(xs[outside]).astype(int);yy=np.rint(ys[outside]).astype(int)
+                            nearby=outside_distance[yy,xx]<=step/2+1.
+                            if (float(nearby.mean())<.92 or
+                                    min(float(chunk.mean()) for chunk in np.array_split(nearby,5))<.80):
+                                continue
+                        refinement={}
+                        direct_coverage=coverage
+                        if node_radii:
+                            original_amplitude=amplitude
+                            trials=(np.linspace(max(0.,amplitude-step/2),min(max_bend,amplitude+step/2),9)
+                                    if refinement_count<24 else [amplitude])
+                            limited=refinement_count>=24
+                            refinement_count+=not limited
+                            best_fit=None
+                            for trial in trials:
+                                tx=base_x+ux*sign*trial*shape;ty=base_y+uy*sign*trial*shape
+                                if tx.min()<2 or ty.min()<2 or tx.max()>=width-2 or ty.max()>=height-2:continue
+                                visible=(((tx-ax)**2+(ty-ay)**2>(first_radius+2)**2)&
+                                         ((tx-bx)**2+(ty-by)**2>(second_radius+2)**2))
+                                if np.count_nonzero(visible)<12:continue
+                                if any(np.any(((tx-vx)**2+(ty-vy)**2)[(ts>.12)&(ts<.88)&visible]<
+                                              (node_radii.get(name,radius)*.8)**2)
+                                       for k,(name,vx,vy) in enumerate(local) if k not in (i,j)):continue
+                                pattern=_curve_pattern(ink,tx,ty,visible,ux,uy)
+                                if not pattern[1] and not pattern[2]:continue
+                                xx=np.rint(tx[visible]).astype(int);yy=np.rint(ty[visible]).astype(int)
+                                distances=outside_distance[yy,xx]
+                                cost=float(np.mean(np.minimum(distances,3.))-.18*np.mean(np.minimum(inside_distance[yy,xx],3.)))
+                                if best_fit is None or cost<best_fit[0]:
+                                    best_fit=(cost,float(trial),pattern,float(np.mean(distances<=.96)))
+                            if best_fit is not None:
+                                fit_cost,amplitude,pattern,direct_coverage=best_fit
+                                coverage,continuous,dashed,middle=pattern
+                                refinement={'initial_bend_pixels':round(sign*original_amplitude,3),
+                                            'fitted_bend_pixels':round(sign*amplitude,3),
+                                            'ridge_coverage':round(direct_coverage,4),
+                                            'fit_cost':round(fit_cost,4),'trial_cap':9,
+                                            'pair_refinement_cap':24,'refinement_limited':limited}
+                        if not continuous and not dashed:
                             continue
                         # Use a shorter initial point to anchor near a node
                         # rim, preserving the actually observed stroke shape.
@@ -587,8 +848,12 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*
                         best_routes.append({
                             'from':local[i][0], 'to':local[j][0],
                             'path':path,'pixel_length':round(distance*(1+amplitude/distance)),
-                            'score':round(coverage,3),'needs_review':True,
+                            'score':round(direct_coverage if continuous else min(.80,direct_coverage+.18),3),'needs_review':True,
                             'method':'opencv_curved_ink_template',
+                            'style':'solid' if continuous else 'dashed',
+                            'connector_evidence': {'kind':'stroke_chain','gap_pattern':'continuous' if continuous else 'repeated_bounded',
+                                                   'complete_interior_gap_count':len(middle),'proposal_only':True,
+                                                   **({'curve_fit':refinement} if refinement else {})},
                             'bend':round(sign*amplitude,1),
                         })
             # Keep distinct ink corridors (parallel arches), not redundant
@@ -602,16 +867,25 @@ def _curved_stroke_candidates(rgb, local, x_off, y_off, radius, full_w, full_h,*
                         or _same_ink_route(candidate,old,{
                             local[i][0]:(ax+x_off,ay+y_off),
                             local[j][0]:(bx+x_off,by+y_off)},
-                            full_w,full_h,radius)
+                            full_w,full_h,radius,ink=ink,offset=(x_off,y_off),
+                            node_geometry=node_geometry)
                         for old in selected):
                     selected.append(candidate)
                 if len(selected)>=4:
+                    capped_route_pairs.append([local[i][0],local[j][0]])
                     break
+            refinement_counts.append({'endpoints':[local[i][0],local[j][0]],'count':refinement_count})
             output.extend(selected)
+    if diagnostics is not None and node_radii:
+        diagnostics.append({'kind':'curve_refinement_budget','total_refined_hypotheses':sum(row['count'] for row in refinement_counts),
+                            'maximum_pair_refinements':max((row['count'] for row in refinement_counts),default=0),
+                            'pair_refinement_limit':24,'amplitude_trial_limit':9,
+                            'refinement_limit_reached_pairs':[row['endpoints'] for row in refinement_counts if row['count']>=24],
+                            'pair_route_limit':4,'route_limit_reached_pairs':capped_route_pairs})
     return output
 
 
-def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,marker_scale=1.):
+def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,marker_scale=1.,diagnostics=None):
     h, w = rgb.shape[:2]
     points = _vertices(graph, w, h)
     if not points:
@@ -623,6 +897,37 @@ def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,ma
     ]
     median_sep = float(np.median(nearest))
     radius = max(3, min(13, round(median_sep * 0.12)))
+    # Explicit evidence contract: radii are measured in the supplied image's
+    # pixels, then scaled exactly once if _decode reduced that image. A missing
+    # mapping retains the legacy path; no native-recovery flag is fabricated.
+    measured_radii = {}
+    measured_geometry = {}
+    supplied_radii = graph.get('measured_marker_radii')
+    if isinstance(supplied_radii, dict):
+        for name, _, _ in points:
+            value = supplied_radii.get(name)
+            if (type(value) in (int, float) and math.isfinite(value)
+                    and value > 0 and math.isfinite(marker_scale) and marker_scale > 0):
+                scaled = value*marker_scale
+                if scaled <= max(w, h):
+                    measured_radii[name] = scaled
+    supplied_geometry = graph.get('measured_marker_geometry')
+    if isinstance(supplied_geometry, dict):
+        for name, _, _ in points:
+            entry = supplied_geometry.get(name)
+            if not isinstance(entry, dict):
+                continue
+            try:
+                centre = np.asarray(entry['center_pixels'], float)
+                axes = np.asarray(entry['semiaxes_pixels'], float)
+                values = np.r_[centre, axes, float(entry['angle_degrees']), float(entry['radius_pixels'])]
+                if (centre.shape != (2,) or axes.shape != (2,) or not np.isfinite(values).all()
+                        or min(axes) <= 0 or max(axes)*marker_scale > max(w,h)):
+                    continue
+                measured_geometry[name] = scaled_geometry(entry, marker_scale)
+                measured_radii[name] = measured_geometry[name]['radius_pixels']
+            except (TypeError, ValueError, KeyError):
+                continue
     proof={p['vertex']:p for p in graph.get('node_position_evidence',[])}
     native_radii={}
     if graph.get('node_review',{}).get('native_disk_core_size_recovery') and len(proof)==len(points):
@@ -667,9 +972,22 @@ def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,ma
     ink_mask=photo_mask if photo_mask is not None else _foreground(rgb[min_y:max_y, min_x:max_x])
     skel = _thin(ink_mask)
     local = [(label, x - min_x, y - min_y) for label, x, y in points]
+    local_geometry = {name: scaled_geometry(value, 1., offset=(min_x,min_y))
+                      for name, value in measured_geometry.items()}
     # Erase only already-detected vertex interiors, not line crossings.
     for name, x, y in local:
-        clearance=math.ceil(native_radii[name])+1 if native_radii else max(1,radius-2)
+        if name in local_geometry:
+            geometry = local_geometry[name]
+            cx,cy = geometry['center_pixels']
+            reach = max(geometry['semiaxes_pixels'])+3
+            left,top = max(0,math.floor(cx-reach)),max(0,math.floor(cy-reach))
+            right,bottom = min(skel.shape[1],math.ceil(cx+reach+1)),min(skel.shape[0],math.ceil(cy+reach+1))
+            yy,xx=np.mgrid[top:bottom,left:right]
+            erase=contains_points(np.stack([xx,yy],axis=-1),geometry,margin=1.)
+            skel[top:bottom,left:right][erase]=0
+            continue
+        clearance = (math.ceil(measured_radii[name])+1 if name in measured_radii else
+                     math.ceil(native_radii[name])+1 if native_radii else max(1,radius-2))
         cv2.circle(skel, (x, y), clearance, 0, -1)
     # Preserve genuinely different routes between the same pair of vertices.
     # Duplicate forward/reverse traces of one stroke must NOT become multiedges.
@@ -682,9 +1000,23 @@ def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,ma
         pair = tuple(sorted((indices[candidate["from"]],
                              indices[candidate["to"]])))
         variants=path_variants.setdefault(pair,[])
+        if candidate.get('connector_evidence',{}).get('kind')=='outlined_arrow':
+            for old in variants:
+                if (old.get('connector_evidence',{}).get('kind')=='outlined_arrow' and old['score']>=candidate['score']
+                        and _same_ink_route(candidate,old,node_pixels,w,h,radius,ink=ink_mask,
+                                            offset=(min_x,min_y),node_geometry=measured_geometry or None)):
+                    return
+            variants[:]=[old for old in variants if not _same_ink_route(
+                candidate,old,node_pixels,w,h,radius,ink=ink_mask,offset=(min_x,min_y),
+                node_geometry=measured_geometry or None)]
+            variants.append(candidate)
+            return
         for index,old in enumerate(variants):
-            if _same_ink_route(candidate,old,node_pixels,w,h,radius,ink=ink_mask,offset=(min_x,min_y)):
-                if candidate["score"]>old["score"]: variants[index]=candidate
+            if _same_ink_route(candidate,old,node_pixels,w,h,radius,ink=ink_mask,offset=(min_x,min_y),
+                               node_geometry=measured_geometry or None):
+                if (candidate["score"]>old["score"] and
+                        old.get('connector_evidence',{}).get('kind')!='outlined_arrow'):
+                    variants[index]=candidate
                 return
         # Variants are candidate strokes, not certified multiplicity.
         if len(variants)<6:
@@ -698,9 +1030,13 @@ def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,ma
         1600, max(50, round(2.4 * (max_x - min_x + max_y - min_y)))
     )
     for source in range(len(local)):
-        for start in _unique_seeds(skel, local, source, radius):
+        source_radius = measured_radii.get(local[source][0], radius)
+        sectors = max(24, min(128, round(2*math.pi*source_radius/4))) if measured_radii else 24
+        for start in _unique_seeds(skel, local, source, source_radius, sectors=sectors,
+                                   geometry=local_geometry.get(local[source][0])):
             target, path, turns, ambiguity = _follow(
-                skel, local, source, start, radius, max_steps
+                skel, local, source, start, radius, max_steps,
+                node_radii=measured_radii or None, node_geometry=local_geometry or None
             )
             if target is None:
                 continue
@@ -730,29 +1066,40 @@ def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,ma
                 'method': ('opencv_skeleton_loop_trace'
                            if source == target else 'opencv_skeleton_tangent_trace'),
                 'loop_candidate': source == target,
+                'connector_evidence': {'kind': 'stroke_chain', 'source': 'skeleton_ports',
+                                       'proposal_only': True},
             }
             if not candidate['path']:continue
             keep_candidate(candidate)
 
     for candidate in _straight_stroke_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h,ink_mask=photo_mask):
+            radius, w, h,ink_mask=photo_mask,node_radii=measured_radii or None):
         keep_candidate(candidate)
     # A long edge can terminate on a circular node rim away from the line
     # joining the two node centers; Hough endpoints recover these cases.
     for candidate in _hough_endpoint_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h,ink_mask=photo_mask):
+            radius, w, h,ink_mask=photo_mask,node_radii=measured_radii or None,
+            node_geometry=local_geometry or None):
         keep_candidate(candidate)
     # Add paths around genuinely curved independent ink corridors, including
     # a straight+arc parallel pair which skeleton's greedy walker may miss.
     for candidate in _curved_stroke_candidates(
             rgb[min_y:max_y, min_x:max_x], local, min_x, min_y,
-            radius, w, h,ink_mask=photo_mask):
+            radius, w, h,ink_mask=photo_mask,node_radii=measured_radii or None,
+            node_geometry=measured_geometry or None,diagnostics=diagnostics):
         keep_candidate(candidate)
+    if measured_geometry:
+        for candidate in outlined_arrow_candidates(ink_mask,local,local_geometry,measured_radii,radius,
+                                                   offset=(min_x,min_y),full_size=(w,h)):
+            keep_candidate(candidate)
     result = []
     for variants in path_variants.values():
         result.extend(variants)
+    if diagnostics is not None and len(result)>=MAX_TRACES_PER_GRAPH:
+        diagnostics.append({'kind':'graph_candidate_limit','before_count':len(result),
+                            'limit':MAX_TRACES_PER_GRAPH,'truncated':len(result)>MAX_TRACES_PER_GRAPH})
     ordered = sorted(
         result, key=lambda x: (-x['score'], x['from'], x['to'])
     )[:MAX_TRACES_PER_GRAPH]
@@ -761,6 +1108,29 @@ def _graph_candidates(rgb, graph, *, dense_paths=False,consistent_paper=False,ma
         pair = tuple(sorted((entry['from'], entry['to'])))
         entry['path_variant'] = variants.get(pair, 0)
         variants[pair] = entry['path_variant'] + 1
+        if measured_geometry:
+            points=np.asarray(_route_polyline_pixels(entry,w,h),float)
+            if len(points)>=2:
+                lengths=np.r_[0.,np.cumsum(np.linalg.norm(np.diff(points,axis=0),axis=1))]
+                if lengths[-1]>1:
+                    samples=np.linspace(0.,lengths[-1],min(256,max(24,math.ceil(lengths[-1]/2.))))
+                    points=np.stack([np.interp(samples,lengths,points[:,axis]) for axis in range(2)],axis=1)
+                origin=np.asarray(node_pixels[entry['from']])
+                if np.linalg.norm(points[0]-origin)>np.linalg.norm(points[-1]-origin):points=points[::-1]
+                ports=[]
+                for name,route in ((entry['from'],points),(entry['to'],points[::-1])):
+                    geometry=measured_geometry.get(name)
+                    if not geometry:continue
+                    outside=np.flatnonzero(~contains_points(route,geometry,margin=1.))
+                    if not len(outside):continue
+                    k=int(outside[0]);point=route[k]
+                    tangent=route[min(len(route)-1,k+1)]-point
+                    norm=float(np.linalg.norm(tangent))
+                    ports.append({'vertex':name,'point':[round(float(point[0]/max(w-1,1)),6),round(float(point[1]/max(h-1,1)),6)],
+                                  'outward_tangent':[round(float(x/max(norm,1e-6)),5) for x in tangent],
+                                  'footprint_confidence':geometry.get('confidence',0.),
+                                  'footprint_source':geometry.get('source','measured')})
+                entry['ports']=ports
     return ordered
 
 
@@ -775,10 +1145,14 @@ def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False,consistent
         marker_scale=min(rgb.shape[1]/native_size[0],rgb.shape[0]/native_size[1])
         result = dict(cv_result)
         candidates = []
+        trace_diagnostics=[]
         for graph in (cv_result.get('graphs') or [])[:MAX_GRAPHS]:
             if not isinstance(graph, dict):
                 continue
-            traces = _graph_candidates(rgb, graph,dense_paths=dense_paths,consistent_paper=consistent_paper,marker_scale=marker_scale)
+            limits=[]
+            traces = _graph_candidates(rgb, graph,dense_paths=dense_paths,consistent_paper=consistent_paper,
+                                       marker_scale=marker_scale,diagnostics=limits)
+            if limits:trace_diagnostics.append({'id':str(graph.get('id','')),'diagnostics':limits})
             if traces:
                 # The arrow result is evidence, not an accepted direction.
                 try:
@@ -800,6 +1174,8 @@ def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False,consistent
                 })
         if candidates:
             result['line_path_evidence'] = candidates
+        if trace_diagnostics:
+            result['line_trace_diagnostics']=trace_diagnostics
         return result
     except (ValueError, TypeError, cv2.error, OSError,
             KeyError, MemoryError) as exc:

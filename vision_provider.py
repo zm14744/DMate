@@ -140,6 +140,11 @@ class VisionProvider:
         if not self.available():raise VisionError('missing_key')
         self.logical_calls+=1
         payload=self.payload(prompt,images)
+        if self.name=='qwen' and hasattr(budget,'output_tokens'):
+            value=budget.output_tokens
+            if type(value) is not int or not 1024<=value<=16384:
+                raise ValueError('invalid_bounded_output_budget')
+            payload['max_tokens']=value
         if self.name=='qwen':
             import ai
             key=ai.API_KEY;request=self.transport or ai._request_qwen_completion
@@ -147,6 +152,7 @@ class VisionProvider:
         for attempt in range(self.retries+1):
             timeout=budget.take();started=time.monotonic();status=None;raw=None;error=None
             metric={'provider':self.name,'model':self.model,'thinking':self.thinking,
+                    'max_output_tokens':payload['max_tokens'],
                     'reasoning_effort':self.reasoning_effort,
                     'thinking_budget':self.thinking_budget,
                     'started_at_unix':time.time(),
