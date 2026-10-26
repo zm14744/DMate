@@ -214,3 +214,46 @@ def test_existing_call_and_deadline_limits_remain_enforced():
     with pytest.raises(VisionError, match='^transport_failed$'):
         RoleRunner(ledger, provider=remote).call('connections', 'JSON', {}, [], revision=3)
     assert len(calls) == 1 and ledger.remaining == 0 and ledger.network_recoveries == 0
+
+
+def test_source_call_reserves_review_time_without_changing_shared_upload_deadline():
+    ledger = AgentBudget(seconds=20, calls=4, call_seconds=75)
+    original_deadline = ledger.deadline
+    seen = []
+    def remote(prompt, images, attempt):
+        timeout = attempt.take()
+        seen.append((attempt.deadline, timeout))
+        assert attempt.deadline == original_deadline - 8
+        assert 10 < timeout <= 12
+        return {'sources': []}
+    result = RoleRunner(ledger, provider=remote).call('semantic_edges', 'JSON', {}, [],
+        response_identity=False, reserve_seconds=8)
+    assert result == {'sources': []} and len(seen) == 1
+    assert ledger.deadline == original_deadline and ledger.remaining == 3
+    # The subsequent final reader gets the original, unshortened deadline.
+    def reviewer(prompt, images, attempt):
+        assert attempt.deadline == original_deadline
+        assert attempt.take() > 18
+        return {'body_text': '', 'graphs': []}
+    RoleRunner(ledger, provider=reviewer).call('semantic_review', 'JSON', {}, [], response_identity=False)
+    assert ledger.remaining == 2
+
+
+def test_exhausted_source_window_does_not_spend_final_review_call():
+    ledger = AgentBudget(seconds=10, calls=3)
+    sent = []
+    def remote(*args):
+        sent.append(True)
+        return {}
+    with pytest.raises(TimeoutError, match='agent_task_deadline'):
+        RoleRunner(ledger, provider=remote).call('semantic_edges', 'JSON', {}, [], reserve_seconds=8)
+    assert not sent and ledger.remaining == 3
+
+
+@pytest.mark.parametrize('reserve', [True, -1, float('nan'), float('inf'), '8'])
+def test_invalid_time_reserve_is_rejected_before_provider_dispatch(reserve):
+    ledger = budget()
+    with pytest.raises(ValueError, match='invalid_role_time_reserve'):
+        RoleRunner(ledger, provider=lambda *args: pytest.fail('must not dispatch')).call(
+            'semantic_edges', 'JSON', {}, [], reserve_seconds=reserve)
+    assert ledger.remaining == 8 and not ledger.events

@@ -11,9 +11,12 @@ import requests
 @pytest.fixture
 def application(monkeypatch):
     monkeypatch.setenv('DMATE_GRAPH_NEXTGEN', '1')
+    # These historical worker-health contracts exercise the retained route
+    # which actually requests Paddle; semantic default routing is tested apart.
+    monkeypatch.setenv('DMATE_GRAPH_PIPELINE', 'evidence-two-pass')
     for key in ('DATABASE_URL', 'POSTGRES_CONNECTION_STRING', 'POSTGRES_URL',
                 'PGHOST', 'POSTGRES_HOST', 'DASHSCOPE_API_KEY',
-                'DASHSCOPE_VISION_API_KEY', 'DEEPSEEK_API_KEY'):
+                'DASHSCOPE_VISION_API_KEY', 'DEEPSEEK_API_KEY', 'ZHIPU_API_KEY'):
         monkeypatch.delenv(key, raising=False)
     calls = {'network': 0, 'models': 0, 'legacy_vision': 0, 'legacy_audit': 0}
 

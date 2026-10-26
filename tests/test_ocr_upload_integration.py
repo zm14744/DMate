@@ -9,12 +9,17 @@ from copy import deepcopy
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
+import threading
+import time
 
 import pytest
 
 from scripts.verify_ocr_application_upload import (CASES, EXPECTED_BOUNDARY_CALLS, ROOT, SENTINEL,
-    clean_child_environment, local_service, multipart_observation, private_directory,
-    run, summarize)
+    browser_uploads, clean_child_environment, digest, health_observation, local_service,
+    multipart_observation, private_directory, run, summarize, synthetic_image, wait_file,
+    write_bytes, write_json)
 
 
 def test_child_environment_cannot_inherit_production_or_proxy_settings(tmp_path):
@@ -166,3 +171,168 @@ def test_actual_chromium_file_input_through_real_isolated_flask_route():
             assert first['http_status'] == 200
             assert first['body']['diagnostics']['local_ocr']['available'] is True
             assert 'text' in first['body']['diagnostics']['local_ocr']['stages']
+
+
+def _serve_semantic_fixture(folder):
+    """Fresh process: real app/provider, no local models, network, DB or mail."""
+    import socket
+    import smtplib
+    import requests
+    from flask import request
+    from werkzeug.serving import make_server, WSGIRequestHandler
+
+    folder = Path(folder)
+    expected = clean_child_environment(folder)
+    expected.pop('DMATE_GRAPH_PIPELINE')
+    if ({k: v for k, v in os.environ.items() if k != 'LC_CTYPE'} != expected):
+        raise ValueError('Semantic fixture must have a clean default-pipeline environment')
+    ledger = {'fixture_only': True, 'actual_model_sends': {'qwen': 0, 'glm': 0, 'deepseek': 0},
+              'guards': [], 'boundary_calls': [], 'requests': []}
+
+    def forbidden(name):
+        def fail(*args, **kwargs):
+            ledger['guards'].append(name)
+            raise RuntimeError('semantic_fixture_forbidden_'+name)
+        return fail
+
+    requests.sessions.Session.send = forbidden('http_send')
+    socket.socket.connect = forbidden('socket_connect')
+    socket.socket.connect_ex = forbidden('socket_connect_ex')
+    smtplib.SMTP = forbidden('smtp')
+    smtplib.SMTP_SSL = forbidden('smtp_ssl')
+    try:
+        import psycopg
+        psycopg.connect = forbidden('database_connect')
+    except ImportError:
+        pass
+    import ocr_runtime
+    for name in ('load_models', 'recognize_image', 'run_worker'):
+        setattr(ocr_runtime, name, forbidden(name))
+    import app as application
+    import ai
+    if application.AUTH_CONFIGURED or application.TRUSTED_PROXY_CIDRS:
+        raise ValueError('Semantic fixture unexpectedly configured production accounts')
+    for name in ('recognize_graphs', 'analyze_image_structure', 'verify_graph_image_independently'):
+        setattr(application, name, forbidden(name))
+
+    def qwen(payload, headers, **kwargs):
+        content = payload['messages'][0]['content']
+        prompt = next(row['text'] for row in content if row['type'] == 'text')
+        task = json.loads(prompt.rsplit('\n', 1)[1])
+        role = task['role']
+        ledger['boundary_calls'].append({'provider': 'qwen', 'role': role})
+        # This answers only synthetic_image(); the real provider and LangGraph
+        # still parse, normalize, review and serialize their own response.
+        document = {'body_text': 'Count the edges.', 'graphs': [{'id': 'G1',
+            'vertices': [{'id': 'a', 'label': 'a'}, {'id': 'b', 'label': 'b'}],
+            'edges': [{'from': 'a', 'to': 'b', 'direction': 'undirected'}]}], 'uncertainties': []}
+        if role == 'semantic_extract':
+            for graph in document['graphs']:
+                graph['edges'] = []
+        elif role == 'semantic_edges':
+            from test_agent_upload_route import source_reply
+            document = source_reply(document, task['task'])
+        elif role != 'semantic_review':
+            raise AssertionError('Unexpected role in successful semantic upload: '+role)
+        return 200, {}, {'model': 'qwen3-vl-plus', 'choices': [{'finish_reason': 'stop',
+            'message': {'content': json.dumps(document)}}]}
+
+    def deepseek(*args, **kwargs):
+        ledger['boundary_calls'].append({'provider': 'deepseek'})
+        return {'ok': True, 'content': '{"edits":[]}',
+                'choice': {'finish_reason': 'stop'}, 'model': 'deepseek-flash'}
+
+    ai._request_qwen_completion = qwen
+    ai._request_text_completion = deepseek
+
+    @application.app.after_request
+    def observe(response):
+        record = {'path': request.path, 'method': request.method, 'http_status': response.status_code}
+        if request.path == '/ocr':
+            image = request.files['image']
+            image.stream.seek(0)
+            raw, body = image.read(), response.get_data()
+            write_bytes(folder/'first_response.bin', body)
+            record.update(image_sha256=digest(raw), response_sha256=digest(body),
+                          request_id=request.form['request_id'])
+        ledger['requests'].append(record)
+        return response
+
+    class QuietHandler(WSGIRequestHandler):
+        def log_request(self, *args, **kwargs):
+            pass
+
+    server = make_server('127.0.0.1', 0, application.app, threaded=True, request_handler=QuietHandler)
+    write_json(folder/'server.json', {'url': 'http://127.0.0.1:'+str(server.server_port)})
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        while not (folder/'stop').exists():
+            time.sleep(.05)
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()
+        write_json(folder/'server_evidence.json', ledger)
+
+
+def test_actual_chromium_default_semantic_route_never_starts_paddle():
+    executable = os.environ.get('DMATE_BROWSER_EXECUTABLE')
+    cache = os.environ.get('DMATE_BROWSER_CDN_CACHE')
+    base = os.environ.get('DMATE_UPLOAD_INTEGRATION_OUTPUT')
+    if not executable or not cache or not base:
+        pytest.skip('Semantic browser upload not run: set Chromium, verified cache and private output')
+    pytest.importorskip('playwright.sync_api')
+    output = private_directory(Path(base)/'semantic_default')
+    folder = output/'isolated_server'
+    folder.mkdir(mode=0o700)
+    environment = clean_child_environment(folder)
+    environment.pop('DMATE_GRAPH_PIPELINE')  # Exercise the actual default.
+    command = [sys.executable, '-c',
+               'import sys; sys.path.insert(0,"tests"); '
+               'from test_ocr_upload_integration import _serve_semantic_fixture; '
+               '_serve_semantic_fixture(sys.argv[1])', str(folder)]
+    with (folder/'process.log').open('xb') as log:
+        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=log)
+        try:
+            service = wait_file(folder/'server.json', timeout=30)['url']
+            initial = health_observation(service)
+            write_json(output/'initial_health.json', initial)
+            row = synthetic_image(output/'synthetic_transparent.png')
+            cases, network = browser_uploads(service, [('semantic_default', row)], output, executable, cache)
+        finally:
+            (folder/'stop').touch()
+            try:
+                process.wait(timeout=8)
+            except subprocess.TimeoutExpired:
+                process.terminate()
+                process.wait(timeout=5)
+    server = wait_file(folder/'server_evidence.json', timeout=2)
+    case = cases[0]
+    response = case['http_responses'][0]
+    submitted = [entry for entry in server['requests'] if entry['path'] == '/ocr']
+    initial_ready = initial['/ready']['body']
+    ready = case['health_after']['/ready']['body']
+    report = {'fixture_only': True, 'status': 'not_certified',
+              'actual_model_sends': server['actual_model_sends'],
+              'case': case, 'network': network, 'initial_ready': initial_ready, 'ready': ready,
+              'recognition_accuracy_test': False}
+    write_json(output/'summary.json', report)
+    assert case['contract_status'] == 'pass', case
+    assert server['guards'] == []
+    assert server['actual_model_sends'] == {'qwen': 0, 'glm': 0, 'deepseek': 0}
+    assert network['external_requests_blocked'] == [] and network['external_network_sends'] == 0
+    assert len(submitted) == 1
+    assert submitted[0]['image_sha256'] == row['sha256']
+    assert submitted[0]['request_id'] == case['browser_uploads'][0]['request_id']
+    assert submitted[0]['response_sha256'] == response['response_sha256']
+    assert response['body']['recognition_status'] == 'complete' and case['dialog_calls'] == 1
+    assert response['body']['diagnostics']['semantic_workflow']['reviewed'] is True
+    assert [entry['role'] for entry in server['boundary_calls'] if entry['provider'] == 'qwen'] == [
+        'semantic_extract', 'semantic_edges', 'semantic_review']
+    assert initial_ready['recognition_mode'] == ready['recognition_mode'] == 'semantic_visual'
+    assert initial_ready['recognition_ready'] is False and ready['recognition_ready'] is True
+    assert ready['ocr_ready'] is False and ready['local_ocr_required'] is False
+    assert ready['ocr_stages']['text']['status'] == 'skipped'
+    assert ready['ocr_stages']['semantic']['status'] == 'complete'
+    assert all(entry['path'] not in ('/init_ocr', '/chat') for entry in server['requests'])
