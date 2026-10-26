@@ -1212,6 +1212,9 @@ $$
 
     context = teaching_context or {}
     system_content = SYSTEM_PROMPT + teaching_prompt(context)
+    if context.get("semantic_math"):
+        from graph_semantic_solver import semantic_math_prompt
+        system_content += semantic_math_prompt(context["semantic_math"])
     if context.get("mode") == "full_solution":
         reference = str(context.get("solution_reference_answer") or "").strip()[:1200]
         if reference:

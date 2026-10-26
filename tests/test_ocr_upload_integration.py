@@ -174,7 +174,7 @@ def test_actual_chromium_file_input_through_real_isolated_flask_route():
 
 
 def _serve_semantic_fixture(folder):
-    """Fresh process: real app/provider, no local models, network, DB or mail."""
+    """Real app/provider/tool adapters; worker fixtures, no model or external sends."""
     import socket
     import smtplib
     import requests
@@ -187,7 +187,7 @@ def _serve_semantic_fixture(folder):
     if ({k: v for k, v in os.environ.items() if k != 'LC_CTYPE'} != expected):
         raise ValueError('Semantic fixture must have a clean default-pipeline environment')
     ledger = {'fixture_only': True, 'actual_model_sends': {'qwen': 0, 'glm': 0, 'deepseek': 0},
-              'guards': [], 'boundary_calls': [], 'requests': []}
+              'guards': [], 'boundary_calls': [], 'requests': [], 'worker_events': []}
 
     def forbidden(name):
         def fail(*args, **kwargs):
@@ -206,8 +206,12 @@ def _serve_semantic_fixture(folder):
     except ImportError:
         pass
     import ocr_runtime
-    for name in ('load_models', 'recognize_image', 'run_worker'):
+    for name in ('load_models', 'recognize_image'):
         setattr(ocr_runtime, name, forbidden(name))
+    import pytest
+    from test_graph_semantic_pipeline import install_semantic_worker_fixtures
+    worker_patch = pytest.MonkeyPatch()
+    install_semantic_worker_fixtures(worker_patch, ledger['worker_events'], lock_root=folder)
     import app as application
     import ai
     if application.AUTH_CONFIGURED or application.TRUSTED_PROXY_CIDRS:
@@ -220,7 +224,10 @@ def _serve_semantic_fixture(folder):
         prompt = next(row['text'] for row in content if row['type'] == 'text')
         task = json.loads(prompt.rsplit('\n', 1)[1])
         role = task['role']
-        ledger['boundary_calls'].append({'provider': 'qwen', 'role': role})
+        ledger['boundary_calls'].append({'provider': 'qwen', 'role': role,
+            'review_mode': task.get('review_mode'),
+            'local_text_hint_count': len(task.get('local_ocr_candidates', [])),
+            'layout_candidates_received': bool(task.get('local_layout_candidates'))})
         # This answers only synthetic_image(); the real provider and LangGraph
         # still parse, normalize, review and serialize their own response.
         document = {'body_text': 'Count the edges.', 'graphs': [{'id': 'G1',
@@ -232,6 +239,10 @@ def _serve_semantic_fixture(folder):
         elif role == 'semantic_edges':
             from test_agent_upload_route import source_reply
             document = source_reply(document, task['task'])
+        elif role == 'semantic_review' and task.get('review_mode') == 'read_only':
+            document = {'issues': []}
+        elif role == 'semantic_body':
+            document = {'body_text': document['body_text'], 'uncertainties': []}
         elif role != 'semantic_review':
             raise AssertionError('Unexpected role in successful semantic upload: '+role)
         return 200, {}, {'model': 'qwen3-vl-plus', 'choices': [{'finish_reason': 'stop',
@@ -276,7 +287,7 @@ def _serve_semantic_fixture(folder):
         write_json(folder/'server_evidence.json', ledger)
 
 
-def test_actual_chromium_default_semantic_route_never_starts_paddle():
+def test_actual_chromium_default_semantic_route_runs_local_tool_boundaries_without_models():
     executable = os.environ.get('DMATE_BROWSER_EXECUTABLE')
     cache = os.environ.get('DMATE_BROWSER_CDN_CACHE')
     base = os.environ.get('DMATE_UPLOAD_INTEGRATION_OUTPUT')
@@ -329,10 +340,18 @@ def test_actual_chromium_default_semantic_route_never_starts_paddle():
     assert response['body']['recognition_status'] == 'complete' and case['dialog_calls'] == 1
     assert response['body']['diagnostics']['semantic_workflow']['reviewed'] is True
     assert [entry['role'] for entry in server['boundary_calls'] if entry['provider'] == 'qwen'] == [
-        'semantic_extract', 'semantic_edges', 'semantic_review']
+        'semantic_extract', 'semantic_edges', 'semantic_review', 'semantic_body']
+    assert next(row for row in server['boundary_calls']
+                if row.get('role') == 'semantic_review')['review_mode'] == 'read_only'
+    assert server['boundary_calls'][0]['local_text_hint_count'] > 0
+    assert server['boundary_calls'][0]['layout_candidates_received']
+    assert [row['stage'] for row in server['worker_events']
+            if row['kind'] == 'injected_worker'] == ['layout', 'text']
+    assert all(row['fixture_only'] for row in server['worker_events'])
     assert initial_ready['recognition_mode'] == ready['recognition_mode'] == 'semantic_visual'
     assert initial_ready['recognition_ready'] is False and ready['recognition_ready'] is True
-    assert ready['ocr_ready'] is False and ready['local_ocr_required'] is False
-    assert ready['ocr_stages']['text']['status'] == 'skipped'
+    assert ready['ocr_ready'] is True and ready['local_ocr_required'] is False
+    assert ready['ocr_stages']['text']['status'] == 'ok'
+    assert ready['ocr_stages']['text']['model_inference_completed'] is True
     assert ready['ocr_stages']['semantic']['status'] == 'complete'
     assert all(entry['path'] not in ('/init_ocr', '/chat') for entry in server['requests'])

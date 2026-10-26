@@ -361,7 +361,7 @@ def _with_local_ocr_execution(response, execution):
     diagnostics["local_ocr"] = copy.deepcopy(execution)
     response["diagnostics"] = diagnostics
     if (execution.get("required") is False
-            and execution.get("mode") == "skipped_for_semantic_reader"):
+            and execution.get("mode") in ("skipped_for_semantic_reader", "semantic_with_local_tools")):
         # The semantic reader owns both the text and graph verdict. An
         # intentionally absent Paddle hint is neither a success nor a failure.
         return response
@@ -406,35 +406,64 @@ def _semantic_ocr_selected():
 
 
 def _semantic_local_result():
-    """Explicitly skip optional Paddle hints; retain the original image path."""
+    """The graph pipeline runs bounded layout, text and geometry tools."""
     stages = {name: {"status": "skipped", "reason": "semantic_visual_reader",
                      "worker_started": False}
               for name in ("layout", "text", "formula")}
+    stages["layout"] = {"status": "pending", "reason": "semantic_layout_tool", "worker_started": False}
+    stages["text"] = {"status": "pending", "reason": "semantic_text_tool", "worker_started": False}
     result = {"text": "", "text_count": 0, "formula_count": 0,
               "warning": None, "review_regions": None,
-              "layout": {"status": "skipped", "regions": [],
-                         "reason": "semantic_visual_reader"},
+              "layout": {"status": "pending", "regions": [],
+                         "reason": "semantic_layout_tool"},
               "resource_metrics": [{"stage": name, **copy.deepcopy(status)}
                                    for name, status in stages.items()]}
     execution = {"available": OCR_AVAILABLE, "required": False,
-                 "mode": "skipped_for_semantic_reader", "text_succeeded": False,
+                 "mode": "semantic_with_local_tools", "text_succeeded": False,
                  "stages": stages}
     return result, execution
+
+
+def _semantic_tool_execution(response, execution):
+    """Expose actual worker outcomes, not success inferred from a model answer."""
+    updated = copy.deepcopy(execution)
+    diagnostics = response.get("diagnostics") or {}
+    workflow = diagnostics.get("semantic_workflow") or {}
+    local_tools = workflow.get("local_tools") or diagnostics.get("local_tools") or {}
+    for stage in ("layout", "text"):
+        stage_tools = local_tools.get(stage) or {}
+        metrics = stage_tools.get("resource_metrics") or []
+        measurements = [row for row in metrics if isinstance(row, dict) and row.get("stage") == stage]
+        if measurements:
+            last = measurements[-1]
+            updated["stages"][stage] = {key: copy.deepcopy(last[key]) for key in
+                ("status", "worker_started", "model_inference_completed", "previous_model_result_reused",
+                 "error_kind", "phase", "seconds") if key in last}
+            updated["stages"][stage].setdefault("worker_started", False)
+        else:
+            updated["stages"][stage] = {"status": "not_reported", "worker_started": False}
+    text_stage = updated["stages"]["text"]
+    updated["text_succeeded"] = bool(text_stage.get("model_inference_completed")
+                                      or text_stage.get("previous_model_result_reused"))
+    updated["local_tools"] = {key: {"diagnostics": copy.deepcopy(value.get("diagnostics", []))}
+        for key, value in local_tools.items() if isinstance(value, dict)}
+    return updated
 
 
 def _record_semantic_execution(execution, status):
     """Keep local-worker readiness distinct from the selected remote route."""
     global _ocr_ready, _ocr_status, _ocr_stages
     with _ocr_health_lock:
-        _ocr_ready = False  # No local text worker has run in this route.
-        _ocr_status = "本地文字与版面识别已跳过（由视觉模型读取原图）"
+        _ocr_ready = execution.get("text_succeeded") is True
+        _ocr_status = ("版面、Small文字与几何工具辅助视觉识别" if _ocr_ready
+                       else "版面与几何工具辅助视觉识别，本轮Small文字候选未就绪")
         _ocr_stages = copy.deepcopy(execution.get("stages") or {})
         _ocr_stages["semantic"] = {"status": status, "pipeline": "agent-tools"}
 
 
 def _run_graph_ocr_route(raw, result, local_execution, request_id, deadline, *, pipeline):
     """One selected graph route owns its failures and remote budget."""
-    semantic = local_execution.get("mode") == "skipped_for_semantic_reader"
+    semantic = local_execution.get("mode") in ("skipped_for_semantic_reader", "semantic_with_local_tools")
     try:
         from ocr_nextgen import recognize_graph_document
         nextgen = recognize_graph_document(raw, result, graph_pipeline=pipeline,
@@ -443,6 +472,8 @@ def _run_graph_ocr_route(raw, result, local_execution, request_id, deadline, *, 
         if (not isinstance(nextgen, dict)
                 or nextgen.get("recognition_status") not in ("complete", "partial", "failed", "not_graph")):
             raise ValueError("invalid_graph_pipeline_result")
+        if semantic:
+            local_execution = _semantic_tool_execution(nextgen, local_execution)
         if request_id and _take_ocr_cancelled(request_id):
             if semantic:
                 _record_semantic_execution(local_execution, "cancelled")
@@ -3180,6 +3211,19 @@ def chat():
         # 真正解题时中等/困难均为 high。
         ai_teaching["generation_reasoning_effort"] = "none"
 
+    # The current reviewed picture carries the same semantic edge instances
+    # used for rendering. Never recover them by lowercasing/parsing prose or
+    # reuse the preceding picture after navigating to a different question.
+    semantic_math = {"status": "not_requested", "tool_audit": []}
+    if data.get("semantic_context") is not None and not effective_exercise_request:
+        from graph_semantic_solver import semantic_solver_context
+        try:
+            semantic_math = semantic_solver_context(data["semantic_context"], current_user_content)
+        except (ValueError, TypeError, KeyError, ImportError) as exc:
+            semantic_math = {"status": "unavailable", "error_kind": type(exc).__name__, "tool_audit": []}
+        ai_teaching = dict(ai_teaching or {})
+        ai_teaching["semantic_math"] = semantic_math
+
     # 网络层零自动重试 + 质量层最多一次重生成：避免一次出题叠加
     # 3 次 HTTP 重试、app 兜底、格式修补、难度纠偏导致几十秒到数分钟等待。
     # 普通聊天继续使用原来的网络重试行为。
@@ -3287,7 +3331,8 @@ def chat():
                 # This solves the *same original verified graph* by exact finite
                 # algorithms. It never uses an unresolved image or rewrites a
                 # mathematical task into an unrelated exercise.
-                verified_graph_result = solve_certified_graph(original_image_request, reply)
+                verified_graph_result = (None if data.get("semantic_context") is not None
+                                         else solve_certified_graph(original_image_request, reply))
                 if verified_graph_result is not None:
                     reply = verified_graph_result
 
@@ -3552,6 +3597,12 @@ def chat():
             "teaching": {k: v for k, v in teaching.items() if k != "solution_reference_answer"},
             "generated_exercise": bool(is_exercise_request and generated_question)
         }
+        if data.get("semantic_context") is not None:
+            response["diagnostics"] = {"semantic_math": {
+                "status": semantic_math.get("status"),
+                "tool_audit": semantic_math.get("tool_audit", []),
+                "image_accuracy_certified": False,
+            }}
 
         if generated_teaching:
             response["generated_teaching"] = generated_teaching
@@ -3869,9 +3920,8 @@ def ocr():
     recognition_deadline = time.monotonic() + 285
     try:
         if _semantic_ocr_selected():
-            # Semantic extraction reads the full original document itself.
-            # Do not spend the request budget booting layout/text models for
-            # optional hints before starting the actual visual readers.
+            # The selected pipeline owns bounded layout/geometry tools and
+            # visual reads under one deadline; do not start the full OCR stack.
             result, local_execution = _semantic_local_result()
             if request_id and _take_ocr_cancelled(request_id):
                 return jsonify({"cancelled": True})

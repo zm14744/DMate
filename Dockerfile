@@ -4,6 +4,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PADDLE_PDX_MODEL_SOURCE=BOS \
+    DMATE_MODEL_CACHE_DIR=/opt/dmate-model-cache \
     FLAGS_use_mkldnn=0 \
     OMP_NUM_THREADS=1 \
     MKL_NUM_THREADS=1 \
@@ -24,6 +25,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt requirements-agents.txt ./
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt
+
+# Download official packages without loading inference models. Keep this layer
+# ahead of application sources so ordinary code changes reuse the weights.
+COPY ocr_runtime.py ./
+COPY scripts/prepare_ocr_model_cache.py ./scripts/prepare_ocr_model_cache.py
+RUN python scripts/prepare_ocr_model_cache.py && \
+    python scripts/prepare_ocr_model_cache.py --verify-only
 
 COPY . .
 

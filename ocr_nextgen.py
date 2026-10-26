@@ -46,7 +46,8 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
         extra = {'text_result': text_result} if graph_pipeline in ('evidence-two-pass','agent-tools','agent-tools-strict') else {}
         if graph_pipeline in ('agent-tools','agent-tools-strict'):
             extra.update(cancelled=cancelled,task_id=task_id)
-        result=engine(raw,layout=layout.get('regions',[]),provider=vision_provider,
+        layout_input = layout if graph_pipeline == 'agent-tools' else layout.get('regions', [])
+        result=engine(raw,layout=layout_input,provider=vision_provider,
                                budget=budget,audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1', **extra)
         if not result['graphs'] and 'semantic_workflow' not in result:
             raise ValueError('empty_graph_inventory')
@@ -69,6 +70,9 @@ def _failed_graph_result(exc,version,budget,text_result,*,stage_audit=None):
         'recognition_status':'failed','review':{'required':True,'reasons':['图形识别未完成。']},
         'diagnostics':{'stages':['graph_pipeline_failed'],'failure_kind':type(exc).__name__,
             'remote_metrics':budget.metrics,'resource_metrics':text_result.get('resource_metrics',[])}}
+    local_tools = getattr(budget, 'local_tool_execution', None)
+    if isinstance(local_tools, dict):
+        failure['diagnostics']['local_tools'] = local_tools
     evidence=getattr(exc,'graph_stage_audit',stage_audit)
     if os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1' and evidence is not None:
         failure['diagnostics']['stage_audit']=evidence
@@ -77,6 +81,14 @@ def _failed_graph_result(exc,version,budget,text_result,*,stage_audit=None):
 
 def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,request_deadline=None):
     graphs=result['graphs']
+    if isinstance(result.get('local_layout_result'), dict) and result['local_layout_result']:
+        layout = result['local_layout_result']
+    resource_metrics = text_result.get('resource_metrics', [])
+    if result.get('local_resource_metrics'):
+        replaced_stages = {row.get('stage') for row in result['local_resource_metrics'] if isinstance(row, dict)}
+        resource_metrics = [row for row in resource_metrics if row.get('stage') not in replaced_stages] + result['local_resource_metrics']
+    if isinstance(result.get('local_text_result'), dict):
+        text_result = {**text_result, **result['local_text_result']}
     text=text_result.get('text') or ''
     local_text=text
     # If layout failed, use Qwen's explicit graph bounds to partition Small's
@@ -155,7 +167,7 @@ def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,
             'formula_count':0,
             'vision_used':True,'warning':' '.join(reasons) if reasons else None,
             'recognition_status':'partial' if incomplete else 'complete',
-            'diagnostics':{'resource_metrics':text_result.get('resource_metrics',[]),
+            'diagnostics':{'resource_metrics':resource_metrics,
                            'layout_status':layout.get('status','unavailable'),
                            'correction':correction,'validation':issues,
                            'text_evidence':{'source':text_source,'complete':text_complete,

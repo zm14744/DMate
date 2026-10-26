@@ -129,6 +129,7 @@ def _transport_failure_metrics(exc):
 def _glm_request(payload,headers,timeout,wall_deadline):
     response=requests.post(GLM_URL,headers=headers,json=payload,timeout=timeout,stream=True)
     text=[];finish=None;usage={};model=None;fingerprint=None;reasoning_chars=0;size=0;is_sse=False
+    stream_lines=0;sse_events=0;stream_done=False
     try:
         if response.status_code!=200:
             code=None
@@ -142,11 +143,21 @@ def _glm_request(payload,headers,timeout,wall_deadline):
         response.encoding='utf-8'  # SSE is UTF-8 even without a charset header.
         is_sse=True
         for line in response.iter_lines(decode_unicode=True):
-            if time.monotonic()>wall_deadline:raise TimeoutError('vision_wall_deadline')
+            stream_lines+=1
+            if time.monotonic()>=wall_deadline:
+                expired=TimeoutError('vision_wall_deadline')
+                # This exact local branch, not the exception message, proves
+                # that the allotted output window has expired. The runtime
+                # must not recover it as an ordinary transient network fault.
+                expired.vision_failure_context={'wall_deadline_exceeded':True}
+                raise expired
             if isinstance(line,bytes):line=line.decode('utf-8')
             if not line or not line.startswith('data:'):continue
+            sse_events+=1
             data=line[5:].strip()
-            if data=='[DONE]':break
+            if data=='[DONE]':
+                stream_done=True
+                break
             chunk=json.loads(data)
             model=chunk.get('model',model);fingerprint=chunk.get('system_fingerprint',fingerprint)
             usage=chunk.get('usage') or usage
@@ -162,6 +173,13 @@ def _glm_request(payload,headers,timeout,wall_deadline):
                       'choices':[{'message':{'content':''.join(text)},'finish_reason':finish}]}
     except (requests.RequestException,TimeoutError) as exc:
         if is_sse:
+            context=getattr(exc,'vision_failure_context',None)
+            context=dict(context) if isinstance(context,dict) else {}
+            context.update(failure_phase='sse_stream',request_started=True,
+                response_headers_received=True,http_status=response.status_code,
+                partial_stream=not stream_done,stream_done_received=stream_done,
+                stream_lines_received=stream_lines,sse_events_received=sse_events)
+            exc.vision_failure_context=context
             # Audit evidence only. The caller still reports transport failure
             # and must never parse a partial stream as a completed graph.
             exc.vision_partial_result={'http_status':response.status_code,'partial_stream':True,

@@ -1,5 +1,7 @@
 # 图论图片识别：研究依据与实现边界（2026-10-26）
 
+> 本文保留研究来源及历史基线的采用记录。现行调用组织、工具接入和验收边界见 [DMATE_RECOGNITION_ARCHITECTURE.md](DMATE_RECOGNITION_ARCHITECTURE.md)，下文“两次视觉请求”等历史限制不代表当前架构。
+
 ## 目标和基线实现约束
 
 这份记录支持 DMate 的真实图论图片识别重构。保留 PaddleOCR Small 文字识别、PP-DocLayoutV3 版面分析、Qwen3-VL-Plus 视觉识别和 DeepSeek 文字校正的分工。一次原图识别最多两次 Qwen 请求，不通过失败重试或反复识别挑选最佳答案。DeepSeek 不决定图的顶点、边、方向或重数。
