@@ -27,7 +27,8 @@ def test_upload_default_runs_langgraph_and_returns_same_source_identity(applicat
     assert workflow['task_id'] == task_id
     assert workflow['source_sha256'] == hashlib.sha256(raw).hexdigest()
     assert len(result['graph_structures'][0]['edges']) == 1
-    assert workflow['role_sends'] == {'page_vertices': 1, 'body_text': 1, 'connections': 1, 'structure_review': 1}
+    assert workflow['role_sends'] == {'page_vertices': 1, 'body_text': 1, 'connections': 1,
+                                      'attributes': 1, 'structure_review': 1}
     assert all(metric.get('fixture_only') for metric in result['diagnostics']['remote_metrics'])
     assert guards['network'] == 0
     assert client.get('/health').get_json()['graph_nextgen_engine'] == 'agent-tools'

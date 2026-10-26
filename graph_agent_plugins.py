@@ -51,6 +51,7 @@ def build_image_tools(document, text_result, layout, budget):
     from graph_marker_grounding import ground_nodes, marker_proposals
     from graph_panel_context import layout_hints
     from graph_review_views import build_review_sheet
+    from graph_focus_views import build_focused_views
     from graph_text_evidence import text_hints
     from graph_agent_roles import reconcile_role_text
 
@@ -130,17 +131,39 @@ def build_image_tools(document, text_result, layout, budget):
         sheet.save(stream, format='PNG')
         reference = hashlib.sha256(stream.getvalue()).hexdigest()
         context.data['images'][reference] = sheet
-        # One page-only text sheet plus the latest graph sheet are sufficient.
-        if len(context.data['images']) > 6:
-            oldest = next(iter(context.data['images']))
-            if oldest != reference:
-                del context.data['images'][oldest]
+        # These refs can be consumed by concurrent roles. The bounded upload
+        # owns the cache; release it with the context, never evict an active ref
+        # because another role just produced additional focus crops.
         return {'image_ref': reference, 'coordinate_space': 'original_1000',
                 'review_tiles': tiles, 'text_review_tiles': text_tiles,
                 'diagnostics': notes, 'source_pixels_only': True}
 
     register('image.review_views', 'Build original-pixel graph/text crops with explicit full-image coordinates.',
              _GRAPHS, _ROLES, views)
+
+    def focused(args, *, context):
+        images, mappings, diagnostics = build_focused_views(
+            document.original, args['graphs'], args['issues'],
+            hints=context.data.get('hints'), check_deadline=context.check_deadline)
+        references, output_maps = [], []
+        for crop, mapping in zip(images, mappings):
+            context.check_deadline()
+            stream = io.BytesIO()
+            crop.save(stream, format='PNG')
+            reference = hashlib.sha256(stream.getvalue()).hexdigest()
+            context.data['images'][reference] = crop
+            references.append(reference)
+            output_maps.append({**mapping, 'image_ref': reference})
+        return {'image_refs': references, 'focused_views': output_maps,
+                'coordinate_space': 'original_1000', 'source_sha256': context.source_sha256,
+                'source_pixels_only': True, 'diagnostics': diagnostics}
+
+    register('image.focused_views', 'Crop original pixels addressed by verified text/edge/vertex IDs; never render answers.',
+             {'type': 'object', 'required': ['graphs', 'issues'], 'additionalProperties': False,
+              'properties': {'graphs': _GRAPHS['properties']['graphs'],
+                             'issues': {'type': 'array', 'maxItems': 128, 'items': _OBJECT}}},
+             ('body_text', 'connections', 'structure_review'), focused,
+             version='2026-10-26-v4')
 
     def validate(args, *, context):
         graphs, issues = apply_topology(args['response'], context.data['inventory'],

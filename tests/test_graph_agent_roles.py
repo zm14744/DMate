@@ -952,6 +952,255 @@ def test_explicit_independent_curve_is_not_changed_by_a_candidate_reference():
     assert checked['protocol_normalizations'] == []
 
 
+def unbound_equivalent_candidate():
+    g = graph()
+    candidate = {**copy.deepcopy(g['edges'][0]), 'id': 'measured_curve',
+                 'pixel_evidence': {'source': 'original_pixel_route', 'supported': True}}
+    proposals = {'G1': [candidate]}
+    response = connection_response([g], candidates=proposals)
+    row = response['graphs'][0]
+    row['edges'][0]['path'] = [[200, 500], [350, 450], [500, 400], [650, 450], [800, 500]]
+    row['candidate_verdicts'] = [['measured_curve', True]]
+    return g, candidate, proposals, response
+
+
+@pytest.mark.parametrize('source', ['original_pixel_route', 'original_pixel_connector_boundaries'])
+@pytest.mark.parametrize('reverse', [False, True])
+def test_missing_reference_only_is_normalized_for_unique_same_full_polyline(source, reverse):
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    candidate['pixel_evidence']['source'] = source
+    raw = response['graphs'][0]['edges'][0]
+    raw['path'].insert(2, copy.deepcopy(raw['path'][1]))  # Duplicate sample, not another vertex.
+    if reverse:
+        raw['from'], raw['to'] = raw['to'], raw['from']
+        raw['path'].reverse()
+    response['audit'] = {'normalizations': ['model_forgery']}
+    original = copy.deepcopy((g, proposals, response))
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    edge = checked['graphs'][0]['edges'][0]
+    assert edge == {**raw, 'candidate_id': 'measured_curve'}
+    assert checked['graphs'][0]['candidate_verdicts'] == [['measured_curve', True]]
+    normalization = checked['audit']['normalizations'][0]
+    assert checked['audit']['normalizations'] == checked['protocol_normalizations']
+    assert normalization['field'] == 'candidate_id' and normalization['edge_id'] == 'e1'
+    assert normalization['proof_source'] == source and normalization['reversed'] is reverse
+    assert normalization['requires_original_pixel_revalidation'] is True
+    assert normalization['maximum_distance_original_1000'] < 1e-6
+    assert (g, proposals, response) == original
+
+
+def test_only_rounding_scale_displacement_is_accepted_for_missing_binding():
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    candidate['path'] = [[x + .00049, y + .00049] for x, y in candidate['path']]
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    distance = checked['audit']['normalizations'][0]['maximum_distance_original_1000']
+    assert .69 < distance < .70
+    candidate['path'] = [[x + .00005, y + .00005] for x, y in candidate['path']]
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage'):
+        validate_connection_response(response, [g], proposals, revision=4)
+
+
+@pytest.mark.parametrize('vote', [False, None])
+def test_false_or_unknown_vote_is_never_changed_or_bound_implicitly(vote):
+    g, _, proposals, response = unbound_equivalent_candidate()
+    response['graphs'][0]['candidate_verdicts'][0][1] = vote
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    assert 'candidate_id' not in checked['graphs'][0]['edges'][0]
+    assert checked['graphs'][0]['candidate_verdicts'][0][1] is vote
+    assert checked['audit']['normalizations'] == []
+
+
+@pytest.mark.parametrize('mutation', ['unsupported', 'foreign_proof', 'model_proof', 'missing_path',
+                                      'nonfinite_path', 'wrong_units', 'too_many_samples', 'explicit_null'])
+def test_implicit_binding_needs_caller_owned_supported_original_complete_path(mutation):
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    raw = response['graphs'][0]['edges'][0]
+    if mutation == 'unsupported': candidate['pixel_evidence']['supported'] = False
+    if mutation == 'foreign_proof': candidate['pixel_evidence']['source'] = 'model_inferred'
+    if mutation == 'model_proof': raw['pixel_evidence'] = candidate.pop('pixel_evidence')
+    if mutation == 'missing_path': candidate.pop('path')
+    if mutation == 'nonfinite_path': candidate['path'][1][0] = float('nan')
+    if mutation == 'wrong_units': candidate['path'][1][0] = 500
+    if mutation == 'too_many_samples': candidate['path'] = [candidate['path'][0]] * 129
+    if mutation == 'explicit_null': raw['candidate_id'] = None
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage'):
+        validate_connection_response(response, [g], proposals, revision=4)
+    assert 'candidate_id' not in raw or raw['candidate_id'] is None
+
+
+@pytest.mark.parametrize('mutation', ['chord', 'other_arc', 'backtracking', 'wrong_endpoint'])
+def test_implicit_binding_never_turns_same_endpoints_into_curve_equivalence(mutation):
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    raw = response['graphs'][0]['edges'][0]
+    if mutation == 'chord': raw['path'] = [[200, 500], [800, 500]]
+    if mutation == 'other_arc': raw['path'] = [[200, 500], [500, 600], [800, 500]]
+    if mutation == 'backtracking':
+        raw['path'] = [[200, 500], [500, 400], [200, 500], [500, 400], [800, 500]]
+    if mutation == 'wrong_endpoint': candidate['to'] = 'a'
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage'):
+        validate_connection_response(response, [g], proposals, revision=4)
+
+
+@pytest.mark.parametrize('vote, supported', [(True, True), (False, True), (None, True), (False, False)])
+def test_parallel_candidate_ambiguity_is_not_removed_by_vote_or_support_filter(vote, supported):
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    parallel = copy.deepcopy(candidate)
+    parallel.update(id='parallel_curve', path=[[x, y + .0004] for x, y in candidate['path']])
+    parallel['pixel_evidence']['supported'] = supported
+    proposals['G1'].append(parallel)
+    response['graphs'][0]['candidate_verdicts'].append(['parallel_curve', vote])
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage'):
+        validate_connection_response(response, [g], proposals, revision=4)
+
+
+def test_two_model_edge_records_cannot_borrow_one_unique_candidate_instance():
+    g, _, proposals, response = unbound_equivalent_candidate()
+    row = response['graphs'][0]
+    duplicate = copy.deepcopy(row['edges'][0]); duplicate['id'] = 'e2'
+    row['edges'].append(duplicate)
+    for read in row['reads']: read['edge_ids'].append('e2')
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage'):
+        validate_connection_response(response, [g], proposals, revision=4)
+
+
+def test_different_parallel_arcs_can_each_have_one_unique_geometry_binding():
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    parallel = copy.deepcopy(candidate)
+    parallel.update(id='lower_curve', path=[[.2, .5], [.5, .6], [.8, .5]])
+    proposals['G1'].append(parallel)
+    row = response['graphs'][0]
+    edge = copy.deepcopy(row['edges'][0]); edge.update(id='e2', path=[[200, 500], [500, 600], [800, 500]])
+    row['edges'].append(edge)
+    row['candidate_verdicts'].append(['lower_curve', True])
+    for read in row['reads']: read['edge_ids'].append('e2')
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    assert [e['candidate_id'] for e in checked['graphs'][0]['edges']] == ['measured_curve', 'lower_curve']
+
+
+@pytest.mark.parametrize('reference', ['not_a_candidate', 'wrong_endpoints'])
+def test_explicit_wrong_binding_is_not_replaced_with_the_unique_geometric_match(reference):
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    raw = response['graphs'][0]['edges'][0]
+    raw['candidate_id'] = reference
+    if reference == 'wrong_endpoints':
+        wrong = copy.deepcopy(candidate); wrong.update(id=reference, to='a')
+        proposals['G1'].append(wrong)
+        response['graphs'][0]['candidate_verdicts'].append([reference, True])
+    code = 'unknown_candidate_reference' if reference == 'not_a_candidate' else 'changed_candidate_endpoints'
+    with pytest.raises(RoleProtocolError, match=code):
+        validate_connection_response(response, [g], proposals, revision=4)
+    assert raw['candidate_id'] == reference
+
+
+def test_candidate_capacity_cannot_create_a_false_unique_implicit_reference():
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    for index in range(256):
+        other = copy.deepcopy(candidate); other['id'] = 'other_'+str(index)
+        other['path'] = [[.2, .5], [.5, .8], [.8, .5]]
+        proposals['G1'].append(other)
+        response['graphs'][0]['candidate_verdicts'].append([other['id'], False])
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage'):
+        validate_connection_response(response, [g], proposals, revision=4)
+
+
+def test_comparison_capacity_does_not_normalize_using_an_incomplete_uniqueness_search():
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    row = response['graphs'][0]
+    row['edges'], row['candidate_verdicts'], proposals['G1'] = [], [], []
+    for index in range(65):
+        eid, cid = 'e'+str(index+1), 'route_'+str(index)
+        path = [[.2, .5], [.5, .2 + index * .01], [.8, .5]]
+        c = copy.deepcopy(candidate); c.update(id=cid, path=path)
+        proposals['G1'].append(c)
+        row['edges'].append({**copy.deepcopy(g['edges'][0]), 'id': eid,
+                             'path': [[x*1000, y*1000] for x, y in path]})
+        row['candidate_verdicts'].append([cid, True])
+    for read in row['reads']: read['edge_ids'] = [edge['id'] for edge in row['edges']]
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage') as caught:
+        validate_connection_response(response, [g], proposals, revision=4)
+    assert caught.value.audit['normalizations'] == []
+
+
+def test_tiny_segment_after_long_route_cannot_crash_or_prove_implicit_binding():
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    candidate['path'] = [[.2, .5], [.8, .5]] * 50 + [[.8000000000000002, .5]]
+    response['graphs'][0]['edges'][0]['path'] = [[x*1000, y*1000] for x, y in candidate['path']]
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage'):
+        validate_connection_response(response, [g], proposals, revision=4)
+
+
+@pytest.mark.parametrize('reverse', [False, True])
+def test_unique_closed_loop_requires_the_entire_same_route(reverse):
+    g, candidate, proposals, response = unbound_equivalent_candidate()
+    g['edges'][0]['to'] = 'a'
+    candidate.update(to='a', path=[[.2, .5], [.3, .3], [.1, .3], [.2, .5]])
+    row = response['graphs'][0]
+    row['edges'][0].update(to='a', path=[[200, 500], [300, 300], [100, 300], [200, 500]])
+    row['reads'][1]['edge_ids'] = []
+    if reverse: row['edges'][0]['path'].reverse()
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    assert checked['graphs'][0]['edges'][0]['candidate_id'] == 'measured_curve'
+    assert checked['graphs'][0]['edges'][0]['path'] == row['edges'][0]['path']
+
+
+def test_implicit_reference_is_only_metadata_and_original_pixels_still_reject_blank_ink():
+    from PIL import Image
+    from graph_evidence_pipeline import apply_topology
+    from image_evidence import analyze_document
+    g, _, proposals, response = unbound_equivalent_candidate()
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    output, diagnostics = apply_topology(checked, [g], proposals,
+        analyze_document(Image.new('RGB', (300, 300), 'white')), panels_complete=True)
+    assert checked['graphs'][0]['edges'][0]['candidate_id'] == 'measured_curve'
+    assert not output[0]['complete'] and output[0]['edges'][0]['status'] == 'pending'
+    assert any('unresolved_edge_evidence:e1' in message for message in diagnostics)
+
+
+@pytest.mark.parametrize('explicit_path', [False, True])
+def test_supported_explicit_candidate_can_supply_both_omitted_endpoints(explicit_path):
+    g, candidate, proposals, response = reusable_curved_candidate()
+    raw = response['graphs'][0]['edges'][0]
+    raw.pop('from'); raw.pop('to')
+    if explicit_path:
+        raw['path'] = [[200, 500], [410, 270], [800, 500]]
+    original = copy.deepcopy((g, proposals, response))
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    edge = checked['graphs'][0]['edges'][0]
+    assert (edge['from'], edge['to']) == (candidate['from'], candidate['to'])
+    assert edge['path'] == (raw['path'] if explicit_path else [[1000*x, 1000*y] for x, y in candidate['path']])
+    assert checked['audit']['normalizations'][0] == {
+        'graph_id': 'G1', 'edge_id': 'e1', 'field': 'from/to', 'candidate_id': 'curve_1',
+        'derived_from': 'validated_original_candidate', 'from': 'a', 'to': 'b',
+        'requires_original_pixel_revalidation': True}
+    assert (g, proposals, response) == original
+
+
+@pytest.mark.parametrize('mutation', ['only_from_missing', 'only_to_missing', 'both_null', 'from_null',
+                                      'to_null', 'explicit_wrong', 'no_id', 'null_id', 'legacy_id',
+                                      'unsupported', 'model_proof', 'nonfinite_path', 'foreign_endpoint'])
+def test_endpoint_convenience_does_not_guess_null_partial_or_unsupported_bindings(mutation):
+    g, candidate, proposals, response = reusable_curved_candidate()
+    raw = response['graphs'][0]['edges'][0]
+    raw['path'] = [[200, 500], [500, 400], [800, 500]]
+    if mutation == 'only_from_missing': raw.pop('from')
+    elif mutation == 'only_to_missing': raw.pop('to')
+    elif mutation == 'both_null': raw['from'] = raw['to'] = None
+    elif mutation == 'from_null': raw['from'] = None; raw.pop('to')
+    elif mutation == 'to_null': raw['to'] = None; raw.pop('from')
+    elif mutation == 'explicit_wrong': raw['to'] = 'a'
+    else:
+        raw.pop('from'); raw.pop('to')
+        if mutation == 'no_id': raw.pop('candidate_id')
+        if mutation == 'null_id': raw['candidate_id'] = None
+        if mutation == 'legacy_id': raw.pop('candidate_id'); raw['id'] = 'curve_1'
+        if mutation == 'unsupported': candidate['pixel_evidence']['supported'] = False
+        if mutation == 'model_proof': raw['pixel_evidence'] = candidate.pop('pixel_evidence')
+        if mutation == 'nonfinite_path': candidate['path'][1][0] = float('nan')
+        if mutation == 'foreign_endpoint': candidate['to'] = 'another_panel_vertex'
+    with pytest.raises(RoleProtocolError):
+        validate_connection_response(response, [g], proposals, revision=4)
+
+
 def rejected_connection_with_local_position_issue():
     g = graph()
     response = connection_response([g])

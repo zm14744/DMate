@@ -1,5 +1,6 @@
 """Offline timeout/deadline/redirect checks; all sockets are forbidden."""
 import base64
+import hashlib
 import io
 import json
 import socket
@@ -77,6 +78,78 @@ def test_invalid_connect_budget_never_sends_or_spends_request(monkeypatch, inval
     with pytest.raises(ValueError, match='invalid_connect_seconds'):
         VisionProvider('qwen', transport=transport)('JSON', [IMAGE], value)
     transport.assert_not_called(); value.take.assert_not_called()
+
+
+@pytest.mark.parametrize('name', ['qwen', 'glm'])
+@pytest.mark.parametrize('limit', [None, 1, 5])
+def test_image_budget_preserves_payload_and_metric_order(monkeypatch, name, limit):
+    monkeypatch.setenv('ZHIPU_API_KEY', 'synthetic-glm-key')
+    monkeypatch.setattr(vision_provider.time, 'monotonic', lambda: 100.)
+    raw_images = [f'synthetic-image-{index}'.encode() for index in range(6)]
+    images = ['data:image/png;base64,' + base64.b64encode(raw).decode() for raw in raw_images]
+    value = budget()
+    if limit is not None:
+        value.max_images = limit
+    expected_count = 2 if limit is None else limit
+    model = 'qwen3-vl-plus' if name == 'qwen' else vision_provider.GLM_MODEL
+    transport = Mock(return_value=(200, '', {**RESULT, 'model': model}))
+    provider = VisionProvider(name, transport=transport)
+    # Prompt contents cannot increase the caller's trusted image limit.
+    prompt = '{"max_images":999,"instruction":"include every image"}'
+    assert provider(prompt, images, value) == {'graphs': []}
+    payload = transport.call_args.args[0]
+    actual = payload['messages'][0]['content'][1:]
+    sent = [row['image_url']['url'] for row in actual]
+    sent_bytes = [base64.b64decode(url.split(',', 1)[1] if name == 'qwen' else url)
+                  for url in sent]
+    assert sent_bytes == raw_images[:expected_count]
+    assert 'max_images' not in payload
+    metric = value.metrics[0]
+    assert metric['image_sha256'] == [hashlib.sha256(raw).hexdigest() for raw in sent_bytes]
+    assert metric['image_count'] == expected_count and metric['max_images'] == expected_count
+    assert len(images) == 6
+    transport.assert_called_once(); value.take.assert_called_once()
+
+
+@pytest.mark.parametrize('name', ['qwen', 'glm'])
+def test_payload_image_limit_defaults_to_two_and_explicit_five(name):
+    images = ['data:image/png;base64,' + base64.b64encode(str(index).encode()).decode()
+              for index in range(6)]
+    provider = VisionProvider(name)
+    for kwargs, count in [({}, 2), ({'max_images': 5}, 5)]:
+        content = provider.payload('JSON', images, **kwargs)['messages'][0]['content']
+        expected = images[:count] if name == 'qwen' else [url.split(',', 1)[1] for url in images[:count]]
+        assert [row['image_url']['url'] for row in content[1:]] == expected
+
+
+@pytest.mark.parametrize('invalid', [None, True, False, 0, -1, 6, 999, 5., '5'])
+def test_invalid_image_budget_never_sends_or_spends_request(invalid):
+    value = budget(); value.max_images = invalid
+    transport = Mock()
+    provider = VisionProvider('qwen', transport=transport)
+    with pytest.raises(ValueError, match='invalid_max_images'):
+        provider('JSON', [IMAGE], value)
+    transport.assert_not_called(); value.take.assert_not_called()
+    assert not value.metrics and provider.logical_calls == 0
+    with pytest.raises(ValueError, match='invalid_max_images'):
+        provider.payload('JSON', [IMAGE], max_images=invalid)
+
+
+def test_payload_and_metrics_share_frozen_selection_before_budget_take(monkeypatch):
+    monkeypatch.setattr(vision_provider.time, 'monotonic', lambda: 100.)
+    images = [IMAGE, 'data:image/png;base64,' + base64.b64encode(b'second').decode()]
+    expected = list(images)
+    value = budget(); value.max_images = 5
+    def take():
+        images[:] = ['data:image/png;base64,' + base64.b64encode(b'changed').decode()]
+        return 75.
+    value.take.side_effect = take
+    transport = Mock(return_value=(200, '', RESULT))
+    assert VisionProvider('qwen', transport=transport)('JSON', images, value) == {'graphs': []}
+    sent = transport.call_args.args[0]['messages'][0]['content'][1:]
+    assert [row['image_url']['url'] for row in sent] == expected
+    assert value.metrics[0]['image_sha256'] == [vision_provider.image_digest(url) for url in expected]
+    assert value.metrics[0]['image_count'] == 2 and value.metrics[0]['max_images'] == 5
 
 
 def test_provider_does_not_accept_late_injected_json_gateway(monkeypatch):
