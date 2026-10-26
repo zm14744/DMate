@@ -1,6 +1,7 @@
 """Graph-nextgen orchestration; spent graph budgets never start old vision."""
 from __future__ import annotations
 import os
+import time
 from graph_schema import display_graph
 from graph_staged import recognize_staged, Budget
 from graph_validation import audit_graph_records
@@ -8,10 +9,11 @@ from ocr_correction import correct_text
 from ocr_layout import partition_text
 
 
-def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeline='evidence-two-pass'):
+def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeline='evidence-two-pass',
+                             cancelled=None,task_id=None,request_deadline=None):
     # Development branch default; previous engines remain explicit comparisons.
     # The app's existing graph-nextgen gate and production environment are unchanged.
-    if graph_pipeline not in ('staged','qwen-simple-candidate','evidence-two-pass'):
+    if graph_pipeline not in ('staged','qwen-simple-candidate','evidence-two-pass','agent-tools'):
         raise ValueError('Unknown graph pipeline')
     engine=recognize_staged
     version='2026-10-26-qwen-stable-review-v13'
@@ -23,10 +25,23 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
         from graph_evidence_pipeline import recognize_evidence, VERSION
         engine=recognize_evidence
         version=VERSION
+    elif graph_pipeline=='agent-tools':
+        from graph_agent_pipeline import recognize_agents
+        from graph_pipeline_version import AGENT_PIPELINE_VERSION
+        engine=recognize_agents
+        version=AGENT_PIPELINE_VERSION
     layout=text_result.get('layout') or {}
-    budget=Budget(seconds=140,calls=2,call_seconds=75) if graph_pipeline!='staged' else Budget()
+    if graph_pipeline=='agent-tools':
+        from graph_agent_runtime import AgentBudget
+        budget=AgentBudget.configured(task_id=task_id,cancelled=cancelled)
+        if request_deadline is not None:
+            budget.deadline=min(budget.deadline,request_deadline-28)
+    else:
+        budget=Budget(seconds=140,calls=2,call_seconds=75) if graph_pipeline!='staged' else Budget()
     try:
-        extra = {'text_result': text_result} if graph_pipeline == 'evidence-two-pass' else {}
+        extra = {'text_result': text_result} if graph_pipeline in ('evidence-two-pass','agent-tools') else {}
+        if graph_pipeline=='agent-tools':
+            extra.update(cancelled=cancelled,task_id=task_id)
         result=engine(raw,layout=layout.get('regions',[]),provider=vision_provider,
                                budget=budget,audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1', **extra)
         if not result['graphs']:raise ValueError('empty_graph_inventory')
@@ -35,7 +50,11 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
         # legacy vision pipeline outside the already spent graph budget.
         return _failed_graph_result(exc,version,budget,text_result)
     try:
-        return _render_graph_result(raw,text_result,result,version,layout)
+        if cancelled is not None and cancelled():
+            from graph_agent_runtime import AgentCancelled
+            raise AgentCancelled('upload_cancelled')
+        return _render_graph_result(raw,text_result,result,version,layout,
+                                    cancelled=cancelled,request_deadline=request_deadline)
     except Exception as exc:
         return _failed_graph_result(exc,version,budget,text_result,stage_audit=result.get('stage_audit'))
 
@@ -51,7 +70,7 @@ def _failed_graph_result(exc,version,budget,text_result,*,stage_audit=None):
     return failure
 
 
-def _render_graph_result(raw,text_result,result,version,layout):
+def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,request_deadline=None):
     graphs=result['graphs']
     text=text_result.get('text') or ''
     local_text=text
@@ -83,12 +102,25 @@ def _render_graph_result(raw,text_result,result,version,layout):
         if isinstance(body,str):
             text=body
             text_source='original_visual_transcription'
+    if cancelled is not None and cancelled():
+        from graph_agent_runtime import AgentCancelled
+        raise AgentCancelled('upload_cancelled')
     try:
-        corrected,correction=correct_text(text)
+        if request_deadline is not None and request_deadline-time.monotonic()<3:
+            corrected,correction=text,{'status':'not_run_deadline'}
+        elif cancelled is not None or request_deadline is not None:
+            remaining=(request_deadline-time.monotonic()) if request_deadline is not None else 25
+            corrected,correction=correct_text(text,cancelled=cancelled,timeout_seconds=min(25,remaining))
+        else:
+            corrected,correction=correct_text(text)
     except Exception as exc:
         # A text-service exception does not erase independently reviewed graphs.
         corrected,correction=text,{'status':'failed','failure_kind':type(exc).__name__}
-    if 'body_complete' in result and text.strip() and correction.get('status') not in ('ok','empty'):
+    if cancelled is not None and cancelled():
+        from graph_agent_runtime import AgentCancelled
+        raise AgentCancelled('upload_cancelled')
+    if ('body_complete' in result and text.strip() and correction.get('status') not in ('ok','empty')
+            and 'agent_workflow' not in result):
         text_complete=False
     issues=audit_graph_records(graphs)
     if issues:
@@ -121,4 +153,5 @@ def _render_graph_result(raw,text_result,result,version,layout):
                            **({'image_quality':result['image_quality']} if 'image_quality' in result else {}),
                            'stages':result['diagnostics'],
                            'remote_metrics':result.get('remote_metrics',[]),
+                           **({'agent_workflow':result['agent_workflow']} if 'agent_workflow' in result else {}),
                            **({'stage_audit':result['stage_audit']} if 'stage_audit' in result else {})}}

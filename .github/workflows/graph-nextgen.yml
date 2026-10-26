@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: python -m pip install Flask requests numpy==1.26.4 opencv-contrib-python-headless==4.10.0.84 Pillow==11.3.0 networkx pytest playwright==1.55.0
+      - run: python -m pip install Flask requests numpy==1.26.4 opencv-contrib-python-headless==4.10.0.84 Pillow==11.3.0 networkx pytest playwright==1.55.0 -r requirements-agents.txt
       - run: python -m pytest -q tests
       - run: node --check static/script.js && node tests/graph_display_regression.js && node tests/graph_nextgen_display.js
       - run: python -m playwright install --with-deps chromium

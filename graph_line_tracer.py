@@ -1275,4 +1275,101 @@ def attach_line_evidence(image_bytes, cv_result, *, dense_paths=False,consistent
         return cv_result
 
 
-__all__ = ['attach_line_evidence']
+def prepare_skeleton_roi(document, graph, *, evidence=None):
+    """Prepare a bounded, node-erased original-ink ROI for optional tools.
+
+    This additive interface does not change the legacy tracer. It never adds
+    mathematical vertices: supplied vertices determine the ROI and measured
+    footprints determine which pixels to erase. Coordinates are working-image
+    pixel centres; ``offset`` maps local ROI pixels back to that image.
+    """
+    from graph_stroke_checks import StrokeEvidence
+    w, h = document.work_size
+    if max(w, h) > MAX_SIDE or min(w, h) < 2:
+        raise ValueError('working_image_limit')
+    vertices = graph.get('vertices', [])
+    if not isinstance(vertices, list) or not 1 <= len(vertices) <= MAX_VERTICES:
+        raise ValueError('vertex_capacity_or_empty')
+    points = _vertices(graph, w, h)
+    if len(points) != len(vertices):
+        raise ValueError('invalid_vertices')
+    checker = evidence if evidence is not None else StrokeEvidence(document)
+    geometry = {v['id']: checker.marker_geometry(v, vertices) for v in vertices}
+    nearest = [min((math.hypot(x-a, y-b) for other, a, b in points if other != name),
+                   default=80.) for name, x, y in points]
+    separation = float(np.median(nearest))
+    radius = max(3, min(13, round(separation*.12)))
+    margin = max(34, min(120, round(separation*.62)))
+    left = max(0, min(p[1] for p in points)-margin)
+    top = max(0, min(p[2] for p in points)-margin)
+    right = min(w, max(p[1] for p in points)+margin+1)
+    bottom = min(h, max(p[2] for p in points)+margin+1)
+    box = graph.get('bbox')
+    if isinstance(box, (list, tuple)) and len(box) == 4:
+        try:
+            a, b, c, d = map(float, box)
+            if (0 <= a < c <= 1 and 0 <= b < d <= 1 and
+                    all(a <= x/max(w-1, 1) <= c and b <= y/max(h-1, 1) <= d
+                        for _, x, y in points)):
+                left, top = int(a*w), int(b*h)
+                right, bottom = min(w, math.ceil(c*w)), min(h, math.ceil(d*h))
+        except (TypeError, ValueError):
+            pass
+    if min(right-left, bottom-top) < 3:
+        raise ValueError('empty_graph_roi')
+    ink = np.ascontiguousarray(document.ink_mask[top:bottom, left:right])
+    skeleton = _thin(ink)
+    local_geometry = {name: scaled_geometry(value, 1., offset=(left, top))
+                      for name, value in geometry.items()}
+    for item in local_geometry.values():
+        cx, cy = item['center_pixels']
+        reach = max(item['semiaxes_pixels'])+3
+        x0, y0 = max(0, math.floor(cx-reach)), max(0, math.floor(cy-reach))
+        x1 = min(skeleton.shape[1], math.ceil(cx+reach+1))
+        y1 = min(skeleton.shape[0], math.ceil(cy+reach+1))
+        if x1 > x0 and y1 > y0:
+            yy, xx = np.mgrid[y0:y1, x0:x1]
+            erase = contains_points(np.stack([xx, yy], axis=-1), item, margin=1.)
+            skeleton[y0:y1, x0:x1][erase] = 0
+    return {'ink': ink, 'skeleton': skeleton, 'offset': (left, top),
+            'work_size': (w, h), 'points': points, 'radius': radius,
+            'geometry': geometry, 'local_geometry': local_geometry}
+
+
+def keep_path_candidate(candidate, variants, roi):
+    """Apply the tracer's same-ink and six-variant rules to tool proposals.
+
+    ``variants`` is an owned per-endpoint-pair list, never accepted edges. The
+    return value makes duplicate/capacity decisions observable to the caller.
+    """
+    w, h = roi['work_size']
+    pointmap = {name: (x, y) for name, x, y in roi['points']}
+    def same(old):
+        return _same_ink_route(candidate, old, pointmap, w, h, roi['radius'],
+                               ink=roi['ink'], offset=roi['offset'],
+                               node_geometry=roi['geometry'] or None)
+    outlined = candidate.get('connector_evidence', {}).get('kind') == 'outlined_arrow'
+    if outlined:
+        for old in variants:
+            if (old.get('connector_evidence', {}).get('kind') == 'outlined_arrow'
+                    and old['score'] >= candidate['score'] and same(old)):
+                return 'duplicate'
+        variants[:] = [old for old in variants if not same(old)]
+        variants.append(candidate)
+        return 'kept'
+    for index, old in enumerate(variants):
+        if same(old):
+            if (candidate['score'] > old['score'] and
+                    old.get('connector_evidence', {}).get('kind') != 'outlined_arrow'):
+                variants[index] = candidate
+            return 'duplicate'
+    if len(variants) < 6:
+        variants.append(candidate)
+        return 'kept'
+    weakest = min(range(len(variants)), key=lambda i: variants[i]['score'])
+    if candidate['score'] > variants[weakest]['score']:
+        variants[weakest] = candidate
+    return 'pair_capacity_reached'
+
+
+__all__ = ['attach_line_evidence', 'prepare_skeleton_roi', 'keep_path_candidate']

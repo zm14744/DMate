@@ -106,9 +106,9 @@ def _layout(items, width):
     return positions, used_width, y+row_height
 
 
-def build_review_sheet(original, graphs, *, hints=None, side=2200):
+def build_review_sheet(original, graphs, *, hints=None, side=2200, allow_empty=False):
     """Return sheet, graph maps, text maps and explicit capacity observations."""
-    if not graphs or len(graphs) > 16:
+    if (not graphs and not allow_empty) or len(graphs) > 16:
         raise ValueError('invalid_panel_review_inventory')
     side = max(512, min(2200, int(side)))
     width, height = original.size
@@ -135,6 +135,16 @@ def build_review_sheet(original, graphs, *, hints=None, side=2200):
         items.append({'kind': 'text', 'hint_ids': block['hint_ids'], 'rect': rect,
                       'desired_size': (round(w*factor), round(h*factor)),
                       'heading': f'Text crop {index+1}: original pixels; '+','.join(block['hint_ids'][:12])})
+    if not items:
+        # An independent body role can start before page inventory. With no
+        # located text hints, preserve the whole original as its second view.
+        sheet = original.convert('RGB').copy()
+        factor = min(1., side/sheet.width, side/sheet.height,
+                     math.sqrt(MAX_REVIEW_PIXELS/(sheet.width*sheet.height)))
+        if factor < 1:
+            sheet = sheet.resize((max(1, int(sheet.width*factor)), max(1, int(sheet.height*factor))),
+                                 Image.Resampling.LANCZOS)
+        return sheet, [], [], ['body_review_uses_full_original_without_located_hints']
     plans = []
     for trial_width in sorted({min(side, value) for value in (512, 768, 1024, 1280, 1600, 1920, 2200)}):
         positions, w, h = _layout(items, trial_width)

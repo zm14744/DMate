@@ -841,6 +841,7 @@ def _request_text_completion(
     preferred_provider=None,
     timeout=(10, 60),
     response_format=None,
+    cancelled=None,
 ):
     """
     调用文本模型。
@@ -901,6 +902,8 @@ def _request_text_completion(
                 )
 
                 call_start = time.monotonic()
+                if cancelled is not None and cancelled():
+                    return {"ok": False, "cancelled": True}
                 response = _text_http_session().post(
                     provider["url"],
                     headers=headers,
@@ -1347,32 +1350,62 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
     request_payload = dict(payload)
     request_payload["stream"] = True
     response, status_code = None, None
-    failure_phase = "response_headers"
+    failure_phase = "request_start"
     content_parts, reasoning_parts = [], []
     finish_reason, usage = None, None
     returned_model, system_fingerprint = None, None
     is_sse = saw_event = saw_done = False
     stream_lines_received = sse_events_received = 0
     wall_deadline_exceeded = incomplete_stream = False
+    request_started = False
+
+    def check_deadline():
+        nonlocal wall_deadline_exceeded
+        if wall_deadline is not None:
+            remaining = wall_deadline-time.monotonic()
+            if remaining <= 0:
+                wall_deadline_exceeded = True
+                raise TimeoutError("vision_wall_deadline")
+            return remaining
+        return None
+
     try:
+        check_deadline()
+        effective_timeout = timeout
+        if wall_deadline is not None:
+            # Requests' (connect, read) tuple alone can grant a fresh full
+            # read window after uploading. urllib3 total reduces that window
+            # by connection/upload elapsed time. DNS and repeated socket reads
+            # still need cooperative checks; this is not a preemptive timer.
+            from urllib3.util import Timeout as TransportTimeout
+            connect, read = timeout if isinstance(timeout, tuple) else (timeout, timeout)
+            effective_timeout = TransportTimeout(
+                total=check_deadline(), connect=connect, read=read)
         # post(stream=True) includes connecting, TLS and waiting for headers.
         # Record that boundary without guessing which of those steps failed.
+        failure_phase = "response_headers"
+        request_started = True
         response = requests.post(
             API_URL, headers=headers, json=request_payload,
-            timeout=timeout, stream=True
+            timeout=effective_timeout, stream=True, allow_redirects=False
         )
         status_code = int(getattr(response, "status_code", 0) or 0)
+        check_deadline()
         ok = bool(getattr(response, "ok", 200 <= status_code < 300))
         failure_phase = "response_body"
-        if not ok:
-            return status_code, str(getattr(response, "text", "") or ""), None
+        if not ok or 300 <= status_code < 400:
+            error_text = str(getattr(response, "text", "") or "")
+            check_deadline()
+            return status_code, error_text, None
 
         # Compatibility path for mocked responses and gateways ignoring stream=true.
         content_type = str((getattr(response, "headers", None) or {}).get("Content-Type", ""))
         if (not callable(getattr(response, "iter_lines", None))
                 or "application/json" in content_type.lower()):
             try:
-                return status_code, "", response.json()
+                result = response.json()
+                check_deadline()
+                return status_code, "", result
             except ValueError:
                 # Requests' JSONDecodeError is also a RequestException;
                 # malformed JSON is an output failure, not a network failure.
@@ -1389,9 +1422,7 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
         is_sse = True
         for raw_line in response.iter_lines(decode_unicode=True):
             stream_lines_received += 1
-            if wall_deadline is not None and time.monotonic() > wall_deadline:
-                wall_deadline_exceeded = True
-                raise TimeoutError("vision_wall_deadline")
+            check_deadline()
             if raw_line is None:
                 continue
             line = raw_line.decode("utf-8", errors="replace").strip() if isinstance(raw_line, bytes) else str(raw_line).strip()
@@ -1434,6 +1465,7 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
                 if choice.get("finish_reason") is not None:
                     finish_reason = choice.get("finish_reason")
 
+        check_deadline()
         if saw_event and not saw_done and finish_reason is None:
             # A valid JSON prefix/object is still not a completed SSE response.
             # Preserve it only as audit evidence, never as a graph result.
@@ -1443,6 +1475,7 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
             failure_phase = "response_body"
             try:
                 data = response.json()
+                check_deadline()
                 if isinstance(data, dict) and data.get("choices"):
                     return status_code, "", data
             except ValueError:
@@ -1469,6 +1502,7 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
         # Never attach headers, URL, exception messages or the request payload.
         exc.vision_failure_context = {
             "failure_phase": failure_phase,
+            "request_started": request_started,
             "response_headers_received": response is not None,
             "http_status": status_code,
             "partial_stream": is_sse,

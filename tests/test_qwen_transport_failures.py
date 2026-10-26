@@ -187,9 +187,15 @@ def test_clean_eof_without_terminal_event_never_accepts_valid_json_prefix(monkey
 
 def test_wall_deadline_has_its_own_timeout_kind(monkeypatch):
     value = response([event()])
+    clock = [0.]
+    def late_chunk(*args, **kwargs):
+        clock[0] = 2.
+        yield event()
+    value.raw.stream = late_chunk
+    monkeypatch.setattr(ai.time, 'monotonic', lambda: clock[0])
     monkeypatch.setattr(ai.requests, 'post', Mock(return_value=value))
     with pytest.raises(TimeoutError) as caught:
-        ai._request_qwen_completion({}, {}, wall_deadline=-1)
+        ai._request_qwen_completion({}, {}, wall_deadline=1.)
     metric = _transport_failure_metrics(caught.value)
     assert metric['failure_phase'] == 'sse_stream' and metric['http_status'] == 200
     assert metric['confirmed_timeout'] is True and metric['timeout_kind'] == 'wall_deadline'

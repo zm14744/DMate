@@ -27,7 +27,7 @@ from graph_answer_integrity import (detect_count_inconsistency, review_directed_
     parse_labeled_multi_panels, review_labeled_multi_panels,
     FIGURE_VERTEX_COUNT)
 from graph_exact_solver import solve_certified_graph
-from graph_pipeline_version import EVIDENCE_PIPELINE_VERSION
+from graph_pipeline_version import active_pipeline, active_pipeline_version
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
@@ -387,6 +387,7 @@ def _graph_route_failure(kind, local_result, execution):
     return _with_local_ocr_execution({
         "error": "本次图形结构识别未完成，请核对原图。",
         "recognition_status": "failed",
+        "graph_display_version": active_pipeline_version(),
         "review": {"required": True, "reasons": ["图形识别未完成。"]},
         "diagnostics": {"stages": ["graph_route_failed"], "failure_kind": kind,
                         "legacy_vision_started": False,
@@ -400,8 +401,8 @@ _request_history = defaultdict(deque)
 # “撤销”请求在普通 OCR 与 Vision 两阶段之间生效。
 _ocr_cancel_lock = threading.Lock()
 # Unmatched cancellation messages must not accumulate indefinitely.
-# The client uses unique request IDs; 120s covers normal OCR request startup.
-OCR_CANCEL_TTL_SECONDS = 120.0
+# Keep cancellation longer than the complete multi-role upload deadline.
+OCR_CANCEL_TTL_SECONDS = 360.0
 OCR_CANCEL_MAX_PENDING = 1024
 _cancelled_ocr_requests = OrderedDict()  # request ID -> monotonic expiration
 
@@ -458,6 +459,16 @@ def _take_ocr_cancelled(request_id):
         now = time.monotonic()
         _trim_ocr_cancellations(now)
         return _cancelled_ocr_requests.pop(request_id, None) is not None
+
+
+def _ocr_is_cancelled(request_id):
+    """Non-consuming cancellation check for model/tool stages in this upload."""
+    request_id = _normalize_ocr_request_id(request_id)
+    if not request_id:
+        return False
+    with _ocr_cancel_lock:
+        _trim_ocr_cancellations(time.monotonic())
+        return request_id in _cancelled_ocr_requests
 
 
 def _get_client_ip():
@@ -3789,6 +3800,7 @@ def ocr():
             "error": "图片过大，请上传 8MB 以内的图片"
         }), 413
 
+    recognition_deadline = time.monotonic() + 285
     try:
         result = {
             "text": "",
@@ -3865,7 +3877,10 @@ def ocr():
                     for r in (result.get("layout") or {}).get("regions", [])))):
             try:
                 from ocr_nextgen import recognize_graph_document
-                nextgen = recognize_graph_document(raw, result)
+                nextgen = recognize_graph_document(raw, result, graph_pipeline=active_pipeline(),
+                            task_id=request_id or None,
+                            request_deadline=recognition_deadline,
+                            cancelled=(lambda: _ocr_is_cancelled(request_id)))
                 if (not isinstance(nextgen, dict)
                         or nextgen.get("recognition_status") not in ("complete", "partial", "failed", "not_graph")):
                     raise ValueError("invalid_graph_pipeline_result")
@@ -4416,7 +4431,8 @@ def health():
     return jsonify({
         "status": "ok",
         "graph_nextgen_enabled": os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1",
-        "graph_nextgen_version": EVIDENCE_PIPELINE_VERSION,
+        "graph_nextgen_version": active_pipeline_version(),
+        "graph_nextgen_engine": active_pipeline(),
         "graph_integrity_version": "2026-10-20-independent-edge-audit-v2",
         "graph_image_audit_version": "2026-10-20-v4-independent-directed-and-multigraph-vertex-audit",
         "graph_topology_revision": "2026-10-21-hough-blue-outline-cv-v3",
@@ -4437,7 +4453,8 @@ def ready():
         state = {"web": "正常", "ocr_available": OCR_AVAILABLE,
                  "ocr_ready": _ocr_ready, "ocr_status": _ocr_status,
                  "graph_nextgen_enabled": os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1",
-                 "graph_nextgen_version": EVIDENCE_PIPELINE_VERSION,
+                 "graph_nextgen_version": active_pipeline_version(),
+                 "graph_nextgen_engine": active_pipeline(),
                  "ocr_stages": copy.deepcopy(_ocr_stages)}
     return jsonify(state)
 
