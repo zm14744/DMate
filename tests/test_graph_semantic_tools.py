@@ -267,3 +267,134 @@ def test_local_registry_timeout_is_explicit_and_never_image_success(monkeypatch)
     assert result['summaries'] == [] and result['issues']
     assert result['tool_audit'][-1]['status'] == 'timeout'
     assert not result['tool_audit'][-1]['handler_started']
+
+
+def test_adjacency_counts_instances_and_each_mixed_edge_direction_without_type_conversion():
+    doc = document([edge('u1', 'a', 'b'), edge('u2', 'a', 'b'),
+                    edge('arc', 'a', 'b', 'forward'), edge('exit', 'b', 'c', 'forward'),
+                    edge('loop', 'a', 'a', weight=99)], directed=False, weighted=True)
+    before = copy.deepcopy(doc)
+    result = compute(doc, 'adjacency_matrix')
+    assert result['status'] == 'computed'
+    assert result['facts']['vertex_order'] == ['a', 'b', 'c']
+    assert result['facts']['matrix'] == [[1, 3, 0], [2, 0, 1], [0, 0, 0]]
+    assert result['facts']['direction_mode'] == 'mixed'
+    assert result['facts']['entry_meaning'] == 'edge_instance_count'
+    assert result['facts']['weights_used'] is False
+    assert doc == before
+
+
+@pytest.mark.parametrize('source,target,length,count', [
+    ('a', 'c', 2, 3), ('b', 'a', 1, 2), ('c', 'b', 1, 0),
+    ('a', 'a', 2, 7), ('a', 'a', 0, 1), ('a', 'b', 0, 0),
+])
+def test_walk_count_is_edge_distinct_and_honours_loops_length_zero_and_mixed_direction(source, target, length, count):
+    doc = document([edge('u1', 'a', 'b'), edge('u2', 'a', 'b'),
+                    edge('arc', 'a', 'b', 'forward'), edge('exit', 'b', 'c', 'forward'),
+                    edge('loop', 'a', 'a')])
+    result = compute(doc, 'walk_count', source=source, target=target, length=length)
+    assert result['status'] == 'computed' and result['facts']['count'] == count
+    assert result['facts']['walk_definition'] == 'edge_distinct_walks_repetition_allowed'
+
+
+@pytest.mark.parametrize('length', [-1, 65, True, '2', 2.5, 2.0])
+def test_walk_length_is_an_explicit_bounded_integer(length):
+    result = compute(document(), 'walk_count', source='a', target='b', length=length)
+    assert result['status'] == 'not_applicable'
+    assert result['issues'][0]['code'] == 'invalid_math_request'
+
+
+@pytest.mark.parametrize('operation,arguments', [
+    ('adjacency_matrix', {}), ('walk_count', {'source': 'a', 'target': 'b', 'length': 1}),
+])
+def test_transition_calculations_never_turn_unknown_direction_into_undirected(operation, arguments):
+    result = compute(document([edge('u', 'a', 'b', 'unknown')], directed=False), operation, **arguments)
+    assert result['status'] == 'not_applicable'
+    assert result['issues'][0]['code'] == 'unknown_edge_direction_not_supported'
+
+
+def test_euler_trail_returns_every_parallel_instance_and_loop_once():
+    doc = document([edge('first', 'a', 'b'), edge('second', 'a', 'b'), edge('loop', 'a', 'a')], nodes=('a', 'b'))
+    before = copy.deepcopy(doc)
+    result = compute(doc, 'euler', start_vertex='a')
+    assert result['status'] == 'computed' and result['facts']['has_eulerian_circuit']
+    trail = result['facts']['trail']
+    assert {item['edge_id'] for item in trail} == {'first', 'second', 'loop'} and len(trail) == 3
+    assert trail[0]['from'] == trail[-1]['to'] == 'a'
+    assert all(left['to'] == right['from'] for left, right in zip(trail, trail[1:]))
+    assert doc == before
+
+
+def test_euler_directed_start_and_opposite_arcs_are_not_collapsed():
+    doc = document([edge('ab1', 'a', 'b', 'forward'), edge('ab2', 'a', 'b', 'forward'),
+                    edge('ba', 'b', 'a', 'forward'), edge('bb', 'b', 'b', 'forward')], nodes=('a', 'b'))
+    result = compute(doc, 'euler', start_vertex='a')
+    assert result['status'] == 'computed'
+    assert result['facts']['has_eulerian_trail'] and not result['facts']['has_eulerian_circuit']
+    assert [item['edge_id'] for item in result['facts']['trail']].count('ba') == 1
+    assert result['facts']['trail'][-1]['to'] == 'b'
+    invalid = compute(doc, 'euler', start_vertex='b')
+    assert invalid['status'] == 'not_applicable' and invalid['issues'][0]['code'] == 'invalid_euler_start'
+
+
+def test_euler_isolated_vertices_have_an_explicit_convention_not_silent_deletion():
+    doc = document([edge('ab1', 'a', 'b'), edge('ab2', 'a', 'b')])
+    all_nodes = compute(doc, 'euler')['facts']
+    ignored = compute(doc, 'euler', ignore_isolated=True)['facts']
+    assert not all_nodes['has_eulerian_trail'] and all_nodes['vertex_convention'] == 'all_declared_vertices'
+    assert ignored['has_eulerian_circuit'] and ignored['isolated_vertices'] == ['c']
+    assert ignored['vertex_convention'] == 'ignore_isolated'
+    disconnected = document([edge('ab', 'a', 'b'), edge('cd', 'c', 'd')], nodes=('a', 'b', 'c', 'd'))
+    assert not compute(disconnected, 'euler')['facts']['has_eulerian_trail']
+
+
+@pytest.mark.parametrize('direction', ['undirected', 'unknown'])
+def test_euler_abstains_instead_of_forcing_mixed_or_unknown_graph_type(direction):
+    doc = document([edge('ab', 'a', 'b', 'forward'), edge('ba', 'b', 'a', direction)], directed=True)
+    result = compute(doc, 'euler')
+    assert result['status'] == 'not_applicable'
+    assert result['issues'][0]['code'] == 'mixed_or_unknown_direction_not_supported'
+
+
+def test_precise_decimal_weights_keep_strict_path_order_and_exact_mst_sum():
+    larger = '1.0000000000000000000000000001'
+    tiny = '0.00000000000000000000000000001'
+    doc = document([edge('direct', 'a', 'b', 'forward', weight=larger),
+                    edge('via', 'a', 'c', 'forward', weight='1'),
+                    edge('end', 'c', 'b', 'forward', weight=tiny)])
+    result = compute(doc, 'shortest_path', source='a', target='b', weighted=True)
+    assert result['facts']['edge_ids'] == ['via', 'end']
+    assert result['facts']['distance'] == '1.00000000000000000000000000001'
+    assert result['facts']['arithmetic'] == 'exact_rational'
+    for item in doc['graphs'][0]['edges']:
+        item['direction'] = 'undirected'
+    tree = compute(doc, 'minimum_spanning_tree')['facts']
+    assert set(tree['edge_ids']) == {'via', 'end'}
+    assert tree['total_weight'] == '1.00000000000000000000000000001'
+
+
+def test_weight_bound_is_exact_and_missing_declared_weights_never_default_to_one():
+    doc = document([edge('ab', 'a', 'b', weight='1000000000000.0000000000000000001')], nodes=('a', 'b'))
+    assert compute(doc, 'shortest_path', source='a', target='b', weighted=True)['status'] == 'not_applicable'
+    doc['graphs'][0].update(weighted=True)
+    doc['graphs'][0]['edges'][0]['weight'] = None
+    assert compute(doc, 'shortest_path', source='a', target='b')['issues'][0]['code'] == 'path_weight_mode_required'
+    assert compute(doc, 'shortest_path', source='a', target='b', weighted=True)['issues'][0]['code'] == 'complete_numeric_weights_required'
+
+
+@pytest.mark.parametrize('pending', ['unresolved_edges', 'unresolved_vertices', 'uncertain_edges', 'edge_status'])
+def test_pending_content_blocks_full_graph_calculation_and_changes_audit_digest(pending):
+    doc = document([edge('ab', 'a', 'b', weight=1)], nodes=('a', 'b'))
+    before_digest = inspect_semantic_graphs(doc)['tool_audit'][0]['input_digest']
+    if pending == 'edge_status':
+        doc['graphs'][0]['edges'][0]['status'] = 'uncertain'
+    else:
+        doc['graphs'][0][pending] = [{'reason': 'not yet resolved'}]
+    for operation, args in [('shortest_path', {'source': 'a', 'target': 'b', 'weighted': True}),
+                            ('adjacency_matrix', {}), ('walk_count', {'source': 'a', 'target': 'b', 'length': 1}),
+                            ('euler', {})]:
+        result = compute(doc, operation, **args)
+        assert result['issues'][0]['code'] == 'incomplete_semantic_snapshot'
+        assert result['input_complete'] is False
+        assert result['tool_audit'][0]['input_digest'] != before_digest
+    assert compute(doc, 'degrees')['facts']['degrees'][0]['degree'] == 1

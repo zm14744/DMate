@@ -6,7 +6,9 @@ justifies it. Uses stdlib + existing Pillow; no new production dependency.
 """
 from __future__ import annotations
 import fcntl
+import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -14,10 +16,13 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 
 MAX_RSS=1600*1024*1024
 CGROUP_RESERVE=768*1024*1024
 MAX_PIXELS=16_000_000
+MAX_RESULT_BYTES=4*1024**2
+WORKER_RUN_ENV='DMATE_OCR_WORKER_RUN_ID'
 
 
 class OCRError(Exception): pass
@@ -141,11 +146,93 @@ def child_rss(pid):
     return 0
 
 
+def write_worker_result(stage,output_path,result):
+    """Publish bytes atomically, then return this invocation's completion receipt.
+
+    The worker places the receipt in its audit only after its output phase has
+    succeeded. No model, input text, or credentials are placed in this receipt.
+    """
+    if not isinstance(result,dict) or 'worker_error' in result:
+        raise ValueError('invalid_worker_result')
+    payload=json.dumps(result,ensure_ascii=False,allow_nan=False).encode('utf-8')
+    if not 0<len(payload)<MAX_RESULT_BYTES: raise ValueError('worker_result_capacity')
+    path=Path(output_path); temporary=None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent,prefix=path.name+'.',suffix='.tmp',delete=False) as stream:
+            temporary=Path(stream.name)
+            stream.write(payload); stream.flush(); os.fsync(stream.fileno())
+        os.replace(temporary,path)
+    finally:
+        if temporary is not None and temporary.exists(): temporary.unlink()
+    return {'run_id':os.environ.get(WORKER_RUN_ENV),'pid':os.getpid(),'stage':stage,
+            'output_bytes':len(payload),'output_sha256':hashlib.sha256(payload).hexdigest(),
+            'finished_monotonic':time.monotonic()}
+
+
+def _result_file_identity(path):
+    try:
+        info=Path(path).stat()
+        return (info.st_dev,info.st_ino,info.st_mtime_ns,info.st_size)
+    except OSError: return None
+
+
+def _completed_worker_result(path,audit,*,stage,run_id,pid,started,deadline,previous_file):
+    """Require a full current-process result; an old `complete` flag is insufficient."""
+    if not audit or audit.get('stage')!=stage or audit.get('current',{}).get('phase')!='complete':
+        raise ValueError('worker_completion_not_confirmed')
+    receipt=audit.get('completion')
+    if not isinstance(receipt,dict): raise ValueError('worker_completion_receipt_missing')
+    if (receipt.get('run_id')!=run_id or type(receipt.get('pid')) is not int
+            or receipt['pid']!=pid or receipt.get('stage')!=stage):
+        raise ValueError('worker_completion_identity_mismatch')
+    events=audit.get('events')
+    if (not isinstance(events,list) or not events or events[-1].get('phase')!='output'
+            or events[-1].get('status')!='ok'):
+        raise ValueError('worker_output_phase_not_finished')
+    finished=receipt.get('finished_monotonic')
+    if type(finished) not in (int,float) or not math.isfinite(finished) or finished<started:
+        raise ValueError('worker_completion_time_invalid')
+    if finished>deadline: raise ValueError('worker_completion_after_deadline')
+    identity=_result_file_identity(path)
+    if identity is None or identity==previous_file: raise ValueError('worker_result_missing_or_stale')
+    if type(receipt.get('output_bytes')) is not int or not 0<receipt['output_bytes']<MAX_RESULT_BYTES:
+        raise ValueError('worker_result_capacity')
+    with Path(path).open('rb') as stream: payload=stream.read(MAX_RESULT_BYTES)
+    if (len(payload)!=receipt['output_bytes'] or hashlib.sha256(payload).hexdigest()!=receipt.get('output_sha256')):
+        raise ValueError('worker_result_digest_mismatch')
+    def invalid_constant(value): raise ValueError('worker_result_nonfinite')
+    result=json.loads(payload.decode('utf-8'),parse_constant=invalid_constant)
+    if not isinstance(result,dict) or 'worker_error' in result:
+        raise ValueError('invalid_worker_result')
+    if stage=='layout' and (result.get('model')!='PP-DocLayoutV3'
+            or result.get('status')!='ok' or not isinstance(result.get('regions'),list)):
+        raise ValueError('worker_result_stage_mismatch')
+    if stage=='text' and (not isinstance(result.get('text'),str)
+            or not isinstance(result.get('text_evidence'),dict)):
+        raise ValueError('worker_result_stage_mismatch')
+    return result,receipt
+
+
+def _reap_worker(proc):
+    """Bound cleanup by the existing reap allowance; never wait for native atexit."""
+    started=time.monotonic(); signalled=False
+    if proc.poll() is None:
+        try:
+            os.killpg(proc.pid,signal.SIGKILL); signalled=True
+        except ProcessLookupError: pass
+    code=proc.wait(timeout=3)
+    return {'cleanup_status':'terminated_and_reaped' if signalled else 'already_exited',
+            'cleanup_seconds':round(time.monotonic()-started,6),
+            'cleanup_signal_sent':signalled,'process_reaped':True,'process_returncode':code}
+
+
 def run_worker(stage,image_path,output_path,*,layout_path=None,timeout=55,command=None):
     """Poll RSS/cgroup headroom, kill entire process group on timeout/pressure."""
     from ocr_worker_audit import audit_path,read_audit
     metric={'stage':stage,'peak_rss_bytes':0,'rss_observed':False,'seconds':0.,'status':'failed'}
-    start=time.monotonic(); proc=None; phase_peaks={}
+    start=time.monotonic(); proc=None; phase_peaks={}; accepted=None
+    run_id=uuid.uuid4().hex; deadline=start+timeout
+    previous_file=_result_file_identity(output_path)
     sidecar=audit_path(output_path)
     state=cgroup_memory()
     if state and state[1]-state[0]<CGROUP_RESERVE+MAX_RSS:
@@ -157,6 +244,7 @@ def run_worker(stage,image_path,output_path,*,layout_path=None,timeout=55,comman
     for key in ('OMP_NUM_THREADS','MKL_NUM_THREADS','OPENBLAS_NUM_THREADS','NUMEXPR_NUM_THREADS'):
         env[key]='1'
     env['DMATE_FORMULA_ENABLED']='0'
+    env[WORKER_RUN_ENV]=run_id
     try:
         metric['model_cache']=configure_model_cache(env)
     except ModelCacheError:
@@ -185,16 +273,57 @@ def run_worker(stage,image_path,output_path,*,layout_path=None,timeout=55,comman
                               limit_reason='worker_rss' if rss>MAX_RSS else 'cgroup_headroom')
                 if state: metric['memory_at_termination']={'working_set_bytes':state[0],'budget_bytes':state[1]}
                 break
+            # Result publication completes useful work. Third-party native
+            # teardown can hang afterwards, so do not require process exit.
+            # Resource checks retain priority, and the receipt must show that
+            # output completed inside the original wall-clock allowance.
+            if phase=='complete':
+                try:
+                    accepted,receipt=_completed_worker_result(output_path,audit,stage=stage,
+                        run_id=run_id,pid=proc.pid,started=start,deadline=deadline,previous_file=previous_file)
+                except (OSError,ValueError,TypeError,AttributeError) as exc:
+                    metric['result_validation_error']=(str(exc) if isinstance(exc,ValueError)
+                        and str(exc).startswith('worker_') else 'worker_result_invalid_json')
+                else:
+                    metric.update(result_complete=True,completion_validated=True,phase='complete',
+                                  result_completion_seconds=round(receipt['finished_monotonic']-start,6),
+                                  result_received_before_exit=proc.poll() is None)
+                    break
             if time.monotonic()-start>timeout:
                 metric.update(status='timeout',phase=phase,pass_index=pass_index,limit_reason='wall_time'); break
             time.sleep(.05)
-        if proc.poll() is None:
-            os.killpg(proc.pid,signal.SIGKILL); proc.wait(timeout=3)
-        elif proc.returncode==0 and Path(output_path).exists() and Path(output_path).stat().st_size<4*1024**2:
-            result=json.loads(Path(output_path).read_text())
-            if not isinstance(result,dict) or 'worker_error' in result:
-                raise ValueError('invalid_worker_result')
-            metric['status']='ok'; return result,metric
+        if accepted is not None:
+            # A native failure observed before our cleanup is not converted
+            # into success merely because a file exists.
+            code=proc.poll()
+            if code not in (None,0):
+                accepted=None
+                metric.update(status='worker_failed',error_kind='native_worker_failure')
+            else:
+                metric.update(_reap_worker(proc))
+                if (metric['process_returncode']!=0
+                        and not (metric['process_returncode']==-signal.SIGKILL
+                                 and metric['cleanup_signal_sent'])):
+                    accepted=None
+                    metric.update(status='worker_failed',error_kind='native_worker_failure')
+                else:
+                    metric.pop('result_validation_error',None)
+                    metric['status']='ok'; return accepted,metric
+        elif proc.poll() is None:
+            metric.update(_reap_worker(proc))
+        elif proc.returncode==0:
+            try:
+                result,receipt=_completed_worker_result(output_path,read_audit(sidecar),stage=stage,
+                    run_id=run_id,pid=proc.pid,started=start,deadline=deadline,previous_file=previous_file)
+            except (OSError,ValueError,TypeError,AttributeError) as exc:
+                metric.update(status='worker_failed',error_kind='worker_result_unconfirmed',
+                              result_validation_error=(str(exc) if isinstance(exc,ValueError)
+                              and str(exc).startswith('worker_') else 'worker_result_invalid_json'))
+            else:
+                metric.update(_reap_worker(proc),status='ok',result_complete=True,completion_validated=True,
+                              phase='complete',result_received_before_exit=False,
+                              result_completion_seconds=round(receipt['finished_monotonic']-start,6))
+                return result,metric
         else:
             metric['status']='worker_failed'
             if Path(output_path).is_file() and Path(output_path).stat().st_size < 1024:
@@ -211,7 +340,14 @@ def run_worker(stage,image_path,output_path,*,layout_path=None,timeout=55,comman
     except (OSError,ValueError,subprocess.SubprocessError): metric['status']='worker_failed'
     finally:
         if proc is not None and proc.poll() is None:
-            os.killpg(proc.pid,signal.SIGKILL); proc.wait()
+            try: metric.update(_reap_worker(proc))
+            except (OSError,subprocess.SubprocessError):
+                metric.update(cleanup_status='reap_failed',process_reaped=False)
+        if proc is not None and proc.poll() is not None:
+            metric.setdefault('process_returncode',proc.returncode)
+            metric.setdefault('process_reaped',True)
+            metric.setdefault('cleanup_status','already_exited')
+            metric.setdefault('cleanup_seconds',0.)
         metric['seconds']=round(time.monotonic()-start,3)
         metric['phase_peaks']=list(phase_peaks.values())
         audit=read_audit(sidecar)

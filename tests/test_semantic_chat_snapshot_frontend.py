@@ -185,6 +185,48 @@ def test_actual_upload_cancel_neither_saves_snapshot_nor_calls_chat():
     assert result['messages'] == []
 
 
+def test_optional_question_reference_survives_upload_without_changing_graph():
+    data = response()
+    reference = {'source_sha256': 'a'*64, 'advisory_only': True,
+        'non_authoritative': True, 'cannot_drop_content': True, 'status': 'ready',
+        'focus': [{'question': '核对v₂的引用'}]}
+    data['diagnostics']['semantic_workflow']['question_reference'] = reference
+    data['text_context'] = {'legends': [{'text': '蓝边可通行', 'graph_ids': ['G1']}]}
+    result = run_js({'operation': 'upload', 'response': data, 'reviewed': reviewed()})
+    sent = result['requests'][1]['body']['semantic_context']
+    assert sent['question_reference'] == reference
+    assert sent['document']['text_context'] == data['text_context']
+    assert len(sent['document']['graphs'][0]['edges']) == len(graphs()[0]['edges'])
+
+
+def test_optional_reference_and_legends_cannot_overflow_away_a_valid_snapshot():
+    value = context()
+    value['source_sha256'] = 'a'*64
+    graph = value['document']['graphs'][0]
+    graph['edges'] = []
+    for i in range(300):
+        edge = deepcopy(graphs()[0]['edges'][0])
+        edge.update(id=f'e{i}', edge_label='x'*256, weight='3'*100)
+        graph['edges'].append(edge)
+    base = run_js({'operation': 'sanitize', 'context': value})
+    assert base is not None
+    value['document']['text_context'] = {'legends': [
+        {'text': '说明'*1000, 'graph_ids': ['G1']} for _ in range(32)]}
+    value['question_reference'] = {'source_sha256': 'a'*64, 'advisory_only': True,
+        'non_authoritative': True, 'cannot_drop_content': True, 'status': 'ready',
+        'focus': 'x'*35000}
+    result = run_js({'operation': 'sanitize', 'context': value})
+    assert result == base
+
+
+@pytest.mark.parametrize('field', ['unresolved_edges', 'unresolved_vertices', 'uncertain_edges'])
+def test_unresolved_records_survive_client_storage_and_chat(field):
+    value = context()
+    value['document']['graphs'][0][field] = [{'id': 'unresolved', 'reason': '看不清'}]
+    result = run_js({'operation': 'sanitize', 'context': value})
+    assert result['document']['graphs'][0][field] == [{'id': 'unresolved', 'reason': '看不清'}]
+
+
 @pytest.mark.parametrize('index,sha', [(0, 'a'*64), (2, 'b'*64)])
 def test_followup_uses_exact_target_message_not_last_ocr(index, sha):
     result = run_js({'operation': 'select', 'graphs': graphs(), 'targetIndex': index})

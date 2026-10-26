@@ -16,6 +16,7 @@ from graph_semantic_schema import MAX_EDGES, MAX_GRAPHS, MAX_VERTICES
 
 SOURCE_READ_PROMPT = """只根据原图读取任务 source_ids 中每个源顶点的边。完整 vertices 清单只用于找点和引用端点；position/x/y 是粗略辅助，不能代替原图。不要猜测原图是否属于某种标准图，不用度数、连通性或预期边数补删边。
 local_connection_candidates来自实际OpenCV/sknw工具，请用其中路径与端点提示沿原图确认连接。它们不是答案：文字、交叉和断线可能产生假候选；同一笔画的不同工具提议不代表多条边；没被工具找到的真实边仍需读出。unmapped只表示候选端点尚未关联数学节点，不表示原图没有这条线。候选路径长度不是印刷权值。
+候选的from/to是几何追踪顺序，不能代表箭头方向；只按原图的箭头尖端识别有向边。保留所有清楚可见的印刷边名，不能因题干未引用某条边就省略e₁等标签。
 有向边只列从该源顶点出发的箭头；指向源顶点的入边不要在此源重复列出。无向边在两个端点各自的读取中都要列出。平行边逐条列出，即使属性相同也不能合成一条；每个自环在该源下列一次。没有出边或无向邻边时 edges=[]，不能省略此 source。
 线型契约：未声明特殊线型、style 字段缺省或为 null，表示普通实线（solid）；虚线或点线必须明确写 dashed/dotted。若确实看不清线型，请显式写 unknown，不能用缺省表示看不清。
 返回 {"sources":[{"id":"任务中真实源ID","edges":[{"to":"完整清单中的端点ID","direction":"forward或undirected","weight":null,"edge_label":null,"color":"原图颜色","style":"solid/dashed/dotted"}]}]}。印刷边名与权值分开。只填写原图可见内容，看不清用 unknown 并留给最终复核；不要填写候选ID、路径、证据框或正确答案。"""
