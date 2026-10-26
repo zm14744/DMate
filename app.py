@@ -27,6 +27,7 @@ from graph_answer_integrity import (detect_count_inconsistency, review_directed_
     parse_labeled_multi_panels, review_labeled_multi_panels,
     FIGURE_VERTEX_COUNT)
 from graph_exact_solver import solve_certified_graph
+from graph_pipeline_version import EVIDENCE_PIPELINE_VERSION
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
@@ -4414,6 +4415,8 @@ def ocr():
 def health():
     return jsonify({
         "status": "ok",
+        "graph_nextgen_enabled": os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1",
+        "graph_nextgen_version": EVIDENCE_PIPELINE_VERSION,
         "graph_integrity_version": "2026-10-20-independent-edge-audit-v2",
         "graph_image_audit_version": "2026-10-20-v4-independent-directed-and-multigraph-vertex-audit",
         "graph_topology_revision": "2026-10-21-hough-blue-outline-cv-v3",
@@ -4433,6 +4436,8 @@ def ready():
     with _ocr_health_lock:
         state = {"web": "正常", "ocr_available": OCR_AVAILABLE,
                  "ocr_ready": _ocr_ready, "ocr_status": _ocr_status,
+                 "graph_nextgen_enabled": os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1",
+                 "graph_nextgen_version": EVIDENCE_PIPELINE_VERSION,
                  "ocr_stages": copy.deepcopy(_ocr_stages)}
     return jsonify(state)
 

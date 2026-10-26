@@ -1346,32 +1346,51 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
     """Call DashScope in SSE mode and reconstruct the OpenAI-compatible result."""
     request_payload = dict(payload)
     request_payload["stream"] = True
-    response = requests.post(
-        API_URL, headers=headers, json=request_payload,
-        timeout=timeout, stream=True
-    )
+    response, status_code = None, None
+    failure_phase = "response_headers"
+    content_parts, reasoning_parts = [], []
+    finish_reason, usage = None, None
+    returned_model, system_fingerprint = None, None
+    is_sse = saw_event = saw_done = False
+    stream_lines_received = sse_events_received = 0
+    wall_deadline_exceeded = incomplete_stream = False
     try:
+        # post(stream=True) includes connecting, TLS and waiting for headers.
+        # Record that boundary without guessing which of those steps failed.
+        response = requests.post(
+            API_URL, headers=headers, json=request_payload,
+            timeout=timeout, stream=True
+        )
         status_code = int(getattr(response, "status_code", 0) or 0)
         ok = bool(getattr(response, "ok", 200 <= status_code < 300))
+        failure_phase = "response_body"
         if not ok:
             return status_code, str(getattr(response, "text", "") or ""), None
 
         # Compatibility path for mocked responses and gateways ignoring stream=true.
-        if not callable(getattr(response, "iter_lines", None)):
+        content_type = str((getattr(response, "headers", None) or {}).get("Content-Type", ""))
+        if (not callable(getattr(response, "iter_lines", None))
+                or "application/json" in content_type.lower()):
             try:
                 return status_code, "", response.json()
+            except ValueError:
+                # Requests' JSONDecodeError is also a RequestException;
+                # malformed JSON is an output failure, not a network failure.
+                return status_code, "", None
+            except (requests.RequestException, TimeoutError):
+                raise
             except Exception:
                 return status_code, "", None
 
         # SSE is always UTF-8, including text/event-stream without a charset.
         # Requests otherwise decodes that legal header as ISO-8859-1.
         response.encoding = "utf-8"
-        content_parts, reasoning_parts = [], []
-        finish_reason, usage = None, None
-        returned_model, system_fingerprint = None, None
-        saw_event = False
+        failure_phase = "sse_stream"
+        is_sse = True
         for raw_line in response.iter_lines(decode_unicode=True):
+            stream_lines_received += 1
             if wall_deadline is not None and time.monotonic() > wall_deadline:
+                wall_deadline_exceeded = True
                 raise TimeoutError("vision_wall_deadline")
             if raw_line is None:
                 continue
@@ -1380,6 +1399,7 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
                 continue
             data = line[5:].strip()
             if data == "[DONE]":
+                saw_done = True
                 break
             if not data:
                 continue
@@ -1390,6 +1410,7 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
             if not isinstance(chunk, dict):
                 continue
             saw_event = True
+            sse_events_received += 1
             returned_model = chunk.get("model") or returned_model
             system_fingerprint = chunk.get("system_fingerprint") or system_fingerprint
             if isinstance(chunk.get("usage"), dict):
@@ -1413,11 +1434,21 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
                 if choice.get("finish_reason") is not None:
                     finish_reason = choice.get("finish_reason")
 
+        if saw_event and not saw_done and finish_reason is None:
+            # A valid JSON prefix/object is still not a completed SSE response.
+            # Preserve it only as audit evidence, never as a graph result.
+            incomplete_stream = True
+            raise requests.ConnectionError("vision_incomplete_sse_stream")
         if not saw_event:
+            failure_phase = "response_body"
             try:
                 data = response.json()
                 if isinstance(data, dict) and data.get("choices"):
                     return status_code, "", data
+            except ValueError:
+                pass
+            except (requests.RequestException, TimeoutError):
+                raise
             except Exception:
                 pass
         normalized = {
@@ -1433,6 +1464,31 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
             "system_fingerprint": system_fingerprint,
         }
         return status_code, "", normalized
+    except (requests.RequestException, TimeoutError) as exc:
+        # Only fixed stage names, booleans and counts belong in normal metrics.
+        # Never attach headers, URL, exception messages or the request payload.
+        exc.vision_failure_context = {
+            "failure_phase": failure_phase,
+            "response_headers_received": response is not None,
+            "http_status": status_code,
+            "partial_stream": is_sse,
+            "stream_lines_received": stream_lines_received,
+            "sse_events_received": sse_events_received,
+            "stream_done_received": saw_done,
+            "wall_deadline_exceeded": wall_deadline_exceeded,
+            "incomplete_stream": incomplete_stream,
+        }
+        if is_sse:
+            # This transient payload is consumed by VisionProvider. Only its
+            # explicit capture=True audit path may persist raw_content.
+            exc.vision_partial_result = {
+                "http_status": status_code, "partial_stream": True,
+                "content": "".join(content_parts),
+                "reasoning_chars": sum(map(len, reasoning_parts)),
+                "model": returned_model, "system_fingerprint": system_fingerprint,
+                "usage": usage or {}, "finish_reason": finish_reason,
+            }
+        raise
     finally:
         close = getattr(response, "close", None)
         if callable(close):

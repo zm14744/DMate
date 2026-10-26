@@ -10,8 +10,11 @@ import hashlib
 import json
 import os
 import re
+import socket
+import ssl
 import time
 import requests
+from urllib3 import exceptions as urllib3_errors
 
 GLM_MODEL='glm-4.6v-flash'
 GLM_PAID_MODEL='glm-4.6v'
@@ -34,6 +37,82 @@ def image_digest(url):
     if not isinstance(url,str) or not url.startswith('data:image/') or ';base64,' not in url:
         raise ValueError('Only explicitly supplied image bytes are supported')
     return hashlib.sha256(base64.b64decode(url.split(',',1)[1],validate=True)).hexdigest()
+
+
+def _transport_failure_metrics(exc):
+    """Describe transport failures without serializing exception messages/URLs.
+
+    Requests turns an urllib3 ReadTimeoutError during iter_content into a
+    ConnectionError. Its inner exception can live in args or reason rather
+    than __cause__, so inspect those exception objects with a fixed bound.
+    """
+    pending=[exc];chain=[];seen=set()
+    while pending and len(chain)<16:
+        error=pending.pop(0)
+        if not isinstance(error,BaseException) or id(error) in seen:continue
+        seen.add(id(error));chain.append(error)
+        cause=getattr(error,'__cause__',None)
+        if cause is not None:pending.append(cause)
+        elif not getattr(error,'__suppress_context__',False):
+            pending.append(getattr(error,'__context__',None))
+        pending.extend(getattr(error,key,None) for key in ('reason','original_error'))
+        pending.extend(value for value in error.args[:8] if isinstance(value,BaseException))
+    truncated=any(isinstance(value,BaseException) and id(value) not in seen for value in pending)
+    def has(*types):return any(isinstance(error,types) for error in chain)
+    def type_name(error):
+        value=type(error).__module__+'.'+type(error).__name__
+        return value if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.]{0,159}',value) else 'Exception'
+
+    context=getattr(exc,'vision_failure_context',None)
+    context=context if isinstance(context,dict) else {}
+    partial=getattr(exc,'vision_partial_result',None)
+    partial=partial if isinstance(partial,dict) else {}
+    phase=context.get('failure_phase')
+    if phase not in ('response_headers','response_body','sse_stream'):
+        phase='sse_stream' if partial.get('partial_stream') is True else 'unknown'
+    status=context.get('http_status',partial.get('http_status'))
+    if type(status) is not int or not 100<=status<=599:
+        status=getattr(getattr(exc,'response',None),'status_code',None)
+    if type(status) is not int or not 100<=status<=599:status=None
+
+    read_timeout=has(requests.ReadTimeout,urllib3_errors.ReadTimeoutError)
+    # urllib3's NewConnectionError (also DNS failure) inherits from
+    # ConnectTimeoutError, despite not establishing that a timeout occurred.
+    connect_timeout=has(requests.ConnectTimeout) or any(
+        isinstance(error,urllib3_errors.ConnectTimeoutError)
+        and not isinstance(error,urllib3_errors.NewConnectionError) for error in chain)
+    wall_timeout=context.get('wall_deadline_exceeded') is True
+    timed_out=wall_timeout or read_timeout or connect_timeout or has(requests.Timeout,TimeoutError)
+    incomplete=context.get('incomplete_stream') is True
+    known_non_timeout=incomplete or has(ssl.SSLCertVerificationError,socket.gaierror,
+                                        ConnectionRefusedError,ConnectionResetError,BrokenPipeError)
+    timeout=True if timed_out else (False if known_non_timeout and not truncated else None)
+    if wall_timeout:kind='wall_deadline'
+    elif incomplete:kind='incomplete_stream'
+    elif has(requests.exceptions.SSLError,urllib3_errors.SSLError,ssl.SSLError):kind='tls'
+    elif has(socket.gaierror) or any(type(error).__name__=='NameResolutionError' for error in chain):kind='dns'
+    elif read_timeout:kind='read_timeout'
+    elif connect_timeout:kind='connect_timeout'
+    elif timed_out:kind='timeout'
+    elif has(requests.exceptions.ChunkedEncodingError,urllib3_errors.ProtocolError):kind='protocol'
+    elif has(requests.exceptions.ProxyError,urllib3_errors.ProxyError):kind='proxy'
+    elif has(requests.ConnectionError,urllib3_errors.NewConnectionError):kind='connection'
+    else:kind='unknown'
+    metric={'exception_type':type_name(exc).rsplit('.',1)[-1],
+            'exception_chain':[type_name(error) for error in chain],
+            'exception_chain_truncated':truncated,'failure_phase':phase,
+            'transport_failure_kind':kind,'confirmed_timeout':timeout,
+            'timeout_kind':('wall_deadline' if wall_timeout else 'read' if read_timeout
+                            else 'connect' if connect_timeout else 'unspecified' if timed_out else None),
+            'response_headers_received':context.get('response_headers_received') is True or status is not None,
+            'partial_stream':context.get('partial_stream') is True or partial.get('partial_stream') is True}
+    if status is not None:metric['http_status']=status
+    for key in ('stream_lines_received','sse_events_received'):
+        value=context.get(key)
+        if type(value) is int and value>=0:metric[key]=value
+    if type(context.get('stream_done_received')) is bool:
+        metric['stream_done_received']=context['stream_done_received']
+    return metric
 
 
 def _glm_request(payload,headers,timeout,wall_deadline):
@@ -204,12 +283,11 @@ class VisionProvider:
                 return parsed
             except (requests.RequestException,TimeoutError) as exc:
                 error=VisionError('transport_failed');metric['status']='transport_failed'
-                metric['exception_type']=type(exc).__name__
-                metric['confirmed_timeout']=True if isinstance(exc,(requests.Timeout,TimeoutError)) else None
+                metric.update(_transport_failure_metrics(exc))
                 partial=getattr(exc,'vision_partial_result',None)
                 if isinstance(partial,dict) and partial.get('partial_stream') is True:
                     raw=partial.get('content')
-                    metric.update(http_status=partial.get('http_status'),partial_stream=True,
+                    metric.update(partial_stream=True,
                         returned_model=partial.get('model'),system_fingerprint=partial.get('system_fingerprint'),
                         usage=partial.get('usage') or {},reasoning_chars=partial.get('reasoning_chars'),
                         finish_reason=partial.get('finish_reason'))
