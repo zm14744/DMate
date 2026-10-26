@@ -1,7 +1,7 @@
 """Lightweight deployment identity shared by OCR and public health checks."""
 
 EVIDENCE_PIPELINE_VERSION = '2026-10-26-evidence-two-pass-v3'
-AGENT_PIPELINE_VERSION = '2026-10-26-agent-semantic-v3'
+AGENT_PIPELINE_VERSION = '2026-10-27-agent-semantic-v4'
 
 
 def active_pipeline():

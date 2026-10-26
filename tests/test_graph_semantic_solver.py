@@ -1,6 +1,8 @@
 import copy
 import json
 
+import pytest
+
 from graph_semantic_solver import semantic_solver_context, semantic_math_prompt
 from test_ocr_application_contract import application
 
@@ -120,3 +122,165 @@ def test_deepseek_request_contains_actual_tool_facts_without_an_extra_model_call
                        teaching_context={'mode': 'hint', 'semantic_math': context})
     assert result['ok'] and len(requests) == 1
     assert 'parallel_2' in requests[0][0]['content'] and '"distance":2' in requests[0][0]['content']
+
+
+def test_declared_weighted_graph_with_missing_weights_is_not_solved_by_edge_count():
+    data = payload()
+    graph = data['document']['graphs'][0]
+    graph['weighted'] = True
+    for edge in graph['edges']:
+        edge['weight'] = None
+    result = semantic_solver_context(data, data['question_text'])['calculations'][0]
+    assert result['request']['weighted'] is True
+    assert result['result']['issues'][0]['code'] == 'complete_numeric_weights_required'
+
+
+def test_explicit_unweighted_question_can_use_counts_without_filling_missing_weights():
+    data = payload('忽略权值，求从a到A按边数计算的最短路径。')
+    graph = data['document']['graphs'][0]
+    graph['weighted'] = True
+    for edge in graph['edges']:
+        edge['weight'] = None
+    before = copy.deepcopy(data)
+    result = semantic_solver_context(data, data['question_text'])['calculations'][0]
+    assert result['request']['weighted'] is False
+    assert result['result']['facts']['distance'] == 1
+    assert data == before
+
+
+@pytest.mark.parametrize('pending', ['unresolved_edges', 'unresolved_vertices', 'uncertain_edges', 'edge_status'])
+def test_snapshot_projection_preserves_pending_graph_content(pending):
+    data = payload()
+    graph = data['document']['graphs'][0]
+    if pending == 'edge_status':
+        graph['edges'][0]['status'] = 'uncertain'
+    else:
+        graph[pending] = [{'reason': 'await source verification'}]
+    result = semantic_solver_context(data, data['question_text'])
+    assert result['calculations'][0]['result']['issues'][0]['code'] == 'incomplete_semantic_snapshot'
+    if pending != 'edge_status':
+        assert result['document']['graphs'][0][pending] == graph[pending]
+
+
+def test_solver_dispatches_adjacency_walk_and_euler_from_literal_question_only():
+    data = payload('按边实例数写邻接矩阵；求从a到b长度为2的通路条数；判断有无欧拉通路。')
+    results = semantic_solver_context(data, data['question_text'])['calculations']
+    facts = {row['request']['operation']: row['result']['facts'] for row in results}
+    assert set(facts) == {'adjacency_matrix', 'walk_count', 'euler'}
+    assert facts['adjacency_matrix']['matrix'] == [[0, 2, 0], [2, 0, 1], [0, 1, 0]]
+    assert facts['walk_count']['count'] == 2
+    assert facts['euler']['has_eulerian_trail'] and not facts['euler']['has_eulerian_circuit']
+
+
+@pytest.mark.parametrize('question', [
+    '求从a到b长度为2的简单通路条数。', '求从a到b长度为2的不重复顶点通路数量。',
+    '求从a到b长度为k的通路条数。', '求从a到b长度为2.5的通路条数。',
+    '求从a到b长度为2/3的通路条数。', '求从a到b长度为2n的通路条数。',
+    '求从a到b长度为2 / 3的通路条数。', '求从a到b长度为2 × 3的通路条数。',
+    '求从a到b长度为2 ^ 3的通路条数。', '求从a到b长度为2 的平方的通路条数。',
+    '求从a到b长度为65的通路条数。', '求长度为2的通路条数。',
+    '从a到A写出一条通路；求从A到b的通路数量。',
+])
+def test_unsupported_or_ambiguous_walk_question_does_not_become_unrestricted_walk_count(question):
+    data = payload(question)
+    result = semantic_solver_context(data, data['question_text'])
+    assert not any(row['request']['operation'] == 'walk_count' for row in result['calculations'])
+
+
+def test_shortest_path_endpoints_are_not_taken_from_a_different_subquestion():
+    data = payload('从a到A写一条通路；求从A到b的最短路径。')
+    request = semantic_solver_context(data, data['question_text'])['calculations'][0]['request']
+    assert (request['source'], request['target']) == ('A', 'b')
+
+
+def test_weighted_adjacency_question_is_not_given_an_unlabelled_count_matrix():
+    data = payload('求带权邻接矩阵。')
+    assert semantic_solver_context(data, data['question_text'])['calculations'] == []
+    unweighted = payload('写出邻接矩阵。')
+    for edge in unweighted['document']['graphs'][0]['edges']:
+        edge['weight'] = None
+    result = semantic_solver_context(unweighted, unweighted['question_text'])['calculations'][0]
+    assert result['result']['facts']['entry_meaning'] == 'edge_instance_count'
+
+
+def reference_for(data):
+    from graph_semantic_question_reference import VERSION, _snapshot
+    snapshot = _snapshot(data['document'], data['source_sha256'])
+    return {'version': VERSION, 'status': 'ready', 'advisory_only': True,
+            'non_authoritative': True, 'cannot_drop_content': True,
+            **{key: snapshot[key] for key in ('source_sha256', 'text_digest', 'graph_catalog_digest')},
+            'subquestions': [], 'references': [], 'focus': [], 'unresolved': []}
+
+
+def test_actual_source_bound_reference_is_optional_prompt_advice_and_not_tool_arguments():
+    data = payload()
+    data['document']['text_context'] = {'legends': [{'text': '蓝色为另一条边', 'graph_ids': ['G1']}], 'captions': []}
+    data['question_reference'] = reference_for(data)
+    data['question_reference']['subquestions'] = [{
+        'id': 'literal_1', 'source_spans': [{'block_id': 'body', 'start': 0,
+            'end': len(data['document']['body_text']), 'quote': data['document']['body_text']}],
+        'graph_ids': ['G1'], 'summary': '参考建议按边数计算，但该建议不得改变工具参数。'}]
+    before = copy.deepcopy(data)
+    result = semantic_solver_context(data, data['question_text'])
+    assert result['question_reference']['advisory_only'] is True
+    assert result['question_reference']['source_sha256'] == data['source_sha256']
+    assert result['calculations'][0]['request']['weighted'] is True
+    assert result['calculations'][0]['result']['facts']['distance'] == 2
+    prompt = semantic_math_prompt(result)
+    assert 'advisory_only' in prompt and '不能改变程序工具参数' in prompt
+    assert data == before
+
+
+@pytest.mark.parametrize('change', ['source', 'body', 'catalog', 'extra_policy', 'oversized', 'circular'])
+def test_stale_or_invalid_optional_reference_never_invalidates_legacy_snapshot(change):
+    data = payload()
+    data['question_reference'] = reference_for(data)
+    if change == 'source':
+        data['question_reference']['source_sha256'] = 'b'*64
+    elif change == 'body':
+        data['document']['body_text'] += ' 新小问'
+    elif change == 'catalog':
+        data['document']['graphs'][0]['vertices'][0]['label'] = 'v₁'
+    elif change == 'extra_policy':
+        data['question_reference']['focus'] = [{'drop_all_edges': True}]
+    elif change == 'oversized':
+        data['question_reference']['unused'] = 'x'*300_000
+    else:
+        data['question_reference']['cycle'] = data['question_reference']
+    result = semantic_solver_context(data, data['question_text'])
+    assert result['status'] == 'bound' and 'question_reference' not in result
+    assert result['calculations'][0]['result']['facts']['distance'] == 2
+
+
+def test_optional_reference_module_failure_does_not_block_computation(monkeypatch):
+    import graph_semantic_question_reference as reference
+    data = payload()
+    data['question_reference'] = reference_for(data)
+    def unavailable(*args, **kwargs):
+        raise RuntimeError('optional helper unavailable')
+    monkeypatch.setattr(reference, 'question_reference_for_document', unavailable)
+    result = semantic_solver_context(data, data['question_text'])
+    assert result['status'] == 'bound' and 'question_reference' not in result
+    assert result['calculations'][0]['result']['facts']['distance'] == 2
+
+
+def test_formula_prose_is_not_evaluated_or_misrepresented_as_a_structured_sympy_input():
+    data = payload('证明 p∧q 蕴含 p，并计算矩阵 [[1,2],[3,4]] 的逆。')
+    result = semantic_solver_context(data, data['question_text'])
+    assert result['status'] == 'bound' and result['calculations'] == []
+
+
+@pytest.mark.parametrize('text_context', [
+    'not a literal context', {'legends': [{'text': object()}]},
+    {'captions': [{'text': 'x'*2001, 'graph_ids': ['G1']}]},
+    {'legends': [{'text': 'a caption', 'graph_ids': ['missing_graph']}]},
+    {'captions': [{'text': 'a caption'}]*33},
+])
+def test_bad_optional_text_context_only_drops_reference_not_usable_graph(text_context):
+    data = payload()
+    data['question_reference'] = reference_for(data)
+    data['document']['text_context'] = text_context
+    result = semantic_solver_context(data, data['question_text'])
+    assert result['status'] == 'bound' and 'question_reference' not in result
+    assert 'text_context' not in result['document']
+    assert result['calculations'][0]['result']['facts']['distance'] == 2

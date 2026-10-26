@@ -9375,6 +9375,21 @@ function sanitizeSemanticContext(value, message = null) {
             if (!string(graph.direction_mode, 32)) return null;
             clean.direction_mode = graph.direction_mode;
         }
+        // Preserve the existence of unresolved edge records. Dropping them
+        // would turn an incomplete snapshot into a seemingly complete graph.
+        for (const field of ["unresolved_edges", "unresolved_vertices", "uncertain_edges"]) {
+            if (graph[field] === undefined) continue;
+            if (!Array.isArray(graph[field]) || graph[field].length > 300) return null;
+            clean[field] = graph[field].map(edge => {
+                const item = {};
+                if (object(edge)) {
+                    for (const key of ["id", "from", "to", "direction", "edge_label", "reason", "status"]) {
+                        if (string(edge[key], 1000)) item[key] = edge[key];
+                    }
+                }
+                return item;
+            });
+        }
         for (const vertex of graph.vertices) {
             if (!object(vertex) || !string(vertex.id, 128, true) || !literal(vertex.label, 256)) return null;
             const node = { id: vertex.id, label: vertex.label ?? null };
@@ -9405,22 +9420,57 @@ function sanitizeSemanticContext(value, message = null) {
     const result = { document: { body_text: value.document.body_text, graphs },
         question_text: value.question_text, rendered_question_text: value.rendered_question_text,
         source_sha256: value.source_sha256.toLowerCase() };
+    try {
+        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 200000) return null;
+    } catch (_error) { return null; }
+    if (object(value.document.text_context)) {
+        const textContext = {};
+        for (const key of ["legends", "captions"]) {
+            const rows = value.document.text_context[key];
+            if (!Array.isArray(rows) || rows.length > 32) continue;
+            textContext[key] = rows.filter(row => object(row) && string(row.text, 2000)
+                && Array.isArray(row.graph_ids) && row.graph_ids.length <= 64
+                && row.graph_ids.every(id => string(id, 128)))
+                .map(row => ({ text: row.text, graph_ids: [...row.graph_ids] }));
+        }
+        result.document.text_context = textContext;
+    }
+    // Advisory payloads never decide what the client displays or calculates.
+    // The server checks their source/text/catalog digests again before reuse.
+    const reference = value.question_reference;
+    if (object(reference) && reference.advisory_only === true
+        && reference.non_authoritative === true && reference.cannot_drop_content === true
+        && reference.source_sha256 === result.source_sha256) {
+        try {
+            const encoded = JSON.stringify(reference);
+            if (new TextEncoder().encode(encoded).byteLength <= 40000) {
+                result.question_reference = JSON.parse(encoded);
+            }
+        } catch (_error) { /* A bad optional reference never invalidates the graph. */ }
+    }
     if (message !== null && (message?.role !== "user" || message?.source !== "ocr"
         || typeof message.text !== "string" || typeof message.apiText !== "string"
         || extractOcrQuestionPayload(message.text) !== result.rendered_question_text
         || !message.apiText.includes(result.question_text))) return null;
     try {
-        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 200000) return null;
+        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 200000) {
+            delete result.question_reference;
+            if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 200000) {
+                delete result.document.text_context;
+            }
+        }
     } catch (_error) { return null; }
     return result;
 }
 
 function buildOcrSemanticContext(data, text, questionText, internalQuestionText) {
     return sanitizeSemanticContext({
-        document: { body_text: text, graphs: data?.graph_structures },
+        document: { body_text: text, graphs: data?.graph_structures,
+            text_context: data?.text_context },
         question_text: internalQuestionText,
         rendered_question_text: extractOcrQuestionPayload(questionText),
-        source_sha256: data?.diagnostics?.semantic_workflow?.source_sha256
+        source_sha256: data?.diagnostics?.semantic_workflow?.source_sha256,
+        question_reference: data?.diagnostics?.semantic_workflow?.question_reference
     });
 }
 

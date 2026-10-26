@@ -208,7 +208,14 @@ class Reader:
             output = output(request)
         if isinstance(output, Exception):
             raise output
-        return copy.deepcopy(output)
+        output = copy.deepcopy(output)
+        if role == 'semantic_review' and isinstance(output, dict) and isinstance(output.get('issues'), list):
+            # Existing fixture findings describe actionable differences. New
+            # protocol rejection/withdrawal cases are tested at the boundary.
+            for issue in output['issues']:
+                if isinstance(issue, dict):
+                    issue.setdefault('verdict', 'change_required')
+        return output
 
 
 def run(reader, **kwargs):
@@ -404,14 +411,20 @@ def test_source_specialist_failure_falls_back_to_qwen_without_erasing_content():
     assert result['graphs'][0]['complete'] and not result['semantic_issues']
 
 
-def test_app_default_route_uses_semantics_and_text_cleanup_failure_is_nonblocking(monkeypatch):
+def test_app_default_route_preserves_literal_text_without_another_model_editor(monkeypatch):
     import ocr_nextgen
     reader = Reader()
-    monkeypatch.setattr(ocr_nextgen, 'correct_text', lambda text, **kwargs: (text, {'status': 'failed'}))
+    calls = []
+    def redundant_editor(text, **kwargs):
+        calls.append(text)
+        return 'unexpected text edit', {'status': 'ok'}
+    monkeypatch.setattr(ocr_nextgen, 'correct_text', redundant_editor)
     result = ocr_nextgen.recognize_graph_document(original(), {},
         graph_pipeline='agent-tools', vision_provider=reader)
     assert result['recognition_status'] == 'complete'
     assert result['text'] == document()['body_text']
+    assert calls == []
+    assert result['diagnostics']['correction']['reason'] == 'literal_semantic_text_preserved'
     from graph_pipeline_version import AGENT_PIPELINE_VERSION
     assert result['graph_display_version'] == AGENT_PIPELINE_VERSION
     assert '颜色 blue' in result['visual_text'] and '虚线' in result['visual_text']
@@ -532,7 +545,7 @@ def test_glm_specialist_runs_at_most_once_after_qwen_review_failure():
     ordinary = Reader({'semantic_review': VisionError('invalid_output')})
     specialist = Specialist({'semantic_specialist': changed})
     result = run(providers(ordinary, specialist))
-    assert structural_roles(specialist) == ['semantic_edges_glm', 'semantic_specialist']
+    assert structural_roles(specialist) == ['semantic_edges_glm_fast', 'semantic_specialist']
     assert result['graphs'][0]['edges'][0]['weight'] == 1
     assert result['graphs'][0]['complete']
 

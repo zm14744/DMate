@@ -82,7 +82,7 @@ def main():
     from ocr_worker_audit import WorkerAudit,BoundedTextModel
     audit=WorkerAudit(output_path,stage,on_phase=_set_phase)
     audit.set_phase('cache')
-    from ocr_runtime import configure_model_cache
+    from ocr_runtime import configure_model_cache,write_worker_result
     configure_model_cache(os.environ)
     # This also applies to explicitly invoked standalone cache-preparation
     # workers; do not rely only on the parent process setting these variables.
@@ -150,7 +150,8 @@ def main():
                 'review_regions':ocr._review_regions(body,image.shape[1],image.shape[0]),
                 'text_evidence':partition,'warning':None}
     with audit.phase('output'):
-        Path(output_path).write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8')
+        completion=write_worker_result(stage,output_path,result)
+    audit.data['completion']=completion
     audit.set_phase('complete')
 
 
