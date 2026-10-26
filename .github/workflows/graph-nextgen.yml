@@ -16,6 +16,8 @@ concurrency:
 jobs:
   mechanisms:
     runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.55.0-noble@sha256:640d578aae63cfb632461d1b0aecb01414e4e020864ac3dd45a868dc0eff3078
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +30,6 @@ jobs:
       - run: python -m pip install Flask requests numpy==1.26.4 opencv-contrib-python-headless==4.10.0.84 Pillow==11.3.0 networkx pytest playwright==1.55.0 -r requirements-agents.txt
       - run: python -m pytest -q tests
       - run: node --check static/script.js && node tests/graph_display_regression.js && node tests/graph_nextgen_display.js
-      - run: python -m playwright install --with-deps chromium
       - name: Prepare pinned public browser scripts with TLS verification
         run: |
           python - <<'PY'
