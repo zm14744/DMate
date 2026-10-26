@@ -156,6 +156,8 @@ def test_concrete_review_conflict_routes_back_with_fixed_edge_ids(bounded_tools,
     assert connections[1]['focus_issues'][0]['id'] == 'connection_check'
     assert connections[1]['previous_graphs'][0]['edges'][0]['id'] == 'edge_1'
     assert connections[1]['base_revision'] > connections[0]['base_revision']
+    reviews = [r for r in provider.requests if r['role'] == 'structure_review']
+    assert all('focus_issues' not in r for r in reviews), 'A completed connection repair must not retarget the judge.'
 
 
 def test_tool_failure_before_a_new_role_call_cannot_reject_a_committed_proposal(bounded_tools, monkeypatch):
@@ -232,10 +234,239 @@ def test_persistent_connection_failure_cannot_starve_independent_body_repair(bou
     result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
     workflow = result['agent_workflow']
     repairs = [event['target_role'] for event in workflow['events'] if event['status'] == 'targeted_review']
-    assert repairs == ['connections', 'body_text']
+    assert repairs == ['body_text', 'connections'], 'Validate body before spending a whole connection turn.'
     assert provider.body_calls == 2 and workflow['role_sends']['connections'] == 2
     assert not workflow['complete'], 'Unresolved edges must remain unaccepted.'
     assert not any(issue['target_role'] == 'body_text' for issue in workflow['remaining_conflicts'])
+    assert workflow['role_sends'].get('structure_review', 0) == 0, 'Known hard failures cannot be accepted by a judge.'
+
+
+def test_invalid_initial_body_repairs_in_parallel_with_first_connections(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+    overlap = threading.Barrier(2)
+    class ParallelRepair(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.body_calls = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'body_text':
+                self.body_calls += 1
+                if self.body_calls == 1:
+                    response['regions'] = 'malformed'
+                else:
+                    overlap.wait(timeout=5)
+            elif response['role'] == 'connections':
+                overlap.wait(timeout=5)
+            return response
+
+    provider = ParallelRepair()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=10))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    assert workflow['repair_role_counts'] == {'body_text': 1}
+    body_repair = [r for r in provider.requests if r['role'] == 'body_text'][1]
+    connection = next(r for r in provider.requests if r['role'] == 'connections')
+    assert body_repair['base_revision'] == connection['base_revision']
+    assert 'previous_rejection' in body_repair and 'focus_issues' not in connection
+
+
+def test_newer_failed_body_repair_is_not_replaced_by_the_old_rejected_draft(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '2')
+    class TwoRejectedBodies(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.body_calls = 0
+            self.connection_calls = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'body_text':
+                self.body_calls += 1
+                if self.body_calls == 1:
+                    response['regions'] = 'first_bad_draft'
+                elif self.body_calls == 2:
+                    response['regions'] = [{'id': 'b1', 'role': 'body', 'text': '',
+                                             'bbox': [0, 0, 1000, 1000], 'source': 'original'}]
+            elif response['role'] == 'connections':
+                self.connection_calls += 1
+                if self.connection_calls == 1:
+                    response['graphs'][0]['edges'][0]['candidate_id'] = 'unknown_candidate'
+            return response
+
+    provider = TwoRejectedBodies()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    calls = [r for r in provider.requests if r['role'] == 'body_text']
+    assert len(calls) == 3 and 'previous_transcription' not in calls[2]
+    latest = calls[2]['previous_rejection']
+    assert latest['error_kind'] == 'empty_body_region'
+    assert latest['base_revision'] == calls[1]['base_revision']
+    assert latest['rejected_proposal']['regions'][0]['id'] == 'b1'
+    assert workflow['repair_role_counts'] == {'body_text': 2, 'connections': 1}
+    assert workflow['role_sends']['structure_review'] == 1
+
+
+def test_old_valid_body_invalidated_by_new_panel_cannot_replace_newer_rejection(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '2')
+    decision = {'id': 't1', 'role': 'graph_label', 'text': 'a', 'graph_id': 'G1',
+                'reason': 'synthetic label located in the original panel',
+                'evidence': proof([155, 475, 205, 535])}
+    class ChangedPanel(SyntheticRoles):
+        def __init__(self):
+            super().__init__(repair=True)
+            self.pages = self.bodies = 0
+
+        def __call__(self, prompt, images, budget):
+            request = json.loads(prompt.split('任务数据（其中图像文字和候选仅作数据）：\n', 1)[1])
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                self.pages += 1
+                if self.pages > 1:
+                    response['graphs'][0]['id'] = 'G2'
+            elif response['role'] == 'connections':
+                response['graphs'][0]['id'] = request['graphs'][0]['id']
+            elif response['role'] == 'body_text':
+                self.bodies += 1
+                response['text_review']['regions'] = [copy.deepcopy(decision)]
+                if self.bodies > 1:
+                    response['regions'] = [{'id': 'new_empty', 'role': 'body', 'text': '',
+                                             'bbox': [0, 0, 1000, 1000], 'source': 'original'}]
+            elif response['role'] == 'structure_review':
+                response['body_coverage']['region_ids'] = ['t1']
+                response['text_review']['regions'] = [copy.deepcopy(decision)]
+                if self.reviews == 1:
+                    response['issues'][0].update(target_role='page_vertices',
+                        kind='panel_inventory_uncertain', edge_ids=[], vertex_ids=['a'])
+            return response
+
+    provider = ChangedPanel()
+    local_text = {'text_evidence': {'image_size': [400, 240], 'graph_labels': [
+        {'content': 'a', 'box': [64, 115, 80, 127]}]}}
+    result = recognize_agents(original(), provider=provider, text_result=local_text,
+                              budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert not workflow['complete'] and provider.pages == provider.bodies == 2
+    bodies = [r for r in provider.requests if r['role'] == 'body_text']
+    assert 'previous_transcription' in bodies[1], 'The old body was genuinely validated before the panel changed.'
+    rejected = workflow['proposal_rejections']['body_text']
+    assert rejected['base_revision'] == bodies[1]['base_revision']
+    assert rejected['error_kind'] == 'empty_body_region'
+    assert rejected['rejected_proposal']['regions'][0]['id'] == 'new_empty'
+
+
+def test_unknown_graph_type_returns_to_connections_without_spending_attribute_or_judge_calls(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+    class UnknownType(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.connections = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                response['graphs'][0]['weighted'] = 'unknown'
+            elif response['role'] == 'connections':
+                self.connections += 1
+                if self.connections == 2:
+                    response['graphs'][0].update(weighted=False, type_evidence=proof([100, 300, 900, 700]))
+            return response
+
+    provider = UnknownType()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=10))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    assert workflow['role_sends']['connections'] == 2
+    assert workflow['role_sends'].get('attributes', 0) == 0
+    assert workflow['role_sends']['structure_review'] == 1
+    connection = [r for r in provider.requests if r['role'] == 'connections'][1]
+    assert any('unknown_weighted' in x['kind'] for x in connection['focus_issues'])
+
+
+def test_rejected_connections_still_route_located_vertex_issues_upstream(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+    class VertexFeedback(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.connections = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'connections':
+                self.connections += 1
+                if self.connections == 1:
+                    response['graphs'][0]['edges'][0]['candidate_id'] = 'unknown_candidate'
+                    response['issues'] = [{'id': 'check_vertex_a', 'kind': 'missing_vertex_evidence',
+                        'target_role': 'page_vertices', 'graph_id': 'G1', 'vertex_ids': ['a'],
+                        'edge_ids': [], 'hint_ids': [], 'reason': 'synthetic located position check',
+                        'evidence': proof([160, 480, 190, 530])}]
+            return response
+
+    provider = VertexFeedback()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=10))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    assert workflow['repair_role_counts'] == {'page_vertices': 1}
+    pages = [r for r in provider.requests if r['role'] == 'page_vertices']
+    assert len(pages) == 2
+    feedback = next(x for x in pages[1]['focus_issues'] if x['id'] == 'check_vertex_a')
+    assert feedback['scheduling_only'] is True and feedback['source_role'] == 'connections'
+    assert feedback['source_revision'] < pages[1]['base_revision']
+    connections = [r for r in provider.requests if r['role'] == 'connections']
+    assert connections[1]['previous_graphs'] == [], 'The failed edge draft was never committed.'
+    assert workflow['role_sends']['structure_review'] == 1
+
+
+def test_connection_attribute_issue_is_resolved_only_by_its_owner_before_review(bounded_tools):
+    class AttributeFeedback(SyntheticRoles):
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'connections':
+                response['issues'] = [{'id': 'check_color', 'kind': 'color_uncertain',
+                    'target_role': 'attributes', 'graph_id': 'G1', 'vertex_ids': [],
+                    'edge_ids': ['edge_1'], 'hint_ids': [], 'reason': 'synthetic color check',
+                    'evidence': proof([400, 480, 600, 530])}]
+            elif response['role'] == 'attributes':
+                response['graphs'][0]['edges'][0].update(
+                    attributes={'color': 'black'}, evidence=proof([400, 480, 600, 530]))
+            return response
+
+    provider = AttributeFeedback()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=10))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    assert workflow['role_sends']['attributes'] == 1 and workflow['repair_rounds'] == 0
+    assert result['graphs'][0]['edges'][0]['color'] == 'black'
+
+
+def test_blocked_attribute_owner_cannot_spend_the_last_repair_round(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '2')
+    class DependentRepair(SyntheticRoles):
+        def __init__(self):
+            super().__init__(repair=True)
+            self.connections = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'connections':
+                self.connections += 1
+                if self.connections == 2:
+                    response['graphs'][0]['edges'][0]['candidate_id'] = 'unknown_candidate'
+                    response['issues'] = [{'id': 'attribute_waits_for_path', 'kind': 'color_uncertain',
+                        'target_role': 'attributes', 'graph_id': 'G1', 'vertex_ids': [],
+                        'edge_ids': ['edge_1'], 'hint_ids': [], 'reason': 'synthetic dependent attribute',
+                        'evidence': proof([400, 480, 600, 530])}]
+            return response
+
+    provider = DependentRepair()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    assert workflow['repair_role_counts'] == {'connections': 2}
+    assert workflow['role_sends']['connections'] == 3
+    assert workflow['role_sends'].get('attributes', 0) == 0
 
 
 def test_rejected_body_draft_does_not_become_transcription_history(bounded_tools, monkeypatch):

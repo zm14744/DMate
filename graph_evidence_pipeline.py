@@ -449,6 +449,7 @@ def _proposal_json(graph, candidates):
         row['revision_id'] = transfer_id(graph['id'], c['id'])
         row['path'] = [[round(x*1000, 2), round(y*1000, 2)] for x, y in path]
         row['pixel_coverage'] = c['pixel_evidence']['coverage']
+        row['path_reuse_allowed'] = c['pixel_evidence'].get('supported') is True
         if c.get('arrow_hint'):
             row['arrow_hint'] = c['arrow_hint']
         if isinstance(c.get('ports'), list):
