@@ -343,6 +343,10 @@ def test_agent_input_identity_allows_five_bound_images_but_not_six(image_count):
 @pytest.mark.parametrize('name,role,allowed', [
     ('image.marker_proposals', 'page_vertices', True),
     ('image.marker_proposals', 'connections', False),
+    ('image.marker_review_views', 'page_vertices', True),
+    ('image.marker_review_views', 'connections', False),
+    ('image.marker_review_views', 'body_review', False),
+    ('image.marker_review_views', 'attributes', False),
     ('image.focused_views', 'page_vertices', True),
     ('image.focused_views', 'body_text', True),
     ('image.focused_views', 'connections', True),

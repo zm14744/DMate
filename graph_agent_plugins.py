@@ -98,6 +98,35 @@ def build_image_tools(document, text_result, layout, budget):
     register('image.marker_proposals', 'Measure bounded original-pixel marker hypotheses before visual vertex inventory.',
              _EMPTY, ('page_vertices',), marker_hints)
 
+    def marker_views(args, *, context):
+        from graph_marker_views import build_marker_review_sheet
+
+        # Only the CPU projection created for this source can address pixels.
+        # The empty public schema never accepts model-proposed centres/boxes.
+        markers = context.data['marker_cache'].get('view_proposals')
+        if markers is None:
+            image, mappings = None, []
+            diagnostics = {'status': 'marker_proposals_unavailable'}
+        else:
+            image, mappings, diagnostics = build_marker_review_sheet(
+                document.original, markers, check_deadline=context.check_deadline)
+        reference = None
+        if image is not None:
+            context.check_deadline()
+            stream = io.BytesIO()
+            image.save(stream, format='PNG')
+            reference = hashlib.sha256(stream.getvalue()).hexdigest()
+            context.data['images'][reference] = image
+        return {'image_ref': reference, 'marker_review_tiles': mappings,
+                'coordinate_space': 'original_1000', 'sheet_coordinate_space': 'sheet_1000',
+                'source_sha256': context.source_sha256, 'source_pixels_only': True,
+                'proposal_only': True, 'vertex_existence_certified': False,
+                'diagnostics': diagnostics}
+
+    register('image.marker_review_views',
+             'Show source-pixel neighbourhoods of the fixed CPU marker proposals; candidates remain unconfirmed.',
+             _EMPTY, ('page_vertices',), marker_views, version='2026-10-26-v6')
+
     def markers(args, *, context):
         graphs = ground_nodes(document, copy.deepcopy(args['graphs']),
                               proposals=context.data['marker_cache'].get('proposals'))

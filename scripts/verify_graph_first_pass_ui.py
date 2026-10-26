@@ -37,7 +37,7 @@ from graph_first_pass_eval import (EXECUTION_MODES, FRONTEND_CHECKS, evaluate_pr
 from scripts.benchmark_graph_first_pass import (digest, load_manifest, same_source,
                                                source_snapshot, utc_now, write_json)
 
-GRAPH_FIELDS = ('schema_version', 'id', 'name', 'directed', 'weighted', 'multigraph', 'complete')
+GRAPH_FIELDS = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete')
 VERTEX_FIELDS = ('id', 'label', 'isolated_confirmed')
 EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'edge_label', 'weight', 'multiplicity',
                'parallel_count', 'style', 'color', 'status')
@@ -190,7 +190,8 @@ def expected_panels(prediction):
         vertices, edges = graph['vertices'], graph['edges']
         labels = {_string(v['id']): _label(v.get('label') or v['id']) for v in vertices}
         raw_labels = [_string(v.get('label') or v['id']).strip() for v in vertices]
-        properties = ['有向图' if graph.get('directed') is True else '无向图'
+        properties = ['混合图' if graph.get('direction_mode') == 'mixed' else
+                      '有向图' if graph.get('directed') is True else '无向图'
                       if graph.get('directed') is False else '方向未确定']
         if graph.get('weighted') is True:
             properties.append('带权')
@@ -217,8 +218,11 @@ def expected_panels(prediction):
                 attrs.append('权值：'+_string(edge['weight']).strip())
             if edge.get('parallel_count', 1) > 1:
                 attrs.append('同端点共 '+str(edge['parallel_count'])+' 条')
-            if edge.get('style') in ('dashed', 'dotted'):
-                attrs.append('虚线' if edge['style'] == 'dashed' else '点线')
+            if edge.get('style') in ('solid', 'dashed', 'dotted'):
+                attrs.append({'solid': '实线', 'dashed': '虚线', 'dotted': '点线'}[edge['style']])
+            color = edge.get('color')
+            if isinstance(color, str) and color.strip() and color.strip().lower() != 'unknown':
+                attrs.append('颜色：'+color.strip())
             if edge.get('direction') == 'unknown':
                 attrs.append('方向未确定')
             if edge.get('status') != 'accepted':

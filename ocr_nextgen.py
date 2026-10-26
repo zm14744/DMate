@@ -13,7 +13,7 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
                              cancelled=None,task_id=None,request_deadline=None):
     # Development branch default; previous engines remain explicit comparisons.
     # The app's existing graph-nextgen gate and production environment are unchanged.
-    if graph_pipeline not in ('staged','qwen-simple-candidate','evidence-two-pass','agent-tools'):
+    if graph_pipeline not in ('staged','qwen-simple-candidate','evidence-two-pass','agent-tools','agent-tools-strict'):
         raise ValueError('Unknown graph pipeline')
     engine=recognize_staged
     version='2026-10-26-qwen-stable-review-v13'
@@ -26,12 +26,16 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
         engine=recognize_evidence
         version=VERSION
     elif graph_pipeline=='agent-tools':
-        from graph_agent_pipeline import recognize_agents
+        from graph_semantic_pipeline import recognize_semantic
         from graph_pipeline_version import AGENT_PIPELINE_VERSION
-        engine=recognize_agents
+        engine=recognize_semantic
         version=AGENT_PIPELINE_VERSION
+    elif graph_pipeline=='agent-tools-strict':
+        from graph_agent_pipeline import recognize_agents
+        engine=recognize_agents
+        version='2026-10-26-agent-tools-v6-unpublished-comparison'
     layout=text_result.get('layout') or {}
-    if graph_pipeline=='agent-tools':
+    if graph_pipeline in ('agent-tools','agent-tools-strict'):
         from graph_agent_runtime import AgentBudget
         budget=AgentBudget.configured(task_id=task_id,cancelled=cancelled)
         if request_deadline is not None:
@@ -39,12 +43,13 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
     else:
         budget=Budget(seconds=140,calls=2,call_seconds=75) if graph_pipeline!='staged' else Budget()
     try:
-        extra = {'text_result': text_result} if graph_pipeline in ('evidence-two-pass','agent-tools') else {}
-        if graph_pipeline=='agent-tools':
+        extra = {'text_result': text_result} if graph_pipeline in ('evidence-two-pass','agent-tools','agent-tools-strict') else {}
+        if graph_pipeline in ('agent-tools','agent-tools-strict'):
             extra.update(cancelled=cancelled,task_id=task_id)
         result=engine(raw,layout=layout.get('regions',[]),provider=vision_provider,
                                budget=budget,audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1', **extra)
-        if not result['graphs']:raise ValueError('empty_graph_inventory')
+        if not result['graphs'] and 'semantic_workflow' not in result:
+            raise ValueError('empty_graph_inventory')
     except Exception as exc:
         # Return a diagnosed failure, so /ocr cannot silently start another
         # legacy vision pipeline outside the already spent graph budget.
@@ -120,18 +125,26 @@ def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,
         from graph_agent_runtime import AgentCancelled
         raise AgentCancelled('upload_cancelled')
     if ('body_complete' in result and text.strip() and correction.get('status') not in ('ok','empty')
-            and 'agent_workflow' not in result):
+            and 'agent_workflow' not in result and 'semantic_workflow' not in result):
         text_complete=False
     issues=audit_graph_records(graphs)
-    if issues:
+    semantic = 'semantic_workflow' in result
+    semantic_issues = result.get('semantic_issues', []) if semantic else []
+    # The semantic adapter validates actual endpoint references and retains
+    # uncertain content. Legacy whole-graph type flags are advisory here: a
+    # mixed graph or a page with only some weighted edges can be legitimate.
+    if issues and not semantic:
         for g in graphs: g['complete']=False
     from ai import _format_graph_data
     visual=_format_graph_data(graphs)
     graph_incomplete=any(g.get('complete') is not True for g in graphs)
-    incomplete=graph_incomplete or not text_complete
+    incomplete=graph_incomplete or not text_complete or bool(semantic_issues)
     reasons=[]
     if graph_incomplete:reasons.append('部分子图、顶点或连线尚未核对完整。')
     if not text_complete:reasons.append('题干文字尚未核对完整。')
+    if semantic_issues:
+        reasons += list(dict.fromkeys(str(i.get('message') or '部分内容仍需核对。')[:240]
+                         for i in semantic_issues if isinstance(i,dict)))[:5]
     return {'text':corrected,'visual_text':visual,
             'graph_display_data':[display_graph(g) for g in graphs],
             'graph_structures':graphs,'raw_ocr_text':text,
@@ -154,4 +167,6 @@ def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,
                            'stages':result['diagnostics'],
                            'remote_metrics':result.get('remote_metrics',[]),
                            **({'agent_workflow':result['agent_workflow']} if 'agent_workflow' in result else {}),
+                           **({'semantic_workflow':result['semantic_workflow'],
+                               'semantic_issues':semantic_issues} if semantic else {}),
                            **({'stage_audit':result['stage_audit']} if 'stage_audit' in result else {})}}

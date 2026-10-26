@@ -21,7 +21,7 @@ from graph_evidence_pipeline import (
 from graph_qwen_coordinates import attribute, box, identifier
 from graph_schema import display_graph, parallel_key
 from graph_text_evidence import (
-    MAX_HINTS, _label_in_panel, content_signature, critical_sequence, reconcile_text,
+    MAX_HINTS, MAX_HINT_CHARACTERS, _label_in_panel, content_signature, critical_sequence, reconcile_text,
 )
 
 
@@ -54,7 +54,9 @@ marker_position_observations给出当前未匹配到标记的节点和未绑定�
 保留可见标签的大小写、上下标与原始字符，不能将字母统一大写/小写或把下标改成正文数字；没有标签用label=null，内部ID不冒充原图文字。已有ID在一次盘点内唯一。
 节点坐标取可见标记中心，不能使用邻近标签或OCR文本框中心；没有明确标记时保留不确定，不凭文字框强定位置。
 同一数学图的多个分量和孤立点仍属一图。版面框只是提议，一个框可有多图，不能以连通性代替分图。
+原图的独立图框、明确对比排布及(a)/(b)等不同子图号用于区分数学子图；分别盘点各自框与节点，不能因共用题干或重复a/b等标签而合并。反过来，同一图的非连通分量和孤立点不能仅因不连通而拆开；图名不提供拓扑答案。
 框包括外弧、自环、孤立点与图内标签。未标记交叉、水印、透印、网格和边名都不是顶点。
+每个顶点的原图中心必须位于它所属图的bbox内；不能把另一子图的点复制到此图，也不能把每个子图坐标重新当成全页坐标。框或归属有误须重看原图修正本次完整盘点，不移动实际点来凑框。
 类型true/false须有原图证据，不能确定填unknown。不得按常见图形模板补点。
 '''
 
@@ -72,7 +74,10 @@ text_review.regions必须逐项覆盖提供的全部text_hints ID，不得遗漏
 hint保持原文且其格式等价片段在正文中唯一时，可省略该review行的text；改字或重复片段不能靠省略text猜测。没有text_hints时可省略text_review。
 text_review中role=body的text必须写本次依据原图确认的最终片段，不是待纠正的OCR旧文；同一位置的重复hint逐个保留ID，但统一核对到同一最终片段。冒号/分号等实际字符差异不能靠格式归一化消除。
 页面角色与本角色并行，graph_label的graph_id可以暂为null，不能猜G1；由本地唯一空间归属和最终审核确认。
+顶层regions与text_review.regions的role含义完全相同：正文才是body，图内顶点标签、印刷边名和权值在两处都是graph_label，水印为noise，无法辨认才是uncertain；不能一处判图标签、另一处因沿用示例就写body。
+graph_id:null仅表示尚未确定属于哪个图，绝不把graph_label变成body。即使正文为空，也须按每个hint的实际用途完成text_review.regions；role=body的text必须确实构成顶层body片段。理由写“顶点标签/边名/权值”时，role也须据同一观察写graph_label，不能与理由自相矛盾。
 删作noise/graph_label或改写hint文字必须说明原图依据；实质文字变化须有该hint位置的evidence，不能引用另一处标签。
+该evidence.bbox须紧贴当前hint的实际字形，可直接使用请求中这个hint的精确原图bbox；包含它的整行、整图或更大空白框不等于该位置的精确依据，不要借另一处文字或泛大框解释删字。
 数字、上下标、希腊字母、中文数词、否定、数量词、通路/回路等逐字核对。
 不同位置的v3/v5可以不同，不能为符合题意或图中标签而改题干。看不清或顶部裁掉时body_complete=false，不能补全。
 无题干时body区域为空；水印、顶点、边名、权值不是题干。公式可用LaTeX，但原意和字符必须保留。
@@ -119,10 +124,14 @@ ATTRIBUTE_PROMPT = _COMMON + '''你是attributes，只复核固定边ID的属性
 "attributes":{"direction":"undirected","style":"solid","weight":null,"edge_label":null,"color":"black"},
 "evidence":{"source":"original","bbox":[100,100,800,800],"reason":"该边原图上的箭头/权值/边名依据"}}]}],"issues":[]}。
 逐图逐边覆盖固定清单，每个ID恰好一次。不能输出from/to/path/vertices或增删边；多条平行边分别核对。
+请求edges[].id只是内部稳定标识，不是原图已读出的印刷边名，即使拼写碰巧相同也不能互相替代。逐条看原图线迹两侧及曲线外侧的文字，保留印刷边名的字母、大小写、上下标；读到边名填写edge_label，不能留在内部id或当成weight。
+请求已有的direction/style/weight/edge_label/color只是待复核草稿；null或unknown表示尚未识别，不证明原图没有字、没有权值或颜色。不得照抄null后以“无标签”概括；只有沿同一条边和邻近文字位置实际检查后才能确认缺省，无把握则uncertain。
+attribute_text_hints是带完整原图bbox的本地OCR待核对提示，paddle_role也可能错；candidate_graph_ids仅表示几何重叠，不是边的归属或正确转录。请用完整原图及原像素局部视图逐字核对，别把OCR数值直接当weight，也别把靠近顶点的顶点标签当边名。没有OCR提示不表示没有印刷文字。
 允许的属性仅direction/style/weight/edge_label/color。无法确认verdict=uncertain，不用上下文猜数字。
 direction=forward表示固定from→to；reverse表示同一条边箭头实际to→from，由本地原子翻转from/to和path且保留ID，再做原图像素校验。
 reverse不能表示“保留原方向”；无向边填undirected。不要自行更换端点ID或给另一路径。
 所有实质属性改变必须给位于该图、该边附近的原图evidence。e1等边名不是权值1，轮廓箭头双边不是平行边。
+读取边名/权值的evidence须包含实际字形并贴近对应同一条线迹，不能只圈一段没有字的线身来证明边上没有标签；保留现有局部证据校验，不能为容纳远处文字而给整图大框。
 evidence.bbox是矩形[最小x,最小y,最大x,最大y]，不是按from→to顺序复制两端点；水平/垂直线需圈出有面积的局部像素区域，不能给零宽或零高框。
 issues每项含{id,kind,target_role,graph_id,vertex_ids:[],edge_ids:[],hint_ids:[],reason,evidence}；
 target_role仅page_vertices/connections/attributes。问题必须保留，不能用属性confirmed掩盖其他具体冲突。
@@ -186,6 +195,84 @@ def connection_graph_view(graph, candidates):
         'fallback': 'approximate_local_ink_boundary_not_evidence_of_missing_vertex',
     }
     return view
+
+
+def attribute_input_view(graphs, text_hints=None):
+    """Bounded geometry and unverified located text for an independent reader.
+
+    Input graphs use full-image normalized coordinates. Keep existing flat
+    attribute fields for caller compatibility, but explicitly identify them as
+    drafts. No OCR text is assigned to an edge, no null means absent printing,
+    and no pixel proof/role verdict is fabricated by this projection.
+    """
+    _inventory(graphs)
+    _check(sum(len(g['vertices']) for g in graphs) <= MAX_TOTAL_VERTICES and
+           sum(len(g.get('edges', [])) for g in graphs) <= MAX_TOTAL_EDGES,
+           'attribute_view_capacity')
+
+    def scale(values, count, code):
+        _check(isinstance(values, (list, tuple)) and len(values) == count and
+               all(type(v) in (int, float) and math.isfinite(v) and 0 <= v <= 1 for v in values), code)
+        return [v*1000 for v in values]
+
+    projected = []
+    for graph in graphs:
+        bounds = scale(graph.get('bbox'), 4, 'attribute_view_invalid_panel')
+        box(bounds)
+        _check(len(graph['vertices']) <= MAX_VERTICES and len(graph.get('edges', [])) <= MAX_EDGES,
+               'attribute_view_capacity')
+        vertices = []
+        for vertex in graph['vertices']:
+            x, y = scale([vertex.get('x'), vertex.get('y')], 2, 'attribute_view_invalid_vertex')
+            vertices.append({'id': vertex['id'], 'label': copy.deepcopy(vertex.get('label')), 'x': x, 'y': y})
+        edges = []
+        for edge in graph.get('edges', []):
+            path = edge.get('path')
+            _check(isinstance(path, list) and 2 <= len(path) <= 128, 'attribute_view_invalid_path')
+            edges.append({**{k: copy.deepcopy(edge.get(k)) for k in
+                ('id', 'from', 'to', 'direction', 'style', 'weight', 'edge_label', 'color')},
+                'path': [scale(p, 2, 'attribute_view_invalid_path') for p in path]})
+        projected.append({'id': graph['id'], 'name': copy.deepcopy(graph.get('name')), 'bbox': bounds,
+            **{k: graph.get(k, 'unknown') for k in ('directed', 'weighted', 'multigraph')},
+            'vertices': vertices, 'edges': edges})
+
+    local, hints = _hints(text_hints)
+    items, omissions, characters = [], [], 0
+    for hid, hint in hints.items():
+        text = hint['text']
+        if not text.strip() or len(text) > 512 or characters + len(text) > MAX_HINT_CHARACTERS:
+            omissions.append({'hint_id': hid, 'reason': 'empty_or_excessive_text'})
+            continue
+        try:
+            normalized = box(hint.get('bbox'))
+        except (TypeError, ValueError):
+            omissions.append({'hint_id': hid, 'reason': 'unlocated_or_invalid_original_bbox'})
+            continue
+        a, b, c, d = normalized
+        # Spatial relevance alone: retain ambiguous overlap with multiple
+        # panels, without using OCR category, confidence, or text as truth.
+        gids = [g['id'] for g in graphs if
+                min(c, g['bbox'][2]) > max(a, g['bbox'][0]) and
+                min(d, g['bbox'][3]) > max(b, g['bbox'][1])]
+        if not gids:
+            omissions.append({'hint_id': hid, 'reason': 'outside_all_panels'})
+            continue
+        row = {'id': hid, 'text': text, 'bbox': list(hint['bbox']),
+               'candidate_graph_ids': gids, 'source': 'local_ocr', 'proposal_only': True}
+        if hint.get('paddle_role') in ('body', 'graph_labels', 'noise', 'uncertain', 'unlocated'):
+            row['paddle_role'] = hint['paddle_role']
+        items.append(row)
+        characters += len(text)
+    return {'graphs': projected,
+        'attribute_reading_contract': {
+            'coordinate_space': 'original_1000',
+            'edge_id': 'internal_identity_not_printed_edge_label',
+            'flat_attribute_values': 'unverified_draft_null_does_not_prove_absence',
+            'located_text': 'unverified_ocr_no_edge_assignment',
+            'original_pixels_required': True,
+            'missing_hint_does_not_prove_absence': True},
+        'attribute_text_hints': {'items': items, 'omissions': omissions,
+                                 'local_status': local.get('local_status', 'unobserved')}}
 
 
 def _audit_value(value, depth=0):
@@ -325,6 +412,21 @@ def decode_page_response(response, marker_hints, *, revision):
                 'normalized_position': [marker['x']/1000, marker['y']/1000],
                 'derived_fields': derived_fields})
     graphs = decode_nodes(value)
+    # Both legacy coordinates and explicit CPU marker references must belong
+    # to their declared panel in the same full-image coordinate space. A
+    # well-formed point elsewhere on the page is not a valid panel member.
+    # Do not clamp, snap, reassign, or enlarge the panel to repair a proposal.
+    raw_graphs = {g['id']: g for g in rows}
+    for graph in graphs:
+        left, top, right, bottom = graph['bbox']
+        raw_graph = raw_graphs[graph['id']]
+        raw_vertices = {v['id']: v for v in raw_graph['vertices']}
+        for vertex in graph['vertices']:
+            raw_vertex = raw_vertices[vertex['id']]
+            _check(left <= vertex['x'] <= right and top <= vertex['y'] <= bottom,
+                   'page_vertex_outside_panel', graph_id=graph['id'], vertex_id=vertex['id'],
+                   coordinate_space='original_1000', center=[raw_vertex['x'], raw_vertex['y']],
+                   panel_bbox=raw_graph['bbox'], marker_id=raw_vertex.get('marker_id'))
     return {'graphs': graphs, 'audit': {
         'source': 'explicit_model_marker_binding', 'coordinate_space': 'original_1000',
         'normalized_position_coordinate_space': 'original_image_normalized',

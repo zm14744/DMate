@@ -13714,7 +13714,7 @@ function formatCanonicalGraphReview(graphs) {
         const g=graphs[i], nodes=g.vertices || [], edges=g.edges || [];
         const labels=new Map(nodes.map(v=>[String(v.id),v.label || v.id]));
         const label=id=>ocrReviewLabel(labels.get(String(id)) || id);
-        const properties=[g.directed===true?"有向图":g.directed===false?"无向图":"方向未确定",
+        const properties=[g.direction_mode==="mixed"?"混合图":g.directed===true?"有向图":g.directed===false?"无向图":"方向未确定",
             g.weighted===true?"带权":"",g.multigraph===true?"多重图":""].filter(Boolean);
         lines.push("### 图 "+(i+1)+"（"+ocrReviewPlain(g.name || g.id)+"）");
         lines.push("**类型：** "+properties.join(" · "));
@@ -13730,8 +13730,11 @@ function formatCanonicalGraphReview(graphs) {
             if(e.edge_label)attrs.push("边名："+ocrReviewPlain(e.edge_label));
             if(e.weight!==null && e.weight!==undefined)attrs.push("权值："+ocrReviewPlain(e.weight));
             if(e.parallel_count>1)attrs.push("同端点共 "+e.parallel_count+" 条");
+            if(e.style==="solid")attrs.push("实线");
             if(e.style==="dashed")attrs.push("虚线");
             if(e.style==="dotted")attrs.push("点线");
+            const color=typeof e.color==="string"?e.color.trim():"";
+            if(color && color.toLowerCase()!=="unknown")attrs.push("颜色："+ocrReviewPlain(color));
             if(e.direction==="unknown")attrs.push("方向未确定");
             if(e.status!=="accepted")attrs.push("待确认");
             // Stable per-card identities; detector source IDs stay in JSON.
