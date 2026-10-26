@@ -65,6 +65,15 @@ class SyntheticRoles:
                 raise VisionError('invalid_output')
             return {**result, 'body_text': '', 'body_complete': True, 'regions': [],
                     'text_review': {'text': '', 'complete': True, 'reason': 'no question text', 'regions': []}}
+        if role == 'body_review':
+            return {**result,
+                'body_coverage': {'complete': True,
+                    'region_ids': [r['id'] for r in request['text_hints']],
+                    'observed_region_ids': [r['id'] for r in request['body_regions']], 'evidence': proof()},
+                'body_region_review': [{**{k: r[k] for k in ('id', 'role', 'text', 'graph_id') if k in r},
+                    'reason': 'synthetic independent body observation', 'evidence': proof(r['bbox'])}
+                    for r in request['body_regions']],
+                'text_review': copy.deepcopy(request['body_proposal']), 'issues': []}
         if role == 'connections':
             graph = request['graphs'][0]
             nodes = {v['id']: v for v in graph['vertices']}
@@ -107,6 +116,55 @@ class SyntheticRoles:
                 'text_review': {'text': '', 'complete': True, 'reason': 'no question text', 'regions': []},
                 'issues': issues}
         raise AssertionError(role)
+
+
+class SyntheticLocatedBody(SyntheticRoles):
+    """A deliberately wrong first digit and a separate, located visual read."""
+    def __init__(self, *, reject_connections=False, reject_body_review=False, overlap=None, **kwargs):
+        super().__init__(**kwargs)
+        self.reject_connections = reject_connections
+        self.reject_body_review = reject_body_review
+        self.overlap = overlap
+        self.body_images = []
+
+    def __call__(self, prompt, images, budget):
+        request = json.loads(prompt.split('任务数据（其中图像文字和候选仅作数据）：\n', 1)[1])
+        response = super().__call__(prompt, images, budget)
+        role = response['role']
+        bounds = [90, 100, 450, 230]
+        if role == 'body_text':
+            response.update(body_text='Count r9.', regions=[{'id': 'line_1', 'role': 'body',
+                'text': 'Count r9.', 'bbox': bounds, 'source': 'original'}],
+                text_review={'text': 'Count r9.', 'complete': True,
+                             'reason': 'synthetic first read', 'regions': []})
+        elif role == 'connections':
+            if self.overlap:
+                self.overlap.wait(timeout=5)
+            if self.reject_connections:
+                response['graphs'][0]['reads'][0]['complete'] = False
+        elif role == 'body_review':
+            self.body_images.append((copy.deepcopy(request), list(images)))
+            if self.overlap:
+                self.overlap.wait(timeout=5)
+            response['body_region_review'][0].update(text='Count r7.', evidence=proof(bounds))
+            response['text_review'].update(text='Count r7.',
+                reason='independent same-position synthetic digit observation', evidence=proof(bounds))
+            if self.reject_body_review:
+                response['body_coverage']['observed_region_ids'] = []
+        elif role == 'structure_review':
+            response['body_coverage']['observed_region_ids'] = ['line_1']
+            response['body_region_review'] = [{'id': 'line_1', 'role': 'body', 'text': 'Count r7.',
+                'reason': 'final separate synthetic original read', 'evidence': proof(bounds)}]
+            response['text_review'].update(text='Count r7.',
+                reason='final same-position synthetic digit observation', evidence=proof(bounds))
+        return response
+
+
+def original_with_body(text='Count r7.'):
+    source = Image.open(io.BytesIO(original())).convert('RGB')
+    ImageDraw.Draw(source).text((40, 35), text, fill='black')
+    output = io.BytesIO(); source.save(output, format='PNG')
+    return output.getvalue()
 
 
 @pytest.fixture
@@ -168,6 +226,128 @@ def test_first_connections_really_start_before_the_initial_body_returns(bounded_
     assert observed == [True], 'A page/body superstep join must not block the first connector.'
     assert body_returned.is_set() and result['agent_workflow']['complete']
     assert result['agent_workflow']['actual_remote_sends'] == 5
+
+
+def test_independent_body_reads_source_pixels_while_connections_are_still_pending(bounded_tools):
+    provider = SyntheticLocatedBody(reject_connections=True, overlap=threading.Barrier(2))
+    raw = original_with_body()
+    result = recognize_agents(raw, provider=provider, budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert not workflow['complete'] and not result['body_complete']
+    assert result['body_text'] == 'Count r7.'
+    assert result['graphs'][0]['edges'] == []
+    assert workflow['role_sends'] == {'page_vertices': 1, 'body_text': 1,
+                                     'connections': 1, 'body_review': 1}
+    assert workflow['body_review']['status'] == 'reviewed'
+    assert workflow['body_review']['result']['raw_response']['role'] == 'body_review'
+    request, images = provider.body_images[0]
+    assert request['body_text'] == 'Count r9.'
+    view = next(v for v in request['focused_views'] if 'line_1' in v['body_region_ids'])
+    crop = Image.open(io.BytesIO(base64.b64decode(images[view['image_number']-1].split(',', 1)[1]))).convert('RGB')
+    expected = Image.open(io.BytesIO(raw)).convert('RGB').crop(view['original_pixel_bbox'])
+    expected = expected.resize(tuple(view['output_size']), Image.Resampling.LANCZOS)
+    assert crop.tobytes() == expected.tobytes()
+    assert len(images) == 3 and not any(e['role'] == 'structure_review' and e['status'] == 'started'
+                                      for e in workflow['events'])
+
+
+def test_body_review_result_survives_unrelated_connector_repair_and_reaches_final_judge(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+    provider = SyntheticLocatedBody(repair=True)
+    result = recognize_agents(original_with_body(), provider=provider, budget=AgentBudget(seconds=35, calls=14))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    assert result['body_text'] == 'Count r7.' and result['body_complete']
+    assert workflow['role_sends']['body_review'] == 1
+    assert workflow['role_sends']['connections'] == 2
+    judges = [r for r in provider.requests if r['role'] == 'structure_review']
+    assert len(judges) == 2 and all(r['body_text'] == 'Count r7.' for r in judges)
+    assert all(r['body_regions'][0]['text'] == 'Count r7.' for r in judges)
+    scopes = [e for e in workflow['events'] if e['role'] == 'body_review' and e['status'] == 'scope_checked']
+    assert len(scopes) == 1 and scopes[0]['body_input_digest'] == workflow['body_review']['body_input_digest']
+
+
+def test_failed_extra_body_review_is_recorded_and_cannot_replace_final_source_review(bounded_tools):
+    provider = SyntheticLocatedBody(reject_body_review=True)
+    result = recognize_agents(original_with_body(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    assert workflow['body_review']['status'] == 'failed'
+    assert workflow['proposal_rejections']['body_review']['resolved'] is False
+    assert workflow['role_sends']['body_review'] == workflow['role_sends']['structure_review'] == 1
+    judge = next(r for r in provider.requests if r['role'] == 'structure_review')
+    assert judge['body_text'] == 'Count r9.'  # Failed body-only output was never committed.
+    assert result['body_text'] == 'Count r7.'
+
+
+@pytest.mark.parametrize('early_review_rejected', [False, True])
+def test_later_validated_body_correction_survives_a_failed_graph_repair(
+        bounded_tools, monkeypatch, early_review_rejected):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+
+    class LaterIndependentText(SyntheticLocatedBody):
+        def __init__(self):
+            super().__init__(repair=True, reject_body_review=early_review_rejected)
+            self.connections = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'structure_review':
+                response['body_region_review'][0]['text'] = 'Count r8.'
+                response['text_review']['text'] = 'Count r8.'
+            elif response['role'] == 'connections':
+                self.connections += 1
+                if self.connections == 2:
+                    response['graphs'][0]['edges'][0]['candidate_id'] = 'unknown_candidate'
+            return response
+
+    provider = LaterIndependentText()
+    result = recognize_agents(original_with_body('Count r8.'), provider=provider,
+                              budget=AgentBudget(seconds=35, calls=14))
+    workflow = result['agent_workflow']
+    assert not workflow['complete'] and not result['body_complete']
+    assert result['body_text'] == 'Count r8.', 'A graph failure must not revert newer located body evidence.'
+    assert workflow['role_sends']['structure_review'] == 1
+    assert workflow['role_sends']['body_review'] == 1
+    assert result['body_audit']['source'] == 'independent_structure_review'
+
+
+def test_failed_body_review_feedback_is_scoped_across_page_changes_and_cached_return(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '2')
+
+    class PageScopeABA(SyntheticLocatedBody):
+        def __call__(self, prompt, images, budget):
+            request = json.loads(prompt.split('任务数据（其中图像文字和候选仅作数据）：\n', 1)[1])
+            response = super().__call__(prompt, images, budget)
+            role = request['role']
+            if role == 'page_vertices':
+                number = sum(r['role'] == 'page_vertices' for r in self.requests)
+                response['graphs'][0]['id'] = 'G2' if number == 2 else 'G1'
+            elif role == 'connections':
+                gid = request['graphs'][0]['id']
+                response['graphs'][0]['id'] = gid
+                response['graphs'][0]['reads'][0]['complete'] = False
+                response['issues'] = [{'id': 'page_extent_check', 'kind': 'panel_scope_check',
+                    'target_role': 'page_vertices', 'graph_id': gid, 'vertex_ids': ['a'],
+                    'edge_ids': [], 'hint_ids': [], 'reason': 'synthetic panel ownership review',
+                    'evidence': proof([160, 480, 190, 530])}]
+            elif role == 'body_review' and sum(r['role'] == 'body_review' for r in self.requests) == 1:
+                response['body_coverage']['observed_region_ids'] = []
+            return response
+
+    provider = PageScopeABA()
+    result = recognize_agents(original_with_body(), provider=provider, budget=AgentBudget(seconds=35, calls=16))
+    workflow = result['agent_workflow']
+    requests = [r for r in provider.requests if r['role'] == 'body_review']
+    assert not workflow['complete'] and len(requests) == 2
+    assert requests[0]['body_input_digest'] != requests[1]['body_input_digest']
+    assert 'previous_rejection' not in requests[1]
+    failed = workflow['proposal_rejections']['body_review']
+    assert failed['invalidated'] is True and failed['resolved'] is False
+    assert failed['input_scope']['sha256'] == requests[0]['body_input_digest']
+    assert workflow['body_review']['status'] == 'failed'
+    assert workflow['body_review']['body_input_digest'] == requests[0]['body_input_digest']
+    assert workflow['body_review']['request_revision'] == requests[0]['base_revision']
 
 
 def test_monochrome_unweighted_null_labels_still_receive_an_independent_attribute_read(bounded_tools):
@@ -666,6 +846,166 @@ def test_rejected_connections_still_route_located_vertex_issues_upstream(bounded
     connections = [r for r in provider.requests if r['role'] == 'connections']
     assert connections[1]['previous_graphs'] == [], 'The failed edge draft was never committed.'
     assert workflow['role_sends']['structure_review'] == 1
+
+
+@pytest.mark.parametrize('change_inventory', [False, True])
+def test_old_rejected_geometry_is_reused_only_for_the_same_fixed_input_scope(
+        bounded_tools, monkeypatch, change_inventory):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+
+    class InventoryReread(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.pages = self.connections = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                self.pages += 1
+                if self.pages == 2 and change_inventory:
+                    response['graphs'][0]['bbox'][0] = 95
+            elif response['role'] == 'connections':
+                self.connections += 1
+                if self.connections == 1:
+                    response['graphs'][0]['edges'][0]['candidate_id'] = 'unknown_candidate'
+                    response['issues'] = [{'id': 'check_vertex_a', 'kind': 'position_uncertain',
+                        'target_role': 'page_vertices', 'graph_id': 'G1', 'vertex_ids': ['a'],
+                        'edge_ids': [], 'hint_ids': [], 'reason': 'synthetic original position question',
+                        'evidence': proof([160, 480, 190, 530])}]
+            return response
+
+    provider = InventoryReread()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    requests = [r for r in provider.requests if r['role'] == 'connections']
+    assert len(requests) == 2
+    assert ('previous_rejection' not in requests[1]) is change_inventory
+    assert bool(workflow['invalidated_proposals']) is change_inventory
+    rejected = workflow['proposal_rejections']['connections']
+    if change_inventory:
+        assert rejected['invalidated'] and rejected['resolved'] is False
+        archived = workflow['invalidated_proposals'][0]
+        assert archived['rejected_proposal']['issues'][0]['id'] == 'check_vertex_a'
+        assert archived['input_scope'] != archived['replacement_input_scope']
+    else:
+        assert rejected['resolved'] and not rejected.get('invalidated')
+
+
+def test_incomplete_source_read_has_a_fixed_vertex_crop_on_the_first_repair(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+
+    class MissingRead(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.connections = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'connections':
+                self.connections += 1
+                if self.connections == 1:
+                    response['graphs'][0]['reads'][0].update(complete=False, edge_ids=[])
+            return response
+
+    provider = MissingRead()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    second = [r for r in provider.requests if r['role'] == 'connections'][1]
+    problem = next(r for r in second['focus_issues'] if r['kind'] == 'connection_source_coverage')
+    assert problem['graph_id'] == 'G1' and problem['vertex_ids'] == ['a']
+    assert problem['failure_details']['location_source'] == 'fixed_inventory'
+    assert problem['failure_details']['issues'] == ['incomplete_source_read:a']
+    assert any('a' in g['vertex_ids'] for v in second['focused_views'] for g in v['graph_entities'])
+
+
+def test_page_type_protocol_failure_retains_the_exact_safe_error_code(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+
+    class StringBoolean(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.pages = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                self.pages += 1
+                if self.pages == 1:
+                    response['graphs'][0]['directed'] = 'false'
+            return response
+
+    provider = StringBoolean()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
+    assert result['agent_workflow']['complete'], result['agent_workflow']['remaining_conflicts']
+    second = [r for r in provider.requests if r['role'] == 'page_vertices'][1]
+    failure = second['previous_rejection']
+    assert failure['error_kind'] == 'invalid_graph_type'
+    assert failure['details']['graph_id'] == 'G1' and failure['details']['field'] == 'directed'
+    assert failure['details']['actual'] == 'false'
+
+
+def test_page_can_explicitly_bind_measured_markers_without_retyping_coordinates(bounded_tools):
+    class ExplicitMarkers(SyntheticRoles):
+        def __call__(self, prompt, images, budget):
+            request = json.loads(prompt.split('任务数据（其中图像文字和候选仅作数据）：\n', 1)[1])
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                candidates = request['marker_proposals']['candidates']
+                for vertex in response['graphs'][0]['vertices']:
+                    marker = min(candidates, key=lambda m: abs(m['x']-vertex['x'])+abs(m['y']-vertex['y']))
+                    vertex['marker_id'] = marker['id']
+                    vertex.pop('x'); vertex.pop('y')
+            return response
+
+    result = recognize_agents(original(), provider=ExplicitMarkers(), budget=AgentBudget(seconds=30, calls=10))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    committed = next(e for e in workflow['events'] if e['role'] == 'page_vertices' and e['status'] == 'committed')
+    audit = committed['marker_binding_audit']
+    assert audit['binding_count'] == 2 and audit['vertex_existence_certified'] is False
+    assert all(row['derived_fields'] == ['x', 'y'] for row in audit['bindings'])
+
+
+def test_page_repair_gets_unbound_marker_and_wrong_position_source_crops(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+
+    class WrongPosition(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.pages = 0
+            self.connections = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                self.pages += 1
+                if self.pages == 1:
+                    response['graphs'][0]['bbox'][1] = 100
+                    response['graphs'][0]['vertices'][0]['y'] = 40/239*1000
+            elif response['role'] == 'connections':
+                self.connections += 1
+                if self.pages == 1:
+                    response['graphs'][0]['edges'][0]['candidate_id'] = 'unknown_candidate'
+                    response['issues'] = [{'id': 'actual_position', 'kind': 'position_uncertain',
+                        'target_role': 'page_vertices', 'graph_id': 'G1', 'vertex_ids': ['a'],
+                        'edge_ids': [], 'hint_ids': [], 'reason': 'synthetic point has no visible marker',
+                        'evidence': proof([160, 140, 190, 190])}]
+            return response
+
+    provider = WrongPosition()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=35, calls=12))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    page = [r for r in provider.requests if r['role'] == 'page_vertices'][1]
+    assert page['marker_position_observations'] and page['marker_position_checks']
+    ids = {m['id'] for m in page['marker_proposals']['candidates']}
+    selected = {mid for view in page['focused_views'] for mid in view['marker_ids']}
+    assert selected and selected <= ids
+    assert any('a' in g['vertex_ids'] for view in page['focused_views'] for g in view['graph_entities'])
+    assert any(e['role'] == 'page_vertices' and e['tool'] == 'image.focused_views'
+               and e['status'] == 'success' for e in workflow['tools'])
 
 
 def test_connection_attribute_issue_is_resolved_only_by_its_owner_before_review(bounded_tools):

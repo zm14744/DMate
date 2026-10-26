@@ -31,6 +31,8 @@ class AgentState(TypedDict, total=False):
     body_proposal: dict
     body_previous: dict
     body_error: str
+    body_review: dict
+    reviewed_body: dict
     graphs: list
     candidates: dict
     connection_response: dict
@@ -59,6 +61,14 @@ class ImageToolFailure(RuntimeError):
 
 
 def _error_kind(exc):
+    # These are application-owned pure decoder codes. Preserve their precise
+    # protocol feedback without serializing arbitrary exception messages.
+    known = {'node_coordinate_contract', 'node_panel_inventory', 'invalid_graph_record',
+             'duplicate_graph_identity', 'invalid_node_inventory', 'duplicate_or_excessive_nodes',
+             'invalid_vertex_record', 'invalid_graph_type', 'invalid_qwen_coordinate',
+             'invalid_qwen_point', 'invalid_qwen_box', 'invalid_qwen_id', 'invalid_qwen_attribute'}
+    if type(exc) is ValueError and str(exc) in known:
+        return str(exc)
     return str(getattr(exc, 'kind', None) or getattr(exc, 'code', None) or type(exc).__name__)[:80]
 
 
@@ -106,7 +116,7 @@ def _merge_conflict_sources(measured, model_issues):
         # Role protocols validate these identities and located observations.
         # Extra model fields cannot assert local measurement or soft routing.
         fields = ('id', 'kind', 'target_role', 'graph_id', 'vertex_ids', 'edge_ids',
-                  'hint_ids', 'reason', 'evidence', 'source_role', 'source_revision',
+                  'hint_ids', 'body_region_ids', 'reason', 'evidence', 'source_role', 'source_revision',
                   'scheduling_only')
         item = {key: copy.deepcopy(issue[key]) for key in fields if key in issue}
         existing = result.get(item['id'])
@@ -212,10 +222,12 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
     from graph_agent_plugins import build_image_tools, combine_candidates
     from graph_agent_roles import (
         PAGE_VERTICES_PROMPT, BODY_PROMPT, CONNECTION_PROMPT, ATTRIBUTE_PROMPT,
-        REVIEW_PROMPT, TARGETED_REVIEW_PROMPT, decode_nodes, merge_body_response,
+        REVIEW_PROMPT, TARGETED_REVIEW_PROMPT, decode_page_response, merge_body_response,
         validate_connection_response, merge_attribute_response, decode_review_response,
-        extract_rejected_role_issues)
-    from graph_evidence_pipeline import _url, _proposal_json
+        extract_rejected_role_issues, connection_graph_view)
+    from graph_agent_body_review import (BODY_REVIEW_PROMPT, body_review_input_digest,
+                                        decode_body_review_response)
+    from graph_evidence_pipeline import _url
     from graph_schema import canonical_graph
     from graph_validation import audit_graph_records
     from image_evidence import analyze_document
@@ -236,6 +248,9 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
     overview = _url(document.original)
     history = []
     proposal_rejections = {}
+    invalidated_proposals = []
+    role_call_scopes = {}
+    body_review_attempts = {}
     validated_body_digests = set()
     max_repairs = bounded_setting('DMATE_AGENT_REVIEW_ROUNDS', 2, 0, 3)
 
@@ -265,7 +280,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
 
     def committed(role, response=None):
         with ledger._lock:
-            if role in proposal_rejections:
+            if role in proposal_rejections and not proposal_rejections[role].get('invalidated'):
                 rejected = proposal_rejections[role]
                 if (response is not None and
                         response.get('base_revision', -1) < rejected.get('base_revision', -1)):
@@ -273,6 +288,31 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
                 proposal_rejections[role]['resolved'] = True
 
     def call(role, prompt, request, images, state, *, tokens=12000):
+        # A rejected connector draft names the inventory and measured
+        # candidates of that invocation. Page edits or new candidate scopes
+        # must not reintroduce its old coordinates into a fresh request.
+        scope = None
+        if role == 'body_review':
+            scope = {'kind': 'body_visual_inputs', 'sha256': request['body_input_digest']}
+        elif role in ('connections', 'attributes', 'structure_review'):
+            keys = (('graphs', 'previous_graphs') if role == 'connections' else
+                    ('graphs',) if role == 'attributes' else
+                    ('graphs', 'body_text', 'body_proposal', 'body_regions'))
+            scope = {'kind': 'fixed_role_inputs',
+                     'sha256': json_digest({key: request.get(key) for key in keys})}
+        with ledger._lock:
+            role_call_scopes[role] = scope
+            prior = proposal_rejections.get(role)
+            if (scope is not None and prior and not prior.get('resolved')
+                    and not prior.get('invalidated') and prior.get('input_scope') != scope):
+                prior.update(invalidated=True, invalidation_reason='role_input_scope_changed',
+                             invalidated_at_revision=state.get('revision', 0),
+                             replacement_input_scope=copy.deepcopy(scope))
+                if len(invalidated_proposals) < 8:
+                    invalidated_proposals.append(copy.deepcopy(prior))
+                ledger.event(role, 'rejection_scope_invalidated', revision=state.get('revision', 0),
+                    previous_scope=copy.deepcopy(prior.get('input_scope')), input_scope=copy.deepcopy(scope),
+                    error_kind=prior.get('error_kind'))
         focus = [x for x in state.get('focus_issues') or []
                  if isinstance(x, dict) and x.get('target_role') == role]
         if focus:
@@ -280,13 +320,15 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
             request = {**request, 'focus_issues': focus,
                        'repair_round': state.get('repair_round', 0)}
         crop_issues = (request.get('required_issues', []) + focus
-                       if role == 'structure_review' else focus)
-        if crop_issues and role in ('body_text', 'connections', 'structure_review'):
+                       if role in ('page_vertices', 'structure_review', 'body_review') else focus)
+        if crop_issues and role in ('page_vertices', 'body_text', 'body_review', 'connections', 'structure_review'):
             crop_issues = list({x['id']: x for x in crop_issues if isinstance(x, dict)
                                and isinstance(x.get('id'), str)}.values())[:128]
-            focused = tool('image.focused_views',
-                {'graphs': state.get('graphs') or state.get('inventory') or [],
-                 'issues': crop_issues}, role, optional=True)
+            focus_args = {'graphs': state.get('graphs') or state.get('inventory') or [],
+                          'issues': crop_issues}
+            if isinstance(request.get('body_regions'), list):
+                focus_args['body_regions'] = request['body_regions']
+            focused = tool('image.focused_views', focus_args, role, optional=True)
             if focused is not None:
                 images = list(images)
                 mappings = []
@@ -303,7 +345,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
                                '0..1000坐标，不把裁片局部坐标当原图坐标，也不把裁片视为正确性结论。')
         with ledger._lock:
             rejected = copy.deepcopy(proposal_rejections.get(role))
-        if rejected and not rejected.get('resolved'):
+        if rejected and not rejected.get('resolved') and not rejected.get('invalidated'):
             request = {**request, 'previous_rejection': rejected}
             prompt += ('\nprevious_rejection 是未提交的提案与明确校验错误，'
                        '请修正对应字段；它不是已确认结构，不能从中创造可退役边。')
@@ -317,6 +359,16 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
             raise exc
         kind = _error_kind(exc)
         details = _bounded_json(getattr(exc, 'audit', {}), 24_000)
+        if kind == 'invalid_graph_type' and role == 'page_vertices' and isinstance(response, dict):
+            for graph in response.get('graphs', []) if isinstance(response.get('graphs'), list) else []:
+                if not isinstance(graph, dict):
+                    continue
+                bad = next((key for key in ('directed', 'weighted', 'multigraph')
+                            if key in graph and type(graph[key]) is not bool and graph[key] != 'unknown'), None)
+                if bad:
+                    details = _bounded_json({'issue': kind, 'graph_id': graph.get('id'), 'field': bad,
+                        'expected': 'JSON boolean true/false or the string unknown', 'actual': graph[bad]}, 6000)
+                    break
         with ledger._lock:
             if isinstance(response, dict):
                 previous_revision = proposal_rejections.get(role, {}).get('base_revision', -1)
@@ -325,6 +377,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     proposal_rejections[role] = {'role': role, 'error_kind': kind,
                         'base_revision': revision,
                         'details': details, 'rejected_proposal': _role_snapshot(response),
+                        'input_scope': copy.deepcopy(role_call_scopes.get(role)),
                         'resolved': False, 'source_sha256': source_sha,
                         'task_id': ledger.task_id}
         ledger.event(role, 'proposal_rejected' if isinstance(response, dict) else 'stage_failed',
@@ -334,17 +387,37 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
     def page(state):
         response = None
         try:
+            marker_focus = []
+            known_markers = {m['id'] for m in (marker_hints or {}).get('candidates', [])}
+            for entry in state.get('marker_observations') or []:
+                observation = entry.get('observations') or {}
+                missing = [m['marker_id'] for m in observation.get('unbound_strong_markers', [])
+                           if isinstance(m, dict) and m.get('marker_id') in known_markers]
+                if missing:
+                    marker_focus.append(_issue('unbound_marker_visual_check', 'page_vertices',
+                        graph_id=entry.get('graph_id'), marker_ids=missing))
+            for entry in state.get('position_checks') or []:
+                marker_focus.append(_issue('unobserved_position_visual_check', 'page_vertices',
+                    graph_id=entry.get('graph_id'), vertex_ids=entry.get('vertex_ids') or []))
             response = call('page_vertices', PAGE_VERTICES_PROMPT,
                             {'layout_hints': evidence['layout_hints'], 'text_hints': hints['items'],
                              'original_image_size': list(document.original.size),
                              'marker_proposals': marker_hints,
                              'previous_inventory': _review_graphs(state.get('inventory') or []),
-                             'marker_review_context': state.get('page_issues') or []},
+                             'marker_review_context': state.get('page_issues') or [],
+                             'marker_position_observations': state.get('marker_observations') or [],
+                             'marker_position_checks': state.get('position_checks') or [],
+                             'required_issues': marker_focus + (state.get('page_issues') or [])},
                             [overview, _url(document.normalized)], state, tokens=10000)
-            graphs = decode_nodes(response)
+            decoded = decode_page_response(response, marker_hints, revision=state.get('revision', 0))
+            graphs = decoded['graphs']
             for graph in graphs:
+                bindings = [row for row in decoded['audit']['bindings'] if row['graph_id'] == graph['id']]
+                binding_audit = {**copy.deepcopy(decoded['audit']),
+                                 'bindings': copy.deepcopy(bindings), 'binding_count': len(bindings)}
                 graph['node_review'] = {'source': 'page_vertices',
-                    'source_sha256': source_sha, 'observed_vertices': copy.deepcopy(graph['vertices'])}
+                    'source_sha256': source_sha, 'observed_vertices': copy.deepcopy(graph['vertices']),
+                    'marker_binding_audit': binding_audit}
             grounded = tool('image.marker_grounding', {'graphs': graphs}, 'page_vertices', optional=True)
             graphs = grounded['graphs'] if grounded is not None else graphs
             position_issues, observations, position_checks = [], [], []
@@ -368,7 +441,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
                         marker_observations=copy.deepcopy(observations[-1]['observations'])))
             committed('page_vertices')
             ledger.event('page_vertices', 'committed', revision=state.get('revision', 0)+1,
-                         inventory_digest=json_digest(graphs))
+                         inventory_digest=json_digest(graphs), marker_binding_audit=copy.deepcopy(decoded['audit']))
             # Any inventory edit invalidates ALL old paths and edge evidence.
             return {'initial': response, 'inventory': graphs, 'graphs': [], 'candidates': {},
                     'connection_response': {}, 'page_error': '',
@@ -389,6 +462,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
                 previous = None  # A rejected draft is feedback, not committed transcription history.
             if previous:
                 request['previous_transcription'] = copy.deepcopy(previous)
+                request['body_regions'] = copy.deepcopy(previous.get('regions', []))
             response = call('body_text', BODY_PROMPT,
                             request, body_images, state, tokens=8500)
             if state.get('inventory'):
@@ -402,7 +476,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
         except Exception as exc:
             return {'body_error': failed('body_text', exc, response)}
 
-    def text_proposal(state):
+    def text_proposal(state, *, reviewed=True):
         proposal = state.get('body_proposal')
         if not proposal or (state.get('body_error') and json_digest(proposal) not in validated_body_digests):
             # A newer failed repair must not be overwritten by decoding the
@@ -416,11 +490,78 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
                         revision=proposal.get('base_revision', 0))
             validated_body_digests.add(json_digest(proposal))
             committed('body_text', proposal)
+            dependency = (body_review_input_digest(value, hints,
+                state.get('graphs') or state.get('inventory') or []) if reviewed else None)
+            latest = state.get('reviewed_body') or {}
+            if reviewed and latest.get('body_input_digest') == dependency:
+                return {**copy.deepcopy(latest['result']), 'role_valid': True}
+            independent = state.get('body_review') or {}
+            if (reviewed and independent.get('status') == 'reviewed'
+                    and independent.get('body_input_digest') == dependency):
+                return {**copy.deepcopy(independent['result']), 'role_valid': True}
             return {**value, 'role_valid': True}
         except Exception as exc:
             error = failed('body_text', exc, proposal)
             return {'body_text': '', 'body_complete': False, 'role_valid': False,
                     'issues': [error], 'text_review': {'text': '', 'complete': False, 'regions': []}}
+
+    def independent_body(state):
+        """Read located body pixels without waiting for a valid edge graph.
+
+        This is an additional, separately recorded visual reader. It neither
+        certifies graphs nor replaces the mandatory final whole-page judge.
+        Its scope follows body/panel evidence, not unrelated edge revisions.
+        """
+        first = text_proposal(state, reviewed=False)
+        graphs = state.get('graphs') or state.get('inventory') or []
+        if not first.get('role_valid') or not graphs:
+            ledger.event('body_review', 'deferred', reason='body_or_panel_inventory_unavailable')
+            return {}
+        regions = [r for r in first.get('regions', []) if r.get('role') == 'body']
+        if not regions:
+            ledger.event('body_review', 'skipped', reason='no_located_body_to_review')
+            return {}
+        digest = body_review_input_digest(first, hints, graphs)
+        if (state.get('body_review') or {}).get('body_input_digest') == digest:
+            return {}  # Same pixels/input: a graph repair is not a body reread.
+        if digest in body_review_attempts:
+            cached = copy.deepcopy(body_review_attempts[digest])
+            ledger.event('body_review', 'scope_reused', revision=state.get('revision', 0),
+                         body_input_digest=digest, source_request_revision=cached['request_revision'])
+            return {'body_review': cached}
+        if ledger.remaining < 2 or ledger.deadline-time.monotonic() < 15:
+            ledger.event('body_review', 'deferred', reason='reserved_final_review_budget')
+            return {}
+        response = None
+        revision = state.get('revision', 0)
+        ledger.event('body_review', 'scope_checked', revision=revision, body_input_digest=digest)
+        try:
+            focused = [_issue('independent_body_region:'+r['id'], 'body_review',
+                              body_region_ids=[r['id']]) for r in regions]
+            request = {'body_text': first['body_text'], 'body_proposal': first.get('text_review'),
+                       'body_regions': first.get('regions', []), 'text_hints': hints['items'],
+                       'text_review_tiles': body_view['text_review_tiles'],
+                       'graphs': [{'id': g['id'], 'bbox': [round(v*1000, 3) for v in g['bbox']]}
+                                  for g in graphs],
+                       'body_input_digest': digest, 'required_issues': focused}
+            response = call('body_review', BODY_REVIEW_PROMPT, request, body_images, state, tokens=10000)
+            result = decode_body_review_response(response, first, hints=hints, graphs=graphs,
+                                                 revision=revision)
+            if result['body_input_digest'] != digest:
+                raise ValueError('body_review_input_changed')
+            committed('body_review', response)
+            ledger.event('body_review', 'reviewed', revision=revision, body_input_digest=digest,
+                         body_complete=result['body_complete'], conflict_count=len(result['issues']))
+            value = {'status': 'reviewed', 'body_input_digest': digest,
+                     'request_revision': revision, 'result': result}
+            body_review_attempts[digest] = copy.deepcopy(value)
+            return {'body_review': value}
+        except Exception as exc:
+            error = failed('body_review', exc, response)
+            value = {'status': 'failed', 'body_input_digest': digest,
+                     'request_revision': revision, 'error_kind': error}
+            body_review_attempts[digest] = copy.deepcopy(value)
+            return {'body_review': value}
 
     def review_view(graphs, role):
         view = tool('image.review_views', {'graphs': graphs}, role)
@@ -466,7 +607,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
             else:
                 notes.append('sknw_tool_unavailable')
             view, images = review_view(inventory, 'connections')
-            request = {'graphs': [_proposal_json(g, candidates.get(g['id'], [])) for g in inventory],
+            request = {'graphs': [connection_graph_view(g, candidates.get(g['id'], [])) for g in inventory],
                        'review_tiles': view['review_tiles'], 'candidate_generation_diagnostics': notes,
                        'vertex_position_observations': state.get('marker_observations') or [],
                        'previous_graphs': _review_graphs(state.get('graphs') or []),
@@ -565,9 +706,16 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     continue
                 rejected = proposal_rejections.get(role) or {}
                 details = (rejected.get('details') or {}) if (not rejected.get('resolved')
+                            and not rejected.get('invalidated')
                             and rejected.get('error_kind') == state[key]) else {}
-                conflicts.append(_issue(state[key], role,
-                    failure_details=copy.deepcopy(details)))
+                fixed = {g['id']: g for g in state.get('inventory') or []}
+                gid = details.get('graph_id')
+                gid = gid if isinstance(gid, str) and gid in fixed else None
+                known = {v['id'] for v in fixed[gid]['vertices']} if gid else set()
+                vids = [v for v in details.get('vertex_ids', [])
+                        if isinstance(v, str) and v in known] if isinstance(details.get('vertex_ids'), list) else []
+                conflicts.append(_issue(state[key], role, graph_id=gid,
+                    vertex_ids=list(dict.fromkeys(vids)), failure_details=copy.deepcopy(details)))
         for graph in graphs:
             for field in ('directed', 'weighted', 'multigraph'):
                 if type(graph.get(field)) is not bool:
@@ -589,6 +737,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
             conflicts.append(body_issue(str(code), soft=body_value.get('role_valid') is True
                                         and not state.get('body_error')))
         model_issues = []
+        model_issues.extend(copy.deepcopy(body_value.get('model_issues') or []))
         for code in state.get('connection_issues', []):
             model_issues.append(copy.deepcopy(code) if isinstance(code, dict) else _issue(str(code), 'connections'))
         for code in state.get('attribute_issues', []):
@@ -677,9 +826,36 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
             final_conflicts = _merge_conflict_sources(final_conflicts, response.get('issues', []))
             if reviewed.get('verdict') != 'accept' and not final_conflicts:
                 final_conflicts.append(_issue('independent_review_incomplete', 'connections'))
+            body_update = {}
+            # A valid whole-page reader can correct body text while asking
+            # for an unrelated edge repair. Keep that newer located text;
+            # a later deferred graph review must not resurrect an older read.
+            if (text_value['body_complete'] is True
+                    and not any(x.get('target_role') == 'body_text' for x in final_conflicts)):
+                decisions = {r['id']: r for r in reviewed.get('body_region_review', [])}
+                regions = []
+                for old in first_body.get('regions', []):
+                    decision = decisions[old['id']]
+                    region = {**copy.deepcopy(old), 'role': decision['role'],
+                              'text': decision.get('text', old['text'])}
+                    region.pop('graph_id', None)
+                    if decision['role'] == 'graph_label':
+                        region['graph_id'] = decision.get('graph_id')
+                    regions.append(region)
+                dependency = body_review_input_digest(text_proposal(state, reviewed=False), hints, graphs)
+                body_result = {'role': 'structure_review', 'base_revision': state.get('revision', 0),
+                    'body_text': text_value['body_text'], 'body_complete': True, 'regions': regions,
+                    'text_review': copy.deepcopy(reviewed['text_review']), 'issues': [], 'model_issues': [],
+                    'audit': {'source': 'independent_structure_review', 'scope': 'body_only',
+                              'source_sha256': source_sha, 'base_revision': state.get('revision', 0),
+                              'reconciliation': copy.deepcopy(text_value['body_audit'])}}
+                body_update['reviewed_body'] = {'body_input_digest': dependency, 'result': body_result}
+                ledger.event('structure_review', 'body_committed', revision=state.get('revision', 0),
+                             body_input_digest=dependency, content_digest=json_digest(body_result))
             ledger.event('structure_review', 'reviewed', revision=state.get('revision', 0),
                          verdict=reviewed.get('verdict'), conflict_count=len(final_conflicts))
-            return {'review': reviewed, 'review_error': '', 'conflicts': final_conflicts[:160], **text_value}
+            return {'review': reviewed, 'review_error': '', 'conflicts': final_conflicts[:160],
+                    **text_value, **body_update}
         except Exception as exc:
             error = failed('structure_review', exc, response)
             conflicts.extend(rejected_issues('structure_review', response, state))
@@ -746,17 +922,32 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
         # LangGraph joins START branches at a superstep barrier. A single
         # node with two disjoint lanes lets page -> connections progress as
         # soon as the inventory is available, while the body read continues.
-        with ThreadPoolExecutor(max_workers=1) as pool:
+        with ThreadPoolExecutor(max_workers=2) as pool:
             body_future = pool.submit(body, copy.deepcopy(state))
             page_updates = page(state)
             current = {**state, **page_updates}
-            connection_updates = connections(current)
+            connection_future = pool.submit(connections, copy.deepcopy(current))
             body_updates = body_future.result()
+            body_review_updates = independent_body({**current, **body_updates})
+            connection_updates = connection_future.result()
         updates = {**page_updates, **connection_updates}
-        if set(updates) & set(body_updates):
+        if set(updates) & (set(body_updates) | set(body_review_updates)):
             raise ValueError('initial_role_state_collision')
         updates.update(body_updates)
+        updates.update(body_review_updates)
         return updates
+
+    def connections_and_body_review(state):
+        # After a page repair, independently review newly located body scope
+        # while tracing the new inventory. A prior unchanged body scope is a
+        # no-op, regardless of how many connector revisions have occurred.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            future = pool.submit(connections, copy.deepcopy(state))
+            body_updates = independent_body(state)
+            updates = future.result()
+        if set(updates) & set(body_updates):
+            raise ValueError('page_repair_state_collision')
+        return {**updates, **body_updates}
 
     def prepare_initial(state):
         first_body = text_proposal(state)
@@ -805,6 +996,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
             if set(updates) & set(value):
                 raise ValueError('parallel_repair_state_collision')
             updates.update(value)
+        updates.update(independent_body({**state, **updates}))
         return updates
 
     def after_repairs(state):
@@ -837,6 +1029,12 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
                     'events': copy.deepcopy(ledger.events), 'tools': copy.deepcopy(context.audit),
                     'remaining_conflicts': copy.deepcopy(conflicts),
                     'proposal_rejections': copy.deepcopy(proposal_rejections),
+                    'invalidated_proposals': copy.deepcopy(invalidated_proposals),
+                    'body_review': _bounded_json(state.get('body_review') or {}, 96_000),
+                    'body_review_history': [{'status': value['status'], 'body_input_digest': digest,
+                        'request_revision': value['request_revision'], 'error_kind': value.get('error_kind'),
+                        'result_digest': json_digest(value['result']) if value.get('result') else None}
+                        for digest, value in body_review_attempts.items()],
                     'position_review': {'required': copy.deepcopy(state.get('position_checks') or []),
                         'verdict': state.get('review', {}).get('verdict'),
                         'graphs': _bounded_json([{'id': graph.get('id'),
@@ -857,7 +1055,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
         return {'result': result}
 
     builder = StateGraph(AgentState)
-    for name, node in [('initial_roles', initial_roles), ('connections', connections),
+    for name, node in [('initial_roles', initial_roles), ('connections', connections_and_body_review),
                        ('attributes', attributes), ('structure_review', review), ('plan_repair', plan_repair),
                        ('prepare_initial', prepare_initial), ('role_repairs', role_repairs),
                        ('page_repair', page), ('finish', finish)]:
