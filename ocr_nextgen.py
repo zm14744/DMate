@@ -1,0 +1,124 @@
+"""Graph-nextgen orchestration; spent graph budgets never start old vision."""
+from __future__ import annotations
+import os
+from graph_schema import display_graph
+from graph_staged import recognize_staged, Budget
+from graph_validation import audit_graph_records
+from ocr_correction import correct_text
+from ocr_layout import partition_text
+
+
+def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeline='evidence-two-pass'):
+    # Development branch default; previous engines remain explicit comparisons.
+    # The app's existing graph-nextgen gate and production environment are unchanged.
+    if graph_pipeline not in ('staged','qwen-simple-candidate','evidence-two-pass'):
+        raise ValueError('Unknown graph pipeline')
+    engine=recognize_staged
+    version='2026-10-26-qwen-stable-review-v13'
+    if graph_pipeline=='qwen-simple-candidate':
+        from graph_qwen_simple import recognize_simple
+        engine=recognize_simple
+        version='qwen-simple-candidate-v59'
+    elif graph_pipeline=='evidence-two-pass':
+        from graph_evidence_pipeline import recognize_evidence, VERSION
+        engine=recognize_evidence
+        version=VERSION
+    layout=text_result.get('layout') or {}
+    budget=Budget(seconds=140,calls=2,call_seconds=75) if graph_pipeline!='staged' else Budget()
+    try:
+        extra = {'text_result': text_result} if graph_pipeline == 'evidence-two-pass' else {}
+        result=engine(raw,layout=layout.get('regions',[]),provider=vision_provider,
+                               budget=budget,audit=os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1', **extra)
+        if not result['graphs']:raise ValueError('empty_graph_inventory')
+    except Exception as exc:
+        # Return a diagnosed failure, so /ocr cannot silently start another
+        # legacy vision pipeline outside the already spent graph budget.
+        return _failed_graph_result(exc,version,budget,text_result)
+    try:
+        return _render_graph_result(raw,text_result,result,version,layout)
+    except Exception as exc:
+        return _failed_graph_result(exc,version,budget,text_result,stage_audit=result.get('stage_audit'))
+
+
+def _failed_graph_result(exc,version,budget,text_result,*,stage_audit=None):
+    failure={'error':'本次图形结构识别未完成，请核对原图。','graph_display_version':version,
+        'recognition_status':'failed','review':{'required':True,'reasons':['图形识别未完成。']},
+        'diagnostics':{'stages':['graph_pipeline_failed'],'failure_kind':type(exc).__name__,
+            'remote_metrics':budget.metrics,'resource_metrics':text_result.get('resource_metrics',[])}}
+    evidence=getattr(exc,'graph_stage_audit',stage_audit)
+    if os.environ.get('DMATE_GRAPH_STAGE_AUDIT')=='1' and evidence is not None:
+        failure['diagnostics']['stage_audit']=evidence
+    return failure
+
+
+def _render_graph_result(raw,text_result,result,version,layout):
+    graphs=result['graphs']
+    text=text_result.get('text') or ''
+    local_text=text
+    # If layout failed, use Qwen's explicit graph bounds to partition Small's
+    # coordinate evidence, never regex-delete labels from an unlocated paragraph.
+    evidence=text_result.get('text_evidence') or {}
+    if text_result.get('layout_degraded') and evidence:
+        regions=[]
+        for graph in graphs:
+            box=graph.get('bbox')
+            if isinstance(box,list) and len(box)==4:
+                try:
+                    a,b,c,d=map(float,box)
+                    if 0<=a<c<=1 and 0<=b<d<=1:
+                        regions.append({'id':graph['id'],'bbox':[a,b,c,d],'role':'figure','score':.75})
+                except (TypeError,ValueError): pass
+        size=evidence.get('image_size')
+        if regions and size:
+            parts=partition_text(evidence.get('body',[]),regions,*size)
+            text='\n'.join(x['content'] for x in parts['body'])
+    text_source='paddle'
+    text_complete=True
+    if 'body_complete' in result:
+        # The image pipeline supplies the final reviewed transcription.
+        # Keep even an incomplete visual result, with its status, instead of
+        # silently swapping back to a different unreviewed OCR paragraph.
+        text_complete=result.get('body_complete') is True
+        body=result.get('body_text')
+        if isinstance(body,str):
+            text=body
+            text_source='original_visual_transcription'
+    try:
+        corrected,correction=correct_text(text)
+    except Exception as exc:
+        # A text-service exception does not erase independently reviewed graphs.
+        corrected,correction=text,{'status':'failed','failure_kind':type(exc).__name__}
+    if 'body_complete' in result and text.strip() and correction.get('status') not in ('ok','empty'):
+        text_complete=False
+    issues=audit_graph_records(graphs)
+    if issues:
+        for g in graphs: g['complete']=False
+    from ai import _format_graph_data
+    visual=_format_graph_data(graphs)
+    graph_incomplete=any(g.get('complete') is not True for g in graphs)
+    incomplete=graph_incomplete or not text_complete
+    reasons=[]
+    if graph_incomplete:reasons.append('部分子图、顶点或连线尚未核对完整。')
+    if not text_complete:reasons.append('题干文字尚未核对完整。')
+    return {'text':corrected,'visual_text':visual,
+            'graph_display_data':[display_graph(g) for g in graphs],
+            'graph_structures':graphs,'raw_ocr_text':text,
+            'graph_display_version':version,
+            'review':{'required':incomplete,'reasons':reasons},
+            'text_count':(len([line for line in corrected.splitlines() if line.strip()])
+                          if text_source=='original_visual_transcription' else text_result.get('text_count',0)),
+            'formula_count':0,
+            'vision_used':True,'warning':' '.join(reasons) if reasons else None,
+            'recognition_status':'partial' if incomplete else 'complete',
+            'diagnostics':{'resource_metrics':text_result.get('resource_metrics',[]),
+                           'layout_status':layout.get('status','unavailable'),
+                           'correction':correction,'validation':issues,
+                           'text_evidence':{'source':text_source,'complete':text_complete,
+                                            'paddle_text':local_text,
+                                            'visual_body_complete':result.get('body_complete'),
+                                            'second_pass_reviewed':result.get('body_audit',{}).get('second_pass_reviewed'),
+                                            'reconciliation':result.get('body_audit',{})},
+                           **({'image_quality':result['image_quality']} if 'image_quality' in result else {}),
+                           'stages':result['diagnostics'],
+                           'remote_metrics':result.get('remote_metrics',[]),
+                           **({'stage_audit':result['stage_audit']} if 'stage_audit' in result else {})}}

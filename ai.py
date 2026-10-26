@@ -840,12 +840,15 @@ def _request_text_completion(
     max_tokens=None,
     preferred_provider=None,
     timeout=(10, 60),
+    response_format=None,
 ):
     """
     调用文本模型。
 
     通过 DeepSeek 完成文本请求，保留原有的错误处理、重试与思考强度策略。
     """
+    if response_format is not None and response_format != {"type": "json_object"}:
+        raise ValueError("Unsupported text response format")
     # 即使上层意外传入旧版 max，也不得写入 provider 请求与日志。
     if str(reasoning_effort or "").lower() == "max":
         reasoning_effort = "high"
@@ -879,6 +882,8 @@ def _request_text_completion(
             reasoning_effort=reasoning_effort,
             max_tokens=max_tokens,
         )
+        if response_format is not None:
+            payload["response_format"] = dict(response_format)
         headers = {
             "Authorization": f"Bearer {provider['api_key']}",
             "Content-Type": "application/json",
@@ -1337,7 +1342,7 @@ def _guess_image_mime(raw):
 
 
 
-def _request_qwen_completion(payload, headers, timeout=(10, 120)):
+def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=None):
     """Call DashScope in SSE mode and reconstruct the OpenAI-compatible result."""
     request_payload = dict(payload)
     request_payload["stream"] = True
@@ -1358,10 +1363,16 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120)):
             except Exception:
                 return status_code, "", None
 
+        # SSE is always UTF-8, including text/event-stream without a charset.
+        # Requests otherwise decodes that legal header as ISO-8859-1.
+        response.encoding = "utf-8"
         content_parts, reasoning_parts = [], []
         finish_reason, usage = None, None
+        returned_model, system_fingerprint = None, None
         saw_event = False
         for raw_line in response.iter_lines(decode_unicode=True):
+            if wall_deadline is not None and time.monotonic() > wall_deadline:
+                raise TimeoutError("vision_wall_deadline")
             if raw_line is None:
                 continue
             line = raw_line.decode("utf-8", errors="replace").strip() if isinstance(raw_line, bytes) else str(raw_line).strip()
@@ -1379,6 +1390,8 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120)):
             if not isinstance(chunk, dict):
                 continue
             saw_event = True
+            returned_model = chunk.get("model") or returned_model
+            system_fingerprint = chunk.get("system_fingerprint") or system_fingerprint
             if isinstance(chunk.get("usage"), dict):
                 usage = chunk["usage"]
             for choice in chunk.get("choices") or []:
@@ -1416,6 +1429,8 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120)):
                 "finish_reason": finish_reason,
             }],
             "usage": usage or {},
+            "model": returned_model,
+            "system_fingerprint": system_fingerprint,
         }
         return status_code, "", normalized
     finally:
@@ -1611,6 +1626,9 @@ def _format_graph_data(graphs):
     """Render validated graph data into a count-consistent visual description."""
     if not graphs:
         return ""
+    if all(g.get('schema_version') == 'dmate.graph/1' for g in graphs):
+        from graph_schema import describe_graphs
+        return describe_graphs(graphs)
     lines, needs_review = [], False
     for graph_index, graph in enumerate(graphs, 1):
         graph_id = graph["id"]

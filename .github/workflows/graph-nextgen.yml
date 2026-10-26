@@ -1,0 +1,125 @@
+name: Graph OCR nextgen acceptance
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      live_api:
+        description: 'Run original-image OCR with test GitHub Secrets (paid API calls)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: graph-nextgen-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  mechanisms:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install Flask requests numpy==1.26.4 opencv-contrib-python-headless==4.10.0.84 Pillow==11.3.0 networkx pytest playwright==1.55.0
+      - run: python -m pytest -q tests
+      - run: node --check static/script.js && node tests/graph_display_regression.js && node tests/graph_nextgen_display.js
+      - run: python -m playwright install --with-deps chromium
+      - name: Prepare pinned public browser scripts with TLS verification
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tests')
+          from browser_assets import verified_asset
+          urls = re.findall(r'<script[^>]+src="(https://cdn\.jsdelivr\.net/[^"?]+\.js)"',
+                            Path('templates/index.html').read_text())
+          if not urls:
+              raise SystemExit('Pinned browser scripts were not found')
+          for url in sorted(set(urls)):
+              verified_asset(url, Path(os.environ['RUNNER_TEMP']) / 'frontend_public_cdn_cache')
+          PY
+      - run: python tests/nextgen_browser.py --mode contract --output artifacts/browser-contract --cdn-cache "$RUNNER_TEMP/frontend_public_cdn_cache"
+      - name: Verify current evidence review dialog and real upload route in Chromium
+        run: |
+          python - <<'PY'
+          import os, subprocess, sys
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          env = os.environ.copy()
+          with sync_playwright() as browser:
+              env['DMATE_BROWSER_EXECUTABLE'] = browser.chromium.executable_path
+          env['DMATE_FRONTEND_CONTRACT_OUTPUT'] = str(Path(env['RUNNER_TEMP']) / 'dmate-evidence-browser')
+          env['DMATE_UI_REPLAY_TEST_OUTPUT'] = str(Path(env['RUNNER_TEMP']) / 'dmate-ui-replay')
+          env['DMATE_UPLOAD_INTEGRATION_OUTPUT'] = str(Path(env['RUNNER_TEMP']) / 'dmate-upload-integration')
+          env['DMATE_BROWSER_CDN_CACHE'] = str(Path(env['RUNNER_TEMP']) / 'frontend_public_cdn_cache')
+          subprocess.run([sys.executable, '-m', 'pytest', '-q',
+                          'tests/test_evidence_frontend_contract.py',
+                          'tests/test_graph_first_pass_ui.py',
+                          'tests/test_ocr_upload_integration.py'], env=env, check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nextgen-browser-contract-not-accuracy
+          path: |
+            artifacts/browser-contract
+            ${{ runner.temp }}/dmate-evidence-browser
+            ${{ runner.temp }}/dmate-ui-replay
+            ${{ runner.temp }}/dmate-upload-integration
+  resource-limit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build existing production dependency set
+        run: docker build -t dmate-ocr-test .
+      - name: Measure real model RSS, wall time and success in fixed cgroup
+        run: |
+          mkdir -p artifacts/resources
+          docker run --name dmate-ocr-resource --cpus=2 --memory=4g --memory-swap=4g \
+            -e DMATE_GRAPH_NEXTGEN=1 -v "$PWD/artifacts/resources:/results" \
+            dmate-ocr-test python scripts/benchmark_ocr_resources.py
+      - name: Record container OOM status
+        if: always()
+        run: docker inspect dmate-ocr-resource --format '{{json .State}}' > artifacts/resources/container-state.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nextgen-real-model-resources
+          path: artifacts/resources
+  original-images-live:
+    if: github.event_name == 'workflow_dispatch' && inputs.live_api
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DASHSCOPE_API_KEY: ${{ secrets.DMATE_TEST_DASHSCOPE_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DMATE_TEST_DEEPSEEK_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require complete original conversation corpus before full regression
+        run: python scripts/graph_corpus.py validate --full
+      - name: Require explicit test secrets; never silently mock a real API test
+        run: test -n "$DASHSCOPE_API_KEY" && test -n "$DEEPSEEK_API_KEY"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install playwright==1.55.0 requests Pillow networkx
+      - run: python -m playwright install --with-deps chromium
+      - run: docker build -t dmate-ocr-live .
+      - name: Start branch application, isolated from production
+        run: |
+          docker run -d --name dmate-ocr-live --cpus=2 --memory=4g --memory-swap=4g \
+            -e DMATE_GRAPH_NEXTGEN=1 -e DASHSCOPE_API_KEY -e DEEPSEEK_API_KEY \
+            -p 127.0.0.1:8080:8080 dmate-ocr-live
+      - name: Upload exact originals and read real review dialog
+        run: python tests/nextgen_browser.py --mode live --base-url http://127.0.0.1:8080 --output artifacts/live
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nextgen-originals-actual-ocr-and-dialog
+          path: artifacts/live

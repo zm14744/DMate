@@ -1,0 +1,67 @@
+{
+  "case_id": "ouc_20261021_graph_operations_six",
+  "original_sha256": "1dba1c9624c7a866397c00c659a38e4d3a679779c1adb848eed74e1fa944d526",
+  "dimensions": {
+    "graph_accuracy": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "存在端点/边名错误，缩边图及顺序错误"
+    },
+    "question_text": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "图内标签进入题干，原题公式或文字损坏"
+    },
+    "formula_rendering": {
+      "status": "partial",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "图标签有MathJax渲染，但题干包含损坏符号"
+    },
+    "description_accuracy": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "图形描述与原图正确边表不符"
+    },
+    "description_uniformity": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "包含结构已列出（仍需以原图核对）等内部状态文字"
+    },
+    "figure_separation": {
+      "status": "fail",
+      "evidence": [
+        "original_ocr.json",
+        "original_capture.json",
+        "original_dialog.png",
+        "ground_truth.json"
+      ],
+      "notes": "六图的顺序及缩边结果归属不正确"
+    }
+  },
+  "scope": "historical baseline, not current branch"
+}

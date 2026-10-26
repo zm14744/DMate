@@ -75,6 +75,11 @@ def load_models():
     global _formula_load_error
     global _formula_last_attempt
 
+    # Isolated Small worker must never load a second layout/formula pipeline.
+    if os.environ.get("DMATE_FORMULA_ENABLED", "1") == "0":
+        global FormulaRecognitionPipeline
+        FormulaRecognitionPipeline = None
+
     now = time.monotonic()
 
     if _text_ocr is not None and _formula_ocr is not None:

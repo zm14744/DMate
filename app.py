@@ -72,7 +72,10 @@ OCR_AVAILABLE = False
 OCR_IMPORT_ERROR = None
 
 try:
-    from ocr import OCRError, load_models, recognize_image
+    if os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1":
+        from ocr_runtime import OCRError, load_models, recognize_image
+    else:
+        from ocr import OCRError, load_models, recognize_image
     OCR_AVAILABLE = True
 except Exception as exc:
     OCR_IMPORT_ERROR = repr(exc)
@@ -294,6 +297,100 @@ _ocr_status = (
     if OCR_AVAILABLE
     else "不可用"
 )
+_ocr_stages = {}
+_ocr_health_lock = threading.Lock()
+
+
+def _local_ocr_execution(result):
+    """Separate a worker's execution outcome from recognized content quality.
+
+    New workers can return useful partial data without raising. An empty pure
+    graph with text status=ok is still a successful text execution; a warning
+    string is never evidence that the formula worker, specifically, failed.
+    """
+    if not isinstance(result, dict):
+        raise ValueError("invalid_local_ocr_result")
+    stages = {}
+    if "resource_metrics" in result:
+        for metric in result.get("resource_metrics") or []:
+            if not isinstance(metric, dict) or metric.get("stage") not in ("layout", "text", "formula"):
+                continue
+            status = metric.get("status")
+            if not isinstance(status, str) or not re.fullmatch(r"[a-z_]{1,48}", status):
+                status = "unknown"
+            stage = {"status": status}
+            for key in ("error_kind", "phase"):
+                value = metric.get(key)
+                if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_]{1,80}", value):
+                    stage[key] = value
+            stages[metric["stage"]] = stage
+        stages.setdefault("text", {"status": "unknown"})
+    else:
+        # Legacy recognize_image raises on text failure. It has no per-worker
+        # metrics; a normal return certifies execution, not complete content.
+        stages["text"] = {"status": "ok", "evidence": "legacy_return"}
+    return {"available": OCR_AVAILABLE, "stages": stages,
+            "text_succeeded": stages["text"]["status"] == "ok"}
+
+
+def _record_ocr_execution(execution, *, warning=False):
+    global _ocr_ready, _ocr_status, _ocr_stages
+    stages = execution.get("stages") or {}
+    text_status = (stages.get("text") or {}).get("status", "unknown")
+    with _ocr_health_lock:
+        _ocr_stages = copy.deepcopy(stages)
+        _ocr_ready = execution.get("text_succeeded") is True
+        if not _ocr_ready:
+            _ocr_status = ({"memory_limit": "文字识别资源受限",
+                            "memory_admission_rejected": "文字识别资源受限",
+                            "timeout": "文字识别超时", "unknown": "文字识别状态未确认"}
+                           .get(text_status, "文字识别暂不可用"))
+        elif (stages.get("layout") or {}).get("status", "ok") != "ok":
+            _ocr_status = "文字识别已就绪（版面识别降级）"
+        elif (stages.get("formula") or {}).get("status", "ok") not in ("ok", "disabled", "not_run"):
+            _ocr_status = "已就绪（公式识别降级）"
+        else:
+            _ocr_status = "已就绪（识别结果需核对）" if warning else "已就绪"
+
+
+def _with_local_ocr_execution(response, execution):
+    """Propagate local failure without erasing an independently reviewed body."""
+    response = dict(response)
+    diagnostics = dict(response.get("diagnostics") or {})
+    diagnostics["local_ocr"] = copy.deepcopy(execution)
+    response["diagnostics"] = diagnostics
+    if execution.get("text_succeeded") is True:
+        return response
+    text_evidence = dict(diagnostics.get("text_evidence") or {})
+    visual_replacement = (text_evidence.get("source") == "original_visual_transcription"
+                          and text_evidence.get("complete") is True
+                          and text_evidence.get("visual_body_complete") is True
+                          and text_evidence.get("second_pass_reviewed") is True)
+    if visual_replacement:
+        return response
+    text_evidence.update(complete=False, local_text_succeeded=False)
+    diagnostics["text_evidence"] = text_evidence
+    review = dict(response.get("review") or {})
+    reasons = [value for value in (review.get("reasons") or []) if isinstance(value, str)]
+    reason = "题干文字尚未核对完整。"
+    review.update(required=True, reasons=list(dict.fromkeys(reasons+[reason])))
+    response["review"] = review
+    if response.get("recognition_status") != "failed":
+        response["recognition_status"] = "partial"
+    response["warning"] = " ".join(review["reasons"])
+    return response
+
+
+def _graph_route_failure(kind, local_result, execution):
+    """An entered new pipeline owns this request, including all its failures."""
+    return _with_local_ocr_execution({
+        "error": "本次图形结构识别未完成，请核对原图。",
+        "recognition_status": "failed",
+        "review": {"required": True, "reasons": ["图形识别未完成。"]},
+        "diagnostics": {"stages": ["graph_route_failed"], "failure_kind": kind,
+                        "legacy_vision_started": False,
+                        "resource_metrics": local_result.get("resource_metrics", [])},
+    }, execution)
 
 _rate_lock = threading.Lock()
 _request_history = defaultdict(deque)
@@ -453,7 +550,9 @@ def _warm_ocr_models():
             model_status.get("text_ready")
         )
 
-        if model_status.get("formula_ready"):
+        if not _ocr_ready:
+            _ocr_status = "文字识别未就绪"
+        elif model_status.get("formula_ready"):
             _ocr_status = "已就绪"
         else:
             _ocr_status = "已就绪（公式识别降级）"
@@ -468,7 +567,7 @@ def _warm_ocr_models():
         )
 
 
-if OCR_AVAILABLE:
+if OCR_AVAILABLE and os.environ.get("DMATE_GRAPH_NEXTGEN", "0") != "1":
     threading.Thread(
         target=_warm_ocr_models,
         daemon=True
@@ -3699,29 +3798,32 @@ def ocr():
         }
         ocr_fallback_reason = None
         ocr_succeeded = False
+        local_execution = {"available": OCR_AVAILABLE, "text_succeeded": False,
+                           "stages": {"text": {"status": "not_run"}}}
 
         if OCR_AVAILABLE and recognize_image is not None:
             try:
-                result = recognize_image(raw)
-                ocr_succeeded = True
-
-                # 即使后台预热曾经失败，只要本次识别成功，就同步刷新就绪状态。
-                global _ocr_ready
-                global _ocr_status
-                _ocr_ready = True
-                _ocr_status = (
-                    "已就绪（公式识别降级）"
-                    if result.get("warning")
-                    else "已就绪"
-                )
+                recognized = recognize_image(raw)
+                local_execution = _local_ocr_execution(recognized)
+                result = recognized
+                ocr_succeeded = local_execution["text_succeeded"]
+                _record_ocr_execution(local_execution, warning=bool(result.get("warning")))
+                if not ocr_succeeded:
+                    ocr_fallback_reason = "普通文字识别未完成"
             except OCRError as exc:
                 # 模糊纯图或文字识别失败均转交 Vision，不直接拒绝图片。
                 ocr_fallback_reason = str(exc)
+                local_execution["text_succeeded"] = False
+                local_execution["stages"]["text"] = {"status": "failed", "error_kind": type(exc).__name__}
+                _record_ocr_execution(local_execution)
                 print(f"普通 OCR 未得到可用文字，转纯图 Vision：{ocr_fallback_reason}")
             except Exception as exc:
                 # 模型初始化/临时资源异常可能没有包装成 OCRError。
                 # OCR 与 Vision 相互隔离，单路失败不应杀掉整次图片请求。
                 ocr_fallback_reason = "普通文字识别暂时不可用"
+                local_execution["text_succeeded"] = False
+                local_execution["stages"]["text"] = {"status": "failed", "error_kind": type(exc).__name__}
+                _record_ocr_execution(local_execution)
                 print(f"文字 OCR 异常，改走 Vision 兜底：{type(exc).__name__}")
         else:
             ocr_fallback_reason = "普通文字 OCR 当前不可用"
@@ -3754,6 +3856,27 @@ def ocr():
                 ocr_text, re.I
             ))
         )
+        # Once selected, the new pipeline owns this document's remote budget.
+        # Even an unexpected exception after its second send must not restart
+        # a legacy visual chain with a fresh, independent budget.
+        if (os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1"
+                and (possible_graph or any(r.get("role") == "figure"
+                    for r in (result.get("layout") or {}).get("regions", [])))):
+            try:
+                from ocr_nextgen import recognize_graph_document
+                nextgen = recognize_graph_document(raw, result)
+                if (not isinstance(nextgen, dict)
+                        or nextgen.get("recognition_status") not in ("complete", "partial", "failed", "not_graph")):
+                    raise ValueError("invalid_graph_pipeline_result")
+                if request_id and _take_ocr_cancelled(request_id):
+                    return jsonify({"cancelled": True})
+                return jsonify(_with_local_ocr_execution(nextgen, local_execution))
+            except Exception as nextgen_exc:
+                print(f"分阶段图识别未完成：{type(nextgen_exc).__name__}")
+                if request_id and _take_ocr_cancelled(request_id):
+                    return jsonify({"cancelled": True})
+                return jsonify(_graph_route_failure(type(nextgen_exc).__name__, result, local_execution)), 503
+
         if possible_graph and recognize_graphs is not None:
             try:
                 graph_cv = recognize_graphs(raw, text_hint=ocr_text,
@@ -3768,7 +3891,8 @@ def ocr():
         try:
             vision_result = analyze_image_structure(
                 raw, ocr_text=ocr_text, review_regions=vision_regions,
-                opencv_graphs=graph_cv
+                opencv_graphs=graph_cv,
+                retries=0 if os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1" else 1
             )
         except Exception as exc:
             print(f"Vision 增强层异常：{type(exc).__name__}")
@@ -4251,7 +4375,7 @@ def ocr():
                     "complete": False, "uncertain_edges": [],
                 })
 
-        return jsonify({
+        return jsonify(_with_local_ocr_execution({
             "text": display_text,
             "visual_text": visual_text,
             "graph_display_data": graph_display_data,
@@ -4270,7 +4394,7 @@ def ocr():
             ),
             "vision_used": bool(vision_result.get("ok")) if isinstance(vision_result, dict) else False,
             "warning": "；".join(warnings) if warnings else None,
-        })
+        }, local_execution))
 
     except OCRError as exc:
         return jsonify({
@@ -4306,12 +4430,11 @@ def health():
 
 @app.route("/ready", methods=["GET"])
 def ready():
-    return jsonify({
-        "web": "正常",
-        "ocr_available": OCR_AVAILABLE,
-        "ocr_ready": _ocr_ready,
-        "ocr_status": _ocr_status
-    })
+    with _ocr_health_lock:
+        state = {"web": "正常", "ocr_available": OCR_AVAILABLE,
+                 "ocr_ready": _ocr_ready, "ocr_status": _ocr_status,
+                 "ocr_stages": copy.deepcopy(_ocr_stages)}
+    return jsonify(state)
 
 
 if __name__ == "__main__":
