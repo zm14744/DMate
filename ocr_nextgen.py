@@ -14,7 +14,7 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
     if graph_pipeline not in ('staged','qwen-simple-candidate'):
         raise ValueError('Unknown graph pipeline')
     engine=recognize_staged
-    version='2026-10-23-qwen-stage-integrity-v13'
+    version='2026-10-26-qwen-stable-review-v13'
     if graph_pipeline=='qwen-simple-candidate':
         from graph_qwen_simple import recognize_simple
         engine=recognize_simple

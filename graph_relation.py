@@ -56,12 +56,14 @@ def _wrong_path_endpoints(edge,nodes,tolerance=.06):
                max(math.dist(first,v),math.dist(last,u)))>tolerance
 
 
-def recover_relations(graph,traces,*,review=None):
+def recover_relations(graph,traces,*,review=None,candidate_evidence=None):
     """Reselect competing routes after new evidence, preserving rejected audit.
 
     Relations are shared-ink conflicts and real-vertex intersections. Per-node
     reciprocal observations and pixel continuity supply local evidence. No degree
     or template completion. Reviews address IDs so parallel edges stay separate.
+    With candidate_evidence, graph.edges is the frozen review inventory. Do not
+    rematch traces after a path correction: that would change the reviewed IDs.
     """
     graph=canonical_graph(graph)
     nodes=graph['vertices']; ids={v['id'] for v in nodes}; candidates=[]
@@ -72,8 +74,11 @@ def recover_relations(graph,traces,*,review=None):
         # They must not acquire visual confidence merely by entering this list.
         c['_visual']=not ('pixels' in sources and not sources.intersection(
             {'node_read','qwen_review_new_stroke','qwen_image_read'}))
-        c['_pixel']=0.; candidates.append(c)
-    for ti,trace in enumerate(traces[:MAX_CANDIDATES]):
+        c['_pixel']=0.
+        if candidate_evidence is not None:
+            c.update(copy.deepcopy(candidate_evidence.get(c['id'],{})))
+        candidates.append(c)
+    for ti,trace in enumerate(traces[:MAX_CANDIDATES] if candidate_evidence is None else []):
         if trace.get('from') not in ids or trace.get('to') not in ids: continue
         path=path_points(trace.get('path'))
         if not path: continue
@@ -111,6 +116,8 @@ def recover_relations(graph,traces,*,review=None):
     for n,c in enumerate(candidates):
         if c['id'] in used: c['id']=f"route_{n+1}_{c['id']}"
         used.add(c['id'])
+    origins={c['id']:{k:copy.deepcopy(c[k]) for k in
+             ('_visual','_pixel','_arrow','_arrow_ambiguous') if k in c} for c in candidates}
     scores=[]; conflicts=defaultdict(list)
     for i,c in enumerate(candidates):
         c['_blocked']=bool(_intermediate_nodes(c['path'],c,nodes)) if c['path'] else False
@@ -181,4 +188,5 @@ def recover_relations(graph,traces,*,review=None):
                            and not unresolved and not graph['uncertain_edges'])
     graph=canonical_graph(graph); graph['relation_audit']=audit
     graph['_candidates']=[{k:v for k,v in c.items() if not k.startswith('_')} for c in candidates]
+    graph['_candidate_evidence']=origins
     return graph
