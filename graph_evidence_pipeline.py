@@ -263,6 +263,14 @@ def _edge_candidate(raw, eid, candidates):
     return cid
 
 
+def _edge_color(value):
+    """A bounded observed attribute; never a path/edge-count decision."""
+    if (not isinstance(value, str) or not value.strip() or len(value) > 32
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)):
+        raise ValueError('invalid_edge_color')
+    return value
+
+
 def _edge_observation(raw, index, reason):
     """Bounded diagnostics retain rejected records without trusting them."""
     def scalar(value):
@@ -278,7 +286,7 @@ def _edge_observation(raw, index, reason):
     if not isinstance(raw, dict):
         result['invalid_type'] = type(raw).__name__
         return result
-    for field in ('id', 'from', 'to', 'candidate_id', 'direction', 'style', 'edge_label', 'weight'):
+    for field in ('id', 'from', 'to', 'candidate_id', 'direction', 'style', 'edge_label', 'weight', 'color'):
         if field in raw:
             result[field] = scalar(raw[field])
     path = raw.get('path')
@@ -540,6 +548,8 @@ def apply_topology(response, initial, proposals, document, *, panels_complete):
                         'path': _route(raw.get('path')), 'style': style,
                         'weight': attribute(raw.get('weight')), 'edge_label': attribute(raw.get('edge_label')),
                         'status': 'pending', 'evidence': [{'source': 'qwen_all_sources_read'}]}
+                if 'color' in raw:
+                    edge['color'] = _edge_color(raw['color'])
                 if cid is not None:
                     seen_candidates.add(cid)
                 if cid is not None and candidate_by_id[cid].get('source_candidate'):

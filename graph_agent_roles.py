@@ -11,11 +11,12 @@ import copy
 import hashlib
 import json
 import math
+import re
 import unicodedata
 
 from graph_evidence_pipeline import (
     MAX_EDGES, MAX_PANELS, MAX_TOTAL_EDGES, _candidate_coverage, _coverage,
-    _edge_candidate, _route, decode_nodes,
+    _edge_candidate, _edge_color, _route, decode_nodes,
 )
 from graph_qwen_coordinates import attribute, box, identifier
 from graph_schema import display_graph, parallel_key
@@ -41,7 +42,11 @@ PAGE_VERTICES_PROMPT = _COMMON + '''你是page_vertices，只盘点整页子图�
 "directed":"unknown","weighted":"unknown","multigraph":"unknown","node_complete":true,
 "vertices":[{"id":"v1","label":null,"x":100,"y":100,"isolated_confirmed":false}]}]}。
 每个点必须定位在原图圆点/空心圈/其他明确标记中心，先找标记，再绑定标签；文字框中心不是节点坐标。
-保留可见标签；没有标签用label=null，内部ID不冒充原图文字。已有ID在一次盘点内唯一。
+original_image_size为完整原图[宽,高]；x/1000和y/1000分别是横向、纵向比例，宽高比不同也不能共用同一像素除数。
+marker_proposals是原像素工具的可错位置提示，坐标已转为相同original_1000；必须逐个结合原图形状和标签确认，不能按候选数量照抄节点清单。
+候选可能是字形孔、箭头或其他噪声，也可能漏点；工具未观察到连出笔画不代表孤立点。limits触顶或marker_review_context未决时重看指定原图位置。
+保留可见标签的大小写、上下标与原始字符，不能将字母统一大写/小写或把下标改成正文数字；没有标签用label=null，内部ID不冒充原图文字。已有ID在一次盘点内唯一。
+节点坐标取可见标记中心，不能使用邻近标签或OCR文本框中心；没有明确标记时保留不确定，不凭文字框强定位置。
 同一数学图的多个分量和孤立点仍属一图。版面框只是提议，一个框可有多图，不能以连通性代替分图。
 框包括外弧、自环、孤立点与图内标签。未标记交叉、水印、透印、网格和边名都不是顶点。
 类型true/false须有原图证据，不能确定填unknown。不得按常见图形模板补点。
@@ -50,33 +55,39 @@ PAGE_VERTICES_PROMPT = _COMMON + '''你是page_vertices，只盘点整页子图�
 BODY_PROMPT = _COMMON + '''你是body_text，独立逐行转录完整原页中的题干和公式，不读取其他角色猜出的正文，不解题、不列边。
 第一张完整原图，第二张文字裁图只放大原始像素；裁图编号由text_review_tiles与hint_ids对应，不能把OCR文字重绘当原文。
 返回{"role":"body_text","base_revision":0,"coordinate_space":"original_1000",
-"body_text":"完整题干或空串","body_complete":true,
+"body_complete":true,
 "regions":[{"id":"body_1","role":"body","text":"对应正文片段","bbox":[0,0,1000,100],"source":"original"}],
-"text_review":{"text":"同一完整题干","complete":true,"reason":"改动所依据的原图位置",
+"text_review":{"reason":"改动所依据的原图位置",
 "regions":[{"id":"t1","role":"body","text":"正文原文片段","graph_id":null,"reason":"原图依据","evidence":{"source":"original","bbox":[0,0,1000,100],"reason":"该处可见文字"}}]}}。
-顶层regions按阅读顺序定位实际文字片段；role可为body/graph_label/noise/uncertain，所有body片段须组成body_text。
+顶层regions按阅读顺序定位实际文字片段；role可为body/graph_label/noise/uncertain。唯一正文源是其中role=body的text，系统按顺序连接，不必再重复整段body_text或text_review.text/complete。
+若仍提供这些兼容字段，必须与regions和body_complete相同；只允许空白、成对数学定界符及显式上下标写法等价，不能出现真实字词或数字差异。
 text_review.regions必须逐项覆盖提供的全部text_hints ID，不得遗漏或添加未知hint ID；未被OCR找到的正文仍要补进顶层regions。
+hint保持原文且其格式等价片段在正文中唯一时，可省略该review行的text；改字或重复片段不能靠省略text猜测。没有text_hints时可省略text_review。
 页面角色与本角色并行，graph_label的graph_id可以暂为null，不能猜G1；由本地唯一空间归属和最终审核确认。
 删作noise/graph_label或改写hint文字必须说明原图依据；实质文字变化须有该hint位置的evidence，不能引用另一处标签。
 数字、上下标、希腊字母、中文数词、否定、数量词、通路/回路等逐字核对。
 不同位置的v3/v5可以不同，不能为符合题意或图中标签而改题干。看不清或顶部裁掉时body_complete=false，不能补全。
-无题干body_text为空且body区域为空；水印、顶点、边名、权值不是题干。公式可用LaTeX，但原意和字符必须保留。
+无题干时body区域为空；水印、顶点、边名、权值不是题干。公式可用LaTeX，但原意和字符必须保留。
 '''
 
 CONNECTION_PROMPT = _COMMON + '''你是connections，只沿原图检查固定顶点之间的真实笔画，不承担正文转录或独立终审，不解题。
 返回{"role":"connections","base_revision":0,"coordinate_space":"original_1000","panels_complete":true,
 "graphs":[{"id":"G1","node_inventory_confirmed":true,"inventory_complete":true,
-"edges":[{"id":"e1","from":"a","to":"b","direction":"undirected","style":"solid",
-"path":[[100,100],[800,800]],"candidate_id":"已有候选ID"}],
+"edges":[{"id":"e1","from":"a","to":"b","direction":"undirected","style":"solid","color":"unknown",
+"path":[[100,100],[800,800]]}],
 "reads":[{"vertex":"a","complete":true,"edge_ids":["e1"]},{"vertex":"b","complete":true,"edge_ids":["e1"]}],
-"candidate_verdicts":[["已有候选ID",true]],"retired_edges":[]}],"issues":[]}。
+"candidate_verdicts":[["已有候选ID",false]],"retired_edges":[]}],"issues":[]}。
 回答每一个给定图，reads逐项覆盖每个顶点的所有入边/出边；孤立点edge_ids为空。每条独立笔画一次，平行边有不同ID。
 固定节点ID、标签、坐标和图框，不能新增/删除/移动节点或换图；发现漏点/分图问题放issues并要求page_vertices重读。
+vertex_position_observations只是CV定位复核提示：结合原图检查固定位置，若该点不在实际节点上，必须给含vertex_ids与局部evidence的page_vertices问题，不能沿错误坐标编边；CV未检出本身不证明节点不存在。
 每条path沿实际整条线迹给2到128点，含曲线中段；起点对应from，终点对应to；无标记交叉继续原笔画，不能换线。
 direction=forward/undirected/unknown；forward从箭尾到箭尖；style=solid/dashed/dotted/unknown。
-candidate_id只引用同图给定候选，保持其无序端点对；未测出的新笔画可自定唯一边ID并省略candidate_id，无需特殊前缀。
-边ID、候选ID和印刷边名是不同字段；边名填edge_label，数值权重填weight。所有候选须有true/false/null判定。
-已有边ID保持稳定；确认为误识需显式retired_edges:[{id,reason,evidence}]，不能因漏写而丢弃。不能按端点去重。
+逐条观察原图可见颜色，color可用简短颜色名或色值，无法确认填unknown；颜色只是该独立线迹的属性，不能凭颜色合并、拆分或补出边数量。
+候选只是可错的辅助线迹提议；优先从原图独立给出真实path和端点，不必强挂candidate_id。只有确认是同图同一条路径且端点一致，才可显式关联该候选；不能改候选端点后继续借用它的凭证。
+省略candidate_id时使用独立唯一边ID，不复用候选ID以免触发兼容绑定。边ID、候选ID和印刷边名是不同字段；边名填edge_label，数值权重填weight。
+所有候选须有true/false/null判定：true表示采用且确实绑定该候选实例，false表示不采用该辅助提议，null表示未决；独立追踪的新笔画不因未绑定候选而丢弃。
+只有previous_graphs中已经提交的边属于已有边，ID保持稳定；确认为误识需显式retired_edges:[{id,reason,evidence}]，不能因漏写而丢弃。没有已有边时retired_edges省略或空数组。不能按端点去重。
+previous_rejection及其rejected_proposal是未提交的失败提案，不属于previous_graphs；候选ID和失败提案中的边都不能作为可退役边。按反馈修正完整提案，不能虚构退役历史。
 修改directed/weighted/multigraph须给type_evidence。inventory_complete只是本角色覆盖声明，不是最终验收结果。
 issues每项含{id,kind,target_role,graph_id,vertex_ids:[],edge_ids:[],hint_ids:[],reason,evidence}；
 target_role仅page_vertices/connections/attributes，漏点用位置证据和空vertex_ids说明，不编造未知ID。
@@ -106,6 +117,10 @@ REVIEW_PROMPT = _COMMON + '''你是structure_review，独立看完整原图与�
 "body_region_review":[{"id":"body_1","role":"body","text":"该独立正文区域原文","reason":"逐行原图依据","evidence":{"source":"original","bbox":[0,0,1000,100],"reason":"该正文区域自身位置"}}],
 "text_review":{"text":"最终完整题干或空串","complete":true,"reason":"实质修改的本位置原图依据","regions":[]},
 "issues":[]}。
+请求marker_position_checks只列当前必须视觉复核的节点；各对应graphs行增加vertex_position_review:[{"id":"指定顶点ID","position":[原图x1000,原图y1000],"verdict":"confirmed","evidence":{"source":"original","bbox":[点附近左,上,右,下],"reason":"该位置可见的标记或裁切依据"}}]，精确覆盖指定ID，不多不少、不重复。
+position必须回传当前冻结坐标（只允许舍入误差），不能直接改点。verdict只用confirmed/uncertain/needs_revision；后两者说明具体原因并要求page_vertices处理，不能为了通过审核填confirmed。
+每个位置evidence须紧贴同一子图中的该点，包含当前点且足够局部；另一处点、整页或大范围图框都不算定位证据。confirmed仅解除当前定位疑问，不代表CV检出成功或图已完整。
+没有列入marker_position_checks的普通节点无需增加此字段。marker_observations中未绑定强候选仅用于核对全图漏点或噪声，不能按候选数新增节点；CV漏检也不能单独证明节点不存在。
 text_review.regions逐项覆盖全部text_hints，格式与body_text角色相同；正文关键字符必须依据其自身原图位置，不引用另一处标签或题意。
 body_region_review另外逐项覆盖请求body_regions的全部ID（无则空数组），不能与OCR hint ID混用；body_coverage.observed_region_ids也须完整覆盖。
 保持的body片段必须组成最终text_review.text；实质改写、删为noise或改为graph_label须reason及该原body region位置的evidence。
@@ -129,11 +144,42 @@ SOLVER_PROMPT = '''你是solver，仅根据已通过独立审核的固定revisio
 '''
 
 
+def _audit_value(value, depth=0):
+    """Small protocol facts only; never serialize an arbitrary object/repr."""
+    if value is None or type(value) in (bool, int):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, str):
+        return value if len(value) <= 160 else value[:157] + '...'
+    if depth >= 3:
+        return '<bounded>'
+    if isinstance(value, (list, tuple)):
+        rows = [_audit_value(v, depth + 1) for v in value[:8]]
+        if len(value) > 8:
+            rows.append({'omitted_count': len(value) - 8})
+        return rows
+    if isinstance(value, dict):
+        rows = {str(k)[:64]: _audit_value(v, depth + 1)
+                for k, v in list(value.items())[:12]}
+        if len(value) > 12:
+            rows['omitted_count'] = len(value) - 12
+        return rows
+    return '<' + type(value).__name__[:40] + '>'
+
+
 class RoleProtocolError(ValueError):
     def __init__(self, code, **details):
         self.code = code
-        self.audit = {'accepted': False, 'issue': code, **details}
+        self.audit = {'accepted': False, 'issue': code}
+        self.add_context(**details)
         super().__init__(code)
+
+    def add_context(self, **details):
+        for key, value in list(details.items())[:12]:
+            if key not in self.audit and key not in ('accepted', 'issue'):
+                self.audit[key] = _audit_value(value)
+        return self
 
 
 def _check(condition, code, **details):
@@ -198,15 +244,18 @@ def _inventory(graphs):
 
 
 def _rows(rows, key, expected, code):
-    _check(isinstance(rows, list), code + '_missing')
+    _check(isinstance(rows, list), code + '_missing', expected_ids=sorted(expected),
+           expected_count=len(expected))
     found = {}
-    for row in rows:
-        _check(isinstance(row, dict), code + '_invalid')
+    for index, row in enumerate(rows):
+        _check(isinstance(row, dict), code + '_invalid', row_index=index)
         value = row.get(key)
-        _check(isinstance(value, str) and value in expected, code + '_unknown_id')
-        _check(value not in found, code + '_duplicate_id')
+        _check(isinstance(value, str) and value in expected, code + '_unknown_id', actual_id=value,
+               expected_ids=sorted(expected), expected_count=len(expected), row_index=index)
+        _check(value not in found, code + '_duplicate_id', actual_id=value, row_index=index)
         found[value] = row
-    _check(set(found) == set(expected), code + '_incomplete', missing=sorted(set(expected) - set(found)))
+    _check(set(found) == set(expected), code + '_incomplete', missing=sorted(set(expected) - set(found)),
+           expected_count=len(expected), actual_count=len(found))
     return found
 
 
@@ -234,37 +283,120 @@ def _compact(value):
     return ''.join(unicodedata.normalize('NFC', value).split())
 
 
-def _text_review(review, hints, graphs, *, bind_unassigned=False):
+_SUBSCRIPT_DIGITS = str.maketrans('₀₁₂₃₄₅₆₇₈₉', '0123456789')
+_SUPERSCRIPT_DIGITS = str.maketrans('⁰¹²³⁴⁵⁶⁷⁸⁹', '0123456789')
+
+
+def _format_signature(text):
+    """Comparison only: preserve words/numbers/index identity, without NFKC.
+
+    Explicit mathematical markup may differ between independent transcriptions.
+    This is not an OCR correction: v3, v_3 and v_5 remain different, as do x2
+    and x². No arbitrary TeX command, punctuation or semantic word is erased.
+    """
+    value = content_signature(text)
+    value = re.sub(r'\\\((.*?)\\\)', r'\1', value)
+    value = re.sub(r'\\\[(.*?)\\\]', r'\1', value)
+    value = re.sub(r'(?<!\\)\$\$([^$]*?)(?<!\\)\$\$', r'\1', value)
+    value = re.sub(r'(?<![\\$])\$(?!\$)([^$]*?)(?<!\\)\$(?!\$)', r'\1', value)
+    value = re.sub('[₀₁₂₃₄₅₆₇₈₉]+', lambda m: '_{' + m[0].translate(_SUBSCRIPT_DIGITS) + '}', value)
+    value = re.sub('[⁰¹²³⁴⁵⁶⁷⁸⁹]+', lambda m: '^{' + m[0].translate(_SUPERSCRIPT_DIGITS) + '}', value)
+    # In TeX an unbraced script applies to exactly one character, not a digit run.
+    value = re.sub(r'([_^])\s*([0-9A-Za-z])', r'\1{\2}', value)
+    return _compact(value)
+
+
+def reconcile_role_text(first, second, hints, graphs):
+    """Use the common reconciliation gate with format-only comparison copies.
+
+    Decoders still require located proof for real changes. The returned body
+    remains the original accepted transcription, never the comparison syntax.
+    """
+    first_copy, second_copy, hint_copy = copy.deepcopy(first), copy.deepcopy(second), copy.deepcopy(hints)
+    if isinstance(first_copy.get('body_text'), str):
+        first_copy['body_text'] = _format_signature(first_copy['body_text'])
+    review = second_copy.get('text_review')
+    raw_review = second.get('text_review')
+    if isinstance(review, dict):
+        if isinstance(review.get('text'), str):
+            review['text'] = _format_signature(review['text'])
+        if isinstance(review.get('regions'), list):
+            for row in review['regions']:
+                if isinstance(row, dict) and isinstance(row.get('text'), str):
+                    row['text'] = _format_signature(row['text'])
+    for hint in hint_copy.get('items', []):
+        if isinstance(hint, dict) and isinstance(hint.get('text'), str):
+            hint['text'] = _format_signature(hint['text'])
+    _, complete, audit = reconcile_text(first_copy, second_copy, hint_copy, graphs)
+    # Restore source spelling in the audit, too; normalized text is not evidence.
+    original_rows = {r.get('id'): r for r in raw_review.get('regions', []) if isinstance(r, dict)} \
+        if isinstance(raw_review, dict) and isinstance(raw_review.get('regions'), list) else {}
+    for row in audit.get('region_decisions', []):
+        source = original_rows.get(row.get('id'), {})
+        if 'text' in row and isinstance(source.get('text'), str):
+            row['text'] = source['text']
+    audit['comparison_policy'] = 'located_text_format_equivalence_v1'
+    text = (raw_review.get('text') if isinstance(raw_review, dict) else None)
+    if not isinstance(text, str):
+        text = first.get('body_text', '')
+    return text[:12000], complete, audit
+
+
+def _text_review(review, hints, graphs, *, bind_unassigned=False,
+                 canonical_text=None, canonical_complete=None):
+    hints, expected = _hints(hints)
+    if review is None and not expected and canonical_text is not None:
+        review = {'regions': []}
+    if isinstance(review, dict):
+        review = copy.deepcopy(review)
+        if canonical_text is not None:
+            review.setdefault('text', canonical_text)
+        if canonical_complete is not None:
+            review.setdefault('complete', canonical_complete)
     _check(isinstance(review, dict) and isinstance(review.get('text'), str)
            and len(review['text']) <= 12000 and type(review.get('complete')) is bool, 'invalid_text_review')
-    hints, expected = _hints(hints)
     rows = _rows(review.get('regions'), 'id', expected, 'text_review_regions')
     graph_ids = {g['id'] for g in graphs}
     issues, bindings = [], []
     for hid, row in rows.items():
         hint = expected[hid]; role = row.get('role')
-        _check(role in ('body', 'graph_label', 'noise', 'uncertain'), 'invalid_text_region_role')
-        if role == 'body':
-            text = row.get('text')
-            _check(isinstance(text, str) and text.strip() and _compact(text) in _compact(review['text']),
-                   'body_fragment_not_in_text', hint_id=hid)
-            if content_signature(text) != content_signature(hint['text']):
+        try:
+            _check(role in ('body', 'graph_label', 'noise', 'uncertain'), 'invalid_text_region_role')
+            if role == 'body':
+                text = row.get('text')
+                if 'text' not in row:
+                    fragment = _format_signature(hint['text'])
+                    whole = _format_signature(review['text'])
+                    first = whole.find(fragment) if fragment else -1
+                    # Count overlapping occurrences too (aa inside aaa).
+                    unique = first >= 0 and whole.find(fragment, first + 1) < 0
+                    _check(unique, 'body_fragment_text_not_derivable',
+                           match_count=0 if first < 0 else (1 if unique else 'multiple'))
+                    text = row['text'] = hint['text']
+                _check(isinstance(text, str) and len(text) <= 12000 and text.strip() and
+                       _format_signature(text) in _format_signature(review['text']),
+                       'body_fragment_not_in_text', expected={'body_text': review['text']}, actual={'text': text})
+                if _format_signature(text) != _format_signature(hint['text']):
+                    _reason(row.get('reason'))
+                    row['evidence'] = _located_hint_proof(row, hint)
+            elif role in ('noise', 'graph_label'):
                 _reason(row.get('reason'))
-                row['evidence'] = _located_hint_proof(row, hint)
-        elif role in ('noise', 'graph_label'):
-            _reason(row.get('reason'))
-            row['evidence'] = (_located_hint_proof(row, hint) if hint.get('bbox') is not None
-                               else _proof(row.get('evidence')))
-            if role == 'graph_label':
-                gid = row.get('graph_id')
-                _check(gid is None or gid in graph_ids, 'unknown_text_graph_id', hint_id=hid)
-                eligible = [g['id'] for g in graphs if _label_in_panel(hint, g)]
-                if gid is None and bind_unassigned and len(eligible) == 1:
-                    row['graph_id'] = eligible[0]
-                    bindings.append({'hint_id': hid, 'graph_id': eligible[0], 'source': 'unique_hint_panel_overlap'})
-                elif gid is None or gid not in eligible:
-                    row['role'] = 'uncertain'
-                    issues.append('text_graph_ownership_unresolved:' + hid)
+                row['evidence'] = (_located_hint_proof(row, hint) if hint.get('bbox') is not None
+                                   else _proof(row.get('evidence')))
+                if role == 'graph_label':
+                    gid = row.get('graph_id')
+                    _check(gid is None or gid in graph_ids, 'unknown_text_graph_id', hint_id=hid)
+                    eligible = [g['id'] for g in graphs if _label_in_panel(hint, g)]
+                    if gid is None and bind_unassigned and len(eligible) == 1:
+                        row['graph_id'] = eligible[0]
+                        bindings.append({'hint_id': hid, 'graph_id': eligible[0], 'source': 'unique_hint_panel_overlap'})
+                    elif gid is None or gid not in eligible:
+                        row['role'] = 'uncertain'
+                        issues.append('text_graph_ownership_unresolved:' + hid)
+        except RoleProtocolError as exc:
+            raise exc.add_context(hint_id=hid, expected_hint={'text': hint['text'], 'bbox': hint.get('bbox')},
+                                  actual_region={'role': role, 'text': row.get('text'),
+                                                 'graph_id': row.get('graph_id')})
         if row['role'] == 'uncertain':
             issues.append('uncertain_text_region:' + hid)
     return {**copy.deepcopy(review), 'regions': list(rows.values())}, issues, bindings
@@ -275,9 +407,7 @@ def decode_body_response(response, *, hints=None, graphs=None, previous=None, re
     value = _envelope(response, 'body_text', revision)
     graphs = graphs or []
     _check('graphs' not in value and 'edges' not in value, 'body_role_authority_violation')
-    text = value.get('body_text')
-    _check(isinstance(text, str) and len(text) <= 12000 and type(value.get('body_complete')) is bool,
-           'invalid_body_transcription')
+    _check(type(value.get('body_complete')) is bool, 'invalid_body_transcription')
     regions = value.get('regions')
     _check(isinstance(regions, list) and len(regions) <= MAX_HINTS, 'body_regions_missing')
     seen, fragments, region_issues = set(), [], []
@@ -294,19 +424,42 @@ def decode_body_response(response, *, hints=None, graphs=None, previous=None, re
             fragments.append(region['text'])
         elif region['role'] == 'uncertain':
             region_issues.append('uncertain_body_region:' + rid)
-    _check(_compact(''.join(fragments)) == _compact(text), 'body_regions_do_not_cover_transcription')
-    review, issues, bindings = _text_review(value.get('text_review'), hints, graphs, bind_unassigned=bool(graphs))
-    _check(content_signature(review['text']) == content_signature(text), 'body_review_text_mismatch')
-    _check(review['complete'] == value['body_complete'], 'body_review_complete_mismatch')
-    if previous is not None and content_signature(previous.get('body_text', '')) != content_signature(text):
+    # Located region text is the only authority. Compatibility fields are
+    # checked against it, never selected as a competing best transcription.
+    text = '\n'.join(fragments)
+    _check(len(text) <= 12000, 'invalid_body_transcription')
+    if 'body_text' in value:
+        supplied = value['body_text']
+        _check(isinstance(supplied, str) and len(supplied) <= 12000, 'invalid_body_transcription')
+        _check(_format_signature(text) == _format_signature(supplied),
+               'body_regions_do_not_cover_transcription', expected={'region_text': text},
+               actual={'body_text': supplied})
+    review, issues, bindings = _text_review(value.get('text_review'), hints, graphs,
+        bind_unassigned=bool(graphs), canonical_text=text, canonical_complete=value['body_complete'])
+    _check(_format_signature(review['text']) == _format_signature(text), 'body_review_text_mismatch',
+           expected={'region_text': text}, actual={'review_text': review['text']})
+    _check(review['complete'] == value['body_complete'], 'body_review_complete_mismatch',
+           expected=value['body_complete'], actual=review['complete'])
+    review['text'] = text
+    initial = {'body_text': text, 'body_complete': value['body_complete']}
+    if previous is not None:
+        _check(isinstance(previous, dict), 'invalid_previous_body_transcription')
+        initial = copy.deepcopy(previous)
+        # Prior raw responses may also omit the redundant body_text now.
+        if isinstance(initial.get('regions'), list):
+            prior_regions = initial['regions']
+            _check(all(isinstance(r, dict) and isinstance(r.get('text'), str) for r in prior_regions),
+                   'invalid_previous_body_transcription')
+            initial['body_text'] = '\n'.join(r['text'] for r in prior_regions if r.get('role') == 'body')
+        _check(isinstance(initial.get('body_text'), str), 'invalid_previous_body_transcription')
+    if previous is not None and _format_signature(initial['body_text']) != _format_signature(text):
         _reason(review.get('reason'))
         _check(bool(fragments) or text == '', 'body_revision_without_original_regions')
         # Emptying a previously nonempty body is a substantive deletion too.
         if not text:
             _proof(review.get('evidence'))
     local, _ = _hints(hints)
-    initial = previous if previous is not None else {'body_text': text, 'body_complete': value['body_complete']}
-    reconciled, complete, reconciliation = reconcile_text(initial, {'text_review': review}, local, graphs)
+    reconciled, complete, reconciliation = reconcile_role_text(initial, {'text_review': review}, local, graphs)
     issues = list(dict.fromkeys(region_issues + issues + reconciliation['issues']))
     return {'role': 'body_text', 'base_revision': revision, 'coordinate_space': 'original_1000',
             'body_text': reconciled,
@@ -349,16 +502,36 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
         for edge in edges:
             _check(isinstance(edge, dict), 'invalid_connection_edge')
             eid = identifier(edge.get('id'))
-            _check(eid not in seen, 'duplicate_connection_edge_id', graph_id=gid); seen.add(eid)
-            _check(edge.get('from') in vertices and edge.get('to') in vertices, 'unknown_connection_endpoint')
+            _check(eid not in seen, 'duplicate_connection_edge_id', graph_id=gid, edge_id=eid); seen.add(eid)
+            _check(edge.get('from') in vertices and edge.get('to') in vertices, 'unknown_connection_endpoint',
+                   graph_id=gid, edge_id=eid, expected_vertex_ids=sorted(vertices),
+                   actual={'from': edge.get('from'), 'to': edge.get('to')})
             _check(edge.get('direction') in ('forward', 'undirected', 'unknown'), 'invalid_connection_direction')
             _check(edge.get('style') in ('solid', 'dashed', 'dotted', 'unknown'), 'invalid_connection_style')
             _route(edge.get('path')); attribute(edge.get('weight')); attribute(edge.get('edge_label'))
-            cid = _edge_candidate(edge, eid, candidate_by_id)
+            if 'color' in edge:
+                try:
+                    _edge_color(edge['color'])
+                except ValueError:
+                    raise RoleProtocolError('invalid_connection_color', graph_id=gid, edge_id=eid,
+                                            actual=edge['color']) from None
+            try:
+                cid = _edge_candidate(edge, eid, candidate_by_id)
+            except (ValueError, TypeError) as exc:
+                code = str(exc) if str(exc) in ('unknown_candidate_reference', 'conflicting_candidate_reference') \
+                    else 'invalid_candidate_reference'
+                raise RoleProtocolError(code, graph_id=gid, edge_id=eid,
+                    candidate_id=edge.get('candidate_id'), expected_candidate_ids=sorted(candidate_by_id),
+                    expected_count=len(candidate_by_id)) from None
             if cid is not None:
                 candidate = candidate_by_id[cid]
-                _check({edge['from'], edge['to']} == {candidate['from'], candidate['to']}, 'changed_candidate_endpoints')
-                _check(cid not in used_candidates, 'duplicate_candidate_binding'); used_candidates.add(cid)
+                _check({edge['from'], edge['to']} == {candidate['from'], candidate['to']},
+                       'changed_candidate_endpoints', graph_id=gid, edge_id=eid, candidate_id=cid,
+                       expected={'from': candidate['from'], 'to': candidate['to']},
+                       actual={'from': edge['from'], 'to': edge['to']})
+                _check(cid not in used_candidates, 'duplicate_candidate_binding',
+                       graph_id=gid, edge_id=eid, candidate_id=cid)
+                used_candidates.add(cid)
                 bindings[eid] = cid
         retired = row.get('retired_edges', [])
         _check(isinstance(retired, list), 'invalid_retired_edges')
@@ -367,7 +540,11 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
         for retirement in retired:
             _check(isinstance(retirement, dict), 'invalid_retired_edge')
             eid = retirement.get('id')
-            _check(eid in old_ids and eid not in retired_ids and eid not in seen, 'unknown_or_duplicate_retired_edge')
+            _check(isinstance(eid, str) and eid in old_ids and eid not in retired_ids and eid not in seen,
+                   'unknown_or_duplicate_retired_edge', graph_id=gid, edge_id=eid,
+                   expected_retirable_ids=sorted(old_ids), expected_count=len(old_ids),
+                   actual={'retired_id': eid, 'already_retired': isinstance(eid, str) and eid in retired_ids,
+                           'still_proposed': isinstance(eid, str) and eid in seen})
             _reason(retirement.get('reason')); _proof(retirement.get('evidence')); retired_ids.add(eid)
         _check(old_ids <= seen | retired_ids, 'existing_edge_silently_omitted', graph_id=gid,
                missing=sorted(old_ids - seen - retired_ids))
@@ -514,7 +691,11 @@ def merge_attribute_response(graphs, response, *, revision=0):
             for field in ('weight', 'edge_label'):
                 if field in attrs: attribute(attrs[field])
             if 'color' in attrs:
-                _check(isinstance(attrs['color'], str) and len(attrs['color']) <= 32, 'invalid_attribute_color')
+                try:
+                    _edge_color(attrs['color'])
+                except ValueError:
+                    raise RoleProtocolError('invalid_attribute_color', graph_id=gid, edge_id=edge['id'],
+                                            actual=attrs['color']) from None
             changed = any((field == 'direction' and val == 'reverse') or edge.get(field) != val
                           for field, val in attrs.items())
             _edge_proof_location(proof, edge, graph, changed=changed)
@@ -572,10 +753,81 @@ def _review_issues(rows, fixed, hints, *, allowed_roles=EDIT_ROLES):
     return result
 
 
+def _position_requirements(checks, fixed):
+    if checks is None:
+        return {}
+    _check(isinstance(checks, (list, tuple)) and len(checks) <= MAX_PANELS,
+           'invalid_position_checks')
+    result = {}
+    for check in checks:
+        _check(isinstance(check, dict), 'invalid_position_checks')
+        gid = check.get('graph_id')
+        _check(isinstance(gid, str) and gid in fixed and gid not in result,
+               'unknown_or_duplicate_position_graph', graph_id=gid)
+        vids = check.get('vertex_ids')
+        known = {v['id'] for v in fixed[gid]['vertices']}
+        _check(isinstance(vids, list) and all(isinstance(v, str) and v in known for v in vids),
+               'unknown_position_check_vertex', graph_id=gid, actual=vids)
+        _check(len(vids) == len(set(vids)), 'duplicate_position_check_vertex', graph_id=gid)
+        result[gid] = set(vids)
+    return result
+
+
+def _review_positions(row, graph, required):
+    """Review only caller-selected advisory positions; never move a vertex."""
+    gid = graph['id']
+    try:
+        decisions = _rows(row.get('vertex_position_review', []), 'id', required, 'vertex_position_review')
+    except RoleProtocolError as exc:
+        raise exc.add_context(graph_id=gid)
+    nodes = {v['id']: v for v in graph['vertices']}
+    issues, observations = [], []
+    for vid, decision in decisions.items():
+        try:
+            _check(set(decision) <= {'id', 'position', 'verdict', 'evidence'}, 'position_review_mutation_forbidden')
+            verdict = decision.get('verdict')
+            _check(verdict in ('confirmed', 'uncertain', 'needs_revision'), 'invalid_position_review_verdict')
+            point = decision.get('position')
+            _check(isinstance(point, list) and len(point) == 2 and
+                   all(type(v) in (int, float) and math.isfinite(v) and 0 <= v <= 1000 for v in point),
+                   'invalid_reviewed_position')
+            expected = [float(nodes[vid]['x']) * 1000, float(nodes[vid]['y']) * 1000]
+            _check(all(abs(a-b) <= .51 for a, b in zip(point, expected)),
+                   'reviewed_position_changed', expected=expected, actual=point)
+            evidence = _proof(decision.get('evidence'))
+            bounds = evidence['bbox']
+            panel = [float(v) * 1000 for v in graph['bbox']]
+            x, y = expected
+            _check(bounds[0] - .51 <= x <= bounds[2] + .51 and
+                   bounds[1] - .51 <= y <= bounds[3] + .51,
+                   'position_evidence_does_not_contain_vertex', expected=expected, actual=bounds)
+            _check(panel[0] - .51 <= bounds[0] < bounds[2] <= panel[2] + .51 and
+                   panel[1] - .51 <= bounds[1] < bounds[3] <= panel[3] + .51,
+                   'position_evidence_wrong_panel', expected=panel, actual=bounds)
+            # A genuinely small/cropped panel can itself be a local view.
+            # Large panels still need an individual marker-sized observation.
+            limits = [max(32., min(160., (panel[i+2]-panel[i]) * .5)) for i in (0, 1)]
+            _check(bounds[2]-bounds[0] <= limits[0] and bounds[3]-bounds[1] <= limits[1],
+                   'position_evidence_not_localized', maximum_size=limits, actual=bounds)
+            observations.append({'graph_id': gid, 'vertex_id': vid, 'position': list(point),
+                                 'verdict': verdict, 'evidence': evidence,
+                                 'source': 'independent_visual_position_review'})
+            if verdict != 'confirmed':
+                iid = 'position_review_' + hashlib.sha256((gid+'\0'+vid).encode()).hexdigest()[:16]
+                issues.append({'id': iid, 'kind': 'vertex_position_' + verdict,
+                    'target_role': 'page_vertices', 'graph_id': gid, 'vertex_ids': [vid],
+                    'edge_ids': [], 'hint_ids': [], 'reason': evidence['reason'], 'evidence': evidence,
+                    'source': 'independent_visual_position_review'})
+        except RoleProtocolError as exc:
+            raise exc.add_context(graph_id=gid, vertex_id=vid)
+    return observations, issues
+
+
 def decode_review_response(response, graphs, *, body_complete, revision=0, required_issues=(),
-                           hints=None, body_regions=()):
+                           hints=None, body_regions=(), position_checks=None):
     value = _envelope(response, 'structure_review', revision)
     fixed = _inventory(graphs)
+    required_positions = _position_requirements(position_checks, fixed)
     _check(set(value) <= {'role', 'base_revision', 'coordinate_space', 'verdict', 'page_coverage',
                          'graphs', 'body_coverage', 'text_review', 'body_region_review', 'issues'},
            'review_mutation_forbidden')
@@ -584,9 +836,10 @@ def decode_review_response(response, graphs, *, body_complete, revision=0, requi
     _check(isinstance(page, dict) and type(page.get('complete')) is bool, 'page_coverage_missing')
     _ids(page.get('graph_ids'), fixed, 'page_graphs'); _proof(page.get('evidence'))
     rows = _rows(value.get('graphs'), 'id', fixed, 'review_graphs')
-    local_issues = []
+    local_issues, position_observations, position_issues = [], [], []
     for gid, row in rows.items():
-        _check(set(row) <= {'id', 'vertex_ids', 'edge_ids', 'verdict', 'evidence'}, 'review_mutation_forbidden')
+        _check(set(row) <= {'id', 'vertex_ids', 'edge_ids', 'verdict', 'evidence', 'vertex_position_review'},
+               'review_mutation_forbidden')
         _ids(row.get('vertex_ids'), {v['id'] for v in fixed[gid]['vertices']}, 'review_vertices')
         _ids(row.get('edge_ids'), {e['id'] for e in fixed[gid]['edges']}, 'review_edges')
         _check(row.get('verdict') in ('accept', 'needs_review'), 'invalid_panel_review_verdict')
@@ -595,6 +848,9 @@ def decode_review_response(response, graphs, *, body_complete, revision=0, requi
             _check(_label_in_panel({'bbox': proof['bbox']}, fixed[gid]), 'review_evidence_wrong_panel')
         if row['verdict'] != 'accept': local_issues.append('panel_review_unresolved:' + gid)
         graph = fixed[gid]
+        observed_positions, unresolved_positions = _review_positions(row, graph, required_positions.get(gid, set()))
+        position_observations.extend(observed_positions)
+        position_issues.extend(unresolved_positions)
         if (graph.get('complete') is not True or graph.get('uncertain_edges') or
                 any(type(graph.get(key)) is not bool for key in ('directed', 'weighted', 'multigraph')) or
                 any(e.get('status') != 'accepted' or e.get('direction') == 'unknown'
@@ -630,8 +886,9 @@ def decode_review_response(response, graphs, *, body_complete, revision=0, requi
         text_issues.extend(body_issues)
         fragments = [r['text'] for r in checked_body['regions'] if r.get('role') == 'body']
         if not body_issues:
-            _check(content_signature(_compact(''.join(fragments))) == content_signature(_compact(review['text'])),
-                   'review_body_regions_do_not_cover_text')
+            _check(_format_signature(''.join(fragments)) == _format_signature(review['text']),
+                   'review_body_regions_do_not_cover_text',
+                   expected={'region_text': '\n'.join(fragments)}, actual={'review_text': review['text']})
     issues = _review_issues(value.get('issues'), fixed, expected_hints)
     if page['complete'] is not True: local_issues.append('whole_page_review_incomplete')
     if body['complete'] is not True or review['complete'] is not True or body_complete is not True:
@@ -642,7 +899,7 @@ def decode_review_response(response, graphs, *, body_complete, revision=0, requi
     # cannot mask a required failure by reusing its ID with a different route.
     _check(isinstance(required_issues, (list, tuple)), 'invalid_required_issues')
     required, seen = [], set()
-    for issue in required_issues:
+    for issue in list(required_issues) + position_issues:
         if isinstance(issue, dict):
             iid = identifier(issue.get('id'))
             _check(issue.get('target_role') in ROLE_NAMES, 'invalid_required_issue_role')
@@ -672,7 +929,8 @@ def decode_review_response(response, graphs, *, body_complete, revision=0, requi
             'reviewed_inventory_sha256': _inventory_digest(graphs),
             'reviewed_body_signature': content_signature(review['text']),
             'audit': {'role': 'structure_review', 'base_revision': revision,
-                      'requested_verdict': value['verdict'], 'accepted': accepted}}
+                      'requested_verdict': value['verdict'], 'accepted': accepted,
+                      'position_checks': position_observations}}
 
 
 def decode_targeted_review(response, conflicts, *, revision=0):

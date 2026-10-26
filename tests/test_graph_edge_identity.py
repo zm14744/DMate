@@ -88,6 +88,43 @@ def test_unprefixed_white_detour_is_retained_pending_without_forged_metadata():
     assert result['coverage_audit']['rejected_edges'] == []
 
 
+def test_attribute_color_survives_fresh_original_pixel_revalidation():
+    from graph_agent_roles import merge_attribute_response
+    _, graphs = scene()
+    image = Image.new('RGB', (401, 401), 'white')
+    draw = ImageDraw.Draw(image)
+    draw.line(STRAIGHT, fill='#2244aa', width=3)
+    for x, y in STRAIGHT:
+        draw.ellipse((x-5, y-5, x+5, y+5), fill='black')
+    document = analyze_document(image)
+    original = apply(document, graphs, [edge('e1', color='unknown')])
+    assert original['complete']
+    response = {'role': 'attributes', 'base_revision': 0, 'coordinate_space': 'original_1000',
+                'graphs': [{'id': 'G', 'edges': [{'id': 'e1', 'verdict': 'confirmed',
+                    'attributes': {'color': '#2244aa'}, 'evidence': {'source': 'original',
+                    'bbox': [480, 485, 520, 515], 'reason': '该线迹中段的可见蓝色'}}]}], 'issues': []}
+    updated, audit = merge_attribute_response([original], response)
+    assert audit['requires_pixel_revalidation'] and updated[0]['edges'][0]['status'] == 'pending'
+    raw = copy.deepcopy(updated[0]['edges'][0])
+    raw['path'] = [[x*1000, y*1000] for x, y in raw['path']]
+    checked = apply(document, updated, [raw])
+    assert checked['complete'] and checked['edges'][0]['color'] == '#2244aa'
+    assert checked['edges'][0]['status'] == 'accepted'
+    raw['path'] = [[150, 500], [300, 200], [700, 200], [850, 500]]
+    unsupported = apply(document, updated, [raw])
+    assert not unsupported['complete'] and unsupported['edges'][0]['status'] == 'pending'
+    assert unsupported['edges'][0]['color'] == '#2244aa'
+
+
+@pytest.mark.parametrize('color', [None, True, 12, [], '', 'x'*33, 'red\nblue'])
+def test_topology_rejects_invalid_color_without_silently_discarding_attribute(color):
+    document, graphs = scene()
+    checked = apply(document, graphs, [edge('e1', color=color)])
+    assert not checked['complete'] and checked['edges'] == []
+    rejected = checked['coverage_audit']['rejected_edges'][0]
+    assert rejected['reason'] == 'invalid_edge_color' and 'color' in rejected
+
+
 def test_explicit_candidate_reference_keeps_output_id_and_source_reads():
     document, graphs = scene()
     candidate = measured(document, graphs)

@@ -3,7 +3,7 @@
 Closed marker holes and compact filled silhouettes are position proposals,
 never a node inventory or an edge answer. Small hollow markers do not require
 Hough's larger radius threshold. A proposal can move a supplied vertex only
-when its pixels, panel ownership and mutually unique local assignment agree.
+when its pixels, panel ownership and a unique bounded assignment agree.
 Unmarked/ambiguous vertices are retained unchanged. No OCR, label lookup,
 reference image, model call, graph-name rule or topology completion is used.
 """
@@ -20,7 +20,7 @@ from image_evidence import DocumentEvidence, analyze_document
 from graph_node_geometry import (circle_geometry, contains_points,
                                  estimate_marker_geometry, _compact_component_fraction)
 
-VERSION = 'original-marker-grounding-v1'
+VERSION = 'original-marker-grounding-v3'
 MAX_MARKERS = 256
 MAX_HOLES = 1024
 MAX_FILLED_COMPONENTS = 1024
@@ -108,6 +108,15 @@ def _radial_proof(ink, center, radius, *, hollow, signal=None):
     core, _ = _sample(ink, np.asarray(center)+DIRECTIONS*outer*.55)
     if not hollow and float(np.mean(core)) < .94:
         return None
+    # A rounded junction inside a printed digit can fill a small central
+    # patch without being a solid marker. Verify the wider inner disk as
+    # well; a true dot remains filled through three quarters of its radius.
+    # This uses original pixels and does not depend on the digit/label text.
+    wide_core = None
+    if not hollow:
+        wide_core, _ = _sample(ink, np.asarray(center)+DIRECTIONS*outer*.75)
+        if float(np.mean(wide_core)) < .94:
+            return None
     rim_radii = np.maximum(.5, outer-np.asarray([.75, 1.25, 1.75]))
     rim, _ = _sample(ink, np.asarray(center)+rim_radii[:, None, None]*DIRECTIONS)
     if hollow:
@@ -119,12 +128,16 @@ def _radial_proof(ink, center, radius, *, hollow, signal=None):
     clear_fraction = float(np.mean(~outside))
     if coverage < .82 or min(sectors) < .50 or clear_fraction < .56:
         return None
-    return {'radius_pixels': round(outer, 3), 'rim_support': round(coverage, 4),
+    proof = {'radius_pixels': round(outer, 3), 'rim_support': round(coverage, 4),
             'minimum_sector_support': round(min(sectors), 4),
             'exterior_clear_fraction': round(clear_fraction, 4),
             'radial_median_deviation': round(deviation, 4),
             'core_ink_fraction': round(float(np.mean(core)), 4),
             'rim_sampling': 'original_bilinear_coverage' if hollow else 'original_nearest_pixel'}
+    if wide_core is not None:
+        proof['solid_inner_disk_fraction'] = round(float(np.mean(wide_core)), 4)
+        proof['solid_inner_disk_radius_fraction'] = .75
+    return proof
 
 
 def _contour_roundness(contour):
@@ -181,7 +194,20 @@ def _large_outlines(document):
         geometry = estimate_marker_geometry(document.ink_mask, ink_distance, seed, [seed], document.work_size)
         refinement_limited |= any(value is True for key, value in geometry.get('limits', {}).items()
                                   if key.endswith('_cap_reached'))
-        if (geometry['confidence'] < .80 or not 12 <= geometry['radius_pixels'] <= 90
+        # The geometry confidence blends rim and exterior evidence; incoming
+        # arrows can reduce the latter even when a complete original rim is
+        # independently supported. Keep its usual threshold, with a second
+        # stricter full-rim consensus route instead of lowering it globally.
+        complete_rim_consensus = (
+            geometry.get('kind') == 'hollow_marker'
+            and support >= .95 and aligned_support >= .95
+            and geometry.get('boundary_visible_fraction', 0.) >= .99
+            and geometry.get('boundary_support', 0.) >= .86
+            and geometry.get('direct_boundary_ink_fraction', 0.) >= .50
+            and geometry.get('exterior_clear_fraction', 0.) >= .75
+            and geometry.get('center_offset_pixels', float('inf')) <= max(2., float(radius)*.05))
+        if ((geometry['confidence'] < .80 and not complete_rim_consensus)
+                or not 12 <= geometry['radius_pixels'] <= 90
                 or not .70*radius <= max(geometry['semiaxes_pixels']) <= 1.30*radius):
             continue
         found.append({'center': list(geometry['center_pixels']), 'radius': geometry['radius_pixels'],
@@ -190,6 +216,8 @@ def _large_outlines(document):
             # isolated node. Its conservative attraction bound is the radius.
             'connected_stroke': False,
             'evidence': {'source': 'original_gradient_and_ink_outline',
+                         'acceptance': ('geometry_and_original_gradient' if geometry['confidence'] >= .80
+                                        else 'independent_complete_rim_consensus'),
                          'original_gradient_rim_support': round(support, 4),
                          'original_radial_gradient_support': round(aligned_support, 4),
                          'geometry': geometry}})
@@ -300,8 +328,19 @@ def _pool(document):
         nested_glyph = False
         for outline in outlines:
             geometry = outline['evidence']['geometry']
-            if (candidate['radius'] >= .40*min(geometry['semiaxes_pixels'])
-                    or not contains_points(candidate['center'], geometry, margin=2.)):
+            if candidate['radius'] >= .40*min(geometry['semiaxes_pixels']):
+                continue
+            if not contains_points(candidate['center'], geometry, margin=2.):
+                # Converging arrow outlines at a large node's rim can enclose
+                # a tiny white hole just outside that rim. Its centre alone
+                # previously escaped the interior-glyph check. Keep a real
+                # touching small ring as an advisory proposal, but do not let
+                # this boundary ambiguity compete as a trusted node centre.
+                if candidate['kind'] == 'hollow' and contains_points(
+                        candidate['center'], geometry, margin=2.+candidate['radius']):
+                    candidate['confidence'] = min(candidate['confidence'], .65)
+                    candidate['advisory_only'] = True
+                    candidate['advisory_reason'] = 'touches_enclosing_outline_boundary'
                 continue
             small = circle_geometry(candidate['center'], candidate['radius'])
             compact = _compact_component_fraction(document.ink_mask, small, geometry)
@@ -363,6 +402,88 @@ def _point(vertex, size):
     return [x*max(size[0]-1, 1), y*max(size[1]-1, 1)]
 
 
+def _unique_remaining_assignments(relations):
+    """Accept only components having exactly one complete one-to-one match.
+
+    The left side contains ungrounded model vertices and the right side unused
+    original-pixel markers. A local match has already reserved its marker.
+    We do not greedily pick the nearest remaining mark or minimize a cost that
+    could silently choose between two plausible vertex identities. A complete
+    bipartite matching is unique exactly when it has no alternating cycle
+    (and no unused candidate on the right). The input is bounded by the vertex
+    and marker limits; this needs one matching and a linear cycle check per
+    component rather than enumerating assignments.
+    """
+    reverse = {}
+    for ni, candidates in relations.items():
+        for _, mi in candidates:
+            reverse.setdefault(mi, set()).add(ni)
+    pending = {ni for ni, candidates in relations.items() if candidates}
+    selected, rejected, components = {}, {}, []
+    while pending:
+        root = min(pending)
+        left, right, stack = set(), set(), [root]
+        while stack:
+            ni = stack.pop()
+            if ni in left:
+                continue
+            left.add(ni)
+            for _, mi in relations[ni]:
+                right.add(mi)
+                stack.extend(reverse[mi]-left)
+        pending -= left
+        record = {'vertices': len(left), 'markers': len(right), '_node_indices': sorted(left)}
+        # More candidate markers permit an alternative for at least one
+        # vertex. Fewer cannot cover the whole component without inventing or
+        # dropping a vertex. Neither is a uniqueness proof.
+        if len(right) != len(left):
+            reason = ('global_assignment_not_unique' if len(right) > len(left)
+                      else 'global_assignment_incomplete')
+            rejected.update({ni: reason for ni in left})
+            components.append({**record, 'status': reason})
+            continue
+        owner = {}
+
+        def augment(ni, seen):
+            for _, mi in relations[ni]:
+                if mi in seen:
+                    continue
+                seen.add(mi)
+                if mi not in owner or augment(owner[mi], seen):
+                    owner[mi] = ni
+                    return True
+            return False
+
+        if not all(augment(ni, set()) for ni in sorted(left)):
+            rejected.update({ni: 'global_assignment_incomplete' for ni in left})
+            components.append({**record, 'status': 'global_assignment_incomplete'})
+            continue
+        chosen = {ni: mi for mi, ni in owner.items()}
+        state = {}
+
+        def cyclic(ni):
+            if state.get(ni) == 1:
+                return True
+            if state.get(ni) == 2:
+                return False
+            state[ni] = 1
+            for _, mi in relations[ni]:
+                if mi != chosen[ni] and cyclic(owner[mi]):
+                    return True
+            state[ni] = 2
+            return False
+
+        if any(cyclic(ni) for ni in sorted(left)):
+            rejected.update({ni: 'global_assignment_not_unique' for ni in left})
+            components.append({**record, 'status': 'global_assignment_not_unique'})
+            continue
+        for ni, mi in chosen.items():
+            distance = next(distance for distance, marker in relations[ni] if marker == mi)
+            selected[ni] = (mi, distance)
+        components.append({**record, 'status': 'unique'})
+    return selected, rejected, components
+
+
 def ground_nodes(image, graphs, proposals=None):
     """Return a deep copy with only uniquely supported vertex positions moved.
 
@@ -370,8 +491,13 @@ def ground_nodes(image, graphs, proposals=None):
     are a diagnostic reuse contract, not trusted model input: the current image
     is independently remeasured and a changed/foreign pool is rejected. Passing
     an existing DocumentEvidence avoids decoding/preprocessing a second time.
-    Each graph gets marker_grounding and node_position_evidence. Unchanged
-    nodes retain their original x/y values, labels, IDs and inventory flags.
+    Each graph gets marker_grounding and node_position_evidence. A second
+    bounded assignment can recover a vertex whose erroneous model position
+    made its initial local search too small, but cannot steal an anchored
+    marker or choose between multiple assignments. Unchanged nodes retain
+    their original x/y values, labels, IDs and inventory flags. Diagnostics
+    expose untrusted vertices and unbound strong markers for visual rereading;
+    this function never changes node completeness or invents a node.
     """
     output = copy.deepcopy(graphs)
     document = _document(image)
@@ -385,14 +511,50 @@ def ground_nodes(image, graphs, proposals=None):
              for vi, vertex in enumerate(graph.get('vertices', []))]
     limited = any(value for key, value in pool['limits'].items() if key.endswith('_limit_reached'))
     if len(nodes) > MAX_VERTICES or limited:
-        for graph in output:
+        for gi, graph in enumerate(output):
+            affected = [vertex.get('id') for group, _, vertex, _ in nodes if group == gi]
             graph['marker_grounding'] = {'version': VERSION, 'status': 'not_applied',
                 'reason': 'vertex_budget_exceeded' if len(nodes) > MAX_VERTICES else 'marker_candidate_budget_exceeded',
-                'source': copy.deepcopy(pool['source']), 'limits': copy.deepcopy(pool['limits'])}
+                'source': copy.deepcopy(pool['source']), 'limits': copy.deepcopy(pool['limits']),
+                'review_required': True, 'position_evidence_only': True,
+                'untrusted_vertices': [{'vertex': vid, 'reason': 'grounding_budget_exceeded',
+                                        'classification': 'insufficient_pixel_evidence', 'blocks_connections': False}
+                                       for vid in affected[:MAX_VERTICES]],
+                'untrusted_vertex_count': len(affected),
+                'diagnostics_truncated': len(affected) > MAX_VERTICES,
+                'position_gate': {'hard_blocking': False, 'hard_conflicts': [],
+                    'visual_review_required': True, 'unobserved_vertices': affected[:MAX_VERTICES],
+                    'ambiguous_vertices': []}}
         return output
     bounds = [_box(graph) for graph in output]
+    owners = {mi: [gi for gi, box in enumerate(bounds) if box is not None
+                  and box[0]-.012 <= marker['x'] <= box[2]+.012
+                  and box[1]-.012 <= marker['y'] <= box[3]+.012]
+              for mi, marker in enumerate(items)}
+    # CV non-detection is not a proof of a wrong model position. Only an
+    # unusable coordinate or coincident identities claiming one visible mark
+    # creates a hard conflict here. Clipping, ambiguity and budget limits are
+    # observations for the original-image reviewer, not a connection veto.
+    identity_conflicts = {}
+    for mi, marker in enumerate(items):
+        if marker['confidence'] < .84 or len(owners[mi]) != 1:
+            continue
+        gi = owners[mi][0]
+        centre = [marker['x']*(size[0]-1), marker['y']*(size[1]-1)]
+        claimants = [ni for ni, (group, _, _, point) in enumerate(nodes)
+                     if group == gi and point is not None
+                     and math.dist(point, centre) <= max(3., marker['radius_pixels']*.5)]
+        for index, ni in enumerate(claimants):
+            for other in claimants[index+1:]:
+                if (nodes[ni][2].get('id') != nodes[other][2].get('id')
+                        and math.dist(nodes[ni][3], nodes[other][3]) <= 3.):
+                    conflict = {'kind': 'shared_marker_identity', 'marker_id': marker['id'],
+                        'vertex_ids': [nodes[ni][2].get('id'), nodes[other][2].get('id')],
+                        'reason': 'distinct_vertex_identities_claim_one_original_marker'}
+                    identity_conflicts.setdefault(ni, []).append(conflict)
+                    identity_conflicts.setdefault(other, []).append(conflict)
     relations, reverse = {}, {}
-    reasons = {}
+    reasons, local_reaches, nearest_nodes = {}, {}, {}
     for ni, (gi, vi, vertex, point) in enumerate(nodes):
         if point is None:
             reasons[ni] = 'invalid_position'
@@ -402,18 +564,18 @@ def ground_nodes(image, graphs, proposals=None):
             continue
         nearest = min((math.dist(point, other[3]) for oi, other in enumerate(nodes)
                        if oi != ni and other[0] == gi and other[3] is not None), default=diagonal*.20)
+        nearest_nodes[ni] = nearest
         # A broad displacement bound only limits search. It is never evidence
         # of a marker and cannot override pixel/ambiguity/ownership checks.
         reach = min(diagonal*.10, max(8., nearest*.70))
+        local_reaches[ni] = reach
         candidates = []
         for mi, marker in enumerate(items):
             if marker['confidence'] < .84:
                 continue
             radius = marker['radius_pixels']
             mx, my = marker['x'], marker['y']
-            owners = [index for index, box in enumerate(bounds) if box is not None
-                      and box[0]-.012 <= mx <= box[2]+.012 and box[1]-.012 <= my <= box[3]+.012]
-            if owners != [gi]:
+            if owners[mi] != [gi]:
                 continue  # Overlapping panels do not get arbitrary ownership.
             distance = math.dist(point, [mx*(size[0]-1), my*(size[1]-1)])
             cap = reach if marker['connected_stroke'] else min(reach, max(3., radius*1.25))
@@ -437,13 +599,64 @@ def ground_nodes(image, graphs, proposals=None):
             reasons[ni] = 'ambiguous_one_to_one_assignment'
             continue
         selected[ni] = (mi, distance)
+    local_selected = set(selected)
+    assigned_markers = {mi for mi, _ in selected.values()}
+    broad_relations = {}
+    for ni, (gi, _, _, point) in enumerate(nodes):
+        if ni in selected or ni not in local_reaches:
+            continue
+        # Coincident/nearly coincident model identities are an inventory
+        # ambiguity. Removing an anchored competitor must not make one of
+        # these identities silently jump to a different visible mark.
+        if nearest_nodes[ni] <= 3.:
+            reasons[ni] = 'ambiguous_one_to_one_assignment'
+            continue
+        candidates = []
+        for mi, marker in enumerate(items):
+            if mi in assigned_markers or marker['confidence'] < .84 or owners[mi] != [gi]:
+                continue
+            radius = marker['radius_pixels']
+            distance = math.dist(point, [marker['x']*(size[0]-1), marker['y']*(size[1]-1)])
+            # Preserve the existing absolute displacement bound. Only the
+            # nearest-MODEL-node density restriction is removed at this stage;
+            # isolated text circles retain their small radius-based bound.
+            cap = diagonal*.10 if marker['connected_stroke'] else min(
+                local_reaches[ni], max(3., radius*1.25))
+            if distance <= cap and radius < max(4., nearest_nodes[ni]*.40):
+                candidates.append((distance, mi))
+        broad_relations[ni] = sorted(candidates)
+    recovered, rejected, components = _unique_remaining_assignments(broad_relations)
+    reasons.update(rejected)
+    selected.update(recovered)
+    assigned_markers = {mi for mi, _ in selected.values()}
     for gi, graph in enumerate(output):
-        evidence, unresolved = [], []
+        evidence, unresolved, untrusted = [], [], []
         for ni, (group, vi, vertex, point) in enumerate(nodes):
             if group != gi:
                 continue
             if ni not in selected:
-                unresolved.append({'vertex': vertex.get('id'), 'reason': reasons.get(ni, 'assignment_not_unique')})
+                row = {'vertex': vertex.get('id'), 'reason': reasons.get(ni, 'assignment_not_unique')}
+                unresolved.append(row)
+                classification = ('invalid_position' if point is None else
+                                  'shared_marker_identity' if ni in identity_conflicts else
+                                  'ambiguous_pixel_assignment' if 'ambiguous' in row['reason'] or 'not_unique' in row['reason']
+                                  else 'pixel_unobserved')
+                nearby = sorted((math.dist(point, [m['x']*(size[0]-1), m['y']*(size[1]-1)]), mi)
+                    for mi, m in enumerate(items) if point is not None and m['confidence'] >= .84 and gi in owners[mi])
+                nearest_marker = None
+                if nearby:
+                    distance, mi = nearby[0]
+                    marker = items[mi]
+                    nearest_marker = {'marker_id': marker['id'], 'distance_work_pixels': round(distance, 3),
+                        'x': marker['x'], 'y': marker['y'], 'radius_pixels': marker['radius_pixels'],
+                        'already_bound': mi in assigned_markers,
+                        'panel_owners': [output[index].get('id') for index in owners[mi]]}
+                untrusted.append({**row, 'position': [vertex.get('x'), vertex.get('y')],
+                    'classification': classification,
+                    'blocks_connections': classification in ('invalid_position', 'shared_marker_identity'),
+                    'local_search_radius_work_pixels': round(local_reaches[ni], 3) if ni in local_reaches else None,
+                    'nearest_strong_marker': nearest_marker,
+                    'broad_candidate_ids': [items[mi]['id'] for _, mi in broad_relations.get(ni, [])]})
                 continue
             mi, distance = selected[ni]
             marker = items[mi]
@@ -452,12 +665,56 @@ def ground_nodes(image, graphs, proposals=None):
             evidence.append({'vertex': vertex.get('id'), 'source': VERSION,
                 'marker_id': marker['id'], 'node_position': before, 'pixel_position': after,
                 'shift_work_pixels': round(distance, 3), 'kind': marker['kind'],
-                'confidence': round(marker['confidence'], 4), 'pixel_evidence': copy.deepcopy(marker['evidence'])})
+                'confidence': round(marker['confidence'], 4), 'pixel_evidence': copy.deepcopy(marker['evidence']),
+                'assignment': {'method': 'mutual_local' if ni in local_selected else 'unique_remaining_component',
+                    'local_search_radius_work_pixels': round(local_reaches[ni], 3),
+                    'absolute_search_radius_work_pixels': round(diagonal*.10, 3),
+                    'reserved_local_anchors': len(local_selected)}})
             vertex['x'], vertex['y'] = after
         prior = graph.get('node_position_evidence')
         graph['node_position_evidence'] = (copy.deepcopy(prior) if isinstance(prior, list) else [])+evidence
-        graph['marker_grounding'] = {'version': VERSION, 'status': 'grounded' if not unresolved else 'partial',
+        unbound = []
+        for mi, marker in enumerate(items):
+            if mi in assigned_markers or marker['confidence'] < .84 or gi not in owners[mi]:
+                continue
+            unbound.append({'marker_id': marker['id'], 'x': marker['x'], 'y': marker['y'],
+                'work_point': [round(marker['x']*(size[0]-1), 3), round(marker['y']*(size[1]-1), 3)],
+                'radius_pixels': marker['radius_pixels'], 'kind': marker['kind'],
+                'confidence': round(marker['confidence'], 4), 'connected_stroke': marker['connected_stroke'],
+                'panel_owners': [output[index].get('id') for index in owners[mi]],
+                'reason': 'ambiguous_panel_ownership' if len(owners[mi]) > 1 else 'no_unique_vertex_assignment',
+                'review_relevant': bool(owners[mi] == [gi] and (
+                    marker['connected_stroke']
+                    or marker['evidence'].get('source') == 'original_gradient_and_ink_outline'
+                    or (marker['kind'] == 'hollow' and marker['radius_pixels'] >= 12
+                        and marker['evidence'].get('source') == 'closed_original_ink_hole')))})
+        review_required = bool(untrusted or any(row['review_relevant'] for row in unbound))
+        hard_conflicts = []
+        for ni, (group, _, vertex, point) in enumerate(nodes):
+            if group != gi:
+                continue
+            if point is None:
+                hard_conflicts.append({'kind': 'invalid_position', 'vertex_ids': [vertex.get('id')],
+                                       'reason': 'coordinate_missing_nonfinite_or_out_of_bounds'})
+            for conflict in identity_conflicts.get(ni, []):
+                if conflict not in hard_conflicts:
+                    hard_conflicts.append(copy.deepcopy(conflict))
+        graph_components = [{key: copy.deepcopy(value) for key, value in component.items() if not key.startswith('_')}
+                            for component in components if nodes[component['_node_indices'][0]][0] == gi]
+        graph['marker_grounding'] = {'version': VERSION, 'status': 'partial' if review_required else 'grounded',
             'grounded_vertices': len(evidence), 'retained_vertices': unresolved,
             'source': copy.deepcopy(pool['source']), 'limits': copy.deepcopy(pool['limits']),
+            'untrusted_vertices': untrusted, 'untrusted_vertex_count': len(untrusted),
+            'unbound_strong_markers': unbound, 'marker_scope': 'own_or_overlapping_panel',
+            'review_required': review_required,
+            'position_gate': {'hard_blocking': bool(hard_conflicts), 'hard_conflicts': hard_conflicts,
+                'visual_review_required': review_required,
+                'unobserved_vertices': [row['vertex'] for row in untrusted if row['classification'] == 'pixel_unobserved'],
+                'ambiguous_vertices': [row['vertex'] for row in untrusted if row['classification'] in (
+                    'ambiguous_pixel_assignment', 'shared_marker_identity')]},
+            'assignment_summary': {'local_assignments': sum(ni in local_selected for ni, node in enumerate(nodes) if node[0] == gi),
+                'global_unique_assignments': sum(ni in recovered for ni, node in enumerate(nodes) if node[0] == gi),
+                'absolute_search_radius_work_pixels': round(diagonal*.10, 3),
+                'components': graph_components},
             'position_evidence_only': True}
     return output
