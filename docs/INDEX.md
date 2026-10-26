@@ -1,5 +1,7 @@
 # 文档索引
 
+- [`DMATE_RECOGNITION_ARCHITECTURE.md`](DMATE_RECOGNITION_ARCHITECTURE.md)：当前图论图片识别统一架构；五类图像问题、Layout/Small、OpenCV/sknw、模型分工、局部修复与语义验收，以此处状态表区分已上线和接入中能力
+
 - [`../README.md`](../README.md)：DMate 总览、核心功能、账号同步与运行方式
 - [`PROJECT_INFO.md`](PROJECT_INFO.md)：项目基本信息与产品定位
 - [`ARCHITECTURE.md`](ARCHITECTURE.md)：教学、模型路由、账号、云同步与数据流

@@ -61,7 +61,7 @@ class AgentBudget:
         # Leave time for local OCR and conservative text cleanup under the
         # existing 300-second Gunicorn request limit.
         return cls(seconds=bounded_setting('DMATE_AGENT_SECONDS', 230, 60, 245),
-                   calls=bounded_setting('DMATE_AGENT_MAX_CALLS', 14, 5, 24),
+                   calls=bounded_setting('DMATE_AGENT_MAX_CALLS', 16, 5, 24),
                    call_seconds=bounded_setting('DMATE_AGENT_CALL_SECONDS', 75, 15, 90),
                    source_sha256=source_sha256, task_id=task_id, cancelled=cancelled)
 

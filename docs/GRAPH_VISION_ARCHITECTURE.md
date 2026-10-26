@@ -1,5 +1,7 @@
 # DMate 图论图形识别：像素证据 + 视觉复核架构（2026-10-22）
 
+> 本文为 10 月 22 日历史设计。当前统一架构、模型与工具分工和实施状态见 [DMATE_RECOGNITION_ARCHITECTURE.md](DMATE_RECOGNITION_ARCHITECTURE.md)。
+
 ## 范围及保护原则
 
 本改动只涉及离散数学图论图片识别，不更改账户、聊天、解题、知识图谱、客户端、下载或原有 OCR 文字处理逻辑。视觉模型固定使用原有的 `qwen3-vl-plus` 和既有 `DASHSCOPE_API_KEY`。不创建昂贵的图论题库 GitHub Actions。

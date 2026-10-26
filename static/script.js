@@ -1944,6 +1944,10 @@ function mergeCloudMessage(left, right) {
     ]) {
         if (!merged[key] && left?.[key]) merged[key] = left[key];
     }
+    const semanticContext = sanitizeSemanticContext(right?.semanticContext, merged)
+        || sanitizeSemanticContext(left?.semanticContext, merged);
+    if (semanticContext) merged.semanticContext = semanticContext;
+    else delete merged.semanticContext;
     return merged;
 }
 
@@ -9343,6 +9347,115 @@ function getFriendlyInputSource(value) {
 // -----------------------------
 // 本地持久化
 // -----------------------------
+// OCR semantic snapshots keep edge instances and literal labels. They never
+// carry image coordinates, paths, pixel proofs, or arbitrary worker metadata.
+function sanitizeSemanticContext(value, message = null) {
+    const object = item => item && typeof item === "object" && !Array.isArray(item);
+    const string = (item, limit, nonempty = false) => typeof item === "string"
+        && item.length <= limit && (!nonempty || Boolean(item.trim()));
+    const literal = (item, limit) => item === null || item === undefined || string(item, limit);
+    if (!object(value) || !object(value.document)
+        || !string(value.source_sha256, 64) || !/^[a-f0-9]{64}$/i.test(value.source_sha256)
+        || !string(value.question_text, 24000, true)
+        || !string(value.rendered_question_text, 24000, true)
+        || !string(value.document.body_text, 24000)
+        || !Array.isArray(value.document.graphs) || value.document.graphs.length > 64) return null;
+    const graphs = [];
+    for (const graph of value.document.graphs) {
+        if (!object(graph) || !string(graph.id, 128, true) || !literal(graph.name, 256)
+            || !Array.isArray(graph.vertices) || graph.vertices.length > 100
+            || !Array.isArray(graph.edges) || graph.edges.length > 300) return null;
+        const clean = { id: graph.id, name: graph.name ?? null, complete: graph.complete === true,
+            vertices: [], edges: [] };
+        for (const key of ["directed", "weighted", "multigraph"]) {
+            if (graph[key] !== undefined && typeof graph[key] !== "boolean" && graph[key] !== "unknown") return null;
+            clean[key] = graph[key] ?? "unknown";
+        }
+        if (graph.direction_mode !== undefined) {
+            if (!string(graph.direction_mode, 32)) return null;
+            clean.direction_mode = graph.direction_mode;
+        }
+        for (const vertex of graph.vertices) {
+            if (!object(vertex) || !string(vertex.id, 128, true) || !literal(vertex.label, 256)) return null;
+            const node = { id: vertex.id, label: vertex.label ?? null };
+            if (typeof vertex.isolated_confirmed === "boolean") node.isolated_confirmed = vertex.isolated_confirmed;
+            clean.vertices.push(node);
+        }
+        for (const edge of graph.edges) {
+            if (!object(edge) || !string(edge.id, 128, true)
+                || !string(edge.from, 128, true) || !string(edge.to, 128, true)
+                || !["forward", "undirected", "unknown"].includes(edge.direction)
+                || !literal(edge.edge_label, 256) || !literal(edge.color, 64) || !literal(edge.style, 64)
+                || !(edge.weight === null || edge.weight === undefined || string(edge.weight, 256)
+                    || (typeof edge.weight === "number" && Number.isFinite(edge.weight)))) return null;
+            const item = { id: edge.id, from: edge.from, to: edge.to, direction: edge.direction,
+                weight: edge.weight ?? null, edge_label: edge.edge_label ?? null,
+                color: edge.color ?? null, style: edge.style ?? null,
+                status: edge.status === "accepted" ? "accepted" : "pending" };
+            for (const key of ["multiplicity", "parallel_count"]) {
+                if (edge[key] !== undefined) {
+                    if (!Number.isInteger(edge[key]) || edge[key] < 1 || edge[key] > 300) return null;
+                    item[key] = edge[key];
+                }
+            }
+            clean.edges.push(item);
+        }
+        graphs.push(clean);
+    }
+    const result = { document: { body_text: value.document.body_text, graphs },
+        question_text: value.question_text, rendered_question_text: value.rendered_question_text,
+        source_sha256: value.source_sha256.toLowerCase() };
+    if (message !== null && (message?.role !== "user" || message?.source !== "ocr"
+        || typeof message.text !== "string" || typeof message.apiText !== "string"
+        || extractOcrQuestionPayload(message.text) !== result.rendered_question_text
+        || !message.apiText.includes(result.question_text))) return null;
+    try {
+        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 200000) return null;
+    } catch (_error) { return null; }
+    return result;
+}
+
+function buildOcrSemanticContext(data, text, questionText, internalQuestionText) {
+    return sanitizeSemanticContext({
+        document: { body_text: text, graphs: data?.graph_structures },
+        question_text: internalQuestionText,
+        rendered_question_text: extractOcrQuestionPayload(questionText),
+        source_sha256: data?.diagnostics?.semantic_workflow?.source_sha256
+    });
+}
+
+function semanticContextForRequest(session, targetCandidate, apiMessages, options = {}) {
+    if (!Array.isArray(session?.messages) || !Array.isArray(apiMessages)
+        || options.exerciseRequest || options.retestGeneration) return undefined;
+    let latestIndex = -1;
+    for (let index = session.messages.length - 1; index >= 0; index -= 1) {
+        const entry = session.messages[index];
+        if (entry?.role === "user" && !entry.isError && !entry.isNotice
+            && typeof entry.text === "string" && entry.text.trim()) { latestIndex = index; break; }
+    }
+    if (latestIndex < 0) return undefined;
+    const latest = session.messages[latestIndex];
+    if (latest.isRetestPrompt || latest.isRetestAnswer) return undefined;
+    let selected = null;
+    if (latest.source === "ocr") selected = latest;
+    else {
+        // New typed problems and generated exercises never inherit an old
+        // image just because a previous graph remains in the same session.
+        if ((latest.manualIsQuestion === true || looksLikeActualLearningProblem(latest))
+            && !isQuestionNavigationFollowUp(latest.text)) return undefined;
+        if (!Number.isInteger(targetCandidate?.index) || targetCandidate.index < 0
+            || targetCandidate.index >= latestIndex || targetCandidate.role !== "user") return undefined;
+        selected = session.messages[targetCandidate.index];
+    }
+    const context = sanitizeSemanticContext(selected?.semanticContext, selected);
+    if (!context) return undefined;
+    if (selected !== latest && targetCandidate.text !== context.rendered_question_text) return undefined;
+    const current = [...apiMessages].reverse().find(row => row?.role === "user");
+    if (typeof current?.content !== "string" || !(current.content.includes(context.question_text)
+        || current.content.includes(context.rendered_question_text))) return undefined;
+    return context;
+}
+
 function saveState() {
     if (shouldPersistClientState()) {
         try {
@@ -9414,6 +9527,7 @@ function loadState() {
                     apiText: typeof message.apiText === "string"
                         ? message.apiText
                         : undefined,
+                    semanticContext: sanitizeSemanticContext(message.semanticContext, message) || undefined,
                     generatedExercise: Boolean(
                         message.generatedExercise
                     ),
@@ -13139,6 +13253,10 @@ async function requestAiReply(session) {
             && session.solverEffortPreference?.effort === "high"
             ? "high" : undefined;
 
+        const apiMessages = buildApiMessages(session, requestTargetCandidate);
+        const semanticContext = semanticContextForRequest(session, requestTargetCandidate, apiMessages, {
+            exerciseRequest: latestIsExerciseRequest, retestGeneration: latestIsRetestGeneration
+        });
         const response = await fetch("/chat", {
             method: "POST",
             signal: activeRequest.controller.signal,
@@ -13146,10 +13264,8 @@ async function requestAiReply(session) {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                messages: buildApiMessages(
-                    session,
-                    requestTargetCandidate
-                ),
+                messages: apiMessages,
+                semantic_context: semanticContext,
                 // 强约束：明确出题请求由前端直接告诉后端。
                 // 后端据此必须返回 generated_question + generated_teaching，
                 // 不再只靠自然语言二次猜测“这是不是出题”。
@@ -14145,7 +14261,8 @@ async function handleImageSelected(event) {
             text: combinedText,
             source: "ocr",
             ocrIsQuestion,
-            apiText
+            apiText,
+            semanticContext: buildOcrSemanticContext(data, text, questionText, internalQuestionText) || undefined
         });
 
         maybeAutoNameSession(
