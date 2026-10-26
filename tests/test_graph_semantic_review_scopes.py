@@ -22,6 +22,64 @@ def test_readonly_verifier_never_supplies_document_replacement():
         _verification_issues(document(), original)
 
 
+def test_confirmed_and_withdrawn_observations_do_not_schedule_repairs():
+    response = {'issues': [
+        {'verdict': 'confirmed', 'scope': 'graph', 'graph_id': 'G1', 'field': 'edges', 'message': '无误'},
+        {'verdict': 'withdrawn', 'scope': 'document', 'message': '复看后无有效差异'},
+        {'verdict': 'change_required', 'scope': 'graph', 'graph_id': 'G1', 'field': 'weight',
+         'edge_ids': ['e1'], 'message': '此边印刷权值需要重读'}]}
+    result = _verification_issues(response, document())
+    assert len(result) == 1 and result[0]['edge_ids'] == ['e1']
+
+
+def test_nonempty_review_without_explicit_verdict_is_not_silently_actionable():
+    with pytest.raises(ValueError, match='verdict'):
+        _verification_issues({'issues': [
+            {'scope': 'graph', 'graph_id': 'G1', 'field': 'edges', 'message': '无有效差异'}]}, document())
+
+
+def test_edge_repair_preserves_isolated_vertices_labels_and_panel_name():
+    old = document()
+    old['graphs'][0]['vertices'].append({'id': 'isolated', 'label': 'V₅'})
+    new = copy.deepcopy(old)
+    new['graphs'][0]['vertices'] = [{'id': 'a', 'label': 'wrong'}, {'id': 'b'}]
+    new['graphs'][0]['name'] = 'Wrong panel'
+    new['graphs'][0]['edges'].pop()
+    result, audit = _scope_repair(old, new, [
+        {'scope': 'graph', 'graph_id': 'G1', 'field': 'edges', 'source_ids': ['a']}])
+    assert result['graphs'][0]['vertices'] == old['graphs'][0]['vertices']
+    assert result['graphs'][0]['name'] == old['graphs'][0]['name']
+    assert result['graphs'][0]['edges'] == new['graphs'][0]['edges']
+    assert audit['field_permissions'][0]['mode'] == 'edges_only'
+
+
+def test_edge_repair_cannot_invent_an_unreported_node():
+    old = document()
+    new = copy.deepcopy(old)
+    new['graphs'][0]['vertices'].append({'id': 'new'})
+    new['graphs'][0]['edges'].append({'id': 'new_edge', 'from': 'a', 'to': 'new'})
+    result, audit = _scope_repair(old, new, [
+        {'scope': 'graph', 'graph_id': 'G1', 'field': 'edges'}])
+    assert result['graphs'] == old['graphs']
+    assert result['uncertainties']
+    assert audit['field_permissions'][0]['unresolved_graph'] is True
+
+
+def test_source_endpoint_disagreement_does_not_grant_node_replacement():
+    old = document()
+    old['graphs'][0]['vertices'].append({'id': 'isolated'})
+    new = copy.deepcopy(old)
+    new['graphs'][0]['vertices'].pop()
+    new['graphs'][0]['edges'].pop()
+    result, audit = _scope_repair(old, new, [
+        {'scope': 'graph', 'graph_id': 'G1', 'kind': 'undirected_instance_mismatch',
+         'message': '两端读取的实例数不一致'},
+        {'scope': 'graph', 'graph_id': 'G1', 'field': 'edges', 'source_ids': ['a']}])
+    assert result['graphs'][0]['vertices'] == old['graphs'][0]['vertices']
+    assert result['graphs'][0]['edges'] == new['graphs'][0]['edges']
+    assert audit['field_permissions'][0]['mode'] == 'edges_only'
+
+
 def test_scoped_attribute_changes_only_named_field_on_named_edge():
     old = document()
     new = copy.deepcopy(old)

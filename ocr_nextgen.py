@@ -81,6 +81,7 @@ def _failed_graph_result(exc,version,budget,text_result,*,stage_audit=None):
 
 def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,request_deadline=None):
     graphs=result['graphs']
+    semantic = 'semantic_workflow' in result
     if isinstance(result.get('local_layout_result'), dict) and result['local_layout_result']:
         layout = result['local_layout_result']
     resource_metrics = text_result.get('resource_metrics', [])
@@ -123,7 +124,12 @@ def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,
         from graph_agent_runtime import AgentCancelled
         raise AgentCancelled('upload_cancelled')
     try:
-        if request_deadline is not None and request_deadline-time.monotonic()<3:
+        if semantic:
+            # The semantic chain already performed literal visual checks.
+            # DeepSeek supplies optional question advice, not another editor
+            # that rewrites the source spans or spends an extra remote call.
+            corrected,correction=text,{'status':'not_run','reason':'literal_semantic_text_preserved'}
+        elif request_deadline is not None and request_deadline-time.monotonic()<3:
             corrected,correction=text,{'status':'not_run_deadline'}
         elif cancelled is not None or request_deadline is not None:
             remaining=(request_deadline-time.monotonic()) if request_deadline is not None else 25
@@ -140,7 +146,6 @@ def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,
             and 'agent_workflow' not in result and 'semantic_workflow' not in result):
         text_complete=False
     issues=audit_graph_records(graphs)
-    semantic = 'semantic_workflow' in result
     semantic_issues = result.get('semantic_issues', []) if semantic else []
     # The semantic adapter validates actual endpoint references and retains
     # uncertain content. Legacy whole-graph type flags are advisory here: a
@@ -160,6 +165,7 @@ def _render_graph_result(raw,text_result,result,version,layout,*,cancelled=None,
     return {'text':corrected,'visual_text':visual,
             'graph_display_data':[display_graph(g) for g in graphs],
             'graph_structures':graphs,'raw_ocr_text':text,
+            **({'text_context':result['text_context']} if isinstance(result.get('text_context'),dict) else {}),
             'graph_display_version':version,
             'review':{'required':incomplete,'reasons':reasons},
             'text_count':(len([line for line in corrected.splitlines() if line.strip()])

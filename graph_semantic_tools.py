@@ -14,13 +14,16 @@ import re
 import time
 from collections import Counter
 from decimal import Decimal, InvalidOperation
+from fractions import Fraction
 
 from dmate_tool_registry import ToolContext, ToolRegistry, ToolSpec
 
-VERSION = '2026-10-26-semantic-networkx-v1'
+VERSION = '2026-10-26-semantic-networkx-v2'
 MAX_GRAPHS, MAX_VERTICES, MAX_EDGES = 64, 100, 300
-_EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'color', 'style', 'multiplicity')
-_OPERATIONS = frozenset(('degrees', 'components', 'bipartite', 'shortest_path', 'minimum_spanning_tree'))
+MAX_WALK_LENGTH = 64
+_EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'color', 'style', 'multiplicity', 'status')
+_OPERATIONS = frozenset(('degrees', 'components', 'bipartite', 'shortest_path', 'minimum_spanning_tree',
+                         'adjacency_matrix', 'walk_count', 'euler'))
 _DECIMAL = re.compile(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d{1,3})?\Z')
 _MESSAGES = {
     'invalid_graph_inventory': '图结构必须提供顶点和边列表。',
@@ -43,7 +46,7 @@ _MESSAGES = {
     'graph_tool_capacity': '本次图工具输入超出有界计算容量。',
     'invalid_math_request': '本次数学计算请求不属于支持的明确操作。',
     'unknown_graph': '本次计算未找到唯一的图记录。',
-    'incomplete_semantic_snapshot': '图结构尚未完整确认，暂不计算全图路径或生成树。',
+    'incomplete_semantic_snapshot': '图结构尚未完整确认，暂不计算全图矩阵、通路、欧拉性质或生成树。',
     'mixed_or_unknown_direction_not_supported': '该算法需要明确且适用的全图方向类型。',
     'mst_requires_undirected_graph': '此最小生成树算法只适用于无向图。',
     'complete_numeric_weights_required': '本次带权计算需要每条边的有限数值权重。',
@@ -51,6 +54,8 @@ _MESSAGES = {
     'unknown_path_endpoint': '路径起终点不能对应所选图的顶点。',
     'path_weight_mode_required': '图内含权值，请明确最短路按权值计算还是按边数计算。',
     'reachable_negative_cycle': '检测到可达负权环，不能给出有限最短距离。',
+    'unknown_edge_direction_not_supported': '本次计算需要每条边的方向明确，不能将未知方向当无向边。',
+    'invalid_euler_start': '指定起点不能作为该欧拉通路的起点。',
 }
 
 
@@ -86,7 +91,8 @@ def _digest(graphs):
         if not isinstance(graph, dict):
             rows.append(_safe(graph))
             continue
-        row = {k: _safe(graph[k]) for k in ('id', 'name', 'directed', 'weighted', 'multigraph', 'complete')
+        row = {k: _safe(graph[k]) for k in ('id', 'name', 'directed', 'weighted', 'multigraph', 'complete',
+                                         'unresolved_edges', 'unresolved_vertices', 'uncertain_edges')
                if k in graph}
         row['vertices'] = [_safe({k: n[k] for k in ('id', 'label') if k in n}) if isinstance(n, dict) else _safe(n)
                            for n in graph.get('vertices', [])[:MAX_VERTICES]] if isinstance(graph.get('vertices'), list) else None
@@ -112,7 +118,13 @@ def _numeric_weight(value):
         return None
     try:
         number = Decimal(text)
-        return number if number.is_finite() and abs(number) <= Decimal('1e12') else None
+        if not number.is_finite():
+            return None
+        # Decimal construction is exact, but arithmetic/abs use the ambient
+        # precision (normally 28 digits). Fraction preserves close weights and
+        # path ordering rather than rounding distinct routes into a false tie.
+        exact = Fraction(number)
+        return exact if abs(exact) <= 10**12 else None
     except InvalidOperation:
         return None
 
@@ -121,6 +133,14 @@ def _direction(edge, graph):
     if 'direction' not in edge:
         return 'forward' if graph.get('directed') is True else 'undirected' if graph.get('directed') is False else 'unknown'
     return 'unknown' if edge['direction'] is None else edge['direction']
+
+
+def _complete(source):
+    return (source.get('complete') is True and not source.get('unresolved_edges')
+            and not source.get('unresolved_vertices') and not source.get('uncertain_edges')
+            and isinstance(source.get('edges'), list)
+            and all(isinstance(e, dict) and e.get('status') in (None, 'accepted')
+                    for e in source.get('edges', [])))
 
 
 def _record(graph, graph_id, budget):
@@ -233,7 +253,7 @@ def _inspect(document, budget):
         nodes, edges, problems, notes = _record(source, gid, budget)
         issues.extend(problems)
         summary = {'graph_id': gid, 'structural_valid': not problems, 'image_fidelity_certified': False,
-                   'input_complete': source.get('complete') is True,
+                   'input_complete': _complete(source),
                    'vertex_count': len(nodes), 'edge_count': len(edges), 'declaration_notes': notes,
                    'vertex_labels': [{'id': node.get('id'), 'label': _safe(node.get('label'))}
                                      for node in nodes if isinstance(node, dict)],
@@ -294,15 +314,79 @@ def _inspect(document, budget):
 
 
 def _decimal_output(value):
-    number = Decimal(value)
-    return int(number) if number == number.to_integral() else str(number.normalize())
+    """Serialize exact sums of bounded decimal weights without rounding."""
+    number = Fraction(value)
+    if number.denominator == 1:
+        return number.numerator
+    denominator, twos, fives = number.denominator, 0, 0
+    while denominator % 2 == 0:
+        denominator //= 2
+        twos += 1
+    while denominator % 5 == 0:
+        denominator //= 5
+        fives += 1
+    if denominator != 1:
+        raise ValueError('non_terminating_weight_sum')
+    scale = max(twos, fives)
+    numerator = abs(number.numerator) * 2**(scale-twos) * 5**(scale-fives)
+    digits = str(numerator).rjust(scale+1, '0')
+    return ('-' if number < 0 else '') + digits[:-scale] + '.' + digits[-scale:].rstrip('0')
+
+
+def _transition_counts(item, budget):
+    """Count edge instances directly; do not coerce a mixed graph's type.
+
+    As in the existing graph adjacency/walk tools, a self-loop permits one
+    one-step traversal. An undirected non-loop permits either traversal; a
+    directed edge permits only from -> to. A parallel edge contributes again.
+    """
+    ids = [node['id'] for node in item['nodes']]
+    indices = {vid: index for index, vid in enumerate(ids)}
+    matrix = [[0] * len(ids) for _ in ids]
+    for edge in item['edges']:
+        _check(budget)
+        left, right = indices[edge['from']], indices[edge['to']]
+        matrix[left][right] += 1
+        if edge['direction'] == 'undirected' and left != right:
+            matrix[right][left] += 1
+    return ids, matrix
+
+
+def _euler_facts(item, request, nx, budget):
+    actual = item['directed'] if item['summary']['direction_mode'] == 'directed' else item['underlying']
+    isolated = list(nx.isolates(actual))
+    ignore = request.get('ignore_isolated', False)
+    analysed = actual.subgraph([v for v in actual if v not in isolated]).copy() if ignore else actual
+    start = request.get('start_vertex')
+    if start is not None and (start not in actual or start not in analysed):
+        return None, 'invalid_euler_start'
+    _check(budget)
+    if analysed.number_of_nodes() == 0:
+        # Explicit legacy convention; not an inferred missing vertex.
+        circuit = trail_exists = True
+    else:
+        circuit = bool(nx.is_eulerian(analysed))
+        trail_exists = bool(nx.has_eulerian_path(analysed))
+    if start is not None and trail_exists and not nx.has_eulerian_path(analysed, source=start):
+        return None, 'invalid_euler_start'
+    trail = []
+    if trail_exists and analysed.number_of_edges():
+        for left, right, key in nx.eulerian_path(analysed, source=start, keys=True):
+            _check(budget)
+            trail.append({'edge_id': analysed[left][right][key]['id'], 'from': left, 'to': right})
+    return {'has_eulerian_circuit': circuit, 'has_eulerian_trail': trail_exists,
+            'trail': trail, 'isolated_vertices': isolated,
+            'vertex_convention': 'ignore_isolated' if ignore else 'all_declared_vertices',
+            'empty_graph_convention': 'empty_edge_trail',
+            'direction_mode': item['summary']['direction_mode'],
+            'parallel_instances_preserved': True}, None
 
 
 def _prepare_math(document, request=None, *, budget=None):
     """Run an explicitly selected operation; never infer one from OCR text.
 
     Caller supplies the application-held canonical snapshot after the user
-    starts solving. ``None`` performs no calculation. Paths/MST additionally
+    starts solving. ``None`` performs no calculation. Full-graph calculations
     require a complete semantic snapshot and applicable direction/weights.
     """
     _check(budget)
@@ -310,12 +394,19 @@ def _prepare_math(document, request=None, *, budget=None):
               'image_fidelity_certified': False}
     if request is None:
         return result
-    if (not isinstance(request, dict) or set(request) - {'operation', 'graph_id', 'source', 'target', 'weighted'}
+    if (not isinstance(request, dict) or set(request) - {'operation', 'graph_id', 'source', 'target',
+                                                         'weighted', 'length', 'start_vertex', 'ignore_isolated'}
             or request.get('operation') not in _OPERATIONS or not _identifier(request.get('graph_id'))):
         return {**result, 'status': 'not_applicable', 'issues': [_issue('invalid_math_request')]}
     op, gid = request['operation'], request['graph_id']
-    permitted = {'operation', 'graph_id'} | ({'source', 'target', 'weighted'} if op == 'shortest_path' else set())
-    if set(request) - permitted or ('weighted' in request and type(request['weighted']) is not bool):
+    operation_fields = {'shortest_path': {'source', 'target', 'weighted'},
+                        'walk_count': {'source', 'target', 'length'},
+                        'euler': {'start_vertex', 'ignore_isolated'}}
+    permitted = {'operation', 'graph_id'} | operation_fields.get(op, set())
+    if (set(request) - permitted or ('weighted' in request and type(request['weighted']) is not bool)
+            or ('ignore_isolated' in request and type(request['ignore_isolated']) is not bool)
+            or (op == 'walk_count' and (type(request.get('length')) is not int
+                                      or not 0 <= request['length'] <= MAX_WALK_LENGTH))):
         return {**result, 'status': 'not_applicable', 'issues': [_issue('invalid_math_request')]}
     inspected, prepared = _inspect(document, budget)
     result['tool_audit'] = inspected['tool_audit']
@@ -342,11 +433,40 @@ def _prepare_math(document, request=None, *, budget=None):
     elif op == 'bipartite':
         facts = {'is_bipartite': bool(nx.is_bipartite(actual)), 'direction_convention': 'underlying_graph'}
         executed = True
-    elif (source.get('complete') is not True or source.get('unresolved_edges')
-          or source.get('unresolved_vertices') or source.get('uncertain_edges')):
+    elif not _complete(source):
         failure = 'incomplete_semantic_snapshot'
+    elif op in ('adjacency_matrix', 'walk_count'):
+        if summary['direction_mode'] == 'unknown':
+            failure = 'unknown_edge_direction_not_supported'
+        else:
+            ids, matrix = _transition_counts(item, budget)
+            common = {'vertex_order': ids, 'direction_mode': summary['direction_mode'],
+                      'direction_convention': 'per_edge_traversal',
+                      'diagonal_convention': 'one_per_loop', 'parallel_instances_preserved': True}
+            if op == 'adjacency_matrix':
+                facts = {**common, 'matrix': matrix, 'entry_meaning': 'edge_instance_count',
+                         'weights_used': False}
+                executed = True
+            else:
+                left, right = request.get('source'), request.get('target')
+                if left not in ids or right not in ids:
+                    failure = 'unknown_path_endpoint'
+                else:
+                    counts = [int(vid == left) for vid in ids]
+                    for _ in range(request['length']):
+                        _check(budget)
+                        counts = [sum(counts[i] * matrix[i][j] for i in range(len(ids)))
+                                  for j in range(len(ids))]
+                    facts = {**common, 'source': left, 'target': right,
+                             'length': request['length'], 'count': counts[ids.index(right)],
+                             'walk_definition': 'edge_distinct_walks_repetition_allowed',
+                             'weights_used': False}
+                    executed = True
     elif summary['direction_mode'] not in ('directed', 'undirected', 'empty'):
         failure = 'mixed_or_unknown_direction_not_supported'
+    elif op == 'euler':
+        facts, failure = _euler_facts(item, request, nx, budget)
+        executed = failure is None
     elif op == 'minimum_spanning_tree' and summary['direction_mode'] == 'directed':
         failure = 'mst_requires_undirected_graph'
     elif (op == 'shortest_path' and 'weighted' not in request
@@ -360,7 +480,7 @@ def _prepare_math(document, request=None, *, budget=None):
         else:
             actual = actual.copy()
             for _, _, key, data in actual.edges(keys=True, data=True):
-                data['_cost'] = _numeric_weight(data.get('weight')) if weighted else Decimal(1)
+                data['_cost'] = _numeric_weight(data.get('weight')) if weighted else Fraction(1)
             try:
                 if op == 'minimum_spanning_tree':
                     if actual.number_of_nodes() == 0 or not nx.is_connected(actual):
@@ -368,8 +488,9 @@ def _prepare_math(document, request=None, *, budget=None):
                     else:
                         tree = list(nx.minimum_spanning_edges(actual, algorithm='kruskal', weight='_cost', keys=True, data=True))
                         facts = {'edge_ids': [data['id'] for _, _, _, data in tree],
-                                 'total_weight': _decimal_output(sum((data['_cost'] for _, _, _, data in tree), Decimal(0))),
-                                 'vertex_ids': list(actual), 'parallel_instances_preserved': True}
+                                 'total_weight': _decimal_output(sum((data['_cost'] for _, _, _, data in tree), Fraction(0))),
+                                 'vertex_ids': list(actual), 'parallel_instances_preserved': True,
+                                 'arithmetic': 'exact_rational'}
                         executed = True
                 else:
                     a, b = request.get('source'), request.get('target')
@@ -389,6 +510,7 @@ def _prepare_math(document, request=None, *, budget=None):
                         facts = {'vertex_ids': path, 'edge_ids': instances,
                                  'distance': _decimal_output(distance),
                                  'equal_cost_edge_choices': ties, 'weighted': weighted,
+                                 'arithmetic': 'exact_rational' if weighted else 'edge_count',
                                  'algorithm': 'bellman_ford' if negative else 'dijkstra'}
                         executed = True
             except nx.NetworkXNoPath:
@@ -438,11 +560,20 @@ def _build_registry():
     identifier = {'type': 'string', 'minLength': 1, 'maxLength': 128}
     ordinary = {'type': 'object', 'additionalProperties': False,
         'required': ['operation', 'graph_id'], 'properties': {
-            'operation': {'enum': sorted(_OPERATIONS - {'shortest_path'})}, 'graph_id': identifier}}
+            'operation': {'enum': sorted(_OPERATIONS - {'shortest_path', 'walk_count', 'euler'})}, 'graph_id': identifier}}
     path = {'type': 'object', 'additionalProperties': False,
         'required': ['operation', 'graph_id'], 'properties': {
             'operation': {'const': 'shortest_path'}, 'graph_id': identifier,
             'source': identifier, 'target': identifier, 'weighted': {'type': 'boolean'}}}
+    walk = {'type': 'object', 'additionalProperties': False,
+        'required': ['operation', 'graph_id', 'source', 'target', 'length'], 'properties': {
+            'operation': {'const': 'walk_count'}, 'graph_id': identifier,
+            'source': identifier, 'target': identifier,
+            'length': {'type': 'integer', 'minimum': 0, 'maximum': MAX_WALK_LENGTH}}}
+    euler = {'type': 'object', 'additionalProperties': False,
+        'required': ['operation', 'graph_id'], 'properties': {
+            'operation': {'const': 'euler'}, 'graph_id': identifier,
+            'start_vertex': identifier, 'ignore_isolated': {'type': 'boolean'}}}
     registry = ToolRegistry()
     registry.register(ToolSpec(name='graph.semantic_inspect', version=VERSION,
         description='Inspect the private semantic graph with NetworkX; never certify image reading.',
@@ -453,7 +584,7 @@ def _build_registry():
         allowed_roles=frozenset({'semantic_review'}), source_required=False, timeout_seconds=5.), _inspect_tool)
     registry.register(ToolSpec(name='graph.semantic_math', version=VERSION,
         description='Run one explicit bounded operation on the private semantic snapshot.',
-        input_schema={'oneOf': [ordinary, path]},
+        input_schema={'oneOf': [ordinary, path, walk, euler]},
         output_schema={'type': 'object', 'required': ['status', 'facts', 'issues', 'tool_audit'],
                        'properties': {'status': {'enum': ['not_requested', 'computed', 'not_applicable']},
                                       'issues': {'type': 'array'}, 'tool_audit': {'type': 'array'}}},
