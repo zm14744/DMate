@@ -1,9 +1,10 @@
-"""Bounded, source-only crops addressed by existing text/graph identities.
+"""Bounded, source-only crops addressed by existing text/graph/marker identities.
 
 Issue evidence boxes and prose never choose pixels. Text locations come from
 the caller's existing OCR hints; graph locations come from the current fixed
 inventory and complete stored paths. A crop is another observation, not proof
-that a proposed label, endpoint or route is correct.
+that a proposed label, endpoint or route is correct. CPU marker identities
+select measured source locations; they never grant mathematical vertex status.
 """
 from __future__ import annotations
 
@@ -24,6 +25,8 @@ MAX_SCALE = 6.
 MAX_GRAPHS = 48
 MAX_ISSUES = 128
 MAX_HINTS = 128
+MAX_BODY_REGIONS = 128
+MAX_MARKERS = 256
 MAX_ENTITIES = 512
 MAX_REFERENCES = 128
 MAX_TARGETS = 256
@@ -76,6 +79,8 @@ def _merge_into(left, right):
     a, b = left['rect'], right['rect']
     left['rect'] = (min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]))
     left['hint_ids'].update(right['hint_ids'])
+    left['body_region_ids'].update(right['body_region_ids'])
+    left['marker_ids'].update(right['marker_ids'])
     left['issue_ids'].update(right['issue_ids'])
     left['targets'].extend(right['targets'])
     for gid, entities in right['graph_entities'].items():
@@ -84,12 +89,18 @@ def _merge_into(left, right):
             group[key].update(entities[key])
 
 
-def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=None):
+def build_focused_views(original, graphs, issues, *, hints=None, body_regions=None,
+                        markers=None, check_deadline=None):
     """Return ``images, coordinate_maps, diagnostics`` without changing inputs.
 
     ``graphs`` use the application's internal 0..1 coordinates. Hint bboxes
-    use original_1000. Returned pixel rectangles are half-open crop bounds;
+    and caller-validated body region bboxes use original_1000. Body region
+    identities are a separate namespace from OCR hints and require an explicit
+    original source. Returned pixel rectangles are half-open crop bounds;
     returned original_bbox values divide those bounds by the full image size.
+    Optional ``markers`` are a caller-owned list of CPU measurements with
+    id/x/y/radius_x/radius_y in original_1000. Their independent marker_ids
+    namespace does not create, attach, move or confirm any graph vertex.
     Only caller-owned IDs can select pixels. No issue-supplied bbox is read.
     """
     if not isinstance(original, Image.Image):
@@ -136,6 +147,20 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
     by_graph = index(graphs, MAX_GRAPHS, 'graph')
     by_hint = index((hints or {}).get('items', []) if isinstance(hints, dict) else [],
                     MAX_HINTS, 'hint')
+    if isinstance(body_regions, list) and len(body_regions) > MAX_BODY_REGIONS:
+        # Do not accept a prefix whose identity could be duplicated beyond the
+        # cap. The caller must supply a bounded, unambiguous region inventory.
+        capacity['body_region_limit_reached'] = True
+        by_body_region = {}
+    else:
+        by_body_region = index(body_regions, MAX_BODY_REGIONS, 'body_region') \
+            if body_regions is not None else {}
+    if isinstance(markers, list) and len(markers) > MAX_MARKERS:
+        # A duplicate beyond a truncated prefix cannot establish identity.
+        capacity['marker_limit_reached'] = True
+        by_marker = {}
+    else:
+        by_marker = index(markers, MAX_MARKERS, 'marker') if markers is not None else {}
     by_issue = index(issues, MAX_ISSUES, 'issue')
     graph_indexes = {}
     for gid, graph in by_graph.items():
@@ -148,7 +173,7 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
             index(graph.get('edges', []), MAX_ENTITIES, 'edge'))
     targets = []
 
-    def references(issue, field):
+    def references(issue, field, *, report_duplicates=False):
         values = issue.get(field, [])
         if not isinstance(values, list):
             omit(issue['id'], 'invalid_reference_list', kind=field)
@@ -163,17 +188,27 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
             elif value not in seen:
                 seen.add(value)
                 result.append(value)
+            elif report_duplicates:
+                omit(issue['id'], 'duplicate_reference_id', kind=field, identity=value)
         return result
 
-    def add(rect, issue_id, *, hint_id=None, gid=None, edge_ids=(), vertex_ids=()):
+    def add(rect, issue_id, *, hint_id=None, body_region_id=None, marker_id=None,
+            gid=None, edge_ids=(), vertex_ids=()):
         if len(targets) >= MAX_TARGETS:
             capacity['target_limit_reached'] = True
-            omit(issue_id, 'target_capacity_reached', identity=hint_id, graph_id=gid)
+            omit(issue_id, 'target_capacity_reached',
+                 kind='marker' if marker_id else 'body_region' if body_region_id else None,
+                 identity=marker_id or body_region_id or hint_id, graph_id=gid)
             return
         entities = {gid: {'edge_ids': set(edge_ids), 'vertex_ids': set(vertex_ids)}} if gid else {}
         targets.append({'rect': rect, 'issue_ids': {issue_id},
-                        'hint_ids': {hint_id} if hint_id else set(), 'graph_entities': entities,
+                        'hint_ids': {hint_id} if hint_id else set(),
+                        'body_region_ids': {body_region_id} if body_region_id else set(),
+                        'marker_ids': {marker_id} if marker_id else set(),
+                        'graph_entities': entities,
                         'targets': [{'issue_id': issue_id, 'hint_id': hint_id, 'graph_id': gid,
+                                     'body_region_id': body_region_id,
+                                     'marker_id': marker_id,
                                      'edge_ids': list(edge_ids), 'vertex_ids': list(vertex_ids)}]})
 
     def vertex_points(vertex, graph):
@@ -199,6 +234,8 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
         check()
         before = len(targets)
         hint_ids = references(issue, 'hint_ids')
+        body_region_ids = references(issue, 'body_region_ids', report_duplicates=True)
+        marker_ids = references(issue, 'marker_ids', report_duplicates=True)
         edge_ids = references(issue, 'edge_ids')
         vertex_ids = references(issue, 'vertex_ids')
         for hid in hint_ids:
@@ -210,6 +247,42 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
             a, b, c, d = box
             add(_padded_rect((a*width, b*height, c*width, d*height), source.size, text=True), iid,
                 hint_id=hid)
+        for rid in body_region_ids:
+            region = by_body_region.get(rid)
+            if region is None:
+                reason = ('body_region_inventory_capacity_reached'
+                          if capacity.get('body_region_limit_reached') else 'unknown_or_ambiguous_body_region')
+                omit(iid, reason, kind='body_region', identity=rid)
+                continue
+            if region.get('source') != 'original':
+                omit(iid, 'body_region_source_not_original', kind='body_region', identity=rid)
+                continue
+            box = _bounds(region.get('bbox'), 1000.)
+            if box is None:
+                omit(iid, 'invalid_body_region_bounds', kind='body_region', identity=rid)
+                continue
+            a, b, c, d = box
+            add(_padded_rect((a*width, b*height, c*width, d*height), source.size, text=True), iid,
+                body_region_id=rid)
+        for mid in marker_ids:
+            marker = by_marker.get(mid)
+            if marker is None:
+                reason = ('marker_inventory_capacity_reached' if capacity.get('marker_limit_reached')
+                          else 'unknown_or_ambiguous_marker')
+                omit(iid, reason, kind='marker', identity=mid)
+                continue
+            values = [marker.get(key) for key in ('x', 'y', 'radius_x', 'radius_y')]
+            if (any(type(v) not in (int, float) or not math.isfinite(v) for v in values)
+                    or not all(0 <= v <= 1000 for v in values[:2])
+                    or not all(0 < v <= 1000 for v in values[2:])):
+                omit(iid, 'invalid_marker_geometry', kind='marker', identity=mid)
+                continue
+            x, y, rx, ry = values
+            # CPU locations describe point centers, using the same W-1/H-1
+            # axes as fixed vertices; x/y radii are independently normalized.
+            cx, cy = x/1000*(width-1), y/1000*(height-1)
+            rx, ry = rx/1000*(width-1), ry/1000*(height-1)
+            add(_padded_rect((cx-rx, cy-ry, cx+rx, cy+ry), source.size), iid, marker_id=mid)
         gid = issue.get('graph_id')
         if edge_ids or vertex_ids:
             if not _identifier(gid) or gid not in graph_indexes:
@@ -256,7 +329,8 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
                         omit(iid, 'unknown_ambiguous_or_unlocated_vertex', kind='vertex', identity=vid, graph_id=gid)
                     else:
                         add(point_rect(points), iid, gid=gid, vertex_ids=[vid])
-        if len(targets) == before and not hint_ids and not edge_ids and not vertex_ids:
+        if (len(targets) == before and not hint_ids and not body_region_ids
+                and not marker_ids and not edge_ids and not vertex_ids):
             omit(iid, 'issue_has_no_locatable_ids')
 
     # Collapse genuinely overlapping crops, including a vertex crop already
@@ -283,7 +357,9 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
         capacity['view_limit_reached'] = True
         for region in regions[MAX_VIEWS:]:
             for target in region['targets']:
-                omit(target['issue_id'], 'view_capacity_reached', identity=target['hint_id'],
+                omit(target['issue_id'], 'view_capacity_reached',
+                     kind='marker' if target['marker_id'] else 'body_region' if target['body_region_id'] else None,
+                     identity=target['marker_id'] or target['body_region_id'] or target['hint_id'],
                      graph_id=target['graph_id'])
     selected = regions[:MAX_VIEWS]
     images, views = [], []
@@ -314,6 +390,26 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
                                 'vertex_ids': sorted(value['vertex_ids'])}
                                for gid, value in sorted(region['graph_entities'].items())],
             'source_pixels_only': True})
+        if body_regions is not None:
+            views[-1]['body_region_ids'] = sorted(region['body_region_ids'])
+        if markers is not None:
+            views[-1]['marker_ids'] = sorted(region['marker_ids'])
+        if body_regions is not None or markers is not None:
+            mapped_targets = []
+            for target in region['targets']:
+                mapped = {'issue_id': target['issue_id']}
+                if target['marker_id'] is not None:
+                    mapped.update(entity_type='marker', marker_id=target['marker_id'])
+                elif target['body_region_id'] is not None:
+                    mapped.update(entity_type='body_region', body_region_id=target['body_region_id'])
+                elif target['hint_id'] is not None:
+                    mapped.update(entity_type='hint', hint_id=target['hint_id'])
+                else:
+                    mapped.update(entity_type='edge' if target['edge_ids'] else 'vertex',
+                                  graph_id=target['graph_id'], edge_ids=target['edge_ids'],
+                                  vertex_ids=target['vertex_ids'])
+                mapped_targets.append(mapped)
+            views[-1]['targets'] = mapped_targets
     diagnostics = {'version': VERSION, 'requested_issue_count': len(issues) if isinstance(issues, list) else 0,
         'resolved_target_count': len(targets), 'merged_region_count': merged_count,
         'produced_view_count': len(views), 'output_pixels': MAX_TOTAL_PIXELS-remaining_pixels,
@@ -323,4 +419,10 @@ def build_focused_views(original, graphs, issues, *, hints=None, check_deadline=
         'limits': {'max_views': MAX_VIEWS, 'max_view_pixels': MAX_VIEW_PIXELS,
                    'max_total_pixels': MAX_TOTAL_PIXELS, 'max_side': MAX_SIDE, 'max_scale': MAX_SCALE,
                    'max_targets': MAX_TARGETS, 'max_issues': MAX_ISSUES, 'max_graphs': MAX_GRAPHS}}
+    if body_regions is not None:
+        diagnostics['requested_body_region_count'] = len(body_regions) if isinstance(body_regions, list) else 0
+        diagnostics['limits']['max_body_regions'] = MAX_BODY_REGIONS
+    if markers is not None:
+        diagnostics['requested_marker_count'] = len(markers) if isinstance(markers, list) else 0
+        diagnostics['limits']['max_markers'] = MAX_MARKERS
     return images, views, diagnostics

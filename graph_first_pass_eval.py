@@ -611,16 +611,16 @@ def _run_evidence_two_pass(evidence, reference, prediction=None):
             'pipeline_contract': evidence.get('pipeline_contract')}
 
 
-_AGENT_ROLES = frozenset(('page_vertices', 'body_text', 'connections', 'attributes', 'structure_review'))
+_AGENT_ROLES = frozenset(('page_vertices', 'body_text', 'body_review', 'connections', 'attributes', 'structure_review'))
 _AGENT_REQUIRED_ROLES = frozenset(('page_vertices', 'body_text', 'connections', 'structure_review'))
 _AGENT_TOOL_ROLES = {
-    'image.local_evidence': _AGENT_ROLES,
+    'image.local_evidence': _AGENT_ROLES-{'body_review'},
     'image.marker_proposals': {'page_vertices'},
     'image.marker_grounding': {'page_vertices'},
     'image.trace_candidates': {'connections'},
     'image.sknw_candidates': {'connections'},
     'image.review_views': _AGENT_ROLES,
-    'image.focused_views': {'body_text', 'connections', 'structure_review'},
+    'image.focused_views': {'page_vertices', 'body_text', 'body_review', 'connections', 'structure_review'},
     'graph.stroke_validation': {'connections', 'attributes', 'structure_review'},
     'text.visual_reconciliation': {'body_text', 'structure_review'},
     'graph.structure_audit': {'structure_review'},
@@ -650,6 +650,8 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
     Body repair is independent of graph repair. Two adjacent coordinator
     announcements can therefore authorize one body+connections/attributes
     round, not two rounds. Their actual owner calls must use the same revision.
+    Optional body-only reads additionally bind their dependency digest. A
+    cached scope can reuse a recorded outcome, never manufacture a new send.
     """
     events = workflow.get('events')
     if not isinstance(events, list) or not events:
@@ -659,9 +661,11 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
     active, repair_groups = {}, []
     owner_counts = Counter()
     seen_invocations = Counter()
+    body_scope_pending = None
+    body_scopes, body_scope_digests, body_reviews = {}, set(), set()
     downstream = {
         'page_vertices': _AGENT_ROLES-{'body_text'},
-        'body_text': {'body_text', 'structure_review'},
+        'body_text': {'body_text', 'body_review', 'structure_review'},
         'connections': {'connections', 'attributes', 'structure_review'},
         'attributes': {'attributes', 'structure_review'},
         'structure_review': {'structure_review'},
@@ -676,10 +680,38 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
         if not isinstance(role, str):
             issues.append('invalid_agent_event_role')
             continue
+        if body_scope_pending is not None and role == 'body_review' and status not in ('scope_checked', 'started'):
+            issues.append('body_review_scope_not_followed_by_start')
+        if status == 'scope_checked':
+            digest, revision = event.get('body_input_digest'), event.get('revision')
+            if role != 'body_review':
+                issues.append('body_review_scope_role_invalid')
+                continue
+            if body_scope_pending is not None:
+                issues.append('body_review_scope_not_consumed')
+            if not _sha256_string(digest) or type(revision) is not int or revision < 0:
+                issues.append('body_review_scope_identity_invalid')
+            elif digest in body_scope_digests:
+                issues.append('body_review_repeated_input_digest')
+            else:
+                body_scope_digests.add(digest)
+            body_scope_pending = {**event, '_position': position}
+        elif status == 'scope_reused':
+            prior = next(((key, scope) for key, scope in body_scopes.items()
+                          if scope.get('body_input_digest') == event.get('body_input_digest')), None)
+            if (role != 'body_review' or not _sha256_string(event.get('body_input_digest'))
+                    or type(event.get('revision')) is not int
+                    or type(event.get('source_request_revision')) is not int or prior is None):
+                issues.append('body_review_reused_scope_unverified')
+            elif (event['source_request_revision'] != prior[1]['revision']
+                  or event['revision'] < prior[1]['revision']
+                  or (prior[0] not in body_reviews
+                      and outcomes.get(prior[0]) not in ('failed', 'proposal_rejected'))):
+                issues.append('body_review_reused_scope_unverified')
         if status == 'targeted_review':
             owner, number, conflict_ids = event.get('target_role'), event.get('repair_round'), event.get('conflict_ids')
             if (role != 'coordinator' or not isinstance(event.get('target_role'), str)
-                    or event['target_role'] not in _AGENT_ROLES or
+                    or event['target_role'] not in downstream or
                     not isinstance(conflict_ids, list) or not conflict_ids
                     or any(not isinstance(x, str) or not x for x in conflict_ids)
                     or (isinstance(conflict_ids, list) and all(isinstance(x, str) for x in conflict_ids)
@@ -699,7 +731,7 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
                     issues.append('agent_repair_announced_after_work_started')
                 repair_groups[-1]['last_announcement'] = position
             group = repair_groups[-1]
-            if isinstance(owner, str) and owner in _AGENT_ROLES:
+            if isinstance(owner, str) and owner in downstream:
                 if owner in group['owners']:
                     issues.append('agent_repair_owner_repeated')
                 group['owners'].add(owner)
@@ -714,6 +746,14 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
                 issues.append('invalid_agent_invocation_event')
                 continue
             key = (role, invocation)
+            if role == 'body_review':
+                if body_scope_pending is None:
+                    missing.append('body_review_scope_missing')
+                else:
+                    if revision != body_scope_pending.get('revision'):
+                        issues.append('body_review_scope_revision_mismatch')
+                    body_scopes[key] = body_scope_pending
+                    body_scope_pending = None
             group = repair_groups[-1] if repair_groups else None
             repair_round = group['number'] if group else 0
             seen_invocations[role] += 1
@@ -746,6 +786,20 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
                 missing.append('agent_role_request_digest_missing')
             starts[key] = {**event, '_position': position, '_repair_round': repair_round}
             active[role] = key
+        elif status == 'reviewed' and role == 'body_review':
+            key = active.get(role)
+            scope = body_scopes.get(key)
+            if key is None or scope is None or outcomes.get(key) != 'responded':
+                issues.append('body_review_result_without_response')
+            elif (type(event.get('revision')) is not int or event['revision'] != starts[key]['revision']
+                  or event.get('body_input_digest') != scope.get('body_input_digest')):
+                issues.append('body_review_result_scope_mismatch')
+            if key in body_reviews:
+                issues.append('body_review_result_repeated')
+            if (type(event.get('body_complete')) is not bool
+                    or type(event.get('conflict_count')) is not int or event['conflict_count'] < 0):
+                issues.append('body_review_result_invalid')
+            body_reviews.add(key)
         elif status in ('responded', 'network_recovery', 'failed', 'proposal_rejected'):
             key = active.get(role)
             if status in ('responded', 'network_recovery', 'failed'):
@@ -764,6 +818,8 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
                     issues.append('agent_response_revision_mismatch')
                 if not _sha256_string(event.get('response_digest')):
                     missing.append('agent_role_response_digest_missing')
+    if body_scope_pending is not None:
+        missing.append('body_review_scope_without_invocation')
     rounds = workflow.get('repair_rounds')
     if type(rounds) is not int or not 0 <= rounds <= 3 or rounds != len(repair_groups):
         issues.append('agent_repair_ledger_mismatch')
@@ -810,6 +866,17 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
         successful = (last.get('http_status') == 200 and last.get('status') == 200
                       and last.get('finish_reason') == 'stop' and not last.get('partial_stream')
                       and not last.get('error') and not last.get('exception_type'))
+        if key[0] == 'body_review':
+            # This read-only role is optional. A disclosed failure can be
+            # resolved by the mandatory final structure_review; it never
+            # substitutes for that final accepted review. All sends/scopes
+            # still require their ordinary independent transport evidence.
+            if successful and outcomes.get(key) == 'responded':
+                if key not in body_reviews:
+                    missing.append('body_review_decoder_result_missing')
+            elif outcomes.get(key) not in ('failed', 'proposal_rejected'):
+                issues.append('agent_failed_invocation_not_disclosed')
+            continue
         if key[1] == latest[key[0]]:
             if not successful or outcomes.get(key) != 'responded':
                 issues.append('agent_final_role_response_not_successful')

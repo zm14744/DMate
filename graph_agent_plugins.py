@@ -79,7 +79,7 @@ def build_image_tools(document, text_result, layout, budget):
     def marker_hints(args, *, context):
         proposals = marker_proposals(document)
         context.data['marker_cache']['proposals'] = proposals
-        return {'version': proposals['version'], 'source_sha256': context.source_sha256,
+        result = {'version': proposals['version'], 'source_sha256': context.source_sha256,
                 'coordinate_space': 'original_1000', 'proposal_only': True,
                 'candidates': [{'id': row['id'], 'x': round(row['x']*1000, 3),
                                 'y': round(row['y']*1000, 3), 'kind': row['kind'],
@@ -92,6 +92,8 @@ def build_image_tools(document, text_result, layout, budget):
                                 'connected_stroke': row['connected_stroke']}
                                for row in proposals['items']],
                 'limits': copy.deepcopy(proposals['limits'])}
+        context.data['marker_cache']['view_proposals'] = copy.deepcopy(result['candidates'])
+        return result
 
     register('image.marker_proposals', 'Measure bounded original-pixel marker hypotheses before visual vertex inventory.',
              _EMPTY, ('page_vertices',), marker_hints)
@@ -139,12 +141,15 @@ def build_image_tools(document, text_result, layout, budget):
                 'diagnostics': notes, 'source_pixels_only': True}
 
     register('image.review_views', 'Build original-pixel graph/text crops with explicit full-image coordinates.',
-             _GRAPHS, _ROLES, views)
+             _GRAPHS, (*_ROLES, 'body_review'), views)
 
     def focused(args, *, context):
+        markers = (context.data['marker_cache'].get('view_proposals')
+                   if any(row.get('marker_ids') for row in args['issues'] if isinstance(row, dict)) else None)
         images, mappings, diagnostics = build_focused_views(
             document.original, args['graphs'], args['issues'],
-            hints=context.data.get('hints'), check_deadline=context.check_deadline)
+            hints=context.data.get('hints'), body_regions=args.get('body_regions'),
+            markers=markers, check_deadline=context.check_deadline)
         references, output_maps = [], []
         for crop, mapping in zip(images, mappings):
             context.check_deadline()
@@ -161,9 +166,10 @@ def build_image_tools(document, text_result, layout, budget):
     register('image.focused_views', 'Crop original pixels addressed by verified text/edge/vertex IDs; never render answers.',
              {'type': 'object', 'required': ['graphs', 'issues'], 'additionalProperties': False,
               'properties': {'graphs': _GRAPHS['properties']['graphs'],
-                             'issues': {'type': 'array', 'maxItems': 128, 'items': _OBJECT}}},
-             ('body_text', 'connections', 'structure_review'), focused,
-             version='2026-10-26-v4')
+                             'issues': {'type': 'array', 'maxItems': 128, 'items': _OBJECT},
+                             'body_regions': {'type': 'array', 'maxItems': 128, 'items': _OBJECT}}},
+             ('page_vertices', 'body_text', 'body_review', 'connections', 'structure_review'), focused,
+             version='2026-10-26-v5')
 
     def validate(args, *, context):
         graphs, issues = apply_topology(args['response'], context.data['inventory'],

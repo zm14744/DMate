@@ -133,7 +133,7 @@ def test_real_curved_parallel_paths_reach_model_proposal_through_registry():
     _json_bytes(proposal)
 
 
-@pytest.mark.parametrize('role', ['body_text', 'connections', 'structure_review'])
+@pytest.mark.parametrize('role', ['page_vertices', 'body_text', 'body_review', 'connections', 'structure_review'])
 def test_focused_tool_uses_context_hints_and_preserves_existing_image_refs(role):
     document = analyze_document(Image.new('RGB', (300, 180), 'white'))
     registry, context = registry_for(document)
@@ -148,7 +148,7 @@ def test_focused_tool_uses_context_hints_and_preserves_existing_image_refs(role)
     assert value['source_sha256'] == context.source_sha256 and value['source_pixels_only'] is True
     assert value['image_refs'][0] in context.data['images']
     assert value['focused_views'][0]['image_ref'] == value['image_refs'][0]
-    assert result['version'] == '2026-10-26-v4' and result['audit']['result_digest']
+    assert result['version'] == '2026-10-26-v5' and result['audit']['result_digest']
     for ref, image in previous.items():
         assert context.data['images'][ref] is image
     # The existing review sheet must also leave concurrent body/focus refs alive.
@@ -159,12 +159,72 @@ def test_focused_tool_uses_context_hints_and_preserves_existing_image_refs(role)
     assert value['image_refs'][0] in context.data['images']
 
 
-@pytest.mark.parametrize('role', ['page_vertices', 'attributes', 'solver'])
+@pytest.mark.parametrize('role', ['attributes', 'solver'])
 def test_focused_tool_denies_roles_without_crop_authority(role):
     registry, context = registry_for(analyze_document(Image.new('RGB', (80, 60), 'white')))
     result = registry.call('image.focused_views', {'graphs': [], 'issues': []}, role=role, context=context)
     assert not result['ok'] and result['error']['code'] == 'role_not_allowed'
     assert not context.data['images']
+
+
+def test_body_review_can_only_read_views_and_cannot_run_graph_or_solver_tools():
+    registry, context = registry_for(analyze_document(Image.new('RGB', (80, 60), 'white')))
+    assert {row['name'] for row in registry.describe(role='body_review')} == {
+        'image.review_views', 'image.focused_views'}
+    for name in ('image.local_evidence', 'image.marker_grounding', 'image.trace_candidates',
+                 'image.sknw_candidates', 'graph.stroke_validation', 'graph.structure_audit',
+                 'text.visual_reconciliation', 'graph.adjacency_matrix'):
+        result = registry.call(name, {}, role='body_review', context=context)
+        assert not result['ok'] and result['error']['code'] == 'role_not_allowed'
+    assert not context.data['images']
+
+
+def test_registered_body_crop_uses_fixed_region_identity_and_original_pixels():
+    document = analyze_document(Image.new('RGB', (180, 100), (120, 30, 90)))
+    registry, context = registry_for(document)
+    result = registry.call('image.focused_views', {'graphs': [],
+        'body_regions': [{'id': 'line_a', 'source': 'original', 'role': 'body',
+                          'bbox': [100, 300, 800, 500], 'text': 'not rendered into the image'}],
+        'issues': [{'id': 'body_check', 'body_region_ids': ['line_a'], 'bbox': [0, 0, 1, 1]}]},
+        role='body_review', context=context)
+    assert result['ok'], result
+    mapping = result['result']['focused_views'][0]
+    assert mapping['body_region_ids'] == ['line_a'] and mapping['hint_ids'] == []
+    crop = context.data['images'][mapping['image_ref']]
+    expected = document.original.crop(mapping['original_pixel_bbox']).resize(
+        tuple(mapping['output_size']), Image.Resampling.LANCZOS)
+    assert crop.tobytes() == expected.tobytes()
+
+
+def test_page_marker_crops_use_registered_measurements_without_mutating_tool_context():
+    from PIL import ImageDraw
+    source = Image.new('RGB', (160, 100), 'white')
+    draw = ImageDraw.Draw(source)
+    draw.line((30, 50, 130, 50), fill='black', width=2)
+    for x in (30, 130):
+        draw.ellipse((x-6, 44, x+6, 56), fill='black')
+    document = analyze_document(source)
+    registry, context = registry_for(document)
+    hints = registry.call('image.marker_proposals', {}, role='page_vertices', context=context)
+    assert hints['ok'], hints
+    candidates = hints['result']['candidates']
+    assert len(candidates) == 2
+    assert context.data['marker_cache']['view_proposals'] == candidates
+    marker = candidates[0]
+    arguments = {'graphs': [], 'issues': [{'id': 'unbound_circle', 'marker_ids': [marker['id']],
+                                           'bbox': [900, 900, 950, 950]}]}
+    focused = registry.call('image.focused_views', arguments, role='page_vertices', context=context)
+    assert focused['ok'], focused
+    mapping = focused['result']['focused_views'][0]
+    assert mapping['marker_ids'] == [marker['id']]
+    crop = context.data['images'][mapping['image_ref']]
+    expected = document.original.crop(mapping['original_pixel_bbox']).resize(
+        tuple(mapping['output_size']), Image.Resampling.LANCZOS)
+    assert crop.tobytes() == expected.tobytes()
+    # The caller cannot replace CPU positions through this tool's JSON API.
+    forged = registry.call('image.focused_views', {**arguments, 'markers': [marker]},
+                           role='page_vertices', context=context)
+    assert not forged['ok'] and forged['error']['code'] == 'invalid_arguments'
 
 
 def test_focused_tool_cannot_accept_caller_supplied_hint_boxes():

@@ -7,7 +7,7 @@ import copy
 import pytest
 
 from graph_agent_roles import (
-    RoleProtocolError, build_solver_input, decode_body_response,
+    RoleProtocolError, build_solver_input, connection_graph_view, decode_body_response, decode_page_response,
     decode_review_response, decode_targeted_review, merge_attribute_response,
     merge_body_response, reconcile_role_text, validate_connection_response, extract_rejected_role_issues,
 )
@@ -97,6 +97,169 @@ def issue(iid='issue_1', role='connections', gid='G1'):
     return {'id': iid, 'kind': 'visible_conflict', 'target_role': role, 'graph_id': gid,
             'vertex_ids': [], 'edge_ids': [], 'hint_ids': [],
             'reason': '这里有尚未解释的独立笔画', 'evidence': proof()}
+
+
+def page_marker_hints():
+    return {'version': 'synthetic-original-markers', 'coordinate_space': 'original_1000',
+            'source_sha256': 'a'*64, 'proposal_only': True,
+            'candidates': [
+                {'id': 'marker_left', 'x': 123.456, 'y': 789.012, 'confidence': .95,
+                 'evidence_source': 'closed_original_ink_hole'},
+                {'id': 'marker_right', 'x': 845.125, 'y': 231.875, 'confidence': .97,
+                 'evidence_source': 'original_gradient_and_ink_outline'}],
+            'limits': {}}
+
+
+def page_response(vertices=None):
+    return {**envelope('page_vertices'), 'panels_complete': True, 'graphs': [{
+        'id': 'G1', 'name': None, 'bbox': [0, 0, 1000, 1000], 'node_complete': True,
+        'directed': False, 'weighted': False, 'multigraph': False,
+        'vertices': vertices if vertices is not None else [
+            {'id': 'a', 'label': 'a', 'marker_id': 'marker_right'},
+            {'id': 'b', 'label': None, 'marker_id': 'marker_left'}]}]}
+
+
+def test_explicit_page_marker_binding_uses_exact_published_position_not_order_or_label():
+    from graph_evidence_pipeline import decode_nodes
+    pool, response = page_marker_hints(), page_response()
+    original_pool, original_response = copy.deepcopy(pool), copy.deepcopy(response)
+    decoded = decode_page_response(response, pool, revision=4)
+    expected = copy.deepcopy(response)
+    expected['graphs'][0]['vertices'][0].update(x=845.125, y=231.875)
+    expected['graphs'][0]['vertices'][1].update(x=123.456, y=789.012)
+    assert decoded['graphs'] == decode_nodes(expected)
+    assert pool == original_pool and response == original_response
+    audit = decoded['audit']
+    assert audit['source_sha256'] == pool['source_sha256']
+    assert audit['position_evidence_only'] is True and audit['vertex_existence_certified'] is False
+    assert audit['binding_count'] == 2
+    assert audit['bindings'] == [
+        {'graph_id': 'G1', 'vertex_id': 'a', 'marker_id': 'marker_right',
+         'evidence_source': 'original_gradient_and_ink_outline',
+         'candidate_original_1000': [845.125, 231.875],
+         'normalized_position': [845.125/1000, 231.875/1000], 'derived_fields': ['x', 'y']},
+        {'graph_id': 'G1', 'vertex_id': 'b', 'marker_id': 'marker_left',
+         'evidence_source': 'closed_original_ink_hole',
+         'candidate_original_1000': [123.456, 789.012],
+         'normalized_position': [123.456/1000, 789.012/1000], 'derived_fields': ['x', 'y']}]
+
+
+def test_explicit_matching_marker_coordinates_are_preserved_not_derived():
+    response = page_response([{'id': 'a', 'label': 'a', 'marker_id': 'marker_left',
+                              'x': 123.456, 'y': 789.012}])
+    before = copy.deepcopy(response)
+    result = decode_page_response(response, page_marker_hints(), revision=4)
+    assert result['audit']['bindings'][0]['derived_fields'] == []
+    assert result['graphs'][0]['vertices'][0]['x'] == 123.456/1000
+    assert response == before
+
+
+@pytest.mark.parametrize('coordinates, code', [
+    ({'x': 123.456}, 'partial_page_marker_coordinates'),
+    ({'y': 789.012}, 'partial_page_marker_coordinates'),
+    ({'x': None, 'y': None}, 'invalid_page_marker_coordinates'),
+    ({'x': None, 'y': 789.012}, 'invalid_page_marker_coordinates'),
+    ({'x': True, 'y': 789.012}, 'invalid_page_marker_coordinates'),
+    ({'x': float('nan'), 'y': 789.012}, 'invalid_page_marker_coordinates'),
+    ({'x': 123.456, 'y': 1001}, 'invalid_page_marker_coordinates'),
+    ({'x': 123, 'y': 789}, 'page_marker_coordinates_conflict'),
+    ({'x': 123.456000001, 'y': 789.012}, 'page_marker_coordinates_conflict'),
+    ({'x': .123456, 'y': .789012}, 'page_marker_coordinates_conflict'),
+])
+def test_marker_binding_never_repairs_explicit_incomplete_or_conflicting_coordinates(coordinates, code):
+    response = page_response([{'id': 'a', 'label': None, 'marker_id': 'marker_left', **coordinates}])
+    with pytest.raises(RoleProtocolError, match=code) as caught:
+        decode_page_response(response, page_marker_hints(), revision=4)
+    assert caught.value.audit['graph_id'] == 'G1' and caught.value.audit['vertex_id'] == 'a'
+    # The published marker does not overwrite an explicit model coordinate,
+    # even when the mismatch is smaller than a pixel or caused by unit errors.
+    assert response['graphs'][0]['vertices'][0].keys() == {'id', 'label', 'marker_id', *coordinates}
+    if code == 'page_marker_coordinates_conflict':
+        assert caught.value.audit['expected'] == {'x': 123.456, 'y': 789.012}
+        assert caught.value.audit['actual'] == coordinates
+
+
+@pytest.mark.parametrize('marker_id, code', [
+    (None, 'invalid_page_marker_reference'), ('', 'invalid_page_marker_reference'),
+    ('not_given', 'unknown_page_marker_reference'),
+])
+def test_invalid_or_unknown_page_marker_is_not_inferred_from_coordinates(marker_id, code):
+    response = page_response([{'id': 'a', 'marker_id': marker_id, 'x': 123.456, 'y': 789.012}])
+    with pytest.raises(RoleProtocolError, match=code):
+        decode_page_response(response, page_marker_hints(), revision=4)
+
+
+@pytest.mark.parametrize('across_graphs', [False, True])
+def test_one_marker_cannot_create_two_vertex_identities(across_graphs):
+    response = page_response()
+    if across_graphs:
+        duplicate = copy.deepcopy(response['graphs'][0])
+        duplicate['id'] = 'G2'
+        duplicate['vertices'] = [{'id': 'other', 'marker_id': 'marker_right'}]
+        response['graphs'].append(duplicate)
+    else:
+        response['graphs'][0]['vertices'][1]['marker_id'] = 'marker_right'
+    before = copy.deepcopy(response)
+    with pytest.raises(RoleProtocolError, match='duplicate_page_marker_binding') as caught:
+        decode_page_response(response, page_marker_hints(), revision=4)
+    assert caught.value.audit['marker_id'] == 'marker_right'
+    assert caught.value.audit['previous_binding'] == {'graph_id': 'G1', 'vertex_id': 'a'}
+    assert response == before
+
+
+@pytest.mark.parametrize('mutation, code', [
+    ('absent', 'page_marker_hints_unavailable'), ('crop_coordinates', 'page_marker_coordinate_contract'),
+    ('source_missing', 'page_marker_source_missing'), ('duplicate_id', 'ambiguous_page_marker_candidate'),
+    ('invalid_coordinate', 'invalid_page_marker_candidate_coordinates'),
+    ('capacity', 'page_marker_candidate_capacity'),
+])
+def test_explicit_binding_requires_bounded_unambiguous_published_original_candidates(mutation, code):
+    from graph_agent_roles import MAX_PAGE_MARKERS
+    pool = page_marker_hints()
+    if mutation == 'absent': pool = None
+    if mutation == 'crop_coordinates': pool['coordinate_space'] = 'crop_1000'
+    if mutation == 'source_missing': pool.pop('source_sha256')
+    if mutation == 'duplicate_id': pool['candidates'].append(copy.deepcopy(pool['candidates'][0]))
+    if mutation == 'invalid_coordinate': pool['candidates'][0]['x'] = float('inf')
+    if mutation == 'capacity': pool['candidates'] = [pool['candidates'][0]]*(MAX_PAGE_MARKERS+1)
+    with pytest.raises(RoleProtocolError, match=code):
+        decode_page_response(page_response(), pool, revision=4)
+
+
+def test_legacy_page_coordinates_and_types_keep_decode_nodes_behavior_without_pool_matching():
+    from graph_evidence_pipeline import decode_nodes
+    response = page_response([{'id': 'a', 'label': None, 'x': 123.4, 'y': 789.0}])
+    decoded = decode_page_response(response, {'not': 'a usable pool'}, revision=4)
+    assert decoded['graphs'] == decode_nodes(response)
+    assert decoded['audit']['bindings'] == [] and decoded['audit']['binding_count'] == 0
+    missing = page_response([{'id': 'a', 'label': None}])
+    with pytest.raises(ValueError, match='invalid_qwen_coordinate'):
+        decode_page_response(missing, page_marker_hints(), revision=4)
+    response = page_response(); response['graphs'][0]['directed'] = 'true'
+    with pytest.raises(ValueError, match='invalid_graph_type'):
+        decode_page_response(response, page_marker_hints(), revision=4)
+
+
+@pytest.mark.parametrize('mutation, code', [
+    ('revision', 'stale_or_missing_revision'), ('role', 'wrong_role'), ('coordinates', 'role_coordinate_contract'),
+])
+def test_page_envelope_precedes_marker_binding(mutation, code):
+    response = page_response()
+    response[{'revision': 'base_revision', 'role': 'role', 'coordinates': 'coordinate_space'}[mutation]] = {
+        'revision': 3, 'role': 'connections', 'coordinates': 'crop_1000'}[mutation]
+    with pytest.raises(RoleProtocolError, match=code):
+        decode_page_response(response, None, revision=4)
+
+
+@pytest.mark.parametrize('confidence', [0., 1.])
+def test_marker_binding_does_not_infer_vertex_existence_or_complete_candidate_inventory(confidence):
+    pool = page_marker_hints()
+    pool['candidates'][0]['confidence'] = confidence
+    response = page_response([{'id': 'a', 'marker_id': 'marker_left', 'label': None}])
+    result = decode_page_response(response, pool, revision=4)
+    assert len(result['graphs'][0]['vertices']) == 1, 'Unused marker proposals never manufacture vertices.'
+    assert result['audit']['vertex_existence_certified'] is False
+    assert result['audit']['position_evidence_only'] is True
 
 
 def test_body_keeps_all_independently_located_questions():
@@ -232,6 +395,108 @@ def test_connection_record_identity_is_independent_of_candidate_name():
     checked = validate_connection_response(response, [g], candidates, revision=4)
     assert checked['graphs'][0]['edges'][0]['id'] == 'e1'
     assert checked['graphs'][0]['edges'][0]['candidate_id'] == 'px_1'
+
+
+@pytest.mark.parametrize('fit_score', [0., .25, .95])
+@pytest.mark.parametrize('stroke_supported', [False, True])
+def test_connection_view_scopes_footprints_without_changing_measured_evidence(fit_score, stroke_supported):
+    from graph_evidence_pipeline import _proposal_json
+    g = graph()
+    g['node_geometry_evidence'] = {'a': {
+        'footprint_outline': [[190., 500.], [200., 510.], [210., 500.]],
+        'footprint_confidence': fit_score, 'footprint_kind': 'uncertain_disk',
+        'footprint_source': 'local_ink_fallback',
+        'footprint_limits': {'contour_cap_reached': True, 'contours_seen': 64}}}
+    candidate = copy.deepcopy(g['edges'][0])
+    candidate['pixel_evidence'] = {'coverage': .64, 'supported': stroke_supported,
+        'source': 'original_pixel_route', 'reasons': ['retained_measurement']}
+    candidate['ports'] = [{'vertex': 'a', 'point': [.21, .5],
+                           'footprint_confidence': fit_score,
+                           'footprint_source': 'local_ink_fallback'}]
+    raw_graph, raw_candidate = copy.deepcopy(g), copy.deepcopy(candidate)
+    legacy = _proposal_json(g, [candidate])
+    view = connection_graph_view(g, [candidate])
+    assert g == raw_graph and candidate == raw_candidate
+    assert legacy['vertices'][0]['footprint_confidence'] == fit_score
+    assert legacy['candidates'][0]['ports'][0]['footprint_confidence'] == fit_score
+    # Every existing coordinate, outline, source and capacity diagnostic stays
+    # in the view. Only the semantically misleading fit-score exposure changes.
+    expected = copy.deepcopy(legacy)
+    expected['vertices'][0].pop('footprint_confidence')
+    expected['candidates'][0]['ports'][0].pop('footprint_confidence')
+    semantics = view.pop('node_footprint_semantics')
+    assert view == expected
+    assert semantics['purpose'] == 'endpoint_mask_and_port_estimation'
+    assert semantics['vertex_existence_assessment'] == 'not_provided'
+    assert view['candidates'][0]['path_reuse_allowed'] is stroke_supported
+    # Role-facing copies cannot later mutate the underlying measurement audit.
+    view['vertices'][0]['footprint_outline'][0][0] = 999.
+    view['vertices'][0]['footprint_limits'].clear()
+    assert g == raw_graph and candidate == raw_candidate
+
+
+def test_incomplete_read_is_rejected_with_same_graph_fixed_vertex_context():
+    first, second = graph(), graph('G2')
+    second['vertices'][1].update(x=.65, y=.7, label='b₂')
+    second['node_geometry_evidence'] = {'b': {'footprint_confidence': .25,
+        'footprint_source': 'local_ink_fallback'}}
+    response = connection_response([first, second])
+    response['graphs'][1]['reads'][1].update(complete=False, edge_ids=[], graph_id='G1',
+        x=999, y=999, evidence=proof([900, 900, 999, 999]))
+    raw_response, raw_graphs = copy.deepcopy(response), copy.deepcopy([first, second])
+    with pytest.raises(RoleProtocolError, match='connection_source_coverage') as caught:
+        validate_connection_response(response, [first, second], {}, revision=4)
+    audit = caught.value.audit
+    assert audit['accepted'] is False
+    assert audit['issues'] == ['incomplete_source_read:b']
+    assert audit['graph_id'] == 'G2' and audit['vertex_ids'] == ['b']
+    assert audit['vertex_context'] == [{'id': 'b', 'label': 'b₂', 'x': 650., 'y': 700.}]
+    assert audit['coordinate_space'] == 'original_1000'
+    assert audit['location_source'] == 'fixed_inventory'
+    assert audit['affected_vertex_count'] == 1 and audit['omitted_vertex_count'] == 0
+    assert response == raw_response and [first, second] == raw_graphs
+
+
+@pytest.mark.parametrize('mutation, expected_ids', [
+    ('missing_all', ['a', 'b']), ('missing_one', ['b']), ('duplicate', ['a']),
+    ('unknown', []), ('malformed_extra', []),
+])
+def test_coverage_context_never_invents_vertex_locations(mutation, expected_ids):
+    g = graph(); response = connection_response([g]); row = response['graphs'][0]
+    if mutation == 'missing_all': row['reads'] = None
+    if mutation == 'missing_one': row['reads'].pop()
+    if mutation == 'duplicate': row['reads'].append(copy.deepcopy(row['reads'][0]))
+    if mutation == 'unknown':
+        row['reads'].append({'vertex': 'unknown:incomplete_source_read:a',
+                             'complete': False, 'edge_ids': []})
+    if mutation == 'malformed_extra': row['reads'].append({'vertex': None, 'x': 200, 'y': 500})
+    with pytest.raises(RoleProtocolError, match='connection_source_coverage') as caught:
+        validate_connection_response(response, [g], {}, revision=4)
+    audit = caught.value.audit
+    assert audit['graph_id'] == 'G1'
+    assert audit['vertex_ids'] == expected_ids
+    assert [v['id'] for v in audit['vertex_context']] == expected_ids
+    assert audit['affected_vertex_count'] == len(expected_ids)
+    assert audit['omitted_vertex_count'] == 0
+
+
+def test_coverage_context_cap_reports_omissions_without_relaxing_coverage():
+    g = graph(edges=False)
+    g['vertices'] = [{'id': 'node:'+str(i), 'label': None, 'x': .2+i*.04, 'y': .5}
+                     for i in range(13)]
+    response = connection_response([g]); response['graphs'][0]['reads'] = None
+    with pytest.raises(RoleProtocolError, match='connection_source_coverage') as caught:
+        validate_connection_response(response, [g], {}, revision=4)
+    audit = caught.value.audit
+    assert audit['issues'] == ['source_coverage_missing']
+    assert audit['vertex_ids'] == [v['id'] for v in g['vertices'][:8]]
+    assert len(audit['vertex_context']) == 8
+    assert audit['affected_vertex_count'] == 13 and audit['omitted_vertex_count'] == 5
+    # A colon inside a legitimate ID is part of that ID, not another error.
+    response = connection_response([g]); response['graphs'][0]['reads'][10]['complete'] = False
+    with pytest.raises(RoleProtocolError, match='connection_source_coverage') as caught:
+        validate_connection_response(response, [g], {}, revision=4)
+    assert caught.value.audit['vertex_ids'] == ['node:10']
 
 
 @pytest.mark.parametrize('mutation', ['unknown_endpoint', 'duplicate_id', 'missing_read', 'node_edit', 'body_edit'])
