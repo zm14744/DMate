@@ -135,7 +135,7 @@ def make_frozen_run(folder, snapshot, *, count=1):
         images.append({'id': cid, 'path': str(path), 'sha256': digest(path.read_bytes()), 'width': 320, 'height': 180})
         references.append(None)  # Synthetic rendering does not manufacture gold.
     write_json(manifest_path, {'images': images})
-    write_json(folder/'run.json', {'check_only': False, 'kind': 'synthetic_runner_validation', 'fixture_only': True,
+    write_json(folder/'run.json', {'mode': 'local', 'check_only': False, 'kind': 'synthetic_runner_validation', 'fixture_only': True,
         'manifest_sha256': digest(manifest_path.read_bytes()), 'selected_image_ids': ids,
         'original_manifest_count': count, 'source_snapshot': snapshot,
         'policy': {'document_attempts_per_image': 1, 'automatic_retry': False, 'select_best_result': False}})
@@ -150,7 +150,7 @@ def make_frozen_run(folder, snapshot, *, count=1):
                               diagnostics={'text_evidence': {'complete': True}})
         case = folder/row['id']
         case.mkdir()
-        evidence = {'execution_id': 'synthetic-execution-'+row['id'], 'is_live': False,
+        evidence = {'mode': 'local', 'execution_id': 'synthetic-execution-'+row['id'], 'is_live': False,
             'document_requests': 1, 'source_unchanged': True, 'source_snapshot': snapshot,
             'image_sha256': row['sha256'], 'prediction_sha256': prediction_digest(prediction)}
         write_json(case/'response.json', {'prediction': prediction, 'execution_evidence': evidence})
@@ -176,6 +176,8 @@ def test_complete_freeze_loads_without_keys_or_ocr_imports(frozen):
 
 @pytest.mark.parametrize('target,mutate,error', [
     ('run.json', lambda d: d.update(check_only=True), 'preflight'),
+    ('run.json', lambda d: d.update(mode='unrecognized_mode'), 'execution mode'),
+    ('synthetic_1/response.json', lambda d: d['execution_evidence'].update(mode='http'), 'execution mode differs'),
     ('run.json', lambda d: d.update(selected_image_ids=[]), 'complete manifest'),
     ('summary.json', lambda d: d.update(actual_document_requests=0), 'complete manifest'),
     ('run.json', lambda d: d['source_snapshot'].update(dirty=False), 'Current source differs'),
@@ -230,6 +232,9 @@ def test_actual_chromium_replays_only_synthetic_frozen_first_results(monkeypatch
     summary = ui.replay(loaded, Path(executable), Path(cache))
     assert summary['kind'] == 'synthetic_runner_validation' and summary['fixture_only'] is True
     assert summary['certified_passes'] == 0 and summary['status'] != 'pass'
+    assert summary['application_status'] == 'not_run' and summary['application_certified_passes'] == 0
+    assert summary['execution_scope'] == 'local_pipeline'
+    assert summary['frontend_scope'] == 'response_dialog_replay'
     assert summary['frontend_contract_passes'] == (0 if inject_forbidden_request else 2)
     assert summary['ocr_requests'] == (4 if inject_forbidden_request else 0)
     assert summary['external_network_requests'] == summary['frontend_replay_document_requests'] == 0
@@ -237,6 +242,8 @@ def test_actual_chromium_replays_only_synthetic_frozen_first_results(monkeypatch
     for case in loaded['cases']:
         proof = ui.read_json(case['folder']/'frontend_evidence.json')
         assert proof['status'] == ('fail' if inject_forbidden_request else 'pass'), proof
+        assert proof['application_status'] == 'not_run'
+        assert proof['certification_scope'] == 'local_pipeline_and_ui_replay'
         assert proof['execution_id'] == case['execution']['execution_id']
         assert proof['source_tree_sha256'] == loaded['source']['source_tree_sha256']
         assert proof['prediction_sha256'] == prediction_digest(case['prediction'])

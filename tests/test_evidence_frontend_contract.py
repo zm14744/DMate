@@ -193,6 +193,8 @@ def test_actual_chromium_dialog_contract(monkeypatch):
     thread.start()
     base_url = f'http://127.0.0.1:{server.server_port}'
     report = {'kind': 'synthetic_contract', 'fixture_only': True, 'actual_browser': False,
+              'execution_scope': 'synthetic_frontend_contract', 'frontend_scope': 'response_dialog_replay',
+              'application_status': 'not_run', 'application_certified_passes': 0,
               'recognition_accuracy_test': False, 'first_pass_certified_images': 0,
               'contract': 'original_preview_and_text_cards', 'ocr_requests': [],
               'external_network_requests': 0,

@@ -5,6 +5,10 @@ The original response/result files are never replaced. New browser observations,
 frontend_evidence.json, result_with_frontend.json and summary_with_frontend.json
 remain in the private run directory. This verifies the existing original preview
 and text cards, not a newly drawn graph or recognition accuracy by itself.
+This is response_dialog_replay, not the browser upload handler or an actual
+/ocr application acceptance run. Scoped pipeline/UI passes never create
+application-certified passes. Actual HTTP observations stay visible while
+their full application status remains not_certified; local status is not_run.
 
 Example (requires no model credentials):
   python scripts/verify_graph_first_pass_ui.py --run /private/first-pass \
@@ -15,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-from collections import Counter
 import hashlib
 import io
 import json
@@ -29,8 +32,8 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from graph_first_pass_eval import (FRONTEND_CHECKS, evaluate_prediction,
-                                   prediction_digest)
+from graph_first_pass_eval import (EXECUTION_MODES, FRONTEND_CHECKS, evaluate_prediction,
+                                   evaluation_scope, prediction_digest, summarize_assessments)
 from scripts.benchmark_graph_first_pass import (digest, load_manifest, same_source,
                                                source_snapshot, utc_now, write_json)
 
@@ -58,6 +61,9 @@ def load_frozen_run(run, manifest_path):
         raise ValueError('Private run and browser artifacts must remain outside the repository')
     manifest, rows = load_manifest(manifest_path)
     metadata, summary, refs = [read_json(run/name) for name in ('run.json', 'summary.json', 'references.json')]
+    mode = metadata.get('mode')
+    if not isinstance(mode, str) or mode not in EXECUTION_MODES:
+        raise ValueError('Unsupported or missing frozen execution mode')
     identifiers = [row['id'] for row in rows]
     if metadata.get('check_only') is not False or summary.get('check_only') is True:
         raise ValueError('A preflight is not a completed first-pass run')
@@ -98,6 +104,8 @@ def load_frozen_run(run, manifest_path):
         evidence, prediction = response.get('execution_evidence'), response.get('prediction')
         if not isinstance(evidence, dict):
             raise ValueError('Missing frozen execution evidence: '+row['id'])
+        if evidence.get('mode') != mode:
+            raise ValueError('Response execution mode differs from the frozen run: '+row['id'])
         execution = evidence.get('execution_id')
         if not isinstance(execution, str) or not execution or execution in executions:
             raise ValueError('Missing or reused execution ID: '+row['id'])
@@ -390,6 +398,7 @@ def replay(loaded, browser_path, cache):
     output = loaded['run']/'frontend'
     output.mkdir(mode=0o700)
     write_json(output/'replay.json', {'started_at': utc_now(), 'kind': 'frozen_first_response_replay',
+        **evaluation_scope(loaded['metadata']['mode']),
         'fixture_only': loaded['fixture_only'], 'source_snapshot': loaded['source'],
         'first_files_sha256': loaded['baseline'], 'ocr_requests_allowed': 0,
         'external_network_allowed': 0, 'modes': list(MODES)})
@@ -524,7 +533,9 @@ def replay(loaded, browser_path, cache):
             checks.append({'name': name, 'status': 'pass' if success else 'fail'})
         passed = actual_browser and not record['errors'] and all(c['status'] == 'pass' for c in checks)
         artifacts = record['artifacts']+[str(network_path)]
-        evidence = {'schema_version': 2, 'status': 'pass' if passed else 'fail',
+        evidence = {'schema_version': 2, **evaluation_scope(loaded['metadata']['mode'],
+                     http_status=case['execution'].get('http_status')),
+            'status': 'pass' if passed else 'fail',
             'kind': 'synthetic_runner_validation' if loaded['fixture_only'] else 'original_response',
             'fixture_only': loaded['fixture_only'], 'actual_browser': actual_browser,
             'browser_version': browser_version, 'contract': 'original_preview_and_text_cards',
@@ -546,8 +557,7 @@ def replay(loaded, browser_path, cache):
                       frontend_evidence_file=str(case['folder']/'frontend_evidence.json'))
         write_json(case['folder']/'result_with_frontend.json', result)
         assessments.append(result)
-    counts = Counter(r['status'] for r in assessments)
-    summary = {'status': 'pass' if counts.get('pass', 0) == len(assessments) else 'incomplete',
+    summary = {**summarize_assessments(assessments, loaded['metadata']['mode']),
         'kind': 'synthetic_runner_validation' if loaded['fixture_only'] else 'original_response',
         'fixture_only': loaded['fixture_only'], 'finished_at': utc_now(), 'images_requested': len(assessments),
         'actual_document_requests': loaded['summary']['actual_document_requests'],
@@ -556,10 +566,11 @@ def replay(loaded, browser_path, cache):
         'frontend_contract_passes': sum(all(c['status'] == 'pass' for c in read_json(case['folder']/'frontend_evidence.json')['checks'])
                                         for case in loaded['cases']),
         'source_unchanged': stable, 'original_files_unchanged': originals_unchanged(loaded),
-        'status_counts': dict(counts), 'certified_passes': counts.get('pass', 0),
         'full_corpus_selected': True, 'ocr_requests': len(network['ocr_requests']),
         'external_network_requests': network['external_network_requests'],
-        'results': [{k: r.get(k) for k in ('id', 'status', 'structure_status')} for r in assessments]}
+        'results': [{k: r.get(k) for k in ('id', 'status', 'structure_status', 'pipeline_status',
+                                         'frontend_status', 'pipeline_ui_status', 'application_status')}
+                    for r in assessments]}
     write_json(loaded['run']/'summary_with_frontend.json', summary)
     return summary
 
@@ -582,8 +593,9 @@ def main(argv=None):
     except (OSError, ValueError, KeyError, TypeError) as exc:
         parser.error(str(exc))
     summary = replay(loaded, browser, Path(args.cdn_cache).resolve())
-    print(json.dumps({key: summary[key] for key in ('status', 'kind', 'images_requested',
-        'frontend_contract_passes', 'certified_passes', 'frontend_replay_document_requests',
+    print(json.dumps({key: summary[key] for key in ('status', 'kind', 'certification_scope',
+        'application_status', 'images_requested', 'pipeline_passes', 'pipeline_ui_passes',
+        'frontend_contract_passes', 'certified_passes', 'application_certified_passes', 'frontend_replay_document_requests',
         'ocr_requests', 'external_network_requests', 'source_unchanged')}, ensure_ascii=False))
     return 0 if summary['status'] == 'pass' else 2
 

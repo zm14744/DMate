@@ -30,6 +30,7 @@ STRUCTURE_DIMENSIONS = (
     'weights', 'edge_labels', 'styles', 'edge_instances', 'graph_types',
 )
 CURRENT_PIPELINE_VERSION = '2026-10-26-evidence-two-pass-v2'
+EXECUTION_MODES = {'local': 'local_pipeline', 'http': 'http_ocr_response'}
 FRONTEND_CHECKS = (
     'public_projection', 'panels', 'vertex_labels', 'graph_types', 'edge_instances',
     'edge_endpoints', 'directions', 'multiplicity', 'self_loops', 'weights',
@@ -37,6 +38,54 @@ FRONTEND_CHECKS = (
     'response_immutable', 'readonly', 'no_markup_injection',
     'source_unchanged', 'network_isolation',
 )
+
+
+def evaluation_scope(mode, *, http_status=None):
+    """These tools certify components, never the actual application workflow.
+
+    Even HTTP mode plus direct dialog replay does not exercise the browser's
+    upload handler or certify /ocr dispatch, readiness and HTTP error behavior.
+    Application evidence is intentionally unsupported until a separate real
+    application harness exists; caller-supplied claims cannot enable it. A
+    recorded HTTP response remains visible as observed but not app-certified.
+    """
+    known = isinstance(mode, str) and mode in EXECUTION_MODES
+    scope = EXECUTION_MODES[mode] if known else 'unverified_execution'
+    observed_http = mode == 'http' and type(http_status) is int and 100 <= http_status <= 599
+    return {'execution_mode': mode if known else 'unknown', 'execution_scope': scope,
+            'frontend_scope': 'response_dialog_replay',
+            'certification_scope': scope+'_and_ui_replay',
+            'application_status': 'not_certified' if observed_http else 'not_run',
+            'application_certified_passes': 0,
+            'http_response_observed': observed_http,
+            'http_status': http_status if observed_http else None}
+
+
+def _assessment_status(statuses):
+    if not statuses:
+        return 'not_run'
+    return 'fail' if 'fail' in statuses else 'pass' if all(s == 'pass' for s in statuses) else 'not_certified'
+
+
+def summarize_assessments(results, mode):
+    """Keep scoped pass counts without promoting them to application passes."""
+    http_responses = [r['http_status'] for r in results if r.get('http_response_observed') is True
+                      and type(r.get('http_status')) is int]
+    return {**evaluation_scope(mode),
+            'application_status': 'not_certified' if http_responses else 'not_run',
+            'http_response_observed': bool(http_responses),
+            'http_response_count': len(http_responses),
+            'http_status_counts': dict(Counter(str(status) for status in http_responses)),
+            'status': 'fail' if any(r.get('status') == 'fail' for r in results) else 'not_certified',
+            'status_counts': dict(Counter(r.get('status', 'not_certified') for r in results)),
+            'certified_passes': 0,
+            'pipeline_status': _assessment_status([r.get('pipeline_status', 'not_certified') for r in results]),
+            'frontend_status': _assessment_status([r.get('frontend_status', 'not_run') for r in results]),
+            'pipeline_ui_status': _assessment_status([r.get('pipeline_ui_status', 'not_certified') for r in results]),
+            'pipeline_passes': sum(r.get('pipeline_status') == 'pass' for r in results),
+            'frontend_passes': sum(r.get('frontend_status') == 'pass' for r in results),
+            'pipeline_ui_passes': sum(r.get('pipeline_ui_status') == 'pass' for r in results),
+            'structure_passes': sum(r.get('structure_status') == 'pass' for r in results)}
 
 
 def normalized_text(value):
@@ -374,6 +423,9 @@ def _run_evidence(evidence, reference, prediction=None):
     if not isinstance(evidence, dict):
         return {'status': 'not_certified', 'issues': ['missing_live_run_evidence']}
     issues, missing = [], []
+    mode = evidence.get('mode')
+    if not isinstance(mode, str) or mode not in EXECUTION_MODES:
+        issues.append('unsupported_or_missing_execution_mode')
     if evidence.get('document_requests') != 1:
         issues.append('document_not_executed_exactly_once')
     if evidence.get('is_live') is not True:
@@ -550,6 +602,7 @@ def _run_evidence(evidence, reference, prediction=None):
     return {'status': 'fail' if issues else 'not_certified' if missing else 'pass',
             'issues': sorted(set(issues)), 'missing_evidence': sorted(set(missing)),
             'qwen_sends': len(qwen_sends), 'text_sends': len(text_sends),
+            'execution_scope': evaluation_scope(mode)['execution_scope'],
             'pipeline_contract': evidence.get('pipeline_contract')}
 
 
@@ -560,6 +613,8 @@ def _frontend_evidence(evidence, reference, prediction, run_evidence):
         return {'status': 'fail', 'issues': ['actual_browser_render_failed']}
     if evidence.get('kind') != 'original_response' or evidence.get('fixture_only') is True:
         return {'status': 'not_certified', 'issues': ['fixture_or_unbound_browser_run_cannot_certify_original']}
+    if evidence.get('frontend_scope') != 'response_dialog_replay':
+        return {'status': 'not_certified', 'issues': ['frontend_replay_scope_missing']}
     required = ('image_sha256', 'prediction_sha256', 'source_tree_sha256', 'execution_id')
     missing = [name for name in required if not evidence.get(name)]
     artifacts = evidence.get('artifact_paths')
@@ -621,6 +676,10 @@ def _frontend_evidence(evidence, reference, prediction, run_evidence):
         issues.append('browser_source_snapshot_mismatch')
     if evidence['execution_id'] != run.get('execution_id'):
         issues.append('browser_execution_id_mismatch')
+    expected_scope = evaluation_scope(run.get('mode'))
+    if any(evidence.get(key) != expected_scope[key]
+           for key in ('execution_mode', 'execution_scope', 'certification_scope')):
+        issues.append('browser_execution_scope_mismatch')
     browser_source = evidence['source_snapshot']
     if any(browser_source.get(key) != snapshot.get(key)
            for key in ('git_sha', 'dirty', 'source_tree_sha256')):
@@ -632,15 +691,22 @@ def _frontend_evidence(evidence, reference, prediction, run_evidence):
 def evaluate_prediction(reference, prediction, *, run_evidence=None, frontend_evidence=None, config=None):
     """Strict first-result evaluation with separately visible evidence gates.
 
-    A structure pass is never a full certification: original text, completeness,
-    source/attempt evidence, and actual frontend rendering must also pass.
+    A pipeline/UI pass checks original text, completeness, source/attempts and
+    actual dialog rendering. This harness does not certify actual /ocr routing,
+    upload handling, HTTP status or readiness. Local application_status stays
+    not_run; observed HTTP responses remain not_certified for full application.
     """
     config = config or EvaluationConfig()
     if not 0 < config.minimum_panel_iou <= 1 or not 0 < config.maximum_vertex_distance < 1:
         raise ValueError('Invalid evaluation tolerances')
     ref_issues = reference_issues(reference)
     dims = {name: {'status': 'pass', 'issues': []} for name in STRUCTURE_DIMENSIONS+('schema', 'completeness')}
-    result = {'schema_version': 1, 'image_id': (reference or {}).get('id', (reference or {}).get('image_id')),
+    mode = run_evidence.get('mode') if isinstance(run_evidence, dict) else None
+    http_status = run_evidence.get('http_status') if isinstance(run_evidence, dict) else None
+    result = {'schema_version': 2, **evaluation_scope(mode, http_status=http_status),
+              'status': 'not_certified', 'pipeline_status': 'not_certified',
+              'frontend_status': 'not_run', 'pipeline_ui_status': 'not_certified',
+              'image_id': (reference or {}).get('id', (reference or {}).get('image_id')),
               'config': asdict(config), 'reference': {'status': 'not_certified' if ref_issues else 'ready',
                   'scope': 'graph_structure', 'issues': ref_issues,
                   'text_status': 'not_certified' if reference_text_issues(reference) else 'ready',
@@ -792,7 +858,11 @@ def evaluate_prediction(reference, prediction, *, run_evidence=None, frontend_ev
     dims['frontend'] = _frontend_evidence(frontend_evidence, reference or {}, prediction, run_evidence)
     structure = [dims[k]['status'] for k in STRUCTURE_DIMENSIONS+('schema',)]
     result['structure_status'] = 'not_certified' if ref_issues else 'fail' if 'fail' in structure else 'pass'
-    statuses = [d['status'] for d in dims.values()]
-    result['status'] = ('not_certified' if ref_issues else 'fail' if 'fail' in statuses
-                        else 'pass' if all(s == 'pass' for s in statuses) else 'not_certified')
+    result['pipeline_status'] = ('not_certified' if ref_issues else
+                                 _assessment_status([d['status'] for key, d in dims.items() if key != 'frontend']))
+    result['frontend_status'] = dims['frontend']['status']
+    result['pipeline_ui_status'] = ('not_certified' if ref_issues else
+                                    _assessment_status([d['status'] for d in dims.values()]))
+    # Do not turn a component certificate into an unqualified application pass.
+    result['status'] = 'fail' if result['pipeline_ui_status'] == 'fail' else 'not_certified'
     return result

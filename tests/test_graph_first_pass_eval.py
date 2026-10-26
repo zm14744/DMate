@@ -4,7 +4,9 @@ import json
 
 import pytest
 
-from graph_first_pass_eval import CURRENT_PIPELINE_VERSION, FRONTEND_CHECKS, evaluate_prediction, load_annotations, prediction_digest, reference_issues
+from graph_first_pass_eval import (CURRENT_PIPELINE_VERSION, FRONTEND_CHECKS, evaluate_prediction,
+                                   evaluation_scope, load_annotations, prediction_digest,
+                                   reference_issues, summarize_assessments)
 from scripts.benchmark_graph_first_pass import digest, main, same_source, validate_base_url
 
 
@@ -73,7 +75,8 @@ def live():
 def browser(actual=None, gold=None, run=None):
     actual, gold, run = actual or prediction(), gold or reference(), run or live()
     checks = [{'name': name, 'status': 'pass'} for name in FRONTEND_CHECKS]
-    return {'schema_version': 2, 'status': 'pass', 'actual_browser': True, 'exact_edge_projection_checked': True,
+    return {'schema_version': 2, **evaluation_scope(run.get('mode'), http_status=run.get('http_status')),
+            'status': 'pass', 'actual_browser': True, 'exact_edge_projection_checked': True,
             'kind': 'original_response', 'fixture_only': False,
             'contract': 'original_preview_and_text_cards',
             'image_sha256': gold['sha256'], 'prediction_sha256': prediction_digest(actual),
@@ -95,9 +98,101 @@ def evaluate(gold, actual, **kwargs):
                                frontend_evidence=kwargs.pop('frontend_evidence', browser(actual, gold, evidence)), **kwargs)
 
 
-def test_valid_raw_result_has_to_pass_all_gates():
+def test_valid_local_pipeline_and_ui_do_not_certify_the_application():
     result = evaluate(reference(), prediction())
-    assert result['status'] == result['structure_status'] == 'pass'
+    assert result['pipeline_status'] == result['pipeline_ui_status'] == result['structure_status'] == 'pass'
+    assert result['frontend_status'] == 'pass'
+    assert result['status'] == 'not_certified'
+    assert result['certification_scope'] == 'local_pipeline_and_ui_replay'
+    assert result['execution_scope'] == 'local_pipeline'
+    assert result['frontend_scope'] == 'response_dialog_replay'
+    assert result['application_status'] == 'not_run'
+    assert result['application_certified_passes'] == 0
+
+
+@pytest.mark.parametrize('mode', [None, '', 'unrecognized_mode', 'LOCAL', True, {}])
+def test_missing_or_unknown_execution_mode_never_passes(mode):
+    evidence = live()
+    evidence['mode'] = mode
+    result = evaluate(reference(), prediction(), run_evidence=evidence)
+    assert result['status'] == result['pipeline_status'] == 'fail'
+    assert 'unsupported_or_missing_execution_mode' in result['dimensions']['run_evidence']['issues']
+
+
+def test_http_observation_is_preserved_without_claiming_application_acceptance():
+    evidence = live()
+    evidence.update(mode='http', server_source_verified=True, http_status=200)
+    result = evaluate(reference(), prediction(), run_evidence=evidence)
+    assert result['pipeline_ui_status'] == 'pass'
+    assert result['status'] == result['application_status'] == 'not_certified'
+    assert result['http_response_observed'] is True and result['http_status'] == 200
+    summary = summarize_assessments([result], 'http')
+    assert summary['http_response_count'] == 1 and summary['http_status_counts'] == {'200': 1}
+    assert summary['application_status'] == 'not_certified'
+    assert summary['pipeline_passes'] == summary['pipeline_ui_passes'] == summary['frontend_passes'] == 1
+    assert summary['certified_passes'] == summary['application_certified_passes'] == 0
+
+
+def test_application_claims_in_caller_evidence_cannot_enable_application_pass():
+    evidence = live()
+    evidence.update(application_status='pass', application_certified_passes=1,
+                    application_evidence={'status': 'pass'})
+    result = evaluate(reference(), prediction(), run_evidence=evidence)
+    summary = summarize_assessments([result], 'local')
+    assert result['pipeline_ui_status'] == summary['pipeline_ui_status'] == 'pass'
+    assert result['status'] == summary['status'] == 'not_certified'
+    assert summary['application_status'] == 'not_run'
+    assert summary['pipeline_ui_passes'] == 1 and summary['structure_passes'] == 1
+    assert summary['certified_passes'] == summary['application_certified_passes'] == 0
+
+
+@pytest.mark.parametrize('gold,actual', [(reference(), None), (reference(), {}),
+                                        (None, prediction()), (reference(), {'graph_structures': 'invalid'})])
+def test_failed_or_missing_outputs_always_expose_scoped_status_fields(gold, actual):
+    result = evaluate_prediction(gold, actual, run_evidence=live(), frontend_evidence={'status': 'not_run'})
+    assert result['pipeline_status'] in ('fail', 'not_certified')
+    assert result['pipeline_ui_status'] in ('fail', 'not_certified')
+    assert result['frontend_status'] == 'not_run'
+    assert result['application_status'] == 'not_run'
+    assert result['application_certified_passes'] == 0
+
+
+def test_runner_model_failure_records_every_original_and_does_not_raise_missing_status(tmp_path, monkeypatch):
+    from PIL import Image
+    import scripts.benchmark_graph_first_pass as runner
+    rows, references = [], []
+    for index in (1, 2):
+        path = tmp_path/('original_'+str(index)+'.png')
+        Image.new('RGB', (20, 20), 'white').save(path)
+        sha = digest(path.read_bytes())
+        rows.append({'id': 'original_'+str(index), 'path': str(path), 'sha256': sha, 'width': 20, 'height': 20})
+        gold = reference()
+        gold.update(id=rows[-1]['id'], sha256=sha)
+        references.append(gold)
+    manifest, annotations = tmp_path/'manifest.json', tmp_path/'annotations.json'
+    manifest.write_text(json.dumps({'images': rows}))
+    annotations.write_text(json.dumps({'images': references}))
+    monkeypatch.setattr(runner, 'preflight', lambda *args: {'status': 'ready'})
+    calls = []
+    def failed(*args, **kwargs):
+        calls.append(kwargs['execution_id'])
+        if len(calls) == 1:
+            raise RuntimeError('Synthetic transport failure; no API request')
+        return None, {'status': 'failed', 'model_attempts': [], 'text_model_attempts': [], 'transport_attempts': []}
+    monkeypatch.setattr(runner, 'local_recognition', failed)
+    output = tmp_path/'failed-private-run'
+    assert runner.main(['--manifest', str(manifest), '--annotations', str(annotations),
+                        '--local', '--output', str(output)]) == 2
+    assert len(calls) == len(set(calls)) == 2
+    for row in rows:
+        result = json.loads((output/row['id']/'result.json').read_text())
+        assert result['pipeline_status'] == 'fail'
+        assert result['frontend_status'] == 'not_run'
+        assert result['application_status'] == 'not_run'
+        assert (output/row['id']/'response.json').is_file()
+    summary = json.loads((output/'summary.json').read_text())
+    assert summary['actual_document_requests'] == 2
+    assert summary['pipeline_passes'] == summary['application_certified_passes'] == 0
 
 
 def test_same_counts_with_endpoint_exchange_fails():
@@ -160,7 +255,7 @@ def test_arbitrary_ids_and_list_order_are_not_graph_evidence():
     for index, edge in enumerate(graph['edges']):
         edge.update(id=f'new_{index}', **{'from': mapping[edge['from']], 'to': mapping[edge['to']]})
     graph['edges'].reverse()
-    assert evaluate(reference(), actual)['status'] == 'pass'
+    assert evaluate(reference(), actual)['pipeline_ui_status'] == 'pass'
 
 
 def two_panels():
@@ -180,7 +275,7 @@ def test_panel_reordering_is_allowed_but_cross_panel_endpoint_is_not():
     gold = two_panels()
     actual = prediction(gold)
     actual['graph_structures'].reverse()
-    assert evaluate(gold, actual)['status'] == 'pass'
+    assert evaluate(gold, actual)['pipeline_ui_status'] == 'pass'
     actual['graph_structures'][0]['edges'][0]['to'] = 'left_only_node'
     result = evaluate(gold, actual)
     assert result['status'] == 'fail'
@@ -211,7 +306,7 @@ def test_unlabeled_nodes_are_matched_one_to_one_by_position():
         node['label'] = None
     actual = prediction(gold)
     actual['graph_structures'][0]['vertices'].reverse()
-    assert evaluate(gold, actual)['status'] == 'pass'
+    assert evaluate(gold, actual)['pipeline_ui_status'] == 'pass'
     actual['graph_structures'][0]['vertices'][0]['x'] = .9
     result = evaluate(gold, actual)
     assert result['dimensions']['vertices']['status'] == 'fail'
@@ -259,6 +354,8 @@ def test_text_and_frontend_are_independent_certification_gates():
     result = evaluate(reference(), prediction(), frontend_evidence={'status': 'not_run'})
     assert result['structure_status'] == 'pass'
     assert result['dimensions']['frontend']['status'] == 'not_run'
+    assert result['pipeline_status'] == 'pass'
+    assert result['pipeline_ui_status'] == 'not_certified'
     assert result['status'] == 'not_certified'
     actual = prediction()
     actual['text'] = '无关内容'
@@ -348,7 +445,7 @@ def test_text_correction_has_a_separate_single_send_ledger():
     result = evaluate(reference(), prediction(), run_evidence=evidence)
     assert result['dimensions']['run_evidence']['qwen_sends'] == 2
     assert result['dimensions']['run_evidence']['text_sends'] == 1
-    assert result['status'] == 'pass'
+    assert result['pipeline_ui_status'] == 'pass'
     evidence['text_model_attempts'] = []
     assert evaluate(reference(), prediction(), run_evidence=evidence)['status'] == 'not_certified'
 
@@ -501,6 +598,10 @@ def test_check_only_never_calls_recognition_or_records_fake_pass(tmp_path, monke
     summary = json.loads((output/'summary.json').read_text())
     assert summary['actual_document_requests'] == summary['certified_passes'] == 0
     assert summary['frontend_rendering'] == 'not_run'
+    assert summary['execution_scope'] == 'local_pipeline'
+    assert summary['frontend_scope'] == 'response_dialog_replay'
+    assert summary['application_status'] == 'not_run'
+    assert summary['application_certified_passes'] == summary['pipeline_ui_passes'] == 0
     with pytest.raises(SystemExit):
         main(['--manifest', str(manifest), '--annotations', str(annotations), '--local', '--check-only', '--output', str(output)])
 
@@ -632,7 +733,7 @@ def test_opposite_arrows_do_not_imply_a_multigraph():
     gold['graphs'][0]['edges'].append({**gold['graphs'][0]['edges'][0], 'id': 'back', 'from': 'b', 'to': 'a'})
     actual = prediction(gold)
     assert actual['graph_structures'][0]['multigraph'] is False
-    assert evaluate(gold, actual)['status'] == 'pass'
+    assert evaluate(gold, actual)['pipeline_ui_status'] == 'pass'
 
 
 def test_conflicting_reference_completeness_cannot_be_certified():

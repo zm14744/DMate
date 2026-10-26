@@ -7,12 +7,16 @@ Example (no model/API calls):
 
 Artifacts include private original responses and must remain outside the repo.
 No gold data is passed into any recognition function, prompt, or model call.
+--local evaluates the local recognition pipeline; subsequent dialog replay is
+separate. Neither mode certifies the application's /ocr enablement/dispatch,
+browser upload handler, HTTP error handling or readiness. Application status
+is not_run locally; an observed HTTP response is retained as not_certified for
+full application acceptance even when pipeline and replay components pass.
 """
 from __future__ import annotations
 
 import argparse
 import base64
-from collections import Counter
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from datetime import datetime, timezone
 import hashlib
@@ -32,7 +36,9 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from graph_first_pass_eval import evaluate_prediction, load_annotations, prediction_digest, reference_issues, reference_text_issues
+from graph_first_pass_eval import (evaluate_prediction, evaluation_scope, load_annotations,
+                                   prediction_digest, reference_issues, reference_text_issues,
+                                   summarize_assessments)
 
 
 def utc_now():
@@ -402,7 +408,8 @@ def main(argv=None):
     check = preflight(rows, annotations, execution_mode)
     source = source_snapshot()
     manifest_path = Path(args.manifest).resolve()
-    metadata = {'schema_version': 1, 'started_at': utc_now(), 'mode': execution_mode,
+    metadata = {'schema_version': 2, **evaluation_scope(execution_mode),
+                'started_at': utc_now(), 'mode': execution_mode,
                 'check_only': args.check_only, 'base_url': base_url,
                 'manifest_sha256': digest(manifest_path.read_bytes()),
                 'annotation_sources': [{'path': str(Path(p).resolve()), 'sha256': digest(Path(p).read_bytes())}
@@ -419,7 +426,8 @@ def main(argv=None):
     write_json(output/'references.json', {'evaluation_only': True, 'production_lookup_forbidden': True,
                                        'records': [annotations.get(row['id']) for row in rows]})
     if args.check_only:
-        write_json(output/'summary.json', {'status': check['status'], 'check_only': True, 'images_requested': len(rows),
+        write_json(output/'summary.json', {**summarize_assessments([], execution_mode),
+                                         'status': check['status'], 'check_only': True, 'images_requested': len(rows),
                                          'actual_document_requests': 0, 'certified_passes': 0,
                                          'frontend_rendering': 'not_run', 'reference_ready_count': check['reference_ready_count'],
                                          'reference_scope': 'graph_structure',
@@ -435,7 +443,7 @@ def main(argv=None):
         case = output/row['id']
         case.mkdir(mode=0o700)
         if blocked_reason:
-            record = {'id': row['id'], 'status': 'blocked', 'reason': blocked_reason, 'actual_document_requests': 0,
+            record = {**evaluation_scope(execution_mode), 'id': row['id'], 'status': 'blocked', 'reason': blocked_reason, 'actual_document_requests': 0,
                       'frontend_rendering': 'not_run', 'structure_status': 'not_certified'}
             write_json(case/'result.json', record)
             results.append(record)
@@ -443,7 +451,7 @@ def main(argv=None):
         before = source_snapshot()
         if not same_source(source, before):
             blocked_reason = 'source_changed_after_run_freeze'
-            record = {'id': row['id'], 'status': 'blocked', 'reason': blocked_reason,
+            record = {**evaluation_scope(execution_mode), 'id': row['id'], 'status': 'blocked', 'reason': blocked_reason,
                       'actual_document_requests': 0, 'structure_status': 'not_certified'}
             write_json(case/'result.json', record)
             results.append(record)
@@ -451,7 +459,7 @@ def main(argv=None):
         raw = Path(row['path']).read_bytes()
         if digest(raw) != row['sha256']:
             blocked_reason = 'original_changed_after_preflight'
-            record = {'id': row['id'], 'status': 'blocked', 'reason': blocked_reason,
+            record = {**evaluation_scope(execution_mode), 'id': row['id'], 'status': 'blocked', 'reason': blocked_reason,
                       'actual_document_requests': 0, 'structure_status': 'not_certified'}
             write_json(case/'result.json', record)
             results.append(record)
@@ -469,7 +477,8 @@ def main(argv=None):
             except Exception as exc:
                 prediction, execution = None, {'status': 'failed', 'exception_type': type(exc).__name__, 'model_attempts': []}
         after = source_snapshot()
-        evidence = {**execution, 'mode': execution_mode, 'document_requests': 1, 'is_live': True,
+        evidence = {**execution, **evaluation_scope(execution_mode, http_status=execution.get('http_status')),
+                    'mode': execution_mode, 'document_requests': 1, 'is_live': True,
                     'execution_id': execution_id, 'pipeline_contract': 'evidence-two-pass',
                     'image_sha256': row['sha256'], 'request_started_at': started, 'request_finished_at': utc_now(),
                     'prediction_sha256': prediction_digest(prediction),
@@ -492,19 +501,22 @@ def main(argv=None):
         results.append(assessment)
         print(json.dumps({'id': row['id'], 'status': assessment['status'],
                           'structure_status': assessment['structure_status'],
+                          'pipeline_status': assessment['pipeline_status'],
+                          'application_status': assessment['application_status'],
                           'seconds': evidence['seconds']}, ensure_ascii=False), flush=True)
         if not evidence['source_unchanged']:
             blocked_reason = 'source_changed_during_request'
-    counts = Counter(r['status'] for r in results)
-    summary = {'status': 'pass' if counts.get('pass', 0) == len(rows) else 'incomplete',
+    summary = {**summarize_assessments(results, execution_mode),
                'finished_at': utc_now(), 'images_requested': len(rows),
                'actual_document_requests': sum(r.get('actual_document_requests', 0) for r in results),
-               'status_counts': dict(counts), 'certified_passes': counts.get('pass', 0),
-               'structure_passes': sum(r.get('structure_status') == 'pass' for r in results),
                'full_corpus_selected': len(rows) == metadata['original_manifest_count'],
-               'frontend_rendering': 'not_run', 'results': [{k: r.get(k) for k in ('id', 'status', 'structure_status')} for r in results]}
+               'frontend_rendering': 'not_run', 'results': [{k: r.get(k) for k in
+                   ('id', 'status', 'structure_status', 'pipeline_status', 'frontend_status', 'pipeline_ui_status', 'application_status')}
+                   for r in results]}
     write_json(output/'summary.json', summary)
-    print(json.dumps({k: summary[k] for k in ('status', 'images_requested', 'actual_document_requests', 'status_counts', 'certified_passes')}, ensure_ascii=False))
+    print(json.dumps({k: summary[k] for k in ('status', 'certification_scope', 'application_status',
+        'images_requested', 'actual_document_requests', 'status_counts', 'pipeline_passes', 'pipeline_ui_passes',
+        'certified_passes', 'application_certified_passes')}, ensure_ascii=False))
     return 0 if summary['status'] == 'pass' else 2
 
 
