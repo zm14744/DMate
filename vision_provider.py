@@ -20,6 +20,7 @@ from urllib3 import exceptions as urllib3_errors
 GLM_MODEL='glm-4.6v-flash'
 GLM_PAID_MODEL='glm-4.6v'
 GLM_53_FLASH_MODEL='glm-5.3-flash'
+GLM_5V_TURBO_MODEL='glm-5v-turbo'
 GLM_URL='https://open.bigmodel.cn/api/paas/v4/chat/completions'
 QWEN_MODEL='qwen3-vl-plus'
 
@@ -175,7 +176,7 @@ class VisionProvider:
         if name not in ('qwen','glm'):raise ValueError('Unsupported vision provider')
         if type(thinking) is not bool:raise ValueError('thinking must be explicit boolean')
         if type(retries) is not int or not 0<=retries<=2:raise ValueError('retry limit is 0..2')
-        allowed=(QWEN_MODEL,) if name=='qwen' else (GLM_MODEL,GLM_PAID_MODEL,GLM_53_FLASH_MODEL)
+        allowed=(QWEN_MODEL,) if name=='qwen' else (GLM_MODEL,GLM_PAID_MODEL,GLM_53_FLASH_MODEL,GLM_5V_TURBO_MODEL)
         self.name=name;self.model=model or allowed[0]
         if self.model not in allowed:raise ValueError('Unsupported provider model')
         if self.model==GLM_53_FLASH_MODEL:
@@ -214,15 +215,20 @@ class VisionProvider:
             if self.thinking_budget is not None:payload['thinking_budget']=self.thinking_budget
             if not self.thinking:payload['response_format']={'type':'json_object'}
         else:
-            # Zhipu's SDK treats temperature=0 as do_sample=False, not a valid
-            # raw API temperature. Omit temperature when sampling is disabled.
+            # Zhipu ignores temperature/top_p when do_sample=False. Keep the
+            # deterministic request explicit without redundant sampling fields.
             payload.update(thinking={'type':'enabled' if self.thinking else 'disabled'},do_sample=False)
             if self.model==GLM_53_FLASH_MODEL:
                 payload['reasoning_effort']=self.reasoning_effort
                 # Verified on original photos: GLM 5.3 accepts JSON mode while
                 # thinking is enabled. Qwen's thinking payload is different.
                 payload['response_format']={'type':'json_object'}
-            if not self.thinking:payload['response_format']={'type':'json_object'}
+            # The 5V guide documents multimodal JSON in the prompt, while the
+            # chat API reserves response_format for text models. Do not assume
+            # support for this optional field; strict JSON parsing below stays
+            # mandatory. Preserve the existing 4.6/5.3 request contract.
+            if not self.thinking and self.model!=GLM_5V_TURBO_MODEL:
+                payload['response_format']={'type':'json_object'}
         return payload
 
     def __call__(self,prompt,images,budget):
@@ -238,7 +244,7 @@ class VisionProvider:
         self.logical_calls+=1
         payload=self.payload(prompt,selected_images,max_images=max_images)
         image_sha256=[image_digest(url) for url in selected_images]
-        if self.name=='qwen' and hasattr(budget,'output_tokens'):
+        if (self.name=='qwen' or self.model==GLM_5V_TURBO_MODEL) and hasattr(budget,'output_tokens'):
             value=budget.output_tokens
             if type(value) is not int or not 1024<=value<=16384:
                 raise ValueError('invalid_bounded_output_budget')
@@ -296,7 +302,7 @@ class VisionProvider:
                               returned_model=result.get('model'),system_fingerprint=result.get('system_fingerprint'),
                               reasoning_chars=result.get('reasoning_chars',len((choice.get('message') or {}).get('reasoning_content') or '')))
                 returned=str(result.get('model') or '').lower()
-                if self.model==GLM_53_FLASH_MODEL and not returned:
+                if self.model in (GLM_53_FLASH_MODEL,GLM_5V_TURBO_MODEL) and not returned:
                     raise VisionError('model_identity_unverified')
                 if returned and (not (returned==self.model or returned.startswith(self.model+'-')) or
                         self.model==GLM_PAID_MODEL and returned.startswith(GLM_MODEL)):

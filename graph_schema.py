@@ -133,7 +133,7 @@ def canonical_graph(source, index=1):
 
 def display_graph(graph):
     """Public display fields only; pixels/model diagnostics stay server-side."""
-    fields = ('schema_version', 'id', 'name', 'directed', 'weighted', 'multigraph', 'complete')
+    fields = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete')
     out = {k: graph[k] for k in fields if k in graph}
     out['vertices'] = [{k: v[k] for k in ('id', 'label', 'isolated_confirmed') if k in v}
                        for v in graph['vertices']]
@@ -161,15 +161,19 @@ def describe_graphs(graphs):
             if edge['from'] == edge['to']: attrs.append('自环')
             if edge.get('edge_label') is not None: attrs.append('边名 '+str(edge['edge_label']))
             if edge.get('weight') is not None: attrs.append('权值 '+str(edge['weight']))
-            if edge.get('style') in ('dashed', 'dotted'):
-                attrs.append('虚线' if edge['style'] == 'dashed' else '点线')
+            if edge.get('style') in ('solid', 'dashed', 'dotted'):
+                attrs.append({'solid': '实线', 'dashed': '虚线', 'dotted': '点线'}[edge['style']])
+            color = edge.get('color')
+            if isinstance(color, str) and color.strip() and color.strip().lower() != 'unknown':
+                attrs.append('颜色 '+color.strip())
             if edge['direction'] == 'unknown': attrs.append('方向未确定')
             if edge['status'] != 'accepted': attrs.append('待确认')
             suffix = '（'+'，'.join(attrs)+'）' if attrs else ''
             edges.append(f"{edge['id']}: {labels[edge['from']]}{connector}{labels[edge['to']]}{suffix}")
         isolated = [labels[v['id']] for v in graph['vertices'] if v['id'] not in incident
                     and (graph['complete'] or v.get('isolated_confirmed'))]
-        kind = '有向图' if graph['directed'] is True else '无向图' if graph['directed'] is False else '方向未确定'
+        kind = ('混合图' if graph.get('direction_mode') == 'mixed' else
+                '有向图' if graph['directed'] is True else '无向图' if graph['directed'] is False else '方向未确定')
         line = f"{graph['name']}：{kind}。顶点："+'、'.join(labels.values())+'。'
         if isolated: line += '孤立顶点：'+'、'.join(isolated)+'。'
         line += f"边（{'共' if graph['complete'] else '暂录'}{len(edges)}条）："+'；'.join(edges)+'。'

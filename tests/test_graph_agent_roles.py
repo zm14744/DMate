@@ -7,7 +7,7 @@ import copy
 import pytest
 
 from graph_agent_roles import (
-    RoleProtocolError, build_solver_input, connection_graph_view, decode_body_response, decode_page_response,
+    RoleProtocolError, attribute_input_view, build_solver_input, connection_graph_view, decode_body_response, decode_page_response,
     decode_review_response, decode_targeted_review, merge_attribute_response,
     merge_body_response, reconcile_role_text, validate_connection_response, extract_rejected_role_issues,
 )
@@ -260,6 +260,78 @@ def test_marker_binding_does_not_infer_vertex_existence_or_complete_candidate_in
     assert len(result['graphs'][0]['vertices']) == 1, 'Unused marker proposals never manufacture vertices.'
     assert result['audit']['vertex_existence_certified'] is False
     assert result['audit']['position_evidence_only'] is True
+
+
+@pytest.mark.parametrize('center', [(199.999999, 500), (800.000001, 500),
+                                    (500, 299.999999), (500, 700.000001)])
+@pytest.mark.parametrize('use_marker', [False, True])
+def test_page_vertices_cannot_escape_own_panel_even_with_valid_original_coordinates(center, use_marker):
+    pool = page_marker_hints()
+    pool['candidates'][0].update(x=center[0], y=center[1])
+    vertex = {'id': 'a', 'label': 'a'}
+    vertex.update({'marker_id': 'marker_left'} if use_marker else {'x': center[0], 'y': center[1]})
+    response = page_response([vertex]); response['graphs'][0]['bbox'] = [200, 300, 800, 700]
+    before, pool_before = copy.deepcopy(response), copy.deepcopy(pool)
+    with pytest.raises(RoleProtocolError, match='page_vertex_outside_panel') as caught:
+        decode_page_response(response, pool, revision=4)
+    assert caught.value.audit == {
+        'accepted': False, 'issue': 'page_vertex_outside_panel', 'graph_id': 'G1', 'vertex_id': 'a',
+        'coordinate_space': 'original_1000', 'center': list(center), 'panel_bbox': [200, 300, 800, 700],
+        'marker_id': 'marker_left' if use_marker else None}
+    assert response == before and pool == pool_before, 'No clamping, panel expansion, or reassignment.'
+
+
+def test_page_panel_boundaries_use_full_image_coordinates_and_keep_same_labels_in_distinct_panels():
+    response = page_response([{'id': 'a', 'label': 'a', 'x': 100, 'y': 200},
+                              {'id': 'b', 'label': 'b', 'x': 400, 'y': 700}])
+    response['graphs'][0]['bbox'] = [100, 200, 400, 700]
+    second = copy.deepcopy(response['graphs'][0]); second['id'] = 'G2'
+    second['bbox'] = [600, 200, 900, 700]
+    for v in second['vertices']: v['x'] += 500
+    response['graphs'].append(second)
+    result = decode_page_response(response, None, revision=4)
+    assert [[(v['x'], v['y']) for v in g['vertices']] for g in result['graphs']] == [
+        [(.1, .2), (.4, .7)], [(.6, .2), (.9, .7)]]
+    response['graphs'][1]['vertices'][0]['x'] = 100
+    with pytest.raises(RoleProtocolError, match='page_vertex_outside_panel') as caught:
+        decode_page_response(response, None, revision=4)
+    assert caught.value.audit['graph_id'] == 'G2', 'Being inside another valid panel cannot authorize membership.'
+
+
+def test_page_panel_validation_does_not_relax_invalid_full_image_coordinates():
+    response = page_response([{'id': 'a', 'x': 1001, 'y': 500}])
+    with pytest.raises(ValueError, match='invalid_qwen_coordinate'):
+        decode_page_response(response, None, revision=4)
+
+
+def test_empty_body_can_keep_graph_label_hints_with_unassigned_graph_identity():
+    local = hints('q₂', bbox=(450, 380, 480, 420))
+    response = body_response('', local=local, role='graph_label', gid=None)
+    response['regions'] = [{'id': 'observed_label', 'role': 'graph_label', 'text': 'q₂',
+                            'source': 'original', 'bbox': [450, 380, 480, 420]}]
+    before = copy.deepcopy(response)
+    deferred = decode_body_response(response, hints=local, revision=4)
+    assert deferred['body_text'] == ''
+    assert deferred['regions'][0]['role'] == 'graph_label'
+    assert deferred['body_complete'] is False, 'Unknown panel ownership remains unresolved, not body text.'
+    merged = merge_body_response(response, local, [graph()], revision=4)
+    assert merged['body_text'] == '' and merged['body_complete'] is True
+    assert merged['text_review']['regions'][0]['role'] == 'graph_label'
+    assert merged['text_review']['regions'][0]['graph_id'] == 'G1'
+    assert response == before
+
+
+def test_body_hint_role_contradiction_is_not_repaired_from_its_reason_or_null_graph_id():
+    local = hints('q₂', bbox=(450, 380, 480, 420))
+    response = body_response('', local=local, role='body', gid=None)
+    response['regions'] = [{'id': 'observed_label', 'role': 'graph_label', 'text': 'q₂',
+                            'source': 'original', 'bbox': [450, 380, 480, 420]}]
+    response['text_review']['regions'][0]['reason'] = '这是图内边名，不是正文'
+    before = copy.deepcopy(response)
+    with pytest.raises(RoleProtocolError, match='body_fragment_not_in_text') as caught:
+        merge_body_response(response, local, [graph()], revision=4)
+    assert caught.value.audit['hint_id'] == 't1'
+    assert response == before
 
 
 def test_body_keeps_all_independently_located_questions():
@@ -545,6 +617,83 @@ def test_connection_issues_are_not_hidden_by_inventory_complete():
     response['issues'][0]['vertex_ids'] = ['invented']
     with pytest.raises(RoleProtocolError, match='unknown_or_duplicate_issue_reference'):
         validate_connection_response(response, [g], {}, revision=4)
+
+
+def test_attribute_projection_keeps_fixed_ids_full_curve_and_null_as_unverified_draft():
+    g = graph()
+    g['edges'][0]['id'] = 'internal_42'
+    g['edges'][0]['path'] = [[.2+i*.01, .4+(i % 5)*.01] for i in range(61)]
+    g['edges'][0]['evidence'] = [{'source': 'private_runtime_audit', 'supported': True}]
+    local = hints('q₂', bbox=(450, 380, 480, 420))
+    local['items'][0].update(paddle_role='body', score=0.01)
+    before = copy.deepcopy((g, local))
+    view = attribute_input_view([g], local)
+    edge = view['graphs'][0]['edges'][0]
+    assert edge['id'] == 'internal_42' and edge['edge_label'] is None and edge['weight'] is None
+    assert edge['path'] == [[x*1000, y*1000] for x, y in g['edges'][0]['path']]
+    assert len(edge['path']) == 61 and edge['from'] == 'a' and edge['to'] == 'b'
+    assert 'evidence' not in edge and 'status' not in edge
+    assert view['graphs'][0]['bbox'] == [100, 200, 900, 900]
+    assert view['attribute_reading_contract']['flat_attribute_values'] == 'unverified_draft_null_does_not_prove_absence'
+    item = view['attribute_text_hints']['items'][0]
+    assert item == {'id': 't1', 'text': 'q₂', 'bbox': [450, 380, 480, 420],
+                    'candidate_graph_ids': ['G1'], 'paddle_role': 'body',
+                    'source': 'local_ocr', 'proposal_only': True}
+    assert 'edge_id' not in item and 'weight' not in item, 'No text-to-edge or digit-to-weight inference.'
+    view['graphs'][0]['edges'][0]['path'][0][0] = 999
+    view['attribute_text_hints']['items'][0]['bbox'][0] = 999
+    assert (g, local) == before
+
+
+def test_attribute_projection_does_not_infer_a_unique_panel_or_edge_from_ocr_category():
+    local = hints('12', bbox=(450, 380, 480, 420))
+    local['items'][0]['paddle_role'] = 'noise'
+    view = attribute_input_view([graph(), graph('G2')], local)
+    item = view['attribute_text_hints']['items'][0]
+    assert item['candidate_graph_ids'] == ['G1', 'G2']
+    assert item['text'] == '12' and item['paddle_role'] == 'noise'
+    assert all(e['weight'] is None for g in view['graphs'] for e in g['edges'])
+
+
+def test_attribute_projection_reports_unusable_or_unlocated_hints_without_inventing_positions():
+    local = {'items': [
+        {'id': 'unlocated', 'text': 'q₂'},
+        {'id': 'outside', 'text': 'heading', 'bbox': [0, 0, 80, 80]},
+        {'id': 'invalid', 'text': 'q₃', 'bbox': [450, 380, 450, 420]},
+        {'id': 'oversize', 'text': 'q'*513, 'bbox': [450, 380, 480, 420]}],
+        'issues': [], 'local_status': 'unavailable'}
+    view = attribute_input_view([graph()], local)
+    assert view['attribute_text_hints']['items'] == []
+    assert view['attribute_text_hints']['local_status'] == 'unavailable'
+    assert {r['hint_id']: r['reason'] for r in view['attribute_text_hints']['omissions']} == {
+        'unlocated': 'unlocated_or_invalid_original_bbox', 'outside': 'outside_all_panels',
+        'invalid': 'unlocated_or_invalid_original_bbox', 'oversize': 'empty_or_excessive_text'}
+    assert view['attribute_reading_contract']['missing_hint_does_not_prove_absence'] is True
+
+
+@pytest.mark.parametrize('bad_path', [[], [[.2, .5], [float('nan'), .5]],
+                                    [[.2, .5], [1.001, .5]], [[.2, .5]]*129])
+def test_attribute_projection_cannot_sanitize_or_truncate_invalid_geometry(bad_path):
+    g = graph(); g['edges'][0]['path'] = bad_path
+    with pytest.raises(RoleProtocolError, match='attribute_view_invalid_path'):
+        attribute_input_view([g], None)
+
+
+def test_attribute_projection_is_input_only_and_label_change_still_needs_its_own_pixel_location():
+    g = graph(); local = hints('q₂', bbox=(450, 380, 480, 420))
+    view = attribute_input_view([g], local)
+    assert g['edges'][0]['edge_label'] is None
+    response = attribute_response([g])
+    item = response['graphs'][0]['edges'][0]
+    item.update(attributes={'edge_label': view['attribute_text_hints']['items'][0]['text']},
+                evidence=proof([200, 750, 250, 800]))
+    with pytest.raises(RoleProtocolError, match='attribute_evidence_wrong_edge'):
+        merge_attribute_response([g], response, revision=4)
+    item['evidence'] = proof([450, 380, 480, 420])
+    updated, audit = merge_attribute_response([g], response, revision=4)
+    assert updated[0]['edges'][0]['edge_label'] == 'q₂'
+    assert updated[0]['edges'][0]['status'] == 'pending'
+    assert audit['requires_pixel_revalidation'] is True and g['edges'][0]['edge_label'] is None
 
 
 def test_parallel_edge_instances_remain_distinct_through_attributes():

@@ -25,7 +25,7 @@ from jsonschema.exceptions import SchemaError, ValidationError
 
 ROLES = frozenset({
     'page_vertices', 'body_text', 'body_review', 'connections', 'attributes',
-    'structure_review', 'solver',
+    'structure_review', 'solver', 'semantic_extract', 'semantic_review', 'semantic_repair',
 })
 MAX_JSON_BYTES = 4_000_000
 MAX_JSON_NODES = 400_000

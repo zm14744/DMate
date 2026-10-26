@@ -30,6 +30,53 @@ def registry_for(document):
     return build_image_tools(document, {}, [], budget)
 
 
+def test_marker_sheet_uses_fixed_cpu_projection_and_keeps_original_refs():
+    image = np.full((140, 220, 3), 255, dtype=np.uint8)
+    cv2.circle(image, (45, 60), 11, (0, 0, 0), 2)
+    cv2.circle(image, (175, 80), 12, (0, 0, 0), 2)
+    document = analyze_document(Image.fromarray(image))
+    before = document.original.tobytes()
+    registry, context = registry_for(document)
+    context.data['images']['existing'] = Image.new('RGB', (2, 2), 'red')
+    proposals = registry.call('image.marker_proposals', {}, role='page_vertices', context=context)
+    assert proposals['ok'] and proposals['result']['candidates']
+    frozen = copy.deepcopy(context.data['marker_cache']['view_proposals'])
+    result = registry.call('image.marker_review_views', {}, role='page_vertices', context=context)
+    assert result['ok'], result
+    value = result['result']
+    assert value['source_sha256'] == context.source_sha256
+    assert value['source_pixels_only'] and value['proposal_only']
+    assert value['vertex_existence_certified'] is False
+    assert value['coordinate_space'] == 'original_1000'
+    assert value['sheet_coordinate_space'] == 'sheet_1000'
+    assert [m['marker_id'] for m in value['marker_review_tiles']] == [m['id'] for m in frozen]
+    sheet = context.data['images'][value['image_ref']]
+    assert sheet.mode == 'RGB' and max(sheet.size) <= 1600 and sheet.width*sheet.height <= 2_000_000
+    assert document.original.tobytes() == before
+    assert context.data['marker_cache']['view_proposals'] == frozen
+    assert context.data['images']['existing'].getpixel((0, 0)) == (255, 0, 0)
+    assert result['audit']['result_digest'] and result['version'] == '2026-10-26-v6'
+
+
+@pytest.mark.parametrize('role', ['body_text', 'body_review', 'connections', 'attributes', 'structure_review', 'solver'])
+def test_marker_sheet_is_only_available_to_page_role(role):
+    registry, context = registry_for(analyze_document(Image.new('RGB', (80, 60), 'white')))
+    result = registry.call('image.marker_review_views', {}, role=role, context=context)
+    assert not result['ok'] and not context.data['images']
+
+
+def test_marker_sheet_cannot_accept_caller_boxes_or_missing_cpu_identity():
+    registry, context = registry_for(analyze_document(Image.new('RGB', (80, 60), 'white')))
+    missing = registry.call('image.marker_review_views', {}, role='page_vertices', context=context)
+    assert missing['ok'] and missing['result']['image_ref'] is None
+    assert missing['result']['marker_review_tiles'] == []
+    assert missing['result']['diagnostics']['status'] == 'marker_proposals_unavailable'
+    forged = registry.call('image.marker_review_views',
+                           {'markers': [{'id': 'fake', 'x': 500, 'y': 500}]},
+                           role='page_vertices', context=context)
+    assert not forged['ok'] and not context.data['images']
+
+
 def traced_row(value):
     return {'id': 'px_1', 'from': 'a', 'to': 'b', 'style': 'solid',
             'path': [[.2, .5], [.4, .2], [.6, .2], [.8, .5]],

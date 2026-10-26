@@ -616,6 +616,7 @@ _AGENT_REQUIRED_ROLES = frozenset(('page_vertices', 'body_text', 'connections', 
 _AGENT_TOOL_ROLES = {
     'image.local_evidence': _AGENT_ROLES-{'body_review'},
     'image.marker_proposals': {'page_vertices'},
+    'image.marker_review_views': {'page_vertices'},
     'image.marker_grounding': {'page_vertices'},
     'image.trace_candidates': {'connections'},
     'image.sknw_candidates': {'connections'},

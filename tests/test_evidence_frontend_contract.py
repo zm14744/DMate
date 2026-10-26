@@ -24,7 +24,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from graph_schema import canonical_graph, display_graph
+from graph_schema import canonical_graph, describe_graphs, display_graph
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -38,17 +38,17 @@ def canonical_fixture(*, uncertain=False):
                      {'id': 'b', 'label': '乙', 'x': .8, 'y': .5}],
         'edges': [
             {'id': 'loop', 'from': 'a', 'to': 'a', 'direction': 'forward',
-             'weight': 0, 'edge_label': 'loop', 'style': 'solid', 'status': 'accepted',
+             'weight': 0, 'edge_label': 'loop', 'style': 'solid', 'color': 'black', 'status': 'accepted',
              'path': [[.2, .5], [.1, .2], [.3, .2], [.2, .5]]},
             {'id': 'first_parallel', 'from': 'a', 'to': 'b', 'direction': 'forward',
-             'weight': 1, 'edge_label': 'alpha', 'style': 'solid', 'status': 'accepted',
+             'weight': 1, 'edge_label': 'alpha', 'style': 'solid', 'color': 'red', 'status': 'accepted',
              'path': [[.2, .5], [.5, .3], [.8, .5]]},
             {'id': 'second_parallel', 'from': 'a', 'to': 'b', 'direction': 'forward',
-             'weight': 2, 'edge_label': 'beta', 'style': 'dashed', 'status': 'accepted',
+             'weight': 2, 'edge_label': 'beta', 'style': 'dashed', 'color': 'blue', 'status': 'accepted',
              'path': [[.2, .5], [.5, .7], [.8, .5]]},
             {'id': 'uncertain_direction', 'from': 'b', 'to': 'a',
              'direction': 'unknown' if uncertain else 'forward', 'weight': 3,
-             'edge_label': 'gamma', 'style': 'dotted',
+             'edge_label': 'gamma', 'style': 'dotted', 'color': '#2244aa',
              'status': 'pending' if uncertain else 'accepted',
              'path': [[.8, .5], [.5, .5], [.2, .5]]},
         ], 'relation_audit': ['PRIVATE_ROUTE_AUDIT'],
@@ -82,12 +82,45 @@ def test_public_projection_preserves_atomic_edges_but_is_not_a_drawing_api():
     assert [edge['weight'] for edge in public['edges']] == [0, 1, 2, 3]
     assert [edge['edge_label'] for edge in public['edges']] == ['loop', 'alpha', 'beta', 'gamma']
     assert [edge['style'] for edge in public['edges']] == ['solid', 'solid', 'dashed', 'dotted']
+    assert [edge['color'] for edge in public['edges']] == ['black', 'red', 'blue', '#2244aa']
     assert len([edge for edge in public['edges'] if (edge['from'], edge['to']) == ('a', 'b')]) == 2
     assert all(edge['multiplicity'] == 1 for edge in public['edges'])
     assert public['edges'][-1]['status'] == 'pending' and public['complete'] is False
     assert 'bbox' not in public and all('x' not in vertex for vertex in public['vertices'])
     assert all('path' not in edge for edge in public['edges'])
     assert source == original and source['edges'][0]['path']
+
+
+def test_semantic_graph_text_preserves_printed_attributes_without_any_positions_or_pixel_evidence():
+    raw = canonical_fixture()
+    raw['vertices'][0]['label'] = 'v₂'
+    raw['vertices'][1]['label'] = 'V₂'
+    raw.pop('bbox')
+    for vertex in raw['vertices']:
+        vertex.pop('x'); vertex.pop('y')
+    for edge in raw['edges']:
+        edge.pop('path'); edge.pop('evidence')
+    raw['edges'][1]['edge_label'] = 'q₂'
+    raw['edges'][2]['edge_label'] = 'Q₂'
+    graph = canonical_graph(raw)
+    before = deepcopy(graph)
+    text = describe_graphs([graph])
+    assert all(v['x'] is None and v['y'] is None for v in graph['vertices'])
+    assert all(e['path'] == [] and e['evidence'] == [] for e in graph['edges'])
+    assert 'v₂→V₂' in text and 'V₂→v₂' in text
+    assert '边名 q₂' in text and '边名 Q₂' in text and '权值 0' in text
+    assert all(style in text for style in ('实线', '虚线', '点线'))
+    assert all('颜色 '+color in text for color in ('black', 'red', 'blue', '#2244aa'))
+    assert text.count('颜色 ') == len(graph['edges']), 'Each instance has one observed color, without endpoint deduplication.'
+    assert '边（共4条）' in text and '自环' in text
+    assert graph == before
+
+
+@pytest.mark.parametrize('color', [None, '', 'unknown', ' UNKNOWN '])
+def test_describe_graphs_does_not_invent_an_absent_color(color):
+    graph = canonical_fixture()
+    for edge in graph['edges']: edge['color'] = color
+    assert '颜色 ' not in describe_graphs([graph])
 
 
 def test_new_pipeline_text_partial_survives_public_envelope(monkeypatch):
@@ -135,6 +168,7 @@ process.stdout.write(JSON.stringify({
     assert observed['rendered'].count('- e') == 4
     assert '甲 → 甲' in observed['rendered'] and '乙 ? 甲' in observed['rendered']
     assert '权值：0' in observed['rendered'] and '虚线' in observed['rendered'] and '点线' in observed['rendered']
+    assert '实线' in observed['rendered'] and '颜色：red' in observed['rendered'] and '颜色：blue' in observed['rendered']
     assert observed['statuses'][0].count('题干文字尚未核对完整。') == 1
     assert all('待核对' in text for text in observed['statuses'][:3])
     assert observed['statuses'][3:] == ['', '']
@@ -214,6 +248,7 @@ def test_actual_chromium_dialog_contract(monkeypatch):
     literal_graph['vertices'][0]['label'] = '<img src=x onerror=window.__labelExecuted=1>'
     literal_graph['vertices'][1]['label'] = 'v₁'
     literal_graph['edges'][0]['edge_label'] = '<b>loop&[x]</b>'
+    literal_graph['edges'][0]['color'] = '<b>red&[x]</b>'
     literal['graph_display_data'] = [display_graph(literal_graph)]
     legacy = response_fixture()
     for key in ('review', 'warning', 'recognition_status', 'diagnostics'):
@@ -314,10 +349,14 @@ def test_actual_chromium_dialog_contract(monkeypatch):
                                 check(case, 'zero_weight_preserved', '权值：0' in rows[0])
                                 check(case, 'unknown_direction_not_arrow', '乙?甲' in rows[3] and '方向未确定' in rows[3] and '待确认' in rows[3])
                                 check(case, 'dash_and_dot_preserved', '虚线' in rows[2] and '点线' in rows[3])
+                                check(case, 'observed_colors_and_solid_preserved',
+                                      '实线' in rows[1] and '颜色：red' in rows[1]
+                                      and '颜色：blue' in rows[2] and '颜色：#2244aa' in rows[3])
                             if name == 'literal_labels':
                                 check(case, 'html_labels_are_literal', literal_graph['name'] == observed['heading'].split('（', 1)[-1].rsplit('）', 1)[0]
                                       and literal_graph['vertices'][0]['label'] in observed['text']
-                                      and literal_graph['edges'][0]['edge_label'] in observed['rows'][0])
+                                      and literal_graph['edges'][0]['edge_label'] in observed['rows'][0]
+                                      and literal_graph['edges'][0]['color'] in observed['rows'][0])
                                 check(case, 'labels_create_no_elements_or_events', observed['embeddedImages'] == 0
                                       and observed['injectedMarkup'] == 0 and observed['codeExecuted'] == 0)
                             if name == 'text_partial':

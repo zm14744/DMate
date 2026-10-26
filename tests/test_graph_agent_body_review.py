@@ -1,9 +1,13 @@
 """Synthetic protocol cases only; no user images, gold, model or network."""
 import copy
+import json
 
 import pytest
 
-from graph_agent_body_review import body_review_input_digest, decode_body_review_response
+from graph_agent_body_review import (
+    BODY_IDENTITY_INSTRUCTIONS, BODY_REVIEW_PROMPT, body_review_input_digest,
+    build_body_identity_contract, decode_body_review_response,
+)
 from graph_agent_roles import RoleProtocolError, build_solver_input
 
 
@@ -296,4 +300,124 @@ def test_nested_graph_mutation_fields_are_not_accepted_in_text_decisions():
     body = first(); local = hints(body); raw = response(body, local)
     raw['body_region_review'][0]['vertices'] = []
     with pytest.raises(RoleProtocolError, match='body_review_mutation_forbidden'):
+        decode(raw, body, local)
+
+
+def test_identity_contract_uses_actual_sparse_ids_and_separate_return_field_lists():
+    body = first(('检查区域甲。', '检查区域乙。'))
+    body['regions'][0]['id'] = 'question_alpha'
+    body['regions'][1]['id'] = 'question_omega'
+    local = hints(body)
+    local['items'][0]['id'] = 'scan_08'
+    local['items'][1]['id'] = 'scan_41'
+    contract = build_body_identity_contract(body, local)
+    assert contract['required_ids'] == {
+        'body_coverage_region_ids': ['scan_08', 'scan_41'],
+        'body_coverage_observed_region_ids': ['question_alpha', 'question_omega'],
+        'body_region_review_ids': ['question_alpha', 'question_omega'],
+        'text_review_region_ids': ['scan_08', 'scan_41']}
+    assert contract['coordinate_space'] == 'original_1000'
+    assert contract['body_regions'][1]['bbox'] == body['regions'][1]['bbox']
+    assert contract['text_hints'][1]['bbox'] == local['items'][1]['bbox']
+    assert contract['rules']['id_match_certifies_content'] is False
+
+
+def test_identity_contract_does_not_assume_equal_region_counts_or_renumber_hints():
+    body = first(tuple('检查区域' + str(i) + '。' for i in range(5)))
+    local = hints(body)
+    local['items'].extend({'id': 'caption_' + str(i), 'text': '图内字形',
+                           'bbox': [100, 600, 200, 650]} for i in range(16))
+    contract = build_body_identity_contract(body, local)
+    assert len(contract['required_ids']['body_coverage_region_ids']) == 21
+    assert len(contract['required_ids']['body_coverage_observed_region_ids']) == 5
+    assert contract['required_ids']['text_review_region_ids'][-1] == 'caption_15'
+    assert contract['required_ids']['body_region_review_ids'] == [r['id'] for r in body['regions']]
+
+
+def test_identity_contract_preserves_overlapping_literal_ids_in_separate_namespaces():
+    body = first(); local = hints(body)
+    local['items'][0]['id'] = body['regions'][0]['id']
+    local['items'][0]['bbox'] = [100, 600, 200, 650]
+    contract = build_body_identity_contract(body, local)
+    assert contract['body_regions'][0]['id'] == contract['text_hints'][0]['id']
+    assert contract['body_regions'][0]['bbox'] != contract['text_hints'][0]['bbox']
+    assert contract['rules']['namespaces_are_distinct'] is True
+
+
+def test_identity_contract_contains_no_transcription_or_answer_and_is_detached():
+    body = first(('原字形必须由视觉角色独立阅读。',)); local = hints(body)
+    body['regions'].append({'id': 'decoration', 'role': 'noise', 'text': '旁注',
+                            'bbox': [10, 500, 50, 600], 'source': 'original'})
+    before = copy.deepcopy((body, local))
+    contract = build_body_identity_contract(body, local)
+    encoded = json.dumps(contract, ensure_ascii=False, allow_nan=False)
+    assert body['body_text'] not in encoded and '旁注' not in encoded
+    assert contract['body_regions'][1]['role'] == 'noise'
+    assert contract['required_ids']['body_region_review_ids'] == ['line_0', 'decoration']
+    contract['body_regions'][0]['bbox'][0] = 0
+    contract['text_hints'][0]['bbox'][0] = 0
+    contract['required_ids']['body_coverage_region_ids'].append('invented')
+    assert contract['required_ids']['text_review_region_ids'] == ['ocr_0']
+    assert (body, local) == before
+
+
+@pytest.mark.parametrize('bounds', [None, [0, 0, 0, 100], [0, 0, 1001, 100],
+                                   [0, 0, float('nan'), 100], [0, 0, True, 100]])
+def test_identity_contract_keeps_unlocated_hint_id_without_fabricating_pixels(bounds):
+    body = first(); local = hints(body); local['items'][0]['bbox'] = bounds
+    contract = build_body_identity_contract(body, local)
+    assert contract['text_hints'] == [{'id': 'ocr_0', 'bbox': None, 'location_status': 'unavailable'}]
+    assert contract['required_ids']['body_coverage_region_ids'] == ['ocr_0']
+    json.dumps(contract, allow_nan=False)
+
+
+@pytest.mark.parametrize('empty_hints', [False, True])
+def test_identity_contract_preserves_empty_or_uncertain_body_without_certification(empty_hints):
+    body = first(); body.update(body_complete=False, body_text='')
+    body['regions'][0]['role'] = 'uncertain'
+    local = hints(body, empty=empty_hints)
+    contract = build_body_identity_contract(body, local)
+    assert contract['body_regions'][0]['role'] == 'uncertain'
+    assert contract['required_ids']['body_region_review_ids'] == ['line_0']
+    assert contract['required_ids']['text_review_region_ids'] == ([] if empty_hints else ['ocr_0'])
+    assert not contract['rules']['id_match_certifies_content']
+    empty = first(())
+    assert all(ids == [] for ids in build_body_identity_contract(empty, hints(empty))['required_ids'].values())
+
+
+@pytest.mark.parametrize('mutation', ['invalid_body', 'duplicate_body', 'duplicate_hint', 'body_capacity',
+                                     'hint_capacity', 'bad_body_bounds'])
+def test_identity_contract_rejects_invalid_caller_snapshot_instead_of_repairing_it(mutation):
+    from graph_agent_roles import MAX_HINTS
+    body = first(); local = hints(body)
+    if mutation == 'invalid_body': body['role_valid'] = False
+    if mutation == 'duplicate_body': body['regions'].append(copy.deepcopy(body['regions'][0]))
+    if mutation == 'duplicate_hint': local['items'].append(copy.deepcopy(local['items'][0]))
+    if mutation == 'body_capacity': body['regions'] *= MAX_HINTS + 1
+    if mutation == 'hint_capacity': local['items'] *= MAX_HINTS + 1
+    if mutation == 'bad_body_bounds': body['regions'][0]['bbox'] = [0, 0, 0, 100]
+    with pytest.raises((RoleProtocolError, ValueError)):
+        build_body_identity_contract(body, local)
+
+
+def test_prompt_uses_dynamic_identity_contract_without_copyable_example_ids():
+    assert '"body_1"' not in BODY_REVIEW_PROMPT and '"t1"' not in BODY_REVIEW_PROMPT
+    assert BODY_IDENTITY_INSTRUCTIONS in BODY_REVIEW_PROMPT
+    contract = build_body_identity_contract(first(), hints(first()))
+    for field in contract['required_ids']:
+        assert 'identity_contract.required_ids.' + field in BODY_IDENTITY_INSTRUCTIONS
+
+
+def test_dynamic_identity_contract_does_not_accept_wrong_namespace_or_bad_pixel_evidence():
+    body = first(); local = hints(body); contract = build_body_identity_contract(body, local)
+    raw = response(body, local)
+    raw['body_coverage']['region_ids'] = contract['required_ids']['body_region_review_ids']
+    with pytest.raises(RoleProtocolError, match='review_body_regions_coverage'):
+        decode(raw, body, local)
+    raw['body_coverage']['region_ids'] = contract['required_ids']['body_coverage_region_ids']
+    raw['body_region_review'][0]['text'] = '检查另一个集合。'
+    raw['text_review']['text'] = '检查另一个集合。'
+    raw['text_review']['regions'][0]['text'] = '检查另一个集合。'
+    raw['body_region_review'][0]['evidence'] = proof([0, 600, 100, 700])
+    with pytest.raises(RoleProtocolError, match='text_evidence_wrong_location'):
         decode(raw, body, local)

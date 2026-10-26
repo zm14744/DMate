@@ -20,9 +20,9 @@ def synthetic_prediction():
         'vertices': [{'id': 'a', 'label': 'v₁', 'x': .2, 'y': .5},
                      {'id': 'b', 'label': '<img src=x onerror=alert(1)>', 'x': .8, 'y': .5}],
         'edges': [{'id': 'loop', 'from': 'a', 'to': 'a', 'direction': 'forward',
-                   'weight': 0, 'edge_label': 'loop&[0]', 'style': 'solid', 'status': 'accepted'},
+                   'weight': 0, 'edge_label': 'loop&[0]', 'style': 'solid', 'color': 'red', 'status': 'accepted'},
                   {'id': 'parallel_1', 'from': 'a', 'to': 'b', 'direction': 'forward',
-                   'weight': 2, 'edge_label': 'alpha', 'style': 'dashed', 'status': 'accepted'},
+                   'weight': 2, 'edge_label': 'alpha', 'style': 'dashed', 'color': '蓝色', 'status': 'accepted'},
                   {'id': 'parallel_2', 'from': 'a', 'to': 'b', 'direction': 'forward',
                    'weight': 3, 'edge_label': 'beta', 'style': 'solid', 'status': 'accepted'},
                   {'id': 'unknown', 'from': 'b', 'to': 'a', 'direction': 'unknown',
@@ -82,7 +82,10 @@ def test_unassigned_internal_prose_before_cards_is_not_ignored():
     ('权值：0', '权值：1', 'weights'),
     ('边名：loop&[0]', '边名：changed', 'edge_labels'),
     ('同端点共 2 条', '同端点共 1 条', 'multiplicity'),
+    ('实线', '虚线', 'styles'),
     ('虚线', '点线', 'styles'),
+    ('颜色：red', '颜色：blue', 'edge_instances'),
+    ('，颜色：蓝色', '', 'edge_instances'),
     ('方向未确定', '', 'directions'),
     ('待确认', '', 'edge_instances'),
 ])
@@ -105,6 +108,28 @@ def test_internal_spaces_in_a_literal_label_cannot_disappear():
     observed = observation()
     observed['panels'][1]['paragraphs'] = [text.replace('甲 乙', '甲乙') for text in observed['panels'][1]['paragraphs']]
     assert checked(observed)['vertex_labels'] == 'fail'
+
+
+def test_independent_expected_rows_include_solid_and_literal_color():
+    panels = ui.expected_panels(synthetic_prediction())
+    assert panels[0]['rows'][0] == 'e1：v_{1} → v_{1}（边名：loop&[0]，权值：0，实线，颜色：red）'
+    assert '虚线，颜色：蓝色' in panels[0]['rows'][1]
+    assert '颜色：unknown' not in ''.join(panels[0]['rows'])
+
+
+def test_mixed_graph_public_projection_and_title_are_independently_checked():
+    prediction = synthetic_prediction()
+    graph = prediction['graph_structures'][0]
+    graph.update(directed='unknown', direction_mode='mixed')
+    prediction['graph_display_data'] = [display_graph(g) for g in prediction['graph_structures']]
+    assert ui.public_projection_issues(prediction) == []
+    observed = observation(prediction)
+    assert observed['panels'][0]['paragraphs'][0] == '类型： 混合图 · 带权 · 多重图'
+    assert checked(observed, prediction)['graph_types'] == 'pass'
+    observed['panels'][0]['paragraphs'][0] = observed['panels'][0]['paragraphs'][0].replace('混合图', '方向未确定')
+    assert checked(observed, prediction)['graph_types'] == 'fail'
+    del prediction['graph_display_data'][0]['direction_mode']
+    assert ui.public_projection_issues(prediction) == ['canonical_public_projection_changed']
 
 
 @pytest.mark.parametrize('field,value,dimension', [

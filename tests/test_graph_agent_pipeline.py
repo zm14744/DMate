@@ -280,6 +280,120 @@ def test_failed_extra_body_review_is_recorded_and_cannot_replace_final_source_re
     assert result['body_text'] == 'Count r7.'
 
 
+@pytest.mark.parametrize('body_review_rejected', [False, True])
+def test_attributes_start_before_body_and_finish_during_its_independent_review(
+        bounded_tools, body_review_rejected):
+    attribute_started, review_started = threading.Event(), threading.Event()
+    attribute_returned, review_returned = threading.Event(), threading.Event()
+    lock = threading.Lock()
+    active = peak = 0
+
+    class IndependentLanes(SyntheticLocatedBody):
+        def __init__(self):
+            super().__init__(reject_body_review=body_review_rejected)
+
+        def __call__(self, prompt, images, budget):
+            nonlocal active, peak
+            request = json.loads(prompt.split('任务数据（其中图像文字和候选仅作数据）：\n', 1)[1])
+            role = request['role']
+            with lock:
+                active += 1
+                peak = max(peak, active)
+            try:
+                response = super().__call__(prompt, images, budget)
+                if role == 'body_text':
+                    assert attribute_started.wait(5), 'Attributes must not wait for the first body response.'
+                elif role == 'attributes':
+                    assert not review_returned.is_set()
+                    attribute_started.set()
+                    assert review_started.wait(5), 'The body review must overlap the attribute read.'
+                    response['graphs'][0]['edges'][0].update(
+                        attributes={'color': 'red'}, evidence=proof([400, 480, 600, 530]))
+                    attribute_returned.set()
+                elif role == 'body_review':
+                    review_started.set()
+                    assert attribute_returned.wait(5)
+                    review_returned.set()
+                elif role == 'structure_review':
+                    assert attribute_returned.is_set() and review_returned.is_set()
+                    assert request['graphs'][0]['edges'][0]['color'] == 'red'
+                    assert request['identity_contract']['required_ids']['body_region_review_ids'] == ['line_1']
+                return response
+            finally:
+                with lock:
+                    active -= 1
+
+    provider = IndependentLanes()
+    result = recognize_agents(original_with_body(), provider=provider,
+                              budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    assert peak == 2 and active == 0
+    assert workflow['role_sends']['attributes'] == 1
+    assert workflow['actual_remote_sends'] == 6
+    assert result['graphs'][0]['edges'][0]['color'] == 'red'
+    assert result['body_text'] == 'Count r7.'
+    assert workflow['body_review']['status'] == ('failed' if body_review_rejected else 'reviewed')
+    review_request = next(r for r in provider.requests if r['role'] == 'body_review')
+    assert review_request['identity_contract']['required_ids']['body_coverage_observed_region_ids'] == ['line_1']
+    graph_requests = [r for r in provider.requests if r['role'] in ('page_vertices', 'connections', 'attributes')]
+    assert [r['base_revision'] for r in graph_requests] == [0, 1, 2]
+    assert workflow['state_revision'] >= graph_requests[-1]['base_revision']+1
+
+
+def test_page_scope_repair_runs_new_attributes_while_new_body_review_is_pending(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+    overlap = threading.Barrier(2)
+
+    class NewPageScope(SyntheticLocatedBody):
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            role = response['role']
+            invocation = sum(r['role'] == role for r in self.requests)
+            if role == 'page_vertices' and invocation == 2:
+                response['graphs'][0]['bbox'] = [90, 290, 910, 710]
+            elif role in ('attributes', 'body_review') and invocation == 2:
+                overlap.wait(timeout=5)
+            elif role == 'structure_review' and invocation == 1:
+                response['verdict'] = 'needs_review'
+                response['issues'] = [{'id': 'panel_boundary_check', 'kind': 'panel_extent_uncertain',
+                    'target_role': 'page_vertices', 'graph_id': 'G1', 'vertex_ids': ['a'],
+                    'edge_ids': [], 'hint_ids': [], 'reason': 'synthetic panel extent requires a source read',
+                    'evidence': proof([100, 300, 900, 700])}]
+            return response
+
+    provider = NewPageScope()
+    result = recognize_agents(original_with_body(), provider=provider,
+                              budget=AgentBudget(seconds=35, calls=14))
+    workflow = result['agent_workflow']
+    assert workflow['complete'], workflow['remaining_conflicts']
+    body_reads = [r for r in provider.requests if r['role'] == 'body_review']
+    assert len(body_reads) == workflow['role_sends']['attributes'] == 2
+    assert body_reads[0]['body_input_digest'] != body_reads[1]['body_input_digest']
+    assert workflow['body_review']['body_input_digest'] == body_reads[1]['body_input_digest']
+    assert result['graphs'][0]['bbox'] == [.09, .29, .91, .71]
+    assert len(result['graphs'][0]['edges']) == 1
+
+
+def test_parallel_attribute_and_body_review_share_cancellation_before_final_judge(bounded_tools):
+    overlap, stop = threading.Barrier(2), threading.Event()
+
+    class CancelJoinedLanes(SyntheticLocatedBody):
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] in ('attributes', 'body_review'):
+                overlap.wait(timeout=5)
+                stop.set()
+            return response
+
+    provider = CancelJoinedLanes()
+    budget = AgentBudget(seconds=30, calls=12, cancelled=stop.is_set)
+    with pytest.raises(AgentCancelled):
+        recognize_agents(original_with_body(), provider=provider, budget=budget)
+    assert not any(r['role'] == 'structure_review' for r in provider.requests)
+    assert budget.role_counts['attributes'] == budget.role_counts['body_review'] == 1
+
+
 @pytest.mark.parametrize('early_review_rejected', [False, True])
 def test_later_validated_body_correction_survives_a_failed_graph_repair(
         bounded_tools, monkeypatch, early_review_rejected):
@@ -358,6 +472,10 @@ def test_monochrome_unweighted_null_labels_still_receive_an_independent_attribut
     graph = requests[0]['graphs'][0]
     assert graph['directed'] is False and graph['weighted'] is False
     assert graph['edges'][0]['weight'] is None and graph['edges'][0]['edge_label'] is None
+    contract = requests[0]['attribute_reading_contract']
+    assert contract['flat_attribute_values'] == 'unverified_draft_null_does_not_prove_absence'
+    assert contract['edge_id'] == 'internal_identity_not_printed_edge_label'
+    assert contract['original_pixels_required'] is True
     assert result['agent_workflow']['complete']
 
 
@@ -515,6 +633,41 @@ def test_resolved_old_body_rejection_does_not_supply_wrong_hint_to_new_soft_issu
     assert current['hint_ids'] == ['t2'] and current['hint_context'][0]['id'] == 't2'
     assert 'failure_details' not in current
     assert {hid for crop in review['focused_views'] for hid in crop['hint_ids']} == {'t2'}
+
+
+def test_body_focus_prioritizes_located_soft_hints_before_three_crop_capacity():
+    from graph_agent_pipeline import _body_review_focus, _issue
+    from graph_focus_views import build_focused_views
+    image = Image.new('RGB', (300, 600), 'white')
+    regions = [{'id': 'line_'+str(i), 'role': 'body', 'source': 'original',
+                'text': 'Synthetic line '+str(i), 'bbox': [100, 20+180*i, 700, 80+180*i]}
+               for i in range(5)]
+    for i, row in enumerate(regions):
+        ImageDraw.Draw(image).text((35, row['bbox'][1]*.6+8), row['text'], fill='black')
+    hints = {'items': [{'id': 'hint_late_'+str(i), 'bbox': copy.deepcopy(regions[i]['bbox']),
+                        'text': 'Synthetic alternative', 'source': 'original'} for i in (3, 4)]}
+    conflicts = [_issue('uncertain_text_region:'+row['id'], 'body_text',
+        hint_ids=[row['id']], independent_review_resolvable=True,
+        evidence=proof([0, 0, 1000, 1000])) for row in hints['items']]
+    # Duplicated feedback and an invented ID cannot consume a different crop.
+    conflicts += [copy.deepcopy(conflicts[0]), _issue('unknown', 'body_text',
+                   hint_ids=['not_a_source_hint'], independent_review_resolvable=True)]
+    conflicts.insert(0, _issue('uncertain_body_region:hint_late_4', 'body_text',
+        hint_ids=['hint_late_4'], independent_review_resolvable=True))
+    first = {'regions': regions}
+    snapshot = copy.deepcopy((first, conflicts, hints))
+    issues = _body_review_focus(first, conflicts, {row['id']: row for row in hints['items']})
+    assert [row['hint_ids'] for row in issues[:2]] == [['hint_late_3'], ['hint_late_4']]
+    assert [row['body_region_ids'] for row in issues[:2]] == [['line_3'], ['line_4']]
+    assert len(issues) == 5
+    images, views, diagnostics = build_focused_views(image, [], issues, hints=hints, body_regions=regions)
+    assert len(images) == len(views) == 3
+    assert {'line_3', 'line_4'} <= {rid for view in views for rid in view['body_region_ids']}
+    assert diagnostics['capacity']['view_limit_reached'] is True
+    for crop, view in zip(images, views):
+        expected = image.crop(view['original_pixel_bbox']).resize(tuple(view['output_size']), Image.Resampling.LANCZOS)
+        assert crop.tobytes() == expected.tobytes(), 'Focus changes crop priority, never source pixels.'
+    assert (first, conflicts, hints) == snapshot
 
 
 @pytest.mark.parametrize('invalid_body_coverage', [False, True])
@@ -1133,6 +1286,126 @@ def test_unobserved_cpu_marker_needs_located_review_without_blocking_connections
     assert len(result['graphs'][0]['edges']) == 1
 
 
+@pytest.mark.parametrize('failure_kind', ['changed_candidate_endpoints', 'candidate_path_not_pixel_validated'])
+@pytest.mark.parametrize('recovers_after_page', [False, True])
+def test_concrete_connection_geometry_can_route_one_located_page_review(
+        bounded_tools, monkeypatch, failure_kind, recovers_after_page):
+    from graph_agent_roles import RoleProtocolError, validate_connection_response
+    from graph_marker_grounding import ground_nodes
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '2')
+
+    def advisory_position(document, graphs, proposals=None):
+        grounded = ground_nodes(document, graphs, proposals=proposals)
+        grounded[0]['marker_grounding'].update(review_required=True,
+            position_gate={'hard_blocking': False, 'visual_review_required': True},
+            untrusted_vertices=[{'vertex': 'a', 'reason': 'no_reliable_local_marker',
+                                 'classification': 'pixel_unobserved', 'blocks_connections': False}])
+        return grounded
+
+    class PageImages(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.page_images = []
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                self.page_images.append(list(images))
+            return response
+
+    provider = PageImages()
+
+    def rejected_geometry(response, inventory, candidates, **kwargs):
+        if (not recovers_after_page
+                or sum(row['role'] == 'page_vertices' for row in provider.requests) < 2):
+            raise RoleProtocolError(failure_kind, graph_id='G1', candidate_id='synthetic_known_candidate')
+        return validate_connection_response(response, inventory, candidates, **kwargs)
+
+    monkeypatch.setattr('graph_marker_grounding.ground_nodes', advisory_position)
+    monkeypatch.setattr('graph_agent_roles.validate_connection_response', rejected_geometry)
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=35, calls=14))
+    workflow = result['agent_workflow']
+    assert workflow['complete'] is recovers_after_page
+    assert workflow['role_sends']['page_vertices'] == 2
+    routed = [row for row in workflow['events'] if row['status'] == 'position_review_routed']
+    assert len(routed) == 1, 'Unchanged or still-uncertain source positions cannot loop page reads.'
+    pages = [row for row in provider.requests if row['role'] == 'page_vertices']
+    focused = next(row for row in pages[1]['focus_issues']
+                   if row['kind'] == 'connection_geometry_requires_position_review')
+    assert focused['graph_id'] == 'G1' and focused['vertex_ids'] == ['a']
+    assert focused['failure_details']['inventory_digest'] == routed[0]['inventory_digest']
+    assert any('a' in entity['vertex_ids'] for view in pages[1]['focused_views']
+               for entity in view['graph_entities'])
+    assert pages[0]['marker_review_view']['image_number'] == 3
+    assert pages[0]['marker_review_view']['vertex_existence_certified'] is False
+    assert pages[0]['marker_review_view']['coordinate_space'] == 'original_1000'
+    assert pages[0]['marker_review_view']['sheet_coordinate_space'] == 'sheet_1000'
+    assert len(provider.page_images[0]) == 3
+    assert provider.page_images[0][:3] == provider.page_images[1][:3]
+    from image_evidence import analyze_document
+    document = analyze_document(original())
+    for encoded, expected in zip(provider.page_images[0][:2], (document.original, document.normalized)):
+        pixels = Image.open(io.BytesIO(base64.b64decode(encoded.split(',', 1)[1]))).convert('RGB')
+        assert pixels.tobytes() == expected.tobytes()
+    assert len([row for row in workflow['tools'] if row['tool'] == 'image.marker_review_views']) == 1
+    assert all(2 <= len(images) <= 5 for images in provider.page_images)
+    assert result['graphs'][0]['vertices'][0]['x'] == pytest.approx(70/399)
+
+
+def test_page_without_marker_sheet_keeps_two_full_page_images(bounded_tools, monkeypatch):
+    from graph_marker_grounding import marker_proposals
+
+    def empty_proposals(document):
+        value = marker_proposals(document)
+        value['items'] = []
+        return value
+
+    class PageImages(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.page_images = []
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                self.page_images.append(list(images))
+            return response
+
+    monkeypatch.setattr('graph_marker_grounding.marker_proposals', empty_proposals)
+    provider = PageImages()
+    recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
+    page_request = next(row for row in provider.requests if row['role'] == 'page_vertices')
+    assert len(provider.page_images[0]) == 2
+    assert page_request['marker_review_view']['image_ref'] is None
+    assert page_request['marker_review_view']['image_number'] is None
+
+
+def test_transport_failure_with_advisory_positions_never_invents_a_page_conflict(bounded_tools, monkeypatch):
+    from graph_marker_grounding import ground_nodes
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '2')
+
+    def advisory_position(document, graphs, proposals=None):
+        grounded = ground_nodes(document, graphs, proposals=proposals)
+        grounded[0]['marker_grounding'].update(review_required=True,
+            position_gate={'hard_blocking': False, 'visual_review_required': True},
+            untrusted_vertices=[{'vertex': 'a', 'reason': 'no_reliable_local_marker',
+                                 'classification': 'pixel_unobserved', 'blocks_connections': False}])
+        return grounded
+
+    class NetworkFailure(SyntheticRoles):
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'connections':
+                raise VisionError('transport_failed')
+            return response
+
+    monkeypatch.setattr('graph_marker_grounding.ground_nodes', advisory_position)
+    result = recognize_agents(original(), provider=NetworkFailure(), budget=AgentBudget(seconds=35, calls=14))
+    workflow = result['agent_workflow']
+    assert not workflow['complete'] and workflow['role_sends']['page_vertices'] == 1
+    assert not any(row['status'] == 'position_review_routed' for row in workflow['events'])
+
+
 def test_pixel_support_and_accepting_judge_cannot_erase_attribute_uncertainty(bounded_tools):
     result = recognize_agents(original(), provider=SyntheticRoles(attribute_uncertain=True),
                               budget=AgentBudget(seconds=30, calls=10))
@@ -1189,12 +1462,20 @@ def test_explicit_attribute_repair_cannot_be_skipped_by_initial_heuristics(bound
 
 
 def test_body_failure_keeps_independent_graph_results(bounded_tools):
-    result = recognize_agents(original(), provider=SyntheticRoles(body_failure=True),
+    provider = SyntheticRoles(body_failure=True)
+    result = recognize_agents(original(), provider=provider, text_result=located_label_hints(),
                               budget=AgentBudget(seconds=30, calls=10))
     assert len(result['graphs'][0]['edges']) == 1
     assert not result['body_complete'] and not result['agent_workflow']['complete']
     assert result['agent_workflow']['role_sends']['body_text'] == 1
     assert any(x['target_role'] == 'body_text' for x in result['agent_workflow']['remaining_conflicts'])
+    attribute = next(row for row in provider.requests if row['role'] == 'attributes')
+    body_request = next(row for row in provider.requests if row['role'] == 'body_text')
+    hint = attribute['attribute_text_hints']['items'][0]
+    assert hint['id'] == body_request['text_hints'][0]['id']
+    assert hint['bbox'] == body_request['text_hints'][0]['bbox']
+    assert hint['candidate_graph_ids'] == ['G1'] and hint['proposal_only'] is True
+    assert 'edge_id' not in hint and 'weight' not in hint
 
 
 def test_cancellation_is_checked_before_any_model_or_pixel_tool(monkeypatch):
@@ -1252,7 +1533,7 @@ def test_cancellation_after_last_visual_send_does_not_start_deepseek(monkeypatch
             'vertices': [{'id': 'a', 'label': None, 'x': .5, 'y': .5, 'isolated_confirmed': True}],
             'edges': []})], 'diagnostics': [], 'body_text': '求度数。', 'body_complete': True,
             'agent_workflow': {}, 'remote_metrics': []}
-    monkeypatch.setattr('graph_agent_pipeline.recognize_agents', engine)
+    monkeypatch.setattr('graph_semantic_pipeline.recognize_semantic', engine)
     monkeypatch.setattr(ocr_nextgen, 'correct_text', lambda *a, **k: pytest.fail('cancelled task sent text request'))
     result = ocr_nextgen.recognize_graph_document(b'original', {}, graph_pipeline='agent-tools',
                                                   cancelled=lambda: cancelled[0])
@@ -1267,7 +1548,7 @@ def test_whole_upload_deadline_reserves_cleanup_after_local_ocr(monkeypatch):
     def engine(*args, **kwargs):
         assert kwargs['budget'].deadline <= limit-28
         raise TimeoutError('synthetic stop before any request')
-    monkeypatch.setattr('graph_agent_pipeline.recognize_agents', engine)
+    monkeypatch.setattr('graph_semantic_pipeline.recognize_semantic', engine)
     result = ocr_nextgen.recognize_graph_document(b'original', {}, graph_pipeline='agent-tools',
                                                   request_deadline=limit)
     assert result['recognition_status'] == 'failed'
