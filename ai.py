@@ -840,12 +840,15 @@ def _request_text_completion(
     max_tokens=None,
     preferred_provider=None,
     timeout=(10, 60),
+    response_format=None,
 ):
     """
     调用文本模型。
 
     通过 DeepSeek 完成文本请求，保留原有的错误处理、重试与思考强度策略。
     """
+    if response_format is not None and response_format != {"type": "json_object"}:
+        raise ValueError("Unsupported text response format")
     # 即使上层意外传入旧版 max，也不得写入 provider 请求与日志。
     if str(reasoning_effort or "").lower() == "max":
         reasoning_effort = "high"
@@ -879,6 +882,8 @@ def _request_text_completion(
             reasoning_effort=reasoning_effort,
             max_tokens=max_tokens,
         )
+        if response_format is not None:
+            payload["response_format"] = dict(response_format)
         headers = {
             "Authorization": f"Bearer {provider['api_key']}",
             "Content-Type": "application/json",
@@ -1358,6 +1363,9 @@ def _request_qwen_completion(payload, headers, timeout=(10, 120), wall_deadline=
             except Exception:
                 return status_code, "", None
 
+        # SSE is always UTF-8, including text/event-stream without a charset.
+        # Requests otherwise decodes that legal header as ISO-8859-1.
+        response.encoding = "utf-8"
         content_parts, reasoning_parts = [], []
         finish_reason, usage = None, None
         returned_model, system_fingerprint = None, None

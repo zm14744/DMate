@@ -108,3 +108,15 @@ python scripts/verify_graph_first_pass_ui.py \
 当前脚本的范围是`local_pipeline/http_ocr_response`加`response_dialog_replay`，不是完整应用上传验收。它们分别输出`pipeline_status`、`frontend_status`、`pipeline_ui_status`及通过数量；本地应用状态为`not_run`，HTTP实际已响应时保留HTTP事实但应用为`not_certified`。`certified_passes`和`application_certified_passes`保持0，顶层没有无范围限定的pass，未知或缺失执行模式失败。运行/重放的退出码2表示完整应用未认证，即使组件可以全部通过；预检的ready/blocked另记。现有前端上传确实提交原始File且无预压缩，但这是源码检查，不能代替真实上传观察。
 
 完整应用验收仍需同时满足：从实际文件选择/上传进入正确`/ocr`路由、配置与就绪状态；原图与源码一致；两个Qwen成功发送且均正常结束；全部数学子图、节点、边端点、方向、独立重边、自环、权值、边名、样式、题干正确；所有不确定项解除；同一首次响应在桌面与手机实际展示相符；目标容器资源门禁通过。当前管线/弹窗工具没有实现全部应用证据的自动认证。任何一项缺证据都不报告整图单遍通过。
+
+## 后续真实调用准备与上传观察
+
+上文739项、Paddle v3及候选v7属于各自明确冻结的工程检查点。后续新增Qwen SSE UTF-8接收修复、仅OCR纠错启用的DeepSeek JSON模式和完整阶段预检，并增加实际上传观察工具；历史结果保留，不重写成真实模型单遍成功。SSE新测试在旧代码上为2失败/5通过，修复后7项全部通过；含预检、文字输出、私有发送记录和相关文字证据的定向集合141项通过，均未发送真实模型请求。
+
+补充后的全仓冻结回归为 **774 passed、0 skipped、43.41秒**，源码起止摘要一致。真实Chromium覆盖既有展示/重放及新的实际上传集成：后者5个合成场景经真实Flask路由，服务器外部发送、数据库与邮件尝试均为0。模型/worker边界注入清楚标记为合成契约，完整应用准确性认证仍为0。该次代码验证不包含另行记录的线上旧版真实失败基线。
+
+最终`abbbb51`工程检查点的[CI运行40273580531](https://github.com/zm14744/DMate/actions/runs/40273580531)已成功：真实2CPU/4GiB容器内，2张公共样本和1张12MP合成图各两次，本地模型6/6成功，775次health成功，文字worker峰值1263.059MiB，`OOMKilled=false`、`ExitCode=0`。真实模型原图job明确跳过；这些资源事实不包含Qwen/DeepSeek识别准确率。之后补充提交的CI结果在草稿PR逐次记录。
+
+新增[实际上传验收工具](OCR_APPLICATION_UPLOAD_HARNESS.md)将真实文件选择、实际`/ocr`、首次HTTP响应和UI状态关联。合成模式只在worker/model transport边界注入结果，记录`fixture_only=true`、外部模型发送0，不能认证原图识别准确率。`observed-http`只接受隔离的loopback测试服务，保存真实上传观察；缺少服务端源码与实际模型发送证明时，不把HTTP/UI观察升级为完整应用认证。
+
+本地原图预检要求Qwen与DeepSeek两项凭据、Paddle依赖和启用的视觉配置。DeepSeek的原始content及摘要仅保存到私有运行ledger，便于诊断拒绝的修改或无效JSON，不进入普通日志。原图先导集包含12张、覆盖五类历史问题及多重图/完整题干；它是后续真实实验的固定入口，尚未执行真实模型识别，也不能替代53张完整批次。

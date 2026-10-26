@@ -547,6 +547,7 @@ def test_local_runner_links_actual_prepared_request_bytes_and_separate_text_call
     assert result['diagnostics']['correction']['status'] == 'ok'
     assert len(sent) == 3
     assert [r['provider'] for r in evidence['transport_attempts']] == ['qwen', 'qwen', 'text']
+    assert sent[2]['response_format'] == {'type': 'json_object'}
     assert len(evidence['model_attempts']) == 2 and len(evidence['text_model_attempts']) == 1
     for metric in evidence['model_attempts']:
         transport = next(row for row in evidence['transport_attempts'] if row['transport_id'] == metric['transport_id'])
@@ -554,6 +555,9 @@ def test_local_runner_links_actual_prepared_request_bytes_and_separate_text_call
         assert metric['image_sha256'] == transport['image_sha256']
         assert metric['http_status'] == metric['status'] == transport['http_status'] == 200
     assert evidence['text_model_attempts'][0]['transport_id'] == evidence['transport_attempts'][2]['transport_id']
+    text_metric = evidence['text_model_attempts'][0]
+    assert json.loads(text_metric['raw_content']) == {'edits': []}
+    assert text_metric['raw_content_sha256'] == digest(text_metric['raw_content'].encode())
 
 
 def test_two_annotation_collections_and_duplicate_detection(tmp_path):

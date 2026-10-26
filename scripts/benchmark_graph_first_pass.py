@@ -147,10 +147,15 @@ def preflight(rows, annotations, mode):
     credentials = {'qwen_key_present': bool((os.environ.get('DASHSCOPE_API_KEY') or os.environ.get('DASHSCOPE_VISION_API_KEY') or '').strip()),
                    'deepseek_key_present': bool((os.environ.get('DEEPSEEK_API_KEY') or '').strip())}
     dependencies = {name: importlib.util.find_spec(name) is not None for name in ('PIL', 'requests', 'cv2', 'networkx', 'paddleocr', 'paddle')}
-    missing = [name for name in ('PIL', 'requests', 'cv2', 'networkx') if not dependencies[name]]
-    blocked = mode == 'local' and (not credentials['qwen_key_present'] or bool(missing))
+    missing = [name for name, available in dependencies.items() if not available]
+    missing_credentials = [name for name, present in credentials.items() if not present]
+    vision_enabled = os.environ.get('VISION_ANALYSIS_ENABLED', '1').strip().lower() not in {'0', 'false', 'off', 'no'}
+    blocked = mode == 'local' and bool(missing_credentials or missing or not vision_enabled)
     return {'status': 'blocked' if blocked else 'ready', 'mode': mode, 'credentials': credentials,
             'dependencies': dependencies, 'blocking_dependencies': missing if mode == 'local' else [],
+            'blocking_credentials': missing_credentials if mode == 'local' else [],
+            'vision_enabled': vision_enabled,
+            'blocking_configuration': ['VISION_ANALYSIS_ENABLED'] if mode == 'local' and not vision_enabled else [],
             'reference_records': records, 'reference_ready_count': sum(r['reference_status'] == 'ready' for r in records),
             'reference_not_certified_count': sum(r['reference_status'] != 'ready' for r in records),
             'reference_text_ready_count': sum(r['text_reference_status'] == 'ready' for r in records),
@@ -224,6 +229,12 @@ def capture_model_transports(records, *, execution_id=None):
             if isinstance(result, dict):
                 metric['model'] = result.get('model')
                 metric['finish_reason'] = (result.get('choice') or {}).get('finish_reason')
+                # This benchmark ledger is private, like the Qwen raw-content
+                # capture. Preserve the actual text response so rejected edits
+                # and malformed JSON can be diagnosed without another API call.
+                metric['raw_content'] = result.get('content')
+                if isinstance(metric['raw_content'], str):
+                    metric['raw_content_sha256'] = digest(metric['raw_content'].encode())
             return result
         except Exception as exc:
             metric.update(status='failed', exception_type=type(exc).__name__)

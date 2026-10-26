@@ -127,6 +127,7 @@ def test_deepseek_actual_content_field_is_used():
         text,audit=correct_text('求顶奌v1')
     assert text=='求顶点v1' and audit['status']=='ok' and audit['accepted_edits']==1
     assert api.call_args.kwargs['retries']==0
+    assert api.call_args.kwargs['response_format']=={'type':'json_object'}
 
 
 @pytest.mark.parametrize('content',['{}','not json','{"edits":null}'])
