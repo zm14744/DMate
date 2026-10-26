@@ -131,3 +131,64 @@ def test_real_curved_parallel_paths_reach_model_proposal_through_registry():
     assert len(prompt_arcs) == 2 and all(len(row['path']) > 2 for row in prompt_arcs)
     assert prompt_arcs[0]['path'] != prompt_arcs[1]['path']
     _json_bytes(proposal)
+
+
+@pytest.mark.parametrize('role', ['body_text', 'connections', 'structure_review'])
+def test_focused_tool_uses_context_hints_and_preserves_existing_image_refs(role):
+    document = analyze_document(Image.new('RGB', (300, 180), 'white'))
+    registry, context = registry_for(document)
+    context.data['hints'] = {'items': [{'id': 't1', 'bbox': [100, 600, 900, 700]}]}
+    previous = {f'active_ref_{i}': Image.new('RGB', (2, 2), (i, 0, 0)) for i in range(8)}
+    context.data['images'].update(previous)
+    arguments = {'graphs': [], 'issues': [{'id': 'i1', 'hint_ids': ['t1']}]}
+    result = registry.call('image.focused_views', arguments, role=role, context=context)
+    assert result['ok'], result
+    value = result['result']
+    assert len(value['image_refs']) == 1 and value['focused_views'][0]['hint_ids'] == ['t1']
+    assert value['source_sha256'] == context.source_sha256 and value['source_pixels_only'] is True
+    assert value['image_refs'][0] in context.data['images']
+    assert value['focused_views'][0]['image_ref'] == value['image_refs'][0]
+    assert result['version'] == '2026-10-26-v4' and result['audit']['result_digest']
+    for ref, image in previous.items():
+        assert context.data['images'][ref] is image
+    # The existing review sheet must also leave concurrent body/focus refs alive.
+    reviewed = registry.call('image.review_views', {'graphs': []}, role=role, context=context)
+    assert reviewed['ok'], reviewed
+    for ref, image in previous.items():
+        assert context.data['images'][ref] is image
+    assert value['image_refs'][0] in context.data['images']
+
+
+@pytest.mark.parametrize('role', ['page_vertices', 'attributes', 'solver'])
+def test_focused_tool_denies_roles_without_crop_authority(role):
+    registry, context = registry_for(analyze_document(Image.new('RGB', (80, 60), 'white')))
+    result = registry.call('image.focused_views', {'graphs': [], 'issues': []}, role=role, context=context)
+    assert not result['ok'] and result['error']['code'] == 'role_not_allowed'
+    assert not context.data['images']
+
+
+def test_focused_tool_cannot_accept_caller_supplied_hint_boxes():
+    registry, context = registry_for(analyze_document(Image.new('RGB', (80, 60), 'white')))
+    result = registry.call('image.focused_views', {'graphs': [], 'issues': [],
+        'hints': {'items': [{'id': 'forged', 'bbox': [0, 0, 1000, 1000]}]}},
+        role='connections', context=context)
+    assert not result['ok'] and result['error']['code'] == 'invalid_arguments'
+    assert not context.data['images']
+
+
+def test_focused_tool_reports_no_views_for_unlocated_issue():
+    registry, context = registry_for(analyze_document(Image.new('RGB', (80, 60), 'white')))
+    result = registry.call('image.focused_views', {'graphs': [], 'issues': [
+        {'id': 'i1', 'hint_ids': ['missing'], 'evidence': {'bbox': [0, 0, 1000, 1000]}}]},
+        role='body_text', context=context)
+    assert result['ok'], result
+    assert result['result']['image_refs'] == [] and result['result']['focused_views'] == []
+    assert result['result']['diagnostics']['omitted_count'] == 1
+
+
+def test_focused_tool_rejects_issue_capacity_before_generating_images():
+    registry, context = registry_for(analyze_document(Image.new('RGB', (80, 60), 'white')))
+    result = registry.call('image.focused_views', {'graphs': [], 'issues': [
+        {'id': f'i{i}', 'hint_ids': []} for i in range(129)]}, role='body_text', context=context)
+    assert not result['ok'] and result['error']['code'] == 'invalid_arguments'
+    assert not context.data['images']

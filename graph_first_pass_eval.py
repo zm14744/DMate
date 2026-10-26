@@ -615,10 +615,12 @@ _AGENT_ROLES = frozenset(('page_vertices', 'body_text', 'connections', 'attribut
 _AGENT_REQUIRED_ROLES = frozenset(('page_vertices', 'body_text', 'connections', 'structure_review'))
 _AGENT_TOOL_ROLES = {
     'image.local_evidence': _AGENT_ROLES,
+    'image.marker_proposals': {'page_vertices'},
     'image.marker_grounding': {'page_vertices'},
     'image.trace_candidates': {'connections'},
     'image.sknw_candidates': {'connections'},
     'image.review_views': _AGENT_ROLES,
+    'image.focused_views': {'body_text', 'connections', 'structure_review'},
     'graph.stroke_validation': {'connections', 'attributes', 'structure_review'},
     'text.visual_reconciliation': {'body_text', 'structure_review'},
     'graph.structure_audit': {'structure_review'},
@@ -643,14 +645,27 @@ def _agent_attempt_key(record):
 
 
 def _agent_event_evidence(workflow, metrics, issues, missing):
-    """Bind every role invocation/recovery to the single task's event history."""
+    """Bind role sends to task history, including two owners of one repair round.
+
+    Body repair is independent of graph repair. Two adjacent coordinator
+    announcements can therefore authorize one body+connections/attributes
+    round, not two rounds. Their actual owner calls must use the same revision.
+    """
     events = workflow.get('events')
     if not isinstance(events, list) or not events:
         missing.append('agent_event_ledger_missing')
         return {}, {}, []
     starts, outcomes, recoveries = {}, {}, Counter()
-    active, targeted = {}, []
+    active, repair_groups = {}, []
+    owner_counts = Counter()
     seen_invocations = Counter()
+    downstream = {
+        'page_vertices': _AGENT_ROLES-{'body_text'},
+        'body_text': {'body_text', 'structure_review'},
+        'connections': {'connections', 'attributes', 'structure_review'},
+        'attributes': {'attributes', 'structure_review'},
+        'structure_review': {'structure_review'},
+    }
     for position, event in enumerate(events, 1):
         if not isinstance(event, dict):
             issues.append('invalid_agent_event')
@@ -662,13 +677,36 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
             issues.append('invalid_agent_event_role')
             continue
         if status == 'targeted_review':
+            owner, number, conflict_ids = event.get('target_role'), event.get('repair_round'), event.get('conflict_ids')
             if (role != 'coordinator' or not isinstance(event.get('target_role'), str)
                     or event['target_role'] not in _AGENT_ROLES or
-                    not isinstance(event.get('conflict_ids'), list) or not event['conflict_ids']):
+                    not isinstance(conflict_ids, list) or not conflict_ids
+                    or any(not isinstance(x, str) or not x for x in conflict_ids)
+                    or (isinstance(conflict_ids, list) and all(isinstance(x, str) for x in conflict_ids)
+                        and len(set(conflict_ids)) != len(conflict_ids))):
                 issues.append('unscoped_agent_repair')
-            if type(event.get('repair_round')) is not int or event['repair_round'] != len(targeted)+1:
+            if type(number) is not int or number < 1 or number > 3:
                 issues.append('agent_repair_sequence_invalid')
-            targeted.append({**event, '_position': position})
+                continue
+            if not repair_groups or number != repair_groups[-1]['number']:
+                if number != len(repair_groups)+1:
+                    issues.append('agent_repair_sequence_invalid')
+                repair_groups.append({'number': number, 'owners': set(), 'starts': {},
+                    'owner_revisions': {}, 'last_announcement': position,
+                    'previous_revision': max((x['revision'] for x in starts.values()), default=-1)})
+            else:
+                if repair_groups[-1]['last_announcement'] != position-1:
+                    issues.append('agent_repair_announced_after_work_started')
+                repair_groups[-1]['last_announcement'] = position
+            group = repair_groups[-1]
+            if isinstance(owner, str) and owner in _AGENT_ROLES:
+                if owner in group['owners']:
+                    issues.append('agent_repair_owner_repeated')
+                group['owners'].add(owner)
+                owner_counts[owner] += 1
+                if len(group['owners']) > 1 and group['owners'] not in (
+                        {'body_text', 'connections'}, {'body_text', 'attributes'}):
+                    issues.append('agent_repair_owner_pair_invalid')
         if status == 'started':
             invocation, revision = event.get('invocation'), event.get('revision')
             if (role not in _AGENT_ROLES or type(invocation) is not int or invocation < 1 or
@@ -676,30 +714,37 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
                 issues.append('invalid_agent_invocation_event')
                 continue
             key = (role, invocation)
+            group = repair_groups[-1] if repair_groups else None
+            repair_round = group['number'] if group else 0
             seen_invocations[role] += 1
             if key in starts or invocation != seen_invocations[role]:
                 issues.append('repeated_or_skipped_agent_invocation')
-            if invocation > len(targeted)+1:
+            if invocation > len(repair_groups)+1:
                 issues.append('agent_invocation_without_targeted_review')
             if invocation > 1:
                 previous = starts.get((role, invocation-1))
                 if previous and revision <= previous.get('revision', revision):
                     issues.append('agent_rerun_without_new_revision')
-                if not targeted or targeted[-1]['_position'] < (previous or {}).get('_position', position):
+                if group is None or previous is None or previous['_repair_round'] >= repair_round:
                     issues.append('agent_invocation_without_targeted_review')
-                elif isinstance(targeted[-1].get('target_role'), str):
-                    downstream = {
-                        'page_vertices': _AGENT_ROLES-{'body_text'},
-                        'body_text': {'body_text', 'structure_review'},
-                        'connections': {'connections', 'attributes', 'structure_review'},
-                        'attributes': {'attributes', 'structure_review'},
-                        'structure_review': {'structure_review'},
-                    }.get(targeted[-1]['target_role'], set())
-                    if role not in downstream:
-                        issues.append('agent_rerun_outside_targeted_scope')
+            if group is not None:
+                scope = set().union(*(downstream[owner] for owner in group['owners']))
+                # A hard initial body repair can accompany the FIRST normal
+                # attribute read; that read is not an attribute-owner retry.
+                if group['owners'] == {'body_text'} and role == 'attributes' and invocation == 1:
+                    scope.add('attributes')
+                if role not in scope:
+                    issues.append('agent_rerun_outside_targeted_scope')
+                if role in group['starts']:
+                    issues.append('agent_role_repeated_within_repair_round')
+                group['starts'][role] = {'revision': revision, 'position': position}
+                if revision <= group['previous_revision']:
+                    issues.append('agent_repair_uses_stale_revision')
+                if role in group['owners']:
+                    group['owner_revisions'][role] = revision
             if not _sha256_string(event.get('request_digest')):
                 missing.append('agent_role_request_digest_missing')
-            starts[key] = {**event, '_position': position}
+            starts[key] = {**event, '_position': position, '_repair_round': repair_round}
             active[role] = key
         elif status in ('responded', 'network_recovery', 'failed', 'proposal_rejected'):
             key = active.get(role)
@@ -720,8 +765,21 @@ def _agent_event_evidence(workflow, metrics, issues, missing):
                 if not _sha256_string(event.get('response_digest')):
                     missing.append('agent_role_response_digest_missing')
     rounds = workflow.get('repair_rounds')
-    if type(rounds) is not int or not 0 <= rounds <= 3 or rounds != len(targeted):
+    if type(rounds) is not int or not 0 <= rounds <= 3 or rounds != len(repair_groups):
         issues.append('agent_repair_ledger_mismatch')
+    recorded_owners = workflow.get('repair_role_counts')
+    if (not isinstance(recorded_owners, dict)
+            or any(type(value) is not int or not 1 <= value <= 3 for value in recorded_owners.values())
+            or recorded_owners != dict(owner_counts)):
+        issues.append('agent_repair_owner_count_mismatch')
+    for group in repair_groups:
+        for owner in group['owners']-set(group['starts']):
+            missing.append('targeted_agent_owner_not_started:'+owner)
+        revisions = set(group['owner_revisions'].values())
+        if len(revisions) > 1:
+            issues.append('agent_paired_owners_revision_mismatch')
+        if revisions and any(x['revision'] < min(revisions) for x in group['starts'].values()):
+            issues.append('agent_repair_downstream_revision_mismatch')
     count = workflow.get('network_recoveries')
     if (type(count) is not int or not 0 <= count <= 2 or count != sum(recoveries.values())
             or any(value > 1 for value in recoveries.values())):
@@ -816,10 +874,7 @@ def _agent_attributes_needed(graphs):
     for graph in graphs:
         if not isinstance(graph, dict) or not isinstance(graph.get('edges'), list):
             return True
-        if (graph.get('directed') is not False or graph.get('weighted') is not False
-                or graph.get('multigraph') is True
-                or any(isinstance(e, dict) and (e.get('style') == 'unknown' or e.get('edge_label') is not None)
-                       for e in graph['edges'])):
+        if graph['edges']:
             return True
     return False
 
@@ -987,6 +1042,8 @@ def _run_evidence_agent(evidence, reference, prediction):
                     missing.append('vision_input_identity_missing')
                 elif metric['prompt_sha256'] != sent.get('prompt_sha256') or images != sent.get('image_sha256'):
                     issues.append('provider_transport_input_mismatch')
+                if isinstance(images, list) and len(images) > 5:
+                    issues.append('agent_vision_image_budget_exceeded')
             stamp, sent_at, duration = metric.get('started_at_unix'), sent.get('started_at_unix'), metric.get('seconds')
             if type(duration) not in (int, float) or not math.isfinite(duration) or duration < 0:
                 missing.append('model_attempt_duration_missing')
@@ -1029,9 +1086,16 @@ def _run_evidence_agent(evidence, reference, prediction):
     attributes_needed = _agent_attributes_needed(prediction.get('graph_structures'))
     if attributes_needed:
         required_roles.add('attributes')
+        connection_starts = [value for (role, _), value in starts.items() if role == 'connections']
+        attribute_starts = [value for (role, _), value in starts.items() if role == 'attributes']
+        if connection_starts and attribute_starts:
+            connection, attribute = connection_starts[-1], attribute_starts[-1]
+            if (attribute['_position'] <= connection['_position']
+                    or attribute['revision'] <= connection['revision']):
+                issues.append('agent_attributes_not_current_after_connections')
     elif not role_counts['attributes'] and not any(
             event.get('role') == 'attributes' and event.get('status') == 'skipped'
-            and event.get('reason') == 'no_attribute_conflict_or_annotated_edges' for event in events if isinstance(event, dict)):
+            and event.get('reason') == 'no_edges_to_read' for event in events if isinstance(event, dict)):
         missing.append('optional_attribute_role_skip_not_explained')
     for role in required_roles:
         if not role_counts[role]:

@@ -123,6 +123,9 @@ class _RoleBudget:
         self.call_seconds = ledger.call_seconds
         self.connect_seconds = min(20, ledger.call_seconds)
         self.output_tokens = output_tokens
+        # Overview, review sheet and at most three source-only focused crops.
+        # Other VisionProvider callers keep its two-image default.
+        self.max_images = 5
         self.metrics = _MetricSink(ledger, role, revision, invocation)
 
     @property

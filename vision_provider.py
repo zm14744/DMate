@@ -40,6 +40,13 @@ def image_digest(url):
     return hashlib.sha256(base64.b64decode(url.split(',',1)[1],validate=True)).hexdigest()
 
 
+def _selected_images(images,max_images):
+    # This is a trusted caller budget, never a field supplied by model output.
+    if type(max_images) is not int or not 1<=max_images<=5:
+        raise ValueError('invalid_max_images')
+    return tuple(images[:max_images])
+
+
 def _transport_failure_metrics(exc):
     """Describe transport failures without serializing exception messages/URLs.
 
@@ -191,9 +198,9 @@ class VisionProvider:
         import ai
         return bool(ai.API_KEY and ai.VISION_ENABLED)
 
-    def payload(self,prompt,images):
+    def payload(self,prompt,images,*,max_images=2):
         content=[{'type':'text','text':prompt}]
-        for url in images[:2]:
+        for url in _selected_images(images,max_images):
             image_digest(url)
             # Official Zhipu SDK drop_prefix_image_data sends raw base64.
             value={'url':url if self.name=='qwen' else url.split(',',1)[1]}
@@ -226,8 +233,11 @@ class VisionProvider:
         if (type(connect_requested) not in (int,float) or not math.isfinite(connect_requested)
                 or connect_requested<=0):
             raise ValueError('invalid_connect_seconds')
+        max_images=getattr(budget,'max_images',2)
+        selected_images=_selected_images(images,max_images)
         self.logical_calls+=1
-        payload=self.payload(prompt,images)
+        payload=self.payload(prompt,selected_images,max_images=max_images)
+        image_sha256=[image_digest(url) for url in selected_images]
         if self.name=='qwen' and hasattr(budget,'output_tokens'):
             value=budget.output_tokens
             if type(value) is not int or not 1024<=value<=16384:
@@ -251,7 +261,8 @@ class VisionProvider:
                     'thinking_budget':self.thinking_budget,
                     'started_at_unix':time.time(),
                     'logical_call':self.logical_calls,'attempt':attempt+1,'prompt_sha256':hashlib.sha256(prompt.encode()).hexdigest(),
-                    'image_sha256':[image_digest(url) for url in images[:2]]}
+                    'max_images':max_images,'image_count':len(selected_images),
+                    'image_sha256':list(image_sha256)}
             try:
                 remaining=wall_deadline-time.monotonic()
                 if remaining<=0:

@@ -1,5 +1,6 @@
 """Synthetic role/transport boundaries; never a model-accuracy certificate."""
 import copy
+import base64
 import io
 import json
 import threading
@@ -125,8 +126,10 @@ def test_real_langgraph_parallel_roles_and_registered_tools_complete_one_task(bo
     workflow = result['agent_workflow']
     assert workflow['engine'] == 'langgraph' and workflow['provider_source'] == 'injected'
     assert workflow['complete'], workflow['remaining_conflicts']
-    assert workflow['actual_remote_sends'] == 4
-    assert set(workflow['role_sends']) == {'page_vertices', 'body_text', 'connections', 'structure_review'}
+    # The independent attribute read is now mandatory even for monochrome,
+    # apparently unweighted edges with no upstream label reported.
+    assert workflow['actual_remote_sends'] == 5
+    assert set(workflow['role_sends']) == {'page_vertices', 'body_text', 'connections', 'attributes', 'structure_review'}
     assert len({m['task_id'] for m in result['remote_metrics']}) == 1
     assert all(m['source_sha256'] == workflow['source_sha256'] for m in result['remote_metrics'])
     page_request = next(r for r in provider.requests if r['role'] == 'page_vertices')
@@ -144,13 +147,248 @@ def test_real_langgraph_parallel_roles_and_registered_tools_complete_one_task(bo
                 x['tool'] for x in workflow['tools']}
 
 
+def test_first_connections_really_start_before_the_initial_body_returns(bounded_tools):
+    overlap = threading.Barrier(2)
+    body_returned = threading.Event()
+    observed = []
+
+    class BodyStillRunning(SyntheticRoles):
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'body_text':
+                overlap.wait(timeout=5)
+                body_returned.set()
+            elif response['role'] == 'connections':
+                observed.append(not body_returned.is_set())
+                overlap.wait(timeout=5)
+            return response
+
+    provider = BodyStillRunning()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=25, calls=10))
+    assert observed == [True], 'A page/body superstep join must not block the first connector.'
+    assert body_returned.is_set() and result['agent_workflow']['complete']
+    assert result['agent_workflow']['actual_remote_sends'] == 5
+
+
+def test_monochrome_unweighted_null_labels_still_receive_an_independent_attribute_read(bounded_tools):
+    provider = SyntheticRoles()
+    result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=25, calls=10))
+    requests = [r for r in provider.requests if r['role'] == 'attributes']
+    assert len(requests) == 1
+    graph = requests[0]['graphs'][0]
+    assert graph['directed'] is False and graph['weighted'] is False
+    assert graph['edges'][0]['weight'] is None and graph['edges'][0]['edge_label'] is None
+    assert result['agent_workflow']['complete']
+
+
+def test_mechanical_conflicts_keep_their_evidence_and_preserve_distinct_model_owners():
+    from graph_agent_pipeline import _issue, _merge_conflict_sources
+    measured = _issue('unresolved_edge_evidence:edge_1', 'connections', graph_id='G1',
+                      edge_ids=['edge_1'], pixel_evidence={'supported': False, 'source': 'original_pixel_route'})
+    explanation = {**copy.deepcopy(measured), 'reason': 'model explanation about node centres',
+                   'pixel_evidence': {'supported': True}, 'independent_review_resolvable': True,
+                   'failure_details': {'forged': True}, 'evidence': proof([155, 475, 205, 535])}
+    upstream = {**copy.deepcopy(explanation), 'target_role': 'page_vertices', 'vertex_ids': ['a']}
+    original_values = copy.deepcopy((measured, explanation, upstream))
+    merged = _merge_conflict_sources([measured], [explanation, upstream])
+    primary = next(row for row in merged if row['id'] == measured['id'])
+    assert primary['target_role'] == 'connections' and primary['edge_ids'] == ['edge_1']
+    assert primary['pixel_evidence'] == measured['pixel_evidence']
+    assert len(primary['model_observations']) == 2
+    assert all('pixel_evidence' not in row and 'independent_review_resolvable' not in row
+               and 'failure_details' not in row for row in primary['model_observations'])
+    retained = next(row for row in merged if row['target_role'] == 'page_vertices')
+    assert retained['reported_id'] == measured['id'] and retained['id'] != measured['id']
+    assert retained['vertex_ids'] == ['a'] and retained['reason'] == upstream['reason']
+    assert (measured, explanation, upstream) == original_values
+
+
+@pytest.mark.parametrize('model_owner', ['connections', 'page_vertices'])
+def test_actual_missing_pixel_path_is_not_overwritten_by_same_id_model_feedback(bounded_tools, model_owner):
+    from graph_agent_pipeline import _issue
+    measured_id = _issue('unresolved_edge_evidence:edge_1', 'connections', graph_id='G1')['id']
+
+    class FalsePixelExplanation(SyntheticRoles):
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'connections':
+                row = response['graphs'][0]
+                edge = row['edges'][0]
+                edge.pop('candidate_id', None)
+                edge['path'].insert(1, [500, 150])  # White background, not the drawn horizontal line.
+                row['candidate_verdicts'] = [[cid, False] for cid, _ in row['candidate_verdicts']]
+                response['issues'] = [{'id': measured_id, 'kind': 'reported_pixel_explanation',
+                    'target_role': model_owner, 'graph_id': 'G1', 'vertex_ids': ['a'],
+                    'edge_ids': ['edge_1'], 'hint_ids': [], 'reason': 'model claims node centres invalidate the tool',
+                    'evidence': proof([155, 475, 205, 535]),
+                    'pixel_evidence': {'supported': True}, 'independent_review_resolvable': True}]
+            return response
+
+    result = recognize_agents(original(), provider=FalsePixelExplanation(), budget=AgentBudget(seconds=25, calls=10))
+    workflow = result['agent_workflow']
+    assert not workflow['complete'] and not result['graphs'][0]['complete']
+    main = next(row for row in workflow['remaining_conflicts'] if row['id'] == measured_id)
+    assert main['target_role'] == 'connections' and main['pixel_evidence']['supported'] is False
+    assert main['model_observations'][0]['reason'] == 'model claims node centres invalidate the tool'
+    assert 'independent_review_resolvable' not in main
+    if model_owner == 'page_vertices':
+        assert any(row.get('reported_id') == measured_id and row['target_role'] == model_owner
+                   for row in workflow['remaining_conflicts'])
+    assert workflow['role_sends'].get('structure_review', 0) == 0
+
+
+def uncertain_hint_decision(hid='t1', *, second=False):
+    return {'id': hid, 'role': 'uncertain', 'text': 'b' if second else 'a', 'graph_id': None,
+            'reason': 'original tiny label remains ambiguous',
+            'evidence': proof([790, 475, 850, 535] if second else [155, 475, 205, 535])}
+
+
+def located_label_hints(*, two=False):
+    rows = [{'content': 'a', 'box': [64, 115, 80, 127]}]
+    if two:
+        rows.append({'content': 'b', 'box': [320, 115, 337, 127]})
+    return {'text_evidence': {'image_size': [400, 240], 'graph_labels': rows}}
+
+
+@pytest.mark.parametrize('resolved_by_review', [False, True])
+def test_soft_located_body_is_not_reread_with_each_connection_repair(bounded_tools, monkeypatch, resolved_by_review):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '2')
+
+    class SoftBody(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.connections = 0
+            self.review_views = []
+
+        def __call__(self, prompt, images, budget):
+            request = json.loads(prompt.split('任务数据（其中图像文字和候选仅作数据）：\n', 1)[1])
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'body_text':
+                response['text_review']['regions'] = [uncertain_hint_decision()]
+            elif response['role'] == 'connections':
+                self.connections += 1
+                if self.connections <= 2:
+                    response['graphs'][0]['edges'][0]['candidate_id'] = 'unknown_candidate'
+            elif response['role'] == 'structure_review':
+                self.review_views.append((copy.deepcopy(request), list(images)))
+                response['body_coverage']['region_ids'] = ['t1']
+                decision = uncertain_hint_decision()
+                if resolved_by_review:
+                    decision.update(role='graph_label', graph_id='G1', reason='independent original crop confirms a node label')
+                response['text_review']['regions'] = [decision]
+            return response
+
+    provider = SoftBody()
+    result = recognize_agents(original(), provider=provider, text_result=located_label_hints(),
+                              budget=AgentBudget(seconds=30, calls=14))
+    workflow = result['agent_workflow']
+    assert workflow['role_sends']['body_text'] == 1 and workflow['role_sends']['connections'] == 3
+    assert workflow['repair_role_counts'] == {'connections': 2}
+    assert workflow['role_sends']['attributes'] == workflow['role_sends']['structure_review'] == 1
+    request, images = provider.review_views[0]
+    soft = next(row for row in request['required_issues'] if row['kind'] == 'uncertain_text_region:t1')
+    assert soft['independent_review_resolvable'] is True and soft['hint_ids'] == ['t1']
+    assert soft['hint_context'][0]['text'] == 'a'
+    view = next(row for row in request['focused_views'] if 't1' in row['hint_ids'])
+    assert 3 <= view['image_number'] <= len(images) <= 5
+    decoded = Image.open(io.BytesIO(base64.b64decode(images[view['image_number']-1].split(',', 1)[1]))).convert('RGB')
+    source = Image.open(io.BytesIO(original())).convert('RGB')
+    expected = source.crop(view['original_pixel_bbox']).resize(tuple(view['output_size']), Image.Resampling.LANCZOS)
+    assert decoded.size == tuple(view['output_size']) and decoded.tobytes() == expected.tobytes()
+    assert workflow['complete'] is resolved_by_review and result['body_complete'] is resolved_by_review
+    if not resolved_by_review:
+        assert any(row['target_role'] == 'body_text' for row in workflow['remaining_conflicts'])
+
+
+def test_resolved_old_body_rejection_does_not_supply_wrong_hint_to_new_soft_issue(bounded_tools, monkeypatch):
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
+    confirmed = uncertain_hint_decision()
+    confirmed.update(role='graph_label', graph_id='G1', reason='original node label confirmed')
+
+    class RepairedWithDifferentUncertainty(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.bodies = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'body_text':
+                self.bodies += 1
+                first = copy.deepcopy(confirmed)
+                if self.bodies == 1:
+                    first.update(role='body', text='a', graph_id=None)  # Not present in the empty body text.
+                response['text_review']['regions'] = [first, uncertain_hint_decision('t2', second=True)]
+            elif response['role'] == 'structure_review':
+                response['body_coverage']['region_ids'] = ['t1', 't2']
+                response['text_review']['regions'] = [copy.deepcopy(confirmed), uncertain_hint_decision('t2', second=True)]
+            return response
+
+    provider = RepairedWithDifferentUncertainty()
+    result = recognize_agents(original(), provider=provider, text_result=located_label_hints(two=True),
+                              budget=AgentBudget(seconds=30, calls=12))
+    workflow = result['agent_workflow']
+    assert provider.bodies == 2 and not workflow['complete']
+    prior = workflow['proposal_rejections']['body_text']
+    assert prior['resolved'] is True and prior['details']['hint_id'] == 't1'
+    review = next(row for row in provider.requests if row['role'] == 'structure_review')
+    current = next(row for row in review['required_issues'] if row['kind'] == 'uncertain_text_region:t2')
+    assert current['hint_ids'] == ['t2'] and current['hint_context'][0]['id'] == 't2'
+    assert 'failure_details' not in current
+    assert {hid for crop in review['focused_views'] for hid in crop['hint_ids']} == {'t2'}
+
+
+@pytest.mark.parametrize('invalid_body_coverage', [False, True])
+def test_independent_review_same_id_keeps_mechanical_body_failure_and_other_owner(bounded_tools, monkeypatch, invalid_body_coverage):
+    from graph_agent_pipeline import _issue, _merge_conflict_sources
+    measured_id = _issue('uncertain_text_region:t1', 'body_text')['id']
+    merged_raw_review = []
+
+    def observed_merge(measured, model):
+        if any(row.get('reason') == 'independent-review-owner-echo' and 'reported_id' not in row for row in model):
+            merged_raw_review.append(1)
+        return _merge_conflict_sources(measured, model)
+
+    monkeypatch.setattr('graph_agent_pipeline._merge_conflict_sources', observed_merge)
+
+    class IndependentEcho(SyntheticRoles):
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'body_text':
+                response['text_review']['regions'] = [uncertain_hint_decision()]
+            elif response['role'] == 'structure_review':
+                response['body_coverage']['region_ids'] = ['not_a_hint'] if invalid_body_coverage else ['t1']
+                response['text_review']['regions'] = [uncertain_hint_decision()]
+                response['issues'] = [{'id': measured_id, 'kind': 'located_position_concern',
+                    'target_role': 'page_vertices', 'graph_id': 'G1', 'vertex_ids': ['a'], 'edge_ids': [],
+                    'hint_ids': [], 'reason': 'independent-review-owner-echo',
+                    'evidence': proof([155, 475, 205, 535]), 'independent_review_resolvable': True,
+                    'pixel_evidence': {'supported': True}}]
+            return response
+
+    result = recognize_agents(original(), provider=IndependentEcho(), text_result=located_label_hints(),
+                              budget=AgentBudget(seconds=25, calls=10))
+    workflow = result['agent_workflow']
+    assert not workflow['complete'] and not result['body_complete']
+    mechanical = next(row for row in workflow['remaining_conflicts']
+                      if row['id'] == measured_id and row['target_role'] == 'body_text')
+    assert mechanical['hint_ids'] == ['t1']
+    if invalid_body_coverage:
+        assert merged_raw_review == []
+        assert workflow['proposal_rejections']['structure_review']['resolved'] is False
+    else:
+        assert merged_raw_review
+        upstream = next(row for row in workflow['remaining_conflicts'] if row.get('reported_id') == measured_id)
+        assert upstream['target_role'] == 'page_vertices' and upstream['vertex_ids'] == ['a']
+        assert 'independent_review_resolvable' not in upstream and 'pixel_evidence' not in upstream
+
+
 def test_concrete_review_conflict_routes_back_with_fixed_edge_ids(bounded_tools, monkeypatch):
     monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
     provider = SyntheticRoles(repair=True)
     result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=10))
     workflow = result['agent_workflow']
     assert workflow['complete'], workflow['remaining_conflicts']
-    assert workflow['repair_rounds'] == 1 and workflow['actual_remote_sends'] == 6
+    assert workflow['repair_rounds'] == 1 and workflow['actual_remote_sends'] == 8
     connections = [r for r in provider.requests if r['role'] == 'connections']
     assert len(connections) == 2
     assert connections[1]['focus_issues'][0]['id'] == 'connection_check'
@@ -158,6 +396,9 @@ def test_concrete_review_conflict_routes_back_with_fixed_edge_ids(bounded_tools,
     assert connections[1]['base_revision'] > connections[0]['base_revision']
     reviews = [r for r in provider.requests if r['role'] == 'structure_review']
     assert all('focus_issues' not in r for r in reviews), 'A completed connection repair must not retarget the judge.'
+    attributes = [r for r in provider.requests if r['role'] == 'attributes']
+    assert len(attributes) == 2, 'A connection repair invalidates the previous attribute read.'
+    assert attributes[1]['base_revision'] > attributes[0]['base_revision']
 
 
 def test_tool_failure_before_a_new_role_call_cannot_reject_a_committed_proposal(bounded_tools, monkeypatch):
@@ -234,14 +475,18 @@ def test_persistent_connection_failure_cannot_starve_independent_body_repair(bou
     result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=12))
     workflow = result['agent_workflow']
     repairs = [event['target_role'] for event in workflow['events'] if event['status'] == 'targeted_review']
-    assert repairs == ['body_text', 'connections'], 'Validate body before spending a whole connection turn.'
-    assert provider.body_calls == 2 and workflow['role_sends']['connections'] == 2
+    assert repairs == ['body_text', 'connections', 'connections']
+    assert workflow['repair_role_counts'] == {'body_text': 1, 'connections': 2}
+    assert provider.body_calls == 2 and workflow['role_sends']['connections'] == 3
+    body_repair = [r for r in provider.requests if r['role'] == 'body_text'][1]
+    connection_repair = [r for r in provider.requests if r['role'] == 'connections'][1]
+    assert body_repair['base_revision'] == connection_repair['base_revision'], 'Independent body repair is not starved.'
     assert not workflow['complete'], 'Unresolved edges must remain unaccepted.'
     assert not any(issue['target_role'] == 'body_text' for issue in workflow['remaining_conflicts'])
     assert workflow['role_sends'].get('structure_review', 0) == 0, 'Known hard failures cannot be accepted by a judge.'
 
 
-def test_invalid_initial_body_repairs_in_parallel_with_first_connections(bounded_tools, monkeypatch):
+def test_invalid_initial_body_repairs_in_parallel_with_first_attributes(bounded_tools, monkeypatch):
     monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
     overlap = threading.Barrier(2)
     class ParallelRepair(SyntheticRoles):
@@ -257,7 +502,7 @@ def test_invalid_initial_body_repairs_in_parallel_with_first_connections(bounded
                     response['regions'] = 'malformed'
                 else:
                     overlap.wait(timeout=5)
-            elif response['role'] == 'connections':
+            elif response['role'] == 'attributes':
                 overlap.wait(timeout=5)
             return response
 
@@ -268,7 +513,8 @@ def test_invalid_initial_body_repairs_in_parallel_with_first_connections(bounded
     assert workflow['repair_role_counts'] == {'body_text': 1}
     body_repair = [r for r in provider.requests if r['role'] == 'body_text'][1]
     connection = next(r for r in provider.requests if r['role'] == 'connections')
-    assert body_repair['base_revision'] == connection['base_revision']
+    attributes = next(r for r in provider.requests if r['role'] == 'attributes')
+    assert body_repair['base_revision'] == attributes['base_revision'] > connection['base_revision']
     assert 'previous_rejection' in body_repair and 'focus_issues' not in connection
 
 
@@ -357,7 +603,7 @@ def test_old_valid_body_invalidated_by_new_panel_cannot_replace_newer_rejection(
     assert rejected['rejected_proposal']['regions'][0]['id'] == 'new_empty'
 
 
-def test_unknown_graph_type_returns_to_connections_without_spending_attribute_or_judge_calls(bounded_tools, monkeypatch):
+def test_unknown_graph_type_is_repaired_before_attribute_or_judge_calls(bounded_tools, monkeypatch):
     monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '1')
     class UnknownType(SyntheticRoles):
         def __init__(self):
@@ -379,10 +625,13 @@ def test_unknown_graph_type_returns_to_connections_without_spending_attribute_or
     workflow = result['agent_workflow']
     assert workflow['complete'], workflow['remaining_conflicts']
     assert workflow['role_sends']['connections'] == 2
-    assert workflow['role_sends'].get('attributes', 0) == 0
+    assert workflow['role_sends']['attributes'] == 1
     assert workflow['role_sends']['structure_review'] == 1
     connection = [r for r in provider.requests if r['role'] == 'connections'][1]
     assert any('unknown_weighted' in x['kind'] for x in connection['focus_issues'])
+    order = [r['role'] for r in provider.requests]
+    second_connection = [i for i, role in enumerate(order) if role == 'connections'][1]
+    assert second_connection < order.index('attributes') < order.index('structure_review')
 
 
 def test_rejected_connections_still_route_located_vertex_issues_upstream(bounded_tools, monkeypatch):
@@ -466,7 +715,11 @@ def test_blocked_attribute_owner_cannot_spend_the_last_repair_round(bounded_tool
     assert workflow['complete'], workflow['remaining_conflicts']
     assert workflow['repair_role_counts'] == {'connections': 2}
     assert workflow['role_sends']['connections'] == 3
-    assert workflow['role_sends'].get('attributes', 0) == 0
+    assert workflow['role_sends']['attributes'] == 2
+    order = [r['role'] for r in provider.requests]
+    connector_calls = [i for i, role in enumerate(order) if role == 'connections']
+    attribute_calls = [i for i, role in enumerate(order) if role == 'attributes']
+    assert attribute_calls[0] < connector_calls[1] < connector_calls[2] < attribute_calls[1]
 
 
 def test_rejected_body_draft_does_not_become_transcription_history(bounded_tools, monkeypatch):
@@ -588,7 +841,10 @@ def test_explicit_attribute_repair_cannot_be_skipped_by_initial_heuristics(bound
     result = recognize_agents(original(), provider=provider, budget=AgentBudget(seconds=30, calls=10))
     workflow = result['agent_workflow']
     assert workflow['complete'], workflow['remaining_conflicts']
-    assert workflow['role_sends'].get('attributes') == 1
+    assert workflow['role_sends']['attributes'] == 2
+    attribute_calls = [r for r in provider.requests if r['role'] == 'attributes']
+    assert 'focus_issues' not in attribute_calls[0]
+    assert any(issue['target_role'] == 'attributes' for issue in attribute_calls[1]['focus_issues'])
     assert result['graphs'][0]['edges'][0]['color'] == 'black'
 
 

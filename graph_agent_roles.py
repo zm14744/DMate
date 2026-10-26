@@ -79,19 +79,20 @@ CONNECTION_PROMPT = _COMMON + '''你是connections，只沿原图检查固定顶
 "graphs":[{"id":"G1","node_inventory_confirmed":true,"inventory_complete":true,
 "directed":false,"weighted":false,"multigraph":false,
 "type_evidence":{"source":"original","bbox":[0,0,1000,1000],"reason":"逐项核对实际箭头、印刷权值和独立平行线迹/自环"},
-"edges":[{"id":"e1","from":"a","to":"b","direction":"undirected","style":"solid","color":"unknown",
-"path":[[100,100],[800,800]]}],
+"edges":[{"id":"e1","candidate_id":"候选c1","direction":"undirected","style":"solid","color":"unknown"}],
 "reads":[{"vertex":"a","complete":true,"edge_ids":["e1"]},{"vertex":"b","complete":true,"edge_ids":["e1"]}],
-"candidate_verdicts":[["已有候选ID",false]],"retired_edges":[]}],"issues":[]}。
+"candidate_verdicts":[["候选c1",true]],"retired_edges":[]}],"issues":[]}。
 回答每一个给定图，reads逐项覆盖每个顶点的所有入边/出边；孤立点edge_ids为空。每条独立笔画一次，平行边有不同ID。
 固定节点ID、标签、坐标和图框，不能新增/删除/移动节点或换图；发现漏点/分图问题放issues并要求page_vertices重读。
 vertex_position_observations只是CV定位复核提示：结合原图检查固定位置，若该点不在实际节点上，必须给含vertex_ids与局部evidence的page_vertices问题，不能沿错误坐标编边；CV未检出本身不证明节点不存在。
 每条path沿实际整条线迹给2到128点，含曲线中段；起点对应from，终点对应to；无标记交叉继续原笔画，不能换线。
 path中间点只是同一条墨迹上的几何采样，不是额外数学顶点，也不因不是顶点而无效；曲线必须保留中间走向，不能用两端之间的直线弦代替实际外弧。
 若明确采用同图同端点的一个候选，可显式写candidate_id并完全省略path；本地仅从该候选已有、通过原图像素检查的完整路径补入采样，必要时按from/to反转，仍重新校验。独立新线或不满足复用条件的候选必须给完整path；null/空数组不表示复用。
+合法显式candidate_id且该候选path_reuse_allowed=true时，from/to可以同时完全省略，系统按该同图候选的from/to顺序确定端点；只省略一项、写null或显式错误端点均不补。若实际箭头反向，显式给正确from/to与direction，不能靠省略端点猜箭头方向。上面示例仅适用于请求确实提供并核实的候选c1。
+path首尾使用固定节点中心是合法协议；原像素工具在检查时排除节点标记内部，不能仅因端点在中心而非圆圈边缘就宣称候选不受支持。pixel工具的measured proof属于本地原图测量，模型说明不能覆写其supported/source；若原图显示实际冲突，用局部证据报告，不改写工具凭证。
 direction=forward/undirected/unknown；forward从箭尾到箭尖；style=solid/dashed/dotted/unknown。
 逐条观察原图可见颜色，color可用简短颜色名或色值，无法确认填unknown；颜色只是该独立线迹的属性，不能凭颜色合并、拆分或补出边数量。
-候选只是可错的辅助线迹提议；优先从原图独立给出真实path和端点，不必强挂candidate_id。只有确认是同图同一条路径且端点一致，才可显式关联该候选；不能改候选端点后继续借用它的凭证。
+先逐条对照原图核对候选；若确认是同图同一条真实笔画、端点一致且path_reuse_allowed=true，优先明确candidate_id并省略path，复用整条已测路径，不重新画这条路径或改成两端弦。候选仍可能有错，工具支持不等于识别通过；实际不同或新增线迹可独立给完整path与端点，不能改候选端点后借用其凭证。
 省略candidate_id时使用独立唯一边ID，不复用候选ID以免触发兼容绑定。边ID、候选ID和印刷边名是不同字段；边名填edge_label，数值权重填weight。
 所有候选须有true/false/null判定：true表示采用且确实绑定该候选实例，false表示不采用该辅助提议，null表示未决；独立追踪的新笔画不因未绑定候选而丢弃。
 采用候选的合法组合示例：edges:[{id:"e1",candidate_id:"候选c1",from:"a",to:"b",direction:"undirected",style:"solid"}]配candidate_verdicts:[["候选c1",true]]，仅当该候选path_reuse_allowed=true才可如例省略path。
@@ -534,6 +535,148 @@ def _reuse_candidate_path(edge, candidate):
     return [[x*1000, y*1000] for x, y in points], reverse
 
 
+# A nearest-integer original_1000 coordinate may move by sqrt(.5**2+.5**2).
+# This fixed rounding allowance is unrelated to image names, graph density or
+# measured marker radii. Never increase it to make a curved route match a chord.
+_BINDING_ROUNDING_TOLERANCE = .75
+_BINDING_MAX_CANDIDATES = 256
+_BINDING_MAX_ROUTE_COMPARISONS = 4096
+
+
+def _binding_route_profile(raw, scale):
+    """A bounded full polyline; discard only consecutive identical samples."""
+    if (not isinstance(raw, list) or not 2 <= len(raw) <= 128 or
+            any(not isinstance(p, (list, tuple)) or len(p) != 2 or
+                any(type(x) not in (int, float) or not math.isfinite(x) or
+                    not 0 <= x <= 1000 / scale for x in p) for p in raw)):
+        return None
+    points, distances = [], [0.]
+    for raw_point in raw:
+        point = tuple(x * scale for x in raw_point)
+        if points and point == points[-1]:
+            continue
+        if points:
+            cumulative = distances[-1] + math.dist(points[-1], point)
+            if cumulative <= distances[-1]:
+                return None  # Precision loss is not evidence of equivalence.
+            distances.append(cumulative)
+        points.append(point)
+    if len(points) < 2 or distances[-1] <= 2 * _BINDING_ROUNDING_TOLERANCE:
+        return None
+    length = distances[-1]
+    times = [d / length for d in distances]
+    if any(b <= a for a, b in zip(times, times[1:])):
+        return None
+    return points, times, length
+
+
+def _binding_route_comparison(model, candidate):
+    """Two-sided, ordered comparison of every segment, not sampled vertices.
+
+    At the union of normalized arclength breakpoints both polylines are linear.
+    Their difference is linear between consecutive breakpoints, so its largest
+    Euclidean norm occurs at an endpoint. This bounds the entire two-sided
+    arclength correspondence, including each curve and any backtracking.
+    """
+    length_delta = abs(model[2] - candidate[2])
+    if length_delta > 2 * _BINDING_ROUNDING_TOLERANCE:
+        return None
+    points_a, times_a, _ = model
+    points_b, times_b, _ = candidate
+    ia = ib = 0
+    maximum = 0.
+    for time in sorted(set(times_a + times_b)):
+        while ia + 2 < len(times_a) and times_a[ia + 1] < time:
+            ia += 1
+        while ib + 2 < len(times_b) and times_b[ib + 1] < time:
+            ib += 1
+        def interpolate(points, times, index):
+            fraction = (time - times[index]) / (times[index + 1] - times[index])
+            return tuple(a + (b - a) * fraction
+                         for a, b in zip(points[index], points[index + 1]))
+        maximum = max(maximum, math.dist(interpolate(points_a, times_a, ia),
+                                         interpolate(points_b, times_b, ib)))
+        if maximum > _BINDING_ROUNDING_TOLERANCE:
+            return None
+    return {'maximum_distance_original_1000': round(maximum, 9),
+            'length_difference_original_1000': round(length_delta, 9)}
+
+
+def _normalize_missing_candidate_bindings(gid, edges, candidates, verdicts, bindings):
+    """Repair an omitted reference only, with mutual full-route uniqueness.
+
+    All candidate/edge routes compete for geometric uniqueness, including false,
+    null, unsupported and already-bound records. They cannot be targets, but
+    excluding them could manufacture uniqueness between close parallel routes.
+    Invalid candidate geometry blocks this normalization for that endpoint pair.
+    """
+    if (len(candidates) > _BINDING_MAX_CANDIDATES or not isinstance(verdicts, list) or
+            any(not isinstance(v, list) or len(v) != 2 or not isinstance(v[0], str)
+                or (type(v[1]) is not bool and v[1] is not None) for v in verdicts)):
+        return []
+    votes = {v[0]: v[1] for v in verdicts}
+    if len(votes) != len(verdicts) or set(votes) != {c['id'] for c in candidates}:
+        return []
+    def endpoints(row):
+        a, b = row.get('from'), row.get('to')
+        return tuple(sorted((a, b))) if isinstance(a, str) and isinstance(b, str) else None
+    comparisons = sum(sum(endpoints(c) == endpoints(e) for c in candidates) for e in edges)
+    if comparisons > _BINDING_MAX_ROUTE_COMPARISONS:
+        return []  # Never infer uniqueness from a truncated comparison set.
+    profiles, blocked_pairs = {}, set()
+    for candidate in candidates:
+        profile = _binding_route_profile(candidate.get('path'), 1000.)
+        pair = endpoints(candidate)
+        if profile is None:
+            blocked_pairs.add(pair)
+        else:
+            points, times, length = profile
+            profiles[candidate['id']] = (profile,
+                (list(reversed(points)), [1-t for t in reversed(times)], length))
+    matches = {edge['id']: [] for edge in edges}
+    owners = {candidate['id']: [] for candidate in candidates}
+    for edge in edges:
+        pair = endpoints(edge)
+        model = _binding_route_profile(edge.get('path'), 1.)
+        if model is None or pair in blocked_pairs:
+            continue
+        for candidate in candidates:
+            if endpoints(candidate) != pair or candidate['id'] not in profiles:
+                continue
+            reverse = edge['from'] != edge['to'] and edge['from'] == candidate['to']
+            comparison = _binding_route_comparison(model, profiles[candidate['id']][int(reverse)])
+            if comparison is None and edge['from'] == edge['to']:
+                comparison = _binding_route_comparison(model, profiles[candidate['id']][1])
+                reverse = comparison is not None
+            if comparison is not None:
+                matches[edge['id']].append((candidate, comparison, reverse))
+                owners[candidate['id']].append(edge['id'])
+    normalizations = []
+    used = set(bindings.values())
+    for edge in edges:
+        options = matches[edge['id']]
+        # An explicit null is not an omitted field; neither is a legacy ID.
+        if 'candidate_id' in edge or edge['id'] in bindings or len(options) != 1:
+            continue
+        candidate, comparison, reverse = options[0]
+        cid, proof = candidate['id'], candidate.get('pixel_evidence')
+        if (votes.get(cid) is not True or cid in used or owners[cid] != [edge['id']] or
+                not isinstance(proof, dict) or proof.get('supported') is not True or
+                proof.get('source') not in ('original_pixel_route', 'original_pixel_connector_boundaries')):
+            continue
+        edge['candidate_id'] = cid
+        bindings[edge['id']] = cid
+        used.add(cid)
+        normalizations.append({'graph_id': gid, 'edge_id': edge['id'], 'field': 'candidate_id',
+            'candidate_id': cid, 'derived_from': 'unique_rounding_equivalent_original_candidate',
+            'comparison': 'ordered_full_polyline_arclength_v1', 'reversed': reverse,
+            'proof_source': proof['source'], 'tolerance_original_1000': _BINDING_ROUNDING_TOLERANCE,
+            **comparison, 'model_point_count': len(edge['path']),
+            'candidate_point_count': len(candidate['path']),
+            'requires_original_pixel_revalidation': True})
+    return normalizations
+
+
 def validate_connection_response(response, graphs, proposals, *, revision=0):
     """Validate IDs/coverage before the existing original-pixel topology gate."""
     value = _envelope(response, 'connections', revision)
@@ -563,7 +706,34 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
             _check(isinstance(edge, dict), 'invalid_connection_edge')
             eid = identifier(edge.get('id'))
             _check(eid not in seen, 'duplicate_connection_edge_id', graph_id=gid, edge_id=eid); seen.add(eid)
-            _check(edge.get('from') in vertices and edge.get('to') in vertices, 'unknown_connection_endpoint',
+            try:
+                cid = _edge_candidate(edge, eid, candidate_by_id)
+            except (ValueError, TypeError) as exc:
+                code = str(exc) if str(exc) in ('unknown_candidate_reference', 'conflicting_candidate_reference') \
+                    else 'invalid_candidate_reference'
+                raise RoleProtocolError(code, graph_id=gid, edge_id=eid,
+                    candidate_id=edge.get('candidate_id'), expected_candidate_ids=sorted(candidate_by_id),
+                    expected_count=len(candidate_by_id)) from None
+            if 'from' not in edge and 'to' not in edge and 'candidate_id' in edge:
+                _check(isinstance(edge['candidate_id'], str) and cid is not None,
+                       'endpoints_require_explicit_supported_candidate', graph_id=gid, edge_id=eid)
+                candidate = candidate_by_id[cid]
+                _check(all(isinstance(candidate.get(k), str) and candidate[k] in vertices
+                           for k in ('from', 'to')),
+                       'unknown_connection_endpoint', graph_id=gid, edge_id=eid, candidate_id=cid)
+                try:
+                    # Validate caller-owned original proof and the entire path,
+                    # but do not replace an explicitly supplied model path.
+                    _reuse_candidate_path({**edge, 'from': candidate['from'], 'to': candidate['to']}, candidate)
+                except RoleProtocolError as exc:
+                    raise exc.add_context(graph_id=gid, edge_id=eid, candidate_id=cid, field='from/to')
+                edge['from'], edge['to'] = candidate['from'], candidate['to']
+                normalizations.append({'graph_id': gid, 'edge_id': eid, 'field': 'from/to',
+                    'candidate_id': cid, 'derived_from': 'validated_original_candidate',
+                    'from': edge['from'], 'to': edge['to'],
+                    'requires_original_pixel_revalidation': True})
+            _check(all(isinstance(edge.get(k), str) and edge[k] in vertices for k in ('from', 'to')),
+                   'unknown_connection_endpoint',
                    graph_id=gid, edge_id=eid, expected_vertex_ids=sorted(vertices),
                    actual={'from': edge.get('from'), 'to': edge.get('to')})
             _check(edge.get('direction') in ('forward', 'undirected', 'unknown'), 'invalid_connection_direction')
@@ -575,14 +745,6 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
                 except ValueError:
                     raise RoleProtocolError('invalid_connection_color', graph_id=gid, edge_id=eid,
                                             actual=edge['color']) from None
-            try:
-                cid = _edge_candidate(edge, eid, candidate_by_id)
-            except (ValueError, TypeError) as exc:
-                code = str(exc) if str(exc) in ('unknown_candidate_reference', 'conflicting_candidate_reference') \
-                    else 'invalid_candidate_reference'
-                raise RoleProtocolError(code, graph_id=gid, edge_id=eid,
-                    candidate_id=edge.get('candidate_id'), expected_candidate_ids=sorted(candidate_by_id),
-                    expected_count=len(candidate_by_id)) from None
             if cid is not None:
                 candidate = candidate_by_id[cid]
                 _check({edge['from'], edge['to']} == {candidate['from'], candidate['to']},
@@ -628,10 +790,12 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
             _check(isinstance(verdicts, list) and all(isinstance(item, list) and len(item) == 2
                    and (type(item[1]) is bool or item[1] is None) for item in verdicts),
                    'invalid_candidate_verdict_type')
+        normalizations.extend(_normalize_missing_candidate_bindings(gid, edges, candidates, verdicts, bindings))
         coverage = _candidate_coverage(verdicts, candidates, edges, bindings)
         # Explicit null is preserved as an unresolved observation, not a guessed rejection.
         malformed = [issue for issue in coverage if not issue.startswith('unresolved_candidate_verdict:')]
-        _check(not malformed, 'connection_candidate_coverage', issues=malformed)
+        _check(not malformed, 'connection_candidate_coverage', issues=malformed,
+               normalizations=normalizations)
         changed_types = []
         for field in ('directed', 'weighted', 'multigraph'):
             if field in row:
@@ -655,6 +819,8 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
                                     allowed_roles={'page_vertices', 'connections', 'attributes'})
     # Do not trust a model-supplied claim that a field was normalized locally.
     value['protocol_normalizations'] = normalizations
+    value['audit'] = {'role': 'connections', 'base_revision': revision,
+                      'normalizations': copy.deepcopy(normalizations)}
     return value
 
 
