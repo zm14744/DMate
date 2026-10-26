@@ -9,7 +9,7 @@ import pytest
 from graph_agent_roles import (
     RoleProtocolError, build_solver_input, decode_body_response,
     decode_review_response, decode_targeted_review, merge_attribute_response,
-    merge_body_response, reconcile_role_text, validate_connection_response,
+    merge_body_response, reconcile_role_text, validate_connection_response, extract_rejected_role_issues,
 )
 
 
@@ -778,3 +778,255 @@ def test_default_review_needs_no_position_rows_and_confirmation_cannot_mask_othe
     checked = decode_review_response(response, [g], body_complete=True, hints=hints(),
                                      revision=4, position_checks=checks)
     assert checked['verdict'] == 'needs_review'
+
+
+def test_missing_body_source_is_audited_contract_default_without_rewriting_text():
+    response = body_response('比较 p 与 q；', local={'items': []})
+    response['regions'][0].pop('source')
+    original = copy.deepcopy(response)
+    result = decode_body_response(response, hints={'items': []}, revision=4)
+    assert response == original and result['body_text'] == '比较 p 与 q；'
+    assert result['regions'][0]['source'] == 'original'
+    assert result['audit']['normalizations'] == [{
+        'region_id': 'paragraph_1', 'field': 'source', 'value': 'original',
+        'derived_from': 'body_role_original_1000_contract'}]
+    assert result['body_complete']
+
+
+@pytest.mark.parametrize('source', [None, 'ocr', 'crop_reconstruction'])
+def test_explicit_wrong_body_source_is_never_normalized(source):
+    response = body_response('原文', local={'items': []})
+    response['regions'][0]['source'] = source
+    with pytest.raises(RoleProtocolError, match='invalid_body_region_source') as caught:
+        decode_body_response(response, hints={'items': []}, revision=4)
+    assert caught.value.audit['region_id'] == 'paragraph_1'
+    assert caught.value.audit['actual']['source'] == source
+
+
+def test_missing_body_source_does_not_hide_punctuation_conflict_or_invalid_location():
+    local = hints('比较 p 与 q：')
+    response = body_response('比较 p 与 q；', local=local)
+    response['regions'][0].pop('source')
+    response['text_review']['regions'][0]['text'] = '比较 p 与 q：'
+    with pytest.raises(RoleProtocolError, match='body_fragment_not_in_text') as caught:
+        decode_body_response(response, hints=local, revision=4)
+    assert caught.value.audit['hint_id'] == 't1'
+    response['regions'][0]['bbox'] = [40, 20, 40, 80]
+    with pytest.raises(RoleProtocolError, match='body_region_bbox_invalid'):
+        decode_body_response(response, hints=local, revision=4)
+
+
+@pytest.mark.parametrize('bounds', [[520, 380, 480, 420], [480, 420, 520, 380], [520, 420, 480, 380]])
+def test_attribute_opposite_corners_normalize_only_rectangle_order_with_audit(bounds):
+    g = graph(); response = attribute_response([g])
+    row = response['graphs'][0]['edges'][0]
+    row.update(attributes={'color': 'blue'}, evidence=proof(bounds))
+    original = copy.deepcopy(response)
+    updated, audit = merge_attribute_response([g], response, revision=4)
+    assert response == original and updated[0]['edges'][0]['path'] == g['edges'][0]['path']
+    assert updated[0]['edges'][0]['status'] == 'pending' and audit['requires_pixel_revalidation']
+    assert audit['normalizations'] == [{'graph_id': 'G1', 'edge_id': 'e1', 'field': 'evidence.bbox',
+        'bbox': [480., 380., 520., 420.], 'kind': 'ordered_opposite_corners', 'original_bbox': bounds}]
+    assert audit['changes'][0]['evidence']['bbox_normalization']['original_bbox'] == bounds
+
+
+@pytest.mark.parametrize('bounds', [[480, 380, 480, 420], [480, 380, 520, 380], [1020, 420, 480, 380]])
+def test_attribute_box_normalization_never_pads_or_clamps_invalid_evidence(bounds):
+    g = graph(); response = attribute_response([g])
+    response['graphs'][0]['edges'][0]['evidence'] = proof(bounds)
+    with pytest.raises(RoleProtocolError, match='original_evidence_bbox_invalid') as caught:
+        merge_attribute_response([g], response, revision=4)
+    assert caught.value.audit['graph_id'] == 'G1' and caught.value.audit['edge_id'] == 'e1'
+    assert caught.value.audit['actual'] == bounds
+
+
+@pytest.mark.parametrize(('bounds', 'code'), [
+    ([320, 300, 280, 250], 'attribute_evidence_wrong_edge'),
+    ([900, 900, 100, 200], 'attribute_evidence_not_localized'),
+])
+def test_reordered_box_still_needs_the_same_edge_and_locality(bounds, code):
+    g = graph(); response = attribute_response([g])
+    response['graphs'][0]['edges'][0].update(attributes={'color': 'blue'}, evidence=proof(bounds))
+    with pytest.raises(RoleProtocolError, match=code):
+        merge_attribute_response([g], response, revision=4)
+
+
+def test_connection_graph_type_updates_use_one_explicit_original_evidence_object():
+    g = graph()
+    for field in ('directed', 'weighted', 'multigraph'):
+        g[field] = 'unknown'
+    response = connection_response([g]); row = response['graphs'][0]
+    row.update(directed=False, weighted=False, multigraph=False,
+               type_evidence=proof([900, 900, 100, 200]))
+    checked = validate_connection_response(response, [g], {}, revision=4)['graphs'][0]
+    assert all(checked[field] is False for field in ('directed', 'weighted', 'multigraph'))
+    assert checked['type_evidence']['bbox'] == [100., 200., 900., 900.]
+    assert checked['type_evidence']['bbox_normalization']['original_bbox'] == [900, 900, 100, 200]
+    row['type_evidence'] = {'directed': proof(), 'weighted': proof(), 'multigraph': proof()}
+    with pytest.raises(RoleProtocolError, match='original_evidence_missing') as caught:
+        validate_connection_response(response, [g], {}, revision=4)
+    assert caught.value.audit['graph_id'] == 'G1'
+    assert caught.value.audit['fields'] == ['directed', 'weighted', 'multigraph']
+
+
+def test_absent_graph_types_remain_compatible_without_inference_from_edge_direction():
+    g = graph(); g['directed'] = g['weighted'] = 'unknown'
+    response = connection_response([g])
+    checked = validate_connection_response(response, [g], {}, revision=4)['graphs'][0]
+    assert 'directed' not in checked and 'weighted' not in checked
+    assert g['directed'] == g['weighted'] == 'unknown'
+
+
+def reusable_curved_candidate():
+    g = graph()
+    candidate = {**copy.deepcopy(g['edges'][0]), 'id': 'curve_1',
+        'path': [[.2, .5], [.3, .25], [.6, .2], [.8, .5]],
+        'pixel_evidence': {'source': 'original_pixel_route', 'supported': True}}
+    proposals = {'G1': [candidate]}
+    response = connection_response([g], candidates=proposals)
+    row = response['graphs'][0]
+    row['edges'][0]['candidate_id'] = 'curve_1'
+    row['edges'][0].pop('path')
+    row['candidate_verdicts'] = [['curve_1', True]]
+    return g, candidate, proposals, response
+
+
+@pytest.mark.parametrize('reversed_edge', [False, True])
+@pytest.mark.parametrize('source', ['original_pixel_route', 'original_pixel_connector_boundaries'])
+def test_explicit_pixel_candidate_reuses_every_curve_sample_in_endpoint_order(reversed_edge, source):
+    g, candidate, proposals, response = reusable_curved_candidate()
+    candidate['pixel_evidence']['source'] = source
+    raw = response['graphs'][0]['edges'][0]
+    if reversed_edge:
+        raw['from'], raw['to'] = raw['to'], raw['from']
+    original = copy.deepcopy((g, proposals, response))
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    expected = [[x*1000, y*1000] for x, y in candidate['path']]
+    if reversed_edge: expected.reverse()
+    assert checked['graphs'][0]['edges'][0]['path'] == expected
+    assert checked['graphs'][0]['edges'][0]['id'] == 'e1'
+    assert checked['protocol_normalizations'] == [{'graph_id': 'G1', 'edge_id': 'e1', 'field': 'path',
+        'candidate_id': 'curve_1', 'derived_from': 'validated_original_candidate',
+        'reversed': reversed_edge, 'point_count': 4}]
+    assert (g, proposals, response) == original
+
+
+@pytest.mark.parametrize('mutation', ['no_id', 'legacy_only', 'wrong_endpoints', 'unknown_id',
+                                      'nonfinite', 'wrong_units', 'unsupported', 'model_proof'])
+def test_candidate_path_reuse_requires_explicit_identity_and_valid_original_route(mutation):
+    g, candidate, proposals, response = reusable_curved_candidate()
+    raw = response['graphs'][0]['edges'][0]
+    if mutation == 'no_id': raw.pop('candidate_id')
+    if mutation == 'legacy_only':
+        raw.pop('candidate_id'); raw['id'] = 'curve_1'
+    if mutation == 'wrong_endpoints': candidate['to'] = 'a'
+    if mutation == 'unknown_id': raw['candidate_id'] = 'not_in_this_panel'
+    if mutation == 'nonfinite': candidate['path'][1][0] = float('nan')
+    if mutation == 'wrong_units': candidate['path'][1][0] = 300
+    if mutation == 'unsupported': candidate['pixel_evidence']['supported'] = False
+    if mutation == 'model_proof':
+        raw['pixel_evidence'] = copy.deepcopy(candidate.pop('pixel_evidence'))
+    code = {'wrong_endpoints': 'changed_candidate_endpoints', 'unknown_id': 'unknown_candidate_reference',
+            'nonfinite': 'invalid_candidate_reuse_path', 'wrong_units': 'invalid_candidate_reuse_path',
+            'unsupported': 'candidate_path_not_pixel_validated',
+            'model_proof': 'candidate_path_not_pixel_validated'}.get(mutation, 'path_requires_explicit_candidate')
+    with pytest.raises(RoleProtocolError, match=code) as caught:
+        validate_connection_response(response, [g], proposals, revision=4)
+    assert caught.value.audit['graph_id'] == 'G1'
+
+
+@pytest.mark.parametrize('path', [None, []])
+def test_present_invalid_path_is_not_silently_replaced_by_a_candidate(path):
+    g, _, proposals, response = reusable_curved_candidate()
+    response['graphs'][0]['edges'][0]['path'] = path
+    with pytest.raises(RoleProtocolError, match='invalid_connection_path'):
+        validate_connection_response(response, [g], proposals, revision=4)
+
+
+def test_explicit_independent_curve_is_not_changed_by_a_candidate_reference():
+    g, _, proposals, response = reusable_curved_candidate()
+    path = [[200, 500], [400, 340], [650, 330], [800, 500]]
+    response['graphs'][0]['edges'][0]['path'] = path
+    checked = validate_connection_response(response, [g], proposals, revision=4)
+    assert checked['graphs'][0]['edges'][0]['path'] == path
+    assert checked['protocol_normalizations'] == []
+
+
+def rejected_connection_with_local_position_issue():
+    g = graph()
+    response = connection_response([g])
+    response['graphs'][0]['candidate_verdicts'] = [['unknown_candidate', True]]
+    observation = issue('vertex_position_1', role='page_vertices')
+    observation.update(kind='missing_vertex_evidence', vertex_ids=['a'],
+                       reason='当前冻结位置未见独立标记，请页面角色核对实际原图位置。',
+                       evidence=proof([185, 485, 215, 515], '该小框只有背景线，未见节点轮廓'))
+    response['issues'] = [observation]
+    return g, response
+
+
+def test_rejected_graph_can_preserve_only_independently_validated_upstream_issue():
+    g, response = rejected_connection_with_local_position_issue()
+    original = copy.deepcopy((g, response))
+    with pytest.raises(RoleProtocolError, match='connection_candidate_coverage'):
+        validate_connection_response(response, [g], {}, revision=4)
+    kept = extract_rejected_role_issues(response, [g], role='connections', revision=4)
+    assert len(kept) == 1 and kept[0]['target_role'] == 'page_vertices'
+    assert kept[0]['vertex_ids'] == ['a'] and kept[0]['reason'] == response['issues'][0]['reason']
+    assert kept[0]['source_revision'] == 4 and kept[0]['source_role'] == 'connections'
+    assert kept[0]['scheduling_only'] is True
+    assert 'graphs' not in kept[0] and (g, response) == original
+    # Neither the invalid graph body nor an extra edit payload is considered.
+    response['graphs'] = [{'id': 'fake_graph', 'vertices': [{'id': 'fake_vertex'}]}]
+    response['issues'][0]['graph_edits'] = {'delete_all_vertices': True}
+    assert extract_rejected_role_issues(response, [g], role='connections', revision=4) == kept
+
+
+@pytest.mark.parametrize('mutation', ['stale', 'wrong_role', 'wrong_space', 'unknown_graph', 'fake_vertex',
+    'fake_edge', 'uncommitted_edge', 'fake_hint', 'bad_bbox', 'wrong_panel', 'whole_page', 'no_source', 'bad_target'])
+def test_rejected_issue_extraction_filters_unsafe_identity_or_evidence(mutation):
+    g, response = rejected_connection_with_local_position_issue()
+    row = response['issues'][0]
+    if mutation == 'stale': response['base_revision'] = 3
+    if mutation == 'wrong_role': response['role'] = 'structure_review'
+    if mutation == 'wrong_space': response['coordinate_space'] = 'crop_1000'
+    if mutation == 'unknown_graph': row['graph_id'] = 'invented'
+    if mutation == 'fake_vertex': row['vertex_ids'] = ['invented']
+    if mutation in ('fake_edge', 'uncommitted_edge'): row['edge_ids'] = ['draft_only']
+    if mutation == 'uncommitted_edge':
+        response['graphs'][0]['edges'].append({**copy.deepcopy(g['edges'][0]), 'id': 'draft_only'})
+    if mutation == 'fake_hint': row['hint_ids'] = ['unknown_hint']
+    if mutation == 'bad_bbox': row['evidence']['bbox'] = [200, 400, 200, 410]
+    if mutation == 'wrong_panel': row['evidence']['bbox'] = [20, 20, 40, 40]
+    if mutation == 'whole_page': row['evidence']['bbox'] = [0, 0, 1000, 1000]
+    if mutation == 'no_source': row['evidence'].pop('source')
+    if mutation == 'bad_target': row['target_role'] = 'solver'
+    assert extract_rejected_role_issues(response, [g], role='connections', revision=4) == []
+
+
+def test_rejected_issue_extraction_keeps_valid_sibling_but_rejects_duplicate_identity():
+    g, response = rejected_connection_with_local_position_issue()
+    valid = copy.deepcopy(response['issues'][0])
+    invalid = copy.deepcopy(valid); invalid['id'] = 'bad'; invalid['vertex_ids'] = ['unknown']
+    response['issues'].append(invalid)
+    assert [i['id'] for i in extract_rejected_role_issues(response, [g], role='connections', revision=4)] == [valid['id']]
+    response['issues'].append(copy.deepcopy(valid))
+    assert extract_rejected_role_issues(response, [g], role='connections', revision=4) == []
+
+
+def test_rejected_text_issue_cannot_borrow_known_hint_id_at_another_position():
+    g, response = rejected_connection_with_local_position_issue()
+    response['role'] = 'structure_review'
+    row = response['issues'][0]
+    row.update(target_role='body_text', graph_id=None, vertex_ids=[], hint_ids=['t1'],
+               evidence=proof([50, 20, 850, 100]))
+    assert len(extract_rejected_role_issues(response, [g], role='structure_review', revision=4, hints=hints())) == 1
+    row['evidence'] = proof([185, 485, 215, 515])
+    assert extract_rejected_role_issues(response, [g], role='structure_review', revision=4, hints=hints()) == []
+
+
+def test_rejected_issue_extraction_is_closed_for_indeterminate_input_context():
+    g, response = rejected_connection_with_local_position_issue()
+    assert extract_rejected_role_issues(None, [g], role='connections', revision=4) == []
+    assert extract_rejected_role_issues(response, [g], role=[], revision=4) == []
+    assert extract_rejected_role_issues(response, [g], role='connections', revision=True) == []
+    assert extract_rejected_role_issues(response, [{'id': 'G1'}], role='connections', revision=4) == []

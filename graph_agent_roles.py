@@ -44,6 +44,7 @@ PAGE_VERTICES_PROMPT = _COMMON + '''你是page_vertices，只盘点整页子图�
 每个点必须定位在原图圆点/空心圈/其他明确标记中心，先找标记，再绑定标签；文字框中心不是节点坐标。
 original_image_size为完整原图[宽,高]；x/1000和y/1000分别是横向、纵向比例，宽高比不同也不能共用同一像素除数。
 marker_proposals是原像素工具的可错位置提示，坐标已转为相同original_1000；必须逐个结合原图形状和标签确认，不能按候选数量照抄节点清单。
+若原图确认某marker正是此节点，直接使用它的原图x/y，不改成等间距、整百数或规整网格坐标；无可靠匹配时依据原图实际量取位置，不能按常见图形排点。
 候选可能是字形孔、箭头或其他噪声，也可能漏点；工具未观察到连出笔画不代表孤立点。limits触顶或marker_review_context未决时重看指定原图位置。
 保留可见标签的大小写、上下标与原始字符，不能将字母统一大写/小写或把下标改成正文数字；没有标签用label=null，内部ID不冒充原图文字。已有ID在一次盘点内唯一。
 节点坐标取可见标记中心，不能使用邻近标签或OCR文本框中心；没有明确标记时保留不确定，不凭文字框强定位置。
@@ -60,19 +61,24 @@ BODY_PROMPT = _COMMON + '''你是body_text，独立逐行转录完整原页中�
 "text_review":{"reason":"改动所依据的原图位置",
 "regions":[{"id":"t1","role":"body","text":"正文原文片段","graph_id":null,"reason":"原图依据","evidence":{"source":"original","bbox":[0,0,1000,100],"reason":"该处可见文字"}}]}}。
 顶层regions按阅读顺序定位实际文字片段；role可为body/graph_label/noise/uncertain。唯一正文源是其中role=body的text，系统按顺序连接，不必再重复整段body_text或text_review.text/complete。
+本角色的regions均来自已给定原图，source省略时按本角色和original_1000契约补为original；显式source只能是original，不能把OCR猜测或重绘内容标成原图观察。
 若仍提供这些兼容字段，必须与regions和body_complete相同；只允许空白、成对数学定界符及显式上下标写法等价，不能出现真实字词或数字差异。
 text_review.regions必须逐项覆盖提供的全部text_hints ID，不得遗漏或添加未知hint ID；未被OCR找到的正文仍要补进顶层regions。
 hint保持原文且其格式等价片段在正文中唯一时，可省略该review行的text；改字或重复片段不能靠省略text猜测。没有text_hints时可省略text_review。
+text_review中role=body的text必须写本次依据原图确认的最终片段，不是待纠正的OCR旧文；同一位置的重复hint逐个保留ID，但统一核对到同一最终片段。冒号/分号等实际字符差异不能靠格式归一化消除。
 页面角色与本角色并行，graph_label的graph_id可以暂为null，不能猜G1；由本地唯一空间归属和最终审核确认。
 删作noise/graph_label或改写hint文字必须说明原图依据；实质文字变化须有该hint位置的evidence，不能引用另一处标签。
 数字、上下标、希腊字母、中文数词、否定、数量词、通路/回路等逐字核对。
 不同位置的v3/v5可以不同，不能为符合题意或图中标签而改题干。看不清或顶部裁掉时body_complete=false，不能补全。
 无题干时body区域为空；水印、顶点、边名、权值不是题干。公式可用LaTeX，但原意和字符必须保留。
+无题干的最小正文示例是{"body_complete":true,"regions":[]}，绝不能造role="body",text=""的占位区域；有text_hints时仍必须逐ID给text_review.regions，按原图确认graph_label/noise/uncertain，不能因正文为空而跳过它们。
 '''
 
 CONNECTION_PROMPT = _COMMON + '''你是connections，只沿原图检查固定顶点之间的真实笔画，不承担正文转录或独立终审，不解题。
 返回{"role":"connections","base_revision":0,"coordinate_space":"original_1000","panels_complete":true,
 "graphs":[{"id":"G1","node_inventory_confirmed":true,"inventory_complete":true,
+"directed":false,"weighted":false,"multigraph":false,
+"type_evidence":{"source":"original","bbox":[0,0,1000,1000],"reason":"逐项核对实际箭头、印刷权值和独立平行线迹/自环"},
 "edges":[{"id":"e1","from":"a","to":"b","direction":"undirected","style":"solid","color":"unknown",
 "path":[[100,100],[800,800]]}],
 "reads":[{"vertex":"a","complete":true,"edge_ids":["e1"]},{"vertex":"b","complete":true,"edge_ids":["e1"]}],
@@ -81,14 +87,19 @@ CONNECTION_PROMPT = _COMMON + '''你是connections，只沿原图检查固定顶
 固定节点ID、标签、坐标和图框，不能新增/删除/移动节点或换图；发现漏点/分图问题放issues并要求page_vertices重读。
 vertex_position_observations只是CV定位复核提示：结合原图检查固定位置，若该点不在实际节点上，必须给含vertex_ids与局部evidence的page_vertices问题，不能沿错误坐标编边；CV未检出本身不证明节点不存在。
 每条path沿实际整条线迹给2到128点，含曲线中段；起点对应from，终点对应to；无标记交叉继续原笔画，不能换线。
+path中间点只是同一条墨迹上的几何采样，不是额外数学顶点，也不因不是顶点而无效；曲线必须保留中间走向，不能用两端之间的直线弦代替实际外弧。
+若明确采用同图同端点的一个候选，可显式写candidate_id并完全省略path；本地仅从该候选已有、通过原图像素检查的完整路径补入采样，必要时按from/to反转，仍重新校验。独立新线或不满足复用条件的候选必须给完整path；null/空数组不表示复用。
 direction=forward/undirected/unknown；forward从箭尾到箭尖；style=solid/dashed/dotted/unknown。
 逐条观察原图可见颜色，color可用简短颜色名或色值，无法确认填unknown；颜色只是该独立线迹的属性，不能凭颜色合并、拆分或补出边数量。
 候选只是可错的辅助线迹提议；优先从原图独立给出真实path和端点，不必强挂candidate_id。只有确认是同图同一条路径且端点一致，才可显式关联该候选；不能改候选端点后继续借用它的凭证。
 省略candidate_id时使用独立唯一边ID，不复用候选ID以免触发兼容绑定。边ID、候选ID和印刷边名是不同字段；边名填edge_label，数值权重填weight。
 所有候选须有true/false/null判定：true表示采用且确实绑定该候选实例，false表示不采用该辅助提议，null表示未决；独立追踪的新笔画不因未绑定候选而丢弃。
+采用候选的合法组合示例：edges:[{id:"e1",candidate_id:"候选c1",from:"a",to:"b",direction:"undirected",style:"solid"}]配candidate_verdicts:[["候选c1",true]]，仅当该候选path_reuse_allowed=true才可如例省略path。
+不采用辅助候选而独立画线时，提交完整path、保持独立边ID，相关候选判false；不允许把候选判true却没有任何边的candidate_id指向它。提交前逐项核对这个对应关系。
 只有previous_graphs中已经提交的边属于已有边，ID保持稳定；确认为误识需显式retired_edges:[{id,reason,evidence}]，不能因漏写而丢弃。没有已有边时retired_edges省略或空数组。不能按端点去重。
 previous_rejection及其rejected_proposal是未提交的失败提案，不属于previous_graphs；候选ID和失败提案中的边都不能作为可退役边。按反馈修正完整提案，不能虚构退役历史。
-修改directed/weighted/multigraph须给type_evidence。inventory_complete只是本角色覆盖声明，不是最终验收结果。
+每图明确返回directed、weighted、multigraph，各自只能true/false/unknown；逐项看原图，不能照抄示例或仅凭题型猜测，无法确认保留unknown。旧值unknown也需主动核对，不因上一角色未判断而永久省略。
+相对固定图改变任一类型时，须给一个共享type_evidence={source:"original",bbox:[左,上,右,下],reason:"各项依据"}，不能改成按字段分组的映射；印刷边名不自动当数值权重。inventory_complete只是本角色覆盖声明，不是最终验收结果。
 issues每项含{id,kind,target_role,graph_id,vertex_ids:[],edge_ids:[],hint_ids:[],reason,evidence}；
 target_role仅page_vertices/connections/attributes，漏点用位置证据和空vertex_ids说明，不编造未知ID。
 不要输出body_text、text_review、node_updates、new_vertices、removed_vertices或panel_revision。
@@ -104,6 +115,7 @@ ATTRIBUTE_PROMPT = _COMMON + '''你是attributes，只复核固定边ID的属性
 direction=forward表示固定from→to；reverse表示同一条边箭头实际to→from，由本地原子翻转from/to和path且保留ID，再做原图像素校验。
 reverse不能表示“保留原方向”；无向边填undirected。不要自行更换端点ID或给另一路径。
 所有实质属性改变必须给位于该图、该边附近的原图evidence。e1等边名不是权值1，轮廓箭头双边不是平行边。
+evidence.bbox是矩形[最小x,最小y,最大x,最大y]，不是按from→to顺序复制两端点；水平/垂直线需圈出有面积的局部像素区域，不能给零宽或零高框。
 issues每项含{id,kind,target_role,graph_id,vertex_ids:[],edge_ids:[],hint_ids:[],reason,evidence}；
 target_role仅page_vertices/connections/attributes。问题必须保留，不能用属性confirmed掩盖其他具体冲突。
 '''
@@ -205,11 +217,25 @@ def _reason(value):
 
 def _proof(value):
     _check(isinstance(value, dict) and value.get('source') == 'original', 'original_evidence_missing')
+    raw = value.get('bbox')
+    ordered = raw
+    normalization = None
+    # Two opposite corners define the same rectangle irrespective of order.
+    # Do not pad a degenerate box, clamp bounds, guess units or invent pixels.
+    if (isinstance(raw, (list, tuple)) and len(raw) == 4 and
+            all(type(v) in (int, float) and math.isfinite(v) and 0 <= v <= 1000 for v in raw)):
+        ordered = [min(raw[0], raw[2]), min(raw[1], raw[3]), max(raw[0], raw[2]), max(raw[1], raw[3])]
+        if list(raw) != ordered:
+            normalization = {'kind': 'ordered_opposite_corners', 'original_bbox': list(raw)}
     try:
-        bounds = box(value.get('bbox'))
+        bounds = box(ordered)
     except (ValueError, TypeError):
-        raise RoleProtocolError('original_evidence_bbox_invalid') from None
-    return {'source': 'original', 'bbox': [v * 1000 for v in bounds], 'reason': _reason(value.get('reason'))}
+        raise RoleProtocolError('original_evidence_bbox_invalid',
+                                expected='nondegenerate original_1000 rectangle', actual=raw) from None
+    proof = {'source': 'original', 'bbox': [v * 1000 for v in bounds], 'reason': _reason(value.get('reason'))}
+    if normalization is not None:
+        proof['bbox_normalization'] = normalization
+    return proof
 
 
 def _overlap(a, b):
@@ -410,17 +436,30 @@ def decode_body_response(response, *, hints=None, graphs=None, previous=None, re
     _check(type(value.get('body_complete')) is bool, 'invalid_body_transcription')
     regions = value.get('regions')
     _check(isinstance(regions, list) and len(regions) <= MAX_HINTS, 'body_regions_missing')
-    seen, fragments, region_issues = set(), [], []
+    seen, fragments, region_issues, normalizations = set(), [], [], []
     for region in regions:
         _check(isinstance(region, dict), 'invalid_body_region')
         rid = identifier(region.get('id'))
         _check(rid not in seen, 'duplicate_body_region'); seen.add(rid)
+        if 'source' not in region:
+            # A redundant protocol constant, not a claim of independent pixel
+            # validation. Explicit contradictory provenance is never repaired.
+            region['source'] = 'original'
+            normalizations.append({'region_id': rid, 'field': 'source', 'value': 'original',
+                                   'derived_from': 'body_role_original_1000_contract'})
         _check(region.get('source') == 'original' and region.get('role') in
-               ('body', 'graph_label', 'noise', 'uncertain'), 'invalid_body_region_source')
-        box(region.get('bbox'))
+               ('body', 'graph_label', 'noise', 'uncertain'), 'invalid_body_region_source',
+               region_id=rid, expected={'source': 'original'},
+               actual={'source': region.get('source'), 'role': region.get('role')})
+        try:
+            box(region.get('bbox'))
+        except (ValueError, TypeError):
+            raise RoleProtocolError('body_region_bbox_invalid', region_id=rid,
+                                    actual=region.get('bbox')) from None
         _check(isinstance(region.get('text'), str) and len(region['text']) <= 12000, 'invalid_body_region_text')
         if region['role'] == 'body':
-            _check(bool(region['text'].strip()), 'empty_body_region')
+            _check(bool(region['text'].strip()), 'empty_body_region', region_id=rid,
+                   expected='omit empty body placeholders; use regions=[] only when no body is visible')
             fragments.append(region['text'])
         elif region['role'] == 'uncertain':
             region_issues.append('uncertain_body_region:' + rid)
@@ -466,12 +505,33 @@ def decode_body_response(response, *, hints=None, graphs=None, previous=None, re
             'body_complete': value['body_complete'] and complete and not issues,
             'regions': regions, 'text_review': review, 'issues': issues,
             'audit': {'role': 'body_text', 'base_revision': revision, 'panel_bindings': bindings,
+                      'normalizations': normalizations,
                       'content_sha256': hashlib.sha256(text.encode()).hexdigest(),
                       'critical_sequence': critical_sequence(text), 'reconciliation': reconciliation}}
 
 
 def merge_body_response(response, hints, graphs, *, previous=None, revision=0):
     return decode_body_response(response, hints=hints, graphs=graphs, previous=previous, revision=revision)
+
+
+def _reuse_candidate_path(edge, candidate):
+    """Reuse one explicit caller-owned pixel proposal, never a model proof."""
+    _check(isinstance(edge.get('candidate_id'), str) and candidate is not None,
+           'path_requires_explicit_candidate')
+    proof = candidate.get('pixel_evidence')
+    _check(isinstance(proof, dict) and proof.get('supported') is True and
+           proof.get('source') in ('original_pixel_route', 'original_pixel_connector_boundaries'),
+           'candidate_path_not_pixel_validated')
+    route = candidate.get('path')
+    _check(isinstance(route, list) and 2 <= len(route) <= 128 and
+           all(isinstance(p, (list, tuple)) and len(p) == 2 and
+               all(type(v) in (int, float) and math.isfinite(v) and 0 <= v <= 1 for v in p)
+               for p in route), 'invalid_candidate_reuse_path')
+    # The endpoint identity gate runs before this helper. Self-loops retain
+    # their observed orientation; no direction is guessed from coincident IDs.
+    reverse = edge['from'] != edge['to'] and edge['from'] == candidate['to']
+    points = list(reversed(route)) if reverse else route
+    return [[x*1000, y*1000] for x, y in points], reverse
 
 
 def validate_connection_response(response, graphs, proposals, *, revision=0):
@@ -483,7 +543,7 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
            'connection_role_authority_violation')
     _check(type(value.get('panels_complete')) is bool, 'panel_confirmation_missing')
     by_id = _rows(value.get('graphs'), 'id', fixed, 'connection_graphs')
-    total, issue_inventory = 0, {}
+    total, issue_inventory, normalizations = 0, {}, []
     for gid, row in by_id.items():
         old = fixed[gid]
         _check(not any(k in row for k in ('vertices', 'node_updates', 'new_vertices', 'removed_vertices', 'panel_update')),
@@ -508,7 +568,7 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
                    actual={'from': edge.get('from'), 'to': edge.get('to')})
             _check(edge.get('direction') in ('forward', 'undirected', 'unknown'), 'invalid_connection_direction')
             _check(edge.get('style') in ('solid', 'dashed', 'dotted', 'unknown'), 'invalid_connection_style')
-            _route(edge.get('path')); attribute(edge.get('weight')); attribute(edge.get('edge_label'))
+            attribute(edge.get('weight')); attribute(edge.get('edge_label'))
             if 'color' in edge:
                 try:
                     _edge_color(edge['color'])
@@ -533,6 +593,19 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
                        graph_id=gid, edge_id=eid, candidate_id=cid)
                 used_candidates.add(cid)
                 bindings[eid] = cid
+            if 'path' not in edge:
+                try:
+                    edge['path'], reversed_path = _reuse_candidate_path(edge, candidate_by_id.get(cid))
+                except RoleProtocolError as exc:
+                    raise exc.add_context(graph_id=gid, edge_id=eid, candidate_id=cid)
+                normalizations.append({'graph_id': gid, 'edge_id': eid, 'field': 'path',
+                    'candidate_id': cid, 'derived_from': 'validated_original_candidate',
+                    'reversed': reversed_path, 'point_count': len(edge['path'])})
+            try:
+                _route(edge.get('path'))
+            except (ValueError, TypeError):
+                raise RoleProtocolError('invalid_connection_path', graph_id=gid, edge_id=eid,
+                                        candidate_id=cid) from None
         retired = row.get('retired_edges', [])
         _check(isinstance(retired, list), 'invalid_retired_edges')
         old_ids = {e['id'] for e in old['edges']}
@@ -559,11 +632,20 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
         # Explicit null is preserved as an unresolved observation, not a guessed rejection.
         malformed = [issue for issue in coverage if not issue.startswith('unresolved_candidate_verdict:')]
         _check(not malformed, 'connection_candidate_coverage', issues=malformed)
+        changed_types = []
         for field in ('directed', 'weighted', 'multigraph'):
             if field in row:
-                _check(type(row[field]) is bool or row[field] == 'unknown', 'invalid_connection_graph_type')
+                _check(type(row[field]) is bool or row[field] == 'unknown', 'invalid_connection_graph_type',
+                       graph_id=gid, field=field, actual=row[field])
                 if row[field] != old.get(field):
-                    _proof(row.get('type_evidence'))
+                    changed_types.append(field)
+        if changed_types:
+            try:
+                row['type_evidence'] = _proof(row.get('type_evidence'))
+            except RoleProtocolError as exc:
+                raise exc.add_context(graph_id=gid, fields=changed_types,
+                                      expected={'source': 'original', 'bbox': '[left,top,right,bottom]',
+                                                'reason': 'original-image basis for graph types'})
         # Issues may identify an existing edge or a newly proposed instance.
         # The ID universe is explicit; an unknown missing entity uses a bbox.
         known_edges = {e['id']: e for e in old['edges']}
@@ -571,6 +653,8 @@ def validate_connection_response(response, graphs, proposals, *, revision=0):
         issue_inventory[gid] = {**old, 'edges': list(known_edges.values())}
     value['issues'] = _review_issues(value.get('issues', []), issue_inventory, {},
                                     allowed_roles={'page_vertices', 'connections', 'attributes'})
+    # Do not trust a model-supplied claim that a field was normalized locally.
+    value['protocol_normalizations'] = normalizations
     return value
 
 
@@ -660,7 +744,7 @@ def merge_attribute_response(graphs, response, *, revision=0):
     rows = _rows(value.get('graphs'), 'id', fixed, 'attribute_graphs')
     output = copy.deepcopy(graphs)
     audit = {'role': 'attributes', 'base_revision': revision, 'input_sha256': _inventory_digest(graphs),
-             'changes': [], 'issues': [], 'requires_pixel_revalidation': False}
+             'changes': [], 'issues': [], 'normalizations': [], 'requires_pixel_revalidation': False}
     allowed = {'direction', 'style', 'weight', 'edge_label', 'color'}
     for graph in output:
         gid = graph['id']; row = rows[gid]
@@ -680,7 +764,13 @@ def merge_attribute_response(graphs, response, *, revision=0):
                     'vertex_ids': [], 'edge_ids': [edge['id']], 'hint_ids': [],
                     'reason': 'attribute_uncertain', 'source': 'deterministic_validation'})
                 continue
-            proof = _proof(item.get('evidence'))
+            try:
+                proof = _proof(item.get('evidence'))
+            except RoleProtocolError as exc:
+                raise exc.add_context(graph_id=gid, edge_id=edge['id'])
+            if 'bbox_normalization' in proof:
+                audit['normalizations'].append({'graph_id': gid, 'edge_id': edge['id'],
+                    'field': 'evidence.bbox', 'bbox': proof['bbox'], **proof['bbox_normalization']})
             bounds = graph.get('bbox')
             if isinstance(bounds, list) and len(bounds) == 4:
                 _check(_label_in_panel({'bbox': proof['bbox']}, graph), 'attribute_evidence_wrong_panel')
@@ -750,6 +840,65 @@ def _review_issues(rows, fixed, hints, *, allowed_roles=EDIT_ROLES):
                    and len(values) == len(set(values)), 'unknown_or_duplicate_issue_reference')
         _reason(row.get('reason')); _proof(row.get('evidence'))
         result.append(copy.deepcopy(row))
+    return result
+
+
+def extract_rejected_role_issues(response, graphs, *, role, revision=0, hints=None):
+    """Return separately validated scheduling hints, never rejected geometry.
+
+    Call at the failed invocation's revision against its fixed inventory and
+    already committed edges. The caller must invalidate these hints when that
+    inventory changes; a later revision must not re-certify the old proposal.
+    Unknown/ambiguous records fail closed without hiding valid sibling issues.
+    """
+    if not isinstance(role, str) or role not in EDIT_ROLES | {'structure_review'} or not isinstance(response, dict):
+        return []
+    try:
+        header = {key: response.get(key) for key in ('role', 'base_revision', 'coordinate_space')}
+        _envelope(header, role, revision)
+        fixed = {} if isinstance(graphs, list) and not graphs else _inventory(graphs)
+        _, expected_hints = _hints(hints)
+        rows = response.get('issues')
+        _check(isinstance(rows, list) and len(rows) <= MAX_ISSUES, 'review_issues_missing')
+    except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
+        return []
+    counts = {}
+    for row in rows:
+        if isinstance(row, dict) and isinstance(row.get('id'), str):
+            counts[row['id']] = counts.get(row['id'], 0) + 1
+    allowed = ({'page_vertices', 'connections', 'attributes'}
+               if role in ('connections', 'attributes') else EDIT_ROLES)
+    fields = ('id', 'kind', 'target_role', 'graph_id', 'vertex_ids', 'edge_ids', 'hint_ids', 'reason', 'evidence')
+    result = []
+    for raw in rows:
+        if not isinstance(raw, dict) or not isinstance(raw.get('id'), str) or counts.get(raw['id']) != 1:
+            continue
+        try:
+            # Extra fields such as a proposed graph/coordinate edit never
+            # escape through the issue channel, even if the core issue is valid.
+            selected = {key: raw[key] for key in fields if key in raw}
+            row = _review_issues([selected], fixed, expected_hints, allowed_roles=allowed)[0]
+            proof = _proof(row['evidence'])
+            bounds = proof['bbox']
+            gid = row.get('graph_id')
+            panel = [float(v)*1000 for v in fixed[gid]['bbox']] if gid is not None else [0., 0., 1000., 1000.]
+            box(panel)
+            _check(panel[0]-.51 <= bounds[0] < bounds[2] <= panel[2]+.51 and
+                   panel[1]-.51 <= bounds[1] < bounds[3] <= panel[3]+.51,
+                   'rejected_issue_evidence_wrong_panel')
+            area = (bounds[2]-bounds[0])*(bounds[3]-bounds[1])
+            panel_area = (panel[2]-panel[0])*(panel[3]-panel[1])
+            _check(area <= min(250000., panel_area*.35), 'rejected_issue_evidence_not_localized')
+            # An existing text reference also needs evidence at that text's
+            # location. No hint ID is borrowed from an unrelated page region.
+            for hid in row.get('hint_ids', []):
+                _located_hint_proof({'evidence': proof}, expected_hints[hid])
+            result.append({**row, 'vertex_ids': row.get('vertex_ids', []),
+                'edge_ids': row.get('edge_ids', []), 'hint_ids': row.get('hint_ids', []),
+                'evidence': proof, 'source': 'validated_rejected_role_issue',
+                'source_role': role, 'source_revision': revision, 'scheduling_only': True})
+        except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
+            continue
     return result
 
 

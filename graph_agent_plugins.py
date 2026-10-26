@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import io
+import math
 import time
 
 from dmate_tool_registry import ToolContext, ToolRegistry, ToolSpec
@@ -15,6 +16,33 @@ _GRAPHS = {'type': 'object', 'required': ['graphs'], 'additionalProperties': Fal
            'properties': {'graphs': {'type': 'array', 'maxItems': 48,
                                     'items': {'type': 'object'}}}}
 _ROLES = ('page_vertices', 'body_text', 'connections', 'attributes', 'structure_review')
+
+
+def _native_trace_measurements(candidates):
+    """Make the tracer's finite numeric fit diagnostics JSON-native.
+
+    NumPy amplitude grids can leave numpy.floating scalars in curve_fit. Only
+    these measured scalar fields are normalized; paths, support decisions and
+    arbitrary objects still go through the registry's strict JSON/capacity
+    checks. This is deliberately not a general-purpose object serializer.
+    """
+    import numpy as np
+
+    result = copy.deepcopy(candidates)
+    for rows in result.values():
+        for row in rows:
+            evidence = row.get('connector_evidence')
+            fit = evidence.get('curve_fit') if isinstance(evidence, dict) else None
+            if not isinstance(fit, dict):
+                continue
+            for field in ('initial_bend_pixels', 'fitted_bend_pixels',
+                          'ridge_coverage', 'fit_cost'):
+                value = fit.get(field)
+                if isinstance(value, np.floating) and np.isfinite(value):
+                    native = float(value)
+                    if math.isfinite(native):
+                        fit[field] = native
+    return result
 
 
 def build_image_tools(document, text_result, layout, budget):
@@ -32,8 +60,9 @@ def build_image_tools(document, text_result, layout, budget):
                           deadline_monotonic=budget.deadline)
     registry = ToolRegistry()
 
-    def register(name, description, schema, roles, handler, *, timeout=15):
-        registry.register(ToolSpec(name=name, version='2026-10-26-v2',
+    def register(name, description, schema, roles, handler, *, timeout=15,
+                 version='2026-10-26-v2'):
+        registry.register(ToolSpec(name=name, version=version,
             description=description, input_schema=schema, output_schema=_OBJECT,
             allowed_roles=tuple(roles), source_required=True, timeout_seconds=timeout), handler)
 
@@ -77,11 +106,12 @@ def build_image_tools(document, text_result, layout, budget):
     def trace(args, *, context):
         graphs = copy.deepcopy(args['graphs'])
         candidates, diagnostics = collect_candidates(document, graphs)
-        return {'graphs': graphs, 'candidates': candidates, 'diagnostics': diagnostics,
+        return {'graphs': graphs, 'candidates': _native_trace_measurements(candidates),
+                'diagnostics': diagnostics,
                 'proposal_only': True}
 
     register('image.trace_candidates', 'Trace original-source paths; candidates require later visual and pixel review.',
-             _GRAPHS, ('connections',), trace, timeout=30)
+             _GRAPHS, ('connections',), trace, timeout=30, version='2026-10-26-v3')
 
     def skeleton(args, *, context):
         from graph_sknw_plugin import suggest_candidates
