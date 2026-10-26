@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
+COPY requirements.txt requirements-agents.txt ./
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt
 

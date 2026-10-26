@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import os
 import re
 import socket
@@ -68,7 +69,7 @@ def _transport_failure_metrics(exc):
     partial=getattr(exc,'vision_partial_result',None)
     partial=partial if isinstance(partial,dict) else {}
     phase=context.get('failure_phase')
-    if phase not in ('response_headers','response_body','sse_stream'):
+    if phase not in ('request_start','response_headers','response_body','sse_stream'):
         phase='sse_stream' if partial.get('partial_stream') is True else 'unknown'
     status=context.get('http_status',partial.get('http_status'))
     if type(status) is not int or not 100<=status<=599:
@@ -112,6 +113,8 @@ def _transport_failure_metrics(exc):
         if type(value) is int and value>=0:metric[key]=value
     if type(context.get('stream_done_received')) is bool:
         metric['stream_done_received']=context['stream_done_received']
+    if type(context.get('request_started')) is bool:
+        metric['request_started']=context['request_started']
     return metric
 
 
@@ -217,6 +220,12 @@ class VisionProvider:
 
     def __call__(self,prompt,images,budget):
         if not self.available():raise VisionError('missing_key')
+        # Existing v3 budgets keep eight seconds; the agent budget can choose
+        # another cap without adding a request or changing the wall deadline.
+        connect_requested=getattr(budget,'connect_seconds',8.)
+        if (type(connect_requested) not in (int,float) or not math.isfinite(connect_requested)
+                or connect_requested<=0):
+            raise ValueError('invalid_connect_seconds')
         self.logical_calls+=1
         payload=self.payload(prompt,images)
         if self.name=='qwen' and hasattr(budget,'output_tokens'):
@@ -230,6 +239,12 @@ class VisionProvider:
         else:key=os.environ['ZHIPU_API_KEY'];request=self.transport or _glm_request
         for attempt in range(self.retries+1):
             timeout=budget.take();started=time.monotonic();status=None;raw=None;error=None
+            if type(timeout) not in (int,float) or not math.isfinite(timeout) or timeout<=0:
+                raise ValueError('invalid_call_seconds')
+            deadline=getattr(budget,'deadline',started+timeout)
+            if type(deadline) not in (int,float) or not math.isfinite(deadline):
+                raise ValueError('invalid_wall_deadline')
+            wall_deadline=min(started+timeout,deadline)
             metric={'provider':self.name,'model':self.model,'thinking':self.thinking,
                     'max_output_tokens':payload['max_tokens'],
                     'reasoning_effort':self.reasoning_effort,
@@ -238,8 +253,29 @@ class VisionProvider:
                     'logical_call':self.logical_calls,'attempt':attempt+1,'prompt_sha256':hashlib.sha256(prompt.encode()).hexdigest(),
                     'image_sha256':[image_digest(url) for url in images[:2]]}
             try:
+                remaining=wall_deadline-time.monotonic()
+                if remaining<=0:
+                    expired=TimeoutError('vision_wall_deadline')
+                    expired.vision_failure_context={'failure_phase':'request_start',
+                        'request_started':False,'wall_deadline_exceeded':True}
+                    raise expired
+                connect_timeout=min(float(connect_requested),remaining)
+                read_timeout=min(float(timeout),remaining)
+                metric.update(connect_timeout_requested_seconds=float(connect_requested),
+                    connect_timeout_seconds=round(connect_timeout,6),
+                    read_timeout_seconds=round(read_timeout,6),
+                    wall_timeout_seconds=round(remaining,6),
+                    deadline_enforcement='cooperative_socket_timeout')
                 status,_,result=request(payload,{'Authorization':f'Bearer {key}','Content-Type':'application/json'},
-                    timeout=(min(8,timeout),timeout),wall_deadline=time.monotonic()+timeout)
+                    timeout=(connect_timeout,read_timeout),wall_deadline=wall_deadline)
+                # Injected transports and JSON gateways must not turn a late
+                # response into a successful result outside the task budget.
+                if time.monotonic()>=wall_deadline:
+                    expired=TimeoutError('vision_wall_deadline')
+                    expired.vision_failure_context={'failure_phase':'response_body',
+                        'request_started':True,'response_headers_received':True,
+                        'http_status':status,'wall_deadline_exceeded':True}
+                    raise expired
                 metric['http_status']=status
                 if isinstance(result,dict) and result.get('error_code'):metric['error_code']=result['error_code']
                 if status!=200 or not isinstance(result,dict):raise VisionError('http_error',status)

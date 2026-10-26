@@ -17,6 +17,8 @@ from pathlib import Path
 import re
 import unicodedata
 
+from graph_pipeline_version import AGENT_PIPELINE_VERSION, EVIDENCE_PIPELINE_VERSION
+
 
 @dataclass(frozen=True)
 class EvaluationConfig:
@@ -29,7 +31,10 @@ STRUCTURE_DIMENSIONS = (
     'panels', 'vertices', 'endpoints', 'directions', 'multiplicity', 'self_loops',
     'weights', 'edge_labels', 'styles', 'edge_instances', 'graph_types',
 )
-CURRENT_PIPELINE_VERSION = '2026-10-26-evidence-two-pass-v2'
+# Keep this public name for the existing two-pass benchmark fixtures/callers.
+# Agent execution has a separate contract; it must never inherit a two-send
+# certificate by changing only a display version string.
+CURRENT_PIPELINE_VERSION = EVIDENCE_PIPELINE_VERSION
 EXECUTION_MODES = {'local': 'local_pipeline', 'http': 'http_ocr_response'}
 FRONTEND_CHECKS = (
     'public_projection', 'panels', 'vertex_labels', 'graph_types', 'edge_instances',
@@ -419,7 +424,7 @@ def _predicted_graph_issues(graph):
     return sorted(set(issues))
 
 
-def _run_evidence(evidence, reference, prediction=None):
+def _run_evidence_two_pass(evidence, reference, prediction=None):
     if not isinstance(evidence, dict):
         return {'status': 'not_certified', 'issues': ['missing_live_run_evidence']}
     issues, missing = [], []
@@ -604,6 +609,464 @@ def _run_evidence(evidence, reference, prediction=None):
             'qwen_sends': len(qwen_sends), 'text_sends': len(text_sends),
             'execution_scope': evaluation_scope(mode)['execution_scope'],
             'pipeline_contract': evidence.get('pipeline_contract')}
+
+
+_AGENT_ROLES = frozenset(('page_vertices', 'body_text', 'connections', 'attributes', 'structure_review'))
+_AGENT_REQUIRED_ROLES = frozenset(('page_vertices', 'body_text', 'connections', 'structure_review'))
+_AGENT_TOOL_ROLES = {
+    'image.local_evidence': _AGENT_ROLES,
+    'image.marker_grounding': {'page_vertices'},
+    'image.trace_candidates': {'connections'},
+    'image.sknw_candidates': {'connections'},
+    'image.review_views': _AGENT_ROLES,
+    'graph.stroke_validation': {'connections', 'attributes', 'structure_review'},
+    'text.visual_reconciliation': {'body_text', 'structure_review'},
+    'graph.structure_audit': {'structure_review'},
+    'graph.adjacency_matrix': {'structure_review', 'solver'},
+    'graph.walk_count': {'solver'}, 'graph.euler': {'solver'},
+    'math.logic': {'solver'}, 'math.matrix': {'solver'},
+}
+
+
+def _sha256_string(value):
+    return isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value) is not None
+
+
+def _agent_attempt_key(record):
+    if (not isinstance(record, dict) or not isinstance(record.get('agent_role'), str)
+            or record['agent_role'] not in _AGENT_ROLES):
+        return None
+    numbers = [record.get(k) for k in ('role_invocation', 'logical_call', 'attempt')]
+    if any(type(value) is not int or value < 1 for value in numbers):
+        return None
+    return (record['agent_role'], *numbers)
+
+
+def _agent_event_evidence(workflow, metrics, issues, missing):
+    """Bind every role invocation/recovery to the single task's event history."""
+    events = workflow.get('events')
+    if not isinstance(events, list) or not events:
+        missing.append('agent_event_ledger_missing')
+        return {}, {}, []
+    starts, outcomes, recoveries = {}, {}, Counter()
+    active, targeted = {}, []
+    seen_invocations = Counter()
+    for position, event in enumerate(events, 1):
+        if not isinstance(event, dict):
+            issues.append('invalid_agent_event')
+            continue
+        if type(event.get('sequence')) is not int or event['sequence'] != position:
+            issues.append('agent_event_sequence_invalid')
+        role, status = event.get('role'), event.get('status')
+        if not isinstance(role, str):
+            issues.append('invalid_agent_event_role')
+            continue
+        if status == 'targeted_review':
+            if (role != 'coordinator' or not isinstance(event.get('target_role'), str)
+                    or event['target_role'] not in _AGENT_ROLES or
+                    not isinstance(event.get('conflict_ids'), list) or not event['conflict_ids']):
+                issues.append('unscoped_agent_repair')
+            if type(event.get('repair_round')) is not int or event['repair_round'] != len(targeted)+1:
+                issues.append('agent_repair_sequence_invalid')
+            targeted.append({**event, '_position': position})
+        if status == 'started':
+            invocation, revision = event.get('invocation'), event.get('revision')
+            if (role not in _AGENT_ROLES or type(invocation) is not int or invocation < 1 or
+                    type(revision) is not int or revision < 0):
+                issues.append('invalid_agent_invocation_event')
+                continue
+            key = (role, invocation)
+            seen_invocations[role] += 1
+            if key in starts or invocation != seen_invocations[role]:
+                issues.append('repeated_or_skipped_agent_invocation')
+            if invocation > len(targeted)+1:
+                issues.append('agent_invocation_without_targeted_review')
+            if invocation > 1:
+                previous = starts.get((role, invocation-1))
+                if previous and revision <= previous.get('revision', revision):
+                    issues.append('agent_rerun_without_new_revision')
+                if not targeted or targeted[-1]['_position'] < (previous or {}).get('_position', position):
+                    issues.append('agent_invocation_without_targeted_review')
+                elif isinstance(targeted[-1].get('target_role'), str):
+                    downstream = {
+                        'page_vertices': _AGENT_ROLES-{'body_text'},
+                        'body_text': {'body_text', 'structure_review'},
+                        'connections': {'connections', 'attributes', 'structure_review'},
+                        'attributes': {'attributes', 'structure_review'},
+                        'structure_review': {'structure_review'},
+                    }.get(targeted[-1]['target_role'], set())
+                    if role not in downstream:
+                        issues.append('agent_rerun_outside_targeted_scope')
+            if not _sha256_string(event.get('request_digest')):
+                missing.append('agent_role_request_digest_missing')
+            starts[key] = {**event, '_position': position}
+            active[role] = key
+        elif status in ('responded', 'network_recovery', 'failed', 'proposal_rejected'):
+            key = active.get(role)
+            if status in ('responded', 'network_recovery', 'failed'):
+                explicit = (role, event.get('invocation'))
+                if explicit != key:
+                    issues.append('agent_response_invocation_mismatch')
+            if key is None:
+                issues.append('agent_event_without_started_role')
+                continue
+            if status == 'network_recovery':
+                recoveries[key] += 1
+            else:
+                outcomes[key] = status
+            if status == 'responded':
+                if event.get('revision') != starts[key].get('revision'):
+                    issues.append('agent_response_revision_mismatch')
+                if not _sha256_string(event.get('response_digest')):
+                    missing.append('agent_role_response_digest_missing')
+    rounds = workflow.get('repair_rounds')
+    if type(rounds) is not int or not 0 <= rounds <= 3 or rounds != len(targeted):
+        issues.append('agent_repair_ledger_mismatch')
+    count = workflow.get('network_recoveries')
+    if (type(count) is not int or not 0 <= count <= 2 or count != sum(recoveries.values())
+            or any(value > 1 for value in recoveries.values())):
+        issues.append('agent_network_recovery_ledger_mismatch')
+    groups = {}
+    for metric in metrics:
+        key = _agent_attempt_key(metric)
+        if key:
+            groups.setdefault(key[:2], []).append(metric)
+    if set(starts) != set(groups):
+        missing.append('agent_invocations_not_bound_to_actual_sends')
+    latest = {role: max(key[1] for key in groups if key[0] == role) for role in {k[0] for k in groups}}
+    for key, rows in groups.items():
+        rows.sort(key=lambda row: row['logical_call'])
+        if [row['logical_call'] for row in rows] != list(range(1, len(rows)+1)) or len(rows) > 2:
+            issues.append('agent_hidden_or_reordered_retry')
+        if len(rows)-1 != recoveries[key]:
+            issues.append('agent_retry_without_recovery_event')
+        start = starts.get(key)
+        for row in rows:
+            if start and row.get('state_revision') != start.get('revision'):
+                issues.append('agent_metric_event_revision_mismatch')
+        for row in rows[:-1]:
+            retryable = row.get('status') == 'transport_failed' or row.get('http_status') in (429, 500, 502, 503, 504)
+            if not retryable:
+                issues.append('agent_retry_after_non_transport_result')
+        last = rows[-1]
+        successful = (last.get('http_status') == 200 and last.get('status') == 200
+                      and last.get('finish_reason') == 'stop' and not last.get('partial_stream')
+                      and not last.get('error') and not last.get('exception_type'))
+        if key[1] == latest[key[0]]:
+            if not successful or outcomes.get(key) != 'responded':
+                issues.append('agent_final_role_response_not_successful')
+        elif not successful and outcomes.get(key) not in ('failed', 'proposal_rejected'):
+            issues.append('agent_failed_invocation_not_disclosed')
+    return starts, outcomes, events
+
+
+def _agent_tool_evidence(workflow, source_sha, issues, missing):
+    records = workflow.get('tools')
+    if not isinstance(records, list) or not records:
+        missing.append('agent_tool_audit_missing')
+        return
+    seen, successes = set(), Counter()
+    allowed_fields = {'call_id', 'tool', 'tool_version', 'role', 'source_sha256',
+                      'input_digest', 'result_digest', 'elapsed_seconds', 'status',
+                      'error_code', 'timeout_mode', 'handler_started', 'handler_finished'}
+    for row in records:
+        if not isinstance(row, dict):
+            issues.append('invalid_agent_tool_audit')
+            continue
+        if set(row)-allowed_fields:
+            issues.append('agent_tool_audit_has_unscoped_fields')
+        cid, name, role = row.get('call_id'), row.get('tool'), row.get('role')
+        if not isinstance(cid, str) or not cid or cid in seen:
+            issues.append('agent_tool_call_identity_invalid')
+        else:
+            seen.add(cid)
+        if (not isinstance(name, str) or name not in _AGENT_TOOL_ROLES
+                or not isinstance(role, str) or role not in _AGENT_TOOL_ROLES[name]):
+            issues.append('agent_tool_role_not_allowed')
+        if row.get('source_sha256') != source_sha:
+            issues.append('agent_tool_source_mismatch')
+        if not isinstance(row.get('tool_version'), str) or not row['tool_version']:
+            missing.append('agent_tool_version_missing')
+        seconds = row.get('elapsed_seconds')
+        if type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0:
+            missing.append('agent_tool_elapsed_time_missing')
+        if row.get('timeout_mode') != 'cooperative':
+            missing.append('agent_tool_deadline_contract_missing')
+        if row.get('status') == 'success':
+            if (not _sha256_string(row.get('input_digest')) or not _sha256_string(row.get('result_digest'))
+                    or row.get('handler_started') is not True or row.get('handler_finished') is not True
+                    or row.get('error_code') is not None):
+                missing.append('agent_tool_success_not_bound_to_result')
+            if isinstance(name, str) and isinstance(role, str):
+                successes[(name, role)] += 1
+        elif row.get('status') not in ('failed', 'timeout', 'denied') or not row.get('error_code'):
+            issues.append('agent_tool_status_invalid')
+    required = [('image.local_evidence', 'page_vertices'), ('image.marker_grounding', 'page_vertices'),
+                ('image.trace_candidates', 'connections'), ('graph.stroke_validation', 'connections'),
+                ('image.review_views', 'body_text'), ('image.review_views', 'structure_review'),
+                ('text.visual_reconciliation', 'structure_review'), ('graph.structure_audit', 'structure_review')]
+    for name, role in required:
+        if not successes[(name, role)]:
+            missing.append('required_agent_tool_not_successful:'+name+':'+role)
+
+
+def _agent_attributes_needed(graphs):
+    if not isinstance(graphs, list):
+        return True
+    for graph in graphs:
+        if not isinstance(graph, dict) or not isinstance(graph.get('edges'), list):
+            return True
+        if (graph.get('directed') is not False or graph.get('weighted') is not False
+                or graph.get('multigraph') is True
+                or any(isinstance(e, dict) and (e.get('style') == 'unknown' or e.get('edge_label') is not None)
+                       for e in graph['edges'])):
+            return True
+    return False
+
+
+def _run_evidence_agent(evidence, reference, prediction):
+    """A role workflow needs observed sends; self-reported counters are insufficient."""
+    if not isinstance(evidence, dict):
+        return {'status': 'not_certified', 'issues': ['missing_live_run_evidence']}
+    issues, missing = [], []
+    mode = evidence.get('mode')
+    if not isinstance(mode, str) or mode not in EXECUTION_MODES:
+        issues.append('unsupported_or_missing_execution_mode')
+    if type(evidence.get('document_requests')) is not int or evidence['document_requests'] != 1:
+        issues.append('document_not_executed_exactly_once')
+    if evidence.get('is_live') is not True:
+        missing.append('not_a_verified_live_run')
+    if any(evidence.get(k) is True for k in ('fixture_only', 'synthetic', 'mocked')):
+        issues.append('synthetic_run_cannot_certify_live_agents')
+    if evidence.get('source_unchanged') is False:
+        issues.append('source_changed_during_request')
+    elif evidence.get('source_unchanged') is not True:
+        missing.append('source_snapshot_not_verified')
+    source_sha = reference.get('sha256')
+    if not _sha256_string(source_sha) or evidence.get('image_sha256') != source_sha:
+        issues.append('original_image_digest_mismatch')
+    snapshot = evidence.get('source_snapshot')
+    if (not isinstance(snapshot, dict) or not snapshot.get('git_sha') or
+            type(snapshot.get('dirty')) is not bool or not _sha256_string(snapshot.get('source_tree_sha256'))):
+        missing.append('git_and_source_snapshot_missing')
+    if mode == 'http' and evidence.get('server_source_verified') is not True:
+        missing.append('http_server_source_identity_unverified')
+    if evidence.get('pipeline_contract') != 'agent-tools':
+        missing.append('agent_tools_execution_contract_missing')
+    prediction = prediction if isinstance(prediction, dict) else {}
+    if prediction.get('graph_display_version') != AGENT_PIPELINE_VERSION:
+        missing.append('current_agent_pipeline_version_not_verified')
+    diagnostics = prediction.get('diagnostics')
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    workflow = diagnostics.get('agent_workflow')
+    workflow = workflow if isinstance(workflow, dict) else {}
+    if workflow.get('engine') != 'langgraph' or workflow.get('version') != AGENT_PIPELINE_VERSION:
+        missing.append('agent_workflow_identity_missing')
+    task_id = workflow.get('task_id')
+    if not isinstance(task_id, str) or not task_id or len(task_id) > 128:
+        missing.append('agent_task_identity_missing')
+    if workflow.get('source_sha256') != source_sha:
+        issues.append('agent_workflow_source_mismatch')
+    if workflow.get('provider_source') == 'injected':
+        issues.append('injected_model_provider_cannot_certify_live_agents')
+    elif workflow.get('provider_source') != 'configured_live':
+        missing.append('configured_live_agent_provider_not_verified')
+    conflicts = workflow.get('remaining_conflicts')
+    if not isinstance(conflicts, list):
+        missing.append('agent_remaining_conflicts_not_explicit')
+    elif conflicts:
+        issues.append('agent_has_remaining_conflicts')
+    if workflow.get('complete') is not True:
+        missing.append('agent_workflow_not_complete')
+        if prediction.get('recognition_status') == 'complete':
+            issues.append('complete_prediction_with_incomplete_agent_workflow')
+    execution_id = evidence.get('execution_id')
+    if not isinstance(execution_id, str) or not execution_id:
+        missing.append('execution_identity_missing')
+    started = finished = None
+    try:
+        first = datetime.fromisoformat(evidence['request_started_at'])
+        last = datetime.fromisoformat(evidence['request_finished_at'])
+        if first.tzinfo is None or last.tzinfo is None:
+            raise ValueError('timezone_missing')
+        started, finished = first.timestamp(), last.timestamp()
+        if finished < started:
+            issues.append('request_finished_before_start')
+    except (KeyError, TypeError, ValueError, OverflowError):
+        missing.append('request_time_not_verifiable')
+
+    def check_time(row):
+        stamp = row.get('started_at_unix')
+        if type(stamp) not in (int, float) or not math.isfinite(stamp):
+            missing.append('attempt_start_missing')
+        elif started is not None and finished is not None and not started-1 <= stamp <= finished+1:
+            issues.append('model_attempt_not_from_this_request')
+        if row.get('execution_id') != execution_id or not execution_id:
+            missing.append('attempt_execution_identity_unverified')
+
+    metrics, text_metrics, transports, remote = [], [], [], []
+    for field, destination in (('model_attempts', metrics), ('text_model_attempts', text_metrics),
+                               ('transport_attempts', transports)):
+        value = evidence.get(field)
+        if not isinstance(value, list) or (field != 'text_model_attempts' and not value):
+            missing.append(field+'_missing')
+        elif any(not isinstance(row, dict) for row in value):
+            issues.append('invalid_'+field)
+        else:
+            destination.extend(value)
+    value = diagnostics.get('remote_metrics')
+    if not isinstance(value, list) or not value:
+        missing.append('agent_remote_metrics_missing')
+    elif any(not isinstance(row, dict) for row in value):
+        issues.append('invalid_agent_remote_metrics')
+    else:
+        remote = value
+    sends, used, attempt_keys = {}, set(), set()
+    for sent in transports:
+        check_time(sent)
+        tid = sent.get('transport_id')
+        if not isinstance(tid, str) or not tid or tid in sends:
+            issues.append('repeated_or_invalid_transport_identity')
+        else:
+            sends[tid] = sent
+        if sent.get('provider') not in ('qwen', 'text'):
+            issues.append('unscoped_model_transport')
+        if type(sent.get('attempt')) is not int or sent['attempt'] != 1:
+            issues.append('model_retry_or_unidentified_attempt')
+        if sent.get('method') != 'POST' or not sent.get('host'):
+            missing.append('transport_target_unverified')
+        if not _sha256_string(sent.get('request_body_sha256')):
+            missing.append('transport_payload_digest_missing')
+    for group, rows in (('qwen', metrics), ('text', text_metrics)):
+        for metric in rows:
+            check_time(metric)
+            if metric.get('provider') != group:
+                issues.append('model_metric_in_wrong_ledger')
+            if type(metric.get('attempt')) is not int or metric['attempt'] != 1:
+                issues.append('model_retry_or_unidentified_attempt')
+            if group == 'qwen':
+                key = _agent_attempt_key(metric)
+                if key is None or key in attempt_keys:
+                    issues.append('agent_attempt_identity_invalid_or_repeated')
+                else:
+                    attempt_keys.add(key)
+                if metric.get('task_id') != task_id or metric.get('source_sha256') != source_sha:
+                    issues.append('agent_metric_task_or_source_mismatch')
+                if metric.get('model') != 'qwen3-vl-plus':
+                    issues.append('unexpected_vision_model')
+                if metric.get('status') == 200:
+                    returned = metric.get('returned_model')
+                    if not isinstance(returned, str) or not (returned == 'qwen3-vl-plus' or returned.startswith('qwen3-vl-plus-')):
+                        missing.append('returned_vision_model_unverified')
+            else:
+                model = metric.get('model')
+                if not isinstance(model, str) or not model.startswith('deepseek-'):
+                    issues.append('unexpected_text_correction_model')
+                if type(metric.get('logical_call')) is not int or metric['logical_call'] != 1:
+                    issues.append('text_correction_single_send_budget_exceeded')
+            tid = metric.get('transport_id')
+            sent = sends.get(tid) if isinstance(tid, str) else None
+            if sent is None:
+                missing.append('model_metric_has_no_observed_send')
+                continue
+            if tid in used:
+                issues.append('multiple_metrics_for_one_transport')
+            used.add(tid)
+            if metric.get('status') == 200 and (sent.get('http_status') != 200 or sent.get('exception_type')):
+                issues.append('successful_metric_has_failed_transport')
+            fields = ('provider', 'logical_call', 'attempt', 'model', 'http_status', 'execution_id')
+            if group == 'qwen':
+                fields += ('agent_role', 'role_invocation', 'state_revision', 'task_id', 'source_sha256')
+            for field in fields:
+                if metric.get(field) != sent.get(field):
+                    issues.append('provider_transport_mismatch:'+field)
+            if group == 'qwen':
+                images = metric.get('image_sha256')
+                if (not _sha256_string(metric.get('prompt_sha256')) or not isinstance(images, list)
+                        or not images or not all(_sha256_string(x) for x in images)):
+                    missing.append('vision_input_identity_missing')
+                elif metric['prompt_sha256'] != sent.get('prompt_sha256') or images != sent.get('image_sha256'):
+                    issues.append('provider_transport_input_mismatch')
+            stamp, sent_at, duration = metric.get('started_at_unix'), sent.get('started_at_unix'), metric.get('seconds')
+            if type(duration) not in (int, float) or not math.isfinite(duration) or duration < 0:
+                missing.append('model_attempt_duration_missing')
+            elif type(stamp) in (int, float) and type(sent_at) in (int, float) and not stamp-.1 <= sent_at <= stamp+duration+.1:
+                issues.append('transport_outside_provider_call')
+    if set(sends)-used:
+        missing.append('observed_send_has_no_provider_metric')
+    qwen_sends = [x for x in transports if x.get('provider') == 'qwen']
+    text_sends = [x for x in transports if x.get('provider') == 'text']
+    count, maximum = workflow.get('actual_remote_sends'), workflow.get('max_remote_calls')
+    if (type(count) is not int or count != len(metrics) or count != len(remote) or count != len(qwen_sends)):
+        issues.append('agent_actual_send_count_mismatch')
+    if type(maximum) is not int or not 4 <= maximum <= 24 or (type(count) is int and count > maximum):
+        issues.append('agent_remote_send_budget_invalid')
+    if len(text_metrics) > 1 or len(text_sends) > 1:
+        issues.append('text_correction_single_send_budget_exceeded')
+    role_counts = Counter(x.get('agent_role') for x in metrics if isinstance(x.get('agent_role'), str))
+    recorded_counts = workflow.get('role_sends')
+    if (not isinstance(recorded_counts, dict) or any(type(v) is not int or v <= 0 for v in recorded_counts.values())
+            or recorded_counts != dict(role_counts)):
+        issues.append('agent_role_send_count_mismatch')
+    if [row.get('send_sequence') for row in remote] != list(range(1, len(remote)+1)):
+        issues.append('agent_remote_sequence_invalid')
+    by_key = {_agent_attempt_key(row): row for row in metrics if _agent_attempt_key(row) is not None}
+    compare_fields = ('provider', 'model', 'logical_call', 'attempt', 'agent_role', 'role_invocation',
+                      'state_revision', 'task_id', 'source_sha256', 'send_sequence', 'http_status', 'status',
+                      'finish_reason', 'prompt_sha256', 'image_sha256', 'started_at_unix', 'seconds',
+                      'returned_model', 'partial_stream')
+    for row in remote:
+        other = by_key.get(_agent_attempt_key(row))
+        if other is None or any(row.get(key) != other.get(key) for key in compare_fields):
+            issues.append('agent_response_remote_ledger_mismatch')
+    revision = workflow.get('state_revision')
+    if (type(revision) is not int or revision < 0 or any(
+            type(row.get('state_revision')) is not int or not 0 <= row['state_revision'] <= revision
+            for row in remote)):
+        issues.append('agent_state_revision_invalid')
+    starts, outcomes, events = _agent_event_evidence(workflow, metrics, issues, missing)
+    required_roles = set(_AGENT_REQUIRED_ROLES)
+    attributes_needed = _agent_attributes_needed(prediction.get('graph_structures'))
+    if attributes_needed:
+        required_roles.add('attributes')
+    elif not role_counts['attributes'] and not any(
+            event.get('role') == 'attributes' and event.get('status') == 'skipped'
+            and event.get('reason') == 'no_attribute_conflict_or_annotated_edges' for event in events if isinstance(event, dict)):
+        missing.append('optional_attribute_role_skip_not_explained')
+    for role in required_roles:
+        if not role_counts[role]:
+            missing.append('required_agent_role_not_executed:'+role)
+    reviews = [e for e in events if isinstance(e, dict) and e.get('role') == 'structure_review' and e.get('status') == 'reviewed']
+    if (not reviews or reviews[-1].get('verdict') != 'accept'
+            or type(reviews[-1].get('conflict_count')) is not int or reviews[-1]['conflict_count'] != 0):
+        missing.append('independent_agent_review_not_accepted')
+    elif reviews[-1].get('revision') != revision:
+        issues.append('agent_final_review_is_stale')
+    _agent_tool_evidence(workflow, source_sha, issues, missing)
+    correction = diagnostics.get('correction')
+    correction = correction if isinstance(correction, dict) else {}
+    if correction.get('status') == 'ok' and str(prediction.get('text') or '').strip():
+        if len(text_metrics) != 1 or len(text_sends) != 1:
+            missing.append('claimed_text_correction_has_no_observed_call')
+        elif (text_metrics[0].get('status') != 200 or text_metrics[0].get('http_status') != 200
+              or text_metrics[0].get('finish_reason') != 'stop' or text_sends[0].get('exception_type')):
+            issues.append('claimed_text_correction_not_successful')
+    elif str(prediction.get('text') or '').strip() and prediction.get('text') != prediction.get('raw_ocr_text'):
+        issues.append('unverified_agent_text_changed_after_visual_review')
+    return {'status': 'fail' if issues else 'not_certified' if missing else 'pass',
+            'issues': sorted(set(issues)), 'missing_evidence': sorted(set(missing)),
+            'qwen_sends': len(qwen_sends), 'text_sends': len(text_sends),
+            'task_id': task_id, 'execution_scope': evaluation_scope(mode)['execution_scope'],
+            'pipeline_contract': evidence.get('pipeline_contract')}
+
+
+def _run_evidence(evidence, reference, prediction=None):
+    diagnostics = prediction.get('diagnostics') if isinstance(prediction, dict) else None
+    agent_response = (isinstance(prediction, dict) and prediction.get('graph_display_version') == AGENT_PIPELINE_VERSION)
+    agent_response = agent_response or isinstance(diagnostics, dict) and 'agent_workflow' in diagnostics
+    if agent_response or isinstance(evidence, dict) and evidence.get('pipeline_contract') == 'agent-tools':
+        return _run_evidence_agent(evidence, reference, prediction)
+    return _run_evidence_two_pass(evidence, reference, prediction)
 
 
 def _frontend_evidence(evidence, reference, prediction, run_evidence):
@@ -832,7 +1295,7 @@ def evaluate_prediction(reference, prediction, *, run_evidence=None, frontend_ev
             if (text_evidence.get('source') == 'original_visual_transcription'
                     and text_evidence.get('visual_body_complete') is not True):
                 text_evidence_issues.append('visual_body_completeness_not_explicit')
-            if prediction.get('graph_display_version') == CURRENT_PIPELINE_VERSION:
+            if prediction.get('graph_display_version') in (EVIDENCE_PIPELINE_VERSION, AGENT_PIPELINE_VERSION):
                 if text_evidence.get('second_pass_reviewed') is not True:
                     text_evidence_issues.append('second_pass_text_review_not_explicit')
                 reconciliation = text_evidence.get('reconciliation')
@@ -843,8 +1306,9 @@ def evaluate_prediction(reference, prediction, *, run_evidence=None, frontend_ev
                 elif reconciliation.get('second_pass_reviewed') is False:
                     text_evidence_issues.append('text_reconciliation_review_conflict')
                 correction = diagnostics.get('correction')
-                if str(prediction.get('text') or '').strip() and (
-                        not isinstance(correction, dict) or correction.get('status') != 'ok'):
+                if (prediction.get('graph_display_version') == EVIDENCE_PIPELINE_VERSION
+                        and str(prediction.get('text') or '').strip() and (
+                        not isinstance(correction, dict) or correction.get('status') != 'ok')):
                     text_evidence_issues.append('text_correction_not_verified')
         for field in ('body_complete', 'text_complete'):
             if field in prediction and prediction[field] is not True:

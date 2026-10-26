@@ -75,6 +75,7 @@ def clean_child_environment(folder, inherited=None):
     env = {key: source[key] for key in allowed if key in source}
     env.update(PYTHONUNBUFFERED='1', PYTHONDONTWRITEBYTECODE='1',
                TMPDIR=str(folder), DMATE_GRAPH_NEXTGEN='1',
+               DMATE_GRAPH_PIPELINE='evidence-two-pass',
                DMATE_GRAPH_STAGE_AUDIT='1', VISION_ANALYSIS_ENABLED='1',
                DASHSCOPE_API_KEY=SENTINEL, DEEPSEEK_API_KEY=SENTINEL,
                TRUSTED_PROXY_CIDRS='', OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1',

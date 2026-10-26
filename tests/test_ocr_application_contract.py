@@ -68,14 +68,14 @@ def post_image(client):
 @pytest.mark.parametrize('flag', ['0', '1'])
 def test_deployment_identity_exposes_pipeline_selection_without_model_calls(application, monkeypatch, flag):
     _, client, _ = application
-    from graph_pipeline_version import EVIDENCE_PIPELINE_VERSION
+    from graph_pipeline_version import active_pipeline_version
     monkeypatch.setenv('DMATE_GRAPH_NEXTGEN', flag)
     for route in ('/health', '/ready'):
         response = client.get(route)
         assert response.status_code == 200
         data = response.get_json()
         assert data['graph_nextgen_enabled'] is (flag == '1')
-        assert data['graph_nextgen_version'] == EVIDENCE_PIPELINE_VERSION
+        assert data['graph_nextgen_version'] == active_pipeline_version()
 
 
 @pytest.mark.parametrize('status', ['memory_limit', 'memory_admission_rejected', 'timeout',
@@ -84,7 +84,7 @@ def test_returned_text_worker_failure_never_becomes_formula_degradation(applicat
     module, client, _ = application
     import ocr_nextgen
     monkeypatch.setattr(module, 'recognize_image', lambda raw: local_result(status))
-    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args: graph_result())
+    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args, **kwargs: graph_result())
     response = post_image(client)
     assert response.status_code == 200
     body = response.get_json()
@@ -102,7 +102,7 @@ def test_successful_blank_text_stage_is_ready_and_layout_failure_has_its_own_sta
     module, client, _ = application
     import ocr_nextgen
     monkeypatch.setattr(module, 'recognize_image', lambda raw: local_result(layout_status='worker_failed'))
-    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args: graph_result())
+    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args, **kwargs: graph_result())
     body = post_image(client).get_json()
     ready = client.get('/ready').get_json()
     assert ready['ocr_ready'] is True
@@ -118,7 +118,7 @@ def test_independent_visual_text_review_can_replace_failed_local_text(applicatio
     monkeypatch.setattr(module, 'recognize_image', lambda raw: local_result('memory_limit'))
     original = graph_result(source='original_visual_transcription', second_review=reviewed)
     before = deepcopy(original)
-    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args: original)
+    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args, **kwargs: original)
     body = post_image(client).get_json()
     assert body['recognition_status'] == ('complete' if reviewed else 'partial')
     assert body['diagnostics']['text_evidence']['complete'] is reviewed
@@ -130,7 +130,7 @@ def test_old_warning_is_not_assumed_to_be_a_formula_failure(application, monkeyp
     module, client, _ = application
     import ocr_nextgen
     monkeypatch.setattr(module, 'recognize_image', lambda raw: {'text': '', 'warning': '文字中的数字有冲突。'})
-    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args: graph_result())
+    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args, **kwargs: graph_result())
     assert post_image(client).status_code == 200
     ready = client.get('/ready').get_json()
     assert ready['ocr_ready'] is True and '公式' not in ready['ocr_status']
@@ -143,7 +143,7 @@ def test_explicit_formula_failure_is_distinct_from_text_failure(application, mon
     result = local_result()
     result['resource_metrics'].append({'stage': 'formula', 'status': 'worker_failed'})
     monkeypatch.setattr(module, 'recognize_image', lambda raw: result)
-    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args: graph_result())
+    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args, **kwargs: graph_result())
     assert post_image(client).status_code == 200
     ready = client.get('/ready').get_json()
     assert ready['ocr_ready'] is True and ready['ocr_status'] == '已就绪（公式识别降级）'
@@ -156,7 +156,7 @@ def test_entered_new_chain_exception_never_restarts_legacy_vision(application, m
     monkeypatch.setattr(module, 'recognize_image', lambda raw: local_result())
     fake_sent = []
 
-    def broken_new_chain(*args):
+    def broken_new_chain(*args, **kwargs):
         fake_sent.extend(range(consumed))
         raise RuntimeError('injected after synthetic sends')
 
@@ -173,7 +173,7 @@ def test_invalid_new_chain_return_does_not_open_a_legacy_budget(application, mon
     module, client, _ = application
     import ocr_nextgen
     monkeypatch.setattr(module, 'recognize_image', lambda raw: local_result())
-    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args: invalid)
+    monkeypatch.setattr(ocr_nextgen, 'recognize_graph_document', lambda *args, **kwargs: invalid)
     response = post_image(client)
     assert response.status_code == 503
     assert response.get_json()['recognition_status'] == 'failed'
