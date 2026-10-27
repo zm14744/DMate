@@ -13,8 +13,9 @@ def test_default_health_reports_the_actual_fast_budget(monkeypatch):
     actual = configured_recognition_budget()
     budget = configured_fast_budget()
     assert actual['seconds'] == round(budget.deadline-budget.started) == 200
-    assert actual['total_remote_calls'] == budget.initial_calls == 2
-    assert actual['network_recoveries'] == actual['json_recoveries'] == 0
+    assert actual['total_remote_calls'] == budget.initial_calls == 3
+    assert actual['network_recoveries'] == 1
+    assert actual['json_recoveries'] == 0
     assert actual['performance_target_seconds'] == 120
     assert actual['max_concurrent_images'] == 4
 
