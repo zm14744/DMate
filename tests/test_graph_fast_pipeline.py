@@ -645,10 +645,11 @@ def test_only_main_call_receives_existing_panel_crops_and_never_body_fragments(p
     assert len(handles) == 1
 
 
-def test_budget_is_explicit_and_does_not_retry_slow_or_failed_requests():
+def test_budget_is_explicit_with_one_preheader_qwen_recovery_but_no_json_retries():
     budget = fast.configured_fast_budget()
-    assert budget.initial_calls == 2
-    assert budget.max_network_recoveries == budget.max_json_format_recoveries == 0
+    assert budget.initial_calls == 3
+    assert budget.max_network_recoveries == 1
+    assert budget.max_json_format_recoveries == 0
     assert budget.deadline-budget.started == pytest.approx(200)
 
 
