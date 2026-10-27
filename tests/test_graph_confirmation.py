@@ -253,6 +253,7 @@ def test_image_positions_paths_and_anonymous_ids_survive_confirm_and_reuse():
     value = document()
     graph = value["graphs"][0]
     graph["bbox"] = [.1, .1, .9, .9]
+    graph["region_polygon"] = [[.1, .1], [.9, .1], [.8, .9], [.2, .8]]
     graph["anon_next"] = 4
     graph["vertices"][0].update(x=.2, y=.3)
     graph["vertices"][1].update(x=.8, y=.7)
@@ -264,6 +265,8 @@ def test_image_positions_paths_and_anonymous_ids_survive_confirm_and_reuse():
     assert "path" not in saved["document"]["graphs"][0]["edges"][0]
     assert "bbox" not in saved["semantic_context"]["document"]["graphs"][0]
     assert final["bbox"] == [.1, .1, .9, .9]
+    assert final["region_polygon"] == [[.1, .1], [.9, .1], [.8, .9], [.2, .8]]
+    assert "region_polygon" not in saved["semantic_context"]["document"]["graphs"][0]
     assert final["anon_next"] == 4
     assert final["vertices"][-1]["label"] is None
     assert final["vertices"][-1]["display_label"] == "③"
