@@ -11,7 +11,7 @@ import networkx as nx
 
 from graph_pixel_safety import (measure_image_pixel_evidence,
     create_grid_column_views, reconcile_anonymous_pixel_graphs)
-from graph_fast_pipeline import _caption_grid_issues
+from graph_fast_pipeline import _caption_grid_issues, _grid_dark_disk_issues
 
 
 PUBLIC_ORIGINALS = Path(__file__).resolve().parent / "fixtures" / "original_ouc_20261021"
@@ -135,3 +135,49 @@ def test_no_pixel_repair_if_labels_or_weights_make_mapping_unsafe():
         after, repairs = reconcile_anonymous_pixel_graphs(draft, evidence)
         assert repairs == []
         assert after == before
+
+
+def test_six_public_figures_have_stable_filled_dark_vertices_and_straight_lower_bounds():
+    evidence = measure_image_pixel_evidence(_image("181309.png"))
+    rows = evidence["grid_dark_disks"]
+    assert rows["status"] == "measured"
+    assert rows["thresholds"] == [100, 130, 160]
+    assert len(rows["panels"]) == 6
+    assert [p["candidate_count"] for p in rows["panels"]] == [5, 5, 5, 4, 3, 4]
+    assert [p["straight_edge_lower_bound"] for p in rows["panels"]] == [7, 6, 5, 5, 3, 5]
+    assert all(p["status"] == "measured"
+               and p["edge_count_is_exact"] is False
+               and len(p["nodes"]) == p["candidate_count"]
+               and len(p["straight_edge_candidates"]) == p["straight_edge_lower_bound"]
+               for p in rows["panels"])
+    assert rows["image_accuracy_certified"] is False
+
+
+def test_black_pixel_inventory_flags_missing_edges_and_wrong_last_vertex_count():
+    evidence = measure_image_pixel_evidence(_image("181309.png"))
+    actual_nodes = [5, 5, 5, 4, 3, 5]  # Last panel was wrongly copied as G.
+    actual_edges = [7, 6, 5, 4, 2, 7]  # Two missing straight strokes.
+    graphs = [{"id": f"G{i+1}",
+               "vertices": [{"id": f"v{j+1}"} for j in range(actual_nodes[i])],
+               "edges": [{"id": f"e{j+1}"} for j in range(actual_edges[i])]}
+              for i in range(6)]
+    document = {"body_text": "", "graphs": graphs}
+    snapshot = copy.deepcopy(document)
+    issues = _grid_dark_disk_issues(document, evidence)
+    assert document == snapshot
+    assert {(row["graph_id"], row["field"], row["kind"]) for row in issues} == {
+        ("G4", "edges", "pixel_straight_edge_lower_bound_conflict"),
+        ("G5", "edges", "pixel_straight_edge_lower_bound_conflict"),
+        ("G6", "vertices", "pixel_disk_vertex_count_conflict"),
+    }
+    # Five measured straight pairs in G6 do not disprove an additional
+    # curved parallel edge. No generated relation or edge deletion is allowed.
+    assert not any(row["graph_id"] == "G6" and row["field"] == "edges" for row in issues)
+    assert _caption_grid_issues(document, evidence) == []
+
+
+def test_dark_disk_inventory_is_inactive_without_a_strict_grid():
+    sample = measure_image_pixel_evidence(_image("180506.png"))
+    assert sample["grid"] is None
+    assert sample["grid_dark_disks"] == {"status": "not_applicable", "panels": []}
+    assert _grid_dark_disk_issues({"body_text": "", "graphs": []}, sample) == []
