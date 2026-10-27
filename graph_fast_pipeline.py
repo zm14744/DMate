@@ -581,7 +581,8 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             'performance': {'target_seconds': PERFORMANCE_TARGET_SECONDS,
                 'recognition_seconds': round(time.monotonic()-started, 6),
                 'scope': 'recognition_before_response_rendering',
-                'within_target': time.monotonic()-started <= PERFORMANCE_TARGET_SECONDS}})
+                'completed': not issues,
+                'within_target': not issues and time.monotonic()-started <= PERFORMANCE_TARGET_SECONDS}})
     budget.local_tool_execution = tools_public
     if audit:
         result['stage_audit'] = {'responses': readings, 'observations': runner.observations}

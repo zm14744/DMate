@@ -156,6 +156,8 @@ def test_required_visual_attributes_stay_pending_until_actually_read(prepared, f
     assert result['graphs'][1]['edges'][0][field] == 'unknown'
     workflow = result['semantic_workflow']
     assert workflow['final_validation']['status'] == 'completed'
+    assert workflow['performance']['completed'] is False
+    assert workflow['performance']['within_target'] is False
     assert any(row['kind'] == expected for row in workflow['final_validation']['issues'])
     assert workflow['local_review']['targets']['graph_ids'] == ['G2']
     if review_available:

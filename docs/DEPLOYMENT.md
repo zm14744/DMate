@@ -21,10 +21,12 @@
 启动命令记录：
 
 ```text
-gunicorn -w 1 --threads 2 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app
+gunicorn -w 1 --threads 8 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app
 ```
 
 当前限流实现保存在单个 Python 进程内，因此当前 1 worker 配置与该实现保持一致；若未来增加多 worker，需要同步调整限流设计。
+
+四图识别需要 8 个 HTTP 线程承载并行上传以及取消、健康检查等请求；本地高内存推理由共享调度器串行执行。若平台覆盖 Docker 启动命令，请同步修改。当前识别与编辑确认流程见 [fast-editable-workflow.md](fast-editable-workflow.md)。
 
 ## 3. 核心环境变量
 
