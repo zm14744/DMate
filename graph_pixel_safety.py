@@ -297,6 +297,18 @@ def _stable_dark_disks(rgb, grid):
         for threshold, items in snapshots.items():
             candidates = [item for item in items if
                 x0 <= item['x']/width < x1 and y0 <= item['y']/height < y1]
+            # A single tiny glyph can survive the highest gray threshold
+            # beside several equally sized true disk vertices. Remove ONLY a
+            # unique extreme undersized outlier (<42% of the dominant median),
+            # preserving genuinely varying node sizes for manual review.
+            if len(candidates) >= 4:
+                median = float(np.median([item['diameter'] for item in candidates]))
+                tiny = [i for i,item in enumerate(candidates)
+                        if item['diameter'] < median*.42]
+                if (len(tiny) == 1 and all(
+                        item['diameter'] >= median*.72
+                        for i,item in enumerate(candidates) if i not in tiny)):
+                    candidates.pop(tiny[0])
             candidates.sort(key=lambda p:(p['y'],p['x']))
             lists[threshold] = candidates
         points = lists[130]
