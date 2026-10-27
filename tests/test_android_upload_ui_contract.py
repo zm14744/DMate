@@ -25,6 +25,13 @@ class AndroidUploadUiTests(unittest.TestCase):
         self.assertIn('<input id="imageInput" type="file" accept="image/*" multiple aria-label="选择图片">', self.html)
         self.assertIn('<p class="ocr-task-panel-hint">最多4张</p>', self.html)
 
+    def test_no_visible_ocr_task_count_or_timing(self):
+        self.assertNotIn('id="ocrTaskCount"', self.html)
+        self.assertNotIn('ocr-task-time', self.html)
+        self.assertNotIn('ocrTaskCount', self.js)
+        self.assertNotIn('ocr-task-time', self.js)
+        self.assertIn('ocr-task-panel-hint">最多4张', self.html)
+
     def test_solid_selection_and_compact_red_remove(self):
         self.assertIn(".ocr-question-choice input[type=\"radio\"]:checked", self.html)
         self.assertIn("ocr-task-remove", self.html)

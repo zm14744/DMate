@@ -14216,8 +14216,6 @@ function ocrTaskSeconds(task) {
 function updateOcrTaskTimes() {
     for (const task of ocrTasks.values()) {
         const card = document.querySelector(`[data-ocr-task-id="${task.id}"]`);
-        const timer = card?.querySelector(".ocr-task-time");
-        if (timer) timer.textContent = `${ocrTaskSeconds(task).toFixed(task.finishedAt ? 1 : 0)} 秒`;
         if (card) card.dataset.elapsedSeconds = String(ocrTaskSeconds(task));
         const slow = card?.querySelector(".ocr-task-slow");
         if (slow) slow.hidden = task.state !== "recognizing" || ocrTaskSeconds(task) < 120;
@@ -14244,8 +14242,6 @@ function renderOcrTasks() {
     panel.hidden = ocrTasks.size === 0;
     const manualQuestion = document.getElementById("manualQuestionMode");
     if (manualQuestion) manualQuestion.hidden = ocrTasks.size > 0;
-    const count = document.getElementById("ocrTaskCount");
-    if (count) count.textContent = `${ocrActiveCount()} 张识别中 · ${ocrTasks.size} 张图片`;
     const fragment = document.createDocumentFragment();
     const element = (tag, className, text) => {
         const node = document.createElement(tag);
@@ -14264,7 +14260,7 @@ function renderOcrTasks() {
         const heading = element("div", "ocr-task-heading");
         const name = element("strong", "ocr-task-name", task.file.name || "图片");
         name.title = task.file.name;
-        heading.append(name, element("span", "ocr-task-time", `${ocrTaskSeconds(task).toFixed(task.finishedAt ? 1 : 0)} 秒`));
+        heading.append(name);
         const status = element("p", "ocr-task-status", ocrTaskLabel(task));
         status.setAttribute("role", "status");
         content.append(heading, status);
