@@ -14267,6 +14267,17 @@ function renderOcrTasks() {
             const vertices = graphs.reduce((sum, graph) => sum + (graph.vertices || []).length, 0);
             const edges = graphs.reduce((sum, graph) => sum + (graph.edges || []).length, 0);
             content.append(element("p", "ocr-task-summary", `${graphs.length} 幅子图 · ${vertices} 个节点 · ${edges} 条边`));
+            if (task.descriptionState === "running") {
+                content.append(element("p", "ocr-task-summary", "正在整理图形外观描述…"));
+            } else if (task.descriptions && Object.keys(task.descriptions).length) {
+                for (const graph of graphs) {
+                    const description = task.descriptions[String(graph.id)];
+                    if (typeof description === "string" && description) {
+                        content.append(element("p", "ocr-task-description",
+                            (graph.name || graph.id) + " · 图形描述：" + description));
+                    }
+                }
+            }
         }
         const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
         slow.hidden = task.state !== "recognizing" || ocrTaskSeconds(task) < 120;
@@ -14448,7 +14459,8 @@ async function enqueueOcrFiles(files) {
             state: "recognizing", startedAt: performance.now(), finishedAt: null,
             controller: new AbortController(), draft: { body_text: "", graphs: [] },
             initialDocument: { body_text: "", graphs: [] }, confirmation: null,
-            dirty: false, userRequest: "", error: "", notice: "", sourceSha256: null
+            dirty: false, userRequest: "", error: "", notice: "", sourceSha256: null,
+            descriptions: null, descriptionState: null
         };
         ocrTasks.set(task.id, task);
         accepted.push(task);
@@ -14458,6 +14470,39 @@ async function enqueueOcrFiles(files) {
     document.getElementById("ocrTaskPanel")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
     // Independent promises: one failed image cannot reject or cancel its peers.
     return Promise.allSettled(accepted.map(recognizeOcrTask));
+}
+
+async function requestGraphDescriptions(task, confirmation) {
+    const drawing = confirmation?.drawing_document;
+    const eligible = Array.isArray(drawing?.graphs) && drawing.graphs.some(graph =>
+        (graph.vertices || []).filter(v => Number.isFinite(v.x) && Number.isFinite(v.y)).length >= 2);
+    if (!eligible || !confirmation.semantic_context) return;
+    const revision = confirmation.revision;
+    task.descriptionState = "running";
+    renderOcrTasks();
+    try {
+        const response = await fetch("/graph/describe", {
+            method: "POST", credentials: "same-origin",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({semantic_context: confirmation.semantic_context,
+                drawing_document: drawing})
+        });
+        const result = await parseResponseJson(response);
+        if (!ocrTasks.has(task.id) || task.dirty || task.confirmation?.revision !== revision) return;
+        if (response.ok && result?.status === "ok" && result.descriptions
+            && typeof result.descriptions === "object") {
+            const known = new Set((task.draft.graphs || []).map(g => String(g.id)));
+            task.descriptions = Object.fromEntries(Object.entries(result.descriptions)
+                .filter(([id, value]) => known.has(id) && typeof value === "string"
+                    && value.length <= 135));
+            task.descriptionState = "complete";
+        } else task.descriptionState = "unavailable";
+    } catch (_error) {
+        if (ocrTasks.has(task.id) && task.confirmation?.revision === revision)
+            task.descriptionState = "unavailable";
+    } finally {
+        if (ocrTasks.has(task.id)) renderOcrTasks();
+    }
 }
 
 function ensureGraphSession() {
@@ -14490,7 +14535,10 @@ async function confirmOcrTask(task, documentValue) {
         task.draft = cloneOcrDocument(data.drawing_document || data.document);
         task.confirmation = cloneOcrDocument(data);
         task.dirty = false;
+        task.descriptions = null;
+        task.descriptionState = null;
         task.notice = "修改已保存，解题将使用这份确认后的结构。";
+        void requestGraphDescriptions(task, data);
         return data;
     } catch (error) {
         task.error = error?.message || "结构确认失败，请稍后重试。";
@@ -14535,6 +14583,8 @@ async function editOcrTask(id) {
                 task.draft = cloneOcrDocument(value);
                 task.dirty = true;
                 task.confirmation = null;
+                task.descriptions = null;
+                task.descriptionState = null;
                 task.error = "";
             },
             onCancel: () => { if (!task.confirming) dialog.close(); },
