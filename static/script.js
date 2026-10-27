@@ -9367,17 +9367,6 @@ function sanitizeSemanticContext(value, message = null) {
             || !Array.isArray(graph.edges) || graph.edges.length > 300) return null;
         const clean = { id: graph.id, name: graph.name ?? null, complete: graph.complete === true,
             vertices: [], edges: [] };
-        const coord = n => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
-        const point = p => Array.isArray(p) && p.length === 2 && p.every(coord);
-        if (graph.bbox !== undefined) {
-            if (!Array.isArray(graph.bbox) || graph.bbox.length !== 4 || !graph.bbox.every(coord)
-                || !(graph.bbox[0] < graph.bbox[2] && graph.bbox[1] < graph.bbox[3])) return null;
-            clean.bbox = [...graph.bbox];
-        }
-        if (graph.anon_next !== undefined) {
-            if (!Number.isInteger(graph.anon_next) || graph.anon_next < 1 || graph.anon_next > 10000) return null;
-            clean.anon_next = graph.anon_next;
-        }
         for (const key of ["directed", "weighted", "multigraph"]) {
             if (graph[key] !== undefined && typeof graph[key] !== "boolean" && graph[key] !== "unknown") return null;
             clean[key] = graph[key] ?? "unknown";
@@ -9405,14 +9394,6 @@ function sanitizeSemanticContext(value, message = null) {
             if (!object(vertex) || !string(vertex.id, 128, true) || !literal(vertex.label, 256)) return null;
             const node = { id: vertex.id, label: vertex.label ?? null };
             if (typeof vertex.isolated_confirmed === "boolean") node.isolated_confirmed = vertex.isolated_confirmed;
-            if (vertex.display_label !== undefined) {
-                if (!string(vertex.display_label, 16)) return null;
-                node.display_label = vertex.display_label;
-            }
-            if (vertex.x !== undefined || vertex.y !== undefined) {
-                if (!((vertex.x === null && vertex.y === null) || (coord(vertex.x) && coord(vertex.y)))) return null;
-                node.x = vertex.x; node.y = vertex.y;
-            }
             clean.vertices.push(node);
         }
         for (const edge of graph.edges) {
@@ -9426,10 +9407,6 @@ function sanitizeSemanticContext(value, message = null) {
                 weight: edge.weight ?? null, edge_label: edge.edge_label ?? null,
                 color: edge.color ?? null, style: edge.style ?? null,
                 status: edge.status === "accepted" ? "accepted" : "pending" };
-            if (edge.path !== undefined) {
-                if (!Array.isArray(edge.path) || edge.path.length > 128 || !edge.path.every(point)) return null;
-                item.path = edge.path.map(p => [...p]);
-            }
             for (const key of ["multiplicity", "parallel_count"]) {
                 if (edge[key] !== undefined) {
                     if (!Number.isInteger(edge[key]) || edge[key] < 1 || edge[key] > 300) return null;
@@ -14510,7 +14487,7 @@ async function confirmOcrTask(task, documentValue) {
         if (!data?.document || !data?.confirmation_token || !data?.semantic_context) {
             throw new Error("结构确认响应不完整，请重新确认。");
         }
-        task.draft = cloneOcrDocument(data.document);
+        task.draft = cloneOcrDocument(data.drawing_document || data.document);
         task.confirmation = cloneOcrDocument(data);
         task.dirty = false;
         task.notice = "修改已保存，解题将使用这份确认后的结构。";
@@ -14586,7 +14563,8 @@ async function solveOcrTask(id) {
     }
     const context = sanitizeSemanticContext(task.confirmation.semantic_context);
     if (!context || !context.confirmation_token
-        || JSON.stringify(task.draft) !== JSON.stringify(task.confirmation.document)) {
+        || JSON.stringify(task.draft) !== JSON.stringify(
+            task.confirmation.drawing_document || task.confirmation.document)) {
         task.confirmation = null;
         task.error = "结构已修改或确认已失效，请先重新核对并确认。";
         renderOcrTasks();

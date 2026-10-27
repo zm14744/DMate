@@ -188,6 +188,37 @@ def validate_document(value):
     return document, inspection
 
 
+def _drawing_document(edited, document):
+    """Keep image positions separate from verified math and chat snapshots.
+
+    The submitted fields were validated in validate_document; only known
+    graph/vertex/edge IDs can receive geometry. Do not copy model proofs.
+    """
+    drawing = copy.deepcopy(document)
+    sources = {g['id']: g for g in edited['graphs']}
+    for graph in drawing['graphs']:
+        source = sources.get(graph['id'])
+        if source is None:
+            continue
+        for key in ('bbox', 'anon_next'):
+            if key in source:
+                graph[key] = copy.deepcopy(source[key])
+        by_vertex = {v['id']: v for v in source['vertices']}
+        by_edge = {e['id']: e for e in source['edges']}
+        for node in graph['vertices']:
+            v = by_vertex.get(node['id'], {})
+            if v.get('display_label'):
+                node['display_label'] = v['display_label']
+            if v.get('x') is not None and v.get('y') is not None:
+                node['x'], node['y'] = v['x'], v['y']
+        for edge in graph['edges']:
+            source_edge = by_edge.get(edge['id'], {})
+            if source_edge.get('path'):
+                edge['path'] = copy.deepcopy(source_edge['path'])
+    _json(drawing)
+    return drawing
+
+
 def _context(document, request_id, source_sha256, token, revision):
     from graph_schema import describe_graphs
     visual = describe_graphs(document['graphs'])
@@ -216,7 +247,9 @@ def confirm_document(owner, payload):
         raise ConfirmationError('confirmation_required', '请先核对并确认当前题目结构。')
     request_id, sha = payload.get('request_id'), payload.get('source_sha256')
     _identity(request_id, sha)
-    document, inspection = validate_document(payload.get('document'))
+    edited = payload.get('document')
+    document, inspection = validate_document(edited)
+    drawing_document = _drawing_document(edited, document)
     token, digest = secrets.token_hex(32), document_digest(document)
     with _connection() as connection:
         row = connection.execute('SELECT source_sha256,revision FROM graph_confirmations WHERE owner=? AND request_id=?',
@@ -228,7 +261,9 @@ def confirm_document(owner, payload):
         connection.execute('''UPDATE graph_confirmations SET revision=?,document_sha256=?,token_sha256=?,expires=?
             WHERE owner=? AND request_id=?''', (revision, digest, hashlib.sha256(token.encode()).hexdigest(),
             time.time() + TTL_SECONDS, owner, request_id))
-    return {'document': document, 'semantic_context': context, 'confirmation_token': token,
+    return {'document': document, 'drawing_document': drawing_document,
+            'drawing_sha256': document_digest(drawing_document),
+            'semantic_context': context, 'confirmation_token': token,
             'document_sha256': digest, 'revision': revision, 'request_id': request_id,
             'source_sha256': sha, 'graph_display_data': document['graphs'], 'visual_text': visual,
             'validation': {'status': 'valid', 'schema': VERSION, 'tool_audit': inspection['tool_audit'],

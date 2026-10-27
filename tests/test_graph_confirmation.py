@@ -259,7 +259,10 @@ def test_image_positions_paths_and_anonymous_ids_survive_confirm_and_reuse():
     graph["vertices"][-1].update(x=.5, y=.2, display_label="③")
     graph["edges"][0]["path"] = [[.2, .3], [.5, .4], [.8, .7]]
     saved = confirm(value=value)
-    final = saved["document"]["graphs"][0]
+    final = saved["drawing_document"]["graphs"][0]
+    assert "bbox" not in saved["document"]["graphs"][0]
+    assert "path" not in saved["document"]["graphs"][0]["edges"][0]
+    assert "bbox" not in saved["semantic_context"]["document"]["graphs"][0]
     assert final["bbox"] == [.1, .1, .9, .9]
     assert final["anon_next"] == 4
     assert final["vertices"][-1]["label"] is None
