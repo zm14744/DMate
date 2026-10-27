@@ -22,6 +22,13 @@
         for (const graph of draft.graphs || []) {
             const used = new Set((graph.vertices || []).map(v => v.label || v.display_label).filter(Boolean));
             let next = Math.max(1, Number.isInteger(graph.anon_next) ? graph.anon_next : 1);
+            const circleNames = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+            for (const name of used) {
+                const at = circleNames.indexOf(String(name));
+                if (at >= 0 && String(name).length === 1) next = Math.max(next, at + 2);
+                const match = /^未命名(\d+)$/.exec(String(name));
+                if (match) next = Math.max(next, Number(match[1]) + 1);
+            }
             for (const vertex of graph.vertices || []) {
                 if (vertex.label || vertex.display_label) continue;
                 let display;
@@ -141,7 +148,7 @@
 
     function createModel(input, initialDocument) {
         let state = importDocument(input);
-        const initial = importDocument(initialDocument || input), history = [];
+        const initial = importDocument(initialDocument || input), history = [], future = [];
         const listeners = new Set();
         const getGraph = (draft, gid) => {
             const graph = draft.graphs.find(row => row.id === gid);
@@ -155,6 +162,7 @@
             if (JSON.stringify(next) === JSON.stringify(state)) return;
             history.push(state);
             if (history.length > 40) history.shift();
+            future.length = 0;
             state = next;
             publish();
         }
@@ -168,8 +176,10 @@
             getDocument: () => copy(state),
             validate: () => validateDocument(state),
             canUndo: () => history.length > 0,
+            canRedo: () => future.length > 0,
             subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); },
-            undo: () => { if (history.length) { state = history.pop(); publish(); } },
+            undo: () => { if (history.length) { future.push(state); state = history.pop(); publish(); } },
+            redo: () => { if (future.length) { history.push(state); state = future.pop(); publish(); } },
             reset: () => change(draft => { Object.keys(draft).forEach(key => delete draft[key]); Object.assign(draft, copy(initial)); }),
             setBody: value => change(draft => { draft.body_text = String(value); }),
             renameGraph: (gid, name) => change(draft => { getGraph(draft, gid).name = String(name); }),
@@ -199,8 +209,18 @@
                     graph.vertices.push(vertex); });
                 return vertexId;
             },
-            renameVertex: (gid, vid, label) => change(draft => { const vertex = getGraph(draft, gid).vertices.find(row => row.id === vid);
-                if (!vertex) throw new Error('找不到这个节点。'); vertex.label = String(label).trim() || null; }),
+            renameVertex: (gid, vid, label) => change(draft => {
+                const graph = getGraph(draft, gid), vertex = graph.vertices.find(row => row.id === vid);
+                if (!vertex) throw new Error('找不到这个节点。');
+                vertex.label = String(label).trim() || null;
+                if (!vertex.label && !vertex.display_label) {
+                    let next = Math.max(1, graph.anon_next || 1);
+                    const used = new Set(graph.vertices.flatMap(v => [v.label, v.display_label]).filter(Boolean));
+                    while (used.has(ring(next))) next++;
+                    vertex.display_label = ring(next++);
+                    graph.anon_next = next;
+                }
+            }),
             moveVertex: (gid, vid, x, y) => change(draft => {
                 if (!unit(x) || !unit(y)) throw new Error('顶点位置必须位于原图内。');
                 const graph = getGraph(draft, gid), vertex = graph.vertices.find(v => v.id === vid);

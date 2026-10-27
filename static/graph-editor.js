@@ -59,6 +59,7 @@
             const status = container.querySelector('.dge-status'); if (status) status.textContent = notice;
             const ack = container.querySelector('.dge-footer input[type=checkbox]'); if (ack) ack.checked = acknowledged;
             const undo = container.querySelector('[data-editor-undo]'); if (undo) undo.disabled = saving || !model.canUndo();
+            const redo = container.querySelector('[data-editor-redo]'); if (redo) redo.disabled = saving || !model.canRedo();
             for (const selector of container.querySelectorAll('select[data-graph-nodes]')) {
                 const owner = document.graphs.find(row => row.id === selector.dataset.graphNodes);
                 if (!owner) continue;
@@ -172,7 +173,9 @@
             const top = element('div', 'dge-topline');
             top.append(element('p', 'dge-muted', useOverlay ? '请直接在原图上核查、补点、连边，详细属性可以在下方修改。' : '请对照原图核对题干，再点击节点或边修改结构。'));
             const undo = button('撤销', () => { pendingDelete = ''; model.undo(); }); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
-            top.append(undo, button('恢复识别初稿', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
+            const redo = button('重做', () => { pendingDelete = ''; model.redo(); });
+            redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
+            top.append(undo, redo, button('恢复识别初稿', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
             const observations = (Array.isArray(options.issues) ? options.issues : [])
                 .map(issue => typeof issue === 'string' ? issue : text(issue?.message)).filter(Boolean);
             if (observations.length) { const details = element('details', 'dge-observations'); details.open = true;

@@ -255,6 +255,21 @@ def test_real_browser_mobile_layout_and_two_step_delete(browser_editor):
     assert page.evaluate('instance.getDocument().graphs[0].edges.length') == 1
 
 
+def test_redo_after_undo_and_new_change_discards_future():
+    result = run_model("""
+const old = model.getDocument().graphs[0].vertices[0].label;
+model.renameVertex('G1','a','X');
+model.undo();
+const restored = model.getDocument().graphs[0].vertices[0].label === old;
+model.redo();
+const redone = model.getDocument().graphs[0].vertices[0].label === 'X';
+model.undo();
+model.renameVertex('G1','a','Y');
+console.log(JSON.stringify({restored,redone,canRedo:model.canRedo(),name:model.getDocument().graphs[0].vertices[0].label}));
+""")
+    assert result == {'restored': True, 'redone': True, 'canRedo': False, 'name': 'Y'}
+
+
 def test_svg_editor_and_data_model_share_the_same_operations():
     if not NODE:
         pytest.skip('Node is required to verify graph editor exports')

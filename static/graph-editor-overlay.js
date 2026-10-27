@@ -9,13 +9,21 @@ function mount(host,o){
  root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');hint.className='dge-overlay-hint';status.className='dge-overlay-status';
  stage.append(image,svg);scroll.append(stage);root.append(bar,scroll,hint,status);host.append(root);
  const button=(label,key,fn)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',()=>{if(!o.disabled?.())fn();});bar.append(b);return b;};
- for(const [key,label] of [['select','选择移动'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']]){
+ for(const [key,label] of [['select','选择移动'],['pan','平移'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']]){
   button(label,key,()=>{s.mode=key;s.start=null;draw();});
  }
  const select=(label,entries,type)=>{const n=d.createElement('select');n.setAttribute('aria-label',label);for(const [v,t] of entries){const p=d.createElement('option');p.value=v;p.textContent=t;n.append(p);}n.addEventListener('change',()=>{const g=o.graph();if(g&&n.value!=='unknown')change(()=>o.model.setGraphType(g.id,type,n.value==='true'));});bar.append(n);return n;};
  const dir=select('图形方向',[['unknown','方向待核对'],['false','无向图'],['true','有向图']],'directed'),weight=select('图形权值',[['unknown','权值待核对'],['false','无权图'],['true','带权图']],'weighted');
  const visible=button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();});
- const zoom=x=>{s.zoom=Math.max(100,Math.min(400,Math.round(x)));stage.style.width=s.zoom+'%';value.textContent=s.zoom+'%';};
+ const zoom=x=>{
+   const previous=s.zoom||100;
+   const cx=scroll.scrollLeft+scroll.clientWidth/2,cy=scroll.scrollTop+scroll.clientHeight/2;
+   s.zoom=Math.max(100,Math.min(400,Math.round(x)));
+   stage.style.width=s.zoom+'%';value.textContent=s.zoom+'%';
+   const ratio=s.zoom/previous;
+   scroll.scrollLeft=cx*ratio-scroll.clientWidth/2;
+   scroll.scrollTop=cy*ratio-scroll.clientHeight/2;
+ };
  button('－','zoom-out',()=>zoom(s.zoom/1.25)).setAttribute('aria-label','缩小原图');
  const value=d.createElement('span');value.className='dge-overlay-zoom';bar.append(value);
  button('＋','zoom-in',()=>zoom(s.zoom*1.25)).setAttribute('aria-label','放大原图');
@@ -30,8 +38,8 @@ function mount(host,o){
  const px=p=>[p[0]*w,p[1]*h],mouse=e=>{const r=svg.getBoundingClientRect();return [clamp((e.clientX-r.left)/Math.max(1,r.width)),clamp((e.clientY-r.top)/Math.max(1,r.height))];};
  function draw(){
   const g=o.graph();dir.value=typeof g?.directed==='boolean'?String(g.directed):'unknown';weight.value=typeof g?.weighted==='boolean'?String(g.weighted):'unknown';visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
-  for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
-  hint.textContent=s.mode==='vertex'?'点击原图添加顶点':s.mode==='edge'?'依次点击两个顶点连边，同一点两次可建自环':s.mode==='bounds'?'拖动鼠标框选当前图形':'拖动顶点校准位置，点击边编辑属性';
+  for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
+  hint.textContent=s.mode==='vertex'?'点击原图添加顶点':s.mode==='edge'?'依次点击两个顶点连边，同一点两次可建自环':s.mode==='bounds'?'拖动框选当前图形':s.mode==='pan'?'拖动图片平移，双指可缩放':'拖动顶点校准位置，点击边编辑属性';
   svg.replaceChildren();if(!g||!s.visible)return;
   const radius=Math.max(5,Math.min(w,h)*.008),defs=E(d,'defs'),mark=E(d,'marker',{id:o.instance+'-arrow',viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto'});mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill:'currentColor'}));defs.append(mark);svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
@@ -65,7 +73,8 @@ function mount(host,o){
   const node=e.target.closest('[data-vertex-id]')?.dataset.vertexId,edge=e.target.closest('[data-edge-id]')?.dataset.edgeId,handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
   if(s.mode==='vertex'&&!node){change(()=>o.model.addVertex(g.id,'',...p));return;}
   if(s.mode==='edge'&&node){if(!s.start){s.start=node;draw();}else{const from=s.start;s.start=null;change(()=>o.model.addEdge(g.id,{from,to:node,direction:g.directed===true?'forward':'undirected'}));}return;}
-  if(s.mode==='bounds'&&!node&&!edge)active={kind:'bounds',pointer:e.pointerId,start:p,end:p};
+  if(s.mode==='pan'||(s.mode==='select'&&e.shiftKey))active={kind:'pan',pointer:e.pointerId,start:[e.clientX,e.clientY],sx:scroll.scrollLeft,sy:scroll.scrollTop};
+  else if(s.mode==='bounds'&&!node&&!edge)active={kind:'bounds',pointer:e.pointerId,start:p,end:p};
   else if(s.mode==='select'&&handle)active={kind:'handle',pointer:e.pointerId,id:handle,start:p,end:p};
   else if(s.mode==='select'&&node)active={kind:'node',pointer:e.pointerId,id:node,start:p,end:p};
   else if(s.mode==='select'&&edge)o.selectEdge?.(edge);
@@ -75,6 +84,11 @@ function mount(host,o){
   if(pointers.has(e.pointerId))pointers.set(e.pointerId,[e.clientX,e.clientY]);
   if(base&&pointers.size>=2){const a=[...pointers.values()],distance=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(base.distance>4)zoom(base.zoom*distance/base.distance);return;}
   if(!active||active.pointer!==e.pointerId)return;
+  if(active.kind==='pan'){
+    scroll.scrollLeft=active.sx+active.start[0]-e.clientX;
+    scroll.scrollTop=active.sy+active.start[1]-e.clientY;
+    return;
+  }
   active.end=mouse(e);ghost=active.kind==='node'?{vertex:active.id,pos:active.end}:active.kind==='handle'?{edge:active.id,pos:active.end}:null;draw();
  });
  function release(e,cancel=false){
