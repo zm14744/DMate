@@ -8,6 +8,7 @@ import copy
 from pathlib import Path
 
 import networkx as nx
+from test_graph_fast_pipeline import prepared
 
 from graph_pixel_safety import (measure_image_pixel_evidence,
     create_grid_column_views, create_grid_panel_views, reconcile_anonymous_pixel_graphs)
