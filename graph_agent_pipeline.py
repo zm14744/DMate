@@ -991,7 +991,7 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
             'vertices': [{key: vertex.get(key) for key in ('id', 'label', 'x', 'y')}
                          for vertex in graph['vertices']]} for graph in inventory.values()])
         located = []
-        if measured_geometry and not position_repair_scopes:
+        if measured_geometry and scope not in position_repair_scopes:
             known_markers = {row['id'] for row in (marker_hints or {}).get('candidates', [])}
             affected_graphs = {row['graph_id'] for row in measured_geometry if row.get('graph_id') in inventory}
             observations = {row.get('graph_id'): row.get('observations') or {}
