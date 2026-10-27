@@ -4120,6 +4120,12 @@ def ocr():
     # Do not start Vision, OpenCV topology recovery or even text OCR here.
     # Text is recognized separately when the user chooses its original pixels.
     if request.form.get("workflow") == "manual_graph":
+        from image_evidence import decode_document_image
+        try:
+            checked = decode_document_image(raw, max_pixels=24_000_000)
+            checked.close()
+        except (ValueError, TypeError, OSError):
+            return jsonify({"error": "这不是可读取的图片，请重新上传。"}), 400
         return jsonify({
             "manual_mode": True, "recognition_status": "manual",
             "source_sha256": hashlib.sha256(raw).hexdigest(),

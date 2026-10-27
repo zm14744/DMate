@@ -250,7 +250,9 @@
             }),
             setGraphBounds: (gid, bbox) => change(draft => {
                 if (!validBox(bbox)) throw new Error('请框选有效的图形范围。');
-                getGraph(draft, gid).bbox = [...bbox];
+                const graph = getGraph(draft, gid);
+                graph.bbox = [...bbox];
+                delete graph.region_polygon;
             }),
             setGraphPolygon: (gid, polygon) => change(draft => {
                 if (!polygonValid(polygon)) throw new Error('自由选区需要至少三个有效角点。');

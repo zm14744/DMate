@@ -143,3 +143,11 @@
 .dge-overlay-label{fill:#172033;stroke:#fff}
 .dge-overlay-svg[data-mode="pan"]{cursor:grab}
 .dge-overlay-node:active,.dge-overlay-svg[data-mode="pan"]:active{cursor:grabbing}
+
+/* Minimal user-selected polygon and text regions, shared source coordinates. */
+.dge-overlay-polygon{fill:rgba(37,99,235,.045);stroke:var(--accent,#2463b2);stroke-width:2;stroke-dasharray:7 5;pointer-events:none}
+.dge-overlay-polygon-draft{fill:rgba(37,99,235,.035);stroke:var(--accent,#2463b2);stroke-width:2.4;stroke-dasharray:6 4;pointer-events:none}
+.dge-overlay-polygon-draft.is-text{fill:rgba(130,130,130,.05);stroke:#555}
+.dge-overlay-draft-dot{fill:#fff;stroke:var(--accent,#2463b2);stroke-width:2;pointer-events:none}
+.dge-overlay-text-region{fill:rgba(60,60,60,.07);stroke:#545454;stroke-width:2.4;stroke-dasharray:7 4;pointer-events:none}
+.dge-overlay-tools [hidden]{display:none!important}

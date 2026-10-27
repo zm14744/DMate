@@ -14608,6 +14608,21 @@ async function editOcrTask(id) {
         ocrEditorController = window.DMateGraphEditor.mount(mount, {
             document: cloneOcrDocument(task.draft), initialDocument: cloneOcrDocument(task.initialDocument),
             originalUrl: task.originalUrl,
+            onRecognizeText: async polygon => {
+                const selected = new FormData();
+                selected.append("image", task.file);
+                selected.append("request_id", task.id);
+                selected.append("polygon", JSON.stringify(polygon));
+                const response = await fetch("/graph/text-region", {
+                    method: "POST", credentials: "same-origin", body: selected
+                });
+                const result = await parseResponseJson(response);
+                if (!response.ok || result?.error)
+                    throw new Error(result?.error || "文字区域识别失败，请调整范围");
+                if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id)
+                    throw new Error("文字识别结果与原图不匹配，请重新选择区域");
+                return typeof result.text === "string" ? result.text : "";
+            },
             issues: [...(Array.isArray(task.result?.diagnostics?.semantic_issues) ? task.result.diagnostics.semantic_issues : []),
                 ...(Array.isArray(task.result?.review?.reasons) ? task.result.review.reasons : []),
                 ...(task.error ? [task.error] : [])],

@@ -254,11 +254,13 @@
             else if (overlay) { overlay.destroy(); overlay = null; }
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
             const top = element('div', 'dge-topline');
-            top.append(element('p', 'dge-muted', useOverlay ? '请直接在原图上核查、补点、连边，详细属性可以在下方修改。' : '请对照原图核对题干，再点击节点或边修改结构。'));
+            top.append(element('p', 'dge-muted', useOverlay
+                ? '先在原图上描点、连边；图形和文字都可以单独框选区域。'
+                : '请对照原图核对题干，再点击节点或边修改结构。'));
             const undo = button('撤销', () => { pendingDelete = ''; model.undo(); }); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
             const redo = button('重做', () => { pendingDelete = ''; model.redo(); });
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
-            top.append(undo, redo, button('恢复识别初稿', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
+            top.append(undo, redo, button('清空修改', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
             const observations = (Array.isArray(options.issues) ? options.issues : [])
                 .map(issue => typeof issue === 'string' ? issue : text(issue?.message)).filter(Boolean);
             if (observations.length) { const details = element('details', 'dge-observations'); details.open = true;
@@ -277,7 +279,18 @@
                     nodeSelected: () => selectedNodes,
                     selectEdge: id => { selectedEdge = id; selectedNodes.clear(); render(); },
                     selectNode: id => { selectedNodes = new Set([id]); selectedEdge = null; render(); },
-                    changed: () => { acknowledged = false; render(); }
+                    changed: () => { acknowledged = false; render(); },
+                    recognizeText: async polygon => {
+                        if (typeof options.onRecognizeText !== 'function')
+                            throw new Error('文字区域识别暂不可用，请手动输入。');
+                        const text = await options.onRecognizeText(polygon);
+                        if (typeof text === 'string' && text.trim()) {
+                            const previous = model.getDocument().body_text;
+                            model.setBody([previous.trimEnd(), text.trim()].filter(Boolean).join('\n'));
+                            render();
+                        }
+                        return text;
+                    }
                 });
                 else overlay.refresh();
                 workspace.append(buildSelectedProperties(graph));
