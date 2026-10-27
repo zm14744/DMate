@@ -4,6 +4,10 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      full_suite:
+        description: 'Run exhaustive tests, browser replays and 2-CPU/4GB resource checks before merging'
+        type: boolean
+        default: false
       live_api:
         description: 'Run original-image OCR with test GitHub Secrets (paid API calls)'
         type: boolean
@@ -11,8 +15,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: graph-nextgen-${{ github.ref }}
-  cancel-in-progress: true
+  group: graph-nextgen-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   mechanisms:
     runs-on: ubuntu-24.04
@@ -46,7 +50,45 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install Flask requests numpy==1.26.4 opencv-contrib-python-headless==4.10.0.84 Pillow==11.3.0 networkx pytest playwright==1.55.0 -r requirements-agents.txt
+      # PR feedback stays bounded and checks only the changing graph-editor contract.
+      # Expensive historical suites and the 4GB Docker check are kept for manual pre-merge runs.
+      - name: Use the bundled Chromium for real editor interactions
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as runtime:
+              executable = Path(runtime.chromium.executable_path)
+          if not executable.is_file():
+              raise SystemExit("Pinned Chromium is required for graph-editor smoke tests")
+          with open(os.environ["GITHUB_ENV"], "a") as target:
+              target.write(f"DMATE_BROWSER_EXECUTABLE={executable}\n")
+          print("Graph editor Chromium:", executable)
+          PY
+      - name: Focused editor and confirmation regression (free, no OCR/model requests)
+        run: |
+          python -m pytest -q \
+            tests/test_visual_graph_editor.py \
+            tests/test_graph_overlay.py \
+            tests/test_graph_confirmation.py \
+            tests/test_graph_description.py \
+            tests/test_graph_semantic_schema.py \
+            tests/test_evidence_frontend_contract.py::test_public_projection_preserves_atomic_edges_but_is_not_a_drawing_api \
+            tests/test_graph_first_pass_ui.py::test_exact_rendering_contract_checks_every_field_and_panel \
+            tests/test_semantic_chat_snapshot_frontend.py::test_snapshot_whitelist_strips_auxiliary_fields_without_changing_instances \
+            tests/test_graph_fast_pipeline.py::test_local_review_keeps_only_same_identity_and_same_topology_drawing_geometry
+      - name: Graph JavaScript syntax and compact render tests
+        run: |
+          node --check static/graph-editor-model.js
+          node --check static/graph-editor-overlay.js
+          node --check static/graph-editor-format.js
+          node --check static/graph-editor.js
+          node --check static/script.js
+          node tests/graph_display_regression.js
+          node tests/graph_nextgen_display.js
       - name: Install the exact DejaVu test font with bounded APT time
+        if: github.event_name == 'workflow_dispatch' && inputs.full_suite
         timeout-minutes: 3
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -58,9 +100,11 @@ jobs:
           font = ImageFont.truetype('DejaVuSans.ttf', 34)
           print('Required test font:', font.path)
           PY
-      - run: python -m pytest -q tests
-      - run: node --check static/graph-editor-model.js && node --check static/graph-editor.js && node --check static/script.js && node tests/graph_display_regression.js && node tests/graph_nextgen_display.js
+      - name: Full regression only before merge or on explicit request
+        if: github.event_name == 'workflow_dispatch' && inputs.full_suite
+        run: python -m pytest -q tests
       - name: Prepare pinned public browser scripts with TLS verification
+        if: github.event_name == 'workflow_dispatch' && inputs.full_suite
         run: |
           python - <<'PY'
           import os, re, sys
@@ -74,8 +118,10 @@ jobs:
           for url in sorted(set(urls)):
               verified_asset(url, Path(os.environ['RUNNER_TEMP']) / 'frontend_public_cdn_cache')
           PY
-      - run: python tests/nextgen_browser.py --mode contract --output artifacts/browser-contract --cdn-cache "$RUNNER_TEMP/frontend_public_cdn_cache"
+      - if: github.event_name == 'workflow_dispatch' && inputs.full_suite
+        run: python tests/nextgen_browser.py --mode contract --output artifacts/browser-contract --cdn-cache "$RUNNER_TEMP/frontend_public_cdn_cache"
       - name: Verify current evidence review dialog and real upload route in Chromium
+        if: github.event_name == 'workflow_dispatch' && inputs.full_suite
         run: |
           python - <<'PY'
           import os, subprocess, sys
@@ -94,7 +140,7 @@ jobs:
                           'tests/test_ocr_upload_integration.py'], env=env, check=True)
           PY
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.full_suite
         with:
           name: nextgen-browser-contract-not-accuracy
           path: |
@@ -103,6 +149,7 @@ jobs:
             ${{ runner.temp }}/dmate-ui-replay
             ${{ runner.temp }}/dmate-upload-integration
   resource-limit:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_suite
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

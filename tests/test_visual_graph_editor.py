@@ -1,6 +1,7 @@
 """User-editable semantic structure, exercised in Node and actual Chromium."""
 import copy
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -156,7 +157,7 @@ console.log(JSON.stringify({document:model.getDocument(),issues:model.validate()
 
 @pytest.fixture
 def browser_editor():
-    executable = shutil.which('chromium')
+    executable = os.environ.get('DMATE_BROWSER_EXECUTABLE') or shutil.which('chromium')
     if not executable:
         pytest.skip('Chromium is required for actual editor interaction')
     playwright = pytest.importorskip('playwright.sync_api')

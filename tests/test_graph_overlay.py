@@ -1,6 +1,7 @@
 """Exercise the real editable image overlay, not just semantic form fields."""
 import base64
 import io
+import os
 import shutil
 from pathlib import Path
 
@@ -11,7 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def canvas_page():
-    if not shutil.which("chromium"):
+    executable = os.environ.get("DMATE_BROWSER_EXECUTABLE") or shutil.which("chromium")
+    if not executable:
         pytest.skip("Chromium not available")
     playwright = pytest.importorskip("playwright.sync_api")
     from PIL import Image, ImageDraw
@@ -33,7 +35,7 @@ def canvas_page():
                    "path": [[.2, .25], [.5, .5], [.8, .75]]}]
     }]}
     with playwright.sync_playwright() as engine:
-        browser = engine.chromium.launch(executable_path=shutil.which("chromium"), headless=True)
+        browser = engine.chromium.launch(executable_path=executable, headless=True)
         page = browser.new_page(viewport={"width": 1200, "height": 900})
         page.route("**/*", lambda request: request.abort())
         page.set_content('<main id="editor" style="max-width:1000px"></main>')
