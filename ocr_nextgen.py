@@ -88,7 +88,20 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
 
 
 def _failed_graph_result(exc,version,budget,text_result,*,stage_audit=None):
-    failure={'error':'本次图形结构识别未完成，请核对原图。','graph_display_version':version,
+    kind=getattr(exc,'kind',None)
+    last_metric=budget.metrics[-1] if budget.metrics else {}
+    reason=None
+    if isinstance(exc,TimeoutError) or last_metric.get('confirmed_timeout') is True:
+        reason='识别服务处理超时'
+    elif kind in ('transport_failed','upstream_network_error'):
+        reason='识别服务连接中断'
+    elif kind in ('invalid_output','truncated_output','reasoning_only_output'):
+        reason='识别服务返回的内容格式不完整或无效'
+    elif kind in ('http_error','missing_key','model_identity_unverified','model_mismatch'):
+        reason='识别服务暂不可用'
+    message=('本次图形结构识别未完成：'+reason+'。可重新上传或手动录入。'
+             if reason else '本次图形结构识别未完成，请核对原图。')
+    failure={'error':message,'graph_display_version':version,
         'recognition_status':'failed','review':{'required':True,'reasons':['图形识别未完成。']},
         'diagnostics':{'stages':['graph_pipeline_failed'],'failure_kind':type(exc).__name__,
             'remote_metrics':budget.metrics,'resource_metrics':text_result.get('resource_metrics',[])}}

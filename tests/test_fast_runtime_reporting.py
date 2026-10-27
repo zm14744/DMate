@@ -1,4 +1,5 @@
 import copy
+import pytest
 
 from test_graph_fast_pipeline import prepared
 
@@ -46,3 +47,21 @@ def test_unexecuted_selected_tool_cannot_be_a_complete_performance_success(prepa
     assert rendered['recognition_timing']['within_target'] is False
     assert rendered['recognition_timing']['completed'] is False
     assert rendered['service_warnings'][0]['kind'] == 'local_tools_degraded'
+
+
+@pytest.mark.parametrize(('kind','timed_out','message'),[
+    ('transport_failed',True,'处理超时'),
+    ('transport_failed',False,'连接中断'),
+    ('invalid_output',False,'内容格式不完整或无效'),
+])
+def test_service_failure_stays_failed_and_explains_the_actual_cause(monkeypatch,kind,timed_out,message):
+    import ocr_nextgen
+    from vision_provider import VisionError
+    def fail(*args, **kwargs):
+        kwargs['budget'].metrics.append({'confirmed_timeout':timed_out})
+        raise VisionError(kind)
+    monkeypatch.setattr('graph_fast_pipeline.recognize_fast', fail)
+    result=ocr_nextgen.recognize_graph_document(b'original',{},graph_pipeline='agent-tools')
+    assert result['recognition_status']=='failed'
+    assert message in result['error']
+    assert 'recognition_timing' not in result
