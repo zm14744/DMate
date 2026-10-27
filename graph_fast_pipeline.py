@@ -27,7 +27,7 @@ from vision_provider import GLM_5V_TURBO_MODEL, VisionError, VisionProvider
 PERFORMANCE_TARGET_SECONDS = 120
 
 MAIN_PROMPT = r'''读取数学题原图，返回紧凑JSON题干和图结构，不解题，不输出解释或Markdown。
-第一张总览决定独立子图数量；后续局部只是同一原图的放大窗口，不能重复计图。local_caption_grid是从原图彩色图注矩形测出的版面参考。如果存在多行多列图注，逐格核对对应的独立数学图，不得只返回第一幅；同一图的放大窗口不能重复计图。local_colored_graph_candidates是原像素中的彩色顶点与直线候选，必须对照原图核实端点，不得用图名或工具候选凑边。同图不连通分量不能仅因分开就拆图。多图时每图给相对完整原图0..1000的粗bbox，也可附对应layout_panel_ids；不要将每个局部窗口都填成整页bbox。坐标不要求精确。
+第一张总览决定独立子图数量；后续局部只是同一原图的放大窗口，不能重复计图。local_caption_grid是从原图彩色图注矩形测出的版面参考。如果存在多行多列图注，逐格核对对应的独立数学图，不得只返回第一幅；同一图的放大窗口不能重复计图。local_colored_graph_candidates是原像素中的彩色顶点与直线候选。local_dark_disk_summary逐格列出多图页面中经过三种阈值核对的黑色圆点数量，以及图中能沿原像素追到的直线数量下界；必须逐幅对照原图核实。下界不代表总边数，曲线、自环、重边可能额外存在。不能只为满足候选计数、图名或性质而补删点边。同图不连通分量不能仅因分开就拆图。多图时每图给相对完整原图0..1000的粗bbox，也可附对应layout_panel_ids；不要将每个局部窗口都填成整页bbox。坐标不要求精确。
 先清点真实圆点、圆圈或明确顶点，包括孤立点，再沿实际连线读端点。普通交叉、箭头尖和文字不是顶点；边名不能变成节点。无印刷节点名则label=null；e_i也可能是真节点名，须按原图位置判别。local_visual_inventory中的同类圆点须逐个对照原图，可在顶点附marker_id绑定对应候选；若有候选以外的真实点，保留并只为该点附短visual_basis说明具体位置与可见依据。候选可能错漏，不能按候选数、题干、图名、度数或模板补删点边。
 对于能够辨认的子图，请独立清点并给出visible_vertex_count和visible_edge_count，再与vertices、edges逐一核对；确实不能确定时填null并注明疑点。不能为了让两种计数相等而补删图结构，也不能直接把数组长度或工具候选数抄成视觉计数。只输出一份vertices和edges，不逐点逐边重复描述。
 交叉处沿原笔画走，不换线；经过真实顶点才分成不同边。虚线的多个短划是一条边。每条无向边、有向边、自环、重边和反向弧各列一次。方向只按箭头尖确定，不能按编号或布局猜；看不清用unknown。
@@ -39,7 +39,7 @@ uncertainties格式：{"scope":"body|graph|document","graph_id":"图问题填写
 
 LOCAL_REVIEW_PROMPT = r'''你是数学图像的局部复核者。完整原图和所有局部视图来自同一张图。只检查targets明确指出的正文或数学子图，不解题。
 draft是尚待用户确认的读取结果，工具候选和题意规则都是辅助，可能错误。沿原图确认目标图的顶点、连接、箭头、孤立点、自环、重边、权重，完整保留其必要标签/线型/颜色；不从常见图模板或度数反推图片。
-local_marker_candidates是整张原图上的圆点候选，含位置、大小和置信度，也可能混入正文或字形。核对目标子图内形状、大小相近的清晰圆点与draft顶点是否逐一对应，尤其检查较大圆点旁的字母是否实际为边名；有数量差异时重新对照原图确认真实点和连接，不将整页候选总数或某一尺寸组的数量强制作为节点数。匿名真实点保留label=null，不能仅凭e_i等词形删除真正的节点名。
+local_marker_candidates是整张原图上的圆点候选，含位置、大小和置信度，也可能混入正文或字形。local_dark_disk_inventory在多幅图注的版面中逐格提供独立的黑色实心圆点中心和清晰直线候选；必须核对目标子图实际圆点、端点和曲线。直线数量只是下界，不能排除其他弧线、重边或自环。other_graphs_read_only只是同页已有图的暂定读法，不能擅自改写非目标图，也不能用题名推算后直接代替像素核对。核对目标子图内形状、大小相近的清晰圆点与draft顶点是否逐一对应，尤其检查较大圆点旁的字母是否实际为边名；有数量差异时重新对照原图确认真实点和连接，不将整页候选总数或某一尺寸组的数量强制作为节点数。匿名真实点保留label=null，不能仅凭e_i等词形删除真正的节点名。
 若issues指出计数冲突，先重新清点原图实际点与整条连线，不能只补颜色而保留未核实连接。若draft中有visible_vertex_count或visible_edge_count，请对目标子图重新独立清点并在返回的子图中提供这两个字段；不能确定时返回null并明确疑点，不能省略计数字段来消除原有冲突。local_visual_inventory中的圆点候选须逐个对照原图，可用marker_id绑定对应顶点；额外真实点允许保留并附短visual_basis定位依据，不能按候选数凑答案。只返回紧凑vertices/edges，可给独立视觉计数visible_vertex_count/visible_edge_count；仍不能确认则null并列疑点。保留weighted布尔值；方向和权重必须来自原图，不按全图类型补猜。
 targets.document=true时必须对照整张原图及local_caption_grid逐格重读所有独立数学子图，不能只回传draft中已存在的一幅图；若确认有漏图，则按原图顺序补齐。否则只返回targets内已复核的完整子图，保留原graph.id。无需返回未请求的图。题干仅在targets.body=true时返回完整逐字body_text；不能新增原图不存在的问题或补全裁切文字。
 返回格式：{"graphs":[{"id":"G1","name":"原图图注","vertices":[...],"edges":[...]}],"uncertainties":[]}。节点和边结构与主读取相同。已确认修正的问题不留在uncertainties；仍看不清时明确列出scope/graph_id/field/message，保留可用内容，不以空图抹掉整幅结构。仅内部ID或坐标差异不是识别疑点。'''
@@ -191,6 +191,50 @@ def _caption_grid_issues(document, pixel_evidence):
         evidence_source='same_original_rgb_caption_rectangles')]
 
 
+def _grid_dark_disk_issues(document, pixel_evidence):
+    """Independent stable filled-node count and straight-stroke lower bounds.
+
+    Only run when all original caption positions were enumerated. A pixel
+    candidate never adds/deletes a vertex or edge, and missing curve candidates
+    are NEVER treated as proof that the model listed too many edges.
+    """
+    grid = pixel_evidence.get('grid') if isinstance(pixel_evidence, dict) else None
+    inventory = pixel_evidence.get('grid_dark_disks') if isinstance(pixel_evidence, dict) else None
+    if (not isinstance(grid, dict) or grid.get('status') != 'regular_caption_grid'
+            or not isinstance(inventory, dict) or not isinstance(inventory.get('panels'), list)
+            or not isinstance(document, dict) or not isinstance(document.get('graphs'), list)):
+        return []
+    panels, graphs = inventory['panels'], document['graphs']
+    if len(panels) != len(graphs) or len(panels) != grid.get('minimum_captioned_panels'):
+        return []  # Already handled as an incomplete page by caption-grid check.
+    issues = []
+    for index,(panel,graph) in enumerate(zip(panels,graphs),1):
+        if not isinstance(panel,dict) or panel.get('status') != 'measured' or not isinstance(graph,dict):
+            continue
+        gid = str(graph.get('id',f'G{index}'))
+        listed_vertices = graph.get('vertices')
+        listed_edges = graph.get('edges')
+        independent = panel.get('candidate_count')
+        lower_bound = panel.get('straight_edge_lower_bound')
+        if (type(independent) is int and isinstance(listed_vertices,list)
+                and independent != len(listed_vertices)):
+            issues.append(_issue('pixel_disk_vertex_count_conflict',
+                f'该子图原像素中的稳定实心圆点有 {independent} 个，识别表列出 {len(listed_vertices)} 个。'
+                '请对照原图逐点重新核对，不能单纯凑数。',
+                scope='graph',graph_id=gid,field='vertices',
+                pixel_count=independent,listed_count=len(listed_vertices),
+                image_accuracy_certified=False))
+        if (type(lower_bound) is int and isinstance(listed_edges,list)
+                and lower_bound > len(listed_edges)):
+            issues.append(_issue('pixel_straight_edge_lower_bound_conflict',
+                f'该子图至少有 {lower_bound} 条独立的原像素直线连接，识别表只列出 {len(listed_edges)} 条边。'
+                '请逐条核对端点及重边；直线下界不是全部曲线与重边的边数。',
+                scope='graph',graph_id=gid,field='edges',
+                straight_edge_lower_bound=lower_bound,listed_count=len(listed_edges),
+                image_accuracy_certified=False))
+    return issues
+
+
 def _visual_count_issues(document):
     """Reread visually reported counts that disagree with the actual edge/node lists.
 
@@ -300,7 +344,8 @@ def _validate_tool(arguments, *, context):
     issues = (normalized['semantic_issues'] + schema_issues + inspected['issues']
               + required_attributes + unknown_weights + _stroke_inventory_issues(draft)
               + _visual_count_issues(draft)
-              + _caption_grid_issues(draft, context.data.get('pixel_evidence')))
+              + _caption_grid_issues(draft, context.data.get('pixel_evidence'))
+              + _grid_dark_disk_issues(draft, context.data.get('pixel_evidence')))
     if context.data.get('visual_inventory') is not None:
         from graph_visual_inventory import compare_visual_inventory
         issues += compare_visual_inventory(draft, context.data['visual_inventory'])['issues']
@@ -658,7 +703,10 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
     if local_submit is None:
         from graph_local_scheduler import submit_local_bundle
         local_submit = submit_local_bundle
-    local_policy = {'text': True, 'layout': _complex_layout_needed(quick, markers),
+    # A strict 2D grid with original-pixel panel coordinates already covers
+    # figure segmentation; avoid a redundant heavy CPU Layout worker.
+    local_policy = {'text': True, 'layout': _complex_layout_needed(quick, markers)
+                    and not bool(pixel_evidence.get('grid')),
                     'paths': False, 'sknw': False}
     handle = local_submit(raw, budget=budget, quick_layout=quick, initial_geometry=markers,
                           policy=local_policy)
@@ -696,6 +744,14 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
              'local_visual_inventory': _compact_visual_inventory(visual_inventory),
              'local_caption_grid': pixel_evidence.get('grid'),
              'local_colored_graph_candidates': pixel_evidence.get('colored_graphs', [])[:12],
+             'local_dark_disk_summary': {'source': 'same_original_gray_pixels',
+                 'advisory_only': True,
+                 'panels': [{'region_id': r.get('region_id'), 'row': r.get('row'),
+                             'column': r.get('column'),
+                             'vertex_candidates': r.get('candidate_count'),
+                             'straight_edge_lower_bound': r.get('straight_edge_lower_bound'),
+                             'edge_count_is_exact': False, 'status': r.get('status')}
+                            for r in (pixel_evidence.get('grid_dark_disks') or {}).get('panels', [])]},
              'local_ocr_candidates': hints['candidates'], 'local_ocr_policy': hints['policy']},
             main_views['images'], output_tokens=12000, response_identity=False,
             reserve_seconds=12)
@@ -744,7 +800,12 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             local_result.setdefault('tool_audit', []).extend(path_result.get('tool_audit', []))
         from graph_semantic_arrow_views import prepare_panel_views
         from graph_semantic_panel_context import panel_context
-        review_views = copy.deepcopy(views)
+        # Multiple disputed panels in a grid need the same column images as
+        # the initial reader; an overview alone repeatedly merged distinct
+        # operators/graphs. Always retain an original-page anchor.
+        review_views = copy.deepcopy(
+            main_views if pixel_evidence.get('grid') and
+            (targets.get('document') or len(targets['graph_ids']) >= 2) else views)
         for graph in state['draft']['graphs']:
             if not isinstance(graph, dict) or str(graph.get('id')) not in targets['graph_ids']:
                 continue
@@ -765,6 +826,10 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
                  'local_visual_inventory': visual_inventory,
                  'local_caption_grid': pixel_evidence.get('grid'),
                  'local_colored_graph_candidates': pixel_evidence.get('colored_graphs', [])[:12],
+                 'local_dark_disk_inventory': pixel_evidence.get('grid_dark_disks'),
+                 'other_graphs_read_only': [
+                     g for g in state['draft']['graphs'] if isinstance(g,dict)
+                     and str(g.get('id')) not in targets['graph_ids']][:16],
                  'local_ocr_candidates': hints['candidates'],
                  'local_connection_candidates': project_connection_hints(local_result.get('geometry', {}).get('graphs', [])),
                  'question_reference': state.get('reference', {})},
@@ -866,6 +931,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             'local_review': state.get('local_review', {}),
             'pixel_evidence': {'grid': copy.deepcopy(pixel_evidence.get('grid')),
                                'colored_graphs': copy.deepcopy(pixel_evidence.get('colored_graphs', [])),
+                               'grid_dark_disks': copy.deepcopy(pixel_evidence.get('grid_dark_disks')),
                                'repairs': copy.deepcopy(pixel_repairs),
                                'image_accuracy_certified': False},
             'question_reference': state.get('reference', {}),
