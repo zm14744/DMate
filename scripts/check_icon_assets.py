@@ -4,7 +4,7 @@ import struct
 import io
 from pathlib import Path
 from PIL import Image, ImageChops
-from generate_icons import draw_mark, svg_mark, STROKE, TAB_STROKE, FIREFOX_TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK, BING_STROKES, BING_FACETS
+from generate_icons import draw_mark, STROKE, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK, BING_STROKES, BING_FACETS
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "static" / "icons"
@@ -89,15 +89,9 @@ def main():
     for px in (38, 76, 114):
         assert f"/static/icons/dmate-brand-desktop-v41-{px}.png" in template
 
-    # Firefox desktop keeps pure white paths / black tile, and reduces only
-    # their line thickness. The Safari, Bing and mobile sources are unchanged.
-    firefox_icon = ICONS / "dmate-firefox-tab-thin-v1.svg"
-    assert FIREFOX_TAB_STROKE == 42 < SAFARI_TAB_STROKE == 78
-    assert firefox_icon.read_text(encoding="utf-8") == svg_mark(
-        "#000", stroke=FIREFOX_TAB_STROKE, corner_radius=180
-    )
-    assert 'stroke="#fff"' in firefox_icon.read_text(encoding="utf-8")
-    assert 'fill="none"' in firefox_icon.read_text(encoding="utf-8")
+    # Both browsers share all three assets (not a second SVG with an altered
+    # stroke or an opaque tile); Firefox cannot accidentally use the old icon.
+    assert not (ICONS / "dmate-firefox-tab-thin-v1.svg").exists()
 
     # macOS light mode preserves a black tile; dark mode uses no tile at all.
     for theme, background, foreground in (
@@ -290,9 +284,15 @@ def main():
         assert f'<link rel="icon" type="image/png" sizes="{pixel}x{pixel}" href="/favicon-{pixel}.png?v=dmate-bing-v40-20261020">' in html
     assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v36-64.png?v=dmate-safari-v36-20261019">' in html
     assert 'is_desktop_firefox=is_desktop_firefox,' in app_text
-    assert '{% elif is_desktop_firefox %}' in html
-    assert 'dmate-firefox-tab-thin-v1.svg?v=dmate-firefox-tab-20261028' in html
-    assert html.index('{% elif is_desktop_firefox %}') < html.index('{% elif is_windows_browser %}')
+    assert '{% elif is_desktop_firefox or is_windows_browser %}' in html
+    assert '{% elif is_desktop_firefox %}' not in html
+    favicon_block = html.split('{% elif is_desktop_firefox or is_windows_browser %}', 1)[1].split('{% else %}', 1)[0]
+    assert favicon_block.count('rel="icon"') == 2  # SVG and 32px PNG
+    assert 'rel="shortcut icon"' in favicon_block  # same ICO fallback as Edge
+    assert '/static/icons/dmate-transparent.svg?v=dmate-win-tab-v21-20261019' in favicon_block
+    assert '/static/icons/favicon-32.png?v=dmate-win-tab-v21-20261019' in favicon_block
+    assert '/static/icons/favicon.ico?v=dmate-win-tab-v21-20261019' in favicon_block
+    assert 'dmate-firefox-tab-thin-v1.svg' not in html
     assert 'document.head.appendChild(icon)' not in html
     assert 'dmate-safari-" + theme' not in html
     assert '<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">' in html
