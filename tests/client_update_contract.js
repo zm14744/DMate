@@ -11,6 +11,7 @@ assert.equal(update.compareVersions('unexpected','1.0.1'),null);
 const androidOld = update.detectInstalledClient('Mozilla/5.0 DMateAndroid/1.0.1',{isAndroidApp:true},'Linux arm');
 assert.equal(androidOld.kind,'android');
 assert.equal(update.selectPublishedUpdate(androidOld,manifest).version,'1.0.3');
+assert.equal(update.selectPublishedUpdate(androidOld,manifest).sha256,null);
 const androidPrior = update.detectInstalledClient('Mozilla/5.0 DMateAndroid/1.0.2',{isAndroidApp:true},'Linux arm');
 assert.equal(update.selectPublishedUpdate(androidPrior,manifest).version,'1.0.3');
 const androidCurrent = update.detectInstalledClient('Mozilla/5.0 DMateAndroid/1.0.3',{isAndroidApp:true},'Linux arm');

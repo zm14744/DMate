@@ -20,6 +20,13 @@ class AndroidUploadUiTests(unittest.TestCase):
         self.assertIn("launchImagePicker(true)", self.java)
         self.assertIn("Intent.EXTRA_ALLOW_MULTIPLE", self.java)
         self.assertIn("callback.onReceiveValue(result)", self.java)
+        native = (ROOT / "android/app/src/main/java/app/dmate/client/NativeUpdateManager.java").read_text()
+        manifest = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text()
+        self.assertIn("DownloadManager.Request", native)
+        self.assertIn('MessageDigest.getInstance("SHA-256")', native)
+        self.assertIn("FileProvider.getUriForFile", native)
+        self.assertIn("canRequestPackageInstalls()", native)
+        self.assertIn('REQUEST_INSTALL_PACKAGES', manifest)
         self.assertNotIn("FileChooserParams.parseResult(resultCode, data)", self.java)
         self.assertIn("filePathCallback.onReceiveValue(null)", self.java)
 

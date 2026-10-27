@@ -60,7 +60,51 @@
         } catch (_err) {
             return null;
         }
-        return { version:item.version, url:item.url, platform:client.platform };
+        const sha256 = client.kind === 'android'
+            && typeof item.sha256 === 'string' && /^[a-fA-F0-9]{64}$/.test(item.sha256)
+            ? item.sha256.toLowerCase() : null;
+        return { version:item.version, url:item.url, sha256, platform:client.platform };
+    }
+    // Newer APKs have an origin-restricted native download bridge.
+    // Older APKs still use the official browser-download path.
+    function downloadInsideAndroid(update) {
+        const bridge = root.DMateUpdate;
+        if (!bridge?.postMessage || !update.sha256) return Promise.resolve(null);
+        const id = 'native-update-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+        return new Promise(resolve => {
+            let settled = false;
+            let previous;
+            let timer;
+            const onMessage = event => {
+                let response;
+                try { response = JSON.parse(event.data); } catch (_err) { return; }
+                if (response?.id === id) finish(response);
+            };
+            const chained = event => {
+                onMessage(event);
+                if (typeof previous === 'function') previous(event);
+            };
+            const finish = result => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                bridge.removeEventListener?.('message', onMessage);
+                if (bridge.onmessage === chained) bridge.onmessage = previous;
+                resolve(result);
+            };
+            previous = bridge.onmessage;
+            if (typeof bridge.addEventListener === 'function') {
+                bridge.addEventListener('message', onMessage);
+            } else bridge.onmessage = chained;
+            timer = setTimeout(() => finish({ ok:false, message:'更新请求超时' }), 15000);
+            try {
+                bridge.postMessage(JSON.stringify({
+                    id, url:update.url, version:update.version, sha256:update.sha256
+                }));
+            } catch (_err) {
+                finish({ ok:false, message:'无法启动应用内下载' });
+            }
+        });
     }
     function createButton(doc, label, handler, primary) {
         const button = doc.createElement('button');
@@ -93,10 +137,16 @@
                 try { root.sessionStorage.setItem(key, '1'); } catch (_err) {}
                 box.remove();
             }, false),
-            createButton(doc, '下载更新', () => {
+            createButton(doc, '下载更新', async () => {
                 if (client.kind === 'android') {
-                    // Android's host WebView intercepts non-DMate navigation
-                    // and opens the OS browser. Android verifies APK signatures.
+                    if (root.DMateUpdate?.postMessage && update.sha256) {
+                        description.textContent = '正在请求系统后台下载…';
+                        const result = await downloadInsideAndroid(update);
+                        description.textContent = String(result?.message ||
+                            '应用内更新不可用，请使用下方官方链接');
+                        return;
+                    }
+                    // Legacy APKs cannot gain a new native bridge via web code.
                     root.location.assign(update.url);
                 } else {
                     // Remote Tauri webviews may block popups; keep copyable link.

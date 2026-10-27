@@ -13,11 +13,11 @@ android {
         applicationId 'app.dmate.client'
         minSdk 26
         targetSdk 36
-        versionCode 4
-        versionName '1.0.3'
+        versionCode 5
+        versionName '1.0.4'
 
         buildConfigField 'String', 'DMATE_URL', '"https://dmate.zeabur.app/"'
-        buildConfigField 'String', 'DMATE_USER_AGENT', '"DMateAndroid/1.0.3"'
+        buildConfigField 'String', 'DMATE_USER_AGENT', '"DMateAndroid/1.0.4"'
     }
 
     buildFeatures {
@@ -58,4 +58,5 @@ android {
 // Origin-bound JavaScript-to-native image-saving bridge.
 dependencies {
     implementation "androidx.webkit:webkit:1.16.0"
+    implementation "androidx.core:core:1.16.0"
 }
