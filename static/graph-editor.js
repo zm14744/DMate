@@ -285,7 +285,8 @@
                     }
                 });
                 else overlay.refresh();
-                workspace.append(buildSelectedProperties(graph));
+                const properties = buildSelectedProperties(graph);
+                if (properties.childElementCount) workspace.append(properties);
             } else {
                 const preview = element('section', 'dge-original'); preview.append(element('h3', '', '原图'));
                 if (typeof options.originalUrl === 'string') {
