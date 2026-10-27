@@ -59,7 +59,7 @@ jobs:
           print('Required test font:', font.path)
           PY
       - run: python -m pytest -q tests
-      - run: node --check static/script.js && node tests/graph_display_regression.js && node tests/graph_nextgen_display.js
+      - run: node --check static/graph-editor-model.js && node --check static/graph-editor.js && node --check static/script.js && node tests/graph_display_regression.js && node tests/graph_nextgen_display.js
       - name: Prepare pinned public browser scripts with TLS verification
         run: |
           python - <<'PY'
