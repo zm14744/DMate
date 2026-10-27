@@ -572,6 +572,35 @@ def test_four_uploads_have_independent_identity_results_and_budget(prepared):
     assert all(handle.closed for handle in handles)
 
 
+
+def test_local_review_keeps_only_same_identity_and_same_topology_drawing_geometry():
+    previous = document()
+    source = previous['graphs'][0]
+    source['bbox'] = [.1, .2, .9, .8]
+    source['vertices'][0].update(x=.2, y=.3)
+    source['vertices'][1].update(x=.8, y=.7)
+    source['edges'][0]['path'] = [[.2, .3], [.4, .5], [.8, .7]]
+    reviewed = copy.deepcopy(source)
+    reviewed.pop('bbox')
+    for node in reviewed['vertices']:
+        node.pop('x', None)
+        node.pop('y', None)
+    for edge in reviewed['edges']:
+        edge.pop('path', None)
+    reviewed['edges'][1]['to'] = 'z'  # A changed endpoint cannot inherit prior geometry.
+    amended, issues = fast._merge_local_review(previous, {
+        'graphs': [reviewed], 'uncertainties': []
+    }, {'graph_ids': ['G1'], 'document': False, 'body': False})
+    graph = amended['graphs'][0]
+    assert graph['bbox'] == [.1, .2, .9, .8]
+    assert graph['vertices'][0]['x'] == .2
+    assert graph['vertices'][1]['y'] == .7
+    assert graph['edges'][0]['path'] == [[.2, .3], [.4, .5], [.8, .7]]
+    assert 'path' not in graph['edges'][1]
+    assert amended['graphs'][1] == previous['graphs'][1]
+    assert issues == []
+
+
 def test_whole_document_dispute_can_correct_panel_inventory_without_old_graph_id_requirements():
     initial = document()
     initial['uncertainties'] = [{'scope': 'document', 'message': '分图边界存疑'}]
