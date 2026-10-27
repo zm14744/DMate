@@ -2965,6 +2965,43 @@ def confirm_graph_document():
     return response
 
 
+@app.route("/graph/describe", methods=["POST"])
+def describe_confirmed_graph_document():
+    """Optional appearance wording only; never changes confirmed math data."""
+    from graph_confirmation import (ConfirmationError, confirmation_owner,
+                                    resolve_confirmed_context, validate_document,
+                                    document_digest)
+    from graph_description import describe_confirmed_drawing
+    if request.content_length is not None and request.content_length > 500_000:
+        return jsonify({"error": "图形描述数据过大", "code": "description_too_large"}), 413
+    if not _check_rate_limit(_get_client_ip(), "graph_describe"):
+        return jsonify({"error": "图形描述请求过于频繁", "code": "rate_limited"}), 429
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "缺少已确认的图形", "code": "invalid_document"}), 400
+    try:
+        owner = confirmation_owner()
+        context = resolve_confirmed_context(owner, payload.get("semantic_context"))
+        if context is None:
+            raise ConfirmationError("confirmation_required", "请先确认图形结构。", status=409)
+        drawing = payload.get("drawing_document")
+        semantic, _ = validate_document(drawing)
+        if document_digest(semantic) != context["document_sha256"]:
+            raise ConfirmationError("confirmation_changed", "图形已修改，请重新确认。", status=409)
+    except ConfirmationError as exc:
+        return jsonify({"error": exc.message, "code": exc.code, "issues": exc.issues}), exc.status
+    except (OSError, ValueError, TypeError):
+        return jsonify({"error": "已确认图形无法核验", "code": "confirmation_unavailable"}), 503
+    try:
+        answer = describe_confirmed_drawing(drawing)
+    except Exception as exc:
+        print(f"图形外观描述未完成：{type(exc).__name__}")
+        answer = {"status": "unavailable", "descriptions": {}}
+    response = jsonify(answer)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     ip = _get_client_ip()
