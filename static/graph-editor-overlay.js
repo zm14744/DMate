@@ -1,0 +1,96 @@
+(function(root){
+'use strict';
+const NS='http://www.w3.org/2000/svg',clamp=x=>Math.max(0,Math.min(1,x)),unit=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1;
+const E=(d,t,a={})=>{const n=d.createElementNS(NS,t);for(const [k,v] of Object.entries(a))n.setAttribute(k,String(v));return n;};
+function mount(host,o){
+ const d=host.ownerDocument,s=o.state||{mode:'select',zoom:100,visible:true,start:null};
+ let w=1000,h=1000,active=null,ghost=null,base=null;const pointers=new Map();
+ const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),hint=d.createElement('p'),status=d.createElement('span');
+ root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');hint.className='dge-overlay-hint';status.className='dge-overlay-status';
+ stage.append(image,svg);scroll.append(stage);root.append(bar,scroll,hint,status);host.append(root);
+ const button=(label,key,fn)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',()=>{if(!o.disabled?.())fn();});bar.append(b);return b;};
+ for(const [key,label] of [['select','选择移动'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']]){
+  button(label,key,()=>{s.mode=key;s.start=null;draw();});
+ }
+ const select=(label,entries,type)=>{const n=d.createElement('select');n.setAttribute('aria-label',label);for(const [v,t] of entries){const p=d.createElement('option');p.value=v;p.textContent=t;n.append(p);}n.addEventListener('change',()=>{const g=o.graph();if(g&&n.value!=='unknown')change(()=>o.model.setGraphType(g.id,type,n.value==='true'));});bar.append(n);return n;};
+ const dir=select('图形方向',[['unknown','方向待核对'],['false','无向图'],['true','有向图']],'directed'),weight=select('图形权值',[['unknown','权值待核对'],['false','无权图'],['true','带权图']],'weighted');
+ const visible=button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();});
+ const zoom=x=>{s.zoom=Math.max(100,Math.min(400,Math.round(x)));stage.style.width=s.zoom+'%';value.textContent=s.zoom+'%';};
+ button('－','zoom-out',()=>zoom(s.zoom/1.25)).setAttribute('aria-label','缩小原图');
+ const value=d.createElement('span');value.className='dge-overlay-zoom';bar.append(value);
+ button('＋','zoom-in',()=>zoom(s.zoom*1.25)).setAttribute('aria-label','放大原图');
+ button('适应','zoom-fit',()=>zoom(100));
+ const change=fn=>{try{fn();o.changed?.();draw();}catch(e){status.textContent=e?.message||'修改失败';}};
+ const pos=(v,i,g)=>{
+  if(ghost?.vertex===v.id)return ghost.pos;
+  if(unit(v.x)&&unit(v.y))return [v.x,v.y];
+  const b=g.bbox?.length===4?g.bbox:[0,0,1,1],a=i*Math.PI*2/Math.max(1,g.vertices.length)-Math.PI/2;
+  return [clamp((b[0]+b[2])/2+(b[2]-b[0])*.34*Math.cos(a)),clamp((b[1]+b[3])/2+(b[3]-b[1])*.34*Math.sin(a))];
+ };
+ const px=p=>[p[0]*w,p[1]*h],mouse=e=>{const r=svg.getBoundingClientRect();return [clamp((e.clientX-r.left)/Math.max(1,r.width)),clamp((e.clientY-r.top)/Math.max(1,r.height))];};
+ function draw(){
+  const g=o.graph();dir.value=typeof g?.directed==='boolean'?String(g.directed):'unknown';weight.value=typeof g?.weighted==='boolean'?String(g.weighted):'unknown';visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
+  for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
+  hint.textContent=s.mode==='vertex'?'点击原图添加顶点':s.mode==='edge'?'依次点击两个顶点连边，同一点两次可建自环':s.mode==='bounds'?'拖动鼠标框选当前图形':'拖动顶点校准位置，点击边编辑属性';
+  svg.replaceChildren();if(!g||!s.visible)return;
+  const radius=Math.max(5,Math.min(w,h)*.008),defs=E(d,'defs'),mark=E(d,'marker',{id:o.instance+'-arrow',viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto'});mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill:'currentColor'}));defs.append(mark);svg.append(defs);
+  const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
+  if(g.bbox?.length===4)svg.append(E(d,'rect',{x:g.bbox[0]*w,y:g.bbox[1]*h,width:(g.bbox[2]-g.bbox[0])*w,height:(g.bbox[3]-g.bbox[1])*h,class:'dge-overlay-bbox'}));
+  const pairs=new Map();for(const e of g.edges){const key=[e.from,e.to].sort().join('/');if(!pairs.has(key))pairs.set(key,[]);pairs.get(key).push(e);}
+  for(const edges of pairs.values())for(const [i,e] of edges.entries()){
+   if(!coords.has(e.from)||!coords.has(e.to))continue;
+   const a=px(coords.get(e.from)),b=px(coords.get(e.to)),pts=Array.isArray(e.path)&&e.path.length>=2&&e.path.every(p=>Array.isArray(p)&&p.length===2&&p.every(unit))?e.path:null;
+   let line,center;
+   if(ghost?.edge===e.id){center=px(ghost.pos);line='M '+a.join(' ')+' L '+center.join(' ')+' L '+b.join(' ');}
+   else if(pts){const ps=pts.map(px);ps[0]=a;ps[ps.length-1]=b;center=ps[Math.floor(ps.length/2)];line='M '+ps.map(p=>p.join(' ')).join(' L ');}
+   else if(e.from===e.to){const r=radius*(5+i*2);line='M '+(a[0]-r*.3)+' '+(a[1]-r*.3)+' C '+(a[0]-2*r)+' '+(a[1]-2*r)+' '+(a[0]+2*r)+' '+(a[1]-2*r)+' '+(a[0]+r*.3)+' '+(a[1]-r*.3);center=[a[0],a[1]-r*1.5];}
+   else{const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2],len=Math.hypot(b[0]-a[0],b[1]-a[1])||1,k=(i-(edges.length-1)/2)*radius*3,c=[mid[0]-(b[1]-a[1])*k/len,mid[1]+(b[0]-a[0])*k/len];center=[(mid[0]+c[0])/2,(mid[1]+c[1])/2];line='M '+a.join(' ')+' Q '+c.join(' ')+' '+b.join(' ');}
+   const chosen=o.edgeSelected?.()===e.id,group=E(d,'g',{'data-edge-id':e.id,class:'dge-overlay-edge'+(chosen?' is-selected':'')+(e.direction==='unknown'?' is-uncertain':'')});group.append(E(d,'path',{d:line,class:'dge-overlay-hit'}));
+   const att={d:line,class:'dge-overlay-stroke'};if(e.direction==='forward')att['marker-end']='url(#'+o.instance+'-arrow)';if(e.style==='dashed')att['stroke-dasharray']='9 6';if(e.style==='dotted')att['stroke-dasharray']='2 5';group.append(E(d,'path',att));
+   const label=[e.edge_label,e.weight==null?'':String(e.weight)].filter(Boolean).join(' · ');if(label){const t=E(d,'text',{x:center[0],y:center[1]-radius,class:'dge-overlay-label','text-anchor':'middle'});t.textContent=label;group.append(t);}
+   if(chosen&&e.from!==e.to&&s.mode==='select')group.append(E(d,'circle',{cx:center[0],cy:center[1],r:radius*1.1,class:'dge-overlay-handle','data-handle-id':e.id}));svg.append(group);
+  }
+  for(const [i,v] of g.vertices.entries()){
+   const p=px(coords.get(v.id)),gNode=E(d,'g',{'data-vertex-id':v.id,class:'dge-overlay-node'+(!unit(v.x)||!unit(v.y)?' is-estimated':'')+(o.nodeSelected?.().has(v.id)?' is-selected':'')});
+   gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*2.6,class:'dge-overlay-node-hit'}));gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius,class:'dge-overlay-dot'}));
+   const t=E(d,'text',{x:p[0]+radius*1.25,y:p[1]-radius*1.1,class:'dge-overlay-label'});t.textContent=v.label||v.display_label||'未命名'+(i+1);gNode.append(t);svg.append(gNode);
+  }
+  if(s.start&&coords.has(s.start)){const p=px(coords.get(s.start));svg.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*1.8,class:'dge-overlay-pending'}));}
+  if(active?.kind==='bounds'){const a=active.start,b=active.end;svg.append(E(d,'rect',{x:Math.min(a[0],b[0])*w,y:Math.min(a[1],b[1])*h,width:Math.abs(a[0]-b[0])*w,height:Math.abs(a[1]-b[1])*h,class:'dge-overlay-selection'}));}
+ }
+ svg.addEventListener('pointerdown',e=>{
+  if(o.disabled?.()||!s.visible||!o.graph())return;
+  pointers.set(e.pointerId,[e.clientX,e.clientY]);
+  if(pointers.size===2){const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;return;}if(pointers.size>2)return;
+  const node=e.target.closest('[data-vertex-id]')?.dataset.vertexId,edge=e.target.closest('[data-edge-id]')?.dataset.edgeId,handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
+  if(s.mode==='vertex'&&!node){change(()=>o.model.addVertex(g.id,'',...p));return;}
+  if(s.mode==='edge'&&node){if(!s.start){s.start=node;draw();}else{const from=s.start;s.start=null;change(()=>o.model.addEdge(g.id,{from,to:node,direction:g.directed===true?'forward':'undirected'}));}return;}
+  if(s.mode==='bounds'&&!node&&!edge)active={kind:'bounds',pointer:e.pointerId,start:p,end:p};
+  else if(s.mode==='select'&&handle)active={kind:'handle',pointer:e.pointerId,id:handle,start:p,end:p};
+  else if(s.mode==='select'&&node)active={kind:'node',pointer:e.pointerId,id:node,start:p,end:p};
+  else if(s.mode==='select'&&edge)o.selectEdge?.(edge);
+  if(active){e.preventDefault();svg.setPointerCapture?.(e.pointerId);}
+ });
+ svg.addEventListener('pointermove',e=>{
+  if(pointers.has(e.pointerId))pointers.set(e.pointerId,[e.clientX,e.clientY]);
+  if(base&&pointers.size>=2){const a=[...pointers.values()],distance=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(base.distance>4)zoom(base.zoom*distance/base.distance);return;}
+  if(!active||active.pointer!==e.pointerId)return;
+  active.end=mouse(e);ghost=active.kind==='node'?{vertex:active.id,pos:active.end}:active.kind==='handle'?{edge:active.id,pos:active.end}:null;draw();
+ });
+ function release(e,cancel=false){
+  pointers.delete(e.pointerId);if(pointers.size<2)base=null;
+  if(!active||active.pointer!==e.pointerId)return;const op=active;active=null;ghost=null;const g=o.graph();
+  if(!cancel&&g){
+   if(op.kind==='node'){if(Math.hypot(op.start[0]-op.end[0],op.start[1]-op.end[1])>.004)change(()=>o.model.moveVertex(g.id,op.id,...op.end));o.selectNode?.(op.id);}
+   if(op.kind==='bounds'){const a=op.start,b=op.end,box=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];if(box[2]-box[0]>.01&&box[3]-box[1]>.01)change(()=>o.model.setGraphBounds(g.id,box));}
+   if(op.kind==='handle'){const edge=g.edges.find(x=>x.id===op.id),a=g.vertices.find(x=>x.id===edge?.from),b=g.vertices.find(x=>x.id===edge?.to);if(a&&b&&unit(a.x)&&unit(a.y)&&unit(b.x)&&unit(b.y))change(()=>o.model.setEdgePath(g.id,op.id,[[a.x,a.y],op.end,[b.x,b.y]]));else status.textContent='请先校准这条边的两个端点';}
+  }draw();
+ }
+ svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
+ scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));},{passive:false});
+ image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;svg.setAttribute('viewBox','0 0 '+w+' '+h);draw();};
+ image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
+ return {refresh:draw,state:s,destroy(){image.onload=null;image.onerror=null;host.replaceChildren();}};
+}
+root.DMateGraphOverlay={mount};if(typeof module!=='undefined'&&module.exports)module.exports={mount};
+})(typeof window!=='undefined'?window:globalThis);
