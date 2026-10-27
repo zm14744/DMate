@@ -167,6 +167,7 @@ def browser_editor():
         page.route('**/*', lambda route: (external.append(route.request.url), route.abort()))
         page.set_content('<main id="editor"></main>')
         page.add_style_tag(content=(ROOT/'static/graph-editor.css').read_text())
+        page.add_script_tag(content=(ROOT/'static/graph-editor-model.js').read_text())
         page.add_script_tag(content=(ROOT/'static/graph-editor.js').read_text())
         page.evaluate("""value => {
             window.changes=[];window.confirmations=[];window.cancelled=0;window.failSave=false;
@@ -252,3 +253,27 @@ def test_real_browser_mobile_layout_and_two_step_delete(browser_editor):
     page.get_by_role('button', name='撤销', exact=True).click()
     assert page.evaluate('instance.getDocument().graphs[0].vertices.length') == 3
     assert page.evaluate('instance.getDocument().graphs[0].edges.length') == 1
+
+
+def test_svg_editor_and_data_model_share_the_same_operations():
+    if not NODE:
+        pytest.skip('Node is required to verify graph editor exports')
+    script = """
+const model = require('./static/graph-editor-model.js');
+const editor = require('./static/graph-editor.js');
+if (editor.createModel !== model.createModel ||
+    editor.validateDocument !== model.validateDocument ||
+    editor.groupEdges !== model.groupEdges) process.exit(3);
+const doc = {body_text:'check', graphs:[{
+    id:'G1', vertices:[{id:'a',label:null},{id:'b',label:'B'}],
+    edges:[{id:'e1',from:'a',to:'b',direction:'forward',weight:0}]
+}]};
+const state = editor.createModel(doc);
+state.addEdge('G1', {from:'b',to:'a',direction:'forward'});
+if (state.validate().length || state.getDocument().graphs[0].edges.length !== 2) process.exit(4);
+state.undo();
+if (state.getDocument().graphs[0].edges.length !== 1) process.exit(5);
+"""
+    process = subprocess.run([NODE, '-e', script], cwd=ROOT, capture_output=True,
+                             text=True, timeout=15)
+    assert process.returncode == 0, process.stderr or process.stdout
