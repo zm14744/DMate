@@ -73,11 +73,13 @@ jobs:
             tests/test_graph_overlay.py \
             tests/test_graph_confirmation.py \
             tests/test_graph_description.py \
+            tests/test_graph_manual_regions.py \
             tests/test_graph_semantic_schema.py \
             tests/test_evidence_frontend_contract.py::test_public_projection_preserves_atomic_edges_but_is_not_a_drawing_api \
             tests/test_graph_first_pass_ui.py::test_exact_rendering_contract_checks_every_field_and_panel \
             tests/test_semantic_chat_snapshot_frontend.py::test_snapshot_whitelist_strips_auxiliary_fields_without_changing_instances \
-            tests/test_graph_fast_pipeline.py::test_local_review_keeps_only_same_identity_and_same_topology_drawing_geometry
+            tests/test_graph_fast_pipeline.py::test_local_review_keeps_only_same_identity_and_same_topology_drawing_geometry \
+            tests/test_ocr_application_contract.py::test_manual_graph_upload_registers_source_without_any_vision_or_ocr_call
       - name: Graph JavaScript syntax and compact render tests
         run: |
           node --check static/graph-editor-model.js

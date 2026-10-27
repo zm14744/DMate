@@ -44,11 +44,15 @@ def canvas_page():
                      "graph-editor-overlay.js", "graph-editor.js"):
             page.add_script_tag(content=(ROOT / "static" / name).read_text())
         page.evaluate("""args => {
-            window.confirmed = []; window.changed = [];
+            window.confirmed = []; window.changed = []; window.textAreas = [];
             window.instance = DMateGraphEditor.mount(document.getElementById('editor'), {
                 originalUrl: args.url, document: args.sample,
                 onChange: document => changed.push(document),
-                onConfirm: async document => confirmed.push(document)
+                onConfirm: async document => confirmed.push(document),
+                onRecognizeText: async polygon => {
+                    textAreas.push(polygon);
+                    return '框选文字';
+                }
             });
         }""", {"url": data_url, "sample": sample})
         page.wait_for_function("document.querySelector('.dge-overlay-image').naturalWidth===900")
@@ -152,3 +156,47 @@ def test_coarse_pointer_has_real_touch_targets_on_phone(canvas_page):
     assert hit is not None and hit["width"] >= 40, hit
     assert hit["height"] >= 40
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 2")
+
+def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
+    page = canvas_page
+    page.get_by_label("选区方式").select_option("graph_poly")
+    bounds = page.locator(".dge-overlay-svg").bounding_box()
+    assert bounds
+    for x, y in ((.08, .12), (.86, .1), (.93, .91), (.08, .89)):
+        page.mouse.click(bounds["x"] + bounds["width"]*x,
+                         bounds["y"] + bounds["height"]*y)
+    assert page.get_by_role("button", name="完成轮廓").is_enabled()
+    page.get_by_role("button", name="完成轮廓").click()
+    polygon = page.evaluate("instance.getDocument().graphs[0].region_polygon")
+    assert len(polygon) == 4
+    assert polygon[0] == pytest.approx([.08, .12], abs=.005)
+    assert page.locator(".dge-overlay-polygon").count() == 1
+    page.get_by_role("button", name="撤销", exact=True).click()
+    assert "region_polygon" not in page.evaluate("instance.getDocument().graphs[0]")
+
+
+def test_user_text_rectangle_and_diy_polygon_feed_only_selected_area(canvas_page):
+    page = canvas_page
+    bounds = page.locator(".dge-overlay-svg").bounding_box()
+    assert bounds
+    page.get_by_label("选区方式").select_option("text_rect")
+    page.mouse.move(bounds["x"] + bounds["width"]*.08,
+                    bounds["y"] + bounds["height"]*.05)
+    page.mouse.down()
+    page.mouse.move(bounds["x"] + bounds["width"]*.6,
+                    bounds["y"] + bounds["height"]*.18, steps=7)
+    page.mouse.up()
+    page.get_by_role("button", name="识别所选文字").click()
+    page.wait_for_function("textAreas.length===1")
+    assert len(page.evaluate("textAreas[0]")) == 4
+    assert "框选文字" in page.evaluate("instance.getDocument().body_text")
+    page.get_by_label("选区方式").select_option("text_poly")
+    bounds = page.locator(".dge-overlay-svg").bounding_box()
+    for x, y in ((.08, .07), (.9, .06), (.55, .15)):
+        page.mouse.click(bounds["x"] + bounds["width"]*x,
+                         bounds["y"] + bounds["height"]*y)
+    page.get_by_role("button", name="完成轮廓").click()
+    page.get_by_role("button", name="识别所选文字").click()
+    page.wait_for_function("textAreas.length===2")
+    assert len(page.evaluate("textAreas[1]")) == 3
+    assert page.evaluate("instance.getDocument().body_text").count("框选文字") == 2
