@@ -1,16 +1,15 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DMate · 图形核对 V1 本地演示</title>
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DMate | 手动图形描绘 V1</title>
 <style>
-:root{color-scheme:light;--surface-0:#fff;--surface-1:#fff;--surface-2:#f7f7f8;--surface-3:#eef0f3;--surface-4:#dfe4e9;
---text-primary:#172033;--text-subtle:#667085;--border-strong:#d8dde4;--accent:#2463b2;--accent-bg:#e9f1fa}
-body{margin:0;padding:0 16px 40px;font:14px/1.55 Arial,"Microsoft YaHei",sans-serif;background:#f7f7f8;color:var(--text-primary)}
-header{max-width:1240px;margin:22px auto 16px;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
-header strong{font-size:20px}header span{color:#667085}
-main{max-width:1240px;margin:auto;padding:16px;border:1px solid #d8dde4;border-radius:14px;background:#fff}
-#save-status{max-width:1240px;margin:12px auto;color:#4c596d;font-size:13px}
-#confirmed-result{white-space:pre-wrap;font:14px/1.8 Arial,"Microsoft YaHei",sans-serif;max-width:1240px;margin:12px auto;padding:12px 16px;border:1px solid #d8dde4;border-radius:10px;background:#fff}
-#confirmed-result:empty{display:none}
-@media(max-width:600px){header{margin-top:14px}main{padding:9px}body{padding:0 7px 24px}}
+:root{--surface-0:#fff;--surface-1:#fff;--surface-2:#f7f7f8;--surface-3:#eff0f2;--surface-4:#e5e7eb;--text-primary:#202631;--text-subtle:#677180;--border-strong:#d5d9df;--accent:#2463b2;--accent-bg:#eaf1f9}
+*{box-sizing:border-box}body{margin:0;padding:0 12px 40px;background:#f7f7f8;color:var(--text-primary);font:14px/1.6 Arial,"Microsoft YaHei",sans-serif}
+header,#note,#result,main{max-width:1240px;margin-left:auto;margin-right:auto}header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:22px;margin-bottom:14px}
+header strong{font-size:20px}header span{color:var(--text-subtle);font-size:12px}
+main{padding:13px;border:1px solid var(--border-strong);border-radius:12px;background:#fff}
+#note,#result{border:1px solid var(--border-strong);border-radius:10px;background:#fff;padding:10px 14px;margin-top:10px;font-size:13px}
+#result{white-space:pre-wrap;line-height:1.8}#result:empty{display:none}
+@media(max-width:600px){body{padding:0 6px 22px}main{padding:7px}header{margin-top:9px}}
 .dmate-graph-editor { --dge-border:var(--border-strong,#cbd5e1); --dge-surface:var(--surface-1,#f8fafc); --dge-text:var(--text-primary,#172033); color:var(--dge-text); font:inherit; }
 .dmate-graph-editor * { box-sizing:border-box; }
 .dmate-graph-editor h3 { font-size:1rem; margin:0 0 12px; }
@@ -157,10 +156,19 @@ main{max-width:1240px;margin:auto;padding:16px;border:1px solid #d8dde4;border-r
 .dge-overlay-svg[data-mode="pan"]{cursor:grab}
 .dge-overlay-node:active,.dge-overlay-svg[data-mode="pan"]:active{cursor:grabbing}
 
-</style></head>
-<body><header><strong>DMate · 图形核对</strong><span>V1 独立体验页面 · 离线运行</span></header>
-<main id="editor"></main><p id="save-status">这是自带示例图的真实编辑器，本演示不调用 AI、不上传图片、不修改 GitHub 或线上数据。关闭页面后修改不会保留。</p>
-<pre id="confirmed-result"></pre>
+/* Minimal user-selected polygon and text regions, shared source coordinates. */
+.dge-overlay-polygon{fill:rgba(37,99,235,.045);stroke:var(--accent,#2463b2);stroke-width:2;stroke-dasharray:7 5;pointer-events:none}
+.dge-overlay-polygon-draft{fill:rgba(37,99,235,.035);stroke:var(--accent,#2463b2);stroke-width:2.4;stroke-dasharray:6 4;pointer-events:none}
+.dge-overlay-polygon-draft.is-text{fill:rgba(130,130,130,.05);stroke:#555}
+.dge-overlay-draft-dot{fill:#fff;stroke:var(--accent,#2463b2);stroke-width:2;pointer-events:none}
+.dge-overlay-text-region{fill:rgba(60,60,60,.07);stroke:#545454;stroke-width:2.4;stroke-dasharray:7 4;pointer-events:none}
+.dge-overlay-tools [hidden]{display:none!important}
+
+</style></head><body>
+<header><strong>DMate · 图形描绘</strong><span>离线试用 · 没有 AI 预设顶点和边</span></header>
+<main id="editor"></main>
+<p id="note">这是可独立使用的真实 SVG 绘图界面：在原图上加点、连边、框选多边形。离线试用不连接服务器，文字选区可画出轮廓，但不会实际调用 PaddleOCR。</p>
+<pre id="result"></pre>
 <script>
 (function (root) {
     'use strict';
@@ -180,6 +188,14 @@ main{max-width:1240px;margin:auto;padding:16px;border:1px solid #d8dde4;border-r
     const point = value => Array.isArray(value) && value.length === 2 && value.every(unit);
     const validPath = value => Array.isArray(value) && value.length >= 2 && value.length <= 128 && value.every(point);
     const validBox = value => Array.isArray(value) && value.length === 4 && value.every(unit) && value[0] < value[2] && value[1] < value[3];
+    const polygonValid = value => {
+        if (!Array.isArray(value) || value.length < 3 || value.length > 64 || !value.every(point)) return false;
+        const signed = value.reduce((sum, p, i) => {
+            const next = value[(i + 1) % value.length];
+            return sum + p[0] * next[1] - next[0] * p[1];
+        }, 0);
+        return Math.abs(signed) / 2 >= .00002;
+    };
     const ring = number => number >= 1 && number <= 20 ? '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'[number - 1] : '未命名' + number;
     function ensureAnonymousLabels(input) {
         const draft = copy(input);
@@ -214,6 +230,8 @@ main{max-width:1240px;margin:auto;padding:16px;border:1px solid #d8dde4;border-r
             if (typeof raw.directed === 'boolean') graph.directed = raw.directed;
             if (typeof raw.weighted === 'boolean') graph.weighted = raw.weighted;
             if (validBox(raw.bbox)) graph.bbox = [...raw.bbox];
+            if (polygonValid(raw.region_polygon))
+                graph.region_polygon = raw.region_polygon.map(p => [...p]);
             if (Number.isInteger(raw.anon_next) && raw.anon_next >= 1 && raw.anon_next <= 10000) graph.anon_next = raw.anon_next;
             if (result.graphs.some(row => row.id === graph.id)) graph.id = unique('G', result.graphs);
             const inputVertices = Array.isArray(raw.vertices) ? raw.vertices.filter(row => row && typeof row === 'object') : [];
@@ -270,6 +288,8 @@ main{max-width:1240px;margin:auto;padding:16px;border:1px solid #d8dde4;border-r
             if (!graph.vertices.length) issues.push(name + '没有节点；请添加节点或删除这幅空图。');
             if (graph.vertices.length > LIMITS.vertices || graph.edges.length > LIMITS.edges) issues.push(name + '超出编辑范围（100 个节点、300 条边）。');
             if (graph.bbox !== undefined && !validBox(graph.bbox)) issues.push(name + '的框选区域无效。');
+            if (graph.region_polygon !== undefined && !polygonValid(graph.region_polygon))
+                issues.push(name + '的自由选区无效。');
             const vertices = new Set(), edges = new Set();
             for (const vertex of graph.vertices) {
                 if (!vertex.id || vertices.has(vertex.id)) issues.push(name + '有重复或缺失的节点编号。');
@@ -402,7 +422,16 @@ main{max-width:1240px;margin:auto;padding:16px;border:1px solid #d8dde4;border-r
             }),
             setGraphBounds: (gid, bbox) => change(draft => {
                 if (!validBox(bbox)) throw new Error('请框选有效的图形范围。');
-                getGraph(draft, gid).bbox = [...bbox];
+                const graph = getGraph(draft, gid);
+                graph.bbox = [...bbox];
+                delete graph.region_polygon;
+            }),
+            setGraphPolygon: (gid, polygon) => change(draft => {
+                if (!polygonValid(polygon)) throw new Error('自由选区需要至少三个有效角点。');
+                const graph = getGraph(draft, gid);
+                graph.region_polygon = polygon.map(p => [...p]);
+                // A new custom region supersedes the previous rectangle.
+                delete graph.bbox;
             }),
             setGraphType: (gid, type, enabled) => change(draft => {
                 if (!['directed', 'weighted'].includes(type) || typeof enabled !== 'boolean') throw new Error('图形类型无效。');
@@ -604,7 +633,8 @@ const NS='http://www.w3.org/2000/svg',clamp=x=>Math.max(0,Math.min(1,x)),unit=x=
 const E=(d,t,a={})=>{const n=d.createElementNS(NS,t);for(const [k,v] of Object.entries(a))n.setAttribute(k,String(v));return n;};
 function mount(host,o){
  const d=host.ownerDocument,s=o.state||{mode:'select',zoom:100,visible:true,start:null};
- let w=1000,h=1000,active=null,ghost=null,base=null;const pointers=new Map();
+ s.polygonDraft ||= [];
+ let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false;const pointers=new Map();
  const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),hint=d.createElement('p'),status=d.createElement('span');
  root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');hint.className='dge-overlay-hint';status.className='dge-overlay-status';
  stage.append(image,svg);scroll.append(stage);root.append(bar,scroll,hint,status);host.append(root);
@@ -612,6 +642,44 @@ function mount(host,o){
  for(const [key,label] of [['select','选择移动'],['pan','平移'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']]){
   button(label,key,()=>{s.mode=key;s.start=null;draw();});
  }
+ const regionMode=d.createElement('select');
+ regionMode.setAttribute('aria-label','选区方式');
+ for(const [key,label] of [['','更多框选方式'],['graph_poly','不规则框选图形'],
+     ['text_rect','矩形框选文字'],['text_poly','不规则框选文字']]){
+   const item=d.createElement('option');item.value=key;item.textContent=label;regionMode.append(item);
+ }
+ regionMode.addEventListener('change',()=>{
+   if(o.disabled?.())return;
+   s.mode=regionMode.value||'select';s.start=null;s.polygonDraft=[];draw();
+ });
+ bar.append(regionMode);
+ const finishPolygon=()=>{
+   if(!['graph_poly','text_poly'].includes(s.mode) || s.polygonDraft.length<3) return;
+   const points=s.polygonDraft.map(p=>[...p]);
+   const nextMode=s.mode;
+   s.polygonDraft=[];s.mode='select';regionMode.value='';
+   if(nextMode==='graph_poly'){
+     const g=o.graph();if(g)change(()=>o.model.setGraphPolygon(g.id,points));
+   }else{
+     s.textRegion=points;
+     status.textContent='已限定文字区域，点击“识别所选文字”。';
+   }
+   draw();
+ };
+ const finishButton=button('完成轮廓','finish-polygon',finishPolygon);
+ const clearButton=button('清除文字选区','clear-text',()=>{s.textRegion=null;s.polygonDraft=[];status.textContent='已清除文字选区';draw();});
+ const textButton=button('识别所选文字','recognize-text',async()=>{
+   if(textBusy || !s.textRegion || !o.recognizeText)return;
+   textBusy=true;status.textContent='正在识别限定区域内的文字…';draw();
+   try{
+      const recognized=await o.recognizeText(s.textRegion.map(p=>[...p]));
+      if(typeof recognized==='string' && recognized.trim()){
+        s.textRegion=null;
+        status.textContent='文字已追加到题干，请校对。';
+      }else status.textContent='没有识别到文字，可扩大范围或直接输入。';
+   }catch(error){status.textContent=error?.message||'文字识别暂不可用，请手动输入。';}
+   finally{textBusy=false;draw();}
+ });
  const select=(label,entries,type)=>{const n=d.createElement('select');n.setAttribute('aria-label',label);for(const [v,t] of entries){const p=d.createElement('option');p.value=v;p.textContent=t;n.append(p);}n.addEventListener('change',()=>{const g=o.graph();if(g&&n.value!=='unknown')change(()=>o.model.setGraphType(g.id,type,n.value==='true'));});bar.append(n);return n;};
  const dir=select('图形方向',[['unknown','方向待核对'],['false','无向图'],['true','有向图']],'directed'),weight=select('图形权值',[['unknown','权值待核对'],['false','无权图'],['true','带权图']],'weighted');
  const visible=button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();});
@@ -628,6 +696,22 @@ function mount(host,o){
  const value=d.createElement('span');value.className='dge-overlay-zoom';bar.append(value);
  button('＋','zoom-in',()=>zoom(s.zoom*1.25)).setAttribute('aria-label','放大原图');
  button('适应','zoom-fit',()=>zoom(100));
+ const focusButton=button('聚焦图形','focus-region',()=>{
+   const g=o.graph();
+   const p=g?.region_polygon;
+   const box=Array.isArray(p)&&p.length>=3
+     ?[Math.min(...p.map(v=>v[0])),Math.min(...p.map(v=>v[1])),
+       Math.max(...p.map(v=>v[0])),Math.max(...p.map(v=>v[1]))]
+     :g?.bbox;
+   if(!Array.isArray(box)||box.length!==4) {
+      status.textContent='请先框选当前图形的矩形或多边形范围';
+      return;
+   }
+   const dx=box[2]-box[0],dy=box[3]-box[1];
+   zoom(Math.min(400,Math.max(100,Math.round(90/Math.max(dx,dy,.1)))));
+   scroll.scrollLeft=stage.scrollWidth*(box[0]+box[2])/2-scroll.clientWidth/2;
+   scroll.scrollTop=stage.scrollHeight*(box[1]+box[3])/2-scroll.clientHeight/2;
+ });
  const change=fn=>{try{fn();o.changed?.();draw();}catch(e){status.textContent=e?.message||'修改失败';}};
  const pos=(v,i,g)=>{
   if(ghost?.vertex===v.id)return ghost.pos;
@@ -638,8 +722,21 @@ function mount(host,o){
  const px=p=>[p[0]*w,p[1]*h],mouse=e=>{const r=svg.getBoundingClientRect();return [clamp((e.clientX-r.left)/Math.max(1,r.width)),clamp((e.clientY-r.top)/Math.max(1,r.height))];};
  function draw(){
   const g=o.graph();dir.value=typeof g?.directed==='boolean'?String(g.directed):'unknown';weight.value=typeof g?.weighted==='boolean'?String(g.weighted):'unknown';visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
+  regionMode.value=['graph_poly','text_rect','text_poly'].includes(s.mode)?s.mode:'';
+  finishButton.hidden=!['graph_poly','text_poly'].includes(s.mode);
+  finishButton.disabled=s.polygonDraft.length<3||Boolean(o.disabled?.());
+  textButton.hidden=!s.textRegion&&!textBusy;
+  textButton.disabled=textBusy||!s.textRegion||Boolean(o.disabled?.());
+  clearButton.hidden=!s.textRegion;
+  focusButton.disabled=!(g?.region_polygon?.length>=3 || g?.bbox?.length===4);
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
-  hint.textContent=s.mode==='vertex'?'点击原图添加顶点':s.mode==='edge'?'依次点击两个顶点连边，同一点两次可建自环':s.mode==='bounds'?'拖动框选当前图形':s.mode==='pan'?'拖动图片平移，双指可缩放':'拖动顶点校准位置，点击边编辑属性';
+  hint.textContent=s.mode==='graph_poly'||s.mode==='text_poly'
+    ?'沿轮廓依次点击角点，然后点击“完成轮廓”；可围住不规则形状'
+    :s.mode==='text_rect'?'拖动圈出要识别的文字范围'
+    :s.mode==='vertex'?'点击原图添加顶点'
+    :s.mode==='edge'?'依次点击两个顶点连边，同一点两次可建自环'
+    :s.mode==='bounds'?'拖动框选当前图形'
+    :s.mode==='pan'?'拖动图片平移，双指可缩放':'点击原图绘制、校正顶点和边，滚轮可以缩放';
   svg.replaceChildren();if(!g||!s.visible)return;
   // The mathematical path is in original-image coordinates. Input targets
   // and labels instead use a constant on-screen size, including at 400% zoom.
@@ -656,6 +753,16 @@ function mount(host,o){
   const defs=E(d,'defs'),mark=E(d,'marker',{id:o.instance+'-arrow',viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto'});mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill:'currentColor'}));defs.append(mark);svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
   if(g.bbox?.length===4)svg.append(E(d,'rect',{x:g.bbox[0]*w,y:g.bbox[1]*h,width:(g.bbox[2]-g.bbox[0])*w,height:(g.bbox[3]-g.bbox[1])*h,class:'dge-overlay-bbox'}));
+  const outline=(points,cssClass)=>{
+    if(Array.isArray(points)&&points.length){
+      const polygon=E(d,'polygon',{points:points.map(p=>px(p).join(',')).join(' '),class:cssClass});
+      svg.append(polygon);
+      if(cssClass.includes('draft'))for(const p of points)
+        svg.append(E(d,'circle',{cx:p[0]*w,cy:p[1]*h,r:hitRadius*.45,class:'dge-overlay-draft-dot'}));
+    }
+  };
+  outline(g.region_polygon,'dge-overlay-polygon');
+  outline(s.textRegion,'dge-overlay-text-region');
   const pairs=new Map();for(const e of g.edges){const key=[e.from,e.to].sort().join('/');if(!pairs.has(key))pairs.set(key,[]);pairs.get(key).push(e);}
   for(const edges of pairs.values())for(const [i,e] of edges.entries()){
    if(!coords.has(e.from)||!coords.has(e.to))continue;
@@ -687,16 +794,28 @@ function mount(host,o){
    gNode.append(t);svg.append(gNode);
   }
   if(s.start&&coords.has(s.start)){const p=px(coords.get(s.start));svg.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*1.8,class:'dge-overlay-pending'}));}
-  if(active?.kind==='bounds'){const a=active.start,b=active.end;svg.append(E(d,'rect',{x:Math.min(a[0],b[0])*w,y:Math.min(a[1],b[1])*h,width:Math.abs(a[0]-b[0])*w,height:Math.abs(a[1]-b[1])*h,class:'dge-overlay-selection'}));}
+  if(s.polygonDraft?.length)outline(s.polygonDraft,
+     'dge-overlay-polygon-draft'+(s.mode==='text_poly'?' is-text':''));
+  if(active?.kind==='bounds'||active?.kind==='text_bounds'){
+    const a=active.start,b=active.end;
+    svg.append(E(d,'rect',{x:Math.min(a[0],b[0])*w,y:Math.min(a[1],b[1])*h,
+      width:Math.abs(a[0]-b[0])*w,height:Math.abs(a[1]-b[1])*h,
+      class:active.kind==='text_bounds'?'dge-overlay-text-region':'dge-overlay-selection'}));
+  }
  }
  svg.addEventListener('pointerdown',e=>{
   if(o.disabled?.()||!s.visible||!o.graph())return;
   pointers.set(e.pointerId,[e.clientX,e.clientY]);
   if(pointers.size===2){const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;return;}if(pointers.size>2)return;
   const node=e.target.closest('[data-vertex-id]')?.dataset.vertexId,edge=e.target.closest('[data-edge-id]')?.dataset.edgeId,handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
+  if(s.mode==='graph_poly'||s.mode==='text_poly'){
+    if(s.polygonDraft.length>=64){status.textContent='轮廓最多64个角点';return;}
+    s.polygonDraft.push(p);draw();return;
+  }
   if(s.mode==='vertex'&&!node){change(()=>o.model.addVertex(g.id,'',...p));return;}
   if(s.mode==='edge'&&node){if(!s.start){s.start=node;draw();}else{const from=s.start;s.start=null;change(()=>o.model.addEdge(g.id,{from,to:node,direction:g.directed===true?'forward':'undirected'}));}return;}
-  if(s.mode==='pan'||(s.mode==='select'&&e.shiftKey))active={kind:'pan',pointer:e.pointerId,start:[e.clientX,e.clientY],sx:scroll.scrollLeft,sy:scroll.scrollTop};
+  if(s.mode==='text_rect')active={kind:'text_bounds',pointer:e.pointerId,start:p,end:p};
+  else if(s.mode==='pan'||(s.mode==='select'&&e.shiftKey))active={kind:'pan',pointer:e.pointerId,start:[e.clientX,e.clientY],sx:scroll.scrollLeft,sy:scroll.scrollTop};
   else if(s.mode==='bounds'&&!node&&!edge)active={kind:'bounds',pointer:e.pointerId,start:p,end:p};
   else if(s.mode==='select'&&handle)active={kind:'handle',pointer:e.pointerId,id:handle,start:p,end:p};
   else if(s.mode==='select'&&node)active={kind:'node',pointer:e.pointerId,id:node,start:p,end:p};
@@ -719,7 +838,16 @@ function mount(host,o){
   if(!active||active.pointer!==e.pointerId)return;const op=active;active=null;ghost=null;const g=o.graph();
   if(!cancel&&g){
    if(op.kind==='node'){if(Math.hypot(op.start[0]-op.end[0],op.start[1]-op.end[1])>.004)change(()=>o.model.moveVertex(g.id,op.id,...op.end));o.selectNode?.(op.id);}
-   if(op.kind==='bounds'){const a=op.start,b=op.end,box=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];if(box[2]-box[0]>.01&&box[3]-box[1]>.01)change(()=>o.model.setGraphBounds(g.id,box));}
+   if(op.kind==='bounds'||op.kind==='text_bounds'){
+     const a=op.start,b=op.end,box=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
+     if(box[2]-box[0]>.01 && box[3]-box[1]>.01){
+       if(op.kind==='bounds')change(()=>o.model.setGraphBounds(g.id,box));
+       else{
+         s.textRegion=[[box[0],box[1]],[box[2],box[1]],[box[2],box[3]],[box[0],box[3]]];
+         s.mode='select';regionMode.value='';status.textContent='文字区域已限定，可点击“识别所选文字”。';
+       }
+     }
+   }
    if(op.kind==='handle'){const edge=g.edges.find(x=>x.id===op.id),a=g.vertices.find(x=>x.id===edge?.from),b=g.vertices.find(x=>x.id===edge?.to);if(a&&b&&unit(a.x)&&unit(a.y)&&unit(b.x)&&unit(b.y))change(()=>o.model.setEdgePath(g.id,op.id,[[a.x,a.y],op.end,[b.x,b.y]]));else status.textContent='请先校准这条边的两个端点';}
   }draw();
  }
@@ -989,11 +1117,13 @@ root.DMateGraphOverlay={mount};if(typeof module!=='undefined'&&module.exports)mo
             else if (overlay) { overlay.destroy(); overlay = null; }
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
             const top = element('div', 'dge-topline');
-            top.append(element('p', 'dge-muted', useOverlay ? '请直接在原图上核查、补点、连边，详细属性可以在下方修改。' : '请对照原图核对题干，再点击节点或边修改结构。'));
+            top.append(element('p', 'dge-muted', useOverlay
+                ? '先在原图上描点、连边；图形和文字都可以单独框选区域。'
+                : '请对照原图核对题干，再点击节点或边修改结构。'));
             const undo = button('撤销', () => { pendingDelete = ''; model.undo(); }); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
             const redo = button('重做', () => { pendingDelete = ''; model.redo(); });
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
-            top.append(undo, redo, button('恢复识别初稿', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
+            top.append(undo, redo, button('清空修改', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
             const observations = (Array.isArray(options.issues) ? options.issues : [])
                 .map(issue => typeof issue === 'string' ? issue : text(issue?.message)).filter(Boolean);
             if (observations.length) { const details = element('details', 'dge-observations'); details.open = true;
@@ -1012,7 +1142,18 @@ root.DMateGraphOverlay={mount};if(typeof module!=='undefined'&&module.exports)mo
                     nodeSelected: () => selectedNodes,
                     selectEdge: id => { selectedEdge = id; selectedNodes.clear(); render(); },
                     selectNode: id => { selectedNodes = new Set([id]); selectedEdge = null; render(); },
-                    changed: () => { acknowledged = false; render(); }
+                    changed: () => { acknowledged = false; render(); },
+                    recognizeText: async polygon => {
+                        if (typeof options.onRecognizeText !== 'function')
+                            throw new Error('文字区域识别暂不可用，请手动输入。');
+                        const text = await options.onRecognizeText(polygon);
+                        if (typeof text === 'string' && text.trim()) {
+                            const previous = model.getDocument().body_text;
+                            model.setBody([previous.trimEnd(), text.trim()].filter(Boolean).join('\n'));
+                            render();
+                        }
+                        return text;
+                    }
                 });
                 else overlay.refresh();
                 workspace.append(buildSelectedProperties(graph));
@@ -1146,19 +1287,22 @@ root.DMateGraphOverlay={mount};if(typeof module!=='undefined'&&module.exports)mo
 </script>
 <script>
 (function(){
- const source="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 600\" width=\"960\" height=\"600\">\n<rect x=\"0\" y=\"0\" width=\"960\" height=\"600\" fill=\"white\"/>\n<g fill=\"none\" stroke=\"#414141\" stroke-width=\"3.2\" stroke-linecap=\"round\">\n<path d=\"M192 132 L730 138\"/>\n<path d=\"M730 138 L634 438\"/>\n<path d=\"M634 438 L221 420\"/>\n<path d=\"M221 420 L192 132\"/>\n<path d=\"M192 132 Q407 294 634 438\"/>\n<path d=\"M730 138 Q880 20 880 168 Q850 270 730 138\"/>\n</g>\n<g fill=\"#333\"><circle cx=\"192\" cy=\"132\" r=\"9\"/><circle cx=\"730\" cy=\"138\" r=\"9\"/>\n<circle cx=\"634\" cy=\"438\" r=\"9\"/><circle cx=\"221\" cy=\"420\" r=\"9\"/></g>\n<g font-family=\"Arial,sans-serif\" font-size=\"27\" fill=\"#222\">\n<text x=\"165\" y=\"109\">A</text><text x=\"748\" y=\"137\">B</text><text x=\"651\" y=\"464\">C</text>\n<text x=\"435\" y=\"102\">e₁</text><text x=\"794\" y=\"302\">0</text>\n<text x=\"403\" y=\"483\">-2</text><text x=\"174\" y=\"280\">5</text><text x=\"390\" y=\"325\">1</text>\n</g></svg>";
- const drawing={"body_text":"根据图形回答相关问题（本地编辑演示，不执行解题）","graphs":[{"id":"G1","name":"G1","directed":true,"weighted":true,"bbox":[0.1,0.1,0.96,0.85],"vertices":[{"id":"a","label":"A","x":0.2,"y":0.22},{"id":"b","label":"B","x":0.7604166666666666,"y":0.23},{"id":"c","label":"C","x":0.6604166666666667,"y":0.73},{"id":"v4","label":null,"x":0.23020833333333332,"y":0.7}],"edges":[{"id":"e1","from":"a","to":"b","direction":"forward","weight":3,"edge_label":"e₁","path":[[0.2,0.22],[0.7604166666666666,0.23]]},{"id":"e2","from":"b","to":"c","direction":"forward","weight":0,"path":[[0.7604166666666666,0.23],[0.6604166666666667,0.73]]},{"id":"e3","from":"c","to":"v4","direction":"forward","weight":-2,"path":[[0.6604166666666667,0.73],[0.23020833333333332,0.7]]},{"id":"e4","from":"v4","to":"a","direction":"forward","weight":5,"path":[[0.23020833333333332,0.7],[0.2,0.22]]},{"id":"e5","from":"a","to":"c","direction":"forward","weight":1,"path":[[0.2,0.22],[0.4239583333333333,0.49],[0.6604166666666667,0.73]]}]}]};
- const input=document.getElementById("save-status"), result=document.getElementById("confirmed-result");
- window.graphEditorDemo=DMateGraphEditor.mount(document.getElementById("editor"),{
-   originalUrl:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(source),
-   document:drawing,
-   initialDocument:drawing,
-   onChange:()=>{input.textContent="修改尚未确认 · 这是本地独立演示";result.textContent="";},
-   onCancel:()=>{input.textContent="可继续修改；没有实际账号和服务器操作";},
-   onConfirm:async doc=>{
-     input.textContent="已在当前页面完成结构校验（演示模式，无服务器保存）";
-     result.textContent=DMateGraphFormat.toPlain(doc.graphs);
-     result.scrollIntoView({behavior:"smooth",block:"nearest"});
+ const initial={"body_text":"","graphs":[{"id":"G1","name":"G1","directed":false,"weighted":false,"vertices":[],"edges":[]}]};
+ const svg="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"960\" height=\"600\" viewBox=\"0 0 960 600\"><rect width=\"960\" height=\"600\" fill=\"white\"/>\n<g fill=\"none\" stroke=\"#333\" stroke-width=\"3.1\" stroke-linecap=\"round\">\n<path d=\"M170 200 L720 200 L715 445 L260 445 Z M170 200 Q434 346 715 445\"/>\n<path d=\"M720 200 Q890 110 860 273 Q812 316 720 200\"/>\n</g>\n<g fill=\"#202020\"><circle cx=\"170\" cy=\"200\" r=\"9\"/><circle cx=\"720\" cy=\"200\" r=\"9\"/><circle cx=\"715\" cy=\"445\" r=\"9\"/><circle cx=\"260\" cy=\"445\" r=\"9\"/></g>\n<g fill=\"#202020\" font-family=\"Arial\" font-size=\"26\">\n<text x=\"65\" y=\"70\">例题：请标注图中的顶点和各条边，并完成问题</text>\n<text x=\"145\" y=\"175\">A</text><text x=\"739\" y=\"195\">B</text><text x=\"737\" y=\"465\">C</text>\n<text x=\"445\" y=\"177\">e₁</text><text x=\"449\" y=\"480\">5</text><text x=\"439\" y=\"347\">0</text>\n</g></svg>";
+ const note=document.getElementById("note"),result=document.getElementById("result");
+ window.graphDemo=DMateGraphEditor.mount(document.getElementById("editor"),{
+   originalUrl:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg),
+   document:initial,initialDocument:initial,
+   onChange:()=>{note.textContent="正在本地编辑：关闭页面后不会保存。";result.textContent="";},
+   onRecognizeText:async()=>{
+      note.textContent="离线演示不连接 PaddleOCR。正式版本会只识别所选区域，其余像素被遮蔽。";
+      return "";
+   },
+   onCancel:()=>{note.textContent="可继续修改，本页没有云端或账号操作。";},
+   onConfirm:async document=>{
+      result.textContent=DMateGraphFormat.toPlain(document.graphs);
+      note.textContent="已完成本地结构校验；不代表服务器已保存。";
+      result.scrollIntoView({behavior:"smooth",block:"nearest"});
    }
  });
 })();
