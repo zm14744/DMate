@@ -27,7 +27,7 @@ from vision_provider import GLM_5V_TURBO_MODEL, VisionError, VisionProvider
 PERFORMANCE_TARGET_SECONDS = 120
 
 MAIN_PROMPT = r'''读取数学题原图，返回紧凑JSON题干和图结构，不解题，不输出解释或Markdown。
-第一张总览决定独立子图数量；后续局部只是同一原图的放大窗口，不能重复计图。同图不连通分量不能仅因分开就拆图。多图时每图给相对完整原图0..1000的粗bbox，也可附对应layout_panel_ids；不要将每个局部窗口都填成整页bbox。坐标不要求精确。
+第一张总览决定独立子图数量；后续局部只是同一原图的放大窗口，不能重复计图。local_caption_grid是从原图彩色图注矩形测出的版面参考。如果存在多行多列图注，逐格核对对应的独立数学图，不得只返回第一幅；同一图的放大窗口不能重复计图。local_colored_graph_candidates是原像素中的彩色顶点与直线候选，必须对照原图核实端点，不得用图名或工具候选凑边。同图不连通分量不能仅因分开就拆图。多图时每图给相对完整原图0..1000的粗bbox，也可附对应layout_panel_ids；不要将每个局部窗口都填成整页bbox。坐标不要求精确。
 先清点真实圆点、圆圈或明确顶点，包括孤立点，再沿实际连线读端点。普通交叉、箭头尖和文字不是顶点；边名不能变成节点。无印刷节点名则label=null；e_i也可能是真节点名，须按原图位置判别。local_visual_inventory中的同类圆点须逐个对照原图，可在顶点附marker_id绑定对应候选；若有候选以外的真实点，保留并只为该点附短visual_basis说明具体位置与可见依据。候选可能错漏，不能按候选数、题干、图名、度数或模板补删点边。
 对于能够辨认的子图，请独立清点并给出visible_vertex_count和visible_edge_count，再与vertices、edges逐一核对；确实不能确定时填null并注明疑点。不能为了让两种计数相等而补删图结构，也不能直接把数组长度或工具候选数抄成视觉计数。只输出一份vertices和edges，不逐点逐边重复描述。
 交叉处沿原笔画走，不换线；经过真实顶点才分成不同边。虚线的多个短划是一条边。每条无向边、有向边、自环、重边和反向弧各列一次。方向只按箭头尖确定，不能按编号或布局猜；看不清用unknown。
@@ -41,7 +41,7 @@ LOCAL_REVIEW_PROMPT = r'''你是数学图像的局部复核者。完整原图和
 draft是尚待用户确认的读取结果，工具候选和题意规则都是辅助，可能错误。沿原图确认目标图的顶点、连接、箭头、孤立点、自环、重边、权重，完整保留其必要标签/线型/颜色；不从常见图模板或度数反推图片。
 local_marker_candidates是整张原图上的圆点候选，含位置、大小和置信度，也可能混入正文或字形。核对目标子图内形状、大小相近的清晰圆点与draft顶点是否逐一对应，尤其检查较大圆点旁的字母是否实际为边名；有数量差异时重新对照原图确认真实点和连接，不将整页候选总数或某一尺寸组的数量强制作为节点数。匿名真实点保留label=null，不能仅凭e_i等词形删除真正的节点名。
 若issues指出计数冲突，先重新清点原图实际点与整条连线，不能只补颜色而保留未核实连接。若draft中有visible_vertex_count或visible_edge_count，请对目标子图重新独立清点并在返回的子图中提供这两个字段；不能确定时返回null并明确疑点，不能省略计数字段来消除原有冲突。local_visual_inventory中的圆点候选须逐个对照原图，可用marker_id绑定对应顶点；额外真实点允许保留并附短visual_basis定位依据，不能按候选数凑答案。只返回紧凑vertices/edges，可给独立视觉计数visible_vertex_count/visible_edge_count；仍不能确认则null并列疑点。保留weighted布尔值；方向和权重必须来自原图，不按全图类型补猜。
-只返回targets内已复核的完整子图，保留原graph.id。无需返回未请求的图。题干仅在targets.body=true时返回完整逐字body_text；不能新增原图不存在的问题或补全裁切文字。
+targets.document=true时必须对照整张原图及local_caption_grid逐格重读所有独立数学子图，不能只回传draft中已存在的一幅图；若确认有漏图，则按原图顺序补齐。否则只返回targets内已复核的完整子图，保留原graph.id。无需返回未请求的图。题干仅在targets.body=true时返回完整逐字body_text；不能新增原图不存在的问题或补全裁切文字。
 返回格式：{"graphs":[{"id":"G1","name":"原图图注","vertices":[...],"edges":[...]}],"uncertainties":[]}。节点和边结构与主读取相同。已确认修正的问题不留在uncertainties；仍看不清时明确列出scope/graph_id/field/message，保留可用内容，不以空图抹掉整幅结构。仅内部ID或坐标差异不是识别疑点。'''
 
 
@@ -170,6 +170,27 @@ def _stroke_inventory_issues(document):
     return issues
 
 
+def _caption_grid_issues(document, pixel_evidence):
+    """Repeated colored caption windows may expose missing independent figures.
+
+    The pixel tool finds caption rectangles, not mathematical graph identities.
+    This creates a review requirement, never automatically invents a graph.
+    """
+    grid = pixel_evidence.get('grid') if isinstance(pixel_evidence, dict) else None
+    if not isinstance(grid, dict) or grid.get('status') != 'regular_caption_grid':
+        return []
+    reported = len(document['graphs']) if (isinstance(document, dict)
+        and isinstance(document.get('graphs'), list)) else 0
+    observed = grid.get('minimum_captioned_panels')
+    if type(observed) is not int or not 4 <= observed <= 16 or reported >= observed:
+        return []
+    return [_issue('captioned_panel_inventory_omission',
+        f'原图检测到 {observed} 个规则排列的独立彩色图注位置，本次只返回 {reported} 幅图。'
+        '请逐格核对图注上方的实际数学图，不能遗漏后标记为完整。',
+        field='graphs', observed_caption_positions=observed, reported_graphs=reported,
+        evidence_source='same_original_rgb_caption_rectangles')]
+
+
 def _visual_count_issues(document):
     """Reread visually reported counts that disagree with the actual edge/node lists.
 
@@ -278,7 +299,8 @@ def _validate_tool(arguments, *, context):
                     scope='graph', graph_id=graph['id'], field='weight', edge_id=edge['id']))
     issues = (normalized['semantic_issues'] + schema_issues + inspected['issues']
               + required_attributes + unknown_weights + _stroke_inventory_issues(draft)
-              + _visual_count_issues(draft))
+              + _visual_count_issues(draft)
+              + _caption_grid_issues(draft, context.data.get('pixel_evidence')))
     if context.data.get('visual_inventory') is not None:
         from graph_visual_inventory import compare_visual_inventory
         issues += compare_visual_inventory(draft, context.data['visual_inventory'])['issues']
@@ -302,11 +324,12 @@ def _validation_registry():
         source_required=True), _validate_tool)
 
 
-def _validate(draft, budget, phase, *, visual_inventory=None):
+def _validate(draft, budget, phase, *, visual_inventory=None, pixel_evidence=None):
     result = {}
     context = ToolContext(source_sha256=budget.source_sha256,
         deadline_monotonic=min(time.monotonic()+10, budget.deadline),
-        data={'draft': draft, 'budget': budget, 'result': result, 'visual_inventory': visual_inventory})
+        data={'draft': draft, 'budget': budget, 'result': result, 'visual_inventory': visual_inventory,
+              'pixel_evidence': pixel_evidence})
     envelope = _validation_registry().call('graph.fast_validate', {'phase': phase},
                                            role='semantic_review', context=context)
     if not envelope['ok']:
@@ -597,6 +620,8 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
     from graph_semantic_layout import prepare_semantic_layout
     from graph_semantic_geometry import prepare_semantic_geometry
     from graph_semantic_hints import project_ocr_hints, project_connection_hints
+    from graph_pixel_safety import (measure_image_pixel_evidence,
+        create_grid_column_views, reconcile_anonymous_pixel_graphs)
 
     started = time.monotonic()
     source = hashlib.sha256(raw).hexdigest()
@@ -610,8 +635,26 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
     quick = prepare_semantic_layout(raw, budget=budget, layout=layout, run_layout=False)
     markers = prepare_semantic_geometry(raw, budget=budget, layout=quick)
     visual_inventory = _measure_marker_inventory(markers, quick, budget)
+    pixel_evidence = {'grid': None, 'colored_graphs': [], 'advisory_only': True}
+    try:
+        measured = measure_image_pixel_evidence(raw)
+        if measured.get('source_sha256') == source:
+            pixel_evidence = measured
+    except Exception as exc:
+        budget.event('fast_pixel_evidence', 'unavailable', error_kind=type(exc).__name__)
+    budget.check()
     views = {'images': quick['images'][:1], 'view_descriptions': quick['view_descriptions'][:1]}
     main_views = _main_panel_views(quick)
+    if pixel_evidence.get('grid'):
+        try:
+            columns = create_grid_column_views(raw, pixel_evidence)
+        except Exception as exc:
+            columns = []
+            budget.event('fast_grid_columns', 'unavailable', error_kind=type(exc).__name__)
+        if columns:
+            main_views = {'images': views['images'] + [c['image'] for c in columns],
+                          'view_descriptions': views['view_descriptions']
+                                               + [c['description'] for c in columns]}
     if local_submit is None:
         from graph_local_scheduler import submit_local_bundle
         local_submit = submit_local_bundle
@@ -625,6 +668,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
     stages = []
     local_result = {}
     extra_issues = []
+    pixel_repairs = []
     budget.local_tool_execution = {'layout': _public_local_result({'layout': quick})['layout'],
         'markers': {'marker_candidates': copy.deepcopy(markers.get('marker_candidates', []))}}
 
@@ -650,6 +694,8 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
              'local_layout_candidates': quick.get('panels', [])[:32],
              'local_marker_candidates': markers.get('marker_candidates', [])[:120],
              'local_visual_inventory': _compact_visual_inventory(visual_inventory),
+             'local_caption_grid': pixel_evidence.get('grid'),
+             'local_colored_graph_candidates': pixel_evidence.get('colored_graphs', [])[:12],
              'local_ocr_candidates': hints['candidates'], 'local_ocr_policy': hints['policy']},
             main_views['images'], output_tokens=12000, response_identity=False,
             reserve_seconds=12)
@@ -670,10 +716,13 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
         return state
 
     def initial_check(state):
-        checked = _validate(state['draft'], budget, 'initial', visual_inventory=visual_inventory)
-        checked['issues'] += _text_candidate_issues(state['draft'], local_result.get('text', {}), quick)
+        draft, corrections = reconcile_anonymous_pixel_graphs(state['draft'], pixel_evidence)
+        pixel_repairs.extend(corrections)
+        checked = _validate(draft, budget, 'initial',
+                            visual_inventory=visual_inventory, pixel_evidence=pixel_evidence)
+        checked['issues'] += _text_candidate_issues(draft, local_result.get('text', {}), quick)
         reference = _local_reference(checked['normalized'], budget)
-        return {**state, **checked, 'reference': reference}
+        return {**state, **checked, 'draft': draft, 'reference': reference}
 
     def review(state):
         nonlocal local_result
@@ -714,6 +763,8 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
                  'image_views': review_views['view_descriptions'],
                  'local_marker_candidates': markers.get('marker_candidates', [])[:120],
                  'local_visual_inventory': visual_inventory,
+                 'local_caption_grid': pixel_evidence.get('grid'),
+                 'local_colored_graph_candidates': pixel_evidence.get('colored_graphs', [])[:12],
                  'local_ocr_candidates': hints['candidates'],
                  'local_connection_candidates': project_connection_hints(local_result.get('geometry', {}).get('graphs', [])),
                  'question_reference': state.get('reference', {})},
@@ -739,11 +790,14 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
                                              'targets': targets}}
 
     def final_check(state):
-        # Always execute the final schema/NetworkX check, even when the main
-        # reading is clean or the optional model is unavailable.
-        checked = _validate(state['draft'], budget, 'final', visual_inventory=visual_inventory)
-        checked['issues'] += _text_candidate_issues(state['draft'], local_result.get('text', {}), quick)
-        return {**state, **checked}
+        # GLM can propose a change; independent pixel evidence still needs to
+        # agree for clear anonymous colored-marker straight-line diagrams.
+        draft, corrections = reconcile_anonymous_pixel_graphs(state['draft'], pixel_evidence)
+        pixel_repairs.extend(corrections)
+        checked = _validate(draft, budget, 'final',
+                            visual_inventory=visual_inventory, pixel_evidence=pixel_evidence)
+        checked['issues'] += _text_candidate_issues(draft, local_result.get('text', {}), quick)
+        return {**state, **checked, 'draft': draft}
 
     flow = StateGraph(_State)
     for name, handler in (('main_reading', extract), ('local_candidates', local_tools),
@@ -810,6 +864,10 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             'readings': readings, 'timings': timings, 'local_tools': tools_public,
             'local_scheduler': local_audit, 'local_tool_policy': local_policy,
             'local_review': state.get('local_review', {}),
+            'pixel_evidence': {'grid': copy.deepcopy(pixel_evidence.get('grid')),
+                               'colored_graphs': copy.deepcopy(pixel_evidence.get('colored_graphs', [])),
+                               'repairs': copy.deepcopy(pixel_repairs),
+                               'image_accuracy_certified': False},
             'question_reference': state.get('reference', {}),
             'final_validation': state['validation'],
             'tool_audit': quick.get('tool_audit', [])+markers.get('tool_audit', [])
