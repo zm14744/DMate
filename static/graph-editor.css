@@ -138,3 +138,8 @@
  .dge-selection-panel{padding:12px;gap:8px}
  .dge-selection-panel .dge-field{flex:1 1 140px}
 }
+
+/* Labels are always drawn over the unchanged (usually white) photograph. */
+.dge-overlay-label{fill:#172033;stroke:#fff}
+.dge-overlay-svg[data-mode="pan"]{cursor:grab}
+.dge-overlay-node:active,.dge-overlay-svg[data-mode="pan"]:active{cursor:grabbing}

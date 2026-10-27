@@ -123,3 +123,32 @@ def test_mobile_overlay_fits_without_external_assets(canvas_page):
     assert page.locator(".dge-overlay-svg.is-hidden").count() == 1
     page.get_by_role("button", name="显示描绘", exact=True).click()
     assert page.locator(".dge-overlay-svg.is-hidden").count() == 0
+
+def test_overlay_keeps_image_and_zoom_when_selecting_or_renaming(canvas_page):
+    page = canvas_page
+    page.get_by_role("button", name="放大原图", exact=True).click()
+    page.get_by_role("button", name="放大原图", exact=True).click()
+    assert page.locator(".dge-overlay-zoom").inner_text() == "156%"
+    page.evaluate("window.imageBefore=document.querySelector('.dge-overlay-image')")
+    page.locator('[data-vertex-id="a"] .dge-overlay-dot').click()
+    assert page.get_by_label("当前顶点名称").is_visible()
+    assert page.evaluate("window.imageBefore===document.querySelector('.dge-overlay-image')")
+    page.get_by_label("当前顶点名称").fill("Z")
+    assert page.evaluate("window.imageBefore===document.querySelector('.dge-overlay-image')")
+    assert page.get_by_text("点：Z、①", exact=True).is_visible()
+    assert page.locator(".dge-overlay-zoom").inner_text() == "156%"
+    assert "Z—①" in page.evaluate("DMateGraphFormat.toPlain(instance.getDocument().graphs)")
+
+
+def test_coarse_pointer_has_real_touch_targets_on_phone(canvas_page):
+    page = canvas_page
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.evaluate("""() => {
+        Object.defineProperty(navigator, 'maxTouchPoints', {configurable:true, value:5});
+    }""")
+    page.get_by_role("button", name="隐藏描绘", exact=True).click()
+    page.get_by_role("button", name="显示描绘", exact=True).click()
+    hit=page.locator('[data-vertex-id="a"] .dge-overlay-node-hit').bounding_box()
+    assert hit is not None and hit["width"] >= 40, hit
+    assert hit["height"] >= 40
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 2")

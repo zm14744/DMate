@@ -41,7 +41,17 @@ function mount(host,o){
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
   hint.textContent=s.mode==='vertex'?'点击原图添加顶点':s.mode==='edge'?'依次点击两个顶点连边，同一点两次可建自环':s.mode==='bounds'?'拖动框选当前图形':s.mode==='pan'?'拖动图片平移，双指可缩放':'拖动顶点校准位置，点击边编辑属性';
   svg.replaceChildren();if(!g||!s.visible)return;
-  const radius=Math.max(5,Math.min(w,h)*.008),defs=E(d,'defs'),mark=E(d,'marker',{id:o.instance+'-arrow',viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto'});mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill:'currentColor'}));defs.append(mark);svg.append(defs);
+  // The mathematical path is in original-image coordinates. Input targets
+  // and labels instead use a constant on-screen size, including at 400% zoom.
+  const radius=Math.max(5,Math.min(w,h)*.008);
+  const scale=Math.max(.0001,svg.getBoundingClientRect().width/w);
+  const touch=Boolean(root.navigator?.maxTouchPoints || root.matchMedia?.('(pointer: coarse)')?.matches);
+  const hitRadius=Math.max(radius*2.6,(touch?22:12)/scale);
+  const dotRadius=Math.max(1.5,4.5/scale);
+  const handleRadius=Math.max(radius*1.1,(touch?15:8)/scale);
+  const labelSize=Math.max(3,Math.min(80,13/scale));
+  const labelOffset=Math.max(radius*1.25,11/scale);
+  const defs=E(d,'defs'),mark=E(d,'marker',{id:o.instance+'-arrow',viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto'});mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill:'currentColor'}));defs.append(mark);svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
   if(g.bbox?.length===4)svg.append(E(d,'rect',{x:g.bbox[0]*w,y:g.bbox[1]*h,width:(g.bbox[2]-g.bbox[0])*w,height:(g.bbox[3]-g.bbox[1])*h,class:'dge-overlay-bbox'}));
   const pairs=new Map();for(const e of g.edges){const key=[e.from,e.to].sort().join('/');if(!pairs.has(key))pairs.set(key,[]);pairs.get(key).push(e);}
@@ -53,15 +63,26 @@ function mount(host,o){
    else if(pts){const ps=pts.map(px);ps[0]=a;ps[ps.length-1]=b;center=ps[Math.floor(ps.length/2)];line='M '+ps.map(p=>p.join(' ')).join(' L ');}
    else if(e.from===e.to){const r=radius*(5+i*2);line='M '+(a[0]-r*.3)+' '+(a[1]-r*.3)+' C '+(a[0]-2*r)+' '+(a[1]-2*r)+' '+(a[0]+2*r)+' '+(a[1]-2*r)+' '+(a[0]+r*.3)+' '+(a[1]-r*.3);center=[a[0],a[1]-r*1.5];}
    else{const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2],len=Math.hypot(b[0]-a[0],b[1]-a[1])||1,k=(i-(edges.length-1)/2)*radius*3,c=[mid[0]-(b[1]-a[1])*k/len,mid[1]+(b[0]-a[0])*k/len];center=[(mid[0]+c[0])/2,(mid[1]+c[1])/2];line='M '+a.join(' ')+' Q '+c.join(' ')+' '+b.join(' ');}
-   const chosen=o.edgeSelected?.()===e.id,group=E(d,'g',{'data-edge-id':e.id,class:'dge-overlay-edge'+(chosen?' is-selected':'')+(e.direction==='unknown'?' is-uncertain':'')});group.append(E(d,'path',{d:line,class:'dge-overlay-hit'}));
-   const att={d:line,class:'dge-overlay-stroke'};if(e.direction==='forward')att['marker-end']='url(#'+o.instance+'-arrow)';if(e.style==='dashed')att['stroke-dasharray']='9 6';if(e.style==='dotted')att['stroke-dasharray']='2 5';group.append(E(d,'path',att));
-   const label=[e.edge_label,e.weight==null?'':String(e.weight)].filter(Boolean).join(' · ');if(label){const t=E(d,'text',{x:center[0],y:center[1]-radius,class:'dge-overlay-label','text-anchor':'middle'});t.textContent=label;group.append(t);}
-   if(chosen&&e.from!==e.to&&s.mode==='select')group.append(E(d,'circle',{cx:center[0],cy:center[1],r:radius*1.1,class:'dge-overlay-handle','data-handle-id':e.id}));svg.append(group);
+   const chosen=o.edgeSelected?.()===e.id,group=E(d,'g',{'data-edge-id':e.id,class:'dge-overlay-edge'+(chosen?' is-selected':'')+(e.direction==='unknown'?' is-uncertain':'')});
+   const hit=E(d,'path',{d:line,class:'dge-overlay-hit'});
+   hit.style.strokeWidth=(touch?44:18)/scale+'px';
+   group.append(hit);
+   const att={d:line,class:'dge-overlay-stroke'};if(e.direction==='forward')att['marker-end']='url(#'+o.instance+'-arrow)';if(e.style==='dashed')att['stroke-dasharray']='9 6';if(e.style==='dotted')att['stroke-dasharray']='2 5';
+   const stroke=E(d,'path',att);stroke.style.strokeWidth=(chosen?3.6:2.1)/scale+'px';group.append(stroke);
+   const label=[e.edge_label,e.weight==null?'':String(e.weight)].filter(Boolean).join(' · ');if(label){
+     const t=E(d,'text',{x:center[0],y:center[1]-labelOffset,class:'dge-overlay-label','text-anchor':'middle'});
+     t.textContent=label;t.style.fontSize=labelSize+'px';group.append(t);
+   }
+   if(chosen&&e.from!==e.to&&s.mode==='select')group.append(E(d,'circle',{cx:center[0],cy:center[1],r:handleRadius,class:'dge-overlay-handle','data-handle-id':e.id}));svg.append(group);
   }
   for(const [i,v] of g.vertices.entries()){
    const p=px(coords.get(v.id)),gNode=E(d,'g',{'data-vertex-id':v.id,class:'dge-overlay-node'+(!unit(v.x)||!unit(v.y)?' is-estimated':'')+(o.nodeSelected?.().has(v.id)?' is-selected':'')});
-   gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*2.6,class:'dge-overlay-node-hit'}));gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius,class:'dge-overlay-dot'}));
-   const t=E(d,'text',{x:p[0]+radius*1.25,y:p[1]-radius*1.1,class:'dge-overlay-label'});t.textContent=v.label||v.display_label||'未命名'+(i+1);gNode.append(t);svg.append(gNode);
+   gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:hitRadius,class:'dge-overlay-node-hit'}));
+   const dot=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius,class:'dge-overlay-dot'});
+   dot.style.strokeWidth=(o.nodeSelected?.().has(v.id)?3:2)/scale+'px';gNode.append(dot);
+   const t=E(d,'text',{x:p[0]+labelOffset,y:p[1]-labelOffset,class:'dge-overlay-label'});
+   t.textContent=v.label||v.display_label||'未命名'+(i+1);t.style.fontSize=labelSize+'px';
+   gNode.append(t);svg.append(gNode);
   }
   if(s.start&&coords.has(s.start)){const p=px(coords.get(s.start));svg.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*1.8,class:'dge-overlay-pending'}));}
   if(active?.kind==='bounds'){const a=active.start,b=active.end;svg.append(E(d,'rect',{x:Math.min(a[0],b[0])*w,y:Math.min(a[1],b[1])*h,width:Math.abs(a[0]-b[0])*w,height:Math.abs(a[1]-b[1])*h,class:'dge-overlay-selection'}));}
