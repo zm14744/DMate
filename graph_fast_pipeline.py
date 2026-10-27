@@ -85,6 +85,24 @@ class _State(TypedDict, total=False):
 
 
 class FastRunner(RoleRunner):
+    def _network_recovery_allowed(self, role, error, facts):
+        """Retry once ONLY if Qwen timed out before any HTTP response header.
+
+        A partial stream, completed response, TLS error, JSON error, GLM review
+        failure, or per-call output deadline is never replayed. No hidden
+        provider retries; the extra send uses the SAME upload source and budget.
+        """
+        return (role == 'fast_main' and getattr(error, 'kind', None) == 'transport_failed'
+            and facts.get('failure_phase') in ('response_headers', 'request_start')
+            and facts.get('response_headers_received') is False
+            and facts.get('request_started') is True
+            and facts.get('partial_stream') is False
+            and facts.get('content_chars') == 0
+            and facts.get('confirmed_timeout') is True
+            and facts.get('http_status') is None
+            and facts.get('transport_failure_kind') in ('timeout', 'connect_timeout', 'read_timeout')
+            and facts.get('timeout_kind') != 'wall_deadline')
+
     def _provider_for(self, role):
         if role == 'fast_main':
             supplied = self.provider.get(role) if isinstance(self.provider, dict) else self.provider
@@ -113,9 +131,11 @@ def configured_fast_budget(*, source_sha256=None, task_id=None, cancelled=None):
     # An operational fault ceiling is deliberately separate from the 120 s
     # performance target. A valid late result remains late; it is never cut
     # short or labelled fast to meet the acceptance metric.
-    budget = AgentBudget(seconds=200, calls=2, call_seconds=75,
+    # Usually just Qwen + optional GLM. One EXTRA slot exists solely for a
+    # verified Qwen pre-header timeout; it is not spent on success or reviews.
+    budget = AgentBudget(seconds=200, calls=3, call_seconds=75,
                          source_sha256=source_sha256, task_id=task_id, cancelled=cancelled)
-    budget.max_network_recoveries = 0
+    budget.max_network_recoveries = 1
     budget.max_json_format_recoveries = 0
     return budget
 
