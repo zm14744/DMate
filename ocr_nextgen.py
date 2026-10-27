@@ -11,8 +11,8 @@ from ocr_layout import partition_text
 
 def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeline='evidence-two-pass',
                              cancelled=None,task_id=None,request_deadline=None):
-    # Development branch default; previous engines remain explicit comparisons.
-    # The app's existing graph-nextgen gate and production environment are unchanged.
+    # The application's agent-tools selection uses the fast editable workflow.
+    # Older explicit engines remain available for existing diagnostic callers.
     if graph_pipeline not in ('staged','qwen-simple-candidate','evidence-two-pass','agent-tools','agent-tools-strict'):
         raise ValueError('Unknown graph pipeline')
     engine=recognize_staged
@@ -26,16 +26,21 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
         engine=recognize_evidence
         version=VERSION
     elif graph_pipeline=='agent-tools':
-        from graph_semantic_pipeline import recognize_semantic
+        from graph_fast_pipeline import recognize_fast
         from graph_pipeline_version import AGENT_PIPELINE_VERSION
-        engine=recognize_semantic
+        engine=recognize_fast
         version=AGENT_PIPELINE_VERSION
     elif graph_pipeline=='agent-tools-strict':
         from graph_agent_pipeline import recognize_agents
         engine=recognize_agents
         version='2026-10-26-agent-tools-v6-unpublished-comparison'
     layout=text_result.get('layout') or {}
-    if graph_pipeline in ('agent-tools','agent-tools-strict'):
+    if graph_pipeline == 'agent-tools':
+        from graph_fast_pipeline import configured_fast_budget
+        budget=configured_fast_budget(task_id=task_id,cancelled=cancelled)
+        if request_deadline is not None:
+            budget.deadline=min(budget.deadline,request_deadline-3)
+    elif graph_pipeline == 'agent-tools-strict':
         from graph_agent_runtime import AgentBudget
         budget=AgentBudget.configured(task_id=task_id,cancelled=cancelled)
         if request_deadline is not None:
@@ -59,8 +64,19 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
         if cancelled is not None and cancelled():
             from graph_agent_runtime import AgentCancelled
             raise AgentCancelled('upload_cancelled')
-        return _render_graph_result(raw,text_result,result,version,layout,
-                                    cancelled=cancelled,request_deadline=request_deadline)
+        rendered=_render_graph_result(raw,text_result,result,version,layout,
+                                      cancelled=cancelled,request_deadline=request_deadline)
+        if result.get('recognition_profile') == 'fast-editable':
+            seconds=round(time.monotonic()-budget.started,6)
+            rendered.update(confirmation_required=True,recognition_profile='fast-editable',
+                recognition_timing={'seconds':seconds,'target_seconds':120,
+                    'within_target':seconds<=120,'scope':'recognition_and_response_rendering'})
+            warnings=result.get('service_warnings',[])
+            if warnings:
+                rendered['service_warnings']=warnings
+                rendered['warning']=' '.join(filter(None,[rendered.get('warning')]+[
+                    item.get('message') for item in warnings]))
+        return rendered
     except Exception as exc:
         return _failed_graph_result(exc,version,budget,text_result,stage_audit=result.get('stage_audit'))
 

@@ -13,6 +13,7 @@ import fcntl
 import hashlib
 import io
 import math
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -36,6 +37,19 @@ MAX_CROP_PIXELS = 900_000
 MAX_OVERVIEW_PIXELS = 1_800_000
 MAX_OUTPUT_PIXELS = MAX_OVERVIEW_PIXELS + 4 * MAX_CROP_PIXELS
 MODEL_NAME = 'PP-DocLayoutV3'
+DEFAULT_LAYOUT_SECONDS = 30.
+MAX_LAYOUT_SECONDS = 35.
+
+
+def configured_layout_timeout():
+    """Bound cold model startup and inference within the upload's deadline."""
+    try:
+        seconds = float(os.environ.get('DMATE_LAYOUT_SECONDS', DEFAULT_LAYOUT_SECONDS))
+    except (TypeError, ValueError):
+        seconds = DEFAULT_LAYOUT_SECONDS
+    if not math.isfinite(seconds):
+        seconds = DEFAULT_LAYOUT_SECONDS
+    return min(MAX_LAYOUT_SECONDS, max(1., seconds))
 
 
 def _check(context):
@@ -215,39 +229,34 @@ def _run_layout(original, context, timeout):
     metric = {'stage': 'layout', 'status': 'not_run', 'worker_started': False,
               'model': MODEL_NAME, 'timeout_seconds': timeout, 'model_inference_completed': False}
     _check(context)
-    lock_path = Path(tempfile.gettempdir())/'dmate-local-model.lock'
-    with lock_path.open('a') as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+    from graph_local_scheduler import local_model_lock
+    with local_model_lock() as acquired:
+        if not acquired:
             return {'status': 'busy', 'regions': [], 'model': MODEL_NAME}, {**metric, 'status': 'busy', 'seconds': 0.}
-        try:
-            if deadline-time.monotonic() < 1.:
+        if deadline-time.monotonic() < 1.:
+            return {'status': 'not_run', 'regions': [], 'model': MODEL_NAME}, {**metric, 'status': 'deadline_reserved'}
+        with tempfile.TemporaryDirectory(prefix='dmate-semantic-layout-') as folder:
+            path = Path(folder)
+            view = original.copy()
+            view.thumbnail((MAX_WORK_SIDE, MAX_WORK_SIDE))
+            view.save(path/'layout.png', compress_level=2)
+            _check(context)
+            remaining = deadline-time.monotonic()
+            if remaining < 1.:
                 return {'status': 'not_run', 'regions': [], 'model': MODEL_NAME}, {**metric, 'status': 'deadline_reserved'}
-            with tempfile.TemporaryDirectory(prefix='dmate-semantic-layout-') as folder:
-                path = Path(folder)
-                view = original.copy()
-                view.thumbnail((MAX_WORK_SIDE, MAX_WORK_SIDE))
-                view.save(path/'layout.png', compress_level=2)
-                _check(context)
-                remaining = deadline-time.monotonic()
-                if remaining < 1.:
-                    return {'status': 'not_run', 'regions': [], 'model': MODEL_NAME}, {**metric, 'status': 'deadline_reserved'}
-                result, measured = run_worker('layout', path/'layout.png', path/'layout.json', timeout=remaining)
-                metric.update(measured)
-                metric['worker_started'] = bool(measured.get('phase_peaks') or measured.get('audit')
-                                                or measured.get('rss_observed') or measured.get('status') == 'ok')
-                regions = _valid_regions(result)
-                completed = regions is not None and measured.get('status') == 'ok'
-                metric['model_inference_completed'] = completed
-                metric['seconds_including_preparation'] = round(time.monotonic()-started, 6)
-                if completed:
-                    return {'status': 'ok', 'model': MODEL_NAME, 'regions': regions,
-                            'coordinate_space': 'original_normalized_0_1', 'source': 'executed_layout_worker'}, metric
-                return {'status': 'unavailable', 'model': MODEL_NAME, 'regions': [],
-                        'reason': str(metric.get('status', 'worker_failed'))}, metric
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+            result, measured = run_worker('layout', path/'layout.png', path/'layout.json', timeout=remaining)
+            metric.update(measured)
+            metric['worker_started'] = bool(measured.get('phase_peaks') or measured.get('audit')
+                                            or measured.get('rss_observed') or measured.get('status') == 'ok')
+            regions = _valid_regions(result)
+            completed = regions is not None and measured.get('status') == 'ok'
+            metric['model_inference_completed'] = completed
+            metric['seconds_including_preparation'] = round(time.monotonic()-started, 6)
+            if completed:
+                return {'status': 'ok', 'model': MODEL_NAME, 'regions': regions,
+                        'coordinate_space': 'original_normalized_0_1', 'source': 'executed_layout_worker'}, metric
+            return {'status': 'unavailable', 'model': MODEL_NAME, 'regions': [],
+                    'reason': str(metric.get('status', 'worker_failed'))}, metric
 
 
 def _fuse(panels, body, layout):
@@ -394,28 +403,35 @@ def _registry():
         description='真实OpenCV留白/墨迹分组及可选隔离PP-DocLayoutV3版面预测，提供原RGB宽松局部。',
         input_schema={'type': 'object', 'required': ['run_layout', 'layout_timeout'],
                       'additionalProperties': False, 'properties': {
-                          'run_layout': {'type': 'boolean'}, 'layout_timeout': {'type': 'number', 'minimum': 1, 'maximum': 18}}},
+                          'run_layout': {'type': 'boolean'}, 'layout_timeout': {'type': 'number', 'minimum': 1, 'maximum': MAX_LAYOUT_SECONDS}}},
         output_schema={'type': 'object', 'required': ['panels', 'body_regions', 'layout', 'image_refs',
             'view_descriptions', 'view_metadata', 'resource_metrics', 'diagnostics'],
             'properties': {'image_refs': {'type': 'array', 'minItems': 1, 'maxItems': 5, 'items': {'type': 'string'}},
                            'panels': {'type': 'array', 'maxItems': MAX_PANELS},
                            'body_regions': {'type': 'array', 'maxItems': MAX_BODY_REGIONS}}},
-        allowed_roles=frozenset({'semantic_extract'}), source_required=True, timeout_seconds=28), _layout_tool)
+        allowed_roles=frozenset({'semantic_extract'}), source_required=True,
+        timeout_seconds=MAX_LAYOUT_SECONDS+10), _layout_tool)
 
 
 def prepare_semantic_layout(raw, *, budget, layout=None, run_layout=False,
-                            layout_timeout=18., document=None):
+                            layout_timeout=None, document=None):
     """Return local candidates, original views, and actual execution audits.
 
     ``document`` is an optional caller-owned analysis of these same bytes;
     it must never come from model output. Only a completed, explicitly named
     PP-DocLayoutV3 result can skip a requested worker. No text/formula worker
-    is started. The shared lock is nonblocking and included in the 18s cap.
+    is started. The nonblocking shared lock, image preparation, cold model
+    initialization and inference share a bounded worker allowance, clipped to
+    the remaining upload deadline. DMATE_LAYOUT_SECONDS defaults to 30 and
+    cannot exceed 35; an explicit argument may choose a shorter allowance.
     """
     budget.check()
     if not isinstance(raw, (bytes, bytearray, memoryview)):
         raise TypeError('expected image bytes')
-    if type(run_layout) is not bool or type(layout_timeout) not in (int, float) or not 1 <= layout_timeout <= 18:
+    if layout_timeout is None:
+        layout_timeout = configured_layout_timeout()
+    if (type(run_layout) is not bool or type(layout_timeout) not in (int, float)
+            or not math.isfinite(layout_timeout) or not 1 <= layout_timeout <= MAX_LAYOUT_SECONDS):
         raise ValueError('invalid_layout_budget')
     if document is not None and not isinstance(document, DocumentEvidence):
         raise TypeError('expected DocumentEvidence')
@@ -451,4 +467,4 @@ def prepare_semantic_layout(raw, *, budget, layout=None, run_layout=False,
     return {**result, 'images': [state['images'][r] for r in result['image_refs']], 'tool_audit': list(context.audit)}
 
 
-__all__ = ['prepare_semantic_layout']
+__all__ = ['prepare_semantic_layout', 'configured_layout_timeout']

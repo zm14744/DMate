@@ -146,60 +146,55 @@ def suggest_candidates(document, graphs, *, max_candidates=MAX_CANDIDATES, deadl
             raise ValueError('invalid_coordinate_scale')
         if any(abs(scale[i]-document.work_size[i]/original_size[i]) > 1e-8 for i in (0, 1)):
             raise ValueError('inconsistent_coordinate_scale')
-        lock_path = Path(tempfile.gettempdir())/'dmate-local-model.lock'
-        with lock_path.open('a') as lock:
-            try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
+        from graph_local_scheduler import local_model_lock
+        with local_model_lock() as acquired:
+            if not acquired:
                 return inventory, [_diagnostic('local_cpu_busy', 'failed')]
-            try:
-                with tempfile.TemporaryDirectory(prefix='dmate-sknw-') as name:
-                    folder = Path(name)
-                    np.savez(folder/'masks.npz', ink=masks[0], strong=masks[1], weak=masks[2])
-                    request = {'graphs': selected[:MAX_GRAPHS], 'work_size': [width, height],
-                               'original_size': original_size, 'scale_xy': scale,
-                               'max_candidates': max_candidates}
-                    (folder/'request.json').write_text(json.dumps(request), encoding='utf-8')
-                    if time.monotonic() >= deadline:
-                        return inventory, [_diagnostic('deadline_exceeded', 'failed')]
-                    proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--worker', str(folder)],
-                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                        env=_child_environment(folder), start_new_session=True, cwd=str(folder))
-                    peak = 0
-                    failure = None
-                    try:
-                        while proc.poll() is None:
-                            peak = max(peak, _rss_bytes(proc.pid))
-                            if time.monotonic() >= deadline:
-                                failure = 'deadline_exceeded'
-                                break
-                            if peak > MAX_RSS_BYTES:
-                                failure = 'memory_limit_exceeded'
-                                break
-                            time.sleep(min(.025, max(.001, deadline-time.monotonic())))
-                    finally:
-                        _stop_process(proc)
-                    if failure:
-                        return inventory, [_diagnostic(failure, 'failed', peak_rss_bytes=peak,
-                            seconds=round(time.monotonic()-started, 3))]
-                    output = folder/'response.json'
-                    if proc.returncode != 0 or not output.is_file() or output.stat().st_size > MAX_OUTPUT_BYTES:
-                        return inventory, [_diagnostic('worker_failed', 'failed', returncode=proc.returncode)]
-                    result = json.loads(output.read_text(encoding='utf-8'))
-                    if not isinstance(result.get('inventory'), dict) or not isinstance(result.get('diagnostics'), list):
-                        raise ValueError('invalid_worker_result')
-                    inventory.update(result['inventory'])
-                    diagnostics = result['diagnostics']
-                    if len(selected) > MAX_GRAPHS:
-                        diagnostics.append(_diagnostic('graph_capacity_reached', graph_limit=MAX_GRAPHS,
-                                                       graph_count=len(selected)))
-                    reported_peak = result.get('worker_peak_rss_bytes', 0)
-                    diagnostics.append(_diagnostic('worker_resources', 'ok', peak_rss_bytes=max(peak, reported_peak),
-                        rss_observed=bool(peak or reported_peak), address_space_limit_bytes=MAX_ADDRESS_BYTES,
-                        seconds=round(time.monotonic()-started, 3), cpu_parallelism=1))
-                    return inventory, diagnostics
-            finally:
-                fcntl.flock(lock, fcntl.LOCK_UN)
+            with tempfile.TemporaryDirectory(prefix='dmate-sknw-') as name:
+                folder = Path(name)
+                np.savez(folder/'masks.npz', ink=masks[0], strong=masks[1], weak=masks[2])
+                request = {'graphs': selected[:MAX_GRAPHS], 'work_size': [width, height],
+                           'original_size': original_size, 'scale_xy': scale,
+                           'max_candidates': max_candidates}
+                (folder/'request.json').write_text(json.dumps(request), encoding='utf-8')
+                if time.monotonic() >= deadline:
+                    return inventory, [_diagnostic('deadline_exceeded', 'failed')]
+                proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--worker', str(folder)],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    env=_child_environment(folder), start_new_session=True, cwd=str(folder))
+                peak = 0
+                failure = None
+                try:
+                    while proc.poll() is None:
+                        peak = max(peak, _rss_bytes(proc.pid))
+                        if time.monotonic() >= deadline:
+                            failure = 'deadline_exceeded'
+                            break
+                        if peak > MAX_RSS_BYTES:
+                            failure = 'memory_limit_exceeded'
+                            break
+                        time.sleep(min(.025, max(.001, deadline-time.monotonic())))
+                finally:
+                    _stop_process(proc)
+                if failure:
+                    return inventory, [_diagnostic(failure, 'failed', peak_rss_bytes=peak,
+                        seconds=round(time.monotonic()-started, 3))]
+                output = folder/'response.json'
+                if proc.returncode != 0 or not output.is_file() or output.stat().st_size > MAX_OUTPUT_BYTES:
+                    return inventory, [_diagnostic('worker_failed', 'failed', returncode=proc.returncode)]
+                result = json.loads(output.read_text(encoding='utf-8'))
+                if not isinstance(result.get('inventory'), dict) or not isinstance(result.get('diagnostics'), list):
+                    raise ValueError('invalid_worker_result')
+                inventory.update(result['inventory'])
+                diagnostics = result['diagnostics']
+                if len(selected) > MAX_GRAPHS:
+                    diagnostics.append(_diagnostic('graph_capacity_reached', graph_limit=MAX_GRAPHS,
+                                                   graph_count=len(selected)))
+                reported_peak = result.get('worker_peak_rss_bytes', 0)
+                diagnostics.append(_diagnostic('worker_resources', 'ok', peak_rss_bytes=max(peak, reported_peak),
+                    rss_observed=bool(peak or reported_peak), address_space_limit_bytes=MAX_ADDRESS_BYTES,
+                    seconds=round(time.monotonic()-started, 3), cpu_parallelism=1))
+                return inventory, diagnostics
     except (ImportError, OSError, ValueError, TypeError, AttributeError, subprocess.SubprocessError) as exc:
         # Never leak input bytes, file paths, arbitrary worker output or env.
         return inventory, [_diagnostic('worker_unavailable', 'failed', error_type=type(exc).__name__)]

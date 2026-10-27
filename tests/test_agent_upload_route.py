@@ -1,4 +1,8 @@
-"""Real Flask upload/agent wiring with explicit synthetic model boundaries."""
+"""Retained multi-role reader contracts through real Flask upload wiring.
+
+The old reader is explicitly injected by this fixture. The production default
+and four-image editable flow have separate fast-pipeline and browser tests.
+"""
 import hashlib
 import io
 import copy
@@ -18,6 +22,10 @@ from vision_provider import VisionError
 def semantic_application(application, monkeypatch, tmp_path):
     module, client, guards = application
     monkeypatch.delenv('DMATE_GRAPH_PIPELINE', raising=False)
+    from graph_agent_runtime import AgentBudget
+    from graph_semantic_pipeline import recognize_semantic
+    monkeypatch.setattr('graph_fast_pipeline.recognize_fast', recognize_semantic)
+    monkeypatch.setattr('graph_fast_pipeline.configured_fast_budget', AgentBudget.configured)
     blocked = []
     worker_events = install_semantic_worker_fixtures(monkeypatch, lock_root=tmp_path)
     for owner, name in ((module, 'recognize_image'), (module, 'recognize_graphs')):

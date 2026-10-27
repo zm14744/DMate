@@ -15,7 +15,7 @@ from datetime import timedelta
 from collections import defaultdict, deque, OrderedDict
 import ipaddress
 
-from flask import Flask, jsonify, render_template, request, session, make_response, redirect
+from flask import Flask, jsonify, render_template, request, session, make_response, redirect, has_request_context
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
@@ -27,7 +27,7 @@ from graph_answer_integrity import (detect_count_inconsistency, review_directed_
     parse_labeled_multi_panels, review_labeled_multi_panels,
     FIGURE_VERTEX_COUNT)
 from graph_exact_solver import solve_certified_graph
-from graph_pipeline_version import active_pipeline, active_pipeline_version
+from graph_pipeline_version import active_pipeline, active_pipeline_version, graph_nextgen_enabled
 from graph_consistency import reconcile_vision_edges, summarize_tree_question
 from math_answer_guard import audit_explicit_count_answer
 from solution_integrity import verify_exact_question
@@ -73,7 +73,7 @@ OCR_AVAILABLE = False
 OCR_IMPORT_ERROR = None
 
 try:
-    if os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1":
+    if graph_nextgen_enabled():
         from ocr_runtime import OCRError, load_models, recognize_image
     else:
         from ocr import OCRError, load_models, recognize_image
@@ -413,7 +413,7 @@ def _graph_route_failure(kind, local_result, execution):
 
 
 def _semantic_ocr_selected():
-    return (os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1"
+    return (graph_nextgen_enabled()
             and active_pipeline() == "agent-tools")
 
 
@@ -473,14 +473,20 @@ def _record_semantic_execution(execution, status):
         _ocr_stages["semantic"] = {"status": status, "pipeline": "agent-tools"}
 
 
-def _run_graph_ocr_route(raw, result, local_execution, request_id, deadline, *, pipeline):
+def _run_graph_ocr_route(raw, result, local_execution, request_id, deadline, *, pipeline,
+                         started_at=None):
     """One selected graph route owns its failures and remote budget."""
+    from graph_confirmation import confirmation_owner
+    from graph_upload_tasks import UPLOAD_TASKS, UploadAdmissionError
+    owner = confirmation_owner()
+    started_at = time.monotonic() if started_at is None else started_at
     semantic = local_execution.get("mode") in ("skipped_for_semantic_reader", "semantic_with_local_tools")
     try:
         from ocr_nextgen import recognize_graph_document
-        nextgen = recognize_graph_document(raw, result, graph_pipeline=pipeline,
-                    task_id=request_id or None, request_deadline=deadline,
-                    cancelled=(lambda: _ocr_is_cancelled(request_id)))
+        with UPLOAD_TASKS.admit(owner, request_id):
+            nextgen = recognize_graph_document(raw, result, graph_pipeline=pipeline,
+                        task_id=request_id or None, request_deadline=deadline,
+                        cancelled=(lambda: _ocr_is_cancelled(request_id, owner=owner)))
         if (not isinstance(nextgen, dict)
                 or nextgen.get("recognition_status") not in ("complete", "partial", "failed", "not_graph")):
             raise ValueError("invalid_graph_pipeline_result")
@@ -492,7 +498,16 @@ def _run_graph_ocr_route(raw, result, local_execution, request_id, deadline, *, 
             return jsonify({"cancelled": True})
         if semantic:
             _record_semantic_execution(local_execution, nextgen["recognition_status"])
+        nextgen = dict(nextgen)
+        nextgen.update(request_id=request_id, source_sha256=hashlib.sha256(raw).hexdigest(),
+                       server_elapsed_seconds=round(time.monotonic()-started_at, 3))
         return jsonify(_with_local_ocr_execution(nextgen, local_execution))
+    except UploadAdmissionError as exc:
+        return jsonify({"error": ("此图片正在识别，请等待当前任务。" if exc.code == 'duplicate_active_task'
+                                  else "当前识别任务较多，请稍后重试。"),
+                        "error_code": exc.code, "request_id": request_id,
+                        "source_sha256": hashlib.sha256(raw).hexdigest(),
+                        "recognition_status": "failed"}), (409 if exc.code == 'duplicate_active_task' else 429)
     except Exception as nextgen_exc:
         print(f"分阶段图识别未完成：{type(nextgen_exc).__name__}")
         if request_id and _take_ocr_cancelled(request_id):
@@ -501,7 +516,10 @@ def _run_graph_ocr_route(raw, result, local_execution, request_id, deadline, *, 
             return jsonify({"cancelled": True})
         if semantic:
             _record_semantic_execution(local_execution, "failed")
-        return jsonify(_graph_route_failure(type(nextgen_exc).__name__, result, local_execution)), 503
+        failure = _graph_route_failure(type(nextgen_exc).__name__, result, local_execution)
+        failure.update(request_id=request_id, source_sha256=hashlib.sha256(raw).hexdigest(),
+                       server_elapsed_seconds=round(time.monotonic()-started_at, 3))
+        return jsonify(failure), 503
 
 _rate_lock = threading.Lock()
 _request_history = defaultdict(deque)
@@ -547,10 +565,18 @@ def _trim_ocr_cancellations(now):
         _cancelled_ocr_requests.popitem(last=False)
 
 
-def _mark_ocr_cancelled(request_id):
+def _ocr_cancel_key(request_id, owner=None):
+    if owner is None and has_request_context():
+        from graph_confirmation import confirmation_owner
+        owner = confirmation_owner()
+    return (owner, request_id) if owner is not None else request_id
+
+
+def _mark_ocr_cancelled(request_id, *, owner=None):
     request_id = _normalize_ocr_request_id(request_id)
     if not request_id:
         return False
+    request_id = _ocr_cancel_key(request_id, owner)
     with _ocr_cancel_lock:
         now = time.monotonic()
         _trim_ocr_cancellations(now)
@@ -560,21 +586,23 @@ def _mark_ocr_cancelled(request_id):
     return True
 
 
-def _take_ocr_cancelled(request_id):
+def _take_ocr_cancelled(request_id, *, owner=None):
     request_id = _normalize_ocr_request_id(request_id)
     if not request_id:
         return False
+    request_id = _ocr_cancel_key(request_id, owner)
     with _ocr_cancel_lock:
         now = time.monotonic()
         _trim_ocr_cancellations(now)
         return _cancelled_ocr_requests.pop(request_id, None) is not None
 
 
-def _ocr_is_cancelled(request_id):
+def _ocr_is_cancelled(request_id, *, owner=None):
     """Non-consuming cancellation check for model/tool stages in this upload."""
     request_id = _normalize_ocr_request_id(request_id)
     if not request_id:
         return False
+    request_id = _ocr_cancel_key(request_id, owner)
     with _ocr_cancel_lock:
         _trim_ocr_cancellations(time.monotonic())
         return request_id in _cancelled_ocr_requests
@@ -688,7 +716,7 @@ def _warm_ocr_models():
         )
 
 
-if OCR_AVAILABLE and os.environ.get("DMATE_GRAPH_NEXTGEN", "0") != "1":
+if OCR_AVAILABLE and not graph_nextgen_enabled():
     threading.Thread(
         target=_warm_ocr_models,
         daemon=True
@@ -2907,6 +2935,36 @@ def _parse_requested_outputs(instruction):
     return result
 
 
+@app.after_request
+def attach_graph_confirmation_owner(response):
+    from graph_confirmation import attach_confirmation_cookie
+    return attach_confirmation_cookie(response)
+
+
+@app.route("/graph/session", methods=["GET"])
+def graph_confirmation_session():
+    from graph_confirmation import confirmation_owner
+    confirmation_owner()
+    response = jsonify({"ready": True})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/graph/confirm", methods=["POST"])
+def confirm_graph_document():
+    from graph_confirmation import ConfirmationError, confirmation_owner, confirm_document
+    import sqlite3
+    try:
+        result = confirm_document(confirmation_owner(), request.get_json(silent=True))
+    except ConfirmationError as exc:
+        return jsonify({"error": exc.message, "code": exc.code, "issues": exc.issues}), exc.status
+    except (sqlite3.Error, OSError):
+        return jsonify({"error": "题目确认暂时无法保存，请稍后再试。", "code": "confirmation_unavailable"}), 503
+    response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     ip = _get_client_ip()
@@ -2922,6 +2980,19 @@ def chat():
         return jsonify({
             "error": "请求格式不正确，请检查提交内容"
         }), 400
+
+    confirmed_context = None
+    if data.get("semantic_context") is not None:
+        from graph_confirmation import ConfirmationError, confirmation_owner, resolve_confirmed_context
+        import sqlite3
+        try:
+            confirmed_context = resolve_confirmed_context(confirmation_owner(), data["semantic_context"])
+        except ConfirmationError as exc:
+            return jsonify({"error": exc.message, "code": exc.code, "issues": exc.issues}), exc.status
+        except (sqlite3.Error, OSError):
+            return jsonify({"error": "暂时无法核对题目确认状态，请稍后再试。", "code": "confirmation_unavailable"}), 503
+        if confirmed_context is not None:
+            data = {**data, "semantic_context": confirmed_context}
 
     messages = data.get("messages")
     request_kind = str(data.get("request_kind", "") or "").strip().lower()
@@ -2958,11 +3029,12 @@ def chat():
         if not content:
             continue
 
-        if len(content) > MAX_MESSAGE_CHARS:
+        message_limit = 28000 if confirmed_context is not None else MAX_MESSAGE_CHARS
+        if len(content) > message_limit:
             return jsonify({
                 "error": (
                     "单条消息过长，请控制在 "
-                    f"{MAX_MESSAGE_CHARS} 个字符以内"
+                    f"{message_limit} 个字符以内"
                 )
             }), 400
 
@@ -3079,7 +3151,7 @@ def chat():
     # 仅当本轮确实要求答案、客户端发送的题干与实际请求锚点一致时，
     # 才使用这道生成题之前保存的参考答案；不查其他账号或会话。
     solution_reference_answer = ""
-    if solution_mode and not client_requires_exercise:
+    if solution_mode and not client_requires_exercise and confirmed_context is None:
         ref = data.get("solution_reference")
         if isinstance(ref, dict):
             q = ref.get("question")
@@ -3227,12 +3299,24 @@ def chat():
     # used for rendering. Never recover them by lowercasing/parsing prose or
     # reuse the preceding picture after navigating to a different question.
     semantic_math = {"status": "not_requested", "tool_audit": []}
+    if confirmed_context is not None and effective_exercise_request:
+        return jsonify({"error": "请从已确认的题目提出解题或讲解请求；生成新练习时不要沿用图片确认。",
+                        "code": "confirmed_question_action_mismatch"}), 400
     if data.get("semantic_context") is not None and not effective_exercise_request:
         from graph_semantic_solver import semantic_solver_context
         try:
             semantic_math = semantic_solver_context(data["semantic_context"], current_user_content)
         except (ValueError, TypeError, KeyError, ImportError) as exc:
             semantic_math = {"status": "unavailable", "error_kind": type(exc).__name__, "tool_audit": []}
+        if confirmed_context is not None:
+            if semantic_math.get("status") != "bound":
+                return jsonify({"error": "当前请求与已确认题目不一致，请从对应图片重新发起解题。",
+                                "code": "confirmed_question_mismatch"}), 409
+            semantic_math.update(user_confirmed=True,
+                document_sha256=confirmed_context["document_sha256"],
+                confirmation_revision=confirmed_context["revision"])
+            from graph_semantic_solver import confirmed_matrix_calculations
+            semantic_math = confirmed_matrix_calculations(semantic_math, current_user_content)
         ai_teaching = dict(ai_teaching or {})
         ai_teaching["semantic_math"] = semantic_math
 
@@ -3291,12 +3375,23 @@ def chat():
             })
         return jsonify({"error": result.get("error") or "这次没有生成有效题目，请重试"}), 503
 
+    if confirmed_context is not None:
+        # An edit/confirmation made while DeepSeek was working invalidates the
+        # old reply as well as the next request; it cannot appear as the answer
+        # for the newly edited graph.
+        try:
+            resolve_confirmed_context(confirmation_owner(), confirmed_context)
+        except ConfirmationError as exc:
+            return jsonify({"error": exc.message, "code": exc.code}), exc.status
+        except (sqlite3.Error, OSError):
+            return jsonify({"error": "暂时无法核对题目确认状态，请稍后再试。", "code": "confirmation_unavailable"}), 503
+
     if result.get("ok") is True:
         reply = result.get("reply", "")
         # Use deterministic connectivity and edge counts when the user gives
         # a COMPLETE set of labeled graphs. Never let the final tree selection
         # disagree with the explicit graph structure.
-        if not effective_exercise_request and cleaned:
+        if not effective_exercise_request and cleaned and confirmed_context is None:
             latest_graph_text = next(
                 (m["content"] for m in reversed(cleaned) if m.get("role") == "user"), ""
             )
@@ -3325,14 +3420,15 @@ def chat():
             # yet the model invented a different two-degree-three tree exercise.
             # Graph-dependent answers must fail closed at the response boundary,
             # regardless of what the model confidently claims.
-            protected_reply = protect_uncertain_graph_answer(latest_math_request, reply)
+            protected_reply = (None if confirmed_context is not None else
+                               protect_uncertain_graph_answer(latest_math_request, reply))
             if protected_reply is not None:
                 reply = protected_reply
 
         # This final safety boundary MUST ALSO run for solve requests that
         # the teaching/exercise classifier mislabels. Previously the whole
         # guard was accidentally inside "if not effective_exercise_request".
-        if cleaned and isinstance(reply, str):
+        if cleaned and isinstance(reply, str) and confirmed_context is None:
             original_image_request = next(
                 (m["content"] for m in reversed(cleaned) if m.get("role") == "user"), ""
             )
@@ -3614,6 +3710,8 @@ def chat():
                 "status": semantic_math.get("status"),
                 "tool_audit": semantic_math.get("tool_audit", []),
                 "image_accuracy_certified": False,
+                **({"user_confirmed": True, "document_sha256": confirmed_context["document_sha256"],
+                    "revision": confirmed_context["revision"]} if confirmed_context is not None else {}),
             }}
 
         if generated_teaching:
@@ -3890,6 +3988,7 @@ def cancel_ocr():
 
 @app.route("/ocr", methods=["POST"])
 def ocr():
+    started_at = time.monotonic()
     # 普通 OCR 与 Vision 互为兜底。即使 PaddleOCR 暂时不可用，
     # 也允许 Vision 处理“只有图、没有文字”的题目。
     ip = _get_client_ip()
@@ -3901,7 +4000,7 @@ def ocr():
 
     request_id = _normalize_ocr_request_id(
         request.form.get("request_id", "")
-    )
+    ) or secrets.token_hex(16)
 
     # 如果撤销通知比上传请求更早抵达，直接结束，不启动模型。
     if request_id and _take_ocr_cancelled(request_id):
@@ -3929,6 +4028,13 @@ def ocr():
             "error": "图片过大，请上传 8MB 以内的图片"
         }), 413
 
+    from graph_confirmation import confirmation_owner, register_recognition, ConfirmationError
+    try:
+        register_recognition(confirmation_owner(), request_id, hashlib.sha256(raw).hexdigest())
+    except ConfirmationError as exc:
+        return jsonify({"error": "图片任务与原图不匹配，请重新选择图片。",
+                        "error_code": exc.code, "request_id": request_id}), exc.status
+
     recognition_deadline = time.monotonic() + 285
     try:
         if _semantic_ocr_selected():
@@ -3939,7 +4045,7 @@ def ocr():
                 return jsonify({"cancelled": True})
             _record_semantic_execution(local_execution, "running")
             return _run_graph_ocr_route(raw, result, local_execution, request_id,
-                                       recognition_deadline, pipeline="agent-tools")
+                                       recognition_deadline, pipeline="agent-tools", started_at=started_at)
         result = {
             "text": "",
             "text_count": 0,
@@ -4010,11 +4116,11 @@ def ocr():
         # Once selected, the new pipeline owns this document's remote budget.
         # Even an unexpected exception after its second send must not restart
         # a legacy visual chain with a fresh, independent budget.
-        if (os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1"
+        if (graph_nextgen_enabled()
                 and (possible_graph or any(r.get("role") == "figure"
                     for r in (result.get("layout") or {}).get("regions", [])))):
             return _run_graph_ocr_route(raw, result, local_execution, request_id,
-                                       recognition_deadline, pipeline=active_pipeline())
+                                       recognition_deadline, pipeline=active_pipeline(), started_at=started_at)
 
         if possible_graph and recognize_graphs is not None:
             try:
@@ -4031,7 +4137,7 @@ def ocr():
             vision_result = analyze_image_structure(
                 raw, ocr_text=ocr_text, review_regions=vision_regions,
                 opencv_graphs=graph_cv,
-                retries=0 if os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1" else 1
+                retries=0 if graph_nextgen_enabled() else 1
             )
         except Exception as exc:
             print(f"Vision 增强层异常：{type(exc).__name__}")
@@ -4555,7 +4661,7 @@ def health():
         "status": "ok",
         "runtime_source": _RUNTIME_SOURCE,
         "recognition_budget": configured_recognition_budget(),
-        "graph_nextgen_enabled": os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1",
+        "graph_nextgen_enabled": graph_nextgen_enabled(),
         "graph_nextgen_version": active_pipeline_version(),
         "graph_nextgen_engine": active_pipeline(),
         "graph_integrity_version": "2026-10-20-independent-edge-audit-v2",
@@ -4585,7 +4691,7 @@ def ready():
                  "local_ocr_required": not semantic,
                  "recognition_ready": (semantic_status in ("complete", "partial")
                                        if semantic else _ocr_ready),
-                 "graph_nextgen_enabled": os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1",
+                 "graph_nextgen_enabled": graph_nextgen_enabled(),
                  "graph_nextgen_version": active_pipeline_version(),
                  "graph_nextgen_engine": active_pipeline(),
                  "ocr_stages": copy.deepcopy(_ocr_stages)}

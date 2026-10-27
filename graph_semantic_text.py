@@ -145,42 +145,37 @@ def _run_text(original, layout, context):
     if context.deadline_monotonic-time.monotonic() < 1.:
         return None, {**metric, 'status': 'deadline_reserved'}
     _check(context)
-    lock_path = Path(tempfile.gettempdir())/'dmate-local-model.lock'
-    with lock_path.open('a') as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+    from graph_local_scheduler import local_model_lock
+    with local_model_lock() as acquired:
+        if not acquired:
             return None, {**metric, 'status': 'busy', 'seconds': 0.}
-        try:
-            readiness = _cache_readiness()
-            metric.update(readiness)
-            if readiness['status'] != 'ready':
-                return None, metric
+        readiness = _cache_readiness()
+        metric.update(readiness)
+        if readiness['status'] != 'ready':
+            return None, metric
+        _check(context)
+        with tempfile.TemporaryDirectory(prefix='dmate-semantic-text-') as folder:
+            root = Path(folder)
+            # Native recognition crops keep all original pixels. The
+            # existing BoundedTextModel limits only the detector to 1600.
+            original.save(root/'original.png', compress_level=1)
+            (root/'layout.json').write_text(json.dumps(layout, ensure_ascii=False), encoding='utf-8')
             _check(context)
-            with tempfile.TemporaryDirectory(prefix='dmate-semantic-text-') as folder:
-                root = Path(folder)
-                # Native recognition crops keep all original pixels. The
-                # existing BoundedTextModel limits only the detector to 1600.
-                original.save(root/'original.png', compress_level=1)
-                (root/'layout.json').write_text(json.dumps(layout, ensure_ascii=False), encoding='utf-8')
-                _check(context)
-                remaining = context.deadline_monotonic-time.monotonic()-.25
-                if remaining < 1.:
-                    return None, {**metric, 'status': 'deadline_reserved'}
-                result, measured = run_worker('text', root/'original.png', root/'text.json',
-                    layout_path=root/'layout.json', timeout=remaining)
-                metric.update(measured)
-                metric['worker_timeout_seconds'] = remaining
-                metric['worker_started'] = bool(measured.get('phase_peaks') or measured.get('audit')
-                                                or measured.get('rss_observed') or measured.get('status') == 'ok')
-                completed = measured.get('status') == 'ok' and _evidence_valid(result, original.size)
-                metric['model_inference_completed'] = completed
-                metric['seconds_including_preparation'] = round(time.monotonic()-started, 6)
-                if measured.get('status') == 'ok' and not completed:
-                    metric['status'] = 'invalid_worker_output'
-                return result if completed else None, metric
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+            remaining = context.deadline_monotonic-time.monotonic()-.25
+            if remaining < 1.:
+                return None, {**metric, 'status': 'deadline_reserved'}
+            result, measured = run_worker('text', root/'original.png', root/'text.json',
+                layout_path=root/'layout.json', timeout=remaining)
+            metric.update(measured)
+            metric['worker_timeout_seconds'] = remaining
+            metric['worker_started'] = bool(measured.get('phase_peaks') or measured.get('audit')
+                                            or measured.get('rss_observed') or measured.get('status') == 'ok')
+            completed = measured.get('status') == 'ok' and _evidence_valid(result, original.size)
+            metric['model_inference_completed'] = completed
+            metric['seconds_including_preparation'] = round(time.monotonic()-started, 6)
+            if measured.get('status') == 'ok' and not completed:
+                metric['status'] = 'invalid_worker_output'
+            return result if completed else None, metric
 
 
 def _normalise(result, size, context):

@@ -2,7 +2,7 @@
 
 Synthetic mode runs the real application in a fresh, loopback-only process.
 Only local worker and Qwen/DeepSeek transport boundaries are injected. It never
-replaces /ocr, recognize_image, VisionProvider, graph extraction or the dialog.
+replaces /ocr, recognize_image, VisionProvider, graph extraction or the editor.
 The result is a synthetic application CONTRACT check, not model/image accuracy.
 
 Observed-http mode accepts an explicitly supplied loopback test service and a
@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.benchmark_graph_first_pass import (digest, load_manifest, same_source,
                                                source_snapshot, utc_now, write_json)
-from scripts.verify_graph_first_pass_ui import OBSERVE_JS, _cached_asset, compare_observation
+from scripts.verify_graph_first_pass_ui import _cached_asset
 
 MODES = ('synthetic', 'observed-http')
 CASES = ('normal', 'memory_limit', 'vision_failure', 'cancel_local', 'duplicate_selection')
@@ -359,15 +359,12 @@ def health_observation(base_url):
 
 
 OBSERVER_INSTALL = r"""() => {
-  const original = window.reviewRecognizedQuestion;
-  if (typeof original !== 'function') throw Error('Real upload dialog is unavailable');
+  if (typeof window.DMateGraphEditor?.mount !== 'function') throw Error('Real graph editor unavailable');
   window.__uploadDialogCalls = 0;
   window.__uploadFormEvidence = [];
   window.__uploadFormPromises = [];
   const originalFetch = window.fetch;
   window.fetch = function(input, options) {
-    // Observe the actual FormData/File without replacing, cloning, delaying or
-    // changing the request. Chromium DevTools omits file bytes from postData.
     const result = originalFetch.apply(this, arguments);
     if (typeof input === 'string' && new URL(input, location.href).pathname === '/ocr'
         && options?.body instanceof FormData) {
@@ -382,11 +379,11 @@ OBSERVER_INSTALL = r"""() => {
     }
     return result;
   };
-  window.reviewRecognizedQuestion = function(file, data) {
+  const mount = window.DMateGraphEditor.mount;
+  window.DMateGraphEditor.mount = function(container, options) {
     window.__uploadDialogCalls++;
-    window.__firstPassResponse = data;
-    window.__firstPassBefore = JSON.stringify(data);
-    return original.call(this, file, data);
+    window.__editorInitialDocument = JSON.parse(JSON.stringify(options.document));
+    return mount.call(this, container, options);
   };
 }"""
 
@@ -415,7 +412,11 @@ def multipart_observation(raw, content_type):
 
 
 def capture_upload(context, base_url, row, case_id, folder, *, server_folder=None, mobile=False):
-    """One actual file selection and original response; no OCR request replay."""
+    """Observe real single-file upload and explicitly open/dismiss its editor.
+
+    This retains the historical memory/failure/cancellation checks while using
+    the editable task card. Recognition never opens a modal or solves by itself.
+    """
     from PIL import Image, ImageOps
     case = {'id': case_id, 'image_id': row['id'], 'image_sha256': row['sha256'],
             'request_started_at': utc_now(), 'checks': [], 'requests': [],
@@ -423,122 +424,123 @@ def capture_upload(context, base_url, row, case_id, folder, *, server_folder=Non
     folder.mkdir(mode=0o700)
     page = context.new_page()
     page.on('pageerror', lambda error: case['page_errors'].append(str(error)))
+    captured_responses = []
 
     def observe_request(request):
         path = urlsplit(request.url).path
-        if path in ('/ocr', '/ocr/cancel', '/chat'):
-            record = {'path': path, 'method': request.method, 'at': utc_now(),
-                      'post_data_sha256': digest(request.post_data_buffer or b'')}
-            if path == '/ocr':
-                try:
-                    multipart = multipart_observation(request.post_data_buffer or b'',
-                                                      request.headers.get('content-type', ''))
-                    record['request_id'] = multipart['request_id']
-                    record['devtools_multipart'] = multipart
-                    record['devtools_omits_file_bytes'] = multipart['image_bytes'] == 0
-                except (ValueError, TypeError, UnicodeError) as exc:
-                    record['upload_capture_error'] = type(exc).__name__
-            case['requests'].append(record)
-
-    captured_responses = []
+        if path not in ('/ocr', '/ocr/cancel', '/chat'): return
+        record = {'path': path, 'method': request.method, 'at': utc_now(),
+                  'post_data_sha256': digest(request.post_data_buffer or b'')}
+        if path == '/ocr':
+            try:
+                multipart = multipart_observation(request.post_data_buffer or b'', request.headers.get('content-type', ''))
+                record.update(request_id=multipart['request_id'], devtools_multipart=multipart,
+                              devtools_omits_file_bytes=multipart['image_bytes'] == 0)
+            except (ValueError, TypeError, UnicodeError) as exc:
+                record['upload_capture_error'] = type(exc).__name__
+        case['requests'].append(record)
     page.on('request', observe_request)
     page.on('response', lambda response: captured_responses.append(response)
             if urlsplit(response.url).path == '/ocr' else None)
     try:
         case['health_before'] = health_observation(base_url)
         page.goto(base_url, wait_until='networkidle', timeout=30000)
-        page.wait_for_function('typeof handleImageSelected === "function" && !!window.MathJax?.typesetPromise')
+        page.wait_for_function('typeof handleImageSelected === "function" && !!window.DMateGraphEditor?.mount')
         page.evaluate(OBSERVER_INSTALL)
-        before = page.evaluate('() => ({count:getCurrent()?.messages?.length || 0,review:ocrReviewInProgress})')
-        _check(case, 'idle_before_selection', before['review'] is False)
+        _check(case, 'idle_before_selection', page.locator('[data-ocr-task-id]').count() == 0)
         selected = Path(row['path'])
         page.locator('#imageInput').set_input_files(str(selected))
-
+        card = page.locator('article[data-ocr-task-id]').first
+        card.wait_for(state='visible')
         if case_id in ('cancel_local', 'duplicate_selection') and server_folder is not None:
             deadline = time.monotonic()+20
             waiting = None
             while time.monotonic() < deadline:
                 waiting = next((x for x in server_events(server_folder)
                                 if x['kind'] == 'worker_waiting' and x['case'] == case_id), None)
-                if waiting:
-                    break
+                if waiting: break
                 page.wait_for_timeout(25)
-            if waiting is None:
-                raise TimeoutError('Real request did not reach paused worker')
+            if waiting is None: raise TimeoutError('Real request did not reach paused worker')
             if case_id == 'cancel_local':
                 with page.expect_response(lambda r: urlsplit(r.url).path == '/ocr/cancel') as cancelled:
-                    page.locator('#ocrCancelBtn').click()
-                cancel_response = cancelled.value
-                case['cancel_response'] = {'http_status': cancel_response.status, 'body': cancel_response.json()}
-            else:
-                page.locator('#imageInput').set_input_files(str(selected))
+                    card.locator('[data-ocr-action="cancel"]').click()
+                case['cancel_response'] = {'http_status': cancelled.value.status, 'body': cancelled.value.json()}
+            # Re-selecting while a request runs is now permitted as a separate
+            # task. The old duplicate scenario instead checks the editor guard.
             (server_folder/('release_'+waiting['request_id'])).touch(exist_ok=False)
-
-        page.wait_for_function('!ocrReviewInProgress || document.querySelector("#ocrReviewDialog").open', timeout=60000)
+        page.wait_for_function('document.querySelector("article[data-ocr-task-id]")?.dataset.state !== "recognizing"', timeout=60000)
         if case_id == 'cancel_local' and server_folder is not None:
             deadline = time.monotonic()+20
-            while time.monotonic() < deadline and not any(
-                    e['kind'] == 'response_completed' and e.get('path') == '/ocr'
-                    and e.get('case') == case_id for e in server_events(server_folder)):
+            while time.monotonic() < deadline and not any(e['kind'] == 'response_completed'
+                    and e.get('path') == '/ocr' and e.get('case') == case_id for e in server_events(server_folder)):
                 page.wait_for_timeout(25)
+        page.wait_for_timeout(100)
         for index, response in enumerate(captured_responses):
             record = {'http_status': response.status, 'received_at': utc_now()}
             try:
-                raw = response.body()
-                write_bytes(folder/f'first_response_{index+1:02d}.bin', raw)
+                raw = response.body(); write_bytes(folder/f'first_response_{index+1:02d}.bin', raw)
                 record.update(response_sha256=digest(raw), body=json.loads(raw))
-            except Exception as exc:
-                record['body_capture_error'] = type(exc).__name__
+            except Exception as exc: record['body_capture_error'] = type(exc).__name__
             case['http_responses'].append(record)
-        dialog = page.locator('#ocrReviewDialog')
-        case['dialog_opened'] = dialog.evaluate('(element) => element.open')
-        case['dialog_calls'] = page.evaluate('window.__uploadDialogCalls')
-        prediction = (case['http_responses'][0].get('body') if case['http_responses'] else None)
-        if case['dialog_opened']:
-            if not isinstance(prediction, dict):
-                raise ValueError('Dialog has no captured first response')
-            observed = page.evaluate(OBSERVE_JS, {'sourceText': str(prediction.get('text') or '').strip()})
+        prediction = case['http_responses'][0].get('body') if case['http_responses'] else None
+        case['task_state'] = card.get_attribute('data-state')
+        _check(case, 'no_automatic_editor_or_solver', page.evaluate('window.__uploadDialogCalls') == 0
+               and not any(r['path'] == '/chat' for r in case['requests']))
+        case['dialog_opened'] = False
+        if case['task_state'] == 'ready':
+            card.locator('[data-ocr-action="edit"]').click()
+            page.locator('#graphEditorDialog').wait_for(state='visible')
+            page.wait_for_function("[...document.querySelectorAll('#graphEditorMount img')].some(img => img.complete && img.naturalWidth > 0)")
+            case['dialog_opened'] = True
+            observed = page.evaluate("""() => ({document:window.__editorInitialDocument,
+              body:document.querySelector('#graphEditorMount textarea[aria-label="题干、全部小问与公式"]')?.value,
+              preview:[...document.querySelectorAll('#graphEditorMount img')].map(img=>({width:img.naturalWidth,height:img.naturalHeight})),
+              svg:!!document.querySelector('#graphEditorMount .dge-visual svg'),
+              renderedVertices:document.querySelectorAll('#graphEditorMount .dge-visual-node').length,
+              renderedEdges:document.querySelectorAll('#graphEditorMount .dge-visual-edge').length})""")
             write_json(folder/'ui_observation.json', observed)
-            with Image.open(selected) as image:
-                display_size = ImageOps.exif_transpose(image).size
-            case['checks'].extend(compare_observation(prediction, observed, row, display_size))
-            _check(case, 'dialog_uses_first_http_body', json.loads(page.evaluate('window.__firstPassBefore')) == prediction)
+            expected = {'body_text': prediction.get('text', ''), 'graphs': prediction.get('graph_structures', [])}
+            if isinstance(prediction.get('text_context'), dict): expected['text_context'] = prediction['text_context']
+            _check(case, 'editor_uses_first_http_document', observed['document'] == expected)
+            _check(case, 'editable_body_is_literal', observed['body'] == expected['body_text'])
+            with Image.open(selected) as image: display_size = list(ImageOps.exif_transpose(image).size)
+            _check(case, 'original_preview_and_graph_rendered', bool(observed['preview'])
+                   and [observed['preview'][0]['width'], observed['preview'][0]['height']] == display_size
+                   and (not expected['graphs'] or (observed['svg']
+                        and observed['renderedVertices'] == len(expected['graphs'][0].get('vertices', []))
+                        and observed['renderedEdges'] == len(expected['graphs'][0].get('edges', [])))))
             if case_id == 'duplicate_selection':
                 page.locator('#imageInput').set_input_files(str(selected))
-                page.keyboard.press('Escape')
-            else:
-                page.locator('#ocrReviewCancel').click()
-            page.wait_for_function('!ocrReviewInProgress')
-        if isinstance(prediction, dict) and prediction.get('error'):
-            # The existing UI animates assistant errors; observe its completed
-            # message, not a transient first few characters of that animation.
-            page.wait_for_function('!isCurrentSessionTyping()', timeout=20000)
+            page.locator('#graphEditorMount').get_by_role('button', name='稍后继续', exact=True).click()
+            page.locator('#graphEditorDialog').wait_for(state='hidden')
+        case['dialog_calls'] = page.evaluate('window.__uploadDialogCalls')
         case['browser_uploads'] = page.evaluate('async () => {await Promise.all(window.__uploadFormPromises); return window.__uploadFormEvidence;}')
         case['health_after'] = health_observation(base_url)
-        after = page.evaluate('''() => ({messages:getCurrent()?.messages || [],
-            inputValue:document.querySelector('#imageInput').value,
-            inFlight:ocrRequestInFlight, reviewing:ocrReviewInProgress,
-            uploadDisabled:document.querySelector('#imageBtn')?.disabled ?? null,
-            body:document.body.innerText})''')
+        after = page.evaluate("""() => ({messages:getCurrent()?.messages || [],
+            inputValue:document.querySelector('#imageInput').value, inFlight:ocrRequestInFlight,
+            reviewing:ocrReviewInProgress, uploadDisabled:document.querySelector('#imageBtn')?.disabled ?? null,
+            body:document.body.innerText})""")
         case['ui_after'] = after
         _check(case, 'file_selection_reset', after['inputValue'] == '')
-        _check(case, 'upload_handler_released', after['inFlight'] is False
-               and after['reviewing'] is False and after['uploadDisabled'] is False)
-        _check(case, 'exactly_one_ocr_request', sum(r['path'] == '/ocr' for r in case['requests']) == 1)
+        _check(case, 'upload_handler_released', not after['inFlight'] and not after['reviewing'] and not after['uploadDisabled'])
         requests = [r for r in case['requests'] if r['path'] == '/ocr']
-        _check(case, 'browser_submitted_original_bytes', len(case['browser_uploads']) == 1
-               and len(requests) == 1 and case['browser_uploads'][0]['image_sha256'] == row['sha256']
+        _check(case, 'exactly_one_ocr_request', len(requests) == 1)
+        _check(case, 'browser_submitted_original_bytes', len(case['browser_uploads']) == 1 and len(requests) == 1
+               and case['browser_uploads'][0]['image_sha256'] == row['sha256']
                and case['browser_uploads'][0]['request_id'] == requests[0].get('request_id'))
         _check(case, 'no_chat_request', not any(r['path'] == '/chat' for r in case['requests']))
         _check(case, 'no_question_added_on_dismissal', not any(m.get('source') == 'ocr' for m in after['messages']))
         _check(case, 'no_browser_exception', not case['page_errors'])
         if case_id == 'cancel_local' and server_folder is not None:
-            _check(case, 'cancelled_without_dialog', not case['dialog_opened'] and case['dialog_calls'] == 0)
-            _check(case, 'actual_cancel_endpoint', case.get('cancel_response') == {
-                'http_status': 200, 'body': {'cancelled': True}})
-        elif isinstance(prediction, dict) and (prediction.get('error') or prediction.get('recognition_status') == 'failed'):
+            _check(case, 'cancelled_without_dialog', not case['dialog_opened'] and case['dialog_calls'] == 0
+                   and case['task_state'] == 'cancelled')
+            _check(case, 'actual_cancel_endpoint', case.get('cancel_response', {}).get('http_status') == 200
+                   and case.get('cancel_response', {}).get('body', {}).get('cancelled') is True)
+        elif case['task_state'] == 'failed':
             _check(case, 'failed_body_never_reviewed', not case['dialog_opened'] and case['dialog_calls'] == 0)
-            _check(case, 'error_visible', bool(prediction.get('error')) and prediction['error'] in after['body'])
+            error_text = str((prediction or {}).get('error') or '')
+            _check(case, 'error_visible', error_text in card.inner_text() if error_text else
+                   any(word in card.inner_text() for word in ('失败', '未完成')))
         else:
             _check(case, 'original_response_opened_once', case['dialog_opened'] and case['dialog_calls'] == 1)
         if server_folder is not None and case_id != 'cancel_local':
@@ -554,17 +556,17 @@ def capture_upload(context, base_url, row, case_id, folder, *, server_folder=Non
                        and prediction.get('recognition_status') == 'failed' and bool(prediction.get('error')))
             elif case_id in ('normal', 'duplicate_selection'):
                 _check(case, 'synthetic_full_chain_completed', prediction.get('recognition_status') == 'complete')
-        case['reported_model_evidence'] = {
-            'verification': 'injected_boundaries' if server_folder else 'server_reported_unverified',
+        case['reported_model_evidence'] = {'verification': 'injected_boundaries' if server_folder else 'server_reported_unverified',
             'remote_metrics': (prediction or {}).get('diagnostics', {}).get('remote_metrics'),
             'transport_ledger': (prediction or {}).get('diagnostics', {}).get('transport_ledger')}
     except Exception as exc:
         case['exception'] = {'type': type(exc).__name__, 'message': str(exc)[:500]}
-        _check(case, 'harness_completed', False)
+        _check(case, 'exception_free', False)
     finally:
+        case['request_finished_at'] = utc_now()
+        case['contract_status'] = 'pass' if case['checks'] and all(c['status'] == 'pass' for c in case['checks']) else 'fail'
+        write_json(folder/'observation.json', case)
         page.close()
-    case['contract_status'] = 'pass' if case['checks'] and all(x['status'] == 'pass' for x in case['checks']) else 'fail'
-    write_json(folder/'observation.json', case)
     return case
 
 

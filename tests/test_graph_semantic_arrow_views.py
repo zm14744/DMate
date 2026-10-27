@@ -227,6 +227,37 @@ def test_separate_panels_are_cropped_from_same_full_source_with_clipped_padding(
     assert results[1]['view_metadata'][1]['source_box'][2] == image.width
 
 
+def test_shifted_inventory_hints_supply_each_panel_real_pixels_and_full_original():
+    from graph_semantic_panel_context import panel_context
+    from test_graph_semantic_panel_context import shifted_six_panel_case
+
+    graphs, layout = shifted_six_panel_case()
+    source = Image.new('RGB', (1000, 1000), 'white')
+    drawing = ImageDraw.Draw(source)
+    colours = ['red', 'green', 'blue', 'yellow', 'purple', 'orange']
+    for row, colour in zip(layout['panels'], colours):
+        drawing.rectangle(row['bbox'], fill=colour)
+    raw = png(source)
+    overview = arrow.prepare_arrow_views(raw, budget=Budget())
+    crops = []
+    for graph, panel in zip(graphs, layout['panels']):
+        contextual = panel_context(graph, layout)
+        views = arrow.prepare_panel_views(raw, graph=contextual['graph'],
+                                           overview_views=overview, budget=Budget())
+        assert len(views['images']) == 2
+        assert views['images'][0] == overview['images'][0]
+        metadata = views['view_metadata'][1]
+        box = metadata['source_box']
+        left, top, right, bottom = panel['bbox']
+        assert box[0] <= left < right <= box[2] and box[1] <= top < bottom <= box[3]
+        crop = source.crop(box)
+        assert metadata['source_pixel_sha256'] == hashlib.sha256(crop.tobytes()).hexdigest()
+        output = decoded(views['images'][1])
+        assert output.tobytes() == crop.resize(output.size, Image.Resampling.NEAREST).tobytes()
+        crops.append(tuple(box))
+    assert len(set(crops)) == 6
+
+
 def test_panel_tool_failure_retains_overviews_and_cancel_does_not(monkeypatch):
     raw = png(Image.new('RGB', (50, 30), 'white'))
     overview = arrow.prepare_arrow_views(raw, budget=Budget())

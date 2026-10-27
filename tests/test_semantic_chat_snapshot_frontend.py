@@ -29,7 +29,10 @@ const sandbox={console, TextEncoder, AbortController, MAX_IMAGE_BYTES:8*1024*102
   sessions:[{id:'s',name:'synthetic',messages:[]}],currentId:'s',deletedSessionIds:{},
   ocrReviewInProgress:false,ocrRequestInFlight:false,ocrAbortController:null,ocrRequestId:'',
   FormData:class{append(){}},
-  isCurrentSessionTyping:()=>false,isSessionBusy:()=>false,
+  isCurrentSessionTyping:()=>false,isSessionBusy:()=>false,isSessionPendingAiStart:()=>false,
+  performance:{now:()=>Date.now()},requestAnimationFrame:callback=>callback(),
+  URL:{createObjectURL:()=> 'blob:synthetic',revokeObjectURL:()=>{}},
+  document:{getElementById:()=>null,querySelector:()=>null},window:{},
   refreshInputAvailability:()=>{},saveState:()=>{},renderChat:()=>{},renderSessions:()=>{},renderInfo:()=>{},
   maybeAutoNameSession:()=>{},makeOcrRequestId:()=> 'synthetic-request',
   showCurrentError:x=>notices.push(x),showAssistantMessage:(s,x)=>notices.push(x),
@@ -46,8 +49,20 @@ const sandbox={console, TextEncoder, AbortController, MAX_IMAGE_BYTES:8*1024*102
   questionCandidateFingerprint:c=>c?.text||'',activeQuestionCandidateFromHistory:()=>null,
   currentQuestionCandidateFromLearningState:()=>null,
   fetch:async(url,options)=>{
-    requests.push({url,body:url==='/chat'?JSON.parse(options.body):null});
-    return {ok:true,json:async()=>url==='/ocr'?input.response:{}};
+    const body=options?.body && typeof options.body==='string'?JSON.parse(options.body):null;
+    requests.push({url,body});
+    let result={};
+    if(url==='/ocr') result=input.response;
+    if(url==='/graph/confirm') {
+      const reviewed=input.reviewed;
+      const rendered=reviewed.text+'\n\n【图形信息】\n'+reviewed.visualText;
+      const internal='【题目文字】\n'+reviewed.text+'\n\n【图形信息】\n'+reviewed.analysisVisualText;
+      const context=sandbox.sanitizeSemanticContext({document:body.document,source_sha256:body.source_sha256,
+        question_text:internal,rendered_question_text:rendered,profile:'editable-v1',
+        confirmation_token:'synthetic-confirmed-token',document_sha256:'b'.repeat(64),revision:1,request_id:body.request_id});
+      result={document:context.document,confirmation_token:context.confirmation_token,semantic_context:context};
+    }
+    return {ok:true,json:async()=>result};
   }
 };
 sandbox.getCurrent=()=>sandbox.sessions.find(x=>x.id===sandbox.currentId);
@@ -58,7 +73,7 @@ const fragments = [
   block('function buildTargetQuestionApiText(', 'async function parseResponseJson('),
   block('function mergeCloudMessage(', 'function cloudHash('),
   block('function loadState(', 'function escapeRawHtml('),
-  block('async function handleImageSelected(', 'function isClearlyNonQuestionWrongBookText(')
+  block('const OCR_MAX_CONCURRENT = 4;', 'function isClearlyNonQuestionWrongBookText(')
 ];
 const chat = block('        const apiMessages = buildApiMessages(session, requestTargetCandidate);',
                    '        const data = await parseResponseJson(response);');
@@ -71,6 +86,7 @@ fragments.push(`async function capturedExistingChat(session, requestTargetCandid
  return response;
 }`);
 vm.runInContext(fragments.join('\n'),sandbox);
+sandbox.renderOcrTasks=()=>{};
 sandbox.requestAiReply=s=>sandbox.capturedExistingChat(s);
 function ocrMessage(source='a', label='same') {
   const question='【题目文字】\n求'+label+'的度数\n\n【图形信息】\n'+label+'显示边表';
@@ -82,8 +98,16 @@ function ocrMessage(source='a', label='same') {
 (async()=>{
  let result;
  if(input.operation==='upload') {
-   await sandbox.handleImageSelected({target:{files:[{type:'image/png',size:100}],value:'selected'}});
-   result={requests,messages:sandbox.sessions[0].messages,notices};
+   await sandbox.handleImageSelected({target:{files:[{name:'original.png',type:'image/png',size:100}],value:'selected'}});
+   const beforeConfirmation=sandbox.sessions[0].messages.length;
+   const task=vm.runInContext('[...ocrTasks.values()][0]',sandbox);
+   if(input.reviewed) {
+     task.userRequest=input.reviewed.userRequest || '';
+     if(input.edited_document) task.draft=input.edited_document;
+     await sandbox.confirmOcrTask(task,task.draft);
+     if(input.solve!==false) await sandbox.solveOcrTask(task.id);
+   }
+   result={requests,messages:sandbox.sessions[0].messages,notices,beforeConfirmation};
  } else if(input.operation==='sanitize') {
    result=sandbox.sanitizeSemanticContext(input.context,input.message??null);
  } else if(input.operation==='load') {
@@ -165,12 +189,13 @@ def reviewed():
 
 def test_actual_upload_confirmation_saves_snapshot_and_existing_chat_sends_it_once():
     result = run_js({'operation': 'upload', 'response': response(), 'reviewed': reviewed()})
-    assert [r['url'] for r in result['requests']] == ['/ocr', '/chat']
+    assert [r['url'] for r in result['requests']] == ['/graph/session', '/ocr', '/graph/confirm', '/chat']
+    assert result['beforeConfirmation'] == 0
     assert len(result['messages']) == 1
     saved = result['messages'][0]['semanticContext']
-    sent = result['requests'][1]['body']['semantic_context']
+    sent = result['requests'][-1]['body']['semantic_context']
     assert sent == saved
-    assert sent['question_text'] in result['requests'][1]['body']['messages'][-1]['content']
+    assert sent['question_text'] in result['requests'][-1]['body']['messages'][-1]['content']
     assert sent['rendered_question_text'] == '求度数\n\n【图形信息】\n显示边表'
     assert [n['label'] for n in sent['document']['graphs'][0]['vertices']] == ['v₂', 'V₂', None]
     assert [(e['from'], e['to']) for e in sent['document']['graphs'][0]['edges']] == [
@@ -179,13 +204,13 @@ def test_actual_upload_confirmation_saves_snapshot_and_existing_chat_sends_it_on
     assert [e['edge_label'] for e in sent['document']['graphs'][0]['edges']] == ['e₁', 'e₂', 'E₂', None]
 
 
-def test_actual_upload_cancel_neither_saves_snapshot_nor_calls_chat():
+def test_upload_without_user_confirmation_neither_saves_snapshot_nor_calls_chat():
     result = run_js({'operation': 'upload', 'response': response(), 'reviewed': None})
-    assert [r['url'] for r in result['requests']] == ['/ocr']
+    assert [r['url'] for r in result['requests']] == ['/graph/session', '/ocr']
     assert result['messages'] == []
 
 
-def test_optional_question_reference_survives_upload_without_changing_graph():
+def test_confirmed_legends_survive_without_reusing_recognition_model_advice():
     data = response()
     reference = {'source_sha256': 'a'*64, 'advisory_only': True,
         'non_authoritative': True, 'cannot_drop_content': True, 'status': 'ready',
@@ -193,8 +218,8 @@ def test_optional_question_reference_survives_upload_without_changing_graph():
     data['diagnostics']['semantic_workflow']['question_reference'] = reference
     data['text_context'] = {'legends': [{'text': '蓝边可通行', 'graph_ids': ['G1']}]}
     result = run_js({'operation': 'upload', 'response': data, 'reviewed': reviewed()})
-    sent = result['requests'][1]['body']['semantic_context']
-    assert sent['question_reference'] == reference
+    sent = result['requests'][-1]['body']['semantic_context']
+    assert 'question_reference' not in sent
     assert sent['document']['text_context'] == data['text_context']
     assert len(sent['document']['graphs'][0]['edges']) == len(graphs()[0]['edges'])
 
@@ -318,3 +343,38 @@ def test_old_device_merge_preserves_only_a_same_message_valid_snapshot():
     invalid = run_js({'operation': 'merge', 'graphs': graphs(), 'tamper': True})
     assert valid['semanticContext']['source_sha256'] == 'a'*64
     assert 'semanticContext' not in invalid
+
+
+def test_confirmation_and_solver_are_separate_explicit_actions():
+    result = run_js({'operation': 'upload', 'response': response(), 'reviewed': reviewed(), 'solve': False})
+    assert [row['url'] for row in result['requests']] == ['/graph/session', '/ocr', '/graph/confirm']
+    assert result['messages'] == []
+
+
+def test_solver_receives_user_edited_snapshot_instead_of_initial_ocr_graph():
+    edited = {'body_text': '求修改后的最短路', 'graphs': deepcopy(graphs())}
+    edited['graphs'][0]['vertices'][0]['label'] = '修改后的起点'
+    edited['graphs'][0]['edges'][1]['weight'] = 17
+    edited['graphs'][0]['edges'].pop()
+    result = run_js({'operation': 'upload', 'response': response(), 'reviewed': reviewed(),
+                     'edited_document': edited})
+    confirmation = next(row['body'] for row in result['requests'] if row['url'] == '/graph/confirm')
+    sent = result['requests'][-1]['body']['semantic_context']
+    assert confirmation['document'] == edited
+    assert sent['document']['body_text'] == edited['body_text']
+    assert sent['document']['graphs'][0]['vertices'][0]['label'] == '修改后的起点'
+    assert sent['document']['graphs'][0]['edges'][1]['weight'] == 17
+    assert len(sent['document']['graphs'][0]['edges']) == 3
+    assert sent['profile'] == 'editable-v1' and sent['confirmation_token'] == 'synthetic-confirmed-token'
+
+
+def test_confirmed_server_wrapper_survives_same_message_binding_and_storage():
+    value = context()
+    value.update(profile='editable-v1', confirmation_token='confirmed-token',
+                 document_sha256='b'*64, revision=2, request_id='task-original')
+    value['rendered_question_text'] = '【题目文字】\n' + value['rendered_question_text']
+    message = {'role': 'user', 'source': 'ocr', 'text': value['rendered_question_text'] + '\n\n【我的要求】\n解题',
+               'apiText': value['question_text']}
+    result = run_js({'operation': 'sanitize', 'context': value, 'message': message})
+    assert result['confirmation_token'] == value['confirmation_token']
+    assert result['revision'] == 2 and result['request_id'] == 'task-original'

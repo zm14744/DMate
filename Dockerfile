@@ -38,4 +38,6 @@ COPY . .
 # Regenerate sharp platform-specific icons as part of every production image build.
 RUN python scripts/generate_icons.py && python scripts/check_icon_assets.py
 
-CMD ["sh", "-c", "gunicorn -w 1 --threads 2 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app"]
+# Four independent image requests plus capacity for cancellation, health and chat.
+# The local model scheduler, rather than HTTP threads, limits inference memory.
+CMD ["sh", "-c", "gunicorn -w 1 --threads 8 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app"]

@@ -227,7 +227,8 @@ def _serve_semantic_fixture(folder):
         ledger['boundary_calls'].append({'provider': 'qwen', 'role': role,
             'review_mode': task.get('review_mode'),
             'local_text_hint_count': len(task.get('local_ocr_candidates', [])),
-            'layout_candidates_received': bool(task.get('local_layout_candidates'))})
+            'layout_candidates_received': isinstance(task.get('local_layout_candidates'), list),
+            'layout_candidate_count': len(task.get('local_layout_candidates', []))})
         # This answers only synthetic_image(); the real provider and LangGraph
         # still parse, normalize, review and serialize their own response.
         document = {'body_text': 'Count the edges.', 'graphs': [{'id': 'G1',
@@ -243,7 +244,7 @@ def _serve_semantic_fixture(folder):
             document = {'issues': []}
         elif role == 'semantic_body':
             document = {'body_text': document['body_text'], 'uncertainties': []}
-        elif role != 'semantic_review':
+        elif role not in ('semantic_review', 'fast_main'):
             raise AssertionError('Unexpected role in successful semantic upload: '+role)
         return 200, {}, {'model': 'qwen3-vl-plus', 'choices': [{'finish_reason': 'stop',
             'message': {'content': json.dumps(document)}}]}
@@ -338,15 +339,17 @@ def test_actual_chromium_default_semantic_route_runs_local_tool_boundaries_witho
     assert submitted[0]['request_id'] == case['browser_uploads'][0]['request_id']
     assert submitted[0]['response_sha256'] == response['response_sha256']
     assert response['body']['recognition_status'] == 'complete' and case['dialog_calls'] == 1
-    assert response['body']['diagnostics']['semantic_workflow']['reviewed'] is True
-    assert [entry['role'] for entry in server['boundary_calls'] if entry['provider'] == 'qwen'] == [
-        'semantic_extract', 'semantic_edges', 'semantic_review', 'semantic_body']
-    assert next(row for row in server['boundary_calls']
-                if row.get('role') == 'semantic_review')['review_mode'] == 'read_only'
-    assert server['boundary_calls'][0]['local_text_hint_count'] > 0
+    workflow = response['body']['diagnostics']['semantic_workflow']
+    assert workflow['mode'] == 'fast_editable'
+    assert workflow['final_validation']['schema_valid'] is True
+    assert workflow['final_validation']['status'] == 'completed'
+    assert any(row.get('library') == 'networkx' and row.get('executed') is True
+               for row in workflow['final_validation']['tool_audit'])
+    assert [entry['role'] for entry in server['boundary_calls'] if entry['provider'] == 'qwen'] == ['fast_main']
+    assert not any(entry['provider'] == 'deepseek' for entry in server['boundary_calls'])
     assert server['boundary_calls'][0]['layout_candidates_received']
     assert [row['stage'] for row in server['worker_events']
-            if row['kind'] == 'injected_worker'] == ['layout', 'text']
+            if row['kind'] == 'injected_worker'] == ['text']
     assert all(row['fixture_only'] for row in server['worker_events'])
     assert initial_ready['recognition_mode'] == ready['recognition_mode'] == 'semantic_visual'
     assert initial_ready['recognition_ready'] is False and ready['recognition_ready'] is True

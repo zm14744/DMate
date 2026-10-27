@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import math
+import re
 
 
 def _box(value):
@@ -41,6 +42,81 @@ def _point(vertex):
                         for v in value)):
             return tuple(value)
     return None
+
+
+def _position_axes(value):
+    """Interpret only a short spatial locator, never a graph name or claim."""
+    if not isinstance(value, str) or len(value) > 40:
+        return {}
+    value = value.strip().lower()
+    if not re.fullmatch(r'[上下左右中间央部排行侧方角端区域图像整页位置的\s、,，/\-]+', value):
+        return {}
+    axes = {}
+    for axis, low, high in (('x', '左', '右'), ('y', '上', '下')):
+        if low in value and high in value:
+            return {}
+        if low in value:
+            axes[axis] = 0.
+        elif high in value:
+            axes[axis] = 1.
+    if any(word in value for word in ('中', '央')):
+        for axis in ('x', 'y'):
+            axes.setdefault(axis, .5)
+    return axes
+
+
+def _position_candidate(candidates, position):
+    axes = _position_axes(position)
+    if not axes or not candidates:
+        return None
+    centres = [(row, ((row['bbox'][0]+row['bbox'][2])/2,
+                      (row['bbox'][1]+row['bbox'][3])/2)) for row in candidates]
+    limits = [(min(point[i] for _, point in centres), max(point[i] for _, point in centres))
+              for i in range(2)]
+    matches = []
+    for row, point in centres:
+        found = True
+        for name, target in axes.items():
+            index = 0 if name == 'x' else 1
+            lo, hi = limits[index]
+            if hi-lo < 80:
+                continue  # The windows do not distinguish this axis.
+            if abs((point[index]-lo)/(hi-lo)-target) > .22:
+                found = False
+        if found:
+            matches.append(row)
+    return matches[0] if len(matches) == 1 else None
+
+
+def _nearby_candidate(candidates, points):
+    """A separated nearby window is a reading hint, not a node association.
+
+    Exact point containment is too strict for deliberately rough page hints:
+    a whole row of anonymous vertices may be shifted above the actual ink.
+    Use the cloud centre only when the nearest bounded window is substantially
+    nearer than every alternative. Ambiguous/reused clouds remain unassigned.
+    """
+    if len(set(points)) < 2:
+        return None
+    xs, ys = zip(*points)
+    if max(xs)-min(xs) > 700 or max(ys)-min(ys) > 700:
+        return None
+    centre = ((min(xs)+max(xs))/2, (min(ys)+max(ys))/2)
+    ranked = []
+    for row in candidates:
+        box = row['bbox']
+        if _area(box) > 450000:
+            continue
+        distance = math.hypot((box[0]+box[2])/2-centre[0], (box[1]+box[3])/2-centre[1])
+        limit = min(250., max(100., .75*math.hypot(box[2]-box[0], box[3]-box[1])))
+        ranked.append((distance, limit, row))
+    ranked.sort(key=lambda item: item[0])
+    if not ranked or ranked[0][0] > ranked[0][1]:
+        return None
+    if len(ranked) > 1 and (ranked[1][0]-ranked[0][0] < 60
+                            or ranked[0][0] > .7*ranked[1][0]):
+        return None
+    return ranked[0][2]
 
 
 def separate_location_hints(graphs):
@@ -136,13 +212,25 @@ def panel_context(graph, layout):
         if ranked and (len(ranked) == 1 or ranked[0][0]-ranked[1][0] >= .12):
             selected = [ranked[0][1]]
             association = 'coarse_spatial_match'
+    if not selected and model_box is None:
+        nearby = _position_candidate(candidates, graph.get('position'))
+        if nearby is not None:
+            selected = [nearby]
+            association = 'unique_spatial_locator'
+        else:
+            nearby = _nearby_candidate(candidates, points)
+            if nearby is not None:
+                selected = [nearby]
+                association = 'nearby_layout_candidate'
     if selected:
         boxes = [r['bbox'] for r in selected]
         if model_box:
             boxes.append(model_box)
-        # Include indicated vertices even when coarse model and tool boxes
-        # disagree; the consumer adds another margin and keeps the full page.
-        if points:
+        # A nearby-window fallback exists precisely because the rough cloud
+        # missed the ink. Expanding back to those inaccurate points can pull
+        # the preceding panel's caption into the crop. Keep that candidate's
+        # measured window; the consumer pads it and always keeps the full page.
+        if points and association not in ('nearby_layout_candidate', 'unique_spatial_locator'):
             xs, ys = zip(*points)
             boxes.append([max(0, min(xs)-20), max(0, min(ys)-20),
                           min(1000, max(xs)+20), min(1000, max(ys)+20)])

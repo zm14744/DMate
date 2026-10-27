@@ -279,52 +279,48 @@ def _trace_opencv(document, graphs, *, deadline, budget):
                                    MAX_RSS_BYTES)
     started = time.monotonic()
     inventory = {g['id']: [] for g in graphs}
-    with (Path(tempfile.gettempdir()) / 'dmate-local-model.lock').open('a') as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+    from graph_local_scheduler import local_model_lock
+    with local_model_lock() as acquired:
+        if not acquired:
             return inventory, [{'code': 'local_cpu_busy', 'status': 'failed', 'executed': False}]
-        try:
-            with tempfile.TemporaryDirectory(prefix='dmate-semantic-cv-') as name:
-                folder = Path(name)
-                np.savez(folder / 'pixels.npz', rgb=np.asarray(document.working),
-                         normalized=np.asarray(document.normalized), ink=document.ink_mask,
-                         strong=document.strong_ink, weak=document.uncertain_ink)
-                (folder / 'request.json').write_text(json.dumps({
-                    'graphs': graphs, 'original_size': list(document.original.size),
-                    'work_size': list(document.work_size), 'scale_xy': list(document.scale_xy)}),
-                    encoding='utf-8')
-                _worker_checkpoint(budget)
-                if time.monotonic() >= deadline:
-                    return inventory, [{'code': 'deadline_exceeded', 'status': 'failed', 'executed': False}]
-                proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--opencv-worker', name],
-                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    env=_child_environment(folder), cwd=name, start_new_session=True)
-                failure, peak = None, 0
-                try:
-                    while proc.poll() is None:
-                        _worker_checkpoint(budget)
-                        peak = max(peak, _rss_bytes(proc.pid))
-                        if time.monotonic() >= deadline or peak > MAX_RSS_BYTES:
-                            failure = 'deadline_exceeded' if time.monotonic() >= deadline else 'memory_limit_exceeded'
-                            break
-                        time.sleep(.025)
-                finally:
-                    _stop_process(proc)
-                output = folder / 'response.json'
-                result = {'candidates': inventory, 'diagnostics': []}
-                if output.is_file() and output.stat().st_size <= MAX_OUTPUT_BYTES:
-                    result = json.loads(output.read_text(encoding='utf-8'))
-                diagnostics = result['diagnostics']
-                if failure or proc.returncode != 0:
-                    diagnostics.append({'code': failure or 'worker_failed', 'status': 'failed',
-                                        'executed': any(d.get('code') == 'roi_traced' for d in diagnostics)})
-                diagnostics.append({'code': 'worker_resources', 'status': 'ok',
-                                    'peak_rss_bytes': peak, 'cpu_parallelism': 1,
-                                    'seconds': round(time.monotonic() - started, 4)})
-                return result['candidates'], diagnostics
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+        with tempfile.TemporaryDirectory(prefix='dmate-semantic-cv-') as name:
+            folder = Path(name)
+            np.savez(folder / 'pixels.npz', rgb=np.asarray(document.working),
+                     normalized=np.asarray(document.normalized), ink=document.ink_mask,
+                     strong=document.strong_ink, weak=document.uncertain_ink)
+            (folder / 'request.json').write_text(json.dumps({
+                'graphs': graphs, 'original_size': list(document.original.size),
+                'work_size': list(document.work_size), 'scale_xy': list(document.scale_xy)}),
+                encoding='utf-8')
+            _worker_checkpoint(budget)
+            if time.monotonic() >= deadline:
+                return inventory, [{'code': 'deadline_exceeded', 'status': 'failed', 'executed': False}]
+            proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--opencv-worker', name],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                env=_child_environment(folder), cwd=name, start_new_session=True)
+            failure, peak = None, 0
+            try:
+                while proc.poll() is None:
+                    _worker_checkpoint(budget)
+                    peak = max(peak, _rss_bytes(proc.pid))
+                    if time.monotonic() >= deadline or peak > MAX_RSS_BYTES:
+                        failure = 'deadline_exceeded' if time.monotonic() >= deadline else 'memory_limit_exceeded'
+                        break
+                    time.sleep(.025)
+            finally:
+                _stop_process(proc)
+            output = folder / 'response.json'
+            result = {'candidates': inventory, 'diagnostics': []}
+            if output.is_file() and output.stat().st_size <= MAX_OUTPUT_BYTES:
+                result = json.loads(output.read_text(encoding='utf-8'))
+            diagnostics = result['diagnostics']
+            if failure or proc.returncode != 0:
+                diagnostics.append({'code': failure or 'worker_failed', 'status': 'failed',
+                                    'executed': any(d.get('code') == 'roi_traced' for d in diagnostics)})
+            diagnostics.append({'code': 'worker_resources', 'status': 'ok',
+                                'peak_rss_bytes': peak, 'cpu_parallelism': 1,
+                                'seconds': round(time.monotonic() - started, 4)})
+            return result['candidates'], diagnostics
 
 
 def _color_measurement(document, path):
@@ -404,7 +400,7 @@ def _project(document, inventories, associations, *, deadline=None, budget=None)
     return graphs, archive, count
 
 
-def prepare_semantic_geometry(raw, *, draft=None, budget, document=None, layout=None):
+def prepare_semantic_geometry(raw, *, draft=None, budget, document=None, layout=None, run_sknw=True):
     """Measure a source twice at most: markers, then bounded per-graph routes.
 
     ``layout`` accepts source-bound layout panels in original_1000 coordinates.
@@ -416,6 +412,8 @@ def prepare_semantic_geometry(raw, *, draft=None, budget, document=None, layout=
     from graph_sknw_plugin import suggest_candidates
     started = time.monotonic()
     budget.check()
+    if type(run_sknw) is not bool:
+        raise ValueError('invalid_sknw_policy')
     if not isinstance(raw, (bytes, bytearray, memoryview)):
         raise TypeError('expected_image_bytes')
     source = hashlib.sha256(raw).hexdigest()
@@ -467,6 +465,10 @@ def prepare_semantic_geometry(raw, *, draft=None, budget, document=None, layout=
     inventories = []
     for name in ('opencv', 'sknw'):
         tick = time.monotonic()
+        if name == 'sknw' and not run_sknw:
+            result['tool_audit'].append(_audit('image.semantic_sknw', source, tick, 'not_requested',
+                reason='local_tool_policy', executed=False))
+            continue
         if not graphs or tick >= deadline:
             result['tool_audit'].append(_audit('image.semantic_' + name, source, tick, 'skipped',
                 reason='no_bounded_roi' if not graphs else 'geometry_deadline'))

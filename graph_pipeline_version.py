@@ -1,7 +1,13 @@
 """Lightweight deployment identity shared by OCR and public health checks."""
 
 EVIDENCE_PIPELINE_VERSION = '2026-10-26-evidence-two-pass-v3'
-AGENT_PIPELINE_VERSION = '2026-10-27-agent-semantic-v6'
+AGENT_PIPELINE_VERSION = '2026-10-27-fast-editable-v2'
+
+
+def graph_nextgen_enabled():
+    """Default to the current architecture; retain the explicit 0/1 gate."""
+    import os
+    return os.environ.get('DMATE_GRAPH_NEXTGEN', '1') == '1'
 
 
 def active_pipeline():
