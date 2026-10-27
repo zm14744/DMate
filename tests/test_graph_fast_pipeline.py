@@ -74,7 +74,10 @@ class Handle:
         return self.result()
 
     def audit(self):
-        return {'stages': [{'stage': key, 'status': 'ok'} for key, value in self.policy.items() if value],
+        stages = [key for key in ('text', 'layout') if self.policy.get(key)]
+        if self.policy.get('paths'):
+            stages.append('geometry')
+        return {'stages': [{'stage': key, 'status': 'ok'} for key in stages],
                 'source_sha256': hashlib.sha256(self.raw).hexdigest()}
 
 
@@ -239,6 +242,112 @@ def test_missing_glm_keeps_specific_unknown_and_runs_final_validation(prepared):
     assert result['graphs'][1]['edges'][0]['direction'] == 'unknown'
     assert result['semantic_workflow']['local_review']['reason'] == 'glm_not_configured'
     assert result['semantic_workflow']['final_validation']['status'] == 'completed'
+
+
+@pytest.mark.parametrize('mixed', [False, True])
+def test_missing_direction_does_not_become_an_accepted_default_arrow(prepared, mixed):
+    _, run, _ = prepared
+    initial = document()
+    graph = initial['graphs'][0 if mixed else 1]
+    edge = graph['edges'][1 if mixed else 0]
+    edge.pop('direction')
+    if mixed:
+        graph['edges'][0]['direction'] = 'forward'
+    result, _ = run(Provider(initial))
+    rendered = result['graphs'][0 if mixed else 1]['edges'][1 if mixed else 0]
+    assert rendered['direction'] == 'unknown' and rendered['status'] == 'pending'
+    assert result['complete'] is False
+    assert any(issue['kind'] == 'unknown_direction' for issue in result['semantic_issues'])
+
+
+@pytest.mark.parametrize(('weight', 'declared_weighted', 'body'), [
+    ('unknown', False, ''), ('?', False, ''), ('未知', False, ''),
+    (None, True, ''), (None, False, '计算加权图的最短路径。'),
+])
+def test_unknown_and_required_missing_weights_remain_pending(prepared, weight, declared_weighted, body):
+    _, run, _ = prepared
+    initial = document()
+    initial['graphs'][1]['edges'][0]['weight'] = weight
+    initial['graphs'][1]['weighted'] = declared_weighted
+    if body:
+        initial['body_text'] = body
+        initial['text_context'] = {'legends': [{'text': body, 'graph_ids': ['G2']}]}
+    result, _ = run(Provider(initial))
+    assert result['complete'] is False
+    assert result['graphs'][1]['edges'][0]['status'] == 'pending'
+    assert any(issue.get('field') == 'weight' and issue.get('graph_id') == 'G2'
+               for issue in result['semantic_issues'])
+
+
+@pytest.mark.parametrize('body', ['比较加权图和无权图的定义。', '下图是非加权图。', 'This graph is not weighted.'])
+def test_weight_concepts_and_negative_legends_do_not_make_unweighted_edges_missing(prepared, body):
+    _, run, _ = prepared
+    initial = document()
+    initial['body_text'] = body
+    initial['text_context'] = {'legends': [{'text': body, 'graph_ids': ['G2']}]}
+    for graph in initial['graphs']:
+        for edge in graph['edges']:
+            edge['weight'] = None
+    result, _ = run(Provider(initial))
+    assert result['complete'] is True
+
+
+def test_symbolic_weights_and_unweighted_nulls_remain_valid_and_read_weight_can_clear(prepared):
+    _, run, handles = prepared
+    initial = document()
+    initial['graphs'][0]['edges'][0]['weight'] = 'π'
+    initial['graphs'][0]['edges'][1]['weight'] = 'x'
+    result, _ = run(Provider(initial))
+    assert result['complete'] is True
+    assert [edge['weight'] for edge in result['graphs'][0]['edges']] == ['π', 'x', None]
+    initial['graphs'][1]['edges'][0]['weight'] = 'unknown'
+    corrected = copy.deepcopy(initial['graphs'][1])
+    corrected['edges'][0]['weight'] = 0
+    glm = Specialist({'graphs': [corrected], 'uncertainties': []})
+    result, main = run(Provider(initial), glm)
+    assert len(main.requests) == len(glm.requests) == 1
+    assert result['complete'] is True and result['graphs'][1]['edges'][0]['weight'] == 0
+    assert len(handles) == 2  # One Small bundle per upload, no extra topology tracing.
+
+
+@pytest.mark.parametrize('status', ['memory_admission_rejected', 'partial', 'unavailable', None])
+def test_unfinished_selected_tools_preserve_editable_result_but_fail_performance(prepared, monkeypatch, status):
+    _, run, _ = prepared
+    original = Handle.audit
+    def failed_audit(self):
+        result = original(self)
+        if status is None:
+            result['stages'] = []
+        else:
+            result['stages'][0]['status'] = status
+        return result
+    monkeypatch.setattr(Handle, 'audit', failed_audit)
+    result, _ = run()
+    assert result['complete'] is True and result['graphs'][0]['edges']
+    assert result['local_tools_complete'] is False and result['selected_tools_complete'] is False
+    assert result['service_warnings']
+    performance = result['semantic_workflow']['performance']
+    assert performance['local_tools_complete'] is False
+    assert performance['selected_tools_complete'] is False
+    assert performance['completed'] is False and performance['within_target'] is False
+
+
+def test_selected_path_tool_failure_also_excludes_performance_after_visual_correction(prepared, monkeypatch):
+    _, run, _ = prepared
+    original = Handle.audit
+    def failed_paths(self):
+        result = original(self)
+        for stage in result['stages']:
+            if stage['stage'] == 'geometry':
+                stage['status'] = 'partial'
+        return result
+    monkeypatch.setattr(Handle, 'audit', failed_paths)
+    initial = document()
+    initial['uncertainties'] = [{'scope': 'graph', 'graph_id': 'G1', 'field': 'edges', 'message': '边未确定'}]
+    glm = Specialist({'graphs': [copy.deepcopy(initial['graphs'][0])], 'uncertainties': []})
+    result, _ = run(Provider(initial), glm)
+    assert result['complete'] is True and result['selected_tools_complete'] is False
+    assert result['semantic_workflow']['performance']['within_target'] is False
 
 
 def test_specialist_network_failure_retains_editable_data_and_unaffected_panel(prepared):

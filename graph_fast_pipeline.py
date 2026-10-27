@@ -142,7 +142,19 @@ def _validate_tool(arguments, *, context):
     from graph_semantic_pipeline import _required_visual_attribute_issues
     context.check_deadline()
     draft = context.data['draft']
-    normalized = normalize_semantic_document(draft, reviewed=True)
+    normalization_input = copy.deepcopy(draft)
+    for graph in normalization_input.get('graphs', []) if isinstance(normalization_input, dict) else []:
+        if not isinstance(graph, dict) or not isinstance(graph.get('edges'), list):
+            continue
+        has_arrows = graph.get('directed') is True or any(
+            isinstance(edge, dict) and edge.get('direction') == 'forward' for edge in graph['edges'])
+        if has_arrows:
+            for edge in graph['edges']:
+                if isinstance(edge, dict) and 'direction' not in edge:
+                    # A graph-level directed flag does not tell us which end
+                    # of this particular stroke carries the arrowhead.
+                    edge['direction'] = 'unknown'
+    normalized = normalize_semantic_document(normalization_input, reviewed=True)
     # Normalization intentionally keeps human messages small. Retain an
     # explicit model field hint for tool selection; never infer it from prose.
     declared = draft.get('uncertainties', []) if isinstance(draft, dict) else []
@@ -164,7 +176,35 @@ def _validate_tool(arguments, *, context):
                        if isinstance(draft, dict) else {}}
     required_attributes = [issue for issue in _required_visual_attribute_issues(visual_document)
                            if issue['field'] in ('color', 'style')]
-    issues = normalized['semantic_issues'] + schema_issues + inspected['issues'] + required_attributes
+    # A page may compare weighted and unweighted diagrams. Only a located,
+    # positive legend/caption makes a literal weight requirement graph-specific;
+    # the explicit graph.weighted flag is handled below as well.
+    context_rows = visual_document['text_context'] if isinstance(visual_document['text_context'], dict) else {}
+    scoped_weights = {}
+    for kind in ('legends', 'captions'):
+        rows = context_rows.get(kind, [])
+        scoped_weights[kind] = [row for row in rows if isinstance(row, dict)
+            and isinstance(row.get('graph_ids'), list) and row['graph_ids']
+            and not re.search(r'无权|非加权|未加权|\bunweighted\b|\b(?:not|non)\s*-?\s*weighted\b',
+                              str(row.get('text', '')), re.I)] if isinstance(rows, list) else []
+    required_attributes += [issue for issue in _required_visual_attribute_issues(
+        {'body_text': '', 'graphs': normalized['graphs'], 'text_context': scoped_weights})
+        if issue['field'] == 'weight']
+    required_weight_graphs = {issue['graph_id'] for issue in required_attributes if issue['field'] == 'weight'}
+    declared_weighted = {str(graph.get('id')) for graph in draft.get('graphs', [])
+                        if isinstance(graph, dict) and graph.get('weighted') is True} if isinstance(draft, dict) else set()
+    unknown_weights = []
+    for graph in normalized['graphs']:
+        if graph['id'] in required_weight_graphs:
+            continue
+        for edge in graph['edges']:
+            weight = edge.get('weight')
+            unknown = isinstance(weight, str) and weight.strip().lower() in (
+                'unknown', 'uncertain', '未知', '不确定', '?', '？')
+            if unknown or weight is None and graph['id'] in declared_weighted:
+                unknown_weights.append(_issue('unknown_weight', '该边有待确认的权重，不能按已读清处理。',
+                    scope='graph', graph_id=graph['id'], field='weight', edge_id=edge['id']))
+    issues = normalized['semantic_issues'] + schema_issues + inspected['issues'] + required_attributes + unknown_weights
     context.data['result'].update(normalized=normalized, issues=issues,
         schema_valid=not schema_issues, program=inspected)
     return {'phase': arguments['phase'], 'schema_valid': not schema_issues,
@@ -325,6 +365,20 @@ def _public_local_result(value):
     return {name: {field: copy.deepcopy(value[name][field]) for field in selected
                    if field in value.get(name, {})}
             for name, selected in fields.items() if isinstance(value.get(name), dict)}
+
+
+def _selected_local_tools_complete(handles, audits):
+    if not handles or len(handles) != len(audits):
+        return False
+    for handle, audit in zip(handles, audits):
+        expected = {name for name in ('text', 'layout') if handle.policy.get(name)}
+        if handle.policy.get('paths'):
+            expected.add('geometry')
+        stages = audit.get('stages', [])
+        if (not expected.issubset({row.get('stage') for row in stages})
+                or any(row.get('status') not in ('ok', 'not_needed') for row in stages)):
+            return False
+    return True
 
 
 def _main_panel_views(quick):
@@ -576,6 +630,8 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
         result['text_context'] = copy.deepcopy(state['draft']['text_context'])
     text = local_result.get('text', {})
     local_audit = [pending_handle.audit() for pending_handle in handles]
+    local_tools_complete = _selected_local_tools_complete(handles, local_audit)
+    selected_tools_complete = local_tools_complete and state['validation'].get('status') == 'completed'
     resource_metrics = quick.get('resource_metrics', []) + local_result.get('resource_metrics', [])
     tools_public = _public_local_result(local_result)
     tools_public['layout'] = _public_local_result({'layout': local_result.get('layout') or quick})['layout']
@@ -587,10 +643,10 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
         local_text_result={key: copy.deepcopy(text[key]) for key in ('text', 'text_evidence') if key in text},
         local_resource_metrics=resource_metrics,
         confirmation_required=True, recognition_profile='fast-editable',
+        local_tools_complete=local_tools_complete, selected_tools_complete=selected_tools_complete,
         service_warnings=([{'kind': 'local_tools_degraded',
             'message': '部分本地图像辅助工具未完成，已保留视觉识别结果，请核对后确认。'}]
-            if any(any(stage.get('status') not in ('ok', 'not_needed') for stage in item.get('stages', []))
-                   for item in local_audit) else []),
+            if not local_tools_complete else []),
         semantic_workflow={'version': AGENT_PIPELINE_VERSION, 'mode': 'fast_editable',
             'task_id': budget.task_id, 'source_sha256': source,
             'image_accuracy_certified': False, 'user_confirmation_required': True,
@@ -605,8 +661,11 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             'performance': {'target_seconds': PERFORMANCE_TARGET_SECONDS,
                 'recognition_seconds': round(time.monotonic()-started, 6),
                 'scope': 'recognition_before_response_rendering',
-                'completed': not issues,
-                'within_target': not issues and time.monotonic()-started <= PERFORMANCE_TARGET_SECONDS}})
+                'local_tools_complete': local_tools_complete,
+                'selected_tools_complete': selected_tools_complete,
+                'completed': not issues and selected_tools_complete,
+                'within_target': not issues and selected_tools_complete
+                    and time.monotonic()-started <= PERFORMANCE_TARGET_SECONDS}})
     budget.local_tool_execution = tools_public
     if audit:
         result['stage_audit'] = {'responses': readings, 'observations': runner.observations}

@@ -29,3 +29,20 @@ def test_fast_partial_result_is_not_a_performance_success(prepared, monkeypatch)
     assert rendered['recognition_status'] == 'partial'
     assert rendered['recognition_timing']['within_target'] is False
     assert rendered['recognition_timing']['completed'] is False
+
+
+def test_unexecuted_selected_tool_cannot_be_a_complete_performance_success(prepared, monkeypatch):
+    import graph_fast_pipeline
+    import ocr_nextgen
+    raw, run, _ = prepared
+    result, _ = run()
+    result['selected_tools_complete'] = False
+    result['service_warnings'] = [{'kind': 'local_tools_degraded',
+                                   'message': '本地文字候选未完成。'}]
+    monkeypatch.setattr(graph_fast_pipeline, 'recognize_fast', lambda *a, **kw: copy.deepcopy(result))
+    rendered = ocr_nextgen.recognize_graph_document(raw, {}, graph_pipeline='agent-tools')
+    assert rendered['graph_structures']  # Keep the usable draft for editing.
+    assert rendered['selected_tools_complete'] is False
+    assert rendered['recognition_timing']['within_target'] is False
+    assert rendered['recognition_timing']['completed'] is False
+    assert rendered['service_warnings'][0]['kind'] == 'local_tools_degraded'

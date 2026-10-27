@@ -68,10 +68,14 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
                                       cancelled=cancelled,request_deadline=request_deadline)
         if result.get('recognition_profile') == 'fast-editable':
             seconds=round(time.monotonic()-budget.started,6)
+            tools_complete=result.get('selected_tools_complete') is True
+            process_complete=rendered.get('recognition_status')=='complete' and tools_complete
             rendered.update(confirmation_required=True,recognition_profile='fast-editable',
+                selected_tools_complete=tools_complete,
                 recognition_timing={'seconds':seconds,'target_seconds':120,
-                    'within_target':seconds<=120 and rendered.get('recognition_status')=='complete',
-                    'completed':rendered.get('recognition_status')=='complete',
+                    'within_target':seconds<=120 and process_complete,
+                    'completed':process_complete,
+                    'selected_tools_complete':tools_complete,
                     'scope':'recognition_and_response_rendering'})
             warnings=result.get('service_warnings',[])
             if warnings:
