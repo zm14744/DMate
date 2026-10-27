@@ -180,3 +180,24 @@ def test_invalid_new_chain_return_does_not_open_a_legacy_budget(application, mon
     response = post_image(client)
     assert response.status_code == 503
     assert response.get_json()['recognition_status'] == 'failed'
+
+
+def test_manual_graph_upload_registers_source_without_any_vision_or_ocr_call(application, monkeypatch):
+    module, client, calls = application
+    monkeypatch.setattr(module, 'recognize_image', lambda *a, **kw: pytest.fail('Paddle must be deferred'))
+    monkeypatch.setattr(module, '_run_graph_ocr_route',
+                        lambda *a, **kw: pytest.fail('Vision must not execute in manual workflow'))
+    from PIL import Image
+    import io
+    sample = io.BytesIO()
+    Image.new('RGB', (120, 80), 'white').save(sample, format='PNG')
+    response = client.post('/ocr', data={'image': (io.BytesIO(sample.getvalue()), 'manual.png'),
+        'request_id': 'manual-first-1', 'workflow': 'manual_graph'}, content_type='multipart/form-data')
+    assert response.status_code == 200, response.get_json()
+    data = response.get_json()
+    assert data['manual_mode'] and data['recognition_status'] == 'manual'
+    assert data['graph_structures'] == [] and data['text'] == ''
+    assert data['document']['graphs'][0]['vertices'] == []
+    assert data['document']['graphs'][0]['edges'] == []
+    assert data['manual_entry'] == {'graph_ai_calls': 0, 'text_ocr_calls': 0}
+    assert len(data['source_sha256']) == 64

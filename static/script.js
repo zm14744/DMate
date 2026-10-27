@@ -14339,7 +14339,7 @@ function renderOcrTasks() {
         if (task.state === "recognizing") {
             button("取消这张", "cancel");
         } else {
-            button(task.confirmation ? "继续修改" : task.state === "ready" ? "编辑核对" : "手动录入", "edit", !task.confirmation);
+            button(task.confirmation ? "继续修改" : task.result?.manual_mode ? "开始描绘" : task.state === "ready" ? "编辑核对" : "手动录入", "edit", !task.confirmation);
             if (task.confirmation) button("解题", "solve", true);
             button("移除", "remove");
         }
@@ -14385,6 +14385,7 @@ async function recognizeOcrTask(task) {
         const formData = new FormData();
         formData.append("image", task.file);
         formData.append("request_id", task.id);
+        formData.append("workflow", "manual_graph");
         const response = await fetch("/ocr", { method: "POST", body: formData, signal: task.controller.signal });
         const data = await parseResponseJson(response);
         if (task.state === "cancelled" || !ocrTasks.has(task.id)) return;
@@ -14401,11 +14402,14 @@ async function recognizeOcrTask(task) {
         task.draft = draftFromOcrResponse(data);
         task.initialDocument = cloneOcrDocument(task.draft);
         task.sourceSha256 = data?.source_sha256 || data?.diagnostics?.semantic_workflow?.source_sha256 || null;
-        task.state = data?.recognition_status === "failed"
-            || !task.draft.body_text.trim() && !task.draft.graphs.length ? "failed" : "ready";
-        task.notice = ocrReviewStatusText(data) || (task.state === "failed"
-            ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
-            : "请对照原图检查节点、连边和题干，确认后再解题。");
+        task.state = data?.manual_mode === true ? "ready"
+            : data?.recognition_status === "failed"
+                || !task.draft.body_text.trim() && !task.draft.graphs.length ? "failed" : "ready";
+        task.notice = data?.manual_mode === true
+            ? "原图已准备好。直接描绘顶点和边，文字可框选后识别。"
+            : ocrReviewStatusText(data) || (task.state === "failed"
+                ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
+                : "请对照原图检查节点、连边和题干，确认后再解题。");
     } catch (error) {
         if (task.state === "cancelled" || error?.name === "AbortError") {
             task.state = "cancelled";

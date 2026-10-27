@@ -4072,6 +4072,23 @@ def ocr():
         return jsonify({"error": "图片任务与原图不匹配，请重新选择图片。",
                         "error_code": exc.code, "request_id": request_id}), exc.status
 
+    # Manual graph uploads are source-bound drafts, not automatic graph reads.
+    # Do not start Vision, OpenCV topology recovery or even text OCR here.
+    # Text is recognized separately when the user chooses its original pixels.
+    if request.form.get("workflow") == "manual_graph":
+        return jsonify({
+            "manual_mode": True, "recognition_status": "manual",
+            "source_sha256": hashlib.sha256(raw).hexdigest(),
+            "request_id": request_id,
+            "text": "", "graph_structures": [],
+            "document": {"body_text": "", "graphs": [{
+                "id": "G1", "name": "G1", "directed": False, "weighted": False,
+                "vertices": [], "edges": []}]},
+            "server_elapsed_seconds": round(time.monotonic() - started_at, 3),
+            "review": {"required": True, "reasons": []},
+            "manual_entry": {"graph_ai_calls": 0, "text_ocr_calls": 0},
+        })
+
     recognition_deadline = time.monotonic() + 285
     try:
         if _semantic_ocr_selected():
