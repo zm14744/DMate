@@ -15,8 +15,12 @@ class AndroidUploadUiTests(unittest.TestCase):
     def test_native_documents_fallback_and_webview_callback(self):
         self.assertIn("Intent.ACTION_OPEN_DOCUMENT", self.java)
         self.assertIn("Intent.ACTION_GET_CONTENT", self.java)
+        self.assertIn('Intent.createChooser(intent, "选择图片")', self.java)
+        self.assertIn("SystemClock.elapsedRealtime() - filePickerLaunchedAt < 450", self.java)
+        self.assertIn("launchImagePicker(true)", self.java)
         self.assertIn("Intent.EXTRA_ALLOW_MULTIPLE", self.java)
         self.assertIn("callback.onReceiveValue(result)", self.java)
+        self.assertNotIn("FileChooserParams.parseResult(resultCode, data)", self.java)
         self.assertIn("filePathCallback.onReceiveValue(null)", self.java)
 
     def test_file_input_and_independent_question_selector(self):

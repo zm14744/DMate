@@ -10,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.media.MediaScannerConnection;
+import android.os.SystemClock;
 import android.util.Base64;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.JavaScriptReplyProxy;
@@ -25,7 +26,6 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
@@ -57,6 +57,9 @@ public final class MainActivity extends Activity {
 
     private WebView webView;
     private ValueCallback<Uri[]> pendingFileCallback;
+    private boolean filePickerTriedDocuments;
+    private boolean filePickerMultiple;
+    private long filePickerLaunchedAt;
     private final ExecutorService imageSaver = Executors.newSingleThreadExecutor();
     private PendingSave pendingLegacySave;
 
@@ -344,7 +347,18 @@ public final class MainActivity extends Activity {
         intent.setType("image/*");
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        return intent;
+        return Intent.createChooser(intent, "选择图片");
+    }
+
+    private boolean launchImagePicker(boolean documents) {
+        try {
+            filePickerLaunchedAt = SystemClock.elapsedRealtime();
+            startActivityForResult(createImagePickerIntent(documents, filePickerMultiple), FILE_CHOOSER_REQUEST);
+            filePickerTriedDocuments = documents;
+            return true;
+        } catch (ActivityNotFoundException | SecurityException error) {
+            return false;
+        }
     }
 
     private final class DmateChromeClient extends WebChromeClient {
@@ -359,20 +373,16 @@ public final class MainActivity extends Activity {
             }
             pendingFileCallback = filePathCallback;
 
-            // Avoid OEM WebView pickers that flash and immediately dismiss.
-            boolean multiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
-            try {
-                startActivityForResult(createImagePickerIntent(true, multiple), FILE_CHOOSER_REQUEST);
-            } catch (ActivityNotFoundException | SecurityException firstError) {
-                try {
-                    startActivityForResult(createImagePickerIntent(false, multiple), FILE_CHOOSER_REQUEST);
-                } catch (ActivityNotFoundException | SecurityException fallbackError) {
-                    pendingFileCallback = null;
-                    filePathCallback.onReceiveValue(null);
-                    Toast.makeText(MainActivity.this, "无法打开系统图片选择器", Toast.LENGTH_SHORT).show();
-                }
+            // Huawei and some other Android WebViews may immediately close the
+            // ACTION_OPEN_DOCUMENT UI. Prefer the content chooser, and allow one
+            // document-picker retry when an OEM picker exits almost instantly.
+            filePickerMultiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
+            filePickerTriedDocuments = false;
+            if (!launchImagePicker(false) && !launchImagePicker(true)) {
+                pendingFileCallback = null;
+                filePathCallback.onReceiveValue(null);
+                Toast.makeText(MainActivity.this, "无法打开系统图片选择器", Toast.LENGTH_SHORT).show();
             }
-            // Complete every handled WebView file callback, including launch failures.
             return true;
         }
 
@@ -446,6 +456,14 @@ public final class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != FILE_CHOOSER_REQUEST || pendingFileCallback == null) return;
 
+        // An immediate empty result often means the OEM chooser failed to
+        // launch, not that the user deliberately cancelled a normal dialog.
+        if (resultCode != RESULT_OK && !filePickerTriedDocuments &&
+            SystemClock.elapsedRealtime() - filePickerLaunchedAt < 450 &&
+            launchImagePicker(true)) {
+            return;
+        }
+
         ValueCallback<Uri[]> callback = pendingFileCallback;
         pendingFileCallback = null;
         Uri[] result = null;
@@ -461,8 +479,10 @@ public final class MainActivity extends Activity {
             if (data.getData() != null && "content".equalsIgnoreCase(data.getData().getScheme())) {
                 selected.add(data.getData());
             }
+            // The origin only receives URIs intentionally granted by the user.
+            // Reject file:// and other schemes rather than handing an untrusted
+            // provider's raw local path to a remote web page.
             if (!selected.isEmpty()) result = selected.toArray(new Uri[0]);
-            else result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
         }
         callback.onReceiveValue(result);
     }
