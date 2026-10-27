@@ -29,6 +29,7 @@ _TEXT = {'type': ['string', 'null'], 'maxLength': 256}
 _COORD = {'type': 'number', 'minimum': 0, 'maximum': 1}
 _POINT = {'type': 'array', 'prefixItems': [_COORD, _COORD], 'minItems': 2, 'maxItems': 2}
 _BBOX = {'type': 'array', 'prefixItems': [_COORD, _COORD, _COORD, _COORD], 'minItems': 4, 'maxItems': 4}
+_POLYGON = {'type': 'array', 'items': _POINT, 'minItems': 3, 'maxItems': 64}
 _EDGE = {'type': 'object', 'required': ['id', 'from', 'to', 'direction'], 'properties': {
     'id': _ID, 'from': _ID, 'to': _ID, 'direction': {'enum': ['forward', 'undirected']},
     'weight': {'type': ['number', 'string', 'null'], 'maxLength': 256},
@@ -39,7 +40,7 @@ DOCUMENT_SCHEMA = {'type': 'object', 'required': ['body_text', 'graphs'], 'prope
     'body_text': {'type': 'string', 'maxLength': 24000},
     'graphs': {'type': 'array', 'maxItems': 64, 'items': {
         'type': 'object', 'required': ['id', 'vertices', 'edges'], 'properties': {
-            'id': _ID, 'name': _TEXT, 'bbox': _BBOX,
+            'id': _ID, 'name': _TEXT, 'bbox': _BBOX, 'region_polygon': _POLYGON,
             'anon_next': {'type': 'integer', 'minimum': 1, 'maximum': 10000},
             'vertices': {'type': 'array', 'minItems': 1, 'maxItems': 100, 'items': {
                 'type': 'object', 'required': ['id'], 'properties': {
@@ -161,6 +162,12 @@ def validate_document(value):
         box = graph.get('bbox')
         if box is not None and not (box[0] < box[2] and box[1] < box[3]):
             issues.append({'graph_id': graph['id'], 'message': '图形框选范围无效。'})
+        if graph.get('region_polygon') is not None:
+            from graph_region import validate_polygon, RegionError
+            try:
+                validate_polygon(graph['region_polygon'])
+            except RegionError:
+                issues.append({'graph_id': graph['id'], 'message': '不规则框选区域无效。'})
         for vertex in graph['vertices']:
             if (vertex.get('x') is None) != (vertex.get('y') is None):
                 issues.append({'graph_id': graph['id'], 'vertex_id': vertex['id'], 'message': '顶点坐标必须成对提供。'})
@@ -212,7 +219,7 @@ def _drawing_document(edited, document):
         source = sources.get(graph['id'])
         if source is None:
             continue
-        for key in ('bbox', 'anon_next'):
+        for key in ('bbox', 'anon_next', 'region_polygon'):
             if key in source:
                 graph[key] = copy.deepcopy(source[key])
         by_vertex = {v['id']: v for v in source['vertices']}

@@ -16,6 +16,14 @@
     const point = value => Array.isArray(value) && value.length === 2 && value.every(unit);
     const validPath = value => Array.isArray(value) && value.length >= 2 && value.length <= 128 && value.every(point);
     const validBox = value => Array.isArray(value) && value.length === 4 && value.every(unit) && value[0] < value[2] && value[1] < value[3];
+    const polygonValid = value => {
+        if (!Array.isArray(value) || value.length < 3 || value.length > 64 || !value.every(point)) return false;
+        const signed = value.reduce((sum, p, i) => {
+            const next = value[(i + 1) % value.length];
+            return sum + p[0] * next[1] - next[0] * p[1];
+        }, 0);
+        return Math.abs(signed) / 2 >= .00002;
+    };
     const ring = number => number >= 1 && number <= 20 ? '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'[number - 1] : '未命名' + number;
     function ensureAnonymousLabels(input) {
         const draft = copy(input);
@@ -50,6 +58,8 @@
             if (typeof raw.directed === 'boolean') graph.directed = raw.directed;
             if (typeof raw.weighted === 'boolean') graph.weighted = raw.weighted;
             if (validBox(raw.bbox)) graph.bbox = [...raw.bbox];
+            if (polygonValid(raw.region_polygon))
+                graph.region_polygon = raw.region_polygon.map(p => [...p]);
             if (Number.isInteger(raw.anon_next) && raw.anon_next >= 1 && raw.anon_next <= 10000) graph.anon_next = raw.anon_next;
             if (result.graphs.some(row => row.id === graph.id)) graph.id = unique('G', result.graphs);
             const inputVertices = Array.isArray(raw.vertices) ? raw.vertices.filter(row => row && typeof row === 'object') : [];
@@ -106,6 +116,8 @@
             if (!graph.vertices.length) issues.push(name + '没有节点；请添加节点或删除这幅空图。');
             if (graph.vertices.length > LIMITS.vertices || graph.edges.length > LIMITS.edges) issues.push(name + '超出编辑范围（100 个节点、300 条边）。');
             if (graph.bbox !== undefined && !validBox(graph.bbox)) issues.push(name + '的框选区域无效。');
+            if (graph.region_polygon !== undefined && !polygonValid(graph.region_polygon))
+                issues.push(name + '的自由选区无效。');
             const vertices = new Set(), edges = new Set();
             for (const vertex of graph.vertices) {
                 if (!vertex.id || vertices.has(vertex.id)) issues.push(name + '有重复或缺失的节点编号。');
@@ -239,6 +251,13 @@
             setGraphBounds: (gid, bbox) => change(draft => {
                 if (!validBox(bbox)) throw new Error('请框选有效的图形范围。');
                 getGraph(draft, gid).bbox = [...bbox];
+            }),
+            setGraphPolygon: (gid, polygon) => change(draft => {
+                if (!polygonValid(polygon)) throw new Error('自由选区需要至少三个有效角点。');
+                const graph = getGraph(draft, gid);
+                graph.region_polygon = polygon.map(p => [...p]);
+                // A new custom region supersedes the previous rectangle.
+                delete graph.bbox;
             }),
             setGraphType: (gid, type, enabled) => change(draft => {
                 if (!['directed', 'weighted'].includes(type) || typeof enabled !== 'boolean') throw new Error('图形类型无效。');
