@@ -8581,7 +8581,7 @@ window.MathJax = {
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 
 
-<link rel="stylesheet" href="/static/graph-editor.css?v=dmate-editor-minimal-v3">
+<link rel="stylesheet" href="/static/graph-editor.css?v={{ dmate_web_revision }}">
 <style>
 .ocr-task-panel[hidden] { display:none !important; }
 .ocr-task-panel { flex:none; box-sizing:border-box; width:min(820px,calc(100% - 32px)); margin:0 auto 12px; padding:12px; border:1px solid var(--border-strong); border-radius:12px; background:var(--surface-2); max-height:min(42dvh,430px); overflow:auto; }
@@ -8676,6 +8676,7 @@ window.MathJax = {
 
 <body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
 <script>
+window.DMATE_WEB_REVISION = {{ dmate_web_revision | tojson }};
 window.DMATE_CLIENT_CONFIG = {{ {
     "isAndroidApp": is_dmate_android_app,
     "isDesktopApp": is_dmate_desktop_app,
@@ -9413,12 +9414,13 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
-<script src="/static/graph-editor-model.js?v=dmate-manual-v1"></script>
-<script src="/static/graph-editor-format.js?v=dmate-format-v1"></script>
-<script src="/static/graph-editor-overlay.js?v=dmate-editor-minimal-v3"></script>
-<script src="/static/graph-editor.js?v=dmate-editor-minimal-v3"></script>
-<script src="/static/script.js?v=dmate-native-tap-v6"></script>
-<script src="/static/client-update.js?v=dmate-client-updates-v1"></script>
+<script src="/static/graph-editor-model.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/graph-editor-format.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/graph-editor-overlay.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/graph-editor.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/script.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/client-update.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 
 </body>
 </html>

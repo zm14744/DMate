@@ -5,10 +5,15 @@ on:
     branches: [main]
     paths:
       - 'static/client-update.js'
+      - 'static/web-sync.js'
+      - 'static/legacy-worker-retire.js'
+      - 'app.py'
       - 'static/client-updates.json'
       - 'static/script.js'
       - 'templates/index.html'
       - 'tests/client_update_contract.js'
+      - 'tests/web_sync_contract.js'
+      - 'tests/test_web_sync_contract.py'
       - 'tests/test_android_upload_ui_contract.py'
       - 'android/app/src/main/java/app/dmate/client/NativeUpdateManager.java'
       - '.github/workflows/client-update-smoke.yml'
@@ -29,7 +34,14 @@ jobs:
       - name: Validate client JavaScript
         run: |
           node --check static/client-update.js
+          node --check static/web-sync.js
+          node --check static/legacy-worker-retire.js
           node --check static/script.js
           node tests/client_update_contract.js
+          node tests/web_sync_contract.js
       - name: Check Android file upload and release rules
         run: python -m unittest discover -s tests -p 'test_android_upload_ui_contract.py'
+      - name: Verify installed apps receive latest web without new APK
+        run: |
+          python -m unittest discover -s tests -p 'test_web_sync_contract.py'
+          python -m py_compile app.py

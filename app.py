@@ -220,6 +220,20 @@ def attach_runtime_source(response):
         response.headers['X-DMate-Runtime-Sha256'] = _RUNTIME_SOURCE['manifest_sha256']
     return response
 
+
+# The native Android/WebView and desktop/Tauri shells open the remote site.
+# Revalidate the actual HTML/JS/CSS every time; never serve old OCR or editor
+# scripts from the HTTP cache after a Zeabur deployment.
+@app.after_request
+def no_stale_web_application_assets(response):
+    path = request.path
+    if (path == '/service-worker.js' or path == '/web-version' or
+        (path.startswith('/static/') and path.endswith(('.js', '.css', '.json')))):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 # 账号只使用服务器签名的 HttpOnly Cookie；前端 JS 不保存登录令牌。
 app.config.update(
     SECRET_KEY=AUTH_SECRET_KEY or "auth-disabled-placeholder",
@@ -2199,6 +2213,30 @@ def favicon_png_root():
     return response
 
 
+@app.route("/service-worker.js")
+def retire_legacy_dmate_service_worker():
+    """Give *already installed* PWA workers an update that unregisters them.
+
+    DMate no longer registers any service worker or offers PWA installation.
+    Returning 404 here can leave old registrations serving cached HTML offline.
+    """
+    response = app.send_static_file("legacy-worker-retire.js")
+    response.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Service-Worker-Allowed"] = "/"
+    return response
+
+
+@app.route("/web-version")
+def web_application_revision():
+    """Report the live deployed web/backend revision without caching."""
+    revision = (_RUNTIME_SOURCE.get("manifest_sha256")
+        if _RUNTIME_SOURCE.get("status") == "ok" else None)
+    response = jsonify({"revision": revision})
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return response
+
+
 @app.route("/")
 def home():
     # 普通 Android 浏览器显示 APK 下载入口；已安装的 APK 隐藏重复入口。
@@ -2228,6 +2266,8 @@ def home():
     response = make_response(render_template(
         "index.html",
         knowledge_graph_data=KNOWLEDGE_GRAPH_DATA,
+        dmate_web_revision=(_RUNTIME_SOURCE.get("manifest_sha256")
+            if _RUNTIME_SOURCE.get("status") == "ok" else None),
         is_android=is_android,
         is_ios=is_ios,
         is_mac_safari=is_mac_safari,
