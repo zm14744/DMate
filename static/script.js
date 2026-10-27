@@ -20581,11 +20581,18 @@ function downloadOptionsForCurrentPlatform() {
         };
     }
     if (platform === "android") {
+        // The GitHub APK is published directly by the signed Android workflow.
+        // GitCode is a separately maintained mirror and may lag native fixes.
+        const [gitcodeApk, githubApk, ...extraSources] = installers(
+            "DMate.apk", config.androidApkUrl, "APK"
+        );
         return {
             platform:"Android",
-            text:"选择 APK 下载源",
+            text:"优先下载 GitHub 已更新的 APK；GitCode 镜像可能仍是旧版",
             actions:[
-                ...installers("DMate.apk", config.androidApkUrl, "APK"),
+                { ...githubApk, label:"GitHub · APK（新版）", secondary:false },
+                { ...gitcodeApk, label:"GitCode · APK（请核对版本）", secondary:true },
+                ...extraSources,
                 { label:"itch.io", url:itch, secondary:true }
             ]
         };

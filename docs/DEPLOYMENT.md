@@ -223,6 +223,8 @@ node --check static/script.js
 | `app.py`、`teaching.py`、`knowledge_graph.json`、`ai.py`、`ocr.py` | 更新服务端代码并让 Zeabur 成功部署 / 重启应用 | 新请求使用新版能力，通常无需重新安装 |
 | `static/script.js`、`templates/index.html`、网页样式 / 图标 | 更新 Zeabur 站点，客户端刷新或重新打开 | 从远程站点读取新版，可能受缓存影响 |
 | `android/` 下的 Java、Manifest、Gradle、原生资源 | 重新构建、签名并分发 APK | 需要安装新版 APK |
+
+**2026-10-27 安装版图片上传修复：** Android v1.0.2 (versionCode 3) 已修改 WebView 的系统图片选择器和多图回调；网页版正常不代表旧版安装包的原生层已更新。签名 Android 工作流现新增 `apksigner` 校验与 `gh release upload v1.0.1 dist/DMate.apk --clobber`，成功后只替换现有 GitHub 多平台 Release 的 APK 文件，不改 Windows/macOS/Linux 旧安装包。GitCode、itch.io、商店均不会被该流程自动同步，镜像未确认前不要把它们当作已修复版。手机升级安装后仍需实机检查“上传→系统文件选择→看到图片卡片→进入描绘”，不能用构建成功冒充实机成功。
 | `desktop/src-tauri/` 下的配置、Rust、权限、窗口及原生资源 | 重新构建并分发新的桌面安装包 | 需要安装新版安装包 |
 
 **操作顺序**：提交变更 → Zeabur 部署完成 → 通过 `/health` 与 `/ready` 观察服务状态 → 在网页和已安装客户端各测试一轮重点功能。对本次产品能力变更，重点检查图同构、二部图、拓扑排序、模逆 / CRT、齐次与非齐次递推，以及同知识点出题是否偏题。本项目已有 175 项个人功能自测结果记录；部署新版时仍应针对本次实际改动复测 AI 出题、OCR、复制、账号同步与移动端交互，不能仅因既往记录为通过便视为新部署完成验收。

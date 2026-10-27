@@ -1,5 +1,13 @@
 name: Build DMate Android Release
 
+# Publish the signed APK to the existing multi-platform release so the public
+# download URL actually receives native WebView fixes, not just old v1.0.1.
+permissions:
+  contents: write
+concurrency:
+  group: dmate-android-release-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
@@ -60,6 +68,22 @@ jobs:
           mkdir -p dist
           cp android/app/build/outputs/apk/release/app-release.apk dist/DMate.apk
 
+      - name: Verify signed release artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/DMate.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose dist/DMate.apk
+          python - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          apk = Path("dist/DMate.apk")
+          with ZipFile(apk) as zipped:
+              assert "AndroidManifest.xml" in zipped.namelist()
+              assert zipped.testzip() is None
+          print(f"Verified signed Android APK: {apk.stat().st_size} bytes")
+          PY
+
       - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
@@ -67,3 +91,17 @@ jobs:
           path: dist/DMate.apk
           if-no-files-found: error
           retention-days: 30
+
+      # This tag also holds Windows/macOS/Linux assets; replacing only DMate.apk
+      # preserves the desktop downloads and the releases/latest/download URLs.
+      - name: Publish signed APK to existing GitHub Release
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view v1.0.1 --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload v1.0.1 dist/DMate.apk --clobber --repo "$GITHUB_REPOSITORY"
+          gh release view v1.0.1 --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[] | select(.name=="DMate.apk") | {name, size, updatedAt}'

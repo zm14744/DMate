@@ -32,6 +32,15 @@ class AndroidUploadUiTests(unittest.TestCase):
         self.assertNotIn('ocr-task-time', self.js)
         self.assertIn('ocr-task-panel-hint">最多4张', self.html)
 
+    def test_signed_android_build_reaches_public_download_url(self):
+        workflow = (ROOT / ".github/workflows/build-android-release.yml").read_text()
+        self.assertIn("contents: write", workflow)
+        self.assertIn("apksigner\" verify", workflow)
+        self.assertIn("gh release upload v1.0.1 dist/DMate.apk --clobber", workflow)
+        self.assertIn("retention-days: 30", workflow)
+        self.assertIn("GitHub · APK（新版）", self.js)
+        self.assertIn("GitCode · APK（请核对版本）", self.js)
+
     def test_solid_selection_and_compact_red_remove(self):
         self.assertIn(".ocr-question-choice input[type=\"radio\"]:checked", self.html)
         self.assertIn("ocr-task-remove", self.html)
