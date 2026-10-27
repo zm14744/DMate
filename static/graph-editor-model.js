@@ -12,6 +12,27 @@
         return prefix + next;
     };
     const ATTRS = ['weight', 'edge_label', 'color', 'style'];
+    const unit = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+    const point = value => Array.isArray(value) && value.length === 2 && value.every(unit);
+    const validPath = value => Array.isArray(value) && value.length >= 2 && value.length <= 128 && value.every(point);
+    const validBox = value => Array.isArray(value) && value.length === 4 && value.every(unit) && value[0] < value[2] && value[1] < value[3];
+    const ring = number => number >= 1 && number <= 20 ? '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'[number - 1] : '未命名' + number;
+    function ensureAnonymousLabels(input) {
+        const draft = copy(input);
+        for (const graph of draft.graphs || []) {
+            const used = new Set((graph.vertices || []).map(v => v.label || v.display_label).filter(Boolean));
+            let next = Math.max(1, Number.isInteger(graph.anon_next) ? graph.anon_next : 1);
+            for (const vertex of graph.vertices || []) {
+                if (vertex.label || vertex.display_label) continue;
+                let display;
+                do { display = ring(next++); } while (used.has(display));
+                vertex.display_label = display;
+                used.add(display);
+            }
+            graph.anon_next = next;
+        }
+        return draft;
+    }
 
     function importDocument(input) {
         const source = input && typeof input === 'object' ? input : {};
@@ -19,6 +40,10 @@
         for (const raw of Array.isArray(source.graphs) ? source.graphs : []) {
             if (!raw || typeof raw !== 'object') continue;
             const graph = { id: id(raw.id) || unique('G', result.graphs), name: text(raw.name), vertices: [], edges: [] };
+            if (typeof raw.directed === 'boolean') graph.directed = raw.directed;
+            if (typeof raw.weighted === 'boolean') graph.weighted = raw.weighted;
+            if (validBox(raw.bbox)) graph.bbox = [...raw.bbox];
+            if (Number.isInteger(raw.anon_next) && raw.anon_next >= 1 && raw.anon_next <= 10000) graph.anon_next = raw.anon_next;
             if (result.graphs.some(row => row.id === graph.id)) graph.id = unique('G', result.graphs);
             const inputVertices = Array.isArray(raw.vertices) ? raw.vertices.filter(row => row && typeof row === 'object') : [];
             const oldCounts = new Map();
@@ -27,7 +52,10 @@
             for (const rawVertex of inputVertices) {
                 let vertexId = id(rawVertex.id) || unique('v', graph.vertices);
                 if (graph.vertices.some(row => row.id === vertexId)) vertexId = unique('v', graph.vertices);
-                graph.vertices.push({ id: vertexId, label: scalar(rawVertex.label) && text(rawVertex.label).trim() ? text(rawVertex.label) : null });
+                const vertex = { id: vertexId, label: scalar(rawVertex.label) && text(rawVertex.label).trim() ? text(rawVertex.label) : null };
+                if (unit(rawVertex.x) && unit(rawVertex.y)) { vertex.x = rawVertex.x; vertex.y = rawVertex.y; }
+                if (typeof rawVertex.display_label === 'string' && rawVertex.display_label.length <= 16 && rawVertex.display_label) vertex.display_label = rawVertex.display_label;
+                graph.vertices.push(vertex);
                 if (id(rawVertex.id) && oldCounts.get(id(rawVertex.id)) === 1) aliases.set(id(rawVertex.id), vertexId);
             }
             for (const rawEdge of Array.isArray(raw.edges) ? raw.edges : []) {
@@ -40,6 +68,7 @@
                         : raw.directed === true ? 'forward' : raw.directed === false ? 'undirected' : 'unknown' };
                 for (const field of ATTRS) if (rawEdge[field] === null || scalar(rawEdge[field])) edge[field] = rawEdge[field];
                 if (rawEdge.weight !== undefined && rawEdge.weight !== null && !scalar(rawEdge.weight)) edge.weight = 'unknown';
+                if (validPath(rawEdge.path)) edge.path = rawEdge.path.map(row => [...row]);
                 graph.edges.push(edge);
             }
             result.graphs.push(graph);
@@ -69,12 +98,14 @@
             graphIds.add(graph.id);
             if (!graph.vertices.length) issues.push(name + '没有节点；请添加节点或删除这幅空图。');
             if (graph.vertices.length > LIMITS.vertices || graph.edges.length > LIMITS.edges) issues.push(name + '超出编辑范围（100 个节点、300 条边）。');
+            if (graph.bbox !== undefined && !validBox(graph.bbox)) issues.push(name + '的框选区域无效。');
             const vertices = new Set(), edges = new Set();
             for (const vertex of graph.vertices) {
                 if (!vertex.id || vertices.has(vertex.id)) issues.push(name + '有重复或缺失的节点编号。');
                 vertices.add(vertex.id);
                 if (vertex.label !== null && typeof vertex.label !== 'string') issues.push(name + '有无效节点标签。');
                 if (text(vertex.label).length > 128) issues.push(name + '的节点标签超过 128 字。');
+                if ((vertex.x !== undefined || vertex.y !== undefined) && !(unit(vertex.x) && unit(vertex.y))) issues.push(name + '有无效顶点位置。');
             }
             graph.edges.forEach((edge, index) => {
                 const label = name + '第 ' + (index + 1) + ' 条边';
@@ -83,6 +114,8 @@
                 if (!vertices.has(edge.from) || !vertices.has(edge.to)) issues.push(label + '需要选择有效的两个端点。');
                 if (!['forward', 'undirected'].includes(edge.direction)) issues.push(label + '的方向尚未确认。');
                 if (edge.weight !== undefined && edge.weight !== null && (!scalar(edge.weight) || /^(unknown|未知|不确定)$/i.test(text(edge.weight).trim()))) issues.push(label + '的权重尚未确认；无权重请留空。');
+                if (graph.weighted === true && (edge.weight === undefined || edge.weight === null || text(edge.weight).trim() === '')) issues.push(label + '缺少权值。');
+                if (edge.path !== undefined && !validPath(edge.path)) issues.push(label + '的绘图路径无效。');
                 for (const field of ATTRS) if (text(edge[field]).length > 128) issues.push(label + '的属性文字过长。');
             });
         }
@@ -147,30 +180,84 @@
                 return gid;
             },
             deleteGraph: gid => change(draft => { getGraph(draft, gid); draft.graphs = draft.graphs.filter(row => row.id !== gid); }),
-            addVertex: (gid, label) => {
+            addVertex: (gid, label, x, y) => {
                 let vertexId;
                 change(draft => { const graph = getGraph(draft, gid); if (graph.vertices.length >= LIMITS.vertices) throw new Error('每幅图最多 100 个节点。');
-                    vertexId = unique('v', graph.vertices); graph.vertices.push({ id: vertexId, label: String(label || '').trim() || null }); });
+                    vertexId = unique('v', graph.vertices);
+                    const vertex = { id: vertexId, label: String(label || '').trim() || null };
+                    if (x !== undefined || y !== undefined) {
+                        if (!unit(x) || !unit(y)) throw new Error('顶点位置必须位于原图内。');
+                        vertex.x = x; vertex.y = y;
+                    }
+                    if (!vertex.label) {
+                        let next = Math.max(1, graph.anon_next || 1);
+                        const names = new Set(graph.vertices.map(v => v.label || v.display_label));
+                        while (names.has(ring(next))) next++;
+                        vertex.display_label = ring(next++);
+                        graph.anon_next = next;
+                    }
+                    graph.vertices.push(vertex); });
                 return vertexId;
             },
             renameVertex: (gid, vid, label) => change(draft => { const vertex = getGraph(draft, gid).vertices.find(row => row.id === vid);
                 if (!vertex) throw new Error('找不到这个节点。'); vertex.label = String(label).trim() || null; }),
+            moveVertex: (gid, vid, x, y) => change(draft => {
+                if (!unit(x) || !unit(y)) throw new Error('顶点位置必须位于原图内。');
+                const graph = getGraph(draft, gid), vertex = graph.vertices.find(v => v.id === vid);
+                if (!vertex) throw new Error('找不到这个节点。');
+                const before = unit(vertex.x) && unit(vertex.y) ? [vertex.x, vertex.y] : null;
+                vertex.x = x; vertex.y = y;
+                for (const edge of graph.edges) if (validPath(edge.path)) {
+                    if (edge.from === vid && edge.to === vid && before) {
+                        edge.path = edge.path.map(p => [Math.min(1, Math.max(0, p[0] + x - before[0])), Math.min(1, Math.max(0, p[1] + y - before[1]))]);
+                    } else {
+                        if (edge.from === vid) edge.path[0] = [x, y];
+                        if (edge.to === vid) edge.path[edge.path.length - 1] = [x, y];
+                    }
+                }
+            }),
+            setGraphBounds: (gid, bbox) => change(draft => {
+                if (!validBox(bbox)) throw new Error('请框选有效的图形范围。');
+                getGraph(draft, gid).bbox = [...bbox];
+            }),
+            setGraphType: (gid, type, enabled) => change(draft => {
+                if (!['directed', 'weighted'].includes(type) || typeof enabled !== 'boolean') throw new Error('图形类型无效。');
+                const graph = getGraph(draft, gid); graph[type] = enabled;
+                if (type === 'directed') graph.edges.forEach(edge => { edge.direction = enabled ? 'forward' : 'undirected'; });
+                if (type === 'weighted' && !enabled) graph.edges.forEach(edge => { edge.weight = null; });
+            }),
+            setEdgePath: (gid, eid, path) => change(draft => {
+                if (path !== null && !validPath(path)) throw new Error('边的路径必须位于原图内。');
+                const edge = getGraph(draft, gid).edges.find(e => e.id === eid);
+                if (!edge) throw new Error('找不到这条边。');
+                if (path === null) delete edge.path;
+                else edge.path = path.map(row => [...row]);
+            }),
             deleteVertices: (gid, ids) => change(draft => { const graph = getGraph(draft, gid), selected = new Set(ids);
                 graph.vertices = graph.vertices.filter(row => !selected.has(row.id));
                 graph.edges = graph.edges.filter(row => !selected.has(row.from) && !selected.has(row.to)); }),
             addEdge: (gid, values) => {
                 let edgeId;
                 change(draft => { const graph = getGraph(draft, gid); if (graph.edges.length >= LIMITS.edges) throw new Error('每幅图最多 300 条边。');
-                    edgeId = unique('e', graph.edges); graph.edges.push({ id: edgeId, from: values.from || '', to: values.to || '', direction: values.direction || 'undirected', weight: values.weight ?? null }); });
+                    edgeId = unique('e', graph.edges);
+                    const edge = { id: edgeId, from: values.from || '', to: values.to || '', direction: values.direction || 'undirected', weight: values.weight ?? null };
+                    if (validPath(values.path)) edge.path = values.path.map(row => [...row]);
+                    graph.edges.push(edge); });
                 return edgeId;
             },
             updateEdges: (gid, ids, field, value) => change(draft => {
                 if (!['from', 'to', 'direction', ...ATTRS].includes(field)) throw new Error('无法修改这个字段。');
                 const graph = getGraph(draft, gid), selected = new Set(ids);
-                graph.edges.forEach(edge => { if (selected.has(edge.id)) edge[field] = value; });
+                graph.edges.forEach(edge => { if (selected.has(edge.id)) {
+                    edge[field] = value;
+                    if (field === 'from' || field === 'to') delete edge.path;
+                } });
             }),
             reverseEdges: (gid, ids) => change(draft => { const graph = getGraph(draft, gid);
-                graph.edges.forEach(edge => { if (ids.includes(edge.id)) [edge.from, edge.to] = [edge.to, edge.from]; }); }),
+                graph.edges.forEach(edge => { if (ids.includes(edge.id)) {
+                    [edge.from, edge.to] = [edge.to, edge.from];
+                    if (validPath(edge.path)) edge.path.reverse();
+                } }); }),
             setEdgeCount: (gid, ids, count) => change(draft => {
                 if (!Number.isInteger(count) || count < 1 || count > 50) throw new Error('相同边数量须为 1 到 50。');
                 const graph = getGraph(draft, gid), selected = graph.edges.filter(row => ids.includes(row.id));
@@ -236,7 +323,8 @@
     }
 
     // All semantic graph mutations and validation live here, without DOM access.
-    const api = { createModel, importDocument, validateDocument, groupEdges, valueText: text };
+    const api = { createModel, importDocument, validateDocument, groupEdges,
+        ensureAnonymousLabels, valueText: text };
     root.DMateGraphEditorModel = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
