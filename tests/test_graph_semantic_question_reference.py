@@ -56,6 +56,8 @@ class FakeCompletion:
         assert request['source_sha256'] == SHA
         assert request['role'] == qr.ROLE
         assert request['response_schema']['additionalProperties'] is False
+        span_schema = request['response_schema']['properties']['subquestions']['items']['properties']['source_spans']['items']
+        assert span_schema['required'] == ['block_id', 'quote']
         if kwargs['cancelled']():
             return {'ok': False}
         if self.delay:
@@ -176,6 +178,8 @@ def test_invalid_remote_output_is_nonblocking_but_not_certified():
     assert result['status'] == 'local_only' and result['reason'] == 'invalid_advice'
     assert result['subquestions'] == []
     assert result['metrics'][0]['response_received'] is True
+    assert result['validation_audit']['code'] == 'schema_invalid'
+    assert result['metrics'][0]['advice_validation'] == result['validation_audit']
 
 
 def test_missing_credentials_does_not_spend_a_model_call(monkeypatch):
@@ -365,3 +369,177 @@ def test_local_only_reference_has_bounded_knowledge_hints(monkeypatch):
     assert safe is not None and safe['status'] == 'local_only'
     assert safe['local_hints']['rule_index_used'] is True
     assert 'tool_evidence' not in safe and 'metrics' not in safe
+
+
+def single_quote_advice(quote, **offsets):
+    return {'subquestions': [{'id': 'q1', 'source_spans': [
+        {'block_id': 'body', 'quote': quote, **offsets}],
+        'graph_ids': ['G1'], 'summary': '核对原文引用'}],
+        'references': [], 'focus': [], 'unresolved': []}
+
+
+@pytest.mark.parametrize('offsets', [{}, {'start': -1, 'end': 500},
+                                   {'start': 0}, {'end': 1}])
+def test_unique_unicode_quote_gets_program_computed_offsets_without_text_edits(offsets):
+    doc = document()
+    doc['body_text'] = '🔵第①问：求 v₃ 的度数；第②问：α₂≠α³。'
+    quote = '求 v₃ 的度数'
+    proposal = single_quote_advice(quote, **offsets)
+    before = copy.deepcopy(proposal)
+    canonical, audit = qr._canonicalize_advice(proposal, qr._snapshot(doc, SHA))
+    span = canonical['subquestions'][0]['source_spans'][0]
+    start = doc['body_text'].index(quote)
+    assert span == {'block_id': 'body', 'quote': quote, 'start': start, 'end': start + len(quote)}
+    assert start != len(doc['body_text'][:start].encode('utf-8'))
+    assert proposal == before and doc['body_text'][span['start']:span['end']] == quote
+    assert audit['normalized_spans'] == 1 and audit['validated_spans'] == 1
+    assert quote not in json.dumps(audit, ensure_ascii=False)
+    qr._VALIDATOR.validate(canonical)
+
+
+def test_correct_legacy_offsets_are_preserved_including_repeated_quote():
+    doc = document()
+    doc['body_text'] = '求度数；求度数。'
+    quote, start = '求度数', 4
+    proposal = single_quote_advice(quote, start=start, end=start + len(quote))
+    canonical, audit = qr._canonicalize_advice(proposal, qr._snapshot(doc, SHA))
+    assert canonical == proposal
+    assert audit['normalizations'] == [] and audit['normalized_spans'] == 0
+
+
+@pytest.mark.parametrize('offsets', [{}, {'start': 1, 'end': 3}, {'start': 0}])
+def test_repeated_quote_without_valid_full_offsets_is_never_assigned_first(offsets):
+    doc = document()
+    doc['body_text'] = '求度数；求度数。'
+    with pytest.raises(qr.AdviceValidationError) as caught:
+        qr._canonicalize_advice(single_quote_advice('求度数', **offsets), qr._snapshot(doc, SHA))
+    assert caught.value.code == 'ambiguous_literal_quote'
+
+
+def test_overlapping_quote_occurrences_are_ambiguous():
+    doc = document()
+    doc['body_text'] = 'aaaa'
+    with pytest.raises(qr.AdviceValidationError, match='ambiguous_literal_quote'):
+        qr._canonicalize_advice(single_quote_advice('aaa'), qr._snapshot(doc, SHA))
+
+
+@pytest.mark.parametrize('quote', ['求v₅的度数', '求V₃的度数', '求v3的度数', '求v³的度数', '求 v₃ 的度数'])
+def test_quote_matching_does_not_normalize_semantic_characters_or_spaces(quote):
+    doc = document()
+    doc['body_text'] = '求v₃的度数'
+    with pytest.raises(qr.AdviceValidationError, match='literal_quote_not_found'):
+        qr._canonicalize_advice(single_quote_advice(quote), qr._snapshot(doc, SHA))
+
+
+@pytest.mark.parametrize('offsets', [{'start': True, 'end': 2}, {'start': None}, {'end': '3'}])
+def test_malformed_offset_types_still_rejected_even_for_unique_quote(offsets):
+    with pytest.raises(qr.ValidationError):
+        qr._canonicalize_advice(single_quote_advice('(1)', **offsets), qr._snapshot(document(), SHA))
+
+
+def test_canonical_consumer_does_not_relocate_or_complete_cached_spans():
+    doc = document()
+    reference = bound_reference(doc)
+    span = reference['subquestions'][0]['source_spans'][0]
+    span['start'] = 1
+    assert qr.question_reference_for_document(reference, doc, source_sha256=SHA) is None
+    del span['start']
+    assert qr.question_reference_for_document(reference, doc, source_sha256=SHA) is None
+
+
+def test_spawned_quote_only_response_produces_canonical_source_bound_reference():
+    doc = document()
+    quote = doc['body_text'][:doc['body_text'].index('(2)')]
+    ledger = budget()
+    result = qr.prepare_question_reference(doc, budget=ledger,
+                                           completion=FakeCompletion(single_quote_advice(quote)))
+    assert result['status'] == 'ready'
+    assert result['subquestions'][0]['source_spans'][0]['end'] == len(quote)
+    assert result['validation_audit']['normalizations'][0]['action'] == 'offsets_generated'
+    assert ledger.remaining == 9 and len(ledger.metrics) == 1
+    assert ledger.metrics[0]['request_attempted'] is True
+    assert ledger.metrics[0]['response_received'] is True
+    assert ledger.metrics[0]['worker_reaped'] is True
+    assert qr.question_reference_for_document(result, doc, source_sha256=SHA) is not None
+
+
+@pytest.mark.parametrize('change,code', [
+    ('unknown_block', 'unknown_source_block'),
+    ('unknown_graph', 'unknown_graph_reference'),
+    ('fake_quote', 'literal_quote_not_found'),
+    ('schema', 'schema_invalid'),
+])
+def test_remote_rejection_exposes_safe_specific_reason_without_private_values(change, code):
+    proposal = single_quote_advice('(1)')
+    item = proposal['subquestions'][0]
+    private = 'PRIVATE_REJECTED_VALUE_DO_NOT_LOG'
+    if change == 'unknown_block':
+        item['source_spans'][0]['block_id'] = private
+    elif change == 'unknown_graph':
+        item['graph_ids'] = [private]
+    elif change == 'fake_quote':
+        item['source_spans'][0]['quote'] = private
+    else:
+        item[private] = private
+    ledger = budget()
+    result = qr.prepare_question_reference(document(), budget=ledger, completion=FakeCompletion(proposal))
+    assert result['status'] == 'local_only' and result['reason'] == 'invalid_advice'
+    assert result['validation_audit']['code'] == code
+    assert result['subquestions'] == []
+    audit = json.dumps({'audit': result['validation_audit'], 'metrics': ledger.metrics,
+                        'events': ledger.events}, ensure_ascii=False)
+    assert private not in audit and document()['body_text'] not in audit
+    assert ledger.remaining == 9 and len(ledger.metrics) == 1
+    assert ledger.metrics[0]['response_received'] is True
+
+
+@dataclass
+class InvalidJsonCompletion:
+    def __call__(self, messages, **kwargs):
+        assert kwargs['retries'] == 0
+        assert not kwargs['cancelled']()
+        return {'ok': True, 'content': '{PRIVATE_INVALID_JSON_MUST_NOT_LEAK',
+                'choice': {'finish_reason': 'stop'}}
+
+
+def test_json_syntax_failure_has_own_safe_code_and_does_not_trigger_retry():
+    ledger = budget()
+    result = qr.prepare_question_reference(document(), budget=ledger, completion=InvalidJsonCompletion())
+    assert result['validation_audit'] == {'status': 'rejected', 'code': 'invalid_json',
+                                          'path': [], 'character_position': 1}
+    assert result['reason'] == 'invalid_advice' and len(ledger.metrics) == 1
+    assert 'PRIVATE_INVALID_JSON' not in json.dumps(result, ensure_ascii=False)
+
+
+def test_normalization_audit_is_bounded_and_contains_only_locations_and_actions():
+    proposal = single_quote_advice('(1)')
+    original = proposal['subquestions'][0]
+    proposal['subquestions'] = [{**copy.deepcopy(original), 'id': f'q{i}'} for i in range(24)]
+    canonical, audit = qr._canonicalize_advice(proposal, qr._snapshot(document(), SHA))
+    assert len(canonical['subquestions']) == 24
+    assert audit['normalized_spans'] == 24 and len(audit['normalizations']) == 12
+    assert audit['normalizations_truncated'] is True
+    assert all(set(row) == {'path', 'action'} for row in audit['normalizations'])
+
+
+def test_relocated_reference_still_invalidates_on_body_catalog_or_source_change():
+    doc = document()
+    canonical, audit = qr._canonicalize_advice(single_quote_advice('v₁的度数', start=0, end=1),
+                                             qr._snapshot(doc, SHA))
+    result = {**qr._base(qr._snapshot(doc, SHA), budget()), **canonical,
+              'status': 'ready', 'validation_audit': audit}
+    handle = qr.QuestionReferenceHandle(result)
+    handle._done.set()
+    assert qr.get_ready_question_reference(handle, document=doc, source_sha256=SHA)['status'] == 'ready'
+    for change in ('body', 'graph', 'source'):
+        changed = copy.deepcopy(doc)
+        if change == 'body':
+            changed['body_text'] = changed['body_text'].replace('v₁', 'v₅')
+        elif change == 'graph':
+            changed['graphs'][0]['vertices'][0]['label'] = 'V₁'
+        else:
+            changed['source_sha256'] = 'b' * 64
+        stale = qr.get_ready_question_reference(handle, document=changed, source_sha256=SHA)
+        assert stale['status'] == 'stale' and stale['subquestions'] == []
+        assert stale['validation_audit'] == audit
+        assert qr.question_reference_for_document(result, changed, source_sha256=SHA) is None

@@ -208,6 +208,18 @@ _auth_rate_history = defaultdict(deque)
 
 app = Flask(__name__)
 
+# Bind health and the response from the actual /ocr worker to one startup
+# source snapshot, including the shared semantic schema and web renderer.
+from runtime_source_identity import compute_runtime_source, configured_recognition_budget
+_RUNTIME_SOURCE, _ = compute_runtime_source(os.path.dirname(os.path.abspath(__file__)))
+
+
+@app.after_request
+def attach_runtime_source(response):
+    if request.path in ('/health', '/ready', '/ocr') and _RUNTIME_SOURCE['status'] == 'ok':
+        response.headers['X-DMate-Runtime-Sha256'] = _RUNTIME_SOURCE['manifest_sha256']
+    return response
+
 # 账号只使用服务器签名的 HttpOnly Cookie；前端 JS 不保存登录令牌。
 app.config.update(
     SECRET_KEY=AUTH_SECRET_KEY or "auth-disabled-placeholder",
@@ -4541,6 +4553,8 @@ def ocr():
 def health():
     return jsonify({
         "status": "ok",
+        "runtime_source": _RUNTIME_SOURCE,
+        "recognition_budget": configured_recognition_budget(),
         "graph_nextgen_enabled": os.environ.get("DMATE_GRAPH_NEXTGEN", "0") == "1",
         "graph_nextgen_version": active_pipeline_version(),
         "graph_nextgen_engine": active_pipeline(),
@@ -4564,6 +4578,8 @@ def ready():
         semantic = _semantic_ocr_selected()
         semantic_status = (_ocr_stages.get("semantic") or {}).get("status", "not_run")
         state = {"web": "正常", "ocr_available": OCR_AVAILABLE,
+                 "runtime_source": _RUNTIME_SOURCE,
+                 "recognition_budget": configured_recognition_budget(),
                  "ocr_ready": _ocr_ready, "ocr_status": _ocr_status,
                  "recognition_mode": "semantic_visual" if semantic else "local_ocr_then_vision",
                  "local_ocr_required": not semantic,

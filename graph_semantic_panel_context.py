@@ -30,6 +30,74 @@ def _area(box):
     return max(1., (box[2]-box[0])*(box[3]-box[1]))
 
 
+def _point(vertex):
+    if not isinstance(vertex, dict):
+        return None
+    # Match the geometry adapter: an invalid optional position does not hide
+    # usable x/y coordinates. Every consumer must reject the same collisions.
+    for value in (vertex.get('position'), [vertex.get('x'), vertex.get('y')]):
+        if (isinstance(value, (list, tuple)) and len(value) == 2
+                and all(type(v) in (int, float) and math.isfinite(v) and 0 <= v <= 1000
+                        for v in value)):
+            return tuple(value)
+    return None
+
+
+def separate_location_hints(graphs):
+    """Withdraw reused page coordinates without changing any graph content.
+
+    Readers sometimes copy panel-local coordinates to other panels as though
+    they were page coordinates. Using that same point cloud to select crops
+    then directs both source readers and local tracers to the first panel.
+    A complete, repeated cloud is therefore an ambiguous hint. This check
+    never matches labels, infers a different location, merges graphs or adds
+    a semantic uncertainty: every original graph still needs to be read.
+    """
+    result = copy.deepcopy(graphs)
+    if not isinstance(graphs, list) or len(graphs) > 64:
+        return result, {'status': 'skipped', 'reason': 'invalid_inventory',
+                        'candidate_only': True, 'withdrawn_graph_ids': []}
+    clouds = []
+    for index, graph in enumerate(graphs):
+        if not isinstance(graph, dict):
+            continue
+        vertices = graph.get('vertices')
+        if not isinstance(vertices, list) or not 2 <= len(vertices) <= 100:
+            continue
+        points = []
+        for vertex in vertices:
+            point = _point(vertex)
+            if point is None:
+                break
+            points.append(point)
+        if len(points) == len(vertices) and len(set(points)) == len(points):
+            clouds.append((index, set(points)))
+    conflicted, pairs = set(), []
+    for offset, (left, a) in enumerate(clouds):
+        for right, b in clouds[offset+1:]:
+            # Require exact reused coordinates, not nearby or similar shapes.
+            # The small allowed difference handles an otherwise identical
+            # template with one additional visible vertex in another panel.
+            shared = len(a & b)
+            if shared != min(len(a), len(b)) or shared / max(len(a), len(b)) < .8:
+                continue
+            conflicted.update((left, right))
+            if len(pairs) < 64:
+                pairs.append([left, right])
+    for index in conflicted:
+        for vertex in result[index]['vertices']:
+            vertex.pop('x', None)
+            vertex.pop('y', None)
+            if isinstance(vertex.get('position'), (list, tuple)):
+                vertex.pop('position', None)
+        # A separate bbox or explicit layout reference may still identify
+        # the right panel. Only the repeated vertex coordinates are withdrawn.
+    return result, {'status': 'ambiguous_locations_withdrawn' if conflicted else 'unchanged',
+        'candidate_only': True, 'original_overview_required': True,
+        'withdrawn_graph_ids': [str(graphs[i].get('id', '')) for i in sorted(conflicted)],
+        'conflicting_panel_indices': pairs, 'graph_content_changed': False}
+
+
 def panel_context(graph, layout):
     """Return a copy of the graph with an optional enlarged reading bbox.
 
@@ -48,12 +116,8 @@ def panel_context(graph, layout):
     association = 'inventory_window_reference' if selected else 'none'
     points = []
     for vertex in graph.get('vertices', []) if isinstance(graph.get('vertices'), list) else []:
-        if not isinstance(vertex, dict):
-            continue
-        point = vertex.get('position')
-        if not isinstance(point, (tuple, list)) or len(point) != 2:
-            point = [vertex.get('x'), vertex.get('y')]
-        if all(type(x) in (int, float) and math.isfinite(x) and 0 <= x <= 1000 for x in point):
+        point = _point(vertex)
+        if point is not None:
             points.append(point)
     if not selected:
         ranked = []
@@ -90,4 +154,4 @@ def panel_context(graph, layout):
     return {'graph': result, 'audit': audit}
 
 
-__all__ = ['panel_context']
+__all__ = ['panel_context', 'separate_location_hints']
