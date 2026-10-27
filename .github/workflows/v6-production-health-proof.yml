@@ -1,0 +1,70 @@
+name: Temporary V6 production health proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v6-production-health-proof.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute checkout runtime source identity
+        run: |
+          python - <<'PY' > /tmp/expected.json
+          import json
+          from runtime_source_identity import compute_runtime_source
+          public, _ = compute_runtime_source('.')
+          if public.get('status') != 'ok':
+              raise SystemExit('checkout runtime source unavailable')
+          print(json.dumps(public, sort_keys=True))
+          PY
+      - name: Compare deployed health with this exact source tree
+        run: |
+          set -euo pipefail
+          : > /tmp/observed-shas
+          for n in 1 2 3; do
+            curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+              --retry 6 --retry-all-errors --retry-delay 5 --connect-timeout 10 --max-time 30 \
+              -D "/tmp/headers-$n" -o "/tmp/health-$n.json" \
+              https://dmate.zeabur.app/health
+            python - "$n" <<'PY'
+          import json, re, sys
+          from pathlib import Path
+          n=sys.argv[1]
+          expected=json.loads(Path('/tmp/expected.json').read_text())
+          health=json.loads(Path(f'/tmp/health-{n}.json').read_text())
+          headers=Path(f'/tmp/headers-{n}').read_text()
+          if health.get('status') != 'ok':
+              raise SystemExit('deployed health is not ok')
+          if health.get('graph_nextgen_enabled') is not True:
+              raise SystemExit('nextgen is not enabled')
+          if health.get('graph_nextgen_version') != '2026-10-27-agent-semantic-v6':
+              raise SystemExit('wrong deployed pipeline version')
+          if health.get('graph_nextgen_engine') != 'agent-tools':
+              raise SystemExit('wrong deployed pipeline engine')
+          runtime=health.get('runtime_source') or {}
+          if runtime != expected:
+              raise SystemExit(f'runtime source mismatch: {runtime} != {expected}')
+          match=re.findall(r'(?im)^x-dmate-runtime-sha256:\s*([0-9a-f]{64})\s*$', headers)
+          if match != [expected['manifest_sha256']]:
+              raise SystemExit('runtime source response header mismatch')
+          budget=health.get('recognition_budget') or {}
+          wanted={'seconds':230,'total_remote_calls':16,'per_call_seconds':75,
+                  'remote_concurrency':2,'network_recoveries':2,'json_recoveries':1,
+                  'recoveries_share_total_budget':True}
+          if budget != wanted:
+              raise SystemExit(f'unexpected deployed recognition budget: {budget}')
+          Path('/tmp/observed-shas').open('a').write(expected['manifest_sha256']+'\n')
+          print(json.dumps({'sample':n,'version':health['graph_nextgen_version'],
+              'engine':health['graph_nextgen_engine'],'runtime_sha256':expected['manifest_sha256'],
+              'budget':budget}, sort_keys=True))
+          PY
+          done
+          test "$(sort -u /tmp/observed-shas | wc -l)" -eq 1
