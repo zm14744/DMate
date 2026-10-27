@@ -133,12 +133,12 @@ def canonical_graph(source, index=1):
 
 def display_graph(graph):
     """Public display fields only; pixels/model diagnostics stay server-side."""
-    fields = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete')
+    fields = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete', 'bbox')
     out = {k: graph[k] for k in fields if k in graph}
-    out['vertices'] = [{k: v[k] for k in ('id', 'label', 'isolated_confirmed') if k in v}
+    out['vertices'] = [{k: v[k] for k in ('id', 'label', 'isolated_confirmed', 'display_label', 'x', 'y') if k in v}
                        for v in graph['vertices']]
     out['edges'] = [{k: e[k] for k in ('id', 'from', 'to', 'direction', 'edge_label', 'weight',
-                                      'multiplicity', 'parallel_count', 'style', 'color', 'status') if k in e}
+                                      'multiplicity', 'parallel_count', 'style', 'color', 'status', 'path') if k in e}
                     for e in graph['edges']]
     return out
 
@@ -151,7 +151,7 @@ def describe_graphs(graphs):
     """
     lines = []
     for graph in graphs:
-        labels = {v['id']: v.get('label') or v['id'] for v in graph['vertices']}
+        labels = {v['id']: v.get('label') or v.get('display_label') or v['id'] for v in graph['vertices']}
         edges = []
         incident = set()
         for edge in graph['edges']:

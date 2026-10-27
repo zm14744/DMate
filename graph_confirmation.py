@@ -26,18 +26,25 @@ MAX_BYTES = 200_000
 TTL_SECONDS = 7 * 24 * 60 * 60
 _ID = {'type': 'string', 'minLength': 1, 'maxLength': 128, 'pattern': r'\S'}
 _TEXT = {'type': ['string', 'null'], 'maxLength': 256}
+_COORD = {'type': 'number', 'minimum': 0, 'maximum': 1}
+_POINT = {'type': 'array', 'prefixItems': [_COORD, _COORD], 'minItems': 2, 'maxItems': 2}
+_BBOX = {'type': 'array', 'prefixItems': [_COORD, _COORD, _COORD, _COORD], 'minItems': 4, 'maxItems': 4}
 _EDGE = {'type': 'object', 'required': ['id', 'from', 'to', 'direction'], 'properties': {
     'id': _ID, 'from': _ID, 'to': _ID, 'direction': {'enum': ['forward', 'undirected']},
     'weight': {'type': ['number', 'string', 'null'], 'maxLength': 256},
     'edge_label': _TEXT, 'style': {'type': ['string', 'null'], 'maxLength': 64},
-    'color': {'type': ['string', 'null'], 'maxLength': 64}, 'multiplicity': {'const': 1}}}
+    'color': {'type': ['string', 'null'], 'maxLength': 64}, 'multiplicity': {'const': 1},
+    'path': {'type': 'array', 'items': _POINT, 'maxItems': 128}}}
 DOCUMENT_SCHEMA = {'type': 'object', 'required': ['body_text', 'graphs'], 'properties': {
     'body_text': {'type': 'string', 'maxLength': 24000},
     'graphs': {'type': 'array', 'maxItems': 64, 'items': {
         'type': 'object', 'required': ['id', 'vertices', 'edges'], 'properties': {
-            'id': _ID, 'name': _TEXT,
+            'id': _ID, 'name': _TEXT, 'bbox': _BBOX,
             'vertices': {'type': 'array', 'minItems': 1, 'maxItems': 100, 'items': {
-                'type': 'object', 'required': ['id'], 'properties': {'id': _ID, 'label': _TEXT}}},
+                'type': 'object', 'required': ['id'], 'properties': {
+                    'id': _ID, 'label': _TEXT, 'display_label': {'type': 'string', 'maxLength': 16},
+                    'x': {'anyOf': [_COORD, {'type': 'null'}]},
+                    'y': {'anyOf': [_COORD, {'type': 'null'}]}}}},
             'edges': {'type': 'array', 'maxItems': 300, 'items': _EDGE}}}}}}
 
 
@@ -138,6 +145,12 @@ def validate_document(value):
             issues.append({'graph_id': graph['id'], 'message': '子图标识重复。'})
         graph_ids.add(graph['id'])
         nodes, edges = [v['id'] for v in graph['vertices']], [e['id'] for e in graph['edges']]
+        box = graph.get('bbox')
+        if box is not None and not (box[0] < box[2] and box[1] < box[3]):
+            issues.append({'graph_id': graph['id'], 'message': '图形框选范围无效。'})
+        for vertex in graph['vertices']:
+            if (vertex.get('x') is None) != (vertex.get('y') is None):
+                issues.append({'graph_id': graph['id'], 'vertex_id': vertex['id'], 'message': '顶点坐标必须成对提供。'})
         if len(set(nodes)) != len(nodes) or len(set(edges)) != len(edges):
             issues.append({'graph_id': graph['id'], 'message': '节点或边的标识重复。'})
         for edge in graph['edges']:

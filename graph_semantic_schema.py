@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 from collections import Counter, defaultdict
 
-from graph_schema import SCHEMA_VERSION, parallel_key
+from graph_schema import SCHEMA_VERSION, parallel_key, unit, path_points
 
 
 SEMANTIC_SCHEMA_VERSION = "dmate.semantic/1"
@@ -122,6 +122,10 @@ def _normalize_graph(source, graph_id, issues, notes):
         graph["name"] = _visible_text(source.get("name")) or graph_id
     except ValueError:
         _issue(issues, "graph", "invalid_graph_name", "图名称不是可读文本。", graph_id=graph_id)
+    box = source.get('bbox')
+    if (isinstance(box, list) and len(box) == 4 and all(unit(n) is not None for n in box)
+            and unit(box[0]) < unit(box[2]) and unit(box[1]) < unit(box[3])):
+        graph['bbox'] = [unit(n) for n in box]
     raw_nodes = source.get("vertices")
     if not isinstance(raw_nodes, list):
         _issue(issues, "graph", "invalid_vertex_inventory", "vertices 必须是顶点列表。", graph_id=graph_id)
@@ -157,8 +161,12 @@ def _normalize_graph(source, graph_id, issues, notes):
                    graph_id=graph_id, vertex_id=vertex_id)
             graph["unresolved_vertices"].append({"source_index": index, "vertex_id": vertex_id,
                                                 "record": {"label": _safe_value(item.get("label"))}})
-        graph["vertices"].append({"id": vertex_id, "label": label, "x": None, "y": None,
-                                  "isolated_confirmed": False})
+        vx, vy = unit(item.get('x')), unit(item.get('y'))
+        vertex = {'id': vertex_id, 'label': label, 'x': vx, 'y': vy,
+                  'isolated_confirmed': False}
+        if isinstance(item.get('display_label'), str) and 0 < len(item['display_label']) <= 16:
+            vertex['display_label'] = item['display_label']
+        graph['vertices'].append(vertex)
         if label is not None:
             labels[label].append(vertex_id)
     raw_edges = source.get("edges")
@@ -236,7 +244,7 @@ def _normalize_graph(source, graph_id, issues, notes):
             continue
         graph["edges"].append({"id": edge_id, **endpoints, "direction": direction,
                                "weight": weight, "edge_label": edge_label, **attributes,
-                               "multiplicity": 1, "parallel_count": 1, "path": [],
+                               "multiplicity": 1, "parallel_count": 1, "path": path_points(item.get('path')),
                                "status": "pending", "evidence": []})
     edges = graph["edges"]
     directions = observed_directions
