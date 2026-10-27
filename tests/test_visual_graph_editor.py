@@ -311,3 +311,18 @@ console.log(JSON.stringify({graph:model.getDocument().graphs[0],more,removed,iss
     assert graph["edges"][0]["path"] == [[.2, .3], [.46, .56], [.8, .7]]
     assert len({edge["id"] for edge in graph["edges"]}) == len(graph["edges"])
     assert value["issues"] == []
+
+def test_graph_type_change_cannot_invent_edge_arrow_direction():
+    output = run_model("""
+model.setGraphType('G1','directed',false);
+model.setGraphType('G1','directed',true);
+const edge = model.getDocument().graphs[0].edges[0];
+const after = {direction:edge.direction,issues:model.validate()};
+model.updateEdges('G1',['e1'],'direction','forward');
+console.log(JSON.stringify({after,accepted:model.validate()}));
+""")
+    assert output['after']['direction'] == 'unknown'
+    assert any('方向尚未确认' in message for message in output['after']['issues'])
+    assert output['accepted'] == []
+
+

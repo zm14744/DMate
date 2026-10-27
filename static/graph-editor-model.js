@@ -243,7 +243,13 @@
             setGraphType: (gid, type, enabled) => change(draft => {
                 if (!['directed', 'weighted'].includes(type) || typeof enabled !== 'boolean') throw new Error('图形类型无效。');
                 const graph = getGraph(draft, gid); graph[type] = enabled;
-                if (type === 'directed') graph.edges.forEach(edge => { edge.direction = enabled ? 'forward' : 'undirected'; });
+                if (type === 'directed') graph.edges.forEach(edge => {
+                    // The diagram's type does not reveal any previously undirected
+                    // edge's arrow direction. Preserve known arrows, leave
+                    // uncertain ones pending user review instead of inventing A→B.
+                    if (!enabled) edge.direction = 'undirected';
+                    else if (edge.direction !== 'forward') edge.direction = 'unknown';
+                });
                 if (type === 'weighted' && !enabled) graph.edges.forEach(edge => { edge.weight = null; });
             }),
             setEdgePath: (gid, eid, path) => change(draft => {
