@@ -45,7 +45,9 @@ function mount(host,o){
   // and labels instead use a constant on-screen size, including at 400% zoom.
   const radius=Math.max(5,Math.min(w,h)*.008);
   const scale=Math.max(.0001,svg.getBoundingClientRect().width/w);
-  const touch=Boolean(root.navigator?.maxTouchPoints || root.matchMedia?.('(pointer: coarse)')?.matches);
+  const browser = d.defaultView;
+  const touch=Boolean(browser?.navigator?.maxTouchPoints
+      || browser?.matchMedia?.('(pointer: coarse)')?.matches);
   const hitRadius=Math.max(radius*2.6,(touch?22:12)/scale);
   const dotRadius=Math.max(1.5,4.5/scale);
   const handleRadius=Math.max(radius*1.1,(touch?15:8)/scale);

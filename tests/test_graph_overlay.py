@@ -130,7 +130,7 @@ def test_overlay_keeps_image_and_zoom_when_selecting_or_renaming(canvas_page):
     page.get_by_role("button", name="放大原图", exact=True).click()
     assert page.locator(".dge-overlay-zoom").inner_text() == "156%"
     page.evaluate("window.imageBefore=document.querySelector('.dge-overlay-image')")
-    page.locator('[data-vertex-id="a"] .dge-overlay-dot').click()
+    page.locator('[data-vertex-id="a"] .dge-overlay-node-hit').click()
     assert page.get_by_label("当前顶点名称").is_visible()
     assert page.evaluate("window.imageBefore===document.querySelector('.dge-overlay-image')")
     page.get_by_label("当前顶点名称").fill("Z")
