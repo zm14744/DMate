@@ -637,14 +637,25 @@ def _literal_required_edge_attributes(document):
         for gid in selected:
             required[gid].update(fields)
 
-    # Unscoped body prose applies to every graph it can refer to. Located
-    # legends and captions narrow the requirement when graph_ids are known.
-    apply(draft.get('body_text', ''), graph_ids)
+    # A located legend/caption may also be retained verbatim inside body_text.
+    # If its exact text already has graph_ids, remove only that duplicate span
+    # from the unscoped scan, then apply it to its known graphs. This prevents a
+    # G2-only color legend from making unrelated G1/G3 edges color-mandatory.
     context = draft.get('text_context') if isinstance(draft.get('text_context'), dict) else {}
+    located = []
+    body = str(draft.get('body_text', '') or '')
     for kind in ('legends', 'captions'):
         for row in context.get(kind, []) if isinstance(context.get(kind), list) else []:
-            if isinstance(row, dict):
-                apply(row.get('text', ''), row.get('graph_ids', []))
+            if not isinstance(row, dict):
+                continue
+            text = str(row.get('text', '') or '')
+            targets = row.get('graph_ids', [])
+            located.append((text, targets))
+            if text and isinstance(targets, list) and targets:
+                body = body.replace(text, ' ')
+    apply(body, graph_ids)
+    for text, targets in located:
+        apply(text, targets)
     return required
 
 
