@@ -25,7 +25,7 @@
 <script>
 /* 仅迁移清理旧版 DMate Service Worker 与历史缓存；不注册新 Worker，也不提供网页应用安装功能。 */
 (function () {
-    var reloadKey = "dmate-legacy-worker-cleanup-v2-reloaded";
+    var reloadKey = "dmate-legacy-worker-cleanup-v3-reloaded";
     var cleanupTasks = [];
 
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {

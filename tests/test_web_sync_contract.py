@@ -27,6 +27,7 @@ class RemoteWebSyncContract(unittest.TestCase):
         regex = '/^dmate-(?:pwa-|store-pwa-|ios-webapp-)/i'
         self.assertIn(regex, self.html)
         self.assertIn(regex, self.worker)
+        self.assertIn('dmate-legacy-worker-cleanup-v3-reloaded', self.html)
         self.assertNotIn('localStorage.clear()', self.html)
         self.assertNotIn('indexedDB.deleteDatabase(', self.worker)
         self.assertNotIn("Clear-Site-Data", self.app)
