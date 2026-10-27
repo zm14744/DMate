@@ -190,6 +190,58 @@
             return null;
         }
 
+        function buildSelectedProperties(graph) {
+            const aside = element('aside', 'dge-selection-panel');
+            if (!graph) return aside;
+            const selectedNode = selectedNodes.size === 1
+                ? graph.vertices.find(v => selectedNodes.has(v.id)) : null;
+            const edge = graph.edges.find(e => e.id === selectedEdge);
+            if (edge) {
+                aside.append(element('h3', '', '边的属性'));
+                const index = graph.edges.indexOf(edge) + 1, ids = [edge.id];
+                const endpoints = nodeOptions(graph);
+                aside.append(field('起点', select(endpoints, edge.from, '当前边起点',
+                    value => model.updateEdges(graph.id, ids, 'from', value))));
+                aside.append(field('终点', select(endpoints, edge.to, '当前边终点',
+                    value => model.updateEdges(graph.id, ids, 'to', value))));
+                aside.append(field('方向', select([['undirected','无向 —'], ['forward','有向 →'],
+                    ['unknown','待核对 ?']], edge.direction, '当前边方向',
+                    value => model.updateEdges(graph.id, ids, 'direction', value))));
+                aside.append(button('反转方向', () => model.reverseEdges(graph.id, ids)));
+                aside.append(field('权值', input(edge.weight, '当前边权值',
+                    value => model.updateEdges(graph.id, ids, 'weight', weightValue(value)))));
+                aside.append(field('边名', input(edge.edge_label, '当前边名称',
+                    value => model.updateEdges(graph.id, ids, 'edge_label', value || null))));
+                aside.append(button('删除这条边', () =>
+                    askDelete('edges:' + edge.id, '将删除这一条边。', () =>
+                        model.deleteEdges(graph.id, ids)), 'dge-danger'));
+                const note = element('p', 'dge-muted', '每条重边都能独立修改 · 边 ' + index);
+                aside.append(note);
+            } else if (selectedNode) {
+                aside.append(element('h3', '', '顶点的属性'));
+                aside.append(field('名称', input(selectedNode.label, '当前顶点名称',
+                    value => model.renameVertex(graph.id, selectedNode.id, value))));
+                if (!selectedNode.label) aside.append(element('p', 'dge-muted',
+                    '临时编号 ' + (selectedNode.display_label || '') + ' 仅用于核对原图'));
+                aside.append(button('删除这个顶点', () => {
+                    const incident = graph.edges.filter(e =>
+                        e.from === selectedNode.id || e.to === selectedNode.id).length;
+                    askDelete('vertex:' + selectedNode.id,
+                        '会同时删除 ' + incident + ' 条关联边。', () => {
+                            model.deleteVertices(graph.id, [selectedNode.id]);
+                            selectedNodes.clear();
+                        });
+                }, 'dge-danger'));
+            } else {
+                aside.append(element('h3', '', '图形核对'));
+                aside.append(element('p', 'dge-muted',
+                    '点击图中的顶点或边，即可在这里修改名称、端点、箭头和权值'));
+                aside.append(element('p', 'dge-muted',
+                    '工具栏支持补点、连边、框选图形，所有关系都可手动修正'));
+            }
+            return aside;
+        }
+
         function render() {
             if (destroyed) return;
             const document = model.getDocument();
@@ -228,6 +280,7 @@
                     changed: () => { acknowledged = false; render(); }
                 });
                 else overlay.refresh();
+                workspace.append(buildSelectedProperties(graph));
             } else {
                 const preview = element('section', 'dge-original'); preview.append(element('h3', '', '原图'));
                 if (typeof options.originalUrl === 'string') {
@@ -317,7 +370,14 @@
                     });
                     move.append(target, endpointFields, button('移动这条边', () => model.moveEdges(graph.id, target.value, [selectedEdge], targetFrom?.value, targetTo?.value))); edges.append(move);
                 }
-                panels.append(nodes, edges); container.append(panels);
+                panels.append(nodes, edges);
+                if (useOverlay) {
+                    const advanced = element('details', 'dge-advanced-panel');
+                    advanced.append(element('summary', '',
+                        '更多编辑选项 · 批量修改节点、重边及子图归属'));
+                    advanced.append(panels);
+                    container.append(advanced);
+                } else container.append(panels);
             }
             const status = element('div', 'dge-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.textContent = notice; container.append(status);
             renderValidation();
