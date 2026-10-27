@@ -1,9 +1,8 @@
 {
   "schema": 1,
   "android": {
-    "version": "1.0.4",
+    "version": "1.0.1",
     "published": false,
-    "sha256": "c40f4d465c4ebdc9658034e8f33fb1936d3b4c2a61321c5f86602478e4da5635",
     "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate.apk"
   },
   "desktop": {

@@ -56,7 +56,6 @@ public final class MainActivity extends Activity {
     private static final String HOME_HOST = "dmate.zeabur.app";
 
     private WebView webView;
-    private NativeUpdateManager nativeUpdater;
     private ValueCallback<Uri[]> pendingFileCallback;
     private boolean filePickerTriedDocuments;
     private boolean filePickerMultiple;
@@ -130,8 +129,6 @@ public final class MainActivity extends Activity {
         cookies.setAcceptThirdPartyCookies(webView, false);
 
         installGallerySaveBridge();
-        nativeUpdater = new NativeUpdateManager(this, webView, HOME_HOST);
-        nativeUpdater.installBridge();
         webView.setWebViewClient(new DmateWebViewClient());
         webView.setWebChromeClient(new DmateChromeClient());
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
@@ -498,7 +495,6 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
-        if (nativeUpdater != null) nativeUpdater.onPause();
         if (webView != null) webView.onPause();
         CookieManager.getInstance().flush();
         super.onPause();
@@ -508,15 +504,10 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
-        if (nativeUpdater != null) nativeUpdater.onResume();
     }
 
     @Override
     protected void onDestroy() {
-        if (nativeUpdater != null) {
-            nativeUpdater.onDestroy();
-            nativeUpdater = null;
-        }
         if (pendingFileCallback != null) {
             pendingFileCallback.onReceiveValue(null);
             pendingFileCallback = null;

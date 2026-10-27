@@ -15,6 +15,8 @@ assert.equal(update.selectPublishedUpdate(androidOld,manifest),null);
 // Version/signature validation remains covered for a hypothetical signed release.
 const offered = structuredClone(manifest);
 offered.android.published = true;
+offered.android.version = '1.0.4';
+offered.android.sha256 = 'a'.repeat(64);
 assert.equal(update.selectPublishedUpdate(androidOld,offered).version,'1.0.4');
 assert.equal(update.selectPublishedUpdate(androidOld,offered).sha256,offered.android.sha256);
 const androidPrior = update.detectInstalledClient('Mozilla/5.0 DMateAndroid/1.0.2',{isAndroidApp:true},'Linux arm');

@@ -224,7 +224,8 @@ node --check static/script.js
 | `static/script.js`、`templates/index.html`、网页样式 / 图标 | 更新 Zeabur 站点，客户端刷新或重新打开 | 从远程站点读取新版，可能受缓存影响 |
 | `android/` 下的 Java、Manifest、Gradle、原生资源 | 重新构建、签名并分发 APK | 需要安装新版 APK |
 
-**2026-10-27 安装版图片上传修复：** Android v1.0.3 (versionCode 4) 修复文件选择器的多图回调，并针对国产 ROM 在通用图片选择器立即退出时增加系统文档选择器重试；网页版正常不代表旧版安装包的原生层已更新。签名 Android 工作流现新增 `apksigner` 校验与 `gh release upload v1.0.1 dist/DMate.apk --clobber`，成功后只替换现有 GitHub 多平台 Release 的 APK 文件，不改 Windows/macOS/Linux 旧安装包。GitCode、itch.io、商店均不会被该流程自动同步，镜像未确认前不要把它们当作已修复版。手机升级安装后仍需实机检查“上传→系统文件选择→看到图片卡片→进入描绘”，不能用构建成功冒充实机成功。
+**2026-10-28 兼容性修复：** 已恢复 GitHub Release 中原有的已签名 Android **1.0.1** APK，取消自动覆盖发布。旧安装版图片选择控件会由服务端 JavaScript 针对 1.0.1–1.0.4 WebView 使用单张文件选择（可连续上传，最多仍为四张），并监听 `input`/`change`，以避免部分系统文件多选无响应。旧版原生文件选择器若本身不能返回文件，该问题不能仅靠服务端脚本百分百消除；上线后必须真机检验。
+
 | `desktop/src-tauri/` 下的配置、Rust、权限、窗口及原生资源 | 重新构建并分发新的桌面安装包 | 需要安装新版安装包 |
 
 **操作顺序**：提交变更 → Zeabur 部署完成 → 通过 `/health` 与 `/ready` 观察服务状态 → 在网页和已安装客户端各测试一轮重点功能。对本次产品能力变更，重点检查图同构、二部图、拓扑排序、模逆 / CRT、齐次与非齐次递推，以及同知识点出题是否偏题。本项目已有 175 项个人功能自测结果记录；部署新版时仍应针对本次实际改动复测 AI 出题、OCR、复制、账号同步与移动端交互，不能仅因既往记录为通过便视为新部署完成验收。
@@ -283,26 +284,18 @@ node --check static/script.js
 **通过标准**：静态检查通过只是进入发布验收的前置条件；不能替代在线 API、OCR 真机、客户端和账户/数据库端到端验证。测试记录与当前未验证清单见 [`TESTING.md`](TESTING.md) 与 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)。
 
 
-## 14. 安装版更新检查（2026-10-28）
+## 14. 恢复旧安装包，网页功能不再触发安装升级（2026-10-28）
 
-DMate 安装版现在通过同源 `/static/client-updates.json` 在每次打开应用时检查更新，应用重新进入前台且超过六小时后再次检查。它只对带有 `DMateAndroid/x.y.z` 或 `DMateDesktop/x.y.z` 用户代理的已安装应用提示，不对网页版提示；只接受 GitHub 官方 DMate Release 下载路径，拒绝未知地址。
+此前临时上传的 Android 1.0.4 曾覆盖 GitHub `v1.0.1` 发行页中原有的 `DMate.apk`。已经从仓库的 `v1.0.1` 标签重新构建、使用原签名校验并恢复了发行文件，公开 Android 安装包恢复为 **1.0.1（versionCode 2）**。Windows、macOS、Linux 的原发行文件未改。
 
-已发布的 Android APK 为 **1.0.4**（versionCode 5），在 GitHub 的 `v1.0.1` 多平台发行页中覆盖旧的 `DMate.apk`；电脑端当前正式资源仍为 **1.0.0**。未来每次正式发布新安装包，都必须**先确认签名/公证与 Release 下载资源已经发布成功，再更新该版本清单**，避免让用户提前下载到旧安装包。GitCode、itch.io 和应用商店有独立的同步/更新机制，不得冒充已更新。
+**目前不再提供新版安装包提醒和下载更新提示**：网页不加载 `static/client-update.js`，兼容用的 `static/client-updates.json` 标记 `published:false`；Android 正式构建工作流取消了推送触发和自动覆盖 Release，只能手动生成待验证的构建 Artifact，不会自动发布。新增的原生 APK 下载及请求安装通道已从当前源码清理，不申请 `REQUEST_INSTALL_PACKAGES` 权限。
 
-更新提示提供“下载更新”与“稍后”，安装由 Android/Windows/macOS/Linux 系统按各自安全策略确认；**不属于无人值守静默安装**。现有 Tauri 桌面安装包还没有签名的内置自动更新插件；真正的 Tauri 安装器自升级，需要先安全地生成并保管私钥、在打包中生成 .sig、配置公钥与已发布的更新清单，不得关闭签名验真。新版网页输入控件允许在安装壳中通过真实触摸打开本机文件选择窗口，避免仅依赖 JavaScript 模拟点击。
-
-### 原生安卓应用内更新（1.0.4 起）
-
-新版 Android 应用注册只允许 `https://dmate.zeabur.app` 顶级页面使用的 `DMateUpdate` 通道。网页读取发布清单，验证版本与官方 GitHub 下载地址，用户选择「下载更新」后由 Android DownloadManager 在后台下载，下载完成后校验公示的 **SHA-256、APK 包名及版本递增**，再由 Android 系统安装器请求用户确认。后台断网或重启后 DownloadManager 仍可继续管理下载；应用返回前台时继续校验并启动安装流程。无须再手动找 APK，但**普通应用不能绕过 Android 的安装确认或来源授权**。
-
-为兼容老版本：1.0.3 及更早 APK 缺少原生更新通道，升级到 1.0.4 时仍会跳到官方下载页；升级成功后，未来更新可在应用内部下载并调起安装。仅对 GitHub 直装 APK 启用此类更新；应用商店渠道应遵循商店自身更新政策，尤其要注意 `REQUEST_INSTALL_PACKAGES` 在 Google Play 的发布限制。下载页版本清单必须在**发布并验证新签名 APK 以及 GitHub SHA-256 之后**才递增，不能提前改版本清单，否则安装版会下载到过期或不匹配的 APK。
-
-桌面端仍是远程加载网页（网页功能改动即加载生效），**尚未具备已签名并完整部署的 Tauri 原生安装器更新**。不要把网页中的安装包更新提示理解为已经实现 Windows/macOS/Linux 的安全静默安装。
+网页安装弹窗恢复原先 Android 的 GitCode、GitHub APK 下载按钮、顺序及「选择 APK 下载源」说明；其他平台选项保持不变。服务端部署更新后，已安装 Android WebView / 桌面 Tauri 的**网页与后端功能**应通过在线版本检查和无缓存资源同步；**不能直接替换已安装程序中的旧 Android Java/Tauri Rust 原生代码**。若旧 ROM 的本机文件选择器回调失败，仍需要针对该设备进行原生修复并由用户安装对应构建；不能把静态 CI 通过当作实机验收。
 
 ## 15. 旧安装版自动同步最新版网页（不需要重新安装）
 
 DMate 的 Android WebView 与电脑 Tauri 安装壳都以 Zeabur 远程地址为首页。旧版 Service Worker 曾通过 `/service-worker.js` 注册，2026-10-19 删除 PWA 时直接删除此脚本，导致某些旧设备的缓存注册在无法获取新 Worker 脚本时难以完成清理。
 
-现在 **恢复旧路径的清退响应**，实际代码来自 `static/legacy-worker-retire.js`：仅 `skipWaiting`、删除 `dmate-pwa-*` CacheStorage 缓存并 `unregister()`，不注册新 PWA、不缓存、不拦截任何 fetch。新网页自身已有老 Worker 清理，服务端关键 JS/CSS/JSON 改为 `no-store`，`/web-version` 提供进程启动时代码清单的 SHA-256，首页将 SHA 注入所有主要脚本/样式的 `?v=` 地址。安装版通过 `static/web-sync.js` 在启动、切回前台、定期检查此 SHA；发现新版且没有输入内容、未完成识图任务、活跃编辑器或其他工作时，自动跳转带版本参数的最新首页；用户正在操作时延后重载，以免丢失输入或识图草稿。没有 Service Worker 重新安装，没有清除登录 Cookie、IndexedDB 或 localStorage。
+现在 **恢复旧路径的清退响应**，实际代码来自 `static/legacy-worker-retire.js`：仅 `skipWaiting`、删除 `dmate-pwa-*`、`dmate-ios-webapp-*`、`dmate-store-pwa-*` CacheStorage 缓存并 `unregister()`，不注册新 PWA、不缓存、不拦截任何 fetch。新网页自身已有老 Worker 清理，服务端关键 JS/CSS/JSON 改为 `no-store`，`/web-version` 提供进程启动时代码清单的 SHA-256，首页将 SHA 注入所有主要脚本/样式的 `?v=` 地址。安装版通过 `static/web-sync.js` 在启动、切回前台、页面恢复、网络恢复和定期检查此 SHA；发现新版且没有输入内容、未完成识图任务、活跃编辑器或其他工作时，自动跳转带版本参数的最新首页；用户正在操作时延后重载，以免丢失输入或识图草稿。没有 Service Worker 重新安装，没有清除登录 Cookie、IndexedDB 或 localStorage。
 
 **能力边界**：这解决旧安装壳里网页代码及服务端图论识别功能的版本同步问题，不能把 Android APK 中旧的 `WebChromeClient.onShowFileChooser` 或 Tauri Rust 原生功能直接替换。若 WebView 系统图片选择器本身仍在系统层立即退出，新网页的真实 `<input type=file>` 点击修复可能有效，但仍需要该设备实测；旧 APK 的原生故障不能靠缓存机制无条件修复。

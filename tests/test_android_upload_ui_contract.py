@@ -20,13 +20,11 @@ class AndroidUploadUiTests(unittest.TestCase):
         self.assertIn("launchImagePicker(true)", self.java)
         self.assertIn("Intent.EXTRA_ALLOW_MULTIPLE", self.java)
         self.assertIn("callback.onReceiveValue(result)", self.java)
-        native = (ROOT / "android/app/src/main/java/app/dmate/client/NativeUpdateManager.java").read_text()
         manifest = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text()
-        self.assertIn("DownloadManager.Request", native)
-        self.assertIn('MessageDigest.getInstance("SHA-256")', native)
-        self.assertIn("FileProvider.getUriForFile", native)
-        self.assertIn("canRequestPackageInstalls()", native)
-        self.assertIn('REQUEST_INSTALL_PACKAGES', manifest)
+        self.assertNotIn("NativeUpdateManager", self.java)
+        self.assertNotIn('REQUEST_INSTALL_PACKAGES', manifest)
+        self.assertNotIn('FileProvider', manifest)
+        self.assertFalse((ROOT / "android/app/src/main/java/app/dmate/client/NativeUpdateManager.java").exists())
         self.assertNotIn("FileChooserParams.parseResult(resultCode, data)", self.java)
         self.assertIn("filePathCallback.onReceiveValue(null)", self.java)
 
@@ -60,6 +58,7 @@ class AndroidUploadUiTests(unittest.TestCase):
         self.assertNotIn('GitCode · APK（请核对版本）', self.js)
         self.assertNotIn('/static/client-update.js?v=', self.html)
         self.assertIn('imageInput.multiple = false;', self.js)
+        self.assertIn('DMateAndroid\\/1\\.0\\.[0-4]', self.js)
         self.assertIn('imageInput.addEventListener("input", handleImageSelected)', self.js)
 
     def test_solid_selection_and_compact_red_remove(self):

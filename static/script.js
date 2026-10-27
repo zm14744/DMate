@@ -20828,11 +20828,11 @@ document.addEventListener(
         }
 
         if (imageInput) {
-            // Historical 1.0.1-1.0.3 Android WebViews may return no file when
+            // Historical 1.0.1-1.0.4 Android WebViews may return no file when
             // multiple selection is enabled. Keep up to four independent OCR
             // tasks, but request files one by one on these unchanged APKs.
             // The website and newer native shells retain multi-file selection.
-            if (/DMateAndroid\/1\.0\.[0-3](?!\d)/i.test(navigator.userAgent || "")) {
+            if (/DMateAndroid\/1\.0\.[0-4](?!\d)/i.test(navigator.userAgent || "")) {
                 imageInput.multiple = false;
             }
             // Some OEM WebViews dispatch only input or only change.

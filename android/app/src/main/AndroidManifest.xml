@@ -3,8 +3,6 @@
 
     <!-- Android 10+ 使用 MediaStore 保存至 Pictures/DMate，无需相册权限。Android 8/9 首次保存需存储授权。 -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Only to install a GitHub sideloaded APK after explicit user consent. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <application
@@ -23,16 +21,6 @@
         <meta-data
             android:name="android.webkit.WebView.EnableSafeBrowsing"
             android:value="true" />
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.updates"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/update_file_paths" />
-        </provider>
 
         <activity
             android:name=".MainActivity"
