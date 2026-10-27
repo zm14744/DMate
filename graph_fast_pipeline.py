@@ -470,6 +470,34 @@ def _merge_local_review(previous, response, targets):
         previous_graph = next((old for old in previous.get('graphs', [])
                                if isinstance(old, dict) and str(old.get('id')) == gid), None)
         if previous_graph is not None:
+            # The second visual read is about disputed semantics. If it omits
+            # image coordinates, keep precisely identifiable earlier geometry;
+            # a changed endpoint, label or edge direction is never silently
+            # assigned its predecessor's path.
+            if 'bbox' not in returned[gid] and isinstance(previous_graph.get('bbox'), list):
+                returned[gid]['bbox'] = copy.deepcopy(previous_graph['bbox'])
+            old_vertices = {str(v['id']): v for v in previous_graph.get('vertices', [])
+                            if isinstance(v, dict) and v.get('id') is not None}
+            for vertex in returned[gid]['vertices']:
+                if not isinstance(vertex, dict) or vertex.get('id') is None:
+                    continue
+                old_vertex = old_vertices.get(str(vertex['id']))
+                if not old_vertex or vertex.get('label') != old_vertex.get('label'):
+                    continue
+                if ('x' not in vertex and 'y' not in vertex
+                        and old_vertex.get('x') is not None and old_vertex.get('y') is not None):
+                    vertex['x'], vertex['y'] = old_vertex['x'], old_vertex['y']
+            old_edges = {str(e['id']): e for e in previous_graph.get('edges', [])
+                         if isinstance(e, dict) and e.get('id') is not None}
+            for edge in returned[gid]['edges']:
+                if not isinstance(edge, dict) or edge.get('id') is None or 'path' in edge:
+                    continue
+                old_edge = old_edges.get(str(edge['id']))
+                if (old_edge and edge.get('from') == old_edge.get('from')
+                        and edge.get('to') == old_edge.get('to')
+                        and edge.get('direction') == old_edge.get('direction')
+                        and isinstance(old_edge.get('path'), list)):
+                    edge['path'] = copy.deepcopy(old_edge['path'])
             for count_key, list_key in (('visible_vertex_count', 'vertices'),
                                         ('visible_edge_count', 'edges')):
                 if count_key in previous_graph and count_key not in graph:
