@@ -55,7 +55,7 @@
     if ("caches" in window && window.caches.keys) {
         cleanupTasks.push(window.caches.keys().then(function (keys) {
             var legacyKeys = keys.filter(function (key) {
-                return /^dmate-pwa-/i.test(key);
+                return /^dmate-(?:pwa-|store-pwa-|ios-webapp-)/i.test(key);
             });
             return Promise.all(legacyKeys.map(function (key) {
                 return window.caches.delete(key);

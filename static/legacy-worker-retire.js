@@ -14,7 +14,7 @@ self.addEventListener('activate', event => {
     event.waitUntil((async () => {
         try {
             const keys = await caches.keys();
-            await Promise.all(keys.filter(key => /^dmate-pwa-/i.test(key))
+            await Promise.all(keys.filter(key => /^dmate-(?:pwa-|store-pwa-|ios-webapp-)/i.test(key))
                 .map(key => caches.delete(key)));
         } catch (_error) {
             // CacheStorage can be unavailable; retirement still must proceed.

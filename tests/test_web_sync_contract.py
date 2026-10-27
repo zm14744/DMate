@@ -21,6 +21,16 @@ class RemoteWebSyncContract(unittest.TestCase):
         self.assertNotIn("addEventListener('fetch'", self.worker)
         self.assertNotIn("serviceWorker.register(", self.html)
 
+    def test_historical_cache_prefixes_are_retired_without_wiping_user_storage(self):
+        # Oct 7 shipped dmate-ios-webapp-*; Oct 17 used dmate-store-pwa-*.
+        # The previous cleanup only handled dmate-pwa-*, so it missed both.
+        regex = '/^dmate-(?:pwa-|store-pwa-|ios-webapp-)/i'
+        self.assertIn(regex, self.html)
+        self.assertIn(regex, self.worker)
+        self.assertNotIn('localStorage.clear()', self.html)
+        self.assertNotIn('indexedDB.deleteDatabase(', self.worker)
+        self.assertNotIn("Clear-Site-Data", self.app)
+
     def test_server_no_cache_and_runtime_asset_urls(self):
         self.assertIn('@app.route("/web-version")', self.app)
         self.assertIn('no_stale_web_application_assets', self.app)

@@ -67,6 +67,39 @@ async function run() {
     const browser=environment({installed:false});
     assert.equal(await browser.root.DMateWebSync.checkNow(true), false);
     assert.equal(browser.calls, 0);
+    // Run the actual retired worker's activation handler against historical
+    // CacheStorage names, checking user/application-owned caches are preserved.
+    const oldWorker = fs.readFileSync(require('node:path').join(__dirname,
+        '../static/legacy-worker-retire.js'), 'utf8');
+    const removed = [];
+    const history = [
+        'dmate-pwa-20261001',
+        'dmate-ios-webapp-v6-15-20261009',
+        'dmate-store-pwa-20261012',
+        'dmate-sessions-preserve',
+        'other-app-cache',
+    ];
+    let activation;
+    const workerScope = {
+        self: {
+            skipWaiting:async () => {},
+            registration:{unregister:async () => true},
+            clients:{matchAll:async () => [{postMessage:() => {}}]},
+            addEventListener(type, cb) { if (type === 'activate') activation = cb; },
+        },
+        caches:{
+            keys:async () => history,
+            delete:async key => {removed.push(key);return true;},
+        },
+        URL, Promise,
+    };
+    vm.runInNewContext(oldWorker,vm.createContext(workerScope));
+    assert.equal(typeof activation, 'function');
+    let activationWork;
+    activation({waitUntil(promise){activationWork = promise;}});
+    await activationWork;
+    assert.deepEqual(removed, history.slice(0,3));
+
     console.log('DMate old-installed-shell web sync: passed');
 }
 run().catch(error => {console.error(error);process.exitCode=1;});
