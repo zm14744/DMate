@@ -108,6 +108,18 @@ def test_start_does_not_wait_for_remote_and_ready_is_copied():
     assert qr.close_question_reference(handle)
 
 
+
+def test_worker_stop_reason_treats_unpublished_exitcode_after_deadline_as_timeout(monkeypatch):
+    class Process:
+        exitcode = None
+    monkeypatch.setattr(qr.time, 'monotonic', lambda: 10.0)
+    assert qr._worker_stop_reason(Process(), 9.0) == 'wall_timeout'
+    Process.exitcode = 124
+    assert qr._worker_stop_reason(Process(), 99.0) == 'wall_timeout'
+    Process.exitcode = 1
+    assert qr._worker_stop_reason(Process(), 9.0) == 'worker_failed'
+
+
 def test_hard_wall_timeout_reaps_worker_and_releases_remote_slot(monkeypatch):
     monkeypatch.setattr(qr, 'MAX_SECONDS', .6)
     ledger = budget()
