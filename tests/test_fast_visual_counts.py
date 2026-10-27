@@ -25,7 +25,8 @@ def test_model_visible_counts_trigger_scoped_review_only_when_mismatched(
         reviewed["vertices"] = reviewed["vertices"][:2]
     else:
         reviewed["edges"].append({
-            "id": "e4", "from": "b", "to": "z", "direction": "undirected"
+            "id": "e4", "from": "b", "to": "z", "direction": "undirected",
+            "style": "solid"
         })
     specialist = Specialist({"graphs": [reviewed], "uncertainties": []})
     result, main = run(Provider(initial), specialist)
