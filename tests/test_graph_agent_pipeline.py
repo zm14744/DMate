@@ -1352,6 +1352,67 @@ def test_concrete_connection_geometry_can_route_one_located_page_review(
     assert result['graphs'][0]['vertices'][0]['x'] == pytest.approx(70/399)
 
 
+
+def test_changed_inventory_scope_can_route_a_second_located_page_review(
+        bounded_tools, monkeypatch):
+    """A new panel/node inventory gets its own single localized position review."""
+    from graph_agent_roles import RoleProtocolError
+    from graph_marker_grounding import ground_nodes
+    monkeypatch.setenv('DMATE_AGENT_REVIEW_ROUNDS', '2')
+
+    def advisory_position(document, graphs, proposals=None):
+        grounded = ground_nodes(document, graphs, proposals=proposals)
+        grounded[0]['marker_grounding'].update(
+            review_required=True,
+            position_gate={'hard_blocking': False, 'visual_review_required': True},
+            untrusted_vertices=[{'vertex': 'a', 'reason': 'no_reliable_local_marker',
+                                 'classification': 'pixel_unobserved',
+                                 'blocks_connections': False}])
+        return grounded
+
+    class ChangedInventory(SyntheticRoles):
+        def __init__(self):
+            super().__init__()
+            self.pages = 0
+
+        def __call__(self, prompt, images, budget):
+            response = super().__call__(prompt, images, budget)
+            if response['role'] == 'page_vertices':
+                self.pages += 1
+                if self.pages >= 2:
+                    # A real page repair may change a panel extent or node
+                    # location. Keep the repaired inventory stable afterwards.
+                    response['graphs'][0]['bbox'][0] = 95
+            return response
+
+    provider = ChangedInventory()
+
+    def rejected_geometry(response, inventory, candidates, **kwargs):
+        raise RoleProtocolError(
+            'changed_candidate_endpoints',
+            graph_id='G1',
+            candidate_id='synthetic_known_candidate',
+        )
+
+    monkeypatch.setattr('graph_marker_grounding.ground_nodes', advisory_position)
+    monkeypatch.setattr('graph_agent_roles.validate_connection_response', rejected_geometry)
+    result = recognize_agents(
+        original(), provider=provider, budget=AgentBudget(seconds=40, calls=18))
+    workflow = result['agent_workflow']
+
+    # The first concrete geometry failure reviews the original inventory.
+    # The repaired panel creates a distinct inventory digest, so a second
+    # concrete geometry failure may review that new scope exactly once.
+    assert workflow['role_sends']['page_vertices'] == 3
+    routed = [row for row in workflow['events']
+              if row['status'] == 'position_review_routed']
+    assert len(routed) == 2
+    assert routed[0]['inventory_digest'] != routed[1]['inventory_digest']
+    pages = [row for row in provider.requests if row['role'] == 'page_vertices']
+    assert pages[1]['focus_issues'][0]['failure_details']['inventory_digest'] == routed[0]['inventory_digest']
+    assert pages[2]['focus_issues'][0]['failure_details']['inventory_digest'] == routed[1]['inventory_digest']
+
+
 def test_page_without_marker_sheet_keeps_two_full_page_images(bounded_tools, monkeypatch):
     from graph_marker_grounding import marker_proposals
 
