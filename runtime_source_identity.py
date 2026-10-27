@@ -67,6 +67,17 @@ def compute_runtime_source(root):
 
 def configured_recognition_budget():
     """Expose bounded settings, without constructing a provider or using keys."""
+    from graph_pipeline_version import active_pipeline
+    if active_pipeline() == 'agent-tools':
+        from graph_fast_pipeline import configured_fast_budget, PERFORMANCE_TARGET_SECONDS
+        budget = configured_fast_budget()
+        return {'seconds': round(budget.deadline-budget.started),
+                'performance_target_seconds': PERFORMANCE_TARGET_SECONDS,
+                'total_remote_calls': budget.initial_calls, 'per_call_seconds': budget.call_seconds,
+                'remote_concurrency': 1, 'max_concurrent_images': 4,
+                'network_recoveries': budget.max_network_recoveries,
+                'json_recoveries': budget.max_json_format_recoveries,
+                'recoveries_share_total_budget': True}
     from graph_agent_runtime import AgentBudget
     budget = AgentBudget.configured()
     return {'seconds': round(budget.deadline-budget.started),

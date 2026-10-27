@@ -51,4 +51,3 @@ def test_invalid_explicit_allowance_never_starts_a_worker(value, monkeypatch):
     with pytest.raises(ValueError, match='invalid_layout_budget'):
         module.prepare_semantic_layout(png(picture()), budget=Budget(), run_layout=True, layout_timeout=value)
     worker.assert_not_called()
-

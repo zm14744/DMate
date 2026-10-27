@@ -70,7 +70,9 @@ def recognize_graph_document(raw,text_result,*,vision_provider=None,graph_pipeli
             seconds=round(time.monotonic()-budget.started,6)
             rendered.update(confirmation_required=True,recognition_profile='fast-editable',
                 recognition_timing={'seconds':seconds,'target_seconds':120,
-                    'within_target':seconds<=120,'scope':'recognition_and_response_rendering'})
+                    'within_target':seconds<=120 and rendered.get('recognition_status')=='complete',
+                    'completed':rendered.get('recognition_status')=='complete',
+                    'scope':'recognition_and_response_rendering'})
             warnings=result.get('service_warnings',[])
             if warnings:
                 rendered['service_warnings']=warnings

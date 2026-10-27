@@ -60,6 +60,7 @@ def test_missing_file_and_symlink_fail_closed(tmp_path):
 
 
 def test_budget_uses_effective_bounded_configuration(monkeypatch):
+    monkeypatch.setenv('DMATE_GRAPH_PIPELINE', 'evidence-two-pass')
     monkeypatch.setenv('DMATE_AGENT_SECONDS', '180')
     monkeypatch.setenv('DMATE_AGENT_MAX_CALLS', '12')
     monkeypatch.setenv('DMATE_AGENT_CALL_SECONDS', '50')

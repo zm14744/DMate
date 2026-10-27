@@ -40,6 +40,7 @@ uncertainties格式：{"scope":"body|graph|document","graph_id":"图问题填写
 
 LOCAL_REVIEW_PROMPT = r'''你是数学图像的局部复核者。完整原图和所有局部视图来自同一张图。只检查targets明确指出的正文或数学子图，不解题。
 draft是尚待用户确认的读取结果，工具候选和题意规则都是辅助，可能错误。沿原图确认目标图的顶点、连接、箭头、孤立点、自环、重边、权重，完整保留其必要标签/线型/颜色；不从常见图模板或度数反推图片。
+local_marker_candidates是整张原图上的圆点候选，含位置、大小和置信度，也可能混入正文或字形。核对目标子图内形状、大小相近的清晰圆点与draft顶点是否逐一对应，尤其检查较大圆点旁的字母是否实际为边名；有数量差异时重新对照原图确认真实点和连接，不将整页候选总数或某一尺寸组的数量强制作为节点数。匿名真实点保留label=null，不能仅凭e_i等词形删除真正的节点名。
 只返回targets内已复核的完整子图，保留原graph.id。无需返回未请求的图。题干仅在targets.body=true时返回完整逐字body_text；不能新增原图不存在的问题或补全裁切文字。
 返回格式：{"graphs":[{"id":"G1","name":"原图图注","vertices":[...],"edges":[...]}],"uncertainties":[]}。节点和边结构与主读取相同。已确认修正的问题不留在uncertainties；仍看不清时明确列出scope/graph_id/field/message，保留可用内容，不以空图抹掉整幅结构。仅内部ID或坐标差异不是识别疑点。'''
 
@@ -138,6 +139,7 @@ def _schema_issues(document):
 
 def _validate_tool(arguments, *, context):
     from graph_semantic_tools import inspect_semantic_graphs
+    from graph_semantic_pipeline import _required_visual_attribute_issues
     context.check_deadline()
     draft = context.data['draft']
     normalized = normalize_semantic_document(draft, reviewed=True)
@@ -156,7 +158,13 @@ def _validate_tool(arguments, *, context):
             issue['field'] = matches[0]['field']
     schema_issues = _schema_issues(draft)
     inspected = inspect_semantic_graphs(normalized, budget=context.data['budget'])
-    issues = normalized['semantic_issues'] + schema_issues + inspected['issues']
+    # Normalization omits located legends; retain their scope so a G2-only
+    # legend cannot make otherwise cosmetic attributes mandatory in G1.
+    visual_document = {**normalized, 'text_context': draft.get('text_context', {})
+                       if isinstance(draft, dict) else {}}
+    required_attributes = [issue for issue in _required_visual_attribute_issues(visual_document)
+                           if issue['field'] in ('color', 'style')]
+    issues = normalized['semantic_issues'] + schema_issues + inspected['issues'] + required_attributes
     context.data['result'].update(normalized=normalized, issues=issues,
         schema_valid=not schema_issues, program=inspected)
     return {'phase': arguments['phase'], 'schema_valid': not schema_issues,
@@ -473,6 +481,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
                  'draft': {'body_text': state['draft']['body_text'], 'graphs': [
                      graph for graph in state['draft']['graphs'] if str(graph.get('id')) in targets['graph_ids']]},
                  'image_views': review_views['view_descriptions'],
+                 'local_marker_candidates': markers.get('marker_candidates', [])[:120],
                  'local_ocr_candidates': hints['candidates'],
                  'local_connection_candidates': project_connection_hints(local_result.get('geometry', {}).get('graphs', [])),
                  'question_reference': state.get('reference', {})},

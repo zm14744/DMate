@@ -19,11 +19,11 @@ def document():
         {'id': 'G1', 'name': '(a)', 'directed': False,
          'vertices': [{'id': 'a', 'label': 'a'}, {'id': 'b', 'label': 'b'}, {'id': 'z', 'label': None}],
          'edges': [{'id': 'e1', 'from': 'a', 'to': 'b', 'direction': 'undirected', 'weight': 0, 'style': 'dashed'},
-                   {'id': 'e2', 'from': 'a', 'to': 'b', 'direction': 'undirected', 'weight': 7},
-                   {'id': 'e3', 'from': 'a', 'to': 'a', 'direction': 'undirected'}]},
+                   {'id': 'e2', 'from': 'a', 'to': 'b', 'direction': 'undirected', 'weight': 7, 'style': 'solid'},
+                   {'id': 'e3', 'from': 'a', 'to': 'a', 'direction': 'undirected', 'style': 'solid'}]},
         {'id': 'G2', 'name': '(b)', 'directed': True,
          'vertices': [{'id': 'a', 'label': 'a'}, {'id': 'b', 'label': 'b'}],
-         'edges': [{'id': 'arrow', 'from': 'b', 'to': 'a', 'direction': 'forward', 'weight': -3}]}],
+         'edges': [{'id': 'arrow', 'from': 'b', 'to': 'a', 'direction': 'forward', 'weight': -3, 'style': 'solid'}]}],
         'uncertainties': []}
 
 
@@ -133,6 +133,80 @@ def test_clean_upload_is_one_main_call_with_actual_final_program_validation(prep
     json.dumps(result, allow_nan=False)
 
 
+@pytest.mark.parametrize(('field', 'legend'), [
+    ('color', '绿色边表示树边，黑色边表示其余边。'),
+    ('style', '虚线表示可选边，实线表示其余边。'),
+])
+@pytest.mark.parametrize('review_available', [False, True])
+def test_required_visual_attributes_stay_pending_until_actually_read(prepared, field, legend, review_available):
+    _, run, handles = prepared
+    initial = document()
+    initial['body_text'] = '观察两幅图。' + legend + '回答问题。'
+    initial['text_context'] = {'legends': [{'text': legend, 'graph_ids': ['G2']}]}
+    initial['graphs'][1]['edges'][0].pop(field, None)
+    glm = Specialist({'graphs': [copy.deepcopy(initial['graphs'][1])], 'uncertainties': []},
+                     available=review_available)
+    result, main = run(Provider(initial), glm)
+    assert len(main.requests) == 1 and len(glm.requests) == int(review_available)
+    assert result['complete'] is False and result['graphs'][0]['complete'] is True
+    assert result['graphs'][1]['complete'] is False and result['body_complete'] is True
+    expected = 'required_' + field + '_unresolved'
+    issues = [row for row in result['semantic_issues'] if row['kind'] == expected]
+    assert len(issues) == 1 and issues[0]['graph_id'] == 'G2' and issues[0]['edge_ids'] == ['arrow']
+    assert result['graphs'][1]['edges'][0][field] == 'unknown'
+    workflow = result['semantic_workflow']
+    assert workflow['final_validation']['status'] == 'completed'
+    assert any(row['kind'] == expected for row in workflow['final_validation']['issues'])
+    assert workflow['local_review']['targets']['graph_ids'] == ['G2']
+    if review_available:
+        assert any(row['kind'] == expected for row in glm.requests[0]['issues'])
+    assert len(handles) == 1  # Required color/style does not schedule topology tracing.
+
+
+def test_required_attributes_can_clear_in_same_review_with_advisory_marker_candidates(prepared, monkeypatch):
+    _, run, handles = prepared
+    import graph_semantic_geometry
+    markers = [{'id': f'circle-{i}', 'position': [100+i*100, 500],
+                'radius_x': 18, 'radius_y': 18, 'confidence': .97, 'proposal_only': True}
+               for i in range(6)] + [
+                {'id': 'glyph', 'position': [50, 30], 'radius_x': 3,
+                 'radius_y': 3, 'confidence': .8, 'proposal_only': True}]
+    monkeypatch.setattr(graph_semantic_geometry, 'prepare_semantic_geometry', lambda *a, **kw: {
+        'marker_candidates': copy.deepcopy(markers), 'diagnostics': [], 'tool_audit': []})
+    initial = document()
+    legend = '绿边表示树边，黑色虚线表示其余边。'
+    initial['body_text'] = '观察两幅图。' + legend
+    initial['text_context'] = {'legends': [{'text': legend, 'graph_ids': ['G2']}]}
+    initial['graphs'][1]['edges'][0].pop('style')
+    corrected = copy.deepcopy(initial['graphs'][1])
+    corrected['edges'][0].update(color='green', style='solid')
+    glm = Specialist({'graphs': [corrected], 'uncertainties': []})
+    result, main = run(Provider(initial), glm)
+    assert len(main.requests) == len(glm.requests) == 1
+    assert glm.requests[0]['local_marker_candidates'] == markers
+    assert glm.requests[0]['targets']['graph_ids'] == ['G2']
+    assert result['complete'] is True and result['semantic_issues'] == []
+    # Candidates guide visual checking; their count never overwrites the read.
+    assert len(result['graphs'][1]['vertices']) == 2
+    assert result['graphs'][1]['edges'][0]['color'] == 'green'
+    assert result['graphs'][1]['edges'][0]['style'] == 'solid'
+    assert len(handles) == 1
+
+
+def test_unmentioned_cosmetic_attributes_do_not_trigger_review(prepared):
+    _, run, _ = prepared
+    initial = document()
+    initial['body_text'] = '判断下图是否为树，并求各顶点的度数。'
+    for graph in initial['graphs']:
+        for edge in graph['edges']:
+            edge.pop('style', None)
+            edge.pop('color', None)
+    glm = Specialist(AssertionError('Cosmetic attributes must not trigger review'))
+    result, main = run(Provider(initial), glm)
+    assert len(main.requests) == 1 and glm.requests == []
+    assert result['complete'] is True
+
+
 def test_uncertain_graph_gets_one_scoped_glm_read_without_overwriting_other_graph_or_body(prepared):
     _, run, handles = prepared
     initial = document()
@@ -235,7 +309,7 @@ def test_budget_is_explicit_and_does_not_retry_slow_or_failed_requests():
     budget = fast.configured_fast_budget()
     assert budget.initial_calls == 2
     assert budget.max_network_recoveries == budget.max_json_format_recoveries == 0
-    assert budget.deadline-budget.started == 200
+    assert budget.deadline-budget.started == pytest.approx(200)
 
 
 def test_default_main_uses_bounded_thinking_without_changing_explicit_injected_provider():

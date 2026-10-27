@@ -181,4 +181,3 @@ def test_inventory_location_cannot_leak_an_untested_connection_claim():
     assert spatial_position_hint('upper left, connected to three nodes') == 'upper left'
     assert spatial_position_hint('外环右下角') == '外环右下角'
     assert spatial_position_hint([140, 310]) == [140, 310]
-

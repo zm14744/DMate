@@ -70,4 +70,3 @@ def test_unset_deployment_flag_upload_runs_semantic_roles(semantic_application, 
     assert len(body['graph_structures'][0]['edges']) == 1
     assert [row['stage'] for row in guards['worker_events'] if row['kind'] == 'injected_worker'] == ['layout', 'text']
     assert reader.requests and guards['network'] == 0
-
