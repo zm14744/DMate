@@ -126,6 +126,8 @@ def _normalize_graph(source, graph_id, issues, notes):
     if (isinstance(box, list) and len(box) == 4 and all(unit(n) is not None for n in box)
             and unit(box[0]) < unit(box[2]) and unit(box[1]) < unit(box[3])):
         graph['bbox'] = [unit(n) for n in box]
+    if isinstance(source.get('anon_next'), int) and not isinstance(source['anon_next'], bool) and 1 <= source['anon_next'] <= 10000:
+        graph['anon_next'] = source['anon_next']
     raw_nodes = source.get("vertices")
     if not isinstance(raw_nodes, list):
         _issue(issues, "graph", "invalid_vertex_inventory", "vertices 必须是顶点列表。", graph_id=graph_id)

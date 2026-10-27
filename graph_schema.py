@@ -133,7 +133,7 @@ def canonical_graph(source, index=1):
 
 def display_graph(graph):
     """Public display fields only; pixels/model diagnostics stay server-side."""
-    fields = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete', 'bbox')
+    fields = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete', 'bbox', 'anon_next')
     out = {k: graph[k] for k in fields if k in graph}
     out['vertices'] = [{k: v[k] for k in ('id', 'label', 'isolated_confirmed', 'display_label', 'x', 'y') if k in v}
                        for v in graph['vertices']]
