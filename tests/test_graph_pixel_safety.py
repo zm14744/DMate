@@ -128,7 +128,7 @@ def test_no_pixel_repair_if_labels_or_weights_make_mapping_unsafe():
         elif variant == "weighted":
             current["edges"][0]["weight"] = 1
         elif variant == "parallel":
-            current["edges"][0]["to"] = current["edges"][1]["to"]
+            current["edges"][0]["from"] = current["edges"][1]["from"]
         elif variant == "loop":
             current["edges"][0]["to"] = current["edges"][0]["from"]
         before = copy.deepcopy(draft)
