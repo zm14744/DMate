@@ -206,11 +206,149 @@ def _color_line_topology(rgb):
     return result
 
 
+def _dark_disks_once(gray, *, level, kernel):
+    """Find filled circular dark marks rather than thin text and ink strokes."""
+    binary = np.uint8(gray < level) * 255
+    opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel, kernel)))
+    _, _, stats, centers = cv2.connectedComponentsWithStats(opened, 8)
+    minimum = max(10, round(kernel * 1.1))
+    maximum = min(70, round(kernel * 5.0))
+    result = []
+    for (x,y,w,h,area),(cx,cy) in zip(stats[1:], centers[1:]):
+        if (not minimum <= w <= maximum or not minimum <= h <= maximum
+                or area < max(55, kernel*kernel*.65)
+                or not .55 <= w/h <= 1.75 or area/(w*h) < .60):
+            continue
+        result.append({'x': float(cx), 'y': float(cy), 'diameter': int(max(w,h))})
+    return result
+
+
+def _dark_line_candidates(gray, nodes):
+    """High-coverage straight corridors are only a LOWER bound on real edges.
+
+    Curves, parallel strokes, breaks, loops and dashed lines are not disproved
+    by this tool. No edge is ever automatically added to a labelled diagram.
+    """
+    if len(nodes) > 12:
+        return []
+    height, width = gray.shape
+    ink = (gray < 145).astype(np.uint8)
+    links = []
+    for i,a in enumerate(nodes):
+        for j,b in enumerate(nodes[i+1:], i+1):
+            dx,dy = b['x']-a['x'], b['y']-a['y']
+            distance = math.hypot(dx,dy)
+            guard = max(a['diameter'],b['diameter'])*.6+3
+            if distance <= guard*2+8:
+                continue
+            # A path passing through a third marked node is NOT a direct edge.
+            passes_node = False
+            for k,other in enumerate(nodes):
+                if k in (i,j):
+                    continue
+                along = ((other['x']-a['x'])*dx+(other['y']-a['y'])*dy)/(distance*distance)
+                if .05 < along < .95:
+                    cross = abs((other['x']-a['x'])*dy-(other['y']-a['y'])*dx)/distance
+                    if cross < other['diameter']*.52+3:
+                        passes_node = True
+                        break
+            if passes_node:
+                continue
+            t = np.linspace(guard/distance,1-guard/distance,
+                            max(40,min(320,round(distance*1.2))))
+            xx,yy = a['x']+dx*t,a['y']+dy*t
+            nx,ny = -dy/distance, dx/distance
+            strips = []
+            for offset in (-2,-1,0,1,2):
+                xi = np.clip(np.rint(xx+offset*nx).astype(np.int32),0,width-1)
+                yi = np.clip(np.rint(yy+offset*ny).astype(np.int32),0,height-1)
+                strips.append(ink[yi,xi])
+            support = float(np.max(strips,axis=0).mean())
+            if support >= .85:
+                links.append({'from': f'disk_{i+1}','to':f'disk_{j+1}',
+                              'support':round(support,3),
+                              'source':'same_original_grayscale_straight_corridor'})
+    return links
+
+
+def _stable_dark_disks(rgb, grid):
+    """Measure filled black nodes per strict grid panel at three thresholds.
+
+    Positions must agree across all three independently thresholded rasters.
+    Only such stable blobs generate scoped count/straight-stroke advisories.
+    """
+    if not isinstance(grid,dict) or grid.get('status') != 'regular_caption_grid':
+        return {'status':'not_applicable','panels':[]}
+    gray = cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY)
+    height,width = gray.shape
+    kernel = max(7,min(13,round(max(width,height)/185)))
+    if kernel%2 == 0:
+        kernel += 1
+    snapshots = {threshold:_dark_disks_once(gray,level=threshold,kernel=kernel)
+                 for threshold in (100,130,160)}
+    panels = []
+    for row in grid.get('panels',[]):
+        bounds = row.get('bbox')
+        if not isinstance(bounds,list) or len(bounds)!=4:
+            continue
+        x0,y0,x1,y1 = [v/1000 for v in bounds]
+        lists = {}
+        for threshold, items in snapshots.items():
+            candidates = [item for item in items if
+                x0 <= item['x']/width < x1 and y0 <= item['y']/height < y1]
+            candidates.sort(key=lambda p:(p['y'],p['x']))
+            lists[threshold] = candidates
+        points = lists[130]
+        stable = 2 <= len(points) <= MAX_NODES
+        if stable:
+            for threshold in (100,160):
+                found = lists[threshold]
+                if len(found) != len(points):
+                    stable = False
+                    break
+                unmatched = set(range(len(found)))
+                for p in points:
+                    valid = [index for index in unmatched if
+                             math.hypot(p['x']-found[index]['x'],p['y']-found[index]['y'])
+                             <= max(9,kernel*1.6)]
+                    if len(valid) != 1:
+                        stable = False
+                        break
+                    unmatched.remove(valid[0])
+                if not stable:
+                    break
+        if not stable:
+            panels.append({'region_id':row.get('id'), 'row':row.get('row'),
+                           'column':row.get('column'), 'status':'unstable',
+                           'advisory_only':True})
+            continue
+        links = _dark_line_candidates(gray,points)
+        panels.append({'region_id':row.get('id'), 'row':row.get('row'),
+                       'column':row.get('column'), 'status':'measured',
+                       'candidate_count':len(points),
+                       'nodes':[{'id':f'disk_{i+1}',
+                                 'x':round(p['x']/width*1000,2),
+                                 'y':round(p['y']/height*1000,2),
+                                 'diameter_pixels':p['diameter']}
+                                for i,p in enumerate(points)],
+                       'straight_edge_candidates':links,
+                       'straight_edge_lower_bound':len(links),
+                       'edge_count_is_exact':False, 'advisory_only':True})
+    status = 'measured' if len(panels)==grid['minimum_captioned_panels'] and all(
+        panel['status']=='measured' for panel in panels) else 'partial'
+    return {'status':status,'panels':panels, 'kernel':kernel,
+            'thresholds':[100,130,160], 'source':'same_original_gray_pixels',
+            'image_accuracy_certified':False}
+
+
 def measure_image_pixel_evidence(raw):
     """One CPU-only bounded snapshot; fail open without pretending success."""
     original, rgb = _image(raw)
+    grid = _colored_caption_grid(rgb)
     return {"source_sha256": hashlib.sha256(raw).hexdigest(),
-            "grid": _colored_caption_grid(rgb),
+            "grid": grid,
+            "grid_dark_disks": _stable_dark_disks(rgb, grid),
             "colored_graphs": _color_line_topology(rgb),
             "source_size": list(original.size),
             "work_size": [int(rgb.shape[1]), int(rgb.shape[0])],
