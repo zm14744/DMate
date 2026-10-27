@@ -20,6 +20,7 @@ MASTER = ROOT / "android" / "app" / "src" / "main" / "res" / "mipmap-xxxhdpi" / 
 VIEWBOX = 1254
 STROKE = 13  # Original installed Android icon uses ~2px hairline at 192px
 TAB_STROKE = 23  # Other browser tabs keep existing white hairline artwork.
+FIREFOX_TAB_STROKE = 42  # Desktop Firefox: ~46% thinner than former 78-unit fallback.
 SAFARI_TAB_STROKE = 78  # At 16–24 CSS px the black strokes must stay readable.
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
@@ -224,6 +225,13 @@ def main():
             save_png(draw_mark(size), STATIC / name)
 
     (STATIC / "dmate-mark.svg").write_text(svg_mark("#000"), encoding="utf-8")
+    # Firefox desktop previously inherited the thick 78-unit legacy tile.
+    # Keep the exact same line geometry, pure black rounded tile and white
+    # unfilled wireframe; only reduce the stroke to 42 vector units.
+    (STATIC / "dmate-firefox-tab-thin-v1.svg").write_text(
+        svg_mark("#000", stroke=FIREFOX_TAB_STROKE, corner_radius=180),
+        encoding="utf-8"
+    )
     (STATIC / "dmate-transparent.svg").write_text(
         svg_mark(background=None, stroke=TAB_STROKE), encoding="utf-8"
     )

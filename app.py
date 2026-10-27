@@ -2251,6 +2251,12 @@ def home():
     is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
     is_android_browser = is_android and not is_dmate_android_app
     is_windows_browser = bool(re.search(r"Windows", user_agent, re.IGNORECASE) and not is_dmate_desktop_app)
+    # Desktop Firefox was inheriting the thick Safari (78-unit) favicon.
+    # Use a dedicated thinner (42-unit) black/white vector icon without
+    # changing Android Fennec, Safari, Chromium, or desktop app artwork.
+    is_desktop_firefox = bool(not is_android and not is_ios
+        and not is_dmate_android_app and not is_dmate_desktop_app
+        and re.search(r"Firefox/", user_agent, re.IGNORECASE))
     # Search engines must see the public branded favicon even if a crawler UA
     # happens to include Windows/Android/Safari tokens. Browser icons stay intact.
     is_search_crawler = bool(re.search(
@@ -2274,6 +2280,7 @@ def home():
         is_search_crawler=is_search_crawler,
         is_android_browser=is_android_browser,
         is_windows_browser=is_windows_browser,
+        is_desktop_firefox=is_desktop_firefox,
         is_android_edge=is_android_edge,
         is_android_firefox=is_android_firefox,
         is_dmate_android_app=is_dmate_android_app,
