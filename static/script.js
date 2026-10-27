@@ -13919,6 +13919,7 @@ function ocrReviewLabel(value) {
 }
 
 function formatCanonicalGraphReview(graphs) {
+    if (typeof window !== 'undefined' && window.DMateGraphFormat?.toMarkdown) return window.DMateGraphFormat.toMarkdown(graphs);
     const lines=[];
     for (let i=0;i<graphs.length;i++) {
         const g=graphs[i], nodes=g.vertices || [], edges=g.edges || [];

@@ -203,6 +203,25 @@
                 else visual.append(element('p', 'dge-empty', '当前没有子图，可添加图形，或只确认题干。'));
                 workspace.append(preview, visual); container.append(workspace);
             }
+            if (graph && root.DMateGraphFormat?.graphRows) {
+                const data = root.DMateGraphFormat.graphRows(graph, document.graphs.indexOf(graph));
+                const summary = element('details', 'dge-review-summary'); summary.open = true;
+                summary.append(element('summary', '', '图形结构 · ' + graph.vertices.length + ' 点 / ' + graph.edges.length + ' 边'));
+                const section = element('div', 'dge-review-content');
+                section.append(element('p', 'dge-review-type', data.title + '    ' + data.type));
+                section.append(element('p', '', '点：' + (data.vertices.join('、') || '无')));
+                if (data.named.length) section.append(element('p', '', '边：' + data.named.join('、')));
+                section.append(element('p', 'dge-review-subhead', '关系：'));
+                if (!data.relations.length) section.append(element('p', '', '无'));
+                for (const row of data.relations) {
+                    const link = element('button', 'dge-review-relation', row.txt);
+                    link.type = 'button';
+                    if (row.id === selectedEdge) link.classList.add('is-selected');
+                    link.addEventListener('click', () => act(() => { selectedEdge = row.id; selectedNodes.clear(); }));
+                    section.append(link);
+                }
+                summary.append(section); container.append(summary);
+            }
             const body = element('textarea', 'dge-body'); body.value = document.body_text; body.rows = 4; body.setAttribute('aria-label', '题干、全部小问与公式'); body.disabled = saving;
             body.addEventListener('input', () => edit(() => model.setBody(body.value)));
             container.append(field('题干、全部小问与公式', body)); renderContext(document, container);
