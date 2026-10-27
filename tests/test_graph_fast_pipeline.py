@@ -307,6 +307,61 @@ def test_normal_multifigure_page_does_not_always_select_layout_model():
     assert fast._complex_layout_needed(ambiguous, {}) is True
 
 
+def test_main_views_reuse_only_panel_metadata_and_keep_overview_without_duplicates():
+    quick = {'images': ['overview', 'body', 'panel', 'duplicate-panel', 'panel', 'unlocated'],
+             'view_descriptions': ['完整原图'],
+             'panels': [{'id': 'panel_1'}, {'id': 'panel_2'}],
+             'body_regions': [{'id': 'body_region_1'}],
+             'view_metadata': [{}, {'region_id': 'body_region_1'}, {'region_id': 'panel_1'},
+                               {'region_id': 'panel_1'}, {'region_id': 'panel_2'}]}
+    before = copy.deepcopy(quick)
+    views = fast._main_panel_views(quick)
+    assert views['images'] == ['overview', 'panel']
+    assert len(views['view_descriptions']) == 2
+    assert '同一原图' in views['view_descriptions'][1] and '不是新增子图' in views['view_descriptions'][1]
+    assert quick == before
+
+
+def test_main_views_allow_four_panel_crops_and_fall_back_to_overview_without_metadata():
+    quick = {'images': ['overview'] + [f'crop-{i}' for i in range(6)],
+             'view_descriptions': ['完整原图'],
+             'panels': [{'id': f'panel_{i}'} for i in range(6)],
+             'view_metadata': [{}] + [{'region_id': f'panel_{i}'} for i in range(6)]}
+    assert fast._main_panel_views(quick)['images'] == ['overview', 'crop-0', 'crop-1', 'crop-2', 'crop-3']
+    quick.pop('view_metadata')
+    assert fast._main_panel_views(quick) == {'images': ['overview'], 'view_descriptions': ['完整原图']}
+
+
+def test_only_main_call_receives_existing_panel_crops_and_never_body_fragments(prepared, monkeypatch):
+    _, run, handles = prepared
+    import graph_semantic_layout, graph_semantic_arrow_views
+    prepare = graph_semantic_layout.prepare_semantic_layout
+    def with_crops(*args, **kwargs):
+        quick = prepare(*args, **kwargs)
+        quick.update(images=quick['images'] + ['synthetic-panel', 'synthetic-body'],
+                     panels=[{'id': 'panel_1'}], body_regions=[{'id': 'body_region_1'}],
+                     view_metadata=[{}, {'region_id': 'panel_1'}, {'region_id': 'body_region_1'}])
+        return quick
+    monkeypatch.setattr(graph_semantic_layout, 'prepare_semantic_layout', with_crops)
+    monkeypatch.setattr(graph_semantic_arrow_views, 'prepare_panel_views',
+                        lambda raw, **kwargs: copy.deepcopy(kwargs['overview_views']))
+    class CaptureImages(Provider):
+        def __call__(self, prompt, images, budget):
+            self.received_images = list(images)
+            return super().__call__(prompt, images, budget)
+    initial = document()
+    initial['uncertainties'] = [{'scope': 'graph', 'graph_id': 'G1', 'field': 'weight', 'message': '权重存疑'}]
+    main = CaptureImages(initial)
+    glm = CaptureImages({'graphs': [copy.deepcopy(initial['graphs'][0])], 'uncertainties': []})
+    glm.name, glm.model = 'glm', GLM_5V_TURBO_MODEL
+    result, _ = run(main, glm)
+    assert main.received_images[1:] == ['synthetic-panel']
+    assert len(glm.received_images) == 1 and glm.received_images[0] == main.received_images[0]
+    assert len(main.requests) == len(glm.requests) == 1 and result['complete'] is True
+    assert len(main.requests[0]['image_views']) == 2 and len(glm.requests[0]['image_views']) == 1
+    assert len(handles) == 1
+
+
 def test_budget_is_explicit_and_does_not_retry_slow_or_failed_requests():
     budget = fast.configured_fast_budget()
     assert budget.initial_calls == 2

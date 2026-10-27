@@ -1533,7 +1533,7 @@ def test_cancellation_after_last_visual_send_does_not_start_deepseek(monkeypatch
             'vertices': [{'id': 'a', 'label': None, 'x': .5, 'y': .5, 'isolated_confirmed': True}],
             'edges': []})], 'diagnostics': [], 'body_text': '求度数。', 'body_complete': True,
             'agent_workflow': {}, 'remote_metrics': []}
-    monkeypatch.setattr('graph_semantic_pipeline.recognize_semantic', engine)
+    monkeypatch.setattr('graph_fast_pipeline.recognize_fast', engine)
     monkeypatch.setattr(ocr_nextgen, 'correct_text', lambda *a, **k: pytest.fail('cancelled task sent text request'))
     result = ocr_nextgen.recognize_graph_document(b'original', {}, graph_pipeline='agent-tools',
                                                   cancelled=lambda: cancelled[0])
@@ -1545,11 +1545,15 @@ def test_whole_upload_deadline_reserves_cleanup_after_local_ocr(monkeypatch):
     import time
     import ocr_nextgen
     limit = time.monotonic()+40
+    invoked = []
     def engine(*args, **kwargs):
-        assert kwargs['budget'].deadline <= limit-28
+        invoked.append(True)
+        assert kwargs['budget'].deadline <= limit-3
         raise TimeoutError('synthetic stop before any request')
-    monkeypatch.setattr('graph_semantic_pipeline.recognize_semantic', engine)
+    monkeypatch.setattr('graph_fast_pipeline.recognize_fast', engine)
     result = ocr_nextgen.recognize_graph_document(b'original', {}, graph_pipeline='agent-tools',
                                                   request_deadline=limit)
     assert result['recognition_status'] == 'failed'
+    assert invoked == [True]
+    assert result['diagnostics']['failure_kind'] == 'TimeoutError'
     assert result['diagnostics']['remote_metrics'] == []

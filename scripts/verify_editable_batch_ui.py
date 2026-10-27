@@ -364,6 +364,17 @@ def run(output, browser, cache):
             cards['B'].locator('[data-ocr-action="edit"]').click()
             editor.get_by_label('边 1 权重', exact=True).fill('11')
             editor.get_by_role('button', name='稍后继续', exact=True).click()
+            # Native dialog.close() queues its close event. The real close
+            # handler destroys the mounted editor and renders the updated
+            # task card; click() can resolve before that event runs.
+            report['dismissal_observation'] = page.evaluate('''(id) => ({
+                dialogOpen: document.querySelector('#graphEditorDialog').open,
+                editorChildren: document.querySelector('#graphEditorMount').childElementCount,
+                solveButtons: document.querySelectorAll(
+                    `[data-ocr-action="solve"][data-task-id="${id}"]`).length
+            })''', identities['B'])
+            page.wait_for_function('''() => !document.querySelector('#graphEditorDialog').open
+                && document.querySelector('#graphEditorMount').childElementCount === 0''')
             check('editing_invalidates_old_confirmation_in_ui', cards['B'].locator('[data-ocr-action="solve"]').count()==0)
             check('editing_does_not_send_another_solver_request', sum(e['kind']=='solver_boundary' for e in events(folder))==1)
             cards['B'].locator('[data-ocr-action="edit"]').click()

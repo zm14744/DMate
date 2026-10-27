@@ -327,6 +327,29 @@ def _public_local_result(value):
             for name, selected in fields.items() if isinstance(value.get(name), dict)}
 
 
+def _main_panel_views(quick):
+    """Reuse up to four existing figure windows; keep the full-page anchor."""
+    images = quick['images'][:1]
+    descriptions = quick['view_descriptions'][:1]
+    panel_ids = {row['id'] for row in quick.get('panels', [])
+                 if isinstance(row, dict) and isinstance(row.get('id'), str)}
+    metadata = quick.get('view_metadata', [])
+    used_panels, used_images = set(), set(images)
+    for index, image in enumerate(quick['images'][1:], 1):
+        if len(images) >= 5:
+            break
+        meta = metadata[index] if index < len(metadata) else None
+        region_id = meta.get('region_id') if isinstance(meta, dict) else None
+        if region_id not in panel_ids or region_id in used_panels or image in used_images:
+            continue
+        images.append(image)
+        descriptions.append(f'同一原图的局部窗口 {region_id}，对应总览中的相同内容，仅供放大阅读，'
+                            '不是新增子图；不能按窗口数量计图，图的数量与边界仍以完整原图为准。')
+        used_panels.add(region_id)
+        used_images.add(image)
+    return {'images': images, 'view_descriptions': descriptions}
+
+
 def _text_candidate_issues(draft, local_text, quick):
     """Flag concrete omitted prose, never turn OCR labels into a question.
 
@@ -382,6 +405,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
     quick = prepare_semantic_layout(raw, budget=budget, layout=layout, run_layout=False)
     markers = prepare_semantic_geometry(raw, budget=budget, layout=quick)
     views = {'images': quick['images'][:1], 'view_descriptions': quick['view_descriptions'][:1]}
+    main_views = _main_panel_views(quick)
     if local_submit is None:
         from graph_local_scheduler import submit_local_bundle
         local_submit = submit_local_bundle
@@ -416,11 +440,11 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
                                   body_regions=quick.get('body_regions', []),
                                   marker_candidates=markers.get('marker_candidates', []))
         response = runner.call('fast_main', MAIN_PROMPT,
-            {'image_views': views['view_descriptions'],
+            {'image_views': main_views['view_descriptions'],
              'local_layout_candidates': quick.get('panels', [])[:32],
              'local_marker_candidates': markers.get('marker_candidates', [])[:120],
              'local_ocr_candidates': hints['candidates'], 'local_ocr_policy': hints['policy']},
-            views['images'], output_tokens=12000, response_identity=False,
+            main_views['images'], output_tokens=12000, response_identity=False,
             reserve_seconds=12)
         if not isinstance(response.get('graphs'), list) or not isinstance(response.get('body_text'), str):
             raise VisionError('main_document_unreadable')
