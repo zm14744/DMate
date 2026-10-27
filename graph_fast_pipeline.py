@@ -29,7 +29,7 @@ PERFORMANCE_TARGET_SECONDS = 120
 MAIN_PROMPT = r'''读取数学题原图，返回紧凑JSON题干和图结构，不解题，不输出解释或Markdown。
 第一张总览决定独立子图数量；后续局部只是同一原图的放大窗口，不能重复计图。同图不连通分量不能仅因分开就拆图。多图时每图给相对完整原图0..1000的粗bbox，也可附对应layout_panel_ids；不要将每个局部窗口都填成整页bbox。坐标不要求精确。
 先清点真实圆点、圆圈或明确顶点，包括孤立点，再沿实际连线读端点。普通交叉、箭头尖和文字不是顶点；边名不能变成节点。无印刷节点名则label=null；e_i也可能是真节点名，须按原图位置判别。local_visual_inventory中的同类圆点须逐个对照原图，可在顶点附marker_id绑定对应候选；若有候选以外的真实点，保留并只为该点附短visual_basis说明具体位置与可见依据。候选可能错漏，不能按候选数、题干、图名、度数或模板补删点边。
-可先给visible_vertex_count、visible_edge_count，须独立对原图清点，再与记录核对；不确定则null并列明疑点，不能把数组长度或工具数抄成视觉结论。只输出一份vertices和edges，不逐点逐边重复描述。
+对于能够辨认的子图，请独立清点并给出visible_vertex_count和visible_edge_count，再与vertices、edges逐一核对；确实不能确定时填null并注明疑点。不能为了让两种计数相等而补删图结构，也不能直接把数组长度或工具候选数抄成视觉计数。只输出一份vertices和edges，不逐点逐边重复描述。
 交叉处沿原笔画走，不换线；经过真实顶点才分成不同边。虚线的多个短划是一条边。每条无向边、有向边、自环、重边和反向弧各列一次。方向只按箭头尖确定，不能按编号或布局猜；看不清用unknown。
 weighted必须是布尔值：只有实际边权才true，节点数字、节点编号、边名不算权重。已知存在但未读清的边权用null并列疑点。保留零、负数及π、√2、1/3等原始符号，不计算近似值。同一印刷项仅放对应的weight或edge_label，不能重复填写。保留必要颜色、虚线与点线；阴影、透印不能当新增线条。
 body_text逐字保留全部可见题干、小问、公式、数学符号和图例；图内标签、图注放图结构。没有题干就用空字符串，不能根据图生成问题、补写“如图所示”等原图没有的话或猜裁切文字。只把具体仍看不清的内容列为uncertainties。
@@ -40,7 +40,7 @@ uncertainties格式：{"scope":"body|graph|document","graph_id":"图问题填写
 LOCAL_REVIEW_PROMPT = r'''你是数学图像的局部复核者。完整原图和所有局部视图来自同一张图。只检查targets明确指出的正文或数学子图，不解题。
 draft是尚待用户确认的读取结果，工具候选和题意规则都是辅助，可能错误。沿原图确认目标图的顶点、连接、箭头、孤立点、自环、重边、权重，完整保留其必要标签/线型/颜色；不从常见图模板或度数反推图片。
 local_marker_candidates是整张原图上的圆点候选，含位置、大小和置信度，也可能混入正文或字形。核对目标子图内形状、大小相近的清晰圆点与draft顶点是否逐一对应，尤其检查较大圆点旁的字母是否实际为边名；有数量差异时重新对照原图确认真实点和连接，不将整页候选总数或某一尺寸组的数量强制作为节点数。匿名真实点保留label=null，不能仅凭e_i等词形删除真正的节点名。
-若issues指出计数冲突，先重新清点原图实际点与整条连线，不能只补颜色而保留未核实连接。local_visual_inventory中的圆点候选须逐个对照原图，可用marker_id绑定对应顶点；额外真实点允许保留并附短visual_basis定位依据，不能按候选数凑答案。只返回紧凑vertices/edges，可给独立视觉计数visible_vertex_count/visible_edge_count；仍不能确认则null并列疑点。保留weighted布尔值；方向和权重必须来自原图，不按全图类型补猜。
+若issues指出计数冲突，先重新清点原图实际点与整条连线，不能只补颜色而保留未核实连接。若draft中有visible_vertex_count或visible_edge_count，请对目标子图重新独立清点并在返回的子图中提供这两个字段；不能确定时返回null并明确疑点，不能省略计数字段来消除原有冲突。local_visual_inventory中的圆点候选须逐个对照原图，可用marker_id绑定对应顶点；额外真实点允许保留并附短visual_basis定位依据，不能按候选数凑答案。只返回紧凑vertices/edges，可给独立视觉计数visible_vertex_count/visible_edge_count；仍不能确认则null并列疑点。保留weighted布尔值；方向和权重必须来自原图，不按全图类型补猜。
 只返回targets内已复核的完整子图，保留原graph.id。无需返回未请求的图。题干仅在targets.body=true时返回完整逐字body_text；不能新增原图不存在的问题或补全裁切文字。
 返回格式：{"graphs":[{"id":"G1","name":"原图图注","vertices":[...],"edges":[...]}],"uncertainties":[]}。节点和边结构与主读取相同。已确认修正的问题不留在uncertainties；仍看不清时明确列出scope/graph_id/field/message，保留可用内容，不以空图抹掉整幅结构。仅内部ID或坐标差异不是识别疑点。'''
 
@@ -54,6 +54,8 @@ _DRAFT_SCHEMA = {
             'type': 'object', 'required': ['vertices', 'edges'], 'properties': {
                 'id': _IDENTIFIER,
                 'weighted': {'type': 'boolean'},
+                'visible_vertex_count': {'type': ['integer', 'null'], 'minimum': 0, 'maximum': 100},
+                'visible_edge_count': {'type': ['integer', 'null'], 'minimum': 0, 'maximum': 300},
                 'vertices': {'type': 'array', 'maxItems': 100, 'items': {
                     'type': 'object', 'properties': {'id': _IDENTIFIER,
                         'label': {'type': ['string', 'integer', 'number', 'null']}}}},
@@ -168,6 +170,45 @@ def _stroke_inventory_issues(document):
     return issues
 
 
+def _visual_count_issues(document):
+    """Reread visually reported counts that disagree with the actual edge/node lists.
+
+    These are consistency checks, NOT independent pixel truth. Missing legacy
+    fields are tolerated; an explicit unknown count must stay pending. The
+    model may be wrong in both its count and edge list, so an apparent match
+    never certifies that the image was recognized correctly.
+    """
+    issues = []
+    rows = document.get('graphs', []) if isinstance(document, dict) else []
+    for index, graph in enumerate(rows) if isinstance(rows, list) else ():
+        if not isinstance(graph, dict):
+            continue
+        graph_id = graph.get('id', f'G{index+1}')
+        for field, collection, maximum, term in (
+                ('visible_vertex_count', 'vertices', 100, '顶点'),
+                ('visible_edge_count', 'edges', 300, '边')):
+            if field not in graph:
+                continue
+            count = graph[field]
+            listed = len(graph[collection]) if isinstance(graph.get(collection), list) else None
+            if count is None:
+                issues.append(_issue('visual_count_unresolved',
+                    f'原图中的{term}数量未独立确定，请结合原图逐一核对。',
+                    scope='graph', graph_id=graph_id, field=collection,
+                    recorded_count=listed))
+            elif type(count) is not int or not 0 <= count <= maximum:
+                issues.append(_issue('visual_count_invalid',
+                    f'{term}的独立视觉计数无效，需重新读取原图。',
+                    scope='graph', graph_id=graph_id, field=collection,
+                    recorded_count=listed))
+            elif listed is not None and count != listed:
+                issues.append(_issue('visual_count_mismatch',
+                    f'原图独立读取的{term}数为 {count}，结构表却列出 {listed} 个，请重新读图核对，不能仅为凑数增删。',
+                    scope='graph', graph_id=graph_id, field=collection,
+                    visible_count=count, recorded_count=listed))
+    return issues
+
+
 def _validate_tool(arguments, *, context):
     from graph_semantic_tools import inspect_semantic_graphs
     from graph_semantic_pipeline import _required_visual_attribute_issues
@@ -236,7 +277,8 @@ def _validate_tool(arguments, *, context):
                 unknown_weights.append(_issue('unknown_weight', '该边有待确认的权重，不能按已读清处理。',
                     scope='graph', graph_id=graph['id'], field='weight', edge_id=edge['id']))
     issues = (normalized['semantic_issues'] + schema_issues + inspected['issues']
-              + required_attributes + unknown_weights + _stroke_inventory_issues(draft))
+              + required_attributes + unknown_weights + _stroke_inventory_issues(draft)
+              + _visual_count_issues(draft))
     if context.data.get('visual_inventory') is not None:
         from graph_visual_inventory import compare_visual_inventory
         issues += compare_visual_inventory(draft, context.data['visual_inventory'])['issues']
@@ -327,6 +369,21 @@ def _merge_local_review(previous, response, targets):
         returned[gid] = copy.deepcopy(graph)
         for key, value in old_flags.get(gid, {}).items():
             returned[gid].setdefault(key, value)
+        # A targeted reread cannot erase an earlier visual-count disagreement
+        # just by omitting the count fields. Keep the earlier observation only
+        # when the number of listed instances remains unchanged. When the
+        # reread changes cardinality but fails to state its independent count,
+        # mark that count unresolved instead of silently certifying the edit.
+        previous_graph = next((old for old in previous.get('graphs', [])
+                               if isinstance(old, dict) and str(old.get('id')) == gid), None)
+        if previous_graph is not None:
+            for count_key, list_key in (('visible_vertex_count', 'vertices'),
+                                        ('visible_edge_count', 'edges')):
+                if count_key in previous_graph and count_key not in graph:
+                    before = previous_graph.get(list_key)
+                    after = graph.get(list_key)
+                    unchanged = isinstance(before, list) and isinstance(after, list) and len(before) == len(after)
+                    returned[gid][count_key] = copy.deepcopy(previous_graph[count_key]) if unchanged else None
         if 'stroke_inventory' not in graph and gid in old_inventory:
             # Dropping an existing checklist must not silently erase a real
             # mismatch. A corrected visual reread may replace the checklist.
