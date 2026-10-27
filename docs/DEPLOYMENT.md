@@ -224,7 +224,7 @@ node --check static/script.js
 | `static/script.js`、`templates/index.html`、网页样式 / 图标 | 更新 Zeabur 站点，客户端刷新或重新打开 | 从远程站点读取新版，可能受缓存影响 |
 | `android/` 下的 Java、Manifest、Gradle、原生资源 | 重新构建、签名并分发 APK | 需要安装新版 APK |
 
-**2026-10-27 安装版图片上传修复：** Android v1.0.2 (versionCode 3) 已修改 WebView 的系统图片选择器和多图回调；网页版正常不代表旧版安装包的原生层已更新。签名 Android 工作流现新增 `apksigner` 校验与 `gh release upload v1.0.1 dist/DMate.apk --clobber`，成功后只替换现有 GitHub 多平台 Release 的 APK 文件，不改 Windows/macOS/Linux 旧安装包。GitCode、itch.io、商店均不会被该流程自动同步，镜像未确认前不要把它们当作已修复版。手机升级安装后仍需实机检查“上传→系统文件选择→看到图片卡片→进入描绘”，不能用构建成功冒充实机成功。
+**2026-10-27 安装版图片上传修复：** Android v1.0.3 (versionCode 4) 修复文件选择器的多图回调，并针对国产 ROM 在通用图片选择器立即退出时增加系统文档选择器重试；网页版正常不代表旧版安装包的原生层已更新。签名 Android 工作流现新增 `apksigner` 校验与 `gh release upload v1.0.1 dist/DMate.apk --clobber`，成功后只替换现有 GitHub 多平台 Release 的 APK 文件，不改 Windows/macOS/Linux 旧安装包。GitCode、itch.io、商店均不会被该流程自动同步，镜像未确认前不要把它们当作已修复版。手机升级安装后仍需实机检查“上传→系统文件选择→看到图片卡片→进入描绘”，不能用构建成功冒充实机成功。
 | `desktop/src-tauri/` 下的配置、Rust、权限、窗口及原生资源 | 重新构建并分发新的桌面安装包 | 需要安装新版安装包 |
 
 **操作顺序**：提交变更 → Zeabur 部署完成 → 通过 `/health` 与 `/ready` 观察服务状态 → 在网页和已安装客户端各测试一轮重点功能。对本次产品能力变更，重点检查图同构、二部图、拓扑排序、模逆 / CRT、齐次与非齐次递推，以及同知识点出题是否偏题。本项目已有 175 项个人功能自测结果记录；部署新版时仍应针对本次实际改动复测 AI 出题、OCR、复制、账号同步与移动端交互，不能仅因既往记录为通过便视为新部署完成验收。
@@ -281,3 +281,12 @@ node --check static/script.js
 7. **失败时回滚**：回到已知正常的应用提交/镜像，确认 `/health`、`/ready` 和核心对话恢复。数据库 schema 改动需事先制定独立回滚方案；不可直接假设代码回滚等于数据回滚。
 
 **通过标准**：静态检查通过只是进入发布验收的前置条件；不能替代在线 API、OCR 真机、客户端和账户/数据库端到端验证。测试记录与当前未验证清单见 [`TESTING.md`](TESTING.md) 与 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)。
+
+
+## 14. 安装版更新检查（2026-10-28）
+
+DMate 安装版现在通过同源 `/static/client-updates.json` 在每次打开应用时检查更新，应用重新进入前台且超过六小时后再次检查。它只对带有 `DMateAndroid/x.y.z` 或 `DMateDesktop/x.y.z` 用户代理的已安装应用提示，不对网页版提示；只接受 GitHub 官方 DMate Release 下载路径，拒绝未知地址。
+
+已发布的 Android APK 为 **1.0.3**，在 GitHub 的 `v1.0.1` 多平台发行页中覆盖旧的 `DMate.apk`；电脑端当前正式资源仍为 **1.0.0**。未来每次正式发布新安装包，都必须**先确认签名/公证与 Release 下载资源已经发布成功，再更新该版本清单**，避免让用户提前下载到旧安装包。GitCode、itch.io 和应用商店有独立的同步/更新机制，不得冒充已更新。
+
+更新提示提供“下载更新”与“稍后”，安装由 Android/Windows/macOS/Linux 系统按各自安全策略确认；**不属于无人值守静默安装**。现有 Tauri 桌面安装包还没有签名的内置自动更新插件；真正的 Tauri 安装器自升级，需要先安全地生成并保管私钥、在打包中生成 .sig、配置公钥与已发布的更新清单，不得关闭签名验真。新版网页输入控件允许在安装壳中通过真实触摸打开本机文件选择窗口，避免仅依赖 JavaScript 模拟点击。
