@@ -291,6 +291,9 @@ def run_case(browser, case, url, image_path, output, mode, solve, timeout_second
             }
             record["steps"].append("captured_actual_graph_editor")
             shot("ocr-editable-review")
+            # Includes the browser's actual editor rendering, not merely the
+            # server JSON arrival. In mock mode this is UI latency only.
+            record["upload_to_editable_render_seconds"] = round(time.monotonic() - t0, 2)
             if not question and not visual:
                 raise AssertionError("Editable OCR result has no rendered question or graph")
             if solve:
