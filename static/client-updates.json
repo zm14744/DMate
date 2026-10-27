@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "android": {
+    "version": "1.0.2",
+    "published": true,
+    "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate.apk"
+  },
+  "desktop": {
+    "windows": {
+      "version": "1.0.0",
+      "published": true,
+      "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_x64-setup.exe"
+    },
+    "macos": {
+      "version": "1.0.0",
+      "published": true,
+      "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_universal.dmg"
+    },
+    "linux": {
+      "version": "1.0.0",
+      "published": true,
+      "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_amd64.AppImage"
+    }
+  }
+}

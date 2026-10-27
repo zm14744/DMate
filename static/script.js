@@ -3250,6 +3250,8 @@ function refreshInputAvailability() {
     if (imageInput) {
         imageInput.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
     }
+    const imagePickerWrap = document.getElementById("imagePickerWrap");
+    if (imagePickerWrap) imagePickerWrap.hidden = visibleMode !== "idle";
     if (inputWrap) {
         inputWrap.classList.toggle("ai-input-busy", visibleMode === "ai");
         // CSS 必须只依赖最终可见状态，避免等待 OCR/思考回调时闪现按钮。

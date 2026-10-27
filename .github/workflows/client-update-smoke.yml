@@ -1,0 +1,34 @@
+name: Client Update & Image Upload UI Checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'static/client-update.js'
+      - 'static/client-updates.json'
+      - 'static/script.js'
+      - 'templates/index.html'
+      - 'tests/client_update_contract.js'
+      - 'tests/test_android_upload_ui_contract.py'
+      - '.github/workflows/client-update-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  client-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate client JavaScript
+        run: |
+          node --check static/client-update.js
+          node --check static/script.js
+          node tests/client_update_contract.js
+      - name: Check Android file upload and release rules
+        run: python -m unittest discover -s tests -p 'test_android_upload_ui_contract.py'

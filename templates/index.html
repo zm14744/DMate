@@ -8345,6 +8345,53 @@ body[data-appearance-theme] .input #imageInput,
     pointer-events:none !important;
     box-shadow:none !important;
 }
+/* A real touch on the native file control avoids synthetic-click restrictions
+   in Huawei Android WebView, Windows WebView2, and system WebKit. */
+.input > .image-picker-wrap {
+    display:inline-flex;
+    position:relative;
+    flex:0 0 auto;
+    align-items:center;
+    min-width:0;
+    align-self:center;
+}
+.input > .image-picker-wrap[hidden] { display:none !important; }
+.input > .image-picker-wrap > #imageBtn { align-self:center !important; }
+body[data-appearance-theme] .input .image-picker-wrap > #imageInput,
+.input .image-picker-wrap > #imageInput {
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    min-width:100% !important;
+    max-width:100% !important;
+    height:100% !important;
+    min-height:100% !important;
+    max-height:100% !important;
+    margin:0 !important;
+    padding:0 !important;
+    opacity:0 !important;
+    border:0 !important;
+    clip-path:none !important;
+    overflow:visible !important;
+    pointer-events:auto !important;
+    cursor:pointer !important;
+    z-index:2 !important;
+}
+.input > .image-picker-wrap:focus-within > #imageBtn {
+    outline:2px solid var(--accent) !important;
+    outline-offset:2px;
+}
+@media (min-width:1101px) {
+    body[data-appearance-theme] .input > .image-picker-wrap > #imageBtn {
+        height:46px !important; min-height:46px !important; max-height:46px !important;
+    }
+}
+@media (max-width:1100px) {
+    body[data-appearance-theme] .input > .image-picker-wrap > #imageBtn {
+        height:42px !important; min-height:42px !important; max-height:42px !important;
+    }
+}
+
 /* Composer: field and actions share the same vertical centre. */
 .input { align-items:center !important; }
 .input .manual-question-composer { align-self:center; }
@@ -8591,6 +8638,39 @@ window.MathJax = {
     .ocr-task-list { grid-template-columns:minmax(0,1fr); }
     .graph-editor-dialog { width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border-radius:0; padding:12px; }
 }
+.dmate-update-notice {
+    position:fixed; z-index:2100;
+    top:calc(12px + env(safe-area-inset-top,0px));
+    right:12px;
+    box-sizing:border-box; width:min(370px,calc(100vw - 24px));
+    padding:14px 16px;
+    border:1px solid var(--border-strong);
+    border-radius:12px;
+    background:var(--surface-1);
+    color:var(--text-primary);
+    box-shadow:0 8px 30px rgba(0,0,0,.18);
+    font-size:13px;
+}
+.dmate-update-notice[hidden] { display:none !important; }
+.dmate-update-notice h3 { margin:0 0 5px; font-size:15px; }
+.dmate-update-notice p { margin:0 0 12px; color:var(--text-subtle); line-height:1.5; }
+.dmate-update-notice .dmate-update-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.dmate-update-notice button {
+    border:1px solid var(--border-strong);
+    padding:8px 12px; border-radius:8px;
+    background:var(--surface-3); color:var(--text-primary);
+    cursor:pointer; font:inherit;
+}
+.dmate-update-notice button.dmate-update-primary {
+    border-color:var(--accent); background:var(--accent); color:white;
+}
+.dmate-update-notice .dmate-update-url {
+    display:block; padding-top:7px; font-size:11px;
+    color:var(--text-subtle); word-break:break-all;
+}
+@media(max-width:760px) {
+    .dmate-update-notice { left:10px; right:10px; top:calc(10px + env(safe-area-inset-top,0px)); width:auto; }
+}
 </style>
 </head>
 
@@ -8684,8 +8764,10 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div class="manual-question-composer">
                 <input id="text" type="text" placeholder="" autocomplete="off">
             </div>
-            <input id="imageInput" type="file" accept="image/*" multiple aria-label="选择图片">
-            <button id="imageBtn" type="button" title="一次选择 1–4 张原图，也可以拖放或粘贴">图片识题</button>
+            <span class="image-picker-wrap" id="imagePickerWrap">
+                <button id="imageBtn" type="button" title="一次选择 1–4 张原图，也可以拖放或粘贴">图片识题</button>
+                <input id="imageInput" type="file" accept="image/*" multiple tabindex="-1" aria-label="选择图片">
+            </span>
             <button id="ocrCancelBtn" type="button" hidden aria-label="撤销图片识别" title="撤销图片识别"></button>
             <button id="sendBtn" type="button" onclick="handleSendOrStop()">发送</button>
         </div>
@@ -9335,7 +9417,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/graph-editor-format.js?v=dmate-format-v1"></script>
 <script src="/static/graph-editor-overlay.js?v=dmate-editor-minimal-v3"></script>
 <script src="/static/graph-editor.js?v=dmate-editor-minimal-v3"></script>
-<script src="/static/script.js?v=dmate-android-release-fix-v5"></script>
+<script src="/static/script.js?v=dmate-native-tap-v6"></script>
+<script src="/static/client-update.js?v=dmate-client-updates-v1"></script>
 
 </body>
 </html>

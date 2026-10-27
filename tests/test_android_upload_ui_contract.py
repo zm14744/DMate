@@ -21,8 +21,11 @@ class AndroidUploadUiTests(unittest.TestCase):
 
     def test_file_input_and_independent_question_selector(self):
         self.assertIn("input.showPicker()", self.js)
+        self.assertIn('id="imagePickerWrap"', self.html)
+        self.assertIn("pointer-events:auto !important", self.html)
+        self.assertIn('imagePickerWrap.hidden = visibleMode !== "idle"', self.js)
         self.assertIn("manualQuestion.hidden = ocrTasks.size > 0", self.js)
-        self.assertIn('<input id="imageInput" type="file" accept="image/*" multiple aria-label="选择图片">', self.html)
+        self.assertIn('<input id="imageInput" type="file" accept="image/*" multiple tabindex="-1" aria-label="选择图片">', self.html)
         self.assertIn('<p class="ocr-task-panel-hint">最多4张</p>', self.html)
 
     def test_no_visible_ocr_task_count_or_timing(self):
