@@ -2950,6 +2950,50 @@ def graph_confirmation_session():
     return response
 
 
+@app.route("/graph/text-region", methods=["POST"])
+def recognize_manual_text_region():
+    """Only OCR explicitly framed pixels; never reconstruct graph topology."""
+    from graph_confirmation import (ConfirmationError, confirmation_owner,
+                                    require_recognition_source)
+    from graph_region import RegionError, crop_region
+    if not _check_rate_limit(_get_client_ip(), "ocr"):
+        return jsonify({"error": "文字区域识别过于频繁，请稍后重试"}), 429
+    request_id = _normalize_ocr_request_id(request.form.get("request_id"))
+    source = request.files.get("image")
+    if not request_id or source is None:
+        return jsonify({"error": "缺少原图或识别任务"}), 400
+    raw = source.read(MAX_IMAGE_BYTES + 1)
+    if not raw or len(raw) > MAX_IMAGE_BYTES:
+        return jsonify({"error": "图片必须小于 8MB"}), 413
+    source_sha = hashlib.sha256(raw).hexdigest()
+    try:
+        require_recognition_source(confirmation_owner(), request_id, source_sha)
+    except ConfirmationError as exc:
+        return jsonify({"error": exc.message, "code": exc.code}), exc.status
+    raw_region = request.form.get("polygon", "")
+    if len(raw_region) > 6000:
+        return jsonify({"error": "选区轮廓过于复杂"}), 400
+    try:
+        region = json.loads(raw_region)
+        cropped = crop_region(raw, region)
+    except (ValueError, TypeError, RegionError) as exc:
+        return jsonify({"error": str(exc) or "文字选区无效"}), 400
+    if not OCR_AVAILABLE or recognize_image is None:
+        return jsonify({"error": "文字 OCR 暂不可用，可继续手动输入"}), 503
+    try:
+        recognized = recognize_image(cropped)
+    except Exception as exc:
+        print(f"所选文字区域 OCR 失败：{type(exc).__name__}")
+        return jsonify({"error": "选区文字识别未完成，可调整范围或手动输入"}), 503
+    result = recognized if isinstance(recognized, dict) else {}
+    text = str(result.get("text") or "").strip()
+    return jsonify({"text": text, "text_count": result.get("text_count", 0),
+                    "request_id": request_id, "source_sha256": source_sha,
+                    "selection_mode": "polygon",
+                    "recognition_status": "complete" if text else "partial",
+                    "warning": None if text else "选区内未识别到文字，请调整范围或手动输入"})
+
+
 @app.route("/graph/confirm", methods=["POST"])
 def confirm_graph_document():
     from graph_confirmation import ConfirmationError, confirmation_owner, confirm_document

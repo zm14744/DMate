@@ -120,6 +120,18 @@ def _identity(request_id, source_sha256):
         raise ConfirmationError('invalid_source_sha256', '原图标识无效，请重新选择原图。')
 
 
+def require_recognition_source(owner, request_id, source_sha256):
+    """Text ROI requests must belong to an uploaded image in THIS browser."""
+    _identity(request_id, source_sha256)
+    with _connection() as connection:
+        row = connection.execute('''SELECT source_sha256,expires
+            FROM graph_confirmations WHERE owner=? AND request_id=?''',
+            (owner, request_id)).fetchone()
+    if row is None or row[0] != source_sha256 or row[1] < time.time():
+        raise ConfirmationError("unknown_source_task",
+                                "原图任务已失效，请重新上传该图片。", status=409)
+
+
 def register_recognition(owner, request_id, source_sha256):
     """Called after /ocr receives the original bytes, including failed reads."""
     _identity(request_id, source_sha256)
