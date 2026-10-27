@@ -113,7 +113,7 @@ def describe_confirmed_drawing(drawing, *, completion=None):
         if ident not in allowed or not isinstance(value, str):
             continue
         value = re.sub(r"\s+", " ", value).strip().strip("。")
-        if not 1 <= len(value) <= 135 or _DISALLOWED.search(value):
+        if not 1 <= len(value) <= 90 or _DISALLOWED.search(value):
             continue
         descriptions[ident] = value
     return {"status": "ok" if descriptions else "unavailable",

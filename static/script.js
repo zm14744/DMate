@@ -14269,14 +14269,42 @@ function renderOcrTasks() {
             content.append(element("p", "ocr-task-summary", `${graphs.length} 幅子图 · ${vertices} 个节点 · ${edges} 条边`));
             if (task.descriptionState === "running") {
                 content.append(element("p", "ocr-task-summary", "正在整理图形外观描述…"));
-            } else if (task.descriptions && Object.keys(task.descriptions).length) {
-                for (const graph of graphs) {
-                    const description = task.descriptions[String(graph.id)];
+            }
+            // Keep the confirmed mathematical review in ONE consistent layout.
+            // The optional DeepSeek description is UI-only; never enter the
+            // signed semantic snapshot or the solver input.
+            if (task.confirmation && graphs.length && window.DMateGraphFormat?.graphRows) {
+                const details = element("details", "ocr-task-structure");
+                details.open = task.structureExpanded === true;
+                const summary = element("summary", "", "点、边与关系");
+                details.append(summary);
+                details.addEventListener("toggle", () => { task.structureExpanded = details.open; });
+                for (const [index, graph] of graphs.entries()) {
+                    const view = window.DMateGraphFormat.graphRows(graph, index);
+                    const section = element("section", "ocr-task-structure-graph");
+                    section.append(element("strong", "", view.title));
+                    section.append(element("p", "ocr-task-structure-type", view.type));
+                    section.append(element("p", "", "点：" + (view.vertices.join("、") || "无")));
+                    if (view.named.length) section.append(element("p", "",
+                        "边：" + view.named.join("、")));
+                    section.append(element("p", "ocr-task-structure-head", "关系："));
+                    if (view.relations.length) {
+                        const table = element("div", "ocr-task-relations");
+                        for (const row of view.relations) {
+                            const item = element("p", "", row.txt);
+                            item.dataset.edgeId = row.id;
+                            table.append(item);
+                        }
+                        section.append(table);
+                    } else section.append(element("p", "", "无"));
+                    const description = task.descriptions?.[String(graph.id)];
                     if (typeof description === "string" && description) {
-                        content.append(element("p", "ocr-task-description",
-                            (graph.name || graph.id) + " · 图形描述：" + description));
+                        section.append(element("p", "ocr-task-structure-head", "图形描述："));
+                        section.append(element("p", "", description));
                     }
+                    details.append(section);
                 }
+                content.append(details);
             }
         }
         const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
