@@ -39,8 +39,9 @@ def test_failure_reason_preserves_usage_and_never_retries_or_salvages(raw,reason
     assert metric['output_error']==reason and metric['usage']=={'total_tokens':37}
     assert metric.get('json_root_type')==root_type
     if reason=='json_syntax':
-        assert set(metric['json_error'])=={'line','column','position'}
+        assert set(metric['json_error'])=={'line','column','position','kind'}
         assert metric['json_error']['line']>=1 and metric['json_error']['position']>=0
+        assert metric['json_error']['kind']==('invalid_value' if raw=='{"graphs":[' else 'extra_data')
     assert not provider.observations  # Raw response capture stays opt-in.
     assert 'private fixture' not in json.dumps(metric)
     assert 'offline-test-key' not in json.dumps(metric)

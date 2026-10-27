@@ -252,6 +252,37 @@ def test_inventory_then_blind_source_read_then_fresh_review_without_pixel_protoc
     assert len(result['semantic_workflow']['source_audit']['graphs']) == 1
 
 
+def test_global_discovery_never_counts_extra_views_as_more_pages_but_source_keeps_panel_crop(monkeypatch):
+    import graph_semantic_images
+    real = graph_semantic_images.prepare_semantic_images
+    prepared = {}
+
+    def several_views(*args, **kwargs):
+        result = real(*args, **kwargs)
+        prepared['original'] = result['images'][0]
+        # Simulate multiple valid auxiliary views. They describe the same
+        # original; the page-level roles must receive only its full overview.
+        result['images'] = result['images'][:1] * 5
+        result['view_descriptions'] = [result['view_descriptions'][0]] + ['同一原图的局部'] * 4
+        result['image_quality']['view_count'] = 5
+        return result
+
+    monkeypatch.setattr(graph_semantic_images, 'prepare_semantic_images', several_views)
+    source = document()
+    source['graphs'][0]['bbox'] = [50, 250, 950, 980]
+    reader = Reader(source_document=source)
+    result = run(reader)
+    global_calls = [call for call in reader.calls if call['request']['role'] in
+                    ('semantic_extract', 'semantic_review', 'semantic_repair')]
+    assert global_calls
+    assert all(call['images'] == [prepared['original']] for call in global_calls)
+    sources = [call for call in reader.calls if call['request']['role'] in SOURCE_ROLES]
+    assert sources and all(len(call['images']) == 2 for call in sources)
+    assert all(call['images'][0] == prepared['original'] for call in sources)
+    assert result['image_quality']['global_view_policy'] == 'single_original_page'
+    assert result['complete'] is True
+
+
 def test_literal_body_reader_corrects_critical_digit_and_source_reader_keeps_edge_names():
     wrong = document()
     wrong['body_text'] = '③求顶点v₃的度数。'

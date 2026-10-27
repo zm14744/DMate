@@ -122,6 +122,13 @@ class _State(TypedDict, total=False):
     verification_issues: list
     program_issues: list
     body_review_required: bool
+    focused_resolution_audit: list
+    last_nonempty_body: str
+
+
+# Match the visual transport's content ceiling. Keep one exact accepted text,
+# never an accumulating transcript or a truncated replacement of the question.
+MAX_BODY_SNAPSHOT_CHARACTERS = 262144
 
 
 def _issue(kind, message):
@@ -188,6 +195,160 @@ def _has_content(value):
         isinstance(graph, dict) and isinstance(graph.get('vertices'), list)
         and any(isinstance(vertex, dict) for vertex in graph['vertices'])
         for graph in value['graphs'])
+
+
+def _failed_attempt_issues(state, remaining, kind, *, focused):
+    """A failed local reread leaves its targets pending, not unrelated content.
+
+    The original full-document reader and an unlocalised dispute still affect
+    the entire document. A scoped final repair already has an independently
+    reviewed draft and cannot modify other panels or the undisputed body, so
+    its transport/format failure must use the same boundary.
+    """
+    general = _issue(kind, '本轮视觉复核未完成，已保留可读取的内容。')
+    if (not focused or not state.get('reviewed') or not _has_content(state.get('draft'))
+            or not isinstance(remaining, list) or not 0 < len(remaining) <= 128):
+        return [general]
+    known = {g.get('id') for g in state['draft']['graphs']
+             if isinstance(g, dict) and isinstance(g.get('id'), str)}
+    targets = []
+    for row in remaining:
+        if not isinstance(row, dict):
+            return [general]
+        scope = row.get('scope')
+        if scope == 'body':
+            target = ('body', None)
+        elif (scope == 'graph' and isinstance(row.get('graph_id'), str)
+              and row['graph_id'] in known):
+            target = ('graph', row['graph_id'])
+        else:
+            return [general]
+        if target not in targets:
+            targets.append(target)
+    failures = []
+    for scope, gid in targets:
+        failure = {'scope': scope, **({'graph_id': gid} if gid is not None else {}),
+                   'kind': kind,
+                   'message': ('题干的定向视觉复核未完成，已保留此前可读文字。' if scope == 'body'
+                               else '该子图的定向视觉复核未完成，已保留此前可读结构。')}
+        local = [row for row in remaining if row.get('scope') == scope
+                 and (scope == 'body' or row.get('graph_id') == gid)]
+        # A failed direction-only repair has the same narrow scope as its
+        # request. A later successful arrow read may resolve it, but cannot
+        # clear a combined topology/attribute failure on the same panel.
+        if scope == 'graph' and all(_is_direction_issue(row) for row in local):
+            failure['field'] = 'direction'
+            ids = [_issue_edge_ids(row) for row in local]
+            if all(value is not None for value in ids):
+                failure['edge_ids'] = list(dict.fromkeys(eid for value in ids for eid in value))
+        failures.append(failure)
+    return failures
+
+
+def _is_direction_issue(issue):
+    return isinstance(issue, dict) and (issue.get('field') == 'direction'
+        or issue.get('field') is None and issue.get('kind') in (
+            'unknown_direction', 'direction_uncertain', 'missing_direction_edges',
+            'missing_direction_graph', 'focused_directions_unavailable'))
+
+
+def _issue_edge_ids(issue):
+    ids = issue.get('edge_ids')
+    if ids is None and issue.get('edge_id') is not None:
+        ids = [issue['edge_id']]
+    if (not isinstance(ids, list) or not ids
+            or any(type(eid) not in (str, int) for eid in ids)):
+        return None
+    return ids
+
+
+def _resolve_focused_issues(rows, *, origin, audit, body_confirmed=False,
+                            confirmed_directions=None, whole_direction_graphs=()):
+    """Retire only the fields actually confirmed by the final pixel reader.
+
+    Generic graph/document findings include unknown structural work and stay
+    pending. Direction findings need exact confirmed instances, or a complete
+    direction read covering every existing edge of that graph.
+    """
+    confirmed_directions = confirmed_directions or {}
+    kept = []
+    for row in rows:
+        resolved = False
+        if isinstance(row, dict):
+            if (body_confirmed and row.get('scope') == 'body'
+                    and row.get('field') in (None, 'body_text')):
+                resolved = True
+            elif row.get('scope') == 'graph' and _is_direction_issue(row):
+                gid = row.get('graph_id')
+                ids = _issue_edge_ids(row)
+                if type(gid) in (str, int):
+                    confirmed = confirmed_directions.get(gid, set())
+                    unspecified = (row.get('edge_ids') in (None, [])
+                                   and row.get('edge_id') is None)
+                    resolved = (set(ids) <= confirmed if ids is not None
+                                else unspecified and gid in whole_direction_graphs)
+        if resolved:
+            audit.append({'origin': origin, 'scope': row['scope'],
+                          'field': 'body_text' if row['scope'] == 'body' else 'direction',
+                          **{key: copy.deepcopy(row[key]) for key in
+                             ('graph_id', 'edge_id', 'edge_ids', 'kind') if key in row}})
+        else:
+            kept.append(row)
+    return kept
+
+
+def _literal_body_uncertainties(response):
+    """A malformed uncertainty list cannot certify a previously disputed body."""
+    rows = response.get('uncertainties', [])
+    if not isinstance(rows, list) or len(rows) > 40:
+        raise ValueError('literal_body_uncertainties_unreadable')
+    result = []
+    for row in rows:
+        if isinstance(row, str) and row.strip():
+            result.append({'scope': 'body', 'message': row})
+        elif (isinstance(row, dict) and isinstance(row.get('message'), str)
+                and row['message'].strip() and row.get('scope') in (None, 'body')
+                and row.get('field') in (None, 'body_text')):
+            result.append({'scope': 'body', 'message': row['message']})
+        else:
+            raise ValueError('literal_body_uncertainties_unreadable')
+    return result
+
+
+def _focused_failure_issues(kind, direction_task, *, error_kind=None):
+    code = error_kind or 'focused_' + kind + '_unavailable'
+    if kind == 'body':
+        return [{'scope': 'body', 'field': 'body_text', 'kind': code,
+                 'message': '逐字题干复核未完成。'}]
+    return [{'scope': 'graph', 'graph_id': graph['id'], 'field': 'direction',
+             'edge_ids': [edge['id'] for edge in graph['edges']], 'kind': code,
+             'message': '该子图的箭头局部复核未完成，已保留原有连接。'}
+            for graph in direction_task['graphs']]
+
+
+def _confirmed_direction_scope(task, document, patched):
+    """New unresolved findings override confirmation of the affected edges."""
+    requested = {graph['id']: {edge['id'] for edge in graph['edges']}
+                 for graph in task.get('graphs', [])}
+    confirmed = {gid: set() for gid in requested}
+    for row in patched.get('audit', {}).get('confirmed_edges', []):
+        gid, eid = row.get('graph_id'), row.get('edge_id')
+        if gid in requested and eid in requested[gid]:
+            confirmed[gid].add(eid)
+    for issue in patched.get('issues', []):
+        gid = issue.get('graph_id')
+        if issue.get('scope') != 'graph' or gid not in requested:
+            return {}, set()
+        ids = _issue_edge_ids(issue)
+        if ids is None:
+            confirmed[gid].clear()
+        else:
+            confirmed[gid].difference_update(ids)
+    whole = {graph['id'] for graph in document.get('graphs', [])
+             if graph.get('id') in requested and requested[graph['id']]
+             and len(graph.get('edges', [])) == len(requested[graph['id']])
+             and confirmed[graph['id']] == requested[graph['id']]}
+    return confirmed, whole
 
 
 def _scope_repair(previous, proposed, issues):
@@ -317,14 +478,20 @@ def _scope_graph_fields(previous, proposed, issues):
         # error must be explicitly identified as such by the reviewer.
         vertex_ids = {str(v.get('id')) for v in previous.get('vertices', []) if isinstance(v, dict)}
         proposed_edges = proposed.get('edges')
+        identity_audit = None
         if (not isinstance(proposed_edges, list) or len(proposed_edges) > 300
                 or any(not isinstance(edge, dict)
                     or str(edge.get('from')) not in vertex_ids
                     or str(edge.get('to')) not in vertex_ids for edge in proposed_edges)):
-            return result, {'mode': 'edges_only', 'unresolved_graph': True,
-                            'reason': 'edge_repair_changed_node_inventory'}
+            from graph_semantic_repair_identity import remap_repair_edges
+            proposed_edges, identity_audit = remap_repair_edges(previous, proposed)
+            if proposed_edges is None:
+                return result, {'mode': 'edges_only', 'unresolved_graph': True,
+                                'reason': 'edge_repair_changed_node_inventory',
+                                'vertex_identity_remap': identity_audit}
         result['edges'] = copy.deepcopy(proposed_edges)
-        return result, {'mode': 'edges_only', 'vertices_retained': True}
+        return result, {'mode': 'edges_only', 'vertices_retained': True,
+                        **({'vertex_identity_remap': identity_audit} if identity_audit else {})}
     replacements = {str(edge.get('id')): edge for edge in proposed.get('edges', []) if isinstance(edge, dict)}
     changed, unresolved = [], []
     for edge in result.get('edges', []):
@@ -447,25 +614,18 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
         ('text_hints', 'regions', 'diagnostics', 'resource_metrics') if key in local_text}
     geometry = initial_geometry
     views = prepare_semantic_images(raw, budget=budget, text_result=local_text, layout=layout)
-    # Layout proposals actively choose source-pixel views, but never determine
-    # how many mathematical graphs the page contains. Keep the full original.
-    layout_images = local_layout.get('images', [])
-    layout_descriptions = local_layout.get('view_descriptions', [])
-    if len(layout_images) > 1 and len(layout_images) == len(layout_descriptions):
-        images, descriptions = [views['images'][0]], [views['view_descriptions'][0]]
-        for img, description in zip(layout_images[1:], layout_descriptions[1:]):
-            if len(images) >= 5:
-                break
-            if img not in images:
-                images.append(img)
-                descriptions.append(description)
-        # A shade-normalised view remains useful if the layout leaves room.
-        if len(images) < 5 and views['image_quality'].get('normalization_view_included'):
-            images.append(views['images'][-1])
-            descriptions.append(views['view_descriptions'][-1])
-        views['images'], views['view_descriptions'] = images, descriptions
-        views['image_quality']['view_count'] = len(images)
-        views['image_quality']['layout_views_included'] = True
+    # Discover page identities from one full source. Supplying the overview
+    # beside several overlapping figure crops made a real multi-panel upload
+    # enumerate crops again as additional mathematical graphs. Layout/marker
+    # proposals still accompany discovery as location hints; original-pixel
+    # crops are used only after a particular graph_id has been selected below.
+    views['images'] = views['images'][:1]
+    views['view_descriptions'] = [views['view_descriptions'][0]]
+    if isinstance(views.get('view_metadata'), list):
+        views['view_metadata'] = views['view_metadata'][:1]
+    views['image_quality'].update(view_count=1, layout_views_included=False,
+        normalization_view_included=False, global_view_policy='single_original_page',
+        scoped_layout_crops_available=max(0, len(local_layout.get('images', [])) - 1))
     runner = SemanticRunner(budget, provider=provider, capture=audit)
     responses, stages, response_lock = [], [], threading.Lock()
     extra_view_audit = []
@@ -579,6 +739,7 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
         return result
 
     def attempt(role, prompt, state, *, reviewed, inventory=False, final=False):
+        remaining = []
         try:
             remaining = (state.get('normalized', {}).get('semantic_issues', [])
                          + state.get('review_changes', []) + state.get('errors', [])
@@ -600,6 +761,11 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
                 for graph in draft['graphs']:
                     if isinstance(graph, dict):
                         graph['edges'] = []
+            last_nonempty_body = state.get('last_nonempty_body', '')
+            if draft['body_text'].strip():
+                if len(draft['body_text']) > MAX_BODY_SNAPSHOT_CHARACTERS:
+                    raise ValueError('semantic_body_capacity')
+                last_nonempty_body = draft['body_text']
             independently_reviewed = (reviewed and state.get('content_read', False)
                 and _readable_document(previous)
                 and (_has_content(previous) or not _has_content(draft)))
@@ -607,6 +773,7 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
             changes = (meaningful_review_changes(previous, draft) if reviewed and independently_reviewed and not final
                        and not state.get('reviewed') else [])
             return {**state, 'draft': draft, 'normalized': normalized, 'reviewed': independently_reviewed,
+                    'last_nonempty_body': last_nonempty_body,
                     'content_read': not _has_vertices(draft) if inventory else True,
                     'review_changes': changes, 'errors': [], 'verification_issues': [],
                     'body_review_required': (state.get('body_review_required', False)
@@ -618,8 +785,8 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
         except (VisionError, ValueError, TimeoutError) as exc:
             kind = exc.kind if isinstance(exc, VisionError) else type(exc).__name__
             budget.event(role, 'content_unavailable', error_kind=kind)
-            return {**state, 'errors': state.get('errors', []) + [
-                _issue(kind, '本轮视觉复核未完成，已保留可读取的内容。')]}
+            return {**state, 'errors': state.get('errors', [])
+                    + _failed_attempt_issues(state, remaining, kind, focused=final)}
 
     def extract(state):
         nonlocal question_handle, question_reference
@@ -646,8 +813,10 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
         draft = state.get('draft')
         if not _has_vertices(draft):
             return state
-        from graph_semantic_panel_context import panel_context
+        from graph_semantic_panel_context import panel_context, separate_location_hints
         draft = copy.deepcopy(draft)
+        draft['graphs'], location_audit = separate_location_hints(draft['graphs'])
+        extra_view_audit.append({'phase': 'inventory_location_hints', **location_audit})
         for index, graph in enumerate(draft['graphs']):
             if isinstance(graph, dict):
                 contextual = panel_context(graph, local_layout)
@@ -801,12 +970,22 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
 
     def focused_checks(state):
         """Literal body OCR and arrow-only checks cannot rewrite graph content."""
-        from graph_semantic_arrow_views import prepare_arrow_views
+        from graph_semantic_arrow_views import prepare_arrow_views, prepare_direction_views
         from graph_semantic_directions import (DIRECTION_PROMPT, build_direction_task,
                                                 apply_direction_reading)
         if not _has_content(state.get('draft')):
             return state
         draft = copy.deepcopy(state['draft'])
+        # A structural repair may omit the entire body while retaining graphs.
+        # Keep the latest accepted nonempty transcription in this upload until
+        # a final nonempty pixel reading replaces it. Two empty responses do
+        # not establish that previously read questions never existed.
+        last_nonempty_body = state.get('last_nonempty_body', '')
+        if not draft.get('body_text', '').strip() and last_nonempty_body.strip():
+            draft['body_text'] = last_nonempty_body
+            state = {**state, 'draft': draft,
+                     'normalized': normalize_semantic_document(
+                         draft, reviewed=state.get('reviewed', False))}
         direction_task = build_direction_task(draft)
         body_needed = (state.get('body_review_required', False) or bool(draft.get('body_text', '').strip())
                       or any(_plausible_body_hint(row) for row in local_text.get('text_hints', []))
@@ -820,35 +999,48 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
             jobs.append(('directions', DIRECTION_PROMPT, {'task': direction_task}))
         if not jobs:
             return state
+        direction_geometry = (geometry if _geometry_identity(draft) == geometry_identity else {})
         try:
             detail = prepare_arrow_views(raw, budget=budget)
+            direction_detail = (prepare_direction_views(raw, draft=draft,
+                geometry=direction_geometry, overview_views=detail, budget=budget)
+                if direction_task.get('graphs') else detail)
         except AgentCancelled:
             raise
         except (TimeoutError, ValueError) as exc:
             budget.event('semantic_focused_checks', 'content_unavailable', error_kind=type(exc).__name__)
-            return {**state, 'errors': state.get('errors', []) + [
-                _issue('focused_review_unavailable', '题干或箭头的定向原图复核尚未完成，已保留原有读法。')]}
+            failures = [issue for kind, _, _ in jobs for issue in
+                        _focused_failure_issues(kind, direction_task,
+                                               error_kind='focused_review_unavailable')]
+            return {**state, 'errors': state.get('errors', []) + failures}
         extra_view_audit.append({'phase': 'focused_details',
             'tool_audit': detail.get('tool_audit', []), 'image_quality': detail.get('image_quality', {})})
+        if direction_task.get('graphs'):
+            extra_view_audit.append({'phase': 'direction_pair_details',
+                'tool_audit': direction_detail.get('tool_audit', []),
+                'image_quality': direction_detail.get('image_quality', {}),
+                'view_metadata': direction_detail.get('view_metadata', [])})
 
         def dispatch(job):
             kind, prompt, task = job
+            job_detail = direction_detail if kind == 'directions' else detail
             ordinary = 'semantic_' + kind
             roles = [ordinary + '_glm', ordinary] if specialist else [ordinary]
             for role in roles:
                 try:
                     reference = available_reference(draft)
                     response = runner.call(role, prompt + QUESTION_REFERENCE_NOTICE,
-                        {'image_views': detail['view_descriptions'], **task,
+                        {'image_views': job_detail['view_descriptions'], **task,
                          **({'question_reference': reference} if reference else {}),
-                         **({'local_geometry_candidates': geometry.get('graphs', [])[:32]}
+                         **({'local_geometry_candidates': direction_geometry.get('graphs', [])[:32]}
                             if kind == 'directions' else
                             {'local_body_regions': local_layout.get('body_regions', [])[:32],
-                             'local_ocr_candidates': text_hints(body=True)})}, detail['images'],
+                             'local_ocr_candidates': text_hints(body=True)})}, job_detail['images'],
                         revision=len(responses), output_tokens=5000, response_identity=False)
                     if kind == 'body':
                         if not isinstance(response.get('body_text'), str):
                             raise ValueError('literal_body_unreadable')
+                        _literal_body_uncertainties(response)
                         remember(role, {'body_text': response['body_text'], 'graphs': [],
                                         'uncertainties': response.get('uncertainties', [])})
                     else:
@@ -873,47 +1065,73 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
                 except (VisionError, ValueError, TimeoutError) as exc:
                     kind_error = exc.kind if isinstance(exc, VisionError) else type(exc).__name__
                     budget.event(role, 'content_unavailable', error_kind=kind_error)
-            return kind, None, {'scope': 'body' if kind == 'body' else 'document',
-                'kind': 'focused_' + kind + '_unavailable',
-                'message': '逐字题干复核未完成。' if kind == 'body' else '箭头局部复核未完成，已保留原有连接。'}
+            return kind, None, _focused_failure_issues(kind, direction_task)
 
         with ThreadPoolExecutor(max_workers=2, thread_name_prefix='semantic-detail') as pool:
             checked = list(pool.map(dispatch, jobs))
         errors = list(state.get('errors', []))
         changes = list(state.get('review_changes', []))
+        verification_issues = list(state.get('verification_issues', []))
+        resolved = []
         direction_audit = {}
         body_checked = False
+
+        def resolve(**coverage):
+            nonlocal errors, changes, verification_issues
+            for origin in ('errors', 'review_changes', 'verification_issues', 'uncertainties'):
+                rows = {'errors': errors, 'review_changes': changes,
+                        'verification_issues': verification_issues,
+                        'uncertainties': draft.get('uncertainties', [])}[origin]
+                if not isinstance(rows, list):
+                    continue
+                kept = _resolve_focused_issues(rows, origin=origin, audit=resolved, **coverage)
+                if origin == 'errors':
+                    errors = kept
+                elif origin == 'review_changes':
+                    changes = kept
+                elif origin == 'verification_issues':
+                    verification_issues = kept
+                else:
+                    draft['uncertainties'] = kept
+
         for kind, response, error in checked:
             if error:
-                errors.append(error)
+                errors.extend(error)
                 continue
             if kind == 'body':
-                if not response['body_text'].strip() and not draft.get('graphs'):
-                    errors.append({'scope': 'body', 'kind': 'literal_body_removed_all_content',
+                # An empty last reading does not establish that all previously
+                # visible question text was absent. Keep that text pending even
+                # when usable graphs remain elsewhere on the same page.
+                if not response['body_text'].strip() and (
+                        draft.get('body_text', '').strip() or not draft.get('graphs')):
+                    errors.append({'scope': 'body', 'field': 'body_text',
+                                   'kind': 'literal_body_removed_all_content',
                                    'message': '逐字复核为空，已保留此前可读正文。'})
                     continue
                 draft['body_text'] = response['body_text']
-                old_uncertainties = draft.get('uncertainties', [])
-                draft['uncertainties'] = [x for x in old_uncertainties
-                    if not isinstance(x, dict) or x.get('scope') != 'body'] if isinstance(old_uncertainties, list) else []
-                new_uncertainties = response.get('uncertainties', [])
-                if isinstance(new_uncertainties, list):
-                    for issue in new_uncertainties[:40]:
-                        if isinstance(issue, str) and issue.strip():
-                            draft['uncertainties'].append({'scope': 'body', 'message': issue})
-                        elif isinstance(issue, dict) and isinstance(issue.get('message'), str):
-                            draft['uncertainties'].append({'scope': 'body', 'message': issue['message']})
-                changes = [x for x in changes if x.get('scope') != 'body']
+                new_uncertainties = _literal_body_uncertainties(response)
+                if not new_uncertainties:
+                    resolve(body_confirmed=True)
+                if isinstance(draft.get('uncertainties'), list):
+                    draft['uncertainties'].extend(new_uncertainties)
+                elif new_uncertainties:
+                    # Preserve a malformed earlier uncertainty container as a
+                    # pending error instead of silently treating it as empty.
+                    errors.append(_issue('invalid_uncertainty', '此前疑点记录尚未核对完整。'))
+                    draft['uncertainties'] = new_uncertainties
                 body_checked = True
             else:
                 patched = apply_direction_reading(draft, response)
                 draft = patched['document']
                 direction_audit = patched.get('audit', {})
+                confirmed, whole = _confirmed_direction_scope(direction_task, draft, patched)
+                resolve(confirmed_directions=confirmed, whole_direction_graphs=whole)
                 # The direction adapter scopes each unresolved edge itself.
                 errors.extend(patched.get('issues', []))
         return {**state, 'draft': draft,
                 'normalized': normalize_semantic_document(draft, reviewed=state.get('reviewed', False)),
-                'errors': errors, 'review_changes': changes,
+                'errors': errors, 'review_changes': changes, 'verification_issues': verification_issues,
+                'focused_resolution_audit': resolved,
                 'direction_audit': direction_audit, 'body_checked': body_checked}
 
     flow = StateGraph(_State)
@@ -1002,6 +1220,7 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
             'edge_strategy': 'node_inventory_then_source_conditioned_edges',
             'source_audit': copy.deepcopy(state.get('source_audit', {})),
             'direction_audit': copy.deepcopy(state.get('direction_audit', {})),
+            'focused_resolution_audit': copy.deepcopy(state.get('focused_resolution_audit', [])),
             'question_reference': copy.deepcopy(question_reference),
             'question_reference_role': 'advisory_only_never_filters_content',
             'local_color_audit': copy.deepcopy(color_audits),

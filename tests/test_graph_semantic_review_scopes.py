@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from graph_semantic_pipeline import _scope_repair, _verification_issues
+from graph_semantic_pipeline import _failed_attempt_issues, _scope_repair, _verification_issues
 
 
 def document():
@@ -178,3 +178,47 @@ def test_repair_clearing_body_cannot_skip_last_literal_read_when_small_is_unavai
     assert any(request['role'] == 'semantic_body' for request in reader.requests)
     assert result['body_text'] == full_document()['body_text']
     assert result['semantic_workflow']['literal_body_checked'] is True
+
+
+@pytest.mark.parametrize('body', ['', '分别观察两幅图。'])
+def test_failed_targeted_graph_reread_does_not_fail_other_panel_or_body(monkeypatch, tmp_path, body):
+    from test_graph_semantic_pipeline import Reader, run, install_semantic_worker_fixtures
+    from vision_provider import VisionError, VisionProvider
+    import graph_semantic_text
+    install_semantic_worker_fixtures(monkeypatch, lock_root=tmp_path)
+    monkeypatch.setattr(VisionProvider, 'available', lambda self: False)
+    monkeypatch.setattr(graph_semantic_text, '_cache_readiness', lambda: {
+        'status': 'dependency_unavailable', 'worker_started': False})
+    original = document()
+    original['body_text'] = body
+    reader = Reader({'semantic_review': {'issues': [
+        {'scope': 'graph', 'graph_id': 'G1', 'field': 'edges',
+         'source_ids': ['a'], 'message': '仅第一幅图的平行边需要再核对'}]},
+        'semantic_repair': VisionError('invalid_output')}, source_document=original)
+    result = run(reader)
+    assert result['complete'] is False
+    assert result['graphs'][0]['complete'] is False
+    assert result['graphs'][1]['complete'] is True
+    assert result['body_complete'] is True and result['body_text'] == body
+    failures = [row for row in result['semantic_issues'] if row.get('kind') == 'invalid_output']
+    assert len(failures) == 1 and failures[0]['graph_id'] == 'G1'
+    assert failures[0]['scope'] == 'graph'
+    assert len(result['graphs'][0]['edges']) == 2
+    assert result['graphs'][1]['vertices'][0]['id'] == 'v'
+
+
+@pytest.mark.parametrize('remaining', [
+    [], [{'scope': 'document'}], [{'scope': 'graph', 'graph_id': 'not_in_inventory'}],
+    [{'scope': 'graph', 'graph_id': 'G1'}, {'scope': 'unknown'}],
+])
+def test_unlocalised_failure_cannot_be_reported_as_one_safe_panel(remaining):
+    state = {'reviewed': True, 'draft': document()}
+    errors = _failed_attempt_issues(state, remaining, 'invalid_output', focused=True)
+    assert len(errors) == 1 and errors[0]['scope'] == 'document'
+
+
+def test_initial_reader_failure_still_has_document_scope():
+    state = {'reviewed': False, 'draft': document()}
+    errors = _failed_attempt_issues(state, [{'scope': 'graph', 'graph_id': 'G1'}],
+                                    'transport_failed', focused=True)
+    assert errors[0]['scope'] == 'document'

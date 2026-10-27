@@ -1,14 +1,16 @@
 """Per-attempt deadline classification; offline providers and synthetic bytes."""
 import base64
 import copy
+import io
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
+from threading import Barrier, Event
 
 import pytest
 import requests
 
-from graph_agent_runtime import AgentBudget, RoleRunner
+from graph_agent_runtime import AgentBudget, AgentCancelled, RoleRunner
 from vision_provider import VisionError, VisionProvider
 
 
@@ -257,3 +259,234 @@ def test_invalid_time_reserve_is_rejected_before_provider_dispatch(reserve):
         RoleRunner(ledger, provider=lambda *args: pytest.fail('must not dispatch')).call(
             'semantic_edges', 'JSON', {}, [], reserve_seconds=reserve)
     assert ledger.remaining == 8 and not ledger.events
+
+
+def syntax_failure(**changes):
+    return {'status': 'invalid_output', 'output_error': 'json_syntax',
+            'http_status': 200, 'finish_reason': 'stop', 'content_chars': 27,
+            'json_error': {'line': 1, 'column': 26, 'position': 25}, **changes}
+
+
+def assert_slots_released(ledger):
+    assert ledger._remote_slots.acquire(blocking=False)
+    assert ledger._remote_slots.acquire(blocking=False)
+    assert not ledger._remote_slots.acquire(blocking=False)
+    ledger._remote_slots.release()
+    ledger._remote_slots.release()
+
+
+def test_native_glm_complete_invalid_json_gets_one_real_re_request_with_same_input_and_budget(monkeypatch):
+    """Exercise actual SSE assembly/strict parsing, with zero HTTP sends."""
+    from graph_semantic_pipeline import SemanticRunner
+    from vision_provider import GLM_5V_TURBO_MODEL
+    monkeypatch.setenv('ZHIPU_API_KEY', 'offline-test-key')
+    ledger = budget(); before_deadline = ledger.deadline; requests_seen = []
+    expected = {'body_text': '读取同一幅图。', 'graphs': []}
+    def post(url, *, json, **kwargs):
+        requests_seen.append(copy.deepcopy(json))
+        content = '{"body_text":"读取同一幅图。","graphs":[}' if len(requests_seen) == 1 else __import__('json').dumps(expected)
+        chunk = {'model': GLM_5V_TURBO_MODEL, 'choices': [
+            {'delta': {'content': content}, 'finish_reason': 'stop'}]}
+        response = requests.Response(); response.status_code = 200
+        response.headers['Content-Type'] = 'text/event-stream'
+        response.raw = io.BytesIO(('data: ' + __import__('json').dumps(chunk, ensure_ascii=False)
+                                  + '\n\ndata: [DONE]\n\n').encode('utf-8'))
+        return response
+    monkeypatch.setattr(requests, 'post', post)
+    provider = VisionProvider('glm', model=GLM_5V_TURBO_MODEL, retries=0)
+    runner = SemanticRunner(ledger, provider={'semantic_specialist': provider})
+    image = 'data:image/png;base64,' + base64.b64encode(b'fixed offline image bytes').decode()
+    result = runner.call('semantic_specialist', '读取原图，返回完整 JSON。', {'draft': expected},
+                         [image], revision=4, response_identity=False, reserve_seconds=5)
+    assert result == expected and len(requests_seen) == 2
+    first, second = requests_seen
+    assert first['messages'][0]['content'][1:] == second['messages'][0]['content'][1:]
+    original_prompt = first['messages'][0]['content'][0]['text']
+    recovery_prompt = second['messages'][0]['content'][0]['text']
+    assert recovery_prompt.startswith(original_prompt)
+    assert '完整、合法的 JSON 对象' in recovery_prompt and '不得只输出修改片段' in recovery_prompt
+    assert first['model'] == second['model'] and first['max_tokens'] == second['max_tokens']
+    assert ledger.deadline == before_deadline and ledger.remaining == 6
+    assert ledger.role_counts == {'semantic_specialist': 2}
+    assert ledger.network_recoveries == 0 and ledger.json_format_recoveries == 1
+    assert [m['status'] for m in ledger.metrics] == ['invalid_output', 200]
+    assert [m['agent_attempt_kind'] for m in ledger.metrics] == ['initial', 'json_format_recovery']
+    assert [m['role_attempt'] for m in ledger.metrics] == [1, 2]
+    assert len({m['role_invocation'] for m in ledger.metrics}) == 1
+    assert ledger.metrics[0]['finish_reason'] == 'stop' and ledger.metrics[0]['output_error'] == 'json_syntax'
+    event = next(e for e in ledger.events if e['status'] == 'json_format_recovery')
+    assert event['failure_facts']['send_sequence'] == 1
+    assert event['failure_facts']['completion_evidence'] == 'http_200_finish_stop'
+    assert event['failure_facts']['json_error']['kind'] == 'invalid_value'
+    assert event['failure_facts']['task_id'] == ledger.task_id
+    assert_slots_released(ledger)
+
+
+def test_json_format_recovery_failure_is_preserved_without_third_format_request():
+    ledger = budget(); sends = []
+    def remote(prompt, images, attempt):
+        attempt.take(); sends.append(prompt)
+        attempt.metrics.append(syntax_failure()); raise VisionError('invalid_output')
+    with pytest.raises(VisionError, match='^invalid_output$') as caught:
+        RoleRunner(ledger, provider=remote).call('connections', 'JSON', {}, [], revision=3)
+    assert len(sends) == 2 and ledger.remaining == 6
+    assert len(ledger.metrics) == 2 and all(m['status'] == 'invalid_output' for m in ledger.metrics)
+    assert ledger.events[-1]['status'] == 'failed'
+    assert caught.value.audit['accepted'] is False
+    assert caught.value.audit['failure_facts']['send_sequence'] == 2
+    assert caught.value.audit['json_format_recovery_used'] is True
+    assert ledger.network_recoveries == 0 and ledger.json_format_recoveries == 1
+    assert_slots_released(ledger)
+
+
+@pytest.mark.parametrize('changes,error_kind', [
+    ({'finish_reason': 'length'}, 'truncated_output'),
+    ({'finish_reason': None}, 'invalid_output'),
+    ({'finish_reason': 'network_error'}, 'upstream_network_error'),
+    ({'partial_stream': True}, 'invalid_output'),
+    ({'stream_done_received': False}, 'invalid_output'),
+    ({'timeout_kind': 'wall_deadline'}, 'invalid_output'),
+    ({'wall_deadline_exceeded': True}, 'invalid_output'),
+    ({'http_status': 201}, 'invalid_output'),
+    ({'output_error': 'non_finite_json_number'}, 'invalid_output'),
+    ({'output_error': 'root_not_object'}, 'invalid_output'),
+    ({'output_error': 'content_not_string'}, 'invalid_output'),
+    ({'output_error': None}, 'invalid_output'),
+    ({}, 'model_identity_unverified'),
+    ({}, 'model_mismatch'),
+    ({'json_error': {'line': True, 'column': 1, 'position': 0}}, 'invalid_output'),
+])
+def test_non_complete_json_syntax_failures_never_get_format_recovery(changes, error_kind):
+    ledger = budget(); calls = []
+    def remote(prompt, images, attempt):
+        attempt.take(); calls.append(True)
+        attempt.metrics.append(syntax_failure(**changes)); raise VisionError(error_kind)
+    with pytest.raises(VisionError) as caught:
+        RoleRunner(ledger, provider=remote).call('connections', 'JSON', {}, [], revision=3)
+    assert caught.value.kind == error_kind and len(calls) == 1
+    assert ledger.remaining == 7 and ledger.json_format_recoveries == 0
+    assert ledger.network_recoveries == 0
+    assert_slots_released(ledger)
+
+
+@pytest.mark.parametrize('limit', ['calls', 'time', 'reserved_time'])
+def test_format_recovery_cannot_spend_missing_calls_or_reserved_review_time(limit):
+    ledger = budget(); calls = []; reserve = 12 if limit == 'reserved_time' else 0
+    if limit == 'calls': ledger.remaining = 1
+    def remote(prompt, images, attempt):
+        attempt.take(); calls.append(True)
+        if limit != 'calls': ledger.deadline = time.monotonic() + reserve + 7
+        attempt.metrics.append(syntax_failure()); raise VisionError('invalid_output')
+    with pytest.raises(VisionError, match='^invalid_output$') as caught:
+        RoleRunner(ledger, provider=remote).call('connections', 'JSON', {}, [],
+                                               revision=3, reserve_seconds=reserve)
+    assert len(calls) == 1 and ledger.json_format_recoveries == 0
+    assert caught.value.audit['accepted'] is False
+    assert caught.value.audit['failure_facts']['output_error'] == 'json_syntax'
+    assert_slots_released(ledger)
+
+
+def test_format_recovery_keeps_identity_validation_and_does_not_retry_identity_mismatch():
+    ledger = budget(); calls = []
+    def remote(prompt, images, attempt):
+        attempt.take(); calls.append(True)
+        if len(calls) == 1:
+            attempt.metrics.append(syntax_failure()); raise VisionError('invalid_output')
+        attempt.metrics.append({'status': 200})
+        return answer(revision=99)
+    with pytest.raises(ValueError, match='agent_response_identity_mismatch'):
+        RoleRunner(ledger, provider=remote).call('connections', 'JSON', {}, [], revision=3)
+    assert len(calls) == 2 and not any(e['status'] == 'responded' for e in ledger.events)
+    assert ledger.metrics[0]['status'] == 'invalid_output'
+    assert_slots_released(ledger)
+
+
+def test_valid_json_after_recovery_still_has_to_pass_original_semantic_validation():
+    from graph_semantic_schema import normalize_semantic_document
+    ledger = budget(); calls = []
+    bad_graph = {'id': 'G1', 'directed': False, 'vertices': [{'id': 'a', 'label': 'A'}],
+                 'edges': [{'id': 'e1', 'from': 'a', 'to': 'missing', 'direction': 'undirected'}]}
+    def remote(prompt, images, attempt):
+        attempt.take(); calls.append(True)
+        if len(calls) == 1:
+            attempt.metrics.append(syntax_failure()); raise VisionError('invalid_output')
+        attempt.metrics.append({'status': 200}); return {'body_text': '', 'graphs': [bad_graph]}
+    result = RoleRunner(ledger, provider=remote).call('semantic_review', 'JSON', {}, [],
+                                                   response_identity=False)
+    normalized = normalize_semantic_document(result, reviewed=True)
+    assert normalized['semantic_issues'] and not normalized['graphs'][0]['complete']
+    assert normalized['complete'] is False and len(calls) == 2
+
+
+def test_foreign_or_previous_json_metric_does_not_authorize_current_format_recovery():
+    ledger = budget(); calls = []
+    def remote(prompt, images, attempt):
+        attempt.take(); calls.append(True)
+        ledger.metrics.append({**syntax_failure(), 'agent_role': 'other', 'state_revision': 3,
+                               'role_invocation': 1, 'task_id': ledger.task_id})
+        raise VisionError('invalid_output')
+    runner = RoleRunner(ledger, provider=remote)
+    for _ in range(2):
+        with pytest.raises(VisionError, match='^invalid_output$'):
+            runner.call('connections', 'JSON', {}, [], revision=3)
+    assert len(calls) == 2 and ledger.json_format_recoveries == 0
+    assert_slots_released(ledger)
+
+
+@pytest.mark.parametrize('first_error', ['network', 'json'])
+def test_network_and_json_recovery_are_separate_bounded_sends(first_error):
+    ledger = budget(); calls = []
+    errors = ['network', 'json'] if first_error == 'network' else ['json', 'network']
+    def remote(prompt, images, attempt):
+        attempt.take(); calls.append(prompt)
+        if len(calls) <= 2:
+            if errors[len(calls)-1] == 'json':
+                attempt.metrics.append(syntax_failure()); raise VisionError('invalid_output')
+            attempt.metrics.append(failure(timeout_kind='connect', transport_failure_kind='connect_timeout',
+                                           partial_stream=False, http_status=None))
+            raise VisionError('transport_failed')
+        attempt.metrics.append({'status': 200}); return answer()
+    assert RoleRunner(ledger, provider=remote).call('connections', 'JSON', {}, [], revision=3) == answer()
+    assert len(calls) == 3 and ledger.remaining == 5
+    assert ledger.network_recoveries == ledger.json_format_recoveries == 1
+    assert [m['role_attempt'] for m in ledger.metrics] == [1, 2, 3]
+    assert len({m['task_id'] for m in ledger.metrics}) == 1
+    assert_slots_released(ledger)
+
+
+def test_concurrent_json_failures_share_one_upload_recovery_and_release_slots():
+    ledger = budget(); both_failed = Barrier(2)
+    def remote(prompt, images, attempt):
+        attempt.take()
+        if attempt.metrics.role_attempt == 1:
+            attempt.metrics.append(syntax_failure()); both_failed.wait(timeout=2)
+            raise VisionError('invalid_output')
+        attempt.metrics.append({'status': 200})
+        return answer(attempt.role)
+    runner = RoleRunner(ledger, provider=remote)
+    def run(role):
+        try:
+            return runner.call(role, 'JSON', {}, [], revision=3)
+        except VisionError as exc:
+            return exc.kind
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(run, ['connections', 'body_text']))
+    assert sum(isinstance(r, dict) for r in results) == 1 and results.count('invalid_output') == 1
+    assert ledger.json_format_recoveries == 1 and ledger.network_recoveries == 0
+    assert len(ledger.metrics) == 3 and ledger.remaining == 5
+    assert len([e for e in ledger.events if e['status'] == 'json_format_recovery']) == 1
+    assert_slots_released(ledger)
+
+
+def test_cancellation_before_format_resend_propagates_without_another_send():
+    cancelled = Event(); ledger = AgentBudget(seconds=30, calls=5, cancelled=cancelled.is_set)
+    calls = []
+    def remote(prompt, images, attempt):
+        attempt.take(); calls.append(True)
+        attempt.metrics.append(syntax_failure()); cancelled.set()
+        raise VisionError('invalid_output')
+    with pytest.raises(AgentCancelled, match='upload_cancelled'):
+        RoleRunner(ledger, provider=remote).call('connections', 'JSON', {}, [], revision=3)
+    assert len(calls) == 1 and ledger.remaining == 4
+    assert ledger.metrics[0]['status'] == 'invalid_output'
+    assert_slots_released(ledger)

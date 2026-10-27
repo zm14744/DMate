@@ -20,7 +20,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
 
 from dmate_tool_registry import ToolContext, ToolRegistry, ToolSpec
 
@@ -46,22 +46,39 @@ _SPAN = _object({'block_id': _ID, 'start': {'type': 'integer', 'minimum': 0},
                  'end': {'type': 'integer', 'minimum': 1, 'maximum': MAX_TEXT},
                  'quote': {'type': 'string', 'minLength': 1, 'maxLength': 1200}})
 _SPANS = {'type': 'array', 'items': _SPAN, 'minItems': 1, 'maxItems': 8}
+_INPUT_SPAN = _object({
+    'block_id': _ID, 'quote': _SPAN['properties']['quote'],
+    # Legacy offsets are hints at this boundary, never proof by themselves.
+    # Wide bounded integers accommodate byte/UTF-16 offsets without requiring
+    # the model to count characters. Booleans, strings and null remain invalid.
+    'start': {'type': 'integer', 'minimum': -MAX_TEXT * 8, 'maximum': MAX_TEXT * 8},
+    'end': {'type': 'integer', 'minimum': -MAX_TEXT * 8, 'maximum': MAX_TEXT * 8},
+}, required=['block_id', 'quote'])
+_INPUT_SPANS = {**_SPANS, 'items': _INPUT_SPAN}
 _SHORT = {'type': 'string', 'minLength': 1, 'maxLength': 240}
-RESPONSE_SCHEMA = _object({
-    'subquestions': {'type': 'array', 'maxItems': 24, 'items': _object({
-        'id': _ID, 'source_spans': _SPANS, 'graph_ids': _GRAPH_IDS, 'summary': _SHORT})},
-    'references': {'type': 'array', 'maxItems': 48, 'items': _object({
-        'kind': {'enum': ['legend', 'caption', 'vertex', 'edge', 'formula', 'unknown']},
-        'source_spans': _SPANS, 'graph_ids': _GRAPH_IDS, 'description': _SHORT})},
-    'focus': {'type': 'array', 'maxItems': 32, 'items': _object({
-        'aspect': {'enum': ['text', 'panels', 'labels', 'edge_labels', 'direction',
-                            'weight', 'color', 'style', 'formula', 'legend', 'reference']},
-        'source_spans': _SPANS, 'graph_ids': _GRAPH_IDS, 'question': _SHORT})},
-    'unresolved': {'type': 'array', 'maxItems': 24, 'items': _object({
-        'source_spans': {**_SPANS, 'minItems': 0}, 'graph_ids': _GRAPH_IDS,
-        'message': _SHORT})},
-})
-_VALIDATOR = Draft202012Validator(RESPONSE_SCHEMA)
+
+
+def _response_schema(spans):
+    return _object({
+        'subquestions': {'type': 'array', 'maxItems': 24, 'items': _object({
+            'id': _ID, 'source_spans': spans, 'graph_ids': _GRAPH_IDS, 'summary': _SHORT})},
+        'references': {'type': 'array', 'maxItems': 48, 'items': _object({
+            'kind': {'enum': ['legend', 'caption', 'vertex', 'edge', 'formula', 'unknown']},
+            'source_spans': spans, 'graph_ids': _GRAPH_IDS, 'description': _SHORT})},
+        'focus': {'type': 'array', 'maxItems': 32, 'items': _object({
+            'aspect': {'enum': ['text', 'panels', 'labels', 'edge_labels', 'direction',
+                                'weight', 'color', 'style', 'formula', 'legend', 'reference']},
+            'source_spans': spans, 'graph_ids': _GRAPH_IDS, 'question': _SHORT})},
+        'unresolved': {'type': 'array', 'maxItems': 24, 'items': _object({
+            'source_spans': {**spans, 'minItems': 0}, 'graph_ids': _GRAPH_IDS,
+            'message': _SHORT})},
+    })
+
+
+RESPONSE_SCHEMA = _response_schema(_INPUT_SPANS)
+CANONICAL_RESPONSE_SCHEMA = _response_schema(_SPANS)
+_INPUT_VALIDATOR = Draft202012Validator(RESPONSE_SCHEMA)
+_VALIDATOR = Draft202012Validator(CANONICAL_RESPONSE_SCHEMA)
 _LOCAL_SCHEMA = _object({
     'category': {'type': 'string', 'maxLength': 80},
     'knowledge_points': {'type': 'array', 'maxItems': 16, 'items': _SHORT},
@@ -82,7 +99,8 @@ QUESTION_REFERENCE_PROMPT = '''你是题干理解参考助手，不是图片识�
 只提供非权威参考；不得输出必需/可选字段策略，不得要求删图、删节点、删边或删属性，不得生成图结构。
 不得根据欧拉、树、完全图、连通性、题目答案等推断原图的边或点；没有提及某属性不表示该属性不存在或不需读取。
 正文、图例、图注和答案批注的作用不同；未知或裁切之处保留不确定，不补完整题目。图清单中的重复标签不能用来合并子图。
-引用必须给出输入文本块中原样的 source_spans：block_id、start、end、quote。索引按 Unicode 字符，左闭右开，大小写/下标/否定词不改。
+引用必须给出输入文本块中原样的 source_spans：block_id、quote。quote逐字复制，大小写、下标、否定词、标点和空白均不改；无需计算start/end，程序将精确定位并生成Unicode字符索引。
+若同一文本块中出现多处相同quote，选用包含邻近原文的更完整逐字quote以明确位置；无法唯一定位则写unresolved，不猜第一次出现。已有正确start/end可保留，索引为左闭右开。
 graph_ids只能引用输入清单；无法对应时用[]并写unresolved，不能猜图ID。关注点是供原图读取者核对的问题，不是修改命令。
 只返回符合所附JSON Schema的一个JSON对象，四个数组subquestions/references/focus/unresolved均需出现；无可提供内容时数组为空。'''
 
@@ -224,7 +242,79 @@ def _base(snapshot, budget):
             'text_digest': snapshot['text_digest'],
             'graph_catalog_digest': snapshot['graph_catalog_digest'],
             'subquestions': [], 'references': [], 'focus': [], 'unresolved': [],
-            'local_hints': {}, 'tool_evidence': [], 'metrics': []}
+            'local_hints': {}, 'tool_evidence': [], 'metrics': [],
+            'validation_audit': {'status': 'not_run'}}
+
+
+class AdviceValidationError(ValueError):
+    """A safe code and schema location, without model text or identifiers."""
+
+    def __init__(self, code, path=()):
+        super().__init__(code)
+        self.code = code
+        self.path = tuple(path)
+
+
+def _safe_validation_path(path):
+    allowed = {'subquestions', 'references', 'focus', 'unresolved', 'id',
+               'source_spans', 'graph_ids', 'summary', 'kind', 'description',
+               'aspect', 'question', 'message', 'block_id', 'quote', 'start', 'end'}
+    return [part if type(part) is int and 0 <= part <= 1000 else
+            part if type(part) is str and part in allowed else '<field>'
+            for part in list(path)[:8]]
+
+
+def _validation_failure(exc):
+    """Do not serialize ValidationError.message/instance or exception text."""
+    result = {'status': 'rejected', 'code': 'validation_internal_error', 'path': []}
+    if isinstance(exc, AdviceValidationError):
+        result.update(code=exc.code, path=_safe_validation_path(exc.path))
+    elif isinstance(exc, ValidationError):
+        result.update(code='schema_invalid', path=_safe_validation_path(exc.absolute_path))
+        if exc.validator in {'type', 'required', 'additionalProperties', 'maxItems',
+                'minItems', 'maxLength', 'minLength', 'minimum', 'maximum', 'enum', 'uniqueItems'}:
+            result['rule'] = exc.validator
+    elif isinstance(exc, json.JSONDecodeError):
+        result.update(code='invalid_json', character_position=min(MAX_RESPONSE, exc.pos))
+    return result
+
+
+def _canonicalize_advice(value, snapshot):
+    """Locate exact quotes once at the remote boundary; never rewrite them."""
+    _INPUT_VALIDATOR.validate(value)
+    canonical = copy.deepcopy(value)
+    blocks = {block['id']: block['text'] for block in snapshot['text_blocks']}
+    audit = {'status': 'accepted', 'code': 'literal_source_verified',
+             'validated_spans': 0, 'normalized_spans': 0, 'normalizations': []}
+    for name in ('subquestions', 'references', 'focus', 'unresolved'):
+        for item_index, item in enumerate(canonical[name]):
+            for span_index, span in enumerate(item['source_spans']):
+                path = (name, item_index, 'source_spans', span_index)
+                text = blocks.get(span['block_id'])
+                if text is None:
+                    raise AdviceValidationError('unknown_source_block', path + ('block_id',))
+                start, end = span.get('start'), span.get('end')
+                valid = (type(start) is int and type(end) is int
+                         and 0 <= start < end <= len(text)
+                         and text[start:end] == span['quote'])
+                if not valid:
+                    first = text.find(span['quote'])
+                    if first < 0:
+                        raise AdviceValidationError('literal_quote_not_found', path + ('quote',))
+                    # Include overlapping occurrences; never choose the first
+                    # occurrence merely because another starts inside it.
+                    if text.find(span['quote'], first + 1) >= 0:
+                        raise AdviceValidationError('ambiguous_literal_quote', path + ('quote',))
+                    action = ('offsets_generated' if 'start' not in span and 'end' not in span
+                              else 'offsets_relocated')
+                    span['start'], span['end'] = first, first + len(span['quote'])
+                    audit['normalized_spans'] += 1
+                    if len(audit['normalizations']) < 12:
+                        audit['normalizations'].append({'path': list(path), 'action': action})
+                audit['validated_spans'] += 1
+    audit['normalizations_truncated'] = audit['normalized_spans'] > len(audit['normalizations'])
+    # Consumers always receive the strict canonical shape, including offsets.
+    return _validate_advice(canonical, snapshot), audit
 
 
 def _validate_advice(value, snapshot):
@@ -233,17 +323,22 @@ def _validate_advice(value, snapshot):
     graph_ids = {graph['id'] for graph in snapshot['graph_catalog']}
     ids = [item['id'] for item in value['subquestions']]
     if len(ids) != len(set(ids)):
-        raise ValueError('duplicate_subquestion')
+        raise AdviceValidationError('duplicate_subquestion', ('subquestions',))
     for name in ('subquestions', 'references', 'focus', 'unresolved'):
-        for item in value[name]:
-            if any(gid not in graph_ids for gid in item['graph_ids']):
-                raise ValueError('unknown_graph_reference')
-            for span in item['source_spans']:
+        for item_index, item in enumerate(value[name]):
+            for graph_index, gid in enumerate(item['graph_ids']):
+                if gid not in graph_ids:
+                    raise AdviceValidationError('unknown_graph_reference',
+                                                (name, item_index, 'graph_ids', graph_index))
+            for span_index, span in enumerate(item['source_spans']):
+                path = (name, item_index, 'source_spans', span_index)
                 text = blocks.get(span['block_id'])
-                if (text is None or type(span['start']) is not int or type(span['end']) is not int
+                if text is None:
+                    raise AdviceValidationError('unknown_source_block', path + ('block_id',))
+                if (type(span['start']) is not int or type(span['end']) is not int
                         or not 0 <= span['start'] < span['end'] <= len(text)
                         or text[span['start']:span['end']] != span['quote']):
-                    raise ValueError('literal_source_span_mismatch')
+                    raise AdviceValidationError('literal_source_span_mismatch', path)
     return copy.deepcopy(value)
 
 
@@ -368,11 +463,13 @@ def _monitor(handle, connection, budget, slot, deadline, started, request_digest
             try:
                 content = packet.get('content')
                 if type(content) is not str or len(content) > MAX_RESPONSE:
-                    raise ValueError('invalid_content')
-                value = _validate_advice(json.loads(content), handle._snapshot)
-                handle._result.update(value, status='ready', reason='source_anchored_advice')
+                    raise AdviceValidationError('invalid_content')
+                value, validation_audit = _canonicalize_advice(json.loads(content), handle._snapshot)
+                handle._result.update(value, status='ready', reason='source_anchored_advice',
+                                      validation_audit=validation_audit)
                 reason = 'ready'
-            except Exception:
+            except Exception as exc:
+                handle._result['validation_audit'] = _validation_failure(exc)
                 reason = 'invalid_advice'
         elif packet is not None:
             reason = 'truncated' if packet.get('truncated') else 'transport_failed'
@@ -394,12 +491,14 @@ def _monitor(handle, connection, budget, slot, deadline, started, request_digest
             'transport_observation': 'application_before_post_hook',
             'independent_transport_evidence': False, 'worker_reaped': reaped,
             'hard_timeout_seconds': round(max(0., deadline - started), 4)}
+        metric['advice_validation'] = copy.deepcopy(handle._result['validation_audit'])
         if packet is not None and 'model' in packet:
             metric['model'] = packet['model']
         _append_metric(budget, metric)
         handle._result['metrics'].append(copy.deepcopy(metric))
         budget.event(ROLE, 'responded' if reason == 'ready' else 'failed',
-                     reason=reason, request_digest=request_digest, worker_reaped=reaped)
+                     reason=reason, request_digest=request_digest, worker_reaped=reaped,
+                     validation_code=handle._result['validation_audit'].get('code'))
         handle._done.set()
 
 
@@ -587,4 +686,4 @@ def question_reference_for_document(reference, document, *, source_sha256=None):
 __all__ = ['prepare_question_reference', 'start_question_reference',
            'get_ready_question_reference', 'cancel_question_reference', 'close_question_reference',
            'question_reference_for_document', 'register_question_reference_tools',
-           'QUESTION_REFERENCE_PROMPT', 'RESPONSE_SCHEMA']
+           'QUESTION_REFERENCE_PROMPT', 'RESPONSE_SCHEMA', 'CANONICAL_RESPONSE_SCHEMA']

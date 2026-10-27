@@ -35,6 +35,19 @@ def _invalid_json_constant(value):
     raise ValueError('Non-finite JSON number')
 
 
+def _json_error_kind(error):
+    """Bounded parser diagnostics; never retain model text or error messages."""
+    if error.msg == 'Extra data':
+        return 'extra_data'
+    if error.msg in ("Expecting ',' delimiter", "Expecting ':' delimiter"):
+        return 'missing_delimiter'
+    if error.msg in ('Expecting value', 'Expecting property name enclosed in double quotes'):
+        return 'invalid_value'
+    if error.msg.startswith('Unterminated string'):
+        return 'unterminated_string'
+    return 'other'
+
+
 def image_digest(url):
     if not isinstance(url,str) or not url.startswith('data:image/') or ';base64,' not in url:
         raise ValueError('Only explicitly supplied image bytes are supported')
@@ -168,6 +181,13 @@ def _glm_request(payload,headers,timeout,wall_deadline):
                 reasoning_chars+=len(delta.get('reasoning_content') or '')
                 finish=choice.get('finish_reason') or finish
             if size>262144:raise ValueError('vision_output_budget')
+        if sse_events and not stream_done and finish is None:
+            # A clean socket EOF can still cut a generation short, even when
+            # its current content happens to be valid JSON. Match the Qwen
+            # transport: require a terminal event before parsing that content.
+            incomplete=requests.ConnectionError('vision_incomplete_sse_stream')
+            incomplete.vision_failure_context={'incomplete_stream':True}
+            raise incomplete
         return 200,'',{'model':model,'system_fingerprint':fingerprint,'usage':usage,
                       'reasoning_chars':reasoning_chars,
                       'choices':[{'message':{'content':''.join(text)},'finish_reason':finish}]}
@@ -342,7 +362,8 @@ class VisionProvider:
                     # Positions are enough to locate a captured failure without
                     # copying private model text into ordinary request metrics.
                     metric.update(output_error='json_syntax',json_error={
-                        'line':exc.lineno,'column':exc.colno,'position':exc.pos})
+                        'line':exc.lineno,'column':exc.colno,'position':exc.pos,
+                        'kind':_json_error_kind(exc)})
                     raise VisionError('invalid_output') from exc
                 except ValueError as exc:
                     metric['output_error']='non_finite_json_number'
