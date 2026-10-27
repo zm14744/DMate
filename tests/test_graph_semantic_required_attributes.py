@@ -133,3 +133,16 @@ def test_weight_and_edge_label_are_required_only_when_literal_question_requests_
     assert {row['field'] for row in _required_visual_attribute_issues(doc)} == {
         'weight', 'edge_label'
     }
+
+
+def test_scoped_legend_duplicated_in_body_does_not_expand_to_other_graphs():
+    legend = '绿色边表示树边，黑色虚线表示其余边。'
+    doc = {
+        'body_text': '观察两幅图。' + legend + '回答问题。',
+        'graphs': [graph('G1'), graph('G2')],
+        'text_context': {'legends': [{'text': legend, 'graph_ids': ['G2']}]},
+        'uncertainties': [],
+    }
+    assert _literal_required_edge_attributes(doc) == {
+        'G1': set(), 'G2': {'color', 'style'}
+    }
