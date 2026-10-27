@@ -432,6 +432,21 @@ def _reap(process):
     return not process.is_alive()
 
 
+def _worker_stop_reason(process, deadline):
+    """Classify a child stop without racing its hard wall deadline.
+
+    A SIGALRM child exits with 124, but Pipe EOF can reach the parent a few
+    scheduler ticks before multiprocessing publishes that exitcode. If the
+    deadline has already elapsed and the exitcode is still unavailable, this is
+    the same hard timeout, not a generic worker crash. A concrete non-124 exit
+    remains worker_failed even when observed near the deadline.
+    """
+    code = process.exitcode
+    if code == 124 or (code is None and time.monotonic() >= deadline):
+        return 'wall_timeout'
+    return 'worker_failed'
+
+
 def _monitor(handle, connection, budget, slot, deadline, started, request_digest):
     process = handle._process
     packet, reason, attempted = None, 'transport_failed', False
@@ -457,7 +472,7 @@ def _monitor(handle, connection, budget, slot, deadline, started, request_digest
                     reason = 'response_received'
                     break
             elif not process.is_alive():
-                reason = 'wall_timeout' if process.exitcode == 124 else 'worker_failed'
+                reason = _worker_stop_reason(process, deadline)
                 break
         if packet is not None and packet.get('ok') is True and not packet.get('truncated'):
             try:
@@ -474,7 +489,7 @@ def _monitor(handle, connection, budget, slot, deadline, started, request_digest
         elif packet is not None:
             reason = 'truncated' if packet.get('truncated') else 'transport_failed'
     except Exception:
-        reason = 'wall_timeout' if process.exitcode == 124 else 'worker_failed'
+        reason = _worker_stop_reason(process, deadline)
     finally:
         with handle._reap_lock:
             reaped = _reap(process)
