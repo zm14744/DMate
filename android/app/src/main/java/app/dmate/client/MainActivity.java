@@ -4,6 +4,7 @@ import android.annotation.TargetApi;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ContentResolver;
+import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.pm.PackageManager;
 import android.os.Environment;
@@ -20,6 +21,7 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -336,6 +338,15 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private Intent createImagePickerIntent(boolean documents, boolean multiple) {
+        Intent intent = new Intent(documents ? Intent.ACTION_OPEN_DOCUMENT : Intent.ACTION_GET_CONTENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return intent;
+    }
+
     private final class DmateChromeClient extends WebChromeClient {
         @Override
         public boolean onShowFileChooser(
@@ -348,23 +359,21 @@ public final class MainActivity extends Activity {
             }
             pendingFileCallback = filePathCallback;
 
-            Intent intent;
+            // Avoid OEM WebView pickers that flash and immediately dismiss.
+            boolean multiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
             try {
-                intent = fileChooserParams.createIntent();
-            } catch (Exception ignored) {
-                intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType("image/*");
+                startActivityForResult(createImagePickerIntent(true, multiple), FILE_CHOOSER_REQUEST);
+            } catch (ActivityNotFoundException | SecurityException firstError) {
+                try {
+                    startActivityForResult(createImagePickerIntent(false, multiple), FILE_CHOOSER_REQUEST);
+                } catch (ActivityNotFoundException | SecurityException fallbackError) {
+                    pendingFileCallback = null;
+                    filePathCallback.onReceiveValue(null);
+                    Toast.makeText(MainActivity.this, "无法打开系统图片选择器", Toast.LENGTH_SHORT).show();
+                }
             }
-
-            try {
-                startActivityForResult(intent, FILE_CHOOSER_REQUEST);
-                return true;
-            } catch (ActivityNotFoundException error) {
-                pendingFileCallback = null;
-                Toast.makeText(MainActivity.this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
-                return false;
-            }
+            // Complete every handled WebView file callback, including launch failures.
+            return true;
         }
 
         @Override
@@ -437,9 +446,25 @@ public final class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != FILE_CHOOSER_REQUEST || pendingFileCallback == null) return;
 
-        Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
-        pendingFileCallback.onReceiveValue(result);
+        ValueCallback<Uri[]> callback = pendingFileCallback;
         pendingFileCallback = null;
+        Uri[] result = null;
+        if (resultCode == RESULT_OK && data != null) {
+            LinkedHashSet<Uri> selected = new LinkedHashSet<>();
+            ClipData clips = data.getClipData();
+            if (clips != null) {
+                for (int i = 0; i < clips.getItemCount(); i++) {
+                    Uri uri = clips.getItemAt(i).getUri();
+                    if (uri != null && "content".equalsIgnoreCase(uri.getScheme())) selected.add(uri);
+                }
+            }
+            if (data.getData() != null && "content".equalsIgnoreCase(data.getData().getScheme())) {
+                selected.add(data.getData());
+            }
+            if (!selected.isEmpty()) result = selected.toArray(new Uri[0]);
+            else result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+        }
+        callback.onReceiveValue(result);
     }
 
     @Override

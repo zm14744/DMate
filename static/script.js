@@ -3193,6 +3193,7 @@ function refreshInputAvailability() {
     const input = document.getElementById("text");
     const sendBtn = document.getElementById("sendBtn");
     const imageBtn = document.getElementById("imageBtn");
+    const imageInput = document.getElementById("imageInput");
     const ocrCancelBtn = document.getElementById("ocrCancelBtn");
     const inputLockHint = document.getElementById("inputLockHint");
     const inputWrap = input?.closest?.(".input-wrap") || null;
@@ -3245,6 +3246,9 @@ function refreshInputAvailability() {
     if (imageBtn) {
         imageBtn.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
         setInputControlVisible(imageBtn, visibleMode === "idle");
+    }
+    if (imageInput) {
+        imageInput.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
     }
     if (inputWrap) {
         inputWrap.classList.toggle("ai-input-busy", visibleMode === "ai");
@@ -14238,6 +14242,8 @@ function renderOcrTasks() {
     const focusInfo = focused ? { taskId: focused.dataset.taskId, action: focused.dataset.ocrAction,
         field: focused.dataset.ocrField, start: focused.selectionStart, end: focused.selectionEnd } : null;
     panel.hidden = ocrTasks.size === 0;
+    const manualQuestion = document.getElementById("manualQuestionMode");
+    if (manualQuestion) manualQuestion.hidden = ocrTasks.size > 0;
     const count = document.getElementById("ocrTaskCount");
     if (count) count.textContent = `${ocrActiveCount()} 张识别中 · ${ocrTasks.size} 张图片`;
     const fragment = document.createDocumentFragment();
@@ -14264,12 +14270,6 @@ function renderOcrTasks() {
         content.append(heading, status);
         if (task.draft && task.state !== "recognizing") {
             const graphs = task.draft.graphs || [];
-            const vertices = graphs.reduce((sum, graph) => sum + (graph.vertices || []).length, 0);
-            const edges = graphs.reduce((sum, graph) => sum + (graph.edges || []).length, 0);
-            content.append(element("p", "ocr-task-summary", `${graphs.length} 幅子图 · ${vertices} 个节点 · ${edges} 条边`));
-            if (task.descriptionState === "running") {
-                content.append(element("p", "ocr-task-summary", "正在整理图形外观描述…"));
-            }
             // Keep the confirmed mathematical review in ONE consistent layout.
             // The optional DeepSeek description is UI-only; never enter the
             // signed semantic snapshot or the solver input.
@@ -14310,8 +14310,8 @@ function renderOcrTasks() {
         const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
         slow.hidden = task.state !== "recognizing" || ocrTaskSeconds(task) < 120;
         content.append(slow);
-        if (task.error || task.notice) {
-            content.append(element("p", "ocr-task-notice", task.error || task.notice));
+        if (task.error) {
+            content.append(element("p", "ocr-task-notice", task.error));
         }
         if (task.confirmation) {
             const label = element("label", "ocr-task-request-label", "解题要求（可选）");
@@ -14336,15 +14336,20 @@ function renderOcrTasks() {
             actions.append(node);
             return node;
         };
-        if (task.state === "recognizing") {
-            button("取消这张", "cancel");
-        } else {
+        if (task.state !== "recognizing") {
             button(task.confirmation ? "继续修改" : task.result?.manual_mode ? "开始描绘" : task.state === "ready" ? "编辑核对" : "手动录入", "edit", !task.confirmation);
             if (task.confirmation) button("解题", "solve", true);
-            button("移除", "remove");
         }
         content.append(actions);
         card.append(thumbnail, content);
+        const remove = element("button", "ocr-task-remove");
+        remove.type = "button";
+        remove.dataset.ocrAction = task.state === "recognizing" ? "cancel" : "remove";
+        remove.dataset.taskId = task.id;
+        remove.setAttribute("aria-label", (task.state === "recognizing" ? "取消图片：" : "移除图片：") + (task.file.name || "图片"));
+        remove.title = task.state === "recognizing" ? "取消识别" : "移除";
+        remove.disabled = Boolean(task.confirming || task.sending);
+        card.append(remove);
         fragment.append(card);
     }
     list.replaceChildren(fragment);
@@ -14455,7 +14460,16 @@ function openImagePicker() {
         showCurrentError("最多同时识别 4 张图片，请等其中一张结束后再添加。");
         return;
     }
-    document.getElementById("imageInput")?.click();
+    const input = document.getElementById("imageInput");
+    if (!input || input.disabled) return;
+    // Invoke the native chooser inside the actual user activation.
+    // Hidden inputs can silently fail in some Android WebViews.
+    try {
+        if (typeof input.showPicker === "function") input.showPicker();
+        else input.click();
+    } catch (_error) {
+        input.click();
+    }
 }
 
 async function handleImageSelected(event) {

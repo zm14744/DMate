@@ -232,12 +232,6 @@
                             selectedNodes.clear();
                         });
                 }, 'dge-danger'));
-            } else {
-                aside.append(element('h3', '', '图形核对'));
-                aside.append(element('p', 'dge-muted',
-                    '点击图中的顶点或边，即可在这里修改名称、端点、箭头和权值'));
-                aside.append(element('p', 'dge-muted',
-                    '工具栏支持补点、连边、框选图形，所有关系都可手动修正'));
             }
             return aside;
         }
@@ -254,16 +248,14 @@
             else if (overlay) { overlay.destroy(); overlay = null; }
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
             const top = element('div', 'dge-topline');
-            top.append(element('p', 'dge-muted', useOverlay
-                ? '先在原图上描点、连边；图形和文字都可以单独框选区域。'
-                : '请对照原图核对题干，再点击节点或边修改结构。'));
+            // The toolbar already names its actions; keep the dialog compact.
             const undo = button('撤销', () => { pendingDelete = ''; model.undo(); }); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
             const redo = button('重做', () => { pendingDelete = ''; model.redo(); });
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
             top.append(undo, redo, button('清空修改', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
             const observations = (Array.isArray(options.issues) ? options.issues : [])
                 .map(issue => typeof issue === 'string' ? issue : text(issue?.message)).filter(Boolean);
-            if (observations.length) { const details = element('details', 'dge-observations'); details.open = true;
+            if (observations.length && !useOverlay) { const details = element('details', 'dge-observations'); details.open = true;
                 details.append(element('summary', '', '识别时需留意'));
                 const list = element('ul'); observations.slice(0, 64).forEach(message => list.append(element('li', '', message))); details.append(list); container.append(details); }
             const workspace = element('div', 'dge-workspace');

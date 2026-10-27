@@ -2,6 +2,11 @@ name: Build DMate Android Release
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-android-release.yml'
 
 jobs:
   build-release:
@@ -37,6 +42,13 @@ jobs:
           echo "DMATE_KEYSTORE_PASSWORD=${{ secrets.DMATE_ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
           echo "DMATE_KEY_ALIAS=${{ secrets.DMATE_ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
           echo "DMATE_KEY_PASSWORD=${{ secrets.DMATE_ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+
+      - name: Check mobile image picker integration
+        run: |
+          python -m unittest discover -s tests -p 'test_android_upload_ui_contract.py'
+          node --check static/script.js
+          node --check static/graph-editor.js
+          node --check static/graph-editor-overlay.js
 
       - name: Build signed release APK
         working-directory: android

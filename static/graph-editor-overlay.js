@@ -6,9 +6,9 @@ function mount(host,o){
  const d=host.ownerDocument,s=o.state||{mode:'select',zoom:100,visible:true,start:null};
  s.polygonDraft ||= [];
  let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false;const pointers=new Map();
- const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),hint=d.createElement('p'),status=d.createElement('span');
- root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');hint.className='dge-overlay-hint';status.className='dge-overlay-status';
- stage.append(image,svg);scroll.append(stage);root.append(bar,scroll,hint,status);host.append(root);
+ const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),status=d.createElement('span');
+ root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
+ stage.append(image,svg);scroll.append(stage);root.append(bar,scroll,status);host.append(root);
  const button=(label,key,fn)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',()=>{if(!o.disabled?.())fn();});bar.append(b);return b;};
  for(const [key,label] of [['select','选择移动'],['pan','平移'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']]){
   button(label,key,()=>{s.mode=key;s.start=null;draw();});
@@ -101,13 +101,6 @@ function mount(host,o){
   clearButton.hidden=!s.textRegion;
   focusButton.disabled=!(g?.region_polygon?.length>=3 || g?.bbox?.length===4);
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
-  hint.textContent=s.mode==='graph_poly'||s.mode==='text_poly'
-    ?'沿轮廓依次点击角点，然后点击“完成轮廓”；可围住不规则形状'
-    :s.mode==='text_rect'?'拖动圈出要识别的文字范围'
-    :s.mode==='vertex'?'点击原图添加顶点'
-    :s.mode==='edge'?'依次点击两个顶点连边，同一点两次可建自环'
-    :s.mode==='bounds'?'拖动框选当前图形'
-    :s.mode==='pan'?'拖动图片平移，双指可缩放':'点击原图绘制、校正顶点和边，滚轮可以缩放';
   svg.replaceChildren();if(!g||!s.visible)return;
   // The mathematical path is in original-image coordinates. Input targets
   // and labels instead use a constant on-screen size, including at 400% zoom.

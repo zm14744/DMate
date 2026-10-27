@@ -753,14 +753,12 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
 
 .mobile-choice-option.active .mobile-choice-option-check {
     border-color:var(--accent);
+    background:var(--accent);
 }
 
 .mobile-choice-option.active .mobile-choice-option-check::after {
-    content:"";
-    position:absolute;
-    inset:4px;
-    border-radius:50%;
-    background:var(--accent);
+    content:none;
+    display:none;
 }
 
 #wrongBookList {
@@ -8124,7 +8122,16 @@ body[data-appearance-theme="light"] #wrongBookModal .wrong-tools button:hover {
     font-weight:400; cursor:pointer;
 }
 .ocr-question-choice input[type="radio"] {
-    width:16px; height:16px; margin:0; accent-color:var(--accent);
+    appearance:none; -webkit-appearance:none;
+    box-sizing:border-box; flex:0 0 16px; width:16px; height:16px;
+    margin:0; border:2px solid var(--text-muted);
+    border-radius:50%; background:transparent; cursor:pointer;
+}
+.ocr-question-choice input[type="radio"]:checked {
+    border-color:var(--accent); background:var(--accent);
+}
+.ocr-question-choice input[type="radio"]:focus-visible {
+    outline:2px solid var(--accent); outline-offset:2px;
 }
 
 
@@ -8244,6 +8251,7 @@ body[data-appearance-theme] .input .manual-question-composer > #text:focus {
     max-height:46px !important;
     padding:0 12px !important;
 }
+.input-wrap > .manual-question-mode[hidden] { display:none !important; }
 .input-wrap > .manual-question-mode {
     position:absolute;
     top:-25px;
@@ -8293,7 +8301,8 @@ body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question
     border-radius:50%;
 }
 .input-wrap > .manual-question-mode .manual-question-choice[aria-pressed="true"] .manual-question-dot {
-    border:3.4px solid var(--accent);
+    border:1.4px solid var(--accent);
+    background:var(--accent);
 }
 body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question-choice[aria-pressed="true"] {
     color:var(--text-primary) !important;
@@ -8323,6 +8332,19 @@ body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question
     }
 }
 
+/* Keep the file input mounted so Android WebView can open its native picker. */
+body[data-appearance-theme] .input #imageInput,
+.input #imageInput {
+    position:absolute !important;
+    left:0 !important; top:0 !important;
+    width:1px !important; min-width:1px !important; max-width:1px !important;
+    height:1px !important; min-height:1px !important; max-height:1px !important;
+    margin:0 !important; padding:0 !important; border:0 !important;
+    opacity:0 !important; overflow:hidden !important;
+    clip-path:inset(50%) !important;
+    pointer-events:none !important;
+    box-shadow:none !important;
+}
 /* Composer: field and actions share the same vertical centre. */
 .input { align-items:center !important; }
 .input .manual-question-composer { align-self:center; }
@@ -8515,14 +8537,28 @@ window.MathJax = {
 <link rel="stylesheet" href="/static/graph-editor.css?v=dmate-manual-v1">
 <style>
 .ocr-task-panel[hidden] { display:none !important; }
-.ocr-task-panel { flex:none; margin:0 16px 12px; padding:14px; border:1px solid var(--border-strong); border-radius:14px; background:var(--surface-2); max-height:45vh; overflow:auto; }
+.ocr-task-panel { flex:none; box-sizing:border-box; width:min(820px,calc(100% - 32px)); margin:0 auto 12px; padding:12px; border:1px solid var(--border-strong); border-radius:12px; background:var(--surface-2); max-height:min(42dvh,430px); overflow:auto; }
 .ocr-task-panel-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
 .ocr-task-panel-head h2 { margin:0; font-size:15px; }
 #ocrTaskCount,.ocr-task-panel-hint { font-size:12px; color:var(--text-subtle); }
 .ocr-task-panel-hint { margin:7px 0 12px; line-height:1.5; }
 .ocr-task-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-.ocr-task-card { display:flex; gap:10px; min-width:0; padding:12px; border:1px solid var(--border-strong); border-radius:10px; background:var(--surface-1); }
-.ocr-task-thumbnail { width:54px; height:64px; flex:none; object-fit:contain; border-radius:5px; background:#fff; }
+.ocr-task-card { position:relative; display:flex; align-items:center; gap:10px; min-width:0; min-height:78px; padding:9px 42px 9px 10px; border:1px solid var(--border-strong); border-radius:10px; background:var(--surface-1); }
+.ocr-task-thumbnail { width:64px; height:54px; flex:none; object-fit:contain; border-radius:5px; background:#fff; }
+.ocr-task-remove {
+    position:absolute; top:10px; right:10px;
+    box-sizing:border-box; width:22px; height:22px; min-width:22px; min-height:22px;
+    padding:0; border:0; border-radius:50%; background:#ef4444;
+    box-shadow:none; cursor:pointer;
+}
+.ocr-task-remove:focus-visible { outline:2px solid #ef4444; outline-offset:3px; }
+.ocr-task-remove:disabled { opacity:.45; cursor:wait; }
+@media(hover:hover) and (pointer:fine) {
+    .ocr-task-remove:not(:disabled):hover { background:#dc2626; }
+}
+@media(hover:none), (pointer:coarse) {
+    .ocr-task-remove:not(:disabled):hover { background:#ef4444; }
+}
 .ocr-task-content { min-width:0; flex:1; }
 .ocr-task-heading { display:flex; gap:7px; align-items:baseline; justify-content:space-between; }
 .ocr-task-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
@@ -8552,7 +8588,7 @@ window.MathJax = {
 .graph-editor-dialog::backdrop { background:rgba(0,0,0,.6); }
 .graph-editor-dialog > h2 { margin:0 0 12px; font-size:18px; overflow-wrap:anywhere; }
 @media(max-width:760px) {
-    .ocr-task-panel { margin:0 8px 8px; padding:10px; max-height:38dvh; }
+    .ocr-task-panel { width:calc(100% - 16px); margin:0 auto 8px; padding:8px; max-height:36dvh; }
     .ocr-task-list { grid-template-columns:minmax(0,1fr); }
     .graph-editor-dialog { width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border-radius:0; padding:12px; }
 }
@@ -8637,7 +8673,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <h2 id="ocrTaskTitle">图片识题</h2>
             <span id="ocrTaskCount"></span>
         </div>
-        <p class="ocr-task-panel-hint">每次最多 4 张。先编辑核对，再确认解题；每张图片独立处理。</p>
+        <p class="ocr-task-panel-hint">最多4张</p>
         <div id="ocrTaskList" class="ocr-task-list"></div>
     </section>
     <div class="input-wrap">
@@ -8650,7 +8686,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div class="manual-question-composer">
                 <input id="text" type="text" placeholder="" autocomplete="off">
             </div>
-            <input id="imageInput" type="file" accept="image/*" multiple hidden>
+            <input id="imageInput" type="file" accept="image/*" multiple aria-label="选择图片">
             <button id="imageBtn" type="button" title="一次选择 1–4 张原图，也可以拖放或粘贴">图片识题</button>
             <button id="ocrCancelBtn" type="button" hidden aria-label="撤销图片识别" title="撤销图片识别"></button>
             <button id="sendBtn" type="button" onclick="handleSendOrStop()">发送</button>
@@ -9299,9 +9335,9 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
 <script src="/static/graph-editor-model.js?v=dmate-manual-v1"></script>
 <script src="/static/graph-editor-format.js?v=dmate-format-v1"></script>
-<script src="/static/graph-editor-overlay.js?v=dmate-manual-v1"></script>
-<script src="/static/graph-editor.js?v=dmate-manual-v1"></script>
-<script src="/static/script.js?v=dmate-manual-v1-20261027"></script>
+<script src="/static/graph-editor-overlay.js?v=dmate-picker-v2"></script>
+<script src="/static/graph-editor.js?v=dmate-picker-v2"></script>
+<script src="/static/script.js?v=dmate-picker-v2-20261027"></script>
 
 </body>
 </html>

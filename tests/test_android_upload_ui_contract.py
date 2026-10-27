@@ -1,0 +1,36 @@
+"""Fast, dependency-free checks for APK image picker and OCR task UI."""
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class AndroidUploadUiTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.java = (ROOT / "android/app/src/main/java/app/dmate/client/MainActivity.java").read_text()
+        cls.html = (ROOT / "templates/index.html").read_text()
+        cls.js = (ROOT / "static/script.js").read_text()
+
+    def test_native_documents_fallback_and_webview_callback(self):
+        self.assertIn("Intent.ACTION_OPEN_DOCUMENT", self.java)
+        self.assertIn("Intent.ACTION_GET_CONTENT", self.java)
+        self.assertIn("Intent.EXTRA_ALLOW_MULTIPLE", self.java)
+        self.assertIn("callback.onReceiveValue(result)", self.java)
+        self.assertIn("filePathCallback.onReceiveValue(null)", self.java)
+
+    def test_file_input_and_independent_question_selector(self):
+        self.assertIn("input.showPicker()", self.js)
+        self.assertIn("manualQuestion.hidden = ocrTasks.size > 0", self.js)
+        self.assertIn('<input id="imageInput" type="file" accept="image/*" multiple aria-label="选择图片">', self.html)
+        self.assertIn('<p class="ocr-task-panel-hint">最多4张</p>', self.html)
+
+    def test_solid_selection_and_compact_red_remove(self):
+        self.assertIn(".ocr-question-choice input[type=\"radio\"]:checked", self.html)
+        self.assertIn("ocr-task-remove", self.html)
+        self.assertIn("remove.dataset.ocrAction", self.js)
+        self.assertNotIn('button("移除", "remove")', self.js)
+
+
+if __name__ == "__main__":
+    unittest.main()
