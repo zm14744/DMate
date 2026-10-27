@@ -100,6 +100,10 @@
     root.document.addEventListener('visibilitychange', () => {
         if (!root.document.hidden) void checkNow(true);
     });
+    // Native WebViews can restore an old page from the back-forward cache;
+    // pageshow/online provide a fresh revision check without an APK update.
+    root.addEventListener?.('pageshow', () => void checkNow(true));
+    root.addEventListener?.('online', () => void checkNow(true));
     root.addEventListener?.('focus', () => void checkNow(false));
     root.navigator?.serviceWorker?.addEventListener?.('message', event => {
         if (event.data?.type === 'dmate-old-worker-retired') void checkNow(true);

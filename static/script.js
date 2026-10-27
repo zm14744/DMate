@@ -20583,18 +20583,11 @@ function downloadOptionsForCurrentPlatform() {
         };
     }
     if (platform === "android") {
-        // The GitHub APK is published directly by the signed Android workflow.
-        // GitCode is a separately maintained mirror and may lag native fixes.
-        const [gitcodeApk, githubApk, ...extraSources] = installers(
-            "DMate.apk", config.androidApkUrl, "APK"
-        );
         return {
             platform:"Android",
-            text:"优先下载 GitHub 已更新的 APK；GitCode 镜像可能仍是旧版",
+            text:"选择 APK 下载源",
             actions:[
-                { ...githubApk, label:"GitHub · APK（新版）", secondary:false },
-                { ...gitcodeApk, label:"GitCode · APK（请核对版本）", secondary:true },
-                ...extraSources,
+                ...installers("DMate.apk", config.androidApkUrl, "APK"),
                 { label:"itch.io", url:itch, secondary:true }
             ]
         };
@@ -20835,10 +20828,18 @@ document.addEventListener(
         }
 
         if (imageInput) {
-            imageInput.addEventListener(
-                "change",
-                handleImageSelected
-            );
+            // Historical 1.0.1-1.0.3 Android WebViews may return no file when
+            // multiple selection is enabled. Keep up to four independent OCR
+            // tasks, but request files one by one on these unchanged APKs.
+            // The website and newer native shells retain multi-file selection.
+            if (/DMateAndroid\/1\.0\.[0-3](?!\d)/i.test(navigator.userAgent || "")) {
+                imageInput.multiple = false;
+            }
+            // Some OEM WebViews dispatch only input or only change.
+            // handleImageSelected consumes and clears files synchronously, so
+            // the second event cannot enqueue the same selection twice.
+            imageInput.addEventListener("input", handleImageSelected);
+            imageInput.addEventListener("change", handleImageSelected);
         }
         initializeOcrTaskPanel();
 

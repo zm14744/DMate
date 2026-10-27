@@ -46,14 +46,21 @@ class AndroidUploadUiTests(unittest.TestCase):
         self.assertNotIn('ocr-task-time', self.js)
         self.assertIn('ocr-task-panel-hint">最多4张', self.html)
 
-    def test_signed_android_build_reaches_public_download_url(self):
+    def test_existing_client_web_features_do_not_force_an_apk(self):
         workflow = (ROOT / ".github/workflows/build-android-release.yml").read_text()
-        self.assertIn("contents: write", workflow)
-        self.assertIn("apksigner\" verify", workflow)
-        self.assertIn("gh release upload v1.0.1 dist/DMate.apk --clobber", workflow)
-        self.assertIn("retention-days: 30", workflow)
-        self.assertIn("GitHub · APK（新版）", self.js)
-        self.assertIn("GitCode · APK（请核对版本）", self.js)
+        update_manifest = (ROOT / "static/client-updates.json").read_text()
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertNotIn("gh release upload", workflow)
+        self.assertNotIn("    branches: [main]", workflow)
+        self.assertIn('"published": false', update_manifest)
+        self.assertIn('GitCode · " + displayName', self.js)
+        self.assertIn('GitHub · " + displayName', self.js)
+        self.assertIn('text:"选择 APK 下载源"', self.js)
+        self.assertNotIn('GitHub · APK（新版）', self.js)
+        self.assertNotIn('GitCode · APK（请核对版本）', self.js)
+        self.assertNotIn('/static/client-update.js?v=', self.html)
+        self.assertIn('imageInput.multiple = false;', self.js)
+        self.assertIn('imageInput.addEventListener("input", handleImageSelected)', self.js)
 
     def test_solid_selection_and_compact_red_remove(self):
         self.assertIn(".ocr-question-choice input[type=\"radio\"]:checked", self.html)

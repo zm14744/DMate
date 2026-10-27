@@ -64,6 +64,8 @@ async function run() {
     assert.equal(await current.root.DMateWebSync.checkNow(true), false);
     assert.equal(current.navigation.length, 0);
 
+    assert.match(code, /addEventListener\\?\.\('pageshow'/);
+    assert.match(code, /addEventListener\\?\.\('online'/);
     const browser=environment({installed:false});
     assert.equal(await browser.root.DMateWebSync.checkNow(true), false);
     assert.equal(browser.calls, 0);

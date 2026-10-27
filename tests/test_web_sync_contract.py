@@ -39,7 +39,7 @@ class RemoteWebSyncContract(unittest.TestCase):
         self.assertIn('dmate_web_revision=', self.app)
         self.assertIn('window.DMATE_WEB_REVISION = {{ dmate_web_revision | tojson }};', self.html)
         for name in ['script.js', 'graph-editor-model.js', 'graph-editor-format.js',
-                     'graph-editor-overlay.js', 'graph-editor.js', 'client-update.js',
+                     'graph-editor-overlay.js', 'graph-editor.js',
                      'web-sync.js']:
             self.assertIn(f'/static/{name}?v={{{{ dmate_web_revision }}}}', self.html)
 
@@ -49,6 +49,9 @@ class RemoteWebSyncContract(unittest.TestCase):
         self.assertIn("root.location.replace", self.sync)
         self.assertIn("DMateAndroid", self.sync)
         self.assertIn("DMateDesktop", self.sync)
+        self.assertIn("root.addEventListener?.('pageshow'", self.sync)
+        self.assertIn("root.addEventListener?.('online'", self.sync)
+        self.assertNotIn('/static/client-update.js?v=', self.html)
 
 
 if __name__ == '__main__':

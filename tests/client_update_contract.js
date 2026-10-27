@@ -10,18 +10,23 @@ assert.equal(update.compareVersions('1.0.2','1.0.2'),0);
 assert.equal(update.compareVersions('unexpected','1.0.1'),null);
 const androidOld = update.detectInstalledClient('Mozilla/5.0 DMateAndroid/1.0.1',{isAndroidApp:true},'Linux arm');
 assert.equal(androidOld.kind,'android');
-assert.equal(update.selectPublishedUpdate(androidOld,manifest).version,'1.0.4');
-assert.equal(update.selectPublishedUpdate(androidOld,manifest).sha256,manifest.android.sha256);
+// Older pages that still loaded client-update.js see the disabled manifest.
+assert.equal(update.selectPublishedUpdate(androidOld,manifest),null);
+// Version/signature validation remains covered for a hypothetical signed release.
+const offered = structuredClone(manifest);
+offered.android.published = true;
+assert.equal(update.selectPublishedUpdate(androidOld,offered).version,'1.0.4');
+assert.equal(update.selectPublishedUpdate(androidOld,offered).sha256,offered.android.sha256);
 const androidPrior = update.detectInstalledClient('Mozilla/5.0 DMateAndroid/1.0.2',{isAndroidApp:true},'Linux arm');
-assert.equal(update.selectPublishedUpdate(androidPrior,manifest).version,'1.0.4');
+assert.equal(update.selectPublishedUpdate(androidPrior,offered).version,'1.0.4');
 const androidInstalledPrior = update.detectInstalledClient('Mozilla/5.0 DMateAndroid/1.0.3',{isAndroidApp:true},'Linux arm');
-assert.equal(update.selectPublishedUpdate(androidInstalledPrior,manifest).version,'1.0.4');
+assert.equal(update.selectPublishedUpdate(androidInstalledPrior,offered).version,'1.0.4');
 const androidCurrent = update.detectInstalledClient('Mozilla/5.0 DMateAndroid/1.0.4',{isAndroidApp:true},'Linux arm');
 assert.equal(update.selectPublishedUpdate(androidCurrent,manifest),null);
 const windows = update.detectInstalledClient('Mozilla/5.0 DMateDesktop/1.0.0',{isDesktopApp:true},'Win32');
 assert.equal(update.selectPublishedUpdate(windows,manifest),null);
 assert.equal(update.detectInstalledClient('Mozilla/5.0 (Android)',{isAndroidApp:false},'Linux'),null);
-const wrong = structuredClone(manifest);
+const wrong = structuredClone(offered);
 wrong.android.version='8.0.0';
 wrong.android.url='https://evil.example/DMate.apk';
 assert.equal(update.selectPublishedUpdate(androidOld,wrong),null);
