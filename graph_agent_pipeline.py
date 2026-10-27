@@ -989,7 +989,8 @@ def recognize_agents(raw, *, layout=None, provider=None, budget=None, audit=Fals
         inventory = {graph['id']: graph for graph in state.get('inventory') or []}
         scope = json_digest([{'id': graph['id'], 'bbox': graph['bbox'],
             'vertices': [{key: vertex.get(key) for key in ('id', 'label', 'x', 'y')}
-                         for vertex in graph['vertices']]} for graph in inventory.values()])
+                         for vertex in sorted(graph['vertices'], key=lambda row: row['id'])]}
+            for graph in sorted(inventory.values(), key=lambda row: row['id'])])
         located = []
         if measured_geometry and scope not in position_repair_scopes:
             known_markers = {row['id'] for row in (marker_hints or {}).get('candidates', [])}
