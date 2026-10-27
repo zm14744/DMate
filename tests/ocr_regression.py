@@ -176,12 +176,29 @@ def run_case(browser, case, url, image_path, output, mode, solve, timeout_second
         record["screenshots"].append(dest.name)
 
     def mock_response(route):
+        # The current product uses independent OCR task cards and a structured
+        # editing dialog. A text-only legacy fixture silently creates a blank
+        # editor, so include the SAME graphs in the real editor document.
+        # This is a synthetic UI contract, not evidence of visual recognition.
+        from graph_schema import canonical_graph, display_graph
         expected = case["expected"]
         graph = expected.get("graph", {})
         graphs = expected.get("graphs") or ([graph] if graph else [])
-        payload = {"text": case.get("mock_text", "Exercise: " + cid),
+        editable = []
+        for index, row in enumerate(graphs, 1):
+            if not isinstance(row, dict):
+                continue
+            edges = [{**edge, "status": "accepted"} for edge in row.get("edges", [])
+                     if isinstance(edge, dict)]
+            editable.append(display_graph(canonical_graph(
+                {**row, "edges": edges, "complete": True}, index)))
+        body_text = case.get("mock_text", "Exercise: " + cid)
+        payload = {"text": body_text, "body_text": body_text,
                    "visual_text": case.get("mock_visual", "图形结构：请根据图判断所有顶点与边"),
                    "graph_display_data": graphs,
+                   "graph_structures": editable,
+                   "document": {"body_text": body_text, "graphs": editable},
+                   "recognition_status": "complete",
                    "vision_used": True, "warning": None}
         route.fulfill(status=200, content_type="application/json",
                       body=json.dumps(payload, ensure_ascii=False))
@@ -226,58 +243,125 @@ def run_case(browser, case, url, image_path, output, mode, solve, timeout_second
         if not ocr_http.ok or data.get("error") or data.get("cancelled"):
             raise AssertionError("OCR HTTP %s: %s" % (ocr_http.status, data.get("error") or "cancelled"))
 
-        dialog = page.locator("#ocrReviewDialog")
-        dialog.wait_for(state="visible", timeout=25000)
-        page.wait_for_timeout(750)  # allow MathJax rendering to settle
-        question = page.locator("#ocrReviewQuestion").inner_text(timeout=10000).strip()
-        visual = page.locator("#ocrReviewGraph").inner_text(timeout=10000).strip()
-        record["rendered"] = {
-            "question": question, "graph": visual,
-            "mathjax_svg_count": page.locator("#ocrReviewDialog mjx-container svg").count(),
-            "question_type": page.locator('input[name="ocrQuestionType"]:checked').input_value()
-        }
-        record["steps"].append("captured_actual_review_dialog")
-        shot("ocr-review")
-
-        if not (data.get("text") or data.get("visual_text")):
-            raise AssertionError("OCR dialog opened but server returned no text or visual_text")
-        if not (question or visual):
-            raise AssertionError("OCR review is visually empty")
-        record["comparisons"] = topology_comparison(
-            data.get("graph_display_data"), case.get("expected", {}),
-            str(data.get("text") or ""), str(data.get("visual_text") or ""))
-        if solve:
-            t0 = time.monotonic()
-            # Confirmation is the user's real AI-solver route, not an API shortcut.
-            with page.expect_response(
-                lambda r: urlsplit(r.url).path == "/chat" and r.request.method == "POST",
-                timeout=timeout_seconds*1000
-            ) as answer_wait:
-                page.locator("#ocrReviewConfirm").click()
-            answer_http = answer_wait.value
-            record["answer_http_status"] = answer_http.status
-            record["answer_seconds"] = round(time.monotonic() - t0, 2)
-            try:
-                answer_json = answer_http.json()
-            except Exception:
-                answer_json = {"error": "Invalid /chat JSON", "text": answer_http.text()[:1000]}
-            record["answer"] = {
-                "reply": answer_json.get("reply", "") if isinstance(answer_json, dict) else "",
-                "error": answer_json.get("error") if isinstance(answer_json, dict) else "Invalid response"
+        # Prefer the current four-image task-card + visual editor workflow.
+        # Keep a legacy fallback for historical deployments only.
+        modern = page.locator("#ocrTaskList .ocr-task-card").first
+        if page.locator("#ocrTaskPanel").count():
+            modern.wait_for(state="visible", timeout=25000)
+            page.wait_for_function(
+                """() => {
+                    const card = document.querySelector('#ocrTaskList .ocr-task-card');
+                    return card && ['ready', 'failed', 'cancelled'].includes(card.dataset.state);
+                }""", timeout=25000)
+            state = modern.get_attribute("data-state")
+            if state != "ready":
+                raise AssertionError("New OCR task did not become editable: " + str(state)
+                                     + " " + modern.inner_text()[:500])
+            record["task_state"] = state
+            record["task_summary"] = modern.locator(".ocr-task-summary").inner_text(timeout=10000)
+            modern.locator('button[data-ocr-action="edit"]').click()
+            editor = page.locator("#graphEditorDialog")
+            editor.wait_for(state="visible", timeout=15000)
+            mount = page.locator("#graphEditorMount")
+            question = mount.locator(".dge-body").input_value(timeout=10000).strip()
+            visual_parts = []
+            selector = mount.locator('select[aria-label="当前子图"]')
+            if selector.count():
+                # Read every panel from the user's real editing UI, not only
+                # the first panel selected by default.
+                options = selector.locator("option").evaluate_all(
+                    "(rows) => rows.map(row => row.value)")
+                for option in options:
+                    mount.locator('select[aria-label="当前子图"]').select_option(value=option)
+                    visual_parts.append(mount.locator(".dge-visual").inner_text())
+                    visual_parts.append(mount.locator(".dge-node-panel").inner_text())
+                    visual_parts.append(mount.locator(".dge-edge-panel").inner_text())
+            else:
+                visual_parts.append(mount.locator(".dge-visual").inner_text())
+                if mount.locator(".dge-node-panel").count():
+                    visual_parts.append(mount.locator(".dge-node-panel").inner_text())
+                if mount.locator(".dge-edge-panel").count():
+                    visual_parts.append(mount.locator(".dge-edge-panel").inner_text())
+            visual = "\\n".join(part for part in visual_parts if part.strip()).strip()
+            record["rendered"] = {
+                "question": question, "graph": visual,
+                "editor_graph_count": len(options) if selector.count() else (1 if visual else 0),
+                "editor_svg_count": mount.locator(".dge-visual svg").count(),
+                "renderer": "editable_graph_editor"
             }
-            (output / (cid + "-answer.json")).write_text(
-                json.dumps(record["answer"], ensure_ascii=False, indent=2), encoding="utf-8")
-            if not answer_http.ok or not record["answer"]["reply"]:
-                raise AssertionError("AI answer failed HTTP %s" % answer_http.status)
-            page.wait_for_timeout(1200)
-            shot("answer")
-            record["steps"].append("captured_ai_answer")
+            record["steps"].append("captured_actual_graph_editor")
+            shot("ocr-editable-review")
+            # Includes the browser's actual editor rendering, not merely the
+            # server JSON arrival. In mock mode this is UI latency only.
+            record["upload_to_editable_render_seconds"] = round(time.monotonic() - t0, 2)
+            if not question and not visual:
+                raise AssertionError("Editable OCR result has no rendered question or graph")
+            if solve:
+                # The current route must first confirm the actual edited
+                # structure, then explicitly start a separate solver request.
+                with page.expect_response(
+                    lambda r: urlsplit(r.url).path == "/graph/confirm"
+                    and r.request.method == "POST", timeout=timeout_seconds*1000
+                ) as confirmed:
+                    mount.locator(".dge-footer input[type=checkbox]").check()
+                    mount.locator(".dge-actions button.dge-primary").click()
+                approval = confirmed.value
+                if not approval.ok:
+                    raise AssertionError("Graph confirmation failed HTTP %s" % approval.status)
+                editor.wait_for(state="hidden", timeout=15000)
+                t0 = time.monotonic()
+                with page.expect_response(
+                    lambda r: urlsplit(r.url).path == "/chat"
+                    and r.request.method == "POST", timeout=timeout_seconds*1000
+                ) as answer_wait:
+                    page.locator('#ocrTaskList button[data-ocr-action="solve"]').first.click()
+                answer_http = answer_wait.value
+                record["answer_http_status"] = answer_http.status
+                record["answer_seconds"] = round(time.monotonic() - t0, 2)
+                try:
+                    answer_json = answer_http.json()
+                except Exception:
+                    answer_json = {"error": "Invalid /chat JSON", "text": answer_http.text()[:1000]}
+                record["answer"] = {
+                    "reply": answer_json.get("reply", "") if isinstance(answer_json, dict) else "",
+                    "error": answer_json.get("error") if isinstance(answer_json, dict) else "Invalid response"
+                }
+                (output / (cid + "-answer.json")).write_text(
+                    json.dumps(record["answer"], ensure_ascii=False, indent=2), encoding="utf-8")
+                if not answer_http.ok or not record["answer"]["reply"]:
+                    raise AssertionError("AI answer failed HTTP %s" % answer_http.status)
+                shot("answer")
+                record["steps"].append("captured_ai_answer")
+            else:
+                mount.locator(".dge-actions button", has_text="稍后继续").click()
+                editor.wait_for(state="hidden", timeout=10000)
+                record["steps"].append("closed_editor_before_ai_solver")
         else:
-            # Cancel safely: no paid solver and no unintended learning-history entry.
+            dialog = page.locator("#ocrReviewDialog")
+            dialog.wait_for(state="visible", timeout=25000)
+            question = page.locator("#ocrReviewQuestion").inner_text(timeout=10000).strip()
+            visual = page.locator("#ocrReviewGraph").inner_text(timeout=10000).strip()
+            record["rendered"] = {
+                "question": question, "graph": visual,
+                "mathjax_svg_count": dialog.locator("mjx-container svg").count(),
+                "renderer": "legacy_dialog"
+            }
+            record["steps"].append("captured_actual_review_dialog")
+            shot("ocr-review")
+            if not (question or visual):
+                raise AssertionError("OCR dialog has no rendered question or graph")
+            if solve:
+                raise AssertionError("Legacy solver workflow is no longer covered by this browser contract")
             page.locator("#ocrReviewCancel").click()
             dialog.wait_for(state="hidden", timeout=10000)
             record["steps"].append("cancelled_before_ai_solver")
 
+        if not (data.get("text") or data.get("visual_text") or data.get("graph_structures")):
+            raise AssertionError("OCR response has no question or graph content")
+        record["comparisons"] = topology_comparison(
+            data.get("graph_display_data") or data.get("graph_structures"),
+            case.get("expected", {}), str(data.get("text") or ""),
+            str(data.get("visual_text") or ""))
     except Exception as exc:
         record["operational_error"] = str(exc)[:2500]
         record["traceback"] = traceback.format_exc()[-2500:]

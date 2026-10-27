@@ -1,4 +1,4 @@
-"""Actual dialog contract test OR explicit real original-image API regression.
+"""Four-image OCR task-card/editor contract OR explicit original-image API regression.
 Contract mode mocks /ocr and NEVER grades recognition accuracy. Live mode uses
 only a local branch server, not production. Original bytes must match SHA256.
 """
@@ -135,8 +135,15 @@ def main():
                     response=json.loads(response_path.read_text()) if response_path.exists() else {}
                     record['six_dimensions']=grade(case,response,record)
                 elif args.mode=='contract':
-                    visible=(record.get('rendered') or {}).get('graph','')
-                    record['contract_ok']=bool(record['operational_ok'] and visible and not any(x in visible for x in BANNED))
+                    shown=record.get('rendered') or {}
+                    visible=shown.get('graph','')
+                    panels=len(input_case['expected']['graphs'])
+                    record['contract_ok']=bool(
+                        record['operational_ok']
+                        and shown.get('renderer')=='editable_graph_editor'
+                        and shown.get('editor_graph_count')==panels
+                        and record.get('task_summary','').startswith(f'{panels} 幅子图')
+                        and visible and not any(x in visible for x in BANNED))
                     record['semantic_status']='NOT_AN_ACCURACY_TEST'
                 else:
                     record['semantic_status']='UNVERIFIED_CAPTURE_ONLY'
