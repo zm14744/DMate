@@ -74,3 +74,35 @@
  .dge-actions { margin-left:auto; }
 }
 @media (max-width:420px) { .dge-edge-row { grid-template-columns:repeat(2,minmax(0,1fr)); } .dge-toolbar .dge-field { flex-basis:100%; } }
+
+/* Original-image editor: monochrome controls and a single subdued drawing color. */
+.dge-workspace:has(.dge-overlay-host){display:block}
+.dge-overlay-host{min-width:0;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface);overflow:hidden}
+.dge-overlay-tools{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:9px;border-bottom:1px solid var(--dge-border);background:var(--surface-1,#fff)}
+.dge-overlay-tools button,.dge-overlay-tools select{font-size:13px;width:auto;flex:0 0 auto;border-radius:7px;padding:7px 10px;min-height:34px}
+.dge-overlay-tools button.is-active{background:var(--accent-bg,#eaf2ff);border-color:var(--accent,#2563eb)}
+.dge-overlay-tools select{max-width:152px}
+.dge-overlay-zoom{font-size:12px;color:var(--text-subtle,#64748b);min-width:42px;text-align:center}
+.dge-overlay-viewport{background:var(--surface-2,#f3f4f6);max-height:min(63dvh,700px);min-height:220px;overflow:auto;overscroll-behavior:contain}
+.dge-overlay-stage{position:relative;width:100%;min-width:100%;margin:0 auto;background:white}
+.dge-overlay-image{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none;background:#fff}
+.dge-overlay-svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;overflow:visible;color:var(--accent,#2563eb);cursor:crosshair}
+.dge-overlay-svg.is-hidden{pointer-events:none;visibility:hidden}
+.dge-overlay-edge{cursor:pointer;color:var(--accent,#2563eb)}
+.dge-overlay-hit{stroke:transparent;stroke-width:17px;fill:none;pointer-events:stroke}
+.dge-overlay-stroke{stroke:currentColor;stroke-width:3px;fill:none;opacity:.8;pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
+.dge-overlay-edge.is-selected .dge-overlay-stroke{stroke-width:5px;opacity:1}
+.dge-overlay-edge.is-uncertain .dge-overlay-stroke{stroke-dasharray:7 5;opacity:.5}
+.dge-overlay-node{cursor:pointer}
+.dge-overlay-node-hit{fill:transparent;pointer-events:all}
+.dge-overlay-dot{fill:var(--surface-0,#fff);stroke:var(--accent,#2563eb);stroke-width:3px;pointer-events:none}
+.dge-overlay-node.is-selected .dge-overlay-dot{stroke-width:5px}
+.dge-overlay-node.is-estimated .dge-overlay-dot{stroke-dasharray:4 3;opacity:.65}
+.dge-overlay-label{fill:var(--text-primary,#182334);paint-order:stroke;stroke:var(--surface-0,#fff);stroke-width:4px;stroke-linejoin:round;font-size:16px;pointer-events:none;font-family:inherit}
+.dge-overlay-bbox{fill:none;stroke:var(--accent,#2563eb);stroke-width:2px;stroke-dasharray:9 7;pointer-events:none;opacity:.6}
+.dge-overlay-handle{fill:var(--surface-0,#fff);stroke:var(--accent,#2563eb);stroke-width:3px;cursor:move}
+.dge-overlay-pending,.dge-overlay-selection{fill:rgba(59,130,246,.08);stroke:var(--accent,#2563eb);stroke-width:3px;stroke-dasharray:6 4;pointer-events:none}
+.dge-overlay-hint{margin:0;padding:9px 14px;font-size:12px;color:var(--text-subtle,#64748b)}
+.dge-overlay-status{display:block;font-size:12px;padding:0 14px 7px;color:var(--text-subtle,#64748b)}
+.dge-overlay-status:empty{display:none}
+@media(max-width:760px){.dge-overlay-tools{gap:4px;padding:7px}.dge-overlay-tools button,.dge-overlay-tools select{padding:6px 7px;font-size:12px}.dge-overlay-viewport{max-height:55dvh;min-height:200px}.dge-overlay-hint{padding:8px 10px}}

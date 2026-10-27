@@ -10,11 +10,18 @@
     function mount(container, options) {
         if (!container || !container.ownerDocument) throw new Error('编辑器需要有效的页面容器。');
         options ||= {};
-        const dom = container.ownerDocument, model = createModel(options.document, options.initialDocument);
+        const dom = container.ownerDocument;
+        const useOverlay = typeof options.originalUrl === 'string' && /^((blob:)|(data:image\/)|(https?:\/\/))/i.test(options.originalUrl) && root.DMateGraphOverlay?.mount;
+        const initialized = useOverlay && modelApi.ensureAnonymousLabels
+            ? modelApi.ensureAnonymousLabels(options.document) : options.document;
+        const initial = useOverlay && modelApi.ensureAnonymousLabels
+            ? modelApi.ensureAnonymousLabels(options.initialDocument || options.document) : options.initialDocument;
+        const model = createModel(initialized, initial);
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
         let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null;
         let individually = false, saving = false, destroyed = false, acknowledged = false, notice = '', pendingDelete = '';
-        let unsubscribe;
+        let unsubscribe, overlay = null;
+        const overlayState = { mode: 'select', zoom: 100, visible: true, start: null };
         const element = (tag, className, label) => { const node = dom.createElement(tag); if (className) node.className = className;
             if (label !== undefined) node.textContent = label; return node; };
         const svgElement = (tag, attributes, label) => { const node = dom.createElementNS(svgNS, tag);
@@ -39,7 +46,7 @@
             if (pendingDelete === key) { pendingDelete = ''; action(); }
             else { pendingDelete = key; notice = message + ' 再次点击删除可确认，也可用“撤销”恢复。'; }
         }
-        const nodeOptions = graph => { const rows = [['', '请选择节点'], ...graph.vertices.map((vertex, index) => [vertex.id, vertex.label === null ? '未命名节点 ' + (index + 1) : vertex.label])]; rows.graphId = graph.id; return rows; };
+        const nodeOptions = graph => { const rows = [['', '请选择节点'], ...graph.vertices.map((vertex, index) => [vertex.id, vertex.label === null ? (vertex.display_label || '未命名节点 ' + (index + 1)) : vertex.label])]; rows.graphId = graph.id; return rows; };
         const graphOptions = (document, excluded) => [['', '选择目标子图'], ...document.graphs.filter(graph => graph.id !== excluded).map((graph, index) => [graph.id, graph.name || '图 ' + (index + 1)])];
         const weightValue = value => value.trim() === '' ? null : /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(value.trim()) && Number.isFinite(Number(value)) ? Number(value) : value;
 
@@ -48,6 +55,7 @@
             const document = model.getDocument(), graph = document.graphs.find(row => row.id === currentGraph);
             const visual = container.querySelector('.dge-visual');
             if (visual && graph) { visual.querySelector('svg')?.remove(); visual.append(drawGraph(graph)); }
+            overlay?.refresh();
             const status = container.querySelector('.dge-status'); if (status) status.textContent = notice;
             const ack = container.querySelector('.dge-footer input[type=checkbox]'); if (ack) ack.checked = acknowledged;
             const undo = container.querySelector('[data-editor-undo]'); if (undo) undo.disabled = saving || !model.canUndo();
@@ -118,7 +126,7 @@
                 group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); svg.append(group);
             });
             graph.vertices.forEach((vertex, index) => {
-                const [x, y] = points.get(vertex.id), label = vertex.label ?? '未命名 ' + (index + 1);
+                const [x, y] = points.get(vertex.id), label = vertex.label ?? vertex.display_label ?? '未命名 ' + (index + 1);
                 const group = svgElement('g', { class: 'dge-visual-node' + (selectedNodes.has(vertex.id) ? ' is-selected' : ''), tabindex: 0, role: 'button', 'aria-label': '选择节点 ' + label });
                 group.append(svgElement('title', {}, label), svgElement('circle', { cx: x, cy: y, r: 18 }),
                     svgElement('text', { x, y: y + 5, 'text-anchor': 'middle' }, label.length > 12 ? label.slice(0, 11) + '…' : label));
@@ -159,9 +167,10 @@
             let graph = document.graphs.find(row => row.id === currentGraph) || document.graphs[0]; currentGraph = graph?.id;
             selectedNodes = new Set([...selectedNodes].filter(vid => graph?.vertices.some(row => row.id === vid)));
             if (!graph?.edges.some(edge => edge.id === selectedEdge)) selectedEdge = null;
+            overlay?.destroy(); overlay = null;
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
             const top = element('div', 'dge-topline');
-            top.append(element('p', 'dge-muted', '先对照原图核对题干，再点击图中的节点或边进行修改。图的位置仅用于查看结构。'));
+            top.append(element('p', 'dge-muted', useOverlay ? '请直接在原图上核查、补点、连边，详细属性可以在下方修改。' : '请对照原图核对题干，再点击节点或边修改结构。'));
             const undo = button('撤销', () => { pendingDelete = ''; model.undo(); }); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
             top.append(undo, button('恢复识别初稿', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
             const observations = (Array.isArray(options.issues) ? options.issues : [])
@@ -169,14 +178,31 @@
             if (observations.length) { const details = element('details', 'dge-observations'); details.open = true;
                 details.append(element('summary', '', '识别时需留意'));
                 const list = element('ul'); observations.slice(0, 64).forEach(message => list.append(element('li', '', message))); details.append(list); container.append(details); }
-            const workspace = element('div', 'dge-workspace'), preview = element('section', 'dge-original');
-            preview.append(element('h3', '', '原图'));
-            if (typeof options.originalUrl === 'string' && /^(blob:|data:image\/(?:png|jpeg|webp|gif|avif|bmp);|https?:\/\/)/i.test(options.originalUrl)) {
-                const image = element('img'); image.src = options.originalUrl; image.alt = '上传的原图，用于核对识别结果'; preview.append(image);
-            } else preview.append(element('p', 'dge-muted', '原图预览暂不可用，可继续编辑结构。'));
-            const visual = element('section', 'dge-visual'); visual.append(element('h3', '', '结构预览'));
-            if (graph) visual.append(drawGraph(graph)); else visual.append(element('p', 'dge-empty', '当前没有子图，可添加图形，或只确认题干。'));
-            workspace.append(preview, visual); container.append(workspace);
+            const workspace = element('div', 'dge-workspace');
+            if (useOverlay) {
+                const host = element('section', 'dge-overlay-host'); workspace.append(host);
+                container.append(workspace);
+                overlay = root.DMateGraphOverlay.mount(host, {
+                    instance, originalUrl: options.originalUrl, model, state: overlayState,
+                    graph: () => model.getDocument().graphs.find(row => row.id === currentGraph),
+                    disabled: () => saving || destroyed,
+                    edgeSelected: () => selectedEdge,
+                    nodeSelected: () => selectedNodes,
+                    selectEdge: id => { selectedEdge = id; selectedNodes.clear(); render(); },
+                    selectNode: id => { selectedNodes = new Set([id]); selectedEdge = null; render(); },
+                    changed: () => { acknowledged = false; render(); }
+                });
+            } else {
+                const preview = element('section', 'dge-original'); preview.append(element('h3', '', '原图'));
+                if (typeof options.originalUrl === 'string') {
+                    const image = element('img'); image.src = options.originalUrl;
+                    image.alt = '上传的原图，用于核对识别结果'; preview.append(image);
+                } else preview.append(element('p', 'dge-muted', '原图预览暂不可用，可继续编辑结构。'));
+                const visual = element('section', 'dge-visual'); visual.append(element('h3', '', '结构预览'));
+                if (graph) visual.append(drawGraph(graph));
+                else visual.append(element('p', 'dge-empty', '当前没有子图，可添加图形，或只确认题干。'));
+                workspace.append(preview, visual); container.append(workspace);
+            }
             const body = element('textarea', 'dge-body'); body.value = document.body_text; body.rows = 4; body.setAttribute('aria-label', '题干、全部小问与公式'); body.disabled = saving;
             body.addEventListener('input', () => edit(() => model.setBody(body.value)));
             container.append(field('题干、全部小问与公式', body)); renderContext(document, container);
@@ -189,7 +215,7 @@
                 if (document.graphs.length > 1) { const target = select(graphOptions(document, graph.id), '', '合并目标子图', null);
                     toolbar.append(field('合并子图', target), button('合并到所选图', () => { if (!target.value) throw new Error('请先选择合并目标。'); const targetId = target.value; model.mergeGraph(graph.id, targetId); currentGraph = targetId; })); }
             }
-            container.append(toolbar);
+            container.insertBefore(toolbar, workspace);
             if (graph) {
                 const panels = element('div', 'dge-edit-panels'), nodes = element('section', 'dge-node-panel'), edges = element('section', 'dge-edge-panel');
                 nodes.append(element('h3', '', '节点 · ' + graph.vertices.length));
@@ -277,7 +303,7 @@
         unsubscribe = model.subscribe(document => { acknowledged = false; pendingDelete = ''; options.onChange?.(document); });
         render();
         return { getDocument: model.getDocument, validate: model.validate, model,
-            destroy() { destroyed = true; unsubscribe(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
+            destroy() { destroyed = true; unsubscribe(); overlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };
     root.DMateGraphEditor = api;
