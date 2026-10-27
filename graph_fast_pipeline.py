@@ -666,7 +666,8 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
     from graph_semantic_geometry import prepare_semantic_geometry
     from graph_semantic_hints import project_ocr_hints, project_connection_hints
     from graph_pixel_safety import (measure_image_pixel_evidence,
-        create_grid_column_views, reconcile_anonymous_pixel_graphs)
+        create_grid_column_views, create_grid_panel_views,
+        reconcile_anonymous_pixel_graphs)
 
     started = time.monotonic()
     source = hashlib.sha256(raw).hexdigest()
@@ -800,20 +801,44 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             local_result.setdefault('tool_audit', []).extend(path_result.get('tool_audit', []))
         from graph_semantic_arrow_views import prepare_panel_views
         from graph_semantic_panel_context import panel_context
-        # Multiple disputed panels in a grid need the same column images as
-        # the initial reader; an overview alone repeatedly merged distinct
-        # operators/graphs. Always retain an original-page anchor.
-        review_views = copy.deepcopy(
-            main_views if pixel_evidence.get('grid') and
-            (targets.get('document') or len(targets['graph_ids']) >= 2) else views)
-        for graph in state['draft']['graphs']:
-            if not isinstance(graph, dict) or str(graph.get('id')) not in targets['graph_ids']:
-                continue
-            contextual = panel_context(graph, local_result.get('layout') or quick)['graph']
-            panel = prepare_panel_views(raw, graph=contextual, overview_views=views, budget=budget)
-            if len(panel['images']) > 1 and len(review_views['images']) < 5:
-                review_views['images'].append(panel['images'][1])
-                review_views['view_descriptions'].append('待核对子图'+str(graph['id'])+'的原像素局部；'+panel['view_descriptions'][1])
+        # Read the disputed cells at original resolution. Column-wide crops
+        # were useful for the initial inventory but made GLM repeatedly miss
+        # clear strokes in G4/G5 and a missing node in G6. Keep an overview
+        # for context and up to four unique individual figure positions.
+        targeted = []
+        if not targets.get('document') and pixel_evidence.get('grid'):
+            grid = pixel_evidence['grid']
+            graphs = state['draft'].get('graphs', [])
+            if (len(graphs) == grid.get('minimum_captioned_panels')
+                    and 1 <= len(targets['graph_ids']) <= 4):
+                indices = [index for index, graph in enumerate(graphs)
+                           if isinstance(graph, dict)
+                           and str(graph.get('id')) in targets['graph_ids']]
+                if len(indices) == len(targets['graph_ids']):
+                    try:
+                        targeted = create_grid_panel_views(raw, pixel_evidence, indices)
+                    except Exception as exc:
+                        budget.event('fast_targeted_grid_views', 'unavailable',
+                                     error_kind=type(exc).__name__)
+        if targeted and len(targeted) <= 4:
+            review_views = {'images': views['images'] + [row['image'] for row in targeted],
+                            'view_descriptions': views['view_descriptions'] +
+                                [row['description'] for row in targeted]}
+            view_strategy = 'original_overview_plus_disputed_grid_cells'
+        else:
+            # Whole-document inventory disputes still require all columns.
+            review_views = copy.deepcopy(
+                main_views if pixel_evidence.get('grid') and
+                (targets.get('document') or len(targets['graph_ids']) >= 2) else views)
+            view_strategy = 'original_overview_with_legacy_views'
+            for graph in state['draft']['graphs']:
+                if not isinstance(graph, dict) or str(graph.get('id')) not in targets['graph_ids']:
+                    continue
+                contextual = panel_context(graph, local_result.get('layout') or quick)['graph']
+                panel = prepare_panel_views(raw, graph=contextual, overview_views=views, budget=budget)
+                if len(panel['images']) > 1 and len(review_views['images']) < 5:
+                    review_views['images'].append(panel['images'][1])
+                    review_views['view_descriptions'].append('待核对子图'+str(graph['id'])+'的原像素局部；'+panel['view_descriptions'][1])
         text = local_result.get('text', {})
         hints = project_ocr_hints(text, role='semantic_review', body_regions=quick.get('body_regions', []))
         try:
@@ -838,7 +863,9 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             patched, pending = _merge_local_review(state['draft'], response, targets)
             extra_issues.extend(pending)
             return {**state, 'draft': patched, 'local_review': {'status': 'completed', 'model_calls': 1,
-                                                             'targets': targets}}
+                                                             'targets': targets,
+                                                             'view_strategy': view_strategy,
+                                                             'image_count': len(review_views['images'])}}
         except AgentCancelled:
             raise
         except (VisionError, ValueError, TimeoutError) as exc:
@@ -852,7 +879,8 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
                 if targets['body']:
                     extra_issues.append(_issue('local_review_failed', message, scope='body', reason=kind))
             return {**state, 'local_review': {'status': 'failed', 'reason': kind, 'model_calls': 1,
-                                             'targets': targets}}
+                                             'targets': targets, 'view_strategy': view_strategy,
+                                             'image_count': len(review_views['images'])}}
 
     def final_check(state):
         # GLM can propose a change; independent pixel evidence still needs to

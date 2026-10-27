@@ -398,6 +398,57 @@ def create_grid_column_views(raw, evidence):
     return views
 
 
+def create_grid_panel_views(raw, evidence, indices):
+    """Zoom only the disputed mathematical panels from the ORIGINAL RGB.
+
+    Indices are zero-based in full-page reading order. The caller must supply
+    independently flagged graph indices; this never selects a "winning" crop
+    by comparing to an expected result or invents a graph identity.
+    """
+    grid = evidence.get("grid") if isinstance(evidence, dict) else None
+    if not isinstance(grid, dict) or grid.get("status") != "regular_caption_grid":
+        return []
+    rows = grid.get("panels")
+    if (not isinstance(rows, list) or len(rows) != grid.get("minimum_captioned_panels")
+            or not isinstance(indices, (list, tuple)) or not 1 <= len(indices) <= 4
+            or any(type(index) is not int or index < 0 or index >= len(rows)
+                   for index in indices) or len(set(indices)) != len(indices)):
+        return []
+    original, _ = _image(raw)
+    width, height = original.size
+    views = []
+    for index in indices:
+        panel = rows[index]
+        box = panel.get("bbox") if isinstance(panel, dict) else None
+        if (not isinstance(box, list) or len(box) != 4
+                or any(type(v) not in (int, float) or not math.isfinite(v) for v in box)):
+            return []
+        x0, y0, x1, y1 = [float(v) / 1000. for v in box]
+        if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+            return []
+        left, top = max(0, int(math.floor(x0*width))), max(0, int(math.floor(y0*height)))
+        right, bottom = min(width, int(math.ceil(x1*width))), min(height, int(math.ceil(y1*height)))
+        if right-left < width*.10 or bottom-top < height*.12:
+            return []
+        cut = original.crop((left, top, right, bottom))
+        maximum = min(1., 1280/max(cut.size), math.sqrt(950_000/(cut.width*cut.height)))
+        if maximum < 1.:
+            cut = cut.resize((max(1,int(cut.width*maximum)),
+                              max(1,int(cut.height*maximum))), Image.Resampling.LANCZOS)
+        stream = io.BytesIO()
+        cut.save(stream, format="PNG", compress_level=3)
+        views.append({
+            "image": "data:image/png;base64," + base64.b64encode(stream.getvalue()).decode("ascii"),
+            "description": (f"完整原图中第{index+1}个图注位置的独立原RGB局部放大，"
+                            f"位于第{panel.get('row')}行第{panel.get('column')}列；"
+                            "用于核查这个位置的顶点、实际连线和箭头。"
+                            "这不是新增图，不按图名或模型草稿推测原像素。"),
+            "region_id": panel.get("id"),
+            "original_pixel_bbox": [left, top, right, bottom]
+        })
+    return views
+
+
 def reconcile_anonymous_pixel_graphs(draft, evidence):
     """High-confidence straight-line pixel edges may repair unlabeled graphs.
 
@@ -466,4 +517,5 @@ def reconcile_anonymous_pixel_graphs(draft, evidence):
 
 
 __all__ = ["measure_image_pixel_evidence", "create_grid_column_views",
+           "create_grid_panel_views",
            "reconcile_anonymous_pixel_graphs"]
