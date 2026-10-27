@@ -10,7 +10,7 @@ from pathlib import Path
 import networkx as nx
 
 from graph_pixel_safety import (measure_image_pixel_evidence,
-    create_grid_column_views, reconcile_anonymous_pixel_graphs)
+    create_grid_column_views, create_grid_panel_views, reconcile_anonymous_pixel_graphs)
 from graph_fast_pipeline import _caption_grid_issues, _grid_dark_disk_issues
 
 
@@ -181,3 +181,93 @@ def test_dark_disk_inventory_is_inactive_without_a_strict_grid():
     assert sample["grid"] is None
     assert sample["grid_dark_disks"] == {"status": "not_applicable", "panels": []}
     assert _grid_dark_disk_issues({"body_text": "", "graphs": []}, sample) == []
+
+
+
+def test_original_rgb_targeted_crops_are_the_three_disputed_bottom_panels():
+    """The visual-review provider must receive actual pixels, not model crops."""
+    import base64
+    import io
+    from PIL import Image
+
+    raw = _image("181309.png")
+    evidence = measure_image_pixel_evidence(raw)
+    zooms = create_grid_panel_views(raw, evidence, [3, 4, 5])
+    assert len(zooms) == 3
+    assert [row["region_id"] for row in zooms] == [
+        "colored_caption_r2c1", "colored_caption_r2c2", "colored_caption_r2c3"]
+    assert len({row["image"] for row in zooms}) == 3
+    original = Image.open(io.BytesIO(raw)).convert("RGB")
+    for crop in zooms:
+        assert "原RGB" in crop["description"]
+        assert crop["image"].startswith("data:image/png;base64,")
+        pixels = base64.b64decode(crop["image"].split(",", 1)[1], validate=True)
+        seen = Image.open(io.BytesIO(pixels)).convert("RGB")
+        x0, y0, x1, y1 = crop["original_pixel_bbox"]
+        assert seen.size == (x1-x0, y1-y0)
+        assert seen.tobytes() == original.crop((x0, y0, x1, y1)).tobytes()
+
+
+def test_targeted_crops_reject_ambiguous_or_incomplete_panel_inventory():
+    raw = _image("181309.png")
+    evidence = measure_image_pixel_evidence(raw)
+    assert create_grid_panel_views(raw, evidence, [0, 0]) == []
+    assert create_grid_panel_views(raw, evidence, [-1]) == []
+    assert create_grid_panel_views(raw, evidence, [6]) == []
+    assert create_grid_panel_views(raw, evidence, [0, 1, 2, 3, 4]) == []
+    bad = copy.deepcopy(evidence)
+    bad["grid"]["panels"][5]["bbox"] = [0, 0, 10000, 500]
+    assert create_grid_panel_views(raw, bad, [5]) == []
+    broken = copy.deepcopy(evidence)
+    broken["grid"]["minimum_captioned_panels"] = 7
+    assert create_grid_panel_views(raw, broken, [5]) == []
+
+
+def test_fast_review_chooses_only_disputed_grid_panels(monkeypatch, prepared):
+    from test_graph_fast_pipeline import Provider, Specialist, document
+    import hashlib
+    import graph_pixel_safety
+    raw, run, _ = prepared
+    baseline = document()
+    initial = {"body_text": baseline["body_text"], "graphs": [], "uncertainties": []}
+    for i in range(6):
+        row = copy.deepcopy(baseline["graphs"][0])
+        row["id"] = f"G{i+1}"
+        row["name"] = f"G{i+1}"
+        if i in (3, 4):
+            row["visible_edge_count"] = len(row["edges"]) + 1
+        elif i == 5:
+            row["visible_vertex_count"] = len(row["vertices"]) + 1
+        initial["graphs"].append(row)
+
+    grids = []
+    for row in range(2):
+        for column in range(3):
+            grids.append({"id": f"colored_caption_r{row+1}c{column+1}",
+                          "bbox": [column * 333, row * 500,
+                                   (column+1) * 333 if column < 2 else 1000,
+                                   (row+1) * 500],
+                          "row": row+1, "column": column+1})
+    evidence = {"source_sha256": hashlib.sha256(raw).hexdigest(),
+                "grid": {"status": "regular_caption_grid", "panels": grids,
+                         "rows": 2, "columns": 3, "minimum_captioned_panels": 6,
+                         "column_bounds": [0, 1/3, 2/3, 1]},
+                "grid_dark_disks": {"status": "partial", "panels": [
+                    {"status": "unstable", "region_id": g["id"]} for g in grids]},
+                "colored_graphs": [], "advisory_only": True}
+    monkeypatch.setattr(graph_pixel_safety, "measure_image_pixel_evidence",
+                        lambda data: copy.deepcopy(evidence))
+    review = {"graphs": copy.deepcopy(initial["graphs"][3:]),
+              "uncertainties": []}
+    specialist = Specialist(review)
+    result, main = run(main=Provider(initial), specialist=specialist)
+    assert len(main.requests) == len(specialist.requests) == 1
+    assert specialist.requests[0]["targets"]["graph_ids"] == ["G4", "G5", "G6"]
+    views = specialist.requests[0]["image_views"]
+    assert len(views) == 4
+    assert all("原RGB局部放大" in name for name in views[1:])
+    assert [text.split("图注位置")[0][-2:] for text in views[1:]]  # three distinct locations
+    assert result["semantic_workflow"]["local_review"]["view_strategy"] == (
+        "original_overview_plus_disputed_grid_cells")
+    assert result["semantic_workflow"]["local_review"]["image_count"] == 4
+    assert len(result["graphs"]) == 6
