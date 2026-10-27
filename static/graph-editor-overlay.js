@@ -8,7 +8,7 @@ function mount(host,o){
  let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false;const pointers=new Map();
  const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),status=d.createElement('span');
  root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
- stage.append(image,svg);scroll.append(stage);root.append(bar,scroll,status);host.append(root);
+ stage.append(image,svg);scroll.append(stage);root.append(bar,scroll);host.append(root);
  const button=(label,key,fn)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',()=>{if(!o.disabled?.())fn();});bar.append(b);return b;};
  for(const [key,label] of [['select','选择移动'],['pan','平移'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']]){
   button(label,key,()=>{s.mode=key;s.start=null;draw();});
@@ -83,6 +83,7 @@ function mount(host,o){
    scroll.scrollLeft=stage.scrollWidth*(box[0]+box[2])/2-scroll.clientWidth/2;
    scroll.scrollTop=stage.scrollHeight*(box[1]+box[3])/2-scroll.clientHeight/2;
  });
+ bar.append(status); // Actionable feedback appears with the tools, never below the photo.
  const change=fn=>{try{fn();o.changed?.();draw();}catch(e){status.textContent=e?.message||'修改失败';}};
  const pos=(v,i,g)=>{
   if(ghost?.vertex===v.id)return ghost.pos;

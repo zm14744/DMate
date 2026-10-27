@@ -184,6 +184,7 @@ def browser_editor():
 
 def test_real_browser_edits_and_confirms_the_same_user_visible_document(browser_editor, tmp_path):
     page = browser_editor
+    assert page.locator('.dge-validation, .dge-context, .dge-footer .dge-check').count() == 0
     label = '<img src=x onerror="window.INJECTED=true">'
     page.get_by_label('节点 1 标签', exact=True).fill(label)
     page.get_by_label('题干、全部小问与公式', exact=True).fill('（1）求修改后的度数。\n（2）列出全部边。')
@@ -193,7 +194,6 @@ def test_real_browser_edits_and_confirms_the_same_user_visible_document(browser_
     page.get_by_role('button', name='应用数量', exact=True).click()
     page.get_by_label('逐条编辑重边', exact=True).check()
     page.get_by_label('边 2 权重', exact=True).fill('7')
-    page.get_by_label('我已对照原图核对题干与各子图', exact=True).check()
     page.get_by_role('button', name='保存并确认', exact=True).click()
     page.wait_for_function('confirmations.length===1')
     confirmed = page.evaluate('confirmations[0]')
@@ -205,7 +205,8 @@ def test_real_browser_edits_and_confirms_the_same_user_visible_document(browser_
     assert page.locator('#editor img').count() == 0
     page.screenshot(path=str(tmp_path/'editor-desktop.png'), full_page=True)
     page.get_by_label('节点 1 标签', exact=True).fill('A′')
-    assert not page.get_by_label('我已对照原图核对题干与各子图', exact=True).is_checked()
+    assert page.get_by_label('我已对照原图核对题干与各子图', exact=True).count() == 0
+    assert page.locator('.dge-context, .dge-validation').count() == 0
     assert page.evaluate('changes.at(-1).graphs[0].vertices[0].label') == 'A′'
 
 
@@ -228,13 +229,12 @@ def test_real_browser_adds_nodes_and_moves_edges_without_losing_select_values(br
 def test_real_browser_unknown_direction_and_failed_save_keep_editable_draft(browser_editor):
     page = browser_editor
     page.get_by_label('边 1 方向', exact=True).select_option('unknown')
-    page.get_by_label('我已对照原图核对题干与各子图', exact=True).check()
     page.get_by_role('button', name='保存并确认', exact=True).click()
     assert page.evaluate('confirmations.length') == 0
-    assert page.get_by_text('请先处理上方标出的结构问题。', exact=True).is_visible()
+    assert '方向' in page.locator('.dge-status').inner_text()
+    assert page.locator('.dge-validation').count() == 0
     page.get_by_label('边 1 方向', exact=True).select_option('forward')
     page.evaluate('window.failSave=true')
-    page.get_by_label('我已对照原图核对题干与各子图', exact=True).check()
     page.get_by_role('button', name='保存并确认', exact=True).click()
     page.get_by_text('保存失败，请重试', exact=True).wait_for()
     assert page.get_by_label('边 1 权重', exact=True).input_value() == '2'

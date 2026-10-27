@@ -19,7 +19,7 @@
         const model = createModel(initialized, initial);
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
         let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null;
-        let individually = false, saving = false, destroyed = false, acknowledged = false, notice = '', pendingDelete = '';
+        let individually = false, saving = false, destroyed = false, notice = '', pendingDelete = '';
         let unsubscribe, overlay = null;
         const overlayState = { mode: 'select', zoom: 100, visible: true, start: null };
         const element = (tag, className, label) => { const node = dom.createElement(tag); if (className) node.className = className;
@@ -62,7 +62,6 @@
                 if (refreshed) { refreshed.open = oldReview.open; oldReview.replaceWith(refreshed); }
             }
             const status = container.querySelector('.dge-status'); if (status) status.textContent = notice;
-            const ack = container.querySelector('.dge-footer input[type=checkbox]'); if (ack) ack.checked = acknowledged;
             const undo = container.querySelector('[data-editor-undo]'); if (undo) undo.disabled = saving || !model.canUndo();
             const redo = container.querySelector('[data-editor-redo]'); if (redo) redo.disabled = saving || !model.canRedo();
             for (const selector of container.querySelectorAll('select[data-graph-nodes]')) {
@@ -80,15 +79,6 @@
                     count.textContent = amount ? amount + ' 条关联边' : '孤立点';
                 }
             }
-            renderValidation();
-        }
-
-        function renderValidation() {
-            container.querySelector('.dge-validation')?.remove();
-            const issues = model.validate(); if (!issues.length) return;
-            const details = element('details', 'dge-validation'); details.open = true; details.append(element('summary', '', '确认前还需处理 ' + issues.length + ' 项'));
-            const list = element('ul'); issues.forEach(message => list.append(element('li', '', message))); details.append(list);
-            const footer = container.querySelector('.dge-footer'); footer ? container.insertBefore(details, footer) : container.append(details);
         }
 
         function drawGraph(graph) {
@@ -140,31 +130,6 @@
                 group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); svg.append(group);
             });
             return svg;
-        }
-
-        function renderContext(document, parent) {
-            const details = element('details', 'dge-context');
-            details.append(element('summary', '', '图例与说明'));
-            for (const [kind, label] of [['legends', '图例'], ['captions', '说明']]) {
-                (document.text_context?.[kind] || []).forEach((row, index) => {
-                    const box = element('div', 'dge-context-row');
-                    const area = element('textarea'); area.value = row.text; area.rows = 2; area.setAttribute('aria-label', label + ' ' + (index + 1)); area.disabled = saving;
-                    area.addEventListener('input', () => edit(() => model.setContext(kind, index, { ...model.getDocument().text_context[kind][index], text: area.value })));
-                    box.append(area);
-                    const associations = element('div', 'dge-context-associations');
-                    associations.append(element('span', 'dge-muted', '适用子图（未选表示整题）'));
-                    document.graphs.forEach(graph => {
-                        const choice = element('label'), check = element('input'); check.type = 'checkbox'; check.checked = row.graph_ids.includes(graph.id); check.disabled = saving;
-                        check.addEventListener('change', () => act(() => { const current = model.getDocument().text_context[kind][index];
-                            model.setContext(kind, index, { ...current, graph_ids: check.checked ? [...current.graph_ids, graph.id] : current.graph_ids.filter(gid => gid !== graph.id) }); }));
-                        choice.append(check, dom.createTextNode(graph.name || graph.id)); associations.append(choice);
-                    });
-                    box.append(associations, button('适用整题', () => model.setContext(kind, index, { ...model.getDocument().text_context[kind][index], graph_ids: [] })),
-                        button('删除' + label, () => model.setContext(kind, index, null), 'dge-danger')); details.append(box);
-                });
-                details.append(button('添加' + label, () => model.setContext(kind, document.text_context?.[kind]?.length || 0, { text: '', graph_ids: [] })));
-            }
-            parent.append(details);
         }
 
         function buildReview(graph, document) {
@@ -271,7 +236,7 @@
                     nodeSelected: () => selectedNodes,
                     selectEdge: id => { selectedEdge = id; selectedNodes.clear(); render(); },
                     selectNode: id => { selectedNodes = new Set([id]); selectedEdge = null; render(); },
-                    changed: () => { acknowledged = false; render(); },
+                    changed: () => render(),
                     recognizeText: async polygon => {
                         if (typeof options.onRecognizeText !== 'function')
                             throw new Error('文字区域识别暂不可用，请手动输入。');
@@ -302,7 +267,7 @@
             if (review) container.append(review);
             const body = element('textarea', 'dge-body'); body.value = document.body_text; body.rows = 4; body.setAttribute('aria-label', '题干、全部小问与公式'); body.disabled = saving;
             body.addEventListener('input', () => edit(() => model.setBody(body.value)));
-            container.append(field('题干、全部小问与公式', body)); renderContext(document, container);
+            container.append(field('题干、全部小问与公式', body));
             const toolbar = element('div', 'dge-toolbar');
             if (document.graphs.length) toolbar.append(field('当前子图', select(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; pendingDelete = ''; render(); })));
             toolbar.append(button('添加子图', () => { currentGraph = model.addGraph(); selectedNodes.clear(); selectedEdge = null; }));
@@ -386,17 +351,15 @@
                 } else container.append(panels);
             }
             const status = element('div', 'dge-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.textContent = notice; container.append(status);
-            renderValidation();
-            const confirmRow = element('div', 'dge-footer'), ackLabel = element('label', 'dge-check'), ack = element('input'); ack.type = 'checkbox'; ack.checked = acknowledged; ack.disabled = saving;
-            ack.addEventListener('change', () => { acknowledged = ack.checked; }); ackLabel.append(ack, dom.createTextNode('我已对照原图核对题干与各子图')); confirmRow.append(ackLabel);
+            const confirmRow = element('div', 'dge-footer');
             const actions = element('div', 'dge-actions'); actions.append(button('稍后继续', () => options.onCancel?.()));
             const confirm = button(saving ? '正在保存…' : '保存并确认', async () => {
                 if ([...container.querySelectorAll('input[type=number]')].some(control => !control.checkValidity())) {
                     notice = '请填写有效的相同边数量（1 到 50）。'; refreshDraftViews(); return;
                 }
                 const problems = model.validate();
-                if (problems.length) { notice = '请先处理上方标出的结构问题。'; render(); return; }
-                if (!acknowledged) { notice = '请核对原图后勾选确认。'; render(); return; }
+                // The default draft may be empty; only show validation errors after Save is pressed.
+                if (problems.length) { notice = problems[0]; render(); return; }
                 if (typeof options.onConfirm !== 'function') { notice = '暂时无法保存，请稍后重试。'; render(); return; }
                 saving = true; render();
                 try { await options.onConfirm(model.getDocument()); }
@@ -404,7 +367,7 @@
                 finally { saving = false; if (!destroyed) render(); }
             }, 'dge-primary'); actions.append(confirm); confirmRow.append(actions); container.append(confirmRow);
         }
-        unsubscribe = model.subscribe(document => { acknowledged = false; pendingDelete = ''; options.onChange?.(document); });
+        unsubscribe = model.subscribe(document => { pendingDelete = ''; options.onChange?.(document); });
         render();
         return { getDocument: model.getDocument, validate: model.validate, model,
             destroy() { destroyed = true; unsubscribe(); overlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };

@@ -14608,7 +14608,7 @@ async function editOcrTask(id) {
     }
     ocrEditorTaskId = task.id;
     ocrReviewInProgress = true;
-    if (title) title.textContent = `核对与修改 · ${task.file.name}`;
+    if (title) title.textContent = task.file?.name || "图片";
     const finish = () => {
         dialog.removeEventListener("close", finish);
         ocrEditorController?.destroy();

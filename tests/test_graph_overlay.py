@@ -68,6 +68,9 @@ def center(locator):
 
 def test_overlay_makes_named_and_anonymous_nodes_and_edges_editable(canvas_page):
     page = canvas_page
+    assert page.locator(".dge-overlay-hint, .dge-validation, .dge-context, .dge-footer .dge-check").count() == 0
+    assert page.locator(".dge-overlay-viewport + .dge-overlay-status").count() == 0
+    assert page.locator(".dge-overlay-tools .dge-overlay-status").count() == 1
     assert page.locator(".dge-overlay-node").count() == 2
     state = page.evaluate("instance.getDocument()")
     assert state["graphs"][0]["vertices"][1]["display_label"] == "①"
@@ -111,7 +114,6 @@ def test_drag_geometry_and_bounds_can_be_saved_and_restored(canvas_page):
     page.mouse.up()
     graph = page.evaluate("instance.getDocument().graphs[0]")
     assert graph["bbox"][0] < graph["bbox"][2] and graph["bbox"][1] < graph["bbox"][3]
-    page.get_by_label("我已对照原图核对题干与各子图", exact=True).check()
     page.get_by_role("button", name="保存并确认", exact=True).click()
     page.wait_for_function("confirmed.length===1")
     assert page.evaluate("confirmed[0].graphs[0].edges[0].path.length") == 3
