@@ -291,7 +291,13 @@
                 if (graph.edges.length - selected.length + count > LIMITS.edges) throw new Error('每幅图最多 300 条边。');
                 const removed = new Set(selected.slice(count).map(row => row.id));
                 graph.edges = graph.edges.filter(row => !removed.has(row.id));
-                for (let number = selected.length; number < count; number++) graph.edges.push({ ...copy(selected[0]), id: unique('e', graph.edges) });
+                for (let number = selected.length; number < count; number++) {
+                    const duplicate = { ...copy(selected[0]), id: unique('e', graph.edges) };
+                    // Every new parallel edge must have an independent path:
+                    // overlapping traces cannot be selected individually.
+                    delete duplicate.path;
+                    graph.edges.push(duplicate);
+                }
             }),
             deleteEdges: (gid, ids) => change(draft => { const graph = getGraph(draft, gid); graph.edges = graph.edges.filter(row => !ids.includes(row.id)); }),
             moveVertices: (fromId, toId, ids) => change(draft => {
