@@ -28,7 +28,7 @@ PERFORMANCE_TARGET_SECONDS = 120
 
 MAIN_PROMPT = r'''读取数学题原图，返回紧凑JSON题干和图结构，不解题，不输出解释或Markdown。
 第一张总览决定独立子图数量；后续局部只是同一原图的放大窗口，不能重复计图。local_caption_grid是从原图彩色图注矩形测出的版面参考。如果存在多行多列图注，逐格核对对应的独立数学图，不得只返回第一幅；同一图的放大窗口不能重复计图。local_colored_graph_candidates是原像素中的彩色顶点与直线候选。local_dark_disk_summary逐格列出多图页面中经过三种阈值核对的黑色圆点数量，以及图中能沿原像素追到的直线数量下界；必须逐幅对照原图核实。下界不代表总边数，曲线、自环、重边可能额外存在。不能只为满足候选计数、图名或性质而补删点边。同图不连通分量不能仅因分开就拆图。多图时每图给相对完整原图0..1000的粗bbox，也可附对应layout_panel_ids；不要将每个局部窗口都填成整页bbox。坐标不要求精确。
-先清点真实圆点、圆圈或明确顶点，包括孤立点，再沿实际连线读端点。普通交叉、箭头尖和文字不是顶点；边名不能变成节点。无印刷节点名则label=null；e_i也可能是真节点名，须按原图位置判别。local_visual_inventory中的同类圆点须逐个对照原图，可在顶点附marker_id绑定对应候选；若有候选以外的真实点，保留并只为该点附短visual_basis说明具体位置与可见依据。候选可能错漏，不能按候选数、题干、图名、度数或模板补删点边。
+先清点真实圆点、圆圈或明确顶点，包括孤立点，再沿实际连线读端点。能明确定位的顶点可附 x、y，使用整张原图 0..1 的相对坐标；位置不确定时省略，不能编造。能够明确沿笔画追踪的边可附 path:[[x,y],...]（整张原图 0..1，最多128个坐标），不能可靠追踪的边可以省略 path，用户稍后自行校准。普通交叉、箭头尖和文字不是顶点；边名不能变成节点。无印刷节点名则label=null；e_i也可能是真节点名，须按原图位置判别。local_visual_inventory中的同类圆点须逐个对照原图，可在顶点附marker_id绑定对应候选；若有候选以外的真实点，保留并只为该点附短visual_basis说明具体位置与可见依据。候选可能错漏，不能按候选数、题干、图名、度数或模板补删点边。
 对于能够辨认的子图，请独立清点并给出visible_vertex_count和visible_edge_count，再与vertices、edges逐一核对；确实不能确定时填null并注明疑点。不能为了让两种计数相等而补删图结构，也不能直接把数组长度或工具候选数抄成视觉计数。只输出一份vertices和edges，不逐点逐边重复描述。
 交叉处沿原笔画走，不换线；经过真实顶点才分成不同边。虚线的多个短划是一条边。每条无向边、有向边、自环、重边和反向弧各列一次。方向只按箭头尖确定，不能按编号或布局猜；看不清用unknown。
 weighted必须是布尔值：只有实际边权才true，节点数字、节点编号、边名不算权重。已知存在但未读清的边权用null并列疑点。保留零、负数及π、√2、1/3等原始符号，不计算近似值。同一印刷项仅放对应的weight或edge_label，不能重复填写。保留必要颜色、虚线与点线；阴影、透印不能当新增线条。
@@ -58,7 +58,9 @@ _DRAFT_SCHEMA = {
                 'visible_edge_count': {'type': ['integer', 'null'], 'minimum': 0, 'maximum': 300},
                 'vertices': {'type': 'array', 'maxItems': 100, 'items': {
                     'type': 'object', 'properties': {'id': _IDENTIFIER,
-                        'label': {'type': ['string', 'integer', 'number', 'null']}}}},
+                        'label': {'type': ['string', 'integer', 'number', 'null']},
+                        'x': {'type': ['number', 'null'], 'minimum': 0, 'maximum': 1},
+                        'y': {'type': ['number', 'null'], 'minimum': 0, 'maximum': 1}}}},
                 'stroke_inventory': {'type': 'array', 'maxItems': 300, 'items': {
                     'type': 'object', 'required': ['id'], 'properties': {
                         'id': _IDENTIFIER, 'position': {'type': 'string', 'maxLength': 160}}}},
@@ -67,7 +69,10 @@ _DRAFT_SCHEMA = {
                         'id': _IDENTIFIER, 'from': _IDENTIFIER, 'to': _IDENTIFIER,
                         'direction': {'enum': ['forward', 'undirected', 'unknown']},
                         'weight': {'type': ['string', 'integer', 'number', 'null']},
-                        'edge_label': {'type': ['string', 'integer', 'number', 'null']}}}},
+                        'edge_label': {'type': ['string', 'integer', 'number', 'null']},
+                        'path': {'type': 'array', 'minItems': 2, 'maxItems': 128,
+                        'items': {'type': 'array', 'minItems': 2, 'maxItems': 2,
+                        'items': {'type': 'number', 'minimum': 0, 'maximum': 1}}}}}},
             }}},
         'uncertainties': {'type': 'array', 'maxItems': 128},
     },
@@ -465,6 +470,34 @@ def _merge_local_review(previous, response, targets):
         previous_graph = next((old for old in previous.get('graphs', [])
                                if isinstance(old, dict) and str(old.get('id')) == gid), None)
         if previous_graph is not None:
+            # The second visual read is about disputed semantics. If it omits
+            # image coordinates, keep precisely identifiable earlier geometry;
+            # a changed endpoint, label or edge direction is never silently
+            # assigned its predecessor's path.
+            if 'bbox' not in returned[gid] and isinstance(previous_graph.get('bbox'), list):
+                returned[gid]['bbox'] = copy.deepcopy(previous_graph['bbox'])
+            old_vertices = {str(v['id']): v for v in previous_graph.get('vertices', [])
+                            if isinstance(v, dict) and v.get('id') is not None}
+            for vertex in returned[gid]['vertices']:
+                if not isinstance(vertex, dict) or vertex.get('id') is None:
+                    continue
+                old_vertex = old_vertices.get(str(vertex['id']))
+                if not old_vertex or vertex.get('label') != old_vertex.get('label'):
+                    continue
+                if ('x' not in vertex and 'y' not in vertex
+                        and old_vertex.get('x') is not None and old_vertex.get('y') is not None):
+                    vertex['x'], vertex['y'] = old_vertex['x'], old_vertex['y']
+            old_edges = {str(e['id']): e for e in previous_graph.get('edges', [])
+                         if isinstance(e, dict) and e.get('id') is not None}
+            for edge in returned[gid]['edges']:
+                if not isinstance(edge, dict) or edge.get('id') is None or 'path' in edge:
+                    continue
+                old_edge = old_edges.get(str(edge['id']))
+                if (old_edge and edge.get('from') == old_edge.get('from')
+                        and edge.get('to') == old_edge.get('to')
+                        and edge.get('direction') == old_edge.get('direction')
+                        and isinstance(old_edge.get('path'), list)):
+                    edge['path'] = copy.deepcopy(old_edge['path'])
             for count_key, list_key in (('visible_vertex_count', 'vertices'),
                                         ('visible_edge_count', 'edges')):
                 if count_key in previous_graph and count_key not in graph:

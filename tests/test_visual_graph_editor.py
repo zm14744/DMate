@@ -1,6 +1,7 @@
 """User-editable semantic structure, exercised in Node and actual Chromium."""
 import copy
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -156,7 +157,7 @@ console.log(JSON.stringify({document:model.getDocument(),issues:model.validate()
 
 @pytest.fixture
 def browser_editor():
-    executable = shutil.which('chromium')
+    executable = os.environ.get('DMATE_BROWSER_EXECUTABLE') or shutil.which('chromium')
     if not executable:
         pytest.skip('Chromium is required for actual editor interaction')
     playwright = pytest.importorskip('playwright.sync_api')
@@ -167,6 +168,7 @@ def browser_editor():
         page.route('**/*', lambda route: (external.append(route.request.url), route.abort()))
         page.set_content('<main id="editor"></main>')
         page.add_style_tag(content=(ROOT/'static/graph-editor.css').read_text())
+        page.add_script_tag(content=(ROOT/'static/graph-editor-model.js').read_text())
         page.add_script_tag(content=(ROOT/'static/graph-editor.js').read_text())
         page.evaluate("""value => {
             window.changes=[];window.confirmations=[];window.cancelled=0;window.failSave=false;
@@ -252,3 +254,76 @@ def test_real_browser_mobile_layout_and_two_step_delete(browser_editor):
     page.get_by_role('button', name='撤销', exact=True).click()
     assert page.evaluate('instance.getDocument().graphs[0].vertices.length') == 3
     assert page.evaluate('instance.getDocument().graphs[0].edges.length') == 1
+
+
+def test_redo_after_undo_and_new_change_discards_future():
+    result = run_model("""
+const old = model.getDocument().graphs[0].vertices[0].label;
+model.renameVertex('G1','a','X');
+model.undo();
+const restored = model.getDocument().graphs[0].vertices[0].label === old;
+model.redo();
+const redone = model.getDocument().graphs[0].vertices[0].label === 'X';
+model.undo();
+model.renameVertex('G1','a','Y');
+console.log(JSON.stringify({restored,redone,canRedo:model.canRedo(),name:model.getDocument().graphs[0].vertices[0].label}));
+""")
+    assert result == {'restored': True, 'redone': True, 'canRedo': False, 'name': 'Y'}
+
+
+def test_svg_editor_and_data_model_share_the_same_operations():
+    if not NODE:
+        pytest.skip('Node is required to verify graph editor exports')
+    script = """
+const model = require('./static/graph-editor-model.js');
+const editor = require('./static/graph-editor.js');
+if (editor.createModel !== model.createModel ||
+    editor.validateDocument !== model.validateDocument ||
+    editor.groupEdges !== model.groupEdges) process.exit(3);
+const doc = {body_text:'check', graphs:[{
+    id:'G1', vertices:[{id:'a',label:null},{id:'b',label:'B'}],
+    edges:[{id:'e1',from:'a',to:'b',direction:'forward',weight:0}]
+}]};
+const state = editor.createModel(doc);
+state.addEdge('G1', {from:'b',to:'a',direction:'forward'});
+if (state.validate().length || state.getDocument().graphs[0].edges.length !== 2) process.exit(4);
+state.undo();
+if (state.getDocument().graphs[0].edges.length !== 1) process.exit(5);
+"""
+    process = subprocess.run([NODE, '-e', script], cwd=ROOT, capture_output=True,
+                             text=True, timeout=15)
+    assert process.returncode == 0, process.stderr or process.stdout
+
+
+def test_image_geometry_model_preserves_stable_anonymous_labels_and_parallel_ids():
+    value = run_model("""
+const before = model.getDocument();
+const p = model.addVertex('G1','',.33,.4);
+const q = model.addVertex('G1','',.56,.71);
+model.setEdgePath('G1','e1',[[.2,.3],[.46,.56],[.8,.7]]);
+model.moveVertex('G1',p,.4,.42);
+const removed = model.getDocument().graphs[0].vertices.find(v=>v.id===p).display_label;
+model.deleteVertices('G1',[p]);
+const more = model.addVertex('G1','',.38,.22);
+console.log(JSON.stringify({graph:model.getDocument().graphs[0],more,removed,issues:model.validate()}));
+""")
+    graph = value["graph"]
+    assert graph["vertices"][-1]["display_label"] != value["removed"]
+    assert graph["edges"][0]["path"] == [[.2, .3], [.46, .56], [.8, .7]]
+    assert len({edge["id"] for edge in graph["edges"]}) == len(graph["edges"])
+    assert value["issues"] == []
+
+def test_graph_type_change_cannot_invent_edge_arrow_direction():
+    output = run_model("""
+model.setGraphType('G1','directed',false);
+model.setGraphType('G1','directed',true);
+const edge = model.getDocument().graphs[0].edges[0];
+const after = {direction:edge.direction,issues:model.validate()};
+model.updateEdges('G1',['e1'],'direction','forward');
+console.log(JSON.stringify({after,accepted:model.validate()}));
+""")
+    assert output['after']['direction'] == 'unknown'
+    assert any('方向尚未确认' in message for message in output['after']['issues'])
+    assert output['accepted'] == []
+
+

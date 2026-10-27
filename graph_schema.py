@@ -151,7 +151,7 @@ def describe_graphs(graphs):
     """
     lines = []
     for graph in graphs:
-        labels = {v['id']: v.get('label') or v['id'] for v in graph['vertices']}
+        labels = {v['id']: v.get('label') or v.get('display_label') or v['id'] for v in graph['vertices']}
         edges = []
         incident = set()
         for edge in graph['edges']:

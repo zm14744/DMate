@@ -13896,6 +13896,7 @@ function ocrReviewLabel(value) {
 }
 
 function formatCanonicalGraphReview(graphs) {
+    if (typeof window !== 'undefined' && window.DMateGraphFormat?.toMarkdown) return window.DMateGraphFormat.toMarkdown(graphs);
     const lines=[];
     for (let i=0;i<graphs.length;i++) {
         const g=graphs[i], nodes=g.vertices || [], edges=g.edges || [];
@@ -14266,6 +14267,45 @@ function renderOcrTasks() {
             const vertices = graphs.reduce((sum, graph) => sum + (graph.vertices || []).length, 0);
             const edges = graphs.reduce((sum, graph) => sum + (graph.edges || []).length, 0);
             content.append(element("p", "ocr-task-summary", `${graphs.length} 幅子图 · ${vertices} 个节点 · ${edges} 条边`));
+            if (task.descriptionState === "running") {
+                content.append(element("p", "ocr-task-summary", "正在整理图形外观描述…"));
+            }
+            // Keep the confirmed mathematical review in ONE consistent layout.
+            // The optional DeepSeek description is UI-only; never enter the
+            // signed semantic snapshot or the solver input.
+            if (task.confirmation && graphs.length && window.DMateGraphFormat?.graphRows) {
+                const details = element("details", "ocr-task-structure");
+                details.open = task.structureExpanded === true;
+                const summary = element("summary", "", "点、边与关系");
+                details.append(summary);
+                details.addEventListener("toggle", () => { task.structureExpanded = details.open; });
+                for (const [index, graph] of graphs.entries()) {
+                    const view = window.DMateGraphFormat.graphRows(graph, index);
+                    const section = element("section", "ocr-task-structure-graph");
+                    section.append(element("strong", "", view.title));
+                    section.append(element("p", "ocr-task-structure-type", view.type));
+                    section.append(element("p", "", "点：" + (view.vertices.join("、") || "无")));
+                    if (view.named.length) section.append(element("p", "",
+                        "边：" + view.named.join("、")));
+                    section.append(element("p", "ocr-task-structure-head", "关系："));
+                    if (view.relations.length) {
+                        const table = element("div", "ocr-task-relations");
+                        for (const row of view.relations) {
+                            const item = element("p", "", row.txt);
+                            item.dataset.edgeId = row.id;
+                            table.append(item);
+                        }
+                        section.append(table);
+                    } else section.append(element("p", "", "无"));
+                    const description = task.descriptions?.[String(graph.id)];
+                    if (typeof description === "string" && description) {
+                        section.append(element("p", "ocr-task-structure-head", "图形描述："));
+                        section.append(element("p", "", description));
+                    }
+                    details.append(section);
+                }
+                content.append(details);
+            }
         }
         const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
         slow.hidden = task.state !== "recognizing" || ocrTaskSeconds(task) < 120;
@@ -14299,7 +14339,7 @@ function renderOcrTasks() {
         if (task.state === "recognizing") {
             button("取消这张", "cancel");
         } else {
-            button(task.confirmation ? "继续修改" : task.state === "ready" ? "编辑核对" : "手动录入", "edit", !task.confirmation);
+            button(task.confirmation ? "继续修改" : task.result?.manual_mode ? "开始描绘" : task.state === "ready" ? "编辑核对" : "手动录入", "edit", !task.confirmation);
             if (task.confirmation) button("解题", "solve", true);
             button("移除", "remove");
         }
@@ -14345,6 +14385,7 @@ async function recognizeOcrTask(task) {
         const formData = new FormData();
         formData.append("image", task.file);
         formData.append("request_id", task.id);
+        formData.append("workflow", "manual_graph");
         const response = await fetch("/ocr", { method: "POST", body: formData, signal: task.controller.signal });
         const data = await parseResponseJson(response);
         if (task.state === "cancelled" || !ocrTasks.has(task.id)) return;
@@ -14361,11 +14402,14 @@ async function recognizeOcrTask(task) {
         task.draft = draftFromOcrResponse(data);
         task.initialDocument = cloneOcrDocument(task.draft);
         task.sourceSha256 = data?.source_sha256 || data?.diagnostics?.semantic_workflow?.source_sha256 || null;
-        task.state = data?.recognition_status === "failed"
-            || !task.draft.body_text.trim() && !task.draft.graphs.length ? "failed" : "ready";
-        task.notice = ocrReviewStatusText(data) || (task.state === "failed"
-            ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
-            : "请对照原图检查节点、连边和题干，确认后再解题。");
+        task.state = data?.manual_mode === true ? "ready"
+            : data?.recognition_status === "failed"
+                || !task.draft.body_text.trim() && !task.draft.graphs.length ? "failed" : "ready";
+        task.notice = data?.manual_mode === true
+            ? "原图已准备好。直接描绘顶点和边，文字可框选后识别。"
+            : ocrReviewStatusText(data) || (task.state === "failed"
+                ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
+                : "请对照原图检查节点、连边和题干，确认后再解题。");
     } catch (error) {
         if (task.state === "cancelled" || error?.name === "AbortError") {
             task.state = "cancelled";
@@ -14447,7 +14491,8 @@ async function enqueueOcrFiles(files) {
             state: "recognizing", startedAt: performance.now(), finishedAt: null,
             controller: new AbortController(), draft: { body_text: "", graphs: [] },
             initialDocument: { body_text: "", graphs: [] }, confirmation: null,
-            dirty: false, userRequest: "", error: "", notice: "", sourceSha256: null
+            dirty: false, userRequest: "", error: "", notice: "", sourceSha256: null,
+            descriptions: null, descriptionState: null
         };
         ocrTasks.set(task.id, task);
         accepted.push(task);
@@ -14457,6 +14502,39 @@ async function enqueueOcrFiles(files) {
     document.getElementById("ocrTaskPanel")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
     // Independent promises: one failed image cannot reject or cancel its peers.
     return Promise.allSettled(accepted.map(recognizeOcrTask));
+}
+
+async function requestGraphDescriptions(task, confirmation) {
+    const drawing = confirmation?.drawing_document;
+    const eligible = Array.isArray(drawing?.graphs) && drawing.graphs.some(graph =>
+        (graph.vertices || []).filter(v => Number.isFinite(v.x) && Number.isFinite(v.y)).length >= 2);
+    if (!eligible || !confirmation.semantic_context) return;
+    const revision = confirmation.revision;
+    task.descriptionState = "running";
+    renderOcrTasks();
+    try {
+        const response = await fetch("/graph/describe", {
+            method: "POST", credentials: "same-origin",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({semantic_context: confirmation.semantic_context,
+                drawing_document: drawing})
+        });
+        const result = await parseResponseJson(response);
+        if (!ocrTasks.has(task.id) || task.dirty || task.confirmation?.revision !== revision) return;
+        if (response.ok && result?.status === "ok" && result.descriptions
+            && typeof result.descriptions === "object") {
+            const known = new Set((task.draft.graphs || []).map(g => String(g.id)));
+            task.descriptions = Object.fromEntries(Object.entries(result.descriptions)
+                .filter(([id, value]) => known.has(id) && typeof value === "string"
+                    && value.length <= 135));
+            task.descriptionState = "complete";
+        } else task.descriptionState = "unavailable";
+    } catch (_error) {
+        if (ocrTasks.has(task.id) && task.confirmation?.revision === revision)
+            task.descriptionState = "unavailable";
+    } finally {
+        if (ocrTasks.has(task.id)) renderOcrTasks();
+    }
 }
 
 function ensureGraphSession() {
@@ -14486,10 +14564,13 @@ async function confirmOcrTask(task, documentValue) {
         if (!data?.document || !data?.confirmation_token || !data?.semantic_context) {
             throw new Error("结构确认响应不完整，请重新确认。");
         }
-        task.draft = cloneOcrDocument(data.document);
+        task.draft = cloneOcrDocument(data.drawing_document || data.document);
         task.confirmation = cloneOcrDocument(data);
         task.dirty = false;
+        task.descriptions = null;
+        task.descriptionState = null;
         task.notice = "修改已保存，解题将使用这份确认后的结构。";
+        void requestGraphDescriptions(task, data);
         return data;
     } catch (error) {
         task.error = error?.message || "结构确认失败，请稍后重试。";
@@ -14527,6 +14608,21 @@ async function editOcrTask(id) {
         ocrEditorController = window.DMateGraphEditor.mount(mount, {
             document: cloneOcrDocument(task.draft), initialDocument: cloneOcrDocument(task.initialDocument),
             originalUrl: task.originalUrl,
+            onRecognizeText: async polygon => {
+                const selected = new FormData();
+                selected.append("image", task.file);
+                selected.append("request_id", task.id);
+                selected.append("polygon", JSON.stringify(polygon));
+                const response = await fetch("/graph/text-region", {
+                    method: "POST", credentials: "same-origin", body: selected
+                });
+                const result = await parseResponseJson(response);
+                if (!response.ok || result?.error)
+                    throw new Error(result?.error || "文字区域识别失败，请调整范围");
+                if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id)
+                    throw new Error("文字识别结果与原图不匹配，请重新选择区域");
+                return typeof result.text === "string" ? result.text : "";
+            },
             issues: [...(Array.isArray(task.result?.diagnostics?.semantic_issues) ? task.result.diagnostics.semantic_issues : []),
                 ...(Array.isArray(task.result?.review?.reasons) ? task.result.review.reasons : []),
                 ...(task.error ? [task.error] : [])],
@@ -14534,6 +14630,8 @@ async function editOcrTask(id) {
                 task.draft = cloneOcrDocument(value);
                 task.dirty = true;
                 task.confirmation = null;
+                task.descriptions = null;
+                task.descriptionState = null;
                 task.error = "";
             },
             onCancel: () => { if (!task.confirming) dialog.close(); },
@@ -14562,7 +14660,8 @@ async function solveOcrTask(id) {
     }
     const context = sanitizeSemanticContext(task.confirmation.semantic_context);
     if (!context || !context.confirmation_token
-        || JSON.stringify(task.draft) !== JSON.stringify(task.confirmation.document)) {
+        || JSON.stringify(task.draft) !== JSON.stringify(
+            task.confirmation.drawing_document || task.confirmation.document)) {
         task.confirmation = null;
         task.error = "结构已修改或确认已失效，请先重新核对并确认。";
         renderOcrTasks();

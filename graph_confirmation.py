@@ -26,18 +26,27 @@ MAX_BYTES = 200_000
 TTL_SECONDS = 7 * 24 * 60 * 60
 _ID = {'type': 'string', 'minLength': 1, 'maxLength': 128, 'pattern': r'\S'}
 _TEXT = {'type': ['string', 'null'], 'maxLength': 256}
+_COORD = {'type': 'number', 'minimum': 0, 'maximum': 1}
+_POINT = {'type': 'array', 'prefixItems': [_COORD, _COORD], 'minItems': 2, 'maxItems': 2}
+_BBOX = {'type': 'array', 'prefixItems': [_COORD, _COORD, _COORD, _COORD], 'minItems': 4, 'maxItems': 4}
+_POLYGON = {'type': 'array', 'items': _POINT, 'minItems': 3, 'maxItems': 64}
 _EDGE = {'type': 'object', 'required': ['id', 'from', 'to', 'direction'], 'properties': {
     'id': _ID, 'from': _ID, 'to': _ID, 'direction': {'enum': ['forward', 'undirected']},
     'weight': {'type': ['number', 'string', 'null'], 'maxLength': 256},
     'edge_label': _TEXT, 'style': {'type': ['string', 'null'], 'maxLength': 64},
-    'color': {'type': ['string', 'null'], 'maxLength': 64}, 'multiplicity': {'const': 1}}}
+    'color': {'type': ['string', 'null'], 'maxLength': 64}, 'multiplicity': {'const': 1},
+    'path': {'type': 'array', 'items': _POINT, 'maxItems': 128}}}
 DOCUMENT_SCHEMA = {'type': 'object', 'required': ['body_text', 'graphs'], 'properties': {
     'body_text': {'type': 'string', 'maxLength': 24000},
     'graphs': {'type': 'array', 'maxItems': 64, 'items': {
         'type': 'object', 'required': ['id', 'vertices', 'edges'], 'properties': {
-            'id': _ID, 'name': _TEXT,
+            'id': _ID, 'name': _TEXT, 'bbox': _BBOX, 'region_polygon': _POLYGON,
+            'anon_next': {'type': 'integer', 'minimum': 1, 'maximum': 10000},
             'vertices': {'type': 'array', 'minItems': 1, 'maxItems': 100, 'items': {
-                'type': 'object', 'required': ['id'], 'properties': {'id': _ID, 'label': _TEXT}}},
+                'type': 'object', 'required': ['id'], 'properties': {
+                    'id': _ID, 'label': _TEXT, 'display_label': {'type': 'string', 'maxLength': 16},
+                    'x': {'anyOf': [_COORD, {'type': 'null'}]},
+                    'y': {'anyOf': [_COORD, {'type': 'null'}]}}}},
             'edges': {'type': 'array', 'maxItems': 300, 'items': _EDGE}}}}}}
 
 
@@ -112,6 +121,18 @@ def _identity(request_id, source_sha256):
         raise ConfirmationError('invalid_source_sha256', '原图标识无效，请重新选择原图。')
 
 
+def require_recognition_source(owner, request_id, source_sha256):
+    """Text ROI requests must belong to an uploaded image in THIS browser."""
+    _identity(request_id, source_sha256)
+    with _connection() as connection:
+        row = connection.execute('''SELECT source_sha256,expires
+            FROM graph_confirmations WHERE owner=? AND request_id=?''',
+            (owner, request_id)).fetchone()
+    if row is None or row[0] != source_sha256 or row[1] < time.time():
+        raise ConfirmationError("unknown_source_task",
+                                "原图任务已失效，请重新上传该图片。", status=409)
+
+
 def register_recognition(owner, request_id, source_sha256):
     """Called after /ocr receives the original bytes, including failed reads."""
     _identity(request_id, source_sha256)
@@ -138,6 +159,18 @@ def validate_document(value):
             issues.append({'graph_id': graph['id'], 'message': '子图标识重复。'})
         graph_ids.add(graph['id'])
         nodes, edges = [v['id'] for v in graph['vertices']], [e['id'] for e in graph['edges']]
+        box = graph.get('bbox')
+        if box is not None and not (box[0] < box[2] and box[1] < box[3]):
+            issues.append({'graph_id': graph['id'], 'message': '图形框选范围无效。'})
+        if graph.get('region_polygon') is not None:
+            from graph_region import validate_polygon, RegionError
+            try:
+                validate_polygon(graph['region_polygon'])
+            except RegionError:
+                issues.append({'graph_id': graph['id'], 'message': '不规则框选区域无效。'})
+        for vertex in graph['vertices']:
+            if (vertex.get('x') is None) != (vertex.get('y') is None):
+                issues.append({'graph_id': graph['id'], 'vertex_id': vertex['id'], 'message': '顶点坐标必须成对提供。'})
         if len(set(nodes)) != len(nodes) or len(set(edges)) != len(edges):
             issues.append({'graph_id': graph['id'], 'message': '节点或边的标识重复。'})
         for edge in graph['edges']:
@@ -174,6 +207,37 @@ def validate_document(value):
     return document, inspection
 
 
+def _drawing_document(edited, document):
+    """Keep image positions separate from verified math and chat snapshots.
+
+    The submitted fields were validated in validate_document; only known
+    graph/vertex/edge IDs can receive geometry. Do not copy model proofs.
+    """
+    drawing = copy.deepcopy(document)
+    sources = {g['id']: g for g in edited['graphs']}
+    for graph in drawing['graphs']:
+        source = sources.get(graph['id'])
+        if source is None:
+            continue
+        for key in ('bbox', 'anon_next', 'region_polygon'):
+            if key in source:
+                graph[key] = copy.deepcopy(source[key])
+        by_vertex = {v['id']: v for v in source['vertices']}
+        by_edge = {e['id']: e for e in source['edges']}
+        for node in graph['vertices']:
+            v = by_vertex.get(node['id'], {})
+            if v.get('display_label'):
+                node['display_label'] = v['display_label']
+            if v.get('x') is not None and v.get('y') is not None:
+                node['x'], node['y'] = v['x'], v['y']
+        for edge in graph['edges']:
+            source_edge = by_edge.get(edge['id'], {})
+            if source_edge.get('path'):
+                edge['path'] = copy.deepcopy(source_edge['path'])
+    _json(drawing)
+    return drawing
+
+
 def _context(document, request_id, source_sha256, token, revision):
     from graph_schema import describe_graphs
     visual = describe_graphs(document['graphs'])
@@ -202,7 +266,9 @@ def confirm_document(owner, payload):
         raise ConfirmationError('confirmation_required', '请先核对并确认当前题目结构。')
     request_id, sha = payload.get('request_id'), payload.get('source_sha256')
     _identity(request_id, sha)
-    document, inspection = validate_document(payload.get('document'))
+    edited = payload.get('document')
+    document, inspection = validate_document(edited)
+    drawing_document = _drawing_document(edited, document)
     token, digest = secrets.token_hex(32), document_digest(document)
     with _connection() as connection:
         row = connection.execute('SELECT source_sha256,revision FROM graph_confirmations WHERE owner=? AND request_id=?',
@@ -214,7 +280,9 @@ def confirm_document(owner, payload):
         connection.execute('''UPDATE graph_confirmations SET revision=?,document_sha256=?,token_sha256=?,expires=?
             WHERE owner=? AND request_id=?''', (revision, digest, hashlib.sha256(token.encode()).hexdigest(),
             time.time() + TTL_SECONDS, owner, request_id))
-    return {'document': document, 'semantic_context': context, 'confirmation_token': token,
+    return {'document': document, 'drawing_document': drawing_document,
+            'drawing_sha256': document_digest(drawing_document),
+            'semantic_context': context, 'confirmation_token': token,
             'document_sha256': digest, 'revision': revision, 'request_id': request_id,
             'source_sha256': sha, 'graph_display_data': document['graphs'], 'visual_text': visual,
             'validation': {'status': 'valid', 'schema': VERSION, 'tool_audit': inspection['tool_audit'],

@@ -2950,6 +2950,50 @@ def graph_confirmation_session():
     return response
 
 
+@app.route("/graph/text-region", methods=["POST"])
+def recognize_manual_text_region():
+    """Only OCR explicitly framed pixels; never reconstruct graph topology."""
+    from graph_confirmation import (ConfirmationError, confirmation_owner,
+                                    require_recognition_source)
+    from graph_region import RegionError, crop_region
+    if not _check_rate_limit(_get_client_ip(), "ocr"):
+        return jsonify({"error": "文字区域识别过于频繁，请稍后重试"}), 429
+    request_id = _normalize_ocr_request_id(request.form.get("request_id"))
+    source = request.files.get("image")
+    if not request_id or source is None:
+        return jsonify({"error": "缺少原图或识别任务"}), 400
+    raw = source.read(MAX_IMAGE_BYTES + 1)
+    if not raw or len(raw) > MAX_IMAGE_BYTES:
+        return jsonify({"error": "图片必须小于 8MB"}), 413
+    source_sha = hashlib.sha256(raw).hexdigest()
+    try:
+        require_recognition_source(confirmation_owner(), request_id, source_sha)
+    except ConfirmationError as exc:
+        return jsonify({"error": exc.message, "code": exc.code}), exc.status
+    raw_region = request.form.get("polygon", "")
+    if len(raw_region) > 6000:
+        return jsonify({"error": "选区轮廓过于复杂"}), 400
+    try:
+        region = json.loads(raw_region)
+        cropped = crop_region(raw, region)
+    except (ValueError, TypeError, RegionError) as exc:
+        return jsonify({"error": str(exc) or "文字选区无效"}), 400
+    if not OCR_AVAILABLE or recognize_image is None:
+        return jsonify({"error": "文字 OCR 暂不可用，可继续手动输入"}), 503
+    try:
+        recognized = recognize_image(cropped)
+    except Exception as exc:
+        print(f"所选文字区域 OCR 失败：{type(exc).__name__}")
+        return jsonify({"error": "选区文字识别未完成，可调整范围或手动输入"}), 503
+    result = recognized if isinstance(recognized, dict) else {}
+    text = str(result.get("text") or "").strip()
+    return jsonify({"text": text, "text_count": result.get("text_count", 0),
+                    "request_id": request_id, "source_sha256": source_sha,
+                    "selection_mode": "polygon",
+                    "recognition_status": "complete" if text else "partial",
+                    "warning": None if text else "选区内未识别到文字，请调整范围或手动输入"})
+
+
 @app.route("/graph/confirm", methods=["POST"])
 def confirm_graph_document():
     from graph_confirmation import ConfirmationError, confirmation_owner, confirm_document
@@ -2961,6 +3005,43 @@ def confirm_graph_document():
     except (sqlite3.Error, OSError):
         return jsonify({"error": "题目确认暂时无法保存，请稍后再试。", "code": "confirmation_unavailable"}), 503
     response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/graph/describe", methods=["POST"])
+def describe_confirmed_graph_document():
+    """Optional appearance wording only; never changes confirmed math data."""
+    from graph_confirmation import (ConfirmationError, confirmation_owner,
+                                    resolve_confirmed_context, validate_document,
+                                    document_digest)
+    from graph_description import describe_confirmed_drawing
+    if request.content_length is not None and request.content_length > 500_000:
+        return jsonify({"error": "图形描述数据过大", "code": "description_too_large"}), 413
+    if not _check_rate_limit(_get_client_ip(), "graph_describe"):
+        return jsonify({"error": "图形描述请求过于频繁", "code": "rate_limited"}), 429
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "缺少已确认的图形", "code": "invalid_document"}), 400
+    try:
+        owner = confirmation_owner()
+        context = resolve_confirmed_context(owner, payload.get("semantic_context"))
+        if context is None:
+            raise ConfirmationError("confirmation_required", "请先确认图形结构。", status=409)
+        drawing = payload.get("drawing_document")
+        semantic, _ = validate_document(drawing)
+        if document_digest(semantic) != context["document_sha256"]:
+            raise ConfirmationError("confirmation_changed", "图形已修改，请重新确认。", status=409)
+    except ConfirmationError as exc:
+        return jsonify({"error": exc.message, "code": exc.code, "issues": exc.issues}), exc.status
+    except (OSError, ValueError, TypeError):
+        return jsonify({"error": "已确认图形无法核验", "code": "confirmation_unavailable"}), 503
+    try:
+        answer = describe_confirmed_drawing(drawing)
+    except Exception as exc:
+        print(f"图形外观描述未完成：{type(exc).__name__}")
+        answer = {"status": "unavailable", "descriptions": {}}
+    response = jsonify(answer)
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -4034,6 +4115,29 @@ def ocr():
     except ConfirmationError as exc:
         return jsonify({"error": "图片任务与原图不匹配，请重新选择图片。",
                         "error_code": exc.code, "request_id": request_id}), exc.status
+
+    # Manual graph uploads are source-bound drafts, not automatic graph reads.
+    # Do not start Vision, OpenCV topology recovery or even text OCR here.
+    # Text is recognized separately when the user chooses its original pixels.
+    if request.form.get("workflow") == "manual_graph":
+        from image_evidence import decode_document_image
+        try:
+            checked = decode_document_image(raw, max_pixels=24_000_000)
+            checked.close()
+        except (ValueError, TypeError, OSError):
+            return jsonify({"error": "这不是可读取的图片，请重新上传。"}), 400
+        return jsonify({
+            "manual_mode": True, "recognition_status": "manual",
+            "source_sha256": hashlib.sha256(raw).hexdigest(),
+            "request_id": request_id,
+            "text": "", "graph_structures": [],
+            "document": {"body_text": "", "graphs": [{
+                "id": "G1", "name": "G1", "directed": False, "weighted": False,
+                "vertices": [], "edges": []}]},
+            "server_elapsed_seconds": round(time.monotonic() - started_at, 3),
+            "review": {"required": True, "reasons": []},
+            "manual_entry": {"graph_ai_calls": 0, "text_ocr_calls": 0},
+        })
 
     recognition_deadline = time.monotonic() + 285
     try:

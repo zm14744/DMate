@@ -88,6 +88,7 @@ def test_public_projection_preserves_atomic_edges_but_is_not_a_drawing_api():
     assert public['edges'][-1]['status'] == 'pending' and public['complete'] is False
     assert 'bbox' not in public and all('x' not in vertex for vertex in public['vertices'])
     assert all('path' not in edge for edge in public['edges'])
+    assert all('evidence' not in edge for edge in public['edges'])
     assert source == original and source['edges'][0]['path']
 
 
