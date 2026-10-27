@@ -556,14 +556,138 @@ def _verification_issues(response, draft):
 
 
 def _geometry_identity(document):
-    """Pixel associations expire when the node/panel identity or location changes."""
+    """Pixel associations expire only when node/panel identity or location changes.
+
+    Model JSON list order is not geometric identity. A repair may emit the same
+    panels or vertices in another order; that must not discard already measured
+    source-pixel routes, colors or direction crops. Actual IDs, labels,
+    positions, coordinates, panel bounds and layout associations remain part of
+    the identity, so substantive location or identity edits still invalidate
+    the old measurements.
+    """
     try:
         graphs = _draft_view(document).get('graphs', [])
-        return json_digest([{key: graph[key] for key in
-            ('id', 'name', 'vertices', 'position', 'bbox', 'layout_panel_ids') if key in graph}
-            for graph in graphs])
+        canonical = []
+        for graph in graphs:
+            row = {key: copy.deepcopy(graph[key]) for key in
+                   ('id', 'name', 'position', 'bbox') if key in graph}
+            vertices = graph.get('vertices', [])
+            row['vertices'] = sorted(
+                (copy.deepcopy(vertex) for vertex in vertices),
+                key=lambda vertex: (str(vertex.get('id', '')), json_digest(vertex)))
+            if 'layout_panel_ids' in graph:
+                values = graph['layout_panel_ids']
+                row['layout_panel_ids'] = (sorted(copy.deepcopy(values), key=str)
+                                           if isinstance(values, list)
+                                           else copy.deepcopy(values))
+            canonical.append(row)
+        canonical.sort(key=lambda graph: (str(graph.get('id', '')), json_digest(graph)))
+        return json_digest(canonical)
     except (TypeError, ValueError):
         return None
+
+
+_EDGE_VISUAL_WORD = r'(?:边|弦|弧|连线|线段|线|edges?|arcs?|chords?|lines?)'
+_EDGE_COLOR_WORD = (
+    r'(?:红(?:色)?|蓝(?:色)?|绿(?:色)?|黄(?:色)?|黑(?:色)?|白(?:色)?|'
+    r'紫(?:色)?|橙(?:色)?|灰(?:色)?|棕(?:色)?|青(?:色)?|'
+    r'red|blue|green|yellow|black|white|purple|orange|gr[ae]y|brown|cyan)'
+)
+
+
+def _literal_required_edge_attributes(document):
+    """Return only which visible edge attributes the literal question requires.
+
+    This never infers an attribute value. It uses the already transcribed
+    question and legend text to decide whether leaving a field unknown would
+    make the rendered semantics insufficient for the task. The optional
+    DeepSeek question-reference side channel can help visual roles notice the
+    same locations, but is deliberately not an acceptance dependency here.
+    """
+    draft = _draft_view(document)
+    graph_ids = [str(graph.get('id')) for graph in draft.get('graphs', [])
+                 if isinstance(graph, dict) and graph.get('id') is not None]
+    required = {gid: set() for gid in graph_ids}
+    if not graph_ids:
+        return required
+
+    def aspects(text):
+        value = str(text or '')
+        found = set()
+        if (re.search(_EDGE_COLOR_WORD + r'.{0,10}' + _EDGE_VISUAL_WORD, value, re.I)
+                or re.search(_EDGE_VISUAL_WORD + r'.{0,10}' + _EDGE_COLOR_WORD, value, re.I)
+                or (re.search(r'(?:颜色|配色|colou?r)', value, re.I)
+                    and re.search(_EDGE_VISUAL_WORD, value, re.I))):
+            found.add('color')
+        if re.search(r'(?:虚线|实线|点线|破折线|dashed|dotted|solid)', value, re.I):
+            found.add('style')
+        if re.search(r'(?:权值|权重|边权|加权|weighted|edge\s*weights?|weights?\s+of\s+edges?)',
+                     value, re.I):
+            found.add('weight')
+        if re.search(r'(?:边名|边标号|边编号|边标签|edge\s*labels?|labelled\s+edges?|labeled\s+edges?)',
+                     value, re.I):
+            found.add('edge_label')
+        return found
+
+    def apply(text, targets):
+        fields = aspects(text)
+        if not fields:
+            return
+        selected = [str(gid) for gid in targets if str(gid) in required] if targets else graph_ids
+        for gid in selected:
+            required[gid].update(fields)
+
+    # Unscoped body prose applies to every graph it can refer to. Located
+    # legends and captions narrow the requirement when graph_ids are known.
+    apply(draft.get('body_text', ''), graph_ids)
+    context = draft.get('text_context') if isinstance(draft.get('text_context'), dict) else {}
+    for kind in ('legends', 'captions'):
+        for row in context.get(kind, []) if isinstance(context.get(kind), list) else []:
+            if isinstance(row, dict):
+                apply(row.get('text', ''), row.get('graph_ids', []))
+    return required
+
+
+def _required_visual_attribute_issues(document):
+    """Fail visibly when a question-required edge attribute is still unread."""
+    draft = _draft_view(document)
+    requirements = _literal_required_edge_attributes(draft)
+    issues = []
+    labels = {'color': '颜色', 'style': '线型', 'weight': '权值', 'edge_label': '边名'}
+
+    def unresolved(field, value):
+        if field in ('color', 'style'):
+            return (not isinstance(value, str)
+                    or value.strip().lower() in ('', 'unknown', 'uncertain', '未知', '不确定'))
+        if value is None or isinstance(value, bool):
+            return True
+        return isinstance(value, str) and value.strip().lower() in (
+            '', 'unknown', 'uncertain', '未知', '不确定')
+
+    for graph in draft.get('graphs', []):
+        if not isinstance(graph, dict):
+            continue
+        gid = str(graph.get('id'))
+        fields = requirements.get(gid, set())
+        if not fields:
+            continue
+        edges = [edge for edge in graph.get('edges', []) if isinstance(edge, dict)]
+        for field in sorted(fields):
+            missing = [edge for edge in edges if unresolved(field, edge.get(field))]
+            if not missing:
+                continue
+            issue = {
+                'scope': 'graph', 'graph_id': gid, 'field': field,
+                'kind': 'required_' + field + '_unresolved',
+                'message': ('题干或图例明确依赖边的' + labels[field]
+                            + '，但该图仍有边未从原图确认这一属性。'),
+            }
+            ids = [edge.get('id') for edge in missing]
+            if ids and all(isinstance(eid, (str, int)) and not isinstance(eid, bool)
+                           for eid in ids):
+                issue['edge_ids'] = list(dict.fromkeys(ids))
+            issues.append(issue)
+    return issues
 
 
 def _plausible_body_hint(row):
@@ -919,19 +1043,26 @@ def recognize_semantic(raw, *, layout=None, provider=None, budget=None, audit=Fa
                 raise
             except (ValueError, TypeError, TimeoutError) as exc:
                 budget.event('semantic_local_colors', 'unavailable', error_kind=type(exc).__name__)
+        # Literal question and legend requirements constrain only whether a
+        # field has been read. They never supply the missing value.
+        required_attributes = _required_visual_attribute_issues(state.get('draft'))
         normalized = state.get('normalized')
         if not isinstance(normalized, dict):
-            return state
+            return {**state, 'program_issues': required_attributes}
         try:
             inspected = inspect_semantic_graphs(normalized, budget=budget)
         except AgentCancelled:
             raise
         except (ImportError, ValueError, TimeoutError) as exc:
             budget.event('semantic_program_check', 'tool_unavailable', error_kind=type(exc).__name__)
-            return state
+            return {**state, 'program_issues': required_attributes}
         program_audits.extend(copy.deepcopy(inspected.get('tool_audit', [])))
-        budget.local_tool_execution['program'] = copy.deepcopy(inspected)
-        return {**state, 'program_issues': copy.deepcopy(inspected.get('issues', []))}
+        budget.local_tool_execution['program'] = {
+            **copy.deepcopy(inspected),
+            'required_visual_attributes': copy.deepcopy(required_attributes),
+        }
+        combined = copy.deepcopy(inspected.get('issues', [])) + required_attributes
+        return {**state, 'program_issues': combined}
 
     def review(state):
         # An incomplete source phase needs a complete reader to recover the
