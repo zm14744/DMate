@@ -11,6 +11,7 @@ import hashlib
 import re
 import time
 import unicodedata
+from collections import Counter
 from difflib import SequenceMatcher
 from typing import TypedDict
 
@@ -27,20 +28,24 @@ PERFORMANCE_TARGET_SECONDS = 120
 
 MAIN_PROMPT = r'''读取这张数学题原图，输出可供用户核对和编辑的完整题干与图结构，不解题。
 只依据原图实际内容；工具候选用于定位，可能漏读/误读，不能据候选数量、图名、度数或常见模板补删边。
+local_visual_inventory是经原像素支持的同类圆点候选，含位置、尺寸和像素测量依据。请借此逐点区分真实圆点与旁边的边名、字形；它仍是候选，不是完整顶点真值，不能为了候选数量一致补删顶点。
 先区分每幅独立数学子图，再读全真实顶点与标签（包括孤立点），沿每条实际连线找到两端点。普通交叉、箭头尖、文字笔画不是额外顶点。相连的两个局部仍是一幅图；同图的不连通分量不能仅因分开就拆成多图。所有辅助窗口都来自同一原图，不重复计图。
 顶点清单按实际圆点/圆圈或明确端点建立，旁边的边名不能变成额外节点；没有印刷节点名的真实点保留label=null。e_i也可以是原图真正的节点名，必须按它与点/线的实际位置判别，不能只按词形删点。遇到没有节点标记的交叉，沿原来的连续笔画继续走，不能在交叉处换到另一条线，也不能把上下同列而无连线的点连接起来。
+每幅图依次输出三项：先vertices列实际点，附短position（如“左中蓝圆点”）和mark（filled/hollow/endpoint/label/unknown），不要求坐标；再独立扫描原图，按整条可见连线列stroke_inventory，每项给唯一id和短position（如“上方外弧”“左侧竖线”），此时先不填两端；最后edges使用同一组id逐条填写两端及属性。虚线的多个短划是一条边，普通交叉不拆边，经过真实顶点才分成不同边；自环、重边各占一个实例。逐项检查每条已见笔画恰好对应一条边，不能为了题干、模板、工具候选数或自报数量而补删笔画。
 按箭头尖确定方向。有向边仅列一次；无向边仅列一次；每条重边、反向弧、自环分别保留。保留印刷权重，包括零、负数和符号。节点旁的字母属于节点，不能抄为边名；印刷边名(e₁等)与权重分开。
+每图填写weighted布尔值：只有原图实际标注了边权才为true，节点编号、节点数字及边名都不算边权。能看出是边权但具体值未读清时仍保留weighted=true、该边weight=null并列明疑点；不得为补齐字段编造数值。
 输出前逐幅对照原图核对每条线的实际两端和箭头，不能按节点编号递增、左右顺序或对称布局决定方向。符号权重如π、√2、1/3原样保留为字符串，不计算近似值。同一处印刷标注仅放在其实际对应的weight或edge_label字段，不重复复制；只有原图确有两处独立标注时才同时填写两个字段。
 body_text逐字保留全部可见题干、小问、公式、数学符号和必要图例；图内标签与(a)/(b)图注放在图结构，不变成题干。不生成“如图所示”等原图没有的文字，不推测被裁掉的内容。没有题干用空字符串。
 保留题目有用的颜色和虚线/点线区别。普通黑白印刷、白色粉笔、背景装饰、精确坐标与线条粗细不影响完成状态。阴影和背面透印不能当新增线条。只把具体仍看不清的内容列为uncertainties，供用户修改。
 输出紧凑JSON，不输出解释或Markdown：
-{"body_text":"原文", "graphs":[{"id":"G1","name":"原图图注或G1","directed":false,"bbox":[0,0,1000,1000],"vertices":[{"id":"a","label":"a"},{"id":"b","label":null}],"edges":[{"from":"a","to":"b","direction":"undirected","weight":null,"edge_label":null,"style":"solid"}]}],"uncertainties":[]}
-direction为forward/undirected/unknown，forward表示from→to；无印刷标签的点label=null。内部ID可自行分配但图内引用一致；边ID和bbox可省略，bbox仅为相对完整原图0..1000的宽松位置提示。style为solid/dashed/dotted/unknown。无特殊颜色可省略color。没有图时graphs=[]。
+{"body_text":"原文", "graphs":[{"id":"G1","name":"原图图注或G1","directed":false,"weighted":false,"bbox":[0,0,1000,1000],"vertices":[{"id":"a","label":"a","position":"左侧","mark":"hollow"},{"id":"b","label":null,"position":"右侧","mark":"filled"}],"stroke_inventory":[{"id":"s1","position":"两点间直线"}],"edges":[{"id":"s1","from":"a","to":"b","direction":"undirected","weight":null,"edge_label":null,"style":"solid"}]}],"uncertainties":[]}
+direction为forward/undirected/unknown，forward表示from→to；无印刷标签的点label=null。内部ID可自行分配但图内引用一致；edges.id必须与stroke_inventory.id逐条对应。bbox可省略，仅为相对完整原图0..1000的宽松位置提示。style为solid/dashed/dotted/unknown。无特殊颜色可省略color。没有图时graphs=[]。
 uncertainties格式：{"scope":"body|graph|document","graph_id":"图问题填写","field":"vertices|edges|direction|weight|body_text等","message":"具体位置及未读清内容"}。必要图例可另存text_context.legends=[{"text":"原文","graph_ids":["G1"]}]，但不得从body_text中遗漏。'''
 
 LOCAL_REVIEW_PROMPT = r'''你是数学图像的局部复核者。完整原图和所有局部视图来自同一张图。只检查targets明确指出的正文或数学子图，不解题。
 draft是尚待用户确认的读取结果，工具候选和题意规则都是辅助，可能错误。沿原图确认目标图的顶点、连接、箭头、孤立点、自环、重边、权重，完整保留其必要标签/线型/颜色；不从常见图模板或度数反推图片。
 local_marker_candidates是整张原图上的圆点候选，含位置、大小和置信度，也可能混入正文或字形。核对目标子图内形状、大小相近的清晰圆点与draft顶点是否逐一对应，尤其检查较大圆点旁的字母是否实际为边名；有数量差异时重新对照原图确认真实点和连接，不将整页候选总数或某一尺寸组的数量强制作为节点数。匿名真实点保留label=null，不能仅凭e_i等词形删除真正的节点名。
+若issues指出圆点数或笔画清单冲突，先重新清点原图实际点和整条连线，不能只补颜色而保留未核实的连接。local_visual_inventory是原像素支持的候选及测量依据，仍不是答案。每幅返回图先列vertices及短position，再列stroke_inventory=[{"id":"s1","position":"上方外弧"}]，最后edges以相同id填写两端与属性；只按原图纠正清单，不按候选数量凑数。仍不能确认时保留具体疑点。
 只返回targets内已复核的完整子图，保留原graph.id。无需返回未请求的图。题干仅在targets.body=true时返回完整逐字body_text；不能新增原图不存在的问题或补全裁切文字。
 返回格式：{"graphs":[{"id":"G1","name":"原图图注","vertices":[...],"edges":[...]}],"uncertainties":[]}。节点和边结构与主读取相同。已确认修正的问题不留在uncertainties；仍看不清时明确列出scope/graph_id/field/message，保留可用内容，不以空图抹掉整幅结构。仅内部ID或坐标差异不是识别疑点。'''
 
@@ -53,9 +58,13 @@ _DRAFT_SCHEMA = {
         'graphs': {'type': 'array', 'maxItems': 64, 'items': {
             'type': 'object', 'required': ['vertices', 'edges'], 'properties': {
                 'id': _IDENTIFIER,
+                'weighted': {'type': 'boolean'},
                 'vertices': {'type': 'array', 'maxItems': 100, 'items': {
                     'type': 'object', 'properties': {'id': _IDENTIFIER,
                         'label': {'type': ['string', 'integer', 'number', 'null']}}}},
+                'stroke_inventory': {'type': 'array', 'maxItems': 300, 'items': {
+                    'type': 'object', 'required': ['id'], 'properties': {
+                        'id': _IDENTIFIER, 'position': {'type': 'string', 'maxLength': 160}}}},
                 'edges': {'type': 'array', 'maxItems': 300, 'items': {
                     'type': 'object', 'required': ['from', 'to'], 'properties': {
                         'id': _IDENTIFIER, 'from': _IDENTIFIER, 'to': _IDENTIFIER,
@@ -137,6 +146,34 @@ def _schema_issues(document):
     return result
 
 
+def _stroke_inventory_issues(document):
+    """Check observed-stroke bookkeeping, never synthesize missing edges."""
+    issues = []
+    for graph in document.get('graphs', []) if isinstance(document, dict) else []:
+        if not isinstance(graph, dict) or not isinstance(graph.get('stroke_inventory'), list):
+            continue
+        inventory, edges = graph['stroke_inventory'], graph.get('edges', [])
+        if not isinstance(edges, list):
+            continue
+        def ids(rows):
+            return [str(row['id']) for row in rows if isinstance(row, dict)
+                    and type(row.get('id')) in (str, int) and str(row['id']).strip()]
+        stroke_ids, edge_ids = ids(inventory), ids(edges)
+        duplicate_strokes = [key for key, count in Counter(stroke_ids).items() if count > 1]
+        duplicate_edges = [key for key, count in Counter(edge_ids).items() if count > 1]
+        missing = sorted(set(stroke_ids) - set(edge_ids))
+        unlisted = sorted(set(edge_ids) - set(stroke_ids))
+        if (missing or unlisted or duplicate_strokes or duplicate_edges
+                or len(stroke_ids) != len(inventory) or len(edge_ids) != len(edges)):
+            issues.append(_issue('stroke_inventory_mismatch',
+                '已清点的可见笔画与边记录尚不能逐条对应，请对照原图核对漏列、重复或多列；不能按数量补删边。',
+                scope='graph', graph_id=graph.get('id'), field='edges',
+                inventoried_strokes=len(inventory), recorded_edges=len(edges),
+                unmapped_stroke_ids=missing, unlisted_edge_ids=unlisted,
+                duplicate_stroke_ids=duplicate_strokes, duplicate_edge_ids=duplicate_edges))
+    return issues
+
+
 def _validate_tool(arguments, *, context):
     from graph_semantic_tools import inspect_semantic_graphs
     from graph_semantic_pipeline import _required_visual_attribute_issues
@@ -204,7 +241,11 @@ def _validate_tool(arguments, *, context):
             if unknown or weight is None and graph['id'] in declared_weighted:
                 unknown_weights.append(_issue('unknown_weight', '该边有待确认的权重，不能按已读清处理。',
                     scope='graph', graph_id=graph['id'], field='weight', edge_id=edge['id']))
-    issues = normalized['semantic_issues'] + schema_issues + inspected['issues'] + required_attributes + unknown_weights
+    issues = (normalized['semantic_issues'] + schema_issues + inspected['issues']
+              + required_attributes + unknown_weights + _stroke_inventory_issues(draft))
+    if context.data.get('visual_inventory') is not None:
+        from graph_visual_inventory import compare_visual_inventory
+        issues += compare_visual_inventory(draft, context.data['visual_inventory'])['issues']
     context.data['result'].update(normalized=normalized, issues=issues,
         schema_valid=not schema_issues, program=inspected)
     return {'phase': arguments['phase'], 'schema_valid': not schema_issues,
@@ -225,11 +266,11 @@ def _validation_registry():
         source_required=True), _validate_tool)
 
 
-def _validate(draft, budget, phase):
+def _validate(draft, budget, phase, *, visual_inventory=None):
     result = {}
     context = ToolContext(source_sha256=budget.source_sha256,
         deadline_monotonic=min(time.monotonic()+10, budget.deadline),
-        data={'draft': draft, 'budget': budget, 'result': result})
+        data={'draft': draft, 'budget': budget, 'result': result, 'visual_inventory': visual_inventory})
     envelope = _validation_registry().call('graph.fast_validate', {'phase': phase},
                                            role='semantic_review', context=context)
     if not envelope['ok']:
@@ -273,6 +314,12 @@ def _merge_local_review(previous, response, targets):
     if not isinstance(response, dict) or not isinstance(response.get('graphs'), list):
         raise ValueError('local_review_invalid_document')
     result, returned, issues = copy.deepcopy(previous), {}, []
+    old_inventory = {str(graph.get('id')): graph['stroke_inventory']
+                     for graph in previous.get('graphs', []) if isinstance(graph, dict)
+                     and 'stroke_inventory' in graph}
+    old_flags = {str(graph.get('id')): {key: graph[key] for key in ('directed', 'weighted')
+                                       if type(graph.get(key)) is bool}
+                 for graph in previous.get('graphs', []) if isinstance(graph, dict)}
     allowed = set(targets['graph_ids'])
     whole = targets.get('document') is True
     for graph in response['graphs']:
@@ -284,6 +331,12 @@ def _merge_local_review(previous, response, targets):
         if not isinstance(graph.get('vertices'), list) or not isinstance(graph.get('edges'), list):
             continue
         returned[gid] = copy.deepcopy(graph)
+        for key, value in old_flags.get(gid, {}).items():
+            returned[gid].setdefault(key, value)
+        if 'stroke_inventory' not in graph and gid in old_inventory:
+            # Dropping an existing checklist must not silently erase a real
+            # mismatch. A corrected visual reread may replace the checklist.
+            returned[gid]['stroke_inventory'] = copy.deepcopy(old_inventory[gid])
     old_graphs = result.get('graphs', [])
     if whole and all(isinstance(graph, dict) and isinstance(graph.get('vertices'), list)
                      and isinstance(graph.get('edges'), list) for graph in response['graphs']):
@@ -343,7 +396,8 @@ def _complex_layout_needed(quick, markers):
 
 def _path_policy(draft, issues):
     graph_issues = [row for row in issues if row.get('scope') == 'graph'
-                    and row.get('field') in (None, 'vertices', 'edges', 'direction')]
+                    and row.get('field') in (None, 'vertices', 'edges', 'direction')
+                    and row.get('kind') not in ('visual_marker_count_conflict', 'stroke_inventory_mismatch')]
     ids = {str(row.get('graph_id')) for row in graph_issues}
     graphs = [graph for graph in draft.get('graphs', []) if isinstance(graph, dict)
               and str(graph.get('id')) in ids]
@@ -379,6 +433,52 @@ def _selected_local_tools_complete(handles, audits):
                 or any(row.get('status') not in ('ok', 'not_needed') for row in stages)):
             return False
     return True
+
+
+def _measure_marker_inventory(markers, quick, budget):
+    from graph_visual_inventory import measure_visual_inventory
+    try:
+        return measure_visual_inventory(markers, quick, budget=budget)
+    except (AgentCancelled, TimeoutError):
+        raise
+    except Exception as exc:
+        budget.check()
+        # A local evidence failure cannot discard a usable visual reading or
+        # count as a completed performance run.
+        return {'status': 'failed', 'source_sha256': budget.source_sha256,
+                'panels': [], 'diagnostics': [type(exc).__name__], 'proposal_only': True,
+                'tool_audit': [{'tool': 'image.visual_marker_inventory', 'status': 'failed',
+                                'source_sha256': budget.source_sha256, 'executed': False}]}
+
+
+def _marker_inventory_complete(evidence):
+    audits = [row for row in evidence.get('tool_audit', [])
+              if isinstance(row, dict) and row.get('tool') == 'image.visual_marker_inventory']
+    return (evidence.get('status') == 'measured' and bool(audits)
+            and all(row.get('executed') is True and row.get('status') in ('success', 'ok') for row in audits))
+
+
+def _compact_visual_inventory(evidence):
+    """Only pixel-supported groups help the main reader; omit tool bookkeeping."""
+    result = {'proposal_only': True, 'image_accuracy_certified': False,
+              'position_space': 'original_1000', 'panels': []}
+    if evidence.get('status') != 'measured':
+        return result
+    for panel in evidence.get('panels', [])[:32]:
+        if not isinstance(panel, dict) or panel.get('comparison_eligible') is not True:
+            continue
+        row = {key: copy.deepcopy(panel[key]) for key in ('region_id', 'bbox', 'candidate_count') if key in panel}
+        row.update(proposal_only=True, markers=[])
+        for marker in panel.get('markers', [])[:160]:
+            if not isinstance(marker, dict):
+                continue
+            candidate = {key: copy.deepcopy(marker[key]) for key in ('id', 'position', 'radius_pixels') if key in marker}
+            proof = marker.get('proof', {})
+            candidate['pixel_support'] = {key: copy.deepcopy(proof[key]) for key in
+                ('source', 'convex_hull_roundness', 'component_fill', 'component_pixels') if key in proof}
+            row['markers'].append(candidate)
+        result['panels'].append(row)
+    return result
 
 
 def _main_panel_views(quick):
@@ -458,6 +558,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
     budget.check()
     quick = prepare_semantic_layout(raw, budget=budget, layout=layout, run_layout=False)
     markers = prepare_semantic_geometry(raw, budget=budget, layout=quick)
+    visual_inventory = _measure_marker_inventory(markers, quick, budget)
     views = {'images': quick['images'][:1], 'view_descriptions': quick['view_descriptions'][:1]}
     main_views = _main_panel_views(quick)
     if local_submit is None:
@@ -497,6 +598,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             {'image_views': main_views['view_descriptions'],
              'local_layout_candidates': quick.get('panels', [])[:32],
              'local_marker_candidates': markers.get('marker_candidates', [])[:120],
+             'local_visual_inventory': _compact_visual_inventory(visual_inventory),
              'local_ocr_candidates': hints['candidates'], 'local_ocr_policy': hints['policy']},
             main_views['images'], output_tokens=12000, response_identity=False,
             reserve_seconds=12)
@@ -517,7 +619,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
         return state
 
     def initial_check(state):
-        checked = _validate(state['draft'], budget, 'initial')
+        checked = _validate(state['draft'], budget, 'initial', visual_inventory=visual_inventory)
         checked['issues'] += _text_candidate_issues(state['draft'], local_result.get('text', {}), quick)
         reference = _local_reference(checked['normalized'], budget)
         return {**state, **checked, 'reference': reference}
@@ -560,6 +662,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
                      graph for graph in state['draft']['graphs'] if str(graph.get('id')) in targets['graph_ids']]},
                  'image_views': review_views['view_descriptions'],
                  'local_marker_candidates': markers.get('marker_candidates', [])[:120],
+                 'local_visual_inventory': visual_inventory,
                  'local_ocr_candidates': hints['candidates'],
                  'local_connection_candidates': project_connection_hints(local_result.get('geometry', {}).get('graphs', [])),
                  'question_reference': state.get('reference', {})},
@@ -587,7 +690,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
     def final_check(state):
         # Always execute the final schema/NetworkX check, even when the main
         # reading is clean or the optional model is unavailable.
-        checked = _validate(state['draft'], budget, 'final')
+        checked = _validate(state['draft'], budget, 'final', visual_inventory=visual_inventory)
         checked['issues'] += _text_candidate_issues(state['draft'], local_result.get('text', {}), quick)
         return {**state, **checked}
 
@@ -630,13 +733,15 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
         result['text_context'] = copy.deepcopy(state['draft']['text_context'])
     text = local_result.get('text', {})
     local_audit = [pending_handle.audit() for pending_handle in handles]
-    local_tools_complete = _selected_local_tools_complete(handles, local_audit)
+    local_tools_complete = (_selected_local_tools_complete(handles, local_audit)
+                            and _marker_inventory_complete(visual_inventory))
     selected_tools_complete = local_tools_complete and state['validation'].get('status') == 'completed'
     resource_metrics = quick.get('resource_metrics', []) + local_result.get('resource_metrics', [])
     tools_public = _public_local_result(local_result)
     tools_public['layout'] = _public_local_result({'layout': local_result.get('layout') or quick})['layout']
     tools_public['markers'] = {'marker_candidates': copy.deepcopy(markers.get('marker_candidates', [])),
                                'diagnostics': copy.deepcopy(markers.get('diagnostics', []))}
+    tools_public['visual_inventory'] = copy.deepcopy(visual_inventory)
     result.update(diagnostics=stages, remote_metrics=copy.deepcopy(budget.metrics),
         image_quality=copy.deepcopy(quick.get('diagnostics', {})),
         local_layout_result=copy.deepcopy((local_result.get('layout') or quick).get('layout', {})),
@@ -657,6 +762,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             'question_reference': state.get('reference', {}),
             'final_validation': state['validation'],
             'tool_audit': quick.get('tool_audit', [])+markers.get('tool_audit', [])
+                +visual_inventory.get('tool_audit', [])
                 +local_result.get('tool_audit', [])+state['validation'].get('tool_audit', []),
             'performance': {'target_seconds': PERFORMANCE_TARGET_SECONDS,
                 'recognition_seconds': round(time.monotonic()-started, 6),

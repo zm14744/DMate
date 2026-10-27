@@ -90,10 +90,13 @@ def prepared(monkeypatch):
     quick = {'images': [encoded], 'view_descriptions': ['完整原图'], 'panels': [], 'body_regions': [],
         'layout': {'status': 'not_requested', 'regions': []}, 'resource_metrics': [], 'tool_audit': [],
         'diagnostics': {'original_size': [24, 20], 'cv_executed': True}}
-    import graph_semantic_layout, graph_semantic_geometry, graph_semantic_question_reference
+    import graph_semantic_layout, graph_semantic_geometry, graph_semantic_question_reference, graph_visual_inventory
     monkeypatch.setattr(graph_semantic_layout, 'prepare_semantic_layout', lambda *a, **kw: copy.deepcopy(quick))
     monkeypatch.setattr(graph_semantic_geometry, 'prepare_semantic_geometry', lambda *a, **kw: {
         'marker_candidates': [], 'diagnostics': [], 'tool_audit': []})
+    monkeypatch.setattr(graph_visual_inventory, 'measure_visual_inventory', lambda *a, **kw: {
+        'status': 'measured', 'panels': [], 'diagnostics': [], 'proposal_only': True,
+        'tool_audit': [{'tool': 'image.visual_marker_inventory', 'status': 'success', 'executed': True}]})
     monkeypatch.setattr(graph_semantic_question_reference, 'start_question_reference',
                         lambda *a, **kw: pytest.fail('Recognition must not call DeepSeek'))
     import requests
@@ -350,6 +353,138 @@ def test_selected_path_tool_failure_also_excludes_performance_after_visual_corre
     assert result['semantic_workflow']['performance']['within_target'] is False
 
 
+def test_visual_stroke_inventory_preserves_loop_parallel_instances_and_needs_no_coordinates(prepared):
+    _, run, _ = prepared
+    initial = document()
+    for graph in initial['graphs']:
+        graph['stroke_inventory'] = [{'id': edge['id'], 'position': '原图中的独立笔画'} for edge in graph['edges']]
+    glm = Specialist(AssertionError('A matching inventory is not a review trigger'))
+    result, main = run(Provider(initial), glm)
+    assert len(main.requests) == 1 and glm.requests == [] and result['complete'] is True
+    assert len(result['graphs'][0]['edges']) == 3
+    assert result['semantic_workflow']['image_accuracy_certified'] is False
+
+
+@pytest.mark.parametrize('mismatch', ['unmapped_stroke', 'unlisted_edge', 'duplicate_stroke', 'missing_edge_id'])
+def test_stroke_inventory_conflicts_do_not_fill_or_delete_edges(prepared, mismatch):
+    _, run, _ = prepared
+    initial = document()
+    graph = initial['graphs'][0]
+    graph['stroke_inventory'] = [{'id': edge['id']} for edge in graph['edges']]
+    if mismatch == 'unmapped_stroke':
+        graph['stroke_inventory'].append({'id': 's4', 'position': '右侧弧线'})
+    elif mismatch == 'unlisted_edge':
+        graph['stroke_inventory'].pop()
+    elif mismatch == 'duplicate_stroke':
+        graph['stroke_inventory'][1]['id'] = graph['stroke_inventory'][0]['id']
+    else:
+        graph['edges'][0].pop('id')
+    result, main = run(Provider(initial))
+    assert len(main.requests) == 1 and result['complete'] is False
+    assert len(result['graphs'][0]['edges']) == 3 and len(result['graphs'][0]['vertices']) == 3
+    assert result['graphs'][1]['complete'] is True
+    assert any(issue['kind'] == 'stroke_inventory_mismatch' for issue in result['semantic_issues'])
+
+
+@pytest.mark.parametrize('corrected_inventory', [False, True])
+def test_same_review_must_resolve_stroke_mismatch_without_dropping_checklist(prepared, corrected_inventory):
+    _, run, handles = prepared
+    initial = document()
+    initial['graphs'][0]['stroke_inventory'] = [{'id': 'extra-stroke'}]
+    corrected = copy.deepcopy(initial['graphs'][0])
+    if corrected_inventory:
+        corrected['stroke_inventory'] = [{'id': edge['id']} for edge in corrected['edges']]
+    else:
+        corrected.pop('stroke_inventory')
+    glm = Specialist({'graphs': [corrected], 'uncertainties': []})
+    result, main = run(Provider(initial), glm)
+    assert len(main.requests) == len(glm.requests) == 1
+    assert result['complete'] is corrected_inventory
+    assert len(result['graphs'][0]['edges']) == 3
+    assert len(handles) == 1  # Checklist issues need a visual recount, not path tracing.
+
+
+@pytest.mark.parametrize('corrected_vertices', [False, True])
+def test_independent_marker_conflict_triggers_one_review_and_is_rechecked_afterwards(
+        prepared, monkeypatch, corrected_vertices):
+    _, run, handles = prepared
+    import graph_visual_inventory
+    evidence = {'status': 'measured', 'panels': [{'region_id': 'panel_1', 'bbox': [0, 0, 1000, 1000],
+        'candidate_count': 4, 'comparison_eligible': True,
+        'markers': [{'id': f'm{i}', 'position': [100+i*200, 500]} for i in range(4)]}],
+        'diagnostics': [], 'proposal_only': True,
+        'tool_audit': [{'tool': 'image.visual_marker_inventory', 'status': 'success', 'executed': True}]}
+    calls = []
+    def measure(*args, **kwargs):
+        calls.append(True)
+        return copy.deepcopy(evidence)
+    monkeypatch.setattr(graph_visual_inventory, 'measure_visual_inventory', measure)
+    initial = document()
+    initial['graphs'] = initial['graphs'][:1]
+    corrected = copy.deepcopy(initial['graphs'][0])
+    if corrected_vertices:
+        corrected['vertices'].append({'id': 'visible-isolated', 'label': None})
+    glm = Specialist({'graphs': [corrected], 'uncertainties': []})
+    result, main = run(Provider(initial), glm)
+    assert len(calls) == 1 and len(main.requests) == len(glm.requests) == 1
+    assert main.requests[0]['local_visual_inventory'] == fast._compact_visual_inventory(evidence)
+    assert glm.requests[0]['local_visual_inventory'] == evidence
+    assert any(issue['kind'] == 'visual_marker_count_conflict' for issue in glm.requests[0]['issues'])
+    assert result['complete'] is corrected_vertices
+    assert len(result['graphs'][0]['vertices']) == (4 if corrected_vertices else 3)
+    assert result['selected_tools_complete'] is True
+    if not corrected_vertices:
+        assert any(issue['kind'] == 'visual_marker_count_conflict' for issue in result['semantic_issues'])
+        assert result['semantic_workflow']['performance']['within_target'] is False
+    assert len(handles) == 1  # Counting real markers does not schedule edge tracing.
+
+
+def test_marker_measurement_failure_preserves_visual_result_but_is_not_performance_success(prepared, monkeypatch):
+    _, run, _ = prepared
+    import graph_visual_inventory
+    def broken_measure(*args, **kwargs):
+        raise ValueError('local pixel measurement failed')
+    monkeypatch.setattr(graph_visual_inventory, 'measure_visual_inventory', broken_measure)
+    result, main = run()
+    assert len(main.requests) == 1 and result['complete'] is True
+    assert result['selected_tools_complete'] is False and result['service_warnings']
+    assert result['semantic_workflow']['local_tools']['visual_inventory']['status'] == 'failed'
+    assert result['semantic_workflow']['performance']['within_target'] is False
+
+
+def test_missing_marker_execution_audit_is_warned_and_not_a_performance_success(prepared, monkeypatch):
+    _, run, _ = prepared
+    import graph_visual_inventory
+    monkeypatch.setattr(graph_visual_inventory, 'measure_visual_inventory', lambda *a, **kw: {
+        'status': 'measured', 'panels': [], 'diagnostics': [], 'tool_audit': []})
+    result, _ = run()
+    assert result['complete'] is True and result['graphs'][0]['edges']
+    assert result['local_tools_complete'] is False and result['selected_tools_complete'] is False
+    assert result['service_warnings'][0]['kind'] == 'local_tools_degraded'
+    assert result['semantic_workflow']['performance']['within_target'] is False
+
+
+def test_main_inventory_projection_only_sends_eligible_pixel_supported_groups():
+    evidence = {'status': 'measured', 'diagnostics': ['internal'], 'tool_audit': [{'internal': True}],
+        'panels': [{'region_id': 'panel_1', 'bbox': [0, 0, 500, 1000], 'candidate_count': 3,
+                    'comparison_eligible': True, 'markers': [{
+                        'id': 'm1', 'position': [100, 200], 'radius_pixels': 18, 'color_hue': 120,
+                        'proof': {'source': 'original_colour_component', 'convex_hull_roundness': .94,
+                                  'component_fill': .98, 'component_pixels': 900, 'internal': 'omit'}}]},
+                   {'region_id': 'weak', 'candidate_count': 15, 'comparison_eligible': False,
+                    'markers': [{'id': 'glyph'}]}]}
+    before = copy.deepcopy(evidence)
+    compact = fast._compact_visual_inventory(evidence)
+    assert compact['proposal_only'] is True and compact['image_accuracy_certified'] is False
+    assert [row['region_id'] for row in compact['panels']] == ['panel_1']
+    assert compact['panels'][0]['candidate_count'] == 3
+    marker = compact['panels'][0]['markers'][0]
+    assert marker['position'] == [100, 200] and marker['radius_pixels'] == 18
+    assert marker['pixel_support']['source'] == 'original_colour_component'
+    assert 'internal' not in marker['pixel_support'] and 'tool_audit' not in compact
+    assert evidence == before
+
+
 def test_specialist_network_failure_retains_editable_data_and_unaffected_panel(prepared):
     _, run, handles = prepared
     initial = document()
@@ -372,6 +507,45 @@ def test_schema_invalid_endpoint_cannot_be_certified_by_networkx_cleanup(prepare
     assert result['complete'] is False
     assert any(issue['kind'] == 'json_schema_invalid' for issue in result['semantic_issues'])
     assert result['graphs'][0]['unresolved_edges']
+
+
+@pytest.mark.parametrize('value', ['unknown', None, 1])
+def test_provided_weighted_flag_must_be_boolean(prepared, value):
+    _, run, _ = prepared
+    initial = document()
+    initial['graphs'][0]['weighted'] = value
+    result, _ = run(Provider(initial))
+    assert result['complete'] is False
+    assert any(issue['kind'] == 'json_schema_invalid' and issue.get('field') == 'weighted'
+               for issue in result['semantic_issues'])
+
+
+@pytest.mark.parametrize('explicit_correction', [False, True])
+def test_review_omitted_graph_flags_cannot_clear_unknown_direction_or_weight(prepared, explicit_correction):
+    _, run, _ = prepared
+    initial = document()
+    initial['graphs'][1]['weighted'] = True
+    initial['graphs'][1]['edges'][0]['weight'] = None
+    corrected = copy.deepcopy(initial['graphs'][1])
+    corrected.pop('directed')
+    corrected.pop('weighted')
+    corrected['edges'][0].pop('direction')
+    if explicit_correction:
+        corrected.update(directed=False, weighted=False)
+        corrected['edges'][0]['direction'] = 'undirected'
+    glm = Specialist({'graphs': [corrected], 'uncertainties': []})
+    result, main = run(Provider(initial), glm)
+    assert len(main.requests) == len(glm.requests) == 1
+    edge = result['graphs'][1]['edges'][0]
+    assert edge['weight'] is None  # No value is invented to satisfy a flag.
+    assert result['complete'] is explicit_correction
+    if explicit_correction:
+        assert edge['direction'] == 'undirected'
+        assert result['graphs'][1]['directed'] is False and result['graphs'][1]['weighted'] is False
+    else:
+        assert edge['direction'] == 'unknown' and edge['status'] == 'pending'
+        assert {'unknown_direction', 'unknown_weight'}.issubset(
+            {issue['kind'] for issue in result['semantic_issues']})
 
 
 def test_main_model_failure_closes_running_tools_and_does_not_start_another_visual_role(prepared):
