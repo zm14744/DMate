@@ -6,6 +6,7 @@ import json
 import pytest
 
 from graph_confirmation import COOKIE_NAME, register_recognition
+from test_ocr_application_contract import application
 
 
 @pytest.fixture(autouse=True)
