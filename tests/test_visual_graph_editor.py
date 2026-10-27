@@ -277,3 +277,22 @@ if (state.getDocument().graphs[0].edges.length !== 1) process.exit(5);
     process = subprocess.run([NODE, '-e', script], cwd=ROOT, capture_output=True,
                              text=True, timeout=15)
     assert process.returncode == 0, process.stderr or process.stdout
+
+
+def test_image_geometry_model_preserves_stable_anonymous_labels_and_parallel_ids():
+    value = run_model("""
+const before = model.getDocument();
+const p = model.addVertex('G1','',.33,.4);
+const q = model.addVertex('G1','',.56,.71);
+model.setEdgePath('G1','e1',[[.2,.3],[.46,.56],[.8,.7]]);
+model.moveVertex('G1',p,.4,.42);
+const removed = model.getDocument().graphs[0].vertices.find(v=>v.id===p).display_label;
+model.deleteVertices('G1',[p]);
+const more = model.addVertex('G1','',.38,.22);
+console.log(JSON.stringify({graph:model.getDocument().graphs[0],more,removed,issues:model.validate()}));
+""")
+    graph = value["graph"]
+    assert graph["vertices"][-1]["display_label"] != value["removed"]
+    assert graph["edges"][0]["path"] == [[.2, .3], [.46, .56], [.8, .7]]
+    assert len({edge["id"] for edge in graph["edges"]}) == len(graph["edges"])
+    assert value["issues"] == []

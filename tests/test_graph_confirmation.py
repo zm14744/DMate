@@ -247,3 +247,38 @@ def test_symbolic_bridge_does_not_guess_ambiguous_operands(question, monkeypatch
     monkeypatch.setattr('graph_semantic_solver.prepare_semantic_math',
                         lambda *a, **k: pytest.fail('Ambiguous matrix convention reached tools'))
     assert confirmed_matrix_calculations(context, question) == context
+
+
+def test_image_positions_paths_and_anonymous_ids_survive_confirm_and_reuse():
+    value = document()
+    graph = value["graphs"][0]
+    graph["bbox"] = [.1, .1, .9, .9]
+    graph["anon_next"] = 4
+    graph["vertices"][0].update(x=.2, y=.3)
+    graph["vertices"][1].update(x=.8, y=.7)
+    graph["vertices"][-1].update(x=.5, y=.2, display_label="③")
+    graph["edges"][0]["path"] = [[.2, .3], [.5, .4], [.8, .7]]
+    saved = confirm(value=value)
+    final = saved["document"]["graphs"][0]
+    assert final["bbox"] == [.1, .1, .9, .9]
+    assert final["anon_next"] == 4
+    assert final["vertices"][-1]["label"] is None
+    assert final["vertices"][-1]["display_label"] == "③"
+    assert final["edges"][0]["path"] == [[.2, .3], [.5, .4], [.8, .7]]
+    assert resolve_confirmed_context("owner", saved["semantic_context"]) == saved["semantic_context"]
+
+
+@pytest.mark.parametrize("bad", ["point", "path", "bbox", "half_coordinate"])
+def test_bad_geometry_is_rejected_instead_of_silently_erased(bad):
+    value = document()
+    graph = value["graphs"][0]
+    if bad == "point":
+        graph["vertices"][0].update(x=1.1, y=.3)
+    elif bad == "path":
+        graph["edges"][0]["path"] = [[.2, .3], [2, .5]]
+    elif bad == "bbox":
+        graph["bbox"] = [.9, .1, .1, .8]
+    else:
+        graph["vertices"][0]["x"] = .3
+    with pytest.raises(ConfirmationError):
+        confirm(value=value)
