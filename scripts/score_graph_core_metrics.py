@@ -330,6 +330,24 @@ def score_image(reference, prediction, scope, *, browser_evidence=None, mapping_
                 panel[name].update(status="fail", reason="missing_prediction_panel")
             panel["basic_type"]["predicted"] = "missing"
         panels.append(panel)
+    extra_indices = sorted(set(range(len(graphs))) - set(mapped))
+    extras = []
+    for index in extra_indices:
+        try:
+            nodes, edges = _inventory(graphs[index])
+        except (ValueError, TypeError, AttributeError):
+            extras.append({"prediction_index": index, "status": "not_assessed",
+                           "reason": "invalid_extra_prediction_inventory"})
+            continue
+        # No reference panel corresponds to these claims. Count every vertex
+        # and expanded edge instance as a false positive; never invent an
+        # empty reference graph merely to put them into the matched list.
+        extras.append({"prediction_index": index, "status": "assessed",
+                       "vertices": len(nodes), "edge_instances": len(edges),
+                       "false_positive_claims": {"connections": len(edges),
+                           "directions": sum(edge["direction"] != "undirected" for edge in edges),
+                           "weights": sum(edge["weight"] is not None for edge in edges),
+                           "vertex_labels": len(nodes)}})
     body = prediction.get("text", prediction.get("body_text"))
     literal = reference.get("body_text", reference.get("question_text"))
     overrides = scope.get("reference_overrides", {})
@@ -359,7 +377,7 @@ def score_image(reference, prediction, scope, *, browser_evidence=None, mapping_
                 performance["reason"] = "missing_explicit_selected_tool_completion_audit"
     return {"id": scope["id"], "common_clear": scope.get("common_clear") is True,
             "panel_count": {"status": "pass" if len(expected) == len(graphs) else "fail", "expected": len(expected), "predicted": len(graphs)},
-            "extra_prediction_panels": sorted(set(range(len(graphs))) - set(mapped)), "panels": panels,
+            "extra_prediction_panels": extra_indices, "extra_prediction_inventories": extras, "panels": panels,
             "question": _question_metrics(body, literal, scope.get("question")),
             "performance": performance}
 
@@ -367,6 +385,8 @@ def score_image(reference, prediction, scope, *, browser_evidence=None, mapping_
 def summarize(images, selection_basis):
     eligible = [row for row in images if row["common_clear"]]
     panels = [panel for row in eligible for panel in row["panels"]]
+    extras = [extra for row in eligible for extra in row["extra_prediction_inventories"]]
+    extra_inventories_complete = all(extra["status"] == "assessed" for extra in extras)
     summary = {"selection_basis": selection_basis, "images": len(images), "common_clear_images": len(eligible),
                "certified_acceptance": False, "metrics": {}}
     for name, values in [("panel_count", [r["panel_count"] for r in eligible]),
@@ -375,12 +395,28 @@ def summarize(images, selection_basis):
         summary["metrics"][name] = {"passed": sum(v["status"] == "pass" for v in values), "total": len(values),
                                     "status": "fail" if any(v["status"] == "fail" for v in values) else
                                     "not_assessed" if not values or any(v["status"] == "not_assessed" for v in values) else "pass"}
+        if name in ("vertex_count", "edge_count", "basic_type"):
+            # Preserve the independently declared reference-panel denominator
+            # and expose additional predictions separately. They still make
+            # the image inventory fail its 100% count/type requirement.
+            summary["metrics"][name].update(count_scope="matched_reference_panels",
+                                            extra_prediction_panels=len(extras))
+            if name in ("vertex_count", "edge_count"):
+                field = "vertices" if name == "vertex_count" else "edge_instances"
+                summary["metrics"][name]["extra_prediction_instances"] = (
+                    sum(extra[field] for extra in extras) if extra_inventories_complete else None)
+            if extras:
+                summary["metrics"][name]["status"] = "fail"
     for name, threshold in (("connections", .9), ("directions", .9), ("weights", .9), ("vertex_labels", .95)):
         values = [p.get(name, {"status": "not_assessed"}) for p in panels]
         known = [v for v in values if "correct" in v]
-        metric = ratio_metric(sum(v["correct"] for v in known), sum(v["expected"] for v in known), sum(v["predicted"] for v in known), threshold)
+        extra_claims = sum(extra.get("false_positive_claims", {}).get(name, 0) for extra in extras)
+        metric = ratio_metric(sum(v["correct"] for v in known), sum(v["expected"] for v in known),
+                              sum(v["predicted"] for v in known) + extra_claims, threshold)
+        metric["extra_panel_false_positives"] = extra_claims
         metric["unassessed_panels"] = sum(v["status"] == "not_assessed" for v in values)
-        if metric["unassessed_panels"] or any(r["extra_prediction_panels"] for r in eligible):
+        metric["unassessed_extra_panels"] = sum(extra["status"] != "assessed" for extra in extras)
+        if metric["unassessed_panels"] or not extra_inventories_complete:
             metric["status"] = "not_assessed"
         summary["metrics"][name] = metric
     question_counts = [row["question"]["subquestion_count"] for row in eligible]
@@ -443,8 +479,12 @@ def markdown(report):
     for name, metric in report["summary"]["metrics"].items():
         detail = f'{metric["passed"]}/{metric["total"]}' if "passed" in metric else (
             f'正确 {metric["correct"]}，参考 {metric["expected"]}，预测 {metric["predicted"]}；P={metric.get("precision", 0):.3f}，R={metric.get("recall", 0):.3f}' if "correct" in metric else "未评")
+        if metric.get("extra_prediction_panels"):
+            detail += f'；另有 {metric["extra_prediction_panels"]} 个额外预测面板，硬指标失败'
+        if metric.get("extra_panel_false_positives"):
+            detail += f'；含额外面板误报 {metric["extra_panel_false_positives"]} 项'
         lines.append(f'| {name} | {metric["status"]} | {detail} |')
-    lines += ["", "匿名点使用同一个有界结构最优对应计算全部指标，属于结构匹配上界，不宣称已确定原像素中的逐点对应。标签大小写严格计分，近似标签只协助定位对应。重边、自环按独立实例一对一比较；未知方向/权重不从分母中删除。", ""]
+    lines += ["", "匿名点使用同一个有界结构最优对应计算全部指标，属于结构匹配上界，不宣称已确定原像素中的逐点对应。标签大小写严格计分，近似标签只协助定位对应。重边、自环按独立实例一对一比较；未知方向/权重不从分母中删除。额外面板不伪造参考对应，其所有点、边及属性声明计入精确率误报分母。", ""]
     return "\n".join(lines)
 
 

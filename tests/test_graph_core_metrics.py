@@ -129,7 +129,8 @@ def test_panel_counts_do_not_cancel_each_others_missing_vertices():
         {"reference_index": 1, "prediction_index": 1, **SCOPE}]}
     result = score_image(reference, prediction, scope)
     assert result["panel_count"]["status"] == "pass"
-    assert summarize([result], "predeclared")["metrics"]["vertex_count"] == {"passed": 0, "total": 2, "status": "fail"}
+    metric = summarize([result], "predeclared")["metrics"]["vertex_count"]
+    assert metric["passed"] == 0 and metric["total"] == 2 and metric["status"] == "fail"
 
 
 def test_uncertain_or_degraded_fast_response_is_not_a_performance_pass():
@@ -257,3 +258,64 @@ def test_inconsistent_directed_declaration_cannot_pass_basic_type():
     expected, actual = graph(), graph()
     actual["directed"] = True
     assert score_panel(expected, actual, SCOPE)["basic_type"]["status"] == "fail"
+
+
+def test_duplicate_extra_panel_counts_all_vertices_and_edges_as_false_positives():
+    result = score_image({"graphs": [graph()]}, {"graph_structures": [graph(), graph()]}, image_scope())
+    assert len(result["panels"]) == 1  # No fabricated reference panel.
+    assert result["extra_prediction_panels"] == [1]
+    assert result["extra_prediction_inventories"][0]["vertices"] == 3
+    summary = summarize([result], "predeclared")["metrics"]
+    assert summary["vertex_count"]["passed"] == summary["vertex_count"]["total"] == 1
+    assert summary["vertex_count"]["extra_prediction_instances"] == 3
+    assert summary["edge_count"]["extra_prediction_instances"] == 2
+    assert all(summary[name]["status"] == "fail" for name in ("panel_count", "vertex_count", "edge_count", "basic_type"))
+    assert summary["connections"]["correct"] == summary["connections"]["expected"] == 2
+    assert summary["connections"]["predicted"] == 4
+    assert summary["connections"]["precision"] == .5
+    assert summary["vertex_labels"]["correct"] == 3 and summary["vertex_labels"]["predicted"] == 6
+    assert summary["vertex_labels"]["status"] == "fail"
+
+
+def test_extra_direction_weight_and_parallel_claims_have_complete_denominators():
+    expected = graph(edges=[edge("0", "1", "forward", 0)])
+    extra = graph(edges=[edge("0", "1", "forward", 0, multiplicity=2),
+                         edge("1", "1", "unknown", "π"), edge("1", "2", "undirected")])
+    result = score_image({"graphs": [expected]}, {"graph_structures": [expected, extra]}, image_scope())
+    summary = summarize([result], "predeclared")["metrics"]
+    assert summary["connections"]["predicted"] == 5
+    assert summary["directions"]["expected"] == summary["directions"]["correct"] == 1
+    assert summary["directions"]["predicted"] == 4  # Includes unknown arrow and both parallel arcs.
+    assert summary["directions"]["extra_panel_false_positives"] == 3
+    assert summary["directions"]["status"] == "fail"
+    assert summary["weights"]["expected"] == summary["weights"]["correct"] == 1
+    assert summary["weights"]["predicted"] == 4
+    assert summary["weights"]["status"] == "fail"
+
+
+def test_extra_claims_without_reference_attributes_are_false_positives():
+    extra = graph(edges=[edge("0", "1", "unknown", "unknown")])
+    result = score_image({"graphs": [graph()]}, {"graph_structures": [graph(), extra]}, image_scope())
+    summary = summarize([result], "predeclared")["metrics"]
+    for name in ("directions", "weights"):
+        assert summary[name]["expected"] == summary[name]["correct"] == 0
+        assert summary[name]["predicted"] == 1 and summary[name]["status"] == "fail"
+
+
+def test_extra_panel_does_not_turn_unknown_mapping_into_assessed_accuracy():
+    anonymous = graph((None,) * 9, [])
+    result = score_image({"graphs": [anonymous]}, {"graph_structures": [anonymous, graph()]}, image_scope(), mapping_limit=1)
+    summary = summarize([result], "predeclared")["metrics"]
+    assert summary["vertex_count"]["status"] == "fail"
+    assert summary["connections"]["status"] == "not_assessed"
+    assert summary["connections"]["extra_panel_false_positives"] == 2
+
+
+def test_malformed_extra_inventory_cannot_disappear_from_scoring():
+    result = score_image({"graphs": [graph()]}, {"graph_structures": [graph(), {"vertices": [], "edges": [{}]}]}, image_scope())
+    summary = summarize([result], "predeclared")["metrics"]
+    # This malformed edge has unknown endpoints but still is a listed edge
+    # instance and must be counted as an extra connection/direction claim.
+    assert summary["connections"]["predicted"] == 3
+    assert summary["directions"]["extra_panel_false_positives"] == 1
+    assert summary["vertex_count"]["status"] == "fail"

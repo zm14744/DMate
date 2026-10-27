@@ -652,17 +652,17 @@ def test_budget_is_explicit_and_does_not_retry_slow_or_failed_requests():
     assert budget.deadline-budget.started == pytest.approx(200)
 
 
-def test_default_main_uses_bounded_thinking_without_changing_explicit_injected_provider():
+def test_default_main_uses_json_mode_without_changing_explicit_injected_provider():
     from vision_provider import VisionProvider
     budget = fast.configured_fast_budget()
     runner = fast.FastRunner(budget)
     ordinary = runner._provider_for('fast_main')
     payload = ordinary.payload('Only JSON', [])
     assert ordinary.name == 'qwen' and ordinary.model == 'qwen3-vl-plus'
-    assert ordinary.retries == 0 and ordinary.thinking_budget == 1024
-    assert payload['enable_thinking'] is True and payload['thinking_budget'] == 1024
-    assert 'response_format' not in payload
-    injected = VisionProvider('qwen', thinking=False, retries=0)
+    assert ordinary.retries == 0 and ordinary.thinking_budget is None
+    assert payload['enable_thinking'] is False and 'thinking_budget' not in payload
+    assert payload['response_format'] == {'type': 'json_object'}
+    injected = VisionProvider('qwen', thinking=True, thinking_budget=1024, retries=0)
     assert fast.FastRunner(budget, provider=injected)._provider_for('fast_main') is injected
     assert fast.FastRunner(budget, provider={'fast_main': injected})._provider_for('fast_main') is injected
     assert fast.FastRunner(budget)._provider_for('fast_local_review').thinking is False

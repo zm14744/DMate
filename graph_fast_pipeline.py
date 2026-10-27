@@ -26,26 +26,21 @@ from vision_provider import GLM_5V_TURBO_MODEL, VisionError, VisionProvider
 
 PERFORMANCE_TARGET_SECONDS = 120
 
-MAIN_PROMPT = r'''读取这张数学题原图，输出可供用户核对和编辑的完整题干与图结构，不解题。
-只依据原图实际内容；工具候选用于定位，可能漏读/误读，不能据候选数量、图名、度数或常见模板补删边。
-local_visual_inventory是经原像素支持的同类圆点候选，含位置、尺寸和像素测量依据。请借此逐点区分真实圆点与旁边的边名、字形；它仍是候选，不是完整顶点真值，不能为了候选数量一致补删顶点。
-先区分每幅独立数学子图，再读全真实顶点与标签（包括孤立点），沿每条实际连线找到两端点。普通交叉、箭头尖、文字笔画不是额外顶点。相连的两个局部仍是一幅图；同图的不连通分量不能仅因分开就拆成多图。所有辅助窗口都来自同一原图，不重复计图。
-顶点清单按实际圆点/圆圈或明确端点建立，旁边的边名不能变成额外节点；没有印刷节点名的真实点保留label=null。e_i也可以是原图真正的节点名，必须按它与点/线的实际位置判别，不能只按词形删点。遇到没有节点标记的交叉，沿原来的连续笔画继续走，不能在交叉处换到另一条线，也不能把上下同列而无连线的点连接起来。
-每幅图依次输出三项：先vertices列实际点，附短position（如“左中蓝圆点”）和mark（filled/hollow/endpoint/label/unknown），不要求坐标；再独立扫描原图，按整条可见连线列stroke_inventory，每项给唯一id和短position（如“上方外弧”“左侧竖线”），此时先不填两端；最后edges使用同一组id逐条填写两端及属性。虚线的多个短划是一条边，普通交叉不拆边，经过真实顶点才分成不同边；自环、重边各占一个实例。逐项检查每条已见笔画恰好对应一条边，不能为了题干、模板、工具候选数或自报数量而补删笔画。
-按箭头尖确定方向。有向边仅列一次；无向边仅列一次；每条重边、反向弧、自环分别保留。保留印刷权重，包括零、负数和符号。节点旁的字母属于节点，不能抄为边名；印刷边名(e₁等)与权重分开。
-每图填写weighted布尔值：只有原图实际标注了边权才为true，节点编号、节点数字及边名都不算边权。能看出是边权但具体值未读清时仍保留weighted=true、该边weight=null并列明疑点；不得为补齐字段编造数值。
-输出前逐幅对照原图核对每条线的实际两端和箭头，不能按节点编号递增、左右顺序或对称布局决定方向。符号权重如π、√2、1/3原样保留为字符串，不计算近似值。同一处印刷标注仅放在其实际对应的weight或edge_label字段，不重复复制；只有原图确有两处独立标注时才同时填写两个字段。
-body_text逐字保留全部可见题干、小问、公式、数学符号和必要图例；图内标签与(a)/(b)图注放在图结构，不变成题干。不生成“如图所示”等原图没有的文字，不推测被裁掉的内容。没有题干用空字符串。
-保留题目有用的颜色和虚线/点线区别。普通黑白印刷、白色粉笔、背景装饰、精确坐标与线条粗细不影响完成状态。阴影和背面透印不能当新增线条。只把具体仍看不清的内容列为uncertainties，供用户修改。
-输出紧凑JSON，不输出解释或Markdown：
-{"body_text":"原文", "graphs":[{"id":"G1","name":"原图图注或G1","directed":false,"weighted":false,"bbox":[0,0,1000,1000],"vertices":[{"id":"a","label":"a","position":"左侧","mark":"hollow"},{"id":"b","label":null,"position":"右侧","mark":"filled"}],"stroke_inventory":[{"id":"s1","position":"两点间直线"}],"edges":[{"id":"s1","from":"a","to":"b","direction":"undirected","weight":null,"edge_label":null,"style":"solid"}]}],"uncertainties":[]}
-direction为forward/undirected/unknown，forward表示from→to；无印刷标签的点label=null。内部ID可自行分配但图内引用一致；edges.id必须与stroke_inventory.id逐条对应。bbox可省略，仅为相对完整原图0..1000的宽松位置提示。style为solid/dashed/dotted/unknown。无特殊颜色可省略color。没有图时graphs=[]。
-uncertainties格式：{"scope":"body|graph|document","graph_id":"图问题填写","field":"vertices|edges|direction|weight|body_text等","message":"具体位置及未读清内容"}。必要图例可另存text_context.legends=[{"text":"原文","graph_ids":["G1"]}]，但不得从body_text中遗漏。'''
+MAIN_PROMPT = r'''读取数学题原图，返回紧凑JSON题干和图结构，不解题，不输出解释或Markdown。
+第一张总览决定独立子图数量；后续局部只是同一原图的放大窗口，不能重复计图。同图不连通分量不能仅因分开就拆图。多图时每图给相对完整原图0..1000的粗bbox，也可附对应layout_panel_ids；不要将每个局部窗口都填成整页bbox。坐标不要求精确。
+先清点真实圆点、圆圈或明确顶点，包括孤立点，再沿实际连线读端点。普通交叉、箭头尖和文字不是顶点；边名不能变成节点。无印刷节点名则label=null；e_i也可能是真节点名，须按原图位置判别。local_visual_inventory中的同类圆点须逐个对照原图，可在顶点附marker_id绑定对应候选；若有候选以外的真实点，保留并只为该点附短visual_basis说明具体位置与可见依据。候选可能错漏，不能按候选数、题干、图名、度数或模板补删点边。
+可先给visible_vertex_count、visible_edge_count，须独立对原图清点，再与记录核对；不确定则null并列明疑点，不能把数组长度或工具数抄成视觉结论。只输出一份vertices和edges，不逐点逐边重复描述。
+交叉处沿原笔画走，不换线；经过真实顶点才分成不同边。虚线的多个短划是一条边。每条无向边、有向边、自环、重边和反向弧各列一次。方向只按箭头尖确定，不能按编号或布局猜；看不清用unknown。
+weighted必须是布尔值：只有实际边权才true，节点数字、节点编号、边名不算权重。已知存在但未读清的边权用null并列疑点。保留零、负数及π、√2、1/3等原始符号，不计算近似值。同一印刷项仅放对应的weight或edge_label，不能重复填写。保留必要颜色、虚线与点线；阴影、透印不能当新增线条。
+body_text逐字保留全部可见题干、小问、公式、数学符号和图例；图内标签、图注放图结构。没有题干就用空字符串，不能根据图生成问题、补写“如图所示”等原图没有的话或猜裁切文字。只把具体仍看不清的内容列为uncertainties。
+格式：{"body_text":"原文","graphs":[{"id":"G1","name":"图注或G1","directed":false,"weighted":false,"visible_vertex_count":2,"visible_edge_count":1,"vertices":[{"id":"a","label":"a"},{"id":"b","label":null}],"edges":[{"from":"a","to":"b","direction":"undirected","weight":null,"edge_label":null,"style":"solid"}]}],"uncertainties":[]}
+direction为forward/undirected/unknown，forward表示from→to；style为solid/dashed/dotted/unknown，无特殊颜色可省略color。内部ID只需图内一致，边ID可省略。无图则graphs=[]。
+uncertainties格式：{"scope":"body|graph|document","graph_id":"图问题填写","field":"vertices|edges|direction|weight|body_text等","message":"具体位置与疑点"}。图例可另存text_context.legends=[{"text":"原文","graph_ids":["G1"]}]，同时保留在body_text。'''
 
 LOCAL_REVIEW_PROMPT = r'''你是数学图像的局部复核者。完整原图和所有局部视图来自同一张图。只检查targets明确指出的正文或数学子图，不解题。
 draft是尚待用户确认的读取结果，工具候选和题意规则都是辅助，可能错误。沿原图确认目标图的顶点、连接、箭头、孤立点、自环、重边、权重，完整保留其必要标签/线型/颜色；不从常见图模板或度数反推图片。
 local_marker_candidates是整张原图上的圆点候选，含位置、大小和置信度，也可能混入正文或字形。核对目标子图内形状、大小相近的清晰圆点与draft顶点是否逐一对应，尤其检查较大圆点旁的字母是否实际为边名；有数量差异时重新对照原图确认真实点和连接，不将整页候选总数或某一尺寸组的数量强制作为节点数。匿名真实点保留label=null，不能仅凭e_i等词形删除真正的节点名。
-若issues指出圆点数或笔画清单冲突，先重新清点原图实际点和整条连线，不能只补颜色而保留未核实的连接。local_visual_inventory是原像素支持的候选及测量依据，仍不是答案。每幅返回图先列vertices及短position，再列stroke_inventory=[{"id":"s1","position":"上方外弧"}]，最后edges以相同id填写两端与属性；只按原图纠正清单，不按候选数量凑数。仍不能确认时保留具体疑点。
+若issues指出计数冲突，先重新清点原图实际点与整条连线，不能只补颜色而保留未核实连接。local_visual_inventory中的圆点候选须逐个对照原图，可用marker_id绑定对应顶点；额外真实点允许保留并附短visual_basis定位依据，不能按候选数凑答案。只返回紧凑vertices/edges，可给独立视觉计数visible_vertex_count/visible_edge_count；仍不能确认则null并列疑点。保留weighted布尔值；方向和权重必须来自原图，不按全图类型补猜。
 只返回targets内已复核的完整子图，保留原graph.id。无需返回未请求的图。题干仅在targets.body=true时返回完整逐字body_text；不能新增原图不存在的问题或补全裁切文字。
 返回格式：{"graphs":[{"id":"G1","name":"原图图注","vertices":[...],"edges":[...]}],"uncertainties":[]}。节点和边结构与主读取相同。已确认修正的问题不留在uncertainties；仍看不清时明确列出scope/graph_id/field/message，保留可用内容，不以空图抹掉整幅结构。仅内部ID或坐标差异不是识别疑点。'''
 
@@ -92,8 +87,7 @@ class FastRunner(RoleRunner):
         if role == 'fast_main':
             supplied = self.provider.get(role) if isinstance(self.provider, dict) else self.provider
             if supplied is None:
-                return VisionProvider('qwen', thinking=True, thinking_budget=1024,
-                                      retries=0, capture=self.capture)
+                return VisionProvider('qwen', thinking=False, retries=0, capture=self.capture)
             # Explicit injected providers remain intact for controlled tests
             # and comparisons; the parent identity checks still apply.
             return super()._provider_for(role)
