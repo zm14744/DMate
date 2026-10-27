@@ -269,6 +269,14 @@ class RoleRunner:
             raise ValueError('agent_requires_explicit_qwen_without_hidden_retries')
         return remote
 
+    def _network_recovery_allowed(self, role, error, facts):
+        """Specialized role runners may narrow the existing retry allowance.
+
+        The legacy bounded runner keeps its original policy. The fast OCR
+        subclass only allows a no-header timeout for the first Qwen reader.
+        """
+        return True
+
     def call(self, role, prompt, request, images, *, revision=0, output_tokens=12000,
              response_identity=True, reserve_seconds=0):
         if (type(reserve_seconds) not in (int, float) or not math.isfinite(reserve_seconds)
@@ -367,6 +375,7 @@ class RoleRunner:
                                    'failure_facts': facts}
                 retryable = not output_deadline and (
                     exc.kind == 'transport_failed' or exc.status in (429, 500, 502, 503, 504))
+                retryable = retryable and self._network_recovery_allowed(role, exc, facts)
                 retry = not network_recovered and retryable and self.budget.recover_network()
                 self.budget.event(role, 'network_recovery' if retry else 'failed',
                                   revision=revision, invocation=invocation,
