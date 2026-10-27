@@ -200,3 +200,17 @@ def test_user_text_rectangle_and_diy_polygon_feed_only_selected_area(canvas_page
     page.wait_for_function("textAreas.length===2")
     assert len(page.evaluate("textAreas[1]")) == 3
     assert page.evaluate("instance.getDocument().body_text").count("框选文字") == 2
+
+def test_focus_after_diy_region_keeps_math_positions_unchanged(canvas_page):
+    page = canvas_page
+    initial = page.evaluate("instance.getDocument().graphs[0].vertices.map(v => [v.x,v.y])")
+    page.get_by_label("选区方式").select_option("graph_poly")
+    rect = page.locator(".dge-overlay-svg").bounding_box()
+    assert rect
+    for x, y in ((.17, .2), (.55, .2), (.52, .7), (.17, .7)):
+        page.mouse.click(rect["x"] + rect["width"]*x,
+                         rect["y"] + rect["height"]*y)
+    page.get_by_role("button", name="完成轮廓").click()
+    page.get_by_role("button", name="聚焦图形").click()
+    assert int(page.locator(".dge-overlay-zoom").inner_text().rstrip("%")) > 100
+    assert page.evaluate("instance.getDocument().graphs[0].vertices.map(v => [v.x,v.y])") == initial

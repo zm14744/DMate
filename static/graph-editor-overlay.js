@@ -67,6 +67,22 @@ function mount(host,o){
  const value=d.createElement('span');value.className='dge-overlay-zoom';bar.append(value);
  button('＋','zoom-in',()=>zoom(s.zoom*1.25)).setAttribute('aria-label','放大原图');
  button('适应','zoom-fit',()=>zoom(100));
+ const focusButton=button('聚焦图形','focus-region',()=>{
+   const g=o.graph();
+   const p=g?.region_polygon;
+   const box=Array.isArray(p)&&p.length>=3
+     ?[Math.min(...p.map(v=>v[0])),Math.min(...p.map(v=>v[1])),
+       Math.max(...p.map(v=>v[0])),Math.max(...p.map(v=>v[1]))]
+     :g?.bbox;
+   if(!Array.isArray(box)||box.length!==4) {
+      status.textContent='请先框选当前图形的矩形或多边形范围';
+      return;
+   }
+   const dx=box[2]-box[0],dy=box[3]-box[1];
+   zoom(Math.min(400,Math.max(100,Math.round(90/Math.max(dx,dy,.1)))));
+   scroll.scrollLeft=stage.scrollWidth*(box[0]+box[2])/2-scroll.clientWidth/2;
+   scroll.scrollTop=stage.scrollHeight*(box[1]+box[3])/2-scroll.clientHeight/2;
+ });
  const change=fn=>{try{fn();o.changed?.();draw();}catch(e){status.textContent=e?.message||'修改失败';}};
  const pos=(v,i,g)=>{
   if(ghost?.vertex===v.id)return ghost.pos;
@@ -83,6 +99,7 @@ function mount(host,o){
   textButton.hidden=!s.textRegion&&!textBusy;
   textButton.disabled=textBusy||!s.textRegion||Boolean(o.disabled?.());
   clearButton.hidden=!s.textRegion;
+  focusButton.disabled=!(g?.region_polygon?.length>=3 || g?.bbox?.length===4);
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
   hint.textContent=s.mode==='graph_poly'||s.mode==='text_poly'
     ?'沿轮廓依次点击角点，然后点击“完成轮廓”；可围住不规则形状'
