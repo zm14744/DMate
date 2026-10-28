@@ -20,6 +20,7 @@ import numpy as np
 from PIL import Image
 
 from image_evidence import decode_document_image
+from ocr_layout import separate_diagram_labels
 
 
 VERSION = "2026-10-28-accuracy-first-segmentation-v3"
@@ -607,6 +608,19 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                     issues = ["自动分图或子图复核未完成；没有预绘制任何顶点和边"]
             if not figures and not vision_failed:
                 issues.append("图片有几何图形候选，但未确认独立数学子图，请核对")
+        # Small OCR was run on the original pixels while high-accuracy auto
+        # segmentation worked in parallel. Now intersect its individual OCR
+        # boxes with the confirmed diagram rectangles. Only the OUTSIDE text
+        # may enter the question; graph labels/weights stay out of body_text.
+        diagram_label_count = 0
+        question_text_count = int(text_result.get("text_count") or 0)
+        if figures:
+            text, question_text_count, diagram_label_count, located = (
+                separate_diagram_labels(text_result, figures))
+            if not located and text:
+                issues.append("OCR未返回文字坐标，无法确认图内标签已从题干分离，请核对")
+            if any("bbox" not in figure for figure in figures):
+                issues.append("部分图形尚无定位边界，题干与图内文字可能需要人工核对")
         if text_error:
             issues.append(text_error)
         if not figures and not text and not issues:
@@ -617,7 +631,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
             "workflow_profile": "layout_only",
             "text": text,
             "raw_ocr_text": text,
-            "text_count": int(text_result.get("text_count") or 0),
+            "text_count": question_text_count,
             "formula_count": 0,
             "graph_structures": figures,
             "graph_display_data": [],
@@ -638,6 +652,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                 "independently_verified_type_fields": certified,
                 "layout_model_calls": 0,
                 "text_worker_metrics": text_result.get("resource_metrics", []),
+                "diagram_text_items_excluded_from_question": diagram_label_count,
                 "duration_seconds": round(time.monotonic() - start, 3),
                 "deadline_hit": time.monotonic() >= deadline,
                 "image_accuracy_certified": False,
