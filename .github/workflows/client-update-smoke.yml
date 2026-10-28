@@ -10,7 +10,11 @@ on:
       - 'app.py'
       - 'static/client-updates.json'
       - 'static/script.js'
+      - 'static/graph-editor.js'
+      - 'static/graph-editor-overlay.js'
+      - 'static/graph-editor.css'
       - 'templates/index.html'
+      - 'tests/test_graph_editor_ui_contract.py'
       - 'tests/client_update_contract.js'
       - 'tests/web_sync_contract.js'
       - 'tests/test_web_sync_contract.py'
@@ -37,6 +41,8 @@ jobs:
           node --check static/web-sync.js
           node --check static/legacy-worker-retire.js
           node --check static/script.js
+          node --check static/graph-editor.js
+          node --check static/graph-editor-overlay.js
           node tests/client_update_contract.js
           node tests/web_sync_contract.js
       - name: Check Android file upload and release rules
@@ -44,4 +50,5 @@ jobs:
       - name: Verify installed apps receive latest web without new APK
         run: |
           python -m unittest discover -s tests -p 'test_web_sync_contract.py'
+          python -m unittest discover -s tests -p 'test_graph_editor_ui_contract.py'
           python -m py_compile app.py

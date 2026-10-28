@@ -171,10 +171,10 @@ def browser_editor():
         page.add_script_tag(content=(ROOT/'static/graph-editor-model.js').read_text())
         page.add_script_tag(content=(ROOT/'static/graph-editor.js').read_text())
         page.evaluate("""value => {
-            window.changes=[];window.confirmations=[];window.cancelled=0;window.failSave=false;
+            window.changes=[];window.confirmations=[];window.confirmedTypes=[];window.cancelled=0;window.failSave=false;
             window.instance=DMateGraphEditor.mount(document.getElementById('editor'),{
                 document:value,onChange:doc=>changes.push(doc),onCancel:()=>cancelled++,
-                onConfirm:async doc=>{if(failSave)throw Error('保存失败，请重试');confirmations.push(doc);}
+                onConfirm:async (doc,isQuestion)=>{if(failSave)throw Error('保存失败，请重试');confirmations.push(doc);confirmedTypes.push(isQuestion);}
             });
         }""", document())
         yield page
@@ -185,6 +185,11 @@ def browser_editor():
 def test_real_browser_edits_and_confirms_the_same_user_visible_document(browser_editor, tmp_path):
     page = browser_editor
     assert page.locator('.dge-validation, .dge-context, .dge-footer .dge-check').count() == 0
+    assert page.get_by_role('radiogroup', name='识别内容是否为题目').count() == 1
+    assert page.get_by_role('radio', name='是', exact=True).is_checked()
+    assert page.get_by_role('button', name='稍后继续', exact=True).count() == 0
+    assert page.evaluate("getComputedStyle(document.querySelector('.dge-footer')).position") == 'static'
+    assert page.evaluate("getComputedStyle(document.querySelector('.dge-footer')).backgroundColor") == 'rgba(0, 0, 0, 0)'
     label = '<img src=x onerror="window.INJECTED=true">'
     page.get_by_label('节点 1 标签', exact=True).fill(label)
     page.get_by_label('题干、全部小问与公式', exact=True).fill('（1）求修改后的度数。\n（2）列出全部边。')
@@ -208,6 +213,17 @@ def test_real_browser_edits_and_confirms_the_same_user_visible_document(browser_
     assert page.get_by_label('我已对照原图核对题干与各子图', exact=True).count() == 0
     assert page.locator('.dge-context, .dge-validation').count() == 0
     assert page.evaluate('changes.at(-1).graphs[0].vertices[0].label') == 'A′'
+
+
+def test_question_type_survives_graph_edit_and_reaches_save(browser_editor):
+    page = browser_editor
+    page.get_by_role('radio', name='否', exact=True).check()
+    assert page.evaluate('instance.getIsQuestion()') is False
+    page.get_by_role('button', name='添加节点', exact=True).click()
+    assert page.get_by_role('radio', name='否', exact=True).is_checked()
+    page.get_by_role('button', name='保存并确认', exact=True).click()
+    page.wait_for_function('confirmedTypes.length===1')
+    assert page.evaluate('confirmedTypes[0]') is False
 
 
 def test_real_browser_adds_nodes_and_moves_edges_without_losing_select_values(browser_editor):

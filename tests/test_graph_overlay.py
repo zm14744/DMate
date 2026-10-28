@@ -130,6 +130,24 @@ def test_mobile_overlay_fits_without_external_assets(canvas_page):
     page.get_by_role("button", name="显示描绘", exact=True).click()
     assert page.locator(".dge-overlay-svg.is-hidden").count() == 0
 
+def test_overlay_zoom_out_and_fit_below_100_percent(canvas_page):
+    page = canvas_page
+    for _ in range(3):
+        page.get_by_role('button', name='缩小原图', exact=True).click()
+    assert page.locator('.dge-overlay-zoom').inner_text() == '51%'
+    assert page.evaluate("""() => {
+        const stage=document.querySelector('.dge-overlay-stage');
+        const viewport=document.querySelector('.dge-overlay-viewport');
+        return stage.getBoundingClientRect().width < viewport.getBoundingClientRect().width;
+    }""")
+    for _ in range(20):
+        page.get_by_role('button', name='缩小原图', exact=True).click()
+    assert page.locator('.dge-overlay-zoom').inner_text() == '25%'
+    page.get_by_role('button', name='适应', exact=True).click()
+    fitted = int(page.locator('.dge-overlay-zoom').inner_text().rstrip('%'))
+    assert 25 <= fitted <= 100
+
+
 def test_overlay_keeps_image_and_zoom_when_selecting_or_renaming(canvas_page):
     page = canvas_page
     page.get_by_role("button", name="放大原图", exact=True).click()
