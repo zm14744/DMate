@@ -181,3 +181,25 @@ def test_auto_graph_route_and_frontend_are_layout_only():
     assert 'if (useOverlay && graph)' in graph_editor
     assert "dge-detected-type" in graph_editor
     assert all(s not in TYPE_PROMPT for s in ("枚举顶点", "追踪全部边", "按连通图补充"))
+
+
+def test_public_university_graphs_are_not_silently_downgraded_to_text_only():
+    """Real archived university diagrams should take the Qwen type-only route."""
+    from pathlib import Path
+    originals = Path(__file__).resolve().parent / "fixtures" / "original_ouc_20261021"
+    for filename in ("180506.png", "181309.png"):
+        source = originals / filename
+        assert source.is_file(), filename
+        with Image.open(source) as picture:
+            result = visual_preflight(picture.convert("RGB"))
+        assert result["possible_graph"], (filename, result)
+
+
+def test_failed_qwen_is_counted_as_attempted_and_not_fabricated():
+    def unavailable(*_args):
+        raise RuntimeError("synthetic_Qwen_failure")
+    result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
+                                   provider=unavailable, budget=object())
+    assert result["recognition_status"] == "failed"
+    assert result["diagnostics"]["qwen_graph_calls"] == 1
+    assert result["graph_structures"] == []
