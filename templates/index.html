@@ -8656,6 +8656,84 @@ window.MathJax = {
     .ocr-task-list { grid-template-columns:minmax(0,1fr); }
     .graph-editor-dialog { width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border-radius:0; padding:12px; }
 }
+
+/* The image task area is ONE larger panel plus ONE upload control, visually
+   outside the panel on its lower-right. The ordinary chat composer is
+   restored when the last image task is removed. No duplicate file input. */
+.ocr-upload-stage[hidden],
+.center > .input-wrap[hidden],
+.ocr-upload-stage .ocr-task-panel[hidden] {
+    display:none !important;
+}
+.ocr-upload-stage {
+    display:flex; flex:0 1 auto; box-sizing:border-box; align-items:flex-end;
+    gap:14px; width:min(1280px,calc(100% - 36px));
+    min-width:0; margin:0 auto 16px;
+}
+.ocr-upload-stage > .ocr-task-panel {
+    flex:1 1 auto; box-sizing:border-box; min-width:0; width:auto;
+    min-height:260px; max-height:min(62dvh,670px);
+    margin:0; padding:20px 22px; border-radius:16px; overflow:auto;
+}
+.ocr-upload-stage .ocr-task-panel-head h2 {font-size:20px;line-height:1.4;}
+.ocr-upload-stage .ocr-task-panel-hint {margin:8px 0 18px;}
+.ocr-upload-actions {flex:0 0 auto; align-self:flex-end; min-width:0;}
+.ocr-upload-stage .image-picker-wrap {
+    position:relative; display:inline-flex; flex:0 0 auto;
+    align-items:center; justify-content:center; align-self:flex-end;
+}
+.ocr-upload-stage .image-picker-wrap[hidden] {display:none !important;}
+body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn {
+    box-sizing:border-box !important; display:inline-flex !important;
+    align-items:center !important; justify-content:center !important;
+    flex:0 0 auto !important; width:auto !important;
+    min-width:120px !important; max-width:none !important;
+    height:52px !important; min-height:52px !important; max-height:52px !important;
+    margin:0 !important; padding:0 19px !important;
+    border:0 !important; border-radius:12px !important;
+    background:var(--accent) !important; color:#fff !important;
+    -webkit-text-fill-color:#fff !important;
+    font-size:15px !important; font-weight:650 !important;
+    line-height:1.2 !important; white-space:nowrap !important;
+    text-indent:0 !important; box-shadow:none !important; cursor:pointer;
+}
+body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn::before {
+    content:none !important; display:none !important;
+}
+body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn:disabled {
+    opacity:.5 !important; cursor:not-allowed;
+}
+/* Keep the actual file input covering the visible button. Direct native taps
+   remain supported in older Android WebView and WebKit. */
+body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
+    position:absolute !important; inset:0 !important;
+    width:100% !important; min-width:100% !important; max-width:100% !important;
+    height:100% !important; min-height:100% !important; max-height:100% !important;
+    margin:0 !important; padding:0 !important; border:0 !important;
+    opacity:0 !important; clip-path:none !important;
+    overflow:visible !important; pointer-events:auto !important;
+    cursor:pointer !important; z-index:2 !important;
+}
+.ocr-upload-stage .image-picker-wrap:focus-within > #imageBtn {
+    outline:2px solid var(--accent) !important; outline-offset:3px;
+}
+@media(max-width:760px) {
+    .ocr-upload-stage {
+        flex-direction:column; align-items:stretch; gap:10px;
+        width:calc(100% - 16px);
+        margin-bottom:max(10px,env(safe-area-inset-bottom));
+    }
+    .ocr-upload-stage > .ocr-task-panel {
+        width:100%; flex:none; min-height:190px;
+        max-height:min(52dvh,480px); padding:14px;
+    }
+    .ocr-upload-actions {align-self:flex-end;}
+    body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn {
+        height:46px !important; min-height:46px !important; max-height:46px !important;
+        min-width:108px !important; padding:0 16px !important;
+        font-size:14px !important;
+    }
+}
 </style>
 </head>
 
@@ -8733,13 +8811,19 @@ window.DMATE_CLIENT_CONFIG = {{ {
         </button>
     </nav>
 
-    <section id="ocrTaskPanel" class="ocr-task-panel" aria-labelledby="ocrTaskTitle" hidden>
-        <div class="ocr-task-panel-head">
-            <h2 id="ocrTaskTitle">图片识题</h2>
-        </div>
-        <p class="ocr-task-panel-hint">最多4张</p>
-        <div id="ocrTaskList" class="ocr-task-list"></div>
-    </section>
+    <!-- When images are queued, this replaces (rather than duplicates) the
+         normal chat composer. The SAME mounted file chooser is moved into
+         the lower-right slot so Android/iOS/WebView uploads keep working. -->
+    <div id="ocrUploadStage" class="ocr-upload-stage" hidden>
+        <section id="ocrTaskPanel" class="ocr-task-panel" aria-labelledby="ocrTaskTitle" hidden>
+            <div class="ocr-task-panel-head">
+                <h2 id="ocrTaskTitle">图片</h2>
+            </div>
+            <p class="ocr-task-panel-hint">最多4张</p>
+            <div id="ocrTaskList" class="ocr-task-list"></div>
+        </section>
+        <div id="ocrUploadActions" class="ocr-upload-actions"></div>
+    </div>
     <div class="input-wrap">
         <div id="manualQuestionMode" class="manual-question-mode" role="group" aria-label="手动输入是否为题目">
             <span class="manual-question-mode-label">题目</span>
@@ -8751,7 +8835,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <input id="text" type="text" placeholder="" autocomplete="off">
             </div>
             <span class="image-picker-wrap" id="imagePickerWrap">
-                <button id="imageBtn" type="button" title="一次选择 1–4 张原图，也可以拖放或粘贴">图片识题</button>
+                <button id="imageBtn" type="button" title="一次选择 1–4 张图片，也可以拖放或粘贴">上传图片</button>
                 <input id="imageInput" type="file" accept="image/*" multiple tabindex="-1" aria-label="选择图片">
             </span>
             <button id="ocrCancelBtn" type="button" hidden aria-label="撤销图片识别" title="撤销图片识别"></button>

@@ -12108,7 +12108,10 @@ function updateChatJumpControls() {
     if (!chat || !topButton || !bottomButton || !center) return;
 
     const inputWrap = center.querySelector(".input-wrap");
-    const inputHeight = inputWrap?.getBoundingClientRect().height || 80;
+    // When reviewing uploads, the enlarged image panel replaces the composer.
+    const taskStage = center.querySelector("#ocrUploadStage:not([hidden])");
+    const inputHeight = taskStage?.getBoundingClientRect().height
+        || inputWrap?.getBoundingClientRect().height || 80;
     center.style.setProperty("--dmate-chat-input-height", `${Math.ceil(inputHeight)}px`);
 
     const maxScroll = Math.max(0, chat.scrollHeight - chat.clientHeight);
@@ -14237,9 +14240,29 @@ function renderOcrTasks() {
     const focused = list.contains(document.activeElement) ? document.activeElement : null;
     const focusInfo = focused ? { taskId: focused.dataset.taskId, action: focused.dataset.ocrAction,
         field: focused.dataset.ocrField, start: focused.selectionStart, end: focused.selectionEnd } : null;
-    panel.hidden = ocrTasks.size === 0;
+    const hasImages = ocrTasks.size > 0;
+    panel.hidden = !hasImages;
+    const stage = document.getElementById("ocrUploadStage");
+    if (stage) stage.hidden = !hasImages;
+    const composerWrap = document.querySelector(".center > .input-wrap");
+    if (composerWrap) composerWrap.hidden = hasImages;
     const manualQuestion = document.getElementById("manualQuestionMode");
-    if (manualQuestion) manualQuestion.hidden = ocrTasks.size > 0;
+    if (manualQuestion) manualQuestion.hidden = hasImages;
+    // Reuse the SAME native file input and click handlers: move the whole
+    // image-picker wrapper next to the panel while image tasks are present.
+    // Moving a DOM node preserves listeners and current file-input settings.
+    const picker = document.getElementById("imagePickerWrap");
+    const uploadActions = document.getElementById("ocrUploadActions");
+    const normalComposer = composerWrap?.querySelector(".input");
+    if (picker && uploadActions && normalComposer) {
+        const destination = hasImages ? uploadActions : normalComposer;
+        if (picker.parentElement !== destination) {
+            if (hasImages) uploadActions.appendChild(picker);
+            else normalComposer.insertBefore(picker,
+                normalComposer.querySelector("#ocrCancelBtn")
+                || normalComposer.querySelector("#sendBtn"));
+        }
+    }
     const fragment = document.createDocumentFragment();
     const element = (tag, className, text) => {
         const node = document.createElement(tag);
@@ -14356,6 +14379,7 @@ function renderOcrTasks() {
     }
     updateOcrTaskTimes();
     syncOcrTaskAvailability();
+    queueChatJumpControlsUpdate();
 }
 
 function draftFromOcrResponse(data) {
