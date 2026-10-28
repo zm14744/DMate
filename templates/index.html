@@ -8688,7 +8688,17 @@ window.MathJax = {
 .ocr-task-relations p { margin:2px 0; }
 .graph-editor-dialog { width:min(1280px,96vw); max-width:96vw; height:min(900px,94dvh); max-height:94dvh; box-sizing:border-box; margin:auto; padding:18px; border:1px solid var(--border-strong); border-radius:16px; background:var(--surface-1); color:var(--text-primary); overflow:auto; }
 .graph-editor-dialog::backdrop { background:rgba(0,0,0,.6); }
-.graph-editor-dialog > h2 { margin:0 0 12px; font-size:18px; overflow-wrap:anywhere; }
+.graph-editor-dialog-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.graph-editor-dialog-head > h2 { margin:0; font-size:18px; overflow-wrap:anywhere; min-width:0; }
+.graph-editor-dialog .graph-editor-close-dot {
+    appearance:none; -webkit-appearance:none; display:block; flex:0 0 22px;
+    width:22px; min-width:22px; height:22px; min-height:22px;
+    margin:0; padding:0!important; border:0!important; border-radius:50%;
+    background:#ef4444!important; box-shadow:none!important; cursor:pointer;
+}
+.graph-editor-dialog .graph-editor-close-dot:hover:not(:disabled) { background:#dc2626!important; }
+.graph-editor-dialog .graph-editor-close-dot:focus-visible { outline:2px solid #ef4444; outline-offset:3px; }
+.graph-editor-dialog .graph-editor-close-dot:disabled { opacity:.45; cursor:wait; }
 @media(max-width:760px) {
     .ocr-task-panel { width:calc(100% - 16px); margin:0 auto 8px; padding:8px; max-height:36dvh; }
     .ocr-task-list { grid-template-columns:minmax(0,1fr); }
@@ -8835,7 +8845,11 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
 
 <dialog id="graphEditorDialog" class="graph-editor-dialog" aria-labelledby="graphEditorTitle">
-    <h2 id="graphEditorTitle">图片</h2>
+    <div class="graph-editor-dialog-head">
+        <h2 id="graphEditorTitle">图片</h2>
+        <button id="graphEditorClose" class="graph-editor-close-dot" type="button"
+                aria-label="关闭图形识别编辑器" title="关闭"></button>
+    </div>
     <div id="graphEditorMount"></div>
 </dialog>
 
