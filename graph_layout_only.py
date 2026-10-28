@@ -76,6 +76,11 @@ def visual_preflight(image: Image.Image):
     # Text rules can be long horizontal lines: one line is not a graph.
     long_strokes = sum(1 for x1, y1, x2, y2 in segments
                        if math.hypot(x2 - x1, y2 - y1) >= long_threshold)
+    # Real paragraphs form surprisingly long Hough "strokes" along repeated
+    # glyph baselines. Require non-horizontal geometric paths unless distinct
+    # round vertex markers are visible; all-horizontal text must remain fast.
+    non_horizontal = sum(1 for x1, y1, x2, y2 in segments
+                         if abs(y2 - y1) >= .17 * max(1, math.hypot(x2 - x1, y2 - y1)))
     colored = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
     saturated = cv2.inRange(colored, (0, 105, 90), (179, 255, 255))
     count, _, stats, _ = cv2.connectedComponentsWithStats(saturated, 8)
@@ -85,20 +90,33 @@ def visual_preflight(image: Image.Image):
                 and .62 <= w / max(h, 1) <= 1.55
                 and area >= 24 and area / (w * h) >= .53):
             round_marks += 1
+    # Isolated large filled BLACK disks are common graph vertices. Tiny text
+    # glyphs are deliberately excluded by the proportional diameter limit.
+    dark_ink = (gray <= 105).astype(np.uint8)
+    _, _, dark_stats, _ = cv2.connectedComponentsWithStats(dark_ink, 8)
+    disk_threshold = max(10, int(min(height, width) * .028))
+    dark_disks = sum(1 for _, _, w, h, area in dark_stats[1:]
+                     if (disk_threshold <= w <= width * .1
+                         and disk_threshold <= h <= height * .1
+                         and .7 <= w / max(h, 1) <= 1.4
+                         and area / max(1, w * h) >= .62))
     # Multiple distinct loops or isolated hollow markers also suggest a
     # diagram with few straight lines. This does NOT infer their connectivity.
     circles = 0
-    if long_strokes < 2:
+    if non_horizontal < 2 and round_marks < 3 and dark_disks < 2:
         search = cv2.HoughCircles(cv2.medianBlur(gray, 5),
                                  cv2.HOUGH_GRADIENT, dp=1.5, minDist=16,
                                  param1=90, param2=24,
                                  minRadius=max(5, int(min(height, width) * .012)),
                                  maxRadius=max(8, int(min(height, width) * .09)))
         circles = 0 if search is None else min(len(search[0]), 24)
-    possible = long_strokes >= 2 or round_marks >= 3 or circles >= 3
+    possible = (non_horizontal >= 2 or round_marks >= 3 or dark_disks >= 2
+                or circles >= 3)
     return {"possible_graph": bool(possible),
             "long_stroke_count": min(long_strokes, 100),
+            "non_horizontal_stroke_count": min(non_horizontal, 100),
             "colored_round_mark_count": min(round_marks, 100),
+            "dark_disk_count": min(dark_disks, 100),
             "hollow_circle_count": circles,
             "is_graph_certificate": False}
 
