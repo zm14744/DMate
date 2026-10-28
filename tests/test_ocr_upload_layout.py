@@ -147,7 +147,7 @@ def test_red_cancel_immediately_removes_running_image_instead_of_cancelled_card(
     # Run the actual production cancel implementation against the actual
     # production upload-card renderer, not a hand-written mock of UI behavior.
     source = SCRIPT.split("function discardOcrTask(task) {", 1)[1].split(
-        "\\nfunction openImagePicker()", 1)[0]
+        "\nfunction openImagePicker()", 1)[0]
     source = "function discardOcrTask(task) {" + source
     page.evaluate("""source => {
         window.cancelNotification = false;
