@@ -108,8 +108,14 @@ def main():
                            stroke_units=TAB_STROKE)
             actual = rgba(path)
             assert actual.getpixel((0, 0))[3] == 0, ("Nontransparent tile", path)
-            assert actual.getpixel((size // 2, size // 2))[3] == 0, ("Filled center", path)
-            assert actual.getchannel("A").getbbox(), ("Missing wireframe", path)
+            alpha = actual.getchannel("A")
+            assert alpha.getbbox(), ("Missing wireframe", path)
+            # SVG paths may pass through the center (and LANCZOS adds subpixel
+            # coverage), so test overall transparent area rather than guessing
+            # a single 'empty' center pixel.
+            assert sum(a >= 250 for a in alpha.getdata()) < size * size // 3, (
+                "Opaque background/fill appeared", path
+            )
     # The 32px dark-mode Safari raster is pixel-identical to Edge's PNG.
     assert (ICONS / "dmate-safari-contrast-dark-v43-32.png").read_bytes() == (
         ICONS / "favicon-32.png"
