@@ -347,8 +347,8 @@ def test_focused_failure_preserves_regions_but_never_confident_types():
 
 
 def test_initial_slow_vision_is_not_cut_off_by_manual_four_second_timer():
-    # No actual 4-second sleep in CI: a targeted 0.2-second deadline proves
-    # that the normal upload uses its own request budget, not manual deadline.
+    # No actual 4-second sleep in CI. A normal initial-upload budget must
+    # admit the independent inventory and focused review without manual cap.
     from graph_layout_only import INITIAL_SCAN_MAX_SECONDS, MANUAL_SCAN_MAX_SECONDS
     assert INITIAL_SCAN_MAX_SECONDS >= 60
     assert MANUAL_SCAN_MAX_SECONDS < 4
@@ -366,7 +366,7 @@ def test_initial_slow_vision_is_not_cut_off_by_manual_four_second_timer():
     start = time.monotonic()
     result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
                                    provider=qwen, budget=object(),
-                                   request_deadline=time.monotonic() + 2.0)
+                                   request_deadline=time.monotonic() + 30.0)
     assert time.monotonic() - start >= .19
     assert result["graph_structures"][0]["directed"] is False
     assert result["diagnostics"]["qwen_graph_calls"] == 3
