@@ -14503,7 +14503,7 @@ async function enqueueOcrFiles(files) {
             state: "recognizing", startedAt: performance.now(), finishedAt: null,
             controller: new AbortController(), draft: { body_text: "", graphs: [] },
             initialDocument: { body_text: "", graphs: [] }, confirmation: null,
-            dirty: false, userRequest: "", error: "", notice: "", sourceSha256: null,
+            dirty: false, userRequest: "", isQuestion: true, error: "", notice: "", sourceSha256: null,
             descriptions: null, descriptionState: null
         };
         ocrTasks.set(task.id, task);
@@ -14599,7 +14599,8 @@ async function editOcrTask(id) {
     const dialog = document.getElementById("graphEditorDialog");
     const mount = document.getElementById("graphEditorMount");
     const title = document.getElementById("graphEditorTitle");
-    if (!dialog || !mount || !window.DMateGraphEditor?.mount) {
+    const closeButton = document.getElementById("graphEditorClose");
+    if (!dialog || !mount || !closeButton || !window.DMateGraphEditor?.mount) {
         task.error = "图片编辑界面未加载，请刷新后重试。";
         renderOcrTasks();
         return;
@@ -14607,8 +14608,13 @@ async function editOcrTask(id) {
     ocrEditorTaskId = task.id;
     ocrReviewInProgress = true;
     if (title) title.textContent = task.file?.name || "图片";
+    // Closing retains the current local OCR draft but must not interrupt Save.
+    const requestClose = () => { if (!task.confirming) dialog.close(); };
+    const blockCloseDuringSave = event => { if (task.confirming) event.preventDefault(); };
     const finish = () => {
         dialog.removeEventListener("close", finish);
+        dialog.removeEventListener("cancel", blockCloseDuringSave);
+        closeButton.removeEventListener("click", requestClose);
         ocrEditorController?.destroy();
         ocrEditorController = null;
         ocrEditorTaskId = null;
@@ -14620,6 +14626,8 @@ async function editOcrTask(id) {
         ocrEditorController = window.DMateGraphEditor.mount(mount, {
             document: cloneOcrDocument(task.draft), initialDocument: cloneOcrDocument(task.initialDocument),
             originalUrl: task.originalUrl,
+            isQuestion: task.isQuestion !== false,
+            onQuestionChange: flag => { task.isQuestion = flag; },
             onRecognizeText: async polygon => {
                 const selected = new FormData();
                 selected.append("image", task.file);
@@ -14646,10 +14654,15 @@ async function editOcrTask(id) {
                 task.descriptionState = null;
                 task.error = "";
             },
-            onCancel: () => { if (!task.confirming) dialog.close(); },
-            onConfirm: async value => { await confirmOcrTask(task, value); dialog.close(); }
+            onConfirm: async (value, isQuestion) => {
+                task.isQuestion = isQuestion;
+                await confirmOcrTask(task, value);
+                dialog.close();
+            }
         });
         dialog.addEventListener("close", finish);
+        dialog.addEventListener("cancel", blockCloseDuringSave);
+        closeButton.addEventListener("click", requestClose);
         dialog.showModal();
         refreshInputAvailability();
     } catch (error) {
@@ -14693,7 +14706,8 @@ async function solveOcrTask(id) {
     task.error = "";
     ocrSolvingSessions.add(session.id);
     currentId = session.id;
-    session.messages.push({ role: "user", text: combinedText, source: "ocr", ocrIsQuestion: true,
+    session.messages.push({ role: "user", text: combinedText, source: "ocr",
+        ocrIsQuestion: task.isQuestion !== false,
         apiText, semanticContext: context });
     maybeAutoNameSession(session, task.draft.body_text || task.file.name || "图片识题", "ocr");
     saveState();
