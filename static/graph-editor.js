@@ -20,6 +20,8 @@
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
         let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null;
         let individually = false, saving = false, destroyed = false, notice = '', pendingDelete = '';
+        // "Is this a question?" is a per-upload choice, separate from graph data.
+        let isQuestion = options.isQuestion !== false;
         let unsubscribe, overlay = null;
         const overlayState = { mode: 'select', zoom: 100, visible: true, start: null };
         const element = (tag, className, label) => { const node = dom.createElement(tag); if (className) node.className = className;
@@ -201,6 +203,30 @@
             return aside;
         }
 
+        function questionChoice() {
+            const row = element('div', 'dge-question-mode');
+            row.setAttribute('role', 'radiogroup');
+            row.setAttribute('aria-label', '识别内容是否为题目');
+            row.append(element('span', 'dge-question-label', '题目'));
+            for (const [label, flag] of [['是', true], ['否', false]]) {
+                const option = element('label', 'dge-question-option');
+                const radio = element('input');
+                radio.type = 'radio';
+                radio.name = instance + '-question';
+                radio.value = flag ? 'question' : 'other';
+                radio.checked = isQuestion === flag;
+                radio.disabled = saving;
+                radio.addEventListener('change', () => {
+                    if (!radio.checked || saving || destroyed) return;
+                    isQuestion = flag;
+                    options.onQuestionChange?.(isQuestion);
+                });
+                option.append(radio, dom.createTextNode(label));
+                row.append(option);
+            }
+            return row;
+        }
+
         function render() {
             if (destroyed) return;
             const document = model.getDocument();
@@ -217,7 +243,9 @@
             const undo = button('撤销', () => { pendingDelete = ''; model.undo(); }); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
             const redo = button('重做', () => { pendingDelete = ''; model.redo(); });
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
-            top.append(undo, redo, button('清空修改', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset()))); container.append(top);
+            top.append(questionChoice(), undo, redo,
+                button('清空修改', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset())));
+            container.append(top);
             const observations = (Array.isArray(options.issues) ? options.issues : [])
                 .map(issue => typeof issue === 'string' ? issue : text(issue?.message)).filter(Boolean);
             if (observations.length && !useOverlay) { const details = element('details', 'dge-observations'); details.open = true;
@@ -352,7 +380,8 @@
             }
             const status = element('div', 'dge-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.textContent = notice; container.append(status);
             const confirmRow = element('div', 'dge-footer');
-            const actions = element('div', 'dge-actions'); actions.append(button('稍后继续', () => options.onCancel?.()));
+            // The dialog header contains the close button; footer is save only.
+            const actions = element('div', 'dge-actions');
             const confirm = button(saving ? '正在保存…' : '保存并确认', async () => {
                 if ([...container.querySelectorAll('input[type=number]')].some(control => !control.checkValidity())) {
                     notice = '请填写有效的相同边数量（1 到 50）。'; refreshDraftViews(); return;
@@ -362,14 +391,15 @@
                 if (problems.length) { notice = problems[0]; render(); return; }
                 if (typeof options.onConfirm !== 'function') { notice = '暂时无法保存，请稍后重试。'; render(); return; }
                 saving = true; render();
-                try { await options.onConfirm(model.getDocument()); }
+                try { await options.onConfirm(model.getDocument(), isQuestion); }
                 catch (error) { notice = error?.message || '保存失败，当前修改已保留。'; }
                 finally { saving = false; if (!destroyed) render(); }
             }, 'dge-primary'); actions.append(confirm); confirmRow.append(actions); container.append(confirmRow);
         }
         unsubscribe = model.subscribe(document => { pendingDelete = ''; options.onChange?.(document); });
         render();
-        return { getDocument: model.getDocument, validate: model.validate, model,
+        return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
+            validate: model.validate, model,
             destroy() { destroyed = true; unsubscribe(); overlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };
