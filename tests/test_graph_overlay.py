@@ -339,76 +339,108 @@ def test_repeated_vertex_placement_does_not_jump_back_to_top(canvas_page):
 
 
 
-def test_mask_strength_slider_preserves_image_and_original_graph_data(canvas_page):
+def test_original_can_be_hidden_for_drawing_only_and_opacity_is_adjustable(canvas_page):
     page = canvas_page
-    slider = page.get_by_role("slider", name="蒙层强度")
-    assert slider.input_value() == "16"
-    assert page.locator(".dge-overlay-mask").count() == 1
-    assert page.locator(".dge-overlay-mask").get_attribute("fill-rule") == "evenodd"
-    assert page.locator(".dge-overlay-mask").evaluate(
-        "node => getComputedStyle(node).pointerEvents") == "none"
+    slider = page.get_by_role("slider", name="原图透明度")
+    photo = page.locator(".dge-overlay-image")
+    assert slider.input_value() == "100"
+    assert photo.evaluate("node => node.style.visibility") == "visible"
     page.evaluate("""() => {
-        window.photoBeforeVeil = document.querySelector('.dge-overlay-image');
-        window.dataBeforeVeil = JSON.stringify(instance.getDocument());
-        window.zoomBeforeVeil = document.querySelector('.dge-overlay-zoom').textContent;
+        window.originalPhoto = document.querySelector('.dge-overlay-image');
+        window.originalGraph = JSON.stringify(instance.getDocument());
+        window.originalStageSize = [
+            document.querySelector('.dge-overlay-stage').scrollWidth,
+            document.querySelector('.dge-overlay-stage').scrollHeight
+        ];
     }""")
-    # The user can disable the mask completely for very faint originals.
-    slider.focus()
-    slider.press("Home")
-    assert slider.input_value() == "0"
-    assert page.locator(".dge-overlay-mask-value").inner_text() == "0%"
-    assert page.locator(".dge-overlay-mask").evaluate(
-        "node => node.style.fill.endsWith(', 0)')") is True
-    slider.press("End")
-    assert slider.input_value() == "65"
-    assert page.locator(".dge-overlay-mask-value").inner_text() == "65%"
+    slider.evaluate("""el => {
+        el.value = '38';
+        el.dispatchEvent(new Event('input', {bubbles:true}));
+    }""")
+    assert slider.input_value() == "38"
+    assert photo.evaluate("node => node.style.opacity") == "0.38"
+    assert page.locator(".dge-overlay-opacity-value").inner_text() == "38%"
+    # Hiding the original leaves the drawing layer and source coordinate system intact.
+    page.get_by_role("button", name="隐藏原图").click()
+    assert photo.evaluate("node => node.style.visibility") == "hidden"
+    assert page.locator(".dge-overlay-node").count() == 2
+    assert page.locator(".dge-overlay-edge").count() == 1
+    assert page.locator(".dge-overlay-stage").evaluate(
+        "node => getComputedStyle(node).backgroundColor") == "rgb(255, 255, 255)"
+    assert page.get_by_role("button", name="显示原图").is_visible()
     assert page.evaluate("""() => {
-        return window.photoBeforeVeil === document.querySelector('.dge-overlay-image')
-            && window.dataBeforeVeil === JSON.stringify(instance.getDocument())
-            && window.zoomBeforeVeil === document.querySelector('.dge-overlay-zoom').textContent;
+        return window.originalPhoto === document.querySelector('.dge-overlay-image')
+            && window.originalGraph === JSON.stringify(instance.getDocument())
+            && JSON.stringify(window.originalStageSize) === JSON.stringify([
+                document.querySelector('.dge-overlay-stage').scrollWidth,
+                document.querySelector('.dge-overlay-stage').scrollHeight
+            ]);
     }""")
-    # Manual drawing must retain the current strength after a vertex mutation.
-    page.get_by_role("button", name="添加顶点", exact=True).click()
-    box = page.locator(".dge-overlay-svg").bounding_box()
-    assert box
-    page.mouse.click(box["x"] + box["width"]*.48,
-                     box["y"] + box["height"]*.32)
-    assert page.locator(".dge-overlay-node").count() == 3
-    assert page.get_by_role("slider", name="蒙层强度").input_value() == "65"
-    assert page.evaluate("window.photoBeforeVeil === document.querySelector('.dge-overlay-image')")
+    # Restore photo at the same opacity; slider changes do not alter drawing.
+    page.get_by_role("button", name="显示原图").click()
+    assert photo.evaluate("node => node.style.visibility") == "visible"
+    assert photo.evaluate("node => node.style.opacity") == "0.38"
+    slider.evaluate("""el => {
+        el.value = '100';
+        el.dispatchEvent(new Event('input', {bubbles:true}));
+    }""")
+    assert photo.evaluate("node => node.style.opacity") == "1"
 
 
-def test_mask_cutout_follows_user_defined_rectangle_and_polygon(canvas_page):
+def test_points_and_edges_choose_high_contrast_ink_from_local_pixels(canvas_page):
     page = canvas_page
-    page.get_by_role("button", name="框选图形", exact=True).click()
-    rect = page.locator(".dge-overlay-svg").bounding_box()
-    assert rect
-    page.mouse.move(rect["x"] + rect["width"]*.18,
-                    rect["y"] + rect["height"]*.15)
-    page.mouse.down()
-    page.mouse.move(rect["x"] + rect["width"]*.82,
-                    rect["y"] + rect["height"]*.75, steps=5)
-    page.mouse.up()
-    assert page.locator(".dge-overlay-mask").get_attribute("data-has-cutout") == "true"
-    path = page.locator(".dge-overlay-mask").get_attribute("d")
-    assert "H 900 V 580 H 0 Z" in path
-    assert " H " in path and " V " in path
-    mask_before = page.locator(".dge-overlay-mask").evaluate("node => node.style.fill")
-    page.get_by_role("slider", name="蒙层强度").press("Home")
-    assert page.locator(".dge-overlay-mask").evaluate(
-        "node => node.style.fill.endsWith(', 0)')")
-    page.get_by_role("slider", name="蒙层强度").press("End")
-    assert page.locator(".dge-overlay-mask").evaluate("node => node.style.fill") != mask_before
-    # Replacing the rectangle with an irregular figure outline produces a
-    # proper polygonal clear area, without changing original source pixels.
-    page.get_by_label("选区方式").select_option("graph_poly")
-    rect = page.locator(".dge-overlay-svg").bounding_box()
-    for x, y in ((.23,.20),(.72,.25),(.62,.70),(.21,.65)):
-        page.mouse.click(rect["x"] + rect["width"]*x,
-                         rect["y"] + rect["height"]*y)
-    page.get_by_role("button", name="完成轮廓").click()
-    assert page.locator(".dge-overlay-mask").get_attribute("data-has-cutout") == "true"
-    poly_path = page.locator(".dge-overlay-mask").get_attribute("d")
-    assert poly_path != path
-    assert " L " in poly_path
-    assert page.locator(".dge-overlay-polygon").count() == 1
+    page.evaluate("""() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 900; canvas.height = 580;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 900, 580);
+        ctx.fillStyle = '#080808'; ctx.fillRect(450, 0, 450, 580);
+        const url = canvas.toDataURL('image/png');
+        instance.destroy();
+        instance = DMateGraphEditor.mount(document.getElementById('editor'), {
+            originalUrl: url,
+            document: {body_text:'', graphs:[{
+                id:'G1', name:'图 G', directed:true, weighted:false, bbox:[0,0,1,1],
+                vertices:[
+                    {id:'left', label:'A', x:.25, y:.5},
+                    {id:'right', label:'B', x:.75, y:.5}
+                ],
+                edges:[{id:'edge1', from:'left', to:'right', direction:'forward'}]
+            }]},
+            onChange: doc => changed.push(doc),
+            onConfirm: async doc => confirmed.push(doc)
+        });
+    }""")
+    page.wait_for_function("""() => {
+        const img = document.querySelector('.dge-overlay-image');
+        const left = document.querySelector('[data-vertex-id="left"] .dge-overlay-dot');
+        const right = document.querySelector('[data-vertex-id="right"] .dge-overlay-dot');
+        return img?.naturalWidth === 900 && left?.dataset.ink && right?.dataset.ink;
+    }""")
+    left = page.locator('[data-vertex-id="left"] .dge-overlay-dot')
+    right = page.locator('[data-vertex-id="right"] .dge-overlay-dot')
+    # White paper => black ink; dark shadow/background => white ink.
+    assert left.get_attribute("data-ink") == "#111827"
+    assert right.get_attribute("data-ink") == "#ffffff"
+    cores = page.locator('[data-edge-id="edge1"] .dge-overlay-stroke')
+    inks = cores.evaluate_all("nodes => [...new Set(nodes.map(node => node.dataset.ink))]")
+    assert "#111827" in inks and "#ffffff" in inks
+    # Every local core stroke gets the complementary halo, including across
+    # the white-to-dark boundary; arrowheads use the same contrast family.
+    pairs = cores.evaluate_all("""nodes => nodes.map(node => ({
+        ink: node.dataset.ink,
+        halo: node.previousElementSibling?.style.stroke,
+        marker: node.getAttribute('marker-end') || ''
+    }))""")
+    assert all((row["halo"] == "#ffffff" if row["ink"] == "#111827"
+                else row["halo"] == "#111827") for row in pairs)
+    assert any(row["marker"].endswith("-light)") for row in pairs)
+    # The local sampler works on the original pixels, not the opacity-adjusted display.
+    page.get_by_role("slider", name="原图透明度").evaluate("""el => {
+        el.value = '10'; el.dispatchEvent(new Event('input', {bubbles:true}));
+    }""")
+    assert left.get_attribute("data-ink") == "#111827"
+    assert right.get_attribute("data-ink") == "#ffffff"
+    page.get_by_role("button", name="隐藏原图").click()
+    assert page.locator('[data-vertex-id="left"] .dge-overlay-dot').get_attribute("data-ink") == "#111827"
+    assert page.locator('[data-vertex-id="right"] .dge-overlay-dot').get_attribute("data-ink") == "#ffffff"
