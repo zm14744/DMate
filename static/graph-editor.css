@@ -99,12 +99,12 @@
 .dge-overlay-hit{stroke:transparent;stroke-width:17px;fill:none;pointer-events:stroke}
 .dge-overlay-stroke{stroke:currentColor;stroke-width:3px;fill:none;opacity:.8;pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
 .dge-overlay-edge.is-selected .dge-overlay-stroke{stroke-width:5px;opacity:1}
-.dge-overlay-edge.is-uncertain .dge-overlay-stroke{stroke-dasharray:7 5;opacity:.5}
+.dge-overlay-edge.is-uncertain .dge-overlay-stroke{stroke-dasharray:7 5;opacity:1}
 .dge-overlay-node{cursor:pointer}
 .dge-overlay-node-hit{fill:transparent;pointer-events:all}
 .dge-overlay-dot{fill:var(--surface-0,#fff);stroke:var(--accent,#2563eb);stroke-width:3px;pointer-events:none}
 .dge-overlay-node.is-selected .dge-overlay-dot{stroke-width:5px}
-.dge-overlay-node.is-estimated .dge-overlay-dot{stroke-dasharray:4 3;opacity:.65}
+.dge-overlay-node.is-estimated .dge-overlay-dot{stroke-dasharray:4 3;opacity:1}
 .dge-overlay-label{fill:var(--text-primary,#182334);paint-order:stroke;stroke:var(--surface-0,#fff);stroke-width:4px;stroke-linejoin:round;font-size:16px;pointer-events:none;font-family:inherit}
 .dge-overlay-bbox{fill:none;stroke:var(--accent,#2563eb);stroke-width:2px;stroke-dasharray:9 7;pointer-events:none;opacity:.6}
 .dge-overlay-handle{fill:var(--surface-0,#fff);stroke:var(--accent,#2563eb);stroke-width:3px;cursor:move}
