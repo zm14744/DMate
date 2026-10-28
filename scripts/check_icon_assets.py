@@ -332,13 +332,15 @@ def main():
     safari_head = html.split('{% elif is_mac_safari %}', 1)[1].split(
         '{% elif is_android_browser %}', 1
     )[0]
-    assert 'dmate-safari-position-v46-20261028' in safari_head
-    assert 'setSafariIcon("tab")' in safari_head
-    assert 'setSafariIcon("address")' in safari_head
+    assert 'dmate-safari-position-v47-20261028' in safari_head
+    assert 'setSafariIcon(whiteAddress ? "address-white" : "tab-black")' in safari_head
+    assert 'addressCandidate && !document.hidden' in safari_head
+    assert 'appearance.matches' in safari_head
+    assert '(prefers-color-scheme: dark)' in safari_head
     assert 'window.addEventListener("blur"' in safari_head
     assert 'window.addEventListener("focus"' in safari_head
     assert 'window.addEventListener("pageshow"' in safari_head
-    assert 'prefers-color-scheme' not in safari_head
+    assert 'appearance.addEventListener("change", refreshSafariIcon)' in safari_head
     assert 'dmate-safari-contrast-' not in safari_head
     assert 'dmate-safari-black-v44' not in html
     assert 'dmate-site-v36-64.png?v=dmate-safari-v36-20261019' not in html

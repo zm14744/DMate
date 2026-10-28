@@ -85,59 +85,77 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=dmate-bing-v40-20261020">
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=dmate-bing-v40-20261020">
 {% elif is_mac_safari %}
-<!-- Safari compact toolbar compatibility:
-     The LARGE URL editing field is targeted when the webpage loses focus.
-     The SMALL normal tab keeps the BLACK geometry by default and on focus.
-     Both icons are transparent, same 23-unit geometry as Edge. Safari owns
-     the browser chrome; its native favicon cache may delay these changes. -->
+<!-- Safari compact tabs: the SMALL normal tab favicon is ALWAYS transparent
+     black. The LARGE address editor receives the white candidate ONLY when
+     macOS is dark and the page blurs. In light mode BOTH remain black.
+     Browser chrome still controls the actual icons and may cache them. -->
 <script id="dmateSafariFaviconSwitch">
 (function () {
     "use strict";
-    var version = "dmate-safari-position-v46-20261028";
-    var currentMode = "";
+    var version = "dmate-safari-position-v47-20261028";
+    var mode = "";
+    var addressCandidate = false;
+    var appearance = window.matchMedia
+        ? window.matchMedia("(prefers-color-scheme: dark)") : null;
 
-    function setSafariIcon(target) {
-        // Never let a background tab retain the white icon from a blur.
-        if (target === "address" && document.hidden) return;
-        var mode = target === "address" ? "address-white" : "tab-black";
+    function setSafariIcon(nextMode) {
         var previousPng = document.getElementById("dmateSafariFaviconPng");
         var previousSvg = document.getElementById("dmateSafariFavicon");
-        if (currentMode === mode && previousPng && previousSvg) return;
-        currentMode = mode;
+        if (mode === nextMode && previousPng && previousSvg) return;
+        mode = nextMode;
 
         var png = document.createElement("link");
         png.id = "dmateSafariFaviconPng";
         png.rel = "icon";
         png.type = "image/png";
         png.sizes = "64x64";
-        png.href = "/static/icons/dmate-safari-" + mode + "-v46-64.png?v=" + version;
+        png.href = "/static/icons/dmate-safari-" + nextMode + "-v46-64.png?v=" + version;
 
         var svg = document.createElement("link");
         svg.id = "dmateSafariFavicon";
         svg.rel = "icon";
         svg.type = "image/svg+xml";
-        svg.href = "/static/icons/dmate-safari-" + mode + "-v46.svg?v=" + version;
+        svg.href = "/static/icons/dmate-safari-" + nextMode + "-v46.svg?v=" + version;
 
-        // A new URL and node replace the old light/dark mode favicon links.
         if (previousPng) previousPng.remove();
         if (previousSvg) previousSvg.remove();
         document.head.appendChild(png);
         document.head.appendChild(svg);
     }
 
-    // Keep the small tab BLACK regardless of macOS system appearance.
-    setSafariIcon("tab");
-    // When the page loses focus to Safari's address field, try the WHITE
-    // geometry for the expanded URL box. This cannot detect browser chrome
-    // specifically: it is a best-effort Safari-only workaround.
+    function refreshSafariIcon() {
+        // Default/normal tab: BLACK on either macOS appearance.
+        // URL editing candidate: WHITE only on dark macOS, never light.
+        var whiteAddress = addressCandidate && !document.hidden &&
+            Boolean(appearance && appearance.matches);
+        setSafariIcon(whiteAddress ? "address-white" : "tab-black");
+    }
+
+    refreshSafariIcon();
     window.addEventListener("blur", function () {
-        if (!document.hidden) setSafariIcon("address");
+        // Best effort: Safari does not expose address-field focus directly.
+        addressCandidate = true;
+        refreshSafariIcon();
     });
-    window.addEventListener("focus", function () { setSafariIcon("tab"); });
-    window.addEventListener("pageshow", function () { setSafariIcon("tab"); });
+    window.addEventListener("focus", function () {
+        addressCandidate = false;
+        refreshSafariIcon();
+    });
+    window.addEventListener("pageshow", function () {
+        addressCandidate = false;
+        refreshSafariIcon();
+    });
     document.addEventListener("visibilitychange", function () {
-        if (document.hidden) setSafariIcon("tab");
+        if (document.hidden) addressCandidate = false;
+        refreshSafariIcon();
     });
+    if (appearance) {
+        if (typeof appearance.addEventListener === "function") {
+            appearance.addEventListener("change", refreshSafariIcon);
+        } else if (typeof appearance.addListener === "function") {
+            appearance.addListener(refreshSafariIcon);
+        }
+    }
 })();
 </script>
 {% elif is_android_browser %}
