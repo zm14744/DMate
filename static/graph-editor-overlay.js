@@ -142,6 +142,66 @@ function mount(host,o){
    if(sequence===scanSequence)status.textContent=error?.message||'4秒内未能确定图类型，可手动核对';
   }finally{if(sequence===scanSequence)draw();}
  }
+ const buildSampler=()=>{
+  sampleCtx=null;
+  try{
+   const ratio=Math.min(1,1400/Math.max(1,w,h));
+   sampleCanvas.width=Math.max(1,Math.round(w*ratio));
+   sampleCanvas.height=Math.max(1,Math.round(h*ratio));
+   sampleCtx=sampleCanvas.getContext('2d',{willReadFrequently:true});
+   sampleCtx.drawImage(image,0,0,sampleCanvas.width,sampleCanvas.height);
+   // A cross-origin source may taint the canvas. Detect once and fall back safely.
+   sampleCtx.getImageData(0,0,1,1);
+  }catch(_){sampleCtx=null;}
+ };
+ const pixelLuminance=pixel=>{
+  const alpha=pixel[3]/255;
+  const channels=[0,1,2].map(i=>(pixel[i]*alpha+255*(1-alpha))/255);
+  const linear=v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);
+  return .2126*linear(channels[0])+.7152*linear(channels[1])+.0722*linear(channels[2]);
+ };
+ const localLuminance=point=>{
+  if(!sampleCtx||!Array.isArray(point)||point.length!==2)return null;
+  const x=Math.round(clamp(point[0])*Math.max(0,sampleCanvas.width-1));
+  const y=Math.round(clamp(point[1])*Math.max(0,sampleCanvas.height-1));
+  try{
+   const x0=Math.max(0,x-1),y0=Math.max(0,y-1);
+   const x1=Math.min(sampleCanvas.width,x+2),y1=Math.min(sampleCanvas.height,y+2);
+   const data=sampleCtx.getImageData(x0,y0,x1-x0,y1-y0).data,values=[];
+   for(let i=0;i<data.length;i+=4)values.push(pixelLuminance(data.subarray(i,i+4)));
+   values.sort((a,b)=>a-b);
+   const median=values[Math.floor(values.length/2)]??.5;
+   const center=pixelLuminance(sampleCtx.getImageData(x,y,1,1).data);
+   // Centre sampling catches thin strokes/shadows; median suppresses local noise.
+   return Math.max(0,Math.min(1,center*.72+median*.28));
+  }catch(_){return null;}
+ };
+ const inkAt=point=>{
+  const light=localLuminance(point);
+  // Choose black on light paper and white on dark ink/shadows.
+  // The complementary halo keeps a stroke visible across mixed backgrounds.
+  return light===null||light>.179?'#111827':'#ffffff';
+ };
+ const oppositeInk=ink=>ink==='#ffffff'?'#111827':'#ffffff';
+ const pointsPath=points=>'M '+points.map(point=>point.join(' ')).join(' L ');
+ const quadraticPoints=(a,c,b,steps=24)=>{
+  const out=[];
+  for(let i=0;i<=steps;i++){
+   const t=i/steps,u=1-t;
+   out.push([u*u*a[0]+2*u*t*c[0]+t*t*b[0],
+             u*u*a[1]+2*u*t*c[1]+t*t*b[1]]);
+  }
+  return out;
+ };
+ const cubicPoints=(a,c1,c2,b,steps=24)=>{
+  const out=[];
+  for(let i=0;i<=steps;i++){
+   const t=i/steps,u=1-t;
+   out.push([u*u*u*a[0]+3*u*u*t*c1[0]+3*u*t*t*c2[0]+t*t*t*b[0],
+             u*u*u*a[1]+3*u*u*t*c1[1]+3*u*t*t*c2[1]+t*t*t*b[1]]);
+  }
+  return out;
+ };
  const pos=(v,i,g)=>{
   if(ghost?.vertex===v.id)return ghost.pos;
   if(unit(v.x)&&unit(v.y))return [v.x,v.y];
@@ -279,7 +339,7 @@ function mount(host,o){
  }
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
  scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));},{passive:false});
- image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;svg.setAttribute('viewBox','0 0 '+w+' '+h);draw();};
+ image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;svg.setAttribute('viewBox','0 0 '+w+' '+h);syncOriginal();buildSampler();draw();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
  return {refresh:draw,state:s,destroy(){image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
