@@ -52,8 +52,9 @@ jobs:
             tests/test_visual_graph_editor.py::test_real_browser_mobile_layout_and_two_step_delete \
             tests/test_graph_overlay.py::test_overlay_zoom_out_and_fit_below_100_percent \
             tests/test_graph_overlay.py::test_overlay_keeps_image_and_zoom_when_selecting_or_renaming \
-            tests/test_graph_overlay.py::test_mask_strength_slider_preserves_image_and_original_graph_data \
-            tests/test_graph_overlay.py::test_mask_cutout_follows_user_defined_rectangle_and_polygon \
+            tests/test_graph_overlay.py::test_repeated_vertex_placement_does_not_jump_back_to_top \
+            tests/test_graph_overlay.py::test_original_can_be_hidden_for_drawing_only_and_opacity_is_adjustable \
+            tests/test_graph_overlay.py::test_points_and_edges_choose_high_contrast_ink_from_local_pixels \
             tests/test_graph_overlay.py::test_empty_auto_detected_panel_has_no_predrawn_strokes \
             tests/test_graph_overlay.py::test_pure_text_ocr_does_not_create_a_dummy_graph_canvas \
             tests/test_ocr_upload_layout.py
