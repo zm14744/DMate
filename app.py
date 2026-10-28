@@ -4187,6 +4187,19 @@ def ocr():
 
     recognition_deadline = time.monotonic() + 285
     try:
+        if request.form.get("workflow") == "auto_graph":
+            # Explicit auto-graph uploads MUST run the graph reader, including
+            # multi-figure segmentation. Never return the manual blank G1.
+            if not graph_nextgen_enabled():
+                return jsonify({"error": "自动分图与图形识别当前未启用，请稍后重试。",
+                                "error_code": "auto_graph_unavailable"}), 503
+            local_result, local_execution = _semantic_local_result()
+            if request_id and _take_ocr_cancelled(request_id):
+                return jsonify({"cancelled": True})
+            _record_semantic_execution(local_execution, "running")
+            return _run_graph_ocr_route(raw, local_result, local_execution, request_id,
+                                       recognition_deadline, pipeline=active_pipeline(),
+                                       started_at=started_at)
         if _semantic_ocr_selected():
             # The selected pipeline owns bounded layout/geometry tools and
             # visual reads under one deadline; do not start the full OCR stack.

@@ -14388,7 +14388,9 @@ async function recognizeOcrTask(task) {
         const formData = new FormData();
         formData.append("image", task.file);
         formData.append("request_id", task.id);
-        formData.append("workflow", "manual_graph");
+        // Automatic per-figure recognition; manual_graph returned an empty G1
+        // and never ran the vision recognizer.
+        formData.append("workflow", "auto_graph");
         const response = await fetch("/ocr", { method: "POST", body: formData, signal: task.controller.signal });
         const data = await parseResponseJson(response);
         if (task.state === "cancelled" || !ocrTasks.has(task.id)) return;

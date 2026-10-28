@@ -51,8 +51,9 @@ function mount(host,o){
    }catch(error){status.textContent=error?.message||'文字识别暂不可用，请手动输入。';}
    finally{textBusy=false;draw();}
  });
- const select=(label,entries,type)=>{const n=d.createElement('select');n.setAttribute('aria-label',label);for(const [v,t] of entries){const p=d.createElement('option');p.value=v;p.textContent=t;n.append(p);}n.addEventListener('change',()=>{const g=o.graph();if(g&&n.value!=='unknown')change(()=>o.model.setGraphType(g.id,type,n.value==='true'));});bar.append(n);return n;};
- const dir=select('图形方向',[['unknown','方向待核对'],['false','无向图'],['true','有向图']],'directed'),weight=select('图形权值',[['unknown','权值待核对'],['false','无权图'],['true','带权图']],'weighted');
+ // Each independently segmented graph receives its own direction and weight
+ // from OCR + visual edge evidence. Do not override this with toolbar labels.
+ // Edge-level corrections in the advanced editor remain available.
  const visible=button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();});
  const MIN_ZOOM=25,MAX_ZOOM=400;
  const zoom=x=>{
@@ -102,7 +103,7 @@ function mount(host,o){
  };
  const px=p=>[p[0]*w,p[1]*h],mouse=e=>{const r=svg.getBoundingClientRect();return [clamp((e.clientX-r.left)/Math.max(1,r.width)),clamp((e.clientY-r.top)/Math.max(1,r.height))];};
  function draw(){
-  const g=o.graph();dir.value=typeof g?.directed==='boolean'?String(g.directed):'unknown';weight.value=typeof g?.weighted==='boolean'?String(g.weighted):'unknown';visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
+  const g=o.graph();visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
   regionMode.value=['graph_poly','text_rect','text_poly'].includes(s.mode)?s.mode:'';
   finishButton.hidden=!['graph_poly','text_poly'].includes(s.mode);
   finishButton.disabled=s.polygonDraft.length<3||Boolean(o.disabled?.());

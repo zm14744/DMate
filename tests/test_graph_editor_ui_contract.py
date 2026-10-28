@@ -36,6 +36,20 @@ class GraphEditorUiContract(unittest.TestCase):
         self.assertIn('closeButton.addEventListener("click", requestClose)', self.client)
         self.assertIn("if (task.confirming) event.preventDefault()", self.client)
 
+    def test_auto_graph_request_has_no_manual_global_direction_or_weight(self):
+        self.assertNotIn("const dir=select(", self.overlay)
+        self.assertNotIn("图形方向", self.overlay)
+        self.assertNotIn("图形权值", self.overlay)
+        self.assertNotIn("无向图", self.overlay)
+        self.assertNotIn("无权图", self.overlay)
+        self.assertNotIn("dir.value=", self.overlay)
+        self.assertNotIn("weight.value=", self.overlay)
+        self.assertIn('formData.append("workflow", "auto_graph")', self.client)
+        self.assertNotIn('formData.append("workflow", "manual_graph")', self.client)
+        server = (ROOT / "app.py").read_text()
+        self.assertIn('request.form.get("workflow") == "auto_graph"', server)
+        self.assertIn('pipeline=active_pipeline()', server)
+
     def test_zoom_out_is_not_blocked_by_css_minwidth(self):
         self.assertIn("MIN_ZOOM=25,MAX_ZOOM=400", self.overlay)
         self.assertIn("Math.max(MIN_ZOOM,Math.min(MAX_ZOOM", self.overlay)
