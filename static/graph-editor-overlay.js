@@ -246,8 +246,10 @@ function mount(host,o){
     if(Array.isArray(points)&&points.length){
       const polygon=E(d,'polygon',{points:points.map(p=>px(p).join(',')).join(' '),class:cssClass});
       svg.append(polygon);
-      if(cssClass.includes('draft'))for(const p of points)
-        svg.append(E(d,'circle',{cx:p[0]*w,cy:p[1]*h,r:hitRadius*.45,class:'dge-overlay-draft-dot'}));
+      if(cssClass.includes('draft'))for(const p of points){
+        const ink=inkAt(p),dot=E(d,'circle',{cx:p[0]*w,cy:p[1]*h,r:hitRadius*.45,class:'dge-overlay-draft-dot'});
+        dot.style.fill=ink;dot.style.stroke=oppositeInk(ink);svg.append(dot);
+      }
     }
   };
   outline(g.region_polygon,'dge-overlay-polygon');
@@ -303,17 +305,26 @@ function mount(host,o){
    }
    const label=[e.edge_label,e.weight==null?'':String(e.weight)].filter(Boolean).join(' · ');if(label){
      const t=E(d,'text',{x:center[0],y:center[1]-labelOffset,class:'dge-overlay-label','text-anchor':'middle'});
-     t.textContent=label;t.style.fontSize=labelSize+'px';group.append(t);
+     t.textContent=label;t.style.fontSize=labelSize+'px';
+     const labelInk=inkAt([center[0]/w,center[1]/h]);
+     t.style.fill=labelInk;t.style.stroke=oppositeInk(labelInk);t.style.strokeWidth=(4/scale)+'px';
+     group.append(t);
    }
    if(chosen&&e.from!==e.to&&s.mode==='select')group.append(E(d,'circle',{cx:center[0],cy:center[1],r:handleRadius,class:'dge-overlay-handle','data-handle-id':e.id}));svg.append(group);
   }
   for(const [i,v] of g.vertices.entries()){
-   const p=px(coords.get(v.id)),gNode=E(d,'g',{'data-vertex-id':v.id,class:'dge-overlay-node'+(!unit(v.x)||!unit(v.y)?' is-estimated':'')+(o.nodeSelected?.().has(v.id)?' is-selected':'')});
+   const p=px(coords.get(v.id)),normalized=[p[0]/w,p[1]/h],ink=inkAt(normalized),
+         haloInk=oppositeInk(ink),
+         gNode=E(d,'g',{'data-vertex-id':v.id,class:'dge-overlay-node'+(!unit(v.x)||!unit(v.y)?' is-estimated':'')+(o.nodeSelected?.().has(v.id)?' is-selected':'')});
    gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:hitRadius,class:'dge-overlay-node-hit'}));
+   const halo=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius+2/scale,class:'dge-overlay-dot-halo'});
+   halo.style.fill='none';halo.style.stroke=haloInk;halo.style.strokeWidth=(3/scale)+'px';gNode.append(halo);
    const dot=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius,class:'dge-overlay-dot'});
+   dot.style.fill=ink;dot.style.stroke=haloInk;
    dot.style.strokeWidth=(o.nodeSelected?.().has(v.id)?3:2)/scale+'px';gNode.append(dot);
    const t=E(d,'text',{x:p[0]+labelOffset,y:p[1]-labelOffset,class:'dge-overlay-label'});
    t.textContent=v.label||v.display_label||'未命名'+(i+1);t.style.fontSize=labelSize+'px';
+   t.style.fill=ink;t.style.stroke=haloInk;t.style.strokeWidth=(4/scale)+'px';
    gNode.append(t);svg.append(gNode);
   }
   if(s.start&&coords.has(s.start)){const p=px(coords.get(s.start));svg.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*1.8,class:'dge-overlay-pending'}));}
