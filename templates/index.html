@@ -85,12 +85,62 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=dmate-bing-v40-20261020">
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=dmate-bing-v40-20261020">
 {% elif is_mac_safari %}
-<!-- Safari tab only. Both macOS appearances use the very same transparent
-     BLACK wireframe. A new v44 filename avoids Safari's cached white icon.
-     The SVG uses Edge's original geometry and 23-unit line width; PNG is an
-     independently rendered fallback for versions of Safari that ignore SVG. -->
-<link id="dmateSafariFaviconPng" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-safari-black-v44-64.png?v=dmate-safari-black-v44-20261028">
-<link id="dmateSafariFavicon" rel="icon" type="image/svg+xml" href="/static/icons/dmate-safari-black-v44.svg?v=dmate-safari-black-v44-20261028">
+<!-- Safari does not reliably apply prefers-color-scheme inside SVG favicons.
+     Choose a real transparent, single-color icon BEFORE head parsing finishes.
+     The dark SVG is the exact same file as the Windows Edge SVG. -->
+<script id="dmateSafariFaviconSwitch">
+(function () {
+    "use strict";
+    var scheme = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+    var lastAppearance = "";
+    var version = "dmate-safari-v45-20261028";
+
+    function refreshSafariIcon() {
+        var appearance = scheme && scheme.matches ? "dark" : "light";
+        var existingPng = document.getElementById("dmateSafariFaviconPng");
+        var existingSvg = document.getElementById("dmateSafariFavicon");
+        if (lastAppearance === appearance && existingPng && existingSvg) return;
+        lastAppearance = appearance;
+
+        // High-density PNG for older Safari, followed by crisp SVG for Safari 26+.
+        // Both use Edge's original 23-unit geometry, with NO filled background.
+        var png = document.createElement("link");
+        png.id = "dmateSafariFaviconPng";
+        png.rel = "icon";
+        png.type = "image/png";
+        png.sizes = "64x64";
+        png.href = "/static/icons/dmate-safari-contrast-" + appearance + "-v43-64.png?v=" + version;
+
+        var svg = document.createElement("link");
+        svg.id = "dmateSafariFavicon";
+        svg.rel = "icon";
+        svg.type = "image/svg+xml";
+        svg.href = appearance === "dark"
+            ? "/static/icons/dmate-transparent.svg?v=" + version
+            : "/static/icons/dmate-safari-contrast-light-v43.svg?v=" + version;
+
+        // Replacing nodes also avoids WebKit keeping an outdated icon node.
+        if (existingPng) existingPng.remove();
+        if (existingSvg) existingSvg.remove();
+        document.head.appendChild(png);
+        document.head.appendChild(svg);
+    }
+
+    refreshSafariIcon();
+    if (scheme) {
+        if (typeof scheme.addEventListener === "function") {
+            scheme.addEventListener("change", refreshSafariIcon);
+        } else if (typeof scheme.addListener === "function") {
+            scheme.addListener(refreshSafariIcon);
+        }
+    }
+    window.addEventListener("pageshow", refreshSafariIcon);
+    window.addEventListener("focus", refreshSafariIcon);
+    document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) refreshSafariIcon();
+    });
+})();
+</script>
 {% elif is_android_browser %}
 <!-- Android: browser-specific favicon geometry compensation, native master unchanged. -->
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-32-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-32-v17.png{% endif %}">

@@ -244,18 +244,6 @@ def main():
                                stroke_units=TAB_STROKE),
                      STATIC / f"dmate-safari-contrast-{appearance}-v43-{size}.png")
 
-    # Safari's tab background can be light even in macOS dark mode. Give both
-    # appearances exactly the same transparent BLACK wireframe at v44.
-    # Generate from the same 23-unit paths as Edge, not from an enlarged PNG.
-    (STATIC / "dmate-safari-black-v44.svg").write_text(
-        svg_mark(background=None, foreground="#000", stroke=TAB_STROKE),
-        encoding="utf-8"
-    )
-    for size in (32, 64):
-        save_png(draw_mark(size, background=None, foreground=BLACK,
-                           stroke_units=TAB_STROKE),
-                 STATIC / f"dmate-safari-black-v44-{size}.png")
-
     # Legacy Safari assets retained for reference; new v43 uses transparent
     # monochrome outlines selected from the page based on macOS appearance.
     # Keep the working light-mode black tile. In dark mode Safari can
@@ -426,7 +414,7 @@ def main():
              background=None, stroke_units=TAB_STROKE)
 
     print(json.dumps({"status": "vector-only generation",
-                      "mac_favicon": "identical transparent black outlines in both modes (SVG + PNG)",
+                      "mac_favicon": "transparent black outlines in light mode; transparent white outlines in dark mode (SVG + PNG)",
                       "formats": ["SVG", "PNG", "ICO", "ICNS"],
                       "platforms": ["iOS Safari", "Android browser", "Windows", "macOS", "Linux"]},
                      ensure_ascii=False, indent=2))
