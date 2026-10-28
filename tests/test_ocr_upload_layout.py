@@ -139,3 +139,40 @@ def test_only_selected_ui_names_are_changed():
     assert 'composerWrap.hidden = hasImages' in SCRIPT
     assert 'uploadActions.appendChild(picker)' in SCRIPT
     assert 'normalComposer.insertBefore(picker' in SCRIPT
+
+
+@pytest.mark.parametrize("layout_page", [(1440, 900, "dark")], indirect=True)
+def test_red_cancel_immediately_removes_running_image_instead_of_cancelled_card(layout_page):
+    page = layout_page
+    # Run the actual production cancel implementation against the actual
+    # production upload-card renderer, not a hand-written mock of UI behavior.
+    source = SCRIPT.split("function discardOcrTask(task) {", 1)[1].split(
+        "\\nfunction openImagePicker()", 1)[0]
+    source = "function discardOcrTask(task) {" + source
+    page.evaluate("""source => {
+        window.cancelNotification = false;
+        window.abortObserved = false;
+        window.cancelTask = new Function(
+            'ocrTasks', 'renderOcrTasks', 'notifyOcrCancelled',
+            source + '\\nreturn cancelOcrTask;'
+        )(window.ocrTasks, window.renderTasks, () => {
+            window.cancelNotification = true;
+        });
+        window.ocrTasks.set('running', {
+            id: 'running',
+            file: {name: 'test.png'},
+            originalUrl: 'data:image/png;base64,iVBORw0KGgo=',
+            state: 'recognizing',
+            startedAt: performance.now(),
+            finishedAt: null,
+            controller: {abort: () => {window.abortObserved = true;}},
+            error: '', confirming: false, sending: false
+        });
+        renderTasks();
+    }""", source)
+    assert page.locator(".ocr-task-card").count() == 1
+    page.evaluate("cancelTask('running')")
+    assert page.locator(".ocr-task-card").count() == 0
+    assert page.locator("#ocrTaskPanel").is_hidden()
+    assert page.get_by_role("button", name="上传图片").is_visible()
+    assert page.evaluate("abortObserved && cancelNotification && ocrTasks.size === 0")
