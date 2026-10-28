@@ -10,7 +10,7 @@ import time
 
 from PIL import Image, ImageDraw
 
-from graph_layout_only import (TYPE_PROMPT, FOCUSED_TYPE_PROMPT,
+from graph_layout_only import (TYPE_PROMPT, LAYOUT_AUDIT_PROMPT, FOCUSED_TYPE_PROMPT,
                                DISPUTE_TYPE_PROMPT, _project_figures,
                                recognize_layout_only, recognize_selected_graph_type,
                                visual_preflight)
@@ -78,6 +78,10 @@ def test_figures_have_individual_types_and_original_bounds_with_zero_drawing():
 
     def qwen(prompt, images, budget):
         submitted.append((prompt, images, budget))
+        if prompt == LAYOUT_AUDIT_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "G", "bbox": [.05, .13, .47, .94]},
+                {"name": "H", "bbox": [.53, .13, .96, .94]}]}
         if prompt == FOCUSED_TYPE_PROMPT:
             assert len(images) == 2
             return {"figures": [
@@ -97,10 +101,12 @@ def test_figures_have_individual_types_and_original_bounds_with_zero_drawing():
 
     result = recognize_layout_only(raw(picture), recognize_text=fast_text,
                                    provider=qwen, budget=object())
-    assert len(submitted) == 2
+    assert len(submitted) == 3
     assert "严禁识别或输出顶点列表" in submitted[0][0]
     assert submitted[0][1][0].startswith("data:image/png;base64,")
-    assert all(url.startswith("data:image/png;base64,") for url in submitted[1][1])
+    assert submitted[1][0] == LAYOUT_AUDIT_PROMPT
+    assert all(url.startswith("data:image/png;base64,") for url in submitted[2][1])
+    assert result["diagnostics"]["layout_audit_calls"] == 1
     assert result["diagnostics"]["type_review_calls"] == 1
     assert result["diagnostics"]["independently_verified_type_fields"] == 4
     assert result["workflow_profile"] == "layout_only"
@@ -281,6 +287,9 @@ def test_overview_and_crop_disagreement_requires_targeted_recheck():
             return {"has_graph": True, "graphs": [{
                 "name": "A", "bbox": [.05, .1, .94, .91],
                 "directed": False, "weighted": True}], "uncertainties": []}
+        if prompt == LAYOUT_AUDIT_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "A", "bbox": [.05, .1, .94, .91]}]}
         if prompt == FOCUSED_TYPE_PROMPT:
             return {"figures": [{"image_index": 1,
                                  "directed": True, "weighted": False}]}
@@ -292,8 +301,8 @@ def test_overview_and_crop_disagreement_requires_targeted_recheck():
     graph = result["graph_structures"][0]
     assert (graph["directed"], graph["weighted"]) == (True, False)
     assert graph["vertices"] == graph["edges"] == []
-    assert calls == [TYPE_PROMPT, FOCUSED_TYPE_PROMPT, DISPUTE_TYPE_PROMPT]
-    assert result["diagnostics"]["qwen_graph_calls"] == 3
+    assert calls == [TYPE_PROMPT, LAYOUT_AUDIT_PROMPT, FOCUSED_TYPE_PROMPT, DISPUTE_TYPE_PROMPT]
+    assert result["diagnostics"]["qwen_graph_calls"] == 4
 
 
 def test_unresolved_arrows_and_edge_weights_are_not_confidently_guessed():
@@ -302,6 +311,9 @@ def test_unresolved_arrows_and_edge_weights_are_not_confidently_guessed():
             return {"has_graph": True, "graphs": [{
                 "name": "A", "bbox": [.05, .1, .94, .91],
                 "directed": False, "weighted": False}], "uncertainties": []}
+        if prompt == LAYOUT_AUDIT_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "A", "bbox": [.05, .1, .94, .91]}]}
         if prompt == FOCUSED_TYPE_PROMPT:
             return {"figures": [{"image_index": 1,
                                  "directed": True, "weighted": True}]}
@@ -321,6 +333,9 @@ def test_focused_failure_preserves_regions_but_never_confident_types():
             return {"has_graph": True, "graphs": [
                 {"name": "A", "bbox": [.02, .1, .9, .9],
                  "directed": True, "weighted": True}], "uncertainties": []}
+        if prompt == LAYOUT_AUDIT_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "A", "bbox": [.02, .1, .9, .9]}]}
         raise RuntimeError("vision unavailable")
     result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
                                    provider=qwen, budget=object())
@@ -343,12 +358,59 @@ def test_initial_slow_vision_is_not_cut_off_by_manual_four_second_timer():
             return {"has_graph": True, "graphs": [{
                 "name": "A", "bbox": [.03, .1, .91, .9],
                 "directed": False, "weighted": False}]}
+        if prompt == LAYOUT_AUDIT_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "A", "bbox": [.03, .1, .91, .9]}]}
         return {"figures": [{"image_index": 1,
                              "directed": False, "weighted": False}]}
     start = time.monotonic()
     result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
                                    provider=qwen, budget=object(),
                                    request_deadline=time.monotonic() + 2.0)
-    assert time.monotonic() - start >= .13
+    assert time.monotonic() - start >= .19
     assert result["graph_structures"][0]["directed"] is False
-    assert result["diagnostics"]["qwen_graph_calls"] == 2
+    assert result["diagnostics"]["qwen_graph_calls"] == 3
+
+
+
+def test_independent_inventory_recovers_missing_distinct_diagram_without_drawing():
+    def qwen(prompt, images, budget):
+        if prompt == TYPE_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "G", "bbox": [.05, .13, .44, .90],
+                 "directed": False, "weighted": False}]}
+        if prompt == LAYOUT_AUDIT_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "G", "bbox": [.05, .13, .44, .90]},
+                {"name": "H", "bbox": [.52, .13, .94, .90]}]}
+        if prompt == FOCUSED_TYPE_PROMPT:
+            return {"figures": [
+                {"image_index": 1, "directed": False, "weighted": False},
+                {"image_index": 2, "directed": True, "weighted": True}]}
+        return {"figures": [{"image_index": 1,
+                             "directed": True, "weighted": True}]}
+    result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
+                                   provider=qwen, budget=object())
+    graphs = result["graph_structures"]
+    assert len(graphs) == 2, graphs
+    assert graphs[0]["name"] == "G"
+    assert graphs[1]["name"] == "H"
+    assert (graphs[1]["directed"], graphs[1]["weighted"]) == (True, True)
+    assert all(g["vertices"] == [] and g["edges"] == [] for g in graphs)
+    assert "补充" in result["warning"]
+    assert result["diagnostics"]["layout_audit_calls"] == 1
+
+
+def test_inventory_disagreement_never_deletes_first_pass_diagram():
+    from graph_layout_only import _audit_inventory
+    with diagrams_image() as photo:
+        primary = [
+            {"id": "G1", "name": "G", "bbox": [.05, .12, .44, .9],
+             "directed": False, "weighted": True, "vertices": [], "edges": []},
+            {"id": "G2", "name": "H", "bbox": [.52, .12, .94, .9],
+             "directed": True, "weighted": False, "vertices": [], "edges": []}]
+        kept, issues, calls = _audit_inventory(photo, primary, provider=lambda *a: {
+            "has_graph": True, "graphs": [{"name": "G", "bbox": [.05, .12, .44, .9]}]})
+    assert len(kept) == 2 and kept[1]["name"] == "H"
+    assert any("分图数量" in issue for issue in issues)
+    assert calls == 1
