@@ -205,7 +205,7 @@ def include_figure_captions(text_result, figures):
             above = y2 <= b + 1
             # Caption printed inside the bottom 10% of a padded figure box.
             bottom_band = (b <= my <= d and
-                           my >= d - min(figure_height*.13, max(15., height*.035)))
+                           my >= d - min(figure_height*.22, max(15., height*.095)))
             if below:
                 gap = max(0., y1-d)
             elif above and kind == "explicit":
