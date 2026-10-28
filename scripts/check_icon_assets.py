@@ -4,7 +4,7 @@ import struct
 import io
 from pathlib import Path
 from PIL import Image, ImageChops
-from generate_icons import draw_mark, STROKE, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK, BING_STROKES, BING_FACETS
+from generate_icons import draw_mark, svg_mark, STROKE, TAB_STROKE, SAFARI_TAB_STROKE, WHITE, BLACK, BING_STROKES, BING_FACETS
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "static" / "icons"
@@ -93,7 +93,30 @@ def main():
     # stroke or an opaque tile); Firefox cannot accidentally use the old icon.
     assert not (ICONS / "dmate-firefox-tab-thin-v1.svg").exists()
 
-    # macOS light mode preserves a black tile; dark mode uses no tile at all.
+    # Safari v43 must share the exact same SVG path and 23-unit stroke as
+    # Windows Edge. The background is genuinely transparent in BOTH modes.
+    assert (ICONS / "dmate-transparent.svg").read_text(encoding="utf-8") == svg_mark(
+        background=None, foreground="#fff", stroke=TAB_STROKE
+    )
+    assert (ICONS / "dmate-safari-contrast-light-v43.svg").read_text(encoding="utf-8") == svg_mark(
+        background=None, foreground="#000", stroke=TAB_STROKE
+    )
+    for appearance, foreground in (("dark", WHITE), ("light", BLACK)):
+        for size in (32, 64):
+            path = ICONS / f"dmate-safari-contrast-{appearance}-v43-{size}.png"
+            matches_vector(path, size, background=None, foreground=foreground,
+                           stroke_units=TAB_STROKE)
+            actual = rgba(path)
+            assert actual.getpixel((0, 0))[3] == 0, ("Nontransparent tile", path)
+            assert actual.getpixel((size // 2, size // 2))[3] == 0, ("Filled center", path)
+            assert actual.getchannel("A").getbbox(), ("Missing wireframe", path)
+    # The 32px dark-mode Safari raster is pixel-identical to Edge's PNG.
+    assert (ICONS / "dmate-safari-contrast-dark-v43-32.png").read_bytes() == (
+        ICONS / "favicon-32.png").read_bytes()
+    )
+
+    # Older pre-v43 Safari assets remain byte-identical and are no longer
+    # referenced by the Safari webpage favicon branch.
     for theme, background, foreground in (
         ("light", BLACK, WHITE), ("dark", None, WHITE)
     ):
@@ -282,7 +305,13 @@ def main():
     assert '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-bing-v40-20261020">' in html
     for pixel in (16,32,64):
         assert f'<link rel="icon" type="image/png" sizes="{pixel}x{pixel}" href="/favicon-{pixel}.png?v=dmate-bing-v40-20261020">' in html
-    assert '<link id="dmateSafariFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-site-v36-64.png?v=dmate-safari-v36-20261019">' in html
+    assert '<script id="dmateSafariFaviconSwitch">' in html
+    assert 'dmate-safari-contrast-light-v43.svg?v=' in html
+    assert 'dmate-transparent.svg?v=' in html
+    assert 'dmate-safari-contrast-' in html
+    assert 'scheme.addEventListener("change", refreshSafariIcon)' in html
+    assert 'dmate-site-v36-64.png?v=dmate-safari-v36-20261019' not in html
+    assert '{% elif is_mac_safari %}' in html
     assert 'is_desktop_firefox=is_desktop_firefox,' in app_text
     assert '{% elif is_desktop_firefox or is_windows_browser %}' in html
     assert '{% elif is_desktop_firefox %}' not in html

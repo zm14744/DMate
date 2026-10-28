@@ -26,6 +26,7 @@ jobs:
       - name: Check front-end script and graph review rendering
         run: |
           node --check static/script.js
+          node tests/safari_favicon_contract.cjs
           node tests/graph_display_regression.js
       - name: Commit canonical binaries
         run: |

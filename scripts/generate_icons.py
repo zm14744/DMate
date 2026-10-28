@@ -228,6 +228,24 @@ def main():
         svg_mark(background=None, stroke=TAB_STROKE), encoding="utf-8"
     )
 
+    # New macOS Safari favicon variants: BOTH have fully transparent pixels
+    # around the original Edge line geometry, not a black or white square.
+    # Safari 26 SVG favicons ignore internal dark-mode media rules, so the
+    # page selects a fixed-color asset before the favicon is loaded.
+    # Dark SVG reuses dmate-transparent.svg verbatim: this is precisely the
+    # existing Windows Edge vector, stroke geometry and weight (23 units).
+    (STATIC / "dmate-safari-contrast-light-v43.svg").write_text(
+        svg_mark(background=None, foreground="#000", stroke=TAB_STROKE),
+        encoding="utf-8"
+    )
+    for appearance, color in (("dark", WHITE), ("light", BLACK)):
+        for size in (32, 64):
+            save_png(draw_mark(size, background=None, foreground=color,
+                               stroke_units=TAB_STROKE),
+                     STATIC / f"dmate-safari-contrast-{appearance}-v43-{size}.png")
+
+    # Legacy Safari assets retained for reference; new v43 uses transparent
+    # monochrome outlines selected from the page based on macOS appearance.
     # Keep the working light-mode black tile. In dark mode Safari can
     # paint a pale background over DARK-FILLED favicons; use TRANSPARENT
     # background with bright WHITE vector strokes instead. Fresh path versions
@@ -396,7 +414,7 @@ def main():
              background=None, stroke_units=TAB_STROKE)
 
     print(json.dumps({"status": "vector-only generation",
-                      "mac_favicon": "light black tile/white lines; dark transparent white lines (PNG + ICO)",
+                      "mac_favicon": "transparent black outlines in light mode; transparent white outlines in dark mode (SVG + PNG)",
                       "formats": ["SVG", "PNG", "ICO", "ICNS"],
                       "platforms": ["iOS Safari", "Android browser", "Windows", "macOS", "Linux"]},
                      ensure_ascii=False, indent=2))
