@@ -5,7 +5,7 @@ const E=(d,t,a={})=>{const n=d.createElementNS(NS,t);for(const [k,v] of Object.e
 function mount(host,o){
  const d=host.ownerDocument,s=o.state||{mode:'select',zoom:100,visible:true,start:null};
  s.polygonDraft ||= [];
- let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false;const pointers=new Map();
+ let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false,scanSequence=0;const pointers=new Map();
  const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),status=d.createElement('span');
  root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
  stage.append(image,svg);scroll.append(stage);root.append(bar,scroll);host.append(root);
@@ -30,7 +30,7 @@ function mount(host,o){
    const nextMode=s.mode;
    s.polygonDraft=[];s.mode='select';regionMode.value='';
    if(nextMode==='graph_poly'){
-     const g=o.graph();if(g)change(()=>o.model.setGraphPolygon(g.id,points));
+     const g=o.graph();if(g){change(()=>o.model.setGraphPolygon(g.id,points));void scanFigureType(points,g.id);}
    }else{
      s.textRegion=points;
      status.textContent='已限定文字区域，点击“识别所选文字”。';
@@ -95,6 +95,22 @@ function mount(host,o){
  });
  bar.append(status); // Actionable feedback appears with the tools, never below the photo.
  const change=fn=>{try{fn();o.changed?.();draw();}catch(e){status.textContent=e?.message||'修改失败';}};
+ async function scanFigureType(polygon,graphId){
+  if(typeof o.recognizeGraphType!=='function')return;
+  const sequence=++scanSequence;
+  status.textContent='正在快速判断箭头与权值…';draw();
+  try{
+   const result=await o.recognizeGraphType(polygon.map(p=>[...p]),graphId);
+   if(sequence!==scanSequence)return;
+   if(result?.stale){status.textContent='图形选区已更改，忽略旧的扫描结果';return;}
+   const directed=result?.directed===true?'有向':result?.directed===false?'无向':'方向待核对';
+   const weighted=result?.weighted===true?'带权':result?.weighted===false?'无权':'权值待核对';
+   status.textContent=(result?.recognition_status==='complete'?'识别完成：':'扫描完成：')+directed+' · '+weighted;
+   if(result?.warning)status.textContent+='；'+result.warning;
+  }catch(error){
+   if(sequence===scanSequence)status.textContent=error?.message||'4秒内未能确定图类型，可手动核对';
+  }finally{if(sequence===scanSequence)draw();}
+ }
  const pos=(v,i,g)=>{
   if(ghost?.vertex===v.id)return ghost.pos;
   if(unit(v.x)&&unit(v.y))return [v.x,v.y];
@@ -216,7 +232,11 @@ function mount(host,o){
    if(op.kind==='bounds'||op.kind==='text_bounds'){
      const a=op.start,b=op.end,box=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
      if(box[2]-box[0]>.01 && box[3]-box[1]>.01){
-       if(op.kind==='bounds')change(()=>o.model.setGraphBounds(g.id,box));
+       if(op.kind==='bounds'){
+         change(()=>o.model.setGraphBounds(g.id,box));
+         void scanFigureType([[box[0],box[1]],[box[2],box[1]],
+             [box[2],box[3]],[box[0],box[3]]],g.id);
+       }
        else{
          s.textRegion=[[box[0],box[1]],[box[2],box[1]],[box[2],box[3]],[box[0],box[3]]];
          s.mode='select';regionMode.value='';status.textContent='文字区域已限定，可点击“识别所选文字”。';
