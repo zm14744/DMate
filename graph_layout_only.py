@@ -232,12 +232,14 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
         figures = []
         issues = []
         vision_failed = False
+        qwen_attempted = False
         if hint["possible_graph"]:
             if request_deadline is not None and request_deadline - time.monotonic() < 8:
                 vision_failed = True
                 issues.append("图形类型识别超时，未生成任何预绘图")
             else:
                 try:
+                    qwen_attempted = True
                     figures, issues = _vision_layout(image, provider=provider,
                                                        budget=budget, cancelled=cancelled)
                 except LayoutOnlyCancelled:
@@ -275,7 +277,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                 "preflight": hint,
                 "no_auto_draw": True,
                 "figure_count": len(figures),
-                "qwen_graph_calls": int(bool(hint["possible_graph"] and not vision_failed)),
+                "qwen_graph_calls": int(qwen_attempted),
                 "layout_model_calls": 0,
                 "text_worker_metrics": text_result.get("resource_metrics", []),
                 "duration_seconds": round(time.monotonic() - start, 3),
