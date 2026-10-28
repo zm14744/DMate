@@ -3200,20 +3200,16 @@ function refreshInputAvailability() {
 
     let statusText = "";
     let placeholder = "";
-    let busyMode = "";
 
-    if (ocrReviewInProgress) {
-        statusText = "正在核对图片，保存或关闭编辑器后可继续输入";
-        placeholder = "正在核对图片…";
-        busyMode = "ocr";
-    } else if (typingNow) {
+    // The graph editor is a modal: composer status text sits behind it and
+    // is unreadable. Do not render an OCR-specific lock banner or placeholder.
+    // Keep the real input lock while the editor is open.
+    if (!ocrReviewInProgress && typingNow) {
         statusText = "AI 正在回答，当前输入框已锁定";
         placeholder = "AI 正在回答…";
-        busyMode = "answering";
-    } else if (waitingReply) {
+    } else if (!ocrReviewInProgress && waitingReply) {
         statusText = "AI 正在思考，当前输入框已锁定";
         placeholder = "AI 正在思考…";
-        busyMode = "thinking";
     }
 
     if (input) {

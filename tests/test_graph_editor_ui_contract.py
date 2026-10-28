@@ -36,6 +36,15 @@ class GraphEditorUiContract(unittest.TestCase):
         self.assertIn('closeButton.addEventListener("click", requestClose)', self.client)
         self.assertIn("if (task.confirming) event.preventDefault()", self.client)
 
+    def test_editor_does_not_show_unreadable_ocr_input_lock_hint(self):
+        self.assertNotIn("正在核对图片，保存或关闭编辑器后可继续输入", self.client)
+        self.assertNotIn("正在核对图片…", self.client)
+        self.assertIn("if (!ocrReviewInProgress && typingNow)", self.client)
+        self.assertIn("else if (!ocrReviewInProgress && waitingReply)", self.client)
+        # Modal input blocking still works, without the extra blue text row.
+        self.assertIn("input.disabled = hardBlocked || ocrReviewInProgress", self.client)
+        self.assertIn('inputLockHint.classList.toggle("hidden", !statusText)', self.client)
+
     def test_auto_graph_request_has_no_manual_global_direction_or_weight(self):
         self.assertNotIn("const dir=select(", self.overlay)
         self.assertNotIn("图形方向", self.overlay)
