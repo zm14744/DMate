@@ -4188,18 +4188,49 @@ def ocr():
     recognition_deadline = time.monotonic() + 285
     try:
         if request.form.get("workflow") == "auto_graph":
-            # Explicit auto-graph uploads MUST run the graph reader, including
-            # multi-figure segmentation. Never return the manual blank G1.
-            if not graph_nextgen_enabled():
-                return jsonify({"error": "自动分图与图形识别当前未启用，请稍后重试。",
-                                "error_code": "auto_graph_unavailable"}), 503
-            local_result, local_execution = _semantic_local_result()
-            if request_id and _take_ocr_cancelled(request_id):
+            # No topology prediction: the new route returns ONLY graph bounds
+            # and per-figure directed/weighted metadata with EMPTY point/edge
+            # lists. Plain text gets one Small OCR worker and no layout or Qwen.
+            from graph_layout_only import (recognize_layout_only, LayoutOnlyCancelled)
+            from graph_upload_tasks import UPLOAD_TASKS, UploadAdmissionError
+            from graph_confirmation import confirmation_owner
+            owner = confirmation_owner()
+            # If a deployment explicitly selected the legacy OCR reader,
+            # preserve its single-argument signature instead of failing.
+            text_reader = (recognize_image if graph_nextgen_enabled()
+                           else (lambda image, *, text_only: recognize_image(image)))
+            if not OCR_AVAILABLE:
+                text_reader = None
+            try:
+                with UPLOAD_TASKS.admit(owner, request_id):
+                    routed = recognize_layout_only(
+                        raw, recognize_text=text_reader,
+                        cancelled=lambda: _ocr_is_cancelled(request_id, owner=owner),
+                        request_deadline=recognition_deadline)
+                if request_id and _take_ocr_cancelled(request_id, owner=owner):
+                    return jsonify({"cancelled": True})
+                routed.update(request_id=request_id,
+                              source_sha256=hashlib.sha256(raw).hexdigest(),
+                              server_elapsed_seconds=round(time.monotonic()-started_at, 3))
+                return jsonify(routed)
+            except LayoutOnlyCancelled:
                 return jsonify({"cancelled": True})
-            _record_semantic_execution(local_execution, "running")
-            return _run_graph_ocr_route(raw, local_result, local_execution, request_id,
-                                       recognition_deadline, pipeline=active_pipeline(),
-                                       started_at=started_at)
+            except UploadAdmissionError as exc:
+                return jsonify({"error": ("此图片正在识别，请等待当前任务。"
+                                         if exc.code == "duplicate_active_task"
+                                         else "当前图片识别任务较多，请稍后重试。"),
+                                "error_code": exc.code, "recognition_status": "failed",
+                                "request_id": request_id}), (
+                                    409 if exc.code == "duplicate_active_task" else 429)
+            except (ValueError, TypeError, OSError):
+                return jsonify({"error": "图片无效或分辨率过大，请重新选择图片",
+                                "recognition_status": "failed",
+                                "request_id": request_id}), 400
+            except Exception as exc:
+                print(f"轻量分图／文字识别未完成：{type(exc).__name__}")
+                return jsonify({"error": "图片识别未完成，请重试或手动补充。",
+                                "recognition_status": "failed",
+                                "request_id": request_id}), 503
         if _semantic_ocr_selected():
             # The selected pipeline owns bounded layout/geometry tools and
             # visual reads under one deadline; do not start the full OCR stack.
