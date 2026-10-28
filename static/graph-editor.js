@@ -277,6 +277,32 @@
                             render();
                         }
                         return text;
+                    },
+                    recognizeGraphType: async (polygon, graphId) => {
+                        if (typeof options.onRecognizeGraphType !== 'function')
+                            throw new Error('当前无法自动判断箭头与权值');
+                        const result = await options.onRecognizeGraphType(polygon);
+                        // Another frame may have been drawn while the async read
+                        // was underway. Never apply old metadata to new pixels.
+                        const graph = model.getDocument().graphs.find(row => row.id === graphId);
+                        if (!graph) return { stale: true };
+                        const samePolygon = Array.isArray(graph.region_polygon)
+                            && JSON.stringify(graph.region_polygon) === JSON.stringify(polygon);
+                        const box = graph.bbox;
+                        const xs = polygon.map(point => point[0]);
+                        const ys = polygon.map(point => point[1]);
+                        const sameBox = Array.isArray(box) && box.length === 4
+                            && Math.abs(box[0] - Math.min(...xs)) < 1e-7
+                            && Math.abs(box[1] - Math.min(...ys)) < 1e-7
+                            && Math.abs(box[2] - Math.max(...xs)) < 1e-7
+                            && Math.abs(box[3] - Math.max(...ys)) < 1e-7;
+                        if ((!samePolygon && !sameBox) || graph.edges.length) return { stale: true };
+                        if (typeof result?.directed === 'boolean')
+                            model.setGraphType(graphId, 'directed', result.directed);
+                        if (typeof result?.weighted === 'boolean')
+                            model.setGraphType(graphId, 'weighted', result.weighted);
+                        render();
+                        return result;
                     }
                 });
                 else overlay.refresh();
