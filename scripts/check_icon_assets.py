@@ -328,19 +328,16 @@ def main():
     assert '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-bing-v40-20261020">' in html
     for pixel in (16,32,64):
         assert f'<link rel="icon" type="image/png" sizes="{pixel}x{pixel}" href="/favicon-{pixel}.png?v=dmate-bing-v40-20261020">' in html
-    assert '<script id="dmateSafariFaviconSwitch">' in html
+    assert '<script id="dmateSafariFaviconSwitch">' not in html
     safari_head = html.split('{% elif is_mac_safari %}', 1)[1].split(
         '{% elif is_android_browser %}', 1
     )[0]
-    assert 'dmate-safari-position-v47-20261028' in safari_head
-    assert 'setSafariIcon(whiteAddress ? "address-white" : "tab-black")' in safari_head
-    assert 'addressCandidate && !document.hidden' in safari_head
-    assert 'appearance.matches' in safari_head
-    assert '(prefers-color-scheme: dark)' in safari_head
-    assert 'window.addEventListener("blur"' in safari_head
-    assert 'window.addEventListener("focus"' in safari_head
-    assert 'window.addEventListener("pageshow"' in safari_head
-    assert 'appearance.addEventListener("change", refreshSafariIcon)' in safari_head
+    assert 'dmate-safari-stable-black-v48-20261028' in safari_head
+    assert 'dmate-safari-tab-black-v46.svg' in safari_head
+    assert 'dmate-safari-tab-black-v46-64.png' in safari_head
+    assert 'address-white' not in safari_head
+    assert 'addEventListener' not in safari_head
+    assert 'prefers-color-scheme' not in safari_head
     assert 'dmate-safari-contrast-' not in safari_head
     assert 'dmate-safari-black-v44' not in html
     assert 'dmate-site-v36-64.png?v=dmate-safari-v36-20261019' not in html

@@ -85,79 +85,14 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=dmate-bing-v40-20261020">
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=dmate-bing-v40-20261020">
 {% elif is_mac_safari %}
-<!-- Safari compact tabs: the SMALL normal tab favicon is ALWAYS transparent
-     black. The LARGE address editor receives the white candidate ONLY when
-     macOS is dark and the page blurs. In light mode BOTH remain black.
-     Browser chrome still controls the actual icons and may cache them. -->
-<script id="dmateSafariFaviconSwitch">
-(function () {
-    "use strict";
-    var version = "dmate-safari-position-v47-20261028";
-    var mode = "";
-    var addressCandidate = false;
-    var appearance = window.matchMedia
-        ? window.matchMedia("(prefers-color-scheme: dark)") : null;
-
-    function setSafariIcon(nextMode) {
-        var previousPng = document.getElementById("dmateSafariFaviconPng");
-        var previousSvg = document.getElementById("dmateSafariFavicon");
-        if (mode === nextMode && previousPng && previousSvg) return;
-        mode = nextMode;
-
-        var png = document.createElement("link");
-        png.id = "dmateSafariFaviconPng";
-        png.rel = "icon";
-        png.type = "image/png";
-        png.sizes = "64x64";
-        png.href = "/static/icons/dmate-safari-" + nextMode + "-v46-64.png?v=" + version;
-
-        var svg = document.createElement("link");
-        svg.id = "dmateSafariFavicon";
-        svg.rel = "icon";
-        svg.type = "image/svg+xml";
-        svg.href = "/static/icons/dmate-safari-" + nextMode + "-v46.svg?v=" + version;
-
-        if (previousPng) previousPng.remove();
-        if (previousSvg) previousSvg.remove();
-        document.head.appendChild(png);
-        document.head.appendChild(svg);
-    }
-
-    function refreshSafariIcon() {
-        // Default/normal tab: BLACK on either macOS appearance.
-        // URL editing candidate: WHITE only on dark macOS, never light.
-        var whiteAddress = addressCandidate && !document.hidden &&
-            Boolean(appearance && appearance.matches);
-        setSafariIcon(whiteAddress ? "address-white" : "tab-black");
-    }
-
-    refreshSafariIcon();
-    window.addEventListener("blur", function () {
-        // Best effort: Safari does not expose address-field focus directly.
-        addressCandidate = true;
-        refreshSafariIcon();
-    });
-    window.addEventListener("focus", function () {
-        addressCandidate = false;
-        refreshSafariIcon();
-    });
-    window.addEventListener("pageshow", function () {
-        addressCandidate = false;
-        refreshSafariIcon();
-    });
-    document.addEventListener("visibilitychange", function () {
-        if (document.hidden) addressCandidate = false;
-        refreshSafariIcon();
-    });
-    if (appearance) {
-        if (typeof appearance.addEventListener === "function") {
-            appearance.addEventListener("change", refreshSafariIcon);
-        } else if (typeof appearance.addListener === "function") {
-            appearance.addListener(refreshSafariIcon);
-        }
-    }
-})();
-</script>
+<!-- Safari 26 uses the same site favicon in the URL field and tab chrome.
+     The previous blur/focus handler incorrectly claimed to control them
+     separately and could recolor the normal tab. Keep the user's existing
+     BLACK small-tab geometry stable in both macOS themes. A website cannot
+     force a separate WHITE Smart Search field icon without also risking the
+     tab favicon; the browser owns this presentation. -->
+<link id="dmateSafariFaviconPng" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-safari-tab-black-v46-64.png?v=dmate-safari-stable-black-v48-20261028">
+<link id="dmateSafariFavicon" rel="icon" type="image/svg+xml" href="/static/icons/dmate-safari-tab-black-v46.svg?v=dmate-safari-stable-black-v48-20261028">
 {% elif is_android_browser %}
 <!-- Android: browser-specific favicon geometry compensation, native master unchanged. -->
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/{% if is_android_edge %}android-edge-32-v21.png?v=dmate-vector-v22{% elif is_android_firefox %}android-fennec-32-v21.png?v=dmate-vector-v22{% else %}mobile-favicon-32-v17.png{% endif %}">
