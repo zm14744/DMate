@@ -234,7 +234,7 @@ def _color_line_topology(rgb, *, trusted_ink=None):
                 pair = {"from": f"p{i+1}", "to": f"p{j+1}",
                         "support": round(support, 3),
                         "minimum_section_support": round(minimum_section, 3)}
-                if support >= .87 and minimum_section >= .72:
+                if support >= .87 and minimum_section >= .60:
                     edges.append(pair)
                 elif support >= .70:
                     borderline.append(pair)
