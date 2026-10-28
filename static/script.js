@@ -14229,7 +14229,6 @@ function ocrTaskLabel(task) {
     if (task.confirmation) return "已确认结构";
     if (task.state === "recognizing") return "识别中";
     if (task.state === "failed") return "识别失败";
-    if (task.state === "cancelled") return "已取消";
     return task.dirty ? "修改待确认" : "待核对";
 }
 
@@ -14431,7 +14430,7 @@ async function recognizeOcrTask(task) {
         const data = await parseResponseJson(response);
         if (task.state === "cancelled" || !ocrTasks.has(task.id)) return;
         if (data?.cancelled) {
-            task.state = "cancelled";
+            discardOcrTask(task);
             return;
         }
         if (!response.ok || data?.error) throw new Error(data?.error || fallbackHttpError(response.status));
@@ -14477,15 +14476,25 @@ async function recognizeOcrTask(task) {
     }
 }
 
-function cancelOcrTask(id) {
-    const task = ocrTasks.get(id);
-    if (!task || task.state !== "recognizing") return;
+function discardOcrTask(task) {
+    if (!task || !ocrTasks.has(task.id)) return;
+    // A cancelled upload is removed, never kept as an "已取消" card.
+    // Late HTTP responses and finally blocks cannot resurrect this task.
     task.state = "cancelled";
     task.finishedAt = performance.now();
     task.controller?.abort();
     task.controller = null;
-    notifyOcrCancelled(task.id);
+    ocrTasks.delete(task.id);
+    URL.revokeObjectURL(task.originalUrl);
     renderOcrTasks();
+}
+
+function cancelOcrTask(id) {
+    const task = ocrTasks.get(id);
+    if (!task || task.state !== "recognizing") return;
+    const requestId = task.id;
+    discardOcrTask(task); // Immediate UI removal, no cancelled/manual-entry state.
+    notifyOcrCancelled(requestId);
 }
 
 function removeOcrTask(id) {
