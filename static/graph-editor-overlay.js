@@ -94,7 +94,7 @@ function mount(host,o){
    scroll.scrollTop=stage.scrollHeight*(box[1]+box[3])/2-scroll.clientHeight/2;
  });
  bar.append(status); // Actionable feedback appears with the tools, never below the photo.
- const change=fn=>{try{fn();o.changed?.();draw();}catch(e){status.textContent=e?.message||'修改失败';}};
+ const change=(fn,kind)=>{try{fn();o.changed?.(kind);draw();}catch(e){status.textContent=e?.message||'修改失败';}};
  async function scanFigureType(polygon,graphId){
   if(typeof o.recognizeGraphType!=='function')return;
   const sequence=++scanSequence;
@@ -203,7 +203,7 @@ function mount(host,o){
     if(s.polygonDraft.length>=64){status.textContent='轮廓最多64个角点';return;}
     s.polygonDraft.push(p);draw();return;
   }
-  if(s.mode==='vertex'&&!node){change(()=>o.model.addVertex(g.id,'',...p));return;}
+  if(s.mode==='vertex'&&!node){e.preventDefault();change(()=>o.model.addVertex(g.id,'',...p),'vertex');return;}
   if(s.mode==='edge'&&node){if(!s.start){s.start=node;draw();}else{const from=s.start;s.start=null;change(()=>o.model.addEdge(g.id,{from,to:node,direction:g.directed===true?'forward':'undirected'}));}return;}
   if(s.mode==='text_rect')active={kind:'text_bounds',pointer:e.pointerId,start:p,end:p};
   else if(s.mode==='pan'||(s.mode==='select'&&e.shiftKey))active={kind:'pan',pointer:e.pointerId,start:[e.clientX,e.clientY],sx:scroll.scrollLeft,sy:scroll.scrollTop};
@@ -228,7 +228,7 @@ function mount(host,o){
   pointers.delete(e.pointerId);if(pointers.size<2)base=null;
   if(!active||active.pointer!==e.pointerId)return;const op=active;active=null;ghost=null;const g=o.graph();
   if(!cancel&&g){
-   if(op.kind==='node'){if(Math.hypot(op.start[0]-op.end[0],op.start[1]-op.end[1])>.004)change(()=>o.model.moveVertex(g.id,op.id,...op.end));o.selectNode?.(op.id);}
+   if(op.kind==='node'){if(Math.hypot(op.start[0]-op.end[0],op.start[1]-op.end[1])>.004)change(()=>o.model.moveVertex(g.id,op.id,...op.end),'geometry');o.selectNode?.(op.id);}
    if(op.kind==='bounds'||op.kind==='text_bounds'){
      const a=op.start,b=op.end,box=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
      if(box[2]-box[0]>.01 && box[3]-box[1]>.01){
@@ -243,7 +243,7 @@ function mount(host,o){
        }
      }
    }
-   if(op.kind==='handle'){const edge=g.edges.find(x=>x.id===op.id),a=g.vertices.find(x=>x.id===edge?.from),b=g.vertices.find(x=>x.id===edge?.to);if(a&&b&&unit(a.x)&&unit(a.y)&&unit(b.x)&&unit(b.y))change(()=>o.model.setEdgePath(g.id,op.id,[[a.x,a.y],op.end,[b.x,b.y]]));else status.textContent='请先校准这条边的两个端点';}
+   if(op.kind==='handle'){const edge=g.edges.find(x=>x.id===op.id),a=g.vertices.find(x=>x.id===edge?.from),b=g.vertices.find(x=>x.id===edge?.to);if(a&&b&&unit(a.x)&&unit(a.y)&&unit(b.x)&&unit(b.y))change(()=>o.model.setEdgePath(g.id,op.id,[[a.x,a.y],op.end,[b.x,b.y]]),'geometry');else status.textContent='请先校准这条边的两个端点';}
   }draw();
  }
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
