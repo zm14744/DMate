@@ -561,7 +561,8 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                             for flag, title in (("directed", "方向"), ("weighted", "权值")))
                         if not stale:
                             retained.append(message)
-                    return verified, retained + layout_issues + review_issues, layout_calls + verification_calls, certified
+                    return (verified, retained + layout_issues + review_issues,
+                            layout_calls, verification_calls, certified)
                 finally:
                     model_image.close()
 
@@ -589,7 +590,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
 
         text = str(text_result.get("front_text") or text_result.get("text") or "").strip()
         figures, issues = [], []
-        verification_calls = certified = 0
+        layout_audit_calls = verification_calls = certified = 0
         vision_failed = False
         qwen_attempted = "vision" in jobs
         if hint["possible_graph"]:
@@ -598,7 +599,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                 issues.append("自动分图或局部属性复核超过服务端安全时限，请手动核对")
             else:
                 try:
-                    figures, issues, verification_calls, certified = done["vision"].result()
+                    figures, issues, layout_audit_calls, verification_calls, certified = done["vision"].result()
                 except LayoutOnlyCancelled:
                     raise
                 except Exception:
@@ -631,8 +632,9 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                 "preflight": hint,
                 "no_auto_draw": True,
                 "figure_count": len(figures),
-                "qwen_graph_calls": int(qwen_attempted) + verification_calls,
-                "segmentation_and_type_review_calls": verification_calls,
+                "qwen_graph_calls": int(qwen_attempted) + layout_audit_calls + verification_calls,
+                "layout_audit_calls": layout_audit_calls,
+                "type_review_calls": verification_calls,
                 "independently_verified_type_fields": certified,
                 "layout_model_calls": 0,
                 "text_worker_metrics": text_result.get("resource_metrics", []),
