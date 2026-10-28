@@ -121,5 +121,17 @@ def test_public_four_diagram_color_evidence_remains_readable():
         raise AssertionError("Existing public original was deleted")
     result = measure_image_pixel_evidence(data.read_bytes())
     observed = [(len(p["vertices"]), len(p["edges"])) for p in result["colored_graphs"]]
+    if observed != [(6, 5), (6, 6), (6, 10), (5, 10)]:
+        import cv2
+        from graph_pixel_safety import _red_markers
+        _, rgb = _image(data.read_bytes())
+        old_mask = (cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY) < 145).astype(np.uint8)
+        old_rows = _color_line_topology(rgb, trusted_ink=old_mask)
+        for idx, (now, before) in enumerate(zip(result["colored_graphs"], old_rows)):
+            old_edges = {tuple(sorted((e["from"], e["to"]))) for e in before["edges"]}
+            new_edges = {tuple(sorted((e["from"], e["to"]))) for e in now["edges"]}
+            print("PIXEL_DIAGNOSTIC", idx, "strict", len(new_edges),
+                  "fixed_gray", len(old_edges), "missing_from_gray",
+                  sorted(old_edges-new_edges), "mask_quality", result.get("pixel_mask_quality"))
     assert observed == [(6, 5), (6, 6), (6, 10), (5, 10)]
     assert all(p["unambiguous"] for p in result["colored_graphs"])
