@@ -3027,7 +3027,8 @@ def recognize_manual_text_region():
     if not OCR_AVAILABLE or recognize_image is None:
         return jsonify({"error": "文字 OCR 暂不可用，可继续手动输入"}), 503
     try:
-        recognized = recognize_image(cropped)
+        from ocr_runtime import recognize_image as fast_text_recognize
+        recognized = fast_text_recognize(cropped, text_only=True, timeout_seconds=3.0)
     except Exception as exc:
         print(f"所选文字区域 OCR 失败：{type(exc).__name__}")
         return jsonify({"error": "选区文字识别未完成，可调整范围或手动输入"}), 503
@@ -3038,6 +3039,54 @@ def recognize_manual_text_region():
                     "selection_mode": "polygon",
                     "recognition_status": "complete" if text else "partial",
                     "warning": None if text else "选区内未识别到文字，请调整范围或手动输入"})
+
+
+
+@app.route("/graph/figure-type", methods=["POST"])
+def recognize_manual_figure_type():
+    """After manual polygon/rectangle segmentation, scan ONLY arrows + weights."""
+    from graph_confirmation import (ConfirmationError, confirmation_owner,
+                                    require_recognition_source)
+    from graph_region import RegionError, crop_region
+    from graph_layout_only import recognize_selected_graph_type
+    started = time.monotonic()
+    if not _check_rate_limit(_get_client_ip(), "ocr"):
+        return jsonify({"error": "图形类型扫描过于频繁，请稍后再试"}), 429
+    request_id = _normalize_ocr_request_id(request.form.get("request_id"))
+    image = request.files.get("image")
+    if not request_id or image is None:
+        return jsonify({"error": "缺少原图或图形识别任务"}), 400
+    raw = image.read(MAX_IMAGE_BYTES + 1)
+    if not raw or len(raw) > MAX_IMAGE_BYTES:
+        return jsonify({"error": "图片必须小于 8MB"}), 413
+    source_sha = hashlib.sha256(raw).hexdigest()
+    try:
+        require_recognition_source(confirmation_owner(), request_id, source_sha)
+    except ConfirmationError as exc:
+        return jsonify({"error": exc.message, "code": exc.code}), exc.status
+    selection = request.form.get("polygon", "")
+    if len(selection) > 6000:
+        return jsonify({"error": "图形轮廓过于复杂"}), 400
+    try:
+        cropped = crop_region(raw, json.loads(selection))
+    except (ValueError, TypeError, RegionError) as exc:
+        return jsonify({"error": str(exc) or "图形选区无效"}), 400
+    try:
+        result = recognize_selected_graph_type(
+            cropped, request_deadline=started + 3.55)
+    except (ValueError, TypeError, OSError) as exc:
+        return jsonify({"error": "所选区域不是可识别的图像",
+                        "code": type(exc).__name__}), 400
+    except Exception:
+        result = {"directed": "unknown", "weighted": "unknown",
+                  "recognition_status": "partial",
+                  "warning": "箭头或权值没有在时限内识别，请手动选择",
+                  "no_auto_draw": True}
+    # The selected polygon, graph id, vertices and edges remain exclusively
+    # user-owned. The server never generates a path or topology in this route.
+    result.update({"request_id": request_id, "source_sha256": source_sha,
+                   "server_elapsed_seconds": round(time.monotonic()-started, 3)})
+    return jsonify(result)
 
 
 @app.route("/graph/confirm", methods=["POST"])
@@ -4195,18 +4244,20 @@ def ocr():
             from graph_upload_tasks import UPLOAD_TASKS, UploadAdmissionError
             from graph_confirmation import confirmation_owner
             owner = confirmation_owner()
-            # If a deployment explicitly selected the legacy OCR reader,
-            # preserve its single-argument signature instead of failing.
-            text_reader = (recognize_image if graph_nextgen_enabled()
-                           else (lambda image, *, text_only: recognize_image(image)))
-            if not OCR_AVAILABLE:
-                text_reader = None
+            # Always choose the bounded Small-text worker in this fast route.
+            # Never fall through to legacy PP-DocLayout/full-OCR inference.
+            text_reader = None
+            if OCR_AVAILABLE:
+                try:
+                    from ocr_runtime import recognize_image as text_reader
+                except (ImportError, OSError):
+                    pass
             try:
                 with UPLOAD_TASKS.admit(owner, request_id):
                     routed = recognize_layout_only(
                         raw, recognize_text=text_reader,
                         cancelled=lambda: _ocr_is_cancelled(request_id, owner=owner),
-                        request_deadline=recognition_deadline)
+                        request_deadline=min(recognition_deadline, started_at + 3.6))
                 if request_id and _take_ocr_cancelled(request_id, owner=owner):
                     return jsonify({"cancelled": True})
                 routed.update(request_id=request_id,
