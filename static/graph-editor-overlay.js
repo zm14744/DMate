@@ -256,17 +256,51 @@ function mount(host,o){
   for(const edges of pairs.values())for(const [i,e] of edges.entries()){
    if(!coords.has(e.from)||!coords.has(e.to))continue;
    const a=px(coords.get(e.from)),b=px(coords.get(e.to)),pts=Array.isArray(e.path)&&e.path.length>=2&&e.path.every(p=>Array.isArray(p)&&p.length===2&&p.every(unit))?e.path:null;
-   let line,center;
-   if(ghost?.edge===e.id){center=px(ghost.pos);line='M '+a.join(' ')+' L '+center.join(' ')+' L '+b.join(' ');}
-   else if(pts){const ps=pts.map(px);ps[0]=a;ps[ps.length-1]=b;center=ps[Math.floor(ps.length/2)];line='M '+ps.map(p=>p.join(' ')).join(' L ');}
-   else if(e.from===e.to){const r=radius*(5+i*2);line='M '+(a[0]-r*.3)+' '+(a[1]-r*.3)+' C '+(a[0]-2*r)+' '+(a[1]-2*r)+' '+(a[0]+2*r)+' '+(a[1]-2*r)+' '+(a[0]+r*.3)+' '+(a[1]-r*.3);center=[a[0],a[1]-r*1.5];}
-   else{const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2],len=Math.hypot(b[0]-a[0],b[1]-a[1])||1,k=(i-(edges.length-1)/2)*radius*3,c=[mid[0]-(b[1]-a[1])*k/len,mid[1]+(b[0]-a[0])*k/len];center=[(mid[0]+c[0])/2,(mid[1]+c[1])/2];line='M '+a.join(' ')+' Q '+c.join(' ')+' '+b.join(' ');}
-   const chosen=o.edgeSelected?.()===e.id,group=E(d,'g',{'data-edge-id':e.id,class:'dge-overlay-edge'+(chosen?' is-selected':'')+(e.direction==='unknown'?' is-uncertain':'')});
+   let line,center,drawPoints;
+   if(ghost?.edge===e.id){
+    center=px(ghost.pos);drawPoints=[a,center,b];
+   }else if(pts){
+    drawPoints=pts.map(px);drawPoints[0]=a;drawPoints[drawPoints.length-1]=b;
+    center=drawPoints[Math.floor(drawPoints.length/2)];
+   }else if(e.from===e.to){
+    const r=radius*(5+i*2);
+    const p0=[a[0]-r*.3,a[1]-r*.3],p1=[a[0]-2*r,a[1]-2*r],
+          p2=[a[0]+2*r,a[1]-2*r],p3=[a[0]+r*.3,a[1]-r*.3];
+    drawPoints=cubicPoints(p0,p1,p2,p3);
+    center=[a[0],a[1]-r*1.5];
+   }else{
+    const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2],
+          len=Math.hypot(b[0]-a[0],b[1]-a[1])||1,
+          k=(i-(edges.length-1)/2)*radius*3,
+          c=[mid[0]-(b[1]-a[1])*k/len,mid[1]+(b[0]-a[0])*k/len];
+    drawPoints=quadraticPoints(a,c,b);
+    center=drawPoints[Math.floor(drawPoints.length/2)];
+   }
+   line=pointsPath(drawPoints);
+   const chosen=o.edgeSelected?.()===e.id,
+         group=E(d,'g',{'data-edge-id':e.id,class:'dge-overlay-edge'+(chosen?' is-selected':'')+(e.direction==='unknown'?' is-uncertain':'')});
    const hit=E(d,'path',{d:line,class:'dge-overlay-hit'});
-   hit.style.strokeWidth=(touch?44:18)/scale+'px';
-   group.append(hit);
-   const att={d:line,class:'dge-overlay-stroke'};if(e.direction==='forward')att['marker-end']='url(#'+o.instance+'-arrow)';if(e.style==='dashed')att['stroke-dasharray']='9 6';if(e.style==='dotted')att['stroke-dasharray']='2 5';
-   const stroke=E(d,'path',att);stroke.style.strokeWidth=(chosen?3.6:2.1)/scale+'px';group.append(stroke);
+   hit.style.strokeWidth=(touch?44:18)/scale+'px';group.append(hit);
+   for(let j=0;j<drawPoints.length-1;j++){
+    const from=drawPoints[j],to=drawPoints[j+1],
+          segment='M '+from.join(' ')+' L '+to.join(' '),
+          midpoint=[(from[0]+to[0])/(2*w),(from[1]+to[1])/(2*h)],
+          ink=inkAt(midpoint),halo=E(d,'path',{d:segment,class:'dge-overlay-contrast-halo'});
+    halo.style.stroke=oppositeInk(ink);
+    halo.style.strokeWidth=(chosen?6.2:4.8)/scale+'px';
+    if(e.style==='dashed')halo.setAttribute('stroke-dasharray','9 6');
+    if(e.style==='dotted')halo.setAttribute('stroke-dasharray','2 5');
+    group.append(halo);
+    const att={d:segment,class:'dge-overlay-stroke'};
+    if(e.direction==='forward'&&j===drawPoints.length-2)
+      att['marker-end']='url(#'+o.instance+'-arrow-'+(ink==='#ffffff'?'light':'dark')+')';
+    if(e.style==='dashed')att['stroke-dasharray']='9 6';
+    if(e.style==='dotted')att['stroke-dasharray']='2 5';
+    const stroke=E(d,'path',att);
+    stroke.style.stroke=ink;
+    stroke.style.strokeWidth=(chosen?3.6:2.1)/scale+'px';
+    group.append(stroke);
+   }
    const label=[e.edge_label,e.weight==null?'':String(e.weight)].filter(Boolean).join(' · ');if(label){
      const t=E(d,'text',{x:center[0],y:center[1]-labelOffset,class:'dge-overlay-label','text-anchor':'middle'});
      t.textContent=label;t.style.fontSize=labelSize+'px';group.append(t);
