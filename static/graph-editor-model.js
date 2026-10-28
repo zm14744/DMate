@@ -253,11 +253,13 @@
                 const graph = getGraph(draft, gid);
                 graph.bbox = [...bbox];
                 delete graph.region_polygon;
+                if (!graph.edges.length) { delete graph.directed; delete graph.weighted; }
             }),
             setGraphPolygon: (gid, polygon) => change(draft => {
                 if (!polygonValid(polygon)) throw new Error('自由选区需要至少三个有效角点。');
                 const graph = getGraph(draft, gid);
                 graph.region_polygon = polygon.map(p => [...p]);
+                if (!graph.edges.length) { delete graph.directed; delete graph.weighted; }
                 // A new custom region supersedes the previous rectangle.
                 delete graph.bbox;
             }),
