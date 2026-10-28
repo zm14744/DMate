@@ -355,13 +355,20 @@ def run_worker(stage,image_path,output_path,*,layout_path=None,timeout=55,comman
     return None,metric
 
 
-def recognize_image(raw, *, prepare_cache=False, text_only=False):
+def recognize_image(raw, *, prepare_cache=False, text_only=False, timeout_seconds=None):
     """Use only the Small text worker for pure-text / lightweight panel uploads.
 
     The existing standard mode retains both layout and text worker stages.
     Skipping the 45-second layout worker must not affect other OCR callers.
     """
     metrics=[]
+    # The fast upload path has a strict OCR budget; standard OCR is unchanged.
+    deadline = (time.monotonic() + max(.1, float(timeout_seconds))
+                if timeout_seconds is not None else None)
+    def worker_seconds(default):
+        if deadline is None:
+            return default
+        return max(.1, min(default, deadline - time.monotonic() - .12))
     # File lock is shared by all gunicorn processes, unlike threading.Lock.
     lock_path=Path(tempfile.gettempdir())/'dmate-local-model.lock'
     with lock_path.open('a') as lock:
@@ -392,13 +399,18 @@ def recognize_image(raw, *, prepare_cache=False, text_only=False):
                                     'worker_started': False, 'seconds': 0.})
                 else:
                     layout,lm=run_worker('layout',layout_image_path,root/'layout.json',
-                                         timeout=180 if prepare_cache else 45)
+                                         timeout=worker_seconds(180 if prepare_cache else 45))
                     metrics.append(lm)
                     if layout is None: layout={'regions':[],'status':'unavailable'}
                 (root/'layout.json').write_text(json.dumps(layout))
-                text,tm=run_worker('text',text_path,root/'text.json',
-                                   layout_path=root/'layout.json',
-                                   timeout=180 if prepare_cache else 65)
+                if deadline is not None and deadline - time.monotonic() < .25:
+                    text = None
+                    tm = {'stage': 'text', 'status': 'timeout',
+                          'seconds': 0., 'worker_started': False}
+                else:
+                    text,tm=run_worker('text',text_path,root/'text.json',
+                                       layout_path=root/'layout.json',
+                                       timeout=worker_seconds(180 if prepare_cache else 65))
                 metrics.append(tm)
                 if text is None:
                     text={'text':'','front_text':'','text_count':0,'formula_count':0,'review_regions':[],'warning':'题目文字未能完整识别'}
