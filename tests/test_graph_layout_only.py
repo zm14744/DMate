@@ -231,7 +231,7 @@ def test_selected_graph_scans_only_arrows_and_weights_without_any_edges():
     assert result["directed"] is True and result["weighted"] is False
     assert result["recognition_status"] == "complete"
     assert result["no_auto_draw"] is True
-    assert "图像已由用户手动框选" in calls[0][0]
+    assert "图像已经由用户框选" in calls[0][0]
     assert len(calls) == 1
 
 
