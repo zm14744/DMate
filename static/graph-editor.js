@@ -283,6 +283,8 @@
             // either one, even if the overlay is temporarily reparented.
             const scrollState = [];
             if (useOverlay && overlay) {
+                const viewport=container.querySelector('.dge-overlay-viewport');
+                if(viewport)scrollState.push([viewport,viewport.scrollTop,viewport.scrollLeft]);
                 let ancestor = container;
                 while (ancestor) {
                     if (ancestor.scrollHeight > ancestor.clientHeight + 1 ||
@@ -327,6 +329,17 @@
                 if (!overlay) overlay = root.DMateGraphOverlay.mount(host, {
                     instance, originalUrl: options.originalUrl, model, state: overlayState,
                     graph: () => model.getDocument().graphs.find(row => row.id === currentGraph),
+                    createRegion: (points,polygon) => {
+                        const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
+                        const bbox=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
+                        const graphs=model.getDocument().graphs,blank=graphs.length===1&&graphs[0];
+                        if(blank && !blank.vertices.length && !blank.edges.length && !blank.bbox && !blank.region_polygon){
+                            currentGraph=blank.id;
+                            if(polygon)model.setGraphPolygon(currentGraph,points);else model.setGraphBounds(currentGraph,bbox);
+                        }else currentGraph=model.addGraph({bbox,...(polygon?{region_polygon:points}:{})});
+                        selectedNodes.clear();selectedEdge=null;
+                        return currentGraph;
+                    },
                     disabled: () => saving || destroyed,
                     edgeSelected: () => selectedEdge,
                     nodeSelected: () => selectedNodes,

@@ -273,8 +273,9 @@ def test_only_manually_selected_figures_have_four_second_budget():
     assert "discardOcrTask(task); // Immediate UI removal" in client
     assert 'task.state === "cancelled") return "已取消"' not in client
     assert "/graph/figure-type" in server and "/graph/figure-type" in client
-    assert "scanFigureType(points,g.id)" in overlay
-    assert "void scanFigureType([[box[0],box[1]]" in overlay
+    assert "scanFigureType(points,id)" in overlay
+    assert "void scanFigureType(points,id)" in overlay
+    assert "commitRegion([[box[0],box[1]]" in overlay
     assert 'options["timeout_seconds"] = 3.0' in server
 
 

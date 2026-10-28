@@ -196,10 +196,12 @@
             reset: () => change(draft => { Object.keys(draft).forEach(key => delete draft[key]); Object.assign(draft, copy(initial)); }),
             setBody: value => change(draft => { draft.body_text = String(value); }),
             renameGraph: (gid, name) => change(draft => { getGraph(draft, gid).name = String(name); }),
-            addGraph: () => {
+            addGraph: (region) => {
                 let gid;
                 change(draft => { if (draft.graphs.length >= LIMITS.graphs) throw new Error('最多编辑 64 幅子图。');
-                    gid = unique('G', draft.graphs); draft.graphs.push({ id: gid, name: '图 ' + (draft.graphs.length + 1), vertices: [], edges: [] }); });
+                    if(region && (!validBox(region.bbox) || region.region_polygon && !polygonValid(region.region_polygon)))throw new Error('图形选区无效。');
+                    gid = unique('G', draft.graphs); draft.graphs.push({ id: gid, name: '图 ' + (draft.graphs.length + 1), vertices: [], edges: [],
+                        ...(region?{bbox:[...region.bbox],...(region.region_polygon?{region_polygon:region.region_polygon.map(p=>[...p])}:{})}:{}) }); });
                 return gid;
             },
             deleteGraph: gid => change(draft => { getGraph(draft, gid); draft.graphs = draft.graphs.filter(row => row.id !== gid); }),

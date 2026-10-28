@@ -112,12 +112,15 @@ def test_drag_geometry_and_bounds_can_be_saved_and_restored(canvas_page):
     page.mouse.down()
     page.mouse.move(x + bounds["width"]*.93, y + bounds["height"]*.93, steps=6)
     page.mouse.up()
-    graph = page.evaluate("instance.getDocument().graphs[0]")
+    graph = page.evaluate("instance.getDocument().graphs.at(-1)")
     assert graph["bbox"][0] < graph["bbox"][2] and graph["bbox"][1] < graph["bbox"][3]
+    page.get_by_role("button", name="添加顶点", exact=True).click()
+    view=page.locator(".dge-overlay-viewport").bounding_box()
+    page.mouse.click(view["x"]+view["width"]/2,view["y"]+view["height"]/2)
     page.get_by_role("button", name="保存并确认", exact=True).click()
     page.wait_for_function("confirmed.length===1")
     assert page.evaluate("confirmed[0].graphs[0].edges[0].path.length") == 3
-    assert page.evaluate("confirmed[0].graphs[0].bbox.length") == 4
+    assert page.evaluate("confirmed[0].graphs.at(-1).bbox.length") == 4
 
 
 def test_mobile_overlay_fits_without_external_assets(canvas_page):
@@ -189,11 +192,20 @@ def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
                          bounds["y"] + bounds["height"]*y)
     assert page.get_by_role("button", name="完成轮廓").is_enabled()
     page.get_by_role("button", name="完成轮廓").click()
-    polygon = page.evaluate("instance.getDocument().graphs[0].region_polygon")
+    polygon = page.evaluate("instance.getDocument().graphs.at(-1).region_polygon")
     assert len(polygon) == 4
     assert polygon[0] == pytest.approx([.08, .12], abs=.005)
     assert page.locator(".dge-overlay-polygon").count() == 1
+    assert page.evaluate("instance.getDocument().graphs.length")==2
+    assert page.get_by_label('选区方式').input_value()=='graph_poly'
+    for x,y in ((.2,.2),(.4,.2),(.4,.4),(.2,.4)):
+        page.mouse.click(bounds['x']+bounds['width']*x,bounds['y']+bounds['height']*y)
+    page.get_by_role('button',name='完成轮廓',exact=True).click()
+    assert page.evaluate('instance.getDocument().graphs.length')==3
     page.get_by_role("button", name="撤销", exact=True).click()
+    assert page.evaluate("instance.getDocument().graphs.length")==2
+    page.get_by_role("button", name="撤销", exact=True).click()
+    assert page.evaluate("instance.getDocument().graphs.length")==1
     assert "region_polygon" not in page.evaluate("instance.getDocument().graphs[0]")
 
 
@@ -476,3 +488,52 @@ def test_fit_waits_until_hidden_editor_becomes_visible(canvas_page):
     page.wait_for_function("document.querySelector('.dge-overlay-image').getBoundingClientRect().width>100")
     photo=page.locator('.dge-overlay-image').bounding_box();box=page.locator('.dge-overlay-viewport').bounding_box()
     assert photo['height']<=box['height']+1 and photo['width']<=box['width']+1
+
+
+def test_fit_centres_the_entire_image_in_fixed_viewport(canvas_page):
+    page=canvas_page
+    for width,height in [(900,580),(240,1800),(1800,240)]:
+        page.evaluate('''([w,h])=>{
+          const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+          canvas.getContext('2d').fillRect(0,0,w,h);
+          document.querySelector('.dge-overlay-image').src=canvas.toDataURL();
+        }''',[width,height])
+        page.wait_for_function('(w)=>document.querySelector(".dge-overlay-image").naturalWidth===w',arg=width)
+        page.get_by_role('button',name='适应',exact=True).click()
+        page.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))')
+        image=page.locator('.dge-overlay-image').bounding_box()
+        view=page.locator('.dge-overlay-viewport').evaluate('e=>{const b=e.getBoundingClientRect();return {x:b.x+e.clientLeft,y:b.y+e.clientTop,w:e.clientWidth,h:e.clientHeight}}')
+        assert image['width']<=view['w']+1 and image['height']<=view['h']+1
+        assert abs(image['x']+image['width']/2-view['x']-view['w']/2)<3
+        assert abs(image['y']+image['height']/2-view['y']-view['h']/2)<3
+
+
+def test_consecutive_frames_add_graphs_without_camera_jump_even_after_type_reply(canvas_page):
+    page=canvas_page
+    page.evaluate('''()=>{
+      const url=document.querySelector('.dge-overlay-image').src,doc=instance.getDocument();instance.destroy();
+      window.typeReplies=[];
+      instance=DMateGraphEditor.mount(document.getElementById('editor'),{originalUrl:url,document:doc,
+        onRecognizeGraphType:()=>new Promise(r=>typeReplies.push(r))});
+    }''')
+    page.wait_for_function('document.querySelector(".dge-overlay-image").naturalWidth===900')
+    page.get_by_role('button',name='放大原图',exact=True).click()
+    page.get_by_role('button',name='框选图形',exact=True).click()
+    def camera():
+        return page.locator('.dge-overlay-viewport').evaluate('e=>{const i=e.querySelector("img").getBoundingClientRect();return {left:e.scrollLeft,top:e.scrollTop,x:i.x,y:i.y,w:i.width,h:i.height}}')
+    before=camera()
+    for n in range(2):
+        box=page.locator('.dge-overlay-viewport').bounding_box()
+        x=box['x']+40+140*n;y=box['y']+50
+        page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+95,y+100,steps=5);page.mouse.up()
+        page.wait_for_function('(n)=>instance.getDocument().graphs.length===n',arg=n+2)
+        assert page.locator('[data-overlay-tool="bounds"]').get_attribute('aria-pressed')=='true'
+        assert len(page.evaluate('instance.getDocument().graphs[0].vertices'))==2
+        after=camera()
+        for key in before:assert abs(after[key]-before[key])<1.5,(key,before,after)
+    assert page.locator('.dge-overlay-bbox').count()==2
+    page.evaluate('typeReplies.forEach(r=>r({directed:false,weighted:false,recognition_status:"complete"}))')
+    page.wait_for_function('instance.getDocument().graphs.slice(1).every(g=>g.directed===false)')
+    after=camera()
+    for key in before:assert abs(after[key]-before[key])<1.5,(key,before,after)
+    page.get_by_role('button',name='撤销',exact=True).click()

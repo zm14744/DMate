@@ -193,3 +193,7 @@
 .dge-overlay-host{width:100%;box-sizing:border-box}
 .dge-overlay-viewport{width:100%;box-sizing:border-box;flex:none;contain:size layout}
 .dge-overlay-stage{min-width:100%;min-height:100%}
+
+/* Region commits and asynchronous type hints must not move the camera. */
+.dge-workspace:has(.dge-overlay-host){grid-template-columns:minmax(0,1fr)}
+.dge-overlay-tools .dge-overlay-status,.dge-overlay-tools .dge-overlay-status:empty{display:block;box-sizing:border-box;height:3em;min-height:3em;overflow:auto}

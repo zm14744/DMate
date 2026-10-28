@@ -50,18 +50,15 @@ function mount(host,o){
    s.mode=regionMode.value||'select';s.start=null;s.polygonDraft=[];draw();
  });
  bar.append(regionMode);
+ const commitRegion=(points,polygon)=>{
+   let id;
+   change(()=>{id=o.createRegion?.(points,polygon);},'region');
+   if(id)void scanFigureType(points,id);
+ };
  const finishPolygon=()=>{
-   if(!['graph_poly','text_poly'].includes(s.mode) || s.polygonDraft.length<3) return;
-   const points=s.polygonDraft.map(p=>[...p]);
-   const nextMode=s.mode;
-   s.polygonDraft=[];s.mode='select';regionMode.value='';
-   if(nextMode==='graph_poly'){
-     const g=o.graph();if(g){change(()=>o.model.setGraphPolygon(g.id,points));void scanFigureType(points,g.id);}
-   }else{
-     s.textRegion=points;
-     status.textContent='已限定文字区域，点击“识别所选文字”。';
-   }
-   draw();
+   if(s.mode!=='graph_poly'||s.polygonDraft.length<3)return;
+   const points=s.polygonDraft.map(p=>[...p]);s.polygonDraft=[];
+   commitRegion(points,true);draw();
  };
  const finishButton=button('完成轮廓','finish-polygon',finishPolygon);
  // Each independently segmented graph receives its own direction and weight
@@ -87,7 +84,14 @@ function mount(host,o){
    const viewportHeight=Math.max(1,scroll.clientHeight);
    const originalHeightAt100=viewportWidth*h/Math.max(1,w);
    zoom(Math.min(100,(viewportHeight-4)/Math.max(1,originalHeightAt100)*100));
-   const scale=viewportWidth*s.zoom/100;scroll.scrollLeft=-world.left*scale;scroll.scrollTop=-world.top*scale*h/w;
+   const scale=viewportWidth*s.zoom/100;
+   const padX=Math.max(0,(viewportWidth/scale-1)/2);
+   const padY=Math.max(0,(viewportHeight/(scale*h/w)-1)/2);
+   world.left=Math.min(world.left,-padX);world.top=Math.min(world.top,-padY);
+   world.right=Math.max(world.right,1+padX);world.bottom=Math.max(world.bottom,1+padY);
+   layoutWorld();
+   scroll.scrollLeft=(.5-world.left)*scale-viewportWidth/2;
+   scroll.scrollTop=(.5-world.top)*scale*h/w-viewportHeight/2;
  };
  button('－','zoom-out',()=>zoom(s.zoom/1.25)).setAttribute('aria-label','缩小原图');
  const value=d.createElement('span');value.className='dge-overlay-zoom';bar.append(value);
@@ -252,6 +256,11 @@ function mount(host,o){
   }
   svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
+  const regions=o.model.getDocument().graphs;
+  for(const other of regions){if(other.id===g.id)continue;
+   if(other.region_polygon?.length>=3)outline(other.region_polygon,'dge-overlay-polygon');
+   else if(other.bbox?.length===4){const b=other.bbox;svg.append(E(d,'rect',{x:b[0]*w,y:b[1]*h,width:(b[2]-b[0])*w,height:(b[3]-b[1])*h,class:'dge-overlay-bbox'}));}
+  }
   if(g.bbox?.length===4)svg.append(E(d,'rect',{x:g.bbox[0]*w,y:g.bbox[1]*h,width:(g.bbox[2]-g.bbox[0])*w,height:(g.bbox[3]-g.bbox[1])*h,class:'dge-overlay-bbox'}));
   const outline=(points,cssClass)=>{
     if(Array.isArray(points)&&points.length){
@@ -361,7 +370,7 @@ function mount(host,o){
   if(s.mode==='edge'&&node){if(!s.start){s.start=node;draw();}else{const from=s.start;s.start=null;change(()=>o.model.addEdge(g.id,{from,to:node,direction:g.directed===true?'forward':'undirected'}));}return;}
   if(s.mode==='text_rect')active={kind:'text_bounds',pointer:e.pointerId,start:p,end:p};
   else if(s.mode==='pan'||(s.mode==='select'&&e.shiftKey))active={kind:'pan',pointer:e.pointerId,start:[e.clientX,e.clientY],sx:scroll.scrollLeft,sy:scroll.scrollTop};
-  else if(s.mode==='bounds'&&!node&&!edge)active={kind:'bounds',pointer:e.pointerId,start:p,end:p};
+  else if(s.mode==='bounds')active={kind:'bounds',pointer:e.pointerId,start:p,end:p};
   else if(s.mode==='select'&&handle)active={kind:'handle',pointer:e.pointerId,id:handle,start:p,end:p};
   else if(s.mode==='select'&&node)active={kind:'node',pointer:e.pointerId,id:node,start:p,end:p};
   else if(s.mode==='select'&&edge)o.selectEdge?.(edge);
@@ -394,9 +403,8 @@ function mount(host,o){
      const a=regionPoint(op.start),b=regionPoint(op.end),box=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
      if(box[2]-box[0]>.01 && box[3]-box[1]>.01){
        if(op.kind==='bounds'){
-         change(()=>o.model.setGraphBounds(g.id,box));
-         void scanFigureType([[box[0],box[1]],[box[2],box[1]],
-             [box[2],box[3]],[box[0],box[3]]],g.id);
+         commitRegion([[box[0],box[1]],[box[2],box[1]],
+             [box[2],box[3]],[box[0],box[3]]],false);
        }
        else{
          s.textRegion=[[box[0],box[1]],[box[2],box[1]],[box[2],box[3]],[box[0],box[3]]];
