@@ -54,20 +54,29 @@ function mount(host,o){
  const select=(label,entries,type)=>{const n=d.createElement('select');n.setAttribute('aria-label',label);for(const [v,t] of entries){const p=d.createElement('option');p.value=v;p.textContent=t;n.append(p);}n.addEventListener('change',()=>{const g=o.graph();if(g&&n.value!=='unknown')change(()=>o.model.setGraphType(g.id,type,n.value==='true'));});bar.append(n);return n;};
  const dir=select('图形方向',[['unknown','方向待核对'],['false','无向图'],['true','有向图']],'directed'),weight=select('图形权值',[['unknown','权值待核对'],['false','无权图'],['true','带权图']],'weighted');
  const visible=button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();});
+ const MIN_ZOOM=25,MAX_ZOOM=400;
  const zoom=x=>{
    const previous=s.zoom||100;
    const cx=scroll.scrollLeft+scroll.clientWidth/2,cy=scroll.scrollTop+scroll.clientHeight/2;
-   s.zoom=Math.max(100,Math.min(400,Math.round(x)));
+   s.zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Math.round(x)));
    stage.style.width=s.zoom+'%';value.textContent=s.zoom+'%';
    const ratio=s.zoom/previous;
    scroll.scrollLeft=cx*ratio-scroll.clientWidth/2;
    scroll.scrollTop=cy*ratio-scroll.clientHeight/2;
  };
+ // 100% fills the viewport width. "Fit" also accounts for tall images.
+ const fitImage=()=>{
+   const win=d.defaultView;
+   const viewportWidth=Math.max(1,scroll.clientWidth);
+   const viewportHeight=Math.min(700,(win?.innerHeight||800)*(win?.innerWidth<=760 ? 0.55 : 0.63));
+   const originalHeightAt100=viewportWidth*h/Math.max(1,w);
+   zoom(Math.min(100,Math.floor(viewportHeight/Math.max(1,originalHeightAt100)*100)));
+ };
  button('－','zoom-out',()=>zoom(s.zoom/1.25)).setAttribute('aria-label','缩小原图');
  const value=d.createElement('span');value.className='dge-overlay-zoom';bar.append(value);
  button('＋','zoom-in',()=>zoom(s.zoom*1.25)).setAttribute('aria-label','放大原图');
- button('适应','zoom-fit',()=>zoom(100));
- const focusButton=button('聚焦图形','focus-region',()=>{
+ button('适应','zoom-fit',fitImage);
+  const focusButton=button('聚焦图形','focus-region',()=>{
    const g=o.graph();
    const p=g?.region_polygon;
    const box=Array.isArray(p)&&p.length>=3
@@ -79,7 +88,7 @@ function mount(host,o){
       return;
    }
    const dx=box[2]-box[0],dy=box[3]-box[1];
-   zoom(Math.min(400,Math.max(100,Math.round(90/Math.max(dx,dy,.1)))));
+   zoom(Math.min(MAX_ZOOM,Math.max(MIN_ZOOM,Math.round(90/Math.max(dx,dy,.1)))));
    scroll.scrollLeft=stage.scrollWidth*(box[0]+box[2])/2-scroll.clientWidth/2;
    scroll.scrollTop=stage.scrollHeight*(box[1]+box[3])/2-scroll.clientHeight/2;
  });
