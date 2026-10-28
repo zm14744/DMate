@@ -124,8 +124,8 @@ def main():
     # Safari v44 is black in BOTH appearances, identical to the earlier
     # light-mode geometry and raster. There is no black or white tile.
     assert (ICONS / "dmate-safari-black-v44.svg").read_bytes() == (
-        ICONS / "dmate-safari-contrast-light-v43.svg").read_bytes()
-    )
+        ICONS / "dmate-safari-contrast-light-v43.svg"
+    ).read_bytes()
     for size in (32, 64):
         latest = ICONS / f"dmate-safari-black-v44-{size}.png"
         previous_light = ICONS / f"dmate-safari-contrast-light-v43-{size}.png"
