@@ -92,7 +92,6 @@ function mount(host,o){
  const originalButton=button(s.originalVisible?'隐藏原图':'显示原图','original-visibility',()=>{
   s.originalVisible=!s.originalVisible;syncOriginal();
  });
- originalButton.setAttribute('aria-label','切换原图显示');
  const opacityControl=d.createElement('label');opacityControl.className='dge-overlay-opacity-control';
  const opacityTitle=d.createElement('span');opacityTitle.textContent='原图透明度';
  const opacityRange=d.createElement('input');opacityRange.type='range';
@@ -299,7 +298,7 @@ function mount(host,o){
     if(e.style==='dashed')att['stroke-dasharray']='9 6';
     if(e.style==='dotted')att['stroke-dasharray']='2 5';
     const stroke=E(d,'path',att);
-    stroke.style.stroke=ink;
+    stroke.dataset.ink=ink;stroke.style.stroke=ink;
     stroke.style.strokeWidth=(chosen?3.6:2.1)/scale+'px';
     group.append(stroke);
    }
@@ -320,7 +319,7 @@ function mount(host,o){
    const halo=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius+2/scale,class:'dge-overlay-dot-halo'});
    halo.style.fill='none';halo.style.stroke=haloInk;halo.style.strokeWidth=(3/scale)+'px';gNode.append(halo);
    const dot=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius,class:'dge-overlay-dot'});
-   dot.style.fill=ink;dot.style.stroke=haloInk;
+   dot.dataset.ink=ink;dot.style.fill=ink;dot.style.stroke=haloInk;
    dot.style.strokeWidth=(o.nodeSelected?.().has(v.id)?3:2)/scale+'px';gNode.append(dot);
    const t=E(d,'text',{x:p[0]+labelOffset,y:p[1]-labelOffset,class:'dge-overlay-label'});
    t.textContent=v.label||v.display_label||'未命名'+(i+1);t.style.fontSize=labelSize+'px';
