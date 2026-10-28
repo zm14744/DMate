@@ -17,16 +17,16 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from image_evidence import analyze_document, decode_document_image
+
 MAX_SIDE = 1800
 MAX_NODES = 28
 
 
 def _image(raw):
-    with Image.open(io.BytesIO(raw)) as source:
-        source.load()
-        if source.width * source.height > 16_000_000:
-            raise ValueError("pixel_evidence_image_too_large")
-        original = source.convert("RGB")
+    # Preserve EXIF orientation and composite transparent PNG pixels on white.
+    # A bare convert("RGB") made transparent black pixels look like real ink.
+    original = decode_document_image(raw, max_pixels=16_000_000)
     factor = min(1., MAX_SIDE / max(original.size))
     if factor < 1.:
         image = original.resize(
@@ -150,14 +150,46 @@ def _red_markers(rgb):
     return groups
 
 
-def _color_line_topology(rgb):
-    """Trace straight dark strokes between distinct saturated filled nodes.
+def _trusted_stroke_mask(rgb):
+    """Conservative colour-and-shadow-aware evidence, not a reconstructed line.
 
-    Curves, black nodes, and dense unresolved paths are NOT classified as
-    negative edges. The result is a strict measured candidate, not an answer.
+    The old fixed grayscale cutoff treated broad dark paper shadows as lines,
+    discarded bright colored strokes, and promoted faint reverse-side printing.
+    Only strong ink measured from the ORIGINAL pixels may prove a straight
+    connection. Weak/uncertain pixels are retained by image_evidence for
+    review, but must not automatically create topology.
     """
     height, width = rgb.shape[:2]
-    binary = (cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY) < 145).astype(np.uint8)
+    evidence = analyze_document(Image.fromarray(rgb), max_work_side=max(width, height),
+                                max_pixels=MAX_SIDE * MAX_SIDE)
+    quality = evidence.quality
+    strong = (evidence.strong_ink > 0).astype(np.uint8)
+    return strong, {
+        "source": "original_rgb_local_background_and_chroma",
+        "shadows_normalized_for_candidates": bool(quality.get("background_normalized")),
+        "tinted_background": bool(quality.get("tinted_background")),
+        "possible_blur": bool(quality.get("possible_blur")),
+        "low_contrast_only": bool(quality.get("low_contrast_only")),
+        "weak_ink_fraction": quality.get("uncertain_ink_fraction", 0.0),
+        "strong_color_fraction": quality.get("color_ink_fraction", 0.0),
+        "not_automatic_graph_certificate": True,
+    }
+
+
+def _color_line_topology(rgb, *, trusted_ink=None):
+    """Trace conservative colored/dark straight strokes from ORIGINAL pixels.
+
+    Do not bridge through another marked vertex; an unmarked crossing does
+    not join two differently angled strokes. Shadows, paper show-through and
+    weak ink alone cannot certify a new edge. Curves/dashes/weights/arrows
+    remain for model reading and explicit user confirmation.
+    """
+    height, width = rgb.shape[:2]
+    if trusted_ink is None:
+        trusted_ink, _ = _trusted_stroke_mask(rgb)
+    if trusted_ink.shape != (height, width):
+        raise ValueError("pixel_mask_shape_mismatch")
+    binary = (trusted_ink > 0).astype(np.uint8)
     result = []
     for index, group in enumerate(_red_markers(rgb), 1):
         nodes = sorted(group, key=lambda p: (p["y"], p["x"]))
@@ -173,6 +205,15 @@ def _color_line_topology(rgb):
                 length = math.hypot(dx, dy)
                 if length < max(20., 1.8*median_diameter):
                     continue
+                # A single long edge must never jump THROUGH a third marked
+                # vertex. If ink passes through B, A-B and B-C are separate.
+                if any(
+                    .07 < ((node["x"]-a["x"])*dx+(node["y"]-a["y"])*dy)/(length*length) < .93
+                    and abs((node["x"]-a["x"])*dy-(node["y"]-a["y"])*dx)/length
+                        <= node["size"]*.52 + 2
+                    for k, node in enumerate(nodes) if k not in (i, j)
+                ):
+                    continue
                 guard = max(a["size"], b["size"])*.50 + 2
                 fractions = np.linspace(max(.0, min(.47, guard/length)),
                                         min(1., max(.53, 1-guard/length)),
@@ -184,10 +225,16 @@ def _color_line_topology(rgb):
                     px = np.clip(np.rint(sx+offset*perp_x).astype(np.int32), 0, width-1)
                     py = np.clip(np.rint(sy+offset*perp_y).astype(np.int32), 0, height-1)
                     votes.append(binary[py, px])
-                support = float(np.max(votes, axis=0).mean())
+                # Sampling the whole line, rather than one dark crossing,
+                # prevents a short unrelated stroke from becoming a connection.
+                coverage = np.max(votes, axis=0)
+                support = float(coverage.mean())
+                minimum_section = min(float(section.mean())
+                                      for section in np.array_split(coverage, 5))
                 pair = {"from": f"p{i+1}", "to": f"p{j+1}",
-                        "support": round(support, 3)}
-                if support >= .87:
+                        "support": round(support, 3),
+                        "minimum_section_support": round(minimum_section, 3)}
+                if support >= .87 and minimum_section >= .72:
                     edges.append(pair)
                 elif support >= .70:
                     borderline.append(pair)
@@ -358,10 +405,14 @@ def measure_image_pixel_evidence(raw):
     """One CPU-only bounded snapshot; fail open without pretending success."""
     original, rgb = _image(raw)
     grid = _colored_caption_grid(rgb)
+    # One shared candidate mask for all colored-panel lines, measured at the
+    # same coordinates as this bounded RGB snapshot. Never use sharpened ink.
+    ink, safety = _trusted_stroke_mask(rgb)
     return {"source_sha256": hashlib.sha256(raw).hexdigest(),
             "grid": grid,
             "grid_dark_disks": _stable_dark_disks(rgb, grid),
-            "colored_graphs": _color_line_topology(rgb),
+            "pixel_mask_quality": safety,
+            "colored_graphs": _color_line_topology(rgb, trusted_ink=ink),
             "source_size": list(original.size),
             "work_size": [int(rgb.shape[1]), int(rgb.shape[0])],
             "advisory_only": True, "image_accuracy_certified": False}
