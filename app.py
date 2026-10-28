@@ -663,7 +663,8 @@ def _check_rate_limit(ip, route_name):
     """
     limit = (
         RATE_LIMIT_CHAT if route_name == "chat" else
-        45 if route_name == "ocr_cancel" else RATE_LIMIT_OCR
+        45 if route_name == "ocr_cancel" else
+        30 if route_name == "figure_type" else RATE_LIMIT_OCR
     )
 
     # A signed logged-in session gets its own quota. Without this, users
@@ -3050,7 +3051,7 @@ def recognize_manual_figure_type():
     from graph_region import RegionError, crop_region
     from graph_layout_only import recognize_selected_graph_type
     started = time.monotonic()
-    if not _check_rate_limit(_get_client_ip(), "ocr"):
+    if not _check_rate_limit(_get_client_ip(), "figure_type"):
         return jsonify({"error": "图形类型扫描过于频繁，请稍后再试"}), 429
     request_id = _normalize_ocr_request_id(request.form.get("request_id"))
     image = request.files.get("image")
