@@ -234,3 +234,57 @@ def test_focus_after_diy_region_keeps_math_positions_unchanged(canvas_page):
     page.get_by_role("button", name="聚焦图形").click()
     assert int(page.locator(".dge-overlay-zoom").inner_text().rstrip("%")) > 100
     assert page.evaluate("instance.getDocument().graphs[0].vertices.map(v => [v.x,v.y])") == initial
+
+
+def test_empty_auto_detected_panel_has_no_predrawn_strokes(canvas_page):
+    page = canvas_page
+    page.evaluate("""() => {
+        const url = document.querySelector('.dge-overlay-image').src;
+        window.instance.destroy();
+        window.instance = DMateGraphEditor.mount(
+            document.getElementById('editor'), {
+                originalUrl: url,
+                document: { body_text: '手动描绘', graphs: [
+                    {id:'G1',name:'图 G', directed:true, weighted:false,
+                     bbox:[.06,.08,.9,.92], vertices:[],edges:[]}
+                ]},
+                onChange: doc => changed.push(doc),
+                onConfirm: async doc => confirmed.push(doc)
+            });
+    }""")
+    assert page.locator('.dge-overlay-node, .dge-overlay-edge').count() == 0
+    assert page.locator('.dge-overlay-bbox').count() == 1
+    assert page.locator('.dge-detected-type').inner_text() == '有向图 · 无权图'
+    assert page.evaluate('instance.getDocument().graphs[0].vertices.length') == 0
+    assert page.evaluate('instance.getDocument().graphs[0].edges.length') == 0
+
+    # A vertex appears ONLY after the user selects Add and clicks.
+    page.get_by_role('button', name='添加顶点', exact=True).click()
+    rect = page.locator('.dge-overlay-svg').bounding_box()
+    assert rect
+    page.mouse.click(rect['x'] + .33 * rect['width'],
+                     rect['y'] + .37 * rect['height'])
+    assert page.locator('.dge-overlay-node').count() == 1
+    assert page.locator('.dge-overlay-edge').count() == 0
+
+
+def test_pure_text_ocr_does_not_create_a_dummy_graph_canvas(canvas_page):
+    page = canvas_page
+    page.evaluate("""() => {
+        const url = document.querySelector('.dge-overlay-image').src;
+        window.instance.destroy();
+        window.instance = DMateGraphEditor.mount(
+            document.getElementById('editor'), {
+                originalUrl: url,
+                document: {body_text:'这张图片只有文字和公式',graphs:[]},
+                onChange: doc => changed.push(doc),
+                onConfirm: async doc => confirmed.push(doc)
+            });
+    }""")
+    assert page.locator('.dge-overlay').count() == 0
+    assert page.locator('.dge-visual').count() == 0
+    assert page.locator('.dge-text-only-workspace img').is_visible()
+    assert page.get_by_label('题干、全部小问与公式').input_value() == '这张图片只有文字和公式'
+    page.get_by_role('button', name='保存并确认', exact=True).click()
+    page.wait_for_function('confirmed.length===1')
+    assert page.evaluate('confirmed[0].graphs') == []

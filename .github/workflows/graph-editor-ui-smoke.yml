@@ -48,4 +48,6 @@ jobs:
             tests/test_visual_graph_editor.py::test_question_type_survives_graph_edit_and_reaches_save \
             tests/test_visual_graph_editor.py::test_real_browser_mobile_layout_and_two_step_delete \
             tests/test_graph_overlay.py::test_overlay_zoom_out_and_fit_below_100_percent \
-            tests/test_graph_overlay.py::test_overlay_keeps_image_and_zoom_when_selecting_or_renaming
+            tests/test_graph_overlay.py::test_overlay_keeps_image_and_zoom_when_selecting_or_renaming \
+            tests/test_graph_overlay.py::test_empty_auto_detected_panel_has_no_predrawn_strokes \
+            tests/test_graph_overlay.py::test_pure_text_ocr_does_not_create_a_dummy_graph_canvas
