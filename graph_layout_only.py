@@ -211,6 +211,15 @@ SELECTED_TYPE_PROMPT = """图像已经由用户框选为单独一幅图。严格
 """
 
 
+LAYOUT_AUDIT_PROMPT = """请重新独立清点这张完整数学图片的所有实际图形。这一遍只负责检查自动分图是否遗漏、重复或边界不全。
+逐行逐列检查，区分图1/图2/a/b和并列子图；同一幅图中不连通的部分不是两幅图。
+文字、公式、表格、图例和线下的说明文字不算新图。只列每幅独立子图的整图归一化矩形边界[left,top,right,bottom]及原图图名。
+禁止输出顶点、边、箭头、边权、结构、预绘制路径，也不要复制题干。
+仅输出JSON：{"has_graph":true,"graphs":[{"name":"图1","bbox":[0.1,0.2,0.4,0.8]}]}
+没有图时：{"has_graph":false,"graphs":[]}
+"""
+
+
 FOCUSED_TYPE_PROMPT = """下面按顺序提供了1到2张从原图单独裁出的数学图形，每张对应一幅子图。
 请只复核每张图自身的两项属性，不能参考题干文字猜测：
 1. directed：只要边/自环末端确有箭头尖端便是true；确实没有箭头才是false。交叉点、顶点、线尾误差不是箭头。
@@ -312,6 +321,78 @@ def _figure_crop(image, box):
     return image.crop(region)
 
 
+def _overlap_fraction(box_a, box_b):
+    left, top = max(box_a[0], box_b[0]), max(box_a[1], box_b[1])
+    right, bottom = min(box_a[2], box_b[2]), min(box_a[3], box_b[3])
+    intersection = max(0., right - left) * max(0., bottom - top)
+    area_a = (box_a[2] - box_a[0]) * (box_a[3] - box_a[1])
+    area_b = (box_b[2] - box_b[0]) * (box_b[3] - box_b[1])
+    union = max(1e-8, area_a + area_b - intersection)
+    return intersection / union, intersection / max(1e-8, min(area_a, area_b))
+
+
+def _audit_inventory(image, figures, *, provider=None, cancelled=None, deadline=None):
+    """Independent overview inventory protects against first-pass missing panels.
+
+    Keep primary panels on disagreement; add only spatially separate candidate
+    diagrams from the second read. Do not silently delete a potential true
+    panel just because one model response omitted it.
+    """
+    existing = [dict(row) for row in figures]
+    issues = []
+    deadline = deadline or time.monotonic() + INITIAL_SCAN_MAX_SECONDS
+    _check_cancelled(cancelled)
+    if time.monotonic() >= deadline - 12:
+        return existing, ["剩余时间不足，自动分图尚未完成独立核对"], 0
+    try:
+        reader = _provider_or_raise(provider)
+        response = reader(LAYOUT_AUDIT_PROMPT, [_image_url(image)],
+                          _VisionBudget(deadline))
+        _check_cancelled(cancelled)
+        second, _ = _project_figures(response)
+    except LayoutOnlyCancelled:
+        raise
+    except Exception:
+        return existing, ["全图独立分区核对不可用，请对照原图检查是否漏图"], 1
+    matched = set()
+    for candidate in second:
+        box = candidate.get("bbox")
+        if box is None:
+            issues.append("复核发现一幅缺少有效边界的子图，请检查是否漏图")
+            continue
+        closest = None
+        for index, known in enumerate(existing):
+            other = known.get("bbox")
+            if other is None:
+                continue
+            iou, contained = _overlap_fraction(box, other)
+            score = max(iou, contained * .7)
+            if closest is None or score > closest[0]:
+                closest = (score, iou, contained, index)
+        if closest is not None and (
+                closest[1] >= .28 or closest[2] >= .7):
+            matched.add(closest[3])
+            if closest[1] < .58:
+                issues.append(f'{existing[closest[3]]["name"]}的自动框选边界存在分歧，请核对')
+            continue
+        if len(existing) >= MAX_GRAPHS:
+            issues.append("发现额外子图候选，但已达到最大分图数量，请手动检查")
+            continue
+        extra = dict(candidate)
+        extra["id"] = f'G{len(existing) + 1}'
+        extra["directed"] = extra["weighted"] = "unknown"
+        extra["vertices"] = []
+        extra["edges"] = []
+        existing.append(extra)
+        matched.add(len(existing) - 1)
+        issues.append(f'{extra["name"]}由第二次全图清点补充，请对照原图确认')
+    if second and len(matched) < len(figures):
+        issues.append("两次全图清点的分图数量或范围不一致，请核对原图")
+    elif not second and figures:
+        issues.append("独立分图核对未确认首次分图，请对照原图检查")
+    return existing, list(dict.fromkeys(issues)), 1
+
+
 def _verify_figures(image, figures, *, provider=None, cancelled=None, deadline=None):
     """Independent high-resolution crop checks; all paths stay metadata-only.
 
@@ -328,6 +409,11 @@ def _verify_figures(image, figures, *, provider=None, cancelled=None, deadline=N
     calls, certified = 0, 0
     for offset in range(0, len(verified), 2):
         _check_cancelled(cancelled)
+        if time.monotonic() >= deadline - 2:
+            for row in verified[offset:]:
+                row["directed"] = row["weighted"] = "unknown"
+            issues.append("局部类型核对达到服务端安全时限，剩余子图的箭头和边权待核对")
+            break
         images, entries = [], []
         for i in range(offset, min(offset + 2, len(verified))):
             figure = verified[i]
@@ -457,9 +543,12 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                     figures, overview_issues = _vision_layout(
                         model_image, provider=reader, budget=budget,
                         cancelled=cancelled, request_deadline=deadline)
+                    figures, layout_issues, layout_calls = _audit_inventory(
+                        model_image, figures, provider=reader,
+                        cancelled=cancelled, deadline=deadline - 8)
                     verified, review_issues, verification_calls, certified = _verify_figures(
                         model_image, figures, provider=reader,
-                        cancelled=cancelled, deadline=deadline)
+                        cancelled=cancelled, deadline=deadline - 5)
                     # A first-pass "unknown" prompt warning can be resolved
                     # by independent focused checks; do not leave it as a
                     # contradictory notice if the final type is known.
@@ -472,7 +561,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                             for flag, title in (("directed", "方向"), ("weighted", "权值")))
                         if not stale:
                             retained.append(message)
-                    return verified, retained + review_issues, verification_calls, certified
+                    return verified, retained + layout_issues + review_issues, layout_calls + verification_calls, certified
                 finally:
                     model_image.close()
 
@@ -543,7 +632,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                 "no_auto_draw": True,
                 "figure_count": len(figures),
                 "qwen_graph_calls": int(qwen_attempted) + verification_calls,
-                "type_review_calls": verification_calls,
+                "segmentation_and_type_review_calls": verification_calls,
                 "independently_verified_type_fields": certified,
                 "layout_model_calls": 0,
                 "text_worker_metrics": text_result.get("resource_metrics", []),
@@ -603,4 +692,4 @@ def recognize_selected_graph_type(raw, *, provider=None, budget=None,
 __all__ = ["recognize_layout_only", "visual_preflight", "_project_figures",
            "LayoutOnlyCancelled", "VERSION", "SCAN_MAX_SECONDS",
            "MANUAL_SCAN_MAX_SECONDS", "INITIAL_SCAN_MAX_SECONDS",
-           "recognize_selected_graph_type", "_verify_figures"]
+           "recognize_selected_graph_type", "_verify_figures", "_audit_inventory"]
