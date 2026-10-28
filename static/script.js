@@ -14451,7 +14451,10 @@ async function recognizeOcrTask(task) {
             ? (task.state === "failed"
                 ? "分图或文字识别未完成；可以核对原图并手动补充。"
                 : task.draft.graphs.length
-                    ? "已自动分图并判断类型，未预绘制任何顶点或边；请自行描绘。"
+                    ? (task.draft.graphs.some(graph => typeof graph.directed !== "boolean"
+                            || typeof graph.weighted !== "boolean")
+                        ? "已自动分图；部分箭头或边权仍有疑问，请核对原图。没有预绘制顶点或边。"
+                        : "已自动分图并复核每幅图的箭头与边权，没有预绘制顶点或边。")
                     : "已走纯文字 OCR 通道，未启动图论模型；请核对识别文字。")
             : data?.manual_mode === true
                 ? "原图已准备好。直接描绘顶点和边，文字可框选后识别。"
