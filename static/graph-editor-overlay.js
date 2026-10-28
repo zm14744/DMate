@@ -232,7 +232,14 @@ function mount(host,o){
   const handleRadius=Math.max(radius*1.1,(touch?15:8)/scale);
   const labelSize=Math.max(3,Math.min(80,13/scale));
   const labelOffset=Math.max(radius*1.25,11/scale);
-  const defs=E(d,'defs'),mark=E(d,'marker',{id:o.instance+'-arrow',viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto'});mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill:'currentColor'}));defs.append(mark);svg.append(defs);
+  const defs=E(d,'defs');
+  for(const [name,fill,stroke] of [['dark','#111827','#ffffff'],['light','#ffffff','#111827']]){
+   const mark=E(d,'marker',{id:o.instance+'-arrow-'+name,viewBox:'0 0 10 10',
+      refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto',markerUnits:'strokeWidth'});
+   mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill,stroke,'stroke-width':1.1,
+      'stroke-linejoin':'round'}));defs.append(mark);
+  }
+  svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
   if(g.bbox?.length===4)svg.append(E(d,'rect',{x:g.bbox[0]*w,y:g.bbox[1]*h,width:(g.bbox[2]-g.bbox[0])*w,height:(g.bbox[3]-g.bbox[1])*h,class:'dge-overlay-bbox'}));
   const outline=(points,cssClass)=>{
