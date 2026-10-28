@@ -14184,6 +14184,7 @@ function reviewRecognizedQuestion(file, data) {
 // Every original owns its request, draft and confirmation. Arrival order never
 // selects which graph is later sent to the solver.
 const OCR_MAX_CONCURRENT = 4;
+const OCR_SCAN_MAX_MS = 4000;
 const ocrTasks = new Map();
 const ocrSolvingSessions = new Set();
 let ocrTaskTimer = null;
@@ -14328,6 +14329,8 @@ function renderOcrTasks() {
         content.append(slow);
         if (task.error) {
             content.append(element("p", "ocr-task-notice", task.error));
+        } else if (task.result?.manual_mode && task.notice) {
+            content.append(element("p", "ocr-task-notice", task.notice));
         }
         if (task.confirmation) {
             const label = element("label", "ocr-task-request-label", "解题要求（可选）");
@@ -14415,20 +14418,36 @@ async function originalImageDigest(file) {
 }
 
 async function recognizeOcrTask(task) {
+    // The four-second budget starts when the user uploads, not after a
+    // potentially slow session handshake or the response's JSON parsing.
+    const timer = window.setTimeout(() => {
+        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
+        task.controller?.abort();
+        // A timeout is NOT a successful figure classification. Hand back the
+        // untouched original with an empty drawable graph, not guessed edges.
+        const draft = { body_text: "", graphs: [
+            { id: "G1", name: "待框选图形", vertices: [], edges: [] }
+        ] };
+        task.result = { workflow_profile: "layout_only", manual_mode: true,
+            recognition_status: "partial", document: draft };
+        task.draft = cloneOcrDocument(draft);
+        task.initialDocument = cloneOcrDocument(draft);
+        task.state = "ready";
+        task.notice = "4秒内未完成自动扫描。已停止等待，请对照原图框选，方向和权值保持待核对。";
+        task.finishedAt = performance.now();
+        renderOcrTasks();
+    }, Math.max(0, OCR_SCAN_MAX_MS - (performance.now() - task.startedAt)));
     try {
-        // A shared owner cookie isolates cancellation and confirmation across
-        // browsers, including four first uploads dispatched simultaneously.
         await ensureGraphSession();
-        if (task.state === "cancelled" || !ocrTasks.has(task.id)) return;
+        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
         const formData = new FormData();
         formData.append("image", task.file);
         formData.append("request_id", task.id);
-        // Automatic per-figure recognition; manual_graph returned an empty G1
-        // and never ran the vision recognizer.
         formData.append("workflow", "auto_graph");
-        const response = await fetch("/ocr", { method: "POST", body: formData, signal: task.controller.signal });
+        const response = await fetch("/ocr", { method: "POST", body: formData,
+            signal: task.controller.signal });
         const data = await parseResponseJson(response);
-        if (task.state === "cancelled" || !ocrTasks.has(task.id)) return;
+        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
         if (data?.cancelled) {
             discardOcrTask(task);
             return;
@@ -14457,18 +14476,18 @@ async function recognizeOcrTask(task) {
                     ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
                     : "请对照原图检查节点、连边和题干，确认后再解题。");
     } catch (error) {
-        if (task.state === "cancelled" || error?.name === "AbortError") {
-            task.state = "cancelled";
+        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
+        if (error?.name === "AbortError") {
+            discardOcrTask(task);
         } else {
             task.state = "failed";
             task.error = error?.message || "图片识别请求失败，请检查网络。其他图片会继续处理。";
         }
     } finally {
+        window.clearTimeout(timer);
         task.controller = null;
-        renderOcrTasks();
+        if (ocrTasks.has(task.id)) renderOcrTasks();
         if (task.finishedAt === null) {
-            // Include the result's interactive DOM and a browser paint, not
-            // only the HTTP response, in each original's displayed duration.
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             task.finishedAt = performance.now();
             updateOcrTaskTimes();
@@ -14681,6 +14700,34 @@ async function editOcrTask(id) {
             originalUrl: task.originalUrl,
             isQuestion: task.isQuestion !== false,
             onQuestionChange: flag => { task.isQuestion = flag; },
+            onRecognizeGraphType: async polygon => {
+                const controller = new AbortController();
+                const timeout = window.setTimeout(() => controller.abort(), OCR_SCAN_MAX_MS);
+                try {
+                    if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || ""))
+                        task.sourceSha256 = await originalImageDigest(task.file);
+                    const selected = new FormData();
+                    selected.append("image", task.file);
+                    selected.append("request_id", task.id);
+                    selected.append("polygon", JSON.stringify(polygon));
+                    const response = await fetch("/graph/figure-type", {
+                        method: "POST", credentials: "same-origin", body: selected,
+                        signal: controller.signal
+                    });
+                    const result = await parseResponseJson(response);
+                    if (!response.ok || result?.error)
+                        throw new Error(result?.error || "图类型识别失败，可自行核对");
+                    if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id)
+                        throw new Error("识别结果与所选原图不匹配");
+                    return result;
+                } catch (error) {
+                    if (controller.signal.aborted)
+                        throw new Error("图类型扫描已达到4秒上限，请对照原图核对箭头和权值");
+                    throw error;
+                } finally {
+                    window.clearTimeout(timeout);
+                }
+            },
             onRecognizeText: async polygon => {
                 const selected = new FormData();
                 selected.append("image", task.file);
