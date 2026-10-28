@@ -9,6 +9,8 @@ on:
       - 'static/graph-editor.css'
       - 'tests/test_visual_graph_editor.py'
       - 'tests/test_graph_overlay.py'
+      - 'tests/test_graph_canvas_workspace.py'
+      - 'tests/test_graph_text_workspace.py'
       - 'static/script.js'
       - 'templates/index.html'
       - 'tests/test_ocr_upload_layout.py'
@@ -57,4 +59,6 @@ jobs:
             tests/test_graph_overlay.py::test_points_and_edges_choose_high_contrast_ink_from_local_pixels \
             tests/test_graph_overlay.py::test_empty_auto_detected_panel_has_no_predrawn_strokes \
             tests/test_graph_overlay.py::test_pure_text_ocr_does_not_create_a_dummy_graph_canvas \
+            tests/test_graph_canvas_workspace.py \
+            tests/test_graph_text_workspace.py \
             tests/test_ocr_upload_layout.py

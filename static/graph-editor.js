@@ -23,7 +23,11 @@
         let individually = false, saving = false, destroyed = false, notice = '', pendingDelete = '';
         // "Is this a question?" is a per-upload choice, separate from graph data.
         let isQuestion = options.isQuestion !== false;
-        let unsubscribe, overlay = null;
+        let unsubscribe, overlay = null, textOverlay = null, activeTab = 'image', textBusy = false, textSequence = 0;
+        const textState = options.textState || { mode: 'text_rect', zoom: 100, visible: true };
+        let requirements = String(options.requirements || '');
+        const hasDirection = graph => graph.directed === true || graph.directed !== false &&
+            (!graph.edges.length || graph.edges.some(edge => edge.direction !== 'undirected'));
         const overlayState = { mode: 'select', zoom: 100, visible: true, start: null };
         const removeGraph=id=>{model.deleteGraph(id);selectedNodes.clear();selectedEdge=null;selectedGraph=false;
             overlayState.start=null;overlayState.polygonDraft=[];overlayState.textRegion=null;};
@@ -110,6 +114,8 @@
             const visual = container.querySelector('.dge-visual');
             if (visual && graph) { visual.querySelector('svg')?.remove(); visual.append(drawGraph(graph)); }
             overlay?.refresh();
+            const body = container.querySelector('.dge-text-body');
+            if (body && dom.activeElement !== body) body.value = document.body_text;
             const oldReview = container.querySelector('.dge-review-summary');
             if (oldReview && graph) {
                 const refreshed = buildReview(graph, document);
@@ -219,11 +225,11 @@
                 aside.append(element('h3', '', '边的属性'));
                 const index = graph.edges.indexOf(edge) + 1, ids = [edge.id];
                 const endpoints = nodeOptions(graph);
-                aside.append(field('起点', select(endpoints, edge.from, '当前边起点',
+                aside.append(field(hasDirection(graph)?'起点':'端点一', select(endpoints, edge.from, hasDirection(graph)?'当前边起点':'当前边端点一',
                     value => model.updateEdges(graph.id, ids, 'from', value))));
-                aside.append(field('终点', select(endpoints, edge.to, '当前边终点',
+                aside.append(field(hasDirection(graph)?'终点':'端点二', select(endpoints, edge.to, hasDirection(graph)?'当前边终点':'当前边端点二',
                     value => model.updateEdges(graph.id, ids, 'to', value))));
-                if(graph.directed!==false){aside.append(field('方向', select([['undirected','无向 —'], ['forward','有向 →'],
+                if(hasDirection(graph)){aside.append(field('方向', select([['undirected','无向 —'], ['forward','有向 →'],
                     ['unknown','待核对 ?']], edge.direction, '当前边方向',
                     value => model.updateEdges(graph.id, ids, 'direction', value))));
                 aside.append(button('反转方向', () => model.reverseEdges(graph.id, ids)));}
@@ -285,6 +291,60 @@
             return row;
         }
 
+        function buildTextWorkspace() {
+            const pane = element('section', 'dge-text-workspace');
+            pane.setAttribute('role', 'tabpanel'); pane.id = instance + '-text-panel';
+            pane.setAttribute('aria-labelledby', instance + '-text-tab');
+            const host = element('section', 'dge-overlay-host dge-text-overlay-host');
+            pane.append(host);
+            const controls = element('div', 'dge-text-actions');
+            const status = element('span', 'dge-text-status'); status.setAttribute('role', 'status');
+            const recognize = element('button', '', '识别框内文字'); recognize.type = 'button';
+            recognize.disabled = !textState.textRegion;
+            textOverlay = root.DMateGraphOverlay.mount(host, {
+                instance: instance + '-text', originalUrl: options.originalUrl,
+                state: textState, textOnly: true, model, graph: () => null,
+                disabled: () => saving || destroyed,
+                selectionChanged: points => {
+                    textSequence++; recognize.disabled = !points || textBusy;
+                    status.textContent = points ? '已框选文字范围，点击识别。' : '请先框选需要识别的文字。';
+                }
+            });
+            const body = element('textarea', 'dge-text-body'); body.rows = 5; body.maxLength = 23000;
+            body.setAttribute('aria-label', '文字识别结果'); body.value = model.getDocument().body_text;
+            body.placeholder = '先在原图中框选文字并识别，也可在这里手动输入或修改。';
+            body.addEventListener('input', () => edit(() => model.setBody(body.value)));
+            recognize.addEventListener('click', async () => {
+                if (textBusy || saving || destroyed || !textState.textRegion) return;
+                if (typeof options.onRecognizeText !== 'function') {
+                    status.textContent = '文字识别暂不可用，可手动输入。'; return;
+                }
+                const sequence = ++textSequence;
+                const polygon = textState.textRegion.map(p => [...p]);
+                const previousBody = model.getDocument().body_text;
+                textBusy = true; recognize.disabled = true; status.textContent = '正在识别框内文字…';
+                try {
+                    const result = await options.onRecognizeText(polygon);
+                    if (destroyed) return;
+                    if (sequence !== textSequence) { status.textContent = '选区已更改，未应用旧选区的识别结果。'; return; }
+                    const value = typeof result === 'string' ? result : result?.text;
+                    if (!value?.trim()) { status.textContent = result?.warning || '框内未识别到文字，可调整范围或手动输入。'; return; }
+                    if (model.getDocument().body_text !== previousBody) {
+                        status.textContent = '识别期间文字已手动修改，已保留输入；识别结果：' + value; return;
+                    }
+                    model.setBody(value); body.value = value; refreshDraftViews();
+                    status.textContent = result?.warning || '框内文字识别完成，可继续核对修改。';
+                } catch (error) { if (!destroyed) status.textContent = error?.message || '识别失败，可重试或手动输入。'; }
+                finally { textBusy = false; if (!destroyed) recognize.disabled = !textState.textRegion; }
+            });
+            controls.append(recognize, status); pane.append(controls, field('文字识别结果（可修改）', body));
+            const request = element('textarea', 'dge-text-requirements'); request.rows = 3; request.value = requirements; request.maxLength = 4000;
+            request.setAttribute('aria-label', '手动输入要求（可选）'); request.placeholder = '例如：只解第（2）问，给出推导过程。';
+            request.addEventListener('input', () => { requirements = request.value; options.onRequirementsChange?.(requirements); });
+            pane.append(field('手动输入要求（可选）', request));
+            return pane;
+        }
+
         function render() {
             if (destroyed) return;
             // The editor may live in a scrollable dialog AND a scrollable
@@ -314,6 +374,8 @@
             // Pure-text images have no mathematical drawing area to prefill.
             const retainedOverlay = useOverlay
                 ? container.querySelector('.dge-overlay-host') : null;
+            const retainedText = container.querySelector('.dge-text-workspace');
+            if (retainedText) retainedText.remove();
             if (retainedOverlay) retainedOverlay.remove();
             else if (overlay) { overlay.destroy(); overlay = null; }
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
@@ -325,12 +387,29 @@
             top.append(questionChoice(), undo, redo,
                 button('清空修改', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset())));
             container.append(top);
+            if (useOverlay) {
+                const tabs = element('div', 'dge-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '识别方式');
+                for (const [key, label] of [['image', '图像识别'], ['text', '文字识别']]) {
+                    const tab = button(label, () => { activeTab = key; }); tab.setAttribute('role', 'tab');
+                    tab.id = instance + '-' + key + '-tab'; tab.setAttribute('aria-controls', instance + '-' + key + '-panel');
+                    tab.setAttribute('aria-selected', String(activeTab === key));
+                    tab.tabIndex = activeTab === key ? 0 : -1;
+                    tab.addEventListener('keydown', event => {
+                        if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+                        event.preventDefault(); activeTab = event.key === 'Home' ? 'image' : event.key === 'End' ? 'text' : activeTab === 'image' ? 'text' : 'image';
+                        render(); container.querySelector('[aria-selected="true"]')?.focus();
+                    });
+                    tabs.append(tab);
+                }
+                container.append(tabs);
+            }
             const observations = (Array.isArray(options.issues) ? options.issues : [])
                 .map(issue => typeof issue === 'string' ? issue : text(issue?.message)).filter(Boolean);
             if (observations.length && !useOverlay) { const details = element('details', 'dge-observations'); details.open = true;
                 details.append(element('summary', '', '识别时需留意'));
                 const list = element('ul'); observations.slice(0, 64).forEach(message => list.append(element('li', '', message))); details.append(list); container.append(details); }
             const workspace = element('div', 'dge-workspace');
+            if (useOverlay) { workspace.hidden = activeTab !== 'image'; workspace.id = instance + '-image-panel'; workspace.setAttribute('role', 'tabpanel'); workspace.setAttribute('aria-labelledby', instance + '-image-tab'); }
             if (useOverlay) {
                 const host = retainedOverlay || element('section', 'dge-overlay-host');
                 workspace.append(host);
@@ -428,8 +507,6 @@
             if (graph) {
                 toolbar.append(field('子图名称', input(graph.name, '子图名称', value => model.renameGraph(graph.id, value))));
                 toolbar.append(button('删除子图', () => removeGraph(graph.id), 'dge-danger'));
-                if (document.graphs.length > 1) { const target = select(graphOptions(document, graph.id), '', '合并目标子图', null);
-                    toolbar.append(field('合并子图', target), button('合并到所选图', () => { if (!target.value) throw new Error('请先选择合并目标。'); const targetId = target.value; model.mergeGraph(graph.id, targetId); currentGraph = targetId; })); }
             }
             container.insertBefore(toolbar, workspace);
             if (graph) {
@@ -456,9 +533,9 @@
                     const edge = group[0], ids = group.map(row => row.id), row = element('div', 'dge-edge-row' + (ids.includes(selectedEdge) ? ' is-selected' : ''));
                     row.dataset.edgeId = edge.id;
                     row.append(button('边 ' + (index + 1), () => { selectedEdge = edge.id; }, 'dge-edge-select'));
-                    row.append(field('起点', select(nodeOptions(graph), edge.from, '边 ' + (index + 1) + ' 起点', value => model.updateEdges(graph.id, ids, 'from', value))),
-                        ...(graph.directed===false?[]:[field('方向', select([['undirected', '无向 —'], ['forward', '有向 →'], ['unknown', '待确认 ?']], edge.direction, '边 ' + (index + 1) + ' 方向', value => model.updateEdges(graph.id, ids, 'direction', value)))]),
-                        field('终点', select(nodeOptions(graph), edge.to, '边 ' + (index + 1) + ' 终点', value => model.updateEdges(graph.id, ids, 'to', value))),
+                    row.append(field(hasDirection(graph)?'起点':'端点一', select(nodeOptions(graph), edge.from, '边 ' + (index + 1) + (hasDirection(graph)?' 起点':' 端点一'), value => model.updateEdges(graph.id, ids, 'from', value))),
+                        ...(!hasDirection(graph)?[]:[field('方向', select([['undirected', '无向 —'], ['forward', '有向 →'], ['unknown', '待确认 ?']], edge.direction, '边 ' + (index + 1) + ' 方向', value => model.updateEdges(graph.id, ids, 'direction', value)))]),
+                        field(hasDirection(graph)?'终点':'端点二', select(nodeOptions(graph), edge.to, '边 ' + (index + 1) + (hasDirection(graph)?' 终点':' 端点二'), value => model.updateEdges(graph.id, ids, 'to', value))),
                         ...(graph.weighted===false?[]:[field('权重', input(edge.weight, '边 ' + (index + 1) + ' 权重', value => model.updateEdges(graph.id, ids, 'weight', weightValue(value))))]));
                     if (!individually) { const count = input(group.length, '边 ' + (index + 1) + ' 相同边数量', value => {
                             const beforeIds = new Set(model.getDocument().graphs.find(row => row.id === graph.id).edges.map(row => row.id));
@@ -467,7 +544,7 @@
                             ids.splice(0, ids.length, ...latest.filter(row => ids.includes(row.id) || !beforeIds.has(row.id)).map(row => row.id));
                         }, 'number'); count.min = '1'; count.max = '50'; count.required = true;
                         const quantity = field('相同边数量', count); quantity.append(button('应用数量', () => model.setEdgeCount(graph.id, ids, Number(count.value)))); row.append(quantity); }
-                    if(graph.directed!==false)row.append(button('交换端点 / 反向', () => model.reverseEdges(graph.id, ids)));
+                    if(hasDirection(graph))row.append(button('交换端点 / 反向', () => model.reverseEdges(graph.id, ids)));
                     const attributes = element('details', 'dge-edge-attributes'); attributes.append(element('summary', '', '边名、线型与颜色'));
                     attributes.append(field('边名', input(edge.edge_label, '边 ' + (index + 1) + ' 边名', value => model.updateEdges(graph.id, ids, 'edge_label', value || null))),
                         field('线型', select([['', '未标特殊线型'], ['solid', '实线'], ['dashed', '虚线'], ['dotted', '点线'], ['unknown', '尚不确定']], edge.style ?? '', '边 ' + (index + 1) + ' 线型', value => model.updateEdges(graph.id, ids, 'style', value || null))),
@@ -482,8 +559,9 @@
                     const target = select(graphOptions(document, graph.id), '', '边移动目标', null);
                     target.addEventListener('change', () => {
                         endpointFields.replaceChildren(); const destination = document.graphs.find(row => row.id === target.value); if (!destination) return;
-                        targetFrom = select(nodeOptions(destination), '', '移动后起点', null); targetTo = select(nodeOptions(destination), '', '移动后终点', null);
-                        endpointFields.append(field('目标图起点', targetFrom), field('目标图终点', targetTo));
+                        const first = hasDirection(destination)?'起点':'端点一', second = hasDirection(destination)?'终点':'端点二';
+                        targetFrom = select(nodeOptions(destination), '', '移动后' + first, null); targetTo = select(nodeOptions(destination), '', '移动后' + second, null);
+                        endpointFields.append(field('目标图' + first, targetFrom), field('目标图' + second, targetTo));
                     });
                     move.append(target, endpointFields, button('移动这条边', () => model.moveEdges(graph.id, target.value, [selectedEdge], targetFrom?.value, targetTo?.value))); edges.append(move);
                 }
@@ -511,12 +589,20 @@
                 if(review){review.open=true;floating(review,'识别结果','results','dge-float-results');}
                 const advanced=container.querySelector('.dge-advanced-panel');
                 if(advanced)floating(advanced,'批量编辑','advanced','dge-float-advanced');
+                const textPane = retainedText || (activeTab === 'text' ? buildTextWorkspace() : null);
+                if (textPane) {
+                    textPane.hidden = activeTab !== 'text'; container.append(textPane);
+                    const body = textPane.querySelector('.dge-text-body');
+                    body.value = document.body_text; body.disabled = saving;
+                    textPane.querySelector('.dge-text-requirements').disabled = saving;
+                }
             }
             const status = element('div', 'dge-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.textContent = notice; container.append(status);
             const confirmRow = element('div', 'dge-footer');
             // The dialog header contains the close button; footer is save only.
             const actions = element('div', 'dge-actions');
             const confirm = button(saving ? '正在保存…' : '保存并确认', async () => {
+                if (textBusy) { notice = '文字正在识别，请等待完成后保存。'; refreshDraftViews(); return; }
                 if ([...container.querySelectorAll('input[type=number]')].some(control => !control.checkValidity())) {
                     notice = '请填写有效的相同边数量（1 到 50）。'; refreshDraftViews(); return;
                 }
@@ -538,7 +624,7 @@
         render();
         return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
             validate: model.validate, model,
-            destroy() { destroyed = true; unsubscribe(); overlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
+            destroy() { destroyed = true; textSequence++; unsubscribe(); overlay?.destroy(); textOverlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };
     root.DMateGraphEditor = api;

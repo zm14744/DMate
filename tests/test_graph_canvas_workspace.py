@@ -14,7 +14,7 @@ def open_tools(page):
 def test_undirected_unweighted_graph_hides_irrelevant_edge_controls(canvas_page):
     page=canvas_page;close_tools(page)
     page.locator('[data-edge-id="e1"] .dge-overlay-hit').click()
-    assert page.get_by_label('当前边起点').is_visible()
+    assert page.get_by_label('当前边端点一').is_visible()
     assert page.get_by_label('当前边方向').count()==0
     assert page.get_by_label('当前边权值').count()==0
     assert page.get_by_role('button',name='反转方向',exact=True).count()==0
@@ -40,7 +40,7 @@ def test_delete_final_graph_once_keeps_canvas_and_clears_all_frames(canvas_page)
     assert page.locator('.dge-overlay-viewport').is_visible()
     page.get_by_role('button',name='框选图形',exact=True).click();close_tools(page)
     box=page.locator('.dge-overlay-viewport').bounding_box()
-    page.mouse.move(box['x']+100,box['y']+220);page.mouse.down()
+    page.mouse.move(box['x']+170,box['y']+220);page.mouse.down()
     page.mouse.move(box['x']+260,box['y']+350,steps=5);page.mouse.up()
     assert page.evaluate('instance.getDocument().graphs.length')==1
     assert page.locator('.dge-frame-hit').count()==1
@@ -64,7 +64,7 @@ def test_selection_moves_nodes_edges_and_pans_blank_canvas(canvas_page):
     page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+25,y+12,steps=5);page.mouse.up()
     after=page.evaluate('instance.getDocument().graphs[0].vertices.map(v=>[v.x,v.y])')
     assert all(a[0]>b[0] and a[1]>b[1] for a,b in zip(after,before))
-    assert page.get_by_label('当前边起点').is_visible()
+    assert page.get_by_label('当前边端点一').is_visible()
     page.get_by_role('button',name='关闭属性',exact=True).click()
     box=page.locator('.dge-overlay-viewport').bounding_box()
     photo=page.locator('.dge-overlay-image').bounding_box()

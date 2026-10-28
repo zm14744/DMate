@@ -216,3 +216,33 @@
 .dge-frame-hit{fill:transparent;pointer-events:all;cursor:grab}
 .dge-frame-hit.is-current{stroke-width:3}
 @media(max-width:760px){.dge-overlay-viewport{height:72dvh;min-height:320px}.dge-tool-palette{max-width:calc(100% - 24px)}.dge-tool-palette>.dge-overlay-tools{max-height:24dvh}}
+
+/* The tool rail contains drawing modes only; view controls are always outside. */
+.dmate-graph-editor [hidden]{display:none!important}
+.dge-tabs{display:flex;gap:6px;margin:0 0 10px;border-bottom:1px solid var(--dge-border)}
+.dge-tabs [role=tab]{border:0;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;background:transparent}
+.dge-tabs [aria-selected=true]{border-bottom-color:var(--accent,#2563eb);background:var(--accent-bg,#eff6ff)}
+.dge-view-controls{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--dge-border);background:var(--dge-surface)}
+.dge-view-controls button{font-size:13px;min-height:34px;padding:6px 10px}
+.dge-view-controls .dge-overlay-opacity-control{margin-left:auto}
+.dge-tool-palette{top:76px;left:10px;width:116px;max-width:116px;border-radius:10px}
+.dge-tool-palette>h3{font-size:12px;margin:0;padding:9px 10px;color:var(--text-subtle,#64748b)}
+.dge-tool-palette>.dge-overlay-tools{display:flex;flex-direction:column;align-items:stretch;max-height:48dvh;padding:0 7px 8px;gap:6px}
+.dge-tool-palette .dge-overlay-tools button,.dge-tool-palette .dge-overlay-tools select{width:100%;max-width:100%;white-space:normal;font-size:12px;padding:7px 4px}
+.dge-tool-palette .dge-overlay-status{overflow-wrap:anywhere;font-size:11px}
+.dge-floating-actions{top:76px}
+.dge-text-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}
+.dge-text-status{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.dge-text-workspace>.dge-field{margin:12px 0}
+.dge-text-body,.dge-text-requirements{min-height:90px}
+@media(max-width:760px){
+ .dge-view-controls{gap:4px;padding:6px}
+ .dge-view-controls button{font-size:12px;padding:5px 7px}
+ .dge-view-controls .dge-overlay-opacity-control{margin-left:0}
+ .dge-tool-palette{top:112px;width:92px;max-width:92px;left:6px}
+ .dge-tool-palette>.dge-overlay-tools{max-height:45dvh}
+ .dge-floating-actions{top:112px;right:6px;gap:4px}
+ .dge-float-panel>summary{font-size:12px;padding:8px}
+}
+.dge-floating-actions{top:calc(var(--dge-viewbar-height,64px) + 12px)}
+.dge-overlay-status:empty{display:none}

@@ -14726,6 +14726,32 @@ async function editOcrTask(id) {
             originalUrl: task.originalUrl,
             isQuestion: task.isQuestion !== false,
             onQuestionChange: flag => { task.isQuestion = flag; },
+            requirements: task.userRequest || '',
+            onRequirementsChange: value => { task.userRequest = value; },
+            textState: task.textEditorState ||= { mode: 'text_rect', zoom: 100, visible: true },
+            onRecognizeText: async polygon => {
+                const controller = new AbortController();
+                const timeout = window.setTimeout(() => controller.abort(), 25000);
+                try {
+                    if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || ''))
+                        task.sourceSha256 = await originalImageDigest(task.file);
+                    const selected = new FormData();
+                    selected.append('image', task.file);
+                    selected.append('request_id', task.id);
+                    selected.append('polygon', JSON.stringify(polygon));
+                    const response = await fetch('/graph/text-region', {
+                        method: 'POST', credentials: 'same-origin', body: selected, signal: controller.signal
+                    });
+                    const result = await parseResponseJson(response);
+                    if (!response.ok || result?.error) throw new Error(result?.error || '框内文字识别失败');
+                    if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id)
+                        throw new Error('文字识别结果与所选原图不匹配');
+                    return result;
+                } catch (error) {
+                    if (controller.signal.aborted) throw new Error('框内文字识别超时，可重试或手动输入');
+                    throw error;
+                } finally { window.clearTimeout(timeout); }
+            },
             onRecognizeGraphType: async polygon => {
                 const reused = reuseVerifiedTypeForSameRegion(task, polygon);
                 if (reused) return reused;

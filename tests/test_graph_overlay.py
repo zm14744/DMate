@@ -45,13 +45,15 @@ def canvas_page():
                      "graph-editor-overlay.js", "graph-editor.js"):
             page.add_script_tag(content=(ROOT / "static" / name).read_text())
         page.evaluate("""args => {
-            window.confirmed = []; window.changed = []; window.textAreas = [];
+            window.confirmed = []; window.changed = []; window.textAreas = []; window.requirementsChanges = [];
             window.instance = DMateGraphEditor.mount(document.getElementById('editor'), {
                 originalUrl: args.url, document: args.sample,
                 onChange: document => changed.push(document),
                 onConfirm: async document => confirmed.push(document),
+                onRequirementsChange: value => requirementsChanges.push(value),
                 onRecognizeText: async polygon => {
                     textAreas.push(polygon);
+                    if (window.deferText) return new Promise(resolve => window.resolveText = resolve);
                     return '框选文字';
                 }
             });
@@ -114,7 +116,7 @@ def test_drag_geometry_and_bounds_can_be_saved_and_restored(canvas_page):
     tool(page,'框选图形')
     bounds = page.locator(".dge-overlay-svg").bounding_box()
     x, y = bounds["x"], bounds["y"]
-    page.mouse.move(x + bounds["width"]*.12, y + bounds["height"]*.15)
+    page.mouse.move(x + bounds["width"]*.2, y + bounds["height"]*.15)
     page.mouse.down()
     page.mouse.move(x + bounds["width"]*.93, y + bounds["height"]*.93, steps=6)
     page.mouse.up()
@@ -196,7 +198,7 @@ def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
     page.get_by_label("选区方式").select_option("graph_poly")
     bounds = page.locator(".dge-overlay-image").bounding_box()
     assert bounds
-    for x, y in ((.08, .12), (.86, .1), (.93, .91), (.08, .89)):
+    for x, y in ((.18, .12), (.86, .1), (.93, .91), (.18, .89)):
         page.mouse.click(bounds["x"] + bounds["width"]*x,
                          bounds["y"] + bounds["height"]*y)
     page.locator(".dge-tool-palette").evaluate("e=>e.open=true")
@@ -204,7 +206,7 @@ def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
     tool(page,'完成轮廓')
     polygon = page.evaluate("instance.getDocument().graphs.at(-1).region_polygon")
     assert len(polygon) == 4
-    assert polygon[0] == pytest.approx([.08, .12], abs=.005)
+    assert polygon[0] == pytest.approx([.18, .12], abs=.005)
     assert page.locator(".dge-overlay-polygon").count() == 1
     assert page.evaluate("instance.getDocument().graphs.length")==2
     assert page.get_by_label('选区方式').input_value()=='graph_poly'
@@ -220,7 +222,7 @@ def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
 
 
 
-def test_focus_after_diy_region_keeps_math_positions_unchanged(canvas_page):
+def test_fit_after_diy_region_keeps_math_positions_unchanged(canvas_page):
     page = canvas_page
     initial = page.evaluate("instance.getDocument().graphs[0].vertices.map(v => [v.x,v.y])")
     page.locator(".dge-tool-palette").evaluate("e=>e.open=true")
@@ -231,8 +233,9 @@ def test_focus_after_diy_region_keeps_math_positions_unchanged(canvas_page):
         page.mouse.click(rect["x"] + rect["width"]*x,
                          rect["y"] + rect["height"]*y)
     tool(page,'完成轮廓')
-    tool(page,'聚焦图形')
-    assert float(page.locator(".dge-overlay-zoom").text_content().rstrip("%")) > 100
+    assert page.get_by_role('button',name='聚焦图形',exact=True).count()==0
+    page.get_by_role('button',name='适应',exact=True).click()
+    assert float(page.locator(".dge-overlay-zoom").text_content().rstrip("%")) <= 100
     assert page.evaluate("instance.getDocument().graphs[0].vertices.map(v => [v.x,v.y])") == initial
 
 
@@ -457,10 +460,10 @@ def test_fixed_viewport_and_drawing_beyond_source_image(canvas_page):
     assert abs(before['width'] - after['width']) < 1
     tool(page,'选择 / 移动')
     box = viewport.bounding_box()
-    x, y = box['x'] + 100, box['y'] + 100
+    x, y = box['x'] + 180, box['y'] + 100
     page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+300,y+100,steps=5);page.mouse.up()
     tool(page,'添加顶点')
-    page.mouse.click(box['x']+120,box['y']+80)
+    page.mouse.click(box['x']+170,box['y']+80)
     node = page.evaluate('instance.getDocument().graphs[0].vertices.at(-1)')
     assert node['x'] < 0 or node['y'] < 0
     tool(page,'隐藏原图')
@@ -535,7 +538,7 @@ def test_consecutive_frames_add_graphs_without_camera_jump_even_after_type_reply
     before=camera()
     for n in range(2):
         box=page.locator('.dge-overlay-viewport').bounding_box()
-        x=box['x']+120+140*n;y=box['y']+110
+        x=box['x']+180+140*n;y=box['y']+110
         page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+95,y+100,steps=5);page.mouse.up()
         page.wait_for_function('(n)=>instance.getDocument().graphs.length===n',arg=n+2)
         assert page.locator('[data-overlay-tool="bounds"]').get_attribute('aria-pressed')=='true'
