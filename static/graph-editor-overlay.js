@@ -287,7 +287,7 @@ function mount(host,o){
           segment='M '+from.join(' ')+' L '+to.join(' '),
           midpoint=[(from[0]+to[0])/(2*w),(from[1]+to[1])/(2*h)],
           ink=inkAt(midpoint),halo=E(d,'path',{d:segment,class:'dge-overlay-contrast-halo'});
-    halo.style.stroke=oppositeInk(ink);
+    halo.dataset.ink=oppositeInk(ink);halo.style.stroke=oppositeInk(ink);
     halo.style.strokeWidth=(chosen?6.2:4.8)/scale+'px';
     if(e.style==='dashed')halo.setAttribute('stroke-dasharray','9 6');
     if(e.style==='dotted')halo.setAttribute('stroke-dasharray','2 5');
