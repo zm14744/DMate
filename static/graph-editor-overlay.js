@@ -11,6 +11,26 @@ function mount(host,o){
  let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false,scanSequence=0;
  let sampleCanvas=d.createElement('canvas'),sampleCtx=null;
  const pointers=new Map();
+ const world={left:0,top:0,right:1,bottom:1};
+ const finite=x=>typeof x==='number'&&Number.isFinite(x);
+ const layoutWorld=()=>{
+  const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;
+  stage.style.width=(world.right-world.left)*scale+'px';
+  stage.style.height=(world.bottom-world.top)*scale*h/w+'px';
+  image.style.position='absolute';image.style.width=scale+'px';
+  image.style.left=-world.left*scale+'px';image.style.top=-world.top*scale*h/w+'px';
+  svg.setAttribute('viewBox',[world.left*w,world.top*h,(world.right-world.left)*w,(world.bottom-world.top)*h].join(' '));
+ };
+ const expandWorld=(x,y)=>{
+  const oldLeft=world.left,oldTop=world.top;
+  if(x<world.left)world.left=Math.floor(x)-1;if(x>world.right)world.right=Math.ceil(x)+1;
+  if(y<world.top)world.top=Math.floor(y)-1;if(y>world.bottom)world.bottom=Math.ceil(y)+1;
+  layoutWorld();
+  const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;
+  scroll.scrollLeft+=(oldLeft-world.left)*scale;scroll.scrollTop+=(oldTop-world.top)*scale*h/w;
+ };
+ const regionPoint=p=>p.map(clamp);
+ const previewRegion=points=>o.previewRegion?.(points);
  const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),status=d.createElement('span');
  root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
  stage.append(image,svg);scroll.append(stage);root.append(bar,scroll);host.append(root);
@@ -65,7 +85,7 @@ function mount(host,o){
    const previous=s.zoom||100;
    const cx=scroll.scrollLeft+scroll.clientWidth/2,cy=scroll.scrollTop+scroll.clientHeight/2;
    s.zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Math.round(x)));
-   stage.style.width=s.zoom+'%';value.textContent=s.zoom+'%';
+   layoutWorld();value.textContent=s.zoom+'%';
    const ratio=s.zoom/previous;
    scroll.scrollLeft=cx*ratio-scroll.clientWidth/2;
    scroll.scrollTop=cy*ratio-scroll.clientHeight/2;
@@ -77,6 +97,7 @@ function mount(host,o){
    const viewportHeight=Math.min(700,(win?.innerHeight||800)*(win?.innerWidth<=760 ? 0.55 : 0.63));
    const originalHeightAt100=viewportWidth*h/Math.max(1,w);
    zoom(Math.min(100,Math.floor(viewportHeight/Math.max(1,originalHeightAt100)*100)));
+   const scale=viewportWidth*s.zoom/100;scroll.scrollLeft=-world.left*scale;scroll.scrollTop=-world.top*scale*h/w;
  };
  button('－','zoom-out',()=>zoom(s.zoom/1.25)).setAttribute('aria-label','缩小原图');
  const value=d.createElement('span');value.className='dge-overlay-zoom';bar.append(value);
@@ -90,7 +111,7 @@ function mount(host,o){
   originalButton.textContent=s.originalVisible?'隐藏原图':'显示原图';
  };
  const originalButton=button(s.originalVisible?'隐藏原图':'显示原图','original-visibility',()=>{
-  s.originalVisible=!s.originalVisible;syncOriginal();
+  s.originalVisible=!s.originalVisible;syncOriginal();draw();
  });
  const opacityControl=d.createElement('label');opacityControl.className='dge-overlay-opacity-control';
  const opacityTitle=d.createElement('span');opacityTitle.textContent='原图透明度';
@@ -103,7 +124,7 @@ function mount(host,o){
  opacityRange.addEventListener('input',()=>{
   s.originalOpacity=Math.max(0,Math.min(1,Number(opacityRange.value)/100));
   opacityValue.textContent=opacityRange.value+'%';
-  image.style.opacity=String(s.originalOpacity);
+  image.style.opacity=String(s.originalOpacity);draw();
  });
  opacityControl.append(opacityTitle,opacityRange,opacityValue);bar.append(opacityControl);
  syncOriginal();
@@ -120,8 +141,9 @@ function mount(host,o){
    }
    const dx=box[2]-box[0],dy=box[3]-box[1];
    zoom(Math.min(MAX_ZOOM,Math.max(MIN_ZOOM,Math.round(90/Math.max(dx,dy,.1)))));
-   scroll.scrollLeft=stage.scrollWidth*(box[0]+box[2])/2-scroll.clientWidth/2;
-   scroll.scrollTop=stage.scrollHeight*(box[1]+box[3])/2-scroll.clientHeight/2;
+   const scale=Math.max(1,scroll.clientWidth)*s.zoom/100;
+   scroll.scrollLeft=scale*((box[0]+box[2])/2-world.left)-scroll.clientWidth/2;
+   scroll.scrollTop=scale*h/w*((box[1]+box[3])/2-world.top)-scroll.clientHeight/2;
  });
  bar.append(status); // Actionable feedback appears with the tools, never below the photo.
  const change=(fn,kind)=>{try{fn();o.changed?.(kind);draw();}catch(e){status.textContent=e?.message||'修改失败';}};
@@ -154,12 +176,13 @@ function mount(host,o){
   }catch(_){sampleCtx=null;}
  };
  const pixelLuminance=pixel=>{
-  const alpha=pixel[3]/255;
+  const alpha=pixel[3]/255*s.originalOpacity;
   const channels=[0,1,2].map(i=>(pixel[i]*alpha+255*(1-alpha))/255);
   const linear=v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);
   return .2126*linear(channels[0])+.7152*linear(channels[1])+.0722*linear(channels[2]);
  };
  const localLuminance=point=>{
+  if(!s.originalVisible||!unit(point?.[0])||!unit(point?.[1]))return 1;
   if(!sampleCtx||!Array.isArray(point)||point.length!==2)return null;
   const x=Math.round(clamp(point[0])*Math.max(0,sampleCanvas.width-1));
   const y=Math.round(clamp(point[1])*Math.max(0,sampleCanvas.height-1));
@@ -203,13 +226,15 @@ function mount(host,o){
  };
  const pos=(v,i,g)=>{
   if(ghost?.vertex===v.id)return ghost.pos;
-  if(unit(v.x)&&unit(v.y))return [v.x,v.y];
+  if(finite(v.x)&&finite(v.y))return [v.x,v.y];
   const b=g.bbox?.length===4?g.bbox:[0,0,1,1],a=i*Math.PI*2/Math.max(1,g.vertices.length)-Math.PI/2;
   return [clamp((b[0]+b[2])/2+(b[2]-b[0])*.34*Math.cos(a)),clamp((b[1]+b[3])/2+(b[3]-b[1])*.34*Math.sin(a))];
  };
- const px=p=>[p[0]*w,p[1]*h],mouse=e=>{const r=svg.getBoundingClientRect();return [clamp((e.clientX-r.left)/Math.max(1,r.width)),clamp((e.clientY-r.top)/Math.max(1,r.height))];};
+ const px=p=>[p[0]*w,p[1]*h],mouse=e=>{const r=svg.getBoundingClientRect();return [world.left+(e.clientX-r.left)/Math.max(1,r.width)*(world.right-world.left),world.top+(e.clientY-r.top)/Math.max(1,r.height)*(world.bottom-world.top)];};
  function draw(){
-  const g=o.graph();visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
+  const g=o.graph();
+  if(g)for(const v of g.vertices)if(finite(v.x)&&finite(v.y))expandWorld(v.x,v.y);
+  visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
   regionMode.value=['graph_poly','text_rect','text_poly'].includes(s.mode)?s.mode:'';
   finishButton.hidden=!['graph_poly','text_poly'].includes(s.mode);
   finishButton.disabled=s.polygonDraft.length<3||Boolean(o.disabled?.());
@@ -222,7 +247,7 @@ function mount(host,o){
   // The mathematical path is in original-image coordinates. Input targets
   // and labels instead use a constant on-screen size, including at 400% zoom.
   const radius=Math.max(5,Math.min(w,h)*.008);
-  const scale=Math.max(.0001,svg.getBoundingClientRect().width/w);
+  const scale=Math.max(.0001,svg.getBoundingClientRect().width/((world.right-world.left)*w));
   const browser = d.defaultView;
   const touch=Boolean(browser?.navigator?.maxTouchPoints
       || browser?.matchMedia?.('(pointer: coarse)')?.matches);
@@ -256,7 +281,7 @@ function mount(host,o){
   const pairs=new Map();for(const e of g.edges){const key=[e.from,e.to].sort().join('/');if(!pairs.has(key))pairs.set(key,[]);pairs.get(key).push(e);}
   for(const edges of pairs.values())for(const [i,e] of edges.entries()){
    if(!coords.has(e.from)||!coords.has(e.to))continue;
-   const a=px(coords.get(e.from)),b=px(coords.get(e.to)),pts=Array.isArray(e.path)&&e.path.length>=2&&e.path.every(p=>Array.isArray(p)&&p.length===2&&p.every(unit))?e.path:null;
+   const a=px(coords.get(e.from)),b=px(coords.get(e.to)),pts=Array.isArray(e.path)&&e.path.length>=2&&e.path.every(p=>Array.isArray(p)&&p.length===2&&p.every(finite))?e.path:null;
    let line,center,drawPoints;
    if(ghost?.edge===e.id){
     center=px(ghost.pos);drawPoints=[a,center,b];
@@ -314,7 +339,7 @@ function mount(host,o){
   for(const [i,v] of g.vertices.entries()){
    const p=px(coords.get(v.id)),normalized=[p[0]/w,p[1]/h],ink=inkAt(normalized),
          haloInk=oppositeInk(ink),
-         gNode=E(d,'g',{'data-vertex-id':v.id,class:'dge-overlay-node'+(!unit(v.x)||!unit(v.y)?' is-estimated':'')+(o.nodeSelected?.().has(v.id)?' is-selected':'')});
+         gNode=E(d,'g',{'data-vertex-id':v.id,class:'dge-overlay-node'+(!finite(v.x)||!finite(v.y)?' is-estimated':'')+(o.nodeSelected?.().has(v.id)?' is-selected':'')});
    gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:hitRadius,class:'dge-overlay-node-hit'}));
    const halo=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius+2/scale,class:'dge-overlay-dot-halo'});
    halo.style.fill='none';halo.style.stroke=haloInk;halo.style.strokeWidth=(3/scale)+'px';gNode.append(halo);
@@ -343,7 +368,7 @@ function mount(host,o){
   const node=e.target.closest('[data-vertex-id]')?.dataset.vertexId,edge=e.target.closest('[data-edge-id]')?.dataset.edgeId,handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
   if(s.mode==='graph_poly'||s.mode==='text_poly'){
     if(s.polygonDraft.length>=64){status.textContent='轮廓最多64个角点';return;}
-    s.polygonDraft.push(p);draw();return;
+    s.polygonDraft.push(regionPoint(p));draw();return;
   }
   if(s.mode==='vertex'&&!node){e.preventDefault();change(()=>o.model.addVertex(g.id,'',...p),'vertex');return;}
   if(s.mode==='edge'&&node){if(!s.start){s.start=node;draw();}else{const from=s.start;s.start=null;change(()=>o.model.addEdge(g.id,{from,to:node,direction:g.directed===true?'forward':'undirected'}));}return;}
@@ -360,11 +385,18 @@ function mount(host,o){
   if(base&&pointers.size>=2){const a=[...pointers.values()],distance=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(base.distance>4)zoom(base.zoom*distance/base.distance);return;}
   if(!active||active.pointer!==e.pointerId)return;
   if(active.kind==='pan'){
-    scroll.scrollLeft=active.sx+active.start[0]-e.clientX;
-    scroll.scrollTop=active.sy+active.start[1]-e.clientY;
+    let x=active.sx+active.start[0]-e.clientX,y=active.sy+active.start[1]-e.clientY;
+    const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;
+    if(x<0){expandWorld(world.left-1,world.top);active.sx+=2*scale;x+=2*scale;}
+    if(y<0){expandWorld(world.left,world.top-1);active.sy+=2*scale*h/w;y+=2*scale*h/w;}
+    if(x+scroll.clientWidth>=stage.offsetWidth)expandWorld(world.right+1,world.top);
+    if(y+scroll.clientHeight>=stage.offsetHeight)expandWorld(world.left,world.bottom+1);
+    scroll.scrollLeft=x;scroll.scrollTop=y;
     return;
   }
-  active.end=mouse(e);ghost=active.kind==='node'?{vertex:active.id,pos:active.end}:active.kind==='handle'?{edge:active.id,pos:active.end}:null;draw();
+  active.end=mouse(e);
+  if(active.kind==='bounds'){const a=regionPoint(active.start),b=regionPoint(active.end);previewRegion([[Math.min(a[0],b[0]),Math.min(a[1],b[1])],[Math.max(a[0],b[0]),Math.min(a[1],b[1])],[Math.max(a[0],b[0]),Math.max(a[1],b[1])],[Math.min(a[0],b[0]),Math.max(a[1],b[1])]]);}
+  ghost=active.kind==='node'?{vertex:active.id,pos:active.end}:active.kind==='handle'?{edge:active.id,pos:active.end}:null;draw();
  });
  function release(e,cancel=false){
   pointers.delete(e.pointerId);if(pointers.size<2)base=null;
@@ -372,7 +404,7 @@ function mount(host,o){
   if(!cancel&&g){
    if(op.kind==='node'){if(Math.hypot(op.start[0]-op.end[0],op.start[1]-op.end[1])>.004)change(()=>o.model.moveVertex(g.id,op.id,...op.end),'geometry');o.selectNode?.(op.id);}
    if(op.kind==='bounds'||op.kind==='text_bounds'){
-     const a=op.start,b=op.end,box=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
+     const a=regionPoint(op.start),b=regionPoint(op.end),box=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
      if(box[2]-box[0]>.01 && box[3]-box[1]>.01){
        if(op.kind==='bounds'){
          change(()=>o.model.setGraphBounds(g.id,box));
@@ -385,14 +417,15 @@ function mount(host,o){
        }
      }
    }
-   if(op.kind==='handle'){const edge=g.edges.find(x=>x.id===op.id),a=g.vertices.find(x=>x.id===edge?.from),b=g.vertices.find(x=>x.id===edge?.to);if(a&&b&&unit(a.x)&&unit(a.y)&&unit(b.x)&&unit(b.y))change(()=>o.model.setEdgePath(g.id,op.id,[[a.x,a.y],op.end,[b.x,b.y]]),'geometry');else status.textContent='请先校准这条边的两个端点';}
+   if(op.kind==='handle'){const edge=g.edges.find(x=>x.id===op.id),a=g.vertices.find(x=>x.id===edge?.from),b=g.vertices.find(x=>x.id===edge?.to);if(a&&b&&finite(a.x)&&finite(a.y)&&finite(b.x)&&finite(b.y))change(()=>o.model.setEdgePath(g.id,op.id,[[a.x,a.y],op.end,[b.x,b.y]]),'geometry');else status.textContent='请先校准这条边的两个端点';}
   }draw();
  }
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
  scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));},{passive:false});
- image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;svg.setAttribute('viewBox','0 0 '+w+' '+h);syncOriginal();buildSampler();draw();};
+ image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;layoutWorld();syncOriginal();buildSampler();draw();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
- return {refresh:draw,state:s,destroy(){image.onload=null;image.onerror=null;host.replaceChildren();}};
+ const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{layoutWorld();draw();}):null;observer?.observe(scroll);
+ return {refresh:draw,state:s,destroy(){observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
 root.DMateGraphOverlay={mount};if(typeof module!=='undefined'&&module.exports)module.exports={mount};
 })(typeof window!=='undefined'?window:globalThis);

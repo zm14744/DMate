@@ -279,12 +279,20 @@ def test_bad_geometry_is_rejected_instead_of_silently_erased(bad):
     value = document()
     graph = value["graphs"][0]
     if bad == "point":
-        graph["vertices"][0].update(x=1.1, y=.3)
+        graph["vertices"][0].update(x=float("inf"), y=.3)
     elif bad == "path":
-        graph["edges"][0]["path"] = [[.2, .3], [2, .5]]
+        graph["edges"][0]["path"] = [[.2, .3], [float("nan"), .5]]
     elif bad == "bbox":
         graph["bbox"] = [.9, .1, .1, .8]
     else:
         graph["vertices"][0]["x"] = .3
     with pytest.raises(ConfirmationError):
         confirm(value=value)
+
+
+def test_unbounded_drawing_coordinates_survive_confirmation():
+    value=document();value['graphs'][0]['vertices'][0].update(x=-3.5,y=4.25)
+    value['graphs'][0]['edges'][0]['path']=[[-3.5,4.25],[2.5,-2.0]]
+    result=confirm(value=value)["drawing_document"]
+    assert result['graphs'][0]['vertices'][0]['x'] == -3.5
+    assert result['graphs'][0]['edges'][0]['path'][1] == [2.5,-2.0]

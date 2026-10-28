@@ -184,3 +184,8 @@
 .dge-text-only-workspace { display:block; }
 .dge-text-only-workspace .dge-original { max-height:min(55dvh,600px); }
 .dge-detected-type { align-self:center; font-size:13px; color:var(--text-subtle,#64748b); }
+
+/* The viewport is independent of image zoom; its world expands while panning. */
+.dge-overlay-viewport{height:min(63dvh,700px);min-height:220px;max-height:none}
+.dge-overlay-stage{margin:0;flex:none}
+@media(max-width:760px){.dge-overlay-viewport{height:55dvh;min-height:200px;max-height:none}}

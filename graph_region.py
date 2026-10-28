@@ -39,9 +39,12 @@ def validate_polygon(points):
     return validated
 
 
-def crop_region(raw: bytes, polygon):
+def crop_region(raw: bytes, polygon, *, exclusions=None):
     """Return a masked PNG of ONLY the user-requested text area."""
     coords = validate_polygon(polygon)
+    if exclusions is not None and (not isinstance(exclusions, list) or len(exclusions) > 64):
+        raise RegionError("图形选区数量无效。")
+    excluded = [validate_polygon(p) for p in (exclusions or [])]
     from image_evidence import decode_document_image
     try:
         photo = decode_document_image(raw, max_pixels=24_000_000).convert("RGB")
@@ -63,6 +66,8 @@ def crop_region(raw: bytes, polygon):
             mask = Image.new("L", clipped.size, 0)
             outline = [(x * width - x0, y * height - y0) for x, y in coords]
             ImageDraw.Draw(mask).polygon(outline, fill=255)
+            for region in excluded:
+                ImageDraw.Draw(mask).polygon([(x*width-x0, y*height-y0) for x,y in region], fill=0)
             white = Image.new("RGB", clipped.size, (255, 255, 255))
             white.paste(clipped, (0, 0), mask)
             buf = io.BytesIO()

@@ -23,6 +23,32 @@
         // "Is this a question?" is a per-upload choice, separate from graph data.
         let isQuestion = options.isQuestion !== false;
         let unsubscribe, overlay = null;
+        let outsideTimer, outsideSequence=0, outsideSignature='';
+        const graphRegions=override=>model.getDocument().graphs.flatMap(g=>{
+            if(override && g.id===currentGraph)return [override];
+            if(g.region_polygon?.length>=3)return [g.region_polygon];
+            const b=g.bbox;return b?.length===4?[[[b[0],b[1]],[b[2],b[1]],[b[2],b[3]],[b[0],b[3]]]]:[];
+        });
+        function refreshOutside(override){
+            if(typeof options.onRecognizeOutside!=='function')return;
+            const regions=graphRegions(override),sequence=++outsideSequence;
+            clearTimeout(outsideTimer);
+            outsideTimer=setTimeout(async()=>{
+                const before=model.getDocument().body_text;
+                try{
+                    const text=await options.onRecognizeOutside(regions);
+                    if(destroyed || sequence!==outsideSequence || model.getDocument().body_text!==before)return;
+                    if(typeof text==='string' && text!==before){
+                        model.setBody(text);
+                        const area=container.querySelector('.dge-body');if(area)area.value=text;
+                    }
+                }catch(error){if(!destroyed && sequence===outsideSequence){
+                    const status=container.querySelector('.dge-overlay-status');
+                    if(status)status.textContent=error?.message||'框外文字识别暂不可用';
+                }}
+            },180);
+        }
+
         const overlayState = { mode: 'select', zoom: 100, visible: true, start: null };
         const element = (tag, className, label) => { const node = dom.createElement(tag); if (className) node.className = className;
             if (label !== undefined) node.textContent = label; return node; };
@@ -337,6 +363,7 @@
                         else if (kind === 'geometry') refreshDraftViews();
                         else render();
                     },
+                    previewRegion: polygon => refreshOutside(polygon),
                     recognizeText: async polygon => {
                         if (typeof options.onRecognizeText !== 'function')
                             throw new Error('文字区域识别暂不可用，请手动输入。');
@@ -507,11 +534,15 @@
                 scroller.scrollLeft = left;
             }
         }
-        unsubscribe = model.subscribe(document => { pendingDelete = ''; options.onChange?.(document); });
+        unsubscribe = model.subscribe(document => { pendingDelete = ''; options.onChange?.(document);
+            const signature=JSON.stringify(graphRegions());
+            if(signature!==outsideSignature){outsideSignature=signature;refreshOutside();}
+        });
+        outsideSignature=JSON.stringify(graphRegions());refreshOutside();
         render();
         return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
             validate: model.validate, model,
-            destroy() { destroyed = true; unsubscribe(); overlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
+            destroy() { destroyed = true; outsideSequence++;clearTimeout(outsideTimer); unsubscribe(); overlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };
     root.DMateGraphEditor = api;

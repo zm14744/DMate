@@ -179,6 +179,7 @@ def test_coarse_pointer_has_real_touch_targets_on_phone(canvas_page):
 
 def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
     page = canvas_page
+    page.get_by_role("button", name="适应", exact=True).click()
     page.get_by_label("选区方式").select_option("graph_poly")
     bounds = page.locator(".dge-overlay-svg").bounding_box()
     assert bounds
@@ -435,12 +436,53 @@ def test_points_and_edges_choose_high_contrast_ink_from_local_pixels(canvas_page
     assert all((row["halo"] == "#ffffff" if row["ink"] == "#111827"
                 else row["halo"] == "#111827") for row in pairs)
     assert any(row["marker"].endswith("-light)") for row in pairs)
-    # The local sampler works on the original pixels, not the opacity-adjusted display.
+    # Contrast follows the displayed image after opacity blending.
     page.get_by_role("slider", name="原图透明度").evaluate("""el => {
         el.value = '10'; el.dispatchEvent(new Event('input', {bubbles:true}));
     }""")
     assert left.get_attribute("data-ink") == "#111827"
-    assert right.get_attribute("data-ink") == "#ffffff"
+    assert right.get_attribute("data-ink") == "#111827"
     page.get_by_role("button", name="隐藏原图").click()
     assert page.locator('[data-vertex-id="left"] .dge-overlay-dot').get_attribute("data-ink") == "#111827"
-    assert page.locator('[data-vertex-id="right"] .dge-overlay-dot').get_attribute("data-ink") == "#ffffff"
+    assert page.locator('[data-vertex-id="right"] .dge-overlay-dot').get_attribute("data-ink") == "#111827"
+
+
+def test_fixed_viewport_and_drawing_beyond_source_image(canvas_page):
+    page = canvas_page
+    viewport = page.locator('.dge-overlay-viewport')
+    before = viewport.bounding_box()
+    page.get_by_role('button', name='缩小原图').click()
+    after = viewport.bounding_box()
+    assert abs(before['height'] - after['height']) < 1
+    assert abs(before['width'] - after['width']) < 1
+    page.get_by_role('button', name='平移', exact=True).click()
+    box = viewport.bounding_box()
+    x, y = box['x'] + 100, box['y'] + 100
+    page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+300,y+100,steps=5);page.mouse.up()
+    page.get_by_role('button', name='添加顶点', exact=True).click()
+    page.mouse.click(box['x']+30,box['y']+35)
+    node = page.evaluate('instance.getDocument().graphs[0].vertices.at(-1)')
+    assert node['x'] < 0 or node['y'] < 0
+    page.get_by_role('button', name='隐藏原图', exact=True).click()
+    assert page.locator('.dge-overlay-image').evaluate('e=>getComputedStyle(e).visibility') == 'hidden'
+    assert page.locator('.dge-overlay-node').count() == 3
+
+
+def test_live_outside_text_updates_before_frame_pointer_release(canvas_page):
+    page = canvas_page
+    page.evaluate('''() => {
+      const source=document.querySelector('.dge-overlay-image').src;
+      const documentValue=instance.getDocument();instance.destroy();window.liveRegions=[];
+      instance=DMateGraphEditor.mount(document.getElementById('editor'),{
+        originalUrl:source,document:documentValue,
+        onRecognizeOutside:async regions=>{liveRegions.push(regions);return '仅框外文字 '+regions.length;}
+      });
+    }''')
+    page.wait_for_function("document.querySelector('.dge-body').value==='仅框外文字 0'")
+    page.get_by_role('button',name='框选图形',exact=True).click()
+    box=page.locator('.dge-overlay-svg').bounding_box()
+    page.mouse.move(box['x']+20,box['y']+20);page.mouse.down()
+    page.mouse.move(box['x']+220,box['y']+180,steps=5)
+    page.wait_for_function("document.querySelector('.dge-body').value==='仅框外文字 1'")
+    assert page.evaluate('liveRegions.at(-1)[0].length') == 4
+    page.mouse.up()

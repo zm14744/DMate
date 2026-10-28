@@ -27,9 +27,11 @@ TTL_SECONDS = 7 * 24 * 60 * 60
 _ID = {'type': 'string', 'minLength': 1, 'maxLength': 128, 'pattern': r'\S'}
 _TEXT = {'type': ['string', 'null'], 'maxLength': 256}
 _COORD = {'type': 'number', 'minimum': 0, 'maximum': 1}
-_POINT = {'type': 'array', 'prefixItems': [_COORD, _COORD], 'minItems': 2, 'maxItems': 2}
+_DRAW_COORD = {'type': 'number'}
+_POINT = {'type': 'array', 'prefixItems': [_DRAW_COORD, _DRAW_COORD], 'minItems': 2, 'maxItems': 2}
 _BBOX = {'type': 'array', 'prefixItems': [_COORD, _COORD, _COORD, _COORD], 'minItems': 4, 'maxItems': 4}
-_POLYGON = {'type': 'array', 'items': _POINT, 'minItems': 3, 'maxItems': 64}
+_IMAGE_POINT = {'type': 'array', 'prefixItems': [_COORD, _COORD], 'minItems': 2, 'maxItems': 2}
+_POLYGON = {'type': 'array', 'items': _IMAGE_POINT, 'minItems': 3, 'maxItems': 64}
 _EDGE = {'type': 'object', 'required': ['id', 'from', 'to', 'direction'], 'properties': {
     'id': _ID, 'from': _ID, 'to': _ID, 'direction': {'enum': ['forward', 'undirected']},
     'weight': {'type': ['number', 'string', 'null'], 'maxLength': 256},
@@ -45,8 +47,8 @@ DOCUMENT_SCHEMA = {'type': 'object', 'required': ['body_text', 'graphs'], 'prope
             'vertices': {'type': 'array', 'minItems': 1, 'maxItems': 100, 'items': {
                 'type': 'object', 'required': ['id'], 'properties': {
                     'id': _ID, 'label': _TEXT, 'display_label': {'type': 'string', 'maxLength': 16},
-                    'x': {'anyOf': [_COORD, {'type': 'null'}]},
-                    'y': {'anyOf': [_COORD, {'type': 'null'}]}}}},
+                    'x': {'anyOf': [_DRAW_COORD, {'type': 'null'}]},
+                    'y': {'anyOf': [_DRAW_COORD, {'type': 'null'}]}}}},
             'edges': {'type': 'array', 'maxItems': 300, 'items': _EDGE}}}}}}
 
 

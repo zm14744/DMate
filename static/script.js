@@ -14756,6 +14756,58 @@ async function editOcrTask(id) {
                     window.clearTimeout(timeout);
                 }
             },
+            onRecognizeOutside: async exclusions => {
+                if(!Array.isArray(task.result?.text_regions?.image_size) && !task.outsideTextUnavailable){
+                    if(!task.outsideTextLoad)task.outsideTextLoad=(async()=>{
+                        const form=new FormData();form.append('image',task.file);form.append('request_id',task.id);
+                        form.append('polygon',JSON.stringify([[0,0],[1,0],[1,1],[0,1]]));form.append('exclusions','[]');
+                        const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
+                        try{
+                            const response=await fetch('/graph/text-region',{method:'POST',credentials:'same-origin',body:form,signal:controller.signal});
+                            const result=await parseResponseJson(response);
+                            if(!response.ok||result?.error)throw new Error(result?.error||'文字识别未完成');
+                            if(result.source_sha256!==task.sourceSha256||result.request_id!==task.id)throw new Error('文字结果与原图不匹配');
+                            const regions=result.text_regions;
+                            if(regions?.image_size && Array.isArray(regions.emitted_body ?? regions.body)){
+                                task.result ||= {};task.result.text_regions=regions;
+                            }else task.outsideTextUnavailable=true;
+                        }finally{clearTimeout(timeout);task.outsideTextLoad=null;}
+                    })();
+                    await task.outsideTextLoad;
+                }
+                const evidence=task.result?.text_regions;
+                const size=evidence?.image_size,items=evidence?.emitted_body ?? evidence?.body;
+                if(Array.isArray(size)&&size[0]>0&&size[1]>0&&Array.isArray(items)){
+                    // Any OCR box touching a graph frame is excluded, including
+                    // labels on its boundary; never reinsert cached graph text.
+                    const intersects=(box,poly)=>{
+                        const inside=p=>{let hit=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+                            const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1]) && p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])hit=!hit;
+                        }return hit;};
+                        const corners=[[box[0],box[1]],[box[2],box[1]],[box[2],box[3]],[box[0],box[3]]];
+                        if(corners.some(inside)||poly.some(p=>p[0]>=box[0]&&p[0]<=box[2]&&p[1]>=box[1]&&p[1]<=box[3]))return true;
+                        const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+                        for(let i=0;i<poly.length;i++)for(let j=0;j<4;j++){
+                            const a=poly[i],b=poly[(i+1)%poly.length],c=corners[j],d=corners[(j+1)%4];
+                            if(Math.max(a[0],b[0])>=Math.min(c[0],d[0])&&Math.max(c[0],d[0])>=Math.min(a[0],b[0])&&Math.max(a[1],b[1])>=Math.min(c[1],d[1])&&Math.max(c[1],d[1])>=Math.min(a[1],b[1])&&cross(a,b,c)*cross(a,b,d)<=0&&cross(c,d,a)*cross(c,d,b)<=0)return true;
+                        }return false;
+                    };
+                    return items.filter(row=>Array.isArray(row.box)&&row.box.length===4&&!exclusions.some(poly=>intersects(row.box.map((n,i)=>n/size[i%2]),poly)))
+                        .map(row=>row.content||row.text||'').filter(Boolean).join('\n');
+                }
+                task.outsideTextController?.abort();
+                const controller=new AbortController();task.outsideTextController=controller;
+                const selected=new FormData();selected.append('image',task.file);selected.append('request_id',task.id);
+                selected.append('polygon',JSON.stringify([[0,0],[1,0],[1,1],[0,1]]));selected.append('exclusions',JSON.stringify(exclusions));
+                const timeout=setTimeout(()=>controller.abort(),20000);
+                try{
+                    const response=await fetch('/graph/text-region',{method:'POST',credentials:'same-origin',body:selected,signal:controller.signal});
+                    const result=await parseResponseJson(response);
+                    if(!response.ok||result?.error)throw new Error(result?.error||'框外文字识别未完成');
+                    if(result.source_sha256!==task.sourceSha256||result.request_id!==task.id)throw new Error('文字结果与原图不匹配');
+                    return typeof result.text==='string'?result.text:'';
+                }finally{clearTimeout(timeout);}
+            },
             onRecognizeText: async polygon => {
                 const selected = new FormData();
                 selected.append("image", task.file);

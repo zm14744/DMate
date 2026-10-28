@@ -76,3 +76,15 @@ def test_manual_upload_has_no_auto_graph_or_text_calls_and_region_only_calls_pad
     })
     assert cross_source.status_code == 409
     assert len(intercepted) == 1
+
+
+def test_text_crop_erases_all_graph_frames_before_ocr():
+    from PIL import Image
+    import io
+    from graph_region import crop_region
+    photo=Image.new('RGB',(100,100),'black');data=io.BytesIO();photo.save(data,format='PNG')
+    selected=crop_region(data.getvalue(),[[0,0],[1,0],[1,1],[0,1]],
+                         exclusions=[[[.2,.2],[.8,.2],[.8,.8],[.2,.8]]])
+    with Image.open(io.BytesIO(selected)) as result:
+        assert result.getpixel((50,50)) == (255,255,255)
+        assert result.getpixel((5,5)) == (0,0,0)

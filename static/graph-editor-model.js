@@ -13,11 +13,12 @@
     };
     const ATTRS = ['weight', 'edge_label', 'color', 'style'];
     const unit = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
-    const point = value => Array.isArray(value) && value.length === 2 && value.every(unit);
+    const coordinate = value => typeof value === 'number' && Number.isFinite(value);
+    const point = value => Array.isArray(value) && value.length === 2 && value.every(coordinate);
     const validPath = value => Array.isArray(value) && value.length >= 2 && value.length <= 128 && value.every(point);
     const validBox = value => Array.isArray(value) && value.length === 4 && value.every(unit) && value[0] < value[2] && value[1] < value[3];
     const polygonValid = value => {
-        if (!Array.isArray(value) || value.length < 3 || value.length > 64 || !value.every(point)) return false;
+        if (!Array.isArray(value) || value.length < 3 || value.length > 64 || !value.every(p => point(p) && p.every(unit))) return false;
         const signed = value.reduce((sum, p, i) => {
             const next = value[(i + 1) % value.length];
             return sum + p[0] * next[1] - next[0] * p[1];
@@ -70,7 +71,7 @@
                 let vertexId = id(rawVertex.id) || unique('v', graph.vertices);
                 if (graph.vertices.some(row => row.id === vertexId)) vertexId = unique('v', graph.vertices);
                 const vertex = { id: vertexId, label: scalar(rawVertex.label) && text(rawVertex.label).trim() ? text(rawVertex.label) : null };
-                if (unit(rawVertex.x) && unit(rawVertex.y)) { vertex.x = rawVertex.x; vertex.y = rawVertex.y; }
+                if (coordinate(rawVertex.x) && coordinate(rawVertex.y)) { vertex.x = rawVertex.x; vertex.y = rawVertex.y; }
                 if (typeof rawVertex.display_label === 'string' && rawVertex.display_label.length <= 16 && rawVertex.display_label) vertex.display_label = rawVertex.display_label;
                 graph.vertices.push(vertex);
                 if (id(rawVertex.id) && oldCounts.get(id(rawVertex.id)) === 1) aliases.set(id(rawVertex.id), vertexId);
@@ -124,7 +125,7 @@
                 vertices.add(vertex.id);
                 if (vertex.label !== null && typeof vertex.label !== 'string') issues.push(name + '有无效节点标签。');
                 if (text(vertex.label).length > 128) issues.push(name + '的节点标签超过 128 字。');
-                if ((vertex.x !== undefined || vertex.y !== undefined) && !(unit(vertex.x) && unit(vertex.y))) issues.push(name + '有无效顶点位置。');
+                if ((vertex.x !== undefined || vertex.y !== undefined) && !(coordinate(vertex.x) && coordinate(vertex.y))) issues.push(name + '有无效顶点位置。');
             }
             graph.edges.forEach((edge, index) => {
                 const label = name + '第 ' + (index + 1) + ' 条边';
@@ -208,7 +209,7 @@
                     vertexId = unique('v', graph.vertices);
                     const vertex = { id: vertexId, label: String(label || '').trim() || null };
                     if (x !== undefined || y !== undefined) {
-                        if (!unit(x) || !unit(y)) throw new Error('顶点位置必须位于原图内。');
+                        if (!coordinate(x) || !coordinate(y)) throw new Error('顶点位置必须为有效坐标。');
                         vertex.x = x; vertex.y = y;
                     }
                     if (!vertex.label) {
@@ -234,14 +235,14 @@
                 }
             }),
             moveVertex: (gid, vid, x, y) => change(draft => {
-                if (!unit(x) || !unit(y)) throw new Error('顶点位置必须位于原图内。');
+                if (!coordinate(x) || !coordinate(y)) throw new Error('顶点位置必须为有效坐标。');
                 const graph = getGraph(draft, gid), vertex = graph.vertices.find(v => v.id === vid);
                 if (!vertex) throw new Error('找不到这个节点。');
-                const before = unit(vertex.x) && unit(vertex.y) ? [vertex.x, vertex.y] : null;
+                const before = coordinate(vertex.x) && coordinate(vertex.y) ? [vertex.x, vertex.y] : null;
                 vertex.x = x; vertex.y = y;
                 for (const edge of graph.edges) if (validPath(edge.path)) {
                     if (edge.from === vid && edge.to === vid && before) {
-                        edge.path = edge.path.map(p => [Math.min(1, Math.max(0, p[0] + x - before[0])), Math.min(1, Math.max(0, p[1] + y - before[1]))]);
+                        edge.path = edge.path.map(p => [p[0] + x - before[0], p[1] + y - before[1]]);
                     } else {
                         if (edge.from === vid) edge.path[0] = [x, y];
                         if (edge.to === vid) edge.path[edge.path.length - 1] = [x, y];

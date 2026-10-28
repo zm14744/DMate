@@ -3022,7 +3022,10 @@ def recognize_manual_text_region():
         return jsonify({"error": "选区轮廓过于复杂"}), 400
     try:
         region = json.loads(raw_region)
-        cropped = crop_region(raw, region)
+        raw_exclusions = request.form.get("exclusions", "[]")
+        if len(raw_exclusions) > 200000:
+            raise RegionError("图形选区过于复杂")
+        cropped = crop_region(raw, region, exclusions=json.loads(raw_exclusions))
     except (ValueError, TypeError, RegionError) as exc:
         return jsonify({"error": str(exc) or "文字选区无效"}), 400
     if not OCR_AVAILABLE or recognize_image is None:
@@ -3042,6 +3045,8 @@ def recognize_manual_text_region():
             options["text_only"] = True
         if "timeout_seconds" in params or dynamic:
             options["timeout_seconds"] = 3.0
+            if request.form.get("exclusions") is not None:
+                options["timeout_seconds"] = 15.0
         recognized = text_reader(cropped, **options)
     except Exception as exc:
         print(f"所选文字区域 OCR 失败：{type(exc).__name__}")
@@ -3051,6 +3056,7 @@ def recognize_manual_text_region():
     return jsonify({"text": text, "text_count": result.get("text_count", 0),
                     "request_id": request_id, "source_sha256": source_sha,
                     "selection_mode": "polygon",
+                    "text_regions": result.get("text_evidence") or {},
                     "recognition_status": "complete" if text else "partial",
                     "warning": None if text else "选区内未识别到文字，请调整范围或手动输入"})
 

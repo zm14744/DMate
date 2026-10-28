@@ -637,6 +637,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
             "workflow_profile": "layout_only",
             "text": text,
             "raw_ocr_text": text,
+            "text_regions": text_result.get("text_evidence") or {},
             "text_count": question_text_count,
             "formula_count": 0,
             "graph_structures": figures,
