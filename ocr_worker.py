@@ -143,6 +143,11 @@ def main():
             partition['image_size']=[image.shape[1],image.shape[0]]
             partition['coordinate_space']='canonical_image_pixels'
             body=ocr._front_side_text_items(partition['body'],image)
+            # Keep the exact emitted OCR items and their original pixel boxes.
+            # The automatic figure detector later removes only labels INSIDE
+            # recognized diagrams; it must not heuristically delete words from
+            # an already assembled question string.
+            partition['emitted_body']=body
             text=ocr._compose_markdown(body,image.shape[1])
             event['partition_counts']={key:len(partition[key]) for key in ('body','graph_labels','noise','uncertain')}
             event['emitted_body_items']=len(body)
