@@ -31,6 +31,7 @@ MAIN_PROMPT = r'''读取数学题原图，返回紧凑JSON题干和图结构，�
 先清点真实圆点、圆圈或明确顶点，包括孤立点，再沿实际连线读端点。能明确定位的顶点可附 x、y，使用整张原图 0..1 的相对坐标；位置不确定时省略，不能编造。能够明确沿笔画追踪的边可附 path:[[x,y],...]（整张原图 0..1，最多128个坐标），不能可靠追踪的边可以省略 path，用户稍后自行校准。普通交叉、箭头尖和文字不是顶点；边名不能变成节点。无印刷节点名则label=null；e_i也可能是真节点名，须按原图位置判别。local_visual_inventory中的同类圆点须逐个对照原图，可在顶点附marker_id绑定对应候选；若有候选以外的真实点，保留并只为该点附短visual_basis说明具体位置与可见依据。候选可能错漏，不能按候选数、题干、图名、度数或模板补删点边。
 对于能够辨认的子图，请独立清点并给出visible_vertex_count和visible_edge_count，再与vertices、edges逐一核对；确实不能确定时填null并注明疑点。不能为了让两种计数相等而补删图结构，也不能直接把数组长度或工具候选数抄成视觉计数。只输出一份vertices和edges，不逐点逐边重复描述。
 交叉处沿原笔画走，不换线；经过真实顶点才分成不同边。虚线的多个短划是一条边。每条无向边、有向边、自环、重边和反向弧各列一次。方向只按箭头尖确定，不能按编号或布局猜；看不清用unknown。
+每幅子图必须独立判断 directed 和 weighted：只按这幅图实际看得见的箭头、边上权值及其图例，不从同页其他图继承。某条边方向/权值无法看清时，保留unknown/null和具体uncertainties，绝不能用整页“有向图”或“加权图”的标签替它猜。local_original_ink_quality只反映原像素颜色/阴影/透印风险，不是连接或箭头的答案。
 weighted必须是布尔值：只有实际边权才true，节点数字、节点编号、边名不算权重。已知存在但未读清的边权用null并列疑点。保留零、负数及π、√2、1/3等原始符号，不计算近似值。同一印刷项仅放对应的weight或edge_label，不能重复填写。保留必要颜色、虚线与点线；阴影、透印不能当新增线条。
 body_text逐字保留全部可见题干、小问、公式、数学符号和图例；图内标签、图注放图结构。没有题干就用空字符串，不能根据图生成问题、补写“如图所示”等原图没有的话或猜裁切文字。只把具体仍看不清的内容列为uncertainties。
 格式：{"body_text":"原文","graphs":[{"id":"G1","name":"图注或G1","directed":false,"weighted":false,"visible_vertex_count":2,"visible_edge_count":1,"vertices":[{"id":"a","label":"a"},{"id":"b","label":null}],"edges":[{"from":"a","to":"b","direction":"undirected","weight":null,"edge_label":null,"style":"solid"}]}],"uncertainties":[]}
@@ -798,6 +799,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
              'local_visual_inventory': _compact_visual_inventory(visual_inventory),
              'local_caption_grid': pixel_evidence.get('grid'),
              'local_colored_graph_candidates': pixel_evidence.get('colored_graphs', [])[:12],
+             'local_original_ink_quality': pixel_evidence.get('pixel_mask_quality'),
              'local_dark_disk_summary': {'source': 'same_original_gray_pixels',
                  'advisory_only': True,
                  'panels': [{'region_id': r.get('region_id'), 'row': r.get('row'),
@@ -1011,6 +1013,7 @@ def recognize_fast(raw, *, layout=None, provider=None, budget=None, audit=False,
             'local_scheduler': local_audit, 'local_tool_policy': local_policy,
             'local_review': state.get('local_review', {}),
             'pixel_evidence': {'grid': copy.deepcopy(pixel_evidence.get('grid')),
+                               'original_ink_quality': copy.deepcopy(pixel_evidence.get('pixel_mask_quality')),
                                'colored_graphs': copy.deepcopy(pixel_evidence.get('colored_graphs', [])),
                                'grid_dark_disks': copy.deepcopy(pixel_evidence.get('grid_dark_disks')),
                                'repairs': copy.deepcopy(pixel_repairs),
