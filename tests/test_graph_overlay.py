@@ -429,7 +429,7 @@ def test_points_and_edges_choose_high_contrast_ink_from_local_pixels(canvas_page
     # the white-to-dark boundary; arrowheads use the same contrast family.
     pairs = cores.evaluate_all("""nodes => nodes.map(node => ({
         ink: node.dataset.ink,
-        halo: node.previousElementSibling?.style.stroke,
+        halo: node.previousElementSibling?.dataset.ink,
         marker: node.getAttribute('marker-end') || ''
     }))""")
     assert all((row["halo"] == "#ffffff" if row["ink"] == "#111827"
