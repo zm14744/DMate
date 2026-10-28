@@ -3028,8 +3028,21 @@ def recognize_manual_text_region():
     if not OCR_AVAILABLE or recognize_image is None:
         return jsonify({"error": "文字 OCR 暂不可用，可继续手动输入"}), 503
     try:
-        from ocr_runtime import recognize_image as fast_text_recognize
-        recognized = fast_text_recognize(cropped, text_only=True, timeout_seconds=3.0)
+        # Keep the injected/runtime OCR reader for the current nextgen mode;
+        # legacy mode must still use the bounded Small worker, never full layout.
+        from inspect import signature, Parameter
+        if graph_nextgen_enabled():
+            text_reader = recognize_image
+        else:
+            from ocr_runtime import recognize_image as text_reader
+        params = signature(text_reader).parameters
+        dynamic = any(p.kind == Parameter.VAR_KEYWORD for p in params.values())
+        options = {}
+        if "text_only" in params or dynamic:
+            options["text_only"] = True
+        if "timeout_seconds" in params or dynamic:
+            options["timeout_seconds"] = 3.0
+        recognized = text_reader(cropped, **options)
     except Exception as exc:
         print(f"所选文字区域 OCR 失败：{type(exc).__name__}")
         return jsonify({"error": "选区文字识别未完成，可调整范围或手动输入"}), 503
