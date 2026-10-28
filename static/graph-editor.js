@@ -52,6 +52,55 @@
         const graphOptions = (document, excluded) => [['', '选择目标子图'], ...document.graphs.filter(graph => graph.id !== excluded).map((graph, index) => [graph.id, graph.name || '图 ' + (index + 1)])];
         const weightValue = value => value.trim() === '' ? null : /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(value.trim()) && Number.isFinite(Number(value)) ? Number(value) : value;
 
+        function buildNodeRow(graph, vertex, index) {
+            const row = element('div', 'dge-node-row' +
+                (selectedNodes.has(vertex.id) ? ' is-selected' : ''));
+            row.dataset.vertexId = vertex.id;
+            const check = element('input'); check.type = 'checkbox';
+            check.checked = selectedNodes.has(vertex.id); check.disabled = saving;
+            check.setAttribute('aria-label', '选中节点 ' + (vertex.label ?? (index + 1)));
+            check.addEventListener('change', () => act(() => {
+                check.checked ? selectedNodes.add(vertex.id) : selectedNodes.delete(vertex.id);
+            }));
+            const label = input(vertex.label, '节点 ' + (index + 1) + ' 标签',
+                value => model.renameVertex(graph.id, vertex.id, value));
+            label.placeholder = '未命名节点';
+            const incident = graph.edges.filter(edge =>
+                edge.from === vertex.id || edge.to === vertex.id).length;
+            const kind = element('span', 'dge-node-kind',
+                incident ? incident + ' 条关联边' : '孤立点');
+            kind.dataset.nodeIncident = vertex.id;
+            row.append(check, label, kind);
+            return row;
+        }
+
+        function refreshCanvasVertex() {
+            // Pointer drawing changes only one node. Never detach the original
+            // image, its scroll container or the dialog merely to append it.
+            // Retain the zoom, pan position, active drawing mode and scroll.
+            const document = model.getDocument();
+            const graph = document.graphs.find(row => row.id === currentGraph);
+            const panel = container.querySelector('.dge-node-panel');
+            const list = panel?.querySelector('.dge-node-list');
+            if (!graph || !overlay || !list) { render(); return; }
+            refreshDraftViews();
+            const heading = panel.querySelector('h3');
+            if (heading) heading.textContent = '节点 · ' + graph.vertices.length;
+            const present = new Set([...list.children].map(row => row.dataset.vertexId));
+            graph.vertices.forEach((vertex, index) => {
+                if (!present.has(vertex.id)) {
+                    list.append(buildNodeRow(graph, vertex, index));
+                    present.add(vertex.id);
+                }
+            });
+            // The first node can create a review section that did not exist.
+            if (graph.vertices.length && !container.querySelector('.dge-review-summary')) {
+                const review = buildReview(graph, document);
+                const body = container.querySelector('.dge-body')?.closest('.dge-field');
+                if (review && body) container.insertBefore(review, body);
+            }
+        }
+
         function refreshDraftViews() {
             if (destroyed) return;
             const document = model.getDocument(), graph = document.graphs.find(row => row.id === currentGraph);
@@ -229,6 +278,23 @@
 
         function render() {
             if (destroyed) return;
+            // The editor may live in a scrollable dialog AND a scrollable
+            // browser viewport. Swapping ancillary controls must not move
+            // either one, even if the overlay is temporarily reparented.
+            const scrollState = [];
+            if (useOverlay && overlay) {
+                let ancestor = container;
+                while (ancestor) {
+                    if (ancestor.scrollHeight > ancestor.clientHeight + 1 ||
+                            ancestor.scrollWidth > ancestor.clientWidth + 1) {
+                        scrollState.push([ancestor, ancestor.scrollTop, ancestor.scrollLeft]);
+                    }
+                    ancestor = ancestor.parentElement;
+                }
+                const rootScroller = dom.scrollingElement;
+                if (rootScroller && !scrollState.some(entry => entry[0] === rootScroller))
+                    scrollState.push([rootScroller, rootScroller.scrollTop, rootScroller.scrollLeft]);
+            }
             const document = model.getDocument();
             let graph = document.graphs.find(row => row.id === currentGraph) || document.graphs[0]; currentGraph = graph?.id;
             selectedNodes = new Set([...selectedNodes].filter(vid => graph?.vertices.some(row => row.id === vid)));
@@ -266,7 +332,11 @@
                     nodeSelected: () => selectedNodes,
                     selectEdge: id => { selectedEdge = id; selectedNodes.clear(); render(); },
                     selectNode: id => { selectedNodes = new Set([id]); selectedEdge = null; render(); },
-                    changed: () => render(),
+                    changed: kind => {
+                        if (kind === 'vertex') refreshCanvasVertex();
+                        else if (kind === 'geometry') refreshDraftViews();
+                        else render();
+                    },
                     recognizeText: async polygon => {
                         if (typeof options.onRecognizeText !== 'function')
                             throw new Error('文字区域识别暂不可用，请手动输入。');
@@ -355,16 +425,8 @@
                 const panels = element('div', 'dge-edit-panels'), nodes = element('section', 'dge-node-panel'), edges = element('section', 'dge-edge-panel');
                 nodes.append(element('h3', '', '节点 · ' + graph.vertices.length));
                 const nodeList = element('div', 'dge-node-list');
-                graph.vertices.forEach((vertex, index) => {
-                    const row = element('div', 'dge-node-row' + (selectedNodes.has(vertex.id) ? ' is-selected' : ''));
-                    const check = element('input'); check.type = 'checkbox'; check.checked = selectedNodes.has(vertex.id); check.disabled = saving;
-                    check.setAttribute('aria-label', '选中节点 ' + (vertex.label ?? (index + 1)));
-                    check.addEventListener('change', () => act(() => { check.checked ? selectedNodes.add(vertex.id) : selectedNodes.delete(vertex.id); }));
-                    const label = input(vertex.label, '节点 ' + (index + 1) + ' 标签', value => model.renameVertex(graph.id, vertex.id, value)); label.placeholder = '未命名节点';
-                    const incident = graph.edges.filter(edge => edge.from === vertex.id || edge.to === vertex.id).length;
-                    const kind = element('span', 'dge-node-kind', incident ? incident + ' 条关联边' : '孤立点'); kind.dataset.nodeIncident = vertex.id;
-                    row.append(check, label, kind); nodeList.append(row);
-                });
+                graph.vertices.forEach((vertex, index) => nodeList.append(buildNodeRow(graph, vertex, index)));
+
                 nodes.append(nodeList);
                 const addLabel = input('', '新节点标签', null); addLabel.placeholder = '新节点标签（可留空）';
                 const addRow = element('div', 'dge-inline'); addRow.append(addLabel, button('添加节点', () => model.addVertex(graph.id, addLabel.value))); nodes.append(addRow);
@@ -440,6 +502,10 @@
                 catch (error) { notice = error?.message || '保存失败，当前修改已保留。'; }
                 finally { saving = false; if (!destroyed) render(); }
             }, 'dge-primary'); actions.append(confirm); confirmRow.append(actions); container.append(confirmRow);
+            for (const [scroller, top, left] of scrollState) {
+                scroller.scrollTop = top;
+                scroller.scrollLeft = left;
+            }
         }
         unsubscribe = model.subscribe(document => { pendingDelete = ''; options.onChange?.(document); });
         render();
