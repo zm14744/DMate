@@ -251,4 +251,4 @@ def test_fast_upload_and_manual_figures_share_four_second_budget_contract():
     assert "/graph/figure-type" in server and "/graph/figure-type" in client
     assert "scanFigureType(points,g.id)" in overlay
     assert "void scanFigureType([[box[0],box[1]]" in overlay
-    assert 'timeout_seconds=3.0' in server
+    assert 'options["timeout_seconds"] = 3.0' in server
