@@ -3017,6 +3017,33 @@ def recognize_manual_text_region():
         require_recognition_source(confirmation_owner(), request_id, source_sha)
     except ConfirmationError as exc:
         return jsonify({"error": exc.message, "code": exc.code}), exc.status
+    # A batch contains only explicitly framed pixels, in frame-number order.
+    raw_regions = request.form.get("regions")
+    if raw_regions is not None:
+        from graph_region import validate_text_regions
+        from ocr_runtime import recognize_text_regions, OCRError
+        try:
+            if len(raw_regions) > 2_000_000:
+                raise RegionError("文字选区数据过大，请减少选区面积。")
+            regions = validate_text_regions(json.loads(raw_regions))
+        except (ValueError, TypeError, RegionError) as exc:
+            return jsonify({"error": str(exc) or "文字选区无效"}), 400
+        try:
+            result = recognize_text_regions(raw, regions)
+        except RegionError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except OCRError as exc:
+            return jsonify({"error": str(exc), "recognition_status": "failed"}), 503
+        except Exception as exc:
+            print(f"文字批量识别失败：{type(exc).__name__}")
+            return jsonify({"error": "文字识别服务异常，请重试。", "recognition_status": "failed"}), 503
+        rows = [{**row, "recognition_status": "complete" if row.get("text", "").strip() else "empty"}
+                for row in result["regions"]]
+        return jsonify({"regions": rows, "text": result["text"],
+                        "text_count": result.get("text_count", 0),
+                        "request_id": request_id, "source_sha256": source_sha,
+                        "recognition_status": "complete" if all(r["text"].strip() for r in rows) else "partial",
+                        "selection_mode": "numbered_regions"})
     raw_region = request.form.get("polygon", "")
     if len(raw_region) > 6000:
         return jsonify({"error": "选区轮廓过于复杂"}), 400
@@ -3044,14 +3071,17 @@ def recognize_manual_text_region():
         if "text_only" in params or dynamic:
             options["text_only"] = True
         if "timeout_seconds" in params or dynamic:
-            options["timeout_seconds"] = 3.0
-            if request.form.get("exclusions") is not None:
-                options["timeout_seconds"] = 15.0
+            options["timeout_seconds"] = 45.0
         recognized = text_reader(cropped, **options)
     except Exception as exc:
         print(f"所选文字区域 OCR 失败：{type(exc).__name__}")
         return jsonify({"error": "选区文字识别未完成，可调整范围或手动输入"}), 503
     result = recognized if isinstance(recognized, dict) else {}
+    stages = result.get("resource_metrics") or []
+    failed = next((m for m in stages if m.get("stage") == "text" and m.get("status") != "ok"), None)
+    if failed:
+        return jsonify({"error": "文字识别超时，请重试。" if failed.get("status") == "timeout" else "文字识别服务未完成，请稍后重试。",
+                        "recognition_status": "failed"}), 503
     text = str(result.get("text") or "").strip()
     return jsonify({"text": text, "text_count": result.get("text_count", 0),
                     "request_id": request_id, "source_sha256": source_sha,

@@ -276,7 +276,7 @@ def test_only_manually_selected_figures_have_four_second_budget():
     assert "scanFigureType(points,id)" in overlay
     assert "void scanFigureType(points,id)" in overlay
     assert "commitRegion([[box[0],box[1]]" in overlay
-    assert 'options["timeout_seconds"] = 3.0' in server
+    assert 'options["timeout_seconds"] = 45.0' in server
 
 
 

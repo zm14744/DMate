@@ -54,7 +54,7 @@ def canvas_page():
                 onRecognizeText: async polygon => {
                     textAreas.push(polygon);
                     if (window.deferText) return new Promise(resolve => window.resolveText = resolve);
-                    return '框选文字';
+                    return {regions:polygon.map(r=>({id:r.id,text:'框选文字 '+r.id}))};
                 }
             });
         }""", {"url": data_url, "sample": sample})

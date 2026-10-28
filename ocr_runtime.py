@@ -432,3 +432,49 @@ def recognize_image(raw, *, prepare_cache=False, text_only=False, timeout_second
                     text['text_only_fast_path'] = True
                 return text
         finally: fcntl.flock(lock,fcntl.LOCK_UN)
+
+
+def recognize_text_regions(raw, regions, *, timeout_seconds=90):
+    """Recognize numbered, masked crops in order with ONE isolated Small worker.
+
+    No fixed number-of-frames limit. Time, memory and output-size guards still
+    apply; operational failures are errors, never successful empty OCR results.
+    """
+    from graph_region import crop_region, validate_text_regions
+    regions = validate_text_regions(regions)
+    deadline = time.monotonic() + timeout_seconds
+    lock_path = Path(tempfile.gettempdir()) / 'dmate-local-model.lock'
+    with lock_path.open('a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise OCRError('图片识别繁忙，请稍后重试。') from None
+        try:
+            with tempfile.TemporaryDirectory(prefix='dmate-text-regions-') as folder:
+                root = Path(folder); files = []
+                from image_evidence import decode_document_image
+                with decode_document_image(raw, max_pixels=MAX_PIXELS).convert('RGB') as photo:
+                    for region in regions:
+                        if time.monotonic() >= deadline:
+                            raise OCRError('文字选区处理超时，请重试。')
+                        path = root / (str(region['id']) + '.png')
+                        path.write_bytes(crop_region(raw, region['polygon'], _photo=photo))
+                        files.append({'id': region['id'], 'path': str(path)})
+                plan = root / 'regions.json'
+                plan.write_text(json.dumps({'text_region_files': files}))
+                result, metric = run_worker('text', files[0]['path'], root / 'text.json',
+                                            layout_path=plan, timeout=max(.1, deadline-time.monotonic()))
+                if result is None:
+                    status = metric.get('status', 'worker_failed')
+                    message = {'timeout': '文字识别超时，请重试。',
+                               'memory_admission_rejected': '服务器识别资源繁忙，请稍后重试。',
+                               'memory_limit': '文字识别内存不足，请缩小选区后重试。',
+                               'cache_unavailable': '文字识别模型缓存不可用，请检查服务配置。'}
+                    raise OCRError(message.get(status, '文字识别模型启动或运行失败，请稍后重试。'))
+                if ([row.get('id') for row in result.get('regions', [])] !=
+                        [row['id'] for row in regions]):
+                    raise OCRError('文字识别返回的框编号不匹配，请重试。')
+                result['resource_metrics'] = [metric]
+                return result
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)

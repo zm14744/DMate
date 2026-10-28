@@ -23,7 +23,7 @@
         let individually = false, saving = false, destroyed = false, notice = '', pendingDelete = '';
         // "Is this a question?" is a per-upload choice, separate from graph data.
         let isQuestion = options.isQuestion !== false;
-        let unsubscribe, overlay = null, textOverlay = null, activeTab = 'image', textBusy = false, textSequence = 0;
+        let unsubscribe, overlay = null, textOverlay = null, activeTab = 'image', textBusy = false, textTimer = null, refreshTextPanel = null, runTextQueue = null;
         const textState = options.textState || { mode: 'text_rect', zoom: 100, visible: true };
         let requirements = String(options.requirements || '');
         const hasDirection = graph => graph.directed === true || graph.directed !== false &&
@@ -295,53 +295,113 @@
             const pane = element('section', 'dge-text-workspace');
             pane.setAttribute('role', 'tabpanel'); pane.id = instance + '-text-panel';
             pane.setAttribute('aria-labelledby', instance + '-text-tab');
-            const host = element('section', 'dge-overlay-host dge-text-overlay-host');
-            pane.append(host);
-            const controls = element('div', 'dge-text-actions');
-            const status = element('span', 'dge-text-status'); status.setAttribute('role', 'status');
-            const recognize = element('button', '', '识别框内文字'); recognize.type = 'button';
-            recognize.disabled = !textState.textRegion;
+            const host = element('section', 'dge-overlay-host dge-text-overlay-host'); pane.append(host);
+            textState.regions ||= [];
+            textState.nextId = textState.regions.reduce((next,r) => Math.max(next,r.id+1),textState.nextId || 1);
+            for (const row of textState.regions) if (row.status === 'recognizing') row.status = 'queued';
+            const rack = element('div', 'dge-floating-actions'); pane.append(rack);
+            const panel = element('details', 'dge-float-panel dge-text-results'); panel.open = false;
+            const content = element('div', 'dge-float-content');
+            panel.append(element('summary', '', '文字识别结果'), content); rack.append(panel);
+            const status = element('p', 'dge-text-status'); status.setAttribute('role', 'status');
+            const list = element('div', 'dge-text-region-list');
+            const body = element('textarea', 'dge-text-body'); body.rows = 5; body.maxLength = 23000;
+            body.setAttribute('aria-label', '文字识别结果'); body.value = model.getDocument().body_text;
+            body.placeholder = '连续框选文字后自动识别，结果按框编号汇总到这里。';
+            body.addEventListener('input', () => { textState.manuallyEdited = true; edit(() => model.setBody(body.value)); refreshTextPanel(); });
+            const assemble = () => textState.regions.filter(r => r.text?.trim()).map(r => r.text.trim()).join('\n\n');
+            const applyResults = () => {
+                const value = assemble();
+                if (value.length > 23000) { textState.assemblyError = '汇总文字过长，请精简后保存。'; return; }
+                textState.assemblyError = '';
+                model.setBody(value); body.value = value; refreshDraftViews();
+            };
+            const apply = button('使用编号顺序的识别结果', () => { textState.manuallyEdited = false; applyResults(); });
+            const schedule = () => {
+                clearTimeout(textTimer);
+                textTimer = setTimeout(() => { textTimer = null; void runTextQueue(); }, 550);
+            };
+            refreshTextPanel = () => {
+                const rows = textState.regions;
+                panel.querySelector('summary').textContent = '文字识别结果（' + rows.filter(r => r.status === 'done').length + '/' + rows.length + '）';
+                const queued = rows.filter(r => r.status === 'queued').length;
+                const failed = rows.filter(r => ['error','empty'].includes(r.status)).length;
+                status.textContent = textBusy ? '正在按编号识别，新增框会接着处理…'
+                    : queued ? '已框选，准备按编号一次识别…'
+                    : failed ? '部分文字框未识别完成，请查看对应编号并重试。'
+                    : rows.length ? '已按框编号顺序汇总。' : '连续框选即可自动识别，支持多个文字框。';
+                if (textState.assemblyError) status.textContent = textState.assemblyError;
+                if (textState.manuallyEdited && rows.length) status.textContent += ' 已保留手动修改，可点击下方按钮重新汇总。';
+                list.replaceChildren();
+                const labels = {queued:'待识别',recognizing:'识别中',done:'已识别',empty:'未识别到文字',error:'识别失败'};
+                for (const row of rows) {
+                    const item = element('div', 'dge-text-region-row'); item.dataset.textRegionId = row.id;
+                    item.append(element('strong', '', '文字框 ' + row.id + ' · ' + labels[row.status]));
+                    if (row.error) item.append(element('p', 'dge-muted', row.error));
+                    if (row.text) item.append(element('p', 'dge-text-excerpt', row.text));
+                    if (['error','empty'].includes(row.status)) item.append(button('重试文字框 ' + row.id, () => {
+                        row.status = 'queued'; row.error = ''; refreshTextPanel(); schedule();
+                    }));
+                    item.append(button('删除文字框 ' + row.id, () => {
+                        textState.regions = textState.regions.filter(r => r !== row);
+                        if (!textState.manuallyEdited && row.text) applyResults();
+                        refreshTextPanel(); textOverlay?.refresh();
+                    })); list.append(item);
+                }
+                apply.hidden = !textState.manuallyEdited || !rows.some(r => r.text?.trim());
+                textOverlay?.refresh();
+            };
+            runTextQueue = async () => {
+                if (destroyed || saving || textBusy) return;
+                const batch = textState.regions.filter(r => r.status === 'queued').sort((a,b) => a.id-b.id);
+                if (!batch.length) return;
+                textBusy = true; batch.forEach(r => { r.status = 'recognizing'; }); refreshTextPanel();
+                try {
+                    if (typeof options.onRecognizeText !== 'function') throw new Error('文字识别暂不可用，可手动输入。');
+                    const result = await options.onRecognizeText(batch.map(r => ({id:r.id, polygon:r.polygon.map(p => [...p])})));
+                    if (destroyed) return;
+                    const response = result?.regions;
+                    if (!Array.isArray(response) || response.length !== batch.length ||
+                        response.some((r,i) => r.id !== batch[i].id || typeof r.text !== 'string'))
+                        throw new Error('文字识别返回的框编号不匹配，请重试。');
+                    batch.forEach((row,i) => {
+                        if (!textState.regions.includes(row)) return;
+                        row.text = response[i].text; row.status = row.text.trim() ? 'done' : 'empty';
+                        row.error = row.status === 'empty' ? '框内未检测到文字，可调整范围或重试。' : '';
+                    });
+                    if (!textState.manuallyEdited && textState.regions.some(r => r.text?.trim())) applyResults();
+                } catch (error) {
+                    if (!destroyed) for (const row of batch) if (textState.regions.includes(row)) {
+                        row.status = 'error'; row.error = error?.message || '识别失败，请重试。';
+                    }
+                } finally {
+                    textBusy = false;
+                    if (!destroyed) { refreshTextPanel(); if (textState.regions.some(r => r.status === 'queued')) schedule(); }
+                }
+            };
             textOverlay = root.DMateGraphOverlay.mount(host, {
                 instance: instance + '-text', originalUrl: options.originalUrl,
                 state: textState, textOnly: true, model, graph: () => null,
                 disabled: () => saving || destroyed,
                 selectionChanged: points => {
-                    textSequence++; recognize.disabled = !points || textBusy;
-                    status.textContent = points ? '已框选文字范围，点击识别。' : '请先框选需要识别的文字。';
-                }
-            });
-            const body = element('textarea', 'dge-text-body'); body.rows = 5; body.maxLength = 23000;
-            body.setAttribute('aria-label', '文字识别结果'); body.value = model.getDocument().body_text;
-            body.placeholder = '先在原图中框选文字并识别，也可在这里手动输入或修改。';
-            body.addEventListener('input', () => edit(() => model.setBody(body.value)));
-            recognize.addEventListener('click', async () => {
-                if (textBusy || saving || destroyed || !textState.textRegion) return;
-                if (typeof options.onRecognizeText !== 'function') {
-                    status.textContent = '文字识别暂不可用，可手动输入。'; return;
-                }
-                const sequence = ++textSequence;
-                const polygon = textState.textRegion.map(p => [...p]);
-                const previousBody = model.getDocument().body_text;
-                textBusy = true; recognize.disabled = true; status.textContent = '正在识别框内文字…';
-                try {
-                    const result = await options.onRecognizeText(polygon);
-                    if (destroyed) return;
-                    if (sequence !== textSequence) { status.textContent = '选区已更改，未应用旧选区的识别结果。'; return; }
-                    const value = typeof result === 'string' ? result : result?.text;
-                    if (!value?.trim()) { status.textContent = result?.warning || '框内未识别到文字，可调整范围或手动输入。'; return; }
-                    if (model.getDocument().body_text !== previousBody) {
-                        status.textContent = '识别期间文字已手动修改，已保留输入；识别结果：' + value; return;
+                    if (points) {
+                        textState.regions.push({id:textState.nextId++, polygon:points.map(p => [...p]), status:'queued', text:''});
+                        schedule();
+                    } else {
+                        const hadText = textState.regions.some(r => r.text?.trim());
+                        textState.regions = []; clearTimeout(textTimer); textTimer = null;
+                        if (!textState.manuallyEdited && hadText) applyResults();
                     }
-                    model.setBody(value); body.value = value; refreshDraftViews();
-                    status.textContent = result?.warning || '框内文字识别完成，可继续核对修改。';
-                } catch (error) { if (!destroyed) status.textContent = error?.message || '识别失败，可重试或手动输入。'; }
-                finally { textBusy = false; if (!destroyed) recognize.disabled = !textState.textRegion; }
+                    refreshTextPanel();
+                }
             });
-            controls.append(recognize, status); pane.append(controls, field('文字识别结果（可修改）', body));
+            content.append(status, list, field('文字识别结果（可修改）', body), apply);
             const request = element('textarea', 'dge-text-requirements'); request.rows = 3; request.value = requirements; request.maxLength = 4000;
             request.setAttribute('aria-label', '手动输入要求（可选）'); request.placeholder = '例如：只解第（2）问，给出推导过程。';
             request.addEventListener('input', () => { requirements = request.value; options.onRequirementsChange?.(requirements); });
-            pane.append(field('手动输入要求（可选）', request));
+            content.append(field('手动输入要求（可选）', request));
+            refreshTextPanel();
+            if (textState.regions.some(r => r.status === 'queued')) schedule();
             return pane;
         }
 
@@ -602,7 +662,7 @@
             // The dialog header contains the close button; footer is save only.
             const actions = element('div', 'dge-actions');
             const confirm = button(saving ? '正在保存…' : '保存并确认', async () => {
-                if (textBusy) { notice = '文字正在识别，请等待完成后保存。'; refreshDraftViews(); return; }
+                if (textBusy || textState.regions?.some(r => ['queued','recognizing'].includes(r.status))) { notice = '文字正在识别，请等待完成后保存。'; refreshDraftViews(); return; }
                 if ([...container.querySelectorAll('input[type=number]')].some(control => !control.checkValidity())) {
                     notice = '请填写有效的相同边数量（1 到 50）。'; refreshDraftViews(); return;
                 }
@@ -624,7 +684,7 @@
         render();
         return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
             validate: model.validate, model,
-            destroy() { destroyed = true; textSequence++; unsubscribe(); overlay?.destroy(); textOverlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
+            destroy() { destroyed = true; clearTimeout(textTimer); unsubscribe(); overlay?.destroy(); textOverlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };
     root.DMateGraphEditor = api;

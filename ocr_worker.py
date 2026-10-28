@@ -76,6 +76,52 @@ def _limit_resources():
         resource.setrlimit(resource.RLIMIT_DATA,(3*1024**3,3*1024**3))
 
 
+def recognize_text_crop(image,ocr,audit,regions):
+    from ocr_layout import partition_text
+    original_pass=audit.start_pass('original',image)
+    items=ocr._extract_text_items(image)
+    unconfirmed=[]
+    original_pass['accepted_items']=len(items)
+    for index,item in enumerate(items):
+        item['ocr_provenance']={'pass_index':1,'pass_kind':'original','item_index':index}
+    audit.flush()
+    # One bounded auxiliary pass, never a retry loop. It keeps native source
+    # dimensions and the same detector budget; numeric changes still use
+    # the existing conservative merge policy in ocr.py.
+    if ocr._ocr_text_strength(items)<28 or ocr._math_line_risk(items):
+        enhanced_pass=audit.start_pass('enhanced',image)
+        with audit.phase('text_enhance'):
+            enhanced_image=ocr._enhance_faded_photo(image)
+        enhanced=ocr._extract_text_items(enhanced_image)
+        del enhanced_image
+        enhanced_pass['accepted_items']=len(enhanced)
+        for index,item in enumerate(enhanced):
+            item['ocr_provenance']={'pass_index':2,'pass_kind':'enhanced','item_index':index}
+        with audit.phase('text_merge') as event:
+            items=ocr._merge_text_ocr_passes(items,enhanced)
+            unconfirmed=_unconfirmed_enhanced(items,enhanced)
+            event['retained_items']=len(items)
+            event['unconfirmed_enhanced_items']=len(unconfirmed)
+        del enhanced
+    with audit.phase('text_partition') as event:
+        partition=partition_text(items,regions,image.shape[1],image.shape[0])
+        partition['uncertain'].extend(unconfirmed)
+        partition['image_size']=[image.shape[1],image.shape[0]]
+        partition['coordinate_space']='canonical_image_pixels'
+        body=ocr._front_side_text_items(partition['body'],image)
+        # Keep the exact emitted OCR items and their original pixel boxes.
+        # The automatic figure detector later removes only labels INSIDE
+        # recognized diagrams; it must not heuristically delete words from
+        # an already assembled question string.
+        partition['emitted_body']=body
+        text=ocr._compose_markdown(body,image.shape[1])
+        event['partition_counts']={key:len(partition[key]) for key in ('body','graph_labels','noise','uncertain')}
+        event['emitted_body_items']=len(body)
+    return {'text':text,'front_text':text,'text_count':len(body),'formula_count':0,
+            'review_regions':ocr._review_regions(body,image.shape[1],image.shape[0]),
+            'text_evidence':partition,'warning':None}
+
+
 def main():
     stage,image_path,output_path=sys.argv[1:4]
     if stage not in ('layout','text'): raise ValueError('unknown_stage')
@@ -111,49 +157,27 @@ def main():
             from ocr_layout import partition_text
             ocr.load_models()
             ocr._text_ocr=BoundedTextModel(ocr._text_ocr,audit)
-        original_pass=audit.start_pass('original',image)
-        items=ocr._extract_text_items(image)
-        unconfirmed=[]
-        original_pass['accepted_items']=len(items)
-        for index,item in enumerate(items):
-            item['ocr_provenance']={'pass_index':1,'pass_kind':'original','item_index':index}
-        audit.flush()
-        # One bounded auxiliary pass, never a retry loop. It keeps native source
-        # dimensions and the same detector budget; numeric changes still use
-        # the existing conservative merge policy in ocr.py.
-        if ocr._ocr_text_strength(items)<28 or ocr._math_line_risk(items):
-            enhanced_pass=audit.start_pass('enhanced',image)
-            with audit.phase('text_enhance'):
-                enhanced_image=ocr._enhance_faded_photo(image)
-            enhanced=ocr._extract_text_items(enhanced_image)
-            del enhanced_image
-            enhanced_pass['accepted_items']=len(enhanced)
-            for index,item in enumerate(enhanced):
-                item['ocr_provenance']={'pass_index':2,'pass_kind':'enhanced','item_index':index}
-            with audit.phase('text_merge') as event:
-                items=ocr._merge_text_ocr_passes(items,enhanced)
-                unconfirmed=_unconfirmed_enhanced(items,enhanced)
-                event['retained_items']=len(items)
-                event['unconfirmed_enhanced_items']=len(unconfirmed)
-            del enhanced
-        with audit.phase('text_partition') as event:
-            regions=json.loads(Path(sys.argv[4]).read_text()).get('regions',[])
-            partition=partition_text(items,regions,image.shape[1],image.shape[0])
-            partition['uncertain'].extend(unconfirmed)
-            partition['image_size']=[image.shape[1],image.shape[0]]
-            partition['coordinate_space']='canonical_image_pixels'
-            body=ocr._front_side_text_items(partition['body'],image)
-            # Keep the exact emitted OCR items and their original pixel boxes.
-            # The automatic figure detector later removes only labels INSIDE
-            # recognized diagrams; it must not heuristically delete words from
-            # an already assembled question string.
-            partition['emitted_body']=body
-            text=ocr._compose_markdown(body,image.shape[1])
-            event['partition_counts']={key:len(partition[key]) for key in ('body','graph_labels','noise','uncertain')}
-            event['emitted_body_items']=len(body)
-        result={'text':text,'front_text':text,'text_count':len(body),'formula_count':0,
-                'review_regions':ocr._review_regions(body,image.shape[1],image.shape[0]),
-                'text_evidence':partition,'warning':None}
+        plan=json.loads(Path(sys.argv[4]).read_text())
+        files=plan.get('text_region_files')
+        if files:
+            del image
+            results=[]
+            for index,row in enumerate(files):
+                # Keep the audit bounded per region while reusing one loaded model.
+                audit.data['completed_regions']=index
+                audit.data['region_index']=row['id']
+                audit.data['events']=[];audit.data['passes']=[]
+                with audit.phase('decode'):
+                    crop=cv2.imread(row['path'])
+                    if crop is None: raise ValueError('decode_failed')
+                part=recognize_text_crop(crop,ocr,audit,[])
+                del crop
+                results.append({'id':row['id'],'text':part['text'],'text_count':part['text_count']})
+            audit.data['completed_regions']=len(results)
+            result={'text':'\n\n'.join(r['text'] for r in results if r['text']),
+                    'regions':results,'text_evidence':{},'text_count':sum(r['text_count'] for r in results)}
+        else:
+            result=recognize_text_crop(image,ocr,audit,plan.get('regions',[]))
     with audit.phase('output'):
         completion=write_worker_result(stage,output_path,result)
     audit.data['completion']=completion

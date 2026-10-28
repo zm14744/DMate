@@ -14729,16 +14729,16 @@ async function editOcrTask(id) {
             requirements: task.userRequest || '',
             onRequirementsChange: value => { task.userRequest = value; },
             textState: task.textEditorState ||= { mode: 'text_rect', zoom: 100, visible: true },
-            onRecognizeText: async polygon => {
+            onRecognizeText: async regions => {
                 const controller = new AbortController();
-                const timeout = window.setTimeout(() => controller.abort(), 25000);
+                const timeout = window.setTimeout(() => controller.abort(), 100000);
                 try {
                     if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || ''))
                         task.sourceSha256 = await originalImageDigest(task.file);
                     const selected = new FormData();
                     selected.append('image', task.file);
                     selected.append('request_id', task.id);
-                    selected.append('polygon', JSON.stringify(polygon));
+                    selected.append('regions', JSON.stringify(regions));
                     const response = await fetch('/graph/text-region', {
                         method: 'POST', credentials: 'same-origin', body: selected, signal: controller.signal
                     });

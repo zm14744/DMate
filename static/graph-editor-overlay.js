@@ -130,7 +130,7 @@ function mount(host,o){
  });
  opacityControl.append(opacityTitle,opacityRange,opacityValue);viewControls.append(opacityControl);
  syncOriginal();
- if(o.textOnly)button('清除文字框','clear-text-region',()=>{s.textRegion=null;s.polygonDraft=[];o.selectionChanged?.(null);draw();});
+ if(o.textOnly)button('清空文字框','clear-text-region',()=>{s.textRegion=null;s.polygonDraft=[];o.selectionChanged?.(null);draw();});
  bar.append(status); // Actionable feedback appears with the tools, never below the photo.
  const change=(fn,kind)=>{try{fn();o.changed?.(kind);draw();}catch(e){status.textContent=e?.message||'修改失败';}};
  async function scanFigureType(polygon,graphId){
@@ -266,7 +266,12 @@ function mount(host,o){
     if(frame){frame.dataset.graphId=region.id;frame.classList.add('dge-frame-hit');if(region.id===g.id)frame.classList.add('is-current');svg.append(frame);}
   }
 
-  outline(s.textRegion,'dge-overlay-text-region');
+  if(o.textOnly)for(const region of s.regions||[]){
+    outline(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''));
+    const x=Math.min(...region.polygon.map(p=>p[0]))*w,y=Math.min(...region.polygon.map(p=>p[1]))*h;
+    const label=E(d,'text',{x:x+6/scale,y:y+17/scale,class:'dge-text-frame-number'});
+    label.textContent=String(region.id);label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);
+  }
   const pairs=new Map();for(const e of g.edges){const key=[e.from,e.to].sort().join('/');if(!pairs.has(key))pairs.set(key,[]);pairs.get(key).push(e);}
   for(const edges of pairs.values())for(const [i,e] of edges.entries()){
    if(!coords.has(e.from)||!coords.has(e.to))continue;

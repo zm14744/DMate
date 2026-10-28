@@ -39,7 +39,7 @@ def validate_polygon(points):
     return validated
 
 
-def crop_region(raw: bytes, polygon, *, exclusions=None):
+def crop_region(raw: bytes, polygon, *, exclusions=None, _photo=None):
     """Return a masked PNG of ONLY the user-requested text area."""
     coords = validate_polygon(polygon)
     if exclusions is not None and (not isinstance(exclusions, list) or len(exclusions) > 64):
@@ -47,7 +47,7 @@ def crop_region(raw: bytes, polygon, *, exclusions=None):
     excluded = [validate_polygon(p) for p in (exclusions or [])]
     from image_evidence import decode_document_image
     try:
-        photo = decode_document_image(raw, max_pixels=24_000_000).convert("RGB")
+        photo = _photo if _photo is not None else decode_document_image(raw, max_pixels=24_000_000).convert("RGB")
     except (ValueError, TypeError, OSError) as exc:
         raise RegionError("原图无法读取，请重新选择图片。") from exc
     try:
@@ -76,4 +76,20 @@ def crop_region(raw: bytes, polygon, *, exclusions=None):
         finally:
             clipped.close()
     finally:
-        photo.close()
+        if _photo is None:
+            photo.close()
+
+
+def validate_text_regions(regions):
+    """Frame IDs define reading order, independently of their page positions."""
+    if not isinstance(regions, list) or not regions:
+        raise RegionError('请先框选文字。')
+    seen = set(); result = []
+    for row in regions:
+        if not isinstance(row, dict) or type(row.get('id')) is not int or not 0 < row['id'] <= 9007199254740991:
+            raise RegionError('文字框编号无效。')
+        if row['id'] in seen:
+            raise RegionError('文字框编号重复。')
+        seen.add(row['id'])
+        result.append({'id': row['id'], 'polygon': validate_polygon(row.get('polygon'))})
+    return sorted(result, key=lambda row: row['id'])

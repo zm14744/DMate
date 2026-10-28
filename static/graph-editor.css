@@ -246,3 +246,16 @@
 }
 .dge-floating-actions{top:calc(var(--dge-viewbar-height,64px) + 12px)}
 .dge-overlay-status:empty{display:none}
+
+/* Text recognition shares the graph workspace's upper-right floating results. */
+.dge-text-workspace{position:relative}
+.dge-text-results .dge-float-content{max-height:56dvh;padding:12px}
+.dge-text-results .dge-field{margin:12px 0}
+.dge-text-status{margin:0 0 10px}
+.dge-text-region-list{max-height:20dvh;overflow:auto}
+.dge-text-region-row{border-bottom:1px solid var(--dge-border);padding:8px 0;font-size:12px}
+.dge-text-region-row button{font-size:12px;margin:4px 4px 0 0;padding:4px 6px;min-height:30px}
+.dge-text-excerpt{white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:auto;margin:5px 0}
+.dge-text-frame-number{fill:#1e40af;stroke:white;paint-order:stroke;stroke-linejoin:round;font-weight:bold;pointer-events:none}
+.dge-overlay-text-region{stroke:#2563eb;fill:#2563eb0c}
+.dge-overlay-text-region.is-error{stroke:#b91c1c}
