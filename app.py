@@ -4258,8 +4258,8 @@ def ocr():
             from graph_upload_tasks import UPLOAD_TASKS, UploadAdmissionError
             from graph_confirmation import confirmation_owner
             owner = confirmation_owner()
-            # Always choose the bounded Small-text worker in this fast route.
-            # Never fall through to legacy PP-DocLayout/full-OCR inference.
+            # A single Small-text worker runs parallel to accuracy-first
+            # automatic figure segmentation; it is NOT capped at four seconds.
             text_reader = None
             if OCR_AVAILABLE:
                 try:
@@ -4271,7 +4271,7 @@ def ocr():
                     routed = recognize_layout_only(
                         raw, recognize_text=text_reader,
                         cancelled=lambda: _ocr_is_cancelled(request_id, owner=owner),
-                        request_deadline=min(recognition_deadline, started_at + 3.6))
+                        request_deadline=recognition_deadline)
                 if request_id and _take_ocr_cancelled(request_id, owner=owner):
                     return jsonify({"cancelled": True})
                 routed.update(request_id=request_id,
