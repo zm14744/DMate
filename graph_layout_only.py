@@ -9,6 +9,8 @@ Text-only images skip the diagram model and PP-DocLayoutV3 entirely.
 from __future__ import annotations
 
 import base64
+import inspect
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 import hashlib
 import io
 import math
@@ -21,7 +23,9 @@ from PIL import Image
 from image_evidence import decode_document_image
 
 
-VERSION = "2026-10-28-figure-metadata-only-v1"
+VERSION = "2026-10-28-fast-figure-metadata-v2"
+SCAN_MAX_SECONDS = 3.4
+_SCAN_WORKERS = ThreadPoolExecutor(max_workers=8, thread_name_prefix="dmate-quick-scan")
 MAX_GRAPHS = 24
 
 TYPE_PROMPT = """你是离散数学图片的版面分图及图类型读取器，不是图形绘制器。
@@ -175,7 +179,32 @@ def _project_figures(reading):
     return figures, list(dict.fromkeys(questions))[:20]
 
 
-def _vision_layout(image, *, provider=None, budget=None, cancelled=None):
+class _FastVisionBudget:
+    """One provider call; do not spend the remaining upload time on retries."""
+
+    def __init__(self, deadline):
+        self.deadline = deadline
+        self.connect_seconds = 0.85
+        self.output_tokens = 1024
+        self.metrics = []
+
+    def take(self):
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("figure_scan_deadline")
+        return left
+
+
+SELECTED_TYPE_PROMPT = """图像已由用户手动框选为一幅图。只判断该图有无箭头、有无真正的边权。
+箭头存在则directed=true，否则false；不清楚写"unknown"。
+边上的数字/字母是边权才设weighted=true；点的名称和图注不是边权；不清楚写"unknown"。
+禁止提取点、边、连接关系或生成任何绘图。仅输出JSON：
+{"has_graph":true,"graphs":[{"name":"当前子图","bbox":[0,0,1,1],"directed":false,"weighted":false}],"uncertainties":[]}
+"""
+
+
+def _vision_layout(image, *, provider=None, budget=None, cancelled=None,
+                   request_deadline=None, selected=False):
     _check_cancelled(cancelled)
     if provider is None:
         from vision_provider import VisionProvider
@@ -183,78 +212,119 @@ def _vision_layout(image, *, provider=None, budget=None, cancelled=None):
         if not provider.available():
             raise RuntimeError("qwen_layout_unavailable")
     if budget is None:
-        from graph_agent_runtime import AgentBudget
-        budget = AgentBudget(seconds=65, calls=1, call_seconds=55,
-                             cancelled=cancelled)
-        budget.output_tokens = 2048
-    working = _scaled_image(image, side=1480)
-    payload = io.BytesIO()
-    working.save(payload, format="PNG", compress_level=3)
-    url = "data:image/png;base64," + base64.b64encode(payload.getvalue()).decode("ascii")
-    # One bounded Qwen3-VL-Plus call, with NO second visual agent and no
-    # OpenCV/sknw topology recovery or automatic edge reconciliation.
-    response = provider(TYPE_PROMPT, [url], budget)
+        budget = _FastVisionBudget(request_deadline or time.monotonic() + 2.8)
+    working = _scaled_image(image, side=1050).convert("RGB")
+    try:
+        payload = io.BytesIO()
+        # A bounded JPEG transfers faster than a large PNG to the visual API.
+        working.save(payload, format="JPEG", quality=80, optimize=False)
+        url = "data:image/jpeg;base64," + base64.b64encode(payload.getvalue()).decode("ascii")
+    finally:
+        working.close()
+    _check_cancelled(cancelled)
+    response = provider(SELECTED_TYPE_PROMPT if selected else TYPE_PROMPT, [url], budget)
     _check_cancelled(cancelled)
     return _project_figures(response)
 
 
+def _await_until(jobs, deadline, cancelled=None):
+    """Never wait for an OCR/native/model worker after the request deadline."""
+    pending = set(jobs.values())
+    while pending and time.monotonic() < deadline:
+        _check_cancelled(cancelled)
+        _, pending = wait(pending, timeout=min(.04, max(0., deadline - time.monotonic())),
+                          return_when=FIRST_COMPLETED)
+    _check_cancelled(cancelled)
+    for future in pending:
+        future.cancel()
+    return {name: future for name, future in jobs.items() if future.done()
+            and not future.cancelled()}
+
+
+def _fast_text_read(reader, raw, deadline):
+    """Pass the tight timeout only to readers that actually support it."""
+    signature = inspect.signature(reader)
+    supports_timeout = ("timeout_seconds" in signature.parameters or any(
+        param.kind == inspect.Parameter.VAR_KEYWORD
+        for param in signature.parameters.values()))
+    kwargs = {"text_only": True}
+    if supports_timeout:
+        kwargs["timeout_seconds"] = max(.1, deadline - time.monotonic() - .08)
+    return reader(raw, **kwargs)
+
+
 def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=None,
                           cancelled=None, request_deadline=None):
-    """One text worker, optional one Qwen metadata call; never pre-draw edges."""
+    """Concurrent OCR + figure-type read; no graph pre-drawing, max 3.4 s."""
     start = time.monotonic()
+    deadline = min(start + SCAN_MAX_SECONDS, request_deadline or float("inf"))
     source = hashlib.sha256(raw).hexdigest()
     _check_cancelled(cancelled)
     image = decode_document_image(raw, max_pixels=16_000_000)
     try:
-        # CV only routes the request; it is never an AI graph prediction.
         hint = visual_preflight(image)
+        _check_cancelled(cancelled)
+        jobs = {}
+        if recognize_text is not None and time.monotonic() < deadline:
+            jobs["text"] = _SCAN_WORKERS.submit(_fast_text_read, recognize_text, raw, deadline)
+        if hint["possible_graph"] and time.monotonic() < deadline:
+            # Copy for the worker: the request may return while an upstream
+            # socket is still being torn down; it must never use closed pixels.
+            model_image = image.copy()
+
+            def vision_job():
+                try:
+                    return _vision_layout(model_image, provider=provider,
+                                          budget=budget, cancelled=cancelled,
+                                          request_deadline=deadline)
+                finally:
+                    model_image.close()
+
+            jobs["vision"] = _SCAN_WORKERS.submit(vision_job)
+
+        done = _await_until(jobs, deadline, cancelled)
         _check_cancelled(cancelled)
         text_result = {}
         text_error = None
-        if recognize_text is not None:
+        if recognize_text is None:
+            text_error = "文字识别服务暂不可用，请手动补充"
+        elif "text" not in done:
+            text_error = "文字识别未在4秒内完成，可手动补充文字"
+        else:
             try:
-                # No PP-DocLayoutV3 or second picture/graph worker for OCR.
-                text_result = recognize_text(raw, text_only=True)
+                text_result = done["text"].result()
                 if not isinstance(text_result, dict):
                     raise ValueError("text_worker_invalid_response")
                 metrics = text_result.get("resource_metrics") or []
                 if not any(row.get("stage") == "text" and row.get("status") == "ok"
                            for row in metrics if isinstance(row, dict)):
                     text_error = "文字识别没有完成，请核对或手动补充"
-            except LayoutOnlyCancelled:
-                raise
             except Exception:
+                text_result = {}
                 text_error = "文字识别暂不可用，请手动补充"
-        else:
-            text_error = "文字识别服务暂不可用，请手动补充"
-        _check_cancelled(cancelled)
+
         text = str(text_result.get("front_text") or text_result.get("text") or "").strip()
-        figures = []
-        issues = []
+        figures, issues = [], []
         vision_failed = False
-        qwen_attempted = False
+        qwen_attempted = "vision" in jobs
         if hint["possible_graph"]:
-            if request_deadline is not None and request_deadline - time.monotonic() < 8:
+            if "vision" not in done:
                 vision_failed = True
-                issues.append("图形类型识别超时，未生成任何预绘图")
+                issues.append("图形分区或类型未在4秒内确定，请手动框选并选择图类型")
             else:
                 try:
-                    qwen_attempted = True
-                    figures, issues = _vision_layout(image, provider=provider,
-                                                       budget=budget, cancelled=cancelled)
+                    figures, issues = done["vision"].result()
                 except LayoutOnlyCancelled:
                     raise
                 except Exception:
                     vision_failed = True
-                    issues = ["图形分区及类型识别未完成，未生成任何预绘图"]
+                    issues = ["图形分区及类型识别未完成，请手动框选，未生成任何预绘图"]
             if not figures and not vision_failed:
-                issues.append("原图存在几何候选，但视觉模型未确认独立数学图，建议核对")
+                issues.append("原图存在几何候选，但未确认独立数学图，请核对")
         if text_error:
             issues.append(text_error)
         if not figures and not text and not issues:
             issues.append("图片中没有识别到可用的文字或数学图")
-        # An unreadable diagram cannot masquerade as a successful text-only
-        # result just because the adjacent exercise header was OCR'd.
         status = ("failed" if vision_failed or not text and not figures
                   else "partial" if figures or issues else "complete")
         return {
@@ -267,8 +337,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
             "graph_display_data": [],
             "document": {"body_text": text, "graphs": figures},
             "recognition_status": status,
-            "review": {"required": status != "complete",
-                       "reasons": issues[:8]},
+            "review": {"required": status != "complete", "reasons": issues[:8]},
             "warning": "；".join(issues[:5]) if issues else None,
             "diagnostics": {
                 "workflow_profile": VERSION,
@@ -281,6 +350,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                 "layout_model_calls": 0,
                 "text_worker_metrics": text_result.get("resource_metrics", []),
                 "duration_seconds": round(time.monotonic() - start, 3),
+                "deadline_hit": time.monotonic() >= deadline,
                 "image_accuracy_certified": False,
             }
         }
@@ -288,5 +358,48 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
         image.close()
 
 
+def recognize_selected_graph_type(raw, *, provider=None, budget=None,
+                                  cancelled=None, request_deadline=None):
+    """Re-scan only a user-selected figure for arrows/weights, not topology."""
+    start = time.monotonic()
+    deadline = min(start + SCAN_MAX_SECONDS, request_deadline or float("inf"))
+    _check_cancelled(cancelled)
+    image = decode_document_image(raw, max_pixels=16_000_000)
+
+    def work():
+        try:
+            return _vision_layout(image, provider=provider, budget=budget,
+                                  cancelled=cancelled, request_deadline=deadline,
+                                  selected=True)
+        finally:
+            image.close()
+
+    future = _SCAN_WORKERS.submit(work)
+    finished = _await_until({"figure": future}, deadline, cancelled)
+    result = {"directed": "unknown", "weighted": "unknown",
+              "recognition_status": "partial", "warning": None,
+              "elapsed_seconds": round(time.monotonic() - start, 3),
+              "no_auto_draw": True}
+    if "figure" not in finished:
+        result["warning"] = "图类型识别超出4秒，保留原图与手动选择"
+        return result
+    try:
+        figures, issues = finished["figure"].result()
+        if len(figures) == 1:
+            result["directed"] = figures[0]["directed"]
+            result["weighted"] = figures[0]["weighted"]
+            if (type(result["directed"]) is bool and
+                    type(result["weighted"]) is bool):
+                result["recognition_status"] = "complete"
+        else:
+            issues.append("选区包含多幅图或图形未被确认，请逐幅框选")
+        result["warning"] = "；".join(issues[:4]) or None
+    except Exception:
+        result["warning"] = "选区的箭头或权值未能确定，请手动选择"
+    result["elapsed_seconds"] = round(time.monotonic() - start, 3)
+    return result
+
+
 __all__ = ["recognize_layout_only", "visual_preflight", "_project_figures",
-           "LayoutOnlyCancelled", "VERSION"]
+           "LayoutOnlyCancelled", "VERSION", "SCAN_MAX_SECONDS",
+           "recognize_selected_graph_type"]
