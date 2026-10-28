@@ -14647,6 +14647,47 @@ async function confirmOcrTask(task, documentValue) {
     }
 }
 
+function reuseVerifiedTypeForSameRegion(task, polygon) {
+    // Original automatic segmentation has already undergone full-page +
+    // focused checks. An unchanged rectangle can reuse that evidence within
+    // the manual four-second limit without paying for another model call.
+    // A new/irregular/meaningfully changed ROI MUST be independently scanned.
+    if (task?.result?.workflow_profile !== "layout_only"
+        || !Number(task?.result?.diagnostics?.type_review_calls)
+        || !Array.isArray(polygon) || polygon.length !== 4) return null;
+    const xs = polygon.map(p => p?.[0]), ys = polygon.map(p => p?.[1]);
+    if (![...xs, ...ys].every(x => typeof x === "number" && Number.isFinite(x)
+            && x >= 0 && x <= 1)) return null;
+    const candidate = [Math.min(...xs), Math.min(...ys),
+        Math.max(...xs), Math.max(...ys)];
+    if (candidate[2] - candidate[0] < .01 || candidate[3] - candidate[1] < .01)
+        return null;
+    // Accept an axis-aligned rectangle only, not a polygon that shares
+    // its bounding box but masks out material evidence.
+    const near = (a, b) => Math.abs(a - b) < 1e-5;
+    if (!polygon.every(p => (near(p[0],candidate[0]) || near(p[0],candidate[2]))
+        && (near(p[1],candidate[1]) || near(p[1],candidate[3])))) return null;
+    const area = box => (box[2]-box[0])*(box[3]-box[1]);
+    const list = task.initialDocument?.graphs || [];
+    let match = null, best = 0;
+    for (const graph of list) {
+        const box = graph?.bbox;
+        if (!Array.isArray(box) || box.length !== 4
+            || typeof graph.directed !== "boolean"
+            || typeof graph.weighted !== "boolean") continue;
+        const intersection = Math.max(0, Math.min(box[2],candidate[2])-Math.max(box[0],candidate[0]))
+            * Math.max(0, Math.min(box[3],candidate[3])-Math.max(box[1],candidate[1]));
+        const union = area(box) + area(candidate) - intersection;
+        const overlap = union > 0 ? intersection/union : 0;
+        if (overlap > best) { best = overlap; match = graph; }
+    }
+    if (best < .97 || !match) return null;
+    return {directed: match.directed, weighted: match.weighted,
+        recognition_status: "complete", warning: null, no_auto_draw: true,
+        reused_verified_original: true};
+}
+
+
 async function editOcrTask(id) {
     const task = ocrTasks.get(id);
     if (!task || task.state === "recognizing" || task.confirming || task.sending || ocrEditorTaskId) return;
@@ -14683,6 +14724,8 @@ async function editOcrTask(id) {
             isQuestion: task.isQuestion !== false,
             onQuestionChange: flag => { task.isQuestion = flag; },
             onRecognizeGraphType: async polygon => {
+                const reused = reuseVerifiedTypeForSameRegion(task, polygon);
+                if (reused) return reused;
                 const controller = new AbortController();
                 const timeout = window.setTimeout(() => controller.abort(), MANUAL_FIGURE_SCAN_MAX_MS);
                 try {
