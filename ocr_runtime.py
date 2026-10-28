@@ -387,9 +387,15 @@ def recognize_image(raw, *, prepare_cache=False, text_only=False, timeout_second
                 # all canonical source pixels for recognition crops instead
                 # of feeding both models the layout thumbnail.
                 image.save(text_path)
-                layout_image=image.copy(); layout_image.thumbnail((2200,2200))
-                layout_size=list(layout_image.size); layout_image.save(layout_image_path)
-                image.close(); layout_image.close()
+                if text_only:
+                    # Fast text-only scans must not resize/re-encode a second
+                    # image for a layout model that is never invoked.
+                    layout_size=canonical_size[:]
+                else:
+                    layout_image=image.copy(); layout_image.thumbnail((2200,2200))
+                    layout_size=list(layout_image.size); layout_image.save(layout_image_path)
+                    layout_image.close()
+                image.close()
                 if text_only:
                     # No PP-DocLayoutV3 inference and no extra image-reader.
                     # A genuinely empty region list tells the Small worker to
