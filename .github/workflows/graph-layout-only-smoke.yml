@@ -10,6 +10,9 @@ on:
       - 'static/graph-editor.js'
       - 'app.py'
       - 'tests/test_graph_layout_only.py'
+      - 'tests/manual_type_cache_contract.cjs'
+      - 'static/graph-editor-overlay.js'
+      - 'static/graph-editor-model.js'
       - '.github/workflows/graph-layout-only-smoke.yml'
   workflow_dispatch:
 
@@ -37,3 +40,5 @@ jobs:
         run: |
           node --check static/script.js
           node --check static/graph-editor.js
+          node --check static/graph-editor-overlay.js
+          node tests/manual_type_cache_contract.cjs
