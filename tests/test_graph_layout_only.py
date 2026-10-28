@@ -195,7 +195,7 @@ def test_auto_graph_route_and_frontend_are_layout_only():
     assert 'formData.append("workflow", "auto_graph")' in client
     assert 'data?.workflow_profile === "layout_only"' in client
     assert "vertices: [], edges: []" in client
-    assert 'if (useOverlay && graph)' in graph_editor
+    assert 'if (useOverlay)' in graph_editor
     assert "dge-detected-type" in graph_editor
     assert all(s not in TYPE_PROMPT for s in ("枚举顶点", "追踪全部边", "按连通图补充"))
 

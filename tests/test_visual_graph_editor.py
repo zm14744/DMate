@@ -343,3 +343,18 @@ console.log(JSON.stringify({after,accepted:model.validate()}));
     assert output['accepted'] == []
 
 
+
+
+def test_dragging_an_edge_moves_endpoints_and_incident_paths_in_one_undo():
+    value=run_model('''
+model.moveVertex('G1','a',.2,.3);model.moveVertex('G1','b',.6,.7);
+model.setEdgePath('G1','e1',[[.2,.3],[.4,.45],[.6,.7]]);
+const before=model.getDocument();model.moveEdge('G1','e1',.3,-.2);
+const moved=model.getDocument();model.undo();
+console.log(JSON.stringify({before,moved,undone:model.getDocument()}));
+''')
+    assert value['before']==value['undone']
+    nodes=value['moved']['graphs'][0]['vertices']
+    assert nodes[0]['x']==pytest.approx(.5) and nodes[0]['y']==pytest.approx(.1)
+    assert nodes[1]['x']==pytest.approx(.9) and nodes[1]['y']==pytest.approx(.5)
+    assert value['moved']['graphs'][0]['edges'][0]['path'][1]==pytest.approx([.7,.25])

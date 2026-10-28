@@ -251,6 +251,21 @@
                     }
                 }
             }),
+            moveEdge:(gid,eid,dx,dy)=>change(draft=>{
+                if(!coordinate(dx)||!coordinate(dy))throw new Error('移动位置无效。');
+                const g=getGraph(draft,gid),edge=g.edges.find(e=>e.id===eid);
+                if(!edge)throw new Error('找不到这条边。');
+                const moved=new Set([edge.from,edge.to]);
+                for(const v of g.vertices)if(moved.has(v.id)){
+                    if(!coordinate(v.x)||!coordinate(v.y))throw new Error('请先定位边的端点。');
+                    v.x+=dx;v.y+=dy;
+                }
+                for(const e of g.edges)if(validPath(e.path)){
+                    if(moved.has(e.from)&&moved.has(e.to))e.path=e.path.map(p=>[p[0]+dx,p[1]+dy]);
+                    else {if(moved.has(e.from))e.path[0]=[e.path[0][0]+dx,e.path[0][1]+dy];
+                          if(moved.has(e.to)){const i=e.path.length-1;e.path[i]=[e.path[i][0]+dx,e.path[i][1]+dy];}}
+                }
+            }),
             setGraphBounds: (gid, bbox) => change(draft => {
                 if (!validBox(bbox)) throw new Error('请框选有效的图形范围。');
                 const graph = getGraph(draft, gid);

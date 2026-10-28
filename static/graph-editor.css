@@ -197,3 +197,22 @@
 /* Region commits and asynchronous type hints must not move the camera. */
 .dge-workspace:has(.dge-overlay-host){grid-template-columns:minmax(0,1fr)}
 .dge-overlay-tools .dge-overlay-status,.dge-overlay-tools .dge-overlay-status:empty{display:block;box-sizing:border-box;height:3em;min-height:3em;overflow:auto}
+
+/* Canvas-first editor; floating controls never change camera dimensions. */
+.dge-workspace:has(.dge-overlay-host){position:relative;display:block}
+.dge-overlay{position:relative}
+.dge-overlay-viewport{height:72dvh;min-height:360px}
+.dge-tool-palette{position:absolute;z-index:5;left:12px;top:12px;max-width:min(440px,calc(100% - 24px));border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface,#fff);box-shadow:0 4px 18px #0002}
+.dge-tool-palette>summary,.dge-float-panel>summary{padding:9px 13px;cursor:pointer;list-style:none;font-size:13px;user-select:none}
+.dge-tool-palette>.dge-overlay-tools{max-height:30dvh;overflow:auto;border-bottom:0;border-radius:12px}
+.dge-floating-actions{position:absolute;z-index:6;top:12px;right:12px;display:flex;gap:5px}
+.dge-float-panel{position:static;background:var(--dge-surface,#fff);border:1px solid var(--dge-border);border-radius:12px;box-shadow:0 4px 18px #0002}
+.dge-float-content{position:absolute;right:0;top:calc(100% + 8px);width:min(380px,calc(100vw - 50px));max-height:56dvh;overflow:auto;box-sizing:border-box;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface,#fff);box-shadow:0 4px 18px #0002}
+.dge-float-panel .dge-toolbar{margin:0;padding:12px;display:flex;flex-direction:column}
+.dge-float-panel .dge-advanced-panel,.dge-float-panel .dge-review-summary{border:0;margin:0}
+.dge-workspace .dge-selection-panel{position:absolute;z-index:8;right:12px;bottom:12px;width:min(330px,calc(100% - 24px));max-height:50dvh;overflow:auto;box-sizing:border-box;box-shadow:0 4px 18px #0002;background:var(--dge-surface,#fff)}
+.dge-workspace:has(.dge-float-panel[open]) .dge-selection-panel{display:none}
+.dge-panel-close{align-self:flex-end}
+.dge-frame-hit{fill:transparent;pointer-events:all;cursor:grab}
+.dge-frame-hit.is-current{stroke-width:3}
+@media(max-width:760px){.dge-overlay-viewport{height:72dvh;min-height:320px}.dge-tool-palette{max-width:calc(100% - 24px)}.dge-tool-palette>.dge-overlay-tools{max-height:24dvh}}

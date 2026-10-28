@@ -19,11 +19,14 @@
         const model = createModel(initialized, initial);
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
         let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null;
+        let selectedGraph=false;const panelState={};
         let individually = false, saving = false, destroyed = false, notice = '', pendingDelete = '';
         // "Is this a question?" is a per-upload choice, separate from graph data.
         let isQuestion = options.isQuestion !== false;
         let unsubscribe, overlay = null;
         const overlayState = { mode: 'select', zoom: 100, visible: true, start: null };
+        const removeGraph=id=>{model.deleteGraph(id);selectedNodes.clear();selectedEdge=null;selectedGraph=false;
+            overlayState.start=null;overlayState.polygonDraft=[];overlayState.textRegion=null;};
         const element = (tag, className, label) => { const node = dom.createElement(tag); if (className) node.className = className;
             if (label !== undefined) node.textContent = label; return node; };
         const svgElement = (tag, attributes, label) => { const node = dom.createElementNS(svgNS, tag);
@@ -220,11 +223,11 @@
                     value => model.updateEdges(graph.id, ids, 'from', value))));
                 aside.append(field('终点', select(endpoints, edge.to, '当前边终点',
                     value => model.updateEdges(graph.id, ids, 'to', value))));
-                aside.append(field('方向', select([['undirected','无向 —'], ['forward','有向 →'],
+                if(graph.directed!==false){aside.append(field('方向', select([['undirected','无向 —'], ['forward','有向 →'],
                     ['unknown','待核对 ?']], edge.direction, '当前边方向',
                     value => model.updateEdges(graph.id, ids, 'direction', value))));
-                aside.append(button('反转方向', () => model.reverseEdges(graph.id, ids)));
-                aside.append(field('权值', input(edge.weight, '当前边权值',
+                aside.append(button('反转方向', () => model.reverseEdges(graph.id, ids)));}
+                if(graph.weighted!==false)aside.append(field('权值', input(edge.weight, '当前边权值',
                     value => model.updateEdges(graph.id, ids, 'weight', weightValue(value)))));
                 aside.append(field('边名', input(edge.edge_label, '当前边名称',
                     value => model.updateEdges(graph.id, ids, 'edge_label', value || null))));
@@ -248,7 +251,13 @@
                             selectedNodes.clear();
                         });
                 }, 'dge-danger'));
+            } else if(selectedGraph){
+                aside.append(element('h3','','子图属性'));
+                aside.append(field('名称',input(graph.name,'当前子图名称',v=>model.renameGraph(graph.id,v))));
+                aside.append(element('p','dge-muted',(graph.directed===false?'无向':'有向或待核对')+' · '+(graph.weighted===false?'无权':'带权或待核对')));
+                aside.append(button('删除子图',()=>removeGraph(graph.id),'dge-danger'));
             }
+            if(aside.childElementCount){const close=button('关闭属性',()=>{selectedNodes.clear();selectedEdge=null;selectedGraph=false;});close.classList.add('dge-panel-close');aside.prepend(close);}
             return aside;
         }
 
@@ -303,7 +312,7 @@
             if (!graph?.edges.some(edge => edge.id === selectedEdge)) selectedEdge = null;
             // Keep the actual image and zoom/scroll when only controls change.
             // Pure-text images have no mathematical drawing area to prefill.
-            const retainedOverlay = useOverlay && graph
+            const retainedOverlay = useOverlay
                 ? container.querySelector('.dge-overlay-host') : null;
             if (retainedOverlay) retainedOverlay.remove();
             else if (overlay) { overlay.destroy(); overlay = null; }
@@ -322,7 +331,7 @@
                 details.append(element('summary', '', '识别时需留意'));
                 const list = element('ul'); observations.slice(0, 64).forEach(message => list.append(element('li', '', message))); details.append(list); container.append(details); }
             const workspace = element('div', 'dge-workspace');
-            if (useOverlay && graph) {
+            if (useOverlay) {
                 const host = retainedOverlay || element('section', 'dge-overlay-host');
                 workspace.append(host);
                 container.append(workspace);
@@ -341,10 +350,13 @@
                         return currentGraph;
                     },
                     disabled: () => saving || destroyed,
+                    ensureGraph:()=>{if(!model.getDocument().graphs.length)currentGraph=model.addGraph();return currentGraph;},
+                    selectGraph:id=>{for(const k of Object.keys(panelState))panelState[k]=false;currentGraph=id;selectedNodes.clear();selectedEdge=null;selectedGraph=true;render();},
+                    clearSelection:()=>{selectedNodes.clear();selectedEdge=null;selectedGraph=false;render();},
                     edgeSelected: () => selectedEdge,
                     nodeSelected: () => selectedNodes,
-                    selectEdge: id => { selectedEdge = id; selectedNodes.clear(); render(); },
-                    selectNode: id => { selectedNodes = new Set([id]); selectedEdge = null; render(); },
+                    selectEdge: id => { for(const k of Object.keys(panelState))panelState[k]=false;selectedGraph=false;selectedEdge = id; selectedNodes.clear(); render(); },
+                    selectNode: id => { for(const k of Object.keys(panelState))panelState[k]=false;selectedGraph=false;selectedNodes = new Set([id]); selectedEdge = null; render(); },
                     changed: kind => {
                         if (kind === 'vertex') refreshCanvasVertex();
                         else if (kind === 'geometry') refreshDraftViews();
@@ -415,7 +427,7 @@
             toolbar.append(button('添加子图', () => { currentGraph = model.addGraph(); selectedNodes.clear(); selectedEdge = null; }));
             if (graph) {
                 toolbar.append(field('子图名称', input(graph.name, '子图名称', value => model.renameGraph(graph.id, value))));
-                toolbar.append(button('删除子图', () => askDelete('graph:' + graph.id, '将删除这幅图的 ' + graph.vertices.length + ' 个节点和 ' + graph.edges.length + ' 条边。', () => model.deleteGraph(graph.id)), 'dge-danger'));
+                toolbar.append(button('删除子图', () => removeGraph(graph.id), 'dge-danger'));
                 if (document.graphs.length > 1) { const target = select(graphOptions(document, graph.id), '', '合并目标子图', null);
                     toolbar.append(field('合并子图', target), button('合并到所选图', () => { if (!target.value) throw new Error('请先选择合并目标。'); const targetId = target.value; model.mergeGraph(graph.id, targetId); currentGraph = targetId; })); }
             }
@@ -445,9 +457,9 @@
                     row.dataset.edgeId = edge.id;
                     row.append(button('边 ' + (index + 1), () => { selectedEdge = edge.id; }, 'dge-edge-select'));
                     row.append(field('起点', select(nodeOptions(graph), edge.from, '边 ' + (index + 1) + ' 起点', value => model.updateEdges(graph.id, ids, 'from', value))),
-                        field('方向', select([['undirected', '无向 —'], ['forward', '有向 →'], ['unknown', '待确认 ?']], edge.direction, '边 ' + (index + 1) + ' 方向', value => model.updateEdges(graph.id, ids, 'direction', value))),
+                        ...(graph.directed===false?[]:[field('方向', select([['undirected', '无向 —'], ['forward', '有向 →'], ['unknown', '待确认 ?']], edge.direction, '边 ' + (index + 1) + ' 方向', value => model.updateEdges(graph.id, ids, 'direction', value)))]),
                         field('终点', select(nodeOptions(graph), edge.to, '边 ' + (index + 1) + ' 终点', value => model.updateEdges(graph.id, ids, 'to', value))),
-                        field('权重', input(edge.weight, '边 ' + (index + 1) + ' 权重', value => model.updateEdges(graph.id, ids, 'weight', weightValue(value)))));
+                        ...(graph.weighted===false?[]:[field('权重', input(edge.weight, '边 ' + (index + 1) + ' 权重', value => model.updateEdges(graph.id, ids, 'weight', weightValue(value))))]));
                     if (!individually) { const count = input(group.length, '边 ' + (index + 1) + ' 相同边数量', value => {
                             const beforeIds = new Set(model.getDocument().graphs.find(row => row.id === graph.id).edges.map(row => row.id));
                             model.setEdgeCount(graph.id, ids, Number(value));
@@ -455,7 +467,7 @@
                             ids.splice(0, ids.length, ...latest.filter(row => ids.includes(row.id) || !beforeIds.has(row.id)).map(row => row.id));
                         }, 'number'); count.min = '1'; count.max = '50'; count.required = true;
                         const quantity = field('相同边数量', count); quantity.append(button('应用数量', () => model.setEdgeCount(graph.id, ids, Number(count.value)))); row.append(quantity); }
-                    row.append(button('交换端点 / 反向', () => model.reverseEdges(graph.id, ids)));
+                    if(graph.directed!==false)row.append(button('交换端点 / 反向', () => model.reverseEdges(graph.id, ids)));
                     const attributes = element('details', 'dge-edge-attributes'); attributes.append(element('summary', '', '边名、线型与颜色'));
                     attributes.append(field('边名', input(edge.edge_label, '边 ' + (index + 1) + ' 边名', value => model.updateEdges(graph.id, ids, 'edge_label', value || null))),
                         field('线型', select([['', '未标特殊线型'], ['solid', '实线'], ['dashed', '虚线'], ['dotted', '点线'], ['unknown', '尚不确定']], edge.style ?? '', '边 ' + (index + 1) + ' 线型', value => model.updateEdges(graph.id, ids, 'style', value || null))),
@@ -483,6 +495,22 @@
                     advanced.append(panels);
                     container.append(advanced);
                 } else container.append(panels);
+            }
+            if(useOverlay){
+                const rack=element('div','dge-floating-actions');workspace.append(rack);
+                const floating=(node,title,key,position)=>{
+                    if(!node)return;
+                    const panel=element('details','dge-float-panel '+position);panel.dataset.panelKey=key;panel.open=Boolean(panelState[key]);
+                    const content=element('div','dge-float-content');content.append(node);
+                    const launcher=element('summary','',title);
+                    launcher.addEventListener('click',()=>{if(!panel.open)for(const other of rack.children)if(other!==panel){other.open=false;panelState[other.dataset.panelKey]=false;}});
+                    panel.append(launcher,content);
+                    panel.addEventListener('toggle',()=>{panelState[key]=panel.open;if(panel.open)for(const other of rack.children)if(other!==panel)other.open=false;});rack.append(panel);
+                };
+                floating(toolbar,'子图管理','graphs','dge-float-graphs');
+                if(review){review.open=true;floating(review,'识别结果','results','dge-float-results');}
+                const advanced=container.querySelector('.dge-advanced-panel');
+                if(advanced)floating(advanced,'批量编辑','advanced','dge-float-advanced');
             }
             const status = element('div', 'dge-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.textContent = notice; container.append(status);
             const confirmRow = element('div', 'dge-footer');
