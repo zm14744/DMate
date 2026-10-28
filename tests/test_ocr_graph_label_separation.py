@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 from PIL import Image, ImageDraw
 
-from ocr_layout import separate_diagram_labels
+from ocr_layout import include_figure_captions, separate_diagram_labels
 from graph_layout_only import (TYPE_PROMPT, LAYOUT_AUDIT_PROMPT,
                                FOCUSED_TYPE_PROMPT, recognize_layout_only)
 
@@ -106,3 +106,114 @@ def test_initial_auto_graph_does_not_publish_graph_labels_in_document_body():
     assert result["diagnostics"]["diagram_text_items_excluded_from_question"] == 2
     assert result["graph_structures"][0]["vertices"] == []
     assert result["graph_structures"][0]["edges"] == []
+
+
+
+def test_graph_caption_below_is_included_in_figure_box_but_not_question():
+    data = _ocr(_line("判断下列图是否同构", 42, 40, 340, 76),
+                _line("v₁", 275, 300, 308, 327),
+                _line("G₁", 335, 491, 373, 520),
+                _line("（2）求各顶点的度", 45, 570, 350, 602))
+    source = [{"id": "G1", "name": "图 1", "bbox": [.18,.16,.60,.60],
+               "directed": False, "weighted": False, "vertices": [], "edges": []}]
+    enhanced, attached = include_figure_captions(data, source)
+    assert attached == 1
+    assert enhanced[0]["name"] == "G₁"
+    assert enhanced[0]["bbox"][3] >= .652
+    assert source[0]["bbox"][3] == .60  # Never mutate incoming geometry.
+    body, kept, excluded, evidence = separate_diagram_labels(data, enhanced)
+    assert evidence and (kept, excluded) == (2, 2)
+    assert body == "判断下列图是否同构\n（2）求各顶点的度"
+    assert enhanced[0]["vertices"] == enhanced[0]["edges"] == []
+
+
+def test_caption_letters_and_names_below_side_by_side_panels_stay_separate():
+    data = _ocr(_line("请分别计算下图的度数", 10, 15, 425, 48),
+                _line("(a)", 185, 492, 225, 516),
+                _line("彼得森图", 690, 491, 774, 518),
+                _line("求顶点的度数", 140, 605, 400, 637))
+    panels = [{"id": "G1", "name": "图 1", "bbox": [.06,.16,.43,.60]},
+              {"id": "G2", "name": "图 2", "bbox": [.55,.16,.94,.60]}]
+    included, count = include_figure_captions(data, panels)
+    assert count == 2
+    assert [g["name"] for g in included] == ["(a)", "彼得森图"]
+    assert included[0]["bbox"][2] < .5
+    assert included[1]["bbox"][0] > .5
+    assert included[0]["bbox"][3] >= .646
+    assert included[1]["bbox"][3] >= .648
+    body, kept, excluded, evidence = separate_diagram_labels(data, included)
+    assert evidence and (kept, excluded) == (2, 2)
+    assert body == "请分别计算下图的度数\n求顶点的度数"
+
+
+def test_top_caption_belongs_to_graph_without_absorbing_question_instructions():
+    data = _ocr(_line("图 3", 450, 101, 492, 127),
+                _line("已知此图有四个顶点", 160, 42, 478, 72),
+                _line("证明该图是二分图", 130, 600, 380, 636))
+    panels = [{"id": "G1", "name": "图 1", "bbox": [.28,.17,.70,.66]}]
+    included, attached = include_figure_captions(data, panels)
+    assert attached == 1
+    assert included[0]["bbox"][1] <= .125
+    body, kept, excluded, _ = separate_diagram_labels(data, included)
+    assert body == "已知此图有四个顶点\n证明该图是二分图"
+    assert (kept, excluded) == (2, 1)
+
+
+def test_question_line_and_far_short_text_never_expand_a_figure_frame():
+    data = _ocr(_line("（2）求图G的最短路", 180, 491, 450, 528),
+                _line("图", 350, 680, 373, 705),
+                _line("已知图G具有如下性质", 120, 89, 520, 123))
+    panels = [{"id": "G1", "name": "G", "bbox": [.18,.16,.60,.60]}]
+    included, attached = include_figure_captions(data, panels)
+    assert attached == 0
+    assert included[0]["bbox"] == panels[0]["bbox"]
+    body, kept, removed, _ = separate_diagram_labels(data, included)
+    assert (kept, removed) == (3, 0)
+    assert "（2）求图G的最短路" in body
+
+
+def test_caption_already_inside_model_box_still_can_name_figure():
+    data = _ocr(_line("G", 333, 486, 360, 515))
+    # The model already captured the caption; do not pull unrelated lines in.
+    figure = [{"id": "G1", "name": "图 1", "bbox": [.18,.16,.60,.70]}]
+    included, attached = include_figure_captions(data, figure)
+    assert attached == 1
+    assert included[0]["name"] == "G"
+    assert included[0]["bbox"][3] == .70
+
+
+def test_figure_caption_integrates_into_initial_upload_result_without_new_ai():
+    picture = Image.new("RGB", (900, 620), "white")
+    ink = ImageDraw.Draw(picture)
+    ink.line((200, 140, 620, 460), fill="black", width=4)
+    ink.line((620, 140, 200, 460), fill="black", width=4)
+    stream = io.BytesIO()
+    picture.save(stream, "PNG")
+    data = _ocr(_line("试求下图的度数", 40, 35, 310, 65),
+                _line("v₂", 270, 220, 306, 245),
+                _line("(a)", 360, 590, 396, 610),
+                _line("（1）说明你的结论", 10, 708, 400, 739))
+    def text_reader(_raw, *, text_only=True):
+        return data
+    def qwen(prompt, _images, _budget):
+        if prompt == TYPE_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "图 1", "bbox": [.20,.17,.65,.70],
+                 "directed": False, "weighted": False}]}
+        if prompt == LAYOUT_AUDIT_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "图 1", "bbox": [.20,.17,.65,.70]}]}
+        if prompt == FOCUSED_TYPE_PROMPT:
+            return {"figures": [{"image_index": 1,
+                                 "directed": False, "weighted": False}]}
+        raise AssertionError("Only existing overview, inventory and focused read allowed")
+    result = recognize_layout_only(stream.getvalue(), recognize_text=text_reader,
+                                   provider=qwen, budget=object())
+    assert result["text"] == "试求下图的度数\n（1）说明你的结论"
+    assert result["document"]["body_text"] == result["text"]
+    graph = result["graph_structures"][0]
+    assert graph["bbox"][3] >= .764
+    assert graph["name"] == "(a)"
+    assert result["diagnostics"]["graph_captions_attached"] == 1
+    assert result["diagnostics"]["diagram_text_items_excluded_from_question"] == 2
+    assert graph["vertices"] == graph["edges"] == []
