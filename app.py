@@ -4275,7 +4275,7 @@ def ocr():
             try:
                 with UPLOAD_TASKS.admit(owner, request_id):
                     routed = recognize_layout_only(
-                        raw, recognize_text=text_reader,
+                        raw, recognize_text=None, include_text=False,
                         cancelled=lambda: _ocr_is_cancelled(request_id, owner=owner),
                         request_deadline=recognition_deadline)
                 if request_id and _take_ocr_cancelled(request_id, owner=owner):

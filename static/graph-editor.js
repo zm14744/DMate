@@ -23,32 +23,6 @@
         // "Is this a question?" is a per-upload choice, separate from graph data.
         let isQuestion = options.isQuestion !== false;
         let unsubscribe, overlay = null;
-        let outsideTimer, outsideSequence=0, outsideSignature='';
-        const graphRegions=override=>model.getDocument().graphs.flatMap(g=>{
-            if(override && g.id===currentGraph)return [override];
-            if(g.region_polygon?.length>=3)return [g.region_polygon];
-            const b=g.bbox;return b?.length===4?[[[b[0],b[1]],[b[2],b[1]],[b[2],b[3]],[b[0],b[3]]]]:[];
-        });
-        function refreshOutside(override){
-            if(typeof options.onRecognizeOutside!=='function')return;
-            const regions=graphRegions(override),sequence=++outsideSequence;
-            clearTimeout(outsideTimer);
-            outsideTimer=setTimeout(async()=>{
-                const before=model.getDocument().body_text;
-                try{
-                    const text=await options.onRecognizeOutside(regions);
-                    if(destroyed || sequence!==outsideSequence || model.getDocument().body_text!==before)return;
-                    if(typeof text==='string' && text!==before){
-                        model.setBody(text);
-                        const area=container.querySelector('.dge-body');if(area)area.value=text;
-                    }
-                }catch(error){if(!destroyed && sequence===outsideSequence){
-                    const status=container.querySelector('.dge-overlay-status');
-                    if(status)status.textContent=error?.message||'框外文字识别暂不可用';
-                }}
-            },180);
-        }
-
         const overlayState = { mode: 'select', zoom: 100, visible: true, start: null };
         const element = (tag, className, label) => { const node = dom.createElement(tag); if (className) node.className = className;
             if (label !== undefined) node.textContent = label; return node; };
@@ -363,18 +337,6 @@
                         else if (kind === 'geometry') refreshDraftViews();
                         else render();
                     },
-                    previewRegion: polygon => refreshOutside(polygon),
-                    recognizeText: async polygon => {
-                        if (typeof options.onRecognizeText !== 'function')
-                            throw new Error('文字区域识别暂不可用，请手动输入。');
-                        const text = await options.onRecognizeText(polygon);
-                        if (typeof text === 'string' && text.trim()) {
-                            const previous = model.getDocument().body_text;
-                            model.setBody([previous.trimEnd(), text.trim()].filter(Boolean).join('\n'));
-                            render();
-                        }
-                        return text;
-                    },
                     recognizeGraphType: async (polygon, graphId) => {
                         if (typeof options.onRecognizeGraphType !== 'function')
                             throw new Error('当前无法自动判断箭头与权值');
@@ -424,9 +386,6 @@
             }
             const review = buildReview(graph, document);
             if (review && graph?.vertices?.length) container.append(review);
-            const body = element('textarea', 'dge-body'); body.value = document.body_text; body.rows = 4; body.setAttribute('aria-label', '题干、全部小问与公式'); body.disabled = saving;
-            body.addEventListener('input', () => edit(() => model.setBody(body.value)));
-            container.append(field('题干、全部小问与公式', body));
             const toolbar = element('div', 'dge-toolbar');
             if (document.graphs.length) {
                 toolbar.append(field('当前子图', select(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; pendingDelete = ''; render(); })));
@@ -534,15 +493,11 @@
                 scroller.scrollLeft = left;
             }
         }
-        unsubscribe = model.subscribe(document => { pendingDelete = ''; options.onChange?.(document);
-            const signature=JSON.stringify(graphRegions());
-            if(signature!==outsideSignature){outsideSignature=signature;refreshOutside();}
-        });
-        outsideSignature=JSON.stringify(graphRegions());refreshOutside();
+        unsubscribe = model.subscribe(document => { pendingDelete = ''; options.onChange?.(document); });
         render();
         return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
             validate: model.validate, model,
-            destroy() { destroyed = true; outsideSequence++;clearTimeout(outsideTimer); unsubscribe(); overlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
+            destroy() { destroyed = true; unsubscribe(); overlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };
     root.DMateGraphEditor = api;

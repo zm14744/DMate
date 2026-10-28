@@ -9,12 +9,14 @@ function mount(host,o){
  s.originalOpacity = Number.isFinite(s.originalOpacity)
    ? Math.max(0,Math.min(1,s.originalOpacity)) : 1;
  let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false,scanSequence=0;
- let sampleCanvas=d.createElement('canvas'),sampleCtx=null;
+ let sampleCanvas=d.createElement('canvas'),sampleCtx=null,loaded=false,autoFitted=false;
  const pointers=new Map();
  const world={left:0,top:0,right:1,bottom:1};
  const finite=x=>typeof x==='number'&&Number.isFinite(x);
  const layoutWorld=()=>{
   const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;
+  world.right=Math.max(world.right,world.left+Math.max(1,scroll.clientWidth)/scale);
+  world.bottom=Math.max(world.bottom,world.top+Math.max(1,scroll.clientHeight)/(scale*h/w));
   stage.style.width=(world.right-world.left)*scale+'px';
   stage.style.height=(world.bottom-world.top)*scale*h/w+'px';
   image.style.position='absolute';image.style.width=scale+'px';
@@ -40,8 +42,7 @@ function mount(host,o){
  }
  const regionMode=d.createElement('select');
  regionMode.setAttribute('aria-label','选区方式');
- for(const [key,label] of [['','更多框选方式'],['graph_poly','不规则框选图形'],
-     ['text_rect','矩形框选文字'],['text_poly','不规则框选文字']]){
+ for(const [key,label] of [['','更多框选方式'],['graph_poly','不规则框选图形']]){
    const item=d.createElement('option');item.value=key;item.textContent=label;regionMode.append(item);
  }
  regionMode.addEventListener('change',()=>{
@@ -63,28 +64,15 @@ function mount(host,o){
    draw();
  };
  const finishButton=button('完成轮廓','finish-polygon',finishPolygon);
- const clearButton=button('清除文字选区','clear-text',()=>{s.textRegion=null;s.polygonDraft=[];status.textContent='已清除文字选区';draw();});
- const textButton=button('识别所选文字','recognize-text',async()=>{
-   if(textBusy || !s.textRegion || !o.recognizeText)return;
-   textBusy=true;status.textContent='正在识别限定区域内的文字…';draw();
-   try{
-      const recognized=await o.recognizeText(s.textRegion.map(p=>[...p]));
-      if(typeof recognized==='string' && recognized.trim()){
-        s.textRegion=null;
-        status.textContent='文字已追加到题干，请校对。';
-      }else status.textContent='没有识别到文字，可扩大范围或直接输入。';
-   }catch(error){status.textContent=error?.message||'文字识别暂不可用，请手动输入。';}
-   finally{textBusy=false;draw();}
- });
  // Each independently segmented graph receives its own direction and weight
  // from OCR + visual edge evidence. Do not override this with toolbar labels.
  // Edge-level corrections in the advanced editor remain available.
  const visible=button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();});
- const MIN_ZOOM=25,MAX_ZOOM=400;
+ const MIN_ZOOM=.01,MAX_ZOOM=400;
  const zoom=x=>{
    const previous=s.zoom||100;
    const cx=scroll.scrollLeft+scroll.clientWidth/2,cy=scroll.scrollTop+scroll.clientHeight/2;
-   s.zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Math.round(x)));
+   s.zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Math.round(x*100)/100));
    layoutWorld();value.textContent=s.zoom+'%';
    const ratio=s.zoom/previous;
    scroll.scrollLeft=cx*ratio-scroll.clientWidth/2;
@@ -92,11 +80,13 @@ function mount(host,o){
  };
  // 100% fills the viewport width. "Fit" also accounts for tall images.
  const fitImage=()=>{
+   if(!loaded||scroll.clientWidth<=0||scroll.clientHeight<=0)return;
+   autoFitted=true;
    const win=d.defaultView;
    const viewportWidth=Math.max(1,scroll.clientWidth);
-   const viewportHeight=Math.min(700,(win?.innerHeight||800)*(win?.innerWidth<=760 ? 0.55 : 0.63));
+   const viewportHeight=Math.max(1,scroll.clientHeight);
    const originalHeightAt100=viewportWidth*h/Math.max(1,w);
-   zoom(Math.min(100,Math.floor(viewportHeight/Math.max(1,originalHeightAt100)*100)));
+   zoom(Math.min(100,(viewportHeight-4)/Math.max(1,originalHeightAt100)*100));
    const scale=viewportWidth*s.zoom/100;scroll.scrollLeft=-world.left*scale;scroll.scrollTop=-world.top*scale*h/w;
  };
  button('－','zoom-out',()=>zoom(s.zoom/1.25)).setAttribute('aria-label','缩小原图');
@@ -238,9 +228,6 @@ function mount(host,o){
   regionMode.value=['graph_poly','text_rect','text_poly'].includes(s.mode)?s.mode:'';
   finishButton.hidden=!['graph_poly','text_poly'].includes(s.mode);
   finishButton.disabled=s.polygonDraft.length<3||Boolean(o.disabled?.());
-  textButton.hidden=!s.textRegion&&!textBusy;
-  textButton.disabled=textBusy||!s.textRegion||Boolean(o.disabled?.());
-  clearButton.hidden=!s.textRegion;
   focusButton.disabled=!(g?.region_polygon?.length>=3 || g?.bbox?.length===4);
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
   svg.replaceChildren();if(!g||!s.visible)return;
@@ -422,9 +409,9 @@ function mount(host,o){
  }
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
  scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));},{passive:false});
- image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;layoutWorld();syncOriginal();buildSampler();draw();};
+ image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage();syncOriginal();buildSampler();draw();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
- const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{layoutWorld();draw();}):null;observer?.observe(scroll);
+ const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();}):null;observer?.observe(scroll);
  return {refresh:draw,state:s,destroy(){observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
 root.DMateGraphOverlay={mount};if(typeof module!=='undefined'&&module.exports)module.exports={mount};

@@ -192,7 +192,7 @@ def test_real_browser_edits_and_confirms_the_same_user_visible_document(browser_
     assert page.evaluate("getComputedStyle(document.querySelector('.dge-footer')).backgroundColor") == 'rgba(0, 0, 0, 0)'
     label = '<img src=x onerror="window.INJECTED=true">'
     page.get_by_label('节点 1 标签', exact=True).fill(label)
-    page.get_by_label('题干、全部小问与公式', exact=True).fill('（1）求修改后的度数。\n（2）列出全部边。')
+    assert page.get_by_label('题干、全部小问与公式', exact=True).count() == 0
     page.get_by_label('边 1 权重', exact=True).fill('0')
     page.get_by_label('边 1 方向', exact=True).select_option('undirected')
     page.get_by_label('边 1 相同边数量', exact=True).fill('3')
@@ -203,7 +203,7 @@ def test_real_browser_edits_and_confirms_the_same_user_visible_document(browser_
     page.wait_for_function('confirmations.length===1')
     confirmed = page.evaluate('confirmations[0]')
     assert confirmed == page.evaluate('instance.getDocument()')
-    assert confirmed['body_text'].startswith('（1）求修改后的度数。')
+    assert confirmed['body_text'] == document()['body_text']
     assert confirmed['graphs'][0]['vertices'][0]['label'] == label
     assert [edge['weight'] for edge in confirmed['graphs'][0]['edges']] == [0, 7, 0]
     assert page.evaluate('window.INJECTED === undefined')

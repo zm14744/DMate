@@ -414,3 +414,16 @@ def test_inventory_disagreement_never_deletes_first_pass_diagram():
     assert len(kept) == 2 and kept[1]["name"] == "H"
     assert any("分图数量" in issue for issue in issues)
     assert calls == 1
+
+
+def test_graph_only_flow_never_starts_text_reader():
+    calls=[]
+    def text_reader(*args,**kwargs):
+        calls.append(True)
+        raise AssertionError('Graph-only workflow cannot start OCR')
+    result=recognize_layout_only(raw(pure_text_image()),recognize_text=text_reader,include_text=False)
+    assert calls==[]
+    assert result['text']==''
+    assert result['diagnostics']['text_worker_metrics']==[]
+    assert result['diagnostics']['text_recognition_enabled'] is False
+    assert not any('文字识别' in str(r) for r in result['review']['reasons'])

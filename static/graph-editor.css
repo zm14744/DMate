@@ -189,3 +189,7 @@
 .dge-overlay-viewport{height:min(63dvh,700px);min-height:220px;max-height:none}
 .dge-overlay-stage{margin:0;flex:none}
 @media(max-width:760px){.dge-overlay-viewport{height:55dvh;min-height:200px;max-height:none}}
+
+.dge-overlay-host{width:100%;box-sizing:border-box}
+.dge-overlay-viewport{width:100%;box-sizing:border-box;flex:none;contain:size layout}
+.dge-overlay-stage{min-width:100%;min-height:100%}

@@ -517,13 +517,15 @@ def _fast_text_read(reader, raw, deadline):
 
 
 def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=None,
-                          cancelled=None, request_deadline=None):
+                          cancelled=None, request_deadline=None, include_text=True):
     """Automatic original-image segmentation: accuracy first, no 4s cap.
 
     One detailed overview plus independently zoomed per-panel type checks
     execute alongside Small text OCR. The unrelated manual scanner retains
     the 3.4s backend budget. No step generates graph vertices or edges.
     """
+    if not include_text:
+        recognize_text = None
     start = time.monotonic()
     deadline = min(start + INITIAL_SCAN_MAX_SECONDS,
                    request_deadline if request_deadline is not None else float("inf"))
@@ -573,7 +575,9 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
         done = _await_until(jobs, deadline, cancelled)
         _check_cancelled(cancelled)
         text_result, text_error = {}, None
-        if recognize_text is None:
+        if not include_text:
+            pass
+        elif recognize_text is None:
             text_error = "文字识别服务暂不可用，请手动补充"
         elif "text" not in done:
             text_error = "文字识别未在服务端安全时限内完成，请核对文字"
@@ -659,6 +663,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                 "independently_verified_type_fields": certified,
                 "layout_model_calls": 0,
                 "text_worker_metrics": text_result.get("resource_metrics", []),
+                "text_recognition_enabled": include_text,
                 "diagram_text_items_excluded_from_question": diagram_label_count,
                 "graph_captions_attached": caption_count,
                 "duration_seconds": round(time.monotonic() - start, 3),

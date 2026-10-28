@@ -132,27 +132,28 @@ def test_mobile_overlay_fits_without_external_assets(canvas_page):
 
 def test_overlay_zoom_out_and_fit_below_100_percent(canvas_page):
     page = canvas_page
+    initial=float(page.locator('.dge-overlay-zoom').inner_text().rstrip('%'))
     for _ in range(3):
         page.get_by_role('button', name='缩小原图', exact=True).click()
-    assert page.locator('.dge-overlay-zoom').inner_text() == '51%'
+    assert float(page.locator('.dge-overlay-zoom').inner_text().rstrip('%')) < initial
     assert page.evaluate("""() => {
         const stage=document.querySelector('.dge-overlay-stage');
         const viewport=document.querySelector('.dge-overlay-viewport');
-        return stage.getBoundingClientRect().width < viewport.getBoundingClientRect().width;
+        return stage.getBoundingClientRect().width >= viewport.getBoundingClientRect().width;
     }""")
     for _ in range(20):
         page.get_by_role('button', name='缩小原图', exact=True).click()
-    assert page.locator('.dge-overlay-zoom').inner_text() == '25%'
+    assert float(page.locator('.dge-overlay-zoom').inner_text().rstrip('%')) >= .01
     page.get_by_role('button', name='适应', exact=True).click()
-    fitted = int(page.locator('.dge-overlay-zoom').inner_text().rstrip('%'))
-    assert 25 <= fitted <= 100
+    fitted = float(page.locator('.dge-overlay-zoom').inner_text().rstrip('%'))
+    assert .01 <= fitted <= 100
 
 
 def test_overlay_keeps_image_and_zoom_when_selecting_or_renaming(canvas_page):
     page = canvas_page
     page.get_by_role("button", name="放大原图", exact=True).click()
     page.get_by_role("button", name="放大原图", exact=True).click()
-    assert page.locator(".dge-overlay-zoom").inner_text() == "156%"
+    zoom_before=page.locator(".dge-overlay-zoom").inner_text()
     page.evaluate("window.imageBefore=document.querySelector('.dge-overlay-image')")
     page.locator('[data-vertex-id="a"] .dge-overlay-node-hit').click()
     assert page.get_by_label("当前顶点名称").is_visible()
@@ -160,7 +161,7 @@ def test_overlay_keeps_image_and_zoom_when_selecting_or_renaming(canvas_page):
     page.get_by_label("当前顶点名称").fill("Z")
     assert page.evaluate("window.imageBefore===document.querySelector('.dge-overlay-image')")
     assert page.get_by_text("点：Z、①", exact=True).is_visible()
-    assert page.locator(".dge-overlay-zoom").inner_text() == "156%"
+    assert page.locator(".dge-overlay-zoom").inner_text() == zoom_before
     assert "Z—①" in page.evaluate("DMateGraphFormat.toPlain(instance.getDocument().graphs)")
 
 
@@ -181,7 +182,7 @@ def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
     page = canvas_page
     page.get_by_role("button", name="适应", exact=True).click()
     page.get_by_label("选区方式").select_option("graph_poly")
-    bounds = page.locator(".dge-overlay-svg").bounding_box()
+    bounds = page.locator(".dge-overlay-image").bounding_box()
     assert bounds
     for x, y in ((.08, .12), (.86, .1), (.93, .91), (.08, .89)):
         page.mouse.click(bounds["x"] + bounds["width"]*x,
@@ -196,31 +197,6 @@ def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
     assert "region_polygon" not in page.evaluate("instance.getDocument().graphs[0]")
 
 
-def test_user_text_rectangle_and_diy_polygon_feed_only_selected_area(canvas_page):
-    page = canvas_page
-    bounds = page.locator(".dge-overlay-svg").bounding_box()
-    assert bounds
-    page.get_by_label("选区方式").select_option("text_rect")
-    page.mouse.move(bounds["x"] + bounds["width"]*.08,
-                    bounds["y"] + bounds["height"]*.05)
-    page.mouse.down()
-    page.mouse.move(bounds["x"] + bounds["width"]*.6,
-                    bounds["y"] + bounds["height"]*.18, steps=7)
-    page.mouse.up()
-    page.get_by_role("button", name="识别所选文字").click()
-    page.wait_for_function("textAreas.length===1")
-    assert len(page.evaluate("textAreas[0]")) == 4
-    assert "框选文字" in page.evaluate("instance.getDocument().body_text")
-    page.get_by_label("选区方式").select_option("text_poly")
-    bounds = page.locator(".dge-overlay-svg").bounding_box()
-    for x, y in ((.08, .07), (.9, .06), (.55, .15)):
-        page.mouse.click(bounds["x"] + bounds["width"]*x,
-                         bounds["y"] + bounds["height"]*y)
-    page.get_by_role("button", name="完成轮廓").click()
-    page.get_by_role("button", name="识别所选文字").click()
-    page.wait_for_function("textAreas.length===2")
-    assert len(page.evaluate("textAreas[1]")) == 3
-    assert page.evaluate("instance.getDocument().body_text").count("框选文字") == 2
 
 def test_focus_after_diy_region_keeps_math_positions_unchanged(canvas_page):
     page = canvas_page
@@ -233,7 +209,7 @@ def test_focus_after_diy_region_keeps_math_positions_unchanged(canvas_page):
                          rect["y"] + rect["height"]*y)
     page.get_by_role("button", name="完成轮廓").click()
     page.get_by_role("button", name="聚焦图形").click()
-    assert int(page.locator(".dge-overlay-zoom").inner_text().rstrip("%")) > 100
+    assert float(page.locator(".dge-overlay-zoom").inner_text().rstrip("%")) > 100
     assert page.evaluate("instance.getDocument().graphs[0].vertices.map(v => [v.x,v.y])") == initial
 
 
@@ -285,7 +261,8 @@ def test_pure_text_ocr_does_not_create_a_dummy_graph_canvas(canvas_page):
     assert page.locator('.dge-overlay').count() == 0
     assert page.locator('.dge-visual').count() == 0
     assert page.locator('.dge-text-only-workspace img').is_visible()
-    assert page.get_by_label('题干、全部小问与公式').input_value() == '这张图片只有文字和公式'
+    assert page.get_by_label('题干、全部小问与公式').count() == 0
+    assert page.evaluate('instance.getDocument().body_text') == '这张图片只有文字和公式'
     page.get_by_role('button', name='保存并确认', exact=True).click()
     page.wait_for_function('confirmed.length===1')
     assert page.evaluate('confirmed[0].graphs') == []
@@ -468,21 +445,34 @@ def test_fixed_viewport_and_drawing_beyond_source_image(canvas_page):
     assert page.locator('.dge-overlay-node').count() == 3
 
 
-def test_live_outside_text_updates_before_frame_pointer_release(canvas_page):
-    page = canvas_page
+
+
+def test_initial_fit_and_blank_viewport_can_receive_nodes(canvas_page):
+    page=canvas_page
+    viewport=page.locator('.dge-overlay-viewport')
+    photo=page.locator('.dge-overlay-image')
+    v=viewport.bounding_box();image=photo.bounding_box()
+    assert image['width'] <= v['width']+1 and image['height'] <= v['height']+1
+    for _ in range(4):page.get_by_role('button',name='缩小原图',exact=True).click()
+    assert abs(viewport.bounding_box()['height']-v['height'])<1
+    assert abs(viewport.bounding_box()['width']-v['width'])<1
+    page.get_by_role('button',name='添加顶点',exact=True).click()
+    page.mouse.click(v['x']+v['width']-25,v['y']+v['height']-25)
+    node=page.evaluate('instance.getDocument().graphs[0].vertices.at(-1)')
+    assert node['x']>1 or node['y']>1
+    assert page.get_by_label('选区方式').locator('option[value^="text_"]').count()==0
+    assert page.locator('.dge-body').count()==0
+
+
+def test_fit_waits_until_hidden_editor_becomes_visible(canvas_page):
+    page=canvas_page
     page.evaluate('''() => {
-      const source=document.querySelector('.dge-overlay-image').src;
-      const documentValue=instance.getDocument();instance.destroy();window.liveRegions=[];
-      instance=DMateGraphEditor.mount(document.getElementById('editor'),{
-        originalUrl:source,document:documentValue,
-        onRecognizeOutside:async regions=>{liveRegions.push(regions);return '仅框外文字 '+regions.length;}
-      });
+      const url=document.querySelector('.dge-overlay-image').src,doc=instance.getDocument();instance.destroy();
+      const host=document.getElementById('editor');host.style.display='none';
+      instance=DMateGraphEditor.mount(host,{originalUrl:url,document:doc});
     }''')
-    page.wait_for_function("document.querySelector('.dge-body').value==='仅框外文字 0'")
-    page.get_by_role('button',name='框选图形',exact=True).click()
-    box=page.locator('.dge-overlay-svg').bounding_box()
-    page.mouse.move(box['x']+20,box['y']+20);page.mouse.down()
-    page.mouse.move(box['x']+220,box['y']+180,steps=5)
-    page.wait_for_function("document.querySelector('.dge-body').value==='仅框外文字 1'")
-    assert page.evaluate('liveRegions.at(-1)[0].length') == 4
-    page.mouse.up()
+    page.wait_for_function("document.querySelector('.dge-overlay-image').naturalWidth===900")
+    page.evaluate("document.getElementById('editor').style.display='block'")
+    page.wait_for_function("document.querySelector('.dge-overlay-image').getBoundingClientRect().width>100")
+    photo=page.locator('.dge-overlay-image').bounding_box();box=page.locator('.dge-overlay-viewport').bounding_box()
+    assert photo['height']<=box['height']+1 and photo['width']<=box['width']+1
