@@ -10,8 +10,10 @@ import time
 
 from PIL import Image, ImageDraw
 
-from graph_layout_only import (TYPE_PROMPT, _project_figures,
-                               recognize_layout_only, recognize_selected_graph_type, visual_preflight)
+from graph_layout_only import (TYPE_PROMPT, FOCUSED_TYPE_PROMPT,
+                               DISPUTE_TYPE_PROMPT, _project_figures,
+                               recognize_layout_only, recognize_selected_graph_type,
+                               visual_preflight)
 
 
 def raw(image):
@@ -76,6 +78,12 @@ def test_figures_have_individual_types_and_original_bounds_with_zero_drawing():
 
     def qwen(prompt, images, budget):
         submitted.append((prompt, images, budget))
+        if prompt == FOCUSED_TYPE_PROMPT:
+            assert len(images) == 2
+            return {"figures": [
+                {"image_index": 1, "directed": False, "weighted": False},
+                {"image_index": 2, "directed": True, "weighted": True}]}
+        assert prompt == TYPE_PROMPT
         return {"has_graph": True, "graphs": [
             {"name": "G", "bbox": [.05, .13, .47, .94],
              "directed": False, "weighted": False,
@@ -89,9 +97,12 @@ def test_figures_have_individual_types_and_original_bounds_with_zero_drawing():
 
     result = recognize_layout_only(raw(picture), recognize_text=fast_text,
                                    provider=qwen, budget=object())
-    assert len(submitted) == 1
+    assert len(submitted) == 2
     assert "严禁识别或输出顶点列表" in submitted[0][0]
-    assert submitted[0][1][0].startswith("data:image/jpeg;base64,")
+    assert submitted[0][1][0].startswith("data:image/png;base64,")
+    assert all(url.startswith("data:image/png;base64,") for url in submitted[1][1])
+    assert result["diagnostics"]["type_review_calls"] == 1
+    assert result["diagnostics"]["independently_verified_type_fields"] == 4
     assert result["workflow_profile"] == "layout_only"
     assert result["recognition_status"] == "partial"
     assert result["diagnostics"]["route"] == "figure_type_only"
@@ -239,16 +250,105 @@ def test_selected_type_scan_obeys_short_deadline_and_does_not_guess():
     assert result["recognition_status"] == "partial"
 
 
-def test_fast_upload_and_manual_figures_share_four_second_budget_contract():
+def test_only_manually_selected_figures_have_four_second_budget():
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     client = (root / "static/script.js").read_text()
     server = (root / "app.py").read_text()
     overlay = (root / "static/graph-editor-overlay.js").read_text()
-    assert "OCR_SCAN_MAX_MS = 4000" in client
+    assert "MANUAL_FIGURE_SCAN_MAX_MS = 4000" in client
+    assert "OCR_SCAN_MAX_MS" not in client
+    initial_handler = client.split("async function recognizeOcrTask(task) {", 1)[1].split(
+        "function discardOcrTask", 1)[0]
+    assert "setTimeout(" not in initial_handler
+    assert "clearTimeout(timer)" not in initial_handler
+    assert "request_deadline=recognition_deadline" in server
+    assert "started_at + 3.6" not in server
     assert "discardOcrTask(task); // Immediate UI removal" in client
     assert 'task.state === "cancelled") return "已取消"' not in client
     assert "/graph/figure-type" in server and "/graph/figure-type" in client
     assert "scanFigureType(points,g.id)" in overlay
     assert "void scanFigureType([[box[0],box[1]]" in overlay
     assert 'options["timeout_seconds"] = 3.0' in server
+
+
+
+def test_overview_and_crop_disagreement_requires_targeted_recheck():
+    calls = []
+    def qwen(prompt, images, budget):
+        calls.append(prompt)
+        if prompt == TYPE_PROMPT:
+            return {"has_graph": True, "graphs": [{
+                "name": "A", "bbox": [.05, .1, .94, .91],
+                "directed": False, "weighted": True}], "uncertainties": []}
+        if prompt == FOCUSED_TYPE_PROMPT:
+            return {"figures": [{"image_index": 1,
+                                 "directed": True, "weighted": False}]}
+        assert prompt == DISPUTE_TYPE_PROMPT
+        return {"figures": [{"image_index": 1,
+                             "directed": True, "weighted": False}]}
+    result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
+                                   provider=qwen, budget=object())
+    graph = result["graph_structures"][0]
+    assert (graph["directed"], graph["weighted"]) == (True, False)
+    assert graph["vertices"] == graph["edges"] == []
+    assert calls == [TYPE_PROMPT, FOCUSED_TYPE_PROMPT, DISPUTE_TYPE_PROMPT]
+    assert result["diagnostics"]["qwen_graph_calls"] == 3
+
+
+def test_unresolved_arrows_and_edge_weights_are_not_confidently_guessed():
+    def qwen(prompt, images, budget):
+        if prompt == TYPE_PROMPT:
+            return {"has_graph": True, "graphs": [{
+                "name": "A", "bbox": [.05, .1, .94, .91],
+                "directed": False, "weighted": False}], "uncertainties": []}
+        if prompt == FOCUSED_TYPE_PROMPT:
+            return {"figures": [{"image_index": 1,
+                                 "directed": True, "weighted": True}]}
+        return {"figures": [{"image_index": 1,
+                             "directed": "unknown", "weighted": "unknown"}]}
+    result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
+                                   provider=qwen, budget=object())
+    fig = result["graph_structures"][0]
+    assert fig["directed"] == fig["weighted"] == "unknown"
+    assert all(not fig[field] for field in ("vertices", "edges"))
+    assert "多次复核仍存在分歧" in result["warning"]
+
+
+def test_focused_failure_preserves_regions_but_never_confident_types():
+    def qwen(prompt, images, budget):
+        if prompt == TYPE_PROMPT:
+            return {"has_graph": True, "graphs": [
+                {"name": "A", "bbox": [.02, .1, .9, .9],
+                 "directed": True, "weighted": True}], "uncertainties": []}
+        raise RuntimeError("vision unavailable")
+    result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
+                                   provider=qwen, budget=object())
+    assert len(result["graph_structures"]) == 1
+    fig = result["graph_structures"][0]
+    assert fig["bbox"] and fig["directed"] == "unknown" and fig["weighted"] == "unknown"
+    assert result["recognition_status"] == "partial"
+    assert result["diagnostics"]["type_review_calls"] == 1
+
+
+def test_initial_slow_vision_is_not_cut_off_by_manual_four_second_timer():
+    # No actual 4-second sleep in CI: a targeted 0.2-second deadline proves
+    # that the normal upload uses its own request budget, not manual deadline.
+    from graph_layout_only import INITIAL_SCAN_MAX_SECONDS, MANUAL_SCAN_MAX_SECONDS
+    assert INITIAL_SCAN_MAX_SECONDS >= 60
+    assert MANUAL_SCAN_MAX_SECONDS < 4
+    def qwen(prompt, images, budget):
+        time.sleep(.07)
+        if prompt == TYPE_PROMPT:
+            return {"has_graph": True, "graphs": [{
+                "name": "A", "bbox": [.03, .1, .91, .9],
+                "directed": False, "weighted": False}]}
+        return {"figures": [{"image_index": 1,
+                             "directed": False, "weighted": False}]}
+    start = time.monotonic()
+    result = recognize_layout_only(raw(diagrams_image()), recognize_text=fast_text,
+                                   provider=qwen, budget=object(),
+                                   request_deadline=time.monotonic() + 2.0)
+    assert time.monotonic() - start >= .13
+    assert result["graph_structures"][0]["directed"] is False
+    assert result["diagnostics"]["qwen_graph_calls"] == 2
