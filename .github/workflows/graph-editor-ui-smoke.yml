@@ -9,6 +9,9 @@ on:
       - 'static/graph-editor.css'
       - 'tests/test_visual_graph_editor.py'
       - 'tests/test_graph_overlay.py'
+      - 'static/script.js'
+      - 'templates/index.html'
+      - 'tests/test_ocr_upload_layout.py'
       - '.github/workflows/graph-editor-ui-smoke.yml'
   workflow_dispatch:
 
@@ -50,4 +53,5 @@ jobs:
             tests/test_graph_overlay.py::test_overlay_zoom_out_and_fit_below_100_percent \
             tests/test_graph_overlay.py::test_overlay_keeps_image_and_zoom_when_selecting_or_renaming \
             tests/test_graph_overlay.py::test_empty_auto_detected_panel_has_no_predrawn_strokes \
-            tests/test_graph_overlay.py::test_pure_text_ocr_does_not_create_a_dummy_graph_canvas
+            tests/test_graph_overlay.py::test_pure_text_ocr_does_not_create_a_dummy_graph_canvas \
+            tests/test_ocr_upload_layout.py
