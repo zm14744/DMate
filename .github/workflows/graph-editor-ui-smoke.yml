@@ -1,0 +1,51 @@
+name: Graph Editor Focused Browser UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'static/graph-editor.js'
+      - 'static/graph-editor-overlay.js'
+      - 'static/graph-editor.css'
+      - 'tests/test_visual_graph_editor.py'
+      - 'tests/test_graph_overlay.py'
+      - '.github/workflows/graph-editor-ui-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dmate-editor-ui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  editor-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only graph-editor browser test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check pytest==8.4.2 playwright==1.55.0 Pillow==11.3.0
+          python -m playwright install --with-deps chromium
+      - name: Test actual graph-editor controls without AI or backend requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DMATE_BROWSER_EXECUTABLE="$(python - <<'PY'
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as browser_api:
+              print(browser_api.chromium.executable_path)
+          PY
+          )"
+          test -x "$DMATE_BROWSER_EXECUTABLE"
+          python -m pytest -q \
+            tests/test_visual_graph_editor.py::test_real_browser_edits_and_confirms_the_same_user_visible_document \
+            tests/test_visual_graph_editor.py::test_question_type_survives_graph_edit_and_reaches_save \
+            tests/test_visual_graph_editor.py::test_real_browser_mobile_layout_and_two_step_delete \
+            tests/test_graph_overlay.py::test_overlay_zoom_out_and_fit_below_100_percent \
+            tests/test_graph_overlay.py::test_overlay_keeps_image_and_zoom_when_selecting_or_renaming
