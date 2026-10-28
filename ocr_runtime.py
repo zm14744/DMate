@@ -355,7 +355,12 @@ def run_worker(stage,image_path,output_path,*,layout_path=None,timeout=55,comman
     return None,metric
 
 
-def recognize_image(raw, *, prepare_cache=False):
+def recognize_image(raw, *, prepare_cache=False, text_only=False):
+    """Use only the Small text worker for pure-text / lightweight panel uploads.
+
+    The existing standard mode retains both layout and text worker stages.
+    Skipping the 45-second layout worker must not affect other OCR callers.
+    """
     metrics=[]
     # File lock is shared by all gunicorn processes, unlike threading.Lock.
     lock_path=Path(tempfile.gettempdir())/'dmate-local-model.lock'
@@ -378,10 +383,23 @@ def recognize_image(raw, *, prepare_cache=False):
                 layout_image=image.copy(); layout_image.thumbnail((2200,2200))
                 layout_size=list(layout_image.size); layout_image.save(layout_image_path)
                 image.close(); layout_image.close()
-                layout,lm=run_worker('layout',layout_image_path,root/'layout.json',timeout=180 if prepare_cache else 45); metrics.append(lm)
-                if layout is None: layout={'regions':[],'status':'unavailable'}
+                if text_only:
+                    # No PP-DocLayoutV3 inference and no extra image-reader.
+                    # A genuinely empty region list tells the Small worker to
+                    # retain the entire OCR text instead of partitioning it.
+                    layout = {'regions': [], 'status': 'not_run', 'reason': 'text_only_fast_path'}
+                    metrics.append({'stage': 'layout', 'status': 'skipped',
+                                    'worker_started': False, 'seconds': 0.})
+                else:
+                    layout,lm=run_worker('layout',layout_image_path,root/'layout.json',
+                                         timeout=180 if prepare_cache else 45)
+                    metrics.append(lm)
+                    if layout is None: layout={'regions':[],'status':'unavailable'}
                 (root/'layout.json').write_text(json.dumps(layout))
-                text,tm=run_worker('text',text_path,root/'text.json',layout_path=root/'layout.json',timeout=180 if prepare_cache else 65); metrics.append(tm)
+                text,tm=run_worker('text',text_path,root/'text.json',
+                                   layout_path=root/'layout.json',
+                                   timeout=180 if prepare_cache else 65)
+                metrics.append(tm)
                 if text is None:
                     text={'text':'','front_text':'','text_count':0,'formula_count':0,'review_regions':[],'warning':'题目文字未能完整识别'}
                 text['layout']=layout; text['resource_metrics']=metrics
@@ -390,6 +408,9 @@ def recognize_image(raw, *, prepare_cache=False):
                     'text_coordinate_space':'canonical_image_pixels',
                     'layout_to_canonical_scale':[canonical_size[0]/layout_size[0],canonical_size[1]/layout_size[1]],
                     'text_to_original_1000_scale':[1000/canonical_size[0],1000/canonical_size[1]]}
-                if layout.get('status')!='ok': text['layout_degraded']=True
+                if layout.get('status')!='ok' and not text_only:
+                    text['layout_degraded']=True
+                if text_only:
+                    text['text_only_fast_path'] = True
                 return text
         finally: fcntl.flock(lock,fcntl.LOCK_UN)
