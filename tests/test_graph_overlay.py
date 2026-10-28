@@ -288,3 +288,51 @@ def test_pure_text_ocr_does_not_create_a_dummy_graph_canvas(canvas_page):
     page.get_by_role('button', name='保存并确认', exact=True).click()
     page.wait_for_function('confirmed.length===1')
     assert page.evaluate('confirmed[0].graphs') == []
+
+
+
+def test_repeated_vertex_placement_does_not_jump_back_to_top(canvas_page):
+    """Actual browser pointer events must not remount the photograph or scroll."""
+    page = canvas_page
+    # Produce both nested image scrolling and a long editor page.
+    page.get_by_role('button', name='放大原图', exact=True).click()
+    page.get_by_role('button', name='放大原图', exact=True).click()
+    page.get_by_role('button', name='放大原图', exact=True).click()
+    page.get_by_role('button', name='添加顶点', exact=True).click()
+    page.evaluate("""() => {
+        const nested = document.querySelector('.dge-overlay-viewport');
+        nested.scrollTop = Math.min(160, nested.scrollHeight - nested.clientHeight);
+        const root = document.scrollingElement;
+        root.scrollTop = Math.min(160, root.scrollHeight - root.clientHeight);
+        window.originalImageElement = document.querySelector('.dge-overlay-image');
+        window.originalNestedScroller = nested;
+    }""")
+    # Click inside the VISIBLY SCROLLED image viewport (not an advanced form).
+    for count, fx in enumerate((.45, .55, .65), start=3):
+        before = page.evaluate("""() => ({
+            nested: document.querySelector('.dge-overlay-viewport').scrollTop,
+            outer: document.scrollingElement.scrollTop,
+            zoom: document.querySelector('.dge-overlay-zoom').textContent
+        })""")
+        viewport = page.locator('.dge-overlay-viewport').bounding_box()
+        assert viewport
+        x = viewport['x'] + viewport['width'] * fx
+        y = max(35, viewport['y'] + min(90, viewport['height']*.25))
+        assert y < min(885, viewport['y'] + viewport['height'])
+        page.mouse.click(x, y)
+        page.wait_for_function(f"instance.getDocument().graphs[0].vertices.length === {count}")
+        after = page.evaluate("""() => ({
+            nested: document.querySelector('.dge-overlay-viewport').scrollTop,
+            outer: document.scrollingElement.scrollTop,
+            zoom: document.querySelector('.dge-overlay-zoom').textContent,
+            sameImage: window.originalImageElement === document.querySelector('.dge-overlay-image'),
+            sameScroller: window.originalNestedScroller === document.querySelector('.dge-overlay-viewport'),
+            count: document.querySelector('.dge-node-panel h3').textContent
+        })""")
+        assert after['sameImage'] and after['sameScroller']
+        assert after['zoom'] == before['zoom']
+        assert after['nested'] == pytest.approx(before['nested'], abs=1.5)
+        assert after['outer'] == pytest.approx(before['outer'], abs=1.5)
+        assert after['count'] == '节点 · ' + str(count)
+    # In-place vertex edits must still keep every node accessible for renaming.
+    assert page.get_by_label('节点 5 标签').count() == 1
