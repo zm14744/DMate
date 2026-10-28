@@ -121,6 +121,23 @@ def main():
         ICONS / "favicon-32.png"
     ).read_bytes()
 
+    # Safari's large URL edit field and small tab have separate *candidate*
+    # icons, with the same exact Edge geometry and transparent background.
+    for surface, fg, match_svg, match_png in (
+        ("tab-black", BLACK, "dmate-safari-contrast-light-v43.svg",
+         "dmate-safari-contrast-light-v43"),
+        ("address-white", WHITE, "dmate-transparent.svg",
+         "dmate-safari-contrast-dark-v43"),
+    ):
+        svg = ICONS / f"dmate-safari-{surface}-v46.svg"
+        assert svg.read_bytes() == (ICONS / match_svg).read_bytes()
+        for size in (32, 64):
+            png = ICONS / f"dmate-safari-{surface}-v46-{size}.png"
+            matches_vector(png, size, background=None, foreground=fg,
+                           stroke_units=TAB_STROKE)
+            assert png.read_bytes() == (ICONS / f"{match_png}-{size}.png").read_bytes()
+            assert rgba(png).getpixel((0, 0))[3] == 0
+
     # Older pre-v43 Safari assets remain byte-identical and are no longer
     # referenced by the Safari webpage favicon branch.
     for theme, background, foreground in (
@@ -312,15 +329,18 @@ def main():
     for pixel in (16,32,64):
         assert f'<link rel="icon" type="image/png" sizes="{pixel}x{pixel}" href="/favicon-{pixel}.png?v=dmate-bing-v40-20261020">' in html
     assert '<script id="dmateSafariFaviconSwitch">' in html
-    assert 'dmate-safari-v45-20261028' in html
+    safari_head = html.split('{% elif is_mac_safari %}', 1)[1].split(
+        '{% elif is_android_browser %}', 1
+    )[0]
+    assert 'dmate-safari-position-v46-20261028' in safari_head
+    assert 'setSafariIcon("tab")' in safari_head
+    assert 'setSafariIcon("address")' in safari_head
+    assert 'window.addEventListener("blur"' in safari_head
+    assert 'window.addEventListener("focus"' in safari_head
+    assert 'window.addEventListener("pageshow"' in safari_head
+    assert 'prefers-color-scheme' not in safari_head
+    assert 'dmate-safari-contrast-' not in safari_head
     assert 'dmate-safari-black-v44' not in html
-    for old in ('dmate-safari-black-v44.svg', 'dmate-safari-black-v44-32.png',
-                'dmate-safari-black-v44-64.png'):
-        assert not (ICONS / old).exists(), "Obsolete wrong-color Safari icon survived"
-    assert 'dmate-safari-contrast-light-v43.svg?v=' in html
-    assert 'dmate-transparent.svg?v=' in html
-    assert 'dmate-safari-contrast-' in html
-    assert 'scheme.addEventListener("change", refreshSafariIcon)' in html
     assert 'dmate-site-v36-64.png?v=dmate-safari-v36-20261019' not in html
     assert '{% elif is_mac_safari %}' in html
     assert 'is_desktop_firefox=is_desktop_firefox,' in app_text

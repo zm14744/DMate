@@ -244,6 +244,22 @@ def main():
                                stroke_units=TAB_STROKE),
                      STATIC / f"dmate-safari-contrast-{appearance}-v43-{size}.png")
 
+    # Safari compact address-field/tab focus states. Both PNG/SVG variants
+    # use Edge's exact 23-unit vectors and have no opaque background.
+    # The browser still controls final favicon selection and caching.
+    for surface, color, svg_color in (
+        ("tab-black", BLACK, "#000"),
+        ("address-white", WHITE, "#fff"),
+    ):
+        (STATIC / f"dmate-safari-{surface}-v46.svg").write_text(
+            svg_mark(background=None, foreground=svg_color, stroke=TAB_STROKE),
+            encoding="utf-8"
+        )
+        for size in (32, 64):
+            save_png(draw_mark(size, background=None, foreground=color,
+                               stroke_units=TAB_STROKE),
+                     STATIC / f"dmate-safari-{surface}-v46-{size}.png")
+
     # Legacy Safari assets retained for reference; new v43 uses transparent
     # monochrome outlines selected from the page based on macOS appearance.
     # Keep the working light-mode black tile. In dark mode Safari can

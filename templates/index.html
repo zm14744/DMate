@@ -85,59 +85,58 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=dmate-bing-v40-20261020">
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=dmate-bing-v40-20261020">
 {% elif is_mac_safari %}
-<!-- Safari does not reliably apply prefers-color-scheme inside SVG favicons.
-     Choose a real transparent, single-color icon BEFORE head parsing finishes.
-     The dark SVG is the exact same file as the Windows Edge SVG. -->
+<!-- Safari compact toolbar compatibility:
+     The LARGE URL editing field is targeted when the webpage loses focus.
+     The SMALL normal tab keeps the BLACK geometry by default and on focus.
+     Both icons are transparent, same 23-unit geometry as Edge. Safari owns
+     the browser chrome; its native favicon cache may delay these changes. -->
 <script id="dmateSafariFaviconSwitch">
 (function () {
     "use strict";
-    var scheme = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
-    var lastAppearance = "";
-    var version = "dmate-safari-v45-20261028";
+    var version = "dmate-safari-position-v46-20261028";
+    var currentMode = "";
 
-    function refreshSafariIcon() {
-        var appearance = scheme && scheme.matches ? "dark" : "light";
-        var existingPng = document.getElementById("dmateSafariFaviconPng");
-        var existingSvg = document.getElementById("dmateSafariFavicon");
-        if (lastAppearance === appearance && existingPng && existingSvg) return;
-        lastAppearance = appearance;
+    function setSafariIcon(target) {
+        // Never let a background tab retain the white icon from a blur.
+        if (target === "address" && document.hidden) return;
+        var mode = target === "address" ? "address-white" : "tab-black";
+        var previousPng = document.getElementById("dmateSafariFaviconPng");
+        var previousSvg = document.getElementById("dmateSafariFavicon");
+        if (currentMode === mode && previousPng && previousSvg) return;
+        currentMode = mode;
 
-        // High-density PNG for older Safari, followed by crisp SVG for Safari 26+.
-        // Both use Edge's original 23-unit geometry, with NO filled background.
         var png = document.createElement("link");
         png.id = "dmateSafariFaviconPng";
         png.rel = "icon";
         png.type = "image/png";
         png.sizes = "64x64";
-        png.href = "/static/icons/dmate-safari-contrast-" + appearance + "-v43-64.png?v=" + version;
+        png.href = "/static/icons/dmate-safari-" + mode + "-v46-64.png?v=" + version;
 
         var svg = document.createElement("link");
         svg.id = "dmateSafariFavicon";
         svg.rel = "icon";
         svg.type = "image/svg+xml";
-        svg.href = appearance === "dark"
-            ? "/static/icons/dmate-transparent.svg?v=" + version
-            : "/static/icons/dmate-safari-contrast-light-v43.svg?v=" + version;
+        svg.href = "/static/icons/dmate-safari-" + mode + "-v46.svg?v=" + version;
 
-        // Replacing nodes also avoids WebKit keeping an outdated icon node.
-        if (existingPng) existingPng.remove();
-        if (existingSvg) existingSvg.remove();
+        // A new URL and node replace the old light/dark mode favicon links.
+        if (previousPng) previousPng.remove();
+        if (previousSvg) previousSvg.remove();
         document.head.appendChild(png);
         document.head.appendChild(svg);
     }
 
-    refreshSafariIcon();
-    if (scheme) {
-        if (typeof scheme.addEventListener === "function") {
-            scheme.addEventListener("change", refreshSafariIcon);
-        } else if (typeof scheme.addListener === "function") {
-            scheme.addListener(refreshSafariIcon);
-        }
-    }
-    window.addEventListener("pageshow", refreshSafariIcon);
-    window.addEventListener("focus", refreshSafariIcon);
+    // Keep the small tab BLACK regardless of macOS system appearance.
+    setSafariIcon("tab");
+    // When the page loses focus to Safari's address field, try the WHITE
+    // geometry for the expanded URL box. This cannot detect browser chrome
+    // specifically: it is a best-effort Safari-only workaround.
+    window.addEventListener("blur", function () {
+        if (!document.hidden) setSafariIcon("address");
+    });
+    window.addEventListener("focus", function () { setSafariIcon("tab"); });
+    window.addEventListener("pageshow", function () { setSafariIcon("tab"); });
     document.addEventListener("visibilitychange", function () {
-        if (!document.hidden) refreshSafariIcon();
+        if (document.hidden) setSafariIcon("tab");
     });
 })();
 </script>
