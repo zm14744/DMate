@@ -11,7 +11,7 @@ import time
 from PIL import Image, ImageDraw
 
 from graph_layout_only import (TYPE_PROMPT, _project_figures,
-                               recognize_layout_only, visual_preflight)
+                               recognize_layout_only, recognize_selected_graph_type, visual_preflight)
 
 
 def raw(image):
@@ -91,7 +91,7 @@ def test_figures_have_individual_types_and_original_bounds_with_zero_drawing():
                                    provider=qwen, budget=object())
     assert len(submitted) == 1
     assert "严禁识别或输出顶点列表" in submitted[0][0]
-    assert submitted[0][1][0].startswith("data:image/png;base64,")
+    assert submitted[0][1][0].startswith("data:image/jpeg;base64,")
     assert result["workflow_profile"] == "layout_only"
     assert result["recognition_status"] == "partial"
     assert result["diagnostics"]["route"] == "figure_type_only"
@@ -203,3 +203,52 @@ def test_failed_qwen_is_counted_as_attempted_and_not_fabricated():
     assert result["recognition_status"] == "failed"
     assert result["diagnostics"]["qwen_graph_calls"] == 1
     assert result["graph_structures"] == []
+
+
+
+def test_selected_graph_scans_only_arrows_and_weights_without_any_edges():
+    calls = []
+    def fake_qwen(prompt, images, budget):
+        calls.append((prompt, images))
+        return {"has_graph": True, "graphs": [{
+            "name": "test", "bbox": [0, 0, 1, 1],
+            "directed": True, "weighted": False,
+            "vertices": [{"id": "do-not-copy"}],
+            "edges": [{"from": "X", "to": "Y"}]}], "uncertainties": []}
+    result = recognize_selected_graph_type(
+        raw(diagrams_image()), provider=fake_qwen, budget=object())
+    assert result["directed"] is True and result["weighted"] is False
+    assert result["recognition_status"] == "complete"
+    assert result["no_auto_draw"] is True
+    assert "图像已由用户手动框选" in calls[0][0]
+    assert len(calls) == 1
+
+
+def test_selected_type_scan_obeys_short_deadline_and_does_not_guess():
+    def slow_qwen(*args):
+        time.sleep(.35)
+        return {"has_graph": True, "graphs": [{
+            "directed": True, "weighted": True, "bbox": [0, 0, 1, 1]}]}
+    started = time.monotonic()
+    result = recognize_selected_graph_type(
+        raw(diagrams_image()), provider=slow_qwen, budget=object(),
+        request_deadline=time.monotonic() + .12)
+    assert time.monotonic() - started < .3
+    assert result["directed"] == "unknown"
+    assert result["weighted"] == "unknown"
+    assert result["recognition_status"] == "partial"
+
+
+def test_fast_upload_and_manual_figures_share_four_second_budget_contract():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    client = (root / "static/script.js").read_text()
+    server = (root / "app.py").read_text()
+    overlay = (root / "static/graph-editor-overlay.js").read_text()
+    assert "OCR_SCAN_MAX_MS = 4000" in client
+    assert "discardOcrTask(task); // Immediate UI removal" in client
+    assert 'task.state === "cancelled") return "已取消"' not in client
+    assert "/graph/figure-type" in server and "/graph/figure-type" in client
+    assert "scanFigureType(points,g.id)" in overlay
+    assert "void scanFigureType([[box[0],box[1]]" in overlay
+    assert 'timeout_seconds=3.0' in server
