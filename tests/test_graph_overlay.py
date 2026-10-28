@@ -336,3 +336,79 @@ def test_repeated_vertex_placement_does_not_jump_back_to_top(canvas_page):
         assert after['count'] == '节点 · ' + str(count)
     # In-place vertex edits must still keep every node accessible for renaming.
     assert page.get_by_label('节点 5 标签').count() == 1
+
+
+
+def test_mask_strength_slider_preserves_image_and_original_graph_data(canvas_page):
+    page = canvas_page
+    slider = page.get_by_role("slider", name="蒙层强度")
+    assert slider.input_value() == "16"
+    assert page.locator(".dge-overlay-mask").count() == 1
+    assert page.locator(".dge-overlay-mask").get_attribute("fill-rule") == "evenodd"
+    assert page.locator(".dge-overlay-mask").evaluate(
+        "node => getComputedStyle(node).pointerEvents") == "none"
+    page.evaluate("""() => {
+        window.photoBeforeVeil = document.querySelector('.dge-overlay-image');
+        window.dataBeforeVeil = JSON.stringify(instance.getDocument());
+        window.zoomBeforeVeil = document.querySelector('.dge-overlay-zoom').textContent;
+    }""")
+    # The user can disable the mask completely for very faint originals.
+    slider.focus()
+    slider.press("Home")
+    assert slider.input_value() == "0"
+    assert page.locator(".dge-overlay-mask-value").inner_text() == "0%"
+    assert page.locator(".dge-overlay-mask").evaluate(
+        "node => node.style.fill.endsWith(', 0)')") is True
+    slider.press("End")
+    assert slider.input_value() == "65"
+    assert page.locator(".dge-overlay-mask-value").inner_text() == "65%"
+    assert page.evaluate("""() => {
+        return window.photoBeforeVeil === document.querySelector('.dge-overlay-image')
+            && window.dataBeforeVeil === JSON.stringify(instance.getDocument())
+            && window.zoomBeforeVeil === document.querySelector('.dge-overlay-zoom').textContent;
+    }""")
+    # Manual drawing must retain the current strength after a vertex mutation.
+    page.get_by_role("button", name="添加顶点", exact=True).click()
+    box = page.locator(".dge-overlay-svg").bounding_box()
+    assert box
+    page.mouse.click(box["x"] + box["width"]*.48,
+                     box["y"] + box["height"]*.32)
+    assert page.locator(".dge-overlay-node").count() == 3
+    assert page.get_by_role("slider", name="蒙层强度").input_value() == "65"
+    assert page.evaluate("window.photoBeforeVeil === document.querySelector('.dge-overlay-image')")
+
+
+def test_mask_cutout_follows_user_defined_rectangle_and_polygon(canvas_page):
+    page = canvas_page
+    page.get_by_role("button", name="框选图形", exact=True).click()
+    rect = page.locator(".dge-overlay-svg").bounding_box()
+    assert rect
+    page.mouse.move(rect["x"] + rect["width"]*.18,
+                    rect["y"] + rect["height"]*.15)
+    page.mouse.down()
+    page.mouse.move(rect["x"] + rect["width"]*.82,
+                    rect["y"] + rect["height"]*.75, steps=5)
+    page.mouse.up()
+    assert page.locator(".dge-overlay-mask").get_attribute("data-has-cutout") == "true"
+    path = page.locator(".dge-overlay-mask").get_attribute("d")
+    assert "H 900 V 580 H 0 Z" in path
+    assert " H " in path and " V " in path
+    mask_before = page.locator(".dge-overlay-mask").evaluate("node => node.style.fill")
+    page.get_by_role("slider", name="蒙层强度").press("Home")
+    assert page.locator(".dge-overlay-mask").evaluate(
+        "node => node.style.fill.endsWith(', 0)')")
+    page.get_by_role("slider", name="蒙层强度").press("End")
+    assert page.locator(".dge-overlay-mask").evaluate("node => node.style.fill") != mask_before
+    # Replacing the rectangle with an irregular figure outline produces a
+    # proper polygonal clear area, without changing original source pixels.
+    page.get_by_label("选区方式").select_option("graph_poly")
+    rect = page.locator(".dge-overlay-svg").bounding_box()
+    for x, y in ((.23,.20),(.72,.25),(.62,.70),(.21,.65)):
+        page.mouse.click(rect["x"] + rect["width"]*x,
+                         rect["y"] + rect["height"]*y)
+    page.get_by_role("button", name="完成轮廓").click()
+    assert page.locator(".dge-overlay-mask").get_attribute("data-has-cutout") == "true"
+    poly_path = page.locator(".dge-overlay-mask").get_attribute("d")
+    assert poly_path != path
+    assert " L " in poly_path
+    assert page.locator(".dge-overlay-polygon").count() == 1
