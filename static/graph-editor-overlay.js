@@ -5,9 +5,12 @@ const E=(d,t,a={})=>{const n=d.createElementNS(NS,t);for(const [k,v] of Object.e
 function mount(host,o){
  const d=host.ownerDocument,s=o.state||{mode:'select',zoom:100,visible:true,start:null};
  s.polygonDraft ||= [];
- // This only changes the DISPLAYED photo, never the original bytes or drawing.
- s.maskAlpha = Number.isFinite(s.maskAlpha) ? Math.max(0,Math.min(.65,s.maskAlpha)) : .16;
- let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false,scanSequence=0;const pointers=new Map();
+ s.originalVisible = s.originalVisible !== false;
+ s.originalOpacity = Number.isFinite(s.originalOpacity)
+   ? Math.max(0,Math.min(1,s.originalOpacity)) : 1;
+ let w=1000,h=1000,active=null,ghost=null,base=null,textBusy=false,scanSequence=0;
+ let sampleCanvas=d.createElement('canvas'),sampleCtx=null;
+ const pointers=new Map();
  const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),status=d.createElement('span');
  root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
  stage.append(image,svg);scroll.append(stage);root.append(bar,scroll);host.append(root);
@@ -79,24 +82,32 @@ function mount(host,o){
  const value=d.createElement('span');value.className='dge-overlay-zoom';bar.append(value);
  button('＋','zoom-in',()=>zoom(s.zoom*1.25)).setAttribute('aria-label','放大原图');
  button('适应','zoom-fit',fitImage);
- // Adjustable veil keeps the selected figure (including its printed name) clear.
- // Reducing the strength to 0 preserves faint originals without reloading.
- const maskControl=d.createElement('label');maskControl.className='dge-overlay-mask-control';
- const maskTitle=d.createElement('span');maskTitle.textContent='蒙层';
- const maskRange=d.createElement('input');maskRange.type='range';
- maskRange.min='0';maskRange.max='65';maskRange.step='1';
- maskRange.value=String(Math.round(s.maskAlpha*100));
- maskRange.setAttribute('aria-label','蒙层强度');
- const maskValue=d.createElement('output');maskValue.className='dge-overlay-mask-value';
- maskValue.textContent=maskRange.value+'%';
- maskRange.addEventListener('input',()=>{
-  s.maskAlpha=Math.max(0,Math.min(.65,Number(maskRange.value)/100));
-  maskValue.textContent=Math.round(s.maskAlpha*100)+'%';
-  const veil=svg.querySelector('.dge-overlay-mask');
-  if(veil)veil.style.fill='rgba(15, 23, 42, '+(s.maskAlpha * (veil.dataset.hasCutout==='true'?1:.55))+')';
-  else draw();
+ // Hide the source photo independently from the drawing layer.
+ // visibility:hidden preserves its dimensions and all source coordinates.
+ const syncOriginal=()=>{
+  image.style.visibility=s.originalVisible?'visible':'hidden';
+  image.style.opacity=String(s.originalOpacity);
+  originalButton.textContent=s.originalVisible?'隐藏原图':'显示原图';
+ };
+ const originalButton=button(s.originalVisible?'隐藏原图':'显示原图','original-visibility',()=>{
+  s.originalVisible=!s.originalVisible;syncOriginal();
  });
- maskControl.append(maskTitle,maskRange,maskValue);bar.append(maskControl);
+ originalButton.setAttribute('aria-label','切换原图显示');
+ const opacityControl=d.createElement('label');opacityControl.className='dge-overlay-opacity-control';
+ const opacityTitle=d.createElement('span');opacityTitle.textContent='原图透明度';
+ const opacityRange=d.createElement('input');opacityRange.type='range';
+ opacityRange.min='0';opacityRange.max='100';opacityRange.step='1';
+ opacityRange.value=String(Math.round(s.originalOpacity*100));
+ opacityRange.setAttribute('aria-label','原图透明度');
+ const opacityValue=d.createElement('output');opacityValue.className='dge-overlay-opacity-value';
+ opacityValue.textContent=opacityRange.value+'%';
+ opacityRange.addEventListener('input',()=>{
+  s.originalOpacity=Math.max(0,Math.min(1,Number(opacityRange.value)/100));
+  opacityValue.textContent=opacityRange.value+'%';
+  image.style.opacity=String(s.originalOpacity);
+ });
+ opacityControl.append(opacityTitle,opacityRange,opacityValue);bar.append(opacityControl);
+ syncOriginal();
   const focusButton=button('聚焦图形','focus-region',()=>{
    const g=o.graph();
    const p=g?.region_polygon;
@@ -163,23 +174,6 @@ function mount(host,o){
   const labelOffset=Math.max(radius*1.25,11/scale);
   const defs=E(d,'defs'),mark=E(d,'marker',{id:o.instance+'-arrow',viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto'});mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill:'currentColor'}));defs.append(mark);svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
-  // The focus shape uses the final figure bbox, which now includes printed
-  // captions/aliases as well as vertices. The even-odd hole leaves the
-  // current panel un-dimmed; its OCR text and drawing stay fully legible.
-  let hole='';
-  if(Array.isArray(g.region_polygon)&&g.region_polygon.length>=3&&
-      g.region_polygon.every(p=>Array.isArray(p)&&p.length===2&&p.every(unit))){
-   hole=' M '+g.region_polygon.map(p=>(p[0]*w)+' '+(p[1]*h)).join(' L ')+' Z';
-  }else if(Array.isArray(g.bbox)&&g.bbox.length===4&&g.bbox.every(unit)&&
-            g.bbox[0]<g.bbox[2]&&g.bbox[1]<g.bbox[3]){
-   const [a,b,c,d]=g.bbox;hole=' M '+(a*w)+' '+(b*h)+' H '+(c*w)+' V '+(d*h)+' H '+(a*w)+' Z';
-  }
-  const veil=E(d,'path',{d:'M 0 0 H '+w+' V '+h+' H 0 Z'+hole,
-      class:'dge-overlay-mask','fill-rule':'evenodd'});
-  veil.dataset.hasCutout=String(Boolean(hole));
-  veil.style.fill='rgba(15, 23, 42, '+(s.maskAlpha*(hole?1:.55))+')';
-  svg.append(veil);
-
   if(g.bbox?.length===4)svg.append(E(d,'rect',{x:g.bbox[0]*w,y:g.bbox[1]*h,width:(g.bbox[2]-g.bbox[0])*w,height:(g.bbox[3]-g.bbox[1])*h,class:'dge-overlay-bbox'}));
   const outline=(points,cssClass)=>{
     if(Array.isArray(points)&&points.length){
