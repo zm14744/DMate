@@ -121,6 +121,19 @@ def main():
         ICONS / "favicon-32.png"
     ).read_bytes()
 
+    # Safari v44 is black in BOTH appearances, identical to the earlier
+    # light-mode geometry and raster. There is no black or white tile.
+    assert (ICONS / "dmate-safari-black-v44.svg").read_bytes() == (
+        ICONS / "dmate-safari-contrast-light-v43.svg").read_bytes()
+    )
+    for size in (32, 64):
+        latest = ICONS / f"dmate-safari-black-v44-{size}.png"
+        previous_light = ICONS / f"dmate-safari-contrast-light-v43-{size}.png"
+        assert latest.read_bytes() == previous_light.read_bytes()
+        matches_vector(latest, size, background=None, foreground=BLACK,
+                       stroke_units=TAB_STROKE)
+        assert rgba(latest).getpixel((0, 0))[3] == 0
+
     # Older pre-v43 Safari assets remain byte-identical and are no longer
     # referenced by the Safari webpage favicon branch.
     for theme, background, foreground in (
@@ -311,11 +324,17 @@ def main():
     assert '<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-bing-v40-20261020">' in html
     for pixel in (16,32,64):
         assert f'<link rel="icon" type="image/png" sizes="{pixel}x{pixel}" href="/favicon-{pixel}.png?v=dmate-bing-v40-20261020">' in html
-    assert '<script id="dmateSafariFaviconSwitch">' in html
-    assert 'dmate-safari-contrast-light-v43.svg?v=' in html
-    assert 'dmate-transparent.svg?v=' in html
-    assert 'dmate-safari-contrast-' in html
-    assert 'scheme.addEventListener("change", refreshSafariIcon)' in html
+    safari_section = html.split('{% elif is_mac_safari %}', 1)[1].split(
+        '{% elif is_android_browser %}', 1
+    )[0]
+    assert '<script id="dmateSafariFaviconSwitch">' not in safari_section
+    assert 'prefers-color-scheme' not in safari_section
+    assert 'id="dmateSafariFaviconPng"' in safari_section
+    assert 'id="dmateSafariFavicon"' in safari_section
+    assert '/static/icons/dmate-safari-black-v44-64.png?v=dmate-safari-black-v44-20261028' in safari_section
+    assert '/static/icons/dmate-safari-black-v44.svg?v=dmate-safari-black-v44-20261028' in safari_section
+    assert 'dmate-safari-contrast-dark-v43' not in safari_section
+    assert 'dmate-transparent.svg' not in safari_section
     assert 'dmate-site-v36-64.png?v=dmate-safari-v36-20261019' not in html
     assert '{% elif is_mac_safari %}' in html
     assert 'is_desktop_firefox=is_desktop_firefox,' in app_text
