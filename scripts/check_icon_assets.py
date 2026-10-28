@@ -112,8 +112,8 @@ def main():
             assert actual.getchannel("A").getbbox(), ("Missing wireframe", path)
     # The 32px dark-mode Safari raster is pixel-identical to Edge's PNG.
     assert (ICONS / "dmate-safari-contrast-dark-v43-32.png").read_bytes() == (
-        ICONS / "favicon-32.png").read_bytes()
-    )
+        ICONS / "favicon-32.png"
+    ).read_bytes()
 
     # Older pre-v43 Safari assets remain byte-identical and are no longer
     # referenced by the Safari webpage favicon branch.
