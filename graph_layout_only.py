@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image
 
 from image_evidence import decode_document_image
-from ocr_layout import separate_diagram_labels
+from ocr_layout import include_figure_captions, separate_diagram_labels
 
 
 VERSION = "2026-10-28-accuracy-first-segmentation-v3"
@@ -39,6 +39,7 @@ TYPE_PROMPT = """你是离散数学图片的版面分图及图类型读取器，
 普通文字、公式、下划线、表格不是数学图；没有图就返回 graphs=[]。
 仔细逐行、逐列观察图形：并列图、上下图、图a/图b/图1/图2应分开；单个图内部不连通的部分不能误拆；不要把图例、公式、表格、箭头文字或放大视图重复算成独立图。
 边的弯曲、交叉、并行、重边、虚线、阴影、褪色和手绘线都不妨碍判断图形是否存在；不要尝试推断拓扑。
+一幅图的图名、图号、简短代号或下方的命名文字（例如 G、G₁、图2、(a)、彼得森图）也是该图的一部分。定位时必须把紧挨图下、或明确属于该图上方的标题完整包含在这一幅图的框选范围内。不要把这些标题错当独立图，也不要把题干、小问或公式整段框进去。
 每幅图都使用整张原图相对坐标 [left,top,right,bottom]，每个坐标0到1。
 directed：边或自环上能看到任何箭头尖端为true；确认没有箭头为false；看不清/边界裁断/混合情形为"unknown"。不能凭题干的“有向图”字样推断图片里有箭头。
 weighted：确实有写在边旁、用于标示边权的数字或符号为true；确认没有边权为false；顶点数字、图名、顶点标签、边名、公式、下标、坐标轴刻度不算边权；拿不准为"unknown"。
@@ -214,7 +215,7 @@ SELECTED_TYPE_PROMPT = """图像已经由用户框选为单独一幅图。严格
 
 LAYOUT_AUDIT_PROMPT = """请重新独立清点这张完整数学图片的所有实际图形。这一遍只负责检查自动分图是否遗漏、重复或边界不全。
 逐行逐列检查，区分图1/图2/a/b和并列子图；同一幅图中不连通的部分不是两幅图。
-文字、公式、表格、图例和线下的说明文字不算新图。只列每幅独立子图的整图归一化矩形边界[left,top,right,bottom]及原图图名。
+文字、公式、表格、图例和线下的说明文字不算新图。每幅子图的图名/图号/代号（包括绘在子图下方的 G、G1、(a)、图2 等）都属于图的整体，边框必须包含标题，不能只框线条或顶点。只列每幅独立子图连同其标题的整图归一化矩形边界[left,top,right,bottom]及原图图名。
 禁止输出顶点、边、箭头、边权、结构、预绘制路径，也不要复制题干。
 仅输出JSON：{"has_graph":true,"graphs":[{"name":"图1","bbox":[0.1,0.2,0.4,0.8]}]}
 没有图时：{"has_graph":false,"graphs":[]}
@@ -613,8 +614,13 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
         # boxes with the confirmed diagram rectangles. Only the OUTSIDE text
         # may enter the question; graph labels/weights stay out of body_text.
         diagram_label_count = 0
+        caption_count = 0
         question_text_count = int(text_result.get("text_count") or 0)
         if figures:
+            # Qwen frames sometimes stop at the bottom vertex and miss a
+            # printed caption under the diagram. Reconcile with original OCR
+            # boxes before the text/diagram partition and before editor output.
+            figures, caption_count = include_figure_captions(text_result, figures)
             text, question_text_count, diagram_label_count, located = (
                 separate_diagram_labels(text_result, figures))
             if not located and text:
@@ -653,6 +659,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                 "layout_model_calls": 0,
                 "text_worker_metrics": text_result.get("resource_metrics", []),
                 "diagram_text_items_excluded_from_question": diagram_label_count,
+                "graph_captions_attached": caption_count,
                 "duration_seconds": round(time.monotonic() - start, 3),
                 "deadline_hit": time.monotonic() >= deadline,
                 "image_accuracy_certified": False,
