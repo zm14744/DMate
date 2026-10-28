@@ -1,10 +1,9 @@
-"""Fast image routing: pure text or diagram regions/types, never graph pre-drawing.
+"""Automatic accurate segmentation and bounded manual figure-type recognition.
 
-Only the original pixels are used to decide if a visual diagram might exist.
-A single Qwen3-VL-Plus read identifies diagram count, bounds, direction and
-weight per independent figure. Its output is deliberately projected down to
-empty vertices/edges: *no* AI-produced node, edge or pen path is displayed.
-Text-only images skip the diagram model and PP-DocLayoutV3 entirely.
+Initial upload: high-detail Qwen overview, independent focused per-figure type
+verification, and OCR in parallel, with no four-second ceiling. Manually framed
+figure: one bounded Qwen type-only check, within four seconds including UI.
+No stage predicts or draws a node, edge, endpoint, or path.
 """
 from __future__ import annotations
 
@@ -23,19 +22,26 @@ from PIL import Image
 from image_evidence import decode_document_image
 
 
-VERSION = "2026-10-28-fast-figure-metadata-v2"
-SCAN_MAX_SECONDS = 3.4
-_SCAN_WORKERS = ThreadPoolExecutor(max_workers=8, thread_name_prefix="dmate-quick-scan")
+VERSION = "2026-10-28-accuracy-first-segmentation-v3"
+MANUAL_SCAN_MAX_SECONDS = 3.4
+# Only manual region type checks have a four-second limit. Automatic upload
+# has its own generous server-side safety deadline, unrelated to the UI.
+INITIAL_SCAN_MAX_SECONDS = 265.0
+SCAN_MAX_SECONDS = MANUAL_SCAN_MAX_SECONDS  # Existing public manual-scan name
+_SCAN_WORKERS = ThreadPoolExecutor(max_workers=8, thread_name_prefix="dmate-initial-figures")
+_MANUAL_WORKERS = ThreadPoolExecutor(max_workers=8, thread_name_prefix="dmate-manual-types")
 MAX_GRAPHS = 24
 
 TYPE_PROMPT = """你是离散数学图片的版面分图及图类型读取器，不是图形绘制器。
-只完成三件事：1）判断原图有无真实数学图形；2）按完整原图找出每幅独立子图的范围与原有图名；3）独立确定每幅图有无箭头、有无印刷的边权。
+只完成三件事：1）判断原图有无真实数学图形；2）仔细清点每幅独立子图并标出准确的整图范围与原图图名；3）分别判断每幅图有无边上的箭头以及真正的边权。宁可慢一点，也不得漏图或乱拆。
 严禁识别或输出顶点列表、边列表、端点、连接关系、绘制路径；这些全部由用户自行描绘。
 普通文字、公式、下划线、表格不是数学图；没有图就返回 graphs=[]。
-同一图即使不连通也不拆成多图；原图的放大视图也不能重复计数。
+仔细逐行、逐列观察图形：并列图、上下图、图a/图b/图1/图2应分开；单个图内部不连通的部分不能误拆；不要把图例、公式、表格、箭头文字或放大视图重复算成独立图。
+边的弯曲、交叉、并行、重边、虚线、阴影、褪色和手绘线都不妨碍判断图形是否存在；不要尝试推断拓扑。
 每幅图都使用整张原图相对坐标 [left,top,right,bottom]，每个坐标0到1。
-directed：确定有向为true，确定无向为false，看不清为"unknown"。
-weighted：确有边权为true，确定无边权为false；顶点数字、图名、边名、公式不算边权；不能确定为"unknown"。
+directed：边或自环上能看到任何箭头尖端为true；确认没有箭头为false；看不清/边界裁断/混合情形为"unknown"。不能凭题干的“有向图”字样推断图片里有箭头。
+weighted：确实有写在边旁、用于标示边权的数字或符号为true；确认没有边权为false；顶点数字、图名、顶点标签、边名、公式、下标、坐标轴刻度不算边权；拿不准为"unknown"。
+尤其认真查看密集区域的小箭头、线段端部、弧线尖端以及边旁微小权值，不要把线条交叉点误认成箭头，也不要把顶点编号误认成权值。
 如果有不清楚的箭头、边权或分图边界，不得猜测。保留对应子图并说明 uncertainties。
 返回一个JSON对象，不解释，不输出Markdown：
 {"has_graph":true,"graphs":[{"name":"原有图注或图1","bbox":[0.1,0.2,0.4,0.8],"directed":false,"weighted":false}],"uncertainties":[]}
@@ -179,53 +185,222 @@ def _project_figures(reading):
     return figures, list(dict.fromkeys(questions))[:20]
 
 
-class _FastVisionBudget:
-    """One provider call; do not spend the remaining upload time on retries."""
+class _VisionBudget:
+    """Per-call visual budget; full upload does not inherit the manual cap."""
 
-    def __init__(self, deadline):
+    def __init__(self, deadline, *, manual=False):
         self.deadline = deadline
-        self.connect_seconds = 0.85
-        self.output_tokens = 1024
+        self.connect_seconds = 0.85 if manual else 7.0
+        self.call_seconds = 3.2 if manual else 60.0
+        self.output_tokens = 1024 if manual else 2048
         self.metrics = []
 
     def take(self):
-        left = self.deadline - time.monotonic()
+        left = min(self.call_seconds, self.deadline - time.monotonic())
         if left <= 0:
             raise TimeoutError("figure_scan_deadline")
         return left
 
 
-SELECTED_TYPE_PROMPT = """图像已由用户手动框选为一幅图。只判断该图有无箭头、有无真正的边权。
-箭头存在则directed=true，否则false；不清楚写"unknown"。
-边上的数字/字母是边权才设weighted=true；点的名称和图注不是边权；不清楚写"unknown"。
-禁止提取点、边、连接关系或生成任何绘图。仅输出JSON：
+SELECTED_TYPE_PROMPT = """图像已经由用户框选为单独一幅图。严格只识别两个事实：边上是否有箭头，边旁是否有权值。
+请仔细查看细线、小箭头尖端、弧线、环和重边。只要确实存在箭头就directed=true，确定全无才写false；不确定写"unknown"。
+只要确实存在作为边权标注的数字或符号就weighted=true，确定全无才写false；顶点名称、顶点编号、普通边名、图注、公式不是边权。拿不准写"unknown"。
+如果裁剪切掉了可能的箭头或权值，不要把看不见当作不存在。
+禁止提取任何顶点、边、连接关系、箭头方向或绘制路径。仅输出JSON：
 {"has_graph":true,"graphs":[{"name":"当前子图","bbox":[0,0,1,1],"directed":false,"weighted":false}],"uncertainties":[]}
 """
+
+
+FOCUSED_TYPE_PROMPT = """下面按顺序提供了1到2张从原图单独裁出的数学图形，每张对应一幅子图。
+请只复核每张图自身的两项属性，不能参考题干文字猜测：
+1. directed：只要边/自环末端确有箭头尖端便是true；确实没有箭头才是false。交叉点、顶点、线尾误差不是箭头。
+2. weighted：只有边旁用于表示边权的数字或符号才是true；顶点名称、序号、边名、角标、图例、公式不算权值。
+逐条仔细查看密集/褪色细线、曲线及小字符；裁掉的边或模糊区域不要当作不存在。拿不准任一项就写"unknown"。
+禁止绘制或列举顶点、边、连接关系、方向列表。必须一张图返回一条，顺序索引image_index从1开始，不得多报。
+仅输出JSON：{"figures":[{"image_index":1,"directed":false,"weighted":true}]}
+"""
+
+
+DISPUTE_TYPE_PROMPT = """这是单独裁出的图。前两次读取对箭头或权值有分歧，请重新从当前像素独立核对。
+不要根据“有向/无向、带权/不带权”的题目文字猜测。沿每条可见边和环确认是否真的有箭头尖端，
+并区分贴边的权值和顶点名称/编号/普通边名。任何被裁断、被遮挡、模糊的区域不允许断言没有箭头或权值。
+不列出边、顶点或生成绘图。仅输出JSON：
+{"figures":[{"image_index":1,"directed":"unknown","weighted":"unknown"}]}
+"""
+
+
+def _provider_or_raise(provider):
+    if provider is not None:
+        return provider
+    from vision_provider import VisionProvider
+    candidate = VisionProvider("qwen", thinking=False, retries=0)
+    if not candidate.available():
+        raise RuntimeError("qwen_layout_unavailable")
+    return candidate
+
+
+def _image_url(image, *, manual=False, focused=False):
+    # Initial segmentation needs full-page detail; independently enlarged crops
+    # preserve tiny arrow tips and edge weights lost in whole-page thumbnails.
+    side = 1400 if manual else 1900 if focused else 2200
+    working = _scaled_image(image, side=side).convert("RGB")
+    try:
+        if manual:
+            payload = io.BytesIO()
+            working.save(payload, format="JPEG", quality=93, optimize=False)
+            mime = "image/jpeg"
+        else:
+            lossless = io.BytesIO()
+            working.save(lossless, format="PNG", compress_level=2)
+            if lossless.tell() <= 2_000_000:
+                payload, mime = lossless, "image/png"
+            else:
+                payload = io.BytesIO()
+                working.save(payload, format="JPEG", quality=95, optimize=False)
+                mime = "image/jpeg"
+        return "data:" + mime + ";base64," + base64.b64encode(payload.getvalue()).decode("ascii")
+    finally:
+        working.close()
 
 
 def _vision_layout(image, *, provider=None, budget=None, cancelled=None,
                    request_deadline=None, selected=False):
     _check_cancelled(cancelled)
-    if provider is None:
-        from vision_provider import VisionProvider
-        provider = VisionProvider("qwen", thinking=False, retries=0)
-        if not provider.available():
-            raise RuntimeError("qwen_layout_unavailable")
+    reader = _provider_or_raise(provider)
     if budget is None:
-        budget = _FastVisionBudget(request_deadline or time.monotonic() + 2.8)
-    working = _scaled_image(image, side=1050).convert("RGB")
-    try:
-        payload = io.BytesIO()
-        # A bounded JPEG transfers faster than a large PNG to the visual API.
-        working.save(payload, format="JPEG", quality=80, optimize=False)
-        url = "data:image/jpeg;base64," + base64.b64encode(payload.getvalue()).decode("ascii")
-    finally:
-        working.close()
+        budget = _VisionBudget(request_deadline or time.monotonic() +
+                               (MANUAL_SCAN_MAX_SECONDS if selected else INITIAL_SCAN_MAX_SECONDS),
+                               manual=selected)
+    image_url = _image_url(image, manual=selected)
     _check_cancelled(cancelled)
-    response = provider(SELECTED_TYPE_PROMPT if selected else TYPE_PROMPT, [url], budget)
+    response = reader(SELECTED_TYPE_PROMPT if selected else TYPE_PROMPT,
+                      [image_url], budget)
     _check_cancelled(cancelled)
     return _project_figures(response)
 
+
+def _review_entries(reading, count):
+    """Reject missing/duplicate/wrong-index checks rather than guessing."""
+    rows = reading.get("figures") if isinstance(reading, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError("figure_type_review_invalid")
+    indexed = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        index = row.get("image_index")
+        if type(index) is not int or not 1 <= index <= count or index in indexed:
+            raise ValueError("figure_type_review_index_invalid")
+        indexed[index] = {key: _typed(row.get(key))
+                          for key in ("directed", "weighted")}
+    return [indexed.get(i) for i in range(1, count + 1)]
+
+
+def _figure_crop(image, box):
+    width, height = image.size
+    a, b, c, d = box
+    # The overview bbox already has 2% label padding. Keep additional crop
+    # padding small so neighbouring independent diagrams do not contaminate
+    # directed/weighted judgments.
+    pad_x, pad_y = (c - a) * .035, (d - b) * .035
+    region = (max(0, math.floor((a - pad_x) * width)),
+              max(0, math.floor((b - pad_y) * height)),
+              min(width, math.ceil((c + pad_x) * width)),
+              min(height, math.ceil((d + pad_y) * height)))
+    if region[2] - region[0] < 8 or region[3] - region[1] < 8:
+        raise ValueError("figure_crop_too_small")
+    return image.crop(region)
+
+
+def _verify_figures(image, figures, *, provider=None, cancelled=None, deadline=None):
+    """Independent high-resolution crop checks; all paths stay metadata-only.
+
+    A disagreement never silently becomes a confident yes/no. Only an
+    independent targeted deciding read may resolve it; otherwise retain
+    "unknown" for the user to check.
+    """
+    if not figures:
+        return [], [], 0, 0
+    reader = _provider_or_raise(provider)
+    deadline = deadline or time.monotonic() + INITIAL_SCAN_MAX_SECONDS
+    verified = [dict(row) for row in figures]
+    issues = []
+    calls, certified = 0, 0
+    for offset in range(0, len(verified), 2):
+        _check_cancelled(cancelled)
+        images, entries = [], []
+        for i in range(offset, min(offset + 2, len(verified))):
+            figure = verified[i]
+            if "bbox" not in figure:
+                figure["directed"] = figure["weighted"] = "unknown"
+                issues.append(f'{figure["name"]}没有可核对的子图边界，请手动框选')
+                continue
+            try:
+                cropped = _figure_crop(image, figure["bbox"])
+                try:
+                    images.append(_image_url(cropped, focused=True))
+                    entries.append(i)
+                finally:
+                    cropped.close()
+            except (ValueError, OSError):
+                figure["directed"] = figure["weighted"] = "unknown"
+                issues.append(f'{figure["name"]}子图过小或裁剪失败，请手动核对')
+        if not images:
+            continue
+        _check_cancelled(cancelled)
+        try:
+            calls += 1
+            reviewed = reader(FOCUSED_TYPE_PROMPT, images,
+                              _VisionBudget(deadline))
+            _check_cancelled(cancelled)
+            checks = _review_entries(reviewed, len(images))
+        except LayoutOnlyCancelled:
+            raise
+        except Exception:
+            checks = [None for _ in images]
+            issues.append("局部图类型复核失败，无法确保箭头和边权判断可靠")
+        for position, index in enumerate(entries):
+            figure = verified[index]
+            review = checks[position]
+            if review is None:
+                figure["directed"] = figure["weighted"] = "unknown"
+                issues.append(f'{figure["name"]}缺少独立类型核对结果')
+                continue
+            pending = []
+            for flag in ("directed", "weighted"):
+                original = figure[flag]
+                focused = review[flag]
+                if original == focused and type(original) is bool:
+                    certified += 1
+                else:
+                    pending.append(flag)
+                    figure[flag] = "unknown"
+            if not pending:
+                continue
+            # Only disagreements/uncertainties need a third, differently
+            # worded read of the same original crop. Initial upload has time.
+            final_check = None
+            if time.monotonic() < deadline - 2:
+                try:
+                    calls += 1
+                    followup = reader(DISPUTE_TYPE_PROMPT, [images[position]],
+                                      _VisionBudget(deadline))
+                    _check_cancelled(cancelled)
+                    final_check = _review_entries(followup, 1)[0]
+                except LayoutOnlyCancelled:
+                    raise
+                except Exception:
+                    pass
+            for flag in pending:
+                initial = figures[index][flag]
+                focused = review[flag]
+                final = final_check[flag] if final_check else "unknown"
+                if type(final) is bool and (final == initial or final == focused):
+                    figure[flag] = final
+                    certified += 1
+                else:
+                    issues.append(f'{figure["name"]}的{"箭头" if flag == "directed" else "边权"}多次复核仍存在分歧，请对照原图核对')
+    return verified, list(dict.fromkeys(issues)), calls, certified
 
 def _await_until(jobs, deadline, cancelled=None):
     """Never wait for an OCR/native/model worker after the request deadline."""
