@@ -160,3 +160,8 @@
 .dge-overlay-draft-dot{fill:#fff;stroke:var(--accent,#2463b2);stroke-width:2;pointer-events:none}
 .dge-overlay-text-region{fill:rgba(60,60,60,.07);stroke:#545454;stroke-width:2.4;stroke-dasharray:7 4;pointer-events:none}
 .dge-overlay-tools [hidden]{display:none!important}
+
+/* OCR-only images show the photo without an empty graph preview or canvas. */
+.dge-text-only-workspace { display:block; }
+.dge-text-only-workspace .dge-original { max-height:min(55dvh,600px); }
+.dge-detected-type { align-self:center; font-size:13px; color:var(--text-subtle,#64748b); }

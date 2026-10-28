@@ -14364,9 +14364,25 @@ function renderOcrTasks() {
 
 function draftFromOcrResponse(data) {
     const supplied = data?.document && typeof data.document === "object" ? data.document : null;
+    const recognizedGraphs = Array.isArray(supplied?.graphs) ? supplied.graphs
+        : Array.isArray(data?.graph_structures) ? data.graph_structures : [];
+    // Layout-only OCR may never pre-draw a vertex or an edge, including when
+    // a stale server accidentally includes a guessed structure. The detected
+    // graph type and its region survive for user-controlled drawing.
+    const graphs = data?.workflow_profile === "layout_only"
+        ? recognizedGraphs.map((graph, index) => ({
+            id: graph.id || "G" + (index + 1),
+            name: graph.name || "图 " + (index + 1),
+            ...(Array.isArray(graph.bbox) ? {bbox: graph.bbox} : {}),
+            ...(typeof graph.directed === "boolean" ? {directed: graph.directed} : {}),
+            ...(typeof graph.weighted === "boolean" ? {weighted: graph.weighted} : {}),
+            vertices: [], edges: []
+        }))
+        : recognizedGraphs;
     const draft = {
-        body_text: typeof supplied?.body_text === "string" ? supplied.body_text : typeof data?.text === "string" ? data.text : "",
-        graphs: Array.isArray(supplied?.graphs) ? supplied.graphs : Array.isArray(data?.graph_structures) ? data.graph_structures : []
+        body_text: typeof supplied?.body_text === "string" ? supplied.body_text
+            : typeof data?.text === "string" ? data.text : "",
+        graphs
     };
     const context = supplied?.text_context || data?.text_context;
     if (context && typeof context === "object") draft.text_context = context;
@@ -14410,11 +14426,17 @@ async function recognizeOcrTask(task) {
         task.state = data?.manual_mode === true ? "ready"
             : data?.recognition_status === "failed"
                 || !task.draft.body_text.trim() && !task.draft.graphs.length ? "failed" : "ready";
-        task.notice = data?.manual_mode === true
-            ? "原图已准备好。直接描绘顶点和边，文字可框选后识别。"
-            : ocrReviewStatusText(data) || (task.state === "failed"
-                ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
-                : "请对照原图检查节点、连边和题干，确认后再解题。");
+        task.notice = data?.workflow_profile === "layout_only"
+            ? (task.state === "failed"
+                ? "分图或文字识别未完成；可以核对原图并手动补充。"
+                : task.draft.graphs.length
+                    ? "已自动分图并判断类型，未预绘制任何顶点或边；请自行描绘。"
+                    : "已走纯文字 OCR 通道，未启动图论模型；请核对识别文字。")
+            : data?.manual_mode === true
+                ? "原图已准备好。直接描绘顶点和边，文字可框选后识别。"
+                : ocrReviewStatusText(data) || (task.state === "failed"
+                    ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
+                    : "请对照原图检查节点、连边和题干，确认后再解题。");
     } catch (error) {
         if (task.state === "cancelled" || error?.name === "AbortError") {
             task.state = "cancelled";

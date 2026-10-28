@@ -234,7 +234,9 @@
             selectedNodes = new Set([...selectedNodes].filter(vid => graph?.vertices.some(row => row.id === vid)));
             if (!graph?.edges.some(edge => edge.id === selectedEdge)) selectedEdge = null;
             // Keep the actual image and zoom/scroll when only controls change.
-            const retainedOverlay = useOverlay ? container.querySelector('.dge-overlay-host') : null;
+            // Pure-text images have no mathematical drawing area to prefill.
+            const retainedOverlay = useOverlay && graph
+                ? container.querySelector('.dge-overlay-host') : null;
             if (retainedOverlay) retainedOverlay.remove();
             else if (overlay) { overlay.destroy(); overlay = null; }
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
@@ -252,7 +254,7 @@
                 details.append(element('summary', '', '识别时需留意'));
                 const list = element('ul'); observations.slice(0, 64).forEach(message => list.append(element('li', '', message))); details.append(list); container.append(details); }
             const workspace = element('div', 'dge-workspace');
-            if (useOverlay) {
+            if (useOverlay && graph) {
                 const host = retainedOverlay || element('section', 'dge-overlay-host');
                 workspace.append(host);
                 container.append(workspace);
@@ -286,18 +288,35 @@
                     const image = element('img'); image.src = options.originalUrl;
                     image.alt = '上传的原图，用于核对识别结果'; preview.append(image);
                 } else preview.append(element('p', 'dge-muted', '原图预览暂不可用，可继续编辑结构。'));
-                const visual = element('section', 'dge-visual'); visual.append(element('h3', '', '结构预览'));
-                if (graph) visual.append(drawGraph(graph));
-                else visual.append(element('p', 'dge-empty', '当前没有子图，可添加图形，或只确认题干。'));
-                workspace.append(preview, visual); container.append(workspace);
+                if (graph) {
+                    const visual = element('section', 'dge-visual');
+                    visual.append(element('h3', '', '结构预览'), drawGraph(graph));
+                    workspace.append(preview, visual);
+                } else {
+                    // No graph: show only the original image and OCR body.
+                    workspace.append(preview);
+                    workspace.classList.add('dge-text-only-workspace');
+                }
+                container.append(workspace);
             }
             const review = buildReview(graph, document);
-            if (review) container.append(review);
+            if (review && graph?.vertices?.length) container.append(review);
             const body = element('textarea', 'dge-body'); body.value = document.body_text; body.rows = 4; body.setAttribute('aria-label', '题干、全部小问与公式'); body.disabled = saving;
             body.addEventListener('input', () => edit(() => model.setBody(body.value)));
             container.append(field('题干、全部小问与公式', body));
             const toolbar = element('div', 'dge-toolbar');
-            if (document.graphs.length) toolbar.append(field('当前子图', select(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; pendingDelete = ''; render(); })));
+            if (document.graphs.length) {
+                toolbar.append(field('当前子图', select(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; pendingDelete = ''; render(); })));
+                // Metadata only. This summary is never converted into guessed
+                // vertices, arrows, edge weights, or drawing paths.
+                if (graph) {
+                    const direction = graph.directed === true ? '有向图'
+                        : graph.directed === false ? '无向图' : '方向待核对';
+                    const weight = graph.weighted === true ? '带权图'
+                        : graph.weighted === false ? '无权图' : '权值待核对';
+                    toolbar.append(element('span', 'dge-detected-type', direction + ' · ' + weight));
+                }
+            }
             toolbar.append(button('添加子图', () => { currentGraph = model.addGraph(); selectedNodes.clear(); selectedEdge = null; }));
             if (graph) {
                 toolbar.append(field('子图名称', input(graph.name, '子图名称', value => model.renameGraph(graph.id, value))));
