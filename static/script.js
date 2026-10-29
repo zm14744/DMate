@@ -14942,7 +14942,9 @@ async function enqueueOcrFiles(files) {
     }
     if (invalid.length) showCurrentError(invalid.join("；"));
     renderOcrTasks();
-    document.getElementById("ocrTaskPanel")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    // The flex layout already shows the upload stage. Scrolling it into view
+    // also pans the page/hidden shell while a native picker restores its
+    // viewport, producing a visible jump before the viewport settles.
     // Independent promises: one failed image cannot reject or cancel its peers.
     return Promise.allSettled(accepted.map(recognizeOcrTask));
 }

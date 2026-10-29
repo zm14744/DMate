@@ -187,6 +187,55 @@ def test_save_error_is_not_success_and_network_failure_can_retry(notebook_page):
     assert p.evaluate('calls.length') == 2
 
 
+@pytest.mark.parametrize('kind', ['AI 解释', '分析关联'])
+def test_analysis_cancel_is_a_quiet_red_circle_and_cannot_delete_notes(notebook_page, kind):
+    p = notebook_page
+    open_notebook(p)
+    select_both(p)
+    before = p.evaluate('structuredClone(stored)')
+    p.evaluate('window.hold=true')
+    p.get_by_role('button', name=kind, exact=True).click()
+    p.wait_for_function('calls.length===1')
+    cancel = p.get_by_role('button', name='取消分析', exact=True)
+    assert cancel.is_visible()
+    assert cancel.inner_text() == ''
+    assert cancel.get_attribute('title') == '取消分析'
+    assert cancel.evaluate('e=>getComputedStyle(e).backgroundColor') == 'rgb(239, 68, 68)'
+    assert cancel.evaluate('e=>getComputedStyle(e).borderRadius') == '50%'
+    box = cancel.bounding_box()
+    assert box['width'] == box['height'] == 24
+    assert cancel.evaluate('e=>getComputedStyle(e,"::before").inset') == '-8px'
+    assert p.locator('.dcn-ai').get_attribute('aria-busy') == 'true'
+    assert p.locator('.dcn-status').inner_text() == ''
+    cancel.focus()
+    assert cancel.evaluate('e=>getComputedStyle(e).outlineStyle') == 'none'
+    assert cancel.evaluate('e=>getComputedStyle(e).boxShadow') == 'none'
+    size = 'mobile' if p.viewport_size['width'] < 681 else 'desktop'
+    if kind == '分析关联':
+        p.screenshot(path='/tmp/dmate-notebook-' + size + '-cancel-circle.png')
+    cancel.click()
+    assert p.evaluate('window.aborted')
+    assert cancel.is_hidden()
+    assert p.locator('.dcn-ai').get_attribute('aria-busy') == 'false'
+    assert p.locator('.dcn-status').inner_text() == ''
+    assert p.locator('.dcn-results').inner_text() == ''
+    assert p.evaluate('stored') == before
+    assert p.locator('.dcn-confirm').count() == 0
+    assert p.locator('#conceptNotebookDialog').is_visible()
+    assert p.locator('input[type=checkbox]:checked').count() == 2
+    assert p.get_by_role('button', name=kind, exact=True).is_enabled()
+    # The aborted request may still finish on the server. It cannot populate
+    # the notebook or overwrite a later successful analysis.
+    p.evaluate('window.lateReply=reply;window.hold=false')
+    p.get_by_role('button', name=kind, exact=True).click()
+    p.wait_for_function('calls.length===2 && document.querySelector(".dcn-explanation")')
+    final = p.locator('.dcn-results').inner_text()
+    assert final and p.locator('.dcn-status').inner_text() == ''
+    p.evaluate('lateReply()')
+    assert p.locator('.dcn-results').inner_text() == final
+    assert p.evaluate('stored') == before
+
+
 def test_account_refresh_does_not_show_other_accounts_text_or_late_ai(notebook_page):
     p = notebook_page
     open_notebook(p)

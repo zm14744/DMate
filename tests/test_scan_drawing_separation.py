@@ -126,7 +126,7 @@ def test_rectangles_and_freehand_of_both_types_recognize_without_moving_view(sca
     # controls normally; measure framing stability before that user action.
     p.get_by_role('checkbox',name='文字框1',exact=True).check()
     p.get_by_role('checkbox',name='文字框2',exact=True).check()
-    p.get_by_role('button',name='关闭文字信息选择',exact=True).click()
+    p.keyboard.press('Escape')
     assert p.locator('.dge-overlay-text-region').count()==2
     assert p.locator('.dgs-body').inner_text()=='文字区域 1\n\n文字区域 2'
     assert p.locator('.dge-overlay-node,.dge-overlay-edge').count()==0

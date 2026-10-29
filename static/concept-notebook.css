@@ -35,7 +35,7 @@
 .dcn-ai{margin-top:22px;padding-top:18px;border-top:1px solid var(--border-strong,#cbd5e1)}
 .dcn-ai>h3{font-size:17px;margin:0 0 8px}
 .dcn-list-empty{font-size:13px;line-height:1.6;color:var(--text-subtle,#64748b);margin:0 0 12px}
-.dcn-ai-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.dcn-ai-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 .dcn-status{font-size:13px;line-height:1.6;margin:12px 0 0;color:var(--text-subtle,#64748b);overflow-wrap:anywhere}
 .dcn-status:empty{display:none}
 .dcn-results{display:flex;flex-direction:column;gap:12px;margin-top:14px;line-height:1.75;overflow-wrap:anywhere}
@@ -50,6 +50,9 @@
 .dcn-dialog button.dcn-close,.dcn-confirm button.dcn-close{display:block;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0;border:0;border-radius:50%;background:#ef4444;color:transparent;font-size:0;line-height:0;cursor:pointer}
 .dcn-dialog button.dcn-close:hover,.dcn-confirm button.dcn-close:hover{background:#dc2626}
 .dcn-dialog button.dcn-close:focus-visible,.dcn-confirm button.dcn-close:focus-visible{outline:2px solid #ef4444;outline-offset:4px}
+.dcn-dialog .dcn-ai-actions button.dcn-analysis-cancel{position:relative;flex:0 0 24px;width:24px;min-width:24px;max-width:24px;height:24px;min-height:24px;max-height:24px;appearance:none;-webkit-appearance:none}
+.dcn-dialog .dcn-ai-actions button.dcn-analysis-cancel::before{content:'';position:absolute;inset:-8px;border-radius:50%}
+.dcn-dialog .dcn-ai-actions button.dcn-analysis-cancel:focus,.dcn-dialog .dcn-ai-actions button.dcn-analysis-cancel:focus-visible{outline:none!important;box-shadow:none!important}
 .dcn-confirm{box-sizing:border-box;width:min(440px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid var(--border-strong,#cbd5e1);border-radius:18px;background:var(--surface-2,#f8fafc);color:var(--text-primary,#1e293b);box-shadow:0 20px 64px rgba(0,0,0,.38);overflow:auto}
 .dcn-confirm::backdrop{background:rgba(0,0,0,.46)}
 .dcn-confirm-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border-bottom:1px solid var(--border-strong,#cbd5e1)}

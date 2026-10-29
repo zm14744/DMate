@@ -171,3 +171,174 @@ def test_detached_toggle_cannot_override_current_popover_and_live_state_is_retai
     }''')
     assert result=={'afterStale':True,'afterClose':False,'afterOpen':True}
     assert p.get_by_label('绘图权值',exact=True).is_visible()
+
+
+def test_graph_information_tracks_model_changes_without_rebuilding_popup_or_camera(drawing_page):
+    p=drawing_page
+    p.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
+    # Enough real relationships make the information panel scroll on both
+    # phone and desktop, so replacing its scroll container would be visible.
+    p.evaluate('''()=>{for(let i=0;i<18;i++)editor.model.addEdge('G1',{
+      from:'a',to:'b',direction:'forward',weight:i+20});}''')
+    for _ in range(3):p.get_by_role('button',name='放大原图',exact=True).click()
+    p.locator('.dge-float-results > summary').click()
+    p.evaluate('''()=>{
+      const viewport=document.querySelector('.dge-overlay-viewport');
+      viewport.scrollLeft=55;viewport.scrollTop=80;
+      window.infoPopup=document.querySelector('.dge-float-results');
+      window.infoScroll=infoPopup.querySelector('.dge-float-content');
+      window.infoSection=infoPopup.querySelector('.dge-review-summary');
+      window.canvasViewport=viewport;window.canvasImage=document.querySelector('.dge-overlay-image');
+      infoScroll.scrollTop=110;
+      const box=canvasImage.getBoundingClientRect();
+      window.liveCamera=[viewport.scrollLeft,viewport.scrollTop,box.x,box.y,box.width,box.height];
+      window.liveInfoScroll=infoScroll.scrollTop;
+    }''')
+    assert p.evaluate('liveInfoScroll')>0
+
+    def check(points,edges,*expected):
+        heading=p.locator('.dge-review-summary > h3').text_content()
+        assert f'{points} 点 / {edges} 边' in heading
+        text=p.locator('.dge-review-content').text_content()
+        for value in expected:assert value in text
+        state=p.evaluate('''()=>{
+          const box=canvasImage.getBoundingClientRect();return {
+            same:document.querySelector('.dge-float-results')===infoPopup&&
+              document.querySelector('.dge-float-results .dge-float-content')===infoScroll&&
+              document.querySelector('.dge-review-summary')===infoSection&&
+              document.querySelector('.dge-overlay-viewport')===canvasViewport&&
+              document.querySelector('.dge-overlay-image')===canvasImage,
+            open:infoPopup.open,scroll:infoScroll.scrollTop,
+            camera:[canvasViewport.scrollLeft,canvasViewport.scrollTop,box.x,box.y,box.width,box.height]};}''')
+        assert state['same'] and state['open']
+        assert state['scroll']==pytest.approx(p.evaluate('liveInfoScroll'),abs=1)
+        assert state['camera']==pytest.approx(p.evaluate('liveCamera'),abs=1)
+
+    check(2,19,'A→B','权值：5')
+    p.evaluate("window.liveVertex=editor.model.addVertex('G1','C',.5,.8)")
+    check(3,19,'点：A、B、C')
+    p.evaluate("window.liveEdge=editor.model.addEdge('G1',{from:'b',to:liveVertex,direction:'forward',weight:9})")
+    check(3,20,'B→C（权值：9）')
+    p.evaluate("editor.model.renameVertex('G1',liveVertex,'顶点丙')")
+    check(3,20,'B→顶点丙（权值：9）')
+    p.evaluate("editor.model.updateEdges('G1',[liveEdge],'weight',11)")
+    check(3,20,'B→顶点丙（权值：11）')
+    p.evaluate("editor.model.updateEdges('G1',[liveEdge],'edge_label','新线路')")
+    check(3,20,'新线路：B→顶点丙（权值：11）')
+    p.evaluate("editor.model.setGraphType('G1','directed',false)")
+    check(3,20,'无向 · 带权','新线路：B—顶点丙')
+    p.evaluate("editor.model.setGraphType('G1','weighted',false)")
+    check(3,20,'无向 · 无权','新线路：B—顶点丙')
+    assert '权值：' not in p.locator('.dge-review-content').text_content()
+    p.evaluate("editor.model.deleteEdges('G1',[liveEdge])")
+    check(3,19,'点：A、B、顶点丙')
+    assert '新线路' not in p.locator('.dge-review-content').text_content()
+    p.evaluate('editor.model.undo()')
+    check(3,20,'新线路：B—顶点丙')
+    p.evaluate('editor.model.redo()')
+    check(3,19,'点：A、B、顶点丙')
+    p.evaluate("editor.model.deleteVertices('G1',[liveVertex])")
+    check(2,19,'点：A、B')
+    assert '顶点丙' not in p.locator('.dge-review-content').text_content()
+    p.evaluate('editor.model.undo()')
+    check(3,19,'点：A、B、顶点丙')
+    p.evaluate("editor.model.renameGraph('G1','实时绘图')")
+    check(3,19,'图 1（实时绘图）')
+    # Geometry does not change the structure text; it should not even replace
+    # its children during a node drag or another geometry-only publication.
+    p.evaluate("window.liveReviewChild=infoSection.firstElementChild;editor.model.moveVertex('G1','a',.31,.41)")
+    check(3,19,'点：A、B、顶点丙')
+    assert p.evaluate('infoSection.firstElementChild===liveReviewChild')
+
+
+def test_first_blank_vertices_and_edge_update_information_through_pointer_controls(drawing_page):
+    p=drawing_page
+    p.evaluate('''()=>{const originalUrl=document.querySelector('.dge-overlay-image').src;editor.destroy();
+      editor=DMateGraphEditor.mount(document.querySelector('#editor'),{drawingOnly:true,originalUrl,
+        document:{body_text:'',graphs:[{id:'G1',name:'空白页',directed:false,weighted:false,vertices:[],edges:[]}]}});}''')
+    p.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
+    assert '0 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    p.get_by_role('button',name='添加顶点',exact=True).click()
+    p.locator('.dge-tool-palette > summary').click()
+
+    def click_source(x,y):
+        point=p.locator('.dge-overlay-svg').evaluate('''(svg,point)=>{
+          const p=svg.createSVGPoint();p.x=point[0]*1000;p.y=point[1]*700;
+          const screen=p.matrixTransform(svg.getScreenCTM());return [screen.x,screen.y];}''',[x,y])
+        p.mouse.click(*point)
+
+    click_source(.3,.65)
+    assert '1 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '点：1' in p.locator('.dge-review-content').text_content()
+    click_source(.7,.75)
+    assert '2 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '点：1、2' in p.locator('.dge-review-content').text_content()
+    p.locator('.dge-tool-palette > summary').click()
+    p.get_by_role('button',name='添加边',exact=True).click()
+    p.locator('.dge-tool-palette > summary').click()
+    click_source(.3,.65)
+    click_source(.7,.75)
+    assert '2 点 / 1 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '1—2' in p.locator('.dge-review-content').text_content()
+    p.locator('.dge-tool-palette > summary').click()
+    p.get_by_role('button',name='选择 / 移动',exact=True).click()
+    p.locator('.dge-tool-palette > summary').click()
+    click_source(.5,.7)
+    p.get_by_role('button',name='删除这条边',exact=True).click()
+    assert '2 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    p.get_by_role('button',name='撤销',exact=True).click()
+    assert '2 点 / 1 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '1—2' in p.locator('.dge-review-content').text_content()
+    p.get_by_role('button',name='重做',exact=True).click()
+    assert '2 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    click_source(.3,.65)
+    p.get_by_role('button',name='删除这个顶点',exact=True).click()
+    assert '1 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '点：2' in p.locator('.dge-review-content').text_content()
+    p.get_by_role('button',name='撤销',exact=True).click()
+    assert '2 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+
+
+def test_property_typing_updates_closed_information_without_losing_focus_or_caret(drawing_page):
+    p=drawing_page
+    p.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
+    p.locator('[data-vertex-id="a"] .dge-overlay-node-hit').click()
+    name=p.get_by_label('当前顶点名称',exact=True)
+    name.fill('Alpha')
+    p.evaluate('''()=>{window.liveNameInput=document.querySelector('[aria-label="当前顶点名称"]');
+      liveNameInput.focus();liveNameInput.setSelectionRange(2,2);
+      window.closedInfo=document.querySelector('.dge-float-results');
+      window.closedReview=document.querySelector('.dge-review-summary');}''')
+    name.press_sequentially('Z')
+    result=p.evaluate('''()=>({same:document.querySelector('[aria-label="当前顶点名称"]')===liveNameInput,
+      focused:document.activeElement===liveNameInput,value:liveNameInput.value,
+      start:liveNameInput.selectionStart,end:liveNameInput.selectionEnd,
+      popupSame:document.querySelector('.dge-float-results')===closedInfo,
+      reviewSame:document.querySelector('.dge-review-summary')===closedReview,open:closedInfo.open})''')
+    assert result=={'same':True,'focused':True,'value':'AlZpha','start':3,'end':3,
+                    'popupSame':True,'reviewSame':True,'open':False}
+    assert '点：AlZpha、B' in p.locator('.dge-review-content').text_content()
+    assert 'AlZpha→B（权值：5）' in p.locator('.dge-review-content').text_content()
+    p.locator('.dge-float-results > summary').click()
+    assert 'AlZpha→B（权值：5）' in p.locator('.dge-review-content').text_content()
+
+
+def test_property_and_settings_edits_update_graph_information_immediately(drawing_page):
+    p=drawing_page
+    p.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
+    p.locator('[data-edge-id="ab"] .dge-overlay-hit').click()
+    p.get_by_label('当前边权值',exact=True).fill('17')
+    assert 'A→B（权值：17）' in p.locator('.dge-review-content').text_content()
+    p.get_by_label('当前边名称',exact=True).fill('路线甲')
+    assert '路线甲：A→B（权值：17）' in p.locator('.dge-review-content').text_content()
+    p.get_by_role('button',name='关闭属性',exact=True).click()
+    p.locator('.dge-float-graphs > summary').click()
+    p.get_by_label('绘图方向',exact=True).select_option('no')
+    assert '无向 · 带权' in p.locator('.dge-review-content').text_content()
+    assert '路线甲：A—B（权值：17）' in p.locator('.dge-review-content').text_content()
+    p.get_by_label('绘图权值',exact=True).select_option('no')
+    assert '无向 · 无权' in p.locator('.dge-review-content').text_content()
+    assert '权值：' not in p.locator('.dge-review-content').text_content()
+    p.locator('.dge-float-results > summary').click()
+    assert p.locator('.dge-review-summary').is_visible()
+    assert '路线甲：A—B' in p.locator('.dge-review-content').text_content()

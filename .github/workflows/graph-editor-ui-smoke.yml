@@ -23,6 +23,7 @@ on:
       - 'tests/test_voice_no_result_ui.py'
       - 'tests/test_ocr_batch_frontend.py'
       - 'tests/test_image_grouping.py'
+      - 'tests/test_upload_layout_stability.py'
       - 'tests/test_nonquestion_image_context.py'
       - 'static/image-groups.css'
       - 'tests/test_scan_selection_save.py'
@@ -103,6 +104,7 @@ jobs:
             tests/test_voice_no_result_ui.py \
             tests/test_ocr_batch_frontend.py \
             tests/test_image_grouping.py \
+            tests/test_upload_layout_stability.py \
             tests/test_nonquestion_image_context.py \
             tests/test_scan_selection_save.py \
             tests/test_graph_appearance_ui.py \

@@ -27,7 +27,8 @@ function mount(options){
  const saved=el('span','dcn-saved');saved.setAttribute('role','status');editor.append(titleLabel,originalLabel,saved);
  const ai=el('section','dcn-ai'),aiTitle=el('h3','','AI 阅读');
  const questionLabel=el('label','','补充要求（可选）'),question=el('textarea','dcn-question');question.maxLength=1000;question.rows=2;question.setAttribute('aria-label','补充要求（可选）');questionLabel.append(question);
- const controls=el('div','dcn-ai-actions'),explainButton=action('AI 解释',()=>void analyze('explain'),'dcn-primary'),relationButton=action('分析关联',()=>void analyze('relations')),cancelButton=action('取消分析',()=>invalidate('已取消分析。'));
+ const controls=el('div','dcn-ai-actions'),explainButton=action('AI 解释',()=>void analyze('explain'),'dcn-primary'),relationButton=action('分析关联',()=>void analyze('relations')),cancelButton=action('',()=>invalidate(),'dcn-close dcn-analysis-cancel');
+ cancelButton.setAttribute('aria-label','取消分析');cancelButton.title='取消分析';
  const status=el('p','dcn-status'),result=el('div','dcn-results');status.setAttribute('role','status');result.setAttribute('aria-label','AI 解释与概念关联');
  controls.append(explainButton,relationButton,cancelButton);ai.append(aiTitle,questionLabel,controls,status,result);main.append(editor,ai);content.append(sidebar,main);dialog.replaceChildren(heading,content);
  function load(){
@@ -42,12 +43,13 @@ function mount(options){
   try{options.onChange?.(copy(state));saveError=false;saved.textContent='';return true;}
   catch(error){saveError=true;saved.textContent=error?.message||'保存失败，请保留当前页面后重试。';return false;}
  }
- function invalidate(message=''){
-  deletePrompt?.finish(false);deletePending=null;serial++;active?.controller.abort();active=null;result.replaceChildren();status.textContent=message;renderActions();
+ function invalidate(){
+  deletePrompt?.finish(false);deletePending=null;serial++;active?.controller.abort();active=null;result.replaceChildren();status.textContent='';renderActions();
  }
  function renderActions(){
   const size=selected.size;count.textContent='已选 '+size+' 条';
   explainButton.disabled=!!active||size===0;relationButton.disabled=!!active||size<2;cancelButton.hidden=!active;
+  ai.setAttribute('aria-busy',String(Boolean(active)));
   newButton.disabled=state.notes.length>=LIMITS.notes;
   for(const remove of list.querySelectorAll('.dcn-note-delete'))remove.disabled=!!deletePending;
  }
@@ -141,7 +143,7 @@ function mount(options){
   if(!persist()){status.textContent='笔记尚未保存，请先解决保存错误后再分析。';return;}
   const op={id:++serial,controller:new AbortController(),fingerprint:fingerprint(),context:contextKey(),action:kind};active=op;
   const valid=()=>!destroyed&&active===op&&serial===op.id&&dialog.open&&op.context===contextKey()&&op.fingerprint===fingerprint();
-  result.replaceChildren();status.textContent=kind==='relations'?'正在分析所选概念的关联…':'正在解释所选概念…';renderActions();
+  result.replaceChildren();status.textContent='';renderActions();
   const timeout=setTimeout(()=>op.controller.abort(),85000);
   try{
    const response=await transport(options.endpoint||'/notebook/analyze',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},signal:op.controller.signal,

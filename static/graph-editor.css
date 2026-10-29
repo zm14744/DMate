@@ -284,9 +284,9 @@
 .dgs-text{margin:0}
 .dgs-body,.dgs-graph{line-height:1.65;overflow-wrap:anywhere;user-select:text}
 .dgs-graph p{margin:5px 0}.dgs-relation{padding-left:8px}
-.dgs-region-state{margin-top:10px;padding:7px 0;border-top:1px solid var(--dge-border);font-size:13px}
+.dgs-region-state{margin:10px 0 0;padding:0;font-size:13px}
 .dgs-region-state button{margin:4px 5px 0 0;padding:4px 7px;min-height:30px}
-.dgs-region-state p,.dgs-status{font-size:13px;color:var(--text-subtle);overflow-wrap:anywhere}
+.dgs-region-state,.dgs-status{font-size:13px;color:var(--text-subtle);overflow-wrap:anywhere}
 .dgs-requirements-label{display:block;margin-top:16px;font-size:14px}
 .dgs-requirements{display:block;width:100%;resize:vertical;margin-top:7px;padding:9px}
 @media(max-width:760px){.dgs-workspace{grid-template-columns:minmax(0,1fr);gap:12px}.dgs-source{height:44dvh;min-height:300px}.dgs-information{max-height:36dvh}.dge-scan-only .dge-overlay-tools button{padding:6px 8px}}
@@ -314,8 +314,8 @@
 .dgs-source-picker .dgs-source-choice input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:0 0 25px;width:25px;height:25px;min-width:25px;margin:0;border:2px solid var(--text-subtle,#64748b);border-radius:50%;background:transparent;cursor:pointer}
 .dgs-source-picker .dgs-source-choice input[type=checkbox]:checked{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6)}
 .dgs-source-picker-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto}
-.dmate-graph-editor :is(.dge-panel-close,.dgs-source-picker-close,.dgs-source-delete){appearance:none;-webkit-appearance:none;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0!important;border:0!important;border-radius:50%;background:#ef4444!important;box-shadow:none!important;font-size:0}
-.dmate-graph-editor :is(.dge-panel-close,.dgs-source-picker-close,.dgs-source-delete):hover{background:#dc2626!important}
+.dmate-graph-editor :is(.dge-panel-close,.dgs-source-delete){appearance:none;-webkit-appearance:none;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0!important;border:0!important;border-radius:50%;background:#ef4444!important;box-shadow:none!important;font-size:0}
+.dmate-graph-editor :is(.dge-panel-close,.dgs-source-delete):hover{background:#dc2626!important}
 .dgs-source-card{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:6px 10px;border:1px solid var(--dge-border);border-radius:8px}
 .dgs-source-card>.dgs-source-choice{flex:1;min-width:0}
 .dgs-source-choice>span{overflow-wrap:anywhere}

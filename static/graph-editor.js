@@ -18,6 +18,7 @@
             ? modelApi.ensureAnonymousLabels(options.initialDocument || options.document) : options.initialDocument;
         const model = createModel(initialized, initial);
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
+        const reviewKeys = new WeakMap();
         let previewSequence = 0, renderSequence = 0;
         let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null, propertiesVisible = true;
         let selectedGraph=false;const panelState={};
@@ -121,11 +122,7 @@
             overlay?.refresh();
             const body = container.querySelector('.dge-text-body');
             if (body && dom.activeElement !== body) body.value = document.body_text;
-            const oldReview = container.querySelector('.dge-review-summary');
-            if (oldReview && graph) {
-                const refreshed = buildReview(graph, document);
-                if (refreshed) oldReview.replaceWith(refreshed);
-            }
+            refreshReview(document);
             const status = container.querySelector('.dge-status'); if (status) status.textContent = notice;
             const undo = container.querySelector('[data-editor-undo]'); if (undo) undo.disabled = saving || !model.canUndo();
             const redo = container.querySelector('[data-editor-redo]'); if (redo) redo.disabled = saving || !model.canRedo();
@@ -212,10 +209,28 @@
             return {getDocument: model.getDocument, destroy() {container.replaceChildren();}};
         }
 
-        function buildReview(graph, document) {
+        function reviewKey(data) { return JSON.stringify([data, selectedEdge]); }
+
+        function refreshReview(document) {
+            const review = container.querySelector('.dge-review-summary');
+            const graph = document.graphs.find(row => row.id === currentGraph);
+            if (!review || !graph || !root.DMateGraphFormat?.graphRows) return;
+            const data = root.DMateGraphFormat.graphRows(graph, document.graphs.indexOf(graph));
+            const key = reviewKey(data);
+            if (reviewKeys.get(review) === key) return;
+            const refreshed = buildReview(graph, document, data);
+            // Keep the popup, its scroll container and active property input.
+            // Pointer previews never publish model changes; moving a point
+            // also leaves the rendered structure unchanged and skips this.
+            review.replaceChildren(...refreshed.childNodes);
+            reviewKeys.set(review, key);
+        }
+
+        function buildReview(graph, document, data) {
             if (graph && root.DMateGraphFormat?.graphRows) {
-                const data = root.DMateGraphFormat.graphRows(graph, document.graphs.indexOf(graph));
+                data ||= root.DMateGraphFormat.graphRows(graph, document.graphs.indexOf(graph));
                 const summary = element('section', 'dge-review-summary');
+                reviewKeys.set(summary, reviewKey(data));
                 summary.append(element('h3', '', '图形结构 · ' + graph.vertices.length + ' 点 / ' + graph.edges.length + ' 边'));
                 const section = element('div', 'dge-review-content');
                 section.append(element('p', 'dge-review-type', data.title + (data.showType === false ? '' : '    ' + data.type)));
@@ -734,7 +749,7 @@
                 scroller.scrollLeft = left;
             }
         }
-        unsubscribe = model.subscribe(document => { options.onChange?.(document); });
+        unsubscribe = model.subscribe(document => { refreshReview(document); options.onChange?.(document); });
         render();
         return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
             validate: model.validate, model, refresh: refreshDraftViews, getDrawingSvg: () => overlay?.getDrawingSvg?.() || null,

@@ -501,6 +501,13 @@ function mount(host,o){
    const p=px(coords.get(v.id)),normalized=[p[0]/w,p[1]/h],ink=inkAt(normalized),
          haloInk=oppositeInk(ink),
          gNode=E(d,'g',{'data-vertex-id':v.id,class:'dge-overlay-node'+(!finite(v.x)||!finite(v.y)?' is-estimated':'')+(o.nodeSelected?.().has(v.id)?' is-selected':'')});
+   if(s.mode==='edge'){
+    const pending=s.start===v.id,ring=E(d,'circle',{cx:p[0],cy:p[1],r:endpointTarget/scale,
+      class:'dge-overlay-endpoint-target'+(pending?' is-pending':''),'data-endpoint-id':v.id});
+    ring.style.fill=pending?'rgba(59,130,246,.14)':'rgba(59,130,246,.04)';
+    ring.style.stroke='var(--accent,#2563eb)';ring.style.strokeWidth=(pending?2.5:1.5)/scale+'px';
+    ring.style.pointerEvents='none';svg.append(ring);
+   }
    gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:hitRadius,class:'dge-overlay-node-hit'}));
    const halo=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius+2/scale,class:'dge-overlay-dot-halo'});
    halo.style.fill='none';halo.style.stroke=o.drawingOnly?'none':haloInk;halo.style.strokeWidth=(3/scale)+'px';gNode.append(halo);
@@ -515,7 +522,7 @@ function mount(host,o){
   // Selected geometry controls must remain reachable even when a small loop
   // apex is close to its vertex's larger, invisible input target.
   svg.append(...editHandles);
-  if(s.start&&coords.has(s.start)){const p=px(coords.get(s.start));svg.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*1.8,class:'dge-overlay-pending'}));}
+  if(s.mode!=='edge'&&s.start&&coords.has(s.start)){const p=px(coords.get(s.start));svg.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*1.8,class:'dge-overlay-pending'}));}
   if(active?.kind==='freehand')svg.append(E(d,'polyline',{
     points:active.points.map(p=>px(p).join(',')).join(' '),class:'dge-freehand-draft','vector-effect':'non-scaling-stroke'}));
   if(active?.kind==='bounds'||active?.kind==='text_bounds'){

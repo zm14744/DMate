@@ -18,8 +18,10 @@ function mount(container,options){
   state.sourcesVersion=3;
  }
  state.mode=state.mode==='manual'?'manual':'native';delete state.manualSources;
- for(const row of state.graphRegions)if(row.graphs)row.graphs=withLabels({graphs:row.graphs}).graphs;
+ const usable=row=>row.status==='complete'||row.status==='partial';
+ for(const row of state.graphRegions){if(!usable(row))row.graphs=[];else if(row.graphs)row.graphs=withLabels({graphs:row.graphs}).graphs;if(usable(row)&&!row.graphs?.length)row.status='empty';}
  for(const row of [...state.graphRegions,...state.textRegions]){if(row.status==='running')row.status='queued';if(row.selected===undefined)row.selected=true;}
+ for(const row of state.textRegions){if(!usable(row))row.text='';else if(!String(row.text||'').trim())row.status='empty';}
  let document=copy(nativeDocument),destroyed=false,saving=false,graphBusy=false,textBusy=false,textTimer=null;
  let lastEmitted=JSON.stringify(options.document||{body_text:'',graphs:[]}),picker=null,pickerFrame=null,draggedSource=null,renderedPickerKey='';
  const active=new Set(),el=(tag,cls,text)=>{const n=d.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
@@ -45,8 +47,8 @@ function mount(container,options){
   if(state.mode==='native'){document=copy(nativeDocument);return;}
   // A framed workspace has its own document. Native text, graph metadata and
   // references never bleed into the selected ROI result.
-  document={body_text:selected('text').map(row=>row.text||'').filter(Boolean).join('\n\n'),
-   graphs:selected('graph').flatMap(row=>copy(row.graphs||[]))};
+  document={body_text:selected('text').filter(usable).map(row=>row.text||'').filter(Boolean).join('\n\n'),
+   graphs:selected('graph').filter(usable).flatMap(row=>copy(row.graphs||[]))};
  }
  function emit(){assemble();const serialized=JSON.stringify(document);if(serialized!==lastEmitted){lastEmitted=serialized;options.onChange?.(copy(document));}}
  function setMode(mode){if(saving)return;state.mode=mode;picker=null;emit();refresh();}
@@ -69,12 +71,12 @@ function mount(container,options){
   const anchor=container.querySelector('[data-source-picker="'+picker+'"]')?.getBoundingClientRect(),rect=box.getBoundingClientRect();
   const x=Math.max(left,Math.min((anchor?.right||right)-rect.width,right-rect.width));
   let y=(anchor?.bottom||top)+8;if(y+rect.height>bottom)y=(anchor?.top||bottom)-rect.height-8;
-  y=Math.max(top,Math.min(y,bottom-rect.height));box.style.left=x+'px';box.style.top=y+'px';
+  y=Math.max(top,Math.min(y,bottom-rect.height));box.style.left=x+'px';box.style.top=y+'px';box.style.visibility='visible';
  }
  function queuePickerPosition(){if(picker&&!pickerFrame)pickerFrame=d.defaultView.requestAnimationFrame(positionPicker);}
  function sourcePicker(kind){
-  const box=el('div','dgs-source-picker');box.setAttribute('role','dialog');box.setAttribute('aria-label',kind==='graph'?'选择图形来源':'选择文字来源');
-  const pickerHead=el('div','dgs-source-picker-head'),close=button('',closePicker);close.className='dgs-source-picker-close dmate-close-dot';close.setAttribute('aria-label',kind==='graph'?'关闭图形信息选择':'关闭文字信息选择');close.title='关闭';pickerHead.append(el('strong','',kind==='graph'?'选择图形框':'选择文字框'),close);box.append(pickerHead);
+  const box=el('div','dgs-source-picker');box.style.visibility='hidden';box.setAttribute('role','dialog');box.setAttribute('aria-label',kind==='graph'?'选择图形来源':'选择文字来源');
+  const pickerHead=el('div','dgs-source-picker-head');pickerHead.append(el('strong','',kind==='graph'?'选择图形框':'选择文字框'));box.append(pickerHead);
   const check=(text,checked,change)=>{const wrap=el('label','dgs-source-choice'),input=el('input');input.type='checkbox';input.checked=checked;input.disabled=saving;input.setAttribute('aria-label',text);input.addEventListener('change',()=>change(input.checked));wrap.append(input,el('span','',text));return wrap;};
   const list=el('div','dgs-source-list');
   for(const row of rows(kind)){
@@ -89,24 +91,67 @@ function mount(container,options){
   }
   box.append(list);return box;
  }
- function regionStatus(row,kind){const line=el('div','dgs-region-state');line.append(el('span','',label(row,kind)+'：'+({queued:'等待识别',running:'识别中',partial:'待核对',empty:'未识别到内容',error:'识别失败'}[row.status]||'待识别')));if(row.error)line.append(el('p','',row.error));return line;}
+ function regionStatus(row,kind){
+  let message={queued:'等待识别。',running:'正在识别。',partial:'待核对。',empty:kind==='graph'?'未识别到图形。':'未识别到文字。',error:'识别失败。'}[row.status]||'待识别。';
+  if(row.status==='error'&&row.error){const detail=String(row.error).replace(/^(?:选区|框内|局部)?(?:文字|图形)?识别(?:失败|未完成)[，,。:\s]*/,'');if(detail)message='识别失败：'+detail;}
+  else if(row.status==='partial'&&row.error)message='待核对：'+row.error;
+  const line=el('p','dgs-region-state',label(row,kind)+'：'+message);line.setAttribute('role','status');return line;
+ }
  function heading(section,kind,title){const head=el('div','dgs-section-head');head.append(el('h3','',title));if(state.mode==='manual'){const choose=button('选择信息',()=>openPicker(kind));choose.dataset.sourcePicker=kind;choose.setAttribute('aria-label',kind==='graph'?'选择图形信息':'选择文字信息');choose.setAttribute('aria-expanded',String(picker===kind));head.append(choose);}section.replaceChildren(head);}
  function refresh(){
   if(destroyed)return;assemble();nativeMode.setAttribute('aria-selected',String(state.mode==='native'));manualMode.setAttribute('aria-selected',String(state.mode==='manual'));nativeMode.disabled=saving;manualMode.disabled=saving;
-  heading(textSection,'text','文字信息');const body=el('div','dgs-body',document.body_text||'暂无文字信息，可在左侧框选文字。');body.style.whiteSpace='pre-wrap';textSection.append(body);
-  if(state.mode==='manual')for(const row of selected('text').filter(row=>blocked(row)||row.status==='partial'))textSection.append(regionStatus(row,'text'));
-  heading(graphSection,'graph','图形信息');if(!document.graphs.length)graphSection.append(el('p','','暂无图形信息，可在左侧框选图形。'));
+  const textStates=state.mode==='manual'?selected('text').filter(row=>blocked(row)||row.status==='partial'):[],graphStates=state.mode==='manual'?selected('graph').filter(row=>blocked(row)||row.status==='partial'):[];
+  heading(textSection,'text','文字信息');if(document.body_text||!textStates.length){const body=el('div','dgs-body',document.body_text||'暂无文字信息。');body.style.whiteSpace='pre-wrap';textSection.append(body);}
+  for(const row of textStates)textSection.append(regionStatus(row,'text'));
+  heading(graphSection,'graph','图形信息');if(!document.graphs.length&&!graphStates.length)graphSection.append(el('p','','暂无图形信息。'));
   document.graphs.forEach((graph,index)=>{const row=root.DMateGraphFormat.graphRows(graph,index),section=el('section','dgs-graph');section.append(el('h4','',row.title));if(row.showType!==false)section.append(el('p','',row.type));section.append(el('p','','顶点：'+(row.vertices.join('、')||'无')),el('p','',`${graph.vertices.length} 个顶点 · ${graph.edges.length} 条边`));section.append(el('p','dgs-appearance','图形外观：'+(row.description||'未提供外观描述。')));if(row.anonymousNote)section.append(el('p','dgs-anonymous-note',row.anonymousNote));if(row.positions.length){section.append(el('h5','','顶点位置'));for(const vertex of row.positions)section.append(el('p','dgs-vertex-position',vertex.txt));}if(row.named.length)section.append(el('p','','边：'+row.named.join('、')));for(const edge of row.relations)section.append(el('p','dgs-relation',edge.txt));graphSection.append(section);});
-  if(state.mode==='manual')for(const row of selected('graph').filter(row=>blocked(row)||row.status==='partial'))graphSection.append(regionStatus(row,'graph'));
+  for(const row of graphStates)graphSection.append(regionStatus(row,'graph'));
   confirm.disabled=saving||pending();confirm.textContent=saving?'正在保存…':'保存';request.disabled=saving;
   // Recognition updates the information cards, but must not remove a source
   // checkbox or drag target underneath an in-progress pointer action.
   const pickerKey=state.mode==='manual'&&picker?JSON.stringify([picker,saving,rows(picker).map(row=>[String(row.id),row.selected!==false])]):'';
-  if(pickerKey!==renderedPickerKey){const focused=d.activeElement?.getAttribute('aria-label');pickerLayer.replaceChildren();if(pickerKey){pickerLayer.append(sourcePicker(picker));if(focused)for(const node of pickerLayer.querySelectorAll('[aria-label]'))if(node.getAttribute('aria-label')===focused)node.focus({preventScroll:true});}renderedPickerKey=pickerKey;}
+  if(pickerKey!==renderedPickerKey){const focused=d.activeElement?.getAttribute('aria-label');pickerLayer.replaceChildren();if(pickerKey){pickerLayer.append(sourcePicker(picker));positionPicker();if(focused)for(const node of pickerLayer.querySelectorAll('[aria-label]'))if(node.getAttribute('aria-label')===focused)node.focus({preventScroll:true});}renderedPickerKey=pickerKey;}
   if(pickerKey)positionPicker();
  }
- async function pumpGraphs(){if(graphBusy||destroyed)return;graphBusy=true;try{for(let row;(row=state.graphRegions.find(r=>r.status==='queued'))&&!destroyed;){const version=row.version,controller=new AbortController();row.controller=controller;active.add(controller);row.status='running';refresh();try{const result=await options.onRecognizeGraph(copy(row.polygon),{signal:controller.signal});if(destroyed||row.version!==version||!state.graphRegions.includes(row))continue;if(result.recognition_status==='failed')throw new Error(result.error||'图形识别未完成');row.graphs=withLabels({graphs:copy(result.document?.graphs||[])}).graphs.map((g,i)=>({...g,id:row.id+'_'+(i+1)}));row.status=row.graphs.length?'complete':'empty';row.error=result.warning||'';if(result.review?.required){row.status='partial';row.error=result.review.reasons?.join('；')||'局部识别仍有疑点，请对照原图核对。';}}catch(error){if(!destroyed&&row.version===version&&state.graphRegions.includes(row)){row.status='error';row.error=error?.message||'图形识别失败，请重试。';}}finally{active.delete(controller);if(!destroyed){emit();refresh();}}}}finally{graphBusy=false;}}
- async function pumpText(){if(textBusy||destroyed)return;textBusy=true;const queued=state.textRegions.filter(r=>r.status==='queued'),versions=queued.map(r=>r.version),controller=new AbortController();if(!queued.length){textBusy=false;return;}active.add(controller);queued.forEach(r=>{r.status='running';});refresh();try{const result=await options.onRecognizeText(queued.map((r,index)=>({id:r.id,polygon:copy(r.polygon),order:index})),{signal:controller.signal});const returned=new Map((result.regions||[]).map(r=>[r.id,r]));queued.forEach((row,i)=>{if(destroyed||row.version!==versions[i]||!state.textRegions.includes(row))return;const value=returned.get(row.id);if(!value)throw new Error('文字识别响应缺少选区');row.text=String(value.text||'');row.status=row.text.trim()?'complete':'empty';});}catch(error){queued.forEach((row,i)=>{if(!destroyed&&row.version===versions[i]&&state.textRegions.includes(row)){row.status='error';row.error=error?.message||'文字识别失败，请重试。';}});}finally{active.delete(controller);textBusy=false;if(!destroyed){emit();refresh();if(state.textRegions.some(r=>r.status==='queued'))void pumpText();}}}
+ async function pumpGraphs(){
+  if(graphBusy||destroyed)return;graphBusy=true;
+  try{for(let row;(row=state.graphRegions.find(r=>r.status==='queued'))&&!destroyed;){
+   const version=row.version,controller=new AbortController();row.controller=controller;active.add(controller);
+   row.status='running';row.graphs=[];row.error='';refresh();
+   try{
+    const result=await options.onRecognizeGraph(copy(row.polygon),{signal:controller.signal});
+    if(destroyed||row.version!==version||!state.graphRegions.includes(row))continue;
+    if(!result||result.error||result.recognition_status==='failed')throw new Error(result?.error||'图形识别未完成');
+    const graphs=['not_graph','empty'].includes(result.recognition_status)?[]:result.document?.graphs;
+    if(!Array.isArray(graphs)||graphs.some(graph=>!Array.isArray(graph?.vertices)||!Array.isArray(graph?.edges)))throw new Error('图形识别响应不完整。');
+    row.graphs=withLabels({graphs:copy(graphs.filter(graph=>graph.vertices.length||graph.edges.length))}).graphs.map((g,i)=>({...g,id:row.id+'_'+(i+1)}));
+    // Review flags describe returned graphs. A zero-result response is empty,
+    // even when the service also requests a review; it cannot reuse old data.
+    row.status=row.graphs.length?'complete':'empty';row.error='';
+    if(row.graphs.length&&(result.review?.required||['partial','incomplete','uncertain','needs_review','review_required'].includes(result.recognition_status))){row.status='partial';row.error=result.review?.reasons?.join('；')||result.warning||'局部识别仍有疑点，请对照原图核对。';}
+   }catch(error){if(!destroyed&&row.version===version&&state.graphRegions.includes(row)){row.graphs=[];row.status='error';row.error=error?.message||'图形识别失败，请重试。';}}
+   finally{active.delete(controller);if(!destroyed){emit();refresh();}}
+  }}finally{graphBusy=false;}
+ }
+ async function pumpText(){
+  if(textBusy||destroyed)return;textBusy=true;
+  const queued=state.textRegions.filter(r=>r.status==='queued'),versions=queued.map(r=>r.version),controller=new AbortController();
+  if(!queued.length){textBusy=false;return;}active.add(controller);
+  queued.forEach(row=>{row.status='running';row.text='';row.error='';});refresh();
+  try{
+   const result=await options.onRecognizeText(queued.map((row,index)=>({id:row.id,polygon:copy(row.polygon),order:index})),{signal:controller.signal});
+   if(!result||result.error||result.recognition_status==='failed'||!Array.isArray(result.regions))throw new Error(result?.error||'文字识别响应不完整。');
+   const returned=new Map(result.regions.map(row=>[row.id,row]));
+   queued.forEach((row,index)=>{
+    if(destroyed||row.version!==versions[index]||!state.textRegions.includes(row))return;
+    const value=returned.get(row.id);row.text='';row.error='';
+    if(!value||value.error||value.recognition_status==='failed'){row.status='error';row.error=value?.error||'文字识别响应缺少选区。';return;}
+    if(value.recognition_status==='empty'){row.status='empty';return;}
+    row.text=String(value.text||'');row.status=row.text.trim()?'complete':'empty';
+   });
+  }catch(error){queued.forEach((row,index)=>{if(!destroyed&&row.version===versions[index]&&state.textRegions.includes(row)){row.text='';row.status='error';row.error=error?.message||'文字识别失败，请重试。';}});}
+  finally{active.delete(controller);textBusy=false;if(!destroyed){emit();refresh();if(state.textRegions.some(row=>row.status==='queued'))void pumpText();}}
+ }
  const outsidePicker=event=>{if(picker&&!pickerLayer.contains(event.target)&&!event.target.closest?.('[data-source-picker]'))closePicker();};
  const escapePicker=event=>{if(picker&&event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closePicker();}};
  d.addEventListener('pointerdown',outsidePicker,true);d.addEventListener('keydown',escapePicker,true);d.addEventListener('scroll',queuePickerPosition,true);d.defaultView.addEventListener('resize',queuePickerPosition);

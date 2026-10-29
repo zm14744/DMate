@@ -19,7 +19,7 @@ def apply_frames(page, kind, ids):
     label = '图形' if kind == 'graph' else '文字'
     for number in ids:
         page.get_by_role('checkbox', name=f'{label}框{number}', exact=True).check()
-    page.get_by_role('button', name='关闭图形信息选择' if kind == 'graph' else '关闭文字信息选择', exact=True).click()
+    page.keyboard.press('Escape')
 
 
 def test_native_scan_is_not_replaced_by_late_or_deleted_region(scan_page):
@@ -140,7 +140,7 @@ def test_unselected_failed_sources_do_not_block_native_or_other_selected_results
     assert page.get_by_role('button', name='保存', exact=True).is_enabled()
     open_picker(page, 'graph')
     page.get_by_role('checkbox', name='图形框2', exact=True).check()
-    page.get_by_role('button', name='关闭图形信息选择', exact=True).click()
+    page.keyboard.press('Escape')
     assert page.get_by_role('button', name='保存', exact=True).is_disabled()
     assert '模型服务故障' in page.locator('.dgs-information').inner_text()
     page.get_by_role('tab', name='原生识别', exact=True).click()
@@ -199,16 +199,15 @@ def test_manual_results_do_not_import_native_text_context_or_graphs(scan_page):
     assert page.evaluate('ocrTasks.get("scan").draft.text_context') == original['text_context']
 
 
-def test_red_close_keeps_immediate_picker_selection(scan_page):
+def test_choose_button_dismisses_popup_and_keeps_immediate_selection(scan_page):
     page = scan_page
     open_scan(page)
     page.get_by_role('button', name='文字框选', exact=True).click()
     drag(page, [(.1, .1), (.5, .3)])
     page.wait_for_function('textCalls.length===1 && ocrTasks.get("scan").scanState.textRegions[0].status==="complete"')
     page.get_by_role('checkbox', name='文字框1', exact=True).check()
-    close = page.get_by_role('button', name='关闭文字信息选择', exact=True)
-    assert 'dmate-close-dot' in close.get_attribute('class')
-    close.click()
+    assert page.locator('.dgs-source-picker-head button').count() == 0
+    page.get_by_role('button', name='选择文字信息', exact=True).click()
     assert page.locator('.dgs-source-picker').count() == 0
     assert page.evaluate('ocrTasks.get("scan").draft') == {'body_text': '文字区域 1', 'graphs': []}
     open_picker(page, 'text')
@@ -282,7 +281,7 @@ def test_text_and_graph_information_have_their_own_bordered_cards(scan_page):
     assert page.locator('.dgs-section-head button').count() == 0
 
 
-def test_manual_source_choices_are_large_solid_circles_and_close_is_red(scan_page):
+def test_manual_source_choices_are_large_solid_circles_and_row_delete_is_red(scan_page):
     page = scan_page
     open_scan(page)
     page.get_by_role('button', name='文字框选', exact=True).click()
@@ -298,8 +297,9 @@ def test_manual_source_choices_are_large_solid_circles_and_close_is_red(scan_pag
     assert metrics['hit'] >= 44
     assert metrics['radius'] == '50%' and metrics['appearance'] == 'none'
     assert metrics['fill'] not in ('transparent', 'rgba(0, 0, 0, 0)')
-    close = page.get_by_role('button', name='关闭文字信息选择', exact=True)
-    metrics = close.evaluate('''e=>{const s=getComputedStyle(e);return {
+    assert page.locator('.dgs-source-picker-head button').count() == 0
+    delete = page.get_by_role('button', name='删除文字框1', exact=True)
+    metrics = delete.evaluate('''e=>{const s=getComputedStyle(e);return {
       width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height,
       radius:s.borderRadius,fill:s.backgroundColor};}''')
     assert metrics['width'] == metrics['height']
@@ -325,7 +325,7 @@ def test_source_picker_floats_without_reflow_and_only_has_choices_and_red_delete
     assert page.locator('.dgs-source .dge-overlay-image').bounding_box() == pytest.approx(image, abs=1)
     assert page.locator('.dgs-text').bounding_box() == pytest.approx(card, abs=1)
     assert popup.locator('.dgs-source-card').count() == 2
-    assert popup.locator('button').count() == 3  # Red close and one red delete per row.
+    assert popup.locator('button').count() == 2  # Only one red delete per row.
     assert popup.locator('.dgs-region-state,.dgs-source-preview,.dgs-source-order,.dge-primary').count() == 0
     assert all(word not in popup.inner_text() for word in ('放入', '重新识别', '上移', '下移', '未识别'))
     for number in (1, 2):
@@ -384,3 +384,52 @@ def test_recognition_completion_keeps_open_popup_and_checkbox_in_place(scan_page
     assert page.get_by_role('checkbox', name='图形框1', exact=True).evaluate('e=>e===openSourceCheckbox')
     page.get_by_role('checkbox', name='图形框1', exact=True).check()
     assert page.evaluate('ocrTasks.get("scan").draft.graphs.map(g=>g.id)') == ['g1_1']
+
+
+def test_picker_is_placed_before_focus_restoration_and_first_visible_frames(scan_page):
+    page = scan_page
+    page.evaluate('''()=>{ocrTasks.get('scan').scanState={sourcesVersion:3,mode:'manual',graphRegions:[],
+      textRegions:[1,2].map(id=>({id,selected:false,status:'complete',version:1,text:'文字 '+id,
+        polygon:[[.1,.1],[.3,.1],[.3,.3],[.1,.3]]}))};}''')
+    open_scan(page)
+    choose = page.get_by_role('button', name='选择文字信息', exact=True)
+    choose.scroll_into_view_if_needed()
+    image = page.locator('.dgs-source .dge-overlay-image').bounding_box()
+    page.evaluate('''()=>{
+      window.pickerSamples=[];
+      window.samplePicker=where=>{
+        const popup=document.querySelector('.dgs-source-picker');
+        if(!popup||getComputedStyle(popup).visibility==='hidden')return;
+        const box=popup.getBoundingClientRect(),dialog=document.getElementById('graphEditorDialog').getBoundingClientRect(),
+          head=document.querySelector('.graph-editor-dialog-head').getBoundingClientRect();
+        pickerSamples.push({where,x:box.left,y:box.top,right:box.right,bottom:box.bottom,
+          leftLimit:Math.max(8,dialog.left+8),rightLimit:Math.min(innerWidth-8,dialog.right-8),
+          topLimit:Math.max(8,head.bottom+8),bottomLimit:Math.min(innerHeight-8,dialog.bottom-8)});
+      };
+      const original=HTMLElement.prototype.focus;
+      HTMLElement.prototype.focus=function(...args){
+        if(this.closest('.dgs-source-picker'))samplePicker('before-focus');
+        const result=original.apply(this,args);
+        if(this.closest('.dgs-source-picker'))samplePicker('after-focus');
+        return result;
+      };
+      window.sampleVisibleFrames=()=>new Promise(resolve=>requestAnimationFrame(()=>{
+        samplePicker('frame1');requestAnimationFrame(()=>{samplePicker('frame2');resolve();});
+      }));
+    }''')
+    choose.click()
+    page.evaluate('sampleVisibleFrames()')
+    page.get_by_role('checkbox', name='文字框1', exact=True).check()
+    page.evaluate('sampleVisibleFrames()')
+    samples = page.evaluate('pickerSamples')
+    assert any(row['where'] == 'before-focus' for row in samples)
+    assert any(row['where'] == 'frame1' for row in samples)
+    for row in samples:
+        assert row['x'] >= row['leftLimit'] - 1 and row['right'] <= row['rightLimit'] + 1, row
+        assert row['y'] >= row['topLimit'] - 1 and row['bottom'] <= row['bottomLimit'] + 1, row
+    assert page.locator('.dgs-source .dge-overlay-image').bounding_box() == pytest.approx(image, abs=1)
+    assert page.locator('.dgs-source-picker-head button').count() == 0
+    page.locator('.graph-editor-dialog-head').click(position={'x': 35, 'y': 15})
+    assert page.locator('.dgs-source-picker').count() == 0
+    assert page.locator('#graphEditorDialog').evaluate('e=>e.open')
+    assert page.evaluate('ocrTasks.get("scan").draft.body_text') == '文字 1'

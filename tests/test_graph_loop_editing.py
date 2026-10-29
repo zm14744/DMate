@@ -132,9 +132,22 @@ def test_edge_add_uses_large_screen_targets_without_enlarging_visible_dots(loop_
     page.get_by_role('button', name='添加边', exact=True).click()
     page.locator('.dge-tool-palette > summary').click()
     before = page.locator('[data-vertex-id="a"] .dge-overlay-dot').bounding_box()
+    rings = page.locator('.dge-overlay-endpoint-target')
+    assert rings.count() == 2
+    expected_radius = 32 if page.viewport_size['width'] < 760 else 28
+    for ring in rings.all():
+        box = ring.bounding_box()
+        assert box['width'] == pytest.approx(2 * expected_radius + 1.5, abs=.1)
+        assert box['height'] == pytest.approx(2 * expected_radius + 1.5, abs=.1)
+        assert ring.evaluate('e=>getComputedStyle(e).stroke') != 'none'
+    # The visible blue ring matches the real endpoint target at either zoom,
+    # rather than relying on a generous but undiscoverable invisible hit area.
+    pixels = Image.open(io.BytesIO(rings.first.screenshot())).convert('RGB')
+    assert sum(b > r + 60 and b > g + 40 for r, g, b in pixels.getdata()) > 50
     for node in ['a', 'b']:
         x, y = node_center(page, node)
         page.mouse.click(x, y - 22)
+        assert page.locator('.dge-overlay-endpoint-target.is-pending').count() == (node == 'a')
     edges = page.evaluate('editor.getDocument().graphs[0].edges')
     assert len(edges) == 1 and (edges[0]['from'], edges[0]['to']) == ('a', 'b')
     after = page.locator('[data-vertex-id="a"] .dge-overlay-dot').bounding_box()
@@ -145,6 +158,10 @@ def test_edge_add_uses_large_screen_targets_without_enlarging_visible_dots(loop_
     page.mouse.click(x, y - 22)
     edges = page.evaluate('editor.getDocument().graphs[0].edges')
     assert len(edges) == 2 and edges[-1]['from'] == edges[-1]['to'] == 'a'
+    assert page.evaluate('editor.getDrawingSvg().querySelectorAll(".dge-overlay-endpoint-target").length') == 0
+    page.locator('.dge-tool-palette > summary').click()
+    page.get_by_role('button', name='选择 / 移动', exact=True).click()
+    assert page.locator('.dge-overlay-endpoint-target').count() == 0
 
 
 def test_overlapping_endpoint_targets_choose_the_nearest_vertex(loop_page):
