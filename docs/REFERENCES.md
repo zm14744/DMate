@@ -12,6 +12,12 @@
 
 图谱中的 `prerequisites` 是建议前置知识，不能当作严格的数学逻辑蕴含或学生掌握度测量。
 
+### 课程来源如何进入产品
+
+图谱目前整理为 10 个模块、68 个知识节点，用于本地知识匹配、相关节点展示、建议学习路径和教学提示。题目分析中的知识标签会使用这份课程术语索引，但模型生成的题目和解析不是对上述教材内容的逐字复现或官方答案。
+
+课程资料、知识节点和学生实际记录是不同层次：内置图谱不会因为学生打开节点而判定掌握，也不依据教材引用自动得出个人能力分数。新增或调整节点时，应同时检查模块、名称、前置关系和引用，避免只改界面标题而破坏题目索引。
+
 ## 后端、图像与数学工具
 
 | 来源 | 代码中的用途 |
@@ -33,8 +39,19 @@
 
 这些模型与邮件服务按各提供方的 API 和服务条款运行，不随项目源码重新分发。
 
+供应商文档用于查证请求协议、地域、权限、模型和计费规则。供应商支持某个模型，不表示部署账号已经获得该模型权限；SDK 或兼容协议中的默认模型也不一定是当前网页主线。当前实际分工以本仓库的识别流程和部署配置为准。
+
 ## 前端与客户端
 
 - [MathJax](https://docs.mathjax.org/)、[Marked](https://marked.js.org/)、[DOMPurify](https://github.com/cure53/DOMPurify)：公式、Markdown 和 HTML 清理。
 - [html2canvas](https://html2canvas.hertzen.com/)、[jsPDF](https://github.com/parallax/jsPDF)：页面内容和 PDF 导出。
 - [Tauri 2](https://v2.tauri.app/)、[Android WebView](https://developer.android.com/develop/ui/views/layout/webapps/webview)、[Apple WebKit](https://developer.apple.com/documentation/webkit)、[Snapcraft](https://documentation.ubuntu.com/snapcraft/stable/)：客户端包装与平台集成，构建入口见 [部署说明](DEPLOYMENT.md)。
+
+## 怎样核对依赖与许可
+
+- Python 直接依赖以两个 requirements 文件为准，间接依赖以实际安装结果为准。
+- 网页 CDN 库版本以 `templates/index.html` 的加载地址为准，不应只看旧文档中的版本表。
+- Android、Rust 和 Snap 的依赖以各自构建定义与实际产物为准；平台系统组件与项目自有代码分别适用各自条款。
+- 需要分发安装包时，继续核对上游 LICENSE、NOTICE 和模型包说明；本页的链接索引不能替代完整的发行许可检查。
+
+第三方项目名称、教材和服务链接用于说明来源，不表示这些机构或项目对 DMate 提供认证、赞助或背书。项目整体许可状态另见 [第三方说明](../THIRD_PARTY_LICENSES.md)。
