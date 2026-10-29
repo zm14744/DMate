@@ -91,12 +91,12 @@ function mount(options){
    const finish=value=>{if(deletePrompt?.node!==prompt)return;deletePrompt=null;if(prompt.open)prompt.close();prompt.remove();resolve(Boolean(value));};
    const cancel=action('',()=>finish(false),'dcn-close');cancel.setAttribute('aria-label','取消删除');cancel.title='取消删除';head.append(heading,cancel);
    const body=el('p','dcn-confirm-body',settings.body),actions=el('footer','dcn-confirm-actions');
-   actions.append(action(settings.cancelText,()=>finish(false)),action(settings.confirmText,()=>finish(true),'dcn-confirm-delete'));
+   actions.append(action(settings.confirmText,()=>finish(true),'dcn-confirm-delete'));
    prompt.append(head,body,actions);dialog.append(prompt);deletePrompt={node:prompt,finish};
    prompt.addEventListener('cancel',event=>{event.preventDefault();finish(false);});prompt.addEventListener('close',()=>finish(false));
    // Closing on pointerdown cannot consume the click that opened the prompt.
    prompt.addEventListener('pointerdown',event=>{if(event.target===prompt){const box=prompt.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)finish(false);}});
-   prompt.showModal();actions.querySelector('button').focus({preventScroll:true});
+   prompt.showModal();cancel.focus({preventScroll:true});
   });
  }
  async function remove(){

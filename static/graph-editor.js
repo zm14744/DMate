@@ -19,7 +19,7 @@
         const model = createModel(initialized, initial);
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
         let previewSequence = 0, renderSequence = 0;
-        let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null;
+        let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null, propertiesVisible = true;
         let selectedGraph=false;const panelState={};
         const closeFloatingPanels = () => {
             for (const key of Object.keys(panelState)) panelState[key] = false;
@@ -184,7 +184,7 @@
                 group.append(svgElement('path', { d: path, class: 'dge-edge-hit', fill: 'none' }), stroke);
                 const label = [edge.edge_label, edge.weight === null || edge.weight === undefined ? '' : text(edge.weight)].filter(value => value !== null && value !== undefined && value !== '').join(' · ');
                 if (label) { group.append(svgElement('title', {}, label)); group.append(svgElement('text', { x: tx, y: ty, class: 'dge-edge-label', 'text-anchor': 'middle' }, label.length > 24 ? label.slice(0, 23) + '…' : label)); }
-                const choose = () => { selectedEdge = edge.id; render(); };
+                const choose = () => { propertiesVisible = true; selectedEdge = edge.id; render(); };
                 if (!options.previewOnly) { group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); }
                 else { group.removeAttribute('tabindex'); group.removeAttribute('role'); }
                 svg.append(group);
@@ -227,7 +227,7 @@
                     const link = element('button', 'dge-review-relation', row.txt);
                     link.type = 'button';
                     if (row.id === selectedEdge) link.classList.add('is-selected');
-                    link.addEventListener('click', () => act(() => { selectedEdge = row.id; selectedNodes.clear(); }));
+                    link.addEventListener('click', () => act(() => { propertiesVisible = true; selectedEdge = row.id; selectedNodes.clear(); }));
                     section.append(link);
                 }
                 summary.append(section); return summary;
@@ -237,7 +237,7 @@
 
         function buildSelectedProperties(graph) {
             const aside = element('aside', 'dge-selection-panel');
-            if (!graph) return aside;
+            if (!graph || !propertiesVisible) return aside;
             const selectedNode = selectedNodes.size === 1
                 ? graph.vertices.find(v => selectedNodes.has(v.id)) : null;
             const edge = graph.edges.find(e => e.id === selectedEdge);
@@ -275,7 +275,7 @@
                 aside.append(element('p','dge-muted',(graph.directed===false?'无向':'有向或待核对')+' · '+(graph.weighted===false?'无权':'带权或待核对')));
                 aside.append(button('删除子图',()=>removeGraph(graph.id),'dge-danger'));
             }
-            if(aside.childElementCount){const close=button('',()=>{selectedNodes.clear();selectedEdge=null;selectedGraph=false;});close.classList.add('dge-panel-close');close.setAttribute('aria-label','关闭属性');close.title='关闭属性';aside.prepend(close);}
+            if(aside.childElementCount){const close=button('',()=>{propertiesVisible=false;});close.classList.add('dge-panel-close');close.setAttribute('aria-label','关闭属性');close.title='关闭属性';aside.prepend(close);}
             return aside;
         }
 
@@ -526,12 +526,12 @@
                     },
                     disabled: () => saving || destroyed,
                     ensureGraph:()=>{if(!model.getDocument().graphs.length)currentGraph=model.addGraph();return currentGraph;},
-                    selectGraph:id=>{closeFloatingPanels();currentGraph=id;selectedNodes.clear();selectedEdge=null;selectedGraph=true;render();},
+                    selectGraph:id=>{closeFloatingPanels();propertiesVisible=true;currentGraph=id;selectedNodes.clear();selectedEdge=null;selectedGraph=true;render();},
                     clearSelection:()=>{selectedNodes.clear();selectedEdge=null;selectedGraph=false;render();},
                     edgeSelected: () => selectedEdge,
                     nodeSelected: () => selectedNodes,
-                    selectEdge: id => { closeFloatingPanels();selectedGraph=false;selectedEdge = id; selectedNodes.clear(); render(); },
-                    selectNode: id => { closeFloatingPanels();selectedGraph=false;selectedNodes = new Set([id]); selectedEdge = null; render(); },
+                    selectEdge: id => { closeFloatingPanels();propertiesVisible=true;selectedGraph=false;selectedEdge = id; selectedNodes.clear(); render(); },
+                    selectNode: id => { closeFloatingPanels();propertiesVisible=true;selectedGraph=false;selectedNodes = new Set([id]); selectedEdge = null; render(); },
                     changed: kind => {
                         if (kind === 'vertex') refreshCanvasVertex();
                         else if (kind === 'geometry') refreshDraftViews();
@@ -605,7 +605,7 @@
                 }
             }
             if (graph) {
-                toolbar.append(field(options.drawingOnly ? '画页名称' : '子图名称', input(graph.name, options.drawingOnly ? '画页名称' : '子图名称', value => model.renameGraph(graph.id, value))));
+                if (!options.drawingOnly) toolbar.append(field('子图名称', input(graph.name, '子图名称', value => model.renameGraph(graph.id, value))));
                 if (options.drawingOnly || options.structureOnly) {
                     const flags = key => typeof graph[key]==='boolean' ? graph[key]?'yes':'no' : 'unknown';
                     toolbar.append(field('图形方向', select([['unknown','待确认'],['no','无向'],['yes','有向']], flags('directed'), options.drawingOnly?'绘图方向':'图形方向', value => {if(value!=='unknown'){model.setGraphType(graph.id,'directed',value==='yes');render();}})));
@@ -737,7 +737,7 @@
         unsubscribe = model.subscribe(document => { options.onChange?.(document); });
         render();
         return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
-            validate: model.validate, model, getDrawingSvg: () => overlay?.getDrawingSvg?.() || null,
+            validate: model.validate, model, refresh: refreshDraftViews, getDrawingSvg: () => overlay?.getDrawingSvg?.() || null,
             destroy() { destroyed = true; clearTimeout(textTimer); unsubscribe(); overlay?.destroy(); textOverlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };

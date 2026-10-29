@@ -155,7 +155,8 @@ def test_new_note_explicit_selection_confirmed_delete_and_search(notebook_page):
     assert prompt.is_visible()
     assert p.evaluate('(id)=>stored.notes.some(n=>n.id===id)', identifier)
     assert p.locator('.dcn-note-open', has_text='偏序关系').count() == 1
-    prompt.get_by_role('button', name='取消', exact=True).click()
+    assert prompt.get_by_role('button', name='取消', exact=True).count() == 0
+    prompt.get_by_role('button', name='取消删除', exact=True).click()
     assert p.evaluate('(id)=>stored.notes.some(n=>n.id===id)', identifier)
     p.get_by_role('button', name='删除概念', exact=True).click()
     p.locator('.dcn-confirm').get_by_role('button', name='删除概念', exact=True).click()

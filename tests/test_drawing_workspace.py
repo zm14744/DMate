@@ -39,7 +39,7 @@ def drawing_page(request):
               onUpload:async(blob,metadata)=>{uploads.push({type:blob.type,size:blob.size,metadata});},
               onClose:()=>closeCount++});};openDrawing();
         }''')
-        page.wait_for_function('document.querySelector(".dge-overlay-image").naturalWidth===1000')
+        page.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
         yield page
         browser.close()
 
@@ -48,6 +48,7 @@ def test_legacy_saved_pages_new_page_and_account_scope(drawing_page):
     page = drawing_page
     assert page.locator('.ddw-name').input_value() == '我的图形'
     page.locator('.ddw-name').fill('带权图')
+    assert page.evaluate('workspace.getDocument().graphs[0].name') == '带权图'
     page.get_by_role('button', name='新建空白页', exact=True).click()
     assert page.evaluate('workspace.getDocument().graphs[0].vertices.length') == 0
     page.get_by_role('button', name='历史绘图', exact=True).click()
@@ -162,8 +163,8 @@ def test_drawing_panels_use_one_nonoverlapping_toolbar_and_red_closes(drawing_pa
     page = drawing_page
     rail = page.get_by_role('toolbar', name='绘图面板', exact=True)
     controls = rail.get_by_role('button')
-    assert controls.count() == 4
-    boxes = [controls.nth(i).bounding_box() for i in range(4)]
+    assert controls.count() == 3
+    boxes = [controls.nth(i).bounding_box() for i in range(3)]
     assert all(box is not None for box in boxes)
     for index, box in enumerate(boxes):
         for other in boxes[index + 1:]:
@@ -172,7 +173,7 @@ def test_drawing_panels_use_one_nonoverlapping_toolbar_and_red_closes(drawing_pa
         'nodes=>nodes.every(n=>getComputedStyle(n).display==="none")')
     for label, close in [('绘图设置', '关闭绘图设置'), ('图形信息', '关闭图形信息'),
                          ('历史绘图', '关闭历史绘图'), ('AI 回答', '关闭 AI 回答')]:
-        rail.get_by_role('button', name=label, exact=True).click()
+        page.get_by_role('button', name=label, exact=True).click()
         button = page.get_by_role('button', name=close, exact=True)
         assert button.is_visible()
         assert rail.is_hidden()
@@ -192,6 +193,33 @@ def test_drawing_panels_use_one_nonoverlapping_toolbar_and_red_closes(drawing_pa
     page.screenshot(path='/tmp/dmate-drawing-unified-rail-'+('mobile' if page.viewport_size['width'] < 760 else 'desktop')+'.png')
 
 
+def test_history_is_next_to_new_page_in_top_actions_and_opens_above_canvas(drawing_page):
+    page = drawing_page
+    actions = page.locator('.ddw-page-actions')
+    assert actions.get_by_role('button').all_text_contents() == ['新建空白页', '历史绘图', '导出图片', '上传到对话']
+    new = actions.get_by_role('button', name='新建空白页', exact=True).bounding_box()
+    history = actions.get_by_role('button', name='历史绘图', exact=True)
+    box = history.bounding_box()
+    assert box['y'] == pytest.approx(new['y'], abs=1)
+    assert box['x'] >= new['x'] + new['width'] + 4
+    assert page.get_by_role('toolbar', name='绘图面板').get_by_role('button', name='历史绘图', exact=True).count() == 0
+    for button in actions.get_by_role('button').all():
+        bounds = button.bounding_box()
+        assert bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= page.viewport_size['width']
+        assert button.evaluate('e=>e.scrollWidth<=e.clientWidth')
+    assert page.evaluate('document.documentElement.scrollWidth') <= page.viewport_size['width']
+    history.click()
+    assert history.get_attribute('aria-expanded') == 'true'
+    assert history.is_visible()
+    assert page.locator('.ddw-history-list').is_visible()
+    history.click()
+    assert history.get_attribute('aria-expanded') == 'false'
+    assert page.locator('.ddw-side-panel').is_hidden()
+    history.click()
+    page.get_by_role('button', name='关闭历史绘图', exact=True).click()
+    assert history.is_visible() and history.get_attribute('aria-expanded') == 'false'
+
+
 def test_drawing_settings_remain_open_across_editor_redraw(drawing_page):
     page = drawing_page
     page.get_by_role('button', name='绘图设置', exact=True).click()
@@ -201,6 +229,25 @@ def test_drawing_settings_remain_open_across_editor_redraw(drawing_page):
     assert page.get_by_role('toolbar', name='绘图面板').is_visible()
     assert page.evaluate('workspace.getDocument().graphs[0].directed') is False
     assert page.evaluate('workspace.getDocument().graphs[0].weighted') is False
+
+
+def test_top_name_is_the_only_drawing_name_and_refreshes_graph_information(drawing_page):
+    page = drawing_page
+    before = page.locator('.dge-overlay-image').bounding_box()
+    page.locator('.ddw-name').fill('画页甲')
+    assert page.evaluate('workspace.getDocument().graphs[0].name') == '画页甲'
+    page.get_by_role('button', name='绘图设置', exact=True).click()
+    assert page.get_by_label('画页名称', exact=True).count() == 0
+    assert page.locator('.ddw-name').input_value() == '画页甲'
+    page.get_by_role('button', name='关闭绘图设置', exact=True).click()
+    page.get_by_role('button', name='图形信息', exact=True).click()
+    assert '画页甲' in page.locator('.dge-review-type').inner_text()
+    assert page.locator('.dge-overlay-image').bounding_box() == pytest.approx(before, abs=1)
+    page.get_by_role('button', name='关闭图形信息', exact=True).click()
+    page.get_by_role('button', name='撤销', exact=True).click()
+    assert page.locator('.ddw-name').input_value() == page.evaluate('workspace.getDocument().graphs[0].name')
+    page.get_by_role('button', name='重做', exact=True).click()
+    assert page.locator('.ddw-name').input_value() == '画页甲'
 
 
 def test_drawing_answer_uses_shared_renderer_and_invalidates_on_edit(drawing_page):

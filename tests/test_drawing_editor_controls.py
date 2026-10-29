@@ -86,7 +86,7 @@ def test_modes_are_exclusive_and_tools_fold_without_activating_other_buttons(dra
 def test_settings_and_graph_information_are_separate_full_panels(drawing_page):
     p=drawing_page
     p.locator('.dge-float-graphs > summary').click()
-    assert p.get_by_label('画页名称',exact=True).is_visible()
+    assert p.get_by_label('画页名称',exact=True).count()==0
     assert p.get_by_label('绘图方向',exact=True).is_visible()
     assert p.get_by_label('绘图权值',exact=True).is_visible()
     assert p.get_by_label('当前子图',exact=True).count()==0

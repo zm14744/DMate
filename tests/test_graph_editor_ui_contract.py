@@ -69,7 +69,14 @@ class GraphEditorUiContract(unittest.TestCase):
         self.assertLessEqual(minimum, 25)
         self.assertGreaterEqual(maximum, 400)
         self.assertIn("Math.max(MIN_ZOOM,Math.min(MAX_ZOOM", self.overlay)
-        self.assertIn("button('适应','zoom-fit',fitImage,viewControls)", self.overlay)
+        fit_control = re.search(
+            r"button\('适应','zoom-fit',\(\)=>\{(?P<body>[^}]+)\},viewControls\)",
+            self.overlay,
+        )
+        self.assertIsNotNone(fit_control)
+        # A fit changes the camera and immediately repaints screen-sized
+        # input targets; it must not wait for the next editing gesture.
+        self.assertRegex(fit_control.group('body'), r'\bfitImage\(\)\s*;\s*draw\(\)')
         self.assertIn(".dge-overlay-stage{position:relative;width:100%;min-width:0;", self.style)
         self.assertNotIn("min-width:100%;margin:0 auto;background:white", self.style)
 

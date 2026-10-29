@@ -67,10 +67,19 @@ def test_control_point_ink_is_continuous_and_halos_do_not_cut_the_incoming_line(
       // Recreate the former interleaved painting to ensure this probes the
       // actual erased incoming ink, rather than just checking SVG structure.
       oldGroup.querySelectorAll('.dge-overlay-contrast-halo,.dge-overlay-stroke').forEach(e=>e.remove());
-      for(let i=0;i<halos.length;i++)oldGroup.append(halos[i].cloneNode(true),strokes[i].cloneNode(true));
-      const numbers=strokes[0].getAttribute('d').match(/[-+]?\\d*\\.?\\d+(?:e[-+]?\\d+)?/gi).map(Number);
-      const a=numbers.slice(0,2),joint=numbers.slice(2,4),dx=joint[0]-a[0],dy=joint[1]-a[1],length=Math.hypot(dx,dy);
-      const unit=[dx/length,dy/length],pixelUnit=parseFloat(strokes[0].style.strokeWidth)/3.6;
+      const points=path=>{const n=path.getAttribute('d').match(/[-+]?\\d*\\.?\\d+(?:e[-+]?\\d+)?/gi).map(Number);return Array.from({length:n.length/2},(_,i)=>n.slice(i*2,i*2+2));};
+      for(let i=0;i<halos.length;i++){
+        const row=points(strokes[i]);
+        for(let j=0;j<row.length-1;j++){
+          const d='M '+row[j].join(' ')+' L '+row[j+1].join(' '),halo=halos[i].cloneNode(true),stroke=strokes[i].cloneNode(true);
+          halo.setAttribute('d',d);stroke.setAttribute('d',d);oldGroup.append(halo,stroke);
+        }
+      }
+      const control=instance.getDocument().graphs[0].edges.find(e=>e.id==='e1').path[1],
+        target=[control[0]*Number(original.getAttribute('data-source-width')),control[1]*Number(original.getAttribute('data-source-height'))];
+      const joined=strokes.find(stroke=>points(stroke).some((p,i,row)=>i>0&&i<row.length-1&&Math.hypot(p[0]-target[0],p[1]-target[1])<.01));
+      const row=points(joined),at=row.findIndex(p=>Math.hypot(p[0]-target[0],p[1]-target[1])<.01),a=row[at-1],joint=row[at],dx=joint[0]-a[0],dy=joint[1]-a[1],length=Math.hypot(dx,dy);
+      const unit=[dx/length,dy/length],pixelUnit=parseFloat(joined.style.strokeWidth)/3.6;
       async function inspect(svg){
         const span=18*pixelUnit,size=216;
         svg.setAttribute('viewBox',[joint[0]-span/2,joint[1]-span/2,span,span].join(' '));

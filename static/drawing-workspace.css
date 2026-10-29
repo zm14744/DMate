@@ -4,7 +4,8 @@
 .dmate-drawing-workspace{height:100%;min-height:0;display:flex;flex-direction:column;gap:8px;color:var(--text-primary,#172033);position:relative}
 .ddw-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
 .ddw-name{width:190px;min-width:100px;max-width:100%;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-2,#f8fafc);color:inherit;padding:9px 11px;font:inherit}
-.ddw-page-actions{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.ddw-page-actions{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto;min-width:0;max-width:100%}
+.ddw-page-actions>button{white-space:nowrap}
 .dmate-drawing-workspace button{font:inherit;color:inherit;background:var(--surface-2,#f8fafc);border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;padding:9px 12px;cursor:pointer;touch-action:manipulation}
 .dmate-drawing-workspace button:hover:not(:disabled){filter:brightness(.96)}
 .dmate-drawing-workspace button:disabled{opacity:.55;cursor:wait}
@@ -51,4 +52,4 @@
 .ddw-export-preview>.ddw-note{margin:0;flex-shrink:0}
 .ddw-export-image{display:block;max-width:100%;width:auto;height:auto;max-height:calc(100% - 120px);min-height:0;object-fit:contain;background:white;user-select:auto;-webkit-user-select:auto;-webkit-touch-callout:default}
 .ddw-export-download{display:inline-block;border-radius:9px;padding:10px 20px;background:#347cf5;color:white;text-decoration:none;flex-shrink:0}
-@media(max-width:600px){.ddw-header{gap:6px}.ddw-name{width:100%;padding:7px 10px}.ddw-page-actions{width:100%;margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.ddw-page-actions>button{font-size:12px;padding:8px 3px;white-space:nowrap}.ddw-side-actions{right:5px;width:96px}.ddw-side-actions>button{font-size:12px;padding:7px 9px}.ddw-side-panel{right:5px}.ddw-editor .dge-floating-actions{right:5px}}
+@media(max-width:600px){.ddw-header{gap:6px}.ddw-name{width:100%;padding:7px 10px}.ddw-page-actions{width:100%;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ddw-page-actions>button{font-size:12px;padding:8px 10px;white-space:nowrap}.ddw-side-actions{right:5px;width:96px}.ddw-side-actions>button{font-size:12px;padding:7px 9px}.ddw-side-panel{right:5px}.ddw-editor .dge-floating-actions{right:5px}}

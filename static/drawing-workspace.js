@@ -24,8 +24,8 @@
   settingsButton.setAttribute('aria-expanded','false');informationButton.setAttribute('aria-expanded','false');
   historyButton.setAttribute('aria-expanded','false');aiButton.setAttribute('aria-expanded','false');
   const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=button('上传到对话',()=>uploadImage(),'ddw-primary');
-  actions.append(newButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,historyButton,aiButton);body.append(editorHost,rail,panel);shell.append(top,body,status);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
-  let requirement='',answer='',answerDocument='',answerRequirement='';
+  actions.append(newButton,historyButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,aiButton);body.append(editorHost,rail,panel);shell.append(top,body,status);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
+  let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false;
   const active=()=>pages.find(p=>p.id===activeId);
   function setStatus(message){status.textContent=message||persistError;status.classList.toggle('is-error',Boolean(persistError));}
   function abortAnswer(){aiEpoch++;aiAbort?.abort();aiAbort=null;}
@@ -81,10 +81,12 @@
   function schedule(){clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}
   function mountPage(){
    editor?.destroy();editor=null;const p=active();if(!p)return;
-   name.value=p.name;requirement=p.requirement||'';answer='';answerDocument='';answerRequirement='';
+   name.value=p.name;nameFollowsGraph=false;requirement=p.requirement||'';answer='';answerDocument='';answerRequirement='';
    const initial=blank(),url='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700"><rect width="100%" height="100%" fill="white"/></svg>');
    editor=root.DMateGraphEditor.mount(editorHost,{document:clone(p.document),initialDocument:initial,originalUrl:url,drawingOnly:true,
-    onChange:value=>{if(destroyed)return;const selected=active();if(!selected)return;selected.document=clone(value);selected.updatedAt=Date.now();options.onChange?.(clone(value));invalidateAnswer();schedule();},
+    onChange:value=>{if(destroyed)return;const selected=active();if(!selected)return;selected.document=clone(value);selected.updatedAt=Date.now();
+     if(nameFollowsGraph&&doc.activeElement!==name&&value.graphs[0]){selected.name=caption(value.graphs[0].name);name.value=selected.name;}
+     options.onChange?.(clone(value));invalidateAnswer();schedule();},
     onConfirm:async value=>{const selected=active();selected.document=clone(value);selected.name=caption(name.value);selected.updatedAt=Date.now();if(!persist('绘图已保存到历史绘图。'))throw new Error(persistError);if(panelMode==='history')renderPanel();}
    });
    options.onChange?.(clone(p.document));renderPanel();syncChrome();
@@ -145,7 +147,7 @@
    const svg=editor?.getDrawingSvg?.(),document=root.DMateDrawingExport.documentForImage(currentDocument(),svg);
    return {blob:await root.DMateDrawingExport.pngBlob(svg),document};
   }
-  function busy(value){exportBusy=value;const disabled=value||Boolean(exportPreview);exportButton.disabled=disabled;uploadButton.disabled=disabled;newButton.disabled=disabled;name.disabled=disabled;editorHost.inert=disabled;panel.inert=disabled;rail.inert=disabled;}
+  function busy(value){exportBusy=value;const disabled=value||Boolean(exportPreview);exportButton.disabled=disabled;uploadButton.disabled=disabled;newButton.disabled=disabled;historyButton.disabled=disabled;name.disabled=disabled;editorHost.inert=disabled;panel.inert=disabled;rail.inert=disabled;}
   function closeExportPreview(){
    exportPreview?.remove();exportPreview=null;
    if(exportPreviewUrl){win.URL.revokeObjectURL(exportPreviewUrl);exportPreviewUrl='';}
@@ -171,7 +173,10 @@
    catch(error){if(!destroyed)setStatus(error?.message||'绘图上传失败，请重试。');}
    finally{uploadBusy=false;if(!destroyed)busy(false);}
   }
-  name.addEventListener('input',()=>{const p=active();if(p){p.name=caption(name.value);p.updatedAt=Date.now();schedule();}});
+  name.addEventListener('input',()=>{const p=active();if(p){nameFollowsGraph=true;p.name=caption(name.value);p.updatedAt=Date.now();
+   const graph=editor?.getDocument?.().graphs[0];
+   if(graph&&graph.name!==p.name){editor.model?.renameGraph(graph.id,p.name);editor.refresh?.();}
+   schedule();}});
   try{
    const raw=win.localStorage.getItem(key),value=raw?JSON.parse(raw):null;
    if(value?.version===1&&Array.isArray(value.pages)){

@@ -98,8 +98,8 @@ def test_region_results_persist_numbering_and_descriptions_before_confirmation(s
     p.get_by_role('button', name='图形框选', exact=True).click()
     drag(p, [(.1, .1), (.8, .8)])
     p.wait_for_function('graphCalls.length===1 && ocrTasks.get("scan").scanState.graphRegions[0].status==="complete"')
-    p.get_by_role('checkbox', name='放入图形框 1', exact=True).check()
-    p.get_by_role('button', name='放入所选图形信息', exact=True).click()
+    p.get_by_role('checkbox', name='图形框1', exact=True).check()
+    p.get_by_role('button', name='关闭图形信息选择', exact=True).click()
     p.wait_for_function('graphCalls.length===1 && document.querySelector(".dgs-appearance")?.textContent.includes("四个顶点")')
     assert p.locator('.dgs-vertex-position').filter(has_text='1：外圈左上方').count() == 1
     p.get_by_role('button', name='保存').click()

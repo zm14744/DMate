@@ -124,9 +124,9 @@ def test_rectangles_and_freehand_of_both_types_recognize_without_moving_view(sca
     assert all(abs(before[k]-after[k])<2 for k in ['x','y','width','height'])
     # Explicit source selection below the mobile canvas scrolls to those
     # controls normally; measure framing stability before that user action.
-    p.get_by_role('checkbox',name='放入文字框 1',exact=True).check()
-    p.get_by_role('checkbox',name='放入文字框 2',exact=True).check()
-    p.get_by_role('button',name='放入所选文字信息',exact=True).click()
+    p.get_by_role('checkbox',name='文字框1',exact=True).check()
+    p.get_by_role('checkbox',name='文字框2',exact=True).check()
+    p.get_by_role('button',name='关闭文字信息选择',exact=True).click()
     assert p.locator('.dge-overlay-text-region').count()==2
     assert p.locator('.dgs-body').inner_text()=='文字区域 1\n\n文字区域 2'
     assert p.locator('.dge-overlay-node,.dge-overlay-edge').count()==0
@@ -139,7 +139,7 @@ def test_pending_scans_block_confirmation_and_deleted_frames_ignore_late_results
     drag(p,[(.2,.2),(.6,.6)])
     p.wait_for_function('graphCalls.length===1')
     assert p.get_by_role('button',name='保存').is_disabled()
-    p.get_by_role('button',name='删除图形框 1',exact=True).click()
+    p.get_by_role('button',name='删除图形框1',exact=True).click()
     p.evaluate('resolveGraph()')
     p.wait_for_timeout(100)
     assert p.evaluate('ocrTasks.get("scan").draft.graphs.length')==0

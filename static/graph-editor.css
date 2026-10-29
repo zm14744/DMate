@@ -306,19 +306,19 @@
 .dgs-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
 .dgs-section-head h3{margin:0}
 .dgs-section-head>button{flex:0 0 auto;min-height:30px;padding:4px 8px;font-size:12px}
-.dgs-source-picker{display:flex;flex-direction:column;gap:8px;padding:10px;margin:0 0 12px;border:1px solid var(--dge-border);border-radius:9px;background:var(--surface-2,transparent)}
+.dgs-source-picker-layer{position:fixed;inset:0;z-index:40;pointer-events:none}
+.dgs-source-picker-layer:empty{display:none}
+.dgs-source-picker{position:fixed;display:flex;flex-direction:column;gap:12px;padding:12px;box-sizing:border-box;min-width:0;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface,#fff);box-shadow:0 6px 22px #0002;pointer-events:auto;overflow:hidden}
+.dgs-source-list{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;overscroll-behavior:contain}
 .dgs-source-choice{display:flex;align-items:center;gap:9px;min-height:44px;font-size:13px;line-height:1.4;cursor:pointer}
-.dmate-graph-scan .dgs-source-choice input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:0 0 25px;width:25px;height:25px;min-width:25px;margin:0;border:2px solid var(--text-subtle,#64748b);border-radius:50%;background:transparent;cursor:pointer}
-.dmate-graph-scan .dgs-source-choice input[type=checkbox]:checked{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6)}
-.dgs-source-picker-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.dmate-graph-editor :is(.dge-panel-close,.dgs-source-picker-close){appearance:none;-webkit-appearance:none;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0!important;border:0!important;border-radius:50%;background:#ef4444!important;box-shadow:none!important;font-size:0}
-.dmate-graph-editor :is(.dge-panel-close,.dgs-source-picker-close):hover{background:#dc2626!important}
-.dgs-source-card{min-width:0;padding:8px;border:1px solid var(--dge-border);border-radius:7px}
-.dgs-source-card .dgs-region-state{margin:5px 0 0;padding:0;border:0}
-.dgs-source-order{display:flex;gap:6px;margin-top:5px}
-.dgs-source-order button{min-height:28px;padding:3px 7px;font-size:12px}
-.dgs-source-preview,.dgs-source-note{font-size:12px;line-height:1.5;overflow-wrap:anywhere;color:var(--text-subtle);margin:4px 0;white-space:pre-wrap}
-.dgs-source-preview{max-height:100px;overflow:auto}
+.dgs-source-picker .dgs-source-choice input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:0 0 25px;width:25px;height:25px;min-width:25px;margin:0;border:2px solid var(--text-subtle,#64748b);border-radius:50%;background:transparent;cursor:pointer}
+.dgs-source-picker .dgs-source-choice input[type=checkbox]:checked{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6)}
+.dgs-source-picker-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto}
+.dmate-graph-editor :is(.dge-panel-close,.dgs-source-picker-close,.dgs-source-delete){appearance:none;-webkit-appearance:none;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0!important;border:0!important;border-radius:50%;background:#ef4444!important;box-shadow:none!important;font-size:0}
+.dmate-graph-editor :is(.dge-panel-close,.dgs-source-picker-close,.dgs-source-delete):hover{background:#dc2626!important}
+.dgs-source-card{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:6px 10px;border:1px solid var(--dge-border);border-radius:8px}
+.dgs-source-card>.dgs-source-choice{flex:1;min-width:0}
+.dgs-source-choice>span{overflow-wrap:anywhere}
 .dge-graph-frame-number{fill:#2563eb}
 
 /* A drawing page has one tool mode at a time; its rail can be folded away. */

@@ -31,6 +31,7 @@ on:
       - 'tests/test_ai_answer_rendering.py'
       - 'tests/test_interaction_surfaces.py'
       - 'tests/test_graph_outline_smoothness.py'
+      - 'tests/test_graph_loop_editing.py'
       - 'static/drawing-workspace.js'
       - 'static/drawing-workspace.css'
       - 'static/drawing-export.js'
@@ -85,6 +86,7 @@ jobs:
             tests/test_ai_answer_rendering.py \
             tests/test_interaction_surfaces.py \
             tests/test_graph_outline_smoothness.py \
+            tests/test_graph_loop_editing.py \
             tests/test_drawing_workspace.py \
             tests/test_drawing_editor_controls.py \
             tests/test_drawing_app_integration.py \

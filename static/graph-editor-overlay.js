@@ -87,6 +87,7 @@ function mount(host,o){
  s.originalOpacity = Number.isFinite(s.originalOpacity)
    ? Math.max(0,Math.min(1,s.originalOpacity)) : 1;
  let w=1000,h=1000,active=null,ghost=null,base=null,scanSequence=0,resizeFrame=null;
+ const paintedEdges=new Map();
  let sampleCanvas=d.createElement('canvas'),sampleCtx=null,loaded=false,autoFitted=false;
  const pointers=new Map();
  const world={left:0,top:0,right:1,bottom:1};
@@ -178,10 +179,10 @@ function mount(host,o){
    scroll.scrollLeft=(.5-world.left)*scale-viewportWidth/2;
    scroll.scrollTop=(.5-world.top)*scale*h/w-viewportHeight/2;
  };
- button('－','zoom-out',()=>zoom(s.zoom/1.25),viewControls).setAttribute('aria-label','缩小原图');
+ button('－','zoom-out',()=>{zoom(s.zoom/1.25);draw();},viewControls).setAttribute('aria-label','缩小原图');
  const value=d.createElement('span');value.className='dge-overlay-zoom';viewControls.append(value);
- button('＋','zoom-in',()=>zoom(s.zoom*1.25),viewControls).setAttribute('aria-label','放大原图');
- button('适应','zoom-fit',fitImage,viewControls);
+ button('＋','zoom-in',()=>{zoom(s.zoom*1.25);draw();},viewControls).setAttribute('aria-label','放大原图');
+ button('适应','zoom-fit',()=>{fitImage();draw();},viewControls);
  // Hide the source photo independently from the drawing layer.
  // visibility:hidden preserves its dimensions and all source coordinates.
  const syncOriginal=()=>{
@@ -372,7 +373,9 @@ function mount(host,o){
   if(!scroll.clientWidth)return;
   const g=o.textOnly||o.scanOnly?{id:o.graph?.()?.id,vertices:[],edges:[]}:o.graph()||{vertices:[],edges:[]};
   if(g)for(const v of g.vertices)if(finite(v.x)&&finite(v.y))expandWorld(v.x,v.y);
-  svg.replaceChildren();if(!g||!s.visible)return;
+  if(o.drawingOnly)for(const edge of g.edges)if(edge.from===edge.to&&Array.isArray(edge.path))
+   for(const point of edge.path)if(Array.isArray(point)&&point.length===2&&point.every(finite))expandWorld(point[0],point[1]);
+  svg.replaceChildren();paintedEdges.clear();if(!g||!s.visible)return;
   // The mathematical path is in original-image coordinates. Input targets
   // and labels instead use a constant on-screen size, including at 400% zoom.
   const radius=Math.max(5,Math.min(w,h)*.008);
@@ -380,7 +383,8 @@ function mount(host,o){
   const browser = d.defaultView;
   const touch=Boolean(browser?.navigator?.maxTouchPoints
       || browser?.matchMedia?.('(pointer: coarse)')?.matches);
-  const hitRadius=Math.max(radius*2.6,(touch?22:12)/scale);
+  const endpointTarget=touch?32:28;
+  const hitRadius=s.mode==='edge'?endpointTarget/scale:Math.max(radius*2.6,(touch?22:12)/scale);
   const dotRadius=Math.max(1.5,4.5/scale);
   const handleRadius=Math.max(radius*1.1,(touch?15:8)/scale);
   const labelSize=Math.max(3,Math.min(80,13/scale));
@@ -414,22 +418,32 @@ function mount(host,o){
     const b=boxOf(points),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number'});
     label.dataset.frameLabelId=String(region.id);label.dataset.frameLabelKind='text';label.textContent=String(region.id);label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);
   }
+  const editHandles=[];
   const pairs=new Map();for(const e of g.edges){const key=[e.from,e.to].sort().join('/');if(!pairs.has(key))pairs.set(key,[]);pairs.get(key).push(e);}
   for(const edges of pairs.values())for(const [i,e] of edges.entries()){
    if(!coords.has(e.from)||!coords.has(e.to))continue;
    const a=px(coords.get(e.from)),b=px(coords.get(e.to)),pts=Array.isArray(e.path)&&e.path.length>=2&&e.path.every(p=>Array.isArray(p)&&p.length===2&&p.every(finite))?e.path:null;
-   let line,center,drawPoints;
-   if(ghost?.edge===e.id){
+   let line,center,drawPoints,curvePath=null;
+   if(e.from===e.to&&(!pts||pts.length===3||ghost?.edge===e.id)){
+    const vertex=g.vertices.find(v=>v.id===e.from),shift=vertex&&finite(vertex.x)&&finite(vertex.y)?[a[0]-vertex.x*w,a[1]-vertex.y*h]:[0,0];
+    const length=Math.max(radius*7.5,44/scale)+i*Math.max(radius*3,18/scale);
+    center=ghost?.edge===e.id?px(ghost.pos):pts?
+      [pts[1][0]*w+shift[0],pts[1][1]*h+shift[1]]:[a[0],a[1]-length];
+    let dx=center[0]-a[0],dy=center[1]-a[1],distance=Math.hypot(dx,dy);
+    if(distance<8/scale){dx=0;dy=-8/scale;distance=-dy;center=[a[0],a[1]+dy];}
+    const u=[dx/distance,dy/distance],n=[-u[1],u[0]],attach=Math.min(distance*.2,6/scale),width=distance*1.25,pull=(distance-attach*.25)*4/3;
+    const point=(along,across)=>[a[0]+u[0]*along+n[0]*across,a[1]+u[1]*along+n[1]*across];
+    const p0=point(attach,attach),p1=point(pull,width),p2=point(pull,-width),p3=point(attach,-attach);
+    drawPoints=cubicPoints(p0,p1,p2,p3,48);
+    curvePath='M '+p0.join(' ')+' C '+p1.join(' ')+' '+p2.join(' ')+' '+p3.join(' ');
+   }else if(ghost?.edge===e.id){
     center=px(ghost.pos);drawPoints=[a,center,b];
    }else if(pts){
-    drawPoints=pts.map(p=>px(active?.kind==='edge'&&active.id===e.id?[p[0]+active.end[0]-active.start[0],p[1]+active.end[1]-active.start[1]]:p));drawPoints[0]=a;drawPoints[drawPoints.length-1]=b;
-    center=drawPoints[Math.floor(drawPoints.length/2)];
-   }else if(e.from===e.to){
-    const r=radius*(5+i*2);
-    const p0=[a[0]-r*.3,a[1]-r*.3],p1=[a[0]-2*r,a[1]-2*r],
-          p2=[a[0]+2*r,a[1]-2*r],p3=[a[0]+r*.3,a[1]-r*.3];
-    drawPoints=cubicPoints(p0,p1,p2,p3);
-    center=[a[0],a[1]-r*1.5];
+    const vertex=e.from===e.to?g.vertices.find(v=>v.id===e.from):null;
+    const shift=vertex&&finite(vertex.x)&&finite(vertex.y)?[a[0]/w-vertex.x,a[1]/h-vertex.y]:
+      active?.kind==='edge'&&active.id===e.id?[active.end[0]-active.start[0],active.end[1]-active.start[1]]:[0,0];
+    drawPoints=pts.map(p=>px([p[0]+shift[0],p[1]+shift[1]]));drawPoints[0]=a;drawPoints[drawPoints.length-1]=b;
+    center=e.from===e.to?drawPoints.reduce((best,p)=>Math.hypot(p[0]-a[0],p[1]-a[1])>Math.hypot(best[0]-a[0],best[1]-a[1])?p:best,drawPoints[0]):drawPoints[Math.floor(drawPoints.length/2)];
    }else{
     const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2],
           len=Math.hypot(b[0]-a[0],b[1]-a[1])||1,
@@ -437,36 +451,39 @@ function mount(host,o){
           c=[mid[0]-(b[1]-a[1])*k/len,mid[1]+(b[0]-a[0])*k/len];
     drawPoints=quadraticPoints(a,c,b);
     center=drawPoints[Math.floor(drawPoints.length/2)];
+    curvePath=Math.abs(k)<1e-9?'M '+a.join(' ')+' L '+b.join(' '):'M '+a.join(' ')+' Q '+c.join(' ')+' '+b.join(' ');
    }
-   line=pointsPath(drawPoints);
+   line=curvePath||pointsPath(drawPoints);
+   paintedEdges.set(e.id,drawPoints.map(point=>[point[0]/w,point[1]/h]));
    const chosen=o.edgeSelected?.()===e.id,
          group=E(d,'g',{'data-edge-id':e.id,class:'dge-overlay-edge'+(chosen?' is-selected':'')+(e.direction==='unknown'?' is-uncertain':'')});
    const hit=E(d,'path',{d:line,class:'dge-overlay-hit'});
    hit.style.strokeWidth=(touch?44:18)/scale+'px';group.append(hit);
-   const halos=[],strokes=[];let traversed=0;
+   const halos=[],strokes=[],runs=[];let traversed=0;
    for(let j=0;j<drawPoints.length-1;j++){
-    const from=drawPoints[j],to=drawPoints[j+1],
-          segment='M '+from.join(' ')+' L '+to.join(' '),
-          midpoint=[(from[0]+to[0])/(2*w),(from[1]+to[1])/(2*h)],
-          ink=inkAt(midpoint),halo=E(d,'path',{d:segment,class:'dge-overlay-contrast-halo'});
+    const from=drawPoints[j],to=drawPoints[j+1],midpoint=[(from[0]+to[0])/(2*w),(from[1]+to[1])/(2*h)],ink=inkAt(midpoint),previous=runs.at(-1);
+    if(previous?.ink===ink)previous.points.push(to);else runs.push({ink,points:[from,to],offset:traversed});
+    traversed+=Math.hypot(to[0]-from[0],to[1]-from[1]);
+   }
+   for(const [index,run]of runs.entries()){
+    const {ink}=run,segment=runs.length===1?line:pointsPath(run.points),halo=E(d,'path',{d:segment,class:'dge-overlay-contrast-halo'});
     halo.dataset.ink=oppositeInk(ink);halo.style.stroke=oppositeInk(ink);
     halo.style.strokeWidth=(chosen?6.2:4.8)/scale+'px';
     if(e.style==='dashed')halo.setAttribute('stroke-dasharray','9 6');
     if(e.style==='dotted')halo.setAttribute('stroke-dasharray','2 5');
     halos.push(halo);
     const att={d:segment,class:'dge-overlay-stroke'};
-    if(e.direction==='forward'&&j===drawPoints.length-2)
+    if(e.direction==='forward'&&index===runs.length-1)
       att['marker-end']='url(#'+o.instance+'-arrow-'+(ink==='#ffffff'?'light':'dark')+')';
     if(e.style==='dashed')att['stroke-dasharray']='9 6';
     if(e.style==='dotted')att['stroke-dasharray']='2 5';
     const stroke=E(d,'path',att);
     stroke.dataset.ink=ink;stroke.style.stroke=ink;
     stroke.style.strokeWidth=(chosen?3.6:2.1)/scale+'px';
-    // Every halo must be behind every ink segment. Interleaving a later
-    // white halo with earlier ink cuts a visible notch at each control point.
-    // Maintain one dash phase across sampled curve segments as well.
-    halo.setAttribute('stroke-dashoffset',String(-traversed));stroke.setAttribute('stroke-dashoffset',String(-traversed));
-    traversed+=Math.hypot(to[0]-from[0],to[1]-from[1]);strokes.push(stroke);
+    // A uniform stretch is one joined path, rather than translucent little
+    // segments whose overlapping caps leave seams and change arrow thickness.
+    halo.setAttribute('stroke-dashoffset',String(-run.offset));stroke.setAttribute('stroke-dashoffset',String(-run.offset));
+    strokes.push(stroke);
    }
    group.append(...halos,...strokes);
    const label=[e.edge_label,e.weight==null?'':String(e.weight)].filter(Boolean).join(' · ');if(label){
@@ -476,7 +493,7 @@ function mount(host,o){
      t.style.fill=labelInk;t.style.stroke=oppositeInk(labelInk);t.style.strokeWidth=(4/scale)+'px';
      group.append(t);
    }
-   if(chosen&&e.from!==e.to&&s.mode==='select'){const handle=E(d,'circle',{cx:center[0],cy:center[1],r:handleRadius,class:'dge-overlay-handle','data-handle-id':e.id});handle.style.fill='transparent';group.append(handle);}svg.append(group);
+   if(chosen&&s.mode==='select'){const handle=E(d,'circle',{cx:center[0],cy:center[1],r:handleRadius,class:'dge-overlay-handle','data-handle-id':e.id});handle.style.fill='transparent';editHandles.push(handle);}svg.append(group);
   }
   for(const [i,v] of g.vertices.entries()){
    const p=px(coords.get(v.id)),normalized=[p[0]/w,p[1]/h],ink=inkAt(normalized),
@@ -493,6 +510,9 @@ function mount(host,o){
    t.style.fill=ink;t.style.stroke=haloInk;t.style.strokeWidth=(4/scale)+'px';
    gNode.append(t);svg.append(gNode);
   }
+  // Selected geometry controls must remain reachable even when a small loop
+  // apex is close to its vertex's larger, invisible input target.
+  svg.append(...editHandles);
   if(s.start&&coords.has(s.start)){const p=px(coords.get(s.start));svg.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*1.8,class:'dge-overlay-pending'}));}
   if(active?.kind==='freehand')svg.append(E(d,'polyline',{
     points:active.points.map(p=>px(p).join(',')).join(' '),class:'dge-freehand-draft','vector-effect':'non-scaling-stroke'}));
@@ -511,7 +531,27 @@ function mount(host,o){
   if(s.mode==='vertex'&&!o.graph())o.ensureGraph?.();
   pointers.set(e.pointerId,[e.clientX,e.clientY]);
   if(pointers.size===2){cancelResizePreview();const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;return;}if(pointers.size>2)return;
-  const node=e.target.closest('[data-vertex-id]')?.dataset.vertexId,edge=e.target.closest('[data-edge-id]')?.dataset.edgeId,handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
+  let node=e.target.closest('[data-vertex-id]')?.dataset.vertexId;
+  let edge=e.target.closest('[data-edge-id]')?.dataset.edgeId;
+  const handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
+  if(s.mode==='select'&&edge&&!node&&!handle){
+   // Wide touch strokes can overlap, especially for nested self-loops. Pick
+   // the nearest painted centreline instead of the last SVG hit in DOM order.
+   const at=screenPoint(p);let closest=null;
+   for(const [id,points]of paintedEdges)for(let i=1;i<points.length;i++){
+    const a=screenPoint(points[i-1]),b=screenPoint(points[i]),dx=b[0]-a[0],dy=b[1]-a[1],length=dx*dx+dy*dy,
+      t=length?Math.max(0,Math.min(1,((at[0]-a[0])*dx+(at[1]-a[1])*dy)/length)):0,
+      gap=Math.hypot(at[0]-a[0]-t*dx,at[1]-a[1]-t*dy);
+    if(!closest||gap<closest.gap)closest={id,gap};
+   }
+   if(closest)edge=closest.id;
+  }
+  if(s.mode==='edge'&&g){
+   const touch=Boolean(d.defaultView.navigator.maxTouchPoints||d.defaultView.matchMedia?.('(pointer: coarse)').matches),target=touch?32:28;
+   let closest=null;
+   g.vertices.forEach((vertex,index)=>{const gap=distance(p,pos(vertex,index,g));if(gap<=target&&(!closest||gap<closest.gap))closest={id:vertex.id,gap};});
+   node=closest?.id;
+  }
   let hit=e.target.closest('[data-frame-resize]'),graphId=e.target.closest('[data-graph-id]')?.dataset.graphId,
       textId=e.target.closest('[data-text-region-id]')?.dataset.textRegionId;
   const canResize=(o.scanOnly?s.mode==='select':['select','bounds','graph_poly','text_rect','text_poly'].includes(s.mode))&&!e.shiftKey;
@@ -549,7 +589,7 @@ function mount(host,o){
  });
  svg.addEventListener('pointermove',e=>{
   if(pointers.has(e.pointerId))pointers.set(e.pointerId,[e.clientX,e.clientY]);
-  if(base&&pointers.size>=2){const a=[...pointers.values()],distance=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(base.distance>4)zoom(base.zoom*distance/base.distance);return;}
+  if(base&&pointers.size>=2){const a=[...pointers.values()],distance=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(base.distance>4){zoom(base.zoom*distance/base.distance);draw();}return;}
   if(!active||active.pointer!==e.pointerId)return;
   if(active.kind==='pan'){
     // A click or small finger/mouse tremor must only select. In particular,
@@ -622,7 +662,7 @@ function mount(host,o){
   }draw();
  }
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
- scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));},{passive:false});
+ scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));draw();},{passive:false});
  const syncGeometryReady=()=>{const ready=loaded&&autoFitted&&scroll.clientWidth>0&&scroll.clientHeight>0;root.dataset.geometryReady=String(ready);svg.setAttribute('aria-busy',String(!ready));};
  image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage();syncOriginal();buildSampler();draw();syncGeometryReady();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
