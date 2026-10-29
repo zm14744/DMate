@@ -156,3 +156,63 @@ def test_empty_page_export_and_storage_failure_are_honest(drawing_page):
     assert page.locator('.ddw-status').evaluate("e=>e.classList.contains('is-error')")
     assert page.locator('.ddw-name').input_value() == '仍在内存中'
     assert page.evaluate('workspace.getPages().some(p=>p.name==="仍在内存中")')
+
+
+def test_drawing_panels_use_one_nonoverlapping_toolbar_and_red_closes(drawing_page):
+    page = drawing_page
+    rail = page.get_by_role('toolbar', name='绘图面板', exact=True)
+    controls = rail.get_by_role('button')
+    assert controls.count() == 4
+    boxes = [controls.nth(i).bounding_box() for i in range(4)]
+    assert all(box is not None for box in boxes)
+    for index, box in enumerate(boxes):
+        for other in boxes[index + 1:]:
+            assert box['y'] + box['height'] <= other['y'] or other['y'] + other['height'] <= box['y']
+    assert page.locator('.dge-floating-actions > details > summary').evaluate_all(
+        'nodes=>nodes.every(n=>getComputedStyle(n).display==="none")')
+    for label, close in [('绘图设置', '关闭绘图设置'), ('图形信息', '关闭图形信息'),
+                         ('历史绘图', '关闭历史绘图'), ('AI 回答', '关闭 AI 回答')]:
+        rail.get_by_role('button', name=label, exact=True).click()
+        button = page.get_by_role('button', name=close, exact=True)
+        assert button.is_visible()
+        assert rail.is_hidden()
+        button.focus()
+        style = button.evaluate('e=>{const s=getComputedStyle(e);return {background:s.backgroundColor,radius:s.borderRadius,width:s.width,height:s.height,outline:s.outlineStyle,shadow:s.boxShadow}}')
+        assert style['background'] == 'rgb(239, 68, 68)'
+        assert style['radius'] == '50%' and style['width'] == style['height']
+        assert style['outline'] == 'none' and style['shadow'] == 'none'
+        if label == '历史绘图':
+            assert '绘图保存在此设备' not in page.locator('.ddw-side-panel').inner_text()
+        if label == 'AI 回答':
+            assert 'AI 会根据当前绘图' not in page.locator('.ddw-side-panel').inner_text()
+        button.click()
+        assert rail.is_visible()
+    assert '绘图保存在此设备' not in page.locator('.dmate-drawing-workspace').inner_text()
+    assert 'AI 会根据当前绘图' not in page.locator('.dmate-drawing-workspace').inner_text()
+    page.screenshot(path='/tmp/dmate-drawing-unified-rail-'+('mobile' if page.viewport_size['width'] < 760 else 'desktop')+'.png')
+
+
+def test_drawing_settings_remain_open_across_editor_redraw(drawing_page):
+    page = drawing_page
+    page.get_by_role('button', name='绘图设置', exact=True).click()
+    page.get_by_label('绘图方向', exact=True).select_option('no')
+    page.get_by_label('绘图权值', exact=True).select_option('no')
+    page.get_by_role('button', name='关闭绘图设置', exact=True).click()
+    assert page.get_by_role('toolbar', name='绘图面板').is_visible()
+    assert page.evaluate('workspace.getDocument().graphs[0].directed') is False
+    assert page.evaluate('workspace.getDocument().graphs[0].weighted') is False
+
+
+def test_drawing_answer_uses_shared_renderer_and_invalidates_on_edit(drawing_page):
+    page = drawing_page
+    page.evaluate('''()=>{window.richRenderCalls=[];window.DMateAIAnswer={render:(target,text,options)=>{
+      richRenderCalls.push(text);if(!options.isCurrent())throw new Error('stale answer');
+      target.classList.add('wrong-answer-inner');const p=document.createElement('p');p.textContent=text;target.replaceChildren(p);
+      return Promise.resolve(true);}};}''')
+    page.get_by_role('button', name='AI 回答', exact=True).click()
+    assert page.locator('.ddw-ai-answer').text_content() == ''
+    page.get_by_role('button', name='请求 AI 指导', exact=True).click()
+    page.wait_for_function('richRenderCalls.length===1')
+    assert page.locator('.ddw-ai-answer.wrong-answer-inner p').count() == 1
+    page.get_by_label('绘图指导要求（可选）').fill('换一种画法')
+    assert page.locator('.ddw-ai-answer').text_content() == ''

@@ -92,14 +92,14 @@ def test_overlay_makes_named_and_anonymous_nodes_and_edges_editable(canvas_page)
     assert page.locator(".dge-overlay-tools .dge-overlay-status").count() == 1
     assert page.locator(".dge-overlay-node").count() == 2
     state = page.evaluate("instance.getDocument()")
-    assert state["graphs"][0]["vertices"][1]["display_label"] == "①"
-    assert page.get_by_text("点：A、①").count() >= 1
+    assert state["graphs"][0]["vertices"][1]["display_label"] == "1"
+    assert page.get_by_text("点：A、1").count() >= 1
     tool(page,'添加顶点')
     bounds = page.locator(".dge-overlay-svg").bounding_box()
     page.mouse.click(bounds["x"] + .45*bounds["width"], bounds["y"] + .18*bounds["height"])
     graph = page.evaluate("instance.getDocument().graphs[0]")
     assert len(graph["vertices"]) == 3
-    assert graph["vertices"][2]["display_label"] == "②"
+    assert graph["vertices"][2]["display_label"] == "2"
     new_id = graph["vertices"][2]["id"]
     tool(page,'添加边')
     ax, ay = center(page.locator('[data-vertex-id="a"] .dge-overlay-dot'))
@@ -110,7 +110,7 @@ def test_overlay_makes_named_and_anonymous_nodes_and_edges_editable(canvas_page)
     assert len(graph["edges"]) == 2
     assert graph["edges"][-1]["from"] == "a"
     assert graph["edges"][-1]["to"] == new_id
-    assert "A—②" in page.evaluate("DMateGraphFormat.toPlain(instance.getDocument().graphs)")
+    assert "A—2" in page.evaluate("DMateGraphFormat.toPlain(instance.getDocument().graphs)")
 
 
 def test_drag_geometry_and_bounds_can_be_saved_and_restored(canvas_page):
@@ -184,9 +184,9 @@ def test_overlay_keeps_image_and_zoom_when_selecting_or_renaming(canvas_page):
     page.get_by_label("当前顶点名称").fill("Z")
     assert page.evaluate("window.imageBefore===document.querySelector('.dge-overlay-image')")
     page.locator(".dge-float-results").evaluate("e=>e.open=true")
-    assert page.get_by_text("点：Z、①", exact=True).is_visible()
+    assert page.get_by_text("点：Z、1", exact=True).is_visible()
     assert page.locator(".dge-overlay-zoom").text_content() == zoom_before
-    assert "Z—①" in page.evaluate("DMateGraphFormat.toPlain(instance.getDocument().graphs)")
+    assert "Z—1" in page.evaluate("DMateGraphFormat.toPlain(instance.getDocument().graphs)")
 
 
 def test_coarse_pointer_has_real_touch_targets_on_phone(canvas_page):
@@ -439,7 +439,8 @@ def test_points_and_edges_choose_high_contrast_ink_from_local_pixels(canvas_page
     # the white-to-dark boundary; arrowheads use the same contrast family.
     pairs = cores.evaluate_all("""nodes => nodes.map(node => ({
         ink: node.dataset.ink,
-        halo: node.previousElementSibling?.dataset.ink,
+            halo: [...node.parentNode.querySelectorAll('.dge-overlay-contrast-halo')]
+                .find(halo => halo.getAttribute('d') === node.getAttribute('d'))?.dataset.ink,
         marker: node.getAttribute('marker-end') || ''
     }))""")
     assert all((row["halo"] == "#ffffff" if row["ink"] == "#111827"

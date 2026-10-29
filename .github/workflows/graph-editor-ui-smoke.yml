@@ -26,6 +26,11 @@ on:
       - 'tests/test_scan_information_sources.py'
       - 'static/chat-composer.js'
       - 'static/chat-composer.css'
+      - 'static/ai-answer-renderer.js'
+      - 'static/ai-answer-renderer.css'
+      - 'tests/test_ai_answer_rendering.py'
+      - 'tests/test_interaction_surfaces.py'
+      - 'tests/test_graph_outline_smoothness.py'
       - 'static/drawing-workspace.js'
       - 'static/drawing-workspace.css'
       - 'static/drawing-export.js'
@@ -77,6 +82,9 @@ jobs:
           )"
           test -x "$DMATE_BROWSER_EXECUTABLE"
           python -m pytest -q \
+            tests/test_ai_answer_rendering.py \
+            tests/test_interaction_surfaces.py \
+            tests/test_graph_outline_smoothness.py \
             tests/test_drawing_workspace.py \
             tests/test_drawing_editor_controls.py \
             tests/test_drawing_app_integration.py \

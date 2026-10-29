@@ -8757,14 +8757,30 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/concept-notebook.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/chat-composer.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/ai-answer-renderer.css?v={{ dmate_web_revision }}">
 <style>
-/* Pointer activation has no focus halo; keyboard navigation keeps its outline. */
-button, [role="button"], .image-picker-wrap, label {
+/* Keep focus feedback inside the control, without a blue or red outer ring.
+   Important layer declarations also override the older themed focus rules. */
+button, input, textarea, select, summary, [role="button"], .image-picker-wrap, label {
     -webkit-tap-highlight-color:transparent;
 }
-button:focus:not(:focus-visible), [role="button"]:focus:not(:focus-visible) {
-    outline:none !important;
+@layer dmate-control-focus {
+    :is(button, input, textarea, select, summary, a, [role="button"], [role="tab"]):is(:focus, :focus-visible) {
+        outline:none !important;
+        outline-offset:0 !important;
+        box-shadow:none !important;
+    }
+    input:not([type="checkbox"]):not([type="radio"]):is(:focus, :focus-visible),
+    textarea:is(:focus, :focus-visible), select:is(:focus, :focus-visible) {
+        border-color:var(--border-strong,#cbd5e1) !important;
+    }
+    .image-picker-wrap:focus-within > #imageBtn,
+    .image-picker-wrap:has(> #imageInput:focus-visible) > #imageBtn {
+        outline:none !important;
+        box-shadow:none !important;
+    }
 }
+button:focus-visible, summary:focus-visible, [role="button"]:focus-visible { filter:brightness(.9); }
 </style>
 </head>
 
@@ -9536,6 +9552,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/graph-editor-format.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor-overlay.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/ai-answer-renderer.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/drawing-export.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/drawing-workspace.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-scan-workspace.js?v={{ dmate_web_revision }}"></script>

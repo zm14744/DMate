@@ -269,7 +269,7 @@ def test_image_positions_paths_and_anonymous_ids_survive_confirm_and_reuse():
     assert "region_polygon" not in saved["semantic_context"]["document"]["graphs"][0]
     assert final["anon_next"] == 4
     assert final["vertices"][-1]["label"] is None
-    assert final["vertices"][-1]["display_label"] == "③"
+    assert final["vertices"][-1]["display_label"] == "3"
     assert final["edges"][0]["path"] == [[.2, .3], [.5, .4], [.8, .7]]
     assert resolve_confirmed_context("owner", saved["semantic_context"]) == saved["semantic_context"]
 

@@ -171,7 +171,7 @@ def test_single_line_capsule_is_short_wide_spaced_from_bottom_and_blue_send(comp
     assert send.evaluate('e=>getComputedStyle(e,"::before").backgroundColor')=='rgb(255, 255, 255)'
 
 
-def test_pointer_click_has_no_ring_and_keyboard_focus_remains_visible(composer_page):
+def test_pointer_and_keyboard_have_no_outer_ring(composer_page):
     page=composer_page
     for selector in ['#voiceInputBtn','#sendBtn']:
         page.locator(selector).click()
@@ -182,4 +182,5 @@ def test_pointer_click_has_no_ring_and_keyboard_focus_remains_visible(composer_p
     page.keyboard.press('Tab')
     assert page.evaluate('document.activeElement.id')=='voiceInputBtn'
     assert page.locator('#voiceInputBtn').evaluate('e=>e.matches(":focus-visible")')
-    assert page.locator('#voiceInputBtn').evaluate('e=>getComputedStyle(e).outlineStyle')=='solid'
+    assert page.locator('#voiceInputBtn').evaluate('e=>getComputedStyle(e).outlineStyle')=='none'
+    assert page.locator('#voiceInputBtn').evaluate('e=>getComputedStyle(e).boxShadow')=='none'

@@ -3,7 +3,7 @@
 .dmate-graph-editor h3 { font-size:1rem; margin:0 0 12px; }
 .dmate-graph-editor button,.dmate-graph-editor input,.dmate-graph-editor select,.dmate-graph-editor textarea { font:inherit; color:inherit; border:1px solid var(--dge-border); border-radius:8px; background:var(--surface-0,#fff); }
 .dmate-graph-editor button { padding:8px 12px; cursor:pointer; min-height:38px; }
-.dmate-graph-editor button:hover { border-color:var(--accent,#2563eb); }
+.dmate-graph-editor button:hover { border-color:var(--dge-border); }
 .dmate-graph-editor button:disabled { opacity:.55; cursor:default; }
 .dmate-graph-editor input:not([type=checkbox]):not([type=radio]),.dmate-graph-editor select,.dmate-graph-editor textarea { padding:8px 10px; width:100%; min-width:0; }
 .dmate-graph-editor textarea { resize:vertical; line-height:1.65; }
@@ -278,9 +278,10 @@
 .dge-scan-only .dge-overlay-viewport{flex:1;height:auto;min-height:0;max-height:none}
 .dge-scan-only .dge-overlay-bbox,.dge-scan-only .dge-overlay-polygon,.dge-scan-only .dge-overlay-text-region,.dge-scan-only .dge-overlay-selection,.dge-scan-only .dge-freehand-draft{stroke-width:1px;fill:none;opacity:.9;stroke-dasharray:5 4}
 .dge-scan-only .dge-overlay-text-region{stroke:#d97706}
-.dgs-information{min-width:0;max-height:clamp(320px,58dvh,620px);overflow:auto;border:1px solid var(--dge-border);border-radius:12px;padding:14px}
+.dgs-information{display:flex;flex-direction:column;gap:16px;min-width:0;max-height:clamp(320px,58dvh,620px);overflow:auto;padding:0;border:0}
 .dgs-information h3{margin:0 0 10px}.dgs-information h4{margin:12px 0 6px}
-.dgs-text{border-bottom:1px solid var(--dge-border);padding-bottom:16px;margin-bottom:16px}
+.dgs-information-card{border:1px solid var(--dge-border);border-radius:12px;padding:14px;min-width:0;background:var(--dge-surface,#fff)}
+.dgs-text{margin:0}
 .dgs-body,.dgs-graph{line-height:1.65;overflow-wrap:anywhere;user-select:text}
 .dgs-graph p{margin:5px 0}.dgs-relation{padding-left:8px}
 .dgs-region-state{margin-top:10px;padding:7px 0;border-top:1px solid var(--dge-border);font-size:13px}
@@ -306,8 +307,12 @@
 .dgs-section-head h3{margin:0}
 .dgs-section-head>button{flex:0 0 auto;min-height:30px;padding:4px 8px;font-size:12px}
 .dgs-source-picker{display:flex;flex-direction:column;gap:8px;padding:10px;margin:0 0 12px;border:1px solid var(--dge-border);border-radius:9px;background:var(--surface-2,transparent)}
-.dgs-source-choice{display:flex;align-items:center;gap:7px;font-size:13px;line-height:1.4;cursor:pointer}
-.dgs-source-choice input{flex:0 0 auto;width:16px;height:16px;min-width:0;margin:0;accent-color:var(--accent,#2563eb)}
+.dgs-source-choice{display:flex;align-items:center;gap:9px;min-height:44px;font-size:13px;line-height:1.4;cursor:pointer}
+.dmate-graph-scan .dgs-source-choice input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:0 0 25px;width:25px;height:25px;min-width:25px;margin:0;border:2px solid var(--text-subtle,#64748b);border-radius:50%;background:transparent;cursor:pointer}
+.dmate-graph-scan .dgs-source-choice input[type=checkbox]:checked{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6)}
+.dgs-source-picker-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.dmate-graph-editor :is(.dge-panel-close,.dgs-source-picker-close){appearance:none;-webkit-appearance:none;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0!important;border:0!important;border-radius:50%;background:#ef4444!important;box-shadow:none!important;font-size:0}
+.dmate-graph-editor :is(.dge-panel-close,.dgs-source-picker-close):hover{background:#dc2626!important}
 .dgs-source-card{min-width:0;padding:8px;border:1px solid var(--dge-border);border-radius:7px}
 .dgs-source-card .dgs-region-state{margin:5px 0 0;padding:0;border:0}
 .dgs-source-order{display:flex;gap:6px;margin-top:5px}
@@ -322,6 +327,6 @@
 .dge-tool-palette:not([open])>summary{padding:9px 10px}
 .dge-tool-palette[open]>summary{padding:9px 10px;border-bottom:1px solid var(--dge-border);margin-bottom:6px}
 .dmate-graph-editor .dge-overlay-tools button:not(.is-active){background:var(--surface-0,#fff);border-color:var(--dge-border)}
-.dmate-graph-editor .dge-overlay-tools button.is-active{background:var(--accent-bg,#eaf2ff);border-color:var(--accent,#2563eb)}
+.dmate-graph-editor .dge-overlay-tools button.is-active{background:var(--surface-3,#e2e8f0);border-color:var(--dge-border);font-weight:600}
 .dge-review-summary>h3{padding:11px 14px;margin:0;font-weight:600;font-size:14px}
 .dge-float-panel .dge-toolbar>.dge-field{flex:0 0 auto;width:100%}

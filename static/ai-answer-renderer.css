@@ -1,0 +1,10 @@
+/* Same answer body used by the wrong-question book, including its typography. */
+.dmate-ai-answer.wrong-answer-inner{box-sizing:border-box;min-width:0;padding:12px;color:var(--text-secondary,#475569);font-size:var(--font-small,14px);line-height:1.68;white-space:normal;word-break:break-word;overflow-wrap:anywhere}
+.wrong-answer-inner p{margin:1em 0}
+.wrong-answer-inner mjx-container{max-width:100%}
+.wrong-answer-inner mjx-container[display="true"]{display:block!important;width:100%;max-width:100%;overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch;padding-bottom:3px}
+.wrong-answer-inner table{display:block;max-width:100%;overflow-x:auto}
+.wrong-answer-inner pre{max-width:100%;overflow-x:auto;white-space:pre}
+.wrong-answer-inner code{white-space:pre-wrap}
+.dmate-ai-answer.wrong-answer-inner.dmate-ai-answer-plain{white-space:pre-wrap}
+@media(max-width:760px){.wrong-answer-inner mjx-container:not([display="true"]){display:inline-block;max-width:100%;overflow-x:auto;overflow-y:hidden;vertical-align:middle;-webkit-overflow-scrolling:touch}}

@@ -14,6 +14,17 @@ function regionIsSimple(points){
  }
  return true;
 }
+function nearestRegionBoundary(points,anchor,metric){
+ let nearest=null;
+ const [sx,sy]=metric,x=anchor[0]*sx,y=anchor[1]*sy;
+ for(let i=0;i<points.length;i++){
+  const a=points[i],b=points[(i+1)%points.length],dx=(b[0]-a[0])*sx,dy=(b[1]-a[1])*sy,length=dx*dx+dy*dy;
+  const t=length?Math.max(0,Math.min(1,((x-a[0]*sx)*dx+(y-a[1]*sy)*dy)/length)):0;
+  const point=[a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])],distance=Math.hypot(x-point[0]*sx,y-point[1]*sy);
+  if(!nearest||distance<nearest.distance)nearest={point,distance,index:i,t};
+ }
+ return nearest;
+}
 function elasticRegionStart(points,anchor,metric){
  // Parameterise the actual closed outline in screen pixels. A whole band
  // follows the finger; arbitrary source vertices do not become edit handles.
@@ -75,7 +86,7 @@ function mount(host,o){
  s.originalVisible = s.originalVisible !== false;
  s.originalOpacity = Number.isFinite(s.originalOpacity)
    ? Math.max(0,Math.min(1,s.originalOpacity)) : 1;
- let w=1000,h=1000,active=null,ghost=null,base=null,scanSequence=0;
+ let w=1000,h=1000,active=null,ghost=null,base=null,scanSequence=0,resizeFrame=null;
  let sampleCanvas=d.createElement('canvas'),sampleCtx=null,loaded=false,autoFitted=false;
  const pointers=new Map();
  const world={left:0,top:0,right:1,bottom:1};
@@ -324,14 +335,33 @@ function mount(host,o){
   return chosen;
  }
  function resizedPoints(op){
-  if(op.polygon)return elasticRegionPoints(op.elastic,op.end)||op.points;
+  if(op.previewPoints&&op.previewEnd?.every((value,i)=>value===op.end[i]))return op.previewPoints;
+  if(op.polygon){op.previewEnd=[...op.end];return op.previewPoints=elasticRegionPoints(op.elastic,op.end)||op.points;}
   const b=boxOf(op.points),next=[...b],dx=op.end[0]-op.start[0],dy=op.end[1]-op.start[1],min=.012;
   if(op.sides.includes('left'))next[0]=Math.max(0,Math.min(b[2]-min,b[0]+dx));
   if(op.sides.includes('right'))next[2]=Math.min(1,Math.max(b[0]+min,b[2]+dx));
   if(op.sides.includes('top'))next[1]=Math.max(0,Math.min(b[3]-min,b[1]+dy));
   if(op.sides.includes('bottom'))next[3]=Math.min(1,Math.max(b[1]+min,b[3]+dy));
-  return op.points.map(p=>[clamp(next[0]+(p[0]-b[0])/(b[2]-b[0])*(next[2]-next[0])),clamp(next[1]+(p[1]-b[1])/(b[3]-b[1])*(next[3]-next[1]))]);
+  op.previewEnd=[...op.end];
+  return op.previewPoints=op.points.map(p=>[clamp(next[0]+(p[0]-b[0])/(b[2]-b[0])*(next[2]-next[0])),clamp(next[1]+(p[1]-b[1])/(b[3]-b[1])*(next[3]-next[1]))]);
  }
+ const cancelResizePreview=()=>{if(resizeFrame!==null){d.defaultView.cancelAnimationFrame(resizeFrame);resizeFrame=null;}};
+ function paintResizePreview(){
+  resizeFrame=null;const op=active;if(op?.kind!=='resize')return;
+  const points=resizedPoints(op),attribute=points.map(p=>px(p).join(',')).join(' '),id=String(op.id);
+  // Keep the captured SVG and the other ranges in place while the pointer
+  // moves. Replacing the entire drawing tree at input-event frequency causes
+  // visible stutter and makes a grabbed edge disappear under the finger.
+  for(const shape of svg.querySelectorAll('.dge-frame-hit,.dge-frame-edge-hit')){
+   if((op.isText?shape.dataset.textRegionId:shape.dataset.graphId)===id)shape.setAttribute('points',attribute);
+  }
+  const b=boxOf(points),scale=Math.max(.0001,svg.getBoundingClientRect().width/((world.right-world.left)*w));
+  for(const label of svg.querySelectorAll('[data-frame-label-id]'))if(label.dataset.frameLabelId===id&&label.dataset.frameLabelKind===(op.isText?'text':'graph')){
+   label.setAttribute('x',String(b[0]*w+6/scale));label.setAttribute('y',String(b[1]*h+17/scale));
+  }
+  svg.classList.toggle('is-deforming',op.polygon);
+ }
+ const queueResizePreview=()=>{if(resizeFrame===null)resizeFrame=d.defaultView.requestAnimationFrame(paintResizePreview);};
  function draw(){
   // A modal is mounted while hidden. Tool state must already be correct
   // before its first layout/image event, including on a cached-image reopen.
@@ -377,12 +407,12 @@ function mount(host,o){
     const points=graphPoints(region);if(!points)continue;
     const preview=frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id,region.region_polygon?.length>=3);
     if(o.scanOnly){const b=boxOf(preview),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number dge-graph-frame-number','data-frame-label-id':region.id});
-      label.textContent='图形 '+String(region.id).replace(/^g/,'');label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);}
+      label.dataset.frameLabelKind='graph';label.textContent='图形 '+String(region.id).replace(/^g/,'');label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);}
   }
   if(o.textOnly||o.scanOnly)for(const region of s.regions||[]){
     const points=frame(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''),String(region.id),true,s.selectedId===region.id,region.irregular);
     const b=boxOf(points),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number'});
-    label.textContent=String(region.id);label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);
+    label.dataset.frameLabelId=String(region.id);label.dataset.frameLabelKind='text';label.textContent=String(region.id);label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);
   }
   const pairs=new Map();for(const e of g.edges){const key=[e.from,e.to].sort().join('/');if(!pairs.has(key))pairs.set(key,[]);pairs.get(key).push(e);}
   for(const edges of pairs.values())for(const [i,e] of edges.entries()){
@@ -413,6 +443,7 @@ function mount(host,o){
          group=E(d,'g',{'data-edge-id':e.id,class:'dge-overlay-edge'+(chosen?' is-selected':'')+(e.direction==='unknown'?' is-uncertain':'')});
    const hit=E(d,'path',{d:line,class:'dge-overlay-hit'});
    hit.style.strokeWidth=(touch?44:18)/scale+'px';group.append(hit);
+   const halos=[],strokes=[];let traversed=0;
    for(let j=0;j<drawPoints.length-1;j++){
     const from=drawPoints[j],to=drawPoints[j+1],
           segment='M '+from.join(' ')+' L '+to.join(' '),
@@ -422,7 +453,7 @@ function mount(host,o){
     halo.style.strokeWidth=(chosen?6.2:4.8)/scale+'px';
     if(e.style==='dashed')halo.setAttribute('stroke-dasharray','9 6');
     if(e.style==='dotted')halo.setAttribute('stroke-dasharray','2 5');
-    group.append(halo);
+    halos.push(halo);
     const att={d:segment,class:'dge-overlay-stroke'};
     if(e.direction==='forward'&&j===drawPoints.length-2)
       att['marker-end']='url(#'+o.instance+'-arrow-'+(ink==='#ffffff'?'light':'dark')+')';
@@ -431,8 +462,13 @@ function mount(host,o){
     const stroke=E(d,'path',att);
     stroke.dataset.ink=ink;stroke.style.stroke=ink;
     stroke.style.strokeWidth=(chosen?3.6:2.1)/scale+'px';
-    group.append(stroke);
+    // Every halo must be behind every ink segment. Interleaving a later
+    // white halo with earlier ink cuts a visible notch at each control point.
+    // Maintain one dash phase across sampled curve segments as well.
+    halo.setAttribute('stroke-dashoffset',String(-traversed));stroke.setAttribute('stroke-dashoffset',String(-traversed));
+    traversed+=Math.hypot(to[0]-from[0],to[1]-from[1]);strokes.push(stroke);
    }
+   group.append(...halos,...strokes);
    const label=[e.edge_label,e.weight==null?'':String(e.weight)].filter(Boolean).join(' · ');if(label){
      const t=E(d,'text',{x:center[0],y:center[1]-labelOffset,class:'dge-overlay-label','text-anchor':'middle'});
      t.textContent=label;t.style.fontSize=labelSize+'px';
@@ -440,7 +476,7 @@ function mount(host,o){
      t.style.fill=labelInk;t.style.stroke=oppositeInk(labelInk);t.style.strokeWidth=(4/scale)+'px';
      group.append(t);
    }
-   if(chosen&&e.from!==e.to&&s.mode==='select')group.append(E(d,'circle',{cx:center[0],cy:center[1],r:handleRadius,class:'dge-overlay-handle','data-handle-id':e.id}));svg.append(group);
+   if(chosen&&e.from!==e.to&&s.mode==='select'){const handle=E(d,'circle',{cx:center[0],cy:center[1],r:handleRadius,class:'dge-overlay-handle','data-handle-id':e.id});handle.style.fill='transparent';group.append(handle);}svg.append(group);
   }
   for(const [i,v] of g.vertices.entries()){
    const p=px(coords.get(v.id)),normalized=[p[0]/w,p[1]/h],ink=inkAt(normalized),
@@ -471,18 +507,27 @@ function mount(host,o){
   if(o.disabled?.()||!s.visible)return;
   if(s.mode==='vertex'&&!o.graph())o.ensureGraph?.();
   pointers.set(e.pointerId,[e.clientX,e.clientY]);
-  if(pointers.size===2){const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;return;}if(pointers.size>2)return;
+  if(pointers.size===2){cancelResizePreview();const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;return;}if(pointers.size>2)return;
   const node=e.target.closest('[data-vertex-id]')?.dataset.vertexId,edge=e.target.closest('[data-edge-id]')?.dataset.edgeId,handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
-  const hit=e.target.closest('[data-frame-resize]'),graphId=e.target.closest('[data-graph-id]')?.dataset.graphId,
-        textId=e.target.closest('[data-text-region-id]')?.dataset.textRegionId;
-  if(hit && (o.scanOnly?s.mode==='select':['select','bounds','graph_poly','text_rect','text_poly'].includes(s.mode)) && !e.shiftKey){
+  let hit=e.target.closest('[data-frame-resize]'),graphId=e.target.closest('[data-graph-id]')?.dataset.graphId,
+      textId=e.target.closest('[data-text-region-id]')?.dataset.textRegionId;
+  const canResize=(o.scanOnly?s.mode==='select':['select','bounds','graph_poly','text_rect','text_poly'].includes(s.mode))&&!e.shiftKey;
+  if(!hit&&canResize&&!node&&!edge&&!handle){
+    const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100,metric=[scale,scale*h/w],touch=Boolean(d.defaultView.navigator.maxTouchPoints||d.defaultView.matchMedia?.('(pointer: coarse)').matches);
+    let nearest=null;
+    const consider=(points,id,isText)=>{if(!points)return;const candidate=nearestRegionBoundary(points,p,metric);if(candidate&&(!nearest||candidate.distance<nearest.distance))nearest={...candidate,id,isText};};
+    if(!o.textOnly&&!o.drawingOnly)for(const region of o.model.getDocument().graphs)consider(graphPoints(region),region.id,false);
+    if(o.textOnly||o.scanOnly)for(const region of s.regions||[])consider(region.polygon,region.id,true);
+    if(nearest&&nearest.distance<=(touch?24:12)){hit=true;graphId=nearest.isText?null:String(nearest.id);textId=nearest.isText?String(nearest.id):null;}
+  }
+  if(hit&&canResize){
     const isText=o.textOnly||o.scanOnly&&!!textId;
     const region=isText?s.regions?.find(r=>r.id===Number(textId)):o.model.getDocument().graphs.find(r=>r.id===graphId);
     const points=isText?region?.polygon:region&&graphPoints(region);
     if(points){active={kind:'resize',pointer:e.pointerId,id:isText?textId:graphId,isText:!!isText,
       polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(p=>[...p]),sides:resizeSides(points,p)};
       if(active.polygon){const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;active.elastic=elasticRegionStart(points,p,[scale,scale*h/w]);}
-      e.preventDefault();svg.setPointerCapture?.(e.pointerId);return;}
+      e.preventDefault();svg.setPointerCapture?.(e.pointerId);svg.classList.toggle('is-deforming',active.polygon);return;}
   }
   if(s.mode==='graph_poly'||s.mode==='text_poly'){
     active={kind:'freehand',pointer:e.pointerId,start:p,end:p,points:[regionPoint(p)],graphId,textId};
@@ -517,6 +562,7 @@ function mount(host,o){
     return;
   }
   active.end=mouse(e);
+  if(active.kind==='resize'){queueResizePreview();return;}
   if(active.kind==='freehand'){
     const events=e.getCoalescedEvents?.();
     for(const event of events?.length?events:[e]){
@@ -530,6 +576,7 @@ function mount(host,o){
   ghost=active.kind==='node'?{vertex:active.id,pos:active.end}:active.kind==='handle'?{edge:active.id,pos:active.end}:null;draw();
  });
  function release(e,cancel=false){
+  cancelResizePreview();
   pointers.delete(e.pointerId);if(pointers.size<2)base=null;
   if(!active||active.pointer!==e.pointerId)return;const op=active;active=null;ghost=null;const g=o.graph();
   if(!cancel){
@@ -576,7 +623,7 @@ function mount(host,o){
  image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage();syncOriginal();buildSampler();draw();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();}):null;observer?.observe(scroll);observer?.observe(viewControls);
- const resetInteraction=()=>{active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
+ const resetInteraction=()=>{cancelResizePreview();active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
  function getDrawingSvg(){
   // Serialize only the drawing, independently from the source photo, camera,
@@ -603,7 +650,7 @@ function mount(host,o){
   const background=E(d,'rect',{x,y,width,height,fill:'#ffffff'});output.insertBefore(background,output.firstChild);
   return output;
  }
- return {refresh:draw,resetInteraction,state:s,getDrawingSvg,destroy(){observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
+ return {refresh:draw,resetInteraction,state:s,getDrawingSvg,destroy(){cancelResizePreview();observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
-root.DMateGraphOverlay={mount,elasticRegionStart,elasticRegionPoints};if(typeof module!=='undefined'&&module.exports)module.exports={mount,elasticRegionStart,elasticRegionPoints};
+root.DMateGraphOverlay={mount,elasticRegionStart,elasticRegionPoints,nearestRegionBoundary};if(typeof module!=='undefined'&&module.exports)module.exports={mount,elasticRegionStart,elasticRegionPoints,nearestRegionBoundary};
 })(typeof window!=='undefined'?window:globalThis);

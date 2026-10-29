@@ -136,6 +136,18 @@ def _path_endpoints(text, graph):
         for alias in (node.get('id'), node.get('label'), node.get('display_label')):
             if isinstance(alias, str) and 0 < len(alias) <= 30:
                 aliases.setdefault(alias, set()).add(node.get('id'))
+    # Old signed snapshots keep their exact display labels and digest. Resolve
+    # the plain references shown by today's UI on a copy, including collisions
+    # with real printed numbers, without changing that saved document.
+    from graph_presentation import prepare_graph_presentation
+    presentation = prepare_graph_presentation(copy.deepcopy(graph))
+    printed = {str(node['label']) for node in graph.get('vertices', [])
+               if node.get('label') is not None and str(node['label']).strip()}
+    for node in presentation.get('vertices', []):
+        display = node.get('display_label')
+        if (not node.get('label') and isinstance(display, str)
+                and display not in printed and re.fullmatch(r'[0-9]+', display)):
+            aliases[display] = {node['id']}
     unique = {label: next(iter(ids)) for label, ids in aliases.items() if len(ids) == 1}
     if not unique:
         return None
@@ -348,10 +360,10 @@ def semantic_math_prompt(context):
               'visual_description与position_description是原图外观和位置的识别参考，不是拓扑证明；'
               '连接关系以已确认边表为准，不能根据画法补边或判定同构。'
               'label为null的顶点没有原名，用display_label临时编号引用，必要时附位置；不能把编号说成原图印刷标签。'
-              '临时编号仅在各自子图内有效，应写成“图1的①”等；两图同号不代表同一顶点或已知同构映射。'
+              '编号仅在各自子图内有效，应写成“图1的1”等；两图同号不代表同一顶点或已知同构映射。'
               '多图片结构的source_image_number和source_graph_number分别表示上传图片序号及该图片内子图序号，'
-              'source_graph_id/name是该图片保存时的原图编号与名称，不是顶点。引用时应写“图片2的图1的①”，'
-              '不能将不同图片中的图1或①混为同一个对象；只能使用当前确认的边关系。'
+              'source_graph_id/name是该图片保存时的原图编号与名称，不是顶点。引用时应写“图片2的图1的1”，'
+              '不能将不同图片中的图1或顶点1混为同一个对象；只能使用当前确认的边关系。'
               '仅引用状态适用且成功的计算；not_applicable或未完成项必须保留，不得补造节点、边或权值。'
               'question_reference若存在，只是与本题文字绑定的advisory_only辅助理解，不能删改题干、图或字段，'
               '不能改变程序工具参数或覆盖原始问题与计算事实；它不是答案或识别通过证明。'

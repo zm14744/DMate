@@ -119,13 +119,18 @@ def test_rectangles_and_freehand_of_both_types_recognize_without_moving_view(sca
     p.get_by_label('选区方式').select_option('')
     drag(p,[(.58,.5),(.9,.8)])
     p.wait_for_function('textCalls.length===2')
-    p.wait_for_function('document.querySelector(".dgs-body").textContent.includes("文字区域 2")')
+    p.wait_for_function('ocrTasks.get("scan").scanState.textRegions.every(r=>r.status==="complete")')
+    after=p.locator('.dge-overlay-image').bounding_box()
+    assert all(abs(before[k]-after[k])<2 for k in ['x','y','width','height'])
+    # Explicit source selection below the mobile canvas scrolls to those
+    # controls normally; measure framing stability before that user action.
+    p.get_by_role('checkbox',name='放入文字框 1',exact=True).check()
+    p.get_by_role('checkbox',name='放入文字框 2',exact=True).check()
+    p.get_by_role('button',name='放入所选文字信息',exact=True).click()
     assert p.locator('.dge-overlay-text-region').count()==2
     assert p.locator('.dgs-body').inner_text()=='文字区域 1\n\n文字区域 2'
     assert p.locator('.dge-overlay-node,.dge-overlay-edge').count()==0
     assert p.locator('.dge-overlay-bbox').first.evaluate('e=>getComputedStyle(e).strokeWidth')=='1px'
-    after=p.locator('.dge-overlay-image').bounding_box()
-    assert all(abs(before[k]-after[k])<2 for k in ['x','y','width','height'])
 
 
 def test_pending_scans_block_confirmation_and_deleted_frames_ignore_late_results(scan_page):

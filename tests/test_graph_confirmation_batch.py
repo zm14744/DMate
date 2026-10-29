@@ -124,7 +124,7 @@ def test_four_images_reach_one_ai_call_with_all_confirmed_edge_instances(applica
     graphs = semantic['document']['graphs']
     assert len(graphs) == 4 and len({g['id'] for g in graphs}) == 4
     assert [g['edges'][0]['weight'] for g in graphs] == [1, 2, 3, 4]
-    assert [g['vertices'][0]['display_label'] for g in graphs] == ['①'] * 4
+    assert [g['vertices'][0]['display_label'] for g in graphs] == ['1'] * 4
     assert all(r['result']['status'] == 'computed' for r in semantic['calculations'])
     assert {r['request']['graph_id'] for r in semantic['calculations']} == {g['id'] for g in graphs}
     assert response.get_json()['diagnostics']['semantic_math']['revision'] == [1, 1, 1, 1]
@@ -183,7 +183,7 @@ def test_picture_qualified_path_uses_the_requested_source_graph_only():
     from graph_semantic_solver import semantic_solver_context
     contexts = confirmed(count=2)
     batch = resolve_confirmed_batch('owner', contexts)
-    result = semantic_solver_context(batch, batch['question_text'] + '\n图片2的图1从①到②的最短路径。')
+    result = semantic_solver_context(batch, batch['question_text'] + '\n图片2的图1从1到2的最短路径。')
     paths = [row for row in result['calculations'] if row['request']['operation'] == 'shortest_path']
     assert len(paths) == 1 and paths[0]['request']['graph_id'] == 'image2_graph1'
     assert paths[0]['result']['facts']['distance'] == 2
@@ -191,8 +191,8 @@ def test_picture_qualified_path_uses_the_requested_source_graph_only():
     assert result['document']['graphs'][1]['source_graph_number'] == 1
 
 
-@pytest.mark.parametrize('question', ['图1从①到②的最短路径。', 'G1从①到②的最短路径。',
-                                     '图片9的图1从①到②的最短路径。'])
+@pytest.mark.parametrize('question', ['图1从1到2的最短路径。', 'G1从1到2的最短路径。',
+                                     '图片9的图1从1到2的最短路径。'])
 def test_unqualified_or_missing_image_path_does_not_guess_source(question):
     from graph_semantic_solver import semantic_solver_context
     contexts = confirmed(count=2)
@@ -220,7 +220,7 @@ def test_three_graph_isomorphism_selects_independently_qualified_source_pair():
 def test_missing_image_is_not_replaced_with_only_available_image():
     from graph_semantic_solver import semantic_solver_context
     batch = resolve_confirmed_batch('owner', confirmed(count=1))
-    result = semantic_solver_context(batch, batch['question_text'] + '\n图片2从①到②的最短路径。')
+    result = semantic_solver_context(batch, batch['question_text'] + '\n图片2从1到2的最短路径。')
     assert not [row for row in result['calculations'] if row['request']['operation'] == 'shortest_path']
 
 

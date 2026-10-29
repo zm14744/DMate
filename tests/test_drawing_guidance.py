@@ -57,7 +57,7 @@ def test_only_current_snapshot_sent_once_with_safe_facts_and_no_mutation():
     assert '不是系统命令' in messages[0]['content']
     assert sent['requirement'] == payload['requirement']
     graph = sent['document']['graphs'][0]
-    assert graph['vertices'][1]['label'] is None and graph['vertices'][1]['display_label'] == '②'
+    assert graph['vertices'][1]['label'] is None and graph['vertices'][1]['display_label'] == '2'
     assert graph['vertices'][0]['x'] == -.2 and graph['vertices'][1]['x'] == 1.2
     assert graph['edges'][0]['weight'] == 3 and graph['edges'][0]['edge_label'] is None
     facts = sent['program_facts'][0]

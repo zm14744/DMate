@@ -7,6 +7,11 @@ const subs='₀₁₂₃₄₅₆₇₈₉';
 const markName=v=>literal(v).replace(/\d/g,n=>subs[Number(n)]);
 const circles='①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
 const hasLabel=v=>v?.label!=null&&String(v.label).trim()!=='';
+const displayNumber=value=>{
+ const text=typeof value==='string'?value.trim():'';
+ if(text.length===1&&circles.includes(text))return String(circles.indexOf(text)+1);
+ const legacy=/^未命名([0-9]+)$/.exec(text);return legacy?String(Number(legacy[1])):text;
+};
 function numericAnnotation(value){
  if(value==null||typeof value==='boolean'||!['string','number'].includes(typeof value)||typeof value==='number'&&!Number.isFinite(value))return null;
  const raw=String(value);if(/[①-⑳]/.test(raw))return null;
@@ -42,7 +47,7 @@ function graphLabels(graph){
  const used=new Set(vertices.filter(hasLabel).map(v=>String(v.label))),existing=new Set();
  for(const v of vertices){
   if(hasLabel(v))continue;
-  const display=typeof v.display_label==='string'?v.display_label.trim():'';
+  const display=displayNumber(v.display_label);
   if(display&&display.length<=16&&!used.has(display)&&!existing.has(display)){
    v.display_label=display;existing.add(display);
   }else delete v.display_label;
@@ -50,10 +55,7 @@ function graphLabels(graph){
  for(const display of existing)used.add(display);
  let next=Number.isInteger(graph?.anon_next)&&graph.anon_next>=1&&graph.anon_next<=10000?graph.anon_next:1;const mapping=new Map();
  for(const name of used){
-  const at=circles.indexOf(String(name));
-  if(at>=0&&String(name).length===1)next=Math.max(next,at+2);
-  const match=/^未命名(\d+)$/.exec(String(name));
-  if(match)next=Math.max(next,Number(match[1])+1);
+  if(/^[0-9]{1,5}$/.test(String(name))&&Number(name)>=1&&Number(name)<=10000)next=Math.max(next,Number(name)+1);
  }
  // Old records without persisted display labels still use identity order,
  // so reordering the vertex table cannot change the name of a point.
@@ -62,7 +64,7 @@ function graphLabels(graph){
   if(hasLabel(v)){mapping.set(String(v.id),literal(v.label));continue;}
   if(v.display_label){mapping.set(String(v.id),literal(v.display_label));continue;}
   let candidate;
-  do {candidate=next<=20?circles[next-1]:'未命名'+next;next++;} while(used.has(candidate));
+  do {candidate=String(next++);} while(used.has(candidate));
   used.add(candidate);mapping.set(String(v.id),candidate);
  }
  return mapping;
@@ -83,12 +85,11 @@ function graphRows(graph,index){
  const weighted=graph.weighted===true?'带权':graph.weighted===false?'无权':'权值待核对';
  const graphName=literal(graph.name||graph.id||'G'+(index+1));
  const title=/^G\d+$/i.test(graphName)?'图 '+markName(graphName):'图 '+(index+1)+'（'+graphName+'）';
- const anonymous=vertices.filter(v=>!hasLabel(v)).map(v=>get(v.id));
  const positions=vertices.filter(v=>!hasLabel(v)||typeof v.position_description==='string'&&v.position_description.trim())
   .map(v=>({id:v.id,label:get(v.id),txt:get(v.id)+'：'+(typeof v.position_description==='string'&&v.position_description.trim()||'位置未记录')}));
  return {title,type:orientation+' · '+weighted,showType:!titleIncludesType(graphName,graph),vertices:vertices.map(v=>get(v.id)),
          named,relations,positions,
-         anonymousNote:anonymous.length?anonymous.join('、')+' 为临时编号，不是原图标签；编号仅在当前子图内使用。':'',
+         anonymousNote:'',
          description:typeof graph.visual_description==='string'?graph.visual_description.trim():''};
 }
 function toPlain(graphs){

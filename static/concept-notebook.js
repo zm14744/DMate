@@ -117,10 +117,12 @@ function mount(options){
    !data.relations.every(row=>row&&ids.has(row.from)&&ids.has(row.to)&&row.from!==row.to&&typeof row.type==='string'&&typeof row.explanation==='string'))throw new Error('AI 返回了未选中概念的关联，请重试。');
  }
  function showResult(data,notes){
-  const names=new Map(notes.map(n=>[n.id,n.title.trim()||'未命名概念']));result.replaceChildren();
-  if(data.summary)result.append(el('p','dcn-summary',data.summary));
-  for(const row of data.explanations){const section=el('section','dcn-explanation');section.append(el('h4','',names.get(row.note_id)),el('div','dcn-ai-text',row.explanation));result.append(section);}
-  if(data.relations.length){result.append(el('h4','','概念之间的关联'));for(const row of data.relations){const section=el('section','dcn-relation');section.append(el('strong','',names.get(row.from)+' → '+names.get(row.to)+' · '+row.type),el('p','dcn-ai-text',row.explanation));result.append(section);}}
+  const names=new Map(notes.map(n=>[n.id,n.title.trim()||'未命名概念'])),version=serial,key=contextKey(),source=fingerprint();result.replaceChildren();
+  const isCurrent=()=>!destroyed&&dialog.open&&serial===version&&contextKey()===key&&fingerprint()===source;
+  const rich=(className,text)=>{const node=el('div',className);if(root.DMateAIAnswer?.render)void root.DMateAIAnswer.render(node,text,{isCurrent});else node.textContent=text;return node;};
+  if(data.summary)result.append(rich('dcn-summary',data.summary));
+  for(const row of data.explanations){const section=el('section','dcn-explanation');section.append(el('h4','',names.get(row.note_id)),rich('dcn-ai-text',row.explanation));result.append(section);}
+  if(data.relations.length){result.append(el('h4','','概念之间的关联'));for(const row of data.relations){const section=el('section','dcn-relation');section.append(el('strong','',names.get(row.from)+' → '+names.get(row.to)+' · '+row.type),rich('dcn-ai-text',row.explanation));result.append(section);}}
   else if(active?.action==='relations')result.append(el('p','','没有得到可确认的直接关联。'));
  }
  async function analyze(kind){

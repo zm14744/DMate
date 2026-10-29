@@ -47,7 +47,7 @@ def test_reference_assignment_avoids_printed_and_existing_number_collisions():
     prepare_graph_presentation(graph)
     names = [v.get('label') or v.get('display_label') for v in graph['vertices']]
     assert len(set(names)) == 4
-    assert graph['vertices'][2]['display_label'] == '⑤'
+    assert graph['vertices'][2]['display_label'] == '5'
     assert graph['vertices'][0]['label'] == '①'
 
 
@@ -120,7 +120,7 @@ def snapshot(graphs, body='求最短路径。'):
 
 def test_explicit_temporary_endpoint_request_only_runs_for_named_graph():
     data = snapshot([unnamed(), unnamed('G2')])
-    result = semantic_solver_context(data, data['question_text'] + '\n图1：从①到②的最短路径。')
+    result = semantic_solver_context(data, data['question_text'] + '\n图1：从1到2的最短路径。')
     paths = [r for r in result['calculations'] if r['request']['operation'] == 'shortest_path']
     assert len(paths) == 1 and paths[0]['request']['graph_id'] == 'G1'
     assert paths[0]['result']['status'] == 'computed'
@@ -128,7 +128,7 @@ def test_explicit_temporary_endpoint_request_only_runs_for_named_graph():
 
 def test_ambiguous_temporary_endpoint_request_does_not_guess_which_graph():
     data = snapshot([unnamed(), unnamed('G2')])
-    result = semantic_solver_context(data, data['question_text'] + '\n从①到②的最短路径。')
+    result = semantic_solver_context(data, data['question_text'] + '\n从1到2的最短路径。')
     assert not result['calculations']
 
 
@@ -142,7 +142,7 @@ def test_isomorphism_request_requires_a_unique_pair_when_more_than_two_figures()
 
 def test_explicitly_missing_graph_is_not_substituted_with_only_available_graph():
     data = snapshot([unnamed()])
-    result = semantic_solver_context(data, data['question_text'] + '\n图2从①到②的最短路径。')
+    result = semantic_solver_context(data, data['question_text'] + '\n图2从1到2的最短路径。')
     assert not result['calculations']
 
 

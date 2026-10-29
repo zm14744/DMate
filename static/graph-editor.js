@@ -264,10 +264,8 @@
                 aside.append(note);
             } else if (selectedNode) {
                 aside.append(element('h3', '', '顶点的属性'));
-                aside.append(field('名称', input(selectedNode.label, '当前顶点名称',
+                aside.append(field('名称', input(selectedNode.label ?? selectedNode.display_label, '当前顶点名称',
                     value => model.renameVertex(graph.id, selectedNode.id, value))));
-                if (!selectedNode.label) aside.append(element('p', 'dge-muted',
-                    '临时编号 ' + (selectedNode.display_label || '') + ' 仅用于核对原图'));
                 aside.append(button('删除这个顶点', () => {
                     model.deleteVertices(graph.id, [selectedNode.id]); selectedNodes.clear();
                 }, 'dge-danger'));
@@ -277,7 +275,7 @@
                 aside.append(element('p','dge-muted',(graph.directed===false?'无向':'有向或待核对')+' · '+(graph.weighted===false?'无权':'带权或待核对')));
                 aside.append(button('删除子图',()=>removeGraph(graph.id),'dge-danger'));
             }
-            if(aside.childElementCount){const close=button('关闭属性',()=>{selectedNodes.clear();selectedEdge=null;selectedGraph=false;});close.classList.add('dge-panel-close');aside.prepend(close);}
+            if(aside.childElementCount){const close=button('',()=>{selectedNodes.clear();selectedEdge=null;selectedGraph=false;});close.classList.add('dge-panel-close');close.setAttribute('aria-label','关闭属性');close.title='关闭属性';aside.prepend(close);}
             return aside;
         }
 

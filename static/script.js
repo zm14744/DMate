@@ -15192,10 +15192,7 @@ function initializeConceptNotebook() {
         onChange: value => setConceptNotebookState(value),
         isPersistent: () => shouldPersistClientState(),
         getContextKey: () => accountState.authenticated ? "account:" + accountState.username : "guest",
-        onOpen: () => closeMobileShellDrawers(),
-        onResults: container => {
-            if (window.MathJax?.typesetPromise) window.MathJax.typesetPromise([container]).catch(() => {});
-        } });
+        onOpen: () => closeMobileShellDrawers() });
 }
 
 function initializeOcrTaskPanel() {

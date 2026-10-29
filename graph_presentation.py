@@ -6,6 +6,7 @@ Display numbers are local to one graph and never become printed labels.
 from __future__ import annotations
 
 import math
+import re
 
 DESCRIPTION_LIMIT = 800
 POSITION_LIMIT = 160
@@ -17,7 +18,18 @@ def _text(value, limit):
 
 
 def _number(index):
-    return _CIRCLES[index - 1] if index <= len(_CIRCLES) else '未命名' + str(index)
+    return str(index)
+
+
+def _display_number(value):
+    """Migrate old automatic references, never the original printed label."""
+    value = _text(value, 16)
+    if len(value) == 1 and value in _CIRCLES:
+        return str(_CIRCLES.index(value) + 1)
+    legacy = re.fullmatch(r'未命名([0-9]+)', value)
+    if legacy:
+        return str(int(legacy.group(1)))
+    return value
 
 
 def prepare_graph_presentation(graph):
@@ -32,7 +44,7 @@ def prepare_graph_presentation(graph):
     for vertex in vertices:
         if vertex.get('label') is not None and str(vertex['label']).strip():
             continue
-        display = _text(vertex.get('display_label'), 16)
+        display = _display_number(vertex.get('display_label'))
         if display and display not in used and display not in existing:
             vertex['display_label'] = display
             existing.add(display)
@@ -43,10 +55,8 @@ def prepare_graph_presentation(graph):
     if type(next_number) is not int or not 1 <= next_number <= 10000:
         next_number = 1
     for name in used:
-        if len(name) == 1 and name in _CIRCLES:
-            next_number = max(next_number, _CIRCLES.index(name) + 2)
-        elif name.startswith('未命名') and name[3:].isdigit():
-            next_number = max(next_number, int(name[3:]) + 1)
+        if re.fullmatch(r'[0-9]{1,5}', name) and 1 <= int(name) <= 10000:
+            next_number = max(next_number, int(name) + 1)
     for vertex in sorted(vertices, key=lambda v: str(v['id'])):
         if vertex.get('label') is None or not str(vertex['label']).strip():
             vertex['label'] = None

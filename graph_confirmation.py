@@ -224,15 +224,13 @@ def _drawing_document(edited, document):
         source = sources.get(graph['id'])
         if source is None:
             continue
-        for key in ('bbox', 'anon_next', 'region_polygon'):
+        for key in ('bbox', 'region_polygon'):
             if key in source:
                 graph[key] = copy.deepcopy(source[key])
         by_vertex = {v['id']: v for v in source['vertices']}
         by_edge = {e['id']: e for e in source['edges']}
         for node in graph['vertices']:
             v = by_vertex.get(node['id'], {})
-            if v.get('display_label'):
-                node['display_label'] = v['display_label']
             if v.get('x') is not None and v.get('y') is not None:
                 node['x'], node['y'] = v['x'], v['y']
         for edge in graph['edges']:

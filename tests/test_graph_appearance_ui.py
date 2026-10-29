@@ -29,34 +29,36 @@ def test_plain_and_markdown_export_include_appearance_and_collision_free_point_m
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const model=require('./static/graph-editor-model.js'),format=require('./static/graph-editor-format.js');
 const input=JSON.parse(fs.readFileSync(0,'utf8'));
+const original=JSON.stringify(input);
 const normalized=model.ensureAnonymousLabels(input);
 const graph=normalized.graphs[0],byId=Object.fromEntries(graph.vertices.map(v=>[v.id,v]));
-assert.equal(byId.v1.label,null);assert.equal(byId.v1.display_label,'②');
-assert.equal(byId.v2.display_label,'③');assert.equal(byId.v3.label,'①');
+assert.equal(byId.v1.label,null);assert.equal(byId.v1.display_label,'1');
+assert.equal(byId.v2.display_label,'2');assert.equal(byId.v3.label,'①');
 assert.deepEqual([...format.graphLabels(input.graphs[0])],[...format.graphLabels(graph)]);
+assert.equal(JSON.stringify(input),original);
 const reversed=model.ensureAnonymousLabels({...input,graphs:[{...input.graphs[0],vertices:input.graphs[0].vertices.toReversed()}]});
 for(const v of reversed.graphs[0].vertices)assert.equal(v.display_label,byId[v.id].display_label);
 const existing={graphs:[{id:'G2',anon_next:6,vertices:[{id:'z',label:null},{id:'a',label:null,display_label:'⑤'}],edges:[]}]};
 const continued=model.ensureAnonymousLabels(existing).graphs[0];
-assert.equal(continued.vertices[0].display_label,'⑥');assert.equal(continued.vertices[1].display_label,'⑤');
+assert.equal(continued.vertices[0].display_label,'6');assert.equal(continued.vertices[1].display_label,'5');
 assert.deepEqual([...format.graphLabels(existing.graphs[0])],[...format.graphLabels(continued)]);
 const collisions={graphs:[{id:'G3',vertices:[{id:'zero',label:0},
  {id:'a',label:null,display_label:'0'},{id:'b',label:null,display_label:'②'},
  {id:'c',label:null,display_label:'②'},{id:'d',label:''}],edges:[{id:'e',from:'zero',to:'a',direction:'undirected'}]}]};
 const repaired=model.ensureAnonymousLabels(collisions).graphs[0],repairedById=Object.fromEntries(repaired.vertices.map(v=>[v.id,v]));
 assert.equal(repairedById.zero.label,0);assert.equal(repairedById.zero.display_label,undefined);
-assert.equal(repairedById.b.display_label,'②');assert.equal(repairedById.a.display_label,'③');
-assert.equal(repairedById.c.display_label,'④');assert.equal(repairedById.d.display_label,'⑤');
+assert.equal(repairedById.b.display_label,'2');assert.equal(repairedById.a.display_label,'3');
+assert.equal(repairedById.c.display_label,'4');assert.equal(repairedById.d.display_label,'5');
 assert.deepEqual([...format.graphLabels(collisions.graphs[0])],[...format.graphLabels(repaired)]);
 const zeroRow=format.graphRows(repaired,0);assert(zeroRow.vertices.includes('0'));
-assert(!zeroRow.anonymousNote.includes('0'));assert.equal(zeroRow.relations[0].txt,'0—③');
+assert(!zeroRow.anonymousNote.includes('0'));assert.equal(zeroRow.relations[0].txt,'0—3');
 const imported=model.importDocument(normalized).graphs[0];
 assert.equal(imported.visual_description,graph.visual_description);
 assert.equal(imported.vertices[0].position_description,'外圈右上方');
 for(const text of [format.toPlain([graph]),format.toMarkdown([graph])]){
- assert(text.includes('四个顶点分布在外圈'));assert(text.includes('②：外圈左上方'));
- assert(text.includes('③：外圈右上方'));assert(text.includes('②—③'));
- assert(text.includes('临时编号，不是原图标签'));
+ assert(text.includes('四个顶点分布在外圈'));assert(text.includes('1：外圈左上方'));
+ assert(text.includes('2：外圈右上方'));assert(text.includes('1—2'));
+ assert(!text.includes('临时编号'));
 }
 const hostile={...graph,visual_description:'<img onerror=alert(1)>',vertices:graph.vertices.map(v=>({...v,position_description:'<script>x</script>'}))};
 const markdown=format.toMarkdown([hostile]);assert(!markdown.includes('<img'));assert(!markdown.includes('<script>'));
@@ -75,17 +77,17 @@ def test_readonly_scan_maps_anonymous_points_and_confirms_the_same_references(sc
     open_scan(p)
     panel = p.locator('.dgs-information')
     assert panel.get_by_text('图形外观：'+graph['visual_description'], exact=True).count() == 1
-    assert panel.get_by_text('②：外圈左上方', exact=True).count() == 1
-    assert panel.get_by_text('③：外圈右上方', exact=True).count() == 1
-    assert panel.get_by_text('②—③', exact=True).count() == 1
-    assert '临时编号，不是原图标签' in panel.inner_text()
+    assert panel.get_by_text('1：外圈左上方', exact=True).count() == 1
+    assert panel.get_by_text('2：外圈右上方', exact=True).count() == 1
+    assert panel.get_by_text('1—2', exact=True).count() == 1
+    assert '临时编号' not in panel.inner_text()
     assert panel.locator('svg,input,select,textarea,[contenteditable=true]').count() == 0
     p.get_by_role('button', name='保存').click()
     p.wait_for_function('posts.length===1')
     submitted = p.evaluate('posts[0].document.graphs[0]')
     assert submitted['visual_description'] == graph['visual_description']
     assert {v['id']: v.get('display_label') for v in submitted['vertices']} == {
-        'v1': '②', 'v2': '③', 'v3': None}
+        'v1': '1', 'v2': '2', 'v3': None}
     assert all(v['label'] is None for v in submitted['vertices'] if v['id'] != 'v3')
 
 
@@ -95,11 +97,14 @@ def test_region_results_persist_numbering_and_descriptions_before_confirmation(s
     open_scan(p)
     p.get_by_role('button', name='图形框选', exact=True).click()
     drag(p, [(.1, .1), (.8, .8)])
-    p.wait_for_function('graphCalls.length===1 && document.querySelector(".dgs-appearance").textContent.includes("四个顶点")')
-    assert p.locator('.dgs-vertex-position').filter(has_text='②：外圈左上方').count() == 1
+    p.wait_for_function('graphCalls.length===1 && ocrTasks.get("scan").scanState.graphRegions[0].status==="complete"')
+    p.get_by_role('checkbox', name='放入图形框 1', exact=True).check()
+    p.get_by_role('button', name='放入所选图形信息', exact=True).click()
+    p.wait_for_function('graphCalls.length===1 && document.querySelector(".dgs-appearance")?.textContent.includes("四个顶点")')
+    assert p.locator('.dgs-vertex-position').filter(has_text='1：外圈左上方').count() == 1
     p.get_by_role('button', name='保存').click()
     p.wait_for_function('posts.length===1')
     submitted = p.evaluate('posts[0].document.graphs[0]')
     assert submitted['id'] == 'g1_1'
     assert submitted['visual_description'] == anonymous_graph()['visual_description']
-    assert {v['id']: v.get('display_label') for v in submitted['vertices']}['v1'] == '②'
+    assert {v['id']: v.get('display_label') for v in submitted['vertices']}['v1'] == '1'

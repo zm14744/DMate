@@ -25,7 +25,15 @@
         }, 0);
         return Math.abs(signed) / 2 >= .00002;
     };
-    const ring = number => number >= 1 && number <= 20 ? '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'[number - 1] : '未命名' + number;
+    const ring = number => String(number);
+    const displayNumber = value => {
+        if (typeof value !== 'string') return '';
+        value = value.trim();
+        const circles = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+        if (value.length === 1 && circles.includes(value)) return String(circles.indexOf(value) + 1);
+        const legacy = /^未命名([0-9]+)$/.exec(value);
+        return legacy ? String(Number(legacy[1])) : value;
+    };
     const hasLabel = vertex => vertex.label != null && String(vertex.label).trim() !== '';
     function ensureAnonymousLabels(input) {
         const draft = copy(input);
@@ -37,19 +45,16 @@
             const existing = new Set();
             for (const vertex of vertices) {
                 if (hasLabel(vertex)) continue;
-                const display = typeof vertex.display_label === 'string' ? vertex.display_label.trim() : '';
+                const display = displayNumber(vertex.display_label);
                 if (display && display.length <= 16 && !used.has(display) && !existing.has(display)) {
                     vertex.display_label = display; existing.add(display);
                 } else delete vertex.display_label;
             }
             for (const display of existing) used.add(display);
             let next = Number.isInteger(graph.anon_next) && graph.anon_next >= 1 && graph.anon_next <= 10000 ? graph.anon_next : 1;
-            const circleNames = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
             for (const name of used) {
-                const at = circleNames.indexOf(String(name));
-                if (at >= 0 && String(name).length === 1) next = Math.max(next, at + 2);
-                const match = /^未命名(\d+)$/.exec(String(name));
-                if (match) next = Math.max(next, Number(match[1]) + 1);
+                if (/^[0-9]{1,5}$/.test(String(name)) && Number(name) >= 1 && Number(name) <= 10000)
+                    next = Math.max(next, Number(name) + 1);
             }
             const byIdentity = [...vertices].sort((a, b) => String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0);
             for (const vertex of byIdentity) {
@@ -61,7 +66,7 @@
                 vertex.display_label = display;
                 used.add(display);
             }
-            graph.anon_next = next;
+            graph.anon_next = Math.min(10000, next);
         }
         return draft;
     }
@@ -108,7 +113,8 @@
                 if (validPath(rawEdge.path)) edge.path = rawEdge.path.map(row => [...row]);
                 graph.edges.push(edge);
             }
-            result.graphs.push(graph);
+            result.graphs.push(graph.vertices.some(vertex => vertex.display_label)
+                ? ensureAnonymousLabels({graphs: [graph]}).graphs[0] : graph);
         }
         if (source.text_context && typeof source.text_context === 'object') {
             const context = {};

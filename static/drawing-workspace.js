@@ -11,17 +11,20 @@
   if(!root.DMateGraphEditor?.mount)throw new Error('绘图模块未加载，请刷新后重试。');
   const key=String(options.storageKey||'dmate:graph-gallery:v1:guest');
   let pages=[],activeId='',editor=null,timer=null,destroyed=false,persistError='',aiAbort=null,aiEpoch=0,exportBusy=false,panelMode='',uploadBusy=false;
-  let savedRaw='',legacyRead=false,exportPreview=null,exportPreviewUrl='';
+  let savedRaw='',legacyRead=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null;
   const el=(tag,className,text)=>{const n=doc.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
   const button=(text,fn,className)=>{const b=el('button',className,text);b.type='button';b.addEventListener('click',event=>{event.stopPropagation();if(!destroyed)void fn();});return b;};
   const shell=el('section','dmate-drawing-workspace'),top=el('div','ddw-header'),name=el('input','ddw-name');
   name.type='text';name.maxLength=80;name.setAttribute('aria-label','绘图名称');
   const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),status=el('p','ddw-status');
   status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+  const settingsButton=button('绘图设置',()=>toggleEditorPanel('graphs')),informationButton=button('图形信息',()=>toggleEditorPanel('results'));
   const historyButton=button('历史绘图',()=>togglePanel('history')),aiButton=button('AI 回答',()=>togglePanel('ai'));
+  rail.setAttribute('role','toolbar');rail.setAttribute('aria-label','绘图面板');
+  settingsButton.setAttribute('aria-expanded','false');informationButton.setAttribute('aria-expanded','false');
   historyButton.setAttribute('aria-expanded','false');aiButton.setAttribute('aria-expanded','false');
   const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=button('上传到对话',()=>uploadImage(),'ddw-primary');
-  actions.append(newButton,exportButton,uploadButton);top.append(name,actions);rail.append(historyButton,aiButton);body.append(editorHost,rail,panel);shell.append(top,body,status);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
+  actions.append(newButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,historyButton,aiButton);body.append(editorHost,rail,panel);shell.append(top,body,status);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
   let requirement='',answer='',answerDocument='',answerRequirement='';
   const active=()=>pages.find(p=>p.id===activeId);
   function setStatus(message){status.textContent=message||persistError;status.classList.toggle('is-error',Boolean(persistError));}
@@ -29,8 +32,43 @@
   function invalidateAnswer(){
    abortAnswer();answer='';answerDocument='';answerRequirement='';
    const ask=panel.querySelector('[data-drawing-guide]');if(ask){ask.disabled=false;ask.textContent='请求 AI 指导';}
-   const result=panel.querySelector('.ddw-ai-answer');if(result)result.textContent='AI 会根据当前绘图和要求，说明接下来怎么画。';
+   const result=panel.querySelector('.ddw-ai-answer');if(result)result.replaceChildren();
   }
+  function editorPanel(key){return editorHost.querySelector('.dge-float-panel[data-panel-key="'+key+'"]');}
+  function closeEditorPanels(){for(const item of editorHost.querySelectorAll('.dge-floating-actions > details[open]'))item.querySelector(':scope > summary')?.click();}
+  function toggleEditorPanel(key){
+   editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();panelMode='';renderPanel();
+   editorPanel(key)?.querySelector(':scope > summary')?.click();syncChrome();
+  }
+  function syncChrome(){
+   if(destroyed)return;
+   const rack=editorHost.querySelector('.dge-floating-actions'),view=editorHost.querySelector('.dge-view-controls');
+   if(resizeObserver&&observedView!==view){if(observedView)resizeObserver.unobserve(observedView);observedView=view;if(view)resizeObserver.observe(view);}
+   for(const item of editorHost.querySelectorAll('.dge-float-panel')){
+    const content=item.querySelector(':scope > .dge-float-content');
+    if(content&&!content.querySelector(':scope > .ddw-editor-panel-header')){
+     const head=el('div','ddw-editor-panel-header'),close=button('',()=>{if(item.open)item.querySelector(':scope > summary')?.click();syncChrome();},'ddw-panel-close');
+     close.setAttribute('aria-label',item.dataset.panelKey==='graphs'?'关闭绘图设置':'关闭图形信息');close.title=close.getAttribute('aria-label');
+     head.append(el('h3','',item.dataset.panelKey==='graphs'?'绘图设置':'图形信息'),close);content.prepend(head);
+    }
+   }
+   const editorOpen=Boolean(editorHost.querySelector('.dge-floating-actions > details[open]'));
+   const properties=editorHost.querySelector('.dge-selection-panel');
+   const propertyOpen=Boolean(properties?.childElementCount);
+   settingsButton.setAttribute('aria-expanded',String(Boolean(editorPanel('graphs')?.open)));
+   informationButton.setAttribute('aria-expanded',String(Boolean(editorPanel('results')?.open)));
+   rail.hidden=Boolean(panelMode||editorOpen||propertyOpen);
+   shell.dataset.panelOpen=String(Boolean(panelMode||editorOpen||propertyOpen));
+   const origin=body.getBoundingClientRect(),anchor=rack?.getBoundingClientRect(),viewBox=view?.getBoundingClientRect();
+   const top=anchor?anchor.top-origin.top:(viewBox?viewBox.bottom-origin.top+10:64);
+   body.style.setProperty('--ddw-panel-top',Math.max(8,top)+'px');
+   body.style.setProperty('--ddw-panel-space',Math.max(90,origin.height-Math.max(8,top)-10)+'px');
+  }
+  function queueChrome(){if(!chromeFrame&&!destroyed)chromeFrame=win.requestAnimationFrame(()=>{chromeFrame=0;syncChrome();});}
+  const chromeObserver=new win.MutationObserver(queueChrome);chromeObserver.observe(editorHost,{childList:true,subtree:true});
+  const resizeObserver=typeof win.ResizeObserver==='function'?new win.ResizeObserver(queueChrome):null;resizeObserver?.observe(body);
+  editorHost.addEventListener('toggle',queueChrome,true);
+  editorHost.addEventListener('pointerdown',event=>{if(panelMode&&event.target.closest('.dge-overlay-node,.dge-overlay-edge,.dge-overlay-handle')){panelMode='';renderPanel();}},true);
   function currentDocument(){return editor?.getDocument?.()||active()?.document||blank();}
   function collect(){const p=active();if(!p)return;p.document=clone(currentDocument());p.name=caption(name.value);p.updatedAt=Date.now();}
   function persist(message){
@@ -49,34 +87,38 @@
     onChange:value=>{if(destroyed)return;const selected=active();if(!selected)return;selected.document=clone(value);selected.updatedAt=Date.now();options.onChange?.(clone(value));invalidateAnswer();schedule();},
     onConfirm:async value=>{const selected=active();selected.document=clone(value);selected.name=caption(name.value);selected.updatedAt=Date.now();if(!persist('绘图已保存到历史绘图。'))throw new Error(persistError);if(panelMode==='history')renderPanel();}
    });
-   options.onChange?.(clone(p.document));renderPanel();
+   options.onChange?.(clone(p.document));renderPanel();syncChrome();
   }
   function switchPage(pageId){if(pageId===activeId)return;collect();persist();abortAnswer();activeId=pageId;persist();mountPage();setStatus('已打开绘图。');}
   function newPage(){
    if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
    collect();persist();abortAnswer();const p={id:id(),name:'绘图 '+(pages.length+1),document:blank(),requirement:'',createdAt:Date.now(),updatedAt:Date.now()};pages.push(p);activeId=p.id;persist();mountPage();setStatus('已新建空白页。');
   }
-  function togglePanel(mode){panelMode=panelMode===mode?'':mode;renderPanel();}
+  function togglePanel(mode){editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
   function renderPanel(){
    panel.hidden=!panelMode;panel.replaceChildren();historyButton.setAttribute('aria-expanded',String(panelMode==='history'));aiButton.setAttribute('aria-expanded',String(panelMode==='ai'));
-   if(!panelMode)return;
-   const header=el('div','ddw-panel-header');header.append(el('h3','',panelMode==='history'?'历史绘图':'AI 回答'),button('关闭',()=>togglePanel(panelMode),'ddw-panel-close'));panel.append(header);
+   if(!panelMode){queueChrome();return;}
+   const header=el('div','ddw-panel-header'),close=button('',()=>togglePanel(panelMode),'ddw-panel-close');close.setAttribute('aria-label',panelMode==='history'?'关闭历史绘图':'关闭 AI 回答');close.title=close.getAttribute('aria-label');header.append(el('h3','',panelMode==='history'?'历史绘图':'AI 回答'),close);panel.append(header);
    if(panelMode==='history'){
-    panel.append(el('p','ddw-note','绘图保存在此设备，切换页面前会自动保存。'));
     const list=el('div','ddw-history-list');
     pages.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(p=>{
      const row=el('div','ddw-history-item'+(p.id===activeId?' is-current':'')),open=button(p.name,()=>switchPage(p.id),'ddw-history-open');
      open.setAttribute('aria-current',String(p.id===activeId));
      const stats=p.document.graphs.reduce((a,g)=>[a[0]+g.vertices.length,a[1]+g.edges.length],[0,0]);
      row.append(open,el('span','ddw-history-meta',stats[0]+' 点 · '+stats[1]+' 边'),button('删除',()=>removePage(p.id),'ddw-history-delete'));list.append(row);
-    });panel.append(list);return;
+    });panel.append(list);queueChrome();return;
    }
    const label=el('label','ddw-ai-label','要求（可选）'),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label','绘图指导要求（可选）');
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
    const ask=button(aiAbort?'正在回答…':'请求 AI 指导',()=>requestGuide(),'ddw-primary');ask.disabled=Boolean(aiAbort);ask.dataset.drawingGuide='true';
    const result=el('div','ddw-ai-answer');result.setAttribute('aria-live','polite');
-   result.textContent=answer||'AI 会根据当前绘图和要求，说明接下来怎么画。';
    panel.append(label,ask,result);
+   if(answer){
+    const renderedAnswer=answer,renderedPage=activeId,renderedRequirement=requirement;
+    if(root.DMateAIAnswer?.render)root.DMateAIAnswer.render(result,answer,{isCurrent:()=>!destroyed&&panelMode==='ai'&&activeId===renderedPage&&answer===renderedAnswer&&requirement===renderedRequirement});
+    else result.textContent=answer;
+   }
+   queueChrome();
   }
   function removePage(pageId){
    const index=pages.findIndex(p=>p.id===pageId);if(index<0)return;
@@ -148,7 +190,7 @@
   mountPage();persist();if(legacyRead)setStatus('已保留之前的绘图。');
   const pageHide=()=>{collect();persist();};win.addEventListener('pagehide',pageHide);
   return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,
-   destroy(){if(destroyed)return;collect();persist();destroyed=true;closeExportPreview();clearTimeout(timer);abortAnswer();win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
+   destroy(){if(destroyed)return;collect();persist();destroyed=true;closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }
  root.DMateDrawingWorkspace={mount,blankDocument:blank};
 })(typeof window!=='undefined'?window:globalThis);

@@ -43,6 +43,7 @@ on:
       - 'tests/test_learning_tool_entries.py'
       - 'tests/test_graph_elastic_regions.py'
       - 'tests/test_graph_presentation.py'
+      - 'tests/test_numeric_vertex_labels.py'
       - 'tests/test_graph_appearance_ui.py'
       - 'tests/test_semantic_isomorphism.py'
       - '.github/workflows/graph-nextgen.yml'
@@ -115,6 +116,7 @@ jobs:
       - name: Focused editor and confirmation regression (free, no OCR/model requests)
         run: |
           python -m pytest -q \
+            tests/test_numeric_vertex_labels.py \
             tests/test_qwen_image_upload_limits.py \
             tests/test_drawing_guidance.py \
             tests/test_graph_edge_label_separation.py \
