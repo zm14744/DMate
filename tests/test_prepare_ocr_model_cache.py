@@ -178,8 +178,8 @@ def test_cli_failure_returns_nonzero_without_success_json(monkeypatch, tmp_path,
 def test_docker_cache_layer_is_before_full_sources_and_cannot_ignore_failure():
     docker = (Path(__file__).resolve().parents[1]/'Dockerfile').read_text()
     assert 'DMATE_MODEL_CACHE_DIR=/opt/dmate-model-cache' in docker
-    assert 'COPY ocr_runtime.py ./' in docker
     preparation = docker.index('RUN python scripts/prepare_ocr_model_cache.py')
+    assert 'COPY ocr_runtime.py image_upload_limits.py ./' in docker[:preparation]
     assert docker.index('COPY scripts/prepare_ocr_model_cache.py') < preparation < docker.index('COPY . .')
     assert 'python scripts/prepare_ocr_model_cache.py --verify-only' in docker
     assert '|| true' not in docker
