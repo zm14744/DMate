@@ -256,13 +256,13 @@ def test_selected_type_scan_obeys_short_deadline_and_does_not_guess():
     assert result["recognition_status"] == "partial"
 
 
-def test_only_manually_selected_figures_have_four_second_budget():
+def test_initial_and_selected_graph_reads_keep_full_processing_budget():
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     client = (root / "static/script.js").read_text()
     server = (root / "app.py").read_text()
     overlay = (root / "static/graph-editor-overlay.js").read_text()
-    assert "MANUAL_FIGURE_SCAN_MAX_MS = 4000" in client
+    assert "MANUAL_FIGURE_SCAN_MAX_MS" not in client
     assert "OCR_SCAN_MAX_MS" not in client
     initial_handler = client.split("async function recognizeOcrTask(task) {", 1)[1].split(
         "function discardOcrTask", 1)[0]
@@ -272,7 +272,12 @@ def test_only_manually_selected_figures_have_four_second_budget():
     assert "started_at + 3.6" not in server
     assert "discardOcrTask(task); // Immediate UI removal" in client
     assert 'task.state === "cancelled") return "已取消"' not in client
-    assert "/graph/figure-type" in server and "/graph/figure-type" in client
+    # The retained legacy endpoint still has its type-only budget. The new
+    # scan workspace needs actual nodes/edges, not a four-second type guess.
+    assert "/graph/figure-type" in server
+    assert "/graph/recognize-region" in server and "/graph/recognize-region" in client
+    selected_handler = client.split('onRecognizeGraph: async', 1)[1].split('\n            issues:',1)[0]
+    assert "220000" in selected_handler and 'operation_id' in selected_handler
     assert "scanFigureType(points,id)" in overlay
     assert "void scanFigureType(points,id)" in overlay
     assert "commitRegion([[box[0],box[1]]" in overlay

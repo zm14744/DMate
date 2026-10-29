@@ -14184,7 +14184,6 @@ function reviewRecognizedQuestion(file, data) {
 // Every original owns its request, draft and confirmation. Arrival order never
 // selects which graph is later sent to the solver.
 const OCR_MAX_CONCURRENT = 4;
-const MANUAL_FIGURE_SCAN_MAX_MS = 4000;
 const ocrTasks = new Map();
 const ocrSolvingSessions = new Set();
 let ocrTaskTimer = null;
