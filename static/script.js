@@ -14529,13 +14529,8 @@ function renderOcrTasks() {
         thumbnail.alt = `${task.file.name} 原图缩略图`;
         thumbnail.title = task.file.name || "图片";
         const content = element("div", "ocr-task-content");
-        const heading = element("div", "ocr-task-heading");
-        const name = element("strong", "ocr-task-name", task.file.name || "图片");
-        name.title = task.file.name;
-        heading.append(name);
         const status = element("p", "ocr-task-status", ocrTaskLabel(task));
         status.setAttribute("role", "status");
-        if (!task.confirmation) content.append(heading);
         content.append(status);
         if (task.state === "recognizing") {
             const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
