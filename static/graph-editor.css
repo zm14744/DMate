@@ -263,6 +263,8 @@
 .dge-history-arrow{font-size:24px!important;line-height:1;min-width:40px;padding:4px 10px!important}
 .dge-freehand-draft{fill:none;stroke:var(--accent,#2563eb);stroke-width:2.4;pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
 .dge-frame-edge-hit{fill:none;stroke:transparent;pointer-events:stroke;cursor:crosshair}
+.dge-frame-elastic-hit{cursor:grab}
+.dge-overlay-svg.is-deforming .dge-frame-elastic-hit{cursor:grabbing}
 
 /* Image review is a read-only scan workspace; standalone drawing is separate. */
 .dgs-workspace{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}

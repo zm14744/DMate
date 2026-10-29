@@ -153,7 +153,7 @@ def test_requirements_confirm_with_current_readonly_structure(scan_page):
 
 def test_standalone_drawing_saves_reopens_and_never_changes_scan(scan_page):
     p=scan_page;p.evaluate('document.body.classList.add("mobile-tools-open")')
-    p.get_by_role('button',name='绘图',exact=True).click()
+    p.get_by_role('button',name='画图',exact=True).click()
     p.wait_for_function('document.querySelector(".dge-overlay-image").naturalWidth===1000')
     assert p.locator('#graphEditorTitle').inner_text()=='绘图'
     assert p.get_by_role('tab',name='文字识别').count()==0
@@ -167,6 +167,6 @@ def test_standalone_drawing_saves_reopens_and_never_changes_scan(scan_page):
     assert p.evaluate('ocrTasks.get("scan").draft.graphs[0].vertices.length')==2
     assert p.evaluate('posts.length')==0
     p.evaluate('document.body.classList.add("mobile-tools-open")')
-    p.get_by_role('button',name='绘图',exact=True).click()
+    p.get_by_role('button',name='画图',exact=True).click()
     p.wait_for_selector('.dge-overlay-node')
     assert p.locator('.dge-overlay-node').count()==1

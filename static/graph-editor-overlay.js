@@ -2,6 +2,72 @@
 'use strict';
 const NS='http://www.w3.org/2000/svg',clamp=x=>Math.max(0,Math.min(1,x)),unit=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1;
 const E=(d,t,a={})=>{const n=d.createElementNS(NS,t);for(const [k,v] of Object.entries(a))n.setAttribute(k,String(v));return n;};
+const regionSignedArea=points=>points.reduce((sum,p,i)=>{const q=points[(i+1)%points.length];return sum+p[0]*q[1]-q[0]*p[1];},0)/2;
+function regionIsSimple(points){
+ const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+ const on=(a,b,p)=>Math.abs(cross(a,b,p))<1e-10&&p[0]>=Math.min(a[0],b[0])-1e-10&&p[0]<=Math.max(a[0],b[0])+1e-10&&p[1]>=Math.min(a[1],b[1])-1e-10&&p[1]<=Math.max(a[1],b[1])+1e-10;
+ for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++){
+  if(j===i+1||i===0&&j===points.length-1)continue;
+  const a=points[i],b=points[(i+1)%points.length],c=points[j],d=points[(j+1)%points.length];
+  const x=cross(a,b,c),y=cross(a,b,d),u=cross(c,d,a),v=cross(c,d,b);
+  if(x*y<0&&u*v<0||on(a,b,c)||on(a,b,d)||on(c,d,a)||on(c,d,b))return false;
+ }
+ return true;
+}
+function elasticRegionStart(points,anchor,metric){
+ // Parameterise the actual closed outline in screen pixels. A whole band
+ // follows the finger; arbitrary source vertices do not become edit handles.
+ const original=points.map(p=>[...p]),clean=[];
+ for(const p of points)if(!clean.length||Math.hypot(p[0]-clean.at(-1)[0],p[1]-clean.at(-1)[1])>1e-9)clean.push([...p]);
+ if(clean.length>3&&Math.hypot(clean[0][0]-clean.at(-1)[0],clean[0][1]-clean.at(-1)[1])<1e-9)clean.pop();
+ const sx=metric[0],sy=metric[1],screen=clean.map(p=>[p[0]*sx,p[1]*sy]),lengths=[],cumulative=[0];
+ for(let i=0;i<screen.length;i++){const a=screen[i],b=screen[(i+1)%screen.length];lengths.push(Math.hypot(b[0]-a[0],b[1]-a[1]));cumulative.push(cumulative.at(-1)+lengths.at(-1));}
+ const perimeter=cumulative.at(-1);
+ if(clean.length<3||perimeter<=0||!regionIsSimple(clean))return null;
+ let anchorArc=0,nearest=Infinity;
+ for(let i=0;i<screen.length;i++){
+  const a=screen[i],b=screen[(i+1)%screen.length],dx=b[0]-a[0],dy=b[1]-a[1],len=lengths[i];
+  const t=len?Math.max(0,Math.min(1,((anchor[0]*sx-a[0])*dx+(anchor[1]*sy-a[1])*dy)/(len*len))):0;
+  const distance=Math.hypot(anchor[0]*sx-a[0]-t*dx,anchor[1]*sy-a[1]-t*dy);
+  if(distance<nearest){nearest=distance;anchorArc=cumulative[i]+t*len;}
+ }
+ // Preserve meaningful corners while filling the smooth stretches uniformly.
+ // Include the exact grabbed position even when it was midway along an edge.
+ const corners=clean.map((p,i)=>{
+  const before=screen[(i+screen.length-1)%screen.length],here=screen[i],after=screen[(i+1)%screen.length];
+  const ax=here[0]-before[0],ay=here[1]-before[1],bx=after[0]-here[0],by=after[1]-here[1];
+  return {arc:cumulative[i],bend:Math.acos(Math.max(-1,Math.min(1,(ax*bx+ay*by)/(Math.hypot(ax,ay)*Math.hypot(bx,by)||1))))};
+ }).filter(c=>c.bend>.35).sort((a,b)=>b.bend-a.bend).slice(0,30);
+ const extrema=[0,1].flatMap(axis=>[clean.reduce((best,p,i)=>p[axis]<clean[best][axis]?i:best,0),clean.reduce((best,p,i)=>p[axis]>clean[best][axis]?i:best,0)]);
+ const mandatory=[anchorArc%perimeter,...corners.map(c=>c.arc),...extrema.map(i=>cumulative[i])].sort((a,b)=>a-b);
+ const arcs=mandatory.filter((a,i)=>!i||a-mandatory[i-1]>1e-6),slots=64-arcs.length;
+ for(let i=0;i<slots;i++)arcs.push(i*perimeter/slots);
+ arcs.sort((a,b)=>a-b);
+ const ordered=arcs.filter((a,i)=>!i||a-arcs[i-1]>1e-6),radius=Math.max(perimeter*.18,Math.min(72,perimeter*.24));
+ const sample=arc=>{let i=0;while(i<lengths.length-1&&cumulative[i+1]<arc)i++;const t=(arc-cumulative[i])/(lengths[i]||1),a=clean[i],b=clean[(i+1)%clean.length];return[a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])];};
+ const samples=ordered.map(sample),weights=ordered.map(arc=>{const along=Math.abs(arc-anchorArc),distance=Math.min(along,perimeter-along);if(distance>=radius)return 0;const t=distance/radius;return(1-t*t)**2;});
+ return {original,start:[...anchor],samples,weights,orientation:Math.sign(regionSignedArea(clean)),minimumArea:Math.max(.00002,Math.abs(regionSignedArea(clean))*.08)};
+}
+function elasticRegionPoints(gesture,end){
+ if(!gesture)return null;
+ const dx=end[0]-gesture.start[0],dy=end[1]-gesture.start[1];
+ if(Math.abs(dx)+Math.abs(dy)<1e-12)return gesture.original.map(p=>[...p]);
+ let maximum=1;
+ for(let i=0;i<gesture.samples.length;i++)for(const [axis,delta]of [[0,dx],[1,dy]]){
+  const move=delta*gesture.weights[i];if(!move)continue;
+  maximum=Math.min(maximum,move>0?(1-gesture.samples[i][axis])/move:-gesture.samples[i][axis]/move);
+ }
+ const candidate=factor=>gesture.samples.map((p,i)=>[p[0]+dx*gesture.weights[i]*factor,p[1]+dy*gesture.weights[i]*factor]);
+ const valid=points=>regionSignedArea(points)*gesture.orientation>=gesture.minimumArea&&regionIsSimple(points);
+ let factor=Math.max(0,maximum),points=candidate(factor);
+ if(!valid(points)){
+  let low=0,high=factor;
+  for(let i=0;i<12;i++){const mid=(low+high)/2;if(valid(candidate(mid)))low=mid;else high=mid;}
+  factor=low;points=candidate(factor);
+ }
+ // At a hard image boundary an impossible pull is a no-op, not a new ROI.
+ return factor<.001?gesture.original.map(p=>[...p]):points.map(p=>p.map(clamp));
+}
 function mount(host,o){
  const d=host.ownerDocument,s=o.state||{mode:'select',zoom:100,visible:true,start:null};
  s.polygonDraft ||= [];
@@ -256,6 +322,7 @@ function mount(host,o){
   return chosen;
  }
  function resizedPoints(op){
+  if(op.polygon)return elasticRegionPoints(op.elastic,op.end)||op.points;
   const b=boxOf(op.points),next=[...b],dx=op.end[0]-op.start[0],dy=op.end[1]-op.start[1],min=.012;
   if(op.sides.includes('left'))next[0]=Math.max(0,Math.min(b[2]-min,b[0]+dx));
   if(op.sides.includes('right'))next[2]=Math.min(1,Math.max(b[0]+min,b[2]+dx));
@@ -267,6 +334,7 @@ function mount(host,o){
   // A modal is mounted while hidden. Tool state must already be correct
   // before its first layout/image event, including on a cached-image reopen.
   if(visible)visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
+  svg.classList.toggle('is-deforming',active?.kind==='resize'&&active.polygon);
   regionMode.value=o.scanOnly?(s.irregular?'irregular':''):['graph_poly','text_poly'].includes(s.mode)?s.mode:'';
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const key=b.dataset.overlayTool,active=key===s.mode||o.scanOnly&&(key==='bounds'&&s.mode==='graph_poly'||key==='text_rect'&&s.mode==='text_poly');b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds','text_rect'].includes(key))b.setAttribute('aria-pressed',String(active));}
   if(!scroll.clientWidth)return;
@@ -294,21 +362,21 @@ function mount(host,o){
   }
   svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
-  const frame=(points,css,id,isText,current)=>{
+  const frame=(points,css,id,isText,current,irregular)=>{
     const preview=active?.kind==='resize'&&active.id===id&&active.isText===isText?resizedPoints(active):points;
     const shape=E(d,'polygon',{points:preview.map(p=>px(p).join(',')).join(' '),class:css+' dge-frame-hit'+(current?' is-current':''),'vector-effect':'non-scaling-stroke'});
     shape.dataset[isText?'textRegionId':'graphId']=id;svg.append(shape);
-    const hit=E(d,'polygon',{points:preview.map(p=>px(p).join(',')).join(' '),class:'dge-frame-edge-hit','vector-effect':'non-scaling-stroke'});
+    const hit=E(d,'polygon',{points:preview.map(p=>px(p).join(',')).join(' '),class:'dge-frame-edge-hit'+(irregular?' dge-frame-elastic-hit':''),'vector-effect':'non-scaling-stroke'});
     hit.dataset[isText?'textRegionId':'graphId']=id;hit.dataset.frameResize='true';
     hit.style.strokeWidth=touch?'24px':'14px';svg.append(hit);
     return preview;
   };
   for(const region of o.textOnly?[]:o.model.getDocument().graphs){
     const points=graphPoints(region);if(!points)continue;
-    frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id);
+    frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id,region.region_polygon?.length>=3);
   }
   if(o.textOnly||o.scanOnly)for(const region of s.regions||[]){
-    const points=frame(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''),String(region.id),true,s.selectedId===region.id);
+    const points=frame(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''),String(region.id),true,s.selectedId===region.id,region.irregular);
     const b=boxOf(points),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number'});
     label.textContent=String(region.id);label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);
   }
@@ -409,6 +477,7 @@ function mount(host,o){
     const points=isText?region?.polygon:region&&graphPoints(region);
     if(points){active={kind:'resize',pointer:e.pointerId,id:isText?textId:graphId,isText:!!isText,
       polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(p=>[...p]),sides:resizeSides(points,p)};
+      if(active.polygon){const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;active.elastic=elasticRegionStart(points,p,[scale,scale*h/w]);}
       e.preventDefault();svg.setPointerCapture?.(e.pointerId);return;}
   }
   if(s.mode==='graph_poly'||s.mode==='text_poly'){
@@ -464,6 +533,7 @@ function mount(host,o){
    if(op.kind==='resize'){
     if(distance(op.start,op.end)>3){
       const points=resizedPoints(op);
+      if(points.length===op.points.length&&points.every((p,i)=>p.every((value,j)=>Math.abs(value-op.points[i][j])<1e-10)))return draw();
       if(op.isText)o.resizeTextRegion?.(Number(op.id),points);
       else {change(()=>o.resizeRegion?.(op.id,points,op.polygon),'region');
         const owner=o.model.getDocument().graphs.find(r=>r.id===op.id);if(owner&&!owner.edges.length)void scanFigureType(points,op.id);}
@@ -506,5 +576,5 @@ function mount(host,o){
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
  return {refresh:draw,resetInteraction,state:s,destroy(){observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
-root.DMateGraphOverlay={mount};if(typeof module!=='undefined'&&module.exports)module.exports={mount};
+root.DMateGraphOverlay={mount,elasticRegionStart,elasticRegionPoints};if(typeof module!=='undefined'&&module.exports)module.exports={mount,elasticRegionStart,elasticRegionPoints};
 })(typeof window!=='undefined'?window:globalThis);

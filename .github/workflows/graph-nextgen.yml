@@ -23,6 +23,12 @@ on:
       - 'tests/test_graph_confirmation_batch.py'
       - 'tests/test_ocr_batch_frontend.py'
       - 'tests/test_scan_selection_save.py'
+      - 'concept_notebook.py'
+      - 'static/concept-notebook*.js'
+      - 'static/concept-notebook.css'
+      - 'tests/test_concept_notebook*.py'
+      - 'tests/test_learning_tool_entries.py'
+      - 'tests/test_graph_elastic_regions.py'
       - 'tests/test_graph_presentation.py'
       - 'tests/test_graph_appearance_ui.py'
       - 'tests/test_semantic_isomorphism.py'
@@ -96,6 +102,11 @@ jobs:
       - name: Focused editor and confirmation regression (free, no OCR/model requests)
         run: |
           python -m pytest -q \
+            tests/test_concept_notebook.py \
+            tests/test_concept_notebook_sync.py \
+            tests/test_concept_notebook_server_sync.py \
+            tests/test_learning_tool_entries.py \
+            tests/test_graph_elastic_regions.py \
             tests/test_voice_input.py \
             tests/test_graph_confirmation_batch.py \
             tests/test_ocr_batch_frontend.py \

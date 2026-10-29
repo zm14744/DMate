@@ -2108,6 +2108,23 @@ def sync_user_data():
 
                 cur.execute(
                     """
+                    SELECT data, revision
+                    FROM dm_user_data
+                    WHERE user_id = %s
+                    FOR UPDATE
+                    """,
+                    (user_id,),
+                )
+                current = cur.fetchone()
+                if current and int(current["revision"] or 0) == base_revision:
+                    from concept_notebook import preserve_legacy_notebook
+                    data = preserve_legacy_notebook(data, current["data"] or {})
+                    if len(json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > MAX_SYNC_JSON_BYTES:
+                        conn.rollback()
+                        return jsonify({"ok": False, "error": "同步数据过大，请先清理部分历史记录"}), 413
+
+                cur.execute(
+                    """
                     UPDATE dm_user_data
                     SET data = %s,
                         revision = revision + 1,
@@ -2993,6 +3010,25 @@ def graph_confirmation_session():
     from graph_confirmation import confirmation_owner
     confirmation_owner()
     response = jsonify({"ready": True})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/notebook/analyze", methods=["POST"])
+def notebook_analyze():
+    """Explain only explicitly selected notes; never edit their source text."""
+    from concept_notebook import NotebookError, analyze_notebook
+    if not _check_rate_limit(_get_client_ip(), "notebook"):
+        response = jsonify({"ok": False, "error": "概念分析过于频繁，请稍后重试。", "code": "notebook_rate_limited"})
+        response.status_code = 429
+    else:
+        try:
+            result = analyze_notebook(request.get_json(silent=True))
+        except NotebookError as exc:
+            response = jsonify({"ok": False, "error": exc.message, "code": exc.code})
+            response.status_code = exc.status
+        else:
+            response = jsonify(result)
     response.headers["Cache-Control"] = "no-store"
     return response
 

@@ -8752,6 +8752,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 }
 </style>
 <link rel="stylesheet" href="/static/voice-input.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/concept-notebook.css?v={{ dmate_web_revision }}">
 </head>
 
 <body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
@@ -8876,10 +8877,6 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
     <div id="info" class="small rich-copy-surface"></div>
 
-    <div class="learning-actions learning-actions-single graph-drawing-entry">
-        <button id="graphDrawingBtn" type="button">绘图</button>
-    </div>
-
     <div class="learning-panel">
         <div class="panel-heading-row learning-title">
             <div>学习记录</div>
@@ -8888,6 +8885,14 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
         <div class="learning-actions learning-actions-single">
             <button id="wrongBookBtn" type="button">查看错题本 (0)</button>
+        </div>
+
+        <div class="learning-actions learning-actions-single graph-drawing-entry">
+            <button id="graphDrawingBtn" type="button">画图</button>
+        </div>
+
+        <div class="learning-actions learning-actions-single">
+            <button id="conceptNotebookBtn" type="button">笔记本</button>
         </div>
 
         <div class="learning-actions learning-actions-single">
@@ -8904,6 +8909,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 
+
+<dialog id="conceptNotebookDialog" class="concept-notebook-dialog" aria-label="笔记本"></dialog>
 
 <dialog id="graphEditorDialog" class="graph-editor-dialog" aria-labelledby="graphEditorTitle">
     <div class="graph-editor-dialog-head">
@@ -9518,6 +9525,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/graph-editor.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-scan-workspace.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/voice-input.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/concept-notebook-model.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/concept-notebook.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/script.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 

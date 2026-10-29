@@ -1062,6 +1062,7 @@ function clearLoggedOutWorkspace() {
     currentId = null;
     deletedSessionIds = Object.create(null);
     learningState = createEmptyLearningState();
+    window.dmateConceptNotebook?.refresh?.();
     volatileCloudBackup = null;
     purgeGuestPersistentState();
 
@@ -1268,6 +1269,7 @@ function snapshotHasUserData(snapshot) {
     const learning = snapshot.learning;
     if (Array.isArray(learning?.events) && learning.events.length) return true;
     if (Array.isArray(learning?.wrongQuestions) && learning.wrongQuestions.length) return true;
+    if (Array.isArray(learning?.conceptNotebook?.notes) && learning.conceptNotebook.notes.length) return true;
     return false;
 }
 
@@ -1288,6 +1290,11 @@ function applyCloudSnapshot(snapshot) {
     cloudApplyingSnapshot = true;
 
     try {
+        if (!window.DMateConceptNotebookModel && snapshot.learning
+            && [learningState.conceptNotebook, snapshot.learning.conceptNotebook].some(value =>
+                value?.notes?.length || Object.keys(value?.deleted || {}).length)) {
+            throw new Error("笔记同步组件未加载，请刷新后重试，现有笔记未被覆盖。");
+        }
         const sessionData = snapshot.sessions;
         if (sessionData && typeof sessionData === "object" && Array.isArray(sessionData.sessions)) {
             const incomingDeletions = normalizeDeletedSessionIds(
@@ -1304,7 +1311,10 @@ function applyCloudSnapshot(snapshot) {
         }
 
         if (snapshot.learning && typeof snapshot.learning === "object") {
-            localStorage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(snapshot.learning));
+            const incoming = { ...snapshot.learning };
+            if (window.DMateConceptNotebookModel) incoming.conceptNotebook = window.DMateConceptNotebookModel.merge(
+                learningState.conceptNotebook, snapshot.learning.conceptNotebook);
+            localStorage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(incoming));
             loadLearningState();
         }
 
@@ -1804,6 +1814,7 @@ function cloudUiEditInProgress() {
     if (typeof typingTimer !== "undefined" && typingTimer) return true;
     if (typeof ocrReviewInProgress !== "undefined" && ocrReviewInProgress) return true;
     if (typeof wrongAnswerQueueBusy !== "undefined" && wrongAnswerQueueBusy) return true;
+    if (document.getElementById("conceptNotebookDialog")?.open) return true;
     const focused = document.activeElement;
     if (focused && focused.closest?.("#wrongEditModal:not(.hidden), #accountModal:not(.hidden)")) return true;
     return false;
@@ -1968,6 +1979,10 @@ function cloudHash(value) {
 }
 
 function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
+    if (!window.DMateConceptNotebookModel && [localSnapshot, remoteSnapshot].some(snapshot => {
+        const notebook = snapshot?.learning?.conceptNotebook;
+        return notebook?.notes?.length || Object.keys(notebook?.deleted || {}).length;
+    })) throw new Error("笔记同步组件未加载，请刷新后重试，现有笔记未被覆盖。");
     const local = localSnapshot && typeof localSnapshot === "object" ? localSnapshot : {};
     const remote = remoteSnapshot && typeof remoteSnapshot === "object" ? remoteSnapshot : {};
     const localDeletions = normalizeDeletedSessionIds(local.sessions?.deletedSessionIds);
@@ -2037,6 +2052,10 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
 
     const localLearning = local.learning || {};
     const remoteLearning = remote.learning || {};
+    if (!window.DMateConceptNotebookModel && [localLearning.conceptNotebook, remoteLearning.conceptNotebook]
+        .some(value => value?.notes?.length || Object.keys(value?.deleted || {}).length)) {
+        throw new Error("笔记同步组件未加载，请刷新后重试，现有笔记未被覆盖。");
+    }
     const byEvent = new Map();
     const remoteEvents = Array.isArray(remoteLearning.events) ? remoteLearning.events : [];
     const localEvents = Array.isArray(localLearning.events) ? localLearning.events : [];
@@ -2087,7 +2106,10 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
         schemaVersion:1,
         sessions:{sessions:resultSessions, currentId, deletedSessionIds:deletedSessionIdsMerged},
         learning:{version:Math.max(9, Number(localLearning.version || 0), Number(remoteLearning.version || 0)),
-            events, wrongQuestions, deletedWrongQuestionIds:wrongDeletions},
+            events, wrongQuestions, deletedWrongQuestionIds:wrongDeletions,
+            conceptNotebook: window.DMateConceptNotebookModel
+                ? window.DMateConceptNotebookModel.merge(localLearning.conceptNotebook, remoteLearning.conceptNotebook)
+                : { notes: [], deleted: {} }},
     };
 }
 
@@ -2212,6 +2234,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         currentId = null;
         deletedSessionIds = Object.create(null);
         learningState = createEmptyLearningState();
+        window.dmateConceptNotebook?.refresh?.();
         // 前一个账号的自定义背景属个人数据，不在下一账号沿用。
         try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
         clearAppearanceBackgroundVisual();
@@ -3387,6 +3410,7 @@ function createEmptyLearningState() {
         knowledge: {},
         events: [],
         wrongQuestions: [],
+        conceptNotebook: { notes: [], deleted: {} },
         deletedWrongQuestionIds: Object.create(null)
     };
 }
@@ -3461,6 +3485,10 @@ function normalizeLearningState(value) {
     }
 
     state.deletedWrongQuestionIds = normalizeDeletedWrongQuestionIds(value.deletedWrongQuestionIds);
+    state.conceptNotebook = window.DMateConceptNotebookModel
+        ? window.DMateConceptNotebookModel.normalize(value.conceptNotebook)
+        : value.conceptNotebook && typeof value.conceptNotebook === "object"
+            ? JSON.parse(JSON.stringify(value.conceptNotebook)) : { notes: [], deleted: {} };
 
     // v4 起学习统计改为“事件账本”。
     // v3 及更早只有总数，没有来源会话，无法在删除对话时准确回滚。
@@ -3658,12 +3686,12 @@ function normalizeLearningState(value) {
 }
 
 function loadLearningState() {
-    if (!shouldPersistClientState()) {
-        learningState = createEmptyLearningState();
-        return;
-    }
-
+    const previousNotebook = JSON.stringify(learningState.conceptNotebook);
     try {
+        if (!shouldPersistClientState()) {
+            learningState = createEmptyLearningState();
+            return;
+        }
         const raw = localStorage.getItem(LEARNING_STORAGE_KEY);
 
         if (!raw) {
@@ -3677,10 +3705,13 @@ function loadLearningState() {
     } catch (error) {
         console.warn("学习记录读取失败：", error);
         learningState = createEmptyLearningState();
+    } finally {
+        if (previousNotebook !== JSON.stringify(learningState.conceptNotebook)) window.dmateConceptNotebook?.refresh?.();
     }
 }
 
 function saveLearningState() {
+    let persisted = true;
     if (shouldPersistClientState()) {
         try {
             localStorage.setItem(
@@ -3688,12 +3719,31 @@ function saveLearningState() {
                 JSON.stringify(learningState)
             );
         } catch (error) {
+            persisted = false;
             console.warn("学习记录保存失败：", error);
             accountState.status = "本机存储空间不足，请及时导出学习数据备份";
             renderAccountUi();
         }
     }
     scheduleCloudSync();
+    return persisted;
+}
+
+function setConceptNotebookState(value) {
+    if (!window.DMateConceptNotebookModel) throw new Error("笔记本组件未加载，请刷新后重试。");
+    const model = window.DMateConceptNotebookModel;
+    const previous = model.normalize(learningState.conceptNotebook);
+    const characters = rows => rows.reduce((sum, note) => sum + String(note?.title || "").length + String(note?.content || "").length, 0);
+    const before = characters(previous.notes), after = Array.isArray(value?.notes) ? characters(value.notes) : Infinity;
+    // A cross-device union can exceed the local editing budget. Keep every
+    // note, but allow one-by-one deletion/shortening until it fits again.
+    const reducingOverflow = (previous.notes.length > model.LIMITS.notes || before > model.LIMITS.characters)
+        && value?.notes?.length <= previous.notes.length && after <= before
+        && (value.notes.length < previous.notes.length || after < before);
+    const next = model.validate(value, { allowOverCapacity: reducingOverflow });
+    learningState.conceptNotebook = next;
+    if (!saveLearningState()) throw new Error("本机存储空间不足，笔记暂留在当前页面；请不要关闭页面，并检查云同步状态。");
+    return window.DMateConceptNotebookModel.copy(next);
 }
 
 function emptyKnowledgeRecord() {
@@ -15041,6 +15091,22 @@ function initializeVoiceInput() {
             || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) });
 }
 
+function initializeConceptNotebook() {
+    if (window.dmateConceptNotebook || !window.DMateConceptNotebook?.mount) return;
+    const button = document.getElementById("conceptNotebookBtn");
+    const dialog = document.getElementById("conceptNotebookDialog");
+    if (!button || !dialog) return;
+    window.dmateConceptNotebook = window.DMateConceptNotebook.mount({ button, dialog,
+        getState: () => learningState.conceptNotebook,
+        onChange: value => setConceptNotebookState(value),
+        isPersistent: () => shouldPersistClientState(),
+        getContextKey: () => accountState.authenticated ? "account:" + accountState.username : "guest",
+        onOpen: () => closeMobileShellDrawers(),
+        onResults: container => {
+            if (window.MathJax?.typesetPromise) window.MathJax.typesetPromise([container]).catch(() => {});
+        } });
+}
+
 function initializeOcrTaskPanel() {
     const drawingButton = document.getElementById("graphDrawingBtn");
     if (drawingButton && drawingButton.dataset.bound !== "true") {
@@ -20627,6 +20693,8 @@ function initMobileAppShell() {
         "downloadAppBtn",
         "appearanceBtn",
         "wrongBookBtn",
+        "graphDrawingBtn",
+        "conceptNotebookBtn",
         "knowledgeGraphBtn",
         "learningReviewBtn"
     ].forEach(id => {
@@ -21184,6 +21252,7 @@ document.addEventListener(
         }
         initializeOcrTaskPanel();
         initializeVoiceInput();
+        initializeConceptNotebook();
 
 
         if (wrongBookBtn) {

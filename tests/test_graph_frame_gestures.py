@@ -86,7 +86,10 @@ def test_border_drag_expands_and_contracts_region_atomically_without_moving_grap
     drag(page,(.55,.47),(.48,.47))
     graph=page.evaluate('instance.getDocument().graphs[0]')
     if irregular:
-        assert max(p[0] for p in graph['region_polygon'])==pytest.approx(.48,abs=.006)
+        # Irregular outlines bend locally around the grabbed border, leaving
+        # distant portions in place instead of scaling their whole bounding box.
+        assert min(math.hypot(p[0]-.48,p[1]-.47) for p in graph['region_polygon'])<.01
+        assert sum(.25<p[0]<.55 for p in graph['region_polygon'])>=8
         assert min(p[0] for p in graph['region_polygon'])==pytest.approx(.25,abs=.006)
     else:assert graph['bbox']==pytest.approx([.25,.2,.48,.65],abs=.006)
 

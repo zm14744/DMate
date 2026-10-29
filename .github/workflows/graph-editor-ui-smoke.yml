@@ -22,6 +22,11 @@ on:
       - 'tests/test_voice_input_ui.py'
       - 'tests/test_ocr_batch_frontend.py'
       - 'tests/test_scan_selection_save.py'
+      - 'static/concept-notebook.js'
+      - 'static/concept-notebook.css'
+      - 'tests/test_concept_notebook_ui.py'
+      - 'tests/test_learning_tool_entries.py'
+      - 'tests/test_graph_elastic_regions.py'
       - 'static/script.js'
       - 'templates/index.html'
       - 'tests/test_ocr_upload_layout.py'
@@ -60,6 +65,9 @@ jobs:
           )"
           test -x "$DMATE_BROWSER_EXECUTABLE"
           python -m pytest -q \
+            tests/test_concept_notebook_ui.py \
+            tests/test_learning_tool_entries.py \
+            tests/test_graph_elastic_regions.py \
             tests/test_voice_input_ui.py \
             tests/test_ocr_batch_frontend.py \
             tests/test_scan_selection_save.py \

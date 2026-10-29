@@ -12,6 +12,9 @@ on:
       - 'static/script.js'
       - 'static/voice-input.js'
       - 'static/voice-input.css'
+      - 'static/concept-notebook.js'
+      - 'static/concept-notebook-model.js'
+      - 'static/concept-notebook.css'
       - 'static/graph-editor.js'
       - 'static/graph-editor-overlay.js'
       - 'static/graph-editor.css'
@@ -47,6 +50,8 @@ jobs:
           node --check static/legacy-worker-retire.js
           node --check static/script.js
           node --check static/voice-input.js
+          node --check static/concept-notebook.js
+          node --check static/concept-notebook-model.js
           node --check static/graph-editor.js
           node --check static/graph-editor-overlay.js
           node tests/client_update_contract.js
