@@ -75,7 +75,7 @@ def delete(page, identifier):
 def test_delete_open_chat_keeps_other_chats_but_returns_empty_and_survives_reload(conversation_page):
     page = conversation_page
     delete(page, 'open')
-    assert page.locator('#chat').inner_text() == '暂无对话'
+    assert page.locator('#chat').inner_text() == '无'
     assert page.locator('.session.active').count() == 0
     assert page.evaluate('currentId') is None
     assert page.evaluate('sessions.map(s=>s.id)') == ['older']
@@ -84,7 +84,7 @@ def test_delete_open_chat_keeps_other_chats_but_returns_empty_and_survives_reloa
     assert saved['currentId'] is None
     assert [s['id'] for s in saved['sessions']] == ['older']
     page.evaluate("currentId='older';loadState();renderAll()")
-    assert page.locator('#chat').inner_text() == '暂无对话'
+    assert page.locator('#chat').inner_text() == '无'
     assert page.evaluate('currentId') is None
 
 
@@ -117,6 +117,6 @@ def test_live_cloud_poll_keeps_empty_local_view_instead_of_opening_remote_chat(c
     page.evaluate("remoteSnapshot={sessions:{sessions:[{id:'older',name:'另端对话',messages:[]}],currentId:'older',deletedSessionIds:{open:Date.now()}}}")
     assert page.evaluate('pullLatestCloudSnapshot()') is True
     assert page.evaluate('currentId') is None
-    assert page.locator('#chat').inner_text() == '暂无对话'
+    assert page.locator('#chat').inner_text() == '无'
     assert page.locator('.session.active').count() == 0
     assert page.locator('.session').count() == 1

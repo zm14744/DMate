@@ -92,6 +92,28 @@ function graphRows(graph,index){
          anonymousNote:'',
          description:typeof graph.visual_description==='string'?graph.visual_description.trim():''};
 }
+// The scan and drawing workspaces deliberately share the same read-only DOM.
+// Construct text nodes so labels and model descriptions always remain literal.
+function renderGraphInformation(container,documentValue,options={}){
+ const dom=container.ownerDocument,fragment=dom.createDocumentFragment();
+ const element=(tag,className,text)=>{const node=dom.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
+ const graphs=Array.isArray(documentValue?.graphs)?documentValue.graphs:[];
+ for(const [index,graph] of graphs.entries()){
+  const row=graphRows(graph,index),section=element('section','dgs-graph');
+  section.append(element('h4','dgs-graph-title',row.title));
+  if(row.showType!==false)section.append(element('p','dgs-graph-type',row.type));
+  section.append(element('p','dgs-vertices','顶点：'+(row.vertices.join('、')||'无')),
+   element('p','dgs-counts',`${row.vertices.length} 个顶点 · ${row.relations.length} 条边`),
+   element('p','dgs-appearance','图形外观：'+(row.description||'未提供外观描述。')));
+  if(row.anonymousNote)section.append(element('p','dgs-anonymous-note',row.anonymousNote));
+  if(row.positions.length){section.append(element('h5','','顶点位置'));for(const vertex of row.positions)section.append(element('p','dgs-vertex-position',vertex.txt));}
+  if(row.named.length)section.append(element('p','dgs-edge-names','边：'+row.named.join('、')));
+  for(const edge of row.relations)section.append(element('p','dgs-relation',edge.txt));
+  fragment.append(section);
+ }
+ if(!graphs.length&&options.showEmpty!==false)fragment.append(element('p','dgs-empty','暂无图形信息。'));
+ container.classList.add('dmate-graph-information');container.replaceChildren(fragment);return container;
+}
 function toPlain(graphs){
  if(!Array.isArray(graphs))return '';
  return graphs.map((g,index)=>{
@@ -119,7 +141,7 @@ function toMarkdown(graphs){
   return lines.join('\n');
  }).join('\n\n---\n\n');
 }
-const api={graphLabels,graphRows,toPlain,toMarkdown,edgeName};
+const api={graphLabels,graphRows,renderGraphInformation,toPlain,toMarkdown,edgeName};
 root.DMateGraphFormat=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

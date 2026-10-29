@@ -115,7 +115,7 @@
 
 .dge-review-summary{border:1px solid var(--dge-border);border-radius:10px;margin:12px 0;background:var(--surface-1,#fff);overflow:hidden}
 .dge-review-summary>summary{cursor:pointer;padding:11px 14px;font-weight:600;font-size:14px}
-.dge-review-content{padding:0 14px 12px;font-size:14px;line-height:1.7}
+.dge-review-content{padding:0 14px 14px}
 .dge-review-content p{margin:5px 0}
 .dge-review-content .dge-review-type{font-weight:600}
 .dge-review-content .dge-review-subhead{margin-top:10px;font-weight:600}
@@ -282,8 +282,12 @@
 .dgs-information h3{margin:0 0 10px}.dgs-information h4{margin:12px 0 6px}
 .dgs-information-card{border:1px solid var(--dge-border);border-radius:12px;padding:14px;min-width:0;background:var(--dge-surface,#fff)}
 .dgs-text{margin:0}
-.dgs-body,.dgs-graph{line-height:1.65;overflow-wrap:anywhere;user-select:text}
-.dgs-graph p{margin:5px 0}.dgs-relation{padding-left:8px}
+.dgs-body{line-height:1.65;overflow-wrap:anywhere;user-select:text}
+.dmate-graph-editor .dmate-graph-information{font-size:var(--font-base,1rem);line-height:1.65;overflow-wrap:anywhere;user-select:text}
+.dmate-graph-editor .dmate-graph-information h4{margin:12px 0 6px;font-size:1em;font-weight:700}
+.dmate-graph-editor .dmate-graph-information h5{margin:1.67em 0;font-size:.83em;font-weight:700}
+.dmate-graph-editor .dmate-graph-information p{margin:5px 0;line-height:inherit}
+.dmate-graph-information .dgs-relation{padding-left:8px}
 .dgs-region-state{margin:10px 0 0;padding:0;font-size:13px}
 .dgs-region-state button{margin:4px 5px 0 0;padding:4px 7px;min-height:30px}
 .dgs-region-state,.dgs-status{font-size:13px;color:var(--text-subtle);overflow-wrap:anywhere}
@@ -328,5 +332,5 @@
 .dge-tool-palette[open]>summary{padding:9px 10px;border-bottom:1px solid var(--dge-border);margin-bottom:6px}
 .dmate-graph-editor .dge-overlay-tools button:not(.is-active){background:var(--surface-0,#fff);border-color:var(--dge-border)}
 .dmate-graph-editor .dge-overlay-tools button.is-active{background:var(--surface-3,#e2e8f0);border-color:var(--dge-border);font-weight:600}
-.dge-review-summary>h3{padding:11px 14px;margin:0;font-weight:600;font-size:14px}
+.dge-review-summary>h3{padding:14px 14px 0;margin:0 0 10px;font-weight:700;font-size:1rem}
 .dge-float-panel .dge-toolbar>.dge-field{flex:0 0 auto;width:100%}

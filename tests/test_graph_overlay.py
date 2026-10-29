@@ -93,7 +93,7 @@ def test_overlay_makes_named_and_anonymous_nodes_and_edges_editable(canvas_page)
     assert page.locator(".dge-overlay-node").count() == 2
     state = page.evaluate("instance.getDocument()")
     assert state["graphs"][0]["vertices"][1]["display_label"] == "1"
-    assert page.get_by_text("点：A、1").count() >= 1
+    assert page.get_by_text("顶点：A、1").count() >= 1
     tool(page,'添加顶点')
     bounds = page.locator(".dge-overlay-svg").bounding_box()
     page.mouse.click(bounds["x"] + .45*bounds["width"], bounds["y"] + .18*bounds["height"])
@@ -184,7 +184,7 @@ def test_overlay_keeps_image_and_zoom_when_selecting_or_renaming(canvas_page):
     page.get_by_label("当前顶点名称").fill("Z")
     assert page.evaluate("window.imageBefore===document.querySelector('.dge-overlay-image')")
     page.locator(".dge-float-results").evaluate("e=>e.open=true")
-    assert page.get_by_text("点：Z、1", exact=True).is_visible()
+    assert page.get_by_text("顶点：Z、1", exact=True).is_visible()
     assert page.locator(".dge-overlay-zoom").text_content() == zoom_before
     assert "Z—1" in page.evaluate("DMateGraphFormat.toPlain(instance.getDocument().graphs)")
 

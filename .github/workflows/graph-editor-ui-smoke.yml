@@ -28,6 +28,10 @@ on:
       - 'static/image-groups.css'
       - 'static/modal-chrome.css'
       - 'tests/test_modal_chrome.py'
+      - 'tests/test_editor_dialog_position.py'
+      - 'tests/test_drawing_fit.py'
+      - 'tests/test_appearance_surfaces.py'
+      - 'static/appearance-panels.css'
       - 'tests/test_scan_selection_save.py'
       - 'tests/test_scan_information_sources.py'
       - 'static/chat-composer.js'
@@ -92,6 +96,9 @@ jobs:
             tests/test_ai_answer_rendering.py \
             tests/test_interaction_surfaces.py \
             tests/test_modal_chrome.py \
+            tests/test_editor_dialog_position.py \
+            tests/test_drawing_fit.py \
+            tests/test_appearance_surfaces.py \
             tests/test_graph_outline_smoothness.py \
             tests/test_graph_loop_editing.py \
             tests/test_drawing_workspace.py \

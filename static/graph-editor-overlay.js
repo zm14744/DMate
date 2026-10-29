@@ -162,10 +162,11 @@ function mount(host,o){
    scroll.scrollTop=cy*ratio-scroll.clientHeight/2;
  };
  // 100% fills the viewport width. "Fit" also accounts for tall images.
- const fitImage=()=>{
+ const fitImage=(fitDrawing=o.drawingOnly)=>{
    if(!loaded||scroll.clientWidth<=0||scroll.clientHeight<=0)return;
+   if(fitDrawing&&fitGraph())return;
+   if(fitDrawing)Object.assign(world,{left:0,top:0,right:1,bottom:1});
    autoFitted=true;
-   const win=d.defaultView;
    const viewportWidth=Math.max(1,scroll.clientWidth);
    const viewportHeight=Math.max(1,scroll.clientHeight);
    const originalHeightAt100=viewportWidth*h/Math.max(1,w);
@@ -532,6 +533,61 @@ function mount(host,o){
       class:active.kind==='text_bounds'?'dge-overlay-text-region':'dge-overlay-selection'}));
   }
  }
+ function drawingBounds(){
+  let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+  const include=(x,y,pad=0)=>{left=Math.min(left,x-pad);top=Math.min(top,y-pad);right=Math.max(right,x+pad);bottom=Math.max(bottom,y+pad);};
+  // Invisible hit targets and editing controls are deliberately excluded.
+  // SVG getBBox already measures the true extrema of curves and text, but
+  // Chromium does not include strokes or marker heads in those bounds.
+  for(const shape of svg.querySelectorAll('.dge-overlay-stroke,.dge-overlay-dot,.dge-overlay-label')){
+   const style=d.defaultView.getComputedStyle(shape);
+   if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0)continue;
+   const box=shape.getBBox(),stroke=style.stroke==='none'?0:parseFloat(style.strokeWidth)||0;
+   if(![box.x,box.y,box.width,box.height].every(finite))continue;
+   include(box.x,box.y,stroke/2);include(box.x+box.width,box.y+box.height,stroke/2);
+   if(shape.hasAttribute('marker-end')){
+    const length=shape.getTotalLength(),end=shape.getPointAtLength(length),before=shape.getPointAtLength(Math.max(0,length-.01)),
+      angle=Math.atan2(end.y-before.y,end.x-before.x),cos=Math.cos(angle),sin=Math.sin(angle),unit=stroke*.7;
+    for(const [x,y]of [[-8,-5],[2,0],[-8,5]])include(end.x+(x*cos-y*sin)*unit,end.y+(x*sin+y*cos)*unit);
+   }
+  }
+  return [left,top,right,bottom].every(finite)?{x:left,y:top,width:right-left,height:bottom-top}:null;
+ }
+ function centerDrawing(bounds){
+  const cx=bounds.x+bounds.width/2,cy=bounds.y+bounds.height/2;
+  // Keep a viewport of white space on either side for subsequent panning.
+  // Measure again after layout so classic scrollbars are accounted for too.
+  for(let pass=0;pass<2;pass++){
+   const width=scroll.clientWidth,height=scroll.clientHeight,scale=width*s.zoom/100/w;
+   Object.assign(world,{left:(cx-width/scale)/w,right:(cx+width/scale)/w,
+     top:(cy-height/scale)/h,bottom:(cy+height/scale)/h});
+   layoutWorld();
+   const actualScale=scroll.clientWidth*s.zoom/100/w;
+   scroll.scrollLeft=(cx-world.left*w)*actualScale-scroll.clientWidth/2;
+   scroll.scrollTop=(cy-world.top*h)*actualScale-scroll.clientHeight/2;
+  }
+ }
+ function fitGraph(){
+  if(!o.graph?.()?.vertices.length)return false;
+  autoFitted=true;
+  // A fixed starting zoom makes repeated fits independent of the previous
+  // camera. Labels, dots and default loops have screen-sized components, so
+  // remeasure after scaling instead of fitting only the vertex coordinates.
+  zoom(100);draw();
+  let bounds=drawingBounds();if(!bounds)return false;
+  centerDrawing(bounds);draw();
+  for(let pass=0;pass<10;pass++){
+   bounds=drawingBounds();if(!bounds)return false;
+   const scale=scroll.clientWidth*s.zoom/100/w,padding=28,
+     factor=Math.min(Math.max(1,scroll.clientWidth-padding*2)/Math.max(1,bounds.width*scale),
+       Math.max(1,scroll.clientHeight-padding*2)/Math.max(1,bounds.height*scale)),
+     next=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Math.round(s.zoom*factor*100)/100));
+   if(Math.abs(next-s.zoom)<.005)break;
+   zoom(next);draw();
+  }
+  bounds=drawingBounds();if(bounds)centerDrawing(bounds);
+  draw();return true;
+ }
  svg.addEventListener('pointerdown',e=>{
   // A cached image can expose naturalWidth before its queued load handler.
   // Until fitting establishes the source/camera transform, a pointer would
@@ -673,9 +729,9 @@ function mount(host,o){
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
  scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));draw();},{passive:false});
  const syncGeometryReady=()=>{const ready=loaded&&autoFitted&&scroll.clientWidth>0&&scroll.clientHeight>0;root.dataset.geometryReady=String(ready);svg.setAttribute('aria-busy',String(!ready));};
- image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage();syncOriginal();buildSampler();draw();syncGeometryReady();};
+ image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage(false);syncOriginal();buildSampler();draw();syncGeometryReady();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
- const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();syncGeometryReady();}):null;observer?.observe(scroll);observer?.observe(viewControls);
+ const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage(false);else layoutWorld();draw();syncGeometryReady();}):null;observer?.observe(scroll);observer?.observe(viewControls);
  const resetInteraction=()=>{cancelResizePreview();active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
  function getDrawingSvg(){

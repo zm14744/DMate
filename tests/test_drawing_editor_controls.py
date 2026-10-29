@@ -197,8 +197,8 @@ def test_graph_information_tracks_model_changes_without_rebuilding_popup_or_came
     assert p.evaluate('liveInfoScroll')>0
 
     def check(points,edges,*expected):
-        heading=p.locator('.dge-review-summary > h3').text_content()
-        assert f'{points} 点 / {edges} 边' in heading
+        heading=p.locator('.dge-review-content .dgs-counts').text_content()
+        assert f'{points} 个顶点 · {edges} 条边' in heading
         text=p.locator('.dge-review-content').text_content()
         for value in expected:assert value in text
         state=p.evaluate('''()=>{
@@ -216,7 +216,7 @@ def test_graph_information_tracks_model_changes_without_rebuilding_popup_or_came
 
     check(2,19,'A→B','权值：5')
     p.evaluate("window.liveVertex=editor.model.addVertex('G1','C',.5,.8)")
-    check(3,19,'点：A、B、C')
+    check(3,19,'顶点：A、B、C')
     p.evaluate("window.liveEdge=editor.model.addEdge('G1',{from:'b',to:liveVertex,direction:'forward',weight:9})")
     check(3,20,'B→C（权值：9）')
     p.evaluate("editor.model.renameVertex('G1',liveVertex,'顶点丙')")
@@ -231,24 +231,24 @@ def test_graph_information_tracks_model_changes_without_rebuilding_popup_or_came
     check(3,20,'无向 · 无权','新线路：B—顶点丙')
     assert '权值：' not in p.locator('.dge-review-content').text_content()
     p.evaluate("editor.model.deleteEdges('G1',[liveEdge])")
-    check(3,19,'点：A、B、顶点丙')
+    check(3,19,'顶点：A、B、顶点丙')
     assert '新线路' not in p.locator('.dge-review-content').text_content()
     p.evaluate('editor.model.undo()')
     check(3,20,'新线路：B—顶点丙')
     p.evaluate('editor.model.redo()')
-    check(3,19,'点：A、B、顶点丙')
+    check(3,19,'顶点：A、B、顶点丙')
     p.evaluate("editor.model.deleteVertices('G1',[liveVertex])")
-    check(2,19,'点：A、B')
+    check(2,19,'顶点：A、B')
     assert '顶点丙' not in p.locator('.dge-review-content').text_content()
     p.evaluate('editor.model.undo()')
-    check(3,19,'点：A、B、顶点丙')
+    check(3,19,'顶点：A、B、顶点丙')
     p.evaluate("editor.model.renameGraph('G1','实时绘图')")
     check(3,19,'图 1（实时绘图）')
     # Geometry does not change the structure text; it should not even replace
     # its children during a node drag or another geometry-only publication.
-    p.evaluate("window.liveReviewChild=infoSection.firstElementChild;editor.model.moveVertex('G1','a',.31,.41)")
-    check(3,19,'点：A、B、顶点丙')
-    assert p.evaluate('infoSection.firstElementChild===liveReviewChild')
+    p.evaluate("window.liveReviewChild=infoSection.querySelector('.dge-review-content').firstElementChild;editor.model.moveVertex('G1','a',.31,.41)")
+    check(3,19,'顶点：A、B、顶点丙')
+    assert p.evaluate("infoSection.querySelector('.dge-review-content').firstElementChild===liveReviewChild")
 
 
 def test_first_blank_vertices_and_edge_update_information_through_pointer_controls(drawing_page):
@@ -257,7 +257,7 @@ def test_first_blank_vertices_and_edge_update_information_through_pointer_contro
       editor=DMateGraphEditor.mount(document.querySelector('#editor'),{drawingOnly:true,originalUrl,
         document:{body_text:'',graphs:[{id:'G1',name:'空白页',directed:false,weighted:false,vertices:[],edges:[]}]}});}''')
     p.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
-    assert '0 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '0 个顶点 · 0 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
     p.get_by_role('button',name='添加顶点',exact=True).click()
     p.locator('.dge-tool-palette > summary').click()
 
@@ -268,35 +268,35 @@ def test_first_blank_vertices_and_edge_update_information_through_pointer_contro
         p.mouse.click(*point)
 
     click_source(.3,.65)
-    assert '1 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
-    assert '点：1' in p.locator('.dge-review-content').text_content()
+    assert '1 个顶点 · 0 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
+    assert '顶点：1' in p.locator('.dge-review-content').text_content()
     click_source(.7,.75)
-    assert '2 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
-    assert '点：1、2' in p.locator('.dge-review-content').text_content()
+    assert '2 个顶点 · 0 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
+    assert '顶点：1、2' in p.locator('.dge-review-content').text_content()
     p.locator('.dge-tool-palette > summary').click()
     p.get_by_role('button',name='添加边',exact=True).click()
     p.locator('.dge-tool-palette > summary').click()
     click_source(.3,.65)
     click_source(.7,.75)
-    assert '2 点 / 1 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '2 个顶点 · 1 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
     assert '1—2' in p.locator('.dge-review-content').text_content()
     p.locator('.dge-tool-palette > summary').click()
     p.get_by_role('button',name='选择 / 移动',exact=True).click()
     p.locator('.dge-tool-palette > summary').click()
     click_source(.5,.7)
     p.get_by_role('button',name='删除这条边',exact=True).click()
-    assert '2 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '2 个顶点 · 0 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
     p.get_by_role('button',name='撤销',exact=True).click()
-    assert '2 点 / 1 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '2 个顶点 · 1 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
     assert '1—2' in p.locator('.dge-review-content').text_content()
     p.get_by_role('button',name='重做',exact=True).click()
-    assert '2 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '2 个顶点 · 0 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
     click_source(.3,.65)
     p.get_by_role('button',name='删除这个顶点',exact=True).click()
-    assert '1 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
-    assert '点：2' in p.locator('.dge-review-content').text_content()
+    assert '1 个顶点 · 0 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
+    assert '顶点：2' in p.locator('.dge-review-content').text_content()
     p.get_by_role('button',name='撤销',exact=True).click()
-    assert '2 点 / 0 边' in p.locator('.dge-review-summary > h3').text_content()
+    assert '2 个顶点 · 0 条边' in p.locator('.dge-review-content .dgs-counts').text_content()
 
 
 def test_property_typing_updates_closed_information_without_losing_focus_or_caret(drawing_page):
@@ -317,7 +317,7 @@ def test_property_typing_updates_closed_information_without_losing_focus_or_care
       reviewSame:document.querySelector('.dge-review-summary')===closedReview,open:closedInfo.open})''')
     assert result=={'same':True,'focused':True,'value':'AlZpha','start':3,'end':3,
                     'popupSame':True,'reviewSame':True,'open':False}
-    assert '点：AlZpha、B' in p.locator('.dge-review-content').text_content()
+    assert '顶点：AlZpha、B' in p.locator('.dge-review-content').text_content()
     assert 'AlZpha→B（权值：5）' in p.locator('.dge-review-content').text_content()
     p.locator('.dge-float-results > summary').click()
     assert 'AlZpha→B（权值：5）' in p.locator('.dge-review-content').text_content()
@@ -342,3 +342,15 @@ def test_property_and_settings_edits_update_graph_information_immediately(drawin
     p.locator('.dge-float-results > summary').click()
     assert p.locator('.dge-review-summary').is_visible()
     assert '路线甲：A—B' in p.locator('.dge-review-content').text_content()
+
+
+def test_drawing_has_no_save_footer_and_model_edits_still_publish(drawing_page):
+    page = drawing_page
+    assert page.locator('.dge-footer').count() == 0
+    assert page.get_by_role('button', name='保存绘图', exact=True).count() == 0
+    assert page.get_by_role('button', name='保存并确认', exact=True).count() == 0
+    before = page.evaluate('changes')
+    page.evaluate("editor.model.renameVertex('G1','a','实时保存顶点')")
+    assert page.evaluate('changes') > before
+    assert page.evaluate('editor.getDocument().graphs[0].vertices[0].label') == '实时保存顶点'
+    assert '顶点：实时保存顶点、B' in page.locator('.dge-review-content').text_content()

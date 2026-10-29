@@ -122,6 +122,7 @@ def test_text_sources_multiselect_order_controls_recognition_and_saved_output(sc
     # output as the next immutable original scan.
     page.get_by_role('button', name='继续修改', exact=True).click()
     page.wait_for_function('document.querySelector(".dgs-source .dge-overlay-image").naturalWidth===600')
+    page.locator('.dgs-body').wait_for(state='visible')
     assert page.locator('.dgs-body').inner_text() == '文字区域 1\n\n文字区域 3'
     page.get_by_role('tab', name='原生识别', exact=True).click()
     assert page.locator('.dgs-body').inner_text() == original['body_text']

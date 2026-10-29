@@ -107,7 +107,7 @@ const APPEARANCE_MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 const APPEARANCE_MAX_IMAGE_SIDE = 1920;
 
 const APPEARANCE_DEFAULTS = Object.freeze({
-    mode: "light",
+    mode: "system",
     accent: "blue",
     fontSize: "standard",
     backgroundFit: "cover",
@@ -274,9 +274,9 @@ function resolveAppearanceTheme() {
     }
 
     try {
-        return window.matchMedia("(prefers-color-scheme: light)").matches
-            ? "light"
-            : "dark";
+        return window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
     } catch (_error) {
         return "light";
     }
@@ -654,7 +654,7 @@ function updateAppearanceBackgroundUi() {
             preview.setAttribute("role", "button");
             preview.setAttribute("aria-label", "查看当前背景大图");
         } else {
-            preview.textContent = "无背景";
+            preview.textContent = "无";
             preview.style.setProperty("background-image", "none", "important");
             preview.dataset.hasBackground = "false";
             preview.removeAttribute("tabindex");
@@ -822,7 +822,7 @@ async function resetAppearance() {
 
 function setupAppearanceSystemThemeListener() {
     try {
-        appearanceSystemMedia = window.matchMedia("(prefers-color-scheme: light)");
+        appearanceSystemMedia = window.matchMedia("(prefers-color-scheme: dark)");
         const onChange = () => {
             if (appearanceSettings.mode === "system") {
                 applyAppearanceSettings({ save: false });
@@ -1084,7 +1084,7 @@ function clearLoggedOutWorkspace() {
     const sessionsBox = document.getElementById("sessions");
     if (sessionsBox) sessionsBox.innerHTML = "";
     const chat = document.getElementById("chat");
-    if (chat) chat.innerHTML = '<div class="empty-tip">暂无对话</div>';
+    if (chat) chat.innerHTML = '<div class="empty-tip">无</div>';
 
     renderAll();
 }
@@ -6885,28 +6885,11 @@ function formatLearningDate(timestamp) {
 }
 
 function renderLearningSummary() {
-    const box = document.getElementById("learningSummary");
     const wrongButton = document.getElementById("wrongBookBtn");
-
-    if (!box) return;
-
     const wrongCount = learningState.wrongQuestions.length;
-    const pendingWrong = learningState.wrongQuestions
-        .filter(item => !item.corrected)
-        .sort((a, b) => b.updatedAt - a.updatedAt);
-    const pendingCount = pendingWrong.length;
-    const lines = [];
-
-    lines.push(
-        `错题本：${wrongCount} 道，待订正 ${pendingCount} 道`
-    );
-
-    box.innerText = lines.join("\n");
-
     if (wrongButton) {
         wrongButton.textContent = `错题本 (${wrongCount})`;
     }
-
 }
 
 
@@ -7038,10 +7021,10 @@ function updateWrongBookToolbar(allItems, visibleItems) {
     if (stats) {
         const visibleText = visibleItems.length === total
             ? ""
-            : ` · 当前显示 ${visibleItems.length} 道`;
+            : `　当前显示 ${visibleItems.length} 道`;
 
         stats.textContent =
-            `共 ${total} 道 · 待处理 ${pending} · 已订正 ${corrected}${visibleText}`;
+            `共 ${total} 道　待处理 ${pending}　已订正 ${corrected}${visibleText}`;
     }
 
     for (const button of filterButtons) {
@@ -15120,6 +15103,29 @@ async function uploadDrawingResult(blob, metadata = {}) {
     return {ok: true, requestId};
 }
 
+function showGraphEditorDialog(dialog) {
+    // WebViews can composite the top layer before its first modal layout.
+    // Keep that layout invisible, then reveal the already-centered dialog.
+    const opening = String(performance.now());
+    dialog.dataset.positioning = opening;
+    try {
+        dialog.showModal();
+        dialog.getBoundingClientRect();
+        requestAnimationFrame(() => {
+            if (!dialog.open || dialog.dataset.positioning !== opening) return;
+            dialog.getBoundingClientRect();
+            requestAnimationFrame(() => {
+                if (!dialog.open || dialog.dataset.positioning !== opening) return;
+                delete dialog.dataset.positioning;
+                dialog.querySelector('#graphEditorClose')?.focus({preventScroll: true});
+            });
+        });
+    } catch (error) {
+        delete dialog.dataset.positioning;
+        throw error;
+    }
+}
+
 function openGraphDrawing() {
     if (ocrEditorTaskId || !window.DMateGraphEditor?.mount) return;
     const dialog = document.getElementById("graphEditorDialog");
@@ -15177,7 +15183,7 @@ function openGraphDrawing() {
             }
         });
         dialog.addEventListener("close", finish); close.addEventListener("click", requestClose);
-        dialog.showModal(); refreshInputAvailability();
+        showGraphEditorDialog(dialog); refreshInputAvailability();
     } catch (error) {
         finish(); showCurrentError(error?.message || "绘图界面未能打开，请刷新后重试。");
     }
@@ -15287,7 +15293,7 @@ async function editOcrTask(id) {
         dialog.addEventListener("close", finish);
         dialog.addEventListener("cancel", blockCloseDuringSave);
         closeButton.addEventListener("click", requestClose);
-        dialog.showModal();
+        showGraphEditorDialog(dialog);
         refreshInputAvailability();
     } catch (error) {
         finish();
@@ -16383,7 +16389,7 @@ function renderChat() {
 
     if (!session) {
         chat.innerHTML =
-            '<div class="empty-tip">暂无对话</div>';
+            '<div class="empty-tip">无</div>';
         lastRenderedChatSessionId = null;
         queueChatJumpControlsUpdate();
         return;
@@ -20458,7 +20464,7 @@ function renderKnowledgeGraph() {
 
 
 // -----------------------------
-// 右侧会话信息
+// 右侧对话信息
 // -----------------------------
 function renderInfo() {
     const info = document.getElementById("info");
@@ -20467,7 +20473,7 @@ function renderInfo() {
     const session = getCurrent();
 
     if (!session) {
-        info.innerText = "暂无对话";
+        info.innerText = "无";
         return;
     }
 

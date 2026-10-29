@@ -12,6 +12,23 @@
 <meta name="color-scheme" content="only light">
 <meta name="supported-color-schemes" content="light">
 <meta name="theme-color" content="#f8fafc">
+<script id="dmateAppearanceBootstrap">
+/* Account preferences are applied only after authentication. Until then the
+   first frame follows the OS without trusting a previous account's storage. */
+(function () {
+    var theme = "light";
+    try {
+        if (window.matchMedia("(prefers-color-scheme: dark)").matches) theme = "dark";
+    } catch (_) {}
+    var root = document.documentElement;
+    var scheme = theme === "light" ? "only light" : "dark";
+    root.dataset.appearanceTheme = theme;
+    root.style.colorScheme = scheme;
+    document.querySelector('meta[name="color-scheme"]').content = scheme;
+    document.querySelector('meta[name="supported-color-schemes"]').content = theme;
+    document.querySelector('meta[name="theme-color"]').content = theme === "light" ? "#f8fafc" : "#171717";
+})();
+</script>
 <meta name="application-name" content="DMate">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="DMate">
@@ -2764,7 +2781,7 @@ body[data-appearance-theme="light"] .msg-actions button {
         padding-right:9px;
     }
 
-    /* 会话信息 / 学习记录放在聊天区上方，限制高度，可独立滚动。 */
+    /* 对话信息 / 学习记录放在聊天区上方，限制高度，可独立滚动。 */
     .right {
         order:2;
         width:100%;
@@ -8640,7 +8657,8 @@ window.MathJax = {
 .ocr-task-structure-head { margin-top:8px!important; font-weight:600; }
 .ocr-task-relations { padding-left:8px; }
 .ocr-task-relations p { margin:2px 0; }
-.graph-editor-dialog { width:min(1280px,96vw); max-width:96vw; height:min(900px,94dvh); max-height:94dvh; box-sizing:border-box; margin:auto; padding:18px; border:1px solid var(--border-strong); border-radius:16px; background:var(--surface-1); color:var(--text-primary); overflow:hidden; }
+.graph-editor-dialog { position:fixed; inset:0; width:min(1280px,96vw); max-width:96vw; height:min(900px,94dvh); max-height:94dvh; box-sizing:border-box; margin:auto; padding:18px; border:1px solid var(--border-strong); border-radius:16px; background:var(--surface-1); color:var(--text-primary); overflow:hidden; }
+.graph-editor-dialog[data-positioning], .graph-editor-dialog[data-positioning]::backdrop { visibility:hidden; pointer-events:none; }
 .graph-editor-dialog[open] { display:flex; flex-direction:column; }
 .graph-editor-dialog > #graphEditorMount { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .graph-editor-dialog::backdrop { background:rgba(0,0,0,.6); }
@@ -8762,6 +8780,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/drawing-workspace.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/modal-chrome.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/appearance-panels.css?v={{ dmate_web_revision }}">
 <style>
 /* Keep focus feedback inside the control, without a blue or red outer ring.
    Important layer declarations also override the older themed focus rules. */
@@ -8789,6 +8808,10 @@ button:focus-visible, summary:focus-visible, [role="button"]:focus-visible { fil
 </head>
 
 <body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
+<script id="dmateAppearanceBodyBootstrap">
+document.body.dataset.appearanceTheme = document.documentElement.dataset.appearanceTheme;
+document.body.style.colorScheme = document.documentElement.style.colorScheme;
+</script>
 <script>
 window.DMATE_WEB_REVISION = {{ dmate_web_revision | tojson }};
 window.DMATE_CLIENT_CONFIG = {{ {
@@ -8906,7 +8929,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <button id="mobileToolsClose" class="mobile-drawer-close" type="button" aria-label="关闭学习工具">×</button>
     </div>
     <div class="panel-heading-row">
-        <div>会话信息</div>
+        <div>对话信息</div>
     </div>
     <div id="info" class="small rich-copy-surface"></div>
 
@@ -8914,7 +8937,6 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <div class="panel-heading-row learning-title">
             <div>学习记录</div>
         </div>
-        <div id="learningSummary" class="learning-summary"></div>
 
         <div class="learning-tools-primary">
             <div class="learning-actions learning-actions-single">
@@ -9024,7 +9046,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div class="appearance-section">
                 <div class="appearance-section-title">全局背景</div>
                 <div class="appearance-background-row">
-                    <div id="appearanceBackgroundPreview" class="appearance-background-preview">无背景</div>
+                    <div id="appearanceBackgroundPreview" class="appearance-background-preview">无</div>
                     <div>
                         <div class="appearance-background-actions">
                             <button id="appearanceBackgroundUpload" type="button" class="primary">选择图片</button>
@@ -9132,7 +9154,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                     <button id="accountRegister" type="button">注册</button>
                 </div>
                 <button id="accountForgotOpen" type="button" class="account-forgot">忘记密码</button>
-                <div class="account-hint">未登录时，对话、错题本、学习记录和外观设置只在当前打开期间有效，关闭后不会保存</div>
+                <div class="account-hint">未登录时不会保存信息</div>
 
                 <div id="accountRegisterPanel" class="account-register-panel hidden">
                     <div class="account-panel-title">注册账号</div>

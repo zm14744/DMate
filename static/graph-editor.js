@@ -209,45 +209,30 @@
             return {getDocument: model.getDocument, destroy() {container.replaceChildren();}};
         }
 
-        function reviewKey(data) { return JSON.stringify([data, selectedEdge]); }
+        function reviewKey(document) {
+            return JSON.stringify(document.graphs.map((graph, index) => root.DMateGraphFormat.graphRows(graph, index)));
+        }
 
         function refreshReview(document) {
             const review = container.querySelector('.dge-review-summary');
-            const graph = document.graphs.find(row => row.id === currentGraph);
-            if (!review || !graph || !root.DMateGraphFormat?.graphRows) return;
-            const data = root.DMateGraphFormat.graphRows(graph, document.graphs.indexOf(graph));
-            const key = reviewKey(data);
+            if (!review || !root.DMateGraphFormat?.renderGraphInformation) return;
+            const key = reviewKey(document);
             if (reviewKeys.get(review) === key) return;
-            const refreshed = buildReview(graph, document, data);
             // Keep the popup, its scroll container and active property input.
-            // Pointer previews never publish model changes; moving a point
-            // also leaves the rendered structure unchanged and skips this.
-            review.replaceChildren(...refreshed.childNodes);
+            // Geometry-only changes do not alter this key or replace content.
+            root.DMateGraphFormat.renderGraphInformation(review.querySelector('.dge-review-content'), document);
             reviewKeys.set(review, key);
         }
 
-        function buildReview(graph, document, data) {
-            if (graph && root.DMateGraphFormat?.graphRows) {
-                data ||= root.DMateGraphFormat.graphRows(graph, document.graphs.indexOf(graph));
-                const summary = element('section', 'dge-review-summary');
-                reviewKeys.set(summary, reviewKey(data));
-                summary.append(element('h3', '', '图形结构 · ' + graph.vertices.length + ' 点 / ' + graph.edges.length + ' 边'));
-                const section = element('div', 'dge-review-content');
-                section.append(element('p', 'dge-review-type', data.title + (data.showType === false ? '' : '    ' + data.type)));
-                section.append(element('p', '', '点：' + (data.vertices.join('、') || '无')));
-                if (data.named.length) section.append(element('p', '', '边：' + data.named.join('、')));
-                section.append(element('p', 'dge-review-subhead', '关系：'));
-                if (!data.relations.length) section.append(element('p', '', '无'));
-                for (const row of data.relations) {
-                    const link = element('button', 'dge-review-relation', row.txt);
-                    link.type = 'button';
-                    if (row.id === selectedEdge) link.classList.add('is-selected');
-                    link.addEventListener('click', () => act(() => { propertiesVisible = true; selectedEdge = row.id; selectedNodes.clear(); }));
-                    section.append(link);
-                }
-                summary.append(section); return summary;
-            }
-            return null;
+        function buildReview(graph, document) {
+            if (!root.DMateGraphFormat?.renderGraphInformation) return null;
+            const summary = element('section', 'dge-review-summary');
+            reviewKeys.set(summary, reviewKey(document));
+            summary.append(element('h3', '', '图形信息'));
+            const content = element('div', 'dge-review-content');
+            root.DMateGraphFormat.renderGraphInformation(content, document);
+            summary.append(content);
+            return summary;
         }
 
         function buildSelectedProperties(graph) {
@@ -602,7 +587,7 @@
                 container.append(workspace);
             }
             const review = buildReview(graph, document);
-            if (review && graph?.vertices?.length) container.append(review);
+            if (review) container.append(review);
             const toolbar = element('div', 'dge-toolbar');
             if (options.structureOnly && !graph) toolbar.append(button('添加图形结构', () => {
                 currentGraph = model.addGraph();
@@ -727,23 +712,25 @@
                 }
             }
             const status = element('div', 'dge-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.textContent = notice; container.append(status);
-            const confirmRow = element('div', 'dge-footer');
-            // The dialog header contains the close button; footer is save only.
-            const actions = element('div', 'dge-actions');
-            const confirm = button(saving ? '正在保存…' : options.drawingOnly ? '保存绘图' : '保存并确认', async () => {
-                if (textState.regions?.some(r => ['queued','recognizing'].includes(r.status))) { notice = '文字正在识别，请等待完成后保存。'; refreshDraftViews(); return; }
-                if ([...container.querySelectorAll('input[type=number]')].some(control => !control.checkValidity())) {
-                    notice = '请填写有效的相同边数量（1 到 50）。'; refreshDraftViews(); return;
-                }
-                const problems = options.drawingOnly && model.getDocument().graphs.every(g=>!g.vertices.length) ? [] : model.validate();
-                // The default draft may be empty; only show validation errors after Save is pressed.
-                if (problems.length) { notice = problems[0]; render(); return; }
-                if (typeof options.onConfirm !== 'function') { notice = '暂时无法保存，请稍后重试。'; render(); return; }
-                saving = true; render();
-                try { await options.onConfirm(model.getDocument(), isQuestion); }
-                catch (error) { notice = error?.message || '保存失败，当前修改已保留。'; }
-                finally { saving = false; if (!destroyed) render(); }
-            }, 'dge-primary'); actions.append(confirm); confirmRow.append(actions); container.append(confirmRow);
+            if (!options.drawingOnly) {
+                const confirmRow = element('div', 'dge-footer');
+                // The dialog header contains the close button; footer is save only.
+                const actions = element('div', 'dge-actions');
+                const confirm = button(saving ? '正在保存…' : '保存并确认', async () => {
+                    if (textState.regions?.some(r => ['queued','recognizing'].includes(r.status))) { notice = '文字正在识别，请等待完成后保存。'; refreshDraftViews(); return; }
+                    if ([...container.querySelectorAll('input[type=number]')].some(control => !control.checkValidity())) {
+                        notice = '请填写有效的相同边数量（1 到 50）。'; refreshDraftViews(); return;
+                    }
+                    const problems = model.validate();
+                    // The default draft may be empty; only show validation errors after Save is pressed.
+                    if (problems.length) { notice = problems[0]; render(); return; }
+                    if (typeof options.onConfirm !== 'function') { notice = '暂时无法保存，请稍后重试。'; render(); return; }
+                    saving = true; render();
+                    try { await options.onConfirm(model.getDocument(), isQuestion); }
+                    catch (error) { notice = error?.message || '保存失败，当前修改已保留。'; }
+                    finally { saving = false; if (!destroyed) render(); }
+                }, 'dge-primary'); actions.append(confirm); confirmRow.append(actions); container.append(confirmRow);
+            }
             for (const [scroller, top, left] of scrollState) {
                 scroller.scrollTop = top;
                 scroller.scrollLeft = left;

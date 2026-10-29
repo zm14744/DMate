@@ -1,0 +1,72 @@
+/* One opacity setting paints panel backgrounds; text, actions, images and
+   graph pixels keep their own opacity. The important layer supersedes the
+   historical theme-specific opaque backgrounds without changing geometry. */
+body[data-appearance-theme] {
+    --dm-frost-panel:rgba(var(--surface-1-rgb),var(--panel-alpha));
+    --dm-frost-panel-strong:rgba(var(--surface-2-rgb),var(--panel-alpha));
+    --kg-mobile-viewport-bg:rgba(var(--surface-0-rgb),var(--panel-alpha));
+}
+
+@layer dmate-panel-surfaces {
+    /* The page itself supplies the wallpaper or theme base. These structural
+       wrappers must not paint a second opaque sheet over that base. */
+    body[data-appearance-theme] :is(.layout,.center,.chat,.input-wrap),
+    body[data-appearance-theme] :is(
+        .modal-card > .modal-head,
+        .appearance-body,.appearance-section,.appearance-apply-hint,.appearance-footer,
+        .account-body,.wrong-toolbar,.wrong-tools,#wrongBookList,.learning-review-body,
+        .graph-toolbar,.graph-summary,.knowledge-graph-main,.knowledge-graph-side,
+        .knowledge-graph-canvas,.graph-side-tabs,.graph-side-page,.appearance-background-viewer-body,
+        .dgs-information,.dcn-content,.dcn-main,.dcn-sidebar,
+        .dge-overlay-host,.dge-overlay-viewport
+    ) {
+        background-color:transparent!important;
+        background-image:none!important;
+    }
+
+    body[data-appearance-theme] :is(.left,.right,.mobile-topbar) {
+        background-color:rgba(var(--surface-1-rgb),var(--panel-alpha))!important;
+        background-image:none!important;
+    }
+
+    body[data-appearance-theme] :is(
+        .modal-card,.ocr-review-dialog,.graph-editor-dialog,.dcn-dialog,.dcn-confirm,
+        .ocr-group-dialog,.dmate-png-save-panel,
+        .input,#info,.learning-summary,.ocr-task-panel,.ocr-task-card,.ocr-task-structure,
+        .ocr-review-rendered,.ocr-review-preview,.appearance-background-preview:not([data-has-background="true"]),
+        .wrong-card,.wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,
+        .wrong-solution-body,.learning-review-intro,.learning-review-section,
+        .kg-section,.kg-mobile-section,.kg-mobile-viewport,.kg-mobile-zoom-controls,
+        .kg-history-item,.kg-history-preview,.graph-metric,.graph-detail-tip,.graph-detail-empty,
+        .graph-summary-item,.graph-summary-item.focus,
+        .dge-original,.dge-visual,.dge-toolbar,.dge-view-controls,
+        .dge-tool-palette,.dge-float-panel,.dge-float-content,.dge-selection-panel,
+        .dge-overlay-tools,.dge-review-summary,.dge-node-panel,.dge-edge-panel,
+        .dgs-information-card,.dgs-source-picker,.dgs-source-card,
+        .ddw-side-panel,.ddw-export-preview,.ddw-history-item.is-current,
+        .dcn-explanation,.dcn-relation,.dcn-note.is-current,
+        .mobile-choice-option,.download-option,.account-panel,
+        .account-register-panel,.account-email-recovery-panel,.account-recovery-panel,
+        .account-email-bind-panel,.account-recovery-code-panel,.account-registration-recovery-panel,
+        .account-delete-panel
+    ) {
+        background-color:rgba(var(--surface-2-rgb),var(--panel-alpha))!important;
+        background-image:none!important;
+    }
+
+    /* Toolbars embedded in a floating panel share its background. Separate
+       palettes and source pickers remain independent translucent panels. */
+    body[data-appearance-theme] :is(
+        .ddw-editor .dge-floating-actions > .dge-float-panel,
+        .ddw-editor .dge-tool-palette,
+        .ddw-editor .dge-float-panel .dge-toolbar,
+        .ddw-editor .dge-float-panel .dge-review-summary,
+        .dge-tool-palette:has(> .dge-overlay-tools) > .dge-overlay-tools
+    ) {
+        background-color:transparent!important;
+        background-image:none!important;
+    }
+    body[data-appearance-theme] .ddw-editor .dge-tool-palette > .dge-overlay-tools {
+        background-color:rgba(var(--surface-2-rgb),var(--panel-alpha))!important;
+    }
+}

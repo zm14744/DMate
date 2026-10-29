@@ -2,8 +2,10 @@
  'use strict';
  const clone=v=>JSON.parse(JSON.stringify(v));
  const blank=(name='我的图形')=>({body_text:'',graphs:[{id:'G1',name,directed:false,weighted:false,vertices:[],edges:[]}]});
+ const emptyDocument=()=>({body_text:'',graphs:[]});
  const id=()=>root.crypto?.randomUUID?.()||'drawing-'+Date.now()+'-'+Math.random().toString(36).slice(2);
  const goodDocument=v=>v&&typeof v==='object'&&Array.isArray(v.graphs)&&v.graphs.length>0&&v.graphs.every(g=>g&&typeof g==='object'&&Array.isArray(g.vertices)&&Array.isArray(g.edges));
+ const meaningfulDocument=v=>goodDocument(v)&&(String(v.body_text||'').trim()||v.graphs.some(g=>g.vertices.length||g.edges.length||String(g.name||'').trim()&&!['我的图形','图 1','图1'].includes(String(g.name).trim())));
  const caption=v=>String(v||'未命名绘图').trim().slice(0,80)||'未命名绘图';
  const fingerprint=v=>JSON.stringify(v);
  function mount(host,options={}){
@@ -19,30 +21,43 @@
   const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),status=el('p','ddw-status');
   status.setAttribute('role','status');status.setAttribute('aria-live','polite');
   const settingsButton=button('绘图设置',()=>toggleEditorPanel('graphs')),informationButton=button('图形信息',()=>toggleEditorPanel('results'));
-  const historyButton=button('历史绘图',()=>togglePanel('history')),aiButton=button('AI 回答',()=>togglePanel('ai'));
+  const historyButton=button('历史绘图',()=>togglePanel('history')),aiButton=button('AI指导',()=>togglePanel('ai'));
   rail.setAttribute('role','toolbar');rail.setAttribute('aria-label','绘图面板');
   settingsButton.setAttribute('aria-expanded','false');informationButton.setAttribute('aria-expanded','false');
   historyButton.setAttribute('aria-expanded','false');aiButton.setAttribute('aria-expanded','false');
-  const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=button('',()=>uploadImage(),'ddw-primary ddw-upload-button');
-  uploadButton.setAttribute('aria-label','上传到对话');uploadButton.title='上传到对话';
-  actions.append(newButton,historyButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,aiButton);body.append(editorHost,rail,panel);shell.append(top,body,status);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
+  const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=button('上传',()=>uploadImage(),'ddw-primary ddw-upload-button');
+  uploadButton.setAttribute('aria-label','上传');uploadButton.title='上传';
+  actions.append(newButton,historyButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,aiButton);body.append(editorHost,rail);shell.append(top,body,panel,status);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
   let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false;
   const active=()=>pages.find(p=>p.id===activeId);
   function setStatus(message){status.textContent=message||persistError;status.classList.toggle('is-error',Boolean(status.textContent));}
   function abortAnswer(){aiEpoch++;aiAbort?.abort();aiAbort=null;}
   function invalidateAnswer(){
    abortAnswer();answer='';answerDocument='';answerRequirement='';
-   const ask=panel.querySelector('[data-drawing-guide]');if(ask){ask.disabled=false;ask.textContent='请求 AI 指导';}
+   const ask=panel.querySelector('[data-drawing-guide]');if(ask){ask.disabled=false;ask.setAttribute('aria-busy','false');}
    const result=panel.querySelector('.ddw-ai-answer');if(result)result.replaceChildren();
   }
   function editorPanel(key){return editorHost.querySelector('.dge-float-panel[data-panel-key="'+key+'"]');}
   function closeEditorPanels(){for(const item of editorHost.querySelectorAll('.dge-floating-actions > details[open]'))item.querySelector(':scope > summary')?.click();}
   function closeTools(){toolsExpanded=false;const palette=editorHost.querySelector('.dge-tool-palette');if(palette)palette.open=false;}
   function dismissPanels(){closeTools();closeEditorPanels();panelMode='';renderPanel();syncChrome();}
-  function toggleTools(){const next=!toolsExpanded;editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode='';renderPanel();toolsExpanded=next;syncChrome();}
+  function toggleTools(){if(!active())return;const next=!toolsExpanded;editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode='';renderPanel();toolsExpanded=next;syncChrome();}
   function toggleEditorPanel(key){
+   if(!active())return;
    closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();panelMode='';renderPanel();
    editorPanel(key)?.querySelector(':scope > summary')?.click();syncChrome();
+  }
+  function positionPopover(content,trigger,alignLeft=false){
+   if(!content||!trigger)return;
+   content.style.visibility='hidden';
+   const viewport=win.visualViewport,margin=8,gap=8,leftEdge=(viewport?.offsetLeft||0)+margin,topEdge=(viewport?.offsetTop||0)+margin;
+   const rightEdge=leftEdge+(viewport?.width||win.innerWidth)-2*margin,bottomEdge=topEdge+(viewport?.height||win.innerHeight)-2*margin;
+   const anchor=trigger.getBoundingClientRect(),below=bottomEdge-anchor.bottom-gap,above=anchor.top-gap-topEdge;
+   const upwards=below<120&&above>below,space=Math.max(40,upwards?above:below);
+   content.style.maxHeight=space+'px';content.style.maxWidth=Math.max(40,rightEdge-leftEdge)+'px';
+   const box=content.getBoundingClientRect(),left=Math.max(leftEdge,Math.min(alignLeft?anchor.left:anchor.right-box.width,rightEdge-box.width));
+   const top=Math.max(topEdge,Math.min(upwards?anchor.top-gap-box.height:anchor.bottom+gap,bottomEdge-box.height));
+   content.style.left=left+'px';content.style.right='auto';content.style.top=top+'px';content.style.visibility='visible';
   }
   function syncChrome(){
    if(destroyed)return;
@@ -52,7 +67,9 @@
     observedPalette=palette;const trigger=palette.querySelector(':scope > summary');
     trigger?.setAttribute('aria-label','绘图工具');trigger?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();toggleTools();});
    }
-   if(palette){palette.open=toolsExpanded;palette.querySelector(':scope > summary')?.setAttribute('aria-expanded',String(toolsExpanded));}
+   const empty=!active(),disabled=exportBusy||Boolean(exportPreview);name.disabled=empty||disabled;editorHost.inert=empty||disabled;rail.inert=empty||disabled;
+   settingsButton.disabled=empty||disabled;informationButton.disabled=empty||disabled;aiButton.disabled=empty||disabled;shell.classList.toggle('is-empty',empty);
+   if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(empty));}
    for(const item of editorHost.querySelectorAll('.dge-float-panel')){
     const content=item.querySelector(':scope > .dge-float-content');
     if(content&&!content.querySelector(':scope > .ddw-editor-panel-header')){
@@ -70,6 +87,9 @@
    const top=controlsTop+Math.max(rail.getBoundingClientRect().height,palette?.querySelector(':scope > summary')?.getBoundingClientRect().height||0)+8;
    body.style.setProperty('--ddw-panel-top',top+'px');
    body.style.setProperty('--ddw-panel-space',Math.max(90,origin.height-top-10)+'px');
+   if(panelMode)positionPopover(panel,panelMode==='history'?historyButton:aiButton);
+   for(const [key,trigger] of [['graphs',settingsButton],['results',informationButton]]){const item=editorPanel(key);if(item?.open)positionPopover(item.querySelector(':scope > .dge-float-content'),trigger);}
+   if(palette?.open)positionPopover(palette.querySelector(':scope > .dge-overlay-tools'),palette.querySelector(':scope > summary'),true);
   }
   function queueChrome(){if(!chromeFrame&&!destroyed)chromeFrame=win.requestAnimationFrame(()=>{chromeFrame=0;syncChrome();});}
   const chromeObserver=new win.MutationObserver(queueChrome);chromeObserver.observe(editorHost,{childList:true,subtree:true});
@@ -88,51 +108,51 @@
    dismissPanels();focus?.focus({preventScroll:true});
   };
   doc.addEventListener('pointerdown',outsidePointer,true);doc.addEventListener('keydown',escapeKey,true);
-  function currentDocument(){return editor?.getDocument?.()||active()?.document||blank();}
+  win.addEventListener('resize',queueChrome);doc.addEventListener('scroll',queueChrome,true);win.visualViewport?.addEventListener('resize',queueChrome);win.visualViewport?.addEventListener('scroll',queueChrome);
+  function currentDocument(){return editor?.getDocument?.()||active()?.document||emptyDocument();}
   function collect(){const p=active();if(!p)return;p.document=clone(currentDocument());p.name=caption(name.value);p.updatedAt=Date.now();}
   function persist(){
    clearTimeout(timer);timer=null;if(destroyed)return false;
-   const payload=JSON.stringify({version:1,activeId,pages});
+   const payload=JSON.stringify({version:2,activeId,pages});
    if(payload===savedRaw)return true;
    try{win.localStorage.setItem(key,payload);savedRaw=payload;persistError='';setStatus('');return true;}
    catch(_){persistError='此设备存储不足，当前绘图仍在本页保留；请导出图片后再关闭。';setStatus();return false;}
   }
   function schedule(){clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}
   function mountPage(){
-   editor?.destroy();editor=null;const p=active();if(!p)return;
-   name.value=p.name;nameFollowsGraph=false;requirement=p.requirement||'';answer='';answerDocument='';answerRequirement='';
-   const initial=blank(p.name),url='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700"><rect width="100%" height="100%" fill="white"/></svg>');
-   editor=root.DMateGraphEditor.mount(editorHost,{document:clone(p.document),initialDocument:initial,originalUrl:url,drawingOnly:true,
+   editor?.destroy();editor=null;const p=active(),documentValue=p?.document||emptyDocument();
+   name.value=p?.name||'';nameFollowsGraph=false;requirement=p?.requirement||'';answer='';answerDocument='';answerRequirement='';
+   const initial=p?blank(p.name):emptyDocument(),url='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700"><rect width="100%" height="100%" fill="white"/></svg>');
+   editor=root.DMateGraphEditor.mount(editorHost,{document:clone(documentValue),initialDocument:initial,originalUrl:url,drawingOnly:true,
     onChange:value=>{if(destroyed)return;const selected=active();if(!selected)return;selected.document=clone(value);selected.updatedAt=Date.now();
      if(nameFollowsGraph&&doc.activeElement!==name&&value.graphs[0]){selected.name=caption(value.graphs[0].name);name.value=selected.name;}
      options.onChange?.(clone(value));invalidateAnswer();schedule();},
-    onConfirm:async value=>{const selected=active();selected.document=clone(value);selected.name=caption(name.value);selected.updatedAt=Date.now();if(!persist())throw new Error(persistError);if(panelMode==='history')renderPanel();}
+    onConfirm:async value=>{const selected=active();if(!selected)return;selected.document=clone(value);selected.name=caption(name.value);selected.updatedAt=Date.now();if(!persist())throw new Error(persistError);if(panelMode==='history')renderPanel();}
    });
-   options.onChange?.(clone(p.document));renderPanel();syncChrome();
+   options.onChange?.(clone(documentValue));renderPanel();syncChrome();
   }
-  function switchPage(pageId){if(pageId===activeId)return;collect();persist();abortAnswer();activeId=pageId;persist();mountPage();setStatus('');}
+  function switchPage(pageId){if(pageId===activeId||!pages.some(p=>p.id===pageId))return;collect();persist();abortAnswer();activeId=pageId;persist();mountPage();setStatus('');}
   function newPage(){
    if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
    collect();persist();abortAnswer();const pageName='绘图 '+(pages.length+1),p={id:id(),name:pageName,document:blank(pageName),requirement:'',createdAt:Date.now(),updatedAt:Date.now()};pages.push(p);activeId=p.id;persist();mountPage();setStatus('');
   }
-  function togglePanel(mode){closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
+  function togglePanel(mode){if(mode==='ai'&&!active())return;closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
   function renderPanel(){
-   panel.hidden=!panelMode;panel.replaceChildren();historyButton.setAttribute('aria-expanded',String(panelMode==='history'));aiButton.setAttribute('aria-expanded',String(panelMode==='ai'));
+   panel.style.visibility='hidden';panel.hidden=!panelMode;panel.replaceChildren();historyButton.setAttribute('aria-expanded',String(panelMode==='history'));aiButton.setAttribute('aria-expanded',String(panelMode==='ai'));
    if(!panelMode){queueChrome();return;}
-   const header=el('div','ddw-panel-header');header.append(el('h3','',panelMode==='history'?'历史绘图':'AI 回答'));panel.append(header);
+   const header=el('div','ddw-panel-header');header.append(el('h3','',panelMode==='history'?'历史绘图':'AI指导'));panel.append(header);
    if(panelMode==='history'){
     const list=el('div','ddw-history-list');
     pages.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(p=>{
      const row=el('div','ddw-history-item'+(p.id===activeId?' is-current':'')),open=button(p.name,()=>switchPage(p.id),'ddw-history-open');
      open.setAttribute('aria-current',String(p.id===activeId));
-     const stats=p.document.graphs.reduce((a,g)=>[a[0]+g.vertices.length,a[1]+g.edges.length],[0,0]);
      const remove=button('',()=>removePage(p.id),'ddw-history-delete');remove.setAttribute('aria-label','删除绘图：'+p.name+'（'+p.id+'）');remove.title='删除'+p.name;
-     row.append(open,el('span','ddw-history-meta',stats[0]+' 点 · '+stats[1]+' 边'),remove);list.append(row);
-    });panel.append(list);queueChrome();return;
+     row.append(open,remove);list.append(row);
+    });if(!pages.length)list.append(el('p','ddw-history-empty','无'));panel.append(list);syncChrome();return;
    }
    const label=el('label','ddw-ai-label','要求（可选）'),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label','绘图指导要求（可选）');
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
-   const ask=button(aiAbort?'正在回答…':'请求 AI 指导',()=>requestGuide(),'ddw-primary');ask.disabled=Boolean(aiAbort);ask.dataset.drawingGuide='true';
+   const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.disabled=Boolean(aiAbort);ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='请求 AI 指导';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
    const result=el('div','ddw-ai-answer');result.setAttribute('aria-live','polite');
    panel.append(label,ask,result);
    if(answer){
@@ -140,16 +160,16 @@
     if(root.DMateAIAnswer?.render)root.DMateAIAnswer.render(result,answer,{isCurrent:()=>!destroyed&&panelMode==='ai'&&activeId===renderedPage&&answer===renderedAnswer&&requirement===renderedRequirement});
     else result.textContent=answer;
    }
-   queueChrome();
+   syncChrome();
   }
   function removePage(pageId){
    const index=pages.findIndex(p=>p.id===pageId);if(index<0)return;
-   if(pageId===activeId){abortAnswer();editor?.destroy();editor=null;pages.splice(index,1);if(!pages.length)pages.push({id:id(),name:'绘图 1',document:blank('绘图 1'),requirement:'',createdAt:Date.now(),updatedAt:Date.now()});activeId=pages[Math.min(index,pages.length-1)].id;persist();mountPage();}
-   else{pages.splice(index,1);persist();renderPanel();}
+   if(pageId===activeId){abortAnswer();editor?.destroy();editor=null;pages.splice(index,1);activeId=pages[Math.min(index,pages.length-1)]?.id||'';persist();mountPage();}
+   else{collect();pages.splice(index,1);persist();renderPanel();}
    setStatus('');
   }
   async function requestGuide(){
-   if(aiAbort||destroyed)return;collect();persist();
+   if(aiAbort||destroyed||!active())return;collect();persist();
    const snapshot=clone(currentDocument()),snapshotKey=fingerprint(snapshot),request=requirement,selected=activeId,epoch=++aiEpoch;
    const controller=new win.AbortController();aiAbort=controller;answer='';renderPanel();setStatus('');
    try{
@@ -162,12 +182,13 @@
    finally{if(epoch===aiEpoch){aiAbort=null;if(!destroyed)renderPanel();}}
   }
   async function makeImage(){
+   if(!active())throw new Error('请先新建空白页。');
    if(!root.DMateDrawingExport?.pngBlob)throw new Error('导出模块未加载，请刷新后重试。');
    if(!currentDocument().graphs.some(g=>g.vertices.length))throw new Error('请先在空白页添加顶点和边。');
    const svg=editor?.getDrawingSvg?.(),document=root.DMateDrawingExport.documentForImage(currentDocument(),svg);
    return {blob:await root.DMateDrawingExport.pngBlob(svg),document};
   }
-  function busy(value){exportBusy=value;const disabled=value||Boolean(exportPreview);exportButton.disabled=disabled;uploadButton.disabled=disabled;newButton.disabled=disabled;historyButton.disabled=disabled;name.disabled=disabled;editorHost.inert=disabled;panel.inert=disabled;rail.inert=disabled;}
+  function busy(value){exportBusy=value;const disabled=value||Boolean(exportPreview);exportButton.disabled=disabled;uploadButton.disabled=disabled;newButton.disabled=disabled;historyButton.disabled=disabled;panel.inert=disabled;syncChrome();}
   function closeExportPreview(){
    exportPreview?.remove();exportPreview=null;
    if(exportPreviewUrl){win.URL.revokeObjectURL(exportPreviewUrl);exportPreviewUrl='';}
@@ -199,15 +220,15 @@
    schedule();}});
   try{
    const raw=win.localStorage.getItem(key),value=raw?JSON.parse(raw):null;
-   if(value?.version===1&&Array.isArray(value.pages)){
+   if((value?.version===1||value?.version===2)&&Array.isArray(value.pages)){
     restoredGallery=true;
     pages=value.pages.filter(p=>p&&typeof p.id==='string'&&goodDocument(p.document)).slice(0,50).map(p=>({...p,name:caption(p.name),requirement:String(p.requirement||'').slice(0,2000),updatedAt:Number(p.updatedAt)||0}));
-    const ids=new Set();pages=pages.filter(p=>{if(ids.has(p.id))return false;ids.add(p.id);return true;});activeId=pages.some(p=>p.id===value.activeId)?value.activeId:pages[0]?.id||'';savedRaw=JSON.stringify({version:1,activeId,pages});
+    const ids=new Set();pages=pages.filter(p=>{if(ids.has(p.id))return false;ids.add(p.id);return true;});activeId=pages.some(p=>p.id===value.activeId)?value.activeId:pages[0]?.id||'';savedRaw=JSON.stringify({version:value.version,activeId,pages});
    }
   }catch(_){persistError='历史绘图暂时无法读取，当前绘图仍可编辑和导出。';}
-  if(!pages.length){
-   const legacy=goodDocument(options.legacyDocument)?clone(options.legacyDocument):null;
-   pages=[{id:id(),name:legacy?'我的图形':'绘图 1',document:legacy||blank('绘图 1'),requirement:'',createdAt:Date.now(),updatedAt:Date.now()}];activeId=pages[0].id;
+  if(!restoredGallery){
+   const legacy=meaningfulDocument(options.legacyDocument)?clone(options.legacyDocument):null;
+   if(legacy){pages=[{id:id(),name:'我的图形',document:legacy,requirement:'',createdAt:Date.now(),updatedAt:Date.now()}];activeId=pages[0].id;}
   }
   // Older blank pages kept the generic graph title after receiving a page number.
   if(restoredGallery)for(const p of pages)if(/^绘图\s*\d+$/.test(p.name)&&p.document.graphs.length===1&&p.document.graphs[0].name==='我的图形')p.document.graphs[0].name=p.name;
@@ -218,7 +239,7 @@
   mountPage();persist();
   const pageHide=()=>{collect();persist();};win.addEventListener('pagehide',pageHide);
   return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,
-   destroy(){if(destroyed)return;collect();persist();destroyed=true;closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
+   destroy(){if(destroyed)return;collect();persist();destroyed=true;closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',queueChrome,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }
  root.DMateDrawingWorkspace={mount,blankDocument:blank};
 })(typeof window!=='undefined'?window:globalThis);

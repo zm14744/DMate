@@ -136,7 +136,7 @@ def test_long_filename_and_content_scroll_keep_main_red_close_in_fixed_header(mo
     assert page.locator('#graphEditorTitle').evaluate('e=>e.scrollWidth>e.clientWidth')
     assert page.locator('#graphEditorDialog').bounding_box() == dialog
     if mode == 'drawing':
-        page.get_by_role('button', name='AI 回答', exact=True).click()
+        page.get_by_role('button', name='AI指导', exact=True).click()
         scroller = page.locator('.ddw-side-panel')
     else:
         scroller = page.locator('.dgs-content')

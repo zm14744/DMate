@@ -42,8 +42,10 @@ def scan_page(request):
         page.add_style_tag(content=styles)
         page.add_style_tag(content=(ROOT/'static/voice-input.css').read_text())
         page.add_style_tag(content=(ROOT/'static/graph-editor.css').read_text())
+        page.add_style_tag(content=(ROOT/'static/drawing-workspace.css').read_text())
         page.add_style_tag(content=(ROOT/'static/modal-chrome.css').read_text())
-        for name in ['graph-editor-model.js','graph-editor-format.js','graph-editor-overlay.js','graph-editor.js','graph-scan-workspace.js']:
+        for name in ['graph-editor-model.js','graph-editor-format.js','graph-editor-overlay.js','graph-editor.js',
+                     'drawing-export.js','drawing-workspace.js','graph-scan-workspace.js']:
             page.add_script_tag(content=(ROOT/'static'/name).read_text())
         page.add_script_tag(content='''window.ocrRequestInFlight=false;window.ocrReviewInProgress=false;
           window.refreshInputAvailability=()=>{};window.queueChatJumpControlsUpdate=()=>{};
@@ -75,6 +77,7 @@ def scan_page(request):
 def open_scan(p):
     p.get_by_role('button',name='编辑核对',exact=True).click()
     p.wait_for_function('document.querySelector(".dgs-source .dge-overlay-image").naturalWidth===600')
+    p.locator('#graphEditorDialog').wait_for(state='visible')
 
 
 def drag(p, points):
@@ -158,21 +161,44 @@ def test_requirements_confirm_with_current_readonly_structure(scan_page):
 
 
 def test_standalone_drawing_saves_reopens_and_never_changes_scan(scan_page):
-    p=scan_page;p.evaluate('document.body.classList.add("mobile-tools-open")')
+    p=scan_page;p.evaluate('''()=>{document.body.classList.add('mobile-tools-open');
+      window.originalScan=JSON.stringify(ocrTasks.get('scan').draft);
+      window.galleryKey='dmate:graph-gallery:v1::'+encodeURIComponent(drawingStorageOwner());}''')
     p.get_by_role('button',name='绘图',exact=True).click()
     p.wait_for_function('document.querySelector(".dge-overlay-image").naturalWidth===1000')
+    assert p.locator('.dmate-drawing-workspace').count()==1
     assert p.locator('#graphEditorTitle').inner_text()=='绘图'
     assert p.get_by_role('tab',name='文字识别').count()==0
+    assert p.evaluate('ocrEditorController.getPages().length')==0
+    assert p.locator('.ddw-name').input_value()==''
+    assert p.get_by_role('button',name='保存绘图',exact=True).count()==0
+    p.get_by_role('button',name='新建空白页',exact=True).click()
+    p.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
+    p.get_by_text('绘图工具',exact=True).click()
     p.get_by_role('button',name='添加顶点',exact=True).click()
-    svg=p.locator('.dge-overlay-svg').bounding_box()
-    p.mouse.click(svg['x']+svg['width']*.4,svg['y']+svg['height']*.4)
+    point=p.locator('.dge-overlay-svg').evaluate('''svg=>
+      new DOMPoint(600,455).matrixTransform(svg.getScreenCTM()).toJSON()''')
+    p.mouse.click(point['x'],point['y'])
     assert p.locator('.dge-overlay-node').count()==1
-    p.get_by_role('button',name='保存绘图',exact=True).click()
-    p.wait_for_function('!document.getElementById("graphEditorDialog").open')
-    assert p.evaluate('JSON.parse(localStorage.getItem(DRAWING_STORAGE_KEY)).graphs[0].vertices.length')==1
-    assert p.evaluate('ocrTasks.get("scan").draft.graphs[0].vertices.length')==2
+    # Close in the same browser task as an edit, before the autosave timer.
+    # Dialog destruction must flush the current page to the real gallery.
+    p.evaluate('''()=>{const name=document.querySelector('.ddw-name');name.value='关闭时立即保存';
+      name.dispatchEvent(new Event('input',{bubbles:true}));
+      window.beforeCloseName=JSON.parse(localStorage.getItem(galleryKey)).pages[0].name;
+      document.getElementById('graphEditorClose').click();}''')
+    assert p.evaluate('beforeCloseName')!='关闭时立即保存'
+    p.wait_for_function('!document.getElementById("graphEditorDialog").open&&ocrEditorTaskId===null')
+    gallery=p.evaluate('JSON.parse(localStorage.getItem(galleryKey))')
+    assert len(gallery['pages'])==1
+    assert gallery['pages'][0]['name']=='关闭时立即保存'
+    assert len(gallery['pages'][0]['document']['graphs'][0]['vertices'])==1
+    assert p.evaluate('JSON.stringify(ocrTasks.get("scan").draft)===originalScan')
+    assert p.evaluate('localStorage.getItem(DRAWING_STORAGE_KEY)') is None
     assert p.evaluate('posts.length')==0
     p.evaluate('document.body.classList.add("mobile-tools-open")')
     p.get_by_role('button',name='绘图',exact=True).click()
     p.wait_for_selector('.dge-overlay-node')
+    assert p.locator('.ddw-name').input_value()=='关闭时立即保存'
+    assert p.evaluate('ocrEditorController.getPages().length')==1
     assert p.locator('.dge-overlay-node').count()==1
+    assert p.evaluate('JSON.stringify(ocrTasks.get("scan").draft)===originalScan')

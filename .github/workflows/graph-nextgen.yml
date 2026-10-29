@@ -41,6 +41,10 @@ on:
       - 'static/image-groups.css'
       - 'static/modal-chrome.css'
       - 'tests/test_modal_chrome.py'
+      - 'tests/test_editor_dialog_position.py'
+      - 'tests/test_drawing_fit.py'
+      - 'tests/test_appearance_surfaces.py'
+      - 'static/appearance-panels.css'
       - 'tests/test_scan_selection_save.py'
       - 'concept_notebook.py'
       - 'static/concept-notebook*.js'
@@ -135,6 +139,9 @@ jobs:
             tests/test_concept_notebook_server_sync.py \
             tests/test_learning_tool_entries.py \
             tests/test_modal_chrome.py \
+            tests/test_editor_dialog_position.py \
+            tests/test_drawing_fit.py \
+            tests/test_appearance_surfaces.py \
             tests/test_graph_elastic_regions.py \
             tests/test_voice_input.py \
             tests/test_graph_confirmation_batch.py \

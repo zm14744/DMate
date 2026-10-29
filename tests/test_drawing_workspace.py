@@ -31,7 +31,7 @@ def drawing_page(request):
             edges:[{id:'ab',from:'a',to:'b',direction:'forward',weight:12,path:[[.2,.3],[.7,.2],[1.2,.7]]}]}]};
           window.uploads=[];window.closeCount=0;window.aiRequests=[];
           window.fetch=async(url,options)=>{aiRequests.push(JSON.parse(options.body));
-            if(window.deferAi)return new Promise(resolve=>window.resolveAi=()=>resolve({ok:true,json:async()=>({ok:true,answer:'旧图回答'})}));
+            if(window.deferAi)return new Promise(resolve=>{window.resolveAi=()=>resolve({ok:true,json:async()=>({ok:true,answer:'旧图回答'})});options.signal.addEventListener('abort',()=>window.aiAborted=true);});
             return {ok:true,json:async()=>({ok:true,answer:'先画 A、B，再从 A 向 B 连一条权值为 12 的有向边。'})};};
           window.openDrawing=(storageKey='drawings:user1',legacy=sample)=>{
             window.workspace=DMateDrawingWorkspace.mount(document.getElementById('mount'),{
@@ -61,15 +61,15 @@ def test_legacy_saved_pages_new_page_and_account_scope(drawing_page):
     assert page.evaluate('workspace.getPages().length') == 2
     assert page.evaluate('(name)=>workspace.getPages().find(p=>p.name===name).document.graphs[0].name', new_name) == new_name
     page.evaluate("workspace.destroy();openDrawing('drawings:user2',null)")
-    assert page.evaluate('workspace.getDocument().graphs[0].vertices.length') == 0
-    assert page.evaluate('workspace.getPages().length') == 1
-    assert page.evaluate('workspace.getDocument().graphs[0].name') == page.locator('.ddw-name').input_value() == '绘图 1'
+    assert page.evaluate('workspace.getDocument().graphs') == []
+    assert page.evaluate('workspace.getPages()') == []
+    assert page.locator('.ddw-name').input_value() == ''
     assert page.evaluate("JSON.parse(localStorage.getItem('drawings:user1')).pages.length") == 2
 
 
 def test_guidance_uses_snapshot_and_does_not_modify_drawing(drawing_page):
     page = drawing_page
-    page.get_by_role('button', name='AI 回答', exact=True).click()
+    page.get_by_role('button', name='AI指导', exact=True).click()
     page.get_by_label('绘图指导要求（可选）').fill('说明有向边怎么画')
     page.get_by_role('button', name='请求 AI 指导', exact=True).click()
     page.wait_for_function('document.querySelector(".ddw-ai-answer").textContent.includes("从 A 向 B")')
@@ -83,13 +83,17 @@ def test_guidance_uses_snapshot_and_does_not_modify_drawing(drawing_page):
     assert page.get_by_label('绘图指导要求（可选）').input_value() == '重新解释'
     page.evaluate('window.deferAi=true')
     page.get_by_role('button', name='请求 AI 指导', exact=True).click()
+    assert page.get_by_role('button', name='请求 AI 指导', exact=True).is_disabled()
+    assert page.get_by_role('button', name='请求 AI 指导', exact=True).get_attribute('aria-busy') == 'true'
     page.get_by_role('button', name='新建空白页', exact=True).click()
+    assert page.evaluate('window.aiAborted')
     page.evaluate('resolveAi()')
     page.wait_for_timeout(50)
     assert page.locator('.ddw-ai-answer').count() == 0
-    page.get_by_role('button', name='AI 回答', exact=True).click()
+    page.get_by_role('button', name='AI指导', exact=True).click()
     assert page.locator('.ddw-ai-answer').inner_text() == ''
     assert page.get_by_role('button', name='请求 AI 指导', exact=True).is_enabled()
+    assert page.get_by_role('button', name='请求 AI 指导', exact=True).get_attribute('aria-busy') == 'false'
 
 
 def test_old_multiple_graphs_become_individual_accessible_pages(drawing_page):
@@ -127,7 +131,7 @@ def test_export_png_and_upload_only_enqueue_result(drawing_page, tmp_path):
         assert image.format == 'PNG'
         assert image.width > 100 and image.height > 50
         assert image.convert('RGB').getextrema()[0][0] < 100
-    page.get_by_role('button', name='上传到对话', exact=True).click()
+    page.get_by_role('button', name='上传', exact=True).click()
     page.wait_for_function('uploads.length===1')
     upload = page.evaluate('uploads[0]')
     assert upload['type'] == 'image/png' and upload['size'] > 100
@@ -144,7 +148,7 @@ def test_export_png_and_upload_only_enqueue_result(drawing_page, tmp_path):
 
 def test_guide_requirement_matches_backend_limit(drawing_page):
     page = drawing_page
-    page.get_by_role('button', name='AI 回答', exact=True).click()
+    page.get_by_role('button', name='AI指导', exact=True).click()
     assert page.get_by_label('绘图指导要求（可选）').get_attribute('maxlength') == '2000'
     page.get_by_label('绘图指导要求（可选）').fill('画' * 2000)
     page.get_by_role('button', name='请求 AI 指导', exact=True).click()
@@ -152,23 +156,34 @@ def test_guide_requirement_matches_backend_limit(drawing_page):
     assert len(page.evaluate('aiRequests[0].requirement')) == 2000
 
 
-def test_drawing_upload_is_an_accessible_upload_arrow_with_live_theme_color(drawing_page):
+def test_drawing_upload_is_literal_text_and_guidance_uses_the_chat_plus_icon(drawing_page):
     page = drawing_page
-    button = page.get_by_role('button', name='上传到对话', exact=True)
-    assert button.inner_text() == ''
-    assert button.get_attribute('title') == '上传到对话'
+    button = page.get_by_role('button', name='上传', exact=True)
+    assert button.inner_text() == '上传'
+    assert button.get_attribute('title') == '上传'
     box = button.bounding_box()
-    assert box['width'] == pytest.approx(box['height'], abs=1)
+    assert button.evaluate('e=>getComputedStyle(e).borderRadius') != '50%'
+    assert button.evaluate('e=>getComputedStyle(e,"::before").content') == 'none'
     assert page.locator('.ddw-page-actions').bounding_box()['x'] <= box['x']
+    page.get_by_role('button', name='AI指导', exact=True).click()
+    assert page.locator('.ddw-panel-header h3').inner_text() == 'AI指导'
+    guide = page.get_by_role('button', name='请求 AI 指导', exact=True)
+    assert guide.inner_text() == ''
+    assert guide.get_attribute('title') == '请求 AI 指导'
+    assert guide.get_attribute('aria-busy') == 'false'
+    page.add_style_tag(content=(ROOT / 'static/chat-composer.css').read_text())
+    page.evaluate('''()=>{document.body.dataset.appearanceTheme='light';const reference=document.createElement('div');
+      reference.className='center';reference.style.cssText='position:fixed;left:-2000px;bottom:0;width:500px';
+      reference.innerHTML='<div class="input-wrap"><div class="input"><div class="image-picker-wrap"><button id="imageBtn" type="button">上传图片</button></div></div></div>';
+      document.body.append(reference);}''')
+    chat_plus = page.locator('#imageBtn')
     for color in ('#3b82f6', '#14b8a6', '#8b5cf6'):
         page.evaluate('color=>document.body.style.setProperty("--accent",color)', color)
         expected = page.evaluate('color=>{const node=document.createElement("i");node.style.color=color;document.body.append(node);const rgb=getComputedStyle(node).color;node.remove();return rgb;}', color)
         assert button.evaluate('e=>getComputedStyle(e).backgroundColor') == expected
-        assert button.evaluate('e=>getComputedStyle(e,"::before").backgroundColor') == 'rgb(255, 255, 255)'
-        assert button.evaluate('e=>getComputedStyle(e,"::before").maskImage') != 'none'
-        icon = button.evaluate('e=>decodeURIComponent(getComputedStyle(e,"::before").maskImage)')
-        assert 'M12 16V3m-5 5 5-5 5 5M4 15v5' in icon
-        assert 'M12 3v18M3 12h18' not in icon
+        assert guide.evaluate('e=>getComputedStyle(e).backgroundColor') == 'rgba(0, 0, 0, 0)'
+        assert guide.evaluate('e=>getComputedStyle(e,"::before").maskImage') == chat_plus.evaluate('e=>getComputedStyle(e,"::before").maskImage')
+        assert guide.evaluate('e=>getComputedStyle(e,"::before").backgroundColor') == chat_plus.evaluate('e=>getComputedStyle(e,"::before").backgroundColor')
     assert page.evaluate('aiRequests.length') == page.evaluate('uploads.length') == 0
 
 
@@ -210,7 +225,7 @@ def test_drawing_panels_share_compact_popovers_and_horizontal_accessible_trigger
     appearance = '''e=>{const s=getComputedStyle(e);return {background:s.backgroundColor,border:s.border,padding:s.padding,radius:s.borderRadius,shadow:s.boxShadow}}'''
     expected = page.locator('[data-style-probe]').evaluate(appearance)
     for label, selector in [('绘图工具', '.dge-tool-palette > .dge-overlay-tools'), ('绘图设置', '[data-panel-key="graphs"] > .dge-float-content'),
-                            ('图形信息', '[data-panel-key="results"] > .dge-float-content'), ('历史绘图', '.ddw-side-panel'), ('AI 回答', '.ddw-side-panel')]:
+                            ('图形信息', '[data-panel-key="results"] > .dge-float-content'), ('历史绘图', '.ddw-side-panel'), ('AI指导', '.ddw-side-panel')]:
         trigger = tools if label == '绘图工具' else page.get_by_role('button', name=label, exact=True)
         trigger.click()
         content = page.locator(selector)
@@ -220,7 +235,8 @@ def test_drawing_panels_share_compact_popovers_and_horizontal_accessible_trigger
         assert content.evaluate(appearance) == expected
         assert page.locator('.ddw-panel-header button,.ddw-editor-panel-header button').count() == 0
         bounds = content.bounding_box()
-        assert bounds['y'] >= boxes[0]['y'] + boxes[0]['height']
+        anchor = trigger.bounding_box()
+        assert bounds['y'] == pytest.approx(anchor['y'] + anchor['height'] + 8, abs=1)
         assert bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= page.viewport_size['width']
         assert content.evaluate('e=>e.scrollWidth<=e.clientWidth')
         if label == '绘图工具':
@@ -250,8 +266,8 @@ def test_drawing_panels_share_compact_popovers_and_horizontal_accessible_trigger
 def test_history_is_next_to_new_page_in_top_actions_and_opens_above_canvas(drawing_page):
     page = drawing_page
     actions = page.locator('.ddw-page-actions')
-    assert actions.get_by_role('button').all_text_contents() == ['新建空白页', '历史绘图', '导出图片', '']
-    assert actions.get_by_role('button', name='上传到对话', exact=True).count() == 1
+    assert actions.get_by_role('button').all_text_contents() == ['新建空白页', '历史绘图', '导出图片', '上传']
+    assert actions.get_by_role('button', name='上传', exact=True).count() == 1
     new = actions.get_by_role('button', name='新建空白页', exact=True).bounding_box()
     history = actions.get_by_role('button', name='历史绘图', exact=True)
     box = history.bounding_box()
@@ -296,7 +312,8 @@ def test_top_name_is_the_only_drawing_name_and_refreshes_graph_information(drawi
     assert page.locator('.ddw-name').input_value() == '画页甲'
     page.get_by_role('button', name='绘图设置', exact=True).click()
     page.get_by_role('button', name='图形信息', exact=True).click()
-    assert '画页甲' in page.locator('.dge-review-type').inner_text()
+    assert page.locator('.dge-review-content .dgs-counts').inner_text() == '2 个顶点 · 1 条边'
+    assert page.evaluate('workspace.getDocument().graphs[0].name') == '画页甲'
     assert page.locator('.dge-overlay-image').bounding_box() == pytest.approx(before, abs=1)
     page.get_by_role('button', name='图形信息', exact=True).click()
     page.get_by_role('button', name='撤销', exact=True).click()
@@ -311,7 +328,7 @@ def test_drawing_answer_uses_shared_renderer_and_invalidates_on_edit(drawing_pag
       richRenderCalls.push(text);if(!options.isCurrent())throw new Error('stale answer');
       target.classList.add('wrong-answer-inner');const p=document.createElement('p');p.textContent=text;target.replaceChildren(p);
       return Promise.resolve(true);}};}''')
-    page.get_by_role('button', name='AI 回答', exact=True).click()
+    page.get_by_role('button', name='AI指导', exact=True).click()
     assert page.locator('.ddw-ai-answer').text_content() == ''
     page.get_by_role('button', name='请求 AI 指导', exact=True).click()
     page.wait_for_function('richRenderCalls.length===1')
@@ -328,7 +345,7 @@ def test_opening_another_popover_only_changes_that_trigger_and_closes_the_previo
     settings.click()
     assert tools.get_attribute('aria-expanded') == 'false'
     assert settings.get_attribute('aria-expanded') == 'true'
-    ai = page.get_by_role('button', name='AI 回答', exact=True)
+    ai = page.get_by_role('button', name='AI指导', exact=True)
     ai.click()
     assert settings.get_attribute('aria-expanded') == 'false'
     assert ai.get_attribute('aria-expanded') == 'true'
@@ -360,15 +377,30 @@ def test_history_red_delete_circle_removes_its_page_and_keeps_current_drawing(dr
     assert page.locator('.ddw-name').input_value() == active_name
     assert page.evaluate('workspace.getDocument().graphs[0].vertices.length') == 0
     assert page.locator('.ddw-history-item').count() == 1
+    assert page.locator('.ddw-history-meta').count() == 0
     assert page.locator('.ddw-status').is_hidden()
     page.locator('.ddw-history-delete').click()
+    assert page.evaluate('workspace.getPages()') == []
+    assert page.evaluate('workspace.getDocument().graphs') == []
+    assert page.locator('.ddw-name').input_value() == ''
+    assert page.locator('.dge-overlay-node,.dge-overlay-edge').count() == 0
+    assert page.locator('.ddw-history-list').inner_text() == '无'
+    assert page.evaluate("JSON.parse(localStorage.getItem('drawings:user1'))") == {'version': 2, 'activeId': '', 'pages': []}
+    page.evaluate('workspace.destroy();openDrawing()')
+    assert page.evaluate('workspace.getPages()') == []
+    assert page.evaluate('workspace.getDocument().graphs') == []
+    assert page.locator('.ddw-name').input_value() == ''
+    assert page.locator('.ddw-name').is_disabled()
+    page.get_by_role('button', name='历史绘图', exact=True).click()
+    assert page.locator('.ddw-history-list').inner_text() == '无'
+    page.get_by_role('button', name='新建空白页', exact=True).click()
     assert page.evaluate('workspace.getPages().length') == 1
-    assert page.evaluate('workspace.getDocument().graphs[0].name') == page.locator('.ddw-name').input_value() == '绘图 1'
+    assert page.locator('.ddw-name').input_value() == '绘图 1'
 
 
 def test_upload_callback_failure_is_visible_and_the_same_button_can_retry(drawing_page):
     page = drawing_page
-    upload = page.get_by_role('button', name='上传到对话', exact=True)
+    upload = page.get_by_role('button', name='上传', exact=True)
     page.evaluate('window.uploadFailure="绘图上传失败，请重试。"')
     upload.click()
     page.wait_for_function('document.querySelector(".ddw-status").textContent==="绘图上传失败，请重试。"')
@@ -398,5 +430,75 @@ def test_reopened_numbered_pages_migrate_only_the_old_generic_graph_title(drawin
     page.evaluate("workspace.destroy();openDrawing('drawings:old-generic',null)")
     assert page.locator('.ddw-name').input_value() == '绘图 5'
     page.get_by_role('button', name='图形信息', exact=True).click()
-    assert '绘图 5' in page.locator('.dge-review-type').inner_text()
+    assert page.locator('.dge-review-content .dgs-counts').inner_text() == '2 个顶点 · 1 条边'
+    assert page.evaluate('workspace.getDocument().graphs[0].name') == '绘图 5'
     assert page.evaluate('workspace.getPages().find(p=>p.id==="real-title").document.graphs[0].name') == '原来的图'
+
+
+def test_empty_first_use_does_not_import_a_placeholder_but_preserves_named_legacy(drawing_page):
+    page = drawing_page
+    placeholder = page.evaluate('DMateDrawingWorkspace.blankDocument()')
+    for key, legacy in [('new-empty', None), ('blank-placeholder', placeholder)]:
+        page.evaluate('(values)=>{workspace.destroy();openDrawing(values.key,values.legacy);}', {'key': key, 'legacy': legacy})
+        assert page.evaluate('workspace.getPages()') == []
+        assert page.evaluate('workspace.getDocument()') == {'body_text': '', 'graphs': []}
+        assert page.locator('.ddw-name').input_value() == ''
+        assert page.locator('.dge-overlay-node,.dge-overlay-edge').count() == 0
+        assert page.get_by_role('button', name='新建空白页', exact=True).is_enabled()
+        page.get_by_role('button', name='历史绘图', exact=True).click()
+        assert page.locator('.ddw-history-list').inner_text() == '无'
+        assert page.evaluate('(key)=>JSON.parse(localStorage.getItem(key))', key) == {'version': 2, 'activeId': '', 'pages': []}
+    page.evaluate("workspace.destroy();openDrawing('named-legacy',DMateDrawingWorkspace.blankDocument('保留的空图'))")
+    assert page.evaluate('workspace.getPages().length') == 1
+    assert page.evaluate('workspace.getDocument().graphs[0].name') == '保留的空图'
+    page.evaluate("workspace.destroy();localStorage.setItem('old-empty',JSON.stringify({version:1,activeId:'',pages:[]}));openDrawing('old-empty',sample)")
+    assert page.evaluate('workspace.getPages()') == []
+    assert page.evaluate("JSON.parse(localStorage.getItem('old-empty')).version") == 2
+
+
+def test_last_geometry_name_and_requirements_are_saved_immediately_on_close(drawing_page):
+    page = drawing_page
+    node = page.locator('[data-vertex-id="a"] .dge-overlay-node-hit').bounding_box()
+    page.mouse.move(node['x'] + node['width'] / 2, node['y'] + node['height'] / 2)
+    page.mouse.down()
+    page.mouse.move(node['x'] + node['width'] / 2 + 18, node['y'] + node['height'] / 2 + 20, steps=5)
+    page.mouse.up()
+    point = page.evaluate('workspace.getDocument().graphs[0].vertices.find(v=>v.id==="a")')
+    assert point['x'] != .2 or point['y'] != .3
+    page.locator('.ddw-name').fill('关闭前的最后一次编辑')
+    page.get_by_role('button', name='AI指导', exact=True).click()
+    requirement = '关闭前刚输入的要求'
+    page.get_by_label('绘图指导要求（可选）').fill(requirement)
+    assert page.evaluate("JSON.parse(localStorage.getItem('drawings:user1')).pages[0].requirement") != requirement
+    page.evaluate("workspace.destroy();openDrawing('drawings:user1',null)")
+    assert page.locator('.ddw-name').input_value() == '关闭前的最后一次编辑'
+    assert page.evaluate('workspace.getDocument().graphs[0].vertices.find(v=>v.id==="a")') == point
+    page.get_by_role('button', name='AI指导', exact=True).click()
+    assert page.get_by_label('绘图指导要求（可选）').input_value() == requirement
+    assert page.evaluate('aiRequests') == []
+
+
+def test_popovers_are_anchored_on_the_first_visible_frame_and_reclamp_on_resize(drawing_page):
+    page = drawing_page
+    for label, selector in [('历史绘图', '.ddw-side-panel'), ('绘图设置', '[data-panel-key="graphs"] > .dge-float-content'),
+                            ('图形信息', '[data-panel-key="results"] > .dge-float-content')]:
+        trigger = page.get_by_role('button', name=label, exact=True)
+        trigger.evaluate('''(button,selector)=>{window.firstPopoverFrame=null;button.addEventListener('click',()=>requestAnimationFrame(()=>{
+          const content=document.querySelector(selector),box=content.getBoundingClientRect(),anchor=button.getBoundingClientRect();
+          window.firstPopoverFrame={visible:getComputedStyle(content).visibility,top:box.top,bottom:box.bottom,left:box.left,right:box.right,anchorBottom:anchor.bottom};
+        }),{once:true});}''', selector)
+        trigger.click()
+        page.wait_for_function('window.firstPopoverFrame!==null')
+        frame = page.evaluate('firstPopoverFrame')
+        assert frame['visible'] == 'visible'
+        assert frame['top'] == pytest.approx(frame['anchorBottom'] + 8, abs=1)
+        assert frame['left'] >= 8 and frame['right'] <= page.viewport_size['width'] - 8
+        assert frame['bottom'] <= page.viewport_size['height'] - 8
+        trigger.click()
+    page.get_by_role('button', name='历史绘图', exact=True).click()
+    page.set_viewport_size({'width': 340, 'height': 580})
+    page.wait_for_function('''()=>{const box=document.querySelector('.ddw-side-panel').getBoundingClientRect();
+      return box.left>=7.5&&box.right<=innerWidth-7.5&&box.top>=7.5&&box.bottom<=innerHeight-7.5;}''')
+    history = page.get_by_role('button', name='历史绘图', exact=True).bounding_box()
+    popup = page.locator('.ddw-side-panel').bounding_box()
+    assert popup['y'] == pytest.approx(history['y'] + history['height'] + 8, abs=1)

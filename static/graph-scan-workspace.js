@@ -103,8 +103,9 @@ function mount(container,options){
   const textStates=state.mode==='manual'?selected('text').filter(row=>blocked(row)||row.status==='partial'):[],graphStates=state.mode==='manual'?selected('graph').filter(row=>blocked(row)||row.status==='partial'):[];
   heading(textSection,'text','文字信息');if(document.body_text||!textStates.length){const body=el('div','dgs-body',document.body_text||'暂无文字信息。');body.style.whiteSpace='pre-wrap';textSection.append(body);}
   for(const row of textStates)textSection.append(regionStatus(row,'text'));
-  heading(graphSection,'graph','图形信息');if(!document.graphs.length&&!graphStates.length)graphSection.append(el('p','','暂无图形信息。'));
-  document.graphs.forEach((graph,index)=>{const row=root.DMateGraphFormat.graphRows(graph,index),section=el('section','dgs-graph');section.append(el('h4','',row.title));if(row.showType!==false)section.append(el('p','',row.type));section.append(el('p','','顶点：'+(row.vertices.join('、')||'无')),el('p','',`${graph.vertices.length} 个顶点 · ${graph.edges.length} 条边`));section.append(el('p','dgs-appearance','图形外观：'+(row.description||'未提供外观描述。')));if(row.anonymousNote)section.append(el('p','dgs-anonymous-note',row.anonymousNote));if(row.positions.length){section.append(el('h5','','顶点位置'));for(const vertex of row.positions)section.append(el('p','dgs-vertex-position',vertex.txt));}if(row.named.length)section.append(el('p','','边：'+row.named.join('、')));for(const edge of row.relations)section.append(el('p','dgs-relation',edge.txt));graphSection.append(section);});
+  heading(graphSection,'graph','图形信息');
+  const graphInformation=el('div','dgs-graph-information');
+  root.DMateGraphFormat.renderGraphInformation(graphInformation,document,{showEmpty:!graphStates.length});graphSection.append(graphInformation);
   for(const row of graphStates)graphSection.append(regionStatus(row,'graph'));
   confirm.disabled=saving||pending();confirm.textContent=saving?'正在保存…':'保存';request.disabled=saving;
   // Recognition updates the information cards, but must not remove a source

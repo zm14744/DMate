@@ -108,3 +108,89 @@ def test_region_results_persist_numbering_and_descriptions_before_confirmation(s
     assert submitted['id'] == 'g1_1'
     assert submitted['visual_description'] == anonymous_graph()['visual_description']
     assert {v['id']: v.get('display_label') for v in submitted['vertices']}['v1'] == '1'
+
+
+def equivalent_documents():
+    first = anonymous_graph()
+    first['name'] = '无向无权图'
+    first['visual_description'] = '外圈与中心顶点，以线段相连。'
+    second = {
+        'id': 'G2', 'name': '带权有向图', 'directed': True, 'weighted': True,
+        'vertices': [{'id': 'x', 'label': 'X', 'x': .2, 'y': .2, 'position_description': '左上'},
+                     {'id': 'y', 'label': None, 'display_label': '⑤', 'x': .8, 'y': .8}],
+        'edges': [
+            {'id': 'zero', 'from': 'x', 'to': 'y', 'direction': 'forward', 'weight': 0, 'edge_label': '0'},
+            {'id': 'fraction', 'from': 'y', 'to': 'x', 'direction': 'forward', 'weight': '1/2', 'edge_label': '路线甲'},
+            {'id': 'missing', 'from': 'x', 'to': 'x', 'direction': 'unknown', 'weight': None,
+             'edge_label': '7', 'edge_label_is_explicit': True},
+        ],
+    }
+    hostile = anonymous_graph()
+    hostile['name'] = '<b>图名</b>'
+    hostile['visual_description'] = '<img src=x onerror=alert(1)> 原样文字'
+    hostile['vertices'][0]['position_description'] = '<script>未执行</script>'
+    hostile['vertices'][1]['label'] = '<svg/onload=alert(1)>'
+    return [
+        {'body_text': '', 'graphs': [first, second]},
+        {'body_text': '', 'graphs': [{'id': 'G1', 'name': '空白页', 'directed': False,
+                                    'weighted': False, 'vertices': [], 'edges': []}]},
+        {'body_text': '', 'graphs': []},
+        {'body_text': '', 'graphs': [hostile]},
+    ]
+
+
+@pytest.mark.parametrize('document', equivalent_documents(), ids=['types_names_weights_anonymous', 'empty_graph', 'empty_document', 'literal_text'])
+def test_drawing_and_scan_use_identical_readonly_graph_information_dom_and_styles(scan_page, document):
+    page = scan_page
+    page.evaluate('''documentValue=>{
+      document.documentElement.style.setProperty('--font-scale','1.2');
+      // Both views receive exactly the same canonical model data; this test
+      // compares display paths rather than their independent import rules.
+      const normalized=DMateGraphEditorModel.ensureAnonymousLabels(DMateGraphEditorModel.importDocument(documentValue));
+      const task=ocrTasks.get('scan');task.initialDocument=normalized;task.draft=structuredClone(normalized);
+      window.originalGraphData=JSON.stringify(normalized);window.renderPaths=[];
+      const original=DMateGraphFormat.renderGraphInformation;
+      DMateGraphFormat.renderGraphInformation=function(host,value,options){
+        renderPaths.push(host.className);return original(host,value,options);
+      };
+    }''', document)
+    open_scan(page)
+    result = page.evaluate('''()=>{
+      const task=ocrTasks.get('scan'),source=document.querySelector('.dgs-graphs .dmate-graph-information');
+      const host=document.createElement('div');document.getElementById('graphEditorDialog').append(host);
+      window.comparisonDrawing=DMateGraphEditor.mount(host,{drawingOnly:true,
+        originalUrl:document.querySelector('.dgs-source .dge-overlay-image').src,
+        document:structuredClone(task.scanState.nativeDocument)});
+      host.querySelector('.dge-float-results').open=true;
+      const drawing=host.querySelector('.dge-review-content.dmate-graph-information');
+      const styleRows=container=>[...container.querySelectorAll('h4,h5,p')].map(node=>{
+        const style=getComputedStyle(node);return {tag:node.tagName,text:node.textContent,
+          font:style.fontFamily,size:style.fontSize,weight:style.fontWeight,lineHeight:style.lineHeight,
+          top:style.marginTop,bottom:style.marginBottom,left:style.paddingLeft,color:style.color};
+      });
+      const readonly=container=>container.querySelectorAll('button,input,select,textarea,svg,[contenteditable=true]').length;
+      return {source:source.innerHTML,drawing:drawing.innerHTML,sourceText:source.textContent,drawingText:drawing.textContent,
+        sourceStyles:styleRows(source),drawingStyles:styleRows(drawing),sourceReadonly:readonly(source),drawingReadonly:readonly(drawing),
+        sourceData:JSON.stringify(task.scanState.nativeDocument),drawingData:JSON.stringify(comparisonDrawing.getDocument()),
+        baseFont:getComputedStyle(document.body).fontSize,sourceFont:getComputedStyle(source).fontSize,drawingFont:getComputedStyle(drawing).fontSize,
+        renderPaths,footer:host.querySelectorAll('.dge-footer').length,
+        badHtml:source.querySelectorAll('script,img,svg,b').length+drawing.querySelectorAll('script,img,svg,b').length};
+    }''')
+    assert result['source'] == result['drawing']
+    assert result['sourceText'] == result['drawingText']
+    assert result['sourceStyles'] == result['drawingStyles']
+    assert result['sourceFont'] == result['drawingFont'] == result['baseFont']
+    assert result['sourceReadonly'] == result['drawingReadonly'] == 0
+    assert result['badHtml'] == result['footer'] == 0
+    assert result['sourceData'] == page.evaluate('originalGraphData')
+    assert json.loads(result['sourceData']) == json.loads(result['drawingData'])
+    assert any('dgs-graph-information' in name for name in result['renderPaths'])
+    assert any('dge-review-content' in name for name in result['renderPaths'])
+    if not document['graphs']:
+        assert result['sourceText'] == '暂无图形信息。'
+    elif len(document['graphs']) == 2:
+        assert '0 个顶点' not in result['sourceText']
+        assert '图形外观：未提供外观描述。' in result['sourceText']
+        assert '路线甲：5→X（权值：1/2）' in result['sourceText']
+        assert '0：X' not in result['sourceText']  # A numeric edge name equal to its weight is redundant.
+        assert '7：X？X' in result['sourceText']

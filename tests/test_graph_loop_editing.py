@@ -40,7 +40,7 @@ def loop_page(request):
             edges:[{id:'loop',from:'a',to:'a',direction:'forward',weight:4},
               {id:'ab',from:'a',to:'b',direction:'forward',weight:2}]}]};
           window.openEditor=value=>{window.editor?.destroy?.();window.editor=DMateGraphEditor.mount(document.getElementById('editor'),{
-            drawingOnly:true,originalUrl,document:value||sample,onConfirm:async doc=>saved.push(doc)});};
+            drawingOnly:true,originalUrl,document:value||sample,onChange:doc=>saved.push(doc)});};
           openEditor();
         }''', url)
         page.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
@@ -84,7 +84,9 @@ def test_self_loop_can_resize_rotate_save_reopen_and_follow_its_vertex(loop_page
     assert edge['direction'] == 'forward' and edge['weight'] == 4
     assert len(edge['path']) == 3 and edge['path'][0] == edge['path'][-1]
     assert page.locator('[data-edge-id="loop"] .dge-overlay-hit').get_attribute('d') != old
-    page.get_by_role('button', name='保存绘图', exact=True).click()
+    # Standalone pages persist model changes automatically; reopening that
+    # published snapshot must retain the adjusted loop without a save footer.
+    assert page.get_by_role('button', name='保存绘图', exact=True).count() == 0
     page.wait_for_function('saved.length===1')
     saved = page.evaluate('structuredClone(saved[0])')
     page.evaluate('openEditor(saved[0])')

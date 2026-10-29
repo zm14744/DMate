@@ -88,7 +88,7 @@ def test_red_close_stays_in_header_while_answer_scrolls(drawing_app):
     dialog = page.locator('#graphEditorDialog').bounding_box()
     assert abs(before['x'] + before['width'] - (dialog['x'] + dialog['width'] - (13 if page.viewport_size['width'] <= 760 else 17))) <= 1
     assert before['y'] < dialog['y'] + 30
-    page.get_by_role('button', name='AI 回答', exact=True).click()
+    page.get_by_role('button', name='AI指导', exact=True).click()
     page.get_by_role('button', name='请求 AI 指导', exact=True).click()
     page.wait_for_function('document.querySelector(".ddw-ai-answer").textContent.includes("A、B")')
     page.locator('.ddw-side-panel').evaluate('e=>e.scrollTop=e.scrollHeight')
@@ -106,10 +106,10 @@ def test_uploaded_drawing_keeps_exact_structure_and_waits_for_user_send(drawing_
     page = drawing_app
     open_drawing(page)
     page.locator('.ddw-name').fill('已绘制的有向图')
-    page.get_by_role('button', name='AI 回答', exact=True).click()
+    page.get_by_role('button', name='AI指导', exact=True).click()
     page.get_by_label('绘图指导要求（可选）').fill('检查这条权值为 12 的边')
     page.evaluate('window.deferUpload=true')
-    page.get_by_role('button', name='上传到对话', exact=True).click()
+    page.get_by_role('button', name='上传', exact=True).click()
     page.wait_for_function('uploads.length===1')
     assert page.locator('#graphEditorDialog').evaluate('e=>e.open')
     assert page.evaluate('ocrTasks.size') == 0
@@ -153,7 +153,38 @@ def test_saved_drawing_gallery_reopens_and_is_scoped_to_account(drawing_app):
     page.wait_for_function('ocrEditorTaskId===null')
     page.evaluate("accountState.username='bob'")
     open_drawing(page)
-    assert page.evaluate('ocrEditorController.getDocument().graphs[0].vertices.length') == 0
+    assert page.evaluate('ocrEditorController.getDocument().graphs') == []
+    assert page.evaluate('ocrEditorController.getPages()') == []
+    assert page.locator('.ddw-name').input_value() == ''
+    assert page.locator('.ddw-name').is_disabled()
+    page.get_by_role('button', name='历史绘图', exact=True).click()
+    assert page.locator('.ddw-history-item').count() == 0
+    assert page.locator('.ddw-history-empty').text_content() == '无'
+    assert page.get_by_role('button', name='Alice 的图', exact=True).count() == 0
+    # Persisting and reopening an account with no drawings must not create a
+    # fallback page. Only the explicit New action creates Bob's first page.
+    page.get_by_role('button', name='关闭绘图', exact=True).click()
+    page.wait_for_function('ocrEditorTaskId===null')
+    open_drawing(page)
+    assert page.evaluate('ocrEditorController.getPages()') == []
+    assert page.evaluate('ocrEditorController.getDocument().graphs') == []
+    assert page.locator('.ddw-name').input_value() == ''
+    page.get_by_role('button', name='新建空白页', exact=True).click()
+    assert page.locator('.ddw-name').input_value() == '绘图 1'
+    assert not page.locator('.ddw-name').is_disabled()
+    bob_pages = page.evaluate('ocrEditorController.getPages()')
+    bob_document = page.evaluate('ocrEditorController.getDocument()')
+    assert len(bob_pages) == 1 and bob_pages[0]['name'] == '绘图 1'
+    assert bob_pages[0]['document']['graphs'][0]['vertices'] == []
+    page.get_by_role('button', name='关闭绘图', exact=True).click()
+    page.wait_for_function('ocrEditorTaskId===null')
+    open_drawing(page)
+    assert page.locator('.ddw-name').input_value() == '绘图 1'
+    reopened = page.evaluate('ocrEditorController.getPages()')
+    assert len(reopened) == 1
+    assert {key: reopened[0][key] for key in ('id', 'name')} == {
+        key: bob_pages[0][key] for key in ('id', 'name')}
+    assert reopened[0]['document'] == bob_document
     page.get_by_role('button', name='历史绘图', exact=True).click()
     assert page.locator('.ddw-history-item').count() == 1
     assert page.get_by_role('button', name='Alice 的图', exact=True).count() == 0
@@ -165,7 +196,7 @@ def test_closing_drawing_during_upload_does_not_enqueue_a_late_result(drawing_ap
     page.on('pageerror', lambda error: errors.append(str(error)))
     open_drawing(page)
     page.evaluate('window.deferUpload=true')
-    page.get_by_role('button', name='上传到对话', exact=True).click()
+    page.get_by_role('button', name='上传', exact=True).click()
     page.wait_for_function('uploads.length===1')
     page.get_by_role('button', name='关闭绘图', exact=True).click()
     page.wait_for_function('ocrEditorTaskId===null')
