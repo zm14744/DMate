@@ -22,6 +22,10 @@ on:
       - 'tests/test_voice_input_ui.py'
       - 'tests/test_ocr_batch_frontend.py'
       - 'tests/test_scan_selection_save.py'
+      - 'tests/test_scan_information_sources.py'
+      - 'static/chat-composer.js'
+      - 'static/chat-composer.css'
+      - 'tests/test_chat_composer.py'
       - 'static/concept-notebook.js'
       - 'static/concept-notebook.css'
       - 'tests/test_concept_notebook_ui.py'
@@ -65,6 +69,8 @@ jobs:
           )"
           test -x "$DMATE_BROWSER_EXECUTABLE"
           python -m pytest -q \
+            tests/test_chat_composer.py \
+            tests/test_scan_information_sources.py \
             tests/test_concept_notebook_ui.py \
             tests/test_learning_tool_entries.py \
             tests/test_graph_elastic_regions.py \

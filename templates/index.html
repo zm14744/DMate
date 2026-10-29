@@ -8753,6 +8753,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 </style>
 <link rel="stylesheet" href="/static/voice-input.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/concept-notebook.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/chat-composer.css?v={{ dmate_web_revision }}">
 </head>
 
 <body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
@@ -8850,7 +8851,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         </div>
         <div class="input">
             <div class="manual-question-composer">
-                <input id="text" type="text" placeholder="" autocomplete="off">
+                <textarea id="text" rows="1" placeholder="输入消息" autocomplete="off" enterkeyhint="enter" aria-label="消息输入"></textarea>
                 <button id="voiceInputBtn" class="voice-input-button" type="button" aria-label="语音输入" title="语音输入" aria-pressed="false">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>
                 </button>
@@ -9527,6 +9528,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/voice-input.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/concept-notebook-model.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/concept-notebook.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/chat-composer.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/script.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 

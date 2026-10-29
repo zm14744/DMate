@@ -12,6 +12,8 @@ on:
       - 'static/script.js'
       - 'static/voice-input.js'
       - 'static/voice-input.css'
+      - 'static/chat-composer.js'
+      - 'static/chat-composer.css'
       - 'static/concept-notebook.js'
       - 'static/concept-notebook-model.js'
       - 'static/concept-notebook.css'
@@ -50,6 +52,7 @@ jobs:
           node --check static/legacy-worker-retire.js
           node --check static/script.js
           node --check static/voice-input.js
+          node --check static/chat-composer.js
           node --check static/concept-notebook.js
           node --check static/concept-notebook-model.js
           node --check static/graph-editor.js

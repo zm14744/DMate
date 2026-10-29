@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import math
 from collections import Counter
+from graph_edge_labels import separate_graph_edge_labels
 
 SCHEMA_VERSION = 'dmate.graph/1'
 
@@ -120,6 +121,8 @@ def canonical_graph(source, index=1):
                 'style': item.get('style') if item.get('style') in ('solid', 'dashed', 'dotted') else 'unknown',
                 'color': str(item.get('color') or 'unknown')[:32],
                 'status': item.get('status') if item.get('status') in ('accepted', 'pending') else 'pending'}
+        if isinstance(item.get('edge_label_is_explicit'), bool):
+            edge['edge_label_is_explicit'] = item['edge_label_is_explicit']
         evidence = item.get('evidence')
         edge['evidence'] = copy.deepcopy(evidence[:12]) if isinstance(evidence, list) else []
         if ((graph['directed'] is False and direction == 'forward')
@@ -129,6 +132,9 @@ def canonical_graph(source, index=1):
             edge['direction']='unknown'
             edge['status']='pending'
         graph['edges'].append(edge)
+    label_changes = separate_graph_edge_labels(graph)
+    if label_changes:
+        graph['edge_label_normalization'] = label_changes
     pair_counts = Counter(parallel_key(e) for e in graph['edges'])
     for e in graph['edges']:
         e['parallel_count'] = pair_counts[parallel_key(e)]
@@ -147,7 +153,7 @@ def display_graph(graph):
     out['vertices'] = [{k: v[k] for k in ('id', 'label', 'display_label', 'position_description', 'isolated_confirmed') if k in v}
                        for v in graph['vertices']]
     out['edges'] = [{k: e[k] for k in ('id', 'from', 'to', 'direction', 'edge_label', 'weight',
-                                      'multiplicity', 'parallel_count', 'style', 'color', 'status') if k in e}
+                                      'edge_label_is_explicit', 'multiplicity', 'parallel_count', 'style', 'color', 'status') if k in e}
                     for e in graph['edges']]
     return out
 

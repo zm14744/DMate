@@ -19,7 +19,7 @@ _GRAPH_FIELDS = ('id', 'name', 'directed', 'direction_mode', 'weighted', 'multig
                  'visual_description', 'unresolved_edges', 'unresolved_vertices', 'uncertain_edges',
                  'source_image_number', 'source_graph_number', 'source_graph_id', 'source_graph_name')
 _VERTEX_FIELDS = ('id', 'label', 'display_label', 'position_description', 'isolated_confirmed')
-_EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'color', 'style',
+_EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'edge_label_is_explicit', 'color', 'style',
                 'status', 'multiplicity', 'parallel_count')
 
 

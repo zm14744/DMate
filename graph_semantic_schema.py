@@ -13,6 +13,7 @@ import math
 from collections import Counter, defaultdict
 
 from graph_schema import SCHEMA_VERSION, parallel_key, unit, path_points
+from graph_edge_labels import separate_graph_edge_labels
 
 
 SEMANTIC_SCHEMA_VERSION = "dmate.semantic/1"
@@ -252,7 +253,11 @@ def _normalize_graph(source, graph_id, issues, notes):
                                "weight": weight, "edge_label": edge_label, **attributes,
                                "multiplicity": 1, "parallel_count": 1, "path": path_points(item.get('path')),
                                "status": "pending", "evidence": []})
+        if isinstance(item.get('edge_label_is_explicit'), bool):
+            graph['edges'][-1]['edge_label_is_explicit'] = item['edge_label_is_explicit']
     edges = graph["edges"]
+    for change in separate_graph_edge_labels(graph):
+        notes.append({**change, 'graph_id': graph_id})
     directions = observed_directions
     if directions == {"forward"}:
         graph["directed"] = True

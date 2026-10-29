@@ -373,7 +373,9 @@ function mount(host,o){
   };
   for(const region of o.textOnly?[]:o.model.getDocument().graphs){
     const points=graphPoints(region);if(!points)continue;
-    frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id,region.region_polygon?.length>=3);
+    const preview=frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id,region.region_polygon?.length>=3);
+    if(o.scanOnly){const b=boxOf(preview),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number dge-graph-frame-number','data-frame-label-id':region.id});
+      label.textContent='图形 '+String(region.id).replace(/^g/,'');label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);}
   }
   if(o.textOnly||o.scanOnly)for(const region of s.regions||[]){
     const points=frame(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''),String(region.id),true,s.selectedId===region.id,region.irregular);

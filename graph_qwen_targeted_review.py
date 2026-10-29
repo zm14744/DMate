@@ -8,6 +8,7 @@ import copy
 import math
 from collections import Counter
 from decimal import Decimal, InvalidOperation
+from graph_edge_labels import separate_weight_and_edge_label
 
 PATH_SCORE = .82
 UNBOUND_PATH_SCORE = .55
@@ -19,6 +20,7 @@ SOURCE_PROMPT = '''只做原图局部的逐源节点读取，不解题。附图�
 特别检查细线尖端的小箭头；不能从整体布局判断有向/无向，也不要继承其他图片或前一次的类型判断。
 同一条边必须在两个端点各自的读取中报告。flow=out表示source_id→to，in表示to→source_id，undirected表示确认无箭头，unknown表示看不清。
 重边按不同独立笔画分别报告，不能把相同端点、相同权值去重。数字权值必须对应其真实所在笔画；保留边名，不按题意或度数补边。
+weight只记录权值；edge_label只记录独立印刷的边名，没有名字必须写null。同一处数字只能作为权值，不能再复制为边名。只有确实看见与权值分开标注的独立边名时才填写edge_label并附edge_label_is_explicit:true，尤其不能把200这种权值当成边的名字或内部ID。
 返回JSON：{"graphs":[{"graph_id":"任务ID","reads":[{"source_id":"指定源ID","complete":true,"edges":[{"to":"清单内另一端ID","flow":"out|in|undirected|unknown","weight":null,"edge_label":null}]}]}]}。
 每个指定source_id都要返回，即使edges=[]。complete只有确实读清该源的全部线迹才true。无法确认写unknown，不编造。
 节点清单仅用于身份对应，位置为粗略辅助；不可新增、删除或重命名节点。没有候选的真实线仍须读出，工具可能漏检，也可能把噪声当线。
@@ -130,7 +132,16 @@ def _signature(edge, source):
     elif flow == 'in': a,b,direction=target,source,'forward'
     elif flow == 'undirected': a,b=pair(source,target);direction='undirected'
     else:return None
-    return a,b,direction,_normal(edge.get('weight')),_normal(edge.get('edge_label'))
+    attributes = _label_attributes(edge)
+    return a,b,direction,_normal(attributes.get('weight')),_normal(attributes.get('edge_label'))
+
+
+def _label_attributes(edge):
+    attributes = {'weight': edge.get('weight'), 'edge_label': edge.get('edge_label')}
+    if isinstance(edge.get('edge_label_is_explicit'), bool):
+        attributes['edge_label_is_explicit'] = edge['edge_label_is_explicit']
+    separate_weight_and_edge_label(attributes)
+    return attributes
 
 
 def merge_source_review(graphs, plans, response):
@@ -164,7 +175,8 @@ def merge_source_review(graphs, plans, response):
             for edge in row['edges']:
                 if (not isinstance(edge,dict) or edge.get('to') not in ids or
                         edge.get('flow') not in ('out','in','undirected','unknown') or
-                        not _attribute(edge.get('weight')) or not _attribute(edge.get('edge_label'))):
+                        not _attribute(edge.get('weight')) or not _attribute(edge.get('edge_label')) or
+                        'edge_label_is_explicit' in edge and not isinstance(edge['edge_label_is_explicit'], bool)):
                     invalid.add(source);break
         for key in map(tuple,plan['target_pairs']):
             old=[e for e in graph['edges'] if pair(e['from'],e['to'])==key]
@@ -192,6 +204,7 @@ def merge_source_review(graphs, plans, response):
                     for edge in old:edge['direction']='unknown'
                 continue
             signature,reading=reads[0];a,b,direction,_,_=signature
+            attributes = _label_attributes(reading)
             if old:
                 edge=old[0]
                 # Scope is the nominated stroke, never the rest of the graph.
@@ -199,10 +212,11 @@ def merge_source_review(graphs, plans, response):
                 if (edge['from'],edge['to'],edge['direction']) != (a,b,direction):
                     changes.append({'graph_id':graph['id'],'edge_id':edge['id'],'kind':'direction_review'})
                 edge.update({'from':a,'to':b,'direction':direction})
-                if (_normal(edge.get('weight'))!=_normal(reading.get('weight')) or
-                        _normal(edge.get('edge_label'))!=_normal(reading.get('edge_label'))):
+                if (_normal(edge.get('weight'))!=_normal(attributes.get('weight')) or
+                        _normal(edge.get('edge_label'))!=_normal(attributes.get('edge_label'))):
                     changes.append({'graph_id':graph['id'],'edge_id':edge['id'],'kind':'stroke_attribute_review'})
-                edge.update(weight=reading.get('weight'),edge_label=reading.get('edge_label'))
+                edge.pop('edge_label_is_explicit', None)
+                edge.update(attributes)
                 # If its orientation changed, keep a source-ordered curve.
                 path=edge.get('path')
                 if path and direction=='forward':
@@ -214,8 +228,7 @@ def merge_source_review(graphs, plans, response):
             elif list(key) in plan['missing_pairs']:
                 used={e['id'] for e in graph['edges']};index=1
                 while 'r'+str(index) in used:index+=1
-                graph['edges'].append({'id':'r'+str(index),'from':a,'to':b,'direction':direction,
-                                       'weight':reading.get('weight'),'edge_label':reading.get('edge_label')})
+                graph['edges'].append({'id':'r'+str(index),'from':a,'to':b,'direction':direction, **attributes})
                 changes.append({'graph_id':graph['id'],'edge_id':'r'+str(index),'kind':'visually_reviewed_stroke'})
         modes={e['direction'] for e in graph['edges']}
         if 'forward' in modes: graph['directed']=True

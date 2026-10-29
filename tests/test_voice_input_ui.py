@@ -39,11 +39,12 @@ def voice_page(request):
           createGain(){return {gain:{value:1},connect(){},disconnect(){}};}
           createScriptProcessor(){const node={connect(){},disconnect(){},onaudioprocess:null};window.audioProcessor=node;return node;}
         };
-        window.pushAudio=(size=24000)=>{const data=new Float32Array(size);for(let i=0;i<data.length;i++)data[i]=.25*Math.sin(i/12);
+        window.pushAudio=(size=24000,marker=null)=>{const data=new Float32Array(size);for(let i=0;i<data.length;i++)data[i]=marker??(.25*Math.sin(i/12));
           audioProcessor.onaudioprocess?.({inputBuffer:{getChannelData:()=>data}});};
         window.transport=async(url,options)=>{
           const file=options.body.get('audio'), bytes=await file.arrayBuffer(),v=new DataView(bytes);
-          calls.push({url,filename:file.name,type:file.type,length:bytes.byteLength,rate:v.getUint32(24,true),channels:v.getUint16(22,true),bits:v.getUint16(34,true),frames:v.getUint32(40,true)/2});
+          const pcm=Array.from({length:v.getUint32(40,true)/2},(_,i)=>v.getInt16(44+i*2,true));
+          calls.push({url,filename:file.name,type:file.type,length:bytes.byteLength,rate:v.getUint32(24,true),channels:v.getUint16(22,true),bits:v.getUint16(34,true),frames:pcm.length,pcm});
           if(window.holdResponse)return new Promise((resolve,reject)=>{
             window.reply=()=>resolve({ok:true,json:async()=>({ok:true,text:'语音结果'})});
             options.signal.addEventListener('abort',()=>{window.requestAborted=true;reject(new DOMException('cancelled','AbortError'));});
@@ -60,6 +61,8 @@ def voice_page(request):
 
 def start_recording(page):
     page.get_by_role('button', name='语音输入', exact=True).click()
+    page.wait_for_function('voice.state==="preparing"')
+    page.evaluate('pushAudio(1)')  # Device delivery, rather than permission alone, enables speaking.
     page.wait_for_function('voice.state==="recording"')
 
 
@@ -84,7 +87,7 @@ def test_dictation_inserts_at_cursor_without_sending_and_releases_capture(voice_
     assert record['filename'] == 'voice.wav'
     assert record['type'] == 'audio/wav'
     assert (record['rate'], record['channels'], record['bits']) == (16000, 1, 16)
-    assert 7990 <= record['frames'] <= 8000  # 0.5s at 48kHz becomes 16kHz mono.
+    assert record['frames'] == 14401  # Real 0.5s + one source sample, and 0.4s boundary silence.
     assert p.get_by_role('status').inner_text() == '语音已转为文字，可修改后发送。'
     button = p.locator('#voiceInputBtn').bounding_box()
     field = p.locator('#text').bounding_box()
@@ -184,3 +187,52 @@ def test_unsupported_environment_explains_reason_instead_of_starting_request(voi
     p.get_by_role('button', name='语音输入', exact=True).click()
     assert '无法使用麦克风' in p.get_by_role('status').inner_text()
     assert p.evaluate('permissionCalls') == p.evaluate('calls.length') == 0
+
+
+def test_microphone_is_not_announced_ready_before_audio_blocks_arrive(voice_page):
+    p = voice_page
+    p.get_by_role('button', name='语音输入', exact=True).click()
+    p.wait_for_function('voice.state==="preparing"')
+    assert p.get_by_role('button', name='正在启动麦克风', exact=True).is_disabled()
+    assert '准备' in p.get_by_role('status').inner_text()
+    assert p.evaluate('calls.length') == 0
+    p.evaluate('pushAudio(960,.7)')
+    p.wait_for_function('voice.state==="recording"')
+    assert '已开始录音，请说话' in p.get_by_role('status').inner_text()
+
+
+def test_first_block_and_stop_grace_tail_are_kept_between_silent_boundaries(voice_page):
+    p = voice_page
+    p.get_by_role('button', name='语音输入', exact=True).click()
+    p.wait_for_function('voice.state==="preparing"')
+    p.evaluate('pushAudio(9600,.7)')
+    p.wait_for_function('voice.state==="recording"')
+    p.get_by_role('button', name='结束录音并识别', exact=True).click()
+    p.wait_for_function('voice.state==="finishing"')
+    assert p.get_by_role('button', name='正在收录尾音', exact=True).is_disabled()
+    assert p.evaluate('calls.length') == p.evaluate('stops') == 0
+    p.evaluate('pushAudio(9600,.9)')  # Browser delivery after Stop must still be included.
+    p.locator('#voiceInputBtn').dispatch_event('click')
+    p.wait_for_function('voice.state==="idle" && calls.length===1')
+    pcm = p.evaluate('calls[0].pcm')
+    assert pcm[:2400] == [0] * 2400
+    assert pcm[2400] == round(.7 * 32767)
+    assert min(pcm[2401:5599]) >= 22936
+    assert min(pcm[-5000:-4000]) >= 29489
+    assert pcm[-4001] == round(.9 * 32767)
+    assert pcm[-4000:] == [0] * 4000
+    assert p.evaluate('stops') == p.evaluate('closes') == 1
+    assert p.evaluate('sends') == 0
+
+
+def test_cancelling_during_stop_grace_releases_microphone_without_upload(voice_page):
+    p = voice_page
+    start_recording(p)
+    p.evaluate('pushAudio()')
+    p.get_by_role('button', name='结束录音并识别', exact=True).click()
+    p.wait_for_function('voice.state==="finishing"')
+    p.get_by_role('button', name='取消', exact=True).click()
+    p.wait_for_timeout(400)  # Cancelled grace must not submit on its timer.
+    assert p.evaluate('voice.state') == 'idle'
+    assert p.evaluate('calls.length') == 0
+    assert p.evaluate('stops') == p.evaluate('closes') == 1

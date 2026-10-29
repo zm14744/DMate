@@ -7,6 +7,36 @@ const subs='₀₁₂₃₄₅₆₇₈₉';
 const markName=v=>literal(v).replace(/\d/g,n=>subs[Number(n)]);
 const circles='①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
 const hasLabel=v=>v?.label!=null&&String(v.label).trim()!=='';
+function numericAnnotation(value){
+ if(value==null||typeof value==='boolean'||!['string','number'].includes(typeof value)||typeof value==='number'&&!Number.isFinite(value))return null;
+ const raw=String(value);if(/[①-⑳]/.test(raw))return null;
+ let text=raw.normalize('NFKC').trim().replace(/−/g,'-').replace(/⁄/g,'/');if(text.length>256)return null;
+ const latex=/^\\(?:d?frac)\{([+-]?\d+)\}\{([+-]?\d+)\}$/.exec(text);if(latex)text=latex[1]+'/'+latex[2];
+ text=text.replace(/\s*\/\s*/g,'/');
+ const fraction=/^([+-]?\d+)\/([+-]?\d+)$/.exec(text);
+ if(fraction){const denominator=BigInt(fraction[2]);return denominator===0n?null:[BigInt(fraction[1]),denominator];}
+ const decimal=/^([+-]?)(\d+(?:\.\d*)?|\.\d+)(?:[eE]([+-]?\d{1,3}))?$/.exec(text);if(!decimal)return null;
+ const exponent=Number(decimal[3]||0);if(Math.abs(exponent)>308)return null;
+ const parts=decimal[2].split('.'),scale=(parts[1]||'').length-exponent;
+ let numerator=BigInt(parts.join(''));if(decimal[1]==='-')numerator=-numerator;
+ return scale>=0?[numerator,10n**BigInt(scale)]:[numerator*10n**BigInt(-scale),1n];
+}
+function edgeName(edge){
+ const label=edge?.edge_label;if(label==null||!String(label).trim())return null;
+ if(edge.edge_label_is_explicit===true)return literal(label);
+ const name=numericAnnotation(label),weight=numericAnnotation(edge.weight);
+ return name&&weight&&name[0]*weight[1]===weight[0]*name[1]?null:literal(label);
+}
+function titleIncludesType(name,graph){
+ let kind=String(name).replace(/\s/g,'');
+ if(graph.direction_mode==='mixed'){
+  if(!/混合(?:方向|图)/.test(kind))return false;
+ }else if(graph.directed===false){if(!/(?:无向图|无向)/.test(kind))return false;}
+ else if(graph.directed===true){if(/无向/.test(kind)||!/有向/.test(kind))return false;}
+ else return false;
+ return graph.weighted===true?/(?:带权|加权|有权)/.test(kind)&&!/无权/.test(kind)
+  :graph.weighted===false?/无权/.test(kind):false;
+}
 function graphLabels(graph){
  const vertices=(Array.isArray(graph?.vertices)?graph.vertices:[]).filter(Boolean).map(v=>({...v}));
  const used=new Set(vertices.filter(hasLabel).map(v=>String(v.label))),existing=new Set();
@@ -40,10 +70,10 @@ function graphLabels(graph){
 function graphRows(graph,index){
  const vertices=Array.isArray(graph?.vertices)?graph.vertices:[],edges=Array.isArray(graph?.edges)?graph.edges:[];
  const labels=graphLabels(graph),get=id=>labels.get(String(id))||String(id??'?');
- const named=edges.filter(e=>e?.edge_label!=null&&String(e.edge_label).trim());
+ const named=edges.map(edgeName).filter(value=>value!==null);
  const relations=edges.map(e=>{
   const middle=e.direction==='forward'?'→':e.direction==='undirected'?'—':'？';
-  const prefix=e.edge_label!=null&&String(e.edge_label).trim()?literal(e.edge_label)+'：':'';
+  const name=edgeName(e),prefix=name!==null?name+'：':'';
   const weight=e.weight===null||e.weight===undefined||String(e.weight).trim()===''?'': '（权值：'+literal(e.weight)+'）';
   const pending=e.direction==='unknown'?'（方向待核对）':'';
   const missing=graph.weighted===true&&!weight?'（权值待核对）':'';
@@ -56,15 +86,15 @@ function graphRows(graph,index){
  const anonymous=vertices.filter(v=>!hasLabel(v)).map(v=>get(v.id));
  const positions=vertices.filter(v=>!hasLabel(v)||typeof v.position_description==='string'&&v.position_description.trim())
   .map(v=>({id:v.id,label:get(v.id),txt:get(v.id)+'：'+(typeof v.position_description==='string'&&v.position_description.trim()||'位置未记录')}));
- return {title,type:orientation+' · '+weighted,vertices:vertices.map(v=>get(v.id)),
-         named:named.map(e=>literal(e.edge_label)),relations,positions,
+ return {title,type:orientation+' · '+weighted,showType:!titleIncludesType(graphName,graph),vertices:vertices.map(v=>get(v.id)),
+         named,relations,positions,
          anonymousNote:anonymous.length?anonymous.join('、')+' 为临时编号，不是原图标签；编号仅在当前子图内使用。':'',
          description:typeof graph.visual_description==='string'?graph.visual_description.trim():''};
 }
 function toPlain(graphs){
  if(!Array.isArray(graphs))return '';
  return graphs.map((g,index)=>{
-  const row=graphRows(g,index),lines=[row.title+'    '+row.type,'','点：'+(row.vertices.join('、')||'无')];
+  const row=graphRows(g,index),lines=[row.title+(row.showType?'    '+row.type:''),'','点：'+(row.vertices.join('、')||'无')];
   if(row.anonymousNote)lines.push(row.anonymousNote);
   if(row.positions.length)lines.push('','顶点位置：',...row.positions.map(v=>v.txt));
   if(row.named.length)lines.push('边：'+row.named.join('、'));
@@ -77,7 +107,7 @@ function toPlain(graphs){
 function toMarkdown(graphs){
  if(!Array.isArray(graphs))return '';
  return graphs.map((g,index)=>{
-  const row=graphRows(g,index),lines=['### '+safe(row.title),'*'+safe(row.type)+'*','',
+  const row=graphRows(g,index),lines=['### '+safe(row.title),...(row.showType?['*'+safe(row.type)+'*']:[]),'',
     '**点：** '+row.vertices.map(safe).join('、')];
   if(row.anonymousNote)lines.push(safe(row.anonymousNote));
   if(row.positions.length)lines.push('','**顶点位置：**',...row.positions.map(v=>'- '+safe(v.txt)));
@@ -88,7 +118,7 @@ function toMarkdown(graphs){
   return lines.join('\n');
  }).join('\n\n---\n\n');
 }
-const api={graphLabels,graphRows,toPlain,toMarkdown};
+const api={graphLabels,graphRows,toPlain,toMarkdown,edgeName};
 root.DMateGraphFormat=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

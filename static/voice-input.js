@@ -2,6 +2,9 @@
     'use strict';
     const SAMPLE_RATE = 16000;
     const MAX_SECONDS = 60;
+    const LEADING_PAD_SAMPLES = Math.round(SAMPLE_RATE * .15);
+    const TRAILING_PAD_SAMPLES = Math.round(SAMPLE_RATE * .25);
+    const TAIL_CAPTURE_MS = 350;
     const ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>';
 
     function wavBlob(chunks, count) {
@@ -20,23 +23,35 @@
     // conversion never restarts its phase at a browser audio-block boundary.
     function pcmSampler(sourceRate) {
         const step = sourceRate / SAMPLE_RATE;
-        let position = 0, previous = null;
-        return function (input) {
-            const data = new Float32Array(input.length + (previous === null ? 0 : 1));
-            let offset = 0;
-            if (previous !== null) { data[0] = previous; offset = 1; }
-            data.set(input, offset);
+        let samples = 0, emitted = 0, previous = null, ended = false;
+        const pcm = sample => Math.round(Math.max(-1, Math.min(1, sample)) * (sample < 0 ? 32768 : 32767));
+        const sample = function (input) {
+            if (ended || !input.length) return new Int16Array(0);
+            const begin = samples, end = begin + input.length - 1;
+            const at = index => index < begin ? previous : input[index - begin];
             const output = [];
-            while (position < data.length - 1) {
+            // Use the global output index rather than restarting or rounding
+            // phase in each browser callback. The first real sample is kept.
+            while (emitted * step < end) {
+                const position = emitted * step;
                 const index = Math.floor(position), fraction = position - index;
-                const sample = Math.max(-1, Math.min(1, data[index] * (1 - fraction) + data[index + 1] * fraction));
-                output.push(Math.round(sample * (sample < 0 ? 32768 : 32767)));
-                position += step;
+                output.push(pcm(at(index) * (1 - fraction) + at(index + 1) * fraction));
+                emitted++;
             }
-            position -= Math.max(0, data.length - 1);
-            previous = data.length ? data[data.length - 1] : previous;
+            samples += input.length; previous = input[input.length - 1];
             return Int16Array.from(output);
         };
+        sample.flush = () => {
+            if (ended || previous === null) return new Int16Array(0);
+            ended = true;
+            const output = [];
+            // Final fractional positions need no future microphone block.
+            // Hold the last available sample, matching finite-signal padding.
+            while (emitted * step < samples) { output.push(pcm(previous)); emitted++; }
+            previous = null;
+            return Int16Array.from(output);
+        };
+        return sample;
     }
 
     function mount(options) {
@@ -48,6 +63,9 @@
         const Audio = options.AudioContext || win.AudioContext || win.webkitAudioContext;
         const fetcher = options.fetch || win.fetch.bind(win);
         const seconds = Math.max(1, Math.min(MAX_SECONDS, Number(options.maxSeconds) || MAX_SECONDS));
+        // Padding is part of the service's 60-second file limit, not extra
+        // hidden duration. All captured samples, including stop grace, fit.
+        const captureLimit = Math.floor(SAMPLE_RATE * seconds) - LEADING_PAD_SAMPLES - TRAILING_PAD_SAMPLES;
         let state = 'idle', serial = 0, active = null, disposed = false;
         const contextKey = () => options.getContextKey ? options.getContextKey() : '';
         const busy = () => input.disabled || input.readOnly || Boolean(options.isBusy?.());
@@ -66,16 +84,16 @@
         function render(next) {
             const changed = state !== next;
             state = next; button.dataset.voiceState = state;
-            button.setAttribute('aria-pressed', String(state === 'recording'));
-            button.setAttribute('aria-busy', String(state === 'requesting' || state === 'transcribing'));
-            const label = state === 'recording' ? '结束录音并识别' : state === 'transcribing' ? '正在识别语音' : state === 'requesting' ? '正在请求麦克风权限' : '语音输入';
+            button.setAttribute('aria-pressed', String(state === 'recording' || state === 'finishing'));
+            button.setAttribute('aria-busy', String(['requesting', 'preparing', 'finishing', 'transcribing'].includes(state)));
+            const label = state === 'recording' ? '结束录音并识别' : state === 'finishing' ? '正在收录尾音' : state === 'preparing' ? '正在启动麦克风' : state === 'transcribing' ? '正在识别语音' : state === 'requesting' ? '正在请求麦克风权限' : '语音输入';
             button.title = label; button.setAttribute('aria-label', label);
-            button.disabled = state === 'requesting' || state === 'transcribing' || state === 'idle' && busy();
+            button.disabled = ['requesting', 'preparing', 'finishing', 'transcribing'].includes(state) || state === 'idle' && busy();
             if (changed) options.onStateChange?.(state);
         }
         function releaseCapture(op) {
             if (!op) return;
-            clearTimeout(op.timer); clearInterval(op.contextTimer);
+            clearTimeout(op.timer); clearTimeout(op.readyTimer); clearTimeout(op.finishTimer); clearInterval(op.contextTimer);
             if (op.captureReleased) return;
             if (op.stream) op.captureReleased = true;
             if (op.processor) op.processor.onaudioprocess = null;
@@ -90,9 +108,25 @@
             if (op) { op.chunks = []; op.count = 0; }
             if (!disposed) { render('idle'); notice(message); }
         }
-        async function finish() {
+        function appendPcm(op, pcm) {
+            const remaining = captureLimit - op.count;
+            if (pcm.length > remaining) pcm = pcm.subarray(0, remaining);
+            if (pcm.length) { op.chunks.push(pcm); op.count += pcm.length; }
+        }
+        function finish() {
             const op = active;
             if (!op || state !== 'recording') return;
+            clearTimeout(op.timer);
+            render('finishing'); notice('正在收录尾音，请稍候…', true);
+            // ScriptProcessor delivers blocks after they were recorded. Keep
+            // capturing briefly after Stop so its pending tail is delivered.
+            if (op.count >= captureLimit) void transcribe(op);
+            else op.finishTimer = setTimeout(() => void transcribe(op), TAIL_CAPTURE_MS);
+        }
+        async function transcribe(op) {
+            if (!current(op) || op.transcribing) return;
+            op.transcribing = true;
+            appendPcm(op, op.sample?.flush() || new Int16Array(0));
             releaseCapture(op);
             if (!current(op) || busy()) { cancel('输入位置已改变，语音输入已取消。'); return; }
             if (op.count < SAMPLE_RATE * .25) { cancel('录音时间太短，请重新录音。'); return; }
@@ -101,7 +135,9 @@
             op.contextTimer = setInterval(() => { if (!current(op) || busy()) cancel('会话或输入状态已改变，语音输入已取消。'); }, 250);
             const timeout = setTimeout(() => op.controller.abort(), 75000);
             try {
-                const body = new FormData(); body.append('audio', wavBlob(op.chunks, op.count), 'voice.wav');
+                const chunks = [new Int16Array(LEADING_PAD_SAMPLES), ...op.chunks, new Int16Array(TRAILING_PAD_SAMPLES)];
+                const total = LEADING_PAD_SAMPLES + op.count + TRAILING_PAD_SAMPLES;
+                const body = new FormData(); body.append('audio', wavBlob(chunks, total), 'voice.wav');
                 op.chunks = [];
                 const response = await fetcher(options.endpoint || '/voice/transcribe', {
                     method: 'POST', body, signal: op.controller.signal, credentials: 'same-origin'
@@ -145,24 +181,31 @@
                 // Use the device/browser rate; resample explicitly below.
                 // Some Safari/Firefox devices reject a 16kHz capture context.
                 op.audio = new Audio();
-                await op.audio.resume();
-                if (!current(op) || busy()) { releaseCapture(op); if (active === op) cancel('输入位置已改变，语音输入已取消。'); return; }
                 op.source = op.audio.createMediaStreamSource(stream);
-                op.processor = op.audio.createScriptProcessor(4096, 1, 1);
+                op.processor = op.audio.createScriptProcessor(1024, 1, 1);
                 op.mute = op.audio.createGain(); op.mute.gain.value = 0;
-                const sample = pcmSampler(op.audio.sampleRate);
+                op.sample = pcmSampler(op.audio.sampleRate);
                 op.processor.onaudioprocess = event => {
                     if (!current(op) || busy()) { cancel('会话或输入状态已改变，语音输入已取消。'); return; }
-                    let pcm = sample(event.inputBuffer.getChannelData(0));
-                    const remaining = Math.floor(SAMPLE_RATE * seconds) - op.count;
-                    if (pcm.length > remaining) pcm = pcm.subarray(0, remaining);
-                    if (pcm.length) { op.chunks.push(pcm); op.count += pcm.length; }
-                    if (op.count >= SAMPLE_RATE * seconds) void finish();
+                    const input = event.inputBuffer.getChannelData(0);
+                    if (!input.length) return;
+                    appendPcm(op, op.sample(input));
+                    if (!op.started) {
+                        op.started = true; clearTimeout(op.readyTimer);
+                        render('recording'); notice(`已开始录音，请说话；再点麦克风结束（单段最长 ${seconds} 秒）。`, true);
+                        op.timer = setTimeout(finish, Math.max(0, (captureLimit - op.count) / SAMPLE_RATE * 1000 - TAIL_CAPTURE_MS));
+                    }
+                    if (op.count >= captureLimit) {
+                        if (state === 'finishing') void transcribe(op);
+                        else finish();
+                    }
                 };
+                render('preparing'); notice('麦克风正在准备，显示开始录音后再说话。', true);
                 op.source.connect(op.processor); op.processor.connect(op.mute); op.mute.connect(op.audio.destination);
-                render('recording'); notice(`正在录音，再点麦克风结束（最多 ${seconds} 秒）。`, true);
-                op.timer = setTimeout(() => void finish(), seconds * 1000);
                 op.contextTimer = setInterval(() => { if (!current(op) || busy()) cancel('会话或输入状态已改变，语音输入已取消。'); }, 250);
+                op.readyTimer = setTimeout(() => { if (current(op) && !op.started) cancel('麦克风尚未开始采集，请检查设备后重试。'); }, 10000);
+                await op.audio.resume();
+                if (!current(op) || busy()) { releaseCapture(op); if (active === op) cancel('输入位置已改变，语音输入已取消。'); return; }
             } catch (error) {
                 releaseCapture(op);
                 if (!current(op)) { if (active === op) cancel('会话已切换，语音输入已取消。'); return; }
@@ -190,4 +233,5 @@
         };
     }
     root.DMateVoiceInput = { mount };
+    if (typeof module !== 'undefined' && module.exports) module.exports = { mount, pcmSampler, wavBlob };
 })(typeof window !== 'undefined' ? window : globalThis);

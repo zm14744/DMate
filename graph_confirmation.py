@@ -35,7 +35,8 @@ _POLYGON = {'type': 'array', 'items': _IMAGE_POINT, 'minItems': 3, 'maxItems': 6
 _EDGE = {'type': 'object', 'required': ['id', 'from', 'to', 'direction'], 'properties': {
     'id': _ID, 'from': _ID, 'to': _ID, 'direction': {'enum': ['forward', 'undirected']},
     'weight': {'type': ['number', 'string', 'null'], 'maxLength': 256},
-    'edge_label': _TEXT, 'style': {'type': ['string', 'null'], 'maxLength': 64},
+    'edge_label': _TEXT, 'edge_label_is_explicit': {'type': 'boolean'},
+    'style': {'type': ['string', 'null'], 'maxLength': 64},
     'color': {'type': ['string', 'null'], 'maxLength': 64}, 'multiplicity': {'const': 1},
     'path': {'type': 'array', 'items': _POINT, 'maxItems': 128}}}
 DOCUMENT_SCHEMA = {'type': 'object', 'required': ['body_text', 'graphs'], 'properties': {

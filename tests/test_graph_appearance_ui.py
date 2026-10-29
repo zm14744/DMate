@@ -71,7 +71,7 @@ console.log(JSON.stringify(normalized));
 def test_readonly_scan_maps_anonymous_points_and_confirms_the_same_references(scan_page):
     p = scan_page
     graph = anonymous_graph()
-    p.evaluate("g=>{ocrTasks.get('scan').draft={body_text:'判断左右两图是否同构。',graphs:[g]};}", graph)
+    p.evaluate("g=>{const task=ocrTasks.get('scan');task.initialDocument={body_text:'判断左右两图是否同构。',graphs:[g]};task.draft=structuredClone(task.initialDocument);}", graph)
     open_scan(p)
     panel = p.locator('.dgs-information')
     assert panel.get_by_text('图形外观：'+graph['visual_description'], exact=True).count() == 1

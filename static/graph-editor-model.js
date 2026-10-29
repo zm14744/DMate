@@ -103,6 +103,7 @@
                     direction: ['forward', 'undirected', 'unknown'].includes(rawEdge.direction) ? rawEdge.direction
                         : raw.directed === true ? 'forward' : raw.directed === false ? 'undirected' : 'unknown' };
                 for (const field of ATTRS) if (rawEdge[field] === null || scalar(rawEdge[field])) edge[field] = rawEdge[field];
+                if (typeof rawEdge.edge_label_is_explicit === 'boolean') edge.edge_label_is_explicit = rawEdge.edge_label_is_explicit;
                 if (rawEdge.weight !== undefined && rawEdge.weight !== null && !scalar(rawEdge.weight)) edge.weight = 'unknown';
                 if (validPath(rawEdge.path)) edge.path = rawEdge.path.map(row => [...row]);
                 graph.edges.push(edge);
@@ -335,6 +336,7 @@
                 const graph = getGraph(draft, gid), selected = new Set(ids);
                 graph.edges.forEach(edge => { if (selected.has(edge.id)) {
                     edge[field] = value;
+                    if (field === 'edge_label') edge.edge_label_is_explicit = value != null && String(value).trim() !== '';
                     if (field === 'from' || field === 'to') delete edge.path;
                 } });
             }),

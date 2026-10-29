@@ -40,7 +40,7 @@ from scripts.benchmark_graph_first_pass import (digest, load_manifest, same_sour
 GRAPH_FIELDS = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete',
                 'visual_description', 'anon_next')
 VERTEX_FIELDS = ('id', 'label', 'display_label', 'position_description', 'isolated_confirmed')
-EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'edge_label', 'weight', 'multiplicity',
+EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'edge_label', 'edge_label_is_explicit', 'weight', 'multiplicity',
                'parallel_count', 'style', 'color', 'status')
 MODES = {'desktop': {'width': 1440, 'height': 1000}, 'mobile': {'width': 390, 'height': 844}}
 

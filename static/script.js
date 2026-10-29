@@ -3151,6 +3151,7 @@ function handleSendOrStop() {
         stopCurrentAiReply();
         return;
     }
+    if (window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") return;
     if (ocrTasks.size > 0) {
         void sendOcrBatch();
         return;
@@ -3232,7 +3233,7 @@ function refreshInputAvailability() {
     const inputWrap = input?.closest?.(".input-wrap") || null;
 
     let statusText = "";
-    let placeholder = "";
+    let placeholder = "输入消息";
 
     // The graph editor is a modal: composer status text sits behind it and
     // is unreadable. Do not render an OCR-specific lock banner or placeholder.
@@ -3247,8 +3248,9 @@ function refreshInputAvailability() {
 
     if (input) {
         input.disabled = hardBlocked || ocrReviewInProgress;
-        input.placeholder = placeholder;
+        input.placeholder = ocrReviewInProgress ? "" : placeholder;
     }
+    window.dmateChatComposer?.refresh?.();
     // Recognition requests have their own cards and cancellation controls.
     // Only an open editor locks the composer; other originals keep running.
     const recognizing = Boolean(ocrReviewInProgress);
@@ -3271,6 +3273,10 @@ function refreshInputAvailability() {
         sendBtn.setAttribute("aria-label", stoppingAllowed ? "停止当前 AI 回复" : "发送消息");
         sendBtn.title = stoppingAllowed ? "停止当前 AI 回复" : "发送";
         setInputControlVisible(sendBtn, sendVisible);
+        if (visibleMode === "idle" && window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") {
+            sendBtn.disabled = true;
+            sendBtn.title = "语音输入完成后发送";
+        }
     }
     if (imageBtn) {
         imageBtn.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
@@ -9489,6 +9495,10 @@ function sanitizeSemanticContext(value, message = null) {
                 weight: edge.weight ?? null, edge_label: edge.edge_label ?? null,
                 color: edge.color ?? null, style: edge.style ?? null,
                 status: edge.status === "accepted" ? "accepted" : "pending" };
+            if (edge.edge_label_is_explicit !== undefined) {
+                if (typeof edge.edge_label_is_explicit !== "boolean") return null;
+                item.edge_label_is_explicit = edge.edge_label_is_explicit;
+            }
             for (const key of ["multiplicity", "parallel_count"]) {
                 if (edge[key] !== undefined) {
                     if (!Number.isInteger(edge[key]) || edge[key] < 1 || edge[key] > 300) return null;
@@ -13706,6 +13716,7 @@ async function requestAiReply(session) {
 }
 
 function send() {
+    if (window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") return;
     if (ocrTasks.size > 0) { void sendOcrBatch(); return; }
     if (
         ocrReviewInProgress
@@ -13825,6 +13836,7 @@ function send() {
     );
 
     input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
 
     forceChatBottomOnce = true;
 
@@ -14413,7 +14425,7 @@ function renderOcrTasks() {
                     const view = window.DMateGraphFormat.graphRows(graph, index);
                     const section = element("section", "ocr-task-structure-graph");
                     section.append(element("strong", "", view.title));
-                    section.append(element("p", "ocr-task-structure-type", view.type));
+                    if (view.showType !== false) section.append(element("p", "ocr-task-structure-type", view.type));
                     section.append(element("p", "", "点：" + (view.vertices.join("、") || "无")));
                     if (view.named.length) section.append(element("p", "",
                         "边：" + view.named.join("、")));
@@ -15080,12 +15092,20 @@ async function sendOcrBatch() {
     }
 }
 
+function initializeChatComposer() {
+    if (window.dmateChatComposer || !window.DMateChatComposer?.mount) return;
+    const input = document.getElementById("text");
+    if (!input) return;
+    window.dmateChatComposer = window.DMateChatComposer.mount({ input, onSend: () => handleSendOrStop() });
+}
+
 function initializeVoiceInput() {
     if (window.dmateVoiceInput || !window.DMateVoiceInput?.mount) return;
     const button = document.getElementById("voiceInputBtn"), input = document.getElementById("text");
     if (!button || !input) return;
     window.dmateVoiceInput = window.DMateVoiceInput.mount({ button, input,
         status: document.getElementById("voiceInputStatus"), endpoint: "/voice/transcribe",
+        onStateChange: () => refreshInputAvailability(),
         getContextKey: () => String(currentId ?? ""),
         isBusy: () => Boolean(ocrReviewInProgress || ocrBatchPreparing || ocrTasks.size > 0 || isSessionBusy(currentId)
             || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) });
@@ -21206,20 +21226,7 @@ document.addEventListener(
             );
         }
 
-        if (input) {
-            input.addEventListener(
-                "keydown",
-                event => {
-                    if (
-                        event.key === "Enter"
-                        && !event.shiftKey
-                    ) {
-                        event.preventDefault();
-                        send();
-                    }
-                }
-            );
-        }
+        initializeChatComposer();
 
         if (imageBtn) {
             imageBtn.addEventListener(

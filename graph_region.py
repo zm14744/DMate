@@ -81,15 +81,23 @@ def crop_region(raw: bytes, polygon, *, exclusions=None, _photo=None):
 
 
 def validate_text_regions(regions):
-    """Frame IDs define reading order, independently of their page positions."""
+    """Use explicit user order, or frame numbers for older callers."""
     if not isinstance(regions, list) or not regions:
         raise RegionError('请先框选文字。')
-    seen = set(); result = []
+    seen = set(); seen_order = set(); result = []
+    ordered = any(isinstance(row, dict) and 'order' in row for row in regions)
     for row in regions:
         if not isinstance(row, dict) or type(row.get('id')) is not int or not 0 < row['id'] <= 9007199254740991:
             raise RegionError('文字框编号无效。')
         if row['id'] in seen:
             raise RegionError('文字框编号重复。')
         seen.add(row['id'])
-        result.append({'id': row['id'], 'polygon': validate_polygon(row.get('polygon'))})
-    return sorted(result, key=lambda row: row['id'])
+        item = {'id': row['id'], 'polygon': validate_polygon(row.get('polygon'))}
+        if ordered:
+            order = row.get('order')
+            if type(order) is not int or not 0 <= order <= 9007199254740991 or order in seen_order:
+                raise RegionError('文字框识别顺序无效或重复。')
+            seen_order.add(order)
+            item['order'] = order
+        result.append(item)
+    return sorted(result, key=lambda row: row['order'] if ordered else row['id'])
