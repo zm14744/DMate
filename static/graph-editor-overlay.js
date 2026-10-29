@@ -118,7 +118,7 @@ function mount(host,o){
  const regionPoint=p=>p.map(clamp);
  const previewRegion=points=>o.previewRegion?.(points);
  const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),status=d.createElement('span');
- root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
+ root.className='dge-overlay';root.dataset.geometryReady='false';svg.setAttribute('aria-busy','true');bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
  if(o.scanOnly){root.classList.add('dge-scan-only');svg.setAttribute('aria-label','原图框选层');}
  const palette=d.createElement(o.drawingOnly?'details':'section');palette.className='dge-tool-palette';
  if(o.drawingOnly){palette.open=s.toolsOpen!==false;palette.addEventListener('toggle',()=>{s.toolsOpen=palette.open;});}
@@ -504,7 +504,10 @@ function mount(host,o){
   }
  }
  svg.addEventListener('pointerdown',e=>{
-  if(o.disabled?.()||!s.visible)return;
+  // A cached image can expose naturalWidth before its queued load handler.
+  // Until fitting establishes the source/camera transform, a pointer would
+  // otherwise be interpreted against the temporary 1000x1000 defaults.
+  if(!loaded||!autoFitted||o.disabled?.()||!s.visible)return;
   if(s.mode==='vertex'&&!o.graph())o.ensureGraph?.();
   pointers.set(e.pointerId,[e.clientX,e.clientY]);
   if(pointers.size===2){cancelResizePreview();const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;return;}if(pointers.size>2)return;
@@ -620,9 +623,10 @@ function mount(host,o){
  }
  svg.addEventListener('pointerup',e=>release(e));svg.addEventListener('pointercancel',e=>release(e,true));
  scroll.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom(s.zoom*(e.deltaY>0?0.9:1.1));},{passive:false});
- image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage();syncOriginal();buildSampler();draw();};
+ const syncGeometryReady=()=>{const ready=loaded&&autoFitted&&scroll.clientWidth>0&&scroll.clientHeight>0;root.dataset.geometryReady=String(ready);svg.setAttribute('aria-busy',String(!ready));};
+ image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage();syncOriginal();buildSampler();draw();syncGeometryReady();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
- const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();}):null;observer?.observe(scroll);observer?.observe(viewControls);
+ const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();syncGeometryReady();}):null;observer?.observe(scroll);observer?.observe(viewControls);
  const resetInteraction=()=>{cancelResizePreview();active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
  function getDrawingSvg(){

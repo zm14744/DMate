@@ -20,7 +20,7 @@ def test_every_outline_segment_grabs_outside_thin_stroke_without_remounting(scan
       document.getElementById('graphEditorDialog').close();}''', polygon)
     page.wait_for_function('ocrEditorTaskId===null')
     page.get_by_role('button', name='编辑核对', exact=True).click()
-    page.wait_for_function('document.querySelector(".dgs-source .dge-overlay-image").naturalWidth===600')
+    page.wait_for_function('document.querySelector(".dgs-source .dge-overlay")?.dataset.geometryReady==="true"')
     box = page.locator('.dgs-source .dge-overlay-image').bounding_box()
     a, b = polygon[edge_index], polygon[(edge_index + 1) % len(polygon)]
     midpoint = [(a[i] + b[i]) / 2 for i in (0, 1)]
@@ -87,3 +87,33 @@ def test_control_point_ink_is_continuous_and_halos_do_not_cut_the_incoming_line(
     }''')
     assert max(result['fixed']) < 120
     assert max(result['former']) > max(result['fixed']) + 50
+
+
+def test_loaded_image_cannot_accept_a_gesture_before_its_fit_handler_runs(scan_page):
+    page = scan_page
+    # Chromium may publish naturalWidth before dispatching load. Hold just that
+    # queued callback, deterministically, instead of relying on timer delays or
+    # a particular headless browser's image-cache event ordering.
+    page.evaluate('''()=>{
+      let owner=HTMLImageElement.prototype,descriptor;
+      while(owner&&!descriptor){descriptor=Object.getOwnPropertyDescriptor(owner,'onload');owner=Object.getPrototypeOf(owner);}
+      Object.defineProperty(HTMLImageElement.prototype,'onload',{configurable:true,
+        get(){return descriptor.get.call(this);},
+        set(callback){descriptor.set.call(this,callback?event=>{window.pendingGeometryLoad=()=>callback.call(this,event);}:null);}});
+    }''')
+    polygon = set_regions(page)
+    page.wait_for_function('typeof pendingGeometryLoad==="function"')
+    assert page.locator('.dgs-source .dge-overlay-image').evaluate('e=>e.naturalWidth') == 600
+    assert page.locator('.dgs-source .dge-overlay').get_attribute('data-geometry-ready') == 'false'
+    assert page.locator('.dge-overlay-svg').get_attribute('aria-busy') == 'true'
+    point = page.locator('.dge-overlay-svg').evaluate('''svg=>{
+      const p=svg.createSVGPoint();p.x=730;p.y=520;const screen=p.matrixTransform(svg.getScreenCTM());return [screen.x,screen.y];}''')
+    page.mouse.move(*point)
+    page.mouse.down()
+    page.mouse.move(point[0] + 20, point[1], steps=4)
+    page.mouse.up()
+    assert region(page) == polygon
+    assert page.evaluate('graphCalls.length') == 0
+    page.evaluate('pendingGeometryLoad()')
+    page.wait_for_function('document.querySelector(".dgs-source .dge-overlay").dataset.geometryReady==="true"')
+    assert page.locator('.dge-overlay-svg').get_attribute('aria-busy') == 'false'
