@@ -33,7 +33,6 @@
 .dcn-saved{flex:1 1 auto;color:var(--text-subtle,#64748b)}
 .dcn-saved:empty{display:none}
 .dcn-ai{margin-top:22px;padding-top:18px;border-top:1px solid var(--border-strong,#cbd5e1)}
-.dcn-ai>h3{font-size:17px;margin:0 0 8px}
 .dcn-list-empty{font-size:13px;line-height:1.6;color:var(--text-subtle,#64748b);margin:0 0 12px}
 .dcn-ai-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 .dcn-status{font-size:13px;line-height:1.6;margin:12px 0 0;color:var(--text-subtle,#64748b);overflow-wrap:anywhere}
@@ -45,6 +44,11 @@
 .dcn-explanation,.dcn-relation{padding:12px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--surface-2,#f8fafc)}
 .dcn-ai-text:not(.dmate-ai-answer){white-space:pre-wrap}
 @media(max-width:680px){.dcn-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);padding:14px;border-radius:14px}.dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(150px,25dvh) minmax(0,1fr);gap:14px}.dcn-sidebar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:8px}.dcn-selection,.dcn-list{grid-column:1/-1}.dcn-list{display:block}.dcn-note{padding:4px 7px}.dcn-dialog .dcn-original{min-height:170px}.dcn-main{padding-right:3px}.dcn-heading h2{font-size:18px}.dcn-dialog button{min-height:36px}}
+.dcn-dialog.is-empty{height:fit-content}
+.dcn-dialog.is-empty .dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;flex:0 0 auto;gap:0}
+.dcn-dialog.is-empty .dcn-sidebar{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;gap:10px;align-content:start}
+.dcn-dialog.is-empty .dcn-list{grid-column:1/-1;display:block;flex:0 0 auto;overflow:visible}
+.dcn-dialog.is-empty .dcn-list-empty{margin:0}
 
 /* The close control stays in the fixed header; only content scrolls. */
 .dcn-dialog button.dcn-close,.dcn-confirm button.dcn-close{display:block;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0;border:0;border-radius:50%;background:#ef4444;color:transparent;font-size:0;line-height:0;cursor:pointer}

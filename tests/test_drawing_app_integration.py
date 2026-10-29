@@ -29,7 +29,7 @@ def drawing_app(request):
         page.goto('https://dmate.test/')
         page.set_content('<body data-appearance-theme="light"><div class="center" style="height:90dvh">' + stage + '<aside class="right">' + menu + '</aside>' + dialog + '</body>')
         page.add_style_tag(content=styles)
-        for name in ['voice-input.css', 'graph-editor.css', 'drawing-workspace.css']:
+        for name in ['voice-input.css', 'graph-editor.css', 'drawing-workspace.css', 'modal-chrome.css']:
             page.add_style_tag(content=(ROOT / 'static' / name).read_text())
         for name in ['graph-editor-model.js', 'graph-editor-format.js', 'graph-editor-overlay.js',
                      'graph-editor.js', 'drawing-export.js', 'drawing-workspace.js', 'graph-scan-workspace.js']:
@@ -86,7 +86,7 @@ def test_red_close_stays_in_header_while_answer_scrolls(drawing_app):
     open_drawing(page)
     before = page.locator('#graphEditorClose').bounding_box()
     dialog = page.locator('#graphEditorDialog').bounding_box()
-    assert abs(before['x'] + before['width'] - (dialog['x'] + dialog['width'] - (13 if page.viewport_size['width'] <= 760 else 19))) <= 3
+    assert abs(before['x'] + before['width'] - (dialog['x'] + dialog['width'] - (13 if page.viewport_size['width'] <= 760 else 17))) <= 1
     assert before['y'] < dialog['y'] + 30
     page.get_by_role('button', name='AI 回答', exact=True).click()
     page.get_by_role('button', name='请求 AI 指导', exact=True).click()

@@ -3256,7 +3256,7 @@ function refreshInputAvailability() {
     const inputWrap = input?.closest?.(".input-wrap") || null;
 
     let statusText = "";
-    let placeholder = "输入消息";
+    let placeholder = "询问DMate";
 
     // The graph editor is a modal: composer status text sits behind it and
     // is unreadable. Do not render an OCR-specific lock banner or placeholder.
@@ -8965,7 +8965,7 @@ function renderWrongBook() {
         empty.className = "wrong-empty";
 
         if (!allItems.length) {
-            empty.textContent = "错题本还是空的";
+            empty.textContent = "无";
         } else if (wrongBookSearch) {
             empty.textContent = "没有找到匹配的错题";
         } else if (wrongBookFilter === "pending") {

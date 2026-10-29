@@ -5,6 +5,7 @@
     const LEADING_PAD_SAMPLES = Math.round(SAMPLE_RATE * .15);
     const TRAILING_PAD_SAMPLES = Math.round(SAMPLE_RATE * .25);
     const TAIL_CAPTURE_MS = 350;
+    const LITTLE_ENDIAN = new Uint8Array(Uint16Array.of(1).buffer)[0] === 1;
     const ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>';
 
     function wavBlob(chunks, count) {
@@ -14,8 +15,17 @@
         view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
         view.setUint32(24, SAMPLE_RATE, true); view.setUint32(28, SAMPLE_RATE * 2, true);
         view.setUint16(32, 2, true); view.setUint16(34, 16, true); word(36, 'data'); view.setUint32(40, count * 2, true);
-        let offset = 44;
-        for (const chunk of chunks) for (const sample of chunk) { view.setInt16(offset, sample, true); offset += 2; }
+        if (LITTLE_ENDIAN) {
+            // Browser PCM is already Int16. A native bulk copy retains every
+            // sample without a second per-sample JavaScript encoding pass.
+            const output = new Int16Array(buffer, 44, count);
+            let offset = 0;
+            for (const chunk of chunks) { output.set(chunk, offset); offset += chunk.length; }
+        } else {
+            // WAV is little endian even on a host with another byte order.
+            let offset = 44;
+            for (const chunk of chunks) for (const sample of chunk) { view.setInt16(offset, sample, true); offset += 2; }
+        }
         return new Blob([buffer], { type: 'audio/wav' });
     }
 
@@ -29,27 +39,32 @@
             if (ended || !input.length) return new Int16Array(0);
             const begin = samples, end = begin + input.length - 1;
             const at = index => index < begin ? previous : input[index - begin];
-            const output = [];
+            // A callback can emit at most ceil(input.length / step) plus one
+            // carried fractional position. Avoid an intermediate JS array
+            // and Int16Array.from copy for every microphone callback.
+            const output = new Int16Array(Math.ceil(input.length / step) + 2);
+            let length = 0;
             // Use the global output index rather than restarting or rounding
             // phase in each browser callback. The first real sample is kept.
             while (emitted * step < end) {
                 const position = emitted * step;
                 const index = Math.floor(position), fraction = position - index;
-                output.push(pcm(at(index) * (1 - fraction) + at(index + 1) * fraction));
+                output[length++] = pcm(at(index) * (1 - fraction) + at(index + 1) * fraction);
                 emitted++;
             }
             samples += input.length; previous = input[input.length - 1];
-            return Int16Array.from(output);
+            return output.subarray(0, length);
         };
         sample.flush = () => {
             if (ended || previous === null) return new Int16Array(0);
             ended = true;
-            const output = [];
+            const output = new Int16Array(Math.ceil(1 / step) + 1);
+            let length = 0;
             // Final fractional positions need no future microphone block.
             // Hold the last available sample, matching finite-signal padding.
-            while (emitted * step < samples) { output.push(pcm(previous)); emitted++; }
+            while (emitted * step < samples) { output[length++] = pcm(previous); emitted++; }
             previous = null;
-            return Int16Array.from(output);
+            return output.subarray(0, length);
         };
         return sample;
     }

@@ -18,19 +18,19 @@ function mount(options){
  const closeButton=action('',close,'dcn-close');closeButton.title='关闭笔记本';closeButton.setAttribute('aria-label','关闭笔记本');heading.append(headingText,closeButton);
  const content=el('div','dcn-content'),sidebar=el('aside','dcn-sidebar'),main=el('section','dcn-main');
  sidebar.setAttribute('aria-label','概念笔记列表');
- const newButton=action('新建概念',create,'dcn-primary'),search=el('input','dcn-search');search.type='search';search.placeholder='搜索概念';search.setAttribute('aria-label','搜索概念');
+ const newButton=action('新建概念',create,'dcn-primary'),search=el('input','dcn-search');search.type='search';search.placeholder='搜索';search.setAttribute('aria-label','搜索');
  const list=el('div','dcn-list'),selection=el('div','dcn-selection'),count=el('span');
  selection.append(count);sidebar.append(newButton,search,selection,list);
  const editor=el('section','dcn-editor');
  const titleLabel=el('label','','概念名称'),title=el('input','dcn-title');title.maxLength=LIMITS.title;title.setAttribute('aria-label','概念名称');titleLabel.append(title);
  const originalLabel=el('label','','我的概念笔记'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=9;original.setAttribute('aria-label','我的概念笔记');originalLabel.append(original);
  const saved=el('span','dcn-saved');saved.setAttribute('role','status');editor.append(titleLabel,originalLabel,saved);
- const ai=el('section','dcn-ai'),aiTitle=el('h3','','AI 阅读');
+ const ai=el('section','dcn-ai');
  const questionLabel=el('label','','补充要求（可选）'),question=el('textarea','dcn-question');question.maxLength=1000;question.rows=2;question.setAttribute('aria-label','补充要求（可选）');questionLabel.append(question);
  const controls=el('div','dcn-ai-actions'),explainButton=action('AI 解释',()=>void analyze('explain'),'dcn-primary'),relationButton=action('分析关联',()=>void analyze('relations')),cancelButton=action('',()=>invalidate(),'dcn-close dcn-analysis-cancel');
  cancelButton.setAttribute('aria-label','取消分析');cancelButton.title='取消分析';
  const status=el('p','dcn-status'),result=el('div','dcn-results');status.setAttribute('role','status');result.setAttribute('aria-label','AI 解释与概念关联');
- controls.append(explainButton,relationButton,cancelButton);ai.append(aiTitle,questionLabel,controls,status,result);main.append(editor,ai);content.append(sidebar,main);dialog.replaceChildren(heading,content);
+ controls.append(explainButton,relationButton,cancelButton);ai.append(questionLabel,controls,status,result);main.append(editor,ai);content.append(sidebar,main);dialog.replaceChildren(heading,content);
  function load(){
   const key=contextKey();if(key!==loadedContext){currentId=null;selected.clear();question.value='';search.value='';saveError=false;saved.textContent='';loadedContext=key;}
   const source=copy(options.getState?.()||{notes:[],deleted:{}});
@@ -47,6 +47,7 @@ function mount(options){
   deletePrompt?.finish(false);deletePending=null;serial++;active?.controller.abort();active=null;result.replaceChildren();status.textContent='';renderActions();
  }
  function renderActions(){
+  const empty=state.notes.length===0;dialog.classList.toggle('is-empty',empty);selection.hidden=empty;ai.hidden=empty;main.hidden=empty;
   const size=selected.size;count.textContent='已选 '+size+' 条';
   explainButton.disabled=!!active||size===0;relationButton.disabled=!!active||size<2;cancelButton.hidden=!active;
   ai.setAttribute('aria-busy',String(Boolean(active)));
@@ -56,7 +57,7 @@ function mount(options){
  function renderList(){
   const query=search.value.trim().toLocaleLowerCase();list.replaceChildren();
   const visible=state.notes.filter(note=>(note.title+'\n'+note.content).toLocaleLowerCase().includes(query));
-  if(!visible.length)list.append(el('p','dcn-list-empty',state.notes.length?'没有匹配的概念。':'还没有概念笔记。'));
+  if(!visible.length)list.append(el('p','dcn-list-empty',state.notes.length?'没有匹配的概念。':'无'));
   const names=new Map();for(const note of state.notes)names.set(noteName(note),(names.get(noteName(note))||0)+1);
   for(const note of visible){
    const row=el('div','dcn-note'+(note.id===currentId?' is-current':''));row.dataset.noteId=note.id;

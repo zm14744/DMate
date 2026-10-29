@@ -63,6 +63,26 @@ def select_both(page):
     page.get_by_role('checkbox', name='选择概念：关系', exact=True).check()
 
 
+def assert_empty_notebook(page):
+    assert page.locator('#conceptNotebookDialog').is_visible()
+    assert page.locator('.dcn-list').inner_text() == '无'
+    assert page.locator('.dcn-list-empty').is_visible()
+    assert page.locator('.dcn-main,.dcn-ai,.dcn-editor,.dcn-selection').evaluate_all('nodes=>nodes.every(n=>n.hidden)')
+    assert page.get_by_role('button', name='新建概念', exact=True).is_enabled()
+    search = page.get_by_role('searchbox', name='搜索', exact=True)
+    assert search.is_visible() and search.get_attribute('placeholder') == '搜索'
+    assert page.get_by_role('button', name='AI 解释', exact=True).count() == 0
+    assert page.get_by_role('button', name='分析关联', exact=True).count() == 0
+    assert page.get_by_label('补充要求（可选）', exact=True).is_hidden()
+    assert page.locator('.dcn-results').is_hidden()
+    assert page.get_by_role('heading', name='AI 阅读', exact=True).count() == 0
+    assert page.locator('#conceptNotebookDialog').bounding_box()['height'] < 220
+    assert page.locator('.dcn-content').bounding_box()['height'] < 120
+    empty, search_box = page.locator('.dcn-list-empty').bounding_box(), search.bounding_box()
+    assert search_box['y'] + search_box['height'] <= empty['y'] <= search_box['y'] + search_box['height'] + 16
+    assert page.locator('#conceptNotebookDialog').evaluate('e=>e.scrollWidth<=e.clientWidth')
+
+
 def test_notes_autosave_reopen_and_relation_analysis_does_not_modify_original(notebook_page):
     p = notebook_page
     open_notebook(p)
@@ -148,7 +168,7 @@ def test_new_note_explicit_selection_confirmed_delete_and_search(notebook_page):
     assert p.evaluate('calls[0].body.notes[0].title') == '偏序关系'
     assert p.evaluate('calls[0].body.notes[0].content') == ''
     identifier = p.evaluate('stored.notes[0].id')
-    p.get_by_label('搜索概念', exact=True).fill('偏序')
+    p.get_by_label('搜索', exact=True).fill('偏序')
     assert p.locator('.dcn-note').count() == 1
     p.get_by_role('button', name='删除概念：偏序关系', exact=True).click()
     prompt = p.locator('.dcn-confirm')
@@ -279,7 +299,7 @@ def test_switch_to_empty_account_clears_hidden_editor_and_old_save_error(noteboo
     assert p.locator('.dcn-question').input_value() == ''
     assert p.locator('.dcn-editor').is_hidden()
     assert p.locator('.dcn-saved').inner_text() == ''
-    assert p.locator('.dcn-list').inner_text() == '还没有概念笔记。'
+    assert p.locator('.dcn-list').inner_text() == '无'
     assert p.locator('.dcn-results').inner_text() == ''
 
 
@@ -287,8 +307,15 @@ def test_new_first_note_and_open_note_never_implicitly_select_for_ai(notebook_pa
     p = notebook_page
     p.evaluate('stored={notes:[],deleted:{}}')
     open_notebook(p)
+    assert_empty_notebook(p)
+    size = 'mobile' if p.viewport_size['width'] < 681 else 'desktop'
+    p.screenshot(path='/tmp/dmate-notebook-' + size + '-empty.png')
     p.get_by_role('button', name='新建概念', exact=True).click()
     p.get_by_label('概念名称', exact=True).fill('第一个概念')
+    assert p.locator('.dcn-ai').is_visible()
+    assert p.locator('.dcn-selection').is_visible()
+    assert p.get_by_label('补充要求（可选）', exact=True).is_visible()
+    assert p.get_by_role('heading', name='AI 阅读', exact=True).count() == 0
     assert p.locator('input[type=checkbox]:checked').count() == 0
     p.get_by_role('button', name='第一个概念', exact=True).click()
     assert p.locator('input[type=checkbox]:checked').count() == 0
@@ -417,12 +444,64 @@ def test_duplicate_title_delete_identifies_the_exact_concept(notebook_page):
     first = p.get_by_role('button', name='删除概念：同名概念（set）', exact=True)
     second = p.get_by_role('button', name='删除概念：同名概念（relation）', exact=True)
     assert first.count() == second.count() == 1
-    p.get_by_label('搜索概念', exact=True).fill('笛卡尔积')
+    p.get_by_label('搜索', exact=True).fill('笛卡尔积')
     assert p.locator('.dcn-note').count() == 1
     assert second.count() == 1
     second.click()
     p.locator('.dcn-confirm').get_by_role('button', name='删除概念', exact=True).click()
     assert p.evaluate('stored.notes.map(n=>n.id)') == ['set']
     assert p.get_by_label('我的概念笔记', exact=True).input_value() == '集合是一组对象。'
-    p.get_by_label('搜索概念', exact=True).fill('')
+    p.get_by_label('搜索', exact=True).fill('')
     assert p.get_by_role('button', name='删除概念：同名概念', exact=True).count() == 1
+
+
+def test_no_search_matches_keeps_existing_notes_and_ai_controls(notebook_page):
+    p = notebook_page
+    open_notebook(p)
+    p.get_by_role('checkbox', name='选择概念：集合', exact=True).check()
+    p.get_by_label('搜索', exact=True).fill('没有这个概念')
+    assert p.locator('.dcn-list').inner_text() == '没有匹配的概念。'
+    assert p.locator('.dcn-selection').is_visible()
+    assert p.locator('.dcn-selection').inner_text() == '已选 1 条'
+    assert p.locator('.dcn-ai').is_visible()
+    assert p.get_by_role('button', name='AI 解释', exact=True).is_enabled()
+    assert p.get_by_role('heading', name='AI 阅读', exact=True).count() == 0
+    assert p.evaluate('stored.notes.length') == 2
+
+
+def test_deleting_every_note_hides_ai_and_count_and_ignores_late_analysis(notebook_page):
+    p = notebook_page
+    open_notebook(p)
+    select_both(p)
+    p.evaluate('window.hold=true')
+    p.get_by_role('button', name='分析关联', exact=True).click()
+    p.wait_for_function('calls.length===1')
+    for title in ('集合', '关系'):
+        p.get_by_role('button', name='删除概念：' + title, exact=True).click()
+        p.locator('.dcn-confirm').get_by_role('button', name='删除概念', exact=True).click()
+    assert p.evaluate('window.aborted')
+    p.evaluate('reply()')
+    assert p.evaluate('stored.notes.length') == 0
+    assert set(p.evaluate('Object.keys(stored.deleted)')) == {'set', 'relation'}
+    assert p.locator('.dcn-results').text_content() == ''
+    assert p.locator('input[type=checkbox]:checked').count() == 0
+    assert_empty_notebook(p)
+    p.get_by_role('button', name='新建概念', exact=True).click()
+    assert p.locator('.dcn-ai').is_visible()
+    assert p.locator('.dcn-selection').inner_text() == '已选 0 条'
+    assert p.get_by_role('button', name='AI 解释', exact=True).is_disabled()
+
+
+def test_same_account_sync_to_no_notes_aborts_ai_and_compacts_the_notebook(notebook_page):
+    p = notebook_page
+    open_notebook(p)
+    p.get_by_role('checkbox', name='选择概念：集合', exact=True).check()
+    p.evaluate('window.hold=true')
+    p.get_by_role('button', name='AI 解释', exact=True).click()
+    p.wait_for_function('calls.length===1')
+    p.evaluate('stored={notes:[],deleted:{set:10,relation:10}};notebook.refresh();reply()')
+    assert p.evaluate('window.aborted')
+    assert p.locator('.dcn-results').text_content() == ''
+    assert p.locator('.dcn-title').input_value() == ''
+    assert p.locator('.dcn-original').input_value() == ''
+    assert_empty_notebook(p)

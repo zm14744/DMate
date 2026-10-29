@@ -26,6 +26,8 @@ on:
       - 'tests/test_upload_layout_stability.py'
       - 'tests/test_nonquestion_image_context.py'
       - 'static/image-groups.css'
+      - 'static/modal-chrome.css'
+      - 'tests/test_modal_chrome.py'
       - 'tests/test_scan_selection_save.py'
       - 'tests/test_scan_information_sources.py'
       - 'static/chat-composer.js'
@@ -73,7 +75,7 @@ jobs:
           python-version: '3.11'
       - name: Install only graph-editor browser test dependencies
         run: |
-          python -m pip install --disable-pip-version-check pytest==8.4.2 playwright==1.55.0 Pillow==11.3.0
+          python -m pip install --disable-pip-version-check pytest==8.4.2 playwright==1.55.0 Pillow==11.3.0 Jinja2==3.1.6
           python -m playwright install --with-deps chromium
       - name: Test actual graph-editor controls without AI or backend requests
         shell: bash
@@ -89,6 +91,7 @@ jobs:
           python -m pytest -q \
             tests/test_ai_answer_rendering.py \
             tests/test_interaction_surfaces.py \
+            tests/test_modal_chrome.py \
             tests/test_graph_outline_smoothness.py \
             tests/test_graph_loop_editing.py \
             tests/test_drawing_workspace.py \

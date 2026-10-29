@@ -42,6 +42,7 @@ def scan_page(request):
         page.add_style_tag(content=styles)
         page.add_style_tag(content=(ROOT/'static/voice-input.css').read_text())
         page.add_style_tag(content=(ROOT/'static/graph-editor.css').read_text())
+        page.add_style_tag(content=(ROOT/'static/modal-chrome.css').read_text())
         for name in ['graph-editor-model.js','graph-editor-format.js','graph-editor-overlay.js','graph-editor.js','graph-scan-workspace.js']:
             page.add_script_tag(content=(ROOT/'static'/name).read_text())
         page.add_script_tag(content='''window.ocrRequestInFlight=false;window.ocrReviewInProgress=false;

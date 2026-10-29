@@ -1425,7 +1425,7 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     width:100%;
 }
 
-.learning-tools-secondary { margin-top:24px; }
+.learning-tools-secondary { margin-top:32px; }
 
 
 /* 学习回顾：只读取现有本地记录，不做能力评分。 */
@@ -8761,6 +8761,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/image-groups.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/modal-chrome.css?v={{ dmate_web_revision }}">
 <style>
 /* Keep focus feedback inside the control, without a blue or red outer ring.
    Important layer declarations also override the older themed focus rules. */
@@ -8882,7 +8883,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         </div>
         <div class="input">
             <div class="manual-question-composer">
-                <textarea id="text" rows="1" placeholder="输入消息" autocomplete="off" enterkeyhint="enter" aria-label="消息输入"></textarea>
+                <textarea id="text" rows="1" placeholder="询问DMate" autocomplete="off" enterkeyhint="enter" aria-label="消息输入"></textarea>
                 <button id="voiceInputBtn" class="voice-input-button" type="button" aria-label="语音输入" title="语音输入" aria-pressed="false">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>
                 </button>

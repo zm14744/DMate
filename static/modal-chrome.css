@@ -1,0 +1,66 @@
+/* Match the existing wrong-book, learning-report and knowledge-graph headers.
+   Negative margins extend only the header through each dialog's own padding;
+   the workspace dimensions and inner control positions remain unchanged. */
+.graph-editor-dialog > .graph-editor-dialog-head,
+.dcn-dialog > .dcn-heading {
+    display:flex;
+    flex:0 0 auto;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    min-width:0;
+    padding:14px 16px;
+    border-bottom:1px solid var(--surface-3);
+}
+.graph-editor-dialog > .graph-editor-dialog-head { margin:-18px -18px 3px; }
+.dcn-dialog > .dcn-heading { margin:-20px -20px -5px; }
+
+.graph-editor-dialog > .graph-editor-dialog-head > h2,
+.dcn-dialog > .dcn-heading > h2,
+.ocr-upload-stage .ocr-task-panel-head > h2 {
+    margin:0;
+    font:inherit;
+    min-width:0;
+}
+.graph-editor-dialog > .graph-editor-dialog-head > h2,
+.dcn-dialog > .dcn-heading > h2 {
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.graph-editor-dialog .graph-editor-close-dot,
+.dcn-dialog > .dcn-heading > button.dcn-close {
+    flex:0 0 20px;
+    width:20px;
+    min-width:20px;
+    max-width:20px;
+    height:20px;
+    min-height:20px;
+    max-height:20px;
+    margin:0;
+}
+
+@media(max-width:760px) {
+    .graph-editor-dialog > .graph-editor-dialog-head,
+    .dcn-dialog > .dcn-heading {
+        min-height:50px;
+        padding:11px 12px;
+        padding-top:max(11px, env(safe-area-inset-top));
+    }
+    .graph-editor-dialog > .graph-editor-dialog-head { margin:-12px -12px 0; }
+    .dcn-dialog > .dcn-heading { margin:-20px -20px -2px; }
+    .graph-editor-dialog .graph-editor-close-dot,
+    .dcn-dialog > .dcn-heading > button.dcn-close {
+        flex-basis:22px;
+        width:22px;
+        min-width:22px;
+        max-width:22px;
+        height:22px;
+        min-height:22px;
+        max-height:22px;
+    }
+}
+@media(max-width:680px) {
+    .dcn-dialog > .dcn-heading { margin:-14px -14px -11px; }
+}

@@ -11,6 +11,7 @@ import io
 import os
 import re
 import threading
+import time
 import wave
 from urllib.parse import urlsplit, urlunsplit
 
@@ -22,6 +23,7 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024
 MAX_AUDIO_SECONDS = 60
 SAMPLE_RATE = 16000
 _ACTIVE = threading.BoundedSemaphore(2)
+_HTTP = threading.local()
 _NATIVE_PATH = '/api/v1/services/aigc/multimodal-generation/generation'
 
 
@@ -74,24 +76,60 @@ def _configuration():
     return endpoint, model, vocabulary, key
 
 
+def _http_session():
+    """Reuse TLS connections within one worker thread, never across a fork."""
+    session = getattr(_HTTP, 'session', None)
+    pid = os.getpid()
+    if session is not None and getattr(_HTTP, 'pid', None) != pid:
+        session.close()
+        session = None
+    if session is None:
+        session = requests.Session()
+        # A thread performs one dictation at a time. Do not retain an unbounded
+        # pool or replay a POST after a stale connection/ambiguous response.
+        session.mount('https://', requests.adapters.HTTPAdapter(
+            pool_connections=1, pool_maxsize=1, max_retries=0, pool_block=True))
+        _HTTP.session, _HTTP.pid = session, pid
+    return session
+
+
+def _discard_http_session(session):
+    if session is not None:
+        _HTTP.session = None
+        session.close()
+
+
 def transcribe_voice(raw, *, post=None):
     """One explicit model call, with the user's vocabulary; no silent fallback."""
+    started = time.perf_counter()
     seconds = inspect_wav(raw)
+    validated = time.perf_counter()
     endpoint, model, vocabulary, key = _configuration()
     if not _ACTIVE.acquire(blocking=False):
         raise VoiceInputError('asr_busy', '语音服务繁忙，请稍后重试。', status=429)
+    session = response = None
     try:
         payload = {'model': model, 'input': {'messages': [{'role': 'user', 'content': [{
             'type': 'input_audio', 'input_audio': {'data': 'data:audio/wav;base64,' + base64.b64encode(raw).decode('ascii')}}]}]},
             'parameters': {'format': 'wav', 'sample_rate': str(SAMPLE_RATE), 'vocabulary_id': vocabulary}}
+        if post is None:
+            session = _http_session()
+            # Only the connection is shared between dictations. Authorization
+            # is per request, and provider cookies must not cross user requests.
+            session.cookies.clear()
+            post = session.post
+        prepared = time.perf_counter()
         try:
-            response = (post or requests.post)(endpoint, headers={
+            response = post(endpoint, headers={
                 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'X-DashScope-SSE': 'disable'},
                 json=payload, timeout=(8, 50), allow_redirects=False)
         except requests.Timeout as exc:
+            _discard_http_session(session)
             raise VoiceInputError('asr_timeout', '语音识别超时，请重试。', status=504) from exc
         except requests.RequestException as exc:
+            _discard_http_session(session)
             raise VoiceInputError('asr_connection_failed', '语音服务连接失败，请重试。', status=502) from exc
+        received = time.perf_counter()
         try:
             result = response.json()
         except (ValueError, TypeError) as exc:
@@ -112,7 +150,23 @@ def transcribe_voice(raw, *, post=None):
         text = output.get('text') if isinstance(output, dict) else None
         if not isinstance(text, str) or len(text) > 12000:
             raise VoiceInputError('asr_invalid_response', '语音服务没有返回有效文字，请重试。', status=502)
-        return {'text': text.strip(), 'recognized': bool(text.strip()), 'model': model,
-                'vocabulary_id': vocabulary, 'audio_seconds': round(seconds, 3)}
+        text = text.strip()
+        parsed = time.perf_counter()
+        return {'text': text, 'recognized': bool(text), 'model': model,
+                'vocabulary_id': vocabulary, 'audio_seconds': round(seconds, 3),
+                # Provider time includes network and model processing, not just
+                # inference. No recording, transcript, URL or key is logged.
+                'timings_ms': {
+                    'validation': round((validated - started) * 1000, 3),
+                    'preparation': round((prepared - validated) * 1000, 3),
+                    'provider': round((received - prepared) * 1000, 3),
+                    'parsing': round((parsed - received) * 1000, 3),
+                    'total': round((parsed - started) * 1000, 3)}}
     finally:
-        _ACTIVE.release()
+        try:
+            if response is not None:
+                response.close()
+            if session is not None:
+                session.cookies.clear()
+        finally:
+            _ACTIVE.release()
