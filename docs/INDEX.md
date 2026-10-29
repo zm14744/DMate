@@ -1,34 +1,18 @@
-# 文档索引
+# DMate 文档索引
 
-- [`fast-editable-workflow.md`](fast-editable-workflow.md)：当前识别架构与运行验收；四图并发、按需工具和局部复核、可视化修改、确认结构后解题。
-- [`DMATE_RECOGNITION_ARCHITECTURE.md`](DMATE_RECOGNITION_ARCHITECTURE.md)：历史 semantic-v5 设计与验收记录，已由上述编辑优先流程取代。
+这些文档说明当前源码中的产品行为、接口和维护方式。线上配置和安装包发布状态需要在相应部署或发行渠道单独确认。
 
-- [`../README.md`](../README.md)：DMate 总览、核心功能、账号同步与运行方式
-- [`PROJECT_INFO.md`](PROJECT_INFO.md)：项目基本信息与产品定位
-- [`ARCHITECTURE.md`](ARCHITECTURE.md)：教学、模型路由、账号、云同步与数据流
-- [`API.md`](API.md)：HTTP 接口、账号接口与云同步接口
-- [`KNOWLEDGE_GRAPH.md`](KNOWLEDGE_GRAPH.md)：10 模块 / 68 节点知识图谱
-- [`DEPLOYMENT.md`](DEPLOYMENT.md)：Zeabur、PostgreSQL、Brevo/SMTP、更新机制与环境变量
-- [`SECURITY_PRIVACY.md`](SECURITY_PRIVACY.md)：游客 / 登录数据、安全与第三方数据流
-- [`AI_ASSISTED_DEVELOPMENT.md`](AI_ASSISTED_DEVELOPMENT.md)：GPT-5.6 Sol 辅助研发说明
-- [`THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md)：直接依赖、前端库与主要外部服务
-- [`TESTING.md`](TESTING.md)：175项自测默认状态、历史回归、2026-10-13 实际离线核验、未验证的端到端范围
-- [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)：发布前的核心学习、OCR、账号同步、桌面/移动端、回滚核对清单
-- [`REVIEW_20261013.md`](REVIEW_20261013.md)：说明文档与 175 项用例对照源码的审校与勘误
-- [`REFERENCES.md`](REFERENCES.md)：权威资料与官方技术来源
-- [`CHANGELOG.md`](../CHANGELOG.md)：主要代码调整记录
+| 文档 | 内容 |
+| --- | --- |
+| [README](../README.md) | 产品概览、模型用途与快速启动 |
+| [使用指南](USER_GUIDE.md) | 对话、图片分组、框选、绘图、错题、笔记、报告、账号与外观 |
+| [架构](ARCHITECTURE.md) | 服务、前端状态、模块与数据边界 |
+| [API](API.md) | HTTP 接口、字段、限制和错误处理 |
+| [识别流程](RECOGNITION.md) | 当前网页识图路径、其他后端路径、确认与计算 |
+| [部署说明](DEPLOYMENT.md) | 依赖、环境变量、容器、数据库与客户端构建 |
+| [数据与隐私](SECURITY_PRIVACY.md) | 本机和云端数据、第三方服务、认证和删除边界 |
+| [macOS 分发](MACOS_DISTRIBUTION.md) | Developer ID 签名、公证与构建产物 |
+| [参考资料](REFERENCES.md) | 课程知识与第三方技术来源 |
+| [第三方许可](../THIRD_PARTY_LICENSES.md) | 依赖、远程模型服务与客户端组件的来源和许可 |
 
-
-**当前进度（更新至 2026-10-20）**：Microsoft Store 已正式上架；itch.io 已公开发布；Snap Store `dmate` 1.0.0 / Revision 1 已在 Stable；Bing 已可公开检索到 DMate。网页 PWA 安装链路与 iOS WebClip 描述文件入口均已移除；iOS 通过浏览器访问官网。百度仍需等待索引，Uptodown 曾拒绝。具体状态以 [`../README.md`](../README.md) 与 [`PROJECT_INFO.md`](PROJECT_INFO.md) 为准。
-
-最新功能说明：OCR 非题目拦截和移动端交互见 [`API.md`](API.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)；部署与远程网页更新见 [`DEPLOYMENT.md`](DEPLOYMENT.md)；离线测试与未完成验收范围见 [`TESTING.md`](TESTING.md)。
-
-## 2026-10-13 文档增补导航
-
-- **新一轮工作记录**：根目录 `CHANGELOG.md` 的“2026-10-09—2026-10-13”章节，包括 GitHub Actions、Snap Stable、曾测试后移除的 iOS WebClip、商店/搜索引擎进展与最新 API 消费快照。
-- **用户功能/支持平台**：`../README.md` 的“下载与商店分发”；功能说明仍以原有“核心功能”章节为准。
-- **平台构建与认证**：`DEPLOYMENT.md` 的新增第 10—12 节；注意发布凭据只保存在 GitHub Actions Secret。
-- **浏览器/原生壳架构**：`ARCHITECTURE.md` 的新增第 17—18 节；接口补充见 `API.md`。
-- **个人测试与发行验证分离**：`TESTING.md` 的新增第 10—11 节；不把商店发布或站长验证算作产品功能测试。
-- **安全与第三方版权**：`SECURITY_PRIVACY.md` 第 14 节及 `../THIRD_PARTY_LICENSES.md` 新增分发依赖说明。
-- **投入成本快照**：`PROJECT_INFO.md`（2026-10-13 DeepSeek 累计消费 ¥103.65、余额 ¥16.34）；10/8 旧值保留为历史。
+文档以代码中实际执行的路径为准。模型输出、结构确认和程序计算分别有适用条件；本文档不提供识别准确率或全题型正确性承诺。

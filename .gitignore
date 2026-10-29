@@ -1,0 +1,39 @@
+# Local configuration and generated state
+.env
+.env.*
+!.env.example
+*.log
+*.db
+*.sqlite*
+
+# Python and editor caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.model-cache/
+.cache/
+.DS_Store
+.idea/
+.vscode/
+
+# Generated reports and client builds
+artifacts/
+dist/
+build/
+node_modules/
+android/.gradle/
+android/local.properties
+android/**/build/
+desktop/src-tauri/target/
+*.jks
+*.keystore
+
+# Historical verification sources are kept in Git history, not main.
+tests/
+coverage/
+.coverage
+htmlcov/

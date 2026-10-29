@@ -1,424 +1,52 @@
 # DMate
 
-**离散数学智能辅学系统**
+DMate 是离散数学智能辅学应用，将文字提问、图片识题、图形绘制、AI 练习、错题订正、概念笔记和学习报告放在同一工作区。
 
-DMate 是面向高校离散数学学习场景的 AI 智能辅学产品。系统以自由式学习交互为入口，将文本提问、图片识题、教学模式控制、知识识别、题目状态管理、难度分级、AI 练习生成、错题订正复测、知识图谱、学习回顾、账号与多设备同步组织到同一学习流程中。
+网页版入口：<https://dmate.zeabur.app/>。Android WebView 和 Windows、macOS、Linux 的 Tauri 客户端打开同一远程网站，AI、识图、账号与同步需要联网。
 
-## 项目信息
+## 能做什么
 
-- 项目主名：DMate
-- 完整说明：离散数学智能辅学系统
-- 参赛方向：人工智能 + 教育创新
-- 学校：中国海洋大学
-- 学部：信息科学与工程学部
-- 项目负责人：朱明
-- 年级：2025 级
-- 专业：物理学
-- 团队形式：单人项目
-- 指导教师：宋宁
-- 在线地址：https://dmate.zeabur.app
-- 当前部署平台：Zeabur
-- 部署历程：Render → Zeabur
-- 当前服务器记录：Tencent Seoul 2C 4GB（2 核 CPU / 4 GB 内存）
-- 当前服务器费用记录：US$4/月；Zeabur 已初次开通 1 次、续费 1 次，共 **2 次付款**（按套餐标价粗略估算为 US$8，实际扣款以 Zeabur 账单为准）。
-- 截至 **2026-10-13**，DeepSeek API 后台截图显示 **累计消费 ¥103.65**、**充值余额 ¥16.34**；2026-10-08 的 ¥101.96 / ¥8.03 为先前历史快照。余额不等于累计支出，也不等于服务器费用或单用户成本。
-- **近期集中迭代与产品发布：2026-09-28—2026-10-14**（9/28—10/8 为功能开发密集期，10/9 起继续多端发行、商店申请及 SEO 工作），**不是项目启动日期**。
+- **教学对话**：提示引导、完整解析、概念讲解、出题和答案诊断。解题默认先给提示，明确要求后再提供完整答案。
+- **图片工作区**：每批最多 4 张，逐张识别与核对；支持文字框、图形框、自主选择来源，以及把多张图分成一道题。
+- **独立绘图**：编辑顶点、边、箭头、权值、边名和布局，保留本机历史，导出 PNG，或上传当前结构后提问。
+- **学习整理**：错题订正与同类复测、可搜索的概念笔记本、按现存记录生成的学习报告。
+- **知识图谱**：10 个模块、68 个节点，展示相关知识和建议前置关系，不计算学生掌握度。
+- **语音与外观**：语音先转为可编辑文字；支持跟随系统、白色、黑色、蓝色主题及背景、透明度设置。
 
-## 近期开发历程（2026-09-28—2026-10-14）
+发送文字前可用“题目：是 / 否”明确是否收录为题目；图片在“分组”中分别设置题目标记。游客的聊天、错题和笔记仅留在当前页面；登录后可缓存并云同步。独立绘图库始终只保存在当前浏览器，游客绘图也会持久保存。具体操作与存储区别见[使用指南](docs/USER_GUIDE.md)。
 
-本阶段持续推进产品能力与多端体验，重点包括：
+## 技术与模型
 
-- **9 月 28 日—9 月末**：推进图片识题输入流程、图形结构核对、难度识别、错题与知识图谱相关交互，以及手机端适配。
-- **10 月上旬**：围绕账号注册登录、PostgreSQL 数据同步、跨设备使用、远程网页客户端、部署与移动端交互持续完善。
-- **截至 10 月 8 日**：集中排查 AI 练习生成及难度误判、同知识点复测、OCR 非题目图片处理和识别中按钮状态；完成相关离线回归、文档及测试记录整理。
+后端为 Python 3.10、Flask、Gunicorn；前端为原生 JavaScript，使用 MathJax 显示公式。账号与同步使用 PostgreSQL，邮件使用 Brevo 或 SMTP。
 
-- **10 月 9—13 日**：完善 Windows、macOS、Linux/Android 分发，基于 GitHub Actions 构建并成功将 DMate Snap 1.0.0（Revision 1，AMD64）发布到 Stable；曾测试 iOS WebClip，后续已随网页安装入口清理而移除。
-- **10 月 14 日**：补充错题复测与 OCR 容错修复；itch.io 项目已设为 Public，提供 macOS、Windows、Android 安装包；**微软商店 Microsoft Store 审核通过，DMate 正式上架**；记录此前的网页应用目录申请（后续不再作为当前发行渠道）、Uptodown 审核拒绝，并据开发者反馈记录 Bing 公开搜索已可检索到 DMate。
+当前网页自动识图使用 **`qwen3.8-flash`**，按需对局部连线复核；文字框识别使用隔离的 PaddleOCR CPU worker。教学、出题、笔记和绘图指导使用 DeepSeek，默认文本模型 **`deepseek-flash`**。语音使用 **`qwen-audio-3.1-asr-flash`** 和配置的数学词库。服务端还保留其他显式识别路径，详见[识别流程](docs/RECOGNITION.md)。
 
-以上按**阶段**归纳，不等于每天都有独立发布或所有功能已完成线上验收。详细历史见 [`CHANGELOG.md`](CHANGELOG.md)。
+识图结果需要对照原图核对，特别是箭头、交叉、重边、自环和权值。结构校验、用户确认和局部数学计算不能保证模型读图或所有解答正确。
 
-## 学术依据与高校题目实测
+## 本地启动
 
-DMate 的课程内容以公开教材和高校课程资料为参考，知识图谱现有 **10 个模块、68 个知识节点**。高校题目验证记录保留了来源、题目概要、参考结果、真实运行日志和未通过案例；其中斯坦福树图属于**安全防错核验**，不冒称完整正确解答。
+服务端以 Linux + Python 3.10 为运行基线，需要 Dockerfile 中列出的 OpenCV / Paddle 系统库。Windows 自托管请使用 WSL2 或 Linux 容器；多平台客户端只打开远程网站，不在本机运行这个服务端。依赖安装和模型包下载需要网络，不会在安装时发起付费模型请求。
 
-- **[高校课程题目验证与知识图谱学术来源说明](docs/UNIVERSITY_BENCHMARK_AND_KNOWLEDGE_SOURCES.md)**：适合竞赛答辩、作品文档与评审查验的可追溯证据清单。
-- [知识图谱技术说明](docs/KNOWLEDGE_GRAPH.md) · [公开教材及技术参考资料](docs/REFERENCES.md)
-
-## 核心功能
-
-### 1. AI 教学辅导
-
-`teaching.py` 将用户学习意图划分为五类教学模式：
-
-- 提示引导
-- 完整解析
-- 概念讲解
-- 练习出题
-- 答案诊断
-
-题目求解默认采用“提示优先”：先指出知识点与关键思路；用户明确要求完整答案时，再进入完整解析。
-
-### 2. 离散数学知识识别与难度分级
-
-`teaching.py` 使用可解释规则识别 10 个课程模块，并将结果与 `knowledge_graph.json` 中的知识节点连接。当前知识图谱包含 **10 个模块、68 个节点**（其中图论 21 个、初等数论 7 个）。
-
-正式题目会进一步给出：
-
-- `category`
-- `knowledge_points`
-- `focus_points`
-- `prerequisite_points`
-- `knowledge_path`
-- `question_type`
-- `difficulty`
-
-题目难度严格使用三档：**简单 / 中等 / 困难**。难度只用于真实题目与正式生成题，不把普通功能讨论或纯元问题当成题目评级。题型优先识别选择、填空、证明、作图、构造、判断、计算等明确类型，无法细分时回退为“一般题”。
-
-本次能力校准覆盖图同构、二部图、拓扑排序、模逆与中国剩余定理，以及由 `a_n` 递推公式识别线性齐次 / 非齐次递推；校准了多步题的中等难度识别。该能力属于规则判定，不代表可以保证全部离散数学题都被准确分类。
-
-文本模型按题目难度调整推理配置：解题时简单题使用 `none`，**中等题与困难题均使用 `high`**，本快照不向模型发送 `max`。练习生成默认使用非思考路径，题目目标难度与推理配置是两个不同概念。
-
-### 3. 图片识题与图形结构理解
-
-图片入口采用两层处理：
-
-1. PaddleOCR 识别普通文字与数学公式；
-2. DeepSeek Vision 校对文字，并补充图、树、哈斯图、箭头、二维结构等 OCR 难以表达的信息。
-
-Vision 负责结构补充，不直接替代教学模块解题。Vision 调用失败时尽量保留 OCR 结果；普通 OCR 暂不可用时，后端仍允许 Vision 处理纯图结构。前端支持撤销正在进行的图片识别请求。新增图片用途识别：明确非习题的课件、笔记和照片返回 422 并阻止进入解题；不确定或纯图题保留核对入口，避免误拦截。识别期间桌面隐藏“图片识题”、手机隐藏“＋”入口，输入框自然补位，红色撤销按钮保留；手机 OCR 核对页操作按钮固定底部，内容区独立滚动。该判断依赖模型，不能承诺所有非题目图片均可识别。
-
-### 4. AI 练习生成与难度控制
-
-明确出题请求通过结构化 `request_kind="exercise"` 传入后端。后端会：
-
-- 重新确认出题意图；
-- 提取并登记 `generated_question`；
-- 生成 `generated_teaching`；
-- 将可见题目与隐藏参考答案分离；
-- 对生成题重新执行课程分类与难度估计。
-
-出题难度规则：
-
-- 用户明确指定“简单 / 中等 / 困难”时，以用户要求为准；
-- **错题本复测**优先继承该错题存储的难度（简单/中等/困难），旧记录没有难度时后端重新分析原题，仍无法判定才按中等；不会强制把困难错题改成中等。
-- **普通独立出题或“照这题再出一道”**未明确指定难度时仍默认以中等为目标；普通参照题不自动继承旧题难度。
-- 未明确指定难度时，默认提示模型生成中等题，但不会仅因规则估计难度不同而丢弃有效题；明确要求难度时可以重试一次，仍偏离时保留通过其他校验的有效题目，故最终难度不保证完全符合要求。
-- 对“照这题再出一道 / 同知识点复测”，除模块一致性外，已能识别的核心知识点也必须有交集，避免“图同构 → 最短路”这种同属图论却偏题的生成结果。知识点偏离时会拒绝该题并提示重新生成；该规则依赖识别结果，不构成数学正确性验证。
-
-因此 AI 生成题不是普通聊天文本，而是能够进入题目历史、错题、订正和复测流程的正式学习对象。
-
-### 5. 当前题与历史题状态管理
-
-前端维护题目候选、题目指纹与教学快照，并优先把自然语言指代解析成明确题目对象。支持：
-
-- “第一题”“第 2 题”等正序题号；
-- “倒数第一题”“倒数第二题”；
-- “上一道题”“下一道题”“往后 2 道题”；
-- “最开始那道题”“最后一道题”“当前题”；
-- “第 2 题的下一题”等组合导航；
-- “集合那道题”“数论那道题”等主题指代；
-- “继续”“为什么”“再解释一下”等短追问保持。
-
-“第 2 小题”“第 2 问”等当前大题内部编号不会被误当成会话历史第 2 道题。显式目标不存在时返回定位失败提示，不静默切换到别的题。
-
-当前上下文容量：
-
-- 后端单次最多接收 32 条消息；
-- AI 历史最多保留 32 条消息；
-- AI 历史总字符预算 60,000；
-- 单条消息上限 6,000 字符；
-- 显式题目状态不可用时，前端回退到最近 12 条自然语言消息。
-
-### 6. 错题—订正—复测闭环
-
-错题本支持：
-
-- 记为错题；
-- 答案与解析；
-- 笔记编辑；
-- 完成订正；
-- 针对原知识点生成新题复测；
-- 提交复测答案并记录正确、错误或待继续判断；
-- 搜索、筛选、排序；
-- PDF 导出。
-
-复测新会话直接保存原错题 `referenceQuestion`，并通过 `exercise_reference` 显式提交原题。生成结果保存 `generated_question` 与隐藏的 `generated_answer`；提交答案时只核验本次复测题，避免混入原错题或其他历史题。
-
-当前错题上限为 80 条。
-
-### 7. 知识图谱与学习回顾
-
-知识图谱用于展示当前题知识点、建议前置知识、直接后续知识，以及当前题 / 当前会话 / 历史题范围的知识聚焦。
-
-`prerequisites` 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；知识图谱不记录学生“掌握度”。
-
-学习回顾只依据真实学习记录与错题状态组织内容，不生成无数据依据的能力百分比。
-
-### 8. 账号、邮箱验证与多设备同步
-
-账号系统基于 PostgreSQL，支持：
-
-- 用户名 + 邮箱 + 密码 + 6 位邮箱验证码注册；
-- 注册成功后自动登录；
-- 用户名或邮箱登录；
-- 已登录旧账号绑定 / 更换邮箱；
-- 邮箱验证码重置密码；
-- 用户名 + 恢复码作为备用重置方式；
-- 登录后使用当前密码修改恢复码；
-- 退出登录；
-- 输入当前密码永久注销账号。
-
-注册时系统自动生成一枚高熵恢复码，明文只在注册成功响应中返回一次，服务端只保存 scrypt 哈希。
-
-邮箱验证码为 6 位数字，10 分钟有效；同一用途 60 秒后可重发，单邮箱同用途每小时最多 8 次，单个验证码最多允许 6 次错误尝试。事务邮件优先通过 Brevo API 发送，失败时可自动回退 SMTP。
-
-### 9. 游客模式与云同步
-
-DMate 区分游客和登录用户：
-
-- **游客模式**：聊天、学习记录与外观设置只在当前页面生命周期内存在，不写入持久 `localStorage`；关闭或刷新后不保证保留。
-- **登录模式**：本机保存缓存，并通过 `/sync` 将会话、学习状态、错题、复测状态与外观参数同步到 PostgreSQL。
-- 云同步使用 `revision` 做冲突检测；多设备同时修改时由前端**自动合并并按新版本重试**，必要时将同一会话分叉保留，避免丢失其中一端的记录。当前不弹出覆盖云端选择框，服务端拒绝 `force=true`。
-- `/sync` 逻辑中 `data` 的 JSON 限制设置为 **12 MiB**，但 Flask 全局 `MAX_CONTENT_LENGTH` 仅 **8.5 MiB**（8 MiB 图片上限 + 512 KiB multipart 余量），因此当前 HTTP 同步请求会**先撞上全局限制**，实际可上传的 JSON 略小于 8.5 MiB。二者需在业务代码中统一，本次仅记录不更改。
-- 自定义背景图片本体仍保存在当前设备 IndexedDB，不上传到云端；背景相关参数可随账号同步。
-
-退出登录后，界面会清空并回到真正的游客状态。
-
-### 10. 数学渲染、复制与导出
-
-前端使用：
-
-- Marked：Markdown 解析；
-- DOMPurify：HTML 清洗；
-- MathJax：LaTeX → SVG 数学渲染；
-- html2canvas + jsPDF：错题 PDF 导出。
-
-MathJax 使用 `fontCache: 'none'`，PDF 导出前处理 MathJax SVG 与辅助 MathML，降低重复绘制风险。
-
-**富文本与公式复制**是前端已有的独立能力，不只是复制原始字符串：
-
-- **保留视觉效果**：复制渲染后的内容时，优先同时写入剪贴板 `text/html` 与 `text/plain`。富文本包含段落、标题、列表、表格、代码等格式；已渲染的 MathJax 公式在 HTML 中转为嵌入式 SVG 图片，供支持富文本的粘贴目标保留视觉效果。
-- **纯文本降级**：不支持富文本剪贴板的浏览器回退为文本，公式转为 `$...$` 或 `$$...$$` LaTeX 表示；不承诺粘贴到所有软件后都保持可视公式。
-- **局部选择复制**：支持用户拖选文字与公式混排区域；公式 SVG 还实现了按字形范围选中、高亮和复制，尽量只复制被选中的局部，而非强制整段复制。选区高亮颜色统一；行为依赖浏览器选择与剪贴板权限。
-- **复制入口精简**：聊天区只对可识别的**完整题目**展示题目复制入口，不对普通寒暄、追问或 AI 讲解滥加按钮；错题本提供每题复制，复制时清理按钮等无关控件；知识图谱侧重点是**复制图谱图片**，不是复制一串节点文字。
-- **图谱复制为图片**：导出的是完整知识图谱 PNG，支持图片剪贴板时直接复制；受浏览器限制不能写入图片剪贴板时尝试保存 PNG，不悄悄退回到纯文字。
-
-**错题 PDF**按题组织，导出前对公式做渲染处理，避免同一道题在导出中重复出现。以上能力均属于代码设计与兼容性实现，实际粘贴样式仍取决于目标应用和设备浏览器。
-
-### 11. 个性化外观
-
-外观模式：
-
-- 跟随系统
-- 白色
-- 黑色
-- 蓝色
-
-同时支持蓝 / 紫 / 青绿强调色、字号、全局背景、背景适配、遮罩、模糊、面板透明度与对话气泡透明度。
-
-默认打开使用白色模式。游客外观不持久化；登录用户的外观参数可随账号同步，自定义背景图片本体仅在当前设备保存。
-
-## 下载与商店分发（更新至 2026-10-19）
-
-**网页版**：https://dmate.zeabur.app/ ，可以直接在线使用。Windows、macOS、Linux 和 Android 使用独立安装包；iPhone / iPad 直接通过浏览器访问网页。网页 AI、OCR、账号和同步功能均需要联网。
-
-| 渠道 / 平台 | 当前状态与说明 |
-|---|---|
-| Web（Zeabur） | [dmate.zeabur.app](https://dmate.zeabur.app/) 为现行入口；旧域名已停用。 |
-| GitHub Release | [v1.0.1](https://github.com/zm14744/DMate/releases/tag/v1.0.1) 提供 Windows EXE、macOS DMG、Linux DEB / AppImage 与 Android APK。 |
-| Windows / macOS / Linux | 提供独立桌面安装包；macOS 已加入可选 Developer ID 签名及公证的验证流程，未配置 Apple 凭据时生成的包仍为未公证测试版。参见 [macOS 发布说明](docs/MACOS_DISTRIBUTION.md)。 |
-| **Snap Store** | [dmate](https://snapcraft.io/dmate) 1.0.0 / Revision 1 / Stable 已发布；当前为 AMD64，需要 `snapd`。 |
-| **itch.io** | [DMate 项目页](https://zm14744.itch.io/dmate) 已公开，提供 Windows EXE、macOS DMG 和 Android APK。 |
-| Android | 通过 GitCode、GitHub Release 或 itch.io 获取 APK。 |
-| iPhone / iPad | 直接通过浏览器访问网页版；目前没有原生 iOS 安装包。 |
-| **Microsoft Store** | [DMate 产品页](https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK)；开发者已确认正式上架。 |
-| 百度搜索 | 已完成站点验证与首页提交，仍需等待爬取、索引及公开结果刷新。 |
-| Bing 搜索 | 已可在公开搜索中找到 DMate；图标与摘要更新仍受 Bing 抓取和缓存影响。 |
-| Uptodown / Product Hunt | Uptodown 曾因纯 WebView 封装被拒；Product Hunt 尚无新的正式公开发布确认。 |
-
-### 国内用户下载推荐
-
-| 系统 | 优先入口 | 其他渠道 |
-|---|---|---|
-| Windows | Microsoft Store、GitCode EXE | GitHub Release、itch.io |
-| Linux（AMD64） | Snap Store | GitCode / GitHub 的 DEB、AppImage |
-| Android | GitCode APK | GitHub Release、itch.io |
-| macOS | GitCode DMG | GitHub Release、itch.io |
-| iOS / iPadOS | 浏览器直接访问官网 | 暂无独立安装包 |
-
-安装弹窗只列出平台安装包和应用商店入口；网页 PWA 安装引导与 iOS WebClip 描述文件均已移除。GitHub、GitCode、itch.io 的实际可达性可能因网络环境而异；商店上架或文件公开不等于所有设备均已完成实机安装验收。
-
-Linux 网站下载入口提供 `.deb`、AppImage 和 [Snap Store](https://snapcraft.io/dmate) 三种途径：Ubuntu/Debian/Mint 可选 DEB，其他发行版可尝试 AppImage，已启用 `snapd` 的系统可安装 Snap。只需选择一种方式；Snap 当前仅 AMD64，AppImage 可能需要 FUSE。
-
-**iOS / iPadOS**：通过浏览器直接访问官网。项目目前没有 Apple App Store 原生 IPA。
-
-**商店与 SEO 的验证边界**：Microsoft Store 已由开发者确认正式上架；Snap Revision 1 Stable 有发布记录，itch.io 已公开发布，Bing 已可公开检索。提交、上架、可下载、可搜索、真实安装通过属于不同阶段。
-
-## AI 运行链路
-
-文本回答代码支持两级提供方：
-
-1. 可选的鲁信杯 OpenAI-compatible 文本接口作为优先通道；
-2. 官方 DeepSeek Chat Completions 作为长期兜底。
-
-鲁信通道支持开关、后台探测与熔断；不可用时直接回退 DeepSeek，避免外部算力通道成为单点故障。DeepSeek 文本模型通过 `DEEPSEEK_CHAT_MODEL` 配置，当前代码默认 `deepseek-flash`。
-
-图片结构理解继续走 DeepSeek Vision 路径，模型通过 `DEEPSEEK_VISION_MODEL` 配置，当前代码默认 `deepseek-flash`。
-
-## 技术架构
-
-```mermaid
-flowchart TD
-    U["DMate 用户"] --> F["前端交互层<br/>HTML + JavaScript"]
-    F -->|POST /chat| A["Flask 服务编排层"]
-    F -->|POST /ocr| A
-    F -->|/auth/* + /sync| A
-    A --> T["教学理解层<br/>teaching.py"]
-    T --> K["knowledge_graph.json<br/>10 模块 · 68 节点"]
-    A --> L["文本模型路由<br/>鲁信可选 → DeepSeek兜底"]
-    A --> O["PaddleOCR<br/>文字 + 公式"]
-    A --> V["DeepSeek Vision"]
-    A --> DB["PostgreSQL<br/>账号 + 云同步"]
-    A --> M["Brevo API / SMTP<br/>邮箱验证码"]
+```bash
+python3.10 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python app.py
 ```
 
-详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+默认访问 <http://localhost:5000/>。启动前在运行环境配置所需服务：
 
-## 网页搜索与分享基础（更新至 2026-10-14）
+| 功能 | 环境变量 |
+| --- | --- |
+| 教学、出题、笔记分析、绘图指导 | `DEEPSEEK_API_KEY` |
+| 网页自动识图、语音 | `DASHSCOPE_API_KEY`；服务地域或工作空间不同还需设置对应服务地址 |
+| 账号、云同步 | `DATABASE_URL`、`AUTH_SECRET_KEY` |
+| 邮箱注册与邮箱找回 | Brevo 或 SMTP 配置 |
 
-首页已设置针对离散数学学习的 Meta Description，使用可识别的 H1 标题，并补足静态图片的 Alt 说明；首页 HTML 已加入 Bing 与百度站点验证 meta 标签。**Bing 由开发者确认已能公开搜索到 DMate；百度站点及链接提交已完成，当前仍在审核/等待进一步收录反馈。**旧域名 `discrete-math-tutor.zeabur.app` 目前不再可访问。`robots.txt`、`sitemap.xml` 与规范链接 canonical 尚未作为专项配置交付，不应误写为已配置。搜索引擎收录和排名由第三方决定，不承诺固定上线时间。
+无数据库和账号密钥时仍可打开游客工作区；未配置模型凭据的功能会报配置错误。HTTP 本地账号调试还需设置 `SESSION_COOKIE_SECURE=0`，生产环境保持 HTTPS 和默认安全 Cookie。完整配置、模型缓存及容器启动方法见[部署说明](docs/DEPLOYMENT.md)。
 
-## 已安装客户端如何获得更新
+## 文档
 
-当前 Windows / macOS / Linux 桌面端采用 Tauri 远程网页壳，Android 采用 WebView 远程网页壳；二者均打开 `https://dmate.zeabur.app`，不内置 Flask 后端或整套网页业务源码。因此：
+[文档索引](docs/INDEX.md) · [使用指南](docs/USER_GUIDE.md) · [架构](docs/ARCHITECTURE.md) · [API](docs/API.md) · [数据与隐私](docs/SECURITY_PRIVACY.md) · [macOS 分发](docs/MACOS_DISTRIBUTION.md) · [参考资料](docs/REFERENCES.md)
 
-- **后端能力**（`app.py`、`teaching.py`、`knowledge_graph.json`）更新并成功部署到 Zeabur 后，已安装客户端的新请求会使用更新后的服务端逻辑；无需重新打包客户端。
-- **网页前端**（`static/script.js`、`templates/index.html` 等）更新并成功部署后，客户端重新加载远程页面即可获取新版；若旧资源还在缓存中，可关闭重开或刷新页面。
-- **原生壳**（Android Java / Manifest / Gradle、Tauri Rust / 配置 / 权限等）本身有变更时，需要重新构建、分发并安装新版本。当前工程**没有实现安装包二进制自动更新**；远程网页更新不等于安装包自动升级。
-- iOS / iPadOS 通过浏览器直接访问在线网页；目前没有独立安装包。
-
-更详细的部署流程与更新边界见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)。
-
-## 主要接口
-
-| 方法 | 路径 | 作用 |
-|---|---|---|
-| GET | `/` | 主页面 |
-| POST | `/chat` | AI 教学对话、题目锚定、难度控制与生成题登记 |
-| POST | `/analyze-questions` | 批量规则化分析历史题目 |
-| POST | `/ocr` | OCR + Vision 图片题理解 |
-| POST | `/ocr/cancel` | 撤销图片识别请求 |
-| GET | `/auth/me` | 当前账号状态 |
-| POST | `/auth/email/send-code` | 注册 / 重置 / 绑定邮箱验证码 |
-| POST | `/auth/register` | 邮箱验证注册 |
-| POST | `/auth/login` | 用户名或邮箱登录 |
-| POST | `/auth/email/bind` | 绑定 / 更换邮箱 |
-| POST | `/auth/recovery-code` | 修改恢复码 |
-| POST | `/auth/recover-password-email` | 邮箱验证码重置密码 |
-| POST | `/auth/recover-password` | 恢复码重置密码 |
-| POST | `/auth/logout` | 退出登录 |
-| POST | `/auth/delete-account` | 永久注销账号 |
-| GET / PUT | `/sync` | 云端数据读取 / 写入与冲突检测 |
-| GET | `/health` | Web 服务健康状态 |
-| GET | `/ready` | Web 与 OCR 就绪状态 |
-
-详见 [`docs/API.md`](docs/API.md)。
-
-## 运行环境与直接依赖
-
-项目 Docker 基础镜像记录为 `python:3.10-slim`。
-
-```text
-Flask==3.1.2
-requests==2.32.5
-gunicorn==23.0.0
-paddlepaddle==3.3.1
-paddleocr[doc-parser]==3.7.0
-numpy==1.26.4
-opencv-contrib-python==4.10.0.84
-Pillow==11.3.0
-psycopg[binary]>=3.2.0,<4.0
-```
-
-前端直接加载：
-
-```text
-MathJax 3.2.2
-Marked 15.0.12
-DOMPurify 3.2.6
-html2canvas 1.4.1
-jsPDF 2.5.2
-```
-
-第三方许可证见 [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)。
-
-## 关键环境变量
-
-| 变量 | 用途 |
-|---|---|
-| `DEEPSEEK_API_KEY` | DeepSeek 文本兜底与 Vision 凭据 |
-| `DEEPSEEK_CHAT_MODEL` | DeepSeek 文本模型 |
-| `DEEPSEEK_VISION_MODEL` | Vision 模型 |
-| `LUXIN_API_KEY` / `LUXIN_MODEL_ID` | 可选鲁信文本通道 |
-| `LUXIN_ENABLED` | 鲁信通道总开关 |
-| `DATABASE_URL` / `POSTGRES_CONNECTION_STRING` | PostgreSQL 账号与同步数据库 |
-| `AUTH_SECRET_KEY` | Flask Session、验证码 HMAC 等服务端密钥 |
-| `BREVO_API_KEY` | Brevo 事务邮件 API |
-| `BREVO_SENDER_EMAIL` / `BREVO_SENDER_NAME` | Brevo 发件人 |
-| `SMTP_*` | Brevo 失败时的 SMTP 备用通道 |
-| `SESSION_COOKIE_SECURE` | Session Cookie Secure 开关，默认开启 |
-| `PORT` | Web 监听端口 |
-
-完整说明见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)。
-
-## 数据与隐私边界
-
-- 游客聊天、学习记录和外观不持久化；
-- 登录用户的会话、学习状态、错题与外观参数可同步到 PostgreSQL；
-- 自定义背景图片本体仅保存在当前设备；
-- 聊天文本会发送给当前文本模型提供方；
-- Vision 开启时图片会发送给 DeepSeek Vision；
-- OCR 在服务端使用 PaddleOCR CPU 推理；
-- 邮箱验证码会通过 Brevo 或 SMTP 发往用户邮箱；
-- DeepSeek、鲁信、Brevo、SMTP 和数据库凭据均只从服务端环境变量读取，不写入前端 JavaScript。
-
-详见 [`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md)。
-
-## 功能测试与验证范围
-
-项目已整理 **175 项个人功能自测用例**，状态列预填 **175/175 项“通过”**，覆盖 AI 提示与讲解、出题与三档难度、OCR 和图形结构确认、历史题定位、错题订正及复测、数学富文本复制与公式局部复制、PDF、68 节点知识图谱、账号安全、多设备同步、部署与移动/桌面客户端等。此数值为**个人记录中的结果**，并非本次文档修订时重新逐项执行的 175 项独立验证。
-
-2026-10-08 后续 OCR/出题修复曾记录 **27 项离线回归通过**（该轮测试用例和执行日志未包含于本次源码快照，不能在此包内复现）。离线规则测试与人工端到端验收属于不同口径；线上 AI 调用、实拍 OCR、邮件、云同步冲突及安装包兼容情况仍以实际运行证据为准。详细范围见 [`docs/TESTING.md`](docs/TESTING.md)。
-
-## AI 辅助开发说明
-
-项目研发过程中使用 ChatGPT 辅助，包括历史记录中的 GPT-5.6 Sol，以及近期用于 GitHub Actions、Snap、客户端分发与 SEO 的 ChatGPT 辅助迭代；不同阶段模型不宜混为一个固定版本。项目负责人负责需求定义、功能取舍、代码整合、运行验证、部署与最终结果审查。
-
-生产运行时的基础文本与图像理解来自外部运行服务；ChatGPT GPT-5.6 Sol 属于研发辅助工具，不是 DMate 面向用户回答时的基础模型。
-
-详见 [`docs/AI_ASSISTED_DEVELOPMENT.md`](docs/AI_ASSISTED_DEVELOPMENT.md)。
-
-## 历史完整源码交付与验证口径（2026-10-13 快照）
-
-交付用源码以 GitHub `main` 提交 `296b3388f0ee3e200078ef5e090454dd40f5b894` 为基准；**程序代码保持原样**，本次仅补齐说明文档与 175 项功能自测表中的版本/平台表述。压缩包中的 `docs/RELEASE_CHECKLIST.md` 增加操作级验收清单，`docs/TESTING.md` 对历史测试与这次确实执行的离线检查作了区分。
-
-- 当前源码可静态检查的 Python、JS 与 JSON 文件已通过对应语法/解析检查，但**未进行全部线上/真机功能测试**。
-- 附带 Excel 的 175 个“通过”是**预设测试状态**，J 列明确区分实际静态检查与待验证项目；不是 175 个已真实执行的结果；其中涉及 Android、iOS、安装包、商店、邮件、数据库和在线 AI 的项目必须在目标环境再次核验。
-- **仅对 2026-10-13 的旧源码快照而言**，当时没有 `tests/` 目录，历史“10/10”不能在那份快照中复现；**当前 GitHub main 已新增 `tests/test_retest_ocr_regression.py`，2026-10-14 的 5 项专项离线测试见下节和 `docs/TESTING.md`**。
-- 主程序、数据库、敏感环境变量均未因生成此源码包而改变；本包不包含 API 密钥、线上数据库、商店认证或已编译的多平台安装包。
-
-完整验收顺序见 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)，具体验证边界见 [`docs/TESTING.md`](docs/TESTING.md)。
-
-### 2026-10-14：错题复测难度继承、出题容错和低清图片识题
-
-- 错题本每道题保存的难度将经结构化 `exercise_reference.retest` / `difficulty` 传给后端，复测题以**原错题难度**为目标；历史错题缺少难度时由后端重新分析原题。
-- 出题生成仍校验真实题干、隐藏答案、学科与全部指定核心考点。**不再仅凭启发式难度标签偏差丢弃通过这些校验的题**；明确选档或错题复测最多进行一次纠偏，普通未指定难度的出题不因标签偏差额外请求模型，减少延迟。实际难度偏离会随 API 返回独立提醒字段。
-- 低对比度/小图文字 OCR 首轮证据不足时最多做一次 CLAHE 增强重识别；保留两次中证据更完整的文本，不重复运行公式模型。PaddleOCR 初始化/执行偶发异常时允许 Vision 降级；有可靠题面问句的 OCR 结果不再被单次 Vision“非题目”分类直接覆盖。**纯图形交叉边和低清小字识别仍需真人核对，不能保证每张图片正确识别**。
-- 本次附有离线回归 `tests/test_retest_ocr_regression.py`；不是 PaddleOCR/DeepSeek 在线成功率或全部历史 175 项的现场测试结论。
-
-
-## Playwright 真实浏览器回归测试（2026-10-22）
-
-- [网页基础交互测试](docs/BROWSER_SMOKE.md)：GitHub Actions 启动 Chromium，测试桌面和手机界面的首页、知识图谱、错题本、学习回顾，自动保存截图与浏览器 Trace。
-- [图片识别与拓扑比对测试](docs/OCR_REGRESSION.md)：真实上传 PNG、捕获 `/ocr` JSON、提取核对窗口文字和公式，并根据独立标准答案逐项比对顶点、边方向和重边数。支持仅手动执行付费识别与可选完整 AI 解题。
-- 识别模型的真实正确率必须看每张图片的 `semantic_status`，不能以网页交互通过冒充图论识别正确。默认自动化仅运行不收费的浏览器界面测试。
+本文描述仓库当前实现；运行环境、商店版本与已安装客户端可能与源码不同。

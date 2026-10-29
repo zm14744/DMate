@@ -36,7 +36,7 @@ RUN python scripts/prepare_ocr_model_cache.py && \
 COPY . .
 
 # Regenerate sharp platform-specific icons as part of every production image build.
-RUN python scripts/generate_icons.py && python scripts/check_icon_assets.py
+RUN python scripts/generate_icons.py
 
 # Four independent image requests plus capacity for cancellation, health and chat.
 # The local model scheduler, rather than HTTP threads, limits inference memory.

@@ -1,31 +1,31 @@
-# DMate macOS 签名与公证发布
+# macOS 构建、签名与公证
 
-此文档对应 `.github/workflows/build-desktop.yml` 和 Tauri v2。旧版 `tauri.conf.json` 中的 `signingIdentity: "-"` 仅为 ad-hoc 签名，不能通过 macOS Gatekeeper 的正式分发验证。**macOS 用户需要的正式版必须具有 Developer ID 签名与 Apple 公证。**
+当前桌面端使用 Tauri v2，配置位于 `desktop/src-tauri/tauri.conf.json`：最低系统版本 10.15，默认加载远程 DMate 网站。`.github/workflows/build-desktop.yml` 构建 `universal-apple-darwin` DMG，同时安装 Apple Silicon 与 Intel Rust target。
 
-## 需要准备的 Apple 开发者凭据
+## 配置发布凭据
 
-Apple Developer Program 中的 **Developer ID Application** 证书应导出包含私钥的 `.p12`，并转为不带换行的 Base64。只将以下内容添加为 GitHub 仓库 Actions secrets，不要放在代码、PR、文档、日志或 Zeabur 环境变量里：
+将 Developer ID Application 证书连同私钥导出为 `.p12`，转换为 Base64 后存到 GitHub 仓库 Actions Secrets。工作流使用以下六项，均不能提交到代码或公开日志：
 
-| GitHub Actions Secret | 含义 |
-|---|---|
-| `APPLE_CERTIFICATE` | Developer ID Application 的 p12 文件 Base64 |
-| `APPLE_CERTIFICATE_PASSWORD` | 导出 p12 时设置的密码 |
-| `APPLE_SIGNING_IDENTITY` | Keychain 中以 `Developer ID Application:` 开头的完整证书名 |
+| Secret | 含义 |
+| --- | --- |
+| `APPLE_CERTIFICATE` | 包含私钥的 p12 文件 Base64 |
+| `APPLE_CERTIFICATE_PASSWORD` | p12 导出密码 |
+| `APPLE_SIGNING_IDENTITY` | 以 `Developer ID Application:` 开头的完整证书名称 |
 | `APPLE_ID` | Apple 开发者账号邮箱 |
-| `APPLE_PASSWORD` | Apple 账号生成的**应用专用密码**，不是账户登录密码 |
-| `APPLE_TEAM_ID` | 10 位 Apple Developer Team ID |
+| `APPLE_PASSWORD` | Apple 应用专用密码 |
+| `APPLE_TEAM_ID` | Apple Developer Team ID |
 
-本仓库不持有这些证书或 Apple 凭据，不能自动替拥有者完成 Apple Developer 注册和公证。所有 6 个 Secret 填写齐全之后，构建工作流会创建临时 Keychain、导入证书，执行 `cargo tauri build --target universal-apple-darwin --bundles dmg`。Tauri 使用上述环境变量自动签名和公证，流水线随后以 `codesign --verify`、`spctl --assess`、`xcrun stapler validate` 检查公证后的应用，并额外使用 `xcrun notarytool submit` 公证最终 DMG、`xcrun stapler staple` 附加磁盘映像票据，再验证 DMG 能通过 Gatekeeper；只有全套步骤成功才上传正式 artifact。验证失败不会上传任何标称正式公证的安装包。
+六项全部缺省时，工作流使用 ad-hoc 签名并生成 `DMate-macos-UNSIGNED-TEST-ONLY`；这类产物未公证，Gatekeeper 可能阻止打开。部分配置时直接失败。全部配置有效后才进入正式签名与公证路径。
 
-- 6 个 Secret **全部未设置**：仍能生成 `DMate-macos-UNSIGNED-TEST-ONLY` 测试用安装包，但是 Gatekeeper 仍可能警告，**不得作为无需手动放行的正式版宣传或替换 GitHub Release**。
-- Secret **仅设置一部分**：macOS 构建直接失败，避免混淆。
-- Secret **全部设置且验证通过**：生成 `DMate-macos-SIGNED-NOTARIZED`；发布前需要人工确认 Release、GitCode 和 itch.io 对应 DMG 已被替换，构建 Artifact 不会自动覆盖既有 Release。
-- 如果 Apple 公证服务暂时不可用或拒绝包，将保留日志并失败；不使用 `xattr -d com.apple.quarantine` 等命令绕过用户设备上的安全检查。
+## 构建与发布
 
-可以从 GitHub → Settings → Secrets and variables → Actions 添加 Secrets。完成后在 Actions 页面手动运行 **Build DMate Desktop**，检查 macOS 构建记录和 DMG artifact。
+1. 在 GitHub Actions 手动运行 **Build DMate Desktop**，或由桌面配置 / 图标相关路径的 main 分支更新触发。
+2. 正式路径创建临时 Keychain，导入证书后执行 `cargo tauri build --target universal-apple-darwin --bundles dmg`。Tauri 完成应用签名与公证。
+3. 工作流用 `codesign --verify`、`spctl --assess`、`xcrun stapler validate` 检查应用；对最终 DMG 再执行 `notarytool submit`、`stapler staple` 与 Gatekeeper 检查。
+4. 全部成功才上传 `DMate-macos-SIGNED-NOTARIZED` Artifact。下载并核对实际产物后，再更新选定的对外发行渠道。
 
-**限制：**截至本次提交，没有验证苹果公证 Secret 已配置，也没有实际获得 Apple notarization ticket；已发布的旧 `DMate_1.0.0_universal.dmg` 不会因仓库配置改变而自动变成已签名版。
+工作流仅生成 Artifact，不自动替换 GitHub Release、GitCode 或其他渠道的旧 DMG。源码存在签名流程也不能证明线上旧安装包已签名或取得公证票据；应依据该次构建日志和实际下载文件判断。
 
-官方文档：
-- https://v2.tauri.app/distribute/sign/macos/
-- https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution
+网页更新无需重新打包，但 Tauri 原生逻辑、可信来源或包元数据变更需要新构建。默认远程站点的 TLS、登录 Cookie 和模型数据流见[部署说明](DEPLOYMENT.md)与[数据与隐私](SECURITY_PRIVACY.md)。
+
+参考：[Tauri macOS 签名](https://v2.tauri.app/distribute/sign/macos/) · [Apple 公证说明](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)

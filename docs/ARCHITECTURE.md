@@ -1,354 +1,84 @@
-# 系统架构说明
+# 系统架构
 
-## 1. 总体结构
+DMate 是 Flask 提供网页和 API、浏览器保存学习状态的离散数学辅学应用。Android WebView 与 Tauri 桌面壳加载同一远程站点；客户端更新与服务器业务部署分别管理。
 
-DMate 当前可以划分为五个逻辑层：
+## 代码入口与职责
 
-1. **前端交互与题目状态层**：`templates/index.html` + `static/script.js`
-2. **账号、会话与同步层**：Flask Session + PostgreSQL + 前端同步状态
-3. **Flask 服务编排层**：`app.py`
-4. **教学理解与知识组织层**：`teaching.py` + `knowledge_graph.json`
-5. **模型、OCR 与外部服务层**：`ai.py` + `ocr.py` + DeepSeek + 可选鲁信通道 + Brevo/SMTP
+| 位置 | 职责 |
+| --- | --- |
+| `app.py` | HTTP 路由、参数校验、账号、同步、识别与教学服务编排 |
+| `templates/index.html`、`static/script.js` | 页面、聊天、题目状态、学习记录和工作区交互 |
+| `static/graph-editor*.js` | 图结构模型、编辑、原图叠加和格式转换 |
+| `static/graph-scan-workspace.js`、`static/drawing-workspace.js` | 扫描与独立画板工作区 |
+| `static/chat-composer.js`、`static/voice-input.js` | 输入框、多图发送、录音转写 |
+| `teaching.py`、`knowledge_graph.json` | 本地教学模式、题目分类、难度与知识依赖分析 |
+| `ai.py` | DeepSeek 文本请求、数学格式处理，以及兼容路径的图片理解 |
+| `graph_qwen_targeted.py`、`graph_qwen_targeted_review.py` | 网页自动识图及有范围的局部复核 |
+| `graph_confirmation.py`、`graph_confirmation_batch.py` | 原图登记、用户确认、快照校验和多图组合 |
+| `ocr_runtime.py`、`ocr_worker.py` | 有资源边界的本地 OCR 子进程 |
+| `concept_notebook.py`、`drawing_guidance.py`、`voice_input.py` | 概念分析、画图指导和语音转写 |
 
 ```mermaid
-flowchart LR
-    U["用户"] --> F["前端交互层"]
-    F -->|/chat| A["Flask app.py"]
-    F -->|/ocr| A
-    F -->|/auth/*| A
-    F -->|/sync| A
-    A --> T["teaching.py"]
-    T --> KG["knowledge_graph.json"]
-    A --> TXT["文本模型路由\n鲁信可选 → DeepSeek兜底"]
-    A --> OCR["PaddleOCR"]
-    A --> VIS["Qwen3-VL-235B-A22B-Thinking"]
-    A --> DB["PostgreSQL\n账号 + 云同步"]
-    A --> MAIL["Brevo API / SMTP\n邮箱验证码"]
+flowchart TD
+    Web[网页与客户端壳] --> App[Flask app.py]
+    App --> Teaching[本地教学分析与知识图谱]
+    App --> Text[DeepSeek 文本服务]
+    App --> Scan[图文草稿与选区识别]
+    Scan --> Vision[Qwen 自动识图]
+    Scan --> Local[本地 OCR 与图像工具]
+    Web --> Confirm[核对编辑并确认]
+    Confirm --> Registry[SQLite 确认摘要]
+    Confirm --> App
+    App --> DB[可选 PostgreSQL 账号与同步]
+    App --> Mail[Brevo 或 SMTP 验证码]
 ```
 
-## 2. 文本学习链路
+## 文本教学与出题
 
-```text
-用户最新输入
-→ 前端解析显式题目指代 / 当前题
-→ 构造题目锚点与本轮唯一请求
-→ POST /chat
-→ app.py 清洗、限流、消息长度控制
-→ teaching.py 分析教学模式、模块、知识点、题型、难度、难点与前置知识
-→ ai.py 根据难度选择思考强度并选择文本提供方
-→ 返回回答与 teaching 元数据
-→ 前端 Markdown → DOMPurify → MathJax 渲染
-→ 更新当前题、会话、学习状态与云同步状态
-```
+前端提交当前题目和本轮请求，`/chat` 清洗消息后由 `teaching.py` 分析，再请求文本模型。主要模式是提示、完整解析、概念讲解、练习出题和答案诊断。题目难度与知识点由规则估计，不是数学正确性证明。
 
-### 教学模式
+当前文本提供方为 DeepSeek，模型由 `DEEPSEEK_CHAT_MODEL` 设置，默认 `deepseek-flash`。简单题通常使用 `none` 思考强度，中等和困难题使用 `high`；出题首次生成使用非思考路径。普通输出预算由 `DEEPSEEK_MAX_OUTPUT_TOKENS` 控制，`high` 预算由 `MEDIUM_MAX_OUTPUT_TOKENS` 控制。代码不支持 `max` 思考强度。
 
-- `hint`：提示引导
-- `full_solution`：完整解析
-- `concept`：概念讲解
-- `exercise`：练习出题
-- `check_answer`：答案诊断
+普通聊天最多处理最近 32 条消息，单条最多 6000 字符。确认图片结构时使用更大的消息边界，并把完整结构单独交给受限图算法和文本服务。部分明确题型还会经过本地精确计算或答案一致性检查；这些检查只覆盖代码支持的范围。
 
-文本题求解默认提示优先；完整解析由明确请求触发。
+出题请求使用 `request_kind: "exercise"`，可携带参照题。后端重新分析生成题的完整性、模块、核心知识点和难度。未指定难度时普通出题以中等为目标；错题复测可继承已存难度。显式难度偏离时最多补充生成一次，仍可能保留有效但难度估计不同的题。初次正文是否展示答案由本轮要求决定，响应可另外携带参考答案供后续使用。
 
-## 3. 题目难度与模型思考强度
+## 图片、图结构与确认
 
-`teaching.py` 对正式题目给出三档难度：
+当前网页自动上传显式发送 `workflow=auto_graph`，调用 Qwen `qwen3.8-flash` 生成可编辑的题干与图结构。OpenCV 点线候选用于触发局部视觉复核；结构校验检查字段、端点和引用。自动识别不会直接开始解题。模型、工具和程序检查均不能代替用户核对原图。
 
-```text
-简单 / 中等 / 困难
-```
+`workflow=manual_graph` 只验证并登记原图，返回手工编辑草稿。文字选区、图形选区和图类型扫描分别调用独立接口。详细路由、模型与资源边界见 [识别流程](RECOGNITION.md)。
 
-`ai.py` 根据 `teaching_context.difficulty` 选择：
-
-```text
-简单 → none
-中等 → high
-困难 → high
-```
+确认时，服务端把浏览器身份、原图摘要、请求 ID、文档摘要、修订号和令牌摘要绑定起来，SQLite 只保存这些标识。`/chat` 再核验客户端携带的完整快照；编辑内容后必须重新确认。一次可按用户顺序提交 1–4 张已确认图片，每张独立核验，再组合为本轮上下文。
 
-普通输出预算受 `DEEPSEEK_MAX_OUTPUT_TOKENS` 控制；`high` 推理（中等、困难共用）预算受 `MEDIUM_MAX_OUTPUT_TOKENS` 控制。当前代码不读取 `HARD_MAX_OUTPUT_TOKENS`，也不会向模型发送 `max`。出题生成默认先走非思考路径，和最终题目难度并非一一对应。
+`DMATE_GRAPH_NEXTGEN` 与 `DMATE_GRAPH_PIPELINE` 控制未显式指定网页工作流时的兼容入口；其中 `agent-tools` 实际调用 `graph_fast_pipeline.py`。仓库中的 strict 多角色、staged 和 evidence 模块仍被部分代码路径引用，不能根据文件名推断它们是网页当前自动识图主线。
 
-练习生成时，后端把“目标难度”和“生成后的实际难度”分开处理，必要时允许重生成一次。
+## 学习状态与持久化
 
-## 4. 文本模型路由与熔断
+前端负责会话、题目索引、错题、知识学习记录、概念笔记、画板与外观状态。游客主要使用当前页面内存状态；登录后使用本机缓存并通过 `/sync` 同步。具体数据与清理方式见 [安全与隐私](SECURITY_PRIVACY.md)。
 
-文本回答代码支持：
+账号与云同步使用可选 PostgreSQL：
 
-```text
-鲁信杯兼容接口（可选、优先）
-        ↓ 失败 / 禁用 / 熔断
-DeepSeek Chat Completions（兜底）
-```
+| 表 | 内容 |
+| --- | --- |
+| `dm_users` | 账号、已验证邮箱、密码及恢复码哈希、会话版本 |
+| `dm_user_data` | 用户同步 JSONB、递增 revision、更新时间 |
+| `dm_email_codes` | 验证码摘要、用途、到期、尝试和消费状态 |
 
-鲁信通道支持：
+登录使用 Flask 签名的 HttpOnly Cookie。密码和恢复码使用 `scrypt`；验证码使用含服务密钥的 HMAC 摘要。数据库或必要认证配置缺失时，账号功能不可用，游客功能可继续运行。
 
-- `LUXIN_ENABLED` 总开关；
-- `LUXIN_MODEL_ID` 显式模型 ID；
-- 未配置模型 ID 时一次性 `/v1/models` 探测；
-- 后台网络探测；
-- 熔断冷却；
-- 失败自动切换 DeepSeek。
+同步采用 revision 比较后更新。写入携带 `baseRevision`，不匹配返回 409 及当前云端快照，客户端合并后重试。服务端不支持强制覆盖。读取可先查询 revision 或分段摘要，再按同一 revision 拉取所需部分。单份同步 JSON 上限 12 MiB。
 
-Vision 不走该文本切换链，独立使用阿里云百炼 Qwen3-VL-235B-A22B-Thinking。
+## 附加服务边界
 
-## 5. 上下文管理
+概念分析只接收本次选中的笔记，返回解释和关联，不修改原笔记。画图指导只接收当前画图快照和要求，返回文字建议；上传画图则验证 PNG 与结构，不重新识别图片内容。语音接口默认调用 `qwen-audio-3.1-asr-flash`，返回文字到输入框，发送聊天由用户另行操作。
 
-后端：
+## 运行与维护
 
-```text
-MAX_MESSAGES_PER_REQUEST = 32
-MAX_MESSAGE_CHARS = 6000
-```
+部署命令、环境变量及模型缓存见 [部署说明](DEPLOYMENT.md)，字段约定见 [API](API.md)。构建依赖以 `requirements.txt`、`requirements-agents.txt` 和各客户端构建文件为准。
 
-AI 历史：
+限流、活动识别任务和取消标记保存在 Web 进程内，当前部署应保持单 worker、多线程。确认摘要使用 SQLite 事务，可由同机 worker 共享；它不使其余进程内状态自动共享。扩展 worker 或副本数量前，需要统一限流、取消、任务容量和确认存储。
 
-```text
-MAX_HISTORY_MESSAGES = 32
-MAX_HISTORY_CHARS = 60000
-MAX_MESSAGE_CHARS = 6000
-```
+`/health` 表示 Web 能响应并附带源文件摘要与识别配置；`/ready` 展示本地 OCR 和兼容识别状态。它们不会主动调用远程模型，也不能证明当前网页 `auto_graph` 识别正确。修改识别路径时应同步检查网页提交的 `workflow`、实际调用模块和诊断字段，避免把兼容入口的健康信息当作网页主链结果。
 
-前端自然语言回退：
-
-```text
-FALLBACK_API_CONTEXT_MESSAGES = 12
-```
-
-前端优先使用明确题目对象和题目指纹，而不是机械提交完整聊天历史。只有显式题目状态不可用时才退回近期自然语言消息。
-
-## 6. AI 生成题链路
-
-```text
-用户要求出题
-→ 判断独立出题 / 参照题出题
-→ request_kind="exercise"
-→ 可选 exercise_reference.question
-→ 后端重新分析参照题
-→ 解析目标难度
-→ 强制 exercise 教学模式
-→ AI 生成题目 + 内部参考答案
-→ 分离可见题干 / 隐藏答案
-→ analyze_question(generated_question)
-→ 校验参照题模块与可识别核心知识点是否匹配
-→ 校验生成题实际难度
-→ 未明确要求难度时不拦截有效题；明确难度不匹配时最多补充生成一次，仍偏离则保留已通过知识点校验的有效题（不保证难度完全匹配）
-→ 前端登记为正式生成题
-```
-
-普通独立出题和同知识点参照出题未指定难度时以**中等**为目标；**错题本复测**通过独立 `retest` 标志继承已存的错题难度，缺失时后端分析原题。普通参照题出题在已识别核心知识点时至少要求一个知识点相交；**错题本结构化复测**如给出了 `retest_core_points`，则要求新题覆盖其中**全部**核心知识点（前端最多提取 4 项），否则拒绝该候选。这是启发式知识一致性检查，不能证明数学答案正确。
-
-## 7. OCR + Vision 链路
-
-OCR 模型：
-
-- `PP-OCRv6_small_det`
-- `PP-OCRv6_small_rec`
-- `PP-FormulaNet_plus-S`
-- CPU 推理
-- 图片最长边 2200 px
-
-流程：
-
-```text
-图片
-→ /ocr（8 MiB）
-→ EXIF方向处理 + 图像预处理
-→ PaddleOCR文字
-→ FormulaNet公式
-→ Qwen3-VL-235B-A22B-Thinking 校对与图形结构解析
-→ Vision 在原调用中标识 exercise / non_exercise / uncertain
-→ 明确非题目返回 422、不进入 AI 解题；不确定和纯图题保留核对
-→ corrected text + visual text
-→ 手机端核对区独立滚动、底部操作固定，识别中隐藏图片入口
-→ 前端组合为题目上下文
-```
-
-前端可通过 `/ocr/cancel` 撤销识别请求。普通 OCR、公式识别和 Vision 具有故障隔离，尽量保留仍可使用的部分结果。
-
-## 8. 知识组织层
-
-`knowledge_graph.json` 当前包含：
-
-- 10 个模块
-- 68 个节点
-- 保留“RSA公钥密码”“矩阵树定理”等拓展知识点；本版新增“模逆与中国剩余定理”“图同构”“二部图”“拓扑排序”
-
-`prerequisites` 表示建议学习前置 / 依赖关系，不表示严格逻辑蕴含。
-
-`teaching.py` 可从图结构与常见题干识别图同构、二部图、拓扑排序，从模运算题识别模逆 / 中国剩余定理，也支持无显式“齐次”字样的公式型递推识别。明确题型信号优先落到选择、填空、证明、作图、构造、判断、计算等类型；无法区分时使用“一般题”。
-
-`teaching.py` 主要输出：
-
-- `category`
-- `knowledge_points`
-- `focus_points`
-- `prerequisite_points`
-- `knowledge_path`
-- `question_type`
-- `difficulty`
-- `mode`
-- `mode_label`
-
-## 9. 账号与数据库结构
-
-账号系统在未配置数据库时不会影响游客模式；配置后使用 PostgreSQL。
-
-主要表：
-
-```text
-dm_users       账号、邮箱、密码哈希、恢复码哈希、auth_version
-dm_user_data   云同步 JSONB、revision、updated_at
-dm_email_codes 邮箱验证码摘要、用途、过期时间、错误次数、消费时间
-```
-
-密码和恢复码使用 Werkzeug `scrypt` 哈希；邮箱验证码不保存明文，使用 `AUTH_SECRET_KEY` 参与 HMAC-SHA256 摘要。
-
-## 10. Session 与账号生命周期
-
-服务器 Session Cookie：
-
-- HttpOnly；
-- SameSite=Lax；
-- Secure 默认开启；
-- `PERMANENT_SESSION_LIFETIME = 30 days`；
-- 每次请求滚动续期。
-
-`auth_version` 用于使旧 Session 失效；密码重置会提升版本并重新建立当前登录会话。
-
-## 11. 游客、本机缓存与云同步
-
-游客：
-
-```text
-会话 / 学习状态 / 外观
-→ 只保留当前页面运行状态
-→ 不写持久 localStorage
-```
-
-登录用户：
-
-```text
-前端状态
-→ localStorage 本机缓存
-→ collectCloudSnapshot()
-→ PUT /sync
-→ PostgreSQL JSONB
-```
-
-云快照包含：
-
-- sessions
-- learning
-- appearance 参数
-
-自定义背景图片 Blob 使用 IndexedDB，仅保存在当前设备，不进入云快照。
-
-同步通过 `revision` 做乐观并发控制。冲突时后端返回 409 和云端最新数据，前端**按 ID 自动合并**并使用新修订号重试（至多尝试若干次）；发生会话分叉时保留另一设备的分支，避免静默丢消息。后端不允许 `force=true` 强制覆盖，也没有“覆盖云端/使用云端”的交互弹窗。
-
-## 12. 错题闭环
-
-```text
-正式题目
-→ 记为错题
-→ 答案 / 解析 / 笔记
-→ 完成订正
-→ 保存 referenceQuestion
-→ exercise_reference 结构化参照
-→ 生成同核心知识点复测题
-→ 保存 generatedQuestion + hidden generatedAnswer
-→ 提交复测答案
-→ 独立答案诊断
-→ 更新复测统计
-```
-
-浏览器端错题上限 80 条。
-
-## 13. 前端内容安全与数学渲染
-
-```text
-AI文本
-→ 数学内容保护 / 整理
-→ Marked
-→ DOMPurify sanitize
-→ 恢复数学片段
-→ MathJax SVG
-```
-
-Marked 只负责 Markdown，不承担 HTML 安全过滤。
-
-### 富文本、公式选择与知识图谱图片复制
-
-- 渲染层使用 Marked、DOMPurify 与 MathJax；复制层为普通文字和公式混排内容分别生成 `text/plain` 与 `text/html`。公式在 HTML 里优先使用内嵌 SVG 图片，纯文本使用 LaTeX 回退，保证不支持富文本的环境也有可读结果。
-- 页面支持正常文字选区、跨 MathJax 混合选区、公式字形级局部选中；统一高亮颜色，并在复制事件中按当前选择构建内容。输入框仍走浏览器原生复制，不应被富文本拦截。
-- 复制按钮按场景限制：聊天只暴露完整题目的复制，错题本每题可复制，弹窗、控件与隐藏部分会在内容序列化时清理。
-- 知识图谱复制以完整图形 PNG 为目标，支持 `image/png` 剪贴板时直接写入；不支持则尝试下载 PNG，不退化成纯文字替代。
-- 复制功能存在浏览器权限、粘贴目标格式兼容边界；本实现不能保证所有目标编辑器可把 SVG 自动转回可编辑的原生数学公式。
-
-## 14. PDF 导出
-
-```text
-错题 DOM
-→ 等待 MathJax
-→ 处理 SVG / 辅助 MathML
-→ html2canvas
-→ jsPDF
-→ A4 PDF
-```
-
-MathJax 使用 `fontCache: 'none'`。
-
-## 15. 服务运行结构
-
-Gunicorn 记录配置：
-
-```text
-gunicorn -w 1 --threads 2 --timeout 300 -b 0.0.0.0:${PORT:-8080} app:app
-```
-
-进程内 60 秒限流：
-
-- `/chat`：20 次 / 60 秒 / 客户端 IP；
-- `/ocr`：10 次 / 60 秒 / 客户端 IP；
-- 账号相关接口：按路由分别 20 次 / 60 秒 / 客户端 IP；
-- 邮箱验证码另有 60 秒重发、8 次/小时和 6 次错误尝试限制。
-
-## 16. 网页端与安装包的更新边界
-
-- **服务器端**：修改并部署 `app.py` / `teaching.py` / `knowledge_graph.json` 后，新请求执行新的服务器逻辑；不需要重建原生客户端。
-- **远程前端**：桌面 Tauri 的 `frontendDist` 与窗口 URL 均指向 `https://dmate.zeabur.app`；Android `DMATE_URL` / WebView 同样指向远程站点。部署 `templates/index.html` 与 `static/script.js` 后，刷新或重启客户端获取新页面（受网络与缓存影响）。
-- **安装包自身**：Android 和桌面壳有代码、权限、版本、签名等变更时必须重新构建；目前没有安装包二进制自动升级组件。
-- **iOS / iPadOS WebClip**：通过 `.mobileconfig` 将官网添加到主屏幕；它打开在线网页，不使用独立 Service Worker 缓存。
-
-上述“随服务端生效”指部署成功之后的后续请求，不意味着尚未部署的本地修改会自动出现在用户设备上，也不是无条件实时推送到已打开的页面。
-
-## 17. 多平台远程页面与发行渠道（2026-10-13）
-
-```text
-浏览器 / iOS WebClip
-            │
-Tauri (Windows NSIS / macOS DMG / Linux DEB、AppImage、Snap)
-            │
-Android WebView APK
-            ▼
-https://dmate.zeabur.app/  ← Zeabur + Flask + PostgreSQL / AI 服务
-```
-
-所有这些客户端**使用远程网页业务层**，并非每种系统都复制一套独立的 AI 后端。区别主要在窗口、安装器、分发方式、操作系统权限与文件/剪贴板行为：
-
-- Windows / macOS / Linux：`desktop/src-tauri/tauri.conf.json` 使用 Tauri 2，产品版本 1.0.0；Github Actions 生成 NSIS、DMG、DEB/AppImage。
-- Linux Snap：构建 Tauri DEB 再以 `core24`、GNOME 扩展、`strict` 沙盒封装为 AMD64 Snap，Store Revision 1 已发布 `stable`；Snap 包更新与网页内容更新是两条独立渠道。
-- Android：`android/` 为 WebView 原生壳，有独立 debug APK Actions，正式签名与审核以实际渠道记录为准。
-- iOS：`.mobileconfig` 提供 Apple WebClip 主屏幕入口；不是 IPA / 原生商店程序。
-
-客户端没有自有 AI 推理核心，联网和 Zeabur / 运行时服务可用性是使用 AI 功能的必要条件；WebClip 只是官网快捷入口，不提供离线 AI 能力。
-
-## 18. 网站可发现性与搜索引擎（2026-10-13）
-
-首页 SEO/平台验证由 `templates/index.html` 承担（Description、H1、Alt、Bing/Baidu 校验标签）；Bing Site Scan/URL Inspection 与百度站点验证/手工提交属于外部索引流程，**不影响 Flask 业务路由、用户数据和模型选择**。旧子域名已经不能访问，应以 `https://dmate.zeabur.app/` 作为唯一公开入口。`robots.txt`、`sitemap.xml`、canonical 仍列为候选 SEO 改进，非当前已完成代码功能。
-
-### 2026-10-14 可靠性修复
-
-出题候选必须先过实际题面、隐藏答案、部分可精确计算的答案一致性、题目条件和参照知识点校验；这些失败依然阻断存题。**难度分类只是启发式标签**：复测继承原错题目标难度并允许一次纠偏，普通出题默认中等但不因第一次有效候选的分类偏差追加网络请求；纠偏后仍偏档时不再丢弃有效题，返回实际难度与偏差信息。这降低了“题目有效却因分类器不一致而反复失败”的风险。
-
-OCR：首轮文本证据不足时，第二次文字识别仅对局部对比度作温和增强；第二轮失败保留首轮。公式识别只运行一次。文本 OCR 模型抛出非 `OCRError` 的异常时允许进入 Vision。图片类型 `non_exercise` 拦截增加明确数学问句保护，既保留教材图题，也不直接放行普通笔记。OpenCV 对弧线、交叉边、低清图可能不识别，人工核对流程仍保留。
+维护时先确认改动涉及的入口、结构字段及持久化格式；前后端共享字段应同时更新。可离线检查 Python 语法、JavaScript 语法、JSON 格式和文档链接。涉及网络、模型或发布的结果，应明确说明实际执行范围与限制，不根据历史记录宣称当前版本已验证。

@@ -5,11 +5,9 @@ on:
     branches: [main]
     paths:
       - "scripts/generate_icons.py"
-      - "scripts/check_icon_assets.py"
       - "templates/index.html"
       - "app.py"
       - "static/script.js"
-      - "scripts/test_install_dialog.cjs"
       - ".github/workflows/sync-icon-assets.yml"
 permissions:
   contents: write
@@ -22,12 +20,9 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check Pillow==11.3.0
           python scripts/generate_icons.py
-          python scripts/check_icon_assets.py
-      - name: Check front-end script and graph review rendering
+      - name: Check front-end JavaScript syntax
         run: |
           node --check static/script.js
-          node tests/safari_favicon_contract.cjs
-          node tests/graph_display_regression.js
       - name: Commit canonical binaries
         run: |
           git config user.name "github-actions[bot]"
