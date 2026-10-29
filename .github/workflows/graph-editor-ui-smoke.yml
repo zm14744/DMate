@@ -6,6 +6,7 @@ on:
     paths:
       - 'static/graph-editor.js'
       - 'static/graph-editor-overlay.js'
+      - 'static/graph-scan-workspace.js'
       - 'static/graph-editor.css'
       - 'tests/test_visual_graph_editor.py'
       - 'tests/test_graph_overlay.py'

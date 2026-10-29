@@ -8734,31 +8734,6 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
         font-size:14px !important;
     }
 }
-/* Scan results: the source stays separate from the generated diagram. */
-.ocr-upload-stage .ocr-task-list {grid-template-columns:minmax(0,1fr);gap:18px;}
-.ocr-task-card {display:grid;grid-template-columns:minmax(160px,.85fr) minmax(0,1.15fr);align-items:start;padding:18px 38px 18px 18px;gap:22px;}
-.ocr-task-thumbnail {width:100%;height:auto;max-height:52dvh;min-height:160px;object-fit:contain;position:sticky;top:0;border-radius:10px;}
-.ocr-task-content {width:100%;min-width:0;}
-.ocr-task-text-label {display:block;font-size:14px;font-weight:600;margin:12px 0;}
-.ocr-task-text {display:block;box-sizing:border-box;width:100%;min-height:80px;margin-top:8px;padding:10px;resize:vertical;border:1px solid var(--border-strong);border-radius:9px;background:var(--surface-2);color:var(--text-primary);font:inherit;font-weight:400;line-height:1.6;}
-.ocr-task-rendered h3 {font-size:14px;margin:14px 0 8px;}
-.ocr-task-graph-preview {--dge-border:var(--border-strong);--dge-surface:var(--surface-2);--dge-text:var(--text-primary);}
-.ocr-task-graph-preview h4 {margin:0 0 8px;font-size:13px;}
-.ocr-task-graph-preview .dge-visual {margin:8px 0;overflow:auto;}
-.ocr-task-graph-preview svg {max-height:220px;}
-.ocr-task-graph-preview .dge-visual-node,.ocr-task-graph-preview .dge-visual-edge {cursor:default;}
-.ocr-task-graph-preview .dge-edge-label {paint-order:stroke;stroke:var(--surface-2);stroke-width:5px;stroke-linejoin:round;}
-.ocr-task-graph-preview .dge-edge-stroke {stroke:var(--text-primary);}
-.ocr-task-graph-preview .dge-edge-label {fill:var(--text-primary);}
-.ocr-task-request-label {font-size:14px;font-weight:600;margin-top:16px;}
-.graph-drawing-entry {margin:14px 0;}
-@media(min-width:761px) {
-    .ocr-upload-stage > .ocr-task-panel {max-height:min(80dvh,900px);}
-}
-@media(max-width:760px) {
-    .ocr-task-card {grid-template-columns:minmax(0,1fr);padding:14px 30px 14px 10px;gap:12px;}
-    .ocr-task-thumbnail {position:static;min-height:120px;max-height:240px;}
-}
 </style>
 </head>
 
@@ -9520,6 +9495,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/graph-editor-format.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor-overlay.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/graph-scan-workspace.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/script.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 

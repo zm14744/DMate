@@ -3092,6 +3092,44 @@ def recognize_manual_text_region():
 
 
 
+@app.route("/graph/recognize-region", methods=["POST"])
+def recognize_selected_graph_region():
+    from graph_confirmation import ConfirmationError, confirmation_owner, require_recognition_source
+    from graph_region import RegionError
+    from graph_region_recognition import recognize_graph_region
+    from graph_agent_runtime import AgentCancelled
+    from graph_upload_tasks import UPLOAD_TASKS, UploadAdmissionError
+    import uuid
+    owner=confirmation_owner()
+    request_id=_normalize_ocr_request_id(request.form.get('request_id'))
+    operation_id=_normalize_ocr_request_id(request.form.get('operation_id')) or 'region-'+uuid.uuid4().hex
+    image=request.files.get('image')
+    if not request_id or image is None:return jsonify({'error':'缺少原图或识别任务。'}),400
+    raw=image.read(MAX_IMAGE_BYTES+1)
+    if not raw or len(raw)>MAX_IMAGE_BYTES:return jsonify({'error':'图片必须小于 8MB。'}),413
+    try:
+        require_recognition_source(owner,request_id,hashlib.sha256(raw).hexdigest())
+        selection=request.form.get('polygon','')
+        if len(selection)>6000:raise RegionError('图形轮廓过于复杂。')
+        polygon=json.loads(selection)
+    except ConfirmationError as exc:return jsonify({'error':exc.message,'code':exc.code}),exc.status
+    except (ValueError,TypeError,RegionError):return jsonify({'error':'图形选区无效，请重新框选。'}),400
+    try:
+        with UPLOAD_TASKS.admit(owner,operation_id):
+            result=recognize_graph_region(raw,polygon,cancelled=lambda:_ocr_is_cancelled(operation_id,owner=owner))
+        if _take_ocr_cancelled(operation_id,owner=owner):return jsonify({'cancelled':True})
+        result.update(request_id=request_id,operation_id=operation_id)
+        return jsonify(result)
+    except AgentCancelled:
+        _take_ocr_cancelled(operation_id,owner=owner)
+        return jsonify({'cancelled':True})
+    except UploadAdmissionError:
+        return jsonify({'error':'当前识别任务较多，请稍后重新识别此选区。'}),429
+    except (RegionError,ValueError,TypeError,OSError):return jsonify({'error':'选区无法读取，请扩大或调整范围。'}),400
+    except Exception:
+        return jsonify({'error':'选区图形识别未完成，请重试。','recognition_status':'failed'}),503
+
+
 @app.route("/graph/figure-type", methods=["POST"])
 def recognize_manual_figure_type():
     """After manual polygon/rectangle segmentation, scan ONLY arrows + weights."""

@@ -14290,28 +14290,7 @@ function renderOcrTasks() {
             // Keep the confirmed mathematical review in ONE consistent layout.
             // The optional DeepSeek description is UI-only; never enter the
             // signed semantic snapshot or the solver input.
-            const textLabel = element("label", "ocr-task-text-label", "文字信息");
-            const textInput = element("textarea", "ocr-task-text");
-            textInput.rows = 3; textInput.maxLength = 23000;
-            textInput.value = task.draft.body_text || "";
-            textInput.placeholder = "图片中的题干和小问，也可以手动补充或修改";
-            textInput.dataset.taskId = task.id; textInput.dataset.ocrField = "bodyText";
-            textInput.disabled = Boolean(task.confirming || task.sending);
-            textLabel.append(textInput); content.append(textLabel);
-            if (graphs.length && window.DMateGraphEditor?.mount) {
-                const graphView = element("section", "ocr-task-rendered");
-                graphView.setAttribute("aria-label", "图形渲染结果");
-                graphView.append(element("h3", "", "图形信息"));
-                graphView.append(element("p", "ocr-task-summary", `${graphs.length} 幅图 · ${graphs.reduce((n,g)=>n+(g.vertices||[]).length,0)} 个顶点 · ${graphs.reduce((n,g)=>n+(g.edges||[]).length,0)} 条边`));
-                const picture = element("div", "ocr-task-graph-preview"); graphView.append(picture);
-                window.DMateGraphEditor.mount(picture, {document: task.draft, previewOnly: true});
-                content.append(graphView);
-            } else if (!graphs.length) {
-                const graphView = element("section", "ocr-task-rendered");
-                graphView.append(element("h3", "", "图形信息"), element("p", "ocr-task-summary", "暂无可用的数学图形结果。"));
-                content.append(graphView);
-            }
-            if (graphs.length && window.DMateGraphFormat?.graphRows) {
+            if (task.confirmation && graphs.length && window.DMateGraphFormat?.graphRows) {
                 const details = element("details", "ocr-task-structure");
                 details.open = task.structureExpanded === true;
                 const summary = element("summary", "", "点、边与关系");
@@ -14350,10 +14329,10 @@ function renderOcrTasks() {
         content.append(slow);
         if (task.error) {
             content.append(element("p", "ocr-task-notice", task.error));
-        } else if (task.notice) {
+        } else if (task.result?.manual_mode && task.notice) {
             content.append(element("p", "ocr-task-notice", task.notice));
         }
-        if (task.state !== "recognizing") {
+        if (task.confirmation) {
             const label = element("label", "ocr-task-request-label", "解题要求（可选）");
             const input = element("textarea", "ocr-task-request");
             input.rows = 2;
@@ -14377,9 +14356,7 @@ function renderOcrTasks() {
             return node;
         };
         if (task.state !== "recognizing") {
-            button("修改结构", "edit");
-            if (!task.confirmation && (task.draft?.graphs?.length || task.draft?.body_text?.trim()))
-                button("确认识别结果", "confirm", true);
+            button(task.confirmation ? "继续修改" : task.result?.manual_mode ? "开始描绘" : task.state === "ready" ? "编辑核对" : "手动录入", "edit", !task.confirmation);
             if (task.confirmation) button("解题", "solve", true);
         }
         content.append(actions);
@@ -14768,7 +14745,7 @@ async function editOcrTask(id) {
     const mount = document.getElementById("graphEditorMount");
     const title = document.getElementById("graphEditorTitle");
     const closeButton = document.getElementById("graphEditorClose");
-    if (!dialog || !mount || !closeButton || !window.DMateGraphEditor?.mount) {
+    if (!dialog || !mount || !closeButton || !window.DMateGraphScan?.mount) {
         task.error = "图片编辑界面未加载，请刷新后重试。";
         renderOcrTasks();
         return;
@@ -14791,8 +14768,8 @@ async function editOcrTask(id) {
         renderOcrTasks();
     };
     try {
-        ocrEditorController = window.DMateGraphEditor.mount(mount, {
-            structureOnly: true,
+        ocrEditorController = window.DMateGraphScan.mount(mount, {
+            scanState: task.scanState ||= {},
             document: cloneOcrDocument(task.draft), initialDocument: cloneOcrDocument(task.initialDocument),
             originalUrl: task.originalUrl,
             isQuestion: task.isQuestion !== false,
@@ -14800,9 +14777,12 @@ async function editOcrTask(id) {
             requirements: task.userRequest || '',
             onRequirementsChange: value => { task.userRequest = value; },
             textState: task.textEditorState ||= { mode: 'text_rect', zoom: 100, visible: true },
-            onRecognizeText: async regions => {
+            onRecognizeText: async (regions, {signal} = {}) => {
                 const controller = new AbortController();
                 const timeout = window.setTimeout(() => controller.abort(), 100000);
+                const abort = () => controller.abort();
+                signal?.addEventListener("abort", abort, {once:true});
+                if (signal?.aborted) abort();
                 try {
                     if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || ''))
                         task.sourceSha256 = await originalImageDigest(task.file);
@@ -14821,37 +14801,26 @@ async function editOcrTask(id) {
                 } catch (error) {
                     if (controller.signal.aborted) throw new Error('框内文字识别超时，可重试或手动输入');
                     throw error;
-                } finally { window.clearTimeout(timeout); }
+                } finally { window.clearTimeout(timeout); signal?.removeEventListener("abort", abort); }
             },
-            onRecognizeGraphType: async polygon => {
-                const reused = reuseVerifiedTypeForSameRegion(task, polygon);
-                if (reused) return reused;
-                const controller = new AbortController();
-                const timeout = window.setTimeout(() => controller.abort(), MANUAL_FIGURE_SCAN_MAX_MS);
+            onRecognizeGraph: async (polygon, {signal} = {}) => {
+                const controller = new AbortController(), operationId = makeOcrRequestId();
+                const timeout = window.setTimeout(() => controller.abort(), 220000);
+                const abort = () => { controller.abort(); notifyOcrCancelled(operationId); };
+                signal?.addEventListener('abort', abort, {once:true});
+                if (signal?.aborted) abort();
                 try {
-                    if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || ""))
-                        task.sourceSha256 = await originalImageDigest(task.file);
+                    if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || '')) task.sourceSha256 = await originalImageDigest(task.file);
                     const selected = new FormData();
-                    selected.append("image", task.file);
-                    selected.append("request_id", task.id);
-                    selected.append("polygon", JSON.stringify(polygon));
-                    const response = await fetch("/graph/figure-type", {
-                        method: "POST", credentials: "same-origin", body: selected,
-                        signal: controller.signal
-                    });
+                    selected.append('image',task.file); selected.append('request_id',task.id);
+                    selected.append('operation_id',operationId); selected.append('polygon',JSON.stringify(polygon));
+                    const response = await fetch('/graph/recognize-region', {method:'POST',credentials:'same-origin',body:selected,signal:controller.signal});
                     const result = await parseResponseJson(response);
-                    if (!response.ok || result?.error)
-                        throw new Error(result?.error || "图类型识别失败，可自行核对");
-                    if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id)
-                        throw new Error("识别结果与所选原图不匹配");
+                    if (!response.ok || result?.error || result?.cancelled) throw new Error(result?.error || '选区识别已取消');
+                    if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id || result.operation_id !== operationId)
+                        throw new Error('图形识别结果与所选原图不匹配');
                     return result;
-                } catch (error) {
-                    if (controller.signal.aborted)
-                        throw new Error("图类型扫描已达到4秒上限，请对照原图核对箭头和权值");
-                    throw error;
-                } finally {
-                    window.clearTimeout(timeout);
-                }
+                } finally { window.clearTimeout(timeout); signal?.removeEventListener('abort',abort); }
             },
             issues: [...(Array.isArray(task.result?.diagnostics?.semantic_issues) ? task.result.diagnostics.semantic_issues : []),
                 ...(Array.isArray(task.result?.review?.reasons) ? task.result.review.reasons : []),
@@ -14939,16 +14908,9 @@ function initializeOcrTaskPanel() {
     if (panel && panel.dataset.bound !== "true") {
         panel.dataset.bound = "true";
         panel.addEventListener("input", event => {
+            if (event.target.dataset.ocrField !== "userRequest") return;
             const task = ocrTasks.get(event.target.dataset.taskId);
-            if (!task || task.confirming || task.sending) return;
-            if (event.target.dataset.ocrField === "userRequest") task.userRequest = event.target.value;
-            if (event.target.dataset.ocrField === "bodyText") {
-                const confirmed = Boolean(task.confirmation);
-                task.draft.body_text = event.target.value;
-                task.dirty = true; task.confirmation = null; task.descriptions = null;
-                if (confirmed) renderOcrTasks();
-                else event.target.closest('.ocr-task-card')?.querySelector('.ocr-task-status')?.replaceChildren(document.createTextNode(ocrTaskLabel(task)));
-            }
+            if (task) task.userRequest = event.target.value;
         });
         panel.addEventListener("click", event => {
             const button = event.target.closest("button[data-ocr-action]");
@@ -14957,11 +14919,6 @@ function initializeOcrTaskPanel() {
             if (button.dataset.ocrAction === "cancel") cancelOcrTask(id);
             if (button.dataset.ocrAction === "remove") removeOcrTask(id);
             if (button.dataset.ocrAction === "edit") void editOcrTask(id);
-            if (button.dataset.ocrAction === "confirm") {
-                const task = ocrTasks.get(id);
-                if (task && !task.confirming && !task.sending)
-                    void confirmOcrTask(task, task.draft).catch(() => {}).finally(renderOcrTasks);
-            }
             if (button.dataset.ocrAction === "solve") void solveOcrTask(id);
         });
     }

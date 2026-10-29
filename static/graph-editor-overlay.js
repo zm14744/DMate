@@ -39,23 +39,25 @@ function mount(host,o){
  const previewRegion=points=>o.previewRegion?.(points);
  const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),status=d.createElement('span');
  root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
+ if(o.scanOnly){root.classList.add('dge-scan-only');svg.setAttribute('aria-label','原图框选层');}
  const palette=d.createElement('section');palette.className='dge-tool-palette';
  if(o.textOnly)svg.setAttribute('aria-label','文字框选层');
- const paletteTitle=d.createElement('h3');paletteTitle.textContent=o.textOnly?'文字工具':'绘图工具';palette.append(paletteTitle,bar);
+ const paletteTitle=d.createElement('h3');paletteTitle.textContent=o.scanOnly?'框选':o.textOnly?'文字工具':'绘图工具';palette.append(paletteTitle,bar);
  const viewControls=d.createElement('div');viewControls.className='dge-view-controls';viewControls.setAttribute('aria-label','视图控制');
  stage.append(image,svg);scroll.append(stage);root.append(viewControls,palette,scroll);host.append(root);
  const button=(label,key,fn,parent=bar)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',()=>{if(!o.disabled?.())fn();});parent.append(b);return b;};
- for(const [key,label] of (o.textOnly?[['select','选择 / 移动'],['text_rect','框选文字']]:[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']])){
-  button(label,key,()=>{s.mode=key;s.start=null;o.clearSelection?.();draw();});
+ for(const [key,label] of (o.scanOnly?[['select','选择 / 平移'],['bounds','图形框选'],['text_rect','文字框选']]:o.textOnly?[['select','选择 / 移动'],['text_rect','框选文字']]:[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']])){
+  button(label,key,()=>{s.mode=o.scanOnly&&s.irregular?(key==='bounds'?'graph_poly':key==='text_rect'?'text_poly':key):key;s.start=null;o.clearSelection?.();draw();});
  }
  const regionMode=d.createElement('select');
  regionMode.setAttribute('aria-label','选区方式');
- for(const [key,label] of [['','框选方式'],o.textOnly?['text_poly','不规则框选']:['graph_poly','不规则框选']]){
+ for(const [key,label] of (o.scanOnly?[['','矩形框选'],['irregular','不规则框选']]:[['','框选方式'],o.textOnly?['text_poly','不规则框选']:['graph_poly','不规则框选']])){
    const item=d.createElement('option');item.value=key;item.textContent=label;regionMode.append(item);
  }
  regionMode.addEventListener('change',()=>{
    if(o.disabled?.())return;
-   s.mode=regionMode.value||'select';s.start=null;s.polygonDraft=[];o.clearSelection?.();draw();
+   if(o.scanOnly){s.irregular=regionMode.value==='irregular';const text=['text_rect','text_poly'].includes(s.mode);s.mode=text?(s.irregular?'text_poly':'text_rect'):(s.irregular?'graph_poly':'bounds');}
+   else s.mode=regionMode.value||'select';s.start=null;s.polygonDraft=[];o.clearSelection?.();draw();
  });
  bar.append(regionMode);
  const commitRegion=(points,polygon)=>{
@@ -66,7 +68,7 @@ function mount(host,o){
  // Each independently segmented graph receives its own direction and weight
  // from OCR + visual edge evidence. Do not override this with toolbar labels.
  // Edge-level corrections in the advanced editor remain available.
- const visible=o.textOnly?null:button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();},viewControls);
+ const visible=o.textOnly||o.scanOnly?null:button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();},viewControls);
  const MIN_ZOOM=.01,MAX_ZOOM=400;
  const zoom=x=>{
    const previous=s.zoom||100;
@@ -124,9 +126,11 @@ function mount(host,o){
  });
  opacityControl.append(opacityTitle,opacityRange,opacityValue);viewControls.append(opacityControl);
  if(o.drawingOnly){originalButton.remove();opacityControl.remove();image.alt='空白画板';}
+ if(o.scanOnly){originalButton.remove();opacityControl.remove();s.originalVisible=true;s.originalOpacity=1;}
  syncOriginal();
  if(o.textOnly)button('清空文字框','clear-text-region',()=>{s.textRegion=null;s.polygonDraft=[];o.selectionChanged?.(null);draw();});
  bar.append(status); // Actionable feedback appears with the tools, never below the photo.
+ if(o.scanOnly){status.classList.add('dgs-source-status');status.setAttribute('role','status');}
  const change=(fn,kind)=>{try{fn();o.changed?.(kind);draw();}catch(e){status.textContent=e?.message||'修改失败';}};
  async function scanFigureType(polygon,graphId){
   if(typeof o.recognizeGraphType!=='function')return;
@@ -259,11 +263,11 @@ function mount(host,o){
  }
  function draw(){
   if(!scroll.clientWidth)return;
-  const g=o.textOnly?{vertices:[],edges:[]}:o.graph()||{vertices:[],edges:[]};
+  const g=o.textOnly||o.scanOnly?{id:o.graph?.()?.id,vertices:[],edges:[]}:o.graph()||{vertices:[],edges:[]};
   if(g)for(const v of g.vertices)if(finite(v.x)&&finite(v.y))expandWorld(v.x,v.y);
   if(visible)visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
-  regionMode.value=['graph_poly','text_poly'].includes(s.mode)?s.mode:'';
-  for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
+  regionMode.value=o.scanOnly?(s.irregular?'irregular':''):['graph_poly','text_poly'].includes(s.mode)?s.mode:'';
+  for(const b of bar.querySelectorAll('[data-overlay-tool]')){const key=b.dataset.overlayTool,active=key===s.mode||o.scanOnly&&(key==='bounds'&&s.mode==='graph_poly'||key==='text_rect'&&s.mode==='text_poly');b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds','text_rect'].includes(key))b.setAttribute('aria-pressed',String(active));}
   svg.replaceChildren();if(!g||!s.visible)return;
   // The mathematical path is in original-image coordinates. Input targets
   // and labels instead use a constant on-screen size, including at 400% zoom.
@@ -299,7 +303,7 @@ function mount(host,o){
     const points=graphPoints(region);if(!points)continue;
     frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id);
   }
-  if(o.textOnly)for(const region of s.regions||[]){
+  if(o.textOnly||o.scanOnly)for(const region of s.regions||[]){
     const points=frame(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''),String(region.id),true,s.selectedId===region.id);
     const b=boxOf(points),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number'});
     label.textContent=String(region.id);label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);
@@ -395,11 +399,12 @@ function mount(host,o){
   const node=e.target.closest('[data-vertex-id]')?.dataset.vertexId,edge=e.target.closest('[data-edge-id]')?.dataset.edgeId,handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
   const hit=e.target.closest('[data-frame-resize]'),graphId=e.target.closest('[data-graph-id]')?.dataset.graphId,
         textId=e.target.closest('[data-text-region-id]')?.dataset.textRegionId;
-  if(hit && ['select','bounds','graph_poly','text_rect','text_poly'].includes(s.mode) && !e.shiftKey){
-    const region=o.textOnly?s.regions?.find(r=>r.id===Number(textId)):o.model.getDocument().graphs.find(r=>r.id===graphId);
-    const points=o.textOnly?region?.polygon:region&&graphPoints(region);
-    if(points){active={kind:'resize',pointer:e.pointerId,id:o.textOnly?textId:graphId,isText:!!o.textOnly,
-      polygon:o.textOnly?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(p=>[...p]),sides:resizeSides(points,p)};
+  if(hit && (o.scanOnly?s.mode==='select':['select','bounds','graph_poly','text_rect','text_poly'].includes(s.mode)) && !e.shiftKey){
+    const isText=o.textOnly||o.scanOnly&&!!textId;
+    const region=isText?s.regions?.find(r=>r.id===Number(textId)):o.model.getDocument().graphs.find(r=>r.id===graphId);
+    const points=isText?region?.polygon:region&&graphPoints(region);
+    if(points){active={kind:'resize',pointer:e.pointerId,id:isText?textId:graphId,isText:!!isText,
+      polygon:isText?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(p=>[...p]),sides:resizeSides(points,p)};
       e.preventDefault();svg.setPointerCapture?.(e.pointerId);return;}
   }
   if(s.mode==='graph_poly'||s.mode==='text_poly'){
@@ -461,7 +466,7 @@ function mount(host,o){
     op.points.push(regionPoint(mouse(e)));
     const points=simplifyStroke(op.points);
     if(points.length>=3 && area(points)>=.00002){
-      if(o.textOnly){o.selectionChanged?.(points,true);status.textContent='已框选文字范围';}else commitRegion(points,true);
+      if(o.textOnly||o.scanOnly&&s.mode==='text_poly'){o.selectionChanged?.(points,true);status.textContent='已框选文字范围';}else commitRegion(points,true);
     }else if(distance(op.start,op.end)<4)choose();
     else status.textContent='请用一笔画出有面积的闭合范围';
    }
