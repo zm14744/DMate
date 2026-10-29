@@ -79,6 +79,7 @@ let cloudSyncCapacityRetryAt = 0;
 let appConfirmResolver = null;
 let mobileChoiceResolver = null;
 let mobileChoiceOptions = [];
+let mobileChoiceOpenVersion = 0;
 
 function shouldPersistClientState() {
     // 绝不能信任上次登录留下的 localStorage 元信息作为认证依据。
@@ -1129,11 +1130,30 @@ function showAppConfirm(options = {}) {
     });
 }
 
-function closeMobileChoiceModal() {
+function setMobileChoiceOpen(open) {
     const modal = document.getElementById("mobileChoiceModal");
     if (!modal) return;
-    modal.classList.add("hidden");
-    modal.setAttribute("aria-hidden", "true");
+    const version = ++mobileChoiceOpenVersion;
+    modal.classList.toggle("hidden", !open);
+    modal.setAttribute("aria-hidden", open ? "false" : "true");
+    if (!open) {
+        if (modal.open) modal.close();
+        delete modal.dataset.positioning;
+        return;
+    }
+    // The same chooser must appear above native drawing/image dialogs too.
+    modal.dataset.positioning = "true";
+    if (typeof modal.showModal === "function" && !modal.open) modal.showModal();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (version !== mobileChoiceOpenVersion || modal.classList.contains("hidden")) return;
+        delete modal.dataset.positioning;
+        (modal.querySelector(".mobile-choice-option.active:not(:disabled)")
+            || modal.querySelector("button:not(:disabled)"))?.focus({ preventScroll:true });
+    }));
+}
+
+function closeMobileChoiceModal() {
+    setMobileChoiceOpen(false);
     const resolver = mobileChoiceResolver;
     mobileChoiceResolver = null;
     mobileChoiceOptions = [];
@@ -1141,14 +1161,11 @@ function closeMobileChoiceModal() {
 }
 
 function selectMobileChoice(value) {
+    const result = mobileChoiceOptions.find(item => item.value === value) || null;
+    if (!result || result.disabled) return;
     const resolver = mobileChoiceResolver;
     mobileChoiceResolver = null;
-    const modal = document.getElementById("mobileChoiceModal");
-    if (modal) {
-        modal.classList.add("hidden");
-        modal.setAttribute("aria-hidden", "true");
-    }
-    const result = mobileChoiceOptions.find(item => item.value === value) || null;
+    setMobileChoiceOpen(false);
     mobileChoiceOptions = [];
     if (typeof resolver === "function") resolver(result);
 }
@@ -1169,13 +1186,15 @@ function openMobileChoiceModal({ title = "请选择", intro = "", options = [], 
     introEl.classList.toggle("hidden", !intro);
     mobileChoiceOptions = Array.isArray(options) ? options.map(item => ({
         value:String(item.value ?? ""),
-        label:String(item.label ?? item.value ?? "")
+        label:String(item.label ?? item.value ?? ""),
+        disabled:item.disabled === true
     })) : [];
 
     list.replaceChildren(...mobileChoiceOptions.map(item => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "mobile-choice-option";
+        button.disabled = item.disabled;
         if (item.value === value) button.classList.add("active");
         button.setAttribute("role", "radio");
         button.setAttribute("aria-checked", String(item.value === value));
@@ -1187,8 +1206,7 @@ function openMobileChoiceModal({ title = "请选择", intro = "", options = [], 
         return button;
     }));
 
-    modal.classList.remove("hidden");
-    modal.setAttribute("aria-hidden", "false");
+    setMobileChoiceOpen(true);
 
     return new Promise(resolve => {
         mobileChoiceResolver = resolve;
@@ -18356,10 +18374,10 @@ function ensureKnowledgeGraphSelection(visibleNodes, context) {
     knowledgeGraphSelectedNodeId = visibleNodes?.[0]?.id || "";
 }
 
-function clampMobileGraphScale(value) {
+function clampMobileGraphScale(value, minimum = 0.35) {
     const number = Number(value);
     if (!Number.isFinite(number)) return 1;
-    return Math.max(0.35, Math.min(3, number));
+    return Math.max(minimum, Math.min(3, number));
 }
 
 function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
@@ -18374,9 +18392,10 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     let pinchFrame = 0;
     let pendingPinch = null;
     let suppressClickUntil = 0;
+    let minimumScale = 0.35;
 
     const currentScale = () => (
-        clampMobileGraphScale(viewport._kgScale || 1)
+        clampMobileGraphScale(viewport._kgScale || 1, minimumScale)
     );
 
     const updateLabel = scale => {
@@ -18387,7 +18406,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
 
     const applyScale = (nextScale, anchor = null) => {
         const oldScale = currentScale();
-        const scale = clampMobileGraphScale(nextScale);
+        const scale = clampMobileGraphScale(nextScale, minimumScale);
 
         let contentX = null;
         let contentY = null;
@@ -18411,15 +18430,22 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     };
 
     const fitGraph = () => {
-        const availableWidth = Math.max(1, viewport.clientWidth - 24);
-        const availableHeight = Math.max(1, viewport.clientHeight - 24);
-        const scale = clampMobileGraphScale(
-            Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight)
-        );
+        if (!viewport.isConnected || !viewport.clientWidth || !viewport.clientHeight) return;
+        const styles = window.getComputedStyle(viewport);
+        const padding = name => parseFloat(styles[name]) || 0;
+        // clientHeight 包含底部工具栏的预留内边距，不能算作图谱可用空间。
+        const availableWidth = Math.max(1, viewport.clientWidth
+            - padding("paddingLeft") - padding("paddingRight") - 24);
+        const availableHeight = Math.max(1, viewport.clientHeight
+            - padding("paddingTop") - padding("paddingBottom") - 24);
+        const scale = Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight);
+        // 全部知识的图可能很大；适应时允许低于手动缩放原来的 35% 下限。
+        minimumScale = Math.min(0.35, scale);
         applyScale(scale);
+        viewport.style.visibility = "";
         requestAnimationFrame(() => {
-            viewport.scrollLeft = Math.max(0, (surface.scrollWidth - viewport.clientWidth) / 2);
-            viewport.scrollTop = Math.max(0, (surface.scrollHeight - viewport.clientHeight) / 2);
+            viewport.scrollLeft = 0;
+            viewport.scrollTop = 0;
         });
     };
 
@@ -18430,6 +18456,9 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         viewport.scrollTop = 0;
     };
 
+    // 缩小 transform 不会缩小原始布局的溢出范围，避免留下虚假的巨大滚动区域。
+    surface.style.overflow = "hidden";
+    viewport.style.visibility = "hidden";
     applyScale(1);
 
     const viewportPoint = event => {
@@ -18518,7 +18547,8 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
 
             const center = pointerCenter(a, b);
             const scale = clampMobileGraphScale(
-                pinch.scale * pointerDistance(a, b) / pinch.distance
+                pinch.scale * pointerDistance(a, b) / pinch.distance,
+                minimumScale
             );
             // 合并高频 pointermove：一帧只布局、缩放和定位一次。
             pendingPinch = { scale, center, contentX:pinch.contentX, contentY:pinch.contentY };
@@ -19615,15 +19645,9 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         viewport._kgFit?.();
     });
 
-    // 单一全屏视图：以可读尺寸打开；“适应”按钮仍可主动缩放全图。
+    // section 先在 DocumentFragment 内构造；等挂载、全屏 flex 布局完成后再适应。
     requestAnimationFrame(() => {
-        viewport._kgSetScale?.(0.85);
-        const active = positions.get(knowledgeGraphSelectedNodeId)
-            || positions.get(orderedNodes[0]?.id);
-        if (active) {
-            viewport.scrollLeft = Math.max(0, (active.x + nodeWidth / 2) * 0.85 - viewport.clientWidth / 2);
-            viewport.scrollTop = Math.max(0, (active.y + nodeHeight / 2) * 0.85 - viewport.clientHeight / 2);
-        }
+        requestAnimationFrame(() => viewport._kgFit?.());
     });
 }
 
@@ -22021,6 +22045,13 @@ document.addEventListener(
         });
 
         mobileChoiceClose?.addEventListener("click", closeMobileChoiceModal);
+        mobileChoiceModal?.addEventListener("cancel", event => {
+            event.preventDefault();
+            closeMobileChoiceModal();
+        });
+        mobileChoiceModal?.addEventListener("close", () => {
+            if (!mobileChoiceModal.open) closeMobileChoiceModal();
+        });
         mobileChoiceModal?.addEventListener("pointerdown", event => {
             if (event.target === mobileChoiceModal) closeMobileChoiceModal();
         });

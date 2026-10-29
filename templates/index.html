@@ -7311,6 +7311,23 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     z-index:1300 !important;
 }
 
+/* Keep the module chooser's appearance when it is above a native editor. */
+dialog#mobileChoiceModal {
+    inset:0;
+    margin:0;
+    width:100%;
+    max-width:none;
+    height:100dvh;
+    max-height:none;
+    border:0;
+    color:var(--text-primary);
+    font:inherit;
+}
+dialog#mobileChoiceModal::backdrop { background:transparent; }
+dialog#mobileChoiceModal[data-positioning],
+dialog#mobileChoiceModal[data-positioning] *,
+dialog#mobileChoiceModal[data-positioning]::backdrop { visibility:hidden!important; }
+
 @media (max-width:1100px) {
     /* 全局手机 .modal-card 原本强制 100dvh，这两种轻操作必须例外。 */
     #appConfirmModal:not(.hidden),
@@ -9511,8 +9528,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
 </div>
 
-<div id="mobileChoiceModal" class="modal hidden" aria-hidden="true">
-    <div class="modal-card mobile-choice-card" role="dialog" aria-modal="true" aria-labelledby="mobileChoiceTitle">
+<dialog id="mobileChoiceModal" class="modal hidden" aria-hidden="true" aria-labelledby="mobileChoiceTitle">
+    <div class="modal-card mobile-choice-card">
         <div class="modal-head">
             <div id="mobileChoiceTitle">请选择</div>
             <button id="mobileChoiceClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
@@ -9520,7 +9537,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <div id="mobileChoiceIntro" class="mobile-choice-intro hidden"></div>
         <div id="mobileChoiceList" class="mobile-choice-list" role="radiogroup" aria-label="选项列表"></div>
     </div>
-</div>
+</dialog>
 
 
 <div id="knowledgeGraphModal" class="modal hidden">
@@ -9600,6 +9617,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/concept-notebook.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/chat-composer.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/script.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 
 </body>
