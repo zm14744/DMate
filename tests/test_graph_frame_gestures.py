@@ -28,8 +28,14 @@ def test_clear_is_one_click_and_history_buttons_are_accessible_arrows(canvas_pag
     page=canvas_page;before=page.evaluate('instance.getDocument()')
     page.evaluate("instance.model.addVertex('G1','新顶点',.6,.3);instance.model.addGraph({bbox:[.2,.2,.5,.7]})")
     select_tool(page)
-    assert page.get_by_role('button',name='撤销',exact=True).text_content()=='↶'
-    assert page.get_by_role('button',name='重做',exact=True).text_content()=='↷'
+    for label in ['撤销','重做']:
+        control=page.get_by_role('button',name=label,exact=True)
+        assert control.text_content()==''
+        icon=control.locator('svg')
+        assert icon.get_attribute('viewBox')=='0 0 24 24'
+        assert icon.get_attribute('aria-hidden')=='true'
+        assert icon.get_attribute('focusable')=='false'
+        assert icon.locator('path').count()==2
     assert page.get_by_role('button',name='清空修改',exact=True).count()==0
     page.get_by_role('button',name='清空',exact=True).click()
     assert page.evaluate('instance.getDocument()')==before
