@@ -219,7 +219,9 @@ def test_two_regions_merge_only_after_a_cross_stroke_is_read_at_both_ends(monkey
         assert any(e['from']=='b' and e['to']=='d' for e in graphs[0]['edges'])
         assert graphs[0]['id']=='G1'
     else:
-        assert graphs == [left, right]
+        # Presentation references/positions are enriched before any review;
+        # a rejected cross stroke must retain that exact draft and topology.
+        assert graphs == pipeline.validate_draft({'graphs': copy.deepcopy([left, right])})['graphs']
 
 
 def test_two_weak_arrow_locations_trigger_type_review_without_supplying_direction():
@@ -255,7 +257,7 @@ def test_failed_necessary_review_keeps_draft_but_cannot_claim_success(failure, m
     monkeypatch.setattr(pipeline, '_candidates', lambda args, *, context: evidence(context.data['graphs'][0]))
     result = pipeline.recognize_qwen_targeted(pixels(), provider=fake_model({'graphs': [g]}, seen),
                                               review_provider=Mock(side_effect=failure))
-    assert result['document']['graphs'] == [g]
+    assert result['document']['graphs'] == pipeline.validate_draft({'graphs': copy.deepcopy([g])})['graphs']
     assert result['recognition_status'] == 'partial' and result['review']['required']
     assert result['diagnostics']['performance']['complete_within_target'] is False
     assert result['diagnostics']['validation']['json_schema'] == 'passed'

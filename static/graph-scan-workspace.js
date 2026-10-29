@@ -3,8 +3,10 @@
 const copy=value=>JSON.parse(JSON.stringify(value));
 function mount(container,options){
  const d=container.ownerDocument, state=options.scanState||{};
- let document=copy(options.document||{body_text:'',graphs:[]}),destroyed=false,saving=false,graphBusy=false,textBusy=false,textTimer=null;
+ const withLabels=value=>root.DMateGraphEditorModel.ensureAnonymousLabels(value);
+ let document=withLabels(options.document||{body_text:'',graphs:[]}),destroyed=false,saving=false,graphBusy=false,textBusy=false,textTimer=null;
  state.graphRegions ||= [];state.textRegions ||= [];state.nextGraph ||= 1;state.nextText ||= 1;
+ for(const row of state.graphRegions)if(row.graphs)row.graphs=withLabels({graphs:row.graphs}).graphs;
  for(const row of [...state.graphRegions,...state.textRegions])if(row.status==='running')row.status='queued';
  const active=new Set();
  const el=(tag,cls,text)=>{const n=d.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
@@ -62,6 +64,9 @@ function mount(container,options){
    const row=root.DMateGraphFormat.graphRows(graph,index),section=el('section','dgs-graph');
    section.append(el('h4','',row.title),el('p','',row.type),el('p','','顶点：'+(row.vertices.join('、')||'无')),
     el('p','',`${graph.vertices.length} 个顶点 · ${graph.edges.length} 条边`));
+   section.append(el('p','dgs-appearance','图形外观：'+(row.description||'未提供外观描述。')));
+   if(row.anonymousNote)section.append(el('p','dgs-anonymous-note',row.anonymousNote));
+   if(row.positions.length){section.append(el('h5','','顶点位置'));for(const vertex of row.positions)section.append(el('p','dgs-vertex-position',vertex.txt));}
    if(row.named.length)section.append(el('p','','边：'+row.named.join('、')));
    for(const edge of row.relations)section.append(el('p','dgs-relation',edge.txt));graphSection.append(section);
   });
@@ -76,7 +81,7 @@ function mount(container,options){
     const result=await options.onRecognizeGraph(copy(row.polygon),{signal:controller.signal});
     if(destroyed||row.version!==version||!state.graphRegions.includes(row))continue;
     if(result.recognition_status==='failed')throw new Error(result.error||'图形识别未完成');
-    row.graphs=copy(result.document?.graphs||[]).map((g,i)=>({...g,id:row.id+'_'+(i+1)}));
+    row.graphs=withLabels({graphs:copy(result.document?.graphs||[])}).graphs.map((g,i)=>({...g,id:row.id+'_'+(i+1)}));
     row.status=row.graphs.length?'complete':'empty';row.error=result.warning||'';
     // Pending model doubts are retained in the read-only information panel.
     if(result.review?.required){row.status='partial';row.error=result.review.reasons?.join('；')||'局部识别仍有疑点，请对照原图核对。';}
@@ -107,6 +112,7 @@ function mount(container,options){
   resizeTextRegion:(id,points)=>{const row=state.textRegions.find(r=>r.id===id);if(row)changeText(row,points,row.irregular);},
   selectTextRegion:id=>{overlayState.selectedId=id;},clearSelection:()=>{state.selectedGraphId=null;overlayState.selectedId=null;}
  });
+ if(JSON.stringify(document)!==JSON.stringify(options.document||{body_text:'',graphs:[]}))emit();
  refresh();void pumpGraphs();if(state.textRegions.some(r=>r.status==='queued'))void pumpText();
  return {getDocument:()=>copy(document),destroy(){destroyed=true;clearTimeout(textTimer);for(const c of active)c.abort();overlay.destroy();container.replaceChildren();container.classList.remove('dmate-graph-editor','dmate-graph-scan');}};
 }

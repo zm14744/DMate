@@ -43,10 +43,12 @@ DOCUMENT_SCHEMA = {'type': 'object', 'required': ['body_text', 'graphs'], 'prope
     'graphs': {'type': 'array', 'maxItems': 64, 'items': {
         'type': 'object', 'required': ['id', 'vertices', 'edges'], 'properties': {
             'id': _ID, 'name': _TEXT, 'bbox': _BBOX, 'region_polygon': _POLYGON,
+            'visual_description': {'type': 'string', 'maxLength': 800},
             'anon_next': {'type': 'integer', 'minimum': 1, 'maximum': 10000},
             'vertices': {'type': 'array', 'minItems': 1, 'maxItems': 100, 'items': {
                 'type': 'object', 'required': ['id'], 'properties': {
                     'id': _ID, 'label': _TEXT, 'display_label': {'type': 'string', 'maxLength': 16},
+                    'position_description': {'type': 'string', 'maxLength': 160},
                     'x': {'anyOf': [_DRAW_COORD, {'type': 'null'}]},
                     'y': {'anyOf': [_DRAW_COORD, {'type': 'null'}]}}}},
             'edges': {'type': 'array', 'maxItems': 300, 'items': _EDGE}}}}}}

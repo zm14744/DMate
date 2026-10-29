@@ -11,6 +11,13 @@ on:
       - 'graph_region_recognition.py'
       - 'tests/test_graph_region_recognition.py'
       - 'static/graph-scan-workspace.js'
+      - 'graph_presentation.py'
+      - 'graph_schema.py'
+      - 'graph_semantic_*.py'
+      - 'graph_confirmation.py'
+      - 'tests/test_graph_presentation.py'
+      - 'tests/test_graph_appearance_ui.py'
+      - 'tests/test_semantic_isomorphism.py'
       - '.github/workflows/graph-nextgen.yml'
   pull_request:
     branches: [main]
@@ -81,6 +88,9 @@ jobs:
       - name: Focused editor and confirmation regression (free, no OCR/model requests)
         run: |
           python -m pytest -q \
+            tests/test_graph_presentation.py \
+            tests/test_graph_appearance_ui.py \
+            tests/test_semantic_isomorphism.py \
             tests/test_qwen_targeted.py \
             tests/test_scan_drawing_separation.py \
             tests/test_graph_region_recognition.py \

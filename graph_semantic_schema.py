@@ -123,6 +123,8 @@ def _normalize_graph(source, graph_id, issues, notes):
     except ValueError:
         _issue(issues, "graph", "invalid_graph_name", "图名称不是可读文本。", graph_id=graph_id)
     box = source.get('bbox')
+    if isinstance(source.get('visual_description'), str) and len(source['visual_description']) <= 800:
+        graph['visual_description'] = source['visual_description']
     if (isinstance(box, list) and len(box) == 4 and all(unit(n) is not None for n in box)
             and unit(box[0]) < unit(box[2]) and unit(box[1]) < unit(box[3])):
         graph['bbox'] = [unit(n) for n in box]
@@ -168,6 +170,8 @@ def _normalize_graph(source, graph_id, issues, notes):
                   'isolated_confirmed': False}
         if isinstance(item.get('display_label'), str) and 0 < len(item['display_label']) <= 16:
             vertex['display_label'] = item['display_label']
+        if isinstance(item.get('position_description'), str) and 0 < len(item['position_description']) <= 160:
+            vertex['position_description'] = item['position_description']
         graph['vertices'].append(vertex)
         if label is not None:
             labels[label].append(vertex_id)
@@ -275,7 +279,8 @@ def _normalize_graph(source, graph_id, issues, notes):
         if isinstance(source.get(key), bool) and source[key] != graph[key]:
             notes.append({"kind": "graph_type_derived", "graph_id": graph_id,
                           "field": key, "declared": source[key], "derived": graph[key]})
-    return graph
+    from graph_presentation import prepare_graph_presentation
+    return prepare_graph_presentation(graph)
 
 
 def _uncertainties(value, graph_aliases, issues):

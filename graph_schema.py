@@ -58,6 +58,11 @@ def canonical_graph(source, index=1):
                 'panel_revision_audit', 'node_geometry_evidence', 'candidate_trace_diagnostics'):
         if key in source:
             graph[key] = copy.deepcopy(source[key])
+    for key, limit in (('visual_description', 800),):
+        if isinstance(source.get(key), str) and len(source[key]) <= limit:
+            graph[key] = source[key]
+    if type(source.get('anon_next')) is int and 1 <= source['anon_next'] <= 10000:
+        graph['anon_next'] = source['anon_next']
     if isinstance(source.get('qwen_review_audit'), list):
         graph['qwen_review_audit']=copy.deepcopy(source['qwen_review_audit'][:24])
     raw_nodes = source.get('vertices')
@@ -81,6 +86,9 @@ def canonical_graph(source, index=1):
             'label': str(label)[:64] if label is not None and str(label).strip() else None,
             'x': unit(item.get('x')), 'y': unit(item.get('y')),
             'isolated_confirmed': item.get('isolated_confirmed') is True})
+        for key, limit in (('display_label', 16), ('position_description', 160)):
+            if isinstance(item.get(key), str) and 0 < len(item[key]) <= limit:
+                graph['vertices'][-1][key] = item[key]
     edge_ids = set()
     for n, item in enumerate(raw_edges, 1):
         if not isinstance(item, dict):
@@ -128,14 +136,15 @@ def canonical_graph(source, index=1):
     if (graph['uncertain_edges'] or any(e['direction'] == 'unknown' or e['status'] != 'accepted' for e in graph['edges'])
             or any(graph[k] == 'unknown' for k in ('directed', 'weighted', 'multigraph'))):
         graph['complete'] = False
-    return graph
+    from graph_presentation import prepare_graph_presentation
+    return prepare_graph_presentation(graph)
 
 
 def display_graph(graph):
     """Public display fields only; pixels/model diagnostics stay server-side."""
-    fields = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete')
+    fields = ('schema_version', 'id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete', 'visual_description', 'anon_next')
     out = {k: graph[k] for k in fields if k in graph}
-    out['vertices'] = [{k: v[k] for k in ('id', 'label', 'isolated_confirmed') if k in v}
+    out['vertices'] = [{k: v[k] for k in ('id', 'label', 'display_label', 'position_description', 'isolated_confirmed') if k in v}
                        for v in graph['vertices']]
     out['edges'] = [{k: e[k] for k in ('id', 'from', 'to', 'direction', 'edge_label', 'weight',
                                       'multiplicity', 'parallel_count', 'style', 'color', 'status') if k in e}
@@ -177,6 +186,10 @@ def describe_graphs(graphs):
         line = f"{graph['name']}：{kind}。顶点："+'、'.join(labels.values())+'。'
         if isolated: line += '孤立顶点：'+'、'.join(isolated)+'。'
         line += f"边（{'共' if graph['complete'] else '暂录'}{len(edges)}条）："+'；'.join(edges)+'。'
+        from graph_presentation import reference_notes
+        notes = reference_notes(graph)
+        if notes:
+            line += '\n' + notes
         lines.append(line)
     text = '\n\n'.join(lines)
     return ('【图形结构待核对】\n'+text) if any(not g['complete'] for g in graphs) else text

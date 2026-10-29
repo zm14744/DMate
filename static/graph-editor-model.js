@@ -26,11 +26,24 @@
         return Math.abs(signed) / 2 >= .00002;
     };
     const ring = number => number >= 1 && number <= 20 ? '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'[number - 1] : '未命名' + number;
+    const hasLabel = vertex => vertex.label != null && String(vertex.label).trim() !== '';
     function ensureAnonymousLabels(input) {
         const draft = copy(input);
         for (const graph of draft.graphs || []) {
-            const used = new Set((graph.vertices || []).map(v => v.label || v.display_label).filter(Boolean));
-            let next = Math.max(1, Number.isInteger(graph.anon_next) ? graph.anon_next : 1);
+            const vertices = graph.vertices || [];
+            const used = new Set(vertices.filter(hasLabel).map(v => String(v.label)));
+            // Keep the first valid existing number, before filling gaps. Real
+            // printed labels always win over conflicting temporary numbers.
+            const existing = new Set();
+            for (const vertex of vertices) {
+                if (hasLabel(vertex)) continue;
+                const display = typeof vertex.display_label === 'string' ? vertex.display_label.trim() : '';
+                if (display && display.length <= 16 && !used.has(display) && !existing.has(display)) {
+                    vertex.display_label = display; existing.add(display);
+                } else delete vertex.display_label;
+            }
+            for (const display of existing) used.add(display);
+            let next = Number.isInteger(graph.anon_next) && graph.anon_next >= 1 && graph.anon_next <= 10000 ? graph.anon_next : 1;
             const circleNames = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
             for (const name of used) {
                 const at = circleNames.indexOf(String(name));
@@ -38,8 +51,11 @@
                 const match = /^未命名(\d+)$/.exec(String(name));
                 if (match) next = Math.max(next, Number(match[1]) + 1);
             }
-            for (const vertex of graph.vertices || []) {
-                if (vertex.label || vertex.display_label) continue;
+            const byIdentity = [...vertices].sort((a, b) => String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0);
+            for (const vertex of byIdentity) {
+                if (hasLabel(vertex)) continue;
+                vertex.label = null;
+                if (vertex.display_label) continue;
                 let display;
                 do { display = ring(next++); } while (used.has(display));
                 vertex.display_label = display;
@@ -58,6 +74,7 @@
             const graph = { id: id(raw.id) || unique('G', result.graphs), name: text(raw.name), vertices: [], edges: [] };
             if (typeof raw.directed === 'boolean') graph.directed = raw.directed;
             if (typeof raw.weighted === 'boolean') graph.weighted = raw.weighted;
+            if (typeof raw.visual_description === 'string') graph.visual_description = raw.visual_description.trim().slice(0, 800);
             if (validBox(raw.bbox)) graph.bbox = [...raw.bbox];
             if (polygonValid(raw.region_polygon))
                 graph.region_polygon = raw.region_polygon.map(p => [...p]);
@@ -73,6 +90,7 @@
                 const vertex = { id: vertexId, label: scalar(rawVertex.label) && text(rawVertex.label).trim() ? text(rawVertex.label) : null };
                 if (coordinate(rawVertex.x) && coordinate(rawVertex.y)) { vertex.x = rawVertex.x; vertex.y = rawVertex.y; }
                 if (typeof rawVertex.display_label === 'string' && rawVertex.display_label.length <= 16 && rawVertex.display_label) vertex.display_label = rawVertex.display_label;
+                if (typeof rawVertex.position_description === 'string') vertex.position_description = rawVertex.position_description.trim().slice(0, 160);
                 graph.vertices.push(vertex);
                 if (id(rawVertex.id) && oldCounts.get(id(rawVertex.id)) === 1) aliases.set(id(rawVertex.id), vertexId);
             }

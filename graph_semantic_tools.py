@@ -21,9 +21,12 @@ from dmate_tool_registry import ToolContext, ToolRegistry, ToolSpec
 VERSION = '2026-10-26-semantic-networkx-v2'
 MAX_GRAPHS, MAX_VERTICES, MAX_EDGES = 64, 100, 300
 MAX_WALK_LENGTH = 64
+MAX_ISOMORPHISM_VERTICES, MAX_ISOMORPHISM_EDGES = 32, 128
+MAX_ISOMORPHISM_STATES = 50_000
+ISOMORPHISM_SECONDS = 2.
 _EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'color', 'style', 'multiplicity', 'status')
 _OPERATIONS = frozenset(('degrees', 'components', 'bipartite', 'shortest_path', 'minimum_spanning_tree',
-                         'adjacency_matrix', 'walk_count', 'euler'))
+                         'adjacency_matrix', 'walk_count', 'euler', 'isomorphism'))
 _DECIMAL = re.compile(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d{1,3})?\Z')
 _MESSAGES = {
     'invalid_graph_inventory': '图结构必须提供顶点和边列表。',
@@ -56,6 +59,9 @@ _MESSAGES = {
     'reachable_negative_cycle': '检测到可达负权环，不能给出有限最短距离。',
     'unknown_edge_direction_not_supported': '本次计算需要每条边的方向明确，不能将未知方向当无向边。',
     'invalid_euler_start': '指定起点不能作为该欧拉通路的起点。',
+    'isomorphism_weights_not_supported': '本次同构工具只比较无权结构，含权值的图需要明确保权条件后再计算。',
+    'isomorphism_capacity': '两图超出本次有界同构计算容量，尚未得出结论。',
+    'isomorphism_search_limit': '同构搜索达到计算上限，尚未得出结论。',
 }
 
 
@@ -382,6 +388,66 @@ def _euler_facts(item, request, nx, budget):
             'parallel_instances_preserved': True}, None
 
 
+def _isomorphism_facts(prepared, left_id, right_id, nx, budget):
+    """Compare scoped vertex IDs, never printed names or temporary aliases."""
+    left, right = prepared.get(left_id), prepared.get(right_id)
+    if (left_id == right_id or left is None or right is None
+            or not left['summary']['structural_valid'] or not right['summary']['structural_valid']):
+        return None, 'unknown_graph', False
+    for item in (left, right):
+        if not _complete(item['source']):
+            return None, 'incomplete_semantic_snapshot', False
+        mode = item['summary']['direction_mode']
+        if (mode not in ('directed', 'undirected', 'empty')
+                or mode == 'empty' and item['source'].get('directed') is not False):
+            return None, 'mixed_or_unknown_direction_not_supported', False
+        if item['source'].get('weighted') is True or any(e.get('weight') is not None for e in item['edges']):
+            return None, 'isomorphism_weights_not_supported', False
+        if len(item['nodes']) > MAX_ISOMORPHISM_VERTICES or len(item['edges']) > MAX_ISOMORPHISM_EDGES:
+            return None, 'isomorphism_capacity', False
+    directed = left['summary']['direction_mode'] == 'directed'
+    other_directed = right['summary']['direction_mode'] == 'directed'
+    common = {'left_graph_id': left_id, 'right_graph_id': right_id,
+              'mapping': [], 'weights_used': False, 'labels_used': False,
+              'parallel_instances_preserved': True, 'direction_preserved': True,
+              'algorithm': 'networkx_vf2', 'calculation_scope': 'provided_semantic_snapshot'}
+    if directed != other_directed:
+        return {**common, 'isomorphic': False, 'reason': 'different_direction_types'}, None, True
+    first = left['directed'] if directed else left['underlying']
+    second = right['directed'] if directed else right['underlying']
+    matcher_type = (nx.algorithms.isomorphism.MultiDiGraphMatcher if directed
+                    else nx.algorithms.isomorphism.MultiGraphMatcher)
+    deadline, states = time.monotonic() + ISOMORPHISM_SECONDS, 0
+
+    class SearchLimit(Exception):
+        pass
+
+    class BoundedMatcher(matcher_type):
+        def candidate_pairs_iter(self):
+            nonlocal states
+            for candidate in super().candidate_pairs_iter():
+                _check(budget)
+                states += 1
+                if states > MAX_ISOMORPHISM_STATES or time.monotonic() >= deadline:
+                    raise SearchLimit()
+                yield candidate
+
+    matcher = BoundedMatcher(first, second)
+    try:
+        _check(budget)
+        isomorphic = matcher.is_isomorphic()
+        _check(budget)
+        if time.monotonic() >= deadline:
+            raise SearchLimit()
+        mapping = [{'from': vid, 'to': matcher.mapping[vid]} for vid in first] if isomorphic else []
+        return {**common, 'isomorphic': isomorphic, 'mapping': mapping,
+                'explored_states': states}, None, True
+    except SearchLimit:
+        return None, 'isomorphism_search_limit', True
+    finally:
+        matcher.reset_recursion_limit()
+
+
 def _prepare_math(document, request=None, *, budget=None):
     """Run an explicitly selected operation; never infer one from OCR text.
 
@@ -395,16 +461,18 @@ def _prepare_math(document, request=None, *, budget=None):
     if request is None:
         return result
     if (not isinstance(request, dict) or set(request) - {'operation', 'graph_id', 'source', 'target',
-                                                         'weighted', 'length', 'start_vertex', 'ignore_isolated'}
+                                                         'weighted', 'length', 'start_vertex', 'ignore_isolated', 'other_graph_id'}
             or request.get('operation') not in _OPERATIONS or not _identifier(request.get('graph_id'))):
         return {**result, 'status': 'not_applicable', 'issues': [_issue('invalid_math_request')]}
     op, gid = request['operation'], request['graph_id']
     operation_fields = {'shortest_path': {'source', 'target', 'weighted'},
                         'walk_count': {'source', 'target', 'length'},
-                        'euler': {'start_vertex', 'ignore_isolated'}}
+                        'euler': {'start_vertex', 'ignore_isolated'},
+                        'isomorphism': {'other_graph_id'}}
     permitted = {'operation', 'graph_id'} | operation_fields.get(op, set())
     if (set(request) - permitted or ('weighted' in request and type(request['weighted']) is not bool)
             or ('ignore_isolated' in request and type(request['ignore_isolated']) is not bool)
+            or (op == 'isomorphism' and not _identifier(request.get('other_graph_id')))
             or (op == 'walk_count' and (type(request.get('length')) is not int
                                       or not 0 <= request['length'] <= MAX_WALK_LENGTH))):
         return {**result, 'status': 'not_applicable', 'issues': [_issue('invalid_math_request')]}
@@ -419,7 +487,9 @@ def _prepare_math(document, request=None, *, budget=None):
     source, summary = item['source'], item['summary']
     actual = item['underlying']
     _check(budget)
-    if op == 'degrees':
+    if op == 'isomorphism':
+        facts, failure, executed = _isomorphism_facts(prepared, gid, request['other_graph_id'], nx, budget)
+    elif op == 'degrees':
         facts = {'degrees': copy.deepcopy(summary['degrees']),
                  'directed_degrees': copy.deepcopy(summary['directed_degrees']),
                  'degree_convention': 'incidences; a loop contributes two',
@@ -522,6 +592,8 @@ def _prepare_math(document, request=None, *, budget=None):
                    'facts': facts, 'graph_id': gid, 'operation': op,
                    'input_complete': summary['input_complete'],
                    'calculation_scope': 'provided_semantic_snapshot'})
+    if op == 'isomorphism':
+        result['other_graph_id'] = request['other_graph_id']
     if failure:
         result['issues'] = [_issue(failure, gid)]
     result['tool_audit'].append({'tool': 'graph.semantic_math', 'version': VERSION,
@@ -560,7 +632,7 @@ def _build_registry():
     identifier = {'type': 'string', 'minLength': 1, 'maxLength': 128}
     ordinary = {'type': 'object', 'additionalProperties': False,
         'required': ['operation', 'graph_id'], 'properties': {
-            'operation': {'enum': sorted(_OPERATIONS - {'shortest_path', 'walk_count', 'euler'})}, 'graph_id': identifier}}
+            'operation': {'enum': sorted(_OPERATIONS - {'shortest_path', 'walk_count', 'euler', 'isomorphism'})}, 'graph_id': identifier}}
     path = {'type': 'object', 'additionalProperties': False,
         'required': ['operation', 'graph_id'], 'properties': {
             'operation': {'const': 'shortest_path'}, 'graph_id': identifier,
@@ -574,6 +646,10 @@ def _build_registry():
         'required': ['operation', 'graph_id'], 'properties': {
             'operation': {'const': 'euler'}, 'graph_id': identifier,
             'start_vertex': identifier, 'ignore_isolated': {'type': 'boolean'}}}
+    isomorphism = {'type': 'object', 'additionalProperties': False,
+        'required': ['operation', 'graph_id', 'other_graph_id'], 'properties': {
+            'operation': {'const': 'isomorphism'}, 'graph_id': identifier,
+            'other_graph_id': identifier}}
     registry = ToolRegistry()
     registry.register(ToolSpec(name='graph.semantic_inspect', version=VERSION,
         description='Inspect the private semantic graph with NetworkX; never certify image reading.',
@@ -584,7 +660,7 @@ def _build_registry():
         allowed_roles=frozenset({'semantic_review'}), source_required=False, timeout_seconds=5.), _inspect_tool)
     registry.register(ToolSpec(name='graph.semantic_math', version=VERSION,
         description='Run one explicit bounded operation on the private semantic snapshot.',
-        input_schema={'oneOf': [ordinary, path, walk, euler]},
+        input_schema={'oneOf': [ordinary, path, walk, euler, isomorphism]},
         output_schema={'type': 'object', 'required': ['status', 'facts', 'issues', 'tool_audit'],
                        'properties': {'status': {'enum': ['not_requested', 'computed', 'not_applicable']},
                                       'issues': {'type': 'array'}, 'tool_audit': {'type': 'array'}}},

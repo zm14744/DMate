@@ -9369,6 +9369,14 @@ function sanitizeSemanticContext(value, message = null) {
             || !Array.isArray(graph.edges) || graph.edges.length > 300) return null;
         const clean = { id: graph.id, name: graph.name ?? null, complete: graph.complete === true,
             vertices: [], edges: [] };
+        if (graph.visual_description !== undefined) {
+            if (!string(graph.visual_description, 800)) return null;
+            clean.visual_description = graph.visual_description;
+        }
+        if (graph.anon_next !== undefined) {
+            if (!Number.isInteger(graph.anon_next) || graph.anon_next < 1 || graph.anon_next > 10000) return null;
+            clean.anon_next = graph.anon_next;
+        }
         for (const key of ["directed", "weighted", "multigraph"]) {
             if (graph[key] !== undefined && typeof graph[key] !== "boolean" && graph[key] !== "unknown") return null;
             clean[key] = graph[key] ?? "unknown";
@@ -9395,6 +9403,12 @@ function sanitizeSemanticContext(value, message = null) {
         for (const vertex of graph.vertices) {
             if (!object(vertex) || !string(vertex.id, 128, true) || !literal(vertex.label, 256)) return null;
             const node = { id: vertex.id, label: vertex.label ?? null };
+            for (const [field, limit] of [["display_label", 16], ["position_description", 160]]) {
+                if (vertex[field] !== undefined) {
+                    if (!string(vertex[field], limit)) return null;
+                    node[field] = vertex[field];
+                }
+            }
             if (typeof vertex.isolated_confirmed === "boolean") node.isolated_confirmed = vertex.isolated_confirmed;
             clean.vertices.push(node);
         }

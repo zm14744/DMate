@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'static/graph-editor.js'
+      - 'static/graph-editor-model.js'
+      - 'static/graph-editor-format.js'
       - 'static/graph-editor-overlay.js'
       - 'static/graph-scan-workspace.js'
       - 'static/graph-editor.css'
@@ -14,6 +16,7 @@ on:
       - 'tests/test_graph_text_workspace.py'
       - 'tests/test_graph_frame_gestures.py'
       - 'tests/test_scan_drawing_separation.py'
+      - 'tests/test_graph_appearance_ui.py'
       - 'static/script.js'
       - 'templates/index.html'
       - 'tests/test_ocr_upload_layout.py'
@@ -52,6 +55,7 @@ jobs:
           )"
           test -x "$DMATE_BROWSER_EXECUTABLE"
           python -m pytest -q \
+            tests/test_graph_appearance_ui.py \
             tests/test_scan_drawing_separation.py \
             tests/test_visual_graph_editor.py::test_real_browser_edits_and_confirms_the_same_user_visible_document \
             tests/test_visual_graph_editor.py::test_question_type_survives_graph_edit_and_reaches_save \
