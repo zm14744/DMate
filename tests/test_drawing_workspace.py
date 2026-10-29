@@ -639,7 +639,11 @@ def test_real_template_tools_have_one_surface_and_open_on_every_click_even_when_
             if expanded:
                 assert page.get_by_role('button', name='添加顶点', exact=True).is_visible()
                 assert page.locator('.dge-overlay-tools').evaluate('node=>getComputedStyle(node).visibility') == 'visible'
-                assert palette.bounding_box() == pytest.approx(trigger.bounding_box(), abs=1)
+                bounds = palette.evaluate('''node=>{
+                  const rect=element=>{const {x,y,width,height}=element.getBoundingClientRect();return {x,y,width,height};};
+                  return {palette:rect(node),trigger:rect(node.querySelector(':scope > summary'))};
+                }''')
+                assert bounds['palette'] == pytest.approx(bounds['trigger'], abs=1)
                 assert palette.evaluate('node=>getComputedStyle(node).backgroundColor') == 'rgba(0, 0, 0, 0)'
                 assert page.locator('[data-overlay-tool="vertex"]').evaluate('''node=>{const box=node.getBoundingClientRect();
                   return document.elementFromPoint(box.x+box.width/2,box.y+box.height/2)?.closest('[data-overlay-tool="vertex"]')===node;}''')
