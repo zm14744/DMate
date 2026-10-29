@@ -1,6 +1,7 @@
 """Standalone drawing pages use production UI, persisted docs and real PNG export."""
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -33,8 +34,9 @@ def drawing_page(request):
           window.fetch=async(url,options)=>{aiRequests.push(JSON.parse(options.body));
             if(window.deferAi)return new Promise(resolve=>{window.resolveAi=()=>resolve({ok:true,json:async()=>({ok:true,answer:'旧图回答'})});options.signal.addEventListener('abort',()=>window.aiAborted=true);});
             return {ok:true,json:async()=>({ok:true,answer:'先画 A、B，再从 A 向 B 连一条权值为 12 的有向边。'})};};
+          window.drawingMount=document.getElementById('mount');
           window.openDrawing=(storageKey='drawings:user1',legacy=sample)=>{
-            window.workspace=DMateDrawingWorkspace.mount(document.getElementById('mount'),{
+            window.workspace=DMateDrawingWorkspace.mount(drawingMount,{
               storageKey,legacyDocument:legacy,
               onUpload:async(blob,metadata)=>{if(window.uploadFailure)throw new Error(window.uploadFailure);uploads.push({type:blob.type,size:blob.size,metadata});},
               onClose:()=>closeCount++});};openDrawing();
@@ -42,6 +44,25 @@ def drawing_page(request):
         page.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
         yield page
         browser.close()
+
+
+def use_real_dialog_and_template_styles(page, theme):
+    html = (ROOT / 'templates/index.html').read_text()
+    page.evaluate('document.querySelectorAll("style,link[rel=stylesheet]").forEach(node=>node.remove())')
+    for match in re.finditer(r'<style\b[^>]*>([\s\S]*?)</style>|<link\b[^>]*rel="stylesheet"[^>]*>', html):
+        if match.group(1) is not None:
+            page.add_style_tag(content=match.group(1))
+        else:
+            source = re.search(r'/static/([^?"\s]+)', match.group(0))
+            assert source, match.group(0)
+            page.add_style_tag(content=(ROOT / 'static' / source.group(1)).read_text())
+    dialog = '<dialog id="graphEditorDialog"' + html.split('<dialog id="graphEditorDialog"', 1)[1].split('</dialog>', 1)[0] + '</dialog>'
+    page.evaluate('''({markup,theme})=>{workspace.destroy();document.body.innerHTML=markup;
+      document.body.dataset.appearanceTheme=theme;document.documentElement.dataset.appearanceTheme=theme;
+      document.body.style.setProperty('--panel-alpha','.55');drawingMount=document.getElementById('graphEditorMount');
+      document.getElementById('graphEditorTitle').textContent='绘图';openDrawing('drawings:real-template',sample);
+      document.getElementById('graphEditorDialog').showModal();}''', {'markup': dialog, 'theme': theme})
+    page.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
 
 
 def test_legacy_saved_pages_new_page_and_account_scope(drawing_page):
@@ -502,3 +523,51 @@ def test_popovers_are_anchored_on_the_first_visible_frame_and_reclamp_on_resize(
     history = page.get_by_role('button', name='历史绘图', exact=True).bounding_box()
     popup = page.locator('.ddw-side-panel').bounding_box()
     assert popup['y'] == pytest.approx(history['y'] + history['height'] + 8, abs=1)
+
+
+@pytest.mark.parametrize('theme', ['light', 'dark'])
+def test_real_template_tools_have_one_surface_and_open_on_every_click_even_when_gallery_empty(drawing_page, theme):
+    page = drawing_page
+    use_real_dialog_and_template_styles(page, theme)
+    for empty in (False, True):
+        if empty:
+            page.evaluate("workspace.destroy();openDrawing('drawings:real-template-empty',null)")
+            assert page.evaluate('workspace.getPages()') == []
+            assert page.locator('.ddw-name').input_value() == ''
+        palette = page.locator('.dge-tool-palette')
+        trigger = palette.locator(':scope > summary')
+        surface = palette.evaluate('''node=>{const style=getComputedStyle(node),box=node.getBoundingClientRect(),trigger=node.querySelector(':scope > summary').getBoundingClientRect();
+          return {background:style.backgroundColor,image:style.backgroundImage,shadow:style.boxShadow,border:style.borderWidth,padding:style.padding,width:box.width,height:box.height,triggerWidth:trigger.width,triggerHeight:trigger.height};}''')
+        size = 'mobile' if page.viewport_size['width'] < 760 else 'desktop'
+        page.screenshot(path='/tmp/dmate-tools-before-'+theme+'-'+size+('-empty' if empty else '')+'.png')
+        assert surface['background'] == 'rgba(0, 0, 0, 0)', surface
+        assert surface['image'] == 'none' and surface['shadow'] == 'none', surface
+        assert surface['border'] == '0px' and surface['padding'] == '0px', surface
+        assert surface['width'] == pytest.approx(surface['triggerWidth'], abs=1), surface
+        assert surface['height'] == pytest.approx(surface['triggerHeight'], abs=1), surface
+        for index in range(6):
+            trigger.click(timeout=3000)
+            expanded = index % 2 == 0
+            assert trigger.get_attribute('aria-expanded') == str(expanded).lower()
+            assert palette.evaluate('node=>node.open') is expanded
+            if expanded:
+                assert page.get_by_role('button', name='添加顶点', exact=True).is_visible()
+                assert page.locator('.dge-overlay-tools').evaluate('node=>getComputedStyle(node).visibility') == 'visible'
+                assert palette.bounding_box() == pytest.approx(trigger.bounding_box(), abs=1)
+                assert palette.evaluate('node=>getComputedStyle(node).backgroundColor') == 'rgba(0, 0, 0, 0)'
+                assert page.locator('[data-overlay-tool="vertex"]').evaluate('''node=>{const box=node.getBoundingClientRect();
+                  return document.elementFromPoint(box.x+box.width/2,box.y+box.height/2)?.closest('[data-overlay-tool="vertex"]')===node;}''')
+            else:
+                assert page.get_by_role('button', name='添加顶点', exact=True).count() == 0
+            assert page.evaluate('workspace.getPages().length') == 1
+        trigger.click()
+        page.get_by_role('button', name='添加顶点', exact=True).click()
+        assert page.locator('[data-overlay-tool="vertex"]').get_attribute('aria-pressed') == 'true'
+        page.screenshot(path='/tmp/dmate-tools-expanded-'+theme+'-'+size+('-empty' if empty else '')+'.png')
+        before = page.evaluate('workspace.getDocument().graphs[0].vertices.length')
+        canvas = page.locator('.dge-overlay-viewport').bounding_box()
+        page.mouse.click(canvas['x'] + canvas['width'] * .55, canvas['y'] + canvas['height'] * .7)
+        assert page.evaluate('workspace.getDocument().graphs[0].vertices.length') == before + 1
+        storage_key = 'drawings:real-template-empty' if empty else 'drawings:real-template'
+        page.wait_for_function('''({key,count})=>JSON.parse(localStorage.getItem(key)).pages[0].document.graphs[0].vertices.length===count''', arg={'key': storage_key, 'count': before + 1})
+        page.screenshot(path='/tmp/dmate-tools-working-'+theme+'-'+size+('-empty' if empty else '')+'.png')

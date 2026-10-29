@@ -28,10 +28,14 @@
 .ddw-editor .dge-floating-actions{right:10px;top:var(--ddw-panel-top,120px);display:block;width:min(380px,calc(100% - 20px));height:0;z-index:14}
 .ddw-editor .dge-floating-actions>.dge-float-panel{border:0;box-shadow:none;background:transparent}
 .ddw-editor .dge-floating-actions>.dge-float-panel>summary{display:none!important}
+/* Native details can retain a hidden paint/hit-test cache for fixed children.
+   Explicit visibility keeps repeated toggles responsive without changing state. */
+.ddw-editor :is(.dge-tool-palette,.dge-float-panel)::details-content{content-visibility:visible!important}
+.ddw-editor .dge-tool-palette:not([open])>.dge-overlay-tools,.ddw-editor .dge-float-panel:not([open])>.dge-float-content{display:none!important}
 .ddw-editor .dge-float-content{position:fixed;visibility:hidden;width:min(380px,calc(100vw - 16px));z-index:20}
 .ddw-side-panel{position:fixed;visibility:hidden;z-index:20;width:min(380px,calc(100vw - 16px))}
 .ddw-side-panel,.ddw-editor .dge-float-content,.ddw-editor .dge-tool-palette>.dge-overlay-tools{max-height:var(--ddw-panel-space,50dvh);overflow:auto;overscroll-behavior:contain;padding:12px;box-sizing:border-box;border:1px solid var(--border-strong,#cbd5e1);border-radius:12px;background:var(--surface-1,#fff);box-shadow:0 6px 22px #0002}
-.ddw-editor .dge-tool-palette{left:10px;top:var(--ddw-controls-top,76px);width:max-content;max-width:calc(100% - 20px);border:0;border-radius:0;background:transparent;box-shadow:none;z-index:15}
+.ddw-editor .dge-tool-palette{left:10px;top:var(--ddw-controls-top,76px);width:max-content;max-width:calc(100% - 20px);margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;z-index:15}
 .ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{padding:8px 10px;margin:0;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-1,#fff);color:inherit;font-size:13px;font-weight:400;line-height:1.4;box-shadow:0 3px 12px #0000000f}
 .ddw-editor .dge-tool-palette>.dge-overlay-tools{position:fixed;visibility:hidden;width:160px;gap:8px;z-index:20}
 .ddw-editor .dge-tool-palette>summary[aria-disabled=true]{opacity:.55;cursor:default}

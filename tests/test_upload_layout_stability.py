@@ -179,3 +179,54 @@ def test_native_upload_during_viewport_restore(upload_page):
     assert len(visible) >= 5
     assert all(stage == visible[0] for stage in visible)
     assert page.evaluate('ocrTasks.size') == 1
+
+
+@pytest.mark.parametrize('activation', ['native_input', 'button_handler', 'keyboard_enter'])
+def test_one_native_chooser_per_activation_and_cancel_never_reopens(upload_page, activation):
+    page = upload_page
+    choosers = []
+    page.on('filechooser', lambda chooser: choosers.append(chooser))
+    page.evaluate('''()=>{
+        window.nativePickerClicks=0;window.uploadButtonClicks=0;
+        document.getElementById('imageInput').addEventListener('click',()=>nativePickerClicks++);
+        document.getElementById('imageBtn').addEventListener('click',()=>uploadButtonClicks++);
+        window.pickerMoves=[];
+        new MutationObserver(()=>{
+            const parent=document.getElementById('imagePickerWrap').parentElement;
+            pickerMoves.push(parent.className);
+        }).observe(document.getElementById('imagePickerWrap').parentElement,{childList:true});
+        layoutSamples=[];
+    }''')
+    before = page.evaluate('sampleLayout()')
+    with page.expect_file_chooser() as opened:
+        if activation == 'native_input':
+            # Normal pointer/touch interaction hits the real overlaid input.
+            page.locator('#imageInput').click()
+        elif activation == 'button_handler':
+            # Exercise the sibling button's public click handler separately;
+            # the production native overlay normally receives pointer clicks.
+            page.locator('#imageBtn').evaluate('button=>button.click()')
+        else:
+            page.locator('#imageBtn').focus()
+            page.locator('#imageBtn').press('Enter')
+    frames(page, 8)
+    assert len(choosers) == 1
+    assert opened.value.element.get_attribute('id') == 'imageInput'
+    assert page.evaluate('nativePickerClicks') == (1 if activation == 'native_input' else 0)
+    assert page.evaluate('uploadButtonClicks') == (0 if activation == 'native_input' else 1)
+    assert page.evaluate('pickerMoves') == []
+    assert page.evaluate('requests') == []
+    assert page.evaluate('ocrTasks.size') == 0
+    assert_shell_stable(page.evaluate('layoutSamples'), before)
+    assert page.evaluate('originalPicker===document.getElementById("imageInput")')
+
+    # Returning an empty selection exercises the browser input return path.
+    # Playwright intercepts the OS window; it does not measure OS placement.
+    opened.value.set_files([])
+    frames(page, 12)
+    assert len(choosers) == 1
+    assert page.evaluate('pickerMoves') == []
+    assert page.evaluate('ocrTasks.size') == 0
+    assert page.evaluate('requests') == []
+    assert page.locator('dialog[open]').count() == 0
+    assert_shell_stable(page.evaluate('layoutSamples'), before)

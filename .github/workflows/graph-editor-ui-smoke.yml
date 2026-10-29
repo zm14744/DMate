@@ -31,6 +31,7 @@ on:
       - 'tests/test_editor_dialog_position.py'
       - 'tests/test_drawing_fit.py'
       - 'tests/test_appearance_surfaces.py'
+      - 'tests/test_sidebar_and_search_clear.py'
       - 'static/appearance-panels.css'
       - 'tests/test_scan_selection_save.py'
       - 'tests/test_scan_information_sources.py'
@@ -99,6 +100,7 @@ jobs:
             tests/test_editor_dialog_position.py \
             tests/test_drawing_fit.py \
             tests/test_appearance_surfaces.py \
+            tests/test_sidebar_and_search_clear.py \
             tests/test_graph_outline_smoothness.py \
             tests/test_graph_loop_editing.py \
             tests/test_drawing_workspace.py \

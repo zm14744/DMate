@@ -19,8 +19,10 @@ function mount(options){
  const content=el('div','dcn-content'),sidebar=el('aside','dcn-sidebar'),main=el('section','dcn-main');
  sidebar.setAttribute('aria-label','概念笔记列表');
  const newButton=action('新建概念',create,'dcn-primary'),search=el('input','dcn-search');search.type='search';search.placeholder='搜索';search.setAttribute('aria-label','搜索');
+ const searchWrap=el('div','dcn-search-wrap'),searchClear=action('',()=>{search.value='';renderList();search.focus({preventScroll:true});},'dcn-search-clear');
+ searchClear.setAttribute('aria-label','清空搜索');searchClear.title='清空搜索';searchClear.hidden=true;searchWrap.append(search,searchClear);
  const list=el('div','dcn-list'),selection=el('div','dcn-selection'),count=el('span');
- selection.append(count);sidebar.append(newButton,search,selection,list);
+ selection.append(count);sidebar.append(newButton,searchWrap,selection,list);
  const editor=el('section','dcn-editor');
  const titleLabel=el('label','','概念名称'),title=el('input','dcn-title');title.maxLength=LIMITS.title;title.setAttribute('aria-label','概念名称');titleLabel.append(title);
  const originalLabel=el('label','','我的概念笔记'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=9;original.setAttribute('aria-label','我的概念笔记');originalLabel.append(original);
@@ -55,7 +57,7 @@ function mount(options){
   for(const remove of list.querySelectorAll('.dcn-note-delete'))remove.disabled=!!deletePending;
  }
  function renderList(){
-  const query=search.value.trim().toLocaleLowerCase();list.replaceChildren();
+  const query=search.value.trim().toLocaleLowerCase();searchClear.hidden=!search.value;list.replaceChildren();
   const visible=state.notes.filter(note=>(note.title+'\n'+note.content).toLocaleLowerCase().includes(query));
   if(!visible.length)list.append(el('p','dcn-list-empty',state.notes.length?'没有匹配的概念。':'无'));
   const names=new Map();for(const note of state.notes)names.set(noteName(note),(names.get(noteName(note))||0)+1);

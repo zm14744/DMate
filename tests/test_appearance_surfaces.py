@@ -194,7 +194,7 @@ def test_all_major_panels_follow_slider_and_structural_wrappers_do_not_stack(app
     page = appearance_page
     install_appearance(page)
     install_panel_examples(page)
-    surfaces = ['.left', '.right', '#info', '.input', '#appearanceModal .modal-card', '#accountModal .modal-card',
+    surfaces = ['.left', '.right', '.input', '#appearanceModal .modal-card', '#accountModal .modal-card',
                 '#wrongBookModal .modal-card', '#wrongBookList .wrong-card', '#learningReviewModal .modal-card',
                 '.learning-review-section', '#knowledgeGraphModal .modal-card', '.kg-section', '.kg-mobile-viewport',
                 '.graph-metric', '#graphEditorDialog', '#conceptNotebookDialog', '.dcn-note.is-current',
@@ -208,7 +208,7 @@ def test_all_major_panels_follow_slider_and_structural_wrappers_do_not_stack(app
                 '.appearance-body', '.appearance-footer', '#accountModal .modal-head', '.account-body',
                 '.wrong-toolbar', '.wrong-tools', '#wrongBookList', '.learning-review-body', '.graph-toolbar',
                 '.knowledge-graph-canvas', '.knowledge-graph-side', '.dgs-information', '.dge-overlay-host',
-                '.dge-overlay-viewport', '.appearance-background-viewer-body']
+                '.dge-overlay-viewport', '.appearance-background-viewer-body', '#info']
     content = ['.dge-overlay-stage', '.dge-overlay-image', '.ddw-export-image', '.dmate-png-save-preview',
                '.ocr-task-thumbnail', '.ocr-group-row>img']
     page.evaluate('''({theme,wallpaper})=>{

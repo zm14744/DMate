@@ -17,7 +17,7 @@ body[data-appearance-theme] {
         .account-body,.wrong-toolbar,.wrong-tools,#wrongBookList,.learning-review-body,
         .graph-toolbar,.graph-summary,.knowledge-graph-main,.knowledge-graph-side,
         .knowledge-graph-canvas,.graph-side-tabs,.graph-side-page,.appearance-background-viewer-body,
-        .dgs-information,.dcn-content,.dcn-main,.dcn-sidebar,
+        .dgs-information,.dcn-content,.dcn-main,.dcn-sidebar,#info,.learning-summary,
         .dge-overlay-host,.dge-overlay-viewport
     ) {
         background-color:transparent!important;
@@ -29,10 +29,18 @@ body[data-appearance-theme] {
         background-image:none!important;
     }
 
+    /* Session details are inline sidebar text, including the empty “无”. */
+    body[data-appearance-theme] .right #info {
+        padding:0!important;
+        border:0!important;
+        border-radius:0!important;
+        box-shadow:none!important;
+    }
+
     body[data-appearance-theme] :is(
         .modal-card,.ocr-review-dialog,.graph-editor-dialog,.dcn-dialog,.dcn-confirm,
         .ocr-group-dialog,.dmate-png-save-panel,
-        .input,#info,.learning-summary,.ocr-task-panel,.ocr-task-card,.ocr-task-structure,
+        .input,.ocr-task-panel,.ocr-task-card,.ocr-task-structure,
         .ocr-review-rendered,.ocr-review-preview,.appearance-background-preview:not([data-has-background="true"]),
         .wrong-card,.wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,
         .wrong-solution-body,.learning-review-intro,.learning-review-section,

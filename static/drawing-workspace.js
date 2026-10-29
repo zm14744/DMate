@@ -41,7 +41,7 @@
   function closeEditorPanels(){for(const item of editorHost.querySelectorAll('.dge-floating-actions > details[open]'))item.querySelector(':scope > summary')?.click();}
   function closeTools(){toolsExpanded=false;const palette=editorHost.querySelector('.dge-tool-palette');if(palette)palette.open=false;}
   function dismissPanels(){closeTools();closeEditorPanels();panelMode='';renderPanel();syncChrome();}
-  function toggleTools(){if(!active())return;const next=!toolsExpanded;editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode='';renderPanel();toolsExpanded=next;syncChrome();}
+  function toggleTools(){if(!active()){newPage();if(!active())return;}const next=!toolsExpanded;editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode='';renderPanel();toolsExpanded=next;syncChrome();}
   function toggleEditorPanel(key){
    if(!active())return;
    closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();panelMode='';renderPanel();
@@ -67,9 +67,10 @@
     observedPalette=palette;const trigger=palette.querySelector(':scope > summary');
     trigger?.setAttribute('aria-label','绘图工具');trigger?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();toggleTools();});
    }
-   const empty=!active(),disabled=exportBusy||Boolean(exportPreview);name.disabled=empty||disabled;editorHost.inert=empty||disabled;rail.inert=empty||disabled;
+   const empty=!active(),disabled=exportBusy||Boolean(exportPreview);name.disabled=empty||disabled;editorHost.inert=disabled;rail.inert=empty||disabled;
+   const viewport=editorHost.querySelector('.dge-overlay-viewport');if(viewport)viewport.inert=empty;
    settingsButton.disabled=empty||disabled;informationButton.disabled=empty||disabled;aiButton.disabled=empty||disabled;shell.classList.toggle('is-empty',empty);
-   if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(empty));}
+   if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(disabled));}
    for(const item of editorHost.querySelectorAll('.dge-float-panel')){
     const content=item.querySelector(':scope > .dge-float-content');
     if(content&&!content.querySelector(':scope > .ddw-editor-panel-header')){
