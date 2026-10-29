@@ -45,6 +45,15 @@
             if (label !== undefined) node.textContent = label; return node; };
         const button = (label, action, className) => { const node = element('button', className || '', label); node.type = 'button'; node.disabled = saving;
             node.addEventListener('click', event => { event.stopPropagation(); act(action); }); return node; };
+        const historyButton = (label, paths, action) => {
+            const node = button('', action, 'dge-history-arrow');
+            node.setAttribute('aria-label', label); node.title = label;
+            const icon = svgElement('svg', {viewBox:'0 0 24 24', width:24, height:24, fill:'none',
+                stroke:'currentColor', 'stroke-width':1.8, 'stroke-linecap':'round', 'stroke-linejoin':'round',
+                'aria-hidden':'true', focusable:'false'});
+            for (const path of paths) icon.append(svgElement('path', {d:path}));
+            node.append(icon); return node;
+        };
         const input = (value, aria, action, type) => { const node = element('input'); node.type = type || 'text'; node.value = value ?? ''; node.setAttribute('aria-label', aria); node.disabled = saving;
             if (action) node.addEventListener('input', () => edit(() => action(node.value))); return node; };
         const select = (rows, value, aria, action) => { const node = element('select'); node.setAttribute('aria-label', aria); node.disabled = saving;
@@ -466,8 +475,9 @@
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
             const top = element('div', 'dge-topline');
             // The toolbar already names its actions; keep the dialog compact.
-            const undo = button('↶', () => { model.undo(); }); undo.setAttribute('aria-label','撤销'); undo.title='撤销'; undo.classList.add('dge-history-arrow'); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
-            const redo = button('↷', () => { model.redo(); }); redo.setAttribute('aria-label','重做'); redo.title='重做'; redo.classList.add('dge-history-arrow');
+            const undo = historyButton('撤销', ['M9 14 4 9l5-5', 'M4 9h10.5a6.5 6.5 0 0 1 0 13H11'], () => { model.undo(); });
+            undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
+            const redo = historyButton('重做', ['m15 14 5-5-5-5', 'M20 9H9.5a6.5 6.5 0 0 0 0 13H13'], () => { model.redo(); });
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
             if (!options.drawingOnly) top.append(questionChoice());
             top.append(undo, redo,

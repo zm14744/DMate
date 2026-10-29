@@ -17,7 +17,20 @@ body[data-appearance-theme] {
         .account-body,.wrong-toolbar,.wrong-tools,#wrongBookList,.learning-review-body,
         .graph-toolbar,.graph-summary,.knowledge-graph-main,.knowledge-graph-side,
         .knowledge-graph-canvas,.graph-side-tabs,.graph-side-page,.appearance-background-viewer-body,
-        .dgs-information,.dcn-content,.dcn-main,.dcn-sidebar,#info,.learning-summary,
+        .dgs-information,.dgs-modes,.dcn-content,.dcn-main,.dcn-sidebar,#info,.learning-summary,
+        .ocr-task-list,.ocr-task-card,.ocr-task-structure,.ocr-review-rendered,.ocr-review-preview,
+        .appearance-background-preview:not([data-has-background="true"]),
+        .wrong-card,.wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,.wrong-solution-body,
+        .learning-review-intro,.learning-review-section,
+        .kg-section,.kg-mobile-section,.kg-mobile-viewport,.kg-history-item,.kg-history-preview,
+        .graph-metric,.graph-detail-tip,.graph-detail-empty,.graph-summary-item,.graph-summary-item.focus,
+        .dge-original,.dge-visual,.dge-toolbar,.dge-view-controls,.dge-review-summary,.dge-node-panel,.dge-edge-panel,
+        .dgs-information-card,.dgs-source-card,.ddw-history-item.is-current,
+        .dcn-explanation,.dcn-relation,.dcn-note.is-current,.ocr-group-list,.ocr-group-row,
+        .account-panel,
+        .account-register-panel,.account-email-recovery-panel,.account-recovery-panel,
+        .account-email-bind-panel,.account-recovery-code-panel,.account-registration-recovery-panel,
+        .account-delete-panel,
         .dge-overlay-host,.dge-overlay-viewport
     ) {
         background-color:transparent!important;
@@ -40,26 +53,33 @@ body[data-appearance-theme] {
     body[data-appearance-theme] :is(
         .modal-card,.ocr-review-dialog,.graph-editor-dialog,.dcn-dialog,.dcn-confirm,
         .ocr-group-dialog,.dmate-png-save-panel,
-        .input,.ocr-task-panel,.ocr-task-card,.ocr-task-structure,
-        .ocr-review-rendered,.ocr-review-preview,.appearance-background-preview:not([data-has-background="true"]),
-        .wrong-card,.wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,
-        .wrong-solution-body,.learning-review-intro,.learning-review-section,
-        .kg-section,.kg-mobile-section,.kg-mobile-viewport,.kg-mobile-zoom-controls,
-        .kg-history-item,.kg-history-preview,.graph-metric,.graph-detail-tip,.graph-detail-empty,
-        .graph-summary-item,.graph-summary-item.focus,
-        .dge-original,.dge-visual,.dge-toolbar,.dge-view-controls,
+        .input,.ocr-task-panel,.kg-mobile-zoom-controls,
         .dge-tool-palette,.dge-float-panel,.dge-float-content,.dge-selection-panel,
-        .dge-overlay-tools,.dge-review-summary,.dge-node-panel,.dge-edge-panel,
-        .dgs-information-card,.dgs-source-picker,.dgs-source-card,
-        .ddw-side-panel,.ddw-export-preview,.ddw-history-item.is-current,
-        .dcn-explanation,.dcn-relation,.dcn-note.is-current,
-        .mobile-choice-option,.download-option,.account-panel,
-        .account-register-panel,.account-email-recovery-panel,.account-recovery-panel,
-        .account-email-bind-panel,.account-recovery-code-panel,.account-registration-recovery-panel,
-        .account-delete-panel
+        .dge-overlay-tools,.dgs-source-picker,.ddw-side-panel,.ddw-export-preview
     ) {
         background-color:rgba(var(--surface-2-rgb),var(--panel-alpha))!important;
         background-image:none!important;
+        backdrop-filter:none!important;
+        -webkit-backdrop-filter:none!important;
+    }
+
+    body[data-appearance-theme] .session:not(.active) {
+        background-color:transparent!important;
+        background-image:none!important;
+    }
+
+    /* Empty lists keep their centering and spacing without a separate strip. */
+    body[data-appearance-theme] .wrong-empty {
+        border:0!important;
+        box-shadow:none!important;
+    }
+
+    @media(min-width:1101px) {
+        body[data-appearance-theme="light"] #learningReviewModal :is(
+            .modal-head,.learning-review-section,.learning-review-actions
+        ) {
+            border-color:#94a3b8!important;
+        }
     }
 
     /* Toolbars embedded in a floating panel share its background. Separate

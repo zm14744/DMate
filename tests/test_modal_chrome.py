@@ -75,6 +75,13 @@ def modal_page(request):
             });
           };
         }''')
+        source = (ROOT / 'static/script.js').read_text()
+        grouping = source[source.index('function nextOcrGroupId()'):source.index('function renderOcrTasks()')]
+        page.add_script_tag(content='''
+          const OCR_MAX_CONCURRENT=4,ocrTasks=new Map(),ocrSolvingSessions=new Set();
+          let ocrBatchPreparing=false;
+          function renderOcrTasks(){renderOcrGrouping(document.querySelector('#ocrTaskPanel'),true);}
+        ''' + grouping)
         yield page
         browser.close()
 
@@ -92,6 +99,30 @@ def assert_matching_chrome(actual, reference):
         assert actual[field] == pytest.approx(reference[field], abs=.05)
     assert actual['background'] == reference['background'] == 'rgb(239, 68, 68)'
     assert actual['radius'] == reference['radius'] == '50%'
+
+
+@pytest.mark.parametrize('theme', ['light', 'dark'])
+def test_group_title_and_close_match_wrongbook_header_at_every_font_scale(modal_page, theme):
+    page = modal_page
+    page.evaluate('''theme=>{
+      document.documentElement.dataset.appearanceTheme=theme;document.body.dataset.appearanceTheme=theme;
+      ocrTasks.set('group-one',{id:'group-one',file:{name:'图.png'},groupId:'1',isQuestion:true,
+        originalUrl:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"/>')});
+      openOcrGrouping();
+    }''', theme)
+    for scale in [.9, 1, 1.12]:
+        page.evaluate('scale=>document.documentElement.style.setProperty("--font-scale",scale)', scale)
+        actual = page.evaluate('measureHeader("#ocrGroupingTitle","#ocrGroupingDialog",".ocr-group-close")')
+        reference = page.evaluate('referenceHeaders()[0]')
+        assert_matching_chrome(actual, reference)
+    bounds = page.locator('#ocrGroupingDialog').bounding_box()
+    assert 0 <= bounds['x'] and bounds['x'] + bounds['width'] <= page.viewport_size['width']
+    assert 0 <= bounds['y'] and bounds['y'] + bounds['height'] <= page.viewport_size['height']
+    assert page.get_by_role('group', name='图片1是否为题目').get_by_role('button', name='是').get_attribute('aria-pressed') == 'true'
+    page.get_by_label('图片1组别').select_option('2')
+    assert page.evaluate('ocrTasks.get("group-one").groupId') == '2'
+    page.get_by_label('关闭分组').click()
+    assert not page.locator('#ocrGroupingDialog').evaluate('e=>e.open')
 
 
 @pytest.mark.parametrize('theme', ['light', 'dark'])

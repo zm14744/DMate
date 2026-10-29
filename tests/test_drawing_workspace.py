@@ -177,7 +177,7 @@ def test_guide_requirement_matches_backend_limit(drawing_page):
     assert len(page.evaluate('aiRequests[0].requirement')) == 2000
 
 
-def test_drawing_upload_is_literal_text_and_guidance_uses_the_chat_plus_icon(drawing_page):
+def test_drawing_upload_is_literal_text_and_guidance_uses_the_chat_send_arrow(drawing_page):
     page = drawing_page
     button = page.get_by_role('button', name='上传', exact=True)
     assert button.inner_text() == '上传'
@@ -195,16 +195,23 @@ def test_drawing_upload_is_literal_text_and_guidance_uses_the_chat_plus_icon(dra
     page.add_style_tag(content=(ROOT / 'static/chat-composer.css').read_text())
     page.evaluate('''()=>{document.body.dataset.appearanceTheme='light';const reference=document.createElement('div');
       reference.className='center';reference.style.cssText='position:fixed;left:-2000px;bottom:0;width:500px';
-      reference.innerHTML='<div class="input-wrap"><div class="input"><div class="image-picker-wrap"><button id="imageBtn" type="button">上传图片</button></div></div></div>';
+      reference.innerHTML='<div class="input-wrap"><div class="input"><button id="sendBtn" type="button">发送</button></div></div>';
       document.body.append(reference);}''')
-    chat_plus = page.locator('#imageBtn')
+    chat_send = page.locator('#sendBtn')
+    icon = guide.locator('svg')
+    assert icon.get_attribute('aria-hidden') == 'true'
+    assert icon.get_attribute('viewBox') == '0 0 24 24'
+    assert icon.locator('path').get_attribute('d') == 'M12 20V4m-7 7 7-7 7 7'
+    assert icon.locator('path').get_attribute('stroke-width') == '2.4'
+    assert guide.evaluate('e=>getComputedStyle(e).borderRadius') == '50%'
+    assert guide.bounding_box()['width'] == guide.bounding_box()['height'] == 38
     for color in ('#3b82f6', '#14b8a6', '#8b5cf6'):
         page.evaluate('color=>document.body.style.setProperty("--accent",color)', color)
         expected = page.evaluate('color=>{const node=document.createElement("i");node.style.color=color;document.body.append(node);const rgb=getComputedStyle(node).color;node.remove();return rgb;}', color)
         assert button.evaluate('e=>getComputedStyle(e).backgroundColor') == expected
-        assert guide.evaluate('e=>getComputedStyle(e).backgroundColor') == 'rgba(0, 0, 0, 0)'
-        assert guide.evaluate('e=>getComputedStyle(e,"::before").maskImage') == chat_plus.evaluate('e=>getComputedStyle(e,"::before").maskImage')
-        assert guide.evaluate('e=>getComputedStyle(e,"::before").backgroundColor') == chat_plus.evaluate('e=>getComputedStyle(e,"::before").backgroundColor')
+        assert guide.evaluate('e=>getComputedStyle(e).backgroundColor') == chat_send.evaluate('e=>getComputedStyle(e).backgroundColor') == expected
+        assert icon.locator('path').evaluate('e=>getComputedStyle(e).stroke') == 'rgb(255, 255, 255)'
+        assert 'M12 20V4m-7 7 7-7 7 7' in chat_send.evaluate('e=>decodeURIComponent(getComputedStyle(e,"::before").maskImage)')
     assert page.evaluate('aiRequests.length') == page.evaluate('uploads.length') == 0
 
 
@@ -571,3 +578,50 @@ def test_real_template_tools_have_one_surface_and_open_on_every_click_even_when_
         storage_key = 'drawings:real-template-empty' if empty else 'drawings:real-template'
         page.wait_for_function('''({key,count})=>JSON.parse(localStorage.getItem(key)).pages[0].document.graphs[0].vertices.length===count''', arg={'key': storage_key, 'count': before + 1})
         page.screenshot(path='/tmp/dmate-tools-working-'+theme+'-'+size+('-empty' if empty else '')+'.png')
+
+
+@pytest.mark.parametrize('theme', ['light', 'dark'])
+def test_real_template_controls_keep_clearance_with_long_names_zoom_and_scrollbars(drawing_page, theme):
+    page = drawing_page
+    use_real_dialog_and_template_styles(page, theme)
+    page.locator('.ddw-name').fill('用于检查界面留白的很长绘图名称' * 4 + '.png')
+    page.add_style_tag(content='''.dge-overlay-viewport{scrollbar-gutter:stable both-edges;scrollbar-width:auto}
+      .dge-overlay-viewport::-webkit-scrollbar{width:14px;height:14px}''')
+
+    def assert_clearance():
+        page.wait_for_function('''()=>{const viewport=document.querySelector('.dge-overlay-viewport'),view=document.querySelector('.dge-view-controls').getBoundingClientRect();
+          const canvas=viewport.getBoundingClientRect(),rail=document.querySelector('.ddw-side-actions').getBoundingClientRect(),tools=document.querySelector('.dge-tool-palette>summary').getBoundingClientRect();
+          return rail.top>=view.bottom+17.5&&canvas.left+viewport.clientLeft+viewport.clientWidth-rail.right>=17.5&&tools.left-canvas.left-viewport.clientLeft>=17.5;}''')
+        header = page.locator('.graph-editor-dialog-head').bounding_box()
+        actions = page.locator('.ddw-header').bounding_box()
+        undo = page.locator('.dge-topline').bounding_box()
+        assert actions['y'] - header['y'] - header['height'] >= 11.5
+        assert undo['y'] - actions['y'] - actions['height'] >= 11.5
+        tools = page.locator('.dge-tool-palette > summary').bounding_box()
+        rail = page.locator('.ddw-side-actions').bounding_box()
+        assert rail['x'] >= tools['x'] + tools['width'] + 11.5 or rail['y'] >= tools['y'] + tools['height'] + 11.5
+        buttons = page.locator('.ddw-side-actions > button').all()
+        boxes = [button.bounding_box() for button in buttons]
+        assert all(box['y'] == pytest.approx(boxes[0]['y'], abs=1) for box in boxes)
+        assert all(left['x'] + left['width'] < right['x'] for left, right in zip(boxes, boxes[1:]))
+        assert page.locator('#graphEditorDialog').evaluate('n=>n.scrollWidth<=n.clientWidth')
+        assert page.locator('.ddw-header').evaluate('n=>n.scrollWidth<=n.clientWidth')
+        ai = page.get_by_role('button', name='AI指导', exact=True)
+        assert ai.evaluate('''node=>{const box=node.getBoundingClientRect();return document.elementFromPoint(box.x+box.width/2,box.y+box.height/2)?.closest('button')===node;}''')
+
+    assert_clearance()
+    for _ in range(4):
+        page.get_by_role('button', name='放大原图', exact=True).click()
+    page.locator('.dge-overlay-viewport').evaluate('node=>{node.scrollTop=node.scrollHeight;node.scrollLeft=node.scrollWidth;}')
+    assert_clearance()
+    page.get_by_role('button', name='AI指导', exact=True).click()
+    send = page.get_by_role('button', name='请求 AI 指导', exact=True)
+    assert send.locator('svg path').get_attribute('d') == 'M12 20V4m-7 7 7-7 7 7'
+    assert send.evaluate('n=>getComputedStyle(n).backgroundColor') == 'rgb(59, 130, 246)'
+    assert send.locator('svg path').evaluate('n=>getComputedStyle(n).stroke') == 'rgb(255, 255, 255)'
+    size = 'mobile' if page.viewport_size['width'] < 760 else 'desktop'
+    page.screenshot(path='/tmp/dmate-drawing-safe-spacing-'+theme+'-'+size+'.png')
+    page.get_by_role('button', name='AI指导', exact=True).click()
+    page.set_viewport_size({'width': 320, 'height': 720})
+    assert_clearance()
+    page.screenshot(path='/tmp/dmate-drawing-safe-spacing-'+theme+'-'+size+'-narrow.png')

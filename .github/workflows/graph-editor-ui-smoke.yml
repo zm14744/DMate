@@ -28,9 +28,11 @@ on:
       - 'static/image-groups.css'
       - 'static/modal-chrome.css'
       - 'tests/test_modal_chrome.py'
+      - 'tests/test_editor_toolbar_chrome.py'
       - 'tests/test_editor_dialog_position.py'
       - 'tests/test_drawing_fit.py'
       - 'tests/test_appearance_surfaces.py'
+      - 'tests/test_panel_compositing.py'
       - 'tests/test_sidebar_and_search_clear.py'
       - 'static/appearance-panels.css'
       - 'tests/test_scan_selection_save.py'
@@ -72,7 +74,7 @@ concurrency:
 jobs:
   editor-browser:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -97,9 +99,11 @@ jobs:
             tests/test_ai_answer_rendering.py \
             tests/test_interaction_surfaces.py \
             tests/test_modal_chrome.py \
+            tests/test_editor_toolbar_chrome.py \
             tests/test_editor_dialog_position.py \
             tests/test_drawing_fit.py \
             tests/test_appearance_surfaces.py \
+            tests/test_panel_compositing.py \
             tests/test_sidebar_and_search_clear.py \
             tests/test_graph_outline_smoothness.py \
             tests/test_graph_loop_editing.py \

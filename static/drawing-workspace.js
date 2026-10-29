@@ -13,9 +13,12 @@
   if(!root.DMateGraphEditor?.mount)throw new Error('绘图模块未加载，请刷新后重试。');
   const key=String(options.storageKey||'dmate:graph-gallery:v1:guest');
   let pages=[],activeId='',editor=null,timer=null,destroyed=false,persistError='',aiAbort=null,aiEpoch=0,exportBusy=false,panelMode='',uploadBusy=false;
-  let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedPalette=null,toolsExpanded=false;
+  let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedViewport=null,observedPalette=null,toolsExpanded=false;
   const el=(tag,className,text)=>{const n=doc.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
   const button=(text,fn,className)=>{const b=el('button',className,text);b.type='button';b.addEventListener('click',event=>{event.stopPropagation();if(!destroyed)void fn();});return b;};
+  const sendIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg'),path=doc.createElementNS(svg.namespaceURI,'path');
+   svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
+   for(const [key,value] of Object.entries({d:'M12 20V4m-7 7 7-7 7 7',fill:'none',stroke:'#fff','stroke-width':'2.4','stroke-linecap':'round','stroke-linejoin':'round'}))path.setAttribute(key,value);svg.append(path);return svg;};
   const shell=el('section','dmate-drawing-workspace'),top=el('div','ddw-header'),name=el('input','ddw-name');
   name.type='text';name.maxLength=80;name.setAttribute('aria-label','绘图名称');
   const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),status=el('p','ddw-status');
@@ -61,14 +64,15 @@
   }
   function syncChrome(){
    if(destroyed)return;
-   const view=editorHost.querySelector('.dge-view-controls'),palette=editorHost.querySelector('.dge-tool-palette');
+   const view=editorHost.querySelector('.dge-view-controls'),viewport=editorHost.querySelector('.dge-overlay-viewport'),palette=editorHost.querySelector('.dge-tool-palette');
    if(resizeObserver&&observedView!==view){if(observedView)resizeObserver.unobserve(observedView);observedView=view;if(view)resizeObserver.observe(view);}
+   if(resizeObserver&&observedViewport!==viewport){if(observedViewport)resizeObserver.unobserve(observedViewport);observedViewport=viewport;if(viewport)resizeObserver.observe(viewport);}
    if(palette&&observedPalette!==palette){
     observedPalette=palette;const trigger=palette.querySelector(':scope > summary');
     trigger?.setAttribute('aria-label','绘图工具');trigger?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();toggleTools();});
    }
    const empty=!active(),disabled=exportBusy||Boolean(exportPreview);name.disabled=empty||disabled;editorHost.inert=disabled;rail.inert=empty||disabled;
-   const viewport=editorHost.querySelector('.dge-overlay-viewport');if(viewport)viewport.inert=empty;
+   if(viewport)viewport.inert=empty;
    settingsButton.disabled=empty||disabled;informationButton.disabled=empty||disabled;aiButton.disabled=empty||disabled;shell.classList.toggle('is-empty',empty);
    if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(disabled));}
    for(const item of editorHost.querySelectorAll('.dge-float-panel')){
@@ -83,9 +87,17 @@
    settingsButton.setAttribute('aria-expanded',String(Boolean(editorPanel('graphs')?.open)));
    informationButton.setAttribute('aria-expanded',String(Boolean(editorPanel('results')?.open)));
    shell.dataset.panelOpen=String(Boolean(panelMode||editorOpen||propertyOpen||toolsExpanded));
-   const origin=body.getBoundingClientRect(),viewBox=view?.getBoundingClientRect(),controlsTop=Math.max(8,viewBox?viewBox.bottom-origin.top+10:64);
-   body.style.setProperty('--ddw-controls-top',controlsTop+'px');
-   const top=controlsTop+Math.max(rail.getBoundingClientRect().height,palette?.querySelector(':scope > summary')?.getBoundingClientRect().height||0)+8;
+   const origin=body.getBoundingClientRect(),viewBox=view?.getBoundingClientRect(),canvasBox=viewport?.getBoundingClientRect(),inset=18;
+   const controlsTop=Math.max(origin.top+inset,viewBox?viewBox.bottom+inset:origin.top+64);
+   const canvasStyle=viewport?win.getComputedStyle(viewport):null,borderLeft=parseFloat(canvasStyle?.borderLeftWidth)||0,borderRight=parseFloat(canvasStyle?.borderRightWidth)||0;
+   const leftSpace=viewport?viewport.clientLeft:borderLeft,rightSpace=viewport?Math.max(borderRight,viewport.offsetWidth-viewport.clientWidth-leftSpace):borderRight;
+   const canvasRight=canvasBox?canvasBox.right-rightSpace:origin.right,canvasLeft=canvasBox?canvasBox.left+leftSpace:origin.left;
+   rail.style.right=Math.max(inset,origin.right-canvasRight+inset)+'px';rail.style.top=(controlsTop-origin.top)+'px';
+   body.style.setProperty('--ddw-controls-top',(controlsTop-origin.top)+'px');
+   if(palette){const parent=palette.offsetParent?.getBoundingClientRect()||origin;palette.style.top=(controlsTop-parent.top)+'px';palette.style.left=(canvasLeft+inset-parent.left)+'px';}
+   const toolBox=palette?.querySelector(':scope > summary')?.getBoundingClientRect();
+   if(toolBox&&rail.getBoundingClientRect().left<toolBox.right+12)rail.style.top=(toolBox.bottom-origin.top+12)+'px';
+   const top=Math.max(rail.getBoundingClientRect().bottom,toolBox?.bottom||0)-origin.top+8;
    body.style.setProperty('--ddw-panel-top',top+'px');
    body.style.setProperty('--ddw-panel-space',Math.max(90,origin.height-top-10)+'px');
    if(panelMode)positionPopover(panel,panelMode==='history'?historyButton:aiButton);
@@ -153,7 +165,7 @@
    }
    const label=el('label','ddw-ai-label','要求（可选）'),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label','绘图指导要求（可选）');
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
-   const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.disabled=Boolean(aiAbort);ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='请求 AI 指导';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
+   const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.append(sendIcon());ask.disabled=Boolean(aiAbort);ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='请求 AI 指导';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
    const result=el('div','ddw-ai-answer');result.setAttribute('aria-live','polite');
    panel.append(label,ask,result);
    if(answer){

@@ -184,7 +184,7 @@ def install_panel_examples(page):
       append('.dcn-results','<section class="dcn-explanation">概念解释。</section>');
       append('#ocrTaskList','<article class="ocr-task-card"><img class="ocr-task-thumbnail" alt="原图"><div class="ocr-task-structure">图形结构</div></article>');
       append('#graphEditorMount','<aside class="dge-selection-panel">属性</aside><div class="ddw-export-preview"><img class="ddw-export-image" alt="导出图片"></div>');
-      append('body','<dialog class="ocr-group-dialog"><div class="ocr-group-row"><img alt="原图"></div></dialog><dialog class="dcn-confirm"></dialog><div class="dmate-png-save-panel"><img class="dmate-png-save-preview" alt="预览"></div><div class="ai">AI回答</div><div class="user">消息</div>');
+      append('body','<dialog class="ocr-group-dialog"><div class="ocr-group-list"><div class="ocr-group-row"><img alt="原图"><label class="ocr-group-select-label"><select><option>1</option></select></label></div></div></dialog><dialog class="dcn-confirm"></dialog><div class="dmate-png-save-panel"><img class="dmate-png-save-preview" alt="预览"></div><div class="ai">AI回答</div><div class="user">消息</div>');
     }''')
 
 
@@ -195,20 +195,20 @@ def test_all_major_panels_follow_slider_and_structural_wrappers_do_not_stack(app
     install_appearance(page)
     install_panel_examples(page)
     surfaces = ['.left', '.right', '.input', '#appearanceModal .modal-card', '#accountModal .modal-card',
-                '#wrongBookModal .modal-card', '#wrongBookList .wrong-card', '#learningReviewModal .modal-card',
-                '.learning-review-section', '#knowledgeGraphModal .modal-card', '.kg-section', '.kg-mobile-viewport',
-                '.graph-metric', '#graphEditorDialog', '#conceptNotebookDialog', '.dcn-note.is-current',
-                '.dcn-explanation', '.dcn-confirm', '.ocr-task-panel', '.ocr-task-card', '.ocr-task-structure',
-                '.ocr-group-dialog', '.ddw-side-panel', '.ddw-history-item.is-current', '.ddw-export-preview',
-                '.dge-selection-panel', '.dge-view-controls', '.dge-float-content', '.dge-tool-palette>.dge-overlay-tools',
-                '.dgs-information-card', '.dgs-source-picker',
-                '.dgs-source-card', '.dmate-png-save-panel', '.ocr-review-rendered', '.ocr-review-preview',
-                '.appearance-background-preview']
+                '#wrongBookModal .modal-card', '#learningReviewModal .modal-card', '#knowledgeGraphModal .modal-card',
+                '#graphEditorDialog', '#conceptNotebookDialog', '.dcn-confirm', '.ocr-task-panel', '.ocr-group-dialog',
+                '.ddw-side-panel', '.ddw-export-preview', '.dge-selection-panel', '.dge-float-content',
+                '.dge-tool-palette>.dge-overlay-tools', '.dgs-source-picker', '.dmate-png-save-panel']
     wrappers = ['.layout', '.center', '.chat', '.input-wrap', '#appearanceModal .modal-head',
                 '.appearance-body', '.appearance-footer', '#accountModal .modal-head', '.account-body',
                 '.wrong-toolbar', '.wrong-tools', '#wrongBookList', '.learning-review-body', '.graph-toolbar',
                 '.knowledge-graph-canvas', '.knowledge-graph-side', '.dgs-information', '.dge-overlay-host',
-                '.dge-overlay-viewport', '.appearance-background-viewer-body', '#info']
+                '.dge-overlay-viewport', '.appearance-background-viewer-body', '#info',
+                '#wrongBookList .wrong-card', '.learning-review-section', '.kg-section', '.kg-mobile-viewport',
+                '.graph-metric', '.dcn-note.is-current', '.dcn-explanation', '.ocr-task-card', '.ocr-task-structure',
+                '.ddw-history-item.is-current', '.dge-view-controls', '.dgs-information-card', '.dgs-modes',
+                '.dgs-source-card', '.ocr-review-rendered', '.ocr-review-preview', '.appearance-background-preview',
+                '.ocr-group-list', '.ocr-group-row']
     content = ['.dge-overlay-stage', '.dge-overlay-image', '.ddw-export-image', '.dmate-png-save-preview',
                '.ocr-task-thumbnail', '.ocr-group-row>img']
     page.evaluate('''({theme,wallpaper})=>{

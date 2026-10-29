@@ -10,6 +10,8 @@
 }
 .ocr-group-dialog {
     box-sizing: border-box;
+    margin: auto;
+    font: inherit;
     width: min(680px, calc(100vw - 32px));
     max-height: calc(100dvh - 40px);
     padding: 22px;
@@ -29,7 +31,7 @@
     margin-bottom: 18px;
     flex-shrink: 0;
 }
-.ocr-group-dialog h2 { margin: 0; font-size: 22px; }
+.ocr-group-dialog h2 { margin: 0; font: inherit; min-width: 0; }
 .ocr-group-dialog .ocr-group-close {
     flex: 0 0 22px;
     width: 22px;

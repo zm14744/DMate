@@ -188,6 +188,7 @@ def test_group_popup_defaults_dots_red_close_and_bounded_layout(layout_page):
     helpers = source[source.index('function nextOcrGroupId()'):source.index('function renderOcrTasks()')]
     page.add_style_tag(content=(ROOT / 'static/image-groups.css').read_text())
     page.add_style_tag(content=(ROOT / 'static/chat-composer.css').read_text())
+    page.add_style_tag(content=(ROOT / 'static/modal-chrome.css').read_text())
     page.add_script_tag(content='window.OCR_MAX_CONCURRENT=4;window.ocrBatchPreparing=false;window.ocrSolvingSessions=new Set();' + helpers)
     page.evaluate("""() => {
       window.renderOcrTasks=window.renderTasks;
@@ -215,9 +216,9 @@ def test_group_popup_defaults_dots_red_close_and_bounded_layout(layout_page):
     if page.locator('body').get_attribute('data-appearance-theme') == 'dark':
         assert colors['background'] != 'rgb(255, 255, 255)' and colors['color'] != 'rgb(30, 41, 59)'
     close = page.get_by_role('button', name='关闭分组', exact=True)
-    assert close.evaluate("e=>getComputedStyle(e).backgroundColor") == 'rgb(244, 63, 67)'
+    assert close.evaluate("e=>getComputedStyle(e).backgroundColor") == 'rgb(239, 68, 68)'
     close_box = close.bounding_box()
-    assert close_box['width'] == close_box['height'] == 22
+    assert close_box['width'] == close_box['height'] == (22 if page.viewport_size['width'] <= 760 else 20)
     assert close_box['x'] > bounds['x'] + bounds['width'] / 2
     assert close.evaluate("e=>getComputedStyle(e).outlineStyle") == 'none'
     dot = page.locator('.ocr-group-question-choice[aria-pressed="true"] .ocr-group-question-dot').first
