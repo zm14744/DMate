@@ -259,3 +259,8 @@
 .dge-text-frame-number{fill:#1e40af;stroke:white;paint-order:stroke;stroke-linejoin:round;font-weight:bold;pointer-events:none}
 .dge-overlay-text-region{stroke:#2563eb;fill:#2563eb0c}
 .dge-overlay-text-region.is-error{stroke:#b91c1c}
+
+.dge-history-arrow{font-size:24px!important;line-height:1;min-width:40px;padding:4px 10px!important}
+.dge-freehand-draft{fill:none;stroke:var(--accent,#2563eb);stroke-width:2.4;pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
+.dge-frame-edge-hit{fill:none;stroke:transparent;pointer-events:stroke;cursor:crosshair}
+.dge-overlay-svg[data-mode=select] .dge-frame-hit{cursor:pointer}

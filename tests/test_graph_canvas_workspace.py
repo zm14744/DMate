@@ -28,7 +28,8 @@ def test_delete_final_graph_once_keeps_canvas_and_clears_all_frames(canvas_page)
     page.evaluate("instance.model.setGraphBounds('G1',[.1,.1,.9,.9])")
     open_tools(page);page.get_by_role('button',name='选择 / 移动',exact=True).click();close_tools(page)
     assert page.locator('.dge-frame-hit').count()==1
-    page.locator('.dge-float-graphs > summary').click()
+    frame=page.locator('.dge-frame-hit').bounding_box()
+    page.mouse.click(frame['x']+frame['width']*.6,frame['y']+20)
     page.get_by_role('button',name='删除子图',exact=True).click()
     assert page.evaluate('instance.getDocument().graphs.length')==0
     assert page.locator('.dge-frame-hit,.dge-overlay-node,.dge-overlay-edge').count()==0
@@ -78,7 +79,7 @@ def test_frame_click_selects_graph_and_results_popover_does_not_resize_canvas(ca
     page=canvas_page;close_tools(page)
     page.evaluate("instance.model.setGraphBounds('G1',[.1,.1,.4,.4]);instance.model.addGraph({bbox:[.6,.6,.9,.9]})")
     open_tools(page);page.get_by_role('button',name='选择 / 移动',exact=True).click();close_tools(page)
-    box=page.locator('[data-graph-id="G2"]').bounding_box()
+    box=page.locator('.dge-frame-hit[data-graph-id="G2"]').bounding_box()
     page.mouse.click(box['x']+box['width']*.7,box['y']+box['height']*.7)
     assert page.get_by_label('当前子图名称').is_visible()
     assert page.get_by_label('当前子图名称').input_value()=='图 2'
@@ -107,22 +108,18 @@ def test_edge_properties_follow_known_graph_type(canvas_page,directed,weighted):
     assert page.get_by_role('button',name='反转方向',exact=True).count()==int(directed)
 
 
-def test_delete_all_graphs_also_clears_unfinished_polygon(canvas_page):
+def test_cancelled_freehand_does_not_leave_a_draft_or_new_graph(canvas_page):
     page=canvas_page
     page.get_by_label('选区方式').select_option('graph_poly')
     box=page.locator('.dge-overlay-viewport').bounding_box()
-    page.mouse.click(box['x']+250,box['y']+240)
-    page.mouse.click(box['x']+380,box['y']+260)
-    assert page.locator('.dge-overlay-polygon-draft').count()==1
-    page.locator('.dge-float-graphs > summary').click()
-    page.get_by_role('button',name='删除子图',exact=True).click()
-    assert page.evaluate('instance.getDocument().graphs.length')==0
-    page.locator('.dge-float-graphs').evaluate('e=>e.open=false')
-    open_tools(page);page.get_by_role('button',name='添加顶点',exact=True).click()
-    box=page.locator('.dge-overlay-viewport').bounding_box()
-    page.mouse.click(box['x']+300,box['y']+300)
-    assert page.locator('.dge-overlay-node').count()==1
-    assert page.locator('.dge-frame-hit,.dge-overlay-polygon-draft').count()==0
+    page.mouse.move(box['x']+250,box['y']+240);page.mouse.down()
+    page.mouse.move(box['x']+380,box['y']+260,steps=5)
+    assert page.locator('.dge-freehand-draft').count()==1
+    assert page.locator('.dge-overlay-draft-dot').count()==0
+    page.locator('.dge-overlay-svg').dispatch_event('pointercancel',{'pointerId':1})
+    page.mouse.up()
+    assert page.evaluate('instance.getDocument().graphs.length')==1
+    assert page.locator('.dge-freehand-draft').count()==0
 
 
 def test_mobile_floating_panels_remain_inside_the_screen(canvas_page):

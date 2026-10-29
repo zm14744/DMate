@@ -74,6 +74,17 @@ def tool(page,name):
     page.get_by_role('button',name=name,exact=True).click()
 
 
+
+def stroke(page,points):
+    bounds=page.locator('.dge-overlay-image:visible').bounding_box()
+    x,y=points[0]
+    page.mouse.move(bounds['x']+bounds['width']*x,bounds['y']+bounds['height']*y)
+    page.mouse.down()
+    for x,y in points[1:]:
+        page.mouse.move(bounds['x']+bounds['width']*x,bounds['y']+bounds['height']*y,steps=5)
+    page.mouse.up()
+
+
 def test_overlay_makes_named_and_anonymous_nodes_and_edges_editable(canvas_page):
     page = canvas_page
     assert page.locator(".dge-overlay-hint, .dge-validation, .dge-context, .dge-footer .dge-check").count() == 0
@@ -198,21 +209,15 @@ def test_free_polygon_graph_selection_saves_user_outline(canvas_page):
     page.get_by_label("选区方式").select_option("graph_poly")
     bounds = page.locator(".dge-overlay-image").bounding_box()
     assert bounds
-    for x, y in ((.18, .12), (.86, .1), (.93, .91), (.18, .89)):
-        page.mouse.click(bounds["x"] + bounds["width"]*x,
-                         bounds["y"] + bounds["height"]*y)
-    page.locator(".dge-tool-palette").evaluate("e=>e.open=true")
-    assert page.get_by_role("button", name="完成轮廓").is_enabled()
-    tool(page,'完成轮廓')
+    stroke(page,[(.18,.12),(.86,.1),(.93,.91),(.18,.89),(.18,.12)])
+    assert page.get_by_role('button',name='完成轮廓').count()==0
     polygon = page.evaluate("instance.getDocument().graphs.at(-1).region_polygon")
     assert len(polygon) == 4
     assert polygon[0] == pytest.approx([.18, .12], abs=.005)
     assert page.locator(".dge-overlay-polygon").count() == 1
     assert page.evaluate("instance.getDocument().graphs.length")==2
     assert page.get_by_label('选区方式').input_value()=='graph_poly'
-    for x,y in ((.2,.2),(.4,.2),(.4,.4),(.2,.4)):
-        page.mouse.click(bounds['x']+bounds['width']*x,bounds['y']+bounds['height']*y)
-    tool(page,'完成轮廓')
+    stroke(page,[(.23,.23),(.42,.23),(.42,.43),(.23,.43),(.23,.23)])
     assert page.evaluate('instance.getDocument().graphs.length')==3
     page.get_by_role("button", name="撤销", exact=True).click()
     assert page.evaluate("instance.getDocument().graphs.length")==2
@@ -229,10 +234,7 @@ def test_fit_after_diy_region_keeps_math_positions_unchanged(canvas_page):
     page.get_by_label("选区方式").select_option("graph_poly")
     rect = page.locator(".dge-overlay-svg").bounding_box()
     assert rect
-    for x, y in ((.17, .2), (.55, .2), (.52, .7), (.17, .7)):
-        page.mouse.click(rect["x"] + rect["width"]*x,
-                         rect["y"] + rect["height"]*y)
-    tool(page,'完成轮廓')
+    stroke(page,[(.23,.2),(.55,.2),(.52,.7),(.23,.7),(.23,.2)])
     assert page.get_by_role('button',name='聚焦图形',exact=True).count()==0
     page.get_by_role('button',name='适应',exact=True).click()
     assert float(page.locator(".dge-overlay-zoom").text_content().rstrip("%")) <= 100

@@ -11,6 +11,7 @@ on:
       - 'tests/test_graph_overlay.py'
       - 'tests/test_graph_canvas_workspace.py'
       - 'tests/test_graph_text_workspace.py'
+      - 'tests/test_graph_frame_gestures.py'
       - 'static/script.js'
       - 'templates/index.html'
       - 'tests/test_ocr_upload_layout.py'
@@ -61,4 +62,5 @@ jobs:
             tests/test_graph_overlay.py::test_pure_text_ocr_does_not_create_a_dummy_graph_canvas \
             tests/test_graph_canvas_workspace.py \
             tests/test_graph_text_workspace.py \
+            tests/test_graph_frame_gestures.py \
             tests/test_ocr_upload_layout.py

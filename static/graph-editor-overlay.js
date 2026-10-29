@@ -50,7 +50,7 @@ function mount(host,o){
  }
  const regionMode=d.createElement('select');
  regionMode.setAttribute('aria-label','选区方式');
- for(const [key,label] of [['','更多框选方式'],o.textOnly?['text_poly','不规则框选文字']:['graph_poly','不规则框选图形']]){
+ for(const [key,label] of [['','框选方式'],o.textOnly?['text_poly','不规则框选']:['graph_poly','不规则框选']]){
    const item=d.createElement('option');item.value=key;item.textContent=label;regionMode.append(item);
  }
  regionMode.addEventListener('change',()=>{
@@ -63,12 +63,6 @@ function mount(host,o){
    change(()=>{id=o.createRegion?.(points,polygon);},'region');
    if(id)void scanFigureType(points,id);
  };
- const finishPolygon=()=>{
-   if(!['graph_poly','text_poly'].includes(s.mode)||s.polygonDraft.length<3)return;
-   const points=s.polygonDraft.map(p=>[...p]);s.polygonDraft=[];
-   if(o.textOnly){s.textRegion=points;o.selectionChanged?.(points);}else commitRegion(points,true);draw();
- };
- const finishButton=button('完成轮廓','finish-polygon',finishPolygon);
  // Each independently segmented graph receives its own direction and weight
  // from OCR + visual edge evidence. Do not override this with toolbar labels.
  // Edge-level corrections in the advanced editor remain available.
@@ -218,14 +212,56 @@ function mount(host,o){
   return [clamp((b[0]+b[2])/2+(b[2]-b[0])*.34*Math.cos(a)),clamp((b[1]+b[3])/2+(b[3]-b[1])*.34*Math.sin(a))];
  };
  const px=p=>[p[0]*w,p[1]*h],mouse=e=>{const r=svg.getBoundingClientRect();return [world.left+(e.clientX-r.left)/Math.max(1,r.width)*(world.right-world.left),world.top+(e.clientY-r.top)/Math.max(1,r.height)*(world.bottom-world.top)];};
+ const boxOf=points=>{const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];};
+ const boxPoints=b=>[[b[0],b[1]],[b[2],b[1]],[b[2],b[3]],[b[0],b[3]]];
+ const graphPoints=g=>g.region_polygon?.length>=3?g.region_polygon:g.bbox?.length===4?boxPoints(g.bbox):null;
+ const screenPoint=p=>{const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;return [p[0]*scale,p[1]*scale*h/w];};
+ const distance=(a,b)=>{const p=screenPoint(a),q=screenPoint(b);return Math.hypot(p[0]-q[0],p[1]-q[1]);};
+ const area=points=>Math.abs(points.reduce((sum,p,i)=>{const q=points[(i+1)%points.length];return sum+p[0]*q[1]-q[0]*p[1];},0))/2;
+ function simplifyStroke(points){
+  // Simplify a continuous stroke in screen pixels, retaining the schema's
+  // compact polygon representation without displaying editable vertices.
+  const source=points.map(screenPoint);source.push(source[0]);
+  let tolerance=1.5,result;
+  do{
+   const keep=new Set([0,source.length-1]),stack=[[0,source.length-1]];
+   while(stack.length){
+    const [a,b]=stack.pop(),p=source[a],q=source[b],dx=q[0]-p[0],dy=q[1]-p[1],len=dx*dx+dy*dy;
+    let max=tolerance*tolerance,index=-1;
+    for(let i=a+1;i<b;i++){
+     const v=source[i],t=len?Math.max(0,Math.min(1,((v[0]-p[0])*dx+(v[1]-p[1])*dy)/len)):0;
+     const dist=(v[0]-p[0]-t*dx)**2+(v[1]-p[1]-t*dy)**2;
+     if(dist>max){max=dist;index=i;}
+    }
+    if(index>=0){keep.add(index);stack.push([a,index],[index,b]);}
+   }
+   result=[...keep].sort((a,b)=>a-b).filter(i=>i<points.length).map(i=>points[i]);
+   tolerance*=1.5;
+  }while(result.length>64);
+  return result;
+ }
+ function resizeSides(points,p){
+  const b=boxOf(points),scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;
+  const sides=[['left',Math.abs(p[0]-b[0])*scale],['right',Math.abs(p[0]-b[2])*scale],
+   ['top',Math.abs(p[1]-b[1])*scale*h/w],['bottom',Math.abs(p[1]-b[3])*scale*h/w]].sort((a,b)=>a[1]-b[1]);
+  const chosen=[sides[0][0]],second=sides.find(row=>['left','right'].includes(row[0])!==['left','right'].includes(chosen[0]));
+  if(second && sides[0][1]<12 && second[1]<12)chosen.push(second[0]);
+  return chosen;
+ }
+ function resizedPoints(op){
+  const b=boxOf(op.points),next=[...b],dx=op.end[0]-op.start[0],dy=op.end[1]-op.start[1],min=.012;
+  if(op.sides.includes('left'))next[0]=Math.max(0,Math.min(b[2]-min,b[0]+dx));
+  if(op.sides.includes('right'))next[2]=Math.min(1,Math.max(b[0]+min,b[2]+dx));
+  if(op.sides.includes('top'))next[1]=Math.max(0,Math.min(b[3]-min,b[1]+dy));
+  if(op.sides.includes('bottom'))next[3]=Math.min(1,Math.max(b[1]+min,b[3]+dy));
+  return op.points.map(p=>[clamp(next[0]+(p[0]-b[0])/(b[2]-b[0])*(next[2]-next[0])),clamp(next[1]+(p[1]-b[1])/(b[3]-b[1])*(next[3]-next[1]))]);
+ }
  function draw(){
   if(!scroll.clientWidth)return;
-  const g=o.textOnly?{vertices:[],edges:[]}:o.graph();
+  const g=o.textOnly?{vertices:[],edges:[]}:o.graph()||{vertices:[],edges:[]};
   if(g)for(const v of g.vertices)if(finite(v.x)&&finite(v.y))expandWorld(v.x,v.y);
   if(visible)visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
   regionMode.value=['graph_poly','text_poly'].includes(s.mode)?s.mode:'';
-  finishButton.hidden=!['graph_poly','text_poly'].includes(s.mode);
-  finishButton.disabled=s.polygonDraft.length<3||Boolean(o.disabled?.());
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const active=b.dataset.overlayTool===s.mode;b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds'].includes(b.dataset.overlayTool))b.setAttribute('aria-pressed',String(active));}
   svg.replaceChildren();if(!g||!s.visible)return;
   // The mathematical path is in original-image coordinates. Input targets
@@ -249,27 +285,22 @@ function mount(host,o){
   }
   svg.append(defs);
   const coords=new Map(g.vertices.map((v,i)=>[v.id,pos(v,i,g)]));
-  const outline=(points,cssClass)=>{
-    if(Array.isArray(points)&&points.length){
-      const polygon=E(d,'polygon',{points:points.map(p=>px(p).join(',')).join(' '),class:cssClass});
-      svg.append(polygon);
-      if(cssClass.includes('draft'))for(const p of points){
-        const ink=inkAt(p),dot=E(d,'circle',{cx:p[0]*w,cy:p[1]*h,r:hitRadius*.45,class:'dge-overlay-draft-dot'});
-        dot.style.fill=ink;dot.style.stroke=oppositeInk(ink);svg.append(dot);
-      }
-    }
+  const frame=(points,css,id,isText,current)=>{
+    const preview=active?.kind==='resize'&&active.id===id&&active.isText===isText?resizedPoints(active):points;
+    const shape=E(d,'polygon',{points:preview.map(p=>px(p).join(',')).join(' '),class:css+' dge-frame-hit'+(current?' is-current':''),'vector-effect':'non-scaling-stroke'});
+    shape.dataset[isText?'textRegionId':'graphId']=id;svg.append(shape);
+    const hit=E(d,'polygon',{points:preview.map(p=>px(p).join(',')).join(' '),class:'dge-frame-edge-hit','vector-effect':'non-scaling-stroke'});
+    hit.dataset[isText?'textRegionId':'graphId']=id;hit.dataset.frameResize='true';
+    hit.style.strokeWidth=touch?'24px':'14px';svg.append(hit);
+    return preview;
   };
   for(const region of o.textOnly?[]:o.model.getDocument().graphs){
-    let frame;
-    if(region.region_polygon?.length>=3)frame=E(d,'polygon',{points:region.region_polygon.map(p=>px(p).join(',')).join(' '),class:'dge-overlay-polygon'});
-    else if(region.bbox?.length===4){const b=region.bbox;frame=E(d,'rect',{x:b[0]*w,y:b[1]*h,width:(b[2]-b[0])*w,height:(b[3]-b[1])*h,class:'dge-overlay-bbox'});}
-    if(frame){frame.dataset.graphId=region.id;frame.classList.add('dge-frame-hit');if(region.id===g.id)frame.classList.add('is-current');svg.append(frame);}
+    const points=graphPoints(region);if(!points)continue;
+    frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id);
   }
-
   if(o.textOnly)for(const region of s.regions||[]){
-    outline(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''));
-    const x=Math.min(...region.polygon.map(p=>p[0]))*w,y=Math.min(...region.polygon.map(p=>p[1]))*h;
-    const label=E(d,'text',{x:x+6/scale,y:y+17/scale,class:'dge-text-frame-number'});
+    const points=frame(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''),String(region.id),true,s.selectedId===region.id);
+    const b=boxOf(points),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number'});
     label.textContent=String(region.id);label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);
   }
   const pairs=new Map();for(const e of g.edges){const key=[e.from,e.to].sort().join('/');if(!pairs.has(key))pairs.set(key,[]);pairs.get(key).push(e);}
@@ -346,8 +377,8 @@ function mount(host,o){
    gNode.append(t);svg.append(gNode);
   }
   if(s.start&&coords.has(s.start)){const p=px(coords.get(s.start));svg.append(E(d,'circle',{cx:p[0],cy:p[1],r:radius*1.8,class:'dge-overlay-pending'}));}
-  if(s.polygonDraft?.length)outline(s.polygonDraft,
-     'dge-overlay-polygon-draft'+(s.mode==='text_poly'?' is-text':''));
+  if(active?.kind==='freehand')svg.append(E(d,'polyline',{
+    points:active.points.map(p=>px(p).join(',')).join(' '),class:'dge-freehand-draft','vector-effect':'non-scaling-stroke'}));
   if(active?.kind==='bounds'||active?.kind==='text_bounds'){
     const a=active.start,b=active.end;
     svg.append(E(d,'rect',{x:Math.min(a[0],b[0])*w,y:Math.min(a[1],b[1])*h,
@@ -361,19 +392,28 @@ function mount(host,o){
   pointers.set(e.pointerId,[e.clientX,e.clientY]);
   if(pointers.size===2){const a=[...pointers.values()];base={distance:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),zoom:s.zoom};active=null;ghost=null;return;}if(pointers.size>2)return;
   const node=e.target.closest('[data-vertex-id]')?.dataset.vertexId,edge=e.target.closest('[data-edge-id]')?.dataset.edgeId,handle=e.target.closest('[data-handle-id]')?.dataset.handleId,p=mouse(e),g=o.graph();
+  const hit=e.target.closest('[data-frame-resize]'),graphId=e.target.closest('[data-graph-id]')?.dataset.graphId,
+        textId=e.target.closest('[data-text-region-id]')?.dataset.textRegionId;
+  if(hit && ['select','bounds','graph_poly','text_rect','text_poly'].includes(s.mode) && !e.shiftKey){
+    const region=o.textOnly?s.regions?.find(r=>r.id===Number(textId)):o.model.getDocument().graphs.find(r=>r.id===graphId);
+    const points=o.textOnly?region?.polygon:region&&graphPoints(region);
+    if(points){active={kind:'resize',pointer:e.pointerId,id:o.textOnly?textId:graphId,isText:!!o.textOnly,
+      polygon:o.textOnly?!!region.irregular:!!region.region_polygon,start:p,end:p,points:points.map(p=>[...p]),sides:resizeSides(points,p)};
+      e.preventDefault();svg.setPointerCapture?.(e.pointerId);return;}
+  }
   if(s.mode==='graph_poly'||s.mode==='text_poly'){
-    if(s.polygonDraft.length>=64){status.textContent='轮廓最多64个角点';return;}
-    s.polygonDraft.push(regionPoint(p));draw();return;
+    active={kind:'freehand',pointer:e.pointerId,start:p,end:p,points:[regionPoint(p)],graphId,textId};
+    e.preventDefault();svg.setPointerCapture?.(e.pointerId);draw();return;
   }
   if(s.mode==='vertex'&&g&&!node){e.preventDefault();change(()=>o.model.addVertex(g.id,'',...p),'vertex');return;}
   if(s.mode==='edge'&&g&&node){if(!s.start){s.start=node;draw();}else{const from=s.start;s.start=null;change(()=>o.model.addEdge(g.id,{from,to:node,direction:g.directed===true?'forward':'undirected'}));}return;}
-  if(s.mode==='text_rect')active={kind:'text_bounds',pointer:e.pointerId,start:p,end:p};
+  if(s.mode==='text_rect')active={kind:'text_bounds',pointer:e.pointerId,start:p,end:p,textId};
   else if(s.mode==='pan'||(s.mode==='select'&&e.shiftKey))active={kind:'pan',pointer:e.pointerId,start:[e.clientX,e.clientY],sx:scroll.scrollLeft,sy:scroll.scrollTop};
-  else if(s.mode==='bounds')active={kind:'bounds',pointer:e.pointerId,start:p,end:p};
+  else if(s.mode==='bounds')active={kind:'bounds',pointer:e.pointerId,start:p,end:p,graphId};
   else if(s.mode==='select'&&handle)active={kind:'handle',pointer:e.pointerId,id:handle,start:p,end:p};
   else if(s.mode==='select'&&node)active={kind:'node',pointer:e.pointerId,id:node,start:p,end:p};
   else if(s.mode==='select'&&edge){const item=g.edges.find(e=>e.id===edge);active={kind:'edge',pointer:e.pointerId,id:edge,from:item.from,to:item.to,start:p,end:p};}
-  else if(s.mode==='select')active={kind:'pan',pointer:e.pointerId,start:[e.clientX,e.clientY],sx:scroll.scrollLeft,sy:scroll.scrollTop,graphId:e.target.closest('[data-graph-id]')?.dataset.graphId};
+  else if(s.mode==='select')active={kind:'pan',pointer:e.pointerId,start:[e.clientX,e.clientY],sx:scroll.scrollLeft,sy:scroll.scrollTop,graphId,textId};
   if(active){e.preventDefault();svg.setPointerCapture?.(e.pointerId);}
  });
  svg.addEventListener('pointermove',e=>{
@@ -391,6 +431,15 @@ function mount(host,o){
     return;
   }
   active.end=mouse(e);
+  if(active.kind==='freehand'){
+    const events=e.getCoalescedEvents?.();
+    for(const event of events?.length?events:[e]){
+      const point=regionPoint(mouse(event));
+      if(distance(active.points[active.points.length-1],point)>=2)active.points.push(point);
+    }
+    if(active.points.length>2048)active.points=active.points.filter((_,i)=>i%2===0);
+    draw();return;
+  }
   if(active.kind==='bounds'){const a=regionPoint(active.start),b=regionPoint(active.end);previewRegion([[Math.min(a[0],b[0]),Math.min(a[1],b[1])],[Math.max(a[0],b[0]),Math.min(a[1],b[1])],[Math.max(a[0],b[0]),Math.max(a[1],b[1])],[Math.min(a[0],b[0]),Math.max(a[1],b[1])]]);}
   ghost=active.kind==='node'?{vertex:active.id,pos:active.end}:active.kind==='handle'?{edge:active.id,pos:active.end}:null;draw();
  });
@@ -398,7 +447,24 @@ function mount(host,o){
   pointers.delete(e.pointerId);if(pointers.size<2)base=null;
   if(!active||active.pointer!==e.pointerId)return;const op=active;active=null;ghost=null;const g=o.graph();
   if(!cancel){
-   if(op.kind==='pan'&&Math.hypot(e.clientX-op.start[0],e.clientY-op.start[1])<4){if(op.graphId)o.selectGraph?.(op.graphId);else o.clearSelection?.();}
+   const choose=()=>{if(op.graphId)o.selectGraph?.(op.graphId);else if(op.textId)o.selectTextRegion?.(Number(op.textId));};
+   if(op.kind==='resize'){
+    if(distance(op.start,op.end)>3){
+      const points=resizedPoints(op);
+      if(op.isText)o.resizeTextRegion?.(Number(op.id),points);
+      else {change(()=>o.resizeRegion?.(op.id,points,op.polygon),'region');
+        const owner=o.model.getDocument().graphs.find(r=>r.id===op.id);if(owner&&!owner.edges.length)void scanFigureType(points,op.id);}
+    }else if(op.isText)o.selectTextRegion?.(Number(op.id));else o.selectGraph?.(op.id);
+   }
+   if(op.kind==='freehand'){
+    op.points.push(regionPoint(mouse(e)));
+    const points=simplifyStroke(op.points);
+    if(points.length>=3 && area(points)>=.00002){
+      if(o.textOnly){o.selectionChanged?.(points,true);status.textContent='已框选文字范围';}else commitRegion(points,true);
+    }else if(distance(op.start,op.end)<4)choose();
+    else status.textContent='请用一笔画出有面积的闭合范围';
+   }
+   if(op.kind==='pan'&&Math.hypot(e.clientX-op.start[0],e.clientY-op.start[1])<4){if(op.graphId||op.textId)choose();else o.clearSelection?.();}
    if(op.kind==='edge'&&g){const dx=op.end[0]-op.start[0],dy=op.end[1]-op.start[1];
      if(Math.hypot(dx,dy)>.004)change(()=>o.model.moveEdge(g.id,op.id,dx,dy),'geometry');o.selectEdge?.(op.id);}
    if(op.kind==='node'&&g){if(Math.hypot(op.start[0]-op.end[0],op.start[1]-op.end[1])>.004)change(()=>o.model.moveVertex(g.id,op.id,...op.end),'geometry');o.selectNode?.(op.id);}
@@ -411,9 +477,9 @@ function mount(host,o){
        }
        else{
          s.textRegion=[[box[0],box[1]],[box[2],box[1]],[box[2],box[3]],[box[0],box[3]]];
-         o.selectionChanged?.(s.textRegion);status.textContent='已框选文字范围';
+         o.selectionChanged?.(s.textRegion,false);status.textContent='已框选文字范围';
        }
-     }
+     }else if(distance(op.start,op.end)<4)choose();
    }
    if(op.kind==='handle'&&g){const edge=g.edges.find(x=>x.id===op.id),a=g.vertices.find(x=>x.id===edge?.from),b=g.vertices.find(x=>x.id===edge?.to);if(a&&b&&finite(a.x)&&finite(a.y)&&finite(b.x)&&finite(b.y))change(()=>o.model.setEdgePath(g.id,op.id,[[a.x,a.y],op.end,[b.x,b.y]]),'geometry');else status.textContent='请先校准这条边的两个端点';}
   }draw();
@@ -423,7 +489,9 @@ function mount(host,o){
  image.onload=()=>{w=image.naturalWidth||1000;h=image.naturalHeight||1000;loaded=true;fitImage();syncOriginal();buildSampler();draw();};
  image.onerror=()=>{status.textContent='原图未能显示，可使用下方结构编辑';};image.src=o.originalUrl;zoom(s.zoom);draw();
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();}):null;observer?.observe(scroll);observer?.observe(viewControls);
- return {refresh:draw,state:s,destroy(){observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
+ const resetInteraction=()=>{active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
+ svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
+ return {refresh:draw,resetInteraction,state:s,destroy(){observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
 root.DMateGraphOverlay={mount};if(typeof module!=='undefined'&&module.exports)module.exports={mount};
 })(typeof window!=='undefined'?window:globalThis);

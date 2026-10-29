@@ -23,7 +23,7 @@
         let individually = false, saving = false, destroyed = false, notice = '', pendingDelete = '';
         // "Is this a question?" is a per-upload choice, separate from graph data.
         let isQuestion = options.isQuestion !== false;
-        let unsubscribe, overlay = null, textOverlay = null, activeTab = 'image', textBusy = false, textTimer = null, refreshTextPanel = null, runTextQueue = null;
+        let unsubscribe, overlay = null, textOverlay = null, activeTab = 'image', textBusy = false, textTimer = null, refreshTextPanel = null, runTextQueue = null, recognitionEpoch = 0;
         const textState = options.textState || { mode: 'text_rect', zoom: 100, visible: true };
         let requirements = String(options.requirements || '');
         const hasDirection = graph => graph.directed === true || graph.directed !== false &&
@@ -326,7 +326,7 @@
                 panel.querySelector('summary').textContent = '文字识别结果（' + rows.filter(r => r.status === 'done').length + '/' + rows.length + '）';
                 const queued = rows.filter(r => r.status === 'queued').length;
                 const failed = rows.filter(r => ['error','empty'].includes(r.status)).length;
-                status.textContent = textBusy ? '正在按编号识别，新增框会接着处理…'
+                status.textContent = textBusy && rows.some(r=>r.status==='recognizing') ? '正在按编号识别，新增框会接着处理…'
                     : queued ? '已框选，准备按编号一次识别…'
                     : failed ? '部分文字框未识别完成，请查看对应编号并重试。'
                     : rows.length ? '已按框编号顺序汇总。' : '连续框选即可自动识别，支持多个文字框。';
@@ -383,9 +383,17 @@
                 instance: instance + '-text', originalUrl: options.originalUrl,
                 state: textState, textOnly: true, model, graph: () => null,
                 disabled: () => saving || destroyed,
-                selectionChanged: points => {
+                selectTextRegion: id => { textState.selectedId=id; panel.open=true; refreshTextPanel(); },
+                resizeTextRegion: (id,points) => {
+                    const previous=textState.regions.find(r=>r.id===id);
+                    if(!previous)return;
+                    textState.regions=textState.regions.map(r=>r.id===id?{...r,polygon:points.map(p=>[...p]),text:'',error:'',status:'queued'}:r);
+                    if(!textState.manuallyEdited && previous.text)applyResults();
+                    refreshTextPanel(); schedule();
+                },
+                selectionChanged: (points,irregular=false) => {
                     if (points) {
-                        textState.regions.push({id:textState.nextId++, polygon:points.map(p => [...p]), status:'queued', text:''});
+                        textState.regions.push({id:textState.nextId++, polygon:points.map(p => [...p]), irregular, status:'queued', text:''});
                         schedule();
                     } else {
                         const hadText = textState.regions.some(r => r.text?.trim());
@@ -441,11 +449,16 @@
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
             const top = element('div', 'dge-topline');
             // The toolbar already names its actions; keep the dialog compact.
-            const undo = button('撤销', () => { pendingDelete = ''; model.undo(); }); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
-            const redo = button('重做', () => { pendingDelete = ''; model.redo(); });
+            const undo = button('↶', () => { pendingDelete = ''; model.undo(); }); undo.setAttribute('aria-label','撤销'); undo.title='撤销'; undo.classList.add('dge-history-arrow'); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
+            const redo = button('↷', () => { pendingDelete = ''; model.redo(); }); redo.setAttribute('aria-label','重做'); redo.title='重做'; redo.classList.add('dge-history-arrow');
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
             top.append(questionChoice(), undo, redo,
-                button('清空修改', () => askDelete('reset', '将撤销本张图片的全部修改。', () => model.reset())));
+                button('清空', () => {
+                    recognitionEpoch++; pendingDelete=''; model.reset(); selectedNodes.clear(); selectedEdge=null; selectedGraph=false;
+                    overlay?.resetInteraction(); textOverlay?.resetInteraction();
+                    clearTimeout(textTimer); textTimer=null; textState.regions=[]; textState.nextId=1; textState.selectedId=null; textState.manuallyEdited=false; textState.assemblyError='';
+                    refreshTextPanel?.();
+                }));
             container.append(top);
             if (useOverlay) {
                 const tabs = element('div', 'dge-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '识别方式');
@@ -488,6 +501,11 @@
                         selectedNodes.clear();selectedEdge=null;
                         return currentGraph;
                     },
+                    resizeRegion: (id,points,polygon) => {
+                        currentGraph=id; selectedNodes.clear(); selectedEdge=null; selectedGraph=true;
+                        if(polygon)model.setGraphPolygon(id,points);
+                        else {const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);model.setGraphBounds(id,[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)]);}
+                    },
                     disabled: () => saving || destroyed,
                     ensureGraph:()=>{if(!model.getDocument().graphs.length)currentGraph=model.addGraph();return currentGraph;},
                     selectGraph:id=>{for(const k of Object.keys(panelState))panelState[k]=false;currentGraph=id;selectedNodes.clear();selectedEdge=null;selectedGraph=true;render();},
@@ -502,9 +520,11 @@
                         else render();
                     },
                     recognizeGraphType: async (polygon, graphId) => {
+                        const epoch=recognitionEpoch;
                         if (typeof options.onRecognizeGraphType !== 'function')
                             throw new Error('当前无法自动判断箭头与权值');
                         const result = await options.onRecognizeGraphType(polygon);
+                        if(epoch!==recognitionEpoch || destroyed)return {stale:true};
                         // Another frame may have been drawn while the async read
                         // was underway. Never apply old metadata to new pixels.
                         const graph = model.getDocument().graphs.find(row => row.id === graphId);
@@ -563,10 +583,8 @@
                     toolbar.append(element('span', 'dge-detected-type', direction + ' · ' + weight));
                 }
             }
-            toolbar.append(button('添加子图', () => { currentGraph = model.addGraph(); selectedNodes.clear(); selectedEdge = null; }));
             if (graph) {
                 toolbar.append(field('子图名称', input(graph.name, '子图名称', value => model.renameGraph(graph.id, value))));
-                toolbar.append(button('删除子图', () => removeGraph(graph.id), 'dge-danger'));
             }
             container.insertBefore(toolbar, workspace);
             if (graph) {
@@ -662,7 +680,7 @@
             // The dialog header contains the close button; footer is save only.
             const actions = element('div', 'dge-actions');
             const confirm = button(saving ? '正在保存…' : '保存并确认', async () => {
-                if (textBusy || textState.regions?.some(r => ['queued','recognizing'].includes(r.status))) { notice = '文字正在识别，请等待完成后保存。'; refreshDraftViews(); return; }
+                if (textState.regions?.some(r => ['queued','recognizing'].includes(r.status))) { notice = '文字正在识别，请等待完成后保存。'; refreshDraftViews(); return; }
                 if ([...container.querySelectorAll('input[type=number]')].some(control => !control.checkValidity())) {
                     notice = '请填写有效的相同边数量（1 到 50）。'; refreshDraftViews(); return;
                 }
