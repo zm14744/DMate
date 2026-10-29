@@ -27,6 +27,9 @@ on:
       - 'tests/test_nonquestion_image_context.py'
       - 'static/image-groups.css'
       - 'static/modal-chrome.css'
+      - 'static/delete-confirm.js'
+      - 'tests/test_delete_confirmation.py'
+      - 'tests/test_delete_confirmation_style.py'
       - 'tests/test_modal_chrome.py'
       - 'tests/test_editor_toolbar_chrome.py'
       - 'tests/test_editor_dialog_position.py'
@@ -103,6 +106,8 @@ jobs:
             tests/test_ai_answer_rendering.py \
             tests/test_interaction_surfaces.py \
             tests/test_modal_chrome.py \
+            tests/test_delete_confirmation.py \
+            tests/test_delete_confirmation_style.py \
             tests/test_editor_toolbar_chrome.py \
             tests/test_editor_dialog_position.py \
             tests/test_drawing_fit.py \

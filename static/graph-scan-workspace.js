@@ -23,7 +23,7 @@ function mount(container,options){
  for(const row of [...state.graphRegions,...state.textRegions]){if(row.status==='running')row.status='queued';if(row.selected===undefined)row.selected=true;}
  for(const row of state.textRegions){if(!usable(row))row.text='';else if(!String(row.text||'').trim())row.status='empty';}
  let document=copy(nativeDocument),destroyed=false,saving=false,graphBusy=false,textBusy=false,textTimer=null;
- let lastEmitted=JSON.stringify(options.document||{body_text:'',graphs:[]}),picker=null,pickerFrame=null,draggedSource=null,renderedPickerKey='';
+ let lastEmitted=JSON.stringify(options.document||{body_text:'',graphs:[]}),picker=null,pickerFrame=null,draggedSource=null,renderedPickerKey='',deletePending=null;
  const active=new Set(),el=(tag,cls,text)=>{const n=d.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
  const button=(text,fn)=>{const n=el('button','',text);n.type='button';n.disabled=saving;n.addEventListener('click',event=>{if(!saving)fn(event);});return n;};
  const left=el('section','dgs-source'),right=el('aside','dgs-information'),workspace=el('div','dgs-workspace');right.setAttribute('aria-label','识别信息');
@@ -35,6 +35,7 @@ function mount(container,options){
  const requestLabel=el('label','dgs-requirements-label','要求（可选）'),request=el('textarea','dgs-requirements');request.rows=2;request.maxLength=4000;request.value=options.requirements||'';request.setAttribute('aria-label','要求（可选）');request.addEventListener('input',()=>options.onRequirementsChange?.(request.value));requestLabel.append(request);
  const footer=el('div','dge-footer'),confirm=button('保存',async()=>{if(pending()||saving)return;saving=true;refresh();try{await options.onConfirm(copy(document),options.isQuestion!==false);}catch(error){status.textContent=error?.message||'确认失败，请重试。';}finally{saving=false;if(!destroyed)refresh();}});confirm.classList.add('dge-primary');footer.append(confirm);
  const content=el('div','dgs-content');content.append(modes,workspace,requestLabel);container.replaceChildren(content,footer);container.classList.add('dmate-graph-editor','dmate-graph-scan');
+ let contentClip=null;
  // Stay in the native dialog's top layer without taking space from either
  // information card or being clipped by their independent scroll containers.
  const pickerLayer=el('div','dmate-graph-editor dgs-source-picker-layer');
@@ -59,6 +60,19 @@ function mount(container,options){
  function changeGraph(row,points,irregular,activateSource=true){row.polygon=copy(points);row.irregular=irregular;row.version=(row.version||0)+1;row.status='queued';row.error='';row.graphs=[];if(activateSource)activate('graph');emit();refresh();void pumpGraphs();}
  function changeText(row,points,irregular,activateSource=true){row.polygon=copy(points);row.irregular=irregular;row.version=(row.version||0)+1;row.status='queued';row.error='';row.text='';if(activateSource)activate('text');emit();refresh();clearTimeout(textTimer);textTimer=setTimeout(pumpText,450);}
  function remove(row,kind){row.controller?.abort();const list=rows(kind),index=list.indexOf(row);if(index<0)return;list.splice(index,1);if(kind==='graph'&&state.selectedGraphId===row.id)state.selectedGraphId=null;if(kind==='text'&&overlayState.selectedId===row.id)overlayState.selectedId=null;emit();refresh();overlay.refresh();}
+ async function requestRemove(row,kind){
+  if(destroyed||saving||deletePending||!rows(kind).includes(row))return;
+  const op={row,kind,version:row.version,polygon:JSON.stringify(row.polygon),mode:state.mode};deletePending=op;
+  try{
+   const settings={title:'删除这个'+(kind==='graph'?'图形框':'文字框')+'？',body:'删除后无法恢复。\n'+label(row,kind),confirmText:'删除'+(kind==='graph'?'图形框':'文字框')};
+   if(typeof options.confirmDelete!=='function'&&!root.DMateDeleteConfirm?.request)throw new Error('删除确认界面未加载，请刷新后重试。');
+   const confirmed=await (typeof options.confirmDelete==='function'?options.confirmDelete(settings):root.DMateDeleteConfirm.request(container,settings));
+   if(!confirmed||destroyed||saving||deletePending!==op||state.mode!==op.mode||!rows(kind).includes(row)||row.version!==op.version||JSON.stringify(row.polygon)!==op.polygon)return;
+   remove(row,kind);
+   const focus=pickerLayer.querySelector('input,button')||container.querySelector('[data-source-picker="'+kind+'"]');focus?.focus({preventScroll:true});
+  }catch(error){if(!destroyed)status.textContent=error?.message||'无法确认删除，请重试。';}
+  finally{if(deletePending===op)deletePending=null;}
+ }
  function reorder(kind,sourceId,targetId){const list=rows(kind),from=list.findIndex(row=>String(row.id)===sourceId),to=list.findIndex(row=>String(row.id)===targetId);if(from<0||to<0||from===to)return;const [row]=list.splice(from,1);list.splice(to,0,row);emit();refresh();}
  function closePicker(){picker=null;refresh();}
  function openPicker(kind){if(state.mode!=='manual')return;if(picker===kind){closePicker();return;}picker=kind;refresh();}
@@ -71,7 +85,14 @@ function mount(container,options){
   const anchor=container.querySelector('[data-source-picker="'+picker+'"]')?.getBoundingClientRect(),rect=box.getBoundingClientRect();
   const x=Math.max(left,Math.min((anchor?.right||right)-rect.width,right-rect.width));
   let y=(anchor?.bottom||top)+8;if(y+rect.height>bottom)y=(anchor?.top||bottom)-rect.height-8;
-  y=Math.max(top,Math.min(y,bottom-rect.height));box.style.left=x+'px';box.style.top=y+'px';box.style.visibility='visible';
+  y=Math.max(top,Math.min(y,bottom-rect.height));box.style.left=x+'px';box.style.top=y+'px';
+  // Keep the popup translucent without painting information-card borders or
+  // text through its title. The portaled picker is outside this paint-only
+  // hole, so the wallpaper and panel alpha remain intact and layout is stable.
+  if(contentClip===null)contentClip=content.style.clipPath;
+  const behind=content.getBoundingClientRect(),a=x-behind.left,b=y-behind.top,c=a+rect.width,e=b+rect.height;
+  content.style.clipPath='polygon(evenodd,0 0,100% 0,100% 100%,0 100%,0 0,'+[a+'px '+b+'px',c+'px '+b+'px',c+'px '+e+'px',a+'px '+e+'px',a+'px '+b+'px'].join(',')+')';
+  box.style.visibility='visible';
  }
  function queuePickerPosition(){if(picker&&!pickerFrame)pickerFrame=d.defaultView.requestAnimationFrame(positionPicker);}
  function sourcePicker(kind){
@@ -83,7 +104,7 @@ function mount(container,options){
    const card=el('div','dgs-source-card');card.dataset.sourceId=String(row.id);
    const name=label(row,kind).replace('框 ','框');
    card.append(check(name,row.selected!==false,value=>{row.selected=value;emit();refresh();}));
-   const removeButton=button('',()=>remove(row,kind));removeButton.className='dgs-source-delete dmate-close-dot';removeButton.setAttribute('aria-label','删除'+name);removeButton.title='删除';card.append(removeButton);
+   const removeButton=button('',()=>{void requestRemove(row,kind);});removeButton.className='dgs-source-delete dmate-close-dot';removeButton.setAttribute('aria-label','删除'+name);removeButton.title='删除';card.append(removeButton);
    card.draggable=!saving;card.addEventListener('dragstart',event=>{draggedSource={kind,id:String(row.id)};event.dataTransfer?.setData('text/plain',String(row.id));});
    card.addEventListener('dragover',event=>{if(draggedSource?.kind===kind)event.preventDefault();});
    card.addEventListener('drop',event=>{event.preventDefault();if(draggedSource?.kind===kind)reorder(kind,draggedSource.id,String(row.id));draggedSource=null;});card.addEventListener('dragend',()=>{draggedSource=null;});
@@ -112,7 +133,7 @@ function mount(container,options){
   // checkbox or drag target underneath an in-progress pointer action.
   const pickerKey=state.mode==='manual'&&picker?JSON.stringify([picker,saving,rows(picker).map(row=>[String(row.id),row.selected!==false])]):'';
   if(pickerKey!==renderedPickerKey){const focused=d.activeElement?.getAttribute('aria-label');pickerLayer.replaceChildren();if(pickerKey){pickerLayer.append(sourcePicker(picker));positionPicker();if(focused)for(const node of pickerLayer.querySelectorAll('[aria-label]'))if(node.getAttribute('aria-label')===focused)node.focus({preventScroll:true});}renderedPickerKey=pickerKey;}
-  if(pickerKey)positionPicker();
+  if(pickerKey)positionPicker();else if(contentClip!==null){content.style.clipPath=contentClip;contentClip=null;}
  }
  async function pumpGraphs(){
   if(graphBusy||destroyed)return;graphBusy=true;
@@ -153,14 +174,14 @@ function mount(container,options){
   }catch(error){queued.forEach((row,index)=>{if(!destroyed&&row.version===versions[index]&&state.textRegions.includes(row)){row.text='';row.status='error';row.error=error?.message||'文字识别失败，请重试。';}});}
   finally{active.delete(controller);textBusy=false;if(!destroyed){emit();refresh();if(state.textRegions.some(row=>row.status==='queued'))void pumpText();}}
  }
- const outsidePicker=event=>{if(picker&&!pickerLayer.contains(event.target)&&!event.target.closest?.('[data-source-picker]'))closePicker();};
- const escapePicker=event=>{if(picker&&event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closePicker();}};
+ const outsidePicker=event=>{if(!deletePending&&picker&&!pickerLayer.contains(event.target)&&!event.target.closest?.('[data-source-picker]'))closePicker();};
+ const escapePicker=event=>{if(!deletePending&&picker&&event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closePicker();}};
  d.addEventListener('pointerdown',outsidePicker,true);d.addEventListener('keydown',escapePicker,true);d.addEventListener('scroll',queuePickerPosition,true);d.defaultView.addEventListener('resize',queuePickerPosition);
  const overlay=root.DMateGraphOverlay.mount(left,{scanOnly:true,originalUrl:options.originalUrl,state:overlayState,model:{getDocument:()=>({graphs:frames()})},graph:()=>({id:state.selectedGraphId,vertices:[],edges:[]}),disabled:()=>saving,
   createRegion:(points,irregular)=>{const row={id:'g'+state.nextGraph++,graphs:[],selected:false};state.graphRegions.push(row);state.selectedGraphId=row.id;changeGraph(row,points,irregular);showNewSource('graph',row);return row.id;},resizeRegion:(id,points,irregular)=>{const row=state.graphRegions.find(r=>r.id===id);if(row)changeGraph(row,points,irregular);},selectGraph:id=>{state.selectedGraphId=id;},
   selectionChanged:(points,irregular)=>{if(!points)return;const row={id:state.nextText++,selected:false};state.textRegions.push(row);changeText(row,points,irregular);showNewSource('text',row);},resizeTextRegion:(id,points)=>{const row=state.textRegions.find(r=>r.id===id);if(row)changeText(row,points,row.irregular);},selectTextRegion:id=>{overlayState.selectedId=id;},clearSelection:()=>{state.selectedGraphId=null;overlayState.selectedId=null;}});
  assemble();if(migratingMixedManual)emit();else lastEmitted=JSON.stringify(document);refresh();void pumpGraphs();if(state.textRegions.some(r=>r.status==='queued'))void pumpText();
- return{getDocument:()=>copy(document),destroy(){destroyed=true;clearTimeout(textTimer);if(pickerFrame)d.defaultView.cancelAnimationFrame(pickerFrame);d.removeEventListener('pointerdown',outsidePicker,true);d.removeEventListener('keydown',escapePicker,true);d.removeEventListener('scroll',queuePickerPosition,true);d.defaultView.removeEventListener('resize',queuePickerPosition);pickerLayer.remove();for(const controller of active)controller.abort();overlay.destroy();container.replaceChildren();container.classList.remove('dmate-graph-editor','dmate-graph-scan');}};
+ return{getDocument:()=>copy(document),destroy(){destroyed=true;deletePending=null;root.DMateDeleteConfirm?.cancel(container);if(contentClip!==null)content.style.clipPath=contentClip;clearTimeout(textTimer);if(pickerFrame)d.defaultView.cancelAnimationFrame(pickerFrame);d.removeEventListener('pointerdown',outsidePicker,true);d.removeEventListener('keydown',escapePicker,true);d.removeEventListener('scroll',queuePickerPosition,true);d.defaultView.removeEventListener('resize',queuePickerPosition);pickerLayer.remove();for(const controller of active)controller.abort();overlay.destroy();container.replaceChildren();container.classList.remove('dmate-graph-editor','dmate-graph-scan');}};
 }
 root.DMateGraphScan={mount};
 })(typeof window!=='undefined'?window:globalThis);

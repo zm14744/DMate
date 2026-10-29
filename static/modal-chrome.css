@@ -75,3 +75,103 @@
 @media(max-width:680px) {
     .dcn-dialog > .dcn-heading { margin:-14px -14px -11px; }
 }
+
+/* Native confirmations can open above the image/drawing dialog. They share
+   the notebook confirmation's compact header, body and action layout. */
+.dmate-delete-confirm {
+    position:fixed;
+    inset:0;
+    box-sizing:border-box;
+    width:min(440px,calc(100vw - 32px));
+    max-width:calc(100vw - 32px);
+    max-height:calc(100dvh - 48px);
+    margin:auto;
+    padding:0;
+    border:1px solid var(--border-strong,#cbd5e1);
+    border-radius:18px;
+    background:rgba(var(--surface-2-rgb,248,250,252),var(--panel-alpha,1));
+    color:var(--text-primary,#1e293b);
+    font:inherit;
+    box-shadow:0 20px 64px rgba(0,0,0,.38);
+    overflow:hidden;
+}
+.dmate-delete-confirm[open] { display:flex; flex-direction:column; }
+.dmate-delete-confirm::backdrop { background:rgba(0,0,0,.46); }
+.dmate-delete-confirm[data-positioning],
+.dmate-delete-confirm[data-positioning] *,
+.dmate-delete-confirm[data-positioning]::backdrop { visibility:hidden!important; pointer-events:none!important; }
+.dmate-delete-confirm-head {
+    display:flex;
+    flex:0 0 auto;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:14px 16px;
+    border-bottom:1px solid var(--border-strong,#cbd5e1);
+}
+.dmate-delete-confirm .dmate-delete-confirm-title { margin:0; min-width:0; font:inherit; font-size:17px; font-weight:600; line-height:1.5; }
+.dmate-delete-confirm-body { flex:0 1 auto; min-height:0; overflow:auto; margin:0; padding:17px 18px 12px; font-size:15px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+.dmate-delete-confirm-actions { display:flex; flex:0 0 auto; justify-content:flex-end; gap:10px; padding:12px 18px 18px; }
+.dmate-delete-confirm .dmate-delete-confirm-close {
+    appearance:none;
+    -webkit-appearance:none;
+    display:block;
+    flex:0 0 20px;
+    width:20px;
+    min-width:20px;
+    max-width:20px;
+    height:20px;
+    min-height:20px;
+    max-height:20px;
+    margin:0;
+    padding:0;
+    border:0;
+    border-radius:50%;
+    background:#ef4444;
+    color:transparent;
+    font-size:0;
+    cursor:pointer;
+}
+
+/* The old desktop confirmation never received the mobile action styling.
+   Explicit shared declarations prevent generic danger text rules from turning
+   a delete action into a small gray button with pink text. */
+@layer dmate-delete-confirm-actions {
+    #appConfirmModal .app-confirm-actions { gap:10px!important; padding:12px 18px 18px!important; }
+    #appConfirmModal #appConfirmConfirm.danger,
+    .account-delete-actions > #accountDeleteConfirm.danger,
+    .dcn-confirm-actions > .dcn-confirm-delete,
+    .dmate-delete-confirm-actions > .dmate-delete-confirm-delete {
+        display:inline-flex!important;
+        align-items:center!important;
+        justify-content:center!important;
+        box-sizing:border-box!important;
+        min-height:42px!important;
+        min-width:90px!important;
+        width:auto!important;
+        height:auto!important;
+        margin:0!important;
+        padding:10px 14px!important;
+        border:1px solid #dc2626!important;
+        border-radius:10px!important;
+        background:#dc2626!important;
+        color:#fff!important;
+        -webkit-text-fill-color:#fff!important;
+        font:inherit!important;
+        font-size:14px!important;
+        font-weight:600!important;
+        line-height:1.4!important;
+        text-align:center!important;
+        white-space:normal!important;
+        cursor:pointer!important;
+        filter:none!important;
+    }
+    #appConfirmModal #appConfirmConfirm.danger:enabled:hover,
+    .account-delete-actions > #accountDeleteConfirm.danger:enabled:hover,
+    .dcn-confirm-actions > .dcn-confirm-delete:enabled:hover,
+    .dmate-delete-confirm-actions > .dmate-delete-confirm-delete:enabled:hover { background:#b91c1c!important; border-color:#b91c1c!important; }
+    #appConfirmModal #appConfirmConfirm.danger:disabled,
+    .account-delete-actions > #accountDeleteConfirm.danger:disabled,
+    .dcn-confirm-actions > .dcn-confirm-delete:disabled,
+    .dmate-delete-confirm-actions > .dmate-delete-confirm-delete:disabled { opacity:.5; cursor:wait!important; }
+}

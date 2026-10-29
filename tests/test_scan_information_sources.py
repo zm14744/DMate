@@ -45,6 +45,7 @@ def test_native_scan_is_not_replaced_by_late_or_deleted_region(scan_page):
     page.get_by_role('tab', name='自主框选', exact=True).click()
     open_picker(page, 'graph')
     page.get_by_role('button', name='删除图形框1', exact=True).click()
+    page.get_by_role('dialog', name='删除这个图形框？', exact=True).get_by_role('button', name='删除图形框', exact=True).click()
     assert page.locator('.dge-overlay-bbox').count() == 0
     page.get_by_role('tab', name='原生识别', exact=True).click()
     assert page.evaluate('ocrTasks.get("scan").draft') == original
@@ -80,6 +81,7 @@ def test_graph_sources_multiselect_queue_order_delete_and_restore(scan_page):
     assert native_snapshot(page) == original
     open_picker(page, 'graph')
     page.get_by_role('button', name='删除图形框1', exact=True).click()
+    page.get_by_role('dialog', name='删除这个图形框？', exact=True).get_by_role('button', name='删除图形框', exact=True).click()
     assert page.evaluate('ocrTasks.get("scan").draft.graphs.map(g=>g.id)') == ['g3_1']
     page.get_by_role('tab', name='原生识别', exact=True).click()
     assert page.evaluate('ocrTasks.get("scan").draft') == original
@@ -340,6 +342,7 @@ def test_source_picker_floats_without_reflow_and_only_has_choices_and_red_delete
         checkbox.check()
     assert page.evaluate('ocrTasks.get("scan").draft.body_text') == '文字区域 1\n\n文字区域 2'
     page.get_by_role('button', name='删除文字框1', exact=True).click()
+    page.get_by_role('dialog', name='删除这个文字框？', exact=True).get_by_role('button', name='删除文字框', exact=True).click()
     assert page.evaluate('ocrTasks.get("scan").draft.body_text') == '文字区域 2'
     assert page.locator('.dge-overlay-text-region').count() == 1
     assert native_snapshot(page) == original
@@ -434,3 +437,151 @@ def test_picker_is_placed_before_focus_restoration_and_first_visible_frames(scan
     assert page.locator('.dgs-source-picker').count() == 0
     assert page.locator('#graphEditorDialog').evaluate('e=>e.open')
     assert page.evaluate('ocrTasks.get("scan").draft.body_text') == '文字 1'
+
+
+def install_completed_pair(page):
+    page.evaluate('''()=>{
+      const graph=structuredClone(sample.graphs[0]);graph.id='g1_1';
+      const polygon=[[.1,.1],[.4,.1],[.4,.4],[.1,.4]];
+      ocrTasks.get('scan').scanState={sourcesVersion:3,mode:'manual',
+        graphRegions:[{id:'g1',version:1,status:'complete',selected:true,polygon,graphs:[graph]}],
+        textRegions:[{id:1,version:1,status:'complete',selected:true,polygon,text:'保留的文字区域'}]};
+    }''')
+
+
+@pytest.mark.parametrize('kind', ['graph', 'text'])
+def test_both_source_pickers_require_confirmation_and_cancel_preserves_every_frame(scan_page, kind):
+    page = scan_page
+    install_completed_pair(page)
+    open_scan(page)
+    original = native_snapshot(page)
+    before = page.evaluate('structuredClone(ocrTasks.get("scan").draft)')
+    open_picker(page, kind)
+    noun = '图形框' if kind == 'graph' else '文字框'
+    delete = page.get_by_role('button', name='删除' + noun + '1', exact=True)
+    delete.focus()
+    delete.evaluate('button=>{button.click();button.click();}')
+    prompt = page.get_by_role('dialog', name='删除这个' + noun + '？', exact=True)
+    prompt.wait_for(state='visible')
+    assert prompt.count() == 1 and prompt.is_visible()
+    assert page.evaluate('ocrTasks.get("scan").draft') == before
+    assert page.locator('.dge-overlay-bbox').count() == page.locator('.dge-overlay-text-region').count() == 1
+    assert prompt.get_by_role('button', name='取消', exact=True).count() == 0
+    prompt.get_by_role('button', name='取消删除', exact=True).click()
+    assert delete.evaluate('button=>document.activeElement===button')
+    assert page.locator('.dgs-source-picker').is_visible()
+    assert page.evaluate('ocrTasks.get("scan").draft') == before
+    delete.click()
+    page.keyboard.press('Escape')
+    assert prompt.count() == 0
+    assert page.locator('#graphEditorDialog').evaluate('dialog=>dialog.open')
+    assert page.locator('.dgs-source-picker').is_visible()
+    delete.click()
+    prompt.get_by_role('button', name='删除' + noun, exact=True).click()
+    field = 'graphRegions' if kind == 'graph' else 'textRegions'
+    other = 'textRegions' if kind == 'graph' else 'graphRegions'
+    page.wait_for_function('(field)=>ocrTasks.get("scan").scanState[field].length===0', arg=field)
+    assert page.evaluate('(field)=>ocrTasks.get("scan").scanState[field].length', other) == 1
+    assert native_snapshot(page) == original
+    assert page.locator('.dgs-source-picker').is_visible()
+
+
+@pytest.mark.parametrize('kind', ['graph', 'text'])
+def test_changed_or_closed_source_confirmation_cannot_delete_a_different_frame(scan_page, kind):
+    page = scan_page
+    install_completed_pair(page)
+    open_scan(page)
+    open_picker(page, kind)
+    noun = '图形框' if kind == 'graph' else '文字框'
+    field = 'graphRegions' if kind == 'graph' else 'textRegions'
+    delete = page.get_by_role('button', name='删除' + noun + '1', exact=True)
+    delete.click()
+    page.evaluate('(field)=>ocrTasks.get("scan").scanState[field][0].version++', field)
+    page.get_by_role('dialog', name='删除这个' + noun + '？', exact=True).get_by_role('button', name='删除' + noun, exact=True).click()
+    assert page.evaluate('(field)=>ocrTasks.get("scan").scanState[field].length', field) == 1
+    delete.click()
+    page.evaluate('''()=>{
+      window.oldSourceDelete=document.querySelector('.dmate-delete-confirm-delete');
+      document.getElementById('graphEditorDialog').close();
+    }''')
+    page.wait_for_function('ocrEditorTaskId===null')
+    assert page.locator('.dmate-delete-confirm').count() == 0
+    open_scan(page)
+    page.evaluate('oldSourceDelete.click()')
+    assert page.evaluate('(field)=>ocrTasks.get("scan").scanState[field].length', field) == 1
+    assert page.locator('.dgs-content').evaluate('node=>node.style.clipPath') == ''
+
+
+def test_deleted_text_frame_ignores_late_recognition_after_confirmation(scan_page):
+    page = scan_page
+    page.evaluate('''()=>{
+      const originalFetch=window.fetch;
+      window.fetch=async(url,options)=>{
+        if(url!=='/graph/text-region')return originalFetch(url,options);
+        const regions=JSON.parse(options.body.get('regions'));textCalls.push(regions);
+        return new Promise(resolve=>window.resolveText=()=>resolve({ok:true,json:async()=>({
+          request_id:'scan',source_sha256:'a'.repeat(64),regions:regions.map(row=>({id:row.id,text:'迟到的结果'}))})}));
+      };
+    }''')
+    open_scan(page)
+    original = native_snapshot(page)
+    page.get_by_role('button', name='文字框选', exact=True).click()
+    drag(page, [(.1, .1), (.5, .3)])
+    page.wait_for_function('textCalls.length===1')
+    page.get_by_role('button', name='删除文字框1', exact=True).click()
+    page.get_by_role('dialog', name='删除这个文字框？', exact=True).get_by_role('button', name='删除文字框', exact=True).click()
+    page.evaluate('resolveText()')
+    page.wait_for_function('ocrTasks.get("scan").scanState.textRegions.length===0')
+    assert page.evaluate('ocrTasks.get("scan").draft') == {'body_text': '', 'graphs': []}
+    assert native_snapshot(page) == original
+
+
+@pytest.mark.parametrize('theme', ['light', 'dark', 'navy'])
+@pytest.mark.parametrize('alpha', [.75, 1])
+def test_translucent_picker_occludes_underlying_lines_without_changing_panel_alpha(scan_page, theme, alpha):
+    import io
+    from PIL import Image
+    from test_editor_toolbar_chrome import install_production_appearance
+
+    page = scan_page
+    install_production_appearance(page)
+    page.evaluate('''({theme,alpha})=>{
+      document.documentElement.dataset.appearanceTheme=theme;document.body.dataset.appearanceTheme=theme;
+      document.documentElement.style.setProperty('--panel-alpha',String(alpha));
+      ocrTasks.get('scan').scanState={sourcesVersion:3,mode:'manual',graphRegions:[],textRegions:[]};
+    }''', {'theme': theme, 'alpha': alpha})
+    open_scan(page)
+    choose = page.get_by_role('button', name='选择文字信息', exact=True)
+    choose.scroll_into_view_if_needed()
+    image_bounds = page.locator('.dge-overlay-image').bounding_box()
+    prior_clip = 'inset(0px)' if alpha == 1 else ''
+    page.locator('.dgs-content').evaluate('(node,value)=>node.style.clipPath=value', prior_clip)
+    choose.click()
+    popup = page.get_by_role('dialog', name='选择文字来源', exact=True)
+    before = Image.open(io.BytesIO(page.screenshot())).convert('RGB')
+    point = popup.locator('.dgs-source-picker-head').evaluate('''head=>{
+      const r=head.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};
+    }''')
+    fill = popup.evaluate('node=>getComputedStyle(node).backgroundColor')
+    if alpha < 1:
+        assert fill.startswith('rgba(') and fill.endswith(', 0.75)')
+    else:
+        assert fill.startswith('rgb(')
+    page.evaluate('''point=>{
+      const line=document.createElement('div');line.id='underlyingSourceLine';
+      line.style.cssText='position:fixed;left:0;width:100vw;height:3px;background:#ff00ff;pointer-events:none;z-index:0';
+      line.style.top=(point.y-1)+'px';document.querySelector('.dgs-content').append(line);
+    }''', point)
+    after = Image.open(io.BytesIO(page.screenshot())).convert('RGB')
+    # A high-contrast underlying line cannot pass through either the popup
+    # header text or its translucent fill; it still exists beneath the popup.
+    x, y = round(point['x']), round(point['y'])
+    assert before.getpixel((x, y)) == after.getpixel((x, y))
+    assert page.locator('.dge-overlay-image').bounding_box() == pytest.approx(image_bounds, abs=1)
+    assert page.locator('.dgs-content').evaluate('node=>getComputedStyle(node).clipPath').startswith('polygon(evenodd,')
+    size = page.viewport_size['width']
+    page.screenshot(path=f'/tmp/dmate-source-title-uncovered-{theme}-{alpha}-{size}.png')
+    choose.click()
+    assert page.locator('.dgs-content').evaluate('node=>node.style.clipPath') == prior_clip
+    uncovered = Image.open(io.BytesIO(page.screenshot())).convert('RGB')
+    assert uncovered.getpixel((x, y)) == (255, 0, 255)

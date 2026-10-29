@@ -13,7 +13,7 @@
   if(!root.DMateGraphEditor?.mount)throw new Error('绘图模块未加载，请刷新后重试。');
   const key=String(options.storageKey||'dmate:graph-gallery:v1:guest');
   let pages=[],activeId='',editor=null,timer=null,destroyed=false,persistError='',aiAbort=null,aiEpoch=0,exportBusy=false,panelMode='',uploadBusy=false;
-  let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedViewport=null,observedPalette=null,toolsExpanded=false;
+  let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedViewport=null,observedPalette=null,toolsExpanded=false,deletePending=null;
   const el=(tag,className,text)=>{const n=doc.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
   const button=(text,fn,className)=>{const b=el('button',className,text);b.type='button';b.addEventListener('click',event=>{event.stopPropagation();if(!destroyed)void fn();});return b;};
   const sendIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg'),path=doc.createElementNS(svg.namespaceURI,'path');
@@ -130,13 +130,13 @@
   editorHost.addEventListener('toggle',queueChrome,true);
   editorHost.addEventListener('pointerdown',event=>{if(panelMode&&event.target.closest('.dge-overlay-node,.dge-overlay-edge,.dge-overlay-handle')){panelMode='';renderPanel();}},true);
   const outsidePointer=event=>{
-   if(destroyed||exportPreview||!event.target?.closest)return;
+   if(destroyed||exportPreview||deletePending||!event.target?.closest)return;
    if(!panelMode&&!toolsExpanded&&!editorHost.querySelector('.dge-floating-actions > details[open]'))return;
    if(event.target.closest('.ddw-side-actions,.ddw-side-panel,.dge-float-content,.dge-tool-palette')||historyButton.contains(event.target))return;
    dismissPanels();
   };
   const escapeKey=event=>{
-   if(event.key!=='Escape'||exportPreview||(!panelMode&&!toolsExpanded&&!editorHost.querySelector('.dge-floating-actions > details[open]')))return;
+   if(event.key!=='Escape'||exportPreview||deletePending||(!panelMode&&!toolsExpanded&&!editorHost.querySelector('.dge-floating-actions > details[open]')))return;
    event.preventDefault();event.stopPropagation();const focus=panelMode==='history'?historyButton:panelMode==='ai'?aiButton:editorPanel('graphs')?.open?settingsButton:editorPanel('results')?.open?informationButton:editorHost.querySelector('.dge-tool-palette > summary');
    dismissPanels();focus?.focus({preventScroll:true});
   };
@@ -164,10 +164,10 @@
    });
    options.onChange?.(clone(documentValue));renderPanel();syncChrome();
   }
-  function switchPage(pageId){if(pageId===activeId||!pages.some(p=>p.id===pageId))return;collect();persist();abortAnswer();activeId=pageId;persist();mountPage();setStatus('');}
+  function switchPage(pageId){if(pageId===activeId||!pages.some(p=>p.id===pageId))return;cancelDelete();collect();persist();abortAnswer();activeId=pageId;persist();mountPage();setStatus('');}
   function newPage(){
    if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
-   collect();persist();abortAnswer();const pageName='绘图 '+(pages.length+1),p={id:id(),name:pageName,document:blank(pageName),requirement:'',createdAt:Date.now(),updatedAt:Date.now()};pages.push(p);activeId=p.id;persist();mountPage();setStatus('');
+   cancelDelete();collect();persist();abortAnswer();const pageName='绘图 '+(pages.length+1),p={id:id(),name:pageName,document:blank(pageName),requirement:'',createdAt:Date.now(),updatedAt:Date.now()};pages.push(p);activeId=p.id;persist();mountPage();setStatus('');
   }
   function togglePanel(mode){if(mode==='ai'&&!active())return;closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
   function renderPanel(){
@@ -179,7 +179,7 @@
     pages.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(p=>{
      const row=el('div','ddw-history-item'+(p.id===activeId?' is-current':'')),open=button(p.name,()=>switchPage(p.id),'ddw-history-open');
      open.setAttribute('aria-current',String(p.id===activeId));
-     const remove=button('',()=>removePage(p.id),'ddw-history-delete');remove.setAttribute('aria-label','删除绘图：'+p.name+'（'+p.id+'）');remove.title='删除'+p.name;
+     const remove=button('',()=>requestRemovePage(p.id,remove),'ddw-history-delete');remove.setAttribute('aria-label','删除绘图：'+p.name+'（'+p.id+'）');remove.title='删除'+p.name;remove.disabled=Boolean(deletePending);
      row.append(open,remove);list.append(row);
     });if(!pages.length)list.append(el('p','ddw-history-empty','无'));panel.append(list);syncChrome();return;
    }
@@ -194,6 +194,23 @@
     else result.textContent=answer;
    }
    syncChrome();
+  }
+  function syncDeleteButtons(){for(const control of panel.querySelectorAll('.ddw-history-delete'))control.disabled=Boolean(deletePending);}
+  function cancelDelete(){deletePending=null;root.DMateDeleteConfirm?.cancel(shell);syncDeleteButtons();}
+  function deletionSnapshot(page){return fingerprint({...page,document:page.id===activeId?currentDocument():page.document});}
+  async function requestRemovePage(pageId,trigger){
+   const page=pages.find(item=>item.id===pageId);if(!page||deletePending||destroyed)return;
+   const op={id:pageId,page,activeId,snapshot:deletionSnapshot(page),trigger};deletePending=op;
+   const settings={title:'删除这个绘图？',body:'删除后无法恢复。\n'+page.name,confirmText:'删除绘图',confirmTone:'danger'};
+   try{
+    if(typeof options.confirmDelete!=='function'&&typeof root.DMateDeleteConfirm?.request!=='function')throw new Error('删除确认界面未加载，请刷新后重试。');
+    const confirmation=typeof options.confirmDelete==='function'?options.confirmDelete(settings):root.DMateDeleteConfirm?.request(shell,settings);
+    syncDeleteButtons();const confirmed=await confirmation;
+    const current=pages.find(item=>item.id===op.id);
+    if(!confirmed||destroyed||deletePending!==op||activeId!==op.activeId||current!==op.page||deletionSnapshot(current)!==op.snapshot)return;
+    removePage(op.id);
+   }catch(error){if(!destroyed&&deletePending===op)setStatus(error?.message||'无法确认删除，请重试。');}
+   finally{if(deletePending===op){deletePending=null;if(!destroyed){syncDeleteButtons();(trigger?.isConnected?trigger:historyButton).focus({preventScroll:true});}}}
   }
   function removePage(pageId){
    const index=pages.findIndex(p=>p.id===pageId);if(index<0)return;
@@ -272,7 +289,7 @@
   mountPage();persist();
   const pageHide=()=>{collect();persist();};win.addEventListener('pagehide',pageHide);
   return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,
-   destroy(){if(destroyed)return;collect();persist();destroyed=true;closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();observedViewport?.removeEventListener('scroll',canvasScrolled);abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',queueChrome,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
+   destroy(){if(destroyed)return;collect();persist();destroyed=true;cancelDelete();closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();observedViewport?.removeEventListener('scroll',canvasScrolled);abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',queueChrome,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }
  root.DMateDrawingWorkspace={mount,blankDocument:blank};
 })(typeof window!=='undefined'?window:globalThis);

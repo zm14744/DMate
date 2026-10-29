@@ -618,8 +618,8 @@
                 if (!options.drawingOnly) toolbar.append(field('子图名称', input(graph.name, '子图名称', value => model.renameGraph(graph.id, value))));
                 if (options.drawingOnly || options.structureOnly) {
                     const flags = key => typeof graph[key]==='boolean' ? graph[key]?'yes':'no' : 'unknown';
-                    toolbar.append(field('图形方向', select([['unknown','待确认'],['no','无向'],['yes','有向']], flags('directed'), options.drawingOnly?'绘图方向':'图形方向', value => {if(value!=='unknown'){model.setGraphType(graph.id,'directed',value==='yes');render();}})));
-                    toolbar.append(field('图形权值', select([['unknown','待确认'],['no','无权'],['yes','带权']], flags('weighted'), options.drawingOnly?'绘图权值':'图形权值', value => {if(value!=='unknown'){model.setGraphType(graph.id,'weighted',value==='yes');render();}})));
+                    toolbar.append(field('图形方向', select([['no','无向'],['yes','有向']], flags('directed'), options.drawingOnly?'绘图方向':'图形方向', value => {if(value==='no'||value==='yes'){model.setGraphType(graph.id,'directed',value==='yes');render();}})));
+                    toolbar.append(field('图形权值', select([['no','无权'],['yes','带权']], flags('weighted'), options.drawingOnly?'绘图权值':'图形权值', value => {if(value==='no'||value==='yes'){model.setGraphType(graph.id,'weighted',value==='yes');render();}})));
                 }
             }
             container.insertBefore(toolbar, workspace);

@@ -22,9 +22,9 @@ def drawing_page(request):
         page.route('**/*', lambda route: route.fulfill(body='<html><body></body></html>', content_type='text/html'))
         page.goto('https://dmate.test/')
         page.set_content('<style>html,body{margin:0;height:100%;font-family:sans-serif}#mount{height:95dvh;padding:8px;box-sizing:border-box}</style><div id="mount"></div>')
-        for name in ['graph-editor.css', 'drawing-workspace.css']:
+        for name in ['graph-editor.css', 'drawing-workspace.css', 'modal-chrome.css']:
             page.add_style_tag(content=(ROOT / 'static' / name).read_text())
-        for name in ['graph-editor-model.js', 'graph-editor-format.js', 'graph-editor-overlay.js', 'graph-editor.js', 'drawing-export.js', 'drawing-workspace.js']:
+        for name in ['graph-editor-model.js', 'graph-editor-format.js', 'graph-editor-overlay.js', 'graph-editor.js', 'drawing-export.js', 'delete-confirm.js', 'drawing-workspace.js']:
             page.add_script_tag(content=(ROOT / 'static' / name).read_text())
         page.evaluate('''()=>{
           window.sample={body_text:'',graphs:[{id:'G1',name:'原来的图',directed:true,weighted:true,
@@ -35,11 +35,11 @@ def drawing_page(request):
             if(window.deferAi)return new Promise(resolve=>{window.resolveAi=()=>resolve({ok:true,json:async()=>({ok:true,answer:'旧图回答'})});options.signal.addEventListener('abort',()=>window.aiAborted=true);});
             return {ok:true,json:async()=>({ok:true,answer:'先画 A、B，再从 A 向 B 连一条权值为 12 的有向边。'})};};
           window.drawingMount=document.getElementById('mount');
-          window.openDrawing=(storageKey='drawings:user1',legacy=sample)=>{
+          window.openDrawing=(storageKey='drawings:user1',legacy=sample,extra={})=>{
             window.workspace=DMateDrawingWorkspace.mount(drawingMount,{
               storageKey,legacyDocument:legacy,
               onUpload:async(blob,metadata)=>{if(window.uploadFailure)throw new Error(window.uploadFailure);uploads.push({type:blob.type,size:blob.size,metadata});},
-              onClose:()=>closeCount++});};openDrawing();
+              onClose:()=>closeCount++,...extra});};openDrawing();
         }''')
         page.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
         yield page
@@ -401,6 +401,8 @@ def test_history_red_delete_circle_removes_its_page_and_keeps_current_drawing(dr
     assert bounds['width'] == bounds['height'] and bounds['width'] >= 20
     assert remove.get_attribute('aria-label').endswith('）')
     remove.click()
+    assert page.evaluate('workspace.getPages().length') == 2
+    page.get_by_role('button', name='删除绘图', exact=True).click()
     assert page.evaluate('workspace.getPages().length') == 1
     assert page.locator('.ddw-name').input_value() == active_name
     assert page.evaluate('workspace.getDocument().graphs[0].vertices.length') == 0
@@ -408,11 +410,13 @@ def test_history_red_delete_circle_removes_its_page_and_keeps_current_drawing(dr
     assert page.locator('.ddw-history-meta').count() == 0
     assert page.locator('.ddw-status').is_hidden()
     page.locator('.ddw-history-delete').click()
+    page.get_by_role('button', name='删除绘图', exact=True).click()
     assert page.evaluate('workspace.getPages()') == []
     assert page.evaluate('workspace.getDocument().graphs') == []
     assert page.locator('.ddw-name').input_value() == ''
     assert page.locator('.dge-overlay-node,.dge-overlay-edge').count() == 0
-    assert page.locator('.ddw-history-list').inner_text() == '无'
+    page.locator('.ddw-side-panel').wait_for(state='visible')
+    assert page.locator('.ddw-history-list').text_content() == '无'
     assert page.evaluate("JSON.parse(localStorage.getItem('drawings:user1'))") == {'version': 2, 'activeId': '', 'pages': []}
     page.evaluate('workspace.destroy();openDrawing()')
     assert page.evaluate('workspace.getPages()') == []
@@ -420,7 +424,8 @@ def test_history_red_delete_circle_removes_its_page_and_keeps_current_drawing(dr
     assert page.locator('.ddw-name').input_value() == ''
     assert page.locator('.ddw-name').is_disabled()
     page.get_by_role('button', name='历史绘图', exact=True).click()
-    assert page.locator('.ddw-history-list').inner_text() == '无'
+    page.locator('.ddw-side-panel').wait_for(state='visible')
+    assert page.locator('.ddw-history-list').text_content() == '无'
     page.get_by_role('button', name='新建空白页', exact=True).click()
     assert page.evaluate('workspace.getPages().length') == 1
     assert page.locator('.ddw-name').input_value() == '绘图 1'
@@ -439,6 +444,80 @@ def test_upload_callback_failure_is_visible_and_the_same_button_can_retry(drawin
     upload.click()
     page.wait_for_function('uploads.length===1 && closeCount===1')
     assert page.locator('.ddw-status').is_hidden()
+
+
+def test_history_delete_cancel_keeps_saved_pages_and_returns_focus(drawing_page):
+    page = drawing_page
+    page.get_by_role('button', name='历史绘图', exact=True).click()
+    before = page.evaluate("localStorage.getItem('drawings:user1')")
+    identifier = page.evaluate('workspace.getPages()[0].id')
+    trigger = page.locator('.ddw-history-delete')
+    for cancel in ['button', 'escape', 'outside']:
+        trigger.click()
+        prompt = page.get_by_role('dialog', name='删除这个绘图？', exact=True)
+        prompt.wait_for(state='visible')
+        assert prompt.get_by_role('button', name='取消', exact=True).count() == 0
+        assert page.evaluate('workspace.getPages()[0].id') == identifier
+        if cancel == 'button':
+            prompt.get_by_role('button', name='取消删除', exact=True).click()
+        elif cancel == 'escape':
+            page.keyboard.press('Escape')
+        else:
+            page.mouse.click(1, 1)
+        prompt.wait_for(state='detached')
+        assert page.locator('.ddw-history-list').is_visible()
+        assert trigger.is_enabled()
+        page.wait_for_function('document.activeElement.classList.contains("ddw-history-delete")')
+        assert page.evaluate("localStorage.getItem('drawings:user1')") == before
+        assert page.evaluate('workspace.getPages()[0].id') == identifier
+
+
+def test_history_delete_does_not_remove_a_page_changed_while_confirming(drawing_page):
+    page = drawing_page
+    page.get_by_role('button', name='历史绘图', exact=True).click()
+    identifier = page.evaluate('workspace.getPages()[0].id')
+    page.locator('.ddw-history-delete').click()
+    page.evaluate('''()=>{const input=document.querySelector('.ddw-name');
+      input.value='确认期间更新的绘图';input.dispatchEvent(new Event('input',{bubbles:true}));}''')
+    page.get_by_role('button', name='删除绘图', exact=True).click()
+    assert page.evaluate('workspace.getPages().length') == 1
+    assert page.evaluate('workspace.getPages()[0].id') == identifier
+    assert page.locator('.ddw-name').input_value() == '确认期间更新的绘图'
+    page.wait_for_function("JSON.parse(localStorage.getItem('drawings:user1')).pages[0].name==='确认期间更新的绘图'")
+    page.locator('.ddw-history-delete').click()
+    page.get_by_role('button', name='删除绘图', exact=True).click()
+    assert page.evaluate('workspace.getPages()') == []
+
+
+def test_history_delete_prompt_closes_on_workspace_destroy_and_cannot_affect_another_owner(drawing_page):
+    page = drawing_page
+    page.get_by_role('button', name='历史绘图', exact=True).click()
+    page.locator('.ddw-history-delete').click()
+    page.get_by_role('dialog', name='删除这个绘图？', exact=True).wait_for(state='visible')
+    page.evaluate("workspace.destroy();openDrawing('drawings:other-owner',sample)")
+    assert page.locator('.dmate-delete-confirm').count() == 0
+    assert page.evaluate("JSON.parse(localStorage.getItem('drawings:user1')).pages.length") == 1
+    assert page.evaluate('workspace.getPages().length') == 1
+    assert page.evaluate("JSON.parse(localStorage.getItem('drawings:other-owner')).pages.length") == 1
+
+
+def test_delayed_external_history_confirmation_cannot_delete_after_destroy(drawing_page):
+    page = drawing_page
+    page.evaluate("workspace.destroy();openDrawing('drawings:cancelled',sample,{confirmDelete:()=>false})")
+    page.get_by_role('button', name='历史绘图', exact=True).click()
+    page.locator('.ddw-history-delete').click()
+    assert page.evaluate('workspace.getPages().length') == 1
+    assert page.locator('.ddw-status').is_hidden()
+    page.evaluate('''()=>{workspace.destroy();openDrawing('drawings:delayed',sample,{
+      confirmDelete:settings=>{window.deleteSettings=settings;return new Promise(resolve=>window.finishDelete=resolve);}});}''')
+    page.get_by_role('button', name='历史绘图', exact=True).click()
+    page.locator('.ddw-history-delete').click()
+    assert page.evaluate('deleteSettings.confirmText') == '删除绘图'
+    assert page.evaluate('workspace.getPages().length') == 1
+    page.evaluate("workspace.destroy();openDrawing('drawings:next',sample);finishDelete(true)")
+    assert page.evaluate("JSON.parse(localStorage.getItem('drawings:delayed')).pages.length") == 1
+    assert page.evaluate("JSON.parse(localStorage.getItem('drawings:next')).pages.length") == 1
+    assert page.evaluate('workspace.getPages().length') == 1
 
 
 def test_reopened_numbered_pages_migrate_only_the_old_generic_graph_title(drawing_page):

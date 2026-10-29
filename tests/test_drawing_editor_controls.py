@@ -89,6 +89,8 @@ def test_settings_and_graph_information_are_separate_full_panels(drawing_page):
     assert p.get_by_label('画页名称',exact=True).count()==0
     assert p.get_by_label('绘图方向',exact=True).is_visible()
     assert p.get_by_label('绘图权值',exact=True).is_visible()
+    assert p.get_by_label('绘图方向',exact=True).locator('option').all_text_contents()==['无向','有向']
+    assert p.get_by_label('绘图权值',exact=True).locator('option').all_text_contents()==['无权','带权']
     assert p.get_by_label('当前子图',exact=True).count()==0
     # One click switches the active popup. Inner information has no nested
     # collapsing disclosure: all vertices and relationships are already there.

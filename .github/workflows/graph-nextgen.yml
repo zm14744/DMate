@@ -40,6 +40,9 @@ on:
       - 'tests/test_nonquestion_image_context.py'
       - 'static/image-groups.css'
       - 'static/modal-chrome.css'
+      - 'static/delete-confirm.js'
+      - 'tests/test_delete_confirmation.py'
+      - 'tests/test_delete_confirmation_style.py'
       - 'tests/test_modal_chrome.py'
       - 'tests/test_editor_toolbar_chrome.py'
       - 'tests/test_editor_dialog_position.py'
@@ -146,6 +149,8 @@ jobs:
             tests/test_concept_notebook_server_sync.py \
             tests/test_learning_tool_entries.py \
             tests/test_modal_chrome.py \
+            tests/test_delete_confirmation.py \
+            tests/test_delete_confirmation_style.py \
             tests/test_editor_toolbar_chrome.py \
             tests/test_editor_dialog_position.py \
             tests/test_drawing_fit.py \
@@ -189,6 +194,7 @@ jobs:
           node --check static/graph-editor-format.js
           node --check static/graph-editor.js
           node --check static/script.js
+          node --check static/delete-confirm.js
           node tests/graph_display_regression.js
           node tests/graph_nextgen_display.js
       - name: Install the exact DejaVu test font with bounded APT time

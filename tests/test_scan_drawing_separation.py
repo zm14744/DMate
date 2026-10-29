@@ -44,7 +44,7 @@ def scan_page(request):
         page.add_style_tag(content=(ROOT/'static/graph-editor.css').read_text())
         page.add_style_tag(content=(ROOT/'static/drawing-workspace.css').read_text())
         page.add_style_tag(content=(ROOT/'static/modal-chrome.css').read_text())
-        for name in ['graph-editor-model.js','graph-editor-format.js','graph-editor-overlay.js','graph-editor.js',
+        for name in ['delete-confirm.js','graph-editor-model.js','graph-editor-format.js','graph-editor-overlay.js','graph-editor.js',
                      'drawing-export.js','drawing-workspace.js','graph-scan-workspace.js']:
             page.add_script_tag(content=(ROOT/'static'/name).read_text())
         page.add_script_tag(content='''window.ocrRequestInFlight=false;window.ocrReviewInProgress=false;
@@ -144,6 +144,7 @@ def test_pending_scans_block_confirmation_and_deleted_frames_ignore_late_results
     p.wait_for_function('graphCalls.length===1')
     assert p.get_by_role('button',name='保存').is_disabled()
     p.get_by_role('button',name='删除图形框1',exact=True).click()
+    p.get_by_role('dialog',name='删除这个图形框？',exact=True).get_by_role('button',name='删除图形框',exact=True).click()
     p.evaluate('resolveGraph()')
     p.wait_for_timeout(100)
     assert p.evaluate('ocrTasks.get("scan").draft.graphs.length')==0
