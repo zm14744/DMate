@@ -264,12 +264,14 @@ function mount(host,o){
   return op.points.map(p=>[clamp(next[0]+(p[0]-b[0])/(b[2]-b[0])*(next[2]-next[0])),clamp(next[1]+(p[1]-b[1])/(b[3]-b[1])*(next[3]-next[1]))]);
  }
  function draw(){
-  if(!scroll.clientWidth)return;
-  const g=o.textOnly||o.scanOnly?{id:o.graph?.()?.id,vertices:[],edges:[]}:o.graph()||{vertices:[],edges:[]};
-  if(g)for(const v of g.vertices)if(finite(v.x)&&finite(v.y))expandWorld(v.x,v.y);
+  // A modal is mounted while hidden. Tool state must already be correct
+  // before its first layout/image event, including on a cached-image reopen.
   if(visible)visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
   regionMode.value=o.scanOnly?(s.irregular?'irregular':''):['graph_poly','text_poly'].includes(s.mode)?s.mode:'';
   for(const b of bar.querySelectorAll('[data-overlay-tool]')){const key=b.dataset.overlayTool,active=key===s.mode||o.scanOnly&&(key==='bounds'&&s.mode==='graph_poly'||key==='text_rect'&&s.mode==='text_poly');b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds','text_rect'].includes(key))b.setAttribute('aria-pressed',String(active));}
+  if(!scroll.clientWidth)return;
+  const g=o.textOnly||o.scanOnly?{id:o.graph?.()?.id,vertices:[],edges:[]}:o.graph()||{vertices:[],edges:[]};
+  if(g)for(const v of g.vertices)if(finite(v.x)&&finite(v.y))expandWorld(v.x,v.y);
   svg.replaceChildren();if(!g||!s.visible)return;
   // The mathematical path is in original-image coordinates. Input targets
   // and labels instead use a constant on-screen size, including at 400% zoom.

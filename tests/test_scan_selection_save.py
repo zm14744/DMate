@@ -81,3 +81,16 @@ def test_reopening_a_task_resets_last_framing_mode_to_selection(scan_page):
     page.get_by_label('关闭图形识别编辑器', exact=True).click()
     open_scan(page)
     assert page.locator('.dge-overlay-svg').get_attribute('data-mode') == 'select'
+
+
+def test_selection_controls_are_ready_before_hidden_modal_has_layout(scan_page):
+    result = scan_page.evaluate('''() => {
+        const host=document.createElement('div');host.hidden=true;document.body.append(host);
+        const overlay=DMateGraphOverlay.mount(host,{scanOnly:true,originalUrl:'',
+            state:{mode:'select',zoom:100,visible:true},graph:()=>null,
+            model:{getDocument:()=>({graphs:[]})}});
+        const result={width:host.clientWidth,mode:host.querySelector('svg').dataset.mode,
+            pressed:host.querySelector('[data-overlay-tool="select"]').getAttribute('aria-pressed')};
+        overlay.destroy();host.remove();return result;
+    }''')
+    assert result == {'width': 0, 'mode': 'select', 'pressed': 'true'}
