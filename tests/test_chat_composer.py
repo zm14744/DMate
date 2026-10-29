@@ -35,6 +35,7 @@ def composer_page(request):
             return script[at:script.index(end, at + len(start))]
         page.add_script_tag(content='''window.sends=0;window.currentId=1;window.ocrReviewInProgress=false;window.ocrBatchPreparing=false;
             window.waiting=false;window.typing=false;window.ocrTasks=new Map();window.OCR_MAX_CONCURRENT=4;
+            window.ocrBatchRuns=new Map();window.sessionBusyKey=id=>String(id);
             window.isSessionBusy=()=>waiting;window.isSessionPendingAiStart=()=>false;window.isCurrentSessionTyping=()=>typing;
             window.ocrActiveCount=()=>0;window.ocrTaskLabel=()=>"识别中";window.ocrTaskSeconds=()=>0;
             window.updateOcrTaskTimes=()=>{};window.queueChatJumpControlsUpdate=()=>{};
