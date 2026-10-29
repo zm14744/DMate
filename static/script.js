@@ -14273,6 +14273,12 @@ let ocrEditorTaskId = null;
 let ocrEditorController = null;
 let graphSessionPromise = null;
 
+function isOcrSendInProgress() {
+    // Sending changes the visible workspace, while originals and confirmed
+    // drafts stay available until their own request succeeds.
+    return ocrSolvingSessions.size > 0;
+}
+
 function cloneOcrDocument(value) {
     return JSON.parse(JSON.stringify(value));
 }
@@ -14307,11 +14313,11 @@ function updateOcrTaskTimes() {
 
 function ocrTaskLabel(task) {
     if (task.sending) return "正在解题";
-    if (task.confirming) return "正在校验修改";
-    if (task.confirmation) return "已确认结构";
+    if (task.confirming) return "正在保存";
+    if (task.confirmation) return "已保存";
     if (task.state === "recognizing") return "识别中";
     if (task.state === "failed") return "识别失败";
-    return task.dirty ? "修改待确认" : "待核对";
+    return task.dirty ? "修改未保存" : "待核对";
 }
 
 function nextOcrGroupId() {
@@ -14479,7 +14485,7 @@ function renderOcrTasks() {
     const focused = list.contains(document.activeElement) ? document.activeElement : null;
     const focusInfo = focused ? { taskId: focused.dataset.taskId, action: focused.dataset.ocrAction,
         field: focused.dataset.ocrField, start: focused.selectionStart, end: focused.selectionEnd } : null;
-    const hasImages = ocrTasks.size > 0;
+    const hasImages = ocrTasks.size > 0 && !isOcrSendInProgress();
     if (typeof renderOcrGrouping === "function") renderOcrGrouping(panel, hasImages);
     panel.hidden = !hasImages;
     const stage = document.getElementById("ocrUploadStage");
@@ -14517,6 +14523,7 @@ function renderOcrTasks() {
     };
     for (const task of ocrTasks.values()) {
         const card = element("article", "ocr-task-card");
+        card.classList.toggle("is-saved", Boolean(task.confirmation));
         card.dataset.ocrTaskId = task.id;
         card.dataset.state = task.state;
         const thumbnail = element("img", "ocr-task-thumbnail");
@@ -14530,49 +14537,33 @@ function renderOcrTasks() {
         const status = element("p", "ocr-task-status", ocrTaskLabel(task));
         status.setAttribute("role", "status");
         content.append(heading, status);
-        if (task.draft && task.state !== "recognizing") {
-            const graphs = task.draft.graphs || [];
-            // Keep the confirmed mathematical review in ONE consistent layout.
-            // The optional DeepSeek description is UI-only; never enter the
-            // signed semantic snapshot or the solver input.
-            if (task.confirmation && graphs.length && window.DMateGraphFormat?.graphRows) {
-                const details = element("section", "ocr-task-structure");
-                const summary = element("h3", "ocr-task-structure-title", "点、边与关系");
-                details.append(summary);
-                for (const [index, graph] of graphs.entries()) {
-                    const view = window.DMateGraphFormat.graphRows(graph, index);
-                    const section = element("section", "ocr-task-structure-graph");
-                    section.append(element("strong", "", view.title));
-                    if (view.showType !== false) section.append(element("p", "ocr-task-structure-type", view.type));
-                    section.append(element("p", "", "点：" + (view.vertices.join("、") || "无")));
-                    if (view.named.length) section.append(element("p", "",
-                        "边：" + view.named.join("、")));
-                    section.append(element("p", "ocr-task-structure-head", "关系："));
-                    if (view.relations.length) {
-                        const table = element("div", "ocr-task-relations");
-                        for (const row of view.relations) {
-                            const item = element("p", "", row.txt);
-                            item.dataset.edgeId = row.id;
-                            table.append(item);
-                        }
-                        section.append(table);
-                    } else section.append(element("p", "", "无"));
-                    const description = task.descriptions?.[String(graph.id)];
-                    if (typeof description === "string" && description) {
-                        section.append(element("p", "ocr-task-structure-head", "图形描述："));
-                        section.append(element("p", "", description));
-                    }
-                    details.append(section);
-                }
-                content.append(details);
+        if (task.confirmation && task.draft && task.state !== "recognizing") {
+            const preview = element("section", "ocr-task-structure ocr-task-preview");
+            preview.setAttribute("aria-label", "已保存的图片信息");
+            const text = String(task.draft.body_text || "");
+            if (text.trim()) {
+                const section = element("section", "ocr-task-preview-section");
+                section.append(element("h3", "ocr-task-structure-title", "文字信息"),
+                    element("div", "ocr-task-saved-text", text));
+                preview.append(section);
             }
+            if (task.draft.graphs?.length && window.DMateGraphFormat?.renderGraphInformation) {
+                const section = element("section", "ocr-task-preview-section");
+                const information = element("div", "ocr-task-saved-graphs");
+                section.append(element("h3", "ocr-task-structure-title", "图形信息"), information);
+                // Use the same saved document and read-only presentation as
+                // the scan editor, including positions and appearance.
+                window.DMateGraphFormat.renderGraphInformation(information, task.draft);
+                preview.append(section);
+            }
+            content.append(preview);
         }
         const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
         slow.hidden = task.state !== "recognizing" || ocrTaskSeconds(task) < 120;
         content.append(slow);
         if (task.error) {
             content.append(element("p", "ocr-task-notice", task.error));
-        } else if (task.result?.manual_mode && task.notice) {
+        } else if ((task.confirmation || task.result?.manual_mode) && task.notice) {
             content.append(element("p", "ocr-task-notice", task.notice));
         }
         if (task.confirmation) {
@@ -14598,7 +14589,7 @@ function renderOcrTasks() {
             return node;
         };
         if (task.state !== "recognizing") {
-            button(task.confirmation ? "继续修改" : task.result?.manual_mode ? "开始描绘" : task.state === "ready" ? "编辑核对" : "手动录入", "edit", !task.confirmation);
+            button("编辑核对", "edit", true);
         }
         content.append(actions);
         card.append(thumbnail, content);
@@ -14883,10 +14874,11 @@ async function confirmOcrTask(task, documentValue, options = {}) {
         }
         task.draft = cloneOcrDocument(data.drawing_document || data.document);
         task.confirmation = cloneOcrDocument(data);
+        task.state = "ready";
         task.dirty = false;
         task.descriptions = null;
         task.descriptionState = null;
-        task.notice = "修改已保存，解题将使用这份确认后的结构。";
+        task.notice = "已保存当前选择的信息，可继续添加图片或发送。";
         return data;
     } catch (error) {
         if (error?.name !== "AbortError") task.error = error?.message || "结构确认失败，请稍后重试。";
@@ -15233,11 +15225,13 @@ async function solveOcrTask(id) {
         renderOcrTasks();
         return;
     }
-    const userRequest = task.userRequest.trim() || "请依据我确认的题干和图形结构解题，并核验适用的计算结果。";
+    const userRequest = String(task.userRequest || "").trim();
     const questionText = context.rendered_question_text;
-    const combinedText = `${questionText}\n\n【我的要求】\n${userRequest}`;
-    const apiText = ["【当前指向题目】", context.question_text, "【当前指向题目结束】", "",
-        "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n");
+    const combinedText = userRequest ? `${questionText}\n\n【我的要求】\n${userRequest}` : questionText;
+    const apiText = userRequest
+        ? ["【当前指向题目】", context.question_text, "【当前指向题目结束】", "",
+            "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n")
+        : context.question_text;
     if (combinedText.length > 28000 || apiText.length > 28000) {
         task.error = "题目内容过长，请拆分子图后再解题。";
         renderOcrTasks();
@@ -15247,16 +15241,23 @@ async function solveOcrTask(id) {
     task.error = "";
     ocrSolvingSessions.add(session.id);
     currentId = session.id;
-    session.messages.push({ role: "user", text: combinedText, source: "ocr",
+    const message = { role: "user", text: combinedText, source: "ocr",
         ocrIsQuestion: task.isQuestion !== false,
-        apiText, semanticContext: context });
+        apiText, semanticContext: context };
+    session.messages.push(message);
     maybeAutoNameSession(session, task.draft.body_text || task.file.name || "图片识题", "ocr");
     saveState();
     renderChat();
     renderSessions();
     renderInfo();
     renderOcrTasks();
-    try { await requestAiReply(session); }
+    try {
+        const result = await requestAiReply(session, { completeImmediately: true, expectedUserMessage: message });
+        if (result?.status === "success" && ocrTasks.get(task.id) === task) {
+            ocrTasks.delete(task.id);
+            URL.revokeObjectURL(task.originalUrl);
+        }
+    }
     finally { task.sending = false; ocrSolvingSessions.delete(session.id); renderOcrTasks(); }
 }
 
@@ -15288,10 +15289,12 @@ function buildOcrGroupMessage(group, sharedRequest) {
     const requirements = group.tasks.map((task, index) => task.userRequest?.trim()
         ? `图片 ${index + 1}：${task.userRequest.trim()}` : "").filter(Boolean);
     if (sharedRequest) requirements.push(sharedRequest);
-    const userRequest = requirements.join("\n") || "请依据以上图片已确认的题干和图形结构回答，并核验适用的计算结果。";
-    const text = `${rendered}\n\n【我的要求】\n${userRequest}`;
-    const apiText = ["【当前指向题目】", question, "【当前指向题目结束】", "",
-        "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n");
+    const userRequest = requirements.join("\n");
+    const text = userRequest ? `${rendered}\n\n【我的要求】\n${userRequest}` : rendered;
+    const apiText = userRequest
+        ? ["【当前指向题目】", question, "【当前指向题目结束】", "",
+            "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n")
+        : question;
     if (text.length > 28000 || apiText.length > 28000)
         throw new Error("同组题目内容过长，请减少图片或拆分组别后发送。");
     return { role: "user", text, apiText, source: "ocr",
