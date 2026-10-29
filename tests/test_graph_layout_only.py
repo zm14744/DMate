@@ -184,14 +184,14 @@ def test_ocr_runtime_text_only_skips_layout_process(monkeypatch):
     assert result["resource_metrics"][0]["status"] == "skipped"
 
 
-def test_auto_graph_route_and_frontend_are_layout_only():
+def test_auto_graph_keeps_editable_draft_and_legacy_layout_only_stays_empty():
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     server = (root / "app.py").read_text()
     client = (root / "static/script.js").read_text()
     graph_editor = (root / "static/graph-editor.js").read_text()
     assert 'request.form.get("workflow") == "auto_graph"' in server
-    assert "recognize_layout_only(" in server
+    assert "recognize_qwen_targeted(" in server
     assert 'formData.append("workflow", "auto_graph")' in client
     assert 'data?.workflow_profile === "layout_only"' in client
     assert "vertices: [], edges: []" in client

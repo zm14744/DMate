@@ -14418,8 +14418,8 @@ async function originalImageDigest(file) {
 }
 
 async function recognizeOcrTask(task) {
-    // Initial uploads include automatic figure segmentation and independent
-    // arrow/weight verification. Only *manual* region re-scans have a 4s cap.
+    // Each upload has its own editable Qwen draft and evidence-triggered
+    // review. Text OCR runs only for regions selected in its separate tab.
     try {
         await ensureGraphSession();
         if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
@@ -14458,6 +14458,8 @@ async function recognizeOcrTask(task) {
                     : "已走纯文字 OCR 通道，未启动图论模型；请核对识别文字。")
             : data?.manual_mode === true
                 ? "原图已准备好。直接描绘顶点和边，文字可框选后识别。"
+                : data?.workflow_profile === "qwen_targeted"
+                    ? ocrReviewStatusText(data) || "图形草稿已生成，请核对并修改点、边、箭头和权值。文字请切换到文字识别，确认结构后再解题。"
                 : ocrReviewStatusText(data) || (task.state === "failed"
                     ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
                     : "请对照原图检查节点、连边和题干，确认后再解题。");

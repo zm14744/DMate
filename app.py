@@ -4287,25 +4287,17 @@ def ocr():
     recognition_deadline = time.monotonic() + 285
     try:
         if request.form.get("workflow") == "auto_graph":
-            # No topology prediction: the new route returns ONLY graph bounds
-            # and per-figure directed/weighted metadata with EMPTY point/edge
-            # lists. Plain text gets one Small OCR worker and no layout or Qwen.
-            from graph_layout_only import (recognize_layout_only, LayoutOnlyCancelled)
+            # Qwen's thinking draft is editable. Pixel candidates only trigger
+            # scoped source-group review; text OCR remains a separate tab.
+            from graph_qwen_targeted import recognize_qwen_targeted
+            from graph_agent_runtime import AgentCancelled
             from graph_upload_tasks import UPLOAD_TASKS, UploadAdmissionError
             from graph_confirmation import confirmation_owner
             owner = confirmation_owner()
-            # A single Small-text worker runs parallel to accuracy-first
-            # automatic figure segmentation; it is NOT capped at four seconds.
-            text_reader = None
-            if OCR_AVAILABLE:
-                try:
-                    from ocr_runtime import recognize_image as text_reader
-                except (ImportError, OSError):
-                    pass
             try:
                 with UPLOAD_TASKS.admit(owner, request_id):
-                    routed = recognize_layout_only(
-                        raw, recognize_text=None, include_text=False,
+                    routed = recognize_qwen_targeted(
+                        raw,
                         cancelled=lambda: _ocr_is_cancelled(request_id, owner=owner),
                         request_deadline=recognition_deadline)
                 if request_id and _take_ocr_cancelled(request_id, owner=owner):
@@ -4314,7 +4306,7 @@ def ocr():
                               source_sha256=hashlib.sha256(raw).hexdigest(),
                               server_elapsed_seconds=round(time.monotonic()-started_at, 3))
                 return jsonify(routed)
-            except LayoutOnlyCancelled:
+            except AgentCancelled:
                 return jsonify({"cancelled": True})
             except UploadAdmissionError as exc:
                 return jsonify({"error": ("此图片正在识别，请等待当前任务。"
@@ -4328,8 +4320,8 @@ def ocr():
                                 "recognition_status": "failed",
                                 "request_id": request_id}), 400
             except Exception as exc:
-                print(f"轻量分图／文字识别未完成：{type(exc).__name__}")
-                return jsonify({"error": "图片识别未完成，请重试或手动补充。",
+                print(f"千问图形识别未完成：{type(exc).__name__}")
+                return jsonify({"error": "图形识别未完成，模型或网络请求失败，请重试或手动绘制。",
                                 "recognition_status": "failed",
                                 "request_id": request_id}), 503
         if _semantic_ocr_selected():

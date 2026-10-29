@@ -23,6 +23,7 @@ GLM_53_FLASH_MODEL='glm-5.3-flash'
 GLM_5V_TURBO_MODEL='glm-5v-turbo'
 GLM_URL='https://open.bigmodel.cn/api/paas/v4/chat/completions'
 QWEN_MODEL='qwen3-vl-plus'
+QWEN38_FLASH_MODEL='qwen3.8-flash'
 
 
 class VisionError(RuntimeError):
@@ -214,7 +215,7 @@ class VisionProvider:
         if name not in ('qwen','glm'):raise ValueError('Unsupported vision provider')
         if type(thinking) is not bool:raise ValueError('thinking must be explicit boolean')
         if type(retries) is not int or not 0<=retries<=2:raise ValueError('retry limit is 0..2')
-        allowed=(QWEN_MODEL,) if name=='qwen' else (GLM_MODEL,GLM_PAID_MODEL,GLM_53_FLASH_MODEL,GLM_5V_TURBO_MODEL)
+        allowed=(QWEN_MODEL,QWEN38_FLASH_MODEL) if name=='qwen' else (GLM_MODEL,GLM_PAID_MODEL,GLM_53_FLASH_MODEL,GLM_5V_TURBO_MODEL)
         self.name=name;self.model=model or allowed[0]
         if self.model not in allowed:raise ValueError('Unsupported provider model')
         if self.model==GLM_53_FLASH_MODEL:
@@ -340,7 +341,7 @@ class VisionProvider:
                               returned_model=result.get('model'),system_fingerprint=result.get('system_fingerprint'),
                               reasoning_chars=result.get('reasoning_chars',len((choice.get('message') or {}).get('reasoning_content') or '')))
                 returned=str(result.get('model') or '').lower()
-                if self.model in (GLM_53_FLASH_MODEL,GLM_5V_TURBO_MODEL) and not returned:
+                if self.model in (GLM_53_FLASH_MODEL,GLM_5V_TURBO_MODEL,QWEN38_FLASH_MODEL) and not returned:
                     raise VisionError('model_identity_unverified')
                 if returned and (not (returned==self.model or returned.startswith(self.model+'-')) or
                         self.model==GLM_PAID_MODEL and returned.startswith(GLM_MODEL)):
