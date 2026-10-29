@@ -1,6 +1,7 @@
 """Actual production render, handlers and editor, with zero external requests."""
 import base64
 import io
+import os
 import re
 import shutil
 from pathlib import Path
@@ -15,7 +16,7 @@ SCRIPT=(ROOT/'static/script.js').read_text()
 
 @pytest.fixture(params=[(1440,900),(390,844)])
 def scan_page(request):
-    chromium=shutil.which('chromium')
+    chromium=os.environ.get('DMATE_BROWSER_EXECUTABLE') or shutil.which('chromium')
     if not chromium:pytest.skip('Chromium unavailable')
     pw=pytest.importorskip('playwright.sync_api')
     fragment='<div id="ocrUploadStage"'+HTML.split('<div id="ocrUploadStage"',1)[1].split('\n<div class="right">',1)[0]
