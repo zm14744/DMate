@@ -1,0 +1,19 @@
+/* A single red for circular close, delete and stop actions in every theme.
+   Keep disabled opacity/cursor feedback, but hover/focus must not recolor or
+   darken a dot. This layer overrides older themed and mobile declarations. */
+@layer dmate-red-circle-controls {
+    button:is(
+        #sendBtn.ai-stop-button,#ocrCancelBtn,
+        .modal-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
+        .wrong-search-clear,.ocr-task-remove,
+        .dcn-close,.dcn-search-clear,.dcn-note-delete,
+        .dge-panel-close,.dgs-source-delete,
+        .ddw-history-delete,.ddw-export-close
+    ),
+    .session > button.del {
+        background-color:#ef4444!important;
+        background-image:none!important;
+        filter:none!important;
+        box-shadow:none!important;
+    }
+}

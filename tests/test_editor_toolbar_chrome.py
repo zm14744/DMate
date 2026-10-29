@@ -20,7 +20,7 @@ def install_production_appearance(page):
         if match[1] is not None:blocks.append(match[1])
         else:
             path=ROOT/match[2].lstrip('/');linked.append(path.name);blocks.append(path.read_text())
-    assert linked[-1]=='appearance-panels.css'
+    assert linked[-2:]==['appearance-panels.css','red-circle-controls.css']
     theme='dark' if page.viewport_size['width']<760 else 'light'
     page.emulate_media(color_scheme=theme)
     page.evaluate('''theme=>{

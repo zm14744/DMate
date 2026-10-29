@@ -49,6 +49,9 @@ on:
       - 'tests/test_sidebar_and_search_clear.py'
       - 'tests/test_conversation_selection_appearance.py'
       - 'static/appearance-panels.css'
+      - 'static/red-circle-controls.css'
+      - 'tests/test_red_circle_controls.py'
+      - 'tests/test_drawing_canvas_rounding.py'
       - 'tests/test_scan_selection_save.py'
       - 'concept_notebook.py'
       - 'static/concept-notebook*.js'
@@ -149,6 +152,8 @@ jobs:
             tests/test_appearance_surfaces.py \
             tests/test_panel_compositing.py \
             tests/test_sidebar_and_search_clear.py \
+            tests/test_red_circle_controls.py \
+            tests/test_drawing_canvas_rounding.py \
             tests/test_conversation_selection_appearance.py \
             tests/test_graph_elastic_regions.py \
             tests/test_voice_input.py \

@@ -35,6 +35,9 @@ on:
       - 'tests/test_panel_compositing.py'
       - 'tests/test_sidebar_and_search_clear.py'
       - 'static/appearance-panels.css'
+      - 'static/red-circle-controls.css'
+      - 'tests/test_red_circle_controls.py'
+      - 'tests/test_drawing_canvas_rounding.py'
       - 'tests/test_scan_selection_save.py'
       - 'tests/test_scan_information_sources.py'
       - 'static/chat-composer.js'
@@ -106,6 +109,8 @@ jobs:
             tests/test_appearance_surfaces.py \
             tests/test_panel_compositing.py \
             tests/test_sidebar_and_search_clear.py \
+            tests/test_red_circle_controls.py \
+            tests/test_drawing_canvas_rounding.py \
             tests/test_graph_outline_smoothness.py \
             tests/test_graph_loop_editing.py \
             tests/test_drawing_workspace.py \

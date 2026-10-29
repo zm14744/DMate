@@ -62,11 +62,31 @@
    const top=Math.max(topEdge,Math.min(upwards?anchor.top-gap-box.height:anchor.bottom+gap,bottomEdge-box.height));
    content.style.left=left+'px';content.style.right='auto';content.style.top=top+'px';content.style.visibility='visible';
   }
+  function syncCanvasClip(viewport=observedViewport){
+   const stage=viewport?.querySelector(':scope > .dge-overlay-stage');
+   if(!stage||!viewport.clientWidth||!viewport.clientHeight)return;
+   // The native scrollbar gutters sit outside the white canvas. Rounding the
+   // scroll container alone leaves three of its visible content corners square.
+   // Clip the source and drawing together at the stationary client rectangle;
+   // this changes neither camera coordinates nor the exported SVG.
+   const canvas=viewport.getBoundingClientRect(),bounds=stage.getBoundingClientRect(),style=win.getComputedStyle(stage);
+   const scaleX=bounds.width/parseFloat(style.width)||1,scaleY=bounds.height/parseFloat(style.height)||1;
+   const left=canvas.left+viewport.clientLeft*scaleX,top=canvas.top+viewport.clientTop*scaleY;
+   const right=left+viewport.clientWidth*scaleX,bottom=top+viewport.clientHeight*scaleY;
+   const insets=[(top-bounds.top)/scaleY,(bounds.right-right)/scaleX,(bounds.bottom-bottom)/scaleY,(left-bounds.left)/scaleX];
+   stage.style.clipPath='inset('+insets.map(value=>Math.max(0,value)+'px').join(' ')+' round 12px)';
+  }
+  const canvasScrolled=event=>{syncCanvasClip(event.currentTarget);queueChrome();};
   function syncChrome(){
    if(destroyed)return;
    const view=editorHost.querySelector('.dge-view-controls'),viewport=editorHost.querySelector('.dge-overlay-viewport'),palette=editorHost.querySelector('.dge-tool-palette');
    if(resizeObserver&&observedView!==view){if(observedView)resizeObserver.unobserve(observedView);observedView=view;if(view)resizeObserver.observe(view);}
-   if(resizeObserver&&observedViewport!==viewport){if(observedViewport)resizeObserver.unobserve(observedViewport);observedViewport=viewport;if(viewport)resizeObserver.observe(viewport);}
+   if(observedViewport!==viewport){
+    if(observedViewport){resizeObserver?.unobserve(observedViewport);observedViewport.removeEventListener('scroll',canvasScrolled);}
+    observedViewport=viewport;
+    if(viewport){resizeObserver?.observe(viewport);viewport.addEventListener('scroll',canvasScrolled,{passive:true});}
+   }
+   syncCanvasClip(viewport);
    if(palette&&observedPalette!==palette){
     observedPalette=palette;const trigger=palette.querySelector(':scope > summary');
     trigger?.setAttribute('aria-label','绘图工具');trigger?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();toggleTools();});
@@ -252,7 +272,7 @@
   mountPage();persist();
   const pageHide=()=>{collect();persist();};win.addEventListener('pagehide',pageHide);
   return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,
-   destroy(){if(destroyed)return;collect();persist();destroyed=true;closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',queueChrome,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
+   destroy(){if(destroyed)return;collect();persist();destroyed=true;closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();observedViewport?.removeEventListener('scroll',canvasScrolled);abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',queueChrome,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }
  root.DMateDrawingWorkspace={mount,blankDocument:blank};
 })(typeof window!=='undefined'?window:globalThis);

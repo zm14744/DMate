@@ -9,7 +9,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.fixture(params=[(1440, 900, 'light'), (1440, 900, 'dark'), (390, 844, 'light'), (390, 844, 'dark')])
+@pytest.fixture(params=[(1440, 900, theme) for theme in ('light', 'dark', 'navy')]
+                      + [(390, 844, theme) for theme in ('light', 'dark', 'navy')])
 def composer_page(request):
     chromium = os.environ.get('DMATE_BROWSER_EXECUTABLE') or shutil.which('chromium')
     if not chromium:
@@ -18,7 +19,6 @@ def composer_page(request):
     html = (ROOT / 'templates/index.html').read_text()
     script = (ROOT / 'static/script.js').read_text()
     fragment = '<div id="ocrUploadStage"' + html.split('<div id="ocrUploadStage"', 1)[1].split('\n<div class="right">', 1)[0]
-    styles = '\n'.join(re.findall(r'<style[^>]*>([\s\S]*?)</style>', html))
     width, height, theme = request.param
     with pw.sync_playwright() as runtime:
         browser = runtime.chromium.launch(executable_path=chromium, headless=True)
@@ -26,9 +26,12 @@ def composer_page(request):
         page.route('**/*', lambda route: route.fulfill(body='<html></html>', content_type='text/html'))
         page.goto('https://dmate.test/')
         page.set_content('<body data-appearance-theme="' + theme + '"><div class="center" style="height:90dvh;display:flex;flex-direction:column;justify-content:flex-end">' + fragment + '</body>')
-        page.add_style_tag(content=styles)
-        page.add_style_tag(content=(ROOT / 'static/voice-input.css').read_text())
-        page.add_style_tag(content=(ROOT / 'static/chat-composer.css').read_text())
+        page.evaluate('theme=>document.documentElement.dataset.appearanceTheme=theme', theme)
+        # Preserve the complete production order, including important theme
+        # layers and the newer shared control styles after the composer sheet.
+        for match in re.finditer(r'<style\b[^>]*>([\s\S]*?)</style>|<link\b[^>]*href="(/static/[^"?]+\.css)[^"]*"[^>]*>', html, re.I):
+            page.add_style_tag(content=match[1] if match[1] is not None
+                               else (ROOT / match[2].lstrip('/')).read_text())
         page.add_script_tag(content=(ROOT / 'static/chat-composer.js').read_text())
         def block(start, end):
             at = script.index(start)
@@ -136,7 +139,9 @@ def test_send_icons_follow_live_blue_green_purple_accents_in_both_stages(compose
             assert send.evaluate('e=>getComputedStyle(e,"::before").maskImage') != 'none'
             page.evaluate('waiting=true;refreshInputAvailability()')
             assert send.evaluate('e=>getComputedStyle(e).backgroundColor') == 'rgb(239, 68, 68)'
-            assert send.evaluate('e=>getComputedStyle(e,"::before").maskImage') == 'none'
+            for pseudo in ('::before', '::after'):
+                assert send.evaluate('(e,pseudo)=>getComputedStyle(e,pseudo).content', pseudo) == 'none'
+                assert send.evaluate('(e,pseudo)=>getComputedStyle(e,pseudo).display', pseudo) == 'none'
             page.evaluate('waiting=false;refreshInputAvailability()')
             assert send.evaluate('e=>getComputedStyle(e).backgroundColor') == expected
 
@@ -175,6 +180,53 @@ def test_controls_fit_all_themes_and_busy_state_keeps_stop_action(composer_page)
     assert page.locator('#imagePickerWrap').is_hidden()
     page.locator('#sendBtn').click()
     assert not field.is_disabled()
+
+
+def test_plain_red_stop_still_aborts_the_request_from_both_composer_stages(composer_page):
+    import io
+    from PIL import Image
+
+    page = composer_page
+    source = (ROOT / 'static/script.js').read_text()
+    at = source.index('function stopCurrentAiReply()')
+    handlers = source[at:source.index('// -----------------------------\n// 基础状态', at)]
+    page.add_script_tag(content='''
+      window.activeAiRequests=new Map();window.busySessionIds=new Set();
+      window.pendingAiStartSessionIds=new Set();window.cancelOcrBatchRun=()=>{};
+      window.rollbacks=0;window.rollbackRetestAfterRequestFailure=()=>rollbacks++;
+      window.isSessionBusy=id=>busySessionIds.has(sessionBusyKey(id));
+      window.isSessionPendingAiStart=id=>pendingAiStartSessionIds.has(sessionBusyKey(id));
+    ''' + handlers)
+    for with_image in (False, True):
+        page.evaluate('''withImage=>{
+          ocrTasks.clear();if(withImage)ocrTasks.set('stop-image',{id:'stop-image',state:'ready',
+            file:{name:'图片.png'},originalUrl:'data:image/png;base64,iVBORw0KGgo=',startedAt:0,finishedAt:1});
+          renderOcrTasks();window.stoppedRequest={controller:new AbortController(),session:{id:currentId}};
+          activeAiRequests.set(sessionBusyKey(currentId),stoppedRequest);
+          busySessionIds.add(sessionBusyKey(currentId));pendingAiStartSessionIds.add(sessionBusyKey(currentId));
+          refreshInputAvailability();
+        }''', with_image)
+        stop = page.get_by_role('button', name='停止当前 AI 回复', exact=True)
+        assert stop.is_enabled() and stop.get_attribute('title') == '停止当前 AI 回复'
+        for pseudo in ('::before', '::after'):
+            assert stop.evaluate('(e,p)=>getComputedStyle(e,p).content', pseudo) == 'none'
+        # The painted center and surrounding interior are the same red; this
+        # catches pseudo-elements, text glyphs and overlaid child icons alike.
+        theme = page.locator('body').get_attribute('data-appearance-theme')
+        stage = 'images' if with_image else 'chat'
+        shot = stop.screenshot(path=f'/tmp/dmate-plain-stop-{theme}-{page.viewport_size["width"]}-{stage}.png')
+        pixels = Image.open(io.BytesIO(shot)).convert('RGB')
+        cx, cy = pixels.width // 2, pixels.height // 2
+        assert {pixels.getpixel((cx + dx, cy + dy)) for dx in (-5, 0, 5) for dy in (-5, 0, 5)} == {(239, 68, 68)}
+        if with_image:
+            stop.focus();stop.press('Enter')
+        else:
+            stop.click()
+        assert page.evaluate('stoppedRequest.cancelled&&stoppedRequest.controller.signal.aborted')
+        assert page.evaluate('activeAiRequests.size===0&&busySessionIds.size===0&&pendingAiStartSessionIds.size===0')
+        assert not page.locator('#text').is_disabled()
+        assert page.get_by_role('button', name='发送消息', exact=True).evaluate('e=>getComputedStyle(e,"::before").maskImage') != 'none'
+    assert page.evaluate('rollbacks') == 2 and page.evaluate('sends') == 0
 
 
 def test_voice_preparation_and_tail_cannot_send_partial_dictation(composer_page):
