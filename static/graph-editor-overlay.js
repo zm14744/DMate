@@ -393,7 +393,7 @@ function mount(host,o){
   for(const [name,fill,stroke] of [['dark','#111827','#ffffff'],['light','#ffffff','#111827']]){
    const mark=E(d,'marker',{id:o.instance+'-arrow-'+name,viewBox:'0 0 10 10',
       refX:8,refY:5,markerWidth:7,markerHeight:7,orient:'auto',markerUnits:'strokeWidth'});
-   mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill,stroke,'stroke-width':1.1,
+   mark.append(E(d,'path',{d:'M0 0 L10 5 L0 10z',fill,stroke:o.drawingOnly?'none':stroke,'stroke-width':1.1,
       'stroke-linejoin':'round'}));defs.append(mark);
   }
   svg.append(defs);
@@ -431,7 +431,9 @@ function mount(host,o){
       [pts[1][0]*w+shift[0],pts[1][1]*h+shift[1]]:[a[0],a[1]-length];
     let dx=center[0]-a[0],dy=center[1]-a[1],distance=Math.hypot(dx,dy);
     if(distance<8/scale){dx=0;dy=-8/scale;distance=-dy;center=[a[0],a[1]+dy];}
-    const u=[dx/distance,dy/distance],n=[-u[1],u[0]],attach=Math.min(distance*.2,6/scale),width=distance*1.25,pull=(distance-attach*.25)*4/3;
+    // Both arms start inside the visible vertex; the cubic midpoint still
+    // lands exactly on the draggable apex after resizing or rotating.
+    const u=[dx/distance,dy/distance],n=[-u[1],u[0]],attach=Math.min(distance*.2,3/scale),width=distance*1.25,pull=(distance-attach*.25)*4/3;
     const point=(along,across)=>[a[0]+u[0]*along+n[0]*across,a[1]+u[1]*along+n[1]*across];
     const p0=point(attach,attach),p1=point(pull,width),p2=point(pull,-width),p3=point(attach,-attach);
     drawPoints=cubicPoints(p0,p1,p2,p3,48);
@@ -501,9 +503,9 @@ function mount(host,o){
          gNode=E(d,'g',{'data-vertex-id':v.id,class:'dge-overlay-node'+(!finite(v.x)||!finite(v.y)?' is-estimated':'')+(o.nodeSelected?.().has(v.id)?' is-selected':'')});
    gNode.append(E(d,'circle',{cx:p[0],cy:p[1],r:hitRadius,class:'dge-overlay-node-hit'}));
    const halo=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius+2/scale,class:'dge-overlay-dot-halo'});
-   halo.style.fill='none';halo.style.stroke=haloInk;halo.style.strokeWidth=(3/scale)+'px';gNode.append(halo);
+   halo.style.fill='none';halo.style.stroke=o.drawingOnly?'none':haloInk;halo.style.strokeWidth=(3/scale)+'px';gNode.append(halo);
    const dot=E(d,'circle',{cx:p[0],cy:p[1],r:dotRadius,class:'dge-overlay-dot'});
-   dot.dataset.ink=ink;dot.style.fill=ink;dot.style.stroke=haloInk;
+   dot.dataset.ink=ink;dot.style.fill=ink;dot.style.stroke=o.drawingOnly?'none':haloInk;
    dot.style.strokeWidth=(o.nodeSelected?.().has(v.id)?3:2)/scale+'px';gNode.append(dot);
    const t=E(d,'text',{x:p[0]+labelOffset,y:p[1]-labelOffset,class:'dge-overlay-label'});
    t.textContent=v.label||v.display_label||'未命名'+(i+1);t.style.fontSize=labelSize+'px';

@@ -1,5 +1,6 @@
 """Editable self-loops and forgiving edge endpoints use actual browser geometry."""
 import base64
+from collections import deque
 import io
 import json
 import os
@@ -174,6 +175,60 @@ def test_solid_ink_is_a_continuous_path_with_one_final_arrow(loop_page):
         assert edge['count'] == 1 and edge['arrows'] == 1
         assert edge['joins'] == edge['caps'] == ['round']
         assert edge['dashes'] == ['none'] and edge['length'] > 50
+
+
+def test_both_loop_arms_and_straight_edge_are_visibly_connected_to_the_vertex(loop_page):
+    page = loop_page
+    # Test the actual painted pixels, without labels making unrelated ink
+    # look connected. Restrict traversal to the vertex neighbourhood so the
+    # two loop arms cannot reach each other by travelling around the apex.
+    page.add_style_tag(content='.dge-overlay-label { visibility:hidden!important; }')
+
+    def assert_connected():
+        geometry = page.evaluate('''()=>{
+          const dot=document.querySelector('[data-vertex-id="a"] .dge-overlay-dot'),
+            screen=p=>new DOMPoint(p.x,p.y).matrixTransform(dot.getScreenCTM()),
+            center=screen({x:+dot.getAttribute('cx'),y:+dot.getAttribute('cy')}),targets=[];
+          for(const [id,end]of [['loop',false],['loop',true],['ab',false]]){
+            const path=document.querySelector('[data-edge-id="'+id+'"] .dge-overlay-stroke'),
+              matrix=path.getScreenCTM(),scale=Math.hypot(matrix.a,matrix.b),
+              length=path.getTotalLength(),point=path.getPointAtLength(end?length-13/scale:13/scale),
+              target=new DOMPoint(point.x,point.y).matrixTransform(matrix);
+            targets.push({name:id+(end?'-return':'-start'),x:target.x,y:target.y});
+          }
+          return {center:{x:center.x,y:center.y},targets};
+        }''')
+        center = geometry['center']
+        left, top = int(center['x']) - 28, int(center['y']) - 28
+        png = page.screenshot(clip={'x': left, 'y': top, 'width': 56, 'height': 56})
+        image = Image.open(io.BytesIO(png)).convert('RGB')
+        cx, cy = center['x'] - left, center['y'] - top
+        dark = {(x, y) for y in range(56) for x in range(56)
+                if (x - cx) ** 2 + (y - cy) ** 2 < 23 ** 2
+                and max(image.getpixel((x, y))) < 160}
+        origin = (round(cx), round(cy))
+        assert origin in dark, 'The visible vertex must remain filled.'
+        connected, pending = {origin}, deque([origin])
+        while pending:
+            x, y = pending.popleft()
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    neighbour = (x + dx, y + dy)
+                    if neighbour in dark and neighbour not in connected:
+                        connected.add(neighbour)
+                        pending.append(neighbour)
+        for target in geometry['targets']:
+            x, y = round(target['x'] - left), round(target['y'] - top)
+            nearby = {(x + dx, y + dy) for dx in [-1, 0, 1] for dy in [-1, 0, 1]}
+            assert nearby & dark, target['name'] + ' must be painted in the crop.'
+            assert nearby & connected, target['name'] + ' has a visible white gap at the vertex.'
+
+    assert_connected()
+    drag_handle(page, 'loop', 35, -24)
+    close = page.get_by_role('button', name='关闭属性', exact=True)
+    if close.is_visible():
+        close.click()
+    assert_connected()
 
 
 def test_saved_loop_apex_outside_old_canvas_remains_in_the_scrollable_world(loop_page):
