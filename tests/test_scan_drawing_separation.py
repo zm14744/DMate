@@ -40,6 +40,7 @@ def scan_page(request):
         page.goto('https://dmate.test/')
         page.set_content('<div class="center" style="height:90dvh">'+fragment+'<aside class="right">'+menu+'</aside>'+dialog)
         page.add_style_tag(content=styles)
+        page.add_style_tag(content=(ROOT/'static/voice-input.css').read_text())
         page.add_style_tag(content=(ROOT/'static/graph-editor.css').read_text())
         for name in ['graph-editor-model.js','graph-editor-format.js','graph-editor-overlay.js','graph-editor.js','graph-scan-workspace.js']:
             page.add_script_tag(content=(ROOT/'static'/name).read_text())
@@ -129,9 +130,10 @@ def test_rectangles_and_freehand_of_both_types_recognize_without_moving_view(sca
 
 def test_pending_scans_block_confirmation_and_deleted_frames_ignore_late_results(scan_page):
     p=scan_page;open_scan(p);p.evaluate('window.deferGraph=true')
+    p.get_by_role('button',name='图形框选',exact=True).click()
     drag(p,[(.2,.2),(.6,.6)])
     p.wait_for_function('graphCalls.length===1')
-    assert p.get_by_role('button',name='保存并确认').is_disabled()
+    assert p.get_by_role('button',name='保存').is_disabled()
     p.get_by_role('button',name='删除图形框 1',exact=True).click()
     p.evaluate('resolveGraph()')
     p.wait_for_timeout(100)
@@ -142,7 +144,7 @@ def test_pending_scans_block_confirmation_and_deleted_frames_ignore_late_results
 def test_requirements_confirm_with_current_readonly_structure(scan_page):
     p=scan_page;open_scan(p)
     p.get_by_label('要求（可选）',exact=True).fill('只解第二问')
-    p.get_by_role('button',name='保存并确认').click()
+    p.get_by_role('button',name='保存').click()
     p.wait_for_function('posts.length===1')
     assert p.evaluate('posts[0].document.body_text')=='求下图从 A 到 B 的最短路径。'
     assert p.evaluate('posts[0].document.graphs[0].edges.length')==3

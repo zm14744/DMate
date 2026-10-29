@@ -50,6 +50,7 @@ import android.widget.Toast;
 public final class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final int LEGACY_SAVE_PERMISSION_REQUEST = 1002;
+    private static final int MICROPHONE_PERMISSION_REQUEST = 1003;
     private static final int MAX_PNG_BYTES = 20 * 1024 * 1024;
     private static final byte[] PNG_MAGIC = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     private static final String HOME_URL = BuildConfig.DMATE_URL;
@@ -62,6 +63,9 @@ public final class MainActivity extends Activity {
     private long filePickerLaunchedAt;
     private final ExecutorService imageSaver = Executors.newSingleThreadExecutor();
     private PendingSave pendingLegacySave;
+    private PermissionRequest pendingMicrophoneRequest;
+    // Do not attach a new WebView request to an older Android permission dialog.
+    private boolean microphonePermissionInFlight;
 
     private static final class PendingSave {
         final String id;
@@ -191,6 +195,65 @@ public final class MainActivity extends Activity {
             HOME_HOST.equalsIgnoreCase(page.getHost());
     }
 
+    private boolean isTrustedMicrophoneOrigin(Uri origin) {
+        if (origin == null || !"https".equalsIgnoreCase(origin.getScheme()) ||
+            !HOME_HOST.equalsIgnoreCase(origin.getHost()) || origin.getUserInfo() != null) return false;
+        Uri home = Uri.parse(HOME_URL);
+        int expectedPort = home.getPort() == -1 ? 443 : home.getPort();
+        int actualPort = origin.getPort() == -1 ? 443 : origin.getPort();
+        return "https".equalsIgnoreCase(home.getScheme()) &&
+            HOME_HOST.equalsIgnoreCase(home.getHost()) && actualPort == expectedPort;
+    }
+
+    private boolean isTrustedMicrophoneRequest(PermissionRequest request) {
+        return request != null && !isFinishing() && !isDestroyed() && webView != null &&
+            webView.getUrl() != null && isTrustedMicrophoneOrigin(request.getOrigin()) &&
+            isTrustedMicrophoneOrigin(Uri.parse(webView.getUrl()));
+    }
+
+    private void denyMicrophone(PermissionRequest request) {
+        if (request == null) return;
+        try { request.deny(); } catch (IllegalStateException ignored) {
+            // The renderer may already have cancelled its request.
+        }
+    }
+
+    private void cancelPendingMicrophoneRequest() {
+        PermissionRequest request = pendingMicrophoneRequest;
+        pendingMicrophoneRequest = null;
+        denyMicrophone(request);
+    }
+
+    private void grantMicrophone(PermissionRequest request) {
+        if (!isTrustedMicrophoneRequest(request) ||
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            denyMicrophone(request);
+            return;
+        }
+        // Never grant request.getResources(): camera and future permissions
+        // are outside this feature even when Android microphone access exists.
+        try { request.grant(new String[] { PermissionRequest.RESOURCE_AUDIO_CAPTURE }); }
+        catch (IllegalStateException ignored) { /* A cancelled renderer cannot receive a grant. */ }
+    }
+
+    private void requestMicrophone(PermissionRequest request) {
+        String[] resources = request.getResources();
+        if (resources == null || resources.length != 1 ||
+            !PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resources[0]) ||
+            !isTrustedMicrophoneRequest(request) || pendingMicrophoneRequest != null ||
+            microphonePermissionInFlight) {
+            denyMicrophone(request);
+            return;
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            grantMicrophone(request);
+            return;
+        }
+        pendingMicrophoneRequest = request;
+        microphonePermissionInFlight = true;
+        requestPermissions(new String[] { Manifest.permission.RECORD_AUDIO }, MICROPHONE_PERMISSION_REQUEST);
+    }
+
     private static boolean isValidPng(byte[] bytes) {
         if (bytes == null || bytes.length < PNG_MAGIC.length || bytes.length > MAX_PNG_BYTES) return false;
         for (int i = 0; i < PNG_MAGIC.length; i++) {
@@ -285,6 +348,19 @@ public final class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == MICROPHONE_PERMISSION_REQUEST) {
+            microphonePermissionInFlight = false;
+            PermissionRequest request = pendingMicrophoneRequest;
+            pendingMicrophoneRequest = null;
+            if (request == null) return;
+            if (permissions.length == 1 && Manifest.permission.RECORD_AUDIO.equals(permissions[0]) &&
+                grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                grantMicrophone(request); // Recheck both origins after the Android dialog.
+            } else {
+                denyMicrophone(request);
+            }
+            return;
+        }
         if (requestCode != LEGACY_SAVE_PERMISSION_REQUEST) return;
         PendingSave save = pendingLegacySave;
         pendingLegacySave = null;
@@ -297,6 +373,12 @@ public final class MainActivity extends Activity {
     }
 
     private final class DmateWebViewClient extends WebViewClient {
+        @Override
+        public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+            cancelPendingMicrophoneRequest();
+            super.onPageStarted(view, url, favicon);
+        }
+
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             return handleNavigation(request.getUrl());
@@ -388,8 +470,13 @@ public final class MainActivity extends Activity {
 
         @Override
         public void onPermissionRequest(PermissionRequest request) {
-            // v1 不索取摄像头、麦克风、定位等 Web 权限；图片识题走系统文件选择器。
-            request.deny();
+            requestMicrophone(request);
+        }
+
+        @Override
+        public void onPermissionRequestCanceled(PermissionRequest request) {
+            if (pendingMicrophoneRequest == request) pendingMicrophoneRequest = null;
+            super.onPermissionRequestCanceled(request);
         }
 
         @Override
@@ -402,6 +489,7 @@ public final class MainActivity extends Activity {
     }
 
     private boolean handleNavigation(Uri uri) {
+        cancelPendingMicrophoneRequest();
         if (uri == null) return true;
         String scheme = uri.getScheme();
         String host = uri.getHost();
@@ -508,6 +596,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        cancelPendingMicrophoneRequest();
         if (pendingFileCallback != null) {
             pendingFileCallback.onReceiveValue(null);
             pendingFileCallback = null;

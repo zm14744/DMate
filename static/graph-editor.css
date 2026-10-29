@@ -288,3 +288,12 @@
 .dgs-requirements{display:block;width:100%;resize:vertical;margin-top:7px;padding:9px}
 @media(max-width:760px){.dgs-workspace{grid-template-columns:minmax(0,1fr);gap:12px}.dgs-source{height:44dvh;min-height:300px}.dgs-information{max-height:36dvh}.dge-scan-only .dge-overlay-tools button{padding:6px 8px}}
 .dge-overlay-svg[data-mode=select] .dge-frame-hit{cursor:pointer}
+
+/* The image review's save action stays at the dialog's bottom-right edge. */
+.graph-editor-dialog[open]:has(.dmate-graph-scan){display:flex;flex-direction:column;overflow:hidden}
+.graph-editor-dialog:has(.dmate-graph-scan)>.graph-editor-dialog-head{flex:0 0 auto}
+.graph-editor-dialog:has(.dmate-graph-scan)>#graphEditorMount{flex:1 1 auto;min-height:0}
+.dmate-graph-scan{display:flex;flex-direction:column;min-height:0}
+.dmate-graph-scan>.dgs-content{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;overflow-anchor:none}
+.dmate-graph-scan>.dge-footer{flex:0 0 auto;width:100%;justify-content:flex-end;align-items:flex-end;margin:0;padding-top:14px}
+.dmate-graph-scan .dgs-status:empty{display:none}

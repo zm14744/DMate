@@ -2997,6 +2997,30 @@ def graph_confirmation_session():
     return response
 
 
+@app.route("/voice/transcribe", methods=["POST"])
+def voice_transcribe():
+    """Dictation only: return text to the composer, never submit it to chat."""
+    from voice_input import MAX_AUDIO_BYTES, VoiceInputError, transcribe_voice
+    if not _check_rate_limit(_get_client_ip(), "voice"):
+        return jsonify({"ok": False, "error": "语音输入过于频繁，请稍后重试。", "code": "voice_rate_limited"}), 429
+    uploaded = request.files.get("audio")
+    if uploaded is None:
+        return jsonify({"ok": False, "error": "没有收到录音，请重新录音。", "code": "missing_audio"}), 400
+    raw = uploaded.read(MAX_AUDIO_BYTES + 1)
+    try:
+        result = transcribe_voice(raw)
+    except VoiceInputError as exc:
+        payload = {"ok": False, "error": exc.message, "code": exc.code}
+        if exc.provider_code:
+            payload["provider_code"] = exc.provider_code
+        response = jsonify(payload)
+        response.status_code = exc.status
+    else:
+        response = jsonify({"ok": True, **result})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/graph/text-region", methods=["POST"])
 def recognize_manual_text_region():
     """Only OCR explicitly framed pixels; never reconstruct graph topology."""
@@ -3246,11 +3270,18 @@ def chat():
         }), 400
 
     confirmed_context = None
-    if data.get("semantic_context") is not None:
+    confirmed_batch = "semantic_contexts" in data
+    if confirmed_batch or data.get("semantic_context") is not None:
         from graph_confirmation import ConfirmationError, confirmation_owner, resolve_confirmed_context
         import sqlite3
         try:
-            confirmed_context = resolve_confirmed_context(confirmation_owner(), data["semantic_context"])
+            if confirmed_batch:
+                if data.get("semantic_context") is not None:
+                    raise ConfirmationError("ambiguous_confirmation_input", "请使用同一批图片发起解题，不要混用单图结构。")
+                from graph_confirmation_batch import resolve_confirmed_batch
+                confirmed_context = resolve_confirmed_batch(confirmation_owner(), data["semantic_contexts"])
+            else:
+                confirmed_context = resolve_confirmed_context(confirmation_owner(), data["semantic_context"])
         except ConfirmationError as exc:
             return jsonify({"error": exc.message, "code": exc.code, "issues": exc.issues}), exc.status
         except (sqlite3.Error, OSError):
@@ -3644,7 +3675,10 @@ def chat():
         # old reply as well as the next request; it cannot appear as the answer
         # for the newly edited graph.
         try:
-            resolve_confirmed_context(confirmation_owner(), confirmed_context)
+            if confirmed_batch:
+                resolve_confirmed_batch(confirmation_owner(), data["semantic_contexts"])
+            else:
+                resolve_confirmed_context(confirmation_owner(), confirmed_context)
         except ConfirmationError as exc:
             return jsonify({"error": exc.message, "code": exc.code}), exc.status
         except (sqlite3.Error, OSError):

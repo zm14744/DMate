@@ -17,6 +17,11 @@ on:
       - 'tests/test_graph_frame_gestures.py'
       - 'tests/test_scan_drawing_separation.py'
       - 'tests/test_graph_appearance_ui.py'
+      - 'static/voice-input.js'
+      - 'static/voice-input.css'
+      - 'tests/test_voice_input_ui.py'
+      - 'tests/test_ocr_batch_frontend.py'
+      - 'tests/test_scan_selection_save.py'
       - 'static/script.js'
       - 'templates/index.html'
       - 'tests/test_ocr_upload_layout.py'
@@ -55,6 +60,9 @@ jobs:
           )"
           test -x "$DMATE_BROWSER_EXECUTABLE"
           python -m pytest -q \
+            tests/test_voice_input_ui.py \
+            tests/test_ocr_batch_frontend.py \
+            tests/test_scan_selection_save.py \
             tests/test_graph_appearance_ui.py \
             tests/test_scan_drawing_separation.py \
             tests/test_visual_graph_editor.py::test_real_browser_edits_and_confirms_the_same_user_visible_document \

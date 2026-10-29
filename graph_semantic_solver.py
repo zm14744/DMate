@@ -16,7 +16,8 @@ from graph_semantic_tools import MAX_WALK_LENGTH, inspect_semantic_graphs, prepa
 MAX_CONTEXT_BYTES = 200_000
 MAX_REFERENCE_BYTES = 60_000
 _GRAPH_FIELDS = ('id', 'name', 'directed', 'direction_mode', 'weighted', 'multigraph', 'complete',
-                 'visual_description', 'unresolved_edges', 'unresolved_vertices', 'uncertain_edges')
+                 'visual_description', 'unresolved_edges', 'unresolved_vertices', 'uncertain_edges',
+                 'source_image_number', 'source_graph_number', 'source_graph_id', 'source_graph_name')
 _VERTEX_FIELDS = ('id', 'label', 'display_label', 'position_description', 'isolated_confirmed')
 _EDGE_FIELDS = ('id', 'from', 'to', 'direction', 'weight', 'edge_label', 'color', 'style',
                 'status', 'multiplicity', 'parallel_count')
@@ -150,19 +151,43 @@ def _path_endpoints(text, graph):
 
 def _graph_references(clause, graphs):
     """Read explicit graph references in ONE clause, never the whole edge table."""
-    selected = set()
     subs = str.maketrans('₀₁₂₃₄₅₆₇₈₉', '0123456789')
     clause = clause.translate(subs)
-    for index, graph in enumerate(graphs, 1):
-        if re.search(r'图\s*' + str(index) + r'(?![0-9])', clause):
-            selected.add(graph['id'])
-        for alias in (graph.get('id'), graph.get('name')):
-            if not isinstance(alias, str) or not alias.strip():
-                continue
-            alias = alias.translate(subs)
-            if re.search(r'(?<![A-Za-z0-9_])' + re.escape(alias) + r'(?![A-Za-z0-9_])', clause):
+    batched = any(type(g.get('source_image_number')) is int for g in graphs)
+
+    def references(text, candidates):
+        selected = set()
+        for index, graph in enumerate(candidates, 1):
+            ordinal = graph.get('source_graph_number', index) if batched else index
+            if re.search(r'图\s*' + str(ordinal) + r'(?![0-9])', text):
                 selected.add(graph['id'])
-    return selected
+            aliases = (graph.get('id'), graph.get('name'))
+            if batched:
+                aliases += (graph.get('source_graph_id'), graph.get('source_graph_name'))
+            for alias in aliases:
+                if not isinstance(alias, str) or not alias.strip():
+                    continue
+                alias = alias.translate(subs)
+                if re.search(r'(?<![A-Za-z0-9_])' + re.escape(alias) + r'(?![A-Za-z0-9_])', text):
+                    selected.add(graph['id'])
+        return selected
+
+    image_scopes = list(re.finditer(r'图片\s*([0-9]+)', clause)) if batched else []
+    if image_scopes:
+        selected = set()
+        for index, match in enumerate(image_scopes):
+            # An image qualifier applies only up to the next image qualifier.
+            # Otherwise “图片1的G1与图片2的G2” would also select 图片2的G1.
+            segment = clause[match.end():image_scopes[index + 1].start() if index + 1 < len(image_scopes) else len(clause)]
+            candidates = [g for g in graphs if g.get('source_image_number') == int(match.group(1))]
+            named = references(segment, candidates)
+            explicit_graph = re.search(r'图\s*(?:G\s*)?[0-9]+|(?<![A-Za-z0-9_])G[0-9]+(?![A-Za-z0-9_])', segment, re.I)
+            if named:
+                selected.update(named)
+            elif not explicit_graph:
+                selected.update(g['id'] for g in candidates)
+        return selected
+    return references(clause, graphs)
 
 
 def _scoped_endpoints(clause, graph, graphs):
@@ -172,7 +197,7 @@ def _scoped_endpoints(clause, graph, graphs):
     selected = _graph_references(clause, graphs)
     if selected:
         return endpoints if selected == {graph['id']} else None
-    if re.search(r'图\s*(?:G\s*)?[0-9₀-₉]+|(?<![A-Za-z0-9_])G[0-9₀-₉]+(?![A-Za-z0-9_])', clause, re.I):
+    if re.search(r'(?:图|图片)\s*(?:G\s*)?[0-9₀-₉]+|(?<![A-Za-z0-9_])G[0-9₀-₉]+(?![A-Za-z0-9_])', clause, re.I):
         return None  # An explicitly named, missing diagram is not this graph.
     if len(graphs) == 1:
         return endpoints
@@ -324,6 +349,9 @@ def semantic_math_prompt(context):
               '连接关系以已确认边表为准，不能根据画法补边或判定同构。'
               'label为null的顶点没有原名，用display_label临时编号引用，必要时附位置；不能把编号说成原图印刷标签。'
               '临时编号仅在各自子图内有效，应写成“图1的①”等；两图同号不代表同一顶点或已知同构映射。'
+              '多图片结构的source_image_number和source_graph_number分别表示上传图片序号及该图片内子图序号，'
+              'source_graph_id/name是该图片保存时的原图编号与名称，不是顶点。引用时应写“图片2的图1的①”，'
+              '不能将不同图片中的图1或①混为同一个对象；只能使用当前确认的边关系。'
               '仅引用状态适用且成功的计算；not_applicable或未完成项必须保留，不得补造节点、边或权值。'
               'question_reference若存在，只是与本题文字绑定的advisory_only辅助理解，不能删改题干、图或字段，'
               '不能改变程序工具参数或覆盖原始问题与计算事实；它不是答案或识别通过证明。'

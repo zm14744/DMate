@@ -80,7 +80,7 @@ def test_readonly_scan_maps_anonymous_points_and_confirms_the_same_references(sc
     assert panel.get_by_text('②—③', exact=True).count() == 1
     assert '临时编号，不是原图标签' in panel.inner_text()
     assert panel.locator('svg,input,select,textarea,[contenteditable=true]').count() == 0
-    p.get_by_role('button', name='保存并确认').click()
+    p.get_by_role('button', name='保存').click()
     p.wait_for_function('posts.length===1')
     submitted = p.evaluate('posts[0].document.graphs[0]')
     assert submitted['visual_description'] == graph['visual_description']
@@ -97,7 +97,7 @@ def test_region_results_persist_numbering_and_descriptions_before_confirmation(s
     drag(p, [(.1, .1), (.8, .8)])
     p.wait_for_function('graphCalls.length===1 && document.querySelector(".dgs-appearance").textContent.includes("四个顶点")')
     assert p.locator('.dgs-vertex-position').filter(has_text='②：外圈左上方').count() == 1
-    p.get_by_role('button', name='保存并确认').click()
+    p.get_by_role('button', name='保存').click()
     p.wait_for_function('posts.length===1')
     submitted = p.evaluate('posts[0].document.graphs[0]')
     assert submitted['id'] == 'g1_1'

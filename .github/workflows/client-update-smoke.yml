@@ -10,6 +10,8 @@ on:
       - 'app.py'
       - 'static/client-updates.json'
       - 'static/script.js'
+      - 'static/voice-input.js'
+      - 'static/voice-input.css'
       - 'static/graph-editor.js'
       - 'static/graph-editor-overlay.js'
       - 'static/graph-editor.css'
@@ -19,6 +21,9 @@ on:
       - 'tests/web_sync_contract.js'
       - 'tests/test_web_sync_contract.py'
       - 'tests/test_android_upload_ui_contract.py'
+      - 'tests/test_android_voice_permission.py'
+      - 'android/app/src/main/java/app/dmate/client/MainActivity.java'
+      - 'android/app/src/main/AndroidManifest.xml'
       - 'android/app/src/main/java/app/dmate/client/NativeUpdateManager.java'
       - '.github/workflows/client-update-smoke.yml'
   workflow_dispatch:
@@ -41,12 +46,15 @@ jobs:
           node --check static/web-sync.js
           node --check static/legacy-worker-retire.js
           node --check static/script.js
+          node --check static/voice-input.js
           node --check static/graph-editor.js
           node --check static/graph-editor-overlay.js
           node tests/client_update_contract.js
           node tests/web_sync_contract.js
       - name: Check Android file upload and release rules
-        run: python -m unittest discover -s tests -p 'test_android_upload_ui_contract.py'
+        run: |
+          python -m unittest discover -s tests -p 'test_android_upload_ui_contract.py'
+          python -m unittest discover -s tests -p 'test_android_voice_permission.py'
       - name: Verify installed apps receive latest web without new APK
         run: |
           python -m unittest discover -s tests -p 'test_web_sync_contract.py'

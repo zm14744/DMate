@@ -15,22 +15,27 @@ function mount(container,options){
  right.setAttribute('aria-label','识别信息');
  const textSection=el('section','dgs-text'),graphSection=el('section','dgs-graphs'),status=el('p','dgs-status');
  textSection.setAttribute('aria-label','文字信息');graphSection.setAttribute('aria-label','图形信息');status.setAttribute('role','status');
- status.textContent=(options.issues||[]).map(row=>typeof row==='string'?row:row?.message||'').filter(Boolean).join('；');
+ // Model reasoning/debug notes are not user-facing instructions. Current
+ // frame failures and uncertain edge attributes remain visible in their rows.
  right.append(textSection,graphSection,status);workspace.append(left,right);
  const requestLabel=el('label','dgs-requirements-label','要求（可选）'),request=el('textarea','dgs-requirements');
- request.rows=2;request.maxLength=4000;request.value=options.requirements||'';request.placeholder='例如：只解第（2）问';
+ request.rows=2;request.maxLength=4000;request.value=options.requirements||'';
  request.setAttribute('aria-label','要求（可选）');request.addEventListener('input',()=>options.onRequirementsChange?.(request.value));requestLabel.append(request);
- const footer=el('div','dge-footer'),confirm=button('保存并确认',async()=>{
+ const footer=el('div','dge-footer'),confirm=button('保存',async()=>{
   if(pending()||saving)return;saving=true;refresh();
   try{await options.onConfirm(copy(document),options.isQuestion!==false);}catch(error){status.textContent=error?.message||'确认失败，请重试。';}
   finally{saving=false;if(!destroyed)refresh();}
  });footer.append(confirm);confirm.classList.add('dge-primary');
- container.replaceChildren(workspace,requestLabel,footer);container.classList.add('dmate-graph-editor','dmate-graph-scan');
+ const content=el('div','dgs-content');content.append(workspace,requestLabel);
+ container.replaceChildren(content,footer);container.classList.add('dmate-graph-editor','dmate-graph-scan');
  const pending=()=>[...state.graphRegions,...state.textRegions].some(r=>['queued','running','error'].includes(r.status));
  const emit=()=>options.onChange?.(copy(document));
  const bounds=points=>{const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];};
  const frames=()=>state.graphRegions.map(row=>({id:row.id,bbox:bounds(row.polygon),...(row.irregular?{region_polygon:row.polygon}:{}),vertices:[],edges:[]}));
- const overlayState=state.view ||= {mode:'bounds',zoom:100,visible:true};overlayState.regions=state.textRegions;
+ const overlayState=state.view ||= {zoom:100,visible:true};
+ // Opening a saved task starts with selection, even if its last gesture was
+ // a framing tool. Keep the task's source coordinates and recognition rows.
+ overlayState.mode='select';overlayState.start=null;overlayState.polygonDraft=[];overlayState.regions=state.textRegions;
  function assembleGraphs(){if(state.graphSelectionActive)document.graphs=state.graphRegions.flatMap(r=>r.graphs||[]);}
  function assembleText(){if(state.textSelectionActive)document.body_text=state.textRegions.slice().sort((a,b)=>a.id-b.id).map(r=>r.text||'').filter(Boolean).join('\n\n');}
  function changeGraph(row,points,irregular){
@@ -71,7 +76,7 @@ function mount(container,options){
    for(const edge of row.relations)section.append(el('p','dgs-relation',edge.txt));graphSection.append(section);
   });
   for(const row of state.graphRegions)graphSection.append(regionStatus(row,'graph'));
-  confirm.disabled=saving||pending();confirm.textContent=saving?'正在保存…':'保存并确认';request.disabled=saving;
+  confirm.disabled=saving||pending();confirm.textContent=saving?'正在保存…':'保存';request.disabled=saving;
  }
  async function pumpGraphs(){
   if(graphBusy||destroyed)return;graphBusy=true;

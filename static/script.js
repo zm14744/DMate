@@ -1948,6 +1948,12 @@ function mergeCloudMessage(left, right) {
         || sanitizeSemanticContext(left?.semanticContext, merged);
     if (semanticContext) merged.semanticContext = semanticContext;
     else delete merged.semanticContext;
+    const semanticContexts = sanitizeSemanticContexts(right?.semanticContexts, merged)
+        || sanitizeSemanticContexts(left?.semanticContexts, merged);
+    if (semanticContexts) {
+        merged.semanticContexts = semanticContexts;
+        delete merged.semanticContext;
+    } else delete merged.semanticContexts;
     return merged;
 }
 
@@ -3122,6 +3128,10 @@ function handleSendOrStop() {
         stopCurrentAiReply();
         return;
     }
+    if (ocrTasks.size > 0) {
+        void sendOcrBatch();
+        return;
+    }
     send();
 }
 
@@ -3246,6 +3256,12 @@ function refreshInputAvailability() {
     if (imageInput) {
         imageInput.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
     }
+    if (typeof ocrBatchPreparing !== "undefined" && ocrBatchPreparing) {
+        if (sendBtn) sendBtn.disabled = true;
+        if (imageBtn) imageBtn.disabled = true;
+        if (imageInput) imageInput.disabled = true;
+    }
+    window.dmateVoiceInput?.refresh?.();
     const imagePickerWrap = document.getElementById("imagePickerWrap");
     if (imagePickerWrap) imagePickerWrap.hidden = visibleMode !== "idle";
     if (inputWrap) {
@@ -9502,6 +9518,27 @@ function buildOcrSemanticContext(data, text, questionText, internalQuestionText)
     });
 }
 
+function ocrBatchQuestion(contexts, field) {
+    return contexts.map((context, index) => `【图片 ${index + 1}】\n${context[field]}`).join("\n\n");
+}
+
+function sanitizeSemanticContexts(values, message = null) {
+    if (!Array.isArray(values) || values.length < 1 || values.length > 4) return null;
+    const contexts = values.map(value => sanitizeSemanticContext(value));
+    if (contexts.some(value => !value?.confirmation_token)) return null;
+    if (new Set(contexts.map(value => value.request_id)).size !== contexts.length) return null;
+    const question = ocrBatchQuestion(contexts, "question_text");
+    const rendered = ocrBatchQuestion(contexts, "rendered_question_text");
+    if (question.length > 24000 || rendered.length > 24000) return null;
+    try { if (new TextEncoder().encode(JSON.stringify(contexts)).byteLength > 200000) return null; }
+    catch (_error) { return null; }
+    if (message !== null && (message?.role !== "user" || message?.source !== "ocr"
+        || typeof message.text !== "string" || typeof message.apiText !== "string"
+        || extractOcrQuestionPayload(message.text) !== extractOcrQuestionPayload(rendered)
+        || !message.apiText.includes(question))) return null;
+    return contexts;
+}
+
 function semanticContextForRequest(session, targetCandidate, apiMessages, options = {}) {
     if (!Array.isArray(session?.messages) || !Array.isArray(apiMessages)
         || options.exerciseRequest || options.retestGeneration) return undefined;
@@ -9525,7 +9562,11 @@ function semanticContextForRequest(session, targetCandidate, apiMessages, option
             || targetCandidate.index >= latestIndex || targetCandidate.role !== "user") return undefined;
         selected = session.messages[targetCandidate.index];
     }
-    const context = sanitizeSemanticContext(selected?.semanticContext, selected);
+    const contexts = sanitizeSemanticContexts(selected?.semanticContexts, selected);
+    const context = contexts ? {
+        question_text: ocrBatchQuestion(contexts, "question_text"),
+        rendered_question_text: ocrBatchQuestion(contexts, "rendered_question_text")
+    } : sanitizeSemanticContext(selected?.semanticContext, selected);
     if (!context) return undefined;
     if (selected !== latest && extractOcrQuestionPayload(targetCandidate.text)
         !== extractOcrQuestionPayload(context.rendered_question_text)) return undefined;
@@ -9535,7 +9576,7 @@ function semanticContextForRequest(session, targetCandidate, apiMessages, option
     if (typeof current?.content !== "string" || !(current.content.includes(context.question_text)
         || current.content.includes(context.rendered_question_text)
         || current.content.includes(visibleAnchor))) return undefined;
-    return context;
+    return contexts || context;
 }
 
 function saveState() {
@@ -9610,6 +9651,7 @@ function loadState() {
                         ? message.apiText
                         : undefined,
                     semanticContext: sanitizeSemanticContext(message.semanticContext, message) || undefined,
+                    semanticContexts: sanitizeSemanticContexts(message.semanticContexts, message) || undefined,
                     generatedExercise: Boolean(
                         message.generatedExercise
                     ),
@@ -13350,7 +13392,8 @@ async function requestAiReply(session) {
             },
             body: JSON.stringify({
                 messages: apiMessages,
-                semantic_context: semanticContext,
+                semantic_context: Array.isArray(semanticContext) ? undefined : semanticContext,
+                semantic_contexts: Array.isArray(semanticContext) ? semanticContext : undefined,
                 // 强约束：明确出题请求由前端直接告诉后端。
                 // 后端据此必须返回 generated_question + generated_teaching，
                 // 不再只靠自然语言二次猜测“这是不是出题”。
@@ -13613,6 +13656,7 @@ async function requestAiReply(session) {
 }
 
 function send() {
+    if (ocrTasks.size > 0) { void sendOcrBatch(); return; }
     if (
         ocrReviewInProgress
         || isCurrentSessionTyping()
@@ -14200,6 +14244,7 @@ function reviewRecognizedQuestion(file, data) {
 const OCR_MAX_CONCURRENT = 4;
 const ocrTasks = new Map();
 const ocrSolvingSessions = new Set();
+let ocrBatchPreparing = false;
 let ocrTaskTimer = null;
 let ocrEditorTaskId = null;
 let ocrEditorController = null;
@@ -14276,6 +14321,11 @@ function renderOcrTasks() {
                 || normalComposer.querySelector("#sendBtn"));
         }
     }
+    const sendButton = document.getElementById("sendBtn");
+    if (sendButton && uploadActions && normalComposer) {
+        const destination = hasImages ? uploadActions : normalComposer;
+        if (sendButton.parentElement !== destination) destination.appendChild(sendButton);
+    }
     const fragment = document.createDocumentFragment();
     const element = (tag, className, text) => {
         const node = document.createElement(tag);
@@ -14350,7 +14400,6 @@ function renderOcrTasks() {
             const input = element("textarea", "ocr-task-request");
             input.rows = 2;
             input.value = task.userRequest;
-            input.placeholder = "例如：只解第（2）问";
             input.dataset.taskId = task.id;
             input.dataset.ocrField = "userRequest";
             input.maxLength = 4000;
@@ -14370,7 +14419,6 @@ function renderOcrTasks() {
         };
         if (task.state !== "recognizing") {
             button(task.confirmation ? "继续修改" : task.result?.manual_mode ? "开始描绘" : task.state === "ready" ? "编辑核对" : "手动录入", "edit", !task.confirmation);
-            if (task.confirmation) button("解题", "solve", true);
         }
         content.append(actions);
         card.append(thumbnail, content);
@@ -14552,8 +14600,8 @@ async function handleImageSelected(event) {
 async function enqueueOcrFiles(files) {
     const selected = Array.from(files || []);
     if (!selected.length || ocrEditorTaskId) return;
-    if (selected.length > OCR_MAX_CONCURRENT || selected.length + ocrActiveCount() > OCR_MAX_CONCURRENT) {
-        showCurrentError("一次最多选择 4 张图片，同时识别的图片也不能超过 4 张。");
+    if (ocrBatchPreparing || selected.length > OCR_MAX_CONCURRENT || selected.length + ocrTasks.size > OCR_MAX_CONCURRENT) {
+        showCurrentError("每批最多 4 张图片，请发送或移除已有图片后再添加。");
         return;
     }
     if (!currentId) newChat();
@@ -14909,6 +14957,88 @@ async function solveOcrTask(id) {
     renderOcrTasks();
     try { await requestAiReply(session); }
     finally { task.sending = false; ocrSolvingSessions.delete(session.id); renderOcrTasks(); }
+}
+
+async function sendOcrBatch() {
+    if (ocrBatchPreparing || ocrEditorTaskId || !ocrTasks.size) return;
+    const tasks = [...ocrTasks.values()];
+    const session = sessions.find(item => item.id === tasks[0].sessionId);
+    if (!session || tasks.some(task => task.sessionId !== session.id)) {
+        showCurrentError("这些图片不属于同一个会话，请移除其他会话的图片后再发送。");
+        return;
+    }
+    if (ocrSolvingSessions.has(session.id) || isSessionBusy(session.id) || isSessionPendingAiStart(session.id)
+        || session.id === currentId && isCurrentSessionTyping()) return;
+    if (tasks.some(task => task.state === "recognizing" || task.confirming)) {
+        showCurrentError("还有图片正在识别，请完成后一起发送。");
+        return;
+    }
+    if (tasks.some(task => task.state !== "ready" || !task.draft
+        || !task.draft.body_text?.trim() && !task.draft.graphs?.length)) {
+        showCurrentError("有图片未识别成功，请编辑核对或移除后再发送。");
+        return;
+    }
+    ocrBatchPreparing = true;
+    ocrSolvingSessions.add(session.id);
+    tasks.forEach(task => { task.sending = true; });
+    renderOcrTasks();
+    try {
+        // Clicking Send confirms the visible drafts that have not been saved
+        // yet. All source-bound checks finish before any AI request is sent.
+        for (const task of tasks) {
+            const saved = task.confirmation?.drawing_document || task.confirmation?.document;
+            if (!task.confirmation || task.dirty || JSON.stringify(task.draft) !== JSON.stringify(saved))
+                await confirmOcrTask(task, task.draft);
+        }
+        const contexts = sanitizeSemanticContexts(tasks.map(task => task.confirmation?.semantic_context));
+        if (!contexts) throw new Error("图片结构无效或整批内容过长，请核对后拆分发送。");
+        const question = ocrBatchQuestion(contexts, "question_text");
+        const rendered = ocrBatchQuestion(contexts, "rendered_question_text");
+        const requirements = tasks.map((task, index) => task.userRequest.trim()
+            ? `图片 ${index + 1}：${task.userRequest.trim()}` : "").filter(Boolean);
+        const typed = document.getElementById("text");
+        const sharedRequest = typed?.value?.trim() || "";
+        if (sharedRequest) requirements.push(sharedRequest);
+        const userRequest = requirements.join("\n") || "请依据以上全部图片已确认的题干和图形结构解题，并核验适用的计算结果。";
+        const combinedText = `${rendered}\n\n【我的要求】\n${userRequest}`;
+        const apiText = ["【当前指向题目】", question, "【当前指向题目结束】", "",
+            "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n");
+        if (combinedText.length > 28000 || apiText.length > 28000)
+            throw new Error("整批题目内容过长，请减少图片或分批发送。");
+        currentId = session.id;
+        session.messages.push({ role: "user", text: combinedText, apiText, source: "ocr",
+            ocrIsQuestion: tasks.some(task => task.isQuestion !== false), semanticContexts: contexts });
+        maybeAutoNameSession(session, tasks[0].draft.body_text || tasks[0].file.name || "图片识题", "ocr");
+        // The complete signed snapshots are now in chat history. Returning to
+        // the composer avoids sending the same attachment batch a second time.
+        for (const task of tasks) {
+            ocrTasks.delete(task.id);
+            URL.revokeObjectURL(task.originalUrl);
+        }
+        if (typed) { typed.value = ""; typed.dispatchEvent(new Event("input", { bubbles: true })); }
+        saveState(); renderChat(); renderSessions(); renderInfo();
+        ocrBatchPreparing = false;
+        renderOcrTasks();
+        await requestAiReply(session);
+    } catch (error) {
+        showCurrentError(error?.message || "图片未能发送，请稍后重试。");
+    } finally {
+        ocrBatchPreparing = false;
+        tasks.forEach(task => { task.sending = false; });
+        ocrSolvingSessions.delete(session.id);
+        renderOcrTasks();
+    }
+}
+
+function initializeVoiceInput() {
+    if (window.dmateVoiceInput || !window.DMateVoiceInput?.mount) return;
+    const button = document.getElementById("voiceInputBtn"), input = document.getElementById("text");
+    if (!button || !input) return;
+    window.dmateVoiceInput = window.DMateVoiceInput.mount({ button, input,
+        status: document.getElementById("voiceInputStatus"), endpoint: "/voice/transcribe",
+        getContextKey: () => String(currentId ?? ""),
+        isBusy: () => Boolean(ocrReviewInProgress || ocrBatchPreparing || ocrTasks.size > 0 || isSessionBusy(currentId)
+            || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) });
 }
 
 function initializeOcrTaskPanel() {
@@ -21053,6 +21183,7 @@ document.addEventListener(
             imageInput.addEventListener("change", handleImageSelected);
         }
         initializeOcrTaskPanel();
+        initializeVoiceInput();
 
 
         if (wrongBookBtn) {

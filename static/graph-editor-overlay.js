@@ -33,7 +33,9 @@ function mount(host,o){
   if(y<world.top)world.top=Math.floor(y)-1;if(y>world.bottom)world.bottom=Math.ceil(y)+1;
   layoutWorld();
   const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;
-  scroll.scrollLeft+=(oldLeft-world.left)*scale;scroll.scrollTop+=(oldTop-world.top)*scale*h/w;
+  const shift=[(oldLeft-world.left)*scale,(oldTop-world.top)*scale*h/w];
+  scroll.scrollLeft+=shift[0];scroll.scrollTop+=shift[1];
+  return shift;
  };
  const regionPoint=p=>p.map(clamp);
  const previewRegion=points=>o.previewRegion?.(points);
@@ -427,10 +429,13 @@ function mount(host,o){
   if(base&&pointers.size>=2){const a=[...pointers.values()],distance=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(base.distance>4)zoom(base.zoom*distance/base.distance);return;}
   if(!active||active.pointer!==e.pointerId)return;
   if(active.kind==='pan'){
+    // A click or small finger/mouse tremor must only select. In particular,
+    // it must not expand a fitted world whose left/top bounds are fractional.
+    if(!active.dragging&&Math.hypot(e.clientX-active.start[0],e.clientY-active.start[1])<4)return;
+    active.dragging=true;
     let x=active.sx+active.start[0]-e.clientX,y=active.sy+active.start[1]-e.clientY;
-    const scale=Math.max(1,scroll.clientWidth)*(s.zoom||100)/100;
-    if(x<0){expandWorld(world.left-1,world.top);active.sx+=2*scale;x+=2*scale;}
-    if(y<0){expandWorld(world.left,world.top-1);active.sy+=2*scale*h/w;y+=2*scale*h/w;}
+    if(x<0){const shift=expandWorld(world.left-1,world.top);active.sx+=shift[0];active.sy+=shift[1];x+=shift[0];y+=shift[1];}
+    if(y<0){const shift=expandWorld(world.left,world.top-1);active.sx+=shift[0];active.sy+=shift[1];x+=shift[0];y+=shift[1];}
     if(x+scroll.clientWidth>=stage.offsetWidth)expandWorld(world.right+1,world.top);
     if(y+scroll.clientHeight>=stage.offsetHeight)expandWorld(world.left,world.bottom+1);
     scroll.scrollLeft=x;scroll.scrollTop=y;

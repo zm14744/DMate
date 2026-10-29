@@ -8677,7 +8677,7 @@ window.MathJax = {
 }
 .ocr-upload-stage .ocr-task-panel-head h2 {font-size:20px;line-height:1.4;}
 .ocr-upload-stage .ocr-task-panel-hint {margin:8px 0 18px;}
-.ocr-upload-actions {flex:0 0 auto; align-self:flex-end; min-width:0;}
+.ocr-upload-actions {display:flex; gap:12px; flex:0 0 auto; align-self:flex-end; align-items:center; min-width:0;}
 .ocr-upload-stage .image-picker-wrap {
     position:relative; display:inline-flex; flex:0 0 auto;
     align-items:center; justify-content:center; align-self:flex-end;
@@ -8703,6 +8703,18 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn::be
 body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn:disabled {
     opacity:.5 !important; cursor:not-allowed;
 }
+body[data-appearance-theme] .ocr-upload-stage #sendBtn {
+    box-sizing:border-box !important; display:inline-flex !important;
+    align-items:center !important; justify-content:center !important;
+    width:auto !important; min-width:80px !important; flex:0 0 auto !important;
+    height:52px !important; min-height:52px !important; max-height:52px !important;
+    margin:0 !important; padding:0 19px !important; border:0 !important;
+    border-radius:12px !important; background:var(--accent) !important; color:#fff !important;
+    -webkit-text-fill-color:#fff !important; font-size:15px !important; font-weight:650 !important;
+    line-height:1.2 !important; white-space:nowrap !important; cursor:pointer;
+}
+body[data-appearance-theme] .ocr-upload-stage #sendBtn:disabled {opacity:.5 !important;cursor:not-allowed;}
+body[data-appearance-theme] .ocr-upload-stage #sendBtn[hidden] {display:none !important;}
 /* Keep the actual file input covering the visible button. Direct native taps
    remain supported in older Android WebView and WebKit. */
 body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
@@ -8733,8 +8745,13 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
         min-width:108px !important; padding:0 16px !important;
         font-size:14px !important;
     }
+    body[data-appearance-theme] .ocr-upload-stage #sendBtn {
+        height:46px !important; min-height:46px !important; max-height:46px !important;
+        min-width:72px !important; padding:0 16px !important; font-size:14px !important;
+    }
 }
 </style>
+<link rel="stylesheet" href="/static/voice-input.css?v={{ dmate_web_revision }}">
 </head>
 
 <body data-appearance-theme="light" data-platform-android="{{ '1' if is_android else '0' }}" data-platform-ios="{{ '1' if is_ios else '0' }}" data-dmate-android-app="{{ '1' if is_dmate_android_app else '0' }}" data-dmate-desktop-app="{{ '1' if is_dmate_desktop_app else '0' }}">
@@ -8833,6 +8850,9 @@ window.DMATE_CLIENT_CONFIG = {{ {
         <div class="input">
             <div class="manual-question-composer">
                 <input id="text" type="text" placeholder="" autocomplete="off">
+                <button id="voiceInputBtn" class="voice-input-button" type="button" aria-label="语音输入" title="语音输入" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>
+                </button>
             </div>
             <span class="image-picker-wrap" id="imagePickerWrap">
                 <button id="imageBtn" type="button" title="一次选择 1–4 张图片，也可以拖放或粘贴">上传图片</button>
@@ -8842,6 +8862,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <button id="sendBtn" type="button" onclick="handleSendOrStop()">发送</button>
         </div>
         <div id="inputLockHint" class="input-lock-hint hidden" aria-live="polite"></div>
+        <div id="voiceInputStatus" class="voice-input-status" aria-live="polite"></div>
     </div>
 </div>
 
@@ -9496,6 +9517,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/graph-editor-overlay.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-scan-workspace.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/voice-input.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/script.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 

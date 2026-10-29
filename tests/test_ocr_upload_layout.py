@@ -45,6 +45,7 @@ def layout_page(request):
             + fragment + "</body></html>"
         )
         page.add_style_tag(content=styles)
+        page.add_style_tag(content=(ROOT / "static/voice-input.css").read_text())
         page.evaluate("""code => {
             window.ocrTasks = new Map();
             window.ocrTaskLabel = t => t.state === 'recognizing' ? '识别中' : '已就绪';
@@ -93,7 +94,9 @@ def test_single_upload_action_and_larger_image_panel(layout_page):
     assert panel.locator('h2').inner_text() == '图片'
     assert panel.locator('.ocr-task-card').count() == 1
     assert page.locator('.center > .input-wrap').is_hidden()
-    assert page.locator('#sendBtn').is_hidden()
+    assert page.locator('#sendBtn').is_visible()
+    assert page.locator('#sendBtn').count() == 1
+    assert page.locator('#sendBtn').evaluate('el => el.parentElement.id') == 'ocrUploadActions'
     assert page.locator('#imagePickerWrap').evaluate(
         'el => el.parentElement.id') == 'ocrUploadActions'
     assert upload_button.is_visible()
@@ -114,6 +117,9 @@ def test_single_upload_action_and_larger_image_panel(layout_page):
             panel_bounds['x'] + panel_bounds['width'] + 2)
         assert upload_bounds['y'] >= panel_bounds['y'] + panel_bounds['height']
     # The native input is a real hit-area for WebView, not display:none.
+    send_bounds = page.locator('#sendBtn').bounding_box()
+    assert send_bounds and send_bounds['x'] > upload_bounds['x'] + upload_bounds['width']
+    assert abs(send_bounds['y'] - upload_bounds['y']) <= 2
     file_bounds = page.locator('#imageInput').bounding_box()
     assert file_bounds and file_bounds['width'] >= upload_bounds['width'] - 3
     assert file_bounds['height'] >= upload_bounds['height'] - 3
