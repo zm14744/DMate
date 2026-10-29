@@ -54,6 +54,10 @@ def test_one_click_deletes_a_vertex_and_its_incident_edges_and_undo_restores(dra
 def test_one_click_deletes_one_edge_without_altering_its_vertices(drawing_page):
     p=drawing_page
     p.locator('[data-edge-id="ab"] .dge-overlay-hit').click()
+    assert p.get_by_label('当前边方向',exact=True).locator('option').all_text_contents()==['无向','有向']
+    for name in ['当前边起点','当前边终点']:
+        assert p.get_by_label(name,exact=True).locator('option').all_text_contents()==['A','B']
+    assert '每条重边都能独立修改' not in p.locator('.dge-selection-panel').text_content()
     p.get_by_role('button',name='删除这条边',exact=True).click()
     assert p.evaluate('editor.getDocument().graphs[0].edges.length')==0
     assert p.evaluate('editor.getDocument().graphs[0].vertices.length')==2

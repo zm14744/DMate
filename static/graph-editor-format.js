@@ -1,6 +1,8 @@
 (function(root){
 'use strict';
 const literal=v=>String(v??'');
+const geometryApi=root.DMateGraphEditorModel ||
+ (typeof module!=='undefined'&&module.exports?require('./graph-editor-model.js'):null);
 const safe=v=>literal(v).replace(/([\\`*_{}#+!|])/g,'\\$1')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const subs='₀₁₂₃₄₅₆₇₈₉';
@@ -71,6 +73,7 @@ function graphLabels(graph){
 }
 function graphRows(graph,index){
  const vertices=Array.isArray(graph?.vertices)?graph.vertices:[],edges=Array.isArray(graph?.edges)?graph.edges:[];
+ const geometry=geometryApi?.describeGraphGeometry?.(graph);
  const labels=graphLabels(graph),get=id=>labels.get(String(id))||String(id??'?');
  const named=edges.map(edgeName).filter(value=>value!==null);
  const relations=edges.map(e=>{
@@ -85,12 +88,14 @@ function graphRows(graph,index){
  const weighted=graph.weighted===true?'带权':graph.weighted===false?'无权':'权值待核对';
  const graphName=literal(graph.name||graph.id||'G'+(index+1));
  const title=/^G\d+$/i.test(graphName)?'图 '+markName(graphName):'图 '+(index+1)+'（'+graphName+'）';
- const positions=vertices.filter(v=>!hasLabel(v)||typeof v.position_description==='string'&&v.position_description.trim())
-  .map(v=>({id:v.id,label:get(v.id),txt:get(v.id)+'：'+(typeof v.position_description==='string'&&v.position_description.trim()||'位置未记录')}));
+ const position=v=>typeof v.position_description==='string'&&v.position_description.trim()||geometry?.positions.get(String(v.id))||'';
+ const positions=vertices.filter(v=>!hasLabel(v)||position(v))
+  .map(v=>({id:v.id,label:get(v.id),txt:get(v.id)+'：'+(position(v)||'位置未记录')}));
  return {title,type:orientation+' · '+weighted,showType:!titleIncludesType(graphName,graph),vertices:vertices.map(v=>get(v.id)),
          named,relations,positions,
          anonymousNote:'',
-         description:typeof graph.visual_description==='string'?graph.visual_description.trim():''};
+         description:(typeof graph.visual_description==='string'?graph.visual_description.trim():'')||
+          (geometry?.positions.size?geometry.description:'')};
 }
 // The scan and drawing workspaces deliberately share the same read-only DOM.
 // Construct text nodes so labels and model descriptions always remain literal.

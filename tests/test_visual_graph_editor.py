@@ -244,7 +244,11 @@ def test_real_browser_adds_nodes_and_moves_edges_without_losing_select_values(br
 
 def test_real_browser_unknown_direction_and_failed_save_keep_editable_draft(browser_editor):
     page = browser_editor
-    page.get_by_label('边 1 方向', exact=True).select_option('unknown')
+    assert page.get_by_label('边 1 方向', exact=True).locator('option').all_text_contents() == ['无向', '有向']
+    assert page.get_by_label('边 1 起点', exact=True).locator('option').all_text_contents() == ['A', 'B', '未命名节点 3']
+    # Old imported drafts can remain unresolved, but the editor offers only
+    # concrete directions and never silently turns unknown into undirected.
+    page.evaluate("instance.model.updateEdges('G1',['e1'],'direction','unknown')")
     page.get_by_role('button', name='保存并确认', exact=True).click()
     assert page.evaluate('confirmations.length') == 0
     assert '方向' in page.locator('.dge-status').inner_text()

@@ -71,6 +71,60 @@
         return draft;
     }
 
+    // Canvas coordinates can extend beyond the original page. Describe their
+    // relative arrangement within the graph, without inferring a graph family.
+    function describeGraphGeometry(graph) {
+        const vertices = Array.isArray(graph?.vertices) ? graph.vertices : [];
+        const edges = Array.isArray(graph?.edges) ? graph.edges : [];
+        const located = vertices.filter(vertex => coordinate(vertex.x) && coordinate(vertex.y));
+        const positions = new Map();
+        if (located.length) {
+            const xs = located.map(vertex => vertex.x), ys = located.map(vertex => vertex.y);
+            const left = Math.min(...xs), right = Math.max(...xs), top = Math.min(...ys), bottom = Math.max(...ys);
+            for (const vertex of located) {
+                const x = right > left ? (vertex.x - left) / (right - left) : .5;
+                const y = bottom > top ? (vertex.y - top) / (bottom - top) : .5;
+                const horizontal = x < 1 / 3 ? '左' : x > 2 / 3 ? '右' : '';
+                const vertical = y < 1 / 3 ? '上' : y > 2 / 3 ? '下' : '';
+                positions.set(String(vertex.id), '图内' + (horizontal || vertical ? horizontal + vertical + '方' : '中部'));
+            }
+        }
+        const areas = [...new Set(positions.values())];
+        let description = !vertices.length && !edges.length ? '空白画布，尚未添加顶点和边。'
+            : '由 ' + vertices.length + ' 个顶点、' + edges.length + ' 条边组成。';
+        if (areas.length) description += '按当前画布位置，顶点分布于' + areas.join('、') + '。';
+        if (vertices.length > located.length) description += '有 ' + (vertices.length - located.length) + ' 个顶点尚未记录坐标。';
+        const loops = edges.filter(edge => edge.from && edge.from === edge.to).length;
+        if (loops) description += '其中包含 ' + loops + ' 条自环。';
+        const styles = [['dashed', '虚线'], ['dotted', '点线']].map(([style, name]) => {
+            const count = edges.filter(edge => edge.style === style).length;
+            return count ? count + ' 条' + name + '边' : '';
+        }).filter(Boolean);
+        if (styles.length) description += '边的线型包括' + styles.join('、') + '。';
+        const bends = edges.filter(edge => {
+            if (edge.from === edge.to || !validPath(edge.path) || edge.path.length < 3) return false;
+            const first = edge.path[0], last = edge.path[edge.path.length - 1];
+            const dx = last[0] - first[0], dy = last[1] - first[1], length = Math.hypot(dx, dy);
+            return length > 0 && edge.path.slice(1, -1).some(p =>
+                Math.abs(dx * (p[1] - first[1]) - dy * (p[0] - first[0])) / length > Math.max(.003, length * .02));
+        }).length;
+        if (bends) description += '有 ' + bends + ' 条边沿弯曲或折线路径连接端点。';
+        return { positions, description };
+    }
+
+    function refreshDrawingMetadata(document) {
+        for (const graph of document.graphs || []) {
+            const geometry = describeGraphGeometry(graph);
+            graph.visual_description = geometry.description;
+            for (const vertex of graph.vertices || []) {
+                const position = geometry.positions.get(String(vertex.id));
+                if (position) vertex.position_description = position;
+                else delete vertex.position_description;
+            }
+        }
+        return document;
+    }
+
     function importDocument(input) {
         const source = input && typeof input === 'object' ? input : {};
         const result = { body_text: text(source.body_text), graphs: [] };
@@ -184,9 +238,10 @@
         return [...groups.values()];
     }
 
-    function createModel(input, initialDocument) {
-        let state = importDocument(input);
-        const initial = importDocument(initialDocument || input), history = [], future = [];
+    function createModel(input, initialDocument, options = {}) {
+        const prepare = value => options.drawingOnly ? refreshDrawingMetadata(importDocument(value)) : importDocument(value);
+        let state = prepare(input);
+        const initial = prepare(initialDocument || input), history = [], future = [];
         const listeners = new Set();
         const getGraph = (draft, gid) => {
             const graph = draft.graphs.find(row => row.id === gid);
@@ -197,6 +252,7 @@
         function change(operation) {
             const next = copy(state);
             operation(next);
+            if (options.drawingOnly) refreshDrawingMetadata(next);
             if (JSON.stringify(next) === JSON.stringify(state)) return;
             history.push(state);
             if (history.length > 40) history.shift();
@@ -422,7 +478,7 @@
     }
 
     // All semantic graph mutations and validation live here, without DOM access.
-    const api = { createModel, importDocument, validateDocument, groupEdges,
+    const api = { createModel, importDocument, validateDocument, groupEdges, describeGraphGeometry,
         ensureAnonymousLabels, valueText: text };
     root.DMateGraphEditorModel = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

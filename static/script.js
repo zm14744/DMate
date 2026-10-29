@@ -4741,6 +4741,12 @@ function buildLearningQuestionFromSession(session, teaching, excludeLatest = fal
             continue;
         }
 
+        // Explicit chat messages must not reappear as the current problem
+        // through the legacy heuristic fallback when history is empty.
+        if (message.source !== "ocr" && message.manualIsQuestion === false) {
+            continue;
+        }
+
         if (!looksLikeActualLearningProblem(message)) {
             continue;
         }
@@ -17155,18 +17161,24 @@ function looksLikeFormalStudyQuestionForHistory(
         return false;
     }
 
+    if (message?.source === "ocr" && typeof message.ocrIsQuestion === "boolean") {
+        return isRecordableOcrQuestionMessage(message);
+    }
+
+    // 手动输入题目身份完全由用户在发送时的选择决定。
+    // 仅影响题目历史，不修改 AI 讲解/回答的识别路径。
+    if (message?.role === "user" && message.source !== "ocr") {
+        return message.manualIsQuestion === true;
+    }
+
+    // System-related vocabulary can also occur in a real problem. Explicit
+    // user choices decide identity before this automatic compatibility filter.
     if (isHistorySystemMetaText(value)) {
         return false;
     }
 
     if (message?.source === "ocr") {
         return isRecordableOcrQuestionMessage(message);
-    }
-
-    // 手动输入题目身份完全由用户在发送时的选择决定。
-    // 仅影响题目历史，不修改 AI 讲解/回答的识别路径。
-    if (message?.role === "user") {
-        return message.manualIsQuestion === true;
     }
 
     if (/【(?:题目|练习题|题目文字)】/.test(value)) {

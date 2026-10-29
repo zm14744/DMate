@@ -166,7 +166,8 @@
      options.onChange?.(clone(value));invalidateAnswer();schedule();},
     onConfirm:async value=>{const selected=active();if(!selected)return;selected.document=clone(value);selected.name=caption(name.value);selected.updatedAt=Date.now();if(!persist())throw new Error(persistError);if(panelMode==='history')renderPanel();}
    });
-   options.onChange?.(clone(documentValue));renderPanel();syncChrome();
+   const mountedDocument=currentDocument();if(p)p.document=clone(mountedDocument);
+   options.onChange?.(clone(mountedDocument));renderPanel();syncChrome();
   }
   function switchPage(pageId){if(pageId===activeId||!pages.some(p=>p.id===pageId))return;cancelDelete();collect();persist();abortAnswer();activeId=pageId;persist();mountPage();setStatus('');}
   function newPage(){

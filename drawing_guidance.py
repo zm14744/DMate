@@ -80,6 +80,8 @@ def normalize_request(payload):
         graph = {'id': raw['id'], 'name': raw.get('name'),
                  'directed': raw.get('directed'), 'weighted': raw.get('weighted'),
                  'vertices': [], 'edges': []}
+        if 'visual_description' in raw:
+            graph['visual_description'] = raw['visual_description']
         for row in raw['vertices']:
             if row['id'] in vertex_ids:
                 raise _invalid('顶点编号重复，请先修正画图。')

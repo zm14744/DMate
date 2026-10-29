@@ -16,7 +16,7 @@
             ? modelApi.ensureAnonymousLabels(options.document) : options.document;
         const initial = useOverlay && modelApi.ensureAnonymousLabels
             ? modelApi.ensureAnonymousLabels(options.initialDocument || options.document) : options.initialDocument;
-        const model = createModel(initialized, initial);
+        const model = createModel(initialized, initial, {drawingOnly: options.drawingOnly});
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
         const reviewKeys = new WeakMap();
         let previewSequence = 0, renderSequence = 0;
@@ -67,7 +67,8 @@
         function edit(action) { if (saving || destroyed) return; notice = '';
             try { action(); } catch (error) { notice = error?.message || '无法完成这项修改。'; }
             refreshDraftViews(); }
-        const nodeOptions = graph => { const rows = [['', '请选择节点'], ...graph.vertices.map((vertex, index) => [vertex.id, vertex.label === null ? (vertex.display_label || '未命名节点 ' + (index + 1)) : vertex.label])]; rows.graphId = graph.id; return rows; };
+        const nodeOptions = graph => { const rows = graph.vertices.map((vertex, index) => [vertex.id, vertex.label === null ? (vertex.display_label || '未命名节点 ' + (index + 1)) : vertex.label]); rows.graphId = graph.id; return rows; };
+        const directionOptions = [['undirected', '无向'], ['forward', '有向']];
         const graphOptions = (document, excluded) => [['', '选择目标子图'], ...document.graphs.filter(graph => graph.id !== excluded).map((graph, index) => [graph.id, graph.name || '图 ' + (index + 1)])];
         const weightValue = value => value.trim() === '' ? null : /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(value.trim()) && Number.isFinite(Number(value)) ? Number(value) : value;
 
@@ -228,7 +229,7 @@
             const key = reviewKey(document);
             if (reviewKeys.get(review) === key) return;
             // Keep the popup, its scroll container and active property input.
-            // Geometry-only changes do not alter this key or replace content.
+            // Repaint only when the displayed structure or position changes.
             root.DMateGraphFormat.renderGraphInformation(review.querySelector('.dge-review-content'), document);
             reviewKeys.set(review, key);
         }
@@ -252,14 +253,13 @@
             const edge = graph.edges.find(e => e.id === selectedEdge);
             if (edge) {
                 aside.append(element('h3', '', '边的属性'));
-                const index = graph.edges.indexOf(edge) + 1, ids = [edge.id];
+                const ids = [edge.id];
                 const endpoints = nodeOptions(graph);
                 aside.append(field(hasDirection(graph)?'起点':'端点一', select(endpoints, edge.from, hasDirection(graph)?'当前边起点':'当前边端点一',
                     value => model.updateEdges(graph.id, ids, 'from', value))));
                 aside.append(field(hasDirection(graph)?'终点':'端点二', select(endpoints, edge.to, hasDirection(graph)?'当前边终点':'当前边端点二',
                     value => model.updateEdges(graph.id, ids, 'to', value))));
-                if(hasDirection(graph)){aside.append(field('方向', select([['undirected','无向 —'], ['forward','有向 →'],
-                    ['unknown','待核对 ?']], edge.direction, '当前边方向',
+                if(hasDirection(graph)){aside.append(field('方向', select(directionOptions, edge.direction, '当前边方向',
                     value => model.updateEdges(graph.id, ids, 'direction', value))));
                 aside.append(button('反转方向', () => model.reverseEdges(graph.id, ids)));}
                 if(graph.weighted!==false)aside.append(field('权值', input(edge.weight, '当前边权值',
@@ -269,8 +269,6 @@
                 aside.append(button('删除这条边', () => {
                     model.deleteEdges(graph.id, ids); selectedEdge = null;
                 }, 'dge-danger'));
-                const note = element('p', 'dge-muted', '每条重边都能独立修改 · 边 ' + index);
-                aside.append(note);
             } else if (selectedNode) {
                 aside.append(element('h3', '', '顶点的属性'));
                 aside.append(field('名称', input(selectedNode.label ?? selectedNode.display_label, '当前顶点名称',
@@ -647,7 +645,7 @@
                     row.dataset.edgeId = edge.id;
                     row.append(button('边 ' + (index + 1), () => { selectedEdge = edge.id; }, 'dge-edge-select'));
                     row.append(field(hasDirection(graph)?'起点':'端点一', select(nodeOptions(graph), edge.from, '边 ' + (index + 1) + (hasDirection(graph)?' 起点':' 端点一'), value => model.updateEdges(graph.id, ids, 'from', value))),
-                        ...(!hasDirection(graph)?[]:[field('方向', select([['undirected', '无向 —'], ['forward', '有向 →'], ['unknown', '待确认 ?']], edge.direction, '边 ' + (index + 1) + ' 方向', value => model.updateEdges(graph.id, ids, 'direction', value)))]),
+                        ...(!hasDirection(graph)?[]:[field('方向', select(directionOptions, edge.direction, '边 ' + (index + 1) + ' 方向', value => model.updateEdges(graph.id, ids, 'direction', value)))]),
                         field(hasDirection(graph)?'终点':'端点二', select(nodeOptions(graph), edge.to, '边 ' + (index + 1) + (hasDirection(graph)?' 终点':' 端点二'), value => model.updateEdges(graph.id, ids, 'to', value))),
                         ...(graph.weighted===false?[]:[field('权重', input(edge.weight, '边 ' + (index + 1) + ' 权重', value => model.updateEdges(graph.id, ids, 'weight', weightValue(value))))]));
                     if (!individually) { const count = input(group.length, '边 ' + (index + 1) + ' 相同边数量', value => {
