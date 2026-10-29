@@ -146,7 +146,10 @@ def test_new_headers_match_real_existing_modal_typography_and_close_geometry(mod
         assert page.locator('.dcn-main').is_hidden()
         assert page.locator('.dcn-selection').is_hidden()
         assert page.locator('.dcn-list').inner_text() == '无'
-        assert page.locator('#conceptNotebookDialog').bounding_box()['height'] < 300
+        # Empty notebooks now reserve a larger area for the centered “无”.
+        empty_height = page.locator('#conceptNotebookDialog').bounding_box()['height']
+        viewport_height = page.viewport_size['height']
+        assert min(320, viewport_height - 24) - .5 <= empty_height <= min(440, viewport_height - 24) + .5
         page.get_by_role('button', name='关闭笔记本', exact=True).click()
         page.evaluate("notes={notes:[{id:'n1',title:'集合',content:'保留的概念笔记。',updatedAt:1}],deleted:{}}")
         stage_font = page.locator('#ocrTaskTitle').evaluate('''e=>{

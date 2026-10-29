@@ -63,8 +63,23 @@ body[data-appearance-theme] {
         -webkit-backdrop-filter:none!important;
     }
 
-    body[data-appearance-theme] .session:not(.active) {
+    /* Idle conversations merge into the sidebar in every theme. The current
+       conversation keeps a distinct fill, independent of historical mobile
+       and theme rules (dark previously used #181818 on a #171717 sidebar). */
+    body[data-appearance-theme] .left #sessions .session {
+        border-color:transparent!important;
+        box-shadow:none!important;
+    }
+    body[data-appearance-theme] .left #sessions .session:not(.active) {
         background-color:transparent!important;
+        background-image:none!important;
+    }
+    body[data-appearance-theme="dark"] .left #sessions .session.active {
+        background-color:#3d3d3d!important;
+        background-image:none!important;
+    }
+    body[data-appearance-theme="navy"] .left #sessions .session.active {
+        background-color:var(--accent-bg)!important;
         background-image:none!important;
     }
 

@@ -606,6 +606,15 @@ def test_real_template_controls_keep_clearance_with_long_names_zoom_and_scrollba
         assert all(left['x'] + left['width'] < right['x'] for left, right in zip(boxes, boxes[1:]))
         assert page.locator('#graphEditorDialog').evaluate('n=>n.scrollWidth<=n.clientWidth')
         assert page.locator('.ddw-header').evaluate('n=>n.scrollWidth<=n.clientWidth')
+        # The canvas has its own rounded clip, separate from the view toolbar.
+        # Verify the white stage cannot paint or receive clicks in a cut corner.
+        assert page.locator('.dge-overlay-viewport').evaluate('''node=>{
+          const r=node.getBoundingClientRect(),s=getComputedStyle(node);
+          const corner=document.elementFromPoint(r.left+.5,r.top+.5);
+          const bar=document.querySelector('.dge-view-controls').getBoundingClientRect();
+          return ['borderTopLeftRadius','borderTopRightRadius','borderBottomLeftRadius','borderBottomRightRadius'].every(k=>parseFloat(s[k])>=12)
+            &&r.top-bar.bottom>=7.5&&!corner?.closest('.dge-overlay-stage');
+        }''')
         ai = page.get_by_role('button', name='AI指导', exact=True)
         assert ai.evaluate('''node=>{const box=node.getBoundingClientRect();return document.elementFromPoint(box.x+box.width/2,box.y+box.height/2)?.closest('button')===node;}''')
 

@@ -8666,7 +8666,9 @@ window.MathJax = {
 .ocr-task-relations { padding-left:8px; }
 .ocr-task-relations p { margin:2px 0; }
 .graph-editor-dialog { position:fixed; inset:0; width:min(1280px,96vw); max-width:96vw; height:min(900px,94dvh); max-height:94dvh; box-sizing:border-box; margin:auto; padding:18px; border:1px solid var(--border-strong); border-radius:16px; background:var(--surface-1); color:var(--text-primary); overflow:hidden; }
-.graph-editor-dialog[data-positioning], .graph-editor-dialog[data-positioning]::backdrop { visibility:hidden; pointer-events:none; }
+/* Original images and floating content set their own visibility. Hide the
+   entire subtree while the first modal/image layout is prepared. */
+.graph-editor-dialog[data-positioning], .graph-editor-dialog[data-positioning] *, .graph-editor-dialog[data-positioning]::backdrop { visibility:hidden!important; pointer-events:none!important; }
 .graph-editor-dialog[open] { display:flex; flex-direction:column; }
 .graph-editor-dialog > #graphEditorMount { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .graph-editor-dialog::backdrop { background:rgba(0,0,0,.6); }

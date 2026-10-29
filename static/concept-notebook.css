@@ -49,10 +49,10 @@
 .dcn-explanation,.dcn-relation{padding:12px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--surface-2,#f8fafc)}
 .dcn-ai-text:not(.dmate-ai-answer){white-space:pre-wrap}
 @media(max-width:680px){.dcn-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);padding:14px;border-radius:14px}.dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(150px,25dvh) minmax(0,1fr);gap:14px}.dcn-sidebar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:8px}.dcn-selection,.dcn-list{grid-column:1/-1}.dcn-list{display:block}.dcn-note{padding:4px 7px}.dcn-dialog .dcn-original{min-height:170px}.dcn-main{padding-right:3px}.dcn-heading h2{font-size:18px}.dcn-dialog button{min-height:36px}}
-.dcn-dialog.is-empty{height:fit-content}
-.dcn-dialog.is-empty .dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;flex:0 0 auto;gap:0}
-.dcn-dialog.is-empty .dcn-sidebar{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;gap:10px;align-content:start}
-.dcn-dialog.is-empty .dcn-list{grid-column:1/-1;display:block;flex:0 0 auto;overflow:visible}
+.dcn-dialog.is-empty{height:min(52dvh,440px);min-height:min(320px,calc(100dvh - 24px))}
+.dcn-dialog.is-empty .dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);flex:1 1 auto;gap:0}
+.dcn-dialog.is-empty .dcn-sidebar{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:10px;align-content:stretch}
+.dcn-dialog.is-empty .dcn-list{grid-column:1/-1;display:grid;place-items:center;overflow:auto}
 .dcn-dialog.is-empty .dcn-list-empty{margin:0}
 
 /* The close control stays in the fixed header; only content scrolls. */

@@ -15104,20 +15104,41 @@ async function uploadDrawingResult(blob, metadata = {}) {
 }
 
 function showGraphEditorDialog(dialog) {
-    // WebViews can composite the top layer before its first modal layout.
-    // Keep that layout invisible, then reveal the already-centered dialog.
+    // Keep the complete top-layer subtree invisible until the original image
+    // is decoded and fitted. Two frames alone can reveal an unfitted image
+    // when decoding is slower than the first modal layout.
     const opening = String(performance.now());
+    const isCurrentOpening = () => dialog.open && dialog.dataset.positioning === opening;
+    const imageReady = image => new Promise(resolve => {
+        const finish = () => {
+            image.removeEventListener('load', finish);
+            image.removeEventListener('error', finish);
+            dialog.removeEventListener('close', finish);
+            resolve();
+        };
+        if (image.complete) { finish(); return; }
+        image.addEventListener('load', finish);
+        image.addEventListener('error', finish);
+        // Closing during a slow load releases these listeners immediately.
+        dialog.addEventListener('close', finish);
+    }).then(() => {
+        if (isCurrentOpening() && image.naturalWidth && typeof image.decode === 'function')
+            return image.decode().catch(() => {});
+    });
     dialog.dataset.positioning = opening;
     try {
         dialog.showModal();
         dialog.getBoundingClientRect();
-        requestAnimationFrame(() => {
-            if (!dialog.open || dialog.dataset.positioning !== opening) return;
-            dialog.getBoundingClientRect();
+        void Promise.all([...dialog.querySelectorAll('img')].map(imageReady)).then(() => {
+            if (!isCurrentOpening()) return;
             requestAnimationFrame(() => {
-                if (!dialog.open || dialog.dataset.positioning !== opening) return;
-                delete dialog.dataset.positioning;
-                dialog.querySelector('#graphEditorClose')?.focus({preventScroll: true});
+                if (!isCurrentOpening()) return;
+                dialog.getBoundingClientRect();
+                requestAnimationFrame(() => {
+                    if (!isCurrentOpening()) return;
+                    delete dialog.dataset.positioning;
+                    dialog.querySelector('#graphEditorClose')?.focus({preventScroll: true});
+                });
             });
         });
     } catch (error) {

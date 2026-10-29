@@ -18,10 +18,10 @@
 .ddw-editor{flex:1;min-width:0;min-height:0;overflow:hidden}
 .ddw-editor.dmate-graph-editor{height:100%;display:flex;flex-direction:column}
 .ddw-editor>.dge-workspace{flex:1;min-height:0}
-.ddw-editor .dge-overlay-host{height:100%;min-height:0}
-.ddw-editor .dge-overlay{height:100%;min-height:0;max-height:none;display:flex;flex-direction:column}
-.ddw-editor .dge-view-controls{flex-shrink:0}
-.ddw-editor .dge-overlay-viewport{height:auto;flex:1;min-height:0;max-height:none}
+.ddw-editor .dge-overlay-host{height:100%;min-height:0;border:0}
+.ddw-editor .dge-overlay{height:100%;min-height:0;max-height:none;display:flex;flex-direction:column;gap:8px}
+.ddw-editor .dge-view-controls{flex-shrink:0;border:1px solid var(--dge-border,#cbd5e1);border-radius:12px}
+.ddw-editor .dge-overlay-viewport{height:auto;flex:1;min-height:0;max-height:none;border:1px solid var(--dge-border,#cbd5e1);border-radius:12px}
 .ddw-side-actions{position:absolute;z-index:16;right:18px;top:var(--ddw-controls-top,76px);display:flex;gap:6px;flex-direction:row;width:max-content;max-width:calc(100% - 112px)}
 .ddw-side-actions[hidden]{display:none}
 .ddw-side-actions>button{min-width:0;padding:8px 10px;white-space:nowrap;font-size:13px;box-shadow:0 3px 12px #0000000f;background:var(--surface-1,#fff)}

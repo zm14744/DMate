@@ -52,6 +52,7 @@ on:
       - 'tests/test_drawing_editor_controls.py'
       - 'tests/test_drawing_app_integration.py'
       - 'tests/test_conversation_delete_navigation.py'
+      - 'tests/test_conversation_selection_appearance.py'
       - 'tests/test_chat_composer.py'
       - 'static/concept-notebook.js'
       - 'static/concept-notebook.css'
@@ -111,6 +112,7 @@ jobs:
             tests/test_drawing_editor_controls.py \
             tests/test_drawing_app_integration.py \
             tests/test_conversation_delete_navigation.py \
+            tests/test_conversation_selection_appearance.py \
             tests/test_chat_composer.py \
             tests/test_scan_information_sources.py \
             tests/test_concept_notebook_ui.py \

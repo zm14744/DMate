@@ -47,6 +47,7 @@ on:
       - 'tests/test_appearance_surfaces.py'
       - 'tests/test_panel_compositing.py'
       - 'tests/test_sidebar_and_search_clear.py'
+      - 'tests/test_conversation_selection_appearance.py'
       - 'static/appearance-panels.css'
       - 'tests/test_scan_selection_save.py'
       - 'concept_notebook.py'
@@ -148,6 +149,7 @@ jobs:
             tests/test_appearance_surfaces.py \
             tests/test_panel_compositing.py \
             tests/test_sidebar_and_search_clear.py \
+            tests/test_conversation_selection_appearance.py \
             tests/test_graph_elastic_regions.py \
             tests/test_voice_input.py \
             tests/test_graph_confirmation_batch.py \

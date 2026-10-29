@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from test_appearance_surfaces import appearance_page, install_appearance
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -76,11 +78,41 @@ def assert_empty_notebook(page):
     assert page.get_by_label('补充要求（可选）', exact=True).is_hidden()
     assert page.locator('.dcn-results').is_hidden()
     assert page.get_by_role('heading', name='AI 阅读', exact=True).count() == 0
-    assert page.locator('#conceptNotebookDialog').bounding_box()['height'] < 220
-    assert page.locator('.dcn-content').bounding_box()['height'] < 120
+    dialog = page.locator('#conceptNotebookDialog').bounding_box()
+    assert 320 <= dialog['height'] <= 440
     empty, search_box = page.locator('.dcn-list-empty').bounding_box(), search.bounding_box()
-    assert search_box['y'] + search_box['height'] <= empty['y'] <= search_box['y'] + search_box['height'] + 16
+    area = page.locator('.dcn-list').bounding_box()
+    assert area['height'] > 180
+    assert empty['y'] > search_box['y'] + search_box['height'] + 20
+    assert empty['x'] + empty['width'] / 2 == pytest.approx(area['x'] + area['width'] / 2, abs=1)
+    assert empty['y'] + empty['height'] / 2 == pytest.approx(area['y'] + area['height'] / 2, abs=1)
     assert page.locator('#conceptNotebookDialog').evaluate('e=>e.scrollWidth<=e.clientWidth')
+
+
+@pytest.mark.parametrize('theme', ['light', 'dark', 'navy'])
+def test_empty_notebook_has_room_and_centers_text_with_production_styles(appearance_page, theme):
+    p = appearance_page
+    install_appearance(p)
+    p.evaluate('theme=>{appearanceSettings.mode=theme;appearanceSettings.panelOpacity=75;applyAppearanceSettings();}', theme)
+    p.add_script_tag(content=(ROOT / 'static/concept-notebook.js').read_text())
+    p.evaluate('''()=>{
+      window.notebook=DMateConceptNotebook.mount({button:document.querySelector('#conceptNotebookBtn'),
+        dialog:document.querySelector('#conceptNotebookDialog'),getContextKey:()=>'',
+        getState:()=>({notes:[],deleted:{}}),onChange:()=>{}});
+      notebook.open();
+    }''')
+    assert_empty_notebook(p)
+    p.screenshot(path=f'/tmp/dmate-notebook-centered-{theme}-{p.viewport_size["width"]}.png')
+    # The larger empty window must still fit a short landscape/keyboard viewport.
+    p.set_viewport_size({'width': p.viewport_size['width'], 'height': 300})
+    dialog = p.locator('#conceptNotebookDialog').bounding_box()
+    assert dialog['y'] >= 0 and dialog['y'] + dialog['height'] <= 300
+    assert p.get_by_role('button', name='新建概念', exact=True).is_visible()
+    assert p.get_by_role('searchbox', name='搜索', exact=True).is_visible()
+    area, empty = p.locator('.dcn-list').bounding_box(), p.locator('.dcn-list-empty').bounding_box()
+    assert empty['x'] + empty['width'] / 2 == pytest.approx(area['x'] + area['width'] / 2, abs=1)
+    assert empty['y'] + empty['height'] / 2 == pytest.approx(area['y'] + area['height'] / 2, abs=1)
+    assert p.locator('#conceptNotebookDialog').evaluate('e=>e.scrollWidth<=e.clientWidth')
 
 
 def test_notes_autosave_reopen_and_relation_analysis_does_not_modify_original(notebook_page):
@@ -492,7 +524,7 @@ def test_deleting_every_note_hides_ai_and_count_and_ignores_late_analysis(notebo
     assert p.get_by_role('button', name='AI 解释', exact=True).is_disabled()
 
 
-def test_same_account_sync_to_no_notes_aborts_ai_and_compacts_the_notebook(notebook_page):
+def test_same_account_sync_to_no_notes_aborts_ai_and_centers_empty_notebook(notebook_page):
     p = notebook_page
     open_notebook(p)
     p.get_by_role('checkbox', name='选择概念：集合', exact=True).check()
