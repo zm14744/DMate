@@ -24,8 +24,7 @@ function mount(options){
  const editor=el('section','dcn-editor');
  const titleLabel=el('label','','概念名称'),title=el('input','dcn-title');title.maxLength=LIMITS.title;title.setAttribute('aria-label','概念名称');titleLabel.append(title);
  const originalLabel=el('label','','我的概念笔记'),original=el('textarea','dcn-original');original.maxLength=LIMITS.content;original.rows=9;original.setAttribute('aria-label','我的概念笔记');originalLabel.append(original);
- const editorFoot=el('div','dcn-editor-foot'),saved=el('span','dcn-saved'),removeButton=action('删除概念',()=>void remove(),'dcn-remove');
- saved.setAttribute('role','status');editorFoot.append(saved,removeButton);editor.append(titleLabel,originalLabel,editorFoot);
+ const saved=el('span','dcn-saved');saved.setAttribute('role','status');editor.append(titleLabel,originalLabel,saved);
  const ai=el('section','dcn-ai'),aiTitle=el('h3','','AI 阅读');
  const questionLabel=el('label','','补充要求（可选）'),question=el('textarea','dcn-question');question.maxLength=1000;question.rows=2;question.setAttribute('aria-label','补充要求（可选）');questionLabel.append(question);
  const controls=el('div','dcn-ai-actions'),explainButton=action('AI 解释',()=>void analyze('explain'),'dcn-primary'),relationButton=action('分析关联',()=>void analyze('relations')),cancelButton=action('取消分析',()=>invalidate('已取消分析。'));
@@ -50,24 +49,28 @@ function mount(options){
   const size=selected.size;count.textContent='已选 '+size+' 条';
   explainButton.disabled=!!active||size===0;relationButton.disabled=!!active||size<2;cancelButton.hidden=!active;
   newButton.disabled=state.notes.length>=LIMITS.notes;
+  for(const remove of list.querySelectorAll('.dcn-note-delete'))remove.disabled=!!deletePending;
  }
  function renderList(){
   const query=search.value.trim().toLocaleLowerCase();list.replaceChildren();
   const visible=state.notes.filter(note=>(note.title+'\n'+note.content).toLocaleLowerCase().includes(query));
   if(!visible.length)list.append(el('p','dcn-list-empty',state.notes.length?'没有匹配的概念。':'还没有概念笔记。'));
+  const names=new Map();for(const note of state.notes)names.set(noteName(note),(names.get(noteName(note))||0)+1);
   for(const note of visible){
    const row=el('div','dcn-note'+(note.id===currentId?' is-current':''));row.dataset.noteId=note.id;
    const hit=el('label','dcn-note-select'),check=el('input');check.type='checkbox';check.checked=selected.has(note.id);check.setAttribute('aria-label','选择概念：'+noteName(note));hit.append(check);
    check.addEventListener('change',()=>{if(check.checked)selected.add(note.id);else selected.delete(note.id);invalidate();renderActions();});
    const openNote=action(noteName(note),()=>{currentId=note.id;renderList();renderEditor();renderActions();},'dcn-note-open');
-   openNote.setAttribute('aria-current',String(note.id===currentId));row.append(hit,openNote);list.append(row);
+   const remove=action('',event=>{event.stopPropagation();void removeNote(note.id);},'dcn-note-delete');
+   remove.disabled=!!deletePending;remove.title='删除'+noteName(note);
+   remove.setAttribute('aria-label','删除概念：'+noteName(note)+(names.get(noteName(note))>1?'（'+note.id+'）':''));
+   openNote.setAttribute('aria-current',String(note.id===currentId));row.append(hit,openNote,remove);list.append(row);
   }
  }
  function renderEditor(){
   const note=current();editor.hidden=!note;
   if(note){title.value=note.title;original.value=note.content;}
   else{title.value='';original.value='';if(!saveError)saved.textContent='';}
-  removeButton.disabled=!note||!!deletePending;
  }
  function updatedAt(note){return Math.max(Date.now(),Number(note?.updatedAt||0)+1);}
  function create(){
@@ -99,16 +102,19 @@ function mount(options){
    prompt.showModal();cancel.focus({preventScroll:true});
   });
  }
- async function remove(){
-  const note=current();if(!note||deletePending)return;
-  const op={context:contextKey(),note:JSON.stringify(note)};deletePending=op;removeButton.disabled=true;
+ async function removeNote(identifier){
+  const note=state.notes.find(item=>item.id===identifier);if(!note||deletePending)return;
+  const op={context:contextKey(),id:note.id,note:JSON.stringify(note)};deletePending=op;renderActions();
   try{
    const confirmed=await askToDelete(note);
-   if(!confirmed||destroyed||!dialog.open||deletePending!==op||op.context!==contextKey()||currentId!==note.id||JSON.stringify(current())!==op.note)return;
-   state.deleted[note.id]=updatedAt(note);state.notes=state.notes.filter(n=>n.id!==note.id);selected.delete(note.id);currentId=state.notes[0]?.id||null;
+   const currentNote=state.notes.find(item=>item.id===op.id);
+   if(!confirmed||destroyed||!dialog.open||deletePending!==op||op.context!==contextKey()||JSON.stringify(currentNote)!==op.note)return;
+   const index=state.notes.findIndex(item=>item.id===op.id);
+   state.deleted[note.id]=updatedAt(note);state.notes=state.notes.filter(n=>n.id!==note.id);selected.delete(note.id);
+   if(currentId===note.id)currentId=state.notes[Math.min(index,state.notes.length-1)]?.id||null;
    invalidate();persist();renderList();renderEditor();renderActions();
   }catch(error){if(deletePending===op)status.textContent=error?.message||'无法确认删除，请重试。';}
-  finally{if(deletePending===op)deletePending=null;if(!destroyed)renderEditor();}
+  finally{if(deletePending===op)deletePending=null;if(!destroyed){renderEditor();renderActions();}}
  }
  function validateReply(data,notes){
   if(data?.ok!==true||!Array.isArray(data.explanations)||!Array.isArray(data.relations)||typeof data.summary!=='string')throw new Error('AI 返回的概念分析不完整，请重试。');

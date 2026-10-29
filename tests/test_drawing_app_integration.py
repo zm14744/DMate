@@ -76,7 +76,7 @@ def drawing_app(request):
 def open_drawing(page):
     # The real phone menu slides in after the user opens the learning drawer.
     page.evaluate("document.body.classList.add('mobile-tools-open')")
-    page.get_by_role('button', name='画图', exact=True).click()
+    page.get_by_role('button', name='绘图', exact=True).click()
     page.wait_for_function('document.querySelector(".dge-overlay-image")?.naturalWidth===1000')
     assert page.locator('.dmate-drawing-workspace').count() == 1
 

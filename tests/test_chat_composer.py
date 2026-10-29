@@ -93,7 +93,7 @@ def test_keyboard_newlines_ime_and_send_do_not_double_submit(composer_page):
     assert page.evaluate('sends') == (1 if page.viewport_size['width'] < 681 else 2)
 
 
-def test_attachment_stage_reuses_labelled_upload_and_send_then_restores_icons(composer_page):
+def test_attachment_stage_reuses_the_same_picker_and_icon_actions(composer_page):
     page = composer_page
     picker_before = page.locator('#imageInput').evaluate("e=>{e.dataset.identity='same-picker';return e.dataset.identity}")
     page.evaluate("ocrTasks.set('one',{id:'one',state:'recognizing',file:{name:'图片.png'},originalUrl:'data:image/png;base64,iVBORw0KGgo=',startedAt:0,finishedAt:null});renderOcrTasks()")
@@ -101,15 +101,55 @@ def test_attachment_stage_reuses_labelled_upload_and_send_then_restores_icons(co
     assert page.locator('#imageBtn').is_visible() and page.locator('#sendBtn').is_visible()
     assert page.locator('#imageBtn').inner_text() == '上传图片'
     assert page.locator('#sendBtn').inner_text() == '发送'
-    assert page.locator('#imageBtn').evaluate('e=>parseFloat(getComputedStyle(e).fontSize)') >= 14
-    assert page.locator('#sendBtn').evaluate('e=>parseFloat(getComputedStyle(e).fontSize)') >= 14
+    assert page.locator('#imageBtn').evaluate('e=>getComputedStyle(e).fontSize') == '0px'
+    assert page.locator('#sendBtn').evaluate('e=>getComputedStyle(e).fontSize') == '0px'
+    for selector in ('#imageBtn', '#sendBtn'):
+        assert page.locator(selector).evaluate('e=>getComputedStyle(e,"::before").display') == 'block'
+        box = page.locator(selector).bounding_box()
+        assert box['width'] == pytest.approx(box['height'], abs=1)
     assert page.locator('#imageInput').count() == page.locator('#sendBtn').count() == 1
     assert page.locator('#imageInput').get_attribute('data-identity') == picker_before
+    native, plus = page.locator('#imageInput').bounding_box(), page.locator('#imageBtn').bounding_box()
+    assert all(abs(native[key]-plus[key]) < 1 for key in ('x', 'y', 'width', 'height'))
+    with page.expect_file_chooser() as chooser:
+        page.locator('#imageInput').click()
+    assert chooser.value.is_multiple()
+    assert chooser.value.element.get_attribute('id') == 'imageInput'
     first, second = page.locator('#imageBtn').bounding_box(), page.locator('#sendBtn').bounding_box()
     assert first['x'] + first['width'] <= second['x']
     page.evaluate('ocrTasks.clear();renderOcrTasks()')
     assert page.locator('.center > .input-wrap').is_visible()
     assert page.locator('#sendBtn').evaluate('e=>getComputedStyle(e).fontSize') == '0px'
+
+
+def test_send_icons_follow_live_blue_green_purple_accents_in_both_stages(composer_page):
+    page = composer_page
+    for color in ('#3b82f6', '#14b8a6', '#8b5cf6'):
+        page.evaluate('color=>document.body.style.setProperty("--accent",color)', color)
+        expected = page.evaluate('color=>{const node=document.createElement("i");node.style.color=color;document.body.append(node);const rgb=getComputedStyle(node).color;node.remove();return rgb;}', color)
+        for with_image in (False, True):
+            page.evaluate('withImage=>{ocrTasks.clear();if(withImage)ocrTasks.set("accent",{id:"accent",state:"ready",file:{name:"图片.png"},originalUrl:"data:image/png;base64,iVBORw0KGgo=",startedAt:0,finishedAt:1});renderOcrTasks();}', with_image)
+            send = page.locator('#sendBtn')
+            assert send.evaluate('e=>getComputedStyle(e).backgroundColor') == expected
+            assert send.evaluate('e=>getComputedStyle(e,"::before").backgroundColor') == 'rgb(255, 255, 255)'
+            assert send.evaluate('e=>getComputedStyle(e,"::before").maskImage') != 'none'
+            page.evaluate('waiting=true;refreshInputAvailability()')
+            assert send.evaluate('e=>getComputedStyle(e).backgroundColor') == 'rgb(239, 68, 68)'
+            assert send.evaluate('e=>getComputedStyle(e,"::before").maskImage') == 'none'
+            page.evaluate('waiting=false;refreshInputAvailability()')
+            assert send.evaluate('e=>getComputedStyle(e).backgroundColor') == expected
+
+
+def test_learning_tools_keep_two_visibly_separated_groups(composer_page):
+    page = composer_page
+    html = (ROOT / 'templates/index.html').read_text()
+    menu = '<div class="right">' + html.split('\n<div class="right">', 1)[1].split('\n</div>\n\n</div>', 1)[0] + '</div>'
+    page.evaluate('html=>{document.body.insertAdjacentHTML("beforeend",html);document.body.classList.add("mobile-tools-open");}', menu)
+    primary, secondary = page.locator('.learning-tools-primary'), page.locator('.learning-tools-secondary')
+    assert primary.get_by_role('button').all_text_contents() == ['错题本 (0)', '笔记本']
+    assert secondary.get_by_role('button').all_text_contents() == ['知识图谱', '绘图', '学习报告']
+    boxes = primary.bounding_box(), secondary.bounding_box()
+    assert boxes[1]['y'] - (boxes[0]['y'] + boxes[0]['height']) >= 20
 
 
 def test_controls_fit_all_themes_and_busy_state_keeps_stop_action(composer_page):

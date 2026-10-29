@@ -1425,6 +1425,8 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     width:100%;
 }
 
+.learning-tools-secondary { margin-top:24px; }
+
 
 /* 学习回顾：只读取现有本地记录，不做能力评分。 */
 .learning-review-card {
@@ -8756,6 +8758,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/voice-input.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/concept-notebook.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/chat-composer.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/image-groups.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v={{ dmate_web_revision }}">
 <style>
@@ -8912,24 +8915,25 @@ window.DMATE_CLIENT_CONFIG = {{ {
         </div>
         <div id="learningSummary" class="learning-summary"></div>
 
-        <div class="learning-actions learning-actions-single">
-            <button id="wrongBookBtn" type="button">查看错题本 (0)</button>
+        <div class="learning-tools-primary">
+            <div class="learning-actions learning-actions-single">
+                <button id="wrongBookBtn" type="button">错题本 (0)</button>
+            </div>
+            <div class="learning-actions learning-actions-single">
+                <button id="conceptNotebookBtn" type="button">笔记本</button>
+            </div>
         </div>
 
-        <div class="learning-actions learning-actions-single graph-drawing-entry">
-            <button id="graphDrawingBtn" type="button">画图</button>
-        </div>
-
-        <div class="learning-actions learning-actions-single">
-            <button id="conceptNotebookBtn" type="button">笔记本</button>
-        </div>
-
-        <div class="learning-actions learning-actions-single">
-            <button id="knowledgeGraphBtn" type="button">可视化知识图谱</button>
-        </div>
-
-        <div class="learning-actions learning-actions-single">
-            <button id="learningReviewBtn" type="button">学习回顾</button>
+        <div class="learning-tools-secondary">
+            <div class="learning-actions learning-actions-single">
+                <button id="knowledgeGraphBtn" type="button">知识图谱</button>
+            </div>
+            <div class="learning-actions learning-actions-single graph-drawing-entry">
+                <button id="graphDrawingBtn" type="button">绘图</button>
+            </div>
+            <div class="learning-actions learning-actions-single">
+                <button id="learningReviewBtn" type="button">学习报告</button>
+            </div>
         </div>
 
     </div>
@@ -9319,7 +9323,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <div id="learningReviewModal" class="modal hidden">
     <div class="modal-card learning-review-card">
         <div class="modal-head">
-            <div>学习回顾</div>
+            <div>学习报告</div>
             <button id="learningReviewClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
         </div>
 
@@ -9488,7 +9492,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <div id="knowledgeGraphModal" class="modal hidden">
     <div class="modal-card graph-modal-card">
         <div class="modal-head">
-            <div>可视化知识图谱</div>
+            <div>知识图谱</div>
             <button id="knowledgeGraphClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
         </div>
 

@@ -1233,6 +1233,13 @@ function markWrongQuestionDeleted(id) {
 function markSessionDeleted(sessionId) {
     const key = String(sessionId ?? "");
     if (!key) return;
+    cancelOcrBatchRun(sessionId);
+    const request = activeAiRequests.get(key);
+    if (request) {
+        request.cancelled = true;
+        request.controller.abort();
+        activeAiRequests.delete(key);
+    }
     deletedSessionIds[key] = Math.max(
         Date.now(),
         Number(deletedSessionIds[key]) || 0
@@ -1943,7 +1950,11 @@ function requestCloudLivePollNow() {
 // 自动同步采用按 ID 合并 + 云端修订号 CAS，不再弹出“覆盖本地/云端”选择框。
 // 会话若在不同设备上从同一位置分叉，则保留两条分支，避免任何一边聊天记录丢失。
 function cloudMessageKey(message) {
-    return `${message?.role || ""}\u0000${message?.text || ""}`;
+    const contexts = sanitizeSemanticContexts(message?.semanticContexts, message);
+    // Source-bound IDs also exist on older clients which have not retained
+    // the optional group UI metadata. They identify the same submission.
+    const groupId = contexts?.map(context => context.request_id).join("|");
+    return `${message?.role || ""}\u0000${message?.text || ""}${groupId ? "\u0000" + groupId : ""}`;
 }
 
 function mergeCloudMessage(left, right) {
@@ -1965,6 +1976,9 @@ function mergeCloudMessage(left, right) {
         merged.semanticContexts = semanticContexts;
         delete merged.semanticContext;
     } else delete merged.semanticContexts;
+    const group = sanitizeOcrGroup(right?.ocrGroup, merged) || sanitizeOcrGroup(left?.ocrGroup, merged);
+    if (group) merged.ocrGroup = group;
+    else delete merged.ocrGroup;
     return merged;
 }
 
@@ -3105,7 +3119,10 @@ const pendingAiStartSessionIds = new Set();
 const activeAiRequests = new Map();
 
 function throwIfAiRequestCancelled(request) {
-    if (request?.cancelled || request?.controller?.signal?.aborted) {
+    if (request?.cancelled || request?.controller?.signal?.aborted
+        || request?.session && (!sessions.includes(request.session)
+            || deletedSessionIds[sessionBusyKey(request.session.id)])
+        || request?.userMessage && getLatestUserMessage(request.session) !== request.userMessage) {
         const error = new Error("AI request cancelled");
         error.name = "AbortError";
         throw error;
@@ -3131,6 +3148,7 @@ function discardTypingOutput() {
 
 function stopCurrentAiReply() {
     const key = sessionBusyKey(currentId);
+    cancelOcrBatchRun(currentId);
     const request = activeAiRequests.get(key);
     if (request) {
         request.cancelled = true;
@@ -3149,7 +3167,8 @@ function stopCurrentAiReply() {
 }
 
 function handleSendOrStop() {
-    if (isSessionBusy(currentId) || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) {
+    if (isSessionBusy(currentId) || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()
+        || ocrBatchRuns.has(sessionBusyKey(currentId))) {
         stopCurrentAiReply();
         return;
     }
@@ -3223,7 +3242,9 @@ function isCurrentSessionTyping() {
 function refreshInputAvailability() {
     const pendingStart = isSessionPendingAiStart(currentId);
     const typingNow = isCurrentSessionTyping();
-    const waitingReply = isSessionBusy(currentId) || pendingStart;
+    const imageBatchActive = typeof ocrBatchRuns !== "undefined"
+        && Boolean(ocrBatchRuns.get(sessionBusyKey(currentId))?.cancelled === false);
+    const waitingReply = isSessionBusy(currentId) || pendingStart || imageBatchActive;
     const hardBlocked = waitingReply || typingNow;
 
     const input = document.getElementById("text");
@@ -3288,7 +3309,7 @@ function refreshInputAvailability() {
         imageInput.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
     }
     if (typeof ocrBatchPreparing !== "undefined" && ocrBatchPreparing) {
-        if (sendBtn) sendBtn.disabled = true;
+        if (sendBtn && !imageBatchActive) sendBtn.disabled = true;
         if (imageBtn) imageBtn.disabled = true;
         if (imageInput) imageInput.disabled = true;
     }
@@ -6883,7 +6904,7 @@ function renderLearningSummary() {
     box.innerText = lines.join("\n");
 
     if (wrongButton) {
-        wrongButton.textContent = `查看错题本 (${wrongCount})`;
+        wrongButton.textContent = `错题本 (${wrongCount})`;
     }
 
 }
@@ -9601,6 +9622,48 @@ function sanitizeSemanticContexts(values, message = null) {
     return contexts;
 }
 
+function sanitizeOcrGroup(value, message) {
+    if (!value || typeof value !== "object" || typeof value.id !== "string"
+        || !value.id || value.id.length > 1000 || typeof value.groupId !== "string"
+        || !value.groupId || value.groupId.length > 160 || !Array.isArray(value.members)) return undefined;
+    const contexts = sanitizeSemanticContexts(message?.semanticContexts, message);
+    if (!contexts || value.members.length !== contexts.length) return undefined;
+    const members = [];
+    for (let index = 0; index < contexts.length; index += 1) {
+        const member = value.members[index];
+        if (member?.requestId !== contexts[index].request_id || typeof member.isQuestion !== "boolean") return undefined;
+        members.push({ requestId: member.requestId, isQuestion: member.isQuestion });
+    }
+    if (message.ocrIsQuestion !== members.some(member => member.isQuestion)) return undefined;
+    return { id: value.id, groupId: value.groupId, members };
+}
+
+function supportingOcrFollowUpCandidate(session, latest) {
+    if (!latest || latest.source === "ocr" || latest.manualIsQuestion === true
+        || latest.isRetestPrompt || latest.isRetestAnswer
+        || looksLikeActualLearningProblem(latest) || isQuestionNavigationFollowUp(latest.text)
+        || isExerciseRequestText(latest.text)) return null;
+    const latestIndex = session.messages.lastIndexOf(latest);
+    for (let index = latestIndex - 1; index >= 0; index -= 1) {
+        const entry = session.messages[index];
+        if (entry?.role !== "user" || entry.isError || entry.isNotice) continue;
+        if (entry.source !== "ocr") {
+            if (entry.manualIsQuestion === true || looksLikeActualLearningProblem(entry)
+                || isQuestionNavigationFollowUp(entry.text) || isExerciseRequestText(entry.text)
+                || entry.isRetestPrompt || entry.isRetestAnswer) return null;
+            continue;
+        }
+        if (entry.ocrIsQuestion !== false) return null;
+        const contexts = sanitizeSemanticContexts(entry.semanticContexts, entry);
+        const context = contexts ? null : sanitizeSemanticContext(entry.semanticContext, entry);
+        const text = contexts ? ocrBatchQuestion(contexts, "rendered_question_text")
+            : context?.rendered_question_text;
+        return { index, role: "user", source: "ocr",
+            text: text || extractOcrQuestionPayload(entry.text), invalidSemanticContext: !text };
+    }
+    return null;
+}
+
 function semanticContextForRequest(session, targetCandidate, apiMessages, options = {}) {
     if (!Array.isArray(session?.messages) || !Array.isArray(apiMessages)
         || options.exerciseRequest || options.retestGeneration) return undefined;
@@ -9614,15 +9677,17 @@ function semanticContextForRequest(session, targetCandidate, apiMessages, option
     const latest = session.messages[latestIndex];
     if (latest.isRetestPrompt || latest.isRetestAnswer) return undefined;
     let selected = null;
+    const supportingFollowUp = supportingOcrFollowUpCandidate(session, latest);
     if (latest.source === "ocr") selected = latest;
     else {
         // New typed problems and generated exercises never inherit an old
         // image just because a previous graph remains in the same session.
         if ((latest.manualIsQuestion === true || looksLikeActualLearningProblem(latest))
             && !isQuestionNavigationFollowUp(latest.text)) return undefined;
-        if (!Number.isInteger(targetCandidate?.index) || targetCandidate.index < 0
-            || targetCandidate.index >= latestIndex || targetCandidate.role !== "user") return undefined;
-        selected = session.messages[targetCandidate.index];
+        const selectedCandidate = supportingFollowUp || targetCandidate;
+        if (!Number.isInteger(selectedCandidate?.index) || selectedCandidate.index < 0
+            || selectedCandidate.index >= latestIndex || selectedCandidate.role !== "user") return undefined;
+        selected = session.messages[selectedCandidate.index];
     }
     const contexts = sanitizeSemanticContexts(selected?.semanticContexts, selected);
     const context = contexts ? {
@@ -9630,7 +9695,7 @@ function semanticContextForRequest(session, targetCandidate, apiMessages, option
         rendered_question_text: ocrBatchQuestion(contexts, "rendered_question_text")
     } : sanitizeSemanticContext(selected?.semanticContext, selected);
     if (!context) return undefined;
-    if (selected !== latest && extractOcrQuestionPayload(targetCandidate.text)
+    if (selected !== latest && extractOcrQuestionPayload((supportingFollowUp || targetCandidate).text)
         !== extractOcrQuestionPayload(context.rendered_question_text)) return undefined;
     const current = [...apiMessages].reverse().find(row => row?.role === "user");
     const visibleAnchor = extractOcrQuestionPayload(context.rendered_question_text);
@@ -9714,6 +9779,7 @@ function loadState() {
                         : undefined,
                     semanticContext: sanitizeSemanticContext(message.semanticContext, message) || undefined,
                     semanticContexts: sanitizeSemanticContexts(message.semanticContexts, message) || undefined,
+                    ocrGroup: sanitizeOcrGroup(message.ocrGroup, message) || undefined,
                     generatedExercise: Boolean(
                         message.generatedExercise
                     ),
@@ -12500,6 +12566,7 @@ function newChat() {
         forceCompleteTyping();
     }
 
+    pauseOcrBatchRun(currentId);
     const id = makeSessionId();
 
     sessions.push({
@@ -13204,8 +13271,8 @@ function attachTeachingSnapshotToLatestQuestion(
 }
 
 
-async function requestAiReply(session) {
-    if (!session) return;
+async function requestAiReply(session, options = {}) {
+    if (!session) return { status: "skipped" };
 
     const latestUserBeforeRequest = getLatestUserMessage(
         session
@@ -13217,6 +13284,9 @@ async function requestAiReply(session) {
         latestUserBeforeRequest?.isRetestPrompt
         && retestBeforeRequest?.stage === "generating"
     );
+
+    if (options.expectedUserMessage && latestUserBeforeRequest !== options.expectedUserMessage)
+        return { status: "skipped" };
 
     const latestText = latestUserBeforeRequest?.text || "";
     const latestIsNavigationRequest = Boolean(
@@ -13252,6 +13322,17 @@ async function requestAiReply(session) {
         )
     );
 
+    // Images explicitly marked as supporting material are still answered, but
+    // must not overwrite an earlier problem or create learning statistics.
+    const supportingFollowUp = supportingOcrFollowUpCandidate(session, latestUserBeforeRequest);
+    if (supportingFollowUp?.invalidSemanticContext) {
+        showAssistantMessage(session, "图片确认信息已失效，请重新上传并确认后继续。", { isError: true });
+        return { status: "error" };
+    }
+    const supportingImagesOnly = !latestIsExerciseRequest && !latestIsRetestGeneration
+        && (latestUserBeforeRequest?.source === "ocr" && latestUserBeforeRequest.ocrIsQuestion === false
+            || Boolean(supportingFollowUp));
+
     const latestIsFreshQuestion = Boolean(
         latestUserBeforeRequest
         && (
@@ -13279,7 +13360,7 @@ async function requestAiReply(session) {
             ),
             { isError: true }
         );
-        return;
+        return { status: "error" };
     }
 
     // 普通“同知识点出题”从当前会话里找参照题；
@@ -13321,7 +13402,7 @@ async function requestAiReply(session) {
             "还没找到要参照的题目。你可以说“第一道题 / 上一道题 / 数论那道题”，也可以直接说明要练习的知识点",
             { isError: true }
         );
-        return;
+        return { status: "error" };
     }
 
     if (
@@ -13334,13 +13415,14 @@ async function requestAiReply(session) {
             "复测原题已经丢失，请回到错题本重新发起复测",
             { isError: true }
         );
-        return;
+        return { status: "error" };
     }
 
     const requestTargetCandidate = latestIsExerciseRequest
         ? exerciseReference
         : latestIsFreshQuestion ? null : (
-            navigationCandidate
+            supportingFollowUp
+            || navigationCandidate
             || activeQuestionCandidateFromHistory(session)
             || currentQuestionCandidateFromLearningState(session)
         );
@@ -13352,7 +13434,8 @@ async function requestAiReply(session) {
     const activeRequest = {
         session,
         controller: new AbortController(),
-        cancelled: false
+        cancelled: false,
+        userMessage: options.expectedUserMessage
     };
     activeAiRequests.set(requestKey, activeRequest);
     setSessionBusy(session.id, true);
@@ -13362,6 +13445,7 @@ async function requestAiReply(session) {
         // 规则分类补齐，这样右侧“学习内容 / 本题难点”会和目标题同步。
         if (
             requestTargetCandidate
+            && !supportingImagesOnly
             && !candidateTeachingSnapshot(
                 session,
                 requestTargetCandidate
@@ -13484,7 +13568,7 @@ async function requestAiReply(session) {
         const data = await parseResponseJson(response);
         throwIfAiRequestCancelled(activeRequest);
 
-        let localGeneratedQuestion = sanitizeStoredWrongQuestionText(
+        let localGeneratedQuestion = supportingImagesOnly ? "" : sanitizeStoredWrongQuestionText(
             data.generated_question || ""
         );
 
@@ -13541,7 +13625,7 @@ async function requestAiReply(session) {
                 "练习题生成结果未完成题目登记，请重新出题",
                 { isError: true }
             );
-            return;
+            return { status: "error" };
         }
 
         const returnedTeaching = (
@@ -13549,7 +13633,7 @@ async function requestAiReply(session) {
             || data.teaching
         );
 
-        if (returnedTeaching) {
+        if (returnedTeaching && !supportingImagesOnly) {
             const normalizedReturnedTeaching = normalizeTeaching(
                 returnedTeaching
             );
@@ -13617,7 +13701,7 @@ async function requestAiReply(session) {
                 message,
                 { isError: true }
             );
-            return;
+            return { status: "error" };
         }
 
         if (
@@ -13631,7 +13715,7 @@ async function requestAiReply(session) {
                 "AI 服务没有返回有效内容，请重新发送",
                 { isError: true }
             );
-            return;
+            return { status: "error" };
         }
 
         // 已完成最多一次难度纠偏仍未达标时，明确告知用户，不能静默
@@ -13641,7 +13725,7 @@ async function requestAiReply(session) {
             showCopyToast(data.exercise_generation_notice);
         }
 
-        const retestHandled = processWrongQuestionRetestReply(
+        const retestHandled = supportingImagesOnly || processWrongQuestionRetestReply(
             session,
             data.reply,
             localGeneratedQuestion,
@@ -13662,7 +13746,7 @@ async function requestAiReply(session) {
         const assistantMeta = {
             // 只有后端明确返回 generated_question，才标记为“AI 生成题”。
             // 普通讲解里出现编号、反问、步骤，不再被误判。
-            generatedExercise: Boolean(
+            generatedExercise: !supportingImagesOnly && Boolean(
                 localGeneratedQuestion
                 || data.generated_exercise
             ),
@@ -13679,7 +13763,7 @@ async function requestAiReply(session) {
             targetQuestionFingerprint: requestTargetFingerprint
         };
 
-        if (currentId === session.id) {
+        if (!options.completeImmediately && currentId === session.id) {
             startTyping(
                 data.reply,
                 session,
@@ -13694,11 +13778,13 @@ async function requestAiReply(session) {
             saveState();
             renderSessions();
             renderInfo();
+            if (currentId === session.id) renderChat();
         }
+        return { status: "success" };
 
     } catch (error) {
         // 用户主动停止不是网络故障，不显示错误消息，也不保存迟到的回复。
-        if (activeRequest.cancelled || error?.name === "AbortError") return;
+        if (activeRequest.cancelled || error?.name === "AbortError") return { status: "cancelled" };
         console.error("聊天请求失败：", error);
 
         rollbackRetestAfterRequestFailure(session);
@@ -13708,6 +13794,7 @@ async function requestAiReply(session) {
             "网络连接失败，请检查网络后重试",
             { isError: true }
         );
+        return { status: "error" };
 
     } finally {
         // 旧请求晚结束时不能清除用户刚刚重新发起的新请求的忙碌状态。
@@ -14309,6 +14396,7 @@ function reviewRecognizedQuestion(file, data) {
 const OCR_MAX_CONCURRENT = 4;
 const ocrTasks = new Map();
 const ocrSolvingSessions = new Set();
+const ocrBatchRuns = new Map();
 let ocrBatchPreparing = false;
 let ocrTaskTimer = null;
 let ocrEditorTaskId = null;
@@ -14356,6 +14444,164 @@ function ocrTaskLabel(task) {
     return task.dirty ? "修改待确认" : "待核对";
 }
 
+function nextOcrGroupId() {
+    const used = new Set([...ocrTasks.values()].map(task => String(task.groupId ?? task.id)));
+    return ["1", "2", "3", "4"].find(id => !used.has(id)) || "1";
+}
+
+function partitionOcrTasks(tasks) {
+    const groups = new Map();
+    for (const task of tasks) {
+        const id = String(task.groupId ?? task.id);
+        if (!groups.has(id)) groups.set(id, []);
+        groups.get(id).push(task);
+    }
+    return [...groups].map(([id, members]) => ({ id, tasks: members }));
+}
+
+function renderOcrGrouping(panel, hasImages) {
+    const heading = panel.querySelector(".ocr-task-panel-head");
+    if (!heading) return;
+    let button = document.getElementById("ocrGroupButton");
+    if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.id = "ocrGroupButton";
+        button.className = "ocr-group-button";
+        button.textContent = "分组";
+        button.setAttribute("aria-haspopup", "dialog");
+        button.setAttribute("aria-controls", "ocrGroupingDialog");
+        button.addEventListener("click", openOcrGrouping);
+        heading.append(button);
+    }
+    const locked = ocrBatchPreparing || ocrSolvingSessions.size > 0;
+    button.disabled = locked;
+    const dialog = document.getElementById("ocrGroupingDialog");
+    if (!hasImages && dialog?.open) dialog.close();
+    if (!dialog?.open) return;
+    // Recognition can complete while this popup is open. Rebuild only when its
+    // own values change so an in-flight pointer/keyboard action stays intact.
+    const fingerprint = JSON.stringify([locked, [...ocrTasks.values()].map(task =>
+        [task.id, task.groupId, task.isQuestion !== false])]);
+    if (dialog.dataset.fingerprint === fingerprint) return;
+    dialog.dataset.fingerprint = fingerprint;
+    const list = dialog.querySelector(".ocr-group-list");
+    const focused = list.contains(document.activeElement) ? document.activeElement : null;
+    const focusInfo = focused ? { taskId: focused.dataset.taskId,
+        question: focused.dataset.groupQuestion, field: focused.dataset.groupField } : null;
+    list.replaceChildren();
+    let index = 0;
+    for (const task of ocrTasks.values()) {
+        index += 1;
+        const row = document.createElement("section");
+        row.className = "ocr-group-row";
+        row.dataset.groupTaskId = task.id;
+        const image = document.createElement("img");
+        image.src = task.originalUrl;
+        image.alt = "";
+        const content = document.createElement("div");
+        content.className = "ocr-group-content";
+        const name = document.createElement("strong");
+        name.className = "ocr-group-name";
+        name.textContent = task.file?.name || `图片${index}`;
+        const controls = document.createElement("div");
+        controls.className = "ocr-group-controls";
+        const question = document.createElement("div");
+        question.className = "ocr-group-question";
+        question.setAttribute("role", "group");
+        question.setAttribute("aria-label", `图片${index}是否为题目`);
+        const title = document.createElement("span");
+        title.textContent = "题目";
+        question.append(title);
+        for (const [value, label] of [[true, "是"], [false, "否"]]) {
+            const choice = document.createElement("button");
+            choice.type = "button";
+            choice.className = "ocr-group-question-choice";
+            choice.dataset.groupQuestion = String(value);
+            choice.dataset.taskId = task.id;
+            choice.setAttribute("aria-pressed", String((task.isQuestion !== false) === value));
+            choice.disabled = locked;
+            const dot = document.createElement("span");
+            dot.className = "ocr-group-question-dot";
+            dot.setAttribute("aria-hidden", "true");
+            choice.append(dot, label);
+            question.append(choice);
+        }
+        const group = document.createElement("label");
+        group.className = "ocr-group-select-label";
+        group.append("组别");
+        const select = document.createElement("select");
+        select.setAttribute("aria-label", `图片${index}组别`);
+        select.dataset.taskId = task.id;
+        select.dataset.groupField = "groupId";
+        select.disabled = locked;
+        for (let number = 1; number <= OCR_MAX_CONCURRENT; number += 1) {
+            const option = document.createElement("option");
+            option.value = String(number);
+            option.textContent = `第${number}组`;
+            select.append(option);
+        }
+        select.value = String(task.groupId);
+        group.append(select);
+        controls.append(question, group);
+        content.append(name, controls);
+        row.append(image, content);
+        list.append(row);
+    }
+    if (focusInfo) {
+        const replacement = [...list.querySelectorAll("[data-task-id]")].find(control =>
+            control.dataset.taskId === focusInfo.taskId && control.dataset.groupQuestion === focusInfo.question
+            && control.dataset.groupField === focusInfo.field);
+        replacement?.focus({ preventScroll: true });
+    }
+}
+
+function openOcrGrouping() {
+    if (!ocrTasks.size || ocrBatchPreparing || ocrSolvingSessions.size) return;
+    // Older in-memory uploads and imported drawing tasks also get independent
+    // defaults. Changing the select is the only action which combines images.
+    for (const task of ocrTasks.values()) {
+        if (!["1", "2", "3", "4"].includes(String(task.groupId))) task.groupId = nextOcrGroupId();
+    }
+    let dialog = document.getElementById("ocrGroupingDialog");
+    if (!dialog) {
+        dialog = document.createElement("dialog");
+        dialog.id = "ocrGroupingDialog";
+        dialog.className = "ocr-group-dialog";
+        dialog.setAttribute("aria-labelledby", "ocrGroupingTitle");
+        const heading = document.createElement("header");
+        const title = document.createElement("h2");
+        title.id = "ocrGroupingTitle";
+        title.textContent = "分组";
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "ocr-group-close";
+        close.setAttribute("aria-label", "关闭分组");
+        close.addEventListener("click", () => dialog.close());
+        heading.append(title, close);
+        const list = document.createElement("div");
+        list.className = "ocr-group-list";
+        dialog.append(heading, list);
+        dialog.addEventListener("click", event => {
+            const choice = event.target.closest("button[data-group-question]");
+            const task = ocrTasks.get(choice?.dataset.taskId);
+            if (!task || ocrBatchPreparing || ocrSolvingSessions.size) return;
+            task.isQuestion = choice.dataset.groupQuestion === "true";
+            renderOcrGrouping(document.getElementById("ocrTaskPanel"), true);
+        });
+        dialog.addEventListener("change", event => {
+            const select = event.target.closest("select[data-group-field]");
+            const task = ocrTasks.get(select?.dataset.taskId);
+            if (!task || ocrBatchPreparing || ocrSolvingSessions.size) return;
+            task.groupId = select.value;
+            renderOcrGrouping(document.getElementById("ocrTaskPanel"), true);
+        });
+        document.body.append(dialog);
+    }
+    dialog.showModal();
+    renderOcrGrouping(document.getElementById("ocrTaskPanel"), true);
+}
+
 function renderOcrTasks() {
     const panel = document.getElementById("ocrTaskPanel");
     const list = document.getElementById("ocrTaskList");
@@ -14364,6 +14610,7 @@ function renderOcrTasks() {
     const focusInfo = focused ? { taskId: focused.dataset.taskId, action: focused.dataset.ocrAction,
         field: focused.dataset.ocrField, start: focused.selectionStart, end: focused.selectionEnd } : null;
     const hasImages = ocrTasks.size > 0;
+    if (typeof renderOcrGrouping === "function") renderOcrGrouping(panel, hasImages);
     panel.hidden = !hasImages;
     const stage = document.getElementById("ocrUploadStage");
     if (stage) stage.hidden = !hasImages;
@@ -14689,6 +14936,7 @@ async function enqueueOcrFiles(files) {
             dirty: false, userRequest: "", isQuestion: true, error: "", notice: "", sourceSha256: null,
             descriptions: null, descriptionState: null
         };
+        task.groupId = nextOcrGroupId();
         ocrTasks.set(task.id, task);
         accepted.push(task);
     }
@@ -14741,7 +14989,7 @@ function ensureGraphSession() {
     return graphSessionPromise;
 }
 
-async function confirmOcrTask(task, documentValue) {
+async function confirmOcrTask(task, documentValue, options = {}) {
     task.confirming = true;
     task.error = "";
     renderOcrTasks();
@@ -14752,9 +15000,11 @@ async function confirmOcrTask(task, documentValue) {
         const submitted = cloneOcrDocument(documentValue);
         const response = await fetch("/graph/confirm", {
             method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+            signal: options.signal,
             body: JSON.stringify({ document: submitted, source_sha256: task.sourceSha256, request_id: task.id, confirmed: true })
         });
         const data = await parseResponseJson(response);
+        if (options.signal?.aborted) throw Object.assign(new Error("已停止发送"), { name: "AbortError" });
         if (!response.ok || data?.error) throw new Error(data?.error || "修改后的图形未通过校验，请检查节点和连边。");
         if (!data?.document || !data?.confirmation_token || !data?.semantic_context) {
             throw new Error("结构确认响应不完整，请重新确认。");
@@ -14767,7 +15017,7 @@ async function confirmOcrTask(task, documentValue) {
         task.notice = "修改已保存，解题将使用这份确认后的结构。";
         return data;
     } catch (error) {
-        task.error = error?.message || "结构确认失败，请稍后重试。";
+        if (error?.name !== "AbortError") task.error = error?.message || "结构确认失败，请稍后重试。";
         throw error;
     } finally {
         task.confirming = false;
@@ -14856,7 +15106,7 @@ async function uploadDrawingResult(blob, metadata = {}) {
     if (!session || [...ocrTasks.values()].some(task => task.sessionId !== session.id))
         throw new Error("已有图片属于其他对话，请先发送或移除后重试。");
     const now = performance.now(), documentValue = cloneOcrDocument(result.document);
-    ocrTasks.set(requestId, {id: requestId, file, sessionId: session.id,
+    ocrTasks.set(requestId, {id: requestId, groupId: nextOcrGroupId(), file, sessionId: session.id,
         originalUrl: URL.createObjectURL(file), state: "ready", startedAt: now, finishedAt: now,
         controller: null, draft: documentValue, initialDocument: cloneOcrDocument(documentValue),
         confirmation: null, dirty: true, userRequest: String(metadata.requirements || "").slice(0, 4000),
@@ -15091,6 +15341,46 @@ async function solveOcrTask(id) {
     finally { task.sending = false; ocrSolvingSessions.delete(session.id); renderOcrTasks(); }
 }
 
+function cancelOcrBatchRun(sessionId) {
+    const run = ocrBatchRuns.get(sessionBusyKey(sessionId));
+    if (!run) return;
+    run.cancelled = true;
+    run.controller.abort();
+}
+
+function pauseOcrBatchRun(sessionId) {
+    const run = ocrBatchRuns.get(sessionBusyKey(sessionId));
+    if (run) run.paused = true;
+}
+
+function ocrBatchCanContinue(run) {
+    return !run.cancelled && !run.paused && currentId === run.session.id
+        && sessions.includes(run.session) && !deletedSessionIds[sessionBusyKey(run.session.id)];
+}
+
+function buildOcrGroupMessage(group, sharedRequest) {
+    const contexts = sanitizeSemanticContexts(group.tasks.map(task => task.confirmation?.semantic_context));
+    if (!contexts || contexts.some((context, index) => context.request_id !== group.tasks[index].id
+        || context.source_sha256 !== group.tasks[index].sourceSha256))
+        throw new Error("图片结构无效或同组内容过长，请核对后拆分发送。");
+    const question = ocrBatchQuestion(contexts, "question_text");
+    const rendered = ocrBatchQuestion(contexts, "rendered_question_text");
+    // Numbering is local to this group, exactly like its signed batch context.
+    const requirements = group.tasks.map((task, index) => task.userRequest?.trim()
+        ? `图片 ${index + 1}：${task.userRequest.trim()}` : "").filter(Boolean);
+    if (sharedRequest) requirements.push(sharedRequest);
+    const userRequest = requirements.join("\n") || "请依据以上图片已确认的题干和图形结构回答，并核验适用的计算结果。";
+    const text = `${rendered}\n\n【我的要求】\n${userRequest}`;
+    const apiText = ["【当前指向题目】", question, "【当前指向题目结束】", "",
+        "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n");
+    if (text.length > 28000 || apiText.length > 28000)
+        throw new Error("同组题目内容过长，请减少图片或拆分组别后发送。");
+    return { role: "user", text, apiText, source: "ocr",
+        ocrIsQuestion: group.tasks.some(task => task.isQuestion !== false), semanticContexts: contexts,
+        ocrGroup: { id: group.tasks.map(task => task.id).join("|"), groupId: group.id,
+            members: group.tasks.map(task => ({ requestId: task.id, isQuestion: task.isQuestion !== false })) } };
+}
+
 async function sendOcrBatch() {
     if (ocrBatchPreparing || ocrEditorTaskId || !ocrTasks.size) return;
     const tasks = [...ocrTasks.values()];
@@ -15099,8 +15389,8 @@ async function sendOcrBatch() {
         showCurrentError("这些图片不属于同一个会话，请移除其他会话的图片后再发送。");
         return;
     }
-    if (ocrSolvingSessions.has(session.id) || isSessionBusy(session.id) || isSessionPendingAiStart(session.id)
-        || session.id === currentId && isCurrentSessionTyping()) return;
+    if (currentId !== session.id || ocrSolvingSessions.has(session.id) || isSessionBusy(session.id)
+        || isSessionPendingAiStart(session.id) || isCurrentSessionTyping()) return;
     if (tasks.some(task => task.state === "recognizing" || task.confirming)) {
         showCurrentError("还有图片正在识别，请完成后一起发送。");
         return;
@@ -15110,54 +15400,78 @@ async function sendOcrBatch() {
         showCurrentError("有图片未识别成功，请编辑核对或移除后再发送。");
         return;
     }
+    const typed = document.getElementById("text");
+    const sharedRequest = typed?.value?.trim() || "";
+    const run = { session, cancelled: false, paused: false, controller: new AbortController() };
+    const key = sessionBusyKey(session.id);
+    ocrBatchRuns.set(key, run);
     ocrBatchPreparing = true;
     ocrSolvingSessions.add(session.id);
     tasks.forEach(task => { task.sending = true; });
     renderOcrTasks();
     try {
-        // Clicking Send confirms the visible drafts that have not been saved
-        // yet. All source-bound checks finish before any AI request is sent.
+        // Every source-bound confirmation and every group's size check must
+        // pass before the first request. A bad fourth image cannot cause a
+        // partially submitted batch with its first image already answered.
         for (const task of tasks) {
+            if (!ocrBatchCanContinue(run)) return;
             const saved = task.confirmation?.drawing_document || task.confirmation?.document;
             if (!task.confirmation || task.dirty || JSON.stringify(task.draft) !== JSON.stringify(saved))
-                await confirmOcrTask(task, task.draft);
+                await confirmOcrTask(task, task.draft, { signal: run.controller.signal });
         }
-        const contexts = sanitizeSemanticContexts(tasks.map(task => task.confirmation?.semantic_context));
-        if (!contexts) throw new Error("图片结构无效或整批内容过长，请核对后拆分发送。");
-        const question = ocrBatchQuestion(contexts, "question_text");
-        const rendered = ocrBatchQuestion(contexts, "rendered_question_text");
-        const requirements = tasks.map((task, index) => task.userRequest.trim()
-            ? `图片 ${index + 1}：${task.userRequest.trim()}` : "").filter(Boolean);
-        const typed = document.getElementById("text");
-        const sharedRequest = typed?.value?.trim() || "";
-        if (sharedRequest) requirements.push(sharedRequest);
-        const userRequest = requirements.join("\n") || "请依据以上全部图片已确认的题干和图形结构解题，并核验适用的计算结果。";
-        const combinedText = `${rendered}\n\n【我的要求】\n${userRequest}`;
-        const apiText = ["【当前指向题目】", question, "【当前指向题目结束】", "",
-            "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n");
-        if (combinedText.length > 28000 || apiText.length > 28000)
-            throw new Error("整批题目内容过长，请减少图片或分批发送。");
-        currentId = session.id;
-        session.messages.push({ role: "user", text: combinedText, apiText, source: "ocr",
-            ocrIsQuestion: tasks.some(task => task.isQuestion !== false), semanticContexts: contexts });
-        maybeAutoNameSession(session, tasks[0].draft.body_text || tasks[0].file.name || "图片识题", "ocr");
-        // The complete signed snapshots are now in chat history. Returning to
-        // the composer avoids sending the same attachment batch a second time.
-        for (const task of tasks) {
-            ocrTasks.delete(task.id);
-            URL.revokeObjectURL(task.originalUrl);
-        }
-        if (typed) { typed.value = ""; typed.dispatchEvent(new Event("input", { bubbles: true })); }
-        saveState(); renderChat(); renderSessions(); renderInfo();
+        if (!ocrBatchCanContinue(run)) return;
+        const groups = partitionOcrTasks(tasks).map(group => {
+            const request = sharedRequest || group.tasks[0].pendingSharedRequest || "";
+            group.tasks.forEach(task => { task.pendingSharedRequest = request; });
+            return { ...group, message: buildOcrGroupMessage(group, request) };
+        });
         ocrBatchPreparing = false;
-        renderOcrTasks();
-        await requestAiReply(session);
+        let lastMessage = getLatestUserMessage(session);
+        let clearedInput = false;
+        for (const group of groups) {
+            if (!ocrBatchCanContinue(run) || getLatestUserMessage(session) !== lastMessage) break;
+            const signature = JSON.stringify(group.message);
+            const previous = group.tasks[0].submission;
+            // Retrying a stopped/failed group with unchanged drafts reuses its
+            // user message. Successful groups have already left the stage.
+            let message;
+            if (previous?.signature === signature && previous.message === lastMessage
+                && group.tasks.every(task => task.submission === previous)
+                && session.messages.includes(previous.message)) message = previous.message;
+            else {
+                message = group.message;
+                session.messages.push(message);
+                const submission = { signature, message };
+                group.tasks.forEach(task => { task.submission = submission; });
+                maybeAutoNameSession(session, group.tasks[0].draft.body_text || group.tasks[0].file.name || "图片识题", "ocr");
+            }
+            lastMessage = message;
+            if (!clearedInput && typed) {
+                typed.value = "";
+                typed.dispatchEvent(new Event("input", { bubbles: true }));
+                clearedInput = true;
+            }
+            saveState(); renderChat(); renderSessions(); renderInfo(); renderOcrTasks();
+            // Only OCR queues opt into immediate final rendering. The normal
+            // chat's typing animation and other request callers are unchanged.
+            const result = await requestAiReply(session, { completeImmediately: true, expectedUserMessage: message });
+            if (result?.status !== "success") break;
+            for (const task of group.tasks) {
+                if (ocrTasks.get(task.id) !== task) continue;
+                ocrTasks.delete(task.id);
+                URL.revokeObjectURL(task.originalUrl);
+            }
+            renderOcrTasks();
+        }
     } catch (error) {
-        showCurrentError(error?.message || "图片未能发送，请稍后重试。");
+        if (!run.cancelled && error?.name !== "AbortError" && sessions.includes(session)
+            && !deletedSessionIds[key]) showAssistantMessage(session,
+                error?.message || "图片未能发送，请稍后重试。", { isError: true });
     } finally {
         ocrBatchPreparing = false;
         tasks.forEach(task => { task.sending = false; });
         ocrSolvingSessions.delete(session.id);
+        if (ocrBatchRuns.get(key) === run) ocrBatchRuns.delete(key);
         renderOcrTasks();
     }
 }
@@ -16337,6 +16651,7 @@ function renderSessions() {
         span.title = session.name;
 
         const selectSession = () => {
+            if (currentId !== session.id) pauseOcrBatchRun(currentId);
             if (typingTimer) forceCompleteTyping();
             currentId = session.id;
             saveState();

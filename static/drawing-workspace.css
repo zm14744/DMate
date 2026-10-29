@@ -10,7 +10,9 @@
 .dmate-drawing-workspace button:hover:not(:disabled){filter:brightness(.96)}
 .dmate-drawing-workspace button:disabled{opacity:.55;cursor:wait}
 .dmate-drawing-workspace button:focus,.ddw-name:focus,.ddw-ai-requirement:focus{outline:none!important;box-shadow:none!important}
-.dmate-drawing-workspace .ddw-primary{background:#347cf5;border-color:#347cf5;color:white}
+.dmate-drawing-workspace .ddw-primary{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6);color:white}
+.dmate-drawing-workspace .ddw-upload-button{position:relative;flex:0 0 38px;justify-self:end;width:38px;min-width:38px;max-width:38px;height:38px;min-height:38px;max-height:38px;padding:0!important;border:0;border-radius:50%;font-size:0;color:#fff}
+.dmate-drawing-workspace .ddw-upload-button::before{content:'';position:absolute;inset:8px;display:block;background:#fff;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3v18M3 12h18' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3v18M3 12h18' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
 .ddw-body{flex:1;min-height:0;position:relative;display:flex;overflow:hidden;border-radius:12px}
 .ddw-editor{flex:1;min-width:0;min-height:0;overflow:hidden}
 .ddw-editor.dmate-graph-editor{height:100%;display:flex;flex-direction:column}
@@ -51,5 +53,5 @@
 .dmate-drawing-workspace .ddw-export-close{width:20px;height:20px;min-width:20px;min-height:20px;padding:0;background:#ef4444;border:0;border-radius:50%}
 .ddw-export-preview>.ddw-note{margin:0;flex-shrink:0}
 .ddw-export-image{display:block;max-width:100%;width:auto;height:auto;max-height:calc(100% - 120px);min-height:0;object-fit:contain;background:white;user-select:auto;-webkit-user-select:auto;-webkit-touch-callout:default}
-.ddw-export-download{display:inline-block;border-radius:9px;padding:10px 20px;background:#347cf5;color:white;text-decoration:none;flex-shrink:0}
+.ddw-export-download{display:inline-block;border-radius:9px;padding:10px 20px;background:var(--accent,#3b82f6);color:white;text-decoration:none;flex-shrink:0}
 @media(max-width:600px){.ddw-header{gap:6px}.ddw-name{width:100%;padding:7px 10px}.ddw-page-actions{width:100%;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ddw-page-actions>button{font-size:12px;padding:8px 10px;white-space:nowrap}.ddw-side-actions{right:5px;width:96px}.ddw-side-actions>button{font-size:12px;padding:7px 9px}.ddw-side-panel{right:5px}.ddw-editor .dge-floating-actions{right:5px}}

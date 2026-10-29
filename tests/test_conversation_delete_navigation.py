@@ -29,6 +29,7 @@ def conversation_page(request):
           var sessions=[{id:'older',name:'较早对话',messages:[]},{id:'open',name:'当前对话',messages:[]}];
           var currentId='open',deletedSessionIds={},learningState={wrongQuestions:[]},busySessionIds=new Set();
           var STORAGE_KEY='navigation-test',typingTimer=null,confirmDelete=true,syncCount=0;
+          var activeAiRequests=new Map(),cancelOcrBatchRun=()=>{};
           var preserveChatScrollOnce=null,lastRenderedChatSessionId='open',forceChatBottomOnce=false;
           var cloudApplyingSnapshot=false,cloudLivePollEnabled=true,cloudLivePollInFlight=false;
           var cloudSyncContextVersion=1,cloudLivePollGeneration=1,cloudLocalChangeVersion=1;
@@ -45,7 +46,7 @@ def conversation_page(request):
           var chatBottomDistance=()=>0,queueChatJumpControlsUpdate=()=>{},scrollChatToBottom=()=>{};
           var renderMath=async()=>{},refreshInputAvailability=()=>{},renderAccountUi=()=>{};
           var normalizeTeaching=x=>x||null,normalizeLearningQuestion=x=>x||null,normalizeRetestSession=x=>x||null;
-          var sanitizeSemanticContext=()=>null,sanitizeSemanticContexts=()=>null;
+          var sanitizeSemanticContext=()=>null,sanitizeSemanticContexts=()=>null,sanitizeOcrGroup=()=>null;
           var readCloudSyncMeta=()=>({username:'test',dirty:false}),writeCloudSyncMeta=()=>{};
           var cloudUiEditInProgress=()=>false,isCloudSyncContextValid=()=>true;
           var normalizeCloudParts=x=>x,getCloudPartHashMap=()=>({}),computeChangedCloudParts=()=>['sessions'];

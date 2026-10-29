@@ -22,6 +22,9 @@ on:
       - 'tests/test_voice_input_ui.py'
       - 'tests/test_voice_no_result_ui.py'
       - 'tests/test_ocr_batch_frontend.py'
+      - 'tests/test_image_grouping.py'
+      - 'tests/test_nonquestion_image_context.py'
+      - 'static/image-groups.css'
       - 'tests/test_scan_selection_save.py'
       - 'tests/test_scan_information_sources.py'
       - 'static/chat-composer.js'
@@ -99,6 +102,8 @@ jobs:
             tests/test_voice_input_ui.py \
             tests/test_voice_no_result_ui.py \
             tests/test_ocr_batch_frontend.py \
+            tests/test_image_grouping.py \
+            tests/test_nonquestion_image_context.py \
             tests/test_scan_selection_save.py \
             tests/test_graph_appearance_ui.py \
             tests/test_scan_drawing_separation.py \

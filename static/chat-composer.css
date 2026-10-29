@@ -1,4 +1,4 @@
-/* The ordinary message field; the upload stage keeps its labelled actions. */
+/* The ordinary message field and queued images reuse the same icon actions. */
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input {
     display:flex !important; align-items:flex-end !important; gap:8px !important;
     box-sizing:border-box !important; width:min(100%,1440px) !important; min-width:0 !important;
@@ -40,7 +40,8 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .imag
     font-size:0 !important; background:transparent !important; color:var(--text-primary,#334155) !important;
     -webkit-text-fill-color:transparent !important; box-shadow:none !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) #imageBtn::before {
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) #imageBtn::before,
+body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn::before {
     content:'' !important; display:block !important; position:absolute; inset:8px;
     background:var(--text-primary,#334155) !important;
     -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3v18M3 12h18' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
@@ -61,20 +62,60 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #send
     box-sizing:border-box !important; flex:0 0 38px !important; width:38px !important; min-width:38px !important; max-width:38px !important;
     height:38px !important; min-height:38px !important; max-height:38px !important; align-self:flex-end !important;
     margin:0 !important; padding:0 !important; border:0 !important; border-radius:50% !important;
-    background:#3b82f6 !important; color:#fff !important;
+    background:var(--accent,#3b82f6) !important; color:#fff !important;
     -webkit-text-fill-color:transparent !important; font-size:0 !important; box-shadow:none !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn:not(.ai-stop-button)::before {
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn:not(.ai-stop-button)::before,
+body[data-appearance-theme] #ocrUploadActions > #sendBtn:not(.ai-stop-button)::before {
     content:'' !important; display:block !important; position:absolute !important; inset:10px;
     background:#fff !important;
     -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 20V4m-7 7 7-7 7 7' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
     mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 20V4m-7 7 7-7 7 7' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn::after { content:none !important; display:none !important; }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button { background:#ef4444 !important; }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button::before {
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn::after,
+body[data-appearance-theme] #ocrUploadActions > #sendBtn::after { content:none !important; display:none !important; }
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button,
+body[data-appearance-theme] #ocrUploadActions > #sendBtn.ai-stop-button { background:#ef4444 !important; }
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button::before,
+body[data-appearance-theme] #ocrUploadActions > #sendBtn.ai-stop-button::before {
     content:'' !important; display:block !important; position:absolute !important; width:12px !important; height:12px !important;
     inset:auto !important; border-radius:2px; background:#fff !important; mask:none !important; -webkit-mask:none !important;
+}
+
+/* The native chooser is moved, never duplicated. Its transparent input keeps
+   covering this smaller plus control in the queued-image stage. */
+body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap {
+    position:relative; flex:0 0 38px!important; width:38px!important; min-width:38px!important;
+    height:38px!important; min-height:38px!important; max-height:38px!important;
+}
+body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn {
+    display:block!important; position:relative!important; box-sizing:border-box!important;
+    width:38px!important; min-width:38px!important; max-width:38px!important;
+    height:38px!important; min-height:38px!important; max-height:38px!important;
+    padding:0!important; margin:0!important; border:0!important; border-radius:50%!important;
+    background:transparent!important; color:var(--text-primary,#334155)!important;
+    font-size:0!important; -webkit-text-fill-color:transparent!important; box-shadow:none!important;
+}
+body[data-appearance-theme] #ocrUploadActions > #sendBtn {
+    display:inline-flex!important; position:relative!important; box-sizing:border-box!important;
+    flex:0 0 38px!important; width:38px!important; min-width:38px!important; max-width:38px!important;
+    height:38px!important; min-height:38px!important; max-height:38px!important;
+    align-items:center!important; justify-content:center!important;
+    padding:0!important; margin:0!important; border:0!important; border-radius:50%!important;
+    background:var(--accent,#3b82f6)!important; color:#fff!important; box-shadow:none!important;
+    font-size:0!important; -webkit-text-fill-color:transparent!important;
+}
+body[data-appearance-theme] #ocrUploadActions > #sendBtn.ai-stop-button { background:#ef4444!important; }
+body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap:focus-within > #imageBtn,
+body[data-appearance-theme] #ocrUploadActions > #sendBtn:focus { outline:none!important; box-shadow:none!important; }
+body[data-appearance-theme] #ocrUploadActions > #sendBtn[hidden] { display:none!important; }
+@media(max-width:680px) {
+    body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap,
+    body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn,
+    body[data-appearance-theme] #ocrUploadActions > #sendBtn {
+        flex-basis:36px!important; width:36px!important; min-width:36px!important; max-width:36px!important;
+        height:36px!important; min-height:36px!important; max-height:36px!important;
+    }
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn[hidden],
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) #imagePickerWrap[hidden] { display:none !important; }
@@ -92,8 +133,8 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) {
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode {
     left:clamp(18px,2vw,30px);
 }
-/* Pointer focus must not leave circular rings. Keyboard users retain a clear
-   focus outline, including the native file picker layered over its button. */
+/* Activation does not add an outer ring, including the real file picker
+   layered over its visible plus button. */
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) button,
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .image-picker-wrap {
     -webkit-tap-highlight-color:transparent;
@@ -104,7 +145,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .image-picker-wr
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) button:focus-visible,
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .image-picker-wrap:has(#imageInput:focus-visible) > #imageBtn {
-    outline:2px solid #3b82f6 !important; outline-offset:3px !important;
+    outline:none !important; box-shadow:none !important;
 }
 @media(max-width:680px) {
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .manual-question-composer { min-height:36px !important; }

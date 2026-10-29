@@ -146,6 +146,23 @@ def test_guide_requirement_matches_backend_limit(drawing_page):
     assert len(page.evaluate('aiRequests[0].requirement')) == 2000
 
 
+def test_drawing_upload_is_an_accessible_plus_with_live_theme_color(drawing_page):
+    page = drawing_page
+    button = page.get_by_role('button', name='上传到对话', exact=True)
+    assert button.inner_text() == ''
+    assert button.get_attribute('title') == '上传到对话'
+    box = button.bounding_box()
+    assert box['width'] == pytest.approx(box['height'], abs=1)
+    assert page.locator('.ddw-page-actions').bounding_box()['x'] <= box['x']
+    for color in ('#3b82f6', '#14b8a6', '#8b5cf6'):
+        page.evaluate('color=>document.body.style.setProperty("--accent",color)', color)
+        expected = page.evaluate('color=>{const node=document.createElement("i");node.style.color=color;document.body.append(node);const rgb=getComputedStyle(node).color;node.remove();return rgb;}', color)
+        assert button.evaluate('e=>getComputedStyle(e).backgroundColor') == expected
+        assert button.evaluate('e=>getComputedStyle(e,"::before").backgroundColor') == 'rgb(255, 255, 255)'
+        assert button.evaluate('e=>getComputedStyle(e,"::before").maskImage') != 'none'
+    assert page.evaluate('aiRequests.length') == page.evaluate('uploads.length') == 0
+
+
 def test_empty_page_export_and_storage_failure_are_honest(drawing_page):
     page = drawing_page
     page.get_by_role('button', name='新建空白页', exact=True).click()
@@ -196,7 +213,8 @@ def test_drawing_panels_use_one_nonoverlapping_toolbar_and_red_closes(drawing_pa
 def test_history_is_next_to_new_page_in_top_actions_and_opens_above_canvas(drawing_page):
     page = drawing_page
     actions = page.locator('.ddw-page-actions')
-    assert actions.get_by_role('button').all_text_contents() == ['新建空白页', '历史绘图', '导出图片', '上传到对话']
+    assert actions.get_by_role('button').all_text_contents() == ['新建空白页', '历史绘图', '导出图片', '']
+    assert actions.get_by_role('button', name='上传到对话', exact=True).count() == 1
     new = actions.get_by_role('button', name='新建空白页', exact=True).bounding_box()
     history = actions.get_by_role('button', name='历史绘图', exact=True)
     box = history.bounding_box()

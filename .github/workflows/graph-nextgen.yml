@@ -35,6 +35,9 @@ on:
       - 'tests/test_voice_input*.py'
       - 'tests/test_graph_confirmation_batch.py'
       - 'tests/test_ocr_batch_frontend.py'
+      - 'tests/test_image_grouping.py'
+      - 'tests/test_nonquestion_image_context.py'
+      - 'static/image-groups.css'
       - 'tests/test_scan_selection_save.py'
       - 'concept_notebook.py'
       - 'static/concept-notebook*.js'
@@ -132,6 +135,8 @@ jobs:
             tests/test_voice_input.py \
             tests/test_graph_confirmation_batch.py \
             tests/test_ocr_batch_frontend.py \
+            tests/test_image_grouping.py \
+            tests/test_nonquestion_image_context.py \
             tests/test_scan_selection_save.py \
             tests/test_graph_presentation.py \
             tests/test_graph_appearance_ui.py \

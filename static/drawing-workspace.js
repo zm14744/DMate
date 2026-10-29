@@ -23,7 +23,8 @@
   rail.setAttribute('role','toolbar');rail.setAttribute('aria-label','绘图面板');
   settingsButton.setAttribute('aria-expanded','false');informationButton.setAttribute('aria-expanded','false');
   historyButton.setAttribute('aria-expanded','false');aiButton.setAttribute('aria-expanded','false');
-  const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=button('上传到对话',()=>uploadImage(),'ddw-primary');
+  const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=button('',()=>uploadImage(),'ddw-primary ddw-upload-button');
+  uploadButton.setAttribute('aria-label','上传到对话');uploadButton.title='上传到对话';
   actions.append(newButton,historyButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,aiButton);body.append(editorHost,rail,panel);shell.append(top,body,status);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
   let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false;
   const active=()=>pages.find(p=>p.id===activeId);

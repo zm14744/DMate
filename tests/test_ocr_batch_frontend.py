@@ -18,7 +18,7 @@ BATCH_OPERATIONS = r"""
      const task={id:saved.request_id,sessionId:'s',file:{name:'picture'+number+'.png'},
        sourceSha256:saved.source_sha256,originalUrl:'blob:picture'+number,
        state:record.state||'ready',draft:structuredClone(saved.document),initialDocument:structuredClone(saved.document),
-       dirty:!!record.dirty,userRequest:record.userRequest||'',isQuestion:true,error:'',notice:'',
+       dirty:!!record.dirty,userRequest:record.userRequest||'',isQuestion:record.isQuestion!==false,groupId:record.groupId,error:'',notice:'',
        confirmation:record.saved===false?null:{document:structuredClone(saved.document),drawing_document:structuredClone(saved.document),semantic_context:saved},
        sending:false,confirming:false};
      vm.runInContext('ocrTasks',sandbox).set(task.id,task);
@@ -54,6 +54,9 @@ PROGRAM = BASE_PROGRAM.replace(" if(input.operation==='upload') {", BATCH_OPERAT
     'const reviewed=input.reviewed;',
     "const reviewed=input.reviewed||{text:body.document.body_text,visualText:'公开边表 '+body.request_id,analysisVisualText:'内部边表 '+body.request_id};"
 ).replace('const sandbox={console, TextEncoder, AbortController,', 'const sandbox={console, TextEncoder, AbortController, structuredClone,')
+PROGRAM = PROGRAM.replace('sandbox.requestAiReply=s=>sandbox.capturedExistingChat(s);',
+    "sandbox.sessionBusyKey=id=>String(id??'');sandbox.getLatestUserMessage=s=>[...s.messages].reverse().find(m=>m.role==='user')||null;"
+    "sandbox.requestAiReply=async s=>{await sandbox.capturedExistingChat(s);return {status:'success'};};")
 
 
 def run(payload):
@@ -87,8 +90,8 @@ def batch_message(count=4):
 
 
 @pytest.mark.parametrize('count',[1,4])
-def test_send_once_combines_all_images_in_order_and_one_chat_request(count):
-    result=run({'operation':'batch_send','click':True,'tasks':[{'context':signed(i)} for i in range(1,count+1)]})
+def test_same_group_combines_all_images_in_order_and_one_chat_request(count):
+    result=run({'operation':'batch_send','click':True,'tasks':[{'context':signed(i),'groupId':'1'} for i in range(1,count+1)]})
     assert not result['notices']
     assert len(result['messages'])==1
     assert [r['url'] for r in result['requests']]==['/chat']
@@ -102,7 +105,7 @@ def test_send_once_combines_all_images_in_order_and_one_chat_request(count):
 
 
 def test_unsaved_ready_images_are_all_confirmed_before_one_ai_request():
-    result=run({'operation':'batch_send','tasks':[{'context':signed(i),'saved':False} for i in range(1,5)]})
+    result=run({'operation':'batch_send','tasks':[{'context':signed(i),'saved':False,'groupId':'1'} for i in range(1,5)]})
     assert not result['notices']
     assert [r['url'] for r in result['requests']]==['/graph/session']+['/graph/confirm']*4+['/chat']
     assert [r['body']['request_id'] for r in result['requests'] if r['url']=='/graph/confirm']==[f'picture-{i}' for i in range(1,5)]
@@ -117,7 +120,7 @@ def test_unready_image_prevents_sending_any_of_its_ready_peers(state):
 
 
 def test_double_send_cannot_duplicate_the_batch():
-    result=run({'operation':'batch_send','double':True,'tasks':[{'context':signed(i),'saved':False} for i in range(1,5)]})
+    result=run({'operation':'batch_send','double':True,'tasks':[{'context':signed(i),'saved':False,'groupId':'1'} for i in range(1,5)]})
     assert not result['notices']
     assert len([r for r in result['requests'] if r['url']=='/chat'])==1
     assert len(result['messages'])==1
@@ -169,7 +172,7 @@ def test_editor_save_closes_without_starting_ai(scan_page):
 
 
 def test_any_confirmation_failure_prevents_all_ai_calls():
-    result=run({'operation':'batch_send','failConfirm':'picture-2','tasks':[{'context':signed(i),'saved':False} for i in range(1,5)]})
+    result=run({'operation':'batch_send','failConfirm':'picture-2','tasks':[{'context':signed(i),'saved':False,'groupId':'1'} for i in range(1,5)]})
     assert result['notices']==['结构校验失败']
     assert not any(r['url']=='/chat' for r in result['requests'])
     assert result['messages']==[] and result['remaining']==4
