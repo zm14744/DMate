@@ -1,5 +1,7 @@
 # 千问图结构草稿与按需复核（2026-10-29）
 
+这是图结构复核版本 v1 的回归记录。后续图片识别与绘图分离的当前界面及同次文字输出，见 [图片识别与独立绘图](SCAN_AND_DRAWING_WORKSPACES.md)。
+
 上传入口 `workflow=auto_graph` 现在返回可编辑点边草稿，而非只有分图范围。主模型为 `qwen3.8-flash`，开启思考，思考预算 4096；文字仍由独立标签页框选识别。识别阶段不调用 DeepSeek，也不默认运行 OCR、Layout、sknw 或另一家视觉模型。手动绘图入口和用户确认后解题的结构绑定保持原有流程。
 
 实现位于 `graph_qwen_targeted.py`、`graph_qwen_targeted_review.py` 和 `vision_provider.py`。LangGraph 组织主读取、局部候选、按需复核及最终检查；DMate 工具注册器记录原图来源、输入输出契约、耗时和实际执行情况。

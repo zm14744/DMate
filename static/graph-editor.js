@@ -11,13 +11,14 @@
         if (!container || !container.ownerDocument) throw new Error('编辑器需要有效的页面容器。');
         options ||= {};
         const dom = container.ownerDocument;
-        const useOverlay = typeof options.originalUrl === 'string' && /^((blob:)|(data:image\/)|(https?:\/\/))/i.test(options.originalUrl) && root.DMateGraphOverlay?.mount;
-        const initialized = useOverlay && modelApi.ensureAnonymousLabels
+        const useOverlay = !options.structureOnly && typeof options.originalUrl === 'string' && /^((blob:)|(data:image\/)|(https?:\/\/))/i.test(options.originalUrl) && root.DMateGraphOverlay?.mount;
+        const initialized = (useOverlay || options.previewOnly) && modelApi.ensureAnonymousLabels
             ? modelApi.ensureAnonymousLabels(options.document) : options.document;
         const initial = useOverlay && modelApi.ensureAnonymousLabels
             ? modelApi.ensureAnonymousLabels(options.initialDocument || options.document) : options.initialDocument;
         const model = createModel(initialized, initial);
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
+        let previewSequence = 0;
         let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null;
         let selectedGraph=false;const panelState={};
         let individually = false, saving = false, destroyed = false, notice = '', pendingDelete = '';
@@ -142,8 +143,8 @@
         }
 
         function drawGraph(graph) {
-            const svg = svgElement('svg', { viewBox: '0 0 620 390', role: 'group', 'aria-label': (graph.name || '当前图') + '结构预览' });
-            const markerId = instance + '-arrow', defs = svgElement('defs');
+            const svg = svgElement('svg', { viewBox: '0 0 620 390', role: options.previewOnly ? 'img' : 'group', 'aria-label': (graph.name || '当前图') + '结构预览' });
+            const markerId = instance + '-arrow-' + (++previewSequence), defs = svgElement('defs');
             const marker = svgElement('marker', { id: markerId, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' });
             marker.append(svgElement('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: 'context-stroke' })); defs.append(marker); svg.append(defs);
             const points = new Map();
@@ -172,14 +173,17 @@
                 if (edge.direction === 'forward') attrs['marker-end'] = 'url(#' + markerId + ')';
                 if (edge.style === 'dashed') attrs['stroke-dasharray'] = '9 6';
                 if (edge.style === 'dotted') attrs['stroke-dasharray'] = '2 5';
+                if (edge.direction === 'unknown') attrs['stroke-dasharray'] = '4 5';
                 const stroke = svgElement('path', attrs);
                 const colors = { red: '#dc2626', blue: '#2563eb', green: '#15803d', purple: '#9333ea', orange: '#d97706', gray: '#64748b' };
                 if (colors[edge.color]) stroke.style.stroke = colors[edge.color];
                 group.append(svgElement('path', { d: path, class: 'dge-edge-hit', fill: 'none' }), stroke);
-                const label = [edge.edge_label, edge.weight === null || edge.weight === undefined ? '' : text(edge.weight)].filter(value => value !== null && value !== '').join(' · ');
+                const label = [edge.edge_label, edge.weight === null || edge.weight === undefined ? '' : text(edge.weight)].filter(value => value !== null && value !== undefined && value !== '').join(' · ');
                 if (label) { group.append(svgElement('title', {}, label)); group.append(svgElement('text', { x: tx, y: ty, class: 'dge-edge-label', 'text-anchor': 'middle' }, label.length > 24 ? label.slice(0, 23) + '…' : label)); }
                 const choose = () => { selectedEdge = edge.id; render(); };
-                group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); svg.append(group);
+                if (!options.previewOnly) { group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); }
+                else { group.removeAttribute('tabindex'); group.removeAttribute('role'); }
+                svg.append(group);
             });
             graph.vertices.forEach((vertex, index) => {
                 const [x, y] = points.get(vertex.id), label = vertex.label ?? vertex.display_label ?? '未命名 ' + (index + 1);
@@ -187,9 +191,21 @@
                 group.append(svgElement('title', {}, label), svgElement('circle', { cx: x, cy: y, r: 18 }),
                     svgElement('text', { x, y: y + 5, 'text-anchor': 'middle' }, label.length > 12 ? label.slice(0, 11) + '…' : label));
                 const choose = () => { selectedNodes.has(vertex.id) ? selectedNodes.delete(vertex.id) : selectedNodes.add(vertex.id); render(); };
-                group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); svg.append(group);
+                if (!options.previewOnly) { group.addEventListener('click', choose); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); } }); }
+                else { group.removeAttribute('tabindex'); group.removeAttribute('role'); }
+                svg.append(group);
             });
             return svg;
+        }
+
+        if (options.previewOnly) {
+            container.replaceChildren();
+            for (const graph of model.getDocument().graphs) {
+                const section = element('section', 'dge-visual');
+                section.append(element('h4', '', graph.name || graph.id), drawGraph(graph));
+                container.append(section);
+            }
+            return {getDocument: model.getDocument, destroy() {container.replaceChildren();}};
         }
 
         function buildReview(graph, document) {
@@ -452,7 +468,8 @@
             const undo = button('↶', () => { pendingDelete = ''; model.undo(); }); undo.setAttribute('aria-label','撤销'); undo.title='撤销'; undo.classList.add('dge-history-arrow'); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
             const redo = button('↷', () => { pendingDelete = ''; model.redo(); }); redo.setAttribute('aria-label','重做'); redo.title='重做'; redo.classList.add('dge-history-arrow');
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
-            top.append(questionChoice(), undo, redo,
+            if (!options.drawingOnly) top.append(questionChoice());
+            top.append(undo, redo,
                 button('清空', () => {
                     recognitionEpoch++; pendingDelete=''; model.reset(); selectedNodes.clear(); selectedEdge=null; selectedGraph=false;
                     overlay?.resetInteraction(); textOverlay?.resetInteraction();
@@ -460,7 +477,7 @@
                     refreshTextPanel?.();
                 }));
             container.append(top);
-            if (useOverlay) {
+            if (useOverlay && !options.drawingOnly) {
                 const tabs = element('div', 'dge-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '识别方式');
                 for (const [key, label] of [['image', '图像识别'], ['text', '文字识别']]) {
                     const tab = button(label, () => { activeTab = key; }); tab.setAttribute('role', 'tab');
@@ -488,7 +505,7 @@
                 workspace.append(host);
                 container.append(workspace);
                 if (!overlay) overlay = root.DMateGraphOverlay.mount(host, {
-                    instance, originalUrl: options.originalUrl, model, state: overlayState,
+                    instance, originalUrl: options.originalUrl, model, state: overlayState, drawingOnly: options.drawingOnly,
                     graph: () => model.getDocument().graphs.find(row => row.id === currentGraph),
                     createRegion: (points,polygon) => {
                         const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
@@ -557,7 +574,7 @@
                     const image = element('img'); image.src = options.originalUrl;
                     image.alt = '上传的原图，用于核对识别结果'; preview.append(image);
                 } else preview.append(element('p', 'dge-muted', '原图预览暂不可用，可继续编辑结构。'));
-                if (graph) {
+                if (graph && !options.structureOnly) {
                     const visual = element('section', 'dge-visual');
                     visual.append(element('h3', '', '结构预览'), drawGraph(graph));
                     workspace.append(preview, visual);
@@ -571,6 +588,9 @@
             const review = buildReview(graph, document);
             if (review && graph?.vertices?.length) container.append(review);
             const toolbar = element('div', 'dge-toolbar');
+            if (options.structureOnly && !graph) toolbar.append(button('添加图形结构', () => {
+                currentGraph = model.addGraph();
+            }));
             if (document.graphs.length) {
                 toolbar.append(field('当前子图', select(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; pendingDelete = ''; render(); })));
                 // Metadata only. This summary is never converted into guessed
@@ -585,6 +605,11 @@
             }
             if (graph) {
                 toolbar.append(field('子图名称', input(graph.name, '子图名称', value => model.renameGraph(graph.id, value))));
+                if (options.drawingOnly || options.structureOnly) {
+                    const flags = key => typeof graph[key]==='boolean' ? graph[key]?'yes':'no' : 'unknown';
+                    toolbar.append(field('图形方向', select([['unknown','待确认'],['no','无向'],['yes','有向']], flags('directed'), options.drawingOnly?'绘图方向':'图形方向', value => {if(value!=='unknown')model.setGraphType(graph.id,'directed',value==='yes');})));
+                    toolbar.append(field('图形权值', select([['unknown','待确认'],['no','无权'],['yes','带权']], flags('weighted'), options.drawingOnly?'绘图权值':'图形权值', value => {if(value!=='unknown')model.setGraphType(graph.id,'weighted',value==='yes');})));
+                }
             }
             container.insertBefore(toolbar, workspace);
             if (graph) {
@@ -679,12 +704,12 @@
             const confirmRow = element('div', 'dge-footer');
             // The dialog header contains the close button; footer is save only.
             const actions = element('div', 'dge-actions');
-            const confirm = button(saving ? '正在保存…' : '保存并确认', async () => {
+            const confirm = button(saving ? '正在保存…' : options.drawingOnly ? '保存绘图' : '保存并确认', async () => {
                 if (textState.regions?.some(r => ['queued','recognizing'].includes(r.status))) { notice = '文字正在识别，请等待完成后保存。'; refreshDraftViews(); return; }
                 if ([...container.querySelectorAll('input[type=number]')].some(control => !control.checkValidity())) {
                     notice = '请填写有效的相同边数量（1 到 50）。'; refreshDraftViews(); return;
                 }
-                const problems = model.validate();
+                const problems = options.drawingOnly && model.getDocument().graphs.every(g=>!g.vertices.length) ? [] : model.validate();
                 // The default draft may be empty; only show validation errors after Save is pressed.
                 if (problems.length) { notice = problems[0]; render(); return; }
                 if (typeof options.onConfirm !== 'function') { notice = '暂时无法保存，请稍后重试。'; render(); return; }

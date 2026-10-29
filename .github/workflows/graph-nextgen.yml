@@ -78,6 +78,7 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_qwen_targeted.py \
+            tests/test_scan_drawing_separation.py \
             tests/test_graph_upload_tasks.py \
             tests/test_visual_graph_editor.py \
             tests/test_graph_overlay.py \

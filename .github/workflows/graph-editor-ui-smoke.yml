@@ -12,6 +12,7 @@ on:
       - 'tests/test_graph_canvas_workspace.py'
       - 'tests/test_graph_text_workspace.py'
       - 'tests/test_graph_frame_gestures.py'
+      - 'tests/test_scan_drawing_separation.py'
       - 'static/script.js'
       - 'templates/index.html'
       - 'tests/test_ocr_upload_layout.py'
@@ -50,6 +51,7 @@ jobs:
           )"
           test -x "$DMATE_BROWSER_EXECUTABLE"
           python -m pytest -q \
+            tests/test_scan_drawing_separation.py \
             tests/test_visual_graph_editor.py::test_real_browser_edits_and_confirms_the_same_user_visible_document \
             tests/test_visual_graph_editor.py::test_question_type_survives_graph_edit_and_reaches_save \
             tests/test_visual_graph_editor.py::test_real_browser_mobile_layout_and_two_step_delete \

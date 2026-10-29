@@ -28,7 +28,7 @@ class GraphEditorUiContract(unittest.TestCase):
 
     def test_close_red_dot_and_only_bottom_right_save(self):
         self.assertNotIn("button('稍后继续'", self.editor)
-        self.assertIn("button(saving ? '正在保存…' : '保存并确认'", self.editor)
+        self.assertIn("button(saving ? '正在保存…' : options.drawingOnly ? '保存绘图' : '保存并确认'", self.editor)
         self.assertIn(".dge-footer { position:static", self.style)
         self.assertIn("border:0; background:transparent; box-shadow:none;", self.style)
         self.assertNotIn(".dge-footer { bottom:-1px;", self.style)

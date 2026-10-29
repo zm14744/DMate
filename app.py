@@ -4321,7 +4321,7 @@ def ocr():
                                 "request_id": request_id}), 400
             except Exception as exc:
                 print(f"千问图形识别未完成：{type(exc).__name__}")
-                return jsonify({"error": "图形识别未完成，模型或网络请求失败，请重试或手动绘制。",
+                return jsonify({"error": "图片识别未完成，模型或网络请求失败，请重试或手动补充。",
                                 "recognition_status": "failed",
                                 "request_id": request_id}), 503
         if _semantic_ocr_selected():

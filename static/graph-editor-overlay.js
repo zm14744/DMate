@@ -123,6 +123,7 @@ function mount(host,o){
   image.style.opacity=String(s.originalOpacity);draw();
  });
  opacityControl.append(opacityTitle,opacityRange,opacityValue);viewControls.append(opacityControl);
+ if(o.drawingOnly){originalButton.remove();opacityControl.remove();image.alt='空白画板';}
  syncOriginal();
  if(o.textOnly)button('清空文字框','clear-text-region',()=>{s.textRegion=null;s.polygonDraft=[];o.selectionChanged?.(null);draw();});
  bar.append(status); // Actionable feedback appears with the tools, never below the photo.

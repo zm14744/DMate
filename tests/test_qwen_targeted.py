@@ -156,15 +156,16 @@ def fake_model(document, metrics):
     return read
 
 
-def test_pipeline_uses_one_read_without_evidence_and_keeps_text_separate(monkeypatch):
+def test_pipeline_returns_text_and_graph_in_the_same_read_without_extra_ocr(monkeypatch):
     g = graph(); seen = []
     monkeypatch.setattr(pipeline, '_candidates', lambda args, *, context: {
         'graphs': context.data['graphs'], 'line_path_evidence': []})
     forbidden = Mock(side_effect=AssertionError('no review without evidence'))
     result = pipeline.recognize_qwen_targeted(pixels(), provider=fake_model(
-        {'graphs': [g], 'body_text': 'must not populate text tab'}, seen), review_provider=forbidden)
+        {'graphs': [g], 'body_text': '求从 a 到 b 的最短路径。'}, seen), review_provider=forbidden)
     assert len(seen) == 1 and len(seen[0][1]) == 1
-    assert result['text'] == result['document']['body_text'] == ''
+    assert result['text'] == result['document']['body_text'] == '求从 a 到 b 的最短路径。'
+    assert result['diagnostics']['text_ocr_calls'] == 0
     assert result['document']['graphs'][0]['edges'] == g['edges']
     assert result['diagnostics']['validation']['networkx'] == 'passed'
     assert result['diagnostics']['validation']['graphs'][0]['isolated_vertices'] == ['c']
@@ -275,6 +276,17 @@ def test_cancellation_is_not_downgraded_to_partial():
     with pytest.raises(AgentCancelled):
         pipeline.recognize_qwen_targeted(pixels(), provider=remote, cancelled=lambda: True)
     remote.assert_not_called()
+
+
+def test_text_only_scan_preserves_all_subquestions_without_starting_review(monkeypatch):
+    monkeypatch.setattr(pipeline, '_candidates', lambda args, *, context: {
+        'graphs': [], 'line_path_evidence': []})
+    body='设集合 A={1,2}。（1）求幂集。（2）证明 A 不为空集。'
+    reviewer=Mock(side_effect=AssertionError('text-only image needs no graph review'))
+    result=pipeline.recognize_qwen_targeted(pixels(),provider=fake_model({'graphs':[],'body_text':body},[]),review_provider=reviewer)
+    assert result['text']==body and result['document']['body_text']==body
+    assert result['recognition_status']=='complete'
+    reviewer.assert_not_called()
 
 
 def test_local_adapter_shares_unit_bounds_and_serializes_native_cv_values(monkeypatch):
