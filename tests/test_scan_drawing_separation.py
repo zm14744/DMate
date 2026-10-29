@@ -166,6 +166,7 @@ def test_standalone_drawing_saves_reopens_and_never_changes_scan(scan_page):
       window.galleryKey='dmate:graph-gallery:v1::'+encodeURIComponent(drawingStorageOwner());}''')
     p.get_by_role('button',name='绘图',exact=True).click()
     p.wait_for_function('document.querySelector(".dge-overlay-image").naturalWidth===1000')
+    p.locator('#graphEditorDialog').wait_for(state='visible')
     assert p.locator('.dmate-drawing-workspace').count()==1
     assert p.locator('#graphEditorTitle').inner_text()=='绘图'
     assert p.get_by_role('tab',name='文字识别').count()==0

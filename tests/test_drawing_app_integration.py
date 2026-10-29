@@ -78,6 +78,7 @@ def open_drawing(page):
     page.evaluate("document.body.classList.add('mobile-tools-open')")
     page.get_by_role('button', name='绘图', exact=True).click()
     page.wait_for_function('document.querySelector(".dge-overlay-image")?.naturalWidth===1000')
+    page.locator('#graphEditorDialog').wait_for(state='visible')
     assert page.locator('.dmate-drawing-workspace').count() == 1
 
 
