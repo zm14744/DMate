@@ -161,13 +161,15 @@ def test_escape_and_input_lock_stop_recording_without_upload(voice_page):
     assert p.evaluate('calls.length') == 0
 
 
-def test_real_model_failure_is_reported_without_erasing_text(voice_page):
+def test_model_failure_restores_idle_without_message_or_erasing_text(voice_page):
     p = voice_page
     p.evaluate('window.failResponse=true')
     start_recording(p)
     end_recording(p)
     p.wait_for_function('voice.state==="idle" && calls.length===1')
-    assert '模型服务暂时不可用' in p.get_by_role('alert').inner_text()
+    assert p.get_by_role('alert').count() == 0
+    assert p.locator('#voiceInputStatus').text_content() == ''
+    assert_no_visual_caption(p)
     assert p.locator('#text').input_value() == '已有内容'
     assert p.evaluate('sends') == 0
 
@@ -299,12 +301,14 @@ def test_host_error_handler_receives_one_real_error_without_local_error_line(voi
     assert p.locator('#text').input_value() == '已有内容'
 
 
-def test_short_recording_is_a_real_error_and_next_recording_removes_it(voice_page):
+def test_short_recording_restores_idle_silently_and_can_record_again(voice_page):
     p = voice_page
     start_recording(p)
     p.get_by_role('button', name='结束录音并识别', exact=True).click()
     p.wait_for_function('voice.state==="idle"')
-    assert '录音时间太短' in p.get_by_role('alert').inner_text()
+    assert p.get_by_role('alert').count() == 0
+    assert p.locator('#voiceInputStatus').text_content() == ''
+    assert_no_visual_caption(p)
     assert p.evaluate('calls.length') == 0
     start_recording(p)
     assert_no_visual_caption(p)

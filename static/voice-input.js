@@ -140,7 +140,7 @@
             appendPcm(op, op.sample?.flush() || new Int16Array(0));
             releaseCapture(op);
             if (!current(op) || busy()) { cancel('输入位置已改变，语音输入已取消。'); return; }
-            if (op.count < SAMPLE_RATE * .25) { cancel('录音时间太短，请重新录音。', true); return; }
+            if (op.count < SAMPLE_RATE * .25) { cancel(); return; }
             render('transcribing'); notice('正在识别语音…');
             op.controller = new AbortController();
             op.contextTimer = setInterval(() => { if (!current(op) || busy()) cancel('会话或输入状态已改变，语音输入已取消。'); }, 250);
@@ -162,7 +162,7 @@
                 }
                 if (typeof result.text !== 'string' || result.text.length > 24000) throw new Error('语音识别响应异常，请重试。');
                 const text = result.text.trim();
-                if (!text) throw new Error('未识别到语音，请重试。');
+                if (!text) { cancel(); return; }
                 if (busy()) { cancel('输入位置已改变，识别内容未写入。'); return; }
                 const at = Math.max(0, Math.min(input.value.length, input.selectionStart ?? input.value.length));
                 const before = input.value.slice(0, at), after = input.value.slice(at);
@@ -175,8 +175,10 @@
                 active = null; render('idle'); notice('语音已转为文字，可修改后发送。');
             } catch (error) {
                 if (!current(op)) { if (active === op) cancel('会话已切换，语音输入已取消。'); return; }
-                active = null; render('idle');
-                reportError(error?.name === 'AbortError' ? '语音识别超时，请重试。' : error?.message || '语音识别网络异常，请重试。');
+                // An attempt without a transcript simply ends dictation. Keep
+                // service failures in the HTTP result; do not turn them into
+                // chat messages, success text, or changes to the typed draft.
+                cancel();
             } finally { clearTimeout(timeout); clearInterval(op.contextTimer); op.chunks = []; }
         }
         async function start() {

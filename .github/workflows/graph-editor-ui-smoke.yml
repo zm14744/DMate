@@ -20,6 +20,7 @@ on:
       - 'static/voice-input.js'
       - 'static/voice-input.css'
       - 'tests/test_voice_input_ui.py'
+      - 'tests/test_voice_no_result_ui.py'
       - 'tests/test_ocr_batch_frontend.py'
       - 'tests/test_scan_selection_save.py'
       - 'tests/test_scan_information_sources.py'
@@ -86,6 +87,7 @@ jobs:
             tests/test_learning_tool_entries.py \
             tests/test_graph_elastic_regions.py \
             tests/test_voice_input_ui.py \
+            tests/test_voice_no_result_ui.py \
             tests/test_ocr_batch_frontend.py \
             tests/test_scan_selection_save.py \
             tests/test_graph_appearance_ui.py \
