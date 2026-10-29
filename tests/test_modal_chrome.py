@@ -150,25 +150,63 @@ def test_long_filename_and_content_scroll_keep_main_red_close_in_fixed_header(mo
     assert not page.locator('#graphEditorDialog').evaluate('e=>e.open')
 
 
-def test_header_unification_preserves_drawing_canvas_and_notebook_content_space(modal_page):
+def test_header_unification_keeps_bodies_inside_dialogs_and_in_header_flow(modal_page):
     page = modal_page
     page.evaluate('openGraph("drawing")')
     page.wait_for_function('document.querySelector(".dge-overlay-image")?.naturalWidth===1000')
-    measure = '''()=>{
-      const selectors=['#graphEditorDialog','.dge-overlay-viewport','.dge-view-controls'];
-      return selectors.map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [r.x,r.y,r.width,r.height];});
+    measure = '''notebook=>{
+      const rect=selector=>{
+        const r=document.querySelector(selector).getBoundingClientRect();
+        return Object.fromEntries(['x','y','width','height','right','bottom'].map(k=>[k,r[k]]));
+      };
+      const dialog=document.querySelector(notebook?'#conceptNotebookDialog':'#graphEditorDialog');
+      const heading=dialog.querySelector(notebook?'.dcn-heading':'.graph-editor-dialog-head');
+      const result={dialog:rect(notebook?'#conceptNotebookDialog':'#graphEditorDialog'),
+        headerBottom:heading.getBoundingClientRect().bottom,
+        flowBottom:heading.getBoundingClientRect().bottom+parseFloat(getComputedStyle(heading).marginBottom)};
+      if(notebook){
+        result.flowBottom+=parseFloat(getComputedStyle(dialog).rowGap);
+        result.content=rect('.dcn-content');
+      }else{
+        result.canvas=rect('.dge-overlay-viewport');result.controls=rect('.dge-view-controls');
+      }
+      return result;
     }'''
-    current = page.evaluate(measure)
+    current = page.evaluate(measure, False)
     page.evaluate('document.querySelector(\'style[data-dmate-css="modal-chrome.css"]\').sheet.disabled=true')
-    previous = page.evaluate(measure)
-    for actual, baseline in zip(current, previous):
-        assert actual == pytest.approx(baseline, abs=1)
+    previous = page.evaluate(measure, False)
+    assert current['dialog'] == pytest.approx(previous['dialog'], abs=.05)
+    # The new inherited title font may change header height with the browser's
+    # installed fonts. Both canvas and view bar must follow that same flow;
+    # horizontal placement, bar height and the canvas bottom remain stable.
+    flow_shift = current['flowBottom'] - previous['flowBottom']
+    for name in ['canvas', 'controls']:
+        for field in ['x', 'width']:
+            assert current[name][field] == pytest.approx(previous[name][field], abs=.05)
+        assert current[name]['y'] - previous[name]['y'] == pytest.approx(flow_shift, abs=.05)
+        assert current[name]['width'] > 0 and current[name]['height'] > 0
+        assert current['headerBottom'] <= current[name]['y']
+        assert current['dialog']['x'] <= current[name]['x']
+        assert current[name]['right'] <= current['dialog']['right']
+        assert current[name]['bottom'] <= current['dialog']['bottom']
+    assert current['controls']['height'] == pytest.approx(previous['controls']['height'], abs=.05)
+    assert current['canvas']['bottom'] == pytest.approx(previous['canvas']['bottom'], abs=.05)
+    assert current['controls']['bottom'] <= current['canvas']['y']
     page.evaluate('document.querySelector(\'style[data-dmate-css="modal-chrome.css"]\').sheet.disabled=false;document.querySelector("#graphEditorDialog").close();notebook.open()')
-    current = page.locator('.dcn-content').bounding_box()
+    current = page.evaluate(measure, True)
     page.evaluate('document.querySelector(\'style[data-dmate-css="modal-chrome.css"]\').sheet.disabled=true')
-    previous = page.locator('.dcn-content').bounding_box()
-    for field in ['x', 'y', 'width', 'height']:
-        assert current[field] == pytest.approx(previous[field], abs=1)
+    previous = page.evaluate(measure, True)
+    assert current['dialog'] == pytest.approx(previous['dialog'], abs=.05)
+    for field in ['x', 'width', 'bottom']:
+        assert current['content'][field] == pytest.approx(previous['content'][field], abs=.05)
+    assert current['content']['y'] - previous['content']['y'] == pytest.approx(
+        current['flowBottom'] - previous['flowBottom'], abs=.05)
+    assert current['content']['width'] > 0 and current['content']['height'] > 0
+    assert current['headerBottom'] <= current['content']['y']
+    assert current['dialog']['x'] <= current['content']['x']
+    assert current['content']['right'] <= current['dialog']['right']
+    assert current['content']['bottom'] <= current['dialog']['bottom']
+    assert page.locator('.dcn-content').evaluate('e=>e.scrollWidth<=e.clientWidth')
 
 
 def test_full_page_menu_has_wider_group_gap_and_dmate_placeholder(modal_page):
