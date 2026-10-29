@@ -146,7 +146,8 @@ def test_drawing_and_scan_use_identical_readonly_graph_information_dom_and_style
       document.documentElement.style.setProperty('--font-scale','1.2');
       // Both views receive exactly the same canonical model data; this test
       // compares display paths rather than their independent import rules.
-      const normalized=DMateGraphEditorModel.ensureAnonymousLabels(DMateGraphEditorModel.importDocument(documentValue));
+      const labeled=DMateGraphEditorModel.ensureAnonymousLabels(DMateGraphEditorModel.importDocument(documentValue));
+      const normalized=DMateGraphEditorModel.createModel(labeled,undefined,{drawingOnly:true}).getDocument();
       const task=ocrTasks.get('scan');task.initialDocument=normalized;task.draft=structuredClone(normalized);
       window.originalGraphData=JSON.stringify(normalized);window.renderPaths=[];
       const original=DMateGraphFormat.renderGraphInformation;
@@ -190,7 +191,7 @@ def test_drawing_and_scan_use_identical_readonly_graph_information_dom_and_style
         assert result['sourceText'] == '暂无图形信息。'
     elif len(document['graphs']) == 2:
         assert '0 个顶点' not in result['sourceText']
-        assert '图形外观：未提供外观描述。' in result['sourceText']
+        assert '图形外观：由 2 个顶点、3 条边组成。' in result['sourceText']
         assert '路线甲：5→X（权值：1/2）' in result['sourceText']
         assert '0：X' not in result['sourceText']  # A numeric edge name equal to its weight is redundant.
         assert '7：X？X' in result['sourceText']
