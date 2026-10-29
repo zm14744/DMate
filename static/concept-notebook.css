@@ -5,7 +5,6 @@
 .dcn-dialog [hidden]{display:none!important}
 .dcn-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto}
 .dcn-heading h2{font-size:20px;line-height:1.4;margin:0}
-.dcn-persistence{flex:0 0 auto;font-size:12px;line-height:1.5;color:var(--text-subtle,#64748b);margin:0}
 .dcn-dialog button{width:auto;min-width:0;min-height:36px;margin:0;padding:8px 12px;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-3,#f1f5f9);color:var(--text-primary,#334155);font:inherit;font-size:14px;cursor:pointer;line-height:1.4;white-space:normal}
 .dcn-dialog button:disabled{opacity:.5;cursor:default}
 .dcn-dialog button:focus-visible,.dcn-dialog input:focus-visible,.dcn-dialog textarea:focus-visible{outline:2px solid var(--accent,#2563eb);outline-offset:2px}
@@ -15,11 +14,12 @@
 .dcn-dialog input:not([type=checkbox]),.dcn-dialog textarea{display:block;width:100%;min-width:0;max-width:100%;margin:6px 0 0;padding:10px;border:1px solid var(--border-strong,#cbd5e1);border-radius:9px;background:var(--surface-2,#f8fafc);color:var(--text-primary,#1e293b);font:inherit;font-size:14px;line-height:1.6;box-shadow:none}
 .dcn-dialog input.dcn-search{margin:0}
 .dcn-selection{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:var(--text-subtle,#64748b)}
-.dcn-dialog .dcn-selection button{min-height:28px;padding:3px 6px;font-size:12px}
 .dcn-list{display:flex;flex-direction:column;gap:6px;flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
 .dcn-note{display:flex;align-items:center;gap:8px;padding:7px;border:1px solid transparent;border-radius:9px;min-width:0}
 .dcn-note.is-current{border-color:var(--accent,#2563eb);background:var(--accent-bg,#eff6ff)}
-.dcn-note input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;margin:0;accent-color:var(--accent,#2563eb)}
+.dcn-dialog .dcn-note-select{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;margin:0;cursor:pointer}
+.dcn-note input[type=checkbox]{appearance:none;-webkit-appearance:none;box-sizing:border-box;flex:0 0 25px;width:25px;min-width:25px;height:25px;min-height:25px;padding:0;margin:0;border:2px solid var(--text-subtle,#64748b);border-radius:50%;background:transparent;cursor:pointer}
+.dcn-note input[type=checkbox]:checked{background:var(--accent,#2563eb);border-color:var(--accent,#2563eb)}
 .dcn-dialog .dcn-note-open{flex:1 1 auto;min-width:0;text-align:left;background:transparent;border:0;padding:5px;overflow-wrap:anywhere;font-size:14px}
 .dcn-main{overflow:auto;overscroll-behavior:contain;min-width:0;min-height:0;padding:2px 5px 10px 2px}
 .dcn-editor{display:flex;flex-direction:column;gap:14px}
@@ -28,10 +28,11 @@
 .dcn-dialog .dcn-original{min-height:210px}
 .dcn-editor-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:36px;font-size:12px}
 .dcn-saved{flex:1 1 auto;color:var(--text-subtle,#64748b)}
+.dcn-saved:empty{display:none}
 .dcn-dialog .dcn-remove{color:var(--text-subtle,#64748b)}
 .dcn-ai{margin-top:22px;padding-top:18px;border-top:1px solid var(--border-strong,#cbd5e1)}
 .dcn-ai h3{font-size:17px;margin:0 0 8px}
-.dcn-scope,.dcn-empty,.dcn-list-empty{font-size:13px;line-height:1.6;color:var(--text-subtle,#64748b);margin:0 0 12px}
+.dcn-list-empty{font-size:13px;line-height:1.6;color:var(--text-subtle,#64748b);margin:0 0 12px}
 .dcn-ai-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .dcn-status{font-size:13px;line-height:1.6;margin:12px 0 0;color:var(--text-subtle,#64748b);overflow-wrap:anywhere}
 .dcn-status:empty{display:none}
@@ -42,3 +43,16 @@
 .dcn-explanation,.dcn-relation{padding:12px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--surface-2,#f8fafc)}
 .dcn-ai-text{white-space:pre-wrap}
 @media(max-width:680px){.dcn-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);padding:14px;border-radius:14px}.dcn-content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(150px,25dvh) minmax(0,1fr);gap:14px}.dcn-sidebar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:8px}.dcn-selection,.dcn-list{grid-column:1/-1}.dcn-list{display:block}.dcn-note{padding:4px 7px}.dcn-dialog .dcn-original{min-height:170px}.dcn-main{padding-right:3px}.dcn-heading h2{font-size:18px}.dcn-dialog button{min-height:36px}}
+
+/* The close control stays in the fixed header; only content scrolls. */
+.dcn-dialog button.dcn-close,.dcn-confirm button.dcn-close{display:block;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0;border:0;border-radius:50%;background:#ef4444;color:transparent;font-size:0;line-height:0;cursor:pointer}
+.dcn-dialog button.dcn-close:hover,.dcn-confirm button.dcn-close:hover{background:#dc2626}
+.dcn-dialog button.dcn-close:focus-visible,.dcn-confirm button.dcn-close:focus-visible{outline:2px solid #ef4444;outline-offset:4px}
+.dcn-confirm{box-sizing:border-box;width:min(440px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid var(--border-strong,#cbd5e1);border-radius:18px;background:var(--surface-2,#f8fafc);color:var(--text-primary,#1e293b);box-shadow:0 20px 64px rgba(0,0,0,.38);overflow:auto}
+.dcn-confirm::backdrop{background:rgba(0,0,0,.46)}
+.dcn-confirm-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border-bottom:1px solid var(--border-strong,#cbd5e1)}
+.dcn-confirm-head h3{font-size:17px;line-height:1.5;margin:0}
+.dcn-confirm-body{padding:17px 18px 12px;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.7}
+.dcn-confirm-actions{display:flex;justify-content:flex-end;gap:10px;padding:12px 18px 18px}
+.dcn-confirm-actions button{min-height:42px;min-width:90px;border-radius:10px;padding:10px 14px;font:inherit;font-size:14px}
+.dcn-confirm-actions .dcn-confirm-delete{background:#dc2626;border-color:#dc2626;color:#fff}

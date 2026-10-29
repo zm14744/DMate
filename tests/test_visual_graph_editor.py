@@ -257,13 +257,11 @@ def test_real_browser_unknown_direction_and_failed_save_keep_editable_draft(brow
     assert page.evaluate('instance.getDocument().graphs[0].edges[0].direction') == 'forward'
 
 
-def test_real_browser_mobile_layout_and_two_step_delete(browser_editor):
+def test_real_browser_mobile_layout_and_one_click_delete(browser_editor):
     page = browser_editor
     page.set_viewport_size({'width': 390, 'height': 844})
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 2')
     page.get_by_label('选中节点 A', exact=True).check()
-    page.get_by_role('button', name='删除所选节点', exact=True).click()
-    assert page.evaluate('instance.getDocument().graphs[0].vertices.length') == 3
     page.get_by_role('button', name='删除所选节点', exact=True).click()
     assert page.evaluate('instance.getDocument().graphs[0].vertices.length') == 2
     assert page.evaluate('instance.getDocument().graphs[0].edges.length') == 0

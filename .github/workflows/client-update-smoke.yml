@@ -14,6 +14,9 @@ on:
       - 'static/voice-input.css'
       - 'static/chat-composer.js'
       - 'static/chat-composer.css'
+      - 'static/drawing-workspace.js'
+      - 'static/drawing-workspace.css'
+      - 'static/drawing-export.js'
       - 'static/concept-notebook.js'
       - 'static/concept-notebook-model.js'
       - 'static/concept-notebook.css'
@@ -53,6 +56,8 @@ jobs:
           node --check static/script.js
           node --check static/voice-input.js
           node --check static/chat-composer.js
+          node --check static/drawing-workspace.js
+          node --check static/drawing-export.js
           node --check static/concept-notebook.js
           node --check static/concept-notebook-model.js
           node --check static/graph-editor.js

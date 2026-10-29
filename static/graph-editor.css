@@ -315,3 +315,13 @@
 .dgs-source-preview,.dgs-source-note{font-size:12px;line-height:1.5;overflow-wrap:anywhere;color:var(--text-subtle);margin:4px 0;white-space:pre-wrap}
 .dgs-source-preview{max-height:100px;overflow:auto}
 .dge-graph-frame-number{fill:#2563eb}
+
+/* A drawing page has one tool mode at a time; its rail can be folded away. */
+.dge-tool-palette>summary{font-size:12px;font-weight:600;color:var(--text-subtle,#64748b);list-style:none}
+.dge-tool-palette>summary::-webkit-details-marker{display:none}
+.dge-tool-palette:not([open])>summary{padding:9px 10px}
+.dge-tool-palette[open]>summary{padding:9px 10px;border-bottom:1px solid var(--dge-border);margin-bottom:6px}
+.dmate-graph-editor .dge-overlay-tools button:not(.is-active){background:var(--surface-0,#fff);border-color:var(--dge-border)}
+.dmate-graph-editor .dge-overlay-tools button.is-active{background:var(--accent-bg,#eaf2ff);border-color:var(--accent,#2563eb)}
+.dge-review-summary>h3{padding:11px 14px;margin:0;font-weight:600;font-size:14px}
+.dge-float-panel .dge-toolbar>.dge-field{flex:0 0 auto;width:100%}

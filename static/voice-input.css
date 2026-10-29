@@ -14,7 +14,9 @@ body[data-appearance-theme] .input .manual-question-composer > #text:focus { pad
 .voice-input-button[data-voice-state="recording"], #voiceInputBtn[data-voice-state="recording"] { color:#ef4444; border-color:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,.16); }
 .voice-input-button[data-voice-state="transcribing"], .voice-input-button[data-voice-state="requesting"] { opacity:.65; cursor:progress; }
 .voice-input-button:disabled { cursor:default; opacity:.55; }
-.voice-input-status { margin:6px 0 0; min-width:0; font-size:12px; line-height:1.5; color:var(--text-muted,#64748b); overflow-wrap:anywhere; }
+/* Recording progress remains available to screen readers without leaving a
+   caption, link, or spare row beneath the message composer. */
+.voice-input-status { position:absolute!important; width:1px!important; height:1px!important; margin:-1px!important; padding:0!important; border:0!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; clip-path:inset(50%)!important; white-space:nowrap!important; }
+.voice-input-status.voice-input-error { position:static!important; width:auto!important; height:auto!important; margin:6px 0 0!important; clip:auto!important; clip-path:none!important; white-space:normal!important; min-width:0; font-size:12px; line-height:1.5; color:var(--text-muted,#64748b); overflow-wrap:anywhere; }
 .voice-input-status[hidden] { display:none !important; }
-.voice-input-cancel { margin-left:10px; padding:0 3px; border:0; background:transparent; color:inherit; text-decoration:underline; font:inherit; cursor:pointer; }
 @media (max-width:600px) { .voice-input-button, #voiceInputBtn.voice-input-button { flex-basis:36px; width:36px; min-width:36px; } }

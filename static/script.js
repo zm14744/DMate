@@ -5,7 +5,7 @@ marked.setOptions({
 
 const STORAGE_KEY = "discrete_math_ai_sessions_v1";
 const LEARNING_STORAGE_KEY = "discrete_math_ai_learning_v1";
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 20_000_000;
 const MAX_WRONG_QUESTIONS = 240;
 const MAX_LEARNING_EVENTS = 4000;
 const FALLBACK_API_CONTEXT_MESSAGES = 12;
@@ -1899,10 +1899,10 @@ async function pullLatestCloudSnapshot() {
                 const selectedHere = currentId;
                 const remoteSessions = incoming.sessions.sessions;
                 const deleted = normalizeDeletedSessionIds(incoming.sessions.deletedSessionIds);
-                if (selectedHere != null && !deleted[String(selectedHere)] &&
-                    remoteSessions.some(item => String(item.id) === String(selectedHere))) {
-                    incoming.sessions = { ...incoming.sessions, currentId:selectedHere };
-                }
+                incoming.sessions = { ...incoming.sessions, currentId:
+                    selectedHere != null && !deleted[String(selectedHere)] &&
+                    remoteSessions.some(item => String(item.id) === String(selectedHere))
+                        ? selectedHere : null };
             }
             if (!applyCloudSnapshot(incoming)) return false;
             if (!valid()) return false;
@@ -2097,10 +2097,12 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
 
     const localId = local.sessions?.currentId;
     const resolvedCurrentId = branchMap.get(String(localId)) || localId;
-    const currentId = resultSessions.some(item => String(item.id) === String(resolvedCurrentId))
-        ? resolvedCurrentId
-        : (resultSessions.some(item => String(item.id) === String(remote.sessions?.currentId))
-            ? remote.sessions.currentId : resultSessions[0]?.id ?? null);
+    // An explicit empty selection is local navigation state (for example after
+    // deleting the open chat). A sync conflict must not open another chat.
+    const localHasSelection = Object.prototype.hasOwnProperty.call(local.sessions || {}, "currentId");
+    const requestedId = localHasSelection ? resolvedCurrentId : remote.sessions?.currentId;
+    const currentId = requestedId != null && resultSessions.some(item => String(item.id) === String(requestedId))
+        ? requestedId : null;
 
     return {
         schemaVersion:1,
@@ -9769,9 +9771,10 @@ function loadState() {
             session => session.id === data.currentId
         );
 
-        currentId = savedIdExists
+        // null is a deliberate empty workspace, even while other chats remain.
+        currentId = data.currentId != null && savedIdExists
             ? data.currentId
-            : sessions[0].id;
+            : null;
 
         return true;
 
@@ -14416,11 +14419,9 @@ function renderOcrTasks() {
             // The optional DeepSeek description is UI-only; never enter the
             // signed semantic snapshot or the solver input.
             if (task.confirmation && graphs.length && window.DMateGraphFormat?.graphRows) {
-                const details = element("details", "ocr-task-structure");
-                details.open = task.structureExpanded === true;
-                const summary = element("summary", "", "点、边与关系");
+                const details = element("section", "ocr-task-structure");
+                const summary = element("h3", "ocr-task-structure-title", "点、边与关系");
                 details.append(summary);
-                details.addEventListener("toggle", () => { task.structureExpanded = details.open; });
                 for (const [index, graph] of graphs.entries()) {
                     const view = window.DMateGraphFormat.graphRows(graph, index);
                     const section = element("section", "ocr-task-structure-graph");
@@ -14677,7 +14678,7 @@ async function enqueueOcrFiles(files) {
             continue;
         }
         if (file.size > MAX_IMAGE_BYTES) {
-            invalid.push(`${file.name}：图片须小于 8MB`);
+            invalid.push(`${file.name}：单张图片不能超过 20MB`);
             continue;
         }
         const task = {
@@ -14816,7 +14817,56 @@ function reuseVerifiedTypeForSameRegion(task, polygon) {
 
 
 let standaloneDrawing = null;
+let standaloneDrawingOwner = null;
 const DRAWING_STORAGE_KEY = "dmate:graph-drawing:v1";
+
+function drawingStorageOwner() {
+    return typeof accountState !== "undefined" && accountState.authenticated
+        ? "account:" + accountState.username : "guest";
+}
+
+async function uploadDrawingResult(blob, metadata = {}) {
+    if (ocrEditorTaskId !== "standalone-drawing") throw new Error("请先打开绘图工作区。");
+    if (ocrBatchPreparing || ocrTasks.size >= OCR_MAX_CONCURRENT)
+        throw new Error("每批最多 4 张图片，请先发送或移除已有图片。");
+    if (isCurrentSessionTyping() || isSessionBusy(currentId) || isSessionPendingAiStart(currentId))
+        throw new Error("当前对话仍在回答，请结束后再上传绘图。");
+    if (!blob || blob.type !== "image/png" || !blob.size || blob.size > MAX_IMAGE_BYTES)
+        throw new Error("绘图图片无效或超过 20MB，请减少绘图内容后重试。");
+    const owner = drawingStorageOwner(), selectedSession = currentId;
+    const drawing = cloneOcrDocument(metadata.document);
+    const requestId = makeOcrRequestId();
+    const baseName = String(metadata.name || "我的绘图").replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
+    const file = new File([blob], baseName.replace(/\.png$/i, "") + ".png", {type: "image/png"});
+    await ensureGraphSession();
+    const form = new FormData();
+    form.append("image", file); form.append("document", JSON.stringify(drawing));
+    form.append("request_id", requestId);
+    const response = await fetch("/drawing/upload", {method: "POST", credentials: "same-origin", body: form});
+    const result = await parseResponseJson(response);
+    if (!response.ok || result?.ok !== true) throw new Error(result?.error || "绘图上传失败，请重试。");
+    if (result.request_id !== requestId || !/^[a-f0-9]{64}$/i.test(result.source_sha256 || "") || !result.document)
+        throw new Error("绘图上传响应不完整，请重试。");
+    if (drawingStorageOwner() !== owner || currentId !== selectedSession || ocrEditorTaskId !== "standalone-drawing")
+        throw new Error("账号或对话已切换，请重新上传绘图。");
+    if (ocrBatchPreparing || ocrTasks.size >= OCR_MAX_CONCURRENT)
+        throw new Error("本批图片已满，请发送或移除已有图片后重试。");
+    if (!currentId) newChat();
+    const session = getCurrent();
+    if (!session || [...ocrTasks.values()].some(task => task.sessionId !== session.id))
+        throw new Error("已有图片属于其他对话，请先发送或移除后重试。");
+    const now = performance.now(), documentValue = cloneOcrDocument(result.document);
+    ocrTasks.set(requestId, {id: requestId, file, sessionId: session.id,
+        originalUrl: URL.createObjectURL(file), state: "ready", startedAt: now, finishedAt: now,
+        controller: null, draft: documentValue, initialDocument: cloneOcrDocument(documentValue),
+        confirmation: null, dirty: true, userRequest: String(metadata.requirements || "").slice(0, 4000),
+        isQuestion: true, error: "", notice: "绘图已上传，发送时将使用你绘制的结构。",
+        sourceSha256: result.source_sha256, descriptions: null, descriptionState: null,
+        result: {workflow_profile: "user_drawing", document: cloneOcrDocument(documentValue)}});
+    document.getElementById("graphEditorDialog").close();
+    renderOcrTasks();
+    return {ok: true, requestId};
+}
 
 function openGraphDrawing() {
     if (ocrEditorTaskId || !window.DMateGraphEditor?.mount) return;
@@ -14825,8 +14875,16 @@ function openGraphDrawing() {
     const close = document.getElementById("graphEditorClose");
     if (!dialog || !mount || !close) return;
     closeMobileShellDrawers();
+    const owner = drawingStorageOwner();
+    if (standaloneDrawingOwner !== owner) { standaloneDrawing = null; standaloneDrawingOwner = owner; }
     if (!standaloneDrawing) {
-        try { standaloneDrawing = JSON.parse(localStorage.getItem(DRAWING_STORAGE_KEY)); } catch (_) {}
+        try {
+            const legacyOwner = localStorage.getItem(DRAWING_STORAGE_KEY + ":owner");
+            if (!legacyOwner || legacyOwner === owner) {
+                standaloneDrawing = JSON.parse(localStorage.getItem(DRAWING_STORAGE_KEY));
+                if (standaloneDrawing && !legacyOwner) localStorage.setItem(DRAWING_STORAGE_KEY + ":owner", owner);
+            }
+        } catch (_) {}
     }
     standaloneDrawing ||= {body_text: "", graphs: [{id: "G1", name: "我的图形",
         directed: false, weighted: false, vertices: [], edges: []}]};
@@ -14844,7 +14902,19 @@ function openGraphDrawing() {
     };
     try {
         const blank = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700"><rect width="100%" height="100%" fill="white"/></svg>');
-        ocrEditorController = window.DMateGraphEditor.mount(mount, {
+        const workspace = window.DMateDrawingWorkspace;
+        ocrEditorController = workspace?.mount ? workspace.mount(mount, {
+            storageKey: "dmate:graph-gallery:v1::" + encodeURIComponent(owner),
+            legacyDocument: cloneOcrDocument(standaloneDrawing),
+            onChange: value => { standaloneDrawing = cloneOcrDocument(value); },
+            onUpload: uploadDrawingResult,
+            onClose: requestClose,
+            onExport: window.DMateGallery?.postMessage ? async (blob, metadata = {}) => {
+                const result = await savePngToAndroidGallery(blob, metadata.name || "DMate-绘图.png");
+                if (!result?.ok) throw new Error(result?.message || "保存到相册失败，请重试。");
+                return {message: result.message || "已保存到相册"};
+            } : undefined
+        }) : window.DMateGraphEditor.mount(mount, {
             document: cloneOcrDocument(standaloneDrawing),
             initialDocument: {body_text:"",graphs:[{id:"G1",name:"我的图形",directed:false,weighted:false,vertices:[],edges:[]}]},
             originalUrl: blank, drawingOnly: true,
@@ -15105,6 +15175,7 @@ function initializeVoiceInput() {
     if (!button || !input) return;
     window.dmateVoiceInput = window.DMateVoiceInput.mount({ button, input,
         status: document.getElementById("voiceInputStatus"), endpoint: "/voice/transcribe",
+        onError: message => showCurrentError(message),
         onStateChange: () => refreshInputAvailability(),
         getContextKey: () => String(currentId ?? ""),
         isBusy: () => Boolean(ocrReviewInProgress || ocrBatchPreparing || ocrTasks.size > 0 || isSessionBusy(currentId)
@@ -16395,12 +16466,18 @@ function renderSessions() {
                 item => String(item.id) !== String(session.id)
             );
 
-            if (currentId === session.id) {
-                currentId = sessions.length
-                    ? sessions[0].id
-                    : null;
+            if (String(currentId) === String(session.id)) {
+                currentId = null;
+            }
+            // A pending mobile selection must not reopen a removed conversation.
+            if (mobileSessionTapTimer && mobileSessionTapId === String(session.id)) {
+                window.clearTimeout(mobileSessionTapTimer);
+                mobileSessionTapTimer = 0;
+                mobileSessionTapId = "";
+                mobileSessionTapAt = 0;
             }
 
+            // 删除当前会话后保持空白，不自动打开列表里的其他对话。
             // 删除最后一个会话时保持空列表，不自动补一个“新对话”。
             // 下一次真正发送文字或上传图片时，send()/handleImageSelected()
             // 会按需调用 newChat() 创建会话。

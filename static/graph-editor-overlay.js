@@ -71,6 +71,7 @@ function elasticRegionPoints(gesture,end){
 function mount(host,o){
  const d=host.ownerDocument,s=o.state||{mode:'select',zoom:100,visible:true,start:null};
  s.polygonDraft ||= [];
+ if(o.drawingOnly){s.visible=true;if(!['select','vertex','edge'].includes(s.mode))s.mode='select';}
  s.originalVisible = s.originalVisible !== false;
  s.originalOpacity = Number.isFinite(s.originalOpacity)
    ? Math.max(0,Math.min(1,s.originalOpacity)) : 1;
@@ -108,13 +109,14 @@ function mount(host,o){
  const root=d.createElement('section'),bar=d.createElement('div'),scroll=d.createElement('div'),stage=d.createElement('div'),image=d.createElement('img'),svg=E(d,'svg',{viewBox:'0 0 1000 1000',role:'group','aria-label':'图形原图描绘层'}),status=d.createElement('span');
  root.className='dge-overlay';bar.className='dge-overlay-tools';scroll.className='dge-overlay-viewport';stage.className='dge-overlay-stage';image.className='dge-overlay-image';image.alt='原图';svg.classList.add('dge-overlay-svg');status.className='dge-overlay-status';
  if(o.scanOnly){root.classList.add('dge-scan-only');svg.setAttribute('aria-label','原图框选层');}
- const palette=d.createElement('section');palette.className='dge-tool-palette';
+ const palette=d.createElement(o.drawingOnly?'details':'section');palette.className='dge-tool-palette';
+ if(o.drawingOnly){palette.open=s.toolsOpen!==false;palette.addEventListener('toggle',()=>{s.toolsOpen=palette.open;});}
  if(o.textOnly)svg.setAttribute('aria-label','文字框选层');
- const paletteTitle=d.createElement('h3');paletteTitle.textContent=o.scanOnly?'框选':o.textOnly?'文字工具':'绘图工具';palette.append(paletteTitle,bar);
+ const paletteTitle=d.createElement(o.drawingOnly?'summary':'h3');paletteTitle.textContent=o.scanOnly?'框选':o.textOnly?'文字工具':'绘图工具';palette.append(paletteTitle,bar);
  const viewControls=d.createElement('div');viewControls.className='dge-view-controls';viewControls.setAttribute('aria-label','视图控制');
  stage.append(image,svg);scroll.append(stage);root.append(viewControls,palette,scroll);host.append(root);
- const button=(label,key,fn,parent=bar)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',()=>{if(!o.disabled?.())fn();});parent.append(b);return b;};
- for(const [key,label] of (o.scanOnly?[['select','选择 / 平移'],['bounds','图形框选'],['text_rect','文字框选']]:o.textOnly?[['select','选择 / 移动'],['text_rect','框选文字']]:[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']])){
+ const button=(label,key,fn,parent=bar)=>{const b=d.createElement('button');b.type='button';b.textContent=label;b.dataset.overlayTool=key;b.addEventListener('click',event=>{event.stopPropagation();if(!o.disabled?.())fn();});parent.append(b);return b;};
+ for(const [key,label] of (o.scanOnly?[['select','选择 / 平移'],['bounds','图形框选'],['text_rect','文字框选']]:o.textOnly?[['select','选择 / 移动'],['text_rect','框选文字']]:o.drawingOnly?[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边']]:[['select','选择 / 移动'],['vertex','添加顶点'],['edge','添加边'],['bounds','框选图形']])){
   button(label,key,()=>{s.mode=o.scanOnly&&s.irregular?(key==='bounds'?'graph_poly':key==='text_rect'?'text_poly':key):key;s.start=null;o.clearSelection?.();draw();});
  }
  const regionMode=d.createElement('select');
@@ -127,7 +129,7 @@ function mount(host,o){
    if(o.scanOnly){s.irregular=regionMode.value==='irregular';const text=['text_rect','text_poly'].includes(s.mode);s.mode=text?(s.irregular?'text_poly':'text_rect'):(s.irregular?'graph_poly':'bounds');}
    else s.mode=regionMode.value||'select';s.start=null;s.polygonDraft=[];o.clearSelection?.();draw();
  });
- bar.append(regionMode);
+ if(!o.drawingOnly)bar.append(regionMode);
  const commitRegion=(points,polygon)=>{
    let id;
    change(()=>{id=o.createRegion?.(points,polygon);},'region');
@@ -136,7 +138,7 @@ function mount(host,o){
  // Each independently segmented graph receives its own direction and weight
  // from OCR + visual edge evidence. Do not override this with toolbar labels.
  // Edge-level corrections in the advanced editor remain available.
- const visible=o.textOnly||o.scanOnly?null:button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();},viewControls);
+ const visible=o.textOnly||o.scanOnly||o.drawingOnly?null:button('隐藏描绘','visibility',()=>{s.visible=!s.visible;draw();},viewControls);
  const MIN_ZOOM=.01,MAX_ZOOM=400;
  const zoom=x=>{
    const previous=s.zoom||100;
@@ -336,7 +338,7 @@ function mount(host,o){
   if(visible)visible.textContent=s.visible?'隐藏描绘':'显示描绘';svg.classList.toggle('is-hidden',!s.visible);svg.dataset.mode=s.mode;
   svg.classList.toggle('is-deforming',active?.kind==='resize'&&active.polygon);
   regionMode.value=o.scanOnly?(s.irregular?'irregular':''):['graph_poly','text_poly'].includes(s.mode)?s.mode:'';
-  for(const b of bar.querySelectorAll('[data-overlay-tool]')){const key=b.dataset.overlayTool,active=key===s.mode||o.scanOnly&&(key==='bounds'&&s.mode==='graph_poly'||key==='text_rect'&&s.mode==='text_poly');b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds','text_rect'].includes(key))b.setAttribute('aria-pressed',String(active));}
+  for(const b of bar.querySelectorAll('[data-overlay-tool]')){const key=b.dataset.overlayTool,active=Boolean(key===s.mode||o.scanOnly&&(key==='bounds'&&s.mode==='graph_poly'||key==='text_rect'&&s.mode==='text_poly'));b.classList.toggle('is-active',active);if(['select','pan','vertex','edge','bounds','text_rect'].includes(key))b.setAttribute('aria-pressed',String(active));}
   if(!scroll.clientWidth)return;
   const g=o.textOnly||o.scanOnly?{id:o.graph?.()?.id,vertices:[],edges:[]}:o.graph()||{vertices:[],edges:[]};
   if(g)for(const v of g.vertices)if(finite(v.x)&&finite(v.y))expandWorld(v.x,v.y);
@@ -371,7 +373,7 @@ function mount(host,o){
     hit.style.strokeWidth=touch?'24px':'14px';svg.append(hit);
     return preview;
   };
-  for(const region of o.textOnly?[]:o.model.getDocument().graphs){
+  for(const region of o.textOnly||o.drawingOnly?[]:o.model.getDocument().graphs){
     const points=graphPoints(region);if(!points)continue;
     const preview=frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id,region.region_polygon?.length>=3);
     if(o.scanOnly){const b=boxOf(preview),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number dge-graph-frame-number','data-frame-label-id':region.id});
@@ -576,7 +578,32 @@ function mount(host,o){
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(loaded&&!autoFitted)fitImage();else layoutWorld();draw();}):null;observer?.observe(scroll);observer?.observe(viewControls);
  const resetInteraction=()=>{active=null;ghost=null;base=null;pointers.clear();s.start=null;s.polygonDraft=[];scanSequence++;draw();};
  svg.addEventListener('keydown',e=>{if(e.key==='Escape')resetInteraction();});
- return {refresh:draw,resetInteraction,state:s,destroy(){observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
+ function getDrawingSvg(){
+  // Serialize only the drawing, independently from the source photo, camera,
+  // selection hit areas and editor controls. Inline computed SVG paint so the
+  // exported image does not depend on this page's styles or theme.
+  const output=E(d,'svg',{xmlns:NS,role:'img','aria-label':'绘图','data-source-width':w,'data-source-height':h}),defs=svg.querySelector('defs');
+  const graph=o.graph?.();output.exportVertexPositions=graph?{[graph.id]:Object.fromEntries(graph.vertices.map((vertex,index)=>[vertex.id,pos(vertex,index,graph)]))}:{};
+  if(defs)output.append(defs.cloneNode(true));
+  const shapes=svg.querySelectorAll('.dge-overlay-edge,.dge-overlay-node');
+  const bounds=[];
+  const properties=['fill','stroke','stroke-width','stroke-dasharray','stroke-linecap','stroke-linejoin','paint-order','font-family','font-size','font-weight','text-anchor','opacity'];
+  for(const original of shapes){
+   try{const b=original.getBBox();if(b.width||b.height)bounds.push(b);}catch(_){}
+   const clone=original.cloneNode(true),source=[original,...original.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
+   copies.forEach((node,index)=>{const style=d.defaultView.getComputedStyle(source[index]);for(const name of properties)node.style.setProperty(name,style.getPropertyValue(name));node.removeAttribute('tabindex');node.removeAttribute('data-vertex-id');node.removeAttribute('data-edge-id');});
+   clone.querySelectorAll('.dge-overlay-hit,.dge-overlay-node-hit,.dge-overlay-handle').forEach(node=>node.remove());
+   output.append(clone);
+  }
+  let x=0,y=0,width=1000,height=700;
+  if(bounds.length){const scale=Math.max(.0001,svg.getBoundingClientRect().width/((world.right-world.left)*w)),padding=32/scale;
+   x=Math.min(...bounds.map(b=>b.x))-padding;y=Math.min(...bounds.map(b=>b.y))-padding;
+   width=Math.max(64,Math.max(...bounds.map(b=>b.x+b.width))-x+padding);height=Math.max(64,Math.max(...bounds.map(b=>b.y+b.height))-y+padding);}
+  output.setAttribute('viewBox',[x,y,width,height].join(' '));output.setAttribute('width',String(Math.ceil(width)));output.setAttribute('height',String(Math.ceil(height)));
+  const background=E(d,'rect',{x,y,width,height,fill:'#ffffff'});output.insertBefore(background,output.firstChild);
+  return output;
+ }
+ return {refresh:draw,resetInteraction,state:s,getDrawingSvg,destroy(){observer?.disconnect();image.onload=null;image.onerror=null;host.replaceChildren();}};
 }
 root.DMateGraphOverlay={mount,elasticRegionStart,elasticRegionPoints};if(typeof module!=='undefined'&&module.exports)module.exports={mount,elasticRegionStart,elasticRegionPoints};
 })(typeof window!=='undefined'?window:globalThis);

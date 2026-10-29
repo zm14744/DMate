@@ -73,12 +73,23 @@
 
         button.type = 'button'; button.classList.add('voice-input-button'); button.innerHTML = ICON;
         if (status) { status.classList.add('voice-input-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); }
-        function notice(message, cancellable = false) {
+        function notice(message) {
             if (!status) return;
+            status.classList.remove('voice-input-error');
+            status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
             status.replaceChildren(document.createTextNode(message)); status.hidden = !message;
-            if (cancellable) {
-                const cancelButton = document.createElement('button'); cancelButton.type = 'button'; cancelButton.textContent = '取消';
-                cancelButton.className = 'voice-input-cancel'; cancelButton.addEventListener('click', () => cancel()); status.append(cancelButton);
+        }
+        function reportError(message) {
+            notice(message);
+            // Routine progress stays in the accessible live region only. The
+            // host may use its existing error UI rather than add a second one
+            // beneath the composer; standalone callers retain one error line.
+            if (typeof options.onError === 'function') {
+                try { options.onError(message); return; } catch (_) { /* Fall back to the local error line. */ }
+            }
+            if (status) {
+                status.classList.add('voice-input-error');
+                status.setAttribute('role', 'alert'); status.setAttribute('aria-live', 'assertive');
             }
         }
         function render(next) {
@@ -101,12 +112,12 @@
             for (const track of op.stream?.getTracks() || []) track.stop();
             if (op.audio && op.audio.state !== 'closed') Promise.resolve(op.audio.close()).catch(() => {});
         }
-        function cancel(message = '已取消语音输入。') {
+        function cancel(message = '', error = false) {
             serial++;
             const op = active; active = null;
             op?.controller?.abort(); releaseCapture(op);
             if (op) { op.chunks = []; op.count = 0; }
-            if (!disposed) { render('idle'); notice(message); }
+            if (!disposed) { render('idle'); if (error) reportError(message); else notice(message); }
         }
         function appendPcm(op, pcm) {
             const remaining = captureLimit - op.count;
@@ -117,7 +128,7 @@
             const op = active;
             if (!op || state !== 'recording') return;
             clearTimeout(op.timer);
-            render('finishing'); notice('正在收录尾音，请稍候…', true);
+            render('finishing'); notice('正在收录尾音，请稍候…');
             // ScriptProcessor delivers blocks after they were recorded. Keep
             // capturing briefly after Stop so its pending tail is delivered.
             if (op.count >= captureLimit) void transcribe(op);
@@ -129,8 +140,8 @@
             appendPcm(op, op.sample?.flush() || new Int16Array(0));
             releaseCapture(op);
             if (!current(op) || busy()) { cancel('输入位置已改变，语音输入已取消。'); return; }
-            if (op.count < SAMPLE_RATE * .25) { cancel('录音时间太短，请重新录音。'); return; }
-            render('transcribing'); notice('正在识别语音…', true);
+            if (op.count < SAMPLE_RATE * .25) { cancel('录音时间太短，请重新录音。', true); return; }
+            render('transcribing'); notice('正在识别语音…');
             op.controller = new AbortController();
             op.contextTimer = setInterval(() => { if (!current(op) || busy()) cancel('会话或输入状态已改变，语音输入已取消。'); }, 250);
             const timeout = setTimeout(() => op.controller.abort(), 75000);
@@ -165,15 +176,15 @@
             } catch (error) {
                 if (!current(op)) { if (active === op) cancel('会话已切换，语音输入已取消。'); return; }
                 active = null; render('idle');
-                notice(error?.name === 'AbortError' ? '语音识别超时，请重试。' : error?.message || '语音识别网络异常，请重试。');
+                reportError(error?.name === 'AbortError' ? '语音识别超时，请重试。' : error?.message || '语音识别网络异常，请重试。');
             } finally { clearTimeout(timeout); clearInterval(op.contextTimer); op.chunks = []; }
         }
         async function start() {
             if (state !== 'idle' || disposed) return;
             if (busy()) { notice('请等待当前操作完成后再使用语音输入。'); return; }
-            if (!media?.getUserMedia || !Audio || win.isSecureContext === false) { notice('当前环境无法使用麦克风，请在 HTTPS 页面或支持录音的浏览器中打开。'); return; }
+            if (!media?.getUserMedia || !Audio || win.isSecureContext === false) { reportError('当前环境无法使用麦克风，请在 HTTPS 页面或支持录音的浏览器中打开。'); return; }
             const op = { serial: ++serial, contextKey: contextKey(), chunks: [], count: 0 };
-            active = op; render('requesting'); notice('正在请求麦克风权限…', true);
+            active = op; render('requesting'); notice('正在请求麦克风权限…');
             try {
                 const stream = await media.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
                 op.stream = stream;
@@ -192,7 +203,7 @@
                     appendPcm(op, op.sample(input));
                     if (!op.started) {
                         op.started = true; clearTimeout(op.readyTimer);
-                        render('recording'); notice(`已开始录音，请说话；再点麦克风结束（单段最长 ${seconds} 秒）。`, true);
+                        render('recording'); notice(`已开始录音，请说话；再点麦克风结束（单段最长 ${seconds} 秒）。`);
                         op.timer = setTimeout(finish, Math.max(0, (captureLimit - op.count) / SAMPLE_RATE * 1000 - TAIL_CAPTURE_MS));
                     }
                     if (op.count >= captureLimit) {
@@ -200,17 +211,17 @@
                         else finish();
                     }
                 };
-                render('preparing'); notice('麦克风正在准备，显示开始录音后再说话。', true);
+                render('preparing'); notice('麦克风正在准备。');
                 op.source.connect(op.processor); op.processor.connect(op.mute); op.mute.connect(op.audio.destination);
                 op.contextTimer = setInterval(() => { if (!current(op) || busy()) cancel('会话或输入状态已改变，语音输入已取消。'); }, 250);
-                op.readyTimer = setTimeout(() => { if (current(op) && !op.started) cancel('麦克风尚未开始采集，请检查设备后重试。'); }, 10000);
+                op.readyTimer = setTimeout(() => { if (current(op) && !op.started) cancel('麦克风尚未开始采集，请检查设备后重试。', true); }, 10000);
                 await op.audio.resume();
                 if (!current(op) || busy()) { releaseCapture(op); if (active === op) cancel('输入位置已改变，语音输入已取消。'); return; }
             } catch (error) {
                 releaseCapture(op);
                 if (!current(op)) { if (active === op) cancel('会话已切换，语音输入已取消。'); return; }
                 active = null; render('idle');
-                notice(['NotAllowedError', 'SecurityError'].includes(error?.name) ? '麦克风权限被拒绝，请在浏览器设置中允许麦克风后重试。'
+                reportError(['NotAllowedError', 'SecurityError'].includes(error?.name) ? '麦克风权限被拒绝，请在浏览器设置中允许麦克风后重试。'
                     : ['NotFoundError', 'DevicesNotFoundError'].includes(error?.name) ? '未找到可用的麦克风。' : '无法启动录音，请检查麦克风或重试。');
             }
         }

@@ -17,7 +17,7 @@ import numpy as np
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 
-MAX_IMAGE_PIXELS = 16_000_000
+from image_upload_limits import MAX_IMAGE_PIXELS
 DEFAULT_WORK_SIDE = 1600
 
 

@@ -59,6 +59,7 @@ def open_notebook(page):
 
 
 def select_both(page):
+    page.get_by_role('checkbox', name='选择概念：集合', exact=True).check()
     page.get_by_role('checkbox', name='选择概念：关系', exact=True).check()
 
 
@@ -66,7 +67,8 @@ def test_notes_autosave_reopen_and_relation_analysis_does_not_modify_original(no
     p = notebook_page
     open_notebook(p)
     p.get_by_label('我的概念笔记', exact=True).fill('集合是一组确定的对象。\n例如 A={1,2}。')
-    assert p.get_by_text('已保存', exact=True).is_visible()
+    assert p.locator('.dcn-saved').inner_text() == ''
+    assert p.evaluate('stored.notes[0].content') == '集合是一组确定的对象。\n例如 A={1,2}。'
     p.get_by_role('button', name='关闭笔记本', exact=True).click()
     open_notebook(p)
     assert p.get_by_label('我的概念笔记', exact=True).input_value() == '集合是一组确定的对象。\n例如 A={1,2}。'
@@ -94,6 +96,7 @@ def test_notes_autosave_reopen_and_relation_analysis_does_not_modify_original(no
 def test_ai_reads_only_selected_note_and_renders_untrusted_text_without_markup(notebook_page):
     p = notebook_page
     open_notebook(p)
+    p.get_by_role('checkbox', name='选择概念：集合', exact=True).check()
     payload = '<img src=x onerror="window.injected=true"><script>window.injected=true</script>'
     p.evaluate('(text)=>window.responseText=text', payload)
     p.get_by_role('button', name='AI 解释', exact=True).click()
@@ -108,6 +111,7 @@ def test_ai_reads_only_selected_note_and_renders_untrusted_text_without_markup(n
 def test_edit_selection_and_close_ignore_late_analysis(notebook_page):
     p = notebook_page
     open_notebook(p)
+    p.get_by_role('checkbox', name='选择概念：集合', exact=True).check()
     p.evaluate('window.hold=true')
     p.get_by_role('button', name='AI 解释', exact=True).click()
     p.wait_for_function('calls.length===1')
@@ -130,30 +134,42 @@ def test_edit_selection_and_close_ignore_late_analysis(notebook_page):
     assert p.locator('.dcn-results').inner_text() == ''
 
 
-def test_new_note_delete_undo_search_and_title_only_concept(notebook_page):
+def test_new_note_explicit_selection_confirmed_delete_and_search(notebook_page):
     p = notebook_page
     open_notebook(p)
+    assert p.locator('input[type=checkbox]:checked').count() == 0
+    assert p.get_by_role('button', name='AI 解释', exact=True).is_disabled()
     p.get_by_role('button', name='新建概念', exact=True).click()
     p.get_by_label('概念名称', exact=True).fill('偏序关系')
+    assert not p.get_by_role('checkbox', name='选择概念：偏序关系', exact=True).is_checked()
+    p.get_by_role('checkbox', name='选择概念：偏序关系', exact=True).check()
     p.get_by_role('button', name='AI 解释', exact=True).click()
     p.wait_for_function('calls.length===1')
     assert p.evaluate('calls[0].body.notes[0].title') == '偏序关系'
     assert p.evaluate('calls[0].body.notes[0].content') == ''
     identifier = p.evaluate('stored.notes[0].id')
-    p.get_by_role('button', name='删除概念', exact=True).click()
-    deleted_at = p.evaluate('(id)=>stored.deleted[id]', identifier)
-    assert p.locator('.dcn-note-open', has_text='偏序关系').count() == 0
-    p.get_by_role('button', name='撤销删除', exact=True).click()
-    assert p.evaluate('stored.notes[0].updatedAt') > deleted_at
-    assert not p.evaluate('(id)=>id in stored.deleted', identifier)
     p.get_by_label('搜索概念', exact=True).fill('偏序')
     assert p.locator('.dcn-note').count() == 1
-    assert p.get_by_role('button', name='偏序关系', exact=True).is_visible()
+    p.get_by_role('button', name='删除概念', exact=True).click()
+    prompt = p.locator('.dcn-confirm')
+    assert prompt.is_visible()
+    assert p.evaluate('(id)=>stored.notes.some(n=>n.id===id)', identifier)
+    assert p.locator('.dcn-note-open', has_text='偏序关系').count() == 1
+    prompt.get_by_role('button', name='取消', exact=True).click()
+    assert p.evaluate('(id)=>stored.notes.some(n=>n.id===id)', identifier)
+    p.get_by_role('button', name='删除概念', exact=True).click()
+    p.locator('.dcn-confirm').get_by_role('button', name='删除概念', exact=True).click()
+    assert not p.evaluate('(id)=>stored.notes.some(n=>n.id===id)', identifier)
+    assert p.evaluate('(id)=>stored.deleted[id]', identifier) > 0
+    assert p.locator('.dcn-note-open', has_text='偏序关系').count() == 0
+    assert p.get_by_role('button', name='撤销删除', exact=True).count() == 0
+    assert p.get_by_role('button', name='取消选择', exact=True).count() == 0
 
 
 def test_save_error_is_not_success_and_network_failure_can_retry(notebook_page):
     p = notebook_page
     open_notebook(p)
+    p.get_by_role('checkbox', name='选择概念：集合', exact=True).check()
     p.evaluate('window.saveFailure=true')
     p.get_by_label('我的概念笔记', exact=True).fill('尚未保存的新原文')
     assert '尚未保存' in p.locator('.dcn-saved').inner_text()
@@ -173,6 +189,7 @@ def test_save_error_is_not_success_and_network_failure_can_retry(notebook_page):
 def test_account_refresh_does_not_show_other_accounts_text_or_late_ai(notebook_page):
     p = notebook_page
     open_notebook(p)
+    p.get_by_role('checkbox', name='选择概念：集合', exact=True).check()
     p.get_by_label('补充要求（可选）', exact=True).fill('alice的私有问题')
     p.evaluate('window.hold=true')
     p.get_by_role('button', name='AI 解释', exact=True).click()
@@ -185,15 +202,18 @@ def test_account_refresh_does_not_show_other_accounts_text_or_late_ai(notebook_p
     assert '集合' not in p.locator('.dcn-list').inner_text()
 
 
-def test_guest_retention_message_never_claims_account_persistence(notebook_page):
+def test_no_routine_persistence_blurbs_but_autosave_still_updates_state(notebook_page):
     p = notebook_page
     p.evaluate('window.persistent=false;window.contextKey="guest"')
     open_notebook(p)
-    assert '未登录时笔记仅保留在当前页面' in p.locator('.dcn-persistence').inner_text()
+    assert p.locator('.dcn-persistence,.dcn-empty,.dcn-scope').count() == 0
+    assert p.locator('.dcn-saved').inner_text() == ''
     p.get_by_label('我的概念笔记', exact=True).fill('访客当前页面的笔记')
-    assert p.locator('.dcn-saved').inner_text() == '已保留在当前页面'
+    assert p.locator('.dcn-saved').inner_text() == ''
+    assert p.evaluate('stored.notes[0].content') == '访客当前页面的笔记'
     p.evaluate('window.persistent=true;window.contextKey="bob";notebook.refresh()')
-    assert p.locator('.dcn-persistence').inner_text() == '笔记随账号保存并同步。'
+    assert p.locator('.dcn-persistence').count() == 0
+    assert p.locator('input[type=checkbox]:checked').count() == 0
 
 
 def test_switch_to_empty_account_clears_hidden_editor_and_old_save_error(notebook_page):
@@ -207,7 +227,82 @@ def test_switch_to_empty_account_clears_hidden_editor_and_old_save_error(noteboo
     assert p.locator('.dcn-title').input_value() == ''
     assert p.locator('.dcn-original').input_value() == ''
     assert p.locator('.dcn-question').input_value() == ''
-    assert p.locator('.dcn-empty').is_visible()
-    assert p.locator('.dcn-saved').inner_text() == '输入后自动保存'
+    assert p.locator('.dcn-editor').is_hidden()
+    assert p.locator('.dcn-saved').inner_text() == ''
     assert p.locator('.dcn-list').inner_text() == '还没有概念笔记。'
     assert p.locator('.dcn-results').inner_text() == ''
+
+
+def test_new_first_note_and_open_note_never_implicitly_select_for_ai(notebook_page):
+    p = notebook_page
+    p.evaluate('stored={notes:[],deleted:{}}')
+    open_notebook(p)
+    p.get_by_role('button', name='新建概念', exact=True).click()
+    p.get_by_label('概念名称', exact=True).fill('第一个概念')
+    assert p.locator('input[type=checkbox]:checked').count() == 0
+    p.get_by_role('button', name='第一个概念', exact=True).click()
+    assert p.locator('input[type=checkbox]:checked').count() == 0
+    assert p.get_by_role('button', name='AI 解释', exact=True).is_disabled()
+    assert p.evaluate('calls.length') == 0
+
+
+def test_large_solid_circle_multiselect_and_red_close_are_clickable(notebook_page):
+    p = notebook_page
+    open_notebook(p)
+    circle = p.get_by_role('checkbox', name='选择概念：集合', exact=True)
+    dimensions = circle.bounding_box()
+    assert dimensions['width'] >= 22 and dimensions['height'] >= 22
+    hit = p.locator('[data-note-id="set"] .dcn-note-select')
+    assert hit.bounding_box()['width'] >= 44 and hit.bounding_box()['height'] >= 44
+    hit.click(position={'x': 2, 'y': 2})
+    assert circle.is_checked()
+    p.get_by_role('checkbox', name='选择概念：关系', exact=True).check()
+    assert p.locator('input[type=checkbox]:checked').count() == 2
+    assert circle.evaluate('e=>getComputedStyle(e).backgroundColor') != 'rgba(0, 0, 0, 0)'
+    assert circle.evaluate('e=>getComputedStyle(e).borderRadius') == '50%'
+    close = p.get_by_role('button', name='关闭笔记本', exact=True)
+    assert close.inner_text() == ''
+    assert close.evaluate('e=>getComputedStyle(e).backgroundColor') == 'rgb(239, 68, 68)'
+    assert close.evaluate('e=>getComputedStyle(e).borderRadius') == '50%'
+    size = 'mobile' if p.viewport_size['width'] < 681 else 'desktop'
+    p.screenshot(path='/tmp/dmate-notebook-' + size + '-clean.png')
+    top = close.bounding_box()['y']
+    p.locator('.dcn-main').evaluate('e=>e.scrollTop=e.scrollHeight')
+    assert close.bounding_box()['y'] == pytest.approx(top)
+    close.click()
+    assert p.locator('#conceptNotebookDialog').is_hidden()
+
+
+def test_delete_confirmation_escape_and_account_switch_keep_notes(notebook_page):
+    p = notebook_page
+    open_notebook(p)
+    p.get_by_role('button', name='删除概念', exact=True).click()
+    size = 'mobile' if p.viewport_size['width'] < 681 else 'desktop'
+    p.screenshot(path='/tmp/dmate-notebook-' + size + '-delete.png')
+    p.locator('.dcn-confirm').press('Escape')
+    assert p.locator('.dcn-confirm').count() == 0
+    assert p.evaluate('stored.notes.length') == 2
+    assert p.locator('#conceptNotebookDialog').is_visible()
+    p.get_by_role('button', name='删除概念', exact=True).click()
+    p.evaluate("contextKey='bob';stored={notes:[{id:'bob',title:'bob概念',content:'保留内容',updatedAt:3}],deleted:{}};notebook.refresh()")
+    assert p.locator('.dcn-confirm').count() == 0
+    assert p.evaluate('stored.notes[0].id') == 'bob'
+    assert p.evaluate('Object.keys(stored.deleted).length') == 0
+    assert p.get_by_label('我的概念笔记', exact=True).input_value() == '保留内容'
+
+
+def test_external_delete_confirmation_callback_checks_current_context(notebook_page):
+    p = notebook_page
+    p.evaluate("""()=>{notebook.destroy();notebook=DMateConceptNotebook.mount({
+      button:document.getElementById('conceptNotebookBtn'),dialog:document.getElementById('conceptNotebookDialog'),
+      getState:()=>structuredClone(stored),onChange:v=>stored=structuredClone(v),getContextKey:()=>contextKey,
+      confirmDelete:settings=>{window.deleteSettings=settings;return new Promise(resolve=>window.resolveDelete=resolve)}});notebook.open();}""")
+    p.get_by_role('button', name='删除概念', exact=True).click()
+    assert p.evaluate('deleteSettings.confirmTone') == 'danger'
+    assert p.get_by_role('button', name='删除概念', exact=True).is_disabled()
+    p.evaluate('resolveDelete(false)')
+    assert p.evaluate('stored.notes.length') == 2
+    p.get_by_role('button', name='删除概念', exact=True).click()
+    p.evaluate("contextKey='bob';notebook.refresh();resolveDelete(true)")
+    assert p.evaluate('stored.notes.length') == 2
+    assert p.evaluate('Object.keys(stored.deleted).length') == 0

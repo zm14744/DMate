@@ -21,7 +21,7 @@
         let previewSequence = 0;
         let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null;
         let selectedGraph=false;const panelState={};
-        let individually = false, saving = false, destroyed = false, notice = '', pendingDelete = '';
+        let individually = false, saving = false, destroyed = false, notice = '';
         // "Is this a question?" is a per-upload choice, separate from graph data.
         let isQuestion = options.isQuestion !== false;
         let unsubscribe, overlay = null, textOverlay = null, activeTab = 'image', textBusy = false, textTimer = null, refreshTextPanel = null, runTextQueue = null, recognitionEpoch = 0;
@@ -38,7 +38,7 @@
             Object.entries(attributes || {}).forEach(([key, value]) => node.setAttribute(key, String(value)));
             if (label !== undefined) node.textContent = label; return node; };
         const button = (label, action, className) => { const node = element('button', className || '', label); node.type = 'button'; node.disabled = saving;
-            node.addEventListener('click', () => act(action)); return node; };
+            node.addEventListener('click', event => { event.stopPropagation(); act(action); }); return node; };
         const input = (value, aria, action, type) => { const node = element('input'); node.type = type || 'text'; node.value = value ?? ''; node.setAttribute('aria-label', aria); node.disabled = saving;
             if (action) node.addEventListener('input', () => edit(() => action(node.value))); return node; };
         const select = (rows, value, aria, action) => { const node = element('select'); node.setAttribute('aria-label', aria); node.disabled = saving;
@@ -52,10 +52,6 @@
         function edit(action) { if (saving || destroyed) return; notice = '';
             try { action(); } catch (error) { notice = error?.message || '无法完成这项修改。'; }
             refreshDraftViews(); }
-        function askDelete(key, message, action) {
-            if (pendingDelete === key) { pendingDelete = ''; action(); }
-            else { pendingDelete = key; notice = message + ' 再次点击删除可确认，也可用“撤销”恢复。'; }
-        }
         const nodeOptions = graph => { const rows = [['', '请选择节点'], ...graph.vertices.map((vertex, index) => [vertex.id, vertex.label === null ? (vertex.display_label || '未命名节点 ' + (index + 1)) : vertex.label])]; rows.graphId = graph.id; return rows; };
         const graphOptions = (document, excluded) => [['', '选择目标子图'], ...document.graphs.filter(graph => graph.id !== excluded).map((graph, index) => [graph.id, graph.name || '图 ' + (index + 1)])];
         const weightValue = value => value.trim() === '' ? null : /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(value.trim()) && Number.isFinite(Number(value)) ? Number(value) : value;
@@ -90,7 +86,10 @@
             const graph = document.graphs.find(row => row.id === currentGraph);
             const panel = container.querySelector('.dge-node-panel');
             const list = panel?.querySelector('.dge-node-list');
-            if (!graph || !overlay || !list) { render(); return; }
+            if (!graph || !overlay) { render(); return; }
+            // Canvas editing deliberately has no bulk table. Adding a vertex
+            // still updates its geometry, information and undo state in place.
+            if (!list) { refreshDraftViews(); return; }
             refreshDraftViews();
             const heading = panel.querySelector('h3');
             if (heading) heading.textContent = '节点 · ' + graph.vertices.length;
@@ -120,7 +119,7 @@
             const oldReview = container.querySelector('.dge-review-summary');
             if (oldReview && graph) {
                 const refreshed = buildReview(graph, document);
-                if (refreshed) { refreshed.open = oldReview.open; oldReview.replaceWith(refreshed); }
+                if (refreshed) oldReview.replaceWith(refreshed);
             }
             const status = container.querySelector('.dge-status'); if (status) status.textContent = notice;
             const undo = container.querySelector('[data-editor-undo]'); if (undo) undo.disabled = saving || !model.canUndo();
@@ -211,10 +210,10 @@
         function buildReview(graph, document) {
             if (graph && root.DMateGraphFormat?.graphRows) {
                 const data = root.DMateGraphFormat.graphRows(graph, document.graphs.indexOf(graph));
-                const summary = element('details', 'dge-review-summary'); summary.open = true;
-                summary.append(element('summary', '', '图形结构 · ' + graph.vertices.length + ' 点 / ' + graph.edges.length + ' 边'));
+                const summary = element('section', 'dge-review-summary');
+                summary.append(element('h3', '', '图形结构 · ' + graph.vertices.length + ' 点 / ' + graph.edges.length + ' 边'));
                 const section = element('div', 'dge-review-content');
-                section.append(element('p', 'dge-review-type', data.title + '    ' + data.type));
+                section.append(element('p', 'dge-review-type', data.title + (data.showType === false ? '' : '    ' + data.type)));
                 section.append(element('p', '', '点：' + (data.vertices.join('、') || '无')));
                 if (data.named.length) section.append(element('p', '', '边：' + data.named.join('、')));
                 section.append(element('p', 'dge-review-subhead', '关系：'));
@@ -253,9 +252,9 @@
                     value => model.updateEdges(graph.id, ids, 'weight', weightValue(value)))));
                 aside.append(field('边名', input(edge.edge_label, '当前边名称',
                     value => model.updateEdges(graph.id, ids, 'edge_label', value || null))));
-                aside.append(button('删除这条边', () =>
-                    askDelete('edges:' + edge.id, '将删除这一条边。', () =>
-                        model.deleteEdges(graph.id, ids)), 'dge-danger'));
+                aside.append(button('删除这条边', () => {
+                    model.deleteEdges(graph.id, ids); selectedEdge = null;
+                }, 'dge-danger'));
                 const note = element('p', 'dge-muted', '每条重边都能独立修改 · 边 ' + index);
                 aside.append(note);
             } else if (selectedNode) {
@@ -265,15 +264,9 @@
                 if (!selectedNode.label) aside.append(element('p', 'dge-muted',
                     '临时编号 ' + (selectedNode.display_label || '') + ' 仅用于核对原图'));
                 aside.append(button('删除这个顶点', () => {
-                    const incident = graph.edges.filter(e =>
-                        e.from === selectedNode.id || e.to === selectedNode.id).length;
-                    askDelete('vertex:' + selectedNode.id,
-                        '会同时删除 ' + incident + ' 条关联边。', () => {
-                            model.deleteVertices(graph.id, [selectedNode.id]);
-                            selectedNodes.clear();
-                        });
+                    model.deleteVertices(graph.id, [selectedNode.id]); selectedNodes.clear();
                 }, 'dge-danger'));
-            } else if(selectedGraph){
+            } else if(selectedGraph && !options.drawingOnly){
                 aside.append(element('h3','','子图属性'));
                 aside.append(field('名称',input(graph.name,'当前子图名称',v=>model.renameGraph(graph.id,v))));
                 aside.append(element('p','dge-muted',(graph.directed===false?'无向':'有向或待核对')+' · '+(graph.weighted===false?'无权':'带权或待核对')));
@@ -465,13 +458,13 @@
             container.replaceChildren(); container.classList.add('dmate-graph-editor');
             const top = element('div', 'dge-topline');
             // The toolbar already names its actions; keep the dialog compact.
-            const undo = button('↶', () => { pendingDelete = ''; model.undo(); }); undo.setAttribute('aria-label','撤销'); undo.title='撤销'; undo.classList.add('dge-history-arrow'); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
-            const redo = button('↷', () => { pendingDelete = ''; model.redo(); }); redo.setAttribute('aria-label','重做'); redo.title='重做'; redo.classList.add('dge-history-arrow');
+            const undo = button('↶', () => { model.undo(); }); undo.setAttribute('aria-label','撤销'); undo.title='撤销'; undo.classList.add('dge-history-arrow'); undo.dataset.editorUndo = 'true'; undo.disabled = saving || !model.canUndo();
+            const redo = button('↷', () => { model.redo(); }); redo.setAttribute('aria-label','重做'); redo.title='重做'; redo.classList.add('dge-history-arrow');
             redo.dataset.editorRedo = 'true'; redo.disabled = saving || !model.canRedo();
             if (!options.drawingOnly) top.append(questionChoice());
             top.append(undo, redo,
                 button('清空', () => {
-                    recognitionEpoch++; pendingDelete=''; model.reset(); selectedNodes.clear(); selectedEdge=null; selectedGraph=false;
+                    recognitionEpoch++; model.reset(); selectedNodes.clear(); selectedEdge=null; selectedGraph=false;
                     overlay?.resetInteraction(); textOverlay?.resetInteraction();
                     clearTimeout(textTimer); textTimer=null; textState.regions=[]; textState.nextId=1; textState.selectedId=null; textState.manuallyEdited=false; textState.assemblyError='';
                     refreshTextPanel?.();
@@ -499,7 +492,7 @@
                 details.append(element('summary', '', '识别时需留意'));
                 const list = element('ul'); observations.slice(0, 64).forEach(message => list.append(element('li', '', message))); details.append(list); container.append(details); }
             const workspace = element('div', 'dge-workspace');
-            if (useOverlay) { workspace.hidden = activeTab !== 'image'; workspace.id = instance + '-image-panel'; workspace.setAttribute('role', 'tabpanel'); workspace.setAttribute('aria-labelledby', instance + '-image-tab'); }
+            if (useOverlay && !options.drawingOnly) { workspace.hidden = activeTab !== 'image'; workspace.id = instance + '-image-panel'; workspace.setAttribute('role', 'tabpanel'); workspace.setAttribute('aria-labelledby', instance + '-image-tab'); }
             if (useOverlay) {
                 const host = retainedOverlay || element('section', 'dge-overlay-host');
                 workspace.append(host);
@@ -591,8 +584,8 @@
             if (options.structureOnly && !graph) toolbar.append(button('添加图形结构', () => {
                 currentGraph = model.addGraph();
             }));
-            if (document.graphs.length) {
-                toolbar.append(field('当前子图', select(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; pendingDelete = ''; render(); })));
+            if (document.graphs.length && !options.drawingOnly) {
+                toolbar.append(field('当前子图', select(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; render(); })));
                 // Metadata only. This summary is never converted into guessed
                 // vertices, arrows, edge weights, or drawing paths.
                 if (graph) {
@@ -604,15 +597,15 @@
                 }
             }
             if (graph) {
-                toolbar.append(field('子图名称', input(graph.name, '子图名称', value => model.renameGraph(graph.id, value))));
+                toolbar.append(field(options.drawingOnly ? '画页名称' : '子图名称', input(graph.name, options.drawingOnly ? '画页名称' : '子图名称', value => model.renameGraph(graph.id, value))));
                 if (options.drawingOnly || options.structureOnly) {
                     const flags = key => typeof graph[key]==='boolean' ? graph[key]?'yes':'no' : 'unknown';
-                    toolbar.append(field('图形方向', select([['unknown','待确认'],['no','无向'],['yes','有向']], flags('directed'), options.drawingOnly?'绘图方向':'图形方向', value => {if(value!=='unknown')model.setGraphType(graph.id,'directed',value==='yes');})));
-                    toolbar.append(field('图形权值', select([['unknown','待确认'],['no','无权'],['yes','带权']], flags('weighted'), options.drawingOnly?'绘图权值':'图形权值', value => {if(value!=='unknown')model.setGraphType(graph.id,'weighted',value==='yes');})));
+                    toolbar.append(field('图形方向', select([['unknown','待确认'],['no','无向'],['yes','有向']], flags('directed'), options.drawingOnly?'绘图方向':'图形方向', value => {if(value!=='unknown'){model.setGraphType(graph.id,'directed',value==='yes');render();}})));
+                    toolbar.append(field('图形权值', select([['unknown','待确认'],['no','无权'],['yes','带权']], flags('weighted'), options.drawingOnly?'绘图权值':'图形权值', value => {if(value!=='unknown'){model.setGraphType(graph.id,'weighted',value==='yes');render();}})));
                 }
             }
             container.insertBefore(toolbar, workspace);
-            if (graph) {
+            if (graph && !useOverlay) {
                 const panels = element('div', 'dge-edit-panels'), nodes = element('section', 'dge-node-panel'), edges = element('section', 'dge-edge-panel');
                 nodes.append(element('h3', '', '节点 · ' + graph.vertices.length));
                 const nodeList = element('div', 'dge-node-list');
@@ -623,8 +616,7 @@
                 const addRow = element('div', 'dge-inline'); addRow.append(addLabel, button('添加节点', () => model.addVertex(graph.id, addLabel.value))); nodes.append(addRow);
                 nodes.append(button('全选节点', () => { selectedNodes = new Set(graph.vertices.map(vertex => vertex.id)); }), button('删除所选节点', () => {
                     if (!selectedNodes.size) throw new Error('请先勾选节点。');
-                    const ids = [...selectedNodes], count = graph.edges.filter(edge => selectedNodes.has(edge.from) || selectedNodes.has(edge.to)).length;
-                    askDelete('vertices:' + ids.join('|'), '将删除 ' + ids.length + ' 个节点及 ' + count + ' 条关联边。', () => { model.deleteVertices(graph.id, ids); selectedNodes.clear(); });
+                    model.deleteVertices(graph.id, [...selectedNodes]); selectedNodes.clear();
                 }, 'dge-danger'));
                 if (document.graphs.length > 1) { const target = select(graphOptions(document, graph.id), '', '节点移动目标', null);
                     nodes.append(field('节点归属', target), button('移动所选节点', () => { if (!target.value) throw new Error('请先选择目标子图。'); model.moveVertices(graph.id, target.value, [...selectedNodes]); selectedNodes.clear(); })); }
@@ -652,7 +644,7 @@
                     attributes.append(field('边名', input(edge.edge_label, '边 ' + (index + 1) + ' 边名', value => model.updateEdges(graph.id, ids, 'edge_label', value || null))),
                         field('线型', select([['', '未标特殊线型'], ['solid', '实线'], ['dashed', '虚线'], ['dotted', '点线'], ['unknown', '尚不确定']], edge.style ?? '', '边 ' + (index + 1) + ' 线型', value => model.updateEdges(graph.id, ids, 'style', value || null))),
                         field('颜色', input(edge.color, '边 ' + (index + 1) + ' 颜色', value => model.updateEdges(graph.id, ids, 'color', value || null))));
-                    row.append(attributes, button('删除边', () => askDelete('edges:' + ids.join('|'), '将删除这组 ' + ids.length + ' 条边。', () => model.deleteEdges(graph.id, ids)), 'dge-danger')); edgeList.append(row);
+                    row.append(attributes, button('删除边', () => model.deleteEdges(graph.id, ids), 'dge-danger')); edgeList.append(row);
                 });
                 edges.append(edgeList, button('添加边 / 自环', () => { const first = [...selectedNodes][0] || graph.vertices[0]?.id || '', second = [...selectedNodes][1] || graph.vertices[1]?.id || first;
                     selectedEdge = model.addEdge(graph.id, { from: first, to: second, direction: graph.edges.some(edge => edge.direction === 'forward') ? 'forward' : 'undirected' }); }));
@@ -669,13 +661,7 @@
                     move.append(target, endpointFields, button('移动这条边', () => model.moveEdges(graph.id, target.value, [selectedEdge], targetFrom?.value, targetTo?.value))); edges.append(move);
                 }
                 panels.append(nodes, edges);
-                if (useOverlay) {
-                    const advanced = element('details', 'dge-advanced-panel');
-                    advanced.append(element('summary', '',
-                        '更多编辑选项 · 批量修改节点、重边及子图归属'));
-                    advanced.append(panels);
-                    container.append(advanced);
-                } else container.append(panels);
+                container.append(panels);
             }
             if(useOverlay){
                 const rack=element('div','dge-floating-actions');workspace.append(rack);
@@ -688,10 +674,8 @@
                     panel.append(launcher,content);
                     panel.addEventListener('toggle',()=>{panelState[key]=panel.open;if(panel.open)for(const other of rack.children)if(other!==panel)other.open=false;});rack.append(panel);
                 };
-                floating(toolbar,'子图管理','graphs','dge-float-graphs');
-                if(review){review.open=true;floating(review,'识别结果','results','dge-float-results');}
-                const advanced=container.querySelector('.dge-advanced-panel');
-                if(advanced)floating(advanced,'批量编辑','advanced','dge-float-advanced');
+                floating(toolbar,options.drawingOnly ? '绘图设置' : '子图管理','graphs','dge-float-graphs');
+                if(review)floating(review,options.drawingOnly ? '图形信息' : '识别结果','results','dge-float-results');
                 const textPane = retainedText || (activeTab === 'text' ? buildTextWorkspace() : null);
                 if (textPane) {
                     textPane.hidden = activeTab !== 'text'; container.append(textPane);
@@ -723,10 +707,10 @@
                 scroller.scrollLeft = left;
             }
         }
-        unsubscribe = model.subscribe(document => { pendingDelete = ''; options.onChange?.(document); });
+        unsubscribe = model.subscribe(document => { options.onChange?.(document); });
         render();
         return { getDocument: model.getDocument, getIsQuestion: () => isQuestion,
-            validate: model.validate, model,
+            validate: model.validate, model, getDrawingSvg: () => overlay?.getDrawingSvg?.() || null,
             destroy() { destroyed = true; clearTimeout(textTimer); unsubscribe(); overlay?.destroy(); textOverlay?.destroy(); container.replaceChildren(); container.classList.remove('dmate-graph-editor'); } };
     }
     const api = { mount, createModel, importDocument, validateDocument, groupEdges };

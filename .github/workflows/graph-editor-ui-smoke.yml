@@ -25,6 +25,13 @@ on:
       - 'tests/test_scan_information_sources.py'
       - 'static/chat-composer.js'
       - 'static/chat-composer.css'
+      - 'static/drawing-workspace.js'
+      - 'static/drawing-workspace.css'
+      - 'static/drawing-export.js'
+      - 'tests/test_drawing_workspace.py'
+      - 'tests/test_drawing_editor_controls.py'
+      - 'tests/test_drawing_app_integration.py'
+      - 'tests/test_conversation_delete_navigation.py'
       - 'tests/test_chat_composer.py'
       - 'static/concept-notebook.js'
       - 'static/concept-notebook.css'
@@ -69,6 +76,10 @@ jobs:
           )"
           test -x "$DMATE_BROWSER_EXECUTABLE"
           python -m pytest -q \
+            tests/test_drawing_workspace.py \
+            tests/test_drawing_editor_controls.py \
+            tests/test_drawing_app_integration.py \
+            tests/test_conversation_delete_navigation.py \
             tests/test_chat_composer.py \
             tests/test_scan_information_sources.py \
             tests/test_concept_notebook_ui.py \
@@ -81,7 +92,7 @@ jobs:
             tests/test_scan_drawing_separation.py \
             tests/test_visual_graph_editor.py::test_real_browser_edits_and_confirms_the_same_user_visible_document \
             tests/test_visual_graph_editor.py::test_question_type_survives_graph_edit_and_reaches_save \
-            tests/test_visual_graph_editor.py::test_real_browser_mobile_layout_and_two_step_delete \
+            tests/test_visual_graph_editor.py::test_real_browser_mobile_layout_and_one_click_delete \
             tests/test_graph_overlay.py::test_overlay_zoom_out_and_fit_below_100_percent \
             tests/test_graph_overlay.py::test_overlay_keeps_image_and_zoom_when_selecting_or_renaming \
             tests/test_graph_overlay.py::test_repeated_vertex_placement_does_not_jump_back_to_top \

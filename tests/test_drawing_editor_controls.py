@@ -1,0 +1,133 @@
+"""Real pointer controls in the standalone drawing editor, desktop and phone."""
+import base64
+import io
+import os
+import re
+import shutil
+from pathlib import Path
+
+import pytest
+from PIL import Image
+
+ROOT=Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(params=[(1440,900),(390,844)])
+def drawing_page(request):
+    chromium=os.environ.get('DMATE_BROWSER_EXECUTABLE') or shutil.which('chromium')
+    if not chromium:pytest.skip('Chromium unavailable')
+    pw=pytest.importorskip('playwright.sync_api')
+    styles='\n'.join(re.findall(r'<style[^>]*>([\s\S]*?)</style>',(ROOT/'templates/index.html').read_text()))
+    with Image.new('RGB',(1000,700),'white') as image:
+        out=io.BytesIO();image.save(out,format='PNG')
+    src='data:image/png;base64,'+base64.b64encode(out.getvalue()).decode()
+    with pw.sync_playwright() as engine:
+        browser=engine.chromium.launch(executable_path=chromium,headless=True)
+        p=browser.new_page(viewport={'width':request.param[0],'height':request.param[1]})
+        p.set_content('<main id="editor"></main>')
+        p.add_style_tag(content=styles)
+        p.add_style_tag(content=(ROOT/'static/graph-editor.css').read_text())
+        for name in ['graph-editor-model.js','graph-editor-format.js','graph-editor-overlay.js','graph-editor.js']:
+            p.add_script_tag(content=(ROOT/'static'/name).read_text())
+        p.evaluate('''src=>{window.changes=0;window.editor=DMateGraphEditor.mount(document.querySelector('#editor'),{
+          drawingOnly:true,originalUrl:src,onChange:()=>changes++,document:{body_text:'',graphs:[{
+            id:'G1',name:'我的图形',directed:true,weighted:true,
+            vertices:[{id:'a',label:'A',x:.3,y:.4},{id:'b',label:'B',x:.7,y:.6}],
+            edges:[{id:'ab',from:'a',to:'b',direction:'forward',weight:5}]}]}});}''',src)
+        p.wait_for_function('document.querySelector(".dge-overlay-image").naturalWidth===1000')
+        yield p
+        browser.close()
+
+
+def test_one_click_deletes_a_vertex_and_its_incident_edges_and_undo_restores(drawing_page):
+    p=drawing_page
+    p.locator('[data-vertex-id="a"] .dge-overlay-node-hit').click()
+    p.get_by_role('button',name='删除这个顶点',exact=True).click()
+    assert p.evaluate('editor.getDocument().graphs[0].vertices.map(v=>v.id)')==['b']
+    assert p.evaluate('editor.getDocument().graphs[0].edges.length')==0
+    assert p.locator('.dge-selection-panel').count()==0
+    p.get_by_role('button',name='撤销',exact=True).click()
+    assert p.evaluate('editor.getDocument().graphs[0].vertices.length')==2
+    assert p.evaluate('editor.getDocument().graphs[0].edges.length')==1
+
+
+def test_one_click_deletes_one_edge_without_altering_its_vertices(drawing_page):
+    p=drawing_page
+    p.locator('[data-edge-id="ab"] .dge-overlay-hit').click()
+    p.get_by_role('button',name='删除这条边',exact=True).click()
+    assert p.evaluate('editor.getDocument().graphs[0].edges.length')==0
+    assert p.evaluate('editor.getDocument().graphs[0].vertices.length')==2
+    p.get_by_role('button',name='撤销',exact=True).click()
+    assert p.evaluate('editor.getDocument().graphs[0].edges.length')==1
+
+
+def test_modes_are_exclusive_and_tools_fold_without_activating_other_buttons(drawing_page):
+    p=drawing_page
+    for name,key in [('添加顶点','vertex'),('添加边','edge'),('选择 / 移动','select')]:
+        p.get_by_role('button',name=name,exact=True).click()
+        assert p.locator('.dge-overlay-tools [aria-pressed=true]').count()==1
+        assert p.locator('.dge-overlay-tools .is-active').get_attribute('data-overlay-tool')==key
+        assert p.locator('.dge-overlay-svg').get_attribute('data-mode')==key
+    p.locator('.dge-tool-palette > summary').click()
+    assert not p.get_by_role('button',name='添加顶点',exact=True).is_visible()
+    assert p.get_by_role('button',name='适应',exact=True).is_visible()
+    p.locator('.dge-tool-palette > summary').click()
+    assert p.get_by_role('button',name='添加顶点',exact=True).is_visible()
+    assert p.evaluate('changes')==0
+    assert p.get_by_role('button',name='框选图形',exact=True).count()==0
+    assert p.get_by_label('选区方式').count()==0
+    assert p.get_by_role('button',name='隐藏描绘',exact=True).count()==0
+    assert p.get_by_role('button',name='显示描绘',exact=True).count()==0
+    assert p.locator('.dge-advanced-panel,.dge-float-advanced').count()==0
+    assert p.get_by_text('批量编辑',exact=True).count()==0
+    assert p.get_by_text('子图管理',exact=True).count()==0
+
+
+def test_settings_and_graph_information_are_separate_full_panels(drawing_page):
+    p=drawing_page
+    p.locator('.dge-float-graphs > summary').click()
+    assert p.get_by_label('画页名称',exact=True).is_visible()
+    assert p.get_by_label('绘图方向',exact=True).is_visible()
+    assert p.get_by_label('绘图权值',exact=True).is_visible()
+    assert p.get_by_label('当前子图',exact=True).count()==0
+    # One click switches the active popup. Inner information has no nested
+    # collapsing disclosure: all vertices and relationships are already there.
+    p.locator('.dge-float-results > summary').click()
+    assert p.locator('.dge-floating-actions > details[open]').count()==1
+    assert p.locator('.dge-review-summary').is_visible()
+    assert p.locator('.dge-review-summary').evaluate('e=>e.tagName')=='SECTION'
+    assert p.locator('.dge-review-summary summary').count()==0
+    assert 'A' in p.locator('.dge-review-content').inner_text()
+    assert 'B' in p.locator('.dge-review-content').inner_text()
+    assert '5' in p.locator('.dge-review-content').inner_text()
+
+
+def test_export_svg_contains_actual_drawing_with_standalone_styles_and_no_editor_hits(drawing_page):
+    p=drawing_page
+    p.locator('[data-edge-id="ab"] .dge-overlay-hit').click()
+    result=p.evaluate('''()=>{const svg=editor.getDrawingSvg();const b=svg.viewBox.baseVal;return {
+      text:svg.textContent,xml:new XMLSerializer().serializeToString(svg),width:Number(svg.getAttribute('width')),
+      height:Number(svg.getAttribute('height')),hits:svg.querySelectorAll('.dge-overlay-hit,.dge-overlay-node-hit,.dge-overlay-handle').length,
+      nodes:svg.querySelectorAll('.dge-overlay-node').length,edges:svg.querySelectorAll('.dge-overlay-edge').length,
+      strokes:[...svg.querySelectorAll('.dge-overlay-stroke')].map(e=>e.style.stroke),defs:svg.querySelectorAll('marker').length};}''')
+    assert result['nodes']==2 and result['edges']==1
+    assert result['hits']==0 and result['defs']==2
+    assert result['width']>64 and result['height']>64
+    assert all(result['strokes'])
+    assert 'A' in result['text'] and 'B' in result['text'] and '5' in result['text']
+    assert 'xmlns="http://www.w3.org/2000/svg"' in result['xml']
+    assert 'font-size' in result['xml'] and 'paint-order' in result['xml']
+
+
+def test_drawing_type_changes_refresh_contextual_controls(drawing_page):
+    p=drawing_page
+    p.locator('.dge-float-graphs > summary').click()
+    p.get_by_label('绘图方向',exact=True).select_option('no')
+    p.get_by_label('绘图权值',exact=True).select_option('no')
+    p.locator('.dge-float-graphs > summary').click()
+    p.locator('[data-edge-id="ab"] .dge-overlay-hit').click()
+    assert p.get_by_label('当前边端点一',exact=True).is_visible()
+    assert p.get_by_label('当前边端点二',exact=True).is_visible()
+    assert p.get_by_label('当前边方向',exact=True).count()==0
+    assert p.get_by_label('当前边权值',exact=True).count()==0
+    assert p.get_by_role('button',name='反转方向',exact=True).count()==0

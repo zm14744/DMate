@@ -9,7 +9,6 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
-import io
 import json
 import math
 import time
@@ -24,6 +23,7 @@ from graph_agent_runtime import AgentBudget, AgentCancelled
 from graph_qwen_targeted_review import (SOURCE_PROMPT, merge_source_review,
                                         pair, plan_reviews, source_jobs)
 from image_evidence import decode_document_image
+from image_upload_limits import MAX_IMAGE_PIXELS, encode_qwen_image
 from vision_provider import QWEN38_FLASH_MODEL, VisionError, VisionProvider
 from graph_edge_labels import separate_graph_edge_labels
 
@@ -115,9 +115,7 @@ def validate_draft(document):
 
 
 def _encode(image):
-    stream = io.BytesIO()
-    image.save(stream, format='PNG')
-    return 'data:image/png;base64,' + base64.b64encode(stream.getvalue()).decode('ascii')
+    return encode_qwen_image(image)
 
 
 def _checkpoint(context):
@@ -342,7 +340,7 @@ def recognize_qwen_targeted(raw, *, provider=None, review_provider=None, cancell
     reviewer = review_provider or VisionProvider('qwen', model=QWEN38_FLASH_MODEL, thinking=True,
                                                 thinking_budget=4096, retries=0)
     tools, audit = _registry(), []
-    image = decode_document_image(raw, max_pixels=24_000_000)
+    image = decode_document_image(raw, max_pixels=MAX_IMAGE_PIXELS)
     overview = _encode(image)
 
     def tool(name, state, **private):

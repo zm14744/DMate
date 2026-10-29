@@ -155,3 +155,31 @@ def test_voice_preparation_and_tail_cannot_send_partial_dictation(composer_page)
     assert page.locator('#sendBtn').is_enabled()
     page.locator('#sendBtn').click()
     assert page.evaluate('sends') == 1
+
+
+def test_single_line_capsule_is_short_wide_spaced_from_bottom_and_blue_send(composer_page):
+    page=composer_page
+    capsule=page.locator('.center > .input-wrap > .input').bounding_box()
+    center=page.locator('.center').bounding_box()
+    outer=page.locator('.center > .input-wrap').bounding_box()
+    assert capsule['height']==pytest.approx(48 if page.viewport_size['width']<681 else 52,abs=1)
+    padding=page.locator('.center > .input-wrap').evaluate('e=>parseFloat(getComputedStyle(e).paddingLeft)')
+    assert capsule['width']==pytest.approx(min(1440,center['width']-padding*2),abs=2)
+    assert outer['y']+outer['height']-(capsule['y']+capsule['height'])>=15
+    send=page.locator('#sendBtn')
+    assert send.evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(59, 130, 246)'
+    assert send.evaluate('e=>getComputedStyle(e,"::before").backgroundColor')=='rgb(255, 255, 255)'
+
+
+def test_pointer_click_has_no_ring_and_keyboard_focus_remains_visible(composer_page):
+    page=composer_page
+    for selector in ['#voiceInputBtn','#sendBtn']:
+        page.locator(selector).click()
+        style=page.locator(selector).evaluate('e=>({outline:getComputedStyle(e).outlineStyle,shadow:getComputedStyle(e).boxShadow})')
+        assert style['outline']=='none'
+        assert style['shadow']=='none'
+    page.locator('#text').click()
+    page.keyboard.press('Tab')
+    assert page.evaluate('document.activeElement.id')=='voiceInputBtn'
+    assert page.locator('#voiceInputBtn').evaluate('e=>e.matches(":focus-visible")')
+    assert page.locator('#voiceInputBtn').evaluate('e=>getComputedStyle(e).outlineStyle')=='solid'

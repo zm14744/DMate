@@ -333,15 +333,19 @@ def test_repeated_vertex_placement_does_not_jump_back_to_top(canvas_page):
             zoom: document.querySelector('.dge-overlay-zoom').textContent,
             sameImage: window.originalImageElement === document.querySelector('.dge-overlay-image'),
             sameScroller: window.originalNestedScroller === document.querySelector('.dge-overlay-viewport'),
-            count: document.querySelector('.dge-node-panel h3').textContent
+            count: document.querySelectorAll('.dge-overlay-node').length
         })""")
         assert after['sameImage'] and after['sameScroller']
         assert after['zoom'] == before['zoom']
         assert after['nested'] == pytest.approx(before['nested'], abs=1.5)
         assert after['outer'] == pytest.approx(before['outer'], abs=1.5)
-        assert after['count'] == '节点 · ' + str(count)
-    # In-place vertex edits must still keep every node accessible for renaming.
-    assert page.get_by_label('节点 5 标签').count() == 1
+        assert after['count'] == count
+    # The bulk table was removed; every node remains directly selectable for
+    # editing through its contextual properties.
+    tool(page,'选择 / 移动')
+    page.locator('.dge-overlay-node').last.locator('.dge-overlay-node-hit').click()
+    page.get_by_label('当前顶点名称',exact=True).fill('新增点')
+    assert page.evaluate('instance.getDocument().graphs[0].vertices.at(-1).label') == '新增点'
 
 
 

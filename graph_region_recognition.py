@@ -5,12 +5,13 @@ import math
 
 from graph_region import crop_region, validate_polygon
 from image_evidence import decode_document_image
+from image_upload_limits import MAX_IMAGE_PIXELS
 
 
 def recognize_graph_region(raw, polygon, *, recognizer=None, **options):
     from graph_qwen_targeted import recognize_qwen_targeted, validate_draft
     polygon = validate_polygon(polygon)
-    with decode_document_image(raw, max_pixels=24_000_000) as image:
+    with decode_document_image(raw, max_pixels=MAX_IMAGE_PIXELS) as image:
         width, height = image.size
         x0=max(0,math.floor(min(p[0] for p in polygon)*width)-2)
         y0=max(0,math.floor(min(p[1] for p in polygon)*height)-2)

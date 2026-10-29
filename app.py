@@ -302,12 +302,12 @@ KNOWLEDGE_GRAPH_DATA = _load_knowledge_graph()
 MAX_MESSAGE_CHARS = 6000
 MAX_MESSAGES_PER_REQUEST = 32
 
-MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 单张图片最大 8MB
+from image_upload_limits import MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS
 
-# multipart/form-data 本身还有少量协议开销，
-# 所以 Flask 总请求上限略高于单张图片上限。
+# 每张原图单独上传；文字选区 JSON 最多 2MB，另外预留 multipart 协议开销。
+# 文件本身仍在各上传接口按 MAX_IMAGE_BYTES 独立核对。
 app.config["MAX_CONTENT_LENGTH"] = (
-    MAX_IMAGE_BYTES + 512 * 1024
+    MAX_IMAGE_BYTES + 2_000_000 + 512 * 1024
 )
 
 RATE_LIMIT_WINDOW = 60
@@ -741,7 +741,7 @@ if OCR_AVAILABLE and not graph_nextgen_enabled():
 @app.errorhandler(413)
 def request_too_large(_error):
     return jsonify({
-        "error": "图片过大，请上传 8MB 以内的图片"
+        "error": "图片过大，请上传不超过 20MB 的图片"
     }), 413
 
 
@@ -3033,6 +3033,62 @@ def notebook_analyze():
     return response
 
 
+@app.route("/drawing/guide", methods=["POST"])
+def drawing_guide():
+    """Explain the explicitly submitted drawing, without solving or changing it."""
+    from drawing_guidance import DrawingGuidanceError, MAX_REQUEST_BYTES, guide_drawing
+    if not _check_rate_limit(_get_client_ip(), "drawing_guide"):
+        response = jsonify({"ok": False, "error": "画图指导过于频繁，请稍后重试。", "code": "drawing_guidance_rate_limited"})
+        response.status_code = 429
+    elif request.content_length is not None and request.content_length > MAX_REQUEST_BYTES:
+        response = jsonify({"ok": False, "error": "画图内容过大，请分开咨询。", "code": "drawing_document_too_large"})
+        response.status_code = 413
+    else:
+        try:
+            result = guide_drawing(request.get_json(silent=True))
+        except DrawingGuidanceError as exc:
+            response = jsonify({"ok": False, "error": exc.message, "code": exc.code})
+            response.status_code = exc.status
+        else:
+            response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/drawing/upload", methods=["POST"])
+def drawing_upload():
+    """Stage an actual drawing and its exact structure; do not recognize or solve."""
+    from drawing_guidance import DrawingGuidanceError, MAX_DOCUMENT_BYTES, validate_drawing_upload
+    from graph_confirmation import ConfirmationError, confirmation_owner, register_recognition
+    try:
+        if not _check_rate_limit(_get_client_ip(), "drawing_upload"):
+            raise DrawingGuidanceError('drawing_upload_rate_limited', '绘图上传过于频繁，请稍后重试。', status=429)
+        uploaded = request.files.get('image')
+        if uploaded is None:
+            raise DrawingGuidanceError('missing_drawing_image', '没有检测到绘图图片，请重试。')
+        raw = uploaded.read(MAX_IMAGE_BYTES + 1)
+        if not raw or len(raw) > MAX_IMAGE_BYTES:
+            raise DrawingGuidanceError('invalid_drawing_image_size', '绘图图片为空或超过上传上限。', status=413)
+        encoded = request.form.get('document', '')
+        if len(encoded.encode()) > MAX_DOCUMENT_BYTES:
+            raise DrawingGuidanceError('drawing_document_too_large', '画图内容过大，请分开上传。', status=413)
+        try:
+            document = json.loads(encoded, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        except (ValueError, TypeError, RecursionError) as exc:
+            raise DrawingGuidanceError('invalid_drawing_document', '画图内容无法读取，请重新上传。') from exc
+        document = validate_drawing_upload(raw, document)
+        request_id = request.form.get('request_id', '')
+        sha = hashlib.sha256(raw).hexdigest()
+        register_recognition(confirmation_owner(), request_id, sha)
+        response = jsonify({'ok': True, 'request_id': request_id,
+                            'source_sha256': sha, 'document': document})
+    except (DrawingGuidanceError, ConfirmationError) as exc:
+        response = jsonify({'ok': False, 'error': exc.message, 'code': exc.code})
+        response.status_code = exc.status
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @app.route("/voice/transcribe", methods=["POST"])
 def voice_transcribe():
     """Dictation only: return text to the composer, never submit it to chat."""
@@ -3071,7 +3127,7 @@ def recognize_manual_text_region():
         return jsonify({"error": "缺少原图或识别任务"}), 400
     raw = source.read(MAX_IMAGE_BYTES + 1)
     if not raw or len(raw) > MAX_IMAGE_BYTES:
-        return jsonify({"error": "图片必须小于 8MB"}), 413
+        return jsonify({"error": "单张图片不能超过 20MB"}), 413
     source_sha = hashlib.sha256(raw).hexdigest()
     try:
         require_recognition_source(confirmation_owner(), request_id, source_sha)
@@ -3166,7 +3222,7 @@ def recognize_selected_graph_region():
     image=request.files.get('image')
     if not request_id or image is None:return jsonify({'error':'缺少原图或识别任务。'}),400
     raw=image.read(MAX_IMAGE_BYTES+1)
-    if not raw or len(raw)>MAX_IMAGE_BYTES:return jsonify({'error':'图片必须小于 8MB。'}),413
+    if not raw or len(raw)>MAX_IMAGE_BYTES:return jsonify({'error':'单张图片不能超过 20MB。'}),413
     try:
         require_recognition_source(owner,request_id,hashlib.sha256(raw).hexdigest())
         selection=request.form.get('polygon','')
@@ -3206,7 +3262,7 @@ def recognize_manual_figure_type():
         return jsonify({"error": "缺少原图或图形识别任务"}), 400
     raw = image.read(MAX_IMAGE_BYTES + 1)
     if not raw or len(raw) > MAX_IMAGE_BYTES:
-        return jsonify({"error": "图片必须小于 8MB"}), 413
+        return jsonify({"error": "单张图片不能超过 20MB"}), 413
     source_sha = hashlib.sha256(raw).hexdigest()
     try:
         require_recognition_source(confirmation_owner(), request_id, source_sha)
@@ -4350,7 +4406,7 @@ def ocr():
             "error": "没有检测到图片，请重新上传"
         }), 400
 
-    raw = uploaded.read()
+    raw = uploaded.read(MAX_IMAGE_BYTES + 1)
 
     if not raw:
         return jsonify({
@@ -4359,7 +4415,7 @@ def ocr():
 
     if len(raw) > MAX_IMAGE_BYTES:
         return jsonify({
-            "error": "图片过大，请上传 8MB 以内的图片"
+            "error": "图片过大，请上传不超过 20MB 的图片"
         }), 413
 
     from graph_confirmation import confirmation_owner, register_recognition, ConfirmationError
@@ -4375,7 +4431,7 @@ def ocr():
     if request.form.get("workflow") == "manual_graph":
         from image_evidence import decode_document_image
         try:
-            checked = decode_document_image(raw, max_pixels=24_000_000)
+            checked = decode_document_image(raw, max_pixels=MAX_IMAGE_PIXELS)
             checked.close()
         except (ValueError, TypeError, OSError):
             return jsonify({"error": "这不是可读取的图片，请重新上传。"}), 400

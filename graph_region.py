@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import math
 from PIL import Image, ImageDraw
+from image_upload_limits import MAX_IMAGE_PIXELS
 
 MAX_POINTS = 64
 MIN_AREA = 0.00002
@@ -47,7 +48,7 @@ def crop_region(raw: bytes, polygon, *, exclusions=None, _photo=None):
     excluded = [validate_polygon(p) for p in (exclusions or [])]
     from image_evidence import decode_document_image
     try:
-        photo = _photo if _photo is not None else decode_document_image(raw, max_pixels=24_000_000).convert("RGB")
+        photo = _photo if _photo is not None else decode_document_image(raw, max_pixels=MAX_IMAGE_PIXELS).convert("RGB")
     except (ValueError, TypeError, OSError) as exc:
         raise RegionError("原图无法读取，请重新选择图片。") from exc
     try:

@@ -71,6 +71,19 @@ def end_recording(page):
     page.get_by_role('button', name='结束录音并识别', exact=True).click()
 
 
+def assert_no_visual_caption(page):
+    """Accessible progress has no painted text and consumes no input row."""
+    appearance = page.locator('#voiceInputStatus').evaluate('''element=>{
+      const style=getComputedStyle(element);return {position:style.position,
+        clip:style.clipPath,width:style.width,height:style.height,
+        hidden:element.hidden,error:element.classList.contains('voice-input-error'),
+        buttons:element.querySelectorAll('button').length};}''')
+    assert appearance['error'] is False and appearance['buttons'] == 0
+    if not appearance['hidden']:
+        assert appearance['position'] == 'absolute' and appearance['clip'] == 'inset(50%)'
+        assert appearance['width'] == appearance['height'] == '1px'
+
+
 def test_dictation_inserts_at_cursor_without_sending_and_releases_capture(voice_page):
     p = voice_page
     p.locator('#text').evaluate('(e)=>{e.focus();e.setSelectionRange(2,4)}')
@@ -88,7 +101,7 @@ def test_dictation_inserts_at_cursor_without_sending_and_releases_capture(voice_
     assert record['type'] == 'audio/wav'
     assert (record['rate'], record['channels'], record['bits']) == (16000, 1, 16)
     assert record['frames'] == 14401  # Real 0.5s + one source sample, and 0.4s boundary silence.
-    assert p.get_by_role('status').inner_text() == '语音已转为文字，可修改后发送。'
+    assert_no_visual_caption(p)
     button = p.locator('#voiceInputBtn').bounding_box()
     field = p.locator('#text').bounding_box()
     assert button['x'] >= field['x'] and button['x'] + button['width'] <= field['x'] + field['width']
@@ -99,7 +112,7 @@ def test_permission_rejection_has_no_request_and_preserves_existing_text(voice_p
     p.evaluate('window.permissionDenied=true')
     p.get_by_role('button', name='语音输入', exact=True).click()
     p.wait_for_function('voice.state==="idle" && permissionCalls===1')
-    assert '麦克风权限被拒绝' in p.get_by_role('status').inner_text()
+    assert '麦克风权限被拒绝' in p.get_by_role('alert').inner_text()
     assert p.locator('#text').input_value() == '已有内容'
     assert p.evaluate('calls.length') == p.evaluate('sends') == 0
 
@@ -111,11 +124,12 @@ def test_duplicate_permission_clicks_are_ignored_and_late_permission_is_stopped(
     p.wait_for_function('voice.state==="requesting"')
     p.locator('#voiceInputBtn').dispatch_event('click')
     assert p.evaluate('permissionCalls') == 1
-    p.get_by_role('button', name='取消', exact=True).click()
+    p.keyboard.press('Escape')
     p.evaluate('allowPermission()')
     p.wait_for_function('stops===1')
     assert p.evaluate('voice.state') == 'idle'
     assert p.evaluate('calls.length') == 0
+    assert_no_visual_caption(p)
 
 
 def test_session_change_while_transcribing_aborts_and_does_not_write_new_session(voice_page):
@@ -130,6 +144,7 @@ def test_session_change_while_transcribing_aborts_and_does_not_write_new_session
     assert p.locator('#text').input_value() == '另一个会话'
     assert p.evaluate('sends') == 0
     assert '已取消' in p.get_by_role('status').inner_text()
+    assert_no_visual_caption(p)
 
 
 def test_escape_and_input_lock_stop_recording_without_upload(voice_page):
@@ -152,7 +167,7 @@ def test_real_model_failure_is_reported_without_erasing_text(voice_page):
     start_recording(p)
     end_recording(p)
     p.wait_for_function('voice.state==="idle" && calls.length===1')
-    assert '模型服务暂时不可用' in p.get_by_role('status').inner_text()
+    assert '模型服务暂时不可用' in p.get_by_role('alert').inner_text()
     assert p.locator('#text').input_value() == '已有内容'
     assert p.evaluate('sends') == 0
 
@@ -185,7 +200,7 @@ def test_unsupported_environment_explains_reason_instead_of_starting_request(voi
     p.evaluate('''()=>{voice.dispose();window.voice=DMateVoiceInput.mount({button:document.getElementById('voiceInputBtn'),input:document.getElementById('text'),
       status:document.getElementById('voiceInputStatus'),mediaDevices:{},AudioContext:FakeAudio,fetch:transport});}''')
     p.get_by_role('button', name='语音输入', exact=True).click()
-    assert '无法使用麦克风' in p.get_by_role('status').inner_text()
+    assert '无法使用麦克风' in p.get_by_role('alert').inner_text()
     assert p.evaluate('permissionCalls') == p.evaluate('calls.length') == 0
 
 
@@ -195,10 +210,12 @@ def test_microphone_is_not_announced_ready_before_audio_blocks_arrive(voice_page
     p.wait_for_function('voice.state==="preparing"')
     assert p.get_by_role('button', name='正在启动麦克风', exact=True).is_disabled()
     assert '准备' in p.get_by_role('status').inner_text()
+    assert_no_visual_caption(p)
     assert p.evaluate('calls.length') == 0
     p.evaluate('pushAudio(960,.7)')
     p.wait_for_function('voice.state==="recording"')
     assert '已开始录音，请说话' in p.get_by_role('status').inner_text()
+    assert_no_visual_caption(p)
 
 
 def test_first_block_and_stop_grace_tail_are_kept_between_silent_boundaries(voice_page):
@@ -231,8 +248,63 @@ def test_cancelling_during_stop_grace_releases_microphone_without_upload(voice_p
     p.evaluate('pushAudio()')
     p.get_by_role('button', name='结束录音并识别', exact=True).click()
     p.wait_for_function('voice.state==="finishing"')
-    p.get_by_role('button', name='取消', exact=True).click()
+    p.keyboard.press('Escape')
     p.wait_for_timeout(400)  # Cancelled grace must not submit on its timer.
     assert p.evaluate('voice.state') == 'idle'
     assert p.evaluate('calls.length') == 0
     assert p.evaluate('stops') == p.evaluate('closes') == 1
+    assert_no_visual_caption(p)
+
+
+def test_all_routine_states_have_no_visual_caption_or_extra_composer_row(voice_page):
+    p = voice_page
+    initial_height = p.locator('.input-wrap').bounding_box()['height']
+    p.evaluate('window.holdPermission=true;window.holdResponse=true')
+    p.get_by_role('button', name='语音输入', exact=True).click()
+    p.wait_for_function('voice.state==="requesting"')
+    assert_no_visual_caption(p)
+    p.evaluate('allowPermission()')
+    p.wait_for_function('voice.state==="preparing"')
+    assert_no_visual_caption(p)
+    p.evaluate('pushAudio()')
+    p.wait_for_function('voice.state==="recording"')
+    assert_no_visual_caption(p)
+    p.get_by_role('button', name='结束录音并识别', exact=True).click()
+    p.wait_for_function('voice.state==="finishing"')
+    assert_no_visual_caption(p)
+    p.wait_for_function('voice.state==="transcribing" && calls.length===1')
+    assert_no_visual_caption(p)
+    p.evaluate('reply()')
+    p.wait_for_function('voice.state==="idle"')
+    assert_no_visual_caption(p)
+    assert p.locator('.input-wrap').bounding_box()['height'] == initial_height
+    p.evaluate('voice.cancel("已取消语音输入。")')
+    assert_no_visual_caption(p)
+    assert p.locator('.input-wrap').bounding_box()['height'] == initial_height
+
+
+def test_host_error_handler_receives_one_real_error_without_local_error_line(voice_page):
+    p = voice_page
+    p.evaluate('''()=>{voice.dispose();window.voiceErrors=[];window.voice=DMateVoiceInput.mount({
+      button:document.getElementById('voiceInputBtn'),input:document.getElementById('text'),
+      status:document.getElementById('voiceInputStatus'),mediaDevices:fakeMedia,
+      AudioContext:FakeAudio,fetch:transport,onError:message=>voiceErrors.push(message)});}''')
+    p.evaluate('window.permissionDenied=true')
+    p.get_by_role('button', name='语音输入', exact=True).click()
+    p.wait_for_function('voice.state==="idle" && voiceErrors.length===1')
+    assert '麦克风权限被拒绝' in p.evaluate('voiceErrors[0]')
+    assert_no_visual_caption(p)
+    p.evaluate('voice.refresh();voice.cancel();')
+    assert p.evaluate('voiceErrors.length') == 1
+    assert p.locator('#text').input_value() == '已有内容'
+
+
+def test_short_recording_is_a_real_error_and_next_recording_removes_it(voice_page):
+    p = voice_page
+    start_recording(p)
+    p.get_by_role('button', name='结束录音并识别', exact=True).click()
+    p.wait_for_function('voice.state==="idle"')
+    assert '录音时间太短' in p.get_by_role('alert').inner_text()
+    assert p.evaluate('calls.length') == 0
+    start_recording(p)
+    assert_no_visual_caption(p)

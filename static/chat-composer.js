@@ -13,7 +13,7 @@
             const style = win.getComputedStyle(input);
             const line = Number.parseFloat(style.lineHeight) || 24;
             const padding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
-            const minimum = Math.max(40, line + padding);
+            const minimum = Math.max(Number.parseFloat(style.minHeight) || 0, line + padding);
             const viewport = win.visualViewport?.height || win.innerHeight || 700;
             const maximum = Math.max(minimum, Math.min(line * 6 + padding, Math.max(96, viewport * .3)));
             input.style.setProperty('max-height', maximum + 'px', 'important');
