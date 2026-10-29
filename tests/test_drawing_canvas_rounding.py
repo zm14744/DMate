@@ -48,8 +48,8 @@ def canvas_page(request):
 
 def assert_four_visible_corners(page, *, gutters):
     page.wait_for_function('''()=>{
-      const v=document.querySelector('.dge-overlay-viewport'),s=v.querySelector('.dge-overlay-stage');
-      return getComputedStyle(s).clipPath!=='none';
+      const v=document.querySelector('.dge-overlay-viewport');
+      return getComputedStyle(v).clipPath!=='none';
     }''')
     result = page.locator('.dge-overlay-viewport').evaluate('''v=>{
       const r=v.getBoundingClientRect(),x=r.left+v.clientLeft,y=r.top+v.clientTop,
@@ -79,7 +79,7 @@ def test_native_gutters_keep_all_client_corners_round_while_zooming_and_scrollin
     page.add_style_tag(content='''.ddw-editor .dge-overlay-viewport{
       overflow:scroll!important;scrollbar-width:auto!important;scrollbar-gutter:stable both-edges!important}
       .ddw-editor .dge-overlay-viewport::-webkit-scrollbar{display:block!important;width:16px!important;height:16px!important}''')
-    page.wait_for_function('getComputedStyle(document.querySelector(".dge-overlay-stage")).clipPath!=="none"')
+    page.wait_for_function('getComputedStyle(document.querySelector(".dge-overlay-viewport")).clipPath!=="none"')
     document = page.evaluate('workspace.getDocument()')
     for position in ['initial', 'middle', 'end']:
         if position != 'initial':
@@ -135,3 +135,31 @@ def test_overlay_scrollbars_resize_and_export_keep_the_same_document(canvas_page
       const output=new DOMParser().parseFromString(exportedRoundSvg,'image/svg+xml').documentElement;
       return !output.hasAttribute('clip-path')&&!output.style.clipPath&&output.querySelectorAll('.dge-overlay-node').length===2;
     }''')
+
+
+def test_scrolling_does_not_rewrite_the_canvas_or_move_its_controls(canvas_page):
+    page=canvas_page
+    use_real_dialog_and_template_styles(page,'dark')
+    page.add_style_tag(content='''.ddw-editor .dge-overlay-viewport{overflow:scroll!important;scrollbar-width:auto!important}
+      .ddw-editor .dge-overlay-viewport::-webkit-scrollbar{width:16px!important;height:16px!important}''')
+    for _ in range(3):
+        page.get_by_role('button',name='放大原图',exact=True).click()
+    page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+    result=page.evaluate('''async()=>{
+      const v=document.querySelector('.dge-overlay-viewport'),stage=v.querySelector('.dge-overlay-stage');
+      const rail=document.querySelector('.ddw-side-actions'),tool=document.querySelector('.dge-tool-palette');
+      const rect=n=>{const r=n.getBoundingClientRect();return [r.x,r.y,r.width,r.height];};
+      const before={view:rect(v),rail:rect(rail),tool:rect(tool),clip:v.style.clipPath};
+      let writes=0;const observer=new MutationObserver(records=>writes+=records.length);
+      for(const n of [v,stage,rail,tool])observer.observe(n,{attributes:true,attributeFilter:['style']});
+      const frames=[];for(let i=0;i<16;i++){
+        v.scrollTop=i*25;v.scrollLeft=i*35;
+        await new Promise(resolve=>requestAnimationFrame(resolve));
+        frames.push({view:rect(v),rail:rect(rail),tool:rect(tool),clip:v.style.clipPath});
+      }observer.disconnect();return {before,frames,writes,scroll:[v.scrollLeft,v.scrollTop],stageClip:stage.style.clipPath};
+    }''')
+    assert min(result['scroll'])>0
+    assert result['stageClip']==''
+    assert result['writes']==0,result
+    assert all(frame==result['before'] for frame in result['frames']),result
+    assert_four_visible_corners(page,gutters=True)

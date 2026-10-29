@@ -13418,7 +13418,9 @@ async function requestAiReply(session, options = {}) {
         session,
         controller: new AbortController(),
         cancelled: false,
-        userMessage: options.expectedUserMessage
+        // Every request belongs to the message that started it, including
+        // ordinary text sends. Deleting that message invalidates its reply.
+        userMessage: options.expectedUserMessage || latestUserBeforeRequest
     };
     activeAiRequests.set(requestKey, activeRequest);
     setSessionBusy(session.id, true);
@@ -15277,8 +15279,11 @@ async function editOcrTask(id) {
             },
             onRecognizeGraph: async (polygon, {signal} = {}) => {
                 const controller = new AbortController(), operationId = makeOcrRequestId();
-                const timeout = window.setTimeout(() => controller.abort(), 220000);
-                const abort = () => { controller.abort(); notifyOcrCancelled(operationId); };
+                const abort = () => {
+                    if (controller.signal.aborted) return;
+                    controller.abort(); notifyOcrCancelled(operationId);
+                };
+                const timeout = window.setTimeout(abort, 220000);
                 signal?.addEventListener('abort', abort, {once:true});
                 if (signal?.aborted) abort();
                 try {
@@ -16208,7 +16213,9 @@ function startTyping(
     lastTypingAutoScrollAt = 0;
 
     const div = document.createElement("div");
-    div.className = "msg ai";
+    // History refreshes can move this live bubble back into #chat. Keep
+    // MathJax from replacing its text nodes while the timer appends text.
+    div.className = "msg ai tex2jax_ignore";
     chat.appendChild(div);
 
     typingDiv = div;
@@ -16381,6 +16388,9 @@ function renderChat() {
     const chat = document.getElementById("chat");
     if (!chat) return;
 
+    const renderOperation = {};
+    renderChat.currentOperation = renderOperation;
+
     const oldScrollTop = chat.scrollTop;
     const oldBottomDistance = chatBottomDistance(chat);
     const oldNearBottom = oldBottomDistance <= 90;
@@ -16541,6 +16551,12 @@ function renderChat() {
         chat.appendChild(div);
     }
 
+    // A late teaching classification can refresh history during typing.
+    // Reattach the same bubble so its timer keeps updating visible content.
+    if (typingTimer && typingDiv && String(typingSessionId) === String(session.id)) {
+        chat.appendChild(typingDiv);
+    }
+
     const shouldStickBottom = Boolean(
         forceChatBottomOnce
         || sessionChanged
@@ -16561,6 +16577,8 @@ function renderChat() {
 
     queueChatJumpControlsUpdate();
     renderMath(chat).then(() => {
+        // A newer history render or session switch owns the scroll position.
+        if (renderChat.currentOperation !== renderOperation || getCurrent() !== session) return;
         // 公式渲染会改变消息高度，必须在排版完成后再恢复一次位置。
         // 否则长公式/矩阵会把当前视口“顶”到上方。
         if (shouldStickBottom) {

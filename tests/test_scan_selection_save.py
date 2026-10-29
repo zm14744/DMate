@@ -9,6 +9,51 @@ def image_point(page, x, y):
     return box['x'] + box['width'] * x, box['y'] + box['height'] * y
 
 
+@pytest.mark.parametrize('scan_page', [(1440, 900)], indirect=True, ids=['desktop'])
+def test_graph_resize_and_timeout_cancel_their_own_backend_operations(scan_page):
+    page = scan_page
+    page.evaluate('''() => {
+        const originalFetch=window.fetch,originalTimeout=window.setTimeout;
+        window.regionOperations=[];window.cancelNotices=[];
+        window.notifyOcrCancelled=id=>cancelNotices.push(id);
+        window.setTimeout=(callback,delay,...args)=>{
+            if(delay===220000){window.regionTimeout=callback;return -1;}
+            return originalTimeout(callback,delay,...args);
+        };
+        window.fetch=(url,options)=>{
+            if(url!=='/graph/recognize-region')return originalFetch(url,options);
+            const op={id:options.body.get('operation_id'),
+                polygon:JSON.parse(options.body.get('polygon')),signal:options.signal};
+            regionOperations.push(op);
+            return new Promise((resolve,reject)=>{
+                op.resolve=()=>resolve({ok:true,json:async()=>({request_id:'scan',operation_id:op.id,
+                    source_sha256:'a'.repeat(64),document:{graphs:sample.graphs},recognition_status:'complete'})});
+                options.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true});
+            });
+        };
+    }''')
+    open_scan(page)
+    page.get_by_role('button', name='图形框选', exact=True).click()
+    drag(page, [(.15, .15), (.55, .55)])
+    page.wait_for_function('regionOperations.length===1')
+    page.keyboard.press('Escape')
+    page.get_by_role('button', name='选择 / 平移', exact=True).click()
+    drag(page, [(.55, .35), (.7, .35)])
+    page.wait_for_function('regionOperations.length===2')
+    assert page.evaluate('regionOperations[0].signal.aborted') is True
+    assert page.evaluate('cancelNotices') == page.evaluate('[regionOperations[0].id]')
+    assert page.evaluate('Math.max(...regionOperations[1].polygon.map(p=>p[0]))') == pytest.approx(.7, abs=.01)
+    # A late result from the canceled frame cannot populate the replacement.
+    page.evaluate('regionOperations[0].resolve()')
+    assert page.evaluate('ocrTasks.get("scan").scanState.graphRegions[0].graphs') == []
+    page.evaluate('regionTimeout()')
+    page.wait_for_function('ocrTasks.get("scan").scanState.graphRegions[0].status==="error"')
+    assert page.evaluate('regionOperations[1].signal.aborted') is True
+    assert page.evaluate('cancelNotices') == page.evaluate('regionOperations.map(op=>op.id)')
+    assert page.evaluate('ocrTasks.get("scan").scanState.graphRegions[0].graphs') == []
+    assert page.evaluate('"controller" in ocrTasks.get("scan").scanState.graphRegions[0]') is False
+
+
 def test_scan_opens_in_selection_without_debug_instruction_or_placeholder(scan_page):
     page = scan_page
     page.evaluate('''()=>{ocrTasks.get('scan').result={review:{reasons:[

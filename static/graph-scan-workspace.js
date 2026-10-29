@@ -57,7 +57,7 @@ function mount(container,options){
  const frames=()=>state.graphRegions.map(row=>({id:row.id,bbox:bounds(row.polygon),...(row.irregular?{region_polygon:row.polygon}:{}),vertices:[],edges:[]}));
  const overlayState=state.view||={zoom:100,visible:true};overlayState.mode='select';overlayState.start=null;overlayState.polygonDraft=[];overlayState.regions=state.textRegions;
  function activate(kind){state.mode='manual';state[kind==='graph'?'graphSelectionActive':'textSelectionActive']=true;}
- function changeGraph(row,points,irregular,activateSource=true){row.polygon=copy(points);row.irregular=irregular;row.version=(row.version||0)+1;row.status='queued';row.error='';row.graphs=[];if(activateSource)activate('graph');emit();refresh();void pumpGraphs();}
+ function changeGraph(row,points,irregular,activateSource=true){row.polygon=copy(points);row.irregular=irregular;row.version=(row.version||0)+1;row.status='queued';row.error='';row.graphs=[];row.controller?.abort();if(activateSource)activate('graph');emit();refresh();void pumpGraphs();}
  function changeText(row,points,irregular,activateSource=true){row.polygon=copy(points);row.irregular=irregular;row.version=(row.version||0)+1;row.status='queued';row.error='';row.text='';if(activateSource)activate('text');emit();refresh();clearTimeout(textTimer);textTimer=setTimeout(pumpText,450);}
  function remove(row,kind){row.controller?.abort();const list=rows(kind),index=list.indexOf(row);if(index<0)return;list.splice(index,1);if(kind==='graph'&&state.selectedGraphId===row.id)state.selectedGraphId=null;if(kind==='text'&&overlayState.selectedId===row.id)overlayState.selectedId=null;emit();refresh();overlay.refresh();}
  async function requestRemove(row,kind){
@@ -152,7 +152,7 @@ function mount(container,options){
     row.status=row.graphs.length?'complete':'empty';row.error='';
     if(row.graphs.length&&(result.review?.required||['partial','incomplete','uncertain','needs_review','review_required'].includes(result.recognition_status))){row.status='partial';row.error=result.review?.reasons?.join('；')||result.warning||'局部识别仍有疑点，请对照原图核对。';}
    }catch(error){if(!destroyed&&row.version===version&&state.graphRegions.includes(row)){row.graphs=[];row.status='error';row.error=error?.message||'图形识别失败，请重试。';}}
-   finally{active.delete(controller);if(!destroyed){emit();refresh();}}
+   finally{active.delete(controller);if(row.controller===controller)delete row.controller;if(!destroyed){emit();refresh();}}
   }}finally{graphBusy=false;}
  }
  async function pumpText(){
