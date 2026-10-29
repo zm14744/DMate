@@ -131,3 +131,43 @@ def test_drawing_type_changes_refresh_contextual_controls(drawing_page):
     assert p.get_by_label('当前边方向',exact=True).count()==0
     assert p.get_by_label('当前边权值',exact=True).count()==0
     assert p.get_by_role('button',name='反转方向',exact=True).count()==0
+
+
+def test_settings_open_and_change_in_one_task_preserves_popover(drawing_page):
+    p=drawing_page
+    # Do not yield to the event loop between summary activation and change.
+    # Native details.toggle may otherwise conceal this redraw race locally.
+    result=p.evaluate('''()=>{
+      const panel=document.querySelector('.dge-float-graphs');
+      panel.querySelector('summary').click();
+      const direction=panel.querySelector('[aria-label="绘图方向"]');
+      direction.value='no';direction.dispatchEvent(new Event('change',{bubbles:true}));
+      const next=document.querySelector('.dge-float-graphs');
+      return {open:next.open,replaced:next!==panel,weight:next.querySelector('[aria-label="绘图权值"]').getBoundingClientRect().height};
+    }''')
+    assert result['replaced'] and result['open'] and result['weight']>0
+    assert p.get_by_label('绘图权值',exact=True).is_visible()
+
+
+def test_detached_toggle_cannot_override_current_popover_and_live_state_is_retained(drawing_page):
+    p=drawing_page
+    result=p.evaluate('''()=>{
+      const old=document.querySelector('.dge-float-graphs');old.querySelector('summary').click();
+      const change=(label,value)=>{const control=document.querySelector('[aria-label="'+label+'"]');control.value=value;control.dispatchEvent(new Event('change',{bubbles:true}));};
+      change('绘图方向','no');
+      // This event may already be queued by Chromium when the old tree is
+      // detached. Deliver it explicitly before another redraw.
+      old.open=false;old.dispatchEvent(new Event('toggle'));
+      change('绘图权值','no');
+      const afterStale=document.querySelector('.dge-float-graphs').open;
+      // Programmatic/native details changes also survive a same-task redraw,
+      // even before their queued toggle callback has had time to run.
+      document.querySelector('.dge-float-graphs').open=false;
+      change('绘图方向','yes');
+      const afterClose=document.querySelector('.dge-float-graphs').open;
+      document.querySelector('.dge-float-graphs').open=true;
+      change('绘图权值','yes');
+      return {afterStale,afterClose,afterOpen:document.querySelector('.dge-float-graphs').open};
+    }''')
+    assert result=={'afterStale':True,'afterClose':False,'afterOpen':True}
+    assert p.get_by_label('绘图权值',exact=True).is_visible()

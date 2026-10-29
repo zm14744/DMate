@@ -18,9 +18,14 @@
             ? modelApi.ensureAnonymousLabels(options.initialDocument || options.document) : options.initialDocument;
         const model = createModel(initialized, initial);
         const instance = 'dmate-editor-' + (++mountSequence), svgNS = 'http://www.w3.org/2000/svg';
-        let previewSequence = 0;
+        let previewSequence = 0, renderSequence = 0;
         let currentGraph = model.getDocument().graphs[0]?.id, selectedNodes = new Set(), selectedEdge = null;
         let selectedGraph=false;const panelState={};
+        const closeFloatingPanels = () => {
+            for (const key of Object.keys(panelState)) panelState[key] = false;
+            for (const panel of container.querySelectorAll('.dge-floating-actions > details[data-panel-key]'))
+                panel.open = false;
+        };
         let individually = false, saving = false, destroyed = false, notice = '';
         // "Is this a question?" is a per-upload choice, separate from graph data.
         let isQuestion = options.isQuestion !== false;
@@ -424,6 +429,11 @@
 
         function render() {
             if (destroyed) return;
+            // Native details.toggle is queued. Read the current DOM before
+            // replacing it, rather than depending on that later event.
+            for (const panel of container.querySelectorAll('.dge-floating-actions > details[data-panel-key]'))
+                panelState[panel.dataset.panelKey] = panel.open;
+            const renderVersion = ++renderSequence;
             // The editor may live in a scrollable dialog AND a scrollable
             // browser viewport. Swapping ancillary controls must not move
             // either one, even if the overlay is temporarily reparented.
@@ -518,12 +528,12 @@
                     },
                     disabled: () => saving || destroyed,
                     ensureGraph:()=>{if(!model.getDocument().graphs.length)currentGraph=model.addGraph();return currentGraph;},
-                    selectGraph:id=>{for(const k of Object.keys(panelState))panelState[k]=false;currentGraph=id;selectedNodes.clear();selectedEdge=null;selectedGraph=true;render();},
+                    selectGraph:id=>{closeFloatingPanels();currentGraph=id;selectedNodes.clear();selectedEdge=null;selectedGraph=true;render();},
                     clearSelection:()=>{selectedNodes.clear();selectedEdge=null;selectedGraph=false;render();},
                     edgeSelected: () => selectedEdge,
                     nodeSelected: () => selectedNodes,
-                    selectEdge: id => { for(const k of Object.keys(panelState))panelState[k]=false;selectedGraph=false;selectedEdge = id; selectedNodes.clear(); render(); },
-                    selectNode: id => { for(const k of Object.keys(panelState))panelState[k]=false;selectedGraph=false;selectedNodes = new Set([id]); selectedEdge = null; render(); },
+                    selectEdge: id => { closeFloatingPanels();selectedGraph=false;selectedEdge = id; selectedNodes.clear(); render(); },
+                    selectNode: id => { closeFloatingPanels();selectedGraph=false;selectedNodes = new Set([id]); selectedEdge = null; render(); },
                     changed: kind => {
                         if (kind === 'vertex') refreshCanvasVertex();
                         else if (kind === 'geometry') refreshDraftViews();
@@ -670,9 +680,28 @@
                     const panel=element('details','dge-float-panel '+position);panel.dataset.panelKey=key;panel.open=Boolean(panelState[key]);
                     const content=element('div','dge-float-content');content.append(node);
                     const launcher=element('summary','',title);
-                    launcher.addEventListener('click',()=>{if(!panel.open)for(const other of rack.children)if(other!==panel){other.open=false;panelState[other.dataset.panelKey]=false;}});
+                    const closeOtherPanels = () => {
+                        for (const other of rack.children) if (other !== panel) {
+                            other.open = false; panelState[other.dataset.panelKey] = false;
+                        }
+                    };
+                    launcher.addEventListener('click', event => {
+                        // Apply both intent and DOM state during the click.
+                        // A select change can redraw before native toggle runs.
+                        event.preventDefault(); event.stopPropagation();
+                        if (saving || destroyed) return;
+                        const nextOpen = !panel.open;
+                        if (nextOpen) closeOtherPanels();
+                        panelState[key] = nextOpen; panel.open = nextOpen;
+                    });
                     panel.append(launcher,content);
-                    panel.addEventListener('toggle',()=>{panelState[key]=panel.open;if(panel.open)for(const other of rack.children)if(other!==panel)other.open=false;});rack.append(panel);
+                    panel.addEventListener('toggle', () => {
+                        // Detached details can still deliver queued events.
+                        // Their obsolete state must not close a new popover.
+                        if (destroyed || renderVersion !== renderSequence || !panel.isConnected || !container.contains(panel)) return;
+                        panelState[key] = panel.open;
+                        if (panel.open) closeOtherPanels();
+                    });rack.append(panel);
                 };
                 floating(toolbar,options.drawingOnly ? '绘图设置' : '子图管理','graphs','dge-float-graphs');
                 if(review)floating(review,options.drawingOnly ? '图形信息' : '识别结果','results','dge-float-results');
