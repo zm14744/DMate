@@ -18,7 +18,7 @@ body[data-appearance-theme] {
         .graph-toolbar,.graph-summary,.knowledge-graph-main,.knowledge-graph-side,
         .knowledge-graph-canvas,.graph-side-tabs,.graph-side-page,.appearance-background-viewer-body,
         .dgs-information,.dgs-modes,.dcn-content,.dcn-main,.dcn-sidebar,#info,.learning-summary,
-        .ocr-task-list,.ocr-task-card,.ocr-task-structure,.ocr-review-rendered,.ocr-review-preview,
+        .ocr-task-list,.ocr-task-card,.ocr-review-rendered,.ocr-review-preview,
         .appearance-background-preview:not([data-has-background="true"]),
         .wrong-card,.wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,.wrong-solution-body,
         .learning-review-intro,.learning-review-section,

@@ -288,10 +288,10 @@
 .dgs-information-card{border:1px solid var(--dge-border);border-radius:12px;padding:14px;min-width:0;background:var(--dge-surface,#fff)}
 .dgs-text{margin:0}
 .dgs-body{line-height:1.65;overflow-wrap:anywhere;user-select:text}
-:is(.dmate-graph-editor,.ocr-task-preview) .dmate-graph-information{font-size:var(--font-base,1rem);line-height:1.65;overflow-wrap:anywhere;user-select:text}
-:is(.dmate-graph-editor,.ocr-task-preview) .dmate-graph-information h4{margin:12px 0 6px;font-size:1em;font-weight:700}
-:is(.dmate-graph-editor,.ocr-task-preview) .dmate-graph-information h5{margin:1.67em 0;font-size:.83em;font-weight:700}
-:is(.dmate-graph-editor,.ocr-task-preview) .dmate-graph-information p{margin:5px 0;line-height:inherit}
+.dmate-graph-editor .dmate-graph-information{font-size:var(--font-base,1rem);line-height:1.65;overflow-wrap:anywhere;user-select:text}
+.dmate-graph-editor .dmate-graph-information h4{margin:12px 0 6px;font-size:1em;font-weight:700}
+.dmate-graph-editor .dmate-graph-information h5{margin:1.67em 0;font-size:.83em;font-weight:700}
+.dmate-graph-editor .dmate-graph-information p{margin:5px 0;line-height:inherit}
 .dmate-graph-information .dgs-relation{padding-left:8px}
 .dgs-region-state{margin:10px 0 0;padding:0;font-size:13px}
 .dgs-region-state button{margin:4px 5px 0 0;padding:4px 7px;min-height:30px}

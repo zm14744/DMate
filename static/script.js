@@ -14314,7 +14314,7 @@ function updateOcrTaskTimes() {
 function ocrTaskLabel(task) {
     if (task.sending) return "正在解题";
     if (task.confirming) return "正在保存";
-    if (task.confirmation) return "已保存";
+    if (task.confirmation) return "已核对";
     if (task.state === "recognizing") return "识别中";
     if (task.state === "failed") return "识别失败";
     return task.dirty ? "修改未保存" : "待核对";
@@ -14483,8 +14483,7 @@ function renderOcrTasks() {
     const list = document.getElementById("ocrTaskList");
     if (!panel || !list) return;
     const focused = list.contains(document.activeElement) ? document.activeElement : null;
-    const focusInfo = focused ? { taskId: focused.dataset.taskId, action: focused.dataset.ocrAction,
-        field: focused.dataset.ocrField, start: focused.selectionStart, end: focused.selectionEnd } : null;
+    const focusInfo = focused ? { taskId: focused.dataset.taskId, action: focused.dataset.ocrAction } : null;
     const hasImages = ocrTasks.size > 0 && !isOcrSendInProgress();
     if (typeof renderOcrGrouping === "function") renderOcrGrouping(panel, hasImages);
     panel.hidden = !hasImages;
@@ -14523,12 +14522,12 @@ function renderOcrTasks() {
     };
     for (const task of ocrTasks.values()) {
         const card = element("article", "ocr-task-card");
-        card.classList.toggle("is-saved", Boolean(task.confirmation));
         card.dataset.ocrTaskId = task.id;
         card.dataset.state = task.state;
         const thumbnail = element("img", "ocr-task-thumbnail");
         thumbnail.src = task.originalUrl;
         thumbnail.alt = `${task.file.name} 原图缩略图`;
+        thumbnail.title = task.file.name || "图片";
         const content = element("div", "ocr-task-content");
         const heading = element("div", "ocr-task-heading");
         const name = element("strong", "ocr-task-name", task.file.name || "图片");
@@ -14536,47 +14535,17 @@ function renderOcrTasks() {
         heading.append(name);
         const status = element("p", "ocr-task-status", ocrTaskLabel(task));
         status.setAttribute("role", "status");
-        content.append(heading, status);
-        if (task.confirmation && task.draft && task.state !== "recognizing") {
-            const preview = element("section", "ocr-task-structure ocr-task-preview");
-            preview.setAttribute("aria-label", "已保存的图片信息");
-            const text = String(task.draft.body_text || "");
-            if (text.trim()) {
-                const section = element("section", "ocr-task-preview-section");
-                section.append(element("h3", "ocr-task-structure-title", "文字信息"),
-                    element("div", "ocr-task-saved-text", text));
-                preview.append(section);
-            }
-            if (task.draft.graphs?.length && window.DMateGraphFormat?.renderGraphInformation) {
-                const section = element("section", "ocr-task-preview-section");
-                const information = element("div", "ocr-task-saved-graphs");
-                section.append(element("h3", "ocr-task-structure-title", "图形信息"), information);
-                // Use the same saved document and read-only presentation as
-                // the scan editor, including positions and appearance.
-                window.DMateGraphFormat.renderGraphInformation(information, task.draft);
-                preview.append(section);
-            }
-            content.append(preview);
+        if (!task.confirmation) content.append(heading);
+        content.append(status);
+        if (task.state === "recognizing") {
+            const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
+            slow.hidden = ocrTaskSeconds(task) < 120;
+            content.append(slow);
         }
-        const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
-        slow.hidden = task.state !== "recognizing" || ocrTaskSeconds(task) < 120;
-        content.append(slow);
         if (task.error) {
             content.append(element("p", "ocr-task-notice", task.error));
-        } else if ((task.confirmation || task.result?.manual_mode) && task.notice) {
+        } else if (!task.confirmation && task.result?.manual_mode && task.notice) {
             content.append(element("p", "ocr-task-notice", task.notice));
-        }
-        if (task.confirmation) {
-            const label = element("label", "ocr-task-request-label", "解题要求（可选）");
-            const input = element("textarea", "ocr-task-request");
-            input.rows = 2;
-            input.value = task.userRequest;
-            input.dataset.taskId = task.id;
-            input.dataset.ocrField = "userRequest";
-            input.maxLength = 4000;
-            input.disabled = Boolean(task.sending);
-            label.append(input);
-            content.append(label);
         }
         const actions = element("div", "ocr-task-actions");
         const button = (text, action, primary = false) => {
@@ -14589,7 +14558,7 @@ function renderOcrTasks() {
             return node;
         };
         if (task.state !== "recognizing") {
-            button("编辑核对", "edit", true);
+            button("编辑", "edit", true);
         }
         content.append(actions);
         card.append(thumbnail, content);
@@ -14606,10 +14575,8 @@ function renderOcrTasks() {
     list.replaceChildren(fragment);
     if (focusInfo?.taskId) {
         const target = [...list.querySelectorAll("[data-task-id]")].find(node =>
-            node.dataset.taskId === focusInfo.taskId && (focusInfo.field
-                ? node.dataset.ocrField === focusInfo.field : node.dataset.ocrAction === focusInfo.action));
+            node.dataset.taskId === focusInfo.taskId && node.dataset.ocrAction === focusInfo.action);
         target?.focus({ preventScroll: true });
-        if (focusInfo.field && Number.isInteger(focusInfo.start)) target?.setSelectionRange?.(focusInfo.start, focusInfo.end);
     }
     updateOcrTaskTimes();
     syncOcrTaskAvailability();
@@ -14878,7 +14845,7 @@ async function confirmOcrTask(task, documentValue, options = {}) {
         task.dirty = false;
         task.descriptions = null;
         task.descriptionState = null;
-        task.notice = "已保存当前选择的信息，可继续添加图片或发送。";
+        task.notice = "";
         return data;
     } catch (error) {
         if (error?.name !== "AbortError") task.error = error?.message || "结构确认失败，请稍后重试。";
@@ -15319,7 +15286,7 @@ async function sendOcrBatch() {
     }
     if (tasks.some(task => task.state !== "ready" || !task.draft
         || !task.draft.body_text?.trim() && !task.draft.graphs?.length)) {
-        showCurrentError("有图片未识别成功，请编辑核对或移除后再发送。");
+        showCurrentError("有图片未识别成功，请编辑或移除后再发送。");
         return;
     }
     const typed = document.getElementById("text");
@@ -15440,11 +15407,6 @@ function initializeOcrTaskPanel() {
     const panel = document.getElementById("ocrTaskPanel");
     if (panel && panel.dataset.bound !== "true") {
         panel.dataset.bound = "true";
-        panel.addEventListener("input", event => {
-            if (event.target.dataset.ocrField !== "userRequest") return;
-            const task = ocrTasks.get(event.target.dataset.taskId);
-            if (task) task.userRequest = event.target.value;
-        });
         panel.addEventListener("click", event => {
             const button = event.target.closest("button[data-ocr-action]");
             if (!button) return;
