@@ -1,5 +1,6 @@
 """Cheap source contracts for OCR graph editor's actual controls and behavior."""
 import unittest
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,9 +61,15 @@ class GraphEditorUiContract(unittest.TestCase):
         self.assertIn('pipeline=active_pipeline()', server)
 
     def test_zoom_out_is_not_blocked_by_css_minwidth(self):
-        self.assertIn("MIN_ZOOM=25,MAX_ZOOM=400", self.overlay)
+        # Fitting a tall/large original may require much less than 25%.
+        limits = re.search(r'\bMIN_ZOOM\s*=\s*(\d*\.?\d+),\s*MAX_ZOOM\s*=\s*(\d*\.?\d+)', self.overlay)
+        self.assertIsNotNone(limits)
+        minimum, maximum = map(float, limits.groups())
+        self.assertGreater(minimum, 0)
+        self.assertLessEqual(minimum, 25)
+        self.assertGreaterEqual(maximum, 400)
         self.assertIn("Math.max(MIN_ZOOM,Math.min(MAX_ZOOM", self.overlay)
-        self.assertIn("button('适应','zoom-fit',fitImage)", self.overlay)
+        self.assertIn("button('适应','zoom-fit',fitImage,viewControls)", self.overlay)
         self.assertIn(".dge-overlay-stage{position:relative;width:100%;min-width:0;", self.style)
         self.assertNotIn("min-width:100%;margin:0 auto;background:white", self.style)
 
