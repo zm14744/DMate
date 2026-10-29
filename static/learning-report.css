@@ -1,0 +1,106 @@
+/* Report cards share the dialog's translucent surface. Only small controls
+   and status marks add color, so panel-alpha remains the single surface fill. */
+#learningReviewModal .learning-review-card {
+    width:min(980px,94vw);
+    max-height:90dvh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+#learningReviewModal .learning-review-body {
+    flex:1 1 auto;
+    min-height:0;
+    padding:24px;
+    color:var(--text-primary);
+    overflow:auto;
+}
+.lr-report { display:flex; flex-direction:column; gap:20px; min-width:0; }
+.lr-report * { box-sizing:border-box; }
+.lr-report h2,.lr-report h3,.lr-report h4,.lr-report p { margin:0; }
+.lr-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:2px 0 4px; }
+.lr-eyebrow { display:block; margin-bottom:9px; color:var(--text-muted); font-size:10px; font-weight:650; letter-spacing:.15em; }
+.lr-hero h2 { color:var(--text-primary); font-size:24px; font-weight:650; line-height:1.4; letter-spacing:-.02em; }
+.lr-report .lr-description { color:var(--text-secondary); font-size:13px; line-height:1.75; overflow-wrap:anywhere; }
+.lr-hero .lr-description { margin-top:7px; }
+.lr-badge { display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; max-width:100%; padding:4px 8px; border:1px solid var(--border-strong); border-radius:6px; color:var(--text-secondary); font-size:11px; line-height:1.4; white-space:nowrap; }
+.lr-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+#learningReviewModal .lr-report button { font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+#learningReviewModal .lr-report button:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+#learningReviewModal .lr-report .lr-metric { display:flex; flex-direction:column; align-items:flex-start; gap:7px; min-width:0; padding:16px; border:1px solid var(--border-strong); border-radius:12px; background:transparent; color:var(--text-primary); text-align:left; }
+.lr-metric-label { color:var(--text-secondary); font-size:13px; font-weight:550; }
+.lr-metric-value { color:var(--text-primary); font-size:32px; font-weight:650; font-variant-numeric:tabular-nums; line-height:1.1; letter-spacing:-.03em; }
+.lr-metric-hint { color:var(--text-muted); font-size:11px; line-height:1.6; }
+.lr-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:16px; }
+.lr-section { min-width:0; padding:20px; border:1px solid var(--border-strong); border-radius:12px; background:transparent; }
+.lr-section-head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-bottom:15px; }
+.lr-section h3 { color:var(--text-primary); font-size:15px; font-weight:650; line-height:1.5; }
+.lr-section-meta { color:var(--text-muted); font-size:11px; line-height:1.6; }
+.lr-report .lr-next-title { margin:12px 0 10px; color:var(--text-primary); font-size:19px; line-height:1.5; font-weight:600; }
+.lr-question-preview { margin:0 0 10px!important; padding-left:12px; border-left:2px solid var(--accent); color:var(--text-primary); font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
+#learningReviewModal .lr-report .lr-primary,#learningReviewModal .lr-report .lr-link { width:auto; min-height:36px; margin-top:14px; padding:7px 12px; border:1px solid var(--border-strong); border-radius:7px; background:transparent; color:var(--text-primary); font-size:12px; font-weight:550; line-height:1.6; }
+#learningReviewModal .lr-report .lr-primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+#learningReviewModal .lr-report .lr-link { padding:5px 0; border-color:transparent; color:var(--accent-text,var(--accent)); text-align:left; }
+.lr-attention { border-color:rgba(217,119,6,.45); color:#d97706; }
+body[data-appearance-theme="light"] .lr-attention { color:#a85403; }
+.lr-accent { border-color:var(--accent); color:var(--accent-text,var(--accent)); }
+.lr-progress-bar { display:flex; gap:3px; width:100%; height:7px; margin:4px 0 17px; overflow:hidden; border-radius:4px; background:rgba(var(--surface-0-rgb),.4); }
+.lr-progress-bar>span { flex-basis:0; min-width:3px; }
+.lr-pending { background:#d99740; }
+.lr-retest { background:#7493dc; }
+.lr-passed { background:#5eae91; }
+.lr-progress-legend { display:flex; flex-direction:column; gap:11px; margin-bottom:16px; }
+.lr-progress-row { display:flex; align-items:center; gap:8px; color:var(--text-secondary); font-size:12px; }
+.lr-progress-row i { display:block; width:7px; height:7px; border-radius:50%; }
+.lr-progress-row strong { margin-left:auto; color:var(--text-primary); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; }
+.lr-knowledge-list { margin-top:10px; }
+.lr-knowledge-row { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:13px 0; border-top:1px solid var(--border-strong); }
+.lr-knowledge-row:first-child { border-top:0; }
+.lr-knowledge-row:last-child { padding-bottom:0; }
+.lr-knowledge-info,.lr-activity-info { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.lr-knowledge-info>strong,.lr-note-row>strong { color:var(--text-primary); font-size:13px; font-weight:550; line-height:1.5; overflow-wrap:anywhere; }
+.lr-row-detail { display:block; color:var(--text-muted); font-size:12px; font-weight:400; line-height:1.65; overflow-wrap:anywhere; }
+.lr-filters { display:flex; flex-wrap:wrap; gap:7px; margin:15px 0; }
+#learningReviewModal .lr-report .lr-filter { width:auto; min-height:32px; padding:5px 10px; border:1px solid var(--border-strong); border-radius:7px; background:transparent; color:var(--text-secondary); font-size:12px; line-height:1.6; }
+#learningReviewModal .lr-report .lr-filter[aria-pressed="true"] { border-color:var(--accent); color:var(--accent-text,var(--accent)); }
+.lr-question-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+#learningReviewModal .lr-report .lr-question-row { display:flex; flex-direction:column; align-items:stretch; gap:10px; min-width:0; padding:14px; border:1px solid var(--border-strong); border-radius:9px; background:transparent; color:var(--text-primary); text-align:left; }
+.lr-question-meta { display:flex; align-items:center; gap:8px; min-width:0; }
+.lr-session-name { min-width:0; color:var(--text-muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lr-question-text { color:var(--text-primary); font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
+.lr-row-open { margin-top:auto; color:var(--accent-text,var(--accent)); font-size:11px; line-height:1.6; }
+.lr-bottom-grid { grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); }
+#learningReviewModal .lr-report .lr-activity-row { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; width:100%; padding:12px 0; border:0; border-top:1px solid var(--border-strong); border-radius:0; background:transparent; color:var(--text-primary); text-align:left; }
+#learningReviewModal .lr-report .lr-activity-row:first-child { padding-top:0; border-top:0; }
+.lr-activity-info strong { font-size:12px; font-weight:550; line-height:1.6; }
+.lr-activity-time { flex:0 0 auto; color:var(--text-muted); font-size:10px; font-variant-numeric:tabular-nums; line-height:1.9; white-space:nowrap; }
+.lr-note-row { display:flex; flex-direction:column; gap:5px; padding:11px 0; border-top:1px solid var(--border-strong); }
+.lr-section-head+.lr-note-row { border-top:0; padding-top:0; }
+.lr-footnote { padding:0 2px; color:var(--text-muted); font-size:11px; line-height:1.75; }
+.lr-empty { padding:28px; }
+.lr-empty .lr-primary { margin-right:16px; }
+@media(hover:hover) {
+    #learningReviewModal .lr-report :is(.lr-metric,.lr-question-row,.lr-filter,.lr-activity-row):hover { border-color:var(--accent); }
+    #learningReviewModal .lr-report .lr-link:hover { text-decoration:underline; text-underline-offset:3px; }
+    #learningReviewModal .lr-report .lr-primary:hover { filter:brightness(1.08); }
+}
+@media(max-width:760px) {
+    #learningReviewModal .learning-review-card { width:100%; max-width:100%; height:100dvh; max-height:100dvh; }
+    #learningReviewModal .learning-review-body { padding:18px 14px; }
+    .lr-report { gap:16px; }
+    .lr-hero { gap:10px; flex-direction:column; }
+    .lr-hero>.lr-badge { align-self:flex-start; font-size:10px; padding:3px 7px; }
+    .lr-hero h2 { font-size:21px; }
+    .lr-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+    #learningReviewModal .lr-report .lr-metric { padding:14px; gap:6px; }
+    .lr-metric-value { font-size:29px; }
+    .lr-grid,.lr-bottom-grid { grid-template-columns:minmax(0,1fr); gap:16px; }
+    .lr-section { padding:16px; }
+    .lr-question-list { grid-template-columns:minmax(0,1fr); }
+    .lr-activity-time { white-space:normal; max-width:70px; text-align:right; }
+    .lr-knowledge-row { gap:10px; }
+    .lr-badge { white-space:normal; }
+    .lr-question-meta>.lr-badge { white-space:nowrap; }
+}
+@media(prefers-reduced-motion:reduce) {
+    #learningReviewModal .learning-review-body { scroll-behavior:auto; }
+}

@@ -65,6 +65,36 @@ def use_real_dialog_and_template_styles(page, theme):
     page.wait_for_function('document.querySelector(".dge-overlay").dataset.geometryReady==="true"')
 
 
+def test_mobile_edge_properties_stay_below_tools_and_keep_endpoints_compact(drawing_page):
+    page = drawing_page
+    use_real_dialog_and_template_styles(page, 'light')
+    page.get_by_role('button', name='适应', exact=True).click()
+    point = page.locator('[data-edge-id="ab"] .dge-overlay-hit').evaluate('''path=>{
+      const point=path.getPointAtLength(path.getTotalLength()*.65);
+      const screen=new DOMPoint(point.x,point.y).matrixTransform(path.getScreenCTM());
+      return {x:screen.x,y:screen.y};}''')
+    page.mouse.click(point['x'], point['y'])
+    page.wait_for_selector('.dge-selection-panel')
+    page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+    bounds = page.evaluate('''()=>{
+      const panel=document.querySelector('.dge-selection-panel').getBoundingClientRect();
+      const toolbar=document.querySelector('.ddw-side-actions').getBoundingClientRect();
+      const tools=document.querySelector('.dge-tool-palette>summary').getBoundingClientRect();
+      const endpoints=[...document.querySelectorAll('.dge-endpoint-field')].map(e=>e.getBoundingClientRect());
+      const workspace=document.querySelector('.dge-workspace').getBoundingClientRect();
+      return {top:panel.top,bottom:panel.bottom,limit:workspace.bottom,
+        controlsBottom:Math.max(toolbar.bottom,tools.bottom),
+        endpointTops:endpoints.map(e=>e.top),width:panel.width,endpointWidths:endpoints.map(e=>e.width)};}''')
+    assert bounds['top'] >= bounds['controlsBottom'] + 7
+    assert bounds['bottom'] <= bounds['limit'] - 10
+    if page.viewport_size['width'] <= 760:
+        assert abs(bounds['endpointTops'][0] - bounds['endpointTops'][1]) < 1
+        assert max(bounds['endpointWidths']) < bounds['width'] / 2
+    assert page.get_by_label('当前边起点', exact=True).input_value() == 'a'
+    assert page.get_by_label('当前边终点', exact=True).input_value() == 'b'
+    page.screenshot(path='/tmp/dmate-mobile-edge-panel-spaced.png')
+
+
 def test_legacy_saved_pages_new_page_and_account_scope(drawing_page):
     page = drawing_page
     assert page.locator('.ddw-name').input_value() == '我的图形'

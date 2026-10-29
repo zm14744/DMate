@@ -1,10 +1,10 @@
 (function(root){
  'use strict';
  const doc=root.document;
- let pending=null;
+ let pending=null,pointerIntent=null;
  function eligible(target){
-  const select=target?.closest?.('select');
-  return root.matchMedia('(max-width:1100px)').matches && select && !select.disabled &&
+  const select=target?.closest?.('select') || target?.closest?.('label')?.control;
+  return root.matchMedia('(max-width:1100px)').matches && select?.tagName==='SELECT' && !select.disabled &&
    !select.multiple && select.size<=1 && select.options.length &&
    typeof root.openMobileChoiceModal==='function' ? select : null;
  }
@@ -38,11 +38,16 @@
  function activate(event){
   const select=eligible(event.target);if(!select)return;
   event.preventDefault();
+  // Selecting a canvas edge can insert this field before the finger's click
+  // arrives. Only open for a gesture which actually began on this control.
+  const recent=pointerIntent && performance.now()-pointerIntent.time<1000;
+  if((event.detail>0 || event.isTrusted&&recent) && (!recent || pointerIntent.select!==select))return;
   // Keep the following synthetic click from opening Android's native list.
   if(pending===select)return;
   void choose(select);
  }
  doc.addEventListener('pointerdown',event=>{
+  pointerIntent={select:eligible(event.target),time:performance.now()};
   const chooser=event.target.closest?.('#mobileChoiceModal');
   if(chooser?.open){
    // The underlying drawing/scan panels must not treat option taps as outside clicks.
@@ -53,6 +58,7 @@
  },true);
  doc.addEventListener('click',activate,true);
  doc.addEventListener('keydown',event=>{
+  pointerIntent=null;
   if(event.key==='Escape' && doc.getElementById('mobileChoiceModal')?.open){
    event.preventDefault();event.stopImmediatePropagation();root.closeMobileChoiceModal();return;
   }

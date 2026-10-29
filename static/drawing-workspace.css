@@ -18,6 +18,8 @@
 .ddw-editor{flex:1;min-width:0;min-height:0;overflow:hidden}
 .ddw-editor.dmate-graph-editor{height:100%;display:flex;flex-direction:column}
 .ddw-editor>.dge-workspace{flex:1;min-height:0}
+.ddw-editor .dge-workspace .dge-selection-panel{top:var(--ddw-property-top,120px);bottom:auto;max-height:max(0px,calc(100% - var(--ddw-property-top,120px) - 12px));min-height:0}
+.ddw-editor .dge-selection-panel .dge-field{flex:0 0 auto}
 .ddw-editor .dge-overlay-host{height:100%;min-height:0;border:0}
 .ddw-editor .dge-overlay{height:100%;min-height:0;max-height:none;display:flex;flex-direction:column;gap:8px}
 .ddw-editor .dge-view-controls{flex-shrink:0;border:1px solid var(--dge-border,#cbd5e1);border-radius:12px}
@@ -71,3 +73,9 @@
 .ddw-export-image{display:block;max-width:100%;width:auto;height:auto;max-height:calc(100% - 120px);min-height:0;object-fit:contain;background:white;user-select:auto;-webkit-user-select:auto;-webkit-touch-callout:default}
 .ddw-export-download{display:inline-block;border-radius:9px;padding:10px 20px;background:var(--accent,#3b82f6);color:white;text-decoration:none;flex-shrink:0}
 @media(max-width:600px){.ddw-header{gap:6px}.ddw-name{width:100%;padding:7px 10px}.ddw-page-actions{width:100%;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ddw-page-actions>button{font-size:12px;padding:8px 10px;white-space:nowrap}.ddw-side-actions{gap:4px;max-width:calc(100% - 96px)}.ddw-side-actions>button{font-size:12px;padding:7px 6px}.ddw-editor .dge-tool-palette>summary,.ddw-editor .dge-tool-palette[open]>summary{padding:7px 8px;font-size:12px}}
+@media(max-width:760px){
+ .ddw-editor .dge-workspace .dge-selection-panel{right:12px;width:calc(100% - 24px);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:12px}
+ .ddw-editor .dge-selection-panel>*{grid-column:1/-1}
+ .ddw-editor .dge-selection-panel>.dge-endpoint-field{grid-column:auto}
+ .ddw-editor .dge-selection-panel select,.ddw-editor .dge-selection-panel input{min-height:42px;box-sizing:border-box}
+}

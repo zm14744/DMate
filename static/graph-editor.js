@@ -253,12 +253,15 @@
             const edge = graph.edges.find(e => e.id === selectedEdge);
             if (edge) {
                 aside.append(element('h3', '', '边的属性'));
+                aside.dataset.selectionKind = 'edge';
                 const ids = [edge.id];
                 const endpoints = nodeOptions(graph);
-                aside.append(field(hasDirection(graph)?'起点':'端点一', select(endpoints, edge.from, hasDirection(graph)?'当前边起点':'当前边端点一',
-                    value => model.updateEdges(graph.id, ids, 'from', value))));
-                aside.append(field(hasDirection(graph)?'终点':'端点二', select(endpoints, edge.to, hasDirection(graph)?'当前边终点':'当前边端点二',
-                    value => model.updateEdges(graph.id, ids, 'to', value))));
+                const fromField = field(hasDirection(graph)?'起点':'端点一', select(endpoints, edge.from, hasDirection(graph)?'当前边起点':'当前边端点一',
+                    value => model.updateEdges(graph.id, ids, 'from', value)));
+                const toField = field(hasDirection(graph)?'终点':'端点二', select(endpoints, edge.to, hasDirection(graph)?'当前边终点':'当前边端点二',
+                    value => model.updateEdges(graph.id, ids, 'to', value)));
+                fromField.classList.add('dge-endpoint-field');toField.classList.add('dge-endpoint-field');
+                aside.append(fromField,toField);
                 if(hasDirection(graph)){aside.append(field('方向', select(directionOptions, edge.direction, '当前边方向',
                     value => model.updateEdges(graph.id, ids, 'direction', value))));
                 aside.append(button('反转方向', () => model.reverseEdges(graph.id, ids)));}
@@ -282,7 +285,12 @@
                 aside.append(element('p','dge-muted',(graph.directed===false?'无向':'有向或待核对')+' · '+(graph.weighted===false?'无权':'带权或待核对')));
                 aside.append(button('删除子图',()=>removeGraph(graph.id),'dge-danger'));
             }
-            if(aside.childElementCount){const close=button('',()=>{propertiesVisible=false;});close.classList.add('dge-panel-close');close.setAttribute('aria-label','关闭属性');close.title='关闭属性';aside.prepend(close);}
+            if(aside.childElementCount){
+                const head=element('div','dge-property-head'),heading=aside.querySelector('h3');
+                if(heading)head.append(heading);
+                const close=button('',()=>{propertiesVisible=false;});close.classList.add('dge-panel-close');close.setAttribute('aria-label','关闭属性');close.title='关闭属性';
+                head.append(close);aside.prepend(head);
+            }
             return aside;
         }
 

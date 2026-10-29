@@ -136,6 +136,9 @@
  display:flex;flex-direction:column;gap:12px;
 }
 .dge-selection-panel h3{margin:0 0 2px;font-size:14px}
+.dge-property-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}
+.dge-property-head h3{margin:0}
+.dge-property-head .dge-panel-close{flex:0 0 auto;align-self:center}
 .dge-selection-panel .dge-field{gap:5px}
 .dge-selection-panel .dge-muted{margin:0}
 .dge-selection-panel .dge-danger{margin-top:4px}

@@ -8808,6 +8808,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/modal-chrome.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/appearance-panels.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/learning-report.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/red-circle-controls.css?v={{ dmate_web_revision }}">
 <style>
 /* Keep focus feedback inside the control, without a blue or red outer ring.
@@ -9371,10 +9372,10 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
 </div>
 
-<div id="learningReviewModal" class="modal hidden">
-    <div class="modal-card learning-review-card">
+<div id="learningReviewModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card learning-review-card" role="dialog" aria-modal="true" aria-labelledby="learningReviewTitle">
         <div class="modal-head">
-            <div>学习报告</div>
+            <div id="learningReviewTitle">学习报告</div>
             <button id="learningReviewClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>
         </div>
 
@@ -9616,6 +9617,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/concept-notebook-model.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/concept-notebook.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/chat-composer.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/learning-report.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/script.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>

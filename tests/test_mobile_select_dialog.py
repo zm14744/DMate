@@ -43,6 +43,12 @@ def test_mobile_choices_are_modal_cancel_safe_and_leave_desktop_selects_native()
           document.addEventListener('keydown',e=>{if(e.key==='Escape'){parentEscapes++;e.preventDefault();}},true);
           document.addEventListener('pointerdown',e=>{if(e.target.closest('#mobileChoiceModal'))parentOutside++;},true);
           editor.showModal();}''')
+        # A touch started on the canvas, which inserted a field before its
+        # delayed click arrived; that same gesture must not open the chooser.
+        page.evaluate('''()=>{const canvas=document.createElement('div');editor.append(canvas);
+          canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+          document.querySelector('select').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,detail:1}));}''')
+        assert page.evaluate('!mobileChoiceModal.open&&events.length===0')
         page.locator('#editor').get_by_label('绘图方向', exact=True).tap()
         page.wait_for_function('mobileChoiceModal.open&&!mobileChoiceModal.hasAttribute("data-positioning")')
         card = page.locator('#mobileChoiceModal .mobile-choice-card')

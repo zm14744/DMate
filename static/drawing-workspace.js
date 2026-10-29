@@ -123,6 +123,8 @@
    if(toolBox&&rail.getBoundingClientRect().left<toolBox.right+12)rail.style.top=(toolBox.bottom-origin.top+12)+'px';
    const top=Math.max(rail.getBoundingClientRect().bottom,toolBox?.bottom||0)-origin.top+8;
    body.style.setProperty('--ddw-panel-top',top+'px');
+   const propertyOrigin=editorHost.querySelector('.dge-workspace')?.getBoundingClientRect()||origin;
+   body.style.setProperty('--ddw-property-top',Math.max(0,origin.top+top-propertyOrigin.top)+'px');
    body.style.setProperty('--ddw-panel-space',Math.max(90,origin.height-top-10)+'px');
    if(panelMode)positionPopover(panel,panelMode==='history'?historyButton:aiButton);
    for(const [key,trigger] of [['graphs',settingsButton],['results',informationButton]]){const item=editorPanel(key);if(item?.open)positionPopover(item.querySelector(':scope > .dge-float-content'),trigger);}

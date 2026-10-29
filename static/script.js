@@ -6638,253 +6638,91 @@ function processLearningFromReply(
     renderLearningSummary();
 }
 
-function learningReviewItemLabel(item) {
-    if (!item || typeof item !== "object") {
-        return "";
-    }
-
-    const candidates = [
-        ...(Array.isArray(item.focusPoints) ? item.focusPoints : []),
-        ...(Array.isArray(item.knowledgePoints) ? item.knowledgePoints : []),
-        item.category
-    ];
-
-    return candidates.find(
-        value => (
-            typeof value === "string"
-            && value.trim()
-            && value.trim() !== "待识别"
-        )
-    )?.trim() || "这道题";
-}
-
-function validLearningReviewEvents() {
-    const liveSessionIds = new Set(
-        (Array.isArray(sessions) ? sessions : [])
-            .map(session => String(session?.id ?? ""))
-            .filter(Boolean)
-    );
-
-    // 学习回顾只使用仍能对应到现存会话的事件。
-    // 旧版本可能留下 sessionId 为空或原会话已删除的孤立事件，
-    // 这些事件不能继续出现在“最近学习”里。
-    return (Array.isArray(learningState.events) ? learningState.events : [])
-        .filter(event => {
-            if (!event || typeof event !== "object") return false;
-            if (event.sessionId === null || event.sessionId === undefined) {
-                return false;
-            }
-            return liveSessionIds.has(String(event.sessionId));
-        });
-}
-
-function collectLearningReviewPoints() {
-    const points = [];
-
-    const events = [...validLearningReviewEvents()].sort(
-        (a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0)
-    );
-
-    for (const event of events.slice(0, 18)) {
-        points.push(...(
-            Array.isArray(event.points)
-                ? event.points
-                : []
-        ));
-    }
-
-    const recentWrong = [...(
-        Array.isArray(learningState.wrongQuestions)
-            ? learningState.wrongQuestions
-            : []
-    )].sort(
-        (a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0)
-    );
-
-    for (const item of recentWrong.slice(0, 5)) {
-        points.push(
-            ...(item.focusPoints || []),
-            ...(item.knowledgePoints || [])
-        );
-    }
-
-    return uniqueTextList(points, 5);
-}
-
 function buildLearningReviewSnapshot() {
-    const recentPoints = collectLearningReviewPoints();
-    const wrongItems = Array.isArray(learningState.wrongQuestions)
-        ? learningState.wrongQuestions
-        : [];
+    // History collection can recover legacy AI question metadata. Work on
+    // message copies so opening a report never mutates saved conversations.
+    const reportSessions = (Array.isArray(sessions) ? sessions : []).map(session => ({
+        id: session.id,
+        name: session.name,
+        questions: getConversationQuestionHistory({
+            ...session,
+            messages: Array.isArray(session.messages)
+                ? session.messages.map(message => message ? { ...message } : message)
+                : []
+        })
+    }));
+    const notebook = window.DMateConceptNotebookModel
+        ? window.DMateConceptNotebookModel.normalize(learningState.conceptNotebook)
+        : learningState.conceptNotebook;
+    return window.DMateLearningReport.buildSnapshot({
+        sessions: reportSessions,
+        learning: learningState,
+        notebook,
+        currentSessionId: currentId
+    });
+}
 
-    const pending = wrongItems
-        .filter(item => !item.corrected)
-        .sort(
-            (a, b) => (
-                (Number(b.lastWrongAt) || Number(b.updatedAt) || 0)
-                - (Number(a.lastWrongAt) || Number(a.updatedAt) || 0)
-            )
-        );
-
-    const needsRetest = wrongItems
-        .filter(item => item.corrected && !item.retestPassed)
-        .sort(
-            (a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0)
-        );
-
-    const failedRetest = wrongItems
-        .filter(item => (
-            !item.retestPassed
-            && (Number(item.retestFailCount) || 0) > 0
-        ))
-        .sort(
-            (a, b) => (Number(b.lastRetestAt) || 0) - (Number(a.lastRetestAt) || 0)
-        );
-
-    const sections = [];
-
-    if (recentPoints.length) {
-        let recentText = "";
-
-        if (recentPoints.length === 1) {
-            recentText = `从现有记录看，最近主要围绕“${recentPoints[0]}”进行了学习。`;
-        } else if (recentPoints.length === 2) {
-            recentText = `从现有记录看，最近主要接触了“${recentPoints[0]}”和“${recentPoints[1]}”。`;
-        } else {
-            recentText = (
-                `最近的学习比较分散，记录中出现了“${recentPoints[0]}”“${recentPoints[1]}”“${recentPoints[2]}”`
-                + (recentPoints.length > 3 ? "等内容。" : "。")
-            );
-        }
-
-        sections.push({
-            title: "最近学习",
-            text: recentText
-        });
-    }
-
-    const attentionLines = [];
-    const usedLabels = new Set();
-
-    const addAttention = (item, kind) => {
-        const label = learningReviewItemLabel(item);
-        if (!label || usedLabels.has(label)) return;
-
-        usedLabels.add(label);
-
-        if (kind === "failed") {
-            attentionLines.push(
-                `“${label}”有复测未通过的记录，之后如果还想继续，可以再回看一次。`
-            );
-            return;
-        }
-
-        if (kind === "pending") {
-            attentionLines.push(
-                `“${label}”相关题目还留在错题本中，尚未完成订正。`
-            );
-            return;
-        }
-
-        attentionLines.push(
-            `“${label}”已经有订正记录，但目前还没有通过复测。`
-        );
-    };
-
-    failedRetest.slice(0, 2).forEach(
-        item => addAttention(item, "failed")
-    );
-
-    pending.slice(0, 2).forEach(
-        item => addAttention(item, "pending")
-    );
-
-    needsRetest.slice(0, 2).forEach(
-        item => addAttention(item, "retest")
-    );
-
-    if (attentionLines.length) {
-        sections.push({
-            title: "值得再看看",
-            text: attentionLines.slice(0, 2).join("\n")
-        });
-    }
-
-    let nextText = "";
-
-    if (pending.length) {
-        nextText = "如果想继续，可以先从错题本里挑一道尚未订正的题重新做，不必一次处理很多。";
-    } else if (needsRetest.length) {
-        nextText = "如果想继续，可以从已经订正但还没有通过复测的题里挑一道，再测一次。";
-    } else if (recentPoints.length) {
-        nextText = `如果想继续，可以围绕“${recentPoints[0]}”再问一个具体问题，或者让 AI 出一道同类题。`;
-    }
-
-    if (nextText) {
-        sections.push({
-            title: "接下来可以做",
-            text: nextText
-        });
-    }
-
-    const hasAnyRecord = Boolean(
-        recentPoints.length
-        || wrongItems.length
-        || validLearningReviewEvents().length
-    );
-
-    return {
-        hasAnyRecord,
-        sections
-    };
+function openLearningReportSession(sessionId, messageIndex = null) {
+    const session = sessions.find(item => String(item.id) === String(sessionId));
+    if (!session) return;
+    if (currentId !== session.id) pauseOcrBatchRun(currentId);
+    if (typingTimer) forceCompleteTyping();
+    currentId = session.id;
+    closeLearningReview();
+    closeMobileShellDrawers();
+    saveState();
+    renderAll();
+    if (Number.isInteger(messageIndex)) locateKnowledgeHistoryMessage(messageIndex);
 }
 
 function renderLearningReview() {
     const body = document.getElementById("learningReviewBody");
-    if (!body) return;
-
-    body.innerHTML = "";
-
-    const snapshot = buildLearningReviewSnapshot();
-
-    if (!snapshot.hasAnyRecord || !snapshot.sections.length) {
-        const empty = document.createElement("div");
-        empty.className = "learning-review-empty";
-        empty.textContent = "无";
-        body.appendChild(empty);
-        return;
-    }
-
-    for (const section of snapshot.sections) {
-        const card = document.createElement("section");
-        card.className = "learning-review-section";
-
-        const title = document.createElement("div");
-        title.className = "learning-review-section-title";
-        title.textContent = section.title;
-
-        const text = document.createElement("p");
-        text.className = "learning-review-section-text";
-        text.textContent = section.text;
-
-        card.appendChild(title);
-        card.appendChild(text);
-        body.appendChild(card);
-    }
+    if (!body || !window.DMateLearningReport) return;
+    window.DMateLearningReport.render(body, buildLearningReviewSnapshot(), {
+        close: closeLearningReview,
+        question: question => openLearningReportSession(question.sessionId, question.index),
+        session: sessionId => openLearningReportSession(sessionId),
+        knowledge: () => {
+            closeLearningReview();
+            closeMobileShellDrawers();
+            openKnowledgeGraph();
+        },
+        wrong: id => {
+            const item = learningState.wrongQuestions.find(entry => entry.id === id);
+            wrongBookFilter = "all";
+            wrongBookSearch = item ? String(item.question || "").trim().toLowerCase() : "";
+            closeLearningReview();
+            closeMobileShellDrawers();
+            openWrongBook();
+        },
+        notebook: () => {
+            initializeConceptNotebook();
+            if (!window.dmateConceptNotebook) return;
+            closeLearningReview();
+            window.dmateConceptNotebook.open();
+        }
+    });
 }
 
 function openLearningReview() {
     const modal = document.getElementById("learningReviewModal");
     if (!modal) return;
-
+    closeMobileShellDrawers();
     renderLearningReview();
+    const body = document.getElementById("learningReviewBody");
+    if (body) body.scrollTop = 0;
     modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.getElementById("learningReviewClose")?.focus({ preventScroll: true });
 }
 
 function closeLearningReview() {
     const modal = document.getElementById("learningReviewModal");
     if (modal) {
+        const wasOpen = !modal.classList.contains("hidden");
         modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+        if (wasOpen) document.getElementById("learningReviewBtn")?.focus({ preventScroll: true });
     }
 }
 
