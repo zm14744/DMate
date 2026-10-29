@@ -106,8 +106,8 @@ def _connection():
     # SQLite transactions coordinate all Gunicorn workers. No process-local
     # "latest graph" can select another image or undo a newer confirmation.
     connection = sqlite3.connect(str(path), timeout=5)
-    os.chmod(path, 0o600)
     try:
+        os.chmod(path, 0o600)
         with connection:
             connection.execute('''CREATE TABLE IF NOT EXISTS graph_confirmations (
                 owner TEXT NOT NULL, request_id TEXT NOT NULL, source_sha256 TEXT NOT NULL,
@@ -299,6 +299,10 @@ def resolve_confirmed_context(owner, payload):
     request_id, sha, token = payload.get('request_id'), payload.get('source_sha256'), payload.get('confirmation_token')
     required = (payload.get('profile') == 'editable-v1' or any(
         key in payload for key in ('confirmation_token', 'document_sha256', 'revision', 'request_id')))
+    if required:
+        _identity(request_id, sha)
+    elif sha is not None and (not isinstance(sha, str) or not re.fullmatch(r'[a-f0-9]{64}', sha)):
+        raise ConfirmationError('invalid_source_sha256', '原图标识无效，请重新选择原图。')
     with _connection() as connection:
         row = connection.execute('''SELECT request_id,source_sha256,revision,document_sha256,token_sha256
             FROM graph_confirmations WHERE owner=? AND (request_id=? OR source_sha256=?)

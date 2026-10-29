@@ -6662,9 +6662,17 @@ function buildLearningReviewSnapshot() {
     });
 }
 
-function openLearningReportSession(sessionId, messageIndex = null) {
+function openLearningReportSession(sessionId, messageIndex = null, question = null) {
     const session = sessions.find(item => String(item.id) === String(sessionId));
     if (!session) return;
+    if (question) {
+        // Cloud updates can shift message positions while the report is open.
+        const currentQuestion = getConversationQuestionHistory(session).find(item => (
+            item.role === question.role && item.text === question.text
+        ));
+        if (!currentQuestion) { renderLearningReview(); return; }
+        messageIndex = currentQuestion.index;
+    }
     if (currentId !== session.id) pauseOcrBatchRun(currentId);
     if (typingTimer) forceCompleteTyping();
     currentId = session.id;
@@ -6680,7 +6688,7 @@ function renderLearningReview() {
     if (!body || !window.DMateLearningReport) return;
     window.DMateLearningReport.render(body, buildLearningReviewSnapshot(), {
         close: closeLearningReview,
-        question: question => openLearningReportSession(question.sessionId, question.index),
+        question: question => openLearningReportSession(question.sessionId, question.index, question),
         session: sessionId => openLearningReportSession(sessionId),
         knowledge: () => {
             closeLearningReview();
@@ -7379,6 +7387,13 @@ function saveWrongEdit() {
         entry.category = "待识别";
         entry.relatedCategories = [];
         entry.knowledgePoints = [];
+        entry.difficulty = "";
+        entry.referenceAnswer = "";
+        entry.answer = "";
+        entry.analysis = "";
+        entry.answerUpdatedAt = null;
+        entry.analysisUpdatedAt = null;
+        wrongAnalysisExpandedIds.delete(entry.id);
     }
     entry.question = question.slice(0, 3000);
     entry.focusPoints = focusPoints;
@@ -8575,6 +8590,9 @@ async function generateWrongQuestionAnswer(
 
     wrongAnswerLoadingIds.add(id);
     renderWrongBook();
+    const question = entry.question;
+    const isCurrent = () => learningState.wrongQuestions.includes(entry)
+        && entry.question === question && !entry.referenceAnswer && !entry.answer;
 
     const prompt = [
         "请只给出下面这道离散数学题的最终答案。",
@@ -8616,6 +8634,7 @@ async function generateWrongQuestionAnswer(
         const data = await parseResponseJson(
             response
         );
+        if (!isCurrent()) return false;
 
         if (
             !response.ok
@@ -8638,9 +8657,6 @@ async function generateWrongQuestionAnswer(
         if (!finalAnswer || /^(?:抱歉|AI\s*服务|网络连接失败|暂时无法生成|当前请求过于频繁)/i.test(finalAnswer)) {
             return false;
         }
-        if (!learningState.wrongQuestions.includes(entry)) {
-            return false;
-        }
         entry.answer = finalAnswer;
         entry.answerUpdatedAt = Date.now();
         entry.updatedAt = Date.now();
@@ -8650,6 +8666,7 @@ async function generateWrongQuestionAnswer(
         return true;
 
     } catch (error) {
+        if (!isCurrent()) return false;
         console.error("错题答案生成失败：", error);
 
         if (!silent) {
@@ -8691,6 +8708,10 @@ async function generateWrongQuestionAnalysis(id) {
         || entry.answer
         || ""
     );
+    const question = entry.question;
+    const isCurrent = () => learningState.wrongQuestions.includes(entry)
+        && entry.question === question && !entry.analysis
+        && (entry.referenceAnswer || entry.answer || "") === knownAnswer;
 
     const prompt = [
         "请为下面这道离散数学错题提供完整解析，直接讲解，不要反问学生。",
@@ -8737,6 +8758,7 @@ async function generateWrongQuestionAnalysis(id) {
         const data = await parseResponseJson(
             response
         );
+        if (!isCurrent()) return;
 
         if (
             !response.ok
@@ -8764,6 +8786,7 @@ async function generateWrongQuestionAnalysis(id) {
         renderWrongBook();
 
     } catch (error) {
+        if (!isCurrent()) return;
         console.error("错题解析生成失败：", error);
         window.alert(
             "网络连接失败，暂时无法生成解析"
@@ -15865,6 +15888,7 @@ async function deleteChatMessage(sessionId, messageIndex) {
         return;
     }
 
+    const expectedMessage = session.messages[messageIndex];
     const confirmed = await showAppConfirm({
         title: "删除消息",
         body: "确定删除这条聊天消息吗？已加入错题本的内容不会被删除",
@@ -15872,7 +15896,8 @@ async function deleteChatMessage(sessionId, messageIndex) {
         confirmTone: "danger"
     });
 
-    if (!confirmed) return;
+    if (!confirmed || !sessions.includes(session)
+        || session.messages[messageIndex] !== expectedMessage) return;
 
     const chat = document.getElementById("chat");
 
@@ -17507,6 +17532,16 @@ async function analyzeSingleQuestionTeaching(
     }
 }
 
+function resolveQuestionAnalysisCandidate(session, candidate, message, candidates = null) {
+    if (!sessions.includes(session) || deletedSessionIds[sessionBusyKey(session.id)] || !message) return null;
+    // Message positions can change while classification is in flight. Match
+    // the original message and question text before attaching any result.
+    return (candidates || collectConversationQuestionCandidates(session)).find(item => (
+        session.messages[item.index] === message
+        && item.role === candidate.role && item.text === candidate.text
+    )) || null;
+}
+
 async function ensureActiveQuestionAfterHistoryChange(
     session
 ) {
@@ -17523,6 +17558,7 @@ async function ensureActiveQuestionAfterHistoryChange(
         session.learningQuestion = null;
         return;
     }
+    const expectedMessage = session.messages[candidate.index];
 
     const existingTeaching = normalizeTeaching(
         candidateTeachingSnapshot(session, candidate)
@@ -17576,9 +17612,9 @@ async function ensureActiveQuestionAfterHistoryChange(
             return;
         }
 
-        const message = session.messages?.[
-            candidate.index
-        ];
+        const currentCandidate = resolveQuestionAnalysisCandidate(session, candidate, expectedMessage);
+        if (!currentCandidate) return;
+        const message = session.messages[currentCandidate.index];
 
         if (message) {
             if (candidate.role === "ai") {
@@ -17588,11 +17624,11 @@ async function ensureActiveQuestionAfterHistoryChange(
             }
         }
 
-        applyQuestionCandidateAsCurrent(
-            session,
-            candidate,
-            teaching
-        );
+        const activeCandidate = activeQuestionCandidateFromHistory(session);
+        if (activeCandidate && session.messages[activeCandidate.index] === message
+            && activeCandidate.text === currentCandidate.text) {
+            applyQuestionCandidateAsCurrent(session, currentCandidate, teaching);
+        }
     } catch (error) {
         console.warn(
             "删除题目后恢复上一题失败：",
@@ -17616,6 +17652,7 @@ async function refreshConversationKnowledgeIndex(
     if (!candidates.length) {
         return [];
     }
+    const expectedMessages = candidates.map(candidate => session.messages[candidate.index]);
 
     let payload = null;
 
@@ -17654,6 +17691,8 @@ async function refreshConversationKnowledgeIndex(
         return candidates;
     }
 
+    if (!sessions.includes(session) || deletedSessionIds[sessionBusyKey(session.id)]) return [];
+    const currentCandidates = collectConversationQuestionCandidates(session);
     const results = new Map(
         (payload?.results || []).map(
             item => [
@@ -17665,15 +17704,11 @@ async function refreshConversationKnowledgeIndex(
         )
     );
 
-    let latestTeaching = null;
-    let latestCandidate = null;
-
-    for (const candidate of candidates) {
-        const message = session.messages[
-            candidate.index
-        ];
-
-        if (!message) continue;
+    const updatedMessages = new Set();
+    for (const [index, candidate] of candidates.entries()) {
+        const currentCandidate = resolveQuestionAnalysisCandidate(session, candidate, expectedMessages[index], currentCandidates);
+        if (!currentCandidate) continue;
+        const message = session.messages[currentCandidate.index];
 
         const teaching = results.get(
             candidate.key
@@ -17691,51 +17726,20 @@ async function refreshConversationKnowledgeIndex(
             message.questionTeaching = teaching;
         }
 
-        latestTeaching = teaching;
-        latestCandidate = candidate;
+        updatedMessages.add(message);
     }
 
-    if (
-        latestTeaching
-        && latestCandidate
-    ) {
-        session.teaching = latestTeaching;
-
-        const latestMessage = session.messages[
-            latestCandidate.index
-        ];
-
-        session.learningQuestion = {
-            text: latestCandidate.text,
-            knowledgePoints: (
-                latestTeaching.knowledge_points || []
-            ).slice(0, 4),
-            focusPoints: (
-                latestTeaching.focus_points || []
-            ).slice(0, 2),
-            category: latestTeaching.category || "",
-            difficulty: latestTeaching.difficulty || "",
-            source: (
-                latestCandidate.role === "ai"
-                    ? "ai"
-                    : (
-                        latestCandidate.source === "ocr"
-                            ? "ocr"
-                            : "text"
-                    )
-            ),
-            referenceAnswer: (
-                latestMessage?.generatedAnswer || ""
-            ),
-            sessionId: session.id,
-            updatedAt: Date.now()
-        };
+    // Rebuilding the knowledge index must preserve explicit navigation to an
+    // earlier question, including navigation made while the request ran.
+    const activeCandidate = activeQuestionCandidateFromHistory(session);
+    if (activeCandidate && updatedMessages.has(session.messages[activeCandidate.index])) {
+        applyQuestionCandidateAsCurrent(session, activeCandidate);
     }
 
     saveState();
     renderInfo();
 
-    return candidates;
+    return currentCandidates;
 }
 
 

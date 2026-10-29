@@ -912,14 +912,18 @@ def _normalize_username(value):
     username = str(value or "").strip()
     if not re.fullmatch(r"[\w.\-\u4e00-\u9fff]{2,32}", username, flags=re.UNICODE):
         return None, None, "用户名需为 2–32 个字符，只使用文字、数字、下划线、点或短横线"
-    return username, username.casefold(), None
+    username_key = username.casefold()
+    if len(username_key) > 64:
+        return None, None, "用户名转换后的长度过长，请缩短用户名"
+    return username, username_key, None
 
 
 def _normalize_email(value):
     email = str(value or "").strip()
-    if len(email) > 254 or not EMAIL_RE.fullmatch(email):
+    email_key = email.casefold()
+    if len(email) > 254 or len(email_key) > 254 or not EMAIL_RE.fullmatch(email):
         return None, None, "请输入正确的邮箱地址"
-    return email, email.casefold(), None
+    return email, email_key, None
 
 
 def _normalize_auth_credentials(payload):
@@ -1154,6 +1158,7 @@ def _latest_email_code(cur, purpose, email_key, user_id=None, username_key=None)
         WHERE {' AND '.join(clauses)}
         ORDER BY created_at DESC
         LIMIT 1
+        FOR UPDATE
         """,
         tuple(params),
     )
@@ -1222,6 +1227,10 @@ def _current_auth_user():
                         return None
                 else:
                     # 兼容本功能上线前签发的旧登录 Cookie。
+                    # 重置密码后，旧 Cookie 不能被升级为新的登录版本。
+                    if current_version != 1:
+                        session.clear()
+                        return None
                     session["auth_version"] = current_version
 
                 return user
@@ -2077,8 +2086,11 @@ def sync_user_data():
         return jsonify({"ok": False, "error": "不支持强制覆盖云端数据，请合并后重试"}), 400
 
     try:
-        base_revision = int(payload.get("baseRevision", 0))
-    except (TypeError, ValueError):
+        raw_revision = payload.get("baseRevision", 0)
+        if isinstance(raw_revision, bool) or not isinstance(raw_revision, (int, str)):
+            raise ValueError("invalid_sync_revision")
+        base_revision = int(raw_revision)
+    except (TypeError, ValueError, OverflowError):
         base_revision = -1
 
     if not isinstance(data, dict):
@@ -2087,7 +2099,7 @@ def sync_user_data():
         return jsonify({"ok": False, "error": "同步版本号不正确"}), 400
 
     try:
-        encoded = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        encoded = json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
     except Exception:
         return jsonify({"ok": False, "error": "同步数据无法序列化"}), 400
 
@@ -2119,7 +2131,7 @@ def sync_user_data():
                 if current and int(current["revision"] or 0) == base_revision:
                     from concept_notebook import preserve_legacy_notebook
                     data = preserve_legacy_notebook(data, current["data"] or {})
-                    if len(json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > MAX_SYNC_JSON_BYTES:
+                    if len(json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")) > MAX_SYNC_JSON_BYTES:
                         conn.rollback()
                         return jsonify({"ok": False, "error": "同步数据过大，请先清理部分历史记录"}), 413
 
@@ -3216,6 +3228,8 @@ def recognize_selected_graph_region():
     from graph_agent_runtime import AgentCancelled
     from graph_upload_tasks import UPLOAD_TASKS, UploadAdmissionError
     import uuid
+    if not _check_rate_limit(_get_client_ip(), "ocr"):
+        return jsonify({'error': '图片识别请求过于频繁，请稍后再试。'}), 429
     owner=confirmation_owner()
     request_id=_normalize_ocr_request_id(request.form.get('request_id'))
     operation_id=_normalize_ocr_request_id(request.form.get('operation_id')) or 'region-'+uuid.uuid4().hex
@@ -3315,6 +3329,7 @@ def describe_confirmed_graph_document():
                                     resolve_confirmed_context, validate_document,
                                     document_digest)
     from graph_description import describe_confirmed_drawing
+    import sqlite3
     if request.content_length is not None and request.content_length > 500_000:
         return jsonify({"error": "图形描述数据过大", "code": "description_too_large"}), 413
     if not _check_rate_limit(_get_client_ip(), "graph_describe"):
@@ -3333,7 +3348,7 @@ def describe_confirmed_graph_document():
             raise ConfirmationError("confirmation_changed", "图形已修改，请重新确认。", status=409)
     except ConfirmationError as exc:
         return jsonify({"error": exc.message, "code": exc.code, "issues": exc.issues}), exc.status
-    except (OSError, ValueError, TypeError):
+    except (sqlite3.Error, OSError, ValueError, TypeError):
         return jsonify({"error": "已确认图形无法核验", "code": "confirmation_unavailable"}), 503
     try:
         answer = describe_confirmed_drawing(drawing)
@@ -3650,7 +3665,7 @@ def chat():
         # 错题复测：默认继承原错题保存的难度。仅用户在本轮明确下达
         # “改出简单/困难”指令时覆盖；普通出题依旧默认中等。
         # 复测提示中的“与原题相同”属于内部说明，不是一条改难度命令。
-        if is_wrongbook_retest:
+        if is_wrongbook_retest and not requested_difficulty:
             requested_difficulty = original_retest_difficulty
         explicit_exercise_difficulty = requested_difficulty
         exercise_target_difficulty = requested_difficulty or "中等"
@@ -4131,14 +4146,19 @@ def chat():
 
 @app.route("/analyze-questions", methods=["POST"])
 def analyze_questions_batch():
-    """批量重新识别历史题目的模块和知识点，不调用大模型。"""
-    data = request.get_json(silent=True) or {}
+    """批量本地分类；仅显式启用时进行受限的 AI 语义复核。"""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "题目列表格式不正确"}), 400
     items = data.get("questions")
 
     if not isinstance(items, list):
         return jsonify({
             "error": "题目列表格式不正确"
         }), 400
+
+    if data.get("semantic_fallback") is True and not _check_rate_limit(_get_client_ip(), "analyze_questions"):
+        return jsonify({"error": "题目复核请求过于频繁，请稍后再试"}), 429
 
     results = []
     fallback_entries = []
@@ -4366,7 +4386,9 @@ def _retain_unverified_graph_candidate(failure_text, initial_text):
 def cancel_ocr():
     if not _check_rate_limit(_get_client_ip(), "ocr_cancel"):
         return jsonify({"error": "撤销请求过于频繁，请稍后再试"}), 429
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "撤销请求无效"}), 400
     request_id = _normalize_ocr_request_id(data.get("request_id"))
 
     if not request_id:
@@ -4471,6 +4493,7 @@ def ocr():
                               server_elapsed_seconds=round(time.monotonic()-started_at, 3))
                 return jsonify(routed)
             except AgentCancelled:
+                _take_ocr_cancelled(request_id, owner=owner)
                 return jsonify({"cancelled": True})
             except UploadAdmissionError as exc:
                 return jsonify({"error": ("此图片正在识别，请等待当前任务。"
