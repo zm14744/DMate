@@ -12,6 +12,7 @@
   const doc=host.ownerDocument,win=doc.defaultView;
   if(!root.DMateGraphEditor?.mount)throw new Error('绘图模块未加载，请刷新后重试。');
   const key=String(options.storageKey||'dmate:graph-gallery:v1:guest');
+  const persistent=options.persistent===true,sessionState=options.sessionState||{};
   let pages=[],activeId='',editor=null,timer=null,destroyed=false,persistError='',aiAbort=null,aiEpoch=0,exportBusy=false,panelMode='',uploadBusy=false;
   let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedViewport=null,observedPalette=null,toolsExpanded=false,deletePending=null;
   const el=(tag,className,text)=>{const n=doc.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
@@ -154,7 +155,7 @@
    clearTimeout(timer);timer=null;if(destroyed)return false;
    const payload=JSON.stringify({version:2,activeId,pages});
    if(payload===savedRaw)return true;
-   try{win.localStorage.setItem(key,payload);savedRaw=payload;persistError='';setStatus('');return true;}
+   try{if(persistent)win.localStorage.setItem(key,payload);sessionState.gallery=payload;savedRaw=payload;persistError='';setStatus('');return true;}
    catch(_){persistError='此设备存储不足，当前绘图仍在本页保留；请导出图片后再关闭。';setStatus();return false;}
   }
   function schedule(){clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}
@@ -276,7 +277,7 @@
    if(graph&&graph.name!==p.name){editor.model?.renameGraph(graph.id,p.name);editor.refresh?.();}
    schedule();}});
   try{
-   const raw=win.localStorage.getItem(key),value=raw?JSON.parse(raw):null;
+   const raw=persistent?win.localStorage.getItem(key):sessionState.gallery,value=raw?JSON.parse(raw):null;
    if((value?.version===1||value?.version===2)&&Array.isArray(value.pages)){
     restoredGallery=true;
     pages=value.pages.filter(p=>p&&typeof p.id==='string'&&goodDocument(p.document)).slice(0,50).map(p=>({...p,name:caption(p.name),requirement:String(p.requirement||'').slice(0,2000),updatedAt:Number(p.updatedAt)||0}));

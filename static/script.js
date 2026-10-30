@@ -93,6 +93,14 @@ function purgeGuestPersistentState() {
         localStorage.removeItem(LEARNING_STORAGE_KEY);
         localStorage.removeItem(APPEARANCE_STORAGE_KEY);
         localStorage.removeItem(CLOUD_BACKUP_KEY);
+        // 清除旧版本留下的游客图库；账号自己的图库继续保留。
+        localStorage.removeItem("dmate:graph-gallery:v1::guest");
+        localStorage.removeItem("dmate:graph-gallery:v1:guest");
+        const legacyDrawingOwner = localStorage.getItem("dmate:graph-drawing:v1:owner");
+        if (!legacyDrawingOwner || legacyDrawingOwner === "guest") {
+            localStorage.removeItem("dmate:graph-drawing:v1");
+            localStorage.removeItem("dmate:graph-drawing:v1:owner");
+        }
     } catch (_error) {}
 }
 
@@ -6640,7 +6648,7 @@ function processLearningFromReply(
 
 function buildLearningReviewSnapshot() {
     // History collection can recover legacy AI question metadata. Work on
-    // message copies so opening a report never mutates saved conversations.
+    // message copies so opening a review never mutates saved conversations.
     const reportSessions = (Array.isArray(sessions) ? sessions : []).map(session => ({
         id: session.id,
         name: session.name,
@@ -6662,54 +6670,10 @@ function buildLearningReviewSnapshot() {
     });
 }
 
-function openLearningReportSession(sessionId, messageIndex = null, question = null) {
-    const session = sessions.find(item => String(item.id) === String(sessionId));
-    if (!session) return;
-    if (question) {
-        // Cloud updates can shift message positions while the report is open.
-        const currentQuestion = getConversationQuestionHistory(session).find(item => (
-            item.role === question.role && item.text === question.text
-        ));
-        if (!currentQuestion) { renderLearningReview(); return; }
-        messageIndex = currentQuestion.index;
-    }
-    if (currentId !== session.id) pauseOcrBatchRun(currentId);
-    if (typingTimer) forceCompleteTyping();
-    currentId = session.id;
-    closeLearningReview();
-    closeMobileShellDrawers();
-    saveState();
-    renderAll();
-    if (Number.isInteger(messageIndex)) locateKnowledgeHistoryMessage(messageIndex);
-}
-
 function renderLearningReview() {
     const body = document.getElementById("learningReviewBody");
     if (!body || !window.DMateLearningReport) return;
-    window.DMateLearningReport.render(body, buildLearningReviewSnapshot(), {
-        close: closeLearningReview,
-        question: question => openLearningReportSession(question.sessionId, question.index, question),
-        session: sessionId => openLearningReportSession(sessionId),
-        knowledge: () => {
-            closeLearningReview();
-            closeMobileShellDrawers();
-            openKnowledgeGraph();
-        },
-        wrong: id => {
-            const item = learningState.wrongQuestions.find(entry => entry.id === id);
-            wrongBookFilter = "all";
-            wrongBookSearch = item ? String(item.question || "").trim().toLowerCase() : "";
-            closeLearningReview();
-            closeMobileShellDrawers();
-            openWrongBook();
-        },
-        notebook: () => {
-            initializeConceptNotebook();
-            if (!window.dmateConceptNotebook) return;
-            closeLearningReview();
-            window.dmateConceptNotebook.open();
-        }
-    });
+    window.DMateLearningReport.render(body, buildLearningReviewSnapshot());
 }
 
 function openLearningReview() {
@@ -14894,10 +14858,11 @@ function reuseVerifiedTypeForSameRegion(task, polygon) {
 
 let standaloneDrawing = null;
 let standaloneDrawingOwner = null;
+let standaloneDrawingSessionState = {};
 const DRAWING_STORAGE_KEY = "dmate:graph-drawing:v1";
 
 function drawingStorageOwner() {
-    return typeof accountState !== "undefined" && accountState.authenticated
+    return shouldPersistClientState()
         ? "account:" + accountState.username : "guest";
 }
 
@@ -14996,13 +14961,17 @@ function openGraphDrawing() {
     if (!dialog || !mount || !close) return;
     closeMobileShellDrawers();
     const owner = drawingStorageOwner();
-    if (standaloneDrawingOwner !== owner) { standaloneDrawing = null; standaloneDrawingOwner = owner; }
-    if (!standaloneDrawing) {
+    if (standaloneDrawingOwner !== owner) {
+        standaloneDrawing = null;
+        standaloneDrawingSessionState = {};
+        standaloneDrawingOwner = owner;
+    }
+    const persistent = shouldPersistClientState();
+    if (!standaloneDrawing && persistent) {
         try {
             const legacyOwner = localStorage.getItem(DRAWING_STORAGE_KEY + ":owner");
-            if (!legacyOwner || legacyOwner === owner) {
+            if (legacyOwner === owner) {
                 standaloneDrawing = JSON.parse(localStorage.getItem(DRAWING_STORAGE_KEY));
-                if (standaloneDrawing && !legacyOwner) localStorage.setItem(DRAWING_STORAGE_KEY + ":owner", owner);
             }
         } catch (_) {}
     }
@@ -15025,6 +14994,8 @@ function openGraphDrawing() {
         const workspace = window.DMateDrawingWorkspace;
         ocrEditorController = workspace?.mount ? workspace.mount(mount, {
             storageKey: "dmate:graph-gallery:v1::" + encodeURIComponent(owner),
+            persistent,
+            sessionState: standaloneDrawingSessionState,
             legacyDocument: cloneOcrDocument(standaloneDrawing),
             onChange: value => { standaloneDrawing = cloneOcrDocument(value); },
             onUpload: uploadDrawingResult,
@@ -15040,7 +15011,10 @@ function openGraphDrawing() {
             originalUrl: blank, drawingOnly: true,
             onChange: value => { standaloneDrawing = cloneOcrDocument(value); },
             onConfirm: async value => {
-                localStorage.setItem(DRAWING_STORAGE_KEY, JSON.stringify(value));
+                if (persistent) {
+                    localStorage.setItem(DRAWING_STORAGE_KEY, JSON.stringify(value));
+                    localStorage.setItem(DRAWING_STORAGE_KEY + ":owner", owner);
+                }
                 standaloneDrawing = cloneOcrDocument(value); dialog.close();
             }
         });
