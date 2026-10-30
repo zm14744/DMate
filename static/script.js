@@ -6670,6 +6670,7 @@ function buildLearningReviewSnapshot() {
         sessions: reportSessions,
         learning: learningState,
         notebook,
+        drawings: collectLearningReviewDrawings(),
         currentSessionId: currentId
     });
 }
@@ -14868,6 +14869,48 @@ const DRAWING_STORAGE_KEY = "dmate:graph-drawing:v1";
 function drawingStorageOwner() {
     return shouldPersistClientState()
         ? "account:" + accountState.username : "guest";
+}
+
+function collectLearningReviewDrawings() {
+    const owner = drawingStorageOwner();
+    const sameOwner = standaloneDrawingOwner === owner;
+    const meaningful = page => {
+        const value = page?.document;
+        return value && (typeof value.body_text === "string" && value.body_text.trim()
+            || Array.isArray(value.graphs) && value.graphs.some(graph => (
+                Array.isArray(graph?.vertices) && graph.vertices.some(vertex => vertex && typeof vertex === "object")
+                || Array.isArray(graph?.edges) && graph.edges.some(edge => edge && typeof edge === "object")
+            )));
+    };
+    if (sameOwner && ocrEditorTaskId === "standalone-drawing"
+        && typeof ocrEditorController?.getPages === "function") {
+        return ocrEditorController.getPages().slice(0, 50).filter(meaningful);
+    }
+    let raw = sameOwner ? standaloneDrawingSessionState.gallery : null;
+    if (shouldPersistClientState()) {
+        try {
+            raw = localStorage.getItem("dmate:graph-gallery:v1::" + encodeURIComponent(owner)) || raw;
+        } catch (_error) {}
+    }
+    if (raw) {
+        try {
+            const gallery = JSON.parse(raw);
+            if ((gallery?.version === 1 || gallery?.version === 2) && Array.isArray(gallery.pages)) {
+                return gallery.pages.slice(0, 50).filter(meaningful);
+            }
+        } catch (_error) {}
+    }
+    // Support the older single-page editor without reading a guest's stored history.
+    let legacy = sameOwner ? standaloneDrawing : null;
+    if (!legacy && shouldPersistClientState()) {
+        try {
+            if (localStorage.getItem(DRAWING_STORAGE_KEY + ":owner") === owner) {
+                legacy = JSON.parse(localStorage.getItem(DRAWING_STORAGE_KEY));
+            }
+        } catch (_error) {}
+    }
+    const page = { name: legacy?.graphs?.[0]?.name || "我的绘图", document: legacy };
+    return meaningful(page) ? [page] : [];
 }
 
 async function uploadDrawingResult(blob, metadata = {}) {

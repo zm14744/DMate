@@ -1,4 +1,4 @@
-/* Learning review keeps the same three summary cards in every state. */
+/* Records use three summary cards; the empty view only says 无. */
 #learningReviewModal .learning-review-card {
     width:min(980px,94vw);
     max-height:90dvh;
