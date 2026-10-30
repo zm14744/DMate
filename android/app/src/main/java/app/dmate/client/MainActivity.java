@@ -7,6 +7,7 @@ import android.content.ContentResolver;
 import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.media.MediaScannerConnection;
@@ -82,6 +83,9 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // WebView derives prefers-color-scheme from the Activity's light/dark
+        // theme, so choose it before constructing the WebView.
+        setTheme(systemAppearanceTheme(getResources().getConfiguration()));
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
@@ -101,6 +105,24 @@ public final class MainActivity extends Activity {
             webView.loadUrl(HOME_URL);
         } else {
             webView.restoreState(savedInstanceState);
+        }
+    }
+
+    private int systemAppearanceTheme(Configuration configuration) {
+        return (configuration.uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+            ? R.style.Theme_DMate_Dark : R.style.Theme_DMate;
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        // uiMode is handled here instead of recreating the Activity. Change
+        // the actual theme ID so the Activity context's isLightTheme updates.
+        setTheme(systemAppearanceTheme(newConfig));
+        super.onConfigurationChanged(newConfig);
+        if (webView != null) {
+            // Refresh media queries in the existing page without a reload,
+            // preserving unsent text, image selections and guest state.
+            webView.dispatchConfigurationChanged(newConfig);
         }
     }
 

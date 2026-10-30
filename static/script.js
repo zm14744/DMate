@@ -830,22 +830,26 @@ async function resetAppearance() {
 }
 
 function setupAppearanceSystemThemeListener() {
+    const onChange = () => {
+        if (appearanceSettings.mode === "system") {
+            applyAppearanceSettings({ save: false });
+        }
+    };
     try {
         appearanceSystemMedia = window.matchMedia("(prefers-color-scheme: dark)");
-        const onChange = () => {
-            if (appearanceSettings.mode === "system") {
-                applyAppearanceSettings({ save: false });
-            }
-        };
-
         if (typeof appearanceSystemMedia.addEventListener === "function") {
             appearanceSystemMedia.addEventListener("change", onChange);
         } else if (typeof appearanceSystemMedia.addListener === "function") {
             appearanceSystemMedia.addListener(onChange);
         }
     } catch (_error) {
-        // 不支持系统主题监听时维持当前解析结果即可。
+        // 部分移动浏览器不支持变更事件，回到页面时再读取系统设置。
     }
+    window.addEventListener("pageshow", onChange);
+    window.addEventListener("focus", onChange);
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) onChange();
+    });
 }
 
 function bindAppearanceControls() {
