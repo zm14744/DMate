@@ -15124,10 +15124,13 @@ async function editOcrTask(id) {
             requirements: task.userRequest || '',
             onRequirementsChange: value => { task.userRequest = value; },
             textState: task.textEditorState ||= { mode: 'text_rect', zoom: 100, visible: true },
-            onRecognizeText: async (regions, {signal} = {}) => {
-                const controller = new AbortController();
-                const timeout = window.setTimeout(() => controller.abort(), 100000);
-                const abort = () => controller.abort();
+            onRecognizeText: async (regions, {signal, forceRecognition = false} = {}) => {
+                const controller = new AbortController(), operationId = makeOcrRequestId();
+                const abort = () => {
+                    if (controller.signal.aborted) return;
+                    controller.abort(); notifyOcrCancelled(operationId);
+                };
+                const timeout = window.setTimeout(abort, 100000);
                 signal?.addEventListener("abort", abort, {once:true});
                 if (signal?.aborted) abort();
                 try {
@@ -15136,13 +15139,15 @@ async function editOcrTask(id) {
                     const selected = new FormData();
                     selected.append('image', task.file);
                     selected.append('request_id', task.id);
+                    selected.append('operation_id', operationId);
                     selected.append('regions', JSON.stringify(regions));
+                    if (forceRecognition) selected.append('force_recognition', '1');
                     const response = await fetch('/graph/text-region', {
                         method: 'POST', credentials: 'same-origin', body: selected, signal: controller.signal
                     });
                     const result = await parseResponseJson(response);
-                    if (!response.ok || result?.error) throw new Error(result?.error || '框内文字识别失败');
-                    if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id)
+                    if (!response.ok || result?.error || result?.cancelled) throw new Error(result?.error || '框内文字识别已取消');
+                    if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id || result.operation_id !== operationId)
                         throw new Error('文字识别结果与所选原图不匹配');
                     return result;
                 } catch (error) {

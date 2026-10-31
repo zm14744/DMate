@@ -29,6 +29,8 @@ DMate 是 Flask 提供网页和 API、浏览器保存学习状态的离散数学
 | `graph_confirmation.py`、`graph_confirmation_batch.py` | 原图登记、用户确认、快照校验和多图组合 |
 | `ocr_runtime.py`、`ocr_worker.py` | 有资源边界的本地 OCR 子进程 |
 | `ocr_text_engine.py` | 本地文字 ONNX / 显式 Paddle 回退的引擎配置与模型路径 |
+| `ocr_text_preprocess.py` | 原图读取后的质量判断与至多一种同坐标辅助处理 |
+| `ocr_text_cache.py` | 按身份、原图与有效选区隔离的短期机器 OCR 结果缓存 |
 | `concept_notebook.py`、`drawing_guidance.py`、`voice_input.py` | 概念分析、画图指导和语音转写 |
 
 一些维护时常用的补充入口：
@@ -189,6 +191,12 @@ sequenceDiagram
 本地文字阶段默认用 ONNX Runtime CPU 执行 PP-OCRv6 Small 检测与识别，继续使用 PaddleOCR / PaddleX 的前后处理；PP-DocLayoutV3 版面阶段仍使用 Paddle。`ocr_text_engine.py` 只选择已准备的模型及执行配置，不在请求中转换模型。构建时由官方 Paddle 权重导出文字 ONNX 并核对清单，保留原包供显式回退。`DMATE_TEXT_OCR_ENGINE=paddle_static` 选择原执行路径；默认 `onnxruntime`，异常不隐式降级。
 
 模型阶段由本地调度器串行租约约束。DocLayout 与文字 small 模型不在同一个 worker 中并存；远程视觉请求不占本地推理租约。内存判断考虑 worker RSS、cgroup 剩余空间及保守的可回收文件缓存估计。`ocr_worker_audit.py` 是运行时回执与资源审计代码，属于生产路径，不能按文件名当作测试工具删除。
+
+文字 worker 总是先用原像素读取一次。`ocr_text_preprocess.py` 结合首遍置信度、数学符号风险及缩略质量分析，决定跳过补充读取，或在局部对比度、深色底反转后对比度调整、轻度锐化中选择一种；原尺寸与坐标不变，总计最多两遍。补充结果继续进入原有保守合并和未确认候选处理，不把增强读数直接提升为正文真值。
+
+`/graph/text-region` 在 Web 进程内使用 `ocr_text_cache.py` 保存完整非空的机器结果，原图与选区身份校验先于查缓存。键绑定身份、原图 SHA256、有效选区 / 排除区、批量编号和顺序、实际引擎、模型清单和 `text-quality-v1` 预处理版本。失败、部分、空结果及取消不缓存；图片本体、编辑内容、确认令牌和 worker 完成回执也不缓存。命中后重新绑定本次请求，取消状态仍需检查；`force_recognition=1` 使本次跳过并清除匹配旧项。
+
+该缓存有效期 10 分钟，最多 64 条，序列化内容合计最多 8 MiB；过期在后续缓存操作时清理，进程重启清空。它没有持久化或跨进程服务，增加 Web worker 不会共享这些条目。缓存命中可跳过本次本地模型工作，不会据此宣称创建了新的 worker 回执或完成了新的识别。
 
 图片上传准入当前上限为 4 个活动原图 / 图形选区任务；同一浏览器重复的活动任务 ID 被拒绝。它与“前端一次最多 4 张”、每分钟频率限制、本地模型租约分别解决不同问题，不能互相替代。
 

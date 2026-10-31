@@ -3133,10 +3133,13 @@ def recognize_manual_text_region():
     """Only OCR explicitly framed pixels; never reconstruct graph topology."""
     from graph_confirmation import (ConfirmationError, confirmation_owner,
                                     require_recognition_source)
-    from graph_region import RegionError, crop_region
+    from graph_region import RegionError, crop_region, validate_polygon
+    from ocr_text_cache import TEXT_RESULT_CACHE, result_cache_key, reader_cache_tag
     if not _check_rate_limit(_get_client_ip(), "ocr"):
         return jsonify({"error": "文字区域识别过于频繁，请稍后重试"}), 429
     request_id = _normalize_ocr_request_id(request.form.get("request_id"))
+    operation_id = _normalize_ocr_request_id(request.form.get("operation_id"))
+    force_recognition = request.form.get('force_recognition') == '1'
     source = request.files.get("image")
     if not request_id or source is None:
         return jsonify({"error": "缺少原图或识别任务"}), 400
@@ -3144,10 +3147,32 @@ def recognize_manual_text_region():
     if not raw or len(raw) > MAX_IMAGE_BYTES:
         return jsonify({"error": "单张图片不能超过 20MB"}), 413
     source_sha = hashlib.sha256(raw).hexdigest()
+    owner = confirmation_owner()
     try:
-        require_recognition_source(confirmation_owner(), request_id, source_sha)
+        require_recognition_source(owner, request_id, source_sha)
     except ConfirmationError as exc:
         return jsonify({"error": exc.message, "code": exc.code}), exc.status
+
+    def cancelled_response():
+        if operation_id and _ocr_is_cancelled(operation_id, owner=owner):
+            _take_ocr_cancelled(operation_id, owner=owner)
+            return jsonify({'cancelled': True, 'request_id': request_id,
+                            'operation_id': operation_id, 'source_sha256': source_sha})
+        return None
+
+    def cache_lookup(key):
+        if force_recognition:
+            TEXT_RESULT_CACHE.discard(key)
+            return None
+        return TEXT_RESULT_CACHE.get(key)
+
+    def text_response(payload, *, cache_hit):
+        payload.update(request_id=request_id, source_sha256=source_sha, cache_hit=cache_hit)
+        if operation_id:
+            payload['operation_id'] = operation_id
+        response = jsonify(payload)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
     # A batch contains only explicitly framed pixels, in frame-number order.
     raw_regions = request.form.get("regions")
     if raw_regions is not None:
@@ -3159,6 +3184,15 @@ def recognize_manual_text_region():
             regions = validate_text_regions(json.loads(raw_regions))
         except (ValueError, TypeError, RegionError) as exc:
             return jsonify({"error": str(exc) or "文字选区无效"}), 400
+        cancelled = cancelled_response()
+        if cancelled is not None:
+            return cancelled
+        key = result_cache_key(owner, source_sha, {'mode': 'numbered_regions', 'regions': regions},
+                               reader_tag=reader_cache_tag(recognize_text_regions))
+        cached = cache_lookup(key)
+        if cached is not None:
+            cancelled = cancelled_response()
+            return cancelled if cancelled is not None else text_response(cached, cache_hit=True)
         try:
             result = normalize_text_result(recognize_text_regions(raw, regions))
         except RegionError as exc:
@@ -3168,27 +3202,42 @@ def recognize_manual_text_region():
         except Exception as exc:
             print(f"文字批量识别失败：{type(exc).__name__}")
             return jsonify({"error": "文字识别服务异常，请重试。", "recognition_status": "failed"}), 503
+        cancelled = cancelled_response()
+        if cancelled is not None:
+            return cancelled
         rows = result["regions"]
-        return jsonify({"regions": rows, "text": result["text"],
+        payload = {"regions": rows, "text": result["text"],
                         "text_count": result.get("text_count", 0),
-                        "request_id": request_id, "source_sha256": source_sha,
                         "recognition_status": result["recognition_status"],
                         "review_count": result["review_count"],
                         "review_reasons": result["review_reasons"], "warning": result["warning"],
-                        "selection_mode": "numbered_regions"})
+                        "selection_mode": "numbered_regions"}
+        TEXT_RESULT_CACHE.put(key, {**payload, 'resource_metrics': result.get('resource_metrics', [])})
+        cancelled = cancelled_response()
+        if cancelled is not None:
+            TEXT_RESULT_CACHE.discard(key)
+            return cancelled
+        return text_response(payload, cache_hit=False)
     raw_region = request.form.get("polygon", "")
     if len(raw_region) > 6000:
         return jsonify({"error": "选区轮廓过于复杂"}), 400
     try:
-        region = json.loads(raw_region)
+        region = validate_polygon(json.loads(raw_region))
         raw_exclusions = request.form.get("exclusions", "[]")
         if len(raw_exclusions) > 200000:
             raise RegionError("图形选区过于复杂")
-        cropped = crop_region(raw, region, exclusions=json.loads(raw_exclusions))
+        exclusions = json.loads(raw_exclusions)
+        if not isinstance(exclusions, list) or len(exclusions) > 64:
+            raise RegionError('图形选区数量无效。')
+        exclusions = [validate_polygon(points) for points in exclusions]
+        cropped = crop_region(raw, region, exclusions=exclusions)
     except (ValueError, TypeError, RegionError) as exc:
         return jsonify({"error": str(exc) or "文字选区无效"}), 400
     if not OCR_AVAILABLE or recognize_image is None:
         return jsonify({"error": "文字 OCR 暂不可用，可继续手动输入"}), 503
+    cancelled = cancelled_response()
+    if cancelled is not None:
+        return cancelled
     try:
         # Keep the injected/runtime OCR reader for the current nextgen mode;
         # legacy mode must still use the bounded Small worker, never full layout.
@@ -3197,6 +3246,13 @@ def recognize_manual_text_region():
             text_reader = recognize_image
         else:
             from ocr_runtime import recognize_image as text_reader
+        key = result_cache_key(owner, source_sha,
+                               {'mode': 'polygon', 'polygon': region, 'exclusions': exclusions},
+                               reader_tag=reader_cache_tag(text_reader))
+        cached = cache_lookup(key)
+        if cached is not None:
+            cancelled = cancelled_response()
+            return cancelled if cancelled is not None else text_response(cached, cache_hit=True)
         params = signature(text_reader).parameters
         dynamic = any(p.kind == Parameter.VAR_KEYWORD for p in params.values())
         options = {}
@@ -3215,14 +3271,22 @@ def recognize_manual_text_region():
     if failed:
         return jsonify({"error": "文字识别超时，请重试。" if failed.get("status") == "timeout" else "文字识别服务未完成，请稍后重试。",
                         "recognition_status": "failed"}), 503
+    cancelled = cancelled_response()
+    if cancelled is not None:
+        return cancelled
     text = str(result.get("text") or "").strip()
-    return jsonify({"text": text, "text_count": result.get("text_count", 0),
-                    "request_id": request_id, "source_sha256": source_sha,
+    payload = {"text": text, "text_count": result.get("text_count", 0),
                     "selection_mode": "polygon",
                     "text_regions": result.get("text_evidence") or {},
                     "recognition_status": result["recognition_status"],
                     "review_count": result["review_count"],
-                    "review_reasons": result["review_reasons"], "warning": result["warning"]})
+                    "review_reasons": result["review_reasons"], "warning": result["warning"]}
+    TEXT_RESULT_CACHE.put(key, {**payload, 'resource_metrics': stages})
+    cancelled = cancelled_response()
+    if cancelled is not None:
+        TEXT_RESULT_CACHE.discard(key)
+        return cancelled
+    return text_response(payload, cache_hit=False)
 
 
 

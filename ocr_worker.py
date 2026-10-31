@@ -79,20 +79,24 @@ def _limit_resources():
 def recognize_text_crop(image,ocr,audit,regions):
     from ocr_layout import partition_text
     from ocr_runtime import normalize_text_result
+    from ocr_text_preprocess import plan_text_enhancement, apply_text_enhancement
     original_pass=audit.start_pass('original',image)
     items=ocr._extract_text_items(image)
     unconfirmed=[]
     original_pass['accepted_items']=len(items)
     for index,item in enumerate(items):
         item['ocr_provenance']={'pass_index':1,'pass_kind':'original','item_index':index}
+    plan=plan_text_enhancement(image,items,math_risk=ocr._math_line_risk(items))
+    original_pass['enhancement_plan']=plan
     audit.flush()
     # One bounded auxiliary pass, never a retry loop. It keeps native source
     # dimensions and the same detector budget; numeric changes still use
     # the existing conservative merge policy in ocr.py.
-    if ocr._ocr_text_strength(items)<28 or ocr._math_line_risk(items):
+    if plan['mode']!='none':
         enhanced_pass=audit.start_pass('enhanced',image)
+        enhanced_pass['enhancement_mode']=plan['mode']
         with audit.phase('text_enhance'):
-            enhanced_image=ocr._enhance_faded_photo(image)
+            enhanced_image=apply_text_enhancement(image,plan)
         enhanced=ocr._extract_text_items(enhanced_image)
         del enhanced_image
         enhanced_pass['accepted_items']=len(enhanced)

@@ -203,13 +203,26 @@ if (!response.ok) throw new Error(draft.error || "识别未完成");
 
 | 路径 | 附加表单字段 | 主要返回 |
 | --- | --- | --- |
-| `/graph/text-region` | `polygon`；可选 `exclusions`，或改用 `regions` 数组 | `text`、`text_count`、状态及原图标识 |
+| `/graph/text-region` | `polygon`；可选 `exclusions`，或改用 `regions` 数组；可选 `operation_id`、`force_recognition` | `text`、`text_count`、状态、原图标识及 `cache_hit` |
 | `/graph/recognize-region` | `polygon`；建议提供独立 `operation_id` | 图形草稿、选区来源信息、`operation_id` |
 | `/graph/figure-type` | `polygon` | `directed`、`weighted`、状态和提示，不新增拓扑 |
 
 `regions` 格式为 `[{"id":1,"order":0,"polygon":[...]}]`，编号和顺序必须各自唯一；一旦使用 `order`，每项都应提供。未提供顺序时按编号排序。批量文字选区响应另有逐区域结果与 `selection_mode: "numbered_regions"`。单选区可通过 `exclusions` 排除图形区域。文字接口只做所选像素的本地 OCR，图形选区接口使用自动识图后把坐标映射回原图。
 
 本地文字默认使用 ONNX Runtime CPU 执行 PP-OCRv6 Small，沿用 PaddleOCR / PaddleX 前后处理；模型应在启动前完成转换和缓存准备。缓存或引擎故障作为识别失败处理，不返回假空结果，也不在请求中转换模型或静默改用其他引擎；配置与显式回退见[部署说明](DEPLOYMENT.md#本地模型与缓存)。此引擎切换不改变接口字段或原图身份规则。
+
+文字选区的可选控制字段：
+
+| 字段 | 行为 |
+| --- | --- |
+| `operation_id` | 本次文字识别操作的独立 ID；响应携带同一个值。向 `/ocr/cancel` 发送它作为 `request_id` 可登记本次取消，原图来源仍用最初的 `request_id` |
+| `force_recognition` | 字符串 `"1"` 清除当前匹配缓存并实际重识别；其他值按普通缓存查询处理。新结果满足缓存条件时可重新写入 |
+
+普通文字选区请求在身份、原图摘要、选区及排除范围校验通过后查询进程内缓存。键包含当前浏览器 / 账号身份、完整原图 SHA256、有效 ROI / exclusions、批量顺序和编号、文字执行引擎、模型清单及预处理版本；不能凭文字相似或只凭任务 ID 复用。只缓存 `complete`、非空、没有错误或待核对提示的机器 OCR 结果；批量中每一行也都必须满足条件。`partial`、`empty`、失败及取消不写入缓存。
+
+正常文字响应的 `cache_hit` 为布尔值；`true` 表示复用机器识别内容，`false` 表示本次实际识别，不代表结果已由人核对或已经确认。命中响应仍携带本次 `request_id`、`source_sha256` 和可选 `operation_id`，不复用旧确认令牌、旧操作标识或 worker 回执。读取缓存前及返回 / 写入结果前检查本次取消；取消后返回取消状态，已启动的底层推理不因此保证立即终止。接口响应继续带 `Cache-Control: no-store`，服务端结果缓存不等于允许浏览器或代理缓存整个响应。
+
+缓存有效期 10 分钟，每进程最多 64 条且序列化结果合计不超过 8 MiB，访问时清理过期项，进程重启清空。它不写数据库、磁盘或 Redis，不跨进程共享，也不存储原图、用户编辑内容或图形确认凭据。首次识别仍需实际执行；缓存仅减少完全匹配的重复请求。
 
 文字响应及批量中的每一行另有 `review_count`、`review_reasons`、`warning`。`recognition_status` 区分 `complete`、`partial` 和 `empty`，运行失败另行处理；有字但原图 / 增强读数未核对一致时仍是 `partial`，调用方不能仅按非空文字覆盖状态。批量中存在部分结果或空框时，总体状态相应反映不完整，成功行内容仍保留。
 

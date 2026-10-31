@@ -58,7 +58,7 @@ function mount(container,options){
  const overlayState=state.view||={zoom:100,visible:true};overlayState.mode='select';overlayState.start=null;overlayState.polygonDraft=[];overlayState.regions=state.textRegions;
  function activate(kind){state.mode='manual';state[kind==='graph'?'graphSelectionActive':'textSelectionActive']=true;}
  function changeGraph(row,points,irregular,activateSource=true){row.polygon=copy(points);row.irregular=irregular;row.version=(row.version||0)+1;row.status='queued';row.error='';row.graphs=[];row.controller?.abort();if(activateSource)activate('graph');emit();refresh();void pumpGraphs();}
- function changeText(row,points,irregular,activateSource=true){row.polygon=copy(points);row.irregular=irregular;row.version=(row.version||0)+1;row.status='queued';row.error='';row.text='';if(activateSource)activate('text');emit();refresh();clearTimeout(textTimer);textTimer=setTimeout(pumpText,450);}
+ function changeText(row,points,irregular,activateSource=true){row.forceRecognition=Boolean(row.polygon&&JSON.stringify(row.polygon)===JSON.stringify(points));row.polygon=copy(points);row.irregular=irregular;row.version=(row.version||0)+1;row.status='queued';row.error='';row.text='';if(activateSource)activate('text');emit();refresh();clearTimeout(textTimer);textTimer=setTimeout(pumpText,450);}
  function remove(row,kind){row.controller?.abort();const list=rows(kind),index=list.indexOf(row);if(index<0)return;list.splice(index,1);if(kind==='graph'&&state.selectedGraphId===row.id)state.selectedGraphId=null;if(kind==='text'&&overlayState.selectedId===row.id)overlayState.selectedId=null;emit();refresh();overlay.refresh();}
  async function requestRemove(row,kind){
   if(destroyed||saving||deletePending||!rows(kind).includes(row))return;
@@ -161,7 +161,7 @@ function mount(container,options){
   if(!queued.length){textBusy=false;return;}active.add(controller);
   queued.forEach(row=>{row.status='running';row.text='';row.error='';});refresh();
   try{
-   const result=await options.onRecognizeText(queued.map((row,index)=>({id:row.id,polygon:copy(row.polygon),order:index})),{signal:controller.signal});
+   const result=await options.onRecognizeText(queued.map((row,index)=>({id:row.id,polygon:copy(row.polygon),order:index})),{signal:controller.signal,forceRecognition:queued.some(row=>row.forceRecognition===true)});
    if(!result||result.error||result.recognition_status==='failed'||!Array.isArray(result.regions))throw new Error(result?.error||'文字识别响应不完整。');
    const returned=new Map(result.regions.map(row=>[row.id,row]));
    queued.forEach((row,index)=>{
