@@ -209,6 +209,8 @@ if (!response.ok) throw new Error(draft.error || "识别未完成");
 
 `regions` 格式为 `[{"id":1,"order":0,"polygon":[...]}]`，编号和顺序必须各自唯一；一旦使用 `order`，每项都应提供。未提供顺序时按编号排序。批量文字选区响应另有逐区域结果与 `selection_mode: "numbered_regions"`。单选区可通过 `exclusions` 排除图形区域。文字接口只做所选像素的本地 OCR，图形选区接口使用自动识图后把坐标映射回原图。
 
+文字响应及批量中的每一行另有 `review_count`、`review_reasons`、`warning`。`recognition_status` 区分 `complete`、`partial` 和 `empty`，运行失败另行处理；有字但原图 / 增强读数未核对一致时仍是 `partial`，调用方不能仅按非空文字覆盖状态。批量中存在部分结果或空框时，总体状态相应反映不完整，成功行内容仍保留。
+
 选区不是显示器上的像素坐标。客户端先把指针坐标换算到校正方向后的原图，再按宽高归一化到 0–1；缩放和平移只改变显示，不应改变所选原图位置。`polygon`、`exclusions`、`regions` 在 multipart 中都传 JSON 字符串，不能直接把 JavaScript 数组转换为默认的逗号字符串。
 
 `/graph/recognize-region` 的原图身份仍用 `request_id`，本次重识别的取消与容量跟踪用 `operation_id`。取消选区识别时向 `/ocr/cancel` 提交该 `operation_id`，不能用一次新的随机 ID。`/graph/figure-type` 只返回方向 / 权值判断，不自动补顶点、边、路线或完整题干；`unknown` 是未判断出，不能在数据层当作无向 / 无权。

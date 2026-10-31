@@ -170,6 +170,7 @@ function mount(container,options){
     if(!value||value.error||value.recognition_status==='failed'){row.status='error';row.error=value?.error||'文字识别响应缺少选区。';return;}
     if(value.recognition_status==='empty'){row.status='empty';return;}
     row.text=String(value.text||'');row.status=row.text.trim()?'complete':'empty';
+    if(row.text.trim()&&(value.warning||value.review_count>0||value.review_reasons?.length||['partial','incomplete','uncertain','needs_review','review_required'].includes(value.recognition_status))){row.status='partial';row.error=value.review_reasons?.join('；')||value.warning||'文字识别仍有疑点，请对照原图核对。';}
    });
   }catch(error){queued.forEach((row,index)=>{if(!destroyed&&row.version===versions[index]&&state.textRegions.includes(row)){row.text='';row.status='error';row.error=error?.message||'文字识别失败，请重试。';}});}
   finally{active.delete(controller);textBusy=false;if(!destroyed){emit();refresh();if(state.textRegions.some(row=>row.status==='queued'))void pumpText();}}

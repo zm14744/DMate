@@ -78,6 +78,7 @@ def _limit_resources():
 
 def recognize_text_crop(image,ocr,audit,regions):
     from ocr_layout import partition_text
+    from ocr_runtime import normalize_text_result
     original_pass=audit.start_pass('original',image)
     items=ocr._extract_text_items(image)
     unconfirmed=[]
@@ -108,18 +109,30 @@ def recognize_text_crop(image,ocr,audit,regions):
         partition['uncertain'].extend(unconfirmed)
         partition['image_size']=[image.shape[1],image.shape[0]]
         partition['coordinate_space']='canonical_image_pixels'
-        body=ocr._front_side_text_items(partition['body'],image)
+        # A contrast heuristic cannot decide whether weak ink is legitimate
+        # foreground text. Keep all selected body evidence in the primary read;
+        # a bleed-through filtered view is auxiliary only.
+        body=partition['body']
+        front_body=ocr._front_side_text_items(body,image)
         # Keep the exact emitted OCR items and their original pixel boxes.
         # The automatic figure detector later removes only labels INSIDE
         # recognized diagrams; it must not heuristically delete words from
         # an already assembled question string.
         partition['emitted_body']=body
+        partition['front_side_body']=front_body
         text=ocr._compose_markdown(body,image.shape[1])
+        front_text=ocr._compose_markdown(front_body,image.shape[1])
         event['partition_counts']={key:len(partition[key]) for key in ('body','graph_labels','noise','uncertain')}
         event['emitted_body_items']=len(body)
-    return {'text':text,'front_text':text,'text_count':len(body),'formula_count':0,
+    reasons=[]
+    if unconfirmed:
+        reasons.append('原图与增强识别存在未确认差异，请核对数字、符号及漏字。')
+    if len(partition['uncertain'])>len(unconfirmed):
+        reasons.append('部分识别内容尚未确定归属，请对照原图核对。')
+    return normalize_text_result({'text':text,'front_text':front_text,'text_count':len(body),'formula_count':0,
             'review_regions':ocr._review_regions(body,image.shape[1],image.shape[0]),
-            'text_evidence':partition,'warning':None}
+            'text_evidence':partition,'review_count':len(partition['uncertain']),
+            'review_reasons':reasons})
 
 
 def main():
@@ -128,7 +141,7 @@ def main():
     from ocr_worker_audit import WorkerAudit,BoundedTextModel
     audit=WorkerAudit(output_path,stage,on_phase=_set_phase)
     audit.set_phase('cache')
-    from ocr_runtime import configure_model_cache,write_worker_result
+    from ocr_runtime import configure_model_cache,write_worker_result,normalize_text_result
     configure_model_cache(os.environ)
     # This also applies to explicitly invoked standalone cache-preparation
     # workers; do not rely only on the parent process setting these variables.
@@ -172,10 +185,12 @@ def main():
                     if crop is None: raise ValueError('decode_failed')
                 part=recognize_text_crop(crop,ocr,audit,[])
                 del crop
-                results.append({'id':row['id'],'text':part['text'],'text_count':part['text_count']})
+                results.append({'id':row['id'],'text':part['text'],'text_count':part['text_count'],
+                                **{key:part[key] for key in ('review_count','review_reasons',
+                                                            'recognition_status','warning')}})
             audit.data['completed_regions']=len(results)
-            result={'text':'\n\n'.join(r['text'] for r in results if r['text']),
-                    'regions':results,'text_evidence':{},'text_count':sum(r['text_count'] for r in results)}
+            result=normalize_text_result({'text':'\n\n'.join(r['text'] for r in results if r['text']),
+                    'regions':results,'text_evidence':{},'text_count':sum(r['text_count'] for r in results)})
         else:
             result=recognize_text_crop(image,ocr,audit,plan.get('regions',[]))
     with audit.phase('output'):

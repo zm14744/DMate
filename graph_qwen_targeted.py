@@ -21,13 +21,14 @@ from PIL import Image
 from dmate_tool_registry import ToolContext, ToolRegistry, ToolSpec
 from graph_agent_runtime import AgentBudget, AgentCancelled
 from graph_qwen_targeted_review import (SOURCE_PROMPT, merge_source_review,
+                                        normalize_blank_edge_attributes,
                                         pair, plan_reviews, source_jobs)
 from image_evidence import decode_document_image
 from image_upload_limits import MAX_IMAGE_PIXELS, encode_qwen_image
 from vision_provider import QWEN38_FLASH_MODEL, VisionError, VisionProvider
 from graph_edge_labels import separate_graph_edge_labels
 
-VERSION = 'qwen38-source-review-v3'
+VERSION = 'qwen38-source-review-v4'
 PERFORMANCE_TARGET_SECONDS = 120
 OPERATIONAL_SECONDS = 200
 MAX_REVIEW_PAIRS = 16
@@ -86,6 +87,7 @@ def validate_draft(document):
         edges = set()
         reserved = {e['id'] for e in graph['edges'] if 'id' in e}
         for index, edge in enumerate(graph['edges'], 1):
+            normalize_blank_edge_attributes(edge)
             if edge['from'] not in ids or edge['to'] not in ids:
                 raise ValueError('missing_edge_endpoint')
             # Assign display identities only, never change an edge fact.
@@ -279,7 +281,8 @@ def _final_check(arguments, *, context):
             if graph.get('weighted') is True and edge.get('weight') is None:
                 issues.append({'graph_id': graph['id'], 'kind': 'unknown_weight',
                                'edge_id': edge['id'], 'message': '有边的权值未确定，请对照原图填写。'})
-        if graph.get('directed') is False and any(e['direction'] == 'forward' for e in graph['edges']):
+        if (graph.get('directed') is False and any(e['direction'] == 'forward' for e in graph['edges'])
+                or graph.get('directed') is True and any(e['direction'] == 'undirected' for e in graph['edges'])):
             issues.append({'graph_id': graph['id'], 'kind': 'graph_type_conflict',
                            'message': '图类型与部分箭头读法冲突，请确认。'})
         if graph.get('directed') is None or graph.get('weighted') is None:
@@ -390,7 +393,11 @@ def recognize_qwen_targeted(raw, *, provider=None, review_provider=None, cancell
         except AgentCancelled: raise
         except Exception:
             # A failed detector is not evidence that no line was missed.
-            return {'evidence': {}, 'plans': [], 'issues': state['issues'] + [
+            # Explicit unread arrows/weights can still use the one bounded
+            # visual review; they do not need a successful pixel nomination.
+            graphs = state['document']['graphs']
+            return {'evidence': {}, 'plans': plan_reviews(graphs, {}), 'review_graphs': graphs,
+                    'issues': state['issues'] + [
                 {'kind': 'local_evidence_failed', 'message': '本地点线候选检查未完成，请核对原图。'}]}
 
     def review(state):

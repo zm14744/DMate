@@ -3152,7 +3152,7 @@ def recognize_manual_text_region():
     raw_regions = request.form.get("regions")
     if raw_regions is not None:
         from graph_region import validate_text_regions
-        from ocr_runtime import recognize_text_regions, OCRError
+        from ocr_runtime import recognize_text_regions, normalize_text_result, OCRError
         try:
             if len(raw_regions) > 2_000_000:
                 raise RegionError("文字选区数据过大，请减少选区面积。")
@@ -3160,7 +3160,7 @@ def recognize_manual_text_region():
         except (ValueError, TypeError, RegionError) as exc:
             return jsonify({"error": str(exc) or "文字选区无效"}), 400
         try:
-            result = recognize_text_regions(raw, regions)
+            result = normalize_text_result(recognize_text_regions(raw, regions))
         except RegionError as exc:
             return jsonify({"error": str(exc)}), 400
         except OCRError as exc:
@@ -3168,12 +3168,13 @@ def recognize_manual_text_region():
         except Exception as exc:
             print(f"文字批量识别失败：{type(exc).__name__}")
             return jsonify({"error": "文字识别服务异常，请重试。", "recognition_status": "failed"}), 503
-        rows = [{**row, "recognition_status": "complete" if row.get("text", "").strip() else "empty"}
-                for row in result["regions"]]
+        rows = result["regions"]
         return jsonify({"regions": rows, "text": result["text"],
                         "text_count": result.get("text_count", 0),
                         "request_id": request_id, "source_sha256": source_sha,
-                        "recognition_status": "complete" if all(r["text"].strip() for r in rows) else "partial",
+                        "recognition_status": result["recognition_status"],
+                        "review_count": result["review_count"],
+                        "review_reasons": result["review_reasons"], "warning": result["warning"],
                         "selection_mode": "numbered_regions"})
     raw_region = request.form.get("polygon", "")
     if len(raw_region) > 6000:
@@ -3207,7 +3208,8 @@ def recognize_manual_text_region():
     except Exception as exc:
         print(f"所选文字区域 OCR 失败：{type(exc).__name__}")
         return jsonify({"error": "选区文字识别未完成，可调整范围或手动输入"}), 503
-    result = recognized if isinstance(recognized, dict) else {}
+    from ocr_runtime import normalize_text_result
+    result = normalize_text_result(recognized)
     stages = result.get("resource_metrics") or []
     failed = next((m for m in stages if m.get("stage") == "text" and m.get("status") != "ok"), None)
     if failed:
@@ -3218,8 +3220,9 @@ def recognize_manual_text_region():
                     "request_id": request_id, "source_sha256": source_sha,
                     "selection_mode": "polygon",
                     "text_regions": result.get("text_evidence") or {},
-                    "recognition_status": "complete" if text else "partial",
-                    "warning": None if text else "选区内未识别到文字，请调整范围或手动输入"})
+                    "recognition_status": result["recognition_status"],
+                    "review_count": result["review_count"],
+                    "review_reasons": result["review_reasons"], "warning": result["warning"]})
 
 
 

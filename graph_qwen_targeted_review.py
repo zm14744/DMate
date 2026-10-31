@@ -35,8 +35,17 @@ def _finite(value):
     return type(value) in (int, float) and math.isfinite(value)
 
 
+def normalize_blank_edge_attributes(edge):
+    """Blank model attributes are missing observations, never known values."""
+    for key in ('weight', 'edge_label'):
+        value = edge.get(key)
+        if isinstance(value, str) and not value.strip():
+            edge[key] = None
+    return edge
+
+
 def plan_reviews(graphs, evidence):
-    """Choose absent strokes and independent arrow/type disagreements."""
+    """Choose absent strokes, arrow disagreements and explicitly unread weights."""
     paths = {row.get('id'): row.get('paths', []) for row in evidence.get('line_path_evidence', [])}
     plans = []
     for graph in graphs:
@@ -65,6 +74,8 @@ def plan_reviews(graphs, evidence):
                 arrows.append(pair(hint['from'], hint['to']))
                 if hint['score']>=ARROW_SCORE:strong_arrows.append(pair(hint['from'],hint['to']))
         unknown = [pair(e['from'],e['to']) for e in graph['edges'] if e.get('direction')=='unknown']
+        unknown_weights = [pair(e['from'], e['to']) for e in graph['edges']
+                           if graph.get('weighted') is True and e.get('weight') is None]
         type_dispute = graph.get('directed') is False and (bool(strong_arrows) or len(set(arrows))>=2)
         conflicts = []
         for key in (arrows if type_dispute else strong_arrows):
@@ -79,7 +90,8 @@ def plan_reviews(graphs, evidence):
                         and hint.get('to')==edge['from']):
                     conflicts.append(pair(edge['from'],edge['to']))
         missing = sorted(absent, key=lambda key: (-absent[key], key))[:MAX_TARGETS]
-        targets = sorted(set(existing) | set(missing)) if type_dispute else sorted(set(missing+unknown+conflicts))
+        targets = (sorted(set(existing) | set(missing)) if type_dispute else
+                   sorted(set(missing + unknown + unknown_weights + conflicts)))
         if not targets:
             continue
         sources = sorted({n for key in targets for n in key})
@@ -90,7 +102,8 @@ def plan_reviews(graphs, evidence):
                       'reasons':(['arrow_type_conflict'] if type_dispute else []) +
                                 (['unread_stroke'] if missing else []) +
                                 (['arrow_direction_conflict'] if conflicts and not type_dispute else []) +
-                                (['unknown_direction'] if unknown else [])})
+                                (['unknown_direction'] if unknown else []) +
+                                (['unknown_weight'] if unknown_weights else [])})
     return plans
 
 
@@ -138,6 +151,7 @@ def _signature(edge, source):
 
 def _label_attributes(edge):
     attributes = {'weight': edge.get('weight'), 'edge_label': edge.get('edge_label')}
+    normalize_blank_edge_attributes(attributes)
     if isinstance(edge.get('edge_label_is_explicit'), bool):
         attributes['edge_label_is_explicit'] = edge['edge_label_is_explicit']
     separate_weight_and_edge_label(attributes)
@@ -162,6 +176,11 @@ def merge_source_review(graphs, plans, response):
     replies={r['graph_id']:r for r in replies};issues=[];changes=[]
     for plan in plans:
         graph=by_id[plan['graph_id']];ids={v['id'] for v in graph['vertices']}
+        declared_direction = graph.get('directed')
+        prior_modes = {edge['direction'] for edge in graph['edges']}
+        preserve_declared_type = not plan['type_dispute'] and (
+            declared_direction is True and 'undirected' in prior_modes
+            or declared_direction is False and 'forward' in prior_modes)
         raw_reads=replies[graph['id']].get('reads')
         if not isinstance(raw_reads,list):raise ValueError('source_review_missing_reads')
         rows={};invalid=set()
@@ -231,7 +250,12 @@ def merge_source_review(graphs, plans, response):
                 graph['edges'].append({'id':'r'+str(index),'from':a,'to':b,'direction':direction, **attributes})
                 changes.append({'graph_id':graph['id'],'edge_id':'r'+str(index),'kind':'visually_reviewed_stroke'})
         modes={e['direction'] for e in graph['edges']}
-        if 'forward' in modes: graph['directed']=True
+        # A weight/partial-stroke review must not erase a pre-existing type
+        # contradiction merely by recounting the same draft edge directions.
+        # Keep the declaration so final validation still flags any conflict;
+        # the independent whole-type dispute path may recompute it as before.
+        if preserve_declared_type:graph['directed']=declared_direction
+        elif 'forward' in modes: graph['directed']=True
         elif modes=={'undirected'}:graph['directed']=False
         elif plan['type_dispute']:graph['directed']=None
         if plan['type_dispute'] and 'undirected' in modes:

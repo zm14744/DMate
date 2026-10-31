@@ -32,6 +32,66 @@ class ModelCacheError(OCRError):
     """No writable model cache; deliberately excludes local paths from errors."""
 
 
+def normalize_text_result(result):
+    """Preserve OCR text and uncertainty through single and batch readers.
+
+    A nonempty string is not enough to certify an unambiguous read. Legacy
+    readers can supply evidence, a warning or a review object without the new
+    compact fields; retain that information instead of overwriting it.
+    """
+    value = dict(result) if isinstance(result, dict) else {}
+    value['text'] = str(value.get('text') or '').strip()
+    evidence = value.get('text_evidence')
+    uncertain = evidence.get('uncertain') if isinstance(evidence, dict) else []
+    count = value.get('review_count', 0)
+    count = count if type(count) is int and count >= 0 else 0
+    count = max(count, len(uncertain) if isinstance(uncertain, list) else 0)
+    review = value.get('review') if isinstance(value.get('review'), dict) else {}
+    reasons = []
+
+    def add_reasons(items):
+        if not isinstance(items, list):
+            return
+        for item in items:
+            if isinstance(item, str) and item.strip():
+                reason = item.strip()[:240]
+                if reason not in reasons and len(reasons) < 4:
+                    reasons.append(reason)
+
+    add_reasons(value.get('review_reasons'))
+    add_reasons(review.get('reasons'))
+    rows = value.get('regions')
+    incomplete_rows = False
+    if isinstance(rows, list):
+        rows = [normalize_text_result(row) for row in rows]
+        value['regions'] = rows
+        count = max(count, sum(row['review_count'] for row in rows))
+        incomplete_rows = any(row['recognition_status'] != 'complete' for row in rows)
+        for row in rows:
+            add_reasons(row['review_reasons'])
+    warning = value.get('warning')
+    warning = warning.strip() if isinstance(warning, str) else ''
+    empty_warning = '选区内未识别到文字，请调整范围后重试。'
+    if warning and warning != empty_warning and warning != '；'.join(reasons):
+        add_reasons([warning])
+    needs_review = bool(count or reasons or review.get('required') is True
+                        or value.get('recognition_status') in (
+                            'partial', 'incomplete', 'uncertain', 'needs_review', 'review_required')
+                        or incomplete_rows)
+    if needs_review and not reasons:
+        reasons.append('部分文字识别仍有未确认内容，请对照原图核对。')
+    if value.get('recognition_status') in ('failed', 'error') or value.get('error'):
+        status = 'failed'
+    elif not value['text']:
+        status = 'empty'
+    else:
+        status = 'partial' if needs_review else 'complete'
+    value.update(review_count=count, review_reasons=reasons, recognition_status=status,
+                 warning=('；'.join(reasons) if needs_review else
+                          empty_warning if status == 'empty' else None))
+    return value
+
+
 def _probe_cache_directory(path):
     """Probe real writes, including PaddleX's independently mounted subdirs.
 
@@ -430,7 +490,7 @@ def recognize_image(raw, *, prepare_cache=False, text_only=False, timeout_second
                     text['layout_degraded']=True
                 if text_only:
                     text['text_only_fast_path'] = True
-                return text
+                return normalize_text_result(text)
         finally: fcntl.flock(lock,fcntl.LOCK_UN)
 
 
@@ -475,6 +535,6 @@ def recognize_text_regions(raw, regions, *, timeout_seconds=90):
                         [row['id'] for row in regions]):
                     raise OCRError('文字识别返回的框编号不匹配，请重试。')
                 result['resource_metrics'] = [metric]
-                return result
+                return normalize_text_result(result)
         finally:
             fcntl.flock(lock, fcntl.LOCK_UN)
