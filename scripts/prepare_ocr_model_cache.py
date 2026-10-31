@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Prepare the three official OCR model packages during image construction.
+"""Prepare official models and same-weight Small ONNX exports at build time.
 
 Download-only API verified against PaddleX release/3.7:
 https://github.com/PaddlePaddle/PaddleX/blob/release/3.7/paddlex/inference/utils/official_models.py
 No PaddleOCR, LayoutDetection, pipeline, or predictor is instantiated here.
+Text exports use pinned Paddle2ONNX with optional graph-folding installers off.
 The runtime and this script share ocr_runtime.configure_model_cache.
 """
 from __future__ import annotations
@@ -16,6 +17,8 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -25,10 +28,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 MODEL_NAMES = ('PP-DocLayoutV3', 'PP-OCRv6_small_det', 'PP-OCRv6_small_rec')
+TEXT_MODEL_NAMES = MODEL_NAMES[1:]
 REQUIRED_FILES = ('inference.json', 'inference.pdiparams', 'inference.yml')
+ONNX_REQUIRED_FILES = ('inference.onnx', 'inference.yml', 'dmate-onnx-source.json')
+ONNX_OPSET = 17
 MANIFEST_NAME = 'dmate-model-manifest.json'
 DEFAULT_CACHE_DIR = '/opt/dmate-model-cache'
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class CachePreparationError(RuntimeError):
@@ -116,7 +122,46 @@ def inspect_model(cache_home, name):
     return {'name': name, 'declared_model_name': global_config['model_name'], 'files': files}
 
 
-def verify_manifest(cache_home, records=None):
+def inspect_onnx_model(cache_home, name, source_record=None, *, directory=None):
+    """Check the exported graph, original dictionary/config, and source hashes."""
+    import onnx
+    if name not in TEXT_MODEL_NAMES:
+        raise CachePreparationError('unexpected_onnx_model_name')
+    source_record = source_record or inspect_model(cache_home, name)
+    directory = Path(directory) if directory is not None else Path(cache_home)/'onnx_models'/name
+    files = {}
+    for filename in ONNX_REQUIRED_FILES:
+        path = directory/filename
+        try:
+            if not path.is_file() or not 0 < path.stat().st_size <= 64*1024**2:
+                raise CachePreparationError(f'incomplete_or_oversized_onnx_model:{name}:{filename}')
+            files[filename] = {'size_bytes': path.stat().st_size, 'sha256': _sha256(path)}
+        except OSError as exc:
+            raise CachePreparationError(f'unreadable_onnx_model:{name}:{filename}') from exc
+    try:
+        provenance = json.loads((directory/'dmate-onnx-source.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError) as exc:
+        raise CachePreparationError(f'invalid_onnx_source_record:{name}') from exc
+    if (not isinstance(provenance, dict) or provenance.get('schema_version') != 1
+            or provenance.get('name') != name or provenance.get('opset_version') != ONNX_OPSET
+            or provenance.get('source_files') != source_record['files']
+            or provenance.get('onnx_sha256') != files['inference.onnx']['sha256']
+            or files['inference.yml'] != source_record['files']['inference.yml']):
+        raise CachePreparationError(f'onnx_source_identity_or_hash_mismatch:{name}')
+    try:
+        graph = onnx.load(str(directory/'inference.onnx'), load_external_data=False)
+        if any(tensor.data_location == onnx.TensorProto.EXTERNAL for tensor in graph.graph.initializer):
+            raise ValueError('external_model_data_not_supported')
+        if [(op.domain, op.version) for op in graph.opset_import] != [('', ONNX_OPSET)]:
+            raise ValueError('unexpected_onnx_opset')
+        onnx.checker.check_model(graph)
+    except Exception as exc:
+        raise CachePreparationError(f'invalid_onnx_graph:{name}:{type(exc).__name__}') from exc
+    return {'name': name, 'declared_model_name': source_record['declared_model_name'],
+            'source_files': source_record['files'], 'files': files, 'opset_version': ONNX_OPSET}
+
+
+def verify_manifest(cache_home, records=None, *, allow_legacy=False):
     path = Path(cache_home)/MANIFEST_NAME
     try:
         if path.stat().st_size > 64*1024:
@@ -125,10 +170,55 @@ def verify_manifest(cache_home, records=None):
     except (OSError, ValueError) as exc:
         raise CachePreparationError('missing_or_invalid_model_manifest') from exc
     records = records if records is not None else [inspect_model(cache_home, name) for name in MODEL_NAMES]
-    if (not isinstance(manifest, dict) or manifest.get('schema_version') != SCHEMA_VERSION
+    if (not isinstance(manifest, dict) or manifest.get('schema_version') not in (1, SCHEMA_VERSION)
             or manifest.get('models') != records or manifest.get('inference_initialized') is not False):
         raise CachePreparationError('model_manifest_identity_or_hash_mismatch')
+    if manifest['schema_version'] == 1:
+        if allow_legacy:
+            return manifest
+        raise CachePreparationError('model_manifest_upgrade_required_run_prepare')
+    exported = [inspect_onnx_model(cache_home, record['name'], record)
+                for record in records if record['name'] in TEXT_MODEL_NAMES]
+    if manifest.get('onnx_models') != exported:
+        raise CachePreparationError('onnx_manifest_identity_or_hash_mismatch')
     return manifest
+
+
+def _export_onnx_model(cache_home, record, timeout_seconds):
+    """Convert in a bounded child, validate a staging directory, then publish."""
+    name = record['name']
+    source = Path(cache_home)/'official_models'/name
+    parent = Path(cache_home)/'onnx_models'
+    parent.mkdir(parents=True, exist_ok=True)
+    destination = parent/name
+    if destination.exists():
+        return inspect_onnx_model(cache_home, name, record), False
+    with tempfile.TemporaryDirectory(prefix=f'.{name}-', dir=parent) as temporary:
+        staging = Path(temporary)/name
+        staging.mkdir()
+        command = [sys.executable, '-m', 'paddle2onnx.command',
+                   '--model_dir', str(source), '--model_filename', 'inference.json',
+                   '--params_filename', 'inference.pdiparams',
+                   '--save_file', str(staging/'inference.onnx'),
+                   '--opset_version', str(ONNX_OPSET), '--enable_auto_update_opset', 'False',
+                   '--enable_onnx_checker', 'True', '--optimize_tool', 'None']
+        try:
+            # Keep converter output out of JSON stdout; no optional optimiser
+            # may auto-install or upgrade NumPy inside a production build.
+            subprocess.run(command, check=True, stdout=sys.stderr, stderr=sys.stderr,
+                           timeout=timeout_seconds)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise CachePreparationError(f'onnx_export_failed:{name}:{type(exc).__name__}') from exc
+        shutil.copyfile(source/'inference.yml', staging/'inference.yml')
+        provenance = {'schema_version': 1, 'name': name, 'source_files': record['files'],
+                      'opset_version': ONNX_OPSET, 'onnx_sha256': _sha256(staging/'inference.onnx'),
+                      'exporter': 'paddle2onnx', 'exporter_version': metadata.version('paddle2onnx'),
+                      'optimize_tool': 'None', 'quantized': False}
+        (staging/'dmate-onnx-source.json').write_text(
+            json.dumps(provenance, indent=2, sort_keys=True), encoding='utf-8')
+        exported = inspect_onnx_model(cache_home, name, record, directory=staging)
+        os.replace(staging, destination)
+        return exported, True
 
 
 def _official_manager():
@@ -151,7 +241,7 @@ def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
     # A prior manifest is a content checkpoint: never silently rebaseline a
     # modified/partial package and call the same cached model intact.
     if manifest_path.exists():
-        verify_manifest(cache_home)
+        verify_manifest(cache_home, allow_legacy=True)
     manager = None
     records, downloaded, reused = [], [], []
     for name in MODEL_NAMES:
@@ -177,16 +267,24 @@ def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
             raise CachePreparationError(f'download_resolved_wrong_cache:{name}')
         records.append(inspect_model(cache_home, name))
         downloaded.append(name)
+    exports, converted, reused_exports = [], [], []
+    for record in records:
+        if record['name'] not in TEXT_MODEL_NAMES:
+            continue
+        exported, created = _export_onnx_model(cache_home, record, timeout_seconds)
+        exports.append(exported)
+        (converted if created else reused_exports).append(record['name'])
     versions = {}
-    for name in ('paddlex', 'paddleocr', 'paddlepaddle'):
+    for name in ('paddlex', 'paddleocr', 'paddlepaddle', 'paddle2onnx', 'onnx', 'onnxruntime'):
         try:
             versions[name] = metadata.version(name)
         except metadata.PackageNotFoundError:
             versions[name] = None
     manifest = {'schema_version': SCHEMA_VERSION, 'models': records,
+                'onnx_models': exports,
                 'package_versions': versions, 'inference_initialized': False,
                 'download_api': 'paddlex.inference.utils.official_models.official_models.get_model_path',
-                'model_format': 'paddle',
+                'model_format': 'paddle_and_onnx', 'text_engine': 'onnxruntime',
                 'integrity_scope': 'local_file_hashes_and_declared_model_identity_not_publisher_signature'}
     temporary = None
     try:
@@ -201,7 +299,8 @@ def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
             temporary.unlink()
     verify_manifest(cache_home, records)
     return {'status': 'prepared', 'cache_selection': selection, 'downloaded_models': downloaded,
-            'reused_models': reused, 'manifest': manifest}
+            'reused_models': reused, 'converted_onnx_models': converted,
+            'reused_onnx_models': reused_exports, 'manifest': manifest}
 
 
 def main(argv=None):

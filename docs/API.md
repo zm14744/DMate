@@ -209,6 +209,8 @@ if (!response.ok) throw new Error(draft.error || "识别未完成");
 
 `regions` 格式为 `[{"id":1,"order":0,"polygon":[...]}]`，编号和顺序必须各自唯一；一旦使用 `order`，每项都应提供。未提供顺序时按编号排序。批量文字选区响应另有逐区域结果与 `selection_mode: "numbered_regions"`。单选区可通过 `exclusions` 排除图形区域。文字接口只做所选像素的本地 OCR，图形选区接口使用自动识图后把坐标映射回原图。
 
+本地文字默认使用 ONNX Runtime CPU 执行 PP-OCRv6 Small，沿用 PaddleOCR / PaddleX 前后处理；模型应在启动前完成转换和缓存准备。缓存或引擎故障作为识别失败处理，不返回假空结果，也不在请求中转换模型或静默改用其他引擎；配置与显式回退见[部署说明](DEPLOYMENT.md#本地模型与缓存)。此引擎切换不改变接口字段或原图身份规则。
+
 文字响应及批量中的每一行另有 `review_count`、`review_reasons`、`warning`。`recognition_status` 区分 `complete`、`partial` 和 `empty`，运行失败另行处理；有字但原图 / 增强读数未核对一致时仍是 `partial`，调用方不能仅按非空文字覆盖状态。批量中存在部分结果或空框时，总体状态相应反映不完整，成功行内容仍保留。
 
 选区不是显示器上的像素坐标。客户端先把指针坐标换算到校正方向后的原图，再按宽高归一化到 0–1；缩放和平移只改变显示，不应改变所选原图位置。`polygon`、`exclusions`、`regions` 在 multipart 中都传 JSON 字符串，不能直接把 JavaScript 数组转换为默认的逗号字符串。

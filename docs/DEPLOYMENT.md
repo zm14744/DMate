@@ -11,7 +11,7 @@
 | 打开页面、手工编辑画板、查看内置知识图谱 | Python 服务及静态资源 | 服务未启动时页面无法访问 |
 | AI 教学、出题、错题分析、概念分析、绘图指导 | DeepSeek Key 和服务网络 | 相关 AI 请求返回配置或服务错误，不能因此判断画板或页面本身损坏 |
 | 网页自动识图、选区图形重识别 | DashScope Key、可访问的视觉服务地址 | 自动扫描与图形选区重识别不能完成；独立画板仍可使用 |
-| 文字框识别 | Paddle 依赖、官方模型包、可写缓存、足够的进程内存 | 选区 OCR 报初始化、缓存或资源错误；它不使用 DeepSeek Key |
+| 文字框识别 | ONNX Runtime、PaddleOCR / PaddleX 依赖、已转换文字模型、可写缓存、足够的进程内存 | 选区 OCR 报初始化、缓存或资源错误；它不使用 DeepSeek Key |
 | 语音转文字 | DashScope 语音权限、模型与词库、浏览器麦克风权限 | 不能录音或转写，文字输入仍可使用 |
 | 注册、登录、云同步 | PostgreSQL、稳定的认证密钥 | 游客工作区可使用，账号操作不可用 |
 | 邮箱注册、邮箱绑定、邮件找回 | 上述账号配置，加 Brevo 或 SMTP | 邮箱验证码无法发送；已有可用账号的其他登录方式不由邮件服务替代 |
@@ -20,7 +20,7 @@
 
 ## 运行方式
 
-应用由 Flask 提供网页与 API，以 Linux 运行环境为基线；本地 worker 使用 `fcntl` 等系统能力，Windows 自托管应使用 WSL2 或 Linux 容器。Dockerfile 使用 `python:3.10-slim`，安装 `requirements.txt`（包含 `requirements-agents.txt`），并预下载本地文字 / 版面模型。Docker 构建和首次本地模型下载需要访问 Python 包源及 Paddle 官方模型源。
+应用由 Flask 提供网页与 API，以 Linux 运行环境为基线；本地 worker 使用 `fcntl` 等系统能力，Windows 自托管应使用 WSL2 或 Linux 容器。Dockerfile 使用 `python:3.10-slim`，安装 `requirements.txt`（包含 `requirements-agents.txt`），预下载本地文字 / 版面模型，并在构建时将文字模型转换为 ONNX。Docker 构建和首次本地模型下载需要访问 Python 包源及 Paddle 官方模型源。
 
 本地开发可按 [README](../README.md) 建立 Python 3.10 虚拟环境后运行 `python app.py`，默认监听 `0.0.0.0:5000`，`PORT` 可覆盖端口。Linux 系统依赖以 Dockerfile 的 `libgl1`、`libglib2.0-0`、`libgomp1`、`libsm6`、`libxext6`、`libxrender1` 为准。
 
@@ -43,10 +43,14 @@ python -m pip install -r requirements.txt
 export DEEPSEEK_API_KEY='replace_with_your_key'
 export DASHSCOPE_API_KEY='replace_with_your_key'
 export DASHSCOPE_VISION_API_URL='https://your-authorized-host/compatible-mode/v1'
+export DMATE_MODEL_CACHE_DIR="$PWD/.model-cache"
+export PADDLE_PDX_CACHE_HOME="$DMATE_MODEL_CACHE_DIR/paddlex"
+python scripts/prepare_ocr_model_cache.py --cache-dir "$DMATE_MODEL_CACHE_DIR"
+python scripts/prepare_ocr_model_cache.py --cache-dir "$DMATE_MODEL_CACHE_DIR" --verify-only
 python app.py
 ```
 
-浏览器打开 `http://localhost:5000/`。示例占位值必须替换为自己的配置；不使用的服务可以不设置。配置在模块初始化时读取，项目没有在此之前自动加载 `.env` 的步骤，需由 shell、进程管理器或托管平台事先注入变量，不能仅创建文件就假设配置生效。
+浏览器打开 `http://localhost:5000/`。示例占位值必须替换为自己的配置；不使用的服务可以不设置。文字识别需要在启动前成功完成模型准备；只运行 `pip install` 不会生成文字 ONNX 模型。不需要本地文字 / 版面识别时可跳过缓存命令，但相关接口届时不可用。配置在模块初始化时读取，项目没有在此之前自动加载 `.env` 的步骤，需由 shell、进程管理器或托管平台事先注入变量，不能仅创建文件就假设配置生效。
 
 `python app.py` 适合本地开发；对外运行使用 Gunicorn，并交给容器平台或进程管理器处理重启、日志及 HTTPS。非容器生产启动可使用：
 
@@ -90,7 +94,7 @@ DMATE_GRAPH_CONFIRMATION_DB=/data/graph-confirmations.sqlite3
 
 只需要游客模式时，数据库与认证配置可省略。不要把示例占位值用于正式服务。认证密钥可在自己的运行环境用 `python -c 'import secrets; print(secrets.token_hex(32))'` 生成一次，保存到平台 Secret 后持续复用。
 
-镜像构建除了安装依赖，还会预备 OCR 模型包和生成跨平台图标；不是仅复制 Flask 文件。`scripts/generate_icons.py` 的源图位于 Android 资源目录，因此自定义构建上下文时应保留该图标输入，不能把整个 `android/` 目录一并排除。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
+镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。`scripts/generate_icons.py` 的源图位于 Android 资源目录，因此自定义构建上下文时应保留该图标输入，不能把整个 `android/` 目录一并排除。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
 
 ## 模型服务
 
@@ -123,21 +127,36 @@ DMATE_GRAPH_CONFIRMATION_DB=/data/graph-confirmations.sqlite3
 
 ## 本地模型与缓存
 
-当前网页自动读图不先运行整图 OCR。自主框选的文字识别使用 `PP-OCRv6_small_det`、`PP-OCRv6_small_rec`；其他识别路径还可能使用 `PP-DocLayoutV3` 和几何工具。worker 隔离运行，Paddle API Key 不传入本地模型子进程。
+当前网页自动读图不先运行整图 OCR。自主框选的文字识别默认通过 ONNX Runtime CPU 执行 `PP-OCRv6_small_det`、`PP-OCRv6_small_rec`，复用 PaddleOCR / PaddleX 的预后处理。其他识别路径可使用 `PP-DocLayoutV3` 的 Paddle 版面推理和几何工具。worker 隔离运行，云端模型 API Key 不传入本地模型子进程。
 
-Docker 构建运行 `scripts/prepare_ocr_model_cache.py` 下载这三个官方包并验证文件与清单，不初始化推理。容器默认 `DMATE_MODEL_CACHE_DIR=/opt/dmate-model-cache`，其下使用 `paddlex` 目录。运行用户必须能写缓存及临时目录；已有 `PADDLE_PDX_CACHE_HOME` 配置也会优先参与缓存选择。
+主要版本固定为 PaddlePaddle 3.3.1、PaddleOCR 3.7.0、PaddleX 3.7.2、ONNX Runtime 1.23.2、Paddle2ONNX 2.1.0、ONNX 1.17.0。文字模型保留 FP32，不量化；导出为 ONNX opset 17。构建转换禁用导出器的可选优化工具，避免其自动安装额外依赖或改动 NumPy。ORT 使用自身图优化、`CPUExecutionProvider`、`intra_op_num_threads=2`、`inter_op_num_threads=1`、`execution_mode=sequential`。
+
+Docker 构建运行 `scripts/prepare_ocr_model_cache.py`：下载三个官方 Paddle 包，校验原始包，为两个文字包导出 ONNX，再记录转换文件的模型身份和 SHA256。此步骤不对图片执行推理，也不请求云端模型。容器默认 `DMATE_MODEL_CACHE_DIR=/opt/dmate-model-cache`，其下使用 `paddlex` 目录；原包位于 `official_models/<模型名>/`，文字转换文件位于 `onnx_models/<模型名>/inference.onnx`，各目录保留对应的 `inference.yml` 及 `dmate-onnx-source.json` 来源哈希记录。清单为 `paddlex/dmate-model-manifest.json`。运行用户必须能写缓存及临时目录；已有 `PADDLE_PDX_CACHE_HOME` 配置也会优先参与缓存选择。
 
 本地 Linux 可预备到可写目录：
 
 ```bash
 export DMATE_MODEL_CACHE_DIR="$PWD/.model-cache"
+export PADDLE_PDX_CACHE_HOME="$DMATE_MODEL_CACHE_DIR/paddlex"
 python scripts/prepare_ocr_model_cache.py --cache-dir "$DMATE_MODEL_CACHE_DIR"
 python scripts/prepare_ocr_model_cache.py --cache-dir "$DMATE_MODEL_CACHE_DIR" --verify-only
 ```
 
-`--verify-only` 检查包文件与清单，不执行文字识别，也不验证云模型凭据。缓存选择顺序为显式 `PADDLE_PDX_CACHE_HOME`、`DMATE_MODEL_CACHE_DIR/paddlex`、`XDG_CACHE_HOME/dmate/paddlex`、当前系统用户的临时缓存；目录需要能实际创建和写入子文件。只挂载空目录覆盖镜像内的缓存，会遮住预下载内容，应先复制或重新准备所需模型包。
+`--verify-only` 检查已有原包、ONNX 文件格式和清单，不下载、转换、执行文字识别，也不验证云模型凭据。缓存选择顺序为显式 `PADDLE_PDX_CACHE_HOME`、`DMATE_MODEL_CACHE_DIR/paddlex`、`XDG_CACHE_HOME/dmate/paddlex`、当前系统用户的临时缓存；目录需要能实际创建和写入子文件。只挂载空目录覆盖镜像内的缓存，会遮住预下载和转换内容，应先复制或重新准备所需模型包。
 
-本地推理在短生命周期子进程中运行，Web 进程不预加载 Paddle 模型。worker 的 RSS 边界为 1600 MiB，并为容器其余部分预留 768 MiB；准入判断还考虑 cgroup 可用内存。它不是“给容器设置 1600 MiB 就足够”的资源承诺，Web、图像解码、并发请求和系统占用还需要空间。资源不足时先降低并发和图片复杂度，检查容器内存，再调整部署资源，避免通过增加 Web worker 放大内存占用。
+升级旧部署时，应更新依赖并重新构建镜像，或在启动前运行不带 `--verify-only` 的准备命令。原有 Paddle 缓存会先按旧清单核对，再补齐 ONNX 和升级清单；文件损坏或原包身份改变会失败，不会把改变后的文件直接重记为正常缓存。首次转换会产生额外构建耗时和内存占用，应在构建阶段完成。运行请求不导出模型；缺少 ONNX 文件或准备失败时，本地文字识别直接报错，不能只等待请求自行修好。
+
+文字引擎设置：
+
+| 变量 | 值与行为 |
+| --- | --- |
+| `DMATE_TEXT_OCR_ENGINE` | 默认 `onnxruntime`；`paddle_static` 显式回退到原 Paddle CPU 文字执行路径 |
+
+修改该变量后需重启应用。原文字 Paddle 包保留在缓存内供回退使用；回退不会改换模型权重、视觉提供方或图形识别工作流。ONNX 初始化失败不会自动尝试 Paddle，避免把部署缺失隐去或在失败后叠加另一套模型的内存。先查看实际引擎、准备失败阶段和缓存状态，再处理依赖 / 缓存或显式回退。
+
+本地推理在短生命周期子进程中运行，Web 进程不预加载 ONNX 或 Paddle 模型。版面与文字阶段由本地租约串行调度，不共驻一个 worker。文字仍为识别 batch 1、检测长边上限 1600，关闭文字方向分类和文档矫正；切换执行引擎没有放宽图片、并发和资源边界。worker 的 RSS 边界为 1600 MiB，并为容器其余部分预留 768 MiB；准入判断还考虑 cgroup 可用内存。它不是“给容器设置 1600 MiB 就足够”的资源承诺，Web、图像解码、并发请求和系统占用还需要空间。资源不足时先降低并发和图片复杂度，检查容器内存，再调整部署资源，避免通过增加 Web worker 放大内存占用。
+
+本地比较在同权重、同前后处理、固定两个逻辑 CPU 下对五张图各做三轮：合计中位数从 5.24 秒降到 3.91 秒，峰值 RSS 约 1075 → 827 MiB，文字输出逐字一致。该环境不是线上 2 核 / 4 GB 服务器，未模拟 4 GB 内存限制，不含 HTTP、版面分析、增强重读或云端识图耗时。它支持评估执行效率，不能作为线上响应时间、容量或通用识别准确率的承诺。
 
 ## 账号、数据库与邮件
 
@@ -201,7 +220,7 @@ location / {
 | --- | --- | --- |
 | 账号、邮箱状态、密码 / 恢复码哈希、云同步 JSON | PostgreSQL | 使用数据库备份与恢复；恢复后关注同步 revision 和账号状态 |
 | 图片任务与确认摘要 | `DMATE_GRAPH_CONFIRMATION_DB` 指定的 SQLite | 持久卷可保留有效确认；仅有摘要，不能恢复原图或题目全文 |
-| 本地 OCR 模型包 | 模型缓存目录 | 可从官方源重建；保留可减少重复下载与启动等待 |
+| 本地 OCR 原模型与 ONNX 转换文件 | 模型缓存目录及哈希清单 | 可从官方源重下并重新导出；保留完整目录可减少重复下载与转换 |
 | 登录账号独立绘图历史 | 每台设备当前浏览器的 localStorage，按账号分区 | 不属于服务器备份，也不随 `/sync` 云同步 |
 | 游客独立绘图 | 当前页面内存，不使用 localStorage 或 sessionStorage | 同页重开绘图可继续；刷新 / 关闭网页后清空，旧版游客持久图库不导入 |
 | 自定义背景图片 | 当前浏览器 IndexedDB | 不在 PostgreSQL 和服务端确认库中 |

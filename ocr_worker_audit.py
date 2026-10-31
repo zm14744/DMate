@@ -153,6 +153,20 @@ class BoundedTextModel:
         pipeline=getattr(wrapper,'_pipeline',wrapper)
         if not callable(getattr(pipeline,'text_det_model',None)) or not callable(getattr(pipeline,'text_rec_model',None)):
             raise RuntimeError('ocr_predictor_audit_unavailable')
+        from ocr_text_engine import selected_text_engine
+        engine=selected_text_engine()
+        runners={}
+        for name in ('text_det_model','text_rec_model'):
+            runner=getattr(getattr(pipeline,name),'runner',None)
+            session=getattr(runner,'session',None)
+            if session is None: session=getattr(runner,'_session',None)
+            providers=session.get_providers() if hasattr(session,'get_providers') else None
+            if engine=='onnxruntime' and (type(runner).__name__!='ONNXRuntimeRunner'
+                                          or providers!=['CPUExecutionProvider']):
+                raise RuntimeError('text_engine_runtime_mismatch')
+            runners[name]={'runner':type(runner).__name__,'providers':providers}
+        audit.data['parameters'].update(text_engine=engine,runners=runners)
+        audit.flush()
         pipeline.text_det_model=AuditedPredictor(pipeline.text_det_model,audit,'text_det')
         pipeline.text_rec_model=AuditedPredictor(pipeline.text_rec_model,audit,'text_rec')
 

@@ -10,8 +10,12 @@
 | Requests | 2.32.5 | [Apache-2.0](https://github.com/psf/requests/blob/main/LICENSE) |
 | Gunicorn | 23.0.0 | [MIT](https://github.com/benoitc/gunicorn/blob/master/LICENSE) |
 | PaddlePaddle / PaddleOCR | 3.3.1 / 3.7.0 | [PaddlePaddle](https://github.com/PaddlePaddle/Paddle) 与 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) 的 Apache-2.0；模型权重另按对应模型说明处理 |
+| PaddleX | 3.7.2 | [Apache-2.0](https://github.com/PaddlePaddle/PaddleX/blob/release/3.7/LICENSE)，提供模型包和前后处理 |
+| ONNX Runtime | 1.23.2 | [MIT](https://github.com/microsoft/onnxruntime/blob/v1.23.2/LICENSE)，用于本地文字 CPU 推理；随附第三方声明仍须保留 |
+| ONNX | 1.17.0 | [Apache-2.0](https://github.com/onnx/onnx/blob/v1.17.0/LICENSE)，用于模型格式与检查 |
+| Paddle2ONNX | 2.1.0 | [Apache-2.0](https://github.com/PaddlePaddle/Paddle2ONNX/blob/develop/LICENSE)，用于构建时转换同一套文字模型权重 |
 | NumPy | 1.26.4 | [BSD-3-Clause](https://github.com/numpy/numpy/blob/main/LICENSE.txt) |
-| OpenCV contrib headless | 4.10.0.84 | [OpenCV Apache-2.0](https://opencv.org/license/)；wheel 内其他组件另有随附许可 |
+| OpenCV contrib | 4.10.0.84 | [OpenCV Apache-2.0](https://opencv.org/license/)；wheel 内其他组件另有随附许可 |
 | Pillow | 11.3.0 | [MIT-CMU](https://github.com/python-pillow/Pillow/blob/main/LICENSE) |
 | Psycopg | >=3.2.0,<4.0 | [LGPL-3.0](https://github.com/psycopg/psycopg/blob/master/LICENSE.txt) |
 | NetworkX | >=3.4,<4.0 | [BSD-3-Clause](https://github.com/networkx/networkx) |
@@ -21,6 +25,8 @@
 | sknw / Numba / llvmlite | 0.15 / 0.61.2 / 0.44.0 | [sknw](https://github.com/Image-Py/sknw)、[Numba](https://github.com/numba/numba)、[llvmlite](https://github.com/numba/llvmlite) 的 BSD 系列许可 |
 
 其他固定依赖及间接依赖同样受各自许可约束。分发时须根据实际安装和打包结果保留适用声明，不能只凭本表代替完整清单。
+
+将 Paddle 官方权重转换为 ONNX 不改变权重来源或重新授权权重。镜像中保留的原模型与转换产物仍应按对应模型包的许可、模型说明及随附声明处理；执行引擎的 MIT / Apache-2.0 许可不能代替模型权重的许可。
 
 ## 网页直接加载的库
 

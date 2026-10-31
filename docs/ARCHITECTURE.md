@@ -28,6 +28,7 @@ DMate 是 Flask 提供网页和 API、浏览器保存学习状态的离散数学
 | `graph_qwen_targeted.py`、`graph_qwen_targeted_review.py` | 网页自动识图及有范围的局部复核 |
 | `graph_confirmation.py`、`graph_confirmation_batch.py` | 原图登记、用户确认、快照校验和多图组合 |
 | `ocr_runtime.py`、`ocr_worker.py` | 有资源边界的本地 OCR 子进程 |
+| `ocr_text_engine.py` | 本地文字 ONNX / 显式 Paddle 回退的引擎配置与模型路径 |
 | `concept_notebook.py`、`drawing_guidance.py`、`voice_input.py` | 概念分析、画图指导和语音转写 |
 
 一些维护时常用的补充入口：
@@ -183,7 +184,9 @@ sequenceDiagram
 
 ## 本地推理与任务资源
 
-网页 HTTP 线程负责接收和编排，不把 Paddle 模型常驻在 Flask 进程内。`ocr_runtime.py` 准备输入、选择可写模型缓存、启动短生命周期 worker，读取有上限的结果文件，并核对本次运行的回执。`ocr_worker.py` 完成本次模型阶段；崩溃、超时或内存异常由父进程处理，避免把同一原生推理错误直接带入 Web 进程。
+网页 HTTP 线程负责接收和编排，不把 ONNX 或 Paddle 模型常驻在 Flask 进程内。`ocr_runtime.py` 准备输入、选择可写模型缓存、启动短生命周期 worker，读取有上限的结果文件，并核对本次运行的回执。`ocr_worker.py` 完成本次模型阶段；崩溃、超时或内存异常由父进程处理，避免把同一原生推理错误直接带入 Web 进程。
+
+本地文字阶段默认用 ONNX Runtime CPU 执行 PP-OCRv6 Small 检测与识别，继续使用 PaddleOCR / PaddleX 的前后处理；PP-DocLayoutV3 版面阶段仍使用 Paddle。`ocr_text_engine.py` 只选择已准备的模型及执行配置，不在请求中转换模型。构建时由官方 Paddle 权重导出文字 ONNX 并核对清单，保留原包供显式回退。`DMATE_TEXT_OCR_ENGINE=paddle_static` 选择原执行路径；默认 `onnxruntime`，异常不隐式降级。
 
 模型阶段由本地调度器串行租约约束。DocLayout 与文字 small 模型不在同一个 worker 中并存；远程视觉请求不占本地推理租约。内存判断考虑 worker RSS、cgroup 剩余空间及保守的可回收文件缓存估计。`ocr_worker_audit.py` 是运行时回执与资源审计代码，属于生产路径，不能按文件名当作测试工具删除。
 

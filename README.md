@@ -232,7 +232,7 @@ DMate 是面向离散数学学习的智能辅学应用。它把文字问答、�
 - **前端**：原生 JavaScript、HTML、CSS；MathJax 显示公式，Marked 解析 Markdown，DOMPurify 清洗富文本。
 - **账号与同步**：PostgreSQL 存储账号、验证码和学习快照；Cookie 保持登录。
 - **图形确认**：独立 SQLite 登记原图与确认文档摘要、身份、修订和有效期，不代替账号数据库。
-- **本地识别与计算**：PaddleOCR 隔离 worker、图像处理工具，以及适用范围内的 NetworkX / SymPy 计算。
+- **本地识别与计算**：PaddleOCR / PaddleX 前后处理、ONNX Runtime CPU 文字推理、Paddle 版面推理的隔离 worker，以及适用范围内的 NetworkX / SymPy 计算。
 - **客户端**：Android WebView、Tauri 桌面壳；加载远程网站，提供平台集成。
 
 ### 模型各自负责什么
@@ -242,11 +242,23 @@ DMate 是面向离散数学学习的智能辅学应用。它把文字问答、�
 | 教学问答、练习、答案诊断 | DeepSeek，默认 `deepseek-flash` | 由文本教学与上下文逻辑组织请求 |
 | 笔记解释与绘图指导 | DeepSeek | 分别接收所选笔记或当前画板结构 |
 | 自动整图扫描、图形区域重识别 | Qwen `qwen3.8-flash` | 当前 `auto_graph` 主读及按需局部复核固定此模型并开启思考 |
-| 自主框选文字识别 | 本地 PaddleOCR CPU worker | 不发送给 DeepSeek 做文字识别 |
+| 自主框选文字识别 | PP-OCRv6 Small，ONNX Runtime CPU 隔离 worker | 复用 PaddleOCR / PaddleX 前后处理，在服务端本地执行 |
 | 语音转写 | `qwen-audio-3.1-asr-flash` | 使用配置的数学词库，输出先回输入框 |
 | 兼容识别路径 | 按显式后端路由和配置选择 | 不能把兼容适配器的默认模型当作网页自动识图模型 |
 
 当前网页自动扫描不会在失败时自动换到 GLM。服务端保留的兼容流程与可选视觉适配器仍有明确入口，详见[识别流程](docs/RECOGNITION.md)。
+
+### 本地文字识别使用什么引擎
+
+文字框默认使用 **ONNX Runtime CPU** 执行 `PP-OCRv6_small_det` 和 `PP-OCRv6_small_rec`。模型权重仍来自同一套 Paddle 官方 Small 包，构建时转换为 FP32、ONNX opset 17；检测、文字行裁剪、排序、归一化和解码继续使用 PaddleOCR / PaddleX 的实现。没有改成另一套 OCR 模型，也没有增加云端文字识别请求。
+
+当前固定的主要版本为 PaddleOCR 3.7.0、PaddleX 3.7.2、ONNX Runtime 1.23.2、PaddlePaddle 3.3.1、Paddle2ONNX 2.1.0 和 ONNX 1.17.0。Paddle 仍用于 `PP-DocLayoutV3` 版面分析及兼容路径；不能因为文字默认使用 ONNX，就从依赖中直接删除 Paddle。完整安装版本以 `requirements.txt` 为准。
+
+文字推理只使用 `CPUExecutionProvider`，ORT 配置为两个算子内线程、一个算子间线程、顺序执行；识别 batch 为 1，检测长边上限为 1600。方向分类、文档矫正和独立公式模型不在这个文字 worker 中启动。布局和文字阶段继续串行运行于独立短生命周期进程，模型不常驻 Flask 进程。
+
+模型转换放在镜像构建或手工缓存准备阶段，运行请求不临时转换模型。ONNX 文件缺失、损坏或引擎初始化失败时会返回本地识别错误，不会静默换成 Paddle 再占用另一套推理资源。部署者需要回退时，可显式设置 `DMATE_TEXT_OCR_ENGINE=paddle_static` 并重启服务；默认值为 `onnxruntime`。这个变量只选择本地文字执行引擎，不改变网页自动识图、文字来源、图片分组或教学模型。
+
+一次本地比较使用相同权重和前后处理、固定两个逻辑 CPU，对五张图做三轮连续识别：五张合计中位数从 5.24 秒降到 3.91 秒，进程峰值 RSS 从约 1075 MiB 降到 827 MiB，五张文字输出逐字一致。该测试不是用户线上 2 核 / 4 GB 主机实测，未模拟 4 GB 内存限制，样本也不足以给出通用准确率；普通小图基本持平，主要收益来自整页识别和初始化。更换执行引擎的目标是提速和降低内存，复杂公式、下标及图内细小标签仍需核对。
 
 识别逻辑会保留文字框中浅色正文，并将原图 / 增强读取的未确认差异传递为待核对信息。图形中的未知方向、缺失权值可以使用现有局部复核；空白属性与图类型矛盾不会被当作已经读清。这些处理不增加第三轮视觉调用，也不代表所有公式、重边和细小箭头都能准确识别。
 
@@ -292,7 +304,7 @@ export DASHSCOPE_API_KEY='替换为自己的DashScope密钥'
 | AI 问答、练习、笔记分析、绘图指导 | `DEEPSEEK_API_KEY` | 相应 AI 请求报服务配置错误 |
 | 网页自动识图、图形选区识别 | `DASHSCOPE_API_KEY` 与有权限的视觉服务地址 | 对应视觉请求无法完成 |
 | 语音转写 | DashScope 配置及可访问的语音模型、词库 | 语音服务不可用，不自动改换模型 |
-| 文字框 OCR | 本地 Paddle 依赖、可写缓存及模型包 | 需要准备本地模型，不能靠视觉 Key 替代 |
+| 文字框 OCR | ONNX Runtime、PaddleOCR / PaddleX 依赖、可写缓存及已转换模型 | 需要先准备本地模型，不能靠视觉 Key 替代 |
 | 登录与云同步 | `DATABASE_URL`、稳定的 `AUTH_SECRET_KEY` | 可打开游客页面，账号与同步不可用 |
 | 邮箱注册、绑定与邮箱找回 | Brevo 或 SMTP 配置 | 无法完成依赖验证码的邮箱流程 |
 
@@ -309,20 +321,37 @@ export SESSION_COOKIE_SECURE=0
 
 ### 准备本地模型并启动
 
-需要本地文字或版面模型时，可先把官方包下载到可写缓存：
+需要本地文字或版面模型时，先下载官方包并准备文字 ONNX 模型到可写缓存：
 
 ```bash
 export DMATE_MODEL_CACHE_DIR="$PWD/.model-cache"
+export PADDLE_PDX_CACHE_HOME="$DMATE_MODEL_CACHE_DIR/paddlex"
 python scripts/prepare_ocr_model_cache.py --cache-dir "$DMATE_MODEL_CACHE_DIR"
 python scripts/prepare_ocr_model_cache.py --cache-dir "$DMATE_MODEL_CACHE_DIR" --verify-only
 python app.py
 ```
 
-访问 <http://localhost:5000/>。`PORT` 可以覆盖本地端口；`python app.py` 适合本地调试，生产使用 Gunicorn。准备模型缓存只下载和核对包，不初始化推理，也不发送付费模型请求。
+访问 <http://localhost:5000/>。`PORT` 可以覆盖本地端口；`python app.py` 适合本地调试，生产使用 Gunicorn。缓存准备会下载三个官方包、转换两个文字模型、检查模型格式并写入哈希清单；它不执行图片识别，也不发送付费模型请求。首次转换需要额外时间和内存；后续完整缓存可复用。
+
+默认文件布局如下；`PADDLE_PDX_CACHE_HOME` 显式配置时以该目录代替下图的 `paddlex`：
+
+```text
+.model-cache/paddlex/
+├── official_models/
+│   ├── PP-DocLayoutV3/          # 原始 Paddle 版面包
+│   ├── PP-OCRv6_small_det/     # 原始文字检测包，保留转换来源与显式回退
+│   └── PP-OCRv6_small_rec/     # 原始文字识别包
+├── onnx_models/
+│   ├── PP-OCRv6_small_det/     # ONNX、原配置与来源哈希记录
+│   └── PP-OCRv6_small_rec/     # ONNX、原配置与来源哈希记录
+└── dmate-model-manifest.json   # 原包与转换文件的身份和哈希清单
+```
+
+`--verify-only` 只检查已有缓存和清单，不下载、转换或执行识别；缓存不完整时会失败。旧版本仅有 Paddle 包时，应先运行不带 `--verify-only` 的准备命令补齐 ONNX；原清单先核对通过后再升级，不能删除清单来掩盖原模型文件发生变化。
 
 ## 容器与生产部署
 
-Dockerfile 使用 `python:3.10-slim`，安装系统与 Python 依赖，预下载本地模型包，并生成平台图标。构建需要访问相应包源和模型源。
+Dockerfile 使用 `python:3.10-slim`，安装系统与 Python 依赖，预下载本地模型包、构建文字 ONNX 模型并核对缓存，再生成平台图标。构建需要访问相应包源和模型源；平台会复用未变化的依赖和模型构建层。
 
 ```bash
 docker build -t dmate .
@@ -425,7 +454,7 @@ GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“�
 
 **页面能打开，但 AI、账号或识别报错怎么办？**
 
-先按功能检查对应配置。DeepSeek、DashScope、Paddle 本地模型、PostgreSQL 和邮件分别负责不同能力；首页或健康接口可访问，不代表这些依赖都已配置完成。工作空间无权限、模型不存在、数据库不可达和邮件拒收也需要分别处理。
+先按功能检查对应配置。DeepSeek、DashScope、本地 ONNX / Paddle 模型、PostgreSQL 和邮件分别负责不同能力；首页或健康接口可访问，不代表这些依赖都已配置完成。文字识别报模型缓存错误时，先在同一运行环境执行缓存的 `--verify-only`，必要时重新运行缓存准备；工作空间无权限、模型不存在、数据库不可达和邮件拒收需要分别处理。
 
 **为什么只拿到提示，没有最终答案？**
 
@@ -448,6 +477,7 @@ DMate/
 ├── graph_qwen_targeted_review.py  # 按需局部视觉复核
 ├── graph_confirmation.py         # 来源绑定与确认快照登记
 ├── ocr_runtime.py / ocr_worker.py # 本地模型与隔离worker
+├── ocr_text_engine.py            # 本地文字引擎选择与已准备模型定位
 ├── drawing_guidance.py           # 画板结构指导与上传校验
 ├── concept_notebook.py           # 所选概念分析的服务端边界
 ├── voice_input.py                # 语音格式校验与转写适配

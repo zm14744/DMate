@@ -20,10 +20,11 @@ import time
 
 from dmate_tool_registry import ToolContext, ToolRegistry, ToolSpec
 from image_evidence import DocumentEvidence, decode_document_image
+from ocr_text_engine import TEXT_MODELS, selected_text_engine
 
 
 VERSION = '2026-10-26-semantic-text-v1'
-MODEL_NAMES = ('PP-OCRv6_small_det', 'PP-OCRv6_small_rec')
+MODEL_NAMES = TEXT_MODELS
 STAGE_SECONDS = 18.0
 MAX_HINTS = 256
 MAX_HINT_CHARACTERS = 512
@@ -79,28 +80,36 @@ def _layout_input(value):
 
 
 def _cache_readiness():
-    """Inspect the existing configured cache without importing Paddle."""
+    """Inspect the selected text engine/cache without importing a runtime."""
     from ocr_runtime import configure_model_cache, ModelCacheError
-    if any(importlib.util.find_spec(name) is None for name in ('paddle', 'paddleocr')):
+    try:
+        engine = selected_text_engine()
+    except ValueError:
+        return {'status': 'configuration_invalid', 'worker_started': False}
+    runtime = 'onnxruntime' if engine == 'onnxruntime' else 'paddle'
+    if any(importlib.util.find_spec(name) is None for name in (runtime, 'paddleocr')):
         return {'status': 'dependency_unavailable', 'worker_started': False}
     env = dict(os.environ)
     try:
         cache = configure_model_cache(env)
     except ModelCacheError:
         return {'status': 'cache_unavailable', 'worker_started': False}
-    root = Path(env['PADDLE_PDX_CACHE_HOME'])/'official_models'
+    root = Path(env['PADDLE_PDX_CACHE_HOME'])/('onnx_models' if engine == 'onnxruntime' else 'official_models')
+    required = (('inference.onnx', 'inference.yml') if engine == 'onnxruntime'
+                else ('inference.json', 'inference.pdiparams', 'inference.yml'))
     missing = []
     for name in MODEL_NAMES:
         folder = root/name
         try:
             ready = all((folder/file).is_file() and (folder/file).stat().st_size > 0
-                        for file in ('inference.json', 'inference.pdiparams', 'inference.yml'))
+                        for file in required)
         except OSError:
             ready = False
         if not ready:
             missing.append(name)
     return {'status': 'model_cache_missing' if missing else 'ready',
-            'model_cache': cache, 'missing_models': missing, 'worker_started': False}
+            'model_cache': cache, 'missing_models': missing, 'worker_started': False,
+            'text_engine': engine}
 
 
 def _evidence_valid(result, size):

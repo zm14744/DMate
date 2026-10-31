@@ -5,6 +5,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PADDLE_PDX_MODEL_SOURCE=BOS \
     DMATE_MODEL_CACHE_DIR=/opt/dmate-model-cache \
+    DMATE_TEXT_OCR_ENGINE=onnxruntime \
     FLAGS_use_mkldnn=0 \
     OMP_NUM_THREADS=1 \
     MKL_NUM_THREADS=1 \
@@ -26,8 +27,8 @@ COPY requirements.txt requirements-agents.txt ./
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt
 
-# Download official packages without loading inference models. Keep this layer
-# ahead of application sources so ordinary code changes reuse the weights.
+# Cache official packages and export the two Small text models to ONNX without
+# running inference. Ordinary source changes reuse these prepared model layers.
 COPY ocr_runtime.py image_upload_limits.py ./
 COPY scripts/prepare_ocr_model_cache.py ./scripts/prepare_ocr_model_cache.py
 RUN python scripts/prepare_ocr_model_cache.py && \

@@ -24,7 +24,8 @@
 |---|---|
 | [Flask](https://flask.palletsprojects.com/)、[Gunicorn](https://gunicorn.org/)、[Requests](https://requests.readthedocs.io/) | Web 服务、生产进程及 HTTP 请求 |
 | [PostgreSQL](https://www.postgresql.org/docs/)、[Psycopg 3](https://www.psycopg.org/psycopg3/docs/) | 配置数据库后的账号、验证码和云同步 |
-| [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)、[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) | 本地版面、文字和公式识别；实际路由见 [识别说明](RECOGNITION.md) |
+| [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)、[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)、[PaddleX](https://github.com/PaddlePaddle/PaddleX) | 本地版面推理、文字模型及前后处理、兼容公式路径；实际路由见 [识别说明](RECOGNITION.md) |
+| [ONNX Runtime](https://onnxruntime.ai/)、[ONNX](https://onnx.ai/)、[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX) | 默认本地文字 CPU 执行引擎、交换格式与构建时同权重转换；模型不在请求中临时转换 |
 | [OpenCV](https://docs.opencv.org/)、[Pillow](https://pillow.readthedocs.io/)、[NumPy](https://numpy.org/doc/) | 图片解码、裁剪及像素几何处理 |
 | [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview)、[LangChain Core](https://reference.langchain.com/python/langchain_core/)、[JSON Schema](https://python-jsonschema.readthedocs.io/) | 应用内工作流、工具消息与结构校验 |
 | [NetworkX](https://networkx.org/documentation/stable/)、[SymPy](https://docs.sympy.org/) | 已确认图结构和受限数学输入的计算 |

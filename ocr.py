@@ -15,6 +15,7 @@ os.environ.setdefault("PADDLE_PDX_MODEL_SOURCE", "BOS")
 os.environ.setdefault("FLAGS_use_mkldnn", "0")
 
 from paddleocr import PaddleOCR
+from ocr_text_engine import TEXT_DET_MODEL, TEXT_REC_MODEL, text_model_options
 
 _formula_import_error = None
 try:
@@ -25,8 +26,6 @@ except Exception as exc:
     _formula_import_error = repr(exc)
 
 
-TEXT_DET_MODEL = "PP-OCRv6_small_det"
-TEXT_REC_MODEL = "PP-OCRv6_small_rec"
 FORMULA_MODEL = "PP-FormulaNet_plus-S"
 
 MAX_IMAGE_SIDE = 2200
@@ -111,19 +110,10 @@ def load_models():
 
     with _model_lock:
         if _text_ocr is None:
-            print("正在加载 PP-OCRv6-small...")
-            _text_ocr = PaddleOCR(
-                text_detection_model_name=TEXT_DET_MODEL,
-                text_recognition_model_name=TEXT_REC_MODEL,
-                use_doc_orientation_classify=False,
-                use_doc_unwarping=False,
-                use_textline_orientation=False,
-                text_recognition_batch_size=1,
-                device="cpu",
-                enable_mkldnn=False,
-                cpu_threads=2,
-            )
-            print("PP-OCRv6-small 加载完成")
+            options = text_model_options()
+            print(f"正在加载 PP-OCRv6-small ({options['engine']}, CPU)...")
+            _text_ocr = PaddleOCR(**options)
+            print(f"PP-OCRv6-small ({options['engine']}, CPU) 加载完成")
 
         now = time.monotonic()
         should_try_formula = (
