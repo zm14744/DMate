@@ -6,11 +6,19 @@ marked.setOptions({
 const STORAGE_KEY = "discrete_math_ai_sessions_v1";
 const LEARNING_STORAGE_KEY = "discrete_math_ai_learning_v1";
 const MAX_IMAGE_BYTES = 20_000_000;
+const MAX_CHAT_MESSAGE_CHARS = 20_000;
+// Keep confirmed image questions intact as well as ordinary typed questions.
+const MAX_QUESTION_TEXT_CHARS = 28_000;
 const MAX_WRONG_QUESTIONS = 240;
 const MAX_LEARNING_EVENTS = 4000;
-const FALLBACK_API_CONTEXT_MESSAGES = 12;
+const FALLBACK_API_CONTEXT_MESSAGES = 64;
 const MANUAL_QUESTION_MODE_KEY = "dmate_manual_question_mode_tab_v1";
 let manualQuestionMode = false;
+
+function limitQuestionText(value) {
+    // Match Python's character count rather than splitting UTF-16 surrogate pairs.
+    return Array.from(String(value || "")).slice(0, MAX_QUESTION_TEXT_CHARS).join("");
+}
 
 function initManualQuestionMode() {
     // 仅保存当前浏览器标签页的输入偏好，不混入账号或 AI 回复数据。
@@ -3443,12 +3451,12 @@ function normalizeRetestSession(value) {
                 .slice(0, 4)
             : [],
         referenceQuestion: typeof value.referenceQuestion === "string"
-            ? value.referenceQuestion.trim().slice(0, 3000)
+            ? limitQuestionText(value.referenceQuestion.trim())
             : "",
         targetDifficulty: ["简单", "中等", "困难"].includes(value.targetDifficulty)
             ? value.targetDifficulty : "",
         generatedQuestion: typeof value.generatedQuestion === "string"
-            ? value.generatedQuestion.trim().slice(0, 3000)
+            ? limitQuestionText(value.generatedQuestion.trim())
             : "",
         generatedAnswer: typeof value.generatedAnswer === "string"
             ? value.generatedAnswer.trim().slice(0, 1200)
@@ -3502,7 +3510,7 @@ function normalizeLearningQuestion(value) {
         : [];
 
     return {
-        text: text.slice(0, 3000),
+        text: limitQuestionText(text),
         knowledgePoints,
         focusPoints,
         category: typeof value.category === "string"
@@ -3609,7 +3617,7 @@ function normalizeLearningState(value) {
                     id: typeof item.id === "string" && item.id
                         ? item.id
                         : `wrong-${Date.now()}-${Math.random()}`,
-                    question: question.slice(0, 3000),
+                    question: limitQuestionText(question),
                     knowledgePoints: Array.isArray(item.knowledgePoints)
                         ? item.knowledgePoints
                             .filter(point => typeof point === "string" && point.trim())
@@ -3693,7 +3701,7 @@ function normalizeLearningState(value) {
                     retestCount: Math.max(0, Number(item.retestCount) || 0),
                     retestPassCount: Math.max(0, Number(item.retestPassCount) || 0),
                     manualRetestPassCount: Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0)),
-                    retestRecords: Array.isArray(item.retestRecords) ? item.retestRecords.filter(x => x && x.id && x.question).map(x => ({id:String(x.id),question:String(x.question).slice(0,3000),answer:String(x.answer || "").slice(0,8000),analysis:String(x.analysis || "").slice(0,8000),createdAt:Number(x.createdAt)||0})) : [],
+                    retestRecords: Array.isArray(item.retestRecords) ? item.retestRecords.filter(x => x && x.id && x.question).map(x => ({id:String(x.id),question:limitQuestionText(x.question),answer:String(x.answer || "").slice(0,8000),analysis:String(x.analysis || "").slice(0,8000),createdAt:Number(x.createdAt)||0})) : [],
                     passedRetestSessionIds: Array.isArray(item.passedRetestSessionIds)
                         ? [...new Set(item.passedRetestSessionIds.map(String))] : [],
                     retestFailCount: Math.max(0, Number(item.retestFailCount) || 0),
@@ -3705,7 +3713,7 @@ function normalizeLearningState(value) {
                         ? item.lastRetestAt
                         : null,
                     lastRetestQuestion: typeof item.lastRetestQuestion === "string"
-                        ? item.lastRetestQuestion.trim().slice(0, 3000)
+                        ? limitQuestionText(item.lastRetestQuestion.trim())
                         : "",
                     lastRetestFeedback: typeof item.lastRetestFeedback === "string"
                         ? item.lastRetestFeedback.trim().slice(0, 1000)
@@ -4785,7 +4793,7 @@ function buildLearningQuestionFromSession(session, teaching, excludeLatest = fal
         if (!questionText) continue;
 
         return {
-            text: questionText.slice(0, 3000),
+            text: limitQuestionText(questionText),
             knowledgePoints: [...new Set([
                 ...(teaching?.knowledge_points || []).slice(0, 3),
                 ...(teaching?.related_knowledge_points || []).slice(0, 2)
@@ -5202,7 +5210,7 @@ function sanitizeStoredWrongQuestionText(text) {
         return "";
     }
 
-    return value.slice(0, 3000).trim();
+    return limitQuestionText(value).trim();
 }
 
 function extractQuestionOnlyFromMessage(message) {
@@ -5643,7 +5651,7 @@ function extractAiGeneratedExerciseText(reply) {
         text = text.slice(0, hintMatch.index).trim();
     }
 
-    return text.slice(0, 3000);
+    return limitQuestionText(text);
 }
 
 function completeQuestionTextFromChatMessage(
@@ -6324,10 +6332,10 @@ function addWrongQuestion(questionInfo, feedback, source = "auto") {
     if (!info) return { entry: null, countAsMistake: false };
 
     info.text = safeConfirmed
-        ? String(questionInfo.text || "").trim().slice(0, 3000)
+        ? limitQuestionText(String(questionInfo.text || "").trim())
         : sanitizeStoredWrongQuestionText(
             info.text
-        ).slice(0, 3000);
+        );
 
     if (
         source === "auto"
@@ -6489,7 +6497,7 @@ function processLearningFromReply(
         );
 
         session.learningQuestion = {
-            text: generatedExercise || reply.trim().slice(0, 3000),
+            text: limitQuestionText(generatedExercise || reply.trim()),
             knowledgePoints: [...new Set([
                 ...points.slice(0, 3),
                 ...(normalized.related_knowledge_points || []).slice(0, 2)
@@ -6570,7 +6578,7 @@ function processLearningFromReply(
         const learningQuestionText = extractQuestionOnlyFromMessage(latest) || latestText;
 
         session.learningQuestion = {
-            text: learningQuestionText.slice(0, 3000),
+            text: limitQuestionText(learningQuestionText),
             knowledgePoints: points.slice(0, 4),
             focusPoints: normalized.focus_points.slice(0, 2),
             category: normalized.category,
@@ -7351,7 +7359,7 @@ function saveWrongEdit() {
         .filter(Boolean)
         .slice(0, 2);
 
-    if (entry.question !== question.slice(0, 3000)) {
+    if (entry.question !== limitQuestionText(question)) {
         entry.classificationVersion = 0;
         entry.category = "待识别";
         entry.relatedCategories = [];
@@ -7364,7 +7372,7 @@ function saveWrongEdit() {
         entry.analysisUpdatedAt = null;
         wrongAnalysisExpandedIds.delete(entry.id);
     }
-    entry.question = question.slice(0, 3000);
+    entry.question = limitQuestionText(question);
     entry.focusPoints = focusPoints;
     entry.note = noteBox.value.trim().slice(0, 1500);
 
@@ -7513,12 +7521,12 @@ function processWrongQuestionRetestReply(
             return false;
         }
 
-        retest.referenceQuestion = (
+        retest.referenceQuestion = limitQuestionText(
             retest.referenceQuestion
             || entry.question
             || ""
-        ).slice(0, 3000);
-        retest.generatedQuestion = cleanQuestion.slice(0, 3000);
+        );
+        retest.generatedQuestion = limitQuestionText(cleanQuestion);
         retest.generatedAnswer = String(generatedAnswer || "")
             .trim()
             .slice(0, 1200);
@@ -7540,11 +7548,11 @@ function processWrongQuestionRetestReply(
 
     entry.lastRetestAt = now;
     entry.lastRetestSessionId = session.id;
-    entry.lastRetestQuestion = (
+    entry.lastRetestQuestion = limitQuestionText(
         retest.generatedQuestion
         || entry.lastRetestQuestion
         || ""
-    ).slice(0, 3000);
+    );
     entry.lastRetestFeedback = compactFeedback(reply);
     entry.lastRetestResult = assessment;
 
@@ -13219,11 +13227,11 @@ async function requestAiReply(session, options = {}) {
             item => item.id === retestBeforeRequest.wrongQuestionId
         );
 
-        retestReferenceQuestion = String(
+        retestReferenceQuestion = limitQuestionText(String(
             retestBeforeRequest.referenceQuestion
             || entry?.question
             || ""
-        ).trim().slice(0, 3000);
+        ).trim());
     }
 
     if (
@@ -13660,6 +13668,11 @@ function send() {
 
     const text = input.value.trim();
     if (!text) return;
+    if (Array.from(text).length > MAX_CHAT_MESSAGE_CHARS) {
+        showCopyToast("单条文字消息最多 20000 字符，请缩短后发送");
+        input.focus({ preventScroll: true });
+        return;
+    }
 
     if (!currentId) {
         newChat();

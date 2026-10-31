@@ -11,8 +11,11 @@ import threading
 
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
-from teaching import teaching_prompt
+from teaching import teaching_prompt, _active_question_from_messages
 from graph_ocr_cleanup import ocr_is_label_dominated
+from chat_limits import (MAX_MESSAGE_CHARS, MAX_HISTORY_MESSAGES,
+                         MAX_HISTORY_CHARS, MAX_CONFIRMED_MESSAGE_CHARS,
+                         message_char_limit)
 
 
 DEEPSEEK_API_KEY = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
@@ -58,9 +61,6 @@ API_URL = _normalize_vision_api_url(_CONFIGURED_VISION_API_URL)
 ASK_AI_MOCK = False
 
 # 控制单次请求规模，避免上下文无限增长和费用失控
-MAX_HISTORY_MESSAGES = 32
-MAX_HISTORY_CHARS = 60000
-MAX_MESSAGE_CHARS = 6000
 MAX_OUTPUT_TOKENS = max(2000, min(6000, int(os.environ.get("DEEPSEEK_MAX_OUTPUT_TOKENS", "5000"))))
 # 中等和困难统一采用 high 思考；max 不再对外开放。
 # high 模式仍需为最终解答保留足够输出预算。
@@ -364,13 +364,30 @@ def _failure(error):
     }
 
 
-def _trim_messages(messages):
-    """限制历史消息数量、单条长度和总字符量，优先保留最近上下文。"""
+def _current_task_messages(messages):
+    """Keep the actual current question together with the latest instruction."""
+    users = [item for item in messages if item.get("role") == "user"]
+    if not users:
+        return []
+    protected = [users[-1]]
+    active = _active_question_from_messages(messages)
+    question = active[0] if active else ""
+    if question:
+        for item in reversed(users):
+            if question in item["content"]:
+                if item is not protected[0]:
+                    protected.append(item)
+                break
+    return protected
+
+
+def _trim_messages(messages, confirmed=False):
+    """Keep complete current-task messages and the newest whole history items."""
     if not isinstance(messages, list):
         return []
 
     normalized = []
-    for item in messages[-MAX_HISTORY_MESSAGES:]:
+    for item in messages:
         if not isinstance(item, dict):
             continue
 
@@ -387,29 +404,64 @@ def _trim_messages(messages):
         if not content:
             continue
 
-        if len(content) > MAX_MESSAGE_CHARS:
-            content = content[:MAX_MESSAGE_CHARS] + "\n[内容过长，已截断]"
-
         normalized.append({
             "role": role,
             "content": content
         })
 
-    # 32 条只是数量上限。为了避免极端情况下 32 条都接近 6000 字符，
-    # 再加一层总字符预算；从最近消息向前保留，保证最新请求优先。
-    trimmed_reversed = []
-    total_chars = 0
-
+    protected = _current_task_messages(normalized)
+    if any(len(item["content"]) > message_char_limit(item["content"], confirmed) for item in protected):
+        raise ValueError("当前题目或本轮消息过长，请拆分后发送；系统没有截断题目条件。")
+    selected = {id(item) for item in protected}
+    total_chars = sum(len(item["content"]) for item in protected)
+    if total_chars > MAX_HISTORY_CHARS:
+        raise ValueError("当前题目及要求超出上下文容量，请拆分后发送。")
     for item in reversed(normalized):
-        content_len = len(item["content"])
-
-        if trimmed_reversed and total_chars + content_len > MAX_HISTORY_CHARS:
+        if id(item) in selected:
+            continue
+        size = len(item["content"])
+        if size > message_char_limit(item["content"], confirmed) or size + total_chars > MAX_HISTORY_CHARS:
+            continue
+        if len(selected) >= MAX_HISTORY_MESSAGES:
             break
+        selected.add(id(item))
+        total_chars += size
+    return [item for item in normalized if id(item) in selected]
 
-        trimmed_reversed.append(item)
-        total_chars += content_len
 
-    return list(reversed(trimmed_reversed))
+def _context_capacity_error(response):
+    """Only explicit provider context-window failures permit history reduction."""
+    if response.status_code not in (400, 413, 422):
+        return False
+    try:
+        error = response.json().get("error", {})
+    except (ValueError, AttributeError):
+        return False
+    if not isinstance(error, dict):
+        return False
+    code = str(error.get("code") or error.get("type") or "").lower()
+    message = str(error.get("message") or "").lower()
+    return (code in {"context_length_exceeded", "context_window_exceeded"}
+            or bool(re.search(r"maximum context length|context (?:length|window).{0,80}(?:exceed|too (?:long|large))", message)))
+
+
+def _reduced_context(messages, protected_messages=()):
+    """Drop old whole messages once, never system data or original task content."""
+    protected_ids = {id(item) for item in protected_messages}
+    protected_ids.update(id(item) for item in messages if item.get("role") == "system")
+    latest = next((item for item in reversed(messages) if item.get("role") == "user"), None)
+    if latest is not None:
+        protected_ids.add(id(latest))
+    recent_answer = next((item for item in reversed(messages) if item.get("role") == "assistant"), None)
+    if recent_answer is not None:
+        protected_ids.add(id(recent_answer))
+    removable = [item for item in messages if id(item) not in protected_ids]
+    if not removable:
+        return None
+    # Provider token counts are not inferred from characters. One bounded retry
+    # removes the older half of optional history; if still too large, fail closed.
+    remove_ids = {id(item) for item in removable[:max(1, (len(removable) + 1) // 2)]}
+    return [item for item in messages if id(item) not in remove_ids]
 
 
 
@@ -842,6 +894,7 @@ def _request_text_completion(
     timeout=(10, 60),
     response_format=None,
     cancelled=None,
+    protected_messages=None,
 ):
     """
     调用文本模型。
@@ -863,6 +916,7 @@ def _request_text_completion(
     last_status = None
     last_error = None
     saw_empty_body = False
+    context_reduced = False
 
     for provider_index, provider in enumerate(providers):
         # 单一 DeepSeek 线路保留原有重试次数。
@@ -913,6 +967,28 @@ def _request_text_completion(
                 elapsed = time.monotonic() - call_start
                 print(f"{provider['name']} API耗时 {elapsed:.2f}s；HTTP {response.status_code}")
                 last_status = response.status_code
+
+                if _context_capacity_error(response):
+                    reduced = None if context_reduced else _reduced_context(
+                        payload["messages"], protected_messages or ()
+                    )
+                    if reduced is None:
+                        return {"ok": False, "status_code": response.status_code,
+                                "context_length_exceeded": True,
+                                "error": "当前题目及必要上下文超过模型容量，请拆分题目后重试；系统未截断题目条件。"}
+                    context_reduced = True
+                    payload["messages"] = reduced
+                    if cancelled is not None and cancelled():
+                        return {"ok": False, "cancelled": True}
+                    print("模型明确返回上下文容量不足，移除较早的完整历史后仅重试一次。")
+                    response = _text_http_session().post(
+                        provider["url"], headers=headers, json=payload, timeout=provider_timeout
+                    )
+                    last_status = response.status_code
+                    if _context_capacity_error(response):
+                        return {"ok": False, "status_code": response.status_code,
+                                "context_length_exceeded": True,
+                                "error": "当前题目及必要上下文超过模型容量，请拆分题目后重试；系统未截断题目条件。"}
 
                 if response.status_code in RETRYABLE_STATUS:
                     if attempt < attempts - 1:
@@ -1093,6 +1169,7 @@ def _regenerate_broken_math_answer(
         retries=0,
         reasoning_effort=reasoning_effort,
         preferred_provider=preferred_provider,
+        protected_messages=_current_task_messages(final_messages) + retry_messages[len(final_messages):],
     )
     if not result.get("ok"):
         print("数学格式重生成失败：所有可用文本路径均失败")
@@ -1143,6 +1220,7 @@ def _continue_truncated_answer(
             retries=0,
             reasoning_effort=reasoning_effort,
             preferred_provider=current_provider,
+            protected_messages=_current_task_messages(api_messages) + messages[len(api_messages):],
         )
         if not result.get("ok"):
             print("长回答自动续写失败：所有可用文本路径均失败")
@@ -1206,11 +1284,15 @@ $$
         print("AI API 配置错误：DEEPSEEK_API_KEY 未设置")
         return _failure("AI 服务尚未完成配置，请联系管理员。")
 
-    clean_messages = _trim_messages(messages)
+    context = teaching_context or {}
+    semantic = context.get("semantic_math")
+    try:
+        clean_messages = _trim_messages(messages, confirmed=isinstance(semantic, dict) and semantic.get("user_confirmed") is True)
+    except ValueError as exc:
+        return _failure(str(exc))
     if not clean_messages:
         return _failure("没有检测到有效的消息内容。")
 
-    context = teaching_context or {}
     system_content = SYSTEM_PROMPT + teaching_prompt(context)
     if context.get("semantic_math"):
         from graph_semantic_solver import semantic_math_prompt
@@ -1244,6 +1326,7 @@ $$
         api_messages,
         retries=0 if is_full_solution else retries,
         reasoning_effort=reasoning_effort,
+        protected_messages=_current_task_messages(clean_messages),
     )
     if is_full_solution and not result.get("ok") and (
         result.get("empty_body") or result.get("status_code") in (429, 500, 502, 503, 504)
@@ -1268,6 +1351,7 @@ $$
             reasoning_effort="none",
             max_tokens=min(MAX_OUTPUT_TOKENS, 5000),
             timeout=(8, 45),
+            protected_messages=_current_task_messages(api_messages) + recovery_messages[len(api_messages):],
         )
         if fallback.get("ok"):
             result = fallback

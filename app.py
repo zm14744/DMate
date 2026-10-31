@@ -19,6 +19,12 @@ from flask import Flask, jsonify, render_template, request, session, make_respon
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
+from chat_limits import (
+    MAX_MESSAGE_CHARS,
+    MAX_HISTORY_MESSAGES as MAX_MESSAGES_PER_REQUEST,
+    MAX_CONFIRMED_MESSAGE_CHARS,
+    message_char_limit,
+)
 from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, contains_two_labeled_undirected_diagrams, has_critical_edge_or_arrow_uncertainty, FLAG as GRAPH_UNCERTAIN_FLAG
 from graph_answer_integrity import (detect_count_inconsistency, review_directed_graphs,
     protect_uncertain_graph_answer, review_multi_graph_counts,
@@ -299,9 +305,6 @@ KNOWLEDGE_GRAPH_DATA = _load_knowledge_graph()
 # -----------------------------
 # 基础限制
 # -----------------------------
-MAX_MESSAGE_CHARS = 6000
-MAX_MESSAGES_PER_REQUEST = 32
-
 from image_upload_limits import MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS
 
 # 每张原图单独上传；文字选区 JSON 最多 2MB，另外预留 multipart 协议开销。
@@ -2492,7 +2495,7 @@ def _extract_generated_question(reply):
         value
     ).strip()
 
-    value = value[:6000].strip()
+    value = value[:MAX_MESSAGE_CHARS].strip()
 
     # AI 返回“暂时无法出题”等拒绝/故障文字时，绝不能把它登记成题目。
     # 标题【题目】本身不能证明内容是题目；必须同时有可执行的数学任务。
@@ -3431,7 +3434,7 @@ def chat():
         if not content:
             continue
 
-        message_limit = 28000 if confirmed_context is not None else MAX_MESSAGE_CHARS
+        message_limit = message_char_limit(content, confirmed=confirmed_context is not None)
         if len(content) > message_limit:
             return jsonify({
                 "error": (
@@ -3511,7 +3514,7 @@ def chat():
         latest_action = extract_current_request(latest_user["content"])
         content = ("【当前指向题目】\n" + reference_text + "\n【当前指向题目结束】\n"
                    "【本轮唯一需要执行的用户请求】\n" + latest_action + "\n【本轮请求结束】")
-        if len(content) > MAX_MESSAGE_CHARS:
+        if len(content) > message_char_limit(content):
             return jsonify({"error": "参照题和出题要求过长，请精简后重试"}), 400
         cleaned = [{"role": "user", "content": content}]
 
@@ -3559,7 +3562,7 @@ def chat():
             q = ref.get("question")
             a = ref.get("answer")
             if (isinstance(q, str) and isinstance(a, str)
-                    and 5 <= len(q.strip()) <= 6000
+                    and 5 <= len(q.strip()) <= MAX_MESSAGE_CHARS
                     and 0 < len(a.strip()) <= 1200
                     and q.strip() in cleaned[-1]["content"]):
                 solution_reference_answer = a.strip()
@@ -3576,7 +3579,7 @@ def chat():
                 (item["content"] for item in reversed(cleaned)
                  if item["role"] == "user"), ""
             )
-            if (10 <= len(pinned_question) <= 6000
+            if (10 <= len(pinned_question) <= MAX_CONFIRMED_MESSAGE_CHARS
                     and pinned_difficulty in ("简单", "中等", "困难")
                     and "【当前指向题目】" in current_user_content
                     and pinned_question in current_user_content):
@@ -4180,7 +4183,7 @@ def analyze_questions_batch():
 
         try:
             teaching = analyze_question(
-                text[:6000]
+                text[:MAX_MESSAGE_CHARS]
             )
         except Exception as exc:
             print("历史题目知识识别失败：", repr(exc))
@@ -4191,7 +4194,7 @@ def analyze_questions_batch():
             "teaching": teaching
         })
         if teaching is not None:
-            fallback_entries.append((key, text[:6000], teaching))
+            fallback_entries.append((key, text[:MAX_MESSAGE_CHARS], teaching))
 
     # 可选 AI 语义复核只在错题本的后台批量补全启用；普通 /chat
     # 依旧仅调用本地分类，不串行增加一次模型请求。
