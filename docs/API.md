@@ -374,6 +374,14 @@ multipart 字段为 `audio`。仅接受 16 kHz、单声道、PCM16 WAV，时长 
 | `manifestOnly=1` | 读取各部分哈希与字节数 |
 | `parts=sessions,learning,appearance` | 按需读取其中指定的数据部分 |
 | `expectedRevision=版本号` | 绑定读取版本，不匹配返回 409 |
+| `sinceRevision=版本号` | 条件读取；无更新只返回版本，有更新时一次返回摘要和变化分段 |
+| `knownHashes=JSON对象` | 配合 `sinceRevision` 提供已应用分段的 SHA256；查询值应做 URL 编码 |
+
+新客户端优先使用条件读取，例如 `/sync?sinceRevision=12&parts=sessions,learning&knownHashes=%7B%7D`。`sinceRevision` 为非负 PostgreSQL BIGINT 范围内的十进制整数；`knownHashes` 是分段名到 64 位十六进制哈希的对象，只允许 `sessions`、`learning`、兼容字段 `appearance`。没有某个分段的哈希时省略该键，不传空哈希。新网页只请求 `sessions`、`learning`，不会因此恢复旧的外观云同步。
+
+条件读取响应具有 `delta: true`。云端版本不高于 `sinceRevision` 时返回 `changed: false` 和实际 `revision`，不读取快照正文、不生成摘要。有新版本时返回 `changed: true`、`revision`、完整 `parts` 摘要、`changedParts` 名称列表和只包含变化分段的 `data`；分段哈希均相同时允许 `changedParts: []`、`data: {}`。这些字段来自同一数据库行的版本与内容，不需要再次请求 manifest 或 parts。不存在的同步记录按 revision 0 处理，条件读取不为了查询而插入记录。
+
+客户端必须在等待结束后再次核对账号、当前编辑状态和本地变更版本，并确认所有应变化分段均已收到，才可更新已应用修订号及哈希。无 `delta` 标志的旧服务端响应不能当作新协议处理；可消费其完整快照后回到旧读取流程。条件响应使用 `Cache-Control: no-store`。
 
 PUT 示例：
 
@@ -399,7 +407,7 @@ PUT 示例：
 }
 ```
 
-其中 `data` 和 `parts` 应为服务端实际返回的云端内容，这里的空对象仅用于缩短示例。推荐读取流程为 revision → 同版本 manifest → 有变化的指定 parts；所有后续读取都绑定 `expectedRevision`。过程中收到 409 就重新开始版本读取，不能把不同 revision 的分段合成已完成快照。
+其中 `data` 和 `parts` 应为服务端实际返回的云端内容，这里的空对象仅用于缩短示例。兼容读取流程为 revision → 同版本 manifest → 有变化的指定 parts；所有后续读取都绑定 `expectedRevision`。过程中收到 409 就重新开始版本读取，不能把不同 revision 的分段合成已完成快照。新协议的单次条件读取可省去这两次后续请求，PUT 的版本冲突处理仍保持不变。
 
 `baseRevision` 必须是非负整数或可解析为非负整数的字符串，不接受布尔值、浮点数和非有限值；同步数据本身也不能包含 `NaN` / `Infinity`。PUT 成功只说明服务器已接受此快照，不会自动把独立绘图库、背景图片文件和进行中的图片任务转成云同步数据。
 

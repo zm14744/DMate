@@ -2024,6 +2024,70 @@ def sync_user_data():
 
     user_id = int(user["id"])
 
+    if request.method == "GET" and "sinceRevision" in request.args:
+        def delta_response(payload, status=200):
+            response = jsonify(payload)
+            response.status_code = status
+            response.headers["Cache-Control"] = "no-store"
+            return response
+
+        try:
+            raw_revision = request.args.get("sinceRevision", "")
+            if (not re.fullmatch(r"[0-9]{1,19}", raw_revision)
+                    or int(raw_revision) > 9223372036854775807):
+                raise ValueError("invalid_revision")
+            since_revision = int(raw_revision)
+            allowed = ("sessions", "learning", "appearance")
+            raw_parts = request.args.get("parts", "sessions,learning")
+            if len(raw_parts) > 128:
+                raise ValueError("invalid_parts")
+            selected_parts = list(dict.fromkeys(part.strip() for part in raw_parts.split(",")))
+            if not selected_parts or any(part not in allowed for part in selected_parts):
+                raise ValueError("invalid_parts")
+            raw_hashes = request.args.get("knownHashes", "{}")
+            if len(raw_hashes) > 1024:
+                raise ValueError("invalid_hashes")
+            known_hashes = json.loads(raw_hashes)
+            if (not isinstance(known_hashes, dict)
+                    or any(key not in allowed or not isinstance(value, str)
+                           or not re.fullmatch(r"[a-fA-F0-9]{64}", value)
+                           for key, value in known_hashes.items())):
+                raise ValueError("invalid_hashes")
+            known_hashes = {key: value.lower() for key, value in known_hashes.items()}
+        except (TypeError, ValueError, OverflowError):
+            return delta_response({"ok": False, "error": "同步版本、分段或摘要无效"}, 400)
+
+        try:
+            with _auth_connect() as conn:
+                with conn.cursor() as cur:
+                    # The CASE avoids returning/detoasting the JSONB when the
+                    # revision is unchanged. A changed snapshot and its revision
+                    # come from one row/statement, even during concurrent writes.
+                    cur.execute(
+                        """SELECT revision, updated_at,
+                                  CASE WHEN revision > %s THEN data ELSE NULL END AS data
+                           FROM dm_user_data WHERE user_id = %s""",
+                        (since_revision, user_id),
+                    )
+                    row = cur.fetchone()
+            revision = int(row["revision"] or 0) if row else 0
+            if revision <= since_revision:
+                return delta_response({"ok": True, "delta": True,
+                                       "revision": revision, "changed": False})
+            snapshot = row["data"] if isinstance(row.get("data"), dict) else {}
+            manifest = _sync_manifest_from_data(snapshot)
+            changed_parts = [part for part in selected_parts
+                             if manifest[part]["hash"] != known_hashes.get(part)]
+            return delta_response({
+                "ok": True, "delta": True, "revision": revision, "changed": True,
+                "data": {part: snapshot.get(part) for part in changed_parts},
+                "parts": manifest, "changedParts": changed_parts,
+                "updatedAt": row["updated_at"].isoformat() if row.get("updated_at") else None,
+            })
+        except Exception as exc:
+            print(f"增量读取云端同步失败：{repr(exc)}")
+            return delta_response({"ok": False, "error": "读取云端更新失败"}, 500)
+
     if request.method == "GET" and request.args.get("revisionOnly") == "1":
         # 每 1.2 秒仅查询整数 revision；不能频繁读取整份 JSON 再哈希。
         try:

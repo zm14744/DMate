@@ -71,8 +71,8 @@ let cloudApplyingSnapshot = false;
 // 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
 let cloudLocalChangeVersion = 0;
 let cloudSyncContextVersion = 0;
-// 只轮询云端修订号，版本变化时才读取完整快照；后台低频检查、切回前台立即检查。
-// 前台只检查修订号，云端没有变化时不下载完整快照。
+// 条件读取在版本变化时只下载变化分段；无更新仅返回修订号。
+// 后台低频检查，切回前台立即检查，不持续下载完整快照。
 // 与后台 30 秒轮询区分，避免隐藏标签持续占用服务器连接。
 const CLOUD_LIVE_POLL_VISIBLE_MS = 1200;
 const CLOUD_LIVE_POLL_HIDDEN_MS = 30000;
@@ -83,6 +83,9 @@ let cloudLivePollGeneration = 0;
 let cloudLivePollEnabled = false;
 // 哈希属于当前页面已实际应用的快照，不能直接相信其他标签写入的 localStorage。
 let cloudAppliedPartHashes = null;
+// Older servers ignore delta query parameters and return a full snapshot.
+// Negotiate once per page, then retain their lightweight revision polling.
+let cloudDeltaSyncSupported = null;
 let cloudSyncCapacityRetryAt = 0;
 let appConfirmResolver = null;
 let mobileChoiceResolver = null;
@@ -1887,6 +1890,8 @@ async function pullLatestCloudSnapshot() {
 
     cloudLivePollInFlight = true;
     const beforeEdit = cloudLocalChangeVersion;
+    const beforeRevision = Number(accountState.revision || 0);
+    const beforePartHashes = cloudAppliedPartHashes;
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     cloudLivePollAbortController = controller;
     const timeoutId = controller ? window.setTimeout(() => controller.abort(), 12000) : 0;
@@ -1894,14 +1899,29 @@ async function pullLatestCloudSnapshot() {
     const valid = () => cloudLivePollEnabled && generation === cloudLivePollGeneration &&
         isCloudSyncContextValid(owner, contextVersion);
     const safeToApply = () => valid() && !readCloudSyncMeta().dirty &&
-        cloudLocalChangeVersion === beforeEdit && !accountState.syncing && !cloudUiEditInProgress();
+        cloudLocalChangeVersion === beforeEdit && Number(accountState.revision || 0) === beforeRevision &&
+        cloudAppliedPartHashes === beforePartHashes && !accountState.syncing && !cloudUiEditInProgress();
 
     try {
-        // 版本可能在 manifest 与分段请求之间改变：最多重新获取 3 次。
+        // 新服务器一次读取同一版本的变化部分；旧服务器保留分段兼容路径。
         for (let attempt = 0; attempt < 3; attempt++) {
-            const { data:head } = await accountFetch("/sync?revisionOnly=1", options);
-            if (!valid()) return false;
             const localRevision = Number(accountState.revision || 0);
+            const localHashes = cloudAppliedPartHashes;
+            const knownHashes = Object.fromEntries(["sessions", "learning"]
+                .filter(key => /^[a-f0-9]{64}$/i.test(String(localHashes?.[key] || "")))
+                .map(key => [key, localHashes[key]]));
+            const useDelta = cloudDeltaSyncSupported !== false;
+            const query = useDelta
+                ? `/sync?sinceRevision=${localRevision}&parts=sessions,learning&knownHashes=${encodeURIComponent(JSON.stringify(knownHashes))}`
+                : "/sync?revisionOnly=1";
+            const { data:head } = await accountFetch(query, options);
+            if (!valid()) return false;
+            const delta = useDelta && head.delta === true;
+            if (useDelta) cloudDeltaSyncSupported = delta;
+            if (delta && (!Number.isSafeInteger(head.revision) || head.revision < 0 ||
+                typeof head.changed !== "boolean")) {
+                throw new Error("云端同步响应版本无效，稍后重试");
+            }
             const targetRevision = Number(head.revision || 0);
             if (targetRevision <= localRevision) {
                 if (accountState.status === "同步检查失败，自动重试中" && !readCloudSyncMeta().dirty) {
@@ -1912,19 +1932,36 @@ async function pullLatestCloudSnapshot() {
             }
             if (!safeToApply()) return false;
 
-            // 平时只读取 revision；确认有新版本后才查询 manifest。
-            const manifestQuery = `/sync?manifestOnly=1&expectedRevision=${targetRevision}`;
-            const {response:manifestResponse, data:manifest} = await accountFetch(manifestQuery, options);
-            if (!valid()) return false;
-            if (manifestResponse.status === 409 || Number(manifest.revision) !== targetRevision) continue;
-            if (!safeToApply()) return false;
+            let manifest = head;
+            let full = useDelta ? head : null;
+            if (!useDelta) {
+                const manifestQuery = `/sync?manifestOnly=1&expectedRevision=${targetRevision}`;
+                const fetched = await accountFetch(manifestQuery, options);
+                if (!valid()) return false;
+                manifest = fetched.data;
+                if (fetched.response.status === 409 || Number(manifest.revision) !== targetRevision) continue;
+                if (!safeToApply()) return false;
+            }
 
-            const localHashes = cloudAppliedPartHashes;
             const changedParts = localHashes
                 ? computeChangedCloudParts(manifest.parts, localHashes)
                 : ["sessions", "learning"];
+            // A missing manifest or advertised section must never mark a
+            // partially received snapshot as applied, even on a valid revision.
+            if (["sessions", "learning"].some(key =>
+                !/^[a-f0-9]{64}$/i.test(String(manifest.parts?.[key]?.hash || "")))) {
+                throw new Error("云端同步摘要不完整，稍后重试");
+            }
+            if (delta && (head.changed !== true || !Array.isArray(head.changedParts) ||
+                head.changedParts.length !== changedParts.length ||
+                new Set(head.changedParts).size !== changedParts.length ||
+                head.changedParts.some(key => !changedParts.includes(key)) ||
+                !head.data || typeof head.data !== "object" || Array.isArray(head.data))) {
+                throw new Error("云端同步分段不完整，稍后重试");
+            }
             if (!changedParts.length && localHashes) {
                 // 全部分段内容均相同，只增加版本，不重复渲染页面。
+                cloudAppliedPartHashes = getCloudPartHashMap(manifest.parts);
                 accountState.revision = targetRevision;
                 accountState.status = "已同步";
                 writeCloudSyncMeta({ username:owner, revision:targetRevision,
@@ -1932,14 +1969,21 @@ async function pullLatestCloudSnapshot() {
                 renderAccountUi();
                 return true;
             }
-            const sectionQuery = `/sync?expectedRevision=${targetRevision}&parts=${encodeURIComponent(changedParts.join(","))}`;
-            const { response, data:full } = await accountFetch(sectionQuery, options);
-            if (!valid()) return false;
-            if (response.status === 409 || Number(full.revision) !== targetRevision) continue;
-            if (!safeToApply()) return false;
+            if (!full) {
+                const sectionQuery = `/sync?expectedRevision=${targetRevision}&parts=${encodeURIComponent(changedParts.join(","))}`;
+                const fetched = await accountFetch(sectionQuery, options);
+                if (!valid()) return false;
+                full = fetched.data;
+                if (fetched.response.status === 409 || Number(full.revision) !== targetRevision) continue;
+                if (!safeToApply()) return false;
+            }
+            if (!full.data || typeof full.data !== "object" || Array.isArray(full.data) ||
+                changedParts.some(key => !Object.prototype.hasOwnProperty.call(full.data, key))) {
+                throw new Error("云端同步内容不完整，稍后重试");
+            }
 
             // 当前会话属于本机导航状态，不让另一端抢走选中会话。
-            const incoming = full.data && typeof full.data === "object" ? { ...full.data } : {};
+            const incoming = Object.fromEntries(changedParts.map(key => [key, full.data[key]]));
             if (incoming.sessions && Array.isArray(incoming.sessions.sessions)) {
                 const selectedHere = currentId;
                 const remoteSessions = incoming.sessions.sessions;
