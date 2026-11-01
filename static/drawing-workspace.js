@@ -65,10 +65,11 @@
   }
   function syncCanvasClip(viewport=observedViewport){
    if(!viewport?.clientWidth||!viewport.clientHeight)return;
-   // Clip the stationary viewport, never the large scrolling image/SVG layer.
+   // Clip only the scrollable content; the enclosing frame owns the outline.
    // Even-odd paths retain native scrollbar gutters around the rounded canvas.
    const w=viewport.offsetWidth,h=viewport.offsetHeight,l=viewport.clientLeft,t=viewport.clientTop;
-   const r=l+viewport.clientWidth,b=t+viewport.clientHeight,k=Math.min(12,viewport.clientWidth/2,viewport.clientHeight/2);
+   const radius=parseFloat(win.getComputedStyle(viewport).borderTopLeftRadius)||0;
+   const r=l+viewport.clientWidth,b=t+viewport.clientHeight,k=Math.min(radius,viewport.clientWidth/2,viewport.clientHeight/2);
    const outer='M-1 -1H'+(w+1)+'V'+(h+1)+'H-1Z';
    const square='M'+l+' '+t+'H'+r+'V'+b+'H'+l+'Z';
    const rounded='M'+(l+k)+' '+t+'H'+(r-k)+'A'+k+' '+k+' 0 0 1 '+r+' '+(t+k)+'V'+(b-k)+'A'+k+' '+k+' 0 0 1 '+(r-k)+' '+b+'H'+(l+k)+'A'+k+' '+k+' 0 0 1 '+l+' '+(b-k)+'V'+(t+k)+'A'+k+' '+k+' 0 0 1 '+(l+k)+' '+t+'Z';
