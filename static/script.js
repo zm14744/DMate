@@ -55,6 +55,10 @@ const ACCOUNT_LOGOUT_SIGNAL_KEY = "dmate_account_logout_signal_v1";
 let volatileCloudBackup = null;
 // 减少跨设备可见延迟；连续本机写入仍保留短暂防抖，避免每次打字都上传。
 const CLOUD_SYNC_DEBOUNCE_MS = 200;
+const CLOUD_SYNC_MAX_WAIT_MS = 1000;
+const CLOUD_SYNC_REQUEST_TIMEOUT_MS = 15000;
+const CLOUD_SYNC_BULK_TIMEOUT_MS = 120000;
+const CLOUD_SYNC_BULK_BYTES = 256 * 1024;
 let accountState = {
     configured: null,
     emailConfigured: null,
@@ -67,6 +71,7 @@ let accountState = {
     status: ""
 };
 let cloudSyncTimer = 0;
+let cloudSyncQueuedAt = null;
 let cloudApplyingSnapshot = false;
 // 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
 let cloudLocalChangeVersion = 0;
@@ -1027,6 +1032,9 @@ function clearCloudSyncMeta() {
 }
 
 function bumpCloudSyncContext() {
+    if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = 0;
+    cloudSyncQueuedAt = null;
     cloudAppliedPartHashes = null;
     cloudSyncCapacityRetryAt = 0;
     cloudSyncContextVersion += 1;
@@ -1768,29 +1776,87 @@ async function accountFetch(url, options = {}) {
     const fetchOptions = { ...options };
     delete fetchOptions.allowConflict;
 
-    const response = await fetch(url, {
-        credentials: "same-origin",
-        cache: "no-store",
-        ...fetchOptions,
-        headers: {
-            ...(fetchOptions.body ? { "Content-Type":"application/json" } : {}),
-            ...(fetchOptions.headers || {})
+    const syncRequest = /^\/sync(?:\?|$)/.test(String(url));
+    const externalSignal = fetchOptions.signal;
+    const controller = syncRequest && typeof AbortController !== "undefined" ? new AbortController() : null;
+    if (controller) fetchOptions.signal = controller.signal;
+    let extendDeadline = () => {};
+    const execute = async () => {
+        const response = await fetch(url, {
+            credentials: "same-origin", cache: "no-store", ...fetchOptions,
+            headers: {
+                ...(fetchOptions.body ? { "Content-Type":"application/json" } : {}),
+                ...(fetchOptions.headers || {})
+            }
+        });
+        if (syncRequest) {
+            const rawLength = response.headers?.get?.("Content-Length");
+            const length = rawLength == null || rawLength === "" ? NaN : Number(rawLength);
+            if (!Number.isFinite(length) || length < 0 || length > CLOUD_SYNC_BULK_BYTES) extendDeadline();
         }
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (cause) {
+            if (syncRequest) {
+                const error = new Error("云同步响应无法读取，请稍后重试");
+                error.status = response.status;
+                error.cause = cause;
+                throw error;
+            }
+        }
+        if (!response.ok && !(allowConflict && response.status === 409)) {
+            const error = new Error(data?.error || `请求失败（${response.status}）`);
+            error.status = response.status;
+            error.data = data;
+            throw error;
+        }
+        return { response, data };
+    };
+    if (!syncRequest) return execute();
+
+    let timeoutId = 0, abortListener;
+    const deadline = new Promise((_resolve, reject) => {
+        const started = Date.now();
+        const bodyBytes = typeof fetchOptions.body === "string"
+            ? (typeof TextEncoder !== "undefined" ? new TextEncoder().encode(fetchOptions.body).byteLength
+                : fetchOptions.body.length * 3) : 0;
+        let budget = bodyBytes > CLOUD_SYNC_BULK_BYTES
+            ? CLOUD_SYNC_BULK_TIMEOUT_MS : CLOUD_SYNC_REQUEST_TIMEOUT_MS;
+        const armDeadline = () => {
+            if (timeoutId) window.clearTimeout(timeoutId);
+            timeoutId = window.setTimeout(() => {
+                controller?.abort();
+                const error = new Error("云同步请求超时，稍后自动重试");
+                error.name = "TimeoutError";
+                reject(error);
+            }, Math.max(0, budget - (Date.now() - started)));
+        };
+        extendDeadline = () => {
+            if (budget < CLOUD_SYNC_BULK_TIMEOUT_MS) {
+                budget = CLOUD_SYNC_BULK_TIMEOUT_MS;
+                armDeadline();
+            }
+        };
+        abortListener = () => {
+            controller?.abort();
+            const error = new Error("云同步请求已取消");
+            error.name = "AbortError";
+            reject(error);
+        };
+        externalSignal?.addEventListener("abort", abortListener, {once:true});
+        if (externalSignal?.aborted) abortListener();
+        armDeadline();
     });
-
-    let data = {};
     try {
-        data = await response.json();
-    } catch (_error) {}
-
-    if (!response.ok && !(allowConflict && response.status === 409)) {
-        const error = new Error(data?.error || `请求失败（${response.status}）`);
-        error.status = response.status;
-        error.data = data;
-        throw error;
+        // The deadline includes response-body decoding, even if an upstream
+        // fetch implementation does not promptly honour abort().
+        return await Promise.race([execute(), deadline]);
+    } finally {
+        extendDeadline = () => {};
+        if (timeoutId) window.clearTimeout(timeoutId);
+        externalSignal?.removeEventListener("abort", abortListener);
     }
-
-    return { response, data };
 }
 
 function scheduleCloudSync() {
@@ -1809,12 +1875,15 @@ function scheduleCloudSync() {
     }
 
     cloudLocalChangeVersion += 1;
+    const now = Date.now();
+    if (cloudSyncQueuedAt === null) cloudSyncQueuedAt = now;
     // 修改可能发生在前一次网络上传进行中，不要漏掉后续同步。
     if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
     cloudSyncTimer = window.setTimeout(() => {
         cloudSyncTimer = 0;
         pushCloudSnapshot(false);
-    }, CLOUD_SYNC_DEBOUNCE_MS);
+    }, Math.max(0, Math.min(CLOUD_SYNC_DEBOUNCE_MS,
+        CLOUD_SYNC_MAX_WAIT_MS - (now - cloudSyncQueuedAt))));
     renderAccountUi();
 }
 
@@ -1894,7 +1963,6 @@ async function pullLatestCloudSnapshot() {
     const beforePartHashes = cloudAppliedPartHashes;
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     cloudLivePollAbortController = controller;
-    const timeoutId = controller ? window.setTimeout(() => controller.abort(), 12000) : 0;
     const options = controller ? { signal:controller.signal, allowConflict:true } : { allowConflict:true };
     const valid = () => cloudLivePollEnabled && generation === cloudLivePollGeneration &&
         isCloudSyncContextValid(owner, contextVersion);
@@ -2017,7 +2085,6 @@ async function pullLatestCloudSnapshot() {
         }
         return false;
     } finally {
-        if (timeoutId) window.clearTimeout(timeoutId);
         if (cloudLivePollAbortController === controller) cloudLivePollAbortController = null;
         cloudLivePollInFlight = false;
     }
@@ -2212,7 +2279,10 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
 }
 
 async function pushCloudSnapshot(_legacyForce = false) {
-    if (!accountState.authenticated || accountState.syncing) return false;
+    if (!accountState.authenticated || !accountState.username || accountState.syncing) return false;
+    if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = 0;
+    cloudSyncQueuedAt = null;
 
     const meta = readCloudSyncMeta();
     const owner = accountState.username;
@@ -2250,11 +2320,16 @@ async function pushCloudSnapshot(_legacyForce = false) {
                 mergedWithRemote = true;
                 continue;
             }
-            const latestRevision = Number(data.revision || 0);
+            if (!response.ok || data?.ok !== true || !Number.isSafeInteger(data.revision)
+                || data.revision <= revision) {
+                throw new Error("云同步确认无效，保留本机修改后重试");
+            }
+            const latestRevision = data.revision;
             const hadNewEdits = cloudLocalChangeVersion !== submittedChangeVersion;
             latestPartHashes = getCloudPartHashMap(data.parts);
-            if (mergedWithRemote || hadNewEdits) {
-                // 上传期间还在输入时，先合并当前编辑，再将下一轮增量继续同步。
+            if (mergedWithRemote) {
+                // Only a real remote conflict needs a merged local snapshot.
+                // New local edits alone remain in place and are uploaded next.
                 const present = collectCloudSnapshot();
                 const merged = mergeCloudSnapshots(present, snapshotToSend);
                 if (!isCloudSyncContextValid(owner, contextVersion)) {
@@ -2295,14 +2370,16 @@ async function pushCloudSnapshot(_legacyForce = false) {
         if (isCloudSyncContextValid(owner, contextVersion)) {
             accountState.syncing = false;
             if (accountState.authenticated && (
-                cloudLocalChangeVersion !== submittedChangeVersion || !successful && mergedWithRemote
+                cloudLocalChangeVersion !== submittedChangeVersion || !successful
             )) {
                 writeCloudSyncMeta({username:owner, dirty:true, sectionHashes:latestPartHashes});
                 if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
                 cloudSyncTimer = window.setTimeout(() => {
                     cloudSyncTimer = 0;
                     pushCloudSnapshot(false);
-                }, successful ? CLOUD_SYNC_DEBOUNCE_MS : 4000);
+                }, successful ? CLOUD_SYNC_DEBOUNCE_MS : Math.max(
+                    document.hidden ? CLOUD_LIVE_POLL_HIDDEN_MS : 4000,
+                    cloudSyncCapacityRetryAt - Date.now()));
             }
             renderAccountUi();
         }
