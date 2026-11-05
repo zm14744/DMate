@@ -1353,19 +1353,37 @@ input[type="search"]::-webkit-search-cancel-button {
     overflow:auto;
 }
 
+.wrong-safe-body > * {
+    flex-shrink:0;
+}
+
 .wrong-safe-progress {
     color:var(--text-primary);
     font-weight:600;
 }
 
-.wrong-safe-source,
-.wrong-safe-note {
-    color:var(--text-muted);
-    font-size:var(--font-xs);
-    line-height:1.55;
+.wrong-safe-preview {
+    min-width:0;
+    min-height:76px;
+    border:1px solid var(--border-strong);
+    border-radius:9px;
+    background:var(--surface-1);
+    overflow-wrap:anywhere;
 }
 
-.wrong-safe-body label {
+.wrong-safe-preview .wrong-safe-rendered.wrong-answer-inner {
+    color:var(--text-primary);
+    font-size:inherit;
+    line-height:1.6;
+}
+
+.wrong-safe-rendered img {
+    max-width:100%;
+    height:auto;
+}
+
+.wrong-safe-body label,
+.wrong-safe-label {
     margin-top:4px;
     color:var(--text-secondary);
     font-size:var(--font-xs);
@@ -1391,6 +1409,7 @@ input[type="search"]::-webkit-search-cancel-button {
 
 .wrong-safe-actions {
     display:flex;
+    flex-shrink:0;
     justify-content:flex-end;
     gap:8px;
     padding:12px 16px 16px;
@@ -9461,20 +9480,15 @@ window.DMATE_CLIENT_CONFIG = {{ {
             <div id="wrongSafeProgress" class="wrong-safe-progress">
                 请确认下面就是要保存的题目
             </div>
-            <div id="wrongSafeSource" class="wrong-safe-source"></div>
+            <div id="wrongSafePreviewLabel" class="wrong-safe-label">题目预览</div>
+            <div id="wrongSafePreview" class="wrong-safe-preview" role="region" aria-labelledby="wrongSafePreviewLabel" tabindex="0"></div>
 
-            <label for="wrongSafeQuestion">
-                题目预览（可以直接修改）
-            </label>
-            <textarea id="wrongSafeQuestion" rows="12"></textarea>
-
-            <div class="wrong-safe-note">
-                错题本只会保存这个编辑框里的内容。提示、解析、聊天开场白如果仍有残留，可以在这里直接删掉
-            </div>
+            <label for="wrongSafeQuestion">编辑题目</label>
+            <textarea id="wrongSafeQuestion" rows="8"></textarea>
         </div>
 
         <div class="wrong-safe-actions">
-            <button id="wrongSafeConfirm" type="button">确认加入错题本</button>
+            <button id="wrongSafeConfirm" type="button">确认</button>
         </div>
     </div>
 </div>

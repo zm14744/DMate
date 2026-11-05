@@ -979,6 +979,8 @@ let currentWrongEditId = null;
 let pendingWrongQuestionSelection = null;
 let pendingWrongSafeItems = [];
 let pendingWrongSafeIndex = 0;
+let wrongSafePreviewRevision = 0;
+let wrongSafePreviewTimer = null;
 
 const wrongAnswerLoadingIds = new Set();
 const wrongAnswerQueue = [];
@@ -6414,6 +6416,55 @@ function openWrongSafePreview(items) {
     return true;
 }
 
+function clearWrongSafeQuestionPreview() {
+    wrongSafePreviewRevision += 1;
+    clearTimeout(wrongSafePreviewTimer);
+    wrongSafePreviewTimer = null;
+    const preview = document.getElementById("wrongSafePreview");
+    window.DMateAIAnswer.clear(preview);
+    preview?.removeAttribute("aria-busy");
+}
+
+function updateWrongSafeQuestionPreview(delay = 0) {
+    const revision = ++wrongSafePreviewRevision;
+    clearTimeout(wrongSafePreviewTimer);
+    const modal = document.getElementById("wrongSafeModal");
+    const textarea = document.getElementById("wrongSafeQuestion");
+    const preview = document.getElementById("wrongSafePreview");
+    if (!preview || !textarea || !modal || modal.classList.contains("hidden")) return;
+
+    const source = textarea.value;
+    const isCurrent = () => revision === wrongSafePreviewRevision
+        && !modal.classList.contains("hidden") && textarea.value === source;
+    preview.setAttribute("aria-busy", "true");
+    // Keep the previous typeset preview visible while the latest edit is
+    // prepared. Input invalidates older work before the debounce expires.
+    wrongSafePreviewTimer = setTimeout(async () => {
+        wrongSafePreviewTimer = null;
+        if (!isCurrent()) return;
+        const stage = document.createElement("div");
+        stage.className = "wrong-safe-preview reply-render-stage";
+        stage.setAttribute("aria-hidden", "true");
+        stage.style.width = `${preview.getBoundingClientRect().width}px`;
+        const content = document.createElement("div");
+        content.className = "wrong-safe-rendered";
+        stage.appendChild(content);
+        document.body.appendChild(stage);
+        try {
+            const ready = await window.DMateAIAnswer.render(content, prepareAiDisplayText(source), {isCurrent});
+            if (ready && isCurrent()) {
+                window.DMateAIAnswer.clear(preview);
+                preview.replaceChildren(content);
+            }
+        } finally {
+            // The visible content has already moved out of the staging node.
+            window.DMateAIAnswer.clear(stage);
+            stage.remove();
+            if (isCurrent()) preview.removeAttribute("aria-busy");
+        }
+    }, delay);
+}
+
 function renderWrongSafePreview() {
     const modal = document.getElementById(
         "wrongSafeModal"
@@ -6423,12 +6474,6 @@ function renderWrongSafePreview() {
     );
     const progress = document.getElementById(
         "wrongSafeProgress"
-    );
-    const source = document.getElementById(
-        "wrongSafeSource"
-    );
-    const confirm = document.getElementById(
-        "wrongSafeConfirm"
     );
 
     if (
@@ -6443,7 +6488,9 @@ function renderWrongSafePreview() {
         pendingWrongSafeIndex
     ];
 
+    clearWrongSafeQuestionPreview();
     textarea.value = item.text;
+    updateWrongSafeQuestionPreview();
 
     if (progress) {
         progress.textContent = (
@@ -6453,41 +6500,11 @@ function renderWrongSafePreview() {
         );
     }
 
-    if (source) {
-        const sourceLabel = (
-            item.source === "ai"
-                ? "AI 生成题"
-                : (
-                    item.source === "ocr"
-                        ? "图片识题"
-                        : "聊天题目"
-                )
-        );
-
-        source.textContent = (
-            `来源：${sourceLabel}。只有编辑框中的内容会进入错题本`
-        );
-    }
-
-    if (confirm) {
-        confirm.textContent = (
-            pendingWrongSafeIndex
-            < pendingWrongSafeItems.length - 1
-                ? "确认并查看下一道"
-                : "确认加入错题本"
-        );
-    }
-
-    setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(
-            0,
-            0
-        );
-    }, 0);
+    modal.querySelector(".wrong-safe-body").scrollTop = 0;
 }
 
 function closeWrongSafePreview() {
+    clearWrongSafeQuestionPreview();
     const modal = document.getElementById(
         "wrongSafeModal"
     );
@@ -21952,6 +21969,7 @@ document.addEventListener(
         const wrongSafeClose = document.getElementById("wrongSafeClose");
         const wrongSafeConfirm = document.getElementById("wrongSafeConfirm");
         const wrongSafeModal = document.getElementById("wrongSafeModal");
+        const wrongSafeQuestion = document.getElementById("wrongSafeQuestion");
         const knowledgeGraphBtn = document.getElementById("knowledgeGraphBtn");
         const knowledgeGraphClose = document.getElementById("knowledgeGraphClose");
         const knowledgeGraphModal = document.getElementById("knowledgeGraphModal");
@@ -22228,6 +22246,10 @@ document.addEventListener(
                 "click",
                 confirmWrongSafePreview
             );
+        }
+
+        if (wrongSafeQuestion) {
+            wrongSafeQuestion.addEventListener("input", () => updateWrongSafeQuestionPreview(120));
         }
 
         if (wrongSafeModal) {
