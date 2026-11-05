@@ -1,0 +1,74 @@
+name: Refresh iOS Web Clip Release Asset
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "ios_webclip.py"
+      - "scripts/generate_ios_webclip.py"
+      - ".github/workflows/refresh-ios-webclip.yml"
+      - "static/icons/apple-touch-icon.png"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-ios-webclip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate full-screen profile
+        run: |
+          python scripts/generate_ios_webclip.py --output dist/DMate-iPhone-iPad.mobileconfig
+
+      - name: Validate profile payload
+        run: |
+          python - <<'PY'
+          import plistlib
+          from pathlib import Path
+
+          path = Path("dist/DMate-iPhone-iPad.mobileconfig")
+          profile = plistlib.loads(path.read_bytes())
+          assert profile["PayloadType"] == "Configuration"
+          payloads = profile["PayloadContent"]
+          assert len(payloads) == 1
+          webclip = payloads[0]
+          assert webclip["PayloadType"] == "com.apple.webClip.managed"
+          assert webclip["URL"] == "https://dmate.zeabur.app/"
+          assert webclip["FullScreen"] is True
+          assert webclip["IsRemovable"] is True
+          assert webclip["Precomposed"] is True
+          assert webclip["Icon"].startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+          print("Validated DMate full-screen iOS/iPadOS Web Clip profile")
+          PY
+
+      - name: Replace the existing GitHub Release attachment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v1.0.1 dist/DMate-iPhone-iPad.mobileconfig --repo "${GITHUB_REPOSITORY}" --clobber
+
+      - name: Verify the published attachment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/dmate-profile-check
+          gh release download v1.0.1 --repo "${GITHUB_REPOSITORY}" --pattern "DMate-iPhone-iPad.mobileconfig" --dir /tmp/dmate-profile-check
+          python - <<'PY'
+          import plistlib
+          from pathlib import Path
+
+          path = Path("/tmp/dmate-profile-check/DMate-iPhone-iPad.mobileconfig")
+          profile = plistlib.loads(path.read_bytes())
+          assert profile["PayloadContent"][0]["FullScreen"] is True
+          print("GitHub Release attachment verified: FullScreen=True")
+          PY
