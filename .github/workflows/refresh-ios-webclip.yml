@@ -80,14 +80,25 @@ jobs:
         run: |
           gh release delete-asset v1.0.1 DMate-iPhone-iPad.mobileconfig --repo "${GITHUB_REPOSITORY}" --yes || true
 
-      - name: Publish the full-screen profile to GitCode when a token is configured
-        if: ${{ secrets.GITCODE_TOKEN != '' }}
+      - name: Check whether GitCode credentials are configured
+        id: gitcode-token
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          if [ -n "$GITCODE_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish the full-screen profile to GitCode
+        if: steps.gitcode-token.outputs.available == 'true'
         env:
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
         run: |
           python scripts/upload_gitcode_release_asset.py dist/DMate-iPhone-iPad-fullscreen.mobileconfig
 
       - name: Explain skipped GitCode publication
-        if: ${{ secrets.GITCODE_TOKEN == '' }}
+        if: steps.gitcode-token.outputs.available != 'true'
         run: |
           echo "GITCODE_TOKEN is not configured; GitCode release asset must be replaced manually."
