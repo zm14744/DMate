@@ -2353,6 +2353,14 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
         for (const field of ["question", "answer", "analysis", "referenceAnswer", "note", "feedback"]) {
             if (!merged[field] && older[field]) merged[field] = older[field];
         }
+        // Editing a note on another device must not lower recorded failures.
+        // These counters only increase; manual pass selections can be undone.
+        for (const field of ["mistakeCount", "retestFailCount"]) {
+            merged[field] = Math.max(
+                normalizeWrongBookErrorCount(older[field]),
+                normalizeWrongBookErrorCount(newer[field])
+            );
+        }
         byWrong.set(key, merged);
     }
     // 删除对话会一并撤回其学习事件，不能在自动云合并时又把旧统计加回来。
@@ -7130,6 +7138,31 @@ function wrongBookSearchText(item) {
         .toLowerCase();
 }
 
+function normalizeWrongBookErrorCount(value) {
+    const count = Number(value);
+    return Number.isFinite(count)
+        ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(count)))
+        : 0;
+}
+
+function wrongBookErrorGroupKey(item) {
+    // Use the complete, case-sensitive question. Truncated/display-only
+    // fingerprints can join different questions with a common introduction.
+    const question = String(item.question || "").replace(/\s+/g, " ").trim();
+    return question ? `question:${question}` : `id:${item.id}`;
+}
+
+function getWrongBookErrorTotals(items) {
+    const totals = new Map();
+    for (const item of items) {
+        const key = wrongBookErrorGroupKey(item);
+        const errors = normalizeWrongBookErrorCount(item.mistakeCount)
+            + normalizeWrongBookErrorCount(item.retestFailCount);
+        totals.set(key, Math.min(Number.MAX_SAFE_INTEGER, (totals.get(key) || 0) + errors));
+    }
+    return totals;
+}
+
 function getFilteredWrongBookItems() {
     let items = [...learningState.wrongQuestions];
 
@@ -7148,8 +7181,12 @@ function getFilteredWrongBookItems() {
     if (wrongBookSort === "oldest") {
         items.sort((a, b) => a.updatedAt - b.updatedAt);
     } else if (wrongBookSort === "mistakes") {
+        // Repeated captures remain separate records, but all recorded errors
+        // for the same full question contribute to its priority. Filtering
+        // changes visibility, not the count, and manual capture adds no error.
+        const totals = getWrongBookErrorTotals(learningState.wrongQuestions);
         items.sort((a, b) => (
-            b.mistakeCount - a.mistakeCount
+            totals.get(wrongBookErrorGroupKey(b)) - totals.get(wrongBookErrorGroupKey(a))
             || b.updatedAt - a.updatedAt
         ));
     } else {
@@ -7159,7 +7196,7 @@ function getFilteredWrongBookItems() {
     return items;
 }
 
-function updateWrongBookToolbar(allItems, visibleItems) {
+function updateWrongBookToolbar(allItems) {
     const stats = document.getElementById("wrongBookStats");
     const filterButtons = document.querySelectorAll(
         "[data-wrong-filter]"
@@ -7173,12 +7210,8 @@ function updateWrongBookToolbar(allItems, visibleItems) {
         item => wrongBookStatus(item).key === "corrected"
     ).length;
     if (stats) {
-        const visibleText = visibleItems.length === total
-            ? ""
-            : `　当前显示 ${visibleItems.length} 道`;
-
         stats.textContent =
-            `共 ${total} 道　待处理 ${pending}　已订正 ${corrected}${visibleText}`;
+            `共 ${total} 道　待处理 ${pending}　已订正 ${corrected}`;
     }
 
     for (const button of filterButtons) {
@@ -9092,7 +9125,7 @@ function renderWrongBook() {
     const allItems = [...learningState.wrongQuestions];
     const items = getFilteredWrongBookItems();
 
-    updateWrongBookToolbar(allItems, items);
+    updateWrongBookToolbar(allItems);
 
     if (!items.length) {
         const empty = document.createElement("div");
