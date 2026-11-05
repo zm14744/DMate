@@ -1,0 +1,57 @@
+name: Validate OCR model cache preparation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/prepare_ocr_model_cache.py"
+      - "ocr_runtime.py"
+      - ".github/workflows/validate-ocr-model-cache.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Compile model preparation modules
+        run: |
+          python -m py_compile scripts/prepare_ocr_model_cache.py ocr_runtime.py
+
+      - name: Verify source timeout falls through to the next host
+        run: |
+          python - <<'PY'
+          import importlib.util
+          import time
+
+          spec = importlib.util.spec_from_file_location(
+              "prepare_ocr_model_cache", "scripts/prepare_ocr_model_cache.py"
+          )
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          attempted = []
+          with module._download_deadline(0.05):
+              for source in ("preferred", "fallback"):
+                  try:
+                      time.sleep(0.10)
+                  except module._DownloadDeadline:
+                      attempted.append(source)
+
+          assert attempted == ["preferred", "fallback"], attempted
+
+          try:
+              raise RuntimeError("PaddleX wrapped a source timeout") from module._DownloadDeadline("timeout")
+          except RuntimeError as exc:
+              assert module._caused_by_download_deadline(exc)
+
+          print("Source timeout fallback behavior verified")
+          PY
