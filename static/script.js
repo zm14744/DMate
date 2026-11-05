@@ -21645,8 +21645,9 @@ function downloadOptionsForCurrentPlatform() {
     const snap = "https://snapcraft.io/dmate";
     const itch = "https://zm14744.itch.io/dmate";
 
-    // A deployment's verified HTTPS mirror is primary; public releases remain available.
-    function installers(filename, configuredUrl, displayName) {
+    // Keep public download sources in a stable order; a configured mirror
+    // replaces its matching provider link or appears after both public sources.
+    function installers(filename, configuredUrl, formatLabel = "") {
         const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(filename) + "/download";
         const githubUrl = githubDownloadBase + encodeURIComponent(filename);
         let configured = "";
@@ -21657,19 +21658,16 @@ function downloadOptionsForCurrentPlatform() {
         } catch (_) { /* Invalid configured links cannot replace a release download. */ }
         const configuredIsGithub = /^https:\/\/github\.com\/zm14744\/DMate\/releases\//i.test(configured);
         const configuredIsGitcode = /^https:\/\/(?:api\.)?gitcode\.com\//i.test(configured);
-        const defaults = [
-            { label:"GitCode · " + displayName, url:configuredIsGitcode ? configured : gitcodeUrl },
-            { label:"GitHub · " + displayName, url:configuredIsGithub ? configured : githubUrl, secondary:true }
+        const suffix = formatLabel ? " · " + formatLabel : "";
+        const actions = [
+            { label:"GitCode" + suffix, url:configuredIsGitcode ? configured : gitcodeUrl },
+            { label:"GitHub" + suffix, url:configuredIsGithub ? configured : githubUrl, secondary:true }
         ];
-        const actions = [];
-        if (configured) actions.push({ label:(configuredIsGitcode ? "GitCode" : configuredIsGithub ? "GitHub" : "下载") + " · " + displayName, url:configured });
-        for (const option of defaults) {
-            if (!actions.some(item => item.url === option.url))
-                actions.push({ ...option, secondary:actions.length > 0 });
+        if (configured && !configuredIsGithub && !configuredIsGitcode && !actions.some(item => item.url === configured)) {
+            actions.push({ label:"其他下载源", url:configured, secondary:true });
         }
         return actions;
     }
-
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
@@ -21687,7 +21685,7 @@ function downloadOptionsForCurrentPlatform() {
             platform:"Android",
             text:"选择 APK 下载源",
             actions:[
-                ...installers("DMate.apk", config.androidApkUrl, "APK"),
+                ...installers("DMate.apk", config.androidApkUrl),
                 { label:"itch.io", url:itch, secondary:true }
             ]
         };
@@ -21697,7 +21695,7 @@ function downloadOptionsForCurrentPlatform() {
             platform:"Windows",
             text:"选择安装包下载源或应用商店",
             actions:[
-                ...installers("DMate_1.0.0_x64-setup.exe", config.desktopWindowsUrl, "EXE"),
+                ...installers("DMate_1.0.0_x64-setup.exe", config.desktopWindowsUrl),
                 { label:"Microsoft Store", url:microsoftStore, secondary:true },
                 { label:"itch.io", url:itch, secondary:true }
             ]
@@ -21708,7 +21706,7 @@ function downloadOptionsForCurrentPlatform() {
             platform:"macOS",
             text:"选择 DMG 下载源",
             actions:[
-                ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl, "DMG"),
+                ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl),
                 { label:"itch.io", url:itch, secondary:true }
             ]
         };
