@@ -3,12 +3,17 @@
 
 import argparse
 import hashlib
+import sys
 from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from ios_webclip import build_ios_webclip_profile
 
 
-ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "dist" / "DMate-iPhone-iPad.mobileconfig"
 ICON_PATH = ROOT / "static" / "icons" / "apple-touch-icon.png"
 
