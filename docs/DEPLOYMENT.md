@@ -299,16 +299,35 @@ Tauri 配置位于 `desktop/src-tauri/tauri.conf.json`；Android 配置位于 `a
 | `.github/workflows/build-desktop.yml` | Windows NSIS、Linux DEB / AppImage、macOS universal DMG |
 | `.github/workflows/build-android.yml` | 手动生成 debug APK |
 | `.github/workflows/build-android-release.yml` | 手动生成签名 release APK Artifact，不自动覆盖 Release |
+| `.github/workflows/publish-android-release.yml` | 手动校验指定成功构建的签名 APK，再新增版本化发布附件；缺少 GitCode 凭据时明确标记该源未发布 |
 | `.github/workflows/build-snap.yml` | 构建 amd64 Snap |
 | `.github/workflows/publish-snap.yml` | 使用发布凭据上传新构建或提升已有修订渠道 |
 
 Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DMATE_ANDROID_KEYSTORE_PASSWORD`、`DMATE_ANDROID_KEY_ALIAS`、`DMATE_ANDROID_KEY_PASSWORD`；Gradle 读取 `DMATE_KEYSTORE_PATH`、`DMATE_KEYSTORE_PASSWORD`、`DMATE_KEY_ALIAS`、`DMATE_KEY_PASSWORD`。Snap 发布使用 `SNAPCRAFT_STORE_CREDENTIALS`。macOS 见[签名与公证](MACOS_DISTRIBUTION.md)。构建 Artifact 与对外发布是两个步骤，旧下载文件不会因网页更新自动替换。
 
-下载安装弹窗可通过 `ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL` 配置下载地址。地址必须为没有用户凭据或片段的有效 HTTPS URL。按钮顺序保持 GitCode、GitHub：配置的 GitCode 地址或本项目 GitHub 发行版地址替换对应入口，其他自建镜像作为第三项“其他下载源”。未配置时使用 GitCode 文件直链与同一固定发行标签的 GitHub 地址。这些变量只配置下载安装弹窗，不替代安装后检查更新使用的 `static/client-updates.json` 清单。iOS 提供发行版已有的描述文件及备用源，不提供 PWA 安装。`/service-worker.js` 只用于清退旧 worker。
+下载安装弹窗可通过 `ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL` 配置下载地址。自定义地址必须为没有用户凭据或片段的有效 HTTPS URL。Android 新版优先使用网站直链 `/static/downloads/DMate-Android-1.0.3.apk`，第二项为本项目 GitHub `v1.0.1` 发行集合内同名文件；不再显示旧 Android GitCode / itch 入口。遗留环境变量若指向官方旧 `DMate.apk`，不会把入口切回旧包；有效 HTTPS 自定义新镜像作为第三项“其他下载源”，不替换前两项。
+
+桌面端仍使用 GitCode、GitHub 入口：配置的 GitCode 地址或本项目 GitHub 发行版地址替换对应入口，其他自建镜像作为第三项。iOS 继续提供描述文件及备用源，不提供 PWA 安装。这些环境变量只配置下载安装弹窗，不替代安装后检查更新使用的 `static/client-updates.json` 清单。`/service-worker.js` 只用于清退旧 worker。
 
 公式与富文本等前端依赖位于 `static/vendor/<组件-版本>/`，含 MathJax 本地按需资源、上游许可和完整性清单，镜像必须包含这些文件。版本化的第三方目录成功响应允许一年 immutable 缓存；业务 JS / CSS、未版本化资源清单和 `/web-version` 仍禁用旧缓存。升级第三方库应使用新版本目录，不能原地替换已长期缓存的文件。安装壳检查网页更新时会在忙碌期间延后重载；这不能更新 APK / Tauri 中的原生代码。
 
-`static/client-updates.json` 独立控制安装后更新通知。保留实际包版本和发布状态，主源与 `fallbackUrls` 仅指向本仓库同发行版、同文件名的 GitCode / GitHub 地址；不能只改网页就把尚未发布的新原生包标成可更新。检测 GitCode 附件时使用 GET 或 Range GET，HEAD 返回值不能单独判断文件不存在。
+`static/client-updates.json` 独立控制安装后更新通知。Android 的新发布记录以同域版本化 APK 为主源、同版本 GitHub 文件为 `fallbackUrls`，网页仍校验允许的来源和文件路径；其他平台沿用各自已经发布的来源。保留实际包版本和发布状态，不能只改网页就把尚未发布的新原生包标成可更新。检测公开文件时使用 GET 或 Range GET；GitCode 附件的 HEAD 返回值不能单独判断文件不存在。
+
+### Android 签名包发布
+
+Android 1.0.3 使用 `DMate-Android-1.0.3.apk`，内部 `versionName` 为 `1.0.3`、`versionCode` 为 `4`。GitHub 备用文件放在已有的 `v1.0.1` 发行集合中，发行集合标签不是 APK 的内部版本号。网站主源的文件存放在 `static/downloads/`，通过正常网站部署提供；准备文件、部署成功和外网能够下载是三个需要分别核对的步骤。
+
+先运行 `build-android-release.yml` 取得成功的签名 release 构建，再手动运行 `publish-android-release.yml`。发布工作流接收以下三个必填输入：
+
+| 输入 | 含义与填写依据 |
+| --- | --- |
+| `build_run_id` | 已成功完成的 Android release 构建 run ID；不能填 debug 构建或仅有未完成任务的 ID |
+| `expected_head_sha` | 该构建对应的完整源码提交 SHA，用于防止取到另一份源码的产物 |
+| `expected_apk_sha256` | 已核对的签名 APK 文件 SHA256，用于确认发布的正是预期二进制 |
+
+工作流对指定成功构建及其签名包进行校验后，才新增版本化附件，不用新包覆盖旧 `DMate.apk`。网站主源与 GitHub 备用源应提供相同 APK，切换下载入口前核对文件 SHA256、应用 ID、版本、签名证书和启动器资源。更新清单的版本与发布状态只能在相应文件实际提供后更新，Artifact 生成成功不能代替这些发布检查。
+
+GitCode 上传需要单独配置 `GITCODE_TOKEN`。缺少凭据时，工作流明确记录 GitCode 未发布，不能因为 GitHub 成功就声称两个来源都已更新。后续具备凭据时可以补传同一版本化文件，不覆盖旧包；当前 Android 下载界面仍以网站直链和 GitHub 同版本文件为准，不把没有更新的旧 GitCode / itch 地址当成新版备用源。
 
 ### 安装版的系统主题传递
 
@@ -356,7 +375,7 @@ python scripts/generate_icons.py
 
 源码资源齐全和本地图像检查通过，不等于 APK / 桌面安装包编译、签名或真机验证已经完成。发布前仍应检查相应平台的构建产物；仅当新包真实发布后，才更新下载入口或 `static/client-updates.json` 的版本与状态。缓存图标未更新时先重新打开页面 / 应用、必要时重新创建系统快捷方式，不要删除账号存储来刷新图标。
 
-Android 1.0.3 的正式附件采用独立文件名 `DMate-Android-1.0.3.apk`，避免与旧 APK 混淆；使用既有 `v1.0.1` 发行集合时，发行标签与 APK 内部版本并不是同一个值。切换公开下载入口前，应核对签名 release 包的应用 ID、`versionName 1.0.3`、`versionCode 4`、签名证书及启动器资源，并确认 GitCode、GitHub 两个来源下载到相同文件。确认文件实际可用后再修改网页下载入口和更新清单；仅生成该文件名或构建 Artifact 不代表已经发布。
+Android 签名包的版本化文件名、网站主源、GitHub 备用附件和发布前校验见[Android 签名包发布](#android-签名包发布)。各平台的构建与发布结果应分别确认，不因图标资源生成成功就把旧下载包视为已更新。
 
 ### 本地构建客户端
 

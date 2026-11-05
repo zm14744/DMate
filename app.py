@@ -233,7 +233,14 @@ def attach_runtime_source(response):
 @app.after_request
 def no_stale_web_application_assets(response):
     path = request.path
-    if (response.status_code in (200, 206, 304) and re.match(
+    if (response.status_code in (200, 206, 304) and re.fullmatch(
+            r'/static/downloads/DMate-Android-\d+\.\d+\.\d+\.apk', path)):
+        # Versioned release binaries are bundled with the site so Android
+        # downloads do not depend on a separate mirror's availability/version.
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        response.headers['Content-Type'] = 'application/vnd.android.package-archive'
+        response.headers['Content-Disposition'] = 'attachment; filename="' + path.rsplit('/', 1)[1] + '"'
+    elif (response.status_code in (200, 206, 304) and re.match(
             r'^/static/vendor/(?:mathjax|marked|dompurify|html2canvas|jspdf)-[0-9]+\.[0-9]+\.[0-9]+/', path)):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif (path == '/service-worker.js' or path == '/web-version' or

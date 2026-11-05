@@ -21951,13 +21951,28 @@ function downloadOptionsForCurrentPlatform() {
         };
     }
     if (platform === "android") {
+        const filename = "DMate-Android-1.0.3.apk";
+        const actions = [
+            { label:"直接下载", url:"/static/downloads/" + filename },
+            { label:"GitHub", url:githubDownloadBase + filename, secondary:true }
+        ];
+        // An old deployment may still configure releases/latest/DMate.apk.
+        // Never let that override the bundled, verified current installer.
+        try {
+            const candidate = new URL(config.androidApkUrl);
+            const officialRelease = /^(?:api\.)?gitcode\.com$/.test(candidate.hostname)
+                || candidate.hostname === "github.com";
+            const currentFilename = candidate.pathname.split("/").includes(filename);
+            if (candidate.protocol === "https:" && !candidate.username && !candidate.password
+                && !candidate.hash && (!officialRelease || currentFilename)
+                && !actions.some(item => new URL(item.url, location.href).href === candidate.href)) {
+                actions.push({ label:"其他下载源", url:candidate.href, secondary:true });
+            }
+        } catch (_) { /* Unset or invalid optional mirrors do not affect direct downloads. */ }
         return {
-            platform:"Android",
-            text:"选择 APK 下载源",
-            actions:[
-                ...installers("DMate.apk", config.androidApkUrl),
-                { label:"itch.io", url:itch, secondary:true }
-            ]
+            platform:"Android 1.0.3",
+            text:"下载安装包后直接覆盖安装，无需卸载旧版",
+            actions
         };
     }
     if (platform === "windows") {
