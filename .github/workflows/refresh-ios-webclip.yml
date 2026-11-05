@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - "ios_webclip.py"
+      - "app.py"
+      - "static/script.js"
       - "scripts/generate_ios_webclip.py"
       - "scripts/upload_gitcode_release_asset.py"
       - ".github/workflows/refresh-ios-webclip.yml"
@@ -26,6 +28,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Check Python and JavaScript syntax
+        run: |
+          python -m py_compile app.py ios_webclip.py scripts/generate_ios_webclip.py scripts/upload_gitcode_release_asset.py
+          node --check static/script.js
 
       - name: Generate full-screen profile
         run: |
