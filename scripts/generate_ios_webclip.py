@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
 from ios_webclip import build_ios_webclip_profile
 
 
-DEFAULT_OUTPUT = ROOT / "dist" / "DMate-iPhone-iPad.mobileconfig"
+DEFAULT_OUTPUT = ROOT / "dist" / "DMate-iPhone-iPad-fullscreen.mobileconfig"
 ICON_PATH = ROOT / "static" / "icons" / "apple-touch-icon.png"
 
 
