@@ -15,7 +15,7 @@ from ios_webclip import build_ios_webclip_profile
 
 
 DEFAULT_OUTPUT = ROOT / "dist" / "DMate-iPhone-iPad-fullscreen.mobileconfig"
-ICON_PATH = ROOT / "static" / "icons" / "dmate-app-v49-512.png"
+ICON_PATH = ROOT / "static" / "icons" / "dmate-app-v50-512.png"
 
 
 def main():

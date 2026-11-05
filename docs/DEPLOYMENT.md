@@ -318,16 +318,16 @@ python -m pip install Pillow==11.3.0
 python scripts/generate_icons.py
 ```
 
-脚本输出网页 SVG / PNG / ICO、Tauri PNG / ICO / ICNS、Android 密度位图与 VectorDrawable。每种位图尺寸独立从路径绘制，小尺寸单独调整线宽；最大 PNG 和 macOS ICNS 图层为 1024 × 1024。Android 自适应图标前景处于 66dp 直径安全区域，普通 / 圆形资源在 API 26 及以上引用矢量前景，API 33 及以上增加单色主题前景。替换旧 `drawable-nodpi/dmate_foreground.png` 时会删除该文件，避免与同名矢量资源冲突。
+脚本输出网页 SVG / PNG / ICO、Tauri PNG / ICO / ICNS、Android 密度位图与 VectorDrawable。每种位图尺寸独立从路径绘制，全部保持原始的 13 / 1254 线宽比例，不对小尺寸或 Android 前景额外加粗；最大 PNG 和 macOS ICNS 图层为 1024 × 1024。Android 自适应图标前景处于 66dp 直径安全区域，普通 / 圆形资源在 API 26 及以上引用矢量前景，API 33 及以上增加单色主题前景。替换旧 `drawable-nodpi/dmate_foreground.png` 时会删除该文件，避免与同名矢量资源冲突。
 
-当前网页通过带 `v49` 的新文件名和根路径版本参数取图，侧栏和手机顶部直接使用 SVG。浏览器特定的黑白标签图标选择保持独立于网页明暗主题；Safari 不通过失焦 / 聚焦事件反复更换图标。根路径 `/favicon.ico`、`/favicon-16.png`、`/favicon-32.png`、`/favicon-64.png`、Apple touch icon 继续有效。旧版本资源保留给历史缓存页面。
+当前网页通过带 `v50` 的新文件名和根路径版本参数取图，侧栏和手机顶部直接使用 SVG。浏览器特定的黑白标签图标选择保持独立于网页明暗主题；Safari 不通过失焦 / 聚焦事件反复更换图标。根路径 `/favicon.ico`、`/favicon-16.png`、`/favicon-32.png`、`/favicon-64.png`、Apple touch icon 继续有效。旧版本资源保留给历史缓存页面。
 
 发布时分别处理：
 
 - **服务端 / 网页**：Docker 构建会生成资源，新部署提供新图标地址。不要为换图清除用户学习数据或引入额外 Service Worker。
 - **桌面与 Android**：对应构建工作流会先运行生成器；Tauri 配置包含 512 / 1024 PNG 及 ICO / ICNS，Android Gradle 使用新的启动器资源。Android debug / release 工作流仍需手动触发，签名与应用标识保持原配置。
 - **Snap**：手动构建工作流从同次生成的 512 像素 PNG 写入 `snap/gui/dmate.png`；构建和 Snap Store 发布仍是独立步骤。
-- **iOS Web Clip**：`python scripts/generate_ios_webclip.py` 默认生成 `dist/DMate-iPhone-iPad-fullscreen.mobileconfig`；内嵌 `dmate-app-v49-512.png`，与服务端 `/DMate.mobileconfig` 使用相同构建函数，原描述文件身份保持不变。公开 GitCode / GitHub 入口只有在发布工作流更新对应附件后才使用新图，用户已安装的 Web Clip 也需更新描述文件。
+- **iOS Web Clip**：`python scripts/generate_ios_webclip.py` 默认生成 `dist/DMate-iPhone-iPad-fullscreen.mobileconfig`；内嵌 `dmate-app-v50-512.png`，与服务端 `/DMate.mobileconfig` 使用相同构建函数，原描述文件身份保持不变。公开 GitCode / GitHub 入口只有在发布工作流更新对应附件后才使用新图，用户已安装的 Web Clip 也需更新描述文件。
 
 源码资源齐全和本地图像检查通过，不等于 APK / 桌面安装包编译、签名或真机验证已经完成。发布前仍应检查相应平台的构建产物；仅当新包真实发布后，才更新下载入口或 `static/client-updates.json` 的版本与状态。缓存图标未更新时先重新打开页面 / 应用、必要时重新创建系统快捷方式，不要删除账号存储来刷新图标。
 

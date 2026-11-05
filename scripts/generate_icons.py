@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build every DMate icon from the same vector geometry, never from a PNG.
 
-The brand SVG and browser tabs have optical line weights for their CSS sizes.
+All platforms retain the original thin stroke, including the smallest icons.
 Native bitmap frames are rasterized independently; Android adaptive icons use
 VectorDrawable paths. Historical versioned web assets remain available for old
 cached pages but are no longer inputs to this generator.
@@ -21,13 +21,10 @@ ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "static" / "icons"
 TAURI = ROOT / "desktop" / "src-tauri" / "icons"
 ANDROID = ROOT / "android" / "app" / "src" / "main" / "res"
-VERSION = "v49"
+VERSION = "v50"
 VIEWBOX = 1254
-STROKE = 13
-BRAND_STROKE = 34  # About one CSS pixel at the existing 38px sidebar size.
-TAB_STROKE = 80  # About one CSS pixel at a 16px browser tab, at any DPR.
+STROKE = 13  # Preserve the original artwork's line width at every output size.
 ADAPTIVE_SCALE = 0.72
-ADAPTIVE_STROKE = 20
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
@@ -52,12 +49,7 @@ def path_d(points):
     )
 
 
-def optical_stroke(size):
-    """Keep tiny native frames bright instead of averaging a subpixel hairline."""
-    return max(STROKE, 1.15 * VIEWBOX / size)
-
-
-def svg_mark(background="#000", foreground="#fff", stroke=STROKE):
+def svg_mark(background="#000", foreground="#fff"):
     background_element = (f'  <rect width="{VIEWBOX}" height="{VIEWBOX}" fill="{background}"/>\n'
                           if background is not None else "")
     paths = "\n    ".join(f'<path d="{path_d(points)}"/>' for points in PATHS)
@@ -65,14 +57,14 @@ def svg_mark(background="#000", foreground="#fff", stroke=STROKE):
         f'<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" '
         f'viewBox="0 0 {VIEWBOX} {VIEWBOX}" role="img" aria-label="DMate">\n'
         f'{background_element}'
-        f'  <g fill="none" stroke="{foreground}" stroke-width="{stroke}" '
+        f'  <g fill="none" stroke="{foreground}" stroke-width="{STROKE}" '
         f'stroke-linecap="round" stroke-linejoin="round">\n    {paths}\n  </g>\n</svg>\n'
     )
 
 
-def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=None, circle=False):
-    """Rasterize paths at each native output size with supersampled round joins."""
-    oversample = 16 if size < 128 else 4
+def draw_mark(size, background=BLACK, foreground=WHITE, circle=False):
+    """Supersample the original thin paths without minimum-width compensation."""
+    oversample = max(4, math.ceil(1024 / size))
     side = size * oversample
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
@@ -81,8 +73,7 @@ def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=None, circl
             draw.ellipse((0, 0, side - 1, side - 1), fill=background)
         else:
             draw.rectangle((0, 0, side - 1, side - 1), fill=background)
-    stroke_units = optical_stroke(size) if stroke_units is None else stroke_units
-    width = max(1, round(stroke_units * side / VIEWBOX))
+    width = round(STROKE * side / VIEWBOX)
     radius = width / 2
     for path in PATHS:
         points = [(x * side / VIEWBOX, y * side / VIEWBOX) for x, y in path]
@@ -136,7 +127,7 @@ def save_icns(path):
 def android_vector(foreground):
     paths = "\n".join(
         f'        <path android:fillColor="@android:color/transparent" '
-        f'android:strokeColor="{foreground}" android:strokeWidth="{ADAPTIVE_STROKE}" '
+        f'android:strokeColor="{foreground}" android:strokeWidth="{STROKE}" '
         f'android:strokeLineCap="round" android:strokeLineJoin="round" '
         f'android:pathData="{path_d(points)}" />'
         for points in PATHS
@@ -154,7 +145,7 @@ def android_vector(foreground):
 def generate_android():
     # The entire stroked mark stays inside Android's 66dp-diameter safe circle.
     farthest = max(math.hypot(x - VIEWBOX / 2, y - VIEWBOX / 2) for path in PATHS for x, y in path)
-    assert (farthest + ADAPTIVE_STROKE / 2) * ADAPTIVE_SCALE * 108 / VIEWBOX < 33
+    assert (farthest + STROKE / 2) * ADAPTIVE_SCALE * 108 / VIEWBOX < 33
     (ANDROID / "drawable").mkdir(parents=True, exist_ok=True)
     for name, color in (("dmate_foreground", "#FFFFFF"), ("dmate_monochrome", "#000000")):
         (ANDROID / "drawable" / f"{name}.xml").write_text(android_vector(color), encoding="utf-8")
@@ -162,7 +153,7 @@ def generate_android():
     (ANDROID / "drawable-nodpi" / "dmate_foreground.png").unlink(missing_ok=True)
     for density, size in (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)):
         for name, circle in (("ic_launcher", False), ("ic_launcher_round", True)):
-            save_png(draw_mark(size, stroke_units=optical_stroke(48), circle=circle),
+            save_png(draw_mark(size, circle=circle),
                      ANDROID / f"mipmap-{density}" / f"{name}.png")
     for api in (26, 33):
         directory = ANDROID / f"mipmap-anydpi-v{api}"
@@ -181,17 +172,17 @@ def main():
     STATIC.mkdir(parents=True, exist_ok=True)
     TAURI.mkdir(parents=True, exist_ok=True)
     (STATIC / "dmate-master.svg").write_text(svg_mark(), encoding="utf-8")
-    (STATIC / f"dmate-brand-{VERSION}.svg").write_text(svg_mark(stroke=BRAND_STROKE), encoding="utf-8")
+    (STATIC / f"dmate-brand-{VERSION}.svg").write_text(svg_mark(), encoding="utf-8")
     for size in APP_SIZES:
         save_png(draw_mark(size), STATIC / f"dmate-app-{VERSION}-{size}.png")
     save_ico(STATIC / f"dmate-app-{VERSION}.ico")
     for tone, rgba, color in (("white", WHITE, "#fff"), ("black", BLACK, "#000")):
         base = f"dmate-tab-{tone}-{VERSION}"
-        (STATIC / f"{base}.svg").write_text(svg_mark(None, color, TAB_STROKE), encoding="utf-8")
+        (STATIC / f"{base}.svg").write_text(svg_mark(None, color), encoding="utf-8")
         for size in (16, 32, 48, 64, 128):
-            save_png(draw_mark(size, background=None, foreground=rgba, stroke_units=TAB_STROKE),
+            save_png(draw_mark(size, background=None, foreground=rgba),
                      STATIC / f"{base}-{size}.png")
-        save_ico(STATIC / f"{base}.ico", background=None, foreground=rgba, stroke_units=TAB_STROKE)
+        save_ico(STATIC / f"{base}.ico", background=None, foreground=rgba)
     # Keep stable public aliases usable for old pages and direct icon requests.
     for source, target in (
         (f"dmate-brand-{VERSION}.svg", "dmate-mark.svg"),
@@ -214,7 +205,8 @@ def main():
     print(json.dumps({"status": "generated", "version": VERSION, "source": "original vector paths",
                       "formats": ["SVG", "PNG", "ICO", "ICNS", "Android VectorDrawable"],
                       "max_bitmap_size": 1024, "android_adaptive_safe_circle_dp": 66,
-                      "small_icons": "independent optical-size rendering"}, ensure_ascii=False))
+                      "stroke_units": STROKE,
+                      "small_icons": "original thin stroke, independently supersampled"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
