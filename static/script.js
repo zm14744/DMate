@@ -10175,44 +10175,18 @@ function prepareAiDisplayText(text) {
 
     if (!value) return "";
 
-    // 裸矩阵/cases/aligned 只在它们尚未处在 $$ 中时补块公式。
-    value = value.replace(
-        /(^|\n)(\s*)(\\begin\{(bmatrix|pmatrix|matrix|cases|aligned)\}[\s\S]*?\\end\{\3\})(?=\n|$)/g,
-        (_match, prefix, indent, math, _env, offset, full) => {
-            const before = full.slice(
-                Math.max(0, offset - 4),
-                offset
-            );
-
-            if (/\$\$\s*$/.test(before)) {
-                return _match;
-            }
-
-            return `${prefix}${indent}$$\n${math}\n$$`;
-        }
-    );
-
-    // 只修复数学定界符外的文本，避免破坏已经正确的 MathJax。
-    // $...$ 之外，\\(...\\) 和 \\ [...\\] 也属于完整的数学区域。
-    // 旧版漏掉这两种定界符，导致内部 \\geq 被改写成 $\\geq$，
-    // 原本正确的公式因此出现多余美元符号并渲染损坏。
-    const parts = value.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]*\$)/g);
-
-    return parts.map(part => {
-        if (
-            /^\$\$/.test(part)
-            || /^\$/.test(part)
-            || /^\\\[/.test(part)
-            || /^\\\(/.test(part)
-            || /^```/.test(part)
-            || /^~~~/.test(part)
-            || /^`/.test(part)
-        ) {
-            return part;
-        }
-
-        return repairBareLatexTextSegment(part);
-    }).join("");
+    // Keep code and already-delimited math opaque before repairing prose.
+    // Complete bare environments also need protection: otherwise Markdown
+    // consumes their row separators and bare-symbol repair inserts dollars
+    // inside the matrix. Only wrap environments outside existing code/math.
+    const protectedSegments = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]*\$|\\begin\{(bmatrix|pmatrix|matrix|cases|aligned)\}[\s\S]*?\\end\{\1\}/g;
+    let result = "", offset = 0;
+    for (const match of value.matchAll(protectedSegments)) {
+        result += repairBareLatexTextSegment(value.slice(offset, match.index));
+        result += match[1] ? `$$\n${match[0]}\n$$` : match[0];
+        offset = match.index + match[0].length;
+    }
+    return result + repairBareLatexTextSegment(value.slice(offset));
 }
 
 
@@ -13874,6 +13848,41 @@ async function requestAiReply(session, options = {}) {
             || data.teaching
         );
 
+        if (!response.ok || data.error) {
+            const message = data.error
+                || fallbackHttpError(response.status);
+
+            rollbackRetestAfterRequestFailure(session);
+
+            showAssistantMessage(
+                session,
+                message,
+                { isError: true }
+            );
+            return { status: "error" };
+        }
+
+        if (
+            typeof data.reply !== "string"
+            || !data.reply.trim()
+        ) {
+            rollbackRetestAfterRequestFailure(session);
+
+            showAssistantMessage(
+                session,
+                "AI 服务没有返回有效内容，请重新发送",
+                { isError: true }
+            );
+            return { status: "error" };
+        }
+
+        // Complete asynchronous formatting before committing answer-derived
+        // learning/retest changes. Stopping during MathJax must not leave
+        // learning records behind without the corresponding saved answer.
+        const preparedContent = activeRequest.streaming && currentId === session.id && !document.hidden
+            ? await activeRequest.streamPreview?.finish(data.reply) : null;
+        throwIfAiRequestCancelled(activeRequest);
+
         if (returnedTeaching && !supportingImagesOnly) {
             const normalizedReturnedTeaching = normalizeTeaching(
                 returnedTeaching
@@ -13931,34 +13940,6 @@ async function requestAiReply(session, options = {}) {
             }
         }
 
-        if (!response.ok || data.error) {
-            const message = data.error
-                || fallbackHttpError(response.status);
-
-            rollbackRetestAfterRequestFailure(session);
-
-            showAssistantMessage(
-                session,
-                message,
-                { isError: true }
-            );
-            return { status: "error" };
-        }
-
-        if (
-            typeof data.reply !== "string"
-            || !data.reply.trim()
-        ) {
-            rollbackRetestAfterRequestFailure(session);
-
-            showAssistantMessage(
-                session,
-                "AI 服务没有返回有效内容，请重新发送",
-                { isError: true }
-            );
-            return { status: "error" };
-        }
-
         // 已完成最多一次难度纠偏仍未达标时，明确告知用户，不能静默
         // 把“估计中等”的题目伪装成已满足“困难”请求。
         if (latestIsExerciseRequest && typeof data.exercise_generation_notice === "string"
@@ -14005,9 +13986,6 @@ async function requestAiReply(session, options = {}) {
         };
 
         if (activeRequest.streaming) {
-            const preparedContent = currentId === session.id && !document.hidden
-                ? await activeRequest.streamPreview?.finish(data.reply) : null;
-            throwIfAiRequestCancelled(activeRequest);
             discardRequestStreamPreview(activeRequest);
             addAssistantMessage(session, data.reply, assistantMeta);
             saveState();
