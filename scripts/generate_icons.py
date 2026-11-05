@@ -1,30 +1,39 @@
 #!/usr/bin/env python3
-"""Generate DMate artwork directly from geometric paths at every output size.
+"""Build every DMate icon from the same vector geometry, never from a PNG.
 
-No 192px PNG is upscaled to make 512px/ICO/ICNS assets. The pre-existing native
-Android 192px image remains untouched and is retained at exactly native size.
+The brand SVG and browser tabs have optical line weights for their CSS sizes.
+Native bitmap frames are rasterized independently; Android adaptive icons use
+VectorDrawable paths. Historical versioned web assets remain available for old
+cached pages but are no longer inputs to this generator.
 """
 from __future__ import annotations
 
 import io
 import json
+import math
 import shutil
 import struct
 from pathlib import Path
+
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "static" / "icons"
 TAURI = ROOT / "desktop" / "src-tauri" / "icons"
-MASTER = ROOT / "android" / "app" / "src" / "main" / "res" / "mipmap-xxxhdpi" / "ic_launcher.png"
+ANDROID = ROOT / "android" / "app" / "src" / "main" / "res"
+VERSION = "v49"
 VIEWBOX = 1254
-STROKE = 13  # Original installed Android icon uses ~2px hairline at 192px
-TAB_STROKE = 23  # Other browser tabs keep existing white hairline artwork.
-SAFARI_TAB_STROKE = 78  # At 16–24 CSS px the black strokes must stay readable.
+STROKE = 13
+BRAND_STROKE = 34  # About one CSS pixel at the existing 38px sidebar size.
+TAB_STROKE = 80  # About one CSS pixel at a 16px browser tab, at any DPR.
+ADAPTIVE_SCALE = 0.72
+ADAPTIVE_STROKE = 20
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
+ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
+APP_SIZES = (16, 32, 64, 128, 180, 192, 256, 512, 1024)
 
-# The original DMate geometry. This is the ONE editable source of the lines.
+# The original DMate silhouette and every internal edge, unchanged.
 OUTER = [(252, 300), (488, 189), (748, 140), (1038, 376), (1071, 603),
          (1012, 914), (690, 1044), (456, 1064), (199, 807), (165, 589), (252, 300)]
 INNER = [
@@ -36,26 +45,6 @@ INNER = [
 ]
 PATHS = [OUTER, *INNER]
 
-# Search-result-specific faceted light hierarchy. The DMate vertex coordinates,
-# path order and STROKE=13 are untouched. These very dark face fills make the
-# existing white hairlines stand out on Bing's tiny desktop favicon.
-BING_FACETS = [
-    ([(252,300),(488,189),(748,140),(601,268),(302,352)], (22,30,43,255)),
-    ([(252,300),(302,352),(263,686),(199,807),(165,589)], (13,21,33,255)),
-    ([(601,268),(748,140),(1038,376),(1071,603),(790,524)], (27,37,54,255)),
-    ([(302,352),(601,268),(790,524),(563,786),(263,686)], (20,31,47,255)),
-    ([(263,686),(563,786),(690,1044),(456,1064),(199,807)], (14,24,38,255)),
-    ([(790,524),(1071,603),(1012,914),(690,1044),(563,786)], (17,27,42,255)),
-]
-BING_STROKES = [
-    (255,255,255,255), # outer silhouette
-    (234,243,255,255), # upper inner geometry
-    (183,204,226,255), # receding left
-    (247,251,255,255), # prominent right ridge
-    (218,231,246,255), # central diagonal
-    (174,195,219,255), # receding lower structure
-]
-
 
 def path_d(points):
     return "M" + str(points[0][0]) + " " + str(points[0][1]) + " " + " ".join(
@@ -63,130 +52,74 @@ def path_d(points):
     )
 
 
-def svg_mark(background=None, foreground="#fff", stroke=STROKE, corner_radius=0):
-    """Fixed-color SVG: no prefers-color-scheme, CSS media query or masking."""
+def optical_stroke(size):
+    """Keep tiny native frames bright instead of averaging a subpixel hairline."""
+    return max(STROKE, 1.15 * VIEWBOX / size)
+
+
+def svg_mark(background="#000", foreground="#fff", stroke=STROKE):
+    background_element = (f'  <rect width="{VIEWBOX}" height="{VIEWBOX}" fill="{background}"/>\n'
+                          if background is not None else "")
     paths = "\n    ".join(f'<path d="{path_d(points)}"/>' for points in PATHS)
-    bg = ""
-    if background is not None:
-        radius = f' rx="{corner_radius}" ry="{corner_radius}"' if corner_radius else ""
-        bg = f'<rect width="{VIEWBOX}" height="{VIEWBOX}"{radius} fill="{background}"/>'
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" '
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" '
         f'viewBox="0 0 {VIEWBOX} {VIEWBOX}" role="img" aria-label="DMate">\n'
-        f'  {bg}\n'
+        f'{background_element}'
         f'  <g fill="none" stroke="{foreground}" stroke-width="{stroke}" '
         f'stroke-linecap="round" stroke-linejoin="round">\n    {paths}\n  </g>\n</svg>\n'
     )
 
 
-def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=STROKE,
-              figure_scale=1.0, rounded=False, oversample_factor=None,
-              facets=False, stroke_palette=None, coverage_gamma=None):
-    """Rasterize vector coordinates directly at native size with supersampling.
-
-    figure_scale modifies only geometric coordinates BEFORE rasterization.
-    It never stretches or resamples an existing bitmap, and line width does
-    not become thick/thin when a browser's launcher needs size compensation.
-    """
-    if size >= 128:
-        oversample = 4
-    elif oversample_factor is None:
-        oversample = 8
-    else:
-        oversample = max(8, int(oversample_factor))
+def draw_mark(size, background=BLACK, foreground=WHITE, stroke_units=None, circle=False):
+    """Rasterize paths at each native output size with supersampled round joins."""
+    oversample = 16 if size < 128 else 4
     side = size * oversample
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     if background is not None:
-        if rounded:
-            radius = round(190 * side / VIEWBOX)
-            draw.rounded_rectangle((0, 0, side - 1, side - 1), radius=radius, fill=background)
+        if circle:
+            draw.ellipse((0, 0, side - 1, side - 1), fill=background)
         else:
-            draw.rectangle((0, 0, side, side), fill=background)
-
-    def coords(points):
-        return [
-            (round((VIEWBOX / 2 + (x - VIEWBOX / 2) * figure_scale) * side / VIEWBOX),
-             round((VIEWBOX / 2 + (y - VIEWBOX / 2) * figure_scale) * side / VIEWBOX))
-            for x, y in points
-        ]
-
-    # Facet fills are LEGACY v38/v39 ONLY. v40 passes the pure WHITE palette
-    # to the antialias branch but must leave every face solid black.
-    if facets and stroke_palette != [WHITE] * len(PATHS):
-        for points, face_color in BING_FACETS:
-            draw.polygon(coords(points), fill=face_color)
-    line_width = max(1, round(stroke_units * side / VIEWBOX))
-    if facets:
-        # A 13-unit line occupies only ~0.17 source-independent pixels at 16px.
-        # Correct its LANCZOS subpixel luminance after rasterization without
-        # changing the vector stroke width or any original vertex coordinates.
-        ink = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-        pen = ImageDraw.Draw(ink)
-        for index, points in enumerate(PATHS):
-            color = stroke_palette[index] if stroke_palette is not None else foreground
-            pen.line(coords(points), fill=color, width=line_width, joint="curve")
-        reduced = ink.resize((size, size), Image.Resampling.LANCZOS)
-        if size <= 32 or coverage_gamma is not None:
-            exponent = (coverage_gamma if coverage_gamma is not None
-                        else (0.53 if size <= 24 else 0.70))
-            alpha = reduced.getchannel("A").point(
-                lambda value: 0 if value < 12 else min(
-                    255, round(255 * ((value / 255.0) ** exponent))
-                )
-            )
-            reduced.putalpha(alpha)
-        return Image.alpha_composite(
-            canvas.resize((size, size), Image.Resampling.LANCZOS), reduced
-        )
-    for points in PATHS:
-        draw.line(coords(points), fill=foreground, width=line_width, joint="curve")
+            draw.rectangle((0, 0, side - 1, side - 1), fill=background)
+    stroke_units = optical_stroke(size) if stroke_units is None else stroke_units
+    width = max(1, round(stroke_units * side / VIEWBOX))
+    radius = width / 2
+    for path in PATHS:
+        points = [(x * side / VIEWBOX, y * side / VIEWBOX) for x, y in path]
+        draw.line(points, fill=foreground, width=width, joint="curve")
+        # Match SVG/VectorDrawable's round ends and joins at sharp corners.
+        for x, y in points:
+            draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=foreground)
     return canvas.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def save_png(image, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path, "PNG", optimize=True)
 
 
-def render_png_bytes(size, background=BLACK, figure_scale=1.0, stroke_units=STROKE,
-                     foreground=WHITE, rounded=False, oversample_factor=None,
-                     facets=False, stroke_palette=None):
-    with io.BytesIO() as buffer:
-        save_png(draw_mark(size, background=background, foreground=foreground,
-                           figure_scale=figure_scale, stroke_units=stroke_units,
-                           rounded=rounded, oversample_factor=oversample_factor,
-                           facets=facets, stroke_palette=stroke_palette), buffer)
-        return buffer.getvalue()
+def png_bytes(size, **options):
+    with io.BytesIO() as output:
+        draw_mark(size, **options).save(output, "PNG", optimize=True)
+        return output.getvalue()
 
 
-def save_ico(path, sizes, background=BLACK, stroke_units=STROKE, foreground=WHITE,
-             rounded=False, figure_scale=1.0, figure_scale_by_size=None,
-             oversample_factor=None, facets=False, stroke_palette=None):
-    """Build ICO from independently vector-rendered PNGs at EACH exact size."""
-    sizes = list(sizes)
-    figure_scale_by_size = figure_scale_by_size or {}
-    payloads = [
-        render_png_bytes(size, background=background, foreground=foreground,
-                         stroke_units=stroke_units, rounded=rounded,
-                         figure_scale=figure_scale_by_size.get(size, figure_scale),
-                         oversample_factor=oversample_factor, facets=facets,
-                         stroke_palette=stroke_palette)
-        for size in sizes
-    ]
-    offset = 6 + 16 * len(sizes)
-    out = io.BytesIO()
-    out.write(struct.pack("<HHH", 0, 1, len(sizes)))
-    for size, data in zip(sizes, payloads):
-        out.write(struct.pack("<BBBBHHII", size if size < 256 else 0,
-                              size if size < 256 else 0, 0, 0, 1, 32, len(data), offset))
+def save_ico(path, **options):
+    """ICO contains a separately rendered frame at every Windows shell size."""
+    payloads = [png_bytes(size, **options) for size in ICO_SIZES]
+    offset = 6 + 16 * len(ICO_SIZES)
+    output = io.BytesIO()
+    output.write(struct.pack("<HHH", 0, 1, len(ICO_SIZES)))
+    for size, data in zip(ICO_SIZES, payloads):
+        output.write(struct.pack("<BBBBHHII", size if size < 256 else 0,
+                                 size if size < 256 else 0, 0, 0, 1, 32, len(data), offset))
         offset += len(data)
     for data in payloads:
-        out.write(data)
-    path.write_bytes(out.getvalue())
+        output.write(data)
+    path.write_bytes(output.getvalue())
 
 
 def save_icns(path):
-    """ICNS icon representations are drawn from vector paths, never upscaled."""
     representations = [
         (b"icp4", 16), (b"icp5", 32), (b"icp6", 64), (b"ic07", 128),
         (b"ic08", 256), (b"ic09", 512), (b"ic10", 1024),
@@ -194,246 +127,94 @@ def save_icns(path):
     ]
     blocks = []
     for kind, size in representations:
-        payload = render_png_bytes(size)
+        payload = png_bytes(size)
         blocks.append(kind + struct.pack(">I", len(payload) + 8) + payload)
     body = b"".join(blocks)
     path.write_bytes(b"icns" + struct.pack(">I", len(body) + 8) + body)
 
 
+def android_vector(foreground):
+    paths = "\n".join(
+        f'        <path android:fillColor="@android:color/transparent" '
+        f'android:strokeColor="{foreground}" android:strokeWidth="{ADAPTIVE_STROKE}" '
+        f'android:strokeLineCap="round" android:strokeLineJoin="round" '
+        f'android:pathData="{path_d(points)}" />'
+        for points in PATHS
+    )
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
+        f'    android:width="108dp" android:height="108dp" android:viewportWidth="{VIEWBOX}" android:viewportHeight="{VIEWBOX}">\n'
+        f'    <group android:pivotX="{VIEWBOX / 2:g}" android:pivotY="{VIEWBOX / 2:g}" '
+        f'android:scaleX="{ADAPTIVE_SCALE}" android:scaleY="{ADAPTIVE_SCALE}">\n'
+        f'{paths}\n    </group>\n</vector>\n'
+    )
+
+
+def generate_android():
+    # The entire stroked mark stays inside Android's 66dp-diameter safe circle.
+    farthest = max(math.hypot(x - VIEWBOX / 2, y - VIEWBOX / 2) for path in PATHS for x, y in path)
+    assert (farthest + ADAPTIVE_STROKE / 2) * ADAPTIVE_SCALE * 108 / VIEWBOX < 33
+    (ANDROID / "drawable").mkdir(parents=True, exist_ok=True)
+    for name, color in (("dmate_foreground", "#FFFFFF"), ("dmate_monochrome", "#000000")):
+        (ANDROID / "drawable" / f"{name}.xml").write_text(android_vector(color), encoding="utf-8")
+    # Retire the generated bitmap with the same Android resource name.
+    (ANDROID / "drawable-nodpi" / "dmate_foreground.png").unlink(missing_ok=True)
+    for density, size in (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)):
+        for name, circle in (("ic_launcher", False), ("ic_launcher_round", True)):
+            save_png(draw_mark(size, stroke_units=optical_stroke(48), circle=circle),
+                     ANDROID / f"mipmap-{density}" / f"{name}.png")
+    for api in (26, 33):
+        directory = ANDROID / f"mipmap-anydpi-v{api}"
+        directory.mkdir(parents=True, exist_ok=True)
+        monochrome = '    <monochrome android:drawable="@drawable/dmate_monochrome" />\n' if api >= 33 else ""
+        contents = ('<?xml version="1.0" encoding="utf-8"?>\n'
+                    '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+                    '    <background android:drawable="@color/launcher_black" />\n'
+                    '    <foreground android:drawable="@drawable/dmate_foreground" />\n'
+                    + monochrome + '</adaptive-icon>\n')
+        for name in ("ic_launcher", "ic_launcher_round"):
+            (directory / f"{name}.xml").write_text(contents, encoding="utf-8")
+
+
 def main():
     STATIC.mkdir(parents=True, exist_ok=True)
     TAURI.mkdir(parents=True, exist_ok=True)
-    with Image.open(MASTER) as original:
-        assert original.size == (192, 192), "Original Android installed icon changed"
-
-    # Social preview: render directly from vector geometry, not an enlarged bitmap.
-    save_png(draw_mark(512), STATIC / "icon-512.png")
-
-    # Direct path rendering: compensate for browsers' own app-icon crop/inset.
-    # Line thickness stays fixed while the geometry size is adjusted.
-    for browser, geometry_scale in (("edge", 0.95), ("fennec", 1.16)):
-        for size in (32, 192):
-            save_png(draw_mark(size, figure_scale=geometry_scale),
-                     STATIC / f"android-{browser}-{size}-v21.png")
-
-    for size, name in ((32, "mobile-favicon-32-v17.png"),
-                       (192, "mobile-favicon-192-v17.png")):
-        if size == 192:
-            shutil.copyfile(MASTER, STATIC / name)
-        else:
-            save_png(draw_mark(size), STATIC / name)
-
-    (STATIC / "dmate-mark.svg").write_text(svg_mark("#000"), encoding="utf-8")
-    (STATIC / "dmate-transparent.svg").write_text(
-        svg_mark(background=None, stroke=TAB_STROKE), encoding="utf-8"
-    )
-
-    # New macOS Safari favicon variants: BOTH have fully transparent pixels
-    # around the original Edge line geometry, not a black or white square.
-    # Safari 26 SVG favicons ignore internal dark-mode media rules, so the
-    # page selects a fixed-color asset before the favicon is loaded.
-    # Dark SVG reuses dmate-transparent.svg verbatim: this is precisely the
-    # existing Windows Edge vector, stroke geometry and weight (23 units).
-    (STATIC / "dmate-safari-contrast-light-v43.svg").write_text(
-        svg_mark(background=None, foreground="#000", stroke=TAB_STROKE),
-        encoding="utf-8"
-    )
-    for appearance, color in (("dark", WHITE), ("light", BLACK)):
-        for size in (32, 64):
-            save_png(draw_mark(size, background=None, foreground=color,
-                               stroke_units=TAB_STROKE),
-                     STATIC / f"dmate-safari-contrast-{appearance}-v43-{size}.png")
-
-    # Safari compact address-field/tab focus states. Both PNG/SVG variants
-    # use Edge's exact 23-unit vectors and have no opaque background.
-    # The browser still controls final favicon selection and caching.
-    for surface, color, svg_color in (
-        ("tab-black", BLACK, "#000"),
-        ("address-white", WHITE, "#fff"),
+    (STATIC / "dmate-master.svg").write_text(svg_mark(), encoding="utf-8")
+    (STATIC / f"dmate-brand-{VERSION}.svg").write_text(svg_mark(stroke=BRAND_STROKE), encoding="utf-8")
+    for size in APP_SIZES:
+        save_png(draw_mark(size), STATIC / f"dmate-app-{VERSION}-{size}.png")
+    save_ico(STATIC / f"dmate-app-{VERSION}.ico")
+    for tone, rgba, color in (("white", WHITE, "#fff"), ("black", BLACK, "#000")):
+        base = f"dmate-tab-{tone}-{VERSION}"
+        (STATIC / f"{base}.svg").write_text(svg_mark(None, color, TAB_STROKE), encoding="utf-8")
+        for size in (16, 32, 48, 64, 128):
+            save_png(draw_mark(size, background=None, foreground=rgba, stroke_units=TAB_STROKE),
+                     STATIC / f"{base}-{size}.png")
+        save_ico(STATIC / f"{base}.ico", background=None, foreground=rgba, stroke_units=TAB_STROKE)
+    # Keep stable public aliases usable for old pages and direct icon requests.
+    for source, target in (
+        (f"dmate-brand-{VERSION}.svg", "dmate-mark.svg"),
+        (f"dmate-tab-white-{VERSION}.svg", "dmate-transparent.svg"),
+        (f"dmate-app-{VERSION}-180.png", "apple-touch-icon.png"),
+        (f"dmate-app-{VERSION}-512.png", "icon-512.png"),
+        (f"dmate-app-{VERSION}.ico", "favicon-app.ico"),
+        (f"dmate-tab-white-{VERSION}.ico", "favicon.ico"),
     ):
-        (STATIC / f"dmate-safari-{surface}-v46.svg").write_text(
-            svg_mark(background=None, foreground=svg_color, stroke=TAB_STROKE),
-            encoding="utf-8"
-        )
-        for size in (32, 64):
-            save_png(draw_mark(size, background=None, foreground=color,
-                               stroke_units=TAB_STROKE),
-                     STATIC / f"dmate-safari-{surface}-v46-{size}.png")
-
-    # Legacy Safari assets retained for reference; new v43 uses transparent
-    # monochrome outlines selected from the page based on macOS appearance.
-    # Keep the working light-mode black tile. In dark mode Safari can
-    # paint a pale background over DARK-FILLED favicons; use TRANSPARENT
-    # background with bright WHITE vector strokes instead. Fresh path versions
-    # avoid WebKit's per-site favicon database persisting the old icon.
-    for theme, background, foreground in (
-        ("light", BLACK, WHITE),
-        ("dark", None, WHITE),
-    ):
-        for size in (32, 64):
-            save_png(
-                draw_mark(size, background=background, foreground=foreground,
-                          rounded=background is not None, stroke_units=SAFARI_TAB_STROKE),
-                STATIC / f"dmate-safari-{theme}-v32-{size}.png"
-            )
-        save_ico(
-            STATIC / f"dmate-safari-{theme}-v32.ico",
-            (16, 32, 48, 64, 128),
-            background=background, foreground=foreground,
-            stroke_units=SAFARI_TAB_STROKE
-        )
-
-    # Preserve v34 exactly for Safari and existing browser tabs. The earlier
-    # 78-unit strokes are deliberately NOT reused for the Bing/search favicon.
-    # Each ICO size is rendered independently from the original geometry.
-    save_png(draw_mark(64, background=BLACK, foreground=WHITE,
-                       rounded=True, stroke_units=SAFARI_TAB_STROKE),
-             STATIC / "dmate-site-v34-64.png")
-    save_ico(STATIC / "dmate-site-v34.ico", (16, 24, 32, 48, 64, 128, 256),
-             background=BLACK, foreground=WHITE,
-             stroke_units=SAFARI_TAB_STROKE, rounded=True)
-
-    # Bing/search branding: rounded BLACK tile, original thin WHITE geometry.
-    # STROKE=13 is the original DMate line weight; never thicken it to 78.
-    save_png(draw_mark(64, background=BLACK, foreground=WHITE,
-                       rounded=True, stroke_units=STROKE),
-             STATIC / "dmate-site-v35-64.png")
-    save_ico(STATIC / "dmate-site-v35.ico", (16, 24, 32, 48, 64, 128, 256),
-             background=BLACK, foreground=WHITE,
-             stroke_units=STROKE, rounded=True)
-
-    # Bing/search favicon v36: BLACK rounded tile and original WHITE hairlines.
-    # Never increase STROKE; adjust only the geometry size at tiny resolutions.
-    save_png(draw_mark(64, background=BLACK, foreground=WHITE,
-                       rounded=True, stroke_units=STROKE, figure_scale=1.08),
-             STATIC / "dmate-site-v36-64.png")
-    save_ico(STATIC / "dmate-site-v36.ico",
-             (16, 24, 32, 48, 64, 128, 256),
-             background=BLACK, foreground=WHITE,
-             stroke_units=STROKE, rounded=True,
-             figure_scale=1.08,
-             figure_scale_by_size={
-                 16: 1.18, 24: 1.14, 32: 1.11, 48: 1.09,
-                 64: 1.08, 128: 1.06, 256: 1.04,
-             })
-
-    # Bing/search favicon v37: preserve the exact original DMate mark and line width.
-    # Higher supersampling improves subpixel hairline rendering; STROKE remains 13.
-    save_png(draw_mark(64, background=BLACK, foreground=WHITE,
-                       rounded=True, stroke_units=STROKE, figure_scale=1.08,
-                       oversample_factor=16),
-             STATIC / "dmate-site-v37-64.png")
-    save_ico(STATIC / "dmate-site-v37.ico",
-             (16, 24, 32, 48, 64, 128, 256),
-             background=BLACK, foreground=WHITE,
-             stroke_units=STROKE, rounded=True,
-             figure_scale=1.08,
-             figure_scale_by_size={
-                 16: 1.18, 24: 1.14, 32: 1.11, 48: 1.09,
-                 64: 1.08, 128: 1.06, 256: 1.04,
-             },
-             oversample_factor=16)
-
-    # Search favicon v38 only: brighter leading ridges and distinct white/gray
-    # line-depth hierarchy plus low-contrast facets; no thicker strokes. All
-    # mobile/browser/app launch icons remain byte-identical to the old build.
-    bing_scales = {16: 1.18, 24: 1.14, 32: 1.11, 48: 1.09,
-                   64: 1.08, 128: 1.06, 256: 1.04}
-    for size in (16, 32, 64):
-        save_png(draw_mark(size, background=BLACK, rounded=True,
-                           stroke_units=STROKE, figure_scale=bing_scales[size],
-                           oversample_factor=16, facets=True,
-                           stroke_palette=BING_STROKES),
-                 STATIC / f"dmate-site-v38-{size}.png")
-    save_ico(STATIC / "dmate-site-v38.ico",
-             (16, 24, 32, 48, 64, 128, 256),
-             background=BLACK, stroke_units=STROKE, rounded=True,
-             figure_scale_by_size=bing_scales, oversample_factor=16,
-             facets=True, stroke_palette=BING_STROKES)
-
-    # v39 preserves v38's geometry/palette/facets, but lifts only the
-    # anti-aliased subpixel brightness at 16/24/32px for desktop Bing SERP.
-    for size in (16, 32, 64):
-        save_png(draw_mark(size, background=BLACK, rounded=True,
-                           stroke_units=STROKE, figure_scale=bing_scales[size],
-                           oversample_factor=16, facets=True,
-                           stroke_palette=BING_STROKES),
-                 STATIC / f"dmate-site-v39-{size}.png")
-    save_ico(STATIC / "dmate-site-v39.ico",
-             (16, 24, 32, 48, 64, 128, 256),
-             background=BLACK, stroke_units=STROKE, rounded=True,
-             figure_scale_by_size=bing_scales, oversample_factor=16,
-             facets=True, stroke_palette=BING_STROKES)
-
-    # v40 — Bing DESKTOP search favicon ONLY.
-    # Pure white original wireframe (#fff), and pure black interior/background.
-    # No polygons, coloured facets, gradients, glow or thicker strokes.
-    # The existing subpixel alpha correction is applied to 16/24/32px to
-    # lift perceived brightness without changing the 13-unit vector width.
-    for size in (16, 32, 64):
-        save_png(draw_mark(size, background=BLACK, foreground=WHITE,
-                           stroke_units=STROKE, rounded=True,
-                           figure_scale=bing_scales[size], oversample_factor=16,
-                           facets=True, stroke_palette=[WHITE] * len(PATHS),
-                           ),
-                 STATIC / f"dmate-site-v40-{size}.png")
-    save_ico(STATIC / "dmate-site-v40.ico",
-             (16, 24, 32, 48, 64, 128, 256),
-             background=BLACK, foreground=WHITE,
-             stroke_units=STROKE, rounded=True,
-             figure_scale_by_size=bing_scales, oversample_factor=16,
-             facets=True, stroke_palette=[WHITE] * len(PATHS))
-
-    # Desktop WEBSITE sidebar/header brand. The shared dmate-mark.svg stroke
-    # is 13/1254 * 38 = 0.39 CSS px at desktop size: in 1x rasterization
-    # its #fff ink turns dim gray from subpixel coverage. Render independent
-    # DPR=1/2/3 assets directly from the SAME geometry and SAME thin stroke,
-    # then lift subpixel luminance only (not path width or black face fill).
-    # Mobile sidebar/header remain on the original SVG. No favicon changes.
-    brand_densities = ((1, 38, 0.55), (2, 76, 0.72), (3, 114, 0.83))
-    for density, pixels, exponent in brand_densities:
-        save_png(draw_mark(pixels, background=BLACK, foreground=WHITE,
-                           stroke_units=STROKE, rounded=False,
-                           oversample_factor=16, facets=True,
-                           stroke_palette=[WHITE] * len(PATHS),
-                           coverage_gamma=exponent),
-                 STATIC / f"dmate-brand-desktop-v41-{pixels}.png")
-
-    # iOS Safari uses the Apple touch icon for site bookmarks and Home Screen shortcuts.
-    save_png(draw_mark(180), STATIC / "apple-touch-icon.png")
-    for size, name in (
-        (128, "windows-shortcut-128-v20.png"),
-        (192, "windows-shortcut-192-v20.png"),
-        (256, "windows-shortcut-256-v20.png"),
-    ):
-        save_png(draw_mark(size), STATIC / name)
-
-    tauri_sizes = (
-        (16, "icon-16.png"), (24, "icon-24.png"), (32, "32x32.png"),
-        (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
-        (256, "128x128@2x.png"), (512, "icon.png"),
-    )
-    for size, name in tauri_sizes:
-        save_png(draw_mark(size), TAURI / name)
-
-    icon_sizes = (16, 24, 32, 48, 64, 128, 256)
-    save_ico(TAURI / "icon.ico", icon_sizes)
-    save_ico(STATIC / "windows-shortcut-black-v20.ico", icon_sizes)
-    save_ico(STATIC / "favicon-app.ico", icon_sizes)
-    save_icns(TAURI / "icon.icns")
-
-    # Transparent white linework for browser tabs; application icons are generated separately.
+        shutil.copyfile(STATIC / source, STATIC / target)
     for size in (16, 32, 48, 128):
-        save_png(draw_mark(size, background=None, stroke_units=TAB_STROKE),
-                 STATIC / f"favicon-{size}.png")
-    save_ico(STATIC / "favicon.ico", (16, 32, 48, 64, 128),
-             background=None, stroke_units=TAB_STROKE)
-
-    print(json.dumps({"status": "vector-only generation",
-                      "mac_favicon": "transparent black outlines in light mode; transparent white outlines in dark mode (SVG + PNG)",
-                      "formats": ["SVG", "PNG", "ICO", "ICNS"],
-                      "platforms": ["iOS Safari", "Android browser", "Windows", "macOS", "Linux"]},
-                     ensure_ascii=False, indent=2))
+        shutil.copyfile(STATIC / f"dmate-tab-white-{VERSION}-{size}.png", STATIC / f"favicon-{size}.png")
+    for size, name in ((16, "icon-16.png"), (24, "icon-24.png"), (32, "32x32.png"),
+                       (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
+                       (256, "128x128@2x.png"), (512, "icon.png"), (1024, "icon-1024.png")):
+        save_png(draw_mark(size), TAURI / name)
+    save_ico(TAURI / "icon.ico")
+    save_icns(TAURI / "icon.icns")
+    generate_android()
+    print(json.dumps({"status": "generated", "version": VERSION, "source": "original vector paths",
+                      "formats": ["SVG", "PNG", "ICO", "ICNS", "Android VectorDrawable"],
+                      "max_bitmap_size": 1024, "android_adaptive_safe_circle_dp": 66,
+                      "small_icons": "independent optical-size rendering"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

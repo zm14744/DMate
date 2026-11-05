@@ -94,7 +94,7 @@ DMATE_GRAPH_CONFIRMATION_DB=/data/graph-confirmations.sqlite3
 
 只需要游客模式时，数据库与认证配置可省略。不要把示例占位值用于正式服务。认证密钥可在自己的运行环境用 `python -c 'import secrets; print(secrets.token_hex(32))'` 生成一次，保存到平台 Secret 后持续复用。
 
-镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备先从 ModelScope 的官方 PaddlePaddle 仓库取得必需文件的提交版本、大小及 SHA256，按该版本下载并校验；失败后才使用 PaddleX 官方源作为后备。`PADDLE_PDX_MODEL_SOURCE`（当前默认 BOS）只影响 PaddleX 后备源的优先级，不改变 ModelScope 的首选顺序。下载与重试预算见[本地模型与缓存](#本地模型与缓存)。所有来源均无法提供完整模型时构建才会失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。`scripts/generate_icons.py` 的源图位于 Android 资源目录，因此自定义构建上下文时应保留该图标输入，不能把整个 `android/` 目录一并排除。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
+镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备先从 ModelScope 的官方 PaddlePaddle 仓库取得必需文件的提交版本、大小及 SHA256，按该版本下载并校验；失败后才使用 PaddleX 官方源作为后备。`PADDLE_PDX_MODEL_SOURCE`（当前默认 BOS）只影响 PaddleX 后备源的优先级，不改变 ModelScope 的首选顺序。下载与重试预算见[本地模型与缓存](#本地模型与缓存)。所有来源均无法提供完整模型时构建才会失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。`scripts/generate_icons.py` 直接从脚本内的矢量路径生成图标，不再读取 Android 目录里的旧 PNG 作为源图；自定义构建上下文需保留生成脚本及 Pillow 依赖，输出目录由脚本创建。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
 
 ## 模型服务
 
@@ -308,6 +308,28 @@ Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DM
 公式与富文本等前端依赖位于 `static/vendor/<组件-版本>/`，含 MathJax 本地按需资源、上游许可和完整性清单，镜像必须包含这些文件。版本化的第三方目录成功响应允许一年 immutable 缓存；业务 JS / CSS、未版本化资源清单和 `/web-version` 仍禁用旧缓存。升级第三方库应使用新版本目录，不能原地替换已长期缓存的文件。安装壳检查网页更新时会在忙碌期间延后重载；这不能更新 APK / Tauri 中的原生代码。
 
 `static/client-updates.json` 独立控制安装后更新通知。保留实际包版本和发布状态，主源与 `fallbackUrls` 仅指向本仓库同发行版、同文件名的 GitCode / GitHub 地址；不能只改网页就把尚未发布的新原生包标成可更新。检测 GitCode 附件时使用 GET 或 Range GET，HEAD 返回值不能单独判断文件不存在。
+
+### 图标生成与发布
+
+图标生成的唯一输入是 `scripts/generate_icons.py` 内的几何路径；不要单独替换某个平台的 PNG 后期待其他平台自动一致。在仓库根目录先执行：
+
+```bash
+python -m pip install Pillow==11.3.0
+python scripts/generate_icons.py
+```
+
+脚本输出网页 SVG / PNG / ICO、Tauri PNG / ICO / ICNS、Android 密度位图与 VectorDrawable。每种位图尺寸独立从路径绘制，小尺寸单独调整线宽；最大 PNG 和 macOS ICNS 图层为 1024 × 1024。Android 自适应图标前景处于 66dp 直径安全区域，普通 / 圆形资源在 API 26 及以上引用矢量前景，API 33 及以上增加单色主题前景。替换旧 `drawable-nodpi/dmate_foreground.png` 时会删除该文件，避免与同名矢量资源冲突。
+
+当前网页通过带 `v49` 的新文件名和根路径版本参数取图，侧栏和手机顶部直接使用 SVG。浏览器特定的黑白标签图标选择保持独立于网页明暗主题；Safari 不通过失焦 / 聚焦事件反复更换图标。根路径 `/favicon.ico`、`/favicon-16.png`、`/favicon-32.png`、`/favicon-64.png`、Apple touch icon 继续有效。旧版本资源保留给历史缓存页面。
+
+发布时分别处理：
+
+- **服务端 / 网页**：Docker 构建会生成资源，新部署提供新图标地址。不要为换图清除用户学习数据或引入额外 Service Worker。
+- **桌面与 Android**：对应构建工作流会先运行生成器；Tauri 配置包含 512 / 1024 PNG 及 ICO / ICNS，Android Gradle 使用新的启动器资源。Android debug / release 工作流仍需手动触发，签名与应用标识保持原配置。
+- **Snap**：手动构建工作流从同次生成的 512 像素 PNG 写入 `snap/gui/dmate.png`；构建和 Snap Store 发布仍是独立步骤。
+- **iOS Web Clip**：`python scripts/generate_ios_webclip.py` 默认生成 `dist/DMate-iPhone-iPad-fullscreen.mobileconfig`；内嵌 `dmate-app-v49-512.png`，与服务端 `/DMate.mobileconfig` 使用相同构建函数，原描述文件身份保持不变。公开 GitCode / GitHub 入口只有在发布工作流更新对应附件后才使用新图，用户已安装的 Web Clip 也需更新描述文件。
+
+源码资源齐全和本地图像检查通过，不等于 APK / 桌面安装包编译、签名或真机验证已经完成。发布前仍应检查相应平台的构建产物；仅当新包真实发布后，才更新下载入口或 `static/client-updates.json` 的版本与状态。缓存图标未更新时先重新打开页面 / 应用、必要时重新创建系统快捷方式，不要删除账号存储来刷新图标。
 
 ### 本地构建客户端
 

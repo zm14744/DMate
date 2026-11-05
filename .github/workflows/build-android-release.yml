@@ -17,6 +17,11 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v7
 
+      - name: Generate platform-specific icons
+        run: |
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          python scripts/generate_icons.py
+
       - name: Set up Java 17
         uses: actions/setup-java@v6
         with:

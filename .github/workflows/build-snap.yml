@@ -16,6 +16,11 @@ jobs:
       - name: Checkout DMate
         uses: actions/checkout@v4
 
+      - name: Generate platform-specific icons
+        run: |
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          python scripts/generate_icons.py
+
       - name: Install Tauri Linux dependencies
         run: |
           sudo apt-get update
@@ -55,9 +60,9 @@ jobs:
           test "$arch" = "amd64"
           dpkg-deb --contents "${packages[0]}" | grep -q 'usr/bin/dmate-desktop'
           cp "${packages[0]}" DMate_1.0.0_amd64.deb
-          # Use the checked-in Tauri icon; no separate image upload required.
+          # Use the freshly generated 512px icon for high-density launchers.
           mkdir -p snap/gui
-          cp desktop/src-tauri/icons/128x128@2x.png snap/gui/dmate.png
+          cp desktop/src-tauri/icons/icon.png snap/gui/dmate.png
           echo "DEB: ${packages[0]}"
 
       - name: Build Snap on GitHub runner
