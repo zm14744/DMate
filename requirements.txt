@@ -1,5 +1,7 @@
 Flask==3.1.2
 requests==2.32.5
+# PaddleX also installs chardet; Requests 2.32.5 requires its version below 6.
+chardet==5.2.0
 gunicorn==23.0.0
 
 paddlepaddle==3.3.1
