@@ -6976,16 +6976,19 @@ function processLearningFromReply(
 function buildLearningReviewSnapshot() {
     // History collection can recover legacy AI question metadata. Work on
     // message copies so opening a review never mutates saved conversations.
-    const reportSessions = (Array.isArray(sessions) ? sessions : []).map(session => ({
-        id: session.id,
-        name: session.name,
-        questions: getConversationQuestionHistory({
-            ...session,
-            messages: Array.isArray(session.messages)
-                ? session.messages.map(message => message ? { ...message } : message)
-                : []
-        })
-    }));
+    const reportSessions = (Array.isArray(sessions) ? sessions : []).map(session => {
+        const messages = Array.isArray(session.messages)
+            ? session.messages.map(message => message ? { ...message } : message)
+            : [];
+        return {
+            id: session.id,
+            name: session.name,
+            messages,
+            retest: session.retest && typeof session.retest === "object"
+                ? { ...session.retest } : null,
+            questions: getConversationQuestionHistory({ ...session, messages })
+        };
+    });
     const notebook = window.DMateConceptNotebookModel
         ? window.DMateConceptNotebookModel.normalize(learningState.conceptNotebook)
         : learningState.conceptNotebook;

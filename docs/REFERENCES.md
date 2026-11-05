@@ -30,6 +30,19 @@
 
 示例对应的行为和边界见[使用指南](USER_GUIDE.md#常见出题问法与普通追问)。这些资料提供提示设计思路，不是问法的穷尽清单，也不提供本系统识别率或出题质量认证。
 
+## 学习回顾与学习建议
+
+以下资料在 2026-11-05 查阅。学习回顾据此采用“有记录依据的目标 → 一步自测 → 核对理由”的组织方式，具体中文建议由本项目编写，不复制教材题目或把研究结论当成个人学习诊断。
+
+| 来源 | 采用的原则及边界 |
+| --- | --- |
+| [IES / What Works Clearinghouse：Organizing Instruction and Study to Improve Student Learning](https://ies.ed.gov/ncee/wwc/PracticeGuide/1) | 间隔学习、例题与独立解题交替、图文及抽象与具体表示结合、主动测验、解释性问题；用于一般学习方法，不代表系统已验证个体效果 |
+| [MIT Open Learning：Research-based learning findings](https://openlearning.mit.edu/mit-faculty/research-based-learning-findings) | 主动回忆、间隔与交错练习、例题与逐步撤除帮助；建议先尝试回忆和自测，卡住时借助例题，再独立完成 |
+| [MIT OCW：Mathematics for Computer Science，2015 课程目标](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/pages/syllabus/) | 区分严密定义与似是而非的推理；使用逻辑符号、归纳、计数与图模型。用作离散数学任务分类依据，不推断某名学生已经具备或缺少这些能力 |
+| [Keith Weber：Student difficulty in constructing proofs: The need for strategic knowledge](https://doi.org/10.1023/A:1015535614355) | 公开摘要指出：知道相关事实仍可能无法完成证明，选择何种事实和定理也需要策略知识；本项目据此提示核对证明路径和每一步依据。原研究讨论抽象代数证明，不能直接推广为所有学生或所有离散数学题的结论 |
+
+常见学习障碍据此转化为可检查的动作：符号与语义难对应时做自然语言改写；易混条件用例子和反例区分；证明不知道如何起步时列已知、待证与可用定义；套计数公式前用小例子确认顺序和重复；图形与符号脱节时核对图、边关系和矩阵。只有当前记录出现相关主题时才选择对应建议；没有作答证据时，不把这些一般障碍写成用户的实际错误。
+
 ## 后端、图像与数学工具
 
 | 来源 | 代码中的用途 |
