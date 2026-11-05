@@ -776,6 +776,17 @@ def _looks_like_exercise_request_text(text):
     ):
         return False
 
+    # A direct request for a difficulty can omit 出/来, e.g. 我要简单题.
+    # Anchor the complete short command so answers, negation and discussion
+    # such as 我要简单题的答案 / 为什么没有题目标记 cannot become exercises.
+    if re.fullmatch(
+        r"(?:请|麻烦)?(?:我)?(?:只|仅)?(?:想要|想|要)(?:再)?(?:一?道|一?个|一题)?"
+        r"(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)"
+        r"(?:难度)?(?:一点|一些|点儿|点)?(?:的)?(?:题目|题|练习题|练习)(?:吧|呢|呗)?[.!?]*",
+        value,
+    ):
+        return True
+
     # 先识别“换一个简单的 / 刚才太难了，再来个简单的”这类明确新动作。
     replacement_or_level = bool(re.search(
         r"(?:^|[，,。；;！!？?])(?:请|麻烦)?(?:给我|帮我)?"
@@ -1053,6 +1064,42 @@ def _constrained_binary_counting(text):
         re.search(r"二进制串|01串|[01]串", normalized)
         and re.search(r"(?:不含|不包含|不出现|禁止|不能出现|避免).{0,25}(?:连续|相邻|子串|模式)", normalized)
     )
+
+
+def _basic_cartesian_product_task(text):
+    """Recognize only small explicit products with enumeration/cardinality tasks."""
+    value = _normalize(text)
+    value = re.sub(r"\\(?:left|right|lvert|rvert)", lambda m:
+                   "|" if m.group(0).endswith("vert") else "", value)
+    value = value.replace(r"\times", "×").replace(r"\{", "{").replace(r"\}", "}")
+    value = re.sub(r"\\[()[\]]|\$", "", value)
+    products = set(re.findall(r"([a-z])\s*×\s*([a-z])", value))
+    if len(products) != 1:
+        return False
+    left, right = next(iter(products))
+    sets = {}
+    for match in re.finditer(r"([a-z])\s*=\s*\{([^{}]*)\}", value):
+        items = [item.strip() for item in re.split(r"[,，]", match[2]) if item.strip()]
+        if (match[1] in sets or not items
+                or any(not re.fullmatch(r"[+-]?\d+|[a-z]", item) for item in items)):
+            return False
+        sets[match[1]] = set(items)
+    if set(sets) != {left, right} or len(sets[left]) * len(sets[right]) > 36:
+        return False
+    # Remove only known definitions and the same product, then require every
+    # remaining task to be a basic enumeration/cardinality instruction. Extra
+    # conditions, relation proofs and other computations must keep their score.
+    remainder = re.sub(r"[a-z]\s*=\s*\{[^{}]*\}", "", value)
+    remainder = re.sub(r"[a-z]\s*×\s*[a-z]", "积", remainder)
+    remainder = re.sub(r"\|\s*积\s*\|", "基数", remainder)
+    count_task = r"(?:求|计算)(?:基数|积(?:中|的)?(?:元素|有序对)(?:的)?(?:个数|数量|数目))"
+    enumerate_task = r"(?:写出|列出|枚举)(?:笛卡尔积)?积(?:(?:中|的)?(?:全部|所有)?(?:的)?(?:元素|有序对))?"
+    remainder = re.sub(r"\s+", "", remainder)
+    if not re.search(count_task, remainder) or not re.search(enumerate_task, remainder):
+        return False
+    remainder = re.sub(count_task + "|" + enumerate_task, "", remainder)
+    remainder = re.sub(r"(?:已知|给定|设|两个|集合|并且|然后|同时|以及|和|与|并|再|请)|[\d,，。;；:：、().．]", "", remainder)
+    return not remainder
 
 
 def _estimate_difficulty(text, knowledge_points=None, question_type="一般题"):
@@ -1384,8 +1431,7 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         subquestion_count <= 2
         and not has_multi_step_topic
         and not has_advanced_point
-        and re.search(r"(?:写出|列出).{0,24}(?:[a-z]\s*×\s*[a-z]|\\times)", normalized)
-        and re.search(r"(?:求|计算).{0,12}\|\s*[a-z]\s*×\s*[a-z]\s*\|", normalized)
+        and _basic_cartesian_product_task(value)
     ):
         score = min(score, 1)
 

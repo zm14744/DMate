@@ -4405,6 +4405,13 @@ function hasExplicitExerciseGenerationCue(text) {
         return false;
     }
 
+    // Match the explicit short requests accepted by teaching.py, including
+    // "我要简单题". Full anchoring excludes requests for an existing answer
+    // and discussion of labels/difficulty rather than generation.
+    if (/^(?:请|麻烦)?(?:我)?(?:只|仅)?(?:想要|想|要)(?:再)?(?:一?道|一?个|一题)?(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)(?:难度)?(?:一点|一些|点儿|点)?(?:的)?(?:题目|题|练习题|练习)(?:吧|呢|呗)?[.。!！?？]*$/.test(value)) {
+        return true;
+    }
+
     if (/^(?:请|麻烦|给我|帮我)?(?:出题|生成题|出道题)[,，;；].{0,90}$/.test(value)) {
         return true;
     }
@@ -16751,6 +16758,13 @@ function renderChat(preparedReply = null) {
     ) {
         const message = session.messages[messageIndex];
 
+        // Recover older replies before rendering their badge and actions.
+        // Only an explicit generation request can establish this identity;
+        // ordinary explanations and user question toggles keep their rules.
+        const registeredExercise = message.role === "ai" && !message.isError && !message.isNotice
+            && Boolean(recoverGeneratedQuestionFromAssistant(session, messageIndex, message));
+        if (registeredExercise) message.generatedExercise = true;
+
         const div = document.createElement("div");
         div.dataset.messageIndex = String(messageIndex);
         div.className =
@@ -16802,10 +16816,11 @@ function renderChat(preparedReply = null) {
 
         // 复测题和普通题一样显示实际分类难度；
         // 仅显示绑定在这道题上的教学分析，不把后台目标难度写到出题指令上。
-        if (difficultyTeaching?.difficulty) {
+        const questionBadge = difficultyTeaching?.difficulty || (registeredExercise ? "题目" : "");
+        if (questionBadge) {
             const difficultyBadge = document.createElement("div");
             difficultyBadge.className = "difficulty-badge";
-            difficultyBadge.textContent = difficultyTeaching.difficulty;
+            difficultyBadge.textContent = questionBadge;
             div.insertBefore(difficultyBadge, content);
         }
 
