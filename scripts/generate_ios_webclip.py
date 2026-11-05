@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""Generate the versioned DMate iPhone/iPad Web Clip release attachment."""
+
+import argparse
+import hashlib
+from pathlib import Path
+
+from ios_webclip import build_ios_webclip_profile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUTPUT = ROOT / "dist" / "DMate-iPhone-iPad.mobileconfig"
+ICON_PATH = ROOT / "static" / "icons" / "apple-touch-icon.png"
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    args = parser.parse_args()
+
+    content = build_ios_webclip_profile(ICON_PATH)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_bytes(content)
+
+    print(f"Generated: {args.output}")
+    print(f"Size: {len(content)} bytes")
+    print(f"SHA-256: {hashlib.sha256(content).hexdigest()}")
+
+
+if __name__ == "__main__":
+    main()
