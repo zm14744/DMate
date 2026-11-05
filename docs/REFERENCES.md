@@ -18,6 +18,18 @@
 
 课程资料、知识节点和学生实际记录是不同层次：内置图谱不会因为学生打开节点而判定掌握，也不依据教材引用自动得出个人能力分数。新增或调整节点时，应同时检查模块、名称、前置关系和引用，避免只改界面标题而破坏题目索引。
 
+## 教学对话与出题问法
+
+以下页面在 2026-11-05 查阅，用于归纳出题与辅导请求的表达类别。项目据此自行整理中文示例和本地意图规则，没有复制这些页面的课程内容或试题库。
+
+| 来源 | 本次采用的表达思路 |
+| --- | --- |
+| [OpenAI：Teaching with AI](https://openai.com/index/teaching-with-ai/) | 按课程与学习水平设计测验，区分生成练习、概念解释和引导式辅导，逐个提问 |
+| [AI for Education：Quizzes](https://www.aiforeducation.io/prompts/quizzes) | 指定主题、题型、数量、覆盖范围和答案要求；追加题目、调整挑战程度 |
+| [AI for Education：Tutoring Support](https://www.aiforeducation.io/prompts/tutoring-support-from-a-genai-chatbot) | 说明学习目标、逐步辅导、暂不提供答案；辅导中的问句不全是正式练习题 |
+
+示例对应的行为和边界见[使用指南](USER_GUIDE.md#常见出题问法与普通追问)。这些资料提供提示设计思路，不是问法的穷尽清单，也不提供本系统识别率或出题质量认证。
+
 ## 后端、图像与数学工具
 
 | 来源 | 代码中的用途 |

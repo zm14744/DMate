@@ -98,7 +98,7 @@ if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 
 | 字段 | 含义 |
 | --- | --- |
-| `request_kind` | `exercise` 明确请求出题，`solution` 表示解题请求；具体是否显示答案与解析仍结合本轮文字要求判断 |
+| `request_kind` | `exercise` 表示出题意图，`solution` 表示解题请求；本轮文字明确否定出题、要求已有题解答或讨论出题功能时，不因旧客户端误传 `exercise` 而强制生成。具体是否显示答案与解析仍结合文字要求判断 |
 | `exercise_reference` | 出题参照对象，必须有非空 `question`；可有 `retest: true`、`difficulty`、最多 4 项 `core_points` |
 | `solution_reference` | 已生成题的 `question` 与 `answer`，仅匹配当前题且本轮要求答案时使用 |
 | `semantic_context` | `/graph/confirm` 返回的单图完整确认快照 |

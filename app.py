@@ -64,11 +64,11 @@ except (ImportError, OSError) as _fusion_import_error:
     review_direction_and_multiplicity = None
 from graph_ocr_cleanup import clean_graph_question_text, select_graph_question_text, ocr_is_label_dominated
 from classification_semantic import classify_ambiguous_questions
+from exercise_intent import EXERCISE_INTENT_RULES, classify_exercise_request
 from teaching import (
     analyze_messages,
     analyze_question,
     extract_current_request,
-    looks_like_exercise_request,
     normalize_user_request_text,
 )
 
@@ -2407,6 +2407,7 @@ def home():
     response = make_response(render_template(
         "index.html",
         knowledge_graph_data=KNOWLEDGE_GRAPH_DATA,
+        exercise_intent_rules=EXERCISE_INTENT_RULES,
         dmate_web_revision=(_RUNTIME_SOURCE.get("manifest_sha256")
             if _RUNTIME_SOURCE.get("status") == "ok" else None),
         is_android=is_android,
@@ -3653,6 +3654,16 @@ def _chat_response(on_delta=None, cancelled=None):
     normalized_action_for_exercise = normalize_user_request_text(
         latest_action_for_exercise
     )
+    exercise_intent = classify_exercise_request(latest_action_for_exercise)
+    navigation_anchor = re.search(
+        r"【当前指向题目】\s*([\s\S]+?)\s*【当前指向题目结束】",
+        latest_user_before_reference["content"] if latest_user_before_reference else "",
+    )
+    resolved_exercise_navigation = bool(
+        exercise_intent["is_exercise"] and not exercise_intent["explicit"]
+        and not client_requires_exercise and navigation_anchor
+        and navigation_anchor.group(1).strip()
+    )
 
     # 同知识点出题的参照题由前端显式提交。只接收题干，分类由后端重新计算。
     reference = data.get("exercise_reference")
@@ -3698,7 +3709,20 @@ def _chat_response(on_delta=None, cancelled=None):
             return jsonify({"error": "参照题和出题要求过长，请精简后重试"}), 400
         cleaned = [{"role": "user", "content": content}]
 
+    # A stale client-side label cannot override an explicit answer request,
+    # negation or discussion of the generation feature. Preserve any supplied
+    # question anchor, but let the current instruction determine its action.
+    if exercise_intent["blocked"]:
+        client_requires_exercise = False
+
     teaching = analyze_messages(cleaned)
+    if resolved_exercise_navigation:
+        # The browser has located an existing next question. Its bare 下一题
+        # is navigation, while an explicit request_kind=exercise still allows
+        # continuing the practice sequence when no next question exists.
+        teaching = analyze_question(navigation_anchor.group(1))
+        teaching["mode"] = "hint"
+        teaching["mode_label"] = "提示引导"
     # 完整解析只在本轮用户明确请求时开启；不能通过请求参数
     # 绕过学生“不要给答案”的明确指令。
     current_instruction = extract_current_request(
@@ -3801,13 +3825,13 @@ def _chat_response(on_delta=None, cancelled=None):
     current_user_content = next(
         (item["content"] for item in reversed(cleaned) if item.get("role") == "user"), ""
     )
-    server_detected_exercise = looks_like_exercise_request(
-        normalized_action_for_exercise
-    )
+    server_detected_exercise = exercise_intent["is_exercise"]
     effective_exercise_request = bool(
-        client_requires_exercise
-        or (teaching or {}).get("mode") == "exercise"
-        or server_detected_exercise
+        not exercise_intent["blocked"] and not resolved_exercise_navigation and (
+            client_requires_exercise
+            or (teaching or {}).get("mode") == "exercise"
+            or server_detected_exercise
+        )
     )
     # An uploaded original image is a question to SOLVE, not a request to
     # invent a new practice question. Only the explicit instruction section
@@ -4075,13 +4099,9 @@ def _chat_response(on_delta=None, cancelled=None):
                 latest_user_text = item.get("content", "")
                 break
 
-        is_exercise_request = (
-            effective_exercise_request
-            or teaching.get("mode") == "exercise"
-            or looks_like_exercise_request(
-                latest_user_text
-            )
-        )
+        # Use the same decision as generation/streaming above, rather than
+        # classifying the wrapped reference question a second time.
+        is_exercise_request = effective_exercise_request
         if is_scanned_graph_solution_request(latest_user_text):
             is_exercise_request = False
 

@@ -4,6 +4,8 @@ import unicodedata
 from functools import lru_cache
 from pathlib import Path
 
+from exercise_intent import classify_exercise_request
+
 
 MODE_LABELS = {
     "hint": "提示引导",
@@ -699,226 +701,9 @@ def normalize_user_request_text(text):
 
 
 def _looks_like_exercise_request_text(text):
-    """识别自然语言中的出题/继续练习请求，并过滤否定、复盘和功能讨论。"""
-    value = normalize_user_request_text(text)
+    """Use the same local command rules as the browser."""
+    return classify_exercise_request(text)["is_exercise"]
 
-    if not value or len(value) > 180:
-        return False
-
-    # Real MIT/Columbia/NJU exam regression: "请直接给出最终答案并简要解释。命题..."
-    # used to trigger the broad "出...题" generator regex because 给出+命题
-    # look like 出题. Treat an already supplied mathematical question as an
-    # answer request. "出一道题并给出答案" still enters the quiz generator.
-    if re.match(
-        r"^(?:请|麻烦)?(?:直接)?(?:给出(?:最终|完整|正确)?答案|"
-        r"告诉我(?:最终|正确)?答案|解答|求解|判断)",
-        value
-    ) and not re.search(
-        r"(?<!给)(?:出|编|设计|生成|创作).{0,15}(?:一道|几道|道题|题目|练习题)",
-        value
-    ):
-        return False
-
-    # Bare imperative “出题/生成题” is still an exercise request.
-    # Meta discussions and negations below continue to take precedence.
-    if re.fullmatch(r"(?:请|麻烦|给我|帮我)?(?:出题|生成题|出道题)(?:吧|呢)?", value):
-        return True
-
-    # A learner may request a question using “给一道题” without “给我”.
-    # Do not treat meta questions or existing-question explanations as generation.
-    if re.match(r"^(?:只|仅)?(?:要|给|来|请给|请来)(?:我)?(?:一?道|一?个|一题)(?:简单|中等|困难|图论|数论|同构|离散数学)?(?:题|题目|练习)(?=$|[,，。;；]|并|和|与|附)", value):
-        return True
-
-    # 明确拒绝出题：不允许被后面的“出题/难题”关键词反向误触发。
-    if re.search(
-        r"(?:不想(?:让你)?|不要|别|不用|无需|禁止|先别|暂时别|以后别|别再|不要再)"
-        r"(?:给我|帮我)?(?:再)?(?:出|生成|来|给|整|弄|安排|准备|考我|刷)"
-        r".{0,10}(?:题目|题|练习)",
-        value,
-    ):
-        return False
-
-    # “出题功能有 bug / 我在讨论如何生成题目”属于元讨论，不是生成命令。
-    if re.search(
-        r"(?:讨论|解释|分析|研究|功能|bug|代码|逻辑|识别|接口|模式|机制)"
-        r".{0,14}(?:出题|生成题|题目生成|生成练习)"
-        r"|(?:出题|生成题|题目生成|生成练习).{0,14}"
-        r"(?:功能|bug|代码|逻辑|识别|接口|模式|机制)",
-        value,
-        flags=re.IGNORECASE,
-    ):
-        return False
-
-    # “解释为什么出难题慢 / 出题为什么这么久”是对生成能力的提问，
-    # 即使包含“出一道题”字样也不是新出题请求。
-    if re.search(
-        r"^(?:请|麻烦|我想|我要|给我|帮我|你能|能不能|可以)?"
-        r"(?:解释|说明|分析|讨论|研究|讲讲|告诉我|为什么|怎么|如何|为何)"
-        r".{0,80}(?:出题|出.{0,18}题|生成.{0,18}题|题目|难题)",
-        value,
-    ):
-        return False
-    if re.search(
-        r"^(?:出题|生成题|题目生成).{0,25}(?:为什么|怎么|如何|太慢|很慢|慢|耗时|错误|异常)",
-        value,
-    ):
-        return False
-
-    if re.match(r"^(?:请|麻烦|给我|帮我)?(?:出题|生成题|出道题)[,，;；].{0,90}$", value):
-        return True
-
-    # “给我解释/检查/解答这道题”包含“给我 + 一道题”，但明显是在处理已有题目，
-    # 不能被后面的宽泛生成规则误判为“再出一道”。
-    if re.search(
-        r"(?:给我|帮我)(?:解释|讲解|分析|检查|批改|解答|解决|看看|看下|提示|说下思路|给思路|给答案)"
-        r".{0,18}(?:这|该|上面|刚才)?(?:一?道|个)?(?:题目|题|练习)",
-        value,
-    ):
-        return False
-
-    # A direct request for a difficulty can omit 出/来, e.g. 我要简单题.
-    # Anchor the complete short command so answers, negation and discussion
-    # such as 我要简单题的答案 / 为什么没有题目标记 cannot become exercises.
-    if re.fullmatch(
-        r"(?:请|麻烦)?(?:我)?(?:只|仅)?(?:想要|想|要)(?:再)?(?:一?道|一?个|一题)?"
-        r"(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)"
-        r"(?:难度)?(?:一点|一些|点儿|点)?(?:的)?(?:题目|题|练习题|练习)(?:吧|呢|呗)?[.!?]*",
-        value,
-    ):
-        return True
-
-    # 先识别“换一个简单的 / 刚才太难了，再来个简单的”这类明确新动作。
-    replacement_or_level = bool(re.search(
-        r"(?:^|[，,。；;！!？?])(?:请|麻烦)?(?:给我|帮我)?"
-        r"(?:再|重新)?(?:换|来|出|给|整|弄)"
-        r"(?:个|道|一道|一个)?"
-        r"(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)"
-        r"(?:难度)?(?:点|一点|一些|点儿|的)?(?:题|练习)?(?:吧)?$",
-        value,
-    ))
-    if replacement_or_level:
-        return True
-
-    # 单纯复盘上一道生成题，不应触发“再生成一道”。
-    if re.search(
-        r"(?:刚才|之前|上次|前面|你刚).{0,14}"
-        r"(?:出(?:的)?|生成(?:的)?|给(?:我)?(?:的)?)"
-        r".{0,8}(?:题目|题|练习)",
-        value,
-    ):
-        return False
-
-    if re.match(r"^(?:为什么|怎么|如何).{0,40}(?:出(?:的)?|生成(?:的)?|给(?:我)?).{0,10}(?:题目|题|练习)", value):
-        return False
-
-    # “再来一道同知识点 / 照上一题再来一道”允许省略末尾“题”字。
-    # 仍须显式包含续题动词与参照语义，不会把单纯讨论“同知识点”当新请求。
-    if re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|帮我)?(?:再|重新)?(?:来|出|换)(?:一?道|一?个)?"
-        r"(?:相同|同样|同一|同)?(?:知识点|考点|类型|题型)(?:的)?(?:复测|练习|题)?(?:吧)?",
-        value,
-    ) or re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|帮我)?(?:按照|照着|参考|根据)?"
-        r"(?:上一题|上一道题|刚才那题)(?:的)?(?:知识点|考点|类型|题型)?"
-        r"(?:再)?(?:来|出)(?:一?道|一?个)?(?:题|练习)?(?:吧)?",
-        value,
-    ):
-        return True
-
-    # 常见省略“题”字的自然命令。
-    if re.fullmatch(r"(?:请|麻烦)?(?:来)?考我(?:一下|下|几道?|一题|一道)?(?:吧)?", value):
-        return True
-    if re.fullmatch(
-        r"(?:请|麻烦)?(?:陪我|让我|我想|想)?刷(?:几|一|两|二|\d+)?道?"
-        r"(?:谓词逻辑|命题逻辑|逻辑|数论|计数|组合|递推|图论|图|集合|关系|函数|映射|代数|群|树|欧拉|哈密顿|邻接矩阵)?"
-        r"(?:题|练习)?(?:吧)?",
-        value,
-    ):
-        return True
-    if re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|帮我)?(?:随机|随便|再|重新)?(?:来|出|整|弄)?"
-        r"(?:一个|一道|一题)(?:题)?(?:吧)?",
-        value,
-    ):
-        return True
-
-    # “来个简单的 / 给个难的 / 出个中等难度的”。
-    if re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|帮我)?(?:再|重新)?(?:换|来|出|给|整|弄)"
-        r"(?:个|道|一道|一个)?"
-        r"(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)"
-        r"(?:难度)?(?:点|一点|一些|点儿|的)?(?:题|练习)?(?:吧)?",
-        value,
-    ):
-        return True
-
-    # “我想练点图论 / 想刷点关系题”。
-    if re.fullmatch(
-        r"(?:我)?(?:想|想要|要)?(?:练|刷|考)(?:一下|点|些|几道?)?"
-        r"(?:谓词逻辑|命题逻辑|逻辑|数论|计数|组合|递推|图论|图|集合|关系|函数|映射|代数|群|树|"
-        r"欧拉|哈密顿|邻接矩阵|图同构|最短路|最小生成树|二部图|拓扑排序|关系矩阵|关系运算|"
-        r"同余|模运算|中国剩余定理|欧几里得算法|费马小定理|真值表|前束范式|单射|满射|双射|生成函数)"
-        r"(?:题|练习)?(?:吧)?",
-        value,
-    ):
-        return True
-
-    # 更宽泛但仍然本地的生成命令：前面的否定/元讨论已经被过滤，
-    # 因此可以安全覆盖“给我一个非常难的哈密顿图题”“安排两道同余练习”等自然说法。
-    if re.search(
-        r"(?:^|[,;!?])(?:请|麻烦)?(?:给我|帮我|让我|我要|我想要|想要|想)?"
-        r"(?:再|重新|随机|随便|继续)?(?:来|出|生成|安排|准备|整|弄|抽|刷|练|考我)"
-        r".{0,36}(?:题目|题|练习)(?:吧|呢|呗)?$",
-        value,
-    ):
-        return True
-
-    # “给我一个很难的哈密顿图题”省略了“出/来”，仍是清晰的生成请求；
-    # 但“给我解释这道题/帮我检查这题”属于解题动作，明确排除。
-    if re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|给|帮我)(?:再)?(?:一?个|一?道|几道?|几题)?"
-        r"(?!(?:解释|讲解|分析|检查|批改|解答|解决|看看|提示|思路|答案))"
-        r".{0,32}(?:题目|题|练习)(?:吧|呢|呗)?",
-        value,
-    ):
-        return True
-
-    # 省略“题”字但明确在要求一个难度档位的下一道练习。
-    if re.search(
-        r"(?:^|[,;!?])(?:请|麻烦)?(?:给我|帮我)?(?:再|重新)?(?:换|来|出|给|整|弄)"
-        r"(?:一?个|一?道|个|道)?"
-        r".{0,14}(?:简单|容易|轻松|不难|中等|适中|普通|一般|有点难度|稍微难|稍有挑战|困难|很难|高难|挑战|烧脑)"
-        r"(?:一?点|一点儿|一些|些)?(?:的)?(?:吧|呢|呗)?$",
-        value,
-    ):
-        return True
-
-    # 带“题/练习”的普通生成表达。避免把“出的题/生成的题”当命令。
-    if re.search(
-        r"(?:请|麻烦|能否|能不能|可以|可不可以|帮我|给我|让我|我要|我想要|我想|想要|想|再|重新|随机|随便|继续|现在)?"
-        r"(?:给我|帮我)?(?:再|重新|随机|随便|继续)?"
-        r"(?:来|出(?!的)|生成(?!的)|安排|准备|整|弄|抽)"
-        r".{0,12}(?:题目|题|练习)",
-        value,
-    ):
-        return True
-
-    if re.search(r"(?:给我|帮我).{0,10}(?:一道|一题|一个题|几道题|几题|题目|练习)", value):
-        return True
-
-    if re.search(
-        r"(?:想|要|想要|可以|能不能|帮我|让我).{0,10}(?:做|练|刷|考)"
-        r".{0,16}(?:题目|题|练习)",
-        value,
-    ):
-        return True
-
-    return bool(re.fullmatch(
-        r"(?:请|麻烦)?(?:给我|帮我)?(?:下一道题|下一题|下一道|下一个题|"
-        r"再来一道|再来一题|再来一个|再来个|再来一个题|"
-        r"换一道题|换一个题|换个题|换一个|换一道|换一题)(?:吧|。|！|!)?",
-        value,
-    ))
 
 def looks_like_exercise_request(text):
     """对外统一的出题请求判定，供 app.py 与 teaching.py 共用。"""
@@ -2088,17 +1873,7 @@ def _normalize_question_reference_text(text):
 
 
 def _has_explicit_exercise_generation_cue(text):
-    value = _normalize_question_reference_text(text)
-    if not value or len(value) > 140:
-        return False
-
-    return bool(
-        re.search(r"(?:出|生成|来|安排|准备).{0,10}(?:题目|题|练习)", value)
-        or re.search(r"给我(?:来|出|生成)?(?:一|两|二|几|个|道|\d){1,3}.{0,10}(?:题目|题|练习)", value)
-        or re.search(r"(?:再来|再出|再给|换)(?:一|两|二|几|个|道|\d){0,3}(?:题目|题|练习)", value)
-        or re.search(r"(?:想|要|想要|可以|能不能).{0,8}(?:做|练|刷).{0,16}(?:题目|题|练习)", value)
-        or re.fullmatch(r"(?:请)?给我(?:下一道题|下一题|下一个题)", value)
-    )
+    return classify_exercise_request(text)["explicit"]
 
 
 def _parse_question_reference_number(raw):

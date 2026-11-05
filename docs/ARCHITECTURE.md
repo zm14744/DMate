@@ -23,6 +23,7 @@ DMate 是 Flask 提供网页和 API、浏览器保存学习状态的离散数学
 | `static/graph-scan-workspace.js`、`static/drawing-workspace.js` | 扫描与独立画板工作区 |
 | `static/chat-composer.js`、`static/voice-input.js` | 输入框、多图发送、录音转写 |
 | `teaching.py`、`knowledge_graph.json` | 本地教学模式、题目分类、难度与知识依赖分析 |
+| `exercise_intent.py`、`static/exercise-intent.js`、`static/exercise-intent-rules.json` | 前后端共用的出题意图规则，区分新练习、否定、已有题解答、引用与题目导航；规则随首页注入，无额外识别请求 |
 | `ai.py` | DeepSeek 文本请求、数学格式处理，以及兼容路径的图片理解 |
 | `chat_limits.py` | 普通消息、内部题目包装、已确认图片与历史预算的共享边界 |
 | `graph_qwen_targeted.py`、`graph_qwen_targeted_review.py` | 网页自动识图及有范围的局部复核 |

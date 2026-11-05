@@ -4369,117 +4369,7 @@ function normalizeQuestionReferenceText(text) {
 }
 
 function hasExplicitExerciseGenerationCue(text) {
-    const value = normalizeQuestionReferenceText(text);
-
-    if (!value || value.length > 140) {
-        return false;
-    }
-
-    // “出题，给答案 / 出题，只给提示”仍然是出题；元讨论和
-    // 显式拒绝出题由下方排除，不能把“不要给答案”当成“不要出题”。
-    if (/^(?:请|麻烦|给我|帮我)?(?:出题|生成题|出道题)(?:吧|呢)?$/.test(value)) {
-        return true;
-    }
-
-    // “给一道题并讲解 / 只要一道题”同样是明确的出题动作。
-    if (/^(?:只|仅)?(?:要|给|来|请给|请来)(?:我)?(?:一?道|一?个|一题)(?:简单|中等|困难|图论|数论|同构|离散数学)?(?:题|题目|练习)(?=$|[,，。;；]|并|和|与|附)/.test(value)) {
-        return true;
-    }
-
-    // 明确拒绝出题。
-    if (
-        /(?:不想(?:让你)?|不要|别|不用|无需|禁止|先别|暂时别|以后别|别再|不要再)(?:给我|帮我)?(?:再)?(?:出|生成|来|给|整|弄|安排|准备|考我|刷).{0,10}(?:题目|题|练习)/.test(value)
-    ) {
-        return false;
-    }
-
-    // 出题功能/代码/识别等元讨论，不属于生成命令。
-    if (
-        /(?:讨论|解释|分析|研究|功能|bug|代码|逻辑|识别|接口|模式|机制).{0,14}(?:出题|生成题|题目生成|生成练习)|(?:出题|生成题|题目生成|生成练习).{0,14}(?:功能|bug|代码|逻辑|识别|接口|模式|机制)/i.test(value)
-    ) {
-        return false;
-    }
-
-    // 关于出题速度、出题错误的询问是元讨论，不是“再生成一道题”。
-    // 与 teaching.py 采用同一优先级：先排除解释/讨论，再识别出题命令。
-    if (/^(?:请|麻烦|我想|我要|给我|帮我|你能|能不能|可以)?(?:解释|说明|分析|讨论|研究|讲讲|告诉我|为什么|怎么|如何|为何).{0,80}(?:出题|出.{0,18}题|生成.{0,18}题|题目|难题)/.test(value)
-        || /^(?:出题|生成题|题目生成).{0,25}(?:为什么|怎么|如何|太慢|很慢|慢|耗时|错误|异常)/.test(value)) {
-        return false;
-    }
-
-    // Match the explicit short requests accepted by teaching.py, including
-    // "我要简单题". Full anchoring excludes requests for an existing answer
-    // and discussion of labels/difficulty rather than generation.
-    if (/^(?:请|麻烦)?(?:我)?(?:只|仅)?(?:想要|想|要)(?:再)?(?:一?道|一?个|一题)?(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)(?:难度)?(?:一点|一些|点儿|点)?(?:的)?(?:题目|题|练习题|练习)(?:吧|呢|呗)?[.。!！?？]*$/.test(value)) {
-        return true;
-    }
-
-    if (/^(?:请|麻烦|给我|帮我)?(?:出题|生成题|出道题)[,，;；].{0,90}$/.test(value)) {
-        return true;
-    }
-
-    // “刚才太难了，再来个简单的”是明确的新动作。
-    if (
-        /(?:^|[，,。；;！!？?])(?:请|麻烦)?(?:给我|帮我)?(?:再|重新)?(?:换|来|出|给|整|弄)(?:个|道|一道|一个)?(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)(?:难度)?(?:点|一点|一些|点儿|的)?(?:题|练习)?(?:吧)?$/.test(value)
-    ) {
-        return true;
-    }
-
-    // 单纯评价上一道生成题，不生成新题。
-    if (
-        /(?:刚才|之前|上次|前面|你刚).{0,14}(?:出(?:的)?|生成(?:的)?|给(?:我)?(?:的)?).{0,8}(?:题目|题|练习)/.test(value)
-        || /^(?:为什么|怎么|如何).{0,40}(?:出(?:的)?|生成(?:的)?|给(?:我)?).{0,10}(?:题目|题|练习)/.test(value)
-    ) {
-        return false;
-    }
-
-    // 省略末尾“题”字的同知识点续题，必须仍然进入“参照上一题”路径。
-    if (/^(?:请|麻烦)?(?:给我|帮我)?(?:再|重新)?(?:来|出|换)(?:一?道|一?个)?(?:相同|同样|同一|同)?(?:知识点|考点|类型|题型)(?:的)?(?:复测|练习|题)?(?:吧)?$/.test(value)
-        || /^(?:请|麻烦)?(?:给我|帮我)?(?:按照|照着|参考|根据)?(?:上一题|上一道题|刚才那题)(?:的)?(?:知识点|考点|类型|题型)?(?:再)?(?:来|出)(?:一?道|一?个)?(?:题|练习)?(?:吧)?$/.test(value)) {
-        return true;
-    }
-
-    if (/^(?:请|麻烦)?(?:来)?考我(?:一下|下|几道?|一题|一道)?(?:吧)?$/.test(value)) {
-        return true;
-    }
-
-    if (/^(?:请|麻烦)?(?:陪我|让我|我想|想)?刷(?:几|一|两|二|\d+)?道?(?:题)?(?:吧)?$/.test(value)) {
-        return true;
-    }
-
-    if (
-        /^(?:请|麻烦)?(?:给我|帮我)?(?:随机|随便|再|重新)?(?:来|出|整|弄)?(?:一个|一道|一题)(?:题)?(?:吧)?$/.test(value)
-    ) {
-        return true;
-    }
-
-    if (
-        /^(?:请|麻烦)?(?:给我|帮我)?(?:再|重新)?(?:换|来|出|给|整|弄)(?:个|道|一道|一个)?(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)(?:难度)?(?:点|一点|一些|点儿|的)?(?:题|练习)?(?:吧)?$/.test(value)
-    ) {
-        return true;
-    }
-
-    if (
-        /^(?:我)?(?:想|想要|要)?(?:练|刷|考)(?:一下|点|些|几道?)?(?:谓词逻辑|命题逻辑|逻辑|数论|计数|组合|递推|图论|图|集合|关系|函数|代数|群|树|欧拉|哈密顿)(?:题|练习)?(?:吧)?$/.test(value)
-    ) {
-        return true;
-    }
-
-    if (
-        /(?:请|麻烦|能否|能不能|可以|可不可以|帮我|给我|让我|我要|我想要|我想|想要|想|再|重新|随机|随便|继续|现在)?(?:给我|帮我)?(?:再|重新|随机|随便|继续)?(?:来|出(?!的)|生成(?!的)|安排|准备|整|弄|抽).{0,12}(?:题目|题|练习)/.test(value)
-    ) {
-        return true;
-    }
-
-    if (/(?:给我|帮我).{0,10}(?:一道|一题|一个题|几道题|几题|题目|练习)/.test(value)) {
-        return true;
-    }
-
-    if (/(?:想|要|想要|可以|能不能|帮我|让我).{0,10}(?:做|练|刷|考).{0,16}(?:题目|题|练习)/.test(value)) {
-        return true;
-    }
-
-    return /^(?:请|麻烦)?(?:给我|帮我)?(?:下一道题|下一题|下一个题|再来一道|再来一题|再来一个|换一道题|换一个题|换一道|换一题)(?:吧|。|！|!)?$/.test(value);
+    return Boolean(window.DMateExerciseIntent?.classify(text).explicit);
 }
 
 
@@ -5445,6 +5335,8 @@ function looksLikeQuestionPayload(text) {
         "填空",
         "解答",
         "下列",
+        "从下列",
+        "从以下",
         "若",
         "问",
         "什么是",
@@ -5458,6 +5350,11 @@ function looksLikeQuestionPayload(text) {
         starts.some(item => compact.startsWith(item))
         && compact.length >= 4
     ) {
+        return true;
+    }
+
+    if (/^(?:let|given|suppose|find|compute|calculate|determine|prove|show\s+that|list|choose|select)\b/i.test(compact)
+        && compact.length >= 10) {
         return true;
     }
 
@@ -5855,20 +5752,7 @@ function splitQuestionBankText(text) {
 }
 
 function isExerciseRequestText(text) {
-    const value = normalizeQuestionReferenceText(text);
-
-    if (
-        !value
-        || value.length > 140
-        || /^(?:不要|别|不用|无需).{0,18}(?:出|生成|来|给).{0,8}(?:题目|题|练习)/.test(value)
-    ) {
-        return false;
-    }
-
-    return Boolean(
-        hasExplicitExerciseGenerationCue(value)
-        || /^(?:再来一个|再来一道|再来一题|再来个|再来一个题|换一道|换一题|换一道题|换一个题|换个题|换一个|下一题|下一道题|下一道|下一个题)$/.test(value)
-    );
+    return Boolean(window.DMateExerciseIntent?.classify(text).is_exercise);
 }
 
 function exerciseTopicReference(text) {
@@ -5899,9 +5783,9 @@ function hasExplicitExerciseReferenceCue(text) {
 }
 
 function isNextExerciseContinuationRequest(text) {
-    const value = normalizeQuestionReferenceText(text);
+    const value = normalizeQuestionReferenceText(text).replace(/[。.!！?？]+$/, "");
 
-    return /^(?:请|麻烦)?(?:给我|帮我)?(?:出|生成|来)?(?:下一道题|下一题|下一个题)$/.test(
+    return /^(?:请|麻烦)?(?:给我|帮我)?(?:出|生成|来)?(?:下一道题|下一题|下一个题|下一道)(?:吧|呢)?$/.test(
         value
     );
 }
@@ -5909,7 +5793,7 @@ function isNextExerciseContinuationRequest(text) {
 function isContextualExerciseRequest(text) {
     if (!isExerciseRequestText(text)) return false;
 
-    const value = normalizeQuestionReferenceText(text);
+    const value = normalizeQuestionReferenceText(text).replace(/[。.!！?？]+$/, "");
 
     const structural = structuralQuestionReference(value);
 
@@ -5935,7 +5819,7 @@ function isContextualExerciseRequest(text) {
         return false;
     }
 
-    if (/(?:同(?:样|一)?|相同)(?:的)?知识点|同类|同类型|类似|相似/.test(value)) {
+    if (/(?:同(?:样|一)?|相同)(?:的)?(?:知识点|考点|题型|类型)|同类|同类型|类似|相似|变式|改编|换(?:一下|一组|个)?(?:数字|数据|条件)/.test(value)) {
         return true;
     }
 
@@ -5958,7 +5842,10 @@ function isContextualExerciseRequest(text) {
         return true;
     }
 
-    return /^(?:再来一个|再来一道|再来一题|再来个|再来一个题|换一道|换一题|换一道题|换一个题|换个题|换一个)$/.test(value);
+    // Quantity, question type and polite endings may vary; the shared
+    // classifier has already excluded answers, negation and quoted commands.
+    return /^(?:请|麻烦)?(?:给我|帮我)?(?:再(?:来|出|给|整|弄)|重新(?:来|出)|换|继续(?:出题|练习)|接着出题)/.test(value)
+        || /^(?:please)?(?:another|onemore|nextquestion|nextproblem|give(?:me)?another)/i.test(value);
 }
 
 function resolveExerciseReference(session, text) {
@@ -6251,6 +6138,8 @@ function recoverGeneratedQuestionFromAssistant(
     if (
         !message
         || message.role !== "ai"
+        || message.isError
+        || message.isNotice
         || typeof message.text !== "string"
     ) {
         return "";
@@ -6272,20 +6161,13 @@ function recoverGeneratedQuestionFromAssistant(
     if (
         !previous
         || !isExerciseRequestText(previous.text)
+        || (previous.targetQuestionFingerprint && !hasExplicitExerciseGenerationCue(previous.text))
     ) {
         return "";
     }
 
-    generated = sanitizeStoredWrongQuestionText(
-        extractAiGeneratedExerciseText(message.text)
-    );
-
-    if (
-        !generated
-        || !looksLikeQuestionPayload(generated)
-    ) {
-        return "";
-    }
+    generated = extractRecoverableGeneratedQuestion(message.text);
+    if (!generated) return "";
 
     // 兼容旧记录 / 后端没有返回 generated_question 的情况。
     // 只在上一条用户消息明确要求“出题”时恢复，避免把普通讲解误判成题目。
@@ -6293,6 +6175,30 @@ function recoverGeneratedQuestionFromAssistant(
     message.generatedQuestion = generated;
 
     return generated;
+}
+
+function extractRecoverableGeneratedQuestion(reply) {
+    const question = sanitizeStoredWrongQuestionText(extractAiGeneratedExerciseText(reply));
+    return question && looksLikeQuestionPayload(question)
+        && !isGeneratedExerciseClarification(reply, question) ? question : "";
+}
+
+function isGeneratedExerciseClarification(reply, question) {
+    const body = String(question || "").replace(/^[#>*\s]+/, "").trim();
+    // A question mark alone does not make a generated exercise: requests for
+    // topic/difficulty, retry notices and explanations are ordinary replies.
+    const prompt = body.replace(/^(?:好的|可以|没问题|请问)[,，。!！\s]*/, "");
+    if (/^(?:你(?:想|希望|需要|要不要)|请(?:先)?(?:告诉我|选择|提供|说明)|需要我|想练|要不要)[^。！？?\n]{0,50}(?:方向|章节|知识点|题型|难度|简单题|困难题)/.test(prompt)) return true;
+    if (/^你(?:想|希望|需要)(?:先|要)?(?:练|学|做)[^。！？?\n]{0,30}(?:吗|呢|什么|哪)/.test(prompt)) return true;
+    if (/^(?:抱歉|对不起|暂时(?:无法|不能)|未能(?:生成|完成)|生成失败)/.test(prompt)) return true;
+    if (/^(?:目前|现在|暂时|本次)?(?:我)?(?:无法|不能|未能|没有成功).{0,30}(?:生成|出题|完成请求)/.test(body)) return true;
+    if (/^(?:(?:sorry|sure|okay)[,!.\s]*)?(?:what(?:\s+\w+){0,4}\s+(?:topic|difficulty)|which\s+(?:topic|subject|difficulty)|would\s+you\s+like|(?:could\s+you\s+(?:tell|provide)|please\s+(?:choose|specify)).{0,40}(?:topic|subject|difficulty|level)|i\s+(?:cannot|can't|couldn't|am\s+unable))/i.test(body)) return true;
+    if (!hasExplicitQuestionHeading(reply) && (
+        isClearlyNonQuestionWrongBookText(reply)
+        || /^(?:这(?:一)?道题|上(?:一)?道题|上一题|刚才那题).{0,12}(?:答案|解析|考查|思路|做法|解法|解答|为什么)/.test(body)
+        || /^(?:第[一二三四五六七八九十\d]+步|解题步骤|解题思路|先看(?:一下)?这道题)[：:，,\s]/.test(body)
+    )) return true;
+    return false;
 }
 
 function openWrongQuestionPicker(questionInfo, choices) {
@@ -6882,25 +6788,23 @@ function processLearningFromReply(
     const points = normalized.knowledge_points;
     const latest = getLatestUserMessage(session);
     const latestText = latest?.text || "";
+    const trustedGenerated = String(generatedQuestion || "").trim();
+    const resolvedNavigation = latest?.targetQuestionFingerprint
+        && !hasExplicitExerciseGenerationCue(latestText);
+    const exerciseRequested = !resolvedNavigation
+        && (normalized.mode === "exercise" || isExerciseRequestText(latestText));
+    const generatedExercise = trustedGenerated
+        || (exerciseRequested ? extractRecoverableGeneratedQuestion(reply) : "");
+
+    // A clarification or failed generation is not a new learning question.
+    // Keep the earlier topic and counters until an actual question arrives.
+    if (exerciseRequested && !generatedExercise) return;
 
     // 用户明确让 AI 出练习题时，AI 返回的题目本身就是当前学习题。
     // “记为错题”应保存模型生成的题目，而不是“给我一道题”这句请求。
-    if (
-        (
-            Boolean(String(generatedQuestion || "").trim())
-            || normalized.mode === "exercise"
-            || isExerciseRequestText(latestText)
-        )
-        && typeof reply === "string"
-        && reply.trim()
-    ) {
-        const generatedExercise = (
-            String(generatedQuestion || "").trim()
-            || extractAiQuestionPayload(reply)
-        );
-
+    if (generatedExercise) {
         session.learningQuestion = {
-            text: limitQuestionText(generatedExercise || reply.trim()),
+            text: limitQuestionText(generatedExercise),
             knowledgePoints: [...new Set([
                 ...points.slice(0, 3),
                 ...(normalized.related_knowledge_points || []).slice(0, 2)
@@ -6933,6 +6837,7 @@ function processLearningFromReply(
             : latest.manualIsQuestion === true)
         && normalized.mode !== "check_answer"
         && normalized.mode !== "exercise"
+        && !isExerciseRequestText(latestText)
     );
 
     // “上一道题再讲一下”以及后续“继续”都属于题目上下文切换/保持，
@@ -6940,8 +6845,7 @@ function processLearningFromReply(
     // 仍停留在时间上更靠后的那道题。
     if (
         !isSubstantiveQuestion
-        && normalized.mode !== "exercise"
-        && !String(generatedQuestion || "").trim()
+        && !generatedExercise
     ) {
         const activeCandidate = activeQuestionCandidateFromHistory(
             session
@@ -13818,16 +13722,7 @@ async function requestAiReply(session, options = {}) {
             && latestIsExerciseRequest
             && typeof data.reply === "string"
         ) {
-            const recovered = sanitizeStoredWrongQuestionText(
-                extractAiGeneratedExerciseText(data.reply)
-            );
-
-            if (
-                recovered
-                && looksLikeQuestionPayload(recovered)
-            ) {
-                localGeneratedQuestion = recovered;
-            }
+            localGeneratedQuestion = extractRecoverableGeneratedQuestion(data.reply);
         }
 
         let localGeneratedTeaching = normalizeTeaching(

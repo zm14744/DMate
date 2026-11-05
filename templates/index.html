@@ -9621,6 +9621,8 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
+<script id="exerciseIntentRules" type="application/json">{{ exercise_intent_rules | tojson }}</script>
+<script src="/static/exercise-intent.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor-model.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor-format.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor-overlay.js?v={{ dmate_web_revision }}"></script>
