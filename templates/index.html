@@ -6165,6 +6165,21 @@ body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
     border-radius:10px;
 }
 
+/* Subpixel strokes look gray on low-density desktop displays. Lift their
+   coverage brightness without changing the SVG paths, line width or layout.
+   Resolution queries also follow browser zoom and movement between monitors. */
+@media (min-width:1101px) and (max-resolution:1.75dppx) {
+    .dmate-brand-mark { filter:brightness(1.2); }
+}
+
+@media (min-width:1101px) and (max-resolution:1.4dppx) {
+    .dmate-brand-mark { filter:brightness(1.4); }
+}
+
+@media (min-width:1101px) and (max-resolution:1.1dppx) {
+    .dmate-brand-mark { filter:brightness(1.6); }
+}
+
 .dmate-brand-copy {
     min-width:0;
 }
