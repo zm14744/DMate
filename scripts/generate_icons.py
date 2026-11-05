@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build every DMate icon from the same vector geometry, never from a PNG.
 
-All platforms retain the original thin stroke, including the smallest icons.
+All platforms use the same modestly increased stroke, including small icons.
 Native bitmap frames are rasterized independently; Android adaptive icons use
 VectorDrawable paths. Historical versioned web assets remain available for old
 cached pages but are no longer inputs to this generator.
@@ -21,9 +21,9 @@ ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "static" / "icons"
 TAURI = ROOT / "desktop" / "src-tauri" / "icons"
 ANDROID = ROOT / "android" / "app" / "src" / "main" / "res"
-VERSION = "v50"
+VERSION = "v51"
 VIEWBOX = 1254
-STROKE = 13  # Preserve the original artwork's line width at every output size.
+STROKE = 18  # A small increase from 13; no separate thickening for tiny icons.
 ADAPTIVE_SCALE = 0.72
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
@@ -63,7 +63,7 @@ def svg_mark(background="#000", foreground="#fff"):
 
 
 def draw_mark(size, background=BLACK, foreground=WHITE, circle=False):
-    """Supersample the original thin paths without minimum-width compensation."""
+    """Supersample the shared line weight without minimum-width compensation."""
     oversample = max(4, math.ceil(1024 / size))
     side = size * oversample
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
@@ -206,7 +206,7 @@ def main():
                       "formats": ["SVG", "PNG", "ICO", "ICNS", "Android VectorDrawable"],
                       "max_bitmap_size": 1024, "android_adaptive_safe_circle_dp": 66,
                       "stroke_units": STROKE,
-                      "small_icons": "original thin stroke, independently supersampled"}, ensure_ascii=False))
+                      "small_icons": "shared moderate stroke, independently supersampled"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

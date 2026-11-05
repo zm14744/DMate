@@ -2302,7 +2302,7 @@ def sitemap_xml():
 @app.route("/favicon.ico")
 def favicon_ico():
     """A consistent, opaque DMate favicon for indexers and browser fallbacks."""
-    response = app.send_static_file("icons/dmate-app-v50.ico")
+    response = app.send_static_file("icons/dmate-app-v51.ico")
     response.headers["Content-Type"] = "image/x-icon"
     response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return response
@@ -2312,7 +2312,7 @@ def favicon_ico():
 @app.route("/apple-touch-icon-precomposed.png")
 def apple_touch_icon_root():
     """Standard root Apple icon URLs use the current native-size app artwork."""
-    response = app.send_static_file("icons/dmate-app-v50-180.png")
+    response = app.send_static_file("icons/dmate-app-v51-180.png")
     response.headers["Content-Type"] = "image/png"
     response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return response
@@ -2320,7 +2320,7 @@ def apple_touch_icon_root():
 
 @app.route("/favicon-16.png")
 def favicon_png_16_root():
-    response = app.send_static_file("icons/dmate-app-v50-16.png")
+    response = app.send_static_file("icons/dmate-app-v51-16.png")
     response.headers["Content-Type"] = "image/png"
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response
@@ -2328,7 +2328,7 @@ def favicon_png_16_root():
 
 @app.route("/favicon-32.png")
 def favicon_png_32_root():
-    response = app.send_static_file("icons/dmate-app-v50-32.png")
+    response = app.send_static_file("icons/dmate-app-v51-32.png")
     response.headers["Content-Type"] = "image/png"
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response
@@ -2337,7 +2337,7 @@ def favicon_png_32_root():
 @app.route("/favicon-64.png")
 def favicon_png_root():
     """Search bots and Safari can fetch the same clearly branded PNG."""
-    response = app.send_static_file("icons/dmate-app-v50-64.png")
+    response = app.send_static_file("icons/dmate-app-v51-64.png")
     response.headers["Content-Type"] = "image/png"
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response
@@ -2346,7 +2346,7 @@ def favicon_png_root():
 @app.route("/DMate.mobileconfig")
 def ios_ipados_webclip_profile():
     """Download the DMate full-screen Home Screen Web Clip for iPhone/iPad."""
-    icon_path = os.path.join(app.static_folder, "icons", "dmate-app-v50-512.png")
+    icon_path = os.path.join(app.static_folder, "icons", "dmate-app-v51-512.png")
     profile_bytes = build_ios_webclip_profile(icon_path)
     response = make_response(profile_bytes)
     response.headers["Content-Type"] = "application/x-apple-aspen-config"
