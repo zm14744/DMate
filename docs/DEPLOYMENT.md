@@ -379,6 +379,8 @@ Android 签名包的版本化文件名、网站主源、GitHub 备用附件和�
 
 ### 本地构建客户端
 
+桌面构建工作流手动运行时可用 `platform` 选择 `all`、`windows`、`linux` 或 `macos`；默认和源码推送触发时仍构建全部平台。Windows NSIS 安装程序通过 `bundle.windows.nsis.installerIcon` 显式使用 `icons/icon.ico`，避免安装器仍显示 NSIS 默认图标；应用本体继续使用 `bundle.icon` 中的资源。
+
 桌面壳是 Rust / Tauri 2 工程，仓库没有单独的 npm 前端构建步骤。安装 Rust stable、Tauri CLI 2 和当前系统所需的 WebView / 打包依赖后，在 `desktop/` 执行：
 
 ```bash

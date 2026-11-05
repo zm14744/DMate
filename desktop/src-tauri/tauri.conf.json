@@ -46,6 +46,11 @@
       "icons/icon.ico",
       "icons/icon.icns"
     ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
+    },
     "macOS": {
       "minimumSystemVersion": "10.15",
       "infoPlist": "Info.plist",

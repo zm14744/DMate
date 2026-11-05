@@ -2,6 +2,17 @@ name: Build DMate Desktop
 
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Desktop platform to build
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - windows
+          - linux
+          - macos
   push:
     branches:
       - main
@@ -15,18 +26,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            name: windows
-            args: --bundles nsis
-
-          - os: ubuntu-22.04
-            name: linux
-            args: --bundles deb,appimage
-
-          - os: macos-latest
-            name: macos
-            args: --target universal-apple-darwin --bundles dmg
+        include: >-
+          ${{ fromJSON(
+            github.event_name == 'workflow_dispatch' && inputs.platform == 'windows' && '[{"os":"windows-latest","name":"windows","args":"--bundles nsis"}]' ||
+            github.event_name == 'workflow_dispatch' && inputs.platform == 'linux' && '[{"os":"ubuntu-22.04","name":"linux","args":"--bundles deb,appimage"}]' ||
+            github.event_name == 'workflow_dispatch' && inputs.platform == 'macos' && '[{"os":"macos-latest","name":"macos","args":"--target universal-apple-darwin --bundles dmg"}]' ||
+            '[{"os":"windows-latest","name":"windows","args":"--bundles nsis"},{"os":"ubuntu-22.04","name":"linux","args":"--bundles deb,appimage"},{"os":"macos-latest","name":"macos","args":"--target universal-apple-darwin --bundles dmg"}]'
+          ) }}
 
     runs-on: ${{ matrix.os }}
 
