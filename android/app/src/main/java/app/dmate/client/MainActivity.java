@@ -27,6 +27,7 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
@@ -174,7 +175,7 @@ public final class MainActivity extends Activity {
                     !"https".equalsIgnoreCase(sourceOrigin.getScheme()) ||
                     !HOME_HOST.equalsIgnoreCase(sourceOrigin.getHost()) ||
                     message.getType() != WebMessageCompat.TYPE_STRING ||
-                    !isTrustedPage()) {
+                    !isTrustedPage() || !canSaveToGallery()) {
                     return;
                 }
                 String raw = message.getData();
@@ -203,6 +204,8 @@ public final class MainActivity extends Activity {
                             runOnUiThread(() -> sendGalleryReply(replyProxy, id, false, "图片数据无效"));
                         }
                     });
+                } catch (RejectedExecutionException ignored) {
+                    // Activity teardown may close the executor before a late bridge callback.
                 } catch (Exception error) {
                     sendGalleryReply(replyProxy, "", false, "无法解析图片保存请求");
                 }
@@ -292,7 +295,14 @@ public final class MainActivity extends Activity {
         return "DMate-" + System.currentTimeMillis() + "-" + filename;
     }
 
+    private boolean canSaveToGallery() {
+        return !isFinishing() && !isDestroyed() && webView != null && !imageSaver.isShutdown();
+    }
+
     private void beginGallerySave(PendingSave save) {
+        // Decoding runs off the UI thread. Its posted callback can arrive after
+        // onDestroy has closed the executor and disposed the WebView.
+        if (!canSaveToGallery()) return;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             if (pendingLegacySave != null) {
@@ -307,14 +317,19 @@ public final class MainActivity extends Activity {
     }
 
     private void saveImageAsync(PendingSave save) {
-        imageSaver.execute(() -> {
-            try {
-                storePngInGallery(save.png, save.filename);
-                runOnUiThread(() -> sendGalleryReply(save.reply, save.id, true, "图片已保存到相册 · DMate"));
-            } catch (Exception error) {
-                runOnUiThread(() -> sendGalleryReply(save.reply, save.id, false, "保存到相册失败，请检查可用空间"));
-            }
-        });
+        if (!canSaveToGallery()) return;
+        try {
+            imageSaver.execute(() -> {
+                try {
+                    storePngInGallery(save.png, save.filename);
+                    runOnUiThread(() -> sendGalleryReply(save.reply, save.id, true, "图片已保存到相册 · DMate"));
+                } catch (Exception error) {
+                    runOnUiThread(() -> sendGalleryReply(save.reply, save.id, false, "保存到相册失败，请检查可用空间"));
+                }
+            });
+        } catch (RejectedExecutionException ignored) {
+            // Closing the Activity cancels saves that have not started yet.
+        }
     }
 
     private void storePngInGallery(byte[] png, String filename) throws IOException {
@@ -623,6 +638,7 @@ public final class MainActivity extends Activity {
             pendingFileCallback.onReceiveValue(null);
             pendingFileCallback = null;
         }
+        pendingLegacySave = null;
         imageSaver.shutdown();
         if (webView != null) {
             webView.stopLoading();

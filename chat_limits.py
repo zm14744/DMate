@@ -7,6 +7,7 @@ MAX_HISTORY_MESSAGES = 64
 MAX_HISTORY_CHARS = 120_000
 MAX_CONFIRMED_MESSAGE_CHARS = 28_000
 MAX_CONTEXT_MESSAGE_CHARS = 42_000
+MAX_REFERENCE_ANSWER_CHARS = 2_000
 
 _PINNED = re.compile(
     r"\A【当前指向题目】\s*(.*?)\s*【当前指向题目结束】\s*"
@@ -44,7 +45,7 @@ def message_char_limit(content, confirmed=False):
         if not reference.endswith(_REFERENCE_NOTICE):
             return MAX_MESSAGE_CHARS
         reference = reference[:-len(_REFERENCE_NOTICE)].strip()
-        if not 0 < len(reference) <= 1200:
+        if not 0 < len(reference) <= MAX_REFERENCE_ANSWER_CHARS:
             return MAX_MESSAGE_CHARS
     if 0 < len(question.strip()) <= MAX_MESSAGE_CHARS:
         return MAX_CONTEXT_MESSAGE_CHARS

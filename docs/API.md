@@ -109,6 +109,8 @@ if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 
 成功响应主要字段为 `reply`、`teaching`、`generated_exercise`。生成题另外返回 `generated_question`、`generated_teaching`、`generated_answer`；参考答案可以存在响应中而不展示在初次正文。图形解题可能附带相应结构和计算信息。客户端应保留服务端返回的确认对象，不自行重建或改写其摘要和题目锚点。
 
+`generated_answer` 的生成校验上限为 2000 个 Unicode 字符。`solution_reference.answer` 使用相同上限，仅在本轮要求完整解答且 `solution_reference.question` 与本轮题目锚点匹配时使用。客户端应保存和传递完整参考答案，超限则不提交该缓存字段，不能先截断公式或证明再作为完整答案发送。
+
 主要失败：400 参数或上下文不完整；409 图片确认失效或已修改；429 频率超限；502 上游输出或生成题校验失败；503 服务不可用。用户要求 `max` 思考强度时可返回说明与 `unsupported_effort: "max"`，不是使用该强度。
 
 普通回答结构示意：
@@ -220,7 +222,7 @@ if (!response.ok) throw new Error(draft.error || "识别未完成");
 // 保存 request_id、source_sha256 和草稿，并先交给用户编辑核对。
 ```
 
-初始化图片身份应在并发上传前完成。识别任务 ID 与原图字节绑定，重试同一来源可保留 ID，换图必须新建 ID；相同任务仍在运行时不能并发重复提交。文件摘要基于服务端收到的原始字节，后续选区必须再次提交同一原图，不能改传缩略图、截图或重新压缩后的文件。
+初始化图片身份应在并发上传前完成。识别任务 ID 与原图字节绑定，未被取消的同一来源重试可保留 ID，换图必须新建 ID；相同任务仍在运行时不能并发重复提交。已经取消的上传重试应新建任务 ID，选区重试新建 `operation_id` 并保留原图来源 `request_id`。文件摘要基于服务端收到的原始字节，后续选区必须再次提交同一原图，不能改传缩略图、截图或重新压缩后的文件。
 
 ## `POST /ocr/cancel`
 
@@ -229,6 +231,8 @@ if (!response.ok) throw new Error(draft.error || "识别未完成");
 ```
 
 返回 `{"cancelled": true}` 表示当前浏览器的取消标记已登记。工作流在检查点响应取消；该响应不证明正在进行的上游模型请求已中止。对图形选区任务，应把其 `operation_id` 作为这里的 `request_id`。
+
+取消标记按浏览器/账号身份和任务 ID 隔离，在原有 360 秒有效期内保持有效，不由首个抵达的重复请求取走。这样迟到重放与仍在运行的原任务都能观察到取消；新尝试应使用新的任务或操作 ID。
 
 ## 原图选区接口
 
@@ -404,6 +408,8 @@ multipart 字段为 `audio`。仅接受 16 kHz、单声道、PCM16 WAV，时长 
 ## `GET /sync` 与 `PUT /sync`
 
 仅对当前登录用户开放。GET 默认返回 `ok`、`data`、`revision`、`updatedAt` 和各部分 `parts` 摘要。
+
+`sessions.sessions` 中每条消息可携带稳定的 `messageId`，所属会话的 `deletedMessageIds` 是消息 ID 到删除时间的映射。客户端先合并删除标记，再比较保留消息并处理并发分支；服务端按原有快照和修订号保存这些字段，不代替客户端合并。旧快照无消息 ID 时兼容补齐，不能在序列化时丢弃已存在的消息身份和删除标记。该机制用于当前版本的新删除，不能推断升级前已经丢失的删除意图。
 
 | 查询参数 | 作用 |
 | --- | --- |

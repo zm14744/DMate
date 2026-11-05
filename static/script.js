@@ -1338,6 +1338,7 @@ function markSessionDeleted(sessionId) {
 }
 
 function collectCloudSnapshot() {
+    sessions.forEach(session => ensureSessionMessageIds(session));
     return {
         schemaVersion: 1,
         sessions: {
@@ -1471,7 +1472,7 @@ function preserveActiveCloudSessionIdentities(previousSessions) {
                 && !deletedSessionIds[id] && anchor >= 0
                 && candidate.messages.length === originalMessages.length
                 && getLatestUserMessage(candidate) === candidate.messages[anchor]
-                && candidate.messages.every((message, index) => cloudMessageKey(message) === cloudMessageKey(originalMessages[index]));
+                && candidate.messages.every((message, index) => cloudMessageIdentity(message) === cloudMessageIdentity(originalMessages[index]));
         });
         const matching = candidates.find(candidate => String(candidate.id) === oldKey)
             || (candidates.length === 1 ? candidates[0] : null);
@@ -2236,6 +2237,70 @@ function cloudMessageKey(message) {
     return `${message?.role || ""}\u0000${message?.text || ""}${groupId ? "\u0000" + groupId : ""}`;
 }
 
+function cloudMessageIdentity(message) {
+    return JSON.stringify([message?.messageId || "", cloudMessageKey(message)]);
+}
+
+function legacyCloudMessageId(key, occurrence) {
+    // Hash the complete case-sensitive signature, never a shortened question.
+    // Two independent accumulators and its length avoid the old 32-bit-only
+    // identity; the occurrence distinguishes identical messages in one chat.
+    let left = 2166136261, right = 0x9e3779b9;
+    for (let index = 0; index < key.length; index++) {
+        left = Math.imul(left ^ key.charCodeAt(index), 16777619);
+        right = Math.imul(right ^ key.charCodeAt(key.length - index - 1), 2246822519);
+    }
+    return `legacy-v1:${key.length}:${(left >>> 0).toString(36)}:${(right >>> 0).toString(36)}:${occurrence}`;
+}
+
+function ensureSessionMessageIds(session, legacy = false) {
+    if (!session || !Array.isArray(session.messages)) return session;
+    const occurrences = new Map(), seen = new Set();
+    for (const message of session.messages) {
+        if (!message || typeof message !== "object") continue;
+        const key = legacy ? cloudMessageKey(message) : "";
+        const occurrence = (occurrences.get(key) || 0) + 1;
+        if (legacy) occurrences.set(key, occurrence);
+        if (typeof message.messageId !== "string" || !message.messageId
+            || message.messageId.length > 160 || seen.has(message.messageId)) {
+            message.messageId = legacy ? legacyCloudMessageId(key, occurrence)
+                : `message-v1:${window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`}`;
+        }
+        seen.add(message.messageId);
+    }
+    session.deletedMessageIds = normalizeDeletedSessionIds(session.deletedMessageIds);
+    return session;
+}
+
+function normalizeCloudSessionMessages(session, sharedDeletions = {}) {
+    const normalized = ensureSessionMessageIds({ ...session,
+        messages:(Array.isArray(session?.messages) ? session.messages : []).map(message => ({ ...message }))
+    }, true);
+    for (const [id, at] of Object.entries(sharedDeletions)) {
+        normalized.deletedMessageIds[id] = Math.max(at, normalized.deletedMessageIds[id] || 0);
+    }
+    const removed = normalized.messages.filter(message => normalized.deletedMessageIds[message.messageId]);
+    normalized.messages = normalized.messages.filter(message => !normalized.deletedMessageIds[message.messageId]);
+    if (removed.length) {
+        const questionKey = value => typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+        const matchesQuestion = (message, key) => key && [message.text, message.generatedQuestion]
+            .some(value => questionKey(value) === key);
+        const lostQuestion = value => {
+            const key = questionKey(value);
+            return removed.some(message => matchesQuestion(message, key))
+                && !normalized.messages.some(message => matchesQuestion(message, key));
+        };
+        if (!normalized.messages.length || lostQuestion(normalized.learningQuestion?.text)) {
+            normalized.learningQuestion = null;
+            normalized.teaching = null;
+        }
+        if (!normalized.messages.length || lostQuestion(normalized.retest?.generatedQuestion)) {
+            normalized.retest = null;
+        }
+    }
+    return normalized;
+}
+
 function mergeCloudMessage(left, right) {
     const merged = { ...left, ...right };
     // 旧设备的分析结果可能较少；不应抹掉已有的题目/参考答案。
@@ -2290,11 +2355,28 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
     const isDeleted = item => (
         !item || Boolean(deletedSessionIdsMerged[String(item.id)])
     );
-    const localSessions = (Array.isArray(local.sessions?.sessions) ? local.sessions.sessions : [])
-        .filter(item => !isDeleted(item));
-    const remoteSessions = (Array.isArray(remote.sessions?.sessions) ? remote.sessions.sessions : [])
-        .filter(item => !isDeleted(item));
-    const resultSessions = remoteSessions.map(item => ({ ...item }));
+    const localInput = (Array.isArray(local.sessions?.sessions) ? local.sessions.sessions : []).filter(item => !isDeleted(item));
+    const remoteInput = (Array.isArray(remote.sessions?.sessions) ? remote.sessions.sessions : []).filter(item => !isDeleted(item));
+    // Branches share the identity of their common historical messages. Carry
+    // deletion markers into every retained branch before comparing prefixes.
+    const messageDeletions = new Map();
+    const family = session => String(session.id).split("-sync-")[0];
+    for (const session of [...remoteInput, ...localInput]) {
+        const key = family(session), markers = messageDeletions.get(key) || Object.create(null);
+        for (const [id, at] of Object.entries(normalizeDeletedSessionIds(session.deletedMessageIds))) {
+            markers[id] = Math.max(at, markers[id] || 0);
+        }
+        messageDeletions.set(key, markers);
+    }
+    const filteredSessions = new WeakSet();
+    const prepareSession = session => {
+        const normalized = normalizeCloudSessionMessages(session, messageDeletions.get(family(session)));
+        if (normalized.messages.length < (session.messages || []).length) filteredSessions.add(normalized);
+        return normalized;
+    };
+    const localSessions = localInput.map(prepareSession);
+    const remoteSessions = remoteInput.map(prepareSession);
+    const resultSessions = [...remoteSessions];
     const byId = new Map(resultSessions.map((item, index) => [String(item.id), index]));
     const branchMap = new Map();
 
@@ -2312,9 +2394,17 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
         const cloudMessages = Array.isArray(cloudSession.messages) ? cloudSession.messages : [];
         const shared = Math.min(localMessages.length, cloudMessages.length);
         const prefixMatches = Array.from({length:shared}, (_, i) => i)
-            .every(i => cloudMessageKey(localMessages[i]) === cloudMessageKey(cloudMessages[i]));
+            .every(i => cloudMessageIdentity(localMessages[i]) === cloudMessageIdentity(cloudMessages[i]));
         if (prefixMatches) {
             const longer = localMessages.length >= cloudMessages.length ? localMessages : cloudMessages;
+            let contextSource = localMessages.length >= cloudMessages.length ? localSession : cloudSession;
+            if (localMessages.length === cloudMessages.length
+                && filteredSessions.has(localSession) !== filteredSessions.has(cloudSession)) {
+                // A stale snapshot can become the same length only after its
+                // deleted messages are removed. Keep the already-cleaned
+                // side's active question and retest state, including nulls.
+                contextSource = filteredSessions.has(localSession) ? cloudSession : localSession;
+            }
             resultSessions[index] = {
                 ...cloudSession,
                 ...localSession,
@@ -2322,14 +2412,14 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
                     i < shared ? mergeCloudMessage(cloudMessages[i], localMessages[i]) : message
                 )),
                 // 某一边更长，通常表示该边新增了消息；以它的题目上下文为准。
-                teaching: (localMessages.length >= cloudMessages.length ? localSession : cloudSession).teaching,
-                learningQuestion: (localMessages.length >= cloudMessages.length ? localSession : cloudSession).learningQuestion,
-                retest: (localMessages.length >= cloudMessages.length ? localSession : cloudSession).retest
+                teaching: contextSource.teaching,
+                learningQuestion: contextSource.learningQuestion,
+                retest: contextSource.retest
             };
         } else {
             // 不同设备同时修改同一会话时，不应选择性丢弃另一端的消息。
             // 用稳定分支 ID 避免再次合并时重复产生相同会话。
-            const suffix = cloudHash(localMessages.map(cloudMessageKey));
+            const suffix = cloudHash(localMessages.map(cloudMessageIdentity));
             const branchId = `${key}-sync-${suffix}`;
             const duplicate = resultSessions.some(item => (
                 String(item.id) === branchId
@@ -2360,6 +2450,51 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
     for (const [id, at] of Object.entries(normalizeDeletedWrongQuestionIds(localLearning.deletedWrongQuestionIds))) {
         wrongDeletions[id] = Math.max(at, wrongDeletions[id] || 0);
     }
+    const mergeRetestRecords = (left, right) => {
+        const records = new Map();
+        const time = value => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+        for (const parent of [left, right]) {
+            for (const source of Array.isArray(parent.retestRecords) ? parent.retestRecords : []) {
+                if (!source || !source.id || typeof source.question !== "string" || !source.question.trim()) continue;
+                const at = time(source.updatedAt) || time(parent.updatedAt) || time(source.createdAt);
+                const row = { ...source, id: String(source.id), updatedAt: at };
+                for (const field of ["answer", "analysis"]) {
+                    row[field] = typeof source[field] === "string" ? source[field] : "";
+                    row[field + "UpdatedAt"] = time(source[field + "UpdatedAt"]) || (row[field] ? at : null);
+                }
+                const previous = records.get(row.id);
+                if (!previous) { records.set(row.id, row); continue; }
+                const order = value => JSON.stringify([value.question, value.answer, value.analysis]);
+                const newer = row.updatedAt > previous.updatedAt
+                    || (row.updatedAt === previous.updatedAt && order(row) >= order(previous)) ? row : previous;
+                // A reused ID with a changed exercise must not inherit another
+                // exercise's answer or analysis.
+                if (row.question !== previous.question) { records.set(row.id, newer); continue; }
+                const merged = { ...newer, updatedAt: Math.max(row.updatedAt, previous.updatedAt) };
+                const choices = {};
+                for (const field of ["answer", "analysis"]) {
+                    const stamp = field + "UpdatedAt";
+                    const candidates = [previous, row].filter(value => value[field] || time(value[stamp]));
+                    candidates.sort((a, b) => time(b[stamp]) - time(a[stamp])
+                        || Number(Boolean(a[field])) - Number(Boolean(b[field]))
+                        || (a[field] < b[field] ? 1 : a[field] > b[field] ? -1 : 0));
+                    const selected = candidates[0];
+                    merged[field] = selected?.[field] || "";
+                    merged[stamp] = selected?.[stamp] || null;
+                    choices[field] = selected;
+                }
+                // Analysis generated against a different known answer is stale.
+                if (merged.analysis && choices.analysis.answer && merged.answer
+                    && choices.analysis.answer !== merged.answer) {
+                    merged.analysis = "";
+                    merged.analysisUpdatedAt = Math.max(time(merged.analysisUpdatedAt), time(merged.answerUpdatedAt));
+                }
+                records.set(row.id, merged);
+            }
+        }
+        return [...records.values()].sort((a, b) => time(a.createdAt) - time(b.createdAt)
+            || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    };
     const byWrong = new Map();
     const remoteWrong = Array.isArray(remoteLearning.wrongQuestions) ? remoteLearning.wrongQuestions : [];
     const localWrong = Array.isArray(localLearning.wrongQuestions) ? localLearning.wrongQuestions : [];
@@ -2385,11 +2520,16 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
                 classificationVersion: 0, category: "待识别", relatedCategories: [],
                 knowledgePoints: [], focusPoints: [], difficulty: "",
                 referenceAnswer: "", answer: "", analysis: "",
-                answerUpdatedAt: null, analysisUpdatedAt: null
+                answerUpdatedAt: null, analysisUpdatedAt: null, retestRecords: []
             };
             for (const [field, emptyValue] of Object.entries(invalidated)) {
                 if (!Object.prototype.hasOwnProperty.call(newer, field)) merged[field] = emptyValue;
             }
+        } else if (typeof newer.question === "string" && newer.question === older.question) {
+            // Independent retests remain history even when their conversations
+            // were removed. Manual pass selections still come from `newer`, so
+            // an explicit uncheck is not undone by this record-only union.
+            merged.retestRecords = mergeRetestRecords(older, newer);
         }
         // Editing a note on another device must not lower recorded failures.
         // These counters only increase; manual pass selections can be undone.
@@ -3143,7 +3283,6 @@ async function logoutAccount() {
 
     accountState.syncing = true;
     accountState.status = "正在退出…";
-    bumpCloudSyncContext();
     renderAccountUi();
 
     try {
@@ -3159,6 +3298,9 @@ async function logoutAccount() {
         return;
     }
 
+    // A failed logout leaves this account active. Invalidate its pending
+    // replies only after the server has actually confirmed the transition.
+    bumpCloudSyncContext();
     // 同一浏览器的下一个访客不应读取当前账号的本机背景图片。
     try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
     // 退出不留下可供其他使用者读取的学习快照或备份。
@@ -3206,7 +3348,6 @@ async function deleteAccount() {
 
     accountState.syncing = true;
     accountState.status = "正在注销…";
-    bumpCloudSyncContext();
     setAccountDeleteMessage("正在注销账号…");
     renderAccountUi();
 
@@ -3223,6 +3364,7 @@ async function deleteAccount() {
         return;
     }
 
+    bumpCloudSyncContext();
     try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
     volatileCloudBackup = null;
     clearLegacyPersistentBackup();
@@ -3854,6 +3996,13 @@ function normalizeTeaching(value) {
 }
 
 
+function normalizeReferenceAnswer(value) {
+    const answer = typeof value === "string" ? value.trim() : "";
+    // Match the generated-answer validation on the server. A truncated
+    // formula or proof must never be reused as a complete reference answer.
+    return Array.from(answer).length <= 2000 ? answer : "";
+}
+
 function normalizeRetestSession(value) {
     if (!value || typeof value !== "object") {
         return null;
@@ -3887,9 +4036,7 @@ function normalizeRetestSession(value) {
         generatedQuestion: typeof value.generatedQuestion === "string"
             ? limitQuestionText(value.generatedQuestion.trim())
             : "",
-        generatedAnswer: typeof value.generatedAnswer === "string"
-            ? value.generatedAnswer.trim().slice(0, 1200)
-            : "",
+        generatedAnswer: normalizeReferenceAnswer(value.generatedAnswer),
         startedAt: Number.isFinite(value.startedAt)
             ? value.startedAt
             : Date.now(),
@@ -3958,9 +4105,7 @@ function normalizeLearningQuestion(value) {
                     ? "ai"
                     : "text"
             ),
-        referenceAnswer: typeof value.referenceAnswer === "string"
-            ? value.referenceAnswer.trim().slice(0, 1200)
-            : "",
+        referenceAnswer: normalizeReferenceAnswer(value.referenceAnswer),
         sessionId: (
             typeof value.sessionId === "number"
             || typeof value.sessionId === "string"
@@ -4074,9 +4219,7 @@ function normalizeLearningState(value) {
                     feedback: typeof item.feedback === "string"
                         ? item.feedback.trim().slice(0, 1000)
                         : "",
-                    referenceAnswer: typeof item.referenceAnswer === "string"
-                        ? item.referenceAnswer.trim().slice(0, 1200)
-                        : "",
+                    referenceAnswer: normalizeReferenceAnswer(item.referenceAnswer),
                     answer: typeof item.answer === "string"
                         ? item.answer.trim().slice(0, 3000)
                         : "",
@@ -4130,7 +4273,14 @@ function normalizeLearningState(value) {
                     retestCount: Math.max(0, Number(item.retestCount) || 0),
                     retestPassCount: Math.max(0, Number(item.retestPassCount) || 0),
                     manualRetestPassCount: Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0)),
-                    retestRecords: Array.isArray(item.retestRecords) ? item.retestRecords.filter(x => x && x.id && x.question).map(x => ({id:String(x.id),question:limitQuestionText(x.question),answer:String(x.answer || "").slice(0,8000),analysis:String(x.analysis || "").slice(0,8000),createdAt:Number(x.createdAt)||0})) : [],
+                    retestRecords: Array.isArray(item.retestRecords) ? item.retestRecords.filter(x => x && x.id && x.question).map(x => ({
+                        id: String(x.id), question: limitQuestionText(x.question),
+                        answer: String(x.answer || "").slice(0,8000), analysis: String(x.analysis || "").slice(0,8000),
+                        createdAt: Number(x.createdAt) || 0,
+                        updatedAt: Number.isFinite(x.updatedAt) ? x.updatedAt : null,
+                        answerUpdatedAt: Number.isFinite(x.answerUpdatedAt) ? x.answerUpdatedAt : null,
+                        analysisUpdatedAt: Number.isFinite(x.analysisUpdatedAt) ? x.analysisUpdatedAt : null
+                    })) : [],
                     passedRetestSessionIds: Array.isArray(item.passedRetestSessionIds)
                         ? [...new Set(item.passedRetestSessionIds.map(String))] : [],
                     retestFailCount: Math.max(0, Number(item.retestFailCount) || 0),
@@ -7388,10 +7538,16 @@ function persistRetestRecord(item, session) {
     const id = String(session.id);
     const previous = item.retestRecords.find(x => x.id === id);
     if (previous) {
-        if (!previous.answer && retest.generatedAnswer) previous.answer = retest.generatedAnswer;
+        if (previous.question === retest.generatedQuestion && !previous.answer && retest.generatedAnswer) {
+            previous.answer = retest.generatedAnswer;
+            previous.answerUpdatedAt = previous.updatedAt = item.updatedAt = Date.now();
+            return true;
+        }
         return false;
     }
-    item.retestRecords.push({id:id, question:retest.generatedQuestion, answer:retest.generatedAnswer || "", analysis:"", createdAt:retest.startedAt || Date.now()});
+    const now = Date.now();
+    item.retestRecords.push({id:id, question:retest.generatedQuestion, answer:retest.generatedAnswer || "", analysis:"",
+        createdAt:retest.startedAt || now, updatedAt:now, answerUpdatedAt:retest.generatedAnswer ? now : null, analysisUpdatedAt:null});
     return true;
 }
 
@@ -7408,23 +7564,43 @@ function getWrongRetestSessions(item) {
 
 async function generateRetestDetail(itemId, recordId, kind) {
     const item = learningState.wrongQuestions.find(x => x.id === itemId);
-    const record = item && item.retestRecords.find(x => x.id === recordId);
-    if (!record || record[kind]) return;
+    const record = item?.retestRecords?.find(x => x.id === recordId);
+    if (!record || !["answer", "analysis"].includes(kind) || record[kind]) return;
+    const contextVersion = cloudSyncContextVersion;
+    const originalQuestion = item.question, question = record.question, answer = record.answer || "";
+    const currentTarget = () => {
+        if (contextVersion !== cloudSyncContextVersion) return null;
+        const currentItem = learningState.wrongQuestions.find(x => x.id === itemId);
+        const currentRecord = currentItem?.retestRecords?.find(x => x.id === recordId);
+        if (!currentRecord || currentItem.question !== originalQuestion || currentRecord.question !== question
+            || currentRecord[kind] || (kind === "analysis" && (currentRecord.answer || "") !== answer)) return null;
+        return { item: currentItem, record: currentRecord };
+    };
     const request = kind === "answer"
         ? "请准确解答以下离散数学题目，给出最终答案和必要推导，公式使用标准 $...$ 或 $$...$$：\n" + record.question
         : "请为以下离散数学题目给出完整的分步骤解析与易错点，公式使用标准 $...$ 或 $$...$$：\n" + record.question + "\n参考答案：\n" + (record.answer || "请自行推导");
     const button = document.getElementById("retest-gen-" + recordId + "-" + kind);
+    const originalText = button?.textContent;
+    const reviewVisible = () => button?.isConnected
+        && !document.getElementById("wrongRetestReviewModal")?.classList.contains("hidden");
     if (button) { button.disabled = true; button.textContent = "生成中…"; }
     try {
         const response = await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[{role:"user",content:request}]})});
         const data = await parseResponseJson(response);
-        if (!response.ok || data.error || !data.reply || !data.reply.trim()) throw new Error(data.error || "生成失败");
-        record[kind] = data.reply.trim().slice(0,8000);
-        item.updatedAt = Date.now();
+        const target = currentTarget();
+        if (!target) return;
+        if (!response.ok || data.error || typeof data.reply !== "string" || !data.reply.trim()) throw new Error(data.error || "生成失败");
+        // Cloud synchronization can replace these objects while the request is
+        // pending. Commit to the current matching record, never its old copy.
+        target.record[kind] = data.reply.trim().slice(0,8000);
+        target.record[kind + "UpdatedAt"] = target.record.updatedAt = target.item.updatedAt = Date.now();
         saveLearningState();
-        openWrongRetestReview(itemId);
-    } catch (error) { window.alert(error.message || "生成失败，请重试"); }
-    finally { if (button) button.disabled = false; }
+        if (reviewVisible()) openWrongRetestReview(itemId);
+    } catch (error) {
+        if (currentTarget() && reviewVisible()) window.alert(error.message || "生成失败，请重试");
+    } finally {
+        if (button) { button.disabled = false; button.textContent = originalText; }
+    }
 }
 
 function formatRetestDetailParagraphs(text) {
@@ -7879,9 +8055,7 @@ function processWrongQuestionRetestReply(
             || ""
         );
         retest.generatedQuestion = limitQuestionText(cleanQuestion);
-        retest.generatedAnswer = String(generatedAnswer || "")
-            .trim()
-            .slice(0, 1200);
+        retest.generatedAnswer = normalizeReferenceAnswer(generatedAnswer);
         retest.stage = "awaiting_answer";
         session.retest = retest;
         persistRetestRecord(entry, session);
@@ -7975,14 +8149,10 @@ function dedupeWrongBookItemsForPdf(items) {
     const unique = [];
 
     for (const item of items || []) {
-        const fingerprints = [
-            visibleWrongQuestionFingerprint(item?.question),
-            wrongQuestionFingerprint(item?.question)
-        ].filter(Boolean);
-        const key = fingerprints[0] || `id:${item?.id || unique.length}`;
-        const existingIndex = fingerprints
-            .map(value => seen.get(value))
-            .find(index => Number.isInteger(index));
+        // Preserve mathematical case, punctuation and the complete question.
+        // Display fingerprints can collapse distinct variables or long stems.
+        const key = wrongBookQuestionGroupKey(item || { id: unique.length });
+        const existingIndex = seen.get(key);
 
         if (Number.isInteger(existingIndex)) {
             const current = unique[existingIndex];
@@ -7993,17 +8163,12 @@ function dedupeWrongBookItemsForPdf(items) {
                 unique[existingIndex] = item;
             }
 
-            for (const value of fingerprints) {
-                seen.set(value, existingIndex);
-            }
             continue;
         }
 
         const nextIndex = unique.length;
         unique.push(item);
-        for (const value of fingerprints) {
-            seen.set(value, nextIndex);
-        }
+        seen.set(key, nextIndex);
     }
 
     return unique;
@@ -9904,6 +10069,7 @@ function semanticContextForRequest(session, targetCandidate, apiMessages, option
 }
 
 function saveState() {
+    sessions.forEach(session => ensureSessionMessageIds(session));
     if (shouldPersistClientState()) {
         try {
             localStorage.setItem(
@@ -9964,6 +10130,7 @@ function loadState() {
                 if (!text.trim()) continue;
 
                 messages.push({
+                    messageId: typeof message.messageId === "string" ? message.messageId : undefined,
                     role: message.role,
                     text,
                     source: message.source === "ocr" ? "ocr" : undefined,
@@ -9992,6 +10159,8 @@ function loadState() {
                     questionTeaching: normalizeTeaching(
                         message.questionTeaching
                     ),
+                    targetQuestionFingerprint: typeof message.targetQuestionFingerprint === "string"
+                        ? message.targetQuestionFingerprint : "",
                     isRetestPrompt: Boolean(message.isRetestPrompt),
                     isRetestAnswer: Boolean(message.isRetestAnswer),
                     isError: Boolean(message.isError),
@@ -9999,12 +10168,13 @@ function loadState() {
                 });
             }
 
-            loadedSessions.push({
+            loadedSessions.push(normalizeCloudSessionMessages({
                 id: session.id,
                 name: typeof session.name === "string" && session.name.trim()
                     ? session.name
                     : "新对话",
                 messages,
+                deletedMessageIds: session.deletedMessageIds,
                 teaching: normalizeTeaching(session.teaching),
                 learningQuestion: normalizeLearningQuestion(
                     session.learningQuestion
@@ -10018,7 +10188,7 @@ function loadState() {
                     fingerprint: session.solverEffortPreference.fingerprint,
                     effort: session.solverEffortPreference.effort
                 } : null
-            });
+            }));
         }
 
         sessions = loadedSessions;
@@ -13657,10 +13827,10 @@ async function requestAiReply(session, options = {}) {
         const targetGeneratedMessage = requestTargetCandidate?.role === "ai"
             ? session.messages?.[requestTargetCandidate.index] : null;
         const savedSolution = asksForFullSolution
-            ? String(targetGeneratedMessage?.generatedAnswer || "").trim()
+            ? normalizeReferenceAnswer(targetGeneratedMessage?.generatedAnswer)
             : "";
         const solutionReference = savedSolution && requestTargetCandidate?.text
-            ? { question: requestTargetCandidate.text, answer: savedSolution.slice(0, 1200) }
+            ? { question: requestTargetCandidate.text, answer: savedSolution }
             : undefined;
 
         const pinnedTeaching = requestTargetCandidate
@@ -16265,6 +16435,7 @@ async function deleteChatMessage(sessionId, messageIndex) {
     if (!confirmed || !sessions.includes(session)
         || session.messages[messageIndex] !== expectedMessage) return;
 
+    ensureSessionMessageIds(session);
     const chat = document.getElementById("chat");
 
     if (chat) {
@@ -16272,6 +16443,9 @@ async function deleteChatMessage(sessionId, messageIndex) {
     }
 
     const removed = session.messages[messageIndex];
+    session.deletedMessageIds[removed.messageId] = Math.max(
+        Date.now(), session.deletedMessageIds[removed.messageId] || 0
+    );
     if (typingContext?.session === session && typingContext.userMessage === removed) discardTypingOutput();
     const activeRequest = activeAiRequests.get(sessionBusyKey(session.id));
     if (activeRequest?.userMessage === removed) {
@@ -16284,6 +16458,11 @@ async function deleteChatMessage(sessionId, messageIndex) {
         messageIndex,
         1
     );
+    if (activeRequest?.userMessage === removed) {
+        // AbortError deliberately does not save a reply. Restore the retest
+        // input stage here so the next answer is still checked as a retest.
+        rollbackRetestAfterRequestFailure(session);
+    }
 
     const learningQuestion = normalizeLearningQuestion(
         session.learningQuestion
@@ -21233,6 +21412,7 @@ function getTopMobileGesturePage() {
         ["wrongSafeModal", closeWrongSafePreview],
         ["wrongQuestionPickerModal", closeWrongQuestionPicker],
         ["wrongEditModal", closeWrongEdit],
+        ["wrongRetestReviewModal", closeWrongRetestReview],
         ["wrongBookModal", closeWrongBook],
         ["learningReviewModal", closeLearningReview],
         ["accountModal", closeAccountModal],

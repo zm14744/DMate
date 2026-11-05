@@ -15,7 +15,7 @@ from teaching import teaching_prompt, _active_question_from_messages
 from graph_ocr_cleanup import ocr_is_label_dominated
 from chat_limits import (MAX_MESSAGE_CHARS, MAX_HISTORY_MESSAGES,
                          MAX_HISTORY_CHARS, MAX_CONFIRMED_MESSAGE_CHARS,
-                         message_char_limit)
+                         MAX_REFERENCE_ANSWER_CHARS, message_char_limit)
 
 
 DEEPSEEK_API_KEY = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
@@ -1447,8 +1447,9 @@ $$
         from graph_semantic_solver import semantic_math_prompt
         system_content += semantic_math_prompt(context["semantic_math"])
     if context.get("mode") == "full_solution":
-        reference = str(context.get("solution_reference_answer") or "").strip()[:1200]
-        if reference:
+        reference = context.get("solution_reference_answer")
+        reference = reference.strip() if isinstance(reference, str) else ""
+        if 0 < len(reference) <= MAX_REFERENCE_ANSWER_CHARS:
             # 参考答案源于出题时的本地缓存，未经独立证明，必须复核。
             system_content += (
                 "\n【本题生成时保存的参考答案（可能有误，仅供交叉核对）】\n"

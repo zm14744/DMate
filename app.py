@@ -24,6 +24,7 @@ from chat_limits import (
     MAX_MESSAGE_CHARS,
     MAX_HISTORY_MESSAGES as MAX_MESSAGES_PER_REQUEST,
     MAX_CONFIRMED_MESSAGE_CHARS,
+    MAX_REFERENCE_ANSWER_CHARS,
     message_char_limit,
 )
 from graph_integrity import review_graph_transcriptions, answer_graph_isomorphism, contains_two_labeled_undirected_diagrams, has_critical_edge_or_arrow_uncertainty, FLAG as GRAPH_UNCERTAIN_FLAG
@@ -606,6 +607,11 @@ def _mark_ocr_cancelled(request_id, *, owner=None):
 
 
 def _take_ocr_cancelled(request_id, *, owner=None):
+    """Keep cancellation sticky until TTL expiry for every in-flight retry.
+
+    A duplicate request must not consume the cancellation while the original
+    worker is still running. New attempts receive a new request/operation ID.
+    """
     request_id = _normalize_ocr_request_id(request_id)
     if not request_id:
         return False
@@ -613,7 +619,7 @@ def _take_ocr_cancelled(request_id, *, owner=None):
     with _ocr_cancel_lock:
         now = time.monotonic()
         _trim_ocr_cancellations(now)
-        return _cancelled_ocr_requests.pop(request_id, None) is not None
+        return request_id in _cancelled_ocr_requests
 
 
 def _ocr_is_cancelled(request_id, *, owner=None):
@@ -1990,10 +1996,11 @@ def auth_delete_account():
     if not request.is_json:
         return jsonify({"ok": False, "error": "请求格式不正确"}), 400
 
-    user_id = session.get("user_id")
-    if not isinstance(user_id, int):
+    authenticated_user = _current_auth_user()
+    if not authenticated_user:
         session.clear()
         return jsonify({"ok": False, "error": "请先登录"}), 401
+    user_id = int(authenticated_user["id"])
 
     payload = request.get_json(silent=True)
     payload = payload if isinstance(payload, dict) else {}
@@ -2564,12 +2571,30 @@ def _extract_generated_question(reply):
             ):
                 value = value[start.start():].strip()
 
+    # The model may repeat its private answer under a Markdown or bracketed
+    # heading outside WRONGBOOK_ANSWER. Never include that section in the
+    # visible question. Require an actual heading boundary, so question text
+    # such as “答案个数是多少” or “过程是否唯一” remains part of the problem.
+    section_name = (
+        r"(?:参考答案|详细解析|解题过程|答案|解析|解答|过程|"
+        r"思考提示|思路提示|解题提示|小提示|关键提示|方法提示|解题思路|提示|思路)"
+    )
+    wrapped_section = (
+        rf"(?:【[ \t]*{section_name}[ \t]*[:：]?[ \t]*】|"
+        rf"\[[ \t]*{section_name}[ \t]*[:：]?[ \t]*\]|"
+        rf"（[ \t]*{section_name}[ \t]*[:：]?[ \t]*）|"
+        rf"\([ \t]*{section_name}[ \t]*[:：]?[ \t]*\))"
+    )
+    section_label = rf"(?:{wrapped_section}|{section_name})"
+    section_heading = (
+        rf"(?:\*\*[ \t]*{section_label}[ \t]*[:：]?[ \t]*\*\*|"
+        rf"__[ \t]*{section_label}[ \t]*[:：]?[ \t]*__|"
+        rf"(?:\*\*|__)[ \t]*{section_name}[ \t]*[:：]|"
+        rf"{wrapped_section}|{section_name}(?=[ \t]*(?:[:：]|\r?$)))"
+    )
     stop_patterns = (
-        r"(?:^|\n)\s*(?:-{3,}\s*\n\s*)?(?:\*\*|__)?"
-        r"(?:提示|思考提示|思路提示|解题提示|小提示|关键提示|方法提示|解题思路|思路)"
-        r"\s*[:：]?(?:\*\*|__)?",
-        r"(?:^|\n)\s*(?:#{1,6}\s*)?"
-        r"(?:参考答案|答案|解析|解答|详细解析|解题过程|过程)\s*[:：]?",
+        rf"(?:^|\n)[ \t]*(?:-{{3,}}[ \t]*\n[ \t]*)?"
+        rf"(?:#{{1,6}}[ \t]*)?{section_heading}",
         r"(?:^|\n)\s*答\s*[:：]",
         r"(?:^|\n)\s*(?:你先|请先|先尝试|可以先|做完后|卡住了|如果卡住|把答案发给我|告诉我你的进度).{0,220}$",
     )
@@ -2741,7 +2766,7 @@ def _exercise_problem_complete(question, answer):
 def _exercise_answer_valid(answer):
     """错题本必须在首次展示前拿到非占位的隐藏答案。"""
     value = _clean_answer_only(answer).strip()
-    if not value or len(value) > 2000:
+    if not value or len(value) > MAX_REFERENCE_ANSWER_CHARS:
         return False
     if re.fullmatch(
         r"(?:最终答案|答案|略|无|待定|待填写|待计算|自行计算|自行求解|"
@@ -2770,17 +2795,25 @@ def _exercise_answer_simple_consistency(question, answer):
     # 若有多小问/中国剩余/模运算的后续条件，则不做此种单问核验。
     if re.search(r"[（(]\s*[1-9]\s*[)）]|中国剩余|费马|\n\s*\d+[.、]", text):
         return True
-    match = re.search(
-        r"(?:求|计算)\s*(\d{1,10})\s*(?:\^|\*\*|\^\{)\s*(\d{1,10})\}?"
-        r"\s*(?:除以|\s*(?:mod|bmod)\s*|\\(?:mod|bmod)\s*)\s*(\d{1,10})",
+    match = re.fullmatch(
+        r"\s*(?:请)?(?:求|计算)\s*(\d{1,10})\s*(?:\^|\*\*|\^\{)\s*(\d{1,10})\}?"
+        r"\s*(?:除以|\s*(?:mod|bmod)\s*|\\(?:mod|bmod)\s*)\s*(\d{1,10})"
+        r"\s*(?:(?:的)?(?:余数|值|结果))?\s*[。.!！?？]?\s*",
         text, flags=re.IGNORECASE,
     )
     if not match or not re.fullmatch(r"[+-]?\d+", value):
         return True
+    if "除以" in text and "余数" not in text:
+        return True  # Ordinary division is not a modular-remainder request.
     a, b, modulus = (int(group) for group in match.groups())
     if modulus <= 0:
         return False
-    return int(value) % modulus == pow(a, b, modulus)
+    # A remainder is the canonical nonnegative representative. For example,
+    # 8 and -2 are congruent to 3 modulo 5, but neither is a remainder.
+    result = int(value)
+    if "余数" in text and not 0 <= result < modulus:
+        return False
+    return result % modulus == pow(a, b, modulus)
 
 
 def _requested_exercise_difficulty(text):
@@ -3767,7 +3800,7 @@ def _chat_response(on_delta=None, cancelled=None):
             a = ref.get("answer")
             if (isinstance(q, str) and isinstance(a, str)
                     and 5 <= len(q.strip()) <= MAX_MESSAGE_CHARS
-                    and 0 < len(a.strip()) <= 1200
+                    and 0 < len(a.strip()) <= MAX_REFERENCE_ANSWER_CHARS
                     and q.strip() in cleaned[-1]["content"]):
                 solution_reference_answer = a.strip()
                 teaching["solution_reference_answer"] = solution_reference_answer
