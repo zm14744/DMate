@@ -364,6 +364,8 @@ multipart 字段为 `audio`。仅接受 16 kHz、单声道、PCM16 WAV，时长 
 
 登录与邮箱字段应原样作为 JSON 字符串提交，由服务器执行规范化；不要在客户端自己实现另一套大小写规则。错误响应不会返回数据库密码哈希或恢复码哈希。
 
+账号已配置但数据库暂时不可用时，身份查询返回 HTTP 503，包含 `configured: true`、`errorCode: "auth_temporarily_unavailable"`、`retryable: true`，并设置 `Retry-After: 5` 和 `Cache-Control: no-store`。它不表示未登录，不返回 `authenticated: false` 来替代验证失败，也不清除现有签名 Cookie。客户端应保留本机账号缓存，在身份重新验证成功前不显示或上传该缓存；真正的账号不存在或登录版本失效仍按原有未登录规则处理。
+
 ## `GET /sync` 与 `PUT /sync`
 
 仅对当前登录用户开放。GET 默认返回 `ok`、`data`、`revision`、`updatedAt` 和各部分 `parts` 摘要。

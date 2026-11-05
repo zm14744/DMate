@@ -105,11 +105,13 @@ PSYCOPG_IMPORT_ERROR = None
 
 try:
     import psycopg
+    from psycopg.conninfo import make_conninfo
     from psycopg.rows import dict_row
     from psycopg.types.json import Jsonb
     PSYCOPG_AVAILABLE = True
 except Exception as exc:
     psycopg = None
+    make_conninfo = None
     dict_row = None
     Jsonb = None
     PSYCOPG_IMPORT_ERROR = repr(exc)
@@ -139,13 +141,10 @@ def _build_database_dsn():
     port = (os.environ.get("PGPORT") or os.environ.get("POSTGRES_PORT") or "5432").strip()
     dbname = (os.environ.get("PGDATABASE") or os.environ.get("POSTGRES_DATABASE") or "").strip()
     user = (os.environ.get("PGUSER") or os.environ.get("POSTGRES_USERNAME") or "").strip()
-    password = (os.environ.get("PGPASSWORD") or os.environ.get("POSTGRES_PASSWORD") or "").strip()
+    password = os.environ.get("PGPASSWORD") or os.environ.get("POSTGRES_PASSWORD") or ""
 
-    if host and dbname and user and password:
-        return (
-            f"host={host} port={port} dbname={dbname} "
-            f"user={user} password={password}"
-        )
+    if host and dbname and user and password and make_conninfo:
+        return make_conninfo(host=host, port=port, dbname=dbname, user=user, password=password)
     return ""
 
 
@@ -245,7 +244,7 @@ def no_stale_web_application_assets(response):
 
 # 账号只使用服务器签名的 HttpOnly Cookie；前端 JS 不保存登录令牌。
 app.config.update(
-    SECRET_KEY=AUTH_SECRET_KEY or "auth-disabled-placeholder",
+    SECRET_KEY=AUTH_SECRET_KEY or secrets.token_hex(32),
     SESSION_COOKIE_NAME="dm_tutor_session",
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -772,7 +771,29 @@ def _auth_rate_allowed(route_name):
         return True
 
 
+class AuthBackendUnavailable(RuntimeError):
+    """Authentication is temporarily unverifiable, not a revoked login."""
+
+
+@app.errorhandler(AuthBackendUnavailable)
+def _auth_backend_unavailable_response(_error=None):
+    response = jsonify({
+        "ok": False,
+        "configured": True,
+        "emailConfigured": EMAIL_DELIVERY_CONFIGURED,
+        "errorCode": "auth_temporarily_unavailable",
+        "retryable": True,
+        "error": "账号服务暂时不可用，请稍后重试；登录状态和本机记录已保留",
+    })
+    response.status_code = 503
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Retry-After"] = "5"
+    return response
+
+
 def _auth_unavailable_response():
+    if AUTH_CONFIGURED:
+        return _auth_backend_unavailable_response()
     message = "账号系统尚未配置。请先连接 PostgreSQL，并设置 AUTH_SECRET_KEY"
     if not PSYCOPG_AVAILABLE:
         message = "账号系统缺少 PostgreSQL 驱动，请更新 requirements.txt 后重新部署"
@@ -1207,7 +1228,7 @@ def _current_auth_user():
     if not isinstance(user_id, int):
         return None
     if not _ensure_auth_schema():
-        return None
+        raise AuthBackendUnavailable()
 
     try:
         with _auth_connect() as conn:
@@ -1242,7 +1263,7 @@ def _current_auth_user():
                 return user
     except Exception as exc:
         print(f"读取登录用户失败：{repr(exc)}")
-        return None
+        raise AuthBackendUnavailable() from exc
 
 
 def _sync_row_for_user(user_id):
@@ -1451,6 +1472,8 @@ def auth_send_email_code():
                     ),
                 )
                 _send_verification_email(email, code, purpose)
+    except AuthBackendUnavailable:
+        raise
     except Exception as exc:
         print(f"发送邮箱验证码失败：{repr(exc)}")
         return jsonify({"ok": False, "error": "验证码发送失败，请稍后再试"}), 502

@@ -18,6 +18,17 @@ LOGIC_EQ = re.compile(r"(?:(?:命题|判断)\s*)?(.{2,140}?)\s*(?:与|和)\s*(.{
 def _active_question(question):
     """Separate image/previous-answer metadata, refuse complex mixed exercises."""
     text = str(question or "").strip()
+    if "【当前指向题目】" in text or "【本轮唯一需要执行的用户请求】" in text:
+        return ""  # The request may change the anchored task; leave it to the AI.
+    if "【我的要求】" in text:
+        request=text.rsplit("【我的要求】",1)[1].strip()
+        # A separate instruction may add conditions, ask for a negation or
+        # select another subproblem. Only neutral final-answer wording is safe
+        # to remove before applying these narrowly supported exact templates.
+        if request and not re.fullmatch(
+            r"(?:请|直接|给出|最终|答案|完整|解析|并|简要|解释|说明|理由|[\s，。；：！？,.!?:;])*", request
+        ):
+            return ""
     if "【题目文字】" in text:
         text = text.split("【题目文字】", 1)[1].split("【图形信息】", 1)[0].split("【我的要求】", 1)[0].strip()
     if "【我的要求】" in question and NO_ANSWER.search(question.rsplit("【我的要求】", 1)[1]):
@@ -100,7 +111,10 @@ def _split_formula_pair(q):
     # (do not pull expressions out of multi-part exams).
     if not re.search(r"是否逻辑等价|是不是逻辑等价|逻辑等价吗|是否等值",q):
         return None
-    text=q.split("是否逻辑等价")[0].split("是不是逻辑等价")[0].strip()
+    task=re.fullmatch(r"([\s\S]*?)(?:是否逻辑等价|是不是逻辑等价|逻辑等价吗|是否等值)\s*[？?。]?\s*",q)
+    if not task:
+        return None
+    text=task.group(1).strip()
     text=re.sub(r"^(?:判断|命题|请判断|判断下列命题)\s*[:：]?\s*","",text)
     if "\n" in text or "【" in text or len(text)>160:
         return None
@@ -151,6 +165,13 @@ def verify_only_if_symbolization(question):
         return None
     if not re.search(r"p\s*表示\s*下雨",q,re.I) or not re.search(r"q\s*表示\s*带伞",q,re.I):
         return None
+    residue=re.sub(r"p\s*表示\s*下雨|q\s*表示\s*带伞", " ", q, flags=re.I)
+    residue=residue.replace("只有下雨我才带伞", " ")
+    for phrase in ("表示成命题公式", "表示成命题", "请直接给出最终答案", "请给出答案并说明理由",
+                   "并说明理由", "说明理由", "直接给出答案", "符号化", "请将", "请", "将", "把", "设", "令", "用", "和", "且"):
+        residue=residue.replace(phrase, " ")
+    if not re.fullmatch(r"[\s，。；：、！？,.!?:;()（）\"'“”‘’$]*",residue):
+        return None
     return ("“只有下雨我才带伞”表示：**带伞是下雨的充分条件，下雨是带伞的必要条件**。\n"
             "所以符号化为 $q\\to p$。\n"
             "其逆否命题为 $\\neg p\\to\\neg q$，二者逻辑等价。")
@@ -159,8 +180,11 @@ def verify_only_if_symbolization(question):
 def _selection_parse(question):
     q=_active_question(question)
     # Generalize the actual tested structure to 3-8 named persons, any k.
-    head=re.search(r"([A-H](?:[、,，]\s*[A-H]){2,7})\s*中\s*选\s*(\d+)\s*人",q)
+    head=re.search(r"([A-H](?:[、,，]\s*[A-H]){2,7})\s*中\s*选\s*(\d{1,2})\s*人",q)
     if not head or not re.search(r"共有多少种|多少种符合|多少种选派|多少种方案",q):
+        return None
+    prefix=q[:head.start()]
+    if not re.fullmatch(r"(?:请|从|在|现有|设有|有|候选人|人选|以下|人员|[\s，,：:])*",prefix):
         return None
     people=[x.strip() for x in re.split(r"[、,，]",head.group(1))]
     k=int(head.group(2))
@@ -221,10 +245,14 @@ def verify_finite_selection(question):
 
 def verify_finite_relation(question):
     q=_active_question(question)
-    match=re.search(
-        r"(?:在\s*)?A\s*=\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}"
-        r".{0,100}x\s*R\s*y\s*当且仅当\s*x\s*\+\s*y\s*(?:≠|!=)\s*(\d+)",q)
-    if not match or not re.search(r"是不是等价关系|是否.*等价关系",q):
+    # Consume the entire supported task. A suffix such as "且 x<y" changes
+    # the relation and must never be silently dropped by an exact checker.
+    match=re.fullmatch(
+        r"\s*(?:设\s*)?(?:在\s*)?(?:集合\s*)?A\s*=\s*\{\s*(\d{1,10})\s*,\s*(\d{1,10})\s*,\s*(\d{1,10})\s*\}"
+        r"\s*(?:上\s*)?[，,：:]?\s*(?:(?:定义|给定)\s*(?:二元)?关系\s*R?\s*[，,：:]?\s*)?"
+        r"x\s*R\s*y\s*当且仅当\s*x\s*\+\s*y\s*(?:≠|!=)\s*(\d{1,10})"
+        r"\s*[。；;，,]?\s*(?:请判断|判断|问)?\s*R?\s*(?:是不是|是否(?:为|是)?)\s*等价关系\s*[？?。]?\s*",q)
+    if not match:
         return None
     universe=[int(x) for x in match.group(1,2,3)]
     threshold=int(match.group(4))
@@ -260,15 +288,31 @@ def verify_powerset_symmetric_difference(question):
         return None
     q=q.replace("，",",").replace(" ", "").replace(r"\left","").replace(r"\right","")
     q=q.replace(r"\oplus","⊕").replace(r"\triangle","△").replace(r"\Delta","△")
-    a=re.search(r"\|A\|\s*=\s*(\d+)",q,re.I)
-    b=re.search(r"\|P\(B\)\|\s*=\s*(\d+)",q,re.I)
-    d=re.search(r"\|P\(A\)\|\s*=\s*(\d+)",q,re.I)
-    xor=re.search(r"\|P\(A[△⊕]B\)\|\s*=\s*(\d+)",q,re.I)
+    # Require a complete bounded integer literal, not a prefix of 2.5, 16/2,
+    # 2^10, or an enormous integer that Python cannot safely parse.
+    cardinality = r"(\d{1,300})(?=[,。；;！？?\n$]|$)"
+    facts = [list(re.finditer(pattern + cardinality,q,re.I)) for pattern in (
+        r"\|A\|=", r"\|P\(B\)\|=", r"\|P\(A[△⊕]B\)\|=",
+    )]
+    d=re.search(r"\|P\(A\)\|=",q,re.I)
     # Typical wording includes both |P(B)| and |P(A△B)|,
     # but no standalone |P(A)|. Do not select a spurious one.
-    if not (a and b and xor) or d:
+    if any(len(values) != 1 for values in facts) or d:
         return None
-    total_a=int(a.group(1));power_b=int(b.group(1));power_xor=int(xor.group(1))
+    # The three cardinalities determine these answers only for this supported
+    # task. Extra equations or an existence/negation request must not be lost.
+    residue=list(q)
+    for values in facts:
+        start,end=values[0].span()
+        residue[start:end]=" "*(end-start)
+    residue="".join(residue).replace(r"\cap","∩").replace(r"\cup","∪")
+    residue=re.sub(r"\\[()\[\]]", " ", residue)
+    residue=re.sub(r"\|(?:B|A[∩∪\\]B|B\\A)\|", " ", residue)
+    for phrase in ("已知", "有限集合", "集合", "分别", "基数", "元素个数", "大小", "计算", "求出", "求", "设", "为", "和", "与", "及", "的", "A", "B"):
+        residue=residue.replace(phrase," ")
+    if not re.fullmatch(r"[\s，。；：、！？,.?:;()（）$]*",residue):
+        return None
+    total_a,power_b,power_xor=(int(values[0].group(1)) for values in facts)
     def log_power(n):
         return n.bit_length()-1 if n>0 and n&(n-1)==0 else None
     total_b=log_power(power_b)

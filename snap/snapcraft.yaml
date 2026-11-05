@@ -25,6 +25,7 @@ apps:
       - home
       - browser-support
       - audio-playback
+      - audio-record
       - removable-media
 
 parts:

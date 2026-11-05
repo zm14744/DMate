@@ -88,6 +88,11 @@ let cloudLivePollGeneration = 0;
 let cloudLivePollEnabled = false;
 // 哈希属于当前页面已实际应用的快照，不能直接相信其他标签写入的 localStorage。
 let cloudAppliedPartHashes = null;
+let cloudInitialSyncPending = false;
+let cloudInitialSyncInFlight = false;
+let accountVerificationPending = false;
+let accountVerificationTimer = 0;
+let accountVerificationOperation = null;
 // Older servers ignore delta query parameters and return a full snapshot.
 // Negotiate once per page, then retain their lightweight revision polling.
 let cloudDeltaSyncSupported = null;
@@ -1037,6 +1042,11 @@ function bumpCloudSyncContext() {
     cloudSyncQueuedAt = null;
     cloudAppliedPartHashes = null;
     cloudSyncCapacityRetryAt = 0;
+    cloudInitialSyncPending = false;
+    cloudInitialSyncInFlight = false;
+    accountVerificationPending = false;
+    if (accountVerificationTimer) window.clearTimeout(accountVerificationTimer);
+    accountVerificationTimer = 0;
     cloudSyncContextVersion += 1;
     return cloudSyncContextVersion;
 }
@@ -1348,6 +1358,8 @@ function clearLegacyPersistentBackup() {
 function applyCloudSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== "object") return false;
     cloudApplyingSnapshot = true;
+    const previous = { sessions, currentId, deletedSessionIds, learningState };
+    const written = [];
 
     try {
         if (!window.DMateConceptNotebookModel && snapshot.learning
@@ -1355,39 +1367,109 @@ function applyCloudSnapshot(snapshot) {
                 value?.notes?.length || Object.keys(value?.deleted || {}).length)) {
             throw new Error("笔记同步组件未加载，请刷新后重试，现有笔记未被覆盖。");
         }
+        const updates = [];
+        let nextLearning = null;
         const sessionData = snapshot.sessions;
         if (sessionData && typeof sessionData === "object" && Array.isArray(sessionData.sessions)) {
             const incomingDeletions = normalizeDeletedSessionIds(
                 sessionData.deletedSessionIds
             );
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            updates.push([STORAGE_KEY, JSON.stringify({
                 sessions: sessionData.sessions.filter(item => (
                     item && !incomingDeletions[String(item.id)]
                 )),
                 currentId: sessionData.currentId ?? null,
                 deletedSessionIds: incomingDeletions
-            }));
-            loadState();
+            })]);
         }
 
         if (snapshot.learning && typeof snapshot.learning === "object") {
             const incoming = { ...snapshot.learning };
             if (window.DMateConceptNotebookModel) incoming.conceptNotebook = window.DMateConceptNotebookModel.merge(
                 learningState.conceptNotebook, snapshot.learning.conceptNotebook);
-            localStorage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(incoming));
-            loadLearningState();
+            nextLearning = normalizeLearningState(incoming);
+            updates.push([LEARNING_STORAGE_KEY, JSON.stringify(nextLearning)]);
         }
 
-        // Do not override this device's appearance with older cloud values.
+        // Prepare every section before writing, and do not replace live state
+        // until all writes succeed. A quota failure must not half-apply a cloud
+        // revision and then make a retry upload that incomplete local state.
+        for (const [key, value] of updates) {
+            const oldValue = localStorage.getItem(key);
+            localStorage.setItem(key, value);
+            written.push([key, oldValue]);
+        }
+        if (updates.some(([key]) => key === STORAGE_KEY) && !loadState()) {
+            throw new Error("同步会话无法载入");
+        }
+        if (nextLearning) learningState = nextLearning;
+        preserveActiveCloudSessionIdentities(previous.sessions);
 
-        renderAll();
-        refreshInputAvailability();
+        // Do not override this device's appearance with older cloud values.
+        try {
+            renderAll();
+            refreshInputAvailability();
+            window.dmateConceptNotebook?.refresh?.();
+        } catch (error) {
+            // The revision is fully applied even if an unrelated view fails.
+            console.warn("同步后的页面刷新失败：", error);
+        }
         return true;
     } catch (error) {
+        ({ sessions, currentId, deletedSessionIds, learningState } = previous);
+        for (const [key, oldValue] of written.reverse()) {
+            try {
+                if (oldValue === null) localStorage.removeItem(key);
+                else localStorage.setItem(key, oldValue);
+            } catch (restoreError) { console.warn("同步缓存恢复失败，当前页面记录仍保留：", restoreError); }
+        }
         console.warn("应用云端数据失败：", error);
         return false;
     } finally {
         cloudApplyingSnapshot = false;
+    }
+}
+
+function preserveActiveCloudSessionIdentities(previousSessions) {
+    for (const [oldKey, request] of [...activeAiRequests]) {
+        const original = request.session;
+        if (request.cancelled || request.contextVersion !== cloudSyncContextVersion
+            || !previousSessions.includes(original)) continue;
+        const originalMessages = original.messages;
+        const anchor = originalMessages.indexOf(request.userMessage);
+        const candidates = sessions.filter(candidate => {
+            const id = String(candidate.id);
+            return (id === oldKey || id.startsWith(oldKey + "-sync-"))
+                && !deletedSessionIds[id] && anchor >= 0
+                && candidate.messages.length === originalMessages.length
+                && getLatestUserMessage(candidate) === candidate.messages[anchor]
+                && candidate.messages.every((message, index) => cloudMessageKey(message) === cloudMessageKey(originalMessages[index]));
+        });
+        const matching = candidates.find(candidate => String(candidate.id) === oldKey)
+            || (candidates.length === 1 ? candidates[0] : null);
+        const newKey = matching ? sessionBusyKey(matching.id) : null;
+        if (!matching || activeAiRequests.has(newKey) && activeAiRequests.get(newKey) !== request) {
+            request.cancelled = true;
+            request.controller.abort();
+            activeAiRequests.delete(oldKey);
+            busySessionIds.delete(oldKey);
+            pendingAiStartSessionIds.delete(oldKey);
+            continue;
+        }
+        const position = sessions.indexOf(matching);
+        const oldId = original.id;
+        Object.assign(original, matching, { messages:originalMessages.map((message, index) =>
+            Object.assign(message, matching.messages[index])) });
+        sessions[position] = original;
+        if (newKey === oldKey) continue;
+        activeAiRequests.delete(oldKey);
+        activeAiRequests.set(newKey, request);
+        if (busySessionIds.delete(oldKey)) busySessionIds.add(newKey);
+        pendingAiStartSessionIds.delete(oldKey);
+        const run = ocrBatchRuns.get(oldKey);
+        if (run?.session === original) { ocrBatchRuns.delete(oldKey); ocrBatchRuns.set(newKey, run); }
+        if (ocrSolvingSessions.delete(oldId)) ocrSolvingSessions.add(original.id);
+        for (const task of ocrTasks.values()) if (String(task.sessionId) === oldKey) task.sessionId = original.id;
     }
 }
 
@@ -1947,7 +2029,7 @@ async function pullLatestCloudSnapshot() {
     const contextVersion = cloudSyncContextVersion;
     const generation = cloudLivePollGeneration;
     let meta = readCloudSyncMeta();
-    if (meta.username !== owner) {
+    if (cloudInitialSyncPending || meta.username !== owner) {
         // 首次读取失败后仍能恢复；账号未验证前不加载任何旧工作区。
         if (cloudUiEditInProgress()) return false;
         await resolveInitialCloudSync(false);
@@ -2065,7 +2147,7 @@ async function pullLatestCloudSnapshot() {
                     remoteSessions.some(item => String(item.id) === String(selectedHere))
                         ? selectedHere : null };
             }
-            if (!applyCloudSnapshot(incoming)) return false;
+            if (!applyCloudSnapshot(incoming)) throw new Error("云端数据未完整载入，稍后重试");
             if (!valid()) return false;
             cloudAppliedPartHashes = getCloudPartHashMap(full.parts || manifest.parts);
             accountState.revision = targetRevision;
@@ -2282,8 +2364,12 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
     };
 }
 
-async function pushCloudSnapshot(_legacyForce = false) {
+async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false) {
     if (!accountState.authenticated || !accountState.username || accountState.syncing) return false;
+    if (cloudInitialSyncPending && !initialSyncReady) {
+        if (!cloudInitialSyncInFlight) await resolveInitialCloudSync(false);
+        return false;
+    }
     if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
     cloudSyncTimer = 0;
     cloudSyncQueuedAt = null;
@@ -2341,7 +2427,7 @@ async function pushCloudSnapshot(_legacyForce = false) {
                 if (!isCloudSyncContextValid(owner, contextVersion)) {
                     return false;
                 }
-                applyCloudSnapshot(merged);
+                if (!applyCloudSnapshot(merged)) throw new Error("云端数据未完整载入，保留本机修改后重试");
             }
             if (!isCloudSyncContextValid(owner, contextVersion)) {
                 return false;
@@ -2394,47 +2480,53 @@ async function pushCloudSnapshot(_legacyForce = false) {
 }
 
 async function resolveInitialCloudSync(isNewAccount = false) {
-    if (!accountState.authenticated) return;
+    if (!accountState.authenticated || cloudInitialSyncInFlight) return;
     const owner = accountState.username;
     const contextVersion = cloudSyncContextVersion;
-
-    // 必须在服务器验证账号后，才读取属于这个账号的本机缓存。
-    // 同浏览器切换另一个账号时不能显示、更不能上传前一账号的资料。
-    const savedMeta = readCloudSyncMeta();
-    if (isNewAccount || savedMeta.username !== owner) cancelAccountInteractions();
-    if (!isNewAccount && savedMeta.username === accountState.username) {
-        loadLearningState();
-        appearanceSettings = loadAppearanceSettings();
-        appearanceCommittedSettings = { ...appearanceSettings };
-        applyAppearanceSettings({ save:false });
-        if (!loadState()) {
-            sessions = [];
-            currentId = null;
-            deletedSessionIds = Object.create(null);
-        }
-    } else {
-        sessions = [];
-        currentId = null;
-        deletedSessionIds = Object.create(null);
-        learningState = createEmptyLearningState();
-        window.dmateConceptNotebook?.refresh?.();
-        // 前一个账号的自定义背景属个人数据，不在下一账号沿用。
-        try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
-        clearAppearanceBackgroundVisual();
-        purgeGuestPersistentState();
-        // A new account on this browser gets only its own local appearance.
-        appearanceSettings = loadAppearanceSettings();
-        appearanceCommittedSettings = { ...appearanceSettings };
-        applyAppearanceSettings({ save:false });
-        clearLegacyPersistentBackup();
-    }
-    renderAll();
-
-    // 自定义背景图片仍按设备保存；登录成功后再读取，游客不会继承它。
-    await loadAppearanceBackground();
-    if (!isCloudSyncContextValid(owner, contextVersion)) return;
+    const retryingInitialSync = cloudInitialSyncPending;
+    cloudInitialSyncPending = true;
+    cloudInitialSyncInFlight = true;
 
     try {
+        // 必须在服务器验证账号后，才读取属于这个账号的本机缓存。
+        // 同浏览器切换另一个账号时不能显示、更不能上传前一账号的资料。
+        const savedMeta = readCloudSyncMeta();
+        if (!retryingInitialSync) {
+            if (isNewAccount || savedMeta.username !== owner) cancelAccountInteractions();
+            if (!isNewAccount && savedMeta.username === accountState.username) {
+                if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
+                loadLearningState();
+                appearanceSettings = loadAppearanceSettings();
+                appearanceCommittedSettings = { ...appearanceSettings };
+                applyAppearanceSettings({ save:false });
+                if (!loadState()) {
+                    sessions = [];
+                    currentId = null;
+                    deletedSessionIds = Object.create(null);
+                }
+            } else {
+                sessions = [];
+                currentId = null;
+                deletedSessionIds = Object.create(null);
+                learningState = createEmptyLearningState();
+                window.dmateConceptNotebook?.refresh?.();
+                // 前一个账号的自定义背景属个人数据，不在下一账号沿用。
+                try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+                clearAppearanceBackgroundVisual();
+                purgeGuestPersistentState();
+                // A new account on this browser gets only its own local appearance.
+                appearanceSettings = loadAppearanceSettings();
+                appearanceCommittedSettings = { ...appearanceSettings };
+                applyAppearanceSettings({ save:false });
+                clearLegacyPersistentBackup();
+            }
+        }
+        renderAll();
+
+        // 自定义背景图片仍按设备保存；登录成功后再读取，游客不会继承它。
+        await loadAppearanceBackground();
+        if (!isCloudSyncContextValid(owner, contextVersion)) return;
+
         const { data } = await accountFetch("/sync");
         if (!isCloudSyncContextValid(owner, contextVersion)) return;
         const cloudRevision = Number(data.revision || 0);
@@ -2451,16 +2543,18 @@ async function resolveInitialCloudSync(isNewAccount = false) {
                 dirty:true,
                 sectionHashes:partHashes
             });
-            await pushCloudSnapshot(false);
+            cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
             return;
         }
         if (cloudRevision === 0) {
             // 手机首次登录一个空账号时，不能上传此前别的账号/游客的本机数据。
             backupLocalSnapshot("切换到新的空云账号");
-            applyCloudSnapshot({
+            const applied = applyCloudSnapshot({
                 sessions:{sessions:[], currentId:null, deletedSessionIds:{}},
                 learning:createEmptyLearningState()
             });
+            if (!applied) throw new Error("云端数据未完整载入，稍后重试");
+            cloudInitialSyncPending = false;
             cloudAppliedPartHashes = partHashes;
             writeCloudSyncMeta({username:owner,revision:0,dirty:false,sectionHashes:partHashes});
             accountState.status = "已同步";
@@ -2475,9 +2569,9 @@ async function resolveInitialCloudSync(isNewAccount = false) {
 
         if (!sameAccount) {
             backupLocalSnapshot("登录后切换到云端数据");
-            applyCloudSnapshot(data.data || {});
+            if (!applyCloudSnapshot(data.data || {})) throw new Error("云端数据未完整载入，稍后重试");
         } else if (localDirty && localRevision === cloudRevision) {
-            await pushCloudSnapshot(false);
+            cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
             return;
         } else if (localDirty && localRevision !== cloudRevision) {
             // 本设备与其它设备均有改动：自动合并，并用当前云端修订号安全上传。
@@ -2485,16 +2579,17 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
             backupLocalSnapshot("登录后自动合并同步前");
             const merged = mergeCloudSnapshots(collectCloudSnapshot(), data.data || {});
-            applyCloudSnapshot(merged);
+            if (!applyCloudSnapshot(merged)) throw new Error("云端数据未完整载入，保留本机修改后重试");
             writeCloudSyncMeta({username:owner, revision:cloudRevision, dirty:true, sectionHashes:partHashes});
-            await pushCloudSnapshot(false);
+            cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
             return;
         } else if (!localDirty) {
             // 即使云端版本号与共享缓存相同，也必须实际把数据载入此页面。
             // 否则首次打开、缓存损坏或另一标签改过 meta 时会一直显示旧列表。
-            applyCloudSnapshot(data.data || {});
+            if (!applyCloudSnapshot(data.data || {})) throw new Error("云端数据未完整载入，稍后重试");
         }
 
+        cloudInitialSyncPending = false;
         cloudAppliedPartHashes = partHashes;
         writeCloudSyncMeta({
             username:owner,
@@ -2512,6 +2607,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         }
     } finally {
         if (isCloudSyncContextValid(owner, contextVersion)) {
+            cloudInitialSyncInFlight = false;
             startCloudLivePolling();
         }
     }
@@ -3087,6 +3183,81 @@ async function deleteAccount() {
     window.location.reload();
 }
 
+function retryAccountVerificationNow() {
+    if (accountVerificationPending && !accountVerificationOperation) void restoreVerifiedAccountSession();
+}
+
+async function restoreVerifiedAccountSession() {
+    if (accountVerificationOperation) return;
+    const operation = { version:cloudSyncContextVersion };
+    const wasAuthenticated = accountState.authenticated;
+    const controller = new AbortController();
+    accountVerificationOperation = operation;
+    if (accountVerificationTimer) window.clearTimeout(accountVerificationTimer);
+    accountVerificationTimer = 0;
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    try {
+        const { data } = await accountFetch("/auth/me", { signal:controller.signal });
+        if (operation.version !== cloudSyncContextVersion) return;
+        if (typeof data.authenticated !== "boolean" || data.authenticated
+            && (typeof data.user?.username !== "string" || !data.user.username)) {
+            throw new Error("登录状态响应无效，稍后重新验证");
+        }
+        accountVerificationPending = false;
+        accountState.configured = data.configured !== false;
+        accountState.emailConfigured = data.emailConfigured !== false;
+        accountState.authenticated = Boolean(data.authenticated);
+        accountState.username = accountState.authenticated
+            ? String(data.user?.username || "")
+            : "";
+        accountState.email = accountState.authenticated
+            ? String(data.user?.email || "")
+            : "";
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        // A delayed guest verification is not an account transition. Preserve
+        // any guest question/reply already started while /auth/me was pending.
+        if (wasAuthenticated || accountState.authenticated) bumpCloudSyncContext();
+        renderAccountUi();
+
+        if (accountState.authenticated) {
+            await resolveInitialCloudSync(false);
+        } else {
+            // 无有效登录立即清除旧用户缓存；不因浏览器保留旧元信息而复现历史数据。
+            clearCloudSyncMeta();
+            if (wasAuthenticated) clearLoggedOutWorkspace();
+            else purgeGuestPersistentState();
+            // 删除旧版本遗留的 IndexedDB 用户背景（不再给游客读取）。
+            try {
+                const db = await openAppearanceDatabase();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(APPEARANCE_DB_STORE, "readwrite");
+                    tx.objectStore(APPEARANCE_DB_STORE).delete(APPEARANCE_BACKGROUND_KEY);
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                db.close();
+            } catch (_error) {}
+        }
+    } catch (error) {
+        if (operation.version !== cloudSyncContextVersion) return;
+        console.warn("读取账号状态失败：", error);
+        const transient = error?.data?.retryable === true || !error?.status || error.status >= 500;
+        accountVerificationPending = transient;
+        if (error?.status === 503 && error?.data?.configured === false && !error?.data?.retryable) {
+            accountState.configured = false;
+            accountVerificationPending = false;
+        }
+        renderAccountUi();
+        if (accountVerificationPending) {
+            setAccountMessage("账号服务暂时不可用，正在重试验证登录状态", true);
+            accountVerificationTimer = window.setTimeout(retryAccountVerificationNow, 10000);
+        }
+    } finally {
+        window.clearTimeout(timeout);
+        if (accountVerificationOperation === operation) accountVerificationOperation = null;
+    }
+}
+
 async function initAccountSystem() {
     const accountBtn = document.getElementById("accountBtn");
     const accountClose = document.getElementById("accountClose");
@@ -3206,13 +3377,14 @@ async function initAccountSystem() {
     });
 
     window.addEventListener("online", () => {
+        retryAccountVerificationNow();
         const meta = readCloudSyncMeta();
         if (accountState.authenticated && meta.dirty) {
             pushCloudSnapshot(false);
         }
         requestCloudLivePollNow();
     }, { passive:true });
-    window.addEventListener("focus", requestCloudLivePollNow, {passive:true});
+    window.addEventListener("focus", () => { retryAccountVerificationNow(); requestCloudLivePollNow(); }, {passive:true});
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) requestCloudLivePollNow();
         else if (cloudLivePollEnabled) scheduleCloudLivePoll(CLOUD_LIVE_POLL_HIDDEN_MS);
@@ -3220,46 +3392,7 @@ async function initAccountSystem() {
 
     renderAccountUi();
 
-    try {
-        const { data } = await accountFetch("/auth/me");
-        accountState.configured = data.configured !== false;
-        accountState.emailConfigured = data.emailConfigured !== false;
-        accountState.authenticated = Boolean(data.authenticated);
-        accountState.username = accountState.authenticated
-            ? String(data.user?.username || "")
-            : "";
-        accountState.email = accountState.authenticated
-            ? String(data.user?.email || "")
-            : "";
-        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
-        bumpCloudSyncContext();
-        renderAccountUi();
-
-        if (accountState.authenticated) {
-            await resolveInitialCloudSync(false);
-        } else {
-            // 无有效登录立即清除旧用户缓存；不因浏览器保留旧元信息而复现历史数据。
-            clearCloudSyncMeta();
-            clearLoggedOutWorkspace();
-            // 删除旧版本遗留的 IndexedDB 用户背景（不再给游客读取）。
-            try {
-                const db = await openAppearanceDatabase();
-                await new Promise((resolve, reject) => {
-                    const tx = db.transaction(APPEARANCE_DB_STORE, "readwrite");
-                    tx.objectStore(APPEARANCE_DB_STORE).delete(APPEARANCE_BACKGROUND_KEY);
-                    tx.oncomplete = resolve;
-                    tx.onerror = () => reject(tx.error);
-                });
-                db.close();
-            } catch (_error) {}
-        }
-    } catch (error) {
-        console.warn("读取账号状态失败：", error);
-        if (error?.status === 503) {
-            accountState.configured = false;
-        }
-        renderAccountUi();
-    }
+    await restoreVerifiedAccountSession();
 }
 
 
@@ -3342,6 +3475,7 @@ function cancelAccountInteractions() {
 
 function throwIfAiRequestCancelled(request) {
     if (request?.cancelled || request?.controller?.signal?.aborted
+        || request?.contextVersion != null && request.contextVersion !== cloudSyncContextVersion
         || request?.session && (!sessions.includes(request.session)
             || deletedSessionIds[sessionBusyKey(request.session.id)])
         || request?.userMessage && getLatestUserMessage(request.session) !== request.userMessage) {
@@ -13460,7 +13594,8 @@ async function requestAiReply(session, options = {}) {
         cancelled: false,
         // Every request belongs to the message that started it, including
         // ordinary text sends. Deleting that message invalidates its reply.
-        userMessage: options.expectedUserMessage || latestUserBeforeRequest
+        userMessage: options.expectedUserMessage || latestUserBeforeRequest,
+        contextVersion: cloudSyncContextVersion
     };
     activeAiRequests.set(requestKey, activeRequest);
     setSessionBusy(session.id, true);
@@ -13825,8 +13960,9 @@ async function requestAiReply(session, options = {}) {
 
     } finally {
         // 旧请求晚结束时不能清除用户刚刚重新发起的新请求的忙碌状态。
-        if (activeAiRequests.get(requestKey) === activeRequest) {
-            activeAiRequests.delete(requestKey);
+        const activeKey = sessionBusyKey(session.id);
+        if (activeAiRequests.get(activeKey) === activeRequest) {
+            activeAiRequests.delete(activeKey);
             setSessionBusy(session.id, false);
         }
     }
@@ -15575,6 +15711,8 @@ async function sendOcrBatch() {
         tasks.forEach(task => { task.sending = false; });
         ocrSolvingSessions.delete(session.id);
         if (ocrBatchRuns.get(key) === run) ocrBatchRuns.delete(key);
+        const currentKey = sessionBusyKey(session.id);
+        if (ocrBatchRuns.get(currentKey) === run) ocrBatchRuns.delete(currentKey);
         renderOcrTasks();
     }
 }

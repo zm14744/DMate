@@ -14,6 +14,65 @@ ENGLISH = re.compile(r"(?P<n>\d{1,3})\s+books.{0,200}?(?:select(?:ing)?|choos(?:
 NEGATIVE = re.compile(r"不相邻|不连续|互不相邻|任意两本不相邻|no\s+two\s+adjacent|non[- ]adjacent", re.I)
 ANSWER_DEMAND = re.compile(r"给出.*答案|直接.*(?:答案|解答|结果)|求.*(?:多少|方式|方案)|【结果】|完整解析|最终答案|how\s+many", re.I)
 
+# A closed-form answer must not replace an otherwise correct model answer when
+# the question includes conditions that the parser did not understand. Remove
+# only known wording; any remaining word/number makes the checker abstain.
+_COUNT_PUNCTUATION = re.compile(r"[\s，。；：、！？,.!?:;()（）\[\]{}\"'“”‘’*_`$-]*\Z")
+_REQUEST_WORDS = (
+    "请直接给出最终答案并简要解释", "请给出答案并说明理由", "直接给出答案并解析",
+    "直接给出答案", "请给出最终答案", "请给出答案", "最终答案", "完整解析",
+    "并简要解释", "说明理由", "直接回答", "给出答案", "请计算", "求出", "计算", "请", "求",
+)
+
+
+def _known_count_wording(question, phrases, english_words, spans=()):
+    if "【" in question or "】" in question:
+        return False
+    residue = list(question)
+    for start, end in spans:
+        residue[start:end] = " " * (end - start)
+    residue = "".join(residue)
+    # Word boundaries keep e.g. 'not' from being consumed as part of a longer
+    # unsupported condition. Chinese phrases are matched longest first.
+    alternatives = sorted(set((*_REQUEST_WORDS, *phrases)), key=len, reverse=True)
+    residue = re.sub("|".join(re.escape(value) for value in alternatives), " ", residue)
+    residue = re.sub(r"\b(?:" + "|".join(english_words) + r")\b", " ", residue, flags=re.I)
+    return bool(_COUNT_PUNCTUATION.fullmatch(residue))
+
+
+def _plain_book_selection(question, match):
+    if not re.search(r"排成一[行排]|排[在成]一列|连续排列|排成一条直线|(?:in\s+a\s+row|on\s+a\s+(?:book)?shelf)", question, re.I):
+        return False
+    return _known_count_wording(question, (
+        "互不相同的", "各不相同的", "不同的", "互不相同", "各不相同", "不同",
+        "任意两本选中的书不相邻", "任意两本选中的书都不相邻", "任意两本不相邻",
+        "所选的书互不相邻", "所选书互不相邻", "选中的书互不相邻", "互不相邻", "不相邻", "不连续",
+        "共有多少种选法", "共有多少种方法", "共有多少种方案", "有多少种选法", "有多少种方法",
+        "有多少种方案", "多少种选法", "多少种方法", "多少种方案", "求方案数", "求选法数",
+        "在书架上", "书架上", "排成一条直线", "排成一行", "排成一排", "排在一列", "排成一列", "连续排列",
+        "从这些书中", "从中", "现有", "设有", "选取", "选择", "选出", "挑选", "取出",
+        "要求", "使得", "其中", "本书", "本", "书", "的", "有", "选", "取", "且", "从", "中",
+    ), (
+        "there", "are", "is", "the", "a", "in", "on", "of", "from", "them", "these",
+        "books", "book", "shelf", "bookshelf", "row", "distinct", "different", "arranged",
+        "choose", "choosing", "select", "selecting", "chosen", "selected", "so", "that",
+        "no", "two", "adjacent", "non", "nonadjacent", "how", "many", "ways", "to", "can", "be",
+        "please", "give", "final", "answer", "directly", "and", "explain", "briefly",
+    ), (match.span("n"), match.span("k")))
+
+
+def _plain_letter_permutation(question, word):
+    text = re.sub(r"(?<![A-Za-z])" + re.escape(word) + r"(?![A-Za-z])", " ", question)
+    return _known_count_wording(text, (
+        "所有字母", "全部字母", "单词", "字母", "中的", "重新排列", "不同排列", "不同的排列",
+        "全排列", "排列", "共有多少种", "有多少种", "多少种", "有多少个", "多少个",
+        "不同的", "不同", "方式", "方法", "可以", "进行", "全部", "所有", "的", "种",
+    ), (
+        "the", "a", "all", "letters", "letter", "word", "of", "in", "row", "how", "many", "different",
+        "ways", "can", "be", "arrange", "arranged", "arranging", "rearranged", "permutations", "permutation",
+        "are", "there", "please", "give", "final", "answer", "directly", "and", "explain", "briefly",
+    ))
+
 def _last_answer_integer(text):
     """Recognize an explicit LAST-LINE integer result without reading proof digits.
 
@@ -74,7 +133,7 @@ def separate_selection_value(question):
     if not NEGATIVE.search(q):
         return None
     m=CHINESE.search(q) or ENGLISH.search(q)
-    if not m:
+    if not m or not _plain_book_selection(q, m):
         return None
     n,k=int(m.group("n")),int(m.group("k"))
     if not (1<=n<=300 and 1<=k<=n):
@@ -101,6 +160,8 @@ def _letter_arrangement_value(question):
     if len(candidates)!=1:
         return None
     word=candidates.pop()
+    if not _plain_letter_permutation(q, word):
+        return None
     # Other requirements, such as adjacent identical letters or fixed
     # placements, make the usual multiset formula inapplicable.
     if re.search(r"相邻|不得相邻|not\s+adjacent|fixed\s+position|首字母|元音", q, re.I):

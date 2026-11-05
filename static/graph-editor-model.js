@@ -285,7 +285,11 @@
                         ...(region?{bbox:[...region.bbox],...(region.region_polygon?{region_polygon:region.region_polygon.map(p=>[...p])}:{})}:{}) }); });
                 return gid;
             },
-            deleteGraph: gid => change(draft => { getGraph(draft, gid); draft.graphs = draft.graphs.filter(row => row.id !== gid); }),
+            deleteGraph: gid => change(draft => {
+                getGraph(draft, gid);
+                draft.graphs = draft.graphs.filter(row => row.id !== gid);
+                remapContext(draft, gid, null);
+            }),
             addVertex: (gid, label, x, y) => {
                 let vertexId;
                 change(draft => { const graph = getGraph(draft, gid); if (graph.vertices.length >= LIMITS.vertices) throw new Error('每幅图最多 100 个节点。');
