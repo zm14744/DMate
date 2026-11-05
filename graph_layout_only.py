@@ -531,7 +531,7 @@ def recognize_layout_only(raw, *, recognize_text=None, provider=None, budget=Non
                    request_deadline if request_deadline is not None else float("inf"))
     source = hashlib.sha256(raw).hexdigest()
     _check_cancelled(cancelled)
-    image = decode_document_image(raw, max_pixels=16_000_000)
+    image = decode_document_image(raw)
     try:
         hint = visual_preflight(image)
         _check_cancelled(cancelled)
@@ -683,7 +683,7 @@ def recognize_selected_graph_type(raw, *, provider=None, budget=None,
     deadline = min(start + MANUAL_SCAN_MAX_SECONDS,
                    request_deadline if request_deadline is not None else float("inf"))
     _check_cancelled(cancelled)
-    image = decode_document_image(raw, max_pixels=16_000_000)
+    image = decode_document_image(raw)
 
     def work():
         try:

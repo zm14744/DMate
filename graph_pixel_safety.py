@@ -26,7 +26,7 @@ MAX_NODES = 28
 def _image(raw):
     # Preserve EXIF orientation and composite transparent PNG pixels on white.
     # A bare convert("RGB") made transparent black pixels look like real ink.
-    original = decode_document_image(raw, max_pixels=16_000_000)
+    original = decode_document_image(raw)
     factor = min(1., MAX_SIDE / max(original.size))
     if factor < 1.:
         image = original.resize(

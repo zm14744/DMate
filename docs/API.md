@@ -135,6 +135,8 @@ if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 
 网页对累计流式正文及最终 `reply` 分别设置 512 KiB UTF-8 上限，事件解码缓冲也有独立上限。超限时报告错误、保留用户提问，不将截断片段保存为成功回答；它不改变单条输入和历史上下文的容量。
 
+整次 SSE 响应最多持续 300 秒，心跳和零散正文不会重置计时。到限发送 `error`，包含 `code: "chat_stream_timeout"`、`status: 504`，并触发取消。模型达到输出长度上限后会沿用原续写流程；若续写失败或仍被截断，公开流式、受保护回答和旧 JSON 路径均按失败处理，不把半截答案标记为成功。
+
 ```http
 POST /chat
 Content-Type: application/json

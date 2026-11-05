@@ -1537,7 +1537,9 @@ $$
             reasoning_effort="none" if is_full_solution else reasoning_effort,
             cancelled=cancelled,
             on_delta=on_delta,
-            require_complete=callable(on_delta),
+            # Buffered image/exact-answer requests and legacy JSON callers must
+            # not save a truncated response as complete either.
+            require_complete=True,
         )
         if cancelled is not None and cancelled():
             return {"ok": False, "cancelled": True}

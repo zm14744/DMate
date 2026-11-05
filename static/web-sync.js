@@ -24,6 +24,16 @@
     }
     function hasUnsavedWork(doc) {
         if (!doc || doc.hidden) return true;
+        // The visible composer cannot describe background conversations, sync
+        // work or guest-only records. Let the application guard its in-memory
+        // state before a version update replaces the entire page.
+        try {
+            if (typeof root.dmateHasUnsavedWork === 'function'
+                && root.dmateHasUnsavedWork()) return true;
+        } catch (_error) {
+            // During startup/teardown an unknown state is not safe to reload.
+            return true;
+        }
         const input = doc.getElementById?.('text');
         if (typeof input?.value === 'string' && input.value.trim()) return true;
         const panel = doc.getElementById?.('ocrTaskPanel');

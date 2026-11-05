@@ -24,6 +24,7 @@ from PIL import Image
 
 from dmate_tool_registry import ToolContext, ToolRegistry, ToolSpec
 from image_evidence import DocumentEvidence, analyze_document, decode_document_image
+from image_upload_limits import MAX_IMAGE_PIXELS
 
 
 VERSION = '2026-10-26-semantic-layout-v1'
@@ -439,7 +440,7 @@ def prepare_semantic_layout(raw, *, budget, layout=None, run_layout=False,
     if getattr(budget, 'source_sha256', None) not in (None, source_sha256):
         raise ValueError('layout_source_identity_mismatch')
     original = document.original if document is not None else decode_document_image(raw)
-    if original.mode != 'RGB' or original.width*original.height > 16_000_000:
+    if original.mode != 'RGB' or original.width*original.height > MAX_IMAGE_PIXELS:
         raise ValueError('invalid_document_source')
     if cv2.getNumThreads() > 2:
         cv2.setNumThreads(2)

@@ -20,6 +20,7 @@ import time
 
 from dmate_tool_registry import ToolContext, ToolRegistry, ToolSpec
 from image_evidence import DocumentEvidence, decode_document_image
+from image_upload_limits import MAX_IMAGE_PIXELS
 from ocr_text_engine import TEXT_MODELS, selected_text_engine
 
 
@@ -313,7 +314,7 @@ def prepare_semantic_text(raw, *, budget, layout=None, document=None, text_resul
     if getattr(budget, 'source_sha256', None) not in (None, source_sha256):
         raise ValueError('text_source_identity_mismatch')
     original = document.original if document is not None else decode_document_image(raw)
-    if original.mode != 'RGB' or original.width*original.height > 16_000_000:
+    if original.mode != 'RGB' or original.width*original.height > MAX_IMAGE_PIXELS:
         raise ValueError('invalid_document_source')
     budget.check()
     state = {'control_error': None, 'resource_metrics': []}

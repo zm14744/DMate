@@ -2024,6 +2024,22 @@ function cloudUiEditInProgress() {
     return false;
 }
 
+// Native-shell web updates must inspect the whole workspace, including work
+// in another conversation and guest records which exist only in memory.
+function dmateHasUnsavedWork() {
+    if (cloudUiEditInProgress() || activeAiRequests.size || typingContext
+        || ocrTasks.size || ocrBatchPreparing || ocrRequestInFlight
+        || accountVerificationPending || accountVerificationOperation
+        || cloudApplyingSnapshot || cloudInitialSyncPending || cloudInitialSyncInFlight
+        || accountState.syncing || cloudSyncTimer) return true;
+    if (window.dmateVoiceInput && window.dmateVoiceInput.state !== "idle") return true;
+    if (accountState.authenticated) {
+        const meta = readCloudSyncMeta();
+        return Boolean(meta.dirty || meta.username !== accountState.username);
+    }
+    return snapshotHasUserData(collectCloudSnapshot()) || collectLearningReviewDrawings().length > 0;
+}
+
 async function pullLatestCloudSnapshot() {
     if (!cloudLivePollEnabled || cloudLivePollInFlight || accountState.syncing || !accountState.authenticated) return false;
     const owner = accountState.username;
@@ -10180,7 +10196,7 @@ function prepareAiDisplayText(text) {
     // $...$ 之外，\\(...\\) 和 \\ [...\\] 也属于完整的数学区域。
     // 旧版漏掉这两种定界符，导致内部 \\geq 被改写成 $\\geq$，
     // 原本正确的公式因此出现多余美元符号并渲染损坏。
-    const parts = value.split(/(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]*\$|```[\s\S]*?```|`[^`\n]*`)/g);
+    const parts = value.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]*\$)/g);
 
     return parts.map(part => {
         if (
@@ -10189,6 +10205,7 @@ function prepareAiDisplayText(text) {
             || /^\\\[/.test(part)
             || /^\\\(/.test(part)
             || /^```/.test(part)
+            || /^~~~/.test(part)
             || /^`/.test(part)
         ) {
             return part;
@@ -10208,12 +10225,13 @@ function markdownToHtml(text) {
     } = protectMathForMarkdown(source);
 
     const rawHtml = marked.parse(protectedText);
-
-    const safeHtml = window.DOMPurify
-        ? window.DOMPurify.sanitize(rawHtml)
-        : marked.parse(escapeRawHtml(protectedText));
-
-    const result = restoreMathAfterMarkdown(safeHtml, mathSegments);
+    // Restore before the final sanitization. A placeholder can occur inside
+    // an HTML attribute, where restored quotes must not create new attributes
+    // after DOMPurify has already finished checking the markup.
+    const restoredHtml = restoreMathAfterMarkdown(rawHtml, mathSegments);
+    const result = window.DOMPurify
+        ? window.DOMPurify.sanitize(restoredHtml)
+        : escapeRawHtml(source).replace(/\n/g, "<br>");
     // 不能把内部占位符漏到用户界面。极少数解析器异常时，
     // 宁可原样显示完整源码，也不能显示残缺公式或错误连接结果。
     if (result.includes("\uE000DMATE_MATH_")

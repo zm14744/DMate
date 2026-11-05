@@ -7,6 +7,7 @@ presentation data; disconnecting closes this request's cooperative work scope.
 import json
 import queue
 import threading
+import time
 
 from flask import copy_current_request_context, current_app, jsonify
 
@@ -18,6 +19,9 @@ class ChatStreamCancelled(BaseException):
 _QUEUE_SIZE = 64
 _HEARTBEAT_SECONDS = 1.0
 _DELTA_CHARS = 4096
+# Socket read timeouts do not expire while an upstream keeps sending heartbeat
+# comments. Give the complete streamed request a wall-clock budget as well.
+_MAX_STREAM_SECONDS = 300.0
 # A disconnected buffered request may still be inside an upstream read until
 # its ordinary timeout. Bound those workers across HTTP connection lifetimes.
 _STREAM_SLOTS = threading.BoundedSemaphore(4)
@@ -133,6 +137,7 @@ def stream_chat_response(handler):
 
     def generate():
         nonlocal worker_started
+        deadline = time.monotonic() + _MAX_STREAM_SECONDS
         try:
             with lifecycle_lock:
                 if cancelled.is_set():
@@ -145,8 +150,17 @@ def stream_chat_response(handler):
                 raise
             yield ": connected\n\n"
             while not cancelled.is_set():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    cancelled.set()
+                    yield _event("error", {
+                        "error": "回答等待时间过长，已停止本次请求，请稍后重试。",
+                        "code": "chat_stream_timeout",
+                        "status": 504,
+                    })
+                    break
                 try:
-                    name, encoded = events.get(timeout=_HEARTBEAT_SECONDS)
+                    name, encoded = events.get(timeout=min(_HEARTBEAT_SECONDS, remaining))
                 except queue.Empty:
                     if finished.is_set():
                         break

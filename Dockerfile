@@ -27,8 +27,9 @@ COPY requirements.txt requirements-agents.txt ./
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt
 
-# Cache official packages and export the two Small text models to ONNX without
-# running inference. Ordinary source changes reuse these prepared model layers.
+# Fetch verified official ModelScope files (PaddleX sources remain fallback),
+# then export the same two Small text models to ONNX without running inference.
+# Ordinary source changes reuse these prepared model layers.
 COPY ocr_runtime.py image_upload_limits.py ./
 COPY scripts/prepare_ocr_model_cache.py ./scripts/prepare_ocr_model_cache.py
 RUN python scripts/prepare_ocr_model_cache.py && \

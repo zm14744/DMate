@@ -16,6 +16,7 @@ from importlib import metadata
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import shutil
 import subprocess
@@ -35,6 +36,8 @@ ONNX_OPSET = 17
 MANIFEST_NAME = 'dmate-model-manifest.json'
 DEFAULT_CACHE_DIR = '/opt/dmate-model-cache'
 SCHEMA_VERSION = 2
+MODELSCOPE_API = 'https://modelscope.cn/api/v1/models/PaddlePaddle'
+DOWNLOAD_ATTEMPTS = 3
 
 
 class CachePreparationError(RuntimeError):
@@ -244,6 +247,132 @@ def _official_manager():
     return official_models
 
 
+def _modelscope_files(http, name, timeout_seconds):
+    """Read the official publisher's immutable file revisions and SHA256s."""
+    import requests
+    if name not in MODEL_NAMES:
+        raise CachePreparationError('unexpected_model_name')
+    last_error = None
+    for attempt in range(DOWNLOAD_ATTEMPTS):
+        try:
+            with _download_deadline(min(timeout_seconds, 60)):
+                with http.get(f'{MODELSCOPE_API}/{name}/repo/files',
+                              params={'Revision': 'master', 'Recursive': 'true'},
+                              stream=True, timeout=(8, 30)) as response:
+                    response.raise_for_status()
+                    body = bytearray()
+                    for chunk in response.iter_content(64 * 1024):
+                        body.extend(chunk)
+                        if len(body) > 2 * 1024 * 1024:
+                            raise CachePreparationError('modelscope_metadata_too_large')
+                payload = json.loads(body)
+            rows = payload.get('Data', {}).get('Files', [])
+            if payload.get('Code') != 200 or not isinstance(rows, list):
+                raise ValueError('invalid_modelscope_metadata')
+            files = {}
+            for row in rows:
+                if not isinstance(row, dict) or row.get('Path') not in REQUIRED_FILES:
+                    continue
+                filename = row['Path']
+                maximum = 1024**3 if filename.endswith('pdiparams') else 64 * 1024**2
+                if (filename in files or type(row.get('Size')) is not int
+                        or not 0 < row['Size'] <= maximum
+                        or not re.fullmatch(r'[a-fA-F0-9]{64}', str(row.get('Sha256', '')))
+                        or not re.fullmatch(r'[a-fA-F0-9]{40}', str(row.get('Revision', '')))):
+                    raise ValueError('invalid_modelscope_file_record')
+                files[filename] = {'size': row['Size'], 'sha256': row['Sha256'].lower(),
+                                   'revision': row['Revision']}
+            if set(files) != set(REQUIRED_FILES):
+                raise ValueError('missing_modelscope_required_files')
+            return files
+        except (requests.RequestException, _DownloadDeadline, ValueError,
+                AttributeError, CachePreparationError) as exc:
+            last_error = exc
+            if isinstance(exc, requests.HTTPError) and exc.response is not None \
+                    and exc.response.status_code in (401, 403, 404):
+                break
+    raise CachePreparationError(f'modelscope_metadata_failed:{name}') from last_error
+
+
+def _download_modelscope_file(http, name, filename, record, destination, timeout_seconds):
+    """Resume only the same immutable file and verify its exact length/hash."""
+    import requests
+    last_error = None
+    expected_size = record['size']
+    for attempt in range(DOWNLOAD_ATTEMPTS):
+        offset = destination.stat().st_size if destination.exists() else 0
+        if offset == expected_size:
+            if _sha256(destination) == record['sha256']:
+                return
+            destination.unlink()
+            offset = 0
+        elif offset > expected_size:
+            destination.unlink()
+            offset = 0
+        try:
+            with _download_deadline(timeout_seconds):
+                with http.get(f'{MODELSCOPE_API}/{name}/repo',
+                              params={'Revision': record['revision'], 'FilePath': filename},
+                              headers={'Range': f'bytes={offset}-', 'Accept-Encoding': 'identity'},
+                              stream=True, timeout=(8, 30)) as response:
+                    response.raise_for_status()
+                    if response.status_code == 206:
+                        span = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)',
+                                            response.headers.get('Content-Range', ''))
+                        if (span is None or int(span[1]) != offset
+                                or not offset <= int(span[2]) < expected_size
+                                or int(span[3]) != expected_size):
+                            raise CachePreparationError('modelscope_invalid_content_range')
+                    elif response.status_code == 200:
+                        # A server may ignore Range; replace, never append its
+                        # complete response to the bytes from the first attempt.
+                        offset = 0
+                    else:
+                        raise CachePreparationError('modelscope_unexpected_file_status')
+                    received = offset
+                    with destination.open('ab' if offset else 'wb') as target:
+                        for chunk in response.iter_content(64 * 1024):
+                            received += len(chunk)
+                            if received > expected_size:
+                                raise CachePreparationError('modelscope_file_capacity')
+                            target.write(chunk)
+            if destination.stat().st_size != expected_size:
+                raise CachePreparationError('modelscope_incomplete_file')
+            if _sha256(destination) != record['sha256']:
+                destination.unlink()
+                raise CachePreparationError('modelscope_file_hash_mismatch')
+            return
+        except (requests.RequestException, _DownloadDeadline, CachePreparationError) as exc:
+            last_error = exc
+            print(f'Official ModelScope {name}/{filename}: attempt {attempt + 1}/'
+                  f'{DOWNLOAD_ATTEMPTS} failed ({type(exc).__name__}); '
+                  'retaining verified-source partial bytes for retry.', file=sys.stderr)
+            if isinstance(exc, requests.HTTPError) and exc.response is not None \
+                    and exc.response.status_code in (401, 403, 404):
+                break
+    raise CachePreparationError(f'modelscope_file_download_failed:{name}:{filename}') from last_error
+
+
+def _download_modelscope_model(cache_home, name, timeout_seconds):
+    """Fetch only the three Paddle files, validate in staging, publish once."""
+    import requests
+    parent = Path(cache_home) / 'official_models'
+    parent.mkdir(parents=True, exist_ok=True)
+    with requests.Session() as http:
+        records = _modelscope_files(http, name, timeout_seconds)
+        with tempfile.TemporaryDirectory(prefix=f'.{name}-download-', dir=parent) as temporary:
+            staging_home = Path(temporary)
+            staging = staging_home / 'official_models' / name
+            staging.mkdir(parents=True)
+            for filename in REQUIRED_FILES:
+                _download_modelscope_file(http, name, filename, records[filename],
+                                          staging / filename, timeout_seconds)
+            inspect_model(staging_home, name)
+            destination = parent / name
+            os.replace(staging, destination)
+    return destination
+
+
 def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
                         timeout_seconds=300., manager_factory=None):
     if type(timeout_seconds) not in (int, float) or not 0 < timeout_seconds <= 600:
@@ -266,6 +395,18 @@ def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
             records.append(inspect_model(cache_home, name))
             reused.append(name)
             continue
+        if manager_factory is None:
+            try:
+                # PaddleX's one-second root-domain health check can omit a
+                # usable host. Query actual official files and keep progress
+                # across bounded retries before using its general fallback.
+                _download_modelscope_model(cache_home, name, timeout_seconds)
+                records.append(inspect_model(cache_home, name))
+                downloaded.append(name)
+                continue
+            except CachePreparationError as exc:
+                print(f'Official ModelScope download unavailable for {name} '
+                      f'({exc}); trying PaddleX official sources.', file=sys.stderr)
         try:
             with _download_deadline(timeout_seconds):
                 if manager is None:
@@ -301,7 +442,7 @@ def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
     manifest = {'schema_version': SCHEMA_VERSION, 'models': records,
                 'onnx_models': exports,
                 'package_versions': versions, 'inference_initialized': False,
-                'download_api': 'paddlex.inference.utils.official_models.official_models.get_model_path',
+                'download_api': 'official_modelscope_required_files_then_paddlex_official_models',
                 'model_format': 'paddle_and_onnx', 'text_engine': 'onnxruntime',
                 'integrity_scope': 'local_file_hashes_and_declared_model_identity_not_publisher_signature'}
     temporary = None
