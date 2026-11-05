@@ -6,13 +6,13 @@
 
     const MANIFEST = '/static/client-updates.json';
     const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
-    const OFFICIAL_RELEASE_PREFIX = 'https://github.com/zm14744/DMate/releases/';
     let lastChecked = 0;
     let checking = false;
 
     function triplet(value) {
         const match = /^(?:v)?(\d+)\.(\d+)\.(\d+)$/.exec(String(value || ''));
-        return match ? match.slice(1).map(Number) : null;
+        const parts = match ? match.slice(1).map(Number) : null;
+        return parts?.every(Number.isSafeInteger) ? parts : null;
     }
     function compareVersions(a, b) {
         const va = triplet(a), vb = triplet(b);
@@ -39,31 +39,54 @@
         }
         return null;
     }
+    function releaseAsset(client, value) {
+        // These release filenames are ASCII. Reject encoded or normalized path
+        // tricks before URL parsing can discard dot segments or backslashes.
+        if (typeof value !== 'string' || !/^https:\/\/(?:github\.com|api\.gitcode\.com)\//i.test(value)
+            || /[\u0000-\u0020\u007f%\\?#]/.test(value)
+            || /(?:^|\/)\.{1,2}(?:\/|$)/.test(value)) return null;
+        try {
+            const url = new URL(value);
+            if (url.protocol !== 'https:' || url.port || url.username || url.password
+                || url.search || url.hash) return null;
+            const match = url.hostname === 'github.com'
+                ? /^\/zm14744\/DMate\/releases\/download\/(v?\d+\.\d+\.\d+)\/([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(url.pathname)
+                : url.hostname === 'api.gitcode.com'
+                    ? /^\/api\/v5\/repos\/zm14744\/DMate\/releases\/(v?\d+\.\d+\.\d+)\/attach_files\/([A-Za-z0-9][A-Za-z0-9._-]*)\/download$/.exec(url.pathname)
+                    : null;
+            if (!match || match[2].includes('..')) return null;
+            const ext = client.kind === 'android' ? /\.apk$/i :
+                client.platform === 'windows' ? /\.exe$/i :
+                client.platform === 'macos' ? /\.dmg$/i :
+                client.platform === 'linux' ? /\.(?:deb|AppImage)$/i : null;
+            if (!ext?.test(match[2])) return null;
+            return { url:url.href, tag:match[1], filename:match[2] };
+        } catch (_err) {
+            return null;
+        }
+    }
     function selectPublishedUpdate(client, manifest) {
         if (!client || !manifest || manifest.schema !== 1) return null;
         const item = client.kind === 'android'
             ? manifest.android
             : manifest.desktop?.[client.platform];
         if (!item || item.published !== true ||
-            compareVersions(item.version, client.version) !== 1 ||
-            typeof item.url !== 'string' ||
-            !item.url.startsWith(OFFICIAL_RELEASE_PREFIX)) return null;
-        try {
-            const url = new URL(item.url);
-            if (url.protocol !== 'https:' || url.hostname !== 'github.com' ||
-                !url.pathname.startsWith('/zm14744/DMate/releases/download/') ||
-                url.username || url.password || url.search || url.hash) return null;
-            const ext = client.kind === 'android' ? /\.apk$/i :
-                client.platform === 'windows' ? /\.exe$/i :
-                client.platform === 'macos' ? /\.dmg$/i : /\.(?:deb|AppImage)$/i;
-            if (!ext.test(url.pathname)) return null;
-        } catch (_err) {
-            return null;
+            compareVersions(item.version, client.version) !== 1) return null;
+        const primary = releaseAsset(client, item.url);
+        if (!primary) return null;
+        const seen = new Set([primary.url]);
+        const fallbackUrls = [];
+        for (const value of Array.isArray(item.fallbackUrls) ? item.fallbackUrls : []) {
+            const asset = releaseAsset(client, value);
+            if (!asset || asset.tag !== primary.tag || asset.filename !== primary.filename
+                || seen.has(asset.url)) continue;
+            seen.add(asset.url);
+            fallbackUrls.push(asset.url);
         }
         const sha256 = client.kind === 'android'
             && typeof item.sha256 === 'string' && /^[a-fA-F0-9]{64}$/.test(item.sha256)
             ? item.sha256.toLowerCase() : null;
-        return { version:item.version, url:item.url, sha256, platform:client.platform };
+        return { version:item.version, url:primary.url, fallbackUrls, sha256, platform:client.platform };
     }
     // Newer APKs have an origin-restricted native download bridge.
     // Older APKs still use the official browser-download path.
@@ -157,13 +180,28 @@
                 }
             }, true),
         );
-        const link = doc.createElement('a');
-        link.className = 'dmate-update-url';
-        link.href = update.url;
-        link.textContent = '下载地址';
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        box.append(title, description, actions, link);
+        const links = doc.createElement('div');
+        links.className = 'dmate-update-actions';
+        for (const [index, url] of [update.url, ...(update.fallbackUrls || [])].entries()) {
+            const link = doc.createElement('a');
+            link.className = 'dmate-update-url';
+            link.href = url;
+            const source = new URL(url).hostname === 'api.gitcode.com' ? 'GitCode' : 'GitHub';
+            link.textContent = (index ? '备用下载 · ' : '下载地址 · ') + source;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            links.append(link);
+        }
+        const address = doc.createElement('input');
+        address.className = 'dmate-update-address';
+        address.type = 'text';
+        address.readOnly = true;
+        address.value = update.url;
+        address.setAttribute('aria-label', '首选下载地址，可选择复制');
+        address.addEventListener('click', () => address.select());
+        address.style.width = '100%';
+        address.style.boxSizing = 'border-box';
+        box.append(title, description, actions, links, address);
         doc.body.append(box);
     }
     async function checkForUpdates() {

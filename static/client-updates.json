@@ -3,23 +3,27 @@
   "android": {
     "version": "1.0.1",
     "published": false,
-    "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate.apk"
+    "url": "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/DMate.apk/download",
+    "fallbackUrls": ["https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate.apk"]
   },
   "desktop": {
     "windows": {
       "version": "1.0.0",
       "published": true,
-      "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_x64-setup.exe"
+      "url": "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/DMate_1.0.0_x64-setup.exe/download",
+      "fallbackUrls": ["https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_x64-setup.exe"]
     },
     "macos": {
       "version": "1.0.0",
       "published": true,
-      "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_universal.dmg"
+      "url": "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/DMate_1.0.0_universal.dmg/download",
+      "fallbackUrls": ["https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_universal.dmg"]
     },
     "linux": {
       "version": "1.0.0",
       "published": true,
-      "url": "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_amd64.AppImage"
+      "url": "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/DMate_1.0.0_amd64.AppImage/download",
+      "fallbackUrls": ["https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_amd64.AppImage"]
     }
   }
 }

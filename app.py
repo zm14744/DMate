@@ -228,12 +228,14 @@ def attach_runtime_source(response):
 
 
 # The native Android/WebView and desktop/Tauri shells open the remote site.
-# Revalidate the actual HTML/JS/CSS every time; never serve old OCR or editor
-# scripts from the HTTP cache after a Zeabur deployment.
+# Revalidate application code; pinned upstream assets use immutable versions.
 @app.after_request
 def no_stale_web_application_assets(response):
     path = request.path
-    if (path == '/service-worker.js' or path == '/web-version' or
+    if (response.status_code in (200, 206, 304) and re.match(
+            r'^/static/vendor/(?:mathjax|marked|dompurify|html2canvas|jspdf)-[0-9]+\.[0-9]+\.[0-9]+/', path)):
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif (path == '/service-worker.js' or path == '/web-version' or
         (path.startswith('/static/') and path.endswith(('.js', '.css', '.json')))):
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
         response.headers['Pragma'] = 'no-cache'

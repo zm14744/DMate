@@ -1089,6 +1089,7 @@ function computeChangedCloudParts(serverParts, localPartHashes) {
 }
 
 function clearLoggedOutWorkspace() {
+    cancelAccountInteractions();
     // 退出后进入真正的游客模式：页面清空，游客数据不落地。
     sessions = [];
     currentId = null;
@@ -1289,6 +1290,9 @@ function markSessionDeleted(sessionId) {
         request.controller.abort();
         activeAiRequests.delete(key);
     }
+    busySessionIds.delete(key);
+    pendingAiStartSessionIds.delete(key);
+    if (typingContext?.session?.id != null && String(typingContext.session.id) === key) discardTypingOutput();
     deletedSessionIds[key] = Math.max(
         Date.now(),
         Number(deletedSessionIds[key]) || 0
@@ -2325,11 +2329,13 @@ async function pushCloudSnapshot(_legacyForce = false) {
                 throw new Error("云同步确认无效，保留本机修改后重试");
             }
             const latestRevision = data.revision;
-            const hadNewEdits = cloudLocalChangeVersion !== submittedChangeVersion;
             latestPartHashes = getCloudPartHashMap(data.parts);
             if (mergedWithRemote) {
                 // Only a real remote conflict needs a merged local snapshot.
                 // New local edits alone remain in place and are uploaded next.
+                // Flush a received answer before loadState replaces its bound
+                // session object; the flushed text must join the next upload.
+                if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
                 const present = collectCloudSnapshot();
                 const merged = mergeCloudSnapshots(present, snapshotToSend);
                 if (!isCloudSyncContextValid(owner, contextVersion)) {
@@ -2340,6 +2346,7 @@ async function pushCloudSnapshot(_legacyForce = false) {
             if (!isCloudSyncContextValid(owner, contextVersion)) {
                 return false;
             }
+            const hadNewEdits = cloudLocalChangeVersion !== submittedChangeVersion;
             accountState.revision = latestRevision;
             if (!hadNewEdits) cloudAppliedPartHashes = latestPartHashes;
             const dirty = hadNewEdits;
@@ -2394,6 +2401,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
     // 必须在服务器验证账号后，才读取属于这个账号的本机缓存。
     // 同浏览器切换另一个账号时不能显示、更不能上传前一账号的资料。
     const savedMeta = readCloudSyncMeta();
+    if (isNewAccount || savedMeta.username !== owner) cancelAccountInteractions();
     if (!isNewAccount && savedMeta.username === accountState.username) {
         loadLearningState();
         appearanceSettings = loadAppearanceSettings();
@@ -2474,6 +2482,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
         } else if (localDirty && localRevision !== cloudRevision) {
             // 本设备与其它设备均有改动：自动合并，并用当前云端修订号安全上传。
             // 不询问覆盖，也不抹掉任一端独立的聊天或错题。
+            if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
             backupLocalSnapshot("登录后自动合并同步前");
             const merged = mergeCloudSnapshots(collectCloudSnapshot(), data.data || {});
             applyCloudSnapshot(merged);
@@ -3260,6 +3269,7 @@ let typingFullText = "";
 let typingDiv = null;
 let typingSessionId = null;
 let typingMeta = null;
+let typingContext = null;
 
 let typingAutoFollow = true;
 let typingScrollLockedByUser = false;
@@ -3277,6 +3287,54 @@ const pendingAiStartSessionIds = new Set();
 // 每个会话独立跟踪正在执行的请求。取消后，晚到的服务端结果绝不能再落盘。
 const activeAiRequests = new Map();
 
+function clearTypingState(removeBubble = false) {
+    if (typingTimer) clearInterval(typingTimer);
+    if (removeBubble) typingDiv?.remove();
+    typingTimer = null;
+    typingFullText = "";
+    typingDiv = null;
+    typingSessionId = null;
+    typingMeta = null;
+    typingContext = null;
+}
+
+function typingContextIsCurrent() {
+    return Boolean(typingContext && typingContext.version === cloudSyncContextVersion
+        && sessions.includes(typingContext.session)
+        && !deletedSessionIds[sessionBusyKey(typingContext.session.id)]
+        && getLatestUserMessage(typingContext.session) === typingContext.userMessage);
+}
+
+function cancelAccountInteractions() {
+    for (const request of activeAiRequests.values()) {
+        request.cancelled = true;
+        request.controller.abort();
+    }
+    activeAiRequests.clear();
+    busySessionIds.clear();
+    pendingAiStartSessionIds.clear();
+    clearTypingState(true);
+    pendingBackgroundReplyRender = false;
+    typingAutoFollow = true;
+    typingScrollLockedByUser = false;
+    lastTypingAutoScrollAt = 0;
+    for (const run of ocrBatchRuns.values()) { run.cancelled = true; run.controller.abort(); }
+    ocrBatchRuns.clear();
+    ocrSolvingSessions.clear();
+    ocrBatchPreparing = false;
+    for (const task of [...ocrTasks.values()]) {
+        if (task.state === "recognizing") notifyOcrCancelled(task.id);
+        discardOcrTask(task);
+    }
+    if (ocrRequestInFlight) cancelImageRecognition();
+    const dialog = document.getElementById("graphEditorDialog");
+    if (dialog?.open) dialog.close();
+    ocrEditorController?.destroy();
+    ocrEditorController = null;
+    ocrEditorTaskId = null;
+    ocrReviewInProgress = false;
+}
+
 function throwIfAiRequestCancelled(request) {
     if (request?.cancelled || request?.controller?.signal?.aborted
         || request?.session && (!sessions.includes(request.session)
@@ -3289,14 +3347,8 @@ function throwIfAiRequestCancelled(request) {
 }
 
 function discardTypingOutput() {
-    if (!typingTimer) return false;
-    clearInterval(typingTimer);
-    typingTimer = null;
-    typingDiv?.remove();
-    typingFullText = "";
-    typingDiv = null;
-    typingSessionId = null;
-    typingMeta = null;
+    if (!typingTimer && !typingContext && !typingDiv) return false;
+    clearTypingState(true);
     typingAutoFollow = true;
     typingScrollLockedByUser = false;
     lastTypingAutoScrollAt = 0;
@@ -13421,7 +13473,8 @@ async function requestAiReply(session, options = {}) {
         ) {
             const targetTeaching = await analyzeSingleQuestionTeaching(
                 requestTargetCandidate.text,
-                requestTargetCandidate.key
+                requestTargetCandidate.key,
+                { signal: activeRequest.controller.signal }
             );
             throwIfAiRequestCancelled(activeRequest);
 
@@ -13570,7 +13623,8 @@ async function requestAiReply(session, options = {}) {
         ) {
             localGeneratedTeaching = await analyzeSingleQuestionTeaching(
                 localGeneratedQuestion,
-                "generated-current"
+                "generated-current",
+                { signal: activeRequest.controller.signal }
             );
             throwIfAiRequestCancelled(activeRequest);
         }
@@ -13853,7 +13907,7 @@ function send() {
         && !message.isRetestAnswer
         && !isExerciseRequestText(text)) {
         analyzeSingleQuestionTeaching(text, "manual-" + Date.now()).then(teaching => {
-            if (!teaching || !session.messages.includes(message)
+            if (!teaching || !sessions.includes(session) || !session.messages.includes(message)
                 || message.manualIsQuestion !== true) return;
             // 以原有模型返回的有效难度为准；不通过文字长度猜难度。
             message.questionTeaching = teaching;
@@ -16026,6 +16080,7 @@ async function deleteChatMessage(sessionId, messageIndex) {
     }
 
     const removed = session.messages[messageIndex];
+    if (typingContext?.session === session && typingContext.userMessage === removed) discardTypingOutput();
 
     session.messages.splice(
         messageIndex,
@@ -16189,6 +16244,7 @@ function startTyping(
 
     typingFullText = text;
     typingSessionId = session.id;
+    typingContext = { session, userMessage: getLatestUserMessage(session), version: cloudSyncContextVersion };
     typingMeta = {
         generatedExercise: Boolean(
             meta.generatedExercise
@@ -16267,9 +16323,8 @@ function startTyping(
 }
 
 function finishTyping() {
-    const session = sessions.find(
-        item => item.id === typingSessionId
-    );
+    if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
+    const session = typingContext.session;
 
     if (typingDiv) {
         typingDiv.innerHTML =
@@ -16288,10 +16343,7 @@ function finishTyping() {
 
     const finishedDiv = typingDiv;
 
-    typingFullText = "";
-    typingDiv = null;
-    typingSessionId = null;
-    typingMeta = null;
+    clearTypingState();
 
     saveState();
 
@@ -16321,13 +16373,12 @@ function forceCompleteTyping() {
     if (!typingTimer) {
         return;
     }
+    if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
 
     clearInterval(typingTimer);
     typingTimer = null;
 
-    const session = sessions.find(
-        item => item.id === typingSessionId
-    );
+    const session = typingContext.session;
 
     if (typingDiv) {
         typingDiv.innerHTML =
@@ -16346,10 +16397,7 @@ function forceCompleteTyping() {
 
     const finishedDiv = typingDiv;
 
-    typingFullText = "";
-    typingDiv = null;
-    typingSessionId = null;
-    typingMeta = null;
+    clearTypingState();
 
     saveState();
 
@@ -17609,46 +17657,43 @@ function applyQuestionCandidateAsCurrent(
 
 async function analyzeSingleQuestionTeaching(
     question,
-    key = "current"
+    key = "current",
+    options = {}
 ) {
     const text = String(question || "").trim();
     if (!text) return null;
+    const version = cloudSyncContextVersion;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    options.signal?.addEventListener("abort", abort, { once:true });
+    if (options.signal?.aborted) abort();
+    let timeoutId;
 
     try {
-        const response = await fetch(
-            "/analyze-questions",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    questions: [{
-                        key,
-                        text
-                    }]
-                })
-            }
-        );
-
-        const payload = await response.json();
-
-        if (!response.ok) {
-            throw new Error(
-                payload?.error
-                || "题目知识识别失败"
-            );
-        }
-
-        return normalizeTeaching(
-            payload?.results?.[0]?.teaching
-        );
+        const read = async () => {
+            const response = await fetch("/analyze-questions", {
+                method: "POST", signal:controller.signal,
+                headers: { "Content-Type":"application/json" },
+                body: JSON.stringify({ questions:[{key,text}] })
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload?.error || "题目知识识别失败");
+            if (controller.signal.aborted || version !== cloudSyncContextVersion) return null;
+            return normalizeTeaching(payload?.results?.[0]?.teaching);
+        };
+        const deadline = new Promise((_, reject) => {
+            timeoutId = window.setTimeout(() => {
+                controller.abort();
+                reject(new Error("题目知识识别超时"));
+            }, 30000);
+        });
+        return await Promise.race([read(), deadline]);
     } catch (error) {
-        console.warn(
-            "题目知识识别失败：",
-            error
-        );
+        if (!options.signal?.aborted && error?.name !== "AbortError") console.warn("题目知识识别失败：", error);
         return null;
+    } finally {
+        window.clearTimeout(timeoutId);
+        options.signal?.removeEventListener("abort", abort);
     }
 }
 
@@ -21409,38 +21454,46 @@ function downloadOptionsForCurrentPlatform() {
     const gitcodeRelease = "https://gitcode.com/zm14744/DMate/releases/v1.0.1";
     const gitcodeDownloadBase = "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/";
     const githubRelease = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
-    const githubDownloadBase = "https://github.com/zm14744/DMate/releases/latest/download/";
+    const githubDownloadBase = "https://github.com/zm14744/DMate/releases/download/v1.0.1/";
     const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
     const snap = "https://snapcraft.io/dmate";
     const itch = "https://zm14744.itch.io/dmate";
 
-    // 下载按钮固定按 GitCode、GitHub 排列；额外配置的镜像放在其后。
+    // A deployment's verified HTTPS mirror is primary; public releases remain available.
     function installers(filename, configuredUrl, displayName) {
         const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(filename) + "/download";
         const githubUrl = githubDownloadBase + encodeURIComponent(filename);
-        const configured = String(configuredUrl || "").trim();
+        let configured = "";
+        try {
+            const candidate = new URL(String(configuredUrl || "").trim());
+            if (candidate.protocol === "https:" && !candidate.username && !candidate.password && !candidate.href.includes("#"))
+                configured = candidate.href;
+        } catch (_) { /* Invalid configured links cannot replace a release download. */ }
         const configuredIsGithub = /^https:\/\/github\.com\/zm14744\/DMate\/releases\//i.test(configured);
         const configuredIsGitcode = /^https:\/\/(?:api\.)?gitcode\.com\//i.test(configured);
-        const actions = [
+        const defaults = [
             { label:"GitCode · " + displayName, url:configuredIsGitcode ? configured : gitcodeUrl },
             { label:"GitHub · " + displayName, url:configuredIsGithub ? configured : githubUrl, secondary:true }
         ];
-        if (configured && !configuredIsGithub && !configuredIsGitcode
-                && configured !== gitcodeUrl && configured !== githubUrl) {
-            actions.push({ label:"备用 · " + displayName, url:configured, secondary:true });
+        const actions = [];
+        if (configured) actions.push({ label:(configuredIsGitcode ? "GitCode" : configuredIsGithub ? "GitHub" : "下载") + " · " + displayName, url:configured });
+        for (const option of defaults) {
+            if (!actions.some(item => item.url === option.url))
+                actions.push({ ...option, secondary:actions.length > 0 });
         }
         return actions;
     }
 
     if (platform === "ios") {
-        // The file is confirmed in the published GitHub v1.0.1 release.
-        // GitCode is an optional release page, not a fabricated direct asset.
+        // Both published releases contain the same versioned profile attachment.
         return {
             platform:"iPhone / iPad",
             text:"下载描述文件后，在 iOS 设置中确认安装",
             actions:[
+                { label:"GitCode · 描述文件",
+                  url:gitcodeDownloadBase + "DMate-iPhone-iPad.mobileconfig/download" },
                 { label:"GitHub · 描述文件",
-                  url:"https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate-iPhone-iPad.mobileconfig" },
+                  url:githubDownloadBase + "DMate-iPhone-iPad.mobileconfig", secondary:true },
                 { label:"GitCode · 发行版", url:gitcodeRelease, secondary:true }
             ]
         };

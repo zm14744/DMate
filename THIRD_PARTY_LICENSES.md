@@ -38,7 +38,7 @@
 | html2canvas | 1.4.1 | [MIT](https://github.com/niklasvh/html2canvas) |
 | jsPDF | 2.5.2 | [MIT](https://github.com/parallax/jsPDF) |
 
-这些库当前从 jsDelivr 加载，服务可达性与缓存由浏览器和 CDN 决定。
+这些固定版本由网站本域的 `static/vendor/` 提供，浏览器显示公式、Markdown、净化内容和导出时不再依赖 jsDelivr。各组件目录保留其 npm 发布包中的许可证；[资源清单](static/vendor/manifest.json) 记录官方 npm 归档地址、归档 SHA-512 完整性值及分发文件的 SHA256。MathJax 同时包含菜单、TeX 扩展、字体及辅助功能需要的按需资源；完整版本边界和更新方式见 [资源说明](static/vendor/README.md)。
 
 ## 模型与外部服务
 

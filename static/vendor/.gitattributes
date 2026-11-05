@@ -1,0 +1,2 @@
+# Keep third-party release bytes intact, including their original whitespace.
+*-*/** -whitespace

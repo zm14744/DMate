@@ -268,7 +268,11 @@ Tauri 配置位于 `desktop/src-tauri/tauri.conf.json`；Android 配置位于 `a
 
 Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DMATE_ANDROID_KEYSTORE_PASSWORD`、`DMATE_ANDROID_KEY_ALIAS`、`DMATE_ANDROID_KEY_PASSWORD`；Gradle 读取 `DMATE_KEYSTORE_PATH`、`DMATE_KEYSTORE_PASSWORD`、`DMATE_KEY_ALIAS`、`DMATE_KEY_PASSWORD`。Snap 发布使用 `SNAPCRAFT_STORE_CREDENTIALS`。macOS 见[签名与公证](MACOS_DISTRIBUTION.md)。构建 Artifact 与对外发布是两个步骤，旧下载文件不会因网页更新自动替换。
 
-安装弹窗可通过 `ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL` 覆盖下载地址。网页不提供 PWA 或 iOS WebClip 安装；`/service-worker.js` 只用于清退旧 worker。主要静态资源禁用持久 HTTP 缓存，安装壳通过 `/web-version` 检查网页更新，忙碌时延后重载；这不能更新 APK / Tauri 中的原生代码。
+安装弹窗可通过 `ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL` 设置优先下载地址。地址必须为没有用户凭据或片段的有效 HTTPS URL；GitCode 与 GitHub 官方入口仍作为备用保留。未配置时优先 GitCode 文件直链，GitHub 固定到同一发行标签；iOS 提供发行版已有的描述文件及备用源，不提供 PWA 安装。`/service-worker.js` 只用于清退旧 worker。
+
+公式与富文本等前端依赖位于 `static/vendor/<组件-版本>/`，含 MathJax 本地按需资源、上游许可和完整性清单，镜像必须包含这些文件。版本化的第三方目录成功响应允许一年 immutable 缓存；业务 JS / CSS、未版本化资源清单和 `/web-version` 仍禁用旧缓存。升级第三方库应使用新版本目录，不能原地替换已长期缓存的文件。安装壳检查网页更新时会在忙碌期间延后重载；这不能更新 APK / Tauri 中的原生代码。
+
+`static/client-updates.json` 独立控制安装后更新通知。保留实际包版本和发布状态，主源与 `fallbackUrls` 仅指向本仓库同发行版、同文件名的 GitCode / GitHub 地址；不能只改网页就把尚未发布的新原生包标成可更新。检测 GitCode 附件时使用 GET 或 Range GET，HEAD 返回值不能单独判断文件不存在。
 
 ### 本地构建客户端
 
