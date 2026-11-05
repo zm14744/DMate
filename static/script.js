@@ -21535,12 +21535,12 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"下载描述文件后，在系统设置中确认安装；安装后从主屏幕启动 DMate，全屏运行",
+            text:"下载全屏描述文件后，在系统设置中确认安装；之后从主屏幕启动 DMate",
             actions:[
                 { label:"GitCode · 描述文件",
-                  url:gitcodeDownloadBase + "DMate-iPhone-iPad.mobileconfig/download" },
+                  url:gitcodeDownloadBase + "DMate-iPhone-iPad-fullscreen.mobileconfig/download" },
                 { label:"GitHub · 描述文件",
-                  url:githubDownloadBase + "DMate-iPhone-iPad.mobileconfig", secondary:true }
+                  url:githubDownloadBase + "DMate-iPhone-iPad-fullscreen.mobileconfig", secondary:true }
             ]
         };
     }
