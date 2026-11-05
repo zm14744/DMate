@@ -111,6 +111,7 @@
 }
 .dmate-delete-confirm .dmate-delete-confirm-title { margin:0; min-width:0; font:inherit; font-size:17px; font-weight:600; line-height:1.5; }
 .dmate-delete-confirm-body { flex:0 1 auto; min-height:0; overflow:auto; margin:0; padding:17px 18px 12px; font-size:15px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+.dmate-notice-only .dmate-delete-confirm-body { padding-bottom:18px; }
 .dmate-delete-confirm-actions { display:flex; flex:0 0 auto; justify-content:flex-end; gap:10px; padding:12px 18px 18px; }
 .dmate-delete-confirm .dmate-delete-confirm-close {
     appearance:none;

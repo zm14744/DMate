@@ -8,17 +8,18 @@
   cancel(owner);
   const parent=owner.closest('dialog');
   if(parent&&!parent.open)return Promise.resolve(false);
+  const noticeOnly=settings.noticeOnly===true;
   return new Promise(resolve=>{
    const el=(tag,className,text)=>{const node=doc.createElement(tag);node.className=className;if(text!==undefined)node.textContent=text;return node;};
-   const prompt=el('dialog','dmate-delete-confirm'),head=el('header','dmate-delete-confirm-head');
-   const title=el('h3','dmate-delete-confirm-title',String(settings.title||'确认删除？'));
-   const body=el('p','dmate-delete-confirm-body',String(settings.body||'删除后无法恢复。'));
+   const prompt=el('dialog','dmate-delete-confirm'+(noticeOnly?' dmate-notice-only':'')),head=el('header','dmate-delete-confirm-head');
+   const title=el('h3','dmate-delete-confirm-title',String(settings.title||(noticeOnly?'提示':'确认删除？')));
+   const body=el('p','dmate-delete-confirm-body',String(settings.body||(noticeOnly?'操作未完成。':'删除后无法恢复。')));
    const actions=el('footer','dmate-delete-confirm-actions'),close=el('button','dmate-delete-confirm-close modal-close-dot');
    const confirm=el('button','dmate-delete-confirm-delete',String(settings.confirmText||'删除'));
    const previous=doc.activeElement;let finished=false,frame=0;
    title.id='dmateDeleteConfirmTitle'+(++serial);body.id='dmateDeleteConfirmBody'+serial;
    prompt.setAttribute('aria-labelledby',title.id);prompt.setAttribute('aria-describedby',body.id);
-   prompt.dataset.positioning='true';close.type=confirm.type='button';close.title='取消删除';close.setAttribute('aria-label','取消删除');
+   prompt.dataset.positioning='true';close.type=confirm.type='button';close.title=noticeOnly?'关闭':'取消删除';close.setAttribute('aria-label',close.title);
    const finish=value=>{
     if(finished)return;finished=true;
     if(frame)win.cancelAnimationFrame(frame);
@@ -34,11 +35,15 @@
    close.addEventListener('click',()=>finish(false));confirm.addEventListener('click',()=>finish(true));
    prompt.addEventListener('cancel',event=>{event.preventDefault();finish(false);});
    prompt.addEventListener('close',()=>finish(false));
+   prompt.addEventListener('keydown',event=>{
+    if(noticeOnly&&event.key==='Tab'){event.preventDefault();close.focus({preventScroll:true});}
+   });
    prompt.addEventListener('pointerdown',event=>{
     if(event.target!==prompt)return;const box=prompt.getBoundingClientRect();
     if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)finish(false);
    });
-   head.append(title,close);actions.append(confirm);prompt.append(head,body,actions);
+   head.append(title,close);prompt.append(head,body);
+   if(!noticeOnly){actions.append(confirm);prompt.append(actions);}
    pending.set(owner,{node:prompt,finish});(parent||owner).append(prompt);parent?.addEventListener('close',ownerClosed);
    try{
     prompt.showModal();prompt.getBoundingClientRect();

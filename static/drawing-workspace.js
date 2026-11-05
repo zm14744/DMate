@@ -15,6 +15,7 @@
   const persistent=options.persistent===true,sessionState=options.sessionState||{};
   let pages=[],activeId='',editor=null,timer=null,destroyed=false,persistError='',aiAbort=null,aiEpoch=0,exportBusy=false,panelMode='',uploadBusy=false;
   let savedRaw='',restoredGallery=false,exportPreview=null,exportPreviewUrl='',chromeFrame=0,observedView=null,observedViewport=null,observedPalette=null,toolsExpanded=false,deletePending=null;
+  let noticeFrame=0,noticeCurrent='',noticeQueue=[],persistNoticeShown='';
   const el=(tag,className,text)=>{const n=doc.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
   const button=(text,fn,className)=>{const b=el('button',className,text);b.type='button';b.addEventListener('click',event=>{event.stopPropagation();if(!destroyed)void fn();});return b;};
   const sendIcon=()=>{const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg'),path=doc.createElementNS(svg.namespaceURI,'path');
@@ -22,8 +23,8 @@
    for(const [key,value] of Object.entries({d:'M12 20V4m-7 7 7-7 7 7',fill:'none',stroke:'#fff','stroke-width':'2.4','stroke-linecap':'round','stroke-linejoin':'round'}))path.setAttribute(key,value);svg.append(path);return svg;};
   const shell=el('section','dmate-drawing-workspace'),top=el('div','ddw-header'),name=el('input','ddw-name');
   name.type='text';name.maxLength=80;name.setAttribute('aria-label','绘图名称');
-  const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),status=el('p','ddw-status');
-  status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+  const actions=el('div','ddw-page-actions'),body=el('div','ddw-body'),editorHost=el('div','ddw-editor'),rail=el('div','ddw-side-actions'),panel=el('aside','ddw-side-panel'),noticeOwner=el('div','ddw-notice-owner');
+  noticeOwner.hidden=true;
   const settingsButton=button('绘图设置',()=>toggleEditorPanel('graphs')),informationButton=button('图形信息',()=>toggleEditorPanel('results'));
   const historyButton=button('历史绘图',()=>togglePanel('history')),aiButton=button('AI指导',()=>togglePanel('ai'));
   rail.setAttribute('role','toolbar');rail.setAttribute('aria-label','绘图面板');
@@ -31,10 +32,31 @@
   historyButton.setAttribute('aria-expanded','false');aiButton.setAttribute('aria-expanded','false');
   const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=button('上传',()=>uploadImage(),'ddw-primary ddw-upload-button');
   uploadButton.setAttribute('aria-label','上传');uploadButton.title='上传';
-  actions.append(newButton,historyButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,aiButton);body.append(editorHost,rail);shell.append(top,body,panel,status);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
+  actions.append(newButton,historyButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,aiButton);body.append(editorHost,rail);shell.append(top,body,panel,noticeOwner);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
   let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false;
   const active=()=>pages.find(p=>p.id===activeId);
-  function setStatus(message){status.textContent=message||persistError;status.classList.toggle('is-error',Boolean(status.textContent));}
+  function showNextNotice(){
+   if(destroyed||noticeFrame||noticeCurrent||!noticeQueue.length)return;
+   // Mount runs before the outer drawing dialog opens. Defer its first notice
+   // and recheck ownership/lifetime before entering the native top layer.
+   noticeFrame=win.requestAnimationFrame(()=>{
+    noticeFrame=0;const parent=noticeOwner.closest('dialog');
+    if(destroyed||!noticeOwner.isConnected||(parent&&!parent.open)){noticeQueue=[];return;}
+    const next=noticeQueue.shift();
+    if(next.persistent&&next.message!==persistError){showNextNotice();return;}
+    if(typeof root.DMateDeleteConfirm?.request!=='function')return;
+    noticeCurrent=next.message;if(next.persistent)persistNoticeShown=next.message;
+    void root.DMateDeleteConfirm.request(noticeOwner,{title:'绘图提示',body:next.message,noticeOnly:true})
+     .finally(()=>{noticeCurrent='';showNextNotice();});
+   });
+  }
+  function setStatus(message){
+   if(destroyed)return;
+   const value=String(message||persistError||'').trim();if(!value)return;
+   const persistent=Boolean(persistError&&value===persistError);
+   if((persistent&&persistNoticeShown===value)||noticeCurrent===value||noticeQueue.some(item=>item.message===value))return;
+   noticeQueue.push({message:value,persistent});showNextNotice();
+  }
   function abortAnswer(){aiEpoch++;aiAbort?.abort();aiAbort=null;}
   function invalidateAnswer(){
    abortAnswer();answer='';answerDocument='';answerRequirement='';
@@ -138,13 +160,13 @@
   editorHost.addEventListener('toggle',queueChrome,true);
   editorHost.addEventListener('pointerdown',event=>{if(panelMode&&event.target.closest('.dge-overlay-node,.dge-overlay-edge,.dge-overlay-handle')){panelMode='';renderPanel();}},true);
   const outsidePointer=event=>{
-   if(destroyed||exportPreview||deletePending||!event.target?.closest)return;
+   if(destroyed||exportPreview||deletePending||noticeCurrent||!event.target?.closest)return;
    if(!panelMode&&!toolsExpanded&&!editorHost.querySelector('.dge-floating-actions > details[open]'))return;
    if(event.target.closest('.ddw-side-actions,.ddw-side-panel,.dge-float-content,.dge-tool-palette')||historyButton.contains(event.target))return;
    dismissPanels();
   };
   const escapeKey=event=>{
-   if(event.key!=='Escape'||exportPreview||deletePending||(!panelMode&&!toolsExpanded&&!editorHost.querySelector('.dge-floating-actions > details[open]')))return;
+   if(event.key!=='Escape'||exportPreview||deletePending||noticeCurrent||(!panelMode&&!toolsExpanded&&!editorHost.querySelector('.dge-floating-actions > details[open]')))return;
    event.preventDefault();event.stopPropagation();const focus=panelMode==='history'?historyButton:panelMode==='ai'?aiButton:editorPanel('graphs')?.open?settingsButton:editorPanel('results')?.open?informationButton:editorHost.querySelector('.dge-tool-palette > summary');
    dismissPanels();focus?.focus({preventScroll:true});
   };
@@ -152,15 +174,15 @@
   win.addEventListener('resize',queueChrome);doc.addEventListener('scroll',documentScrolled,true);win.visualViewport?.addEventListener('resize',queueChrome);win.visualViewport?.addEventListener('scroll',queueChrome);
   function currentDocument(){return editor?.getDocument?.()||active()?.document||emptyDocument();}
   function collect(){const p=active();if(!p)return;p.document=clone(currentDocument());p.name=caption(name.value);p.updatedAt=Date.now();}
-  function persist(){
+  function persist(notify=true){
    clearTimeout(timer);timer=null;if(destroyed)return false;
    const payload=JSON.stringify({version:2,activeId,pages});
    // Keep the complete gallery in this owner's page memory even when storage
    // is full. Closing the drawing dialog must not discard that newer draft.
    sessionState.gallery=payload;
    if(payload===savedRaw&&!sessionState.galleryDirty)return true;
-   try{if(persistent)win.localStorage.setItem(key,payload);sessionState.galleryDirty=false;savedRaw=payload;persistError='';setStatus('');return true;}
-   catch(_){sessionState.galleryDirty=true;persistError='此设备存储不足，当前绘图仍在本页保留；请导出图片后再关闭页面。';setStatus();return false;}
+   try{if(persistent)win.localStorage.setItem(key,payload);sessionState.galleryDirty=false;savedRaw=payload;persistError='';persistNoticeShown='';return true;}
+   catch(_){sessionState.galleryDirty=true;persistError='此设备存储不足，当前绘图仍在本页保留；请导出图片后再关闭页面。';if(notify)setStatus();return false;}
   }
   function schedule(){clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}
   function mountPage(){
@@ -300,9 +322,9 @@
   pages=pages.flatMap(p=>p.document.graphs.length===1?[p]:p.document.graphs.map((graph,index)=>({...p,id:index?id():p.id,
    name:caption(graph.name||p.name+' '+(index+1)),document:{...clone(p.document),graphs:[clone(graph)]}})));
   mountPage();persist();
-  const pageHide=()=>{collect();persist();};win.addEventListener('pagehide',pageHide);
+  const pageHide=()=>{collect();persist(false);};win.addEventListener('pagehide',pageHide);
   return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,
-   destroy(){if(destroyed)return;collect();persist();destroyed=true;cancelDelete();closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',documentScrolled,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
+   destroy(){if(destroyed)return;collect();persist(false);destroyed=true;noticeQueue=[];if(noticeFrame)win.cancelAnimationFrame(noticeFrame);root.DMateDeleteConfirm?.cancel(noticeOwner);cancelDelete();closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',documentScrolled,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }
  root.DMateDrawingWorkspace={mount,blankDocument:blank};
 })(typeof window!=='undefined'?window:globalThis);

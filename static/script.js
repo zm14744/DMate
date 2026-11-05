@@ -21216,7 +21216,8 @@ function getTopMobileGesturePage() {
         };
     }
 
-    const dialog = document.querySelector("dialog[open]");
+    const dialog = document.activeElement?.closest?.("dialog[open]")
+        || document.querySelector("dialog[open]");
     if (dialog instanceof HTMLDialogElement) {
         return {
             overlay:dialog,

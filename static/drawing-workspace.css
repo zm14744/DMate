@@ -54,7 +54,7 @@
 .ddw-side-panel[hidden]{display:none}
 .ddw-panel-header,.ddw-editor-panel-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
 .ddw-panel-header>h3,.ddw-editor-panel-header>h3{font-size:16px;margin:0}
-.ddw-history-empty{font-size:14px;color:var(--text-secondary,#64748b);margin:0}
+.ddw-history-empty{font-size:14px;color:var(--text-secondary,#64748b);margin:0;text-align:center}
 .ddw-history-list{display:grid;gap:8px}
 .ddw-history-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px}
 .ddw-history-item.is-current{background:var(--surface-2,#f8fafc)}
@@ -66,9 +66,6 @@
 .ddw-ai-requirement{width:100%;box-sizing:border-box;resize:vertical;min-height:70px;max-height:200px;padding:9px;border-radius:8px;border:1px solid var(--border-strong,#cbd5e1);background:var(--surface-2,#f8fafc);color:inherit;font:inherit}
 .ddw-ai-answer{font-size:14px;white-space:normal;overflow-wrap:anywhere;line-height:1.7;margin-top:14px}
 .ddw-ai-answer:empty{display:none}
-.ddw-status{font-size:12px;line-height:1.5;margin:0;color:var(--text-secondary,#64748b);flex-shrink:0}
-.ddw-status:empty{display:none}
-.ddw-status.is-error{color:#dc2626}
 .ddw-export-preview{position:absolute;inset:0;z-index:30;box-sizing:border-box;display:flex;align-items:center;flex-direction:column;gap:12px;padding:14px;border:1px solid var(--border-strong,#cbd5e1);border-radius:12px;background:var(--surface-1,#fff);overflow:auto}
 .ddw-export-header{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}
 .ddw-export-header h3{margin:0;font-size:17px}
