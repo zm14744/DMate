@@ -102,10 +102,11 @@
 
 {% if is_search_crawler %}
 <!-- Bing and other search crawlers always receive the same stable, opaque DMate brand icon. -->
-<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-icons-v52-20261106">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=dmate-icons-v52-20261106">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=dmate-icons-v52-20261106">
-<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=dmate-icons-v52-20261106">
+<link rel="icon" type="image/x-icon" href="/favicon.ico?v=dmate-search-v52-20261106">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=dmate-search-v52-20261106">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png?v=dmate-search-v52-20261106">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png?v=dmate-search-v52-20261106">
+<link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png?v=dmate-search-v52-20261106">
 {% elif is_mac_safari %}
 <!-- Safari 26 uses the same site favicon in the URL field and tab chrome.
      The previous blur/focus handler incorrectly claimed to control them
@@ -721,7 +722,16 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     width:min(440px, 92vw);
 }
 
+#appConfirmModal .modal-head,
+.app-confirm-actions {
+    flex:0 0 auto;
+}
+
 .app-confirm-body {
+    flex:0 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    overflow-wrap:anywhere;
     padding:18px 18px 8px;
     color:var(--text-primary);
     line-height:1.7;
@@ -2579,7 +2589,8 @@ body[data-appearance-theme="light"] .msg-actions button {
     justify-content:center;padding:14px;box-sizing:border-box;
 }
 .dmate-png-save-panel {
-    box-sizing:border-box;width:min(550px,100%);max-height:92dvh;
+    box-sizing:border-box;width:min(550px,100%);max-height:min(92dvh,calc(100dvh - 28px));
+    overflow-y:auto;
     display:flex;flex-direction:column;gap:12px;
     border-radius:16px;padding:16px;background:var(--surface-1,#fff);
     color:var(--text-primary,#111);box-shadow:0 16px 40px rgba(0,0,0,.25);
@@ -5562,17 +5573,6 @@ body[data-appearance-theme="light"] .input input {
         touch-action:none !important;
     }
 
-    .app-confirm-card,
-    .mobile-choice-card {
-        width:100%;
-        max-width:none;
-        border-radius:22px 22px 0 0;
-        border-left:none;
-        border-right:none;
-        border-bottom:none;
-        margin-top:auto;
-    }
-
     .mobile-select-trigger {
         display:inline-flex;
         align-items:center;
@@ -6570,14 +6570,29 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
     background:#383838 !important;
 }
 
-/* 跨平台下载弹窗：桌面居中，手机底部弹出。 */
+/* 下载是轻量弹窗：各端均在中央，长内容只在卡片正文内滚动。 */
+#downloadModal {
+    --download-dialog-gap:max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom));
+    box-sizing:border-box;
+    align-items:center;
+    justify-content:center;
+    padding:var(--download-dialog-gap) max(16px, env(safe-area-inset-left), env(safe-area-inset-right));
+}
 .download-modal-card {
+    box-sizing:border-box;
     width:min(520px, calc(100vw - 32px));
-    max-height:min(680px, calc(100dvh - 48px));
+    min-height:0;
+    max-height:min(680px, calc(100dvh - 2 * var(--download-dialog-gap)));
+}
+#downloadModal .modal-head {
+    flex:0 0 auto;
 }
 .download-modal-body {
+    flex:0 1 auto;
+    min-height:0;
     padding:18px 20px 22px;
     overflow:auto;
+    overflow-wrap:anywhere;
     color:var(--text-primary);
 }
 .download-platform {
@@ -6615,17 +6630,12 @@ body[data-appearance-theme="dark"] .appearance-footer button:not(.primary):hover
 }
 
 @media (max-width:760px) {
-    #downloadModal {
-        padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
-        align-items:flex-end;
-        justify-content:center;
-    }
     #downloadModal .download-modal-card {
         width:100% !important;
-        max-width:100% !important;
+        max-width:520px !important;
         height:auto !important;
         min-height:0 !important;
-        max-height:min(78dvh, 620px) !important;
+        max-height:min(680px, calc(100dvh - 2 * var(--download-dialog-gap))) !important;
         border:1px solid var(--border-strong) !important;
         border-radius:18px !important;
         box-shadow:0 22px 70px rgba(0,0,0,.38) !important;

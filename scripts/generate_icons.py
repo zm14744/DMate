@@ -28,7 +28,7 @@ ADAPTIVE_SCALE = 0.72
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
-APP_SIZES = (16, 32, 64, 128, 180, 192, 256, 512, 1024)
+APP_SIZES = (16, 32, 48, 64, 96, 128, 180, 192, 256, 512, 1024)
 
 # Vector reconstruction of the supplied white-wireframe reference. Keep the
 # same connected polyhedron across platforms, including its generous margins.
@@ -191,11 +191,15 @@ def main():
         (f"dmate-app-{VERSION}-180.png", "apple-touch-icon.png"),
         (f"dmate-app-{VERSION}-512.png", "icon-512.png"),
         (f"dmate-app-{VERSION}.ico", "favicon-app.ico"),
-        (f"dmate-tab-white-{VERSION}.ico", "favicon.ico"),
+        (f"dmate-app-{VERSION}.ico", "favicon.ico"),
+        (f"dmate-app-{VERSION}-192.png", "favicon.png"),
     ):
         shutil.copyfile(STATIC / source, STATIC / target)
-    for size in (16, 32, 48, 128):
-        shutil.copyfile(STATIC / f"dmate-tab-white-{VERSION}-{size}.png", STATIC / f"favicon-{size}.png")
+    # Generic favicon URLs may be discovered by search engines without the
+    # browser-specific HTML. Always use the opaque brand here; transparent
+    # tab variants remain available only under their explicit tab filenames.
+    for size in (16, 32, 48, 64, 96, 128, 192):
+        shutil.copyfile(STATIC / f"dmate-app-{VERSION}-{size}.png", STATIC / f"favicon-{size}.png")
     for size, name in ((16, "icon-16.png"), (24, "icon-24.png"), (32, "32x32.png"),
                        (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
                        (256, "128x128@2x.png"), (512, "icon.png"), (1024, "icon-1024.png")):

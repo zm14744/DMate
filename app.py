@@ -2350,6 +2350,19 @@ def favicon_png_root():
     return response
 
 
+@app.route("/favicon-48.png")
+@app.route("/favicon-96.png")
+@app.route("/favicon-192.png")
+@app.route("/favicon.png")
+def search_favicon_png_root():
+    """Opaque, independently rendered sizes for search-result icon fetching."""
+    size = {"/favicon-48.png": 48, "/favicon-96.png": 96}.get(request.path, 192)
+    response = app.send_static_file(f"icons/dmate-app-v52-{size}.png")
+    response.headers["Content-Type"] = "image/png"
+    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
+    return response
+
+
 @app.route("/DMate.mobileconfig")
 def ios_ipados_webclip_profile():
     """Download the DMate full-screen Home Screen Web Clip for iPhone/iPad."""
@@ -2442,6 +2455,8 @@ def home():
         desktop_linux_appimage_url=DESKTOP_LINUX_APPIMAGE_URL,
     ))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    # The favicon and native-client controls depend on the request's platform.
+    response.vary.add("User-Agent")
     return response
 
 
