@@ -21533,16 +21533,14 @@ function downloadOptionsForCurrentPlatform() {
     }
 
     if (platform === "ios") {
-        // Both published releases contain the same versioned profile attachment.
         return {
             platform:"iPhone / iPad",
-            text:"下载描述文件后，在 iOS 设置中确认安装",
+            text:"下载描述文件后，在系统设置中确认安装；安装后从主屏幕启动 DMate，全屏运行",
             actions:[
                 { label:"GitCode · 描述文件",
                   url:gitcodeDownloadBase + "DMate-iPhone-iPad.mobileconfig/download" },
                 { label:"GitHub · 描述文件",
-                  url:githubDownloadBase + "DMate-iPhone-iPad.mobileconfig", secondary:true },
-                { label:"GitCode · 发行版", url:gitcodeRelease, secondary:true }
+                  url:githubDownloadBase + "DMate-iPhone-iPad.mobileconfig", secondary:true }
             ]
         };
     }
