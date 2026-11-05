@@ -7603,13 +7603,11 @@ function openWrongEdit(id) {
 
     const modal = document.getElementById("wrongEditModal");
     const question = document.getElementById("wrongEditQuestion");
-    const focus = document.getElementById("wrongEditFocus");
     const note = document.getElementById("wrongEditNote");
 
-    if (!modal || !question || !focus || !note) return;
+    if (!modal || !question || !note) return;
 
     question.value = entry.question;
-    focus.value = (entry.focusPoints || []).join("、");
     note.value = entry.note || "";
 
     modal.classList.remove("hidden");
@@ -7635,10 +7633,9 @@ function saveWrongEdit() {
     }
 
     const questionBox = document.getElementById("wrongEditQuestion");
-    const focusBox = document.getElementById("wrongEditFocus");
     const noteBox = document.getElementById("wrongEditNote");
 
-    if (!questionBox || !focusBox || !noteBox) return;
+    if (!questionBox || !noteBox) return;
 
     const question = questionBox.value.trim();
 
@@ -7660,17 +7657,12 @@ function saveWrongEdit() {
         return;
     }
 
-    const focusPoints = focusBox.value
-        .split(/[、,，;；]/)
-        .map(item => item.trim())
-        .filter(Boolean)
-        .slice(0, 2);
-
     if (entry.question !== limitQuestionText(question)) {
         entry.classificationVersion = 0;
         entry.category = "待识别";
         entry.relatedCategories = [];
         entry.knowledgePoints = [];
+        entry.focusPoints = [];
         entry.difficulty = "";
         entry.referenceAnswer = "";
         entry.answer = "";
@@ -7680,17 +7672,7 @@ function saveWrongEdit() {
         wrongAnalysisExpandedIds.delete(entry.id);
     }
     entry.question = limitQuestionText(question);
-    entry.focusPoints = focusPoints;
     entry.note = noteBox.value.trim().slice(0, 1500);
-
-    if (focusPoints.length) {
-        entry.knowledgePoints = [
-            ...new Set([
-                ...focusPoints,
-                ...(entry.knowledgePoints || [])
-            ])
-        ].slice(0, 4);
-    }
 
     entry.updatedAt = Date.now();
 
