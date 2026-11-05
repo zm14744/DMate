@@ -214,9 +214,34 @@ location / {
     proxy_read_timeout 310s;
     proxy_send_timeout 310s;
 }
+
+# 与上面的 location / 并列；SSE 不能等整段缓冲完再交给浏览器。
+location = /chat {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Connection "";
+    proxy_buffering off;
+    proxy_cache off;
+    gzip off;
+    proxy_connect_timeout 10s;
+    proxy_read_timeout 310s;
+    proxy_send_timeout 310s;
+}
 ```
 
 代理的 `24m` 只允许流量到达应用，应用仍执行更严格的文件和请求体上限。若需要应用正确识别代理后的 HTTPS，必须由可信的 WSGI / 平台接入层配置并验证；仅发送 `X-Forwarded-Proto` 不会在此应用中自动启用 `ProxyFix`。正式环境保留安全 Cookie；本机直接 HTTP 调试账号才设置 `SESSION_COOKIE_SECURE=0`。
+
+`/chat` 在请求明确启用流式时发送 SSE，返回 `X-Accel-Buffering: no` 和 `Cache-Control: no-store, no-transform`。前面的独立 location 同时兼容原有 JSON 请求，不必新增域名或流式接口地址。若还有 CDN、网关、托管平台或压缩中间件，须让该 POST 响应及时透传，避免缓存、整段缓冲或压缩合并；应用返回这些头不证明所有上游平台都会遵守。没有修改代理权限时，应由部署者核对平台配置，本仓库的网页修改不会自动重写外部代理。
+
+流式能力默认启用；需要暂时回退时设置 `DMATE_CHAT_STREAMING=0` 并重启应用。服务端会对同一请求返回原 JSON，新前端按响应类型处理，不会自动额外调用一次模型。此开关不修改模型选择、题目校验或已有聊天数据。
+
+当前 `chat_streaming.py` 每进程限制最多 4 个流式工作任务，各有 64 个待发送事件的有界队列。配合默认单 worker、8 个 Gunicorn 线程，流式连接自身不会占满全部 8 个请求线程，可为同步、取消、账号及其他请求保留处理空间；这不是其他负载下的响应时间保证。已断开的受保护 JSON 模型请求可能仍在读取，直到它结束前仍占用同一个工作名额，防止快速断开重连产生无限后台任务。饱和时返回 JSON 429、`chat_stream_busy` 和 `Retry-After: 2`，不要靠客户端自动循环重发突破限额。多进程 / 副本不会共享该进程内信号量，不能仅增 worker 就认定全系统仍是 4 个任务。
+
+等待中的 SSE 连接约每秒发送一次保活注释，以降低空闲断连并让服务器发现客户端离开；心跳不替代模型和后端的超时预算。停止时公开正文上游流会尝试关闭，受完整校验保护的 JSON 读取仍可能运行到原超时。不得把“客户端已断开”当成“提供方已停止生成或费用已撤回”。流式不更改云同步的修订号协议，也不会把临时片段写入已完成聊天记录。
 
 当前关键容量为：单图 20,000,000 字节、总像素 33,177,600；全局请求体 22,524,288 字节；同步 `data` JSON 单独上限 12 MiB。普通文字单条 20,000 字符，历史最多 64 条消息、总计 120,000 字符。已确认图片单条仍为 28,000 字符；完整题干和追问 / 复测的内部包装另有校验，不等于放宽普通输入。
 

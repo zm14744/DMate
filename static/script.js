@@ -1298,6 +1298,7 @@ function markSessionDeleted(sessionId) {
     if (request) {
         request.cancelled = true;
         request.controller.abort();
+        discardRequestStreamPreview(request);
         activeAiRequests.delete(key);
     }
     busySessionIds.delete(key);
@@ -3447,6 +3448,7 @@ function cancelAccountInteractions() {
     for (const request of activeAiRequests.values()) {
         request.cancelled = true;
         request.controller.abort();
+        discardRequestStreamPreview(request);
     }
     activeAiRequests.clear();
     busySessionIds.clear();
@@ -3485,6 +3487,53 @@ function throwIfAiRequestCancelled(request) {
     }
 }
 
+function discardRequestStreamPreview(request) {
+    request?.streamPreview?.dispose();
+    if (request) request.streamPreview = null;
+}
+
+function currentRequestStreamPreview() {
+    return activeAiRequests.get(sessionBusyKey(currentId))?.streamPreview || null;
+}
+
+function hasActiveChatOutput() {
+    return Boolean(typingTimer || currentRequestStreamPreview());
+}
+
+function appendRequestStreamDelta(request, text) {
+    throwIfAiRequestCancelled(request);
+    if (!request.streamPreview) {
+        const chat = document.getElementById("chat");
+        if (!chat) return;
+        const visible = () => currentId === request.session.id && !document.hidden;
+        if (visible()) {
+            typingAutoFollow = isChatNearBottom(chat, 90);
+            typingScrollLockedByUser = false;
+            lastTypingAutoScrollAt = 0;
+        }
+        request.streamPreview = window.DMateChatStream.createPreview({
+            chat,
+            isCurrent: () => {
+                try { throwIfAiRequestCancelled(request); return true; } catch (_error) { return false; }
+            },
+            canRender: visible,
+            format: source => markdownToHtml(prepareAiDisplayText(source)),
+            typeset: renderMath,
+            onRender: () => {
+                if (visible()) {
+                    if (!request.streamVisible) {
+                        request.streamVisible = true;
+                        refreshInputAvailability();
+                    }
+                    maybeAutoFollowTyping();
+                    queueChatJumpControlsUpdate();
+                }
+            }
+        });
+    }
+    request.streamPreview.append(text);
+}
+
 function discardTypingOutput() {
     if (!typingTimer && !typingContext && !typingDiv) return false;
     clearTypingState(true);
@@ -3503,6 +3552,7 @@ function stopCurrentAiReply() {
     if (request) {
         request.cancelled = true;
         request.controller.abort();
+        discardRequestStreamPreview(request);
         activeAiRequests.delete(key);
         busySessionIds.delete(key);
         pendingAiStartSessionIds.delete(key);
@@ -3591,7 +3641,8 @@ function isCurrentSessionTyping() {
 
 function refreshInputAvailability() {
     const pendingStart = isSessionPendingAiStart(currentId);
-    const typingNow = isCurrentSessionTyping();
+    const typingNow = isCurrentSessionTyping()
+        || Boolean(currentRequestStreamPreview()?.element?.isConnected);
     const imageBatchActive = typeof ocrBatchRuns !== "undefined"
         && Boolean(ocrBatchRuns.get(sessionBusyKey(currentId))?.cancelled === false);
     const waitingReply = isSessionBusy(currentId) || pendingStart || imageBatchActive;
@@ -12478,7 +12529,7 @@ function installChatJumpControls() {
     if (!chat || !topButton || !bottomButton) return;
 
     const navigate = toBottom => {
-        if (toBottom && typingTimer) {
+        if (toBottom && hasActiveChatOutput()) {
             typingScrollLockedByUser = false;
             typingAutoFollow = true;
             lastTypingAutoScrollAt = 0;
@@ -12545,14 +12596,14 @@ function chatBottomDistance(chat) {
 }
 
 function stopTypingAutoFollow() {
-    if (!typingTimer) return;
+    if (!hasActiveChatOutput()) return;
 
     typingScrollLockedByUser = true;
     typingAutoFollow = false;
 }
 
 function handleChatWheelWhileTyping(event) {
-    if (!typingTimer) return;
+    if (!hasActiveChatOutput()) return;
 
     // 只要用户主动滚轮，就先停止自动跟随。
     // 这样上下滚动都不会和打字机争夺 scrollTop。
@@ -12562,20 +12613,20 @@ function handleChatWheelWhileTyping(event) {
 }
 
 function handleChatPointerWhileTyping() {
-    if (!typingTimer) return;
+    if (!hasActiveChatOutput()) return;
 
     // 支持拖动滚动条。
     stopTypingAutoFollow();
 }
 
 function handleChatTouchWhileTyping() {
-    if (!typingTimer) return;
+    if (!hasActiveChatOutput()) return;
 
     stopTypingAutoFollow();
 }
 
 function handleChatScrollWhileTyping() {
-    if (!typingTimer) return;
+    if (!hasActiveChatOutput()) return;
 
     const chat = document.getElementById("chat");
     if (!chat) return;
@@ -13692,13 +13743,16 @@ async function requestAiReply(session, options = {}) {
         const semanticContext = semanticContextForRequest(session, requestTargetCandidate, apiMessages, {
             exerciseRequest: latestIsExerciseRequest, retestGeneration: latestIsRetestGeneration
         });
+        const wantsStream = Boolean(window.DMateChatStream?.read);
         const response = await fetch("/chat", {
             method: "POST",
             signal: activeRequest.controller.signal,
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Accept": wantsStream ? "text/event-stream" : "application/json"
             },
             body: JSON.stringify({
+                stream: wantsStream,
                 messages: apiMessages,
                 semantic_context: Array.isArray(semanticContext) ? undefined : semanticContext,
                 semantic_contexts: Array.isArray(semanticContext) ? semanticContext : undefined,
@@ -13726,7 +13780,14 @@ async function requestAiReply(session, options = {}) {
             })
         });
 
-        const data = await parseResponseJson(response);
+        activeRequest.streaming = wantsStream
+            && response.headers.get("Content-Type")?.includes("text/event-stream");
+        const data = activeRequest.streaming
+            ? await window.DMateChatStream.read(response, {
+                signal: activeRequest.controller.signal,
+                onDelta: text => appendRequestStreamDelta(activeRequest, text)
+            })
+            : await parseResponseJson(response);
         throwIfAiRequestCancelled(activeRequest);
 
         let localGeneratedQuestion = supportingImagesOnly ? "" : sanitizeStoredWrongQuestionText(
@@ -13925,7 +13986,21 @@ async function requestAiReply(session, options = {}) {
             targetQuestionFingerprint: requestTargetFingerprint
         };
 
-        if (!options.completeImmediately && currentId === session.id) {
+        if (activeRequest.streaming) {
+            const preparedContent = currentId === session.id && !document.hidden
+                ? await activeRequest.streamPreview?.finish(data.reply) : null;
+            throwIfAiRequestCancelled(activeRequest);
+            discardRequestStreamPreview(activeRequest);
+            addAssistantMessage(session, data.reply, assistantMeta);
+            saveState();
+            renderSessions();
+            renderInfo();
+            if (currentId === session.id) {
+                if (typingAutoFollow && !typingScrollLockedByUser) forceChatBottomOnce = true;
+                renderChat({ message:session.messages[session.messages.length - 1], content:preparedContent });
+                refreshInputAvailability();
+            }
+        } else if (!options.completeImmediately && currentId === session.id) {
             startTyping(
                 data.reply,
                 session,
@@ -13953,12 +14028,13 @@ async function requestAiReply(session, options = {}) {
 
         showAssistantMessage(
             session,
-            "网络连接失败，请检查网络后重试",
+            activeRequest.streaming ? (error?.data?.error || "回答连接中断，请重试") : "网络连接失败，请检查网络后重试",
             { isError: true }
         );
         return { status: "error" };
 
     } finally {
+        discardRequestStreamPreview(activeRequest);
         // 旧请求晚结束时不能清除用户刚刚重新发起的新请求的忙碌状态。
         const activeKey = sessionBusyKey(session.id);
         if (activeAiRequests.get(activeKey) === activeRequest) {
@@ -16224,6 +16300,12 @@ async function deleteChatMessage(sessionId, messageIndex) {
 
     const removed = session.messages[messageIndex];
     if (typingContext?.session === session && typingContext.userMessage === removed) discardTypingOutput();
+    const activeRequest = activeAiRequests.get(sessionBusyKey(session.id));
+    if (activeRequest?.userMessage === removed) {
+        activeRequest.cancelled = true;
+        activeRequest.controller.abort();
+        discardRequestStreamPreview(activeRequest);
+    }
 
     session.messages.splice(
         messageIndex,
@@ -16601,6 +16683,10 @@ document.addEventListener("visibilitychange", () => {
         renderInfo();
         refreshInputAvailability();
     }
+    if (!document.hidden) {
+        const chat = document.getElementById("chat");
+        if (chat) currentRequestStreamPreview()?.attach(chat);
+    }
 });
 
 // -----------------------------
@@ -16794,6 +16880,13 @@ function renderChat(preparedReply = null) {
     if (typingTimer && typingDiv && String(typingSessionId) === String(session.id)) {
         chat.appendChild(typingDiv);
     }
+    const streamPreview = currentRequestStreamPreview();
+    if (streamPreview && sessionChanged) {
+        typingAutoFollow = true;
+        typingScrollLockedByUser = false;
+        lastTypingAutoScrollAt = 0;
+    }
+    streamPreview?.attach(chat);
 
     const shouldStickBottom = Boolean(
         forceChatBottomOnce

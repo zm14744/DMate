@@ -3535,6 +3535,16 @@ def describe_confirmed_graph_document():
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    payload = request.get_json(silent=True)
+    if (_env_bool("DMATE_CHAT_STREAMING", True)
+            and isinstance(payload, dict) and payload.get("stream") is True
+            and "text/event-stream" in request.headers.get("Accept", "")):
+        from chat_streaming import stream_chat_response
+        return stream_chat_response(_chat_response)
+    return _chat_response()
+
+
+def _chat_response(on_delta=None, cancelled=None):
     ip = _get_client_ip()
 
     if not _check_rate_limit(ip, "chat"):
@@ -3895,15 +3905,44 @@ def chat():
         ai_teaching = dict(ai_teaching or {})
         ai_teaching["semantic_math"] = semantic_math
 
+    # A draft must not expose hidden exercise answers or bypass a whole-answer
+    # graph/count/logic check. The final payload still follows every old guard.
+    latest_preview_question = next((m["content"] for m in reversed(cleaned)
+                                    if m.get("role") == "user"), "")
+    from math_answer_guard import separate_selection_value, _letter_arrangement_value
+    graph_bound_preview = re.search(
+        r"【(?:图形|有向边|单图|同构)|(?:边连接关系|边集合|边集|边包括|边为|边)\s*(?:为|包括)?\s*[：:]",
+        latest_preview_question,
+    )
+    preview_allowed = bool(on_delta is not None and not effective_exercise_request
+        and confirmed_context is None and data.get("semantic_context") is None
+        and not solution_reference_answer and not graph_bound_preview
+        and verify_exact_question(latest_preview_question) is None
+        and separate_selection_value(latest_preview_question) is None
+        and _letter_arrangement_value(latest_preview_question) is None)
+
+    def invoke_chat_ai(messages, **options):
+        if cancelled is not None:
+            from chat_streaming import ChatStreamCancelled
+            if cancelled():
+                raise ChatStreamCancelled()
+            options["cancelled"] = cancelled
+        if preview_allowed:
+            options["on_delta"] = on_delta
+        result = ask_ai(messages, **options)
+        if cancelled is not None and cancelled():
+            raise ChatStreamCancelled()
+        return result
+
     # 网络层零自动重试 + 质量层最多一次重生成：避免一次出题叠加
     # 3 次 HTTP 重试、app 兜底、格式修补、难度纠偏导致几十秒到数分钟等待。
     # 普通聊天继续使用原来的网络重试行为。
     try:
         if effective_exercise_request:
-            result = ask_ai(cleaned, retries=0, teaching_context=ai_teaching)
+            result = invoke_chat_ai(cleaned, retries=0, teaching_context=ai_teaching)
         else:
             # 普通聊天完全沿用此前的调用签名与重试逻辑。
-            result = ask_ai(cleaned, teaching_context=ai_teaching)
+            result = invoke_chat_ai(cleaned, teaching_context=ai_teaching)
     except Exception as exc:
         print(f"/chat AI 首次请求异常：{repr(exc)}")
         if not effective_exercise_request:
@@ -3923,7 +3962,7 @@ def chat():
         fallback_context["generation_reasoning_effort"] = "none"  # 只降低思考耗时，不降低出题目标
         fallback_context["exercise_target_difficulty"] = teaching["exercise_target_difficulty"]
         try:
-            result = ask_ai(cleaned[-1:], retries=0, teaching_context=fallback_context)
+            result = invoke_chat_ai(cleaned[-1:], retries=0, teaching_context=fallback_context)
         except Exception as fallback_exc:
             print("练习轻量补救失败：", repr(fallback_exc))
             result = {"ok": False, "error": "AI 服务暂时出现异常"}
@@ -4182,7 +4221,7 @@ def chat():
                 retry_context["generation_reasoning_effort"] = "none"
                 retry_context["exercise_target_difficulty"] = target_difficulty
                 try:
-                    retry_result = ask_ai(
+                    retry_result = invoke_chat_ai(
                         retry_messages,
                         retries=0,
                         teaching_context=retry_context,
@@ -4240,7 +4279,7 @@ def chat():
                     explain_context["mode_label"] = "完整解析"
                     explain_context["difficulty"] = actual_difficulty or "中等"
                     try:
-                        explained = ask_ai([{"role":"user", "content":(
+                        explained = invoke_chat_ai([{"role":"user", "content":(
                             "请独立求解下面的离散数学题，必须给出完整推导、最终答案，"
                             "核对每个结果。若参考答案有误请纠正。\n"
                             "【题目】\n" + generated_question +

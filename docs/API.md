@@ -9,7 +9,7 @@
 - API 与网页默认同源；浏览器可使用 `fetch(path, {credentials: "same-origin"})`。仓库没有提供供第三方跨域网站使用的通用 CORS 接入或 Bearer Token 登录 API。
 - 登录由 `dm_tutor_session` 签名 HttpOnly Cookie 表示，前端不读取登录令牌。图片任务另使用 `dm_graph_owner` HttpOnly Cookie，并与当前登录用户身份共同确定归属。
 - 游客可以调用不要求账号的聊天、识图等功能，但仍受模型配置、容量和频率限制。`/sync`、邮箱绑定、恢复码设置、注销账号等有相应登录要求。
-- `/chat`、识图、笔记分析、绘图指导、语音转写返回完整 JSON；这些路由不是 SSE 或 WebSocket 流式协议。页面上的等待和停止由客户端请求状态管理。
+- `/chat` 默认返回完整 JSON，显式启用时改用下文说明的 SSE；识图、笔记分析、绘图指导和语音转写仍返回完整 JSON，没有改为 WebSocket。页面上的等待和停止由客户端请求状态管理。
 - multipart 请求由浏览器 `FormData` 或上传客户端生成 `Content-Type` 及 boundary；不要手工只填 `multipart/form-data` 而遗漏 boundary。
 - 账号登录 / 退出后图片任务的身份范围会变化，其他浏览器或设备不能仅复制任务 ID 和令牌来复用原确认。
 
@@ -103,6 +103,7 @@ if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 | `solution_reference` | 已生成题的 `question` 与 `answer`，仅匹配当前题且本轮要求答案时使用 |
 | `semantic_context` | `/graph/confirm` 返回的单图完整确认快照 |
 | `semantic_contexts` | 1–4 份完整确认快照，按图片顺序提交；不能同时提交 `semantic_context` |
+| `stream` | 只有 JSON 布尔值 `true` 且 `Accept` 包含 `text/event-stream` 时启用 SSE；省略时保持原 JSON 响应 |
 
 服务端重新分析参照题和生成题。普通出题目标默认中等，错题复测可继承原难度；显式难度偏离时最多额外生成一次，不保证估计难度完全一致。可识别的核心知识点、题干与答案完整性还会进行校验。
 
@@ -125,6 +126,38 @@ if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 上下文由调用方提供，后端不会按一个客户端会话 ID 从数据库自动拼回聊天历史。因此只发送“继续上一题”而不携带条件，可能触发 `missing_question_context`；改变题目后也不应沿用旧题的 `exercise_reference`、`solution_reference` 或图片确认。
 
 网页“题目：是 / 否”与图片分组是前端学习记录策略，不是 `/chat` 的同名参数。题目是否收录、一个分组对应几张图，不应通过给普通消息添加未经后端定义的字段来实现。
+
+### 流式响应
+
+沿用同一个 POST 地址和所有原有字段，增加请求头 `Accept: text/event-stream`、请求体 `"stream": true`。服务端不会因为只有请求头或字符串 `"true"` 就改变返回协议。未显式启用的请求继续收到完整 JSON，原有调用方不必修改。
+
+服务端默认开启流式能力；部署设置 `DMATE_CHAT_STREAMING=0` 可临时停用，带上述字段的请求也会回到 JSON。新前端按实际响应类型兼容处理，不会因此重复发起模型请求。
+
+网页对累计流式正文及最终 `reply` 分别设置 512 KiB UTF-8 上限，事件解码缓冲也有独立上限。超限时报告错误、保留用户提问，不将截断片段保存为成功回答；它不改变单条输入和历史上下文的容量。
+
+```http
+POST /chat
+Content-Type: application/json
+Accept: text/event-stream
+
+{"messages":[{"role":"user","content":"解释等价关系，并举一个例子"}],"stream":true}
+```
+
+建立的 SSE 响应使用 `Content-Type: text/event-stream; charset=utf-8`，设置 `Cache-Control: no-store, no-transform` 和 `X-Accel-Buffering: no`。注释行 `: connected`、`: keepalive` 用于连接与保活，没有回答正文；当前等待期间约每秒保活一次。客户端必须增量解码 UTF-8，按 SSE 空行划分完整事件，不能假设一次网络读取恰好对应一个事件或一个完整汉字。
+
+| 事件 | `data` 内容 | 客户端处理 |
+| --- | --- | --- |
+| `delta` | `{"text":"正文片段"}` | 累加为当前请求的临时显示；不包含提供方内部推理或工具调用字段 |
+| `final` | 与原成功 JSON 相同的完整对象，含 `reply`、`teaching` 及适用的生成题字段 | 以其完整正文替换临时内容，执行一次原有保存与学习记录流程 |
+| `error` | 原失败 JSON 字段加 `status`，例如 `{"error":"…","code":"…","status":409}` | 丢弃临时回答，保留用户提问，按该状态展示错误 |
+
+例如先收到 `event: delta` / `data: {"text":"等价关系需要"}`，最后收到 `event: final` 及完整响应对象。此接口以 `final` 或 `error` 为终止事件，不要求客户端解释模型提供方的 `[DONE]` 标记。成功时只有一个 `final`；连接结束却没有终止事件必须按未完成处理，不能把最后一个片段当成成功答案，也不要自动重发整个 POST。
+
+SSE 响应头一旦发送，后续校验失败不能再改变外层 HTTP 状态，因此 HTTP 200 本身不代表回答成功；客户端还必须等到 `final`，并处理 `error.status`。在流资源准入前饱和的请求会直接收到 JSON HTTP 429、`code: "chat_stream_busy"` 和 `Retry-After: 2`，不会建立 SSE。当前每进程最多 4 个此类工作任务，每个任务最多缓存 64 个待发送事件，以免慢读者或已断开的缓冲请求无限占用线程和内存。
+
+普通公开正文可随模型生成转发。练习 / 复测出题、确认图片与语义图结构、图结构约束、受支持的精确计算题和参考答案解答等需完整校验的路径不会转发未校验正文，仍可通过同一 SSE 连接返回最终结果。`generated_answer` 等原有最终字段仍可能存在于 `final` 中，前端沿用原规则保存，不将其当成首次出题正文展示。临时正文不是校验凭据，最终修复或验证可能改变 `reply`。
+
+断开或主动停止会触发当前请求的协作取消。公开正文的上游 SSE 读取会尝试关闭，后续调用也检查取消；受保护路径的旧 JSON 上游读取仍可能运行到其超时。不能据此承诺模型提供方即时停止执行或撤回费用。流式输出不改变输入 / 历史容量、限流、题目身份、最终答案校验或账号同步数据格式。
 
 ## `POST /analyze-questions`
 

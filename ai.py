@@ -885,6 +885,89 @@ def _text_http_session():
     return session
 
 
+def _read_text_sse(response, on_delta, cancelled=None):
+    """Read one complete OpenAI-compatible public-answer stream.
+
+    Reasoning and tool-call fields never enter the callback or assembled answer.
+    A dropped connection cannot masquerade as a completed short response.
+    """
+    chunks, usage, finish_reason = [], None, None
+    saw_done = False
+    stop_watcher = threading.Event()
+
+    def watch_cancel():
+        while not stop_watcher.wait(.1):
+            if cancelled is not None and cancelled():
+                try:
+                    response.close()
+                except Exception:
+                    pass
+                return
+
+    if cancelled is not None:
+        threading.Thread(target=watch_cancel, daemon=True).start()
+    response.encoding = "utf-8"
+    data_lines = []
+
+    def events():
+        # requests' larger default chunk can delay small text deltas. iter_lines
+        # still joins split UTF-8/network chunks before yielding an SSE line.
+        for line in response.iter_lines(chunk_size=1, decode_unicode=True):
+            if cancelled is not None and cancelled():
+                raise requests.ConnectionError("text_stream_cancelled")
+            if isinstance(line, bytes):
+                line = line.decode("utf-8")
+            if line == "":
+                if data_lines:
+                    yield "\n".join(data_lines)
+                    data_lines.clear()
+            elif line.startswith("data:"):
+                data_lines.append(line[5:].lstrip(" "))
+        if data_lines:
+            yield "\n".join(data_lines)
+
+    try:
+        for event in events():
+            if cancelled is not None and cancelled():
+                raise requests.ConnectionError("text_stream_cancelled")
+            if event.strip() == "[DONE]":
+                saw_done = True
+                break
+            try:
+                payload = json.loads(event)
+            except (ValueError, TypeError) as exc:
+                raise requests.ConnectionError("invalid_text_sse_event") from exc
+            if not isinstance(payload, dict) or payload.get("error"):
+                raise requests.ConnectionError("text_sse_provider_error")
+            if isinstance(payload.get("usage"), dict):
+                usage = payload["usage"]
+            choices = payload.get("choices")
+            if not isinstance(choices, list):
+                continue
+            choice = next((item for item in choices if isinstance(item, dict)
+                           and item.get("index", 0) == 0), None)
+            if choice is None:
+                continue
+            delta = choice.get("delta")
+            content = delta.get("content") if isinstance(delta, dict) else None
+            if isinstance(content, str) and content:
+                if finish_reason is not None:
+                    raise requests.ConnectionError("text_sse_content_after_finish")
+                chunks.append(content)
+                on_delta(content)
+            reason = choice.get("finish_reason")
+            if reason is not None:
+                finish_reason = reason
+        if cancelled is not None and cancelled():
+            raise requests.ConnectionError("text_stream_cancelled")
+        if not saw_done or finish_reason not in ("stop", "length"):
+            raise requests.ConnectionError("incomplete_text_sse_stream")
+        return {"choices": [{"message": {"content": "".join(chunks)},
+                              "finish_reason": finish_reason}], "usage": usage or {}}
+    finally:
+        stop_watcher.set()
+
+
 def _request_text_completion(
     messages,
     retries=2,
@@ -895,6 +978,7 @@ def _request_text_completion(
     response_format=None,
     cancelled=None,
     protected_messages=None,
+    on_delta=None,
 ):
     """
     调用文本模型。
@@ -917,6 +1001,14 @@ def _request_text_completion(
     last_error = None
     saw_empty_body = False
     context_reduced = False
+    public_delta_sent = False
+
+    def publish_delta(piece):
+        nonlocal public_delta_sent
+        if cancelled is not None and cancelled():
+            raise requests.ConnectionError("text_stream_cancelled")
+        public_delta_sent = True
+        on_delta(piece)
 
     for provider_index, provider in enumerate(providers):
         # 单一 DeepSeek 线路保留原有重试次数。
@@ -939,12 +1031,15 @@ def _request_text_completion(
         )
         if response_format is not None:
             payload["response_format"] = dict(response_format)
+        if callable(on_delta):
+            payload["stream"] = True
         headers = {
             "Authorization": f"Bearer {provider['api_key']}",
             "Content-Type": "application/json",
         }
 
         for attempt in range(attempts):
+            response = None
             try:
                 mode_text = {
                     "high": "high 思考",
@@ -963,6 +1058,7 @@ def _request_text_completion(
                     headers=headers,
                     json=payload,
                     timeout=provider_timeout,
+                    **({"stream": True} if callable(on_delta) else {}),
                 )
                 elapsed = time.monotonic() - call_start
                 print(f"{provider['name']} API耗时 {elapsed:.2f}s；HTTP {response.status_code}")
@@ -981,8 +1077,11 @@ def _request_text_completion(
                     if cancelled is not None and cancelled():
                         return {"ok": False, "cancelled": True}
                     print("模型明确返回上下文容量不足，移除较早的完整历史后仅重试一次。")
+                    if callable(getattr(response, "close", None)):
+                        response.close()
                     response = _text_http_session().post(
-                        provider["url"], headers=headers, json=payload, timeout=provider_timeout
+                        provider["url"], headers=headers, json=payload, timeout=provider_timeout,
+                        **({"stream": True} if callable(on_delta) else {}),
                     )
                     last_status = response.status_code
                     if _context_capacity_error(response):
@@ -1011,7 +1110,10 @@ def _request_text_completion(
                     break
 
                 try:
-                    result = response.json()
+                    content_type = str(getattr(response, "headers", {}).get("Content-Type", "")).lower()
+                    result = (_read_text_sse(response, publish_delta, cancelled)
+                              if callable(on_delta) and "text/event-stream" in content_type
+                              else response.json())
                 except ValueError as exc:
                     last_error = exc
                     print(
@@ -1055,6 +1157,11 @@ def _request_text_completion(
                     saw_empty_body = True
                     break
 
+                if cancelled is not None and cancelled():
+                    return {"ok": False, "cancelled": True}
+                if callable(on_delta) and "text/event-stream" not in content_type:
+                    # Compatibility for a gateway that returns complete JSON.
+                    publish_delta(content)
 
                 return {
                     "ok": True,
@@ -1067,8 +1174,10 @@ def _request_text_completion(
 
             except requests.exceptions.Timeout as exc:
                 last_error = exc
+                if cancelled is not None and cancelled():
+                    return {"ok": False, "cancelled": True}
                 print(f"{provider['name']} 请求超时（耗时 {time.monotonic() - call_start:.2f}s）：{repr(exc)}")
-                if attempt < attempts - 1:
+                if attempt < attempts - 1 and not public_delta_sent:
                     wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
                     time.sleep(wait_seconds)
                     continue
@@ -1076,8 +1185,10 @@ def _request_text_completion(
 
             except requests.exceptions.ConnectionError as exc:
                 last_error = exc
+                if cancelled is not None and cancelled():
+                    return {"ok": False, "cancelled": True}
                 print(f"{provider['name']} 网络连接异常：{repr(exc)}")
-                if attempt < attempts - 1:
+                if attempt < attempts - 1 and not public_delta_sent:
                     wait_seconds = (2 ** attempt) + random.uniform(0, 0.4)
                     time.sleep(wait_seconds)
                     continue
@@ -1085,14 +1196,26 @@ def _request_text_completion(
 
             except requests.exceptions.RequestException as exc:
                 last_error = exc
+                if cancelled is not None and cancelled():
+                    return {"ok": False, "cancelled": True}
                 print(f"{provider['name']} 请求异常：{repr(exc)}")
                 break
 
             except Exception as exc:
                 last_error = exc
+                if cancelled is not None and cancelled():
+                    return {"ok": False, "cancelled": True}
                 print(f"{provider['name']} 未知异常：{repr(exc)}")
                 break
+            finally:
+                if response is not None and callable(getattr(response, "close", None)):
+                    try:
+                        response.close()
+                    except Exception:
+                        pass
 
+        if public_delta_sent:
+            break
         if provider_index < len(providers) - 1:
             print(
                 f"{provider['name']} 当前不可用，自动切换到"
@@ -1136,6 +1259,7 @@ def _regenerate_broken_math_answer(
     broken_content,
     preferred_provider=None,
     reasoning_effort="none",
+    cancelled=None,
 ):
     """
     仅在答案数学格式损坏时额外重生成一次。
@@ -1170,6 +1294,7 @@ def _regenerate_broken_math_answer(
         reasoning_effort=reasoning_effort,
         preferred_provider=preferred_provider,
         protected_messages=_current_task_messages(final_messages) + retry_messages[len(final_messages):],
+        cancelled=cancelled,
     )
     if not result.get("ok"):
         print("数学格式重生成失败：所有可用文本路径均失败")
@@ -1191,6 +1316,9 @@ def _continue_truncated_answer(
     partial_content,
     preferred_provider=None,
     reasoning_effort="none",
+    cancelled=None,
+    on_delta=None,
+    require_complete=False,
 ):
     """当模型因为输出长度限制截断时，最多自动续写一次并拼接完整答案。"""
     content = str(partial_content or "").strip()
@@ -1206,6 +1334,8 @@ def _continue_truncated_answer(
     current_provider = preferred_provider
 
     for _round in range(MAX_CONTINUATION_ROUNDS):
+        if cancelled is not None and cancelled():
+            return None if require_complete else content
         messages.append({
             "role": "user",
             "content": (
@@ -1215,19 +1345,34 @@ def _continue_truncated_answer(
             ),
         })
 
+        continuation_started = False
+
+        def publish_continuation(piece):
+            nonlocal continuation_started
+            if not continuation_started:
+                on_delta("\n")
+                continuation_started = True
+            on_delta(piece)
+
         result = _request_text_completion(
             messages,
             retries=0,
             reasoning_effort=reasoning_effort,
             preferred_provider=current_provider,
             protected_messages=_current_task_messages(api_messages) + messages[len(api_messages):],
+            cancelled=cancelled,
+            on_delta=publish_continuation if callable(on_delta) else None,
         )
         if not result.get("ok"):
             print("长回答自动续写失败：所有可用文本路径均失败")
+            if require_complete:
+                return None
             break
 
         piece = str(result.get("content", "") or "").strip()
         if not piece:
+            if require_complete:
+                return None
             break
 
         content = content.rstrip() + "\n" + piece
@@ -1236,6 +1381,8 @@ def _continue_truncated_answer(
         choice = result.get("choice") or {}
         if choice.get("finish_reason") != "length":
             break
+        if require_complete and _round == MAX_CONTINUATION_ROUNDS - 1:
+            return None
 
         messages.append({
             "role": "assistant",
@@ -1260,11 +1407,13 @@ def _friendly_http_error(status_code):
     return "AI 服务暂时出现异常，请稍后再试。"
 
 
-def ask_ai(messages, retries=2, teaching_context=None):
+def ask_ai(messages, retries=2, teaching_context=None, *, on_delta=None, cancelled=None):
     """
     使用 DeepSeek 生成文本回复。
     简单请求关闭思考；中等和困难题均使用 high 思考。
     """
+    if cancelled is not None and cancelled():
+        return {"ok": False, "cancelled": True}
     if ASK_AI_MOCK:
         return _success("""这是一条模拟回复。
 
@@ -1327,7 +1476,11 @@ $$
         retries=0 if is_full_solution else retries,
         reasoning_effort=reasoning_effort,
         protected_messages=_current_task_messages(clean_messages),
+        on_delta=on_delta,
+        cancelled=cancelled,
     )
+    if result.get("cancelled") or cancelled is not None and cancelled():
+        return {"ok": False, "cancelled": True}
     if is_full_solution and not result.get("ok") and (
         result.get("empty_body") or result.get("status_code") in (429, 500, 502, 503, 504)
         or not result.get("status_code")
@@ -1352,9 +1505,13 @@ $$
             max_tokens=min(MAX_OUTPUT_TOKENS, 5000),
             timeout=(8, 45),
             protected_messages=_current_task_messages(api_messages) + recovery_messages[len(api_messages):],
+            cancelled=cancelled,
+            on_delta=on_delta,
         )
         if fallback.get("ok"):
             result = fallback
+        if fallback.get("cancelled") or cancelled is not None and cancelled():
+            return {"ok": False, "cancelled": True}
     if not result.get("ok"):
         return _failure(
             result.get("error")
@@ -1378,7 +1535,14 @@ $$
             content,
             preferred_provider=provider_id,
             reasoning_effort="none" if is_full_solution else reasoning_effort,
+            cancelled=cancelled,
+            on_delta=on_delta,
+            require_complete=callable(on_delta),
         )
+        if cancelled is not None and cancelled():
+            return {"ok": False, "cancelled": True}
+        if content is None:
+            return _failure("AI 回答未完整结束，请重新发送。")
 
     content = _repair_common_latex_typos(content)
 
@@ -1389,7 +1553,10 @@ $$
             content,
             preferred_provider=provider_id,
             reasoning_effort="none" if is_full_solution else reasoning_effort,
+            cancelled=cancelled,
         )
+        if cancelled is not None and cancelled():
+            return {"ok": False, "cancelled": True}
 
         if regenerated:
             content = regenerated
