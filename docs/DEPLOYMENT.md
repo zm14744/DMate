@@ -312,7 +312,7 @@ Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DM
 
 ### 安装版的系统主题传递
 
-源码中的 Android 版本为 1.0.2（`versionCode 3`），桌面版本为 1.0.1。这些版本包含原生明暗信号传递；版本号变更、CI Artifact、公开 Release 和用户实际安装是不同阶段。仅构建 Artifact 不会自动替换 GitCode / GitHub 下载附件，也不能据此将 `static/client-updates.json` 标为已经发布。下面说明实现方式，不代表已经完成所有厂商设备或桌面系统的实测。
+源码中的 Android 版本为 1.0.3（`versionCode 4`），桌面版本为 1.0.2。这些版本包含原生明暗信号传递；版本号变更、CI Artifact、公开 Release 和用户实际安装是不同阶段。仅构建 Artifact 不会自动替换 GitCode / GitHub 下载附件，也不能据此将 `static/client-updates.json` 标为已经发布。下面说明实现方式，不代表已经完成所有厂商设备或桌面系统的实测。
 
 网页在认证前的首屏先读取 `window.__DMATE_NATIVE_SYSTEM_THEME__`，只接受 `light` / `dark`，否则读取 `matchMedia('(prefers-color-scheme: dark)')`。登录身份确认后再应用该账号在本机保存的外观选择。运行期间，明确选择的 `light` / `dark` / `navy` 优先于原生信号；只有 `appearanceSettings.mode === 'system'` 才随系统事件重新应用主题。原生信号存放在页面内存，`dmate:native-system-theme` 事件负责通知更新，不写入外观存储、学习记录或云端快照。
 
@@ -334,27 +334,29 @@ Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DM
 
 ### 图标生成与发布
 
-图标生成的唯一输入是 `scripts/generate_icons.py` 内的几何路径；不要单独替换某个平台的 PNG 后期待其他平台自动一致。在仓库根目录先执行：
+v52 的图形根据参考图重新整理为 `scripts/generate_icons.py` 内的几何路径，统一采用黑底白线的多面体轮廓；生成过程不读取、放大旧位图。浏览器透明黑白线稿和 Android 系统着色的单色前景仍按平台需要生成。不要单独替换某个平台的 PNG 后期待其他平台自动一致。在仓库根目录先执行：
 
 ```bash
 python -m pip install Pillow==11.3.0
 python scripts/generate_icons.py
 ```
 
-脚本输出网页 SVG / PNG / ICO、Tauri PNG / ICO / ICNS、Android 密度位图与 VectorDrawable。每种位图尺寸独立从路径绘制，全部使用统一的 18 / 1254 线宽比例，比原来的 13 / 1254 适度增加；不另设小尺寸最低像素线宽，也不对 Android 前景单独加粗；最大 PNG 和 macOS ICNS 图层为 1024 × 1024。Android 自适应图标前景处于 66dp 直径安全区域，普通 / 圆形资源在 API 26 及以上引用矢量前景，API 33 及以上增加单色主题前景。替换旧 `drawable-nodpi/dmate_foreground.png` 时会删除该文件，避免与同名矢量资源冲突。
+脚本输出网页 SVG / PNG / ICO、Tauri PNG / ICO / ICNS、Android 密度位图与 VectorDrawable。每种位图尺寸独立从路径绘制，全部使用 256 × 256 矢量坐标系和 4.5 的统一线宽，不另设小尺寸最低像素线宽，也不对 Android 前景单独加粗；最大 PNG 和 macOS ICNS 图层为 1024 × 1024。Android 自适应图标前景处于 66dp 直径安全区域，普通 / 圆形资源在 API 26 及以上引用矢量前景，API 33 及以上增加单色主题前景。替换旧 `drawable-nodpi/dmate_foreground.png` 时会删除该文件，避免与同名矢量资源冲突。
 
-当前网页通过带 `v51` 的新文件名和根路径版本参数取图，侧栏和手机顶部直接使用 SVG。浏览器特定的黑白标签图标选择保持独立于网页明暗主题；Safari 不通过失焦 / 聚焦事件反复更换图标。根路径 `/favicon.ico`、`/favicon-16.png`、`/favicon-32.png`、`/favicon-64.png`、Apple touch icon 继续有效。旧版本资源保留给历史缓存页面。
+当前网页通过带 `v52` 的新文件名和根路径版本参数取图，侧栏和手机顶部直接使用 SVG。浏览器特定的黑白标签图标选择保持独立于网页明暗主题；Safari 不通过失焦 / 聚焦事件反复更换图标。根路径 `/favicon.ico`、`/favicon-16.png`、`/favicon-32.png`、`/favicon-64.png`、Apple touch icon 继续有效。旧版本资源保留给历史缓存页面。
 
-桌面左上角标志的低像素密度补偿位于 `templates/index.html` 的 `.dmate-brand-mark` 媒体查询中：桌面布局宽度至少 1101 CSS 像素，按有效 DPR 不超过 1.1 / 1.4 / 1.75 分别使用 1.9 / 1.6 / 1.35 倍亮度，其余情况不加滤镜。只提高抗锯齿灰边的可见度，保持 SVG 的 18 / 1254 线宽和 38 × 38 占位；原图资源、手机顶部及原生启动器图标不重生成。媒体查询随浏览器缩放和跨屏移动重新匹配，无需设备识别脚本。此项是网页模板更新，部署后重新加载网页即可应用，也适用于客户端加载的桌面网页，不需要为了这项显示补偿重新构建安装包。
+桌面左上角标志的低像素密度补偿位于 `templates/index.html` 的 `.dmate-brand-mark` 媒体查询中：桌面布局宽度至少 1101 CSS 像素，按有效 DPR 不超过 1.1 / 1.4 / 1.75 分别使用 1.9 / 1.6 / 1.35 倍亮度，其余情况不加滤镜。只提高抗锯齿灰边的可见度，保持 SVG 的 4.5 / 256 线宽和 38 × 38 占位；手机顶部仍为 25 × 25，手机与原生启动器使用新版图案本身，不叠加这项网页滤镜。媒体查询随浏览器缩放和跨屏移动重新匹配，无需设备识别脚本。此项是网页模板更新，部署后重新加载网页即可应用，也适用于客户端加载的桌面网页，不需要为了这项显示补偿重新构建安装包。
 
 发布时分别处理：
 
 - **服务端 / 网页**：Docker 构建会生成资源，新部署提供新图标地址。不要为换图清除用户学习数据或引入额外 Service Worker。
 - **桌面与 Android**：对应构建工作流会先运行生成器；Tauri 配置包含 512 / 1024 PNG 及 ICO / ICNS，Android Gradle 使用新的启动器资源。Android debug / release 工作流仍需手动触发，签名与应用标识保持原配置。
 - **Snap**：手动构建工作流从同次生成的 512 像素 PNG 写入 `snap/gui/dmate.png`；构建和 Snap Store 发布仍是独立步骤。
-- **iOS Web Clip**：`python scripts/generate_ios_webclip.py` 默认生成 `dist/DMate-iPhone-iPad-fullscreen.mobileconfig`；内嵌 `dmate-app-v51-512.png`，与服务端 `/DMate.mobileconfig` 使用相同构建函数，原描述文件身份保持不变。公开 GitCode / GitHub 入口只有在发布工作流更新对应附件后才使用新图，用户已安装的 Web Clip 也需更新描述文件。
+- **iOS Web Clip**：`python scripts/generate_ios_webclip.py` 默认生成 `dist/DMate-iPhone-iPad-fullscreen.mobileconfig`；内嵌 `dmate-app-v52-512.png`，与服务端 `/DMate.mobileconfig` 使用相同构建函数，原描述文件身份保持不变。公开 GitCode / GitHub 入口只有在发布工作流更新对应附件后才使用新图，用户已安装的 Web Clip 也需更新描述文件。
 
 源码资源齐全和本地图像检查通过，不等于 APK / 桌面安装包编译、签名或真机验证已经完成。发布前仍应检查相应平台的构建产物；仅当新包真实发布后，才更新下载入口或 `static/client-updates.json` 的版本与状态。缓存图标未更新时先重新打开页面 / 应用、必要时重新创建系统快捷方式，不要删除账号存储来刷新图标。
+
+Android 1.0.3 的正式附件采用独立文件名 `DMate-Android-1.0.3.apk`，避免与旧 APK 混淆；使用既有 `v1.0.1` 发行集合时，发行标签与 APK 内部版本并不是同一个值。切换公开下载入口前，应核对签名 release 包的应用 ID、`versionName 1.0.3`、`versionCode 4`、签名证书及启动器资源，并确认 GitCode、GitHub 两个来源下载到相同文件。确认文件实际可用后再修改网页下载入口和更新清单；仅生成该文件名或构建 Artifact 不代表已经发布。
 
 ### 本地构建客户端
 

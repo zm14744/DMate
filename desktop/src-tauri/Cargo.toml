@@ -1,6 +1,6 @@
 [package]
 name = "dmate-desktop"
-version = "1.0.1"
+version = "1.0.2"
 description = "DMate - 离散数学智能辅学系统"
 authors = ["DMate"]
 edition = "2021"

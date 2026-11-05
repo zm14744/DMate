@@ -56,10 +56,10 @@ jobs:
           fi
           version="$(dpkg-deb --field "${packages[0]}" Version)"
           arch="$(dpkg-deb --field "${packages[0]}" Architecture)"
-          test "$version" = "1.0.1"
+          test "$version" = "1.0.2"
           test "$arch" = "amd64"
           dpkg-deb --contents "${packages[0]}" | grep -q 'usr/bin/dmate-desktop'
-          cp "${packages[0]}" DMate_1.0.1_amd64.deb
+          cp "${packages[0]}" DMate_1.0.2_amd64.deb
           # Use the freshly generated 512px icon for high-density launchers.
           mkdir -p snap/gui
           cp desktop/src-tauri/icons/icon.png snap/gui/dmate.png

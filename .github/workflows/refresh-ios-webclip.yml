@@ -12,7 +12,7 @@ on:
       - "scripts/upload_gitcode_release_asset.py"
       - ".github/workflows/refresh-ios-webclip.yml"
       - "static/icons/apple-touch-icon.png"
-      - "static/icons/dmate-app-v51-512.png"
+      - "static/icons/dmate-app-v52-512.png"
   workflow_dispatch:
 
 permissions:

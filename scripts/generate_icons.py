@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build every DMate icon from the same vector geometry, never from a PNG.
 
-All platforms use the same modestly increased stroke, including small icons.
+All platforms use the same bright reference-inspired wireframe and stroke.
 Native bitmap frames are rasterized independently; Android adaptive icons use
 VectorDrawable paths. Historical versioned web assets remain available for old
 cached pages but are no longer inputs to this generator.
@@ -21,24 +21,25 @@ ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "static" / "icons"
 TAURI = ROOT / "desktop" / "src-tauri" / "icons"
 ANDROID = ROOT / "android" / "app" / "src" / "main" / "res"
-VERSION = "v51"
-VIEWBOX = 1254
-STROKE = 18  # A small increase from 13; no separate thickening for tiny icons.
+VERSION = "v52"
+VIEWBOX = 256
+STROKE = 4.5  # Shared reference weight; no separate thickening for tiny icons.
 ADAPTIVE_SCALE = 0.72
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 APP_SIZES = (16, 32, 64, 128, 180, 192, 256, 512, 1024)
 
-# The original DMate silhouette and every internal edge, unchanged.
-OUTER = [(252, 300), (488, 189), (748, 140), (1038, 376), (1071, 603),
-         (1012, 914), (690, 1044), (456, 1064), (199, 807), (165, 589), (252, 300)]
+# Vector reconstruction of the supplied white-wireframe reference. Keep the
+# same connected polyhedron across platforms, including its generous margins.
+OUTER = [(59, 73), (103, 48), (154, 39), (205, 84), (215, 129),
+         (201, 188), (139, 215), (94, 217), (51, 170), (41, 126), (59, 73)]
 INNER = [
-    [(252, 300), (302, 352), (601, 268), (748, 140)],
-    [(302, 352), (263, 686), (199, 807)],
-    [(601, 268), (790, 524), (1071, 603)],
-    [(790, 524), (563, 786), (263, 686)],
-    [(563, 786), (690, 1044)],
+    [(59, 73), (69, 82), (127, 66), (154, 39)],
+    [(69, 82), (61, 145), (51, 170)],
+    [(127, 66), (162, 116), (215, 129)],
+    [(162, 116), (119, 165), (61, 145)],
+    [(119, 165), (139, 215)],
 ]
 PATHS = [OUTER, *INNER]
 
@@ -202,7 +203,7 @@ def main():
     save_ico(TAURI / "icon.ico")
     save_icns(TAURI / "icon.icns")
     generate_android()
-    print(json.dumps({"status": "generated", "version": VERSION, "source": "original vector paths",
+    print(json.dumps({"status": "generated", "version": VERSION, "source": "reference-inspired vector paths",
                       "formats": ["SVG", "PNG", "ICO", "ICNS", "Android VectorDrawable"],
                       "max_bitmap_size": 1024, "android_adaptive_safe_circle_dp": 66,
                       "stroke_units": STROKE,

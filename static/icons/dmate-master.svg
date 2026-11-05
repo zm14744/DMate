@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1254 1254" role="img" aria-label="DMate">
-  <rect width="1254" height="1254" fill="#000"/>
-  <g fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M252 300 L488 189 L748 140 L1038 376 L1071 603 L1012 914 L690 1044 L456 1064 L199 807 L165 589 L252 300"/>
-    <path d="M252 300 L302 352 L601 268 L748 140"/>
-    <path d="M302 352 L263 686 L199 807"/>
-    <path d="M601 268 L790 524 L1071 603"/>
-    <path d="M790 524 L563 786 L263 686"/>
-    <path d="M563 786 L690 1044"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 256 256" role="img" aria-label="DMate">
+  <rect width="256" height="256" fill="#000"/>
+  <g fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M59 73 L103 48 L154 39 L205 84 L215 129 L201 188 L139 215 L94 217 L51 170 L41 126 L59 73"/>
+    <path d="M59 73 L69 82 L127 66 L154 39"/>
+    <path d="M69 82 L61 145 L51 170"/>
+    <path d="M127 66 L162 116 L215 129"/>
+    <path d="M162 116 L119 165 L61 145"/>
+    <path d="M119 165 L139 215"/>
   </g>
 </svg>
