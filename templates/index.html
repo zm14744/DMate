@@ -7349,6 +7349,9 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
     z-index:1300 !important;
 }
 
+#appConfirmModal .app-confirm-actions[hidden] { display:none !important; }
+#appConfirmModal.notice-only .app-confirm-body { padding-bottom:18px; }
+
 /* Keep the module chooser's appearance when it is above a native editor. */
 dialog#mobileChoiceModal {
     inset:0;
@@ -9531,7 +9534,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <div id="appConfirmModal" class="modal hidden" aria-hidden="true">
-    <div class="modal-card app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle">
+    <div class="modal-card app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle" aria-describedby="appConfirmBody">
         <div class="modal-head">
             <div id="appConfirmTitle">请确认</div>
             <button id="appConfirmClose" class="modal-close-dot" type="button" aria-label="关闭" title="关闭"></button>

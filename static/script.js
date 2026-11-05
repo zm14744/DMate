@@ -98,6 +98,7 @@ let accountVerificationOperation = null;
 let cloudDeltaSyncSupported = null;
 let cloudSyncCapacityRetryAt = 0;
 let appConfirmResolver = null;
+let appConfirmReturnFocus = null;
 let mobileChoiceResolver = null;
 let mobileChoiceOptions = [];
 let mobileChoiceOpenVersion = 0;
@@ -1143,8 +1144,11 @@ function setAppConfirmOpen(open) {
 
 function resolveAppConfirm(value) {
     const resolver = appConfirmResolver;
+    const returnFocus = appConfirmReturnFocus;
     appConfirmResolver = null;
+    appConfirmReturnFocus = null;
     setAppConfirmOpen(false);
+    if (returnFocus?.isConnected && !returnFocus.disabled) returnFocus.focus({ preventScroll:true });
     if (typeof resolver === "function") resolver(Boolean(value));
 }
 
@@ -1153,24 +1157,45 @@ function showAppConfirm(options = {}) {
     const title = document.getElementById("appConfirmTitle");
     const body = document.getElementById("appConfirmBody");
     const confirmButton = document.getElementById("appConfirmConfirm");
+    const closeButton = document.getElementById("appConfirmClose");
+    const actions = modal?.querySelector(".app-confirm-actions");
+    const noticeOnly = options.noticeOnly === true;
 
-    if (!modal || !title || !body || !confirmButton) {
+    if (!modal || !title || !body || !confirmButton || !closeButton || !actions) {
+        if (noticeOnly) {
+            showCopyToast(String(options.body || options.title || "操作未完成"));
+            return Promise.resolve(false);
+        }
         return Promise.resolve(window.confirm(String(options.fallbackText || options.body || options.title || "请确认当前操作")));
     }
+
+    if (appConfirmResolver) resolveAppConfirm(false);
 
     title.textContent = String(options.title || "请确认");
     body.textContent = String(options.body || "确定继续吗？");
     confirmButton.textContent = String(options.confirmText || "确定");
     confirmButton.classList.toggle("danger", options.confirmTone === "danger");
     confirmButton.classList.toggle("primary", options.confirmTone !== "danger");
-
-    if (appConfirmResolver) resolveAppConfirm(false);
+    actions.hidden = noticeOnly;
+    modal.classList.toggle("notice-only", noticeOnly);
+    appConfirmReturnFocus = options.returnFocus || null;
 
     setAppConfirmOpen(true);
 
     return new Promise(resolve => {
         appConfirmResolver = resolve;
-        requestAnimationFrame(() => confirmButton.focus?.());
+        requestAnimationFrame(() => {
+            if (appConfirmResolver === resolve) (noticeOnly ? closeButton : confirmButton).focus({ preventScroll:true });
+        });
+    });
+}
+
+function showWrongBookPdfNotice(message) {
+    return showAppConfirm({
+        title: "无法导出 PDF",
+        body: message,
+        noticeOnly: true,
+        returnFocus: document.getElementById("wrongPdfBtn")
     });
 }
 
@@ -8494,7 +8519,7 @@ async function exportWrongBookPdf() {
     const items = getFilteredWrongBookItems();
 
     if (!items.length) {
-        window.alert("当前没有可以导出的错题");
+        void showWrongBookPdfNotice("当前没有可以导出的错题");
         return;
     }
 
@@ -8502,7 +8527,7 @@ async function exportWrongBookPdf() {
         typeof window.html2canvas !== "function"
         || !window.jspdf?.jsPDF
     ) {
-        window.alert(
+        void showWrongBookPdfNotice(
             "PDF 组件加载失败，请刷新页面后重试"
         );
         return;
@@ -8691,7 +8716,7 @@ async function exportWrongBookPdf() {
     } catch (error) {
         console.error("错题本 PDF 导出失败：", error);
 
-        window.alert(
+        void showWrongBookPdfNotice(
             "PDF 生成失败，请刷新页面后重试"
         );
     } finally {
@@ -22300,6 +22325,12 @@ document.addEventListener(
         // created backdrop after the click which originally opened this modal.
         appConfirmModal?.addEventListener("pointerdown", event => {
             if (event.target === appConfirmModal) resolveAppConfirm(false);
+        });
+        appConfirmModal?.addEventListener("keydown", event => {
+            if (event.key === "Tab" && appConfirmModal.classList.contains("notice-only")) {
+                event.preventDefault();
+                appConfirmClose?.focus({ preventScroll:true });
+            }
         });
 
         mobileChoiceClose?.addEventListener("click", closeMobileChoiceModal);
