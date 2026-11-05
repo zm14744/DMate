@@ -425,7 +425,7 @@ gunicorn -w 1 --threads 8 --timeout 300 -b 0.0.0.0:8080 app:app
 
 网页变化通常无需重新打包；原生权限、可信来源、更新逻辑和包元数据变化需要重新构建客户端。把服务迁移到自己的域名时，应同时核对 Android / Tauri 中的来源限制，不能只改页面链接。
 
-GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“构建成功”当作“所有下载入口已经更新”。macOS 没有完整签名凭据时只生成标记为测试用途的未公证产物，具体见[macOS 构建与分发](docs/MACOS_DISTRIBUTION.md)。当前网页不提供 PWA 安装；iPhone / iPad 的下载入口提供发行版已有的描述文件，由使用者在系统设置中确认安装，不等同于原生 iOS App。
+GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“构建成功”当作“所有下载入口已经更新”。macOS 没有完整签名凭据时只生成标记为测试用途的未公证产物，具体见[macOS 构建与分发](docs/MACOS_DISTRIBUTION.md)。当前网页不提供 PWA 安装；iPhone / iPad 的下载入口提供 Apple Web Clip 描述文件，安装后可从主屏幕以全屏网页模式启动 DMate。它仍是网站入口，不等同于原生 iOS App。
 
 没有配置自建下载地址时，安装入口优先提供 GitCode 的对应文件直链，并保留 GitHub 等备用渠道；部署者设置的有效 HTTPS 下载地址会优先使用。GitHub 下载使用固定发行标签和文件名，避免 `latest` 切换到其他发行版后找不到旧文件。安装后更新清单同样提供 GitCode 主源和同发行版 GitHub 备用源，只接受本仓库受限下载路径；它的版本号与 `published` 状态仍以实际发布为准，网页修改不会自动生成新 APK、EXE 或 DMG。
 
