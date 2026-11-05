@@ -2320,7 +2320,7 @@ def ios_ipados_webclip_profile():
     profile_bytes = build_ios_webclip_profile(icon_path)
     response = make_response(profile_bytes)
     response.headers["Content-Type"] = "application/x-apple-aspen-config"
-    response.headers["Content-Disposition"] = 'attachment; filename="DMate-iPhone-iPad.mobileconfig"'
+    response.headers["Content-Disposition"] = 'attachment; filename="DMate-iPhone-iPad-fullscreen.mobileconfig"'
     response.headers["Cache-Control"] = "public, max-age=3600"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
