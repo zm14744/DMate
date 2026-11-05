@@ -2350,8 +2350,21 @@ function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
         const newer = Number(item.updatedAt || 0) >= Number(previous.updatedAt || 0) ? item : previous;
         const older = newer === item ? previous : item;
         const merged = { ...older, ...newer };
-        for (const field of ["question", "answer", "analysis", "referenceAnswer", "note", "feedback"]) {
-            if (!merged[field] && older[field]) merged[field] = older[field];
+        // An explicit empty value is an edit, not a missing legacy field.
+        // Restoring it would revive erased notes or answers for an old question.
+        if (typeof newer.question === "string" && newer.question.trim()
+            && newer.question !== older.question) {
+            // Conflict payloads arrive before normalization. Older clients may
+            // omit derived fields; do not inherit those from a different stem.
+            const invalidated = {
+                classificationVersion: 0, category: "待识别", relatedCategories: [],
+                knowledgePoints: [], focusPoints: [], difficulty: "",
+                referenceAnswer: "", answer: "", analysis: "",
+                answerUpdatedAt: null, analysisUpdatedAt: null
+            };
+            for (const [field, emptyValue] of Object.entries(invalidated)) {
+                if (!Object.prototype.hasOwnProperty.call(newer, field)) merged[field] = emptyValue;
+            }
         }
         // Editing a note on another device must not lower recorded failures.
         // These counters only increase; manual pass selections can be undone.
@@ -3562,7 +3575,9 @@ function appendRequestStreamDelta(request, text) {
 
 function discardTypingOutput() {
     if (!typingTimer && !typingContext && !typingDiv) return false;
+    const onCancel = typingContextIsCurrent() ? typingContext.onCancel : null;
     clearTypingState(true);
+    onCancel?.();
     typingAutoFollow = true;
     typingScrollLockedByUser = false;
     lastTypingAutoScrollAt = 0;
@@ -7678,19 +7693,8 @@ function saveWrongEdit() {
         return;
     }
 
-    const duplicate = learningState.wrongQuestions.find(
-        item => (
-            item.id !== entry.id
-            && wrongQuestionFingerprint(item.question)
-                === wrongQuestionFingerprint(question)
-        )
-    );
-
-    if (duplicate) {
-        window.alert("错题本里已经有这道题了，请不要重复保存");
-        return;
-    }
-
+    // Repeated questions are independent records. Save only this ID so an
+    // existing duplicate cannot block note edits or collapse learning history.
     if (entry.question !== limitQuestionText(question)) {
         entry.classificationVersion = 0;
         entry.category = "待识别";
@@ -13818,87 +13822,96 @@ async function requestAiReply(session, options = {}) {
             ? await activeRequest.streamPreview?.finish(data.reply) : null;
         throwIfAiRequestCancelled(activeRequest);
 
-        if (returnedTeaching && !supportingImagesOnly) {
-            const normalizedReturnedTeaching = normalizeTeaching(
-                returnedTeaching
-            );
-            const latestUser = getLatestUserMessage(session);
-            const activeCandidate = activeQuestionCandidateFromHistory(
-                session
-            );
-
-            // “上一道题/继续/再讲一下”不是新题。返回的教学分析必须写回
-            // 当前指向题，而不是重新覆盖到时间上最新的另一道题。
-            if (
-                !localGeneratedQuestion
-                && latestUser
-                && isShortLearningFollowUp(latestUser.text)
-                && activeCandidate
-            ) {
-                applyQuestionCandidateAsCurrent(
-                    session,
-                    activeCandidate,
-                    normalizedReturnedTeaching
+        // JSON compatibility replies still animate after the request ends.
+        // Commit their derived state only with the saved, completed answer.
+        let answerLearningCommitted = false;
+        const commitAnswerLearning = () => {
+            if (answerLearningCommitted) return;
+            throwIfAiRequestCancelled(activeRequest);
+            answerLearningCommitted = true;
+            if (returnedTeaching && !supportingImagesOnly) {
+                const normalizedReturnedTeaching = normalizeTeaching(
+                    returnedTeaching
                 );
-            } else {
-                session.teaching = normalizedReturnedTeaching;
+                const latestUser = getLatestUserMessage(session);
+                const activeCandidate = activeQuestionCandidateFromHistory(
+                    session
+                );
 
-                if (!localGeneratedQuestion) {
-                    attachTeachingSnapshotToLatestQuestion(
+                // “上一道题/继续/再讲一下”不是新题。返回的教学分析必须写回
+                // 当前指向题，而不是重新覆盖到时间上最新的另一道题。
+                if (
+                    !localGeneratedQuestion
+                    && latestUser
+                    && isShortLearningFollowUp(latestUser.text)
+                    && activeCandidate
+                ) {
+                    applyQuestionCandidateAsCurrent(
                         session,
+                        activeCandidate,
                         normalizedReturnedTeaching
                     );
-                }
-            }
+                } else {
+                    session.teaching = normalizedReturnedTeaching;
 
-            saveState();
-            renderInfo();
-
-            const graphModal = document.getElementById(
-                "knowledgeGraphModal"
-            );
-
-            if (
-                graphModal
-                && !graphModal.classList.contains("hidden")
-            ) {
-                if (knowledgeGraphScope === "current") {
-                    const context = getCurrentKnowledgeContext();
-
-                    if (context.category) {
-                        knowledgeGraphFilter = context.category;
-                        knowledgeGraphViewMode = "focus";
+                    if (!localGeneratedQuestion) {
+                        attachTeachingSnapshotToLatestQuestion(
+                            session,
+                            normalizedReturnedTeaching
+                        );
                     }
                 }
 
-                renderKnowledgeGraph();
+                saveState();
+                renderInfo();
+
+                const graphModal = document.getElementById(
+                    "knowledgeGraphModal"
+                );
+
+                if (
+                    graphModal
+                    && !graphModal.classList.contains("hidden")
+                ) {
+                    if (knowledgeGraphScope === "current") {
+                        const context = getCurrentKnowledgeContext();
+
+                        if (context.category) {
+                            knowledgeGraphFilter = context.category;
+                            knowledgeGraphViewMode = "focus";
+                        }
+                    }
+
+                    renderKnowledgeGraph();
+                }
             }
-        }
 
-        // 已完成最多一次难度纠偏仍未达标时，明确告知用户，不能静默
-        // 把“估计中等”的题目伪装成已满足“困难”请求。
-        if (latestIsExerciseRequest && typeof data.exercise_generation_notice === "string"
-                && data.exercise_generation_notice.trim()) {
-            showCopyToast(data.exercise_generation_notice);
-        }
+            // 已完成最多一次难度纠偏仍未达标时，明确告知用户，不能静默
+            // 把“估计中等”的题目伪装成已满足“困难”请求。
+            if (latestIsExerciseRequest && typeof data.exercise_generation_notice === "string"
+                    && data.exercise_generation_notice.trim()) {
+                showCopyToast(data.exercise_generation_notice);
+            }
 
-        const retestHandled = supportingImagesOnly || processWrongQuestionRetestReply(
-            session,
-            data.reply,
-            localGeneratedQuestion,
-            data.generated_answer || ""
-        );
-
-        if (!retestHandled) {
-            processLearningFromReply(
+            const retestHandled = supportingImagesOnly || processWrongQuestionRetestReply(
                 session,
-                localGeneratedTeaching
-                    || session.teaching,
                 data.reply,
-                data.generated_answer || "",
-                localGeneratedQuestion
+                localGeneratedQuestion,
+                data.generated_answer || ""
             );
-        }
+
+            if (!retestHandled) {
+                processLearningFromReply(
+                    session,
+                    localGeneratedTeaching
+                        || session.teaching,
+                    data.reply,
+                    data.generated_answer || "",
+                    localGeneratedQuestion
+                );
+            }
+
+        };
 
         const assistantMeta = {
             // 只有后端明确返回 generated_question，才标记为“AI 生成题”。
@@ -13923,6 +13936,7 @@ async function requestAiReply(session, options = {}) {
         if (activeRequest.streaming) {
             discardRequestStreamPreview(activeRequest);
             addAssistantMessage(session, data.reply, assistantMeta);
+            commitAnswerLearning();
             saveState();
             renderSessions();
             renderInfo();
@@ -13935,7 +13949,9 @@ async function requestAiReply(session, options = {}) {
             startTyping(
                 data.reply,
                 session,
-                assistantMeta
+                assistantMeta,
+                commitAnswerLearning,
+                () => rollbackRetestAfterRequestFailure(session)
             );
         } else {
             addAssistantMessage(
@@ -13943,6 +13959,7 @@ async function requestAiReply(session, options = {}) {
                 data.reply,
                 assistantMeta
             );
+            commitAnswerLearning();
             saveState();
             renderSessions();
             renderInfo();
@@ -15223,7 +15240,7 @@ function collectLearningReviewDrawings() {
         return ocrEditorController.getPages().slice(0, 50).filter(meaningful);
     }
     let raw = sameOwner ? standaloneDrawingSessionState.gallery : null;
-    if (shouldPersistClientState()) {
+    if (shouldPersistClientState() && !(sameOwner && standaloneDrawingSessionState.galleryDirty && raw)) {
         try {
             raw = localStorage.getItem("dmate:graph-gallery:v1::" + encodeURIComponent(owner)) || raw;
         } catch (_error) {}
@@ -16474,7 +16491,9 @@ async function prepareReplyReveal(context, state) {
 function startTyping(
     text,
     session,
-    meta = {}
+    meta = {},
+    onCommit = null,
+    onCancel = null
 ) {
     if (!session || !text) return;
 
@@ -16484,6 +16503,7 @@ function startTyping(
             text,
             meta
         );
+        onCommit?.();
         saveState();
         return;
     }
@@ -16495,6 +16515,7 @@ function startTyping(
     // 后台标签页定时器可能被浏览器大幅降频；响应已到时直接完整落盘。
     if (document.hidden) {
         addAssistantMessage(session, text, meta);
+        onCommit?.();
         saveState();
         pendingBackgroundReplyRender = true;
         return;
@@ -16502,7 +16523,8 @@ function startTyping(
 
     typingFullText = text;
     typingSessionId = session.id;
-    typingContext = { session, userMessage: getLatestUserMessage(session), version: cloudSyncContextVersion };
+    typingContext = { session, userMessage: getLatestUserMessage(session), version: cloudSyncContextVersion,
+        onCommit, onCancel };
     typingMeta = {
         generatedExercise: Boolean(
             meta.generatedExercise
@@ -16558,7 +16580,8 @@ function startTyping(
 
 function finishTyping() {
     if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
-    const session = typingContext.session;
+    const context = typingContext;
+    const session = context.session;
 
     const preparedContent = completeReplyReveal(typingRenderState);
 
@@ -16574,6 +16597,7 @@ function finishTyping() {
 
     clearTypingState();
 
+    context.onCommit?.();
     saveState();
 
     if (

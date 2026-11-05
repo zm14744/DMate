@@ -94,7 +94,7 @@ DMATE_GRAPH_CONFIRMATION_DB=/data/graph-confirmations.sqlite3
 
 只需要游客模式时，数据库与认证配置可省略。不要把示例占位值用于正式服务。认证密钥可在自己的运行环境用 `python -c 'import secrets; print(secrets.token_hex(32))'` 生成一次，保存到平台 Secret 后持续复用。
 
-镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备阶段会先探测 PaddleX 的可用模型源；默认优先级仍由 `PADDLE_PDX_MODEL_SOURCE` 决定（当前默认 BOS），单个模型源默认最多等待 300 秒，超时后继续尝试其他可用源。所有来源均无法提供完整模型时构建才会失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。`scripts/generate_icons.py` 的源图位于 Android 资源目录，因此自定义构建上下文时应保留该图标输入，不能把整个 `android/` 目录一并排除。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
+镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备先从 ModelScope 的官方 PaddlePaddle 仓库取得必需文件的提交版本、大小及 SHA256，按该版本下载并校验；失败后才使用 PaddleX 官方源作为后备。`PADDLE_PDX_MODEL_SOURCE`（当前默认 BOS）只影响 PaddleX 后备源的优先级，不改变 ModelScope 的首选顺序。下载与重试预算见[本地模型与缓存](#本地模型与缓存)。所有来源均无法提供完整模型时构建才会失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。`scripts/generate_icons.py` 的源图位于 Android 资源目录，因此自定义构建上下文时应保留该图标输入，不能把整个 `android/` 目录一并排除。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
 
 ## 模型服务
 
@@ -303,7 +303,7 @@ Tauri 配置位于 `desktop/src-tauri/tauri.conf.json`；Android 配置位于 `a
 
 Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DMATE_ANDROID_KEYSTORE_PASSWORD`、`DMATE_ANDROID_KEY_ALIAS`、`DMATE_ANDROID_KEY_PASSWORD`；Gradle 读取 `DMATE_KEYSTORE_PATH`、`DMATE_KEYSTORE_PASSWORD`、`DMATE_KEY_ALIAS`、`DMATE_KEY_PASSWORD`。Snap 发布使用 `SNAPCRAFT_STORE_CREDENTIALS`。macOS 见[签名与公证](MACOS_DISTRIBUTION.md)。构建 Artifact 与对外发布是两个步骤，旧下载文件不会因网页更新自动替换。
 
-安装弹窗可通过 `ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL` 设置优先下载地址。地址必须为没有用户凭据或片段的有效 HTTPS URL；GitCode 与 GitHub 官方入口仍作为备用保留。未配置时优先 GitCode 文件直链，GitHub 固定到同一发行标签；iOS 提供发行版已有的描述文件及备用源，不提供 PWA 安装。`/service-worker.js` 只用于清退旧 worker。
+下载安装弹窗可通过 `ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL` 配置下载地址。地址必须为没有用户凭据或片段的有效 HTTPS URL。按钮顺序保持 GitCode、GitHub：配置的 GitCode 地址或本项目 GitHub 发行版地址替换对应入口，其他自建镜像作为第三项“其他下载源”。未配置时使用 GitCode 文件直链与同一固定发行标签的 GitHub 地址。这些变量只配置下载安装弹窗，不替代安装后检查更新使用的 `static/client-updates.json` 清单。iOS 提供发行版已有的描述文件及备用源，不提供 PWA 安装。`/service-worker.js` 只用于清退旧 worker。
 
 公式与富文本等前端依赖位于 `static/vendor/<组件-版本>/`，含 MathJax 本地按需资源、上游许可和完整性清单，镜像必须包含这些文件。版本化的第三方目录成功响应允许一年 immutable 缓存；业务 JS / CSS、未版本化资源清单和 `/web-version` 仍禁用旧缓存。升级第三方库应使用新版本目录，不能原地替换已长期缓存的文件。安装壳检查网页更新时会在忙碌期间延后重载；这不能更新 APK / Tauri 中的原生代码。
 

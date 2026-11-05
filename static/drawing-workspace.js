@@ -155,9 +155,12 @@
   function persist(){
    clearTimeout(timer);timer=null;if(destroyed)return false;
    const payload=JSON.stringify({version:2,activeId,pages});
-   if(payload===savedRaw)return true;
-   try{if(persistent)win.localStorage.setItem(key,payload);sessionState.gallery=payload;savedRaw=payload;persistError='';setStatus('');return true;}
-   catch(_){persistError='此设备存储不足，当前绘图仍在本页保留；请导出图片后再关闭。';setStatus();return false;}
+   // Keep the complete gallery in this owner's page memory even when storage
+   // is full. Closing the drawing dialog must not discard that newer draft.
+   sessionState.gallery=payload;
+   if(payload===savedRaw&&!sessionState.galleryDirty)return true;
+   try{if(persistent)win.localStorage.setItem(key,payload);sessionState.galleryDirty=false;savedRaw=payload;persistError='';setStatus('');return true;}
+   catch(_){sessionState.galleryDirty=true;persistError='此设备存储不足，当前绘图仍在本页保留；请导出图片后再关闭页面。';setStatus();return false;}
   }
   function schedule(){clearTimeout(timer);timer=win.setTimeout(()=>persist(),350);}
   function mountPage(){
@@ -278,7 +281,8 @@
    if(graph&&graph.name!==p.name){editor.model?.renameGraph(graph.id,p.name);editor.refresh?.();}
    schedule();}});
   try{
-   const raw=persistent?win.localStorage.getItem(key):sessionState.gallery,value=raw?JSON.parse(raw):null;
+   const draft=persistent&&sessionState.galleryDirty?sessionState.gallery:null;
+   const raw=draft||(persistent?win.localStorage.getItem(key):sessionState.gallery),value=raw?JSON.parse(raw):null;
    if((value?.version===1||value?.version===2)&&Array.isArray(value.pages)){
     restoredGallery=true;
     pages=value.pages.filter(p=>p&&typeof p.id==='string'&&goodDocument(p.document)).slice(0,50).map(p=>({...p,name:caption(p.name),requirement:String(p.requirement||'').slice(0,2000),updatedAt:Number(p.updatedAt)||0}));

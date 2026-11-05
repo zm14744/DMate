@@ -25,7 +25,10 @@
         // Match the combined evidence in specificity order: a concrete topic
         // in the question must not lose to its broader stored category.
         return points([...detected([...labels, text(body)].join(' ')),
-            ...labels.filter(value => !detected(value).length)]);
+            ...labels.flatMap(value => {
+                const topics = detected(value);
+                return topics.length ? topics : [value];
+            })]);
     };
     const eventTypes = new Set(['seen', 'support', 'wrong', 'correct', 'reviewed']);
     const noteName = note => preview(text(note.title) || note.content);
@@ -77,7 +80,8 @@
         const edges = graphs.flatMap(graph => list(graph.edges)).filter(edge => edge && typeof edge === 'object');
         const body = text(page.document.body_text);
         if (!vertices.length && !edges.length && !body) return null;
-        const topicPoints = detected([page.name, body, ...graphs.map(graph => graph.name)].filter(Boolean).join(' '));
+        const names = [page.name, ...graphs.map(graph => graph.name)].map(text).filter(Boolean);
+        const topicPoints = points([...detected([...names, body].join(' ')), ...names.flatMap(detected)]);
         return {
             id: page.id, type: 'drawing', name: text(page.name) || '未命名绘图',
             at: time(page.updatedAt), vertexCount: vertices.length, edgeCount: edges.length,
@@ -149,7 +153,8 @@
         // The caller normalizes notebook tombstones and enforces drawing owner
         // boundaries. These copies never write review data back to the sources.
         const notes = list(options.notebook?.notes).filter(note => note && (text(note.title) || text(note.content)))
-            .map(note => ({ ...note, type: 'note', at: time(note.updatedAt), points: detected(text(note.title) + ' ' + text(note.content)) }))
+            .map(note => ({ ...note, type: 'note', at: time(note.updatedAt),
+                points: points([...detected(text(note.title) + ' ' + text(note.content)), ...detected(note.title)]) }))
             .sort((a, b) => b.at - a.at);
         const drawings = list(options.drawings).map(drawingRecord).filter(Boolean).sort((a, b) => b.at - a.at);
         const chat = sessions.flatMap(session => (evidence.get(key(session.id)) || [])
