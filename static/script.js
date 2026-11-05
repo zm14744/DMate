@@ -7148,22 +7148,20 @@ function normalizeWrongBookErrorCount(value) {
         : 0;
 }
 
-function wrongBookErrorGroupKey(item) {
+function wrongBookQuestionGroupKey(item) {
     // Use the complete, case-sensitive question. Truncated/display-only
     // fingerprints can join different questions with a common introduction.
     const question = String(item.question || "").replace(/\s+/g, " ").trim();
     return question ? `question:${question}` : `id:${item.id}`;
 }
 
-function getWrongBookErrorTotals(items) {
-    const totals = new Map();
+function getWrongBookQuestionCounts(items) {
+    const counts = new Map();
     for (const item of items) {
-        const key = wrongBookErrorGroupKey(item);
-        const errors = normalizeWrongBookErrorCount(item.mistakeCount)
-            + normalizeWrongBookErrorCount(item.retestFailCount);
-        totals.set(key, Math.min(Number.MAX_SAFE_INTEGER, (totals.get(key) || 0) + errors));
+        const key = wrongBookQuestionGroupKey(item);
+        counts.set(key, (counts.get(key) || 0) + 1);
     }
-    return totals;
+    return counts;
 }
 
 function getFilteredWrongBookItems() {
@@ -7184,12 +7182,12 @@ function getFilteredWrongBookItems() {
     if (wrongBookSort === "oldest") {
         items.sort((a, b) => a.updatedAt - b.updatedAt);
     } else if (wrongBookSort === "mistakes") {
-        // Repeated captures remain separate records, but all recorded errors
-        // for the same full question contribute to its priority. Filtering
-        // changes visibility, not the count, and manual capture adds no error.
-        const totals = getWrongBookErrorTotals(learningState.wrongQuestions);
+        // Rank by how many retained entries have the same full question.
+        // Every entry counts once, including manual captures. Filtering only
+        // changes visibility; answer and retest failure counters do not rank it.
+        const counts = getWrongBookQuestionCounts(learningState.wrongQuestions);
         items.sort((a, b) => (
-            totals.get(wrongBookErrorGroupKey(b)) - totals.get(wrongBookErrorGroupKey(a))
+            counts.get(wrongBookQuestionGroupKey(b)) - counts.get(wrongBookQuestionGroupKey(a))
             || b.updatedAt - a.updatedAt
         ));
     } else {
