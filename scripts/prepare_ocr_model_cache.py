@@ -41,10 +41,20 @@ class CachePreparationError(RuntimeError):
     pass
 
 
-class _DownloadDeadline(BaseException):
-    # Official host fallback catches Exception. A wall deadline must leave the
-    # whole API invocation, not be swallowed and followed by another host.
+class _DownloadDeadline(Exception):
+    """A source deadline that PaddleX can catch to try its next model host."""
     pass
+
+
+def _caused_by_download_deadline(exc):
+    current = exc
+    visited = set()
+    while current is not None and id(current) not in visited:
+        if isinstance(current, _DownloadDeadline):
+            return True
+        visited.add(id(current))
+        current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
+    return False
 
 
 @contextmanager
@@ -52,7 +62,10 @@ def _download_deadline(seconds):
     if not hasattr(signal, 'setitimer'):
         raise CachePreparationError('download_deadline_requires_posix')
     def expired(signum, frame):
-        raise _DownloadDeadline()
+        # PaddleX catches this exception and advances to another available
+        # hoster. Re-arm the deadline so the fallback host also has a limit.
+        signal.setitimer(signal.ITIMER_REAL, seconds, 0)
+        raise _DownloadDeadline(f'model source exceeded {seconds:g}s')
     previous = signal.signal(signal.SIGALRM, expired)
     previous_timer = signal.setitimer(signal.ITIMER_REAL, seconds)
     try:
@@ -78,9 +91,12 @@ def configure_build_cache(cache_dir):
     os.environ['DMATE_MODEL_CACHE_DIR'] = str(root)
     os.environ['PADDLE_PDX_CACHE_HOME'] = str(expected)
     os.environ.setdefault('PADDLE_PDX_MODEL_SOURCE', 'BOS')
-    # This skips host connectivity probes, not certificate verification or
-    # downloads. Actual official download failures still fail this build.
-    os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
+    # Let PaddleX probe its candidate model hosts and omit unreachable ones.
+    # Disabling this check while preferring BOS can make one unreachable or slow
+    # host consume the whole deadline before PaddleX gets to its fallbacks.
+    # PaddleX reads this setting as a raw string, so remove it rather than set
+    # the text "False" (which would still be truthy).
+    os.environ.pop('PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK', None)
     return expected, selected
 
 
@@ -262,6 +278,8 @@ def prepare_model_cache(cache_dir=DEFAULT_CACHE_DIR, *, verify_only=False,
         except CachePreparationError:
             raise
         except Exception as exc:
+            if _caused_by_download_deadline(exc):
+                raise CachePreparationError(f'model_download_deadline_all_sources:{name}') from exc
             raise CachePreparationError(f'model_download_failed:{name}:{type(exc).__name__}') from exc
         if resolved.resolve() != expected.resolve():
             raise CachePreparationError(f'download_resolved_wrong_cache:{name}')
