@@ -47,7 +47,7 @@ jobs:
           assert webclip["FullScreen"] is True
           assert webclip["IsRemovable"] is True
           assert webclip["Precomposed"] is True
-          assert webclip["Icon"].startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+          assert webclip["Icon"].startswith(b"\x89PNG\r\n\x1a\n")
           print("Validated DMate full-screen iOS/iPadOS Web Clip profile")
           PY
 
