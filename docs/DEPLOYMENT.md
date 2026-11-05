@@ -94,7 +94,7 @@ DMATE_GRAPH_CONFIRMATION_DB=/data/graph-confirmations.sqlite3
 
 只需要游客模式时，数据库与认证配置可省略。不要把示例占位值用于正式服务。认证密钥可在自己的运行环境用 `python -c 'import secrets; print(secrets.token_hex(32))'` 生成一次，保存到平台 Secret 后持续复用。
 
-镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。`scripts/generate_icons.py` 的源图位于 Android 资源目录，因此自定义构建上下文时应保留该图标输入，不能把整个 `android/` 目录一并排除。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
+镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备阶段会先探测 PaddleX 的可用模型源；默认优先级仍由 `PADDLE_PDX_MODEL_SOURCE` 决定（当前默认 BOS），单个模型源默认最多等待 300 秒，超时后继续尝试其他可用源。所有来源均无法提供完整模型时构建才会失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。`scripts/generate_icons.py` 的源图位于 Android 资源目录，因此自定义构建上下文时应保留该图标输入，不能把整个 `android/` 目录一并排除。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
 
 ## 模型服务
 
