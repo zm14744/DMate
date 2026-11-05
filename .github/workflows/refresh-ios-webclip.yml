@@ -7,6 +7,7 @@ on:
     paths:
       - "ios_webclip.py"
       - "scripts/generate_ios_webclip.py"
+      - "scripts/upload_gitcode_release_asset.py"
       - ".github/workflows/refresh-ios-webclip.yml"
       - "static/icons/apple-touch-icon.png"
   workflow_dispatch:
@@ -28,7 +29,7 @@ jobs:
 
       - name: Generate full-screen profile
         run: |
-          python scripts/generate_ios_webclip.py --output dist/DMate-iPhone-iPad.mobileconfig
+          python scripts/generate_ios_webclip.py --output dist/DMate-iPhone-iPad-fullscreen.mobileconfig
 
       - name: Validate profile payload
         run: |
@@ -36,7 +37,7 @@ jobs:
           import plistlib
           from pathlib import Path
 
-          path = Path("dist/DMate-iPhone-iPad.mobileconfig")
+          path = Path("dist/DMate-iPhone-iPad-fullscreen.mobileconfig")
           profile = plistlib.loads(path.read_bytes())
           assert profile["PayloadType"] == "Configuration"
           payloads = profile["PayloadContent"]
@@ -55,20 +56,38 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload v1.0.1 dist/DMate-iPhone-iPad.mobileconfig --repo "${GITHUB_REPOSITORY}" --clobber
+          gh release upload v1.0.1 dist/DMate-iPhone-iPad-fullscreen.mobileconfig --repo "${GITHUB_REPOSITORY}" --clobber
 
       - name: Verify the published attachment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p /tmp/dmate-profile-check
-          gh release download v1.0.1 --repo "${GITHUB_REPOSITORY}" --pattern "DMate-iPhone-iPad.mobileconfig" --dir /tmp/dmate-profile-check
+          gh release download v1.0.1 --repo "${GITHUB_REPOSITORY}" --pattern "DMate-iPhone-iPad-fullscreen.mobileconfig" --dir /tmp/dmate-profile-check
           python - <<'PY'
           import plistlib
           from pathlib import Path
 
-          path = Path("/tmp/dmate-profile-check/DMate-iPhone-iPad.mobileconfig")
+          path = Path("/tmp/dmate-profile-check/DMate-iPhone-iPad-fullscreen.mobileconfig")
           profile = plistlib.loads(path.read_bytes())
           assert profile["PayloadContent"][0]["FullScreen"] is True
           print("GitHub Release attachment verified: FullScreen=True")
           PY
+
+      - name: Remove obsolete non-full-screen GitHub attachment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete-asset v1.0.1 DMate-iPhone-iPad.mobileconfig --repo "${GITHUB_REPOSITORY}" --yes || true
+
+      - name: Publish the full-screen profile to GitCode when a token is configured
+        if: ${{ secrets.GITCODE_TOKEN != '' }}
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          python scripts/upload_gitcode_release_asset.py dist/DMate-iPhone-iPad-fullscreen.mobileconfig
+
+      - name: Explain skipped GitCode publication
+        if: ${{ secrets.GITCODE_TOKEN == '' }}
+        run: |
+          echo "GITCODE_TOKEN is not configured; GitCode release asset must be replaced manually."
