@@ -15,6 +15,8 @@ import android.os.SystemClock;
 import android.util.Base64;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.JavaScriptReplyProxy;
+import androidx.webkit.ScriptHandler;
+import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import org.json.JSONObject;
@@ -59,6 +61,8 @@ public final class MainActivity extends Activity {
     private static final String HOME_HOST = "dmate.zeabur.app";
 
     private WebView webView;
+    private ScriptHandler systemThemeStartScript;
+    private String documentStartSystemTheme;
     private ValueCallback<Uri[]> pendingFileCallback;
     private boolean filePickerTriedDocuments;
     private boolean filePickerMultiple;
@@ -124,6 +128,47 @@ public final class MainActivity extends Activity {
             // Refresh media queries in the existing page without a reload,
             // preserving unsent text, image selections and guest state.
             webView.dispatchConfigurationChanged(newConfig);
+            refreshSystemThemeBridge();
+        }
+    }
+
+    private String currentSystemTheme() {
+        return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+            == Configuration.UI_MODE_NIGHT_YES ? "dark" : "light";
+    }
+
+    private String systemThemeScript(String theme) {
+        // The additional runtime guard covers a navigation between the native
+        // origin check and evaluateJavascript. No privileged JS interface is exposed.
+        return "(function(){if(window.top!==window||location.origin!=='https://" + HOME_HOST + "')return;"
+            + "var theme='" + theme + "';window.__DMATE_NATIVE_SYSTEM_THEME__=theme;"
+            + "window.dispatchEvent(new CustomEvent('dmate:native-system-theme',"
+            + "{detail:{theme:theme,source:'android'}}));})();";
+    }
+
+    private void refreshSystemThemeBridge() {
+        if (webView == null || isFinishing() || isDestroyed()) return;
+        String theme = currentSystemTheme();
+        String script = systemThemeScript(theme);
+        // The document-start snapshot must be replaced when the OS changes,
+        // otherwise the next navigation could briefly restore the previous theme.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+            && !theme.equals(documentStartSystemTheme)) {
+            if (systemThemeStartScript != null) systemThemeStartScript.remove();
+            systemThemeStartScript = WebViewCompat.addDocumentStartJavaScript(
+                webView, script, Collections.singleton("https://" + HOME_HOST));
+            documentStartSystemTheme = theme;
+        }
+        String url = webView.getUrl();
+        if (url != null) {
+            Uri page = Uri.parse(url);
+            if ("https".equalsIgnoreCase(page.getScheme())
+                && HOME_HOST.equalsIgnoreCase(page.getHost())
+                && page.getUserInfo() == null && (page.getPort() == -1 || page.getPort() == 443)) {
+                // Keep the existing document, drafts, streams and permission flows.
+                // The webpage applies this hint only when "follow system" is selected.
+                webView.evaluateJavascript(script, null);
+            }
         }
     }
 
@@ -144,6 +189,10 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSafeBrowsingEnabled(true);
+        // DMate supplies its own light/dark CSS, including explicit user choices.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false);
+        }
 
         String ua = settings.getUserAgentString();
         if (ua == null) ua = "";
@@ -156,6 +205,7 @@ public final class MainActivity extends Activity {
         cookies.setAcceptThirdPartyCookies(webView, false);
 
         installGallerySaveBridge();
+        refreshSystemThemeBridge();
         webView.setWebViewClient(new DmateWebViewClient());
         webView.setWebChromeClient(new DmateChromeClient());
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
@@ -431,6 +481,7 @@ public final class MainActivity extends Activity {
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             CookieManager.getInstance().flush();
+            if (view == webView) refreshSystemThemeBridge();
         }
 
         @Override
@@ -628,7 +679,11 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (webView != null) webView.onResume();
+        setTheme(systemAppearanceTheme(getResources().getConfiguration()));
+        if (webView != null) {
+            webView.onResume();
+            refreshSystemThemeBridge();
+        }
     }
 
     @Override
@@ -641,6 +696,11 @@ public final class MainActivity extends Activity {
         pendingLegacySave = null;
         imageSaver.shutdown();
         if (webView != null) {
+            if (systemThemeStartScript != null) {
+                systemThemeStartScript.remove();
+                systemThemeStartScript = null;
+                documentStartSystemTheme = null;
+            }
             webView.stopLoading();
             webView.setWebChromeClient(null);
             webView.setWebViewClient(null);

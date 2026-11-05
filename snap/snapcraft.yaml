@@ -1,6 +1,6 @@
 name: dmate
 base: core24
-version: '1.0.0'
+version: '1.0.1'
 title: DMate
 summary: AI-powered discrete mathematics learning assistant
 description: |
@@ -31,7 +31,7 @@ apps:
 parts:
   dmate-binary:
     plugin: dump
-    source: ./DMate_1.0.0_amd64.deb
+    source: ./DMate_1.0.1_amd64.deb
     source-type: deb
     # Tauri uses WebKitGTK; the GNOME extension alone does not supply it.
     stage-packages:

@@ -18,7 +18,12 @@
 (function () {
     var theme = "light";
     try {
-        if (window.matchMedia("(prefers-color-scheme: dark)").matches) theme = "dark";
+        var nativeTheme = window.__DMATE_NATIVE_SYSTEM_THEME__;
+        if (nativeTheme === "dark" || nativeTheme === "light") {
+            theme = nativeTheme;
+        } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            theme = "dark";
+        }
     } catch (_) {}
     var root = document.documentElement;
     var scheme = theme === "light" ? "only light" : "dark";
@@ -6169,15 +6174,15 @@ body[data-appearance-theme="light"] #accountDeleteOpen.account-delete:hover {
    coverage brightness without changing the SVG paths, line width or layout.
    Resolution queries also follow browser zoom and movement between monitors. */
 @media (min-width:1101px) and (max-resolution:1.75dppx) {
-    .dmate-brand-mark { filter:brightness(1.2); }
+    .dmate-brand-mark { filter:brightness(1.35); }
 }
 
 @media (min-width:1101px) and (max-resolution:1.4dppx) {
-    .dmate-brand-mark { filter:brightness(1.4); }
+    .dmate-brand-mark { filter:brightness(1.6); }
 }
 
 @media (min-width:1101px) and (max-resolution:1.1dppx) {
-    .dmate-brand-mark { filter:brightness(1.6); }
+    .dmate-brand-mark { filter:brightness(1.9); }
 }
 
 .dmate-brand-copy {

@@ -304,6 +304,13 @@ function resolveAppearanceTheme() {
         return "navy";
     }
 
+    // Installed hosts can report the OS theme directly when their WebView's
+    // media query is stale. Keep this device signal in memory, not preferences.
+    const nativeTheme = window.__DMATE_NATIVE_SYSTEM_THEME__;
+    if (nativeTheme === "dark" || nativeTheme === "light") {
+        return nativeTheme;
+    }
+
     try {
         return window.matchMedia("(prefers-color-scheme: dark)").matches
             ? "dark"
@@ -867,6 +874,7 @@ function setupAppearanceSystemThemeListener() {
     } catch (_error) {
         // 部分移动浏览器不支持变更事件，回到页面时再读取系统设置。
     }
+    window.addEventListener("dmate:native-system-theme", onChange);
     window.addEventListener("pageshow", onChange);
     window.addEventListener("focus", onChange);
     document.addEventListener("visibilitychange", () => {
