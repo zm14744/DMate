@@ -387,6 +387,29 @@ body {
 .ai-content p { margin:10px 0; }
 .ai-content h1,.ai-content h2,.ai-content h3 { margin:12px 0 8px; }
 
+/* Keep formula source out of view until its first typeset has completed. */
+.ai-content.math-pending { visibility:hidden; }
+.reply-render-stage {
+    position:fixed !important;
+    left:-100000px !important;
+    top:0 !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
+}
+.reply-unrevealed { display:none !important; }
+.reply-revealed { animation:reply-reveal-in .16s ease-out both; }
+.reply-preparing-dots {
+    display:inline-block;
+    letter-spacing:.18em;
+    color:var(--text-muted);
+    animation:reply-preparing-pulse 1.2s ease-in-out infinite;
+}
+@keyframes reply-reveal-in { from { opacity:.35; } to { opacity:1; } }
+@keyframes reply-preparing-pulse { 50% { opacity:.35; } }
+@media(prefers-reduced-motion:reduce) {
+    .reply-revealed,.reply-preparing-dots { animation:none; }
+}
+
 .input {
     display:flex;
     gap:8px;

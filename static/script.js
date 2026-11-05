@@ -3270,6 +3270,7 @@ let typingDiv = null;
 let typingSessionId = null;
 let typingMeta = null;
 let typingContext = null;
+let typingRenderState = null;
 
 let typingAutoFollow = true;
 let typingScrollLockedByUser = false;
@@ -3278,9 +3279,8 @@ let preserveChatScrollOnce = null;
 let forceChatBottomOnce = false;
 let lastRenderedChatSessionId = null;
 
-const TYPING_RENDER_INTERVAL = 30;
-const TYPING_CHARS_PER_TICK = 3;
-const LONG_RESPONSE_DIRECT_RENDER_CHARS = 2200;
+const REPLY_REVEAL_CHARS_PER_SECOND = 140;
+const REPLY_REVEAL_MAX_MS = 8000;
 
 const busySessionIds = new Set();
 const pendingAiStartSessionIds = new Set();
@@ -3288,7 +3288,11 @@ const pendingAiStartSessionIds = new Set();
 const activeAiRequests = new Map();
 
 function clearTypingState(removeBubble = false) {
-    if (typingTimer) clearInterval(typingTimer);
+    if (typingTimer) cancelAnimationFrame(typingTimer);
+    if (typingRenderState) {
+        typingRenderState.cancelled = true;
+        if (!typingRenderState.preparing) releaseReplyStage(typingRenderState);
+    }
     if (removeBubble) typingDiv?.remove();
     typingTimer = null;
     typingFullText = "";
@@ -3296,6 +3300,7 @@ function clearTypingState(removeBubble = false) {
     typingSessionId = null;
     typingMeta = null;
     typingContext = null;
+    typingRenderState = null;
 }
 
 function typingContextIsCurrent() {
@@ -12468,7 +12473,7 @@ function maybeAutoFollowTyping() {
     // 不再每个字符都操作滚动条。
     const now = Date.now();
 
-    if (now - lastTypingAutoScrollAt < 120) {
+    if (now - lastTypingAutoScrollAt < 32) {
         return;
     }
 
@@ -16195,6 +16200,126 @@ function showCurrentError(text) {
 
 let pendingBackgroundReplyRender = false;
 
+function releaseReplyStage(state) {
+    if (!state?.stage) return;
+    try { window.MathJax?.typesetClear?.([state.stage]); } catch (_error) {}
+    state.stage.remove();
+    state.stage = null;
+}
+
+// Build from complete, sanitized, typeset DOM. Only ordinary text is split;
+// formulas, code and tables always enter the visible answer as complete units.
+function createReplyRevealPlan(root) {
+    const steps = [];
+    const segmenter = typeof Intl.Segmenter === "function"
+        ? new Intl.Segmenter(undefined, { granularity:"grapheme" }) : null;
+    let total = 0;
+    const visit = node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.data;
+            if (!text.trim()) return;
+            const characters = segmenter
+                ? Array.from(segmenter.segment(text), part => part.segment) : Array.from(text);
+            steps.push({ node, characters, start:total, end:total + characters.length, shown:0 });
+            total += characters.length;
+            node.data = "";
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        const firstStep = steps.length;
+        if (node.matches("mjx-container,pre,code,table,svg,math,img,hr,br")) {
+            const cost = node.matches("br,hr") ? 1 : Math.min(48, Math.max(8, (node.textContent || "").length));
+            steps.push({ node, start:total, end:total + cost });
+            total += cost;
+        } else {
+            for (const child of [...node.childNodes]) visit(child);
+        }
+        if (node !== root && steps.length > firstStep) node.classList.add("reply-unrevealed");
+    };
+    visit(root);
+    return { steps, total, index:0, root };
+}
+
+function advanceReplyReveal(plan, progress) {
+    while (plan.index < plan.steps.length) {
+        const step = plan.steps[plan.index];
+        const count = Math.min(step.end - step.start, Math.floor(progress - step.start));
+        if (count <= 0) break;
+        for (let element = step.node.nodeType === Node.ELEMENT_NODE ? step.node : step.node.parentElement;
+            element && element !== plan.root; element = element.parentElement) {
+            if (element.classList.contains("reply-unrevealed")) {
+                element.classList.remove("reply-unrevealed");
+                element.classList.add("reply-revealed");
+            }
+        }
+        if (step.characters && count !== step.shown) {
+            step.node.data = step.characters.slice(0, count).join("");
+            step.shown = count;
+        }
+        if (progress < step.end) break;
+        plan.index += 1;
+    }
+}
+
+function completeReplyReveal(state) {
+    if (!state?.plan) return null;
+    advanceReplyReveal(state.plan, state.plan.total);
+    for (const element of state.content.querySelectorAll(".reply-unrevealed,.reply-revealed")) {
+        element.classList.remove("reply-unrevealed", "reply-revealed");
+    }
+    return state.content;
+}
+
+async function prepareReplyReveal(context, state) {
+    try {
+        const content = document.createElement("div");
+        content.className = "ai-content";
+        const displayText = prepareAiDisplayText(typingFullText);
+        content.innerHTML = markdownToHtml(typingMeta?.generatedExercise
+            ? hideGeneratedExerciseKnowledgePoints(displayText, typingMeta.generatedTeaching)
+            : displayText);
+        const stage = document.createElement("div");
+        stage.className = "msg ai reply-render-stage";
+        stage.setAttribute("aria-hidden", "true");
+        stage.style.width = `${typingDiv.getBoundingClientRect().width}px`;
+        stage.style.setProperty("max-width", "none", "important");
+        stage.appendChild(content);
+        state.stage = stage;
+        // Keep preparation outside #chat: history refreshes clear its MathJax
+        // references and replace its children while classification is pending.
+        document.getElementById("chat").parentElement.appendChild(stage);
+        await renderMath(stage);
+        if (state.cancelled || typingContext !== context) return;
+        if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
+        state.content = content;
+        state.plan = createReplyRevealPlan(content);
+        typingDiv.replaceChildren(content);
+        typingDiv.classList.remove("reply-preparing");
+        const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+        if (reducedMotion || !state.plan.total) { finishTyping(); return; }
+        const duration = Math.min(REPLY_REVEAL_MAX_MS,
+            Math.max(450, state.plan.total / REPLY_REVEAL_CHARS_PER_SECOND * 1000));
+        let startedAt = null;
+        const frame = now => {
+            if (state.cancelled || typingContext !== context) return;
+            if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
+            if (startedAt === null) startedAt = now;
+            const fraction = Math.min(1, (now - startedAt) / duration);
+            advanceReplyReveal(state.plan, fraction * state.plan.total);
+            maybeAutoFollowTyping();
+            if (fraction === 1) { finishTyping(); return; }
+            typingTimer = requestAnimationFrame(frame);
+        };
+        typingTimer = requestAnimationFrame(frame);
+    } catch (error) {
+        console.warn("回答渐进排版失败，使用完整显示：", error);
+        if (!state.cancelled && typingContext === context) finishTyping();
+    } finally {
+        state.preparing = false;
+        releaseReplyStage(state);
+    }
+}
+
 function startTyping(
     text,
     session,
@@ -16224,24 +16349,6 @@ function startTyping(
         return;
     }
 
-    // 长回答继续逐字输出会等待几十秒，期间 LaTeX 只能以源码形式裸露。
-    // 超过阈值时直接完整渲染 Markdown + MathJax；短回答仍保留打字机效果。
-    if (text.length >= LONG_RESPONSE_DIRECT_RENDER_CHARS) {
-        addAssistantMessage(
-            session,
-            text,
-            meta
-        );
-
-        forceChatBottomOnce = true;
-        saveState();
-        renderChat();
-        renderSessions();
-        renderInfo();
-        refreshInputAvailability();
-        return;
-    }
-
     typingFullText = text;
     typingSessionId = session.id;
     typingContext = { session, userMessage: getLatestUserMessage(session), version: cloudSyncContextVersion };
@@ -16266,7 +16373,7 @@ function startTyping(
     };
 
     const chat = document.getElementById("chat");
-    if (!chat) return;
+    if (!chat) { finishTyping(); return; }
 
     typingAutoFollow = isChatNearBottom(
         chat,
@@ -16276,62 +16383,33 @@ function startTyping(
     lastTypingAutoScrollAt = 0;
 
     const div = document.createElement("div");
-    // History refreshes can move this live bubble back into #chat. Keep
-    // MathJax from replacing its text nodes while the timer appends text.
-    div.className = "msg ai tex2jax_ignore";
+    // Ignore only the live bubble; its prepared content already contains SVG.
+    div.className = "msg ai tex2jax_ignore reply-preparing";
+    div.setAttribute("aria-busy", "true");
+    const placeholder = document.createElement("span");
+    placeholder.className = "reply-preparing-dots";
+    placeholder.textContent = "•••";
+    placeholder.setAttribute("aria-label", "正在准备回答");
+    div.appendChild(placeholder);
     chat.appendChild(div);
 
     typingDiv = div;
 
+    // Truthy during both preparation and animation, preserving stop / sync /
+    // account cleanup semantics. Subsequent values are animation frame IDs.
+    typingTimer = -1;
+    const state = { preparing:true, cancelled:false, stage:null, content:null, plan:null };
+    typingRenderState = state;
     refreshInputAvailability();
-
-    let index = 0;
-
-    typingTimer = setInterval(() => {
-        if (!typingDiv) {
-            clearInterval(typingTimer);
-            typingTimer = null;
-            return;
-        }
-
-        if (index < text.length) {
-            const nextIndex = Math.min(
-                text.length,
-                index + TYPING_CHARS_PER_TICK
-            );
-
-            typingDiv.textContent += text.slice(
-                index,
-                nextIndex
-            );
-            index = nextIndex;
-
-            maybeAutoFollowTyping();
-
-            return;
-        }
-
-        clearInterval(typingTimer);
-
-        // 修复旧版核心 Bug：
-        // 正常打字结束后必须清空 typingTimer，
-        // 否则 send() 会永远认为仍在打字。
-        typingTimer = null;
-
-        finishTyping();
-    }, TYPING_RENDER_INTERVAL);
+    maybeAutoFollowTyping();
+    void prepareReplyReveal(typingContext, state);
 }
 
 function finishTyping() {
     if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
     const session = typingContext.session;
 
-    if (typingDiv) {
-        typingDiv.innerHTML =
-            `<div class="ai-content">${markdownToHtml(
-                prepareAiDisplayText(typingFullText)
-            )}</div>`;
-    }
+    const preparedContent = completeReplyReveal(typingRenderState);
 
     if (session) {
         addAssistantMessage(
@@ -16341,7 +16419,7 @@ function finishTyping() {
         );
     }
 
-    const finishedDiv = typingDiv;
+    const finishedMessage = session.messages[session.messages.length - 1];
 
     clearTypingState();
 
@@ -16357,7 +16435,7 @@ function finishTyping() {
     // 重新渲染已落盘的最后一条 AI 消息，立即补上“删除”等消息操作。
     // 旧版只把 typingDiv 换成最终 HTML，没有重新生成 msg-actions，
     // 所以最新一条回答在下一次刷新前看不到删除按钮。
-    renderChat();
+    renderChat({ message:finishedMessage, content:preparedContent });
     renderSessions();
     renderInfo();
 
@@ -16370,56 +16448,7 @@ function finishTyping() {
 
 // 强制完成当前打字动画
 function forceCompleteTyping() {
-    if (!typingTimer) {
-        return;
-    }
-    if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
-
-    clearInterval(typingTimer);
-    typingTimer = null;
-
-    const session = typingContext.session;
-
-    if (typingDiv) {
-        typingDiv.innerHTML =
-            `<div class="ai-content">${markdownToHtml(
-                prepareAiDisplayText(typingFullText)
-            )}</div>`;
-    }
-
-    if (session) {
-        addAssistantMessage(
-            session,
-            typingFullText,
-            typingMeta || {}
-        );
-    }
-
-    const finishedDiv = typingDiv;
-
-    clearTypingState();
-
-    saveState();
-
-    if (
-        typingAutoFollow
-        && !typingScrollLockedByUser
-    ) {
-        forceChatBottomOnce = true;
-    }
-
-    // 重新渲染已落盘的最后一条 AI 消息，立即补上“删除”等消息操作。
-    // 旧版只把 typingDiv 换成最终 HTML，没有重新生成 msg-actions，
-    // 所以最新一条回答在下一次刷新前看不到删除按钮。
-    renderChat();
-    renderSessions();
-    renderInfo();
-
-    refreshInputAvailability();
-
-    typingAutoFollow = true;
-    typingScrollLockedByUser = false;
-    lastTypingAutoScrollAt = 0;
+    if (typingTimer) finishTyping();
 }
 
 
@@ -16439,10 +16468,19 @@ document.addEventListener("visibilitychange", () => {
 // -----------------------------
 // 渲染聊天
 // -----------------------------
-function renderChat() {
+function renderChat(preparedReply = null) {
     const chat = document.getElementById("chat");
     if (!chat) return;
 
+    // Reuse unchanged ready content from this view. A history refresh must not
+    // blank earlier answers while a new formula extension is being loaded.
+    const readyContent = new Map();
+    for (const bubble of chat.children) {
+        const content = bubble.querySelector(".msg-content > .ai-content:not(.math-pending)");
+        if (bubble.dmateMessage && content) {
+            readyContent.set(bubble.dmateMessage, { content, text:bubble.dmateRenderedText });
+        }
+    }
     const renderOperation = {};
     renderChat.currentOperation = renderOperation;
 
@@ -16509,12 +16547,19 @@ function renderChat() {
             content.textContent = message.text;
             content.style.whiteSpace = "pre-wrap";
         } else {
-            content.innerHTML =
-                `<div class="ai-content">${markdownToHtml(
-                    message.generatedExercise
-                        ? hideGeneratedExerciseKnowledgePoints(prepareAiDisplayText(message.text), message.generatedTeaching)
-                        : prepareAiDisplayText(message.text)
-                )}</div>`;
+            const displayText = message.generatedExercise
+                ? hideGeneratedExerciseKnowledgePoints(prepareAiDisplayText(message.text), message.generatedTeaching)
+                : prepareAiDisplayText(message.text);
+            const ready = readyContent.get(message);
+            if (preparedReply?.message === message && preparedReply.content) {
+                content.appendChild(preparedReply.content);
+            } else if (ready?.text === displayText) {
+                content.appendChild(ready.content);
+            } else {
+                content.innerHTML = `<div class="ai-content math-pending">${markdownToHtml(displayText)}</div>`;
+            }
+            div.dmateMessage = message;
+            div.dmateRenderedText = displayText;
         }
 
         div.appendChild(content);
@@ -16634,6 +16679,9 @@ function renderChat() {
     renderMath(chat).then(() => {
         // A newer history render or session switch owns the scroll position.
         if (renderChat.currentOperation !== renderOperation || getCurrent() !== session) return;
+        for (const content of chat.querySelectorAll(".ai-content.math-pending")) {
+            content.classList.remove("math-pending");
+        }
         // 公式渲染会改变消息高度，必须在排版完成后再恢复一次位置。
         // 否则长公式/矩阵会把当前视口“顶”到上方。
         if (shouldStickBottom) {
