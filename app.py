@@ -16,6 +16,7 @@ from collections import defaultdict, deque, OrderedDict
 import ipaddress
 
 from flask import Flask, jsonify, render_template, request, session, make_response, redirect, has_request_context
+from ios_webclip import build_ios_webclip_profile
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ai import ask_ai, analyze_image_structure, verify_graph_image_independently
@@ -2309,6 +2310,19 @@ def favicon_png_root():
     response = app.send_static_file("icons/dmate-site-v40-64.png")
     response.headers["Content-Type"] = "image/png"
     response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
+@app.route("/DMate.mobileconfig")
+def ios_ipados_webclip_profile():
+    """Download the DMate full-screen Home Screen Web Clip for iPhone/iPad."""
+    icon_path = os.path.join(app.static_folder, "icons", "apple-touch-icon.png")
+    profile_bytes = build_ios_webclip_profile(icon_path)
+    response = make_response(profile_bytes)
+    response.headers["Content-Type"] = "application/x-apple-aspen-config"
+    response.headers["Content-Disposition"] = 'attachment; filename="DMate-iPhone-iPad.mobileconfig"'
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     return response
 
 
