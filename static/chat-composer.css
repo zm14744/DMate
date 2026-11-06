@@ -1,3 +1,25 @@
+/* Center the existing composer in an empty conversation. Image tasks keep
+   their normal layout because they hide this same input wrapper. */
+body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
+    position:absolute;
+    inset:50% max(24px,env(safe-area-inset-right,0px)) auto max(24px,env(safe-area-inset-left,0px));
+    width:auto !important; max-width:760px;
+    margin:0 auto !important; padding:0 !important;
+    transform:translateY(-50%);
+    background:transparent !important; background-image:none !important;
+}
+@media(max-width:1100px) {
+    body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
+        left:max(12px,env(safe-area-inset-left,0px));
+        right:max(12px,env(safe-area-inset-right,0px));
+    }
+    body[data-appearance-theme].mobile-keyboard-open .center.chat-empty > .input-wrap:not([hidden]) {
+        position:relative; inset:auto; transform:none;
+        width:100% !important; max-width:none;
+        padding:0 12px max(8px,env(safe-area-inset-bottom,0px)) !important;
+    }
+}
+
 /* The ordinary message field and queued images reuse the same icon actions. */
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input {
     display:flex !important; align-items:flex-end !important; gap:8px !important;

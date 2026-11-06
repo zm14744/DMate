@@ -1147,7 +1147,7 @@ function clearLoggedOutWorkspace() {
     const sessionsBox = document.getElementById("sessions");
     if (sessionsBox) sessionsBox.innerHTML = "";
     const chat = document.getElementById("chat");
-    if (chat) chat.innerHTML = '<div class="empty-tip">无</div>';
+    if (chat) chat.innerHTML = "";
 
     renderAll();
 }
@@ -16993,6 +16993,8 @@ document.addEventListener("visibilitychange", () => {
 function renderChat(preparedReply = null) {
     const chat = document.getElementById("chat");
     if (!chat) return;
+    const session = getCurrent();
+    chat.closest(".center")?.classList.toggle("chat-empty", !session?.messages?.length);
 
     // Reuse unchanged ready content from this view. A history refresh must not
     // blank earlier answers while a new formula extension is being loaded.
@@ -17031,11 +17033,7 @@ function renderChat(preparedReply = null) {
 
     chat.innerHTML = "";
 
-    const session = getCurrent();
-
     if (!session) {
-        chat.innerHTML =
-            '<div class="empty-tip">无</div>';
         lastRenderedChatSessionId = null;
         queueChatJumpControlsUpdate();
         return;
