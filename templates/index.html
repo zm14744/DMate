@@ -9097,6 +9097,14 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
         <div class="appearance-body">
             <div class="appearance-section">
+                <div class="appearance-section-title" data-i18n="languageTitle">界面语言 / Language</div>
+                <div class="appearance-segmented two" role="group" aria-label="界面语言">
+                    <button type="button" data-dmate-language="zh-CN">简体中文</button>
+                    <button type="button" data-dmate-language="en">English</button>
+                </div>
+            </div>
+
+            <div class="appearance-section">
                 <div class="appearance-section-title">显示模式</div>
                 <div class="appearance-segmented modes">
                     <button type="button" data-appearance-mode="system">跟随系统</button>
@@ -9667,6 +9675,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/learning-report.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/chat-stream.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/script.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/language.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 
