@@ -32,6 +32,14 @@
       "url": "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/DMate_1.0.0_amd64.AppImage/download",
       "fallbackUrls": [
         "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_amd64.AppImage"
+      ],
+      "additionalPackages": [
+        {
+          "url": "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/DMate_1.0.0_amd64.deb/download",
+          "fallbackUrls": [
+            "https://github.com/zm14744/DMate/releases/download/v1.0.1/DMate_1.0.0_amd64.deb"
+          ]
+        }
       ]
     }
   }

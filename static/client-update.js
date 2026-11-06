@@ -31,8 +31,8 @@
         const desktop = /DMateDesktop\/(\d+\.\d+\.\d+)/i.exec(agent);
         if (desktop && (config?.isDesktopApp !== false)) {
             let os = String(platform || '').toLowerCase();
-            if (/windows|win/.test(os)) os = 'windows';
-            else if (/mac|darwin/.test(os)) os = 'macos';
+            if (/mac|darwin/.test(os)) os = 'macos';
+            else if (/windows|win/.test(os)) os = 'windows';
             else if (/linux/.test(os)) os = 'linux';
             else return null;
             return { kind:'desktop', platform:os, version:desktop[1] };
@@ -55,12 +55,22 @@
                     ? /^\/api\/v5\/repos\/zm14744\/DMate\/releases\/(v?\d+\.\d+\.\d+)\/attach_files\/([A-Za-z0-9][A-Za-z0-9._-]*)\/download$/.exec(url.pathname)
                     : null;
             if (!match || match[2].includes('..')) return null;
-            const ext = client.kind === 'android' ? /\.apk$/i :
-                client.platform === 'windows' ? /\.exe$/i :
-                client.platform === 'macos' ? /\.dmg$/i :
-                client.platform === 'linux' ? /\.(?:deb|AppImage)$/i : null;
-            if (!ext?.test(match[2])) return null;
+            const filenamePattern = client.kind === 'android'
+                ? /^DMate-Android-(\d+\.\d+\.\d+)\.apk$/
+                : client.platform === 'windows'
+                    ? /^DMate_(\d+\.\d+\.\d+)_x64-setup\.exe$/
+                    : client.platform === 'macos'
+                        ? /^DMate_(\d+\.\d+\.\d+)_universal\.dmg$/
+                        : client.platform === 'linux'
+                            ? /^DMate_(\d+\.\d+\.\d+)_amd64\.(AppImage|deb)$/ : null;
+            const filename = filenamePattern?.exec(match[2]);
+            if (!filename) return null;
+            const format = client.kind === 'android' ? 'APK'
+                : client.platform === 'windows' ? 'EXE'
+                    : client.platform === 'macos' ? 'DMG'
+                        : filename[2] === 'deb' ? 'DEB' : 'AppImage';
             return { url:url.href, tag:match[1], filename:match[2],
+                version:filename[1], format,
                 source:url.hostname === 'github.com' ? 'github' : 'gitcode' };
         } catch (_err) {
             return null;
@@ -74,170 +84,309 @@
         if (!item || item.published !== true ||
             compareVersions(item.version, client.version) !== 1) return null;
         const primary = releaseAsset(client, item.url);
-        if (!primary) return null;
-        const seen = new Set([primary.url]);
-        const fallbackUrls = [];
-        for (const value of Array.isArray(item.fallbackUrls) ? item.fallbackUrls : []) {
-            const asset = releaseAsset(client, value);
-            if (!asset || asset.filename !== primary.filename
-                || asset.tag !== primary.tag || seen.has(asset.url)) continue;
-            seen.add(asset.url);
-            fallbackUrls.push(asset.url);
+        const version = String(item.version).replace(/^v/, '');
+        if (!primary || primary.version !== version) return null;
+        // Mirrors must point to the very same file, while distinct Linux
+        // formats are separate choices rather than interchangeable fallbacks.
+        function packageFor(asset, details) {
+            const seen = new Set([asset.url]);
+            const fallbackUrls = [];
+            for (const value of Array.isArray(details.fallbackUrls) ? details.fallbackUrls : []) {
+                const mirror = releaseAsset(client, value);
+                if (!mirror || mirror.filename !== asset.filename
+                    || mirror.tag !== asset.tag || seen.has(mirror.url)) continue;
+                seen.add(mirror.url);
+                fallbackUrls.push(mirror.url);
+            }
+            return { format:asset.format, url:asset.url, fallbackUrls };
         }
+        const packages = [packageFor(primary, item)];
+        if (client.kind === 'desktop' && client.platform === 'linux') {
+            const formats = new Set([primary.format]);
+            for (const entry of Array.isArray(item.additionalPackages) ? item.additionalPackages : []) {
+                const asset = releaseAsset(client, entry?.url);
+                if (!asset || asset.version !== version || asset.tag !== primary.tag
+                    || formats.has(asset.format)) continue;
+                formats.add(asset.format);
+                packages.push(packageFor(asset, entry));
+            }
+        }
+        const fallbackUrls = packages[0].fallbackUrls;
         const sha256 = client.kind === 'android'
             && typeof item.sha256 === 'string' && /^[a-fA-F0-9]{64}$/.test(item.sha256)
             ? item.sha256.toLowerCase() : null;
-        return { version:item.version, url:primary.url, fallbackUrls, sha256, platform:client.platform };
+        return { version:item.version, url:primary.url, fallbackUrls, sha256,
+            platform:client.platform, packages };
     }
-    // Newer APKs have an origin-restricted native download bridge.
-    // Older APKs still use the official browser-download path.
-    function downloadInsideAndroid(update) {
-        const bridge = root.DMateUpdate;
-        if (!bridge?.postMessage || !update.sha256) return Promise.resolve(null);
-        const id = 'native-update-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-        return new Promise(resolve => {
-            let settled = false;
-            let previous;
-            let timer;
-            const onMessage = event => {
-                let response;
-                try { response = JSON.parse(event.data); } catch (_err) { return; }
-                if (response?.id === id) finish(response);
-            };
-            const chained = event => {
-                onMessage(event);
-                if (typeof previous === 'function') previous(event);
-            };
-            const finish = result => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                bridge.removeEventListener?.('message', onMessage);
-                if (bridge.onmessage === chained) bridge.onmessage = previous;
-                resolve(result);
-            };
-            previous = bridge.onmessage;
-            if (typeof bridge.addEventListener === 'function') {
-                bridge.addEventListener('message', onMessage);
-            } else bridge.onmessage = chained;
-            timer = setTimeout(() => finish({ ok:false, message:'更新请求超时' }), 15000);
-            try {
-                bridge.postMessage(JSON.stringify({
-                    id, url:update.url, version:update.version, sha256:update.sha256
-                }));
-            } catch (_err) {
-                finish({ ok:false, message:'无法启动应用内下载' });
-            }
-        });
+    const dismissed = new Set();
+    let pendingUpdate = null;
+    let pendingTimer = 0;
+
+    function dismissalKey(client, update) {
+        return 'dmate-client-update-dismissed:' + client.platform + ':' + update.version;
     }
-    function createButton(doc, label, handler, primary) {
-        const button = doc.createElement('button');
-        button.type = 'button';
-        button.textContent = label;
-        if (primary) button.className = 'dmate-update-primary';
-        button.addEventListener('click', handler);
-        return button;
+    function wasDismissed(key) {
+        if (dismissed.has(key)) return true;
+        try { return root.sessionStorage?.getItem(key) === '1'; } catch (_error) { return false; }
+    }
+    function canShowNotice(doc) {
+        if (!doc?.body || doc.hidden) return false;
+        try {
+            if (typeof root.dmateCanShowClientUpdate !== 'function'
+                || !root.dmateCanShowClientUpdate()) return false;
+        } catch (_error) { return false; }
+        if (doc.querySelector('dialog[open], .modal:not(.hidden), .dmate-png-save-dialog')) return false;
+        if (doc.body.classList.contains('mobile-left-open')
+            || doc.body.classList.contains('mobile-tools-open')
+            || doc.body.classList.contains('mobile-keyboard-open')) return false;
+        const active = doc.activeElement;
+        if (active?.isContentEditable) return false;
+        if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)
+            && (active.tagName === 'SELECT' || String(active.value || '').trim())) return false;
+        return true;
+    }
+    function uiText(chinese, english) {
+        return root.DMateI18n?.isEnglish?.() === true ? english : chinese;
     }
     function showNotice(client, update) {
         const doc = root.document;
-        if (!doc?.body || doc.getElementById('dmateClientUpdateNotice')) return;
-        const key = 'dmate-client-update-dismissed:' + client.platform + ':' + update.version;
-        try { if (root.sessionStorage.getItem(key) === '1') return; } catch (_err) {}
-        const box = doc.createElement('aside');
+        const key = dismissalKey(client, update);
+        if (!doc?.body || wasDismissed(key) || doc.getElementById('dmateClientUpdateNotice')) return false;
+        const previousFocus = doc.activeElement;
+        const box = doc.createElement('dialog');
         box.id = 'dmateClientUpdateNotice';
-        box.className = 'dmate-update-notice';
-        box.setAttribute('role', 'status');
-        box.setAttribute('aria-live', 'polite');
-        const title = doc.createElement('h3');
-        title.textContent = 'DMate 有新版本 ' + update.version;
+        box.className = 'dmate-update-dialog';
+        box.setAttribute('aria-labelledby', 'dmateClientUpdateTitle');
+        box.setAttribute('aria-describedby', 'dmateClientUpdateDescription');
+        const head = doc.createElement('div');
+        head.className = 'modal-head';
+        const title = doc.createElement('h2');
+        title.id = 'dmateClientUpdateTitle';
+        title.textContent = uiText('更新 DMate', 'Update DMate');
+        const close = doc.createElement('button');
+        close.className = 'modal-close-dot';
+        close.type = 'button';
+        close.title = uiText('关闭', 'Close');
+        close.setAttribute('aria-label', uiText('关闭更新提醒', 'Close update reminder'));
+        const body = doc.createElement('div');
+        body.className = 'dmate-update-body';
         const description = doc.createElement('p');
-        description.textContent = client.kind === 'android'
-            ? '点击更新下载安装包，系统会要求确认安装。无需先卸载旧版。'
-            : '点击更新获取新版安装包。系统可能要求确认安装。';
-        const actions = doc.createElement('div');
-        actions.className = 'dmate-update-actions';
-        actions.append(
-            createButton(doc, '稍后', () => {
-                try { root.sessionStorage.setItem(key, '1'); } catch (_err) {}
-                box.remove();
-            }, false),
-            createButton(doc, '下载更新', async () => {
-                if (client.kind === 'android') {
-                    if (root.DMateUpdate?.postMessage && update.sha256) {
-                        description.textContent = '正在请求系统后台下载…';
-                        const result = await downloadInsideAndroid(update);
-                        description.textContent = String(result?.message ||
-                            '应用内更新不可用，请使用下方官方链接');
-                        return;
-                    }
-                    // Legacy APKs cannot gain a new native bridge via web code.
-                    root.location.assign(update.url);
-                } else {
-                    // Remote Tauri webviews may block popups; keep copyable link.
-                    const opened = root.open(update.url, '_blank', 'noopener,noreferrer');
-                    if (!opened) {
-                        description.textContent = '如果未打开浏览器，请使用下方下载地址。';
-                    }
-                }
-            }, true),
-        );
-        const links = doc.createElement('div');
-        links.className = 'dmate-update-actions';
-        for (const [index, url] of [update.url, ...(update.fallbackUrls || [])].entries()) {
-            const link = doc.createElement('a');
-            link.className = 'dmate-update-url';
-            link.href = url;
-            const host = new URL(url).hostname;
-            const source = host === 'api.gitcode.com' ? 'GitCode' : 'GitHub';
-            link.textContent = (index ? '备用下载 · ' : '下载地址 · ') + source;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            links.append(link);
+        description.id = 'dmateClientUpdateDescription';
+        description.textContent = uiText('发现新版本 ' + update.version + '，需要下载并安装新安装包。',
+            'Version ' + update.version + ' is available. Download and install the new package to update.');
+        body.append(description);
+        const packages = update.packages || [{ url:update.url, fallbackUrls:update.fallbackUrls }];
+        let selectedPackage = packages[0];
+        let picker = null;
+        if (packages.length > 1) {
+            const label = doc.createElement('label');
+            label.className = 'dmate-update-format';
+            label.textContent = uiText('安装包格式', 'Installer format');
+            picker = doc.createElement('select');
+            picker.setAttribute('aria-label', uiText('安装包格式', 'Installer format'));
+            picker.dataset.dmateNativeSelect = 'true';
+            for (const [index, item] of packages.entries()) {
+                const option = doc.createElement('option');
+                option.value = String(index);
+                option.textContent = item.format;
+                picker.append(option);
+            }
+            label.append(picker);
+            body.append(label);
         }
+        const hint = doc.createElement('p');
+        hint.className = 'download-description';
+        hint.textContent = uiText('选择下载源', 'Choose a download source');
+        const links = doc.createElement('div');
+        links.className = 'download-actions dmate-update-actions';
+        const fallback = doc.createElement('div');
+        fallback.className = 'dmate-update-fallback';
+        fallback.hidden = true;
+        const status = doc.createElement('p');
+        status.setAttribute('role', 'status');
         const address = doc.createElement('input');
-        address.className = 'dmate-update-address';
         address.type = 'text';
         address.readOnly = true;
-        address.value = update.url;
-        address.setAttribute('aria-label', '首选下载地址，可选择复制');
+        address.setAttribute('aria-label', uiText('新安装包下载地址', 'New installer download address'));
         address.addEventListener('click', () => address.select());
-        address.style.width = '100%';
-        address.style.boxSizing = 'border-box';
-        box.append(title, description, actions, links, address);
+        const copy = doc.createElement('button');
+        copy.type = 'button';
+        copy.textContent = uiText('复制下载地址', 'Copy download link');
+        copy.addEventListener('click', async () => {
+            const value = address.value;
+            let copied = false;
+            try {
+                if (root.navigator?.clipboard?.writeText) {
+                    await root.navigator.clipboard.writeText(value);
+                    copied = true;
+                }
+            } catch (_error) {}
+            if (!box.isConnected || address.value !== value) return;
+            if (!copied) {
+                address.focus({ preventScroll:true });
+                address.select();
+                try { copied = Boolean(doc.execCommand?.('copy')); } catch (_error) {}
+            }
+            status.textContent = copied
+                ? uiText('下载地址已复制，请在浏览器中打开。', 'The download link was copied. Open it in your browser.')
+                : uiText('请手动选中下载地址，复制到浏览器中打开。', 'Select and copy the download link, then open it in your browser.');
+        });
+        fallback.append(status, address, copy);
+        const renderLinks = () => {
+            links.textContent = '';
+            fallback.hidden = true;
+            address.value = '';
+            const urls = [selectedPackage.url, ...(selectedPackage.fallbackUrls || [])];
+            for (const [host, label] of [['api.gitcode.com', 'GitCode'], ['github.com', 'GitHub']]) {
+                const url = urls.find(value => new URL(value).hostname === host);
+                if (!url) continue;
+                const link = doc.createElement('a');
+                link.href = url;
+                link.textContent = label;
+                link.rel = 'noopener noreferrer';
+                if (links.childElementCount) link.className = 'secondary';
+                if (client.kind === 'desktop') {
+                    link.target = '_blank';
+                    link.addEventListener('click', () => {
+                        // Older Tauri shells may block new windows. Keep the
+                        // workspace in place and provide a copyable address.
+                        address.value = url;
+                        status.textContent = uiText('如果没有开始下载，可复制地址到浏览器中打开。',
+                            'If the download does not start, copy the link and open it in your browser.');
+                        fallback.hidden = false;
+                    });
+                }
+                // Android's native navigation handler opens external URLs in
+                // the browser; do not invoke a nonexistent install bridge.
+                links.append(link);
+            }
+        };
+        picker?.addEventListener('change', () => {
+            selectedPackage = packages[Number(picker.value)] || packages[0];
+            renderLinks();
+        });
+        renderLinks();
+        body.append(hint, links, fallback);
+        head.append(title, close);
+        box.append(head, body);
+        let finished = false;
+        let overlay = null;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            dismissed.add(key);
+            try { root.sessionStorage?.setItem(key, '1'); } catch (_error) {}
+            if (box.open && typeof box.close === 'function') box.close();
+            box.remove();
+            overlay?.remove();
+            root.requestAnimationFrame(() => {
+                if (previousFocus?.isConnected && !previousFocus.disabled
+                    && !doc.querySelector('dialog[open], .modal:not(.hidden), .dmate-png-save-dialog')) {
+                    previousFocus.focus?.({ preventScroll:true });
+                }
+            });
+        };
+        close.addEventListener('click', finish);
+        box.addEventListener('cancel', event => { event.preventDefault(); finish(); });
+        box.addEventListener('close', finish);
+        box.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault(); event.stopPropagation(); finish();
+            } else if (event.key === 'Tab') {
+                const controls = [...box.querySelectorAll('button, a[href], select, input')]
+                    .filter(node => !node.disabled && node.getClientRects().length);
+                const first = controls[0], last = controls[controls.length - 1];
+                if (event.shiftKey && doc.activeElement === first) {
+                    event.preventDefault(); last?.focus();
+                } else if (!event.shiftKey && doc.activeElement === last) {
+                    event.preventDefault(); first?.focus();
+                }
+            }
+        });
+        box.addEventListener('pointerdown', event => {
+            if (event.target !== box) return;
+            const rect = box.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right
+                || event.clientY < rect.top || event.clientY > rect.bottom) finish();
+        });
         doc.body.append(box);
+        try {
+            if (typeof box.showModal === 'function') box.showModal();
+            else {
+                overlay = doc.createElement('div');
+                overlay.className = 'dmate-update-overlay';
+                overlay.addEventListener('pointerdown', event => { if (event.target === overlay) finish(); });
+                doc.body.append(overlay);
+                overlay.append(box);
+                box.setAttribute('open', '');
+                box.setAttribute('role', 'dialog');
+                box.setAttribute('aria-modal', 'true');
+            }
+            close.focus({ preventScroll:true });
+            return true;
+        } catch (_error) {
+            box.remove(); overlay?.remove();
+            return false;
+        }
     }
-    async function checkForUpdates() {
+    function tryPendingNotice() {
+        if (pendingTimer) root.clearTimeout(pendingTimer);
+        pendingTimer = 0;
+        if (!pendingUpdate) return;
+        const {client, update} = pendingUpdate;
+        if (wasDismissed(dismissalKey(client, update))) {
+            pendingUpdate = null;
+            return;
+        }
+        if (canShowNotice(root.document) && showNotice(client, update)) {
+            pendingUpdate = null;
+        } else if (!root.document?.hidden) {
+            pendingTimer = root.setTimeout(tryPendingNotice, 1500);
+        }
+    }
+    async function checkForUpdates(force = false) {
         if (!root.document || checking) return;
         const client = detectInstalledClient(
-            root.navigator?.userAgent, root.DMATE_CLIENT_CONFIG,
-            root.navigator?.platform
+            root.navigator?.userAgent, root.DMATE_CLIENT_CONFIG, root.navigator?.platform
         );
         if (!client) return;
-        if (Date.now() - lastChecked < CHECK_INTERVAL_MS) return;
+        tryPendingNotice();
+        if (!force && lastChecked && Date.now() - lastChecked < CHECK_INTERVAL_MS) return;
         checking = true;
-        lastChecked = Date.now();
+        const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
+        const timer = controller ? root.setTimeout(() => controller.abort(), 10000) : 0;
         try {
-            const response = await root.fetch(MANIFEST, { cache:'no-store', credentials:'same-origin' });
+            const response = await root.fetch(MANIFEST, {
+                cache:'no-store', credentials:'same-origin', ...(controller ? { signal:controller.signal } : {})
+            });
             if (!response.ok) return;
             const update = selectPublishedUpdate(client, await response.json());
-            if (update) showNotice(client, update);
-        } catch (_err) {
-            // Offline use and blocked update checks must not break DMate.
+            lastChecked = Date.now();
+            pendingUpdate = update ? {client, update} : null;
+            tryPendingNotice();
+        } catch (_error) {
+            // Offline checks never interrupt the workspace or show an error dialog.
         } finally {
+            if (timer) root.clearTimeout(timer);
             checking = false;
         }
     }
     const api = { compareVersions, detectInstalledClient, selectPublishedUpdate, checkForUpdates };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
-    if (root.document) {
-        if (root.document.readyState === 'loading') {
-            root.document.addEventListener('DOMContentLoaded', checkForUpdates, { once:true });
-        } else {
-            void checkForUpdates();
-        }
-        root.document.addEventListener('visibilitychange', () => {
-            if (!root.document.hidden) void checkForUpdates();
-        });
-        root.setInterval(() => void checkForUpdates(), CHECK_INTERVAL_MS);
+    if (!root.document) return;
+    root.DMateClientUpdate = api;
+    if (!detectInstalledClient(root.navigator?.userAgent, root.DMATE_CLIENT_CONFIG, root.navigator?.platform)) return;
+    if (root.document.readyState === 'loading') {
+        root.document.addEventListener('DOMContentLoaded', () => void checkForUpdates(), { once:true });
+    } else {
+        void checkForUpdates();
     }
+    root.document.addEventListener('visibilitychange', () => {
+        tryPendingNotice();
+        if (!root.document.hidden) void checkForUpdates();
+    });
+    root.addEventListener?.('online', () => void checkForUpdates(true));
+    root.addEventListener?.('pageshow', () => void checkForUpdates());
+    root.addEventListener?.('focus', () => { tryPendingNotice(); void checkForUpdates(); });
+    root.setInterval(() => void checkForUpdates(), CHECK_INTERVAL_MS);
 })(typeof window !== 'undefined' ? window : globalThis);

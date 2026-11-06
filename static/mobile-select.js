@@ -5,6 +5,7 @@
  function eligible(target){
   const select=target?.closest?.('select') || target?.closest?.('label')?.control;
   return root.matchMedia('(max-width:1100px)').matches && select?.tagName==='SELECT' && !select.disabled &&
+   select.dataset.dmateNativeSelect!=='true' &&
    !select.multiple && select.size<=1 && select.options.length &&
    typeof root.openMobileChoiceModal==='function' ? select : null;
  }

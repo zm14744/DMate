@@ -14,6 +14,7 @@
     let lastChecked = 0;
     let inFlight = false;
     let pendingRevision = '';
+    let navigationRequested = false;
 
     const isRevision = value => /^[a-f0-9]{64}$/i.test(String(value || ''));
     function isInstalledShell() {
@@ -48,29 +49,46 @@
         return false;
     }
     function tryRefresh(revision) {
-        if (!isRevision(revision) || revision === installedRevision) return false;
+        if (navigationRequested || !isRevision(revision) || revision === installedRevision) return false;
         if (hasUnsavedWork(root.document)) {
             pendingRevision = revision;
             return false;
         }
         try {
-            const previous = JSON.parse(root.sessionStorage?.getItem(RETRY_KEY) || '{}');
-            if (previous.revision === revision &&
-                Date.now() - Number(previous.at || 0) < RETRY_GUARD_MS) return false;
-            root.sessionStorage?.setItem(RETRY_KEY, JSON.stringify({
-                revision, at:Date.now()
-            }));
+            const currentUrl = new URL(root.location.href ||
+                ((root.location.pathname || '/') + (root.location.search || '')),
+                root.location.origin);
+            // A navigation already requested this revision but did not receive
+            // it. Leave the current document usable instead of retrying it.
+            if (currentUrl.searchParams.get('dmate_web_revision') === revision.slice(0, 16)) return false;
+            const storage = root.sessionStorage;
+            if (!storage || typeof storage.getItem !== 'function'
+                || typeof storage.setItem !== 'function') return false;
+            const previous = JSON.parse(storage.getItem(RETRY_KEY) || '{}');
+            // Rate-limit all navigation targets. Mixed deployment instances
+            // can alternate revisions and otherwise bypass a per-target limit.
+            if (Date.now() - Number(previous.at || 0) < RETRY_GUARD_MS) return false;
+            if ((previous.fromRevision === installedRevision && previous.revision === revision)
+                || (previous.fromRevision === revision && previous.revision === installedRevision)) return false;
+            const attempt = JSON.stringify({
+                fromRevision:installedRevision, revision, at:Date.now()
+            });
+            storage.setItem(RETRY_KEY, attempt);
+            if (storage.getItem(RETRY_KEY) !== attempt) return false;
         } catch (_error) {
-            // Private mode may deny sessionStorage; the no-store HTTP headers
-            // still make subsequent navigation fetch the live document.
+            // Without durable per-tab protection, another automatic navigation
+            // can loop. A normal manual reload still retrieves the live page.
+            return false;
         }
         pendingRevision = '';
         try {
             const url = new URL('/', root.location.origin);
             url.searchParams.set('dmate_web_revision', revision.slice(0, 16));
+            navigationRequested = true;
             root.location.replace(url.pathname + url.search);
             return true;
         } catch (_error) {
+            navigationRequested = false;
             return false;
         }
     }

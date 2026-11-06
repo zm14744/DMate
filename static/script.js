@@ -2076,6 +2076,17 @@ function dmateHasUnsavedWork() {
     return snapshotHasUserData(collectCloudSnapshot()) || collectLearningReviewDrawings().length > 0;
 }
 
+// A package reminder never reloads the page: saved or guest history alone must
+// not suppress it. Wait only for active operations; leave their queues intact.
+function dmateCanShowClientUpdate() {
+    return !(cloudUiEditInProgress() || activeAiRequests.size || typingContext
+        || ocrTasks.size || ocrBatchPreparing || ocrRequestInFlight
+        || accountVerificationPending || accountVerificationOperation
+        || cloudApplyingSnapshot || cloudInitialSyncPending || cloudInitialSyncInFlight
+        || cloudLivePollInFlight || accountState.syncing || cloudSyncTimer
+        || (window.dmateVoiceInput && window.dmateVoiceInput.state !== "idle"));
+}
+
 async function pullLatestCloudSnapshot() {
     if (!cloudLivePollEnabled || cloudLivePollInFlight || accountState.syncing || !accountState.authenticated) return false;
     const owner = accountState.username;

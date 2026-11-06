@@ -48,7 +48,6 @@
 <script>
 /* 仅迁移清理旧版 DMate Service Worker 与历史缓存；不注册新 Worker，也不提供网页应用安装功能。 */
 (function () {
-    var reloadKey = "dmate-legacy-worker-cleanup-v3-reloaded";
     var cleanupTasks = [];
 
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
@@ -90,14 +89,9 @@
         }));
     }
 
-    Promise.all(cleanupTasks).then(function (results) {
-        if (!results.some(Boolean)) return;
-        try {
-            if (window.sessionStorage.getItem(reloadKey) === "1") return;
-            window.sessionStorage.setItem(reloadKey, "1");
-            window.location.reload();
-        } catch (_) {}
-    }).catch(function () {});
+    // Retire old caches in place. A cleanup callback must never reload an
+    // ordinary browser page or discard work started while cleanup was running.
+    Promise.all(cleanupTasks).catch(function () {});
 })();
 </script>
 
@@ -8869,6 +8863,9 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/drawing-workspace.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/modal-chrome.css?v={{ dmate_web_revision }}">
+{% if is_dmate_android_app or is_dmate_desktop_app %}
+<link rel="stylesheet" href="/static/client-update.css?v={{ dmate_web_revision }}">
+{% endif %}
 <link rel="stylesheet" href="/static/appearance-panels.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/learning-report.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/red-circle-controls.css?v={{ dmate_web_revision }}">
@@ -9678,6 +9675,9 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/language.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
+{% if is_dmate_android_app or is_dmate_desktop_app %}
+<script src="/static/client-update.js?v={{ dmate_web_revision }}"></script>
+{% endif %}
 
 <style id="dmateEnglishTypography">
 /* English typography layer: visual-only overrides, scoped to English UI. */

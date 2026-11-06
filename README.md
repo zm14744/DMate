@@ -494,7 +494,7 @@ gunicorn -w 1 --threads 8 --timeout 300 -b 0.0.0.0:8080 app:app
 | macOS | 同一 Tauri 工程 | 构建 universal DMG，正式分发涉及 Developer ID 签名与公证 |
 | Linux | 同一 Tauri 工程与 `snap/` | 构建 DEB、AppImage，另有 amd64 Snap 工作流 |
 
-网页变化通常无需重新打包；原生权限、可信来源、更新逻辑和包元数据变化需要重新构建客户端。把服务迁移到自己的域名时，应同时核对 Android / Tauri 中的来源限制，不能只改页面链接。
+网页翻译、语言功能、CSS / JS 和 Python 后端等变化随网站部署更新，不触发安装包更新提醒；原生权限、可信来源、原生功能、客户端内嵌图标和原生配置变化才需要重新构建客户端。把服务迁移到自己的域名时，应同时核对 Android / Tauri 中的来源限制，不能只改页面链接。
 
 客户端检测到网页新版本后，有其他会话正在回答、图片待处理、录音或云同步未完成时，会延后自动刷新。访客的聊天、笔记、错题和非空绘图只保存在当前页面内存中，有这些内容时也不自动刷新；用户主动关闭或刷新页面仍会清空访客内容。
 
@@ -517,7 +517,11 @@ GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“�
 
 部署本版后，可以从 Zeabur 删除五个下载地址变量：`ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL`。应用不再读取或注入这些变量，保留旧值也不会覆盖固定链接。此处仅涉及下载地址，账号、数据库、邮件、模型服务及签名等其他凭据不在删除范围内。
 
-安装后检查更新使用独立的 `static/client-updates.json` 清单，Android 采用 GitCode 主源和同版本 GitHub 备用源，保留相同 APK 的 SHA256。今后上传新文件后，应同时核对 `static/script.js` 中的安装入口和更新清单中的版本、文件名、来源及 `published` 状态；不能只改其中一处，也不能仅修改网页就把尚未提供的 APK、EXE 或 DMG 标为可更新。网页自动刷新更新的是页面，原生客户端仍需下载并安装对应安装包。Android 发布工作流及校验流程见[部署说明](docs/DEPLOYMENT.md#android-签名包发布)。
+Android / Tauri 安装版通过独立的 `static/client-updates.json` 检查原生包版本，只在已实际发布的版本高于当前安装版本时提醒。`client-update.js` 仅在原生客户端页面加载，与 `web-sync.js` 和网页版本检测分离；普通网站部署不提高原生清单版本。当前清单仍为 Android 1.0.3、桌面 1.0.0，本次接入提醒无需重新打包。iOS Web Clip 没有原生包版本，不参与比较。
+
+更新提醒在页面中央显示，右上角为实心红色关闭圆点，下载渠道仅有 GitCode / GitHub；Linux 分别提供 AppImage / DEB，每种格式各有两源。用户自行下载并安装，关闭后本会话不重复提示同一版本。检查在启动、每 6 小时、回到前台（有节流）及恢复网络时进行；离线静默，后台、生成、OCR、同步、正在输入或已有弹窗时延后展示，不暂停同步、不刷新页面、不修改学习记录。旧 Android 通过外部浏览器下载；旧 Tauri 若阻止新窗口，可使用点击后提供的复制地址入口。
+
+发布新安装包时，先核对 GitCode / GitHub 的实际文件，再更新 `static/script.js` 的安装入口及清单中的版本、文件名、来源和 `published` 状态；Android 两源保留相同 APK 的 SHA256。Linux 的另一格式使用 `additionalPackages`，每个包的 `fallbackUrls` 必须是同一文件的备用源，不能把 DEB 和 AppImage 混作回退。网页自动刷新只更新页面，原生客户端仍需下载并安装对应安装包。Android 发布工作流及校验流程见[部署说明](docs/DEPLOYMENT.md#android-签名包发布)。
 
 网站不再随镜像携带 Android APK 二进制，也不保留旧的站内 APK 下载入口或跳转路由。APK 下载按钮和安装后更新地址直接使用 GitCode / GitHub 的公开附件。`static/downloads/DMate-Android-1.0.3.json` 仅保留产物来源与校验元数据，不是安装包，不能用于安装。
 

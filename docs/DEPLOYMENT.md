@@ -323,7 +323,13 @@ Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DM
 
 公式与富文本等前端依赖位于 `static/vendor/<组件-版本>/`，含 MathJax 本地按需资源、上游许可和完整性清单，镜像必须包含这些文件。版本化的第三方目录成功响应允许一年 immutable 缓存；业务 JS / CSS、未版本化资源清单和 `/web-version` 仍禁用旧缓存。升级第三方库应使用新版本目录，不能原地替换已长期缓存的文件。安装壳检查网页更新时会在忙碌期间延后重载；这不能更新 APK / Tauri 中的原生代码。
 
-`static/client-updates.json` 独立控制安装后更新通知。Android 以 GitCode 同名 APK 为主源、GitHub 同版本文件为 `fallbackUrls`，保留 APK 原 SHA256；桌面项继续对应现用的 1.0.0 下载文件，不因源码版本增加而自动提高发布版本。网页仍校验允许的来源和文件路径，版本和 `published` 必须对应实际文件。更换安装包后同时核对 `static/script.js` 与该清单，检查文件名、版本、两源内容及可用性。检测公开文件时使用 GET 或 Range GET；GitCode 附件的 HEAD 返回值不能单独判断文件不存在。网页版本自动刷新与原生下载安装继续分别执行，前者不会替换设备上已经安装的原生代码。
+旧 Service Worker 和历史缓存只在当前页内清退，不再由清理回调强制刷新。`web-sync.js` 保留安装壳的自动网页更新，并增加防重复跳转保护：会话存储不可用或写入校验失败时停止自动跳转，跨版本跳转也受冷却约束，同一目标未成功载入及 A/B 版本回跳不再反复重试。需要真正回滚到先前版本时，可在保存必要内容后手动刷新；这些保护不改变独立的原生安装包更新提醒。
+
+`static/client-updates.json` 独立控制安装后原生包更新通知。模板仅为 Android / Tauri 原生客户端加载 `client-update.js`，补齐此前脚本未加载的入口；它与 `web-sync.js`、网页 revision 分离，只在清单中 `published: true` 的原生包版本高于当前安装版本时提醒。网页翻译、语言功能、CSS / JS 或 Python 后端随网站部署更新，不应修改原生清单来触发安装提醒。只有原生功能、客户端内嵌图标、原生配置等实际新包发布后才提高版本；当前仍为 Android 1.0.3、桌面 1.0.0，本次提醒功能无需重新打包。iOS Web Clip 没有原生版本，不参与比较。
+
+提醒使用应用内居中的 `<dialog>`，右上角为实心红色关闭圆点，只提供 GitCode / GitHub 下载渠道，由用户手动下载安装。关闭后同一会话不重复提示同版；启动、每 6 小时、回到前台（有节流）及恢复网络时检查，离线静默。页面在后台、生成 / OCR / 同步进行中、正在输入或已有其他弹窗时延后展示，不暂停同步、不刷新页面或更改学习记录。旧 Android 通过外部浏览器打开下载；旧 Tauri 可能阻止新窗口，点击后提供复制地址以便在浏览器打开。
+
+Android 以 GitCode 同名 APK 为主源、GitHub 同版本文件为 `fallbackUrls`，保留 APK 原 SHA256。Linux 的 AppImage / DEB 分开列出，另一格式放在 `additionalPackages`；每个包各有 GitCode / GitHub，两源必须对应同一文件，不能跨格式作为 `fallbackUrls`。网页仍校验允许的来源和文件路径。发布时先验证两源真实文件、版本与内容，再修改清单中的版本、URL、`published` 及 `static/script.js` 的入口；构建成功或源码版本增加不等于已经发布。检测公开文件时使用 GET 或 Range GET，GitCode 附件的 HEAD 返回值不能单独判断文件不存在。网页版本自动刷新与原生下载安装分别执行，前者不会替换设备上已经安装的原生代码。
 
 ### Android 签名包发布
 
