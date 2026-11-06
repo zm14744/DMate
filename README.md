@@ -502,6 +502,8 @@ GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“�
 
 下载安装弹窗直接链接已经配置的 GitCode / GitHub 附件，按“GitCode 优先、GitHub 备用”排列，并保留相应平台的 Microsoft Store、Snap Store、itch.io 等商店入口。地址和文件名固定在 `static/script.js` 的 `downloadOptionsForCurrentPlatform()` 中；打开弹窗不会临时查询发行版列表 API 或解析 `latest`，点击后直接前往相应文件或商店页面。
 
+各平台下载弹窗的说明统一为“选择下载源”；非 Linux 平台的 GitCode / GitHub 按钮仅显示源名，Linux 保留 DEB / AppImage 格式后缀，并提供 itch.io 入口。
+
 | 平台 | 当前固定附件名（GitCode / GitHub） |
 | --- | --- |
 | Android | `DMate-Android-1.0.3.apk` |

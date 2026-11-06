@@ -21923,21 +21923,21 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"下载全屏描述文件后，在系统设置中确认安装；之后从主屏幕启动 DMate",
-            actions:installers("DMate-iPhone-iPad-fullscreen.mobileconfig", "描述文件")
+            text:"选择下载源",
+            actions:installers("DMate-iPhone-iPad-fullscreen.mobileconfig")
         };
     }
     if (platform === "android") {
         return {
             platform:"Android 1.0.3",
-            text:"下载安装包后直接覆盖安装，无需卸载旧版",
+            text:"选择下载源",
             actions:installers("DMate-Android-1.0.3.apk")
         };
     }
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text:"选择安装包下载源或应用商店",
+            text:"选择下载源",
             actions:[
                 ...installers("DMate_1.0.0_x64-setup.exe"),
                 { label:"Microsoft Store", url:microsoftStore, secondary:true },
@@ -21948,7 +21948,7 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"选择 DMG 下载源",
+            text:"选择下载源",
             actions:[
                 ...installers("DMate_1.0.0_universal.dmg"),
                 { label:"itch.io", url:itch, secondary:true }
@@ -21958,20 +21958,21 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "linux") {
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"Ubuntu/Debian 用 DEB；其他发行版可选 AppImage 或 Snap",
+            text:"选择下载源",
             actions:[
                 ...installers("DMate_1.0.0_amd64.deb", "DEB"),
                 ...installers("DMate_1.0.0_amd64.AppImage", "AppImage"),
-                { label:"Snap Store", url:snap, secondary:true }
+                { label:"Snap Store", url:snap, secondary:true },
+                { label:"itch.io", url:itch, secondary:true }
             ]
         };
     }
     return {
         platform:"桌面系统",
-        text:"选择下载渠道",
+        text:"选择下载源",
         actions:[
-            { label:"GitCode · 发行版", url:gitcodeRelease },
-            { label:"GitHub · 发行版", url:githubRelease, secondary:true },
+            { label:"GitCode", url:gitcodeRelease },
+            { label:"GitHub", url:githubRelease, secondary:true },
             { label:"Microsoft Store", url:microsoftStore, secondary:true },
             { label:"Snap Store", url:snap, secondary:true }
         ]

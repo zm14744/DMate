@@ -2,6 +2,7 @@
 
 ## 2026-11-06
 
+- 下载弹窗说明统一为“选择下载源”，非 Linux 的 GitCode / GitHub 按钮仅显示源名，移除“描述文件”“发行版”后缀；Linux 保留 DEB / AppImage 后缀并增加 itch.io 入口。
 - 移除旧站内 APK 下载路由及更新器对站内安装包地址的兼容，不保留旧 APK 下载入口；APK 下载按钮和更新地址直接指向 GitCode / GitHub 的公开附件。
 - 统一现用安装文件的固定入口为 GitCode 优先、GitHub 备用，保留各平台商店入口；Android 使用 `DMate-Android-1.0.3.apk`，桌面仍引用现有 1.0.0 文件，iOS 使用现有全屏描述文件，不在打开弹窗时查询发行版列表 API。
 - 移除五个下载 URL 环境变量的读取和模板注入，部署新版后可从 Zeabur 删除这些下载地址变量；账号、数据库、邮件及模型等配置继续保留。后续文件变化在 `static/script.js` 与 `static/client-updates.json` 中维护。
