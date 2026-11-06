@@ -48,32 +48,42 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t packages < <(find desktop/src-tauri/target -type f -path '*/release/bundle/deb/*.deb' -print)
+          mapfile -d '' -t packages < <(find desktop/src-tauri/target -type f -path '*/release/bundle/deb/*.deb' -print0)
           if [[ ${#packages[@]} -ne 1 ]]; then
-            echo "Expected one Tauri Debian package; found ${#packages[@]}" >&2
+            echo "::error::Expected one Tauri Debian package; found ${#packages[@]}."
             printf '%s\n' "${packages[@]}" >&2
             exit 1
           fi
-          version="$(dpkg-deb --field "${packages[0]}" Version)"
-          arch="$(dpkg-deb --field "${packages[0]}" Architecture)"
-          test "$version" = "1.0.2"
-          test "$arch" = "amd64"
-          # grep -q closes its input as soon as it finds a match. Piping the
-          # listing into it can kill dpkg-deb with SIGPIPE under pipefail.
-          # Materialize the full listing first so both real failures and a
-          # missing executable remain fatal without a successful-match race.
-          listing="$(mktemp)"
-          trap 'rm -f "$listing"' EXIT
-          dpkg-deb --contents "${packages[0]}" > "$listing"
-          if ! grep -Eq '[[:space:]]\./usr/bin/dmate-desktop$' "$listing"; then
-            echo "::error::The Debian package does not contain usr/bin/dmate-desktop."
+          package="${packages[0]}"
+          version="$(dpkg-deb --field "$package" Version)"
+          arch="$(dpkg-deb --field "$package" Architecture)"
+          echo "Checking DEB: $package (version=$version, architecture=$arch)"
+          if [[ "$version" != "1.0.2" ]]; then
+            echo "::error::Expected Debian version 1.0.2; found $version."
             exit 1
           fi
-          cp "${packages[0]}" DMate_1.0.2_amd64.deb
+          if [[ "$arch" != "amd64" ]]; then
+            echo "::error::Expected Debian architecture amd64; found $arch."
+            exit 1
+          fi
+          # Tauri archives can list "usr/bin/..." without a leading "./".
+          # Check the extracted filesystem, not dpkg-deb's display formatting.
+          # No pipe to grep -q: this also avoids the previous SIGPIPE failure.
+          check_dir="$(mktemp -d)"
+          trap 'rm -rf -- "$check_dir"' EXIT
+          dpkg-deb --extract "$package" "$check_dir"
+          executable="$check_dir/usr/bin/dmate-desktop"
+          if [[ ! -f "$executable" || ! -x "$executable" ]]; then
+            echo "::error::The Debian package must contain an executable usr/bin/dmate-desktop."
+            dpkg-deb --contents "$package"
+            exit 1
+          fi
+          file "$executable"
+          cp "$package" DMate_1.0.2_amd64.deb
           # Use the freshly generated 512px icon for high-density launchers.
           mkdir -p snap/gui
           cp desktop/src-tauri/icons/icon.png snap/gui/dmate.png
-          echo "DEB: ${packages[0]}"
+          echo "Verified DEB and icon are ready for Snapcraft."
 
       - name: Build Snap on GitHub runner
         id: snapcraft
@@ -96,3 +106,14 @@ jobs:
           path: ${{ steps.snapcraft.outputs.snap }}
           if-no-files-found: error
           retention-days: 30
+
+      - name: Preserve DEB for diagnosis if packaging fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMate-snap-debug-inputs
+          path: |
+            desktop/src-tauri/target/**/release/bundle/deb/*.deb
+            snap/snapcraft.yaml
+          if-no-files-found: warn
+          retention-days: 7
