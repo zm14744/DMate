@@ -816,7 +816,17 @@ def _detect_mode(latest_text):
 
 
 def _detect_question_type(text, mode):
-    normalized = _normalize(text)
+    raw = str(text or "")
+    normalized = _normalize(raw)
+    if re.search(r"[A-Za-z]", raw) and not re.search(r"[\\u4e00-\\u9fff]", raw):
+        english = normalize_english_request_text(raw).lower()
+        if mode == "exercise": return "出题请求"
+        if mode == "concept": return "概念题"
+        if mode == "check_answer": return "答案检查"
+        if re.search(r"\\b(?:prove|proof|show that|demonstrate)\\b", english): return "证明题"
+        if re.search(r"\\b(?:draw|sketch|construct|plot)\\b.{0,60}\\b(?:graph|tree|diagram)\\b", english): return "作图题"
+        if re.search(r"\\b(?:true or false|is it true|determine whether|decide whether)\\b", english): return "判断题"
+        if re.search(r"\\b(?:calculate|compute|find|evaluate|determine|list|write down)\\b", english): return "计算题"
 
     if mode == "exercise":
         return "出题请求"
