@@ -13907,6 +13907,7 @@ async function requestAiReply(session, options = {}) {
             },
             body: JSON.stringify({
                 stream: wantsStream,
+                language: window.DMateI18n?.getLanguage?.() || document.documentElement.lang || "zh-CN",
                 messages: apiMessages,
                 semantic_context: Array.isArray(semanticContext) ? undefined : semanticContext,
                 semantic_contexts: Array.isArray(semanticContext) ? semanticContext : undefined,
