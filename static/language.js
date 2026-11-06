@@ -143,8 +143,16 @@
         setLanguage(readSavedLanguage(), false);
     }
 
+    root.addEventListener('dmate:account-state', event => handleAccountState(event.detail));
+
     function bind() {
-        root.addEventListener('dmate:account-state', event => handleAccountState(event.detail));
+        const html = document.documentElement;
+        if (html.dataset.accountStateKnown === '1') {
+            handleAccountState({
+                authenticated: html.dataset.accountAuthenticated === '1',
+                username: html.dataset.accountUsername || ''
+            });
+        }
         document.querySelectorAll('[data-dmate-language]').forEach(button => {
             button.addEventListener('click', () => {
                 const next = button.dataset.dmateLanguage;
