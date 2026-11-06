@@ -3597,6 +3597,7 @@ def _chat_response(on_delta=None, cancelled=None):
             "error": "请求格式不正确，请检查提交内容"
         }), 400
 
+    response_language = "en" if str(data.get("language") or "").lower().startswith("en") else "zh-CN"
     confirmed_context = None
     confirmed_batch = "semantic_contexts" in data
     if confirmed_batch or data.get("semantic_context") is not None:
@@ -3931,7 +3932,8 @@ def _chat_response(on_delta=None, cancelled=None):
     # 目标难度仍由 exercise_target_difficulty 严格写进教学提示；模型思考强度
     # 与题目难度分开。生成练习先快速设计并通过本地检查，不做无正文的长推理。
     # 真正解题时中等/困难统一采用 high。
-    ai_teaching = teaching
+    ai_teaching = dict(teaching or {})
+    ai_teaching["response_language"] = response_language
     if effective_exercise_request:
         ai_teaching = dict(teaching or {})
         target_for_generation = ai_teaching.get("exercise_target_difficulty") or "中等"
