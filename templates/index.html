@@ -9679,5 +9679,155 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 
+<style id="dmateEnglishTypography">
+/* English typography layer: visual-only overrides, scoped to English UI. */
+html[data-ui-language="en"] {
+    --dmate-reading-line: 1.72;
+    --dmate-paragraph-gap: .82em;
+}
+html[data-ui-language="en"] body,
+html[data-ui-language="en"] button,
+html[data-ui-language="en"] input,
+html[data-ui-language="en"] textarea,
+html[data-ui-language="en"] select {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-kerning: normal;
+    font-feature-settings: "kern" 1, "liga" 1;
+}
+html[data-ui-language="en"] body { letter-spacing: .002em; line-height: 1.5; }
+html[data-ui-language="en"] .msg {
+    max-width: min(78%, 920px);
+    line-height: var(--dmate-reading-line);
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: auto;
+}
+html[data-ui-language="en"] .msg-content,
+html[data-ui-language="en"] .ai-content,
+html[data-ui-language="en"] .wrong-answer-inner,
+html[data-ui-language="en"] .wrong-analysis-body,
+html[data-ui-language="en"] .learning-review-body,
+html[data-ui-language="en"] .concept-notebook-content,
+html[data-ui-language="en"] .graph-detail-body,
+html[data-ui-language="en"] .ocr-review-rendered {
+    line-height: var(--dmate-reading-line);
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+html[data-ui-language="en"] .ai-content p,
+html[data-ui-language="en"] .wrong-answer-inner p,
+html[data-ui-language="en"] .wrong-analysis-body p,
+html[data-ui-language="en"] .ocr-review-rendered p {
+    margin-block: var(--dmate-paragraph-gap);
+}
+html[data-ui-language="en"] .ai-content p:first-child,
+html[data-ui-language="en"] .wrong-answer-inner p:first-child,
+html[data-ui-language="en"] .wrong-analysis-body p:first-child { margin-top: 0; }
+html[data-ui-language="en"] .ai-content h1,
+html[data-ui-language="en"] .ai-content h2,
+html[data-ui-language="en"] .ai-content h3,
+html[data-ui-language="en"] .wrong-answer-inner h1,
+html[data-ui-language="en"] .wrong-answer-inner h2,
+html[data-ui-language="en"] .wrong-answer-inner h3,
+html[data-ui-language="en"] .wrong-analysis-body h1,
+html[data-ui-language="en"] .wrong-analysis-body h2,
+html[data-ui-language="en"] .wrong-analysis-body h3 {
+    line-height: 1.32;
+    letter-spacing: -.018em;
+    overflow-wrap: break-word;
+    word-break: normal;
+    margin-block: 1.15em .55em;
+}
+html[data-ui-language="en"] .ai-content ul,
+html[data-ui-language="en"] .ai-content ol,
+html[data-ui-language="en"] .wrong-answer-inner ul,
+html[data-ui-language="en"] .wrong-answer-inner ol,
+html[data-ui-language="en"] .wrong-analysis-body ul,
+html[data-ui-language="en"] .wrong-analysis-body ol {
+    padding-inline-start: 1.65em;
+    margin-block: .65em;
+}
+html[data-ui-language="en"] .ai-content li,
+html[data-ui-language="en"] .wrong-answer-inner li,
+html[data-ui-language="en"] .wrong-analysis-body li {
+    padding-inline-start: .12em;
+    margin-block: .28em;
+}
+html[data-ui-language="en"] .ai-content blockquote,
+html[data-ui-language="en"] .wrong-answer-inner blockquote,
+html[data-ui-language="en"] .wrong-analysis-body blockquote {
+    margin-inline: 0;
+    padding-inline-start: 1em;
+}
+html[data-ui-language="en"] .ai-content table,
+html[data-ui-language="en"] .wrong-answer-inner table,
+html[data-ui-language="en"] .wrong-analysis-body table,
+html[data-ui-language="en"] .ocr-review-rendered table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+    font-size: .94em;
+    line-height: 1.5;
+}
+html[data-ui-language="en"] .ai-content th,
+html[data-ui-language="en"] .ai-content td,
+html[data-ui-language="en"] .wrong-answer-inner th,
+html[data-ui-language="en"] .wrong-answer-inner td,
+html[data-ui-language="en"] .wrong-analysis-body th,
+html[data-ui-language="en"] .wrong-analysis-body td,
+html[data-ui-language="en"] .ocr-review-rendered th,
+html[data-ui-language="en"] .ocr-review-rendered td {
+    padding: .58em .72em;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+html[data-ui-language="en"] .ai-content pre,
+html[data-ui-language="en"] .wrong-answer-inner pre,
+html[data-ui-language="en"] .wrong-analysis-body pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.55;
+    tab-size: 4;
+}
+html[data-ui-language="en"] .ai-content code,
+html[data-ui-language="en"] .wrong-answer-inner code,
+html[data-ui-language="en"] .wrong-analysis-body code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: .91em;
+    overflow-wrap: anywhere;
+}
+html[data-ui-language="en"] .ai-content mjx-container,
+html[data-ui-language="en"] .wrong-answer-inner mjx-container,
+html[data-ui-language="en"] .wrong-analysis-body mjx-container,
+html[data-ui-language="en"] .ocr-review-rendered mjx-container {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+html[data-ui-language="en"] .ai-content mjx-container[display="true"],
+html[data-ui-language="en"] .wrong-answer-inner mjx-container[display="true"],
+html[data-ui-language="en"] .wrong-analysis-body mjx-container[display="true"] {
+    margin: 1.05em 0 !important;
+}
+html[data-ui-language="en"] .msg,
+html[data-ui-language="en"] .wrong-question,
+html[data-ui-language="en"] .wrong-feedback,
+html[data-ui-language="en"] .wrong-note-body {
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+html[data-ui-language="en"] input,
+html[data-ui-language="en"] textarea,
+html[data-ui-language="en"] select { letter-spacing: 0; }
+@media (max-width: 760px) {
+    html[data-ui-language="en"] .msg { max-width: 88%; line-height: 1.68; }
+    html[data-ui-language="en"] .ai-content table,
+    html[data-ui-language="en"] .wrong-answer-inner table,
+    html[data-ui-language="en"] .wrong-analysis-body table { font-size: .9em; }
+}
+</style>
 </body>
 </html>
