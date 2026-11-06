@@ -9,7 +9,8 @@ import queue
 import threading
 import time
 
-from flask import copy_current_request_context, current_app, jsonify
+from flask import copy_current_request_context, current_app, jsonify, request
+from server_i18n import request_language, localize_error_payload
 
 
 class ChatStreamCancelled(BaseException):
@@ -40,6 +41,7 @@ def stream_chat_response(handler):
     Non-stream callers should invoke that handler directly instead.
     """
     app = current_app._get_current_object()
+    language = request_language(request)
     slots = _STREAM_SLOTS
     if not slots.acquire(blocking=False):
         response = jsonify({
@@ -75,7 +77,7 @@ def stream_chat_response(handler):
     def put(name, payload):
         # Encode before enqueueing so malformed values cannot terminate the
         # response generator after it has already claimed final completion.
-        encoded = _event(name, payload)
+        encoded = _event(name, localize_error_payload(payload, language) if name == "error" else payload)
         while not cancelled.is_set():
             try:
                 events.put((name, encoded), timeout=0.1)
@@ -153,11 +155,11 @@ def stream_chat_response(handler):
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     cancelled.set()
-                    yield _event("error", {
+                    yield _event("error", localize_error_payload({
                         "error": "回答等待时间过长，已停止本次请求，请稍后重试。",
                         "code": "chat_stream_timeout",
                         "status": 504,
-                    })
+                    }, language))
                     break
                 try:
                     name, encoded = events.get(timeout=min(_HEARTBEAT_SECONDS, remaining))

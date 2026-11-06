@@ -18,6 +18,7 @@ from graph_answer_integrity import (
     FLAG, single_undirected_named_edges, detect_named_graph_degree_inconsistency,
 )
 from graph_integrity import OK_MARKER
+from server_i18n import localized
 
 _SINGLE_CERT="【图形边集已二次核对】"
 _DIRECTED_CERT="【有向边已独立核对】"
@@ -157,7 +158,7 @@ def _directed_connectivity(vertices,arcs):
     return strong,weak
 
 
-def solve_certified_graph(question, llm_reply=None):
+def solve_certified_graph(question, llm_reply=None, *, language='zh-CN'):
     """Return a correct answer from certified edges, or None (do not override).
 
     The original OCR must be certified by two independent image-only reads.
@@ -183,11 +184,19 @@ def solve_certified_graph(question, llm_reply=None):
         lines=[]
         for i,(v,e) in sorted(graphs.items()):
             strong,weak=_directed_connectivity(v,e)
-            verdict=("是强连通图" if strong else
+            verdict=localized("是强连通图" if strong else
                      "不是强连通图，但属于弱连通图" if weak else
-                     "既不是强连通图，也不是弱连通图")
-            lines.append(f"图({i})：{verdict}（{len(v)} 个顶点、{len(e)} 条有向边）。")
-        return "根据独立逐箭头核对一致的原图边集，忽略箭头判断弱连通，再检查正反方向可达性：\n"+"\n".join(lines)
+                     "既不是强连通图，也不是弱连通图",
+                     "strongly connected" if strong else
+                     "weakly connected but not strongly connected" if weak else
+                     "neither strongly nor weakly connected", language)
+            lines.append(localized(
+                f"图({i})：{verdict}（{len(v)} 个顶点、{len(e)} 条有向边）。",
+                f"Graph ({i}): {verdict} ({len(v)} vertices, {len(e)} directed edges).", language))
+        return localized(
+            "根据独立逐箭头核对一致的原图边集，忽略箭头判断弱连通，再检查正反方向可达性：\n",
+            "Using the independently verified directed edges, test weak connectivity with arrow directions ignored, "
+            "then check reachability in both the original and reversed directions:\n", language)+"\n".join(lines)
     if _SINGLE_CERT not in section and OK_MARKER not in section:
         return None
     if OK_MARKER in section and _SINGLE_CERT not in section:
@@ -207,20 +216,31 @@ def solve_certified_graph(question, llm_reply=None):
     euler_question=bool(re.search(r"欧拉图|欧拉回路|Eulerian|Euler\s+circuit",request,re.I))
     if not (diameter_question or chromatic_question or euler_question):
         return None
-    lines=[f"已核对的无向图有 {len(stats['vertices'])} 个顶点、{len(stats['edges'])} 条边。"]
+    lines=[localized(
+        f"已核对的无向图有 {len(stats['vertices'])} 个顶点、{len(stats['edges'])} 条边。",
+        f"The verified undirected graph has {len(stats['vertices'])} vertices and {len(stats['edges'])} edges.", language)]
     if diameter_question:
         if stats["diameter"] is None:
-            lines.append("图不连通，因此不存在有限的全图直径（按扩展距离约定则为无穷大）。")
+            lines.append(localized(
+                "图不连通，因此不存在有限的全图直径（按扩展距离约定则为无穷大）。",
+                "The graph is disconnected, so it has no finite whole-graph diameter "
+                "(or infinite diameter under the extended-distance convention).", language))
         else:
-            lines.append(f"逐顶点运行最短路广度优先搜索，所有顶点对最短路长度的最大值为 **{stats['diameter']}**，即图的直径。")
+            lines.append(localized(
+                f"逐顶点运行最短路广度优先搜索，所有顶点对最短路长度的最大值为 **{stats['diameter']}**，即图的直径。",
+                f"Breadth-first search from every vertex gives a maximum shortest-path length of **{stats['diameter']}** "
+                "over all vertex pairs. This is the graph's diameter.", language))
     if chromatic_question:
         result=_chromatic_number(stats)
         if result is None:
             return None
         number,colors=result
         colortable="、".join(f"{v}→{colors[v]+1}" for v in sorted(colors))
-        lines.append(f"从 1 色开始逐一检验合法染色的最小值，得到色数 **{number}**。"
-                     f"一种合法 {number} 染色为：{colortable}。")
+        lines.append(localized(
+            f"从 1 色开始逐一检验合法染色的最小值，得到色数 **{number}**。"
+            f"一种合法 {number} 染色为：{colortable}。",
+            f"Testing proper colorings from one color upward gives chromatic number **{number}**. "
+            f"One proper {number}-coloring is: {colortable}.", language))
     if euler_question:
         degrees=stats["degrees"]
         used={v for v in degrees if degrees[v]>0}
@@ -228,13 +248,25 @@ def solve_certified_graph(question, llm_reply=None):
         odd=sorted(v for v in degrees if degrees[v]%2)
         if edge_component and len(odd)==0:
             if stats["connected"]:
-                lines.append("图连通且所有顶点度数均为偶数，因此是欧拉图，存在欧拉回路。")
+                lines.append(localized(
+                    "图连通且所有顶点度数均为偶数，因此是欧拉图，存在欧拉回路。",
+                    "The graph is connected and every vertex has even degree. It is Eulerian and has an Euler circuit.", language))
             else:
-                lines.append("所有非孤立顶点构成一个连通分量且度数为偶数，故存在覆盖全部边的欧拉闭迹；"
-                             "但图含孤立顶点、整体不连通，按要求全图连通的定义不属于欧拉图。")
+                lines.append(localized(
+                    "所有非孤立顶点构成一个连通分量且度数为偶数，故存在覆盖全部边的欧拉闭迹；"
+                    "但图含孤立顶点、整体不连通，按要求全图连通的定义不属于欧拉图。",
+                    "All non-isolated vertices form one connected component and have even degree, so a closed Euler trail covers every edge. "
+                    "However, isolated vertices make the whole graph disconnected; it is not Eulerian under the definition requiring whole-graph connectivity.", language))
         elif edge_component and len(odd)==2:
-            lines.append(f"奇度顶点为 {'、'.join(odd)}，恰有两个，只有欧拉通路而没有欧拉回路；因此不是欧拉图。")
+            lines.append(localized(
+                f"奇度顶点为 {'、'.join(odd)}，恰有两个，只有欧拉通路而没有欧拉回路；因此不是欧拉图。",
+                f"The odd-degree vertices are {', '.join(odd)}. There are exactly two, so the graph has an open Euler trail "
+                "but no Euler circuit; it is not Eulerian.", language))
         else:
-            lines.append(f"奇度顶点：{'、'.join(odd) if odd else '无'}；"
-                         "非孤立顶点不是单个连通分量，或奇度顶点数不为 0/2；因此没有欧拉回路。")
+            lines.append(localized(
+                f"奇度顶点：{'、'.join(odd) if odd else '无'}；"
+                "非孤立顶点不是单个连通分量，或奇度顶点数不为 0/2；因此没有欧拉回路。",
+                f"Odd-degree vertices: {', '.join(odd) if odd else 'none'}. "
+                "The non-isolated vertices do not form a single connected component, or the number of odd-degree vertices is neither 0 nor 2. "
+                "There is no Euler circuit.", language))
     return "\n".join(lines)

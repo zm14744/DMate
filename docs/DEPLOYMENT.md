@@ -96,6 +96,41 @@ DMATE_GRAPH_CONFIRMATION_DB=/data/graph-confirmations.sqlite3
 
 镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备先从 ModelScope 的官方 PaddlePaddle 仓库取得必需文件的提交版本、大小及 SHA256，按该版本下载并校验；失败后才使用 PaddleX 官方源作为后备。`PADDLE_PDX_MODEL_SOURCE`（当前默认 BOS）只影响 PaddleX 后备源的优先级，不改变 ModelScope 的首选顺序。下载与重试预算见[本地模型与缓存](#本地模型与缓存)。所有来源均无法提供完整模型时构建才会失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。`scripts/generate_icons.py` 直接从脚本内的矢量路径生成图标，不再读取 Android 目录里的旧 PNG 作为源图；自定义构建上下文需保留生成脚本及 Pillow 依赖，输出目录由脚本创建。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
 
+## 界面语言与接口语言
+
+中英文功能使用本域静态资源，不需要额外翻译服务或模型配置。页面依次加载 `static/language-catalog.js`、`static/language-knowledge.js`、`static/language.js`，再加载各工作区脚本。发布时应同时部署模板、语言资源及 Python 后端，保持 `/web-version` 与实际业务资源一致；不能仅替换字典却保留不识别语言字段的旧后端。
+
+登录后的网页语言按账号保存在当前浏览器的 localStorage，键为 `dmate_ui_language_v1::` 加 `encodeURIComponent(username)`，值为 `zh-CN` 或 `en`，不进入账号同步快照。游客语言只留在本次页面内存，新打开或刷新网页默认简体中文，不读取旧的全局语言键恢复游客偏好。登录与账号切换时读取对应账号的本机设置，退出后恢复游客的中文默认状态。
+
+保留 `dmate:account-state` 的身份通知与语言模块中的账号切换处理，不用一个全局持久键覆盖所有账号。读取账号偏好后仍通过当前页面更新界面，避免为恢复中文而重载页面。已有学习内容继续使用原文和原有标识；知识图谱的英文名称只用于展示，不改写 `knowledge_graph.json` 的键、消息标记或关联记录。
+
+请求语言约定如下：
+
+| 场景 | 传递方式 |
+| --- | --- |
+| `/chat`、`/notebook/analyze`、`/drawing/guide` 等 AI JSON 请求 | 正文添加 `"language": "en"` 或 `"language": "zh-CN"`，其余题目、消息、结构字段保持原有协议 |
+| `/voice/transcribe` | multipart 表单增加同名 `language` 字段，保留原 `audio` 文件；语言用于识别提示，不改写录音 |
+| 同源账号、上传、识别等请求的系统提示 | 网页请求附带 `X-DMate-Language`；此请求头不发送给跨域下载或模型服务 |
+
+`server_i18n.request_language()` 优先读取 JSON / 表单中的显式 `language`，其次读取 `X-DMate-Language`，均未提供时使用简体中文。浏览器的 `Accept-Language` 不覆盖用户的选择。后端按请求语言组织 AI 指令、应用错误及系统生成说明；错误代码、状态码、内容来源、结构校验、题目身份和同步数据仍遵循原有协议。流式路径在生成与错误事件处处理语言，不能用“翻译整个响应正文”的方式处理 SSE。
+
+新增界面时遵循以下约定：
+
+- 固定文案加入 `language-catalog.js`，或调用 `DMateI18n.t('中文', 'English')`；动态数量、含对象名称的提示也应使用完整的中英句子，便于切回中文。
+- 将用户原文、图形标签、OCR 和 AI 正文放入独立的 `[data-i18n-content]` 或 `[translate="no"]` 元素。只保护内容区域，保留同一面板中的标题、按钮和错误提示可翻译；不要通过修改输入框的值来翻译占位文字。
+- 使用 `DMateI18n.getLanguage()` 获取当前选择。必要时监听窗口的 `dmate:languagechange` 更新显示标签，避免重新挂载编辑器、取消请求或重建整个弹窗，以保留草稿、焦点和正在进行的工作。
+- 新 AI 入口显式传入 `language`；服务端继续校验原始输入并按请求语言选择提示词，不翻译已经保存的学习内容或改变去重、确认摘要所依据的数据。
+
+例如，数量文案与笔记正文分别处理：
+
+```javascript
+countLabel.textContent = DMateI18n.t(`已选 ${count} 条`, `${count} selected`);
+noteBody.setAttribute('data-i18n-content', '');
+noteBody.textContent = note.content;
+```
+
+网页英文界面随站点部署更新，不应因此提高原生安装包清单版本或触发下载提醒。Android 源码另补齐原生离线、权限及操作提示的英文，并通过仅允许可信 HTTPS 主框架发送的语言桥接保存选择；本轮尚未构建或发布包含这些文案的新 APK。维护者须完成构建、签名、发布并让使用者安装后，才能将原生英文提示列为已交付能力。网页正常显示英文不等于旧包的原生离线页已更新。
+
 ## 模型服务
 
 | 变量 | 当前用途与默认值 |
@@ -270,6 +305,7 @@ location = /chat {
 | 游客独立绘图 | 当前页面内存，不使用 localStorage 或 sessionStorage | 同页重开绘图可继续；刷新 / 关闭网页后清空，旧版游客持久图库不导入 |
 | 自定义背景图片 | 当前浏览器 IndexedDB | 不在 PostgreSQL 和服务端确认库中 |
 | 主题、字号等外观参数 | 登录后按当前浏览器、当前账号保存在 localStorage；游客仅当前页面 | 不进入新云同步快照，不属于服务器备份；原生系统明暗信号仅留在页面内存 |
+| 界面语言 | 登录后按本机账号分区保存在 localStorage；游客仅当前页面且默认中文 | 不参与云同步或服务器备份，账号切换读取各自的本机设置 |
 | 尚未发送的图片及其核对草稿 | 当前页面任务状态 | 刷新、关闭或切换环境前先完成发送；服务器摘要不能代替草稿备份 |
 
 备份时不要只复制项目代码或容器镜像。数据库、部署 Secret、上传确认持久卷分别管理；Secret 不应跟随源码公开。升级数据库结构由应用按需补建，仓库没有可自动撤回所有结构变化的通用迁移命令。

@@ -59,6 +59,8 @@ public final class MainActivity extends Activity {
     private static final byte[] PNG_MAGIC = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     private static final String HOME_URL = BuildConfig.DMATE_URL;
     private static final String HOME_HOST = "dmate.zeabur.app";
+    private static final String LANGUAGE_PREFERENCES = "dmate_native_language";
+    private static final String LANGUAGE_KEY = "ui_language";
 
     private WebView webView;
     private ScriptHandler systemThemeStartScript;
@@ -205,12 +207,56 @@ public final class MainActivity extends Activity {
         cookies.setAcceptThirdPartyCookies(webView, false);
 
         installGallerySaveBridge();
+        installLanguageBridge();
         refreshSystemThemeBridge();
         webView.setWebViewClient(new DmateWebViewClient());
         webView.setWebChromeClient(new DmateChromeClient());
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             openExternal(Uri.parse(url));
         });
+    }
+
+    private boolean usesEnglish() {
+        String selected = getSharedPreferences(LANGUAGE_PREFERENCES, MODE_PRIVATE)
+            .getString(LANGUAGE_KEY, "");
+        if ("en".equals(selected)) return true;
+        if ("zh-CN".equals(selected)) return false;
+        Configuration configuration = getResources().getConfiguration();
+        Locale locale = configuration.getLocales().isEmpty()
+            ? Locale.getDefault() : configuration.getLocales().get(0);
+        // English is the fallback for device languages other than Chinese.
+        return !"zh".equalsIgnoreCase(locale.getLanguage());
+    }
+
+    private String nativeText(String chinese, String english) {
+        return usesEnglish() ? english : chinese;
+    }
+
+    /** The trusted website may select a language, never request native actions. */
+    private void installLanguageBridge() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
+        WebViewCompat.addWebMessageListener(
+            webView,
+            "DMateLanguage",
+            Collections.singleton("https://" + HOME_HOST),
+            (view, message, sourceOrigin, isMainFrame, replyProxy) -> {
+                if (!isMainFrame || view != webView || isFinishing() || isDestroyed()
+                    || message.getType() != WebMessageCompat.TYPE_STRING
+                    || !isTrustedMicrophoneOrigin(sourceOrigin)
+                    || view.getUrl() == null
+                    || !isTrustedMicrophoneOrigin(Uri.parse(view.getUrl()))) return;
+                String raw = message.getData();
+                if (raw == null || raw.length() > 100) return;
+                try {
+                    String language = new JSONObject(raw).optString("language", "");
+                    if (!"en".equals(language) && !"zh-CN".equals(language)) return;
+                    getSharedPreferences(LANGUAGE_PREFERENCES, MODE_PRIVATE)
+                        .edit().putString(LANGUAGE_KEY, language).apply();
+                } catch (Exception ignored) {
+                    // Ignore malformed messages without changing the saved choice.
+                }
+            }
+        );
     }
 
     /** Only the HTTPS DMate main frame may request saving a PNG to Photos. */
@@ -230,17 +276,17 @@ public final class MainActivity extends Activity {
                 }
                 String raw = message.getData();
                 if (raw == null || raw.length() > MAX_PNG_BYTES * 4 / 3 + 4096) {
-                    sendGalleryReply(replyProxy, "", false, "图片过大，无法保存");
+                    sendGalleryReply(replyProxy, "", false, nativeText("图片过大，无法保存", "The image is too large to save."));
                     return;
                 }
                 try {
                     JSONObject request = new JSONObject(raw);
                     String id = request.optString("id", "");
-                    String filename = request.optString("filename", "DMate-图片.png");
+                    String filename = request.optString("filename", nativeText("DMate-图片.png", "DMate-image.png"));
                     String base64 = request.optString("base64", "");
                     if (id.length() < 1 || id.length() > 128 || base64.isEmpty() ||
                         base64.length() > MAX_PNG_BYTES * 4 / 3 + 1024) {
-                        sendGalleryReply(replyProxy, id, false, "图片数据不正确");
+                        sendGalleryReply(replyProxy, id, false, nativeText("图片数据不正确", "The image data is invalid."));
                         return;
                     }
                     // Decode away from UI thread; never put 20 MiB PNG into Intent URLs.
@@ -251,13 +297,13 @@ public final class MainActivity extends Activity {
                             PendingSave save = new PendingSave(id, sanitizeFilename(filename), png, replyProxy);
                             runOnUiThread(() -> beginGallerySave(save));
                         } catch (Exception error) {
-                            runOnUiThread(() -> sendGalleryReply(replyProxy, id, false, "图片数据无效"));
+                            runOnUiThread(() -> sendGalleryReply(replyProxy, id, false, nativeText("图片数据无效", "The image data is invalid.")));
                         }
                     });
                 } catch (RejectedExecutionException ignored) {
                     // Activity teardown may close the executor before a late bridge callback.
                 } catch (Exception error) {
-                    sendGalleryReply(replyProxy, "", false, "无法解析图片保存请求");
+                    sendGalleryReply(replyProxy, "", false, nativeText("无法解析图片保存请求", "The image save request could not be read."));
                 }
             }
         );
@@ -356,7 +402,7 @@ public final class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             if (pendingLegacySave != null) {
-                sendGalleryReply(save.reply, save.id, false, "请完成前一次图片保存");
+                sendGalleryReply(save.reply, save.id, false, nativeText("请完成前一次图片保存", "Please finish the previous image save first."));
                 return;
             }
             pendingLegacySave = save;
@@ -372,9 +418,9 @@ public final class MainActivity extends Activity {
             imageSaver.execute(() -> {
                 try {
                     storePngInGallery(save.png, save.filename);
-                    runOnUiThread(() -> sendGalleryReply(save.reply, save.id, true, "图片已保存到相册 · DMate"));
+                    runOnUiThread(() -> sendGalleryReply(save.reply, save.id, true, nativeText("图片已保存到相册 · DMate", "Image saved to Photos · DMate")));
                 } catch (Exception error) {
-                    runOnUiThread(() -> sendGalleryReply(save.reply, save.id, false, "保存到相册失败，请检查可用空间"));
+                    runOnUiThread(() -> sendGalleryReply(save.reply, save.id, false, nativeText("保存到相册失败，请检查可用空间", "Could not save to Photos. Check the available storage space.")));
                 }
             });
         } catch (RejectedExecutionException ignored) {
@@ -455,7 +501,7 @@ public final class MainActivity extends Activity {
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             saveImageAsync(save);
         } else {
-            sendGalleryReply(save.reply, save.id, false, "没有存储权限，无法保存到相册");
+            sendGalleryReply(save.reply, save.id, false, nativeText("没有存储权限，无法保存到相册", "Storage permission is required to save to Photos."));
         }
     }
 
@@ -517,7 +563,7 @@ public final class MainActivity extends Activity {
         intent.setType("image/*");
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        return Intent.createChooser(intent, "选择图片");
+        return Intent.createChooser(intent, nativeText("选择图片", "Choose images"));
     }
 
     private boolean launchImagePicker(boolean documents) {
@@ -551,7 +597,7 @@ public final class MainActivity extends Activity {
             if (!launchImagePicker(false) && !launchImagePicker(true)) {
                 pendingFileCallback = null;
                 filePathCallback.onReceiveValue(null);
-                Toast.makeText(MainActivity.this, "无法打开系统图片选择器", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, nativeText("无法打开系统图片选择器", "Could not open the system image picker."), Toast.LENGTH_SHORT).show();
             }
             return true;
         }
@@ -594,17 +640,19 @@ public final class MainActivity extends Activity {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, uri));
         } catch (ActivityNotFoundException error) {
-            Toast.makeText(this, "无法打开此链接", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, nativeText("无法打开此链接", "Could not open this link."), Toast.LENGTH_SHORT).show();
         }
     }
 
     private void showOfflinePage() {
-        final String html = "<!doctype html><html><head><meta charset='utf-8'>"
+        final String html = "<!doctype html><html lang='" + (usesEnglish() ? "en" : "zh-CN") + "'><head><meta charset='utf-8'>"
             + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
             + "<style>body{margin:0;background:#111;color:#eee;font:16px sans-serif;display:grid;"
             + "place-items:center;min-height:100vh}.c{text-align:center;padding:28px}button{border:0;border-radius:12px;"
-            + "padding:12px 18px;font-size:16px}</style></head><body><div class='c'><h2>DMate 暂时无法连接</h2>"
-            + "<p>请检查网络后重试。</p><button onclick=\"location.href='" + HOME_URL + "'\">重新连接</button>"
+            + "padding:12px 18px;font-size:16px}</style></head><body><div class='c'><h2>"
+            + nativeText("DMate 暂时无法连接", "DMate is temporarily unavailable") + "</h2><p>"
+            + nativeText("请检查网络后重试。", "Check your connection and try again.")
+            + "</p><button onclick=\"location.href='" + HOME_URL + "'\">" + nativeText("重新连接", "Reconnect") + "</button>"
             + "</div></body></html>";
         webView.loadDataWithBaseURL(HOME_URL, html, "text/html", "UTF-8", null);
     }

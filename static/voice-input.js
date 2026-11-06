@@ -1,5 +1,6 @@
 (function (root) {
     'use strict';
+const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     const SAMPLE_RATE = 16000;
     const MAX_SECONDS = 60;
     const LEADING_PAD_SAMPLES = Math.round(SAMPLE_RATE * .15);
@@ -71,7 +72,7 @@
 
     function mount(options) {
         const button = options.button, input = options.input, status = options.status;
-        if (!button || !input) throw new Error('Voice input needs its microphone button and text field.');
+        if (!button || !input) throw new Error(uiText('Voice input needs its microphone button and text field.'));
         const document = button.ownerDocument;
         const win = document.defaultView || root;
         const media = options.mediaDevices || win.navigator.mediaDevices;
@@ -81,7 +82,7 @@
         // Padding is part of the service's 60-second file limit, not extra
         // hidden duration. All captured samples, including stop grace, fit.
         const captureLimit = Math.floor(SAMPLE_RATE * seconds) - LEADING_PAD_SAMPLES - TRAILING_PAD_SAMPLES;
-        let state = 'idle', serial = 0, active = null, disposed = false;
+        let state = 'idle', serial = 0, active = null, disposed = false, lastNotice = '';
         const contextKey = () => options.getContextKey ? options.getContextKey() : '';
         const busy = () => input.disabled || input.readOnly || Boolean(options.isBusy?.());
         const current = op => !disposed && active === op && op.serial === serial && op.contextKey === contextKey();
@@ -89,10 +90,11 @@
         button.type = 'button'; button.classList.add('voice-input-button'); button.innerHTML = ICON;
         if (status) { status.classList.add('voice-input-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); }
         function notice(message) {
+            lastNotice=message;
             if (!status) return;
             status.classList.remove('voice-input-error');
             status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-            status.replaceChildren(document.createTextNode(message)); status.hidden = !message;
+            status.replaceChildren(document.createTextNode(uiText(message))); status.hidden = !message;
         }
         function reportError(message) {
             notice(message);
@@ -100,7 +102,7 @@
             // host may use its existing error UI rather than add a second one
             // beneath the composer; standalone callers retain one error line.
             if (typeof options.onError === 'function') {
-                try { options.onError(message); return; } catch (_) { /* Fall back to the local error line. */ }
+                try { options.onError(uiText(message)); return; } catch (_) { /* Fall back to the local error line. */ }
             }
             if (status) {
                 status.classList.add('voice-input-error');
@@ -113,7 +115,7 @@
             button.setAttribute('aria-pressed', String(state === 'recording' || state === 'finishing'));
             button.setAttribute('aria-busy', String(['requesting', 'preparing', 'finishing', 'transcribing'].includes(state)));
             const label = state === 'recording' ? '结束录音并识别' : state === 'finishing' ? '正在收录尾音' : state === 'preparing' ? '正在启动麦克风' : state === 'transcribing' ? '正在识别语音' : state === 'requesting' ? '正在请求麦克风权限' : '语音输入';
-            button.title = label; button.setAttribute('aria-label', label);
+            button.title = uiText(label); button.setAttribute('aria-label', uiText(label));
             button.disabled = ['requesting', 'preparing', 'finishing', 'transcribing'].includes(state) || state === 'idle' && busy();
             if (changed) options.onStateChange?.(state);
         }
@@ -163,19 +165,19 @@
             try {
                 const chunks = [new Int16Array(LEADING_PAD_SAMPLES), ...op.chunks, new Int16Array(TRAILING_PAD_SAMPLES)];
                 const total = LEADING_PAD_SAMPLES + op.count + TRAILING_PAD_SAMPLES;
-                const body = new FormData(); body.append('audio', wavBlob(chunks, total), 'voice.wav'); body.append('language', window.DMateI18n?.getLanguage?.() || document.documentElement.lang || 'zh-CN');
+                const body = new FormData(); body.append('audio', wavBlob(chunks, total), 'voice.wav'); body.append('language', root.DMateI18n?.getLanguage?.() || document.documentElement.lang || 'zh-CN');
                 op.chunks = [];
                 const response = await fetcher(options.endpoint || '/voice/transcribe', {
                     method: 'POST', body, signal: op.controller.signal, credentials: 'same-origin'
                 });
                 let result;
-                try { result = await response.json(); } catch (_) { throw new Error('语音识别响应异常，请重试。'); }
+                try { result = await response.json(); } catch (_) { throw new Error(uiText('语音识别响应异常，请重试。')); }
                 if (!current(op)) { if (active === op) cancel('会话已切换，语音输入已取消。'); return; }
                 if (!response.ok || result?.ok !== true) {
                     const message = typeof result?.error === 'string' ? result.error : result?.error?.message;
                     throw new Error(typeof message === 'string' ? message.slice(0, 500) : '语音识别失败，请重试。');
                 }
-                if (typeof result.text !== 'string' || result.text.length > 24000) throw new Error('语音识别响应异常，请重试。');
+                if (typeof result.text !== 'string' || result.text.length > 24000) throw new Error(uiText('语音识别响应异常，请重试。'));
                 const text = result.text.trim();
                 if (!text) { cancel(); return; }
                 if (busy()) { cancel('输入位置已改变，识别内容未写入。'); return; }
@@ -220,7 +222,7 @@
                     appendPcm(op, op.sample(input));
                     if (!op.started) {
                         op.started = true; clearTimeout(op.readyTimer);
-                        render('recording'); notice(`已开始录音，请说话；再点麦克风结束（单段最长 ${seconds} 秒）。`);
+                        render('recording'); notice(uiText(`已开始录音，请说话；再点麦克风结束（单段最长 ${seconds} 秒）。`,`Recording. Speak now, then tap the microphone to stop (up to ${seconds} seconds).`));
                         op.timer = setTimeout(finish, Math.max(0, (captureLimit - op.count) / SAMPLE_RATE * 1000 - TAIL_CAPTURE_MS));
                     }
                     if (op.count >= captureLimit) {
@@ -246,6 +248,8 @@
         const escape = event => { if (event.key === 'Escape' && active) { event.preventDefault(); cancel(); } };
         const hidden = () => { if (document.hidden && active) cancel('页面已切换到后台，语音输入已取消。'); };
         const pagehide = () => { if (active) cancel('页面已关闭，语音输入已取消。'); };
+        const languageChanged=()=>{if(!disposed){render(state);if(status)status.textContent=uiText(lastNotice);}};
+        win.addEventListener('dmate:languagechange',languageChanged);
         button.addEventListener('click', click); document.addEventListener('keydown', escape);
         document.addEventListener('visibilitychange', hidden); win.addEventListener('pagehide', pagehide);
         const observer = new win.MutationObserver(() => { if (active && busy()) cancel('输入状态已改变，语音输入已取消。'); else if (state === 'idle') render('idle'); });
@@ -255,6 +259,7 @@
             cancel, get state() { return state; }, refresh() { if (state === 'idle') render('idle'); else if (active && busy()) cancel('输入状态已改变，语音输入已取消。'); },
             dispose() {
                 if (disposed) return; cancel(''); disposed = true; observer.disconnect();
+                win.removeEventListener('dmate:languagechange',languageChanged);
                 button.removeEventListener('click', click); document.removeEventListener('keydown', escape);
                 document.removeEventListener('visibilitychange', hidden); win.removeEventListener('pagehide', pagehide);
             }

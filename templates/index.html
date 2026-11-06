@@ -9107,7 +9107,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
                     <button type="button" data-appearance-mode="system">跟随系统</button>
                     <button type="button" data-appearance-mode="light">白色</button>
                     <button type="button" data-appearance-mode="dark">黑色</button>
-                    <button type="button" data-appearance-mode="navy">蓝色</button>
+                    <button type="button" data-appearance-mode="navy" data-i18n-en="Navy">蓝色</button>
                 </div>
             </div>
 
@@ -9654,6 +9654,9 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
 <script id="exerciseIntentRules" type="application/json">{{ exercise_intent_rules | tojson }}</script>
+<script src="/static/language-catalog.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/language-knowledge.js?v={{ dmate_web_revision }}"></script>
+<script src="/static/language.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/exercise-intent.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor-model.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/graph-editor-format.js?v={{ dmate_web_revision }}"></script>
@@ -9672,7 +9675,6 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script src="/static/learning-report.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/chat-stream.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/script.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/language.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 {% if is_dmate_android_app or is_dmate_desktop_app %}

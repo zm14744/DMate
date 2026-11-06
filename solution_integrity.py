@@ -10,6 +10,8 @@ import itertools
 import re
 from collections import Counter
 
+from server_i18n import localized, normalize_language
+
 NO_ANSWER = re.compile(r"不要.{0,8}答案|只.{0,4}提示|仅.{0,4}提示|不要.{0,8}解答|先不给答案")
 MARKED = re.compile(r"【题目文字】|【我的要求】|【当前指向题目】")
 LOGIC_EQ = re.compile(r"(?:(?:命题|判断)\s*)?(.{2,140}?)\s*(?:与|和)\s*(.{2,140}?)\s*(?:是否|是不是|可否)\s*逻辑等价")
@@ -127,7 +129,7 @@ def _split_formula_pair(q):
     return left,right
 
 
-def verify_proposition_equivalence(question):
+def verify_proposition_equivalence(question, *, language='zh-CN'):
     q=_active_question(question)
     pair=_split_formula_pair(q)
     if pair is None:
@@ -146,18 +148,27 @@ def verify_proposition_equivalence(question):
         return None
     mismatch=next(((e,a,b) for e,a,b in rows if a!=b),None)
     if mismatch is None:
+        if normalize_language(language) == 'en':
+            return ("These propositions are **logically equivalent**. Both formulas have the same truth value "
+                    f"under all {len(rows)} assignments to {', '.join(symbols)}.\n"
+                    "Conclusion: **logically equivalent**.")
         return ("这两个命题**逻辑等价**。对涉及的 "
                 + "、".join(symbols) + " 的全部 " + str(len(rows))
                 + " 组真值赋值，两个公式的值均相同。"
                 + "\n结论：**逻辑等价**。")
     env,a,b=mismatch
+    if normalize_language(language) == 'en':
+        witness=", ".join(f"{s}={'true' if env[s] else 'false'}" for s in symbols)
+        return ("These propositions are **not logically equivalent**. A counterexample assignment is: "
+                + witness + f". The first formula is {'true' if a else 'false'}; "
+                + f"the second is {'true' if b else 'false'}.")
     witness="，".join(f"{s}={'真' if env[s] else '假'}" for s in symbols)
     return ("这两个命题**不逻辑等价**。存在反例赋值："
             + witness + f"；第一个公式为{'真' if a else '假'}，"
             + f"第二个公式为{'真' if b else '假'}。")
 
 
-def verify_only_if_symbolization(question):
+def verify_only_if_symbolization(question, *, language='zh-CN'):
     q=_active_question(question)
     # For the standard "only if" meaning. Never trigger if no exact p/q
     # meanings are explicitly given or if a different sentence was requested.
@@ -172,9 +183,13 @@ def verify_only_if_symbolization(question):
         residue=residue.replace(phrase, " ")
     if not re.fullmatch(r"[\s，。；：、！？,.!?:;()（）\"'“”‘’$]*",residue):
         return None
-    return ("“只有下雨我才带伞”表示：**带伞是下雨的充分条件，下雨是带伞的必要条件**。\n"
+    return localized("“只有下雨我才带伞”表示：**带伞是下雨的充分条件，下雨是带伞的必要条件**。\n"
             "所以符号化为 $q\\to p$。\n"
-            "其逆否命题为 $\\neg p\\to\\neg q$，二者逻辑等价。")
+            "其逆否命题为 $\\neg p\\to\\neg q$，二者逻辑等价。",
+            "The statement “只有下雨我才带伞” means: **taking an umbrella is sufficient for rain; "
+            "rain is necessary for taking an umbrella**.\n"
+            "Its symbolic form is $q\\to p$.\n"
+            "Its contrapositive is $\\neg p\\to\\neg q$; the two are logically equivalent.", language)
 
 
 def _selection_parse(question):
@@ -217,7 +232,7 @@ def _selection_parse(question):
     return people,k,matched
 
 
-def verify_finite_selection(question):
+def verify_finite_selection(question, *, language='zh-CN'):
     parsed=_selection_parse(question)
     if parsed is None:
         return None
@@ -238,12 +253,15 @@ def verify_finite_selection(question):
                 ok=ok and not (a in selected and b in selected)
         if ok:
             valid.append("".join(combination))
-    return ("按题目给出的全部限制逐一检验，不额外增加条件。\n"
+    return localized("按题目给出的全部限制逐一检验，不额外增加条件。\n"
             "符合条件的选派：" + ("、".join(valid) if valid else "无") + "。\n"
-            f"因此共有 **{len(valid)} 种**。")
+            f"因此共有 **{len(valid)} 种**。",
+            "Check each selection against all stated constraints, without adding any conditions.\n"
+            "Valid selections: " + (", ".join(valid) if valid else "none") + ".\n"
+            f"There are **{len(valid)} selections** in total.", language)
 
 
-def verify_finite_relation(question):
+def verify_finite_relation(question, *, language='zh-CN'):
     q=_active_question(question)
     # Consume the entire supported task. A suffix such as "且 x<y" changes
     # the relation and must never be silently dropped by an exact checker.
@@ -264,6 +282,17 @@ def verify_finite_relation(question):
     counter=next(((x,y,z) for x in universe for y in universe for z in universe
                  if (x,y) in rel and (y,z) in rel and (x,z) not in rel),None)
     trans=counter is None
+    if normalize_language(language) == 'en':
+        pieces=[
+            "Checking the relation pair by pair: **" + ("an equivalence relation" if refl and symm and trans else "not an equivalence relation") + "**.",
+            "Reflexive: " + ("yes" if refl else "no") + ".",
+            "Symmetric: " + ("yes" if symm else "no") + ".",
+            "Transitive: " + ("yes" if trans else "no") + ".",
+        ]
+        if counter:
+            x,y,z=counter
+            pieces.append(f"Counterexample: ({x},{y})∈R and ({y},{z})∈R, but ({x},{z})∉R.")
+        return "\n".join(pieces)
     ans=("是" if refl and symm and trans else "不是")
     pieces=[
         f"逐对计算题设关系，结论：**{ans}等价关系**。",
@@ -277,7 +306,7 @@ def verify_finite_relation(question):
     return "\n".join(pieces)
 
 
-def verify_powerset_symmetric_difference(question):
+def verify_powerset_symmetric_difference(question, *, language='zh-CN'):
     """Exact finite-set cardinality algebra. Handles OCR/LaTeX representations.
 
     |A Δ B|=|A|+|B|-2|A∩B|; only enter when every given
@@ -321,10 +350,12 @@ def verify_powerset_symmetric_difference(question):
         return None
     inter_num=total_a+total_b-symdiff
     if inter_num<0 or inter_num%2:
-        return "题目给出的集合基数不一致：无法得到合法的整数交集大小，请先核对题干数字。"
+        return localized("题目给出的集合基数不一致：无法得到合法的整数交集大小，请先核对题干数字。",
+                         "The stated set cardinalities are inconsistent: they do not give a valid integer intersection size. Check the numbers in the question.", language)
     intersection=inter_num//2
     if intersection>min(total_a,total_b):
-        return "题目给出的集合基数不一致：推得的交集大小超过原集合大小，请核对原题。"
+        return localized("题目给出的集合基数不一致：推得的交集大小超过原集合大小，请核对原题。",
+                         "The stated set cardinalities are inconsistent: the derived intersection is larger than an original set. Check the question.", language)
     union=total_a+total_b-intersection
     minus_a=total_a-intersection
     minus_b=total_b-intersection
@@ -340,19 +371,26 @@ def verify_powerset_symmetric_difference(question):
            if name in normalized]
     if names and len(names)==1:
         key=names[0]
-        answer_line=f"最终答案：$|{key}|={result[key]}$。"
+        answer_line=localized(f"最终答案：$|{key}|={result[key]}$。",
+                              f"Final answer: $|{key}|={result[key]}$.", language)
     else:
-        answer_line=("最终答案："
-                     + "，".join(f"$|{key}|={value}$" for key,value in result.items())+"。")
-    steps=(f"因为 $|P(B)|=2^{{|B|}}={power_b}$，所以 $|B|={total_b}$；"
+        answer_line=localized("最终答案："
+                     + "，".join(f"$|{key}|={value}$" for key,value in result.items())+"。",
+                     "Final answer: " + ", ".join(f"$|{key}|={value}$" for key,value in result.items())+".", language)
+    steps=localized(f"因为 $|P(B)|=2^{{|B|}}={power_b}$，所以 $|B|={total_b}$；"
            f"因为 $|P(A\\triangle B)|=2^{{|A\\triangle B|}}={power_xor}$，"
            f"所以 $|A\\triangle B|={symdiff}$。\n"
            f"由 $|A\\triangle B|=|A|+|B|-2|A\\cap B|$，"
-           f"得 $|A\\cap B|=({total_a}+{total_b}-{symdiff})/2={intersection}$。")
+           f"得 $|A\\cap B|=({total_a}+{total_b}-{symdiff})/2={intersection}$。",
+           f"Since $|P(B)|=2^{{|B|}}={power_b}$, $|B|={total_b}$. "
+           f"Since $|P(A\\triangle B)|=2^{{|A\\triangle B|}}={power_xor}$, "
+           f"$|A\\triangle B|={symdiff}$.\n"
+           f"Using $|A\\triangle B|=|A|+|B|-2|A\\cap B|$, "
+           f"$|A\\cap B|=({total_a}+{total_b}-{symdiff})/2={intersection}$.", language)
     return steps+"\n"+answer_line
 
 
-def verify_exact_question(question, reply=None):
+def verify_exact_question(question, reply=None, *, language='zh-CN'):
     """Return proof-quality deterministic answer for supported *whole* questions.
 
     Do not evaluate just an AI-suggested subquestion. Unknown patterns are left
@@ -367,7 +405,7 @@ def verify_exact_question(question, reply=None):
         verify_finite_relation,
         verify_powerset_symmetric_difference,
     ):
-        verified=verifier(question)
+        verified=verifier(question, language=language)
         if verified is not None:
             return verified
     return None

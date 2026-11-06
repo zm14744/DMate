@@ -1,5 +1,6 @@
 (function(root){
  'use strict';
+const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
  const clone=v=>JSON.parse(JSON.stringify(v));
  const blank=(name='我的图形')=>({body_text:'',graphs:[{id:'G1',name,directed:false,weighted:false,vertices:[],edges:[]}]});
  const emptyDocument=()=>({body_text:'',graphs:[]});
@@ -10,7 +11,7 @@
  const fingerprint=v=>JSON.stringify(v);
  function mount(host,options={}){
   const doc=host.ownerDocument,win=doc.defaultView;
-  if(!root.DMateGraphEditor?.mount)throw new Error('绘图模块未加载，请刷新后重试。');
+  if(!root.DMateGraphEditor?.mount)throw new Error(uiText('绘图模块未加载，请刷新后重试。'));
   const key=String(options.storageKey||'dmate:graph-gallery:v1:guest');
   const persistent=options.persistent===true,sessionState=options.sessionState||{};
   let pages=[],activeId='',editor=null,timer=null,destroyed=false,persistError='',aiAbort=null,aiEpoch=0,exportBusy=false,panelMode='',uploadBusy=false;
@@ -201,7 +202,7 @@
   function switchPage(pageId){if(pageId===activeId||!pages.some(p=>p.id===pageId))return;cancelDelete();collect();persist();abortAnswer();activeId=pageId;persist();mountPage();setStatus('');}
   function newPage(){
    if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
-   cancelDelete();collect();persist();abortAnswer();const pageName='绘图 '+(pages.length+1),p={id:id(),name:pageName,document:blank(pageName),requirement:'',createdAt:Date.now(),updatedAt:Date.now()};pages.push(p);activeId=p.id;persist();mountPage();setStatus('');
+   cancelDelete();collect();persist();abortAnswer();const pageName=uiText('绘图 '+(pages.length+1),'Drawing '+(pages.length+1)),p={id:id(),name:pageName,document:blank(pageName),requirement:'',createdAt:Date.now(),updatedAt:Date.now()};pages.push(p);activeId=p.id;persist();mountPage();setStatus('');
   }
   function togglePanel(mode){if(mode==='ai'&&!active())return;closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
   function renderPanel(){
@@ -212,15 +213,16 @@
     const list=el('div','ddw-history-list');
     pages.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(p=>{
      const row=el('div','ddw-history-item'+(p.id===activeId?' is-current':'')),open=button(p.name,()=>switchPage(p.id),'ddw-history-open');
+     open.setAttribute('data-i18n-content','');
      open.setAttribute('aria-current',String(p.id===activeId));
-     const remove=button('',()=>requestRemovePage(p.id,remove),'ddw-history-delete');remove.setAttribute('aria-label','删除绘图：'+p.name+'（'+p.id+'）');remove.title='删除'+p.name;remove.disabled=Boolean(deletePending);
+     const remove=button('',()=>requestRemovePage(p.id,remove),'ddw-history-delete');remove.setAttribute('aria-label',uiText('删除绘图：'+p.name+'（'+p.id+'）','Delete drawing: '+p.name+'（'+p.id+'）'));remove.title=uiText('删除'+p.name,'Delete '+p.name);remove.disabled=Boolean(deletePending);
      row.append(open,remove);list.append(row);
     });if(!pages.length)list.append(el('p','ddw-history-empty','无'));panel.append(list);syncChrome();return;
    }
    const label=el('label','ddw-ai-label','要求（可选）'),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label','绘图指导要求（可选）');
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
    const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.append(sendIcon());ask.disabled=Boolean(aiAbort);ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='请求 AI 指导';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
-   const result=el('div','ddw-ai-answer');result.setAttribute('aria-live','polite');
+   const result=el('div','ddw-ai-answer');result.setAttribute('data-i18n-content','');result.setAttribute('aria-live','polite');
    panel.append(label,ask,result);
    if(answer){
     const renderedAnswer=answer,renderedPage=activeId,renderedRequirement=requirement;
@@ -235,9 +237,9 @@
   async function requestRemovePage(pageId,trigger){
    const page=pages.find(item=>item.id===pageId);if(!page||deletePending||destroyed)return;
    const op={id:pageId,page,activeId,snapshot:deletionSnapshot(page),trigger};deletePending=op;
-   const settings={title:'删除这个绘图？',body:'删除后无法恢复。\n'+page.name,confirmText:'删除绘图',confirmTone:'danger'};
+   const settings={title:'删除这个绘图？',body:'删除后无法恢复。\n'+page.name,content:page.name,confirmText:'删除绘图',confirmTone:'danger'};
    try{
-    if(typeof options.confirmDelete!=='function'&&typeof root.DMateDeleteConfirm?.request!=='function')throw new Error('删除确认界面未加载，请刷新后重试。');
+    if(typeof options.confirmDelete!=='function'&&typeof root.DMateDeleteConfirm?.request!=='function')throw new Error(uiText('删除确认界面未加载，请刷新后重试。'));
     const confirmation=typeof options.confirmDelete==='function'?options.confirmDelete(settings):root.DMateDeleteConfirm?.request(shell,settings);
     syncDeleteButtons();const confirmed=await confirmation;
     const current=pages.find(item=>item.id===op.id);
@@ -257,8 +259,8 @@
    const snapshot=clone(currentDocument()),snapshotKey=fingerprint(snapshot),request=requirement,selected=activeId,epoch=++aiEpoch;
    const controller=new win.AbortController();aiAbort=controller;answer='';renderPanel();setStatus('');
    try{
-    const response=await win.fetch('/drawing/guide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({document:snapshot,requirement:request}),signal:controller.signal});
-    let result;try{result=await response.json();}catch(_){throw new Error('AI 返回内容无效，请重试。');}
+    const response=await win.fetch('/drawing/guide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({document:snapshot,requirement:request,language:root.DMateI18n?.getLanguage?.()||doc.documentElement.lang||'zh-CN'}),signal:controller.signal});
+    let result;try{result=await response.json();}catch(_){throw new Error(uiText('AI 返回内容无效，请重试。'));}
     if(!response.ok||result.ok!==true||typeof result.answer!=='string'||!result.answer.trim())throw new Error(result.error||'AI 指导暂时失败，请重试。');
     if(destroyed||epoch!==aiEpoch||activeId!==selected||fingerprint(currentDocument())!==snapshotKey||requirement!==request)return;
     answer=result.answer;answerDocument=snapshotKey;answerRequirement=request;setStatus('');
@@ -266,9 +268,9 @@
    finally{if(epoch===aiEpoch){aiAbort=null;if(!destroyed)renderPanel();}}
   }
   async function makeImage(){
-   if(!active())throw new Error('请先新建空白页。');
-   if(!root.DMateDrawingExport?.pngBlob)throw new Error('导出模块未加载，请刷新后重试。');
-   if(!currentDocument().graphs.some(g=>g.vertices.length))throw new Error('请先在空白页添加顶点和边。');
+   if(!active())throw new Error(uiText('请先新建空白页。'));
+   if(!root.DMateDrawingExport?.pngBlob)throw new Error(uiText('导出模块未加载，请刷新后重试。'));
+   if(!currentDocument().graphs.some(g=>g.vertices.length))throw new Error(uiText('请先在空白页添加顶点和边。'));
    const svg=editor?.getDrawingSvg?.(),document=root.DMateDrawingExport.documentForImage(currentDocument(),svg);
    return {blob:await root.DMateDrawingExport.pngBlob(svg),document};
   }
@@ -283,7 +285,7 @@
    exportPreview=el('section','ddw-export-preview');exportPreview.setAttribute('role','dialog');exportPreview.setAttribute('aria-modal','true');exportPreview.setAttribute('aria-label','导出绘图');
    const header=el('div','ddw-export-header'),close=button('',closeExportPreview,'ddw-export-close');close.setAttribute('aria-label','关闭图片预览');
    header.append(el('h3','','导出绘图'),close);
-   const image=el('img','ddw-export-image');image.src=exportPreviewUrl;image.alt=pageName+'，绘图导出图片';
+   const image=el('img','ddw-export-image');image.src=exportPreviewUrl;image.alt=uiText(pageName+'，绘图导出图片','Exported drawing: '+pageName);
    const link=el('a','ddw-export-download','下载图片');link.href=exportPreviewUrl;link.download=pageName.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+'.png';
    exportPreview.append(header,image,link);shell.append(exportPreview);
    exportPreview.addEventListener('keydown',event=>{
@@ -294,7 +296,7 @@
   async function exportImage(){if(exportBusy)return;busy(true);try{collect();persist();const {blob}=await makeImage();if(destroyed)return;const metadata={name:caption(name.value)};if(typeof options.onExport==='function')await options.onExport(blob,metadata);else if(win.innerWidth<=760||win.matchMedia?.('(pointer: coarse)').matches)showExportPreview(blob,metadata.name);else root.DMateDrawingExport.download(blob,metadata.name,doc);setStatus('');}catch(error){if(!destroyed)setStatus(error?.message||'图片导出失败。');}finally{if(!destroyed)busy(false);}}
   async function uploadImage(){
    if(exportBusy)return;busy(true);uploadBusy=true;
-   try{if(typeof options.onUpload!=='function')throw new Error('上传功能未就绪，请刷新后重试。');collect();persist();const pageName=caption(name.value),requirements=requirement,{blob,document}=await makeImage();if(destroyed)return;await options.onUpload(blob,{name:pageName,document,requirements});if(!destroyed){setStatus('');options.onClose?.();}}
+   try{if(typeof options.onUpload!=='function')throw new Error(uiText('上传功能未就绪，请刷新后重试。'));collect();persist();const pageName=caption(name.value),requirements=requirement,{blob,document}=await makeImage();if(destroyed)return;await options.onUpload(blob,{name:pageName,document,requirements});if(!destroyed){setStatus('');options.onClose?.();}}
    catch(error){if(!destroyed)setStatus(error?.message||'绘图上传失败，请重试。');}
    finally{uploadBusy=false;if(!destroyed)busy(false);}
   }

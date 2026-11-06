@@ -3,6 +3,13 @@ marked.setOptions({
     breaks: true
 });
 
+const dmateUiText = (source, english) => window.DMateI18n?.t(source, english) ?? source;
+const dmateUiLanguage = () => window.DMateI18n?.getLanguage() || "zh-CN";
+const dmateKnowledgeLabel = value => {
+    const label = window.DMateKnowledgeLanguage?.label(value, dmateUiLanguage());
+    return label && label !== value ? label : dmateUiText(value);
+};
+
 const STORAGE_KEY = "discrete_math_ai_sessions_v1";
 const LEARNING_STORAGE_KEY = "discrete_math_ai_learning_v1";
 const MAX_IMAGE_BYTES = 20_000_000;
@@ -1181,6 +1188,12 @@ function showAppConfirm(options = {}) {
 
     title.textContent = String(options.title || "请确认");
     body.textContent = String(options.body || "确定继续吗？");
+    if (options.content) {
+        const content = document.createElement("div");
+        content.setAttribute("data-i18n-content", "");
+        content.textContent = String(options.content);
+        body.appendChild(content);
+    }
     confirmButton.textContent = String(options.confirmText || "确定");
     confirmButton.classList.toggle("danger", options.confirmTone === "danger");
     confirmButton.classList.toggle("primary", options.confirmTone !== "danger");
@@ -1582,6 +1595,7 @@ function renderAccountUi() {
     entry?.classList.toggle("is-syncing", accountState.syncing);
 
     if (label) {
+        label.toggleAttribute("data-i18n-content", accountState.authenticated);
         label.textContent = accountState.authenticated
             ? accountState.username
             : "登录 / 注册";
@@ -1596,7 +1610,10 @@ function renderAccountUi() {
         setAccountRecoveryCodePanel(false);
     }
 
-    if (username) username.textContent = accountState.username;
+    if (username) {
+        username.setAttribute("data-i18n-content", "");
+        username.textContent = accountState.username;
+    }
     if (currentEmail) {
         currentEmail.textContent = accountState.email
             ? `邮箱：${accountState.email}`
@@ -5321,6 +5338,8 @@ function buildLearningQuestionFromSession(session, teaching, excludeLatest = fal
 
 function stripQuestionDecorations(text) {
     let value = String(text || "");
+    value = value.replace(/^\s*(?:#{1,4}\s*)?(?:\*\*|__)?\s*\[(?:Question|Exercise|Problem)\]\s*(?:\*\*|__)?\s*/im, "")
+        .replace(/^\s*(?:#{1,4}\s*)?(?:\*\*|__)?(?:Question|Exercise|Problem)(?:\s*[:：]|\s*(?:\*\*|__)?\s*$)\s*/im, "");
 
     value = value
         .replace(
@@ -5353,6 +5372,10 @@ function cutQuestionAfterMetaSections(text) {
     if (!value) return "";
 
     const stopPatterns = [
+        /(?:^|\n)[ \t]*(?:#{1,6}[ \t]+(?:Answer|Explanation|Solution|Hint|Topics|Knowledge Points)[ \t]*:?[ \t]*(?=\n|$)|(?:\*\*|__)(?:Answer|Explanation|Solution|Hint|Topics|Knowledge Points)[ \t]*:?(?:\*\*|__)[ \t]*(?=\n|$))/im,
+        /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*|__)?【(?:参考答案|答案|解析|解答|详细解析|解题过程|提示|涉及知识点|知识点)】/m,
+        /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*|__)?\[(?:Answer|Explanation|Solution|Hint|Topics|Knowledge Points)\](?:\*\*|__)?/im,
+        /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*|__)?(?:Answer|Explanation|Solution|Hint|Topics|Knowledge Points)\s*[:：](?:\*\*|__)?/im,
         /(?:^|\n)\s*(?:-{3,}\s*\n\s*)?(?:\*\*|__)?(?:提示|思考提示|思路提示|解题提示|小提示|关键提示|方法提示|解题思路|思路)\s*[:：]?(?:\*\*|__)?/im,
         /(?:^|\n)\s*(?:#{1,6}\s*)?(?:参考答案|答案|解析|解答|详细解析|解题过程|过程)\s*[:：]?/im,
         /(?:^|\n)\s*答\s*[:：]/im,
@@ -5385,6 +5408,9 @@ function removeConversationalQuestionPrefix(text) {
 
     // 明确题目标题后的内容优先。
     const explicitPatterns = [
+        /(?:^|\n)[ \t]*(?:#{1,6}[ \t]+(?:Question|Exercise|Problem)[ \t]*:?[ \t]*(?:\n|$)|(?:\*\*|__)(?:Question|Exercise|Problem)[ \t]*:?(?:\*\*|__)[ \t]*(?:\n|$))/im,
+        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?\[(?:Question|Exercise|Problem)\]\s*(?:\*\*|__)?\s*/im,
+        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?(?:Question|Exercise|Problem)\s*[:：]\s*(?:\*\*|__)?\s*/im,
         // 先吃掉完整 **【题目】**，否则只匹配中间标题会留下孤立 **。
         /(?:^|\n)\s*(?:\*\*|__)\s*【(?:题目|练习题)】\s*(?:\*\*|__)\s*/m,
         /【(?:题目|练习题)】/,
@@ -5763,6 +5789,8 @@ function extractQuestionOnlyFromMessage(message) {
 
 function hasExplicitQuestionHeading(text) {
     const value = String(text || "");
+    if (/(?:^|\n)[ \t]*(?:#{1,6}[ \t]+(?:Question|Exercise|Problem)[ \t]*:?[ \t]*(?:\n|$)|(?:\*\*|__)(?:Question|Exercise|Problem)[ \t]*:?(?:\*\*|__)[ \t]*(?:\n|$))/im.test(value)) return true;
+    if (/(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?(?:\[(?:Question|Exercise|Problem)\]|(?:Question|Exercise|Problem)\s*[:：])(?:\*\*|__)?/im.test(value)) return true;
 
     return Boolean(
         /【(?:题目|练习题)】/.test(value)
@@ -6110,6 +6138,9 @@ function extractAiGeneratedExerciseText(reply) {
     if (!text) return "";
 
     const headingPatterns = [
+        /(?:^|\n)[ \t]*(?:#{1,6}[ \t]+(?:Question|Exercise|Problem)[ \t]*:?[ \t]*(?:\n|$)|(?:\*\*|__)(?:Question|Exercise|Problem)[ \t]*:?(?:\*\*|__)[ \t]*(?:\n|$))/im,
+        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?\[(?:Question|Exercise|Problem)\]\s*(?:\*\*|__)?\s*/im,
+        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?(?:Question|Exercise|Problem)\s*[:：]\s*(?:\*\*|__)?\s*/im,
         /【题目】/,
         /【练习题】/,
         /(?:^|\n)#{1,4}\s*(?:题目|练习题)\s*(?:\n|$)/m,
@@ -6150,7 +6181,7 @@ function extractAiGeneratedExerciseText(reply) {
         text = text.slice(0, hintMatch.index).trim();
     }
 
-    return limitQuestionText(text);
+    return limitQuestionText(cutQuestionAfterMetaSections(text));
 }
 
 function completeQuestionTextFromChatMessage(
@@ -6223,6 +6254,7 @@ function completeQuestionTextFromChatMessage(
 function buildQuestionCopyElement(question) {
     const root = document.createElement("div");
     root.className = "ai-content";
+    root.setAttribute("data-i18n-content", "");
     root.innerHTML = markdownToHtml(prepareAiDisplayText(question));
     return root;
 }
@@ -6461,6 +6493,7 @@ function openWrongQuestionPicker(questionInfo, choices) {
 
         const preview = document.createElement("div");
         preview.className = "wrong-picker-preview";
+        preview.setAttribute("data-i18n-content", "");
         preview.textContent = choice.question
             .replace(/\s+/g, " ")
             .slice(0, 180);
@@ -6824,6 +6857,7 @@ function visibleWrongQuestionFingerprint(question) {
 
     try {
         const temp = document.createElement("div");
+        temp.setAttribute("data-i18n-content", "");
         temp.innerHTML = markdownToHtml(raw);
         const rendered = String(temp.textContent || temp.innerText || "")
             .toLowerCase()
@@ -7611,7 +7645,7 @@ async function generateRetestDetail(itemId, recordId, kind) {
         && !document.getElementById("wrongRetestReviewModal")?.classList.contains("hidden");
     if (button) { button.disabled = true; button.textContent = "生成中…"; }
     try {
-        const response = await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[{role:"user",content:request}]})});
+        const response = await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({language:dmateUiLanguage(),messages:[{role:"user",content:request}]})});
         const data = await parseResponseJson(response);
         const target = currentTarget();
         if (!target) return;
@@ -7689,6 +7723,7 @@ function openWrongRetestReview(id) {
         title.textContent = "第 " + (index+1) + " 次复测";
         const question = document.createElement("div");
         question.className = "wrong-retest-review-question";
+        question.setAttribute("data-i18n-content", "");
         question.innerHTML = markdownToHtml(record.question);
         body.append(title,question);
         ["answer","analysis"].forEach(kind => {
@@ -7700,6 +7735,7 @@ function openWrongRetestReview(id) {
                 summary.textContent = kind === "answer" ? "查看答案" : "查看解析";
                 const content = document.createElement("div");
                 content.className = kind === "answer" ? "wrong-answer-inner wrong-retest-review-detail" : "wrong-analysis-body wrong-retest-review-detail";
+                content.setAttribute("data-i18n-content", "");
                 content.innerHTML = markdownToHtml(formatRetestDetailParagraphs(record[kind]));
                 details.append(summary,content);
                 body.append(details);
@@ -8001,12 +8037,13 @@ function startWrongQuestionRetest(id) {
 
     const targetDifficulty = ["简单", "中等", "困难"].includes(entry.difficulty)
         ? entry.difficulty : "";
-    const visiblePrompt =
-        `给我一道包含“${targetName}”全部核心考点的复测题。`;
+    const englishTarget = targetPoints.length ? targetPoints.map(dmateKnowledgeLabel).join(", ") : "the original question";
+    const visiblePrompt = dmateUiText(`给我一道包含“${targetName}”全部核心考点的复测题。`,
+        `Give me a retest question covering all the core concepts in ${englishTarget}.`);
 
     const session = {
         id: idValue,
-        name: `复测：${targetName}`.slice(0, 22),
+        name: dmateUiText(`复测：${targetName}`, `Retest: ${englishTarget}`).slice(0, dmateUiLanguage() === "en" ? 48 : 22),
         messages: [{
             role: "user",
             text: visiblePrompt,
@@ -8228,9 +8265,9 @@ function buildWrongBookPdfExportElement(items) {
     subtitle.style.fontSize = "13px";
     subtitle.style.color = "#64748b";
     subtitle.style.marginBottom = "22px";
-    subtitle.textContent = (
-        `共 ${items.length} 道 · 导出时间：${new Date().toLocaleString("zh-CN")}`
-    );
+    const exportDate = new Date().toLocaleString(dmateUiLanguage());
+    subtitle.textContent = dmateUiText(`共 ${items.length} 道 · 导出时间：${exportDate}`,
+        `${items.length} questions · Exported: ${exportDate}`);
     container.appendChild(subtitle);
 
     items.forEach((item, index) => {
@@ -8248,7 +8285,7 @@ function buildWrongBookPdfExportElement(items) {
         statusLine.style.fontSize = "15px";
         statusLine.style.fontWeight = "700";
         statusLine.style.marginBottom = "10px";
-        statusLine.textContent = `${index + 1}. ${status.text}`;
+        statusLine.textContent = `${index + 1}. ${dmateUiText(status.text)}`;
         card.appendChild(statusLine);
 
         const question = document.createElement("div");
@@ -8256,6 +8293,7 @@ function buildWrongBookPdfExportElement(items) {
         question.style.fontSize = "15px";
         question.style.whiteSpace = "pre-wrap";
         question.style.wordBreak = "break-word";
+        question.setAttribute("data-i18n-content", "");
         question.innerHTML = markdownToHtml(item.question);
         card.appendChild(question);
 
@@ -8263,19 +8301,20 @@ function buildWrongBookPdfExportElement(items) {
 
         if (item.focusPoints?.length) {
             metaParts.push(
-                `本题难点：${item.focusPoints.join("、")}`
+                dmateUiText("本题难点：", "Focus: ") + item.focusPoints.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
             );
         }
 
         if (item.knowledgePoints?.length) {
             metaParts.push(
-                `整题涉及：${item.knowledgePoints.join("、")}`
+                dmateUiText("整题涉及：", "Concepts: ") + item.knowledgePoints.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
             );
         }
 
         if (item.retestCount) {
             metaParts.push(
-                `复测 ${item.retestCount} 次，通过 ${item.retestPassCount || 0} 次`
+                dmateUiText(`复测 ${item.retestCount} 次，通过 ${item.retestPassCount || 0} 次`,
+                    `Retests: ${item.retestCount} · Passed: ${item.retestPassCount || 0}`)
             );
         }
 
@@ -8301,6 +8340,7 @@ function buildWrongBookPdfExportElement(items) {
             block.appendChild(label);
 
             const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
             body.innerHTML = markdownToHtml(item.feedback);
             block.appendChild(body);
 
@@ -8322,6 +8362,7 @@ function buildWrongBookPdfExportElement(items) {
             block.appendChild(label);
 
             const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
             body.innerHTML = markdownToHtml(item.referenceAnswer);
             block.appendChild(body);
 
@@ -8343,6 +8384,7 @@ function buildWrongBookPdfExportElement(items) {
             block.appendChild(label);
 
             const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
             body.innerHTML = markdownToHtml(item.answer);
             block.appendChild(body);
 
@@ -8364,6 +8406,7 @@ function buildWrongBookPdfExportElement(items) {
             block.appendChild(label);
 
             const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
             body.innerHTML = markdownToHtml(item.analysis);
             block.appendChild(body);
 
@@ -8385,6 +8428,7 @@ function buildWrongBookPdfExportElement(items) {
             block.appendChild(label);
 
             const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
             body.innerHTML = markdownToHtml(item.note);
             block.appendChild(body);
 
@@ -8406,6 +8450,7 @@ function buildWrongBookPdfExportElement(items) {
             block.appendChild(label);
 
             const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
             body.innerHTML = markdownToHtml(item.lastRetestQuestion);
             block.appendChild(body);
 
@@ -8415,6 +8460,7 @@ function buildWrongBookPdfExportElement(items) {
         container.appendChild(card);
     });
 
+    window.DMateI18n?.translate(container);
     document.body.appendChild(container);
     return container;
 }
@@ -9005,6 +9051,9 @@ function extractAnswerOnlyText(text) {
     if (marker) {
         value = marker[1].trim();
     }
+    value = value.replace(/^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:\[(?:Final\s+)?Answer\]|(?:Final\s+)?Answer\s*:)\s*(?:\*\*)?\s*/i, "");
+    value = value.replace(/^[ \t]*(?:#{1,6}[ \t]+(?:Final[ \t]+)?Answer[ \t]*:?[ \t]*(?:\n|$)|(?:\*\*|__)(?:Final[ \t]+)?Answer[ \t]*:?(?:\*\*|__)[ \t]*(?:\n|$))/i, "");
+    value = value.replace(/^\s*(?:#{1,6}\s*)?(?:\*\*)?【(?:参考答案|最终答案|答案)】\s*(?:\*\*)?\s*/m, "");
 
     // 去掉模型常见客套开头。
     value = value.replace(
@@ -9014,6 +9063,9 @@ function extractAnswerOnlyText(text) {
 
     // 一旦进入解析/理由/过程，后面全部不要。
     const stopPatterns = [
+        /\n[ \t]*(?:#{1,6}[ \t]+(?:Explanation|Solution|Reasoning)[ \t]*:?[ \t]*(?=\n|$)|(?:\*\*|__)(?:Explanation|Solution|Reasoning)[ \t]*:?(?:\*\*|__)[ \t]*(?=\n|$))/im,
+        /\n\s*(?:#{1,6}\s*)?(?:\*\*)?【(?:解析|解答|理由|过程|推导|说明|易错点)】/m,
+        /\n\s*(?:#{1,6}\s*)?(?:\*\*)?(?:\[(?:Explanation|Solution|Reasoning)\]|(?:Explanation|Solution|Reasoning)\s*:)/i,
         /\n\s*(?:#{1,6}\s*)?(?:解析|理由|过程|推导|说明|易错点)\s*[:：]?/i,
         /\n\s*(?:因为|所以)\b/,
     ];
@@ -9141,6 +9193,7 @@ async function generateWrongQuestionAnswer(
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
+                    language: dmateUiLanguage(),
                     messages: [
                         {
                             role: "user",
@@ -9265,6 +9318,7 @@ async function generateWrongQuestionAnalysis(id) {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
+                    language: dmateUiLanguage(),
                     messages: [
                         {
                             role: "user",
@@ -9413,6 +9467,7 @@ function renderWrongBook() {
 
         const question = document.createElement("div");
         question.className = "wrong-question";
+        question.setAttribute("data-i18n-content", "");
         question.innerHTML = markdownToHtml(item.question);
 
         const meta = document.createElement("div");
@@ -9479,6 +9534,7 @@ function renderWrongBook() {
 
             const feedbackBody = document.createElement("div");
             feedbackBody.className = "wrong-feedback-body";
+            feedbackBody.setAttribute("data-i18n-content", "");
             feedbackBody.innerHTML = markdownToHtml(item.feedback);
 
             feedback.appendChild(prefixNode);
@@ -9494,6 +9550,7 @@ function renderWrongBook() {
 
             const noteBody = document.createElement("div");
             noteBody.className = "wrong-note-body";
+            noteBody.setAttribute("data-i18n-content", "");
             noteBody.innerHTML = markdownToHtml(item.note);
 
             note.appendChild(noteTitle);
@@ -9542,6 +9599,7 @@ function renderWrongBook() {
         );
 
         if (visibleAnswer) {
+            answerInner.setAttribute("data-i18n-content", "");
             answerInner.innerHTML = markdownToHtml(
                 visibleAnswer
             );
@@ -9587,6 +9645,7 @@ function renderWrongBook() {
 
             const analysisBody = document.createElement("div");
             analysisBody.className = "wrong-analysis-body";
+            analysisBody.setAttribute("data-i18n-content", "");
             analysisBody.innerHTML = markdownToHtml(
                 item.analysis
             );
@@ -11385,8 +11444,8 @@ function knowledgeGraphExportLayout(nodes) {
 
     // Export dimensions are independent of viewport, orientation, browser zoom
     // and the current zoom level of the fullscreen graph.
-    const cellWidth = 164;
-    const cellHeight = 78;
+    const cellWidth = dmateUiLanguage() === "en" ? 220 : 164;
+    const cellHeight = dmateUiLanguage() === "en" ? 94 : 78;
     const spaceX = 100;
     const spaceY = 34;
     const marginX = 42;
@@ -11533,12 +11592,12 @@ async function renderKnowledgeGraphOffscreenPngBlob() {
         const hasBadge = Boolean(state.badge);
         ctx.font = '600 16px system-ui, "Microsoft YaHei", sans-serif';
         ctx.fillStyle = "#ffffff";
-        drawKnowledgeGraphWrappedLabel(ctx, node.name, pos.x + cellWidth / 2,
+        drawKnowledgeGraphWrappedLabel(ctx, dmateKnowledgeLabel(node.name), pos.x + cellWidth / 2,
             pos.y + (hasBadge ? 32 : cellHeight / 2), cellWidth - 18, hasBadge ? 2 : 3);
         if (hasBadge) {
             ctx.font = '12px system-ui, "Microsoft YaHei", sans-serif';
             ctx.fillStyle = "#e9d5ff";
-            ctx.fillText(state.badge, pos.x + cellWidth / 2, pos.y + cellHeight - 12);
+            ctx.fillText(dmateUiText(state.badge), pos.x + cellWidth / 2, pos.y + cellHeight - 12);
         }
     }
 
@@ -14699,6 +14758,7 @@ function renderOcrReviewResult(element, source) {
     }
     // Reuse the site's bare-LaTeX repair and sanitized MathJax display pipeline.
     // Display normalization never changes the OCR text submitted to the model.
+    element.setAttribute("data-i18n-content", "");
     element.innerHTML = markdownToHtml(prepareAiDisplayText(value));
 }
 
@@ -14923,6 +14983,7 @@ function renderOcrGrouping(panel, hasImages) {
         content.className = "ocr-group-content";
         const name = document.createElement("strong");
         name.className = "ocr-group-name";
+        if (task.file?.name) name.setAttribute("data-i18n-content", "");
         name.textContent = task.file?.name || `图片${index}`;
         const controls = document.createElement("div");
         controls.className = "ocr-group-controls";
@@ -15072,6 +15133,7 @@ function renderOcrTasks() {
         thumbnail.src = task.originalUrl;
         thumbnail.alt = `${task.file.name} 原图缩略图`;
         thumbnail.title = task.file.name || "图片";
+        if (task.file.name) thumbnail.setAttribute("data-i18n-content", "");
         const content = element("div", "ocr-task-content");
         const status = element("p", "ocr-task-status", ocrTaskLabel(task));
         status.setAttribute("role", "status");
@@ -15328,7 +15390,7 @@ async function requestGraphDescriptions(task, confirmation) {
         const response = await fetch("/graph/describe", {
             method: "POST", credentials: "same-origin",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({semantic_context: confirmation.semantic_context,
+            body: JSON.stringify({language: dmateUiLanguage(), semantic_context: confirmation.semantic_context,
                 drawing_document: drawing})
         });
         const result = await parseResponseJson(response);
@@ -15338,7 +15400,7 @@ async function requestGraphDescriptions(task, confirmation) {
             const known = new Set((task.draft.graphs || []).map(g => String(g.id)));
             task.descriptions = Object.fromEntries(Object.entries(result.descriptions)
                 .filter(([id, value]) => known.has(id) && typeof value === "string"
-                    && value.length <= 135));
+                    && value.length <= (dmateUiLanguage() === "en" ? 280 : 135)));
             task.descriptionState = "complete";
         } else task.descriptionState = "unavailable";
     } catch (_error) {
@@ -15661,7 +15723,10 @@ async function editOcrTask(id) {
     }
     ocrEditorTaskId = task.id;
     ocrReviewInProgress = true;
-    if (title) title.textContent = task.file?.name || "图片";
+    if (title) {
+        title.toggleAttribute("data-i18n-content", Boolean(task.file?.name));
+        title.textContent = task.file?.name || "图片";
+    }
     // Closing retains the current local OCR draft but must not interrupt Save.
     const requestClose = () => { if (!task.confirming) dialog.close(); };
     const blockCloseDuringSave = event => { if (task.confirming) event.preventDefault(); };
@@ -16401,13 +16466,16 @@ function hideGeneratedExerciseKnowledgePoints(raw, teaching = null) {
     const normalized = normalizeTeaching(teaching);
     const labels = new Set(["集合运算"]);
     const addLabel = value => {
-        if (typeof value === "string" && value.trim()) labels.add(value.trim());
+        if (typeof value === "string" && value.trim()) {
+            labels.add(value.trim());
+            labels.add(window.DMateKnowledgeLanguage?.label(value.trim(), "en") || value.trim());
+        }
     };
     addLabel(normalized?.category);
     (normalized?.knowledge_points || []).forEach(addLabel);
     (normalized?.focus_points || []).forEach(addLabel);
 
-    const heading = /^\s*(?:#{1,6}\s*)?(?:【\s*(?:涉及知识点|所涉知识点|知识点)\s*】|\[\s*(?:涉及知识点|所涉知识点|知识点)\s*\]|(?:涉及知识点|所涉知识点|知识点)\s*[:：])\s*(.*)$/;
+    const heading = /^\s*(?:#{1,6}\s*)?(?:【\s*(?:涉及知识点|所涉知识点|知识点)\s*】|\[\s*(?:涉及知识点|所涉知识点|知识点|Topics|Knowledge Points)\s*\]|(?:涉及知识点|所涉知识点|知识点|Topics|Knowledge Points)\s*[:：])\s*(.*)$/i;
     const output = [];
     let skipLabelLine = false;
     for (const line of lines) {
@@ -16418,8 +16486,8 @@ function hideGeneratedExerciseKnowledgePoints(raw, teaching = null) {
             continue;
         }
         if (skipLabelLine && !trimmed) continue;
-        if (skipLabelLine && !/[。？?]|(?:求|证明|判断|计算|写出|已知|设|下列)/.test(trimmed)
-            && trimmed.length <= 70) {
+        if (skipLabelLine && !/[。？?]|(?:求|证明|判断|计算|写出|已知|设|下列)|\b(?:let|given|suppose|find|prove|calculate|determine)\b/i.test(trimmed)
+            && trimmed.length <= 200) {
             skipLabelLine = false;
             continue;
         }
@@ -16674,6 +16742,7 @@ async function prepareReplyReveal(context, state) {
         const content = document.createElement("div");
         content.className = "ai-content";
         const displayText = prepareAiDisplayText(typingFullText);
+        content.setAttribute("data-i18n-content", "");
         content.innerHTML = markdownToHtml(typingMeta?.generatedExercise
             ? hideGeneratedExerciseKnowledgePoints(displayText, typingMeta.generatedTeaching)
             : displayText);
@@ -16959,6 +17028,7 @@ function renderChat(preparedReply = null) {
 
         const content = document.createElement("div");
         content.className = "msg-content";
+        if (message.isError || message.isNotice) content.setAttribute("data-i18n-ui", "");
 
         if (message.role === "user") {
             content.textContent = message.text;
@@ -17222,6 +17292,7 @@ function renderSessions() {
         }
 
         const span = document.createElement("span");
+        if (session.name !== "新对话" || session.messages.length) span.setAttribute("data-i18n-content", "");
         span.innerText = session.name;
         span.title = session.name;
 
@@ -19571,9 +19642,18 @@ function knowledgeGraphNodeState(nodeName, context) {
 
 
 function splitKnowledgeGraphLabel(text, maxChars = 7) {
-    const value = String(text || "").trim();
+    const value = String(dmateKnowledgeLabel(text) || "").trim();
 
     if (!value) return [""];
+    if (dmateUiLanguage() === "en") {
+        const lines = [];
+        for (const word of value.split(/\s+/)) {
+            const last = lines.length - 1;
+            if (last >= 0 && (lines[last] + " " + word).length <= 23) lines[last] += " " + word;
+            else lines.push(word);
+        }
+        return lines;
+    }
 
     const lines = [];
 
@@ -20062,11 +20142,11 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
         button.style.height = `${nodeHeight}px`;
         button.style.background = state.fill;
         button.style.borderColor = state.stroke;
-        button.setAttribute("aria-label", node.name);
+        button.setAttribute("aria-label", dmateKnowledgeLabel(node.name));
 
         const name = document.createElement("span");
         name.className = "kg-mobile-node-name";
-        name.textContent = node.name;
+        name.textContent = dmateKnowledgeLabel(node.name);
         button.appendChild(name);
 
         const badgeText = state.badge || node.level || "";
@@ -20256,8 +20336,8 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
     }
 
     const mobileGraphLayout = isMobileAppShell();
-    let nodeWidth = 132;
-    let nodeHeight = 58;
+    let nodeWidth = dmateUiLanguage() === "en" ? 190 : 132;
+    let nodeHeight = dmateUiLanguage() === "en" ? 78 : 58;
     let horizontalGap = 74;
     let verticalGap = 26;
     let margin = 24;
@@ -20677,6 +20757,7 @@ function renderKnowledgeGraphHistory() {
 
         const preview = document.createElement("div");
         preview.className = "kg-history-preview ai-content";
+        preview.setAttribute("data-i18n-content", "");
         preview.innerHTML = markdownToHtml(
             prepareAiDisplayText(
                 item.text
@@ -20834,7 +20915,7 @@ function renderKnowledgeGraphDetail() {
         .filter(item => item.prerequisites.includes(node.name))
         .map(item => item.name);
 
-    title.textContent = node.name;
+    title.textContent = dmateKnowledgeLabel(node.name);
     detail.innerHTML = "";
 
     const subline = document.createElement("div");
@@ -21024,17 +21105,18 @@ function renderKnowledgeGraph() {
 function renderInfo() {
     const info = document.getElementById("info");
     if (!info) return;
+    info.setAttribute("data-i18n-content", "");
 
     const session = getCurrent();
 
     if (!session) {
-        info.innerText = "无";
+        info.innerText = dmateUiText("无");
         return;
     }
 
     const lines = [
-        `当前对话：${session.name}`,
-        `消息数：${session.messages.length}`
+        dmateUiText("当前对话：", "Conversation: ") + session.name,
+        dmateUiText("消息数：", "Messages: ") + session.messages.length
     ];
 
     const teaching = getEffectiveSessionTeaching(session);
@@ -21043,13 +21125,13 @@ function renderInfo() {
         // 后台仍使用 teaching.category；右侧概览只展示具体学习要点。
         if (teaching.focus_points.length) {
             lines.push(
-                `本题难点：${teaching.focus_points.join("、")}`
+                dmateUiText("本题难点：", "Focus: ") + teaching.focus_points.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
             );
         }
 
         if (teaching.knowledge_path.length >= 2) {
             lines.push(
-                `知识脉络：${teaching.knowledge_path.join(" → ")}`
+                dmateUiText("知识脉络：", "Learning path: ") + teaching.knowledge_path.map(dmateKnowledgeLabel).join(" → ")
             );
         }
     }
@@ -21185,6 +21267,7 @@ function refreshMobileConversationTitle() {
 
     const session = getCurrent();
     const name = typeof session?.name === "string" ? session.name.trim() : "";
+    title.toggleAttribute("data-i18n-content", Boolean(name && (name !== "新对话" || session.messages.length)));
     title.textContent = name || "DMate";
 }
 
@@ -21880,6 +21963,15 @@ function renderAll() {
     refreshInputAvailability();
     refreshMobileConversationTitle();
 }
+
+window.addEventListener("dmate:languagechange", () => {
+    renderInfo();
+    refreshInputAvailability();
+    if (!document.getElementById("learningReviewModal")?.classList.contains("hidden")) renderLearningReview();
+    knowledgeGraphPreparedPngPromise = null;
+    knowledgeGraphPreparedPngKey = "";
+    renderKnowledgeGraph();
+});
 
 
 function removeDeprecatedCopyControls() {

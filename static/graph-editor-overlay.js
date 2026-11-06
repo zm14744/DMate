@@ -1,5 +1,6 @@
 (function(root){
 'use strict';
+const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
 const NS='http://www.w3.org/2000/svg',clamp=x=>Math.max(0,Math.min(1,x)),unit=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1;
 const E=(d,t,a={})=>{const n=d.createElementNS(NS,t);for(const [k,v] of Object.entries(a))n.setAttribute(k,String(v));return n;};
 const regionSignedArea=points=>points.reduce((sum,p,i)=>{const q=points[(i+1)%points.length];return sum+p[0]*q[1]-q[0]*p[1];},0)/2;
@@ -412,7 +413,7 @@ function mount(host,o){
     const points=graphPoints(region);if(!points)continue;
     const preview=frame(points,region.region_polygon?.length>=3?'dge-overlay-polygon':'dge-overlay-bbox',region.id,false,region.id===g.id,region.region_polygon?.length>=3);
     if(o.scanOnly){const b=boxOf(preview),label=E(d,'text',{x:b[0]*w+6/scale,y:b[1]*h+17/scale,class:'dge-text-frame-number dge-graph-frame-number','data-frame-label-id':region.id});
-      label.dataset.frameLabelKind='graph';label.textContent='图形 '+String(region.id).replace(/^g/,'');label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);}
+      label.dataset.frameLabelKind='graph';label.textContent=uiText('图形 '+String(region.id).replace(/^g/,''),'Graph '+String(region.id).replace(/^g/,''));label.style.fontSize=labelSize+'px';label.style.strokeWidth=4/scale+'px';svg.append(label);}
   }
   if(o.textOnly||o.scanOnly)for(const region of s.regions||[]){
     const points=frame(region.polygon,'dge-overlay-text-region'+(['empty','error'].includes(region.status)?' is-error':''),String(region.id),true,s.selectedId===region.id,region.irregular);
@@ -491,7 +492,7 @@ function mount(host,o){
    group.append(...halos,...strokes);
    const label=[e.edge_label,e.weight==null?'':String(e.weight)].filter(Boolean).join(' · ');if(label){
      const t=E(d,'text',{x:center[0],y:center[1]-labelOffset,class:'dge-overlay-label','text-anchor':'middle'});
-     t.textContent=label;t.style.fontSize=labelSize+'px';
+     t.setAttribute('data-i18n-content','');t.textContent=label;t.style.fontSize=labelSize+'px';
      const labelInk=inkAt([center[0]/w,center[1]/h]);
      t.style.fill=labelInk;t.style.stroke=oppositeInk(labelInk);t.style.strokeWidth=(4/scale)+'px';
      group.append(t);
@@ -516,7 +517,7 @@ function mount(host,o){
    dot.dataset.ink=ink;dot.style.fill=ink;dot.style.stroke=o.drawingOnly?'none':haloInk;
    dot.style.strokeWidth=(o.nodeSelected?.().has(v.id)?3:2)/scale+'px';gNode.append(dot);
    const t=E(d,'text',{x:p[0]+labelOffset,y:p[1]-labelOffset,class:'dge-overlay-label'});
-   t.textContent=v.label||v.display_label||'未命名'+(i+1);t.style.fontSize=labelSize+'px';
+   t.setAttribute('data-i18n-content','');t.textContent=v.label||v.display_label||'未命名'+(i+1);t.style.fontSize=labelSize+'px';
    t.style.fill=ink;t.style.stroke=haloInk;t.style.strokeWidth=(4/scale)+'px';
    gNode.append(t);svg.append(gNode);
   }

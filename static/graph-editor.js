@@ -1,14 +1,15 @@
 (function (root) {
     'use strict';
+const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     // Share one validated semantic model across SVG interaction and Node tests.
     const modelApi = root.DMateGraphEditorModel ||
         (typeof module !== 'undefined' && module.exports ? require('./graph-editor-model.js') : null);
-    if (!modelApi) throw new Error('图结构编辑模块未加载。');
+    if (!modelApi) throw new Error(uiText('图结构编辑模块未加载。'));
     const { createModel, importDocument, validateDocument, groupEdges, valueText: text } = modelApi;
 
     let mountSequence = 0;
     function mount(container, options) {
-        if (!container || !container.ownerDocument) throw new Error('编辑器需要有效的页面容器。');
+        if (!container || !container.ownerDocument) throw new Error(uiText('编辑器需要有效的页面容器。'));
         options ||= {};
         const dom = container.ownerDocument;
         const useOverlay = !options.structureOnly && typeof options.originalUrl === 'string' && /^((blob:)|(data:image\/)|(https?:\/\/))/i.test(options.originalUrl) && root.DMateGraphOverlay?.mount;
@@ -42,7 +43,7 @@
             if (label !== undefined) node.textContent = label; return node; };
         const svgElement = (tag, attributes, label) => { const node = dom.createElementNS(svgNS, tag);
             Object.entries(attributes || {}).forEach(([key, value]) => node.setAttribute(key, String(value)));
-            if (label !== undefined) node.textContent = label; return node; };
+            if (label !== undefined) {node.textContent = label;if(tag==='text'||tag==='title')node.setAttribute('data-i18n-content','');} return node; };
         const button = (label, action, className) => { const node = element('button', className || '', label); node.type = 'button'; node.disabled = saving;
             node.addEventListener('click', event => { event.stopPropagation(); act(action); }); return node; };
         const historyButton = (label, paths, action) => {
@@ -56,8 +57,8 @@
         };
         const input = (value, aria, action, type) => { const node = element('input'); node.type = type || 'text'; node.value = value ?? ''; node.setAttribute('aria-label', aria); node.disabled = saving;
             if (action) node.addEventListener('input', () => edit(() => action(node.value))); return node; };
-        const select = (rows, value, aria, action) => { const node = element('select'); node.setAttribute('aria-label', aria); node.disabled = saving;
-            rows.forEach(([key, label]) => { const option = element('option', '', label); option.value = key; node.append(option); }); node.value = value ?? '';
+        const select = (rows, value, aria, action) => { const node = element('select');if(aria==='当前子图')node.dataset.currentGraph='true'; node.setAttribute('aria-label', aria); node.disabled = saving;
+            rows.forEach(([key, label]) => { const option = element('option', '', label); option.value = key;if(rows.graphId||rows.contentLabels&&key!=='')option.setAttribute('data-i18n-content','');node.append(option); }); node.value = value ?? '';
             if (rows.graphId) node.dataset.graphNodes = rows.graphId;
             if (action) node.addEventListener('change', () => edit(() => action(node.value))); return node; };
         const field = (label, control) => { const wrapper = element('label', 'dge-field'); wrapper.append(element('span', '', label), control); return wrapper; };
@@ -69,7 +70,7 @@
             refreshDraftViews(); }
         const nodeOptions = graph => { const rows = graph.vertices.map((vertex, index) => [vertex.id, vertex.label === null ? (vertex.display_label || '未命名节点 ' + (index + 1)) : vertex.label]); rows.graphId = graph.id; return rows; };
         const directionOptions = [['undirected', '无向'], ['forward', '有向']];
-        const graphOptions = (document, excluded) => [['', '选择目标子图'], ...document.graphs.filter(graph => graph.id !== excluded).map((graph, index) => [graph.id, graph.name || '图 ' + (index + 1)])];
+        const graphOptions = (document, excluded) => {const rows=[['', '选择目标子图'], ...document.graphs.filter(graph => graph.id !== excluded).map((graph, index) => [graph.id, graph.name || '图 ' + (index + 1)])];rows.contentLabels=true;return rows;};
         const weightValue = value => value.trim() === '' ? null : /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(value.trim()) && Number.isFinite(Number(value)) ? Number(value) : value;
 
         function buildNodeRow(graph, vertex, index) {
@@ -88,7 +89,7 @@
             const incident = graph.edges.filter(edge =>
                 edge.from === vertex.id || edge.to === vertex.id).length;
             const kind = element('span', 'dge-node-kind',
-                incident ? incident + ' 条关联边' : '孤立点');
+                incident ? uiText(incident + ' 条关联边',incident+' incident edges') : '孤立点');
             kind.dataset.nodeIncident = vertex.id;
             row.append(check, label, kind);
             return row;
@@ -108,7 +109,7 @@
             if (!list) { refreshDraftViews(); return; }
             refreshDraftViews();
             const heading = panel.querySelector('h3');
-            if (heading) heading.textContent = '节点 · ' + graph.vertices.length;
+            if (heading) heading.textContent = uiText('节点 · ' + graph.vertices.length,'Vertices · '+graph.vertices.length);
             const present = new Set([...list.children].map(row => row.dataset.vertexId));
             graph.vertices.forEach((vertex, index) => {
                 if (!present.has(vertex.id)) {
@@ -142,13 +143,13 @@
                 const labels = new Map(nodeOptions(owner));
                 for (const option of selector.options) if (labels.has(option.value)) option.textContent = labels.get(option.value);
             }
-            const graphSelect = container.querySelector('select[aria-label="当前子图"]');
+            const graphSelect = container.querySelector('select[data-current-graph]');
             if (graphSelect) for (const option of graphSelect.options) { const owner = document.graphs.find(row => row.id === option.value); if (owner) option.textContent = owner.name || owner.id; }
             if (graph) {
-                const edgeHeading = container.querySelector('.dge-edge-panel > h3'); if (edgeHeading) edgeHeading.textContent = '边 · ' + graph.edges.length;
+                const edgeHeading = container.querySelector('.dge-edge-panel > h3'); if (edgeHeading) edgeHeading.textContent = uiText('边 · ' + graph.edges.length,'Edges · '+graph.edges.length);
                 for (const count of container.querySelectorAll('[data-node-incident]')) {
                     const amount = graph.edges.filter(edge => edge.from === count.dataset.nodeIncident || edge.to === count.dataset.nodeIncident).length;
-                    count.textContent = amount ? amount + ' 条关联边' : '孤立点';
+                    count.textContent = amount ? uiText(amount + ' 条关联边',amount+' incident edges') : '孤立点';
                 }
             }
         }
@@ -213,7 +214,7 @@
             container.replaceChildren();
             for (const graph of model.getDocument().graphs) {
                 const section = element('section', 'dge-visual');
-                section.append(element('h4', '', graph.name || graph.id), drawGraph(graph));
+                const heading=element('h4', '', graph.name || graph.id);heading.setAttribute('data-i18n-content','');section.append(heading, drawGraph(graph));
                 container.append(section);
             }
             return {getDocument: model.getDocument, destroy() {container.replaceChildren();}};
@@ -350,7 +351,7 @@
             };
             refreshTextPanel = () => {
                 const rows = textState.regions;
-                panel.querySelector('summary').textContent = '文字识别结果（' + rows.filter(r => r.status === 'done').length + '/' + rows.length + '）';
+                panel.querySelector('summary').textContent = uiText('文字识别结果（' + rows.filter(r => r.status === 'done').length + '/' + rows.length + '）','Recognized Text ('+rows.filter(r=>r.status==='done').length+'/'+rows.length+')');
                 const queued = rows.filter(r => r.status === 'queued').length;
                 const failed = rows.filter(r => ['error','empty'].includes(r.status)).length;
                 status.textContent = textBusy && rows.some(r=>r.status==='recognizing') ? '正在按编号识别，新增框会接着处理…'
@@ -363,13 +364,13 @@
                 const labels = {queued:'待识别',recognizing:'识别中',done:'已识别',empty:'未识别到文字',error:'识别失败'};
                 for (const row of rows) {
                     const item = element('div', 'dge-text-region-row'); item.dataset.textRegionId = row.id;
-                    item.append(element('strong', '', '文字框 ' + row.id + ' · ' + labels[row.status]));
+                    const rowHeading=element('strong','');rowHeading.append(element('span','',uiText('文字框 '+row.id,'Text region '+row.id)),dom.createTextNode(' · '),element('span','',uiText(labels[row.status])));item.append(rowHeading);
                     if (row.error) item.append(element('p', 'dge-muted', row.error));
-                    if (row.text) item.append(element('p', 'dge-text-excerpt', row.text));
-                    if (['error','empty'].includes(row.status)) item.append(button('重试文字框 ' + row.id, () => {
+                    if (row.text) {const excerpt=element('p','dge-text-excerpt',row.text);excerpt.setAttribute('data-i18n-content','');item.append(excerpt);}
+                    if (['error','empty'].includes(row.status)) item.append(button(uiText('重试文字框 '+row.id,'Retry text region '+row.id), () => {
                         row.status = 'queued'; row.error = ''; refreshTextPanel(); schedule();
                     }));
-                    item.append(button('删除文字框 ' + row.id, () => {
+                    item.append(button(uiText('删除文字框 '+row.id,'Delete text region '+row.id), () => {
                         textState.regions = textState.regions.filter(r => r !== row);
                         if (!textState.manuallyEdited && row.text) applyResults();
                         refreshTextPanel(); textOverlay?.refresh();
@@ -384,13 +385,13 @@
                 if (!batch.length) return;
                 textBusy = true; batch.forEach(r => { r.status = 'recognizing'; }); refreshTextPanel();
                 try {
-                    if (typeof options.onRecognizeText !== 'function') throw new Error('文字识别暂不可用，可手动输入。');
+                    if (typeof options.onRecognizeText !== 'function') throw new Error(uiText('文字识别暂不可用，可手动输入。'));
                     const result = await options.onRecognizeText(batch.map(r => ({id:r.id, polygon:r.polygon.map(p => [...p])})));
                     if (destroyed) return;
                     const response = result?.regions;
                     if (!Array.isArray(response) || response.length !== batch.length ||
                         response.some((r,i) => r.id !== batch[i].id || typeof r.text !== 'string'))
-                        throw new Error('文字识别返回的框编号不匹配，请重试。');
+                        throw new Error(uiText('文字识别返回的框编号不匹配，请重试。'));
                     batch.forEach((row,i) => {
                         if (!textState.regions.includes(row)) return;
                         row.text = response[i].text; row.status = row.text.trim() ? 'done' : 'empty';
@@ -556,7 +557,7 @@
                     recognizeGraphType: async (polygon, graphId) => {
                         const epoch=recognitionEpoch;
                         if (typeof options.onRecognizeGraphType !== 'function')
-                            throw new Error('当前无法自动判断箭头与权值');
+                            throw new Error(uiText('当前无法自动判断箭头与权值'));
                         const result = await options.onRecognizeGraphType(polygon);
                         if(epoch!==recognitionEpoch || destroyed)return {stale:true};
                         // Another frame may have been drawn while the async read
@@ -609,7 +610,7 @@
                 currentGraph = model.addGraph();
             }));
             if (document.graphs.length && !options.drawingOnly) {
-                toolbar.append(field('当前子图', select(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; render(); })));
+                toolbar.append(field('当前子图', select(Object.assign(document.graphs.map((row, index) => [row.id, row.name || '图 ' + (index + 1)]),{contentLabels:true}), currentGraph, '当前子图', value => { currentGraph = value; selectedNodes.clear(); selectedEdge = null; render(); })));
                 // Metadata only. This summary is never converted into guessed
                 // vertices, arrows, edge weights, or drawing paths.
                 if (graph) {
@@ -631,7 +632,7 @@
             container.insertBefore(toolbar, workspace);
             if (graph && !useOverlay) {
                 const panels = element('div', 'dge-edit-panels'), nodes = element('section', 'dge-node-panel'), edges = element('section', 'dge-edge-panel');
-                nodes.append(element('h3', '', '节点 · ' + graph.vertices.length));
+                nodes.append(element('h3', '', uiText('节点 · ' + graph.vertices.length,'Vertices · '+graph.vertices.length)));
                 const nodeList = element('div', 'dge-node-list');
                 graph.vertices.forEach((vertex, index) => nodeList.append(buildNodeRow(graph, vertex, index)));
 
@@ -639,19 +640,19 @@
                 const addLabel = input('', '新节点标签', null); addLabel.placeholder = '新节点标签（可留空）';
                 const addRow = element('div', 'dge-inline'); addRow.append(addLabel, button('添加节点', () => model.addVertex(graph.id, addLabel.value))); nodes.append(addRow);
                 nodes.append(button('全选节点', () => { selectedNodes = new Set(graph.vertices.map(vertex => vertex.id)); }), button('删除所选节点', () => {
-                    if (!selectedNodes.size) throw new Error('请先勾选节点。');
+                    if (!selectedNodes.size) throw new Error(uiText('请先勾选节点。'));
                     model.deleteVertices(graph.id, [...selectedNodes]); selectedNodes.clear();
                 }, 'dge-danger'));
                 if (document.graphs.length > 1) { const target = select(graphOptions(document, graph.id), '', '节点移动目标', null);
-                    nodes.append(field('节点归属', target), button('移动所选节点', () => { if (!target.value) throw new Error('请先选择目标子图。'); model.moveVertices(graph.id, target.value, [...selectedNodes]); selectedNodes.clear(); })); }
-                edges.append(element('h3', '', '边 · ' + graph.edges.length));
+                    nodes.append(field('节点归属', target), button('移动所选节点', () => { if (!target.value) throw new Error(uiText('请先选择目标子图。')); model.moveVertices(graph.id, target.value, [...selectedNodes]); selectedNodes.clear(); })); }
+                edges.append(element('h3', '', uiText('边 · ' + graph.edges.length,'Edges · '+graph.edges.length)));
                 const separateLabel = element('label', 'dge-check'), separate = element('input'); separate.type = 'checkbox'; separate.checked = individually; separate.disabled = saving;
                 separate.addEventListener('change', () => act(() => { individually = separate.checked; })); separateLabel.append(separate, dom.createTextNode('逐条编辑重边')); edges.append(separateLabel);
                 const edgeList = element('div', 'dge-edge-list');
                 groupEdges(graph, individually).forEach((group, index) => {
                     const edge = group[0], ids = group.map(row => row.id), row = element('div', 'dge-edge-row' + (ids.includes(selectedEdge) ? ' is-selected' : ''));
                     row.dataset.edgeId = edge.id;
-                    row.append(button('边 ' + (index + 1), () => { selectedEdge = edge.id; }, 'dge-edge-select'));
+                    row.append(button(uiText('边 '+(index+1),'Edge '+(index+1)), () => { selectedEdge = edge.id; }, 'dge-edge-select'));
                     row.append(field(hasDirection(graph)?'起点':'端点一', select(nodeOptions(graph), edge.from, '边 ' + (index + 1) + (hasDirection(graph)?' 起点':' 端点一'), value => model.updateEdges(graph.id, ids, 'from', value))),
                         ...(!hasDirection(graph)?[]:[field('方向', select(directionOptions, edge.direction, '边 ' + (index + 1) + ' 方向', value => model.updateEdges(graph.id, ids, 'direction', value)))]),
                         field(hasDirection(graph)?'终点':'端点二', select(nodeOptions(graph), edge.to, '边 ' + (index + 1) + (hasDirection(graph)?' 终点':' 端点二'), value => model.updateEdges(graph.id, ids, 'to', value))),

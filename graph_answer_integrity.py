@@ -15,6 +15,8 @@ from __future__ import annotations
 import re
 from collections import Counter
 
+from server_i18n import localized
+
 FLAG="【图形结构待核对】"
 
 DIR_HEAD=re.compile(
@@ -464,7 +466,7 @@ def is_scanned_graph_solution_request(user_content):
     ))
 
 
-def protect_uncertain_graph_answer(question, reply):
+def protect_uncertain_graph_answer(question, reply, *, language='zh-CN'):
     """Suppress an irrelevant or definitive LLM answer to unresolved image.
 
     The presence of FLAG alone is not sufficient: a mixed scan can contain
@@ -490,7 +492,11 @@ def protect_uncertain_graph_answer(question, reply):
             or not re.search(r"解答|求解|答案|解析|回答|结果|计算|讲解|说明",request)
             or re.search(r"代数|集合|逻辑|无关|独立|另一题|[0-9]\s*[+*/=]",request)):
             return None
-    return ("这道题依赖图中的实际顶点和边，而当前图片的图形结构尚未核对完整。"
+    return localized("这道题依赖图中的实际顶点和边，而当前图片的图形结构尚未核对完整。"
             "直接据此给出当前问题的确定结论，可能导致计算或推理错误。"
             "请先在识别核对界面确认每条边及箭头方向，或上传更清晰、"
-            "只包含该图的截图；在核对完成前不能给出确定的数学结论。")
+            "只包含该图的截图；在核对完成前不能给出确定的数学结论。",
+            "This question depends on the graph's actual vertices and edges, but the image structure has not been fully verified. "
+            "A definite answer now could contain calculation or reasoning errors. "
+            "Confirm every edge and arrow direction in the recognition review, or upload a clearer crop containing only this graph. "
+            "A definite mathematical conclusion requires completing that check first.", language)

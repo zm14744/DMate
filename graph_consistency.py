@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import re
 
+from server_i18n import localized
+
 SECTION = re.compile(
     r"(?:图\s*(?:G\s*_?\{?\s*([1-9]\d*)\}?|([1-9]\d*))"
     r"|(?<![a-zA-Z])G\s*_?\{?([1-9]\d*)\}?)"
@@ -85,7 +87,7 @@ def _components(vertices, edges):
     return len({root(v) for v in vertices})
 
 
-def summarize_tree_question(text):
+def summarize_tree_question(text, *, language='zh-CN'):
     if not re.search(r"(?:哪些|哪几个|哪一个|什么|是否|判断|是).{0,7}树|树.{0,6}(?:图|判断)", text):
         return ""
     diagrams = analyze_labeled_graphs(text)
@@ -98,11 +100,14 @@ def summarize_tree_question(text):
         is_tree = item["tree"]
         if is_tree:
             trees.append(f"G{no}")
-        lines.append(
+        lines.append(localized(
             f"G{no}: 顶点{len(item['vertices'])}个、边{item['edge_count']}条、"
-            f"连通分量{item['components']}个，{'是' if is_tree else '不是'}树。"
-        )
-    return "\n".join(lines) + "\n因此是树的图：" + ("、".join(trees) if trees else "没有") + "。"
+            f"连通分量{item['components']}个，{'是' if is_tree else '不是'}树。",
+            f"G{no}: {len(item['vertices'])} vertices, {item['edge_count']} edges, "
+            f"{item['components']} connected components; {'a tree' if is_tree else 'not a tree'}.", language))
+    return "\n".join(lines) + localized(
+        "\n因此是树的图：" + ("、".join(trees) if trees else "没有") + "。",
+        "\nThe graphs that are trees: " + (", ".join(trees) if trees else "none") + ".", language)
 
 
 def _two_column_three_row_labels(graph):

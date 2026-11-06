@@ -209,7 +209,19 @@ app = Flask(__name__)
 # Bind health and the response from the actual /ocr worker to one startup
 # source snapshot, including the shared semantic schema and web renderer.
 from runtime_source_identity import compute_runtime_source, configured_recognition_budget
+from server_i18n import (normalize_language, localized, request_language,
+                         localize_error_payload, difficulty_label, topic_label)
 _RUNTIME_SOURCE, _ = compute_runtime_source(os.path.dirname(os.path.abspath(__file__)))
+
+
+@app.after_request
+def localize_application_errors(response):
+    if response.is_json and request_language(request) == "en":
+        payload = response.get_json(silent=True)
+        translated = localize_error_payload(payload, "en")
+        if translated is not payload:
+            response.set_data(app.json.dumps(translated))
+    return response
 
 
 @app.after_request
@@ -995,7 +1007,7 @@ def _new_email_code():
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
-def _verification_email_content(code, purpose):
+def _verification_email_content(code, purpose, *, language="zh-CN"):
     purpose_title = {
         "register": "注册",
         "reset": "重置密码",
@@ -1021,6 +1033,17 @@ def _verification_email_content(code, purpose):
     </div>
   </body>
 </html>"""
+    if normalize_language(language) == "en":
+        english_purpose = {"register": "registration", "reset": "password reset", "bind": "email linking"}.get(purpose, "email verification")
+        subject = f"DMate - {english_purpose.capitalize()} code"
+        text_content = (f"Your verification code is: {code}\n\n"
+                        "This code expires in 10 minutes.\n"
+                        "If you did not request it, you can ignore this email.\n\n"
+                        "If the email is missing from your inbox, please check your spam folder.")
+        html_content = (html_content.replace('lang="zh-CN"', 'lang="en"')
+                        .replace(f"你的{purpose_title}验证码是：", f"Your {english_purpose} code is:")
+                        .replace("验证码 10 分钟内有效。如果不是你本人操作，请忽略这封邮件。", "This code expires in 10 minutes. If you did not request it, you can ignore this email.")
+                        .replace("未收到邮件时，请同时检查垃圾邮件箱。", "If the email is missing, please also check your spam folder."))
     return subject, text_content, html_content
 
 
@@ -1083,11 +1106,11 @@ def _send_via_smtp(email, subject, text_content):
             smtp.send_message(msg)
 
 
-def _send_verification_email(email, code, purpose):
+def _send_verification_email(email, code, purpose, *, language="zh-CN"):
     if not EMAIL_DELIVERY_CONFIGURED:
         raise RuntimeError("email delivery is not configured")
 
-    subject, text_content, html_content = _verification_email_content(code, purpose)
+    subject, text_content, html_content = _verification_email_content(code, purpose, language=language)
 
     # 主通道：Brevo。只有 Brevo 失败时才尝试原 QQ/SMTP。
     if BREVO_CONFIGURED:
@@ -1468,7 +1491,7 @@ def auth_send_email_code():
                         EMAIL_CODE_TTL_SECONDS,
                     ),
                 )
-                _send_verification_email(email, code, purpose)
+                _send_verification_email(email, code, purpose, language=request_language(request))
     except AuthBackendUnavailable:
         raise
     except Exception as exc:
@@ -2482,9 +2505,10 @@ def _looks_like_generated_question_reply(text):
         r"【(?:题目|练习题)】"
         r"|(?:^|\n)\s*#{1,4}\s*(?:题目|练习题)\s*(?:\n|$)"
         r"|(?:^|\n)\s*\*\*(?:题目|练习题)[:：]?\*\*"
-        r"|(?:^|\n)\s*(?:题目|练习题)\s*[:：]?\s*(?:\n|$)",
+        r"|(?:^|\n)\s*(?:题目|练习题)\s*[:：]?\s*(?:\n|$)"
+        r"|(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?\[?(?:Question|Exercise)\]?(?:\*\*|__)?\s*(?::|\n|$)",
         value,
-        flags=re.MULTILINE
+        flags=re.MULTILINE | re.IGNORECASE
     ):
         return True
 
@@ -2502,8 +2526,9 @@ def _looks_like_generated_question_reply(text):
 
     has_problem_language = bool(
         re.search(
-            r"(?:设|已知|给定|请回答|回答以下|回答下列|求|判断|写出|计算|证明)",
-            value
+            r"(?:设|已知|给定|请回答|回答以下|回答下列|求|判断|写出|计算|证明)"
+            r"|\b(?:let|given|suppose|find|determine|calculate|compute|prove|show|construct)\b",
+            value, re.I
         )
     )
 
@@ -2527,6 +2552,10 @@ def _extract_generated_question(reply):
         return ""
 
     heading_patterns = (
+        r"(?:^|\n)[ \t]*(?:#{1,4}[ \t]*)?(?:\*\*|__)?[ \t]*\[(?:Question|Exercise)\][ \t]*(?:\*\*|__)?[ \t]*:?[ \t]*",
+        r"(?:^|\n)[ \t]*#{1,4}[ \t]*(?:Question|Exercise)[ \t]*:?[ \t]*(?:\n|$)",
+        r"(?:^|\n)[ \t]*(?:\*\*|__)[ \t]*(?:Question|Exercise)[ \t]*:?[ \t]*(?:\*\*|__)[ \t]*",
+        r"(?:^|\n)[ \t]*(?:Question|Exercise)[ \t]*(?::[ \t]*|\n|$)",
         # 先匹配完整加粗标题，避免只吃掉【题目】后留下一个孤立的 **。
         r"(?:^|\n)\s*(?:\*\*|__)\s*【(?:题目|练习题)】\s*(?:\*\*|__)\s*",
         r"【(?:题目|练习题)】",
@@ -2539,7 +2568,7 @@ def _extract_generated_question(reply):
     best = None
 
     for pattern in heading_patterns:
-        match = re.search(pattern, value, flags=re.MULTILINE)
+        match = re.search(pattern, value, flags=re.MULTILINE | re.IGNORECASE)
         if match and (best is None or match.start() < best.start()):
             best = match
 
@@ -2547,6 +2576,7 @@ def _extract_generated_question(reply):
         value = value[best.end():].strip()
     else:
         start_patterns = (
+            r"(?:^|\n)\s*(?=(?:Let|Given|Suppose|Consider|Find|Calculate|Compute|Determine|Prove|Show|Construct|How many)\b)",
             r"(?:^|\n)\s*(?=设)",
             r"(?:^|\n)\s*(?=已知)",
             r"(?:^|\n)\s*(?=给定)",
@@ -2560,7 +2590,7 @@ def _extract_generated_question(reply):
 
         start = None
         for pattern in start_patterns:
-            match = re.search(pattern, value, flags=re.MULTILINE)
+            match = re.search(pattern, value, flags=re.MULTILINE | re.IGNORECASE)
             if match and (start is None or match.start() < start.start()):
                 start = match
 
@@ -2569,8 +2599,9 @@ def _extract_generated_question(reply):
             if (
                 len(prefix) <= 180
                 and re.search(
-                    r"(?:好的|没问题|可以|这次|给你|我来|我们来|先来|出一道|练习一下|下面是)",
-                    prefix
+                    r"(?:好的|没问题|可以|这次|给你|我来|我们来|先来|出一道|练习一下|下面是)"
+                    r"|\b(?:sure|certainly|okay|here is|here's|here are)\b",
+                    prefix, re.I
                 )
             ):
                 value = value[start.start():].strip()
@@ -2581,7 +2612,8 @@ def _extract_generated_question(reply):
     # such as “答案个数是多少” or “过程是否唯一” remains part of the problem.
     section_name = (
         r"(?:参考答案|详细解析|解题过程|答案|解析|解答|过程|"
-        r"思考提示|思路提示|解题提示|小提示|关键提示|方法提示|解题思路|提示|思路)"
+        r"思考提示|思路提示|解题提示|小提示|关键提示|方法提示|解题思路|提示|思路|"
+        r"reference answer|final answer|answer|solution|explanation|analysis|reasoning|hint|proof)"
     )
     wrapped_section = (
         rf"(?:【[ \t]*{section_name}[ \t]*[:：]?[ \t]*】|"
@@ -2601,6 +2633,7 @@ def _extract_generated_question(reply):
         rf"(?:#{{1,6}}[ \t]*)?{section_heading}",
         r"(?:^|\n)\s*答\s*[:：]",
         r"(?:^|\n)\s*(?:你先|请先|先尝试|可以先|做完后|卡住了|如果卡住|把答案发给我|告诉我你的进度).{0,220}$",
+        r"(?:^|\n)\s*(?:Try it yourself|Give it a try|Let me know if|Tell me when).{0,220}$",
     )
 
     stop_index = len(value)
@@ -2636,7 +2669,8 @@ def _extract_generated_question(reply):
         return ""
     if re.search(
         r"^(?:抱歉|对不起|很抱歉|无法|不能|暂时不能|暂时无法|出题失败|生成失败|"
-        r"没有可用题目|未能生成|目前没有|请稍后|请重试|服务异常|错误[:：]|error\b)",
+        r"没有可用题目|未能生成|目前没有|请稍后|请重试|服务异常|错误[:：]|error\b|"
+        r"sorry\b|I (?:am sorry|cannot|can't|could not|couldn't)\b|unable to\b|please try again\b)",
         value,
         flags=re.IGNORECASE,
     ):
@@ -2655,16 +2689,20 @@ def _extract_generated_question(reply):
         r"(?:求|计算|证明|求证|判断|判定|确定|写出|列出|找出|求解|解出|"
         r"构造|设计|画出|标出|绘制|给出|推导|枚举|统计|化简|转换|化为|填写|"
         r"选择|选出|试问|问[:：]?|回答下列|回答以下|以下哪|下列哪|"
-        r"是否|多少(?:个|种|条|次)?|几种|几条|几人|有几|使得|满足)",
-        value,
+        r"是否|多少(?:个|种|条|次)?|几种|几条|几人|有几|使得|满足)"
+        r"|\b(?:find|calculate|compute|prove|show|determine|decide|list|write|construct|draw|"
+        r"count|evaluate|simplify|choose|select|how many|what is|what are|whether)\b",
+        value, re.I,
     ))
     has_math_context = bool(re.search(
         r"(?:集合|关系|函数|映射|图|树|顶点|边|整数|素数|质数|同余|"
         r"整除|矩阵|代数|群|环|序列|数列|递推|排列|组合|计数|鸽巢|"
         r"逻辑|真值|谓词|命题|元素|路径|回路|概率|算法|公式|方程|"
         r"gcd|lcm|最短路|欧拉|哈密顿|\\[a-zA-Z]+|"
-        r"[A-Za-z]\s*(?:\^|_|=|∈|\()|\d+)",
-        value,
+        r"[A-Za-z]\s*(?:\^|_|=|∈|\()|\d+)"
+        r"|\b(?:sets?|relations?|functions?|graphs?|trees?|vertices|edges?|integers?|matrices|"
+        r"matrix|permutations?|combinations?|logic|propositions?|paths?|cycles?|equations?)\b",
+        value, re.I,
     ))
     if not (has_action and (has_math_context or len(value) >= 24)):
         return ""
@@ -2682,7 +2720,7 @@ def _clean_answer_only(text):
 
     # 去掉常见开场。
     value = re.sub(
-        r"^(?:好的[，,。\\s]*)?(?:以下是|最终答案(?:是|为)?)[：:\\s]*",
+        r"^(?:(?:好的[，,。\s]*)?(?:以下是|最终答案(?:是|为)?)[：:\s]*|(?:The )?(?:final )?answer\s*:\s*)",
         "",
         value,
         flags=re.IGNORECASE
@@ -2692,6 +2730,7 @@ def _clean_answer_only(text):
     cut_patterns = [
         r"\n\s*(?:#{1,6}\s*)?(?:解析|理由|过程|推导|说明|易错点)\s*[:：]?",
         r"\n\s*(?:因为|所以|由.+可得)\b",
+        r"\n\s*(?:#{1,6}\s*)?(?:\*\*)?\[?(?:Explanation|Reasoning|Derivation|Proof|Analysis)\]?(?:\*\*)?\s*(?::|\n|$)",
     ]
 
     cut_index = len(value)
@@ -2774,7 +2813,9 @@ def _exercise_answer_valid(answer):
         return False
     if re.fullmatch(
         r"(?:最终答案|答案|略|无|待定|待填写|待计算|自行计算|自行求解|"
-        r"参见解析|见解析|请自行.*|无法确定|不知道|TODO|N/A|\?+)",
+        r"参见解析|见解析|请自行.*|无法确定|不知道|TODO|N/A|\?+|"
+        r"answer|unknown|undetermined|not available|to be (?:determined|completed|calculated)|"
+        r"see (?:the )?(?:explanation|solution)|(?:proof|steps?) omitted)",
         value, flags=re.IGNORECASE,
     ):
         return False
@@ -2786,6 +2827,8 @@ def _exercise_answer_valid(answer):
         r"(?:^|[：:、。；;\s）)])(?:略|见解析|证明见解析|参见解析|待证|证明略|步骤略)"
         r"(?:[（(]|[。；;\s]|$)", value, flags=re.I
     ):
+        return False
+    if re.search(r"\b(?:proof omitted|proof left to the reader|answer to be (?:completed|determined)|see (?:the )?explanation for (?:the )?answer)\b", value, re.I):
         return False
     if re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", value):
         return False
@@ -2869,7 +2912,22 @@ def _requested_exercise_difficulty(text):
         rf"(?:基础|初级|入门)(?:{domain_words})",
         # 图论中的“简单图/简单路径”等是数学术语，绝不能把“简单”当难度。
         r"简单(?:图(?!论)|路径|通路|回路|圈|链)",
+        r"\bsimple\s+(?:graphs?|paths?|cycles?)\b",
+        r"\b(?:basic|elementary|introductory)\s+(?:number theory|graph theory|set theory|algebra)\b",
     ))
+
+    # Reserve negated/qualified English requests before individual adjectives.
+    collect("中等", (
+        r"\b(?:not|don't make (?:it|the (?:question|problem)))\s+(?:too\s+)?(?:easy|simple)\b",
+        r"\b(?:not too hard and not too easy|neither too easy nor too hard|a little harder|slightly harder)\b",
+    ), priority=90)
+    collect("简单", (
+        r"\b(?:not|don't make (?:it|the (?:question|problem))|do not make (?:it|the (?:question|problem)))\s+(?:too\s+)?(?:hard|difficult|challenging)\b",
+        r"\b(?:easy|easier|beginner|beginner-friendly)\b",
+        r"\b(?:simple|basic|introductory)\s+(?:question|problem|exercise)s?\b",
+    ), priority=40)
+    collect("中等", (r"\b(?:medium|moderate|intermediate|standard)\b",), priority=50)
+    collect("困难", (r"\b(?:hard|harder|hardest|difficult|challenging|advanced)\b",), priority=60)
 
     # -------- 先收集带否定/程度修饰的完整短语，避免被里面的“难/简单”二次命中 --------
     # 平衡表达、不要太简单、稍微有点难：先锁定为中等，防止后面的“简单/难”裸词拆开误判。
@@ -3007,6 +3065,15 @@ def _requested_reasoning_effort(text):
 
     仅匹配带有命令意味的短语；历史题干里提到 max/high 不触发。
     """
+    english = str(text or "").replace("’", "'").lower()
+    english_matches = []
+    for hit in re.finditer(r"\b(?:use|enable|select|switch to|set(?: it)? to)\s+(max|high)\b(?:\s+(?:reasoning|thinking)(?:\s+(?:effort|mode))?)?", english):
+        prefix = english[max(0, hit.start() - 30):hit.start()]
+        if re.search(r"\b(?:don't|do not|never|not|previously|earlier|last time|you did)\b[^,;.!?]*$", prefix):
+            continue
+        english_matches.append(hit.group(1))
+    if english_matches:
+        return english_matches[-1]
     value = re.sub(r"\s+", "", str(text or "").lower())
     # 先排除单纯禁止某个档位的句子，避免“不要用 max”被当成启用 max。
     patterns = {
@@ -3040,6 +3107,52 @@ def _requested_reasoning_effort(text):
     return max(matched)[1]
 
 
+def _parse_english_requested_outputs(instruction):
+    """Keep answer disclosure opt-in, with local negation and deferred scopes."""
+    text = str(instruction or "").replace("’", "'").lower()
+    result = {"answer": False, "explanation": False, "knowledge": False}
+    terms = {
+        "answer": r"\b(?:answers?|results?|solutions?)\b",
+        "explanation": r"\b(?:explanations?|reasoning|steps|derivations?|proofs?|(?:worked|full|complete|detailed) solutions?)\b",
+        "knowledge": r"\b(?:topics?|concepts?|knowledge points?|learning objectives?)\b",
+    }
+    clauses = re.split(r"[,;.!?\n]|\bbut\b", text)
+    answer_forbidden = False
+    for clause in clauses:
+        only_question = bool(re.search(r"\b(?:only (?:the )?(?:question|problem|exercise|hint)s?|(?:question|problem|exercise|hint)s? only)\b", clause))
+        only_answer = bool(re.search(r"\b(?:only (?:the )?(?:final )?answer|answer only)\b", clause))
+        later = bool(re.search(r"\b(?:later|after(?:wards)?|once|when|until)\b", clause))
+        review_own = bool(re.search(r"\b(?:check|grade|review|mark)\b.{0,30}\bmy\b", clause))
+        for key, term in terms.items():
+            hits = list(re.finditer(term, clause))
+            if not hits:
+                continue
+            # A ban scopes over a joined list: "without answers or explanations".
+            negative = any(re.search(r"\b(?:no|without|don't|do not|never|omit|exclude|hide)\b", clause[:hit.start()]) for hit in hits)
+            positive = any(re.search(r"\b(?:with|include|including|provide|give|show|add|attach|list|identify|explain|want|need)\b", clause[:hit.start()]) for hit in hits)
+            if negative or only_question or (only_answer and key == "explanation"):
+                result[key] = False
+                if key == "answer" and negative:
+                    answer_forbidden = True
+            elif positive and not later and not review_own:
+                result[key] = True
+                if key == "answer":
+                    answer_forbidden = False
+            elif key == "answer" and (later or review_own):
+                result[key] = False
+                answer_forbidden = True
+        if (re.search(r"\b(?:explain|solve) (?:it|the (?:question|problem|exercise))\b", clause)
+                and not later and not review_own and not only_question
+                and not re.search(r"\b(?:don't|do not|never|without)\b", clause)):
+            result["explanation"] = True
+        if result["explanation"] and not answer_forbidden:
+            result["answer"] = True
+    if answer_forbidden:
+        result["answer"] = False
+        result["explanation"] = False
+    return result
+
+
 def _parse_requested_outputs(instruction):
     """Read independent output requests and their local negation/future scopes.
 
@@ -3047,6 +3160,9 @@ def _parse_requested_outputs(instruction):
     A prohibition on explaining must not suppress a separately requested answer,
     and a promise to review later must not trigger immediate answer disclosure.
     """
+    # Do not erase English word boundaries before checking output requests.
+    if re.search(r"[A-Za-z]{2}", str(instruction or "")) and not re.search(r"[\u4e00-\u9fff]", str(instruction or "")):
+        return _parse_english_requested_outputs(instruction)
     text = re.sub(r"\s+", "", normalize_user_request_text(instruction))
     empty = {"answer": False, "explanation": False, "knowledge": False}
     if not text:
@@ -3179,7 +3295,10 @@ def notebook_analyze():
         response.status_code = 429
     else:
         try:
-            result = analyze_notebook(request.get_json(silent=True))
+            payload = request.get_json(silent=True)
+            if isinstance(payload, dict):
+                payload = {**payload, "language": request_language(request)}
+            result = analyze_notebook(payload)
         except NotebookError as exc:
             response = jsonify({"ok": False, "error": exc.message, "code": exc.code})
             response.status_code = exc.status
@@ -3201,7 +3320,10 @@ def drawing_guide():
         response.status_code = 413
     else:
         try:
-            result = guide_drawing(request.get_json(silent=True))
+            payload = request.get_json(silent=True)
+            if isinstance(payload, dict):
+                payload = {**payload, "language": request_language(request)}
+            result = guide_drawing(payload)
         except DrawingGuidanceError as exc:
             response = jsonify({"ok": False, "error": exc.message, "code": exc.code})
             response.status_code = exc.status
@@ -3232,7 +3354,7 @@ def drawing_upload():
             document = json.loads(encoded, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
         except (ValueError, TypeError, RecursionError) as exc:
             raise DrawingGuidanceError('invalid_drawing_document', '画图内容无法读取，请重新上传。') from exc
-        document = validate_drawing_upload(raw, document)
+        document = validate_drawing_upload(raw, document, language=request_language(request))
         request_id = request.form.get('request_id', '')
         sha = hashlib.sha256(raw).hexdigest()
         register_recognition(confirmation_owner(), request_id, sha)
@@ -3256,7 +3378,7 @@ def voice_transcribe():
         return jsonify({"ok": False, "error": "没有收到录音，请重新录音。", "code": "missing_audio"}), 400
     raw = uploaded.read(MAX_AUDIO_BYTES + 1)
     try:
-        result = transcribe_voice(raw, language=request.form.get('language', 'zh-CN'))
+        result = transcribe_voice(raw, language=request_language(request))
     except VoiceInputError as exc:
         payload = {"ok": False, "error": exc.message, "code": exc.code}
         if exc.provider_code:
@@ -3562,7 +3684,7 @@ def describe_confirmed_graph_document():
     except (sqlite3.Error, OSError, ValueError, TypeError):
         return jsonify({"error": "已确认图形无法核验", "code": "confirmation_unavailable"}), 503
     try:
-        answer = describe_confirmed_drawing(drawing)
+        answer = describe_confirmed_drawing(drawing, language=request_language(request))
     except Exception as exc:
         print(f"图形外观描述未完成：{type(exc).__name__}")
         answer = {"status": "unavailable", "descriptions": {}}
@@ -3597,7 +3719,7 @@ def _chat_response(on_delta=None, cancelled=None):
             "error": "请求格式不正确，请检查提交内容"
         }), 400
 
-    response_language = "en" if str(data.get("language") or "").lower().startswith("en") else "zh-CN"
+    response_language = request_language(request)
     confirmed_context = None
     confirmed_batch = "semantic_contexts" in data
     if confirmed_batch or data.get("semantic_context") is not None:
@@ -3778,10 +3900,12 @@ def _chat_response(on_delta=None, cancelled=None):
     # 本轮询问以前是否使用 max、或者明确说“不要用 max”，不在此列。
     if _requested_reasoning_effort(current_instruction) == "max":
         return jsonify({
-            "reply": (
+            "reply": localized(
                 "DMate 当前不支持 max 思考强度"
                 "中等和困难题的解答统一使用 high"
-                "请不指定 max，直接提出题目或要求完整解析"
+                "请不指定 max，直接提出题目或要求完整解析",
+                "DMate does not currently support max reasoning effort. Medium and hard questions use high. "
+                "Please submit your question or request a full explanation without specifying max.", response_language
             ),
             "unsupported_effort": "max",
         })
@@ -3789,6 +3913,7 @@ def _chat_response(on_delta=None, cancelled=None):
     solution_mode = bool(explicit_solution or (
         (teaching or {}).get("mode") == "full_solution"
         and not re.search(r"(?:不要|别|不用|无需|不需要).{0,5}(?:答案|解答)", current_instruction)
+        and not re.search(r"\b(?:no|without|don't|do not|never|hide|omit)\b.{0,30}\b(?:answers?|solutions?)\b", current_instruction, re.I)
     ))
     if solution_mode:
         teaching = dict(teaching or {})
@@ -3935,7 +4060,6 @@ def _chat_response(on_delta=None, cancelled=None):
     ai_teaching = dict(teaching or {})
     ai_teaching["response_language"] = response_language
     if effective_exercise_request:
-        ai_teaching = dict(teaching or {})
         target_for_generation = ai_teaching.get("exercise_target_difficulty") or "中等"
         # 题目生成与题目解答分开控制思考强度：
         # 练习生成优先非思考，质量纠偏也优先重新设计具体题目，
@@ -4042,10 +4166,15 @@ def _chat_response(on_delta=None, cancelled=None):
             # 不声称有完整解析，也不静默伪造证明。
             return jsonify({
                 "reply": (
-                    "本次完整解析没有成功生成。\n\n"
-                    "**出题时保存的参考答案（尚未独立复核）：**\n\n"
+                    localized("本次完整解析没有成功生成。\n\n"
+                              "**出题时保存的参考答案（尚未独立复核）：**\n\n",
+                              "The full explanation could not be generated.\n\n"
+                              "**Reference answer saved with the exercise (not independently verified):**\n\n",
+                              response_language)
                     + solution_reference_answer
-                    + "\n\n请稍后重试“给出答案和解析”以获取推导过程"
+                    + localized("\n\n请稍后重试“给出答案和解析”以获取推导过程",
+                                "\n\nPlease request the answer and explanation again to obtain the derivation.",
+                                response_language)
                 ),
                 "solution_partial": True,
                 "teaching": {k: v for k, v in teaching.items() if k != "solution_reference_answer"},
@@ -4075,13 +4204,13 @@ def _chat_response(on_delta=None, cancelled=None):
             latest_graph_text = next(
                 (m["content"] for m in reversed(cleaned) if m.get("role") == "user"), ""
             )
-            graph_isomorphism_answer = answer_graph_isomorphism(latest_graph_text)
+            graph_isomorphism_answer = answer_graph_isomorphism(latest_graph_text, language=response_language)
             if graph_isomorphism_answer:
                 reply = graph_isomorphism_answer
             else:
-                derived_tree_answer = summarize_tree_question(latest_graph_text)
+                derived_tree_answer = summarize_tree_question(latest_graph_text, language=response_language)
                 if derived_tree_answer:
-                    reply = "依据题目列出的顶点与边集逐图计算：\n\n" + derived_tree_answer
+                    reply = localized("依据题目列出的顶点与边集逐图计算：\n\n", "Calculated from the vertices and edges listed for each graph:\n\n", response_language) + derived_tree_answer
 
         if not effective_exercise_request and cleaned and isinstance(reply, str):
             latest_math_request = next(
@@ -4089,11 +4218,11 @@ def _chat_response(on_delta=None, cancelled=None):
             )
             # Explicit final-answer requests: verify an exact count against a
             # closed-form combinatorial formula before showing it to the user.
-            reply = audit_explicit_count_answer(latest_math_request, reply)
+            reply = audit_explicit_count_answer(latest_math_request, reply, language=response_language)
             # For exactly verified finite/logic exercises, use independent
             # semantics instead of the LLM's possibly unrelated subquestions
             # or contradictory final counting. Unrecognized questions abstain.
-            mathematically_verified = verify_exact_question(latest_math_request, reply)
+            mathematically_verified = verify_exact_question(latest_math_request, reply, language=response_language)
             if mathematically_verified is not None:
                 reply = mathematically_verified
             # Stanford's six-tree university image was flagged as unresolved,
@@ -4101,7 +4230,7 @@ def _chat_response(on_delta=None, cancelled=None):
             # Graph-dependent answers must fail closed at the response boundary,
             # regardless of what the model confidently claims.
             protected_reply = (None if confirmed_context is not None else
-                               protect_uncertain_graph_answer(latest_math_request, reply))
+                               protect_uncertain_graph_answer(latest_math_request, reply, language=response_language))
             if protected_reply is not None:
                 reply = protected_reply
 
@@ -4112,7 +4241,7 @@ def _chat_response(on_delta=None, cancelled=None):
             original_image_request = next(
                 (m["content"] for m in reversed(cleaned) if m.get("role") == "user"), ""
             )
-            final_graph_guard = protect_uncertain_graph_answer(original_image_request, reply)
+            final_graph_guard = protect_uncertain_graph_answer(original_image_request, reply, language=response_language)
             if final_graph_guard is not None:
                 reply = final_graph_guard
             else:
@@ -4120,7 +4249,7 @@ def _chat_response(on_delta=None, cancelled=None):
                 # algorithms. It never uses an unresolved image or rewrites a
                 # mathematical task into an unrelated exercise.
                 verified_graph_result = (None if data.get("semantic_context") is not None
-                                         else solve_certified_graph(original_image_request, reply))
+                                         else solve_certified_graph(original_image_request, reply, language=response_language))
                 if verified_graph_result is not None:
                     reply = verified_graph_result
 
@@ -4179,6 +4308,15 @@ def _chat_response(on_delta=None, cancelled=None):
                 word in (normalized_action_for_exercise or "")
                 for word in explicit_topic_terms
             )
+            if requested_points and re.search(
+                r"\b(?:adjacency matr(?:ix|ices)|graph isomorphism|chinese remainder|modular inverse|prenex|"
+                r"truth tables?|euler(?:ian)?|hamilton(?:ian)?|shortest paths?|minimum spanning trees?|"
+                r"relation matr(?:ix|ices)|transitive closure|bipartite|topological sort|generating functions?|"
+                r"pigeonhole|inclusion[- ]exclusion|mathematical induction|fermat|linear congruences?|"
+                r"recurrences?|group homomorphism|permutations?|function composition)\b",
+                normalized_action_for_exercise or "", re.I,
+            ):
+                is_narrow_topic = True
 
             def evaluate(candidate_reply):
                 if not isinstance(candidate_reply, str):
@@ -4275,6 +4413,9 @@ def _chat_response(on_delta=None, cancelled=None):
                         "请先在内部自行验证题目可解、条件完整、答案一致，不展示自检。"
                         "严格只输出【题目】题干及[[WRONGBOOK_ANSWER]]答案[[/WRONGBOOK_ANSWER]]。"
                     )
+                if response_language == "en":
+                    retry_content = retry_content.replace("【题目】", "[Question]")
+                    retry_content += "\nWrite the new question and hidden answer in English. Preserve the exact hidden-answer markers."
                 retry_messages.append({"role": "user", "content": retry_content})
                 retry_context = dict(ai_teaching)
                 retry_context["generation_reasoning_effort"] = "none"
@@ -4314,8 +4455,12 @@ def _chat_response(on_delta=None, cancelled=None):
             if chosen_level != target_difficulty:
                 print(f"练习有效但难度估计存在偏差：目标={target_difficulty}，实际={chosen_level}")
                 generation_note = (
-                    f"目标难度为{target_difficulty}，本次题目被估计为{chosen_level or '未确定'}；"
-                    "题目已保留，请按实际难度核对"
+                    localized(f"目标难度为{target_difficulty}，本次题目被估计为{chosen_level or '未确定'}；"
+                              "题目已保留，请按实际难度核对",
+                              f"The requested difficulty was {difficulty_label(target_difficulty, 'en')}; "
+                              f"this exercise was estimated as {difficulty_label(chosen_level or '未确定', 'en')}. "
+                              "The exercise has been kept; please review its actual difficulty.",
+                              response_language)
                 )
             else:
                 generation_note = ""
@@ -4326,17 +4471,18 @@ def _chat_response(on_delta=None, cancelled=None):
             generated_teaching = chosen_candidate["teaching"]
             actual_difficulty = generated_teaching.get("difficulty")
             # 题干和参照知识点校验通过后即可展示；难度评级如实返回。
-            reply = "【题目】\n\n" + generated_question
+            reply = localized("【题目】\n\n", "[Question]\n\n", response_language) + generated_question
             if exercise_solution_requested:
                 # The generation model supplies a private *final* answer, not a
                 # proof. For an explicit solution request, expose the checked
                 # answer; request a separate proof only when requested.
-                answer_section = "【答案】\n\n" + generated_answer
+                answer_section = localized("【答案】\n\n", "[Answer]\n\n", response_language) + generated_answer
                 if exercise_explanation_requested:
                     explain_context = dict(generated_teaching or {})
                     explain_context["mode"] = "full_solution"
                     explain_context["mode_label"] = "完整解析"
                     explain_context["difficulty"] = actual_difficulty or "中等"
+                    explain_context["response_language"] = response_language
                     try:
                         explained = invoke_chat_ai([{"role":"user", "content":(
                             "请独立求解下面的离散数学题，必须给出完整推导、最终答案，"
@@ -4351,9 +4497,10 @@ def _chat_response(on_delta=None, cancelled=None):
                     explanation_text = _EXERCISE_ANSWER_PATTERN.sub("", explanation_text).strip()
                     if (isinstance(explained, dict) and explained.get("ok") and explanation_text
                             and not re.search(r"MATHPROTECTTOKEN\d+ENDTOKEN|DMATE_MATH_\d+_END", explanation_text, re.I)):
-                        answer_section += "\n\n【解析】\n\n" + explanation_text
+                        answer_section += localized("\n\n【解析】\n\n", "\n\n[Explanation]\n\n", response_language) + explanation_text
                     else:
-                        answer_section += "\n\n解析暂时未能生成，已先保留出题时的参考答案"
+                        answer_section += localized("\n\n解析暂时未能生成，已先保留出题时的参考答案",
+                            "\n\nThe explanation is unavailable. The reference answer saved with the exercise is shown above.", response_language)
                 reply += "\n\n" + answer_section
             if output_intent.get("knowledge"):
                 # Use freshly analyzed *generated question* metadata, rather
@@ -4366,11 +4513,11 @@ def _chat_response(on_delta=None, cancelled=None):
                     ) if isinstance(item, str) and item.strip()
                 ))[:6]
                 if knowledge_points:
-                    reply += "\n\n【涉及知识点】\n\n" + "、".join(knowledge_points)
+                    reply += localized("\n\n【涉及知识点】\n\n", "\n\n[Topics]\n\n", response_language) + localized("、", "; ", response_language).join(topic_label(point, response_language) for point in knowledge_points)
                 else:
                     category = str((generated_teaching or {}).get("category") or "").strip()
                     if category and category != "待识别":
-                        reply += "\n\n【涉及知识点】\n\n" + category
+                        reply += localized("\n\n【涉及知识点】\n\n", "\n\n[Topics]\n\n", response_language) + topic_label(category, response_language)
             # A newly generated exercise is presented as a question, never as
             # automatic hints. Later, separate requests for help still use the
             # normal hint tutoring flow. Answers/explanations explicitly asked

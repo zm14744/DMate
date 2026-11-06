@@ -6,6 +6,8 @@ a contested image edge into a definite mathematical conclusion.
 from collections import Counter
 import re
 
+from server_i18n import localized
+
 HEADER = re.compile(r"图\s*([1-9]\d*)\s*(?:[（(][^（）()\n]{0,28}[）)])?\s*[:：]", re.I)
 EDGE_START = re.compile(r"(?:边连接关系|边集合|边集|边包括|边为|边)\s*(?:为|包括)?\s*[:：]", re.I)
 # Real Aizu University isomorphism diagrams label one graph a..h and the
@@ -246,7 +248,7 @@ def exact_isomorphism(left, right):
     return "unknown" if result is None and exceeded else result
 
 
-def answer_graph_isomorphism(user_text):
+def answer_graph_isomorphism(user_text, *, language='zh-CN'):
     """Deterministic answer when a fully confirmed graph edge list is present.
 
     Return '' for unrelated tasks, a careful hold for uncertain image graphs.
@@ -261,8 +263,11 @@ def answer_graph_isomorphism(user_text):
         request = text.rsplit("【我的要求】", 1)[1]
         if not re.search(r"同构|isomorph|第\s*10\s*题|全部|所有|整张", request, re.I):
             if FLAG in text and graph_request.search(request):
-                return ("当前图像的边连接关系仍有冲突，不能可靠计算该图的性质。"
-                        "请先在识别核对界面确认图中所有边，再重新解题。")
+                return localized(
+                    "当前图像的边连接关系仍有冲突，不能可靠计算该图的性质。"
+                    "请先在识别核对界面确认图中所有边，再重新解题。",
+                    "The image's edge connections still conflict, so its graph properties cannot be computed reliably. "
+                    "Confirm every edge in the recognition review before solving again.", language)
             numbered_questions = re.findall(r"(?m)^\s*\d{1,2}\s*[.．、]\s*\S+", text)
             generic_answer = bool(re.search(r"直接|解答|答案|求解|解析", request))
             # A single photographed isomorphism question with "直接给答案"
@@ -273,9 +278,12 @@ def answer_graph_isomorphism(user_text):
     if not re.search(r"同构|isomorph", text, re.I):
         return ""
     if FLAG in text:
-        return ("目前无法可靠判断这两张图是否同构：图片的边连接关系在两次识别中存在冲突，"
+        return localized("目前无法可靠判断这两张图是否同构：图片的边连接关系在两次识别中存在冲突，"
                 "直接计算度数或给出同构映射都可能产生错误答案。"
-                "请在识别核对界面确认边，或上传只包含两张图的清晰截图后重试。")
+                "请在识别核对界面确认边，或上传只包含两张图的清晰截图后重试。",
+                "These graphs cannot yet be compared reliably: the two image readings disagree about their edge connections. "
+                "Computing degrees or giving an isomorphism now could produce an incorrect answer. "
+                "Confirm the edges in the recognition review, or upload a clear crop containing only the two graphs.", language)
     graphs = parse_diagrams(text)
     if len(graphs) != 2 or set(graphs) != {1, 2}:
         return ""
@@ -289,11 +297,18 @@ def answer_graph_isomorphism(user_text):
     if iso == "unknown":
         return ""
     if iso is None:
-        return ("按题目列出的完整边集计算，两图不同构。"
+        return localized("按题目列出的完整边集计算，两图不同构。"
                 "已核对顶点数、边数、各顶点度数及全部可能的保邻接双射；"
                 "不存在保持相邻关系的映射。"
-                "（此结论仅针对识别后确认的边集，不能替代原图核对。）")
+                "（此结论仅针对识别后确认的边集，不能替代原图核对。）",
+                "For the complete edge sets listed in the question, the graphs are not isomorphic. "
+                "The vertex counts, edge counts, vertex degrees, and all possible adjacency-preserving bijections were checked; "
+                "no adjacency-preserving mapping exists. "
+                "This conclusion applies only to the confirmed edge sets and does not replace checking the original image.", language)
     mapping = "，".join(f"{k}↦{v}" for k, v in sorted(iso.items()))
-    return ("按题目列出的完整边集验证，两图同构。\n"
+    return localized("按题目列出的完整边集验证，两图同构。\n"
             f"一个保邻接的双射为：{mapping}。\n"
-            "将图1每条边的两个端点分别按上述映射替换，所得边集与图2完全相同。")
+            "将图1每条边的两个端点分别按上述映射替换，所得边集与图2完全相同。",
+            "The complete edge sets listed in the question show that the graphs are isomorphic.\n"
+            f"An adjacency-preserving bijection is: {mapping}.\n"
+            "Applying this mapping to both endpoints of every edge in graph 1 produces exactly the edge set of graph 2.", language)

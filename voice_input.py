@@ -17,6 +17,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
+from server_i18n import localized, normalize_language
+
 DEFAULT_MODEL = 'qwen-audio-3.1-asr-flash'
 DEFAULT_VOCABULARY_ID = 'vocab-dmate-60d8d29883164a5a83fdfbb7f21772a9'
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
@@ -32,6 +34,30 @@ class VoiceInputError(ValueError):
         super().__init__(message)
         self.code, self.message, self.status = code, message, status
         self.provider_code = provider_code
+
+
+_ERRORS_EN = {
+    '没有录到声音，请重新录音。': 'No audio was recorded. Please record again.',
+    '语音文件不能超过10MB。': 'The audio file cannot exceed 10 MB.',
+    '语音格式无效，请重新录音。': 'The audio format is invalid. Please record again.',
+    '请使用16kHz单声道PCM语音。': 'Use 16 kHz mono PCM audio.',
+    '单次语音最多60秒，请分段输入。': 'Each recording can last at most 60 seconds. Record shorter segments.',
+    '录音太短，请重新录音。': 'The recording is too short. Please record again.',
+    '录音文件不完整，请重新录音。': 'The recording is incomplete. Please record again.',
+    '录音文件无效，请重新录音。': 'The recording is invalid. Please record again.',
+    '语音服务地址配置无效。': 'The voice service address is not configured correctly.',
+    '语音模型或词库配置无效。': 'The voice model or vocabulary configuration is invalid.',
+    '语音服务尚未配置，请稍后再试。': 'The voice service is not configured. Please try again later.',
+    '语音服务繁忙，请稍后重试。': 'The voice service is busy. Please try again later.',
+    '语音识别超时，请重试。': 'Voice recognition timed out. Please try again.',
+    '语音服务连接失败，请重试。': 'Could not connect to the voice service. Please try again.',
+    '语音服务返回了无效结果，请重试。': 'The voice service returned an invalid result. Please try again.',
+    '语音服务请求过多，请稍后重试。': 'The voice service has received too many requests. Please try again later.',
+    '语音服务鉴权失败，请检查服务配置。': 'Voice service authentication failed. Check the service configuration.',
+    '语音模型或词库调用失败，请检查服务配置后重试。': 'The voice model or vocabulary request failed. Check the service configuration and try again.',
+    '语音服务返回的模型不符，请检查配置。': 'The voice service returned a different model. Check the configuration.',
+    '语音服务没有返回有效文字，请重试。': 'The voice service did not return valid text. Please try again.',
+}
 
 
 def inspect_wav(raw):
@@ -101,6 +127,16 @@ def _discard_http_session(session):
 
 def transcribe_voice(raw, *, language='zh-CN', post=None):
     """One explicit model call, with the user's vocabulary; no silent fallback."""
+    language = normalize_language(language)
+    try:
+        return _transcribe_voice(raw, language=language, post=post)
+    except VoiceInputError as error:
+        error.message = localized(error.message, _ERRORS_EN.get(error.message, error.message), language)
+        error.args = (error.message,)
+        raise
+
+
+def _transcribe_voice(raw, *, language='zh-CN', post=None):
     started = time.perf_counter()
     seconds = inspect_wav(raw)
     validated = time.perf_counter()

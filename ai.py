@@ -12,6 +12,7 @@ import threading
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
 from teaching import teaching_prompt, _active_question_from_messages
+from server_i18n import normalize_language, localize_error_payload
 from graph_ocr_cleanup import ocr_is_label_dominated
 from chat_limits import (MAX_MESSAGE_CHARS, MAX_HISTORY_MESSAGES,
                          MAX_HISTORY_CHARS, MAX_CONFIRMED_MESSAGE_CHARS,
@@ -1408,6 +1409,11 @@ def _friendly_http_error(status_code):
 
 
 def ask_ai(messages, retries=2, teaching_context=None, *, on_delta=None, cancelled=None):
+    result = _ask_ai(messages, retries, teaching_context, on_delta=on_delta, cancelled=cancelled)
+    return localize_error_payload(result, (teaching_context or {}).get("response_language"))
+
+
+def _ask_ai(messages, retries=2, teaching_context=None, *, on_delta=None, cancelled=None):
     """
     使用 DeepSeek 生成文本回复。
     简单请求关闭思考；中等和困难题均使用 high 思考。
@@ -1442,10 +1448,11 @@ $$
     if not clean_messages:
         return _failure("没有检测到有效的消息内容。")
 
-    system_content = SYSTEM_PROMPT + teaching_prompt(context)
-    response_language = str((context or {}).get("response_language") or "zh-CN")
-    if response_language.lower().startswith("en"):
-        system_content += """\n\n【Response language / 回复语言】\nRespond in natural, fluent English throughout the entire answer. This includes explanations, headings, examples, exercise statements, feedback, summaries, and follow-up questions. Preserve mathematical notation and standard English mathematical terminology. Do not switch to Chinese unless the user explicitly asks for Chinese or requests a Chinese translation. If the user message contains mixed Chinese and English, use English by default in English UI mode while preserving quoted source text as needed.\n"""
+    response_language = normalize_language(context.get("response_language"))
+    base_prompt = SYSTEM_PROMPT
+    if response_language == "en":
+        base_prompt = base_prompt.replace("- 使用中文回答。", "- Respond in English.")
+    system_content = base_prompt + teaching_prompt(context)
     if context.get("semantic_math"):
         from graph_semantic_solver import semantic_math_prompt
         system_content += semantic_math_prompt(context["semantic_math"])
@@ -1462,6 +1469,8 @@ $$
                 "学生要求完整解析：逐小问给结论和必要证明或计算步骤，"
                 "最后输出清晰的最终答案，禁止只输出内部思考。"
             )
+    if response_language == "en":
+        system_content += """\n\n[Response language]\nRespond in natural English throughout explanations, headings, exercise statements, feedback and follow-up questions. The Chinese instructions and canonical topic names above are internal guidance, not a request for Chinese output. Preserve mathematical notation, source quotations, user data, and exact machine-readable markers such as [[WRONGBOOK_ANSWER]] and [[ANSWER_ONLY]]. Only switch language when the user explicitly asks. Use English for mixed-language requests by default.\n"""
     api_messages = [
         {"role": "system", "content": system_content}
     ] + clean_messages

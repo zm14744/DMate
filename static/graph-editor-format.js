@@ -101,22 +101,56 @@ function graphRows(graph,index){
 // Construct text nodes so labels and model descriptions always remain literal.
 function renderGraphInformation(container,documentValue,options={}){
  const dom=container.ownerDocument,fragment=dom.createDocumentFragment();
+ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
  const element=(tag,className,text)=>{const node=dom.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
+ const content=text=>{const node=element('span','',text);node.setAttribute('data-i18n-content','');return node;};
+ const line=(className,caption,value,fallback)=>{const node=element('p',className);node.append(element('span','',uiText(caption)),dom.createTextNode(' '));if(value)node.append(content(value));else node.append(element('span','',uiText(fallback||'无')));return node;};
  const graphs=Array.isArray(documentValue?.graphs)?documentValue.graphs:[];
  for(const [index,graph] of graphs.entries()){
-  const row=graphRows(graph,index),section=element('section','dgs-graph');
-  section.append(element('h4','dgs-graph-title',row.title));
-  if(row.showType!==false)section.append(element('p','dgs-graph-type',row.type));
-  section.append(element('p','dgs-vertices','顶点：'+(row.vertices.join('、')||'无')),
-   element('p','dgs-counts',`${row.vertices.length} 个顶点 · ${row.relations.length} 条边`),
-   element('p','dgs-appearance','图形外观：'+(row.description||'未提供外观描述。')));
-  if(row.anonymousNote)section.append(element('p','dgs-anonymous-note',row.anonymousNote));
-  if(row.positions.length){section.append(element('h5','','顶点位置'));for(const vertex of row.positions)section.append(element('p','dgs-vertex-position',vertex.txt));}
-  if(row.named.length)section.append(element('p','dgs-edge-names','边：'+row.named.join('、')));
-  for(const edge of row.relations)section.append(element('p','dgs-relation',edge.txt));
+  const row=graphRows(graph,index),section=element('section','dgs-graph'),geometry=geometryApi?.describeGraphGeometry?.(graph);
+  const graphName=literal(graph.name||graph.id||'G'+(index+1)),heading=element('h4','dgs-graph-title');
+  heading.append(element('span','',uiText('图 ','Graph ')),content(/^G\d+$/i.test(graphName)?markName(graphName):(index+1)+'（'+graphName+'）'));
+  section.append(heading);
+  const typeEnglish=(graph.direction_mode==='mixed'?'Mixed directions':graph.directed===true?'Directed':graph.directed===false?'Undirected':'Direction needs review')+' · '+(graph.weighted===true?'Weighted':graph.weighted===false?'Unweighted':'Weight needs review');
+  if(row.showType!==false)section.append(element('p','dgs-graph-type',uiText(row.type,typeEnglish)));
+  section.append(line('dgs-vertices','顶点：',row.vertices.join('、')),
+   element('p','dgs-counts',uiText(`${row.vertices.length} 个顶点 · ${row.relations.length} 条边`,`${row.vertices.length} vertices · ${row.relations.length} edges`)));
+  const appearance=line('dgs-appearance','图形外观：',row.description,'未提供外观描述。');
+  // Generated geometry descriptions are chrome; uploaded/AI descriptions stay literal.
+  if(row.description&&row.description===geometry?.description){
+   let english=row.description.replace(/^空白画布，尚未添加顶点和边。/,'Blank canvas. No vertices or edges yet.')
+    .replace(/由 (\d+) 个顶点、(\d+) 条边组成。/,'$1 vertices and $2 edges.')
+    .replace(/按当前画布位置，顶点分布于([^。]+)。/,(_,areas)=>' Vertices are positioned at '+areas.split('、').map(area=>({'图内左上方':'upper left','图内右上方':'upper right','图内上方':'top','图内左下方':'lower left','图内右下方':'lower right','图内下方':'bottom','图内左方':'left','图内右方':'right','图内中部':'center'}[area]||area)).join(', ')+'.')
+    .replace(/有 (\d+) 个顶点尚未记录坐标。/,' $1 vertices have no recorded coordinates.')
+    .replace(/其中包含 (\d+) 条自环。/,' Includes $1 self-loops.')
+    .replace(/边的线型包括([^。]+)。/,(_,styles)=>' Edge styles include '+styles.replace(/(\d+) 条虚线边/g,'$1 dashed edges').replace(/(\d+) 条点线边/g,'$1 dotted edges').replace(/、/g,', ')+'.')
+    .replace(/有 (\d+) 条边沿弯曲或折线路径连接端点。/,' $1 edges connect their endpoints along curved or bent paths.');
+   appearance.lastChild.replaceWith(element('span','',uiText(row.description,english)));
+  }
+  section.append(appearance);
+  if(row.anonymousNote)section.append(element('p','dgs-anonymous-note',uiText(row.anonymousNote)));
+  if(row.positions.length){
+   section.append(element('h5','',uiText('顶点位置')));
+   for(const vertex of row.positions){
+    const position=vertex.txt.slice(vertex.label.length+1),node=element('p','dgs-vertex-position');node.append(content(vertex.label),dom.createTextNode('：'));
+    node.append(position===geometry?.positions.get(String(vertex.id))||position==='位置未记录'?element('span','',uiText(position)):content(position));section.append(node);
+   }
+  }
+  if(row.named.length)section.append(line('dgs-edge-names','边：',row.named.join('、')));
+  const labels=graphLabels(graph),get=id=>labels.get(String(id))||String(id??'?');
+  for(const edge of graph.edges||[]){
+   const node=element('p','dgs-relation'),name=edgeName(edge);
+   if(name!==null)node.append(content(name),dom.createTextNode('：'));
+   node.append(content(get(edge.from)),dom.createTextNode(edge.direction==='forward'?'→':edge.direction==='undirected'?'—':'？'),content(get(edge.to)));
+   const hasWeight=edge.weight!==null&&edge.weight!==undefined&&String(edge.weight).trim()!=='';
+   if(hasWeight)node.append(dom.createTextNode(' '),element('span','',uiText('（权值：','(weight:')),dom.createTextNode(' '),content(literal(edge.weight)),element('span','',uiText('）',')')));
+   if(edge.direction==='unknown')node.append(element('span','',uiText('（方向待核对）',' (direction needs review)')));
+   if(graph.weighted===true&&!hasWeight)node.append(element('span','',uiText('（权值待核对）',' (weight needs review)')));
+   section.append(node);
+  }
   fragment.append(section);
  }
- if(!graphs.length&&options.showEmpty!==false)fragment.append(element('p','dgs-empty','暂无图形信息。'));
+ if(!graphs.length&&options.showEmpty!==false)fragment.append(element('p','dgs-empty',uiText('暂无图形信息。')));
  container.classList.add('dmate-graph-information');container.replaceChildren(fragment);return container;
 }
 function toPlain(graphs){

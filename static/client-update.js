@@ -146,7 +146,8 @@
         return true;
     }
     function uiText(chinese, english) {
-        return root.DMateI18n?.isEnglish?.() === true ? english : chinese;
+        return root.DMateI18n?.t ? root.DMateI18n.t(chinese, english)
+            : root.DMateI18n?.isEnglish?.() === true ? english : chinese;
     }
     function showNotice(client, update) {
         const doc = root.document;

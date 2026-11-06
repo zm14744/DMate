@@ -651,11 +651,30 @@ def _fuzzy_replace_once(value, term):
     return value[:start] + term + value[end:]
 
 
+_ENGLISH_PROTECTED_SPANS = re.compile(
+    r"\$\$[\s\S]*?\$\$|\$[^\n$]*?\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]"
+    r"|`[^`\n]*`|\\[A-Za-z]+(?:\{[^{}]*\})?"
+)
+
+
+def _map_english_prose(text, transform):
+    """Apply local language rules outside quoted code and delimited math."""
+    pieces = []
+    previous = 0
+    for match in _ENGLISH_PROTECTED_SPANS.finditer(text):
+        pieces.extend((transform(text[previous:match.start()]), match.group()))
+        previous = match.end()
+    pieces.append(transform(text[previous:]))
+    return "".join(pieces)
+
+
+def _is_english_request(text):
+    return bool(re.search(r"[A-Za-z]", text) and not re.search(r"[\u4e00-\u9fff]", text))
+
+
 def normalize_english_request_text(text):
-    """Conservative English-only cleanup for short commands; never rewrite math content."""
-    value = unicodedata.normalize("NFKC", str(text or "")).strip()
-    value = value.replace("’", "'").replace("–", "-").replace("—", "-")
-    value = re.sub(r"\\s+", " ", value)
+    """Conservative cleanup for local classification, never display replacement."""
+    value = str(text or "").strip()
     if not value or len(value) > 240:
         return value
     aliases = {
@@ -670,40 +689,108 @@ def normalize_english_request_text(text):
         "adacency matrix": "adjacency matrix", "adjaceny matrix": "adjacency matrix",
         "spanning three": "spanning tree", "minimum spanning three": "minimum spanning tree",
     }
-    for wrong, correct in sorted(aliases.items(), key=lambda item: len(item[0]), reverse=True):
-        value = re.sub(r"(?i)\\b" + re.escape(wrong) + r"\\b", correct, value)
-    return value
+    def normalize(prose):
+        prose = prose.replace("’", "'").replace("–", "-").replace("—", "-")
+        prose = re.sub(r"\s+", " ", prose)
+        for wrong, correct in sorted(aliases.items(), key=lambda item: len(item[0]), reverse=True):
+            prose = re.sub(r"\b" + re.escape(wrong) + r"\b", correct, prose, flags=re.IGNORECASE)
+        return prose
+    return _map_english_prose(value, normalize)
 
 
 _ENGLISH_TOPIC_ALIASES = (
-    (r"\\b(?:propositional|predicate) logic\\b|\\btautolog(?:y|ies)\\b|\\bcontradiction\\b", "命题逻辑"),
-    (r"\\b(?:set theory|power set|cartesian product|cardinality|subset|union|intersection)\\b", "集合"),
-    (r"\\b(?:equivalence relation|equivalence class|partial order|total order|poset|hasse diagram|reflexive|symmetric|antisymmetric|transitive)\\b", "关系"),
-    (r"\\b(?:injective|surjective|bijective|inverse function|composition of functions)\\b", "函数"),
-    (r"\\b(?:pigeonhole principle|permutation|combination|binomial coefficient|inclusion-exclusion principle|stars and bars)\\b", "计数与组合"),
-    (r"\\b(?:recurrence relation|generating function|mathematical induction|inductive hypothesis|proof by contradiction|counterexample)\\b", "递推"),
-    (r"\\b(?:modular arithmetic|greatest common divisor|least common multiple|euclidean algorithm|prime number|congruence)\\b", "数论"),
-    (r"\\b(?:graph theory|directed graph|undirected graph|weighted graph|vertex|vertices|edge|eulerian|hamiltonian|bipartite graph|connected component|spanning tree|shortest path|adjacency matrix|graph coloring)\\b", "图论"),
-    (r"\\b(?:binary tree|rooted tree|minimum spanning tree)\\b", "树"),
+    (r"\b(?:proof|prove) by contradiction\b", "反证法"),
+    (r"\bstrong induction\b", "强归纳法"),
+    (r"\b(?:(?:mathematical )?induction|inductive hypothes(?:is|es))\b", "数学归纳法"),
+    (r"\bpropositional logic\b", "命题逻辑"),
+    (r"\b(?:predicate|first[- ]order) logic\b", "谓词逻辑"),
+    (r"\b(?:universal|existential)?\s*quantifiers?\b", "量词"),
+    (r"\btruth tables?\b", "真值表"),
+    (r"\blogical equivalence\b", "逻辑等价"),
+    (r"\btautolog(?:y|ies)\b", "永真"),
+    (r"\bcontradictions?\b", "永假"),
+    (r"\bpower sets?\b", "幂集"),
+    (r"\bcartesian products?\b", "笛卡尔积"),
+    (r"\bequivalence relations?\b", "等价关系"),
+    (r"\bequivalence class(?:es)?\b", "等价类"),
+    (r"\b(?:partial orders?|posets?)\b", "偏序"),
+    (r"\btotal orders?\b", "全序"),
+    (r"\bhasse diagrams?\b", "哈斯图"),
+    (r"\b(?:reflexive|reflexivity)\b", "自反"),
+    (r"\b(?:irreflexive|irreflexivity)\b", "反自反"),
+    (r"\b(?:symmetric|symmetry)\b", "对称"),
+    (r"\b(?:antisymmetric|antisymmetry)\b", "反对称"),
+    (r"\b(?:transitive|transitivity)\b", "传递"),
+    (r"\b(?:set theory|subsets?|cardinality)\b", "集合"),
+    (r"\b(?:injective|injections?)\b", "单射"),
+    (r"\b(?:surjective|surjections?)\b", "满射"),
+    (r"\b(?:bijective|bijections?)\b", "双射"),
+    (r"\binverse functions?\b", "逆函数"),
+    (r"\b(?:composition of functions|composite functions?)\b", "复合函数"),
+    (r"\bpigeonhole principle\b", "鸽巢原理"),
+    (r"\binclusion[- ]exclusion principle\b", "容斥原理"),
+    (r"\b(?:permutations?|stars and bars)\b", "排列"),
+    (r"\bcombinations?\b", "组合"),
+    (r"\bbinomial (?:coefficients?|theorem)\b", "二项式"),
+    (r"\brecurrence relations?\b", "递推关系"),
+    (r"\bgenerating functions?\b", "生成函数"),
+    (r"\bnumber theory\b", "数论"),
+    (r"\bmodular arithmetic\b", "模运算"),
+    (r"\bgreatest common divisors?\b", "最大公约数"),
+    (r"\bleast common multiples?\b", "最小公倍数"),
+    (r"\beuclidean algorithm\b", "欧几里得算法"),
+    (r"\bprime numbers?\b", "素数"),
+    (r"\bcongruences?\b", "同余"),
+    (r"\bboolean algebra\b", "布尔代数"),
+    (r"\bsubgroups?\b", "子群"),
+    (r"\bgroups?\b", "群"),
+    (r"\brings?\b", "环"),
+    (r"\bfields?\b", "域"),
+    (r"\bhomomorphisms?\b", "同态"),
+    (r"\bminimum spanning trees?\b", "最小生成树"),
+    (r"\bspanning trees?\b", "生成树"),
+    (r"\bbinary trees?\b", "二叉树"),
+    (r"\brooted trees?\b", "根树"),
+    (r"\bundirected graphs?\b", "无向图"),
+    (r"\bdirected graphs?\b", "有向图"),
+    (r"\bweighted graphs?\b", "带权图"),
+    (r"\bbipartite graphs?\b", "二部图"),
+    (r"\bconnected components?\b", "连通分量"),
+    (r"\bshortest paths?\b", "最短路"),
+    (r"\badjacency (?:matrix|matrices)\b", "邻接矩阵"),
+    (r"\badjacency lists?\b", "邻接表"),
+    (r"\bgraph colou?ring\b|\bchromatic numbers?\b", "图着色"),
+    (r"\b(?:eulerian|euler) (?:paths?|circuits?|cycles?|graphs?)\b", "欧拉图"),
+    (r"\b(?:hamiltonian|hamilton) (?:paths?|circuits?|cycles?|graphs?)\b", "哈密顿图"),
+    (r"\b(?:graph isomorphism|isomorphic graphs?)\b", "图同构"),
+    (r"\b(?:graph theory|graphs?)\b", "图论"),
+    (r"\b(?:vertex|vertices)\b", "顶点"),
+    (r"\bedges?\b", "边集"),
+    (r"\btrees?\b", "树"),
+    (r"\bfunctions?\b", "函数"),
+    (r"\brelations?\b", "关系"),
+    (r"\bsets?\b", "集合"),
 )
 
 
 def _english_analysis_aliases(text):
     """Map known English math terms to existing Chinese rule vocabulary for local classification only."""
     value = normalize_english_request_text(text)
-    for pattern, replacement in _ENGLISH_TOPIC_ALIASES:
-        value = re.sub(pattern, replacement, value, flags=re.IGNORECASE)
-    return value
+    def translate(prose):
+        for pattern, replacement in _ENGLISH_TOPIC_ALIASES:
+            prose = re.sub(pattern, replacement, prose, flags=re.IGNORECASE)
+        return prose
+    return _map_english_prose(value, translate)
 
 
 def normalize_user_request_text(text):
     """Normalize short Chinese/English commands for intent recognition only."""
-    raw = unicodedata.normalize("NFKC", str(text or "")).strip()
-    if re.search(r"[A-Za-z]", raw) and not re.search(r"[\\u4e00-\\u9fff]", raw):
+    raw = str(text or "").strip()
+    if _is_english_request(raw):
         return normalize_english_request_text(raw)
-    value = raw.lower()
+    value = unicodedata.normalize("NFKC", raw).lower()
     value = value.replace("，", ",").replace("。", ".").replace("？", "?").replace("！", "!")
-    value = re.sub(r"\\s+", "", value)
+    value = re.sub(r"\s+", "", value)
     if not value or len(value) > 180:
         return value
 
@@ -714,16 +801,16 @@ def normalize_user_request_text(text):
             value = value.replace(wrong, correct)
 
     value = re.sub(
-        r"([一二两三四五六七八九十百\\d]+)[到倒](?=.{0,16}(?:题|练习))",
-        r"\\1道", value,
+        r"([一二两三四五六七八九十百\d]+)[到倒](?=.{0,16}(?:题|练习))",
+        r"\1道", value,
     )
     value = re.sub(
         r"(非常|特别|比较|有点|有一点|稍微|稍稍|太|很|不太|不怎么|不是很|不要太|别太)[南男]",
-        r"\\1难", value,
+        r"\1难", value,
     )
     value = re.sub(
         r"(很难|非常难|特别难|困难|高难)得(?=题目|题)",
-        r"\\1的", value,
+        r"\1的", value,
     )
     for term in sorted(_REQUEST_FUZZY_TERMS, key=len, reverse=True):
         value = _fuzzy_replace_once(value, term)
@@ -740,11 +827,24 @@ def looks_like_exercise_request(text):
     return _looks_like_exercise_request_text(text)
 
 
+def _has_english_exercise_heading(text):
+    return bool(re.search(
+        r"(?:^|\n)\s*(?:\[(?:Question|Exercise)\]"
+        r"|#{1,4}\s+(?:Question|Exercise)(?:\s+\d+)?\s*[:：]?"
+        r"|\*\*(?:Question|Exercise)(?:\s+\d+)?\s*[:：]?\*\*"
+        r"|(?:Question|Exercise)(?:\s+\d+)?\s*[:：])(?:\s|$)",
+        str(text or ""), flags=re.IGNORECASE,
+    ))
+
+
 def _looks_like_generated_exercise_text(text):
     value = str(text or "").strip()
 
     if not value:
         return False
+
+    if _has_english_exercise_heading(value):
+        return True
 
     if re.search(
         r"(?:"
@@ -785,13 +885,30 @@ def _looks_like_generated_exercise_text(text):
 def _detect_mode(latest_text):
     raw = str(latest_text or "")
     text = _normalize(raw)
-    if re.search(r"[A-Za-z]", raw) and not re.search(r"[\\u4e00-\\u9fff]", raw):
+    if _is_english_request(raw):
         english = normalize_english_request_text(raw).lower()
-        if re.search(r"\\b(?:check|grade|mark)\\b.{0,50}\\b(?:my answer|my solution|my work)\\b", english):
+        check_answer = re.search(
+            r"\b(?:check|grade|mark)\b.{0,50}\b(?:my answer|my solution|my work)\b"
+            r"|\bis my (?:answer|solution|work) (?:correct|right|valid)\b", english,
+        )
+        negates_check = re.search(r"\b(?:do not|don't|dont|never)\s+(?:check|grade|mark)\b", english)
+        if check_answer and not negates_check:
             return "check_answer"
-        if re.search(r"\\b(?:give|show|provide)\\b.{0,35}\\b(?:full solution|complete solution|step[- ]by[- ]step solution|final answer and explanation)\\b", english):
+        # An explicit hint-only request must not be mistaken for permission to
+        # reveal the answer simply because it mentions "the full solution".
+        denies_solution = bool(re.search(
+            r"\b(?:do not|don't|dont|never)\s+(?:give|show|provide|reveal|tell)\b"
+            r"[^.!?;]{0,50}\b(?:answers?|solutions?)\b", english,
+        ))
+        rejects_hint_only = bool(re.search(r"\b(?:do not|don't|dont)\s+(?:only|just)\s+(?:give\s+)?(?:me\s+)?hints?\b", english))
+        hint_only = bool(re.search(r"\b(?:only|just)\s+(?:give\s+)?(?:me\s+)?hints?\b", english)) and not rejects_hint_only
+        if denies_solution or hint_only:
+            return "hint"
+        if re.search(r"\b(?:give|show|provide)\b.{0,35}\b(?:full solution|complete solution|step[- ]by[- ]step solution|final answer and explanation)\b", english):
             return "full_solution"
-        if re.search(r"\\b(?:explain|what is|what are|define|meaning of)\\b", english) and not re.search(r"\\b(?:solve|calculate|prove|find|determine)\\b", english):
+        if looks_like_exercise_request(raw):
+            return "exercise"
+        if re.search(r"\b(?:explain|what is|what are|define|meaning of)\b", english) and not re.search(r"\b(?:solve|calculate|prove|find|determine)\b", english):
             return "concept"
 
     # “完整解析，不要只给提示”同时含有“完整解析”和“只给提示”。
@@ -818,15 +935,18 @@ def _detect_mode(latest_text):
 def _detect_question_type(text, mode):
     raw = str(text or "")
     normalized = _normalize(raw)
-    if re.search(r"[A-Za-z]", raw) and not re.search(r"[\\u4e00-\\u9fff]", raw):
+    if _is_english_request(raw):
         english = normalize_english_request_text(raw).lower()
         if mode == "exercise": return "出题请求"
         if mode == "concept": return "概念题"
         if mode == "check_answer": return "答案检查"
-        if re.search(r"\\b(?:prove|proof|show that|demonstrate)\\b", english): return "证明题"
-        if re.search(r"\\b(?:draw|sketch|construct|plot)\\b.{0,60}\\b(?:graph|tree|diagram)\\b", english): return "作图题"
-        if re.search(r"\\b(?:true or false|is it true|determine whether|decide whether)\\b", english): return "判断题"
-        if re.search(r"\\b(?:calculate|compute|find|evaluate|determine|list|write down)\\b", english): return "计算题"
+        if re.search(r"\b(?:multiple[- ]choice|choose the (?:correct|incorrect))\b", english): return "选择题"
+        if re.search(r"\bfill (?:in )?the blanks?\b", english): return "填空题"
+        if re.search(r"\b(?:prove|proof|show that|demonstrate)\b", english): return "证明题"
+        if re.search(r"\b(?:draw|sketch|construct|plot)\b.{0,60}\b(?:graphs?|trees?|diagrams?)\b", english): return "作图题"
+        if re.search(r"\bconstruct\b", english): return "构造题"
+        if re.search(r"\b(?:true or false|is it true|determine whether|decide whether)\b", english): return "判断题"
+        if re.search(r"\b(?:calculate|compute|find|evaluate|determine|list|write down)\b", english): return "计算题"
 
     if mode == "exercise":
         return "出题请求"
@@ -931,7 +1051,8 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
     不调用额外模型，也不参与回答提示词，避免难度功能改变原有教学行为。
     """
     value = str(text or "")
-    normalized = _normalize(value)
+    english_request = _is_english_request(value)
+    normalized = _normalize(_english_analysis_aliases(value) if english_request else value)
     points = [
         str(item).strip()
         for item in (knowledge_points or [])
@@ -950,7 +1071,7 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         score += 1
 
     # 证明、构造、枚举全部结果一类题通常步骤更多。
-    if question_type == "证明题" or any(
+    if question_type in ("证明题", "构造题") or any(
         keyword in normalized
         for keyword in (
             "证明", "推导", "构造", "求证", "反证",
@@ -982,6 +1103,11 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         r"(?:求|计算|判断|判定|证明|构造|画出|写出|列出|找出|确定|给出|求解|解答|化为|转换为|^解(?!释))",
         normalized,
     ))
+    if english_request:
+        explicit_action = explicit_action or bool(re.search(
+            r"\b(?:solve|calculate|compute|find|determine|prove|construct|draw|list|evaluate|write)\b",
+            value, flags=re.IGNORECASE,
+        ))
 
     if has_multi_step_topic and explicit_action:
         score += 1
@@ -1542,6 +1668,8 @@ def _score_categories(text):
 
 
 def _extract_points(text, category):
+    if _is_english_request(str(text or "")):
+        text = _english_analysis_aliases(text)
     normalized = _normalize(text)
     rule = CATEGORY_RULES.get(category)
     if not rule:
@@ -1782,7 +1910,7 @@ def _classify_content(text):
         if len(raw_text) <= 240 and not math_dense
         else raw_text
     )
-    if re.search(r"[A-Za-z]", analysis_text) and not re.search(r"[\\u4e00-\\u9fff]", analysis_text):
+    if _is_english_request(analysis_text):
         analysis_text = _english_analysis_aliases(analysis_text)
     scores = _score_categories(analysis_text)
     ordered = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
@@ -1907,7 +2035,46 @@ def analyze_question(text):
 
 
 def _normalize_question_reference_text(text):
-    return re.sub(r"\s+", "", str(text or "").strip())
+    value = str(text or "").strip()
+    if len(value) <= 180 and (
+        _is_english_request(value) or re.fullmatch(r"#\s*\d{1,3}[?.!]?", value)
+    ):
+        # Only normalize references, never a newly supplied problem or an
+        # explicit request to generate another exercise. Keep word boundaries
+        # for the shared English exercise-intent matcher in those cases.
+        if classify_exercise_request(value)["explicit"] or re.search(
+            r"\b(?:generate|create|prepare|design|make|set)\b.{0,60}\b(?:questions?|exercises?|problems?)\b"
+            r"|"
+            r"\b(?:part|subpart|subquestion)\s*#?\s*\d+\b"
+            r"|\b(?:question|problem|exercise)\s*#?\s*\d+\s*[:.]\s*"
+            r"(?:let|given|suppose|assume|prove|find|calculate|determine)\b",
+            value, flags=re.IGNORECASE,
+        ):
+            return value
+        reference_patterns = (
+            (r"\b(?:previous|preceding)\s+(?:question|problem|exercise)\b", "上一题"),
+            (r"\bnext\s+(?:question|problem|exercise)\b", "下一题"),
+            (r"\b(?:last|latest|most recent)\s+(?:question|problem|exercise)\b", "最后一道题"),
+            (r"\b(?:first|earliest)\s+(?:question|problem|exercise)\b", "最开始的题"),
+            (r"\b(?:current|this)\s+(?:question|problem|exercise)\b", "当前题"),
+            (r"\b(?:question|problem|exercise)\s*#?\s*(\d{1,3})(?!\w|\.\d)", r"第\1题"),
+            (r"(?<!\w)#\s*(\d{1,3})(?!\w|\.\d)", r"第\1题"),
+        )
+        converted = value
+        for pattern, replacement in reference_patterns:
+            converted = re.sub(pattern, replacement, converted, flags=re.IGNORECASE)
+        if converted != value:
+            for pattern, replacement in (
+                (r"\b(?:explain|explanation)\b", "解释"),
+                (r"\banswers?\b", "答案"),
+                (r"\b(?:hints?|help)\b", "提示"),
+                (r"\bsolutions?\b", "完整解析"),
+                (r"\b(?:go back to|return to|go to|back to|what about)\b", "回到"),
+                (r"\b(?:please|the|can you|could you)\b", ""),
+            ):
+                converted = re.sub(pattern, replacement, converted, flags=re.IGNORECASE)
+            value = converted.rstrip("?.!")
+    return re.sub(r"\s+", "", value)
 
 
 def _has_explicit_exercise_generation_cue(text):
@@ -2286,6 +2453,9 @@ def _looks_like_explicit_generated_question(text):
     if not value:
         return False
 
+    if _has_english_exercise_heading(value):
+        return True
+
     return bool(re.search(
         r"(?:"
         r"【(?:题目|练习题)】"
@@ -2320,6 +2490,13 @@ def _looks_like_formal_printed_question(text):
     value = str(text or "").strip()
     if not value:
         return False
+
+    if _is_english_request(value) and re.search(
+        r"^(?:please\s+)?(?:let|given|suppose|assume|prove|show that|solve|calculate|compute|"
+        r"find|determine|draw|construct|list|evaluate|write down|choose|fill)\b",
+        value, flags=re.IGNORECASE,
+    ):
+        return True
 
     compact = re.sub(r"\s+", "", value)
 
@@ -2366,7 +2543,15 @@ def _looks_like_formal_image_request(text):
     “这里有几个点/几条边/这是什么”属于临时观察询问：照常回答，
     但不进入题目历史、难度评级和错题本。
     """
-    value = re.sub(r"\s+", "", str(text or "").strip())
+    raw = str(text or "").strip()
+    if _is_english_request(raw):
+        if re.search(r"\bhow many\b.{0,20}\b(?:vertices|nodes?|points?|edges?|lines?)\b", raw, flags=re.IGNORECASE):
+            return False
+        return bool(re.search(
+            r"^(?:please\s+)?(?:prove|show that|solve|calculate|compute|find|determine|"
+            r"draw|construct|list|evaluate|write down|is (?:this|the) graph)\b", raw, flags=re.IGNORECASE,
+        ))
+    value = re.sub(r"\s+", "", raw)
     if not value:
         return False
 
@@ -2426,6 +2611,12 @@ def _looks_like_user_question_for_context(text):
         )
 
     compact = re.sub(r"\s+", "", value)
+
+    if _is_english_request(value) and (
+        _looks_like_formal_printed_question(value)
+        or re.search(r"^(?:please\s+)?(?:explain|define|what (?:is|are)|why|how)\b", value, flags=re.IGNORECASE)
+    ):
+        return True
 
     # 明确题干/问法；概念型“什么是欧拉图”也属于一道当前学习问题。
     if re.search(
@@ -2627,9 +2818,113 @@ def analyze_messages(messages):
     })
 
 
+def _english_teaching_prompt(context):
+    """English output policy; canonical classification IDs stay unchanged."""
+    mode = context.get("mode") or "hint"
+    difficulty_names = {"简单": "easy", "中等": "medium", "困难": "hard"}
+    difficulty = context.get("exercise_target_difficulty") or context.get("difficulty")
+    difficulty = difficulty if difficulty in difficulty_names else "中等"
+    core_points = [
+        str(item).strip() for item in (context.get("retest_core_points") or [])
+        if str(item).strip()
+    ][:4]
+    normalized_request = str(context.get("normalized_exercise_request") or "").strip()[:180]
+    difficulty_instruction = {
+        "简单": (
+            "Test one core concept with direct wording and one or two key steps. "
+            "Do not combine advanced topics or add tedious calculations."
+        ),
+        "中等": (
+            "Test one or two core concepts with two or three connected reasoning or calculation steps. "
+            "Prefer one or two connected parts, where the second uses the first result or the same structure. "
+            "A single direct substitution, gcd calculation, set listing, copied definition, or matrix entry "
+            "is too easy. Three unrelated tasks do not create meaningful difficulty. "
+            "Internally check the difficulty and revise a one-step problem before responding."
+        ),
+        "困难": (
+            "Require substantial multi-step reasoning, structural analysis, nontrivial counting or construction, "
+            "or two closely connected concepts. Prefer dependent tasks or a core proof, construction or case analysis. "
+            "Larger numbers, a single gcd calculation, direct enumeration, or unrelated extra parts do not make "
+            "a problem hard. Keep it within the relevant discrete mathematics syllabus. "
+            "Internally revise any problem that can be completed in one or two direct steps."
+        ),
+    }[difficulty]
+    exercise_instruction = (
+        "Generate an exercise. The visible response must contain only the problem itself, in English. "
+        f"The target difficulty is {difficulty_names[difficulty]}. {difficulty_instruction} "
+    )
+    if normalized_request:
+        exercise_instruction += (
+            f"Local command normalization: {normalized_request}. "
+            "Use this only to understand likely command typos; never rewrite mathematical expressions from it. "
+        )
+    if core_points:
+        exercise_instruction += (
+            "This is a retest. Every following core topic must be substantively tested, not merely mentioned: "
+            + ", ".join(core_points) + ". Reduce number or graph sizes and combine dependent parts to keep "
+            "the target difficulty without dropping any topic. "
+        )
+    exercise_instruction += (
+        "If the request includes a referenced current problem (including the internal marker 【当前指向题目】), "
+        "use that problem as the sole topic reference. Preserve its core topics while changing conditions or values; "
+        "do not answer the original problem or borrow topics from another conversation problem. "
+        "Use exactly [Question] as the visible heading, with no introduction before it. "
+        "Do not append hints, reasoning, solutions, answers, guidance, or invitations to try the problem. "
+        "The conditions must be consistent and sufficient, and the requested answer must exist. "
+        "Internally verify solvability and the final answer before responding; do not invent unchecked results. "
+        "At the very end append the system-only hidden answer block using these exact delimiters: "
+        "[[WRONGBOOK_ANSWER]]final answer[[/WRONGBOOK_ANSWER]]. "
+        "Inside that block include only the actual final answer, in English with mathematical notation, "
+        "without reasoning, calculations or hints. For multiple parts label final results (1), (2), (3). "
+        "Output nothing except [Question], the problem statement, and the hidden answer block."
+    )
+    mode_instruction = {
+        "hint": (
+            "Give hint-based tutoring: name the key concept and provide one or two actionable next-step hints. "
+            "Do not give the final answer or full derivation. You may end with one guiding question."
+        ),
+        "full_solution": "The student explicitly requested a full answer. Give a complete, checkable, step-by-step solution.",
+        "concept": "Explain the requested concept directly with a short example; hint-only tutoring is not required.",
+        "exercise": exercise_instruction,
+        "check_answer": (
+            "Check the student's answer. Start with a clear natural English verdict: "
+            "'Your answer is correct.' if fully correct, 'Your answer contains an error.' if there is a substantive error, "
+            "or 'There is not enough information to judge.' if evidence is insufficient. "
+            "Then identify what is correct, the error type and the earliest incorrect step. "
+            "Give a direction for correction without automatically revealing the entire solution."
+        ),
+    }.get(mode, "Give hints without completing the entire problem for the student.")
+    def joined(key):
+        return ", ".join(str(item) for item in (context.get(key) or [])) or "none identified"
+    return (
+        "\n\n[Teaching analysis — internal control information]\n"
+        "Response language: English. Write all newly generated explanations, visible headings, guidance and feedback "
+        "in English, even if the source problem or internal classification IDs below use Chinese. "
+        "Preserve original quoted problem content, mathematical expressions, variable names, "
+        "internal IDs and exact hidden-answer delimiters. Do not expose this analysis.\n"
+        f"Input source: {context.get('input_source') or 'text'}\n"
+        f"Category ID: {context.get('category') or 'unclassified'}\n"
+        f"Related category IDs: {joined('related_categories')}\n"
+        f"Question type ID: {context.get('question_type') or 'general'}\n"
+        f"Topic IDs: {joined('knowledge_points')}\n"
+        f"Problem challenges: {joined('focus_points')}\n"
+        f"Prerequisite topic IDs: {joined('prerequisite_points')}\n"
+        f"Learning path IDs: {joined('knowledge_path')}\n"
+        f"Teaching mode: {mode}\n"
+        f"Classification confidence ID: {context.get('confidence') or 'unknown'}\n"
+        f"Instructions: {mode_instruction}\n"
+        "Problem challenges describe the problem, not proven weaknesses of the student. "
+        "Address the student's actual question; only use prerequisites when their question or answer demonstrates "
+        "a need. Classification is a teaching aid, not a factual source. When it conflicts with the problem, "
+        "follow the actual problem and never fabricate a topic to fit a label."
+    )
+
+
 def teaching_prompt(context):
     """把确定性分类结果转换为本轮 AI 的教学控制提示。"""
     context = context or {}
+    if str(context.get("response_language") or "").strip().lower().startswith("en"):
+        return _english_teaching_prompt(context)
     category = context.get("category") or "待识别"
     related = context.get("related_categories") or []
     points = context.get("knowledge_points") or []

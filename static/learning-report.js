@@ -2,6 +2,10 @@
     'use strict';
     const guidance = root.DMateLearningReviewGuidance
         || (typeof module !== 'undefined' && module.exports ? require('./learning-review-guidance.js') : null);
+    const knowledgeLanguage = root.DMateKnowledgeLanguage
+        || (typeof module !== 'undefined' && module.exports ? require('./language-knowledge.js') : null);
+    const selectedLanguage = options => (typeof options === 'string' ? options : options?.language)
+        || root.DMateI18n?.getLanguage?.() || 'zh-CN';
     const list = value => Array.isArray(value) ? value : [];
     const text = value => typeof value === 'string' ? value.trim() : '';
     const points = value => [...new Set(list(value).map(text).filter(value => value && !['待识别', '暂未识别'].includes(value)))];
@@ -83,7 +87,7 @@
         const names = [page.name, ...graphs.map(graph => graph.name)].map(text).filter(Boolean);
         const topicPoints = points([...detected([...names, body].join(' ')), ...names.flatMap(detected)]);
         return {
-            id: page.id, type: 'drawing', name: text(page.name) || '未命名绘图',
+            id: page.id, type: 'drawing', name: text(page.name) || '未命名绘图', unnamed: !text(page.name),
             at: time(page.updatedAt), vertexCount: vertices.length, edgeCount: edges.length,
             directedCount: edges.filter(edge => ['forward', 'backward', 'both'].includes(edge.direction)).length,
             weightedCount: edges.filter(edge => (typeof edge.weight === 'number' && Number.isFinite(edge.weight)) || text(edge.weight)).length,
@@ -194,13 +198,14 @@
                 check: '根据关系的定义决定是否连边，并说明理由；顶点靠得近不代表存在关系。'
             };
         }
-        return guidance ? guidance.advice(target.points[0] || '') : {
+        return guidance ? guidance.advice(target.points[0] || '', 'zh-CN') : {
             action: '先不看原文，用自己的话写出一个定义，再给一个例子。',
             check: '对照原文，逐项核对定义的条件是否满足。'
         };
     }
 
-    function reviewSections(snapshot) {
+    function reviewSections(snapshot, options = {}) {
+        if (selectedLanguage(options).startsWith('en')) return englishReviewSections(snapshot);
         const study = [];
         const chat = snapshot.sources.filter(record => ['question', 'discussion'].includes(record.type));
         const chatPoints = points(chat.flatMap(record => record.points)).slice(0, 3);
@@ -247,18 +252,117 @@
         return [['最近学习', study.join('') || '无'], ['值得再看看', revisit || '无'], ['接下来可以做', next || '无']];
     }
 
-    function render(container, snapshot) {
+    const englishPreview = value => preview(value, 90).replace(/（代码）/g, '[code]').replace(/（公式）/g, '[formula]');
+    const englishPoint = value => knowledgeLanguage ? knowledgeLanguage.label(value, 'en') : value;
+    const englishPoints = values => values.map(value => '“' + englishPoint(value) + '”').join(', ');
+    const englishNoteName = note => englishPreview(text(note.title) || note.content);
+    const englishDrawingName = drawing => drawing.unnamed ? 'Untitled Drawing' : englishPreview(drawing.name);
+    function englishQuestionLabel(record, kind = 'question') {
+        const snippet = englishPreview(record.question || record.text);
+        if (snippet.includes('[formula]')) return record.points.length
+            ? 'the ' + kind + ' about ' + englishPoints(record.points.slice(0, 1)) : 'the ' + kind + ' containing a formula';
+        return 'the ' + kind + ' “' + snippet + '”';
+    }
+    function englishDrawingDescription(drawing) {
+        const label = 'Drawing “' + englishDrawingName(drawing) + '”';
+        if (!drawing.vertexCount && !drawing.edgeCount) return label + ' contains the text “' + englishPreview(drawing.body) + '”.';
+        return label + ' contains ' + drawing.vertexCount + (drawing.vertexCount === 1 ? ' vertex' : ' vertices')
+            + ' and ' + drawing.edgeCount + (drawing.edgeCount === 1 ? ' edge' : ' edges')
+            + (drawing.directedCount ? ', including directed edges' : '')
+            + (drawing.weightedCount ? ', with edge weights' : '') + '.';
+    }
+    function englishTargetAdvice(target) {
+        if (target.type === 'drawing' && target.points.every(point => point === '图的表示')) {
+            if (target.edgeCount) return {
+                action: 'Choose a vertex, list its neighbors, and fill in the corresponding row of the adjacency matrix using a fixed vertex order.',
+                check: 'Compare each edge with the matrix entries'
+                    + (target.directedCount ? ', distinguishing outgoing from incoming edges' : '')
+                    + (target.weightedCount ? '. State whether entries record adjacency, edge counts or weights, then follow that convention.'
+                        : '. State the convention for any loops or parallel edges.')
+            };
+            if (target.vertexCount) return {
+                action: target.vertexCount === 1
+                    ? 'State what the existing vertex represents and whether another object is needed to express a relation.'
+                    : 'Choose two vertices, state what each represents, and decide whether there is a relation to show.',
+                check: 'Use the definition of the relation to decide whether to add an edge and explain why. Nearby vertices need not be related.'
+            };
+        }
+        return guidance ? guidance.advice(target.points[0] || '', 'en') : {
+            action: 'Without looking at the source, state a definition in your own words and give an example.',
+            check: 'Compare each condition with the source and verify that the example satisfies it.'
+        };
+    }
+    function englishReviewSections(snapshot) {
+        const study = [];
+        const chat = snapshot.sources.filter(record => ['question', 'discussion'].includes(record.type));
+        const chatPoints = points(chat.flatMap(record => record.points)).slice(0, 3);
+        if (chat.length) study.push(chatPoints.length ? 'Your conversations cover ' + englishPoints(chatPoints) + '.' : 'Your conversations contain questions you can revisit.');
+        const latestWrong = [...snapshot.wrong].sort((a, b) => b.at - a.at)[0];
+        if (latestWrong) study.push('Your Mistake Book contains ' + englishQuestionLabel(latestWrong) + '.');
+        const note = snapshot.notes[0];
+        if (note) study.push('Note “' + englishNoteName(note) + '”'
+            + (text(note.content) ? ' contains “' + englishPreview(note.content) + '”.' : ' currently has only a title.'));
+        if (snapshot.drawings.length) study.push(englishDrawingDescription(snapshot.drawings[0]));
+        const target = snapshot.target;
+        if (!target) return [['Recent Study', study.join(' ') || 'None'], ['Worth Revisiting', 'None'], ['Next Steps', 'None']];
+        const advice = englishTargetAdvice(target);
+        let revisit = '';
+        const next = [];
+        if (target.type === 'wrong') {
+            const label = englishQuestionLabel(target, 'saved question'), status = target.status;
+            const subject = label[0].toUpperCase() + label.slice(1);
+            if (status.failed) revisit = subject + ' was not passed in the latest retest'
+                + (status.manual ? '; there is also a manually marked pass in its history' : '') + '.';
+            else if (status.uncertain) revisit = subject + (status.manual
+                ? ' has a manually marked pass, but the latest retest result is uncertain. Compare the actual answer with the pass marking.'
+                : ' has an uncertain latest retest result. Review the answer and feedback.');
+            else if (status.state === 'pending') revisit = subject + ' has not been marked as corrected.';
+            else if (status.state === 'retest') revisit = subject + ' has been corrected, but has no recorded retest pass.';
+            else revisit = subject + (status.manual ? ' has a manually marked pass.' : ' has a recorded retest pass.')
+                + ' Change one condition to check whether you can still solve it independently.';
+            if (status.uncertain) next.push('Open this question’s retest history and compare the actual answer with the pass marking.');
+            else if (status.state === 'pending') next.push('Try the question again without looking at the answer.');
+            else if (status.state === 'retest') next.push('Start a retest from this corrected question and answer it independently first.');
+            else next.push('In your next study session, try a small variation on the same topic independently.');
+            next.push(advice.action, advice.check);
+            if (status.state === 'pending' && !status.uncertain) next.push('Write the corrected step in “My Notes,” check it, then mark the question as corrected.');
+            if (status.failed) next.push('If you are still stuck at the start, study one step of a similar worked example, then close it and try again.');
+        } else if (target.type === 'note') {
+            revisit = 'Note “' + englishNoteName(target) + '”' + (text(target.content)
+                ? ' can help you check whether you can explain the definition and justify an example without reading the original.'
+                : ' currently has only a title. Add a definition and an example first.');
+            next.push(text(target.content) ? 'Hide the note before you begin.' : 'Write your own understanding in this note first.',
+                advice.action, advice.check, 'Then compare with your materials and correct any missing conditions.');
+        } else if (target.type === 'drawing') {
+            revisit = 'Drawing “' + englishDrawingName(target) + '” can help you check whether the diagram, text and mathematical definitions agree.';
+            next.push(advice.action, advice.check);
+        } else {
+            const label = target.type === 'question' ? englishQuestionLabel(target) : 'the topic ' + englishPoints(target.points.slice(0, 1)) + ' from your conversation';
+            revisit = 'Revisit ' + label + ' by making your own example or solving it again. Check that the definitions and conditions are used correctly.';
+            next.push(advice.action, advice.check);
+        }
+        const relatedNote = snapshot.notes.find(item => item !== target && item.points.some(point => target.points.includes(point)));
+        if (relatedNote && target.type !== 'note') next.push('You can compare with note “' + englishNoteName(relatedNote) + '”.');
+        return [['Recent Study', study.join(' ') || 'None'], ['Worth Revisiting', revisit || 'None'], ['Next Steps', next.filter(Boolean).join(' ') || 'None']];
+    }
+
+    function render(container, snapshot, options = {}) {
         const document = container.ownerDocument;
+        const language = selectedLanguage(options);
         if (!snapshot.hasAnyRecord) {
             const empty = document.createElement('div');
             empty.className = 'learning-review-empty';
-            empty.textContent = '无';
+            empty.setAttribute('translate', 'no');
+            empty.textContent = language.startsWith('en') ? 'None' : '无';
             container.replaceChildren(empty);
             return;
         }
         const rootNode = document.createElement('div');
         rootNode.className = 'lr-review';
-        for (const [title, description] of reviewSections(snapshot)) {
+        // Descriptions mix translated UI prose with untouched user quotations.
+        // The UI translator must not apply dictionary replacements inside them.
+        rootNode.setAttribute('translate', 'no');
+        for (const [title, description] of reviewSections(snapshot, { language })) {
             const section = document.createElement('section');
             section.className = 'learning-review-section';
             const heading = document.createElement('h3');
@@ -272,7 +376,7 @@
         }
         container.replaceChildren(rootNode);
     }
-    const api = { buildSnapshot, render };
+    const api = { buildSnapshot, render, reviewSections };
     root.DMateLearningReport = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

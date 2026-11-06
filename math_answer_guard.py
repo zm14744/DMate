@@ -8,6 +8,8 @@ import math
 import re
 from collections import Counter
 
+from server_i18n import localized, normalize_language
+
 ANSWER_LINE = re.compile(r"(?m)^\s*【结果】\s*([0-9][0-9,]*)\s*[。.\s]*$")
 CHINESE = re.compile(r"(?P<n>\d{1,3})\s*本.{0,85}?(?:选|选择|取|挑)(?:出|中)?\s*(?P<k>\d{1,3})\s*本", re.S)
 ENGLISH = re.compile(r"(?P<n>\d{1,3})\s+books.{0,200}?(?:select(?:ing)?|choos(?:e|ing))\s*(?P<k>\d{1,3})\b",re.I|re.S)
@@ -171,7 +173,7 @@ def _letter_arrangement_value(question):
     return word,counts,result
 
 
-def audit_letter_arrangement_answer(question, reply):
+def audit_letter_arrangement_answer(question, reply, *, language='zh-CN'):
     """Correct 11!-for-10-letters errors in explicit complete solutions."""
     raw=str(reply or "")
     parsed=_letter_arrangement_value(question)
@@ -195,13 +197,18 @@ def audit_letter_arrangement_answer(question, reply):
         # length or factorial is a wrong proof and must be replaced.
     factors="×".join(f"{n}!" for n in sorted(counts.values(), reverse=True) if n>1)
     denominator=factors or "1"
+    if normalize_language(language) == 'en':
+        return (f"Independent count of letters and repetitions: {word} has {len(word)} letters; "
+                + ", ".join(f"{symbol} occurs {n} times" for symbol,n in sorted(counts.items()))
+                + f". The number of distinct arrangements is {len(word)}!÷({denominator})={result}."
+                + f"\n【结果】{result}")
     return (f"独立复核字母数与重复次数：{word} 共 {len(word)} 个字母，"
             + "，".join(f"{symbol} 出现 {n} 次" for symbol,n in sorted(counts.items()))
             + f"。不同排列的数量应为 {len(word)}!÷({denominator})={result}。"
             + f"\n【结果】{result}")
 
 
-def audit_explicit_count_answer(question, reply):
+def audit_explicit_count_answer(question, reply, *, language='zh-CN'):
     """Return original reply when unsure; correct proven wrong standalone count.
 
     If the model has included a wrong final result, replace it with a short
@@ -210,7 +217,7 @@ def audit_explicit_count_answer(question, reply):
     text=str(reply or "")
     parsed=separate_selection_value(question)
     if not parsed:
-        return audit_letter_arrangement_answer(question, text)
+        return audit_letter_arrangement_answer(question, text, language=language)
     if not ANSWER_DEMAND.search(question):
         return text
     observed=_last_answer_integer(text)
@@ -219,17 +226,25 @@ def audit_explicit_count_answer(question, reply):
     n,k,expected=parsed
     if observed==expected:
         return text
-    proof=(f"独立计数核验：从连续排列的 {n} 本书选 {k} 本，"
+    proof=localized(f"独立计数核验：从连续排列的 {n} 本书选 {k} 本，"
            f"每两本选中书之间至少留一本未选。"
            f"先预留 {k-1} 个必须空出的相邻间隔，"
            f"相当于从 {n-k+1} 个位置选出 {k} 个。\n"
-           f"因此方案数为 C({n-k+1},{k})={expected}。")
+           f"因此方案数为 C({n-k+1},{k})={expected}。",
+           f"Independent count: choose {k} of {n} books in a row, leaving at least one unselected book "
+           f"between successive selected books. Reserve the {k-1} required gaps. "
+           f"This is equivalent to choosing {k} of {n-k+1} positions.\n"
+           f"The number of selections is C({n-k+1},{k})={expected}.", language)
     # This is an actual mathematical correction: returning the originally
     # wrong derivation would be worse than giving a verified concise one.
     if re.search(r"\(a\).*\(b\)|（a）.*（b）",question,re.S|re.I):
-        proof=("（a）对符合条件的选书方案，将前 k-1 本选中书后面"
+        proof=localized("（a）对符合条件的选书方案，将前 k-1 本选中书后面"
                "必须空出的相邻位置与这 k-1 本合并，得到长度"
                f"{n-k+1}、含 {k} 个选中标记的二元序列。"
                "反向恢复也唯一，因此构成双射。\n\n"
-               "（b）"+proof)
+               "（b）"+proof,
+               "(a) In each valid selection, merge each of the first k-1 selected books with its required "
+               f"following unselected position. This produces a binary sequence of length {n-k+1} "
+               f"with {k} selected positions. The reverse construction is unique, so this is a bijection.\n\n"
+               "(b) "+proof, language)
     return proof+f"\n【结果】{expected}"
