@@ -20,5 +20,6 @@ jobs:
           $path = Join-Path $env:RUNNER_TEMP 'submission.cer'
           Export-Certificate -Cert $certificate -FilePath $path | Out-Null
           Write-Host 'Importing temporary certificate into the current-user root store'
-          Import-Certificate -FilePath $path -CertStoreLocation 'Cert:/CurrentUser/Root' | Out-Null
+          & certutil.exe -user -f -addstore Root $path
+          if ($LASTEXITCODE -ne 0) { throw 'Noninteractive certificate import failed' }
           Write-Host 'Certificate import completed without interaction'

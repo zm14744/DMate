@@ -17,6 +17,7 @@ $runtimeName = "Microsoft.WebView2.FixedVersionRuntime.$runtimeVersion.x64.cab"
 $runtimeUrl = "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/b7b22a57-b321-483e-9855-d260b076f1a7/$runtimeName"
 
 function Run-Checked([string]$Program, [string[]]$Arguments) {
+    Write-Host "Running $(Split-Path -Leaf $Program)"
     & $Program @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Tool failed: $Program (exit $LASTEXITCODE)" }
 }
@@ -89,7 +90,8 @@ $runtimeCache = Join-Path $env:RUNNER_TEMP 'dmate-store-runtime-cache'
 New-Item -ItemType Directory -Force $runtimeCache | Out-Null
 $cab = Join-Path $runtimeCache $runtimeName
 if (-not (Test-Path $cab)) {
-    Invoke-WebRequest -Uri $runtimeUrl -OutFile $cab -MaximumRetryCount 2 -RetryIntervalSec 3
+    Write-Host 'Downloading the official fixed WebView2 runtime'
+    Invoke-WebRequest -Uri $runtimeUrl -OutFile $cab -MaximumRetryCount 2 -RetryIntervalSec 3 -TimeoutSec 900
 }
 $runtimeExtract = Join-Path $work 'runtime'
 New-Item -ItemType Directory -Force $runtimeExtract | Out-Null
@@ -147,7 +149,7 @@ $pfx = Join-Path $work 'submission-signing.pfx'
 $cer = Join-Path $work 'submission-signing.cer'
 Export-PfxCertificate -Cert $certificate -FilePath $pfx -Password (ConvertTo-SecureString $certificatePassword -AsPlainText -Force) | Out-Null
 Export-Certificate -Cert $certificate -FilePath $cer | Out-Null
-Import-Certificate -FilePath $cer -CertStoreLocation 'Cert:/CurrentUser/Root' | Out-Null
+Run-Checked 'certutil.exe' @('-user','-f','-addstore','Root',$cer)
 $records = @()
 foreach ($package in $packages) {
     $layout = Join-Path $layouts $package.Layout
