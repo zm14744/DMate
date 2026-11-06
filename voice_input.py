@@ -99,7 +99,7 @@ def _discard_http_session(session):
         session.close()
 
 
-def transcribe_voice(raw, *, post=None):
+def transcribe_voice(raw, *, language='zh-CN', post=None):
     """One explicit model call, with the user's vocabulary; no silent fallback."""
     started = time.perf_counter()
     seconds = inspect_wav(raw)
@@ -109,9 +109,21 @@ def transcribe_voice(raw, *, post=None):
         raise VoiceInputError('asr_busy', '语音服务繁忙，请稍后重试。', status=429)
     session = response = None
     try:
+        is_english = str(language or '').lower().startswith('en')
+        parameters = {
+            'format': 'wav',
+            'sample_rate': str(SAMPLE_RATE),
+            'vocabulary_id': vocabulary,
+            'language_hints': ['en'] if is_english else ['zh'],
+        }
+        # Qwen Audio 3.1 supports request-scoped instant hotwords. Keep the
+        # existing precompiled Chinese vocabulary and API key unchanged; add
+        # English domain terms only when the UI is set to English.
+        if is_english:
+            parameters['vocabulary'] = {"discrete mathematics":4,"propositional logic":4,"predicate logic":4,"tautology":4,"contradiction":4,"De Morgan's law":4,"quantifier":4,"Cartesian product":4,"power set":4,"cardinality":4,"equivalence relation":4,"equivalence class":4,"partial order":4,"total order":4,"poset":4,"Hasse diagram":4,"injective":4,"surjective":4,"bijective":4,"pigeonhole principle":4,"permutation":4,"combination":4,"binomial coefficient":4,"inclusion-exclusion principle":4,"recurrence relation":4,"generating function":4,"mathematical induction":4,"inductive hypothesis":4,"proof by contradiction":4,"counterexample":4,"greatest common divisor":4,"least common multiple":4,"modular arithmetic":4,"Euclidean algorithm":4,"graph theory":4,"directed graph":4,"undirected graph":4,"weighted graph":4,"vertex":4,"vertices":4,"edge":4,"degree":4,"adjacent vertices":4,"connected component":4,"Eulerian path":4,"Eulerian circuit":4,"Hamiltonian path":4,"Hamiltonian cycle":4,"bipartite graph":4,"spanning tree":4,"minimum spanning tree":4,"shortest path":4,"Dijkstra's algorithm":4,"breadth-first search":4,"depth-first search":4,"adjacency matrix":4,"adjacency list":4,"chromatic number":4,"graph coloring":4,"network flow":4,"binary tree":4,"rooted tree":4,"big O notation":4,"time complexity":4}
         payload = {'model': model, 'input': {'messages': [{'role': 'user', 'content': [{
             'type': 'input_audio', 'input_audio': {'data': 'data:audio/wav;base64,' + base64.b64encode(raw).decode('ascii')}}]}]},
-            'parameters': {'format': 'wav', 'sample_rate': str(SAMPLE_RATE), 'vocabulary_id': vocabulary}}
+            'parameters': parameters}
         if post is None:
             session = _http_session()
             # Only the connection is shared between dictations. Authorization
