@@ -131,6 +131,8 @@ noteBody.textContent = note.content;
 
 网页英文界面随站点部署更新，不应因此提高原生安装包清单版本或触发下载提醒。Android 源码另补齐原生离线、权限及操作提示的英文，并通过仅允许可信 HTTPS 主框架发送的语言桥接保存选择；本轮已通过 SDK 36 / Java 17 的 debug APK 构建验证，尚未发布包含这些文案的新正式 APK。维护者须完成构建、签名、发布并让使用者安装后，才能将原生英文提示列为已交付能力。网页正常显示英文不等于旧包的原生离线页已更新。
 
+macOS 麦克风权限文案由 `Info.plist` 与 `locales/en.lproj/InfoPlist.strings`、`locales/zh-Hans.lproj/InfoPlist.strings` 提供，构建时复制进应用的 `Contents/Resources`，按系统语言显示。Linux DEB 与 AppImage 共用 `linux/DMate.desktop.hbs` 模板，默认英文描述为 Discrete Mathematics Tutor，同时保留 `Comment[zh_CN]`；DMate 应用短名不变。这些原生文案需重新构建并安装对应客户端。iOS 的共享描述文件采用中英双语安装说明，仍为同一个全屏 Web Clip；已有主屏幕图标与安装说明需替换描述文件才能更新。生成文件、CI 构建产物、公开下载附件和用户实际安装需分别核对，GitHub 更新不代表 GitCode 附件已同步。
+
 ## 模型服务
 
 | 变量 | 当前用途与默认值 |

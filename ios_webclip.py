@@ -24,6 +24,9 @@ def build_ios_webclip_profile(icon_path):
         "PayloadDescription": (
             "在 iPhone 或 iPad 主屏幕添加 DMate 全屏网页入口。"
             "此配置仅添加网页图标，不包含设备管理、证书、VPN 或限制。"
+            "\n\nAdd DMate — Discrete Mathematics Tutor to the iPhone or iPad Home Screen "
+            "as a full-screen web app. This profile only adds a web shortcut; "
+            "it contains no device management, certificates, VPN settings or restrictions."
         ),
         "PayloadOrganization": "DMate",
         "PayloadContent": [
