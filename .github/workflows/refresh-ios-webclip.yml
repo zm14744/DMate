@@ -14,6 +14,12 @@ on:
       - "static/icons/apple-touch-icon.png"
       - "static/icons/dmate-app-v52-512.png"
   workflow_dispatch:
+    inputs:
+      publish_gitcode:
+        description: Also upload the profile to GitCode
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -100,13 +106,13 @@ jobs:
           fi
 
       - name: Publish the full-screen profile to GitCode
-        if: steps.gitcode-token.outputs.available == 'true'
+        if: steps.gitcode-token.outputs.available == 'true' && (github.event_name != 'workflow_dispatch' || inputs.publish_gitcode)
         env:
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
         run: |
           python scripts/upload_gitcode_release_asset.py dist/DMate-iPhone-iPad-fullscreen.mobileconfig
 
       - name: Explain skipped GitCode publication
-        if: steps.gitcode-token.outputs.available != 'true'
+        if: steps.gitcode-token.outputs.available != 'true' || (github.event_name == 'workflow_dispatch' && !inputs.publish_gitcode)
         run: |
-          echo "GITCODE_TOKEN is not configured; GitCode release asset must be replaced manually."
+          echo "GitCode publication is disabled for this run or no token is configured; the existing GitCode attachment is unchanged."
