@@ -114,9 +114,10 @@
         });
         if (current === LANGS.EN) {
             translateTree(document.body);
-        } else {
-            // A reload restores the original source-language DOM. This avoids
-            // lossy reverse-translation and keeps dynamically generated markup safe.
+        } else if (persist !== false) {
+            // Reload only when the user actively switches back to Chinese.
+            // Initializing the saved/default Chinese preference must never reload
+            // the page, otherwise every first visit enters an endless reload loop.
             root.location.reload();
         }
     }
