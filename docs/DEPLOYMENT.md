@@ -339,7 +339,7 @@ Tauri 配置位于 `desktop/src-tauri/tauri.conf.json`；Android 配置位于 `a
 | `.github/workflows/build-android-release.yml` | 手动生成签名 release APK Artifact，不自动覆盖 Release |
 | `.github/workflows/publish-android-release.yml` | 手动校验指定成功构建的签名 APK，再新增版本化发布附件；缺少 GitCode 凭据时明确标记该源未发布 |
 | `.github/workflows/build-snap.yml` | 构建 amd64 Snap |
-| `.github/workflows/publish-snap.yml` | 使用发布凭据上传新构建或提升已有修订渠道 |
+| `.github/workflows/publish-snap.yml` | 填写成功构建的 `build_run_id`，核对 Snap 元数据后上传；或显式提升已有 revision 的渠道 |
 
 Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DMATE_ANDROID_KEYSTORE_PASSWORD`、`DMATE_ANDROID_KEY_ALIAS`、`DMATE_ANDROID_KEY_PASSWORD`；Gradle 读取 `DMATE_KEYSTORE_PATH`、`DMATE_KEYSTORE_PASSWORD`、`DMATE_KEY_ALIAS`、`DMATE_KEY_PASSWORD`。Snap 发布使用 `SNAPCRAFT_STORE_CREDENTIALS`。macOS 见[签名与公证](MACOS_DISTRIBUTION.md)。构建 Artifact 与对外发布是两个步骤，旧下载文件不会因网页更新自动替换。
 

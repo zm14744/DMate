@@ -7,15 +7,18 @@ on:
         description: Promote an existing revision or upload a genuinely new build
         type: choice
         options:
-          - promote-existing
           - upload-new-build
+          - promote-existing
         required: true
-        default: promote-existing
-      revision:
-        description: Existing Snap Store revision (the first DMate revision is 1)
+        default: upload-new-build
+      build_run_id:
+        description: Successful Build DMate Snap run ID (required for upload-new-build)
         type: string
-        required: true
-        default: '1'
+        required: false
+      revision:
+        description: Existing Snap Store revision (only for promote-existing)
+        type: string
+        required: false
       channel:
         description: Target Snap Store channel
         type: choice
@@ -35,6 +38,10 @@ jobs:
   publish:
     runs-on: ubuntu-24.04
     steps:
+      - name: Checkout release configuration
+        if: inputs.operation == 'upload-new-build'
+        uses: actions/checkout@v4
+
       - name: Check Snap Store credentials
         shell: bash
         env:
@@ -64,23 +71,28 @@ jobs:
           fi
           /snap/bin/snapcraft release dmate "$REVISION" "$CHANNEL"
 
-      - name: Locate latest successful Snap build
+      - name: Verify the explicitly selected Snap build
         if: inputs.operation == 'upload-new-build'
         id: source
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
         run: |
           set -euo pipefail
-          run_id="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/workflows/build-snap.yml/runs" \
-            -f branch=main -f status=success -f per_page=1 \
-            --jq '.workflow_runs[0].id // empty')"
-          if [[ -z "$run_id" ]]; then
-            echo "::error::No successful Build DMate Snap (GitHub) run on main."
+          if [[ ! "$BUILD_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Enter the successful Build DMate Snap run ID in build_run_id."
             exit 1
           fi
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          echo "Using Snap build run $run_id"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${BUILD_RUN_ID}" > "$RUNNER_TEMP/snap-build-run.json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" '
+            .status == "completed" and .conclusion == "success" and
+            .head_branch == "main" and .path == ".github/workflows/build-snap.yml" and
+            .repository.full_name == $repo and .head_repository.full_name == $repo
+          ' "$RUNNER_TEMP/snap-build-run.json" > /dev/null
+          echo "run_id=$BUILD_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "Using successful Snap build run $BUILD_RUN_ID"
+          jq -r '"Source commit: " + .head_sha' "$RUNNER_TEMP/snap-build-run.json"
 
       - name: Download existing Snap artifact
         if: inputs.operation == 'upload-new-build'
@@ -102,6 +114,23 @@ jobs:
             echo "::error::Expected exactly one .snap in the downloaded artifact, found ${#snaps[@]}."
             exit 1
           fi
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends squashfs-tools python3-yaml
+          unsquashfs -cat "${snaps[0]}" meta/snap.yaml > "$RUNNER_TEMP/dmate-snap-metadata.yaml"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import yaml
+
+          expected = yaml.safe_load(Path("snap/snapcraft.yaml").read_text())
+          actual = yaml.safe_load((Path(os.environ["RUNNER_TEMP"]) / "dmate-snap-metadata.yaml").read_text())
+          for key in ("name", "version", "base", "confinement"):
+              if str(actual.get(key)) != str(expected.get(key)):
+                  raise SystemExit(f"Snap {key} does not match current release configuration")
+          if actual.get("architectures") != ["amd64"]:
+              raise SystemExit("Expected an amd64 Snap package")
+          print(f"Verified {actual['name']} {actual['version']} (amd64)")
+          PY
           echo "snap=${snaps[0]}" >> "$GITHUB_OUTPUT"
           ls -lh "${snaps[0]}"
           sha256sum "${snaps[0]}"
