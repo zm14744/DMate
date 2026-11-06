@@ -163,7 +163,7 @@
             try {
                 const chunks = [new Int16Array(LEADING_PAD_SAMPLES), ...op.chunks, new Int16Array(TRAILING_PAD_SAMPLES)];
                 const total = LEADING_PAD_SAMPLES + op.count + TRAILING_PAD_SAMPLES;
-                const body = new FormData(); body.append('audio', wavBlob(chunks, total), 'voice.wav');
+                const body = new FormData(); body.append('audio', wavBlob(chunks, total), 'voice.wav'); body.append('language', window.DMateI18n?.getLanguage?.() || document.documentElement.lang || 'zh-CN');
                 op.chunks = [];
                 const response = await fetcher(options.endpoint || '/voice/transcribe', {
                     method: 'POST', body, signal: op.controller.signal, credentials: 'same-origin'
