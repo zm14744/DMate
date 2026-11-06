@@ -191,15 +191,6 @@ SMTP_CONFIGURED = bool(
 )
 EMAIL_DELIVERY_CONFIGURED = bool(BREVO_CONFIGURED or SMTP_CONFIGURED)
 
-# Android 网页端仅提供 APK 下载入口；不再提供网页应用安装流程。
-ANDROID_APK_URL = (os.environ.get("ANDROID_APK_URL") or "").strip()
-
-# 桌面客户端：Windows / macOS / Linux 统一使用 Tauri，不再依赖网页安装。
-DESKTOP_WINDOWS_URL = (os.environ.get("DESKTOP_WINDOWS_URL") or "").strip()
-DESKTOP_MACOS_URL = (os.environ.get("DESKTOP_MACOS_URL") or "").strip()
-DESKTOP_LINUX_DEB_URL = (os.environ.get("DESKTOP_LINUX_DEB_URL") or "").strip()
-DESKTOP_LINUX_APPIMAGE_URL = (os.environ.get("DESKTOP_LINUX_APPIMAGE_URL") or "").strip()
-
 MAX_SYNC_JSON_BYTES = 12 * 1024 * 1024
 AUTH_RATE_LIMIT_WINDOW = 60
 AUTH_RATE_LIMIT_COUNT = 20
@@ -233,14 +224,7 @@ def attach_runtime_source(response):
 @app.after_request
 def no_stale_web_application_assets(response):
     path = request.path
-    if (response.status_code in (200, 206, 304) and re.fullmatch(
-            r'/static/downloads/DMate-Android-\d+\.\d+\.\d+\.apk', path)):
-        # Versioned release binaries are bundled with the site so Android
-        # downloads do not depend on a separate mirror's availability/version.
-        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
-        response.headers['Content-Type'] = 'application/vnd.android.package-archive'
-        response.headers['Content-Disposition'] = 'attachment; filename="' + path.rsplit('/', 1)[1] + '"'
-    elif (response.status_code in (200, 206, 304) and re.match(
+    if (response.status_code in (200, 206, 304) and re.match(
             r'^/static/vendor/(?:mathjax|marked|dompurify|html2canvas|jspdf)-[0-9]+\.[0-9]+\.[0-9]+/', path)):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif (path == '/service-worker.js' or path == '/web-version' or
@@ -2376,6 +2360,18 @@ def ios_ipados_webclip_profile():
     return response
 
 
+@app.route("/static/downloads/DMate-Android-1.0.3.apk")
+def legacy_android_download():
+    """Keep old installed pages/bookmarks working without bundling the APK."""
+    response = redirect(
+        "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/"
+        "attach_files/DMate-Android-1.0.3.apk/download",
+        code=302,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/service-worker.js")
 def retire_legacy_dmate_service_worker():
     """Give *already installed* PWA workers an update that unregisters them.
@@ -2448,11 +2444,6 @@ def home():
         is_android_firefox=is_android_firefox,
         is_dmate_android_app=is_dmate_android_app,
         is_dmate_desktop_app=is_dmate_desktop_app,
-        android_apk_url=ANDROID_APK_URL,
-        desktop_windows_url=DESKTOP_WINDOWS_URL,
-        desktop_macos_url=DESKTOP_MACOS_URL,
-        desktop_linux_deb_url=DESKTOP_LINUX_DEB_URL,
-        desktop_linux_appimage_url=DESKTOP_LINUX_APPIMAGE_URL,
     ))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     # The favicon and native-client controls depend on the request's platform.

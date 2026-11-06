@@ -305,17 +305,29 @@ Tauri 配置位于 `desktop/src-tauri/tauri.conf.json`；Android 配置位于 `a
 
 Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DMATE_ANDROID_KEYSTORE_PASSWORD`、`DMATE_ANDROID_KEY_ALIAS`、`DMATE_ANDROID_KEY_PASSWORD`；Gradle 读取 `DMATE_KEYSTORE_PATH`、`DMATE_KEYSTORE_PASSWORD`、`DMATE_KEY_ALIAS`、`DMATE_KEY_PASSWORD`。Snap 发布使用 `SNAPCRAFT_STORE_CREDENTIALS`。macOS 见[签名与公证](MACOS_DISTRIBUTION.md)。构建 Artifact 与对外发布是两个步骤，旧下载文件不会因网页更新自动替换。
 
-下载安装弹窗可通过 `ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL` 配置下载地址。自定义地址必须为没有用户凭据或片段的有效 HTTPS URL。Android 新版优先使用网站直链 `/static/downloads/DMate-Android-1.0.3.apk`，第二项为本项目 GitHub `v1.0.1` 发行集合内同名文件；不再显示旧 Android GitCode / itch 入口。遗留环境变量若指向官方旧 `DMate.apk`，不会把入口切回旧包；有效 HTTPS 自定义新镜像作为第三项“其他下载源”，不替换前两项。
+下载安装弹窗由 `static/script.js` 的 `downloadOptionsForCurrentPlatform()` 固定提供 GitCode 优先、GitHub 备用的附件地址，并保留对应平台的商店入口。附件位于现有 `v1.0.1` 发行集合中：Android 为 `DMate-Android-1.0.3.apk`，Windows 为 `DMate_1.0.0_x64-setup.exe`，macOS 为 `DMate_1.0.0_universal.dmg`，Linux 为 `DMate_1.0.0_amd64.deb` / `DMate_1.0.0_amd64.AppImage`，iOS 为 `DMate-iPhone-iPad-fullscreen.mobileconfig`。iOS 继续使用描述文件，不提供 PWA 安装；`/service-worker.js` 只用于清退旧 worker。
 
-桌面端仍使用 GitCode、GitHub 入口：配置的 GitCode 地址或本项目 GitHub 发行版地址替换对应入口，其他自建镜像作为第三项。iOS 继续提供描述文件及备用源，不提供 PWA 安装。这些环境变量只配置下载安装弹窗，不替代安装后检查更新使用的 `static/client-updates.json` 清单。`/service-worker.js` 只用于清退旧 worker。
+新版服务端不再读取、模板也不再注入以下五个下载地址变量，部署本版后可从 Zeabur 删除：
+
+| 可删除的变量 | 原用途 |
+| --- | --- |
+| `ANDROID_APK_URL` | Android APK 地址 |
+| `DESKTOP_WINDOWS_URL` | Windows 安装程序地址 |
+| `DESKTOP_MACOS_URL` | macOS DMG 地址 |
+| `DESKTOP_LINUX_DEB_URL` | Linux DEB 地址 |
+| `DESKTOP_LINUX_APPIMAGE_URL` | Linux AppImage 地址 |
+
+删除范围仅是这五个下载地址变量。账号、数据库、邮件、模型 API、Android 签名、Apple 公证等配置仍按其用途保留；不要把移除下载地址理解为清空服务环境变量。保留旧下载变量不会影响当前链接，也不再产生环境变量指定的“其他下载源”。以后文件名或渠道改变时，应修改源码中的固定入口和更新清单，再部署网页。
+
+页面打开下载弹窗时直接使用上述固定地址，不请求发行版列表 API，也不动态解析 `latest`；GitCode 附件下载接口本身仍是实际下载目标。网站不再携带 APK 二进制；仅对旧精确路径 `/static/downloads/DMate-Android-1.0.3.apk` 返回 HTTP 302，目标为 GitCode 的同名附件，以兼容旧页面或保存链接。该路径不提供通用下载代理，不替代当前 GitCode / GitHub 按钮。产物元数据 `static/downloads/DMate-Android-1.0.3.json` 继续保留。
 
 公式与富文本等前端依赖位于 `static/vendor/<组件-版本>/`，含 MathJax 本地按需资源、上游许可和完整性清单，镜像必须包含这些文件。版本化的第三方目录成功响应允许一年 immutable 缓存；业务 JS / CSS、未版本化资源清单和 `/web-version` 仍禁用旧缓存。升级第三方库应使用新版本目录，不能原地替换已长期缓存的文件。安装壳检查网页更新时会在忙碌期间延后重载；这不能更新 APK / Tauri 中的原生代码。
 
-`static/client-updates.json` 独立控制安装后更新通知。Android 的新发布记录以同域版本化 APK 为主源、同版本 GitHub 文件为 `fallbackUrls`，网页仍校验允许的来源和文件路径；其他平台沿用各自已经发布的来源。保留实际包版本和发布状态，不能只改网页就把尚未发布的新原生包标成可更新。检测公开文件时使用 GET 或 Range GET；GitCode 附件的 HEAD 返回值不能单独判断文件不存在。
+`static/client-updates.json` 独立控制安装后更新通知。Android 以 GitCode 同名 APK 为主源、GitHub 同版本文件为 `fallbackUrls`，保留 APK 原 SHA256；桌面项继续对应现用的 1.0.0 下载文件，不因源码版本增加而自动提高发布版本。网页仍校验允许的来源和文件路径，版本和 `published` 必须对应实际文件。更换安装包后同时核对 `static/script.js` 与该清单，检查文件名、版本、两源内容及可用性。检测公开文件时使用 GET 或 Range GET；GitCode 附件的 HEAD 返回值不能单独判断文件不存在。网页版本自动刷新与原生下载安装继续分别执行，前者不会替换设备上已经安装的原生代码。
 
 ### Android 签名包发布
 
-Android 1.0.3 使用 `DMate-Android-1.0.3.apk`，内部 `versionName` 为 `1.0.3`、`versionCode` 为 `4`。GitHub 备用文件放在已有的 `v1.0.1` 发行集合中，发行集合标签不是 APK 的内部版本号。网站主源的文件存放在 `static/downloads/`，通过正常网站部署提供；准备文件、部署成功和外网能够下载是三个需要分别核对的步骤。
+Android 1.0.3 使用 `DMate-Android-1.0.3.apk`，内部 `versionName` 为 `1.0.3`、`versionCode` 为 `4`。GitCode 与 GitHub 均使用已有 `v1.0.1` 发行集合中的同名文件，发行集合标签不是 APK 的内部版本号。安装包由两源直接分发，不再放进网站镜像；准备文件、上传渠道、配置入口和外网能够下载应分别核对。
 
 先运行 `build-android-release.yml` 取得成功的签名 release 构建，再手动运行 `publish-android-release.yml`。发布工作流接收以下三个必填输入：
 
@@ -325,9 +337,9 @@ Android 1.0.3 使用 `DMate-Android-1.0.3.apk`，内部 `versionName` 为 `1.0.3
 | `expected_head_sha` | 该构建对应的完整源码提交 SHA，用于防止取到另一份源码的产物 |
 | `expected_apk_sha256` | 已核对的签名 APK 文件 SHA256，用于确认发布的正是预期二进制 |
 
-工作流对指定成功构建及其签名包进行校验后，才新增版本化附件，不用新包覆盖旧 `DMate.apk`。网站主源与 GitHub 备用源应提供相同 APK，切换下载入口前核对文件 SHA256、应用 ID、版本、签名证书和启动器资源。更新清单的版本与发布状态只能在相应文件实际提供后更新，Artifact 生成成功不能代替这些发布检查。
+工作流对指定成功构建及其签名包进行校验后，才新增版本化附件，不用新包覆盖旧 `DMate.apk`。GitCode 主源与 GitHub 备用源应提供相同 APK，切换下载入口前核对文件 SHA256、应用 ID、版本、签名证书和启动器资源。更新清单的版本与发布状态只能在相应文件实际提供后更新，Artifact 生成成功不能代替这些发布检查。
 
-GitCode 上传需要单独配置 `GITCODE_TOKEN`。缺少凭据时，工作流明确记录 GitCode 未发布，不能因为 GitHub 成功就声称两个来源都已更新。后续具备凭据时可以补传同一版本化文件，不覆盖旧包；当前 Android 下载界面仍以网站直链和 GitHub 同版本文件为准，不把没有更新的旧 GitCode / itch 地址当成新版备用源。
+通过工作流上传 GitCode 时需要单独配置 `GITCODE_TOKEN`。缺少凭据时，工作流明确记录此次未向 GitCode 发布，不能因为 GitHub 成功就声称该次流程已经更新两个来源；也可以由有权限的维护者在渠道上手动上传并核对同一版本化文件。实际下载以两源附件为准，工作流是否配置 token 不决定已经手动上传的公开文件是否存在。后续发布仍需逐源核对，不覆盖旧包。
 
 ### 安装版的系统主题传递
 
@@ -381,7 +393,7 @@ python scripts/generate_icons.py
 
 源码资源齐全和本地图像检查通过，不等于 APK / 桌面安装包编译、签名或真机验证已经完成。发布前仍应检查相应平台的构建产物；仅当新包真实发布后，才更新下载入口或 `static/client-updates.json` 的版本与状态。缓存图标未更新时先重新打开页面 / 应用、必要时重新创建系统快捷方式，不要删除账号存储来刷新图标。
 
-Android 签名包的版本化文件名、网站主源、GitHub 备用附件和发布前校验见[Android 签名包发布](#android-签名包发布)。各平台的构建与发布结果应分别确认，不因图标资源生成成功就把旧下载包视为已更新。
+Android 签名包的版本化文件名、GitCode 主源、GitHub 备用附件和发布前校验见[Android 签名包发布](#android-签名包发布)。各平台的构建与发布结果应分别确认，不因图标资源生成成功就把旧下载包视为已更新。
 
 ### 本地构建客户端
 

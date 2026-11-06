@@ -500,11 +500,24 @@ gunicorn -w 1 --threads 8 --timeout 300 -b 0.0.0.0:8080 app:app
 
 GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“构建成功”当作“所有下载入口已经更新”。macOS 没有完整签名凭据时只生成标记为测试用途的未公证产物，具体见[macOS 构建与分发](docs/MACOS_DISTRIBUTION.md)。当前网页不提供 PWA 安装；iPhone / iPad 的下载入口提供 Apple Web Clip 描述文件，安装后可从主屏幕以全屏网页模式启动 DMate。它仍是网站入口，不等同于原生 iOS App。
 
-Android 下载安装入口按“网站直链 → GitHub 备用源”的顺序提供同版本文件。Android 1.0.3 的签名包使用独立文件名 `DMate-Android-1.0.3.apk`：网站文件位于 `static/downloads/DMate-Android-1.0.3.apk`，随网站部署提供；GitHub 备用附件放在既有 `v1.0.1` 发行集合中，APK 内部版本仍为 1.0.3。旧 Android GitCode / itch 下载入口不再显示，避免把旧包当成新版。
+下载安装弹窗直接链接已经配置的 GitCode / GitHub 附件，按“GitCode 优先、GitHub 备用”排列，并保留相应平台的 Microsoft Store、Snap Store、itch.io 等商店入口。地址和文件名固定在 `static/script.js` 的 `downloadOptionsForCurrentPlatform()` 中；打开弹窗不会临时查询发行版列表 API 或解析 `latest`，点击后直接前往相应文件或商店页面。
 
-`ANDROID_APK_URL` 中遗留的官方 `DMate.apk` 地址不会覆盖新版 Android 入口；部署者配置有效的 HTTPS 自定义新镜像时，作为第三项“其他下载源”提供。桌面端与 iOS 的下载来源仍按各自配置提供 GitCode、GitHub 等入口，不因为 Android 更换主源而自动迁移。固定发行标签和版本化文件名用于避免 `latest` 变化后链接指向错误产物。
+| 平台 | 当前固定附件名（GitCode / GitHub） |
+| --- | --- |
+| Android | `DMate-Android-1.0.3.apk` |
+| Windows | `DMate_1.0.0_x64-setup.exe` |
+| macOS | `DMate_1.0.0_universal.dmg` |
+| Linux DEB | `DMate_1.0.0_amd64.deb` |
+| Linux AppImage | `DMate_1.0.0_amd64.AppImage` |
+| iPhone / iPad | `DMate-iPhone-iPad-fullscreen.mobileconfig` |
 
-安装后检查更新使用独立的 `static/client-updates.json` 清单。Android 的新发布记录采用网站同域文件为主源、同版本 GitHub 文件为备用源，下载路径受应用校验约束；版本号和 `published` 状态必须对应真实发布结果。源码、成功构建的 Artifact、网站部署和 GitHub 附件分别核对，不能仅修改网页就把尚未提供的 APK、EXE 或 DMG 标为可更新。Android 发布工作流及校验流程见[部署说明](docs/DEPLOYMENT.md#android-签名包发布)。
+这些附件位于两源现有的 `v1.0.1` 发行集合中，发行集合标签不等于每个安装包的内部版本。Android 使用 1.0.3 文件，桌面入口仍使用上述 1.0.0 文件；不能由源码中的桌面版本 1.0.2 推断这些下载包已包含全部新原生修改。
+
+部署本版后，可以从 Zeabur 删除五个下载地址变量：`ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL`。应用不再读取或注入这些变量，保留旧值也不会覆盖固定链接。此处仅涉及下载地址，账号、数据库、邮件、模型服务及签名等其他凭据不在删除范围内。
+
+安装后检查更新使用独立的 `static/client-updates.json` 清单，Android 采用 GitCode 主源和同版本 GitHub 备用源，保留相同 APK 的 SHA256。今后上传新文件后，应同时核对 `static/script.js` 中的安装入口和更新清单中的版本、文件名、来源及 `published` 状态；不能只改其中一处，也不能仅修改网页就把尚未提供的 APK、EXE 或 DMG 标为可更新。网页自动刷新更新的是页面，原生客户端仍需下载并安装对应安装包。Android 发布工作流及校验流程见[部署说明](docs/DEPLOYMENT.md#android-签名包发布)。
+
+网站不再随镜像携带 Android APK 二进制。旧的精确路径 `/static/downloads/DMate-Android-1.0.3.apk` 仅以 HTTP 302 转到 GitCode 的同名附件，兼容已经保存的旧链接；它不是当前下载主源，也不由网站代理传输 APK。`static/downloads/DMate-Android-1.0.3.json` 保留为产物元数据。
 
 公开下载可用性应使用 GET 或小范围 Range GET 检查，不能只凭 HEAD：当前 GitCode 附件接口对 HEAD 可能返回 404，而对应 GET 可返回真实文件及 206 分段响应。国内源的存在不代表已经覆盖大陆所有运营商网络；页面资源同域化、公开文件可获取和用户设备实际下载安装是不同的验证范围。
 

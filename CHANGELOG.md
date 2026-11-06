@@ -2,6 +2,9 @@
 
 ## 2026-11-06
 
+- 统一现用安装文件的固定入口为 GitCode 优先、GitHub 备用，保留各平台商店入口；Android 使用 `DMate-Android-1.0.3.apk`，桌面仍引用现有 1.0.0 文件，iOS 使用现有全屏描述文件，不在打开弹窗时查询发行版列表 API。
+- 移除五个下载 URL 环境变量的读取和模板注入，部署新版后可从 Zeabur 删除这些下载地址变量；账号、数据库、邮件及模型等配置继续保留。后续文件变化在 `static/script.js` 与 `static/client-updates.json` 中维护。
+- Android 更新清单改用 GitCode 主源及 GitHub 同版本备用源，保留原 APK SHA256；网站不再携带 APK 二进制，旧精确 APK 路径仅以 302 跳转到 GitCode 同名附件，产物元数据 JSON 继续保留。
 - 调整手机端下载等普通弹窗的位置及高度约束，居中显示并允许长内容在弹窗内部滚动。
 - 通用 favicon 别名统一使用黑底不透明图，补齐 48 / 96 / 192 像素入口及 192 像素 `favicon.png`；保留浏览器专用透明标签图标。搜索爬虫首页提供 ICO 和多尺寸 PNG，首页增加 `Vary: User-Agent`；搜索引擎已有图标缓存仍由其自身更新，不承诺立即替换。
 - Android 新版下载改为网站直链优先、同版本 GitHub 附件备用，使用 `DMate-Android-1.0.3.apk`，移除旧 Android GitCode / itch 下载入口；旧官方 `DMate.apk` 环境配置不再覆盖新版入口，自定义 HTTPS 新镜像作为第三项。

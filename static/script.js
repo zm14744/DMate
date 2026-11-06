@@ -21883,12 +21883,7 @@ function dmateClientConfig() {
     const ua = navigator.userAgent || "";
     return {
         isAndroidApp: Boolean(config.isAndroidApp ?? /DMateAndroid\//i.test(ua)),
-        isDesktopApp: Boolean(config.isDesktopApp ?? /DMateDesktop\//i.test(ua)),
-        androidApkUrl: String(config.androidApkUrl || "").trim(),
-        desktopWindowsUrl: String(config.desktopWindowsUrl || "").trim(),
-        desktopMacosUrl: String(config.desktopMacosUrl || "").trim(),
-        desktopLinuxDebUrl: String(config.desktopLinuxDebUrl || "").trim(),
-        desktopLinuxAppImageUrl: String(config.desktopLinuxAppImageUrl || "").trim()
+        isDesktopApp: Boolean(config.isDesktopApp ?? /DMateDesktop\//i.test(ua))
     };
 }
 
@@ -21905,7 +21900,6 @@ function detectDmateInstallPlatform() {
 }
 
 function downloadOptionsForCurrentPlatform() {
-    const config = dmateClientConfig();
     const platform = detectDmateInstallPlatform();
     const gitcodeRelease = "https://gitcode.com/zm14744/DMate/releases/v1.0.1";
     const gitcodeDownloadBase = "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/";
@@ -21915,64 +21909,29 @@ function downloadOptionsForCurrentPlatform() {
     const snap = "https://snapcraft.io/dmate";
     const itch = "https://zm14744.itch.io/dmate";
 
-    // Keep public download sources in a stable order; a configured mirror
-    // replaces its matching provider link or appears after both public sources.
-    function installers(filename, configuredUrl, formatLabel = "") {
+    // Public release assets are fixed here, independent of deployment URL settings.
+    // Prefer GitCode for domestic downloads and retain GitHub as the alternate source.
+    function installers(filename, formatLabel = "") {
         const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(filename) + "/download";
         const githubUrl = githubDownloadBase + encodeURIComponent(filename);
-        let configured = "";
-        try {
-            const candidate = new URL(String(configuredUrl || "").trim());
-            if (candidate.protocol === "https:" && !candidate.username && !candidate.password && !candidate.href.includes("#"))
-                configured = candidate.href;
-        } catch (_) { /* Invalid configured links cannot replace a release download. */ }
-        const configuredIsGithub = /^https:\/\/github\.com\/zm14744\/DMate\/releases\//i.test(configured);
-        const configuredIsGitcode = /^https:\/\/(?:api\.)?gitcode\.com\//i.test(configured);
         const suffix = formatLabel ? " · " + formatLabel : "";
-        const actions = [
-            { label:"GitCode" + suffix, url:configuredIsGitcode ? configured : gitcodeUrl },
-            { label:"GitHub" + suffix, url:configuredIsGithub ? configured : githubUrl, secondary:true }
+        return [
+            { label:"GitCode" + suffix, url:gitcodeUrl },
+            { label:"GitHub" + suffix, url:githubUrl, secondary:true }
         ];
-        if (configured && !configuredIsGithub && !configuredIsGitcode && !actions.some(item => item.url === configured)) {
-            actions.push({ label:"其他下载源", url:configured, secondary:true });
-        }
-        return actions;
     }
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
             text:"下载全屏描述文件后，在系统设置中确认安装；之后从主屏幕启动 DMate",
-            actions:[
-                { label:"GitCode · 描述文件",
-                  url:gitcodeDownloadBase + "DMate-iPhone-iPad-fullscreen.mobileconfig/download" },
-                { label:"GitHub · 描述文件",
-                  url:githubDownloadBase + "DMate-iPhone-iPad-fullscreen.mobileconfig", secondary:true }
-            ]
+            actions:installers("DMate-iPhone-iPad-fullscreen.mobileconfig", "描述文件")
         };
     }
     if (platform === "android") {
-        const filename = "DMate-Android-1.0.3.apk";
-        const actions = [
-            { label:"直接下载", url:"/static/downloads/" + filename },
-            { label:"GitHub", url:githubDownloadBase + filename, secondary:true }
-        ];
-        // An old deployment may still configure releases/latest/DMate.apk.
-        // Never let that override the bundled, verified current installer.
-        try {
-            const candidate = new URL(config.androidApkUrl);
-            const officialRelease = /^(?:api\.)?gitcode\.com$/.test(candidate.hostname)
-                || candidate.hostname === "github.com";
-            const currentFilename = candidate.pathname.split("/").includes(filename);
-            if (candidate.protocol === "https:" && !candidate.username && !candidate.password
-                && !candidate.hash && (!officialRelease || currentFilename)
-                && !actions.some(item => new URL(item.url, location.href).href === candidate.href)) {
-                actions.push({ label:"其他下载源", url:candidate.href, secondary:true });
-            }
-        } catch (_) { /* Unset or invalid optional mirrors do not affect direct downloads. */ }
         return {
             platform:"Android 1.0.3",
             text:"下载安装包后直接覆盖安装，无需卸载旧版",
-            actions
+            actions:installers("DMate-Android-1.0.3.apk")
         };
     }
     if (platform === "windows") {
@@ -21980,7 +21939,7 @@ function downloadOptionsForCurrentPlatform() {
             platform:"Windows",
             text:"选择安装包下载源或应用商店",
             actions:[
-                ...installers("DMate_1.0.0_x64-setup.exe", config.desktopWindowsUrl),
+                ...installers("DMate_1.0.0_x64-setup.exe"),
                 { label:"Microsoft Store", url:microsoftStore, secondary:true },
                 { label:"itch.io", url:itch, secondary:true }
             ]
@@ -21991,7 +21950,7 @@ function downloadOptionsForCurrentPlatform() {
             platform:"macOS",
             text:"选择 DMG 下载源",
             actions:[
-                ...installers("DMate_1.0.0_universal.dmg", config.desktopMacosUrl),
+                ...installers("DMate_1.0.0_universal.dmg"),
                 { label:"itch.io", url:itch, secondary:true }
             ]
         };
@@ -22001,8 +21960,8 @@ function downloadOptionsForCurrentPlatform() {
             platform:"Linux（x86-64 / amd64）",
             text:"Ubuntu/Debian 用 DEB；其他发行版可选 AppImage 或 Snap",
             actions:[
-                ...installers("DMate_1.0.0_amd64.deb", config.desktopLinuxDebUrl, "DEB"),
-                ...installers("DMate_1.0.0_amd64.AppImage", config.desktopLinuxAppImageUrl, "AppImage"),
+                ...installers("DMate_1.0.0_amd64.deb", "DEB"),
+                ...installers("DMate_1.0.0_amd64.AppImage", "AppImage"),
                 { label:"Snap Store", url:snap, secondary:true }
             ]
         };

@@ -65,8 +65,10 @@ universal 目标的产物目录通常为 `desktop/src-tauri/target/universal-app
 1. 打开对应的 **Build DMate Desktop** 运行，确认 macOS job 使用了完整凭据，并完成正式检查。
 2. 下载 `DMate-macos-SIGNED-NOTARIZED` Artifact；当前保留期为 7 天，需要及时归档到正式发布位置。
 3. 对将要发布的实际 DMG 核对版本、文件名、签名和票据；不要与同一时期的测试产物混用。
-4. 将核对后的 DMG 上传选定渠道，再修改相应下载入口。网页可通过 `DESKTOP_MACOS_URL` 指向实际发布文件。
+4. 将核对后的同一 DMG 上传 GitCode 与 GitHub，再修改 `static/script.js` 的 macOS 下载入口，并同步核对 `static/client-updates.json` 中的 macOS 版本、URL、备用源和发布状态。网页固定提供 GitCode 优先、GitHub 备用，不在打开弹窗时查询发行版列表 API。
 5. 记录对应提交与构建来源。以后替换网站不能改变已下载 DMG 的签名或原生代码。
+
+当前固定下载文件为 `DMate_1.0.0_universal.dmg`，位于两源现有的 `v1.0.1` 发行集合中。源码中的桌面版本可能更高，不能据此声称此 DMG 已包含所有新修改或已经完成本次签名公证流程。`DESKTOP_MACOS_URL` 已不再读取或注入网页，部署新版后可从 Zeabur 删除；这不涉及 Apple 签名、公证凭据或其他服务配置。
 
 ## 常见失败如何定位
 

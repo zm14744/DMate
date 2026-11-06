@@ -8901,12 +8901,7 @@ document.body.style.colorScheme = document.documentElement.style.colorScheme;
 window.DMATE_WEB_REVISION = {{ dmate_web_revision | tojson }};
 window.DMATE_CLIENT_CONFIG = {{ {
     "isAndroidApp": is_dmate_android_app,
-    "isDesktopApp": is_dmate_desktop_app,
-    "androidApkUrl": android_apk_url,
-    "desktopWindowsUrl": desktop_windows_url,
-    "desktopMacosUrl": desktop_macos_url,
-    "desktopLinuxDebUrl": desktop_linux_deb_url,
-    "desktopLinuxAppImageUrl": desktop_linux_appimage_url
+    "isDesktopApp": is_dmate_desktop_app
 } | tojson }};
 </script>
 
