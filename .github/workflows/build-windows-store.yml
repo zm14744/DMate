@@ -1,0 +1,46 @@
+name: Build and Publish Microsoft Store Packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dmate-windows-store-packages
+  cancel-in-progress: false
+
+jobs:
+  package:
+    if: github.repository == 'zm14744/DMate' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image generation dependency
+        run: python -m pip install --disable-pip-version-check Pillow==11.3.0
+      - name: Cache official fixed WebView2 runtime
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/dmate-store-runtime-cache
+          key: dmate-store-webview2-157.0.4341.42-x64
+      - name: Prepare, package and verify both Store formats
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/build_windows_store.ps1
+      - name: Save Store submission files
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMate-Microsoft-Store-Packages
+          path: dist/windows-store/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish verified submission files to GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/build_windows_store.ps1 -PublishOnly
