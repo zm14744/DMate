@@ -38,7 +38,7 @@
     register({
         '界面语言 / Language': 'Language', '语言 / Language': 'Language',
         '简体中文': '简体中文', 'English': 'English',
-        'DMate - 离散数学智能辅学系统': 'DMate - Discrete Mathematics Learning Assistant'
+        'DMate - 离散数学智能辅学系统': 'DMate - Discrete Mathematics Tutor'
     });
     if (root.DMateKnowledgeLanguage?.labels) register(root.DMateKnowledgeLanguage.labels);
     function english(source, override) {
@@ -117,6 +117,14 @@
         document.documentElement.lang = current;
         document.documentElement.dataset.uiLanguage = current;
         document.title = t('DMate - 离散数学智能辅学系统');
+        document.querySelectorAll('head meta[data-i18n-en]').forEach(element => {
+            const records = attributeSources.get(element) || new Map();
+            const value = element.getAttribute('content') || '';
+            const record = translatedValue(value, records.get('content'), element.dataset.i18nEn);
+            records.set('content', record);
+            attributeSources.set(element, records);
+            if (record.last !== value) element.setAttribute('content', record.last);
+        });
         document.querySelectorAll('[data-dmate-language]').forEach(button => {
             const active = button.dataset.dmateLanguage === current;
             button.classList.toggle('active', active);

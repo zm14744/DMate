@@ -7234,7 +7234,7 @@ function buildLearningReviewSnapshot() {
             : [];
         return {
             id: session.id,
-            name: session.name,
+            name: sessionDisplayName(session),
             messages,
             retest: session.retest && typeof session.retest === "object"
                 ? { ...session.retest } : null,
@@ -8046,6 +8046,7 @@ function startWrongQuestionRetest(id) {
     const session = {
         id: idValue,
         name: dmateUiText(`复测：${targetName}`, `Retest: ${englishTarget}`).slice(0, dmateUiLanguage() === "en" ? 48 : 22),
+        nameSource: "retest",
         messages: [{
             role: "user",
             text: visiblePrompt,
@@ -10260,6 +10261,8 @@ function loadState() {
                 name: typeof session.name === "string" && session.name.trim()
                     ? session.name
                     : "新对话",
+                nameSource: ["default", "user", "content", "ocr", "retest"].includes(session.nameSource)
+                    ? session.nameSource : undefined,
                 messages,
                 deletedMessageIds: session.deletedMessageIds,
                 teaching: normalizeTeaching(session.teaching),
@@ -12889,6 +12892,43 @@ function maybeAutoFollowTyping() {
 }
 
 
+function isDefaultSessionName(session) {
+    return session?.name === "新对话"
+        && (!session.nameSource || session.nameSource === "default");
+}
+
+function sessionDisplayName(session) {
+    const name = typeof session?.name === "string" ? session.name : "";
+    // Custom and content-derived names are user data, even if they happen to
+    // match a translated UI label. Legacy default names remain stored verbatim.
+    if (session?.nameSource === "user" || session?.nameSource === "content") return name;
+    if (isDefaultSessionName(session)) return dmateUiText("新对话", "New conversation");
+    if (session?.nameSource === "ocr" && name === "图片识题") return dmateUiText("图片识题", "Image question");
+    const points = session?.retest?.targetPoints;
+    if (Array.isArray(points)) {
+        const chinese = `复测：${points.length ? points.join("、") : "错题"}`.slice(0, 22);
+        const english = `Retest: ${points.length
+            ? points.map(point => window.DMateKnowledgeLanguage?.label(point, "en") || point).join(", ")
+            : "the original question"}`.slice(0, 48);
+        // Compare the generated title too, so stale provenance from an older
+        // client can never replace an unrelated custom name.
+        if (name === chinese || name === english) return dmateUiLanguage() === "en" ? english : chinese;
+    }
+    return name;
+}
+
+function refreshSessionNameDisplays() {
+    const byId = new Map(sessions.map(session => [String(session.id), session]));
+    for (const element of document.querySelectorAll("#sessions [data-session-id]")) {
+        const session = byId.get(element.dataset.sessionId);
+        const name = element.querySelector("[data-session-name]");
+        if (!session || !name) continue;
+        name.textContent = sessionDisplayName(session);
+        name.title = sessionDisplayName(session);
+    }
+    refreshMobileConversationTitle();
+}
+
 function deriveSessionName(text, source = "text") {
     let value = String(text || "")
         .replace(/【题目文字】/g, "")
@@ -12931,8 +12971,7 @@ function maybeAutoNameSession(
     source = "text"
 ) {
     if (
-        !session
-        || session.name !== "新对话"
+        !isDefaultSessionName(session)
     ) {
         return false;
     }
@@ -12947,6 +12986,7 @@ function maybeAutoNameSession(
     }
 
     session.name = name;
+    session.nameSource = source === "ocr" && name === "图片识题" ? "ocr" : "content";
     return true;
 }
 
@@ -12955,7 +12995,7 @@ function refreshUnnamedSessionNames() {
 
     for (const session of sessions) {
         if (
-            session.name !== "新对话"
+            !isDefaultSessionName(session)
             || !Array.isArray(session.messages)
         ) {
             continue;
@@ -13002,6 +13042,7 @@ function newChat() {
     sessions.push({
         id,
         name: "新对话",
+        nameSource: "default",
         messages: [],
         teaching: null,
         learningQuestion: null,
@@ -17210,6 +17251,7 @@ let mobileSessionTapId = "";
 let mobileSessionTapAt = 0;
 let mobileSessionLastTouchAt = 0;
 let lastSessionRenameAt = 0;
+let refreshSessionRenameLanguage = null;
 function renameSession(session) {
     if (!session || Date.now() - lastSessionRenameAt < 400) return;
     lastSessionRenameAt = Date.now();
@@ -17218,18 +17260,30 @@ function renameSession(session) {
     const input = document.getElementById("sessionRenameInput");
     const submit = document.getElementById("sessionRenameSave");
     if (!modal || !input || !submit) return;
-    input.value = session.name || "";
+    let displayedName = sessionDisplayName(session);
+    let edited = false;
+    input.value = displayedName;
+    input.oninput = () => { edited = true; };
+    refreshSessionRenameLanguage = () => {
+        if (edited) return;
+        const selectedAll = input.selectionStart === 0 && input.selectionEnd === input.value.length;
+        displayedName = sessionDisplayName(session);
+        input.value = displayedName;
+        if (selectedAll) input.select();
+    };
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
     const close = () => {
         modal.classList.add("hidden");
         modal.setAttribute("aria-hidden", "true");
+        refreshSessionRenameLanguage = null;
         if (document.activeElement === input) input.blur();
     };
     const confirm = () => {
         const name = input.value.trim();
-        if (name) {
+        if (name && (edited || name !== displayedName)) {
             session.name = name.slice(0, 80);
+            session.nameSource = "user";
             saveState();
             renderSessions();
             renderInfo();
@@ -17294,9 +17348,10 @@ function renderSessions() {
         }
 
         const span = document.createElement("span");
-        if (session.name !== "新对话" || session.messages.length) span.setAttribute("data-i18n-content", "");
-        span.innerText = session.name;
-        span.title = session.name;
+        span.setAttribute("data-i18n-content", "");
+        span.setAttribute("data-session-name", "");
+        span.innerText = sessionDisplayName(session);
+        span.title = sessionDisplayName(session);
 
         const selectSession = () => {
             if (currentId !== session.id) pauseOcrBatchRun(currentId);
@@ -21117,7 +21172,7 @@ function renderInfo() {
     }
 
     const lines = [
-        dmateUiText("当前对话：", "Conversation: ") + session.name,
+        dmateUiText("当前对话：", "Conversation: ") + sessionDisplayName(session),
         dmateUiText("消息数：", "Messages: ") + session.messages.length
     ];
 
@@ -21268,8 +21323,8 @@ function refreshMobileConversationTitle() {
     if (!title) return;
 
     const session = getCurrent();
-    const name = typeof session?.name === "string" ? session.name.trim() : "";
-    title.toggleAttribute("data-i18n-content", Boolean(name && (name !== "新对话" || session.messages.length)));
+    const name = sessionDisplayName(session).trim();
+    title.setAttribute("data-i18n-content", "");
     title.textContent = name || "DMate";
 }
 
@@ -21967,6 +22022,8 @@ function renderAll() {
 }
 
 window.addEventListener("dmate:languagechange", () => {
+    refreshSessionNameDisplays();
+    refreshSessionRenameLanguage?.();
     renderInfo();
     refreshInputAvailability();
     if (!document.getElementById("learningReviewModal")?.classList.contains("hidden")) renderLearningReview();

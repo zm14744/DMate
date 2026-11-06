@@ -5,8 +5,8 @@
 (function (root) {
     'use strict';
     const exact = {
-        "DMate - 离散数学智能辅学系统": "DMate - Discrete Mathematics Learning Assistant",
-        "离散数学智能辅学系统": "Discrete Mathematics Learning Assistant",
+        "DMate - 离散数学智能辅学系统": "DMate - Discrete Mathematics Tutor",
+        "离散数学智能辅学系统": "Discrete Mathematics Tutor",
         "移动端导航": "Mobile navigation",
         "打开对话列表": "Open conversation list",
         "对话列表": "Conversations",

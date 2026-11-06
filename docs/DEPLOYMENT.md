@@ -414,7 +414,7 @@ python -m pip install Pillow==11.3.0
 python scripts/generate_icons.py
 ```
 
-脚本输出网页 SVG / PNG / ICO、Tauri PNG / ICO / ICNS、Android 密度位图与 VectorDrawable。每种位图尺寸独立从路径绘制；v52 品牌、浏览器专用标签及原生图标继续使用 256 × 256 矢量坐标系和 4.5 的统一线宽，不另设小尺寸最低像素线宽，也不对 Android 前景单独加粗。独立的 v53 搜索资源沿用相同路径，使用 8.0 / 256 线宽与 0.9 像素最低线宽，32 像素图中的线宽约为 1 像素。最大 app PNG 和 macOS ICNS 图层为 1024 × 1024。Android 自适应图标前景处于 66dp 直径安全区域，普通 / 圆形资源在 API 26 及以上引用矢量前景，API 33 及以上增加单色主题前景。替换旧 `drawable-nodpi/dmate_foreground.png` 时会删除该文件，避免与同名矢量资源冲突。
+脚本输出网页 SVG / PNG / ICO、Tauri PNG / ICO / ICNS、Android 密度位图与 VectorDrawable。每种位图尺寸独立从路径绘制；v52 品牌、浏览器专用标签及原生图标使用 256 × 256 矢量坐标系和 4.5 的基础线宽。Windows 的 `desktop/src-tauri/icons/icon.ico` 单独设置 1 像素最低线宽，并提供 16～256 像素的 23 个独立尺寸，包括 60、72、84、96 像素，改善桌面在 125%、150%、175%、200% 缩放下的清晰度；macOS、Android 和网页资源保持原有线宽。Windows 应用和安装器都嵌入该 ICO，必须重新构建并安装新包才能替换旧 EXE 的图标，网页部署不能更新桌面快捷方式图标。独立的 v53 搜索资源沿用相同路径，使用 8.0 / 256 线宽与 0.9 像素最低线宽，32 像素图中的线宽约为 1 像素。最大 app PNG 和 macOS ICNS 图层为 1024 × 1024。Android 自适应图标前景处于 66dp 直径安全区域，普通 / 圆形资源在 API 26 及以上引用矢量前景，API 33 及以上增加单色主题前景。替换旧 `drawable-nodpi/dmate_foreground.png` 时会删除该文件，避免与同名矢量资源冲突。
 
 当前网页品牌、浏览器专用标签及 Apple touch icon 仍使用 v52 资源，侧栏和手机顶部直接使用 SVG。浏览器特定的黑白标签图标选择保持独立于网页明暗主题；Safari 不通过失焦 / 聚焦事件反复更换图标。根路径 `/favicon.ico`、`/favicon.png`（192 像素）、`/favicon-16.png`、`/favicon-32.png`、`/favicon-48.png`、`/favicon-64.png`、`/favicon-96.png`、`/favicon-192.png` 改为提供 v53 搜索资源，使用 300 秒缓存及重新验证；Apple touch icon 继续返回 v52 应用图标。旧版本资源保留给历史缓存页面。
 

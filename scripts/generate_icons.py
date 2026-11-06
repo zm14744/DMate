@@ -32,6 +32,11 @@ ADAPTIVE_SCALE = 0.72
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
+# Windows uses physical-pixel frames at 125%, 150%, 175% and other display
+# scales. Include those frames so Explorer need not enlarge a smaller bitmap.
+WINDOWS_ICO_SIZES = (16, 20, 24, 28, 32, 36, 40, 48, 56, 60, 64, 72,
+                     80, 84, 96, 108, 120, 128, 144, 160, 192, 224, 256)
+WINDOWS_MIN_STROKE_PX = 1.0
 APP_SIZES = (16, 32, 48, 64, 96, 128, 180, 192, 256, 512, 1024)
 SEARCH_SIZES = (16, 24, 32, 48, 64, 96, 128, 192, 256)
 
@@ -102,13 +107,13 @@ def png_bytes(size, **options):
         return output.getvalue()
 
 
-def save_ico(path, **options):
+def save_ico(path, sizes=ICO_SIZES, **options):
     """ICO contains a separately rendered frame at every Windows shell size."""
-    payloads = [png_bytes(size, **options) for size in ICO_SIZES]
-    offset = 6 + 16 * len(ICO_SIZES)
+    payloads = [png_bytes(size, **options) for size in sizes]
+    offset = 6 + 16 * len(sizes)
     output = io.BytesIO()
-    output.write(struct.pack("<HHH", 0, 1, len(ICO_SIZES)))
-    for size, data in zip(ICO_SIZES, payloads):
+    output.write(struct.pack("<HHH", 0, 1, len(sizes)))
+    for size, data in zip(sizes, payloads):
         output.write(struct.pack("<BBBBHHII", size if size < 256 else 0,
                                  size if size < 256 else 0, 0, 0, 1, 32, len(data), offset))
         offset += len(data)
@@ -217,7 +222,10 @@ def main():
                        (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
                        (256, "128x128@2x.png"), (512, "icon.png"), (1024, "icon-1024.png")):
         save_png(draw_mark(size), TAURI / name)
-    save_ico(TAURI / "icon.ico")
+    # Small Windows shell icons otherwise have subpixel strokes (0.84px at
+    # 48px), which lose contrast on ordinary-density desktop displays.
+    save_ico(TAURI / "icon.ico", sizes=WINDOWS_ICO_SIZES,
+             min_stroke_px=WINDOWS_MIN_STROKE_PX)
     save_icns(TAURI / "icon.icns")
     generate_android()
     print(json.dumps({"status": "generated", "version": VERSION, "source": "reference-inspired vector paths",
@@ -226,6 +234,8 @@ def main():
                       "stroke_units": STROKE,
                       "search_version": SEARCH_VERSION, "search_stroke_units": SEARCH_STROKE,
                       "search_min_stroke_px": SEARCH_MIN_STROKE_PX,
+                      "windows_ico_sizes": WINDOWS_ICO_SIZES,
+                      "windows_min_stroke_px": WINDOWS_MIN_STROKE_PX,
                       "small_icons": "independently supersampled; search icons use a stronger stroke"}, ensure_ascii=False))
 
 

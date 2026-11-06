@@ -2,7 +2,7 @@ name: dmate
 base: core24
 version: '1.0.2'
 title: DMate
-summary: AI-powered discrete mathematics learning assistant
+summary: Discrete Mathematics Tutor
 description: |
   DMate helps students learn discrete mathematics with AI explanations,
   practice generation, graph and image recognition, mistake review,

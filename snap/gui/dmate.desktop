@@ -2,6 +2,7 @@
 Type=Application
 Name=DMate
 Comment=离散数学智能辅学系统
+Comment[en]=Discrete Mathematics Tutor
 Exec=dmate
 Icon=${SNAP}/meta/gui/dmate.png
 Terminal=false
