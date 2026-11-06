@@ -9829,5 +9829,259 @@ html[data-ui-language="en"] select { letter-spacing: 0; }
     html[data-ui-language="en"] .wrong-analysis-body table { font-size: .9em; }
 }
 </style>
+<style id="dmateEnglishWorkspaceRendering">
+/* Workspace-specific English reading and diagram-label refinements. */
+html[data-ui-language="en"] .wrong-card,
+html[data-ui-language="en"] .wrong-question,
+html[data-ui-language="en"] .wrong-feedback,
+html[data-ui-language="en"] .wrong-feedback-body,
+html[data-ui-language="en"] .wrong-note-body,
+html[data-ui-language="en"] .wrong-answer-body,
+html[data-ui-language="en"] .wrong-solution-body,
+html[data-ui-language="en"] .wrong-answer-inner,
+html[data-ui-language="en"] .wrong-analysis-body,
+html[data-ui-language="en"] .learning-review-section-text,
+html[data-ui-language="en"] .graph-summary,
+html[data-ui-language="en"] .graph-detail-body,
+html[data-ui-language="en"] .kg-history-item,
+html[data-ui-language="en"] .kg-history-preview,
+html[data-ui-language="en"] .ocr-review-question,
+html[data-ui-language="en"] #ocrReviewQuestion,
+html[data-ui-language="en"] .ocr-review-rendered,
+html[data-ui-language="en"] .dcn-dialog,
+html[data-ui-language="en"] .dcn-list,
+html[data-ui-language="en"] .dcn-main,
+html[data-ui-language="en"] .dcn-ai-result,
+html[data-ui-language="en"] .dcn-result,
+html[data-ui-language="en"] .dge-text-excerpt,
+html[data-ui-language="en"] .dge-muted,
+html[data-ui-language="en"] .dgs-content {
+    line-height: 1.7;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    letter-spacing: .002em;
+}
+html[data-ui-language="en"] .wrong-question,
+html[data-ui-language="en"] .wrong-feedback,
+html[data-ui-language="en"] .wrong-note-body {
+    white-space: normal;
+}
+html[data-ui-language="en"] .wrong-question,
+html[data-ui-language="en"] .wrong-feedback-body,
+html[data-ui-language="en"] .wrong-answer-body,
+html[data-ui-language="en"] .wrong-solution-body,
+html[data-ui-language="en"] .wrong-analysis-body,
+html[data-ui-language="en"] .kg-history-preview,
+html[data-ui-language="en"] .graph-detail-body,
+html[data-ui-language="en"] .ocr-review-rendered,
+html[data-ui-language="en"] .dcn-main,
+html[data-ui-language="en"] .dcn-ai-result {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+html[data-ui-language="en"] .wrong-question p,
+html[data-ui-language="en"] .wrong-feedback-body p,
+html[data-ui-language="en"] .wrong-answer-body p,
+html[data-ui-language="en"] .wrong-solution-body p,
+html[data-ui-language="en"] .wrong-answer-inner p,
+html[data-ui-language="en"] .wrong-analysis-body p,
+html[data-ui-language="en"] .learning-review-section-text p,
+html[data-ui-language="en"] .kg-history-preview p,
+html[data-ui-language="en"] .graph-detail-body p,
+html[data-ui-language="en"] .ocr-review-rendered p,
+html[data-ui-language="en"] .dcn-ai-result p {
+    margin-block: .72em;
+}
+html[data-ui-language="en"] .wrong-question h1,
+html[data-ui-language="en"] .wrong-question h2,
+html[data-ui-language="en"] .wrong-question h3,
+html[data-ui-language="en"] .wrong-answer-inner h1,
+html[data-ui-language="en"] .wrong-answer-inner h2,
+html[data-ui-language="en"] .wrong-answer-inner h3,
+html[data-ui-language="en"] .wrong-analysis-body h1,
+html[data-ui-language="en"] .wrong-analysis-body h2,
+html[data-ui-language="en"] .wrong-analysis-body h3,
+html[data-ui-language="en"] .dcn-ai-result h1,
+html[data-ui-language="en"] .dcn-ai-result h2,
+html[data-ui-language="en"] .dcn-ai-result h3 {
+    line-height: 1.32;
+    letter-spacing: -.015em;
+    word-break: normal;
+    overflow-wrap: break-word;
+    margin-block: 1.05em .52em;
+}
+html[data-ui-language="en"] .wrong-answer-inner ul,
+html[data-ui-language="en"] .wrong-answer-inner ol,
+html[data-ui-language="en"] .wrong-analysis-body ul,
+html[data-ui-language="en"] .wrong-analysis-body ol,
+html[data-ui-language="en"] .learning-review-section-text ul,
+html[data-ui-language="en"] .learning-review-section-text ol,
+html[data-ui-language="en"] .kg-history-preview ul,
+html[data-ui-language="en"] .kg-history-preview ol,
+html[data-ui-language="en"] .graph-detail-body ul,
+html[data-ui-language="en"] .graph-detail-body ol,
+html[data-ui-language="en"] .ocr-review-rendered ul,
+html[data-ui-language="en"] .ocr-review-rendered ol,
+html[data-ui-language="en"] .dcn-ai-result ul,
+html[data-ui-language="en"] .dcn-ai-result ol {
+    padding-inline-start: 1.65em;
+    margin-block: .65em;
+}
+html[data-ui-language="en"] .wrong-answer-inner li,
+html[data-ui-language="en"] .wrong-analysis-body li,
+html[data-ui-language="en"] .learning-review-section-text li,
+html[data-ui-language="en"] .kg-history-preview li,
+html[data-ui-language="en"] .graph-detail-body li,
+html[data-ui-language="en"] .ocr-review-rendered li,
+html[data-ui-language="en"] .dcn-ai-result li {
+    margin-block: .28em;
+    padding-inline-start: .12em;
+}
+html[data-ui-language="en"] .wrong-answer-inner table,
+html[data-ui-language="en"] .wrong-analysis-body table,
+html[data-ui-language="en"] .learning-review-section-text table,
+html[data-ui-language="en"] .kg-history-preview table,
+html[data-ui-language="en"] .graph-detail-body table,
+html[data-ui-language="en"] .ocr-review-rendered table,
+html[data-ui-language="en"] .dcn-ai-result table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    table-layout: auto;
+    font-size: .94em;
+    line-height: 1.5;
+}
+html[data-ui-language="en"] .wrong-answer-inner th,
+html[data-ui-language="en"] .wrong-answer-inner td,
+html[data-ui-language="en"] .wrong-analysis-body th,
+html[data-ui-language="en"] .wrong-analysis-body td,
+html[data-ui-language="en"] .learning-review-section-text th,
+html[data-ui-language="en"] .learning-review-section-text td,
+html[data-ui-language="en"] .kg-history-preview th,
+html[data-ui-language="en"] .kg-history-preview td,
+html[data-ui-language="en"] .graph-detail-body th,
+html[data-ui-language="en"] .graph-detail-body td,
+html[data-ui-language="en"] .ocr-review-rendered th,
+html[data-ui-language="en"] .ocr-review-rendered td,
+html[data-ui-language="en"] .dcn-ai-result th,
+html[data-ui-language="en"] .dcn-ai-result td {
+    padding: .56em .7em;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+html[data-ui-language="en"] .wrong-answer-inner pre,
+html[data-ui-language="en"] .wrong-analysis-body pre,
+html[data-ui-language="en"] .kg-history-preview pre,
+html[data-ui-language="en"] .graph-detail-body pre,
+html[data-ui-language="en"] .ocr-review-rendered pre,
+html[data-ui-language="en"] .dcn-ai-result pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.55;
+    tab-size: 4;
+}
+html[data-ui-language="en"] .wrong-answer-inner code,
+html[data-ui-language="en"] .wrong-analysis-body code,
+html[data-ui-language="en"] .kg-history-preview code,
+html[data-ui-language="en"] .graph-detail-body code,
+html[data-ui-language="en"] .ocr-review-rendered code,
+html[data-ui-language="en"] .dcn-ai-result code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: .91em;
+    overflow-wrap: anywhere;
+}
+html[data-ui-language="en"] .wrong-question mjx-container,
+html[data-ui-language="en"] .wrong-feedback-body mjx-container,
+html[data-ui-language="en"] .wrong-answer-body mjx-container,
+html[data-ui-language="en"] .wrong-solution-body mjx-container,
+html[data-ui-language="en"] .wrong-answer-inner mjx-container,
+html[data-ui-language="en"] .wrong-analysis-body mjx-container,
+html[data-ui-language="en"] .learning-review-body mjx-container,
+html[data-ui-language="en"] .graph-detail-body mjx-container,
+html[data-ui-language="en"] .kg-history-preview mjx-container,
+html[data-ui-language="en"] .ocr-review-rendered mjx-container,
+html[data-ui-language="en"] .dcn-ai-result mjx-container {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+html[data-ui-language="en"] .wrong-answer-inner mjx-container[display="true"],
+html[data-ui-language="en"] .wrong-analysis-body mjx-container[display="true"],
+html[data-ui-language="en"] .learning-review-body mjx-container[display="true"],
+html[data-ui-language="en"] .graph-detail-body mjx-container[display="true"],
+html[data-ui-language="en"] .kg-history-preview mjx-container[display="true"],
+html[data-ui-language="en"] .ocr-review-rendered mjx-container[display="true"],
+html[data-ui-language="en"] .dcn-ai-result mjx-container[display="true"] {
+    margin: 1em 0 !important;
+}
+/* Concept notebook: longer English note titles and AI explanations. */
+html[data-ui-language="en"] .dcn-dialog { font-family: inherit; }
+html[data-ui-language="en"] .dcn-note-open,
+html[data-ui-language="en"] .dcn-list-empty,
+html[data-ui-language="en"] .dcn-selection,
+html[data-ui-language="en"] .dcn-saved,
+html[data-ui-language="en"] .dcn-status {
+    overflow-wrap: anywhere;
+    word-break: normal;
+    line-height: 1.5;
+}
+html[data-ui-language="en"] .dcn-dialog input,
+html[data-ui-language="en"] .dcn-dialog textarea {
+    font-family: inherit;
+    line-height: 1.62;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+/* Graph recognition/editor: allow long Latin labels without breaking each letter. */
+html[data-ui-language="en"] .dge-text-excerpt,
+html[data-ui-language="en"] .dge-text-body,
+html[data-ui-language="en"] .dgs-content,
+html[data-ui-language="en"] .dge-panel,
+html[data-ui-language="en"] .dge-property-panel {
+    overflow-wrap: anywhere;
+    word-break: normal;
+    line-height: 1.55;
+}
+html[data-ui-language="en"] .dge-visual-node text {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    font-size: 11px;
+}
+html[data-ui-language="en"] .kg-mobile-node-name,
+html[data-ui-language="en"] .kg-mobile-node-badge {
+    overflow-wrap: anywhere;
+    word-break: normal;
+    hyphens: auto;
+    line-height: 1.25;
+}
+html[data-ui-language="en"] .kg-mobile-node-name { font-size: 12px; }
+html[data-ui-language="en"] .kg-mobile-node-badge { font-size: 9px; }
+html[data-ui-language="en"] .graph-detail-title,
+html[data-ui-language="en"] .learning-review-section-title {
+    line-height: 1.34;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+@media (max-width: 760px) {
+    html[data-ui-language="en"] .wrong-answer-inner,
+    html[data-ui-language="en"] .wrong-analysis-body,
+    html[data-ui-language="en"] .learning-review-section-text,
+    html[data-ui-language="en"] .graph-detail-body,
+    html[data-ui-language="en"] .kg-history-preview,
+    html[data-ui-language="en"] .ocr-review-rendered,
+    html[data-ui-language="en"] .dcn-main {
+        line-height: 1.66;
+    }
+    html[data-ui-language="en"] .wrong-answer-inner table,
+    html[data-ui-language="en"] .wrong-analysis-body table,
+    html[data-ui-language="en"] .graph-detail-body table,
+    html[data-ui-language="en"] .ocr-review-rendered table,
+    html[data-ui-language="en"] .dcn-ai-result table { font-size: .9em; }
+}
+</style>
 </body>
 </html>
