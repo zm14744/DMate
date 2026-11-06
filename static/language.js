@@ -6,8 +6,22 @@
 (function (root) {
     'use strict';
 
-    const KEY = 'dmate_ui_language_v1';
+    const ACCOUNT_KEY_PREFIX = 'dmate_ui_language_v1::';
     const LANGS = Object.freeze({ ZH: 'zh-CN', EN: 'en' });
+    let account = { authenticated: false, username: '' };
+
+    function accountLanguageKey() {
+        return ACCOUNT_KEY_PREFIX + encodeURIComponent(account.username || '');
+    }
+
+    function readSavedLanguage() {
+        if (!account.authenticated || !account.username) return LANGS.ZH;
+        try {
+            return localStorage.getItem(accountLanguageKey()) === LANGS.EN ? LANGS.EN : LANGS.ZH;
+        } catch (_) {
+            return LANGS.ZH;
+        }
+    }
     const DICT = {
         '外观': 'Appearance',
         '下载 DMate': 'Download DMate',
@@ -65,14 +79,10 @@
     };
 
     function getLanguage() {
-        try {
-            return localStorage.getItem(KEY) === LANGS.EN ? LANGS.EN : LANGS.ZH;
-        } catch (_) {
-            return LANGS.ZH;
-        }
+        return current;
     }
 
-    let current = getLanguage();
+    let current = LANGS.ZH;
     let applying = false;
 
     function translateTextNode(node) {
@@ -102,8 +112,8 @@
 
     function setLanguage(language, persist) {
         current = language === LANGS.EN ? LANGS.EN : LANGS.ZH;
-        if (persist !== false) {
-            try { localStorage.setItem(KEY, current); } catch (_) {}
+        if (persist !== false && account.authenticated && account.username) {
+            try { localStorage.setItem(accountLanguageKey(), current); } catch (_) {}
         }
         document.documentElement.lang = current;
         document.documentElement.dataset.uiLanguage = current;
@@ -115,14 +125,26 @@
         if (current === LANGS.EN) {
             translateTree(document.body);
         } else if (persist !== false) {
-            // Reload only when the user actively switches back to Chinese.
-            // Initializing the saved/default Chinese preference must never reload
-            // the page, otherwise every first visit enters an endless reload loop.
+            // Rebuild the source-language DOM only after an explicit user switch.
             root.location.reload();
         }
     }
 
+    function handleAccountState(detail) {
+        const next = {
+            authenticated: detail?.authenticated === true,
+            username: detail?.authenticated === true ? String(detail.username || '') : ''
+        };
+        const changed = next.authenticated !== account.authenticated || next.username !== account.username;
+        if (!changed) return;
+        account = next;
+        // Guests always start in Chinese and never retain a language preference.
+        // Signed-in users get a separate saved preference for their own account.
+        setLanguage(readSavedLanguage(), false);
+    }
+
     function bind() {
+        root.addEventListener('dmate:account-state', event => handleAccountState(event.detail));
         document.querySelectorAll('[data-dmate-language]').forEach(button => {
             button.addEventListener('click', () => {
                 const next = button.dataset.dmateLanguage;
@@ -148,7 +170,7 @@
             });
             observer.observe(document.body, { childList: true, subtree: true });
         }
-        setLanguage(current, false);
+        setLanguage(LANGS.ZH, false);
     }
 
     if (document.readyState === 'loading') {
