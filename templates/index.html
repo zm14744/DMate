@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preload" as="style" href="/static/chat-composer.css?v={{ dmate_web_revision }}">
+<link rel="preload" as="script" href="/static/script.js?v={{ dmate_web_revision }}">
+<link rel="preload" as="script" href="/static/vendor/mathjax-3.2.2/es5/tex-svg.js">
 <script>
 /*
  * 移动端导航说明：Fennec/Android 的系统返回键保持浏览器原生行为。
@@ -8696,11 +8699,11 @@ window.MathJax = {
 };
 </script>
 
-<script src="/static/vendor/mathjax-3.2.2/es5/tex-svg.js"></script>
-<script src="/static/vendor/marked-15.0.12/marked.umd.js"></script>
-<script src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
-<script src="/static/vendor/html2canvas-1.4.1/html2canvas.min.js"></script>
-<script src="/static/vendor/jspdf-2.5.2/jspdf.umd.min.js"></script>
+<script defer src="/static/vendor/mathjax-3.2.2/es5/tex-svg.js"></script>
+<script defer src="/static/vendor/marked-15.0.12/marked.umd.js"></script>
+<script defer src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
+<script defer src="/static/vendor/html2canvas-1.4.1/html2canvas.min.js"></script>
+<script defer src="/static/vendor/jspdf-2.5.2/jspdf.umd.min.js"></script>
 
 
 <link rel="stylesheet" href="/static/graph-editor.css?v={{ dmate_web_revision }}">
@@ -9654,31 +9657,31 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
 <script id="knowledgeGraphData" type="application/json">{{ knowledge_graph_data | tojson }}</script>
 <script id="exerciseIntentRules" type="application/json">{{ exercise_intent_rules | tojson }}</script>
-<script src="/static/language-catalog.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/language-knowledge.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/language.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/exercise-intent.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/graph-editor-model.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/graph-editor-format.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/graph-editor-overlay.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/graph-editor.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/ai-answer-renderer.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/delete-confirm.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/drawing-export.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/drawing-workspace.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/graph-scan-workspace.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/voice-input.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/concept-notebook-model.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/concept-notebook.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/chat-composer.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/learning-review-guidance.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/learning-report.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/chat-stream.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/script.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
-<script src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/language-catalog.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/language-knowledge.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/language.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/exercise-intent.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/graph-editor-model.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/graph-editor-format.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/graph-editor-overlay.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/graph-editor.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/ai-answer-renderer.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/delete-confirm.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/drawing-export.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/drawing-workspace.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/graph-scan-workspace.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/voice-input.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/concept-notebook-model.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/concept-notebook.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/chat-composer.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/learning-review-guidance.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/learning-report.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/chat-stream.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/script.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 {% if is_dmate_android_app or is_dmate_desktop_app %}
-<script src="/static/client-update.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/client-update.js?v={{ dmate_web_revision }}"></script>
 {% endif %}
 
 <style id="dmateEnglishTypography">

@@ -1,4 +1,4 @@
-/* Center the existing composer in an empty conversation. Image tasks keep
+/* Center the existing composer only when no conversation is selected. Image tasks keep
    their normal layout because they hide this same input wrapper. */
 body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
     position:absolute;
@@ -39,7 +39,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text:hover,
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text:focus {
     display:block !important; box-sizing:border-box !important; width:100% !important; min-width:0 !important; max-width:100% !important;
-    min-height:38px !important; height:38px; max-height:162px;
+    min-height:38px !important; height:38px !important; max-height:162px;
     margin:0 !important; padding:7px 44px 7px 2px !important; border:0 !important; outline:0 !important;
     border-radius:0 !important; background:transparent !important; box-shadow:none !important;
     color:var(--text-primary,#1e293b) !important; -webkit-text-fill-color:var(--text-primary,#1e293b) !important;
@@ -172,7 +172,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .image-picker-wr
 }
 @media(max-width:680px) {
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .manual-question-composer { min-height:36px !important; }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text { min-height:36px !important; padding-top:6px !important; padding-bottom:6px !important; }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text { min-height:36px !important; height:36px !important; padding-top:6px !important; padding-bottom:6px !important; }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn,
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button { flex-basis:36px !important; width:36px !important; min-width:36px !important; max-width:36px !important; height:36px !important; min-height:36px !important; max-height:36px !important; }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .image-picker-wrap,

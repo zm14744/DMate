@@ -1407,7 +1407,7 @@ function clearLegacyPersistentBackup() {
     try { localStorage.removeItem(CLOUD_BACKUP_KEY); } catch (_error) {}
 }
 
-function applyCloudSnapshot(snapshot) {
+function applyCloudSnapshot(snapshot, { selectionId = currentId } = {}) {
     if (!snapshot || typeof snapshot !== "object") return false;
     cloudApplyingSnapshot = true;
     const previous = { sessions, currentId, deletedSessionIds, learningState };
@@ -1430,7 +1430,12 @@ function applyCloudSnapshot(snapshot) {
                 sessions: sessionData.sessions.filter(item => (
                     item && !incomingDeletions[String(item.id)]
                 )),
-                currentId: sessionData.currentId ?? null,
+                // Selection belongs to this open page. Initial cloud restore
+                // must leave the home composer centered; later sync must not
+                // navigate away from a conversation the user has selected.
+                currentId: selectionId != null ? (sessionData.sessions.find(item =>
+                    item && String(item.id) === String(selectionId)
+                    && !incomingDeletions[String(item.id)])?.id ?? null) : null,
                 deletedSessionIds: incomingDeletions
             })]);
         }
@@ -2677,7 +2682,7 @@ async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false)
                 if (!isCloudSyncContextValid(owner, contextVersion)) {
                     return false;
                 }
-                if (!applyCloudSnapshot(merged)) throw new Error("云端数据未完整载入，保留本机修改后重试");
+                if (!applyCloudSnapshot(merged, { selectionId:merged.sessions.currentId })) throw new Error("云端数据未完整载入，保留本机修改后重试");
             }
             if (!isCloudSyncContextValid(owner, contextVersion)) {
                 return false;
@@ -2754,6 +2759,9 @@ async function resolveInitialCloudSync(isNewAccount = false) {
                     currentId = null;
                     deletedSessionIds = Object.create(null);
                 }
+                // Every fresh account workspace starts at home. The stored
+                // conversation list is restored without reopening its last tab.
+                currentId = null;
             } else {
                 sessions = [];
                 currentId = null;
@@ -2829,7 +2837,7 @@ async function resolveInitialCloudSync(isNewAccount = false) {
             if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
             backupLocalSnapshot("登录后自动合并同步前");
             const merged = mergeCloudSnapshots(collectCloudSnapshot(), data.data || {});
-            if (!applyCloudSnapshot(merged)) throw new Error("云端数据未完整载入，保留本机修改后重试");
+            if (!applyCloudSnapshot(merged, { selectionId:merged.sessions.currentId })) throw new Error("云端数据未完整载入，保留本机修改后重试");
             writeCloudSyncMeta({username:owner, revision:cloudRevision, dirty:true, sectionHashes:partHashes});
             cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
             return;
@@ -16994,7 +17002,7 @@ function renderChat(preparedReply = null) {
     const chat = document.getElementById("chat");
     if (!chat) return;
     const session = getCurrent();
-    chat.closest(".center")?.classList.toggle("chat-empty", !session?.messages?.length);
+    chat.closest(".center")?.classList.toggle("chat-empty", !session);
 
     // Reuse unchanged ready content from this view. A history refresh must not
     // blank earlier answers while a new formula extension is being loaded.

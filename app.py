@@ -239,6 +239,14 @@ def no_stale_web_application_assets(response):
     if (response.status_code in (200, 206, 304) and re.match(
             r'^/static/vendor/(?:mathjax|marked|dompurify|html2canvas|jspdf)-[0-9]+\.[0-9]+\.[0-9]+/', path)):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif (response.status_code in (200, 206, 304)
+          and path.startswith('/static/') and path.endswith(('.js', '.css'))
+          and _RUNTIME_SOURCE.get('status') == 'ok'
+          and request.args.get('v') == _RUNTIME_SOURCE.get('manifest_sha256')):
+        # HTML is revalidated and pins these URLs to the exact deployed source
+        # revision. Cache that immutable version, never unversioned update JSON
+        # or a version URL served by an older pod during a rolling deployment.
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif (path == '/service-worker.js' or path == '/web-version' or
         (path.startswith('/static/') and path.endswith(('.js', '.css', '.json')))):
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
