@@ -3256,7 +3256,7 @@ def voice_transcribe():
         return jsonify({"ok": False, "error": "没有收到录音，请重新录音。", "code": "missing_audio"}), 400
     raw = uploaded.read(MAX_AUDIO_BYTES + 1)
     try:
-        result = transcribe_voice(raw)
+        result = transcribe_voice(raw, language=request.form.get('language', 'zh-CN'))
     except VoiceInputError as exc:
         payload = {"ok": False, "error": exc.message, "code": exc.code}
         if exc.provider_code:
