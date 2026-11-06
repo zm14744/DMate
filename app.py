@@ -15,7 +15,7 @@ from datetime import timedelta
 from collections import defaultdict, deque, OrderedDict
 import ipaddress
 
-from flask import Flask, jsonify, render_template, request, session, make_response, redirect, has_request_context
+from flask import Flask, jsonify, render_template, request, session, make_response, has_request_context
 from ios_webclip import build_ios_webclip_profile
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -2357,18 +2357,6 @@ def ios_ipados_webclip_profile():
     response.headers["Content-Disposition"] = 'attachment; filename="DMate-iPhone-iPad-fullscreen.mobileconfig"'
     response.headers["Cache-Control"] = "public, max-age=3600"
     response.headers["X-Content-Type-Options"] = "nosniff"
-    return response
-
-
-@app.route("/static/downloads/DMate-Android-1.0.3.apk")
-def legacy_android_download():
-    """Keep old installed pages/bookmarks working without bundling the APK."""
-    response = redirect(
-        "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/"
-        "attach_files/DMate-Android-1.0.3.apk/download",
-        code=302,
-    )
-    response.headers["Cache-Control"] = "no-store"
     return response
 
 

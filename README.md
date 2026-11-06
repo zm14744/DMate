@@ -517,7 +517,7 @@ GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“�
 
 安装后检查更新使用独立的 `static/client-updates.json` 清单，Android 采用 GitCode 主源和同版本 GitHub 备用源，保留相同 APK 的 SHA256。今后上传新文件后，应同时核对 `static/script.js` 中的安装入口和更新清单中的版本、文件名、来源及 `published` 状态；不能只改其中一处，也不能仅修改网页就把尚未提供的 APK、EXE 或 DMG 标为可更新。网页自动刷新更新的是页面，原生客户端仍需下载并安装对应安装包。Android 发布工作流及校验流程见[部署说明](docs/DEPLOYMENT.md#android-签名包发布)。
 
-网站不再随镜像携带 Android APK 二进制。旧的精确路径 `/static/downloads/DMate-Android-1.0.3.apk` 仅以 HTTP 302 转到 GitCode 的同名附件，兼容已经保存的旧链接；它不是当前下载主源，也不由网站代理传输 APK。`static/downloads/DMate-Android-1.0.3.json` 保留为产物元数据。
+网站不再随镜像携带 Android APK 二进制，也不保留旧的站内 APK 下载入口或跳转路由。APK 下载按钮和安装后更新地址直接使用 GitCode / GitHub 的公开附件。`static/downloads/DMate-Android-1.0.3.json` 仅保留产物来源与校验元数据，不是安装包，不能用于安装。
 
 公开下载可用性应使用 GET 或小范围 Range GET 检查，不能只凭 HEAD：当前 GitCode 附件接口对 HEAD 可能返回 404，而对应 GET 可返回真实文件及 206 分段响应。国内源的存在不代表已经覆盖大陆所有运营商网络；页面资源同域化、公开文件可获取和用户设备实际下载安装是不同的验证范围。
 

@@ -39,19 +39,11 @@
         }
         return null;
     }
-    function releaseAsset(client, value, version) {
+    function releaseAsset(client, value) {
         // These release filenames are ASCII. Reject encoded or normalized path
         // tricks before URL parsing can discard dot segments or backslashes.
         if (typeof value !== 'string' || /[\u0000-\u0020\u007f%\\?#]/.test(value)
             || /(?:^|\/)\.{1,2}(?:\/|$)/.test(value)) return null;
-        // Only versioned APKs on this exact first-party path are allowed.
-        // Matching the raw URL also rejects explicit :443, user info and URLs
-        // that URL() would otherwise normalize into the permitted spelling.
-        const website = /^https:\/\/dmate\.zeabur\.app\/static\/downloads\/(DMate-Android-((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))\.apk)$/.exec(value);
-        if (website) {
-            if (client.kind !== 'android' || website[2] !== version || !triplet(website[2])) return null;
-            return { url:value, tag:null, filename:website[1], source:'website' };
-        }
         if (!/^https:\/\/(?:github\.com|api\.gitcode\.com)\//i.test(value)) return null;
         try {
             const url = new URL(value);
@@ -81,19 +73,14 @@
             : manifest.desktop?.[client.platform];
         if (!item || item.published !== true ||
             compareVersions(item.version, client.version) !== 1) return null;
-        const primary = releaseAsset(client, item.url, item.version);
+        const primary = releaseAsset(client, item.url);
         if (!primary) return null;
         const seen = new Set([primary.url]);
         const fallbackUrls = [];
         for (const value of Array.isArray(item.fallbackUrls) ? item.fallbackUrls : []) {
-            const asset = releaseAsset(client, value, item.version);
+            const asset = releaseAsset(client, value);
             if (!asset || asset.filename !== primary.filename
-                || seen.has(asset.url)) continue;
-            if (primary.source === 'website') {
-                // A versioned APK may live under the repository's existing
-                // release tag; its filename still identifies the same package.
-                if (asset.source !== 'github') continue;
-            } else if (asset.tag !== primary.tag) continue;
+                || asset.tag !== primary.tag || seen.has(asset.url)) continue;
             seen.add(asset.url);
             fallbackUrls.push(asset.url);
         }
@@ -176,11 +163,7 @@
             }, false),
             createButton(doc, '下载更新', async () => {
                 if (client.kind === 'android') {
-                    // Existing native bridges only allow release hosts. Keep
-                    // first-party APKs on the legacy browser-download route
-                    // rather than submitting an unsupported URL to that bridge.
-                    const websiteDownload = new URL(update.url).hostname === 'dmate.zeabur.app';
-                    if (!websiteDownload && root.DMateUpdate?.postMessage && update.sha256) {
+                    if (root.DMateUpdate?.postMessage && update.sha256) {
                         description.textContent = '正在请求系统后台下载…';
                         const result = await downloadInsideAndroid(update);
                         description.textContent = String(result?.message ||
@@ -205,8 +188,7 @@
             link.className = 'dmate-update-url';
             link.href = url;
             const host = new URL(url).hostname;
-            const source = host === 'dmate.zeabur.app' ? '网站直链'
-                : host === 'api.gitcode.com' ? 'GitCode' : 'GitHub';
+            const source = host === 'api.gitcode.com' ? 'GitCode' : 'GitHub';
             link.textContent = (index ? '备用下载 · ' : '下载地址 · ') + source;
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
