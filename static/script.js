@@ -1643,6 +1643,10 @@ function renderAccountUi() {
     } else if (accountState.emailConfigured === false && !accountState.authenticated) {
         setAccountMessage("邮箱验证码服务尚未配置，暂时只能登录已有账号", true);
     }
+
+    window.dispatchEvent(new CustomEvent("dmate:account-state", {
+        detail: { authenticated: accountState.authenticated, username: accountState.username }
+    }));
 }
 
 function setAccountMessage(message = "", isError = false) {
