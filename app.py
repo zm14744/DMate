@@ -2313,14 +2313,18 @@ def sitemap_xml():
     return response
 
 
-_BING_ICON_USER_AGENT = re.compile(
-    r"bingbot|adidxbot|BingPreview|MicrosoftPreview|msnbot", re.IGNORECASE
+_OTHER_SEARCH_ICON_USER_AGENT = re.compile(
+    r"Googlebot|Google\s+Favicon|GoogleOther|Google-InspectionTool|"
+    r"DuckDuckBot|YandexBot|Baiduspider|Sogou|Bytespider|PetalBot", re.IGNORECASE
 )
 
 
 def _search_favicon_base():
-    return ("dmate-bing-v54" if _BING_ICON_USER_AGENT.search(
-        request.headers.get("User-Agent", "")) else "dmate-search-v53")
+    # Favicon fetchers do not always identify themselves as Bing crawlers.
+    # Give the shared fallback the same opaque artwork; keep other identified
+    # search crawlers on their established, explicitly declared resource set.
+    return ("dmate-search-v53" if _OTHER_SEARCH_ICON_USER_AGENT.search(
+        request.headers.get("User-Agent", "")) else "dmate-bing-v55")
 
 
 def _search_favicon_response(suffix, content_type):
@@ -2340,14 +2344,8 @@ def favicon_ico():
 @app.route("/apple-touch-icon.png")
 @app.route("/apple-touch-icon-precomposed.png")
 def apple_touch_icon_root():
-    """Standard root Apple icon URLs use the current native-size app artwork."""
-    if _BING_ICON_USER_AGENT.search(request.headers.get("User-Agent", "")):
-        return _search_favicon_response("-192.png", "image/png")
-    response = app.send_static_file("icons/dmate-app-v52-180.png")
-    response.headers["Content-Type"] = "image/png"
-    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
-    response.vary.add("User-Agent")
-    return response
+    """Unidentified favicon fetchers use the same opaque fallback everywhere."""
+    return _search_favicon_response("-192.png", "image/png")
 
 
 @app.route("/favicon-16.png")

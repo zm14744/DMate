@@ -34,6 +34,10 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: dmate-snap-store-publication
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-24.04
@@ -135,8 +139,17 @@ jobs:
           ls -lh "${snaps[0]}"
           sha256sum "${snaps[0]}"
 
-      - name: Upload and release Snap
+      - name: Check whether the exact Snap is already released
         if: inputs.operation == 'upload-new-build'
+        id: store
+        shell: bash
+        env:
+          SNAP_PATH: ${{ steps.pkg.outputs.snap }}
+          CHANNEL: ${{ inputs.channel }}
+        run: python3 scripts/check_snap_store_channel.py "$SNAP_PATH" "$CHANNEL" >> "$GITHUB_OUTPUT"
+
+      - name: Upload and release Snap
+        if: inputs.operation == 'upload-new-build' && steps.store.outputs.already_released != 'true'
         uses: snapcore/action-publish@v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
