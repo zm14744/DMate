@@ -28,6 +28,8 @@ STROKE = 4.5  # Preserve the existing brand, browser-tab and native-app weight.
 SEARCH_VERSION = "v53"
 SEARCH_STROKE = 8.0  # One pixel at 32px, before antialiasing.
 SEARCH_MIN_STROKE_PX = 0.9
+BING_VERSION = "v54"
+BING_MIN_STROKE_PX = 1.25
 ADAPTIVE_SCALE = 0.72
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
@@ -74,7 +76,7 @@ def svg_mark(background="#000", foreground="#fff"):
 
 
 def draw_mark(size, background=BLACK, foreground=WHITE, circle=False,
-              stroke=STROKE, min_stroke_px=0):
+              stroke=STROKE, min_stroke_px=0, image_mode="RGBA"):
     """Rasterize geometry at its target size; search icons can lift tiny strokes."""
     oversample = max(4, math.ceil(1024 / size))
     side = size * oversample
@@ -93,7 +95,7 @@ def draw_mark(size, background=BLACK, foreground=WHITE, circle=False,
         # Match SVG/VectorDrawable's round ends and joins at sharp corners.
         for x, y in points:
             draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=foreground)
-    return canvas.resize((size, size), Image.Resampling.LANCZOS)
+    return canvas.resize((size, size), Image.Resampling.LANCZOS).convert(image_mode)
 
 
 def save_png(image, path):
@@ -114,8 +116,9 @@ def save_ico(path, sizes=ICO_SIZES, **options):
     output = io.BytesIO()
     output.write(struct.pack("<HHH", 0, 1, len(sizes)))
     for size, data in zip(sizes, payloads):
+        bits = 24 if options.get("image_mode") == "RGB" else 32
         output.write(struct.pack("<BBBBHHII", size if size < 256 else 0,
-                                 size if size < 256 else 0, 0, 0, 1, 32, len(data), offset))
+                                 size if size < 256 else 0, 0, 0, 1, bits, len(data), offset))
         offset += len(data)
     for data in payloads:
         output.write(data)
@@ -202,6 +205,15 @@ def main():
     for size in SEARCH_SIZES:
         save_png(draw_mark(size, **search_options), STATIC / f"{search_base}-{size}.png")
     save_ico(STATIC / f"{search_base}.ico", **search_options)
+    # Bing's favicon pipeline gets an explicit RGB tile, without an alpha
+    # channel or transparent alternatives. Small strokes remain connected
+    # after downsampling or a browser's dark-mode image transformation.
+    bing_base = f"dmate-bing-{BING_VERSION}"
+    bing_options = {"stroke": SEARCH_STROKE,
+                    "min_stroke_px": BING_MIN_STROKE_PX, "image_mode": "RGB"}
+    for size in SEARCH_SIZES:
+        save_png(draw_mark(size, **bing_options), STATIC / f"{bing_base}-{size}.png")
+    save_ico(STATIC / f"{bing_base}.ico", **bing_options)
     # Keep stable public aliases usable for old pages and direct icon requests.
     for source, target in (
         (f"dmate-brand-{VERSION}.svg", "dmate-mark.svg"),
@@ -234,6 +246,7 @@ def main():
                       "stroke_units": STROKE,
                       "search_version": SEARCH_VERSION, "search_stroke_units": SEARCH_STROKE,
                       "search_min_stroke_px": SEARCH_MIN_STROKE_PX,
+                      "bing_version": BING_VERSION, "bing_min_stroke_px": BING_MIN_STROKE_PX,
                       "windows_ico_sizes": WINDOWS_ICO_SIZES,
                       "windows_min_stroke_px": WINDOWS_MIN_STROKE_PX,
                       "small_icons": "independently supersampled; search icons use a stronger stroke"}, ensure_ascii=False))
