@@ -65,10 +65,12 @@ universal 目标的产物目录通常为 `desktop/src-tauri/target/universal-app
 1. 打开对应的 **Build DMate Desktop** 运行，确认 macOS job 使用了完整凭据，并完成正式检查。
 2. 下载 `DMate-macos-SIGNED-NOTARIZED` Artifact；当前保留期为 7 天，需要及时归档到正式发布位置。
 3. 对将要发布的实际 DMG 核对版本、文件名、签名和票据；不要与同一时期的测试产物混用。
-4. 将核对后的同一 DMG 上传 GitCode 与 GitHub，再修改 `static/script.js` 的 macOS 下载入口，并同步核对 `static/client-updates.json` 中的 macOS 版本、URL、备用源和发布状态。网页固定提供 GitCode 优先、GitHub 备用，不在打开弹窗时查询发行版列表 API。
+4. 将核对后的同一 DMG 上传各授权渠道，再修改 `static/script.js` 的 macOS 下载入口，并同步核对 `static/client-updates.json` 中的 macOS 版本、URL、备用源和发布状态。只有已同步目标版本的来源可以用于该版本下载；网页不在打开弹窗时查询发行版列表 API。
 5. 记录对应提交与构建来源。以后替换网站不能改变已下载 DMG 的签名或原生代码。
 
-当前固定下载文件为 `DMate_1.0.0_universal.dmg`，位于两源现有的 `v1.0.1` 发行集合中。源码中的桌面版本可能更高，不能据此声称此 DMG 已包含所有新修改或已经完成本次签名公证流程。`DESKTOP_MACOS_URL` 已不再读取或注入网页，部署新版后可从 Zeabur 删除；这不涉及 Apple 签名、公证凭据或其他服务配置。
+当前 GitHub 文件为 `DMate_1.0.2_universal.dmg`，仍位于 `v1.0.1` 发行集合中。该 macOS 1.0.2 安装包采用 **ad-hoc 签名，未经过 Apple 公证**；对外使用正常安装包名称，发布说明应准确说明签名和公证状态，不能将其称为已公证安装包。它包含新版图标及中英麦克风权限提示，已通过 universal 构建和包内资源核对，但这些检查不能代替 Apple 公证。
+
+GitCode 链接本次保持 `DMate_1.0.0_universal.dmg`，等待维护者自行上传新版后再同步；网页暂时优先提供 GitHub。两源尚未指向同版本时，GitCode 旧文件不能作为新版本提醒中的下载回退。`DESKTOP_MACOS_URL` 已不再读取或注入网页，部署新版后可从 Zeabur 删除；这不涉及 Apple 签名、公证凭据或其他服务配置。
 
 ## 常见失败如何定位
 

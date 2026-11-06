@@ -83,9 +83,19 @@
             : manifest.desktop?.[client.platform];
         if (!item || item.published !== true ||
             compareVersions(item.version, client.version) !== 1) return null;
-        const primary = releaseAsset(client, item.url);
         const version = String(item.version).replace(/^v/, '');
-        if (!primary || primary.version !== version) return null;
+        // Sources can be published at different times. An older mirror must
+        // not hide a ready release or offer an older installer as its update.
+        function currentAsset(details) {
+            const candidates = [details?.url, ...(Array.isArray(details?.fallbackUrls) ? details.fallbackUrls : [])];
+            for (const value of candidates) {
+                const asset = releaseAsset(client, value);
+                if (asset?.version === version) return asset;
+            }
+            return null;
+        }
+        const primary = currentAsset(item);
+        if (!primary) return null;
         // Mirrors must point to the very same file, while distinct Linux
         // formats are separate choices rather than interchangeable fallbacks.
         function packageFor(asset, details) {
@@ -104,7 +114,7 @@
         if (client.kind === 'desktop' && client.platform === 'linux') {
             const formats = new Set([primary.format]);
             for (const entry of Array.isArray(item.additionalPackages) ? item.additionalPackages : []) {
-                const asset = releaseAsset(client, entry?.url);
+                const asset = currentAsset(entry);
                 if (!asset || asset.version !== version || asset.tag !== primary.tag
                     || formats.has(asset.format)) continue;
                 formats.add(asset.format);
@@ -116,7 +126,8 @@
             && typeof item.sha256 === 'string' && /^[a-fA-F0-9]{64}$/.test(item.sha256)
             ? item.sha256.toLowerCase() : null;
         return { version:item.version, url:primary.url, fallbackUrls, sha256,
-            platform:client.platform, packages };
+            platform:client.platform, packages,
+            notarized:client.platform === 'macos' ? item.notarized : undefined };
     }
     const dismissed = new Set();
     let pendingUpdate = null;
@@ -176,6 +187,13 @@
         description.textContent = uiText('发现新版本 ' + update.version + '，需要下载并安装新安装包。',
             'Version ' + update.version + ' is available. Download and install the new package to update.');
         body.append(description);
+        if (client.platform === 'macos' && update.notarized === false) {
+            const note = doc.createElement('p');
+            note.className = 'download-description';
+            note.textContent = uiText('macOS 安装包尚未经过 Apple 公证。',
+                'The macOS installer has not been notarized by Apple.');
+            body.append(note);
+        }
         const packages = update.packages || [{ url:update.url, fallbackUrls:update.fallbackUrls }];
         let selectedPackage = packages[0];
         let picker = null;

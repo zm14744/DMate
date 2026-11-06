@@ -22080,15 +22080,21 @@ function downloadOptionsForCurrentPlatform() {
     const itch = "https://zm14744.itch.io/dmate";
 
     // Public release assets are fixed here, independent of deployment URL settings.
-    // Prefer GitCode for domestic downloads and retain GitHub as the alternate source.
-    function installers(filename, formatLabel = "") {
-        const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(filename) + "/download";
-        const githubUrl = githubDownloadBase + encodeURIComponent(filename);
+    // GitHub has the new desktop packages. Keep each existing GitCode URL
+    // until that mirror is updated separately; never infer its filename.
+    function installers(githubFilename, {gitcodeFilename = githubFilename, formatLabel = "", preferGithub = true} = {}) {
+        const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(gitcodeFilename) + "/download";
+        const githubUrl = githubDownloadBase + encodeURIComponent(githubFilename);
         const suffix = formatLabel ? " · " + formatLabel : "";
-        return [
-            { label:"GitCode" + suffix, url:gitcodeUrl },
-            { label:"GitHub" + suffix, url:githubUrl, secondary:true }
-        ];
+        return preferGithub
+            ? [
+                { label:"GitHub" + suffix, url:githubUrl },
+                { label:"GitCode" + suffix, url:gitcodeUrl, secondary:true }
+            ]
+            : [
+                { label:"GitCode" + suffix, url:gitcodeUrl },
+                { label:"GitHub" + suffix, url:githubUrl, secondary:true }
+            ];
     }
     if (platform === "ios") {
         return {
@@ -22101,7 +22107,7 @@ function downloadOptionsForCurrentPlatform() {
         return {
             platform:"Android 1.0.3",
             text:"选择下载源",
-            actions:installers("DMate-Android-1.0.3.apk")
+            actions:installers("DMate-Android-1.0.3.apk", {preferGithub:false})
         };
     }
     if (platform === "windows") {
@@ -22109,7 +22115,7 @@ function downloadOptionsForCurrentPlatform() {
             platform:"Windows",
             text:"选择下载源",
             actions:[
-                ...installers("DMate_1.0.0_x64-setup.exe"),
+                ...installers("DMate_1.0.2_x64-setup.exe", {gitcodeFilename:"DMate_1.0.0_x64-setup.exe"}),
                 { label:"Microsoft Store", url:microsoftStore, secondary:true },
                 { label:"itch.io", url:itch, secondary:true }
             ]
@@ -22118,9 +22124,10 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:"选择下载源",
+            text:dmateUiText("选择下载源。GitHub 上的 macOS 安装包尚未经过 Apple 公证。",
+                "Choose a download source. The macOS installer on GitHub has not been notarized by Apple."),
             actions:[
-                ...installers("DMate_1.0.0_universal.dmg"),
+                ...installers("DMate_1.0.2_universal.dmg", {gitcodeFilename:"DMate_1.0.0_universal.dmg"}),
                 { label:"itch.io", url:itch, secondary:true }
             ]
         };
@@ -22130,8 +22137,8 @@ function downloadOptionsForCurrentPlatform() {
             platform:"Linux（x86-64 / amd64）",
             text:"选择下载源",
             actions:[
-                ...installers("DMate_1.0.0_amd64.deb", "DEB"),
-                ...installers("DMate_1.0.0_amd64.AppImage", "AppImage"),
+                ...installers("DMate_1.0.2_amd64.deb", {gitcodeFilename:"DMate_1.0.0_amd64.deb", formatLabel:"DEB"}),
+                ...installers("DMate_1.0.2_amd64.AppImage", {gitcodeFilename:"DMate_1.0.0_amd64.AppImage", formatLabel:"AppImage"}),
                 { label:"Snap Store", url:snap, secondary:true },
                 { label:"itch.io", url:itch, secondary:true }
             ]
@@ -22141,8 +22148,8 @@ function downloadOptionsForCurrentPlatform() {
         platform:"桌面系统",
         text:"选择下载源",
         actions:[
-            { label:"GitCode", url:gitcodeRelease },
-            { label:"GitHub", url:githubRelease, secondary:true },
+            { label:"GitHub", url:githubRelease },
+            { label:"GitCode", url:gitcodeRelease, secondary:true },
             { label:"Microsoft Store", url:microsoftStore, secondary:true },
             { label:"Snap Store", url:snap, secondary:true }
         ]

@@ -520,28 +520,28 @@ gunicorn -w 1 --threads 8 --timeout 300 -b 0.0.0.0:8080 app:app
 
 客户端检测到网页新版本后，有其他会话正在回答、图片待处理、录音或云同步未完成时，会延后自动刷新。访客的聊天、笔记、错题和非空绘图只保存在当前页面内存中，有这些内容时也不自动刷新；用户主动关闭或刷新页面仍会清空访客内容。
 
-GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“构建成功”当作“所有下载入口已经更新”。macOS 没有完整签名凭据时只生成标记为测试用途的未公证产物，具体见[macOS 构建与分发](docs/MACOS_DISTRIBUTION.md)。当前网页不提供 PWA 安装；iPhone / iPad 的下载入口提供 Apple Web Clip 描述文件，安装后可从主屏幕以全屏网页模式启动 DMate。它仍是网站入口，不等同于原生 iOS App。
+GitHub Actions 生成 Artifact 与对外发布安装包是两步，不能把“构建成功”当作“所有下载入口已经更新”。macOS 缺少完整 Developer ID 凭据时使用 ad-hoc 签名，实际公证状态须单独核对，具体见[macOS 构建与分发](docs/MACOS_DISTRIBUTION.md)。当前网页不提供 PWA 安装；iPhone / iPad 的下载入口提供 Apple Web Clip 描述文件，安装后可从主屏幕以全屏网页模式启动 DMate。它仍是网站入口，不等同于原生 iOS App。
 
-下载安装弹窗直接链接已经配置的 GitCode / GitHub 附件，按“GitCode 优先、GitHub 备用”排列，并保留相应平台的 Microsoft Store、Snap Store、itch.io 等商店入口。地址和文件名固定在 `static/script.js` 的 `downloadOptionsForCurrentPlatform()` 中；打开弹窗不会临时查询发行版列表 API 或解析 `latest`，点击后直接前往相应文件或商店页面。
+下载安装弹窗直接链接已经配置的 GitCode / GitHub 附件。桌面和 iOS 暂时优先提供已更新的 GitHub 文件，GitCode 现有链接保持不变，待维护者上传对应文件后再同步；Android 的文件、链接与排列保持原样。相应平台的 Microsoft Store、Snap Store、itch.io 等商店入口继续保留。地址和文件名固定在 `static/script.js` 的 `downloadOptionsForCurrentPlatform()` 中；打开弹窗不会临时查询发行版列表 API 或解析 `latest`，点击后直接前往相应文件或商店页面。
 
-各平台下载弹窗的说明统一为“选择下载源”；非 Linux 平台的 GitCode / GitHub 按钮仅显示源名，Linux 保留 DEB / AppImage 格式后缀，并提供 itch.io 入口。
+各平台下载弹窗使用“选择下载源”；macOS 另明确说明当前 GitHub 安装包尚未经过 Apple 公证。非 Linux 平台的 GitCode / GitHub 按钮仅显示源名，Linux 保留 DEB / AppImage 格式后缀，并提供 itch.io 入口。
 
-| 平台 | 当前固定附件名（GitCode / GitHub） |
-| --- | --- |
-| Android | `DMate-Android-1.0.3.apk` |
-| Windows | `DMate_1.0.0_x64-setup.exe` |
-| macOS | `DMate_1.0.0_universal.dmg` |
-| Linux DEB | `DMate_1.0.0_amd64.deb` |
-| Linux AppImage | `DMate_1.0.0_amd64.AppImage` |
-| iPhone / iPad | `DMate-iPhone-iPad-fullscreen.mobileconfig` |
+| 平台 | GitHub 附件名 | 暂时保留的 GitCode 附件名 |
+| --- | --- | --- |
+| Android | `DMate-Android-1.0.3.apk` | `DMate-Android-1.0.3.apk` |
+| Windows | `DMate_1.0.2_x64-setup.exe` | `DMate_1.0.0_x64-setup.exe` |
+| macOS | `DMate_1.0.2_universal.dmg`（未公证） | `DMate_1.0.0_universal.dmg` |
+| Linux DEB | `DMate_1.0.2_amd64.deb` | `DMate_1.0.0_amd64.deb` |
+| Linux AppImage | `DMate_1.0.2_amd64.AppImage` | `DMate_1.0.0_amd64.AppImage` |
+| iPhone / iPad | `DMate-iPhone-iPad-fullscreen.mobileconfig` | `DMate-iPhone-iPad-fullscreen.mobileconfig` |
 
-这些附件位于两源现有的 `v1.0.1` 发行集合中，发行集合标签不等于每个安装包的内部版本。Android 使用 1.0.3 文件，桌面入口仍使用上述 1.0.0 文件；不能由源码中的桌面版本 1.0.2 推断这些下载包已包含全部新原生修改。
+这些附件位于两源现有的 `v1.0.1` 发行集合中，发行集合标签不等于每个安装包的内部版本。GitHub 的旧桌面 1.0.0 附件由已核验的 1.0.2 文件替换，Android 1.0.3 不变。iOS 两源都已启用全屏，但 GitHub 同名描述文件包含 512 像素新版图标和中英双语说明，GitCode 此次尚未替换；不能把同名或全屏设置相同当作内容已同步。
 
 部署本版后，可以从 Zeabur 删除五个下载地址变量：`ANDROID_APK_URL`、`DESKTOP_WINDOWS_URL`、`DESKTOP_MACOS_URL`、`DESKTOP_LINUX_DEB_URL`、`DESKTOP_LINUX_APPIMAGE_URL`。应用不再读取或注入这些变量，保留旧值也不会覆盖固定链接。此处仅涉及下载地址，账号、数据库、邮件、模型服务及签名等其他凭据不在删除范围内。
 
-Android / Tauri 安装版通过独立的 `static/client-updates.json` 检查原生包版本，只在已实际发布的版本高于当前安装版本时提醒。`client-update.js` 仅在原生客户端页面加载，与 `web-sync.js` 和网页版本检测分离；普通网站部署不提高原生清单版本。当前清单仍为 Android 1.0.3、桌面 1.0.0，本次接入提醒无需重新打包。iOS Web Clip 没有原生包版本，不参与比较。
+Android / Tauri 安装版通过独立的 `static/client-updates.json` 检查原生包版本，只在已实际发布的版本高于当前安装版本时提醒。`client-update.js` 仅在原生客户端页面加载，与 `web-sync.js` 和网页版本检测分离；普通网站部署不提高原生清单版本。Android 保持 1.0.3，桌面 GitHub 文件更新为 1.0.2；新版本下载只使用与清单版本匹配的文件，暂未同步的 GitCode 旧包不能作为新版本回退。iOS Web Clip 没有原生包版本，不参与比较。
 
-更新提醒在页面中央显示，右上角为实心红色关闭圆点，下载渠道仅有 GitCode / GitHub；Linux 分别提供 AppImage / DEB，每种格式各有两源。用户自行下载并安装，关闭后本会话不重复提示同一版本。检查在启动、每 6 小时、回到前台（有节流）及恢复网络时进行；离线静默，后台、生成、OCR、同步、正在输入或已有弹窗时延后展示，不暂停同步、不刷新页面、不修改学习记录。旧 Android 通过外部浏览器下载；旧 Tauri 若阻止新窗口，可使用点击后提供的复制地址入口。
+更新提醒在页面中央显示，右上角为实心红色关闭圆点，下载渠道仅有已同步目标版本的 GitCode / GitHub；本次桌面新版本先使用 GitHub，Linux 分别提供 AppImage / DEB。用户自行下载并安装，关闭后本会话不重复提示同一版本。检查在启动、每 6 小时、回到前台（有节流）及恢复网络时进行；离线静默，后台、生成、OCR、同步、正在输入或已有弹窗时延后展示，不暂停同步、不刷新页面、不修改学习记录。旧 Android 通过外部浏览器下载；旧 Tauri 若阻止新窗口，可使用点击后提供的复制地址入口。
 
 发布新安装包时，先核对 GitCode / GitHub 的实际文件，再更新 `static/script.js` 的安装入口及清单中的版本、文件名、来源和 `published` 状态；Android 两源保留相同 APK 的 SHA256。Linux 的另一格式使用 `additionalPackages`，每个包的 `fallbackUrls` 必须是同一文件的备用源，不能把 DEB 和 AppImage 混作回退。网页自动刷新只更新页面，原生客户端仍需下载并安装对应安装包。Android 发布工作流及校验流程见[部署说明](docs/DEPLOYMENT.md#android-签名包发布)。
 

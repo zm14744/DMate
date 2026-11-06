@@ -343,7 +343,7 @@ Tauri 配置位于 `desktop/src-tauri/tauri.conf.json`；Android 配置位于 `a
 
 Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DMATE_ANDROID_KEYSTORE_PASSWORD`、`DMATE_ANDROID_KEY_ALIAS`、`DMATE_ANDROID_KEY_PASSWORD`；Gradle 读取 `DMATE_KEYSTORE_PATH`、`DMATE_KEYSTORE_PASSWORD`、`DMATE_KEY_ALIAS`、`DMATE_KEY_PASSWORD`。Snap 发布使用 `SNAPCRAFT_STORE_CREDENTIALS`。macOS 见[签名与公证](MACOS_DISTRIBUTION.md)。构建 Artifact 与对外发布是两个步骤，旧下载文件不会因网页更新自动替换。
 
-下载安装弹窗由 `static/script.js` 的 `downloadOptionsForCurrentPlatform()` 固定提供 GitCode 优先、GitHub 备用的附件地址，并保留对应平台的商店入口。附件位于现有 `v1.0.1` 发行集合中：Android 为 `DMate-Android-1.0.3.apk`，Windows 为 `DMate_1.0.0_x64-setup.exe`，macOS 为 `DMate_1.0.0_universal.dmg`，Linux 为 `DMate_1.0.0_amd64.deb` / `DMate_1.0.0_amd64.AppImage`，iOS 为 `DMate-iPhone-iPad-fullscreen.mobileconfig`。iOS 继续使用描述文件，不提供 PWA 安装；`/service-worker.js` 只用于清退旧 worker。
+下载安装弹窗由 `static/script.js` 的 `downloadOptionsForCurrentPlatform()` 固定提供各渠道附件地址，并保留对应平台的商店入口。桌面和 iOS 暂时优先使用已更新的 GitHub 文件；GitCode 链接保持原样，等待维护者上传后再同步，Android 保持原来的文件和顺序。附件仍位于 `v1.0.1` 发行集合：GitHub 为 `DMate_1.0.2_x64-setup.exe`、`DMate_1.0.2_universal.dmg`、`DMate_1.0.2_amd64.deb` / `DMate_1.0.2_amd64.AppImage`，GitCode 对应桌面链接仍为 1.0.0。macOS 1.0.2 安装包采用 ad-hoc 签名，尚未经过 Apple 公证。Android 两源仍为 `DMate-Android-1.0.3.apk`；iOS 两源文件名都为 `DMate-iPhone-iPad-fullscreen.mobileconfig` 且全屏设置正常，但本次只替换 GitHub 同名附件中的图标和说明。iOS 不提供 PWA 安装；`/service-worker.js` 只用于清退旧 worker。
 
 新版服务端不再读取、模板也不再注入以下五个下载地址变量，部署本版后可从 Zeabur 删除：
 
@@ -363,11 +363,11 @@ Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DM
 
 旧 Service Worker 和历史缓存只在当前页内清退，不再由清理回调强制刷新。`web-sync.js` 保留安装壳的自动网页更新，并增加防重复跳转保护：会话存储不可用或写入校验失败时停止自动跳转，跨版本跳转也受冷却约束，同一目标未成功载入及 A/B 版本回跳不再反复重试。需要真正回滚到先前版本时，可在保存必要内容后手动刷新；这些保护不改变独立的原生安装包更新提醒。
 
-`static/client-updates.json` 独立控制安装后原生包更新通知。模板仅为 Android / Tauri 原生客户端加载 `client-update.js`，补齐此前脚本未加载的入口；它与 `web-sync.js`、网页 revision 分离，只在清单中 `published: true` 的原生包版本高于当前安装版本时提醒。网页翻译、语言功能、CSS / JS 或 Python 后端随网站部署更新，不应修改原生清单来触发安装提醒。只有原生功能、客户端内嵌图标、原生配置等实际新包发布后才提高版本；当前仍为 Android 1.0.3、桌面 1.0.0，本次提醒功能无需重新打包。iOS Web Clip 没有原生版本，不参与比较。
+`static/client-updates.json` 独立控制安装后原生包更新通知。模板仅为 Android / Tauri 原生客户端加载 `client-update.js`，补齐此前脚本未加载的入口；它与 `web-sync.js`、网页 revision 分离，只在清单中 `published: true` 的原生包版本高于当前安装版本时提醒。网页翻译、语言功能、CSS / JS 或 Python 后端随网站部署更新，不应修改原生清单来触发安装提醒。只有原生功能、客户端内嵌图标、原生配置等实际新包发布后才提高版本；Android 保持 1.0.3，桌面 GitHub 发布文件更新到 1.0.2。新版本选择必须匹配清单版本，暂未更新的 GitCode 1.0.0 文件不能作为 1.0.2 的下载回退。iOS Web Clip 没有原生版本，不参与比较。
 
 提醒使用应用内居中的 `<dialog>`，右上角为实心红色关闭圆点，只提供 GitCode / GitHub 下载渠道，由用户手动下载安装。关闭后同一会话不重复提示同版；启动、每 6 小时、回到前台（有节流）及恢复网络时检查，离线静默。页面在后台、生成 / OCR / 同步进行中、正在输入或已有其他弹窗时延后展示，不暂停同步、不刷新页面或更改学习记录。旧 Android 通过外部浏览器打开下载；旧 Tauri 可能阻止新窗口，点击后提供复制地址以便在浏览器打开。
 
-Android 以 GitCode 同名 APK 为主源、GitHub 同版本文件为 `fallbackUrls`，保留 APK 原 SHA256。Linux 的 AppImage / DEB 分开列出，另一格式放在 `additionalPackages`；每个包各有 GitCode / GitHub，两源必须对应同一文件，不能跨格式作为 `fallbackUrls`。网页仍校验允许的来源和文件路径。发布时先验证两源真实文件、版本与内容，再修改清单中的版本、URL、`published` 及 `static/script.js` 的入口；构建成功或源码版本增加不等于已经发布。检测公开文件时使用 GET 或 Range GET，GitCode 附件的 HEAD 返回值不能单独判断文件不存在。网页版本自动刷新与原生下载安装分别执行，前者不会替换设备上已经安装的原生代码。
+Android 以 GitCode 同名 APK 为主源、GitHub 同版本文件为 `fallbackUrls`，保留 APK 原 SHA256。Linux 的 AppImage / DEB 分开列出，另一格式放在 `additionalPackages`；实际参与新版本下载的两源必须对应同版本、同文件，不能跨格式作为回退。本次 GitCode 旧 URL 保留，桌面新版本只选择已更新的 GitHub 附件。网页仍校验允许的来源和文件路径。发布时先验证各源真实文件、版本与内容，再修改清单中的版本、URL、`published` 及 `static/script.js` 的入口；构建成功或源码版本增加不等于已经发布。检测公开文件时使用 GET 或 Range GET，GitCode 附件的 HEAD 返回值不能单独判断文件不存在。网页版本自动刷新与原生下载安装分别执行，前者不会替换设备上已经安装的原生代码。
 
 ### Android 签名包发布
 
@@ -434,6 +434,8 @@ python scripts/generate_icons.py
 - **桌面与 Android**：对应构建工作流会先运行生成器；Tauri 配置包含 512 / 1024 PNG 及 ICO / ICNS，Android Gradle 使用新的启动器资源。Android debug / release 工作流仍需手动触发，签名与应用标识保持原配置。
 - **Snap**：手动构建工作流从同次生成的 512 像素 PNG 写入 `snap/gui/dmate.png`；构建和 Snap Store 发布仍是独立步骤。
 - **iOS Web Clip**：`python scripts/generate_ios_webclip.py` 默认生成 `dist/DMate-iPhone-iPad-fullscreen.mobileconfig`；内嵌 `dmate-app-v52-512.png`，与服务端 `/DMate.mobileconfig` 使用相同构建函数，原描述文件身份保持不变。公开 GitCode / GitHub 入口只有在发布工作流更新对应附件后才使用新图，用户已安装的 Web Clip 也需更新描述文件。
+
+`refresh-ios-webclip.yml` 会在相关源码推送或手动触发时替换 GitHub 描述文件。手动运行默认 `publish_gitcode=false`，只更新 GitHub；只有明确选择 `publish_gitcode=true` 且配置了 `GITCODE_TOKEN` 才上传 GitCode。源码推送触发仍会在凭据存在时同步两源；需要保留 GitCode 时使用带 `[skip ci]` 的提交，并手动运行 GitHub-only 发布。本次 GitCode 保留原文件与链接，不能将两源都采用 fullscreen 文件名当作图标和说明已经同步。
 
 源码资源齐全和本地图像检查通过，不等于 APK / 桌面安装包编译、签名或真机验证已经完成。发布前仍应检查相应平台的构建产物；仅当新包真实发布后，才更新下载入口或 `static/client-updates.json` 的版本与状态。缓存图标未更新时先重新打开页面 / 应用、必要时重新创建系统快捷方式，不要删除账号存储来刷新图标。
 
