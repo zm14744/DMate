@@ -2293,7 +2293,7 @@ def sitemap_xml():
 @app.route("/favicon.ico")
 def favicon_ico():
     """A consistent, opaque DMate favicon for indexers and browser fallbacks."""
-    response = app.send_static_file("icons/dmate-app-v52.ico")
+    response = app.send_static_file("icons/dmate-search-v53.ico")
     response.headers["Content-Type"] = "image/x-icon"
     response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return response
@@ -2311,26 +2311,26 @@ def apple_touch_icon_root():
 
 @app.route("/favicon-16.png")
 def favicon_png_16_root():
-    response = app.send_static_file("icons/dmate-app-v52-16.png")
+    response = app.send_static_file("icons/dmate-search-v53-16.png")
     response.headers["Content-Type"] = "image/png"
-    response.headers["Cache-Control"] = "public, max-age=3600"
+    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return response
 
 
 @app.route("/favicon-32.png")
 def favicon_png_32_root():
-    response = app.send_static_file("icons/dmate-app-v52-32.png")
+    response = app.send_static_file("icons/dmate-search-v53-32.png")
     response.headers["Content-Type"] = "image/png"
-    response.headers["Cache-Control"] = "public, max-age=3600"
+    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return response
 
 
 @app.route("/favicon-64.png")
 def favicon_png_root():
     """Search bots and Safari can fetch the same clearly branded PNG."""
-    response = app.send_static_file("icons/dmate-app-v52-64.png")
+    response = app.send_static_file("icons/dmate-search-v53-64.png")
     response.headers["Content-Type"] = "image/png"
-    response.headers["Cache-Control"] = "public, max-age=3600"
+    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return response
 
 
@@ -2341,7 +2341,7 @@ def favicon_png_root():
 def search_favicon_png_root():
     """Opaque, independently rendered sizes for search-result icon fetching."""
     size = {"/favicon-48.png": 48, "/favicon-96.png": 96}.get(request.path, 192)
-    response = app.send_static_file(f"icons/dmate-app-v52-{size}.png")
+    response = app.send_static_file(f"icons/dmate-search-v53-{size}.png")
     response.headers["Content-Type"] = "image/png"
     response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return response
@@ -2406,7 +2406,7 @@ def home():
     # Search engines must see the public branded favicon even if a crawler UA
     # happens to include Windows/Android/Safari tokens. Browser icons stay intact.
     is_search_crawler = bool(re.search(
-        r"bingbot|adidxbot|BingPreview|Googlebot|Google-InspectionTool|DuckDuckBot|YandexBot|Baiduspider|Sogou|Bytespider|PetalBot",
+        r"bingbot|adidxbot|BingPreview|MicrosoftPreview|msnbot|Googlebot|Google-InspectionTool|DuckDuckBot|YandexBot|Baiduspider|Sogou|Bytespider|PetalBot",
         user_agent, re.IGNORECASE))
     is_android_edge = bool(is_android_browser and re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE))
     is_android_firefox = bool(is_android_browser and re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE))

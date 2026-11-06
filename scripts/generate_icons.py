@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build every DMate icon from the same vector geometry, never from a PNG.
 
-All platforms use the same bright reference-inspired wireframe and stroke.
+All platforms use the same bright reference-inspired wireframe. Search icons
+use a slightly stronger stroke to stay legible in small search-result slots.
 Native bitmap frames are rasterized independently; Android adaptive icons use
 VectorDrawable paths. Historical versioned web assets remain available for old
 cached pages but are no longer inputs to this generator.
@@ -23,12 +24,16 @@ TAURI = ROOT / "desktop" / "src-tauri" / "icons"
 ANDROID = ROOT / "android" / "app" / "src" / "main" / "res"
 VERSION = "v52"
 VIEWBOX = 256
-STROKE = 4.5  # Shared reference weight; no separate thickening for tiny icons.
+STROKE = 4.5  # Preserve the existing brand, browser-tab and native-app weight.
+SEARCH_VERSION = "v53"
+SEARCH_STROKE = 8.0  # One pixel at 32px, before antialiasing.
+SEARCH_MIN_STROKE_PX = 0.9
 ADAPTIVE_SCALE = 0.72
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 APP_SIZES = (16, 32, 48, 64, 96, 128, 180, 192, 256, 512, 1024)
+SEARCH_SIZES = (16, 24, 32, 48, 64, 96, 128, 192, 256)
 
 # Vector reconstruction of the supplied white-wireframe reference. Keep the
 # same connected polyhedron across platforms, including its generous margins.
@@ -63,8 +68,9 @@ def svg_mark(background="#000", foreground="#fff"):
     )
 
 
-def draw_mark(size, background=BLACK, foreground=WHITE, circle=False):
-    """Supersample the shared line weight without minimum-width compensation."""
+def draw_mark(size, background=BLACK, foreground=WHITE, circle=False,
+              stroke=STROKE, min_stroke_px=0):
+    """Rasterize geometry at its target size; search icons can lift tiny strokes."""
     oversample = max(4, math.ceil(1024 / size))
     side = size * oversample
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
@@ -74,7 +80,7 @@ def draw_mark(size, background=BLACK, foreground=WHITE, circle=False):
             draw.ellipse((0, 0, side - 1, side - 1), fill=background)
         else:
             draw.rectangle((0, 0, side - 1, side - 1), fill=background)
-    width = round(STROKE * side / VIEWBOX)
+    width = round(max(stroke * side / VIEWBOX, min_stroke_px * oversample))
     radius = width / 2
     for path in PATHS:
         points = [(x * side / VIEWBOX, y * side / VIEWBOX) for x, y in path]
@@ -184,22 +190,29 @@ def main():
             save_png(draw_mark(size, background=None, foreground=rgba),
                      STATIC / f"{base}-{size}.png")
         save_ico(STATIC / f"{base}.ico", background=None, foreground=rgba)
+    # Search engines fetch a dedicated opaque icon, independent of browser-tab
+    # colors and installed-app artwork. Render each size directly from paths.
+    search_base = f"dmate-search-{SEARCH_VERSION}"
+    search_options = {"stroke": SEARCH_STROKE, "min_stroke_px": SEARCH_MIN_STROKE_PX}
+    for size in SEARCH_SIZES:
+        save_png(draw_mark(size, **search_options), STATIC / f"{search_base}-{size}.png")
+    save_ico(STATIC / f"{search_base}.ico", **search_options)
     # Keep stable public aliases usable for old pages and direct icon requests.
     for source, target in (
         (f"dmate-brand-{VERSION}.svg", "dmate-mark.svg"),
         (f"dmate-tab-white-{VERSION}.svg", "dmate-transparent.svg"),
         (f"dmate-app-{VERSION}-180.png", "apple-touch-icon.png"),
         (f"dmate-app-{VERSION}-512.png", "icon-512.png"),
-        (f"dmate-app-{VERSION}.ico", "favicon-app.ico"),
-        (f"dmate-app-{VERSION}.ico", "favicon.ico"),
-        (f"dmate-app-{VERSION}-192.png", "favicon.png"),
+        (f"{search_base}.ico", "favicon-app.ico"),
+        (f"{search_base}.ico", "favicon.ico"),
+        (f"{search_base}-192.png", "favicon.png"),
     ):
         shutil.copyfile(STATIC / source, STATIC / target)
     # Generic favicon URLs may be discovered by search engines without the
     # browser-specific HTML. Always use the opaque brand here; transparent
     # tab variants remain available only under their explicit tab filenames.
     for size in (16, 32, 48, 64, 96, 128, 192):
-        shutil.copyfile(STATIC / f"dmate-app-{VERSION}-{size}.png", STATIC / f"favicon-{size}.png")
+        shutil.copyfile(STATIC / f"{search_base}-{size}.png", STATIC / f"favicon-{size}.png")
     for size, name in ((16, "icon-16.png"), (24, "icon-24.png"), (32, "32x32.png"),
                        (48, "icon-48.png"), (64, "icon-64.png"), (128, "128x128.png"),
                        (256, "128x128@2x.png"), (512, "icon.png"), (1024, "icon-1024.png")):
@@ -211,7 +224,9 @@ def main():
                       "formats": ["SVG", "PNG", "ICO", "ICNS", "Android VectorDrawable"],
                       "max_bitmap_size": 1024, "android_adaptive_safe_circle_dp": 66,
                       "stroke_units": STROKE,
-                      "small_icons": "shared moderate stroke, independently supersampled"}, ensure_ascii=False))
+                      "search_version": SEARCH_VERSION, "search_stroke_units": SEARCH_STROKE,
+                      "search_min_stroke_px": SEARCH_MIN_STROKE_PX,
+                      "small_icons": "independently supersampled; search icons use a stronger stroke"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
