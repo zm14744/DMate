@@ -143,11 +143,7 @@ $packages = @(
 $certificate = New-SelfSignedCertificate -Type Custom -Subject $publisher -KeyUsage DigitalSignature `
     -FriendlyName 'DMate Store Submission' -CertStoreLocation 'Cert:/CurrentUser/My' `
     -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3','2.5.29.19={text}')
-$certificatePassword = [Guid]::NewGuid().ToString('N')
-Write-Output "::add-mask::$certificatePassword"
-$pfx = Join-Path $work 'submission-signing.pfx'
 $cer = Join-Path $work 'submission-signing.cer'
-Export-PfxCertificate -Cert $certificate -FilePath $pfx -Password (ConvertTo-SecureString $certificatePassword -AsPlainText -Force) | Out-Null
 Export-Certificate -Cert $certificate -FilePath $cer | Out-Null
 Run-Checked 'certutil.exe' @('-f','-addstore','Root',$cer)
 $records = @()
@@ -165,7 +161,7 @@ foreach ($package in $packages) {
     Run-Checked $makeAppx @('pack','/d',$layout,'/p',$inner,'/h','SHA256','/o')
     $bundle = Join-Path $outputRoot $package.Bundle
     Run-Checked $makeAppx @('bundle','/d',$innerRoot,'/p',$bundle,'/o')
-    Run-Checked $signTool @('sign','/fd','SHA256','/f',$pfx,'/p',$certificatePassword,$bundle)
+    Run-Checked $signTool @('sign','/fd','SHA256','/sha1',$certificate.Thumbprint,'/s','My',$bundle)
     Run-Checked $signTool @('verify','/pa',$bundle)
     $unbundle = Join-Path $work "verified/$($package.Layout)"
     Run-Checked $makeAppx @('unbundle','/p',$bundle,'/d',$unbundle,'/o')
@@ -215,5 +211,5 @@ foreach ($file in @($readmeFile,$sumsFile)) {
 }
 $report = @{status='passed'; source_version='1.0.2'; source_installer_sha256=$sourceHash; source_executable_sha256=$appHash; publisher=$publisher; runtime_version=$runtimeVersion; signature='self-signed for Store submission; Store re-signing required'; files=$records}
 $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot 'DMate-Microsoft-Store-verification.json') -Encoding utf8
-Remove-Item $pfx,$cer -Force
+Remove-Item $cer -Force
 Write-Host 'Both Store submission bundles were built, signed and unpacked for verification.'
