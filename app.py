@@ -2403,10 +2403,13 @@ def home():
     is_desktop_firefox = bool(not is_android and not is_ios
         and not is_dmate_android_app and not is_dmate_desktop_app
         and re.search(r"Firefox/", user_agent, re.IGNORECASE))
-    # Search engines must see the public branded favicon even if a crawler UA
-    # happens to include Windows/Android/Safari tokens. Browser icons stay intact.
+    # Include general Google fetchers and the legacy Google Favicon identifier.
+    # All receive opaque search artwork, even with Windows/Android/Safari UA
+    # tokens, while browser-specific tab icons stay intact.
     is_search_crawler = bool(re.search(
-        r"bingbot|adidxbot|BingPreview|MicrosoftPreview|msnbot|Googlebot|Google-InspectionTool|DuckDuckBot|YandexBot|Baiduspider|Sogou|Bytespider|PetalBot",
+        r"bingbot|adidxbot|BingPreview|MicrosoftPreview|msnbot|"
+        r"Googlebot|Google\s+Favicon|GoogleOther|Google-InspectionTool|"
+        r"DuckDuckBot|YandexBot|Baiduspider|Sogou|Bytespider|PetalBot",
         user_agent, re.IGNORECASE))
     is_android_edge = bool(is_android_browser and re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE))
     is_android_firefox = bool(is_android_browser and re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE))

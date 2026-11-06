@@ -137,7 +137,13 @@
 <link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-app-v52.ico">
 <link id="dmateFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-app-v52-64.png">
 {% endif %}
+{% if is_search_crawler %}
+<!-- Google can also select an apple-touch-icon as its favicon. Keep every
+     crawler-visible candidate on the same opaque search artwork. -->
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="192x192" href="/static/icons/dmate-search-v53-192.png">
+{% else %}
 <link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=dmate-icons-v52-20261106">
+{% endif %}
 <title>DMate - 离散数学智能辅学系统</title>
 
 <style>

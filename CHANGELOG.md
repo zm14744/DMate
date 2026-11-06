@@ -2,6 +2,7 @@
 
 ## 2026-11-06
 
+- 补齐 `GoogleOther`（含 Image / Video 变体）及历史 `Google Favicon` UA 的图标分流，与 Googlebot、Bing 共用 v53 黑底白线资源；`Google Favicon` 已被官方列为退役，不据此断言当前 Search Console 的抓取方式。爬虫可见的 `apple-touch-icon` 候选也统一为 v53 的 192 像素图，普通浏览器及根 touch icon 接口仍用 v52；不据此断言截图异常来自旧 touch icon。普通浏览器标签和原生图标不变，无需重新打包；Search Console 仍自行控制缩放与缓存，不保证立即更新或逐像素一致。
 - 新增独立的 `dmate-search-v53` 搜索图标：沿用多面体路径，统一不透明黑底白线，使用 8.0 / 256 线宽及 0.9 像素最低线宽（32 像素图约 1 像素），提供 16 / 24 / 32 / 48 / 64 / 96 / 128 / 192 / 256 像素 PNG 和多尺寸 ICO。手机与电脑搜索爬虫使用相同资源地址，补充识别 `msnbot` / `MicrosoftPreview`，根路径及通用静态 favicon 别名同步更新。品牌、浏览器专用标签及原生 v52 图标保持 4.5 线宽，本次不需要重新打包安装包；Bing 自身的图标处理及旧缓存仍可能延迟显示更新，不承诺立即生效。
 - 下载弹窗说明统一为“选择下载源”，非 Linux 的 GitCode / GitHub 按钮仅显示源名，移除“描述文件”“发行版”后缀；Linux 保留 DEB / AppImage 后缀并增加 itch.io 入口。
 - 移除旧站内 APK 下载路由及更新器对站内安装包地址的兼容，不保留旧 APK 下载入口；APK 下载按钮和更新地址直接指向 GitCode / GitHub 的公开附件。
