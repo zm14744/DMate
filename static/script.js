@@ -1644,6 +1644,9 @@ function renderAccountUi() {
         setAccountMessage("邮箱验证码服务尚未配置，暂时只能登录已有账号", true);
     }
 
+    document.documentElement.dataset.accountStateKnown = "1";
+    document.documentElement.dataset.accountAuthenticated = accountState.authenticated ? "1" : "0";
+    document.documentElement.dataset.accountUsername = accountState.authenticated ? accountState.username : "";
     window.dispatchEvent(new CustomEvent("dmate:account-state", {
         detail: { authenticated: accountState.authenticated, username: accountState.username }
     }));
