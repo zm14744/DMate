@@ -1443,6 +1443,9 @@ $$
         return _failure("没有检测到有效的消息内容。")
 
     system_content = SYSTEM_PROMPT + teaching_prompt(context)
+    response_language = str((context or {}).get("response_language") or "zh-CN")
+    if response_language.lower().startswith("en"):
+        system_content += """\n\n【Response language / 回复语言】\nRespond in natural, fluent English throughout the entire answer. This includes explanations, headings, examples, exercise statements, feedback, summaries, and follow-up questions. Preserve mathematical notation and standard English mathematical terminology. Do not switch to Chinese unless the user explicitly asks for Chinese or requests a Chinese translation. If the user message contains mixed Chinese and English, use English by default in English UI mode while preserving quoted source text as needed.\n"""
     if context.get("semantic_math"):
         from graph_semantic_solver import semantic_math_prompt
         system_content += semantic_math_prompt(context["semantic_math"])
