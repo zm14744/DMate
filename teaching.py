@@ -651,17 +651,59 @@ def _fuzzy_replace_once(value, term):
     return value[:start] + term + value[end:]
 
 
-def normalize_user_request_text(text):
-    """
-    轻量规范化用户短指令。
+def normalize_english_request_text(text):
+    """Conservative English-only cleanup for short commands; never rewrite math content."""
+    value = unicodedata.normalize("NFKC", str(text or "")).strip()
+    value = value.replace("’", "'").replace("–", "-").replace("—", "-")
+    value = re.sub(r"\\s+", " ", value)
+    if not value or len(value) > 240:
+        return value
+    aliases = {
+        "hamiltonion": "Hamiltonian", "hamiltoninan": "Hamiltonian",
+        "eulerain": "Eulerian", "eulerean": "Eulerian",
+        "equivilence": "equivalence", "equivelence": "equivalence",
+        "cartesion": "Cartesian", "cartisian": "Cartesian",
+        "pigeon hole principle": "pigeonhole principle",
+        "inclusion exclusion": "inclusion-exclusion",
+        "breadth first search": "breadth-first search",
+        "depth first search": "depth-first search",
+        "adacency matrix": "adjacency matrix", "adjaceny matrix": "adjacency matrix",
+        "spanning three": "spanning tree", "minimum spanning three": "minimum spanning tree",
+    }
+    for wrong, correct in sorted(aliases.items(), key=lambda item: len(item[0]), reverse=True):
+        value = re.sub(r"(?i)\\b" + re.escape(wrong) + r"\\b", correct, value)
+    return value
 
-    - 只对 <= 180 字的短输入启用模糊纠错；
-    - 不调用模型，因此不会引入网络延迟；
-    - 不修改页面展示的原始文本，只供意图/难度/知识点识别使用。
-    """
-    value = unicodedata.normalize("NFKC", str(text or "")).strip().lower()
+
+_ENGLISH_TOPIC_ALIASES = (
+    (r"\\b(?:propositional|predicate) logic\\b|\\btautolog(?:y|ies)\\b|\\bcontradiction\\b", "命题逻辑"),
+    (r"\\b(?:set theory|power set|cartesian product|cardinality|subset|union|intersection)\\b", "集合"),
+    (r"\\b(?:equivalence relation|equivalence class|partial order|total order|poset|hasse diagram|reflexive|symmetric|antisymmetric|transitive)\\b", "关系"),
+    (r"\\b(?:injective|surjective|bijective|inverse function|composition of functions)\\b", "函数"),
+    (r"\\b(?:pigeonhole principle|permutation|combination|binomial coefficient|inclusion-exclusion principle|stars and bars)\\b", "计数与组合"),
+    (r"\\b(?:recurrence relation|generating function|mathematical induction|inductive hypothesis|proof by contradiction|counterexample)\\b", "递推"),
+    (r"\\b(?:modular arithmetic|greatest common divisor|least common multiple|euclidean algorithm|prime number|congruence)\\b", "数论"),
+    (r"\\b(?:graph theory|directed graph|undirected graph|weighted graph|vertex|vertices|edge|eulerian|hamiltonian|bipartite graph|connected component|spanning tree|shortest path|adjacency matrix|graph coloring)\\b", "图论"),
+    (r"\\b(?:binary tree|rooted tree|minimum spanning tree)\\b", "树"),
+)
+
+
+def _english_analysis_aliases(text):
+    """Map known English math terms to existing Chinese rule vocabulary for local classification only."""
+    value = normalize_english_request_text(text)
+    for pattern, replacement in _ENGLISH_TOPIC_ALIASES:
+        value = re.sub(pattern, replacement, value, flags=re.IGNORECASE)
+    return value
+
+
+def normalize_user_request_text(text):
+    """Normalize short Chinese/English commands for intent recognition only."""
+    raw = unicodedata.normalize("NFKC", str(text or "")).strip()
+    if re.search(r"[A-Za-z]", raw) and not re.search(r"[\\u4e00-\\u9fff]", raw):
+        return normalize_english_request_text(raw)
+    value = raw.lower()
     value = value.replace("，", ",").replace("。", ".").replace("？", "?").replace("！", "!")
-    value = re.sub(r"\s+", "", value)
+    value = re.sub(r"\\s+", "", value)
     if not value or len(value) > 180:
         return value
 
@@ -671,32 +713,20 @@ def normalize_user_request_text(text):
         if wrong in value:
             value = value.replace(wrong, correct)
 
-    # 量词“道”是中文输入里最常见的同音误字之一。只在后面很快出现“题/练习”时纠正，
-    # 避免把普通句子里的“到/倒”全局改坏：两到图论题 -> 两道图论题。
     value = re.sub(
-        r"([一二两三四五六七八九十百\d]+)[到倒](?=.{0,16}(?:题|练习))",
-        r"\1道",
-        value,
+        r"([一二两三四五六七八九十百\\d]+)[到倒](?=.{0,16}(?:题|练习))",
+        r"\\1道", value,
     )
-    # 常见程度词 + “南/男”基本都是“难”的输入法误字；同样只在短指令里处理。
     value = re.sub(
         r"(非常|特别|比较|有点|有一点|稍微|稍稍|太|很|不太|不怎么|不是很|不要太|别太)[南男]",
-        r"\1难",
-        value,
+        r"\\1难", value,
     )
-
-    # 输入法误字：“出一道很难得题目”中的“得”应作结构助词“的”。
-    # 限定为难度修饰语紧邻“题/题目”，不能把普通的“难得”一词全局改掉。
     value = re.sub(
         r"(很难|非常难|特别难|困难|高难)得(?=题目|题)",
-        r"\1的",
-        value,
+        r"\\1的", value,
     )
-
-    # 先长词后短词，避免“初级数论”被先拆成“数论”。
     for term in sorted(_REQUEST_FUZZY_TERMS, key=len, reverse=True):
         value = _fuzzy_replace_once(value, term)
-
     return value
 
 
@@ -753,33 +783,29 @@ def _looks_like_generated_exercise_text(text):
 
 
 def _detect_mode(latest_text):
-    text = _normalize(latest_text)
+    raw = str(latest_text or "")
+    text = _normalize(raw)
+    if re.search(r"[A-Za-z]", raw) and not re.search(r"[\\u4e00-\\u9fff]", raw):
+        english = normalize_english_request_text(raw).lower()
+        if re.search(r"\\b(?:check|grade|mark)\\b.{0,50}\\b(?:my answer|my solution|my work)\\b", english):
+            return "check_answer"
+        if re.search(r"\\b(?:give|show|provide)\\b.{0,35}\\b(?:full solution|complete solution|step[- ]by[- ]step solution|final answer and explanation)\\b", english):
+            return "full_solution"
+        if re.search(r"\\b(?:explain|what is|what are|define|meaning of)\\b", english) and not re.search(r"\\b(?:solve|calculate|prove|find|determine)\\b", english):
+            return "concept"
 
     # “完整解析，不要只给提示”同时含有“完整解析”和“只给提示”。
-    # 这里先识别“明确拒绝仅提示”的表达，避免被 NO_SOLUTION_PATTERNS
-    # 中的“只给提示”子串误伤。
     rejects_hint_only = bool(
-        re.search(
-            r"(?:不要|别|不用|无需)(?:再)?(?:只|仅)(?:给)?提示",
-            text,
-        )
+        re.search(r"(?:不要|别|不用|无需)(?:再)?(?:只|仅)(?:给)?提示", text)
     )
     if rejects_hint_only and _contains_any(text, FULL_SOLUTION_PATTERNS):
         return "full_solution"
-
-    # 否定式要求优先级必须高于“给我答案”等子串，避免
-    # “不要给我答案”被误判为完整解析。
     if _contains_any(text, NO_SOLUTION_PATTERNS):
         return "hint"
     if _contains_any(text, FULL_SOLUTION_PATTERNS):
         return "full_solution"
-    # “检查我这道练习题的答案”同时含有“练习题”和“检查”，
-    # 答案诊断应优先于出题请求；错题复测回答也依赖这个优先级。
     if _contains_any(text, CHECK_PATTERNS):
         return "check_answer"
-    # 出题模式只接受经过“否定/元讨论过滤”的完整判定。
-    # 不能再用“出题/练习题”裸子串兜底，否则
-    # “不要再给我出题了 / 出题功能为什么有 bug”会被反向误判成出题请求。
     if looks_like_exercise_request(latest_text):
         return "exercise"
     if any(marker.lower() in text for marker in _INTERNAL_IMAGE_MARKERS):
@@ -1743,9 +1769,11 @@ def _classify_content(text):
     )
     analysis_text = (
         normalize_user_request_text(raw_text)
-        if len(raw_text) <= 180 and not math_dense
+        if len(raw_text) <= 240 and not math_dense
         else raw_text
     )
+    if re.search(r"[A-Za-z]", analysis_text) and not re.search(r"[\\u4e00-\\u9fff]", analysis_text):
+        analysis_text = _english_analysis_aliases(analysis_text)
     scores = _score_categories(analysis_text)
     ordered = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     primary, top_score = ordered[0] if ordered else ("待识别", 0)
