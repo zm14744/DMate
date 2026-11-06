@@ -218,7 +218,8 @@
     "^(?:请|麻烦|我|你|现在|暂时|先|还是|今天|算了){0,4}(?:并不是要|不是要|没有让|没让|不想|不需要|不再|不能|不许|不要|别|不用|无需|禁止|停止|取消|不)(?:让你|你|再|继续|给我|帮我|为我|替我|先|真的|直接){0,4}(?:出|生成|设计|编写|编|命|换|安排|准备|提供|来|给|刷|练|做)(?:(?:[一二两三四五六七八九十百千万\\d]+|几|若干|一些|一组|一套|一份|一批|一系列)(?:道|个|题|组|套|份|批)?)?(?:任何|新的|新|更多|其他|别的)?(?:题目|习题|试题|练习题|题|练习|测验|小测|测试|试卷|题组)(?:吧|呢|呗|呀|啊|好吗|好么|行吗|可以吗|行不行|好不好|怎么样|吗|嘛|了){0,3}$",
     "^(?:请|麻烦|我|现在|暂时|先|还是|算了){0,4}(?:不要|别|不用|不想|停止|取消)(?:再|继续|给我|帮我){0,4}(?:考我|考考我|测我|测测我|测试我|抽查我|出题|刷题|练习)(?:吧|呢|呗|呀|啊|好吗|好么|行吗|可以吗|行不行|好不好|怎么样|吗|嘛|了){0,3}$",
     "^(?:先|暂时|还是|不过){0,3}(?:算了|还是算了|取消|先算了|不用了|不要了|停|停下|停止|别出了|不出了|先不出了|不对还是别出题了)(?:吧|了)?$",
-    "^(?:please)?(?:donot|dont|never|stop|cancel)(?:give|generate|create|make|ask|write|design|quiz|test|practice|me|any|a|an|new|more|questions|question|exercises|exercise|problems|problem)*$"
+    "^(?:please)?(?:donot|dont|never|stop|cancel)(?:give|generate|create|make|ask|write|design|quiz|test|practice|me|any|a|an|new|more|questions|question|exercises|exercise|problems|problem)*$",
+    "^(?:please)?(?:dont|donot|never|stop|cancel)(?:give|generate|create|make|design|prepare|ask|quiz|test|practice|me|any|a|an|new|more|questions?|exercises?|problems?|quiz|test)*$"
   ],
   "positive": [
     "^(?:请|麻烦)?(?:让我|我想|想|我要|要|我想要|我希望|我打算)(?:再)?(?:做|练|刷)(?:(?:[一二两三四五六七八九十百千万\\d]+|几|若干|一些|一组|一套|一份|一批|一系列)(?:道|个|题|组|套|份|批)?)?.{0,100}?(?:题目|习题|试题|练习题|题|练习|测验|小测|测试|试卷|题组)(?:吧|呢|呗|呀|啊|好吗|好么|行吗|可以吗|行不行|好不好|怎么样|吗|嘛|了){0,3}(?=$|(?:并|附|带|含|给|不|别|先|要|要求|难度|适合|用|让|只|每|答案|解析|且|但|考))",
@@ -248,7 +249,10 @@
     "^(?:(?:请你|请您|请|麻烦你|麻烦您|麻烦|劳驾|拜托|能不能|能否|可不可以|可以|可否|你能不能|你能否|你可以|你能|你|给我|帮我|为我|替我|帮忙|我想要|我希望|我想|我要|想要|想|要|让我|带我|陪我|我们|我|能)(?:先|现在|再|继续|随机|随便)?){0,4}(?:再|重新|另外|继续|接着|随机|随便|随意|先|现在|也|还|给我|帮我|为我|替我){0,4}(?:来|出|给我)(?:一道|一题|一个)(?:吧|呢|呗|呀|啊|好吗|好么|行吗|可以吗|行不行|好不好|怎么样|吗|嘛|了){0,3}$",
     "^(?:please|canyou|couldyou|wouldyou|iwantyouto|idlikeyouto)?(?:quizme|testme)(?:on|about|in)?[a-z\\d\\-]*$",
     "^(?:please|canyou|couldyou|wouldyou|iwantyouto|idlikeyouto)?(?:give|generate|create|make|write|design|prepare|provide|ask)(?:me|us)?(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|some|afew|several|\\d+)?(?:new|another|more|easy|simple|basic|beginner|medium|intermediate|hard|difficult|challenging|practice|math|mathematics|discretemath|multiple-?choice|trueorfalse|fillintheblank|similar){0,8}(?:questions?|exercises?|problems?|quiz|test)(?:on|about|in|for|with|without|and|but|of|relatedto|please|atatime|basedon|$)",
-    "^(?:please)?(?:give|generate|create|make|write|design|ask)?(?:me)?(?:another|more|anew|new|next)(?:similar|easy|simple|hard|difficult|practice)?(?:questions?|exercises?|problems?|quiz)(?:please)?$"
+    "^(?:please)?(?:give|generate|create|make|write|design|ask)?(?:me)?(?:another|more|anew|new|next)(?:similar|easy|simple|hard|difficult|practice)?(?:questions?|exercises?|problems?|quiz)(?:please)?$",
+    "^(?:please|canyou|couldyou|wouldyou|iwantyouto|idlikeyouto)?(?:give|generate|create|make|design|prepare|write|ask)(?:me)?(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|some|afew|several|\\d+)?(?:new|another|more|easy|simple|basic|beginner|medium|intermediate|hard|difficult|challenging|practice|discrete|mathematics|math|graph|logic|counting|similar|multiplechoice|trueorfalse|fillintheblank){0,12}(?:questions?|exercises?|problems?|quiz|test)(?:on|about|in|for|with|without|basedon|please|atatime|$)",
+    "^(?:please|canyou|couldyou|wouldyou|iwantyouto|idlikeyouto)?(?:quizme|testme)(?:on|about|in)?[a-z\\d\\-]*$",
+    "^(?:please)?(?:give|generate|create|make|design)(?:me)?(?:another|more|anew|new|next)(?:similar|easy|simple|hard|difficult|practice)?(?:questions?|exercises?|problems?|quiz|test)(?:please)?$"
   ],
   "implicit": [
     "^(?:(?:请你|请您|请|麻烦你|麻烦您|麻烦|劳驾|拜托|能不能|能否|可不可以|可以|可否|你能不能|你能否|你可以|你能|你|给我|帮我|为我|替我|帮忙|我想要|我希望|我想|我要|想要|想|要|让我|带我|陪我|我们|我|能)(?:先|现在|再|继续|随机|随便)?){0,4}(?:下一题|下一道题|下一道|下一个题)(?:吧|呢|呗|呀|啊|好吗|好么|行吗|可以吗|行不行|好不好|怎么样|吗|嘛|了){0,3}$"
