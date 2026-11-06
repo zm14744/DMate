@@ -53,6 +53,7 @@
         '函数与映射': 'Functions and Mappings',
         '映射': 'Mappings',
         '单射满射双射': 'Injections, Surjections and Bijections',
+        '单射、满射与双射': 'Injections, Surjections and Bijections',
         '单射': 'Injective Functions',
         '满射': 'Surjective Functions',
         '双射': 'Bijective Functions',

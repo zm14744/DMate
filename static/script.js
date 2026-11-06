@@ -9,6 +9,8 @@ const dmateKnowledgeLabel = value => {
     const label = window.DMateKnowledgeLanguage?.label(value, dmateUiLanguage());
     return label && label !== value ? label : dmateUiText(value);
 };
+const dmateKnowledgeList = values => dmateUiText(values.join("、"),
+    values.map(value => window.DMateKnowledgeLanguage?.label(value, "en") || value).join(", "));
 
 const STORAGE_KEY = "discrete_math_ai_sessions_v1";
 const LEARNING_STORAGE_KEY = "discrete_math_ai_learning_v1";
@@ -9506,7 +9508,7 @@ function renderWrongBook() {
         if (item.focusPoints.length) {
             appendMetaRow(
                 "本题难点",
-                item.focusPoints.join("、"),
+                dmateKnowledgeList(item.focusPoints),
                 "focus"
             );
         }
@@ -9514,7 +9516,7 @@ function renderWrongBook() {
         if (item.knowledgePoints.length) {
             appendMetaRow(
                 "整题涉及",
-                item.knowledgePoints.join("、")
+                dmateKnowledgeList(item.knowledgePoints)
             );
         }
 
@@ -20622,7 +20624,7 @@ function renderKnowledgeGraphSummary(context) {
                         ? "历史题相关"
                         : "本题相关"
                 ),
-            related.join("、")
+            dmateKnowledgeList(related)
         );
     } else {
         addItem(
@@ -20767,7 +20769,7 @@ function renderKnowledgeGraphHistory() {
         const points = document.createElement("div");
         points.className = "kg-history-points";
         points.textContent = item.knowledgePoints.length
-            ? item.knowledgePoints.join("、")
+            ? dmateKnowledgeList(item.knowledgePoints)
             : "知识点暂未识别";
 
         const actions = document.createElement("div");

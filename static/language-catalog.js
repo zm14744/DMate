@@ -283,6 +283,9 @@
         "答案": "Answer",
         "解析": "Explanation",
         "最近复测题": "Latest retest question",
+        "最近复测：通过": "Latest retest: Passed",
+        "最近复测：未通过": "Latest retest: Not passed",
+        "最近复测：尚未确认": "Latest retest: Not yet confirmed",
         "当前没有可以导出的错题": "There are no mistakes to export.",
         "正在生成 PDF…": "Generating PDF…",
         "没有找到匹配的错题": "No matching mistakes found.",
@@ -852,7 +855,10 @@
         "图内下方": "bottom",
         "图内左方": "left",
         "图内右方": "right",
-        "图内中部": "center"
+        "图内中部": "center",
+        "本题难点": "Focus",
+        "整题涉及": "Concepts",
+        "复测情况": "Retest progress"
 };
     // Patterns apply only to a complete system-owned string. Captured names,
     // filenames, question text and other user values are preserved verbatim.
@@ -875,6 +881,7 @@
         [/^共\s*(\d+)\s*道\s+待处理\s*(\d+)\s+已订正\s*(\d+)$/, (_m, total, pending, corrected) => `Total ${total} · Pending ${pending} · Corrected ${corrected}`],
         [/^共\s*(\d+)\s*道\s*·\s*导出时间：([\s\S]+)$/, (_m, n, date) => `${n} ${n === '1' ? 'question' : 'questions'} · Exported: ${date}`],
         [/^已通过复测\s*(\d+)\s*次$/, (_m, n) => `${n} ${n === '1' ? 'retest' : 'retests'} passed`],
+        [/^(\d+) 次，通过 (\d+) 次$/, (_m, attempts, passed) => `${attempts} ${attempts === '1' ? 'retest' : 'retests'} · ${passed} passed`],
         [/^确定移出\s*(\d+)\s*道已完成的错题吗？原聊天不会被删除$/, (_m, n) => `Remove ${n} completed ${n === '1' ? 'question' : 'questions'} from the Mistake Book? Original chats will remain.`],
         [/^题库参考答案：([\s\S]+)$/, (_m, answer) => `Question bank reference answer: ${answer}`],
         [/^图片\s*(\d+)$/, (_m, n) => `Image ${n}`],
