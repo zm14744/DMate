@@ -149,7 +149,7 @@ $pfx = Join-Path $work 'submission-signing.pfx'
 $cer = Join-Path $work 'submission-signing.cer'
 Export-PfxCertificate -Cert $certificate -FilePath $pfx -Password (ConvertTo-SecureString $certificatePassword -AsPlainText -Force) | Out-Null
 Export-Certificate -Cert $certificate -FilePath $cer | Out-Null
-Run-Checked 'certutil.exe' @('-user','-f','-addstore','Root',$cer)
+Run-Checked 'certutil.exe' @('-f','-addstore','Root',$cer)
 $records = @()
 foreach ($package in $packages) {
     $layout = Join-Path $layouts $package.Layout

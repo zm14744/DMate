@@ -19,7 +19,7 @@ jobs:
           $certificate = New-SelfSignedCertificate -Type Custom -Subject 'CN=F4B4F5DD-9B90-49AA-A3A9-C0B049718711' -KeyUsage DigitalSignature -FriendlyName 'DMate Store Signing Diagnostic' -CertStoreLocation 'Cert:/CurrentUser/My' -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3','2.5.29.19={text}')
           $path = Join-Path $env:RUNNER_TEMP 'submission.cer'
           Export-Certificate -Cert $certificate -FilePath $path | Out-Null
-          Write-Host 'Importing temporary certificate into the current-user root store'
-          & certutil.exe -user -f -addstore Root $path
+          Write-Host 'Importing temporary certificate into the isolated runner machine root store'
+          & certutil.exe -f -addstore Root $path
           if ($LASTEXITCODE -ne 0) { throw 'Noninteractive certificate import failed' }
           Write-Host 'Certificate import completed without interaction'
