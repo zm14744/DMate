@@ -22080,8 +22080,7 @@ function downloadOptionsForCurrentPlatform() {
     const itch = "https://zm14744.itch.io/dmate";
 
     // Public release assets are fixed here, independent of deployment URL settings.
-    // GitHub has the new desktop packages. Keep each existing GitCode URL
-    // until that mirror is updated separately; never infer its filename.
+    // GitHub and GitCode now serve the same published desktop packages.
     function installers(githubFilename, {gitcodeFilename = githubFilename, formatLabel = "", preferGithub = true} = {}) {
         const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(gitcodeFilename) + "/download";
         const githubUrl = githubDownloadBase + encodeURIComponent(githubFilename);
@@ -22115,7 +22114,7 @@ function downloadOptionsForCurrentPlatform() {
             platform:"Windows",
             text:"选择下载源",
             actions:[
-                ...installers("DMate_1.0.2_x64-setup.exe", {gitcodeFilename:"DMate_1.0.0_x64-setup.exe"}),
+                ...installers("DMate_1.0.2_x64-setup.exe"),
                 { label:"Microsoft Store", url:microsoftStore, secondary:true },
                 { label:"itch.io", url:itch, secondary:true }
             ]
@@ -22127,7 +22126,7 @@ function downloadOptionsForCurrentPlatform() {
             text:dmateUiText("选择下载源。GitHub 上的 macOS 安装包尚未经过 Apple 公证。",
                 "Choose a download source. The macOS installer on GitHub has not been notarized by Apple."),
             actions:[
-                ...installers("DMate_1.0.2_universal.dmg", {gitcodeFilename:"DMate_1.0.0_universal.dmg"}),
+                ...installers("DMate_1.0.2_universal.dmg"),
                 { label:"itch.io", url:itch, secondary:true }
             ]
         };
@@ -22137,8 +22136,8 @@ function downloadOptionsForCurrentPlatform() {
             platform:"Linux（x86-64 / amd64）",
             text:"选择下载源",
             actions:[
-                ...installers("DMate_1.0.2_amd64.deb", {gitcodeFilename:"DMate_1.0.0_amd64.deb", formatLabel:"DEB"}),
-                ...installers("DMate_1.0.2_amd64.AppImage", {gitcodeFilename:"DMate_1.0.0_amd64.AppImage", formatLabel:"AppImage"}),
+                ...installers("DMate_1.0.2_amd64.deb", {formatLabel:"DEB"}),
+                ...installers("DMate_1.0.2_amd64.AppImage", {formatLabel:"AppImage"}),
                 { label:"Snap Store", url:snap, secondary:true },
                 { label:"itch.io", url:itch, secondary:true }
             ]
