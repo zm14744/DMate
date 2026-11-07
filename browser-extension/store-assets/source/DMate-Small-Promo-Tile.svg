@@ -1,22 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="440" height="280" viewBox="0 0 440 280">
-<defs>
-<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B0E14"/><stop offset="1" stop-color="#151D31"/></linearGradient>
-<radialGradient id="glow" cx="82%" cy="48%" r="58%"><stop offset="0" stop-color="#2563EB" stop-opacity=".34"/><stop offset="1" stop-color="#2563EB" stop-opacity="0"/></radialGradient>
-<pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#8BA6D9" stroke-opacity=".07"/></pattern>
-</defs>
-<rect width="440" height="280" fill="url(#bg)"/><rect width="440" height="280" fill="url(#glow)"/><rect width="440" height="280" fill="url(#grid)"/>
-<rect x="28" y="26" width="68" height="68" rx="20" fill="#030406" stroke="#fff" stroke-opacity=".12"/>
-<g transform="translate(34.5 32.5) scale(.21484375)" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+<rect width="440" height="280" fill="black"/>
+<g transform="translate(18 23) scale(.90)"><g fill="none" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
 <path d="M59 73 L103 48 L154 39 L205 84 L215 129 L201 188 L139 215 L94 217 L51 170 L41 126 L59 73"/>
-<path d="M59 73 L69 82 L127 66 L154 39"/><path d="M69 82 L61 145 L51 170"/><path d="M127 66 L162 116 L215 129"/><path d="M162 116 L119 165 L61 145"/><path d="M119 165 L139 215"/>
-</g>
-<text x="112" y="70" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="38" font-weight="700" letter-spacing="-.8">DMate</text>
-<text x="30" y="145" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="650">Discrete Mathematics Tutor</text>
-<text x="30" y="176" fill="#B8C4D8" font-family="Inter,Arial,sans-serif" font-size="16">Your study space in the Edge sidebar.</text>
-<line x1="30" y1="205" x2="410" y2="205" stroke="#fff" stroke-opacity=".14"/>
-<circle cx="36" cy="233" r="4" fill="#60A5FA"/><text x="48" y="238" fill="#DCE7F8" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="600" letter-spacing=".65">AI TUTOR</text>
-<circle cx="154" cy="233" r="4" fill="#60A5FA"/><text x="166" y="238" fill="#DCE7F8" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="600" letter-spacing=".65">GRAPH TOOLS</text>
-<circle cx="300" cy="233" r="4" fill="#60A5FA"/><text x="312" y="238" fill="#DCE7F8" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="600" letter-spacing=".65">STUDY REVIEW</text>
-<g opacity=".22" fill="none" stroke="#7DB5FF" stroke-width="1.4"><path d="M344 91L390 121L370 173L321 159L344 91Z"/><path d="M344 91L370 173M390 121L321 159"/></g>
-<g fill="#7DB5FF" opacity=".65"><circle cx="344" cy="91" r="4"/><circle cx="390" cy="121" r="4"/><circle cx="370" cy="173" r="4"/><circle cx="321" cy="159" r="4"/></g>
+<path d="M59 73 L69 82 L127 66 L154 39"/>
+<path d="M69 82 L61 145 L51 170"/>
+<path d="M127 66 L162 116 L215 129"/>
+<path d="M162 116 L119 165 L61 145"/>
+<path d="M119 165 L139 215"/>
+</g></g>
+<g transform="translate(206 105) scale(.68)"><path d="M337 68 L315 83 L303 89 L292 91 L289 89 L290 82 L302 77 L311 68 L313 64 L313 61 L310 57 L308 56 L302 57 L291 66 L283 79 L284 90 L288 95 L293 97 L303 96 L318 88 L337 70 Z M294 73 L295 72 L296 73 L295 74 Z M306 62 L307 64 L300 71 L296 73 L295 72 L297 69 Z M130 35 L124 30 L113 26 L106 25 L84 26 L82 23 L81 24 L78 23 L74 28 L59 32 L38 43 L31 51 L32 54 L34 52 L35 55 L37 55 L47 47 L57 42 L68 38 L71 39 L56 83 L52 102 L38 111 L34 115 L37 114 L38 115 L37 116 L39 116 L50 111 L54 111 L86 94 L114 75 L128 62 L134 52 L135 46 Z M128 41 L128 45 L126 50 L113 64 L78 88 L62 97 L60 96 L80 39 L83 35 L96 33 L113 34 L123 37 Z M312 36 L308 35 L284 36 L283 35 L288 24 L286 20 L282 19 L274 37 L271 40 L257 44 L247 50 L247 53 L250 55 L262 49 L268 47 L270 48 L266 59 L264 71 L256 79 L246 85 L245 84 L245 72 L246 71 L245 64 L243 62 L240 62 L235 58 L229 59 L216 72 L210 87 L211 91 L215 95 L220 95 L238 78 L240 81 L241 87 L245 91 L249 91 L262 78 L263 79 L263 92 L265 100 L267 104 L271 108 L273 108 L272 107 L273 105 L270 99 L269 87 L272 67 L279 45 L281 43 L312 37 Z M236 64 L239 68 L225 83 L218 88 L217 85 L222 75 L229 67 Z M218 22 L214 19 L211 19 L192 38 L169 65 L167 64 L171 38 L171 30 L167 25 L163 23 L161 24 L155 33 L135 74 L126 99 L125 109 L128 110 L130 106 L131 109 L146 74 L157 51 L159 49 L160 50 L159 52 L160 71 L165 77 L169 77 L192 50 L204 38 L205 40 L200 53 L194 83 L195 105 L199 115 L201 116 L202 113 L201 90 L203 77 L208 57 L219 27 Z M130 105 L131 104 L132 106 L131 107 Z" fill="white" fill-rule="evenodd"/></g>
 </svg>
