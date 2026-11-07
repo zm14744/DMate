@@ -34,8 +34,8 @@ jobs:
           html = (root / "sidebar.html").read_text(encoding="utf-8")
           assert "<iframe" not in html.lower(), "Remote iframe is not allowed in this package"
           assert "{{" not in html and "{%" not in html, "Unrendered server template remains"
-          assert not re.search(r"\\son[a-z]+\\s*=", html, re.I), "Inline event handler remains"
-          for attrs, body in re.findall(r"<script\\b([^>]*)>([\\s\\S]*?)</script\\s*>", html, re.I):
+          assert not re.search(r'\son[a-z]+\s*=', html, re.I), "Inline event handler remains"
+          for attrs, body in re.findall(r'<script\b([^>]*)>([\s\S]*?)</script\s*>', html, re.I):
               if "src=" not in attrs.lower() and 'application/json' not in attrs.lower():
                   assert not body.strip(), "Inline executable script remains"
           for value in re.findall(r'''(?:src|href)=["'](/static/[^"']+)["']''', html, re.I):
@@ -43,6 +43,7 @@ jobs:
               assert (root / relative).is_file(), f"Missing local asset: {relative}"
           assert (root / "extension/api-bridge.js").is_file()
           assert (root / "extension/events.js").is_file()
+          assert "credentials: 'include'" in (root / "extension/api-bridge.js").read_text(encoding="utf-8")
           print(f"Validated {manifest['name']} {manifest['version']}")
           PY
 
