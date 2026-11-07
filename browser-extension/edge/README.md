@@ -1,31 +1,33 @@
 # DMate for Microsoft Edge
 
-DMate for Edge opens the existing DMate web application in Edge's native Side Panel. The panel uses the existing website and backend; it does not create a second chat client or a separate account store.
+DMate for Edge is a native Edge Side Panel chat client. It keeps the compact dark DMate layout and sends text conversations to the existing DMate chat API.
 
 ## Install locally
 
-1. Download this repository, or check out the `feature/edge-side-panel` branch.
+1. Download this repository ZIP, or check out the `feature/edge-side-panel` branch.
 2. Open `edge://extensions` in Microsoft Edge.
 3. Turn on **Developer mode**.
 4. Choose **Load unpacked**.
-5. Select this `browser-extension/edge` directory.
+5. Select the `browser-extension/edge` directory.
 6. Pin DMate to the toolbar if desired, then click its toolbar icon to open the side panel.
 
-## What this version does
+## Included in this first build
 
-- Uses the native Edge Side Panel rather than a popup or a new tab.
-- Opens the live DMate website as a top-level page in the side panel (not an iframe), so the website remains first-party for its normal login cookies and browser storage.
-- Reuses the current DMate web UI, account system, chat history, and backend.
-- Keeps the extension permissions minimal: only `sidePanel` is requested.
+- Native Edge Side Panel opened from the toolbar action.
+- Dark DMate-style header, conversation area, question marker, and rounded composer.
+- Text chat through the existing `POST /chat` endpoint.
+- Local conversation persistence using `chrome.storage.local`.
+- Enter to send; Shift+Enter for a new line.
+- Only requests `sidePanel` and `storage`, plus host access to the DMate production API.
 
-## Current scope
+## Important scope and privacy notes
 
-This is the first Edge side-panel build. It is a browser-side entry point to the existing DMate web application. It does not yet inject into arbitrary pages, read page contents, or add a “Ask DMate about selection” context-menu command. Those features should be added separately with explicit permissions and a clear user action.
+This first side-panel build runs as a local extension page and calls the DMate API in guest mode. It deliberately does not embed or redirect the full website into the side panel: browser side panels are extension pages, and navigating them to an external website can leave the side panel or open a normal tab.
 
-The extension is not yet submitted to Microsoft Edge Add-ons. Before store submission, prepare and verify the store listing assets (including the required raster icon sizes), screenshots, privacy disclosures, and final package.
+Because the current DMate API uses same-origin HttpOnly session cookies and does not provide a general third-party Bearer-token/CORS account API, this initial extension does **not** sign in to DMate accounts or access cloud-synced chat history. Its side-panel conversation is stored locally in the browser. The question marker is a local UI label; it does not add an item to the website's formal question bank.
 
-## Development notes
+For account login, image recognition, notebooks, graph tools, and cross-device sync, use the full DMate website from the menu.
 
-- Manifest V3.
-- Uses the Edge/Chromium Side Panel API (Edge 116 or later).
-- The app URL is defined in `sidebar.js`.
+## Store release
+
+This is a local development package, not yet submitted to Microsoft Edge Add-ons. Before store submission, prepare the final raster extension icon sizes, store screenshots, privacy disclosures, and listing text, then test the packaged build in Edge.
