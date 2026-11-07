@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "DMate — AI Assistant",
+  "short_name": "DMate",
+  "description": "在 Edge 侧边栏中使用 DMate AI 助手。",
+  "version": "1.0.0",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "sidePanel"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "打开 DMate 侧边栏"
+  },
+  "side_panel": {
+    "default_path": "sidebar.html"
+  }
+}
