@@ -144,7 +144,8 @@
       messages.push({ role: "assistant", content: result.reply });
       await save();
     } catch (error) {
-      addError(error?.message || "连接 DMate 失败，请检查网络后重试。");
+      messages.push({ role: "assistant", content: "请求失败：" + (error?.message || "连接 DMate 失败，请检查网络后重试。") });
+      await save();
     } finally {
       typing.remove();
       setBusy(false);
