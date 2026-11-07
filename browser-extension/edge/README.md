@@ -2,13 +2,11 @@
 
 This is the installable Edge extension package for DMate. It opens the existing DMate website in Edge's native Side Panel; the original website remains responsible for the interface, styling, chat behavior, and backend.
 
-## Download
-
-[Download DMate_Edge_Original_UI.zip](../DMate_Edge_Original_UI.zip)
+The extension uses the existing DMate geometric logo with a rounded black tile and transparent corners. The logo artwork itself has not been redesigned.
 
 ## Install
 
-1. Download and extract the ZIP.
+1. Extract this ZIP.
 2. Open `edge://extensions` in Microsoft Edge.
 3. Turn on **Developer mode**.
 4. Select **Load unpacked**.
@@ -19,7 +17,7 @@ Click the DMate toolbar icon to open the native side panel.
 ## Package details
 
 - Manifest V3; Edge 116 or later.
-- Uses the existing DMate v52 product icon in 16, 32, 48, and 128 pixel sizes.
+- Existing DMate product icon in 16, 32, 48, and 128 pixel sizes.
 - Loads `https://dmate.zeabur.app/` directly in the side panel.
 - Does not ship a second chat interface or a separate local chat implementation.
 

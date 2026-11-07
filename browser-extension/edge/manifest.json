@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "DMate",
   "description": "在 Microsoft Edge 原生侧边栏中打开 DMate。",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "minimum_chrome_version": "116",
   "permissions": ["sidePanel"],
   "host_permissions": ["https://dmate.zeabur.app/*"],
