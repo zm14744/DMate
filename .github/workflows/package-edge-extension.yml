@@ -1,10 +1,11 @@
-name: Package DMate Edge extension
+name: Package DMate Edge extension and store assets
 
 on:
   push:
     branches: [main]
     paths:
       - 'browser-extension/edge/**'
+      - 'browser-extension/store-assets/source/**'
       - '.github/workflows/package-edge-extension.yml'
 
 permissions:
@@ -26,24 +27,20 @@ jobs:
           import json
           import pathlib
           import re
-          import zipfile
-
           root = pathlib.Path("browser-extension/edge")
           manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
           assert manifest["manifest_version"] == 3
           assert manifest["side_panel"]["default_path"] == "sidebar.html"
-
           manifests = sorted(p.relative_to(root).as_posix() for p in root.rglob("manifest.json"))
           assert manifests == ["manifest.json"], f"Extension package must contain exactly one manifest.json: {manifests}"
-          assert (root / "static/vendor/vendor-packages.json").is_file(), "Vendored dependency metadata was not preserved"
-
+          assert (root / "static/vendor/vendor-packages.json").is_file()
           html = (root / "sidebar.html").read_text(encoding="utf-8")
-          assert "<iframe" not in html.lower(), "Remote iframe is not allowed in this package"
-          assert "{{" not in html and "{%" not in html, "Unrendered server template remains"
-          assert not re.search(r'\son[a-z]+\s*=', html, re.I), "Inline event handler remains"
+          assert "<iframe" not in html.lower()
+          assert "{{" not in html and "{%" not in html
+          assert not re.search(r'\son[a-z]+\s*=', html, re.I)
           for attrs, body in re.findall(r'<script\b([^>]*)>([\s\S]*?)</script\s*>', html, re.I):
               if "src=" not in attrs.lower() and 'application/json' not in attrs.lower():
-                  assert not body.strip(), "Inline executable script remains"
+                  assert not body.strip()
           for value in re.findall(r'''(?:src|href)=["'](/static/[^"']+)["']''', html, re.I):
               relative = value.split("?", 1)[0].lstrip("/")
               assert (root / relative).is_file(), f"Missing local asset: {relative}"
@@ -53,6 +50,49 @@ jobs:
           print(f"Validated {manifest['name']} {manifest['version']}")
           PY
 
+      - name: Render Edge Add-ons store listing images
+        run: |
+          python -m pip install --disable-pip-version-check CairoSVG
+          python - <<'PY'
+          from pathlib import Path
+          import struct
+          import cairosvg
+          root = Path("browser-extension/store-assets")
+          source = root / "source"
+          outputs = [
+              ("DMate-Extension-Badge.svg", "DMate-Extension-Badge-300x300.png", 300, 300),
+              ("DMate-Small-Promo-Tile.svg", "DMate-Small-Promo-Tile-440x280.png", 440, 280),
+              ("DMate-Large-Promo-Tile.svg", "DMate-Large-Promo-Tile-1400x560.png", 1400, 560),
+          ]
+          for src, dst, width, height in outputs:
+              target = root / dst
+              cairosvg.svg2png(url=str(source / src), write_to=str(target), output_width=width, output_height=height)
+              data = target.read_bytes()
+              assert data[:8] == b"\x89PNG\r\n\x1a\n"
+              actual = struct.unpack(">II", data[16:24])
+              assert actual == (width, height), (dst, actual)
+              print(f"{dst}: {actual[0]}x{actual[1]}, {len(data)} bytes")
+          PY
+
+      - name: Validate store assets and build their ZIP
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import struct
+          root = Path("browser-extension/store-assets")
+          expected = {
+              "DMate-Extension-Badge-300x300.png": (300, 300),
+              "DMate-Small-Promo-Tile-440x280.png": (440, 280),
+              "DMate-Large-Promo-Tile-1400x560.png": (1400, 560),
+          }
+          for name, size in expected.items():
+              data = (root / name).read_bytes()
+              assert data[:8] == b"\x89PNG\r\n\x1a\n"
+              assert struct.unpack(">II", data[16:24]) == size
+          PY
+          rm -f browser-extension/DMate_Edge_Store_Assets.zip
+          (cd browser-extension/store-assets && zip -X -q ../DMate_Edge_Store_Assets.zip README.md DMate-Extension-Badge-300x300.png DMate-Small-Promo-Tile-440x280.png DMate-Large-Promo-Tile-1400x560.png)
+
       - name: Build ZIP with one root manifest
         run: |
           rm -f browser-extension/DMate_Edge_Original_UI.zip
@@ -60,33 +100,33 @@ jobs:
           python - <<'PY'
           import pathlib
           import zipfile
-
           package = pathlib.Path("browser-extension/DMate_Edge_Original_UI.zip")
           with zipfile.ZipFile(package) as archive:
-              manifests = sorted(name for name in archive.namelist()
-                                 if pathlib.PurePosixPath(name).name.lower() == "manifest.json")
+              manifests = sorted(name for name in archive.namelist() if pathlib.PurePosixPath(name).name.lower() == "manifest.json")
               assert manifests == ["manifest.json"], f"ZIP must contain exactly one manifest.json: {manifests}"
               assert "static/vendor/vendor-packages.json" in archive.namelist()
               assert "sidebar.html" in archive.namelist()
-          print(f"ZIP validated: {package.stat().st_size} bytes; one manifest.json at archive root.")
+          print(f"Extension ZIP validated: {package.stat().st_size} bytes.")
           PY
 
-      - name: Upload package artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: DMate-Edge-Extension-v1.0.4
-          path: browser-extension/DMate_Edge_Original_UI.zip
+          name: DMate-Edge-Release-v1.0.4
+          path: |
+            browser-extension/DMate_Edge_Original_UI.zip
+            browser-extension/DMate_Edge_Store_Assets.zip
           if-no-files-found: error
           retention-days: 90
 
-      - name: Commit the generated ZIP to main
+      - name: Commit generated packages and store images
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add browser-extension/DMate_Edge_Original_UI.zip
+          git add browser-extension/DMate_Edge_Original_UI.zip browser-extension/DMate_Edge_Store_Assets.zip browser-extension/store-assets/*.png
           if git diff --cached --quiet; then
-            echo "Package is already up to date."
+            echo "Packages and store images are already up to date."
             exit 0
           fi
-          git commit -m "Build DMate Edge extension package v1.0.4"
+          git commit -m "Build DMate Edge extension and store listing assets"
           git push origin HEAD:main
