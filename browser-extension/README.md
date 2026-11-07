@@ -1,5 +1,8 @@
-# Browser extensions
+# DMate Browser Extension
 
-- [Microsoft Edge — DMate Side Panel](edge/README.md)
+## Microsoft Edge
 
-The Edge build reuses the production DMate website in the browser's native side panel. Firefox support will be added as a separate browser adapter.
+- **[Download the Edge extension package](DMate_Edge_Original_UI.zip)**
+- [Source files and installation instructions](edge/README.md)
+
+The extension opens the existing DMate website in Microsoft Edge's native Side Panel. It reuses the original DMate interface and the existing product icon assets.

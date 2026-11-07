@@ -1,15 +1,32 @@
 {
   "manifest_version": 3,
   "name": "DMate",
-  "short_name": "DMate",
-  "description": "在 Edge 原生侧边栏中打开 DMate。",
-  "version": "1.0.1",
+  "description": "在 Microsoft Edge 原生侧边栏中打开 DMate。",
+  "version": "1.0.2",
   "minimum_chrome_version": "116",
   "permissions": ["sidePanel"],
   "host_permissions": ["https://dmate.zeabur.app/*"],
-  "background": {"service_worker": "service-worker.js"},
-  "action": {"default_title": "打开 DMate 侧边栏"},
-  "side_panel": {"default_path": "sidebar.html"},
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "打开 DMate 侧边栏",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidebar.html"
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; frame-src https://dmate.zeabur.app"
   }

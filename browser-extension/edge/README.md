@@ -1,19 +1,26 @@
 # DMate for Microsoft Edge
 
-This extension displays the **existing DMate website** inside Edge's native Side Panel. It does not implement a replacement chat UI. The page, styles, scripts, and application features are served by the existing DMate deployment.
+This is the installable Edge extension package for DMate. It opens the existing DMate website in Edge's native Side Panel; the original website remains responsible for the interface, styling, chat behavior, and backend.
+
+## Download
+
+[Download DMate_Edge_Original_UI.zip](../DMate_Edge_Original_UI.zip)
 
 ## Install
 
-1. Extract this ZIP to a folder.
-2. Open `edge://extensions` in Edge.
-3. Enable **Developer mode**.
-4. Click **Load unpacked**.
-5. Select the extracted folder that directly contains `manifest.json`.
+1. Download and extract the ZIP.
+2. Open `edge://extensions` in Microsoft Edge.
+3. Turn on **Developer mode**.
+4. Select **Load unpacked**.
+5. Choose the extracted folder that directly contains `manifest.json`.
 
-## Notes
+Click the DMate toolbar icon to open the native side panel.
 
-- Edge 116+; Manifest V3.
-- Opens from the extension toolbar icon.
-- Embeds `https://dmate.zeabur.app/` directly, so the original DMate HTML/CSS/JavaScript and backend remain the source of the interface and behavior.
-- No separate chat renderer, custom composer, or duplicate local chat store is included.
-- Test sign-in, microphone, uploads, and browser permissions in Edge before store submission. Since the original site is embedded cross-origin, third-party-cookie and frame-embedding policies may affect sign-in; if so, the correct fix is to adapt the existing site's embedding/auth policy, not rebuild its UI.
+## Package details
+
+- Manifest V3; Edge 116 or later.
+- Uses the existing DMate v52 product icon in 16, 32, 48, and 128 pixel sizes.
+- Loads `https://dmate.zeabur.app/` directly in the side panel.
+- Does not ship a second chat interface or a separate local chat implementation.
+
+The embedded site may be subject to the browser's third-party-cookie and frame-embedding rules. Sign-in and media permissions should be tested in the target Edge profile before store submission.
