@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DMate 原图尺寸调整</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #141414; color: #eee; padding: 28px; max-width: 820px; margin: auto; }
+  input, button { font: inherit; }
+  button { margin: 12px 8px 12px 0; padding: 10px 15px; cursor: pointer; }
+  canvas { max-width: 100%; display: block; margin: 12px 0 24px; border: 1px solid #444; }
+  p { color: #bbb; line-height: 1.55; }
+</style>
+</head>
+<body>
+<h2>DMate 原图尺寸调整</h2>
+<p>请选择你提供的原始 PNG。工具只等比例缩放图像，在左右补纯黑背景，不重画标志、修改字体、裁切或增加任何宣传元素。处理完全在本地浏览器进行。</p>
+<input id="source" type="file" accept="image/png,image/jpeg,image/webp,image/*" aria-label="选择原始 DMate 图片">
+<div id="result" hidden>
+  <h3>小型磁贴 · 440 × 280</h3>
+  <canvas id="small" width="440" height="280"></canvas>
+  <button id="downloadSmall">下载 440 × 280 PNG</button>
+  <h3>大型磁贴 · 1400 × 560</h3>
+  <canvas id="large" width="1400" height="560"></canvas>
+  <button id="downloadLarge">下载 1400 × 560 PNG</button>
+</div>
+<p id="error" role="status"></p>
+<script>
+(() => {
+  'use strict';
+  const input = document.getElementById('source');
+  const result = document.getElementById('result');
+  const error = document.getElementById('error');
+  const tiles = [
+    { canvas: document.getElementById('small'), button: document.getElementById('downloadSmall'), filename: 'DMate-Small-Promo-Tile-440x280.png' },
+    { canvas: document.getElementById('large'), button: document.getElementById('downloadLarge'), filename: 'DMate-Large-Promo-Tile-1400x560.png' },
+  ];
+  for (const tile of tiles) {
+    tile.button.addEventListener('click', () => {
+      tile.canvas.toBlob(blob => {
+        if (!blob) { error.textContent = '保存 PNG 失败。'; return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = tile.filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }, 'image/png');
+    });
+  }
+  input.addEventListener('change', async () => {
+    result.hidden = true;
+    error.textContent = '';
+    const file = input.files?.[0];
+    if (!file) return;
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      for (const {canvas} of tiles) {
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const w = canvas.width, h = canvas.height;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0,0,w,h);
+        const scale = Math.min(w / bitmap.width, h / bitmap.height);
+        const destW = bitmap.width * scale, destH = bitmap.height * scale;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(bitmap, (w - destW)/2, (h - destH)/2, destW, destH);
+      }
+      result.hidden = false;
+    } catch (e) {
+      error.textContent = '无法读取该图片，请选择原始 PNG 图片。';
+    } finally {
+      bitmap?.close();
+    }
+  });
+})();
+</script>
+</body>
+</html>
