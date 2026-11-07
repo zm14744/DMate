@@ -26,11 +26,17 @@ jobs:
           import json
           import pathlib
           import re
+          import zipfile
 
           root = pathlib.Path("browser-extension/edge")
           manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
           assert manifest["manifest_version"] == 3
           assert manifest["side_panel"]["default_path"] == "sidebar.html"
+
+          manifests = sorted(p.relative_to(root).as_posix() for p in root.rglob("manifest.json"))
+          assert manifests == ["manifest.json"], f"Extension package must contain exactly one manifest.json: {manifests}"
+          assert (root / "static/vendor/vendor-packages.json").is_file(), "Vendored dependency metadata was not preserved"
+
           html = (root / "sidebar.html").read_text(encoding="utf-8")
           assert "<iframe" not in html.lower(), "Remote iframe is not allowed in this package"
           assert "{{" not in html and "{%" not in html, "Unrendered server template remains"
@@ -47,10 +53,23 @@ jobs:
           print(f"Validated {manifest['name']} {manifest['version']}")
           PY
 
-      - name: Build ZIP with manifest at archive root
+      - name: Build ZIP with one root manifest
         run: |
           rm -f browser-extension/DMate_Edge_Original_UI.zip
           (cd browser-extension/edge && zip -X -qr ../DMate_Edge_Original_UI.zip .)
+          python - <<'PY'
+          import pathlib
+          import zipfile
+
+          package = pathlib.Path("browser-extension/DMate_Edge_Original_UI.zip")
+          with zipfile.ZipFile(package) as archive:
+              manifests = sorted(name for name in archive.namelist()
+                                 if pathlib.PurePosixPath(name).name.lower() == "manifest.json")
+              assert manifests == ["manifest.json"], f"ZIP must contain exactly one manifest.json: {manifests}"
+              assert "static/vendor/vendor-packages.json" in archive.namelist()
+              assert "sidebar.html" in archive.namelist()
+          print(f"ZIP validated: {package.stat().st_size} bytes; one manifest.json at archive root.")
+          PY
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
