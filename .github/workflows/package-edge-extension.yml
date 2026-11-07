@@ -1,0 +1,72 @@
+name: Package DMate Edge extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'browser-extension/edge/**'
+      - '.github/workflows/package-edge-extension.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate Manifest V3 package
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import re
+
+          root = pathlib.Path("browser-extension/edge")
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+          assert manifest["manifest_version"] == 3
+          assert manifest["side_panel"]["default_path"] == "sidebar.html"
+          html = (root / "sidebar.html").read_text(encoding="utf-8")
+          assert "<iframe" not in html.lower(), "Remote iframe is not allowed in this package"
+          assert "{{" not in html and "{%" not in html, "Unrendered server template remains"
+          assert not re.search(r"\\son[a-z]+\\s*=", html, re.I), "Inline event handler remains"
+          for attrs, body in re.findall(r"<script\\b([^>]*)>([\\s\\S]*?)</script\\s*>", html, re.I):
+              if "src=" not in attrs.lower() and 'application/json' not in attrs.lower():
+                  assert not body.strip(), "Inline executable script remains"
+          for value in re.findall(r'''(?:src|href)=["'](/static/[^"']+)["']''', html, re.I):
+              relative = value.split("?", 1)[0].lstrip("/")
+              assert (root / relative).is_file(), f"Missing local asset: {relative}"
+          assert (root / "extension/api-bridge.js").is_file()
+          assert (root / "extension/events.js").is_file()
+          print(f"Validated {manifest['name']} {manifest['version']}")
+          PY
+
+      - name: Build ZIP with manifest at archive root
+        run: |
+          rm -f browser-extension/DMate_Edge_Original_UI.zip
+          (cd browser-extension/edge && zip -X -qr ../DMate_Edge_Original_UI.zip .)
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMate-Edge-Extension-v1.0.4
+          path: browser-extension/DMate_Edge_Original_UI.zip
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit the generated ZIP to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add browser-extension/DMate_Edge_Original_UI.zip
+          if git diff --cached --quiet; then
+            echo "Package is already up to date."
+            exit 0
+          fi
+          git commit -m "Build DMate Edge extension package v1.0.4"
+          git push origin HEAD:main

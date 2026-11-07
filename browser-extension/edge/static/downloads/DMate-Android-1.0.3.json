@@ -1,0 +1,11 @@
+{
+  "file": "DMate-Android-1.0.3.apk",
+  "version": "1.0.3",
+  "versionCode": 4,
+  "package": "app.dmate.client",
+  "size": 1058756,
+  "sha256": "510abc88b5fdf4ce36e07dde3952eb798d1f977d6187e4b73c48455d0e08ab12",
+  "signerSha256": "aecc4ea91621d6466c7db945a9a178498d5b3e1f78e5f19d81f6973f9229c776",
+  "sourceCommit": "de8fcf9e9f8835bf27c784c20a9be84c0db1ccf2",
+  "buildUrl": "https://github.com/zm14744/DMate/actions/runs/42118483748"
+}

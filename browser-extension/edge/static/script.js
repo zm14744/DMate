@@ -1,0 +1,22730 @@
+marked.setOptions({
+    gfm: true,
+    breaks: true
+});
+
+const dmateUiText = (source, english) => window.DMateI18n?.t(source, english) ?? source;
+const dmateUiLanguage = () => window.DMateI18n?.getLanguage() || "zh-CN";
+const dmateKnowledgeLabel = value => {
+    const label = window.DMateKnowledgeLanguage?.label(value, dmateUiLanguage());
+    return label && label !== value ? label : dmateUiText(value);
+};
+const dmateKnowledgeList = values => dmateUiText(values.join("、"),
+    values.map(value => window.DMateKnowledgeLanguage?.label(value, "en") || value).join(", "));
+
+const STORAGE_KEY = "discrete_math_ai_sessions_v1";
+const LEARNING_STORAGE_KEY = "discrete_math_ai_learning_v1";
+const MAX_IMAGE_BYTES = 20_000_000;
+const MAX_CHAT_MESSAGE_CHARS = 20_000;
+// Keep confirmed image questions intact as well as ordinary typed questions.
+const MAX_QUESTION_TEXT_CHARS = 28_000;
+const MAX_WRONG_QUESTIONS = 240;
+const MAX_LEARNING_EVENTS = 4000;
+const FALLBACK_API_CONTEXT_MESSAGES = 64;
+const MANUAL_QUESTION_MODE_KEY = "dmate_manual_question_mode_tab_v1";
+let manualQuestionMode = false;
+
+function limitQuestionText(value) {
+    // Match Python's character count rather than splitting UTF-16 surrogate pairs.
+    return Array.from(String(value || "")).slice(0, MAX_QUESTION_TEXT_CHARS).join("");
+}
+
+function initManualQuestionMode() {
+    // 仅保存当前浏览器标签页的输入偏好，不混入账号或 AI 回复数据。
+    try { manualQuestionMode = sessionStorage.getItem(MANUAL_QUESTION_MODE_KEY) === "question"; }
+    catch (_error) { manualQuestionMode = false; }
+    const container = document.getElementById("manualQuestionMode");
+    if (!container) return;
+    const updateUi = () => {
+        for (const button of container.querySelectorAll("[data-manual-question]")) {
+            const selected = (button.dataset.manualQuestion === "yes") === manualQuestionMode;
+            button.setAttribute("aria-pressed", String(selected));
+        }
+    };
+    for (const button of container.querySelectorAll("[data-manual-question]")) {
+        button.addEventListener("click", () => {
+            manualQuestionMode = button.dataset.manualQuestion === "yes";
+            try {
+                sessionStorage.setItem(
+                    MANUAL_QUESTION_MODE_KEY,
+                    manualQuestionMode ? "question" : "chat"
+                );
+            } catch (_error) {}
+            updateUi();
+        });
+    }
+    updateUi();
+}
+
+
+const CLOUD_SYNC_META_KEY = "discrete_math_ai_cloud_sync_v1";
+const CLOUD_BACKUP_KEY = "discrete_math_ai_cloud_backup_v1";
+const ACCOUNT_LOGOUT_SIGNAL_KEY = "dmate_account_logout_signal_v1";
+// 故障排查备份只存于当前页面内存，退出/换账号后不可被下一位用户读取。
+let volatileCloudBackup = null;
+// 减少跨设备可见延迟；连续本机写入仍保留短暂防抖，避免每次打字都上传。
+const CLOUD_SYNC_DEBOUNCE_MS = 200;
+const CLOUD_SYNC_MAX_WAIT_MS = 1000;
+const CLOUD_SYNC_REQUEST_TIMEOUT_MS = 15000;
+const CLOUD_SYNC_BULK_TIMEOUT_MS = 120000;
+const CLOUD_SYNC_BULK_BYTES = 256 * 1024;
+let accountState = {
+    configured: null,
+    emailConfigured: null,
+    authenticated: false,
+    username: "",
+    email: "",
+    hasRecoveryCode: false,
+    revision: 0,
+    syncing: false,
+    status: ""
+};
+let cloudSyncTimer = 0;
+let cloudSyncQueuedAt = null;
+let cloudApplyingSnapshot = false;
+// 跨设备同步仍按账号独立登录；防止上传期间的新编辑被错误标为已同步。
+let cloudLocalChangeVersion = 0;
+let cloudSyncContextVersion = 0;
+// 条件读取在版本变化时只下载变化分段；无更新仅返回修订号。
+// 后台低频检查，切回前台立即检查，不持续下载完整快照。
+// 与后台 30 秒轮询区分，避免隐藏标签持续占用服务器连接。
+const CLOUD_LIVE_POLL_VISIBLE_MS = 1200;
+const CLOUD_LIVE_POLL_HIDDEN_MS = 30000;
+let cloudLivePollTimer = 0;
+let cloudLivePollInFlight = false;
+let cloudLivePollAbortController = null;
+let cloudLivePollGeneration = 0;
+let cloudLivePollEnabled = false;
+// 哈希属于当前页面已实际应用的快照，不能直接相信其他标签写入的 localStorage。
+let cloudAppliedPartHashes = null;
+let cloudInitialSyncPending = false;
+let cloudInitialSyncInFlight = false;
+let accountVerificationPending = false;
+let accountVerificationTimer = 0;
+let accountVerificationOperation = null;
+// Older servers ignore delta query parameters and return a full snapshot.
+// Negotiate once per page, then retain their lightweight revision polling.
+let cloudDeltaSyncSupported = null;
+let cloudSyncCapacityRetryAt = 0;
+let appConfirmResolver = null;
+let appConfirmReturnFocus = null;
+let mobileChoiceResolver = null;
+let mobileChoiceOptions = [];
+let mobileChoiceOpenVersion = 0;
+
+function shouldPersistClientState() {
+    // 绝不能信任上次登录留下的 localStorage 元信息作为认证依据。
+    // 只有 /auth/me 或登录接口验证成功后，才允许读取及写入学习缓存。
+    return Boolean(accountState.authenticated && accountState.username);
+}
+
+function purgeGuestPersistentState() {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LEARNING_STORAGE_KEY);
+        localStorage.removeItem(APPEARANCE_STORAGE_KEY);
+        localStorage.removeItem(CLOUD_BACKUP_KEY);
+        // 清除旧版本留下的游客图库；账号自己的图库继续保留。
+        localStorage.removeItem("dmate:graph-gallery:v1::guest");
+        localStorage.removeItem("dmate:graph-gallery:v1:guest");
+        const legacyDrawingOwner = localStorage.getItem("dmate:graph-drawing:v1:owner");
+        if (!legacyDrawingOwner || legacyDrawingOwner === "guest") {
+            localStorage.removeItem("dmate:graph-drawing:v1");
+            localStorage.removeItem("dmate:graph-drawing:v1:owner");
+        }
+    } catch (_error) {}
+}
+
+
+// =========================================================
+// 外观系统（仅视觉状态，不读写学习/会话数据）
+// =========================================================
+const APPEARANCE_STORAGE_KEY = "discrete_math_ai_appearance_v1";
+const APPEARANCE_DB_NAME = "discrete_math_ai_appearance_assets_v1";
+const APPEARANCE_DB_STORE = "assets";
+const APPEARANCE_BACKGROUND_KEY = "global_background";
+const APPEARANCE_MAX_SOURCE_BYTES = 15 * 1024 * 1024;
+const APPEARANCE_MAX_IMAGE_SIDE = 1920;
+
+const APPEARANCE_DEFAULTS = Object.freeze({
+    mode: "system",
+    accent: "blue",
+    fontSize: "standard",
+    backgroundFit: "cover",
+    mask: 35,
+    blur: 0,
+    panelOpacity: 100,
+    bubbleOpacity: 100
+});
+
+const APPEARANCE_ACCENTS = Object.freeze({
+    blue: {
+        main: "#3b82f6",
+        rgb: "59,130,246",
+        deep: "#2563eb",
+        deeper: "#1d4ed8",
+        soft: "#60a5fa",
+        pale: "#93c5fd"
+    },
+    purple: {
+        main: "#8b5cf6",
+        rgb: "139,92,246",
+        deep: "#7c3aed",
+        deeper: "#6d28d9",
+        soft: "#a78bfa",
+        pale: "#c4b5fd"
+    },
+    teal: {
+        main: "#14b8a6",
+        rgb: "20,184,166",
+        deep: "#0d9488",
+        deeper: "#0f766e",
+        soft: "#5eead4",
+        pale: "#99f6e4"
+    }
+});
+
+let appearanceSettings = { ...APPEARANCE_DEFAULTS };
+let appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
+let appearanceBackgroundObjectUrl = "";
+let appearanceHasBackground = false;
+let appearanceGuestCommittedBackgroundBlob = null;
+let appearanceSystemMedia = null;
+let appearanceDraftOriginalSettings = null;
+let appearanceBackgroundDraftMode = "unchanged"; // unchanged | set | remove
+let appearanceDraftBackgroundBlob = null;
+let appearanceDraftDirty = false;
+
+function clampAppearanceNumber(value, min, max, fallback) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return fallback;
+    }
+
+    return Math.min(max, Math.max(min, number));
+}
+
+function normalizeAppearanceSettings(value) {
+    const source = value && typeof value === "object"
+        ? value
+        : {};
+
+    return {
+        mode: ["system", "light", "dark", "navy"].includes(source.mode)
+            ? source.mode
+            : APPEARANCE_DEFAULTS.mode,
+        accent: Object.prototype.hasOwnProperty.call(
+            APPEARANCE_ACCENTS,
+            source.accent
+        )
+            ? source.accent
+            : APPEARANCE_DEFAULTS.accent,
+        fontSize: ["small", "standard", "large"].includes(source.fontSize)
+            ? source.fontSize
+            : APPEARANCE_DEFAULTS.fontSize,
+        backgroundFit: ["cover", "contain"].includes(source.backgroundFit)
+            ? source.backgroundFit
+            : APPEARANCE_DEFAULTS.backgroundFit,
+        mask: clampAppearanceNumber(
+            source.mask,
+            0,
+            70,
+            APPEARANCE_DEFAULTS.mask
+        ),
+        blur: clampAppearanceNumber(
+            source.blur,
+            0,
+            12,
+            APPEARANCE_DEFAULTS.blur
+        ),
+        panelOpacity: clampAppearanceNumber(
+            source.panelOpacity,
+            75,
+            100,
+            APPEARANCE_DEFAULTS.panelOpacity
+        ),
+        bubbleOpacity: clampAppearanceNumber(
+            source.bubbleOpacity,
+            60,
+            100,
+            APPEARANCE_DEFAULTS.bubbleOpacity
+        )
+    };
+}
+
+function appearanceLocalStorageKey() {
+    // Each signed-in account has a private appearance preference on this
+    // browser; no visual preference is sent in a cloud snapshot.
+    return APPEARANCE_STORAGE_KEY + "::" + encodeURIComponent(accountState.username || "");
+}
+
+function loadAppearanceSettings() {
+    if (!shouldPersistClientState()) {
+        return { ...APPEARANCE_DEFAULTS };
+    }
+
+    try {
+        const key = appearanceLocalStorageKey();
+        let raw = localStorage.getItem(key);
+        // Migrate existing local settings only if they belonged to this same
+        // verified account before this change.
+        if (!raw && readCloudSyncMeta().username === accountState.username) {
+            raw = localStorage.getItem(APPEARANCE_STORAGE_KEY);
+            if (raw) localStorage.setItem(key, raw);
+        }
+        return raw
+            ? normalizeAppearanceSettings(JSON.parse(raw))
+            : { ...APPEARANCE_DEFAULTS };
+    } catch (_error) {
+        return { ...APPEARANCE_DEFAULTS };
+    }
+}
+
+function saveAppearanceSettings() {
+    appearanceCommittedSettings = normalizeAppearanceSettings(
+        appearanceSettings
+    );
+
+    if (shouldPersistClientState()) {
+        try {
+            localStorage.setItem(
+                appearanceLocalStorageKey(),
+                JSON.stringify(appearanceCommittedSettings)
+            );
+            localStorage.removeItem(APPEARANCE_STORAGE_KEY);
+        } catch (_error) {
+            // 外观保存失败不应影响学习系统本身。
+        }
+    }
+    // No cloud sync: this is deliberately a device-local preference.
+}
+
+function resolveAppearanceTheme() {
+    if (appearanceSettings.mode === "light") {
+        return "light";
+    }
+
+    if (appearanceSettings.mode === "dark") {
+        return "dark";
+    }
+
+    if (appearanceSettings.mode === "navy") {
+        return "navy";
+    }
+
+    // Installed hosts can report the OS theme directly when their WebView's
+    // media query is stale. Keep this device signal in memory, not preferences.
+    const nativeTheme = window.__DMATE_NATIVE_SYSTEM_THEME__;
+    if (nativeTheme === "dark" || nativeTheme === "light") {
+        return nativeTheme;
+    }
+
+    try {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+    } catch (_error) {
+        return "light";
+    }
+}
+
+function fontScaleForAppearance(size) {
+    if (size === "small") return 0.92;
+    if (size === "large") return 1.08;
+    return 1;
+}
+
+function applyAppearanceSettings(options = {}) {
+    const root = document.documentElement;
+    const body = document.body;
+
+    if (!root || !body) return;
+
+    appearanceSettings = normalizeAppearanceSettings(appearanceSettings);
+
+    const accent = APPEARANCE_ACCENTS[appearanceSettings.accent]
+        || APPEARANCE_ACCENTS.blue;
+    const theme = resolveAppearanceTheme();
+
+    body.dataset.appearanceTheme = theme;
+    root.dataset.appearanceTheme = theme;
+
+    // 用户明确选择浅色时用 only light，阻止部分安卓浏览器再次强制染成深色。
+    const browserColorScheme = theme === "light" ? "only light" : "dark";
+    root.style.colorScheme = browserColorScheme;
+    body.style.colorScheme = browserColorScheme;
+    document.querySelector('meta[name="color-scheme"]')
+        ?.setAttribute(
+            "content",
+            theme === "light" ? "only light" : "dark"
+        );
+    document.querySelector('meta[name="supported-color-schemes"]')
+        ?.setAttribute(
+            "content",
+            theme === "light" ? "light" : "dark"
+        );
+    const browserThemeColor = theme === "light"
+        ? "#f8fafc"
+        : (theme === "navy" ? "#0f172a" : "#171717");
+    document.querySelector('meta[name="theme-color"]')
+        ?.setAttribute("content", browserThemeColor);
+    root.style.setProperty("--accent", accent.main);
+    root.style.setProperty("--accent-rgb", accent.rgb);
+    root.style.setProperty("--accent-deep", accent.deep);
+    root.style.setProperty("--accent-deeper", accent.deeper);
+    root.style.setProperty("--accent-soft", accent.soft);
+    root.style.setProperty("--accent-pale", accent.pale);
+    root.style.setProperty(
+        "--accent-bg",
+        `rgba(${accent.rgb},.22)`
+    );
+    const panelAlpha = appearanceSettings.panelOpacity / 100;
+
+    root.style.setProperty(
+        "--panel-alpha",
+        String(panelAlpha)
+    );
+    // 全屏壁纸模式下的三层透明度。显式算成数字写入 CSS，
+    // 避免依赖浏览器对 calc() 乘法的支持。
+    root.style.setProperty(
+        "--workspace-alpha",
+        String(Math.max(0.08, Math.min(0.18, panelAlpha * 0.14)))
+    );
+    root.style.setProperty(
+        "--shell-alpha",
+        String(Math.max(0.30, Math.min(0.48, panelAlpha * 0.44)))
+    );
+    root.style.setProperty(
+        "--composer-alpha",
+        String(Math.max(0.38, Math.min(0.58, panelAlpha * 0.52)))
+    );
+    root.style.setProperty(
+        "--bubble-alpha",
+        String(appearanceSettings.bubbleOpacity / 100)
+    );
+    root.style.setProperty(
+        "--font-scale",
+        String(fontScaleForAppearance(appearanceSettings.fontSize))
+    );
+    root.style.setProperty(
+        "--background-mask-alpha",
+        String(appearanceSettings.mask / 100)
+    );
+    root.style.setProperty(
+        "--background-blur",
+        `${appearanceSettings.blur}px`
+    );
+    root.style.setProperty(
+        "--background-size",
+        appearanceSettings.backgroundFit
+    );
+
+    if (options.save === true) {
+        saveAppearanceSettings();
+    }
+
+    syncAppearanceControls();
+
+    const graphModal = document.getElementById("knowledgeGraphModal");
+    if (
+        graphModal
+        && !graphModal.classList.contains("hidden")
+        && typeof renderKnowledgeGraph === "function"
+    ) {
+        renderKnowledgeGraph();
+    }
+}
+
+function syncAppearanceControls() {
+    document.querySelectorAll("[data-appearance-mode]").forEach(button => {
+        button.classList.toggle(
+            "active",
+            button.dataset.appearanceMode === appearanceSettings.mode
+        );
+    });
+
+    document.querySelectorAll("[data-appearance-accent]").forEach(button => {
+        button.classList.toggle(
+            "active",
+            button.dataset.appearanceAccent === appearanceSettings.accent
+        );
+    });
+
+    document.querySelectorAll("[data-appearance-font]").forEach(button => {
+        button.classList.toggle(
+            "active",
+            button.dataset.appearanceFont === appearanceSettings.fontSize
+        );
+    });
+
+    document.querySelectorAll("[data-appearance-fit]").forEach(button => {
+        button.classList.toggle(
+            "active",
+            button.dataset.appearanceFit === appearanceSettings.backgroundFit
+        );
+    });
+
+    const pairs = [
+        ["appearanceMaskRange", "appearanceMaskValue", appearanceSettings.mask, "%"],
+        ["appearanceBlurRange", "appearanceBlurValue", appearanceSettings.blur, "px"],
+        ["appearancePanelRange", "appearancePanelValue", appearanceSettings.panelOpacity, "%"],
+        ["appearanceBubbleRange", "appearanceBubbleValue", appearanceSettings.bubbleOpacity, "%"]
+    ];
+
+    for (const [rangeId, valueId, value, suffix] of pairs) {
+        const range = document.getElementById(rangeId);
+        const output = document.getElementById(valueId);
+
+        if (range) range.value = String(value);
+        if (output) output.textContent = `${value}${suffix}`;
+    }
+
+    updateAppearanceBackgroundUi();
+}
+
+function beginAppearanceDraft() {
+    appearanceDraftOriginalSettings = {
+        ...normalizeAppearanceSettings(appearanceCommittedSettings)
+    };
+    appearanceSettings = { ...appearanceDraftOriginalSettings };
+    appearanceBackgroundDraftMode = "unchanged";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = false;
+}
+
+async function discardAppearanceDraft() {
+    appearanceSettings = {
+        ...normalizeAppearanceSettings(
+            appearanceDraftOriginalSettings || appearanceCommittedSettings
+        )
+    };
+    applyAppearanceSettings({ save:false });
+
+    appearanceBackgroundDraftMode = "unchanged";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = false;
+    appearanceDraftOriginalSettings = null;
+
+    // 背景图片也回到 IndexedDB 中最后一次“确认”保存的版本。
+    await loadAppearanceBackground();
+}
+
+function openAppearance() {
+    beginAppearanceDraft();
+    applyAppearanceSettings({ save:false });
+    syncAppearanceControls();
+    document.getElementById("appearanceModal")?.classList.remove("hidden");
+}
+
+async function closeAppearance() {
+    const modal = document.getElementById("appearanceModal");
+    if (!modal || modal.classList.contains("hidden")) return;
+
+    // 先关界面，再在后台回滚预览，避免 IndexedDB 读取让关闭动作显得卡顿。
+    modal.classList.add("hidden");
+
+    if (appearanceDraftDirty) {
+        await discardAppearanceDraft();
+    } else {
+        appearanceDraftOriginalSettings = null;
+    }
+}
+
+async function applyAppearanceDraft() {
+    // 先保存背景，再提交文字/透明度等设置。只有这个入口会持久化。
+    try {
+        if (appearanceBackgroundDraftMode === "set") {
+            if (appearanceDraftBackgroundBlob instanceof Blob) {
+                await writeAppearanceBackgroundBlob(appearanceDraftBackgroundBlob);
+            }
+        } else if (appearanceBackgroundDraftMode === "remove") {
+            await deleteAppearanceBackgroundBlob();
+        }
+    } catch (_error) {
+        window.alert("背景图片保存失败，请重试");
+        return;
+    }
+
+    saveAppearanceSettings();
+    appearanceSettings = { ...appearanceCommittedSettings };
+    appearanceBackgroundDraftMode = "unchanged";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = false;
+    appearanceDraftOriginalSettings = null;
+
+    document.getElementById("appearanceModal")?.classList.add("hidden");
+    showCopyToast("外观设置已确认");
+}
+
+function openAppearanceDatabase() {
+    return new Promise((resolve, reject) => {
+        if (!("indexedDB" in window)) {
+            reject(new Error("IndexedDB unavailable"));
+            return;
+        }
+
+        const request = indexedDB.open(APPEARANCE_DB_NAME, 1);
+
+        request.onupgradeneeded = () => {
+            const db = request.result;
+
+            if (!db.objectStoreNames.contains(APPEARANCE_DB_STORE)) {
+                db.createObjectStore(APPEARANCE_DB_STORE);
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error("IndexedDB open failed"));
+    });
+}
+
+async function readAppearanceBackgroundBlob() {
+    if (!shouldPersistClientState()) {
+        return appearanceGuestCommittedBackgroundBlob;
+    }
+
+    const db = await openAppearanceDatabase();
+
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(APPEARANCE_DB_STORE, "readonly");
+            const store = tx.objectStore(APPEARANCE_DB_STORE);
+            const request = store.get(APPEARANCE_BACKGROUND_KEY);
+
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error || new Error("Background read failed"));
+        });
+    } finally {
+        db.close();
+    }
+}
+
+async function writeAppearanceBackgroundBlob(blob) {
+    if (!shouldPersistClientState()) {
+        appearanceGuestCommittedBackgroundBlob = blob instanceof Blob ? blob : null;
+        return;
+    }
+
+    const db = await openAppearanceDatabase();
+
+    try {
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(APPEARANCE_DB_STORE, "readwrite");
+            tx.objectStore(APPEARANCE_DB_STORE).put(
+                blob,
+                APPEARANCE_BACKGROUND_KEY
+            );
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error("Background save failed"));
+            tx.onabort = () => reject(tx.error || new Error("Background save aborted"));
+        });
+    } finally {
+        db.close();
+    }
+}
+
+async function deleteAppearanceBackgroundBlob() {
+    if (!shouldPersistClientState()) {
+        appearanceGuestCommittedBackgroundBlob = null;
+        return;
+    }
+
+    const db = await openAppearanceDatabase();
+
+    try {
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(APPEARANCE_DB_STORE, "readwrite");
+            tx.objectStore(APPEARANCE_DB_STORE).delete(
+                APPEARANCE_BACKGROUND_KEY
+            );
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error("Background delete failed"));
+            tx.onabort = () => reject(tx.error || new Error("Background delete aborted"));
+        });
+    } finally {
+        db.close();
+    }
+}
+
+function clearAppearanceBackgroundVisual() {
+    if (appearanceBackgroundObjectUrl) {
+        URL.revokeObjectURL(appearanceBackgroundObjectUrl);
+        appearanceBackgroundObjectUrl = "";
+    }
+
+    appearanceHasBackground = false;
+    document.body?.classList.remove("has-custom-background");
+
+    const layer = document.getElementById("appearanceBackgroundLayer");
+    if (layer) layer.style.backgroundImage = "none";
+
+    updateAppearanceBackgroundUi();
+}
+
+function setAppearanceBackgroundVisual(blob) {
+    clearAppearanceBackgroundVisual();
+
+    if (!(blob instanceof Blob)) {
+        return;
+    }
+
+    appearanceBackgroundObjectUrl = URL.createObjectURL(blob);
+    appearanceHasBackground = true;
+
+    const layer = document.getElementById("appearanceBackgroundLayer");
+    if (layer) {
+        layer.style.backgroundImage = `url("${appearanceBackgroundObjectUrl}")`;
+    }
+
+    document.body?.classList.add("has-custom-background");
+    updateAppearanceBackgroundUi();
+}
+
+function updateAppearanceBackgroundUi() {
+    const preview = document.getElementById("appearanceBackgroundPreview");
+    const remove = document.getElementById("appearanceBackgroundRemove");
+
+    if (preview) {
+        if (appearanceHasBackground && appearanceBackgroundObjectUrl) {
+            preview.textContent = "";
+            preview.style.setProperty(
+                "background-image",
+                `url("${appearanceBackgroundObjectUrl}")`,
+                "important"
+            );
+            preview.style.setProperty("background-size", "cover", "important");
+            preview.style.setProperty("background-position", "center", "important");
+            preview.style.setProperty("background-repeat", "no-repeat", "important");
+            preview.dataset.hasBackground = "true";
+            preview.tabIndex = 0;
+            preview.setAttribute("role", "button");
+            preview.setAttribute("aria-label", "查看当前背景大图");
+        } else {
+            preview.textContent = "无";
+            preview.style.setProperty("background-image", "none", "important");
+            preview.dataset.hasBackground = "false";
+            preview.removeAttribute("tabindex");
+            preview.removeAttribute("role");
+            preview.removeAttribute("aria-label");
+        }
+    }
+
+    if (remove) {
+        remove.disabled = !appearanceHasBackground;
+    }
+}
+
+
+function openAppearanceBackgroundViewer() {
+    if (!appearanceHasBackground || !appearanceBackgroundObjectUrl) return;
+
+    const modal = document.getElementById("appearanceBackgroundViewer");
+    const image = document.getElementById("appearanceBackgroundViewerImage");
+    if (!modal || !image) return;
+
+    image.src = appearanceBackgroundObjectUrl;
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+}
+
+function closeAppearanceBackgroundViewer() {
+    const modal = document.getElementById("appearanceBackgroundViewer");
+    const image = document.getElementById("appearanceBackgroundViewerImage");
+    if (image) image.removeAttribute("src");
+    if (modal) {
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+    }
+}
+
+async function loadAppearanceBackground() {
+    // 未经服务器验证时，不展示上一个使用者保留在 IndexedDB 的图片。
+    if (!shouldPersistClientState()) {
+        clearAppearanceBackgroundVisual();
+        return;
+    }
+    const owner = accountState.username;
+    try {
+        const blob = await readAppearanceBackgroundBlob();
+        // 异步读取期间可能已退出或切换账号，绝不能把旧图片放到新页面。
+        if (!accountState.authenticated || accountState.username !== owner) return;
+        if (blob instanceof Blob) {
+            setAppearanceBackgroundVisual(blob);
+        } else {
+            clearAppearanceBackgroundVisual();
+        }
+    } catch (_error) {
+        if (accountState.username === owner) clearAppearanceBackgroundVisual();
+    }
+}
+
+function loadImageElementFromBlob(blob) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const image = new Image();
+
+        image.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(image);
+        };
+
+        image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("Image decode failed"));
+        };
+
+        image.src = url;
+    });
+}
+
+async function prepareAppearanceBackgroundBlob(file) {
+    const supported = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!(file instanceof Blob) || !supported.includes(file.type)) {
+        throw new Error("Unsupported image type");
+    }
+
+    if (file.size > APPEARANCE_MAX_SOURCE_BYTES) {
+        throw new Error("Image too large");
+    }
+
+    const image = await loadImageElementFromBlob(file);
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+
+    if (!width || !height) {
+        throw new Error("Invalid image size");
+    }
+
+    const ratio = Math.min(
+        1,
+        APPEARANCE_MAX_IMAGE_SIDE / Math.max(width, height)
+    );
+    const targetWidth = Math.max(1, Math.round(width * ratio));
+    const targetHeight = Math.max(1, Math.round(height * ratio));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const context = canvas.getContext("2d", { alpha: true });
+    if (!context) {
+        throw new Error("Canvas unavailable");
+    }
+
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    const converted = await new Promise(resolve => {
+        canvas.toBlob(
+            blob => resolve(blob),
+            "image/webp",
+            0.88
+        );
+    });
+
+    return converted instanceof Blob && converted.size > 0
+        ? converted
+        : file;
+}
+
+async function handleAppearanceBackgroundSelected(event) {
+    const input = event?.target;
+    const file = input?.files?.[0] || null;
+
+    if (input) {
+        input.value = "";
+    }
+
+    if (!file) return;
+
+    try {
+        const blob = await prepareAppearanceBackgroundBlob(file);
+        appearanceBackgroundDraftMode = "set";
+        appearanceDraftBackgroundBlob = blob;
+        appearanceDraftDirty = true;
+        setAppearanceBackgroundVisual(blob);
+    } catch (_error) {
+        window.alert("背景图片处理失败，请换一张 JPG、PNG 或 WebP 图片");
+    }
+}
+
+async function removeAppearanceBackground() {
+    closeAppearanceBackgroundViewer();
+    appearanceBackgroundDraftMode = "remove";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = true;
+    clearAppearanceBackgroundVisual();
+}
+
+async function resetAppearance() {
+    closeAppearanceBackgroundViewer();
+    appearanceSettings = { ...APPEARANCE_DEFAULTS };
+    appearanceBackgroundDraftMode = "remove";
+    appearanceDraftBackgroundBlob = null;
+    appearanceDraftDirty = true;
+    clearAppearanceBackgroundVisual();
+    applyAppearanceSettings({ save:false });
+}
+
+function setupAppearanceSystemThemeListener() {
+    const onChange = () => {
+        if (appearanceSettings.mode === "system") {
+            applyAppearanceSettings({ save: false });
+        }
+    };
+    try {
+        appearanceSystemMedia = window.matchMedia("(prefers-color-scheme: dark)");
+        if (typeof appearanceSystemMedia.addEventListener === "function") {
+            appearanceSystemMedia.addEventListener("change", onChange);
+        } else if (typeof appearanceSystemMedia.addListener === "function") {
+            appearanceSystemMedia.addListener(onChange);
+        }
+    } catch (_error) {
+        // 部分移动浏览器不支持变更事件，回到页面时再读取系统设置。
+    }
+    window.addEventListener("dmate:native-system-theme", onChange);
+    window.addEventListener("pageshow", onChange);
+    window.addEventListener("focus", onChange);
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) onChange();
+    });
+}
+
+function bindAppearanceControls() {
+    const appearanceBtn = document.getElementById("appearanceBtn");
+    const appearanceClose = document.getElementById("appearanceClose");
+    const appearanceDone = document.getElementById("appearanceDone");
+    const appearanceReset = document.getElementById("appearanceReset");
+    const appearanceModal = document.getElementById("appearanceModal");
+    const upload = document.getElementById("appearanceBackgroundUpload");
+    const remove = document.getElementById("appearanceBackgroundRemove");
+    const input = document.getElementById("appearanceBackgroundInput");
+    const preview = document.getElementById("appearanceBackgroundPreview");
+    const viewer = document.getElementById("appearanceBackgroundViewer");
+    const viewerClose = document.getElementById("appearanceBackgroundViewerClose");
+
+    appearanceBtn?.addEventListener("click", openAppearance);
+    appearanceClose?.addEventListener("click", closeAppearance);
+    appearanceDone?.addEventListener("click", applyAppearanceDraft);
+    appearanceReset?.addEventListener("click", resetAppearance);
+
+    appearanceModal?.addEventListener("click", event => {
+        if (event.target === appearanceModal) {
+            closeAppearance();
+        }
+    });
+
+    upload?.addEventListener("click", () => input?.click());
+    remove?.addEventListener("click", removeAppearanceBackground);
+    input?.addEventListener("change", handleAppearanceBackgroundSelected);
+
+    preview?.addEventListener("click", openAppearanceBackgroundViewer);
+    preview?.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openAppearanceBackgroundViewer();
+        }
+    });
+    viewerClose?.addEventListener("click", closeAppearanceBackgroundViewer);
+    viewer?.addEventListener("click", event => {
+        if (event.target === viewer) closeAppearanceBackgroundViewer();
+    });
+
+    document.querySelectorAll("[data-appearance-mode]").forEach(button => {
+        button.addEventListener("click", () => {
+            appearanceSettings.mode = button.dataset.appearanceMode;
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
+        });
+    });
+
+    document.querySelectorAll("[data-appearance-accent]").forEach(button => {
+        button.addEventListener("click", () => {
+            appearanceSettings.accent = button.dataset.appearanceAccent;
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
+        });
+    });
+
+    document.querySelectorAll("[data-appearance-font]").forEach(button => {
+        button.addEventListener("click", () => {
+            appearanceSettings.fontSize = button.dataset.appearanceFont;
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
+        });
+    });
+
+    document.querySelectorAll("[data-appearance-fit]").forEach(button => {
+        button.addEventListener("click", () => {
+            appearanceSettings.backgroundFit = button.dataset.appearanceFit;
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
+        });
+    });
+
+    const sliders = [
+        ["appearanceMaskRange", "mask"],
+        ["appearanceBlurRange", "blur"],
+        ["appearancePanelRange", "panelOpacity"],
+        ["appearanceBubbleRange", "bubbleOpacity"]
+    ];
+
+    for (const [id, key] of sliders) {
+        document.getElementById(id)?.addEventListener("input", event => {
+            appearanceSettings[key] = Number(event.target.value);
+            appearanceDraftDirty = true;
+            applyAppearanceSettings({ save:false });
+        });
+    }
+}
+
+function initAppearanceSystem() {
+    appearanceSettings = loadAppearanceSettings();
+    appearanceCommittedSettings = { ...appearanceSettings };
+    applyAppearanceSettings({ save:false });
+    bindAppearanceControls();
+    setupAppearanceSystemThemeListener();
+    loadAppearanceBackground();
+}
+
+
+let wrongBookFilter = "all";
+let wrongBookSearch = "";
+let wrongBookSort = "recent";
+let currentWrongEditId = null;
+
+let pendingWrongQuestionSelection = null;
+let pendingWrongSafeItems = [];
+let pendingWrongSafeIndex = 0;
+let wrongSafePreviewRevision = 0;
+let wrongSafePreviewTimer = null;
+
+const wrongAnswerLoadingIds = new Set();
+const wrongAnswerQueue = [];
+let wrongAnswerQueueBusy = false;
+
+const wrongAnalysisExpandedIds = new Set();
+const wrongAnalysisLoadingIds = new Set();
+
+let knowledgeGraphData = null;
+let knowledgeGraphFilter = "";
+let knowledgeGraphViewMode = "focus";
+let knowledgeGraphDesktopScale = 1;
+let knowledgeGraphScope = "current";
+let knowledgeGraphSelectedNodeId = "";
+let knowledgeGraphHistoryMessageIndex = null;
+let knowledgeGraphSideMode = "detail";
+let knowledgeGraphLoading = false;
+
+let sessions = [];
+let currentId = null;
+// 同账号各端共享的会话删除记录；没有删除标记的按 ID 合并会把已删除会话带回来。
+let deletedSessionIds = Object.create(null);
+let learningState = createEmptyLearningState();
+
+
+// =========================================================
+// 账号 + 云同步（用户名 / 密码）
+// =========================================================
+function readCloudSyncMeta() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(CLOUD_SYNC_META_KEY) || "null");
+        if (!parsed || typeof parsed !== "object") return {};
+        return parsed;
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeCloudSyncMeta(patch = {}) {
+    const next = {
+        ...readCloudSyncMeta(),
+        ...patch
+    };
+    try {
+        localStorage.setItem(CLOUD_SYNC_META_KEY, JSON.stringify(next));
+    } catch (_error) {
+        // 同步元信息失败不影响本地使用。
+    }
+    return next;
+}
+
+function clearCloudSyncMeta() {
+    try {
+        localStorage.removeItem(CLOUD_SYNC_META_KEY);
+    } catch (_error) {}
+}
+
+function bumpCloudSyncContext() {
+    if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = 0;
+    cloudSyncQueuedAt = null;
+    cloudAppliedPartHashes = null;
+    cloudSyncCapacityRetryAt = 0;
+    cloudInitialSyncPending = false;
+    cloudInitialSyncInFlight = false;
+    accountVerificationPending = false;
+    if (accountVerificationTimer) window.clearTimeout(accountVerificationTimer);
+    accountVerificationTimer = 0;
+    cloudSyncContextVersion += 1;
+    return cloudSyncContextVersion;
+}
+
+function isCloudSyncContextValid(owner, contextVersion) {
+    return Boolean(
+        accountState.authenticated
+        && owner
+        && accountState.username === owner
+        && cloudSyncContextVersion === contextVersion
+    );
+}
+
+function normalizeCloudParts(value) {
+    const normalized = {};
+    if (!value || typeof value !== "object") return normalized;
+    for (const key of ["sessions", "learning"]) {
+        const part = value[key];
+        if (!part || typeof part !== "object") continue;
+        const hash = typeof part.hash === "string" ? part.hash : "";
+        const bytes = Number(part.bytes || 0);
+        normalized[key] = {
+            hash,
+            bytes: Number.isFinite(bytes) && bytes >= 0 ? bytes : 0
+        };
+    }
+    return normalized;
+}
+
+function getCloudPartHashMap(parts) {
+    const normalized = normalizeCloudParts(parts);
+    return Object.fromEntries(
+        Object.entries(normalized).map(([key, value]) => [key, value.hash || ""])
+    );
+}
+
+function computeChangedCloudParts(serverParts, localPartHashes) {
+    const normalized = normalizeCloudParts(serverParts);
+    const localHashes = localPartHashes && typeof localPartHashes === "object"
+        ? localPartHashes
+        : {};
+    const changed = [];
+    for (const key of ["sessions", "learning"]) {
+        if (!normalized[key]) continue;
+        if (normalized[key].hash !== String(localHashes[key] || "")) {
+            changed.push(key);
+        }
+    }
+    return changed;
+}
+
+function clearLoggedOutWorkspace() {
+    cancelAccountInteractions();
+    // 退出后进入真正的游客模式：页面清空，游客数据不落地。
+    sessions = [];
+    currentId = null;
+    deletedSessionIds = Object.create(null);
+    learningState = createEmptyLearningState();
+    window.dmateConceptNotebook?.refresh?.();
+    volatileCloudBackup = null;
+    purgeGuestPersistentState();
+
+    appearanceSettings = { ...APPEARANCE_DEFAULTS };
+    appearanceCommittedSettings = { ...APPEARANCE_DEFAULTS };
+    appearanceGuestCommittedBackgroundBlob = null;
+    clearAppearanceBackgroundVisual();
+    applyAppearanceSettings({ save:false });
+
+    const input = document.getElementById("text");
+    if (input) input.value = "";
+
+    wrongBookFilter = "all";
+    wrongBookSearch = "";
+    wrongBookSort = "recent";
+    knowledgeGraphHistoryMessageIndex = null;
+    knowledgeGraphSelectedNodeId = "";
+
+    const sessionsBox = document.getElementById("sessions");
+    if (sessionsBox) sessionsBox.innerHTML = "";
+    const chat = document.getElementById("chat");
+    if (chat) chat.innerHTML = "";
+
+    renderAll();
+}
+
+function setAppConfirmOpen(open) {
+    const modal = document.getElementById("appConfirmModal");
+    if (!modal) return;
+    modal.classList.toggle("hidden", !open);
+    modal.setAttribute("aria-hidden", open ? "false" : "true");
+}
+
+function resolveAppConfirm(value) {
+    const resolver = appConfirmResolver;
+    const returnFocus = appConfirmReturnFocus;
+    appConfirmResolver = null;
+    appConfirmReturnFocus = null;
+    setAppConfirmOpen(false);
+    if (returnFocus?.isConnected && !returnFocus.disabled) returnFocus.focus({ preventScroll:true });
+    if (typeof resolver === "function") resolver(Boolean(value));
+}
+
+function showAppConfirm(options = {}) {
+    const modal = document.getElementById("appConfirmModal");
+    const title = document.getElementById("appConfirmTitle");
+    const body = document.getElementById("appConfirmBody");
+    const confirmButton = document.getElementById("appConfirmConfirm");
+    const closeButton = document.getElementById("appConfirmClose");
+    const actions = modal?.querySelector(".app-confirm-actions");
+    const noticeOnly = options.noticeOnly === true;
+
+    if (!modal || !title || !body || !confirmButton || !closeButton || !actions) {
+        if (noticeOnly) {
+            showCopyToast(String(options.body || options.title || "操作未完成"));
+            return Promise.resolve(false);
+        }
+        return Promise.resolve(window.confirm(String(options.fallbackText || options.body || options.title || "请确认当前操作")));
+    }
+
+    if (appConfirmResolver) resolveAppConfirm(false);
+
+    title.textContent = String(options.title || "请确认");
+    body.textContent = String(options.body || "确定继续吗？");
+    if (options.content) {
+        const content = document.createElement("div");
+        content.setAttribute("data-i18n-content", "");
+        content.textContent = String(options.content);
+        body.appendChild(content);
+    }
+    confirmButton.textContent = String(options.confirmText || "确定");
+    confirmButton.classList.toggle("danger", options.confirmTone === "danger");
+    confirmButton.classList.toggle("primary", options.confirmTone !== "danger");
+    actions.hidden = noticeOnly;
+    modal.classList.toggle("notice-only", noticeOnly);
+    appConfirmReturnFocus = options.returnFocus || null;
+
+    setAppConfirmOpen(true);
+
+    return new Promise(resolve => {
+        appConfirmResolver = resolve;
+        requestAnimationFrame(() => {
+            if (appConfirmResolver === resolve) (noticeOnly ? closeButton : confirmButton).focus({ preventScroll:true });
+        });
+    });
+}
+
+function showWrongBookPdfNotice(message) {
+    return showAppConfirm({
+        title: "无法导出 PDF",
+        body: message,
+        noticeOnly: true,
+        returnFocus: document.getElementById("wrongPdfBtn")
+    });
+}
+
+function setMobileChoiceOpen(open) {
+    const modal = document.getElementById("mobileChoiceModal");
+    if (!modal) return;
+    const version = ++mobileChoiceOpenVersion;
+    modal.classList.toggle("hidden", !open);
+    modal.setAttribute("aria-hidden", open ? "false" : "true");
+    if (!open) {
+        if (modal.open) modal.close();
+        delete modal.dataset.positioning;
+        return;
+    }
+    // The same chooser must appear above native drawing/image dialogs too.
+    modal.dataset.positioning = "true";
+    if (typeof modal.showModal === "function" && !modal.open) modal.showModal();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (version !== mobileChoiceOpenVersion || modal.classList.contains("hidden")) return;
+        delete modal.dataset.positioning;
+        (modal.querySelector(".mobile-choice-option.active:not(:disabled)")
+            || modal.querySelector("button:not(:disabled)"))?.focus({ preventScroll:true });
+    }));
+}
+
+function closeMobileChoiceModal() {
+    setMobileChoiceOpen(false);
+    const resolver = mobileChoiceResolver;
+    mobileChoiceResolver = null;
+    mobileChoiceOptions = [];
+    if (typeof resolver === "function") resolver(null);
+}
+
+function selectMobileChoice(value) {
+    const result = mobileChoiceOptions.find(item => item.value === value) || null;
+    if (!result || result.disabled) return;
+    const resolver = mobileChoiceResolver;
+    mobileChoiceResolver = null;
+    setMobileChoiceOpen(false);
+    mobileChoiceOptions = [];
+    if (typeof resolver === "function") resolver(result);
+}
+
+function openMobileChoiceModal({ title = "请选择", intro = "", options = [], value = "" } = {}) {
+    const modal = document.getElementById("mobileChoiceModal");
+    const titleEl = document.getElementById("mobileChoiceTitle");
+    const introEl = document.getElementById("mobileChoiceIntro");
+    const list = document.getElementById("mobileChoiceList");
+    if (!modal || !titleEl || !introEl || !list) {
+        return Promise.resolve(null);
+    }
+
+    // 若窗口已打开，先结束上一轮选择，避免清空刚生成的新选项。
+    if (mobileChoiceResolver) closeMobileChoiceModal();
+    titleEl.textContent = String(title || "请选择");
+    introEl.textContent = String(intro || "");
+    introEl.classList.toggle("hidden", !intro);
+    mobileChoiceOptions = Array.isArray(options) ? options.map(item => ({
+        value:String(item.value ?? ""),
+        label:String(item.label ?? item.value ?? ""),
+        disabled:item.disabled === true
+    })) : [];
+
+    list.replaceChildren(...mobileChoiceOptions.map(item => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "mobile-choice-option";
+        button.disabled = item.disabled;
+        if (item.value === value) button.classList.add("active");
+        button.setAttribute("role", "radio");
+        button.setAttribute("aria-checked", String(item.value === value));
+        button.innerHTML = `
+            <span class="mobile-choice-option-text">${escapeRawHtml(item.label)}</span>
+            <span class="mobile-choice-option-check" aria-hidden="true"></span>
+        `;
+        button.addEventListener("click", () => selectMobileChoice(item.value));
+        return button;
+    }));
+
+    setMobileChoiceOpen(true);
+
+    return new Promise(resolve => {
+        mobileChoiceResolver = resolve;
+    });
+}
+
+// 删除标记保留在同一账号的本地状态和云端快照中。
+// 不设置短期过期时间，否则离线设备中的旧会话会在标记过期后重新出现。
+function normalizeDeletedSessionIds(value) {
+    const normalized = Object.create(null);
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return normalized;
+    }
+    for (const [id, rawDeletedAt] of Object.entries(value)) {
+        const deletedAt = Number(rawDeletedAt);
+        if (id && Number.isFinite(deletedAt) && deletedAt > 0) {
+            normalized[id] = deletedAt;
+        }
+    }
+    return normalized;
+}
+
+function normalizeDeletedWrongQuestionIds(value) {
+    const normalized = Object.create(null);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return normalized;
+    for (const [id, rawAt] of Object.entries(value)) {
+        const deletedAt = Number(rawAt);
+        if (id && Number.isFinite(deletedAt) && deletedAt > 0) normalized[id] = deletedAt;
+    }
+    return normalized;
+}
+
+function markWrongQuestionDeleted(id) {
+    const key = String(id ?? "");
+    if (!key) return;
+    if (!learningState.deletedWrongQuestionIds) learningState.deletedWrongQuestionIds = Object.create(null);
+    learningState.deletedWrongQuestionIds[key] = Math.max(
+        Date.now(), Number(learningState.deletedWrongQuestionIds[key]) || 0
+    );
+}
+
+function markSessionDeleted(sessionId) {
+    const key = String(sessionId ?? "");
+    if (!key) return;
+    cancelOcrBatchRun(sessionId);
+    const request = activeAiRequests.get(key);
+    if (request) {
+        request.cancelled = true;
+        request.controller.abort();
+        discardRequestStreamPreview(request);
+        activeAiRequests.delete(key);
+    }
+    busySessionIds.delete(key);
+    pendingAiStartSessionIds.delete(key);
+    if (typingContext?.session?.id != null && String(typingContext.session.id) === key) discardTypingOutput();
+    deletedSessionIds[key] = Math.max(
+        Date.now(),
+        Number(deletedSessionIds[key]) || 0
+    );
+}
+
+function collectCloudSnapshot() {
+    sessions.forEach(session => ensureSessionMessageIds(session));
+    return {
+        schemaVersion: 1,
+        sessions: {
+            sessions: sessions.filter(item => (
+                item && !deletedSessionIds[String(item.id)]
+            )),
+            currentId,
+            deletedSessionIds: { ...deletedSessionIds }
+        },
+        learning: {
+            ...learningState,
+            wrongQuestions: (learningState.wrongQuestions || []).filter(item => (
+                item && !learningState.deletedWrongQuestionIds?.[String(item.id)]
+            ))
+        }
+    };
+}
+
+function snapshotHasUserData(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return false;
+    const sessionList = Array.isArray(snapshot.sessions?.sessions)
+        ? snapshot.sessions.sessions
+        : [];
+    if (sessionList.some(item => Array.isArray(item?.messages) && item.messages.length)) {
+        return true;
+    }
+    const learning = snapshot.learning;
+    if (Array.isArray(learning?.events) && learning.events.length) return true;
+    if (Array.isArray(learning?.wrongQuestions) && learning.wrongQuestions.length) return true;
+    if (Array.isArray(learning?.conceptNotebook?.notes) && learning.conceptNotebook.notes.length) return true;
+    return false;
+}
+
+function backupLocalSnapshot(reason = "云同步前的临时备份") {
+    if (!accountState.authenticated) return;
+    const snapshot = collectCloudSnapshot();
+    if (!snapshotHasUserData(snapshot)) return;
+    // 避免共享浏览器上的下一位用户通过本地存储读到前一个账号的资料。
+    volatileCloudBackup = { owner:accountState.username, reason, createdAt:Date.now(), data:snapshot };
+}
+
+function clearLegacyPersistentBackup() {
+    try { localStorage.removeItem(CLOUD_BACKUP_KEY); } catch (_error) {}
+}
+
+function applyCloudSnapshot(snapshot, { selectionId = currentId } = {}) {
+    if (!snapshot || typeof snapshot !== "object") return false;
+    cloudApplyingSnapshot = true;
+    const previous = { sessions, currentId, deletedSessionIds, learningState };
+    const written = [];
+
+    try {
+        if (!window.DMateConceptNotebookModel && snapshot.learning
+            && [learningState.conceptNotebook, snapshot.learning.conceptNotebook].some(value =>
+                value?.notes?.length || Object.keys(value?.deleted || {}).length)) {
+            throw new Error("笔记同步组件未加载，请刷新后重试，现有笔记未被覆盖。");
+        }
+        const updates = [];
+        let nextLearning = null;
+        const sessionData = snapshot.sessions;
+        if (sessionData && typeof sessionData === "object" && Array.isArray(sessionData.sessions)) {
+            const incomingDeletions = normalizeDeletedSessionIds(
+                sessionData.deletedSessionIds
+            );
+            updates.push([STORAGE_KEY, JSON.stringify({
+                sessions: sessionData.sessions.filter(item => (
+                    item && !incomingDeletions[String(item.id)]
+                )),
+                // Selection belongs to this open page. Initial cloud restore
+                // must leave the home composer centered; later sync must not
+                // navigate away from a conversation the user has selected.
+                currentId: selectionId != null ? (sessionData.sessions.find(item =>
+                    item && String(item.id) === String(selectionId)
+                    && !incomingDeletions[String(item.id)])?.id ?? null) : null,
+                deletedSessionIds: incomingDeletions
+            })]);
+        }
+
+        if (snapshot.learning && typeof snapshot.learning === "object") {
+            const incoming = { ...snapshot.learning };
+            if (window.DMateConceptNotebookModel) incoming.conceptNotebook = window.DMateConceptNotebookModel.merge(
+                learningState.conceptNotebook, snapshot.learning.conceptNotebook);
+            nextLearning = normalizeLearningState(incoming);
+            updates.push([LEARNING_STORAGE_KEY, JSON.stringify(nextLearning)]);
+        }
+
+        // Prepare every section before writing, and do not replace live state
+        // until all writes succeed. A quota failure must not half-apply a cloud
+        // revision and then make a retry upload that incomplete local state.
+        for (const [key, value] of updates) {
+            const oldValue = localStorage.getItem(key);
+            localStorage.setItem(key, value);
+            written.push([key, oldValue]);
+        }
+        if (updates.some(([key]) => key === STORAGE_KEY) && !loadState()) {
+            throw new Error("同步会话无法载入");
+        }
+        if (nextLearning) learningState = nextLearning;
+        preserveActiveCloudSessionIdentities(previous.sessions);
+
+        // Do not override this device's appearance with older cloud values.
+        try {
+            renderAll();
+            refreshInputAvailability();
+            window.dmateConceptNotebook?.refresh?.();
+        } catch (error) {
+            // The revision is fully applied even if an unrelated view fails.
+            console.warn("同步后的页面刷新失败：", error);
+        }
+        return true;
+    } catch (error) {
+        ({ sessions, currentId, deletedSessionIds, learningState } = previous);
+        for (const [key, oldValue] of written.reverse()) {
+            try {
+                if (oldValue === null) localStorage.removeItem(key);
+                else localStorage.setItem(key, oldValue);
+            } catch (restoreError) { console.warn("同步缓存恢复失败，当前页面记录仍保留：", restoreError); }
+        }
+        console.warn("应用云端数据失败：", error);
+        return false;
+    } finally {
+        cloudApplyingSnapshot = false;
+    }
+}
+
+function preserveActiveCloudSessionIdentities(previousSessions) {
+    for (const [oldKey, request] of [...activeAiRequests]) {
+        const original = request.session;
+        if (request.cancelled || request.contextVersion !== cloudSyncContextVersion
+            || !previousSessions.includes(original)) continue;
+        const originalMessages = original.messages;
+        const anchor = originalMessages.indexOf(request.userMessage);
+        const candidates = sessions.filter(candidate => {
+            const id = String(candidate.id);
+            return (id === oldKey || id.startsWith(oldKey + "-sync-"))
+                && !deletedSessionIds[id] && anchor >= 0
+                && candidate.messages.length === originalMessages.length
+                && getLatestUserMessage(candidate) === candidate.messages[anchor]
+                && candidate.messages.every((message, index) => cloudMessageIdentity(message) === cloudMessageIdentity(originalMessages[index]));
+        });
+        const matching = candidates.find(candidate => String(candidate.id) === oldKey)
+            || (candidates.length === 1 ? candidates[0] : null);
+        const newKey = matching ? sessionBusyKey(matching.id) : null;
+        if (!matching || activeAiRequests.has(newKey) && activeAiRequests.get(newKey) !== request) {
+            request.cancelled = true;
+            request.controller.abort();
+            activeAiRequests.delete(oldKey);
+            busySessionIds.delete(oldKey);
+            pendingAiStartSessionIds.delete(oldKey);
+            continue;
+        }
+        const position = sessions.indexOf(matching);
+        const oldId = original.id;
+        Object.assign(original, matching, { messages:originalMessages.map((message, index) =>
+            Object.assign(message, matching.messages[index])) });
+        sessions[position] = original;
+        if (newKey === oldKey) continue;
+        activeAiRequests.delete(oldKey);
+        activeAiRequests.set(newKey, request);
+        if (busySessionIds.delete(oldKey)) busySessionIds.add(newKey);
+        pendingAiStartSessionIds.delete(oldKey);
+        const run = ocrBatchRuns.get(oldKey);
+        if (run?.session === original) { ocrBatchRuns.delete(oldKey); ocrBatchRuns.set(newKey, run); }
+        if (ocrSolvingSessions.delete(oldId)) ocrSolvingSessions.add(original.id);
+        for (const task of ocrTasks.values()) if (String(task.sessionId) === oldKey) task.sessionId = original.id;
+    }
+}
+
+function accountSyncText() {
+    if (!accountState.authenticated) return "";
+    if (accountState.syncing) return "同步中…";
+    const meta = readCloudSyncMeta();
+    if (accountState.status?.includes("容量已满") || accountState.status?.includes("存储空间不足")) {
+        return accountState.status;
+    }
+    if (meta.username === accountState.username && meta.dirty) {
+        return "等待同步";
+    }
+    return accountState.status || "已同步";
+}
+
+const emailCodeCooldowns = Object.create(null);
+let emailCodeCooldownTimer = 0;
+
+function startEmailCodeCooldown(key, seconds = 60) {
+    emailCodeCooldowns[key] = Date.now() + Math.max(1, Number(seconds || 60)) * 1000;
+    if (!emailCodeCooldownTimer) {
+        emailCodeCooldownTimer = window.setInterval(() => {
+            const now = Date.now();
+            const active = Object.values(emailCodeCooldowns).some(value => Number(value || 0) > now);
+            renderAccountUi();
+            if (!active) {
+                window.clearInterval(emailCodeCooldownTimer);
+                emailCodeCooldownTimer = 0;
+            }
+        }, 1000);
+    }
+    renderAccountUi();
+}
+
+function applyEmailCodeButtonState(button, key) {
+    if (!button) return;
+    const remaining = Math.max(0, Math.ceil((Number(emailCodeCooldowns[key] || 0) - Date.now()) / 1000));
+    const unavailable = accountState.configured === false || accountState.emailConfigured === false;
+    button.disabled = unavailable || accountState.syncing || remaining > 0;
+    button.textContent = remaining > 0 ? `${remaining} 秒后重发` : "发送验证码";
+}
+
+function renderAccountUi() {
+    const entry = document.getElementById("accountBtn");
+    const label = document.getElementById("accountEntryLabel");
+    const guest = document.getElementById("accountGuestView");
+    const user = document.getElementById("accountUserView");
+    const username = document.getElementById("accountCurrentUsername");
+    const currentEmail = document.getElementById("accountCurrentEmail");
+    const syncState = document.getElementById("accountSyncState");
+    const login = document.getElementById("accountLogin");
+    const register = document.getElementById("accountRegister");
+    const forgotOpen = document.getElementById("accountForgotOpen");
+    const emailBindOpen = document.getElementById("accountEmailBindOpen");
+    const recoveryOpen = document.getElementById("accountRecoveryCodeOpen");
+    const recoveryGenerate = document.getElementById("accountRecoveryCodeGenerate");
+    const recoveryCancel = document.getElementById("accountRecoveryCodeCancel");
+    const recoverConfirm = document.getElementById("accountRecoverConfirm");
+    const recoverCancel = document.getElementById("accountRecoverCancel");
+    const logout = document.getElementById("accountLogout");
+    const deleteOpen = document.getElementById("accountDeleteOpen");
+    const deleteConfirm = document.getElementById("accountDeleteConfirm");
+    const deleteCancel = document.getElementById("accountDeleteCancel");
+    const registerConfirm = document.getElementById("accountRegisterConfirm");
+    const registerCancel = document.getElementById("accountRegisterCancel");
+    const emailRecoverConfirm = document.getElementById("accountEmailRecoverConfirm");
+    const emailRecoverCancel = document.getElementById("accountEmailRecoverCancel");
+    const emailBindConfirm = document.getElementById("accountEmailBindConfirm");
+    const emailBindCancel = document.getElementById("accountEmailBindCancel");
+
+    entry?.classList.toggle("is-authenticated", accountState.authenticated);
+    entry?.classList.toggle("is-syncing", accountState.syncing);
+
+    if (label) {
+        label.toggleAttribute("data-i18n-content", accountState.authenticated);
+        label.textContent = accountState.authenticated
+            ? accountState.username
+            : "登录 / 注册";
+    }
+
+    guest?.classList.toggle("hidden", accountState.authenticated);
+    user?.classList.toggle("hidden", !accountState.authenticated);
+
+    if (!accountState.authenticated) {
+        setAccountDeletePanel(false);
+        setAccountEmailBindPanel(false);
+        setAccountRecoveryCodePanel(false);
+    }
+
+    if (username) {
+        username.setAttribute("data-i18n-content", "");
+        username.textContent = accountState.username;
+    }
+    if (currentEmail) {
+        currentEmail.textContent = accountState.email
+            ? `邮箱：${accountState.email}`
+            : "未绑定邮箱";
+    }
+    if (emailBindOpen) {
+        emailBindOpen.textContent = accountState.email ? "更换邮箱" : "绑定邮箱";
+    }
+    if (recoveryOpen) {
+        recoveryOpen.textContent = accountState.hasRecoveryCode
+            ? "修改恢复码"
+            : "设置恢复码";
+    }
+    if (syncState) syncState.textContent = accountSyncText();
+
+    const unavailable = accountState.configured === false;
+    const emailUnavailable = unavailable || accountState.emailConfigured === false;
+    if (login) login.disabled = unavailable || accountState.syncing;
+    if (register) register.disabled = emailUnavailable || accountState.syncing;
+    if (forgotOpen) forgotOpen.disabled = unavailable || accountState.syncing;
+    if (emailBindOpen) emailBindOpen.disabled = emailUnavailable || accountState.syncing;
+    if (recoveryOpen) recoveryOpen.disabled = accountState.syncing;
+    if (recoveryGenerate) recoveryGenerate.disabled = accountState.syncing;
+    if (recoveryCancel) recoveryCancel.disabled = accountState.syncing;
+    if (recoverConfirm) recoverConfirm.disabled = unavailable || accountState.syncing;
+    if (recoverCancel) recoverCancel.disabled = accountState.syncing;
+    if (registerConfirm) registerConfirm.disabled = emailUnavailable || accountState.syncing;
+    if (registerCancel) registerCancel.disabled = accountState.syncing;
+    if (emailRecoverConfirm) emailRecoverConfirm.disabled = emailUnavailable || accountState.syncing;
+    if (emailRecoverCancel) emailRecoverCancel.disabled = accountState.syncing;
+    if (emailBindConfirm) emailBindConfirm.disabled = emailUnavailable || accountState.syncing;
+    if (emailBindCancel) emailBindCancel.disabled = accountState.syncing;
+    if (logout) logout.disabled = accountState.syncing;
+    if (deleteOpen) deleteOpen.disabled = accountState.syncing;
+    if (deleteConfirm) deleteConfirm.disabled = accountState.syncing;
+    if (deleteCancel) deleteCancel.disabled = accountState.syncing;
+
+    applyEmailCodeButtonState(document.getElementById("accountRegisterSendCode"), "register");
+    applyEmailCodeButtonState(document.getElementById("accountEmailRecoverSendCode"), "reset");
+    applyEmailCodeButtonState(document.getElementById("accountEmailBindSendCode"), "bind");
+
+    if (unavailable) {
+        setAccountMessage("服务器还没有配置账号数据库", true);
+    } else if (accountState.emailConfigured === false && !accountState.authenticated) {
+        setAccountMessage("邮箱验证码服务尚未配置，暂时只能登录已有账号", true);
+    }
+
+    document.documentElement.dataset.accountStateKnown = "1";
+    document.documentElement.dataset.accountAuthenticated = accountState.authenticated ? "1" : "0";
+    document.documentElement.dataset.accountUsername = accountState.authenticated ? accountState.username : "";
+    window.dispatchEvent(new CustomEvent("dmate:account-state", {
+        detail: { authenticated: accountState.authenticated, username: accountState.username }
+    }));
+}
+
+function setAccountMessage(message = "", isError = false) {
+    const box = document.getElementById("accountMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountRegisterMessage(message = "", isError = false) {
+    const box = document.getElementById("accountRegisterMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountEmailRecoverMessage(message = "", isError = false) {
+    const box = document.getElementById("accountEmailRecoverMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountEmailBindMessage(message = "", isError = false) {
+    const box = document.getElementById("accountEmailBindMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountRecoverMessage(message = "", isError = false) {
+    const box = document.getElementById("accountRecoverMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountRecoveryCodeMessage(message = "", isError = false) {
+    const box = document.getElementById("accountRecoveryCodeMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountRegisterPanel(open) {
+    const panel = document.getElementById("accountRegisterPanel");
+    panel?.classList.toggle("hidden", !open);
+    if (!open) {
+        ["accountRegisterPassword", "accountRegisterPasswordConfirm", "accountRegisterEmailCode"].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.value = "";
+        });
+        setAccountRegisterMessage("");
+        return;
+    }
+
+    setAccountEmailRecoverPanel(false);
+    setAccountRecoverPanel(false);
+    const loginValue = document.getElementById("accountUsername")?.value?.trim() || "";
+    const username = document.getElementById("accountRegisterUsername");
+    const email = document.getElementById("accountRegisterEmail");
+    if (loginValue.includes("@")) {
+        if (email && !email.value) email.value = loginValue;
+    } else if (username && !username.value) {
+        username.value = loginValue;
+    }
+    window.setTimeout(() => (username?.value ? email : username)?.focus(), 40);
+}
+
+function setAccountEmailRecoverPanel(open) {
+    const panel = document.getElementById("accountEmailRecoverPanel");
+    panel?.classList.toggle("hidden", !open);
+    if (!open) {
+        ["accountEmailRecoverCode", "accountEmailRecoverPassword", "accountEmailRecoverPasswordConfirm"].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.value = "";
+        });
+        setAccountEmailRecoverMessage("");
+        return;
+    }
+
+    setAccountRegisterPanel(false);
+    setAccountRecoverPanel(false);
+    const loginValue = document.getElementById("accountUsername")?.value?.trim() || "";
+    const email = document.getElementById("accountEmailRecoverEmail");
+    if (email && !email.value && loginValue.includes("@")) email.value = loginValue;
+    window.setTimeout(() => email?.focus(), 40);
+}
+
+function setAccountRecoverPanel(open) {
+    const panel = document.getElementById("accountRecoverPanel");
+    const username = document.getElementById("accountRecoverUsername");
+    const code = document.getElementById("accountRecoverCode");
+    const password = document.getElementById("accountRecoverPassword");
+    const confirmPassword = document.getElementById("accountRecoverPasswordConfirm");
+    panel?.classList.toggle("hidden", !open);
+
+    if (!open) {
+        if (code) code.value = "";
+        if (password) password.value = "";
+        if (confirmPassword) confirmPassword.value = "";
+        setAccountRecoverMessage("");
+        return;
+    }
+
+    setAccountRegisterPanel(false);
+    setAccountEmailRecoverPanel(false);
+    const loginUsername = document.getElementById("accountUsername")?.value?.trim() || "";
+    if (username && !username.value && !loginUsername.includes("@")) username.value = loginUsername;
+    window.setTimeout(() => (username?.value ? code : username)?.focus(), 40);
+}
+
+function setAccountEmailBindPanel(open) {
+    const panel = document.getElementById("accountEmailBindPanel");
+    panel?.classList.toggle("hidden", !open);
+    const password = document.getElementById("accountEmailBindPassword");
+    const email = document.getElementById("accountEmailBindEmail");
+    const code = document.getElementById("accountEmailBindCode");
+    if (!open) {
+        if (password) password.value = "";
+        if (code) code.value = "";
+        setAccountEmailBindMessage("");
+        return;
+    }
+    setAccountRecoveryCodePanel(false);
+    setAccountDeletePanel(false);
+    if (email) email.value = accountState.email || "";
+    window.setTimeout(() => password?.focus(), 40);
+}
+
+function setAccountRecoveryCodePanel(open) {
+    const panel = document.getElementById("accountRecoveryCodePanel");
+    const password = document.getElementById("accountRecoveryCurrentPassword");
+    const newCode = document.getElementById("accountRecoveryNewCode");
+    const confirmCode = document.getElementById("accountRecoveryNewCodeConfirm");
+    panel?.classList.toggle("hidden", !open);
+
+    if (!open) {
+        if (password) password.value = "";
+        if (newCode) newCode.value = "";
+        if (confirmCode) confirmCode.value = "";
+        setAccountRecoveryCodeMessage("");
+    } else {
+        setAccountEmailBindPanel(false);
+        setAccountDeletePanel(false);
+        window.setTimeout(() => password?.focus(), 40);
+    }
+}
+
+function openAccountModal() {
+    closeMobileShellDrawers();
+    const modal = document.getElementById("accountModal");
+    if (!modal) return;
+
+    if (!accountState.authenticated) {
+        setAccountDeletePanel(false);
+        setAccountEmailBindPanel(false);
+        setAccountRecoveryCodePanel(false);
+    } else {
+        setAccountRegisterPanel(false);
+        setAccountEmailRecoverPanel(false);
+        setAccountRecoverPanel(false);
+    }
+
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    renderAccountUi();
+}
+
+function revealRegistrationRecoveryCode(code) {
+    const value = String(code || "").trim();
+    if (!value) return;
+
+    const panel = document.getElementById("accountRegistrationRecoveryPanel");
+    const codeNode = document.getElementById("accountRegistrationRecoveryCodeValue");
+    if (codeNode) codeNode.textContent = value;
+    panel?.classList.remove("hidden");
+
+    // 注册后立即把可复制区域滚进视野；不用浏览器 alert，
+    // 避免恢复码无法选择/复制。
+    window.setTimeout(() => {
+        panel?.scrollIntoView({ behavior:"smooth", block:"nearest" });
+        codeNode?.focus({ preventScroll:true });
+    }, 40);
+}
+
+function clearRegistrationRecoveryCode() {
+    const panel = document.getElementById("accountRegistrationRecoveryPanel");
+    const codeNode = document.getElementById("accountRegistrationRecoveryCodeValue");
+    panel?.classList.add("hidden");
+    if (codeNode) codeNode.textContent = "";
+}
+
+async function copyRegistrationRecoveryCode() {
+    const codeNode = document.getElementById("accountRegistrationRecoveryCodeValue");
+    const code = String(codeNode?.textContent || "").trim();
+    if (!code) return;
+
+    const ok = await writeRichClipboard({ text:code, html:"" });
+    if (ok) {
+        showCopyToast("恢复码已复制");
+        return;
+    }
+
+    // 极老浏览器兜底：至少把文本选中，用户可以手动复制。
+    try {
+        const range = document.createRange();
+        range.selectNodeContents(codeNode);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        codeNode.focus();
+        showCopyToast("已选中恢复码，请手动复制");
+    } catch (_error) {}
+}
+
+function setAccountDeleteMessage(message = "", isError = false) {
+    const box = document.getElementById("accountDeleteMessage");
+    if (!box) return;
+    box.textContent = String(message || "");
+    box.classList.toggle("error", Boolean(isError));
+}
+
+function setAccountDeletePanel(open) {
+    const panel = document.getElementById("accountDeletePanel");
+    const password = document.getElementById("accountDeletePassword");
+    panel?.classList.toggle("hidden", !open);
+    if (!open) {
+        if (password) password.value = "";
+        setAccountDeleteMessage("");
+    } else {
+        window.setTimeout(() => password?.focus(), 40);
+    }
+}
+
+function closeAccountModal() {
+    const modal = document.getElementById("accountModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+    const password = document.getElementById("accountPassword");
+    if (password) password.value = "";
+    setAccountRegisterPanel(false);
+    setAccountEmailRecoverPanel(false);
+    setAccountRecoverPanel(false);
+    setAccountEmailBindPanel(false);
+    setAccountRecoveryCodePanel(false);
+    setAccountDeletePanel(false);
+    setAccountMessage("");
+}
+
+async function accountFetch(url, options = {}) {
+    const allowConflict = Boolean(options.allowConflict);
+    const fetchOptions = { ...options };
+    delete fetchOptions.allowConflict;
+
+    const syncRequest = /^\/sync(?:\?|$)/.test(String(url));
+    const externalSignal = fetchOptions.signal;
+    const controller = syncRequest && typeof AbortController !== "undefined" ? new AbortController() : null;
+    if (controller) fetchOptions.signal = controller.signal;
+    let extendDeadline = () => {};
+    const execute = async () => {
+        const response = await fetch(url, {
+            credentials: "same-origin", cache: "no-store", ...fetchOptions,
+            headers: {
+                ...(fetchOptions.body ? { "Content-Type":"application/json" } : {}),
+                ...(fetchOptions.headers || {})
+            }
+        });
+        if (syncRequest) {
+            const rawLength = response.headers?.get?.("Content-Length");
+            const length = rawLength == null || rawLength === "" ? NaN : Number(rawLength);
+            if (!Number.isFinite(length) || length < 0 || length > CLOUD_SYNC_BULK_BYTES) extendDeadline();
+        }
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (cause) {
+            if (syncRequest) {
+                const error = new Error("云同步响应无法读取，请稍后重试");
+                error.status = response.status;
+                error.cause = cause;
+                throw error;
+            }
+        }
+        if (!response.ok && !(allowConflict && response.status === 409)) {
+            const error = new Error(data?.error || `请求失败（${response.status}）`);
+            error.status = response.status;
+            error.data = data;
+            throw error;
+        }
+        return { response, data };
+    };
+    if (!syncRequest) return execute();
+
+    let timeoutId = 0, abortListener;
+    const deadline = new Promise((_resolve, reject) => {
+        const started = Date.now();
+        const bodyBytes = typeof fetchOptions.body === "string"
+            ? (typeof TextEncoder !== "undefined" ? new TextEncoder().encode(fetchOptions.body).byteLength
+                : fetchOptions.body.length * 3) : 0;
+        let budget = bodyBytes > CLOUD_SYNC_BULK_BYTES
+            ? CLOUD_SYNC_BULK_TIMEOUT_MS : CLOUD_SYNC_REQUEST_TIMEOUT_MS;
+        const armDeadline = () => {
+            if (timeoutId) window.clearTimeout(timeoutId);
+            timeoutId = window.setTimeout(() => {
+                controller?.abort();
+                const error = new Error("云同步请求超时，稍后自动重试");
+                error.name = "TimeoutError";
+                reject(error);
+            }, Math.max(0, budget - (Date.now() - started)));
+        };
+        extendDeadline = () => {
+            if (budget < CLOUD_SYNC_BULK_TIMEOUT_MS) {
+                budget = CLOUD_SYNC_BULK_TIMEOUT_MS;
+                armDeadline();
+            }
+        };
+        abortListener = () => {
+            controller?.abort();
+            const error = new Error("云同步请求已取消");
+            error.name = "AbortError";
+            reject(error);
+        };
+        externalSignal?.addEventListener("abort", abortListener, {once:true});
+        if (externalSignal?.aborted) abortListener();
+        armDeadline();
+    });
+    try {
+        // The deadline includes response-body decoding, even if an upstream
+        // fetch implementation does not promptly honour abort().
+        return await Promise.race([execute(), deadline]);
+    } finally {
+        extendDeadline = () => {};
+        if (timeoutId) window.clearTimeout(timeoutId);
+        externalSignal?.removeEventListener("abort", abortListener);
+    }
+}
+
+function scheduleCloudSync() {
+    if (cloudApplyingSnapshot) return;
+    // 用户做出新的修改后，可以重新尝试之前超限的上传。
+    cloudSyncCapacityRetryAt = 0;
+
+    if (!accountState.authenticated || !accountState.username) return;
+    const meta = readCloudSyncMeta();
+    if (meta.username === accountState.username) {
+        writeCloudSyncMeta({dirty:true});
+    } else {
+        // 首次云端载入失败时，也要把后续新增的对话登记成待同步数据。
+        // 不可因缺少 meta.username 就静默丢掉本端编辑或重试时清空工作区。
+        writeCloudSyncMeta({username:accountState.username,revision:Number(accountState.revision || 0),dirty:true});
+    }
+
+    cloudLocalChangeVersion += 1;
+    const now = Date.now();
+    if (cloudSyncQueuedAt === null) cloudSyncQueuedAt = now;
+    // 修改可能发生在前一次网络上传进行中，不要漏掉后续同步。
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = window.setTimeout(() => {
+        cloudSyncTimer = 0;
+        pushCloudSnapshot(false);
+    }, Math.max(0, Math.min(CLOUD_SYNC_DEBOUNCE_MS,
+        CLOUD_SYNC_MAX_WAIT_MS - (now - cloudSyncQueuedAt))));
+    renderAccountUi();
+}
+
+// 对端提交成功后，本端无需切换对话或刷新页面即可检测并更新。
+// 绝不在正在编辑/回答时用云端快照直接重建当前页面；本地未同步的数据总是先走 CAS 合并。
+function stopCloudLivePolling() {
+    cloudLivePollAbortController?.abort();
+    cloudLivePollEnabled = false;
+    cloudLivePollGeneration += 1;
+    if (cloudLivePollTimer) window.clearTimeout(cloudLivePollTimer);
+    cloudLivePollTimer = 0;
+}
+
+function scheduleCloudLivePoll(delayMs) {
+    if (!cloudLivePollEnabled || !accountState.authenticated || !accountState.username) return;
+    if (cloudLivePollTimer) window.clearTimeout(cloudLivePollTimer);
+    const normalDelay = document.hidden ? CLOUD_LIVE_POLL_HIDDEN_MS : CLOUD_LIVE_POLL_VISIBLE_MS;
+    // 网络或服务异常时放缓重试，切回页面、恢复网络仍会立刻检查。
+    const defaultDelay = accountState.status === "同步检查失败，自动重试中"
+        ? Math.max(normalDelay, 10000) : normalDelay;
+    cloudLivePollTimer = window.setTimeout(async () => {
+        cloudLivePollTimer = 0;
+        try {
+            await pullLatestCloudSnapshot();
+        } finally {
+            // 下一轮从上一轮结束后计时，网络拥塞时不累积请求。
+            scheduleCloudLivePoll();
+        }
+    }, Math.max(0, Number.isFinite(delayMs) ? delayMs : defaultDelay));
+}
+
+function startCloudLivePolling() {
+    if (!accountState.authenticated || !accountState.username) return;
+    if (!cloudLivePollEnabled) {
+        cloudLivePollEnabled = true;
+        cloudLivePollGeneration += 1;
+    }
+    scheduleCloudLivePoll(document.hidden ? CLOUD_LIVE_POLL_HIDDEN_MS : CLOUD_LIVE_POLL_VISIBLE_MS);
+}
+
+function cloudUiEditInProgress() {
+    // UI 锁定期间延迟拉取，防止刷新中断正在生成的回答、OCR 或用户编辑。
+    if (typeof busySessionIds !== "undefined" && busySessionIds.size) return true;
+    if (typeof pendingAiStartSessionIds !== "undefined" && pendingAiStartSessionIds.size) return true;
+    if (typeof typingTimer !== "undefined" && typingTimer) return true;
+    if (typeof ocrReviewInProgress !== "undefined" && ocrReviewInProgress) return true;
+    if (typeof wrongAnswerQueueBusy !== "undefined" && wrongAnswerQueueBusy) return true;
+    if (document.getElementById("conceptNotebookDialog")?.open) return true;
+    const focused = document.activeElement;
+    if (focused && focused.closest?.("#wrongEditModal:not(.hidden), #accountModal:not(.hidden)")) return true;
+    return false;
+}
+
+// Native-shell web updates must inspect the whole workspace, including work
+// in another conversation and guest records which exist only in memory.
+function dmateHasUnsavedWork() {
+    if (cloudUiEditInProgress() || activeAiRequests.size || typingContext
+        || ocrTasks.size || ocrBatchPreparing || ocrRequestInFlight
+        || accountVerificationPending || accountVerificationOperation
+        || cloudApplyingSnapshot || cloudInitialSyncPending || cloudInitialSyncInFlight
+        || accountState.syncing || cloudSyncTimer) return true;
+    if (window.dmateVoiceInput && window.dmateVoiceInput.state !== "idle") return true;
+    if (accountState.authenticated) {
+        const meta = readCloudSyncMeta();
+        return Boolean(meta.dirty || meta.username !== accountState.username);
+    }
+    return snapshotHasUserData(collectCloudSnapshot()) || collectLearningReviewDrawings().length > 0;
+}
+
+// A package reminder never reloads the page: saved or guest history alone must
+// not suppress it. Wait only for active operations; leave their queues intact.
+function dmateCanShowClientUpdate() {
+    return !(cloudUiEditInProgress() || activeAiRequests.size || typingContext
+        || ocrTasks.size || ocrBatchPreparing || ocrRequestInFlight
+        || accountVerificationPending || accountVerificationOperation
+        || cloudApplyingSnapshot || cloudInitialSyncPending || cloudInitialSyncInFlight
+        || cloudLivePollInFlight || accountState.syncing || cloudSyncTimer
+        || (window.dmateVoiceInput && window.dmateVoiceInput.state !== "idle"));
+}
+
+async function pullLatestCloudSnapshot() {
+    if (!cloudLivePollEnabled || cloudLivePollInFlight || accountState.syncing || !accountState.authenticated) return false;
+    const owner = accountState.username;
+    const contextVersion = cloudSyncContextVersion;
+    const generation = cloudLivePollGeneration;
+    let meta = readCloudSyncMeta();
+    if (cloudInitialSyncPending || meta.username !== owner) {
+        // 首次读取失败后仍能恢复；账号未验证前不加载任何旧工作区。
+        if (cloudUiEditInProgress()) return false;
+        await resolveInitialCloudSync(false);
+        return false;
+    }
+    if (meta.dirty) {
+        if (Date.now() >= cloudSyncCapacityRetryAt && !cloudSyncTimer) {
+            await pushCloudSnapshot(false);
+        }
+        return false;
+    }
+    if (cloudUiEditInProgress()) return false;
+
+    cloudLivePollInFlight = true;
+    const beforeEdit = cloudLocalChangeVersion;
+    const beforeRevision = Number(accountState.revision || 0);
+    const beforePartHashes = cloudAppliedPartHashes;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    cloudLivePollAbortController = controller;
+    const options = controller ? { signal:controller.signal, allowConflict:true } : { allowConflict:true };
+    const valid = () => cloudLivePollEnabled && generation === cloudLivePollGeneration &&
+        isCloudSyncContextValid(owner, contextVersion);
+    const safeToApply = () => valid() && !readCloudSyncMeta().dirty &&
+        cloudLocalChangeVersion === beforeEdit && Number(accountState.revision || 0) === beforeRevision &&
+        cloudAppliedPartHashes === beforePartHashes && !accountState.syncing && !cloudUiEditInProgress();
+
+    try {
+        // 新服务器一次读取同一版本的变化部分；旧服务器保留分段兼容路径。
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const localRevision = Number(accountState.revision || 0);
+            const localHashes = cloudAppliedPartHashes;
+            const knownHashes = Object.fromEntries(["sessions", "learning"]
+                .filter(key => /^[a-f0-9]{64}$/i.test(String(localHashes?.[key] || "")))
+                .map(key => [key, localHashes[key]]));
+            const useDelta = cloudDeltaSyncSupported !== false;
+            const query = useDelta
+                ? `/sync?sinceRevision=${localRevision}&parts=sessions,learning&knownHashes=${encodeURIComponent(JSON.stringify(knownHashes))}`
+                : "/sync?revisionOnly=1";
+            const { data:head } = await accountFetch(query, options);
+            if (!valid()) return false;
+            const delta = useDelta && head.delta === true;
+            if (useDelta) cloudDeltaSyncSupported = delta;
+            if (delta && (!Number.isSafeInteger(head.revision) || head.revision < 0 ||
+                typeof head.changed !== "boolean")) {
+                throw new Error("云端同步响应版本无效，稍后重试");
+            }
+            const targetRevision = Number(head.revision || 0);
+            if (targetRevision <= localRevision) {
+                if (accountState.status === "同步检查失败，自动重试中" && !readCloudSyncMeta().dirty) {
+                    accountState.status = "已同步";
+                    renderAccountUi();
+                }
+                return false;
+            }
+            if (!safeToApply()) return false;
+
+            let manifest = head;
+            let full = useDelta ? head : null;
+            if (!useDelta) {
+                const manifestQuery = `/sync?manifestOnly=1&expectedRevision=${targetRevision}`;
+                const fetched = await accountFetch(manifestQuery, options);
+                if (!valid()) return false;
+                manifest = fetched.data;
+                if (fetched.response.status === 409 || Number(manifest.revision) !== targetRevision) continue;
+                if (!safeToApply()) return false;
+            }
+
+            const changedParts = localHashes
+                ? computeChangedCloudParts(manifest.parts, localHashes)
+                : ["sessions", "learning"];
+            // A missing manifest or advertised section must never mark a
+            // partially received snapshot as applied, even on a valid revision.
+            if (["sessions", "learning"].some(key =>
+                !/^[a-f0-9]{64}$/i.test(String(manifest.parts?.[key]?.hash || "")))) {
+                throw new Error("云端同步摘要不完整，稍后重试");
+            }
+            if (delta && (head.changed !== true || !Array.isArray(head.changedParts) ||
+                head.changedParts.length !== changedParts.length ||
+                new Set(head.changedParts).size !== changedParts.length ||
+                head.changedParts.some(key => !changedParts.includes(key)) ||
+                !head.data || typeof head.data !== "object" || Array.isArray(head.data))) {
+                throw new Error("云端同步分段不完整，稍后重试");
+            }
+            if (!changedParts.length && localHashes) {
+                // 全部分段内容均相同，只增加版本，不重复渲染页面。
+                cloudAppliedPartHashes = getCloudPartHashMap(manifest.parts);
+                accountState.revision = targetRevision;
+                accountState.status = "已同步";
+                writeCloudSyncMeta({ username:owner, revision:targetRevision,
+                    dirty:false, sectionHashes:getCloudPartHashMap(manifest.parts) });
+                renderAccountUi();
+                return true;
+            }
+            if (!full) {
+                const sectionQuery = `/sync?expectedRevision=${targetRevision}&parts=${encodeURIComponent(changedParts.join(","))}`;
+                const fetched = await accountFetch(sectionQuery, options);
+                if (!valid()) return false;
+                full = fetched.data;
+                if (fetched.response.status === 409 || Number(full.revision) !== targetRevision) continue;
+                if (!safeToApply()) return false;
+            }
+            if (!full.data || typeof full.data !== "object" || Array.isArray(full.data) ||
+                changedParts.some(key => !Object.prototype.hasOwnProperty.call(full.data, key))) {
+                throw new Error("云端同步内容不完整，稍后重试");
+            }
+
+            // 当前会话属于本机导航状态，不让另一端抢走选中会话。
+            const incoming = Object.fromEntries(changedParts.map(key => [key, full.data[key]]));
+            if (incoming.sessions && Array.isArray(incoming.sessions.sessions)) {
+                const selectedHere = currentId;
+                const remoteSessions = incoming.sessions.sessions;
+                const deleted = normalizeDeletedSessionIds(incoming.sessions.deletedSessionIds);
+                incoming.sessions = { ...incoming.sessions, currentId:
+                    selectedHere != null && !deleted[String(selectedHere)] &&
+                    remoteSessions.some(item => String(item.id) === String(selectedHere))
+                        ? selectedHere : null };
+            }
+            if (!applyCloudSnapshot(incoming)) throw new Error("云端数据未完整载入，稍后重试");
+            if (!valid()) return false;
+            cloudAppliedPartHashes = getCloudPartHashMap(full.parts || manifest.parts);
+            accountState.revision = targetRevision;
+            accountState.status = "已同步";
+            writeCloudSyncMeta({ username:owner, revision:targetRevision, dirty:false,
+                sectionHashes:cloudAppliedPartHashes });
+            renderAccountUi();
+            return true;
+        }
+        // 高频写入导致连续版本冲突：下一轮自动重新检查，不承认部分同步成功。
+        if (valid()) {
+            accountState.status = "云端正在更新，稍后自动同步";
+            renderAccountUi();
+        }
+        return false;
+    } catch (error) {
+        console.warn("自动检查云端更新失败：", error);
+        if (valid()) {
+            accountState.status = "同步检查失败，自动重试中";
+            renderAccountUi();
+        }
+        return false;
+    } finally {
+        if (cloudLivePollAbortController === controller) cloudLivePollAbortController = null;
+        cloudLivePollInFlight = false;
+    }
+}
+
+function requestCloudLivePollNow() {
+    if (cloudLivePollEnabled && accountState.authenticated) {
+        scheduleCloudLivePoll(0);
+    }
+}
+
+// 自动同步采用按 ID 合并 + 云端修订号 CAS，不再弹出“覆盖本地/云端”选择框。
+// 会话若在不同设备上从同一位置分叉，则保留两条分支，避免任何一边聊天记录丢失。
+function cloudMessageKey(message) {
+    const contexts = sanitizeSemanticContexts(message?.semanticContexts, message);
+    // Source-bound IDs also exist on older clients which have not retained
+    // the optional group UI metadata. They identify the same submission.
+    const groupId = contexts?.map(context => context.request_id).join("|");
+    return `${message?.role || ""}\u0000${message?.text || ""}${groupId ? "\u0000" + groupId : ""}`;
+}
+
+function cloudMessageIdentity(message) {
+    return JSON.stringify([message?.messageId || "", cloudMessageKey(message)]);
+}
+
+function legacyCloudMessageId(key, occurrence) {
+    // Hash the complete case-sensitive signature, never a shortened question.
+    // Two independent accumulators and its length avoid the old 32-bit-only
+    // identity; the occurrence distinguishes identical messages in one chat.
+    let left = 2166136261, right = 0x9e3779b9;
+    for (let index = 0; index < key.length; index++) {
+        left = Math.imul(left ^ key.charCodeAt(index), 16777619);
+        right = Math.imul(right ^ key.charCodeAt(key.length - index - 1), 2246822519);
+    }
+    return `legacy-v1:${key.length}:${(left >>> 0).toString(36)}:${(right >>> 0).toString(36)}:${occurrence}`;
+}
+
+function ensureSessionMessageIds(session, legacy = false) {
+    if (!session || !Array.isArray(session.messages)) return session;
+    const occurrences = new Map(), seen = new Set();
+    for (const message of session.messages) {
+        if (!message || typeof message !== "object") continue;
+        const key = legacy ? cloudMessageKey(message) : "";
+        const occurrence = (occurrences.get(key) || 0) + 1;
+        if (legacy) occurrences.set(key, occurrence);
+        if (typeof message.messageId !== "string" || !message.messageId
+            || message.messageId.length > 160 || seen.has(message.messageId)) {
+            message.messageId = legacy ? legacyCloudMessageId(key, occurrence)
+                : `message-v1:${window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`}`;
+        }
+        seen.add(message.messageId);
+    }
+    session.deletedMessageIds = normalizeDeletedSessionIds(session.deletedMessageIds);
+    return session;
+}
+
+function normalizeCloudSessionMessages(session, sharedDeletions = {}) {
+    const normalized = ensureSessionMessageIds({ ...session,
+        messages:(Array.isArray(session?.messages) ? session.messages : []).map(message => ({ ...message }))
+    }, true);
+    for (const [id, at] of Object.entries(sharedDeletions)) {
+        normalized.deletedMessageIds[id] = Math.max(at, normalized.deletedMessageIds[id] || 0);
+    }
+    const removed = normalized.messages.filter(message => normalized.deletedMessageIds[message.messageId]);
+    normalized.messages = normalized.messages.filter(message => !normalized.deletedMessageIds[message.messageId]);
+    if (removed.length) {
+        const questionKey = value => typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+        const matchesQuestion = (message, key) => key && [message.text, message.generatedQuestion]
+            .some(value => questionKey(value) === key);
+        const lostQuestion = value => {
+            const key = questionKey(value);
+            return removed.some(message => matchesQuestion(message, key))
+                && !normalized.messages.some(message => matchesQuestion(message, key));
+        };
+        if (!normalized.messages.length || lostQuestion(normalized.learningQuestion?.text)) {
+            normalized.learningQuestion = null;
+            normalized.teaching = null;
+        }
+        if (!normalized.messages.length || lostQuestion(normalized.retest?.generatedQuestion)) {
+            normalized.retest = null;
+        }
+    }
+    return normalized;
+}
+
+function mergeCloudMessage(left, right) {
+    const merged = { ...left, ...right };
+    // 旧设备的分析结果可能较少；不应抹掉已有的题目/参考答案。
+    for (const key of [
+        "generatedQuestion", "generatedAnswer", "generatedTeaching",
+        "questionTeaching", "apiText", "targetQuestionFingerprint"
+    ]) {
+        if (!merged[key] && left?.[key]) merged[key] = left[key];
+    }
+    const semanticContext = sanitizeSemanticContext(right?.semanticContext, merged)
+        || sanitizeSemanticContext(left?.semanticContext, merged);
+    if (semanticContext) merged.semanticContext = semanticContext;
+    else delete merged.semanticContext;
+    const semanticContexts = sanitizeSemanticContexts(right?.semanticContexts, merged)
+        || sanitizeSemanticContexts(left?.semanticContexts, merged);
+    if (semanticContexts) {
+        merged.semanticContexts = semanticContexts;
+        delete merged.semanticContext;
+    } else delete merged.semanticContexts;
+    const group = sanitizeOcrGroup(right?.ocrGroup, merged) || sanitizeOcrGroup(left?.ocrGroup, merged);
+    if (group) merged.ocrGroup = group;
+    else delete merged.ocrGroup;
+    return merged;
+}
+
+function cloudHash(value) {
+    const text = JSON.stringify(value);
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index++) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+}
+
+function mergeCloudSnapshots(localSnapshot, remoteSnapshot) {
+    if (!window.DMateConceptNotebookModel && [localSnapshot, remoteSnapshot].some(snapshot => {
+        const notebook = snapshot?.learning?.conceptNotebook;
+        return notebook?.notes?.length || Object.keys(notebook?.deleted || {}).length;
+    })) throw new Error("笔记同步组件未加载，请刷新后重试，现有笔记未被覆盖。");
+    const local = localSnapshot && typeof localSnapshot === "object" ? localSnapshot : {};
+    const remote = remoteSnapshot && typeof remoteSnapshot === "object" ? remoteSnapshot : {};
+    const localDeletions = normalizeDeletedSessionIds(local.sessions?.deletedSessionIds);
+    const remoteDeletions = normalizeDeletedSessionIds(remote.sessions?.deletedSessionIds);
+    const deletedSessionIdsMerged = Object.create(null);
+    for (const [id, at] of Object.entries(remoteDeletions)) {
+        deletedSessionIdsMerged[id] = at;
+    }
+    for (const [id, at] of Object.entries(localDeletions)) {
+        deletedSessionIdsMerged[id] = Math.max(at, deletedSessionIdsMerged[id] || 0);
+    }
+    const isDeleted = item => (
+        !item || Boolean(deletedSessionIdsMerged[String(item.id)])
+    );
+    const localInput = (Array.isArray(local.sessions?.sessions) ? local.sessions.sessions : []).filter(item => !isDeleted(item));
+    const remoteInput = (Array.isArray(remote.sessions?.sessions) ? remote.sessions.sessions : []).filter(item => !isDeleted(item));
+    // Branches share the identity of their common historical messages. Carry
+    // deletion markers into every retained branch before comparing prefixes.
+    const messageDeletions = new Map();
+    const family = session => String(session.id).split("-sync-")[0];
+    for (const session of [...remoteInput, ...localInput]) {
+        const key = family(session), markers = messageDeletions.get(key) || Object.create(null);
+        for (const [id, at] of Object.entries(normalizeDeletedSessionIds(session.deletedMessageIds))) {
+            markers[id] = Math.max(at, markers[id] || 0);
+        }
+        messageDeletions.set(key, markers);
+    }
+    const filteredSessions = new WeakSet();
+    const prepareSession = session => {
+        const normalized = normalizeCloudSessionMessages(session, messageDeletions.get(family(session)));
+        if (normalized.messages.length < (session.messages || []).length) filteredSessions.add(normalized);
+        return normalized;
+    };
+    const localSessions = localInput.map(prepareSession);
+    const remoteSessions = remoteInput.map(prepareSession);
+    const resultSessions = [...remoteSessions];
+    const byId = new Map(resultSessions.map((item, index) => [String(item.id), index]));
+    const branchMap = new Map();
+
+    for (const localSession of localSessions) {
+        if (!localSession || localSession.id === undefined || localSession.id === null) continue;
+        const key = String(localSession.id);
+        if (!byId.has(key)) {
+            byId.set(key, resultSessions.length);
+            resultSessions.push(localSession);
+            continue;
+        }
+        const index = byId.get(key);
+        const cloudSession = resultSessions[index];
+        const localMessages = Array.isArray(localSession.messages) ? localSession.messages : [];
+        const cloudMessages = Array.isArray(cloudSession.messages) ? cloudSession.messages : [];
+        const shared = Math.min(localMessages.length, cloudMessages.length);
+        const prefixMatches = Array.from({length:shared}, (_, i) => i)
+            .every(i => cloudMessageIdentity(localMessages[i]) === cloudMessageIdentity(cloudMessages[i]));
+        if (prefixMatches) {
+            const longer = localMessages.length >= cloudMessages.length ? localMessages : cloudMessages;
+            let contextSource = localMessages.length >= cloudMessages.length ? localSession : cloudSession;
+            if (localMessages.length === cloudMessages.length
+                && filteredSessions.has(localSession) !== filteredSessions.has(cloudSession)) {
+                // A stale snapshot can become the same length only after its
+                // deleted messages are removed. Keep the already-cleaned
+                // side's active question and retest state, including nulls.
+                contextSource = filteredSessions.has(localSession) ? cloudSession : localSession;
+            }
+            resultSessions[index] = {
+                ...cloudSession,
+                ...localSession,
+                messages: longer.map((message, i) => (
+                    i < shared ? mergeCloudMessage(cloudMessages[i], localMessages[i]) : message
+                )),
+                // 某一边更长，通常表示该边新增了消息；以它的题目上下文为准。
+                teaching: contextSource.teaching,
+                learningQuestion: contextSource.learningQuestion,
+                retest: contextSource.retest
+            };
+        } else {
+            // 不同设备同时修改同一会话时，不应选择性丢弃另一端的消息。
+            // 用稳定分支 ID 避免再次合并时重复产生相同会话。
+            const suffix = cloudHash(localMessages.map(cloudMessageIdentity));
+            const branchId = `${key}-sync-${suffix}`;
+            const duplicate = resultSessions.some(item => (
+                String(item.id) === branchId
+                || (String(item.id).startsWith(`${key}-sync-`)
+                    && JSON.stringify(item.messages || []) === JSON.stringify(localMessages))
+            ));
+            if (!duplicate) {
+                resultSessions.push({ ...localSession, id:branchId, name:`${localSession.name || "对话"}（另一设备）` });
+            }
+            branchMap.set(key, branchId);
+        }
+    }
+
+    const localLearning = local.learning || {};
+    const remoteLearning = remote.learning || {};
+    if (!window.DMateConceptNotebookModel && [localLearning.conceptNotebook, remoteLearning.conceptNotebook]
+        .some(value => value?.notes?.length || Object.keys(value?.deleted || {}).length)) {
+        throw new Error("笔记同步组件未加载，请刷新后重试，现有笔记未被覆盖。");
+    }
+    const byEvent = new Map();
+    const remoteEvents = Array.isArray(remoteLearning.events) ? remoteLearning.events : [];
+    const localEvents = Array.isArray(localLearning.events) ? localLearning.events : [];
+    for (const event of [...remoteEvents, ...localEvents]) {
+        if (!event || !event.id) continue;
+        byEvent.set(String(event.id), event);
+    }
+    const wrongDeletions = normalizeDeletedWrongQuestionIds(remoteLearning.deletedWrongQuestionIds);
+    for (const [id, at] of Object.entries(normalizeDeletedWrongQuestionIds(localLearning.deletedWrongQuestionIds))) {
+        wrongDeletions[id] = Math.max(at, wrongDeletions[id] || 0);
+    }
+    const mergeRetestRecords = (left, right) => {
+        const records = new Map();
+        const time = value => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+        for (const parent of [left, right]) {
+            for (const source of Array.isArray(parent.retestRecords) ? parent.retestRecords : []) {
+                if (!source || !source.id || typeof source.question !== "string" || !source.question.trim()) continue;
+                const at = time(source.updatedAt) || time(parent.updatedAt) || time(source.createdAt);
+                const row = { ...source, id: String(source.id), updatedAt: at };
+                for (const field of ["answer", "analysis"]) {
+                    row[field] = typeof source[field] === "string" ? source[field] : "";
+                    row[field + "UpdatedAt"] = time(source[field + "UpdatedAt"]) || (row[field] ? at : null);
+                }
+                const previous = records.get(row.id);
+                if (!previous) { records.set(row.id, row); continue; }
+                const order = value => JSON.stringify([value.question, value.answer, value.analysis]);
+                const newer = row.updatedAt > previous.updatedAt
+                    || (row.updatedAt === previous.updatedAt && order(row) >= order(previous)) ? row : previous;
+                // A reused ID with a changed exercise must not inherit another
+                // exercise's answer or analysis.
+                if (row.question !== previous.question) { records.set(row.id, newer); continue; }
+                const merged = { ...newer, updatedAt: Math.max(row.updatedAt, previous.updatedAt) };
+                const choices = {};
+                for (const field of ["answer", "analysis"]) {
+                    const stamp = field + "UpdatedAt";
+                    const candidates = [previous, row].filter(value => value[field] || time(value[stamp]));
+                    candidates.sort((a, b) => time(b[stamp]) - time(a[stamp])
+                        || Number(Boolean(a[field])) - Number(Boolean(b[field]))
+                        || (a[field] < b[field] ? 1 : a[field] > b[field] ? -1 : 0));
+                    const selected = candidates[0];
+                    merged[field] = selected?.[field] || "";
+                    merged[stamp] = selected?.[stamp] || null;
+                    choices[field] = selected;
+                }
+                // Analysis generated against a different known answer is stale.
+                if (merged.analysis && choices.analysis.answer && merged.answer
+                    && choices.analysis.answer !== merged.answer) {
+                    merged.analysis = "";
+                    merged.analysisUpdatedAt = Math.max(time(merged.analysisUpdatedAt), time(merged.answerUpdatedAt));
+                }
+                records.set(row.id, merged);
+            }
+        }
+        return [...records.values()].sort((a, b) => time(a.createdAt) - time(b.createdAt)
+            || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    };
+    const byWrong = new Map();
+    const remoteWrong = Array.isArray(remoteLearning.wrongQuestions) ? remoteLearning.wrongQuestions : [];
+    const localWrong = Array.isArray(localLearning.wrongQuestions) ? localLearning.wrongQuestions : [];
+    for (const item of [...remoteWrong, ...localWrong]) {
+        if (!item || !item.id) continue;
+        const key = String(item.id);
+        if (wrongDeletions[key]) continue;
+        const previous = byWrong.get(key);
+        if (!previous) {
+            byWrong.set(key, item);
+            continue;
+        }
+        const newer = Number(item.updatedAt || 0) >= Number(previous.updatedAt || 0) ? item : previous;
+        const older = newer === item ? previous : item;
+        const merged = { ...older, ...newer };
+        // An explicit empty value is an edit, not a missing legacy field.
+        // Restoring it would revive erased notes or answers for an old question.
+        if (typeof newer.question === "string" && newer.question.trim()
+            && newer.question !== older.question) {
+            // Conflict payloads arrive before normalization. Older clients may
+            // omit derived fields; do not inherit those from a different stem.
+            const invalidated = {
+                classificationVersion: 0, category: "待识别", relatedCategories: [],
+                knowledgePoints: [], focusPoints: [], difficulty: "",
+                referenceAnswer: "", answer: "", analysis: "",
+                answerUpdatedAt: null, analysisUpdatedAt: null, retestRecords: []
+            };
+            for (const [field, emptyValue] of Object.entries(invalidated)) {
+                if (!Object.prototype.hasOwnProperty.call(newer, field)) merged[field] = emptyValue;
+            }
+        } else if (typeof newer.question === "string" && newer.question === older.question) {
+            // Independent retests remain history even when their conversations
+            // were removed. Manual pass selections still come from `newer`, so
+            // an explicit uncheck is not undone by this record-only union.
+            merged.retestRecords = mergeRetestRecords(older, newer);
+        }
+        // Editing a note on another device must not lower recorded failures.
+        // These counters only increase; manual pass selections can be undone.
+        for (const field of ["mistakeCount", "retestFailCount"]) {
+            merged[field] = Math.max(
+                normalizeWrongBookErrorCount(older[field]),
+                normalizeWrongBookErrorCount(newer[field])
+            );
+        }
+        byWrong.set(key, merged);
+    }
+    // 删除对话会一并撤回其学习事件，不能在自动云合并时又把旧统计加回来。
+    // 错题本独立保存，仍按原规则保留。
+    const events = [...byEvent.values()]
+        .filter(event => !deletedSessionIdsMerged[String(event.sessionId)])
+        .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+    const wrongQuestions = [...byWrong.values()]
+        .sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0));
+
+    const localId = local.sessions?.currentId;
+    const resolvedCurrentId = branchMap.get(String(localId)) || localId;
+    // An explicit empty selection is local navigation state (for example after
+    // deleting the open chat). A sync conflict must not open another chat.
+    const localHasSelection = Object.prototype.hasOwnProperty.call(local.sessions || {}, "currentId");
+    const requestedId = localHasSelection ? resolvedCurrentId : remote.sessions?.currentId;
+    const currentId = requestedId != null && resultSessions.some(item => String(item.id) === String(requestedId))
+        ? requestedId : null;
+
+    return {
+        schemaVersion:1,
+        sessions:{sessions:resultSessions, currentId, deletedSessionIds:deletedSessionIdsMerged},
+        learning:{version:Math.max(9, Number(localLearning.version || 0), Number(remoteLearning.version || 0)),
+            events, wrongQuestions, deletedWrongQuestionIds:wrongDeletions,
+            conceptNotebook: window.DMateConceptNotebookModel
+                ? window.DMateConceptNotebookModel.merge(localLearning.conceptNotebook, remoteLearning.conceptNotebook)
+                : { notes: [], deleted: {} }},
+    };
+}
+
+async function pushCloudSnapshot(_legacyForce = false, initialSyncReady = false) {
+    if (!accountState.authenticated || !accountState.username || accountState.syncing) return false;
+    if (cloudInitialSyncPending && !initialSyncReady) {
+        if (!cloudInitialSyncInFlight) await resolveInitialCloudSync(false);
+        return false;
+    }
+    if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = 0;
+    cloudSyncQueuedAt = null;
+
+    const meta = readCloudSyncMeta();
+    const owner = accountState.username;
+    const contextVersion = cloudSyncContextVersion;
+    // 以当前标签实际读写过的修订号为准。localStorage 的 revision 可能
+    // 被另一个标签提前更新，直接采用会绕过服务器的 409 冲突保护。
+    let revision = Number(accountState.revision || 0);
+    const submittedChangeVersion = cloudLocalChangeVersion;
+    let snapshotToSend = collectCloudSnapshot();
+    let mergedWithRemote = false;
+    let successful = false;
+    let latestPartHashes = getCloudPartHashMap(meta.sectionHashes);
+    accountState.syncing = true;
+    accountState.status = "同步中…";
+    renderAccountUi();
+
+    try {
+        for (let attempt = 0; attempt < 5; attempt++) {
+            if (!isCloudSyncContextValid(owner, contextVersion)) {
+                return false;
+            }
+            // 永远不用 force=true；服务端按用户隔离并用版本号防止覆盖其它设备更新。
+            const {response, data} = await accountFetch("/sync", {
+                method:"PUT", allowConflict:true,
+                body:JSON.stringify({baseRevision:revision, force:false, data:snapshotToSend})
+            });
+            if (!isCloudSyncContextValid(owner, contextVersion)) {
+                return false;
+            }
+            if (response.status === 409 && data?.conflict) {
+                backupLocalSnapshot("云同步自动合并前");
+                snapshotToSend = mergeCloudSnapshots(snapshotToSend, data.data || {});
+                revision = Number(data.revision || 0);
+                latestPartHashes = getCloudPartHashMap(data.parts);
+                mergedWithRemote = true;
+                continue;
+            }
+            if (!response.ok || data?.ok !== true || !Number.isSafeInteger(data.revision)
+                || data.revision <= revision) {
+                throw new Error("云同步确认无效，保留本机修改后重试");
+            }
+            const latestRevision = data.revision;
+            latestPartHashes = getCloudPartHashMap(data.parts);
+            if (mergedWithRemote) {
+                // Only a real remote conflict needs a merged local snapshot.
+                // New local edits alone remain in place and are uploaded next.
+                // Flush a received answer before loadState replaces its bound
+                // session object; the flushed text must join the next upload.
+                if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
+                const present = collectCloudSnapshot();
+                const merged = mergeCloudSnapshots(present, snapshotToSend);
+                if (!isCloudSyncContextValid(owner, contextVersion)) {
+                    return false;
+                }
+                if (!applyCloudSnapshot(merged, { selectionId:merged.sessions.currentId })) throw new Error("云端数据未完整载入，保留本机修改后重试");
+            }
+            if (!isCloudSyncContextValid(owner, contextVersion)) {
+                return false;
+            }
+            const hadNewEdits = cloudLocalChangeVersion !== submittedChangeVersion;
+            accountState.revision = latestRevision;
+            if (!hadNewEdits) cloudAppliedPartHashes = latestPartHashes;
+            const dirty = hadNewEdits;
+            accountState.status = dirty ? "等待同步" : "已同步";
+            writeCloudSyncMeta({
+                username:owner,
+                revision:latestRevision,
+                dirty,
+                sectionHashes:latestPartHashes
+            });
+            successful = true;
+            return true;
+        }
+        throw new Error("云端更新频繁，稍后将自动再次合并");
+    } catch (error) {
+        console.warn("云同步失败：", error);
+        if (isCloudSyncContextValid(owner, contextVersion)) {
+            if (error?.status === 413) {
+                accountState.status = "云端容量已满，本机记录仍保留，请导出备份";
+                cloudSyncCapacityRetryAt = Date.now() + 60000;
+            } else {
+                accountState.status = "离线，稍后自动同步";
+            }
+            writeCloudSyncMeta({username:owner, revision, dirty:true, sectionHashes:latestPartHashes});
+        }
+        return false;
+    } finally {
+        if (isCloudSyncContextValid(owner, contextVersion)) {
+            accountState.syncing = false;
+            if (accountState.authenticated && (
+                cloudLocalChangeVersion !== submittedChangeVersion || !successful
+            )) {
+                writeCloudSyncMeta({username:owner, dirty:true, sectionHashes:latestPartHashes});
+                if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+                cloudSyncTimer = window.setTimeout(() => {
+                    cloudSyncTimer = 0;
+                    pushCloudSnapshot(false);
+                }, successful ? CLOUD_SYNC_DEBOUNCE_MS : Math.max(
+                    document.hidden ? CLOUD_LIVE_POLL_HIDDEN_MS : 4000,
+                    cloudSyncCapacityRetryAt - Date.now()));
+            }
+            renderAccountUi();
+        }
+    }
+}
+
+async function resolveInitialCloudSync(isNewAccount = false) {
+    if (!accountState.authenticated || cloudInitialSyncInFlight) return;
+    const owner = accountState.username;
+    const contextVersion = cloudSyncContextVersion;
+    const retryingInitialSync = cloudInitialSyncPending;
+    cloudInitialSyncPending = true;
+    cloudInitialSyncInFlight = true;
+
+    try {
+        // 必须在服务器验证账号后，才读取属于这个账号的本机缓存。
+        // 同浏览器切换另一个账号时不能显示、更不能上传前一账号的资料。
+        const savedMeta = readCloudSyncMeta();
+        if (!retryingInitialSync) {
+            if (isNewAccount || savedMeta.username !== owner) cancelAccountInteractions();
+            if (!isNewAccount && savedMeta.username === accountState.username) {
+                if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
+                loadLearningState();
+                appearanceSettings = loadAppearanceSettings();
+                appearanceCommittedSettings = { ...appearanceSettings };
+                applyAppearanceSettings({ save:false });
+                if (!loadState()) {
+                    sessions = [];
+                    currentId = null;
+                    deletedSessionIds = Object.create(null);
+                }
+                // Every fresh account workspace starts at home. The stored
+                // conversation list is restored without reopening its last tab.
+                currentId = null;
+            } else {
+                sessions = [];
+                currentId = null;
+                deletedSessionIds = Object.create(null);
+                learningState = createEmptyLearningState();
+                window.dmateConceptNotebook?.refresh?.();
+                // 前一个账号的自定义背景属个人数据，不在下一账号沿用。
+                try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+                clearAppearanceBackgroundVisual();
+                purgeGuestPersistentState();
+                // A new account on this browser gets only its own local appearance.
+                appearanceSettings = loadAppearanceSettings();
+                appearanceCommittedSettings = { ...appearanceSettings };
+                applyAppearanceSettings({ save:false });
+                clearLegacyPersistentBackup();
+            }
+        }
+        renderAll();
+
+        // 自定义背景图片仍按设备保存；登录成功后再读取，游客不会继承它。
+        await loadAppearanceBackground();
+        if (!isCloudSyncContextValid(owner, contextVersion)) return;
+
+        const { data } = await accountFetch("/sync");
+        if (!isCloudSyncContextValid(owner, contextVersion)) return;
+        const cloudRevision = Number(data.revision || 0);
+        accountState.revision = cloudRevision;
+        const partHashes = getCloudPartHashMap(data.parts);
+        // 初始化拿到完整快照；只在确认工作区与云端一致后建立哈希基准。
+
+        const initialMeta = readCloudSyncMeta();
+        const initialSameAccount = initialMeta.username === owner;
+        if (isNewAccount || (cloudRevision === 0 && initialSameAccount)) {
+            writeCloudSyncMeta({
+                username:owner,
+                revision:cloudRevision,
+                dirty:true,
+                sectionHashes:partHashes
+            });
+            cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
+            return;
+        }
+        if (cloudRevision === 0) {
+            // 手机首次登录一个空账号时，不能上传此前别的账号/游客的本机数据。
+            backupLocalSnapshot("切换到新的空云账号");
+            const applied = applyCloudSnapshot({
+                sessions:{sessions:[], currentId:null, deletedSessionIds:{}},
+                learning:createEmptyLearningState()
+            });
+            if (!applied) throw new Error("云端数据未完整载入，稍后重试");
+            cloudInitialSyncPending = false;
+            cloudAppliedPartHashes = partHashes;
+            writeCloudSyncMeta({username:owner,revision:0,dirty:false,sectionHashes:partHashes});
+            accountState.status = "已同步";
+            renderAccountUi();
+            return;
+        }
+
+        const meta = readCloudSyncMeta();
+        const sameAccount = meta.username === owner;
+        const localDirty = sameAccount && Boolean(meta.dirty);
+        const localRevision = sameAccount ? Number(meta.revision || 0) : -1;
+
+        if (!sameAccount) {
+            backupLocalSnapshot("登录后切换到云端数据");
+            if (!applyCloudSnapshot(data.data || {})) throw new Error("云端数据未完整载入，稍后重试");
+        } else if (localDirty && localRevision === cloudRevision) {
+            cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
+            return;
+        } else if (localDirty && localRevision !== cloudRevision) {
+            // 本设备与其它设备均有改动：自动合并，并用当前云端修订号安全上传。
+            // 不询问覆盖，也不抹掉任一端独立的聊天或错题。
+            if (typingTimer && typingContextIsCurrent()) forceCompleteTyping();
+            backupLocalSnapshot("登录后自动合并同步前");
+            const merged = mergeCloudSnapshots(collectCloudSnapshot(), data.data || {});
+            if (!applyCloudSnapshot(merged, { selectionId:merged.sessions.currentId })) throw new Error("云端数据未完整载入，保留本机修改后重试");
+            writeCloudSyncMeta({username:owner, revision:cloudRevision, dirty:true, sectionHashes:partHashes});
+            cloudInitialSyncPending = !await pushCloudSnapshot(false, true);
+            return;
+        } else if (!localDirty) {
+            // 即使云端版本号与共享缓存相同，也必须实际把数据载入此页面。
+            // 否则首次打开、缓存损坏或另一标签改过 meta 时会一直显示旧列表。
+            if (!applyCloudSnapshot(data.data || {})) throw new Error("云端数据未完整载入，稍后重试");
+        }
+
+        cloudInitialSyncPending = false;
+        cloudAppliedPartHashes = partHashes;
+        writeCloudSyncMeta({
+            username:owner,
+            revision:cloudRevision,
+            dirty:false,
+            sectionHashes:partHashes
+        });
+        accountState.status = "已同步";
+        renderAccountUi();
+    } catch (error) {
+        console.warn("初始化云同步失败：", error);
+        if (isCloudSyncContextValid(owner, contextVersion)) {
+            accountState.status = "离线，稍后自动同步";
+            renderAccountUi();
+        }
+    } finally {
+        if (isCloudSyncContextValid(owner, contextVersion)) {
+            cloudInitialSyncInFlight = false;
+            startCloudLivePolling();
+        }
+    }
+}
+
+function looksLikeEmailAddress(value) {
+    const email = String(value || "").trim();
+    return email.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+}
+
+async function requestEmailCode({ purpose, email, username = "", messageSetter, cooldownKey }) {
+    if (!looksLikeEmailAddress(email)) {
+        messageSetter("请输入正确的邮箱地址", true);
+        return false;
+    }
+    if (accountState.emailConfigured === false) {
+        messageSetter("邮箱验证码服务尚未配置", true);
+        return false;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    messageSetter("正在发送验证码…");
+
+    try {
+        const { data } = await accountFetch("/auth/email/send-code", {
+            method:"POST",
+            body:JSON.stringify({ purpose, email, username })
+        });
+        accountState.syncing = false;
+        startEmailCodeCooldown(cooldownKey, Number(data.resendAfter || 60));
+        messageSetter("验证码已发送，没收到时请检查垃圾邮件箱");
+        return true;
+    } catch (error) {
+        accountState.syncing = false;
+        messageSetter(error?.message || "验证码发送失败，请稍后再试", true);
+        renderAccountUi();
+        return false;
+    }
+}
+
+async function submitAccountLogin() {
+    if (accountState.syncing) return;
+
+    const identifierInput = document.getElementById("accountUsername");
+    const passwordInput = document.getElementById("accountPassword");
+    const identifier = identifierInput?.value?.trim() || "";
+    const password = passwordInput?.value || "";
+
+    if (!identifier || !password) {
+        setAccountMessage("请输入用户名或邮箱和密码", true);
+        return;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    setAccountMessage("正在登录…");
+
+    try {
+        const { data } = await accountFetch("/auth/login", {
+            method:"POST",
+            body:JSON.stringify({ identifier, password })
+        });
+
+        accountState.configured = data.configured !== false;
+        accountState.emailConfigured = data.emailConfigured !== false;
+        accountState.authenticated = true;
+        accountState.username = String(data.user?.username || identifier);
+        accountState.email = String(data.user?.email || "");
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        accountState.revision = Number(data.revision || 0);
+        accountState.status = "同步中…";
+        bumpCloudSyncContext();
+        // 不要在读取云端之前清空“本机有未同步编辑”的标记。
+        // resolveInitialCloudSync 会比较用户名/版本号并处理冲突。
+
+        if (passwordInput) passwordInput.value = "";
+        setAccountMessage("");
+        setAccountDeletePanel(false);
+        clearRegistrationRecoveryCode();
+        accountState.syncing = false;
+        renderAccountUi();
+        showCopyToast("登录成功");
+        await resolveInitialCloudSync(false);
+    } catch (error) {
+        accountState.syncing = false;
+        setAccountMessage(error?.message || "登录失败，请稍后再试", true);
+        renderAccountUi();
+    }
+}
+
+async function sendRegisterEmailCode() {
+    const username = document.getElementById("accountRegisterUsername")?.value?.trim() || "";
+    const email = document.getElementById("accountRegisterEmail")?.value?.trim() || "";
+    if (!username) {
+        setAccountRegisterMessage("请输入用户名", true);
+        document.getElementById("accountRegisterUsername")?.focus();
+        return;
+    }
+    await requestEmailCode({
+        purpose:"register",
+        email,
+        username,
+        messageSetter:setAccountRegisterMessage,
+        cooldownKey:"register"
+    });
+}
+
+async function submitAccountRegistration() {
+    if (accountState.syncing) return;
+
+    const usernameInput = document.getElementById("accountRegisterUsername");
+    const emailInput = document.getElementById("accountRegisterEmail");
+    const passwordInput = document.getElementById("accountRegisterPassword");
+    const confirmInput = document.getElementById("accountRegisterPasswordConfirm");
+    const codeInput = document.getElementById("accountRegisterEmailCode");
+
+    const username = usernameInput?.value?.trim() || "";
+    const email = emailInput?.value?.trim() || "";
+    const password = passwordInput?.value || "";
+    const confirmPassword = confirmInput?.value || "";
+    const emailCode = codeInput?.value?.trim() || "";
+
+    if (!username || !email || !password || !confirmPassword || !emailCode) {
+        setAccountRegisterMessage("请把用户名、邮箱、密码和验证码填写完整", true);
+        if (!username) usernameInput?.focus();
+        else if (!email) emailInput?.focus();
+        else if (!password) passwordInput?.focus();
+        else if (!confirmPassword) confirmInput?.focus();
+        else codeInput?.focus();
+        return;
+    }
+    if (!looksLikeEmailAddress(email)) {
+        setAccountRegisterMessage("请输入正确的邮箱地址", true);
+        emailInput?.focus();
+        return;
+    }
+    if (password.length < 8 || password.length > 128) {
+        setAccountRegisterMessage(password.length < 8 ? "密码不能少于 8 位" : "密码不能超过 128 位", true);
+        passwordInput?.focus();
+        return;
+    }
+    if (password !== confirmPassword) {
+        setAccountRegisterMessage("两次输入的密码不一致", true);
+        confirmInput?.focus();
+        return;
+    }
+    if (!/^\d{6}$/.test(emailCode)) {
+        setAccountRegisterMessage("请输入 6 位邮箱验证码", true);
+        codeInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    setAccountRegisterMessage("正在注册…");
+
+    try {
+        const { data } = await accountFetch("/auth/register", {
+            method:"POST",
+            body:JSON.stringify({ username, email, password, emailCode })
+        });
+
+        accountState.configured = data.configured !== false;
+        accountState.emailConfigured = data.emailConfigured !== false;
+        accountState.authenticated = true;
+        accountState.username = String(data.user?.username || username);
+        accountState.email = String(data.user?.email || email);
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        accountState.revision = Number(data.revision || 0);
+        accountState.status = "同步中…";
+        bumpCloudSyncContext();
+        // 新账号应从空工作区开始，不把同浏览器上一个账号的缓存继承过来。
+
+        if (passwordInput) passwordInput.value = "";
+        if (confirmInput) confirmInput.value = "";
+        if (codeInput) codeInput.value = "";
+        setAccountRegisterMessage("");
+        setAccountRegisterPanel(false);
+        accountState.syncing = false;
+        renderAccountUi();
+        showCopyToast("注册成功，已登录");
+        if (data.recoveryCode) {
+            accountState.hasRecoveryCode = true;
+            revealRegistrationRecoveryCode(data.recoveryCode);
+        }
+        await resolveInitialCloudSync(true);
+    } catch (error) {
+        accountState.syncing = false;
+        setAccountRegisterMessage(error?.message || "注册失败，请稍后再试", true);
+        renderAccountUi();
+    }
+}
+
+async function sendPasswordResetEmailCode() {
+    const email = document.getElementById("accountEmailRecoverEmail")?.value?.trim() || "";
+    await requestEmailCode({
+        purpose:"reset",
+        email,
+        messageSetter:setAccountEmailRecoverMessage,
+        cooldownKey:"reset"
+    });
+}
+
+async function recoverAccountPasswordByEmail() {
+    if (accountState.syncing) return;
+
+    const emailInput = document.getElementById("accountEmailRecoverEmail");
+    const codeInput = document.getElementById("accountEmailRecoverCode");
+    const passwordInput = document.getElementById("accountEmailRecoverPassword");
+    const confirmInput = document.getElementById("accountEmailRecoverPasswordConfirm");
+    const email = emailInput?.value?.trim() || "";
+    const emailCode = codeInput?.value?.trim() || "";
+    const newPassword = passwordInput?.value || "";
+    const confirmPassword = confirmInput?.value || "";
+
+    if (!email || !emailCode || !newPassword || !confirmPassword) {
+        setAccountEmailRecoverMessage("请把邮箱、验证码和新密码填写完整", true);
+        return;
+    }
+    if (!looksLikeEmailAddress(email)) {
+        setAccountEmailRecoverMessage("请输入正确的邮箱地址", true);
+        emailInput?.focus();
+        return;
+    }
+    if (!/^\d{6}$/.test(emailCode)) {
+        setAccountEmailRecoverMessage("请输入 6 位邮箱验证码", true);
+        codeInput?.focus();
+        return;
+    }
+    if (newPassword.length < 8 || newPassword.length > 128) {
+        setAccountEmailRecoverMessage(newPassword.length < 8 ? "新密码不能少于 8 位" : "新密码不能超过 128 位", true);
+        passwordInput?.focus();
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        setAccountEmailRecoverMessage("两次输入的新密码不一致", true);
+        confirmInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    setAccountEmailRecoverMessage("正在重置密码…");
+
+    try {
+        const { data } = await accountFetch("/auth/recover-password-email", {
+            method:"POST",
+            body:JSON.stringify({ email, emailCode, newPassword })
+        });
+        accountState.configured = true;
+        accountState.authenticated = true;
+        accountState.username = String(data.user?.username || "");
+        accountState.email = String(data.user?.email || email);
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        accountState.revision = 0;
+        accountState.status = "同步中…";
+        bumpCloudSyncContext();
+        accountState.syncing = false;
+        writeCloudSyncMeta({ username:accountState.username, revision:0, dirty:false, sectionHashes:{} });
+        setAccountEmailRecoverPanel(false);
+        renderAccountUi();
+        showCopyToast("密码已重置，已登录");
+        await resolveInitialCloudSync(false);
+    } catch (error) {
+        accountState.syncing = false;
+        setAccountEmailRecoverMessage(error?.message || "重置密码失败，请检查邮箱验证码", true);
+        renderAccountUi();
+    }
+}
+
+async function sendBindEmailCode() {
+    const email = document.getElementById("accountEmailBindEmail")?.value?.trim() || "";
+    await requestEmailCode({
+        purpose:"bind",
+        email,
+        messageSetter:setAccountEmailBindMessage,
+        cooldownKey:"bind"
+    });
+}
+
+async function bindAccountEmail() {
+    if (!accountState.authenticated || accountState.syncing) return;
+    const passwordInput = document.getElementById("accountEmailBindPassword");
+    const emailInput = document.getElementById("accountEmailBindEmail");
+    const codeInput = document.getElementById("accountEmailBindCode");
+    const password = passwordInput?.value || "";
+    const email = emailInput?.value?.trim() || "";
+    const emailCode = codeInput?.value?.trim() || "";
+
+    if (!password || !email || !emailCode) {
+        setAccountEmailBindMessage("请把当前密码、新邮箱和验证码填写完整", true);
+        return;
+    }
+    if (!looksLikeEmailAddress(email)) {
+        setAccountEmailBindMessage("请输入正确的邮箱地址", true);
+        emailInput?.focus();
+        return;
+    }
+    if (!/^\d{6}$/.test(emailCode)) {
+        setAccountEmailBindMessage("请输入 6 位邮箱验证码", true);
+        codeInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    accountState.status = "正在绑定邮箱…";
+    renderAccountUi();
+    setAccountEmailBindMessage("正在确认…");
+
+    try {
+        const { data } = await accountFetch("/auth/email/bind", {
+            method:"POST",
+            body:JSON.stringify({ password, email, emailCode })
+        });
+        accountState.email = String(data.email || email);
+        accountState.syncing = false;
+        accountState.status = "已同步";
+        setAccountEmailBindPanel(false);
+        renderAccountUi();
+        showCopyToast("邮箱已绑定");
+    } catch (error) {
+        accountState.syncing = false;
+        accountState.status = "";
+        setAccountEmailBindMessage(error?.message || "绑定邮箱失败，请稍后再试", true);
+        renderAccountUi();
+    }
+}
+
+async function generateAccountRecoveryCode() {
+    if (!accountState.authenticated || accountState.syncing) return;
+
+    const passwordInput = document.getElementById("accountRecoveryCurrentPassword");
+    const newCodeInput = document.getElementById("accountRecoveryNewCode");
+    const confirmInput = document.getElementById("accountRecoveryNewCodeConfirm");
+    const password = passwordInput?.value || "";
+    const newRecoveryCode = newCodeInput?.value?.trim() || "";
+    const confirmRecoveryCode = confirmInput?.value?.trim() || "";
+
+    if (!password) {
+        setAccountRecoveryCodeMessage("请输入当前密码", true);
+        passwordInput?.focus();
+        return;
+    }
+    if (newRecoveryCode.length < 8 || newRecoveryCode.length > 64) {
+        setAccountRecoveryCodeMessage("新恢复码需为 8–64 个字符", true);
+        newCodeInput?.focus();
+        return;
+    }
+    if (newRecoveryCode !== confirmRecoveryCode) {
+        setAccountRecoveryCodeMessage("两次输入的恢复码不一致", true);
+        confirmInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    accountState.status = "正在修改恢复码…";
+    setAccountRecoveryCodeMessage("正在修改…");
+    renderAccountUi();
+
+    try {
+        const { data } = await accountFetch("/auth/recovery-code", {
+            method:"POST",
+            body:JSON.stringify({ password, newRecoveryCode })
+        });
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        accountState.syncing = false;
+        accountState.status = "已同步";
+        setAccountRecoveryCodePanel(false);
+        renderAccountUi();
+        showCopyToast("恢复码已修改");
+    } catch (error) {
+        accountState.syncing = false;
+        accountState.status = "";
+        setAccountRecoveryCodeMessage(error?.message || "修改恢复码失败，请稍后再试", true);
+        renderAccountUi();
+    }
+}
+
+async function recoverAccountPassword() {
+    if (accountState.syncing) return;
+
+    const usernameInput = document.getElementById("accountRecoverUsername");
+    const codeInput = document.getElementById("accountRecoverCode");
+    const passwordInput = document.getElementById("accountRecoverPassword");
+    const confirmInput = document.getElementById("accountRecoverPasswordConfirm");
+
+    const username = usernameInput?.value?.trim() || "";
+    const recoveryCode = codeInput?.value?.trim() || "";
+    const newPassword = passwordInput?.value || "";
+    const confirmPassword = confirmInput?.value || "";
+
+    if (!username || !recoveryCode || !newPassword || !confirmPassword) {
+        setAccountRecoverMessage("请把用户名、恢复码和新密码填写完整", true);
+        if (!username) usernameInput?.focus();
+        else if (!recoveryCode) codeInput?.focus();
+        else if (!newPassword) passwordInput?.focus();
+        else confirmInput?.focus();
+        return;
+    }
+    if (newPassword.length < 8 || newPassword.length > 128) {
+        setAccountRecoverMessage(newPassword.length < 8 ? "新密码不能少于 8 位" : "新密码不能超过 128 位", true);
+        passwordInput?.focus();
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        setAccountRecoverMessage("两次输入的新密码不一致", true);
+        confirmInput?.focus();
+        return;
+    }
+
+    accountState.syncing = true;
+    renderAccountUi();
+    setAccountRecoverMessage("正在重置密码…");
+
+    try {
+        const { data } = await accountFetch("/auth/recover-password", {
+            method:"POST",
+            body:JSON.stringify({
+                username,
+                recoveryCode,
+                newPassword
+            })
+        });
+
+        accountState.configured = true;
+        accountState.authenticated = true;
+        accountState.username = String(data.user?.username || username);
+        accountState.email = String(data.user?.email || "");
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        accountState.revision = 0;
+        accountState.status = "同步中…";
+        bumpCloudSyncContext();
+        accountState.syncing = false;
+        writeCloudSyncMeta({
+            username:accountState.username,
+            revision:0,
+            dirty:false,
+            sectionHashes:{}
+        });
+
+        setAccountRecoverPanel(false);
+        renderAccountUi();
+        showCopyToast("密码已重置，已登录");
+        await resolveInitialCloudSync(false);
+    } catch (error) {
+        accountState.syncing = false;
+        setAccountRecoverMessage(
+            error?.message || "重置密码失败，请检查用户名和恢复码",
+            true
+        );
+        renderAccountUi();
+    }
+}
+
+async function logoutAccount() {
+    if (accountState.syncing) return;
+
+    const meta = readCloudSyncMeta();
+    if (meta.username === accountState.username && meta.dirty) {
+        const synced = await pushCloudSnapshot(false);
+        if (!synced && !window.confirm(
+            "本设备还有尚未同步到云端的数据。\n\n仍然退出吗？为保护账号隐私，退出将清除本地学习缓存，未同步的内容可能无法找回"
+        )) {
+            return;
+        }
+    }
+
+    accountState.syncing = true;
+    accountState.status = "正在退出…";
+    renderAccountUi();
+
+    try {
+        await accountFetch("/auth/logout", {
+            method:"POST",
+            body:JSON.stringify({})
+        });
+    } catch (error) {
+        accountState.syncing = false;
+        accountState.status = "退出失败";
+        setAccountMessage(error?.message || "退出登录失败，请检查网络后重试", true);
+        renderAccountUi();
+        return;
+    }
+
+    // A failed logout leaves this account active. Invalidate its pending
+    // replies only after the server has actually confirmed the transition.
+    bumpCloudSyncContext();
+    // 同一浏览器的下一个访客不应读取当前账号的本机背景图片。
+    try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+    // 退出不留下可供其他使用者读取的学习快照或备份。
+    volatileCloudBackup = null;
+    clearLegacyPersistentBackup();
+
+    stopCloudLivePolling();
+    accountState.authenticated = false;
+    accountState.username = "";
+    accountState.email = "";
+    accountState.hasRecoveryCode = false;
+    accountState.revision = 0;
+    accountState.status = "";
+    accountState.syncing = false;
+    clearCloudSyncMeta();
+    try { localStorage.setItem(ACCOUNT_LOGOUT_SIGNAL_KEY, String(Date.now())); } catch (_error) {}
+    if (cloudSyncTimer) {
+        clearTimeout(cloudSyncTimer);
+        cloudSyncTimer = 0;
+    }
+
+    clearLoggedOutWorkspace();
+    renderAccountUi();
+    closeAccountModal();
+
+    // 重新载入空白游客工作区，保证旧账号内容不会残留在页面上。
+    window.location.reload();
+}
+
+async function deleteAccount() {
+    if (!accountState.authenticated || accountState.syncing) return;
+
+    const passwordInput = document.getElementById("accountDeletePassword");
+    const password = passwordInput?.value || "";
+    if (!password) {
+        setAccountDeleteMessage("请输入当前密码", true);
+        passwordInput?.focus();
+        return;
+    }
+
+    const confirmed = window.confirm(
+        "确定永久注销这个账号吗？\n\n账号和云端同步数据都会被删除，此操作无法撤销。\n注销后页面会进入空白游客模式"
+    );
+    if (!confirmed) return;
+
+    accountState.syncing = true;
+    accountState.status = "正在注销…";
+    setAccountDeleteMessage("正在注销账号…");
+    renderAccountUi();
+
+    try {
+        await accountFetch("/auth/delete-account", {
+            method:"POST",
+            body:JSON.stringify({ password })
+        });
+    } catch (error) {
+        accountState.syncing = false;
+        accountState.status = "";
+        setAccountDeleteMessage(error?.message || "注销账号失败，请稍后再试", true);
+        renderAccountUi();
+        return;
+    }
+
+    bumpCloudSyncContext();
+    try { await deleteAppearanceBackgroundBlob(); } catch (_error) {}
+    volatileCloudBackup = null;
+    clearLegacyPersistentBackup();
+    stopCloudLivePolling();
+    accountState.authenticated = false;
+    accountState.username = "";
+    accountState.email = "";
+    accountState.hasRecoveryCode = false;
+    accountState.revision = 0;
+    accountState.status = "";
+    accountState.syncing = false;
+    clearCloudSyncMeta();
+    try { localStorage.setItem(ACCOUNT_LOGOUT_SIGNAL_KEY, String(Date.now())); } catch (_error) {}
+    if (cloudSyncTimer) {
+        clearTimeout(cloudSyncTimer);
+        cloudSyncTimer = 0;
+    }
+    setAccountDeletePanel(false);
+    clearLoggedOutWorkspace();
+    renderAccountUi();
+    closeAccountModal();
+    showCopyToast("账号已注销");
+    window.location.reload();
+}
+
+function retryAccountVerificationNow() {
+    if (accountVerificationPending && !accountVerificationOperation) void restoreVerifiedAccountSession();
+}
+
+async function restoreVerifiedAccountSession() {
+    if (accountVerificationOperation) return;
+    const operation = { version:cloudSyncContextVersion };
+    const wasAuthenticated = accountState.authenticated;
+    const controller = new AbortController();
+    accountVerificationOperation = operation;
+    if (accountVerificationTimer) window.clearTimeout(accountVerificationTimer);
+    accountVerificationTimer = 0;
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    try {
+        const { data } = await accountFetch("/auth/me", { signal:controller.signal });
+        if (operation.version !== cloudSyncContextVersion) return;
+        if (typeof data.authenticated !== "boolean" || data.authenticated
+            && (typeof data.user?.username !== "string" || !data.user.username)) {
+            throw new Error("登录状态响应无效，稍后重新验证");
+        }
+        accountVerificationPending = false;
+        accountState.configured = data.configured !== false;
+        accountState.emailConfigured = data.emailConfigured !== false;
+        accountState.authenticated = Boolean(data.authenticated);
+        accountState.username = accountState.authenticated
+            ? String(data.user?.username || "")
+            : "";
+        accountState.email = accountState.authenticated
+            ? String(data.user?.email || "")
+            : "";
+        accountState.hasRecoveryCode = Boolean(data.hasRecoveryCode);
+        // A delayed guest verification is not an account transition. Preserve
+        // any guest question/reply already started while /auth/me was pending.
+        if (wasAuthenticated || accountState.authenticated) bumpCloudSyncContext();
+        renderAccountUi();
+
+        if (accountState.authenticated) {
+            await resolveInitialCloudSync(false);
+        } else {
+            // 无有效登录立即清除旧用户缓存；不因浏览器保留旧元信息而复现历史数据。
+            clearCloudSyncMeta();
+            if (wasAuthenticated) clearLoggedOutWorkspace();
+            else purgeGuestPersistentState();
+            // 删除旧版本遗留的 IndexedDB 用户背景（不再给游客读取）。
+            try {
+                const db = await openAppearanceDatabase();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(APPEARANCE_DB_STORE, "readwrite");
+                    tx.objectStore(APPEARANCE_DB_STORE).delete(APPEARANCE_BACKGROUND_KEY);
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                db.close();
+            } catch (_error) {}
+        }
+    } catch (error) {
+        if (operation.version !== cloudSyncContextVersion) return;
+        console.warn("读取账号状态失败：", error);
+        const transient = error?.data?.retryable === true || !error?.status || error.status >= 500;
+        accountVerificationPending = transient;
+        if (error?.status === 503 && error?.data?.configured === false && !error?.data?.retryable) {
+            accountState.configured = false;
+            accountVerificationPending = false;
+        }
+        renderAccountUi();
+        if (accountVerificationPending) {
+            setAccountMessage("账号服务暂时不可用，正在重试验证登录状态", true);
+            accountVerificationTimer = window.setTimeout(retryAccountVerificationNow, 10000);
+        }
+    } finally {
+        window.clearTimeout(timeout);
+        if (accountVerificationOperation === operation) accountVerificationOperation = null;
+    }
+}
+
+async function initAccountSystem() {
+    const accountBtn = document.getElementById("accountBtn");
+    const accountClose = document.getElementById("accountClose");
+    const accountModal = document.getElementById("accountModal");
+    const accountLogin = document.getElementById("accountLogin");
+    const accountRegister = document.getElementById("accountRegister");
+    const accountRegisterCancel = document.getElementById("accountRegisterCancel");
+    const accountRegisterConfirm = document.getElementById("accountRegisterConfirm");
+    const accountRegisterSendCode = document.getElementById("accountRegisterSendCode");
+    const accountRegisterPasswordConfirm = document.getElementById("accountRegisterPasswordConfirm");
+    const accountForgotOpen = document.getElementById("accountForgotOpen");
+    const accountEmailRecoverCancel = document.getElementById("accountEmailRecoverCancel");
+    const accountEmailRecoverConfirm = document.getElementById("accountEmailRecoverConfirm");
+    const accountEmailRecoverSendCode = document.getElementById("accountEmailRecoverSendCode");
+    const accountEmailRecoverPasswordConfirm = document.getElementById("accountEmailRecoverPasswordConfirm");
+    const accountUseRecoveryCode = document.getElementById("accountUseRecoveryCode");
+    const accountUseEmailRecover = document.getElementById("accountUseEmailRecover");
+    const accountRecoverCancel = document.getElementById("accountRecoverCancel");
+    const accountRecoverConfirm = document.getElementById("accountRecoverConfirm");
+    const accountRecoverPasswordConfirm = document.getElementById("accountRecoverPasswordConfirm");
+    const accountRegistrationRecoveryCopy = document.getElementById("accountRegistrationRecoveryCopy");
+    const accountRegistrationRecoveryDone = document.getElementById("accountRegistrationRecoveryDone");
+    const accountEmailBindOpen = document.getElementById("accountEmailBindOpen");
+    const accountEmailBindCancel = document.getElementById("accountEmailBindCancel");
+    const accountEmailBindConfirm = document.getElementById("accountEmailBindConfirm");
+    const accountEmailBindSendCode = document.getElementById("accountEmailBindSendCode");
+    const accountEmailBindCode = document.getElementById("accountEmailBindCode");
+    const accountRecoveryCodeOpen = document.getElementById("accountRecoveryCodeOpen");
+    const accountRecoveryCodeCancel = document.getElementById("accountRecoveryCodeCancel");
+    const accountRecoveryCodeGenerate = document.getElementById("accountRecoveryCodeGenerate");
+    const accountRecoveryCurrentPassword = document.getElementById("accountRecoveryCurrentPassword");
+    const accountRecoveryNewCodeConfirm = document.getElementById("accountRecoveryNewCodeConfirm");
+    const accountLogout = document.getElementById("accountLogout");
+    const accountDeleteOpen = document.getElementById("accountDeleteOpen");
+    const accountDeleteCancel = document.getElementById("accountDeleteCancel");
+    const accountDeleteConfirm = document.getElementById("accountDeleteConfirm");
+    const accountDeletePassword = document.getElementById("accountDeletePassword");
+    const password = document.getElementById("accountPassword");
+
+    accountBtn?.addEventListener("click", openAccountModal);
+    accountClose?.addEventListener("click", closeAccountModal);
+    accountLogin?.addEventListener("click", submitAccountLogin);
+    accountRegister?.addEventListener("click", () => setAccountRegisterPanel(true));
+    accountRegisterCancel?.addEventListener("click", () => setAccountRegisterPanel(false));
+    accountRegisterConfirm?.addEventListener("click", submitAccountRegistration);
+    accountRegisterSendCode?.addEventListener("click", sendRegisterEmailCode);
+    accountRegisterPasswordConfirm?.addEventListener("keydown", event => {
+        if (event.key === "Enter") document.getElementById("accountRegisterEmailCode")?.focus();
+    });
+    document.getElementById("accountRegisterEmailCode")?.addEventListener("keydown", event => {
+        if (event.key === "Enter") submitAccountRegistration();
+    });
+
+    accountForgotOpen?.addEventListener("click", () => setAccountEmailRecoverPanel(true));
+    accountEmailRecoverCancel?.addEventListener("click", () => setAccountEmailRecoverPanel(false));
+    accountEmailRecoverConfirm?.addEventListener("click", recoverAccountPasswordByEmail);
+    accountEmailRecoverSendCode?.addEventListener("click", sendPasswordResetEmailCode);
+    accountEmailRecoverPasswordConfirm?.addEventListener("keydown", event => {
+        if (event.key === "Enter") recoverAccountPasswordByEmail();
+    });
+    accountUseRecoveryCode?.addEventListener("click", () => setAccountRecoverPanel(true));
+    accountUseEmailRecover?.addEventListener("click", () => setAccountEmailRecoverPanel(true));
+
+    accountRecoverCancel?.addEventListener("click", () => setAccountRecoverPanel(false));
+    accountRecoverConfirm?.addEventListener("click", recoverAccountPassword);
+    accountRecoverPasswordConfirm?.addEventListener("keydown", event => {
+        if (event.key === "Enter") recoverAccountPassword();
+    });
+    accountRegistrationRecoveryCopy?.addEventListener("click", copyRegistrationRecoveryCode);
+    accountRegistrationRecoveryDone?.addEventListener("click", clearRegistrationRecoveryCode);
+
+    accountEmailBindOpen?.addEventListener("click", () => setAccountEmailBindPanel(true));
+    accountEmailBindCancel?.addEventListener("click", () => setAccountEmailBindPanel(false));
+    accountEmailBindConfirm?.addEventListener("click", bindAccountEmail);
+    accountEmailBindSendCode?.addEventListener("click", sendBindEmailCode);
+    accountEmailBindCode?.addEventListener("keydown", event => {
+        if (event.key === "Enter") bindAccountEmail();
+    });
+
+    accountRecoveryCodeOpen?.addEventListener("click", () => setAccountRecoveryCodePanel(true));
+    accountRecoveryCodeCancel?.addEventListener("click", () => setAccountRecoveryCodePanel(false));
+    accountRecoveryCodeGenerate?.addEventListener("click", generateAccountRecoveryCode);
+    accountRecoveryCurrentPassword?.addEventListener("keydown", event => {
+        if (event.key === "Enter") document.getElementById("accountRecoveryNewCode")?.focus();
+    });
+    accountRecoveryNewCodeConfirm?.addEventListener("keydown", event => {
+        if (event.key === "Enter") generateAccountRecoveryCode();
+    });
+    accountLogout?.addEventListener("click", logoutAccount);
+    accountDeleteOpen?.addEventListener("click", () => setAccountDeletePanel(true));
+    accountDeleteCancel?.addEventListener("click", () => setAccountDeletePanel(false));
+    accountDeleteConfirm?.addEventListener("click", deleteAccount);
+    accountDeletePassword?.addEventListener("keydown", event => {
+        if (event.key === "Enter") deleteAccount();
+    });
+    accountModal?.addEventListener("click", event => {
+        if (event.target === accountModal) closeAccountModal();
+    });
+    password?.addEventListener("keydown", event => {
+        if (event.key === "Enter") submitAccountLogin();
+    });
+
+    // 同一浏览器其他标签退出/注销后，当前标签也应立即清空私人学习数据。
+    window.addEventListener("storage", event => {
+        if (event.key !== ACCOUNT_LOGOUT_SIGNAL_KEY || !event.newValue) return;
+        stopCloudLivePolling();
+        bumpCloudSyncContext();
+        accountState.authenticated = false;
+        accountState.username = "";
+        if (cloudSyncTimer) {
+            clearTimeout(cloudSyncTimer);
+            cloudSyncTimer = 0;
+        }
+        clearCloudSyncMeta();
+        clearLoggedOutWorkspace();
+        window.location.reload();
+    });
+
+    window.addEventListener("online", () => {
+        retryAccountVerificationNow();
+        const meta = readCloudSyncMeta();
+        if (accountState.authenticated && meta.dirty) {
+            pushCloudSnapshot(false);
+        }
+        requestCloudLivePollNow();
+    }, { passive:true });
+    window.addEventListener("focus", () => { retryAccountVerificationNow(); requestCloudLivePollNow(); }, {passive:true});
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) requestCloudLivePollNow();
+        else if (cloudLivePollEnabled) scheduleCloudLivePoll(CLOUD_LIVE_POLL_HIDDEN_MS);
+    });
+
+    renderAccountUi();
+
+    await restoreVerifiedAccountSession();
+}
+
+
+
+let typingTimer = null;
+let typingFullText = "";
+let typingDiv = null;
+let typingSessionId = null;
+let typingMeta = null;
+let typingContext = null;
+let typingRenderState = null;
+
+let typingAutoFollow = true;
+let typingScrollLockedByUser = false;
+let lastTypingAutoScrollAt = 0;
+let preserveChatScrollOnce = null;
+let forceChatBottomOnce = false;
+let lastRenderedChatSessionId = null;
+
+const REPLY_REVEAL_CHARS_PER_SECOND = 140;
+const REPLY_REVEAL_MAX_MS = 8000;
+
+const busySessionIds = new Set();
+const pendingAiStartSessionIds = new Set();
+// 每个会话独立跟踪正在执行的请求。取消后，晚到的服务端结果绝不能再落盘。
+const activeAiRequests = new Map();
+
+function clearTypingState(removeBubble = false) {
+    if (typingTimer) cancelAnimationFrame(typingTimer);
+    if (typingRenderState) {
+        typingRenderState.cancelled = true;
+        if (!typingRenderState.preparing) releaseReplyStage(typingRenderState);
+    }
+    if (removeBubble) typingDiv?.remove();
+    typingTimer = null;
+    typingFullText = "";
+    typingDiv = null;
+    typingSessionId = null;
+    typingMeta = null;
+    typingContext = null;
+    typingRenderState = null;
+}
+
+function typingContextIsCurrent() {
+    return Boolean(typingContext && typingContext.version === cloudSyncContextVersion
+        && sessions.includes(typingContext.session)
+        && !deletedSessionIds[sessionBusyKey(typingContext.session.id)]
+        && getLatestUserMessage(typingContext.session) === typingContext.userMessage);
+}
+
+function cancelAccountInteractions() {
+    for (const request of activeAiRequests.values()) {
+        request.cancelled = true;
+        request.controller.abort();
+        discardRequestStreamPreview(request);
+    }
+    activeAiRequests.clear();
+    busySessionIds.clear();
+    pendingAiStartSessionIds.clear();
+    clearTypingState(true);
+    pendingBackgroundReplyRender = false;
+    typingAutoFollow = true;
+    typingScrollLockedByUser = false;
+    lastTypingAutoScrollAt = 0;
+    for (const run of ocrBatchRuns.values()) { run.cancelled = true; run.controller.abort(); }
+    ocrBatchRuns.clear();
+    ocrSolvingSessions.clear();
+    ocrBatchPreparing = false;
+    for (const task of [...ocrTasks.values()]) {
+        if (task.state === "recognizing") notifyOcrCancelled(task.id);
+        discardOcrTask(task);
+    }
+    if (ocrRequestInFlight) cancelImageRecognition();
+    const dialog = document.getElementById("graphEditorDialog");
+    if (dialog?.open) dialog.close();
+    ocrEditorController?.destroy();
+    ocrEditorController = null;
+    ocrEditorTaskId = null;
+    ocrReviewInProgress = false;
+}
+
+function throwIfAiRequestCancelled(request) {
+    if (request?.cancelled || request?.controller?.signal?.aborted
+        || request?.contextVersion != null && request.contextVersion !== cloudSyncContextVersion
+        || request?.session && (!sessions.includes(request.session)
+            || deletedSessionIds[sessionBusyKey(request.session.id)])
+        || request?.userMessage && getLatestUserMessage(request.session) !== request.userMessage) {
+        const error = new Error("AI request cancelled");
+        error.name = "AbortError";
+        throw error;
+    }
+}
+
+function discardRequestStreamPreview(request) {
+    request?.streamPreview?.dispose();
+    if (request) request.streamPreview = null;
+}
+
+function currentRequestStreamPreview() {
+    return activeAiRequests.get(sessionBusyKey(currentId))?.streamPreview || null;
+}
+
+function hasActiveChatOutput() {
+    return Boolean(typingTimer || currentRequestStreamPreview());
+}
+
+function appendRequestStreamDelta(request, text) {
+    throwIfAiRequestCancelled(request);
+    if (!request.streamPreview) {
+        const chat = document.getElementById("chat");
+        if (!chat) return;
+        const visible = () => currentId === request.session.id && !document.hidden;
+        if (visible()) {
+            typingAutoFollow = isChatNearBottom(chat, 90);
+            typingScrollLockedByUser = false;
+            lastTypingAutoScrollAt = 0;
+        }
+        request.streamPreview = window.DMateChatStream.createPreview({
+            chat,
+            isCurrent: () => {
+                try { throwIfAiRequestCancelled(request); return true; } catch (_error) { return false; }
+            },
+            canRender: visible,
+            format: source => markdownToHtml(prepareAiDisplayText(source)),
+            typeset: renderMath,
+            onRender: () => {
+                if (visible()) {
+                    if (!request.streamVisible) {
+                        request.streamVisible = true;
+                        refreshInputAvailability();
+                    }
+                    maybeAutoFollowTyping();
+                    queueChatJumpControlsUpdate();
+                }
+            }
+        });
+    }
+    request.streamPreview.append(text);
+}
+
+function discardTypingOutput() {
+    if (!typingTimer && !typingContext && !typingDiv) return false;
+    const onCancel = typingContextIsCurrent() ? typingContext.onCancel : null;
+    clearTypingState(true);
+    onCancel?.();
+    typingAutoFollow = true;
+    typingScrollLockedByUser = false;
+    lastTypingAutoScrollAt = 0;
+    renderChat();
+    refreshInputAvailability();
+    return true;
+}
+
+function stopCurrentAiReply() {
+    const key = sessionBusyKey(currentId);
+    cancelOcrBatchRun(currentId);
+    const request = activeAiRequests.get(key);
+    if (request) {
+        request.cancelled = true;
+        request.controller.abort();
+        discardRequestStreamPreview(request);
+        activeAiRequests.delete(key);
+        busySessionIds.delete(key);
+        pendingAiStartSessionIds.delete(key);
+        // 中断时仍保留已发出的用户消息，方便手动删除并重新输入。
+        rollbackRetestAfterRequestFailure(request.session);
+    }
+    const stoppedTyping = isCurrentSessionTyping() ? discardTypingOutput() : false;
+    if (request || stoppedTyping) {
+        // 不强制弹出手机键盘；保持原滚动位置，方便用户删除刚发出的消息。
+        refreshInputAvailability();
+    }
+}
+
+function handleSendOrStop() {
+    if (isSessionBusy(currentId) || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()
+        || ocrBatchRuns.has(sessionBusyKey(currentId))) {
+        stopCurrentAiReply();
+        return;
+    }
+    if (window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") return;
+    if (ocrTasks.size > 0) {
+        void sendOcrBatch();
+        return;
+    }
+    send();
+}
+
+
+// -----------------------------
+// 基础状态
+// -----------------------------
+function getCurrent() {
+    return sessions.find(s => s.id === currentId) || null;
+}
+
+function makeSessionId() {
+    let id = Date.now();
+
+    while (sessions.some(s => s.id === id) || deletedSessionIds[String(id)]) {
+        id += 1;
+    }
+
+    return id;
+}
+
+function enableInput(enable) {
+    const input = document.getElementById("text");
+    const sendBtn = document.getElementById("sendBtn");
+    const imageBtn = document.getElementById("imageBtn");
+
+    if (input) input.disabled = !enable;
+    if (sendBtn) sendBtn.disabled = !enable;
+    if (imageBtn) imageBtn.disabled = !enable;
+}
+
+function sessionBusyKey(sessionId) {
+    return String(sessionId ?? "");
+}
+
+function isSessionBusy(sessionId = currentId) {
+    if (sessionId === null || sessionId === undefined) {
+        return false;
+    }
+
+    return busySessionIds.has(
+        sessionBusyKey(sessionId)
+    );
+}
+
+function isSessionPendingAiStart(sessionId = currentId) {
+    if (sessionId === null || sessionId === undefined) {
+        return false;
+    }
+
+    return pendingAiStartSessionIds.has(
+        sessionBusyKey(sessionId)
+    );
+}
+
+function isCurrentSessionTyping() {
+    return Boolean(
+        typingTimer
+        && String(typingSessionId) === String(currentId)
+    );
+}
+
+function refreshInputAvailability() {
+    const pendingStart = isSessionPendingAiStart(currentId);
+    const typingNow = isCurrentSessionTyping()
+        || Boolean(currentRequestStreamPreview()?.element?.isConnected);
+    const imageBatchActive = typeof ocrBatchRuns !== "undefined"
+        && Boolean(ocrBatchRuns.get(sessionBusyKey(currentId))?.cancelled === false);
+    const waitingReply = isSessionBusy(currentId) || pendingStart || imageBatchActive;
+    const hardBlocked = waitingReply || typingNow;
+
+    const input = document.getElementById("text");
+    const sendBtn = document.getElementById("sendBtn");
+    const imageBtn = document.getElementById("imageBtn");
+    const imageInput = document.getElementById("imageInput");
+    const ocrCancelBtn = document.getElementById("ocrCancelBtn");
+    const inputLockHint = document.getElementById("inputLockHint");
+    const inputWrap = input?.closest?.(".input-wrap") || null;
+
+    let statusText = "";
+    let placeholder = "询问DMate";
+
+    // The graph editor is a modal: composer status text sits behind it and
+    // is unreadable. Do not render an OCR-specific lock banner or placeholder.
+    // Keep the real input lock while the editor is open.
+    if (!ocrReviewInProgress && typingNow) {
+        statusText = "AI 正在回答，当前输入框已锁定";
+        placeholder = "AI 正在回答…";
+    } else if (!ocrReviewInProgress && waitingReply) {
+        statusText = "AI 正在思考，当前输入框已锁定";
+        placeholder = "AI 正在思考…";
+    }
+
+    if (input) {
+        input.disabled = hardBlocked || ocrReviewInProgress;
+        input.placeholder = ocrReviewInProgress ? "" : placeholder;
+    }
+    window.dmateChatComposer?.refresh?.();
+    // Recognition requests have their own cards and cancellation controls.
+    // Only an open editor locks the composer; other originals keep running.
+    const recognizing = Boolean(ocrReviewInProgress);
+    const stoppingAllowed = !recognizing && Boolean(waitingReply || typingNow);
+    const visibleMode = recognizing ? "ocr" : stoppingAllowed ? "ai" : "idle";
+
+    function setInputControlVisible(element, visible) {
+        if (!element) return;
+        element.hidden = !visible;
+        element.setAttribute("aria-hidden", String(!visible));
+        // 覆盖主题里对 #sendBtn / #imageBtn 的多层 !important 规则。
+        element.style.setProperty("display", visible ? "" : "none", visible ? "" : "important");
+    }
+
+    if (sendBtn) {
+        const sendVisible = visibleMode !== "ocr";
+        sendBtn.disabled = !sendVisible;
+        sendBtn.textContent = stoppingAllowed ? "停止" : "发送";
+        sendBtn.classList.toggle("ai-stop-button", stoppingAllowed);
+        sendBtn.setAttribute("aria-label", stoppingAllowed ? "停止当前 AI 回复" : "发送消息");
+        sendBtn.title = stoppingAllowed ? "停止当前 AI 回复" : "发送";
+        setInputControlVisible(sendBtn, sendVisible);
+        if (visibleMode === "idle" && window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") {
+            sendBtn.disabled = true;
+            sendBtn.title = "语音输入完成后发送";
+        }
+    }
+    if (imageBtn) {
+        imageBtn.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
+        setInputControlVisible(imageBtn, visibleMode === "idle");
+    }
+    if (imageInput) {
+        imageInput.disabled = visibleMode !== "idle" || ocrActiveCount() >= OCR_MAX_CONCURRENT;
+    }
+    if (typeof ocrBatchPreparing !== "undefined" && ocrBatchPreparing) {
+        if (sendBtn && !imageBatchActive) sendBtn.disabled = true;
+        if (imageBtn) imageBtn.disabled = true;
+        if (imageInput) imageInput.disabled = true;
+    }
+    window.dmateVoiceInput?.refresh?.();
+    const imagePickerWrap = document.getElementById("imagePickerWrap");
+    if (imagePickerWrap) imagePickerWrap.hidden = visibleMode !== "idle";
+    if (inputWrap) {
+        inputWrap.classList.toggle("ai-input-busy", visibleMode === "ai");
+        // CSS 必须只依赖最终可见状态，避免等待 OCR/思考回调时闪现按钮。
+        inputWrap.dataset.busyMode = visibleMode === "ai" ? (typingNow ? "answering" : "thinking") : visibleMode;
+    }
+    if (ocrCancelBtn) {
+        ocrCancelBtn.disabled = true;
+        setInputControlVisible(ocrCancelBtn, false);
+    }
+
+    if (inputLockHint) {
+        inputLockHint.textContent = statusText;
+        inputLockHint.classList.toggle("hidden", !statusText);
+    }
+
+}
+
+function setSessionBusy(sessionId, busy) {
+    const key = sessionBusyKey(sessionId);
+
+    if (!key) return;
+
+    if (busy) {
+        busySessionIds.add(key);
+    } else {
+        busySessionIds.delete(key);
+    }
+
+    refreshInputAvailability();
+}
+
+
+function normalizeTeaching(value) {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+
+    const asText = input => (
+        typeof input === "string" ? input.trim() : ""
+    );
+
+    const asTextList = input => (
+        Array.isArray(input)
+            ? input
+                .filter(item => typeof item === "string" && item.trim())
+                .map(item => item.trim())
+                .slice(0, 4)
+            : []
+    );
+
+    return {
+        category: asText(value.category) || "待识别",
+        related_categories: asTextList(value.related_categories),
+        knowledge_points: asTextList(value.knowledge_points),
+        related_knowledge_points: asTextList(value.related_knowledge_points),
+        focus_points: asTextList(value.focus_points).slice(0, 2),
+        prerequisite_points: asTextList(value.prerequisite_points),
+        knowledge_path: asTextList(value.knowledge_path),
+        question_type: asText(value.question_type) || "一般题",
+        difficulty: ["简单", "中等", "困难"].includes(asText(value.difficulty))
+            ? asText(value.difficulty)
+            : "",
+        mode: asText(value.mode) || "hint",
+        mode_label: asText(value.mode_label) || "提示引导",
+        confidence: asText(value.confidence) || "低",
+        classification_source: asText(value.classification_source),
+        input_source: asText(value.input_source) || "文本输入"
+    };
+}
+
+
+function normalizeReferenceAnswer(value) {
+    const answer = typeof value === "string" ? value.trim() : "";
+    // Match the generated-answer validation on the server. A truncated
+    // formula or proof must never be reused as a complete reference answer.
+    return Array.from(answer).length <= 2000 ? answer : "";
+}
+
+function normalizeRetestSession(value) {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+
+    const stage = [
+        "generating",
+        "awaiting_answer",
+        "checking",
+        "finished"
+    ].includes(value.stage)
+        ? value.stage
+        : "finished";
+
+    return {
+        wrongQuestionId: typeof value.wrongQuestionId === "string"
+            ? value.wrongQuestionId
+            : "",
+        stage,
+        targetPoints: Array.isArray(value.targetPoints)
+            ? value.targetPoints
+                .filter(item => typeof item === "string" && item.trim())
+                .map(item => item.trim())
+                .slice(0, 4)
+            : [],
+        referenceQuestion: typeof value.referenceQuestion === "string"
+            ? limitQuestionText(value.referenceQuestion.trim())
+            : "",
+        targetDifficulty: ["简单", "中等", "困难"].includes(value.targetDifficulty)
+            ? value.targetDifficulty : "",
+        generatedQuestion: typeof value.generatedQuestion === "string"
+            ? limitQuestionText(value.generatedQuestion.trim())
+            : "",
+        generatedAnswer: normalizeReferenceAnswer(value.generatedAnswer),
+        startedAt: Number.isFinite(value.startedAt)
+            ? value.startedAt
+            : Date.now(),
+        result: ["correct", "wrong", "unknown"].includes(value.result)
+            ? value.result
+            : ""
+    };
+}
+
+
+function createEmptyLearningState() {
+    return {
+        version: 9,
+        knowledge: {},
+        events: [],
+        wrongQuestions: [],
+        conceptNotebook: { notes: [], deleted: {} },
+        deletedWrongQuestionIds: Object.create(null)
+    };
+}
+
+function normalizeLearningQuestion(value) {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+
+    const text = typeof value.text === "string"
+        ? value.text.trim()
+        : "";
+
+    if (!text) {
+        return null;
+    }
+
+    const knowledgePoints = Array.isArray(value.knowledgePoints)
+        ? value.knowledgePoints
+            .filter(item => typeof item === "string" && item.trim())
+            .map(item => item.trim())
+            .slice(0, 4)
+        : [];
+
+    const focusPoints = Array.isArray(value.focusPoints)
+        ? value.focusPoints
+            .filter(item => typeof item === "string" && item.trim())
+            .map(item => item.trim())
+            .slice(0, 2)
+        : [];
+
+    return {
+        text: limitQuestionText(text),
+        knowledgePoints,
+        focusPoints,
+        category: typeof value.category === "string"
+            ? value.category.trim()
+            : "",
+        relatedCategories: Array.isArray(value.relatedCategories)
+            ? value.relatedCategories.filter(cat => typeof cat === "string" && cat.trim()).slice(0, 3)
+            : [],
+        difficulty: ["简单", "中等", "困难"].includes(value.difficulty)
+            ? value.difficulty
+            : "",
+        source: value.source === "ocr"
+            ? "ocr"
+            : (
+                value.source === "ai"
+                    ? "ai"
+                    : "text"
+            ),
+        referenceAnswer: normalizeReferenceAnswer(value.referenceAnswer),
+        sessionId: (
+            typeof value.sessionId === "number"
+            || typeof value.sessionId === "string"
+        )
+            ? value.sessionId
+            : null,
+        updatedAt: Number.isFinite(value.updatedAt)
+            ? value.updatedAt
+            : Date.now()
+    };
+}
+
+function normalizeLearningState(value) {
+    const state = createEmptyLearningState();
+
+    if (!value || typeof value !== "object") {
+        return state;
+    }
+
+    state.deletedWrongQuestionIds = normalizeDeletedWrongQuestionIds(value.deletedWrongQuestionIds);
+    state.conceptNotebook = window.DMateConceptNotebookModel
+        ? window.DMateConceptNotebookModel.normalize(value.conceptNotebook)
+        : value.conceptNotebook && typeof value.conceptNotebook === "object"
+            ? JSON.parse(JSON.stringify(value.conceptNotebook)) : { notes: [], deleted: {} };
+
+    // v4 起学习统计改为“事件账本”。
+    // v3 及更早只有总数，没有来源会话，无法在删除对话时准确回滚。
+    // 因此升级时保留错题本，但旧的学习计数不继续继承。
+    if (
+        Number(value.version) >= 4
+        && Array.isArray(value.events)
+    ) {
+        state.events = value.events
+            .filter(event => event && typeof event === "object")
+            .map(event => ({
+                id: typeof event.id === "string" && event.id
+                    ? event.id
+                    : `learn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                sessionId: (
+                    typeof event.sessionId === "number"
+                    || typeof event.sessionId === "string"
+                )
+                    ? event.sessionId
+                    : null,
+                type: [
+                    "seen",
+                    "correct",
+                    "wrong",
+                    "support",
+                    "reviewed"
+                ].includes(event.type)
+                    ? event.type
+                    : "",
+                points: Array.isArray(event.points)
+                    ? [
+                        ...new Set(
+                            event.points
+                                .filter(point => typeof point === "string" && point.trim())
+                                .map(point => point.trim())
+                        )
+                    ].slice(0, 4)
+                    : [],
+                createdAt: Number.isFinite(event.createdAt)
+                    ? event.createdAt
+                    : Date.now()
+            }))
+            .filter(event => event.type && event.points.length);
+    }
+
+    if (Array.isArray(value.wrongQuestions)) {
+        const normalizedWrong = value.wrongQuestions
+            .filter(item => item && typeof item === "object")
+            .map(item => {
+                const question = typeof item.question === "string"
+                    ? sanitizeStoredWrongQuestionText(
+                        item.question
+                    )
+                    : "";
+
+                if (!question) return null;
+
+                return {
+                    id: typeof item.id === "string" && item.id
+                        ? item.id
+                        : `wrong-${Date.now()}-${Math.random()}`,
+                    question: limitQuestionText(question),
+                    knowledgePoints: Array.isArray(item.knowledgePoints)
+                        ? item.knowledgePoints
+                            .filter(point => typeof point === "string" && point.trim())
+                            .map(point => point.trim())
+                            .slice(0, 4)
+                        : [],
+                    focusPoints: Array.isArray(item.focusPoints)
+                        ? item.focusPoints
+                            .filter(point => typeof point === "string" && point.trim())
+                            .map(point => point.trim())
+                            .slice(0, 2)
+                        : [],
+                    category: typeof item.category === "string"
+                        ? item.category.trim()
+                        : "",
+                    relatedCategories: Array.isArray(item.relatedCategories)
+                        ? item.relatedCategories.filter(cat => typeof cat === "string" && cat.trim()).slice(0, 3)
+                        : [],
+                    classificationVersion: Number.isInteger(item.classificationVersion)
+                        ? Math.max(0, item.classificationVersion)
+                        : 0,
+                    difficulty: ["简单", "中等", "困难"].includes(item.difficulty)
+                        ? item.difficulty
+                        : "",
+                    feedback: typeof item.feedback === "string"
+                        ? item.feedback.trim().slice(0, 1000)
+                        : "",
+                    referenceAnswer: normalizeReferenceAnswer(item.referenceAnswer),
+                    answer: typeof item.answer === "string"
+                        ? item.answer.trim().slice(0, 3000)
+                        : "",
+                    analysis: typeof item.analysis === "string"
+                        ? item.analysis.trim().slice(0, 8000)
+                        : (
+                            typeof item.solution === "string"
+                                ? item.solution.trim().slice(0, 8000)
+                                : ""
+                        ),
+                    answerUpdatedAt: Number.isFinite(item.answerUpdatedAt)
+                        ? item.answerUpdatedAt
+                        : null,
+                    analysisUpdatedAt: Number.isFinite(item.analysisUpdatedAt)
+                        ? item.analysisUpdatedAt
+                        : (
+                            Number.isFinite(item.solutionUpdatedAt)
+                                ? item.solutionUpdatedAt
+                                : null
+                        ),
+                    note: typeof item.note === "string"
+                        ? item.note.trim().slice(0, 1500)
+                        : "",
+                    source: item.source === "auto" ? "auto" : "manual",
+                    corrected: Boolean(item.corrected),
+                    mistakeCount: item.source === "auto"
+                        ? Math.max(1, Number(item.mistakeCount) || 1)
+                        : Math.max(0, Number(item.mistakeCount) || 0),
+                    sessionId: (
+                        typeof item.sessionId === "number"
+                        || typeof item.sessionId === "string"
+                    )
+                        ? item.sessionId
+                        : null,
+                    createdAt: Number.isFinite(item.createdAt)
+                        ? item.createdAt
+                        : Date.now(),
+                    updatedAt: Number.isFinite(item.updatedAt)
+                        ? item.updatedAt
+                        : Date.now(),
+                    lastWrongAt: Number.isFinite(item.lastWrongAt)
+                        ? item.lastWrongAt
+                        : (
+                            Number.isFinite(item.updatedAt)
+                                ? item.updatedAt
+                                : Date.now()
+                        ),
+                    correctedAt: Number.isFinite(item.correctedAt)
+                        ? item.correctedAt
+                        : null,
+                    retestCount: Math.max(0, Number(item.retestCount) || 0),
+                    retestPassCount: Math.max(0, Number(item.retestPassCount) || 0),
+                    manualRetestPassCount: Math.max(0, Math.floor(Number(item.manualRetestPassCount) || 0)),
+                    retestRecords: Array.isArray(item.retestRecords) ? item.retestRecords.filter(x => x && x.id && x.question).map(x => ({
+                        id: String(x.id), question: limitQuestionText(x.question),
+                        answer: String(x.answer || "").slice(0,8000), analysis: String(x.analysis || "").slice(0,8000),
+                        createdAt: Number(x.createdAt) || 0,
+                        updatedAt: Number.isFinite(x.updatedAt) ? x.updatedAt : null,
+                        answerUpdatedAt: Number.isFinite(x.answerUpdatedAt) ? x.answerUpdatedAt : null,
+                        analysisUpdatedAt: Number.isFinite(x.analysisUpdatedAt) ? x.analysisUpdatedAt : null
+                    })) : [],
+                    passedRetestSessionIds: Array.isArray(item.passedRetestSessionIds)
+                        ? [...new Set(item.passedRetestSessionIds.map(String))] : [],
+                    retestFailCount: Math.max(0, Number(item.retestFailCount) || 0),
+                    retestPassed: Boolean(item.retestPassed),
+                    retestPassedAt: Number.isFinite(item.retestPassedAt)
+                        ? item.retestPassedAt
+                        : null,
+                    lastRetestAt: Number.isFinite(item.lastRetestAt)
+                        ? item.lastRetestAt
+                        : null,
+                    lastRetestQuestion: typeof item.lastRetestQuestion === "string"
+                        ? limitQuestionText(item.lastRetestQuestion.trim())
+                        : "",
+                    lastRetestFeedback: typeof item.lastRetestFeedback === "string"
+                        ? item.lastRetestFeedback.trim().slice(0, 1000)
+                        : "",
+                    lastRetestResult: ["correct", "wrong", "unknown"].includes(
+                        item.lastRetestResult
+                    )
+                        ? item.lastRetestResult
+                        : "",
+                    lastRetestSessionId: (
+                        typeof item.lastRetestSessionId === "number"
+                        || typeof item.lastRetestSessionId === "string"
+                    )
+                        ? item.lastRetestSessionId
+                        : null
+                };
+            })
+            .filter(Boolean);
+
+        // 错题本本身允许出现重复题目：每次记录都作为独立学习记录保留。
+        // PDF 导出时会按题目内容单独去重，不影响这里的原始记录。
+        state.wrongQuestions = normalizedWrong
+            .filter(item => !state.deletedWrongQuestionIds[String(item.id)])
+            .filter(
+                item => !isClearlyNonQuestionWrongBookText(
+                    item.question
+                )
+            )
+            .sort((a, b) => a.updatedAt - b.updatedAt);
+    }
+
+    state.knowledge = buildKnowledgeFromEvents(
+        state.events
+    );
+
+    return state;
+}
+
+function loadLearningState() {
+    const previousNotebook = JSON.stringify(learningState.conceptNotebook);
+    try {
+        if (!shouldPersistClientState()) {
+            learningState = createEmptyLearningState();
+            return;
+        }
+        const raw = localStorage.getItem(LEARNING_STORAGE_KEY);
+
+        if (!raw) {
+            learningState = createEmptyLearningState();
+            return;
+        }
+
+        learningState = normalizeLearningState(
+            JSON.parse(raw)
+        );
+    } catch (error) {
+        console.warn("学习记录读取失败：", error);
+        learningState = createEmptyLearningState();
+    } finally {
+        if (previousNotebook !== JSON.stringify(learningState.conceptNotebook)) window.dmateConceptNotebook?.refresh?.();
+    }
+}
+
+function saveLearningState() {
+    let persisted = true;
+    if (shouldPersistClientState()) {
+        try {
+            localStorage.setItem(
+                LEARNING_STORAGE_KEY,
+                JSON.stringify(learningState)
+            );
+        } catch (error) {
+            persisted = false;
+            console.warn("学习记录保存失败：", error);
+            accountState.status = "本机存储空间不足，请及时导出学习数据备份";
+            renderAccountUi();
+        }
+    }
+    scheduleCloudSync();
+    return persisted;
+}
+
+function setConceptNotebookState(value) {
+    if (!window.DMateConceptNotebookModel) throw new Error("笔记本组件未加载，请刷新后重试。");
+    const model = window.DMateConceptNotebookModel;
+    const previous = model.normalize(learningState.conceptNotebook);
+    const characters = rows => rows.reduce((sum, note) => sum + String(note?.title || "").length + String(note?.content || "").length, 0);
+    const before = characters(previous.notes), after = Array.isArray(value?.notes) ? characters(value.notes) : Infinity;
+    // A cross-device union can exceed the local editing budget. Keep every
+    // note, but allow one-by-one deletion/shortening until it fits again.
+    const reducingOverflow = (previous.notes.length > model.LIMITS.notes || before > model.LIMITS.characters)
+        && value?.notes?.length <= previous.notes.length && after <= before
+        && (value.notes.length < previous.notes.length || after < before);
+    const next = model.validate(value, { allowOverCapacity: reducingOverflow });
+    learningState.conceptNotebook = next;
+    if (!saveLearningState()) throw new Error("本机存储空间不足，笔记暂留在当前页面；请不要关闭页面，并检查云同步状态。");
+    return window.DMateConceptNotebookModel.copy(next);
+}
+
+function emptyKnowledgeRecord() {
+    return {
+        seen: 0,
+        correct: 0,
+        wrong: 0,
+        support: 0,
+        reviewed: 0,
+        updatedAt: 0
+    };
+}
+
+function buildKnowledgeFromEvents(events) {
+    const knowledge = {};
+
+    for (const event of Array.isArray(events) ? events : []) {
+        if (
+            !event
+            || !Array.isArray(event.points)
+            || !event.type
+        ) {
+            continue;
+        }
+
+        for (const rawPoint of event.points) {
+            const point = String(rawPoint || "").trim();
+            if (!point) continue;
+
+            if (!knowledge[point]) {
+                knowledge[point] = emptyKnowledgeRecord();
+            }
+
+            const record = knowledge[point];
+
+            if (event.type === "seen") record.seen += 1;
+            if (event.type === "correct") record.correct += 1;
+            if (event.type === "wrong") record.wrong += 1;
+            if (event.type === "support") record.support += 1;
+            if (event.type === "reviewed") record.reviewed += 1;
+
+            record.updatedAt = Math.max(
+                record.updatedAt,
+                Number(event.createdAt) || 0
+            );
+        }
+    }
+
+    return knowledge;
+}
+
+function rebuildKnowledge() {
+    learningState.knowledge = buildKnowledgeFromEvents(
+        learningState.events
+    );
+}
+
+function updateKnowledge(points, eventType, sessionId = null) {
+    const uniquePoints = [
+        ...new Set(
+            (Array.isArray(points) ? points : [])
+                .filter(point => typeof point === "string" && point.trim())
+                .map(point => point.trim())
+        )
+    ].slice(0, 4);
+
+    if (
+        !uniquePoints.length
+        || ![
+            "seen",
+            "correct",
+            "wrong",
+            "support",
+            "reviewed"
+        ].includes(eventType)
+    ) {
+        return;
+    }
+
+    const now = Date.now();
+
+    learningState.events.push({
+        id: `learn-${now}-${Math.random().toString(36).slice(2, 8)}`,
+        sessionId: (
+            typeof sessionId === "number"
+            || typeof sessionId === "string"
+        )
+            ? sessionId
+            : null,
+        type: eventType,
+        points: uniquePoints,
+        createdAt: now
+    });
+
+    // 不再静默丢弃早期学习事件；超过软阈值仅可能影响云端容量。
+    rebuildKnowledge();
+    saveLearningState();
+}
+
+function removeLearningEventsForSession(sessionId) {
+    if (
+        sessionId === null
+        || sessionId === undefined
+    ) {
+        return;
+    }
+
+    const before = learningState.events.length;
+
+    learningState.events = learningState.events.filter(
+        event => String(event.sessionId) !== String(sessionId)
+    );
+
+    if (learningState.events.length !== before) {
+        rebuildKnowledge();
+        saveLearningState();
+    }
+}
+
+function knowledgeStatus(record) {
+    if (!record || typeof record !== "object") {
+        return "暂无记录";
+    }
+
+    const correct = Number(record.correct) || 0;
+    const wrong = Number(record.wrong) || 0;
+    const seen = Number(record.seen) || 0;
+    const reviewed = Number(record.reviewed) || 0;
+
+    if (!correct && !wrong && !seen && !reviewed) {
+        return "暂无记录";
+    }
+
+    if (wrong > 0) {
+        return "有错误记录";
+    }
+
+    if (correct > 0) {
+        return "已有正确记录";
+    }
+
+    if (reviewed > 0) {
+        return "完成过订正";
+    }
+
+    return "有学习记录";
+}
+
+
+function getLatestUserMessage(session) {
+    if (!session || !Array.isArray(session.messages)) {
+        return null;
+    }
+
+    for (let index = session.messages.length - 1; index >= 0; index -= 1) {
+        const message = session.messages[index];
+
+        if (
+            message
+            && message.role === "user"
+            && typeof message.text === "string"
+            && message.text.trim()
+        ) {
+            return message;
+        }
+    }
+
+    return null;
+}
+
+function normalizeQuestionReferenceText(text) {
+    return String(text || "")
+        .trim()
+        .replace(/\s+/g, "");
+}
+
+function hasExplicitExerciseGenerationCue(text) {
+    return Boolean(window.DMateExerciseIntent?.classify(text).explicit);
+}
+
+
+
+function parseQuestionReferenceNumber(raw) {
+    const value = String(raw || "").trim();
+
+    if (!value) return null;
+
+    if (/^\d{1,3}$/.test(value)) {
+        const number = Number(value);
+        return Number.isInteger(number) && number >= 1
+            ? number
+            : null;
+    }
+
+    const normalized = value.replace(/两/g, "二");
+    const digits = {
+        零: 0,
+        一: 1,
+        二: 2,
+        三: 3,
+        四: 4,
+        五: 5,
+        六: 6,
+        七: 7,
+        八: 8,
+        九: 9
+    };
+
+    if (Object.prototype.hasOwnProperty.call(digits, normalized)) {
+        return digits[normalized] || null;
+    }
+
+    // 会话里的题目数量通常不会很大，这里稳定支持 1~99 的中文序号：
+    // 十、十一、二十、二十三……
+    if (/^[一二三四五六七八九]?十[一二三四五六七八九]?$/.test(normalized)) {
+        const [left, right = ""] = normalized.split("十");
+        const tens = left ? digits[left] : 1;
+        const ones = right ? digits[right] : 0;
+        const number = tens * 10 + ones;
+        return number >= 1 ? number : null;
+    }
+
+    return null;
+}
+
+function questionOrdinalReference(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (!value || value.length > 90) {
+        return null;
+    }
+
+    // “倒数第二题”必须走倒序题号逻辑；不能误抽成“第二题”。
+    if (/倒数第[零一二三四五六七八九十两\d]{1,4}/.test(value)) {
+        return null;
+    }
+
+    // 注意：这里故意不把“第2小题”当成会话历史第2题。
+    // “第2小题 / 第2问”应继续留在当前大题内部，由模型回答当前题的小问。
+    const match = value.match(
+        /第([零一二三四五六七八九十两\d]{1,4})(?:个|道)?(?:大|练习|例|习)?题(?:目)?/
+    );
+
+    if (!match) return null;
+
+    return parseQuestionReferenceNumber(match[1]);
+}
+
+function questionReverseOrdinalReference(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (!value || value.length > 90) {
+        return null;
+    }
+
+    const match = value.match(
+        /倒数第([零一二三四五六七八九十两\d]{1,4})(?:个|道)?(?:大|练习|例|习)?题(?:目)?/
+    );
+
+    if (!match) return null;
+
+    return parseQuestionReferenceNumber(match[1]);
+}
+
+function questionBoundaryReference(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (!value || value.length > 90) {
+        return "";
+    }
+
+    if (
+        /(?:最开始|最早|开头|起初)(?:的)?(?:那|这|一)?(?:道|个)?(?:大|练习)?题(?:目)?/.test(value)
+    ) {
+        return "first";
+    }
+
+    if (
+        /(?:最后|最末|最晚|最新)(?:的)?(?:那|这|一)?(?:道|个)?(?:大|练习)?题(?:目)?/.test(value)
+    ) {
+        return "last";
+    }
+
+    if (
+        /(?:当前|现在|目前|正在讲|刚才|刚刚)(?:的)?(?:这|那|一)?(?:道|个)?(?:大|练习)?题(?:目)?/.test(value)
+        || /^(?:这|那|本)(?:一)?(?:道|个)?(?:大)?题(?:目)?(?:呢|吗|啊|呀|吧|不(?:太|怎么)?会|不会|怎么做|如何做|再讲一下|讲一下|继续|提示一下)?$/.test(value)
+    ) {
+        return "current";
+    }
+
+    return "";
+}
+
+function parseRelativeQuestionOffset(value) {
+    const text = normalizeQuestionReferenceText(value);
+    if (!text) return null;
+
+    // “最后一道题”里包含字面子串“后一道题”，必须先排除边界指代。
+    if (
+        /(?:最后|最末|最晚|最新|最开始|最早|开头|起初)(?:的)?(?:那|这|一)?(?:道|个)?(?:大|练习)?题(?:目)?/.test(text)
+    ) {
+        return null;
+    }
+
+    if (/(?:上上|前前)(?:一)?(?:道|个)?(?:大|练习)?题/.test(text)) {
+        return -2;
+    }
+
+    if (/(?:下下|后后)(?:一)?(?:道|个)?(?:大|练习)?题/.test(text)) {
+        return 2;
+    }
+
+    if (/(?:再|又)(?:往|向)?(?:上|前)(?:一)?(?:道|个)?(?:大|练习)?题/.test(text)) {
+        return -2;
+    }
+
+    if (/(?:再|又)(?:往|向)?(?:下|后)(?:一)?(?:道|个)?(?:大|练习)?题/.test(text)) {
+        return 2;
+    }
+
+    let match = text.match(
+        /(?:往|向)(?:前|上)([零一二三四五六七八九十两\d]{1,4})(?:道|个)?(?:大|练习)?题/
+    );
+    if (match) {
+        const steps = parseQuestionReferenceNumber(match[1]);
+        return steps ? -steps : null;
+    }
+
+    match = text.match(
+        /(?:往|向)(?:后|下)([零一二三四五六七八九十两\d]{1,4})(?:道|个)?(?:大|练习)?题/
+    );
+    if (match) {
+        const steps = parseQuestionReferenceNumber(match[1]);
+        return steps || null;
+    }
+
+    if (
+        /(?:上一道(?:大|练习)?题|上一(?:大|练习)?题|上一个(?:大|练习)?题|前一道(?:大|练习)?题|前一(?:大|练习)?题|前一个(?:大|练习)?题|前面(?:的)?(?:那|这|一)?(?:道|个)?(?:大|练习)?题|刚才上一道(?:大|练习)?题|刚才上一(?:大|练习)?题)/.test(text)
+    ) {
+        return -1;
+    }
+
+    if (
+        /(?:下一道(?:大|练习)?题|下一(?:大|练习)?题|下一个(?:大|练习)?题|后一道(?:大|练习)?题|后一(?:大|练习)?题|后一个(?:大|练习)?题|后面(?:的)?(?:那|这|一)?(?:道|个)?(?:大|练习)?题)/.test(text)
+    ) {
+        return 1;
+    }
+
+    return null;
+}
+
+function relativeQuestionReference(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (!value || value.length > 110) {
+        return null;
+    }
+
+    // 当前大题内部的“第2小题 / 第2问”及其前后小问，不参与会话题目导航。
+    if (/第[零一二三四五六七八九十两\d]{1,4}(?:个|道)?小题|第[零一二三四五六七八九十两\d]{1,4}问/.test(value)) {
+        return null;
+    }
+
+    const normalOrdinalPattern = /第([零一二三四五六七八九十两\d]{1,4})(?:个|道)?(?:大|练习|例|习)?题(?:目)?/;
+    const reverseOrdinalPattern = /倒数第([零一二三四五六七八九十两\d]{1,4})(?:个|道)?(?:大|练习|例|习)?题(?:目)?/;
+
+    const reverseMatch = value.match(reverseOrdinalPattern);
+    if (reverseMatch) {
+        const anchorReverseOrdinal = parseQuestionReferenceNumber(
+            reverseMatch[1]
+        );
+        const suffix = value.slice(
+            (reverseMatch.index || 0) + reverseMatch[0].length
+        );
+        const offset = parseRelativeQuestionOffset(suffix);
+
+        if (anchorReverseOrdinal && offset) {
+            return {
+                offset,
+                anchorOrdinal: null,
+                anchorReverseOrdinal,
+                anchorBoundary: ""
+            };
+        }
+    }
+
+    const normalMatch = value.match(normalOrdinalPattern);
+    if (normalMatch && !value.includes("倒数第")) {
+        const anchorOrdinal = parseQuestionReferenceNumber(
+            normalMatch[1]
+        );
+        const suffix = value.slice(
+            (normalMatch.index || 0) + normalMatch[0].length
+        );
+        const offset = parseRelativeQuestionOffset(suffix);
+
+        if (anchorOrdinal && offset) {
+            return {
+                offset,
+                anchorOrdinal,
+                anchorReverseOrdinal: null,
+                anchorBoundary: ""
+            };
+        }
+    }
+
+    const boundaryAnchors = [
+        ["first", /(?:最开始|最早|开头|起初)(?:的)?(?:那|这|一)?(?:道|个)?(?:大|练习)?题(?:目)?/],
+        ["last", /(?:最后|最末|最晚|最新)(?:的)?(?:那|这|一)?(?:道|个)?(?:大|练习)?题(?:目)?/],
+        ["current", /(?:当前|现在|目前|正在讲|刚才|刚刚)(?:的)?(?:这|那|一)?(?:道|个)?(?:大|练习)?题(?:目)?/]
+    ];
+
+    for (const [anchorBoundary, pattern] of boundaryAnchors) {
+        const match = value.match(pattern);
+        if (!match) continue;
+
+        const suffix = value.slice(
+            (match.index || 0) + match[0].length
+        );
+        const offset = parseRelativeQuestionOffset(suffix);
+
+        if (offset) {
+            return {
+                offset,
+                anchorOrdinal: null,
+                anchorReverseOrdinal: null,
+                anchorBoundary
+            };
+        }
+    }
+
+    const offset = parseRelativeQuestionOffset(value);
+    if (!offset) return null;
+
+    return {
+        offset,
+        anchorOrdinal: null,
+        anchorReverseOrdinal: null,
+        anchorBoundary: ""
+    };
+}
+
+function isPreviousQuestionFollowUp(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (!value || value.length > 100) {
+        return false;
+    }
+
+    // “给我一道和上一题类似的题”是出题请求，不是切换当前题。
+    if (hasExplicitExerciseGenerationCue(value)) {
+        return false;
+    }
+
+    const reference = relativeQuestionReference(value);
+    return Boolean(reference && reference.offset < 0);
+}
+
+function isNextQuestionFollowUp(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (!value || value.length > 100) {
+        return false;
+    }
+
+    // “给我下一道题 / 出下一题”应继续走出题逻辑。
+    if (hasExplicitExerciseGenerationCue(value)) {
+        return false;
+    }
+
+    const reference = relativeQuestionReference(value);
+    return Boolean(reference && reference.offset > 0);
+}
+
+function isOrdinalQuestionFollowUp(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    const ordinal = questionOrdinalReference(value);
+    if (!ordinal || value.length > 90) return false;
+
+    if (hasExplicitExerciseGenerationCue(value)) {
+        return false;
+    }
+
+    // “第2题：已知……”这种完整题干不是导航命令。
+    const freshProblemAfterReference = /第[零一二三四五六七八九十两\d]{1,4}(?:个|道)?(?:大|练习|例|习)?题(?:目)?[：:]?(?:已知|设|给定|若|求|证明|计算|判断|写出|列出)/.test(
+        value
+    );
+
+    if (freshProblemAfterReference) {
+        return false;
+    }
+
+    // “第2题的下一题”属于相对导航，由 relativeQuestionReference 处理。
+    if (relativeQuestionReference(value)) {
+        return false;
+    }
+
+    if (
+        /(?:还记得|回到|返回|切到|跳到|再讲|讲一下|解释|提示|不(?:太|怎么)?会|不会|有点不会|做不来|没思路|没头绪|卡住|不懂|没懂|还是不会|继续|完整解析|答案|怎么做|如何做|看一下)/.test(
+            value
+        )
+    ) {
+        return true;
+    }
+
+    return /^第[零一二三四五六七八九十两\d]{1,4}(?:个|道)?(?:大|练习|例|习)?题(?:目)?(?:呢|吗|啊|呀|吧)?$/.test(
+        value
+    );
+}
+
+function isReverseOrdinalQuestionFollowUp(text) {
+    const value = normalizeQuestionReferenceText(text);
+    const ordinal = questionReverseOrdinalReference(value);
+
+    if (!ordinal || value.length > 90) {
+        return false;
+    }
+
+    if (hasExplicitExerciseGenerationCue(value)) {
+        return false;
+    }
+
+    return true;
+}
+
+function isBoundaryQuestionFollowUp(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (!questionBoundaryReference(value)) {
+        return false;
+    }
+
+    if (hasExplicitExerciseGenerationCue(value)) {
+        return false;
+    }
+
+    return true;
+}
+
+function namedQuestionTopicReference(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (!value || value.length > 100) {
+        return "";
+    }
+
+    // 优先保留更精确的课程模块名称，避免“谓词逻辑那道题”被降成笼统的“逻辑”。
+    const preciseTopics = [
+        ["谓词逻辑", /谓词逻辑|谓词|量词|个体域|辖域|前束范式/],
+        ["命题逻辑", /命题逻辑|命题|真值表|逻辑联结词|主析取|主合取|范式/],
+        ["证明与归纳", /证明与归纳|数学归纳|强归纳|反证法|反证|直接证明/],
+        ["初等数论", /初等数论|数论|整除|素数|质数|同余|最大公(?:约|因)数|欧几里得/],
+        ["计数与组合", /计数与组合|组合|排列|鸽巢|容斥|计数/],
+        ["递推关系", /递推关系|递推|递归|生成函数/],
+        ["图论", /图论|图.{0,12}同构|同构.{0,12}图|邻接矩阵|欧拉(?:图|通路|回路)|哈密顿|最短路|生成树|顶点|边/],
+        ["代数结构", /代数结构|群|子群|半群|幺半群|同态|同构|环|域|格|布尔代数/],
+        ["函数", /函数|映射|单射|满射|双射|逆函数|复合函数/],
+        ["集合与关系", /集合与关系/],
+        ["关系", /二元关系|关系|偏序|等价关系|关系闭包|哈斯图|自反|对称|传递/],
+        ["集合", /集合|子集|幂集|交集|并集|补集/]
+    ];
+
+    const hasReferenceCue = /(?:那|这)(?:一)?(?:道|个)?(?:大|练习)?题|(?:刚才|之前|前面|上面)(?:的)?[^，。！？!?]{0,24}题|[^，。！？!?]{1,24}(?:的)?那(?:一)?(?:道|个)?(?:大|练习)?题/.test(
+        value
+    );
+
+    if (hasReferenceCue) {
+        const matched = preciseTopics.find(([, pattern]) => pattern.test(value));
+        if (matched) {
+            return matched[0];
+        }
+    }
+
+    const match = value.match(
+        /(?:还记得|回到|返回|切到|跳到|刚才|之前|前面|上面)?(?:关于)?(.{1,24}?)(?:的)?(?:那|这)(?:一)?(?:道|个)?(?:大|练习)?题(?:目)?(?:呢|吗|吧|啊|呀|再讲一下|讲一下|不(?:太|怎么)?会|不会|有点不会|做不来|没思路|不懂|没懂|还是不会|怎么做|如何做)?$/
+    );
+
+    if (!match) return "";
+
+    return String(match[1] || "")
+        .replace(/^(?:关于|刚才|之前|前面|上面)/, "")
+        .replace(/(?:相关|方面)$/, "")
+        .trim();
+}
+
+function isNamedQuestionFollowUp(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    if (hasExplicitExerciseGenerationCue(value)) {
+        return false;
+    }
+
+    return Boolean(namedQuestionTopicReference(value));
+}
+
+function isQuestionNavigationFollowUp(text) {
+    return (
+        isPreviousQuestionFollowUp(text)
+        || isNextQuestionFollowUp(text)
+        || isOrdinalQuestionFollowUp(text)
+        || isReverseOrdinalQuestionFollowUp(text)
+        || isBoundaryQuestionFollowUp(text)
+        || isNamedQuestionFollowUp(text)
+    );
+}
+
+function isShortLearningFollowUp(text) {
+    const value = String(text || "")
+        .trim()
+        .replace(/\s+/g, "");
+
+    if (!value) return true;
+
+    if (isQuestionNavigationFollowUp(value)) {
+        return true;
+    }
+
+    const exactCommands = [
+        "继续",
+        "再提示一下",
+        "再给个提示",
+        "给我提示",
+        "完整解析",
+        "给我完整解析",
+        "直接给答案",
+        "告诉我答案",
+        "为什么",
+        "然后呢",
+        "下一步呢",
+        "再讲一下",
+        "再解释一下",
+        "换个写法",
+        "换一种写法",
+        "列一下",
+        "写一下",
+        "展开一下",
+        "用大括号列一下",
+        "用大括号写一下",
+        "用矩阵写一下",
+        "这个怎么看",
+        "这个怎么写",
+        "这一步怎么写"
+    ];
+
+    if (exactCommands.includes(value)) {
+        return true;
+    }
+
+    // 这类短句通常是在追问“怎么表示/怎么改写”，不是一道新题。
+    const followUpPatterns = [
+        /用.+(?:列|写|表示|展开)一下$/,
+        /(?:再|重新).+(?:讲|写|列|解释|说明)一下$/,
+        /(?:换|改).+(?:写法|表示|形式)$/,
+        /^(?:这个|这里|这一步|上面|刚才).{0,12}(?:怎么|为什么|什么意思|看不懂|不明白|不(?:太|怎么)?会|不会|没思路|卡住)/,
+        /(?:怎么写|怎么表示|怎么列|什么意思|看不懂|不明白|不(?:太|怎么)?会|不会|没思路|没头绪|卡住)$/
+    ];
+
+    if (
+        value.length <= 30
+        && followUpPatterns.some(pattern => pattern.test(value))
+    ) {
+        return true;
+    }
+
+    return value.length <= 6;
+}
+
+function extractOcrPrintedQuestionText(text) {
+    const value = String(text || "").trim();
+    if (!value) return "";
+
+    const markers = [
+        "【题目文字】",
+        "【题干与公式识别】"
+    ];
+    const marker = markers.find(item => value.includes(item));
+    if (!marker) return "";
+
+    const start = value.indexOf(marker) + marker.length;
+    const endMarkers = [
+        "【图形信息】",
+        "【图形结构识别】",
+        "【我的要求】"
+    ];
+    const ends = endMarkers
+        .map(item => value.indexOf(item, start))
+        .filter(index => index >= 0);
+    const end = ends.length ? Math.min(...ends) : value.length;
+
+    return cutQuestionAfterMetaSections(
+        value.slice(start, end)
+    ).trim();
+}
+
+function extractOcrUserRequest(text) {
+    const value = String(text || "");
+    if (!value) return "";
+
+    const apiMatch = value.match(
+        /【本轮唯一需要执行的用户请求】\s*([\s\S]*?)\s*【本轮请求结束】/
+    );
+    if (apiMatch) {
+        return String(apiMatch[1] || "").trim();
+    }
+
+    const marker = "【我的要求】";
+    const start = value.indexOf(marker);
+    return start >= 0
+        ? value.slice(start + marker.length).trim()
+        : "";
+}
+
+function looksLikeFormalPureImageRequest(text) {
+    const value = String(text || "").replace(/\s+/g, "").trim();
+    if (!value) return false;
+
+    // 观察型临时询问只回答，不登记为题目。
+    if (
+        /(?:这里|这个|图里|图中|里面|这张图).{0,10}(?:有)?(?:多少|几个|几条)(?:个)?(?:点|顶点|节点|边|线)/.test(value)
+        || /(?:多少|几个|几条)(?:个)?(?:点|顶点|节点|边|线)/.test(value)
+        || /^(?:这|这个|这里|图里|图中|里面).{0,12}(?:是什么|什么意思|怎么看|怎么读)$/.test(value)
+    ) {
+        return false;
+    }
+
+    if (
+        /^(?:请|麻烦|帮我|帮忙)?(?:看一下|看看|帮我看下)?(?:判断(?:一下)?|判定|证明|求证|求解|计算|算(?:一下)?|求(?:一下|出)?|写出|写一下|列出|列一下|找出|找一下|给出|构造|画出|画一下|作出|确定|说明)/.test(value)
+    ) {
+        return true;
+    }
+
+    return Boolean(
+        /(?:是否|是不是).{0,12}(?:同构|连通|欧拉图|哈密顿图|树|平面图|二分图)/.test(value)
+        || /(?:同不同构|同构吗|是否同构|是否连通|欧拉(?:通路|回路|图)|哈密顿(?:通路|回路|图)|最短(?:路|路径)|最小生成树|生成树|邻接矩阵|关联矩阵|度数序列|割点|割边|桥|着色|色数)/.test(value)
+    );
+}
+
+
+
+function isRecordableOcrQuestionMessage(message) {
+    if (
+        !message
+        || message.source !== "ocr"
+        || typeof message.text !== "string"
+    ) {
+        return false;
+    }
+
+    // 用户在 OCR 核对页的明确选择优先于启发式题干识别。
+    if (message.ocrIsQuestion === true) return true;
+    if (message.ocrIsQuestion === false) return false;
+
+    const printed = extractOcrPrintedQuestionText(message.text);
+    if (printed) {
+        return Boolean(
+            looksLikeChatQuestionText(printed)
+            || countTopLevelQuestionParts(printed) >= 1
+            || /^(?:图中|图\s*[A-Za-z0-9_]*|在图.+中).*(?:求|判断|证明|计算|写出|列出|多少|几个|是否)/.test(printed)
+        );
+    }
+
+    // OCR 没有题干时，只有“纯图 + 明确解题要求”才登记成题。
+    // “这里有几个点”之类临时观察问题不登记。
+    return looksLikeFormalPureImageRequest(
+        extractOcrUserRequest(message.text)
+    );
+}
+
+
+function looksLikeActualLearningProblem(message) {
+    if (
+        !message
+        || typeof message.text !== "string"
+    ) {
+        return false;
+    }
+
+    if (message.source === "ocr") {
+        return isRecordableOcrQuestionMessage(message);
+    }
+
+    // 出题命令只是控制动作，不是学生提交的一道题。
+    if (isExerciseRequestText(message.text)) {
+        return false;
+    }
+
+    const text = message.text.trim();
+    if (!text || isShortLearningFollowUp(text)) {
+        return false;
+    }
+
+    const compact = text.replace(/\s+/g, "");
+
+    // 明显的题目结构或题干用语。
+    const problemSignals = [
+        "【题目文字】",
+        "【图形信息】",
+        "[图片识题]",
+        "已知",
+        "设",
+        "求",
+        "求解",
+        "证明",
+        "判断",
+        "计算",
+        "写出",
+        "列出",
+        "回答下列问题",
+        "选择题",
+        "证明题",
+        "计算题"
+    ];
+
+    if (
+        problemSignals.some(signal => compact.includes(signal))
+    ) {
+        return true;
+    }
+
+    if (/[（(]\s*[1-9]\s*[)）]/.test(text)) {
+        return true;
+    }
+
+    // 短而完整的自然学习问句也必须切换成新题，不能继续绑在上一题。
+    // 例如“什么是欧拉图？”“两个图同构吗？”“如何判断欧拉图？”。
+    if (looksLikeChatQuestionText(text)) {
+        return true;
+    }
+
+    // 一般完整题目会比“换个写法/再提示一下”长很多。
+    if (text.length >= 80) {
+        return true;
+    }
+
+    return false;
+}
+
+function buildLearningQuestionFromSession(session, teaching, excludeLatest = false) {
+    if (!session || !Array.isArray(session.messages)) {
+        return null;
+    }
+
+    const end = excludeLatest
+        ? session.messages.length - 2
+        : session.messages.length - 1;
+
+    for (let index = end; index >= 0; index -= 1) {
+        const message = session.messages[index];
+
+        if (
+            !message
+            || message.role !== "user"
+            || typeof message.text !== "string"
+        ) {
+            continue;
+        }
+
+        const text = message.text.trim();
+        if (!text) continue;
+
+        if (message.isRetestPrompt || message.isRetestAnswer) {
+            continue;
+        }
+
+        // Explicit chat messages must not reappear as the current problem
+        // through the legacy heuristic fallback when history is empty.
+        if (message.source !== "ocr" && message.manualIsQuestion === false) {
+            continue;
+        }
+
+        if (!looksLikeActualLearningProblem(message)) {
+            continue;
+        }
+
+        const questionText = extractQuestionOnlyFromMessage(message).trim();
+        if (!questionText) continue;
+
+        return {
+            text: limitQuestionText(questionText),
+            knowledgePoints: [...new Set([
+                ...(teaching?.knowledge_points || []).slice(0, 3),
+                ...(teaching?.related_knowledge_points || []).slice(0, 2)
+            ])].slice(0, 4),
+            focusPoints: Array.isArray(teaching?.focus_points)
+                ? teaching.focus_points.slice(0, 2)
+                : [],
+            category: typeof teaching?.category === "string"
+                ? teaching.category
+                : "",
+            relatedCategories: teaching?.related_categories || [],
+            difficulty: ["简单", "中等", "困难"].includes(teaching?.difficulty)
+                ? teaching.difficulty
+                : "",
+            source: message.source === "ocr" ? "ocr" : "text",
+            sessionId: session.id,
+            updatedAt: Date.now()
+        };
+    }
+
+    return null;
+}
+
+function stripQuestionDecorations(text) {
+    let value = String(text || "");
+    value = value.replace(/^\s*(?:#{1,4}\s*)?(?:\*\*|__)?\s*\[(?:Question|Exercise|Problem)\]\s*(?:\*\*|__)?\s*/im, "")
+        .replace(/^\s*(?:#{1,4}\s*)?(?:\*\*|__)?(?:Question|Exercise|Problem)(?:\s*[:：]|\s*(?:\*\*|__)?\s*$)\s*/im, "");
+
+    value = value
+        .replace(
+            /^\s*(?:\*\*|__)\s*【(?:题目|练习题|题目文字)】\s*(?:\*\*|__)\s*/m,
+            ""
+        )
+        .replace(/^\s*【(?:题目|练习题|题目文字)】\s*/m, "")
+        .replace(
+            /^\s*(?:#{1,4}\s*)?(?:题目|练习题)\s*[:：]?\s*$/m,
+            ""
+        );
+
+    // 删除标题切割后残留的单独 Markdown 装饰行。
+    value = value
+        .replace(
+            /^(?:\s*(?:\*\*|__|[-—_=]{3,})\s*\n)+/,
+            ""
+        )
+        .replace(
+            /(?:\n\s*(?:\*\*|__|[-—_=]{3,})\s*)+$/,
+            ""
+        );
+
+    return value.trim();
+}
+
+function cutQuestionAfterMetaSections(text) {
+    let value = String(text || "").trim();
+
+    if (!value) return "";
+
+    const stopPatterns = [
+        /(?:^|\n)[ \t]*(?:#{1,6}[ \t]+(?:Answer|Explanation|Solution|Hint|Topics|Knowledge Points)[ \t]*:?[ \t]*(?=\n|$)|(?:\*\*|__)(?:Answer|Explanation|Solution|Hint|Topics|Knowledge Points)[ \t]*:?(?:\*\*|__)[ \t]*(?=\n|$))/im,
+        /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*|__)?【(?:参考答案|答案|解析|解答|详细解析|解题过程|提示|涉及知识点|知识点)】/m,
+        /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*|__)?\[(?:Answer|Explanation|Solution|Hint|Topics|Knowledge Points)\](?:\*\*|__)?/im,
+        /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*|__)?(?:Answer|Explanation|Solution|Hint|Topics|Knowledge Points)\s*[:：](?:\*\*|__)?/im,
+        /(?:^|\n)\s*(?:-{3,}\s*\n\s*)?(?:\*\*|__)?(?:提示|思考提示|思路提示|解题提示|小提示|关键提示|方法提示|解题思路|思路)\s*[:：]?(?:\*\*|__)?/im,
+        /(?:^|\n)\s*(?:#{1,6}\s*)?(?:参考答案|答案|解析|解答|详细解析|解题过程|过程)\s*[:：]?/im,
+        /(?:^|\n)\s*答\s*[:：]/im,
+        /(?:^|\n)\s*(?:你先|请先|先尝试|可以先|做完后|卡住了|如果卡住|有结果后|把答案发给我|告诉我你的进度).{0,220}$/im
+    ];
+
+    let end = value.length;
+
+    for (const pattern of stopPatterns) {
+        const match = pattern.exec(value);
+
+        if (
+            match
+            && typeof match.index === "number"
+        ) {
+            end = Math.min(end, match.index);
+        }
+    }
+
+    return value
+        .slice(0, end)
+        .replace(/\n\s*[-—_=]{3,}\s*$/g, "")
+        .trim();
+}
+
+function removeConversationalQuestionPrefix(text) {
+    let value = String(text || "").trim();
+
+    if (!value) return "";
+
+    // 明确题目标题后的内容优先。
+    const explicitPatterns = [
+        /(?:^|\n)[ \t]*(?:#{1,6}[ \t]+(?:Question|Exercise|Problem)[ \t]*:?[ \t]*(?:\n|$)|(?:\*\*|__)(?:Question|Exercise|Problem)[ \t]*:?(?:\*\*|__)[ \t]*(?:\n|$))/im,
+        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?\[(?:Question|Exercise|Problem)\]\s*(?:\*\*|__)?\s*/im,
+        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?(?:Question|Exercise|Problem)\s*[:：]\s*(?:\*\*|__)?\s*/im,
+        // 先吃掉完整 **【题目】**，否则只匹配中间标题会留下孤立 **。
+        /(?:^|\n)\s*(?:\*\*|__)\s*【(?:题目|练习题)】\s*(?:\*\*|__)\s*/m,
+        /【(?:题目|练习题)】/,
+        /(?:^|\n)\s*#{1,4}\s*(?:题目|练习题)\s*(?:\n|$)/m,
+        /(?:^|\n)\s*(?:\*\*|__)\s*(?:题目|练习题)[:：]?\s*(?:\*\*|__)\s*/m,
+        /(?:^|\n)\s*(?:题目|练习题)\s*[:：]\s*/m,
+        /(?:^|\n)\s*(?:题目|练习题)\s*(?:\n|$)/m
+    ];
+
+    let best = null;
+
+    for (const pattern of explicitPatterns) {
+        const match = pattern.exec(value);
+
+        if (
+            match
+            && (
+                !best
+                || match.index < best.index
+            )
+        ) {
+            best = match;
+        }
+    }
+
+    if (best) {
+        return value
+            .slice(best.index + best[0].length)
+            .trim();
+    }
+
+    // AI 常见开场白：真正题干通常从“设/已知/给定/下列/在……中”开始。
+    const startPatterns = [
+        /(?:^|\n)\s*(?=设)/m,
+        /(?:^|\n)\s*(?=已知)/m,
+        /(?:^|\n)\s*(?=给定)/m,
+        /(?:^|\n)\s*(?=下列)/m,
+        /(?:^|\n)\s*(?=在.{0,50}(?:图|集合|关系|系统|空间|序列|网络|情形)中)/m,
+        /(?:^|\n)\s*(?=求(?:解|证|出|下列|$))/m,
+        /(?:^|\n)\s*(?=证明)/m,
+        /(?:^|\n)\s*(?=计算)/m,
+        /(?:^|\n)\s*(?=判断)/m
+    ];
+
+    let start = -1;
+
+    for (const pattern of startPatterns) {
+        const match = pattern.exec(value);
+
+        if (
+            match
+            && (
+                start < 0
+                || match.index < start
+            )
+        ) {
+            start = match.index;
+        }
+    }
+
+    if (start > 0) {
+        const prefix = value.slice(0, start).trim();
+
+        // 只在前缀明显是聊天套话时切掉，避免误删题干前言。
+        if (
+            /(?:好的|没问题|可以|这次|给你|我来|我们来|先来|出一道|练习一下|下面是)/.test(prefix)
+            && prefix.length <= 160
+        ) {
+            value = value.slice(start).trim();
+        }
+    }
+
+    return value;
+}
+
+function extractOcrQuestionPayload(text) {
+    const value = String(text || "").trim();
+
+    if (!value) return "";
+
+    const questionMarker = "【题目文字】";
+    const graphMarker = "【图形信息】";
+    const requestMarker = "【我的要求】";
+
+    if (!value.includes(questionMarker)) {
+        return cutQuestionAfterMetaSections(value);
+    }
+
+    const qStart = value.indexOf(questionMarker) + questionMarker.length;
+    const gStart = value.indexOf(graphMarker);
+    const rStart = value.indexOf(requestMarker);
+    const qEndCandidates = [gStart, rStart].filter(index => index >= 0);
+    const qEnd = qEndCandidates.length
+        ? Math.min(...qEndCandidates)
+        : value.length;
+
+    let question = value.slice(
+        qStart,
+        qEnd
+    ).trim();
+
+    question = cutQuestionAfterMetaSections(question);
+
+    if (gStart >= 0) {
+        const graphEnd = (rStart >= 0 && rStart > gStart)
+            ? rStart
+            : value.length;
+        const graphInfo = value
+            .slice(gStart + graphMarker.length, graphEnd)
+            .trim();
+
+        // 图形结构是题目必要条件，不属于“无关聊天内容”；
+        // “我的要求”是本轮操作指令，不能混进题干或错题本。
+        if (graphInfo) {
+            question = `${question}\n\n【图形信息】\n${graphInfo}`.trim();
+        }
+    }
+
+    return question;
+}
+
+function countTopLevelQuestionParts(text) {
+    const value = String(text || "");
+
+    const parenthesized = (
+        value.match(
+            /(?:^|\n)\s*[（(]\s*\d{1,2}\s*[)）]\s*\S+/gm
+        ) || []
+    ).length;
+
+    const numbered = (
+        value.match(
+            /(?:^|\n)\s*\d{1,2}\s*[、.．]\s*\S+/gm
+        ) || []
+    ).length;
+
+    return Math.max(parenthesized, numbered);
+}
+
+function looksLikeQuestionPayload(text) {
+    const value = String(text || "").trim();
+
+    if (!value) return false;
+
+    if (/【(?:题目|练习题|题目文字)】/.test(value)) {
+        return true;
+    }
+
+    if (/[？?]/.test(value)) {
+        return true;
+    }
+
+    if (countTopLevelQuestionParts(value) >= 1) {
+        return true;
+    }
+
+    const compact = value
+        .replace(/^[#>*\s]+/, "")
+        .trim();
+
+    const starts = [
+        "设",
+        "已知",
+        "给定",
+        "求",
+        "证明",
+        "计算",
+        "判断",
+        "写出",
+        "列出",
+        "选择",
+        "填空",
+        "解答",
+        "下列",
+        "从下列",
+        "从以下",
+        "若",
+        "问",
+        "什么是",
+        "为什么",
+        "为何",
+        "如何",
+        "怎样"
+    ];
+
+    if (
+        starts.some(item => compact.startsWith(item))
+        && compact.length >= 4
+    ) {
+        return true;
+    }
+
+    if (/^(?:let|given|suppose|find|compute|calculate|determine|prove|show\s+that|list|choose|select)\b/i.test(compact)
+        && compact.length >= 10) {
+        return true;
+    }
+
+    if (
+        /(?:多少|是否|哪个|哪些|为何|为什么|如何|怎样|求出|求证|求值|求解)/.test(compact)
+        && compact.length >= 6
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+function isConversationControlOnly(text) {
+    const value = String(text || "")
+        .trim()
+        .replace(/\s+/g, "");
+
+    if (!value) return true;
+
+    if (isQuestionNavigationFollowUp(value)) {
+        return true;
+    }
+
+    const exact = [
+        "不会做",
+        "不会",
+        "不知道",
+        "继续",
+        "下一步",
+        "下一步呢",
+        "然后呢",
+        "好的",
+        "好",
+        "谢谢",
+        "懂了",
+        "再提示一下",
+        "给我提示",
+        "完整解析",
+        "给我完整解析",
+        "直接给答案",
+        "告诉我答案",
+        "出一道题",
+        "给我出一道题",
+        "再来一道"
+    ];
+
+    if (exact.includes(value)) {
+        return true;
+    }
+
+    return Boolean(
+        value.length <= 36
+        && (
+            isExerciseRequestText(value)
+            || /^(?:帮我|给我|请|再)?(?:讲一下|解释一下|继续讲|看一下|检查一下|提示一下)/.test(value)
+        )
+    );
+}
+
+function extractAiQuestionPayload(text) {
+    let value = String(text || "").trim();
+
+    if (!value) return "";
+
+    value = removeConversationalQuestionPrefix(value);
+    value = cutQuestionAfterMetaSections(value);
+    value = stripQuestionDecorations(value);
+
+    return value.trim();
+}
+
+function extractQuestionReviewPayload(text) {
+    const source = String(text || "").trim();
+
+    if (!source) return "";
+
+    const marker = "【题目回顾】";
+    const markerIndex = source.indexOf(marker);
+
+    if (markerIndex < 0) {
+        return source;
+    }
+
+    let value = source
+        .slice(markerIndex + marker.length)
+        .trim();
+
+    // “题目回顾”之后的分步讲解绝不能进入错题本。
+    // 只保留回顾里的原始题干，遇到第一步/开始讲解就截断。
+    const stopPatterns = [
+        /(?:^|\n)\s*(?:[-—_=]{3,}\s*\n\s*)?(?:#{1,6}\s*)?第\s*(?:[一二三四五六七八九十]+|\d+)\s*步\s*[:：]?/m,
+        /(?:^|\n)\s*(?:[-—_=]{3,}\s*\n\s*)?(?:#{1,6}\s*)?(?:开始讲解|下面开始讲解|解题过程|详细讲解)\s*[:：]?/m
+    ];
+
+    let end = value.length;
+
+    for (const pattern of stopPatterns) {
+        const match = pattern.exec(value);
+        if (match && match.index < end) {
+            end = match.index;
+        }
+    }
+
+    return value
+        .slice(0, end)
+        .replace(/(?:\n\s*[-—_=]{3,}\s*)+$/, "")
+        .trim();
+}
+
+function sanitizeStoredWrongQuestionText(text) {
+    let value = String(text || "").trim();
+
+    if (!value) return "";
+
+    if (value.includes("【题目回顾】")) {
+        value = extractQuestionReviewPayload(value);
+    }
+
+    if (value.includes("【题目文字】")) {
+        value = extractOcrQuestionPayload(value);
+    } else {
+        value = removeConversationalQuestionPrefix(value);
+        value = cutQuestionAfterMetaSections(value);
+        value = stripQuestionDecorations(value);
+
+        // 第二遍是刻意的：标题/Markdown 装饰被去掉后，
+        // 原先被遮住的“思路提示/答案/解析”标题也必须继续截掉。
+        value = cutQuestionAfterMetaSections(value);
+        value = stripQuestionDecorations(value);
+    }
+
+    // 旧版可能把一整段纯讲解存进错题本；明确无题干时直接丢弃。
+    if (
+        isClearlyNonQuestionWrongBookText(value)
+        && !looksLikeQuestionPayload(value)
+    ) {
+        return "";
+    }
+
+    return limitQuestionText(value).trim();
+}
+
+function extractQuestionOnlyFromMessage(message) {
+    if (
+        !message
+        || typeof message.text !== "string"
+    ) {
+        return "";
+    }
+
+    if (message.role === "user") {
+        if (message.source === "ocr") {
+            return extractOcrQuestionPayload(
+                message.text
+            );
+        }
+
+        return cutQuestionAfterMetaSections(
+            message.text
+        );
+    }
+
+    if (message.role === "ai") {
+        const generated = String(
+            message.generatedQuestion || ""
+        ).trim();
+
+        if (generated) {
+            return sanitizeStoredWrongQuestionText(
+                generated
+            );
+        }
+
+        return extractAiQuestionPayload(
+            message.text
+        );
+    }
+
+    return "";
+}
+
+function hasExplicitQuestionHeading(text) {
+    const value = String(text || "");
+    if (/(?:^|\n)[ \t]*(?:#{1,6}[ \t]+(?:Question|Exercise|Problem)[ \t]*:?[ \t]*(?:\n|$)|(?:\*\*|__)(?:Question|Exercise|Problem)[ \t]*:?(?:\*\*|__)[ \t]*(?:\n|$))/im.test(value)) return true;
+    if (/(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?(?:\[(?:Question|Exercise|Problem)\]|(?:Question|Exercise|Problem)\s*[:：])(?:\*\*|__)?/im.test(value)) return true;
+
+    return Boolean(
+        /【(?:题目|练习题)】/.test(value)
+        || /(?:^|\n)\s*(?:题目|练习题)\s*[:：]?\s*(?:\n|$)/m.test(value)
+        || /(?:^|\n)\s*#{1,4}\s*(?:题目|练习题)\s*(?:\n|$)/m.test(value)
+        || /(?:^|\n)\s*\*\*(?:题目|练习题)[:：]?\*\*/m.test(value)
+    );
+}
+
+function looksLikeStandaloneAiQuestion(text) {
+    const value = String(text || "").trim();
+
+    if (
+        !value
+        || isClearlyNonQuestionWrongBookText(value)
+    ) {
+        return false;
+    }
+
+    const question = sanitizeStoredWrongQuestionText(
+        extractAiQuestionPayload(value)
+    );
+
+    if (!question) {
+        return false;
+    }
+
+    if (hasExplicitQuestionHeading(value)) {
+        return looksLikeQuestionPayload(question);
+    }
+
+    // 没有“题目”标题时：
+    // 多小问综合题可以认；单题则必须从明确题干开头起步。
+    if (countTopLevelQuestionParts(question) >= 2) {
+        return looksLikeQuestionPayload(question);
+    }
+
+    const compact = question
+        .replace(/^[#>*\s]+/, "")
+        .trim();
+
+    return Boolean(
+        /^(?:设|已知|给定|下列|求|证明|计算|判断|写出|列出|选择|填空)/.test(compact)
+        && looksLikeQuestionPayload(question)
+    );
+}
+
+
+function shouldOfferWrongBookAction(
+    message,
+    session = null,
+    messageIndex = -1
+) {
+    if (
+        !message
+        || message.isError
+        || message.isNotice
+        || typeof message.text !== "string"
+        || !message.text.trim()
+    ) {
+        return false;
+    }
+
+    if (message.role === "user") {
+        if (message.isRetestAnswer) {
+            return false;
+        }
+
+        // “出一道题 / 随便来一道 / 给我个困难题”等是命令，
+        // 永远不能出现“记为错题”。
+        if (isExerciseRequestText(message.text)) {
+            return false;
+        }
+
+        // 普通手动输入和粘贴始终是聊天内容，不自动标为错题。
+        // OCR 是否为题目由核对页决定，AI 出题走下方独立分支。
+        return message.source === "ocr"
+            ? isRecordableOcrQuestionMessage(message)
+            : message.manualIsQuestion === true;
+    }
+
+    if (message.role === "ai") {
+        // 新版本 AI 出题使用强元数据。只要后端已经登记 generatedQuestion，
+        // 就无条件允许加入错题本，不再让题型启发式有机会把真题挡掉。
+        const trustedGenerated = sanitizeStoredWrongQuestionText(
+            message.generatedQuestion || ""
+        );
+
+        if (trustedGenerated) {
+            // generatedQuestion 本身就是强元数据。只要题干已经登记，
+            // 就必须允许加入错题本；不再依赖 generatedExercise 布尔位。
+            return true;
+        }
+
+        // 兼容旧记录：只有上一条用户明确要求出题时，才从 AI 回复恢复题干。
+        const generated = recoverGeneratedQuestionFromAssistant(
+            session,
+            messageIndex,
+            message
+        );
+
+        return Boolean(
+            generated
+            && looksLikeQuestionPayload(generated)
+        );
+    }
+
+    return false;
+}
+
+
+function splitQuestionBankText(text) {
+    const source = String(text || "").trim();
+
+    if (!source) return [];
+
+    const lines = source.split(/\r?\n/);
+    const blocks = [];
+    let current = null;
+
+    const pushCurrent = () => {
+        if (!current) return;
+
+        const raw = current.lines
+            .join("\n")
+            .trim();
+
+        if (!raw) {
+            current = null;
+            return;
+        }
+
+        const answerMatch = raw.match(
+            /(?:^|\n)\s*答\s*[:：]\s*([^\n]*)/m
+        );
+
+        const referenceAnswer = answerMatch
+            ? answerMatch[1].trim()
+            : "";
+
+        const question = raw
+            .replace(
+                /(?:^|\n)\s*答\s*[:：]\s*[^\n]*/m,
+                ""
+            )
+            .trim();
+
+        blocks.push({
+            number: current.number,
+            question,
+            referenceAnswer
+        });
+
+        current = null;
+    };
+
+    for (const line of lines) {
+        const match = line.match(
+            /^\s*(\d{1,2})\s*[、.．]\s*(.*)$/
+        );
+
+        if (match) {
+            pushCurrent();
+
+            current = {
+                number: match[1],
+                lines: [
+                    `${match[1]}、${match[2]}`
+                ]
+            };
+
+            continue;
+        }
+
+        if (current) {
+            current.lines.push(line);
+        }
+    }
+
+    pushCurrent();
+
+    if (blocks.length < 2) {
+        return [];
+    }
+
+    const answerCount = blocks.filter(
+        item => item.referenceAnswer
+    ).length;
+
+    const bankSignal = /题库答案|题库|选择或填空|练习答案|习题答案/.test(
+        source
+    );
+
+    // 避免把“一个大题里的 1/2 两个小问”错误拆开：
+    // 只有多个独立答案，或明显是题库且至少 3 题时才判为题组。
+    const isQuestionBank = (
+        answerCount >= 2
+        || (
+            bankSignal
+            && blocks.length >= 3
+        )
+    );
+
+    if (!isQuestionBank) {
+        return [];
+    }
+
+    return blocks
+        .filter(item => item.question)
+        .slice(0, 30);
+}
+
+function isExerciseRequestText(text) {
+    return Boolean(window.DMateExerciseIntent?.classify(text).is_exercise);
+}
+
+function exerciseTopicReference(text) {
+    const value = String(text || "");
+    const topics = [
+        ["谓词逻辑", /谓词逻辑|谓词|量词|个体域|辖域|前束范式/],
+        ["命题逻辑", /命题逻辑|命题|真值表|逻辑联结词|主析取|主合取|范式/],
+        ["证明与归纳", /证明与归纳|数学归纳|强归纳|反证法|反证|直接证明/],
+        ["初等数论", /初等数论|数论|整除|素数|质数|同余|最大公(?:约|因)数|欧几里得|RSA/],
+        ["计数与组合", /计数与组合|组合|排列|鸽巢|容斥|计数/],
+        ["递推关系", /递推关系|递推|递归|生成函数/],
+        ["图论", /图论|图.{0,12}同构|同构.{0,12}图|邻接矩阵|欧拉(?:图|通路|回路)|哈密顿|最短路|生成树|顶点|边/],
+        ["代数结构", /代数结构|半群|幺半群|子群|同态|同构|布尔代数|环|域|格/],
+        ["函数", /函数|映射|单射|满射|双射|逆函数|复合函数/],
+        ["关系", /二元关系|偏序|等价关系|关系闭包|哈斯图|自反|反自反|对称|反对称|传递/],
+        ["集合", /集合|子集|幂集|交集|并集|补集/]
+    ];
+    return topics.find(([, pattern]) => pattern.test(value))?.[0] || "";
+}
+
+function hasExplicitExerciseReferenceCue(text) {
+    const value = normalizeQuestionReferenceText(text);
+
+    return Boolean(
+        /(?:和|与|根据|基于|参考|按照|照着|仿照).{0,24}(?:第[零一二三四五六七八九十两\d]+题|倒数第|上一|下一|前一|后一|最后|最开始|最早)/.test(value)
+        || /(?:第[零一二三四五六七八九十两\d]+题|倒数第[零一二三四五六七八九十两\d]+题|上一道题|上一题|下一道题|下一题|最后一道题|最后一题).{0,10}(?:的)?(?:同知识点|同类|同类型|类似|相似|复测)/.test(value)
+    );
+}
+
+function isNextExerciseContinuationRequest(text) {
+    const value = normalizeQuestionReferenceText(text).replace(/[。.!！?？]+$/, "");
+
+    return /^(?:请|麻烦)?(?:给我|帮我)?(?:出|生成|来)?(?:下一道题|下一题|下一个题|下一道)(?:吧|呢)?$/.test(
+        value
+    );
+}
+
+function isContextualExerciseRequest(text) {
+    if (!isExerciseRequestText(text)) return false;
+
+    const value = normalizeQuestionReferenceText(text).replace(/[。.!！?？]+$/, "");
+
+    const structural = structuralQuestionReference(value);
+
+    if (structural && hasExplicitExerciseReferenceCue(value)) {
+        return true;
+    }
+
+    if (namedQuestionTopicReference(value)) {
+        return true;
+    }
+
+    const deicticQuestion = /(?:这|那)(?:一)?(?:道|个)?(?:大)?题(?:目)?|(?:刚才|之前|前面|上面)(?:的)?(?:这|那|一)?(?:道|个)?(?:大)?题(?:目)?/.test(
+        value
+    );
+
+    if (deicticQuestion) {
+        return true;
+    }
+
+    // 用户已经明确给出新主题/知识点时，直接按新主题出题，
+    // 不因为“同知识点”这几个字就强行寻找旧题。
+    if (exerciseTopicReference(value)) {
+        return false;
+    }
+
+    if (/(?:同(?:样|一)?|相同)(?:的)?(?:知识点|考点|题型|类型)|同类|同类型|类似|相似|变式|改编|换(?:一下|一组|个)?(?:数字|数据|条件)/.test(value)) {
+        return true;
+    }
+
+    // 只有明确的“再来/换/重新”等续题动作才可能依赖旧题。
+    // “出一道难题/出一道很难的题”是独立生成命令，绝不能在无历史题时
+    // 被拦在前端；无主题由后端自由选择知识点。
+    if (
+        !/(?:随机|随便)/.test(value)
+        && /^(?:请|麻烦)?(?:给我|帮我)?(?:再来|再出|再给|再整|再弄|换|重新来|重新出)(?:个|道|一道|一个)?(?:简单|基础|入门|容易|轻松|中等|适中|普通|一般|困难|高难|难|挑战|复杂)(?:难度)?(?:点|一点|一些|点儿|的)?(?:题|练习)?(?:吧)?$/.test(value)
+    ) {
+        return true;
+    }
+
+    // “给我下一道题 / 出下一题 / 下一题”都属于继续当前练习序列；
+    // 若是裸“下一题”且历史里确实存在后一道题，send() 会优先导航，不会走出题。
+    if (
+        isNextExerciseContinuationRequest(value)
+        || /^(?:下一道)$/.test(value)
+    ) {
+        return true;
+    }
+
+    // Quantity, question type and polite endings may vary; the shared
+    // classifier has already excluded answers, negation and quoted commands.
+    return /^(?:请|麻烦)?(?:给我|帮我)?(?:再(?:来|出|给|整|弄)|重新(?:来|出)|换|继续(?:出题|练习)|接着出题)/.test(value)
+        || /^(?:please)?(?:another|onemore|nextquestion|nextproblem|give(?:me)?another)/i.test(value);
+}
+
+function resolveExerciseReference(session, text) {
+    if (!isContextualExerciseRequest(text)) return null;
+
+    const value = normalizeQuestionReferenceText(text);
+    const structural = structuralQuestionReference(value);
+
+    if (structural && hasExplicitExerciseReferenceCue(value)) {
+        return resolveStructuralQuestionCandidate(
+            session,
+            value
+        );
+    }
+
+    const named = resolveNamedQuestionCandidate(session, value);
+    if (named) {
+        return named;
+    }
+
+    // “给我下一道题 / 出下一题 / 裸下一题”都以当前题作为继续练习的参照；
+    // “下一题不太会/讲下一题”则属于导航，不会进入这个分支。
+    if (
+        isNextExerciseContinuationRequest(value)
+        || /^(?:下一道)$/.test(value)
+    ) {
+        return activeQuestionCandidateFromHistory(session)
+            || currentQuestionCandidateFromLearningState(session);
+    }
+
+    return activeQuestionCandidateFromHistory(session)
+        || currentQuestionCandidateFromLearningState(session);
+}
+
+function extractAiGeneratedExerciseText(reply) {
+    let text = String(reply || "").trim();
+
+    if (!text) return "";
+
+    const headingPatterns = [
+        /(?:^|\n)[ \t]*(?:#{1,6}[ \t]+(?:Question|Exercise|Problem)[ \t]*:?[ \t]*(?:\n|$)|(?:\*\*|__)(?:Question|Exercise|Problem)[ \t]*:?(?:\*\*|__)[ \t]*(?:\n|$))/im,
+        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?\[(?:Question|Exercise|Problem)\]\s*(?:\*\*|__)?\s*/im,
+        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*|__)?(?:Question|Exercise|Problem)\s*[:：]\s*(?:\*\*|__)?\s*/im,
+        /【题目】/,
+        /【练习题】/,
+        /(?:^|\n)#{1,4}\s*(?:题目|练习题)\s*(?:\n|$)/m,
+        /(?:^|\n)\*\*(?:题目|练习题)[:：]?\*\*\s*/m,
+        /(?:^|\n)\s*(?:题目|练习题)\s*[:：]?\s*(?:\n|$)/m
+    ];
+
+    let bestIndex = -1;
+    let bestLength = 0;
+
+    for (const pattern of headingPatterns) {
+        const match = pattern.exec(text);
+
+        if (
+            match
+            && (
+                bestIndex < 0
+                || match.index < bestIndex
+            )
+        ) {
+            bestIndex = match.index;
+            bestLength = match[0].length;
+        }
+    }
+
+    if (bestIndex >= 0) {
+        text = text.slice(
+            bestIndex + bestLength
+        ).trim();
+    }
+
+    // 练习题回答通常在题目后附“提示”。错题本只保存题目正文。
+    const hintMatch = text.match(
+        /\n\s*(?:---+\s*\n\s*)?(?:\*\*)?(?:提示|思考提示|解题提示|小提示)[:：]?(?:\*\*)?/i
+    );
+
+    if (hintMatch && typeof hintMatch.index === "number") {
+        text = text.slice(0, hintMatch.index).trim();
+    }
+
+    return limitQuestionText(cutQuestionAfterMetaSections(text));
+}
+
+function completeQuestionTextFromChatMessage(
+    message,
+    session = null,
+    messageIndex = -1
+) {
+    if (
+        !message
+        || message.isError
+        || message.isNotice
+        || typeof message.text !== "string"
+        || !message.text.trim()
+    ) {
+        return "";
+    }
+
+    // 纯指令、短追问、寒暄都不是“完整题目”。
+    if (
+        isExerciseRequestText(message.text)
+        || isConversationControlOnly(message.text)
+        || (
+            isShortLearningFollowUp(message.text)
+            && !(message.role === "user" && message.manualIsQuestion === true)
+        )
+    ) {
+        return "";
+    }
+
+    let question = "";
+
+    if (message.role === "ai") {
+        // AI 消息严格收口：
+        // 1) 后端登记的 generatedQuestion / 由“上一条明确出题请求”恢复出的题；
+        // 2) 消息本身明确带【题目】/题目标题，并且提取后确实像完整题。
+        // 普通讲解、寒暄、提到“当前题目/度序列”等都不能出现复制按钮。
+        question = recoverGeneratedQuestionFromAssistant(
+            session,
+            messageIndex,
+            message
+        );
+
+        if (!question && hasExplicitQuestionHeading(message.text)) {
+            question = sanitizeStoredWrongQuestionText(
+                extractAiQuestionPayload(message.text)
+            );
+        }
+
+        if (!question) return "";
+
+        return looksLikeQuestionPayload(question)
+            ? question
+            : "";
+    }
+
+    // 用户明确选“是题目”时，也允许使用原有的题目图片复制。
+    if (message.role !== "user" || !(
+        message.source === "ocr"
+            ? isRecordableOcrQuestionMessage(message)
+            : message.manualIsQuestion === true
+    )) {
+        return "";
+    }
+
+    return sanitizeStoredWrongQuestionText(
+        extractQuestionOnlyFromMessage(message)
+    );
+}
+
+function buildQuestionCopyElement(question) {
+    const root = document.createElement("div");
+    root.className = "ai-content";
+    root.setAttribute("data-i18n-content", "");
+    root.innerHTML = markdownToHtml(prepareAiDisplayText(question));
+    return root;
+}
+
+async function prepareTypesetQuestionCopy(question) {
+    const root = buildQuestionCopyElement(question);
+    const holder = document.createElement("div");
+    holder.style.position = "absolute";
+    holder.style.top = "0";
+    holder.style.left = "-100000px";
+    holder.style.width = "860px";
+    holder.appendChild(root);
+    document.body.appendChild(holder);
+    try {
+        // Copy-only isolated node: never re-typeset or replace the live chat DOM.
+        if (window.MathJax?.typesetPromise) {
+            await window.MathJax.typesetPromise([root]);
+        }
+        return buildClipboardPayload(root);
+    } finally {
+        holder.remove();
+    }
+}
+
+async function copyChatQuestionOnly(message, session, messageIndex) {
+    const question = completeQuestionTextFromChatMessage(
+        message, session, messageIndex
+    );
+    if (!question) return false;
+    // “复制”始终代表视觉图片，跟题目是否包含公式无关。
+    // 纯文本复制由每条聊天都有的双矩形图标承担；不再混淆两种行为。
+    return copyRenderedImageToClipboard(() => buildQuestionCopyElement(question));
+}
+
+function shouldShowChatCopyButton(message, session, messageIndex) {
+    return Boolean(
+        completeQuestionTextFromChatMessage(
+            message,
+            session,
+            messageIndex
+        )
+    );
+}
+
+// 任何一条聊天都能复制可编辑文本。只写 text/plain，杜绝 MathJax 的
+// SVG/HTML 被微信误识别为多个 .dat 附件；不修改页面的公式渲染或选区。
+async function copyChatMessageText(message, content) {
+    if (!message || !content) return false;
+    let text = "";
+    try {
+        text = clipboardPlainTextFromRoot(cloneClipboardRoot(content));
+    } catch (error) {
+        console.warn("提取已渲染聊天文本失败：", error);
+    }
+    text = String(text || readableMathClipboardText(message.text || "")).trim();
+    if (!text) {
+        showCopyToast("没有可复制的文本");
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            showCopyToast("已复制文本");
+            return true;
+        }
+    } catch (error) {
+        console.warn("文本剪贴板写入失败，尝试兼容复制：", error);
+    }
+
+    const selection = window.getSelection();
+    const oldRanges = [];
+    if (selection) {
+        for (let i = 0; i < selection.rangeCount; i += 1) {
+            oldRanges.push(selection.getRangeAt(i).cloneRange());
+        }
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.readOnly = true;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-100000px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    let ok = false;
+    try {
+        textarea.select();
+        ok = document.execCommand("copy");
+    } finally {
+        textarea.remove();
+        if (selection) {
+            selection.removeAllRanges();
+            oldRanges.forEach(range => selection.addRange(range));
+        }
+    }
+    showCopyToast(ok ? "已复制文本" : "无法访问剪贴板，请手动选择复制");
+    return ok;
+}
+
+function createChatTextCopyButton(onCopy) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "rich-copy-smart chat-text-copy";
+    button.title = "复制这条消息的可编辑文本";
+    button.setAttribute("aria-label", "复制文本");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.8");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    const back = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    back.setAttribute("x", "8"); back.setAttribute("y", "8");
+    back.setAttribute("width", "12"); back.setAttribute("height", "12");
+    back.setAttribute("rx", "2");
+    const front = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    front.setAttribute("d", "M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2");
+    svg.append(back, front);
+    button.appendChild(svg);
+    button.addEventListener("click", () => {
+        Promise.resolve(onCopy()).catch(error => {
+            console.warn("文本复制失败：", error);
+            showCopyToast("文本复制失败");
+        });
+    });
+    return button;
+}
+
+function recoverGeneratedQuestionFromAssistant(
+    session,
+    messageIndex,
+    message
+) {
+    if (
+        !message
+        || message.role !== "ai"
+        || message.isError
+        || message.isNotice
+        || typeof message.text !== "string"
+    ) {
+        return "";
+    }
+
+    let generated = sanitizeStoredWrongQuestionText(
+        message.generatedQuestion || ""
+    );
+
+    if (generated) {
+        return generated;
+    }
+
+    const previous = previousUserMessageBefore(
+        session,
+        messageIndex
+    );
+
+    if (
+        !previous
+        || !isExerciseRequestText(previous.text)
+        || (previous.targetQuestionFingerprint && !hasExplicitExerciseGenerationCue(previous.text))
+    ) {
+        return "";
+    }
+
+    generated = extractRecoverableGeneratedQuestion(message.text);
+    if (!generated) return "";
+
+    // 兼容旧记录 / 后端没有返回 generated_question 的情况。
+    // 只在上一条用户消息明确要求“出题”时恢复，避免把普通讲解误判成题目。
+    message.generatedExercise = true;
+    message.generatedQuestion = generated;
+
+    return generated;
+}
+
+function extractRecoverableGeneratedQuestion(reply) {
+    const question = sanitizeStoredWrongQuestionText(extractAiGeneratedExerciseText(reply));
+    return question && looksLikeQuestionPayload(question)
+        && !isGeneratedExerciseClarification(reply, question) ? question : "";
+}
+
+function isGeneratedExerciseClarification(reply, question) {
+    const body = String(question || "").replace(/^[#>*\s]+/, "").trim();
+    // A question mark alone does not make a generated exercise: requests for
+    // topic/difficulty, retry notices and explanations are ordinary replies.
+    const prompt = body.replace(/^(?:好的|可以|没问题|请问)[,，。!！\s]*/, "");
+    if (/^(?:你(?:想|希望|需要|要不要)|请(?:先)?(?:告诉我|选择|提供|说明)|需要我|想练|要不要)[^。！？?\n]{0,50}(?:方向|章节|知识点|题型|难度|简单题|困难题)/.test(prompt)) return true;
+    if (/^你(?:想|希望|需要)(?:先|要)?(?:练|学|做)[^。！？?\n]{0,30}(?:吗|呢|什么|哪)/.test(prompt)) return true;
+    if (/^(?:抱歉|对不起|暂时(?:无法|不能)|未能(?:生成|完成)|生成失败)/.test(prompt)) return true;
+    if (/^(?:目前|现在|暂时|本次)?(?:我)?(?:无法|不能|未能|没有成功).{0,30}(?:生成|出题|完成请求)/.test(body)) return true;
+    if (/^(?:(?:sorry|sure|okay)[,!.\s]*)?(?:what(?:\s+\w+){0,4}\s+(?:topic|difficulty)|which\s+(?:topic|subject|difficulty)|would\s+you\s+like|(?:could\s+you\s+(?:tell|provide)|please\s+(?:choose|specify)).{0,40}(?:topic|subject|difficulty|level)|i\s+(?:cannot|can't|couldn't|am\s+unable))/i.test(body)) return true;
+    if (!hasExplicitQuestionHeading(reply) && (
+        isClearlyNonQuestionWrongBookText(reply)
+        || /^(?:这(?:一)?道题|上(?:一)?道题|上一题|刚才那题).{0,12}(?:答案|解析|考查|思路|做法|解法|解答|为什么)/.test(body)
+        || /^(?:第[一二三四五六七八九十\d]+步|解题步骤|解题思路|先看(?:一下)?这道题)[：:，,\s]/.test(body)
+    )) return true;
+    return false;
+}
+
+function openWrongQuestionPicker(questionInfo, choices) {
+    const modal = document.getElementById(
+        "wrongQuestionPickerModal"
+    );
+    const list = document.getElementById(
+        "wrongQuestionPickerList"
+    );
+
+    if (!modal || !list || !choices.length) {
+        return false;
+    }
+
+    pendingWrongQuestionSelection = {
+        questionInfo,
+        choices
+    };
+
+    list.innerHTML = "";
+
+    choices.forEach((choice, index) => {
+        const label = document.createElement("label");
+        label.className = "wrong-picker-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = String(index);
+
+        const content = document.createElement("div");
+        content.className = "wrong-picker-content";
+
+        const title = document.createElement("div");
+        title.className = "wrong-picker-title";
+        title.textContent = `第 ${choice.number} 题`;
+
+        const preview = document.createElement("div");
+        preview.className = "wrong-picker-preview";
+        preview.setAttribute("data-i18n-content", "");
+        preview.textContent = choice.question
+            .replace(/\s+/g, " ")
+            .slice(0, 180);
+
+        content.appendChild(title);
+        content.appendChild(preview);
+
+        if (choice.referenceAnswer) {
+            const answer = document.createElement("div");
+            answer.className = "wrong-picker-answer";
+            answer.textContent = `题库参考答案：${choice.referenceAnswer}`;
+            content.appendChild(answer);
+        }
+
+        label.appendChild(checkbox);
+        label.appendChild(content);
+        list.appendChild(label);
+    });
+
+    modal.classList.remove("hidden");
+    return true;
+}
+
+function closeWrongQuestionPicker() {
+    const modal = document.getElementById(
+        "wrongQuestionPickerModal"
+    );
+
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+
+    pendingWrongQuestionSelection = null;
+}
+
+function normalizeWrongSafeItem(questionInfo) {
+    if (!questionInfo || typeof questionInfo !== "object") {
+        return null;
+    }
+
+    const cleaned = sanitizeStoredWrongQuestionText(
+        questionInfo.text
+    ).trim();
+
+    if (!cleaned) {
+        return null;
+    }
+
+    return {
+        ...questionInfo,
+        text: cleaned
+    };
+}
+
+function openWrongSafePreview(items) {
+    const modal = document.getElementById(
+        "wrongSafeModal"
+    );
+
+    if (!modal) {
+        return false;
+    }
+
+    const sourceItems = Array.isArray(items)
+        ? items
+        : [items];
+
+    pendingWrongSafeItems = sourceItems
+        .map(normalizeWrongSafeItem)
+        .filter(Boolean);
+
+    pendingWrongSafeIndex = 0;
+
+    if (!pendingWrongSafeItems.length) {
+        window.alert(
+            "没有提取到可保存的题目内容"
+        );
+        return false;
+    }
+
+    modal.classList.remove("hidden");
+    renderWrongSafePreview();
+    return true;
+}
+
+function clearWrongSafeQuestionPreview() {
+    wrongSafePreviewRevision += 1;
+    clearTimeout(wrongSafePreviewTimer);
+    wrongSafePreviewTimer = null;
+    const preview = document.getElementById("wrongSafePreview");
+    window.DMateAIAnswer.clear(preview);
+    preview?.removeAttribute("aria-busy");
+}
+
+function updateWrongSafeQuestionPreview(delay = 0) {
+    const revision = ++wrongSafePreviewRevision;
+    clearTimeout(wrongSafePreviewTimer);
+    const modal = document.getElementById("wrongSafeModal");
+    const textarea = document.getElementById("wrongSafeQuestion");
+    const preview = document.getElementById("wrongSafePreview");
+    if (!preview || !textarea || !modal || modal.classList.contains("hidden")) return;
+
+    const source = textarea.value;
+    const isCurrent = () => revision === wrongSafePreviewRevision
+        && !modal.classList.contains("hidden") && textarea.value === source;
+    preview.setAttribute("aria-busy", "true");
+    // Keep the previous typeset preview visible while the latest edit is
+    // prepared. Input invalidates older work before the debounce expires.
+    wrongSafePreviewTimer = setTimeout(async () => {
+        wrongSafePreviewTimer = null;
+        if (!isCurrent()) return;
+        const stage = document.createElement("div");
+        stage.className = "wrong-safe-preview reply-render-stage";
+        stage.setAttribute("aria-hidden", "true");
+        stage.style.width = `${preview.getBoundingClientRect().width}px`;
+        const content = document.createElement("div");
+        content.className = "wrong-safe-rendered";
+        stage.appendChild(content);
+        document.body.appendChild(stage);
+        try {
+            const ready = await window.DMateAIAnswer.render(content, prepareAiDisplayText(source), {isCurrent});
+            if (ready && isCurrent()) {
+                window.DMateAIAnswer.clear(preview);
+                preview.replaceChildren(content);
+            }
+        } finally {
+            // The visible content has already moved out of the staging node.
+            window.DMateAIAnswer.clear(stage);
+            stage.remove();
+            if (isCurrent()) preview.removeAttribute("aria-busy");
+        }
+    }, delay);
+}
+
+function renderWrongSafePreview() {
+    const modal = document.getElementById(
+        "wrongSafeModal"
+    );
+    const textarea = document.getElementById(
+        "wrongSafeQuestion"
+    );
+    const progress = document.getElementById(
+        "wrongSafeProgress"
+    );
+
+    if (
+        !modal
+        || !textarea
+        || !pendingWrongSafeItems.length
+    ) {
+        return;
+    }
+
+    const item = pendingWrongSafeItems[
+        pendingWrongSafeIndex
+    ];
+
+    clearWrongSafeQuestionPreview();
+    textarea.value = item.text;
+    updateWrongSafeQuestionPreview();
+
+    if (progress) {
+        progress.textContent = (
+            pendingWrongSafeItems.length > 1
+                ? `第 ${pendingWrongSafeIndex + 1} / ${pendingWrongSafeItems.length} 道`
+                : "请确认下面就是要保存的题目"
+        );
+    }
+
+    modal.querySelector(".wrong-safe-body").scrollTop = 0;
+}
+
+function closeWrongSafePreview() {
+    clearWrongSafeQuestionPreview();
+    const modal = document.getElementById(
+        "wrongSafeModal"
+    );
+
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+
+    pendingWrongSafeItems = [];
+    pendingWrongSafeIndex = 0;
+}
+
+function confirmWrongSafePreview() {
+    const textarea = document.getElementById(
+        "wrongSafeQuestion"
+    );
+
+    if (
+        !textarea
+        || !pendingWrongSafeItems.length
+    ) {
+        return;
+    }
+
+    const text = textarea.value.trim();
+
+    if (!text) {
+        window.alert(
+            "题目不能为空。请保留题目正文，或者取消本次加入"
+        );
+        return;
+    }
+
+    const item = pendingWrongSafeItems[
+        pendingWrongSafeIndex
+    ];
+
+    addQuestionInfoToWrongBook({
+        ...item,
+        text,
+        safeConfirmed: true
+    });
+
+    pendingWrongSafeIndex += 1;
+
+    if (
+        pendingWrongSafeIndex
+        < pendingWrongSafeItems.length
+    ) {
+        renderWrongSafePreview();
+        return;
+    }
+
+    const total = pendingWrongSafeItems.length;
+
+    closeWrongSafePreview();
+    renderLearningSummary();
+    showCopyToast(total > 1 ? `已记录 ${total} 道错题` : "已加入错题本");
+}
+
+
+function addQuestionInfoToWrongBook(questionInfo) {
+    const result = addWrongQuestion(
+        questionInfo,
+        "这道题已加入错题本",
+        "manual"
+    );
+
+    saveState();
+    renderLearningSummary();
+    renderWrongBook();
+
+    return result;
+}
+
+function confirmWrongQuestionPicker() {
+    const pending = pendingWrongQuestionSelection;
+
+    if (!pending) return;
+
+    const checked = [
+        ...document.querySelectorAll(
+            "#wrongQuestionPickerList input[type='checkbox']:checked"
+        )
+    ];
+
+    if (!checked.length) {
+        window.alert("请至少选择一道题");
+        return;
+    }
+
+    const items = [];
+
+    for (const checkbox of checked) {
+        const index = Number(checkbox.value);
+        const choice = pending.choices[index];
+
+        if (!choice) continue;
+
+        items.push({
+            ...pending.questionInfo,
+            text: choice.question,
+            referenceAnswer: choice.referenceAnswer || ""
+        });
+    }
+
+    closeWrongQuestionPicker();
+
+    if (items.length) {
+        openWrongSafePreview(items);
+    }
+}
+
+
+
+function inferAnswerAssessment(reply) {
+    let text = String(reply || "").replace(/\s+/g, " ").trim();
+
+    if (!text) return "unknown";
+
+    const strongPositive = [
+        "完全正确",
+        "这次作答正确",
+        "作答正确",
+        "答案正确",
+        "结果正确",
+        "计算正确",
+        "没有错误",
+        "没有问题",
+        "没错",
+        "是对的"
+    ];
+
+    const hasPositive = strongPositive.some(
+        phrase => text.includes(phrase)
+    );
+
+    for (const phrase of strongPositive) {
+        text = text.split(phrase).join("");
+    }
+
+    const negative = [
+        "不正确",
+        "这次作答有错误",
+        "作答有错误",
+        "答案有误",
+        "结果有误",
+        "存在错误",
+        "这里错了",
+        "这一步错",
+        "算错",
+        "写错",
+        "错误在",
+        "最早出错",
+        "不成立",
+        "需要修改",
+        "需要纠正",
+        "有一个错误",
+        "有一处错误"
+    ];
+
+    if (negative.some(phrase => text.includes(phrase))) {
+        return "wrong";
+    }
+
+    return hasPositive ? "correct" : "unknown";
+}
+
+function compactFeedback(text) {
+    return String(text || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 1000);
+}
+
+function wrongQuestionFingerprint(question) {
+    return String(question || "")
+        .toLowerCase()
+        .replace(/[【】\[\]（）()，,。.!！?？:：;；"'“”‘’`]/g, "")
+        .replace(/\s+/g, "")
+        .slice(0, 1600);
+}
+
+function visibleWrongQuestionFingerprint(question) {
+    const raw = String(question || "");
+    const fast = wrongQuestionFingerprint(raw);
+
+    try {
+        const temp = document.createElement("div");
+        temp.setAttribute("data-i18n-content", "");
+        temp.innerHTML = markdownToHtml(raw);
+        const rendered = String(temp.textContent || temp.innerText || "")
+            .toLowerCase()
+            .replace(/[【】\[\]（）()，,。.!！?？:：;；"'“”‘’`]/g, "")
+            .replace(/[\\\[\]()]/g, "").replace(/\$+/g, "")
+            .replace(/\s+/g, "")
+            .slice(0, 2000);
+
+        return rendered || fast;
+    } catch (_error) {
+        return fast;
+    }
+}
+
+function wrongBookLearningPoints(entryOrQuestion) {
+    // 错题可能同时考多个核心知识点。旧版有 focusPoints 就直接丢弃
+    // knowledgePoints，导致复测只覆盖一项；这里合并去重，最多保留四项。
+    const focus = Array.isArray(entryOrQuestion?.focusPoints)
+        ? entryOrQuestion.focusPoints : [];
+    const knowledge = Array.isArray(entryOrQuestion?.knowledgePoints)
+        ? entryOrQuestion.knowledgePoints : [];
+    const merged = [...new Set([...focus, ...knowledge]
+        .filter(value => typeof value === "string" && value.trim())
+        .map(value => value.trim()))];
+    // 有具体考点时不把“图的基本概念”等宽泛前置标签当成必须复测的一问。
+    const generic = new Set(["图的基本概念"]);
+    const specific = merged.filter(point => !generic.has(point));
+    return (specific.length ? specific : merged).slice(0, 4);
+}
+
+function addWrongQuestion(questionInfo, feedback, source = "auto") {
+    const safeConfirmed = Boolean(
+        source === "manual"
+        && questionInfo
+        && questionInfo.safeConfirmed
+    );
+
+    const info = normalizeLearningQuestion(questionInfo);
+    if (!info) return { entry: null, countAsMistake: false };
+
+    info.text = safeConfirmed
+        ? limitQuestionText(String(questionInfo.text || "").trim())
+        : sanitizeStoredWrongQuestionText(
+            info.text
+        );
+
+    if (
+        source === "auto"
+        && info.text
+        && !looksLikeQuestionPayload(info.text)
+    ) {
+        return {
+            entry: null,
+            countAsMistake: false
+        };
+    }
+
+    if (!info.text) {
+        return {
+            entry: null,
+            countAsMistake: false
+        };
+    }
+
+    const now = Date.now();
+
+    const entry = {
+        id: `wrong-${now}-${Math.random().toString(36).slice(2, 8)}`,
+        question: info.text,
+        knowledgePoints: info.knowledgePoints,
+        focusPoints: info.focusPoints,
+        category: info.category,
+        relatedCategories: info.relatedCategories || [],
+        // 新错题首次打开错题本也做统一后端复核；不盲信聊天中的初判。
+        classificationVersion: 0,
+        difficulty: info.difficulty || "",
+        feedback: compactFeedback(feedback),
+        referenceAnswer: info.referenceAnswer || "",
+        answer: "",
+        analysis: "",
+        answerUpdatedAt: null,
+        analysisUpdatedAt: null,
+        note: "",
+        source: source === "auto" ? "auto" : "manual",
+        corrected: false,
+        mistakeCount: source === "auto" ? 1 : 0,
+        sessionId: info.sessionId,
+        createdAt: now,
+        updatedAt: now,
+        lastWrongAt: now,
+        correctedAt: null,
+        retestCount: 0,
+        retestPassCount: 0,
+        manualRetestPassCount: 0,
+        passedRetestSessionIds: [],
+        retestRecords: [],
+        retestFailCount: 0,
+        retestPassed: false,
+        retestPassedAt: null,
+        lastRetestAt: null,
+        lastRetestQuestion: "",
+        lastRetestFeedback: "",
+        lastRetestResult: "",
+        lastRetestSessionId: null
+    };
+
+    learningState.wrongQuestions.push(entry);
+
+    // 不因数量上限删除用户早期错题；云端超限会报告并保留本机记录。
+    saveLearningState();
+
+    queueWrongQuestionAnswer(
+        entry.id
+    );
+
+    return {
+        entry,
+        countAsMistake: true
+    };
+}
+
+function currentLearningQuestion(session, teaching) {
+    const saved = normalizeLearningQuestion(
+        session?.learningQuestion
+    );
+    const currentTeaching = normalizeTeaching(
+        teaching
+    );
+
+    if (saved) {
+        const livePoints = currentTeaching?.knowledge_points || [];
+        const liveFocus = currentTeaching?.focus_points || [];
+
+        return {
+            ...saved,
+            // 当前题已经有实时分类时，以当前题为准，
+            // 不再把上一道题的知识点继续混进来。
+            knowledgePoints: livePoints.length
+                ? [...new Set([
+                    ...livePoints.slice(0, 3),
+                    ...(currentTeaching?.related_knowledge_points || []).slice(0, 2)
+                ])].slice(0, 4)
+                : saved.knowledgePoints,
+            focusPoints: liveFocus.length
+                ? liveFocus.slice(0, 2)
+                : saved.focusPoints,
+            category: (
+                currentTeaching?.category
+                && currentTeaching.category !== "待识别"
+            )
+                ? currentTeaching.category
+                : saved.category,
+            relatedCategories: currentTeaching?.related_categories?.length
+                ? currentTeaching.related_categories
+                : (saved.relatedCategories || []),
+            difficulty: currentTeaching?.difficulty
+                || saved.difficulty
+                || ""
+        };
+    }
+
+    return buildLearningQuestionFromSession(
+        session,
+        teaching,
+        true
+    ) || buildLearningQuestionFromSession(
+        session,
+        teaching,
+        false
+    );
+}
+
+function processLearningFromReply(
+    session,
+    teaching,
+    reply,
+    generatedAnswer = "",
+    generatedQuestion = ""
+) {
+    const normalized = normalizeTeaching(teaching);
+
+    if (!session || !normalized) {
+        return;
+    }
+
+    const points = normalized.knowledge_points;
+    const latest = getLatestUserMessage(session);
+    const latestText = latest?.text || "";
+    const trustedGenerated = String(generatedQuestion || "").trim();
+    const resolvedNavigation = latest?.targetQuestionFingerprint
+        && !hasExplicitExerciseGenerationCue(latestText);
+    const exerciseRequested = !resolvedNavigation
+        && (normalized.mode === "exercise" || isExerciseRequestText(latestText));
+    const generatedExercise = trustedGenerated
+        || (exerciseRequested ? extractRecoverableGeneratedQuestion(reply) : "");
+
+    // A clarification or failed generation is not a new learning question.
+    // Keep the earlier topic and counters until an actual question arrives.
+    if (exerciseRequested && !generatedExercise) return;
+
+    // 用户明确让 AI 出练习题时，AI 返回的题目本身就是当前学习题。
+    // “记为错题”应保存模型生成的题目，而不是“给我一道题”这句请求。
+    if (generatedExercise) {
+        session.learningQuestion = {
+            text: limitQuestionText(generatedExercise),
+            knowledgePoints: [...new Set([
+                ...points.slice(0, 3),
+                ...(normalized.related_knowledge_points || []).slice(0, 2)
+            ])].slice(0, 4),
+            focusPoints: normalized.focus_points.slice(0, 2),
+            category: normalized.category,
+            relatedCategories: normalized.related_categories || [],
+            difficulty: normalized.difficulty || "",
+            source: "ai",
+            referenceAnswer: String(
+                generatedAnswer || ""
+            ).trim().slice(0, 3000),
+            sessionId: session.id,
+            updatedAt: Date.now()
+        };
+
+        if (points.length) {
+            updateKnowledge(
+                points,
+                "seen",
+                session.id
+            );
+        }
+    }
+
+    const isSubstantiveQuestion = Boolean(
+        latest
+        && (latest.source === "ocr"
+            ? isRecordableOcrQuestionMessage(latest)
+            : latest.manualIsQuestion === true)
+        && normalized.mode !== "check_answer"
+        && normalized.mode !== "exercise"
+        && !isExerciseRequestText(latestText)
+    );
+
+    // “上一道题再讲一下”以及后续“继续”都属于题目上下文切换/保持，
+    // 不是新题。根据完整消息历史恢复真正的当前题，避免 learningQuestion
+    // 仍停留在时间上更靠后的那道题。
+    if (
+        !isSubstantiveQuestion
+        && !generatedExercise
+    ) {
+        const activeCandidate = activeQuestionCandidateFromHistory(
+            session
+        );
+
+        if (activeCandidate) {
+            const latestMessage = getLatestUserMessage(session);
+            const preserveActiveQuestionTeaching = Boolean(
+                latestMessage
+                && (
+                    isShortLearningFollowUp(latestMessage.text)
+                    || (
+                        latestMessage.source === "ocr"
+                        && !isRecordableOcrQuestionMessage(latestMessage)
+                    )
+                )
+            );
+
+            const targetTeaching = preserveActiveQuestionTeaching
+                ? (
+                    candidateTeachingSnapshot(
+                        session,
+                        activeCandidate
+                    ) || normalized
+                )
+                : normalized;
+
+            applyQuestionCandidateAsCurrent(
+                session,
+                activeCandidate,
+                targetTeaching
+            );
+        }
+    }
+
+    if (isSubstantiveQuestion && points.length) {
+        const learningQuestionText = extractQuestionOnlyFromMessage(latest) || latestText;
+
+        session.learningQuestion = {
+            text: limitQuestionText(learningQuestionText),
+            knowledgePoints: points.slice(0, 4),
+            focusPoints: normalized.focus_points.slice(0, 2),
+            category: normalized.category,
+            difficulty: normalized.difficulty || "",
+            source: latest.source === "ocr" ? "ocr" : "text",
+            sessionId: session.id,
+            updatedAt: Date.now()
+        };
+
+        updateKnowledge(points, "seen", session.id);
+    }
+
+    if (
+        ["hint", "full_solution"].includes(normalized.mode)
+        && points.length
+    ) {
+        updateKnowledge(
+            normalized.focus_points.length
+                ? normalized.focus_points
+                : points,
+            "support",
+            session.id
+        );
+    }
+
+    const selfReportsWrong = /(?:我|这题|刚才).{0,8}(?:做错|算错|写错|错了)/.test(
+        latestText.replace(/\s+/g, "")
+    );
+
+    if (
+        normalized.mode === "check_answer"
+        || selfReportsWrong
+    ) {
+        const assessment = selfReportsWrong
+            ? "wrong"
+            : inferAnswerAssessment(reply);
+
+        if (assessment === "wrong") {
+            const questionInfo = currentLearningQuestion(
+                session,
+                normalized
+            );
+
+            const added = addWrongQuestion(
+                questionInfo,
+                selfReportsWrong
+                    ? "你明确表示这道题做错了，建议完成订正后再标记为已订正"
+                    : reply,
+                "auto"
+            );
+
+            if (added.countAsMistake) {
+                updateKnowledge(
+                    wrongBookLearningPoints(
+                        questionInfo || {
+                            knowledgePoints: points,
+                            focusPoints: normalized.focus_points
+                        }
+                    ),
+                    "wrong",
+                    session.id
+                );
+            }
+        } else if (assessment === "correct") {
+            updateKnowledge(
+                normalized.focus_points.length
+                    ? normalized.focus_points
+                    : points,
+                "correct",
+                session.id
+            );
+        }
+    }
+
+    saveState();
+    saveLearningState();
+    renderLearningSummary();
+}
+
+function buildLearningReviewSnapshot() {
+    // History collection can recover legacy AI question metadata. Work on
+    // message copies so opening a review never mutates saved conversations.
+    const reportSessions = (Array.isArray(sessions) ? sessions : []).map(session => {
+        const messages = Array.isArray(session.messages)
+            ? session.messages.map(message => message ? { ...message } : message)
+            : [];
+        return {
+            id: session.id,
+            name: sessionDisplayName(session),
+            messages,
+            retest: session.retest && typeof session.retest === "object"
+                ? { ...session.retest } : null,
+            questions: getConversationQuestionHistory({ ...session, messages })
+        };
+    });
+    const notebook = window.DMateConceptNotebookModel
+        ? window.DMateConceptNotebookModel.normalize(learningState.conceptNotebook)
+        : learningState.conceptNotebook;
+    return window.DMateLearningReport.buildSnapshot({
+        sessions: reportSessions,
+        learning: learningState,
+        notebook,
+        drawings: collectLearningReviewDrawings(),
+        currentSessionId: currentId
+    });
+}
+
+function renderLearningReview() {
+    const body = document.getElementById("learningReviewBody");
+    if (!body || !window.DMateLearningReport) return;
+    window.DMateLearningReport.render(body, buildLearningReviewSnapshot());
+}
+
+function openLearningReview() {
+    const modal = document.getElementById("learningReviewModal");
+    if (!modal) return;
+    closeMobileShellDrawers();
+    renderLearningReview();
+    const body = document.getElementById("learningReviewBody");
+    if (body) body.scrollTop = 0;
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.getElementById("learningReviewClose")?.focus({ preventScroll: true });
+}
+
+function closeLearningReview() {
+    const modal = document.getElementById("learningReviewModal");
+    if (modal) {
+        const wasOpen = !modal.classList.contains("hidden");
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+        if (wasOpen) document.getElementById("learningReviewBtn")?.focus({ preventScroll: true });
+    }
+}
+
+
+function formatLearningDate(timestamp) {
+    const date = new Date(timestamp);
+
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hour = String(
+        date.getHours()
+    ).padStart(2, "0");
+    const minute = String(
+        date.getMinutes()
+    ).padStart(2, "0");
+
+    return `${month}月${day}日 ${hour}:${minute}`;
+}
+
+function renderLearningSummary() {
+    const wrongButton = document.getElementById("wrongBookBtn");
+    const wrongCount = learningState.wrongQuestions.length;
+    if (wrongButton) {
+        wrongButton.textContent = `错题本 (${wrongCount})`;
+    }
+}
+
+
+function setWrongBookFilter(filter) {
+    if (!["pending", "corrected"].includes(filter)) {
+        return;
+    }
+
+    // 不再单独放“全部”按钮：
+    // 未选择任何状态时就是“全部”；
+    // 再点一次当前筛选即可取消筛选。
+    wrongBookFilter = (
+        wrongBookFilter === filter
+            ? "all"
+            : filter
+    );
+
+    renderWrongBook();
+}
+
+function setWrongBookSearch(value) {
+    wrongBookSearch = String(value || "")
+        .trim()
+        .toLowerCase();
+
+    renderWrongBook();
+}
+
+function setWrongBookSort(value) {
+    if (!["recent", "oldest", "mistakes"].includes(value)) {
+        return;
+    }
+
+    wrongBookSort = value;
+    const nativeSort = document.getElementById("wrongBookSort");
+    if (nativeSort) nativeSort.value = value;
+    const mobileTrigger = document.getElementById("wrongBookSortTrigger");
+    if (mobileTrigger && nativeSort) {
+        mobileTrigger.textContent = nativeSort.selectedOptions[0]?.textContent?.trim() || "最近更新";
+    }
+    renderWrongBook();
+}
+
+function wrongBookStatus(item) {
+    if (item.corrected) {
+        return {
+            key: "corrected",
+            text: "已完成订正",
+            className: "corrected"
+        };
+    }
+
+    if (item.lastRetestResult === "wrong") {
+        return {
+            key: "pending",
+            text: "复测未通过",
+            className: "failed"
+        };
+    }
+
+    return {
+        key: "pending",
+        text: "待订正",
+        className: ""
+    };
+}
+
+function wrongBookSearchText(item) {
+    return [
+        item.question,
+        item.category,
+        ...(item.knowledgePoints || []),
+        ...(item.focusPoints || []),
+        item.feedback,
+        item.referenceAnswer,
+        item.answer,
+        item.analysis,
+        item.note,
+        item.lastRetestQuestion,
+        item.lastRetestFeedback
+    ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+}
+
+function normalizeWrongBookErrorCount(value) {
+    const count = Number(value);
+    return Number.isFinite(count)
+        ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(count)))
+        : 0;
+}
+
+function wrongBookQuestionGroupKey(item) {
+    // Use the complete, case-sensitive question. Truncated/display-only
+    // fingerprints can join different questions with a common introduction.
+    const question = String(item.question || "").replace(/\s+/g, " ").trim();
+    return question ? `question:${question}` : `id:${item.id}`;
+}
+
+function getWrongBookQuestionCounts(items) {
+    const counts = new Map();
+    for (const item of items) {
+        const key = wrongBookQuestionGroupKey(item);
+        counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+}
+
+function getFilteredWrongBookItems() {
+    let items = [...learningState.wrongQuestions];
+
+    if (wrongBookFilter !== "all") {
+        items = items.filter(
+            item => wrongBookStatus(item).key === wrongBookFilter
+        );
+    }
+
+    if (wrongBookSearch) {
+        items = items.filter(
+            item => wrongBookSearchText(item).includes(wrongBookSearch)
+        );
+    }
+
+    if (wrongBookSort === "oldest") {
+        items.sort((a, b) => a.updatedAt - b.updatedAt);
+    } else if (wrongBookSort === "mistakes") {
+        // Rank by how many retained entries have the same full question.
+        // Every entry counts once, including manual captures. Filtering only
+        // changes visibility; answer and retest failure counters do not rank it.
+        const counts = getWrongBookQuestionCounts(learningState.wrongQuestions);
+        items.sort((a, b) => (
+            counts.get(wrongBookQuestionGroupKey(b)) - counts.get(wrongBookQuestionGroupKey(a))
+            || b.updatedAt - a.updatedAt
+        ));
+    } else {
+        items.sort((a, b) => b.updatedAt - a.updatedAt);
+    }
+
+    return items;
+}
+
+function updateWrongBookToolbar(allItems) {
+    const stats = document.getElementById("wrongBookStats");
+    const filterButtons = document.querySelectorAll(
+        "[data-wrong-filter]"
+    );
+
+    const total = allItems.length;
+    const pending = allItems.filter(
+        item => wrongBookStatus(item).key === "pending"
+    ).length;
+    const corrected = allItems.filter(
+        item => wrongBookStatus(item).key === "corrected"
+    ).length;
+    if (stats) {
+        stats.textContent =
+            `共 ${total} 道　待处理 ${pending}　已订正 ${corrected}`;
+    }
+
+    for (const button of filterButtons) {
+        const value = button.getAttribute("data-wrong-filter");
+        button.classList.toggle(
+            "active",
+            value === wrongBookFilter
+        );
+    }
+    const sortSelect = document.getElementById("wrongBookSort");
+    const sortTrigger = document.getElementById("wrongBookSortTrigger");
+    if (sortSelect) sortSelect.value = wrongBookSort;
+    if (sortTrigger && sortSelect) {
+        sortTrigger.textContent = sortSelect.selectedOptions[0]?.textContent?.trim() || "最近更新";
+    }
+}
+
+let wrongBookClassificationInFlight = false;
+
+async function refreshWrongBookClassifications() {
+    if (wrongBookClassificationInFlight) return;
+    const stale = learningState.wrongQuestions.filter(item => (
+        Number(item.classificationVersion || 0) < 3
+        || isGenericTeachingCategory(item.category)
+        || !Array.isArray(item.knowledgePoints)
+        || !item.knowledgePoints.length
+        || !["简单", "中等", "困难"].includes(item.difficulty)
+    ));
+    if (!stale.length) return;
+    wrongBookClassificationInFlight = true;
+
+    try {
+        // /analyze-questions 每次最多处理 80 道；保留题目记录 ID，避免
+        // 跨设备同步或异步修改造成结果误写到另一道题。
+        for (let offset = 0; offset < stale.length; offset += 80) {
+            const batch = stale.slice(offset, offset + 80).map(item => ({
+                id: item.id,
+                question: item.question
+            }));
+            const response = await fetch("/analyze-questions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    questions: batch.map(item => ({ key: item.id, text: item.question })),
+                    semantic_fallback: true
+                })
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const payload = await parseResponseJson(response);
+            const byId = new Map((payload?.results || []).map(item => [
+                String(item?.key || ""),
+                normalizeTeaching(item?.teaching)
+            ]));
+            let changed = false;
+            for (const oldItem of batch) {
+                const item = learningState.wrongQuestions.find(q => q.id === oldItem.id);
+                // 期间如果用户编辑了题目，不用旧题干的识别结果覆盖新内容。
+                if (!item || item.question !== oldItem.question) continue;
+                const detected = byId.get(String(item.id));
+                if (!detected || isGenericTeachingCategory(detected.category)) continue;
+                item.category = detected.category;
+                item.relatedCategories = (detected.related_categories || []).slice(0, 3);
+                item.knowledgePoints = [...new Set([
+                    ...detected.knowledge_points.slice(0, 3),
+                    ...(detected.related_knowledge_points || []).slice(0, 2)
+                ])].slice(0, 4);
+                // 用户已有手动填写的“本题难点”时予以保留。
+                if (!Array.isArray(item.focusPoints) || !item.focusPoints.length) {
+                    item.focusPoints = detected.focus_points.slice(0, 2);
+                }
+                if (["简单", "中等", "困难"].includes(detected.difficulty)) {
+                    item.difficulty = detected.difficulty;
+                }
+                // 低可信本地判断仍允许下次打开错题本时重试语义复核；
+                // 避免模型暂时不可用就永久锁定错误分类。
+                const pendingReview = detected.classification_source !== "AI语义复核"
+                    && (detected.confidence === "低"
+                        || (detected.confidence === "中"
+                            && detected.related_categories.length >= 2));
+                item.classificationVersion = pendingReview ? 2 : 3;
+                changed = true;
+            }
+            if (changed) {
+                saveLearningState();
+                renderWrongBook();
+            }
+        }
+    } catch (error) {
+        console.warn("错题模块与难度补齐失败：", error);
+    } finally {
+        wrongBookClassificationInFlight = false;
+    }
+}
+
+
+function openWrongBook() {
+    const modal = document.getElementById("wrongBookModal");
+    if (!modal) return;
+
+    renderWrongBook();
+    modal.classList.remove("hidden");
+    void refreshWrongBookClassifications();
+
+    // 新错题在加入时已自动准备答案；旧数据/断线后缺失答案的题目，
+    // 再次打开错题本时优先补一个，避免必须点“查看答案”才启动。
+    // 每次只补一题，不突然并发发起大量 AI 请求影响聊天速度。
+    const missingAnswer = getFilteredWrongBookItems().find(item =>
+        !item.referenceAnswer && !item.answer
+        && !wrongAnswerLoadingIds.has(item.id)
+        && !wrongAnswerQueue.includes(item.id)
+    );
+    if (missingAnswer) queueWrongQuestionAnswer(missingAnswer.id);
+
+    const search = document.getElementById("wrongBookSearch");
+    if (search) {
+        search.value = wrongBookSearch;
+    }
+}
+
+function closeWrongBook() {
+    const modal = document.getElementById("wrongBookModal");
+    if (!modal) return;
+
+    modal.classList.add("hidden");
+}
+
+
+function persistRetestRecord(item, session) {
+    const retest = normalizeRetestSession(session && session.retest);
+    if (!item || !retest || !retest.generatedQuestion) return false;
+    if (!Array.isArray(item.retestRecords)) item.retestRecords = [];
+    const id = String(session.id);
+    const previous = item.retestRecords.find(x => x.id === id);
+    if (previous) {
+        if (previous.question === retest.generatedQuestion && !previous.answer && retest.generatedAnswer) {
+            previous.answer = retest.generatedAnswer;
+            previous.answerUpdatedAt = previous.updatedAt = item.updatedAt = Date.now();
+            return true;
+        }
+        return false;
+    }
+    const now = Date.now();
+    item.retestRecords.push({id:id, question:retest.generatedQuestion, answer:retest.generatedAnswer || "", analysis:"",
+        createdAt:retest.startedAt || now, updatedAt:now, answerUpdatedAt:retest.generatedAnswer ? now : null, analysisUpdatedAt:null});
+    return true;
+}
+
+function getWrongRetestSessions(item) {
+    let changed = false;
+    sessions.forEach(session => {
+        if (session.retest && String(session.retest.wrongQuestionId) === String(item.id)) {
+            changed = persistRetestRecord(item, session) || changed;
+        }
+    });
+    if (changed) saveLearningState();
+    return [...(item.retestRecords || [])].sort((a,b) => a.createdAt - b.createdAt);
+}
+
+async function generateRetestDetail(itemId, recordId, kind) {
+    const item = learningState.wrongQuestions.find(x => x.id === itemId);
+    const record = item?.retestRecords?.find(x => x.id === recordId);
+    if (!record || !["answer", "analysis"].includes(kind) || record[kind]) return;
+    const contextVersion = cloudSyncContextVersion;
+    const originalQuestion = item.question, question = record.question, answer = record.answer || "";
+    const currentTarget = () => {
+        if (contextVersion !== cloudSyncContextVersion) return null;
+        const currentItem = learningState.wrongQuestions.find(x => x.id === itemId);
+        const currentRecord = currentItem?.retestRecords?.find(x => x.id === recordId);
+        if (!currentRecord || currentItem.question !== originalQuestion || currentRecord.question !== question
+            || currentRecord[kind] || (kind === "analysis" && (currentRecord.answer || "") !== answer)) return null;
+        return { item: currentItem, record: currentRecord };
+    };
+    const request = kind === "answer"
+        ? "请准确解答以下离散数学题目，给出最终答案和必要推导，公式使用标准 $...$ 或 $$...$$：\n" + record.question
+        : "请为以下离散数学题目给出完整的分步骤解析与易错点，公式使用标准 $...$ 或 $$...$$：\n" + record.question + "\n参考答案：\n" + (record.answer || "请自行推导");
+    const button = document.getElementById("retest-gen-" + recordId + "-" + kind);
+    const originalText = button?.textContent;
+    const reviewVisible = () => button?.isConnected
+        && !document.getElementById("wrongRetestReviewModal")?.classList.contains("hidden");
+    if (button) { button.disabled = true; button.textContent = "生成中…"; }
+    try {
+        const response = await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({language:dmateUiLanguage(),messages:[{role:"user",content:request}]})});
+        const data = await parseResponseJson(response);
+        const target = currentTarget();
+        if (!target) return;
+        if (!response.ok || data.error || typeof data.reply !== "string" || !data.reply.trim()) throw new Error(data.error || "生成失败");
+        // Cloud synchronization can replace these objects while the request is
+        // pending. Commit to the current matching record, never its old copy.
+        target.record[kind] = data.reply.trim().slice(0,8000);
+        target.record[kind + "UpdatedAt"] = target.record.updatedAt = target.item.updatedAt = Date.now();
+        saveLearningState();
+        if (reviewVisible()) openWrongRetestReview(itemId);
+    } catch (error) {
+        if (currentTarget() && reviewVisible()) window.alert(error.message || "生成失败，请重试");
+    } finally {
+        if (button) { button.disabled = false; button.textContent = originalText; }
+    }
+}
+
+function formatRetestDetailParagraphs(text) {
+    // 复测答案沿用错题本 Markdown/CSS，只有编号小问间缺少段落空行时补齐。
+    // 不修改原答案，且不在代码块或独立数学块内插入空行。
+    const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    const result = [];
+    let fence = "";
+    let mathBlock = false;
+    for (const line of lines) {
+        const stripped = line.trim();
+        const fenceMatch = stripped.match(/^(\x60{3,}|~{3,})/);
+        const nextNumberedPart = /^(?:[（(]\d{1,2}[）)]|[1-9]\d*[、.．])\s*\S/.test(stripped);
+        if (!fence && !mathBlock && !fenceMatch && nextNumberedPart
+            && result.length && result[result.length - 1].trim()) {
+            result.push("");
+        }
+        result.push(line);
+        if (fenceMatch) {
+            const token = fenceMatch[1];
+            if (!fence) fence = token;
+            else if (fence[0] === token[0] && token.length >= fence.length) fence = "";
+        }
+        if (!fence) {
+            const markers = line.match(/\$\$|\\\[|\\\]/g) || [];
+            for (const token of markers) {
+                if (token.charCodeAt(0) === 36) mathBlock = !mathBlock;
+                else if (token === "\\[") mathBlock = true;
+                else if (token === "\\]") mathBlock = false;
+            }
+        }
+    }
+    return result.join("\n");
+}
+
+function openWrongRetestReview(id) {
+    const item = learningState.wrongQuestions.find(entry => entry.id === id);
+    const modal = document.getElementById("wrongRetestReviewModal");
+    const list = document.getElementById("wrongRetestReviewList");
+    if (!item || !modal || !list) return;
+    list.replaceChildren();
+    const history = getWrongRetestSessions(item);
+    const selected = new Set((item.passedRetestSessionIds || []).map(String));
+    if (!history.length) {
+        const empty = document.createElement("div");
+        empty.className = "learning-review-empty";
+        empty.textContent = "无";
+        list.appendChild(empty);
+    }
+    history.forEach((record,index) => {
+        const row = document.createElement("div");
+        row.className = "wrong-retest-review-row";
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        check.className = "wrong-retest-review-check";
+        check.checked = selected.has(record.id);
+        check.setAttribute("aria-label","第 " + (index+1) + " 次复测是否通过");
+        const body = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = "第 " + (index+1) + " 次复测";
+        const question = document.createElement("div");
+        question.className = "wrong-retest-review-question";
+        question.setAttribute("data-i18n-content", "");
+        question.innerHTML = markdownToHtml(record.question);
+        body.append(title,question);
+        ["answer","analysis"].forEach(kind => {
+            if (record[kind]) {
+                const details = document.createElement("details");
+                details.className = kind === "answer" ? "wrong-answer-details" : "wrong-analysis-details";
+                const summary = document.createElement("summary");
+                summary.className = kind === "answer" ? "wrong-answer-summary" : "wrong-analysis-summary";
+                summary.textContent = kind === "answer" ? "查看答案" : "查看解析";
+                const content = document.createElement("div");
+                content.className = kind === "answer" ? "wrong-answer-inner wrong-retest-review-detail" : "wrong-analysis-body wrong-retest-review-detail";
+                content.setAttribute("data-i18n-content", "");
+                content.innerHTML = markdownToHtml(formatRetestDetailParagraphs(record[kind]));
+                details.append(summary,content);
+                body.append(details);
+            } else {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "secondary";
+                btn.id = "retest-gen-" + record.id + "-" + kind;
+                btn.textContent = kind === "answer" ? "提供答案" : "生成解析";
+                btn.onclick = () => generateRetestDetail(id,record.id,kind);
+                body.append(btn);
+            }
+        });
+        check.addEventListener("change",() => {
+            const ids = new Set((item.passedRetestSessionIds || []).map(String));
+            if (check.checked) ids.add(record.id); else ids.delete(record.id);
+            item.passedRetestSessionIds = [...ids];
+            item.manualRetestPassCount = ids.size;
+            item.updatedAt = Date.now();
+            saveLearningState();
+            renderWrongBook();
+        });
+        row.append(check,body);
+        list.append(row);
+    });
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden","false");
+    renderMath(list);
+}
+function closeWrongRetestReview() {
+    const modal = document.getElementById("wrongRetestReviewModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+}
+
+function markWrongQuestionCorrected(id) {
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === id
+    );
+
+    if (!entry || entry.corrected) return;
+
+    const now = Date.now();
+
+    entry.corrected = true;
+    entry.correctedAt = now;
+    entry.updatedAt = now;
+
+    updateKnowledge(
+        wrongBookLearningPoints(entry),
+        "reviewed",
+        entry.sessionId
+    );
+
+    saveLearningState();
+    renderLearningSummary();
+    renderWrongBook();
+}
+
+let wrongRemoveConfirmationBusy = false;
+async function removeWrongQuestion(id) {
+    if (wrongRemoveConfirmationBusy) return;
+    const entry = learningState.wrongQuestions.find(item => item.id === id);
+    if (!entry) return;
+
+    wrongRemoveConfirmationBusy = true;
+    let confirmed = false;
+    try {
+        confirmed = await showAppConfirm({
+            title: "移出错题本",
+            body: "确定要把这道题移出错题本吗？这不会删除原聊天",
+            confirmText: "移出",
+            confirmTone: "danger"
+        });
+    } finally {
+        wrongRemoveConfirmationBusy = false;
+    }
+    if (!confirmed) return;
+    // The user may have changed the list while the dialog was open.
+    if (!learningState.wrongQuestions.some(item => item.id === id)) return;
+
+    markWrongQuestionDeleted(id);
+    learningState.wrongQuestions = learningState.wrongQuestions.filter(
+        item => item.id !== id
+    );
+
+    saveLearningState();
+    renderLearningSummary();
+    renderWrongBook();
+}
+
+function clearCompletedWrongQuestions() {
+    const completed = learningState.wrongQuestions.filter(
+        item => item.corrected || item.retestPassed
+    );
+
+    if (!completed.length) {
+        window.alert("目前没有可以清理的已完成错题");
+        return;
+    }
+
+    const confirmed = window.confirm(
+        `确定移出 ${completed.length} 道已完成的错题吗？原聊天不会被删除`
+    );
+
+    if (!confirmed) return;
+
+    const completedIds = new Set(
+        completed.map(item => item.id)
+    );
+
+    for (const item of completed) markWrongQuestionDeleted(item.id);
+    learningState.wrongQuestions = learningState.wrongQuestions.filter(
+        item => !completedIds.has(item.id)
+    );
+
+    saveLearningState();
+    renderLearningSummary();
+    renderWrongBook();
+}
+
+function openWrongQuestionSession(id) {
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === id
+    );
+
+    if (!entry || entry.sessionId === null) return;
+
+    const session = sessions.find(
+        item => String(item.id) === String(entry.sessionId)
+    );
+
+    if (!session) return;
+
+    if (typingTimer) {
+        forceCompleteTyping();
+    }
+
+    currentId = session.id;
+    saveState();
+    closeWrongBook();
+    renderAll();
+}
+
+function openWrongRetestSession(id) {
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === id
+    );
+
+    if (!entry || entry.lastRetestSessionId === null) return;
+
+    const session = sessions.find(
+        item => String(item.id) === String(entry.lastRetestSessionId)
+    );
+
+    if (!session) return;
+
+    if (typingTimer) {
+        forceCompleteTyping();
+    }
+
+    currentId = session.id;
+    saveState();
+    closeWrongBook();
+    renderAll();
+}
+
+function openWrongEdit(id) {
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === id
+    );
+
+    if (!entry) return;
+
+    currentWrongEditId = id;
+
+    const modal = document.getElementById("wrongEditModal");
+    const question = document.getElementById("wrongEditQuestion");
+    const note = document.getElementById("wrongEditNote");
+
+    if (!modal || !question || !note) return;
+
+    question.value = entry.question;
+    note.value = entry.note || "";
+
+    modal.classList.remove("hidden");
+}
+
+function closeWrongEdit() {
+    const modal = document.getElementById("wrongEditModal");
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+
+    currentWrongEditId = null;
+}
+
+function saveWrongEdit() {
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === currentWrongEditId
+    );
+
+    if (!entry) {
+        closeWrongEdit();
+        return;
+    }
+
+    const questionBox = document.getElementById("wrongEditQuestion");
+    const noteBox = document.getElementById("wrongEditNote");
+
+    if (!questionBox || !noteBox) return;
+
+    const question = questionBox.value.trim();
+
+    if (!question) {
+        window.alert("题目内容不能为空");
+        return;
+    }
+
+    // Repeated questions are independent records. Save only this ID so an
+    // existing duplicate cannot block note edits or collapse learning history.
+    if (entry.question !== limitQuestionText(question)) {
+        entry.classificationVersion = 0;
+        entry.category = "待识别";
+        entry.relatedCategories = [];
+        entry.knowledgePoints = [];
+        entry.focusPoints = [];
+        entry.difficulty = "";
+        entry.referenceAnswer = "";
+        entry.answer = "";
+        entry.analysis = "";
+        entry.answerUpdatedAt = null;
+        entry.analysisUpdatedAt = null;
+        wrongAnalysisExpandedIds.delete(entry.id);
+    }
+    entry.question = limitQuestionText(question);
+    entry.note = noteBox.value.trim().slice(0, 1500);
+
+    entry.updatedAt = Date.now();
+
+    saveLearningState();
+    closeWrongEdit();
+    renderLearningSummary();
+    renderWrongBook();
+}
+
+function buildRetestPrompt(entry) {
+    const target = wrongBookLearningPoints(entry);
+    // 错题难度只从保存的原题记录取；缺失时由后端重新分析原题。
+    const difficulty = ["简单", "中等", "困难"].includes(entry?.difficulty)
+        ? entry.difficulty : "";
+    const targetText = target.length
+        ? target.join("、")
+        : (
+            entry.category
+            || "这道题涉及的核心知识点"
+        );
+
+    // 原错题通过 exercise_reference 单独、结构化地发给后端。
+    // 这里仅保留“本轮动作”，避免原题在 prompt 里重复两遍，
+    // 也避免把“原错题正文”误当成本轮要回答的题。
+    return [
+        "【错题复测】",
+        `请围绕知识点“${targetText}”生成 1 道新的离散数学复测题。`,
+        "要求：",
+        "1. 必须同时覆盖上面列出的全部核心知识点，不要只选其中一个；可安排相互关联的小问，但不能把原题原封不动重出；",
+        `2. 本次目标难度与原错题相同${difficulty ? `（${difficulty}）` : "（以系统复核的原题难度为准）"}；不要为了凑难度删掉考点；`,
+        "3. 控制计算规模，让全部核心考点构成一份紧密相关的复测，不靠堆砌无关小问增加难度；",
+        "4. 只给复测题目，不给答案、提示、解析或解题步骤（系统内部隐藏答案除外）；",
+        "5. 题目必须信息完整、可独立作答，不要回答原错题。"
+    ].join("\n");
+}
+
+function startWrongQuestionRetest(id) {
+    if (
+        isCurrentSessionTyping()
+        || isSessionBusy(currentId)
+    ) {
+        return;
+    }
+
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === id
+    );
+
+    if (!entry) return;
+
+    if (!entry.corrected && !entry.retestPassed) {
+        window.alert("请先完成这道错题的订正，再进行复测");
+        return;
+    }
+
+    const targetPoints = wrongBookLearningPoints(entry);
+    const idValue = makeSessionId();
+    const targetName = targetPoints.length
+        ? targetPoints.join("、")
+        : "错题";
+
+    const targetDifficulty = ["简单", "中等", "困难"].includes(entry.difficulty)
+        ? entry.difficulty : "";
+    const englishTarget = targetPoints.length ? targetPoints.map(dmateKnowledgeLabel).join(", ") : "the original question";
+    const visiblePrompt = dmateUiText(`给我一道包含“${targetName}”全部核心考点的复测题。`,
+        `Give me a retest question covering all the core concepts in ${englishTarget}.`);
+
+    const session = {
+        id: idValue,
+        name: dmateUiText(`复测：${targetName}`, `Retest: ${englishTarget}`).slice(0, dmateUiLanguage() === "en" ? 48 : 22),
+        nameSource: "retest",
+        messages: [{
+            role: "user",
+            text: visiblePrompt,
+            apiText: buildRetestPrompt(entry),
+            isRetestPrompt: true
+        }],
+        teaching: null,
+        learningQuestion: null,
+        retest: {
+            wrongQuestionId: entry.id,
+            stage: "generating",
+            targetPoints,
+            referenceQuestion: entry.question,
+            targetDifficulty,
+            generatedQuestion: "",
+            generatedAnswer: "",
+            startedAt: Date.now(),
+            result: ""
+        }
+    };
+
+    sessions.push(session);
+    currentId = session.id;
+
+    entry.lastRetestSessionId = session.id;
+    entry.updatedAt = Date.now();
+
+    saveLearningState();
+    saveState();
+    closeWrongBook();
+    renderAll();
+
+    requestAiReply(session);
+}
+
+function processWrongQuestionRetestReply(
+    session,
+    reply,
+    generatedQuestion = "",
+    generatedAnswer = ""
+) {
+    const retest = normalizeRetestSession(session?.retest);
+
+    if (!session || !retest || !retest.wrongQuestionId) {
+        return false;
+    }
+
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === retest.wrongQuestionId
+    );
+
+    if (!entry) {
+        session.retest = null;
+        saveState();
+        return false;
+    }
+
+    if (retest.stage === "generating") {
+        const cleanQuestion = sanitizeStoredWrongQuestionText(
+            generatedQuestion
+            || extractAiGeneratedExerciseText(reply)
+            || reply
+        );
+
+        if (!cleanQuestion) {
+            return false;
+        }
+
+        retest.referenceQuestion = limitQuestionText(
+            retest.referenceQuestion
+            || entry.question
+            || ""
+        );
+        retest.generatedQuestion = limitQuestionText(cleanQuestion);
+        retest.generatedAnswer = normalizeReferenceAnswer(generatedAnswer);
+        retest.stage = "awaiting_answer";
+        session.retest = retest;
+        persistRetestRecord(entry, session);
+        saveLearningState();
+
+        saveState();
+        return true;
+    }
+
+    if (retest.stage !== "checking") {
+        return false;
+    }
+
+    const assessment = inferAnswerAssessment(reply);
+    const now = Date.now();
+
+    entry.lastRetestAt = now;
+    entry.lastRetestSessionId = session.id;
+    entry.lastRetestQuestion = limitQuestionText(
+        retest.generatedQuestion
+        || entry.lastRetestQuestion
+        || ""
+    );
+    entry.lastRetestFeedback = compactFeedback(reply);
+    entry.lastRetestResult = assessment;
+
+    if (assessment === "correct") {
+        entry.retestCount += 1;
+        entry.retestPassCount += 1;
+        entry.retestPassed = true;
+        entry.retestPassedAt = now;
+        entry.corrected = true;
+        entry.correctedAt = entry.correctedAt || now;
+
+        updateKnowledge(
+            retest.targetPoints.length
+                ? retest.targetPoints
+                : wrongBookLearningPoints(entry),
+            "correct",
+            session.id
+        );
+    } else if (assessment === "wrong") {
+        entry.retestCount += 1;
+        entry.retestFailCount += 1;
+        entry.retestPassed = false;
+        entry.retestPassedAt = null;
+        entry.corrected = false;
+        entry.correctedAt = null;
+
+        updateKnowledge(
+            retest.targetPoints.length
+                ? retest.targetPoints
+                : wrongBookLearningPoints(entry),
+            "wrong",
+            session.id
+        );
+    }
+
+    entry.updatedAt = now;
+
+    retest.result = assessment;
+    retest.stage = assessment === "unknown"
+        ? "awaiting_answer"
+        : "finished";
+    session.retest = retest;
+
+    saveState();
+    saveLearningState();
+    renderLearningSummary();
+    renderWrongBook();
+
+    return true;
+}
+
+function rollbackRetestAfterRequestFailure(session) {
+    const retest = normalizeRetestSession(session?.retest);
+    if (!retest) return;
+
+    if (retest.stage === "checking") {
+        retest.stage = "awaiting_answer";
+        session.retest = retest;
+    } else if (retest.stage === "generating") {
+        session.retest = null;
+    }
+
+    saveState();
+}
+
+function dedupeWrongBookItemsForPdf(items) {
+    const seen = new Map();
+    const unique = [];
+
+    for (const item of items || []) {
+        // Preserve mathematical case, punctuation and the complete question.
+        // Display fingerprints can collapse distinct variables or long stems.
+        const key = wrongBookQuestionGroupKey(item || { id: unique.length });
+        const existingIndex = seen.get(key);
+
+        if (Number.isInteger(existingIndex)) {
+            const current = unique[existingIndex];
+            const currentUpdated = Number(current?.updatedAt || 0);
+            const nextUpdated = Number(item?.updatedAt || 0);
+
+            if (nextUpdated >= currentUpdated) {
+                unique[existingIndex] = item;
+            }
+
+            continue;
+        }
+
+        const nextIndex = unique.length;
+        unique.push(item);
+        seen.set(key, nextIndex);
+    }
+
+    return unique;
+}
+
+function buildWrongBookPdfExportElement(items) {
+    items = dedupeWrongBookItemsForPdf(items);
+
+    const container = document.createElement("div");
+    container.className = "wrong-pdf-export";
+    container.style.position = "fixed";
+    container.style.left = "-100000px";
+    container.style.top = "0";
+    container.style.width = "794px";
+    container.style.boxSizing = "border-box";
+    container.style.padding = "34px 40px";
+    container.style.background = "#ffffff";
+    container.style.color = "#111827";
+    container.style.fontFamily = 'Arial, "Microsoft YaHei", "PingFang SC", sans-serif';
+    container.style.lineHeight = "1.65";
+    container.style.zIndex = "-1";
+
+    const title = document.createElement("div");
+    title.style.fontSize = "28px";
+    title.style.fontWeight = "700";
+    title.style.marginBottom = "6px";
+    title.textContent = "离散数学错题本";
+    container.appendChild(title);
+
+    const subtitle = document.createElement("div");
+    subtitle.style.fontSize = "13px";
+    subtitle.style.color = "#64748b";
+    subtitle.style.marginBottom = "22px";
+    const exportDate = new Date().toLocaleString(dmateUiLanguage());
+    subtitle.textContent = dmateUiText(`共 ${items.length} 道 · 导出时间：${exportDate}`,
+        `${items.length} questions · Exported: ${exportDate}`);
+    container.appendChild(subtitle);
+
+    items.forEach((item, index) => {
+        const status = wrongBookStatus(item);
+        const card = document.createElement("section");
+        card.className = "wrong-pdf-card";
+        card.style.padding = "18px 0 20px";
+        card.style.borderTop = (
+            index === 0
+                ? "0"
+                : "1px solid #e2e8f0"
+        );
+
+        const statusLine = document.createElement("div");
+        statusLine.style.fontSize = "15px";
+        statusLine.style.fontWeight = "700";
+        statusLine.style.marginBottom = "10px";
+        statusLine.textContent = `${index + 1}. ${dmateUiText(status.text)}`;
+        card.appendChild(statusLine);
+
+        const question = document.createElement("div");
+        question.className = "wrong-pdf-question";
+        question.style.fontSize = "15px";
+        question.style.whiteSpace = "pre-wrap";
+        question.style.wordBreak = "break-word";
+        question.setAttribute("data-i18n-content", "");
+        question.innerHTML = markdownToHtml(item.question);
+        card.appendChild(question);
+
+        const metaParts = [];
+
+        if (item.focusPoints?.length) {
+            metaParts.push(
+                dmateUiText("本题难点：", "Focus: ") + item.focusPoints.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
+            );
+        }
+
+        if (item.knowledgePoints?.length) {
+            metaParts.push(
+                dmateUiText("整题涉及：", "Concepts: ") + item.knowledgePoints.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
+            );
+        }
+
+        if (item.retestCount) {
+            metaParts.push(
+                dmateUiText(`复测 ${item.retestCount} 次，通过 ${item.retestPassCount || 0} 次`,
+                    `Retests: ${item.retestCount} · Passed: ${item.retestPassCount || 0}`)
+            );
+        }
+
+        const meta = document.createElement("div");
+        meta.style.marginTop = "10px";
+        meta.style.fontSize = "12px";
+        meta.style.color = "#64748b";
+        meta.textContent = metaParts.join(" · ");
+        card.appendChild(meta);
+
+        if (shouldShowWrongBookFeedback(item)) {
+            const block = document.createElement("div");
+            block.style.marginTop = "12px";
+            block.style.padding = "10px 12px";
+            block.style.borderRadius = "8px";
+            block.style.background = "#f8fafc";
+            block.style.fontSize = "13px";
+
+            const label = document.createElement("div");
+            label.style.fontWeight = "700";
+            label.style.marginBottom = "4px";
+            label.textContent = "最近反馈";
+            block.appendChild(label);
+
+            const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
+            body.innerHTML = markdownToHtml(item.feedback);
+            block.appendChild(body);
+
+            card.appendChild(block);
+        }
+
+        if (item.referenceAnswer) {
+            const block = document.createElement("div");
+            block.style.marginTop = "10px";
+            block.style.padding = "10px 12px";
+            block.style.borderRadius = "8px";
+            block.style.background = "#f8fafc";
+            block.style.fontSize = "13px";
+
+            const label = document.createElement("div");
+            label.style.fontWeight = "700";
+            label.style.marginBottom = "4px";
+            label.textContent = "参考答案";
+            block.appendChild(label);
+
+            const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
+            body.innerHTML = markdownToHtml(item.referenceAnswer);
+            block.appendChild(body);
+
+            card.appendChild(block);
+        }
+
+        if (item.answer) {
+            const block = document.createElement("div");
+            block.style.marginTop = "10px";
+            block.style.padding = "10px 12px";
+            block.style.borderRadius = "8px";
+            block.style.background = "#f8fafc";
+            block.style.fontSize = "13px";
+
+            const label = document.createElement("div");
+            label.style.fontWeight = "700";
+            label.style.marginBottom = "4px";
+            label.textContent = "答案";
+            block.appendChild(label);
+
+            const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
+            body.innerHTML = markdownToHtml(item.answer);
+            block.appendChild(body);
+
+            card.appendChild(block);
+        }
+
+        if (item.analysis) {
+            const block = document.createElement("div");
+            block.style.marginTop = "10px";
+            block.style.padding = "10px 12px";
+            block.style.borderRadius = "8px";
+            block.style.background = "#f8fafc";
+            block.style.fontSize = "13px";
+
+            const label = document.createElement("div");
+            label.style.fontWeight = "700";
+            label.style.marginBottom = "4px";
+            label.textContent = "解析";
+            block.appendChild(label);
+
+            const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
+            body.innerHTML = markdownToHtml(item.analysis);
+            block.appendChild(body);
+
+            card.appendChild(block);
+        }
+
+        if (item.note) {
+            const block = document.createElement("div");
+            block.style.marginTop = "10px";
+            block.style.padding = "10px 12px";
+            block.style.borderRadius = "8px";
+            block.style.background = "#f8fafc";
+            block.style.fontSize = "13px";
+
+            const label = document.createElement("div");
+            label.style.fontWeight = "700";
+            label.style.marginBottom = "4px";
+            label.textContent = "我的笔记";
+            block.appendChild(label);
+
+            const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
+            body.innerHTML = markdownToHtml(item.note);
+            block.appendChild(body);
+
+            card.appendChild(block);
+        }
+
+        if (item.lastRetestQuestion) {
+            const block = document.createElement("div");
+            block.style.marginTop = "10px";
+            block.style.padding = "10px 12px";
+            block.style.borderRadius = "8px";
+            block.style.border = "1px solid #e2e8f0";
+            block.style.fontSize = "13px";
+
+            const label = document.createElement("div");
+            label.style.fontWeight = "700";
+            label.style.marginBottom = "4px";
+            label.textContent = "最近复测题";
+            block.appendChild(label);
+
+            const body = document.createElement("div");
+            body.setAttribute("data-i18n-content", "");
+            body.innerHTML = markdownToHtml(item.lastRetestQuestion);
+            block.appendChild(body);
+
+            card.appendChild(block);
+        }
+
+        container.appendChild(card);
+    });
+
+    window.DMateI18n?.translate(container);
+    document.body.appendChild(container);
+    return container;
+}
+
+async function typesetWrongBookPdfElement(container) {
+    if (
+        window.MathJax
+        && MathJax.typesetPromise
+    ) {
+        try {
+            await MathJax.typesetPromise([container]);
+        } catch (error) {
+            console.warn("导出 PDF 时公式渲染失败：", error);
+        }
+    }
+
+    if (document.fonts?.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_error) {
+            // 字体等待失败不阻止导出。
+        }
+    }
+
+    // 给 SVG 数学公式和字体两帧时间完成最终布局，
+    // 避免 html2canvas 抓到中间态产生重影。
+    await new Promise(resolve => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(resolve);
+        });
+    });
+}
+
+async function rasterizeMathJaxSvgForPdf(container) {
+    if (!container) return;
+
+    // MathJax SVG 输出旁边通常还带一份“辅助 MathML”。浏览器里它被
+    // CSS 隐藏，但 html2canvas 在克隆 DOM 时可能把这份无障碍文本也画出来，
+    // 于是出现矩阵/公式重影。导出副本里先彻底移除这些隐藏节点。
+    container.querySelectorAll(
+        "mjx-assistive-mml, .MJX_Assistive_MathML, [data-mjx-assistive-mml]"
+    ).forEach(node => node.remove());
+
+    const mathContainers = [
+        ...container.querySelectorAll("mjx-container")
+    ];
+
+    for (const mathContainer of mathContainers) {
+        const svg = mathContainer.querySelector("svg");
+        if (!svg) continue;
+
+        const rect = svg.getBoundingClientRect();
+        const width = Math.max(1, rect.width);
+        const height = Math.max(1, rect.height);
+
+        const clone = svg.cloneNode(true);
+        clone.setAttribute(
+            "xmlns",
+            "http://www.w3.org/2000/svg"
+        );
+        clone.setAttribute("width", `${width}px`);
+        clone.setAttribute("height", `${height}px`);
+        clone.style.color = "#111827";
+
+        clone.querySelectorAll('[fill="currentColor"]').forEach(
+            node => node.setAttribute("fill", "#111827")
+        );
+        clone.querySelectorAll('[stroke="currentColor"]').forEach(
+            node => node.setAttribute("stroke", "#111827")
+        );
+
+        const serialized = new XMLSerializer()
+            .serializeToString(clone);
+        const blob = new Blob(
+            [serialized],
+            { type: "image/svg+xml;charset=utf-8" }
+        );
+        const url = URL.createObjectURL(blob);
+
+        try {
+            const image = new Image();
+
+            await new Promise((resolve, reject) => {
+                image.onload = resolve;
+                image.onerror = reject;
+                image.src = url;
+            });
+
+            const scale = 2.5;
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(
+                1,
+                Math.ceil(width * scale)
+            );
+            canvas.height = Math.max(
+                1,
+                Math.ceil(height * scale)
+            );
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+
+            const isDisplay = (
+                mathContainer.getAttribute("display") === "true"
+                || mathContainer.style.display === "block"
+            );
+
+            canvas.style.display = isDisplay
+                ? "block"
+                : "inline-block";
+            canvas.style.verticalAlign = "middle";
+
+            if (isDisplay) {
+                canvas.style.margin = "0.65em auto";
+            }
+
+            const context = canvas.getContext("2d");
+            context.setTransform(
+                scale,
+                0,
+                0,
+                scale,
+                0,
+                0
+            );
+            context.drawImage(
+                image,
+                0,
+                0,
+                width,
+                height
+            );
+
+            // 关键：替换整个 mjx-container，而不是只替换里面的 svg。
+            // 这样 SVG、辅助 MathML、MathJax 包装层不会同时残留在截图 DOM 中。
+            mathContainer.replaceWith(canvas);
+        } catch (error) {
+            console.warn(
+                "PDF 数学公式栅格化失败：",
+                error
+            );
+
+            // 即使某个 SVG 转换失败，也至少移除无障碍 MathML，防止重影。
+            mathContainer.querySelectorAll(
+                "mjx-assistive-mml, .MJX_Assistive_MathML"
+            ).forEach(node => node.remove());
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }
+
+    await new Promise(resolve => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+}
+
+function canvasSlice(sourceCanvas, startY, sliceHeight) {
+    const slice = document.createElement("canvas");
+    slice.width = sourceCanvas.width;
+    slice.height = sliceHeight;
+
+    const context = slice.getContext("2d");
+    context.drawImage(
+        sourceCanvas,
+        0,
+        startY,
+        sourceCanvas.width,
+        sliceHeight,
+        0,
+        0,
+        sourceCanvas.width,
+        sliceHeight
+    );
+
+    return slice;
+}
+
+function findPdfSafeSliceHeight(
+    canvas,
+    startY,
+    maxHeight
+) {
+    const remaining = canvas.height - startY;
+
+    if (remaining <= maxHeight) {
+        return remaining;
+    }
+
+    const target = Math.min(
+        canvas.height - 1,
+        startY + maxHeight
+    );
+    // 宁可上一页底部多留一点空白，也不要把一整行公式 / 矩阵 / 路径
+    // 从中间切成两页。旧版最多只向前找 320px，数学块稍高就找不到
+    // 段落间隙。现在允许回看约半页，优先在真正的空白带分页。
+    const searchBack = Math.min(
+        Math.floor(maxHeight * 0.52),
+        1100
+    );
+    const searchStart = Math.max(
+        startY + Math.floor(maxHeight * 0.34),
+        target - searchBack
+    );
+
+    const context = canvas.getContext(
+        "2d",
+        { willReadFrequently: true }
+    );
+
+    if (!context) {
+        return maxHeight;
+    }
+
+    let imageData;
+
+    try {
+        imageData = context.getImageData(
+            0,
+            searchStart,
+            canvas.width,
+            target - searchStart + 1
+        );
+    } catch (_error) {
+        return maxHeight;
+    }
+
+    const { data, width, height } = imageData;
+    const sampleStep = Math.max(2, Math.floor(width / 260));
+    const blankRows = [];
+
+    for (let y = 0; y < height; y += 1) {
+        let ink = 0;
+        let samples = 0;
+
+        for (let x = 0; x < width; x += sampleStep) {
+            const offset = (y * width + x) * 4;
+            const r = data[offset];
+            const g = data[offset + 1];
+            const b = data[offset + 2];
+            const a = data[offset + 3];
+
+            if (a > 20) {
+                samples += 1;
+
+                // 白色 / #f8fafc 等浅背景都视为空白；真正文字和公式会
+                // 至少有一个通道明显变暗。
+                if (Math.min(r, g, b) < 218) {
+                    ink += 1;
+                }
+            }
+        }
+
+        const ratio = samples ? ink / samples : 0;
+        blankRows.push(ratio < 0.008);
+    }
+
+    let bestEnd = -1;
+    let runStart = -1;
+
+    for (let y = 0; y <= blankRows.length; y += 1) {
+        const blank = y < blankRows.length
+            ? blankRows[y]
+            : false;
+
+        if (blank && runStart < 0) {
+            runStart = y;
+            continue;
+        }
+
+        if (!blank && runStart >= 0) {
+            const runLength = y - runStart;
+
+            if (runLength >= 8) {
+                bestEnd = y - 1;
+            }
+
+            runStart = -1;
+        }
+    }
+
+    if (bestEnd >= 0) {
+        const safeGlobalY = searchStart + bestEnd;
+        const safeHeight = safeGlobalY - startY + 1;
+
+        if (safeHeight >= maxHeight * 0.34) {
+            return Math.max(1, safeHeight);
+        }
+    }
+
+    return maxHeight;
+}
+
+async function exportWrongBookPdf() {
+    const items = getFilteredWrongBookItems();
+
+    if (!items.length) {
+        void showWrongBookPdfNotice("当前没有可以导出的错题");
+        return;
+    }
+
+    if (
+        typeof window.html2canvas !== "function"
+        || !window.jspdf?.jsPDF
+    ) {
+        void showWrongBookPdfNotice(
+            "PDF 组件加载失败，请刷新页面后重试"
+        );
+        return;
+    }
+
+    const button = document.getElementById(
+        "wrongPdfBtn"
+    );
+    const originalText = button?.textContent || "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "正在生成 PDF…";
+    }
+
+    let exportElement = null;
+
+    try {
+        exportElement = buildWrongBookPdfExportElement(
+            items
+        );
+
+        await typesetWrongBookPdfElement(
+            exportElement
+        );
+        await rasterizeMathJaxSvgForPdf(
+            exportElement
+        );
+
+        const {
+            jsPDF
+        } = window.jspdf;
+
+        const pdf = new jsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: "a4",
+            compress: true
+        });
+
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const marginX = 12;
+        const marginY = 12;
+        const usableWidth = pageWidth - marginX * 2;
+        const usableHeight = pageHeight - marginY * 2;
+
+        const sections = [
+            ...exportElement.children
+        ];
+
+        let currentY = marginY;
+        let hasContent = false;
+
+        for (const section of sections) {
+            const canvas = await window.html2canvas(
+                section,
+                {
+                    scale: 2,
+                    backgroundColor: "#ffffff",
+                    useCORS: true,
+                    foreignObjectRendering: false,
+                    logging: false
+                }
+            );
+
+            if (!canvas.width || !canvas.height) {
+                continue;
+            }
+
+            const renderedHeight = (
+                canvas.height
+                * usableWidth
+                / canvas.width
+            );
+
+            const remaining = (
+                usableHeight
+                - (currentY - marginY)
+            );
+
+            if (renderedHeight <= usableHeight) {
+                if (
+                    hasContent
+                    && renderedHeight > remaining
+                ) {
+                    pdf.addPage();
+                    currentY = marginY;
+                }
+
+                const image = canvas.toDataURL(
+                    "image/jpeg",
+                    0.92
+                );
+
+                pdf.addImage(
+                    image,
+                    "JPEG",
+                    marginX,
+                    currentY,
+                    usableWidth,
+                    renderedHeight,
+                    undefined,
+                    "FAST"
+                );
+
+                currentY += renderedHeight + 4;
+                hasContent = true;
+                continue;
+            }
+
+            // 单个内容块超过一页时，从一张新页开始再切片。
+            // 旧版会在这里先 addPage，进入 while 后又 addPage 一次，
+            // 因此中间会凭空多出整张白页。
+            if (hasContent) {
+                pdf.addPage();
+            }
+
+            currentY = marginY;
+
+            const pixelsPerMm = canvas.width / usableWidth;
+            const fullPagePixels = Math.max(
+                1,
+                Math.floor(
+                    usableHeight * pixelsPerMm
+                )
+            );
+
+            let startY = 0;
+            let firstSlice = true;
+
+            while (startY < canvas.height) {
+                if (!firstSlice) {
+                    pdf.addPage();
+                }
+
+                const sliceHeight = Math.min(
+                    findPdfSafeSliceHeight(
+                        canvas,
+                        startY,
+                        fullPagePixels
+                    ),
+                    canvas.height - startY
+                );
+
+                const slice = canvasSlice(
+                    canvas,
+                    startY,
+                    sliceHeight
+                );
+
+                const sliceHeightMm = (
+                    sliceHeight
+                    * usableWidth
+                    / canvas.width
+                );
+
+                pdf.addImage(
+                    slice.toDataURL(
+                        "image/jpeg",
+                        0.92
+                    ),
+                    "JPEG",
+                    marginX,
+                    marginY,
+                    usableWidth,
+                    sliceHeightMm,
+                    undefined,
+                    "FAST"
+                );
+
+                hasContent = true;
+                currentY = marginY + sliceHeightMm + 4;
+                startY += sliceHeight;
+                firstSlice = false;
+            }
+        }
+
+        const date = new Date()
+            .toISOString()
+            .slice(0, 10);
+
+        pdf.save(
+            `离散数学错题本-${date}.pdf`
+        );
+    } catch (error) {
+        console.error("错题本 PDF 导出失败：", error);
+
+        void showWrongBookPdfNotice(
+            "PDF 生成失败，请刷新页面后重试"
+        );
+    } finally {
+        exportElement?.remove();
+
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "导出 PDF";
+        }
+    }
+}
+
+
+function formatWrongBookGeneratedText(text) {
+    let value = String(text || "").trim();
+
+    if (!value) return "";
+
+    // 旧版本已保存的 LaTeX 做“可读化”迁移，避免再次裸露反斜杠。
+    value = value.replace(
+        /\\begin\{(?:bmatrix|pmatrix|matrix)\}([\s\S]*?)\\end\{(?:bmatrix|pmatrix|matrix)\}/g,
+        (_match, body) => {
+            const rows = String(body)
+                .split(/\\\\/)
+                .map(row => row.trim())
+                .filter(Boolean)
+                .map(row => (
+                    "[ "
+                    + row
+                        .split("&")
+                        .map(cell => cell.trim())
+                        .join("  ")
+                    + " ]"
+                ));
+
+            return `\n${rows.join("\n")}\n`;
+        }
+    );
+
+    value = value
+        .replace(/\\xrightarrow\{([^{}]+)\}/g, " —$1→ ")
+        .replace(/\\rightarrow/g, "→")
+        .replace(/\\Rightarrow/g, "⇒")
+        .replace(/\\to/g, "→")
+        .replace(/\\neq|\\ne/g, "≠")
+        .replace(/\\leq|\\le/g, "≤")
+        .replace(/\\geq|\\ge/g, "≥")
+        .replace(/\\in\b/g, "∈")
+        .replace(/\\notin\b/g, "∉")
+        .replace(/\\times/g, "×")
+        .replace(/\\cdot/g, "·")
+        .replace(/\\land/g, "∧")
+        .replace(/\\lor/g, "∨")
+        .replace(/\\neg/g, "¬");
+
+    value = value.replace(
+        /\b([A-Za-z])_\{?([A-Za-z0-9]+)\}?/g,
+        "$1$2"
+    );
+
+    value = value.replace(
+        /\\text\{([^{}]*)\}/g,
+        "$1"
+    );
+
+    value = value
+        .replace(/\$\$/g, "")
+        .replace(/\$/g, "")
+        .replace(/\\[;,!]/g, " ")
+        .replace(/\\\\/g, "\n");
+
+    // 最后移除仍残留的纯排版命令，保留正文。
+    value = value.replace(
+        /\\(?:left|right|displaystyle|quad|qquad)\b/g,
+        ""
+    );
+
+    value = value
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+    return value;
+}
+
+function extractAnswerOnlyText(text) {
+    let value = String(text || "").trim();
+
+    if (!value) return "";
+
+    const marker = value.match(
+        /\[\[ANSWER_ONLY\]\]([\s\S]*?)\[\[\/ANSWER_ONLY\]\]/i
+    );
+
+    if (marker) {
+        value = marker[1].trim();
+    }
+    value = value.replace(/^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:\[(?:Final\s+)?Answer\]|(?:Final\s+)?Answer\s*:)\s*(?:\*\*)?\s*/i, "");
+    value = value.replace(/^[ \t]*(?:#{1,6}[ \t]+(?:Final[ \t]+)?Answer[ \t]*:?[ \t]*(?:\n|$)|(?:\*\*|__)(?:Final[ \t]+)?Answer[ \t]*:?(?:\*\*|__)[ \t]*(?:\n|$))/i, "");
+    value = value.replace(/^\s*(?:#{1,6}\s*)?(?:\*\*)?【(?:参考答案|最终答案|答案)】\s*(?:\*\*)?\s*/m, "");
+
+    // 去掉模型常见客套开头。
+    value = value.replace(
+        /^(?:好的[，,。]?\s*)?(?:以下是)?(?:这道题的)?(?:最终)?答案(?:是|为)?[：:\s]*/i,
+        ""
+    ).trim();
+
+    // 一旦进入解析/理由/过程，后面全部不要。
+    const stopPatterns = [
+        /\n[ \t]*(?:#{1,6}[ \t]+(?:Explanation|Solution|Reasoning)[ \t]*:?[ \t]*(?=\n|$)|(?:\*\*|__)(?:Explanation|Solution|Reasoning)[ \t]*:?(?:\*\*|__)[ \t]*(?=\n|$))/im,
+        /\n\s*(?:#{1,6}\s*)?(?:\*\*)?【(?:解析|解答|理由|过程|推导|说明|易错点)】/m,
+        /\n\s*(?:#{1,6}\s*)?(?:\*\*)?(?:\[(?:Explanation|Solution|Reasoning)\]|(?:Explanation|Solution|Reasoning)\s*:)/i,
+        /\n\s*(?:#{1,6}\s*)?(?:解析|理由|过程|推导|说明|易错点)\s*[:：]?/i,
+        /\n\s*(?:因为|所以)\b/,
+    ];
+
+    let end = value.length;
+
+    for (const pattern of stopPatterns) {
+        const match = value.match(pattern);
+        if (match && typeof match.index === "number") {
+            end = Math.min(end, match.index);
+        }
+    }
+
+    return value.slice(0, end).trim();
+}
+
+
+function queueWrongQuestionAnswer(id) {
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === id
+    );
+
+    if (
+        !entry
+        || entry.referenceAnswer
+        || entry.answer
+        || wrongAnswerLoadingIds.has(id)
+        || wrongAnswerQueue.includes(id)
+    ) {
+        return;
+    }
+
+    wrongAnswerQueue.push(id);
+    runWrongAnswerQueue();
+}
+
+async function runWrongAnswerQueue() {
+    if (wrongAnswerQueueBusy) {
+        return;
+    }
+
+    wrongAnswerQueueBusy = true;
+
+    try {
+        while (wrongAnswerQueue.length) {
+            const id = wrongAnswerQueue.shift();
+
+            await generateWrongQuestionAnswer(
+                id,
+                {
+                    silent: true
+                }
+            );
+        }
+    } finally {
+        wrongAnswerQueueBusy = false;
+    }
+}
+
+
+
+
+
+
+function toggleWrongAnalysis(id) {
+    if (wrongAnalysisExpandedIds.has(id)) {
+        wrongAnalysisExpandedIds.delete(id);
+    } else {
+        wrongAnalysisExpandedIds.add(id);
+    }
+
+    renderWrongBook();
+}
+
+async function generateWrongQuestionAnswer(
+    id,
+    {
+        silent = false
+    } = {}
+) {
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === id
+    );
+
+    if (!entry) return false;
+
+    if (entry.referenceAnswer || entry.answer) {
+        return true;
+    }
+
+    if (wrongAnswerLoadingIds.has(id)) {
+        return false;
+    }
+
+    wrongAnswerLoadingIds.add(id);
+    renderWrongBook();
+    const question = entry.question;
+    const isCurrent = () => learningState.wrongQuestions.includes(entry)
+        && entry.question === question && !entry.referenceAnswer && !entry.answer;
+
+    const prompt = [
+        "请只给出下面这道离散数学题的最终答案。",
+        "绝对不要提供解析、理由、推导、说明、提示，也不要写“因为/所以/由……可得”。",
+        "",
+        "请严格只返回下面这个机器可读格式：",
+        "[[ANSWER_ONLY]]",
+        "最终答案",
+        "[[/ANSWER_ONLY]]",
+        "",
+        "答案内部可以使用规范 MathJax LaTeX：",
+        "- 行内公式使用 $...$；",
+        "- 矩阵/多行公式使用 $$...$$；",
+        "- 不要在答案块之外输出任何文字。",
+        "",
+        "【题目】",
+        entry.question
+    ].join("\n");
+
+    try {
+        const response = await fetch(
+            "/chat",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    language: dmateUiLanguage(),
+                    messages: [
+                        {
+                            role: "user",
+                            content: prompt
+                        }
+                    ]
+                })
+            }
+        );
+
+        const data = await parseResponseJson(
+            response
+        );
+        if (!isCurrent()) return false;
+
+        if (
+            !response.ok
+            || data.error
+            || typeof data.reply !== "string"
+            || !data.reply.trim()
+        ) {
+            if (!silent) {
+                window.alert(
+                    data.error
+                    || "答案生成失败，请稍后重试"
+                );
+            }
+            return false;
+        }
+
+        const finalAnswer = extractAnswerOnlyText(data.reply).trim().slice(0, 3000);
+        // 模型失败文案不是“答案”；用户切换账号/清空错题期间的
+        // 旧异步请求也不能写回另一账号的学习状态。
+        if (!finalAnswer || /^(?:抱歉|AI\s*服务|网络连接失败|暂时无法生成|当前请求过于频繁)/i.test(finalAnswer)) {
+            return false;
+        }
+        entry.answer = finalAnswer;
+        entry.answerUpdatedAt = Date.now();
+        entry.updatedAt = Date.now();
+
+        saveLearningState();
+        renderWrongBook();
+        return true;
+
+    } catch (error) {
+        if (!isCurrent()) return false;
+        console.error("错题答案生成失败：", error);
+
+        if (!silent) {
+            window.alert(
+                "网络连接失败，暂时无法生成答案"
+            );
+        }
+
+        return false;
+
+    } finally {
+        wrongAnswerLoadingIds.delete(id);
+        renderWrongBook();
+    }
+}
+
+async function generateWrongQuestionAnalysis(id) {
+    const entry = learningState.wrongQuestions.find(
+        item => item.id === id
+    );
+
+    if (!entry) return;
+
+    if (entry.analysis) {
+        wrongAnalysisExpandedIds.add(id);
+        renderWrongBook();
+        return;
+    }
+
+    if (wrongAnalysisLoadingIds.has(id)) {
+        return;
+    }
+
+    wrongAnalysisLoadingIds.add(id);
+    renderWrongBook();
+
+    const knownAnswer = (
+        entry.referenceAnswer
+        || entry.answer
+        || ""
+    );
+    const question = entry.question;
+    const isCurrent = () => learningState.wrongQuestions.includes(entry)
+        && entry.question === question && !entry.analysis
+        && (entry.referenceAnswer || entry.answer || "") === knownAnswer;
+
+    const prompt = [
+        "请为下面这道离散数学错题提供完整解析，直接讲解，不要反问学生。",
+        "",
+        "内容要求：",
+        "1. 已知最终答案如下，先核对后围绕它解释：",
+        knownAnswer || "（暂无参考答案）",
+        "2. 分步骤写关键推理；",
+        "3. 解析要清楚，但不要重复抄题或堆废话；",
+        "4. 最后给一条易错点。",
+        "",
+        "数学格式必须严格使用 MathJax 可解析的标准 LaTeX：",
+        "- 行内公式使用 $...$；",
+        "- 独立公式、矩阵、cases、多行推导使用 $$...$$；",
+        "- 矩阵必须写成 $$\\\\begin{bmatrix}...\\\\end{bmatrix}$$；",
+        "- 下标写 $v_1$、$a_{ij}$；",
+        "- 路径可以写 $v_1\\\\to v_2\\\\to v_3$；",
+        "- 所有 $ 必须成对闭合；",
+        "- 不允许裸露 \\\\begin{...}、\\\\to、v_1 这类未被数学定界符包裹的 LaTeX。",
+        "",
+        "【错题】",
+        entry.question
+    ].join("\n");
+
+    try {
+        const response = await fetch(
+            "/chat",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    language: dmateUiLanguage(),
+                    messages: [
+                        {
+                            role: "user",
+                            content: prompt
+                        }
+                    ]
+                })
+            }
+        );
+
+        const data = await parseResponseJson(
+            response
+        );
+        if (!isCurrent()) return;
+
+        if (
+            !response.ok
+            || data.error
+            || typeof data.reply !== "string"
+            || !data.reply.trim()
+        ) {
+            window.alert(
+                data.error
+                || "解析生成失败，请稍后重试"
+            );
+            return;
+        }
+
+        entry.analysis = data.reply.trim().slice(
+            0,
+            8000
+        );
+
+        entry.analysisUpdatedAt = Date.now();
+        entry.updatedAt = Date.now();
+
+        wrongAnalysisExpandedIds.add(id);
+        saveLearningState();
+        renderWrongBook();
+
+    } catch (error) {
+        if (!isCurrent()) return;
+        console.error("错题解析生成失败：", error);
+        window.alert(
+            "网络连接失败，暂时无法生成解析"
+        );
+    } finally {
+        wrongAnalysisLoadingIds.delete(id);
+        renderWrongBook();
+    }
+}
+
+
+function shouldShowWrongBookFeedback(item) {
+    const text = String(item?.feedback || "").trim();
+
+    if (!text) return false;
+
+    if (
+        item?.source === "manual"
+        && (
+            text.includes("加入错题本")
+            || text.includes("完成订正后")
+            || text.includes("手动加入")
+        )
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+function renderWrongBook() {
+    const list = document.getElementById("wrongBookList");
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    const allItems = [...learningState.wrongQuestions];
+    const items = getFilteredWrongBookItems();
+
+    updateWrongBookToolbar(allItems);
+
+    if (!items.length) {
+        const empty = document.createElement("div");
+        empty.className = "wrong-empty";
+
+        if (!allItems.length) {
+            empty.textContent = "无";
+        } else if (wrongBookSearch) {
+            empty.textContent = "没有找到匹配的错题";
+        } else if (wrongBookFilter === "pending") {
+            empty.textContent = "目前没有待处理的错题";
+        } else if (wrongBookFilter === "corrected") {
+            empty.textContent = "目前没有已完成订正的错题";
+        } else {
+            empty.textContent = "没有符合条件的错题";
+        }
+
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const item of items) {
+        const card = document.createElement("div");
+        card.className = "wrong-card";
+
+        const top = document.createElement("div");
+        top.className = "wrong-card-top";
+
+        const statusInfo = wrongBookStatus(item);
+        const status = document.createElement("span");
+        status.className = [
+            "wrong-status",
+            statusInfo.className
+        ]
+            .filter(Boolean)
+            .join(" ");
+        status.textContent = statusInfo.text;
+
+        const date = document.createElement("span");
+        date.className = "wrong-date";
+        date.textContent = formatLearningDate(item.updatedAt);
+
+        top.appendChild(status);
+        const manualPasses = Array.isArray(item.passedRetestSessionIds) ? item.passedRetestSessionIds.length : 0;
+        if (manualPasses > 0) {
+            const passTimes = document.createElement("span");
+            passTimes.className = "wrong-status passed";
+            passTimes.textContent = `已通过复测 ${manualPasses} 次`;
+            top.appendChild(passTimes);
+        }
+        top.appendChild(date);
+
+        const difficulty = ["简单", "中等", "困难"].includes(item.difficulty)
+            ? item.difficulty
+            : "";
+        const difficultyBadge = difficulty
+            ? document.createElement("div")
+            : null;
+
+        if (difficultyBadge) {
+            difficultyBadge.className = "difficulty-badge";
+            difficultyBadge.textContent = difficulty;
+        }
+
+        const question = document.createElement("div");
+        question.className = "wrong-question";
+        question.setAttribute("data-i18n-content", "");
+        question.innerHTML = markdownToHtml(item.question);
+
+        const meta = document.createElement("div");
+        meta.className = "wrong-meta";
+
+        const appendMetaRow = (
+            label,
+            value,
+            className = ""
+        ) => {
+            if (!value) return;
+
+            const row = document.createElement("div");
+            row.className = [
+                "wrong-meta-row",
+                className
+            ]
+                .filter(Boolean)
+                .join(" ");
+
+            const labelNode = document.createElement("span");
+            labelNode.className = "wrong-meta-label";
+            labelNode.textContent = label;
+
+            const valueNode = document.createElement("span");
+            valueNode.className = "wrong-meta-value";
+            valueNode.textContent = value;
+
+            row.appendChild(labelNode);
+            row.appendChild(valueNode);
+            meta.appendChild(row);
+        };
+
+        // 模块分类仅用于后台学习记录、复测和知识图谱关联，
+        // 错题卡不额外展示所属模块或涉及模块。
+        if (item.focusPoints.length) {
+            appendMetaRow(
+                "本题难点",
+                dmateKnowledgeList(item.focusPoints),
+                "focus"
+            );
+        }
+
+        if (item.knowledgePoints.length) {
+            appendMetaRow(
+                "整题涉及",
+                dmateKnowledgeList(item.knowledgePoints)
+            );
+        }
+
+        if (item.retestCount) {
+            appendMetaRow(
+                "复测情况",
+                `${item.retestCount} 次，通过 ${item.retestPassCount} 次`
+            );
+        }
+
+        const feedback = document.createElement("div");
+        feedback.className = "wrong-feedback";
+
+        if (shouldShowWrongBookFeedback(item)) {
+            const prefixNode = document.createElement("strong");
+            prefixNode.textContent = "最近反馈";
+
+            const feedbackBody = document.createElement("div");
+            feedbackBody.className = "wrong-feedback-body";
+            feedbackBody.setAttribute("data-i18n-content", "");
+            feedbackBody.innerHTML = markdownToHtml(item.feedback);
+
+            feedback.appendChild(prefixNode);
+            feedback.appendChild(feedbackBody);
+        }
+
+        const note = document.createElement("div");
+        note.className = "wrong-note";
+
+        if (item.note) {
+            const noteTitle = document.createElement("strong");
+            noteTitle.textContent = "我的笔记：";
+
+            const noteBody = document.createElement("div");
+            noteBody.className = "wrong-note-body";
+            noteBody.setAttribute("data-i18n-content", "");
+            noteBody.innerHTML = markdownToHtml(item.note);
+
+            note.appendChild(noteTitle);
+            note.appendChild(noteBody);
+        }
+
+        const retest = document.createElement("div");
+        retest.className = "wrong-retest";
+
+        if (item.lastRetestAt) {
+            const resultText = item.lastRetestResult === "correct"
+                ? "最近复测：通过"
+                : (
+                    item.lastRetestResult === "wrong"
+                        ? "最近复测：未通过"
+                        : "最近复测：尚未确认"
+                );
+
+            retest.textContent = resultText;
+        }
+
+        const answerDetails = document.createElement("details");
+        answerDetails.className = "wrong-answer-details";
+
+        const answerSummary = document.createElement("summary");
+        answerSummary.className = "wrong-answer-summary";
+
+        if (
+            item.referenceAnswer
+            || item.answer
+        ) {
+            answerSummary.textContent = "查看答案";
+        } else if (wrongAnswerLoadingIds.has(item.id) || wrongAnswerQueue.includes(item.id)) {
+            answerSummary.textContent = "查看答案 · 自动准备中";
+        } else {
+            answerSummary.textContent = "查看答案 · 尚未生成";
+        }
+
+        const answerInner = document.createElement("div");
+        answerInner.className = "wrong-answer-inner";
+
+        const visibleAnswer = (
+            item.referenceAnswer
+            || item.answer
+            || ""
+        );
+
+        if (visibleAnswer) {
+            answerInner.setAttribute("data-i18n-content", "");
+            answerInner.innerHTML = markdownToHtml(
+                visibleAnswer
+            );
+        } else {
+            answerInner.textContent = (
+                wrongAnswerLoadingIds.has(item.id) || wrongAnswerQueue.includes(item.id)
+            )
+                ? "已自动请求生成最终答案，完成后会直接保存，无需手动点击生成"
+                : "暂无可复用答案；展开后会自动请求生成并保存";
+        }
+
+        answerDetails.appendChild(answerSummary);
+        answerDetails.appendChild(answerInner);
+
+        answerDetails.addEventListener(
+            "toggle",
+            () => {
+                if (
+                    answerDetails.open
+                    && !item.referenceAnswer
+                    && !item.answer
+                ) {
+                    queueWrongQuestionAnswer(
+                        item.id
+                    );
+                }
+            }
+        );
+
+        const analysisBox = document.createElement("div");
+        analysisBox.className = "wrong-analysis-box";
+
+        if (item.analysis) {
+            const analysisDetails = document.createElement("details");
+            analysisDetails.className = "wrong-analysis-details";
+            analysisDetails.open = wrongAnalysisExpandedIds.has(
+                item.id
+            );
+
+            const analysisSummary = document.createElement("summary");
+            analysisSummary.className = "wrong-analysis-summary";
+            analysisSummary.textContent = "查看解析";
+
+            const analysisBody = document.createElement("div");
+            analysisBody.className = "wrong-analysis-body";
+            analysisBody.setAttribute("data-i18n-content", "");
+            analysisBody.innerHTML = markdownToHtml(
+                item.analysis
+            );
+
+            analysisDetails.appendChild(analysisSummary);
+            analysisDetails.appendChild(analysisBody);
+
+            analysisDetails.addEventListener(
+                "toggle",
+                () => {
+                    if (analysisDetails.open) {
+                        wrongAnalysisExpandedIds.add(item.id);
+                    } else {
+                        wrongAnalysisExpandedIds.delete(item.id);
+                    }
+                }
+            );
+
+            analysisBox.appendChild(analysisDetails);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "wrong-actions";
+
+        actions.appendChild(createSmartCopyButton(() =>
+            copyRenderedImageToClipboard(() => card.cloneNode(true))
+        ));
+
+        if (!item.analysis) {
+            const analysisButton = document.createElement("button");
+            analysisButton.type = "button";
+            analysisButton.className = "secondary";
+
+            if (wrongAnalysisLoadingIds.has(item.id)) {
+                analysisButton.textContent = "正在生成解析…";
+                analysisButton.disabled = true;
+            } else {
+                analysisButton.textContent = "生成解析";
+            }
+
+            analysisButton.onclick = () => (
+                generateWrongQuestionAnalysis(item.id)
+            );
+
+            actions.appendChild(analysisButton);
+        }
+
+        if (!item.corrected) {
+            const correctedButton = document.createElement("button");
+            correctedButton.type = "button";
+            correctedButton.textContent = "完成订正";
+            correctedButton.onclick = () => (
+                markWrongQuestionCorrected(item.id)
+            );
+            actions.appendChild(correctedButton);
+        }
+
+        const retestButton = document.createElement("button");
+        retestButton.type = "button";
+        retestButton.className = item.corrected || item.retestPassed
+            ? ""
+            : "secondary";
+        retestButton.textContent = item.retestPassed
+            ? "再测一次"
+            : "再测一道";
+        retestButton.disabled = !item.corrected && !item.retestPassed;
+        retestButton.title = retestButton.disabled
+            ? "先完成订正，再进行同知识点复测"
+            : "生成一道同知识点、难度相近的新题进行验证";
+        retestButton.onclick = () => (
+            startWrongQuestionRetest(item.id)
+        );
+        actions.appendChild(retestButton);
+
+        const passButton = document.createElement("button");
+        passButton.type = "button";
+        passButton.className = "secondary";
+        passButton.textContent = "查看复测";
+        passButton.title = "查看每一次复测题并选择通过记录";
+        passButton.onclick = () => openWrongRetestReview(item.id);
+        actions.appendChild(passButton);
+
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.className = "secondary";
+        editButton.textContent = "编辑/笔记";
+        editButton.onclick = () => openWrongEdit(item.id);
+        actions.appendChild(editButton);
+
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "secondary danger";
+        removeButton.textContent = "移出错题本";
+        removeButton.onclick = event => {
+            event.preventDefault();
+            event.stopPropagation();
+            // Defer opening until the originating mobile click is complete.
+            // Otherwise its trailing synthetic click can dismiss the new overlay.
+            window.setTimeout(() => { void removeWrongQuestion(item.id); }, 0);
+        };
+        actions.appendChild(removeButton);
+
+        card.appendChild(top);
+        if (difficultyBadge) {
+            card.appendChild(difficultyBadge);
+        }
+        card.appendChild(question);
+
+        if (meta.textContent) {
+            card.appendChild(meta);
+        }
+
+        if (feedback.textContent.trim()) {
+            card.appendChild(feedback);
+        }
+
+        if (item.note) {
+            card.appendChild(note);
+        }
+
+        if (retest.textContent) {
+            card.appendChild(retest);
+        }
+
+        card.appendChild(answerDetails);
+
+        if (analysisBox.childNodes.length) {
+            card.appendChild(analysisBox);
+        }
+
+        card.appendChild(actions);
+        list.appendChild(card);
+
+        renderMath(question);
+        renderMath(feedback);
+        renderMath(note);
+        renderMath(answerDetails);
+        renderMath(analysisBox);
+    }
+}
+
+
+function isGenericTeachingCategory(value) {
+    const text = String(value || "").trim();
+    return !text || text === "待识别" || text === "离散数学综合";
+}
+
+function getFriendlyCategory(value) {
+    const text = String(value || "").trim();
+
+    if (isGenericTeachingCategory(text)) {
+        return "正在重新判定";
+    }
+
+    return text;
+}
+
+function getFriendlyQuestionType(value) {
+    const text = String(value || "").trim();
+
+    if (!text) {
+        return "一般问题";
+    }
+
+    if (text === "综合题") {
+        return "综合问题";
+    }
+
+    if (text === "一般题") {
+        return "一般问题";
+    }
+
+    if (text === "出题请求") {
+        return "练习题需求";
+    }
+
+    if (text === "答案检查") {
+        return "答案检查";
+    }
+
+    return text;
+}
+
+function getFriendlyMode(value) {
+    const text = String(value || "").trim();
+
+    if (!text || text === "提示引导") {
+        return "先给思路和提示";
+    }
+
+    if (text === "完整解析") {
+        return "直接讲完整解法";
+    }
+
+    if (text === "概念讲解") {
+        return "先解释概念";
+    }
+
+    if (text === "练习出题") {
+        return "给你出练习题";
+    }
+
+    if (text === "答案诊断") {
+        return "帮你检查答案";
+    }
+
+    return text;
+}
+
+function getFriendlyConfidence(value) {
+    const text = String(value || "").trim();
+
+    if (!text || text === "低") {
+        return "不太确定";
+    }
+
+    if (text === "中") {
+        return "比较确定";
+    }
+
+    if (text === "高") {
+        return "较确定";
+    }
+
+    return text;
+}
+
+function getFriendlyInputSource(value) {
+    const text = String(value || "").trim();
+
+    if (!text || text === "文本输入") {
+        return "手动输入";
+    }
+
+    if (text === "图片识题") {
+        return "图片识题";
+    }
+
+    return text;
+}
+
+
+// -----------------------------
+// 本地持久化
+// -----------------------------
+// OCR semantic snapshots keep edge instances and literal labels. They never
+// carry image coordinates, paths, pixel proofs, or arbitrary worker metadata.
+function sanitizeSemanticContext(value, message = null) {
+    const object = item => item && typeof item === "object" && !Array.isArray(item);
+    const string = (item, limit, nonempty = false) => typeof item === "string"
+        && item.length <= limit && (!nonempty || Boolean(item.trim()));
+    const literal = (item, limit) => item === null || item === undefined || string(item, limit);
+    if (!object(value) || !object(value.document)
+        || !string(value.source_sha256, 64) || !/^[a-f0-9]{64}$/i.test(value.source_sha256)
+        || !string(value.question_text, 24000, true)
+        || !string(value.rendered_question_text, 24000, true)
+        || !string(value.document.body_text, 24000)
+        || !Array.isArray(value.document.graphs) || value.document.graphs.length > 64) return null;
+    const graphs = [];
+    for (const graph of value.document.graphs) {
+        if (!object(graph) || !string(graph.id, 128, true) || !literal(graph.name, 256)
+            || !Array.isArray(graph.vertices) || graph.vertices.length > 100
+            || !Array.isArray(graph.edges) || graph.edges.length > 300) return null;
+        const clean = { id: graph.id, name: graph.name ?? null, complete: graph.complete === true,
+            vertices: [], edges: [] };
+        if (graph.visual_description !== undefined) {
+            if (!string(graph.visual_description, 800)) return null;
+            clean.visual_description = graph.visual_description;
+        }
+        if (graph.anon_next !== undefined) {
+            if (!Number.isInteger(graph.anon_next) || graph.anon_next < 1 || graph.anon_next > 10000) return null;
+            clean.anon_next = graph.anon_next;
+        }
+        for (const key of ["directed", "weighted", "multigraph"]) {
+            if (graph[key] !== undefined && typeof graph[key] !== "boolean" && graph[key] !== "unknown") return null;
+            clean[key] = graph[key] ?? "unknown";
+        }
+        if (graph.direction_mode !== undefined) {
+            if (!string(graph.direction_mode, 32)) return null;
+            clean.direction_mode = graph.direction_mode;
+        }
+        // Preserve the existence of unresolved edge records. Dropping them
+        // would turn an incomplete snapshot into a seemingly complete graph.
+        for (const field of ["unresolved_edges", "unresolved_vertices", "uncertain_edges"]) {
+            if (graph[field] === undefined) continue;
+            if (!Array.isArray(graph[field]) || graph[field].length > 300) return null;
+            clean[field] = graph[field].map(edge => {
+                const item = {};
+                if (object(edge)) {
+                    for (const key of ["id", "from", "to", "direction", "edge_label", "reason", "status"]) {
+                        if (string(edge[key], 1000)) item[key] = edge[key];
+                    }
+                }
+                return item;
+            });
+        }
+        for (const vertex of graph.vertices) {
+            if (!object(vertex) || !string(vertex.id, 128, true) || !literal(vertex.label, 256)) return null;
+            const node = { id: vertex.id, label: vertex.label ?? null };
+            for (const [field, limit] of [["display_label", 16], ["position_description", 160]]) {
+                if (vertex[field] !== undefined) {
+                    if (!string(vertex[field], limit)) return null;
+                    node[field] = vertex[field];
+                }
+            }
+            if (typeof vertex.isolated_confirmed === "boolean") node.isolated_confirmed = vertex.isolated_confirmed;
+            clean.vertices.push(node);
+        }
+        for (const edge of graph.edges) {
+            if (!object(edge) || !string(edge.id, 128, true)
+                || !string(edge.from, 128, true) || !string(edge.to, 128, true)
+                || !["forward", "undirected", "unknown"].includes(edge.direction)
+                || !literal(edge.edge_label, 256) || !literal(edge.color, 64) || !literal(edge.style, 64)
+                || !(edge.weight === null || edge.weight === undefined || string(edge.weight, 256)
+                    || (typeof edge.weight === "number" && Number.isFinite(edge.weight)))) return null;
+            const item = { id: edge.id, from: edge.from, to: edge.to, direction: edge.direction,
+                weight: edge.weight ?? null, edge_label: edge.edge_label ?? null,
+                color: edge.color ?? null, style: edge.style ?? null,
+                status: edge.status === "accepted" ? "accepted" : "pending" };
+            if (edge.edge_label_is_explicit !== undefined) {
+                if (typeof edge.edge_label_is_explicit !== "boolean") return null;
+                item.edge_label_is_explicit = edge.edge_label_is_explicit;
+            }
+            for (const key of ["multiplicity", "parallel_count"]) {
+                if (edge[key] !== undefined) {
+                    if (!Number.isInteger(edge[key]) || edge[key] < 1 || edge[key] > 300) return null;
+                    item[key] = edge[key];
+                }
+            }
+            clean.edges.push(item);
+        }
+        graphs.push(clean);
+    }
+    const result = { document: { body_text: value.document.body_text, graphs },
+        question_text: value.question_text, rendered_question_text: value.rendered_question_text,
+        source_sha256: value.source_sha256.toLowerCase() };
+    if (value.confirmation_token !== undefined) {
+        if (!string(value.confirmation_token, 8192, true)
+            || !string(value.document_sha256, 64, true) || !/^[a-f0-9]{64}$/i.test(value.document_sha256)
+            || !Number.isInteger(value.revision) || value.revision < 1
+            || !string(value.request_id, 160, true)) return null;
+        result.confirmation_token = value.confirmation_token;
+        result.document_sha256 = value.document_sha256;
+        result.revision = value.revision;
+        result.request_id = value.request_id;
+        if (value.profile !== "editable-v1") return null;
+        result.profile = value.profile;
+    }
+    try {
+        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 200000) return null;
+    } catch (_error) { return null; }
+    if (object(value.document.text_context)) {
+        const textContext = {};
+        for (const key of ["legends", "captions"]) {
+            const rows = value.document.text_context[key];
+            if (!Array.isArray(rows) || rows.length > 32) continue;
+            textContext[key] = rows.filter(row => object(row) && string(row.text, 2000)
+                && Array.isArray(row.graph_ids) && row.graph_ids.length <= 64
+                && row.graph_ids.every(id => string(id, 128)))
+                .map(row => ({ text: row.text, graph_ids: [...row.graph_ids] }));
+        }
+        result.document.text_context = textContext;
+    }
+    // Advisory payloads never decide what the client displays or calculates.
+    // The server checks their source/text/catalog digests again before reuse.
+    const reference = value.question_reference;
+    if (object(reference) && reference.advisory_only === true
+        && reference.non_authoritative === true && reference.cannot_drop_content === true
+        && reference.source_sha256 === result.source_sha256) {
+        try {
+            const encoded = JSON.stringify(reference);
+            if (new TextEncoder().encode(encoded).byteLength <= 40000) {
+                result.question_reference = JSON.parse(encoded);
+            }
+        } catch (_error) { /* A bad optional reference never invalidates the graph. */ }
+    }
+    if (message !== null && (message?.role !== "user" || message?.source !== "ocr"
+        || typeof message.text !== "string" || typeof message.apiText !== "string"
+        || extractOcrQuestionPayload(message.text) !== extractOcrQuestionPayload(result.rendered_question_text)
+        || !message.apiText.includes(result.question_text))) return null;
+    try {
+        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 200000) {
+            delete result.question_reference;
+            if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 200000) {
+                delete result.document.text_context;
+            }
+        }
+    } catch (_error) { return null; }
+    return result;
+}
+
+function buildOcrSemanticContext(data, text, questionText, internalQuestionText) {
+    return sanitizeSemanticContext({
+        document: { body_text: text, graphs: data?.graph_structures,
+            text_context: data?.text_context },
+        question_text: internalQuestionText,
+        rendered_question_text: extractOcrQuestionPayload(questionText),
+        source_sha256: data?.diagnostics?.semantic_workflow?.source_sha256,
+        question_reference: data?.diagnostics?.semantic_workflow?.question_reference
+    });
+}
+
+function ocrBatchQuestion(contexts, field) {
+    return contexts.map((context, index) => `【图片 ${index + 1}】\n${context[field]}`).join("\n\n");
+}
+
+function sanitizeSemanticContexts(values, message = null) {
+    if (!Array.isArray(values) || values.length < 1 || values.length > 4) return null;
+    const contexts = values.map(value => sanitizeSemanticContext(value));
+    if (contexts.some(value => !value?.confirmation_token)) return null;
+    if (new Set(contexts.map(value => value.request_id)).size !== contexts.length) return null;
+    const question = ocrBatchQuestion(contexts, "question_text");
+    const rendered = ocrBatchQuestion(contexts, "rendered_question_text");
+    if (question.length > 24000 || rendered.length > 24000) return null;
+    try { if (new TextEncoder().encode(JSON.stringify(contexts)).byteLength > 200000) return null; }
+    catch (_error) { return null; }
+    if (message !== null && (message?.role !== "user" || message?.source !== "ocr"
+        || typeof message.text !== "string" || typeof message.apiText !== "string"
+        || extractOcrQuestionPayload(message.text) !== extractOcrQuestionPayload(rendered)
+        || !message.apiText.includes(question))) return null;
+    return contexts;
+}
+
+function sanitizeOcrGroup(value, message) {
+    if (!value || typeof value !== "object" || typeof value.id !== "string"
+        || !value.id || value.id.length > 1000 || typeof value.groupId !== "string"
+        || !value.groupId || value.groupId.length > 160 || !Array.isArray(value.members)) return undefined;
+    const contexts = sanitizeSemanticContexts(message?.semanticContexts, message);
+    if (!contexts || value.members.length !== contexts.length) return undefined;
+    const members = [];
+    for (let index = 0; index < contexts.length; index += 1) {
+        const member = value.members[index];
+        if (member?.requestId !== contexts[index].request_id || typeof member.isQuestion !== "boolean") return undefined;
+        members.push({ requestId: member.requestId, isQuestion: member.isQuestion });
+    }
+    if (message.ocrIsQuestion !== members.some(member => member.isQuestion)) return undefined;
+    return { id: value.id, groupId: value.groupId, members };
+}
+
+function supportingOcrFollowUpCandidate(session, latest) {
+    if (!latest || latest.source === "ocr" || latest.manualIsQuestion === true
+        || latest.isRetestPrompt || latest.isRetestAnswer
+        || looksLikeActualLearningProblem(latest) || isQuestionNavigationFollowUp(latest.text)
+        || isExerciseRequestText(latest.text)) return null;
+    const latestIndex = session.messages.lastIndexOf(latest);
+    for (let index = latestIndex - 1; index >= 0; index -= 1) {
+        const entry = session.messages[index];
+        if (entry?.role !== "user" || entry.isError || entry.isNotice) continue;
+        if (entry.source !== "ocr") {
+            if (entry.manualIsQuestion === true || looksLikeActualLearningProblem(entry)
+                || isQuestionNavigationFollowUp(entry.text) || isExerciseRequestText(entry.text)
+                || entry.isRetestPrompt || entry.isRetestAnswer) return null;
+            continue;
+        }
+        if (entry.ocrIsQuestion !== false) return null;
+        const contexts = sanitizeSemanticContexts(entry.semanticContexts, entry);
+        const context = contexts ? null : sanitizeSemanticContext(entry.semanticContext, entry);
+        const text = contexts ? ocrBatchQuestion(contexts, "rendered_question_text")
+            : context?.rendered_question_text;
+        return { index, role: "user", source: "ocr",
+            text: text || extractOcrQuestionPayload(entry.text), invalidSemanticContext: !text };
+    }
+    return null;
+}
+
+function semanticContextForRequest(session, targetCandidate, apiMessages, options = {}) {
+    if (!Array.isArray(session?.messages) || !Array.isArray(apiMessages)
+        || options.exerciseRequest || options.retestGeneration) return undefined;
+    let latestIndex = -1;
+    for (let index = session.messages.length - 1; index >= 0; index -= 1) {
+        const entry = session.messages[index];
+        if (entry?.role === "user" && !entry.isError && !entry.isNotice
+            && typeof entry.text === "string" && entry.text.trim()) { latestIndex = index; break; }
+    }
+    if (latestIndex < 0) return undefined;
+    const latest = session.messages[latestIndex];
+    if (latest.isRetestPrompt || latest.isRetestAnswer) return undefined;
+    let selected = null;
+    const supportingFollowUp = supportingOcrFollowUpCandidate(session, latest);
+    if (latest.source === "ocr") selected = latest;
+    else {
+        // New typed problems and generated exercises never inherit an old
+        // image just because a previous graph remains in the same session.
+        if ((latest.manualIsQuestion === true || looksLikeActualLearningProblem(latest))
+            && !isQuestionNavigationFollowUp(latest.text)) return undefined;
+        const selectedCandidate = supportingFollowUp || targetCandidate;
+        if (!Number.isInteger(selectedCandidate?.index) || selectedCandidate.index < 0
+            || selectedCandidate.index >= latestIndex || selectedCandidate.role !== "user") return undefined;
+        selected = session.messages[selectedCandidate.index];
+    }
+    const contexts = sanitizeSemanticContexts(selected?.semanticContexts, selected);
+    const context = contexts ? {
+        question_text: ocrBatchQuestion(contexts, "question_text"),
+        rendered_question_text: ocrBatchQuestion(contexts, "rendered_question_text")
+    } : sanitizeSemanticContext(selected?.semanticContext, selected);
+    if (!context) return undefined;
+    if (selected !== latest && extractOcrQuestionPayload((supportingFollowUp || targetCandidate).text)
+        !== extractOcrQuestionPayload(context.rendered_question_text)) return undefined;
+    const current = [...apiMessages].reverse().find(row => row?.role === "user");
+    const visibleAnchor = extractOcrQuestionPayload(context.rendered_question_text);
+    if (!visibleAnchor) return undefined;
+    if (typeof current?.content !== "string" || !(current.content.includes(context.question_text)
+        || current.content.includes(context.rendered_question_text)
+        || current.content.includes(visibleAnchor))) return undefined;
+    return contexts || context;
+}
+
+function saveState() {
+    sessions.forEach(session => ensureSessionMessageIds(session));
+    if (shouldPersistClientState()) {
+        try {
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify({
+                    sessions,
+                    currentId,
+                    deletedSessionIds: { ...deletedSessionIds }
+                })
+            );
+        } catch (error) {
+            console.warn("本地会话保存失败：", error);
+        }
+    }
+    scheduleCloudSync();
+}
+
+function loadState() {
+    if (!shouldPersistClientState()) return false;
+
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.sessions)) {
+            return false;
+        }
+
+        deletedSessionIds = normalizeDeletedSessionIds(data.deletedSessionIds);
+        const loadedSessions = [];
+
+        for (const session of data.sessions) {
+            if (session && deletedSessionIds[String(session.id)]) continue;
+            if (
+                !session
+                || typeof session !== "object"
+                || !Array.isArray(session.messages)
+            ) {
+                continue;
+            }
+
+            const messages = [];
+
+            for (const message of session.messages) {
+                if (
+                    !message
+                    || typeof message !== "object"
+                    || !["user", "ai"].includes(message.role)
+                ) {
+                    continue;
+                }
+
+                const text = typeof message.text === "string"
+                    ? message.text
+                    : String(message.text ?? "");
+
+                if (!text.trim()) continue;
+
+                messages.push({
+                    messageId: typeof message.messageId === "string" ? message.messageId : undefined,
+                    role: message.role,
+                    text,
+                    source: message.source === "ocr" ? "ocr" : undefined,
+                    ocrIsQuestion: typeof message.ocrIsQuestion === "boolean"
+                        ? message.ocrIsQuestion : undefined,
+                    manualIsQuestion: typeof message.manualIsQuestion === "boolean"
+                        ? message.manualIsQuestion : undefined,
+                    apiText: typeof message.apiText === "string"
+                        ? message.apiText
+                        : undefined,
+                    semanticContext: sanitizeSemanticContext(message.semanticContext, message) || undefined,
+                    semanticContexts: sanitizeSemanticContexts(message.semanticContexts, message) || undefined,
+                    ocrGroup: sanitizeOcrGroup(message.ocrGroup, message) || undefined,
+                    generatedExercise: Boolean(
+                        message.generatedExercise
+                    ),
+                    generatedQuestion: typeof message.generatedQuestion === "string"
+                        ? message.generatedQuestion
+                        : "",
+                    generatedAnswer: typeof message.generatedAnswer === "string"
+                        ? message.generatedAnswer
+                        : "",
+                    generatedTeaching: normalizeTeaching(
+                        message.generatedTeaching
+                    ),
+                    questionTeaching: normalizeTeaching(
+                        message.questionTeaching
+                    ),
+                    targetQuestionFingerprint: typeof message.targetQuestionFingerprint === "string"
+                        ? message.targetQuestionFingerprint : "",
+                    isRetestPrompt: Boolean(message.isRetestPrompt),
+                    isRetestAnswer: Boolean(message.isRetestAnswer),
+                    isError: Boolean(message.isError),
+                    isNotice: Boolean(message.isNotice)
+                });
+            }
+
+            loadedSessions.push(normalizeCloudSessionMessages({
+                id: session.id,
+                name: typeof session.name === "string" && session.name.trim()
+                    ? session.name
+                    : "新对话",
+                nameSource: ["default", "user", "content", "ocr", "retest"].includes(session.nameSource)
+                    ? session.nameSource : undefined,
+                messages,
+                deletedMessageIds: session.deletedMessageIds,
+                teaching: normalizeTeaching(session.teaching),
+                learningQuestion: normalizeLearningQuestion(
+                    session.learningQuestion
+                ),
+                retest: normalizeRetestSession(session.retest),
+                solverEffortPreference: (
+                    session.solverEffortPreference
+                    && typeof session.solverEffortPreference.fingerprint === "string"
+                    && session.solverEffortPreference.effort === "high"
+                ) ? {
+                    fingerprint: session.solverEffortPreference.fingerprint,
+                    effort: session.solverEffortPreference.effort
+                } : null
+            }));
+        }
+
+        sessions = loadedSessions;
+
+        // 允许“零会话”作为一个合法的持久化状态。
+        // 这样用户删除最后一个对话后，刷新页面也不会自动长回来。
+        if (!sessions.length) {
+            currentId = null;
+            return true;
+        }
+
+        const savedIdExists = sessions.some(
+            session => session.id === data.currentId
+        );
+
+        // null is a deliberate empty workspace, even while other chats remain.
+        currentId = data.currentId != null && savedIdExists
+            ? data.currentId
+            : null;
+
+        return true;
+
+    } catch (error) {
+        console.warn("本地会话读取失败：", error);
+        return false;
+    }
+}
+
+
+// -----------------------------
+// Markdown / MathJax
+// -----------------------------
+function escapeRawHtml(text) {
+    return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+// 用 Markdown 不会拆分的专用私有字符保存公式，只在解析本次消息期间使用。
+// 旧的 MATHPROTECTTOKEN 文本占位符容易泄漏到页面或被再次解析成公式。
+function protectMathForMarkdown(source) {
+    const mathSegments = [];
+    const prefix = "\uE000DMATE_MATH_";
+    const suffix = "_END\uE001";
+    const stash = match => {
+        const key = prefix + mathSegments.length + suffix;
+        mathSegments.push([key, match]);
+        return key;
+    };
+
+    // 仅保护有效成对的定界符；换行公式优先于单行公式。
+    // 保留原始字符供 MathJax 使用，不把 LaTeX 提前转成 HTML。
+    let protectedText = String(source ?? "");
+    protectedText = protectedText.replace(/\$\$[\s\S]*?\$\$/g, stash);
+    protectedText = protectedText.replace(/\\\[[\s\S]*?\\\]/g, stash);
+    protectedText = protectedText.replace(/\\\([\s\S]*?\\\)/g, stash);
+    protectedText = protectedText.replace(/(?<!\\)\$(?!\$)(?:\\.|[^$\n])+\$/g, stash);
+    return { protectedText, mathSegments };
+}
+
+function restoreMathAfterMarkdown(html, mathSegments) {
+    let restored = String(html ?? "");
+    for (const [token, math] of mathSegments) {
+        restored = restored.split(token).join(escapeRawHtml(math));
+    }
+    return restored;
+}
+
+function repairBareLatexTextSegment(segment) {
+    const source = String(segment || "");
+
+    if (!source) return "";
+
+    return source
+        .split("\n")
+        .map(line => {
+            const trimmed = line.trim();
+
+            if (!trimmed) return line;
+
+            // 对“整行几乎就是公式”的裸 LaTeX 先做块级包裹。
+            // 先处理这一层，避免后面的单命令修复把一个完整公式拆成很多小块。
+            if (
+                !trimmed.includes("$")
+                && !/[\u4e00-\u9fff]/.test(trimmed)
+                && /\\(?:frac|binom|sqrt|sum|prod|cup|cap|lor|land|neg|operatorname|to|rightarrow|Rightarrow)\b/.test(trimmed)
+                && /^[A-Za-z0-9\s\\{}()[\]|=+\-*/!,.^_:<>]+$/.test(trimmed)
+            ) {
+                const indent = line.match(/^\s*/)?.[0] || "";
+                return `${indent}$$${trimmed}$$`;
+            }
+
+            let value = line;
+
+            // 正文里偶尔会出现单独裸露的 LaTeX 运算符。只包裹命令本身，
+            // 避免把旁边的中文一起塞进 MathJax。
+            value = value.replace(
+                /(?<![$\\])\\(lor|land|neg|cup|cap|in|notin|subseteq|subset|supseteq|supset|leq|le|geq|ge|neq|to|rightarrow|Rightarrow)(?![A-Za-z])/g,
+                match => `$${match}$`
+            );
+
+            // 路径类表达式：v_1 \to v_2 \to v_3
+            value = value.replace(
+                /((?:[A-Za-z]_(?:\{[^}\n]+\}|[A-Za-z0-9]+)|[A-Za-z][0-9]+)(?:\s*\\(?:to|rightarrow|Rightarrow|xrightarrow\{[^}\n]+\})\s*(?:[A-Za-z]_(?:\{[^}\n]+\}|[A-Za-z0-9]+)|[A-Za-z][0-9]+))+)/g,
+                match => `$${match}$`
+            );
+
+            // 单个常见上下标/幂表达式低风险包裹。
+            value = value.replace(
+                /(?<![$A-Za-z0-9])([A-Za-z](?:_\{[^}\n]{1,30}\}|_[A-Za-z0-9]{1,12}|\^\{[^}\n]{1,30}\}|\^[A-Za-z0-9]{1,8}))(?![$A-Za-z0-9])/g,
+                match => `$${match}$`
+            );
+
+            return value;
+        })
+        .join("\n");
+}
+
+function prepareAiDisplayText(text) {
+    // 老会话中已损坏的占位符没有保留对应公式，无法凭空恢复原式。
+    // 显示明确提示而不是把内部字串当成数学式再次渲染。
+    let value = String(text ?? "").replace(
+        /MATHPROTECTTOKEN\d+ENDTOKEN/g,
+        "【原公式缺失，请重新生成该题】"
+    );
+
+    if (!value) return "";
+
+    // Keep code and already-delimited math opaque before repairing prose.
+    // Complete bare environments also need protection: otherwise Markdown
+    // consumes their row separators and bare-symbol repair inserts dollars
+    // inside the matrix. Only wrap environments outside existing code/math.
+    const protectedSegments = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]*\$|\\begin\{(bmatrix|pmatrix|matrix|cases|aligned)\}[\s\S]*?\\end\{\1\}/g;
+    let result = "", offset = 0;
+    for (const match of value.matchAll(protectedSegments)) {
+        result += repairBareLatexTextSegment(value.slice(offset, match.index));
+        result += match[1] ? `$$\n${match[0]}\n$$` : match[0];
+        offset = match.index + match[0].length;
+    }
+    return result + repairBareLatexTextSegment(value.slice(offset));
+}
+
+
+function markdownToHtml(text) {
+    const source = String(text ?? "");
+
+    const {
+        protectedText,
+        mathSegments
+    } = protectMathForMarkdown(source);
+
+    const rawHtml = marked.parse(protectedText);
+    // Restore before the final sanitization. A placeholder can occur inside
+    // an HTML attribute, where restored quotes must not create new attributes
+    // after DOMPurify has already finished checking the markup.
+    const restoredHtml = restoreMathAfterMarkdown(rawHtml, mathSegments);
+    const result = window.DOMPurify
+        ? window.DOMPurify.sanitize(restoredHtml)
+        : escapeRawHtml(source).replace(/\n/g, "<br>");
+    // 不能把内部占位符漏到用户界面。极少数解析器异常时，
+    // 宁可原样显示完整源码，也不能显示残缺公式或错误连接结果。
+    if (result.includes("\uE000DMATE_MATH_")
+        || /MATHPROTECTTOKEN\d+ENDTOKEN/.test(result)) {
+        console.warn("数学公式 Markdown 保护/还原异常，使用可读回退显示");
+        return '<div class="math-render-fallback" style="white-space:pre-wrap">'
+            + escapeRawHtml(source).replace(/MATHPROTECTTOKEN\d+ENDTOKEN/g,
+                "【原公式缺失，请重新生成该题】") + '</div>';
+    }
+    return result;
+}
+
+function renderMath(target) {
+    if (!window.MathJax || !MathJax.typesetPromise) {
+        return Promise.resolve();
+    }
+
+    return MathJax.typesetPromise(
+        target ? [target] : undefined
+    ).catch(error => {
+        console.warn("MathJax 渲染失败：", error);
+    });
+}
+
+
+// -----------------------------
+// 第三阶段：富文本 / 公式复制
+// -----------------------------
+function copyMathLatex(mathContainer) {
+    if (!mathContainer) return "";
+
+    const math = mathContainer.querySelector(
+        "mjx-assistive-mml math, .MJX_Assistive_MathML math, math[alttext]"
+    );
+
+    const alt = math?.getAttribute?.("alttext");
+    if (alt && alt.trim()) return alt.trim();
+
+    // MathJax 3 SVG output may keep its accessible expression on the SVG
+    // rather than the outer mjx-container. This is a clipboard-only fallback.
+    const aria = mathContainer.getAttribute?.("aria-label")
+        || mathContainer.querySelector?.("svg[aria-label]")?.getAttribute("aria-label");
+    if (aria && aria.trim()) return aria.trim();
+
+    return "";
+}
+
+function clipboardSvgDataUrl(svg) {
+    if (!svg) return "";
+
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    clone.style.color = "#111827";
+
+    clone.querySelectorAll('[fill="currentColor"]').forEach(
+        node => node.setAttribute("fill", "#111827")
+    );
+    clone.querySelectorAll('[stroke="currentColor"]').forEach(
+        node => node.setAttribute("stroke", "#111827")
+    );
+
+    const serialized = new XMLSerializer().serializeToString(clone);
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`;
+}
+
+function flattenClipboardDetails(root) {
+    root.querySelectorAll("details").forEach(details => {
+        const block = document.createElement("div");
+        block.style.margin = "8px 0";
+
+        const summary = details.querySelector(":scope > summary");
+        if (summary) {
+            const heading = document.createElement("div");
+            heading.style.fontWeight = "700";
+            heading.style.marginBottom = "5px";
+            heading.textContent = summary.textContent || "";
+            block.appendChild(heading);
+        }
+
+        [...details.childNodes].forEach(child => {
+            if (child === summary) return;
+            block.appendChild(child.cloneNode(true));
+        });
+
+        details.replaceWith(block);
+    });
+}
+
+function stripClipboardControls(root) {
+    root.querySelectorAll(
+        [
+            "script",
+            "style",
+            "button",
+            "input",
+            "textarea",
+            "select",
+            ".msg-actions",
+            ".wrong-actions",
+            ".kg-history-actions",
+            ".copy-compact",
+            ".rich-copy-button",
+            ".graph-side-copy",
+            ".modal-close-dot"
+        ].join(",")
+    ).forEach(node => node.remove());
+
+    root.querySelectorAll("[hidden], .hidden").forEach(node => node.remove());
+}
+
+function replaceClipboardMathForPlain(root) {
+    root.querySelectorAll("mjx-container").forEach(container => {
+        const latex = copyMathLatex(container);
+        const display = container.getAttribute("display") === "true";
+        const fallback = latex
+            ? (display ? `\n${readableMathClipboardText(latex)}\n` : readableMathClipboardText(latex))
+            : (container.textContent || "");
+        container.replaceWith(document.createTextNode(fallback));
+    });
+
+    root.querySelectorAll(
+        "mjx-assistive-mml, .MJX_Assistive_MathML, [data-mjx-assistive-mml]"
+    ).forEach(node => node.remove());
+}
+
+// 微信等只读取 text/plain 的粘贴框不能解释 LaTeX。
+// 这里仅处理剪贴板文本的常见数学语法；页面里的 MathJax DOM 完全不改。
+function readableMathClipboardText(source) {
+    let value = String(source || "");
+    const superDigits = {"0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","+":"⁺","-":"⁻","=":"⁼"};
+    const subDigits = {"0":"₀","1":"₁","2":"₂","3":"₃","4":"₄","5":"₅","6":"₆","7":"₇","8":"₈","9":"₉"};
+    value = value.replace(/\\(?:left|right)(?=[\s\[\](){}|]|$)/g, "");
+    value = value.replace(/\\(?:pmod|bmod)\s*\{\s*([^{}]+)\s*\}/g, " (mod $1)");
+    value = value.replace(/\\(?:pmod|bmod)\s+(\d+)/g, " (mod $1)");
+    value = value.replace(/\\(?:frac|dfrac|tfrac)\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "($1)/($2)");
+    value = value.replace(/\\(?:sqrt)\s*\{([^{}]+)\}/g, "√($1)");
+    const symbols = {
+        "gcd":"gcd", "langle":"⟨", "rangle":"⟩", "equiv":"≡",
+        "times":"×", "cdot":"·", "div":"÷", "leq":"≤", "geq":"≥",
+        "neq":"≠", "in":"∈", "notin":"∉", "subseteq":"⊆",
+        "subset":"⊂", "cup":"∪", "cap":"∩", "emptyset":"∅",
+        "forall":"∀", "exists":"∃", "to":"→", "rightarrow":"→",
+        "leftrightarrow":"↔", "land":"∧", "lor":"∨", "neg":"¬",
+        "infty":"∞", "pi":"π", "sum":"Σ", "prod":"Π", "mod":"mod",
+        "mathbb":"", "mathrm":"", "operatorname":"", "text":""
+    };
+    value = value.replace(/\\([A-Za-z]+)/g, (whole, name) => Object.hasOwn(symbols, name) ? symbols[name] : name);
+    value = value.replace(/\^\{([0-9+=\-]+)\}|\^([0-9])/g, (whole, group, digit) =>
+        [...(group || digit)].map(x => superDigits[x] || x).join("")
+    );
+    value = value.replace(/_\{([0-9]+)\}|_([0-9])/g, (whole, group, digit) =>
+        [...(group || digit)].map(x => subDigits[x] || x).join("")
+    );
+    value = value.replace(/\\[()\[\]]/g, "").replace(/\$\$|\$/g, "");
+    value = value.replace(/\\([{}])/g, "$1");
+    value = value.replace(/⟨\s+/g, "⟨").replace(/\s+⟩/g, "⟩");
+    return value;
+}
+
+function containsMathForCopy(text) {
+    return /\$[^$\n]+\$|\$\$|\\\(|\\\[|\\(?:frac|gcd|equiv|times|pmod)|\^\{[^}]+\}|_\{[^}]+\}/.test(String(text || ""));
+}
+
+function replaceClipboardMathForHtml(root) {
+    root.querySelectorAll("mjx-container").forEach(container => {
+        const svg = container.querySelector("svg");
+        const latex = copyMathLatex(container);
+        const display = container.getAttribute("display") === "true";
+
+        if (!svg) {
+            if (latex) {
+                const fallback = document.createElement(display ? "div" : "span");
+                fallback.textContent = display ? `$$${latex}$$` : `$${latex}$`;
+                container.replaceWith(fallback);
+            }
+            return;
+        }
+
+        const image = document.createElement("img");
+        image.src = clipboardSvgDataUrl(svg);
+        image.alt = latex ? (display ? `$$${latex}$$` : `$${latex}$`) : "数学公式";
+        image.setAttribute("data-latex", latex || "");
+
+        const rect = svg.getBoundingClientRect();
+        if (rect.width > 0) image.style.width = `${rect.width}px`;
+        if (rect.height > 0) image.style.height = `${rect.height}px`;
+        image.style.maxWidth = "100%";
+        image.style.objectFit = "contain";
+
+        if (display) {
+            const wrapper = document.createElement("div");
+            wrapper.style.textAlign = "center";
+            wrapper.style.margin = "8px 0";
+            wrapper.appendChild(image);
+            container.replaceWith(wrapper);
+        } else {
+            image.style.display = "inline-block";
+            image.style.verticalAlign = "middle";
+            image.style.margin = "0 2px";
+            container.replaceWith(image);
+        }
+    });
+
+    root.querySelectorAll(
+        "mjx-assistive-mml, .MJX_Assistive_MathML, [data-mjx-assistive-mml]"
+    ).forEach(node => node.remove());
+}
+
+function applyClipboardRichStyles(root) {
+    root.style.fontFamily = 'Arial, "Microsoft YaHei", "PingFang SC", sans-serif';
+    root.style.lineHeight = "1.6";
+
+    root.querySelectorAll("table").forEach(table => {
+        table.style.borderCollapse = "collapse";
+        table.style.margin = "8px 0";
+    });
+
+    root.querySelectorAll("th, td").forEach(cell => {
+        cell.style.border = "1px solid #94a3b8";
+        cell.style.padding = "5px 8px";
+        cell.style.verticalAlign = "top";
+    });
+
+    root.querySelectorAll("pre").forEach(pre => {
+        pre.style.whiteSpace = "pre-wrap";
+        pre.style.wordBreak = "break-word";
+        pre.style.padding = "9px 11px";
+        pre.style.border = "1px solid #cbd5e1";
+        pre.style.borderRadius = "6px";
+        pre.style.background = "#f8fafc";
+    });
+
+    root.querySelectorAll("code").forEach(code => {
+        code.style.fontFamily = 'Consolas, "SFMono-Regular", monospace';
+    });
+
+    root.querySelectorAll("blockquote").forEach(block => {
+        block.style.marginLeft = "0";
+        block.style.paddingLeft = "10px";
+        block.style.borderLeft = "3px solid #94a3b8";
+    });
+
+    root.querySelectorAll("h1,h2,h3,h4").forEach(heading => {
+        heading.style.margin = "10px 0 6px";
+        heading.style.fontWeight = "700";
+    });
+
+    root.querySelectorAll("p").forEach(paragraph => {
+        paragraph.style.margin = "0 0 8px";
+    });
+
+    root.querySelectorAll("ul,ol").forEach(list => {
+        list.style.paddingLeft = "24px";
+        list.style.margin = "6px 0 10px";
+    });
+
+    root.querySelectorAll("li").forEach(item => {
+        item.style.margin = "2px 0";
+    });
+
+    root.querySelectorAll("strong,b").forEach(node => {
+        node.style.fontWeight = "700";
+    });
+
+    root.querySelectorAll("em,i").forEach(node => {
+        node.style.fontStyle = "italic";
+    });
+
+    root.querySelectorAll("a").forEach(link => {
+        link.style.textDecoration = "underline";
+    });
+
+    root.querySelectorAll("hr").forEach(rule => {
+        rule.style.border = "0";
+        rule.style.borderTop = "1px solid #cbd5e1";
+        rule.style.margin = "10px 0";
+    });
+}
+
+function cloneClipboardRoot(node) {
+    const wrapper = document.createElement("div");
+
+    if (node instanceof DocumentFragment) {
+        wrapper.appendChild(node.cloneNode(true));
+    } else if (node) {
+        wrapper.appendChild(node.cloneNode(true));
+    }
+
+    return wrapper;
+}
+
+function clipboardPlainTextFromRoot(root) {
+    const plainRoot = root.cloneNode(true);
+    flattenClipboardDetails(plainRoot);
+    stripClipboardControls(plainRoot);
+    replaceClipboardMathForPlain(plainRoot);
+
+    const holder = document.createElement("div");
+    holder.style.position = "fixed";
+    holder.style.left = "-100000px";
+    holder.style.top = "0";
+    holder.style.width = "900px";
+    holder.style.whiteSpace = "normal";
+    holder.appendChild(plainRoot);
+    document.body.appendChild(holder);
+
+    const text = (holder.innerText || holder.textContent || "")
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+    holder.remove();
+    return text;
+}
+
+function clipboardHtmlFromRoot(root) {
+    const htmlRoot = root.cloneNode(true);
+    flattenClipboardDetails(htmlRoot);
+    stripClipboardControls(htmlRoot);
+    replaceClipboardMathForHtml(htmlRoot);
+    applyClipboardRichStyles(htmlRoot);
+    return htmlRoot.innerHTML.trim();
+}
+
+function buildClipboardPayload(node) {
+    const root = cloneClipboardRoot(node);
+    return {
+        text: clipboardPlainTextFromRoot(root),
+        html: clipboardHtmlFromRoot(root)
+    };
+}
+
+function clipboardSelectionSafeHtmlFromRoot(root) {
+    // Copying a native Range is not the same as pressing the DMate question
+    // copy button. Native Ctrl+C / context-menu Copy must never embed a
+    // data:image/svg+xml or MathJax SVG element: WeChat converts EACH one
+    // into an unreadable .dat attachment in the middle of the copied text.
+    const htmlRoot = root.cloneNode(true);
+    flattenClipboardDetails(htmlRoot);
+    stripClipboardControls(htmlRoot);
+    htmlRoot.querySelectorAll("mjx-container").forEach(container => {
+        const latex = copyMathLatex(container);
+        const visible = latex
+            ? readableMathClipboardText(latex)
+            : (container.getAttribute("aria-label") || container.textContent || "").trim();
+        const display = container.getAttribute("display") === "true";
+        const replacement = document.createElement(display ? "div" : "span");
+        replacement.textContent = visible;
+        if (display) {
+            replacement.style.textAlign = "center";
+            replacement.style.margin = "6px 0";
+        }
+        container.replaceWith(replacement);
+    });
+    // Even if the selection includes a piece of a MathJax subtree rather
+    // than its outer container, do not put image/SVG/object MIME payloads
+    // into the pasted HTML. Keep meaningful alt text where available.
+    htmlRoot.querySelectorAll(
+        "svg, img, picture, canvas, object, embed, iframe, video, audio, source, mjx-assistive-mml, .MJX_Assistive_MathML"
+    ).forEach(node => {
+        const alternative = node.getAttribute?.("alt")
+            || node.getAttribute?.("aria-label") || "";
+        node.replaceWith(document.createTextNode(
+            readableMathClipboardText(alternative)
+        ));
+    });
+    // Avoid hidden resource URLs on surviving HTML nodes as well.
+    htmlRoot.querySelectorAll("*").forEach(node => {
+        node.removeAttribute("src");
+        node.removeAttribute("srcset");
+        node.removeAttribute("poster");
+        node.removeAttribute("data");
+        node.removeAttribute("background");
+        const style = node.getAttribute("style") || "";
+        if (/url\s*\(/i.test(style)) node.removeAttribute("style");
+    });
+    applyClipboardRichStyles(htmlRoot);
+    return htmlRoot.innerHTML.trim();
+}
+
+function buildNativeSelectionClipboardPayload(node) {
+    const root = cloneClipboardRoot(node);
+    return {
+        text: clipboardPlainTextFromRoot(root),
+        html: clipboardSelectionSafeHtmlFromRoot(root)
+    };
+}
+
+
+function showCopyToast(message = "已复制") {
+    document.querySelectorAll(".copy-toast").forEach(node => node.remove());
+    const toast = document.createElement("div");
+    toast.className = "copy-toast";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 1200);
+}
+
+async function writeRichClipboardWhenReady(payloadPromise, fallback) {
+    // Start the clipboard write within the user gesture, even when MathJax
+    // typesetting the isolated copy node takes an asynchronous turn.
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+        try {
+            const richHtml = Promise.resolve(payloadPromise).then(payload =>
+                new Blob([String(payload.html || "")], { type: "text/html" })
+            );
+            const item = new ClipboardItem({
+                "text/plain": new Blob([String(fallback.text || "")], {
+                    type: "text/plain"
+                }),
+                "text/html": richHtml
+            });
+            await navigator.clipboard.write([item]);
+            return true;
+        } catch (error) {
+            console.warn("渲染后富文本复制失败，尝试普通复制：", error);
+        }
+    }
+
+    let payload = fallback;
+    try {
+        payload = await payloadPromise;
+    } catch (error) {
+        console.warn("题目复制专用公式渲染失败：", error);
+    }
+    return writeRichClipboard(payload);
+}
+
+async function writeRichClipboard(payload) {
+    const text = String(payload?.text || "");
+    const html = String(payload?.html || "");
+
+    if (
+        navigator.clipboard?.write
+        && window.ClipboardItem
+        && html
+    ) {
+        try {
+            const item = new ClipboardItem({
+                "text/plain": new Blob([text], { type: "text/plain" }),
+                "text/html": new Blob([html], { type: "text/html" })
+            });
+            await navigator.clipboard.write([item]);
+            return true;
+        } catch (error) {
+            console.warn("富文本剪贴板写入失败，降级为纯文本：", error);
+        }
+    }
+
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (error) {
+            console.warn("剪贴板文本写入失败：", error);
+        }
+    }
+
+    const legacy = document.createElement("div");
+    legacy.contentEditable = "true";
+    legacy.style.position = "fixed";
+    legacy.style.left = "-100000px";
+    legacy.style.top = "0";
+    legacy.style.width = "900px";
+    legacy.innerHTML = html || escapeRawHtml(text).replace(/\n/g, "<br>");
+    document.body.appendChild(legacy);
+
+    const range = document.createRange();
+    range.selectNodeContents(legacy);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    legacy.focus();
+
+    const ok = document.execCommand("copy");
+    selection.removeAllRanges();
+    legacy.remove();
+    return ok;
+}
+
+async function copyRenderedNode(node, successText = "已复制") {
+    if (!node) return false;
+    const payload = buildClipboardPayload(node);
+    if (!payload.text && !payload.html) return false;
+
+    const ok = await writeRichClipboard(payload);
+    if (ok) showCopyToast(successText);
+    return ok;
+}
+
+// Cross-application visual copy: WeChat and some chat editors ignore text/html.
+// This is intentionally separate from normal rich text / granular selection.
+function createRenderedCopyStage(content) {
+    const stage = document.createElement("div");
+    stage.className = "dmate-image-copy-stage";
+    stage.style.position = "absolute";
+    stage.style.left = "0";
+    stage.style.top = `${Math.max(
+        document.documentElement.scrollHeight,
+        document.body?.scrollHeight || 0
+    ) + 100}px`;
+    stage.style.width = "min(860px, calc(100vw - 32px))";
+    stage.style.minWidth = "280px";
+    stage.style.padding = "22px 26px";
+    stage.style.boxSizing = "border-box";
+    stage.style.background = "#ffffff";
+    stage.style.color = "#111827";
+    stage.style.fontSize = "16px";
+    stage.style.lineHeight = "1.7";
+    stage.style.overflow = "visible";
+    stage.style.zIndex = "-2147483648";
+    stage.style.pointerEvents = "none";
+    stage.appendChild(content);
+    // Styles are applied to this export-only clone, not the visible content.
+    stripClipboardControls(stage);
+    flattenClipboardDetails(stage);
+    stage.querySelectorAll(".difficulty-badge").forEach(node => node.remove());
+    applyClipboardRichStyles(stage);
+    stage.querySelectorAll("*").forEach(node => {
+        if (node instanceof HTMLElement) {
+            node.style.setProperty("color", "#111827", "important");
+            node.style.setProperty("text-shadow", "none", "important");
+            node.style.setProperty("background", "transparent", "important");
+        }
+    });
+    document.body.appendChild(stage);
+    return stage;
+}
+
+async function renderContentAsPngBlob(makeContent) {
+    if (typeof window.html2canvas !== "function") {
+        throw new Error("图片渲染组件未加载");
+    }
+    const content = makeContent();
+    if (!content) throw new Error("没有可复制的内容");
+    const stage = createRenderedCopyStage(content);
+    try {
+        if (window.MathJax?.typesetPromise) {
+            // A clone can contain unrendered LaTeX from a generated question.
+            await window.MathJax.typesetPromise([stage]);
+        }
+        if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
+        // Reuse the tested PDF-only rasterizer, avoiding clipped SVG glyphs
+        // and duplicate assistive MathML when html2canvas takes a snapshot.
+        await rasterizeMathJaxSvgForPdf(stage);
+        const width = Math.ceil(stage.getBoundingClientRect().width);
+        const height = Math.ceil(stage.scrollHeight);
+        const scale = Math.max(0.6, Math.min(2, 4096 / width, 12000 / height));
+        const canvas = await window.html2canvas(stage, {
+            backgroundColor: "#ffffff",
+            scale,
+            width,
+            height,
+            windowWidth: Math.max(window.innerWidth, width),
+            windowHeight: Math.max(window.innerHeight, height),
+            useCORS: true,
+            logging: false
+        });
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+        if (!blob) throw new Error("无法生成 PNG");
+        return blob;
+    } finally {
+        stage.remove();
+    }
+}
+
+function downloadRenderedCopyPng(blob) {
+    if (!blob) return false;
+    const url = URL.createObjectURL(blob);
+    try {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "DMate-公式与题目.png";
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return true;
+    } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+}
+
+// Android APK receives PNG over an origin-restricted WebView message channel.
+// The native side replies only after MediaStore has committed the image.
+async function savePngToAndroidGallery(blob, filename) {
+    const bridge = window.DMateGallery;
+    if (!bridge || typeof bridge.postMessage !== "function") return null;
+    if (!blob || blob.size > 20 * 1024 * 1024) {
+        return { ok: false, message: "图片超出安装版可保存的大小（20 MB）" };
+    }
+    const requestId = `png-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return new Promise(resolve => {
+        let completed = false;
+        const finish = result => {
+            if (completed) return;
+            completed = true;
+            clearTimeout(timer);
+            bridge.removeEventListener?.("message", onMessage);
+            if (bridge.onmessage === onMessage) bridge.onmessage = previousHandler;
+            resolve(result);
+        };
+        const onMessage = event => {
+            let response;
+            try { response = JSON.parse(event.data); } catch (_) { return; }
+            if (response?.id !== requestId) return;
+            finish({ ok: response.ok === true, message: String(response.message || "") });
+        };
+        const previousHandler = bridge.onmessage;
+        if (typeof bridge.addEventListener === "function") {
+            bridge.addEventListener("message", onMessage);
+        } else {
+            bridge.onmessage = event => {
+                onMessage(event);
+                if (typeof previousHandler === "function") previousHandler(event);
+            };
+        }
+        const timer = setTimeout(() => finish({ ok: false, message: "相册保存超时，请重试" }), 30000);
+        const reader = new FileReader();
+        reader.onerror = () => finish({ ok: false, message: "无法读取图片" });
+        reader.onload = () => {
+            if (completed) return;
+            try {
+                const base64 = String(reader.result || "").split(",")[1];
+                if (!base64) throw new Error("图片为空");
+                bridge.postMessage(JSON.stringify({ id: requestId, filename, base64 }));
+            } catch (error) {
+                finish({ ok: false, message: "无法发送图片至安装版" });
+            }
+        };
+        reader.readAsDataURL(blob);
+    });
+}
+
+// Websites cannot silently save into iOS/Android Photos. Present an actual
+// image that can be long-pressed, shared or downloaded by an explicit gesture.
+function showMobilePngSaveDialog(blob, filename) {
+    document.querySelector(".dmate-png-save-dialog")?.remove();
+    const url = URL.createObjectURL(blob);
+    const overlay = document.createElement("div");
+    overlay.className = "dmate-png-save-dialog";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "图片保存");
+    const panel = document.createElement("div");
+    panel.className = "dmate-png-save-panel";
+    const title = document.createElement("strong");
+    title.textContent = "图片已生成";
+    const tip = document.createElement("p");
+    tip.textContent = "网页无法直接写入手机相册。可以长按下方图片选择保存，或使用系统分享、下载图片";
+    const preview = document.createElement("img");
+    preview.src = url;
+    preview.alt = "已生成的题目或知识图谱图片，长按可保存";
+    preview.className = "dmate-png-save-preview";
+    const actions = document.createElement("div");
+    actions.className = "dmate-png-save-actions";
+    const download = document.createElement("a");
+    download.href = url;
+    download.download = filename;
+    download.textContent = "下载 PNG";
+    download.setAttribute("role", "button");
+    download.addEventListener("click", () => showCopyToast("下载已发起，请查看浏览器下载记录"));
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "关闭";
+    const dismiss = () => {
+        if (!overlay.isConnected) return;
+        overlay.remove();
+        URL.revokeObjectURL(url);
+        document.removeEventListener("keydown", onEscape);
+    };
+    const onEscape = event => { if (event.key === "Escape") dismiss(); };
+    close.addEventListener("click", dismiss);
+    overlay.addEventListener("click", event => { if (event.target === overlay) dismiss(); });
+    actions.append(download);
+    if (typeof File === "function" && typeof navigator.share === "function") {
+        const file = new File([blob], filename, { type: "image/png" });
+        if (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] })) {
+            const share = document.createElement("button");
+            share.type = "button";
+            share.textContent = "系统分享/保存";
+            share.addEventListener("click", async () => {
+                try {
+                    await navigator.share({ files: [file] });
+                    showCopyToast("已打开系统分享操作，请选择保存位置");
+                } catch (error) {
+                    if (error?.name !== "AbortError") showCopyToast("系统分享不可用，请长按图片保存");
+                }
+            });
+            actions.append(share);
+        }
+    }
+    actions.append(close);
+    panel.append(title, tip, preview, actions);
+    overlay.append(panel);
+    document.body.append(overlay);
+    document.addEventListener("keydown", onEscape);
+    close.focus({ preventScroll: true });
+}
+
+async function deliverRenderedPng(pngPromise, filename = "DMate-公式与题目.png") {
+    const isPhone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    // Prefer verified native album saving over sharing/downloading inside the APK.
+    if (window.DMateGallery?.postMessage) {
+        try {
+            const result = await savePngToAndroidGallery(await pngPromise, filename);
+            showCopyToast(result?.message || (result?.ok ? "已保存到相册" : "保存到相册失败"));
+            return Boolean(result?.ok);
+        } catch (error) {
+            console.warn("Android 原生保存异常：", error);
+            showCopyToast("保存到相册失败，请重试");
+            return false;
+        }
+    }
+    if (isPhone) {
+        try {
+            showMobilePngSaveDialog(await pngPromise, filename);
+            return true; // Preview opened, not a claim that Photos was modified.
+        } catch (error) {
+            console.warn("手机端图片预览失败：", error);
+            showCopyToast("生成图片失败，请重试");
+            return false;
+        }
+    }
+    // Keep the already-working Windows/Linux/macOS ClipboardItem path untouched.
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+        try {
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": pngPromise })]);
+            showCopyToast("图片已复制，可粘贴至微信等应用");
+            return true;
+        } catch (firstError) {
+            console.warn("图片剪贴板即时写入失败：", firstError);
+            try {
+                const blob = await pngPromise;
+                await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+                showCopyToast("图片已复制，可粘贴至微信等应用");
+                return true;
+            } catch (secondError) {
+                console.warn("图片剪贴板写入失败：", secondError);
+            }
+        }
+    }
+    try {
+        if (downloadRenderedCopyPng(await pngPromise)) {
+            showCopyToast("无法直接复制图片，已发起 PNG 下载");
+            return true;
+        }
+    } catch (error) {
+        console.warn("渲染复制图片失败：", error);
+    }
+    showCopyToast("图片复制失败，请重试");
+    return false;
+}
+
+async function copyRenderedImageToClipboard(makeContent) {
+    return deliverRenderedPng(renderContentAsPngBlob(makeContent));
+}
+
+// The original word-labelled button always copies/saves an image.
+function createSmartCopyButton(onCopy) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "rich-copy-smart";
+    button.textContent = "以图片形式复制";
+    button.title = "电脑复制图片，Android 安装版保存到相册；手机网页可预览并保存";
+    button.setAttribute("aria-label", "以图片形式复制");
+    button.addEventListener("click", () => {
+        Promise.resolve(onCopy()).catch(error => console.warn("复制失败：", error));
+    });
+    return button;
+}
+
+// Legacy entry point kept for existing cards; every question is now visual PNG.
+async function writeSmartQuestionClipboard(payloadPromise, fallback, makeContent, hasFormula) {
+    Promise.resolve(payloadPromise).catch(() => {});
+    return copyRenderedImageToClipboard(makeContent);
+}
+
+function effectiveElementBackground(element) {
+    let current = element;
+
+    while (current instanceof Element) {
+        const color = getComputedStyle(current).backgroundColor;
+        if (
+            color
+            && color !== "transparent"
+            && color !== "rgba(0, 0, 0, 0)"
+        ) {
+            return color;
+        }
+        current = current.parentElement;
+    }
+
+    return "#ffffff";
+}
+
+function buildKnowledgeGraphImageCopyTarget() {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    if (!canvas) return null;
+
+    // 手机端默认只显示“完整查看”入口，不会预先创建 .kg-mobile-stage。
+    // 用户直接点复制时，在屏幕外临时构建同一份图谱，避免要求先点完整查看。
+    let temporaryHost = null;
+    let mobileStage = canvas.querySelector?.(".kg-mobile-stage");
+    const svg = canvas.querySelector?.(".kg-svg");
+    if (!mobileStage && !svg && window.matchMedia?.("(max-width: 760px)")?.matches
+            && knowledgeGraphData?.nodes?.length) {
+        temporaryHost = document.createElement("div");
+        temporaryHost.className = "knowledge-graph-canvas kg-copy-temporary-host";
+        temporaryHost.style.cssText = "position:absolute;left:-10000px;top:0;width:360px;pointer-events:none;";
+        document.body.appendChild(temporaryHost);
+        try {
+            const context = getActiveKnowledgeContext();
+            const nodes = knowledgeGraphDisplayedNodes(context);
+            renderMobileKnowledgeGraphSection(
+                temporaryHost, nodes, knowledgeGraphDisplayCategory(), "", context,
+                { forCopy: true }
+            );
+            mobileStage = temporaryHost.querySelector(".kg-mobile-stage");
+        } catch (error) {
+            console.warn("准备移动端图谱复制失败：", error);
+            temporaryHost.remove();
+            return null;
+        }
+    }
+    const source = mobileStage || svg;
+    if (!source) {
+        temporaryHost?.remove();
+        return null;
+    }
+
+    let width = 1;
+    let height = 1;
+    let clone = null;
+
+    if (mobileStage) {
+        // 手机端已经不再使用 .kg-svg 作为完整图谱主体，而是
+        // HTML 节点 + 一层 SVG 连线。旧逻辑只找 .kg-svg，导致手机端
+        // 点击“复制图谱”直接返回 null，看起来就像按钮完全没有作用。
+        width = Math.ceil(
+            mobileStage.scrollWidth
+            || parseFloat(mobileStage.style.width)
+            || mobileStage.getBoundingClientRect().width
+            || 1
+        );
+        height = Math.ceil(
+            mobileStage.scrollHeight
+            || parseFloat(mobileStage.style.height)
+            || mobileStage.getBoundingClientRect().height
+            || 1
+        );
+
+        clone = mobileStage.cloneNode(true);
+        clone.style.position = "relative";
+        clone.style.left = "0";
+        clone.style.top = "0";
+        clone.style.width = `${width}px`;
+        clone.style.height = `${height}px`;
+        clone.style.minWidth = `${width}px`;
+        clone.style.maxWidth = "none";
+        clone.style.maxHeight = "none";
+        clone.style.margin = "0";
+        clone.style.transform = "none";
+    } else {
+        // 桌面端仍沿用 SVG；复制整张图谱而不是当前滚动窗口。
+        let bbox = null;
+        try {
+            bbox = svg.getBBox();
+        } catch (_error) {
+            bbox = null;
+        }
+
+        const fallbackViewBox = svg.viewBox?.baseVal;
+        const padding = 18;
+        const x = Number.isFinite(bbox?.x)
+            ? bbox.x - padding
+            : (fallbackViewBox?.x || 0);
+        const y = Number.isFinite(bbox?.y)
+            ? bbox.y - padding
+            : (fallbackViewBox?.y || 0);
+        width = Math.ceil(
+            (Number.isFinite(bbox?.width) && bbox.width > 0
+                ? bbox.width + padding * 2
+                : fallbackViewBox?.width)
+            || svg.scrollWidth
+            || svg.getBoundingClientRect().width
+            || 1
+        );
+        height = Math.ceil(
+            (Number.isFinite(bbox?.height) && bbox.height > 0
+                ? bbox.height + padding * 2
+                : fallbackViewBox?.height)
+            || svg.scrollHeight
+            || svg.getBoundingClientRect().height
+            || 1
+        );
+
+        clone = svg.cloneNode(true);
+        clone.setAttribute("viewBox", `${x} ${y} ${width} ${height}`);
+        clone.setAttribute("width", String(width));
+        clone.setAttribute("height", String(height));
+        clone.style.setProperty("width", `${width}px`, "important");
+        clone.style.setProperty("height", `${height}px`, "important");
+        clone.style.maxWidth = "none";
+        clone.style.maxHeight = "none";
+        clone.style.display = "block";
+        clone.style.overflow = "visible";
+        clone.style.background = "transparent";
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "kg-copy-render-target";
+    wrapper.style.position = "absolute";
+    wrapper.style.left = "0";
+    wrapper.style.top = `${Math.max(
+        document.documentElement.scrollHeight,
+        document.body?.scrollHeight || 0
+    ) + 80}px`;
+    wrapper.style.width = `${width}px`;
+    wrapper.style.height = `${height}px`;
+    wrapper.style.padding = "0";
+    wrapper.style.margin = "0";
+    wrapper.style.background = (
+        effectiveElementBackground(
+            mobileStage?.closest?.(".kg-mobile-viewport") || canvas
+        ) || "#07142d"
+    );
+    wrapper.style.overflow = "visible";
+    wrapper.style.pointerEvents = "none";
+    wrapper.style.zIndex = "-2147483648";
+
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+    temporaryHost?.remove();
+    return wrapper;
+}
+
+let knowledgeGraphPreparedPngPromise = null;
+let knowledgeGraphPreparedPngKey = "";
+
+function knowledgeGraphCopyKey() {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const mobileStage = canvas?.querySelector?.(".kg-mobile-stage");
+    const svg = canvas?.querySelector?.(".kg-svg");
+    const source = mobileStage || svg;
+    // 手机普通入口不创建图谱 DOM，但图谱数据仍在；缓存键使用数据与筛选状态。
+    if (!source) {
+        if (!shouldDrawKnowledgeGraphOffscreen()
+                || !knowledgeGraphData?.nodes?.length) return "";
+        return [knowledgeGraphFilter || "全部", knowledgeGraphViewMode,
+            knowledgeGraphScope, knowledgeGraphData.nodes.length,
+            knowledgeGraphSelectedNodeId || ""].join("|");
+    }
+
+    return [
+        knowledgeGraphFilter || "全部",
+        knowledgeGraphViewMode,
+        knowledgeGraphScope,
+        source.scrollWidth || source.getBoundingClientRect().width || 0,
+        source.scrollHeight || source.getBoundingClientRect().height || 0,
+        source.querySelectorAll?.(".kg-mobile-node, .kg-node")?.length || 0
+    ].join("|");
+}
+
+// Mobile and tablet export uses the knowledge model, not a cloned live DOM.
+// The live graph contains absolutely-positioned HTML buttons plus SVG edges;
+// html2canvas can move the buttons to the top while leaving the edges behind.
+// Keeping this painter completely off-DOM also prevents scroll jumps and
+// makes Android WebView/tablet exports independent of the fullscreen entry state.
+function shouldDrawKnowledgeGraphOffscreen() {
+    const ua = navigator.userAgent || "";
+    return /Android|iPhone|iPad|iPod/i.test(ua)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+        || Boolean(window.matchMedia?.("(max-width: 1100px)")?.matches);
+}
+
+function knowledgeGraphExportLayout(nodes) {
+    const levels = computeKnowledgeGraphLevels(nodes);
+    const columns = new Map();
+    const originalOrder = new Map(nodes.map((node, index) => [node.id, index]));
+    const categories = new Map();
+    nodes.forEach(node => {
+        if (!categories.has(node.category)) categories.set(node.category, categories.size);
+        const level = levels.get(node.id) || 0;
+        if (!columns.has(level)) columns.set(level, []);
+        columns.get(level).push(node);
+    });
+    const keys = [...columns.keys()].sort((a, b) => a - b);
+    const previousOrder = new Map();
+    for (const key of keys) {
+        const group = columns.get(key);
+        group.sort((a, b) => {
+            const mean = node => {
+                const matches = (node.prerequisites || [])
+                    .map(name => previousOrder.get(name)).filter(Number.isFinite);
+                return matches.length
+                    ? matches.reduce((total, index) => total + index, 0) / matches.length
+                    : Number.POSITIVE_INFINITY;
+            };
+            return (categories.get(a.category) - categories.get(b.category))
+                || mean(a) - mean(b)
+                || originalOrder.get(a.id) - originalOrder.get(b.id);
+        });
+        group.forEach((node, index) => previousOrder.set(node.name, index));
+    }
+
+    // Export dimensions are independent of viewport, orientation, browser zoom
+    // and the current zoom level of the fullscreen graph.
+    const cellWidth = dmateUiLanguage() === "en" ? 220 : 164;
+    const cellHeight = dmateUiLanguage() === "en" ? 94 : 78;
+    const spaceX = 100;
+    const spaceY = 34;
+    const marginX = 42;
+    const marginY = 42;
+    const maxRows = Math.max(1, ...keys.map(key => columns.get(key).length));
+    const width = 2 * marginX + keys.length * cellWidth + Math.max(0, keys.length - 1) * spaceX;
+    const height = 2 * marginY + maxRows * cellHeight + Math.max(0, maxRows - 1) * spaceY;
+    const positions = new Map();
+    keys.forEach((key, columnIndex) => {
+        const group = columns.get(key);
+        const total = group.length * cellHeight + Math.max(0, group.length - 1) * spaceY;
+        const startY = marginY + (height - marginY * 2 - total) / 2;
+        group.forEach((node, rowIndex) => {
+            positions.set(node.id, {
+                x: marginX + columnIndex * (cellWidth + spaceX),
+                y: startY + rowIndex * (cellHeight + spaceY)
+            });
+        });
+    });
+    const byName = new Map(nodes.map(node => [node.name, node]));
+    const edges = [];
+    const incoming = new Map();
+    const outgoing = new Map();
+    for (const node of nodes) {
+        for (const name of node.prerequisites || []) {
+            const from = byName.get(name);
+            if (!from || !positions.has(from.id) || !positions.has(node.id)) continue;
+            const edge = { from: from.id, to: node.id };
+            edges.push(edge);
+            if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
+            if (!incoming.has(edge.to)) incoming.set(edge.to, []);
+            outgoing.get(edge.from).push(edge);
+            incoming.get(edge.to).push(edge);
+        }
+    }
+    for (const group of outgoing.values()) {
+        group.sort((a, b) => positions.get(a.to).y - positions.get(b.to).y);
+    }
+    for (const group of incoming.values()) {
+        group.sort((a, b) => positions.get(a.from).y - positions.get(b.from).y);
+    }
+    return { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight };
+}
+
+function drawKnowledgeGraphRoundRect(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+function drawKnowledgeGraphWrappedLabel(ctx, label, centerX, centerY, maxWidth, maxLines) {
+    const glyphs = Array.from(String(label || ""));
+    const lines = [];
+    let current = "";
+    for (const glyph of glyphs) {
+        if (glyph === "\n") {
+            lines.push(current);
+            current = "";
+            continue;
+        }
+        const test = current + glyph;
+        if (current && ctx.measureText(test).width > maxWidth) {
+            lines.push(current);
+            current = glyph;
+        } else {
+            current = test;
+        }
+    }
+    if (current) lines.push(current);
+    if (lines.length > maxLines) {
+        lines.length = maxLines;
+        let last = lines[maxLines - 1];
+        while (last && ctx.measureText(last + "…").width > maxWidth) last = last.slice(0, -1);
+        lines[maxLines - 1] = last + "…";
+    }
+    const lineHeight = 20;
+    const firstY = centerY - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, index) => ctx.fillText(line, centerX, firstY + index * lineHeight, maxWidth));
+}
+
+async function renderKnowledgeGraphOffscreenPngBlob() {
+    const context = getActiveKnowledgeContext();
+    const nodes = knowledgeGraphDisplayedNodes(context);
+    if (!nodes?.length) throw new Error("当前范围没有可复制的知识节点");
+    const layout = knowledgeGraphExportLayout(nodes);
+    const { width, height, positions, edges, outgoing, incoming, cellWidth, cellHeight } = layout;
+    const smallDevice = window.matchMedia?.("(max-width: 760px)")?.matches;
+    const pixelBudget = smallDevice ? 7000000 : 10000000;
+    // Render in a bounded pixel budget to avoid crashing mobile browsers.
+    const scale = Math.min(1.75, 8192 / Math.max(width, height),
+        Math.sqrt(pixelBudget / Math.max(1, width * height)));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("浏览器无法创建图谱绘图画布");
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, width, height);
+
+    // Every valid graph edge has both endpoints in positions; no dangling paths.
+    const port = (index, count) => (index - (count - 1) / 2)
+        * Math.min(10, (cellHeight - 22) / Math.max(count, 1));
+    ctx.strokeStyle = "#899bb5";
+    ctx.lineWidth = 2.15;
+    ctx.lineCap = "round";
+    for (const edge of edges) {
+        const start = positions.get(edge.from);
+        const end = positions.get(edge.to);
+        const outGroup = outgoing.get(edge.from);
+        const inGroup = incoming.get(edge.to);
+        const x1 = start.x + cellWidth;
+        const x2 = end.x;
+        const y1 = start.y + cellHeight / 2 + port(outGroup.indexOf(edge), outGroup.length);
+        const y2 = end.y + cellHeight / 2 + port(inGroup.indexOf(edge), inGroup.length);
+        const route = routeKnowledgeGraphConnection(
+            edge.from, edge.to, {x:x1,y:y1}, {x:x2,y:y2},
+            positions, cellWidth, cellHeight, height
+        );
+        strokeKnowledgeGraphCanvasRoute(ctx, route);
+    }
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const node of nodes) {
+        const pos = positions.get(node.id);
+        if (!pos) continue;
+        const state = knowledgeGraphNodeState(node.name, context);
+        drawKnowledgeGraphRoundRect(ctx, pos.x, pos.y, cellWidth, cellHeight, 11);
+        ctx.fillStyle = state.fill || "#111827";
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = state.stroke || "#64748b";
+        ctx.stroke();
+        const hasBadge = Boolean(state.badge);
+        ctx.font = '600 16px system-ui, "Microsoft YaHei", sans-serif';
+        ctx.fillStyle = "#ffffff";
+        drawKnowledgeGraphWrappedLabel(ctx, dmateKnowledgeLabel(node.name), pos.x + cellWidth / 2,
+            pos.y + (hasBadge ? 32 : cellHeight / 2), cellWidth - 18, hasBadge ? 2 : 3);
+        if (hasBadge) {
+            ctx.font = '12px system-ui, "Microsoft YaHei", sans-serif';
+            ctx.fillStyle = "#e9d5ff";
+            ctx.fillText(dmateUiText(state.badge), pos.x + cellWidth / 2, pos.y + cellHeight - 12);
+        }
+    }
+
+    return await new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+            // Do not retain a large backing canvas beyond encoding.
+            canvas.width = 0;
+            canvas.height = 0;
+            if (blob) resolve(blob);
+            else reject(new Error("图谱 PNG 编码失败"));
+        }, "image/png");
+    });
+}
+
+async function renderKnowledgeGraphPngBlob() {
+    if (shouldDrawKnowledgeGraphOffscreen()) {
+        return renderKnowledgeGraphOffscreenPngBlob();
+    }
+    const target = buildKnowledgeGraphImageCopyTarget();
+    if (!target) {
+        throw new Error("没有可导出的图谱");
+    }
+
+    try {
+        if (typeof window.html2canvas !== "function") {
+            throw new Error("html2canvas 不可用");
+        }
+
+        if (document.fonts?.ready) {
+            await document.fonts.ready.catch(() => {});
+        }
+
+        const exportWidth = Math.ceil(
+            target.scrollWidth
+            || target.getBoundingClientRect().width
+            || 1
+        );
+        const exportHeight = Math.ceil(
+            target.scrollHeight
+            || target.getBoundingClientRect().height
+            || 1
+        );
+
+        // 完整知识图谱很高；手机端限定导出总像素数，防止内存峰值过大。
+        const pixelBudget = window.matchMedia?.("(max-width: 760px)")?.matches
+            ? 12000000 : 32000000;
+        const exportScale = Math.min(
+            2,
+            window.devicePixelRatio || 1.5,
+            Math.sqrt(pixelBudget / Math.max(1, exportWidth * exportHeight))
+        );
+        const renderedCanvas = await window.html2canvas(target, {
+            backgroundColor: effectiveElementBackground(target),
+            scale: exportScale,
+            useCORS: true,
+            logging: false,
+            width: exportWidth,
+            height: exportHeight,
+            windowWidth: Math.max(window.innerWidth, exportWidth),
+            windowHeight: Math.max(window.innerHeight, exportHeight),
+            scrollX: 0,
+            scrollY: 0
+        });
+
+        const png = await new Promise(resolve => {
+            renderedCanvas.toBlob(resolve, "image/png");
+        });
+
+        if (!png) {
+            throw new Error("图谱 PNG 生成失败");
+        }
+
+        return png;
+    } finally {
+        target.remove();
+    }
+}
+
+function prepareKnowledgeGraphPng(force = false) {
+    const key = knowledgeGraphCopyKey();
+    if (!key) return null;
+
+    if (
+        !force
+        && knowledgeGraphPreparedPngPromise
+        && knowledgeGraphPreparedPngKey === key
+    ) {
+        return knowledgeGraphPreparedPngPromise;
+    }
+
+    knowledgeGraphPreparedPngKey = key;
+    knowledgeGraphPreparedPngPromise = renderKnowledgeGraphPngBlob()
+        .catch(error => {
+            if (knowledgeGraphPreparedPngKey === key) {
+                knowledgeGraphPreparedPngPromise = null;
+            }
+            throw error;
+        });
+
+    return knowledgeGraphPreparedPngPromise;
+}
+
+function scheduleKnowledgeGraphPngPreparation() {
+    const prepare = () => {
+        prepareKnowledgeGraphPng().catch(() => {});
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(prepare, { timeout: 900 });
+    } else {
+        window.setTimeout(prepare, 120);
+    }
+}
+
+function downloadKnowledgeGraphPng(blob) {
+    if (!blob) return false;
+
+    try {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+        return true;
+    } catch (error) {
+        console.warn("保存图谱 PNG 失败：", error);
+        return false;
+    }
+}
+
+async function copyKnowledgeGraphVisual() {
+    // 不以 DOM 中是否存在图谱节点作为“有无知识图谱”的依据：
+    // 未进入完整查看时，移动端节点是故意不渲染的。
+    if (!knowledgeGraphData?.nodes?.length) {
+        try { await ensureKnowledgeGraphData(); } catch (_error) {}
+    }
+    if (!knowledgeGraphData?.nodes?.length) {
+        showCopyToast("知识图谱尚未加载完成，请稍后重试");
+        return false;
+    }
+    const pngPromise = prepareKnowledgeGraphPng();
+    if (!pngPromise) {
+        showCopyToast("图谱图片准备失败，请重试");
+        return false;
+    }
+    return deliverRenderedPng(pngPromise, `离散数学知识图谱-${knowledgeGraphFilter || "全部"}.png`);
+}
+
+function selectionNodeElement(node) {
+    if (node instanceof Element) return node;
+    return node?.parentElement || null;
+}
+
+function cloneSelectionContentsForRichCopy(selection) {
+    if (!selection || selection.rangeCount < 1) {
+        return null;
+    }
+
+    const sourceRange = selection.getRangeAt(0);
+    const range = sourceRange.cloneRange();
+
+    // 普通文字起选、跨过 MathJax 公式时，浏览器的 Range 只能停在
+    // SVG 容器边界。这里仍把这种“跨过公式”的边界补成完整公式，
+    // 但不会用于下面的“直接从公式内部起选”路径；后者按字形精确处理。
+    const startMath = selectionNodeElement(range.startContainer)
+        ?.closest?.("mjx-container");
+    const endMath = selectionNodeElement(range.endContainer)
+        ?.closest?.("mjx-container");
+
+    try {
+        if (startMath && range.intersectsNode(startMath)) {
+            range.setStartBefore(startMath);
+        }
+        if (endMath && range.intersectsNode(endMath)) {
+            range.setEndAfter(endMath);
+        }
+    } catch (error) {
+        console.warn("框选公式边界扩展失败，使用原始选择：", error);
+        return sourceRange.cloneContents();
+    }
+
+    return range.cloneContents();
+}
+
+let richMathGranularSelectionState = null;
+let richMathGranularDragState = null;
+
+function ensureRichSelectionVisualStyle() {
+    if (document.getElementById("richSelectionVisualStyle")) {
+        return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "richSelectionVisualStyle";
+    style.textContent = `
+        /*
+         * 浏览器原生文字选区和 CSS 系统色 Highlight 在部分 Chromium / Edge
+         * 环境里并不是同一个蓝色。用户截图里普通文字是深蓝，而 SVG 公式
+         * 用 Highlight 会变成更亮的蓝。这里显式统一两类选区的配色：
+         * 普通文字仍由浏览器原生 Selection 负责，只统一它的视觉颜色；
+         * MathJax SVG 的整块/局部反馈使用完全相同的颜色变量。
+         */
+        :root {
+            --rich-selection-bg: rgb(6, 60, 169);
+            --rich-selection-fg: rgb(255, 255, 255);
+        }
+
+        ::selection {
+            background: var(--rich-selection-bg);
+            color: var(--rich-selection-fg);
+        }
+
+        ::-moz-selection {
+            background: var(--rich-selection-bg);
+            color: var(--rich-selection-fg);
+        }
+
+        mjx-container.rich-selection-hit > svg {
+            background: var(--rich-selection-bg) !important;
+            color: var(--rich-selection-fg) !important;
+            border-radius: 2px;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+        }
+
+        mjx-container.rich-selection-hit > svg [fill="currentColor"] {
+            fill: var(--rich-selection-fg) !important;
+        }
+
+        mjx-container.rich-selection-hit > svg [stroke="currentColor"] {
+            stroke: var(--rich-selection-fg) !important;
+        }
+
+        /*
+         * 直接从公式内部拖选时不再把整条公式当成一个原子。
+         * 下面按 MathJax SVG 的单个 data-c 字形逐个高亮；局部公式选区
+         * 和上面的普通文字原生选区使用同一组颜色变量。
+         */
+        mjx-container.rich-granular-selection {
+            position: relative !important;
+            isolation: isolate;
+        }
+
+        mjx-container.rich-granular-selection > svg {
+            position: relative;
+            z-index: 1;
+        }
+
+        mjx-container .rich-math-selection-overlay {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        mjx-container .rich-math-selection-piece {
+            position: absolute;
+            background: var(--rich-selection-bg);
+            pointer-events: none;
+        }
+
+        mjx-container svg [data-c].rich-glyph-selected {
+            fill: var(--rich-selection-fg) !important;
+            stroke: var(--rich-selection-fg) !important;
+            color: var(--rich-selection-fg) !important;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function clearRichMathSelectionFeedback() {
+    document.querySelectorAll(
+        "mjx-container.rich-selection-hit"
+    ).forEach(node => {
+        node.classList.remove("rich-selection-hit");
+    });
+}
+
+function clearGranularMathSelectionVisual() {
+    document.querySelectorAll(
+        ".rich-math-selection-overlay"
+    ).forEach(node => node.remove());
+
+    document.querySelectorAll(
+        "svg [data-c].rich-glyph-selected"
+    ).forEach(node => {
+        node.classList.remove("rich-glyph-selected");
+    });
+
+    document.querySelectorAll(
+        "mjx-container.rich-granular-selection"
+    ).forEach(node => {
+        node.classList.remove("rich-granular-selection");
+    });
+}
+
+function clearGranularMathSelection() {
+    richMathGranularSelectionState = null;
+    clearGranularMathSelectionVisual();
+}
+
+function refreshRichMathSelectionFeedback() {
+    const selection = window.getSelection();
+
+    clearRichMathSelectionFeedback();
+
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) {
+        return;
+    }
+
+    const focusElement = selectionNodeElement(selection.focusNode);
+    if (
+        focusElement
+        && focusElement.closest(
+            "input, textarea, [contenteditable='true']"
+        )
+    ) {
+        return;
+    }
+
+    const ranges = [];
+    for (let i = 0; i < selection.rangeCount; i += 1) {
+        ranges.push(selection.getRangeAt(i));
+    }
+
+    document.querySelectorAll("mjx-container").forEach(container => {
+        // 直接从公式内部起选的这一条公式由逐字形高亮负责，
+        // 不能再叠加整块蓝色，否则又退回“整条一起选”的效果。
+        if (
+            richMathGranularSelectionState?.mathContainer === container
+        ) {
+            return;
+        }
+
+        let intersects = false;
+
+        for (const range of ranges) {
+            try {
+                if (range.intersectsNode(container)) {
+                    intersects = true;
+                    break;
+                }
+            } catch (_error) {
+                // 某些浏览器对特殊 SVG/Shadow DOM 节点可能抛异常。
+            }
+        }
+
+        if (intersects) {
+            container.classList.add("rich-selection-hit");
+        }
+    });
+}
+
+function installRichMathSelectionFeedback() {
+    ensureRichSelectionVisualStyle();
+
+    let framePending = false;
+
+    const scheduleRefresh = () => {
+        if (framePending) return;
+        framePending = true;
+
+        requestAnimationFrame(() => {
+            framePending = false;
+            refreshRichMathSelectionFeedback();
+        });
+    };
+
+    document.addEventListener("selectionchange", scheduleRefresh);
+    window.addEventListener("blur", clearRichMathSelectionFeedback);
+}
+
+function mathContainerFromPointerTarget(target) {
+    const element = target instanceof Element
+        ? target
+        : target?.parentElement;
+
+    return element?.closest?.("mjx-container") || null;
+}
+
+function mathGlyphNodes(mathContainer) {
+    if (!mathContainer) return [];
+
+    return [
+        ...mathContainer.querySelectorAll("svg [data-c]")
+    ].filter(node => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    });
+}
+
+function mathGlyphCharacter(glyph) {
+    const code = glyph?.getAttribute?.("data-c") || "";
+    if (!/^[0-9A-F]+$/i.test(code)) return "";
+
+    try {
+        // MathJax 对拉丁字母经常使用“数学斜体 Unicode”码位。
+        // NFKC 后复制出来仍是用户熟悉的 A、R、x 等普通字符。
+        return String.fromCodePoint(parseInt(code, 16)).normalize("NFKC");
+    } catch (_error) {
+        return "";
+    }
+}
+
+function mathGlyphIndexFromPointer(mathContainer, clientX, clientY) {
+    const glyphs = mathGlyphNodes(mathContainer);
+    if (!glyphs.length) return -1;
+
+    let nearestIndex = -1;
+    let nearestDistance = Infinity;
+
+    for (let i = 0; i < glyphs.length; i += 1) {
+        const rect = glyphs[i].getBoundingClientRect();
+
+        if (
+            clientX >= rect.left
+            && clientX <= rect.right
+            && clientY >= rect.top
+            && clientY <= rect.bottom
+        ) {
+            return i;
+        }
+
+        const dx = clientX < rect.left
+            ? rect.left - clientX
+            : clientX > rect.right
+                ? clientX - rect.right
+                : 0;
+        const dy = clientY < rect.top
+            ? rect.top - clientY
+            : clientY > rect.bottom
+                ? clientY - rect.bottom
+                : 0;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestIndex = i;
+        }
+    }
+
+    return nearestIndex;
+}
+
+function granularMathSelectedIndexes(state) {
+    if (!state) return [];
+
+    const start = Math.min(state.startIndex, state.endIndex);
+    const end = Math.max(state.startIndex, state.endIndex);
+    const result = [];
+
+    for (let i = start; i <= end; i += 1) {
+        result.push(i);
+    }
+
+    return result;
+}
+
+function mergeMathSelectionRects(rects) {
+    const items = rects
+        .filter(rect => rect.width > 0 && rect.height > 0)
+        .map(rect => ({ ...rect }))
+        .sort((a, b) => {
+            const dy = a.top - b.top;
+            return Math.abs(dy) > 2 ? dy : a.left - b.left;
+        });
+
+    const merged = [];
+
+    for (const rect of items) {
+        const expanded = {
+            left: rect.left - 0.75,
+            top: rect.top - 0.5,
+            right: rect.right + 0.75,
+            bottom: rect.bottom + 0.5
+        };
+        expanded.width = expanded.right - expanded.left;
+        expanded.height = expanded.bottom - expanded.top;
+
+        const last = merged[merged.length - 1];
+        if (!last) {
+            merged.push(expanded);
+            continue;
+        }
+
+        const overlapTop = Math.max(last.top, expanded.top);
+        const overlapBottom = Math.min(last.bottom, expanded.bottom);
+        const overlapHeight = Math.max(0, overlapBottom - overlapTop);
+        const minHeight = Math.max(
+            1,
+            Math.min(last.height, expanded.height)
+        );
+        const sameVisualLine = overlapHeight / minHeight >= 0.72;
+        const gap = expanded.left - last.right;
+
+        if (sameVisualLine && gap <= 1.75) {
+            last.left = Math.min(last.left, expanded.left);
+            last.top = Math.min(last.top, expanded.top);
+            last.right = Math.max(last.right, expanded.right);
+            last.bottom = Math.max(last.bottom, expanded.bottom);
+            last.width = last.right - last.left;
+            last.height = last.bottom - last.top;
+        } else {
+            merged.push(expanded);
+        }
+    }
+
+    return merged;
+}
+
+function renderGranularMathSelection(state) {
+    clearGranularMathSelectionVisual();
+
+    const mathContainer = state?.mathContainer;
+    if (!mathContainer) return;
+
+    const glyphs = mathGlyphNodes(mathContainer);
+    const selectedIndexes = granularMathSelectedIndexes(state)
+        .filter(index => index >= 0 && index < glyphs.length);
+
+    if (!selectedIndexes.length) return;
+
+    mathContainer.classList.add("rich-granular-selection");
+
+    const containerRect = mathContainer.getBoundingClientRect();
+    const rawRects = [];
+
+    selectedIndexes.forEach(index => {
+        const glyph = glyphs[index];
+        glyph.classList.add("rich-glyph-selected");
+
+        const rect = glyph.getBoundingClientRect();
+        rawRects.push({
+            left: rect.left - containerRect.left,
+            top: rect.top - containerRect.top,
+            right: rect.right - containerRect.left,
+            bottom: rect.bottom - containerRect.top,
+            width: rect.width,
+            height: rect.height
+        });
+    });
+
+    const overlay = document.createElement("span");
+    overlay.className = "rich-math-selection-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+
+    mergeMathSelectionRects(rawRects).forEach(rect => {
+        const piece = document.createElement("span");
+        piece.className = "rich-math-selection-piece";
+        piece.style.left = `${rect.left}px`;
+        piece.style.top = `${rect.top}px`;
+        piece.style.width = `${rect.width}px`;
+        piece.style.height = `${rect.height}px`;
+        overlay.appendChild(piece);
+    });
+
+    mathContainer.appendChild(overlay);
+}
+
+function mathBoundaryPointFromPointer(mathContainer, clientX) {
+    if (!mathContainer?.parentNode) return null;
+
+    const parent = mathContainer.parentNode;
+    const siblings = [...parent.childNodes];
+    const index = siblings.indexOf(mathContainer);
+    if (index < 0) return null;
+
+    const rect = mathContainer.getBoundingClientRect();
+    const useAfter = clientX >= (rect.left + rect.width / 2);
+
+    return {
+        node: parent,
+        offset: index + (useAfter ? 1 : 0),
+        mathContainer
+    };
+}
+
+function caretBoundaryFromViewportPoint(clientX, clientY) {
+    let node = null;
+    let offset = 0;
+
+    try {
+        if (typeof document.caretPositionFromPoint === "function") {
+            const position = document.caretPositionFromPoint(
+                clientX,
+                clientY
+            );
+            node = position?.offsetNode || null;
+            offset = Number(position?.offset || 0);
+        } else if (typeof document.caretRangeFromPoint === "function") {
+            const range = document.caretRangeFromPoint(
+                clientX,
+                clientY
+            );
+            node = range?.startContainer || null;
+            offset = Number(range?.startOffset || 0);
+        }
+    } catch (_error) {
+        return null;
+    }
+
+    if (!node) return null;
+
+    const mathContainer = selectionNodeElement(node)
+        ?.closest?.("mjx-container");
+
+    if (mathContainer) {
+        return mathBoundaryPointFromPointer(
+            mathContainer,
+            clientX
+        );
+    }
+
+    return { node, offset, mathContainer: null };
+}
+
+function collapsedRangeAtBoundary(point) {
+    if (!point?.node) return null;
+
+    const range = document.createRange();
+
+    try {
+        range.setStart(point.node, point.offset);
+        range.collapse(true);
+        return range;
+    } catch (_error) {
+        return null;
+    }
+}
+
+function compareBoundaryPointToMath(point, mathContainer) {
+    const probe = collapsedRangeAtBoundary(point);
+    if (!probe || !mathContainer?.parentNode) return 0;
+
+    const before = document.createRange();
+    const after = document.createRange();
+
+    try {
+        before.setStartBefore(mathContainer);
+        before.collapse(true);
+        after.setStartAfter(mathContainer);
+        after.collapse(true);
+
+        if (
+            probe.compareBoundaryPoints(
+                Range.START_TO_START,
+                before
+            ) <= 0
+        ) {
+            return -1;
+        }
+
+        if (
+            probe.compareBoundaryPoints(
+                Range.START_TO_START,
+                after
+            ) >= 0
+        ) {
+            return 1;
+        }
+    } catch (_error) {
+        return 0;
+    }
+
+    return 0;
+}
+
+function clearNativeDocumentSelection() {
+    const selection = window.getSelection();
+    if (selection) selection.removeAllRanges();
+}
+
+function setNativeSelectionOutsideMath(mathContainer, point, direction) {
+    const selection = window.getSelection();
+    if (!selection || !point?.node || !mathContainer?.parentNode) {
+        return false;
+    }
+
+    const range = document.createRange();
+
+    try {
+        if (direction > 0) {
+            range.setStartAfter(mathContainer);
+            range.setEnd(point.node, point.offset);
+        } else {
+            range.setStart(point.node, point.offset);
+            range.setEndBefore(mathContainer);
+        }
+
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    } catch (_error) {
+        return false;
+    }
+}
+
+function mathSelectionPlainText(state) {
+    const glyphs = mathGlyphNodes(state?.mathContainer);
+    const selected = granularMathSelectedIndexes(state);
+
+    return selected
+        .map(index => mathGlyphCharacter(glyphs[index]))
+        .join("");
+}
+
+function partialMathSvgPayload(state) {
+    const mathContainer = state?.mathContainer;
+    const originalSvg = mathContainer?.querySelector?.("svg");
+    if (!originalSvg) return null;
+
+    const glyphs = mathGlyphNodes(mathContainer);
+    const selectedIndexes = granularMathSelectedIndexes(state)
+        .filter(index => index >= 0 && index < glyphs.length);
+    if (!selectedIndexes.length) return null;
+
+    const selectedSet = new Set(selectedIndexes);
+    const selectedRects = selectedIndexes.map(index => (
+        glyphs[index].getBoundingClientRect()
+    ));
+
+    const left = Math.min(...selectedRects.map(rect => rect.left));
+    const top = Math.min(...selectedRects.map(rect => rect.top));
+    const right = Math.max(...selectedRects.map(rect => rect.right));
+    const bottom = Math.max(...selectedRects.map(rect => rect.bottom));
+
+    const svgRect = originalSvg.getBoundingClientRect();
+    if (!svgRect.width || !svgRect.height) return null;
+
+    const clone = originalSvg.cloneNode(true);
+    clone.classList.remove("rich-glyph-selected");
+    clone.querySelectorAll(".rich-glyph-selected").forEach(node => {
+        node.classList.remove("rich-glyph-selected");
+    });
+
+    const cloneGlyphs = [
+        ...clone.querySelectorAll("[data-c]")
+    ];
+    cloneGlyphs.forEach((glyph, index) => {
+        if (!selectedSet.has(index)) {
+            glyph.setAttribute("visibility", "hidden");
+        }
+    });
+
+    const baseViewBox = originalSvg.viewBox?.baseVal;
+    if (baseViewBox?.width && baseViewBox?.height) {
+        const scaleX = baseViewBox.width / svgRect.width;
+        const scaleY = baseViewBox.height / svgRect.height;
+        const paddingPx = 1;
+        const cropLeft = Math.max(svgRect.left, left - paddingPx);
+        const cropTop = Math.max(svgRect.top, top - paddingPx);
+        const cropRight = Math.min(svgRect.right, right + paddingPx);
+        const cropBottom = Math.min(svgRect.bottom, bottom + paddingPx);
+
+        const viewX = baseViewBox.x
+            + (cropLeft - svgRect.left) * scaleX;
+        const viewY = baseViewBox.y
+            + (cropTop - svgRect.top) * scaleY;
+        const viewWidth = Math.max(1, (cropRight - cropLeft) * scaleX);
+        const viewHeight = Math.max(1, (cropBottom - cropTop) * scaleY);
+
+        clone.setAttribute(
+            "viewBox",
+            `${viewX} ${viewY} ${viewWidth} ${viewHeight}`
+        );
+    }
+
+    const width = Math.max(1, right - left + 2);
+    const height = Math.max(1, bottom - top + 2);
+    clone.setAttribute("width", `${width}px`);
+    clone.setAttribute("height", `${height}px`);
+    clone.style.width = `${width}px`;
+    clone.style.height = `${height}px`;
+    clone.style.color = "#111827";
+
+    const dataUrl = clipboardSvgDataUrl(clone);
+    const text = mathSelectionPlainText(state);
+
+    const image = document.createElement("img");
+    image.src = dataUrl;
+    image.alt = text || "数学公式";
+    image.style.display = "inline-block";
+    image.style.verticalAlign = "middle";
+    image.style.width = `${width}px`;
+    image.style.height = `${height}px`;
+    image.style.maxWidth = "100%";
+
+    return {
+        text,
+        html: image.outerHTML,
+        width,
+        height
+    };
+}
+
+function buildGranularMathClipboardPayload(state, selection) {
+    // Native partial MathJax selections are kept as selected characters,
+    // not SVG <img> attachments. The original per-glyph selection/highlight
+    // logic remains intact; only the clipboard serialization changes.
+    const selectedText = mathSelectionPlainText(state);
+    const partial = {
+        text: selectedText,
+        html: `<span>${escapeRawHtml(selectedText)}</span>`
+    };
+
+    const direction = Number(state?.outsideDirection || 0);
+
+    if (
+        !direction
+        || !selection
+        || selection.isCollapsed
+        || selection.rangeCount < 1
+    ) {
+        return {
+            text: partial.text,
+            html: partial.html
+        };
+    }
+
+    let nativePayload = { text: "", html: "" };
+
+    try {
+        const fragment = selection.getRangeAt(0).cloneContents();
+        nativePayload = buildNativeSelectionClipboardPayload(fragment);
+    } catch (_error) {
+        // 外部文字范围复制失败时至少保留已经精确选中的公式部分。
+    }
+
+    if (direction < 0) {
+        return {
+            text: `${nativePayload.text}${partial.text}`,
+            html: `${nativePayload.html}${partial.html}`
+        };
+    }
+
+    return {
+        text: `${partial.text}${nativePayload.text}`,
+        html: `${partial.html}${nativePayload.html}`
+    };
+}
+
+function installDirectMathSelectionStart() {
+    const finishDrag = () => {
+        richMathGranularDragState = null;
+    };
+
+    document.addEventListener("mousedown", event => {
+        if (event.button !== 0) return;
+
+        const mathContainer = mathContainerFromPointerTarget(
+            event.target
+        );
+
+        if (!mathContainer) {
+            clearGranularMathSelection();
+            return;
+        }
+
+        const startIndex = mathGlyphIndexFromPointer(
+            mathContainer,
+            event.clientX,
+            event.clientY
+        );
+        if (startIndex < 0) return;
+
+        // SVG path 不能成为浏览器原生文字选区的锚点，因此只接管
+        // “鼠标从公式本身按下”的这次拖选。不是整条选中，而是记录
+        // 起始字形，随后鼠标拖到哪个字形就精确选到哪个字形。
+        event.preventDefault();
+        clearGranularMathSelection();
+        clearNativeDocumentSelection();
+
+        richMathGranularDragState = {
+            mathContainer,
+            startIndex,
+            startX: event.clientX,
+            startY: event.clientY,
+            active: false
+        };
+    }, true);
+
+    window.addEventListener("mousemove", event => {
+        const drag = richMathGranularDragState;
+        if (!drag) return;
+
+        if ((event.buttons & 1) !== 1) {
+            finishDrag();
+            return;
+        }
+
+        const distance = Math.hypot(
+            event.clientX - drag.startX,
+            event.clientY - drag.startY
+        );
+
+        // 与普通文字拖选一样，单击不产生选区；真正拖动后才开始高亮。
+        if (!drag.active && distance < 2) return;
+        drag.active = true;
+        event.preventDefault();
+
+        const pointedMath = mathContainerFromPointerTarget(
+            document.elementFromPoint(event.clientX, event.clientY)
+        );
+
+        if (pointedMath === drag.mathContainer) {
+            const endIndex = mathGlyphIndexFromPointer(
+                drag.mathContainer,
+                event.clientX,
+                event.clientY
+            );
+            if (endIndex < 0) return;
+
+            richMathGranularSelectionState = {
+                mathContainer: drag.mathContainer,
+                startIndex: drag.startIndex,
+                endIndex,
+                outsideDirection: 0
+            };
+
+            clearNativeDocumentSelection();
+            renderGranularMathSelection(
+                richMathGranularSelectionState
+            );
+            return;
+        }
+
+        const point = caretBoundaryFromViewportPoint(
+            event.clientX,
+            event.clientY
+        );
+        if (!point) return;
+
+        let relative = compareBoundaryPointToMath(
+            point,
+            drag.mathContainer
+        );
+
+        // 极少数浏览器在 SVG 附近给出的 caret 点仍落在容器边界内部，
+        // 用鼠标实际坐标做一次方向兜底。
+        if (relative === 0) {
+            const rect = drag.mathContainer.getBoundingClientRect();
+            if (event.clientX < rect.left) relative = -1;
+            else if (event.clientX > rect.right) relative = 1;
+            else if (event.clientY < rect.top) relative = -1;
+            else if (event.clientY > rect.bottom) relative = 1;
+        }
+
+        if (relative === 0) return;
+
+        const glyphs = mathGlyphNodes(drag.mathContainer);
+        const endIndex = relative > 0
+            ? Math.max(0, glyphs.length - 1)
+            : 0;
+
+        richMathGranularSelectionState = {
+            mathContainer: drag.mathContainer,
+            startIndex: drag.startIndex,
+            endIndex,
+            outsideDirection: relative
+        };
+
+        setNativeSelectionOutsideMath(
+            drag.mathContainer,
+            point,
+            relative
+        );
+        renderGranularMathSelection(
+            richMathGranularSelectionState
+        );
+        refreshRichMathSelectionFeedback();
+    }, true);
+
+    window.addEventListener("mouseup", event => {
+        const drag = richMathGranularDragState;
+        if (drag && !drag.active) {
+            clearGranularMathSelection();
+            clearNativeDocumentSelection();
+        }
+        finishDrag();
+    }, true);
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            clearGranularMathSelection();
+            clearNativeDocumentSelection();
+        }
+    });
+
+    window.addEventListener("resize", () => {
+        if (richMathGranularSelectionState) {
+            renderGranularMathSelection(
+                richMathGranularSelectionState
+            );
+        }
+    });
+}
+
+function selectionTouchesMathJax(selection) {
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) {
+        return false;
+    }
+
+    const anchorMath = selectionNodeElement(selection.anchorNode)
+        ?.closest?.("mjx-container");
+    const focusMath = selectionNodeElement(selection.focusNode)
+        ?.closest?.("mjx-container");
+
+    if (anchorMath || focusMath) {
+        return true;
+    }
+
+    const mathContainers = document.querySelectorAll("mjx-container");
+
+    for (let i = 0; i < selection.rangeCount; i += 1) {
+        const range = selection.getRangeAt(i);
+
+        for (const container of mathContainers) {
+            try {
+                if (range.intersectsNode(container)) {
+                    return true;
+                }
+            } catch (_error) {
+                // 特殊 SVG 节点异常时继续检查其他公式。
+            }
+        }
+    }
+
+    return false;
+}
+
+function writeSelectionClipboard(event, payload) {
+    // 原生框选复制只写 text/plain。
+    // MathJax 的 SVG / HTML 一旦进入系统剪贴板，微信等聊天软件可能把每个公式
+    // 拆成独立的 .dat 附件。这里故意不写 text/html，也不写 image/*；
+    // 页面渲染、公式逐字形选择与“题目复制”按钮的智能复制完全不受影响。
+    if (!payload?.text) return false;
+    if (!event.clipboardData) return false;
+
+    try {
+        event.clipboardData.clearData();
+    } catch (_error) {
+        // 某些 WebView 不允许 clearData；后续 setData 仍会覆盖文本类型。
+    }
+
+    event.clipboardData.setData(
+        "text/plain",
+        String(payload.text || "")
+    );
+    event.preventDefault();
+    return true;
+}
+
+function installRichSelectionCopy() {
+    installRichMathSelectionFeedback();
+    installDirectMathSelectionStart();
+
+    document.addEventListener("copy", event => {
+        const target = event.target;
+        if (
+            target instanceof Element
+            && target.closest("input, textarea, [contenteditable='true']")
+        ) {
+            return;
+        }
+
+        const selection = window.getSelection();
+
+        // 直接从公式内部拖出的“逐字形选区”优先。即使没有原生 DOM
+        // Selection（只在一个公式内部拖选时就是这种情况），Ctrl+C 仍然
+        // 能精确复制当前选中的那一段，而不是整条公式。
+        if (richMathGranularSelectionState) {
+            const payload = buildGranularMathClipboardPayload(
+                richMathGranularSelectionState,
+                selection
+            );
+            writeSelectionClipboard(event, payload);
+            return;
+        }
+
+        if (!selection || selection.isCollapsed || selection.rangeCount < 1) {
+            return;
+        }
+
+        // 不再让浏览器自行序列化任何 DMate 页面选区。
+        // 即使选区从普通文字开始、只擦过公式边界，Chromium 也可能把 MathJax SVG
+        // 作为富媒体对象放入剪贴板，微信随后会显示多个 .dat 文件。
+        // 因此所有非输入框原生选区统一走安全文本序列化：
+        // - 含公式：用 MathJax 的可访问表达式转成可读数学文本；
+        // - 纯文字：保留浏览器选中的文字和换行；
+        // - 绝不写入 SVG / HTML / image MIME。
+        let payload;
+        if (selectionTouchesMathJax(selection)) {
+            const fragment = cloneSelectionContentsForRichCopy(selection);
+            if (!fragment || !fragment.childNodes.length) return;
+            payload = buildNativeSelectionClipboardPayload(fragment);
+        } else {
+            payload = { text: String(selection.toString() || "") };
+        }
+
+        writeSelectionClipboard(event, payload);
+    }, true);
+}
+
+
+// 快捷跳转控件只观察 #chat 自身，不接管页面/图谱滚动。
+let chatJumpRefreshId = 0;
+
+function updateChatJumpControls() {
+    const chat = document.getElementById("chat");
+    const topButton = document.getElementById("chatJumpTop");
+    const bottomButton = document.getElementById("chatJumpBottom");
+    const center = chat?.closest(".center");
+    if (!chat || !topButton || !bottomButton || !center) return;
+
+    const inputWrap = center.querySelector(".input-wrap");
+    // When reviewing uploads, the enlarged image panel replaces the composer.
+    const taskStage = center.querySelector("#ocrUploadStage:not([hidden])");
+    const inputHeight = taskStage?.getBoundingClientRect().height
+        || inputWrap?.getBoundingClientRect().height || 80;
+    center.style.setProperty("--dmate-chat-input-height", `${Math.ceil(inputHeight)}px`);
+
+    const maxScroll = Math.max(0, chat.scrollHeight - chat.clientHeight);
+    const scrollTop = Math.max(0, Math.min(chat.scrollTop, maxScroll));
+    const canScroll = maxScroll > 50;
+    topButton.hidden = !canScroll || scrollTop <= 16;
+    bottomButton.hidden = !canScroll || (maxScroll - scrollTop) <= 16;
+}
+
+function queueChatJumpControlsUpdate() {
+    if (chatJumpRefreshId) return;
+    chatJumpRefreshId = requestAnimationFrame(() => {
+        chatJumpRefreshId = 0;
+        updateChatJumpControls();
+    });
+}
+
+function installChatJumpControls() {
+    const chat = document.getElementById("chat");
+    const topButton = document.getElementById("chatJumpTop");
+    const bottomButton = document.getElementById("chatJumpBottom");
+    if (!chat || !topButton || !bottomButton) return;
+
+    const navigate = toBottom => {
+        if (toBottom && hasActiveChatOutput()) {
+            typingScrollLockedByUser = false;
+            typingAutoFollow = true;
+            lastTypingAutoScrollAt = 0;
+        } else if (!toBottom) {
+            stopTypingAutoFollow();
+        }
+        const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+        chat.scrollTo({
+            top: toBottom ? chat.scrollHeight : 0,
+            behavior: reducedMotion ? "auto" : "smooth"
+        });
+        queueChatJumpControlsUpdate();
+    };
+    topButton.addEventListener("click", () => navigate(false));
+    bottomButton.addEventListener("click", () => navigate(true));
+    chat.addEventListener("scroll", queueChatJumpControlsUpdate, { passive:true });
+    window.addEventListener("resize", queueChatJumpControlsUpdate, { passive:true });
+    window.visualViewport?.addEventListener("resize", queueChatJumpControlsUpdate, { passive:true });
+    if (typeof ResizeObserver !== "undefined") {
+        const observer = new ResizeObserver(queueChatJumpControlsUpdate);
+        observer.observe(chat);
+        const inputWrap = chat.closest(".center")?.querySelector(".input-wrap");
+        if (inputWrap) observer.observe(inputWrap);
+    }
+    if (typeof MutationObserver !== "undefined") {
+        // 按帧合并变化：长回答/公式渲染期间不会反复触发布局。
+        new MutationObserver(queueChatJumpControlsUpdate).observe(chat, {
+            childList:true,
+            subtree:true
+        });
+    }
+    queueChatJumpControlsUpdate();
+}
+
+function isChatNearBottom(chat, threshold = 90) {
+    if (!chat) return true;
+
+    const distance = (
+        chat.scrollHeight
+        - chat.scrollTop
+        - chat.clientHeight
+    );
+
+    return distance <= threshold;
+}
+
+function scrollChatToBottom() {
+    const chat = document.getElementById("chat");
+
+    if (chat) {
+        chat.scrollTop = chat.scrollHeight;
+    }
+}
+
+function chatBottomDistance(chat) {
+    if (!chat) return 0;
+
+    return Math.max(
+        0,
+        chat.scrollHeight
+        - chat.scrollTop
+        - chat.clientHeight
+    );
+}
+
+function stopTypingAutoFollow() {
+    if (!hasActiveChatOutput()) return;
+
+    typingScrollLockedByUser = true;
+    typingAutoFollow = false;
+}
+
+function handleChatWheelWhileTyping(event) {
+    if (!hasActiveChatOutput()) return;
+
+    // 只要用户主动滚轮，就先停止自动跟随。
+    // 这样上下滚动都不会和打字机争夺 scrollTop。
+    if (event.deltaY !== 0) {
+        stopTypingAutoFollow();
+    }
+}
+
+function handleChatPointerWhileTyping() {
+    if (!hasActiveChatOutput()) return;
+
+    // 支持拖动滚动条。
+    stopTypingAutoFollow();
+}
+
+function handleChatTouchWhileTyping() {
+    if (!hasActiveChatOutput()) return;
+
+    stopTypingAutoFollow();
+}
+
+function handleChatScrollWhileTyping() {
+    if (!hasActiveChatOutput()) return;
+
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    const distance = chatBottomDistance(chat);
+
+    if (typingScrollLockedByUser) {
+        if (distance <= 12) {
+            typingScrollLockedByUser = false;
+            typingAutoFollow = true;
+        } else {
+            typingAutoFollow = false;
+        }
+
+        return;
+    }
+
+    typingAutoFollow = distance <= 90;
+}
+
+function maybeAutoFollowTyping() {
+    if (
+        !typingAutoFollow
+        || typingScrollLockedByUser
+    ) {
+        return;
+    }
+
+    // 不再每个字符都操作滚动条。
+    const now = Date.now();
+
+    if (now - lastTypingAutoScrollAt < 32) {
+        return;
+    }
+
+    lastTypingAutoScrollAt = now;
+    scrollChatToBottom();
+}
+
+
+function isDefaultSessionName(session) {
+    return session?.name === "新对话"
+        && (!session.nameSource || session.nameSource === "default");
+}
+
+function sessionDisplayName(session) {
+    const name = typeof session?.name === "string" ? session.name : "";
+    // Custom and content-derived names are user data, even if they happen to
+    // match a translated UI label. Legacy default names remain stored verbatim.
+    if (session?.nameSource === "user" || session?.nameSource === "content") return name;
+    if (isDefaultSessionName(session)) return dmateUiText("新对话", "New conversation");
+    if (session?.nameSource === "ocr" && name === "图片识题") return dmateUiText("图片识题", "Image question");
+    const points = session?.retest?.targetPoints;
+    if (Array.isArray(points)) {
+        const chinese = `复测：${points.length ? points.join("、") : "错题"}`.slice(0, 22);
+        const english = `Retest: ${points.length
+            ? points.map(point => window.DMateKnowledgeLanguage?.label(point, "en") || point).join(", ")
+            : "the original question"}`.slice(0, 48);
+        // Compare the generated title too, so stale provenance from an older
+        // client can never replace an unrelated custom name.
+        if (name === chinese || name === english) return dmateUiLanguage() === "en" ? english : chinese;
+    }
+    return name;
+}
+
+function refreshSessionNameDisplays() {
+    const byId = new Map(sessions.map(session => [String(session.id), session]));
+    for (const element of document.querySelectorAll("#sessions [data-session-id]")) {
+        const session = byId.get(element.dataset.sessionId);
+        const name = element.querySelector("[data-session-name]");
+        if (!session || !name) continue;
+        name.textContent = sessionDisplayName(session);
+        name.title = sessionDisplayName(session);
+    }
+    refreshMobileConversationTitle();
+}
+
+function deriveSessionName(text, source = "text") {
+    let value = String(text || "")
+        .replace(/【题目文字】/g, "")
+        .replace(/【图形信息】/g, "")
+        .replace(/\[图片识题\]/g, "")
+        .replace(/[#*_`>]/g, "")
+        .trim();
+
+    const firstUsefulLine = value
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .find(line => (
+            line
+            && !/^[-—=]{2,}$/.test(line)
+        ));
+
+    value = firstUsefulLine || value;
+
+    if (!value) {
+        return source === "ocr"
+            ? "图片识题"
+            : "新对话";
+    }
+
+    value = value
+        .replace(/\s+/g, " ")
+        .replace(/^题目[:：]\s*/, "")
+        .trim();
+
+    const maxLength = 15;
+
+    return value.length > maxLength
+        ? `${value.slice(0, maxLength)}…`
+        : value;
+}
+
+function maybeAutoNameSession(
+    session,
+    text,
+    source = "text"
+) {
+    if (
+        !isDefaultSessionName(session)
+    ) {
+        return false;
+    }
+
+    const name = deriveSessionName(
+        text,
+        source
+    );
+
+    if (!name || name === "新对话") {
+        return false;
+    }
+
+    session.name = name;
+    session.nameSource = source === "ocr" && name === "图片识题" ? "ocr" : "content";
+    return true;
+}
+
+function refreshUnnamedSessionNames() {
+    let changed = false;
+
+    for (const session of sessions) {
+        if (
+            !isDefaultSessionName(session)
+            || !Array.isArray(session.messages)
+        ) {
+            continue;
+        }
+
+        const firstUser = session.messages.find(
+            message => (
+                message
+                && message.role === "user"
+                && typeof message.text === "string"
+                && message.text.trim()
+            )
+        );
+
+        if (
+            firstUser
+            && maybeAutoNameSession(
+                session,
+                firstUser.text,
+                firstUser.source || "text"
+            )
+        ) {
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        saveState();
+    }
+}
+
+
+// -----------------------------
+// 新对话
+// -----------------------------
+function newChat() {
+    if (typingTimer) {
+        forceCompleteTyping();
+    }
+
+    pauseOcrBatchRun(currentId);
+    const id = makeSessionId();
+
+    sessions.push({
+        id,
+        name: "新对话",
+        nameSource: "default",
+        messages: [],
+        teaching: null,
+        learningQuestion: null,
+        retest: null
+    });
+
+    currentId = id;
+
+    saveState();
+    renderAll();
+    animateMobileConversationSwitch();
+}
+
+
+// -----------------------------
+// 发送聊天
+// -----------------------------
+function questionCandidateFingerprint(candidate) {
+    return candidate
+        ? wrongQuestionFingerprint(candidate.text)
+        : "";
+}
+
+function findQuestionCandidateByFingerprint(
+    session,
+    fingerprint
+) {
+    const target = String(fingerprint || "").trim();
+    if (!target) return null;
+
+    return collectConversationQuestionCandidates(session)
+        .find(candidate => (
+            questionCandidateFingerprint(candidate) === target
+        )) || null;
+}
+
+function currentQuestionCandidateFromLearningState(session) {
+    const saved = normalizeLearningQuestion(
+        session?.learningQuestion
+    );
+
+    if (!saved) return null;
+
+    return findQuestionCandidateByFingerprint(
+        session,
+        wrongQuestionFingerprint(saved.text)
+    );
+}
+
+function structuralQuestionReference(text) {
+    const value = normalizeQuestionReferenceText(text);
+    if (!value) return null;
+
+    const relative = relativeQuestionReference(value);
+    if (relative) {
+        return {
+            kind: "relative",
+            offset: relative.offset,
+            anchorOrdinal: relative.anchorOrdinal,
+            anchorReverseOrdinal: relative.anchorReverseOrdinal,
+            anchorBoundary: relative.anchorBoundary
+        };
+    }
+
+    const reverseOrdinal = questionReverseOrdinalReference(value);
+    if (reverseOrdinal) {
+        return {
+            kind: "reverse_ordinal",
+            ordinal: reverseOrdinal
+        };
+    }
+
+    const ordinal = questionOrdinalReference(value);
+    if (ordinal) {
+        return {
+            kind: "ordinal",
+            ordinal
+        };
+    }
+
+    const boundary = questionBoundaryReference(value);
+    if (boundary) {
+        return {
+            kind: boundary
+        };
+    }
+
+    return null;
+}
+
+function currentQuestionPositionInCandidates(session, candidates) {
+    if (!Array.isArray(candidates) || !candidates.length) {
+        return -1;
+    }
+
+    const current = currentQuestionCandidateFromLearningState(
+        session
+    );
+
+    if (current) {
+        const fingerprint = questionCandidateFingerprint(current);
+        const position = candidates.findIndex(candidate => (
+            questionCandidateFingerprint(candidate) === fingerprint
+        ));
+
+        if (position >= 0) {
+            return position;
+        }
+    }
+
+    return candidates.length - 1;
+}
+
+function resolveStructuralQuestionPosition(
+    reference,
+    candidateCount,
+    currentPosition
+) {
+    if (!reference || candidateCount <= 0) {
+        return -1;
+    }
+
+    let position = -1;
+
+    if (reference.kind === "relative") {
+        let basePosition = currentPosition;
+
+        if (reference.anchorOrdinal) {
+            basePosition = reference.anchorOrdinal - 1;
+        } else if (reference.anchorReverseOrdinal) {
+            basePosition = candidateCount - reference.anchorReverseOrdinal;
+        } else if (reference.anchorBoundary === "first") {
+            basePosition = 0;
+        } else if (reference.anchorBoundary === "last") {
+            basePosition = candidateCount - 1;
+        } else if (reference.anchorBoundary === "current") {
+            basePosition = currentPosition;
+        }
+
+        if (basePosition < 0 || basePosition >= candidateCount) {
+            return -1;
+        }
+
+        position = basePosition + reference.offset;
+    } else if (reference.kind === "ordinal") {
+        position = reference.ordinal - 1;
+    } else if (reference.kind === "reverse_ordinal") {
+        position = candidateCount - reference.ordinal;
+    } else if (reference.kind === "first") {
+        position = 0;
+    } else if (reference.kind === "last") {
+        position = candidateCount - 1;
+    } else if (reference.kind === "current") {
+        position = currentPosition;
+    }
+
+    return (
+        Number.isInteger(position)
+        && position >= 0
+        && position < candidateCount
+    )
+        ? position
+        : -1;
+}
+
+function resolveStructuralQuestionCandidate(session, text) {
+    const reference = structuralQuestionReference(text);
+    if (!reference) return null;
+
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    if (!candidates.length) return null;
+
+    const currentPosition = currentQuestionPositionInCandidates(
+        session,
+        candidates
+    );
+    const position = resolveStructuralQuestionPosition(
+        reference,
+        candidates.length,
+        currentPosition
+    );
+
+    return position >= 0
+        ? candidates[position]
+        : null;
+}
+
+function resolvePreviousQuestionCandidate(session, steps = 1) {
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    if (!candidates.length) return null;
+
+    const currentPosition = currentQuestionPositionInCandidates(
+        session,
+        candidates
+    );
+    const offset = -Math.max(1, Number(steps) || 1);
+    const position = currentPosition + offset;
+
+    return position >= 0
+        ? candidates[position]
+        : null;
+}
+
+function resolveNextQuestionCandidate(session, steps = 1) {
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    if (!candidates.length) return null;
+
+    const currentPosition = currentQuestionPositionInCandidates(
+        session,
+        candidates
+    );
+    const offset = Math.max(1, Number(steps) || 1);
+    const position = currentPosition + offset;
+
+    return position < candidates.length
+        ? candidates[position]
+        : null;
+}
+
+function resolveOrdinalQuestionCandidate(session, text) {
+    const ordinal = questionOrdinalReference(text);
+    if (!ordinal) return null;
+
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    if (!candidates.length) return null;
+
+    return candidates[ordinal - 1] || null;
+}
+
+function resolveReverseOrdinalQuestionCandidate(session, text) {
+    const ordinal = questionReverseOrdinalReference(text);
+    if (!ordinal) return null;
+
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    if (!candidates.length) return null;
+
+    return candidates[candidates.length - ordinal] || null;
+}
+
+function resolveNamedQuestionCandidate(session, text) {
+    const topic = namedQuestionTopicReference(text);
+    if (!topic) return null;
+
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    if (!candidates.length) return null;
+
+    const aliases = {
+        命题逻辑: ["命题逻辑", "命题", "真值", "真值表", "逻辑联结词", "范式", "主析取", "主合取"],
+        谓词逻辑: ["谓词逻辑", "谓词", "量词", "个体域", "辖域", "前束范式"],
+        证明与归纳: ["证明与归纳", "直接证明", "反证", "反证法", "数学归纳", "强归纳"],
+        集合与关系: ["集合与关系", "集合", "关系", "偏序", "等价关系", "闭包"],
+        集合: ["集合", "全集", "子集", "补集", "并集", "交集", "幂集"],
+        关系: ["关系", "二元关系", "自反", "对称", "传递", "偏序", "等价", "哈斯图", "闭包"],
+        函数: ["函数", "映射", "单射", "满射", "双射", "逆函数", "复合函数"],
+        初等数论: ["初等数论", "数论", "整除", "素数", "质数", "因数", "约数", "同余", "欧几里得", "RSA"],
+        数论: ["初等数论", "数论", "整除", "素数", "质数", "因数", "约数", "同余", "欧几里得", "RSA"],
+        计数与组合: ["计数与组合", "组合", "排列", "鸽巢", "容斥", "计数"],
+        组合: ["计数与组合", "组合", "排列", "鸽巢", "容斥", "计数"],
+        递推关系: ["递推关系", "递推", "递归", "生成函数"],
+        递推: ["递推关系", "递推", "递归", "生成函数"],
+        图论: ["图论", "图", "顶点", "边", "欧拉", "邻接", "路径", "哈密顿", "生成树", "最短路"],
+        代数结构: ["代数结构", "代数", "群", "子群", "半群", "幺半群", "同态", "同构", "环", "域", "格", "布尔代数"],
+        代数: ["代数结构", "代数", "群", "子群", "半群", "幺半群", "同态", "同构", "环", "域", "格", "布尔代数"],
+        逻辑: ["命题逻辑", "谓词逻辑", "逻辑", "命题", "真值", "量词", "谓词", "范式"],
+        归纳: ["证明与归纳", "数学归纳", "强归纳", "反证", "直接证明"]
+    };
+
+    let terms = [topic];
+
+    for (const [name, values] of Object.entries(aliases)) {
+        if (
+            topic === name
+            || topic.includes(name)
+            || name.includes(topic)
+        ) {
+            terms = [...new Set([...terms, ...values])];
+        }
+    }
+
+    let best = null;
+    let bestScore = 0;
+
+    for (const candidate of candidates) {
+        const teaching = candidateTeachingSnapshot(
+            session,
+            candidate
+        );
+
+        const haystack = [
+            candidate.text,
+            teaching?.category || "",
+            ...(teaching?.knowledge_points || []),
+            ...(teaching?.focus_points || [])
+        ].join(" ");
+
+        let score = 0;
+
+        for (const term of terms) {
+            if (term && haystack.includes(term)) {
+                // 精确模块/主题名称权重更高，避免“谓词逻辑”被最近的命题逻辑题抢走。
+                score += term === topic ? 8 : 1;
+            }
+        }
+
+        if (
+            teaching?.category
+            && (
+                teaching.category === topic
+                || topic.includes(teaching.category)
+                || teaching.category.includes(topic)
+            )
+        ) {
+            score += 12;
+        }
+
+        if (
+            score > bestScore
+            || (
+                score === bestScore
+                && score > 0
+                && best
+                && candidate.index > best.index
+            )
+        ) {
+            best = candidate;
+            bestScore = score;
+        }
+    }
+
+    return bestScore > 0 ? best : null;
+}
+
+function resolveQuestionNavigationCandidate(session, text) {
+    const structural = structuralQuestionReference(text);
+
+    if (structural) {
+        return resolveStructuralQuestionCandidate(
+            session,
+            text
+        );
+    }
+
+    return resolveNamedQuestionCandidate(
+        session,
+        text
+    );
+}
+
+function questionNavigationFailureMessage(session, text) {
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+    const count = candidates.length;
+
+    if (!count) {
+        return "当前会话还没有识别到可引用的题目，请先输入或生成一道题";
+    }
+
+    const structural = structuralQuestionReference(text);
+
+    if (structural?.kind === "relative") {
+        const currentPosition = currentQuestionPositionInCandidates(
+            session,
+            candidates
+        );
+        let basePosition = currentPosition;
+
+        if (structural.anchorOrdinal) {
+            basePosition = structural.anchorOrdinal - 1;
+        } else if (structural.anchorReverseOrdinal) {
+            basePosition = count - structural.anchorReverseOrdinal;
+        } else if (structural.anchorBoundary === "first") {
+            basePosition = 0;
+        } else if (structural.anchorBoundary === "last") {
+            basePosition = count - 1;
+        }
+
+        const targetPosition = basePosition + structural.offset;
+
+        if (targetPosition < 0) {
+            return "前面已经没有更早的题目了；当前指代已经到第一道已识别题";
+        }
+
+        if (targetPosition >= count) {
+            return "后面还没有可切换的已识别题目；当前指代已经到最后一道题";
+        }
+    }
+
+    if (structural?.kind === "ordinal") {
+        return `当前会话共识别到 ${count} 道题，找不到第 ${structural.ordinal} 题`;
+    }
+
+    if (structural?.kind === "reverse_ordinal") {
+        return `当前会话共识别到 ${count} 道题，找不到倒数第 ${structural.ordinal} 题`;
+    }
+
+    if (namedQuestionTopicReference(text)) {
+        return "没找到你指的那一道主题题目。可以改说“第2题”“上一道题”“下一道题”或更具体的知识点名称";
+    }
+
+    return "没找到你指的那一道题。可以改说“第2题”“上一道题”“下一道题”“最后一道题”或具体知识点名称";
+}
+
+function buildTargetQuestionApiText(userText, candidate) {
+    const question = String(candidate?.text || "").trim();
+    const latestRequest = String(userText || "").trim();
+
+    if (!question) return latestRequest;
+
+    // 题目正文只是定位上下文，不是另一条待执行的用户请求。
+    // 把它与“本轮唯一请求”合并成同一个 user 消息，避免模型把
+    // 连续两条用户话语都当作本轮任务一起回答。
+    return [
+        "【当前指向题目】",
+        question,
+        "【当前指向题目结束】",
+        "",
+        "【本轮唯一需要执行的用户请求】",
+        latestRequest,
+        "【本轮请求结束】",
+        "",
+        "只回答上面的本轮最新请求。不要重新执行、补答、总结或继续处理更早的用户请求；",
+        "更早的内容只能用于理解指代和题目背景。"
+    ].join("\n");
+}
+
+function buildApiMessages(session, targetCandidate = null) {
+    if (!session || !Array.isArray(session.messages)) {
+        return [];
+    }
+
+    const valid = session.messages
+        .map((message, index) => ({ message, index }))
+        .filter(({ message }) => (
+            message
+            && !message.isError
+            && !message.isNotice
+            && typeof message.text === "string"
+            && message.text.trim()
+        ));
+
+    if (!valid.length) return [];
+
+    const latestUserEntry = [...valid]
+        .reverse()
+        .find(({ message }) => message.role === "user");
+
+    if (!latestUserEntry) return [];
+
+    const latestUser = latestUserEntry.message;
+    const latestIndex = latestUserEntry.index;
+    const target = targetCandidate
+        || activeQuestionCandidateFromHistory(session)
+        || currentQuestionCandidateFromLearningState(session);
+
+    const mapRole = role => (
+        role === "user" ? "user" : "assistant"
+    );
+
+    const messageContent = message => {
+        let content = (
+            message.role === "user"
+            && typeof message.apiText === "string"
+            && message.apiText.trim()
+        )
+            ? message.apiText
+            : message.text;
+
+        if (
+            message.role === "user"
+            && message.source === "ocr"
+        ) {
+            content = `[图片识题]\n${content}`;
+        }
+
+        return content;
+    };
+
+    // 同知识点练习必须携带它引用的题目；指定新主题的独立出题不带旧题。
+    // 注意：裸“下一题”在历史中确实存在后一道题时，会被 send() 解析为
+    // 导航并写入 targetQuestionFingerprint，此时不能再误走出题分支。
+    const latestIsResolvedNavigation = Boolean(
+        isQuestionNavigationFollowUp(latestUser.text)
+        && latestUser.targetQuestionFingerprint
+        && !hasExplicitExerciseGenerationCue(latestUser.text)
+    );
+
+    if (
+        isExerciseRequestText(latestUser.text)
+        && !latestIsResolvedNavigation
+    ) {
+        const reference = isContextualExerciseRequest(latestUser.text)
+            ? (targetCandidate || resolveExerciseReference(session, latestUser.text))
+            : null;
+        return [{
+            role: "user",
+            content: reference
+                ? buildTargetQuestionApiText(latestUser.text, reference)
+                : messageContent(latestUser)
+        }];
+    }
+
+    // 真正的新自包含题也优先独立发送，不要因为会话中已有 target 就
+    // 被错误包装成“上一题的追问”。
+    if (
+        (
+            latestUser.source === "ocr"
+            || looksLikeActualLearningProblem(latestUser)
+        )
+        && !isQuestionNavigationFollowUp(latestUser.text)
+    ) {
+        return [{
+            role: "user",
+            content: messageContent(latestUser)
+        }];
+    }
+
+    if (target) {
+        const targetFingerprint = questionCandidateFingerprint(
+            target
+        );
+
+        // 对“上一题 / 第一题 / 继续 / 为什么 / 我不会”等追问，
+        // 请求中只允许存在一个“当前 user 指令”。题目正文是定位信息，
+        // 不能再单独伪装成另一条 user 消息，否则模型可能把两条都执行。
+        if (
+            target.index < latestIndex
+            || isShortLearningFollowUp(latestUser.text)
+            || latestUser.targetQuestionFingerprint
+        ) {
+            const scoped = [];
+
+            // 只有真正依赖上一段讲解位置的短追问，才保留最近一次相关
+            // assistant 回复作为背景。明确的“第一题/第二题/上一题”导航
+            // 不需要旧回答，直接围绕目标题处理最新一句即可。
+            const needsAssistantContext = (
+                !isQuestionNavigationFollowUp(latestUser.text)
+                && /(?:继续|为什么|然后呢|下一步|这一步|这里|这个|再解释|再讲一下)/.test(
+                    String(latestUser.text || "").replace(/\s+/g, "")
+                )
+            );
+
+            if (needsAssistantContext) {
+                let lastRelatedAssistant = null;
+
+                for (let index = latestIndex - 1; index >= 0; index -= 1) {
+                    const message = session.messages[index];
+
+                    if (!message || message.role !== "ai") {
+                        continue;
+                    }
+
+                    if (
+                        targetFingerprint
+                        && message.targetQuestionFingerprint === targetFingerprint
+                        && !message.isError
+                        && !message.isNotice
+                    ) {
+                        lastRelatedAssistant = message;
+                        break;
+                    }
+                }
+
+                if (lastRelatedAssistant) {
+                    scoped.push({
+                        role: "assistant",
+                        content: lastRelatedAssistant.text
+                    });
+                }
+            }
+
+            const latestContent = latestUser.isRetestAnswer
+                ? messageContent(latestUser)
+                : buildTargetQuestionApiText(
+                    latestUser.text,
+                    target
+                );
+
+            scoped.push({
+                role: "user",
+                content: latestContent
+            });
+
+            return scoped;
+        }
+    }
+
+    // 一道全新的自包含题目，不需要把上一道题的完整回答继续塞进请求。
+    if (
+        latestUser.source === "ocr"
+        || looksLikeActualLearningProblem(latestUser)
+    ) {
+        return [{
+            role: "user",
+            content: messageContent(latestUser)
+        }];
+    }
+
+    // 兼容无法识别题目锚点的旧会话，退回有限的最近窗口。
+    // 正常题目追问仍优先使用显式题目状态，不会把整段历史无差别塞给模型。
+    return valid
+        .slice(-FALLBACK_API_CONTEXT_MESSAGES)
+        .map(({ message }) => ({
+            role: mapRole(message.role),
+            content: messageContent(message)
+        }));
+}
+
+async function parseResponseJson(response) {
+    try {
+        return await response.json();
+    } catch (_error) {
+        return {};
+    }
+}
+
+function fallbackHttpError(status) {
+    if (status === 400) {
+        return "请求内容有误，请检查后重新发送";
+    }
+    if (status === 413) {
+        return "上传内容过大，请重新选择";
+    }
+    if (status === 429) {
+        return "当前请求过于频繁，请稍后再试";
+    }
+    if (status >= 500) {
+        return "服务暂时不可用，请稍后重试";
+    }
+
+    return "请求失败，请稍后重试";
+}
+
+function attachTeachingSnapshotToLatestQuestion(
+    session,
+    teaching
+) {
+    const normalized = normalizeTeaching(teaching);
+
+    if (
+        !session
+        || !normalized
+        || !Array.isArray(session.messages)
+    ) {
+        return;
+    }
+
+    for (
+        let index = session.messages.length - 1;
+        index >= 0;
+        index -= 1
+    ) {
+        const message = session.messages[index];
+
+        if (
+            !message
+            || message.role !== "user"
+            || message.isRetestAnswer
+        ) {
+            continue;
+        }
+
+        // “随便出一道题 / 给我来个难题 / 再来一道”等只是出题命令，
+        // 不是一道可评级的用户题目。即使后端 teaching 带有目标难度，
+        // 也绝不能把这个快照挂到用户命令气泡上。
+        if (isExerciseRequestText(message.text)) {
+            return;
+        }
+
+        // 只对 OCR 确认的题目或用户在输入框明确选择的题目显示难度。
+        // AI 讲解和 AI 出题的消息处理保持不变。
+        if (message.source === "ocr"
+            ? isRecordableOcrQuestionMessage(message)
+            : message.manualIsQuestion === true) {
+            message.questionTeaching = normalized;
+        }
+        return;
+    }
+}
+
+
+async function requestAiReply(session, options = {}) {
+    if (!session) return { status: "skipped" };
+
+    const latestUserBeforeRequest = getLatestUserMessage(
+        session
+    );
+    const retestBeforeRequest = normalizeRetestSession(
+        session.retest
+    );
+    const latestIsRetestGeneration = Boolean(
+        latestUserBeforeRequest?.isRetestPrompt
+        && retestBeforeRequest?.stage === "generating"
+    );
+
+    if (options.expectedUserMessage && latestUserBeforeRequest !== options.expectedUserMessage)
+        return { status: "skipped" };
+
+    const latestText = latestUserBeforeRequest?.text || "";
+    const latestIsNavigationRequest = Boolean(
+        latestUserBeforeRequest
+        && isQuestionNavigationFollowUp(latestText)
+    );
+
+    // send() 已经解析过导航时，优先使用它写入的强指纹；
+    // 兼容旧会话/旧消息时，再现场解析一次。避免“下一题”被解析两次而跳两格。
+    let navigationCandidate = null;
+
+    if (latestIsNavigationRequest) {
+        navigationCandidate = latestUserBeforeRequest?.targetQuestionFingerprint
+            ? findQuestionCandidateByFingerprint(
+                session,
+                latestUserBeforeRequest.targetQuestionFingerprint
+            )
+            : resolveQuestionNavigationCandidate(
+                session,
+                latestText
+            );
+    }
+
+    const rawExerciseRequest = isExerciseRequestText(latestText);
+    const latestIsExerciseRequest = Boolean(
+        latestIsRetestGeneration
+        || (
+            rawExerciseRequest
+            && !(
+                navigationCandidate
+                && !hasExplicitExerciseGenerationCue(latestText)
+            )
+        )
+    );
+
+    // Images explicitly marked as supporting material are still answered, but
+    // must not overwrite an earlier problem or create learning statistics.
+    const supportingFollowUp = supportingOcrFollowUpCandidate(session, latestUserBeforeRequest);
+    if (supportingFollowUp?.invalidSemanticContext) {
+        showAssistantMessage(session, "图片确认信息已失效，请重新上传并确认后继续。", { isError: true });
+        return { status: "error" };
+    }
+    const supportingImagesOnly = !latestIsExerciseRequest && !latestIsRetestGeneration
+        && (latestUserBeforeRequest?.source === "ocr" && latestUserBeforeRequest.ocrIsQuestion === false
+            || Boolean(supportingFollowUp));
+
+    const latestIsFreshQuestion = Boolean(
+        latestUserBeforeRequest
+        && (
+            latestUserBeforeRequest.source === "ocr"
+            || looksLikeActualLearningProblem(
+                latestUserBeforeRequest
+            )
+        )
+        && !latestIsNavigationRequest
+    );
+
+    // 明确说“第99题 / 下一题不太会 / 某主题那道题”却找不到目标时，
+    // 不能悄悄回落到当前题，否则就是用户截图里那类“答错题”的根源。
+    // 裸“下一题”在已经位于最后一题时仍允许走“继续出题”快捷逻辑。
+    if (
+        latestIsNavigationRequest
+        && !navigationCandidate
+        && !latestIsExerciseRequest
+    ) {
+        showAssistantMessage(
+            session,
+            questionNavigationFailureMessage(
+                session,
+                latestText
+            ),
+            { isError: true }
+        );
+        return { status: "error" };
+    }
+
+    // 普通“同知识点出题”从当前会话里找参照题；
+    // 错题复测则直接使用错题本保存的原题，不能再去新建的复测会话里找。
+    const exerciseReference = (
+        latestIsExerciseRequest
+        && !latestIsRetestGeneration
+    )
+        ? resolveExerciseReference(
+            session,
+            latestUserBeforeRequest?.text || ""
+        )
+        : null;
+
+    let retestReferenceQuestion = "";
+
+    if (latestIsRetestGeneration && retestBeforeRequest) {
+        const entry = learningState.wrongQuestions.find(
+            item => item.id === retestBeforeRequest.wrongQuestionId
+        );
+
+        retestReferenceQuestion = limitQuestionText(String(
+            retestBeforeRequest.referenceQuestion
+            || entry?.question
+            || ""
+        ).trim());
+    }
+
+    if (
+        latestIsExerciseRequest
+        && !latestIsRetestGeneration
+        && isContextualExerciseRequest(
+            latestUserBeforeRequest?.text || ""
+        )
+        && !exerciseReference
+    ) {
+        showAssistantMessage(
+            session,
+            "还没找到要参照的题目。你可以说“第一道题 / 上一道题 / 数论那道题”，也可以直接说明要练习的知识点",
+            { isError: true }
+        );
+        return { status: "error" };
+    }
+
+    if (
+        latestIsRetestGeneration
+        && !retestReferenceQuestion
+    ) {
+        rollbackRetestAfterRequestFailure(session);
+        showAssistantMessage(
+            session,
+            "复测原题已经丢失，请回到错题本重新发起复测",
+            { isError: true }
+        );
+        return { status: "error" };
+    }
+
+    const requestTargetCandidate = latestIsExerciseRequest
+        ? exerciseReference
+        : latestIsFreshQuestion ? null : (
+            supportingFollowUp
+            || navigationCandidate
+            || activeQuestionCandidateFromHistory(session)
+            || currentQuestionCandidateFromLearningState(session)
+        );
+    const requestTargetFingerprint = questionCandidateFingerprint(
+        requestTargetCandidate
+    );
+
+    const requestKey = sessionBusyKey(session.id);
+    const activeRequest = {
+        session,
+        controller: new AbortController(),
+        cancelled: false,
+        // Every request belongs to the message that started it, including
+        // ordinary text sends. Deleting that message invalidates its reply.
+        userMessage: options.expectedUserMessage || latestUserBeforeRequest,
+        contextVersion: cloudSyncContextVersion
+    };
+    activeAiRequests.set(requestKey, activeRequest);
+    setSessionBusy(session.id, true);
+
+    try {
+        // 导航到历史 AI 生成题时，旧记录可能还没有教学快照。先用
+        // 规则分类补齐，这样右侧“学习内容 / 本题难点”会和目标题同步。
+        if (
+            requestTargetCandidate
+            && !supportingImagesOnly
+            && !candidateTeachingSnapshot(
+                session,
+                requestTargetCandidate
+            )
+        ) {
+            const targetTeaching = await analyzeSingleQuestionTeaching(
+                requestTargetCandidate.text,
+                requestTargetCandidate.key,
+                { signal: activeRequest.controller.signal }
+            );
+            throwIfAiRequestCancelled(activeRequest);
+
+            if (targetTeaching) {
+                applyQuestionCandidateAsCurrent(
+                    session,
+                    requestTargetCandidate,
+                    targetTeaching
+                );
+                saveState();
+                renderInfo();
+            }
+        }
+
+        throwIfAiRequestCancelled(activeRequest);
+        const latestRawRequest = String(latestUserBeforeRequest?.text || "").trim();
+        const asksForFullSolution = (
+            /(?:给出|给我|直接给|告诉我|输出).{0,8}(?:答案|解析|解答)|(?:完整|详细).{0,3}(?:解析|解答|过程)|答案.{0,3}(?:和|与|及).{0,3}解析/.test(latestRawRequest)
+            && !/(?:不要|别给|不需要|不用|只给提示|别直接)/.test(latestRawRequest)
+            && !latestIsExerciseRequest
+            && !latestIsRetestGeneration
+            && !latestUserBeforeRequest?.isRetestAnswer
+        );
+        const targetGeneratedMessage = requestTargetCandidate?.role === "ai"
+            ? session.messages?.[requestTargetCandidate.index] : null;
+        const savedSolution = asksForFullSolution
+            ? normalizeReferenceAnswer(targetGeneratedMessage?.generatedAnswer)
+            : "";
+        const solutionReference = savedSolution && requestTargetCandidate?.text
+            ? { question: requestTargetCandidate.text, answer: savedSolution }
+            : undefined;
+
+        const pinnedTeaching = requestTargetCandidate
+            ? candidateTeachingSnapshot(session, requestTargetCandidate)
+            : null;
+        const pinnedDifficulty = ["简单", "中等", "困难"].includes(
+            pinnedTeaching?.difficulty
+        ) ? pinnedTeaching.difficulty : "";
+        const questionContext = requestTargetCandidate?.text && pinnedDifficulty
+            ? {
+                question: requestTargetCandidate.text,
+                difficulty: pinnedDifficulty
+            } : undefined;
+
+        // high 可以沿用到本题后续追问；max 已停用，旧偏好必须清理。
+        const instructionWithoutSpaces = latestRawRequest.replace(/\s+/g, "").toLowerCase();
+        const maxRequested = /(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以).{0,8}(?:max|最高|最大)(?:思考|推理|强度|档|模式)?|(?:max|最高|最大)(?:思考|推理|强度|档|模式)(?:来|去|处理|求解|解答|解析)/.test(instructionWithoutSpaces)
+            && !/(?:不要|别|不用|禁止|无需|不准).{0,5}(?:max|最高|最大)/.test(instructionWithoutSpaces);
+        const highRequested = !maxRequested
+            && /(?:请|要|必须|改用|使用|采用|开启|启用|切到|换成|按照|按|用|以).{0,8}high(?:思考|推理|强度|档|模式)?|high(?:思考|推理|强度|档|模式)(?:来|去|处理|求解|解答|解析)/.test(instructionWithoutSpaces)
+            && !/(?:不要|别|不用|禁止|无需|不准).{0,5}high/.test(instructionWithoutSpaces);
+        const preferenceFingerprint = requestTargetFingerprint || (
+            latestIsFreshQuestion
+                ? wrongQuestionFingerprint(
+                    extractQuestionOnlyFromMessage(latestUserBeforeRequest) || latestRawRequest
+                )
+                : ""
+        );
+        if (session.solverEffortPreference?.effort === "max" || maxRequested) {
+            session.solverEffortPreference = null;
+            saveState();
+        } else if (highRequested && preferenceFingerprint) {
+            session.solverEffortPreference = {
+                fingerprint: preferenceFingerprint,
+                effort: "high"
+            };
+            saveState();
+        }
+        const preferredEffort = preferenceFingerprint
+            && session.solverEffortPreference?.fingerprint === preferenceFingerprint
+            && session.solverEffortPreference?.effort === "high"
+            ? "high" : undefined;
+
+        const apiMessages = buildApiMessages(session, requestTargetCandidate);
+        const semanticContext = semanticContextForRequest(session, requestTargetCandidate, apiMessages, {
+            exerciseRequest: latestIsExerciseRequest, retestGeneration: latestIsRetestGeneration
+        });
+        const wantsStream = Boolean(window.DMateChatStream?.read);
+        const response = await fetch("/chat", {
+            method: "POST",
+            signal: activeRequest.controller.signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": wantsStream ? "text/event-stream" : "application/json"
+            },
+            body: JSON.stringify({
+                stream: wantsStream,
+                language: window.DMateI18n?.getLanguage?.() || document.documentElement.lang || "zh-CN",
+                messages: apiMessages,
+                semantic_context: Array.isArray(semanticContext) ? undefined : semanticContext,
+                semantic_contexts: Array.isArray(semanticContext) ? semanticContext : undefined,
+                // 强约束：明确出题请求由前端直接告诉后端。
+                // 后端据此必须返回 generated_question + generated_teaching，
+                // 不再只靠自然语言二次猜测“这是不是出题”。
+                request_kind: latestIsExerciseRequest
+                    ? "exercise"
+                    : asksForFullSolution ? "solution" : "chat",
+                solution_reference: solutionReference,
+                question_context: questionContext,
+                reasoning_effort_override: preferredEffort,
+                exercise_reference: retestReferenceQuestion
+                    ? {
+                        question: retestReferenceQuestion,
+                        core_points: Array.isArray(retestBeforeRequest?.targetPoints)
+                            ? retestBeforeRequest.targetPoints.slice(0, 4)
+                            : [],
+                        retest: true,
+                        difficulty: retestBeforeRequest?.targetDifficulty || ""
+                    }
+                    : exerciseReference
+                        ? { question: exerciseReference.text }
+                        : undefined
+            })
+        });
+
+        activeRequest.streaming = wantsStream
+            && response.headers.get("Content-Type")?.includes("text/event-stream");
+        const data = activeRequest.streaming
+            ? await window.DMateChatStream.read(response, {
+                signal: activeRequest.controller.signal,
+                onDelta: text => appendRequestStreamDelta(activeRequest, text)
+            })
+            : await parseResponseJson(response);
+        throwIfAiRequestCancelled(activeRequest);
+
+        let localGeneratedQuestion = supportingImagesOnly ? "" : sanitizeStoredWrongQuestionText(
+            data.generated_question || ""
+        );
+
+        // 后端旧版本或异常输出没有 generated_question 时，前端仍可根据
+        // “本轮明确出题请求”从回复中恢复真正题干。只在 exercise 请求下做，
+        // 不会把普通讲解误判为题目。
+        if (
+            !localGeneratedQuestion
+            && latestIsExerciseRequest
+            && typeof data.reply === "string"
+        ) {
+            localGeneratedQuestion = extractRecoverableGeneratedQuestion(data.reply);
+        }
+
+        let localGeneratedTeaching = normalizeTeaching(
+            data.generated_teaching
+        );
+
+        if (
+            localGeneratedQuestion
+            && !localGeneratedTeaching
+        ) {
+            localGeneratedTeaching = await analyzeSingleQuestionTeaching(
+                localGeneratedQuestion,
+                "generated-current",
+                { signal: activeRequest.controller.signal }
+            );
+            throwIfAiRequestCancelled(activeRequest);
+        }
+
+        // 系统不变量：明确“出题”的本轮请求，只有在题干与题目分类都拿到后
+        // 才允许把 AI 回复写进聊天历史。否则宁可提示重试，也不能留下一个
+        // “看得见但错题本/题目历史都不认识”的孤儿题目。
+        if (
+            response.ok
+            && !data.error
+            && latestIsExerciseRequest
+            && (
+                !localGeneratedQuestion
+                || !localGeneratedTeaching
+            )
+        ) {
+            rollbackRetestAfterRequestFailure(session);
+            showAssistantMessage(
+                session,
+                "练习题生成结果未完成题目登记，请重新出题",
+                { isError: true }
+            );
+            return { status: "error" };
+        }
+
+        const returnedTeaching = (
+            localGeneratedTeaching
+            || data.teaching
+        );
+
+        if (!response.ok || data.error) {
+            const message = data.error
+                || fallbackHttpError(response.status);
+
+            rollbackRetestAfterRequestFailure(session);
+
+            showAssistantMessage(
+                session,
+                message,
+                { isError: true }
+            );
+            return { status: "error" };
+        }
+
+        if (
+            typeof data.reply !== "string"
+            || !data.reply.trim()
+        ) {
+            rollbackRetestAfterRequestFailure(session);
+
+            showAssistantMessage(
+                session,
+                "AI 服务没有返回有效内容，请重新发送",
+                { isError: true }
+            );
+            return { status: "error" };
+        }
+
+        // Complete asynchronous formatting before committing answer-derived
+        // learning/retest changes. Stopping during MathJax must not leave
+        // learning records behind without the corresponding saved answer.
+        const preparedContent = activeRequest.streaming && currentId === session.id && !document.hidden
+            ? await activeRequest.streamPreview?.finish(data.reply) : null;
+        throwIfAiRequestCancelled(activeRequest);
+
+        // JSON compatibility replies still animate after the request ends.
+        // Commit their derived state only with the saved, completed answer.
+        let answerLearningCommitted = false;
+        const commitAnswerLearning = () => {
+            if (answerLearningCommitted) return;
+            throwIfAiRequestCancelled(activeRequest);
+            answerLearningCommitted = true;
+            if (returnedTeaching && !supportingImagesOnly) {
+                const normalizedReturnedTeaching = normalizeTeaching(
+                    returnedTeaching
+                );
+                const latestUser = getLatestUserMessage(session);
+                const activeCandidate = activeQuestionCandidateFromHistory(
+                    session
+                );
+
+                // “上一道题/继续/再讲一下”不是新题。返回的教学分析必须写回
+                // 当前指向题，而不是重新覆盖到时间上最新的另一道题。
+                if (
+                    !localGeneratedQuestion
+                    && latestUser
+                    && isShortLearningFollowUp(latestUser.text)
+                    && activeCandidate
+                ) {
+                    applyQuestionCandidateAsCurrent(
+                        session,
+                        activeCandidate,
+                        normalizedReturnedTeaching
+                    );
+                } else {
+                    session.teaching = normalizedReturnedTeaching;
+
+                    if (!localGeneratedQuestion) {
+                        attachTeachingSnapshotToLatestQuestion(
+                            session,
+                            normalizedReturnedTeaching
+                        );
+                    }
+                }
+
+                saveState();
+                renderInfo();
+
+                const graphModal = document.getElementById(
+                    "knowledgeGraphModal"
+                );
+
+                if (
+                    graphModal
+                    && !graphModal.classList.contains("hidden")
+                ) {
+                    if (knowledgeGraphScope === "current") {
+                        const context = getCurrentKnowledgeContext();
+
+                        if (context.category) {
+                            knowledgeGraphFilter = context.category;
+                            knowledgeGraphViewMode = "focus";
+                        }
+                    }
+
+                    renderKnowledgeGraph();
+                }
+            }
+
+            // 已完成最多一次难度纠偏仍未达标时，明确告知用户，不能静默
+            // 把“估计中等”的题目伪装成已满足“困难”请求。
+            if (latestIsExerciseRequest && typeof data.exercise_generation_notice === "string"
+                    && data.exercise_generation_notice.trim()) {
+                showCopyToast(data.exercise_generation_notice);
+            }
+
+            const retestHandled = supportingImagesOnly || processWrongQuestionRetestReply(
+                session,
+                data.reply,
+                localGeneratedQuestion,
+                data.generated_answer || ""
+            );
+
+            if (!retestHandled) {
+                processLearningFromReply(
+                    session,
+                    localGeneratedTeaching
+                        || session.teaching,
+                    data.reply,
+                    data.generated_answer || "",
+                    localGeneratedQuestion
+                );
+            }
+
+        };
+
+        const assistantMeta = {
+            // 只有后端明确返回 generated_question，才标记为“AI 生成题”。
+            // 普通讲解里出现编号、反问、步骤，不再被误判。
+            generatedExercise: !supportingImagesOnly && Boolean(
+                localGeneratedQuestion
+                || data.generated_exercise
+            ),
+            generatedQuestion: localGeneratedQuestion,
+            generatedAnswer: data.generated_answer || "",
+            generatedTeaching: (
+                localGeneratedQuestion
+                    ? (
+                        localGeneratedTeaching
+                        || returnedTeaching
+                    )
+                    : null
+            ),
+            targetQuestionFingerprint: requestTargetFingerprint
+        };
+
+        if (activeRequest.streaming) {
+            discardRequestStreamPreview(activeRequest);
+            addAssistantMessage(session, data.reply, assistantMeta);
+            commitAnswerLearning();
+            saveState();
+            renderSessions();
+            renderInfo();
+            if (currentId === session.id) {
+                if (typingAutoFollow && !typingScrollLockedByUser) forceChatBottomOnce = true;
+                renderChat({ message:session.messages[session.messages.length - 1], content:preparedContent });
+                refreshInputAvailability();
+            }
+        } else if (!options.completeImmediately && currentId === session.id) {
+            startTyping(
+                data.reply,
+                session,
+                assistantMeta,
+                commitAnswerLearning,
+                () => rollbackRetestAfterRequestFailure(session)
+            );
+        } else {
+            addAssistantMessage(
+                session,
+                data.reply,
+                assistantMeta
+            );
+            commitAnswerLearning();
+            saveState();
+            renderSessions();
+            renderInfo();
+            if (currentId === session.id) renderChat();
+        }
+        return { status: "success" };
+
+    } catch (error) {
+        // 用户主动停止不是网络故障，不显示错误消息，也不保存迟到的回复。
+        if (activeRequest.cancelled || error?.name === "AbortError") return { status: "cancelled" };
+        console.error("聊天请求失败：", error);
+
+        rollbackRetestAfterRequestFailure(session);
+
+        showAssistantMessage(
+            session,
+            activeRequest.streaming ? (error?.data?.error || "回答连接中断，请重试") : "网络连接失败，请检查网络后重试",
+            { isError: true }
+        );
+        return { status: "error" };
+
+    } finally {
+        discardRequestStreamPreview(activeRequest);
+        // 旧请求晚结束时不能清除用户刚刚重新发起的新请求的忙碌状态。
+        const activeKey = sessionBusyKey(session.id);
+        if (activeAiRequests.get(activeKey) === activeRequest) {
+            activeAiRequests.delete(activeKey);
+            setSessionBusy(session.id, false);
+        }
+    }
+}
+
+function send() {
+    if (window.dmateVoiceInput?.state && window.dmateVoiceInput.state !== "idle") return;
+    if (ocrTasks.size > 0) { void sendOcrBatch(); return; }
+    if (
+        ocrReviewInProgress
+        || isCurrentSessionTyping()
+        || isSessionBusy(currentId)
+    ) {
+        return;
+    }
+
+    const input = document.getElementById("text");
+    if (!input) return;
+
+    const text = input.value.trim();
+    if (!text) return;
+    if (Array.from(text).length > MAX_CHAT_MESSAGE_CHARS) {
+        showCopyToast("单条文字消息最多 20000 字符，请缩短后发送");
+        input.focus({ preventScroll: true });
+        return;
+    }
+
+    if (!currentId) {
+        newChat();
+    }
+
+    const session = getCurrent();
+    if (!session) return;
+
+    const message = {
+        role: "user",
+        text,
+        // 发送时固定选择，不受之后切换输入模式的影响。
+        manualIsQuestion: manualQuestionMode
+    };
+
+    const retest = normalizeRetestSession(session.retest);
+
+    if (retest && retest.stage === "awaiting_answer") {
+        const retestCheckParts = [
+            "【错题复测回答】",
+            "请只检查下面这道复测题的学生作答，不要把它和原错题或会话里的其他题混在一起。",
+            "如果全部正确，请明确说“这次作答正确”；",
+            "如果存在任何实质错误，请明确说“这次作答有错误”；",
+            "如果信息不足，请明确说“现有信息不足以判断”。",
+            "",
+            "【复测题目】",
+            retest.generatedQuestion || "（题目缺失）"
+        ];
+
+        if (retest.generatedAnswer) {
+            retestCheckParts.push(
+                "",
+                "【系统参考答案，仅用于核验】",
+                retest.generatedAnswer,
+                "不要直接向学生泄露这段系统参考答案；应先判断学生作答，再按教学模式给纠正方向。"
+            );
+        }
+
+        retestCheckParts.push(
+            "",
+            "【学生作答】",
+            text
+        );
+
+        message.apiText = retestCheckParts.join("\n");
+        message.isRetestAnswer = true;
+
+        retest.stage = "checking";
+        session.retest = retest;
+    }
+
+    session.messages.push(message);
+
+    // 用户明确标为题目时，独立请求现有知识/难度分类器；不改 AI 回复。
+    // 避免 AI 失败或较慢时题目难度始终空白。
+    if (message.manualIsQuestion === true
+        && !message.isRetestAnswer
+        && !isExerciseRequestText(text)) {
+        analyzeSingleQuestionTeaching(text, "manual-" + Date.now()).then(teaching => {
+            if (!teaching || !sessions.includes(session) || !session.messages.includes(message)
+                || message.manualIsQuestion !== true) return;
+            // 以原有模型返回的有效难度为准；不通过文字长度猜难度。
+            message.questionTeaching = teaching;
+            saveState();
+            if (getCurrent()?.id === session.id) {
+                renderChat();
+                renderInfo();
+            }
+        });
+    }
+
+    // “上一道题 / 第一题 / 第二题”都属于明确的题目导航。
+    // 在请求发出前先切换 current learningQuestion，右侧信息和后端上下文
+    // 都围绕同一道目标题，避免旧题/新题一起被回答。
+    if (isQuestionNavigationFollowUp(text)) {
+        const targetCandidate = resolveQuestionNavigationCandidate(
+            session,
+            text
+        );
+
+        if (targetCandidate) {
+            const targetFingerprint = questionCandidateFingerprint(
+                targetCandidate
+            );
+
+            message.targetQuestionFingerprint = targetFingerprint;
+            message.apiText = buildTargetQuestionApiText(
+                text,
+                targetCandidate
+            );
+
+            applyQuestionCandidateAsCurrent(
+                session,
+                targetCandidate
+            );
+        }
+    }
+
+    maybeAutoNameSession(
+        session,
+        text,
+        "text"
+    );
+
+    input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    forceChatBottomOnce = true;
+
+    saveState();
+    renderChat();
+    renderSessions();
+    renderInfo();
+
+    const pendingKey = sessionBusyKey(session.id);
+    pendingAiStartSessionIds.add(pendingKey);
+    refreshInputAvailability();
+
+    requestAiReply(session).finally(() => {
+        pendingAiStartSessionIds.delete(pendingKey);
+        refreshInputAvailability();
+    });
+}
+
+
+// -----------------------------
+// 图片题文字清理
+// -----------------------------
+function cleanOcrTextForVisual(rawText, hasVisualStructure) {
+    const source = String(rawText ?? "").trim();
+
+    // 没有图形结构识别结果时，保留 OCR 原文，避免误删。
+    if (!source || !hasVisualStructure) {
+        return source;
+    }
+
+    // 找第一道小题的编号，例如 (1)、（1）、1.、1、
+    const questionMatch = source.match(
+        /(?:\(\s*1\s*\)|（\s*1\s*）|(?:^|\s)1\s*[.．、])/m
+    );
+
+    if (!questionMatch || typeof questionMatch.index !== "number") {
+        return source;
+    }
+
+    const questionIndex = questionMatch.index;
+    const beforeQuestions = source.slice(0, questionIndex);
+    const questions = source.slice(questionIndex).trim();
+
+    // 这类提示语后面通常紧跟题图。OCR 会把图中的 v1、e1、e2……
+    // 当成普通文字塞进题干。既然视觉模型已经单独识别了图形结构，
+    // 就把“提示语 → 第(1)问”之间的图形 OCR 噪声去掉。
+    const cues = [
+        "回答下列问题",
+        "回答以下问题",
+        "完成下列问题",
+        "解答下列问题",
+        "求解下列问题",
+        "回答问题"
+    ];
+
+    let bestEnd = -1;
+
+    for (const cue of cues) {
+        const index = beforeQuestions.lastIndexOf(cue);
+
+        if (index >= 0) {
+            bestEnd = Math.max(bestEnd, index + cue.length);
+        }
+    }
+
+    if (bestEnd < 0) {
+        return source;
+    }
+
+    const heading = beforeQuestions
+        .slice(0, bestEnd)
+        .trim()
+        .replace(/[：:]\s*$/, "");
+
+    if (!heading || !questions) {
+        return source;
+    }
+
+    return `${heading}\n${questions}`;
+}
+
+
+// -----------------------------
+// OCR 图片识题
+// -----------------------------
+let ocrReviewInProgress = false;
+let ocrRequestInFlight = false;
+let ocrAbortController = null;
+let ocrRequestId = "";
+
+function makeOcrRequestId() {
+    try {
+        if (window.crypto && typeof window.crypto.randomUUID === "function") {
+            return window.crypto.randomUUID();
+        }
+    } catch (_error) {
+        // 旧浏览器回退到时间戳 + 随机串。
+    }
+
+    return `ocr-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function notifyOcrCancelled(requestId) {
+    const value = String(requestId || "").trim();
+    if (!value) return;
+
+    fetch("/ocr/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_id: value }),
+        keepalive: true
+    }).catch(() => {
+        // 撤销通知失败也不影响前端立即结束本次识别。
+    });
+}
+
+function cancelImageRecognition() {
+    const running = [...ocrTasks.values()].filter(task => task.state === "recognizing");
+    if (running.length) {
+        running.forEach(task => cancelOcrTask(task.id));
+        return;
+    }
+    if (!ocrRequestInFlight || !ocrAbortController) {
+        return;
+    }
+
+    const requestId = ocrRequestId;
+
+    // 前端立即停止等待本次 /ocr，并通知后端尽早结束后续阶段。
+    ocrRequestInFlight = false;
+    ocrAbortController.abort();
+    ocrAbortController = null;
+    ocrRequestId = "";
+    notifyOcrCancelled(requestId);
+    refreshInputAvailability();
+}
+
+function formatOcrGraphForReview(raw) {
+    // 整理描述布局，但绝不猜测或删除边集、顶点数据。
+    let text = String(raw || "").trim();
+    if (!text) return "";
+    text = text
+        .replace(/图中共有\s*(\d+)\s*个独立的无向图[，,]\s*分别标记为\s*/g,
+            "无向图数量：$1；编号：")
+        .replace(/每个图均有\s*(\d+)\s*个顶点[，,]/g,
+            "\n每图顶点数：$1。\n")
+        .replace(/位置分别标记为/g, "顶点位置：")
+        .replace(/图\s*(\d+)\s*[（(]\s*(G\d+)\s*[）)]\s*的边集为\s*[：:]/g,
+            "\n$2（图$1）边集：")
+        .replace(/图\s*(\d+)\s*[（(]\s*(G\d+)\s*[）)]\s*的边集为/g,
+            "\n$2（图$1）边集：")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    return text;
+}
+
+// Deterministic, display-only Chinese graph transcription.
+// The original Qwen result remains unchanged when sent to the AI solver.
+function ocrReviewPlain(value) {
+    // These values are literal labels, not HTML or Markdown from the model.
+    // Escape Markdown first so an original entity (for example &lt;) remains
+    // literal too. This display copy never changes the underlying graph data.
+    return String(value ?? "").replace(/([\\\x60*_{}#+!|])/g, "\\$1")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        // Backslash-escaped brackets/parentheses are also MathJax delimiters.
+        // Entities keep these literal through both Markdown and math parsing.
+        .replace(/[\[\]()]/g, character => "&#" + character.charCodeAt(0) + ";").trim();
+}
+
+function ocrReviewLatexLabel(value) {
+    const label = String(value ?? "").trim().replace(/[₀-₉]/g, digit =>
+        String("₀₁₂₃₄₅₆₇₈₉".indexOf(digit)));
+    if (!/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)?$/.test(label)) return null;
+    const numbered = /^([A-Za-z]+)([0-9]+)$/.exec(label);
+    if (numbered) return numbered[1]+"_{"+numbered[2]+"}";
+    return label.replace(/_([A-Za-z0-9]+)/g, "_{$1}");
+}
+
+function ocrReviewLabel(value) {
+    const latex = ocrReviewLatexLabel(value);
+    return latex === null ? ocrReviewPlain(value) : "\\(" + latex + "\\)";
+}
+
+function formatCanonicalGraphReview(graphs) {
+    if (typeof window !== 'undefined' && window.DMateGraphFormat?.toMarkdown) return window.DMateGraphFormat.toMarkdown(graphs);
+    const lines=[];
+    for (let i=0;i<graphs.length;i++) {
+        const g=graphs[i], nodes=g.vertices || [], edges=g.edges || [];
+        const labels=new Map(nodes.map(v=>[String(v.id),v.label || v.id]));
+        const label=id=>ocrReviewLabel(labels.get(String(id)) || id);
+        const properties=[g.direction_mode==="mixed"?"混合图":g.directed===true?"有向图":g.directed===false?"无向图":"方向未确定",
+            g.weighted===true?"带权":"",g.multigraph===true?"多重图":""].filter(Boolean);
+        lines.push("### 图 "+(i+1)+"（"+ocrReviewPlain(g.name || g.id)+"）");
+        lines.push("**类型：** "+properties.join(" · "));
+        if(g.complete!==true)lines.push("部分内容未识别完整，请对照原图确认。");
+        lines.push("**顶点（"+nodes.length+"）：** "+nodes.map(v=>label(v.id)).join("、"));
+        const incident=new Set(edges.flatMap(e=>[String(e.from),String(e.to)]));
+        const isolated=nodes.filter(v=>!incident.has(String(v.id)) && (g.complete===true || v.isolated_confirmed===true));
+        if(isolated.length)lines.push("**孤立顶点：** "+isolated.map(v=>label(v.id)).join("、"));
+        lines.push("**边（"+(g.complete===true?"":"暂录 ")+edges.length+" 条）：**");
+        for(const [edgeIndex,e] of edges.entries()) {
+            const arrow=e.direction==="forward"?" → ":e.direction==="undirected"?" — ":" ? ";
+            const attrs=[];
+            if(e.edge_label)attrs.push("边名："+ocrReviewPlain(e.edge_label));
+            if(e.weight!==null && e.weight!==undefined)attrs.push("权值："+ocrReviewPlain(e.weight));
+            if(e.parallel_count>1)attrs.push("同端点共 "+e.parallel_count+" 条");
+            if(e.style==="solid")attrs.push("实线");
+            if(e.style==="dashed")attrs.push("虚线");
+            if(e.style==="dotted")attrs.push("点线");
+            const color=typeof e.color==="string"?e.color.trim():"";
+            if(color && color.toLowerCase()!=="unknown")attrs.push("颜色："+ocrReviewPlain(color));
+            if(e.direction==="unknown")attrs.push("方向未确定");
+            if(e.status!=="accepted")attrs.push("待确认");
+            // Stable per-card identities; detector source IDs stay in JSON.
+            lines.push("- e"+(edgeIndex+1)+"："+label(e.from)+arrow+label(e.to)+
+                (attrs.length?"（"+attrs.join("，")+"）":""));
+        }
+        if(!edges.length)lines.push("—");
+        if(i<graphs.length-1)lines.push("---");
+    }
+    return lines.join("\n\n");
+}
+
+function formatStructuredGraphReview(graphs) {
+    if(Array.isArray(graphs) && graphs.length && graphs.length<=12 && graphs.every(g=>g && g.schema_version==="dmate.graph/1")) return formatCanonicalGraphReview(graphs);
+    if (!Array.isArray(graphs) || !graphs.length || graphs.length > 12) return "";
+    const cmp = (a, b) => String(a).localeCompare(String(b), "zh-CN", {numeric:true, sensitivity:"base"});
+    const center = graph => {
+        const vs = (graph.vertices || []).filter(v =>
+            v && v.x != null && v.y != null &&
+            Number.isFinite(Number(v.x)) && Number.isFinite(Number(v.y)) &&
+            Number(v.x) >= 0 && Number(v.x) <= 1 &&
+            Number(v.y) >= 0 && Number(v.y) <= 1);
+        return vs.length === (graph.vertices || []).length && vs.length ?
+            {x:vs.reduce((n,v)=>n+Number(v.x),0)/vs.length,
+             y:vs.reduce((n,v)=>n+Number(v.y),0)/vs.length} : null;
+    };
+    const ordered = graphs.slice();
+    const cs = ordered.map(center);
+    if (ordered.length > 1 && cs.every(Boolean) && (
+        Math.max(...cs.map(p=>p.x)) - Math.min(...cs.map(p=>p.x)) > 0.12 ||
+        Math.max(...cs.map(p=>p.y)) - Math.min(...cs.map(p=>p.y)) > 0.12)) {
+        ordered.sort((a,b) => {
+            const pa=center(a), pb=center(b);
+            return Math.abs(pa.y-pb.y) > 0.12 ? pa.y-pb.y : pa.x-pb.x || pa.y-pb.y;
+        });
+    } else if (ordered.every(g => /^G[1-9]\d*$/i.test(String(g?.id || "")))) {
+        ordered.sort((a,b)=>cmp(a.id,b.id));
+    }
+    const lines=[];
+    for (let index=0;index<ordered.length;index++) {
+        const graph=ordered[index];
+        if (!graph || !Array.isArray(graph.vertices) || !graph.vertices.length ||
+            !Array.isArray(graph.edges)) return "";
+        const graphId=String(graph.id || "G"+(index+1)).trim();
+        const ids=[];
+        const seen=new Set();
+        for(const node of graph.vertices) {
+            if(!node || typeof node!=="object") return "";
+            const id=String(node.id ?? "").trim();
+            if(!id || seen.has(id)) return "";
+            seen.add(id);
+            ids.push(id);
+        }
+        ids.sort(cmp);
+        const compact = id => {
+            const match=String(id).match(/^G\d+_(v\d+)$/i);
+            return match && /^G\d+$/i.test(graphId) ? match[1] : String(id);
+        };
+        const label=id=>ocrReviewLabel(compact(id));
+        const kind=graph.directed===true?"有向图":graph.directed===false?"无向图":"";
+        const weightKind=graph.weighted===true?"带权":graph.weighted===false?"无权":"";
+        let multiKind=graph.multigraph===true?"多重图":graph.multigraph===false?"简单图":"";
+        const pairs=new Map();
+        const incident=new Set();
+        const endpointPairs=new Set();
+        let conflictingType=false;
+        for(const edge of graph.edges) {
+            if(!edge || typeof edge!=="object") return "";
+            let a=String(edge.from ?? "").trim(),b=String(edge.to ?? "").trim();
+            if(!seen.has(a)||!seen.has(b)) return "";
+            incident.add(a);incident.add(b);
+            if(graph.directed!==true && cmp(a,b)>0) [a,b]=[b,a];
+            const endpointKey=JSON.stringify([a,b]);
+            if(a===b||endpointPairs.has(endpointKey))conflictingType=true;
+            endpointPairs.add(endpointKey);
+            const edgeLabel=edge.edge_label==null?"":String(edge.edge_label).trim();
+            const weight=edge.weight==null?"":String(edge.weight).trim();
+            const key=JSON.stringify([a,b,edgeLabel,weight]);
+            if(pairs.has(key))pairs.get(key).count++;
+            else pairs.set(key,{a,b,edgeLabel,weight,count:1});
+        }
+        if(graph.multigraph===false&&conflictingType)multiKind="";
+        const edges=[...pairs.values()].sort((a,b)=>cmp(a.a,b.a)||cmp(a.b,b.b)||cmp(a.edgeLabel,b.edgeLabel)||cmp(a.weight,b.weight));
+        const rendered=edges.map(e=>{
+            const a=compact(e.a),b=compact(e.b);
+            const la=ocrReviewLatexLabel(a),lb=ocrReviewLatexLabel(b);
+            const relation=la!==null&&lb!==null?
+                "\\("+la+(graph.directed===true?"\\to{}":"-")+lb+"\\)":
+                label(e.a)+(graph.directed===true?" → ":"—")+label(e.b);
+            const attrs=[];
+            if(e.edgeLabel)attrs.push("边名："+ocrReviewPlain(e.edgeLabel));
+            if(e.weight)attrs.push("权："+ocrReviewPlain(e.weight));
+            return relation+(e.count>1?" × "+e.count:"")+(attrs.length?"（"+attrs.join("，")+"）":"");
+        });
+        lines.push("### 图 "+(index+1)+"（"+ocrReviewLabel(graphId)+"）");
+        const props=[kind,weightKind,multiKind].filter(Boolean);
+        if(props.length)lines.push("**类型：** "+props.join(" · "));
+        lines.push("**顶点（"+ids.length+"）：** "+ids.map(label).join("、"));
+        const isolated=ids.filter(id=>!incident.has(id));
+        if(graph.complete===true&&isolated.length)
+            lines.push("**孤立顶点：** "+isolated.map(label).join("、"));
+        lines.push("**边（"+(graph.complete===true?"":"暂录 ")+graph.edges.length+" 条）：** "+
+            (rendered.length?rendered.join("、"):"—"));
+        if(index<ordered.length-1)lines.push("---");
+    }
+    return lines.join("\n\n");
+}
+
+function formatOcrReviewGraphDisplay(graphs, visualText) {
+    // Backend exposes graph_display_data only when the final textual audit
+    // has not changed the first-pass canonical graph table.
+    const structured = formatStructuredGraphReview(graphs);
+    if (structured) return structured;
+    // Never leak audit-internal prose, pixel coordinates or old-format status
+    // markers into the user-facing graph panel. Internal visualText remains
+    // available to the AI guard, separately from the graph card.
+    return String(visualText || "").trim() ? "图形结构暂无可展示的边表" : "";
+}
+
+function ocrReviewStatusText(data) {
+    // The document can need review even when every graph is complete: the
+    // question transcription has its own completeness evidence.
+    const result = data && typeof data === "object" ? data : {};
+    const review = result.review && typeof result.review === "object" ? result.review : {};
+    const reasons = Array.isArray(review.reasons) ? [...new Set(review.reasons
+        .filter(value => typeof value === "string").map(value => value.trim()).filter(Boolean))] : [];
+    const warning = typeof result.warning === "string" ? result.warning.trim() : "";
+    const status = String(result.recognition_status || "").toLowerCase();
+    const incomplete = ["partial", "failed", "incomplete", "uncertain", "needs_review", "review_required"].includes(status)
+        || result.diagnostics?.text_evidence?.complete === false;
+    if (review.required !== true && !incomplete && !warning) return "";
+    // Backend warnings commonly repeat review.reasons. Show one document
+    // notice, and use legacy warning text when structured reasons are absent.
+    const detail = reasons.length ? reasons.join(" ") : warning;
+    return "识别结果待核对：" + (detail || "部分内容尚未完整确定，请对照原图确认。");
+}
+
+// OCR review displays recognized content as MathJax, without editable fields.
+// Only "本次要求" remains editable; recognized text is passed through unchanged.
+function renderOcrReviewResult(element, source) {
+    const value = String(source || "").trim();
+    if (!value) {
+        element.innerHTML = '<span class="ocr-review-empty">未识别到内容</span>';
+        return;
+    }
+    // Reuse the site's bare-LaTeX repair and sanitized MathJax display pipeline.
+    // Display normalization never changes the OCR text submitted to the model.
+    element.setAttribute("data-i18n-content", "");
+    element.innerHTML = markdownToHtml(prepareAiDisplayText(value));
+}
+
+function reviewRecognizedQuestion(file, data) {
+    const dialog = document.getElementById("ocrReviewDialog");
+    const preview = document.getElementById("ocrReviewImage");
+    const question = document.getElementById("ocrReviewQuestion");
+    const graph = document.getElementById("ocrReviewGraph");
+    const requestText = document.getElementById("ocrReviewRequest");
+    const error = document.getElementById("ocrReviewError");
+    const confirm = document.getElementById("ocrReviewConfirm");
+    const cancel = document.getElementById("ocrReviewCancel");
+    const zoom = document.getElementById("ocrReviewZoom");
+    if (!dialog || !preview || !question || !graph || !requestText || !confirm || !cancel) {
+        throw new Error("图片核对界面未加载，请刷新页面");
+    }
+
+    return new Promise((resolve, reject) => {
+        const imageUrl = URL.createObjectURL(file);
+        let result = null;
+        preview.src = imageUrl;
+        // The recognizer composites alpha onto white before reading pixels.
+        // Use the same background for transparent originals in every theme;
+        // the uploaded File and its original bytes are unchanged.
+        preview.style.backgroundColor = "#fff";
+        preview.style.width = "100%";
+        if (zoom) zoom.value = "100";
+        const recognizedText = typeof data.text === "string" ? data.text.trim() : "";
+        const recognizedGraph = typeof data.visual_text === "string"
+            ? data.visual_text.trim() : "";
+        const displayGraph = formatOcrReviewGraphDisplay(
+            data.graph_display_data, recognizedGraph
+        );
+        renderOcrReviewResult(question, recognizedText);
+        renderOcrReviewResult(graph, displayGraph);
+        const questionRadios = Array.from(dialog.querySelectorAll('input[name="ocrQuestionType"]'));
+        const inferredQuestion = Boolean(recognizedText || /(?:求|判断|证明|是否|哪些|几个)/.test(recognizedGraph));
+        const initialRadio = questionRadios.find(radio => radio.value === (inferredQuestion ? "question" : "other"));
+        if (initialRadio) initialRadio.checked = true;
+
+        // 本轮要求只在图片核对界面填写，不从主聊天框继承。
+        requestText.value = "";
+        // This result is read-only; uncertain text can be addressed in instructions.
+        // textContent keeps review reasons literal, including old responses
+        // that only provide warning. Missing legacy status fields stay quiet.
+        error.textContent = ocrReviewStatusText(data);
+
+        const resizePreview = () => { preview.style.width = `${zoom.value}%`; };
+        const cleanup = () => {
+            dialog.removeEventListener("close", finish);
+            confirm.removeEventListener("click", submit);
+            cancel.removeEventListener("click", dismiss);
+            if (zoom) zoom.removeEventListener("input", resizePreview);
+            preview.removeAttribute("src");
+            URL.revokeObjectURL(imageUrl);
+            // Release MathJax references before clearing rendered DOM.
+            if (window.MathJax?.typesetClear) {
+                window.MathJax.typesetClear([question, graph]);
+            }
+            question.replaceChildren();
+            graph.replaceChildren();
+            requestText.value = "";
+        };
+        const finish = () => {
+            cleanup();
+            resolve(result);
+        };
+        const dismiss = () => dialog.close();
+        const submit = () => {
+            const text = recognizedText;
+            const visualText = displayGraph;
+            const userRequest = requestText.value.trim();
+            if (!text && !visualText) {
+                error.textContent = "没有识别到题目文字或图形信息，请重新上传图片";
+                return;
+            }
+            if (text.length + visualText.length + userRequest.length > 5600) {
+                error.textContent = "题目和本次要求合计过长，请适当精简后再发送";
+                return;
+            }
+            result = {
+                text, visualText, analysisVisualText: recognizedGraph, userRequest,
+                ocrIsQuestion: dialog.querySelector('input[name="ocrQuestionType"]:checked')?.value === "question"
+            };
+            dialog.close();
+        };
+        confirm.addEventListener("click", submit);
+        cancel.addEventListener("click", dismiss);
+        if (zoom) zoom.addEventListener("input", resizePreview);
+        dialog.addEventListener("close", finish);
+        try {
+            dialog.showModal();
+            // MathJax needs a visible container to lay out formulas correctly.
+            // Use the site's existing renderer: no additional model or API call.
+            void renderMath(question).then(() => {
+                if (dialog.open) return renderMath(graph);
+            });
+            // Keep the dialog at its top after opening; the user can scroll
+            // through the rendered results or select optional instructions.
+        } catch (exception) {
+            cleanup();
+            reject(exception);
+        }
+    });
+}
+
+// Every original owns its request, draft and confirmation. Arrival order never
+// selects which graph is later sent to the solver.
+const OCR_MAX_CONCURRENT = 4;
+const ocrTasks = new Map();
+const ocrSolvingSessions = new Set();
+const ocrBatchRuns = new Map();
+let ocrBatchPreparing = false;
+let ocrTaskTimer = null;
+let ocrEditorTaskId = null;
+let ocrEditorController = null;
+let graphSessionPromise = null;
+
+function isOcrSendInProgress() {
+    // Sending changes the visible workspace, while originals and confirmed
+    // drafts stay available until their own request succeeds.
+    return ocrSolvingSessions.size > 0;
+}
+
+function cloneOcrDocument(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function ocrActiveCount() {
+    return [...ocrTasks.values()].filter(task => task.state === "recognizing").length;
+}
+
+function syncOcrTaskAvailability() {
+    ocrRequestInFlight = ocrActiveCount() > 0;
+    refreshInputAvailability();
+    if (ocrRequestInFlight && !ocrTaskTimer) {
+        ocrTaskTimer = window.setInterval(updateOcrTaskTimes, 1000);
+    } else if (!ocrRequestInFlight && ocrTaskTimer) {
+        window.clearInterval(ocrTaskTimer);
+        ocrTaskTimer = null;
+    }
+}
+
+function ocrTaskSeconds(task) {
+    return Math.max(0, ((task.finishedAt ?? performance.now()) - task.startedAt) / 1000);
+}
+
+function updateOcrTaskTimes() {
+    for (const task of ocrTasks.values()) {
+        const card = document.querySelector(`[data-ocr-task-id="${task.id}"]`);
+        if (card) card.dataset.elapsedSeconds = String(ocrTaskSeconds(task));
+        const slow = card?.querySelector(".ocr-task-slow");
+        if (slow) slow.hidden = task.state !== "recognizing" || ocrTaskSeconds(task) < 120;
+    }
+}
+
+function ocrTaskLabel(task) {
+    if (task.sending) return "正在解题";
+    if (task.confirming) return "正在保存";
+    if (task.confirmation) return "已核对";
+    if (task.state === "recognizing") return "识别中";
+    if (task.state === "failed") return "识别失败";
+    return task.dirty ? "修改未保存" : "待核对";
+}
+
+function nextOcrGroupId() {
+    const used = new Set([...ocrTasks.values()].map(task => String(task.groupId ?? task.id)));
+    return ["1", "2", "3", "4"].find(id => !used.has(id)) || "1";
+}
+
+function partitionOcrTasks(tasks) {
+    const groups = new Map();
+    for (const task of tasks) {
+        const id = String(task.groupId ?? task.id);
+        if (!groups.has(id)) groups.set(id, []);
+        groups.get(id).push(task);
+    }
+    return [...groups].map(([id, members]) => ({ id, tasks: members }));
+}
+
+function renderOcrGrouping(panel, hasImages) {
+    const heading = panel.querySelector(".ocr-task-panel-head");
+    if (!heading) return;
+    let button = document.getElementById("ocrGroupButton");
+    if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.id = "ocrGroupButton";
+        button.className = "ocr-group-button";
+        button.textContent = "分组";
+        button.setAttribute("aria-haspopup", "dialog");
+        button.setAttribute("aria-controls", "ocrGroupingDialog");
+        button.addEventListener("click", openOcrGrouping);
+        heading.append(button);
+    }
+    const locked = ocrBatchPreparing || ocrSolvingSessions.size > 0;
+    button.disabled = locked;
+    const dialog = document.getElementById("ocrGroupingDialog");
+    if (!hasImages && dialog?.open) dialog.close();
+    if (!dialog?.open) return;
+    // Recognition can complete while this popup is open. Rebuild only when its
+    // own values change so an in-flight pointer/keyboard action stays intact.
+    const fingerprint = JSON.stringify([locked, [...ocrTasks.values()].map(task =>
+        [task.id, task.groupId, task.isQuestion !== false])]);
+    if (dialog.dataset.fingerprint === fingerprint) return;
+    dialog.dataset.fingerprint = fingerprint;
+    const list = dialog.querySelector(".ocr-group-list");
+    const focused = list.contains(document.activeElement) ? document.activeElement : null;
+    const focusInfo = focused ? { taskId: focused.dataset.taskId,
+        question: focused.dataset.groupQuestion, field: focused.dataset.groupField } : null;
+    list.replaceChildren();
+    let index = 0;
+    for (const task of ocrTasks.values()) {
+        index += 1;
+        const row = document.createElement("section");
+        row.className = "ocr-group-row";
+        row.dataset.groupTaskId = task.id;
+        const image = document.createElement("img");
+        image.src = task.originalUrl;
+        image.alt = "";
+        const content = document.createElement("div");
+        content.className = "ocr-group-content";
+        const name = document.createElement("strong");
+        name.className = "ocr-group-name";
+        if (task.file?.name) name.setAttribute("data-i18n-content", "");
+        name.textContent = task.file?.name || `图片${index}`;
+        const controls = document.createElement("div");
+        controls.className = "ocr-group-controls";
+        const question = document.createElement("div");
+        question.className = "ocr-group-question";
+        question.setAttribute("role", "group");
+        question.setAttribute("aria-label", `图片${index}是否为题目`);
+        const title = document.createElement("span");
+        title.textContent = "题目";
+        question.append(title);
+        for (const [value, label] of [[true, "是"], [false, "否"]]) {
+            const choice = document.createElement("button");
+            choice.type = "button";
+            choice.className = "ocr-group-question-choice";
+            choice.dataset.groupQuestion = String(value);
+            choice.dataset.taskId = task.id;
+            choice.setAttribute("aria-pressed", String((task.isQuestion !== false) === value));
+            choice.disabled = locked;
+            const dot = document.createElement("span");
+            dot.className = "ocr-group-question-dot";
+            dot.setAttribute("aria-hidden", "true");
+            choice.append(dot, label);
+            question.append(choice);
+        }
+        const group = document.createElement("label");
+        group.className = "ocr-group-select-label";
+        group.append("组别");
+        const select = document.createElement("select");
+        select.setAttribute("aria-label", `图片${index}组别`);
+        select.dataset.taskId = task.id;
+        select.dataset.groupField = "groupId";
+        select.disabled = locked;
+        for (let number = 1; number <= OCR_MAX_CONCURRENT; number += 1) {
+            const option = document.createElement("option");
+            option.value = String(number);
+            option.textContent = `第${number}组`;
+            select.append(option);
+        }
+        select.value = String(task.groupId);
+        group.append(select);
+        controls.append(question, group);
+        content.append(name, controls);
+        row.append(image, content);
+        list.append(row);
+    }
+    if (focusInfo) {
+        const replacement = [...list.querySelectorAll("[data-task-id]")].find(control =>
+            control.dataset.taskId === focusInfo.taskId && control.dataset.groupQuestion === focusInfo.question
+            && control.dataset.groupField === focusInfo.field);
+        replacement?.focus({ preventScroll: true });
+    }
+}
+
+function openOcrGrouping() {
+    if (!ocrTasks.size || ocrBatchPreparing || ocrSolvingSessions.size) return;
+    // Older in-memory uploads and imported drawing tasks also get independent
+    // defaults. Changing the select is the only action which combines images.
+    for (const task of ocrTasks.values()) {
+        if (!["1", "2", "3", "4"].includes(String(task.groupId))) task.groupId = nextOcrGroupId();
+    }
+    let dialog = document.getElementById("ocrGroupingDialog");
+    if (!dialog) {
+        dialog = document.createElement("dialog");
+        dialog.id = "ocrGroupingDialog";
+        dialog.className = "ocr-group-dialog";
+        dialog.setAttribute("aria-labelledby", "ocrGroupingTitle");
+        const heading = document.createElement("header");
+        const title = document.createElement("h2");
+        title.id = "ocrGroupingTitle";
+        title.textContent = "分组";
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "ocr-group-close";
+        close.setAttribute("aria-label", "关闭分组");
+        close.addEventListener("click", () => dialog.close());
+        heading.append(title, close);
+        const list = document.createElement("div");
+        list.className = "ocr-group-list";
+        dialog.append(heading, list);
+        dialog.addEventListener("click", event => {
+            const choice = event.target.closest("button[data-group-question]");
+            const task = ocrTasks.get(choice?.dataset.taskId);
+            if (!task || ocrBatchPreparing || ocrSolvingSessions.size) return;
+            task.isQuestion = choice.dataset.groupQuestion === "true";
+            renderOcrGrouping(document.getElementById("ocrTaskPanel"), true);
+        });
+        dialog.addEventListener("change", event => {
+            const select = event.target.closest("select[data-group-field]");
+            const task = ocrTasks.get(select?.dataset.taskId);
+            if (!task || ocrBatchPreparing || ocrSolvingSessions.size) return;
+            task.groupId = select.value;
+            renderOcrGrouping(document.getElementById("ocrTaskPanel"), true);
+        });
+        document.body.append(dialog);
+    }
+    dialog.showModal();
+    renderOcrGrouping(document.getElementById("ocrTaskPanel"), true);
+}
+
+function renderOcrTasks() {
+    const panel = document.getElementById("ocrTaskPanel");
+    const list = document.getElementById("ocrTaskList");
+    if (!panel || !list) return;
+    const focused = list.contains(document.activeElement) ? document.activeElement : null;
+    const focusInfo = focused ? { taskId: focused.dataset.taskId, action: focused.dataset.ocrAction } : null;
+    const hasImages = ocrTasks.size > 0 && !isOcrSendInProgress();
+    if (typeof renderOcrGrouping === "function") renderOcrGrouping(panel, hasImages);
+    panel.hidden = !hasImages;
+    const stage = document.getElementById("ocrUploadStage");
+    if (stage) stage.hidden = !hasImages;
+    const composerWrap = document.querySelector(".center > .input-wrap");
+    if (composerWrap) composerWrap.hidden = hasImages;
+    const manualQuestion = document.getElementById("manualQuestionMode");
+    if (manualQuestion) manualQuestion.hidden = hasImages;
+    // Reuse the SAME native file input and click handlers: move the whole
+    // image-picker wrapper next to the panel while image tasks are present.
+    // Moving a DOM node preserves listeners and current file-input settings.
+    const picker = document.getElementById("imagePickerWrap");
+    const uploadActions = document.getElementById("ocrUploadActions");
+    const normalComposer = composerWrap?.querySelector(".input");
+    if (picker && uploadActions && normalComposer) {
+        const destination = hasImages ? uploadActions : normalComposer;
+        if (picker.parentElement !== destination) {
+            if (hasImages) uploadActions.appendChild(picker);
+            else normalComposer.insertBefore(picker,
+                normalComposer.querySelector("#ocrCancelBtn")
+                || normalComposer.querySelector("#sendBtn"));
+        }
+    }
+    const sendButton = document.getElementById("sendBtn");
+    if (sendButton && uploadActions && normalComposer) {
+        const destination = hasImages ? uploadActions : normalComposer;
+        if (sendButton.parentElement !== destination) destination.appendChild(sendButton);
+    }
+    const fragment = document.createDocumentFragment();
+    const element = (tag, className, text) => {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+    };
+    for (const task of ocrTasks.values()) {
+        const card = element("article", "ocr-task-card");
+        card.dataset.ocrTaskId = task.id;
+        card.dataset.state = task.state;
+        const thumbnail = element("img", "ocr-task-thumbnail");
+        thumbnail.src = task.originalUrl;
+        thumbnail.alt = `${task.file.name} 原图缩略图`;
+        thumbnail.title = task.file.name || "图片";
+        if (task.file.name) thumbnail.setAttribute("data-i18n-content", "");
+        const content = element("div", "ocr-task-content");
+        const status = element("p", "ocr-task-status", ocrTaskLabel(task));
+        status.setAttribute("role", "status");
+        content.append(status);
+        if (task.state === "recognizing") {
+            const slow = element("p", "ocr-task-slow", "已超过 120 秒，仍在处理；你可以取消这张图片。");
+            slow.hidden = ocrTaskSeconds(task) < 120;
+            content.append(slow);
+        }
+        if (task.error) {
+            content.append(element("p", "ocr-task-notice", task.error));
+        } else if (!task.confirmation && task.result?.manual_mode && task.notice) {
+            content.append(element("p", "ocr-task-notice", task.notice));
+        }
+        const actions = element("div", "ocr-task-actions");
+        const button = (text, action, primary = false) => {
+            const node = element("button", primary ? "primary" : "", text);
+            node.type = "button";
+            node.dataset.ocrAction = action;
+            node.dataset.taskId = task.id;
+            node.disabled = Boolean(task.confirming || task.sending);
+            actions.append(node);
+            return node;
+        };
+        if (task.state !== "recognizing") {
+            button("编辑", "edit", true);
+        }
+        content.append(actions);
+        card.append(thumbnail, content);
+        const remove = element("button", "ocr-task-remove");
+        remove.type = "button";
+        remove.dataset.ocrAction = task.state === "recognizing" ? "cancel" : "remove";
+        remove.dataset.taskId = task.id;
+        remove.setAttribute("aria-label", (task.state === "recognizing" ? "取消图片：" : "移除图片：") + (task.file.name || "图片"));
+        remove.title = task.state === "recognizing" ? "取消识别" : "移除";
+        remove.disabled = Boolean(task.confirming || task.sending);
+        card.append(remove);
+        fragment.append(card);
+    }
+    list.replaceChildren(fragment);
+    if (focusInfo?.taskId) {
+        const target = [...list.querySelectorAll("[data-task-id]")].find(node =>
+            node.dataset.taskId === focusInfo.taskId && node.dataset.ocrAction === focusInfo.action);
+        target?.focus({ preventScroll: true });
+    }
+    updateOcrTaskTimes();
+    syncOcrTaskAvailability();
+    queueChatJumpControlsUpdate();
+}
+
+function draftFromOcrResponse(data) {
+    const supplied = data?.document && typeof data.document === "object" ? data.document : null;
+    const recognizedGraphs = Array.isArray(supplied?.graphs) ? supplied.graphs
+        : Array.isArray(data?.graph_structures) ? data.graph_structures : [];
+    // Layout-only OCR may never pre-draw a vertex or an edge, including when
+    // a stale server accidentally includes a guessed structure. The detected
+    // graph type and its region survive for user-controlled drawing.
+    const graphs = data?.workflow_profile === "layout_only"
+        ? recognizedGraphs.map((graph, index) => ({
+            id: graph.id || "G" + (index + 1),
+            name: graph.name || "图 " + (index + 1),
+            ...(Array.isArray(graph.bbox) ? {bbox: graph.bbox} : {}),
+            ...(typeof graph.directed === "boolean" ? {directed: graph.directed} : {}),
+            ...(typeof graph.weighted === "boolean" ? {weighted: graph.weighted} : {}),
+            vertices: [], edges: []
+        }))
+        : recognizedGraphs;
+    const draft = {
+        body_text: typeof supplied?.body_text === "string" ? supplied.body_text
+            : typeof data?.text === "string" ? data.text : "",
+        graphs
+    };
+    const context = supplied?.text_context || data?.text_context;
+    if (context && typeof context === "object") draft.text_context = context;
+    return cloneOcrDocument(draft);
+}
+
+async function originalImageDigest(file) {
+    if (!window.crypto?.subtle) return null;
+    const digest = await window.crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function recognizeOcrTask(task) {
+    // Each upload has its own editable Qwen draft and evidence-triggered
+    // review. Text OCR runs only for regions selected in its separate tab.
+    try {
+        await ensureGraphSession();
+        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
+        const formData = new FormData();
+        formData.append("image", task.file);
+        formData.append("request_id", task.id);
+        formData.append("workflow", "auto_graph");
+        const response = await fetch("/ocr", { method: "POST", body: formData,
+            signal: task.controller.signal });
+        const data = await parseResponseJson(response);
+        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
+        if (data?.cancelled) {
+            discardOcrTask(task);
+            return;
+        }
+        if (!response.ok || data?.error) throw new Error(data?.error || fallbackHttpError(response.status));
+        if (!data || typeof data !== "object" || (!Array.isArray(data.graph_structures)
+            && typeof data.text !== "string" && !Array.isArray(data.document?.graphs))) {
+            throw new Error("识别响应不完整，请稍后重试。其他图片会继续处理。");
+        }
+        task.result = data;
+        task.draft = draftFromOcrResponse(data);
+        task.initialDocument = cloneOcrDocument(task.draft);
+        task.sourceSha256 = data?.source_sha256 || data?.diagnostics?.semantic_workflow?.source_sha256 || null;
+        task.state = data?.manual_mode === true ? "ready"
+            : data?.recognition_status === "failed"
+                || !task.draft.body_text.trim() && !task.draft.graphs.length ? "failed" : "ready";
+        task.notice = data?.workflow_profile === "layout_only"
+            ? (task.state === "failed"
+                ? "分图或文字识别未完成；可以核对原图并手动补充。"
+                : task.draft.graphs.length
+                    ? (task.draft.graphs.some(graph => typeof graph.directed !== "boolean"
+                            || typeof graph.weighted !== "boolean")
+                        ? "已自动分图；部分箭头或边权仍有疑问，请核对原图。没有预绘制顶点或边。"
+                        : "已自动分图并复核每幅图的箭头与边权，没有预绘制顶点或边。")
+                    : "已走纯文字 OCR 通道，未启动图论模型；请核对识别文字。")
+            : data?.manual_mode === true
+                ? "原图已准备好。直接描绘顶点和边，文字可框选后识别。"
+                : data?.workflow_profile === "qwen_targeted"
+                    ? ocrReviewStatusText(data) || "请对照原图核对文字和图形信息，确认后再解题。"
+                : ocrReviewStatusText(data) || (task.state === "failed"
+                    ? "识别未完成；你可以对照原图手动录入。其他图片会继续处理。"
+                    : "请对照原图检查节点、连边和题干，确认后再解题。");
+    } catch (error) {
+        if (task.state !== "recognizing" || !ocrTasks.has(task.id)) return;
+        if (error?.name === "AbortError") {
+            discardOcrTask(task);
+        } else {
+            task.state = "failed";
+            task.error = error?.message || "图片识别请求失败，请检查网络。其他图片会继续处理。";
+        }
+    } finally {
+        task.controller = null;
+        if (ocrTasks.has(task.id)) renderOcrTasks();
+        if (task.finishedAt === null) {
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            task.finishedAt = performance.now();
+            updateOcrTaskTimes();
+        }
+    }
+}
+
+function discardOcrTask(task) {
+    if (!task || !ocrTasks.has(task.id)) return;
+    // A cancelled upload is removed, never kept as an "已取消" card.
+    // Late HTTP responses and finally blocks cannot resurrect this task.
+    task.state = "cancelled";
+    task.finishedAt = performance.now();
+    task.controller?.abort();
+    task.controller = null;
+    ocrTasks.delete(task.id);
+    URL.revokeObjectURL(task.originalUrl);
+    renderOcrTasks();
+}
+
+function cancelOcrTask(id) {
+    const task = ocrTasks.get(id);
+    if (!task || task.state !== "recognizing") return;
+    const requestId = task.id;
+    discardOcrTask(task); // Immediate UI removal, no cancelled/manual-entry state.
+    notifyOcrCancelled(requestId);
+}
+
+function removeOcrTask(id) {
+    const task = ocrTasks.get(id);
+    if (!task || task.state === "recognizing" || task.confirming || task.sending || ocrEditorTaskId === id) return;
+    URL.revokeObjectURL(task.originalUrl);
+    ocrTasks.delete(id);
+    renderOcrTasks();
+}
+
+function openImagePicker() {
+    if (ocrEditorTaskId || isCurrentSessionTyping() || isSessionBusy(currentId)) return;
+    if (ocrActiveCount() >= OCR_MAX_CONCURRENT) {
+        showCurrentError("最多同时识别 4 张图片，请等其中一张结束后再添加。");
+        return;
+    }
+    const input = document.getElementById("imageInput");
+    if (!input || input.disabled) return;
+    // Invoke the native chooser inside the actual user activation.
+    // Hidden inputs can silently fail in some Android WebViews.
+    try {
+        if (typeof input.showPicker === "function") input.showPicker();
+        else input.click();
+    } catch (_error) {
+        input.click();
+    }
+}
+
+async function handleImageSelected(event) {
+    const input = event?.target;
+    const files = Array.from(input?.files || []);
+    if (input) input.value = "";
+    return enqueueOcrFiles(files);
+}
+
+async function enqueueOcrFiles(files) {
+    const selected = Array.from(files || []);
+    if (!selected.length || ocrEditorTaskId) return;
+    if (ocrBatchPreparing || selected.length > OCR_MAX_CONCURRENT || selected.length + ocrTasks.size > OCR_MAX_CONCURRENT) {
+        showCurrentError("每批最多 4 张图片，请发送或移除已有图片后再添加。");
+        return;
+    }
+    if (!currentId) newChat();
+    const session = getCurrent();
+    if (!session) return;
+    const accepted = [];
+    const invalid = [];
+    for (const file of selected) {
+        if (file.type && !file.type.startsWith("image/")) {
+            invalid.push(`${file.name}：请选择图片文件`);
+            continue;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+            invalid.push(`${file.name}：单张图片不能超过 20MB`);
+            continue;
+        }
+        const task = {
+            id: makeOcrRequestId(), file, sessionId: session.id, originalUrl: URL.createObjectURL(file),
+            state: "recognizing", startedAt: performance.now(), finishedAt: null,
+            controller: new AbortController(), draft: { body_text: "", graphs: [] },
+            initialDocument: { body_text: "", graphs: [] }, confirmation: null,
+            dirty: false, userRequest: "", isQuestion: true, error: "", notice: "", sourceSha256: null,
+            descriptions: null, descriptionState: null
+        };
+        task.groupId = nextOcrGroupId();
+        ocrTasks.set(task.id, task);
+        accepted.push(task);
+    }
+    if (invalid.length) showCurrentError(invalid.join("；"));
+    renderOcrTasks();
+    // The flex layout already shows the upload stage. Scrolling it into view
+    // also pans the page/hidden shell while a native picker restores its
+    // viewport, producing a visible jump before the viewport settles.
+    // Independent promises: one failed image cannot reject or cancel its peers.
+    return Promise.allSettled(accepted.map(recognizeOcrTask));
+}
+
+async function requestGraphDescriptions(task, confirmation) {
+    const drawing = confirmation?.drawing_document;
+    const eligible = Array.isArray(drawing?.graphs) && drawing.graphs.some(graph =>
+        (graph.vertices || []).filter(v => Number.isFinite(v.x) && Number.isFinite(v.y)).length >= 2);
+    if (!eligible || !confirmation.semantic_context) return;
+    const revision = confirmation.revision;
+    task.descriptionState = "running";
+    renderOcrTasks();
+    try {
+        const response = await fetch("/graph/describe", {
+            method: "POST", credentials: "same-origin",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({language: dmateUiLanguage(), semantic_context: confirmation.semantic_context,
+                drawing_document: drawing})
+        });
+        const result = await parseResponseJson(response);
+        if (!ocrTasks.has(task.id) || task.dirty || task.confirmation?.revision !== revision) return;
+        if (response.ok && result?.status === "ok" && result.descriptions
+            && typeof result.descriptions === "object") {
+            const known = new Set((task.draft.graphs || []).map(g => String(g.id)));
+            task.descriptions = Object.fromEntries(Object.entries(result.descriptions)
+                .filter(([id, value]) => known.has(id) && typeof value === "string"
+                    && value.length <= (dmateUiLanguage() === "en" ? 280 : 135)));
+            task.descriptionState = "complete";
+        } else task.descriptionState = "unavailable";
+    } catch (_error) {
+        if (ocrTasks.has(task.id) && task.confirmation?.revision === revision)
+            task.descriptionState = "unavailable";
+    } finally {
+        if (ocrTasks.has(task.id)) renderOcrTasks();
+    }
+}
+
+function ensureGraphSession() {
+    if (!graphSessionPromise) {
+        graphSessionPromise = fetch("/graph/session", { credentials: "same-origin" }).then(async response => {
+            if (!response.ok) throw new Error("无法初始化图片核对，请稍后再试。");
+        }).catch(error => { graphSessionPromise = null; throw error; });
+    }
+    return graphSessionPromise;
+}
+
+async function confirmOcrTask(task, documentValue, options = {}) {
+    task.confirming = true;
+    task.error = "";
+    renderOcrTasks();
+    try {
+        await ensureGraphSession();
+        if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || "")) task.sourceSha256 = await originalImageDigest(task.file);
+        if (!task.sourceSha256) throw new Error("无法校验原图，请使用支持安全连接的浏览器后重试。");
+        const submitted = cloneOcrDocument(documentValue);
+        const response = await fetch("/graph/confirm", {
+            method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+            signal: options.signal,
+            body: JSON.stringify({ document: submitted, source_sha256: task.sourceSha256, request_id: task.id, confirmed: true })
+        });
+        const data = await parseResponseJson(response);
+        if (options.signal?.aborted) throw Object.assign(new Error("已停止发送"), { name: "AbortError" });
+        if (!response.ok || data?.error) throw new Error(data?.error || "修改后的图形未通过校验，请检查节点和连边。");
+        if (!data?.document || !data?.confirmation_token || !data?.semantic_context) {
+            throw new Error("结构确认响应不完整，请重新确认。");
+        }
+        task.draft = cloneOcrDocument(data.drawing_document || data.document);
+        task.confirmation = cloneOcrDocument(data);
+        task.state = "ready";
+        task.dirty = false;
+        task.descriptions = null;
+        task.descriptionState = null;
+        task.notice = "";
+        return data;
+    } catch (error) {
+        if (error?.name !== "AbortError") task.error = error?.message || "结构确认失败，请稍后重试。";
+        throw error;
+    } finally {
+        task.confirming = false;
+        renderOcrTasks();
+    }
+}
+
+function reuseVerifiedTypeForSameRegion(task, polygon) {
+    // Original automatic segmentation has already undergone full-page +
+    // focused checks. An unchanged rectangle can reuse that evidence within
+    // the manual four-second limit without paying for another model call.
+    // A new/irregular/meaningfully changed ROI MUST be independently scanned.
+    if (task?.result?.workflow_profile !== "layout_only"
+        || !Number(task?.result?.diagnostics?.type_review_calls)
+        || !Array.isArray(polygon) || polygon.length !== 4) return null;
+    const xs = polygon.map(p => p?.[0]), ys = polygon.map(p => p?.[1]);
+    if (![...xs, ...ys].every(x => typeof x === "number" && Number.isFinite(x)
+            && x >= 0 && x <= 1)) return null;
+    const candidate = [Math.min(...xs), Math.min(...ys),
+        Math.max(...xs), Math.max(...ys)];
+    if (candidate[2] - candidate[0] < .01 || candidate[3] - candidate[1] < .01)
+        return null;
+    // Accept an axis-aligned rectangle only, not a polygon that shares
+    // its bounding box but masks out material evidence.
+    const near = (a, b) => Math.abs(a - b) < 1e-5;
+    if (!polygon.every(p => (near(p[0],candidate[0]) || near(p[0],candidate[2]))
+        && (near(p[1],candidate[1]) || near(p[1],candidate[3])))) return null;
+    const area = box => (box[2]-box[0])*(box[3]-box[1]);
+    const list = task.initialDocument?.graphs || [];
+    let match = null, best = 0;
+    for (const graph of list) {
+        const box = graph?.bbox;
+        if (!Array.isArray(box) || box.length !== 4
+            || typeof graph.directed !== "boolean"
+            || typeof graph.weighted !== "boolean") continue;
+        const intersection = Math.max(0, Math.min(box[2],candidate[2])-Math.max(box[0],candidate[0]))
+            * Math.max(0, Math.min(box[3],candidate[3])-Math.max(box[1],candidate[1]));
+        const union = area(box) + area(candidate) - intersection;
+        const overlap = union > 0 ? intersection/union : 0;
+        if (overlap > best) { best = overlap; match = graph; }
+    }
+    if (best < .97 || !match) return null;
+    return {directed: match.directed, weighted: match.weighted,
+        recognition_status: "complete", warning: null, no_auto_draw: true,
+        reused_verified_original: true};
+}
+
+
+let standaloneDrawing = null;
+let standaloneDrawingOwner = null;
+let standaloneDrawingSessionState = {};
+const DRAWING_STORAGE_KEY = "dmate:graph-drawing:v1";
+
+function drawingStorageOwner() {
+    return shouldPersistClientState()
+        ? "account:" + accountState.username : "guest";
+}
+
+function collectLearningReviewDrawings() {
+    const owner = drawingStorageOwner();
+    const sameOwner = standaloneDrawingOwner === owner;
+    const meaningful = page => {
+        const value = page?.document;
+        return value && (typeof value.body_text === "string" && value.body_text.trim()
+            || Array.isArray(value.graphs) && value.graphs.some(graph => (
+                Array.isArray(graph?.vertices) && graph.vertices.some(vertex => vertex && typeof vertex === "object")
+                || Array.isArray(graph?.edges) && graph.edges.some(edge => edge && typeof edge === "object")
+            )));
+    };
+    if (sameOwner && ocrEditorTaskId === "standalone-drawing"
+        && typeof ocrEditorController?.getPages === "function") {
+        return ocrEditorController.getPages().slice(0, 50).filter(meaningful);
+    }
+    let raw = sameOwner ? standaloneDrawingSessionState.gallery : null;
+    if (shouldPersistClientState() && !(sameOwner && standaloneDrawingSessionState.galleryDirty && raw)) {
+        try {
+            raw = localStorage.getItem("dmate:graph-gallery:v1::" + encodeURIComponent(owner)) || raw;
+        } catch (_error) {}
+    }
+    if (raw) {
+        try {
+            const gallery = JSON.parse(raw);
+            if ((gallery?.version === 1 || gallery?.version === 2) && Array.isArray(gallery.pages)) {
+                return gallery.pages.slice(0, 50).filter(meaningful);
+            }
+        } catch (_error) {}
+    }
+    // Support the older single-page editor without reading a guest's stored history.
+    let legacy = sameOwner ? standaloneDrawing : null;
+    if (!legacy && shouldPersistClientState()) {
+        try {
+            if (localStorage.getItem(DRAWING_STORAGE_KEY + ":owner") === owner) {
+                legacy = JSON.parse(localStorage.getItem(DRAWING_STORAGE_KEY));
+            }
+        } catch (_error) {}
+    }
+    const page = { name: legacy?.graphs?.[0]?.name || "我的绘图", document: legacy };
+    return meaningful(page) ? [page] : [];
+}
+
+async function uploadDrawingResult(blob, metadata = {}) {
+    if (ocrEditorTaskId !== "standalone-drawing") throw new Error("请先打开绘图工作区。");
+    if (ocrBatchPreparing || ocrTasks.size >= OCR_MAX_CONCURRENT)
+        throw new Error("每批最多 4 张图片，请先发送或移除已有图片。");
+    if (isCurrentSessionTyping() || isSessionBusy(currentId) || isSessionPendingAiStart(currentId))
+        throw new Error("当前对话仍在回答，请结束后再上传绘图。");
+    if (!blob || blob.type !== "image/png" || !blob.size || blob.size > MAX_IMAGE_BYTES)
+        throw new Error("绘图图片无效或超过 20MB，请减少绘图内容后重试。");
+    const owner = drawingStorageOwner(), selectedSession = currentId;
+    const drawing = cloneOcrDocument(metadata.document);
+    const requestId = makeOcrRequestId();
+    const baseName = String(metadata.name || "我的绘图").replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
+    const file = new File([blob], baseName.replace(/\.png$/i, "") + ".png", {type: "image/png"});
+    await ensureGraphSession();
+    const form = new FormData();
+    form.append("image", file); form.append("document", JSON.stringify(drawing));
+    form.append("request_id", requestId);
+    const response = await fetch("/drawing/upload", {method: "POST", credentials: "same-origin", body: form});
+    const result = await parseResponseJson(response);
+    if (!response.ok || result?.ok !== true) throw new Error(result?.error || "绘图上传失败，请重试。");
+    if (result.request_id !== requestId || !/^[a-f0-9]{64}$/i.test(result.source_sha256 || "") || !result.document)
+        throw new Error("绘图上传响应不完整，请重试。");
+    if (drawingStorageOwner() !== owner || currentId !== selectedSession || ocrEditorTaskId !== "standalone-drawing")
+        throw new Error("账号或对话已切换，请重新上传绘图。");
+    if (ocrBatchPreparing || ocrTasks.size >= OCR_MAX_CONCURRENT)
+        throw new Error("本批图片已满，请发送或移除已有图片后重试。");
+    if (!currentId) newChat();
+    const session = getCurrent();
+    if (!session || [...ocrTasks.values()].some(task => task.sessionId !== session.id))
+        throw new Error("已有图片属于其他对话，请先发送或移除后重试。");
+    const now = performance.now(), documentValue = cloneOcrDocument(result.document);
+    ocrTasks.set(requestId, {id: requestId, groupId: nextOcrGroupId(), file, sessionId: session.id,
+        originalUrl: URL.createObjectURL(file), state: "ready", startedAt: now, finishedAt: now,
+        controller: null, draft: documentValue, initialDocument: cloneOcrDocument(documentValue),
+        confirmation: null, dirty: true, userRequest: String(metadata.requirements || "").slice(0, 4000),
+        isQuestion: true, error: "", notice: "绘图已上传，发送时将使用你绘制的结构。",
+        sourceSha256: result.source_sha256, descriptions: null, descriptionState: null,
+        result: {workflow_profile: "user_drawing", document: cloneOcrDocument(documentValue)}});
+    document.getElementById("graphEditorDialog").close();
+    renderOcrTasks();
+    return {ok: true, requestId};
+}
+
+function showGraphEditorDialog(dialog) {
+    // Keep the complete top-layer subtree invisible until the original image
+    // is decoded and fitted. Two frames alone can reveal an unfitted image
+    // when decoding is slower than the first modal layout.
+    const opening = String(performance.now());
+    const isCurrentOpening = () => dialog.open && dialog.dataset.positioning === opening;
+    const imageReady = image => new Promise(resolve => {
+        const finish = () => {
+            image.removeEventListener('load', finish);
+            image.removeEventListener('error', finish);
+            dialog.removeEventListener('close', finish);
+            resolve();
+        };
+        if (image.complete) { finish(); return; }
+        image.addEventListener('load', finish);
+        image.addEventListener('error', finish);
+        // Closing during a slow load releases these listeners immediately.
+        dialog.addEventListener('close', finish);
+    }).then(() => {
+        if (isCurrentOpening() && image.naturalWidth && typeof image.decode === 'function')
+            return image.decode().catch(() => {});
+    });
+    dialog.dataset.positioning = opening;
+    try {
+        dialog.showModal();
+        dialog.getBoundingClientRect();
+        void Promise.all([...dialog.querySelectorAll('img')].map(imageReady)).then(() => {
+            if (!isCurrentOpening()) return;
+            requestAnimationFrame(() => {
+                if (!isCurrentOpening()) return;
+                dialog.getBoundingClientRect();
+                requestAnimationFrame(() => {
+                    if (!isCurrentOpening()) return;
+                    delete dialog.dataset.positioning;
+                    dialog.querySelector('#graphEditorClose')?.focus({preventScroll: true});
+                });
+            });
+        });
+    } catch (error) {
+        delete dialog.dataset.positioning;
+        throw error;
+    }
+}
+
+function openGraphDrawing() {
+    if (ocrEditorTaskId || !window.DMateGraphEditor?.mount) return;
+    const dialog = document.getElementById("graphEditorDialog");
+    const mount = document.getElementById("graphEditorMount");
+    const close = document.getElementById("graphEditorClose");
+    if (!dialog || !mount || !close) return;
+    closeMobileShellDrawers();
+    const owner = drawingStorageOwner();
+    if (standaloneDrawingOwner !== owner) {
+        standaloneDrawing = null;
+        standaloneDrawingSessionState = {};
+        standaloneDrawingOwner = owner;
+    }
+    const persistent = shouldPersistClientState();
+    if (!standaloneDrawing && persistent) {
+        try {
+            const legacyOwner = localStorage.getItem(DRAWING_STORAGE_KEY + ":owner");
+            if (legacyOwner === owner) {
+                standaloneDrawing = JSON.parse(localStorage.getItem(DRAWING_STORAGE_KEY));
+            }
+        } catch (_) {}
+    }
+    standaloneDrawing ||= {body_text: "", graphs: [{id: "G1", name: "我的图形",
+        directed: false, weighted: false, vertices: [], edges: []}]};
+    ocrEditorTaskId = "standalone-drawing";
+    ocrReviewInProgress = true;
+    close.setAttribute("aria-label", "关闭绘图");
+    document.getElementById("graphEditorTitle").textContent = "绘图";
+    const requestClose = () => dialog.close();
+    const finish = () => {
+        dialog.removeEventListener("close", finish); close.removeEventListener("click", requestClose);
+        ocrEditorController?.destroy(); ocrEditorController = null;
+        ocrEditorTaskId = null; ocrReviewInProgress = false;
+        close.setAttribute("aria-label", "关闭图形识别编辑器");
+        refreshInputAvailability();
+    };
+    try {
+        const blank = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700"><rect width="100%" height="100%" fill="white"/></svg>');
+        const workspace = window.DMateDrawingWorkspace;
+        ocrEditorController = workspace?.mount ? workspace.mount(mount, {
+            storageKey: "dmate:graph-gallery:v1::" + encodeURIComponent(owner),
+            persistent,
+            sessionState: standaloneDrawingSessionState,
+            legacyDocument: cloneOcrDocument(standaloneDrawing),
+            onChange: value => { standaloneDrawing = cloneOcrDocument(value); },
+            onUpload: uploadDrawingResult,
+            onClose: requestClose,
+            onExport: window.DMateGallery?.postMessage ? async (blob, metadata = {}) => {
+                const result = await savePngToAndroidGallery(blob, metadata.name || "DMate-绘图.png");
+                if (!result?.ok) throw new Error(result?.message || "保存到相册失败，请重试。");
+                return {message: result.message || "已保存到相册"};
+            } : undefined
+        }) : window.DMateGraphEditor.mount(mount, {
+            document: cloneOcrDocument(standaloneDrawing),
+            initialDocument: {body_text:"",graphs:[{id:"G1",name:"我的图形",directed:false,weighted:false,vertices:[],edges:[]}]},
+            originalUrl: blank, drawingOnly: true,
+            onChange: value => { standaloneDrawing = cloneOcrDocument(value); },
+            onConfirm: async value => {
+                if (persistent) {
+                    localStorage.setItem(DRAWING_STORAGE_KEY, JSON.stringify(value));
+                    localStorage.setItem(DRAWING_STORAGE_KEY + ":owner", owner);
+                }
+                standaloneDrawing = cloneOcrDocument(value); dialog.close();
+            }
+        });
+        dialog.addEventListener("close", finish); close.addEventListener("click", requestClose);
+        showGraphEditorDialog(dialog); refreshInputAvailability();
+    } catch (error) {
+        finish(); showCurrentError(error?.message || "绘图界面未能打开，请刷新后重试。");
+    }
+}
+
+async function editOcrTask(id) {
+    const task = ocrTasks.get(id);
+    if (!task || task.state === "recognizing" || task.confirming || task.sending || ocrEditorTaskId) return;
+    const dialog = document.getElementById("graphEditorDialog");
+    const mount = document.getElementById("graphEditorMount");
+    const title = document.getElementById("graphEditorTitle");
+    const closeButton = document.getElementById("graphEditorClose");
+    if (!dialog || !mount || !closeButton || !window.DMateGraphScan?.mount) {
+        task.error = "图片编辑界面未加载，请刷新后重试。";
+        renderOcrTasks();
+        return;
+    }
+    ocrEditorTaskId = task.id;
+    ocrReviewInProgress = true;
+    if (title) {
+        title.toggleAttribute("data-i18n-content", Boolean(task.file?.name));
+        title.textContent = task.file?.name || "图片";
+    }
+    // Closing retains the current local OCR draft but must not interrupt Save.
+    const requestClose = () => { if (!task.confirming) dialog.close(); };
+    const blockCloseDuringSave = event => { if (task.confirming) event.preventDefault(); };
+    const finish = () => {
+        dialog.removeEventListener("close", finish);
+        dialog.removeEventListener("cancel", blockCloseDuringSave);
+        closeButton.removeEventListener("click", requestClose);
+        ocrEditorController?.destroy();
+        ocrEditorController = null;
+        ocrEditorTaskId = null;
+        ocrReviewInProgress = false;
+        mount.replaceChildren();
+        renderOcrTasks();
+    };
+    try {
+        ocrEditorController = window.DMateGraphScan.mount(mount, {
+            scanState: task.scanState ||= {},
+            document: cloneOcrDocument(task.draft), initialDocument: cloneOcrDocument(task.initialDocument),
+            originalUrl: task.originalUrl,
+            isQuestion: task.isQuestion !== false,
+            onQuestionChange: flag => { task.isQuestion = flag; },
+            requirements: task.userRequest || '',
+            onRequirementsChange: value => { task.userRequest = value; },
+            textState: task.textEditorState ||= { mode: 'text_rect', zoom: 100, visible: true },
+            onRecognizeText: async (regions, {signal, forceRecognition = false} = {}) => {
+                const controller = new AbortController(), operationId = makeOcrRequestId();
+                const abort = () => {
+                    if (controller.signal.aborted) return;
+                    controller.abort(); notifyOcrCancelled(operationId);
+                };
+                const timeout = window.setTimeout(abort, 100000);
+                signal?.addEventListener("abort", abort, {once:true});
+                if (signal?.aborted) abort();
+                try {
+                    if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || ''))
+                        task.sourceSha256 = await originalImageDigest(task.file);
+                    const selected = new FormData();
+                    selected.append('image', task.file);
+                    selected.append('request_id', task.id);
+                    selected.append('operation_id', operationId);
+                    selected.append('regions', JSON.stringify(regions));
+                    if (forceRecognition) selected.append('force_recognition', '1');
+                    const response = await fetch('/graph/text-region', {
+                        method: 'POST', credentials: 'same-origin', body: selected, signal: controller.signal
+                    });
+                    const result = await parseResponseJson(response);
+                    if (!response.ok || result?.error || result?.cancelled) throw new Error(result?.error || '框内文字识别已取消');
+                    if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id || result.operation_id !== operationId)
+                        throw new Error('文字识别结果与所选原图不匹配');
+                    return result;
+                } catch (error) {
+                    if (controller.signal.aborted) throw new Error('框内文字识别超时，可重试或手动输入');
+                    throw error;
+                } finally { window.clearTimeout(timeout); signal?.removeEventListener("abort", abort); }
+            },
+            onRecognizeGraph: async (polygon, {signal} = {}) => {
+                const controller = new AbortController(), operationId = makeOcrRequestId();
+                const abort = () => {
+                    if (controller.signal.aborted) return;
+                    controller.abort(); notifyOcrCancelled(operationId);
+                };
+                const timeout = window.setTimeout(abort, 220000);
+                signal?.addEventListener('abort', abort, {once:true});
+                if (signal?.aborted) abort();
+                try {
+                    if (!/^[a-f0-9]{64}$/i.test(task.sourceSha256 || '')) task.sourceSha256 = await originalImageDigest(task.file);
+                    const selected = new FormData();
+                    selected.append('image',task.file); selected.append('request_id',task.id);
+                    selected.append('operation_id',operationId); selected.append('polygon',JSON.stringify(polygon));
+                    const response = await fetch('/graph/recognize-region', {method:'POST',credentials:'same-origin',body:selected,signal:controller.signal});
+                    const result = await parseResponseJson(response);
+                    if (!response.ok || result?.error || result?.cancelled) throw new Error(result?.error || '选区识别已取消');
+                    if (result.source_sha256 !== task.sourceSha256 || result.request_id !== task.id || result.operation_id !== operationId)
+                        throw new Error('图形识别结果与所选原图不匹配');
+                    return result;
+                } finally { window.clearTimeout(timeout); signal?.removeEventListener('abort',abort); }
+            },
+            issues: [...(Array.isArray(task.result?.diagnostics?.semantic_issues) ? task.result.diagnostics.semantic_issues : []),
+                ...(Array.isArray(task.result?.review?.reasons) ? task.result.review.reasons : []),
+                ...(task.error ? [task.error] : [])],
+            onChange: value => {
+                task.draft = cloneOcrDocument(value);
+                task.dirty = true;
+                task.confirmation = null;
+                task.descriptions = null;
+                task.descriptionState = null;
+                task.error = "";
+            },
+            onConfirm: async (value, isQuestion) => {
+                task.isQuestion = isQuestion;
+                await confirmOcrTask(task, value);
+                dialog.close();
+            }
+        });
+        dialog.addEventListener("close", finish);
+        dialog.addEventListener("cancel", blockCloseDuringSave);
+        closeButton.addEventListener("click", requestClose);
+        showGraphEditorDialog(dialog);
+        refreshInputAvailability();
+    } catch (error) {
+        finish();
+        task.error = error?.message || "图片编辑界面无法打开。";
+        renderOcrTasks();
+    }
+}
+
+async function solveOcrTask(id) {
+    const task = ocrTasks.get(id);
+    if (!task?.confirmation || task.dirty || task.sending || ocrEditorTaskId) return;
+    const session = sessions.find(item => item.id === task.sessionId);
+    if (!session) { task.error = "原会话已删除，请重新上传图片。"; renderOcrTasks(); return; }
+    if (ocrSolvingSessions.has(session.id) || isSessionBusy(session.id) || isSessionPendingAiStart(session.id)
+        || session.id === currentId && isCurrentSessionTyping()) {
+        task.error = "当前会话仍在回答，请结束后再解这张图片。";
+        renderOcrTasks();
+        return;
+    }
+    const context = sanitizeSemanticContext(task.confirmation.semantic_context);
+    if (!context || !context.confirmation_token
+        || JSON.stringify(task.draft) !== JSON.stringify(
+            task.confirmation.drawing_document || task.confirmation.document)) {
+        task.confirmation = null;
+        task.error = "结构已修改或确认已失效，请先重新核对并确认。";
+        renderOcrTasks();
+        return;
+    }
+    const userRequest = String(task.userRequest || "").trim();
+    const questionText = context.rendered_question_text;
+    const combinedText = userRequest ? `${questionText}\n\n【我的要求】\n${userRequest}` : questionText;
+    const apiText = userRequest
+        ? ["【当前指向题目】", context.question_text, "【当前指向题目结束】", "",
+            "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n")
+        : context.question_text;
+    if (combinedText.length > 28000 || apiText.length > 28000) {
+        task.error = "题目内容过长，请拆分子图后再解题。";
+        renderOcrTasks();
+        return;
+    }
+    task.sending = true;
+    task.error = "";
+    ocrSolvingSessions.add(session.id);
+    currentId = session.id;
+    const message = { role: "user", text: combinedText, source: "ocr",
+        ocrIsQuestion: task.isQuestion !== false,
+        apiText, semanticContext: context };
+    session.messages.push(message);
+    maybeAutoNameSession(session, task.draft.body_text || task.file.name || "图片识题", "ocr");
+    saveState();
+    renderChat();
+    renderSessions();
+    renderInfo();
+    renderOcrTasks();
+    try {
+        const result = await requestAiReply(session, { completeImmediately: true, expectedUserMessage: message });
+        if (result?.status === "success" && ocrTasks.get(task.id) === task) {
+            ocrTasks.delete(task.id);
+            URL.revokeObjectURL(task.originalUrl);
+        }
+    }
+    finally { task.sending = false; ocrSolvingSessions.delete(session.id); renderOcrTasks(); }
+}
+
+function cancelOcrBatchRun(sessionId) {
+    const run = ocrBatchRuns.get(sessionBusyKey(sessionId));
+    if (!run) return;
+    run.cancelled = true;
+    run.controller.abort();
+}
+
+function pauseOcrBatchRun(sessionId) {
+    const run = ocrBatchRuns.get(sessionBusyKey(sessionId));
+    if (run) run.paused = true;
+}
+
+function ocrBatchCanContinue(run) {
+    return !run.cancelled && !run.paused && currentId === run.session.id
+        && sessions.includes(run.session) && !deletedSessionIds[sessionBusyKey(run.session.id)];
+}
+
+function buildOcrGroupMessage(group, sharedRequest) {
+    const contexts = sanitizeSemanticContexts(group.tasks.map(task => task.confirmation?.semantic_context));
+    if (!contexts || contexts.some((context, index) => context.request_id !== group.tasks[index].id
+        || context.source_sha256 !== group.tasks[index].sourceSha256))
+        throw new Error("图片结构无效或同组内容过长，请核对后拆分发送。");
+    const question = ocrBatchQuestion(contexts, "question_text");
+    const rendered = ocrBatchQuestion(contexts, "rendered_question_text");
+    // Numbering is local to this group, exactly like its signed batch context.
+    const requirements = group.tasks.map((task, index) => task.userRequest?.trim()
+        ? `图片 ${index + 1}：${task.userRequest.trim()}` : "").filter(Boolean);
+    if (sharedRequest) requirements.push(sharedRequest);
+    const userRequest = requirements.join("\n");
+    const text = userRequest ? `${rendered}\n\n【我的要求】\n${userRequest}` : rendered;
+    const apiText = userRequest
+        ? ["【当前指向题目】", question, "【当前指向题目结束】", "",
+            "【本轮唯一需要执行的用户请求】", userRequest, "【本轮请求结束】"].join("\n")
+        : question;
+    if (text.length > 28000 || apiText.length > 28000)
+        throw new Error("同组题目内容过长，请减少图片或拆分组别后发送。");
+    return { role: "user", text, apiText, source: "ocr",
+        ocrIsQuestion: group.tasks.some(task => task.isQuestion !== false), semanticContexts: contexts,
+        ocrGroup: { id: group.tasks.map(task => task.id).join("|"), groupId: group.id,
+            members: group.tasks.map(task => ({ requestId: task.id, isQuestion: task.isQuestion !== false })) } };
+}
+
+async function sendOcrBatch() {
+    if (ocrBatchPreparing || ocrEditorTaskId || !ocrTasks.size) return;
+    const tasks = [...ocrTasks.values()];
+    const session = sessions.find(item => item.id === tasks[0].sessionId);
+    if (!session || tasks.some(task => task.sessionId !== session.id)) {
+        showCurrentError("这些图片不属于同一个会话，请移除其他会话的图片后再发送。");
+        return;
+    }
+    if (currentId !== session.id || ocrSolvingSessions.has(session.id) || isSessionBusy(session.id)
+        || isSessionPendingAiStart(session.id) || isCurrentSessionTyping()) return;
+    if (tasks.some(task => task.state === "recognizing" || task.confirming)) {
+        showCurrentError("还有图片正在识别，请完成后一起发送。");
+        return;
+    }
+    if (tasks.some(task => task.state !== "ready" || !task.draft
+        || !task.draft.body_text?.trim() && !task.draft.graphs?.length)) {
+        showCurrentError("有图片未识别成功，请编辑或移除后再发送。");
+        return;
+    }
+    const typed = document.getElementById("text");
+    const sharedRequest = typed?.value?.trim() || "";
+    const run = { session, cancelled: false, paused: false, controller: new AbortController() };
+    const key = sessionBusyKey(session.id);
+    ocrBatchRuns.set(key, run);
+    ocrBatchPreparing = true;
+    ocrSolvingSessions.add(session.id);
+    tasks.forEach(task => { task.sending = true; });
+    renderOcrTasks();
+    try {
+        // Every source-bound confirmation and every group's size check must
+        // pass before the first request. A bad fourth image cannot cause a
+        // partially submitted batch with its first image already answered.
+        for (const task of tasks) {
+            if (!ocrBatchCanContinue(run)) return;
+            const saved = task.confirmation?.drawing_document || task.confirmation?.document;
+            if (!task.confirmation || task.dirty || JSON.stringify(task.draft) !== JSON.stringify(saved))
+                await confirmOcrTask(task, task.draft, { signal: run.controller.signal });
+        }
+        if (!ocrBatchCanContinue(run)) return;
+        const groups = partitionOcrTasks(tasks).map(group => {
+            const request = sharedRequest || group.tasks[0].pendingSharedRequest || "";
+            group.tasks.forEach(task => { task.pendingSharedRequest = request; });
+            return { ...group, message: buildOcrGroupMessage(group, request) };
+        });
+        ocrBatchPreparing = false;
+        let lastMessage = getLatestUserMessage(session);
+        let clearedInput = false;
+        for (const group of groups) {
+            if (!ocrBatchCanContinue(run) || getLatestUserMessage(session) !== lastMessage) break;
+            const signature = JSON.stringify(group.message);
+            const previous = group.tasks[0].submission;
+            // Retrying a stopped/failed group with unchanged drafts reuses its
+            // user message. Successful groups have already left the stage.
+            let message;
+            if (previous?.signature === signature && previous.message === lastMessage
+                && group.tasks.every(task => task.submission === previous)
+                && session.messages.includes(previous.message)) message = previous.message;
+            else {
+                message = group.message;
+                session.messages.push(message);
+                const submission = { signature, message };
+                group.tasks.forEach(task => { task.submission = submission; });
+                maybeAutoNameSession(session, group.tasks[0].draft.body_text || group.tasks[0].file.name || "图片识题", "ocr");
+            }
+            lastMessage = message;
+            if (!clearedInput && typed) {
+                typed.value = "";
+                typed.dispatchEvent(new Event("input", { bubbles: true }));
+                clearedInput = true;
+            }
+            saveState(); renderChat(); renderSessions(); renderInfo(); renderOcrTasks();
+            // Only OCR queues opt into immediate final rendering. The normal
+            // chat's typing animation and other request callers are unchanged.
+            const result = await requestAiReply(session, { completeImmediately: true, expectedUserMessage: message });
+            if (result?.status !== "success") break;
+            for (const task of group.tasks) {
+                if (ocrTasks.get(task.id) !== task) continue;
+                ocrTasks.delete(task.id);
+                URL.revokeObjectURL(task.originalUrl);
+            }
+            renderOcrTasks();
+        }
+    } catch (error) {
+        if (!run.cancelled && error?.name !== "AbortError" && sessions.includes(session)
+            && !deletedSessionIds[key]) showAssistantMessage(session,
+                error?.message || "图片未能发送，请稍后重试。", { isError: true });
+    } finally {
+        ocrBatchPreparing = false;
+        tasks.forEach(task => { task.sending = false; });
+        ocrSolvingSessions.delete(session.id);
+        if (ocrBatchRuns.get(key) === run) ocrBatchRuns.delete(key);
+        const currentKey = sessionBusyKey(session.id);
+        if (ocrBatchRuns.get(currentKey) === run) ocrBatchRuns.delete(currentKey);
+        renderOcrTasks();
+    }
+}
+
+function initializeChatComposer() {
+    if (window.dmateChatComposer || !window.DMateChatComposer?.mount) return;
+    const input = document.getElementById("text");
+    if (!input) return;
+    window.dmateChatComposer = window.DMateChatComposer.mount({ input, onSend: () => handleSendOrStop() });
+}
+
+function initializeVoiceInput() {
+    if (window.dmateVoiceInput || !window.DMateVoiceInput?.mount) return;
+    const button = document.getElementById("voiceInputBtn"), input = document.getElementById("text");
+    if (!button || !input) return;
+    window.dmateVoiceInput = window.DMateVoiceInput.mount({ button, input,
+        status: document.getElementById("voiceInputStatus"), endpoint: "/voice/transcribe",
+        onError: message => showCurrentError(message),
+        onStateChange: () => refreshInputAvailability(),
+        getContextKey: () => String(currentId ?? ""),
+        isBusy: () => Boolean(ocrReviewInProgress || ocrBatchPreparing || ocrTasks.size > 0 || isSessionBusy(currentId)
+            || isSessionPendingAiStart(currentId) || isCurrentSessionTyping()) });
+}
+
+function initializeConceptNotebook() {
+    if (window.dmateConceptNotebook || !window.DMateConceptNotebook?.mount) return;
+    const button = document.getElementById("conceptNotebookBtn");
+    const dialog = document.getElementById("conceptNotebookDialog");
+    if (!button || !dialog) return;
+    window.dmateConceptNotebook = window.DMateConceptNotebook.mount({ button, dialog,
+        getState: () => learningState.conceptNotebook,
+        onChange: value => setConceptNotebookState(value),
+        isPersistent: () => shouldPersistClientState(),
+        getContextKey: () => accountState.authenticated ? "account:" + accountState.username : "guest",
+        onOpen: () => closeMobileShellDrawers() });
+}
+
+function initializeOcrTaskPanel() {
+    const drawingButton = document.getElementById("graphDrawingBtn");
+    if (drawingButton && drawingButton.dataset.bound !== "true") {
+        drawingButton.dataset.bound = "true";
+        drawingButton.addEventListener("click", openGraphDrawing);
+    }
+    const panel = document.getElementById("ocrTaskPanel");
+    if (panel && panel.dataset.bound !== "true") {
+        panel.dataset.bound = "true";
+        panel.addEventListener("click", event => {
+            const button = event.target.closest("button[data-ocr-action]");
+            if (!button) return;
+            const id = button.dataset.taskId;
+            if (button.dataset.ocrAction === "cancel") cancelOcrTask(id);
+            if (button.dataset.ocrAction === "remove") removeOcrTask(id);
+            if (button.dataset.ocrAction === "edit") void editOcrTask(id);
+            if (button.dataset.ocrAction === "solve") void solveOcrTask(id);
+        });
+    }
+    const workspace = document.querySelector(".center");
+    if (workspace && workspace.dataset.ocrDropBound !== "true") {
+        workspace.dataset.ocrDropBound = "true";
+        workspace.addEventListener("dragover", event => {
+            if (Array.from(event.dataTransfer?.types || []).includes("Files")) event.preventDefault();
+        });
+        workspace.addEventListener("drop", event => {
+            if (!event.dataTransfer?.files?.length || ocrEditorTaskId) return;
+            event.preventDefault();
+            void enqueueOcrFiles(event.dataTransfer.files);
+        });
+        workspace.addEventListener("paste", event => {
+            if (ocrEditorTaskId) return;
+            const files = Array.from(event.clipboardData?.items || [])
+                .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+                .map(item => item.getAsFile()).filter(Boolean);
+            if (!files.length) return;
+            event.preventDefault();
+            void enqueueOcrFiles(files);
+        });
+    }
+    const dialog = document.getElementById("graphEditorDialog");
+    dialog?.addEventListener("cancel", event => {
+        const task = ocrTasks.get(ocrEditorTaskId);
+        if (task?.confirming) event.preventDefault();
+    });
+}
+
+
+function isClearlyNonQuestionWrongBookText(text) {
+    const value = String(text || "").trim();
+
+    if (!value) return true;
+
+    const patterns = [
+        /这道题出现的是一份题库答案的片段/,
+        /并不是一道待求解的题目/,
+        /请问你希望我帮你做什么/,
+        /我可以帮你出题/,
+        /我先确认一下/,
+        /先确认一下你希望/,
+        /告诉我一个具体的.*(?:方向|章节|知识点)/,
+        /你(?:希望|想要).*(?:方向|章节|知识点)/,
+        /你选哪个/,
+        /可以从以下.*选/,
+        /从以下.*选择/,
+        /如果你是想让我.*(?:核对|整理|讲解)/,
+        /^(?:思路提示|解题提示|关键提示)[：:\s]/,
+        /^做这道题[，,。\s]/,
+        /^没关系[，,。\s].*(?:一步一步|一点一点)/,
+        /^第(?:一|二|三|1|2|3)步[：:\s].*(?:先|看|理解|弄清)/,
+        /以上是一个.*(?:测试文本|测试内容)/,
+        /如果你要检测的是.*(?:渲染|格式|显示)/,
+        /可以对照这些段落查看/,
+        /这只是.*(?:示例|演示|测试)/
+    ];
+
+    return patterns.some(
+        pattern => pattern.test(value)
+    );
+}
+
+function stripQuestionWrappers(text) {
+    return String(text || "")
+        .replace(/【题目文字】/g, "")
+        .replace(/【图形信息】/g, "")
+        .replace(/\[图片识题\]/g, "")
+        .trim();
+}
+
+function looksLikeChatQuestionText(text) {
+    const original = String(text || "").trim();
+
+    if (!original) return false;
+
+    if (isClearlyNonQuestionWrongBookText(original)) {
+        return false;
+    }
+
+    if (splitQuestionBankText(original).length) {
+        return true;
+    }
+
+    const value = stripQuestionWrappers(
+        original
+    );
+
+    if (
+        !value
+        || isShortLearningFollowUp(value)
+        || isExerciseRequestText(value)
+    ) {
+        return false;
+    }
+
+    const numberedQuestion = (
+        /(?:^|\n)\s*\d{1,2}\s*[、.．]\s*\S{3,}/m.test(value)
+        && /[？?（(]|求|判断|写出|证明|计算|选择|填空/.test(value)
+    );
+
+    const parenthesizedSubQuestion = (
+        /(?:^|\n)\s*[（(]\s*\d{1,2}\s*[)）]\s*\S{3,}/m.test(value)
+        && /求|判断|写出|证明|计算|选择|填空|通路|回路|矩阵/.test(value)
+    );
+
+    if (
+        numberedQuestion
+        || parenthesizedSubQuestion
+    ) {
+        return true;
+    }
+
+    const strongStarts = [
+        "已知",
+        "给定",
+        "设 ",
+        "设：",
+        "设有",
+        "求",
+        "求解",
+        "证明",
+        "计算",
+        "判断",
+        "写出",
+        "列出",
+        "下列"
+    ];
+
+    const compact = value
+        .replace(/^[#>*\s]+/, "")
+        .trim();
+
+    if (
+        strongStarts.some(signal => compact.startsWith(signal))
+        && compact.length >= 10
+    ) {
+        return true;
+    }
+
+    if (
+        /[？?]\s*$/.test(compact)
+        && /(命题|公式|集合|关系|函数|映射|图|同构|矩阵|树|通路|回路|欧拉|哈密顿|着色|色数|递推|数论|整除|同余|排列|组合|量词|范式|群|子群|环|域)/.test(compact)
+        && compact.length >= 5
+    ) {
+        return true;
+    }
+
+    if (
+        /^(?:什么是|为什么|为何|如何|怎样)/.test(compact)
+        && /(命题|集合|关系|函数|映射|图|同构|矩阵|树|欧拉|哈密顿|色数|递推|数论|整除|同余|排列|组合|量词|范式|群|子群|环|域)/.test(compact)
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+function looksLikeAiGeneratedQuestion(
+    text,
+    previousUserText = ""
+) {
+    const value = String(text || "").trim();
+
+    if (
+        !value
+        || isClearlyNonQuestionWrongBookText(value)
+    ) {
+        return false;
+    }
+
+    const extracted = extractStructuredAiQuestion(
+        value
+    );
+
+    if (!extracted) {
+        return false;
+    }
+
+    const hasExplicitHeading = (
+        explicitQuestionHeadingEnd(value) >= 0
+    );
+
+    if (hasExplicitHeading) {
+        return looksLikeChatQuestionText(
+            extracted
+        );
+    }
+
+    return (
+        countQuestionSubparts(extracted) >= 2
+        && looksLikeChatQuestionText(
+            extracted
+        )
+    );
+}
+
+
+function previousUserMessageBefore(session, messageIndex) {
+    if (!session || !Array.isArray(session.messages)) {
+        return null;
+    }
+
+    for (let index = messageIndex - 1; index >= 0; index -= 1) {
+        const message = session.messages[index];
+
+        if (
+            message
+            && message.role === "user"
+            && typeof message.text === "string"
+            && message.text.trim()
+        ) {
+            return message;
+        }
+    }
+
+    return null;
+}
+
+function canMessageBeWrongQuestion(session, messageIndex, message) {
+    return shouldOfferWrongBookAction(
+        message,
+        session,
+        messageIndex
+    );
+}
+
+
+function questionInfoFromChatMessage(session, messageIndex) {
+    if (!session || !Array.isArray(session.messages)) {
+        return null;
+    }
+
+    const message = session.messages[messageIndex];
+
+    if (
+        !message
+        || message.isError
+        || message.isNotice
+    ) {
+        return null;
+    }
+
+    const teaching = normalizeTeaching(session.teaching);
+    const messageTeaching = normalizeTeaching(
+        message.generatedTeaching
+        || message.questionTeaching
+    );
+    const saved = normalizeLearningQuestion(
+        session.learningQuestion
+    );
+
+    if (message.role === "ai") {
+        recoverGeneratedQuestionFromAssistant(
+            session,
+            messageIndex,
+            message
+        );
+    }
+
+    let text = sanitizeStoredWrongQuestionText(
+        extractQuestionOnlyFromMessage(
+            message
+        )
+    );
+
+    let source = message.source === "ocr"
+        ? "ocr"
+        : "text";
+
+    if (message.role === "ai") {
+        source = "ai";
+    }
+
+    if (!text) {
+        return null;
+    }
+
+    const savedMatches = Boolean(
+        saved
+        && (
+            wrongQuestionFingerprint(saved.text)
+            === wrongQuestionFingerprint(text)
+        )
+    );
+
+    const isRecent = (
+        messageIndex >= session.messages.length - 2
+    );
+
+    return {
+        text,
+        knowledgePoints: messageTeaching
+            ? messageTeaching.knowledge_points.slice(0, 4)
+            : (
+                savedMatches
+                    ? saved.knowledgePoints
+                    : (
+                        isRecent
+                            ? (teaching?.knowledge_points || []).slice(0, 4)
+                            : []
+                    )
+            ),
+        focusPoints: messageTeaching
+            ? messageTeaching.focus_points.slice(0, 2)
+            : (
+                savedMatches
+                    ? saved.focusPoints
+                    : (
+                        isRecent
+                            ? (teaching?.focus_points || []).slice(0, 2)
+                            : []
+                    )
+            ),
+        category: messageTeaching
+            ? messageTeaching.category
+            : (
+                savedMatches
+                    ? saved.category
+                    : (
+                        isRecent
+                            ? (teaching?.category || "")
+                            : ""
+                    )
+            ),
+        difficulty: messageTeaching?.difficulty
+            || (savedMatches ? saved.difficulty : "")
+            || (isRecent ? (teaching?.difficulty || "") : ""),
+        source,
+        referenceAnswer: (
+            String(message.generatedAnswer || "").trim()
+            || (
+                savedMatches
+                    ? saved.referenceAnswer
+                    : ""
+            )
+        ),
+        sessionId: session.id,
+        updatedAt: Date.now()
+    };
+}
+
+function markChatMessageAsWrong(sessionId, messageIndex) {
+    const session = sessions.find(
+        item => String(item.id) === String(sessionId)
+    );
+
+    if (!session) return;
+
+    const questionInfo = questionInfoFromChatMessage(
+        session,
+        messageIndex
+    );
+
+    if (!questionInfo || !questionInfo.text) {
+        window.alert(
+            "没有从这条内容中提取到有效题目。你可以先把题目单独发一条消息，再加入错题本"
+        );
+        return;
+    }
+
+    const choices = splitQuestionBankText(
+        questionInfo.text
+    );
+
+    if (
+        choices.length
+        && openWrongQuestionPicker(
+            questionInfo,
+            choices
+        )
+    ) {
+        return;
+    }
+
+    openWrongSafePreview(
+        questionInfo
+    );
+}
+
+function hideGeneratedExerciseKnowledgePoints(raw, teaching = null) {
+    // 仅改变生成题目的可见内容，原始题目与知识点信息保持不变。
+    // 特别处理服务端返回“【涉及知识点】\n集合运算”但标题被提前移除的旧消息。
+    const lines = String(raw || "").split("\n");
+    const normalized = normalizeTeaching(teaching);
+    const labels = new Set(["集合运算"]);
+    const addLabel = value => {
+        if (typeof value === "string" && value.trim()) {
+            labels.add(value.trim());
+            labels.add(window.DMateKnowledgeLanguage?.label(value.trim(), "en") || value.trim());
+        }
+    };
+    addLabel(normalized?.category);
+    (normalized?.knowledge_points || []).forEach(addLabel);
+    (normalized?.focus_points || []).forEach(addLabel);
+
+    const heading = /^\s*(?:#{1,6}\s*)?(?:【\s*(?:涉及知识点|所涉知识点|知识点)\s*】|\[\s*(?:涉及知识点|所涉知识点|知识点|Topics|Knowledge Points)\s*\]|(?:涉及知识点|所涉知识点|知识点|Topics|Knowledge Points)\s*[:：])\s*(.*)$/i;
+    const output = [];
+    let skipLabelLine = false;
+    for (const line of lines) {
+        const trimmed = line.trim().replace(/^\*\*(.*?)\*\*$/, "$1").trim();
+        const match = trimmed.match(heading);
+        if (match) {
+            skipLabelLine = !match[1].trim();
+            continue;
+        }
+        if (skipLabelLine && !trimmed) continue;
+        if (skipLabelLine && !/[。？?]|(?:求|证明|判断|计算|写出|已知|设|下列)|\b(?:let|given|suppose|find|prove|calculate|determine)\b/i.test(trimmed)
+            && trimmed.length <= 200) {
+            skipLabelLine = false;
+            continue;
+        }
+        skipLabelLine = false;
+        output.push(line);
+    }
+    // 只移除结尾独立的知识点标签，不能误删题干中的条件或小问。
+    while (output.length && !output[output.length - 1].trim()) output.pop();
+    while (output.length) {
+        const last = output[output.length - 1].trim()
+            .replace(/^\*\*(.*?)\*\*$/, "$1").trim();
+        if (!labels.has(last)) break;
+        output.pop();
+        while (output.length && !output[output.length - 1].trim()) output.pop();
+    }
+    return output.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+async function deleteChatMessage(sessionId, messageIndex) {
+    const session = sessions.find(
+        item => String(item.id) === String(sessionId)
+    );
+
+    if (
+        !session
+        || !Array.isArray(session.messages)
+        || !session.messages[messageIndex]
+    ) {
+        return;
+    }
+
+    const expectedMessage = session.messages[messageIndex];
+    const confirmed = await showAppConfirm({
+        title: "删除消息",
+        body: "确定删除这条聊天消息吗？已加入错题本的内容不会被删除",
+        confirmText: "删除",
+        confirmTone: "danger"
+    });
+
+    if (!confirmed || !sessions.includes(session)
+        || session.messages[messageIndex] !== expectedMessage) return;
+
+    ensureSessionMessageIds(session);
+    const chat = document.getElementById("chat");
+
+    if (chat) {
+        preserveChatScrollOnce = chat.scrollTop;
+    }
+
+    const removed = session.messages[messageIndex];
+    session.deletedMessageIds[removed.messageId] = Math.max(
+        Date.now(), session.deletedMessageIds[removed.messageId] || 0
+    );
+    if (typingContext?.session === session && typingContext.userMessage === removed) discardTypingOutput();
+    const activeRequest = activeAiRequests.get(sessionBusyKey(session.id));
+    if (activeRequest?.userMessage === removed) {
+        activeRequest.cancelled = true;
+        activeRequest.controller.abort();
+        discardRequestStreamPreview(activeRequest);
+    }
+
+    session.messages.splice(
+        messageIndex,
+        1
+    );
+    if (activeRequest?.userMessage === removed) {
+        // AbortError deliberately does not save a reply. Restore the retest
+        // input stage here so the next answer is still checked as a retest.
+        rollbackRetestAfterRequestFailure(session);
+    }
+
+    const learningQuestion = normalizeLearningQuestion(
+        session.learningQuestion
+    );
+
+    if (learningQuestion) {
+        const removedText = removed.role === "ai"
+            ? (
+                extractAiGeneratedExerciseText(
+                    removed.text
+                ) || removed.text
+            )
+            : removed.text;
+
+        if (
+            wrongQuestionFingerprint(learningQuestion.text)
+            === wrongQuestionFingerprint(removedText)
+        ) {
+            session.learningQuestion = null;
+        }
+    }
+
+    // 删除当前题后，不继续沿用已删除题目的 session.teaching。
+    // 按剩余消息历史重新确定当前题；如果上一题没有本地教学快照，
+    // 再通过轻量 /analyze-questions 接口补一次分类。
+    await ensureActiveQuestionAfterHistoryChange(
+        session
+    );
+
+    saveState();
+    renderChat();
+    renderSessions();
+    renderInfo();
+    renderLearningSummary();
+}
+
+
+// -----------------------------
+// AI 消息与打字效果
+// -----------------------------
+function addAssistantMessage(
+    session,
+    text,
+    meta = {}
+) {
+    if (!session || !text) return;
+
+    session.messages.push({
+        role: "ai",
+        text,
+        generatedExercise: Boolean(
+            meta.generatedExercise
+        ),
+        generatedQuestion: typeof meta.generatedQuestion === "string"
+            ? meta.generatedQuestion
+            : "",
+        generatedAnswer: typeof meta.generatedAnswer === "string"
+            ? meta.generatedAnswer
+            : "",
+        generatedTeaching: normalizeTeaching(
+            meta.generatedTeaching
+        ),
+        targetQuestionFingerprint: typeof meta.targetQuestionFingerprint === "string"
+            ? meta.targetQuestionFingerprint
+            : "",
+        isError: Boolean(meta.isError),
+        isNotice: Boolean(meta.isNotice)
+    });
+}
+
+function showAssistantMessage(
+    session,
+    text,
+    meta = {}
+) {
+    if (!session) return;
+
+    if (currentId === session.id && !typingTimer) {
+        startTyping(text, session, meta);
+        return;
+    }
+
+    addAssistantMessage(
+        session,
+        text,
+        meta
+    );
+
+    saveState();
+    renderAll();
+}
+
+function showCurrentError(text) {
+    let session = getCurrent();
+
+    if (!session) {
+        newChat();
+        session = getCurrent();
+    }
+
+    showAssistantMessage(
+        session,
+        text,
+        { isError: true }
+    );
+}
+
+let pendingBackgroundReplyRender = false;
+
+function releaseReplyStage(state) {
+    if (!state?.stage) return;
+    try { window.MathJax?.typesetClear?.([state.stage]); } catch (_error) {}
+    state.stage.remove();
+    state.stage = null;
+}
+
+// Build from complete, sanitized, typeset DOM. Only ordinary text is split;
+// formulas, code and tables always enter the visible answer as complete units.
+function createReplyRevealPlan(root) {
+    const steps = [];
+    const segmenter = typeof Intl.Segmenter === "function"
+        ? new Intl.Segmenter(undefined, { granularity:"grapheme" }) : null;
+    let total = 0;
+    const visit = node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.data;
+            if (!text.trim()) return;
+            const characters = segmenter
+                ? Array.from(segmenter.segment(text), part => part.segment) : Array.from(text);
+            steps.push({ node, characters, start:total, end:total + characters.length, shown:0 });
+            total += characters.length;
+            node.data = "";
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        const firstStep = steps.length;
+        if (node.matches("mjx-container,pre,code,table,svg,math,img,hr,br")) {
+            const cost = node.matches("br,hr") ? 1 : Math.min(48, Math.max(8, (node.textContent || "").length));
+            steps.push({ node, start:total, end:total + cost });
+            total += cost;
+        } else {
+            for (const child of [...node.childNodes]) visit(child);
+        }
+        if (node !== root && steps.length > firstStep) node.classList.add("reply-unrevealed");
+    };
+    visit(root);
+    return { steps, total, index:0, root };
+}
+
+function advanceReplyReveal(plan, progress) {
+    while (plan.index < plan.steps.length) {
+        const step = plan.steps[plan.index];
+        const count = Math.min(step.end - step.start, Math.floor(progress - step.start));
+        if (count <= 0) break;
+        for (let element = step.node.nodeType === Node.ELEMENT_NODE ? step.node : step.node.parentElement;
+            element && element !== plan.root; element = element.parentElement) {
+            if (element.classList.contains("reply-unrevealed")) {
+                element.classList.remove("reply-unrevealed");
+                element.classList.add("reply-revealed");
+            }
+        }
+        if (step.characters && count !== step.shown) {
+            step.node.data = step.characters.slice(0, count).join("");
+            step.shown = count;
+        }
+        if (progress < step.end) break;
+        plan.index += 1;
+    }
+}
+
+function completeReplyReveal(state) {
+    if (!state?.plan) return null;
+    advanceReplyReveal(state.plan, state.plan.total);
+    for (const element of state.content.querySelectorAll(".reply-unrevealed,.reply-revealed")) {
+        element.classList.remove("reply-unrevealed", "reply-revealed");
+    }
+    return state.content;
+}
+
+async function prepareReplyReveal(context, state) {
+    try {
+        const content = document.createElement("div");
+        content.className = "ai-content";
+        const displayText = prepareAiDisplayText(typingFullText);
+        content.setAttribute("data-i18n-content", "");
+        content.innerHTML = markdownToHtml(typingMeta?.generatedExercise
+            ? hideGeneratedExerciseKnowledgePoints(displayText, typingMeta.generatedTeaching)
+            : displayText);
+        const stage = document.createElement("div");
+        stage.className = "msg ai reply-render-stage";
+        stage.setAttribute("aria-hidden", "true");
+        stage.style.width = `${typingDiv.getBoundingClientRect().width}px`;
+        stage.style.setProperty("max-width", "none", "important");
+        stage.appendChild(content);
+        state.stage = stage;
+        // Keep preparation outside #chat: history refreshes clear its MathJax
+        // references and replace its children while classification is pending.
+        document.getElementById("chat").parentElement.appendChild(stage);
+        await renderMath(stage);
+        if (state.cancelled || typingContext !== context) return;
+        if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
+        state.content = content;
+        state.plan = createReplyRevealPlan(content);
+        typingDiv.replaceChildren(content);
+        typingDiv.classList.remove("reply-preparing");
+        const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+        if (reducedMotion || !state.plan.total) { finishTyping(); return; }
+        const duration = Math.min(REPLY_REVEAL_MAX_MS,
+            Math.max(450, state.plan.total / REPLY_REVEAL_CHARS_PER_SECOND * 1000));
+        let startedAt = null;
+        const frame = now => {
+            if (state.cancelled || typingContext !== context) return;
+            if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
+            if (startedAt === null) startedAt = now;
+            const fraction = Math.min(1, (now - startedAt) / duration);
+            advanceReplyReveal(state.plan, fraction * state.plan.total);
+            maybeAutoFollowTyping();
+            if (fraction === 1) { finishTyping(); return; }
+            typingTimer = requestAnimationFrame(frame);
+        };
+        typingTimer = requestAnimationFrame(frame);
+    } catch (error) {
+        console.warn("回答渐进排版失败，使用完整显示：", error);
+        if (!state.cancelled && typingContext === context) finishTyping();
+    } finally {
+        state.preparing = false;
+        releaseReplyStage(state);
+    }
+}
+
+function startTyping(
+    text,
+    session,
+    meta = {},
+    onCommit = null,
+    onCancel = null
+) {
+    if (!session || !text) return;
+
+    if (currentId !== session.id) {
+        addAssistantMessage(
+            session,
+            text,
+            meta
+        );
+        onCommit?.();
+        saveState();
+        return;
+    }
+
+    if (typingTimer) {
+        forceCompleteTyping();
+    }
+
+    // 后台标签页定时器可能被浏览器大幅降频；响应已到时直接完整落盘。
+    if (document.hidden) {
+        addAssistantMessage(session, text, meta);
+        onCommit?.();
+        saveState();
+        pendingBackgroundReplyRender = true;
+        return;
+    }
+
+    typingFullText = text;
+    typingSessionId = session.id;
+    typingContext = { session, userMessage: getLatestUserMessage(session), version: cloudSyncContextVersion,
+        onCommit, onCancel };
+    typingMeta = {
+        generatedExercise: Boolean(
+            meta.generatedExercise
+        ),
+        generatedQuestion: typeof meta.generatedQuestion === "string"
+            ? meta.generatedQuestion
+            : "",
+        generatedAnswer: typeof meta.generatedAnswer === "string"
+            ? meta.generatedAnswer
+            : "",
+        generatedTeaching: normalizeTeaching(
+            meta.generatedTeaching
+        ),
+        targetQuestionFingerprint: typeof meta.targetQuestionFingerprint === "string"
+            ? meta.targetQuestionFingerprint
+            : "",
+        isError: Boolean(meta.isError),
+        isNotice: Boolean(meta.isNotice)
+    };
+
+    const chat = document.getElementById("chat");
+    if (!chat) { finishTyping(); return; }
+
+    typingAutoFollow = isChatNearBottom(
+        chat,
+        90
+    );
+    typingScrollLockedByUser = false;
+    lastTypingAutoScrollAt = 0;
+
+    const div = document.createElement("div");
+    // Ignore only the live bubble; its prepared content already contains SVG.
+    div.className = "msg ai tex2jax_ignore reply-preparing";
+    div.setAttribute("aria-busy", "true");
+    const placeholder = document.createElement("span");
+    placeholder.className = "reply-preparing-dots";
+    placeholder.textContent = "•••";
+    placeholder.setAttribute("aria-label", "正在准备回答");
+    div.appendChild(placeholder);
+    chat.appendChild(div);
+
+    typingDiv = div;
+
+    // Truthy during both preparation and animation, preserving stop / sync /
+    // account cleanup semantics. Subsequent values are animation frame IDs.
+    typingTimer = -1;
+    const state = { preparing:true, cancelled:false, stage:null, content:null, plan:null };
+    typingRenderState = state;
+    refreshInputAvailability();
+    maybeAutoFollowTyping();
+    void prepareReplyReveal(typingContext, state);
+}
+
+function finishTyping() {
+    if (!typingContextIsCurrent()) { discardTypingOutput(); return; }
+    const context = typingContext;
+    const session = context.session;
+
+    const preparedContent = completeReplyReveal(typingRenderState);
+
+    if (session) {
+        addAssistantMessage(
+            session,
+            typingFullText,
+            typingMeta || {}
+        );
+    }
+
+    const finishedMessage = session.messages[session.messages.length - 1];
+
+    clearTypingState();
+
+    context.onCommit?.();
+    saveState();
+
+    if (
+        typingAutoFollow
+        && !typingScrollLockedByUser
+    ) {
+        forceChatBottomOnce = true;
+    }
+
+    // 重新渲染已落盘的最后一条 AI 消息，立即补上“删除”等消息操作。
+    // 旧版只把 typingDiv 换成最终 HTML，没有重新生成 msg-actions，
+    // 所以最新一条回答在下一次刷新前看不到删除按钮。
+    renderChat({ message:finishedMessage, content:preparedContent });
+    renderSessions();
+    renderInfo();
+
+    refreshInputAvailability();
+
+    typingAutoFollow = true;
+    typingScrollLockedByUser = false;
+    lastTypingAutoScrollAt = 0;
+}
+
+// 强制完成当前打字动画
+function forceCompleteTyping() {
+    if (typingTimer) finishTyping();
+}
+
+
+// 页面进入后台时立即完成已收到内容的打字动画，避免恢复后继续排队显示。
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden && typingTimer) {
+        forceCompleteTyping();
+    } else if (!document.hidden && pendingBackgroundReplyRender) {
+        pendingBackgroundReplyRender = false;
+        renderChat();
+        renderSessions();
+        renderInfo();
+        refreshInputAvailability();
+    }
+    if (!document.hidden) {
+        const chat = document.getElementById("chat");
+        if (chat) currentRequestStreamPreview()?.attach(chat);
+    }
+});
+
+// -----------------------------
+// 渲染聊天
+// -----------------------------
+function renderChat(preparedReply = null) {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+    const session = getCurrent();
+    chat.closest(".center")?.classList.toggle("chat-empty", !session);
+
+    // Reuse unchanged ready content from this view. A history refresh must not
+    // blank earlier answers while a new formula extension is being loaded.
+    const readyContent = new Map();
+    for (const bubble of chat.children) {
+        const content = bubble.querySelector(".msg-content > .ai-content:not(.math-pending)");
+        if (bubble.dmateMessage && content) {
+            readyContent.set(bubble.dmateMessage, { content, text:bubble.dmateRenderedText });
+        }
+    }
+    const renderOperation = {};
+    renderChat.currentOperation = renderOperation;
+
+    const oldScrollTop = chat.scrollTop;
+    const oldBottomDistance = chatBottomDistance(chat);
+    const oldNearBottom = oldBottomDistance <= 90;
+    const requestedScrollTop = (
+        preserveChatScrollOnce !== null
+        && Number.isFinite(preserveChatScrollOnce)
+    )
+        ? preserveChatScrollOnce
+        : null;
+
+    preserveChatScrollOnce = null;
+
+    if (
+        window.MathJax
+        && typeof MathJax.typesetClear === "function"
+    ) {
+        try {
+            MathJax.typesetClear([chat]);
+        } catch (error) {
+            console.warn("MathJax 清理旧公式失败：", error);
+        }
+    }
+
+    chat.innerHTML = "";
+
+    if (!session) {
+        lastRenderedChatSessionId = null;
+        queueChatJumpControlsUpdate();
+        return;
+    }
+
+    const sessionChanged = (
+        String(lastRenderedChatSessionId ?? "")
+        !== String(session.id)
+    );
+
+    for (
+        let messageIndex = 0;
+        messageIndex < session.messages.length;
+        messageIndex += 1
+    ) {
+        const message = session.messages[messageIndex];
+
+        // Recover older replies before rendering their badge and actions.
+        // Only an explicit generation request can establish this identity;
+        // ordinary explanations and user question toggles keep their rules.
+        const registeredExercise = message.role === "ai" && !message.isError && !message.isNotice
+            && Boolean(recoverGeneratedQuestionFromAssistant(session, messageIndex, message));
+        if (registeredExercise) message.generatedExercise = true;
+
+        const div = document.createElement("div");
+        div.dataset.messageIndex = String(messageIndex);
+        div.className =
+            "msg " + (
+                message.role === "user"
+                    ? "user"
+                    : "ai"
+            );
+
+        const content = document.createElement("div");
+        content.className = "msg-content";
+        if (message.isError || message.isNotice) content.setAttribute("data-i18n-ui", "");
+
+        if (message.role === "user") {
+            content.textContent = message.text;
+            content.style.whiteSpace = "pre-wrap";
+        } else {
+            const displayText = message.generatedExercise
+                ? hideGeneratedExerciseKnowledgePoints(prepareAiDisplayText(message.text), message.generatedTeaching)
+                : prepareAiDisplayText(message.text);
+            const ready = readyContent.get(message);
+            if (preparedReply?.message === message && preparedReply.content) {
+                content.appendChild(preparedReply.content);
+            } else if (ready?.text === displayText) {
+                content.appendChild(ready.content);
+            } else {
+                content.innerHTML = `<div class="ai-content math-pending">${markdownToHtml(displayText)}</div>`;
+            }
+            div.dmateMessage = message;
+            div.dmateRenderedText = displayText;
+        }
+
+        div.appendChild(content);
+
+        const difficultyTeaching = normalizeTeaching(
+            message.role === "user"
+                ? (
+                    (message.source === "ocr"
+                        ? isRecordableOcrQuestionMessage(message)
+                        : message.manualIsQuestion === true)
+                        ? message.questionTeaching
+                        : null
+                )
+                : (
+                    message.generatedExercise
+                        ? message.generatedTeaching
+                        : null
+                )
+        );
+
+        // 复测题和普通题一样显示实际分类难度；
+        // 仅显示绑定在这道题上的教学分析，不把后台目标难度写到出题指令上。
+        const questionBadge = difficultyTeaching?.difficulty || (registeredExercise ? "题目" : "");
+        if (questionBadge) {
+            const difficultyBadge = document.createElement("div");
+            difficultyBadge.className = "difficulty-badge";
+            difficultyBadge.textContent = questionBadge;
+            div.insertBefore(difficultyBadge, content);
+        }
+
+        // 难度仍显示，但不向用户展示模块分类标签。
+        // generatedTeaching 的模块与相关知识点保留，供复测、错题与图谱使用。
+
+        const actions = document.createElement("div");
+        actions.className = "msg-actions";
+
+        if (
+            shouldShowChatCopyButton(
+                message,
+                session,
+                messageIndex
+            )
+        ) {
+            actions.appendChild(createSmartCopyButton(
+                () => copyChatQuestionOnly(message, session, messageIndex)
+            ));
+        }
+
+        // 双矩形按钮：每条聊天（用户/AI、题目/讲解/追问）均可复制文本。
+        actions.appendChild(createChatTextCopyButton(
+            () => copyChatMessageText(message, content)
+        ));
+
+        if (
+            shouldOfferWrongBookAction(
+                message,
+                session,
+                messageIndex
+            )
+        ) {
+            const wrongButton = document.createElement("button");
+            wrongButton.type = "button";
+            wrongButton.textContent = "记为错题";
+            wrongButton.title = "把这一条题目加入错题本";
+            wrongButton.onclick = () => (
+                markChatMessageAsWrong(
+                    session.id,
+                    messageIndex
+                )
+            );
+
+            actions.appendChild(wrongButton);
+        }
+
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "danger";
+        deleteButton.textContent = "删除";
+        deleteButton.title = "删除这一条聊天消息";
+        deleteButton.onclick = () => (
+            deleteChatMessage(
+                session.id,
+                messageIndex
+            )
+        );
+
+        actions.appendChild(deleteButton);
+
+        div.appendChild(actions);
+        chat.appendChild(div);
+    }
+
+    // A late teaching classification can refresh history during typing.
+    // Reattach the same bubble so its timer keeps updating visible content.
+    if (typingTimer && typingDiv && String(typingSessionId) === String(session.id)) {
+        chat.appendChild(typingDiv);
+    }
+    const streamPreview = currentRequestStreamPreview();
+    if (streamPreview && sessionChanged) {
+        typingAutoFollow = true;
+        typingScrollLockedByUser = false;
+        lastTypingAutoScrollAt = 0;
+    }
+    streamPreview?.attach(chat);
+
+    const shouldStickBottom = Boolean(
+        forceChatBottomOnce
+        || sessionChanged
+        || (requestedScrollTop === null && oldNearBottom)
+    );
+
+    forceChatBottomOnce = false;
+    lastRenderedChatSessionId = session.id;
+
+    // 先给一个同步位置，避免 MathJax 渲染期间出现肉眼可见的闪跳。
+    if (shouldStickBottom) {
+        scrollChatToBottom();
+    } else if (requestedScrollTop !== null) {
+        chat.scrollTop = requestedScrollTop;
+    } else {
+        chat.scrollTop = oldScrollTop;
+    }
+
+    queueChatJumpControlsUpdate();
+    renderMath(chat).then(() => {
+        // A newer history render or session switch owns the scroll position.
+        if (renderChat.currentOperation !== renderOperation || getCurrent() !== session) return;
+        for (const content of chat.querySelectorAll(".ai-content.math-pending")) {
+            content.classList.remove("math-pending");
+        }
+        // 公式渲染会改变消息高度，必须在排版完成后再恢复一次位置。
+        // 否则长公式/矩阵会把当前视口“顶”到上方。
+        if (shouldStickBottom) {
+            scrollChatToBottom();
+            return;
+        }
+
+        if (requestedScrollTop !== null) {
+            chat.scrollTop = Math.min(
+                requestedScrollTop,
+                Math.max(0, chat.scrollHeight - chat.clientHeight)
+            );
+            return;
+        }
+
+        chat.scrollTop = Math.min(
+            oldScrollTop,
+            Math.max(0, chat.scrollHeight - chat.clientHeight)
+        );
+    }).finally(queueChatJumpControlsUpdate);
+}
+
+
+// -----------------------------
+// 会话列表
+// -----------------------------
+let mobileSessionTapTimer = 0;
+let mobileSessionTapId = "";
+let mobileSessionTapAt = 0;
+let mobileSessionLastTouchAt = 0;
+let lastSessionRenameAt = 0;
+let refreshSessionRenameLanguage = null;
+function renameSession(session) {
+    if (!session || Date.now() - lastSessionRenameAt < 400) return;
+    lastSessionRenameAt = Date.now();
+    if (typingTimer) forceCompleteTyping();
+    const modal = document.getElementById("sessionRenameModal");
+    const input = document.getElementById("sessionRenameInput");
+    const submit = document.getElementById("sessionRenameSave");
+    if (!modal || !input || !submit) return;
+    let displayedName = sessionDisplayName(session);
+    let edited = false;
+    input.value = displayedName;
+    input.oninput = () => { edited = true; };
+    refreshSessionRenameLanguage = () => {
+        if (edited) return;
+        const selectedAll = input.selectionStart === 0 && input.selectionEnd === input.value.length;
+        displayedName = sessionDisplayName(session);
+        input.value = displayedName;
+        if (selectedAll) input.select();
+    };
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    const close = () => {
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+        refreshSessionRenameLanguage = null;
+        if (document.activeElement === input) input.blur();
+    };
+    const confirm = () => {
+        const name = input.value.trim();
+        if (name && (edited || name !== displayedName)) {
+            session.name = name.slice(0, 80);
+            session.nameSource = "user";
+            saveState();
+            renderSessions();
+            renderInfo();
+            refreshMobileConversationTitle();
+        }
+        close();
+    };
+    submit.onclick = confirm;
+    document.getElementById("sessionRenameClose").onclick = close;
+    modal.onclick = event => { if (event.target === modal) close(); };
+    input.onkeydown = event => {
+        if (event.key === "Enter") { event.preventDefault(); confirm(); }
+        if (event.key === "Escape") close();
+    };
+    window.setTimeout(() => { input.focus(); input.select(); }, 40);
+}
+function renderSessions() {
+    const box = document.getElementById("sessions");
+    if (!box) return;
+
+    // 保持列表的可见位置：连续删除时不应因为整列重建突然跳到别处。
+    // 优先锚定当前可见的会话；如果该会话被删，锚定下一条仍存在的会话。
+    const oldScrollTop = box.scrollTop;
+    const oldItems = [...box.children];
+    const boxTop = box.getBoundingClientRect().top;
+    const visibleIndex = oldItems.findIndex(item => (
+        item.getBoundingClientRect().bottom > boxTop + 1
+    ));
+    const anchorIndex = visibleIndex < 0 ? 0 : visibleIndex;
+    let anchorId = "";
+    let anchorOffset = 0;
+    for (let index = anchorIndex; index < oldItems.length; index++) {
+        const id = oldItems[index].dataset.sessionId || "";
+        if (id && sessions.some(item => String(item.id) === id)) {
+            anchorId = id;
+            anchorOffset = index === anchorIndex
+                ? oldItems[index].getBoundingClientRect().top - boxTop
+                : (oldItems[anchorIndex]?.getBoundingClientRect().top || boxTop) - boxTop;
+            break;
+        }
+    }
+
+    refreshUnnamedSessionNames();
+    box.innerHTML = "";
+
+    for (const session of sessions) {
+        const isCurrent = (
+            String(session.id) === String(currentId)
+        );
+
+        const div = document.createElement("div");
+        div.dataset.sessionId = String(session.id);
+        div.className = isCurrent
+            ? "session active"
+            : "session";
+
+        if (isCurrent) {
+            div.setAttribute(
+                "aria-current",
+                "true"
+            );
+        }
+
+        const span = document.createElement("span");
+        span.setAttribute("data-i18n-content", "");
+        span.setAttribute("data-session-name", "");
+        span.innerText = sessionDisplayName(session);
+        span.title = sessionDisplayName(session);
+
+        const selectSession = () => {
+            if (currentId !== session.id) pauseOcrBatchRun(currentId);
+            if (typingTimer) forceCompleteTyping();
+            currentId = session.id;
+            saveState();
+            renderAll();
+            animateMobileConversationSwitch();
+            if (isMobileAppShell()) closeMobileShellDrawers();
+        };
+        const handleSessionTap = () => {
+            const now = Date.now();
+            if (mobileSessionTapTimer && mobileSessionTapId === String(session.id)
+                && now - mobileSessionTapAt <= 460) {
+                window.clearTimeout(mobileSessionTapTimer);
+                mobileSessionTapTimer = 0;
+                mobileSessionTapId = "";
+                mobileSessionTapAt = 0;
+                renameSession(session);
+                return;
+            }
+            if (mobileSessionTapTimer) {
+                window.clearTimeout(mobileSessionTapTimer);
+                mobileSessionTapTimer = 0;
+            }
+            mobileSessionTapId = String(session.id);
+            mobileSessionTapAt = now;
+            mobileSessionTapTimer = window.setTimeout(() => {
+                mobileSessionTapTimer = 0;
+                mobileSessionTapId = "";
+                mobileSessionTapAt = 0;
+                selectSession();
+            }, 460);
+        };
+        // 手机 WebView / Safari 对 dblclick 支持不一致：用真实 touchend
+        // 检测双击，并阻止合成 click 让第一次触摸立即关闭会话抽屉。
+        let touchStart = null;
+        span.addEventListener("touchstart", event => {
+            if (!isMobileAppShell() || event.touches.length !== 1) return;
+            const t = event.touches[0];
+            touchStart = { x:t.clientX, y:t.clientY };
+        }, { passive:true });
+        span.addEventListener("touchmove", event => {
+            if (!touchStart || !event.touches.length) return;
+            const t = event.touches[0];
+            if (Math.hypot(t.clientX-touchStart.x, t.clientY-touchStart.y) > 12) {
+                touchStart = null;
+            }
+        }, { passive:true });
+        span.addEventListener("touchcancel", () => { touchStart = null; }, { passive:true });
+        span.addEventListener("touchend", event => {
+            if (!isMobileAppShell() || !touchStart || event.changedTouches.length !== 1) return;
+            const t = event.changedTouches[0];
+            const distance = Math.hypot(t.clientX-touchStart.x, t.clientY-touchStart.y);
+            touchStart = null;
+            if (distance > 12) return;
+            // 防止 iOS 双击缩放和随后浏览器合成的单击事件。
+            event.preventDefault();
+            mobileSessionLastTouchAt = Date.now();
+            handleSessionTap();
+        }, { passive:false });
+        span.onclick = () => {
+            if (!isMobileAppShell()) { selectSession(); return; }
+            if (Date.now() - mobileSessionLastTouchAt < 750) return;
+            // 鼠标、触控板或不触发 touch 事件的设备同样支持双击。
+            handleSessionTap();
+        };
+        span.ondblclick = event => {
+            event.preventDefault();
+            if (mobileSessionTapTimer) window.clearTimeout(mobileSessionTapTimer);
+            mobileSessionTapTimer = 0;
+            mobileSessionTapId = "";
+            mobileSessionTapAt = 0;
+            renameSession(session);
+        };
+
+        const del = document.createElement("button");
+        del.className = "del";
+        del.type = "button";
+        del.textContent = "";
+        del.title = "删除这个对话";
+        del.setAttribute(
+            "aria-label",
+            "删除这个对话"
+        );
+
+        del.onclick = async event => {
+            event.stopPropagation();
+
+            const confirmed = await showAppConfirm({
+                title:"删除这段对话？",
+                body:"这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留",
+                confirmText:"删除对话",
+                cancelText:"取消",
+                confirmTone:"danger",
+                fallbackText:"确定删除这段对话吗？\n\n这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留"
+            });
+
+            if (!confirmed) {
+                return;
+            }
+
+            if (typingTimer) {
+                forceCompleteTyping();
+            }
+
+            // 删除聊天前保存复测题快照；复测记录与聊天会话分别管理。
+            const relatedRetest = learningState.wrongQuestions.find(item =>
+                String(item.id) === String(session.retest?.wrongQuestionId)
+            );
+            if (relatedRetest && persistRetestRecord(relatedRetest, session)) {
+                saveLearningState();
+            }
+
+            removeLearningEventsForSession(
+                session.id
+            );
+
+            // 一次删除就记入本地和云端；自动合并不能把该 ID 复活。
+            markSessionDeleted(session.id);
+
+            busySessionIds.delete(
+                sessionBusyKey(session.id)
+            );
+
+            sessions = sessions.filter(
+                item => String(item.id) !== String(session.id)
+            );
+
+            if (String(currentId) === String(session.id)) {
+                currentId = null;
+            }
+            // A pending mobile selection must not reopen a removed conversation.
+            if (mobileSessionTapTimer && mobileSessionTapId === String(session.id)) {
+                window.clearTimeout(mobileSessionTapTimer);
+                mobileSessionTapTimer = 0;
+                mobileSessionTapId = "";
+                mobileSessionTapAt = 0;
+            }
+
+            // 删除当前会话后保持空白，不自动打开列表里的其他对话。
+            // 删除最后一个会话时保持空列表，不自动补一个“新对话”。
+            // 下一次真正发送文字或上传图片时，send()/handleImageSelected()
+            // 会按需调用 newChat() 创建会话。
+            if (!sessions.length) {
+                currentId = null;
+            }
+
+            saveState();
+            renderAll();
+        };
+
+        div.appendChild(span);
+        div.appendChild(del);
+        box.appendChild(div);
+    }
+
+    const anchor = [...box.children].find(item => (
+        item.dataset.sessionId === anchorId
+    ));
+    if (anchor) {
+        const newOffset = anchor.getBoundingClientRect().top - box.getBoundingClientRect().top;
+        box.scrollTop += newOffset - anchorOffset;
+    } else {
+        box.scrollTop = Math.min(oldScrollTop, Math.max(0, box.scrollHeight - box.clientHeight));
+    }
+}
+
+
+function uniqueTextList(list, limit = 6) {
+    return [
+        ...new Set(
+            (Array.isArray(list) ? list : [])
+                .filter(item => typeof item === "string" && item.trim())
+                .map(item => item.trim())
+        )
+    ].slice(0, limit);
+}
+
+function normalizeKnowledgeGraphData(data) {
+    if (!data || typeof data !== "object") {
+        return null;
+    }
+
+    const nodes = Array.isArray(data.nodes)
+        ? data.nodes
+            .filter(node => node && typeof node === "object")
+            .map(node => ({
+                id: typeof node.id === "string" && node.id.trim()
+                    ? node.id.trim()
+                    : "",
+                name: typeof node.name === "string" && node.name.trim()
+                    ? node.name.trim()
+                    : "",
+                category: typeof node.category === "string" && node.category.trim()
+                    ? node.category.trim()
+                    : "未分类",
+                prerequisites: uniqueTextList(node.prerequisites, 8),
+                level: typeof node.level === "string"
+                    ? node.level.trim()
+                    : "",
+                note: typeof node.note === "string"
+                    ? node.note.trim()
+                    : ""
+            }))
+            .filter(node => node.id && node.name)
+        : [];
+
+    return {
+        version: Number.isFinite(data.version)
+            ? data.version
+            : 1,
+        title: typeof data.title === "string" && data.title.trim()
+            ? data.title.trim()
+            : "离散数学知识图谱",
+        description: typeof data.description === "string"
+            ? data.description.trim()
+            : "",
+        nodes
+    };
+}
+
+function readInitialKnowledgeGraphData() {
+    const element = document.getElementById(
+        "knowledgeGraphData"
+    );
+
+    if (!element) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(
+            element.textContent || "{}"
+        );
+    } catch (error) {
+        console.warn(
+            "知识图谱初始数据解析失败：",
+            error
+        );
+        return null;
+    }
+}
+
+async function ensureKnowledgeGraphData() {
+    if (knowledgeGraphData) {
+        return knowledgeGraphData;
+    }
+
+    if (knowledgeGraphLoading) {
+        return null;
+    }
+
+    knowledgeGraphLoading = true;
+
+    try {
+        // 唯一数据源是 knowledge_graph.json。
+        // Flask 在首页渲染时把同一份数据注入页面，
+        // 无额外 fetch，也不会出现前后端两份图谱不同步。
+        knowledgeGraphData = normalizeKnowledgeGraphData(
+            readInitialKnowledgeGraphData()
+        );
+
+        if (
+            !knowledgeGraphData
+            || !knowledgeGraphData.nodes.length
+        ) {
+            throw new Error("知识图谱数据为空");
+        }
+
+        return knowledgeGraphData;
+    } catch (error) {
+        console.warn("知识图谱加载失败：", error);
+        knowledgeGraphData = null;
+        throw error;
+    } finally {
+        knowledgeGraphLoading = false;
+    }
+}
+
+function getKnowledgeGraphCategories() {
+    if (!knowledgeGraphData) return [];
+
+    return [
+        ...new Set(
+            knowledgeGraphData.nodes.map(
+                node => node.category
+            )
+        )
+    ].sort((a, b) => a.localeCompare(
+        b,
+        "zh-Hans-CN"
+    ));
+}
+
+function getEffectiveSessionTeaching(session) {
+    if (!session) return null;
+
+    const current = normalizeTeaching(
+        session.teaching
+    );
+
+    // 右侧信息必须跟“当前指向的题”走，而不是机械取时间上最新的一题。
+    // 因此 A -> B -> “上一道题再讲一下”时，这里应重新读取 A 的教学快照。
+    const activeCandidate = activeQuestionCandidateFromHistory(
+        session
+    );
+
+    if (activeCandidate) {
+        const own = candidateTeachingSnapshot(
+            session,
+            activeCandidate
+        );
+
+        if (own) {
+            return own;
+        }
+
+        const learningQuestion = normalizeLearningQuestion(
+            session.learningQuestion
+        );
+
+        if (
+            learningQuestion
+            && wrongQuestionFingerprint(learningQuestion.text)
+                === wrongQuestionFingerprint(activeCandidate.text)
+        ) {
+            if (current) {
+                return current;
+            }
+
+            return {
+                category: learningQuestion.category || "待识别",
+                related_categories: learningQuestion.relatedCategories || [],
+                knowledge_points: learningQuestion.knowledgePoints,
+                focus_points: learningQuestion.focusPoints,
+                prerequisite_points: [],
+                knowledge_path: learningQuestion.knowledgePoints,
+                question_type: activeCandidate.role === "ai"
+                    ? "练习题"
+                    : "一般题",
+                mode: activeCandidate.role === "ai"
+                    ? "exercise"
+                    : "hint",
+                mode_label: activeCandidate.role === "ai"
+                    ? "练习出题"
+                    : "提示引导",
+                confidence: "中",
+                input_source: activeCandidate.source === "ocr"
+                    ? "图片识题"
+                    : "文本输入"
+            };
+        }
+    }
+
+    return current;
+}
+
+
+function getCurrentKnowledgeContext() {
+    const session = getCurrent();
+    const teaching = getEffectiveSessionTeaching(
+        session
+    );
+    const learningQuestion = currentLearningQuestion(
+        session,
+        teaching
+    );
+
+    const focusPoints = uniqueTextList([
+        ...(teaching?.focus_points || []),
+        ...(learningQuestion?.focusPoints || [])
+    ], 2);
+
+    const knowledgePoints = uniqueTextList([
+        ...(teaching?.knowledge_points || []),
+        ...(learningQuestion?.knowledgePoints || [])
+    ], 6);
+
+    const prerequisitePoints = uniqueTextList(
+        teaching?.prerequisite_points || [],
+        6
+    );
+
+    const knowledgePath = uniqueTextList(
+        teaching?.knowledge_path || [],
+        10
+    );
+
+    return {
+        category: teaching?.category
+            || learningQuestion?.category
+            || "",
+        focusPoints,
+        knowledgePoints,
+        prerequisitePoints,
+        knowledgePath
+    };
+}
+
+function isHistorySystemMetaText(text) {
+    const value = String(text || "")
+        .replace(/\s+/g, "")
+        .toLowerCase();
+
+    if (!value) return true;
+
+    const metaKeywords = [
+        "错题本",
+        "知识图谱",
+        "图谱",
+        "渲染",
+        "滚轮",
+        "滚动",
+        "按钮",
+        "会话",
+        "对话栏",
+        "输入框",
+        "页面",
+        "界面",
+        "外观",
+        "背景",
+        "删除消息",
+        "删除对话",
+        "ocr扫描",
+        "ocr识别",
+        "github",
+        "代码",
+        "部署",
+        "zeabur",
+        "服务器",
+        "模型生成",
+        "ai生成",
+        "功能",
+        "bug"
+    ];
+
+    return metaKeywords.some(
+        item => value.includes(item)
+    );
+}
+
+function looksLikeFormalStudyQuestionForHistory(
+    text,
+    message = null
+) {
+    const value = sanitizeStoredWrongQuestionText(
+        text
+    ).trim();
+
+    if (!value) {
+        return false;
+    }
+
+    // 出题请求只负责生成下一道题，本身不进入“题目历史”。
+    if (isExerciseRequestText(value)) {
+        return false;
+    }
+
+    if (message?.source === "ocr" && typeof message.ocrIsQuestion === "boolean") {
+        return isRecordableOcrQuestionMessage(message);
+    }
+
+    // 手动输入题目身份完全由用户在发送时的选择决定。
+    // 仅影响题目历史，不修改 AI 讲解/回答的识别路径。
+    if (message?.role === "user" && message.source !== "ocr") {
+        return message.manualIsQuestion === true;
+    }
+
+    // System-related vocabulary can also occur in a real problem. Explicit
+    // user choices decide identity before this automatic compatibility filter.
+    if (isHistorySystemMetaText(value)) {
+        return false;
+    }
+
+    if (message?.source === "ocr") {
+        return isRecordableOcrQuestionMessage(message);
+    }
+
+    if (/【(?:题目|练习题|题目文字)】/.test(value)) {
+        return true;
+    }
+
+    if (countTopLevelQuestionParts(value) >= 1) {
+        return true;
+    }
+
+    const compact = value
+        .replace(/^[#>*\s]+/, "")
+        .trim();
+
+    if (
+        /^(?:设|已知|给定|下列|若|对于|在.+中|求|证明|计算|判断|写出|列出|选择|填空|解答)/.test(
+            compact
+        )
+    ) {
+        return true;
+    }
+
+    // 概念型学习问题允许进入历史，但必须已经被 teaching.py
+    // 明确识别成离散数学模块；系统功能问句不会因为一个问号就进来。
+    const teaching = normalizeTeaching(
+        message?.questionTeaching
+        || message?.generatedTeaching
+    );
+
+    if (
+        teaching
+        && teaching.category
+        && teaching.category !== "待识别"
+        && /^(?:什么是|为什么|为何|如何|怎样)/.test(compact)
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+
+function collectConversationQuestionCandidates(session) {
+    if (
+        !session
+        || !Array.isArray(session.messages)
+    ) {
+        return [];
+    }
+
+    const candidates = [];
+    const seen = new Set();
+
+    for (
+        let index = 0;
+        index < session.messages.length;
+        index += 1
+    ) {
+        const message = session.messages[index];
+
+        if (
+            !message
+            || typeof message.text !== "string"
+        ) {
+            continue;
+        }
+
+        let question = "";
+
+        if (message.role === "user") {
+            if (message.isRetestAnswer) {
+                continue;
+            }
+            if (message.source === "ocr") {
+                if (!isRecordableOcrQuestionMessage(message)) continue;
+            } else if (message.manualIsQuestion !== true) {
+                continue;
+            }
+
+            // 手动标记的短题也属于题目；不再用一般追问规则否决。
+            question = extractQuestionOnlyFromMessage(
+                message
+            );
+
+            if (
+                !looksLikeFormalStudyQuestionForHistory(
+                    question,
+                    message
+                )
+            ) {
+                continue;
+            }
+        } else if (message.role === "ai") {
+            const trustedGenerated = sanitizeStoredWrongQuestionText(
+                message.generatedQuestion || ""
+            );
+
+            if (trustedGenerated) {
+                // generatedQuestion 是题目身份的唯一强标记。只要存在，
+                // 就直接进入题目历史，保证后续 AI 能再次定位到自己出的题。
+                message.generatedExercise = true;
+                question = trustedGenerated;
+            } else {
+                // 兼容旧记录：仅在上一条用户明确要求“出题”时恢复 AI 生成题。
+                question = recoverGeneratedQuestionFromAssistant(
+                    session,
+                    index,
+                    message
+                );
+
+                if (
+                    !question
+                    || !looksLikeFormalStudyQuestionForHistory(
+                        question,
+                        message
+                    )
+                ) {
+                    continue;
+                }
+            }
+        } else {
+            continue;
+        }
+
+        const fingerprint = wrongQuestionFingerprint(
+            question
+        );
+
+        if (
+            !fingerprint
+            || seen.has(fingerprint)
+        ) {
+            continue;
+        }
+
+        seen.add(fingerprint);
+
+        candidates.push({
+            key: `${index}:${fingerprint}`,
+            index,
+            role: message.role,
+            source: message.source || "",
+            text: question
+        });
+    }
+
+    return candidates;
+}
+
+
+function activeQuestionCandidateFromHistory(session) {
+    if (
+        !session
+        || !Array.isArray(session.messages)
+    ) {
+        return null;
+    }
+
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    if (!candidates.length) {
+        return null;
+    }
+
+    // 1. 如果最近一次“上一道题”已经被前端解析过，直接使用它记录的
+    // 目标指纹。这样 AI 回复回来后不会又被最新题目的 teaching 覆盖。
+    for (
+        let index = session.messages.length - 1;
+        index >= 0;
+        index -= 1
+    ) {
+        const message = session.messages[index];
+
+        if (!message || message.role !== "user") {
+            continue;
+        }
+
+        if (
+            isQuestionNavigationFollowUp(message.text)
+            && message.targetQuestionFingerprint
+        ) {
+            const target = candidates.find(candidate => (
+                questionCandidateFingerprint(candidate)
+                === message.targetQuestionFingerprint
+            ));
+
+            if (target) {
+                // 如果该导航之后已经出现真正的新题，新题应成为当前题。
+                const newerQuestion = candidates.find(
+                    candidate => candidate.index > index
+                );
+
+                if (!newerQuestion) {
+                    return target;
+                }
+            }
+
+            break;
+        }
+
+        // 最近用户消息若是真正的新题，就不再向前寻找旧导航命令。
+        if (
+            message.role === "user"
+            && looksLikeActualLearningProblem(message)
+        ) {
+            break;
+        }
+    }
+
+    // 2. 普通“继续/再讲一下”应保持当前 learningQuestion。
+    const savedCandidate = currentQuestionCandidateFromLearningState(
+        session
+    );
+
+    if (savedCandidate) {
+        const latestCandidate = candidates[candidates.length - 1];
+
+        // 旧版本可能没有把 AI 生成题写进 learningQuestion。恢复出一个
+        // 时间上更新的真实题目后，应让它成为当前题，而不是继续锁死旧题。
+        if (
+            latestCandidate
+            && latestCandidate.index > savedCandidate.index
+        ) {
+            return latestCandidate;
+        }
+
+        return savedCandidate;
+    }
+
+    // 3. 旧会话没有 learningQuestion 时，按历史命令做兼容恢复。
+    const byIndex = new Map(
+        candidates.map(candidate => [
+            candidate.index,
+            candidate
+        ])
+    );
+
+    const history = [];
+    let activePos = null;
+
+    for (
+        let index = 0;
+        index < session.messages.length;
+        index += 1
+    ) {
+        const message = session.messages[index];
+
+        if (!message) continue;
+
+        if (
+            message.role === "user"
+            && isQuestionNavigationFollowUp(
+                message.text
+            )
+        ) {
+            if (history.length) {
+                const structural = structuralQuestionReference(
+                    message.text
+                );
+
+                if (structural) {
+                    const basePosition = activePos === null
+                        ? history.length - 1
+                        : activePos;
+                    const resolvedPosition = resolveStructuralQuestionPosition(
+                        structural,
+                        history.length,
+                        basePosition
+                    );
+
+                    if (resolvedPosition >= 0) {
+                        activePos = resolvedPosition;
+                    }
+                }
+            }
+
+            continue;
+        }
+
+        const candidate = byIndex.get(index);
+
+        if (!candidate) continue;
+
+        history.push(candidate);
+        activePos = history.length - 1;
+    }
+
+    if (
+        activePos === null
+        || !history[activePos]
+    ) {
+        return candidates[candidates.length - 1];
+    }
+
+    return history[activePos];
+}
+
+
+function candidateTeachingSnapshot(
+    session,
+    candidate
+) {
+    if (!session || !candidate) {
+        return null;
+    }
+
+    const message = session.messages?.[
+        candidate.index
+    ];
+
+    if (!message) {
+        return null;
+    }
+
+    const own = normalizeTeaching(
+        candidate.role === "ai"
+            ? message.generatedTeaching
+            : message.questionTeaching
+    );
+
+    if (own) {
+        return own;
+    }
+
+    const saved = normalizeLearningQuestion(
+        session.learningQuestion
+    );
+
+    if (
+        saved
+        && wrongQuestionFingerprint(saved.text)
+            === wrongQuestionFingerprint(
+                candidate.text
+            )
+    ) {
+        return {
+            category: saved.category || "待识别",
+            related_categories: saved.relatedCategories || [],
+            knowledge_points: saved.knowledgePoints,
+            focus_points: saved.focusPoints,
+            prerequisite_points: [],
+            knowledge_path: saved.knowledgePoints,
+            question_type: candidate.role === "ai"
+                ? "练习题"
+                : "一般题",
+            difficulty: saved.difficulty || "",
+            mode: candidate.role === "ai"
+                ? "exercise"
+                : "hint",
+            mode_label: candidate.role === "ai"
+                ? "练习出题"
+                : "提示引导",
+            confidence: "中",
+            input_source: candidate.source === "ocr"
+                ? "图片识题"
+                : "文本输入"
+        };
+    }
+
+    return null;
+}
+
+
+function applyQuestionCandidateAsCurrent(
+    session,
+    candidate,
+    teachingOverride = null
+) {
+    if (!session || !candidate) {
+        return false;
+    }
+
+    const message = session.messages?.[
+        candidate.index
+    ];
+
+    if (!message) {
+        return false;
+    }
+
+    const teaching = normalizeTeaching(
+        teachingOverride
+    ) || candidateTeachingSnapshot(
+        session,
+        candidate
+    );
+
+    if (teaching) {
+        if (candidate.role === "ai") {
+            message.generatedTeaching = teaching;
+        } else {
+            message.questionTeaching = teaching;
+        }
+    }
+
+    session.teaching = teaching;
+
+    session.learningQuestion = {
+        text: candidate.text,
+        knowledgePoints: (
+            teaching?.knowledge_points || []
+        ).slice(0, 4),
+        focusPoints: (
+            teaching?.focus_points || []
+        ).slice(0, 2),
+        category: teaching?.category || "",
+        difficulty: teaching?.difficulty || "",
+        source: candidate.role === "ai"
+            ? "ai"
+            : (
+                candidate.source === "ocr"
+                    ? "ocr"
+                    : "text"
+            ),
+        referenceAnswer: String(
+            message.generatedAnswer || ""
+        ).trim().slice(0, 3000),
+        sessionId: session.id,
+        updatedAt: Date.now()
+    };
+
+    return Boolean(teaching);
+}
+
+
+async function analyzeSingleQuestionTeaching(
+    question,
+    key = "current",
+    options = {}
+) {
+    const text = String(question || "").trim();
+    if (!text) return null;
+    const version = cloudSyncContextVersion;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    options.signal?.addEventListener("abort", abort, { once:true });
+    if (options.signal?.aborted) abort();
+    let timeoutId;
+
+    try {
+        const read = async () => {
+            const response = await fetch("/analyze-questions", {
+                method: "POST", signal:controller.signal,
+                headers: { "Content-Type":"application/json" },
+                body: JSON.stringify({ questions:[{key,text}] })
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload?.error || "题目知识识别失败");
+            if (controller.signal.aborted || version !== cloudSyncContextVersion) return null;
+            return normalizeTeaching(payload?.results?.[0]?.teaching);
+        };
+        const deadline = new Promise((_, reject) => {
+            timeoutId = window.setTimeout(() => {
+                controller.abort();
+                reject(new Error("题目知识识别超时"));
+            }, 30000);
+        });
+        return await Promise.race([read(), deadline]);
+    } catch (error) {
+        if (!options.signal?.aborted && error?.name !== "AbortError") console.warn("题目知识识别失败：", error);
+        return null;
+    } finally {
+        window.clearTimeout(timeoutId);
+        options.signal?.removeEventListener("abort", abort);
+    }
+}
+
+function resolveQuestionAnalysisCandidate(session, candidate, message, candidates = null) {
+    if (!sessions.includes(session) || deletedSessionIds[sessionBusyKey(session.id)] || !message) return null;
+    // Message positions can change while classification is in flight. Match
+    // the original message and question text before attaching any result.
+    return (candidates || collectConversationQuestionCandidates(session)).find(item => (
+        session.messages[item.index] === message
+        && item.role === candidate.role && item.text === candidate.text
+    )) || null;
+}
+
+async function ensureActiveQuestionAfterHistoryChange(
+    session
+) {
+    if (!session) {
+        return;
+    }
+
+    const candidate = activeQuestionCandidateFromHistory(
+        session
+    );
+
+    if (!candidate) {
+        session.teaching = null;
+        session.learningQuestion = null;
+        return;
+    }
+    const expectedMessage = session.messages[candidate.index];
+
+    const existingTeaching = normalizeTeaching(
+        candidateTeachingSnapshot(session, candidate)
+    );
+
+    // 旧版本曾把无法命中的题目写成“离散数学综合”。这种快照不能继续沿用，
+    // 必须重新走当前分类器；否则修好分类规则后右侧仍会显示旧的“综合”。
+    if (
+        existingTeaching
+        && !isGenericTeachingCategory(existingTeaching.category)
+        && applyQuestionCandidateAsCurrent(
+            session,
+            candidate,
+            existingTeaching
+        )
+    ) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            "/analyze-questions",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    questions: [{
+                        key: candidate.key,
+                        text: candidate.text
+                    }]
+                })
+            }
+        );
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                payload?.error
+                || "题目知识识别失败"
+            );
+        }
+
+        const teaching = normalizeTeaching(
+            payload?.results?.[0]?.teaching
+        );
+
+        if (!teaching) {
+            return;
+        }
+
+        const currentCandidate = resolveQuestionAnalysisCandidate(session, candidate, expectedMessage);
+        if (!currentCandidate) return;
+        const message = session.messages[currentCandidate.index];
+
+        if (message) {
+            if (candidate.role === "ai") {
+                message.generatedTeaching = teaching;
+            } else {
+                message.questionTeaching = teaching;
+            }
+        }
+
+        const activeCandidate = activeQuestionCandidateFromHistory(session);
+        if (activeCandidate && session.messages[activeCandidate.index] === message
+            && activeCandidate.text === currentCandidate.text) {
+            applyQuestionCandidateAsCurrent(session, currentCandidate, teaching);
+        }
+    } catch (error) {
+        console.warn(
+            "删除题目后恢复上一题失败：",
+            error
+        );
+    }
+}
+
+
+async function refreshConversationKnowledgeIndex(
+    session = getCurrent()
+) {
+    if (!session) {
+        return [];
+    }
+
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    if (!candidates.length) {
+        return [];
+    }
+    const expectedMessages = candidates.map(candidate => session.messages[candidate.index]);
+
+    let payload = null;
+
+    try {
+        const response = await fetch(
+            "/analyze-questions",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    questions: candidates.map(
+                        item => ({
+                            key: item.key,
+                            text: item.text
+                        })
+                    )
+                })
+            }
+        );
+
+        payload = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                payload?.error
+                || "历史题目知识识别失败"
+            );
+        }
+    } catch (error) {
+        console.warn(
+            "历史题目知识识别失败：",
+            error
+        );
+        return candidates;
+    }
+
+    if (!sessions.includes(session) || deletedSessionIds[sessionBusyKey(session.id)]) return [];
+    const currentCandidates = collectConversationQuestionCandidates(session);
+    const results = new Map(
+        (payload?.results || []).map(
+            item => [
+                String(item?.key || ""),
+                normalizeTeaching(
+                    item?.teaching
+                )
+            ]
+        )
+    );
+
+    const updatedMessages = new Set();
+    for (const [index, candidate] of candidates.entries()) {
+        const currentCandidate = resolveQuestionAnalysisCandidate(session, candidate, expectedMessages[index], currentCandidates);
+        if (!currentCandidate) continue;
+        const message = session.messages[currentCandidate.index];
+
+        const teaching = results.get(
+            candidate.key
+        );
+
+        if (!teaching) {
+            continue;
+        }
+
+        if (candidate.role === "ai") {
+            message.generatedExercise = true;
+            message.generatedQuestion = candidate.text;
+            message.generatedTeaching = teaching;
+        } else {
+            message.questionTeaching = teaching;
+        }
+
+        updatedMessages.add(message);
+    }
+
+    // Rebuilding the knowledge index must preserve explicit navigation to an
+    // earlier question, including navigation made while the request ran.
+    const activeCandidate = activeQuestionCandidateFromHistory(session);
+    if (activeCandidate && updatedMessages.has(session.messages[activeCandidate.index])) {
+        applyQuestionCandidateAsCurrent(session, activeCandidate);
+    }
+
+    saveState();
+    renderInfo();
+
+    return currentCandidates;
+}
+
+
+function getConversationKnowledgeContext() {
+    const session = getCurrent();
+
+    if (!session) {
+        return {
+            category: "",
+            categories: [],
+            focusPoints: [],
+            knowledgePoints: [],
+            prerequisitePoints: [],
+            knowledgePath: [],
+            questionCount: 0,
+            scope: "conversation"
+        };
+    }
+
+    const knowledgePoints = [];
+    const prerequisitePoints = [];
+    const knowledgePath = [];
+    const categories = [];
+    const questionFingerprints = new Set();
+
+    let classifiedMessageCount = 0;
+
+    const history = getConversationQuestionHistory(
+        session
+    );
+
+    for (const item of history) {
+        const teaching = normalizeTeaching(
+            item.teaching
+        );
+
+        if (item.text) {
+            questionFingerprints.add(
+                wrongQuestionFingerprint(
+                    item.text
+                )
+            );
+        }
+
+        if (
+            !teaching
+            || teaching.category === "待识别"
+        ) {
+            continue;
+        }
+
+        knowledgePoints.push(
+            ...teaching.knowledge_points,
+            ...teaching.focus_points
+        );
+
+        prerequisitePoints.push(
+            ...teaching.prerequisite_points
+        );
+
+        knowledgePath.push(
+            ...teaching.knowledge_path
+        );
+
+        if (teaching.category) {
+            categories.push(
+                teaching.category
+            );
+        }
+
+        classifiedMessageCount += 1;
+    }
+
+    // 只有严格历史题一条都没有时，才使用旧学习数据兜底。
+    if (
+        history.length === 0
+        && classifiedMessageCount === 0
+    ) {
+        const seenEvents = learningState.events.filter(
+            event => (
+                String(event.sessionId)
+                    === String(session.id)
+                && event.type === "seen"
+            )
+        );
+
+        for (const event of seenEvents) {
+            knowledgePoints.push(
+                ...(event.points || [])
+            );
+        }
+
+        const learningQuestion = normalizeLearningQuestion(
+            session.learningQuestion
+        );
+
+        if (
+            learningQuestion
+            && looksLikeFormalStudyQuestionForHistory(
+                learningQuestion.text
+            )
+        ) {
+            knowledgePoints.push(
+                ...learningQuestion.knowledgePoints,
+                ...learningQuestion.focusPoints
+            );
+
+            if (learningQuestion.category) {
+                categories.push(
+                    learningQuestion.category
+                );
+            }
+
+            if (learningQuestion.text) {
+                questionFingerprints.add(
+                    wrongQuestionFingerprint(
+                        learningQuestion.text
+                    )
+                );
+            }
+        }
+    }
+
+    const uniqueKnowledge = uniqueTextList(
+        knowledgePoints,
+        40
+    );
+
+    for (const point of uniqueKnowledge) {
+        const node = findKnowledgeGraphNodeByName(
+            point
+        );
+
+        if (node?.category) {
+            categories.push(
+                node.category
+            );
+        }
+    }
+
+    const uniqueCategories = uniqueTextList(
+        categories.filter(
+            item => (
+                item
+                && item !== "待识别"
+            )
+        ),
+        12
+    );
+
+    return {
+        category: (
+            uniqueCategories.length === 1
+                ? uniqueCategories[0]
+                : "全部"
+        ),
+        categories: uniqueCategories,
+        focusPoints: [],
+        knowledgePoints: uniqueKnowledge,
+        prerequisitePoints: uniqueTextList(
+            prerequisitePoints,
+            24
+        ),
+        knowledgePath: uniqueTextList(
+            knowledgePath,
+            40
+        ),
+        questionCount: questionFingerprints.size,
+        scope: "conversation"
+    };
+}
+
+
+function getConversationQuestionHistory(
+    session = getCurrent()
+) {
+    if (!session) {
+        return [];
+    }
+
+    const candidates = collectConversationQuestionCandidates(
+        session
+    );
+
+    return candidates.map(
+        (candidate, order) => {
+            const message = session.messages[
+                candidate.index
+            ];
+
+            const teaching = normalizeTeaching(
+                candidate.role === "ai"
+                    ? message?.generatedTeaching
+                    : message?.questionTeaching
+            );
+
+            return {
+                ...candidate,
+                order: order + 1,
+                teaching,
+                category: (
+                    teaching?.category
+                    && teaching.category !== "待识别"
+                )
+                    ? teaching.category
+                    : "暂未识别",
+                knowledgePoints: uniqueTextList(
+                    teaching?.knowledge_points || [],
+                    5
+                )
+            };
+        }
+    );
+}
+
+function getKnowledgeHistoryItemByMessageIndex(
+    messageIndex,
+    session = getCurrent()
+) {
+    const target = Number(messageIndex);
+
+    if (!Number.isInteger(target)) {
+        return null;
+    }
+
+    return getConversationQuestionHistory(
+        session
+    ).find(
+        item => item.index === target
+    ) || null;
+}
+
+function knowledgeContextFromHistoryItem(item) {
+    if (!item) {
+        return null;
+    }
+
+    const teaching = normalizeTeaching(
+        item.teaching
+    );
+
+    if (!teaching) {
+        return {
+            category: item.category || "",
+            categories: (
+                item.category
+                && item.category !== "暂未识别"
+                    ? [item.category]
+                    : []
+            ),
+            focusPoints: [],
+            knowledgePoints: item.knowledgePoints || [],
+            prerequisitePoints: [],
+            knowledgePath: item.knowledgePoints || [],
+            questionCount: 1,
+            scope: "history",
+            historyOrder: item.order,
+            historyText: item.text
+        };
+    }
+
+    return {
+        category: teaching.category || "",
+        categories: (
+            teaching.category
+            && teaching.category !== "待识别"
+                ? [teaching.category]
+                : []
+        ),
+        focusPoints: teaching.focus_points || [],
+        knowledgePoints: teaching.knowledge_points || [],
+        prerequisitePoints: teaching.prerequisite_points || [],
+        knowledgePath: teaching.knowledge_path || [],
+        questionCount: 1,
+        scope: "history",
+        historyOrder: item.order,
+        historyText: item.text
+    };
+}
+
+function knowledgeHistorySourceLabel(item) {
+    if (!item) {
+        return "题目";
+    }
+
+    if (item.role === "ai") {
+        return "AI 出题";
+    }
+
+    if (item.source === "ocr") {
+        return "图片识题";
+    }
+
+    return "手动输入";
+}
+
+function knowledgeHistoryPreview(text, limit = 78) {
+    const value = String(text || "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (value.length <= limit) {
+        return value;
+    }
+
+    return value.slice(0, limit) + "…";
+}
+
+
+
+function getActiveKnowledgeContext() {
+    if (
+        knowledgeGraphScope === "history"
+        && knowledgeGraphHistoryMessageIndex !== null
+    ) {
+        const item = getKnowledgeHistoryItemByMessageIndex(
+            knowledgeGraphHistoryMessageIndex
+        );
+
+        const context = knowledgeContextFromHistoryItem(
+            item
+        );
+
+        if (context) {
+            return context;
+        }
+    }
+
+    if (knowledgeGraphScope === "conversation") {
+        return getConversationKnowledgeContext();
+    }
+
+    const current = getCurrentKnowledgeContext();
+
+    return {
+        ...current,
+        categories: (
+            current.category
+                ? [current.category]
+                : []
+        ),
+        questionCount: 1,
+        scope: "current"
+    };
+}
+
+
+function fillKnowledgeGraphCategoryOptions() {
+    const select = document.getElementById(
+        "knowledgeGraphCategory"
+    );
+    const trigger = document.getElementById(
+        "knowledgeGraphCategoryTrigger"
+    );
+
+    if (!knowledgeGraphData) return;
+
+    const baseCategories = getKnowledgeGraphCategories();
+
+    const categories = ["全部", ...baseCategories];
+
+    if (!knowledgeGraphFilter || !categories.includes(knowledgeGraphFilter)) {
+        knowledgeGraphFilter = "全部";
+    }
+
+    // 不在每次切换视图时重建 select，避免浏览器重新计算工具栏宽度。
+    if (select) {
+        const existing = [...select.options].map(option => option.value);
+        if (existing.length !== categories.length
+            || existing.some((value, index) => value !== categories[index])) {
+            select.replaceChildren(...categories.map(value => {
+                const option = document.createElement("option");
+                option.value = value;
+                option.textContent = value;
+                return option;
+            }));
+        }
+        if (select.value !== knowledgeGraphFilter) select.value = knowledgeGraphFilter;
+    }
+
+    if (trigger) {
+        trigger.textContent = `模块：${knowledgeGraphFilter}`;
+        trigger.setAttribute("aria-label", `当前知识图谱模块：${knowledgeGraphFilter}`);
+    }
+}
+
+async function openKnowledgeGraphCategoryPicker() {
+    if (!knowledgeGraphData) return;
+    fillKnowledgeGraphCategoryOptions();
+    const categories = ["全部", ...getKnowledgeGraphCategories()];
+    const choice = await openMobileChoiceModal({
+        title:"选择知识图谱模块",
+        intro:"在手机上用更清晰的列表样式切换模块",
+        value:knowledgeGraphFilter || "全部",
+        options:categories.map(item => ({ value:item, label:item }))
+    });
+    if (choice?.value) {
+        setKnowledgeGraphFilter(choice.value);
+    }
+}
+
+
+
+// 视图筛选唯一入口：最近一题关联始终跨模块查找，全部知识才按模块筛选。
+// 画布、右侧关系详情和图片导出使用同一批可见节点，避免图中无线、右侧却列出节点。
+function knowledgeGraphDisplayCategory() {
+    return knowledgeGraphViewMode === "focus" ? "全部" : (knowledgeGraphFilter || "全部");
+}
+
+function knowledgeGraphDisplayedNodes(context = getActiveKnowledgeContext()) {
+    const category = knowledgeGraphDisplayCategory();
+    return knowledgeGraphViewMode === "focus"
+        ? knowledgeGraphFocusedNodes(category, context)
+        : knowledgeGraphVisibleNodes(category);
+}
+
+function findKnowledgeGraphNodeById(nodeId) {
+    if (
+        !knowledgeGraphData
+        || !Array.isArray(knowledgeGraphData.nodes)
+    ) {
+        return null;
+    }
+
+    return knowledgeGraphData.nodes.find(
+        node => node.id === nodeId
+    ) || null;
+}
+
+function findKnowledgeGraphNodeByName(name) {
+    if (
+        !knowledgeGraphData
+        || !Array.isArray(knowledgeGraphData.nodes)
+    ) {
+        return null;
+    }
+
+    return knowledgeGraphData.nodes.find(
+        node => node.name === name
+    ) || null;
+}
+
+function ensureKnowledgeGraphSelection(visibleNodes, context) {
+    const ids = new Set(
+        (Array.isArray(visibleNodes) ? visibleNodes : [])
+            .map(node => node.id)
+    );
+
+    if (
+        knowledgeGraphSelectedNodeId
+        && ids.has(knowledgeGraphSelectedNodeId)
+    ) {
+        return;
+    }
+
+    const preferredNames = [
+        ...(context?.focusPoints || []),
+        ...(context?.knowledgePath || []),
+        ...(context?.knowledgePoints || []),
+        ...(context?.prerequisitePoints || [])
+    ];
+
+    for (const name of preferredNames) {
+        const node = (visibleNodes || []).find(
+            item => item.name === name
+        );
+
+        if (node) {
+            knowledgeGraphSelectedNodeId = node.id;
+            return;
+        }
+    }
+
+    knowledgeGraphSelectedNodeId = visibleNodes?.[0]?.id || "";
+}
+
+function clampMobileGraphScale(value, minimum = 0.35) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 1;
+    return Math.max(minimum, Math.min(3, number));
+}
+
+function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
+    if (!viewport || !surface || !stage) return;
+
+    const baseWidth = Math.max(1, Number(stage.dataset.baseWidth) || stage.scrollWidth || 1);
+    const baseHeight = Math.max(1, Number(stage.dataset.baseHeight) || stage.scrollHeight || 1);
+    const modal = document.getElementById("knowledgeGraphModal");
+    const pointers = new Map();
+    let fullscreenPan = null;
+    let pinch = null;
+    let pinchFrame = 0;
+    let pendingPinch = null;
+    let suppressClickUntil = 0;
+    let minimumScale = 0.35;
+
+    const currentScale = () => (
+        clampMobileGraphScale(viewport._kgScale || 1, minimumScale)
+    );
+
+    const updateLabel = scale => {
+        if (zoomLabel) {
+            zoomLabel.textContent = `${Math.round(scale * 100)}%`;
+        }
+    };
+
+    const applyScale = (nextScale, anchor = null) => {
+        const oldScale = currentScale();
+        const scale = clampMobileGraphScale(nextScale, minimumScale);
+
+        let contentX = null;
+        let contentY = null;
+        if (anchor) {
+            contentX = (viewport.scrollLeft + anchor.x) / oldScale;
+            contentY = (viewport.scrollTop + anchor.y) / oldScale;
+        }
+
+        viewport._kgScale = scale;
+        surface.style.width = `${Math.ceil(baseWidth * scale)}px`;
+        surface.style.height = `${Math.ceil(baseHeight * scale)}px`;
+        stage.style.transform = `scale(${scale})`;
+        updateLabel(scale);
+
+        if (anchor && contentX !== null && contentY !== null) {
+            viewport.scrollLeft = Math.max(0, contentX * scale - anchor.x);
+            viewport.scrollTop = Math.max(0, contentY * scale - anchor.y);
+        }
+
+        return scale;
+    };
+
+    const fitGraph = () => {
+        if (!viewport.isConnected || !viewport.clientWidth || !viewport.clientHeight) return;
+        const styles = window.getComputedStyle(viewport);
+        const padding = name => parseFloat(styles[name]) || 0;
+        // clientHeight 包含底部工具栏的预留内边距，不能算作图谱可用空间。
+        const availableWidth = Math.max(1, viewport.clientWidth
+            - padding("paddingLeft") - padding("paddingRight") - 24);
+        const availableHeight = Math.max(1, viewport.clientHeight
+            - padding("paddingTop") - padding("paddingBottom") - 24);
+        const scale = Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight);
+        // 全部知识的图可能很大；适应时允许低于手动缩放原来的 35% 下限。
+        minimumScale = Math.min(0.35, scale);
+        applyScale(scale);
+        viewport.style.visibility = "";
+        requestAnimationFrame(() => {
+            viewport.scrollLeft = 0;
+            viewport.scrollTop = 0;
+        });
+    };
+
+    viewport._kgSetScale = applyScale;
+    viewport._kgFit = fitGraph;
+    viewport._kgReset = () => {
+        applyScale(1);
+        viewport.scrollTop = 0;
+    };
+
+    // 缩小 transform 不会缩小原始布局的溢出范围，避免留下虚假的巨大滚动区域。
+    surface.style.overflow = "hidden";
+    viewport.style.visibility = "hidden";
+    applyScale(1);
+
+    const viewportPoint = event => {
+        const rect = viewport.getBoundingClientRect();
+        return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        };
+    };
+
+    const pointerDistance = (a, b) => Math.hypot(
+        a.clientX - b.clientX,
+        a.clientY - b.clientY
+    );
+
+    const pointerCenter = (a, b) => {
+        const rect = viewport.getBoundingClientRect();
+        return {
+            x: (a.clientX + b.clientX) / 2 - rect.left,
+            y: (a.clientY + b.clientY) / 2 - rect.top
+        };
+    };
+
+    viewport.addEventListener("pointerdown", event => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+
+        const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
+
+        // 普通图谱预览由原生滚动容器接管横向、纵向两轴；
+        // 不拦截 pointermove，以保留安卓浏览器的惯性与边界滚动。
+        if (!fullscreen) return;
+
+        pointers.set(event.pointerId, event);
+
+        if (fullscreen) {
+            try { viewport.setPointerCapture(event.pointerId); } catch (_error) {}
+
+            if (pointers.size >= 2) {
+                const [a, b] = [...pointers.values()].slice(0, 2);
+                const center = pointerCenter(a, b);
+                const scale = currentScale();
+                pinch = {
+                    distance: Math.max(1, pointerDistance(a, b)),
+                    scale,
+                    contentX: (viewport.scrollLeft + center.x) / scale,
+                    contentY: (viewport.scrollTop + center.y) / scale
+                };
+                fullscreenPan = null;
+                event.preventDefault();
+                return;
+            }
+
+            fullscreenPan = {
+                pointerId: event.pointerId,
+                x: event.clientX,
+                y: event.clientY,
+                left: viewport.scrollLeft,
+                top: viewport.scrollTop,
+                moved: false
+            };
+            return;
+        }
+
+    }, { passive: false });
+
+    viewport.addEventListener("pointermove", event => {
+        const fullscreen = Boolean(modal?.classList.contains("graph-fullscreen-view"));
+
+        if (!fullscreen) return;
+
+        if (!pointers.has(event.pointerId)) return;
+        pointers.set(event.pointerId, event);
+
+        if (fullscreen && pointers.size >= 2) {
+            const [a, b] = [...pointers.values()].slice(0, 2);
+            if (!pinch) {
+                const center = pointerCenter(a, b);
+                const scale = currentScale();
+                pinch = {
+                    distance: Math.max(1, pointerDistance(a, b)),
+                    scale,
+                    contentX: (viewport.scrollLeft + center.x) / scale,
+                    contentY: (viewport.scrollTop + center.y) / scale
+                };
+            }
+
+            const center = pointerCenter(a, b);
+            const scale = clampMobileGraphScale(
+                pinch.scale * pointerDistance(a, b) / pinch.distance,
+                minimumScale
+            );
+            // 合并高频 pointermove：一帧只布局、缩放和定位一次。
+            pendingPinch = { scale, center, contentX:pinch.contentX, contentY:pinch.contentY };
+            if (!pinchFrame) {
+                pinchFrame = requestAnimationFrame(() => {
+                    pinchFrame = 0;
+                    const target = pendingPinch;
+                    pendingPinch = null;
+                    if (!target) return;
+                    applyScale(target.scale);
+                    viewport.scrollLeft = Math.max(0, target.contentX * target.scale - target.center.x);
+                    viewport.scrollTop = Math.max(0, target.contentY * target.scale - target.center.y);
+                });
+            }
+            suppressClickUntil = performance.now() + 300;
+            event.preventDefault();
+            return;
+        }
+
+        if (fullscreen && fullscreenPan?.pointerId === event.pointerId) {
+            const dx = event.clientX - fullscreenPan.x;
+            const dy = event.clientY - fullscreenPan.y;
+            if (Math.abs(dx) + Math.abs(dy) > 4) {
+                fullscreenPan.moved = true;
+                suppressClickUntil = performance.now() + 300;
+            }
+            viewport.scrollLeft = fullscreenPan.left - dx;
+            viewport.scrollTop = fullscreenPan.top - dy;
+            event.preventDefault();
+            return;
+        }
+
+    }, { passive: false });
+
+    const finishPointer = event => {
+        pointers.delete(event.pointerId);
+
+        if (fullscreenPan?.pointerId === event.pointerId) {
+            fullscreenPan = null;
+        }
+
+        if (pointers.size < 2) {
+            pinch = null;
+        }
+
+        if (
+            modal?.classList.contains("graph-fullscreen-view")
+            && pointers.size === 1
+        ) {
+            const remaining = [...pointers.values()][0];
+            fullscreenPan = {
+                pointerId: remaining.pointerId,
+                x: remaining.clientX,
+                y: remaining.clientY,
+                left: viewport.scrollLeft,
+                top: viewport.scrollTop,
+                moved: false
+            };
+        }
+    };
+
+    viewport.addEventListener("pointerup", finishPointer, { passive: true });
+    viewport.addEventListener("pointercancel", finishPointer, { passive: true });
+
+    viewport.addEventListener("click", event => {
+        if (performance.now() < suppressClickUntil) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }, true);
+
+    // 桌面调试/触控板也能 Ctrl+滚轮缩放完整图谱。
+    viewport.addEventListener("wheel", event => {
+        if (!modal?.classList.contains("graph-fullscreen-view") || !event.ctrlKey) {
+            return;
+        }
+        const point = viewportPoint(event);
+        const factor = event.deltaY < 0 ? 1.12 : 0.89;
+        applyScale(currentScale() * factor, point);
+        event.preventDefault();
+    }, { passive: false });
+}
+
+function setKnowledgeGraphFullscreenView(enabled) {
+    const modal = document.getElementById("knowledgeGraphModal");
+    if (!modal) return;
+
+    const next = Boolean(enabled);
+    modal.classList.toggle("graph-fullscreen-view", next);
+
+    const button = modal.querySelector(".kg-mobile-expand");
+    if (button) {
+        button.textContent = next ? "退出完整查看" : "完整查看";
+        button.setAttribute(
+            "aria-label",
+            next ? "退出知识图谱完整查看" : "完整查看知识图谱"
+        );
+    }
+
+    requestAnimationFrame(() => {
+        const viewport = modal.querySelector(".kg-mobile-viewport");
+        if (!viewport) return;
+
+        if (next) {
+            // 完整查看默认先把整张图放进屏幕；随后可双指缩放、单指拖动，
+            // 或用底部 +/- / 适应按钮调整。
+            viewport._kgFit?.();
+        } else {
+            // 回到普通预览时恢复 100%，预览内可双向滚动整张图谱。
+            viewport._kgReset?.();
+        }
+    });
+}
+
+function toggleKnowledgeGraphFullscreenView() {
+    const modal = document.getElementById("knowledgeGraphModal");
+    if (!modal) return;
+    setKnowledgeGraphFullscreenView(
+        !modal.classList.contains("graph-fullscreen-view")
+    );
+    // 预览状态只构造入口按钮，进入完整查看时再生成图谱，退出时释放图谱。
+    renderKnowledgeGraph();
+}
+
+function openKnowledgeGraph() {
+    const modal = document.getElementById(
+        "knowledgeGraphModal"
+    );
+
+    if (!modal) return;
+
+    modal.classList.remove("hidden");
+    // 手机保留“完整查看”入口：默认不显示小图，点击按钮才进入原有全屏画布。
+    setKnowledgeGraphFullscreenView(false);
+    renderKnowledgeGraphLoading(
+        "知识图谱加载中…"
+    );
+
+    ensureKnowledgeGraphData()
+        .then(async () => {
+            knowledgeGraphScope = "current";
+            knowledgeGraphHistoryMessageIndex = null;
+            knowledgeGraphSideMode = "detail";
+
+            await refreshConversationKnowledgeIndex(
+                getCurrent()
+            );
+
+            const context = getCurrentKnowledgeContext();
+            // 有具体题目时突出题目相关，没有题目时直接显示全部知识。
+            knowledgeGraphFilter = "全部";
+            knowledgeGraphViewMode = (
+                context.focusPoints?.length || context.knowledgePoints?.length
+            ) ? "focus" : "full";
+
+            fillKnowledgeGraphCategoryOptions();
+            updateKnowledgeGraphScopeButton();
+            updateKnowledgeGraphModeButton();
+            renderKnowledgeGraph();
+        })
+        .catch(() => {
+            renderKnowledgeGraphLoading(
+                "知识图谱暂时加载失败，请稍后重试"
+            );
+        });
+}
+
+function closeKnowledgeGraph() {
+    const modal = document.getElementById(
+        "knowledgeGraphModal"
+    );
+
+    if (modal) {
+        modal.classList.add("hidden");
+        modal.classList.remove("graph-fullscreen-view");
+    }
+
+    knowledgeGraphSideMode = "detail";
+}
+
+function renderKnowledgeGraphLoading(message) {
+    const summary = document.getElementById(
+        "knowledgeGraphSummary"
+    );
+    const canvas = document.getElementById(
+        "knowledgeGraphCanvas"
+    );
+    const detailTitle = document.getElementById(
+        "knowledgeGraphDetailTitle"
+    );
+    const detail = document.getElementById(
+        "knowledgeGraphDetail"
+    );
+
+    if (summary) {
+        summary.textContent = (
+            "这里可以查看当前题目，也可以汇总本对话前面做过的题目"
+        );
+    }
+
+    if (canvas) {
+        canvas.innerHTML = `<div class="kg-empty">${message}</div>`;
+    }
+
+    if (detailTitle) {
+        detailTitle.textContent = "节点详情";
+    }
+
+    if (detail) {
+        detail.textContent = (
+            "点击左侧节点后，这里会显示相关知识和你的学习记录"
+        );
+    }
+}
+
+function setKnowledgeGraphFilter(value) {
+    const next = String(value || "").trim();
+
+    if (!next) return;
+
+    knowledgeGraphFilter = next;
+
+    const context = getActiveKnowledgeContext();
+
+    // 直接选模块就是浏览这个模块的全部知识，避免与“本题关联”混淆。
+    knowledgeGraphScope = "current";
+    knowledgeGraphViewMode = "full";
+    updateKnowledgeGraphScopeButton();
+    updateKnowledgeGraphModeButton();
+    renderKnowledgeGraph();
+}
+
+function updateKnowledgeGraphScopeButton() {
+    const button = document.getElementById("knowledgeGraphScopeBtn");
+    const legend = document.getElementById("knowledgeGraphLegendRelated");
+    if (button) {
+        button.textContent = "最近一题关联";
+        button.title = "显示当前正在讨论的最近一道题目，及其直接前置与后续知识";
+        button.classList.toggle("active", knowledgeGraphViewMode === "focus");
+        button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "focus"));
+    }
+    if (legend) legend.textContent = "最近一题相关知识";
+}
+
+// 两个固定含义的按钮，不再套用「当前/本对话」和「聚焦/完整」两层切换。
+function selectKnowledgeGraphDisplayMode(mode) {
+    if (!knowledgeGraphData) return;
+    knowledgeGraphScope = "current";
+    knowledgeGraphHistoryMessageIndex = null;
+    knowledgeGraphViewMode = mode === "full" ? "full" : "focus";
+    // 视图与模块筛选互不干扰，切换按钮不清除用户选中的模块。
+    if (!knowledgeGraphFilter) knowledgeGraphFilter = "全部";
+    knowledgeGraphSelectedNodeId = "";
+    fillKnowledgeGraphCategoryOptions();
+    renderKnowledgeGraph();
+}
+
+
+async function toggleKnowledgeGraphScope() {
+    if (!knowledgeGraphData) return;
+
+    const button = document.getElementById(
+        "knowledgeGraphScopeBtn"
+    );
+
+    if (knowledgeGraphScope === "current") {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "正在整理本对话…";
+        }
+
+        await refreshConversationKnowledgeIndex(
+            getCurrent()
+        );
+
+        knowledgeGraphScope = "conversation";
+        knowledgeGraphHistoryMessageIndex = null;
+        knowledgeGraphFilter = "全部";
+        knowledgeGraphViewMode = "focus";
+    } else {
+        knowledgeGraphScope = "current";
+        knowledgeGraphHistoryMessageIndex = null;
+
+        const context = getCurrentKnowledgeContext();
+        const categories = getKnowledgeGraphCategories();
+
+        if (
+            context.category
+            && categories.includes(context.category)
+        ) {
+            knowledgeGraphFilter = context.category;
+        }
+
+        knowledgeGraphViewMode = "focus";
+    }
+
+    knowledgeGraphSelectedNodeId = "";
+
+    fillKnowledgeGraphCategoryOptions();
+    updateKnowledgeGraphScopeButton();
+    updateKnowledgeGraphModeButton();
+    renderKnowledgeGraph();
+
+    if (button) {
+        button.disabled = false;
+    }
+}
+
+
+
+function focusKnowledgeGraphOnHistoryQuestion(
+    messageIndex
+) {
+    const item = getKnowledgeHistoryItemByMessageIndex(
+        messageIndex
+    );
+
+    if (!item) {
+        window.alert(
+            "这道历史题暂时无法定位，请重新整理历史记录"
+        );
+        return;
+    }
+
+    knowledgeGraphScope = "history";
+    knowledgeGraphHistoryMessageIndex = item.index;
+    knowledgeGraphViewMode = "focus";
+    knowledgeGraphSelectedNodeId = "";
+    knowledgeGraphSideMode = "history";
+
+    const category = item.teaching?.category || "";
+
+    if (
+        category
+        && category !== "待识别"
+        && getKnowledgeGraphCategories().includes(category)
+    ) {
+        knowledgeGraphFilter = category;
+    }
+
+    fillKnowledgeGraphCategoryOptions();
+    updateKnowledgeGraphScopeButton();
+    updateKnowledgeGraphModeButton();
+    renderKnowledgeGraph();
+}
+
+function locateKnowledgeHistoryMessage(
+    messageIndex
+) {
+    const targetIndex = Number(messageIndex);
+
+    if (!Number.isInteger(targetIndex)) {
+        return;
+    }
+
+    closeKnowledgeGraph();
+
+    const chat = document.getElementById("chat");
+
+    if (!chat) return;
+
+    const findAndScroll = () => {
+        const bubble = chat.querySelector(
+            `[data-message-index="${targetIndex}"]`
+        );
+
+        if (!bubble) {
+            return false;
+        }
+
+        bubble.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+        });
+
+        bubble.classList.add(
+            "history-locate-flash"
+        );
+
+        setTimeout(() => {
+            bubble.classList.remove(
+                "history-locate-flash"
+            );
+        }, 1600);
+
+        return true;
+    };
+
+    if (!findAndScroll()) {
+        renderChat();
+
+        setTimeout(() => {
+            findAndScroll();
+        }, 0);
+    }
+}
+
+async function refreshKnowledgeHistoryPanel() {
+    const session = getCurrent();
+
+    if (!session) return;
+
+    const button = document.querySelector(
+        ".kg-history-refresh"
+    );
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "整理中…";
+    }
+
+    await refreshConversationKnowledgeIndex(
+        session
+    );
+
+    if (
+        knowledgeGraphScope === "history"
+        && knowledgeGraphHistoryMessageIndex !== null
+    ) {
+        const stillExists = getKnowledgeHistoryItemByMessageIndex(
+            knowledgeGraphHistoryMessageIndex
+        );
+
+        if (!stillExists) {
+            knowledgeGraphScope = "current";
+            knowledgeGraphHistoryMessageIndex = null;
+        }
+    }
+
+    renderKnowledgeGraph();
+
+    if (knowledgeGraphSideMode === "history") {
+        renderKnowledgeGraphHistory();
+    }
+}
+
+
+function updateKnowledgeGraphModeButton() {
+    const button = document.getElementById("knowledgeGraphFocusBtn");
+    if (!button) return;
+    button.textContent = "全部知识";
+    button.title = "显示完整知识图谱的全部节点与关系线；可使用模块下拉框筛选";
+    button.classList.toggle("active", knowledgeGraphViewMode === "full");
+    button.setAttribute("aria-pressed", String(knowledgeGraphViewMode === "full"));
+}
+
+
+function focusKnowledgeGraphOnCurrent() {
+    if (!knowledgeGraphData) return;
+
+    if (knowledgeGraphScope === "conversation") {
+        knowledgeGraphViewMode = (
+            knowledgeGraphViewMode === "focus"
+                ? "full"
+                : "focus"
+        );
+
+        updateKnowledgeGraphModeButton();
+        renderKnowledgeGraph();
+        return;
+    }
+
+    const context = getActiveKnowledgeContext();
+    const categories = getKnowledgeGraphCategories();
+
+    if (knowledgeGraphViewMode === "focus") {
+        knowledgeGraphViewMode = "full";
+        updateKnowledgeGraphModeButton();
+        renderKnowledgeGraph();
+        return;
+    }
+
+    if (
+        context.category
+        && categories.includes(context.category)
+    ) {
+        knowledgeGraphFilter = context.category;
+    }
+
+    const currentNodeName = (
+        context.knowledgePoints[0]
+        || context.prerequisitePoints[0]
+        || ""
+    );
+
+    if (currentNodeName) {
+        const node = findKnowledgeGraphNodeByName(
+            currentNodeName
+        );
+
+        if (node) {
+            knowledgeGraphSelectedNodeId = node.id;
+        }
+    }
+
+    knowledgeGraphViewMode = "focus";
+    fillKnowledgeGraphCategoryOptions();
+    updateKnowledgeGraphModeButton();
+    renderKnowledgeGraph();
+}
+
+
+
+function knowledgeGraphNodeState(nodeName, context) {
+    if (
+        context?.focusPoints?.includes(nodeName)
+        || context?.knowledgePoints?.includes(nodeName)
+    ) {
+        return {
+            key: "current",
+            label: (
+                knowledgeGraphScope === "conversation"
+                    ? "本对话相关"
+                    : (
+                        knowledgeGraphScope === "history"
+                            ? "历史题相关"
+                            : "本题相关"
+                    )
+            ),
+            fill: "#5b21b6",
+            stroke: "#c4b5fd",
+            text: "#ffffff",
+            badge: (
+                knowledgeGraphScope === "history"
+                    ? "历史题"
+                    : "本题"
+            )
+        };
+    }
+
+    return {
+        key: "neutral",
+        label: "",
+        fill: "#111827",
+        stroke: "#475569",
+        text: "#ffffff",
+        badge: ""
+    };
+}
+
+
+function splitKnowledgeGraphLabel(text, maxChars = 7) {
+    const value = String(dmateKnowledgeLabel(text) || "").trim();
+
+    if (!value) return [""];
+    if (dmateUiLanguage() === "en") {
+        const lines = [];
+        for (const word of value.split(/\s+/)) {
+            const last = lines.length - 1;
+            if (last >= 0 && (lines[last] + " " + word).length <= 23) lines[last] += " " + word;
+            else lines.push(word);
+        }
+        return lines;
+    }
+
+    const lines = [];
+
+    for (let index = 0; index < value.length; index += maxChars) {
+        lines.push(
+            value.slice(index, index + maxChars)
+        );
+    }
+
+    return lines.slice(0, 2);
+}
+
+function createSvgElement(tag, attrs = {}) {
+    const element = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        tag
+    );
+
+    for (const [key, value] of Object.entries(attrs)) {
+        if (
+            value !== undefined
+            && value !== null
+        ) {
+            element.setAttribute(
+                key,
+                String(value)
+            );
+        }
+    }
+
+    return element;
+}
+
+function knowledgeGraphFocusedNodes(category, context) {
+    const categoryNodes = knowledgeGraphVisibleNodes(
+        category
+    );
+
+    if (!categoryNodes.length) {
+        return [];
+    }
+
+    const byName = new Map(
+        categoryNodes.map(node => [node.name, node])
+    );
+
+    const currentNames = uniqueTextList([
+        ...(context?.focusPoints || []),
+        ...(context?.knowledgePoints || []),
+        ...(context?.prerequisitePoints || []),
+        ...(context?.knowledgePath || [])
+    ], 10)
+        .filter(name => byName.has(name));
+
+    if (!currentNames.length) {
+        return categoryNodes;
+    }
+
+    const included = new Set(currentNames);
+
+    // 所有当前相关节点补一层直接前置。
+    for (const name of currentNames) {
+        const node = byName.get(name);
+
+        for (const prerequisite of node?.prerequisites || []) {
+            if (byName.has(prerequisite)) {
+                included.add(prerequisite);
+            }
+        }
+    }
+
+    // 当前“本题难点”再补一层直接后续，帮助学生知道掌握后会接到哪里。
+    const focusNames = (
+        context?.focusPoints?.length
+            ? context.focusPoints
+            : context?.knowledgePoints?.slice(0, 1) || []
+    );
+
+    for (const focusName of focusNames) {
+        if (!byName.has(focusName)) continue;
+
+        for (const node of categoryNodes) {
+            if (node.prerequisites.includes(focusName)) {
+                included.add(node.name);
+            }
+        }
+    }
+
+    return categoryNodes.filter(
+        node => included.has(node.name)
+    );
+}
+
+function knowledgeGraphVisibleNodes(category) {
+    if (!knowledgeGraphData) return [];
+
+    const allNodes = knowledgeGraphData.nodes;
+
+    if (!category || category === "全部") {
+        return allNodes.slice();
+    }
+
+    return allNodes.filter(
+        node => node.category === category
+    );
+}
+
+function computeKnowledgeGraphLevels(nodes) {
+    const byName = new Map(
+        nodes.map(node => [node.name, node])
+    );
+    const memo = new Map();
+    const visiting = new Set();
+
+    function depth(node) {
+        if (memo.has(node.id)) {
+            return memo.get(node.id);
+        }
+
+        if (visiting.has(node.id)) {
+            return 0;
+        }
+
+        visiting.add(node.id);
+
+        let value = 0;
+
+        for (const prerequisite of node.prerequisites) {
+            const previous = byName.get(prerequisite);
+
+            if (previous) {
+                value = Math.max(
+                    value,
+                    depth(previous) + 1
+                );
+            }
+        }
+
+        visiting.delete(node.id);
+        memo.set(node.id, value);
+
+        return value;
+    }
+
+    for (const node of nodes) {
+        depth(node);
+    }
+
+    return memo;
+}
+
+// Graph connections use a collision-free corridor when a direct curve would
+// cross an intermediate knowledge node. Shared by SVG, mobile view and PNG.
+function routeKnowledgeGraphConnection(fromId, toId, start, end, positions, nodeWidth, nodeHeight, stageHeight) {
+    const x1 = start.x, y1 = start.y, x2 = end.x, y2 = end.y;
+    const bend = Math.max(16, Math.abs(x2 - x1) * 0.42);
+    const obstacles = [];
+    for (const [id, pos] of positions) {
+        if (id === fromId || id === toId) continue;
+        obstacles.push({
+            left:pos.x - 5, right:pos.x + nodeWidth + 5,
+            top:pos.y - 5, bottom:pos.y + nodeHeight + 5
+        });
+    }
+    const inside = (x, y) => obstacles.some(r => x > r.left && x < r.right && y > r.top && y < r.bottom);
+    // Preserve the original smooth appearance for edges entirely in clear gaps.
+    let curveSafe = true;
+    for (let i = 1; i < 32; i++) {
+        const t = i / 32, u = 1 - t;
+        const cx = u*u*u*x1 + 3*u*u*t*(x1+bend) + 3*u*t*t*(x2-bend) + t*t*t*x2;
+        const cy = u*u*u*y1 + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y2;
+        if (inside(cx, cy)) { curveSafe = false; break; }
+    }
+    if (curveSafe) return {type:'curve', x1,y1,x2,y2,bend};
+
+    // Search the orthogonal passages between rows and columns. Travel inside
+    // inter-column gaps for vertical movement; pass a column only in row gaps.
+    const startX = Math.min(x1, x2), endX = Math.max(x1, x2);
+    const xs = [x1, x2];
+    const ys = [y1, y2, 11, Math.max(11, stageHeight - 11)];
+    for (const r of obstacles) {
+        for (const value of [r.left - 7, r.right + 7]) {
+            if (value > startX && value < endX) xs.push(value);
+        }
+        for (const value of [r.top - 7, r.bottom + 7]) {
+            if (value > 7 && value < stageHeight - 7) ys.push(value);
+        }
+    }
+    const sortedUnique = values => [...new Set(values.map(x => Math.round(x * 100) / 100))].sort((a,b)=>a-b);
+    const xx = sortedUnique(xs), yy = sortedUnique(ys);
+    const sx=xx.indexOf(x1), tx=xx.indexOf(x2), sy=yy.indexOf(y1), ty=yy.indexOf(y2);
+    const nx=xx.length, ny=yy.length;
+    const startNode=(sy*nx+sx)*3, targetNode=(ty*nx+tx);
+    const distances = new Float64Array(nx*ny*3).fill(Infinity);
+    const prior = new Int32Array(nx*ny*3).fill(-1);
+    const heap=[];
+    const push=(cost,id)=>{ let p=heap.length; heap.push({cost,id}); while(p){const q=(p-1)>>1;if(heap[q].cost<=cost)break;heap[p]=heap[q];p=q;}heap[p]={cost,id};};
+    const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){let p=0;while(2*p+1<heap.length){let q=2*p+1;if(q+1<heap.length&&heap[q+1].cost<heap[q].cost)q++;if(last.cost<=heap[q].cost)break;heap[p]=heap[q];p=q;}heap[p]=last;}return top;};
+    const isClear=(a,b,c,d)=>{
+        if (a===c) {const lo=Math.min(b,d),hi=Math.max(b,d);return !obstacles.some(r => a>r.left && a<r.right && hi>r.top && lo<r.bottom);}
+        const lo=Math.min(a,c),hi=Math.max(a,c);return !obstacles.some(r => b>r.top && b<r.bottom && hi>r.left && lo<r.right);
+    };
+    distances[startNode]=0;push(0,startNode);
+    let found=-1,expanded=0;
+    while(heap.length && expanded<50000){
+        const entry=pop(),id=entry.id;if(entry.cost>distances[id]+.001)continue;
+        expanded++;
+        const group=Math.floor(id/3),dir=id%3, xi=group%nx,yi=Math.floor(group/nx);
+        if(group===targetNode){found=id;break;}
+        for(const [dx,dy,nd] of [[-1,0,1],[1,0,1],[0,-1,2],[0,1,2]]){
+            const a=xi+dx,b=yi+dy;if(a<0||a>=nx||b<0||b>=ny)continue;
+            const ox=xx[xi],oy=yy[yi],ex=xx[a],ey=yy[b];
+            if(!isClear(ox,oy,ex,ey))continue;
+            const next=(b*nx+a)*3+nd;
+            const delta=Math.abs(ex-ox)+Math.abs(ey-oy);
+            // Penalise extra bends and backtracking, not the node count.
+            const cost=entry.cost+delta+(dir&&dir!==nd?22:0)+(dx<0?delta*.4:0);
+            if(cost>=distances[next]-.001)continue;
+            distances[next]=cost;prior[next]=id;push(cost,next);
+        }
+    }
+    let points=[];
+    if(found>=0){
+        for(let id=found;id>=0;id=prior[id]){const group=Math.floor(id/3);points.push([xx[group%nx],yy[Math.floor(group/nx)]]);}
+        points.reverse();
+        // Drop points which lie on the same straight corridor.
+        const simplified=[];
+        for(const p of points){const n=simplified.length;if(n>=2){const a=simplified[n-2],b=simplified[n-1];if((a[0]===b[0]&&b[0]===p[0])||(a[1]===b[1]&&b[1]===p[1])){simplified[n-1]=p;continue;}}simplified.push(p);}
+        points=simplified;
+    } else {
+        // Guaranteed escape corridor, beyond all nodes, but inside SVG height.
+        const topY=11, leftGap=Math.min(x2-8,x1+Math.max(10,(x2-x1)*.16));
+        const rightGap=Math.max(x1+8,x2-Math.max(10,(x2-x1)*.16));
+        points=[[x1,y1],[leftGap,y1],[leftGap,topY],[rightGap,topY],[rightGap,y2],[x2,y2]];
+    }
+    return {type:'polyline',points};
+}
+
+function knowledgeGraphRouteSvgD(route) {
+    if(route.type==='curve')return `M ${route.x1} ${route.y1} C ${route.x1+route.bend} ${route.y1}, ${route.x2-route.bend} ${route.y2}, ${route.x2} ${route.y2}`;
+    return route.points.map(([x,y],i)=>`${i?'L':'M'} ${x} ${y}`).join(' ');
+}
+
+function strokeKnowledgeGraphCanvasRoute(ctx,route){
+    ctx.beginPath();
+    if(route.type==='curve'){
+        ctx.moveTo(route.x1,route.y1);
+        ctx.bezierCurveTo(route.x1+route.bend,route.y1,route.x2-route.bend,route.y2,route.x2,route.y2);
+    } else {
+        route.points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
+    }
+    ctx.stroke();
+}
+
+function renderMobileKnowledgeGraphSection(container, nodes, title, description, context, options = {}) {
+    const section = document.createElement("div");
+    section.className = "kg-section kg-mobile-section";
+
+    const heading = document.createElement("div");
+    heading.className = "kg-section-title";
+    heading.textContent = title;
+    section.appendChild(heading);
+
+    if (description) {
+        const desc = document.createElement("div");
+        desc.className = "kg-section-desc";
+        desc.textContent = description;
+        section.appendChild(desc);
+    }
+
+    const graphModal = document.getElementById("knowledgeGraphModal");
+    const isExpanded = graphModal?.classList.contains("graph-fullscreen-view");
+    const expandButton = document.createElement("button");
+    expandButton.type = "button";
+    expandButton.className = "kg-mobile-expand";
+    expandButton.textContent = isExpanded ? "退出完整查看" : "完整查看";
+    expandButton.setAttribute(
+        "aria-label",
+        isExpanded ? "退出知识图谱完整查看" : "完整查看知识图谱"
+    );
+    expandButton.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleKnowledgeGraphFullscreenView();
+    });
+    section.appendChild(expandButton);
+
+    if (!isExpanded && !options.forCopy) {
+        // 不再渲染非完整查看的小图：只保留进入原有完整查看的入口。
+        section.classList.add("kg-mobile-entry-only");
+        container.appendChild(section);
+        return;
+    }
+
+    const zoomControls = document.createElement("div");
+    zoomControls.className = "kg-mobile-zoom-controls";
+
+    const zoomOut = document.createElement("button");
+    zoomOut.type = "button";
+    zoomOut.className = "kg-mobile-zoom-btn";
+    zoomOut.textContent = "−";
+    zoomOut.setAttribute("aria-label", "缩小图谱");
+
+    const zoomLabel = document.createElement("span");
+    zoomLabel.className = "kg-mobile-zoom-label";
+    zoomLabel.textContent = "100%";
+
+    const zoomIn = document.createElement("button");
+    zoomIn.type = "button";
+    zoomIn.className = "kg-mobile-zoom-btn";
+    zoomIn.textContent = "+";
+    zoomIn.setAttribute("aria-label", "放大图谱");
+
+    const zoomFit = document.createElement("button");
+    zoomFit.type = "button";
+    zoomFit.className = "kg-mobile-zoom-fit";
+    zoomFit.textContent = "适应";
+    zoomFit.setAttribute("aria-label", "适应屏幕显示完整图谱");
+
+    zoomControls.append(zoomOut, zoomLabel, zoomIn, zoomFit);
+    section.appendChild(zoomControls);
+
+    if (!nodes.length) {
+        const empty = document.createElement("div");
+        empty.className = "kg-empty";
+        empty.textContent = "这个分类下暂时没有可显示的节点";
+        section.appendChild(empty);
+        container.appendChild(section);
+        return;
+    }
+
+    const levels = computeKnowledgeGraphLevels(nodes);
+    const orderedNodes = nodes.slice();
+    const orderMap = new Map(
+        orderedNodes.map((node, index) => [node.id, index])
+    );
+    const columns = new Map();
+
+    for (const node of orderedNodes) {
+        const level = levels.get(node.id) || 0;
+        if (!columns.has(level)) columns.set(level, []);
+        columns.get(level).push(node);
+    }
+
+    const columnKeys = [...columns.keys()].sort((a, b) => a - b);
+    // 按前一层前置节点的重心排列同层知识点，减少线条在层间交叉。
+    const previousOrder = new Map();
+    const categoryOrder = new Map();
+    nodes.forEach(node => {
+        if (!categoryOrder.has(node.category)) categoryOrder.set(node.category, categoryOrder.size);
+    });
+    for (const key of columnKeys) {
+        const group = columns.get(key);
+        group.sort((a, b) => {
+            const average = node => {
+                const indexes = (node.prerequisites || [])
+                    .map(name => previousOrder.get(name)).filter(Number.isFinite);
+                return indexes.length
+                    ? indexes.reduce((sum, value) => sum + value, 0) / indexes.length
+                    : Number.POSITIVE_INFINITY;
+            };
+            return (categoryOrder.get(a.category) - categoryOrder.get(b.category))
+                || average(a) - average(b)
+                || orderMap.get(a.id) - orderMap.get(b.id);
+        });
+        group.forEach((node, index) => previousOrder.set(node.name, index));
+    }
+
+    // 距离解决密集问题：左右预留足够走线通道，上下给弯曲关系留空间。
+    const viewportWidth = Math.max(280, (container.clientWidth || window.innerWidth || 360) - 20);
+    const columnCount = Math.max(columnKeys.length, 1);
+    const marginX = 38;
+    const marginY = 48;
+    const gapX = 116;
+    const gapY = 60;
+    const nodeWidth = 144;
+    const nodeHeight = 76;
+    const maxRows = Math.max(...columnKeys.map(key => columns.get(key).length), 1);
+    const stageWidth = Math.max(viewportWidth, marginX * 2 + columnCount * nodeWidth + (columnCount - 1) * gapX);
+    const stageHeight = marginY * 2 + maxRows * nodeHeight + (maxRows - 1) * gapY;
+
+    const viewport = document.createElement("div");
+    viewport.className = "kg-mobile-viewport";
+    viewport.setAttribute("aria-label", "完整知识图谱：单指拖动、双指缩放，所有知识关联线均可见");
+
+    const zoomSurface = document.createElement("div");
+    zoomSurface.className = "kg-mobile-zoom-surface";
+    zoomSurface.style.width = `${stageWidth}px`;
+    zoomSurface.style.height = `${stageHeight}px`;
+
+    const stage = document.createElement("div");
+    stage.className = "kg-mobile-stage";
+    stage.dataset.baseWidth = String(stageWidth);
+    stage.dataset.baseHeight = String(stageHeight);
+    stage.style.width = `${stageWidth}px`;
+    stage.style.height = `${stageHeight}px`;
+
+    const edgeSvg = createSvgElement("svg", {
+        class: "kg-mobile-edge-layer",
+        width: stageWidth,
+        height: stageHeight,
+        viewBox: `0 0 ${stageWidth} ${stageHeight}`,
+        "aria-hidden": "true"
+    });
+    stage.appendChild(edgeSvg);
+
+    const positions = new Map();
+    for (let columnIndex = 0; columnIndex < columnKeys.length; columnIndex += 1) {
+        const level = columnKeys[columnIndex];
+        const group = columns.get(level);
+        const x = marginX + columnIndex * (nodeWidth + gapX);
+        const totalHeight = (
+            group.length * nodeHeight
+            + Math.max(group.length - 1, 0) * gapY
+        );
+        const startY = marginY + (stageHeight - marginY * 2 - totalHeight) / 2;
+
+        for (let rowIndex = 0; rowIndex < group.length; rowIndex += 1) {
+            const node = group[rowIndex];
+            const y = startY + rowIndex * (nodeHeight + gapY);
+            positions.set(node.id, { x, y });
+        }
+    }
+
+    const byName = new Map(nodes.map(node => [node.name, node]));
+    const edges = [];
+    const outgoing = new Map();
+    const incoming = new Map();
+    for (const node of orderedNodes) {
+        for (const prerequisiteName of node.prerequisites || []) {
+            const parent = byName.get(prerequisiteName);
+            if (!parent || !positions.has(parent.id) || !positions.has(node.id)) continue;
+            const edge = {from:parent.id, to:node.id};
+            edges.push(edge);
+            if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
+            if (!incoming.has(edge.to)) incoming.set(edge.to, []);
+            outgoing.get(edge.from).push(edge);
+            incoming.get(edge.to).push(edge);
+        }
+    }
+    // 每条线分配自己的节点连接端口：全部保留，不再隐藏“次级关系”。
+    const distributePort = (index, count) => (index - (count - 1) / 2) *
+        Math.min(11, (nodeHeight - 18) / Math.max(count, 1));
+    for (const group of outgoing.values()) {
+        group.sort((a, b) => positions.get(a.to).y - positions.get(b.to).y);
+    }
+    for (const group of incoming.values()) {
+        group.sort((a, b) => positions.get(a.from).y - positions.get(b.from).y);
+    }
+    for (const edge of edges) {
+        const from = positions.get(edge.from);
+        const to = positions.get(edge.to);
+        const outGroup = outgoing.get(edge.from);
+        const inGroup = incoming.get(edge.to);
+        const x1 = from.x + nodeWidth;
+        const x2 = to.x;
+        const y1 = from.y + nodeHeight / 2 + distributePort(outGroup.indexOf(edge), outGroup.length);
+        const y2 = to.y + nodeHeight / 2 + distributePort(inGroup.indexOf(edge), inGroup.length);
+        const route = routeKnowledgeGraphConnection(
+            edge.from, edge.to, {x:x1,y:y1}, {x:x2,y:y2},
+            positions, nodeWidth, nodeHeight, stageHeight
+        );
+        const path = createSvgElement("path", {
+            class:"kg-mobile-edge",
+            d:knowledgeGraphRouteSvgD(route),
+            "data-from":edge.from,
+            "data-to":edge.to
+        });
+        edgeSvg.appendChild(path);
+    }
+
+    for (const node of orderedNodes) {
+        const position = positions.get(node.id);
+        if (!position) continue;
+
+        const state = knowledgeGraphNodeState(node.name, context);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = (
+            "kg-mobile-node"
+            + (node.id === knowledgeGraphSelectedNodeId ? " selected" : "")
+        );
+        button.style.left = `${position.x}px`;
+        button.style.top = `${position.y}px`;
+        button.style.width = `${nodeWidth}px`;
+        button.style.height = `${nodeHeight}px`;
+        button.style.background = state.fill;
+        button.style.borderColor = state.stroke;
+        button.setAttribute("aria-label", dmateKnowledgeLabel(node.name));
+
+        const name = document.createElement("span");
+        name.className = "kg-mobile-node-name";
+        name.textContent = dmateKnowledgeLabel(node.name);
+        button.appendChild(name);
+
+        const badgeText = state.badge || node.level || "";
+        if (badgeText) {
+            const badge = document.createElement("span");
+            badge.className = "kg-mobile-node-badge";
+            badge.textContent = badgeText;
+            button.appendChild(badge);
+        }
+
+        button.addEventListener("click", () => {
+            selectKnowledgeGraphNode(node.id, button);
+        });
+
+        stage.appendChild(button);
+    }
+
+    zoomSurface.appendChild(stage);
+    viewport.appendChild(zoomSurface);
+    section.appendChild(viewport);
+    container.appendChild(section);
+    updateMobileGraphEdgeEmphasis(section, knowledgeGraphSelectedNodeId);
+
+    if (options.forCopy) return;
+
+    installMobileGraphInteraction(
+        viewport,
+        zoomSurface,
+        stage,
+        zoomLabel
+    );
+
+    zoomOut.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const rect = viewport.getBoundingClientRect();
+        viewport._kgSetScale?.(
+            (viewport._kgScale || 1) / 1.2,
+            { x: rect.width / 2, y: rect.height / 2 }
+        );
+    });
+
+    zoomIn.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const rect = viewport.getBoundingClientRect();
+        viewport._kgSetScale?.(
+            (viewport._kgScale || 1) * 1.2,
+            { x: rect.width / 2, y: rect.height / 2 }
+        );
+    });
+
+    zoomFit.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        viewport._kgFit?.();
+    });
+
+    // section 先在 DocumentFragment 内构造；等挂载、全屏 flex 布局完成后再适应。
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => viewport._kgFit?.());
+    });
+}
+
+// 桌面图谱始终按真实尺寸绘制，由独立画布处理缩放与二维滚动。
+// 改变缩放只更新 transform，不重新生成节点、关系线或知识点详情。
+function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const surface = canvas?.querySelector(".kg-desktop-zoom-surface");
+    const stage = surface?.querySelector(".kg-desktop-zoom-stage");
+    if (!canvas || !surface || !stage) return;
+
+    const baseWidth = Number(stage.dataset.baseWidth) || 1;
+    const baseHeight = Number(stage.dataset.baseHeight) || 1;
+    const previous = Number(surface.dataset.scale) || 1;
+    const next = Math.max(0.2, Math.min(2.5, Number(value) || 1));
+    const anchorX = keepCenter ? (canvas.scrollLeft + canvas.clientWidth / 2) / previous : 0;
+    const anchorY = keepCenter ? (canvas.scrollTop + canvas.clientHeight / 2) / previous : 0;
+
+    knowledgeGraphDesktopScale = next;
+    surface.dataset.scale = String(next);
+    surface.style.width = `${Math.ceil(baseWidth * next)}px`;
+    surface.style.height = `${Math.ceil(baseHeight * next)}px`;
+    stage.style.transform = `scale(${next})`;
+    if (keepCenter) {
+        canvas.scrollLeft = Math.max(0, anchorX * next - canvas.clientWidth / 2);
+        canvas.scrollTop = Math.max(0, anchorY * next - canvas.clientHeight / 2);
+    }
+    const label = document.getElementById("knowledgeGraphDesktopZoomLabel");
+    if (label) label.textContent = `${Math.round(next * 100)}%`;
+}
+
+// 根据图谱形状选择适应策略：
+//   - 节点较少、图谱不高：完整放入可视区域。
+//   - “全部知识”这类高图：以可读宽度为主，允许在画布内纵向滚动。
+// 不按几十行节点的总高度去缩小整张图，否则右侧空白且文字无法阅读。
+function fitKnowledgeGraphDesktop() {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const stage = canvas?.querySelector(".kg-desktop-zoom-stage");
+    if (!canvas || !stage) return;
+    const width = Number(stage.dataset.baseWidth) || 1;
+    const height = Number(stage.dataset.baseHeight) || 1;
+    const availableWidth = Math.max(1, canvas.clientWidth - 64);
+    const availableHeight = Math.max(1, canvas.clientHeight - 104);
+    const widthScale = availableWidth / width;
+    const heightScale = availableHeight / height;
+    const isTall = heightScale < Math.min(widthScale, 1.15) * 0.72;
+    const preferred = isTall
+        ? Math.min(1.15, widthScale)
+        : Math.min(1.15, widthScale, heightScale);
+    // 极宽的图谱宁可局部横向滚动，也不能把节点文字缩至不可阅读。
+    const fitted = Math.max(0.65, preferred);
+    setKnowledgeGraphDesktopScale(fitted, false);
+    canvas.scrollLeft = 0;
+    canvas.scrollTop = 0;
+}
+
+function installKnowledgeGraphDesktopZoom() {
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    const zoomOut = document.getElementById("knowledgeGraphDesktopZoomOut");
+    const zoomIn = document.getElementById("knowledgeGraphDesktopZoomIn");
+    const zoomFit = document.getElementById("knowledgeGraphDesktopZoomFit");
+    if (!canvas || !zoomOut || !zoomIn || !zoomFit || canvas.dataset.zoomWired === "1") return;
+    canvas.dataset.zoomWired = "1";
+    zoomOut.addEventListener("click", () => setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale / 1.2));
+    zoomIn.addEventListener("click", () => setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale * 1.2));
+    zoomFit.addEventListener("click", fitKnowledgeGraphDesktop);
+    canvas.addEventListener("wheel", event => {
+        if (!event.ctrlKey || !canvas.querySelector(".kg-desktop-zoom-stage")) return;
+        event.preventDefault();
+        setKnowledgeGraphDesktopScale(knowledgeGraphDesktopScale * (event.deltaY < 0 ? 1.12 : 0.89));
+    }, { passive: false });
+}
+
+function renderKnowledgeGraphSection(container, nodes, title, description, context) {
+    const section = document.createElement("div");
+    section.className = "kg-section";
+
+    const heading = document.createElement("div");
+    heading.className = "kg-section-title";
+    heading.textContent = title;
+    section.appendChild(heading);
+
+    if (description) {
+        const desc = document.createElement("div");
+        desc.className = "kg-section-desc";
+        desc.textContent = description;
+        section.appendChild(desc);
+    }
+
+    if (!nodes.length) {
+        const empty = document.createElement("div");
+        empty.className = "kg-empty";
+        empty.textContent = "这个分类下暂时没有可显示的节点";
+        section.appendChild(empty);
+        container.appendChild(section);
+        return;
+    }
+
+    const levels = computeKnowledgeGraphLevels(nodes);
+    const orderedNodes = nodes.slice();
+    const orderMap = new Map(
+        orderedNodes.map(
+            (node, index) => [node.id, index]
+        )
+    );
+
+    const columns = new Map();
+
+    for (const node of orderedNodes) {
+        const level = levels.get(node.id) || 0;
+        if (!columns.has(level)) {
+            columns.set(level, []);
+        }
+        columns.get(level).push(node);
+    }
+
+    const columnKeys = [...columns.keys()].sort((a, b) => a - b);
+
+    for (const key of columnKeys) {
+        columns.get(key).sort(
+            (a, b) => (
+                orderMap.get(a.id)
+                - orderMap.get(b.id)
+            )
+        );
+    }
+
+    const mobileGraphLayout = isMobileAppShell();
+    let nodeWidth = dmateUiLanguage() === "en" ? 190 : 132;
+    let nodeHeight = dmateUiLanguage() === "en" ? 78 : 58;
+    let horizontalGap = 74;
+    let verticalGap = 26;
+    let margin = 24;
+
+    if (mobileGraphLayout) {
+        const viewportWidth = Math.max(
+            320,
+            Math.min(Number(window.innerWidth) || 390, 760)
+        );
+        const columnCount = Math.max(columnKeys.length, 1);
+        const usableWidth = Math.max(280, viewportWidth - 40);
+
+        horizontalGap = columnCount <= 2 ? 26 : 18;
+        margin = 12;
+
+        const fittedWidth = Math.floor(
+            (
+                usableWidth
+                - margin * 2
+                - Math.max(columnCount - 1, 0) * horizontalGap
+            ) / columnCount
+        );
+
+        // 手机优先把常见 2~3 列图谱完整放进卡片；列数再多时
+        // 保持最低可读宽度，并只在图谱卡片内部横向滚动。
+        nodeWidth = Math.max(88, Math.min(118, fittedWidth));
+        nodeHeight = nodeWidth >= 108 ? 56 : 52;
+        verticalGap = 22;
+    }
+
+    const maxRows = Math.max(
+        ...columnKeys.map(
+            key => columns.get(key).length
+        ),
+        1
+    );
+
+    const svgWidth = (
+        margin * 2
+        + columnKeys.length * nodeWidth
+        + Math.max(columnKeys.length - 1, 0) * horizontalGap
+    );
+
+    const svgHeight = (
+        margin * 2
+        + maxRows * nodeHeight
+        + Math.max(maxRows - 1, 0) * verticalGap
+    );
+
+    const svg = createSvgElement("svg", {
+        class: "kg-svg",
+        viewBox: `0 0 ${svgWidth} ${svgHeight}`,
+        width: svgWidth,
+        height: svgHeight,
+        preserveAspectRatio: "xMinYMin meet"
+    });
+
+    const positions = new Map();
+
+    for (let columnIndex = 0; columnIndex < columnKeys.length; columnIndex += 1) {
+        const level = columnKeys[columnIndex];
+        const group = columns.get(level);
+        const x = margin + columnIndex * (nodeWidth + horizontalGap);
+        const totalHeight = (
+            group.length * nodeHeight
+            + Math.max(group.length - 1, 0) * verticalGap
+        );
+        const startY = margin + (svgHeight - margin * 2 - totalHeight) / 2;
+
+        for (let rowIndex = 0; rowIndex < group.length; rowIndex += 1) {
+            const node = group[rowIndex];
+            const y = startY + rowIndex * (nodeHeight + verticalGap);
+            positions.set(node.id, { x, y });
+        }
+    }
+
+    const byName = new Map(
+        nodes.map(node => [node.name, node])
+    );
+
+    for (const node of orderedNodes) {
+        const current = positions.get(node.id);
+
+        if (!current) continue;
+
+        for (const prerequisiteName of node.prerequisites) {
+            const previousNode = byName.get(prerequisiteName);
+
+            if (!previousNode) continue;
+
+            const previous = positions.get(previousNode.id);
+
+            if (!previous) continue;
+
+            const x1 = previous.x + nodeWidth;
+            const y1 = previous.y + nodeHeight / 2;
+            const x2 = current.x;
+            const y2 = current.y + nodeHeight / 2;
+            const route = routeKnowledgeGraphConnection(
+                previousNode.id, node.id, {x:x1,y:y1}, {x:x2,y:y2},
+                positions, nodeWidth, nodeHeight, svgHeight
+            );
+            const path = createSvgElement("path", {
+                class: "kg-edge",
+                d: knowledgeGraphRouteSvgD(route)
+            });
+
+            svg.appendChild(path);
+        }
+    }
+
+    for (const node of orderedNodes) {
+        const position = positions.get(node.id);
+
+        if (!position) continue;
+
+        const state = knowledgeGraphNodeState(
+            node.name,
+            context
+        );
+        const group = createSvgElement("g", {
+            class: (
+                "kg-node-group"
+                + (node.id === knowledgeGraphSelectedNodeId ? " selected" : "")
+            ),
+            transform: `translate(${position.x}, ${position.y})`
+        });
+
+        group.addEventListener(
+            "click",
+            () => {
+                selectKnowledgeGraphNode(node.id, group);
+            }
+        );
+
+        const rect = createSvgElement("rect", {
+            x: 0,
+            y: 0,
+            width: nodeWidth,
+            height: nodeHeight,
+            rx: 12,
+            fill: state.fill,
+            stroke: state.stroke,
+            "stroke-width": node.id === knowledgeGraphSelectedNodeId ? 3 : 2
+        });
+
+        group.appendChild(rect);
+
+        const lines = splitKnowledgeGraphLabel(
+            node.name
+        );
+        const text = createSvgElement("text", {
+            class: "kg-node-label",
+            x: nodeWidth / 2,
+            y: 22,
+            fill: state.text || "#ffffff",
+            "font-size": mobileGraphLayout ? 14 : 12,
+            "font-weight": mobileGraphLayout ? 600 : 500,
+            "text-anchor": "middle"
+        });
+
+        if (lines.length === 1) {
+            const tspan = createSvgElement("tspan", {
+                x: nodeWidth / 2,
+                dy: 0
+            });
+            tspan.textContent = lines[0];
+            text.appendChild(tspan);
+        } else {
+            lines.forEach((line, index) => {
+                const tspan = createSvgElement("tspan", {
+                    x: nodeWidth / 2,
+                    dy: index === 0 ? 0 : 14
+                });
+                tspan.textContent = line;
+                text.appendChild(tspan);
+            });
+        }
+
+        group.appendChild(text);
+
+        const nodeBadge = state.badge || node.level;
+
+        if (nodeBadge) {
+            const badge = createSvgElement("text", {
+                class: "kg-node-badge",
+                x: nodeWidth / 2,
+                y: nodeHeight - 10,
+                fill: "#e2e8f0",
+                "font-size": mobileGraphLayout ? 11 : 10,
+                "text-anchor": "middle"
+            });
+            badge.textContent = nodeBadge;
+            group.appendChild(badge);
+        }
+
+        svg.appendChild(group);
+    }
+
+    // 注意不对 SVG 用 width:100%：整张大图会被压缩到容器宽度，文字小且滚动布局抖动。
+    const surface = document.createElement("div");
+    surface.className = "kg-desktop-zoom-surface";
+    const stage = document.createElement("div");
+    stage.className = "kg-desktop-zoom-stage";
+    stage.dataset.baseWidth = String(svgWidth);
+    stage.dataset.baseHeight = String(svgHeight);
+    stage.style.width = `${svgWidth}px`;
+    stage.style.height = `${svgHeight}px`;
+    svg.style.width = `${svgWidth}px`;
+    svg.style.height = `${svgHeight}px`;
+    stage.appendChild(svg);
+    surface.appendChild(stage);
+    section.appendChild(surface);
+    container.appendChild(section);
+}
+
+function renderKnowledgeGraphSummary(context) {
+    const summary = document.getElementById(
+        "knowledgeGraphSummary"
+    );
+
+    if (!summary) return;
+
+    summary.innerHTML = "";
+
+    const addItem = (
+        label,
+        value,
+        className = ""
+    ) => {
+        if (!value) return;
+
+        const item = document.createElement("div");
+        item.className = [
+            "graph-summary-item",
+            className
+        ]
+            .filter(Boolean)
+            .join(" ");
+
+        const labelNode = document.createElement("span");
+        labelNode.className = "graph-summary-label";
+        labelNode.textContent = label;
+
+        const valueNode = document.createElement("span");
+        valueNode.className = "graph-summary-value";
+        valueNode.textContent = value;
+
+        item.appendChild(labelNode);
+        item.appendChild(valueNode);
+        summary.appendChild(item);
+    };
+
+    if (knowledgeGraphScope === "conversation") {
+        addItem(
+            "查看范围",
+            context.questionCount > 0
+                ? `本对话 · ${context.questionCount} 道题`
+                : "本对话"
+        );
+
+    } else if (knowledgeGraphScope === "history") {
+        addItem(
+            "查看范围",
+            `历史第 ${context.historyOrder || "?"} 题`
+        );
+
+    }
+    // 图谱保留分类筛选功能，摘要不重复显示模块标签。
+
+    const related = uniqueTextList(
+        context.knowledgePoints || [],
+        12
+    );
+
+    if (related.length) {
+        addItem(
+            knowledgeGraphScope === "conversation"
+                ? "本对话相关"
+                : (
+                    knowledgeGraphScope === "history"
+                        ? "历史题相关"
+                        : "本题相关"
+                ),
+            dmateKnowledgeList(related)
+        );
+    } else {
+        addItem(
+            "当前视图",
+            knowledgeGraphViewMode === "focus"
+                ? (
+                    knowledgeGraphScope === "conversation"
+                        ? "本对话暂时没有可汇总的知识点"
+                        : "与当前题目直接相关的知识"
+                )
+                : "完整范围"
+        );
+    }
+}
+
+
+
+function setKnowledgeGraphSideMode(mode) {
+    knowledgeGraphSideMode = (
+        mode === "history"
+            ? "history"
+            : "detail"
+    );
+
+    renderKnowledgeGraphSide();
+}
+
+function updateKnowledgeGraphSideTabs() {
+    const detailTab = document.getElementById(
+        "knowledgeGraphDetailTab"
+    );
+    const historyTab = document.getElementById(
+        "knowledgeGraphHistoryTab"
+    );
+
+    if (detailTab) {
+        detailTab.classList.toggle(
+            "active",
+            knowledgeGraphSideMode === "detail"
+        );
+    }
+
+    if (historyTab) {
+        historyTab.classList.toggle(
+            "active",
+            knowledgeGraphSideMode === "history"
+        );
+
+        const count = getConversationQuestionHistory(
+            getCurrent()
+        ).length;
+
+        historyTab.textContent = count
+            ? `题目历史 (${count})`
+            : "题目历史";
+    }
+}
+
+function renderKnowledgeGraphHistory() {
+    const list = document.getElementById(
+        "knowledgeGraphHistory"
+    );
+
+    if (!list) return;
+
+    const history = getConversationQuestionHistory(
+        getCurrent()
+    );
+
+    list.innerHTML = "";
+
+    const head = document.createElement("div");
+    head.className = "kg-history-head";
+
+    const text = document.createElement("div");
+    text.className = "kg-history-head-text";
+    text.textContent = history.length
+        ? `本对话识别到 ${history.length} 道题`
+        : "本对话暂时没有识别到题目";
+
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "kg-history-refresh";
+    refresh.textContent = "重新整理";
+    refresh.title = "重新从聊天记录逐题识别，不调用大模型";
+
+    refresh.addEventListener(
+        "click",
+        refreshKnowledgeHistoryPanel
+    );
+
+    head.appendChild(text);
+    head.appendChild(refresh);
+    list.appendChild(head);
+
+    if (!history.length) {
+        const empty = document.createElement("div");
+        empty.className = "graph-detail-empty";
+        empty.textContent = (
+            "如果刚刚才发送题目，可以等 AI 回复完成后再点“重新整理”"
+        );
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const item of history) {
+        const card = document.createElement("div");
+        card.className = "kg-history-item";
+
+        if (
+            knowledgeGraphScope === "history"
+            && item.index === knowledgeGraphHistoryMessageIndex
+        ) {
+            card.classList.add("active");
+        }
+
+        const top = document.createElement("div");
+        top.className = "kg-history-item-top";
+
+        const number = document.createElement("div");
+        number.className = "kg-history-number";
+        number.textContent = `第 ${item.order} 题`;
+
+        const source = document.createElement("span");
+        source.className = "kg-history-source";
+        source.textContent = knowledgeHistorySourceLabel(
+            item
+        );
+
+        top.appendChild(number);
+        top.appendChild(source);
+
+        const preview = document.createElement("div");
+        preview.className = "kg-history-preview ai-content";
+        preview.setAttribute("data-i18n-content", "");
+        preview.innerHTML = markdownToHtml(
+            prepareAiDisplayText(
+                item.text
+            )
+        );
+
+        const points = document.createElement("div");
+        points.className = "kg-history-points";
+        points.textContent = item.knowledgePoints.length
+            ? dmateKnowledgeList(item.knowledgePoints)
+            : "知识点暂未识别";
+
+        const actions = document.createElement("div");
+        actions.className = "kg-history-actions";
+
+        const graphButton = document.createElement("button");
+        graphButton.type = "button";
+        graphButton.textContent = "查看图谱";
+        graphButton.addEventListener(
+            "click",
+            () => {
+                focusKnowledgeGraphOnHistoryQuestion(
+                    item.index
+                );
+            }
+        );
+
+        const locateButton = document.createElement("button");
+        locateButton.type = "button";
+        locateButton.className = "secondary";
+        locateButton.textContent = "定位原题";
+        locateButton.addEventListener(
+            "click",
+            () => {
+                locateKnowledgeHistoryMessage(
+                    item.index
+                );
+            }
+        );
+
+        actions.appendChild(graphButton);
+        actions.appendChild(locateButton);
+
+        card.appendChild(top);
+        card.appendChild(preview);
+        card.appendChild(points);
+        card.appendChild(actions);
+        list.appendChild(card);
+    }
+
+    renderMath(list);
+}
+
+// 所有关系线始终存在，选中节点只改变相关线条的强调样式。
+function updateMobileGraphEdgeEmphasis(canvas, selectedNodeId) {
+    if (!canvas) return;
+    canvas.querySelectorAll(".kg-mobile-edge").forEach(edge => {
+        const related = Boolean(selectedNodeId) && (
+            edge.dataset.from === selectedNodeId
+            || edge.dataset.to === selectedNodeId
+        );
+        edge.classList.toggle("is-related", related);
+    });
+}
+
+function selectKnowledgeGraphNode(nodeId, sourceElement = null) {
+    knowledgeGraphSelectedNodeId = nodeId;
+    knowledgeGraphSideMode = "detail";
+
+    const canvas = document.getElementById("knowledgeGraphCanvas");
+    if (canvas) {
+        canvas.querySelectorAll(
+            ".kg-mobile-node.selected, .kg-node-group.selected"
+        ).forEach(element => element.classList.remove("selected"));
+    }
+
+    const selected = sourceElement?.closest?.(
+        ".kg-mobile-node, .kg-node-group"
+    );
+    selected?.classList.add("selected");
+    updateMobileGraphEdgeEmphasis(canvas, nodeId);
+
+    // 只刷新右侧/下方详情，不重建全部节点和连线。
+    // 手机上点击节点时不会再出现整张图谱闪一下、卡一下。
+    renderKnowledgeGraphSide();
+}
+
+
+function renderKnowledgeGraphSide() {
+    updateKnowledgeGraphSideTabs();
+
+    const detailWrap = document.getElementById(
+        "knowledgeGraphDetailWrap"
+    );
+    const historyWrap = document.getElementById(
+        "knowledgeGraphHistoryWrap"
+    );
+
+    if (detailWrap) {
+        detailWrap.classList.toggle(
+            "hidden",
+            knowledgeGraphSideMode !== "detail"
+        );
+    }
+
+    if (historyWrap) {
+        historyWrap.classList.toggle(
+            "hidden",
+            knowledgeGraphSideMode !== "history"
+        );
+    }
+
+    if (knowledgeGraphSideMode === "history") {
+        renderKnowledgeGraphHistory();
+    } else {
+        renderKnowledgeGraphDetail();
+    }
+}
+
+
+function renderKnowledgeGraphDetail() {
+    const title = document.getElementById(
+        "knowledgeGraphDetailTitle"
+    );
+    const detail = document.getElementById(
+        "knowledgeGraphDetail"
+    );
+
+    if (!title || !detail || !knowledgeGraphData) return;
+
+    const node = findKnowledgeGraphNodeById(
+        knowledgeGraphSelectedNodeId
+    );
+
+    if (!node) {
+        title.textContent = "节点详情";
+        detail.innerHTML = (
+            '<div class="graph-detail-empty">点击左侧知识点查看关系。</div>'
+        );
+        return;
+    }
+
+    const context = getActiveKnowledgeContext();
+    const state = knowledgeGraphNodeState(
+        node.name,
+        context
+    );
+
+    // 和当前画布使用同一批节点：仅列出实际能画出关系线的两端。
+    // 跨模块前置关系仍保存在完整数据中，选择「全部知识→全部」时完整显示。
+    const displayedNodes = knowledgeGraphDisplayedNodes(getActiveKnowledgeContext());
+    const namesOnCanvas = new Set(displayedNodes.map(item => item.name));
+    const visiblePrerequisites = node.prerequisites.filter(name => namesOnCanvas.has(name));
+    const nextNodes = displayedNodes
+        .filter(item => item.prerequisites.includes(node.name))
+        .map(item => item.name);
+
+    title.textContent = dmateKnowledgeLabel(node.name);
+    detail.innerHTML = "";
+
+    const subline = document.createElement("div");
+    subline.className = "graph-detail-subline";
+
+    if (node.level) {
+        const level = document.createElement("span");
+        level.className = "graph-level-pill";
+        level.textContent = node.level;
+        subline.appendChild(level);
+    }
+
+    if (state.label) {
+        const pill = document.createElement("span");
+        pill.className = `graph-status-pill ${state.key}`;
+        pill.textContent = state.label;
+        subline.appendChild(pill);
+    }
+
+    detail.appendChild(subline);
+
+    const addDetailField = (labelText, values, emptyText) => {
+        const field = document.createElement("div");
+        field.className = "graph-detail-field";
+
+        const label = document.createElement("div");
+        label.className = "graph-detail-field-label";
+        label.textContent = labelText;
+
+        const value = document.createElement("div");
+        value.className = "graph-detail-field-value graph-detail-term-list";
+        if (values.length) {
+            for (const name of values) {
+                const term = document.createElement("span");
+                term.className = "graph-detail-term";
+                term.textContent = name;
+                value.appendChild(term);
+            }
+        } else {
+            value.textContent = emptyText;
+        }
+
+        field.appendChild(label);
+        field.appendChild(value);
+        detail.appendChild(field);
+    };
+
+    addDetailField(
+        "图中前置知识",
+        visiblePrerequisites,
+        "当前图中暂无前置"
+    );
+
+    addDetailField(
+        "图中直接后续",
+        nextNodes,
+        "当前图中暂无后续"
+    );
+
+    if (node.note) {
+        addDetailField(
+            "说明",
+            [node.note],
+            ""
+        );
+    }
+}
+
+
+
+function renderKnowledgeGraph() {
+    const modal = document.getElementById(
+        "knowledgeGraphModal"
+    );
+
+    if (!modal || modal.classList.contains("hidden")) {
+        return;
+    }
+
+    if (!knowledgeGraphData) {
+        renderKnowledgeGraphLoading(
+            "知识图谱加载中…"
+        );
+        return;
+    }
+
+    // 在两个模式下使用同一个属性控制桌面下拉框与移动端选择入口。
+    modal.dataset.graphView = knowledgeGraphViewMode === "focus" ? "focus" : "full";
+    fillKnowledgeGraphCategoryOptions();
+    updateKnowledgeGraphScopeButton();
+    updateKnowledgeGraphModeButton();
+
+    const context = getActiveKnowledgeContext();
+    const canvas = document.getElementById(
+        "knowledgeGraphCanvas"
+    );
+
+    if (!canvas) return;
+
+    renderKnowledgeGraphSummary(context);
+    knowledgeGraphPreparedPngPromise = null;
+    knowledgeGraphPreparedPngKey = "";
+    if (!knowledgeGraphData.nodes.length) {
+        canvas.innerHTML = (
+            '<div class="kg-empty">知识图谱目前还是空的。</div>'
+        );
+        renderKnowledgeGraphSide();
+        return;
+    }
+
+    const displayCategory = knowledgeGraphDisplayCategory();
+    const fullNodes = knowledgeGraphVisibleNodes(displayCategory);
+    const visibleNodes = knowledgeGraphDisplayedNodes(context);
+
+    ensureKnowledgeGraphSelection(
+        visibleNodes,
+        context
+    );
+
+    const description = (
+        knowledgeGraphViewMode === "focus"
+            ? (
+                knowledgeGraphScope === "conversation"
+                    ? (
+                        visibleNodes.length
+                            ? `已汇总本对话前面题目，只显示 ${visibleNodes.length} 个相关知识点`
+                            : "本对话暂时没有可汇总的知识点"
+                    )
+                    : (
+                        knowledgeGraphScope === "history"
+                            ? (
+                                visibleNodes.length
+                                    ? `正在查看历史第 ${context.historyOrder || "?"} 题，只显示 ${visibleNodes.length} 个相关知识点`
+                                    : "这道历史题暂时没有识别到可显示的知识点"
+                            )
+                            : (
+                                visibleNodes.length < fullNodes.length
+                                    ? `最近一题关联 · ${visibleNodes.length} 个知识点`
+                                    : "当前没有可进一步收缩的题目上下文，显示全部知识"
+                            )
+                    )
+            )
+            : (
+                knowledgeGraphFilter === "全部"
+                    ? `全部知识 · ${fullNodes.length} 个知识点`
+                    : `本模块知识 · ${fullNodes.length} 个知识点`
+            )
+    );
+
+    const mobileGraph = window.matchMedia?.("(max-width: 760px)")?.matches;
+
+    // 离线构造 DOM，完成后一次性替换，避免清空画布导致布局横跳。
+    const fragment = document.createDocumentFragment();
+    if (mobileGraph) {
+        renderMobileKnowledgeGraphSection(
+            fragment,
+            visibleNodes,
+            displayCategory,
+            description,
+            context
+        );
+    } else {
+        renderKnowledgeGraphSection(
+            fragment,
+            visibleNodes,
+            displayCategory,
+            description,
+            context
+        );
+    }
+    canvas.replaceChildren(fragment);
+    if (!mobileGraph) {
+        // 每次切换模块/最近一题关联/全部知识都自动重新适应，不继承上一张图的比例。
+        // SVG 已创建且容器仍可见，此处只做一次轻量尺寸计算，不重新绘图。
+        fitKnowledgeGraphDesktop();
+    }
+
+    renderKnowledgeGraphSide();
+    // 不预先生成高分辨率 PNG。只有点“以图片形式复制”才渲染，
+    // 否则每次切换模块会触发 html2canvas 占用主线程，并临时撑开页面宽度。
+}
+
+
+// -----------------------------
+// 右侧对话信息
+// -----------------------------
+function renderInfo() {
+    const info = document.getElementById("info");
+    if (!info) return;
+    info.setAttribute("data-i18n-content", "");
+
+    const session = getCurrent();
+
+    if (!session) {
+        info.innerText = dmateUiText("无");
+        return;
+    }
+
+    const lines = [
+        dmateUiText("当前对话：", "Conversation: ") + sessionDisplayName(session),
+        dmateUiText("消息数：", "Messages: ") + session.messages.length
+    ];
+
+    const teaching = getEffectiveSessionTeaching(session);
+
+    if (teaching) {
+        // 后台仍使用 teaching.category；右侧概览只展示具体学习要点。
+        if (teaching.focus_points.length) {
+            lines.push(
+                dmateUiText("本题难点：", "Focus: ") + teaching.focus_points.map(dmateKnowledgeLabel).join(dmateUiLanguage() === "en" ? ", " : "、")
+            );
+        }
+
+        if (teaching.knowledge_path.length >= 2) {
+            lines.push(
+                dmateUiText("知识脉络：", "Learning path: ") + teaching.knowledge_path.map(dmateKnowledgeLabel).join(" → ")
+            );
+        }
+    }
+
+    info.innerText = lines.join("\n");
+}
+
+
+// -----------------------------
+// 移动端应用壳：对话抽屉 / 学习工具抽屉
+// -----------------------------
+function isMobileAppShell() {
+    return window.matchMedia?.("(max-width: 1100px)")?.matches ?? false;
+}
+
+let mobileDrawerGestureFrame = 0;
+let mobileDrawerGesturePending = null;
+let mobileDrawerGestureElements = null;
+
+function getMobileDrawerGestureElements() {
+    const cached = mobileDrawerGestureElements;
+    if (
+        cached
+        && cached.center?.isConnected
+        && cached.left?.isConnected
+        && cached.right?.isConnected
+    ) {
+        return cached;
+    }
+
+    mobileDrawerGestureElements = {
+        left:document.querySelector(".left"),
+        right:document.querySelector(".right"),
+        backdrop:document.getElementById("mobileShellBackdrop"),
+        center:document.querySelector(".center")
+    };
+    return mobileDrawerGestureElements;
+}
+
+function resetMobileDrawerGestureStyles() {
+    if (mobileDrawerGestureFrame) {
+        cancelAnimationFrame(mobileDrawerGestureFrame);
+        mobileDrawerGestureFrame = 0;
+    }
+    mobileDrawerGesturePending = null;
+
+    const { left, right, backdrop, center } = getMobileDrawerGestureElements();
+
+    [left, right, backdrop, center].forEach(element => {
+        if (!(element instanceof HTMLElement)) return;
+        element.style.removeProperty("transform");
+        element.style.removeProperty("opacity");
+        element.style.removeProperty("pointer-events");
+    });
+
+    document.body.classList.remove("mobile-drawer-dragging");
+}
+
+function closeMobileShellDrawers() {
+    document.body.classList.remove("mobile-left-open", "mobile-tools-open");
+    resetMobileDrawerGestureStyles();
+}
+
+function openMobileShellDrawer(kind) {
+    if (!isMobileAppShell()) return;
+
+    resetMobileDrawerGestureStyles();
+    document.body.classList.remove("mobile-left-open", "mobile-tools-open");
+    document.body.classList.add(
+        kind === "tools" ? "mobile-tools-open" : "mobile-left-open"
+    );
+}
+
+function paintMobileDrawerDragProgress(kind, progress) {
+    const p = Math.max(0, Math.min(1, Number(progress) || 0));
+    const { left, right, backdrop, center } = getMobileDrawerGestureElements();
+
+    document.body.classList.add("mobile-drawer-dragging");
+
+    if (kind === "left" && left instanceof HTMLElement) {
+        left.style.transform = `translate3d(${-104 + 104 * p}%,0,0)`;
+    }
+    if (kind === "tools" && right instanceof HTMLElement) {
+        right.style.transform = `translate3d(${104 - 104 * p}%,0,0)`;
+    }
+
+    if (backdrop instanceof HTMLElement) {
+        backdrop.style.opacity = String(p);
+        backdrop.style.pointerEvents = "none";
+    }
+
+    if (center instanceof HTMLElement) {
+        const direction = kind === "left" ? 1 : -1;
+        const offset = direction * p * 8;
+        center.style.transform = `translate3d(${offset}px,0,0)`;
+    }
+}
+
+function setMobileDrawerDragProgress(kind, progress) {
+    // touchmove 可能高于屏幕刷新率；每帧只提交一次 transform，避免主线程被
+    // 连续 style 写入拖住。
+    mobileDrawerGesturePending = { kind, progress };
+    if (mobileDrawerGestureFrame) return;
+
+    mobileDrawerGestureFrame = requestAnimationFrame(() => {
+        mobileDrawerGestureFrame = 0;
+        const pending = mobileDrawerGesturePending;
+        mobileDrawerGesturePending = null;
+        if (!pending) return;
+        paintMobileDrawerDragProgress(pending.kind, pending.progress);
+    });
+}
+
+function settleMobileDrawerGesture(kind, shouldOpen) {
+    const body = document.body;
+
+    body.classList.remove("mobile-drawer-dragging");
+    body.classList.remove("mobile-left-open", "mobile-tools-open");
+    if (shouldOpen) {
+        body.classList.add(kind === "tools" ? "mobile-tools-open" : "mobile-left-open");
+    }
+
+    // 保留手指结束瞬间的 inline transform 一帧，再交还给 CSS transition，
+    // 这样不会在 touchend 时突然跳一下。
+    requestAnimationFrame(() => {
+        requestAnimationFrame(resetMobileDrawerGestureStyles);
+    });
+}
+
+function refreshMobileConversationTitle() {
+    const title = document.getElementById("mobileConversationTitle");
+    if (!title) return;
+
+    const session = getCurrent();
+    const name = sessionDisplayName(session).trim();
+    title.setAttribute("data-i18n-content", "");
+    title.textContent = name || "DMate";
+}
+
+
+function mobileSwipeBlockedTarget(target) {
+    if (!(target instanceof Element)) return false;
+
+    return Boolean(target.closest([
+        "input",
+        "textarea",
+        "select",
+        "button",
+        "a",
+        "[contenteditable='true']",
+        // Inline MathJax text is no longer an independent horizontal scroll
+        // target; allow swiping across it to open the navigation drawers.
+        'mjx-container[display="true"]',
+        ".knowledge-graph-canvas",
+        ".kg-history-preview",
+        ".wrong-question",
+        ".wrong-feedback-body",
+        ".wrong-answer-body",
+        ".wrong-solution-body",
+        ".wrong-analysis-body"
+    ].join(",")));
+}
+
+function mobileOverlayIsOpen() {
+    return Boolean(
+        document.querySelector(".modal:not(.hidden)")
+        || document.querySelector("dialog[open]")
+    );
+}
+
+function installMobileSwipeNavigation() {
+    const center = document.querySelector(".center");
+    const left = document.querySelector(".left");
+    const right = document.querySelector(".right");
+    const backdrop = document.getElementById("mobileShellBackdrop");
+    if (!center) return;
+
+    const startSlop = 6;
+    const openThreshold = 0.21;
+    const closeThreshold = 0.82;
+    const fastVelocity = 0.36;
+
+    let drag = null;
+
+    const drawerWidth = kind => {
+        const element = kind === "left" ? left : right;
+        return Math.max(240, element?.getBoundingClientRect?.().width || window.innerWidth * 0.88);
+    };
+
+    const beginDrag = (event, source) => {
+        if (!isMobileAppShell() || event.touches.length !== 1) {
+            drag = null;
+            return;
+        }
+
+        if (mobileOverlayIsOpen() || mobileSwipeBlockedTarget(event.target)) {
+            drag = null;
+            return;
+        }
+
+        const touch = event.touches[0];
+        const leftOpen = document.body.classList.contains("mobile-left-open");
+        const toolsOpen = document.body.classList.contains("mobile-tools-open");
+
+        let kind = null;
+        let opening = false;
+
+        if (source === "left" || (source === "backdrop" && leftOpen)) {
+            if (!leftOpen) return;
+            kind = "left";
+        } else if (source === "tools" || (source === "backdrop" && toolsOpen)) {
+            if (!toolsOpen) return;
+            kind = "tools";
+        } else if (source === "center") {
+            if (leftOpen || toolsOpen) return;
+            opening = true;
+        } else {
+            return;
+        }
+
+        drag = {
+            source,
+            kind,
+            opening,
+            locked:false,
+            cancelled:false,
+            startX:touch.clientX,
+            startY:touch.clientY,
+            lastX:touch.clientX,
+            lastTime:performance.now(),
+            startTime:performance.now(),
+            progress:opening ? 0 : 1,
+            // 已知抽屉在 touchstart 时只读一次布局；主界面打开方向在第一次
+            // 明确横向手势后再读一次，之后 touchmove 不再触发布局测量。
+            width:kind ? drawerWidth(kind) : 0
+        };
+    };
+
+    const moveDrag = event => {
+        if (!drag || drag.cancelled || event.touches.length !== 1) return;
+
+        const touch = event.touches[0];
+        const dx = touch.clientX - drag.startX;
+        const dy = touch.clientY - drag.startY;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+
+        if (!drag.locked) {
+            if (absX < startSlop && absY < startSlop) return;
+
+            // 纵向意图优先交给页面滚动，不抢手势。
+            if (absY > absX * 1.16) {
+                drag.cancelled = true;
+                drag = null;
+                return;
+            }
+
+            if (absX <= absY * 1.04) return;
+
+            if (drag.opening) {
+                drag.kind = dx >= 0 ? "left" : "tools";
+                drag.width = drawerWidth(drag.kind);
+            } else {
+                // 左抽屉只能向左收回，右抽屉只能向右收回。
+                const closingDirection = drag.kind === "left" ? dx < 0 : dx > 0;
+                if (!closingDirection) {
+                    drag.cancelled = true;
+                    drag = null;
+                    return;
+                }
+            }
+
+            drag.locked = true;
+        }
+
+        if (!drag.kind) return;
+        event.preventDefault();
+
+        const width = Math.max(1, drag.width || drawerWidth(drag.kind));
+        let progress;
+
+        if (drag.opening) {
+            progress = Math.abs(dx) / width;
+        } else if (drag.kind === "left") {
+            progress = 1 + dx / width;
+        } else {
+            progress = 1 - dx / width;
+        }
+
+        drag.progress = Math.max(0, Math.min(1, progress));
+        drag.lastX = touch.clientX;
+        drag.lastTime = performance.now();
+        setMobileDrawerDragProgress(drag.kind, drag.progress);
+    };
+
+    const endDrag = event => {
+        if (!drag) return;
+
+        const current = drag;
+        drag = null;
+
+        if (!current.locked || current.cancelled || !current.kind) {
+            resetMobileDrawerGestureStyles();
+            return;
+        }
+
+        const touch = event.changedTouches?.[0];
+        const endX = touch?.clientX ?? current.lastX;
+        const now = performance.now();
+        // Use the entire gesture, not just the time since the last touchmove:
+        // Android can batch touchmove events and make the old speed unstable.
+        const dt = Math.max(1, now - current.startTime);
+        const velocity = (endX - current.startX) / dt;
+
+        let shouldOpen;
+        if (current.opening) {
+            const fastOpen = current.kind === "left"
+                ? velocity > fastVelocity
+                : velocity < -fastVelocity;
+            shouldOpen = current.progress >= openThreshold || fastOpen;
+        } else {
+            const fastClose = current.kind === "left"
+                ? velocity < -fastVelocity
+                : velocity > fastVelocity;
+            shouldOpen = current.progress > closeThreshold && !fastClose;
+        }
+
+        settleMobileDrawerGesture(current.kind, shouldOpen);
+    };
+
+    const cancelDrag = () => {
+        if (!drag) return;
+        const current = drag;
+        drag = null;
+        if (current.kind) {
+            settleMobileDrawerGesture(current.kind, !current.opening);
+        } else {
+            resetMobileDrawerGestureStyles();
+        }
+    };
+
+    const bindInteractive = (element, source) => {
+        if (!element) return;
+        element.addEventListener("touchstart", event => beginDrag(event, source), { passive:true });
+        element.addEventListener("touchmove", moveDrag, { passive:false });
+        element.addEventListener("touchend", endDrag, { passive:true });
+        element.addEventListener("touchcancel", cancelDrag, { passive:true });
+    };
+
+    bindInteractive(center, "center");
+    bindInteractive(left, "left");
+    bindInteractive(right, "tools");
+    bindInteractive(backdrop, "backdrop");
+
+    installMobileOverlaySwipeBack();
+}
+
+function getTopMobileGesturePage() {
+    if (!isMobileAppShell()) return null;
+
+    const graphModal = document.getElementById("knowledgeGraphModal");
+    if (
+        graphModal
+        && !graphModal.classList.contains("hidden")
+        && graphModal.classList.contains("graph-fullscreen-view")
+    ) {
+        return {
+            overlay:graphModal,
+            surface:graphModal.querySelector(".graph-modal-card") || graphModal,
+            close:() => setKnowledgeGraphFullscreenView(false)
+        };
+    }
+
+    const dialog = document.activeElement?.closest?.("dialog[open]")
+        || document.querySelector("dialog[open]");
+    if (dialog instanceof HTMLDialogElement) {
+        return {
+            overlay:dialog,
+            surface:dialog,
+            close:() => dialog.close()
+        };
+    }
+
+    const closers = new Map([
+        ["mobileChoiceModal", closeMobileChoiceModal],
+        ["appConfirmModal", () => resolveAppConfirm(false)],
+        ["appearanceBackgroundViewer", closeAppearanceBackgroundViewer],
+        ["wrongSafeModal", closeWrongSafePreview],
+        ["wrongQuestionPickerModal", closeWrongQuestionPicker],
+        ["wrongEditModal", closeWrongEdit],
+        ["wrongRetestReviewModal", closeWrongRetestReview],
+        ["wrongBookModal", closeWrongBook],
+        ["learningReviewModal", closeLearningReview],
+        ["accountModal", closeAccountModal],
+        ["knowledgeGraphModal", closeKnowledgeGraph],
+        ["downloadModal", closeDmateDownloadDialog],
+        ["appearanceModal", closeAppearance]
+    ]);
+
+    const visible = [...document.querySelectorAll(".modal:not(.hidden)")].reverse();
+    for (const modal of visible) {
+        const close = closers.get(modal.id);
+        if (typeof close !== "function") continue;
+        return {
+            overlay:modal,
+            surface:modal.querySelector(".modal-card") || modal,
+            close
+        };
+    }
+
+    return null;
+}
+
+function installMobileOverlaySwipeBack() {
+    const edgeWidth = 46;
+    const startSlop = 6;
+    const completeDistance = 72;
+    const fastVelocity = 0.40;
+    let swipe = null;
+    let swipeFrame = 0;
+    let swipeVisual = null;
+
+    const cancelSwipeFrame = () => {
+        if (swipeFrame) {
+            cancelAnimationFrame(swipeFrame);
+            swipeFrame = 0;
+        }
+        swipeVisual = null;
+    };
+
+    const scheduleSwipeVisual = (surface, distance) => {
+        swipeVisual = { surface, distance };
+        if (swipeFrame) return;
+
+        swipeFrame = requestAnimationFrame(() => {
+            swipeFrame = 0;
+            const visual = swipeVisual;
+            swipeVisual = null;
+            if (!(visual?.surface instanceof HTMLElement)) return;
+            visual.surface.style.transition = "none";
+            visual.surface.style.transform = `translate3d(${visual.distance}px,0,0)`;
+        });
+    };
+
+    document.addEventListener("touchstart", event => {
+        if (!isMobileAppShell() || event.touches.length !== 1) {
+            swipe = null;
+            return;
+        }
+
+        const page = getTopMobileGesturePage();
+        if (!page) {
+            swipe = null;
+            return;
+        }
+
+        const touch = event.touches[0];
+        if (touch.clientX > edgeWidth) {
+            swipe = null;
+            return;
+        }
+
+        // 如果刚打开页面就立刻滑回，先停掉进入动画，避免两个 transform 打架。
+        try {
+            page.surface.getAnimations?.().forEach(animation => animation.cancel());
+        } catch (_error) {}
+
+        swipe = {
+            page,
+            startX:touch.clientX,
+            startY:touch.clientY,
+            lastX:touch.clientX,
+            lastTime:performance.now(),
+            locked:false,
+            progress:0,
+            width:Math.max(1, page.surface.getBoundingClientRect().width || window.innerWidth)
+        };
+    }, { passive:true, capture:true });
+
+    document.addEventListener("touchmove", event => {
+        if (!swipe || event.touches.length !== 1) return;
+
+        const touch = event.touches[0];
+        const dx = touch.clientX - swipe.startX;
+        const dy = touch.clientY - swipe.startY;
+
+        if (!swipe.locked) {
+            if (Math.abs(dx) < startSlop && Math.abs(dy) < startSlop) return;
+            if (dx <= 0 || Math.abs(dy) > Math.abs(dx) * 0.95) {
+                swipe = null;
+                return;
+            }
+            swipe.locked = true;
+        }
+
+        event.preventDefault();
+
+        const width = swipe.width;
+        const distance = Math.max(0, Math.min(width, dx));
+        const progress = Math.max(0, Math.min(1, distance / width));
+        swipe.progress = progress;
+        swipe.lastX = touch.clientX;
+        swipe.lastTime = performance.now();
+
+        // 只做合成层 transform，不在拖动过程中改整屏背景色/透明度，
+        // 避免 Fennec 上每帧触发大面积重绘。
+        scheduleSwipeVisual(swipe.page.surface, distance);
+    }, { passive:false, capture:true });
+
+    const finish = event => {
+        if (!swipe) return;
+        const current = swipe;
+        swipe = null;
+
+        const surface = current.page.surface;
+        const overlay = current.page.overlay;
+
+        if (!(surface instanceof HTMLElement) || !current.locked) {
+            cancelSwipeFrame();
+            if (surface instanceof HTMLElement) {
+                surface.style.removeProperty("transition");
+                surface.style.removeProperty("transform");
+            }
+            return;
+        }
+
+        const touch = event.changedTouches?.[0];
+        const endX = touch?.clientX ?? current.lastX;
+        const dt = Math.max(1, performance.now() - current.lastTime);
+        const velocity = (endX - current.lastX) / dt;
+        cancelSwipeFrame();
+        const width = current.width;
+        const distance = current.progress * width;
+        surface.style.transition = "none";
+        surface.style.transform = `translate3d(${distance}px,0,0)`;
+        const shouldClose = distance >= completeDistance
+            || current.progress >= 0.24
+            || velocity > fastVelocity;
+
+        surface.style.removeProperty("transition");
+
+        if (shouldClose) {
+            const animation = surface.animate(
+                [
+                    { transform:`translate3d(${distance}px,0,0)` },
+                    { transform:"translate3d(100%,0,0)" }
+                ],
+                {
+                    duration:Math.max(110, 190 - Math.min(70, velocity * 45)),
+                    easing:"cubic-bezier(.22,1,.36,1)",
+                    fill:"forwards"
+                }
+            );
+            animation.finished.catch(() => {}).then(() => {
+                surface.style.removeProperty("transform");
+                current.page.close();
+            });
+        } else {
+            const animation = surface.animate(
+                [
+                    { transform:`translate3d(${distance}px,0,0)` },
+                    { transform:"translate3d(0,0,0)" }
+                ],
+                {
+                    duration:180,
+                    easing:"cubic-bezier(.22,1,.36,1)"
+                }
+            );
+            animation.finished.catch(() => {}).then(() => {
+                surface.style.removeProperty("transform");
+            });
+        }
+    };
+
+    document.addEventListener("touchend", finish, { passive:true, capture:true });
+    document.addEventListener("touchcancel", finish, { passive:true, capture:true });
+}
+
+function animateMobileConversationSwitch() {
+    if (!isMobileAppShell()) return;
+    const chat = document.getElementById("chat");
+    if (!(chat instanceof HTMLElement) || typeof chat.animate !== "function") return;
+
+    chat.animate(
+        [
+            { opacity:0.72, transform:"translate3d(0,7px,0)" },
+            { opacity:1, transform:"translate3d(0,0,0)" }
+        ],
+        {
+            duration:210,
+            easing:"cubic-bezier(.22,1,.36,1)"
+        }
+    );
+}
+
+function initMobileAppShell() {
+    const navBtn = document.getElementById("mobileNavBtn");
+    const toolsBtn = document.getElementById("mobileToolsBtn");
+    const navClose = document.getElementById("mobileNavClose");
+    const toolsClose = document.getElementById("mobileToolsClose");
+    const backdrop = document.getElementById("mobileShellBackdrop");
+    const sessionsBox = document.getElementById("sessions");
+    const newChatBtn = document.querySelector(".left > .btn:not(.appearance-entry)");
+
+    navBtn?.addEventListener("click", () => openMobileShellDrawer("left"));
+    toolsBtn?.addEventListener("click", () => openMobileShellDrawer("tools"));
+    navClose?.addEventListener("click", closeMobileShellDrawers);
+    toolsClose?.addEventListener("click", closeMobileShellDrawers);
+    backdrop?.addEventListener("click", closeMobileShellDrawers);
+
+    newChatBtn?.addEventListener("click", () => {
+        window.setTimeout(closeMobileShellDrawers, 0);
+    });
+
+    [
+        "downloadAppBtn",
+        "appearanceBtn",
+        "wrongBookBtn",
+        "graphDrawingBtn",
+        "conceptNotebookBtn",
+        "knowledgeGraphBtn",
+        "learningReviewBtn"
+    ].forEach(id => {
+        document.getElementById(id)?.addEventListener("click", () => {
+            window.setTimeout(closeMobileShellDrawers, 0);
+        });
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            closeMobileShellDrawers();
+        }
+    });
+
+    const media = window.matchMedia?.("(max-width: 1100px)");
+    media?.addEventListener?.("change", event => {
+        if (!event.matches) {
+            closeMobileShellDrawers();
+        }
+    });
+
+    refreshMobileConversationTitle();
+}
+
+
+// -----------------------------
+// 移动端可视视口：修复软键盘遮住输入框
+// -----------------------------
+let mobileViewportSyncRaf = 0;
+
+let sessionRenameKeyboardOverlayActive = false;
+
+function syncMobileVisualViewport() {
+    if (mobileViewportSyncRaf) {
+        cancelAnimationFrame(mobileViewportSyncRaf);
+    }
+
+    mobileViewportSyncRaf = requestAnimationFrame(() => {
+        mobileViewportSyncRaf = 0;
+
+        const root = document.documentElement;
+        if (!root) return;
+
+        if (!isMobileAppShell()) {
+            sessionRenameKeyboardOverlayActive = false;
+            root.style.removeProperty("--app-visible-height");
+            root.style.removeProperty("--app-viewport-top");
+            root.style.removeProperty("--rename-visible-height");
+            root.style.removeProperty("--rename-viewport-top");
+            document.body?.classList.remove("mobile-keyboard-open");
+            return;
+        }
+
+        const viewport = window.visualViewport;
+        const visibleHeight = Math.max(
+            1,
+            Math.round(viewport?.height || window.innerHeight || 0)
+        );
+        const layoutHeight = Math.max(
+            visibleHeight,
+            Math.round(window.innerHeight || visibleHeight)
+        );
+        const viewportTop = Math.max(
+            0,
+            Math.round(viewport?.offsetTop || 0)
+        );
+        const keyboardInset = Math.max(
+            0,
+            layoutHeight - visibleHeight - viewportTop
+        );
+        const keyboardOpen = keyboardInset > 110;
+        const renameModal = document.getElementById("sessionRenameModal");
+        const renameInput = document.getElementById("sessionRenameInput");
+        const renameModalOpen = Boolean(
+            renameModal && !renameModal.classList.contains("hidden")
+        );
+        const renameInputFocused = Boolean(
+            renameModalOpen && renameInput && document.activeElement === renameInput
+        );
+
+        // 重命名输入框弹出系统键盘时，只调整重命名遮罩的可视区域。
+        // 不缩小整页布局，避免背景抽屉/聊天按钮跟着键盘一起跳动。
+        if (renameModalOpen && renameInputFocused) {
+            // 以输入框焦点为准，而不是依赖所有 Android WebView 都一致的键盘高度报告。
+            sessionRenameKeyboardOverlayActive = true;
+        }
+        if (sessionRenameKeyboardOverlayActive && (renameModalOpen || keyboardOpen)) {
+            if (renameModalOpen) {
+                root.style.setProperty("--rename-visible-height", `${visibleHeight}px`);
+                root.style.setProperty("--rename-viewport-top", `${viewportTop}px`);
+            } else {
+                root.style.removeProperty("--rename-visible-height");
+                root.style.removeProperty("--rename-viewport-top");
+            }
+            document.body?.classList.remove("mobile-keyboard-open");
+            return;
+        }
+
+        if (!renameModalOpen && !keyboardOpen) {
+            sessionRenameKeyboardOverlayActive = false;
+        }
+        root.style.removeProperty("--rename-visible-height");
+        root.style.removeProperty("--rename-viewport-top");
+        root.style.setProperty(
+            "--app-visible-height",
+            `${visibleHeight}px`
+        );
+        root.style.setProperty(
+            "--app-viewport-top",
+            `${viewportTop}px`
+        );
+
+        document.body?.classList.toggle(
+            "mobile-keyboard-open",
+            keyboardOpen
+        );
+
+        if (keyboardOpen) {
+            const text = document.getElementById("text");
+            const chat = document.getElementById("chat");
+            if (text && document.activeElement === text && chat) {
+                chat.scrollTop = chat.scrollHeight;
+            }
+        }
+    });
+}
+
+// 输入邮箱验证码时只滚动账号面板，不让整个 fixed 弹窗被浏览器顶出屏幕。
+function keepAccountFocusedFieldVisible() {
+    const modal = document.getElementById("accountModal");
+    const body = modal?.querySelector(".account-body");
+    const field = document.activeElement;
+    if (!modal || modal.classList.contains("hidden") || !body || !field
+        || !body.contains(field) || !field.matches("input, textarea")) return;
+    const input = field.getBoundingClientRect();
+    const box = body.getBoundingClientRect();
+    if (input.bottom > box.bottom - 14) {
+        body.scrollTop += input.bottom - box.bottom + 14;
+    } else if (input.top < box.top + 14) {
+        body.scrollTop -= box.top + 14 - input.top;
+    }
+}
+
+function installMobileVisualViewportFix() {
+    syncMobileVisualViewport();
+
+    window.addEventListener(
+        "resize",
+        syncMobileVisualViewport,
+        { passive:true }
+    );
+    window.addEventListener(
+        "orientationchange",
+        () => window.setTimeout(syncMobileVisualViewport, 80),
+        { passive:true }
+    );
+
+    const viewport = window.visualViewport;
+    viewport?.addEventListener(
+        "resize",
+        syncMobileVisualViewport,
+        { passive:true }
+    );
+    viewport?.addEventListener(
+        "scroll",
+        syncMobileVisualViewport,
+        { passive:true }
+    );
+
+    const accountModal = document.getElementById("accountModal");
+    accountModal?.addEventListener("focusin", event => {
+        if (!event.target?.matches?.("input, textarea")) return;
+        syncMobileVisualViewport();
+        [70, 180, 360].forEach(delay => window.setTimeout(() => {
+            syncMobileVisualViewport();
+            keepAccountFocusedFieldVisible();
+        }, delay));
+    });
+    window.visualViewport?.addEventListener("resize", () => {
+        requestAnimationFrame(keepAccountFocusedFieldVisible);
+    }, { passive:true });
+
+    const text = document.getElementById("text");
+    if (text) {
+        text.addEventListener("focus", () => {
+            // 安卓键盘动画并非一次完成；几个轻量同步点覆盖首轮打开键盘。
+            syncMobileVisualViewport();
+            [60, 160, 320].forEach(delay => {
+                window.setTimeout(syncMobileVisualViewport, delay);
+            });
+        });
+        text.addEventListener("blur", () => {
+            [0, 120].forEach(delay => {
+                window.setTimeout(syncMobileVisualViewport, delay);
+            });
+        });
+    }
+}
+
+// -----------------------------
+// 全刷新
+// -----------------------------
+function renderAll() {
+    renderSessions();
+    renderChat();
+    renderInfo();
+    renderLearningSummary();
+    renderKnowledgeGraph();
+    refreshInputAvailability();
+    refreshMobileConversationTitle();
+}
+
+window.addEventListener("dmate:languagechange", () => {
+    refreshSessionNameDisplays();
+    refreshSessionRenameLanguage?.();
+    renderInfo();
+    refreshInputAvailability();
+    if (!document.getElementById("learningReviewModal")?.classList.contains("hidden")) renderLearningReview();
+    knowledgeGraphPreparedPngPromise = null;
+    knowledgeGraphPreparedPngKey = "";
+    renderKnowledgeGraph();
+});
+
+
+function removeDeprecatedCopyControls() {
+    [
+        "infoCopyBtn",
+        "learningSummaryCopyBtn",
+        "learningReviewCopy",
+        "knowledgeGraphSideCopyBtn",
+        "wrongCopyBtn"
+    ].forEach(id => {
+        document.getElementById(id)?.remove();
+    });
+}
+
+// -----------------------------
+// 下载：iOS 提供发行版描述文件；Android 提供 APK；桌面系统提供安装包与商店入口
+// -----------------------------
+function dmateClientConfig() {
+    const config = window.DMATE_CLIENT_CONFIG || {};
+    const ua = navigator.userAgent || "";
+    return {
+        isAndroidApp: Boolean(config.isAndroidApp ?? /DMateAndroid\//i.test(ua)),
+        isDesktopApp: Boolean(config.isDesktopApp ?? /DMateDesktop\//i.test(ua))
+    };
+}
+
+function detectDmateInstallPlatform() {
+    const ua = navigator.userAgent || "";
+    const platform = navigator.platform || "";
+    const touchMac = /Mac/i.test(platform) && Number(navigator.maxTouchPoints || 0) > 1;
+    if (/iPhone|iPad|iPod/i.test(ua) || touchMac) return "ios";
+    if (/Android/i.test(ua)) return "android";
+    if (/Macintosh|Mac OS X/i.test(ua) || /Mac/i.test(platform)) return "macos";
+    if (/Windows/i.test(ua) || /Win/i.test(platform)) return "windows";
+    if (/Linux/i.test(ua) || /Linux/i.test(platform)) return "linux";
+    return "other";
+}
+
+function downloadOptionsForCurrentPlatform() {
+    const platform = detectDmateInstallPlatform();
+    const gitcodeRelease = "https://gitcode.com/zm14744/DMate/releases/v1.0.1";
+    const gitcodeDownloadBase = "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/";
+    const githubRelease = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
+    const githubDownloadBase = "https://github.com/zm14744/DMate/releases/download/v1.0.1/";
+    const microsoftStore = "https://apps.microsoft.com/detail/9pk5td2w5m40?hl=zh-CN&gl=HK";
+    const snap = "https://snapcraft.io/dmate";
+    const itch = "https://zm14744.itch.io/dmate";
+
+    // Public release assets are fixed here, independent of deployment URL settings.
+    // GitHub and GitCode now serve the same published desktop packages.
+    function installers(githubFilename, {gitcodeFilename = githubFilename, formatLabel = "", preferGithub = true} = {}) {
+        const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(gitcodeFilename) + "/download";
+        const githubUrl = githubDownloadBase + encodeURIComponent(githubFilename);
+        const suffix = formatLabel ? " · " + formatLabel : "";
+        return preferGithub
+            ? [
+                { label:"GitHub" + suffix, url:githubUrl },
+                { label:"GitCode" + suffix, url:gitcodeUrl, secondary:true }
+            ]
+            : [
+                { label:"GitCode" + suffix, url:gitcodeUrl },
+                { label:"GitHub" + suffix, url:githubUrl, secondary:true }
+            ];
+    }
+    if (platform === "ios") {
+        return {
+            platform:"iPhone / iPad",
+            text:"选择下载源",
+            actions:installers("DMate-iPhone-iPad-fullscreen.mobileconfig")
+        };
+    }
+    if (platform === "android") {
+        return {
+            platform:"Android 1.0.3",
+            text:"选择下载源",
+            actions:installers("DMate-Android-1.0.3.apk", {preferGithub:false})
+        };
+    }
+    if (platform === "windows") {
+        return {
+            platform:"Windows",
+            text:"选择下载源",
+            actions:[
+                ...installers("DMate_1.0.2_x64-setup.exe"),
+                { label:"Microsoft Store", url:microsoftStore, secondary:true },
+                { label:"itch.io", url:itch, secondary:true }
+            ]
+        };
+    }
+    if (platform === "macos") {
+        return {
+            platform:"macOS",
+            text:dmateUiText("选择下载源。GitHub 上的 macOS 安装包尚未经过 Apple 公证。",
+                "Choose a download source. The macOS installer on GitHub has not been notarized by Apple."),
+            actions:[
+                ...installers("DMate_1.0.2_universal.dmg"),
+                { label:"itch.io", url:itch, secondary:true }
+            ]
+        };
+    }
+    if (platform === "linux") {
+        return {
+            platform:"Linux（x86-64 / amd64）",
+            text:"选择下载源",
+            actions:[
+                ...installers("DMate_1.0.2_amd64.deb", {formatLabel:"DEB"}),
+                ...installers("DMate_1.0.2_amd64.AppImage", {formatLabel:"AppImage"}),
+                { label:"Snap Store", url:snap, secondary:true },
+                { label:"itch.io", url:itch, secondary:true }
+            ]
+        };
+    }
+    return {
+        platform:"桌面系统",
+        text:"选择下载源",
+        actions:[
+            { label:"GitHub", url:githubRelease },
+            { label:"GitCode", url:gitcodeRelease, secondary:true },
+            { label:"Microsoft Store", url:microsoftStore, secondary:true },
+            { label:"Snap Store", url:snap, secondary:true }
+        ]
+    };
+}
+
+function openDmateDownloadDialog() {
+    const modal = document.getElementById("downloadModal");
+    const platformEl = document.getElementById("downloadPlatform");
+    const textEl = document.getElementById("downloadDescription");
+    const actionsEl = document.getElementById("downloadActions");
+    if (!modal || !platformEl || !textEl || !actionsEl) return;
+
+    const options = downloadOptionsForCurrentPlatform();
+    if (!options) return;
+    platformEl.textContent = options.platform;
+    textEl.textContent = options.text;
+    const downloadLinks = options.actions.map(action => {
+        const link = document.createElement("a");
+        link.href = action.url;
+        link.textContent = action.label;
+        link.rel = "noopener";
+        if (action.secondary) link.classList.add("secondary");
+        return link;
+    });
+    // Some older Android WebViews still lack replaceChildren().
+    if (typeof actionsEl.replaceChildren === "function") {
+        actionsEl.replaceChildren(...downloadLinks);
+    } else {
+        actionsEl.textContent = "";
+        downloadLinks.forEach(link => actionsEl.appendChild(link));
+    }
+    actionsEl.hidden = downloadLinks.length === 0;
+
+    // Close the mobile navigation drawer before presenting the fixed dialog.
+    // The modal stays outside the drawer so its backdrop never inherits transforms.
+    if (typeof closeMobileShellDrawers === "function") closeMobileShellDrawers();
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+}
+
+function closeDmateDownloadDialog() {
+    const modal = document.getElementById("downloadModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+}
+
+function initDmateDownloadDialog() {
+    const config = dmateClientConfig();
+    const button = document.getElementById("downloadAppBtn");
+    const close = document.getElementById("downloadModalClose");
+    const modal = document.getElementById("downloadModal");
+    if (!button) return;
+
+    if (config.isAndroidApp || config.isDesktopApp) {
+        button.hidden = true;
+        button.setAttribute("aria-hidden", "true");
+        return;
+    }
+
+    const platform = detectDmateInstallPlatform();
+    button.hidden = false;
+    button.setAttribute("aria-hidden", "false");
+    if (platform === "android" || platform === "ios") button.textContent = "下载 DMate";
+    else button.textContent = "下载 DMate 桌面版";
+
+    button.addEventListener("click", openDmateDownloadDialog);
+
+    close?.addEventListener("click", closeDmateDownloadDialog);
+    modal?.addEventListener("click", event => {
+        if (event.target === modal) closeDmateDownloadDialog();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) closeDmateDownloadDialog();
+    });
+
+}
+
+// -----------------------------
+// 初始化
+// -----------------------------
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+        removeDeprecatedCopyControls();
+        initAppearanceSystem();
+        initDmateDownloadDialog();
+        initManualQuestionMode();
+        installRichSelectionCopy();
+        initMobileAppShell();
+        installMobileVisualViewportFix();
+        // Fennec/Android 的系统返回键行为交给浏览器本身，不再污染 history。
+        // 页面内返回与切换统一交给手势和显式按钮。
+        installMobileSwipeNavigation();
+
+        const input = document.getElementById("text");
+        const chat = document.getElementById("chat");
+        const imageBtn = document.getElementById("imageBtn");
+        const imageInput = document.getElementById("imageInput");
+        const wrongBookBtn = document.getElementById("wrongBookBtn");
+        const learningReviewBtn = document.getElementById("learningReviewBtn");
+        const learningReviewClose = document.getElementById("learningReviewClose");
+        const learningReviewModal = document.getElementById("learningReviewModal");
+        const wrongBookClose = document.getElementById("wrongBookClose");
+        const wrongBookModal = document.getElementById("wrongBookModal");
+        const wrongBookSearchBox = document.getElementById("wrongBookSearch");
+        const wrongBookSearchClear = document.getElementById("wrongBookSearchClear");
+        const wrongBookSortBox = document.getElementById("wrongBookSort");
+        const wrongPdfBtn = document.getElementById("wrongPdfBtn");
+        const wrongClearCompletedBtn = document.getElementById("wrongClearCompletedBtn");
+        const wrongEditClose = document.getElementById("wrongEditClose");
+        const wrongEditSave = document.getElementById("wrongEditSave");
+        const wrongEditModal = document.getElementById("wrongEditModal");
+        const wrongQuestionPickerClose = document.getElementById("wrongQuestionPickerClose");
+        const wrongQuestionPickerConfirm = document.getElementById("wrongQuestionPickerConfirm");
+        const wrongQuestionPickerModal = document.getElementById("wrongQuestionPickerModal");
+        const wrongSafeClose = document.getElementById("wrongSafeClose");
+        const wrongSafeConfirm = document.getElementById("wrongSafeConfirm");
+        const wrongSafeModal = document.getElementById("wrongSafeModal");
+        const wrongSafeQuestion = document.getElementById("wrongSafeQuestion");
+        const knowledgeGraphBtn = document.getElementById("knowledgeGraphBtn");
+        const knowledgeGraphClose = document.getElementById("knowledgeGraphClose");
+        const knowledgeGraphModal = document.getElementById("knowledgeGraphModal");
+        const knowledgeGraphCategory = document.getElementById("knowledgeGraphCategory");
+        const knowledgeGraphCategoryTrigger = document.getElementById("knowledgeGraphCategoryTrigger");
+        const knowledgeGraphScopeBtn = document.getElementById("knowledgeGraphScopeBtn");
+        const knowledgeGraphFocusBtn = document.getElementById("knowledgeGraphFocusBtn");
+        const knowledgeGraphCopyBtn = document.getElementById("knowledgeGraphCopyBtn");
+        const knowledgeGraphDetailTab = document.getElementById("knowledgeGraphDetailTab");
+        const knowledgeGraphHistoryTab = document.getElementById("knowledgeGraphHistoryTab");
+        const appConfirmModal = document.getElementById("appConfirmModal");
+        const appConfirmClose = document.getElementById("appConfirmClose");
+        const appConfirmConfirm = document.getElementById("appConfirmConfirm");
+        const mobileChoiceModal = document.getElementById("mobileChoiceModal");
+        const mobileChoiceClose = document.getElementById("mobileChoiceClose");
+        const wrongFilterButtons = document.querySelectorAll(
+            "[data-wrong-filter]"
+        );
+
+        installChatJumpControls();
+
+        if (chat) {
+            chat.addEventListener(
+                "scroll",
+                handleChatScrollWhileTyping,
+                { passive: true }
+            );
+
+            chat.addEventListener(
+                "wheel",
+                handleChatWheelWhileTyping,
+                { passive: true }
+            );
+
+            chat.addEventListener(
+                "pointerdown",
+                handleChatPointerWhileTyping,
+                { passive: true }
+            );
+
+            chat.addEventListener(
+                "touchstart",
+                handleChatTouchWhileTyping,
+                { passive: true }
+            );
+        }
+
+        initializeChatComposer();
+
+        if (imageBtn) {
+            imageBtn.addEventListener(
+                "click",
+                openImagePicker
+            );
+        }
+
+        const ocrCancelBtn = document.getElementById("ocrCancelBtn");
+        if (ocrCancelBtn) {
+            ocrCancelBtn.addEventListener(
+                "click",
+                cancelImageRecognition
+            );
+        }
+
+        if (imageInput) {
+            // Historical 1.0.1-1.0.4 Android WebViews may return no file when
+            // multiple selection is enabled. Keep up to four independent OCR
+            // tasks, but request files one by one on these unchanged APKs.
+            // The website and newer native shells retain multi-file selection.
+            if (/DMateAndroid\/1\.0\.[0-4](?!\d)/i.test(navigator.userAgent || "")) {
+                imageInput.multiple = false;
+            }
+            // Some OEM WebViews dispatch only input or only change.
+            // handleImageSelected consumes and clears files synchronously, so
+            // the second event cannot enqueue the same selection twice.
+            imageInput.addEventListener("input", handleImageSelected);
+            imageInput.addEventListener("change", handleImageSelected);
+        }
+        initializeOcrTaskPanel();
+        initializeVoiceInput();
+        initializeConceptNotebook();
+
+
+        if (wrongBookBtn) {
+            wrongBookBtn.addEventListener(
+                "click",
+                openWrongBook
+            );
+        }
+
+        if (learningReviewBtn) {
+            learningReviewBtn.addEventListener(
+                "click",
+                openLearningReview
+            );
+        }
+
+        if (learningReviewClose) {
+            learningReviewClose.addEventListener(
+                "click",
+                closeLearningReview
+            );
+        }
+
+
+        if (learningReviewModal) {
+            learningReviewModal.addEventListener(
+                "click",
+                event => {
+                    if (event.target === learningReviewModal) {
+                        closeLearningReview();
+                    }
+                }
+            );
+        }
+
+        if (wrongBookClose) {
+            wrongBookClose.addEventListener(
+                "click",
+                closeWrongBook
+            );
+        }
+
+        if (wrongBookModal) {
+            wrongBookModal.addEventListener(
+                "click",
+                event => {
+                    if (event.target === wrongBookModal) {
+                        closeWrongBook();
+                    }
+                }
+            );
+        }
+
+        if (wrongBookSearchBox) {
+            const syncWrongBookSearchClear = () => {
+                if (!wrongBookSearchClear) {
+                    return;
+                }
+
+                wrongBookSearchClear.classList.toggle(
+                    "hidden",
+                    !wrongBookSearchBox.value
+                );
+            };
+
+            wrongBookSearchBox.addEventListener(
+                "input",
+                event => {
+                    setWrongBookSearch(event.target.value);
+                    syncWrongBookSearchClear();
+                }
+            );
+
+            if (wrongBookSearchClear) {
+                wrongBookSearchClear.addEventListener(
+                    "click",
+                    () => {
+                        wrongBookSearchBox.value = "";
+                        setWrongBookSearch("");
+                        syncWrongBookSearchClear();
+                        wrongBookSearchBox.focus();
+                    }
+                );
+            }
+
+            syncWrongBookSearchClear();
+        }
+
+        if (wrongBookSortBox) {
+            wrongBookSortBox.addEventListener(
+                "change",
+                event => setWrongBookSort(event.target.value)
+            );
+        }
+        const wrongBookSortTrigger = document.getElementById("wrongBookSortTrigger");
+        if (wrongBookSortTrigger && wrongBookSortBox) {
+            wrongBookSortTrigger.addEventListener("click", async event => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (wrongBookSortTrigger.dataset.opening === "true") return;
+                wrongBookSortTrigger.dataset.opening = "true";
+                try {
+                    const selected = await openMobileChoiceModal({
+                        title: "排序方式",
+                        options: Array.from(wrongBookSortBox.options).map(item => ({
+                            value: item.value, label: item.textContent.trim()
+                        })),
+                        value: wrongBookSortBox.value
+                    });
+                    if (selected) setWrongBookSort(selected.value);
+                } finally {
+                    delete wrongBookSortTrigger.dataset.opening;
+                }
+            });
+        }
+
+        if (wrongPdfBtn) {
+            wrongPdfBtn.addEventListener(
+                "click",
+                exportWrongBookPdf
+            );
+        }
+
+        if (wrongClearCompletedBtn) {
+            wrongClearCompletedBtn.addEventListener(
+                "click",
+                clearCompletedWrongQuestions
+            );
+        }
+
+        if (wrongEditClose) {
+            wrongEditClose.addEventListener(
+                "click",
+                closeWrongEdit
+            );
+        }
+
+
+        if (wrongEditSave) {
+            wrongEditSave.addEventListener(
+                "click",
+                saveWrongEdit
+            );
+        }
+
+        if (wrongEditModal) {
+            wrongEditModal.addEventListener(
+                "click",
+                event => {
+                    if (event.target === wrongEditModal) {
+                        closeWrongEdit();
+                    }
+                }
+            );
+        }
+
+        if (wrongQuestionPickerClose) {
+            wrongQuestionPickerClose.addEventListener(
+                "click",
+                closeWrongQuestionPicker
+            );
+        }
+
+
+        if (wrongQuestionPickerConfirm) {
+            wrongQuestionPickerConfirm.addEventListener(
+                "click",
+                confirmWrongQuestionPicker
+            );
+        }
+
+        if (wrongQuestionPickerModal) {
+            wrongQuestionPickerModal.addEventListener(
+                "click",
+                event => {
+                    if (event.target === wrongQuestionPickerModal) {
+                        closeWrongQuestionPicker();
+                    }
+                }
+            );
+        }
+
+        if (wrongSafeClose) {
+            wrongSafeClose.addEventListener(
+                "click",
+                closeWrongSafePreview
+            );
+        }
+
+
+        if (wrongSafeConfirm) {
+            wrongSafeConfirm.addEventListener(
+                "click",
+                confirmWrongSafePreview
+            );
+        }
+
+        if (wrongSafeQuestion) {
+            wrongSafeQuestion.addEventListener("input", () => updateWrongSafeQuestionPreview(120));
+        }
+
+        if (wrongSafeModal) {
+            wrongSafeModal.addEventListener(
+                "click",
+                event => {
+                    if (event.target === wrongSafeModal) {
+                        closeWrongSafePreview();
+                    }
+                }
+            );
+        }
+
+        if (knowledgeGraphBtn) {
+            knowledgeGraphBtn.addEventListener(
+                "click",
+                openKnowledgeGraph
+            );
+        }
+
+        if (knowledgeGraphClose) {
+            knowledgeGraphClose.addEventListener(
+                "click",
+                closeKnowledgeGraph
+            );
+        }
+
+        if (knowledgeGraphModal) {
+            knowledgeGraphModal.addEventListener(
+                "click",
+                event => {
+                    if (event.target === knowledgeGraphModal) {
+                        closeKnowledgeGraph();
+                    }
+                }
+            );
+        }
+
+        installKnowledgeGraphDesktopZoom();
+
+        if (knowledgeGraphCategory) {
+            knowledgeGraphCategory.addEventListener(
+                "change",
+                event => setKnowledgeGraphFilter(event.target.value)
+            );
+        }
+
+        if (knowledgeGraphCategoryTrigger) {
+            knowledgeGraphCategoryTrigger.addEventListener(
+                "click",
+                openKnowledgeGraphCategoryPicker
+            );
+        }
+
+        if (knowledgeGraphScopeBtn) {
+            knowledgeGraphScopeBtn.addEventListener(
+                "click",
+                () => selectKnowledgeGraphDisplayMode("focus")
+            );
+        }
+
+        if (knowledgeGraphDetailTab) {
+            knowledgeGraphDetailTab.addEventListener(
+                "click",
+                () => {
+                    setKnowledgeGraphSideMode(
+                        "detail"
+                    );
+                }
+            );
+        }
+
+        if (knowledgeGraphHistoryTab) {
+            knowledgeGraphHistoryTab.addEventListener(
+                "click",
+                () => {
+                    setKnowledgeGraphSideMode(
+                        "history"
+                    );
+                }
+            );
+        }
+
+        if (knowledgeGraphFocusBtn) {
+            knowledgeGraphFocusBtn.addEventListener(
+                "click",
+                () => selectKnowledgeGraphDisplayMode("full")
+            );
+        }
+
+        if (knowledgeGraphCopyBtn) {
+            knowledgeGraphCopyBtn.addEventListener(
+                "click",
+                copyKnowledgeGraphVisual
+            );
+        }
+
+        for (const button of wrongFilterButtons) {
+            button.addEventListener(
+                "click",
+                () => {
+                    setWrongBookFilter(
+                        button.getAttribute("data-wrong-filter")
+                    );
+                }
+            );
+        }
+
+        appConfirmClose?.addEventListener("click", () => resolveAppConfirm(false));
+        appConfirmConfirm?.addEventListener("click", () => resolveAppConfirm(true));
+        // A pointerdown on the *already-open* backdrop is a new gesture.
+        // Do not close on click: mobile synthetic clicks can land on the newly
+        // created backdrop after the click which originally opened this modal.
+        appConfirmModal?.addEventListener("pointerdown", event => {
+            if (event.target === appConfirmModal) resolveAppConfirm(false);
+        });
+        appConfirmModal?.addEventListener("keydown", event => {
+            if (event.key === "Tab" && appConfirmModal.classList.contains("notice-only")) {
+                event.preventDefault();
+                appConfirmClose?.focus({ preventScroll:true });
+            }
+        });
+
+        mobileChoiceClose?.addEventListener("click", closeMobileChoiceModal);
+        mobileChoiceModal?.addEventListener("cancel", event => {
+            event.preventDefault();
+            closeMobileChoiceModal();
+        });
+        mobileChoiceModal?.addEventListener("close", () => {
+            if (!mobileChoiceModal.open) closeMobileChoiceModal();
+        });
+        mobileChoiceModal?.addEventListener("pointerdown", event => {
+            if (event.target === mobileChoiceModal) closeMobileChoiceModal();
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key !== "Escape") return;
+            if (!document.getElementById("appConfirmModal")?.classList.contains("hidden")) {
+                resolveAppConfirm(false);
+            }
+            if (!document.getElementById("mobileChoiceModal")?.classList.contains("hidden")) {
+                closeMobileChoiceModal();
+            }
+        });
+
+        // 启动时始终显示空白工作区。不得根据 localStorage 中旧登录标记
+        // 在 /auth/me 验证之前渲染任何历史聊天或错题。
+        sessions = [];
+        currentId = null;
+        deletedSessionIds = Object.create(null);
+        learningState = createEmptyLearningState();
+        clearLegacyPersistentBackup();
+
+        renderAll();
+        refreshInputAvailability();
+        initAccountSystem();
+
+        // 兼容旧会话：如果之前 AI 出过题但没有保存 generatedQuestion /
+        // generatedTeaching，启动后自动恢复最近真实题目并补分类。
+        const activeSession = getCurrent();
+
+        if (activeSession) {
+            ensureActiveQuestionAfterHistoryChange(
+                activeSession
+            ).then(() => {
+                saveState();
+                renderInfo();
+                renderLearningSummary();
+            });
+        }
+    }
+);
