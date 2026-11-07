@@ -6,7 +6,11 @@
   "version": "1.0.0",
   "minimum_chrome_version": "116",
   "permissions": [
-    "sidePanel"
+    "sidePanel",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://dmate.zeabur.app/*"
   ],
   "background": {
     "service_worker": "service-worker.js"
