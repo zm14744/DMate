@@ -5,7 +5,7 @@ Firefox-specific build of DMate. It reuses the original DMate front-end, CSS, Ja
 ## Firefox integration
 
 - Manifest V3.
-- Uses Firefox's native `sidebar_action` and `browser.sidebarAction` APIs.
+- Uses Firefox's native sidebar_action and browser.sidebarAction APIs.
 - The toolbar button toggles the DMate sidebar.
 - The same local DMate interface is used; the Firefox sidebar is positioned and sized by Firefox.
 - Firefox 140 or later is required for the built-in data-collection consent declaration.
@@ -17,15 +17,20 @@ The original DMate backend remains at https://dmate.zeabur.app/. The packaged AP
 
 ## Install for local testing
 
-1. Open `about:debugging#/runtime/this-firefox`.
-2. Click **Load Temporary Add-on…**.
-3. Select the `manifest.json` file from the extracted Firefox extension folder.
+1. Open about:debugging#/runtime/this-firefox.
+2. Click Load Temporary Add-on…
+3. Select the manifest.json file from the extracted Firefox extension folder.
 4. Click the DMate toolbar button to toggle the sidebar.
 
 For normal user installation, submit the ZIP to Mozilla Add-ons (AMO). Firefox release builds require Mozilla-signed extensions.
+
+## AMO submission files
+
+- DMate_Firefox_Addon.zip: the extension package to upload.
+- DMate_Firefox_Source_Code.zip: source code and dependency package for AMO review.
 
 ## Review notes
 
 The manifest declares the data categories needed for account authentication, user-submitted chat messages, and personally identifying information such as email addresses and voice recordings. It does not request browsing-history, tab-content, or all-sites permissions.
 
-The front-end files are packaged locally. Network access is limited to the DMate backend host declared in `host_permissions`; the backend may forward specific user-submitted content to configured AI and email providers. Confirm the public privacy-policy URL and the production provider configuration before submitting the AMO listing.
+The front-end files are packaged locally. Network access is limited to the DMate backend host declared in host_permissions; the backend may forward specific user-submitted content to configured AI and email providers. Confirm the public privacy-policy URL and the production provider configuration before submitting the AMO listing.

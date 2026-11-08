@@ -6,6 +6,10 @@ on:
     paths:
       - 'browser-extension/firefox/**'
       - '.github/workflows/package-firefox-addon.yml'
+      - 'templates/index.html'
+      - 'static/**'
+      - 'docs/SECURITY_PRIVACY.md'
+      - 'THIRD_PARTY_LICENSES.md'
 
 permissions:
   contents: write
@@ -83,22 +87,88 @@ jobs:
           print(f"Firefox ZIP validated: {package.stat().st_size} bytes.")
           PY
 
-      - name: Upload Firefox package artifact
+      - name: Assemble AMO source-code submission package
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/dmate-firefox-source"
+          mkdir -p "$SRC/extension" "$SRC/original-frontend/static" "$SRC/vendor-source"
+          cp -a browser-extension/firefox/. "$SRC/extension/"
+          cp templates/index.html "$SRC/original-frontend/templates-index.html"
+          cp -a static/. "$SRC/original-frontend/static/"
+          cp docs/SECURITY_PRIVACY.md "$SRC/SECURITY_PRIVACY.md"
+          cp THIRD_PARTY_LICENSES.md "$SRC/THIRD_PARTY_LICENSES.md"
+          cp browser-extension/firefox/static/vendor/vendor-packages.json "$SRC/vendor-packages.json"
+
+          cat > "$SRC/README.md" <<'EOF'
+          # DMate Firefox Add-on — Source Code Submission
+
+          This archive accompanies the DMate Firefox Manifest V3 add-on submitted to Mozilla Add-ons (AMO).
+
+          ## Contents
+
+          - extension/: the exact Firefox extension source tree used to build the submitted ZIP.
+          - original-frontend/templates-index.html: the original server-side HTML template.
+          - original-frontend/static/: the original first-party front-end assets and vendored browser libraries.
+          - vendor-packages.json: exact upstream npm package versions, registry tarball URLs, integrity values, and vendored file hashes.
+          - vendor-source/: official npm package archives for the vendored third-party libraries.
+          - SECURITY_PRIVACY.md: repository documentation describing data flows, local storage, server processing, and third-party services.
+          - THIRD_PARTY_LICENSES.md: third-party license inventory.
+
+          ## Reproducing the package
+
+          1. Use Node.js with npm and Python 3.
+          2. The exact upstream dependencies are recorded in vendor-packages.json:
+             - mathjax 3.2.2
+             - marked 15.0.12
+             - dompurify 3.2.6
+             - html2canvas 1.4.1
+             - jspdf 2.5.2
+          3. The matching official npm archives are included under vendor-source/. Their package versions and integrity values are also recorded in vendor-packages.json.
+          4. The extension uses the original DMate front-end resources locally. extension/sidebar.html is the extension-ready adaptation of the original template: server-side template expressions are resolved or removed, executable inline scripts are moved to local files under extension/extension/, and the API bridge routes application API requests to the declared DMate backend host.
+          5. The Firefox-specific integration is defined by extension/manifest.json and extension/background.js. It uses Firefox's native sidebar_action API; the application UI and first-party front-end assets are otherwise reused from the Edge package.
+          6. To package the exact extension tree, run:
+             cd extension && zip -X -qr ../DMate_Firefox_Addon.zip .
+
+          No remote JavaScript or WebAssembly is loaded for execution. The extension's application requests go to https://dmate.zeabur.app/; the backend may forward user-submitted content to the configured AI and email providers as documented in SECURITY_PRIVACY.md.
+          EOF
+
+          for spec in mathjax@3.2.2 marked@15.0.12 dompurify@3.2.6 html2canvas@1.4.1 jspdf@2.5.2; do
+            npm pack "$spec" --pack-destination "$SRC/vendor-source"
+          done
+
+          rm -f browser-extension/DMate_Firefox_Source_Code.zip
+          (cd "$SRC" && zip -X -qr "$GITHUB_WORKSPACE/browser-extension/DMate_Firefox_Source_Code.zip" .)
+          python - <<'PY'
+          import pathlib, zipfile
+          p = pathlib.Path("browser-extension/DMate_Firefox_Source_Code.zip")
+          with zipfile.ZipFile(p) as z:
+              names = z.namelist()
+              assert "README.md" in names
+              assert "extension/manifest.json" in names
+              assert "original-frontend/templates-index.html" in names
+              assert "vendor-packages.json" in names
+              assert any(n.startswith("vendor-source/") and n.endswith(".tgz") for n in names)
+          print(f"AMO source package validated: {p.stat().st_size} bytes.")
+          PY
+
+      - name: Upload Firefox submission artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: DMate-Firefox-Add-on-v1.0.4
-          path: browser-extension/DMate_Firefox_Addon.zip
+          name: DMate-Firefox-AMO-Submission-v1.0.4
+          path: |
+            browser-extension/DMate_Firefox_Addon.zip
+            browser-extension/DMate_Firefox_Source_Code.zip
           if-no-files-found: error
           retention-days: 90
 
-      - name: Commit generated Firefox ZIP
+      - name: Commit generated Firefox packages
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add browser-extension/DMate_Firefox_Addon.zip
+          git add browser-extension/DMate_Firefox_Addon.zip browser-extension/DMate_Firefox_Source_Code.zip
           if git diff --cached --quiet; then
-            echo "Firefox package is already up to date."
+            echo "Firefox packages are already up to date."
             exit 0
           fi
-          git commit -m "Build DMate Firefox add-on package v1.0.4"
+          git commit -m "Build DMate Firefox AMO submission packages"
           git push origin HEAD:main
