@@ -1,0 +1,46 @@
+.dmate-update-dialog {
+    position:fixed;
+    inset:0;
+    box-sizing:border-box;
+    width:min(520px, calc(100vw - 32px));
+    max-width:calc(100vw - 32px);
+    max-height:calc(100vh - 48px);
+    max-height:calc(100dvh - 48px);
+    margin:auto;
+    padding:0;
+    border:1px solid var(--border-strong, #cbd5e1);
+    border-radius:18px;
+    background:var(--surface-2, #f8fafc);
+    color:var(--text-primary, #1e293b);
+    font:inherit;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+    overflow:hidden;
+}
+.dmate-update-dialog[open] { display:flex; flex-direction:column; }
+.dmate-update-dialog::backdrop { background:rgba(0,0,0,.46); }
+.dmate-update-dialog .modal-head { flex:0 0 auto; gap:16px; }
+.dmate-update-dialog h2 { margin:0; font:inherit; font-weight:600; }
+.dmate-update-body { flex:0 1 auto; min-height:0; padding:18px 20px 22px; overflow:auto; overflow-wrap:anywhere; }
+.dmate-update-body p { margin:0 0 14px; line-height:1.65; }
+.dmate-update-body .download-description { margin:0; }
+.dmate-update-actions a { border:1px solid transparent; }
+.dmate-update-actions a:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.dmate-update-format { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 16px; }
+.dmate-update-format select {
+    max-width:100%; padding:8px 12px; border-radius:10px;
+    border:1px solid var(--border-strong); background:var(--surface-2); color:inherit; font:inherit;
+}
+.dmate-update-fallback { margin-top:18px; }
+.dmate-update-fallback[hidden] { display:none!important; }
+.dmate-update-fallback p { color:var(--text-secondary); }
+.dmate-update-fallback input {
+    box-sizing:border-box; width:100%; padding:10px 12px; margin:0 0 10px;
+    border:1px solid var(--border-strong); border-radius:10px;
+    background:var(--surface-1); color:inherit; font:inherit;
+}
+.dmate-update-fallback button { padding:10px 14px; border:1px solid var(--border-strong); border-radius:10px; font:inherit; cursor:pointer; }
+.dmate-update-overlay { position:fixed; inset:0; z-index:12000; background:rgba(0,0,0,.46); }
+@media(max-width:760px) {
+    .dmate-update-dialog { max-height:calc(100dvh - max(48px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px)); }
+    .dmate-update-body { padding:16px; }
+}

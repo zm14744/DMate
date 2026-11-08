@@ -1,13 +1,13 @@
-# DMate Browser Extension
+# DMate Browser Extensions
 
 ## Microsoft Edge
 
-- **[Download the Edge extension package](DMate_Edge_Original_UI.zip)** (Manifest V3, local UI bundle).
-- [Extension source and installation instructions](edge/README.md)
+- [Download the Edge extension package](DMate_Edge_Original_UI.zip).
+- [Edge extension source and installation instructions](edge/README.md).
 
-## Edge Add-ons store listing images
+## Mozilla Firefox
 
-- **[Download all store images](DMate_Edge_Store_Assets.zip)**.
-- [Store assets folder](store-assets/), including the 300×300 extension badge, 440×280 small promotional tile, and 1400×560 large promotional tile.
+- [Download the Firefox add-on package](DMate_Firefox_Addon.zip).
+- [Firefox extension source and installation instructions](firefox/README.md).
 
-The Edge extension packages the original DMate front end locally in the native Side Panel. Only authenticated application API requests are sent to the existing DMate backend at https://dmate.zeabur.app/.
+The two packages use the same original DMate interface and front-end assets. Each package uses its browser's native sidebar API.

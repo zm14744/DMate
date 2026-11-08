@@ -1,0 +1,341 @@
+.dmate-graph-editor { --dge-border:var(--border-strong,#cbd5e1); --dge-surface:var(--surface-1,#f8fafc); --dge-text:var(--text-primary,#172033); color:var(--dge-text); font:inherit; }
+.dmate-graph-editor * { box-sizing:border-box; }
+.dmate-graph-editor h3 { font-size:1rem; margin:0 0 12px; }
+.dmate-graph-editor button,.dmate-graph-editor input,.dmate-graph-editor select,.dmate-graph-editor textarea { font:inherit; color:inherit; border:1px solid var(--dge-border); border-radius:8px; background:var(--surface-0,#fff); }
+.dmate-graph-editor button { padding:8px 12px; cursor:pointer; min-height:38px; }
+.dmate-graph-editor button:hover { border-color:var(--dge-border); }
+.dmate-graph-editor button:disabled { opacity:.55; cursor:default; }
+.dmate-graph-editor input:not([type=checkbox]):not([type=radio]),.dmate-graph-editor select,.dmate-graph-editor textarea { padding:8px 10px; width:100%; min-width:0; }
+.dmate-graph-editor textarea { resize:vertical; line-height:1.65; }
+.dmate-graph-editor input[type=checkbox] { width:18px; height:18px; flex:0 0 18px; accent-color:var(--accent,#2563eb); }
+.dmate-graph-editor :focus-visible { outline:2px solid var(--accent,#2563eb); outline-offset:2px; }
+.dge-topline,.dge-toolbar,.dge-inline,.dge-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.dge-topline { margin-bottom:14px; }
+.dge-question-mode { display:inline-flex; align-items:center; flex-wrap:wrap; gap:12px; margin-right:auto; font-size:14px; line-height:1.5; }
+.dge-question-label { color:var(--text-subtle,#64748b); font-weight:500; }
+.dge-question-option { display:inline-flex; align-items:center; gap:5px; cursor:pointer; white-space:nowrap; }
+.dmate-graph-editor .dge-question-option input[type=radio] {
+ appearance:none; -webkit-appearance:none; box-sizing:border-box;
+ width:17px; min-width:17px; height:17px; min-height:17px; margin:0; padding:0;
+ border:2px solid var(--text-subtle,#64748b); border-radius:50%; background:transparent;
+ cursor:pointer; flex:0 0 17px;
+}
+.dmate-graph-editor .dge-question-option input[type=radio]:checked {
+ background:var(--accent,#3b82f6); border-color:var(--accent,#3b82f6);
+}
+.dmate-graph-editor .dge-question-option input[type=radio]:disabled { cursor:wait; opacity:.55; }
+.dge-muted,.dge-node-kind { color:var(--text-subtle,#64748b); font-size:.86rem; line-height:1.55; }
+.dge-check { display:flex; align-items:center; gap:7px; font-size:.88rem; line-height:1.5; }
+.dge-edge-attributes summary,.dge-edge-move summary { cursor:pointer; font-weight:500; }
+.dge-workspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; margin-bottom:16px; }
+.dge-original,.dge-visual { border:1px solid var(--dge-border); border-radius:12px; padding:14px; background:var(--dge-surface); min-width:0; }
+.dge-original { max-height:390px; overflow:auto; }
+.dge-original img { display:block; width:100%; height:auto; background:#fff; border-radius:6px; }
+.dge-visual svg { display:block; width:100%; height:auto; max-height:350px; overflow:visible; }
+.dge-empty { padding:55px 12px; text-align:center; color:var(--text-subtle,#64748b); }
+.dge-field { display:flex; flex-direction:column; gap:5px; font-weight:500; min-width:0; }
+.dge-field > span { font-size:.84rem; }
+.dge-body { min-height:108px; margin-bottom:6px; }
+.dge-toolbar { margin:16px 0; padding:12px; border:1px solid var(--dge-border); border-radius:10px; background:var(--dge-surface); align-items:flex-end; }
+.dge-toolbar .dge-field { flex:1 1 140px; }
+.dge-edit-panels { display:grid; grid-template-columns:minmax(200px,.7fr) minmax(0,1.7fr); gap:16px; }
+.dge-node-panel,.dge-edge-panel { border:1px solid var(--dge-border); border-radius:12px; padding:14px; min-width:0; }
+.dge-node-panel > button { margin:8px 6px 8px 0; }
+.dge-node-list { max-height:420px; overflow:auto; margin-bottom:12px; }
+.dge-node-row { display:grid; grid-template-columns:20px minmax(65px,1fr); gap:6px; padding:7px; border-radius:8px; margin-bottom:5px; }
+.dge-node-row .dge-node-kind { grid-column:2; }
+.dge-node-row.is-selected,.dge-edge-row.is-selected { background:var(--accent-bg,#eff6ff); box-shadow:inset 0 0 0 1px var(--accent,#2563eb); }
+.dge-inline > input { flex:1 1 100px; width:auto!important; }
+.dge-edge-list { max-height:560px; overflow:auto; margin:10px 0; }
+.dge-edge-row { display:grid; grid-template-columns:repeat(3,minmax(65px,1fr)); align-items:end; gap:8px; border:1px solid var(--dge-border); padding:10px; border-radius:10px; margin-bottom:9px; }
+.dge-edge-select { grid-column:1 / -1; justify-self:start; background:transparent!important; border:0!important; padding:0!important; min-height:24px!important; font-weight:600!important; }
+.dge-edge-attributes { grid-column:1 / -1; font-size:.86rem; }
+.dge-edge-attributes .dge-field { margin-top:8px; }
+.dge-danger { color:var(--text-primary,#334155)!important; }
+.dge-danger:hover { border-color:#dc2626!important; color:#b91c1c!important; }
+.dge-edge-move { border-top:1px solid var(--dge-border); padding-top:12px; margin-top:12px; }
+.dge-edge-move select,.dge-edge-move button { margin-top:8px; }
+.dge-edge-move .dge-field { flex:1; }
+.dge-status { margin:12px 0 0; line-height:1.5; font-size:.9rem; }
+.dge-status:empty { display:none; }
+.dge-observations { padding:10px 14px; margin-bottom:12px; border:1px solid var(--dge-border); border-radius:9px; font-size:.88rem; }
+.dge-observations summary { cursor:pointer; font-weight:600; }
+.dge-observations ul { margin:8px 0 0; padding-left:20px; line-height:1.6; max-height:120px; overflow:auto; }
+/* No sticky background rectangle, tinted strip or top border in any theme. */
+.dge-footer { position:static; display:flex; justify-content:flex-end; align-items:center; margin:16px 0 0; padding:0; border:0; background:transparent; box-shadow:none; }
+.dge-primary { background:var(--accent,#2563eb)!important; border-color:var(--accent,#2563eb)!important; color:#fff!important; font-weight:600!important; }
+.dge-edge-stroke { stroke:var(--text-subtle,#64748b); stroke-width:2.2; }
+.dge-edge-hit { stroke:transparent; stroke-width:16; }
+.dge-visual-edge,.dge-visual-node { cursor:pointer; }
+.dge-visual-edge.is-selected .dge-edge-stroke { stroke:var(--accent,#2563eb)!important; stroke-width:4; }
+.dge-edge-label { fill:var(--dge-text); paint-order:stroke; stroke:var(--dge-surface); stroke-width:4; stroke-linejoin:round; font-size:14px; }
+.dge-visual-node circle { fill:var(--surface-0,#fff); stroke:var(--text-subtle,#64748b); stroke-width:2; }
+.dge-visual-node text { fill:var(--dge-text); font-size:14px; pointer-events:none; }
+.dge-visual-node.is-selected circle { fill:var(--accent-bg,#dbeafe); stroke:var(--accent,#2563eb); stroke-width:3; }
+@media (max-width:760px) {
+ .dge-workspace,.dge-edit-panels { grid-template-columns:1fr; }
+ .dge-original { max-height:260px; }
+ .dge-visual svg { max-height:290px; }
+ .dge-edge-list { max-height:none; }
+ .dge-actions { margin-left:auto; }
+}
+@media (max-width:420px) { .dge-edge-row { grid-template-columns:repeat(2,minmax(0,1fr)); } .dge-toolbar .dge-field { flex-basis:100%; } }
+
+/* Original-image editor: monochrome controls and a single subdued drawing color. */
+.dge-workspace:has(.dge-overlay-host){display:block}
+.dge-overlay-host{min-width:0;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface);overflow:hidden}
+.dge-overlay-tools{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:9px;border-bottom:1px solid var(--dge-border);background:var(--surface-1,#fff)}
+.dge-overlay-tools button,.dge-overlay-tools select{font-size:13px;width:auto;flex:0 0 auto;border-radius:7px;padding:7px 10px;min-height:34px}
+.dge-overlay-tools button.is-active{background:var(--accent-bg,#eaf2ff);border-color:var(--accent,#2563eb)}
+.dge-overlay-tools .dge-overlay-status{flex:1 1 100%;margin:0;padding:0;font-size:12px;line-height:1.5}
+.dge-overlay-tools select{max-width:152px}
+.dge-overlay-zoom{font-size:12px;color:var(--text-subtle,#64748b);min-width:42px;text-align:center}
+.dge-overlay-viewport{background:var(--surface-2,#f3f4f6);max-height:min(63dvh,700px);min-height:220px;overflow:auto;overscroll-behavior:contain}
+.dge-overlay-stage{position:relative;width:100%;min-width:0;margin:0 auto;background:white}
+.dge-overlay-image{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none;background:#fff}
+.dge-overlay-svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;overflow:visible;color:var(--accent,#2563eb);cursor:crosshair}
+.dge-overlay-svg.is-hidden{pointer-events:none;visibility:hidden}
+.dge-overlay-edge{cursor:pointer;color:var(--accent,#2563eb)}
+.dge-overlay-hit{stroke:transparent;stroke-width:17px;fill:none;pointer-events:stroke}
+.dge-overlay-stroke{stroke:currentColor;stroke-width:3px;fill:none;opacity:.8;pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
+.dge-overlay-edge.is-selected .dge-overlay-stroke{stroke-width:5px;opacity:1}
+.dge-overlay-edge.is-uncertain .dge-overlay-stroke{stroke-dasharray:7 5;opacity:1}
+.dge-overlay-node{cursor:pointer}
+.dge-overlay-node-hit{fill:transparent;pointer-events:all}
+.dge-overlay-dot{fill:var(--surface-0,#fff);stroke:var(--accent,#2563eb);stroke-width:3px;pointer-events:none}
+.dge-overlay-node.is-selected .dge-overlay-dot{stroke-width:5px}
+.dge-overlay-node.is-estimated .dge-overlay-dot{stroke-dasharray:4 3;opacity:1}
+.dge-overlay-label{fill:var(--text-primary,#182334);paint-order:stroke;stroke:var(--surface-0,#fff);stroke-width:4px;stroke-linejoin:round;font-size:16px;pointer-events:none;font-family:inherit}
+.dge-overlay-bbox{fill:none;stroke:var(--accent,#2563eb);stroke-width:2px;stroke-dasharray:9 7;pointer-events:none;opacity:.6}
+.dge-overlay-handle{fill:var(--surface-0,#fff);stroke:var(--accent,#2563eb);stroke-width:3px;cursor:move}
+.dge-overlay-pending,.dge-overlay-selection{fill:rgba(59,130,246,.08);stroke:var(--accent,#2563eb);stroke-width:3px;stroke-dasharray:6 4;pointer-events:none}
+.dge-overlay-status{display:block;font-size:12px;color:var(--text-subtle,#64748b)}
+.dge-overlay-status:empty{display:none}
+@media(max-width:760px){.dge-overlay-tools{gap:4px;padding:7px}.dge-overlay-tools button,.dge-overlay-tools select{padding:6px 7px;font-size:12px}.dge-overlay-viewport{max-height:55dvh;min-height:200px}}
+
+.dge-review-summary{border:1px solid var(--dge-border);border-radius:10px;margin:12px 0;background:var(--surface-1,#fff);overflow:hidden}
+.dge-review-summary>summary{cursor:pointer;padding:11px 14px;font-weight:600;font-size:14px}
+.dge-review-content{padding:0 14px 14px}
+.dge-review-content p{margin:5px 0}
+.dge-review-content .dge-review-type{font-weight:600}
+.dge-review-content .dge-review-subhead{margin-top:10px;font-weight:600}
+.dge-review-relation{display:block!important;padding:3px 8px!important;margin:3px 0!important;min-height:26px!important;border:1px solid transparent!important;background:transparent!important;border-radius:5px;text-align:left;font-size:13px!important}
+.dge-review-relation:hover,.dge-review-relation.is-selected{background:var(--accent-bg,#eaf2ff)!important;border-color:var(--accent,#2563eb)!important}
+
+/* V1 review: one central image, contextual properties, advanced tables on demand. */
+.dge-workspace:has(.dge-overlay-host){
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(242px,280px);
+ gap:12px;align-items:start;
+}
+.dge-workspace:has(.dge-overlay-host):not(:has(.dge-selection-panel)){
+ grid-template-columns:minmax(0,1fr);
+}
+.dge-selection-panel{
+ min-width:0;padding:16px;border:1px solid var(--dge-border);
+ border-radius:12px;background:var(--surface-1,#fff);
+ display:flex;flex-direction:column;gap:12px;
+}
+.dge-selection-panel h3{margin:0 0 2px;font-size:14px}
+.dge-property-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}
+.dge-property-head h3{margin:0}
+.dge-property-head .dge-panel-close{flex:0 0 auto;align-self:center}
+.dge-selection-panel .dge-field{gap:5px}
+.dge-selection-panel .dge-muted{margin:0}
+.dge-selection-panel .dge-danger{margin-top:4px}
+.dge-advanced-panel{border:1px solid var(--dge-border);border-radius:10px;margin:14px 0}
+.dge-advanced-panel>summary{padding:13px 16px;cursor:pointer;font-size:13px}
+.dge-advanced-panel>.dge-edit-panels{padding:0 12px 14px}
+@media(max-width:760px){
+ .dge-workspace:has(.dge-overlay-host){grid-template-columns:1fr;gap:8px}
+ .dge-selection-panel{padding:12px;gap:8px}
+ .dge-selection-panel .dge-field{flex:1 1 140px}
+}
+
+/* Labels are always drawn over the unchanged (usually white) photograph. */
+.dge-overlay-label{fill:#172033;stroke:#fff}
+.dge-overlay-svg[data-mode="pan"]{cursor:grab}
+.dge-overlay-node:active,.dge-overlay-svg[data-mode="pan"]:active{cursor:grabbing}
+
+/* Minimal user-selected polygon and text regions, shared source coordinates. */
+.dge-overlay-polygon{fill:rgba(37,99,235,.045);stroke:var(--accent,#2463b2);stroke-width:2;stroke-dasharray:7 5;pointer-events:none}
+.dge-overlay-polygon-draft{fill:rgba(37,99,235,.035);stroke:var(--accent,#2463b2);stroke-width:2.4;stroke-dasharray:6 4;pointer-events:none}
+.dge-overlay-polygon-draft.is-text{fill:rgba(130,130,130,.05);stroke:#555}
+.dge-overlay-draft-dot{fill:#fff;stroke:var(--accent,#2463b2);stroke-width:2;pointer-events:none}
+.dge-overlay-text-region{fill:rgba(60,60,60,.07);stroke:#545454;stroke-width:2.4;stroke-dasharray:7 4;pointer-events:none}
+.dge-overlay-tools [hidden]{display:none!important}
+/* Independent original-image controls; neither affects graph coordinates. */
+.dge-overlay-opacity-control{
+ display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+ font-size:12px;color:var(--text-subtle,#64748b);min-height:32px;
+}
+.dmate-graph-editor .dge-overlay-opacity-control input[type=range]{
+ box-sizing:border-box;width:100px!important;min-width:58px!important;
+ padding:0!important;margin:0!important;min-height:18px!important;
+ border:0!important;background:transparent!important;
+ accent-color:var(--accent,#2563eb);cursor:pointer;
+}
+.dge-overlay-opacity-value{min-width:34px;text-align:right;display:inline-block;font-variant-numeric:tabular-nums}
+.dge-overlay-stage{background:#fff}
+.dge-overlay-contrast-halo{fill:none;pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
+.dge-overlay-dot-halo{pointer-events:none}
+@media(max-width:760px){
+ .dge-overlay-opacity-control{gap:5px}
+ .dmate-graph-editor .dge-overlay-opacity-control input[type=range]{width:82px!important}
+}
+
+/* OCR-only images show the photo without an empty graph preview or canvas. */
+.dge-text-only-workspace { display:block; }
+.dge-text-only-workspace .dge-original { max-height:min(55dvh,600px); }
+.dge-detected-type { align-self:center; font-size:13px; color:var(--text-subtle,#64748b); }
+
+/* The viewport is independent of image zoom; its world expands while panning. */
+.dge-overlay-viewport{height:min(63dvh,700px);min-height:220px;max-height:none}
+.dge-overlay-stage{margin:0;flex:none}
+@media(max-width:760px){.dge-overlay-viewport{height:55dvh;min-height:200px;max-height:none}}
+
+.dge-overlay-host{width:100%;box-sizing:border-box}
+.dge-overlay-viewport{width:100%;box-sizing:border-box;flex:none;contain:size layout}
+.dge-overlay-stage{min-width:100%;min-height:100%}
+
+/* Region commits and asynchronous type hints must not move the camera. */
+.dge-workspace:has(.dge-overlay-host){grid-template-columns:minmax(0,1fr)}
+.dge-overlay-tools .dge-overlay-status,.dge-overlay-tools .dge-overlay-status:empty{display:block;box-sizing:border-box;height:3em;min-height:3em;overflow:auto}
+
+/* Canvas-first editor; floating controls never change camera dimensions. */
+.dge-workspace:has(.dge-overlay-host){position:relative;display:block}
+.dge-overlay{position:relative}
+.dge-overlay-viewport{height:72dvh;min-height:360px}
+.dge-tool-palette{position:absolute;z-index:5;left:12px;top:12px;max-width:min(440px,calc(100% - 24px));border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface,#fff);box-shadow:0 4px 18px #0002}
+.dge-tool-palette>summary,.dge-float-panel>summary{padding:9px 13px;cursor:pointer;list-style:none;font-size:13px;user-select:none}
+.dge-tool-palette>.dge-overlay-tools{max-height:30dvh;overflow:auto;border-bottom:0;border-radius:12px}
+.dge-floating-actions{position:absolute;z-index:6;top:12px;right:12px;display:flex;gap:5px}
+.dge-float-panel{position:static;background:var(--dge-surface,#fff);border:1px solid var(--dge-border);border-radius:12px;box-shadow:0 4px 18px #0002}
+.dge-float-content{position:absolute;right:0;top:calc(100% + 8px);width:min(380px,calc(100vw - 50px));max-height:56dvh;overflow:auto;box-sizing:border-box;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface,#fff);box-shadow:0 4px 18px #0002}
+.dge-float-panel .dge-toolbar{margin:0;padding:12px;display:flex;flex-direction:column}
+.dge-float-panel .dge-advanced-panel,.dge-float-panel .dge-review-summary{border:0;margin:0}
+.dge-workspace .dge-selection-panel{position:absolute;z-index:8;right:12px;bottom:12px;width:min(330px,calc(100% - 24px));max-height:50dvh;overflow:auto;box-sizing:border-box;box-shadow:0 4px 18px #0002;background:var(--dge-surface,#fff)}
+.dge-workspace:has(.dge-float-panel[open]) .dge-selection-panel{display:none}
+.dge-panel-close{align-self:flex-end}
+.dge-frame-hit{fill:transparent;pointer-events:all;cursor:grab}
+.dge-frame-hit.is-current{stroke-width:3}
+@media(max-width:760px){.dge-overlay-viewport{height:72dvh;min-height:320px}.dge-tool-palette{max-width:calc(100% - 24px)}.dge-tool-palette>.dge-overlay-tools{max-height:24dvh}}
+
+/* The tool rail contains drawing modes only; view controls are always outside. */
+.dmate-graph-editor [hidden]{display:none!important}
+.dge-tabs{display:flex;gap:6px;margin:0 0 10px;border-bottom:1px solid var(--dge-border)}
+.dge-tabs [role=tab]{border:0;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;background:transparent}
+.dge-tabs [aria-selected=true]{border-bottom-color:var(--accent,#2563eb);background:var(--accent-bg,#eff6ff)}
+.dge-view-controls{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--dge-border);background:var(--dge-surface)}
+.dge-view-controls button{font-size:13px;min-height:34px;padding:6px 10px}
+.dge-view-controls .dge-overlay-opacity-control{margin-left:auto}
+.dge-tool-palette{top:76px;left:10px;width:116px;max-width:116px;border-radius:10px}
+.dge-tool-palette>h3{font-size:12px;margin:0;padding:9px 10px;color:var(--text-subtle,#64748b)}
+.dge-tool-palette>.dge-overlay-tools{display:flex;flex-direction:column;align-items:stretch;max-height:48dvh;padding:0 7px 8px;gap:6px}
+.dge-tool-palette .dge-overlay-tools button,.dge-tool-palette .dge-overlay-tools select{width:100%;max-width:100%;white-space:normal;font-size:12px;padding:7px 4px}
+.dge-tool-palette .dge-overlay-status{overflow-wrap:anywhere;font-size:11px}
+.dge-floating-actions{top:76px}
+.dge-text-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}
+.dge-text-status{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.dge-text-workspace>.dge-field{margin:12px 0}
+.dge-text-body,.dge-text-requirements{min-height:90px}
+@media(max-width:760px){
+ .dge-view-controls{gap:4px;padding:6px}
+ .dge-view-controls button{font-size:12px;padding:5px 7px}
+ .dge-view-controls .dge-overlay-opacity-control{margin-left:0}
+ .dge-tool-palette{top:112px;width:92px;max-width:92px;left:6px}
+ .dge-tool-palette>.dge-overlay-tools{max-height:45dvh}
+ .dge-floating-actions{top:112px;right:6px;gap:4px}
+ .dge-float-panel>summary{font-size:12px;padding:8px}
+}
+.dge-floating-actions{top:calc(var(--dge-viewbar-height,64px) + 12px)}
+.dge-overlay-status:empty{display:none}
+
+/* Text recognition shares the graph workspace's upper-right floating results. */
+.dge-text-workspace{position:relative}
+.dge-text-results .dge-float-content{max-height:56dvh;padding:12px}
+.dge-text-results .dge-field{margin:12px 0}
+.dge-text-status{margin:0 0 10px}
+.dge-text-region-list{max-height:20dvh;overflow:auto}
+.dge-text-region-row{border-bottom:1px solid var(--dge-border);padding:8px 0;font-size:12px}
+.dge-text-region-row button{font-size:12px;margin:4px 4px 0 0;padding:4px 6px;min-height:30px}
+.dge-text-excerpt{white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:auto;margin:5px 0}
+.dge-text-frame-number{fill:#1e40af;stroke:white;paint-order:stroke;stroke-linejoin:round;font-weight:bold;pointer-events:none}
+.dge-overlay-text-region{stroke:#2563eb;fill:#2563eb0c}
+.dge-overlay-text-region.is-error{stroke:#b91c1c}
+
+.dge-history-arrow{display:inline-flex;align-items:center;justify-content:center;line-height:1;min-width:40px;min-height:40px;padding:6px 8px!important}
+.dge-history-arrow>svg{display:block;flex:0 0 24px;width:24px;height:24px;pointer-events:none}
+.dge-freehand-draft{fill:none;stroke:var(--accent,#2563eb);stroke-width:2.4;pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
+.dge-frame-edge-hit{fill:none;stroke:transparent;pointer-events:stroke;cursor:crosshair}
+.dge-frame-elastic-hit{cursor:grab}
+.dge-overlay-svg.is-deforming .dge-frame-elastic-hit{cursor:grabbing}
+
+/* Image review is a read-only scan workspace; standalone drawing is separate. */
+.dgs-workspace{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
+.dgs-source{height:clamp(320px,58dvh,620px);min-width:0}
+.dgs-source .dge-scan-only{height:100%;display:flex;flex-direction:column;gap:8px}
+.dge-scan-only .dge-tool-palette{position:static;width:auto;max-width:none;max-height:none;padding:0;border:0;background:transparent;box-shadow:none}
+.dge-scan-only .dge-tool-palette h3{display:none}
+.dge-scan-only .dge-overlay-tools{display:flex;flex-direction:row;flex-wrap:wrap;gap:6px}
+.dge-scan-only .dge-view-controls,.dge-scan-only .dge-tool-palette>.dge-overlay-tools{padding:8px 10px;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface)}
+.dge-scan-only .dge-tool-palette .dge-overlay-tools button,.dge-scan-only .dge-tool-palette .dge-overlay-tools select{width:auto;max-width:none;white-space:nowrap;flex:0 0 auto;padding:6px 9px}
+.dge-scan-only .dge-overlay-tools .dgs-source-status{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;overflow:hidden;clip-path:inset(50%)}
+.dge-scan-only .dge-overlay-viewport{flex:1;height:auto;min-height:0;max-height:none;border:1px solid var(--dge-border);border-radius:12px}
+.dge-scan-only .dge-overlay-bbox,.dge-scan-only .dge-overlay-polygon,.dge-scan-only .dge-overlay-text-region,.dge-scan-only .dge-overlay-selection,.dge-scan-only .dge-freehand-draft{stroke-width:1px;fill:none;opacity:.9;stroke-dasharray:5 4}
+.dge-scan-only .dge-overlay-text-region{stroke:#d97706}
+.dgs-information{display:flex;flex-direction:column;gap:16px;min-width:0;max-height:clamp(320px,58dvh,620px);overflow:auto;padding:0;border:0}
+.dgs-information h3{margin:0 0 10px}.dgs-information h4{margin:12px 0 6px}
+.dgs-information-card{border:1px solid var(--dge-border);border-radius:12px;padding:14px;min-width:0;background:var(--dge-surface,#fff)}
+.dgs-text{margin:0}
+.dgs-body{line-height:1.65;overflow-wrap:anywhere;user-select:text}
+.dmate-graph-editor .dmate-graph-information{font-size:var(--font-base,1rem);line-height:1.65;overflow-wrap:anywhere;user-select:text}
+.dmate-graph-editor .dmate-graph-information h4{margin:12px 0 6px;font-size:1em;font-weight:700}
+.dmate-graph-editor .dmate-graph-information h5{margin:1.67em 0;font-size:.83em;font-weight:700}
+.dmate-graph-editor .dmate-graph-information p{margin:5px 0;line-height:inherit}
+.dmate-graph-information .dgs-relation{padding-left:8px}
+.dgs-region-state{margin:10px 0 0;padding:0;font-size:13px}
+.dgs-region-state button{margin:4px 5px 0 0;padding:4px 7px;min-height:30px}
+.dgs-region-state,.dgs-status{font-size:13px;color:var(--text-subtle);overflow-wrap:anywhere}
+.dgs-requirements-label{display:block;margin-top:16px;font-size:14px}
+.dgs-requirements{display:block;width:100%;resize:vertical;margin-top:7px;padding:9px}
+@media(max-width:760px){.dgs-workspace{grid-template-columns:minmax(0,1fr);gap:12px}.dgs-source{height:44dvh;min-height:300px}.dgs-information{max-height:36dvh}.dge-scan-only .dge-overlay-tools button{padding:6px 8px}}
+.dge-overlay-svg[data-mode=select] .dge-frame-hit{cursor:pointer}
+
+/* The image review's save action stays at the dialog's bottom-right edge. */
+.graph-editor-dialog[open]:has(.dmate-graph-scan){display:flex;flex-direction:column;overflow:hidden}
+.graph-editor-dialog:has(.dmate-graph-scan)>.graph-editor-dialog-head{flex:0 0 auto}
+.graph-editor-dialog:has(.dmate-graph-scan)>#graphEditorMount{flex:1 1 auto;min-height:0}
+.dmate-graph-scan{display:flex;flex-direction:column;min-height:0}
+.dmate-graph-scan>.dgs-content{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;overflow-anchor:none}
+.dmate-graph-scan>.dge-footer{flex:0 0 auto;width:100%;justify-content:flex-end;align-items:flex-end;margin:0;padding-top:14px}
+.dmate-graph-scan .dgs-status:empty{display:none}
+.dgs-modes{display:flex;gap:6px;margin:8px 0 12px;padding:8px 10px;flex-wrap:wrap;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface)}
+.dgs-modes [role=tab]{min-height:34px;padding:6px 12px}
+.dgs-modes [aria-selected=true]{background:var(--accent,#2563eb);border-color:var(--accent,#2563eb);color:#fff}
+.dgs-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.dgs-section-head h3{margin:0}
+.dgs-section-head>button{flex:0 0 auto;min-height:30px;padding:4px 8px;font-size:12px}
+.dgs-source-picker-layer{position:fixed;inset:0;z-index:40;pointer-events:none}
+.dgs-source-picker-layer:empty{display:none}
+.dgs-source-picker{position:fixed;display:flex;flex-direction:column;gap:12px;padding:12px;box-sizing:border-box;min-width:0;border:1px solid var(--dge-border);border-radius:12px;background:var(--dge-surface,#fff);box-shadow:0 6px 22px #0002;pointer-events:auto;overflow:hidden}
+.dgs-source-list{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;overscroll-behavior:contain}
+.dgs-source-choice{display:flex;align-items:center;gap:9px;min-height:44px;font-size:13px;line-height:1.4;cursor:pointer}
+.dgs-source-picker .dgs-source-choice input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:0 0 25px;width:25px;height:25px;min-width:25px;margin:0;border:2px solid var(--text-subtle,#64748b);border-radius:50%;background:transparent;cursor:pointer}
+.dgs-source-picker .dgs-source-choice input[type=checkbox]:checked{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6)}
+.dgs-source-picker-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto}
+.dmate-graph-editor :is(.dge-panel-close,.dgs-source-delete){appearance:none;-webkit-appearance:none;flex:0 0 20px;width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;max-height:20px;padding:0!important;border:0!important;border-radius:50%;background:#ef4444!important;box-shadow:none!important;font-size:0}
+.dmate-graph-editor :is(.dge-panel-close,.dgs-source-delete):hover{background:#dc2626!important}
+.dgs-source-card{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:6px 10px;border:1px solid var(--dge-border);border-radius:8px}
+.dgs-source-card>.dgs-source-choice{flex:1;min-width:0}
+.dgs-source-choice>span{overflow-wrap:anywhere}
+.dge-graph-frame-number{fill:#2563eb}
+
+/* A drawing page has one tool mode at a time; its rail can be folded away. */
+.dge-tool-palette>summary{font-size:12px;font-weight:600;color:var(--text-subtle,#64748b);list-style:none}
+.dge-tool-palette>summary::-webkit-details-marker{display:none}
+.dge-tool-palette:not([open])>summary{padding:9px 10px}
+.dge-tool-palette[open]>summary{padding:9px 10px;border-bottom:1px solid var(--dge-border);margin-bottom:6px}
+.dmate-graph-editor .dge-overlay-tools button:not(.is-active){background:var(--surface-0,#fff);border-color:var(--dge-border)}
+.dmate-graph-editor .dge-overlay-tools button.is-active{background:var(--surface-3,#e2e8f0);border-color:var(--dge-border);font-weight:600}
+.dge-review-summary>h3{padding:14px 14px 0;margin:0 0 10px;font-weight:700;font-size:1rem}
+.dge-float-panel .dge-toolbar>.dge-field{flex:0 0 auto;width:100%}

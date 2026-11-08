@@ -1,0 +1,124 @@
+/* Button surfaces have their own palette; panel and page colors stay intact. */
+body[data-appearance-theme] {
+    --dm-control-transition:background-color .12s ease,border-color .12s ease,color .12s ease;
+}
+body[data-appearance-theme="light"] {
+    --dm-control-bg:#e2e8f0;
+    --dm-control-hover-bg:#cfd9e6;
+    --dm-control-border:#c2cbd7;
+    --dm-control-hover-border:#94a3b8;
+    --dm-control-text:#334155;
+}
+body[data-appearance-theme="navy"] {
+    --dm-control-bg:#1f2937;
+    --dm-control-hover-bg:#30405a;
+    --dm-control-border:#475569;
+    --dm-control-hover-border:#64748b;
+    --dm-control-text:#e2e8f0;
+}
+body[data-appearance-theme="dark"] {
+    --dm-control-bg:#2b2b2b;
+    --dm-control-hover-bg:#393939;
+    --dm-control-border:#4b4b4b;
+    --dm-control-hover-border:#686868;
+    --dm-control-text:#ededed;
+}
+
+/* A named important layer supersedes old theme/mobile !important fills,
+   including the light-theme PNG that otherwise masks hover colors. */
+@layer dmate-button-themes {
+    body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
+        #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
+        .voice-input-button,.manual-question-choice,.ocr-group-question-choice,
+        .modal-close-dot,.dmate-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
+        .wrong-search-clear,.ocr-task-remove,.dcn-close,.dcn-search-clear,.dcn-note-delete,.dcn-analysis-cancel,
+        .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
+        .appearance-swatch,.mobile-topbar-button,.mobile-install-button,.chat-jump-button,
+        .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,
+        .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
+        .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
+        .mobile-choice-option,.dge-review-relation,.dcn-note-open,.ddw-history-open,
+        [data-overlay-tool="zoom-in"],[data-overlay-tool="zoom-out"]
+    )) {
+        background-color:var(--dm-control-bg)!important;
+        background-image:none!important;
+        border-color:var(--dm-control-border)!important;
+        color:var(--dm-control-text)!important;
+        -webkit-text-fill-color:currentColor!important;
+        transition:var(--dm-control-transition);
+    }
+
+    body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
+        #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
+        .voice-input-button,.manual-question-choice,.ocr-group-question-choice,
+        .modal-close-dot,.dmate-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
+        .wrong-search-clear,.ocr-task-remove,.dcn-close,.dcn-search-clear,.dcn-note-delete,.dcn-analysis-cancel,
+        .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
+        .appearance-swatch,.mobile-topbar-button,.mobile-install-button,.chat-jump-button,
+        .rich-copy-smart,.rich-copy-button,.dge-history-arrow,.ddw-guide-button,
+        .kg-mobile-zoom-btn,.kg-mobile-zoom-fit,.kg-mobile-expand,.kg-mobile-node,
+        .kg-desktop-zoom-controls button,.kg-mobile-zoom-controls button,
+        .mobile-choice-option,.dge-review-relation,.dcn-note-open,.ddw-history-open,
+        [data-overlay-tool="zoom-in"],[data-overlay-tool="zoom-out"]
+    )):not(:disabled):not([aria-disabled="true"]):hover {
+        background-color:var(--dm-control-hover-bg)!important;
+        border-color:var(--dm-control-hover-border)!important;
+    }
+
+    /* Match the existing dark-theme border geometry in every palette. */
+    body[data-appearance-theme] .left > .btn {
+        border-width:1px!important;
+        border-style:solid!important;
+        border-radius:10px!important;
+        box-shadow:none!important;
+    }
+    body[data-appearance-theme] .learning-actions button {
+        border-width:1px!important;
+        border-style:solid!important;
+    }
+    @media(min-width:1101px) {
+        body[data-appearance-theme]:is([data-appearance-theme="light"],[data-appearance-theme="navy"]) .left {
+            border-right:1px solid transparent!important;
+        }
+        body[data-appearance-theme]:is([data-appearance-theme="light"],[data-appearance-theme="navy"]) .right {
+            border-left:1px solid transparent!important;
+        }
+    }
+
+    body[data-appearance-theme] button:is(.active,.is-active,[aria-pressed="true"],[aria-selected="true"]) {
+        --dm-control-bg:rgba(var(--accent-rgb),.18);
+        --dm-control-hover-bg:rgba(var(--accent-rgb),.28);
+        --dm-control-border:var(--accent);
+        --dm-control-hover-border:var(--accent);
+        --dm-control-text:var(--text-primary);
+    }
+    body[data-appearance-theme] :is(
+        button.primary,button.dcn-primary,button.dge-primary,button.ddw-primary,button.dmate-update-primary,
+        .wrong-actions button:not(.secondary):not(.danger),
+        .wrong-edit-actions button:not(.secondary),.wrong-safe-actions button:not(.secondary),
+        .wrong-picker-actions button:not(.secondary),.learning-review-actions button,
+        .download-actions > a:not(.secondary)
+    ) {
+        --dm-control-bg:var(--accent);
+        --dm-control-hover-bg:var(--accent-deep);
+        --dm-control-border:var(--accent);
+        --dm-control-hover-border:var(--accent-deep);
+        --dm-control-text:#fff;
+    }
+    body[data-appearance-theme] button:is(.danger,.danger-tool,.dge-danger) {
+        --dm-control-text:var(--dm-danger-text,#ef4444);
+    }
+    body[data-appearance-theme] :is(
+        #appConfirmConfirm.danger,#accountDeleteConfirm.danger,.dcn-confirm-delete,.dmate-delete-confirm-delete
+    ) {
+        --dm-control-bg:#dc2626;
+        --dm-control-hover-bg:#b91c1c;
+        --dm-control-border:#dc2626;
+        --dm-control-hover-border:#b91c1c;
+        --dm-control-text:#fff;
+    }
+}
+
+@media(prefers-reduced-motion:reduce) {
+    body[data-appearance-theme] { --dm-control-transition:none; }
+}

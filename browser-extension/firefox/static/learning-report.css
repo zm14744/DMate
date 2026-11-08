@@ -1,0 +1,61 @@
+/* Records use three summary cards; the empty view only says 无. */
+#learningReviewModal .learning-review-card {
+    width:min(980px,94vw);
+    max-height:90dvh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+#learningReviewModal .learning-review-body {
+    flex:1 1 auto;
+    min-height:0;
+    padding:20px;
+    color:var(--text-primary);
+    overflow:auto;
+}
+.lr-review {
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    min-width:0;
+}
+.lr-review * { box-sizing:border-box; }
+#learningReviewModal .learning-review-section {
+    min-width:0;
+    margin:0;
+    padding:20px;
+    border:1px solid var(--border-strong);
+    border-radius:16px;
+}
+#learningReviewModal .learning-review-section-title {
+    margin:0 0 10px;
+    color:var(--text-primary);
+    font-size:var(--font-base,16px);
+    font-weight:650;
+    line-height:1.5;
+}
+#learningReviewModal .learning-review-section-text {
+    margin:0;
+    color:var(--text-secondary);
+    font-size:var(--font-small,14px);
+    line-height:1.8;
+    white-space:normal;
+    overflow-wrap:anywhere;
+}
+@media(max-width:760px) {
+    #learningReviewModal {
+        padding:12px;
+        align-items:center;
+        justify-content:center;
+    }
+    #learningReviewModal .learning-review-card {
+        width:100%;
+        max-width:100%;
+        height:auto;
+        max-height:calc(100dvh - 24px);
+        border-radius:18px;
+    }
+    #learningReviewModal .learning-review-body { padding:14px; }
+    .lr-review { gap:12px; }
+    #learningReviewModal .learning-review-section { padding:16px; border-radius:14px; }
+}

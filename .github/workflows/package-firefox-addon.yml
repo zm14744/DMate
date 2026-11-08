@@ -1,0 +1,104 @@
+name: Package DMate Firefox Add-on
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'browser-extension/firefox/**'
+      - '.github/workflows/package-firefox-addon.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate Firefox Manifest V3 package
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import re
+
+          root = pathlib.Path("browser-extension/firefox")
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+          assert manifest["manifest_version"] == 3
+          assert manifest["version"] == "1.0.4"
+          assert manifest["sidebar_action"]["default_panel"] == "sidebar.html"
+          assert manifest["browser_specific_settings"]["gecko"]["id"]
+          assert manifest["browser_specific_settings"]["gecko"]["strict_min_version"] == "140.0"
+          assert set(manifest["browser_specific_settings"]["gecko"]["data_collection_permissions"]["required"]) == {
+              "authenticationInfo", "personalCommunications", "personallyIdentifyingInfo"
+          }
+          assert manifest["background"]["scripts"] == ["background.js"]
+          assert "service_worker" not in manifest["background"]
+          assert "sidePanel" not in manifest.get("permissions", [])
+          assert "side_panel" not in manifest
+          manifests = sorted(p.relative_to(root).as_posix() for p in root.rglob("manifest.json"))
+          assert manifests == ["manifest.json"], f"Unexpected nested manifest files: {manifests}"
+          assert (root / "static/vendor/vendor-packages.json").is_file()
+
+          html = (root / "sidebar.html").read_text(encoding="utf-8")
+          assert "<iframe" not in html.lower()
+          assert "{{" not in html and "{%" not in html
+          assert not re.search(r'\son[a-z]+\s*=', html, re.I)
+          for attrs, body in re.findall(r'<script\b([^>]*)>([\s\S]*?)</script\s*>', html, re.I):
+              if "src=" not in attrs.lower() and 'application/json' not in attrs.lower():
+                  assert not body.strip()
+          for value in re.findall(r'''(?:src|href)=["'](/static/[^"']+)["']''', html, re.I):
+              relative = value.split("?", 1)[0].lstrip("/")
+              assert (root / relative).is_file(), f"Missing local asset: {relative}"
+          assert (root / "extension/api-bridge.js").is_file()
+          assert "credentials: 'include'" in (root / "extension/api-bridge.js").read_text(encoding="utf-8")
+
+          background = (root / "background.js").read_text(encoding="utf-8")
+          assert "browser.action.onClicked" in background
+          assert "browser.sidebarAction.toggle()" in background
+          print(f"Validated {manifest['name']} Firefox {manifest['version']}")
+          PY
+
+      - name: Build Firefox Add-on ZIP
+        run: |
+          rm -f browser-extension/DMate_Firefox_Addon.zip
+          (cd browser-extension/firefox && zip -X -qr ../DMate_Firefox_Addon.zip .)
+          python - <<'PY'
+          import pathlib
+          import zipfile
+          package = pathlib.Path("browser-extension/DMate_Firefox_Addon.zip")
+          with zipfile.ZipFile(package) as archive:
+              names = archive.namelist()
+              manifests = sorted(name for name in names if pathlib.PurePosixPath(name).name.lower() == "manifest.json")
+              assert manifests == ["manifest.json"], f"Expected one root manifest.json: {manifests}"
+              assert "sidebar.html" in names
+              assert "background.js" in names
+              assert "icons/icon128.png" in names
+              assert "static/vendor/vendor-packages.json" in names
+          print(f"Firefox ZIP validated: {package.stat().st_size} bytes.")
+          PY
+
+      - name: Upload Firefox package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMate-Firefox-Add-on-v1.0.4
+          path: browser-extension/DMate_Firefox_Addon.zip
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit generated Firefox ZIP
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add browser-extension/DMate_Firefox_Addon.zip
+          if git diff --cached --quiet; then
+            echo "Firefox package is already up to date."
+            exit 0
+          fi
+          git commit -m "Build DMate Firefox add-on package v1.0.4"
+          git push origin HEAD:main
