@@ -98,6 +98,15 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #send
 body[data-appearance-theme] #ocrUploadActions > #sendBtn::after { content:none !important; display:none !important; }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button,
 body[data-appearance-theme] #ocrUploadActions > #sendBtn.ai-stop-button { background:#ef4444 !important; }
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn:disabled:not(.ai-stop-button),
+body[data-appearance-theme] #ocrUploadActions > #sendBtn:disabled:not(.ai-stop-button) {
+    background:var(--border-strong,#737373) !important;
+    opacity:1 !important; cursor:not-allowed !important;
+}
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn:disabled:not(.ai-stop-button)::before,
+body[data-appearance-theme] #ocrUploadActions > #sendBtn:disabled:not(.ai-stop-button)::before {
+    background:var(--text-subtle,#9ca3af) !important;
+}
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button::before,
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button::after,
 body[data-appearance-theme] #ocrUploadActions > #sendBtn.ai-stop-button::before,

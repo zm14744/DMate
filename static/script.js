@@ -3918,17 +3918,15 @@ function refreshInputAvailability() {
     const inputWrap = input?.closest?.(".input-wrap") || null;
 
     let statusText = "";
-    let placeholder = "询问DMate";
+    const placeholder = "询问DMate";
 
     // The graph editor is a modal: composer status text sits behind it and
     // is unreadable. Do not render an OCR-specific lock banner or placeholder.
     // Keep the real input lock while the editor is open.
     if (!ocrReviewInProgress && typingNow) {
-        statusText = "AI 正在回答，当前输入框已锁定";
-        placeholder = "AI 正在回答…";
+        statusText = "AI 正在回答";
     } else if (!ocrReviewInProgress && waitingReply) {
-        statusText = "AI 正在思考，当前输入框已锁定";
-        placeholder = "AI 正在思考…";
+        statusText = "AI 正在思考";
     }
 
     if (input) {
@@ -3952,7 +3950,8 @@ function refreshInputAvailability() {
 
     if (sendBtn) {
         const sendVisible = visibleMode !== "ocr";
-        sendBtn.disabled = !sendVisible;
+        const hasContent = Boolean(input?.value.trim()) || ocrTasks.size > 0;
+        sendBtn.disabled = !sendVisible || (!stoppingAllowed && !hasContent);
         sendBtn.textContent = stoppingAllowed ? "停止" : "发送";
         sendBtn.classList.toggle("ai-stop-button", stoppingAllowed);
         sendBtn.setAttribute("aria-label", stoppingAllowed ? "停止当前 AI 回复" : "发送消息");
@@ -22323,6 +22322,7 @@ document.addEventListener(
             );
         }
 
+        input?.addEventListener("input", refreshInputAvailability);
         initializeChatComposer();
 
         if (imageBtn) {
