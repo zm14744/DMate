@@ -245,7 +245,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     padding-right:82px !important;
 }
 
-/* Keep the keyboard glyph clean: no filled disc, shadow, filter or pseudo-mark. */
+/* Keep the keyboard icon visually clean and transparent in every state. */
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard,
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard:hover,
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard:active,
@@ -269,6 +269,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     border:0 !important;
     border-radius:50% !important;
     background:transparent !important;
+    background-color:transparent !important;
     background-image:none !important;
     color:var(--text-primary,#334155) !important;
     box-shadow:none !important;
@@ -359,6 +360,8 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     border:0 !important;
     border-radius:50% !important;
     background:#ef4444 !important;
+    background-color:#ef4444 !important;
+    background-image:none !important;
     color:#fff !important;
     font-size:20px !important;
     font-weight:500 !important;
@@ -369,12 +372,14 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:hover {
     background:#dc2626 !important;
+    background-color:#dc2626 !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:active {
     background:#b91c1c !important;
+    background-color:#b91c1c !important;
 }
 
-/* Five-column category grid: wraps to two rows and has no scrollbar divider. */
+/* Nine categories: a fixed two-row grid, with no horizontal scrollbar or edge divider. */
 .dmate-symbol-tabs {
     display:grid !important;
     flex:0 0 auto !important;
@@ -434,7 +439,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     text-align:center;
 }
 
-/* Symbol and template keys */
+/* Symbol grid. Long textual operators wrap inside their own key instead of colliding. */
 .dmate-symbol-grid {
     display:grid;
     flex:1 1 auto;
@@ -455,7 +460,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     min-width:0 !important;
     min-height:36px !important;
     margin:0 !important;
-    padding:4px 2px !important;
+    padding:4px 3px !important;
     border:1px solid var(--border-soft,var(--border-strong,#cbd5e1)) !important;
     border-radius:8px !important;
     background:var(--surface-2,#f8fafc) !important;
@@ -467,15 +472,15 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     cursor:pointer !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key.is-text {
+    min-height:38px !important;
+    padding:4px 3px !important;
     font-size:11px !important;
     font-weight:500 !important;
-}
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key.is-template {
-    min-height:38px !important;
-    font-size:10.5px !important;
-    font-weight:500 !important;
-    overflow-wrap:anywhere;
-    word-break:break-word;
+    line-height:1.2 !important;
+    white-space:normal !important;
+    overflow-wrap:anywhere !important;
+    word-break:normal !important;
+    text-align:center !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key:hover {
     border-color:var(--accent,#3b82f6) !important;
