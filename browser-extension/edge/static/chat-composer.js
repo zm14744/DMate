@@ -2,57 +2,86 @@
     'use strict';
     const instances = new WeakMap();
 
+    const RECENT_SYMBOLS_KEY = 'dmate.symbolKeyboard.recent.v1';
+    const RECENT_SYMBOLS_LIMIT = 20;
+
     const SYMBOL_GROUPS = [
+        { id:'recent', label:'最近', items:[] },
         { id:'common', label:'常用', items:[
             ['∀','任意／全称量词'], ['∃','存在量词'], ['∈','属于'], ['∉','不属于'],
-            ['⊆','子集或等于'], ['∪','并集'], ['∩','交集'], ['∅','空集'],
-            ['¬','逻辑非'], ['∧','逻辑与'], ['∨','逻辑或'], ['→','蕴含／箭头'],
-            ['↔','等价'], ['⇒','推出'], ['⇔','当且仅当'], ['≠','不等于'],
-            ['≤','小于等于'], ['≥','大于等于']
+            ['⊆','子集或等于'], ['⊊','真子集'], ['∪','并集'], ['∩','交集'],
+            ['∅','空集'], ['¬','逻辑非'], ['∧','逻辑与'], ['∨','逻辑或'],
+            ['→','蕴含'], ['↔','等价'], ['⇒','推出'], ['⇔','当且仅当'],
+            ['≠','不等于'], ['≤','小于等于'], ['≥','大于等于'], ['∑','求和']
         ]},
         { id:'logic', label:'逻辑', items:[
             ['¬','逻辑非'], ['∧','逻辑与'], ['∨','逻辑或'], ['⊕','异或'],
             ['→','蕴含'], ['↔','等价'], ['⇒','推出'], ['⇔','等价推出'],
             ['∀','全称量词'], ['∃','存在量词'], ['∄','不存在'], ['⊤','永真'],
-            ['⊥','矛盾／假'], ['⊢','语法可证'], ['⊨','语义蕴含'], ['⊭','不语义蕴含']
+            ['⊥','矛盾／假'], ['⊢','语法可证'], ['⊨','语义蕴含'], ['⊭','不语义蕴含'],
+            ['∴','所以'], ['∵','因为'], ['∧','合取'], ['∨','析取']
         ]},
         { id:'sets', label:'集合', items:[
             ['∈','属于'], ['∉','不属于'], ['∋','包含元素'], ['∌','不包含元素'],
-            ['⊆','子集或等于'], ['⊂','真子集'], ['⊇','超集或等于'], ['⊃','真超集'],
-            ['∪','并集'], ['∩','交集'], ['∅','空集'], ['∖','集合差'],
-            ['℘','幂集'], ['×','笛卡尔积'], ['∁','补集'], ['∴','所以']
+            ['⊆','子集或等于'], ['⊊','真子集'], ['⊂','子集（依教材约定）'], ['⊇','超集或等于'],
+            ['⊋','真超集'], ['⊃','超集（依教材约定）'], ['∪','并集'], ['∩','交集'],
+            ['∅','空集'], ['∖','集合差'], ['℘','幂集'], ['×','笛卡尔积'],
+            ['∁','补集'], ['⊄','非子集'], ['⊈','非子集或等于'], ['∣','整除／集合关系符号']
         ]},
         { id:'relations', label:'关系', items:[
             ['=','等于'], ['≠','不等于'], ['≡','恒等／同余'], ['≢','不恒等'],
-            ['≈','约等于'], ['∼','相似／等价关系'], ['≃','渐近相等'], ['<','小于'],
-            ['≤','小于等于'], ['>','大于'], ['≥','大于等于'], ['≺','先于'],
-            ['≼','不严格先于'], ['∥','平行'], ['⊥','垂直'], ['∘','关系复合']
+            ['≈','约等于'], ['≉','不约等于'], ['∼','等价／相似关系'], ['≃','相似'],
+            ['<','小于'], ['≤','小于等于'], ['>','大于'], ['≥','大于等于'],
+            ['≪','远小于'], ['≫','远大于'], ['∝','正比于'], ['∥','平行'],
+            ['⊥','垂直'], ['∘','关系复合'], ['≺','先于'], ['≼','不严格先于']
         ]},
         { id:'graph', label:'图论', items:[
             ['G=(V,E)','图的表示'], ['V(G)','顶点集'], ['E(G)','边集'], ['deg(v)','顶点度'],
-            ['d(v)','顶点度'], ['δ(G)','最小度'], ['Δ(G)','最大度'], ['Kₙ','完全图'],
-            ['Cₙ','圈图'], ['Pₙ','路径图'], ['χ(G)','色数'], ['ω(G)','团数'],
-            ['α(G)','独立数'], ['λ(G)','边连通度'], ['κ(G)','点连通度'], ['N(v)','邻域']
+            ['d(v)','顶点度'], ['N(v)','开邻域'], ['N[v]','闭邻域'], ['δ(G)','最小度'],
+            ['Δ(G)','最大度'], ['Kₙ','完全图'], ['Kₘ,ₙ','完全二部图'], ['Pₙ','路径图'],
+            ['Cₙ','圈图'], ['T','树'], ['χ(G)','色数'], ['ω(G)','团数'],
+            ['α(G)','独立数'], ['κ(G)','点连通度'], ['λ(G)','边连通度'], ['u∼v','相邻顶点']
         ]},
         { id:'number', label:'数论', items:[
             ['ℕ','自然数集'], ['ℤ','整数集'], ['ℚ','有理数集'], ['ℝ','实数集'],
             ['ℂ','复数集'], ['∣','整除'], ['∤','不整除'], ['≡','同余'],
-            ['mod','模运算'], ['gcd','最大公因数'], ['lcm','最小公倍数'], ['∞','无穷大'],
-            ['√','平方根'], ['∑','求和'], ['∏','连乘'], ['∈','属于']
+            ['mod','模运算'], ['gcd(a,b)','最大公因数'], ['lcm(a,b)','最小公倍数'], ['∞','无穷大'],
+            ['⌊x⌋','向下取整'], ['⌈x⌉','向上取整'], ['√n','平方根'], ['p∣n','p 整除 n'],
+            ['a≡b (mod n)','模 n 同余'], ['|a|','绝对值'], ['a mod n','取模'], ['n∈ℕ','自然数条件']
         ]},
         { id:'count', label:'计数', items:[
             ['∑','求和'], ['∏','连乘'], ['n!','阶乘'], ['C(n,k)','组合数'],
-            ['P(n,k)','排列数'], ['⁰','上标零'], ['¹','上标一'], ['²','上标二'],
-            ['³','上标三'], ['ⁿ','上标 n'], ['₀','下标零'], ['₁','下标一'],
-            ['₂','下标二'], ['₃','下标三'], ['ₙ','下标 n'], ['…','省略号']
+            ['P(n,k)','排列数'], ['|A|','集合基数'], ['2ⁿ','2 的 n 次方'], ['₀','下标零'],
+            ['₁','下标一'], ['₂','下标二'], ['₃','下标三'], ['ₙ','下标 n'],
+            ['⁰','上标零'], ['¹','上标一'], ['²','上标二'], ['³','上标三'],
+            ['ⁿ','上标 n'], ['…','省略号'], ['n choose k','组合数读法'], ['A×B','笛卡尔积']
         ]},
-        { id:'greek', label:'希腊字母', items:[
+        { id:'greek', label:'希腊', items:[
             ['α','alpha'], ['β','beta'], ['γ','gamma'], ['δ','delta'],
-            ['ε','epsilon'], ['θ','theta'], ['λ','lambda'], ['μ','mu'],
-            ['π','pi'], ['ρ','rho'], ['σ','sigma'], ['τ','tau'],
-            ['φ','phi'], ['χ','chi'], ['ψ','psi'], ['ω','omega'],
-            ['Γ','Gamma'], ['Δ','Delta'], ['Θ','Theta'], ['Λ','Lambda'],
-            ['Π','Pi'], ['Σ','Sigma'], ['Φ','Phi'], ['Ω','Omega']
+            ['ε','epsilon'], ['ζ','zeta'], ['η','eta'], ['θ','theta'],
+            ['ι','iota'], ['κ','kappa'], ['λ','lambda'], ['μ','mu'],
+            ['ν','nu'], ['ξ','xi'], ['π','pi'], ['ρ','rho'],
+            ['σ','sigma'], ['τ','tau'], ['υ','upsilon'], ['φ','phi'],
+            ['χ','chi'], ['ψ','psi'], ['ω','omega'], ['Γ','Gamma'],
+            ['Δ','Delta'], ['Θ','Theta'], ['Λ','Lambda'], ['Π','Pi'],
+            ['Σ','Sigma'], ['Φ','Phi'], ['Ψ','Psi'], ['Ω','Omega']
+        ]},
+        { id:'templates', label:'模板', items:[
+            ['∀x∈A, □','全称量词表达式','□'], ['∃x∈A, □','存在量词表达式','□'],
+            ['A⊆B ⇔ ∀x(x∈A→x∈B)','子集定义'],
+            ['A∪B={x∣x∈A∨x∈B}','并集定义'],
+            ['A∩B={x∣x∈A∧x∈B}','交集定义'],
+            ['f:A→B, x↦□','函数映射','□'],
+            ['a≡b (mod n) ⇔ n∣(a−b)','同余定义'],
+            ['G=(V,E)','图的定义'],
+            ['deg(v)=|N(v)|','顶点度定义'],
+            ['χ(G)=□','图的色数','□'],
+            ['C(n,k)=□','组合数','□'], ['P(n,k)=□','排列数','□'],
+            ['\\sum_{i=1}^{n} \\square','求和 LaTeX 模板','\\square'],
+            ['\\prod_{i=1}^{n} \\square','连乘 LaTeX 模板','\\square'],
+            ['\\binom{\\square}{\\square}','二项式系数 LaTeX 模板','\\square'],
+            ['⌊x⌋=□','向下取整表达式','□'], ['⌈x⌉=□','向上取整表达式','□'],
+            ['P(A)=□','幂集表达式','□']
         ]}
     ];
 
@@ -60,6 +89,45 @@
         const doc = input.ownerDocument;
         const host = input.parentElement;
         if (!host || host.querySelector('.dmate-symbol-keyboard')) return null;
+
+        function readRecentSymbols() {
+            try {
+                const stored = win.localStorage.getItem(RECENT_SYMBOLS_KEY);
+                const parsed = JSON.parse(stored || '[]');
+                if (!Array.isArray(parsed)) return [];
+                return parsed
+                    .filter(item => item && typeof item.value === 'string' && item.value.length > 0)
+                    .slice(0, RECENT_SYMBOLS_LIMIT);
+            } catch (_error) {
+                return [];
+            }
+        }
+
+        let recentSymbols = readRecentSymbols();
+
+        function rememberSymbol(value, label) {
+            recentSymbols = recentSymbols.filter(item => item.value !== value);
+            recentSymbols.unshift({ value, label:label || value });
+            recentSymbols = recentSymbols.slice(0, RECENT_SYMBOLS_LIMIT);
+            try {
+                win.localStorage.setItem(RECENT_SYMBOLS_KEY, JSON.stringify(recentSymbols));
+            } catch (_error) {}
+        }
+
+        function normalizeItem(item) {
+            if (Array.isArray(item)) {
+                return {
+                    value:String(item[0] || ''),
+                    label:String(item[1] || item[0] || ''),
+                    select:String(item[2] || '')
+                };
+            }
+            return {
+                value:String(item?.value || ''),
+                label:String(item?.label || item?.value || ''),
+                select:String(item?.select || '')
+            };
+        }
 
         const toggle = doc.createElement('button');
         toggle.type = 'button';
@@ -111,6 +179,10 @@
             catch (_error) { element?.focus?.(); }
         }
 
+        function getGroupItems(group) {
+            return group.id === 'recent' ? recentSymbols : group.items;
+        }
+
         function renderGroup() {
             tabs.replaceChildren();
             grid.replaceChildren();
@@ -127,16 +199,28 @@
                 tabs.appendChild(tab);
             }
 
-            const selected = SYMBOL_GROUPS.find(group => group.id === activeGroup) || SYMBOL_GROUPS[0];
-            for (const [value, label] of selected.items) {
+            const selected = SYMBOL_GROUPS.find(group => group.id === activeGroup) || SYMBOL_GROUPS[1];
+            const items = getGroupItems(selected).map(normalizeItem).filter(item => item.value);
+            if (!items.length) {
+                const empty = doc.createElement('div');
+                empty.className = 'dmate-symbol-empty';
+                empty.textContent = '暂无最近使用的符号。点击其他分类插入后，这里会自动记录。';
+                grid.appendChild(empty);
+                return;
+            }
+
+            for (const item of items) {
                 const key = doc.createElement('button');
                 key.type = 'button';
                 key.className = 'dmate-symbol-key';
-                if (value.length > 3 || /[A-Za-z]/.test(value)) key.classList.add('is-text');
-                key.textContent = value;
-                key.dataset.symbolValue = value;
-                key.title = label;
-                key.setAttribute('aria-label', label + '：' + value);
+                if (item.value.length > 3 || /[A-Za-z]/.test(item.value)) key.classList.add('is-text');
+                if (item.select) key.classList.add('is-template');
+                key.textContent = item.value;
+                key.dataset.symbolValue = item.value;
+                key.dataset.symbolLabel = item.label;
+                if (item.select) key.dataset.symbolSelect = item.select;
+                key.title = item.label;
+                key.setAttribute('aria-label', item.label + '：' + item.value);
                 grid.appendChild(key);
             }
         }
@@ -154,19 +238,22 @@
             }
         }
 
-        function insertSymbol(value) {
-            if (input.disabled || input.readOnly) return;
+        function insertSymbol(value, label, selectText) {
+            if (input.disabled || input.readOnly || !value) return;
             const start = Number.isInteger(input.selectionStart) ? input.selectionStart : input.value.length;
             const end = Number.isInteger(input.selectionEnd) ? input.selectionEnd : start;
             if (typeof input.setRangeText === 'function') {
                 input.setRangeText(value, start, end, 'end');
             } else {
                 input.value = input.value.slice(0, start) + value + input.value.slice(end);
-                input.setSelectionRange(start + value.length, start + value.length);
             }
+
+            const placeholderIndex = selectText ? value.indexOf(selectText) : -1;
+            const selectionStart = placeholderIndex >= 0 ? start + placeholderIndex : start + value.length;
+            const selectionEnd = placeholderIndex >= 0 ? selectionStart + selectText.length : selectionStart;
             focusSafely(input);
-            const caret = start + value.length;
-            try { input.setSelectionRange(caret, caret); } catch (_error) {}
+            try { input.setSelectionRange(selectionStart, selectionEnd); } catch (_error) {}
+
             let inputEvent;
             try {
                 inputEvent = new win.InputEvent('input', {
@@ -178,6 +265,8 @@
                 inputEvent = new win.Event('input', { bubbles:true });
             }
             input.dispatchEvent(inputEvent);
+            rememberSymbol(value, label);
+            if (activeGroup === 'recent') renderGroup();
         }
 
         function onPanelClick(event) {
@@ -189,7 +278,13 @@
                 return;
             }
             const key = event.target.closest?.('[data-symbol-value]');
-            if (key && panel.contains(key)) insertSymbol(key.dataset.symbolValue || '');
+            if (key && panel.contains(key)) {
+                insertSymbol(
+                    key.dataset.symbolValue || '',
+                    key.dataset.symbolLabel || key.dataset.symbolValue || '',
+                    key.dataset.symbolSelect || ''
+                );
+            }
         }
 
         function onOutsidePointer(event) {

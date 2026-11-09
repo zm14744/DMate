@@ -244,7 +244,12 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text:focus {
     padding-right:82px !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard {
+
+/* Keep the keyboard glyph clean: no filled disc, shadow, filter or pseudo-mark. */
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard,
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard:hover,
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard:active,
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard[aria-expanded="true"] {
     position:absolute !important;
     top:auto !important;
     right:38px !important;
@@ -264,13 +269,21 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     border:0 !important;
     border-radius:50% !important;
     background:transparent !important;
+    background-image:none !important;
     color:var(--text-primary,#334155) !important;
     box-shadow:none !important;
+    filter:none !important;
+    outline:none !important;
+    transform:none !important;
+    appearance:none !important;
+    -webkit-appearance:none !important;
+    -webkit-tap-highlight-color:transparent !important;
     cursor:pointer !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard:hover,
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard[aria-expanded="true"] {
-    background:var(--surface-3,#e2e8f0) !important;
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard::before,
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard::after {
+    content:none !important;
+    display:none !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard:disabled {
     opacity:.45 !important;
@@ -282,6 +295,8 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     height:21px;
     flex:none;
 }
+
+/* Popup */
 .dmate-symbol-panel[hidden] { display:none !important; }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
     position:absolute !important;
@@ -293,7 +308,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     box-sizing:border-box !important;
     width:min(360px,calc(100vw - 28px)) !important;
     max-width:calc(100vw - 28px) !important;
-    max-height:min(360px,52vh) !important;
+    max-height:min(380px,58vh) !important;
     margin:0 !important;
     padding:10px !important;
     overflow:hidden !important;
@@ -306,7 +321,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
 }
 @supports (height:100dvh) {
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
-        max-height:min(360px,52dvh) !important;
+        max-height:min(380px,58dvh) !important;
     }
 }
 .dmate-symbol-panel-head {
@@ -324,56 +339,102 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     line-height:1.4;
     font-weight:600;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close {
+
+/* Red circular close control */
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close,
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:hover,
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:active {
     display:flex !important;
-    flex:0 0 28px !important;
+    flex:0 0 30px !important;
     align-items:center !important;
     justify-content:center !important;
-    width:28px !important;
-    min-width:28px !important;
-    height:28px !important;
-    min-height:28px !important;
+    width:30px !important;
+    min-width:30px !important;
+    max-width:30px !important;
+    height:30px !important;
+    min-height:30px !important;
+    max-height:30px !important;
     margin:0 !important;
     padding:0 !important;
     border:0 !important;
-    border-radius:7px !important;
-    background:transparent !important;
-    color:var(--text-secondary,#64748b) !important;
-    font-size:21px !important;
+    border-radius:50% !important;
+    background:#ef4444 !important;
+    color:#fff !important;
+    font-size:20px !important;
+    font-weight:500 !important;
     line-height:1 !important;
     box-shadow:none !important;
+    filter:none !important;
     cursor:pointer !important;
 }
-.dmate-symbol-panel-close:hover { background:var(--surface-3,#e2e8f0) !important; }
-.dmate-symbol-tabs {
-    display:flex;
-    flex:0 0 auto;
-    gap:5px;
-    padding:1px 0 8px;
-    overflow-x:auto;
-    overscroll-behavior-x:contain;
-    scrollbar-width:none;
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:hover {
+    background:#dc2626 !important;
 }
-.dmate-symbol-tabs::-webkit-scrollbar { display:none; }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab {
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:active {
+    background:#b91c1c !important;
+}
+
+/* Five-column category grid: wraps to two rows and has no scrollbar divider. */
+.dmate-symbol-tabs {
+    display:grid !important;
     flex:0 0 auto !important;
-    min-height:28px !important;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:5px;
+    width:100%;
+    min-width:0;
+    padding:1px 0 8px;
+    overflow:visible !important;
+    border:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    scrollbar-width:none !important;
+    -ms-overflow-style:none !important;
+}
+.dmate-symbol-tabs::before,
+.dmate-symbol-tabs::after {
+    content:none !important;
+    display:none !important;
+}
+.dmate-symbol-tabs::-webkit-scrollbar {
+    display:none !important;
+    width:0 !important;
+    height:0 !important;
+}
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab {
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    box-sizing:border-box !important;
+    width:100% !important;
+    min-width:0 !important;
+    min-height:29px !important;
     margin:0 !important;
-    padding:5px 9px !important;
+    padding:5px 3px !important;
     border:1px solid transparent !important;
-    border-radius:7px !important;
+    border-radius:8px !important;
     background:transparent !important;
     color:var(--text-secondary,#64748b) !important;
     font-size:12px !important;
     line-height:1.2 !important;
+    white-space:nowrap !important;
     box-shadow:none !important;
     cursor:pointer !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab[aria-pressed="true"] {
-    border-color:var(--border-strong,#cbd5e1) !important;
-    background:var(--surface-3,#e2e8f0) !important;
+    border-color:var(--accent,#3b82f6) !important;
+    background:var(--accent-bg,#eff6ff) !important;
     color:var(--text-strong,#0f172a) !important;
 }
+.dmate-symbol-empty {
+    grid-column:1 / -1;
+    padding:28px 12px;
+    color:var(--text-secondary,#64748b);
+    font-size:12px;
+    line-height:1.6;
+    text-align:center;
+}
+
+/* Symbol and template keys */
 .dmate-symbol-grid {
     display:grid;
     flex:1 1 auto;
@@ -409,6 +470,13 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     font-size:11px !important;
     font-weight:500 !important;
 }
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key.is-template {
+    min-height:38px !important;
+    font-size:10.5px !important;
+    font-weight:500 !important;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+}
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key:hover {
     border-color:var(--accent,#3b82f6) !important;
     background:var(--accent-bg,#eff6ff) !important;
@@ -418,7 +486,11 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     outline-offset:1px !important;
 }
 @media(max-width:680px) {
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) { right:-41px !important; }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
+        right:-41px !important;
+        width:min(340px,calc(100vw - 20px)) !important;
+        max-width:calc(100vw - 20px) !important;
+    }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard {
         bottom:1px !important;
         height:34px !important;
