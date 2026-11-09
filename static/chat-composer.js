@@ -66,23 +66,7 @@
             ['Δ','Delta'], ['Θ','Theta'], ['Λ','Lambda'], ['Π','Pi'],
             ['Σ','Sigma'], ['Φ','Phi'], ['Ψ','Psi'], ['Ω','Omega']
         ]},
-        { id:'templates', label:'模板', items:[
-            ['∀x∈A, □','全称量词表达式','□'], ['∃x∈A, □','存在量词表达式','□'],
-            ['A⊆B ⇔ ∀x(x∈A→x∈B)','子集定义'],
-            ['A∪B={x∣x∈A∨x∈B}','并集定义'],
-            ['A∩B={x∣x∈A∧x∈B}','交集定义'],
-            ['f:A→B, x↦□','函数映射','□'],
-            ['a≡b (mod n) ⇔ n∣(a−b)','同余定义'],
-            ['G=(V,E)','图的定义'],
-            ['deg(v)=|N(v)|','顶点度定义'],
-            ['χ(G)=□','图的色数','□'],
-            ['C(n,k)=□','组合数','□'], ['P(n,k)=□','排列数','□'],
-            ['\\sum_{i=1}^{n} \\square','求和 LaTeX 模板','\\square'],
-            ['\\prod_{i=1}^{n} \\square','连乘 LaTeX 模板','\\square'],
-            ['\\binom{\\square}{\\square}','二项式系数 LaTeX 模板','\\square'],
-            ['⌊x⌋=□','向下取整表达式','□'], ['⌈x⌉=□','向上取整表达式','□'],
-            ['P(A)=□','幂集表达式','□']
-        ]}
+
     ];
 
     function mountSymbolKeyboard(input, win) {
@@ -96,7 +80,7 @@
                 const parsed = JSON.parse(stored || '[]');
                 if (!Array.isArray(parsed)) return [];
                 return parsed
-                    .filter(item => item && typeof item.value === 'string' && item.value.length > 0)
+                    .filter(item => item && typeof item.value === 'string' && item.value.length > 0 && item.value.length <= 20 && !item.value.includes('□') && !item.value.includes('\\square'))
                     .slice(0, RECENT_SYMBOLS_LIMIT);
             } catch (_error) {
                 return [];
@@ -118,14 +102,12 @@
             if (Array.isArray(item)) {
                 return {
                     value:String(item[0] || ''),
-                    label:String(item[1] || item[0] || ''),
-                    select:String(item[2] || '')
+                    label:String(item[1] || item[0] || '')
                 };
             }
             return {
                 value:String(item?.value || ''),
-                label:String(item?.label || item?.value || ''),
-                select:String(item?.select || '')
+                label:String(item?.label || item?.value || '')
             };
         }
 
@@ -214,11 +196,9 @@
                 key.type = 'button';
                 key.className = 'dmate-symbol-key';
                 if (item.value.length > 3 || /[A-Za-z]/.test(item.value)) key.classList.add('is-text');
-                if (item.select) key.classList.add('is-template');
                 key.textContent = item.value;
                 key.dataset.symbolValue = item.value;
                 key.dataset.symbolLabel = item.label;
-                if (item.select) key.dataset.symbolSelect = item.select;
                 key.title = item.label;
                 key.setAttribute('aria-label', item.label + '：' + item.value);
                 grid.appendChild(key);
@@ -238,21 +218,20 @@
             }
         }
 
-        function insertSymbol(value, label, selectText) {
+        function insertSymbol(value, label) {
             if (input.disabled || input.readOnly || !value) return;
             const start = Number.isInteger(input.selectionStart) ? input.selectionStart : input.value.length;
             const end = Number.isInteger(input.selectionEnd) ? input.selectionEnd : start;
+
             if (typeof input.setRangeText === 'function') {
                 input.setRangeText(value, start, end, 'end');
             } else {
                 input.value = input.value.slice(0, start) + value + input.value.slice(end);
             }
 
-            const placeholderIndex = selectText ? value.indexOf(selectText) : -1;
-            const selectionStart = placeholderIndex >= 0 ? start + placeholderIndex : start + value.length;
-            const selectionEnd = placeholderIndex >= 0 ? selectionStart + selectText.length : selectionStart;
             focusSafely(input);
-            try { input.setSelectionRange(selectionStart, selectionEnd); } catch (_error) {}
+            const caret = start + value.length;
+            try { input.setSelectionRange(caret, caret); } catch (_error) {}
 
             let inputEvent;
             try {
@@ -281,8 +260,7 @@
             if (key && panel.contains(key)) {
                 insertSymbol(
                     key.dataset.symbolValue || '',
-                    key.dataset.symbolLabel || key.dataset.symbolValue || '',
-                    key.dataset.symbolSelect || ''
+                    key.dataset.symbolLabel || key.dataset.symbolValue || ''
                 );
             }
         }
