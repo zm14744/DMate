@@ -270,7 +270,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   async function makeImage(){
    if(!active())throw new Error(uiText('请先新建空白页。'));
    if(!root.DMateDrawingExport?.pngBlob)throw new Error(uiText('导出模块未加载，请刷新后重试。'));
-   if(!currentDocument().graphs.some(g=>g.vertices.length))throw new Error(uiText('请先在空白页添加顶点和边。'));
+   if(!currentDocument().graphs.some(g=>g.vertices.length))throw new Error(uiText('请先在空白页添加顶点和边'));
    const svg=editor?.getDrawingSvg?.(),document=root.DMateDrawingExport.documentForImage(currentDocument(),svg);
    return {blob:await root.DMateDrawingExport.pngBlob(svg),document};
   }

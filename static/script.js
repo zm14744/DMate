@@ -1277,6 +1277,7 @@ function openMobileChoiceModal({ title = "请选择", intro = "", options = [], 
     titleEl.textContent = String(title || "请选择");
     introEl.textContent = String(intro || "");
     introEl.classList.toggle("hidden", !intro);
+    introEl.hidden = !intro;
     mobileChoiceOptions = Array.isArray(options) ? options.map(item => ({
         value:String(item.value ?? ""),
         label:String(item.label ?? item.value ?? ""),
@@ -17172,8 +17173,9 @@ function renderChat(preparedReply = null) {
 
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
-        deleteButton.className = "danger";
-        deleteButton.textContent = "删除";
+        deleteButton.className = "danger chat-message-delete";
+        deleteButton.setAttribute("aria-label", "删除这一条聊天消息");
+        deleteButton.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg>';
         deleteButton.title = "删除这一条聊天消息";
         deleteButton.onclick = () => (
             deleteChatMessage(
@@ -18904,7 +18906,6 @@ async function openKnowledgeGraphCategoryPicker() {
     const categories = ["全部", ...getKnowledgeGraphCategories()];
     const choice = await openMobileChoiceModal({
         title:"选择知识图谱模块",
-        intro:"在手机上用更清晰的列表样式切换模块",
         value:knowledgeGraphFilter || "全部",
         options:categories.map(item => ({ value:item, label:item }))
     });
@@ -21199,7 +21200,12 @@ function renderInfo() {
         }
     }
 
-    info.innerText = lines.join("\n");
+    info.replaceChildren(...lines.map(text => {
+        const line = document.createElement("div");
+        line.className = "conversation-info-line";
+        line.textContent = text;
+        return line;
+    }));
 }
 
 

@@ -1,0 +1,27 @@
+/* Shared tooltips for interface controls. Native/content titles stay untouched. */
+.dm-ui-tooltip {
+    position:fixed;
+    z-index:2147483647;
+    box-sizing:border-box;
+    width:max-content;
+    max-width:min(320px,calc(100vw - 24px));
+    margin:0;
+    padding:7px 10px;
+    border:0;
+    border-radius:9px;
+    outline:0;
+    background:rgb(var(--surface-2-rgb,255,255,255));
+    color:var(--text-primary,#1e293b);
+    box-shadow:0 4px 16px rgba(0,0,0,.16);
+    font-family:inherit;
+    font-size:12px;
+    font-weight:400;
+    line-height:1.45;
+    text-align:start;
+    white-space:pre-line;
+    overflow-wrap:anywhere;
+    overflow:hidden;
+    pointer-events:none;
+    user-select:none;
+}
+.dm-ui-tooltip[hidden] { display:none; }

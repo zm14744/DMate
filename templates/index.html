@@ -811,6 +811,7 @@ body[data-appearance-theme="light"] #sendBtn.ai-stop-button:hover {
     color:var(--text-subtle);
     line-height:1.6;
 }
+#mobileChoiceIntro[hidden] { display:none !important; }
 
 .mobile-choice-list {
     padding:14px 14px 16px;
@@ -2659,7 +2660,8 @@ body[data-appearance-theme="light"] .msg-actions button {
     cursor:pointer;
 }
 
-.msg-actions .chat-text-copy {
+.msg-actions .chat-text-copy,
+.msg-actions .chat-message-delete {
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -2669,9 +2671,11 @@ body[data-appearance-theme="light"] .msg-actions button {
     padding:3px 5px;
     vertical-align:middle;
 }
-.msg-actions .chat-text-copy svg { display:block; pointer-events:none; }
+.msg-actions .chat-text-copy svg,
+.msg-actions .chat-message-delete svg { display:block; pointer-events:none; }
 .msg-actions .chat-text-copy:hover,
 .msg-actions .chat-text-copy:focus-visible { color:var(--text-primary); border-color:var(--accent); }
+.conversation-info-line + .conversation-info-line { margin-top:4px; }
 
 /* 第三阶段：富文本复制。只增强复制层，不改变 Markdown / MathJax 渲染。 */
 .panel-heading-row {
@@ -8852,6 +8856,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/learning-report.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/red-circle-controls.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/desktop-shell.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/ui-tooltip.css?v={{ dmate_web_revision }}">
 <style>
 /* Keep focus feedback inside the control, without a blue or red outer ring.
    Important layer declarations also override the older themed focus rules. */
@@ -9669,6 +9674,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script defer src="/static/chat-stream.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/script.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/desktop-shell.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/ui-tooltip.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 {% if is_dmate_android_app or is_dmate_desktop_app %}
