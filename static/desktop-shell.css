@@ -83,7 +83,7 @@
         margin:0 auto !important; padding:38px 24px 16px !important;
     }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap > .manual-question-mode { left:24px; }
-    body[data-appearance-theme] .center.chat-empty > .input-wrap > .manual-question-mode { left:12px; }
+    body[data-appearance-theme] .center.chat-empty > .input-wrap > .manual-question-mode { left:0; }
     body[data-appearance-theme] .center > #ocrUploadStage {
         width:calc(100% - 48px); max-width:var(--dmate-reading-width); margin-inline:auto;
     }
