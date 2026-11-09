@@ -27,15 +27,21 @@ COPY requirements.txt requirements-agents.txt ./
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt
 
-# Fetch verified official ModelScope files (PaddleX sources remain fallback),
+# Fetch verified official Hugging Face files, with ModelScope as fallback,
 # then export the same two Small text models to ONNX without running inference.
-# File transfers keep progressing within a shared bounded retry budget and log
-# byte progress; a single attempt timeout does not mean the build has failed.
-# Ordinary source changes reuse these prepared model layers.
+# Keep completed models and resumable downloads when BuildKit retains its cache;
+# copy only the verified runtime files into the image.
 COPY ocr_runtime.py image_upload_limits.py ./
 COPY scripts/prepare_ocr_model_cache.py ./scripts/prepare_ocr_model_cache.py
-RUN python scripts/prepare_ocr_model_cache.py && \
-    python scripts/prepare_ocr_model_cache.py --verify-only
+COPY scripts/ocr-model-lock.json ./scripts/ocr-model-lock.json
+RUN --mount=type=cache,id=dmate-ocr-model-cache-v2,target=/var/cache/dmate-model-build,sharing=locked \
+    python scripts/prepare_ocr_model_cache.py --cache-dir /var/cache/dmate-model-build && \
+    python scripts/prepare_ocr_model_cache.py --cache-dir /var/cache/dmate-model-build --verify-only && \
+    mkdir -p /opt/dmate-model-cache/paddlex && \
+    cp -a /var/cache/dmate-model-build/paddlex/official_models \
+        /var/cache/dmate-model-build/paddlex/onnx_models \
+        /var/cache/dmate-model-build/paddlex/dmate-model-manifest.json \
+        /opt/dmate-model-cache/paddlex/
 
 COPY . .
 

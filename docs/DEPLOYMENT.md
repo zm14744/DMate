@@ -94,7 +94,11 @@ DMATE_GRAPH_CONFIRMATION_DB=/data/graph-confirmations.sqlite3
 
 只需要游客模式时，数据库与认证配置可省略。不要把示例占位值用于正式服务。认证密钥可在自己的运行环境用 `python -c 'import secrets; print(secrets.token_hex(32))'` 生成一次，保存到平台 Secret 后持续复用。
 
-镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备先从 ModelScope 的官方 PaddlePaddle 仓库取得必需文件的提交版本、大小及 SHA256，按该版本下载并校验；失败后才使用 PaddleX 官方源作为后备。`PADDLE_PDX_MODEL_SOURCE`（当前默认 BOS）只影响 PaddleX 后备源的优先级，不改变 ModelScope 的首选顺序。下载与重试预算见[本地模型与缓存](#本地模型与缓存)。所有来源均无法提供完整模型时构建才会失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。`scripts/generate_icons.py` 直接从脚本内的矢量路径生成图标，不再读取 Android 目录里的旧 PNG 作为源图；自定义构建上下文需保留生成脚本及 Pillow 依赖，输出目录由脚本创建。应用源码更新后重新构建镜像，正常情况下依赖和模型包层可复用缓存。
+镜像构建除了安装依赖，还会预备 OCR 模型包、转换两个文字模型并检查缓存，再生成跨平台图标。模型准备优先下载 Hugging Face 官方 PaddlePaddle 仓库的固定提交文件，失败或持续过慢时尝试 ModelScope 官方仓库中与预期 SHA256 一致的文件；所有下载仍须通过完整大小、哈希及模型身份检查。`PADDLE_PDX_MODEL_SOURCE`（当前默认 BOS）不改变这个构建下载顺序。下载与重试预算见[本地模型与缓存](#本地模型与缓存)。所有来源均无法提供完整模型时构建会明确失败，后续 `--verify-only` 仍会严格检查模型文件、ONNX 导出和哈希清单。
+
+Dockerfile 使用 BuildKit 缓存挂载 `dmate-ocr-model-cache-v2`，在 `/var/cache/dmate-model-build` 保留已准备模型和部分下载，核验后只将运行需要的原包、ONNX 模型及清单复制到镜像的 `/opt/dmate-model-cache/paddlex`。普通业务源码在模型准备之后复制，成功的模型层仍可复用；准备脚本修改或构建失败后，只要构建器仍保留该缓存挂载，也可复用模型和断点。缓存可能被清理，Zeabur 更换构建节点时也不保证保留，不能将它视为持久数据卷。构建需要支持 `RUN --mount=type=cache` 的 BuildKit。
+
+`scripts/generate_icons.py` 直接从脚本内的矢量路径生成图标，不再读取 Android 目录里的旧 PNG 作为源图；自定义构建上下文需保留生成脚本及 Pillow 依赖，输出目录由脚本创建。
 
 ## 界面语言与接口语言
 
@@ -170,11 +174,13 @@ macOS 麦克风权限文案由 `Info.plist` 与 `locales/en.lproj/InfoPlist.stri
 
 Docker 构建运行 `scripts/prepare_ocr_model_cache.py`：下载三个官方 Paddle 包，校验原始包，为两个文字包导出 ONNX，再记录转换文件的模型身份和 SHA256。此步骤不对图片执行推理，也不请求云端模型。容器默认 `DMATE_MODEL_CACHE_DIR=/opt/dmate-model-cache`，其下使用 `paddlex` 目录；原包位于 `official_models/<模型名>/`，文字转换文件位于 `onnx_models/<模型名>/inference.onnx`，各目录保留对应的 `inference.yml` 及 `dmate-onnx-source.json` 来源哈希记录。清单为 `paddlex/dmate-model-manifest.json`。运行用户必须能写缓存及临时目录；已有 `PADDLE_PDX_CACHE_HOME` 配置也会优先参与缓存选择。
 
-下载优先直接访问 ModelScope 上的官方 `PaddlePaddle/<模型名>` 仓库，只取 `inference.json`、`inference.pdiparams` 和 `inference.yml`，不下载 README 等附加文件。脚本从官方文件清单取得固定提交版本、文件大小及 SHA256，按该版本下载并逐文件校验；三个文件及模型身份全部通过后，才把暂存目录发布为可用缓存。失败时继续尝试 PaddleX 的其他官方源，不更换 OCR 模型、不跳过 ONNX 导出或最终清单核验。
+下载使用仓库内的 `scripts/ocr-model-lock.json`，其中固定三个模型必需文件的大小、SHA256、Hugging Face 提交及 ModelScope 文件版本；这些内容已与两处官方元数据交叉核对，构建不必先等待模型文件清单 API。脚本优先直接访问 Hugging Face 上的官方 `PaddlePaddle/<模型名>` 仓库，只下载 `inference.json`、`inference.pdiparams` 和 `inference.yml`，不下载 README 等附加文件。首选源失败或持续过慢时，尝试锁文件中 ModelScope 官方仓库的对应版本；两处来源使用相同的预期文件大小及 SHA256，不能把另一个版本的模型混入断点文件。三个文件及模型身份全部通过后，才发布为可用缓存。准备的模型仍为 `PP-DocLayoutV3`、`PP-OCRv6_small_det` 和 `PP-OCRv6_small_rec`，两个文字模型的 ONNX 导出和最终清单核验也全部保留。
 
-官方文件清单最多尝试 3 次，每次总时限不超过 60 秒；每个文件最多尝试 3 次，三次共享默认 900 秒的下载总预算（`--download-timeout` 的 3 倍），连接超时 8 秒、连续读取无数据超时 30 秒。每收到非空数据块就更新单次默认 300 秒的进度期限，持续传输不会在第 300 秒被强行中断，仍受共享总预算限制；日志每约 15 秒显示已接收字节和比例。超时或断开后保留同一提交版本的部分文件，下一次从断点继续；服务器不支持断点时重新写入该文件，最终仍须满足完整大小及 SHA256。单条 `attempt 1/3 failed` 是重试记录，不能据此判断整个构建失败；日志会列出保留字节、剩余重试次数和总预算。`--download-timeout` 可调整进度期限及 PaddleX 后备源的时限（最多 600 秒），ONNX 导出同样使用该参数。已完整准备的缓存会复核后复用；整个 Docker 下载层失败后的重新构建仍可能需要重新下载，普通业务代码修改则可复用成功的模型构建层。
+每个文件的所有来源及重试共享默认 300 秒的下载总预算，`--download-timeout` 可调整该预算（最多 600 秒）；这不是整个镜像构建的总时限，依赖安装、其他模型文件及 ONNX 导出也需要时间。ONNX 导出使用同一个参数作为单次转换时限。连接超时为 8 秒、连续读取无数据超时为 30 秒。传输持续至少 30 秒后，若平均速度低于 128 KiB/s，且按当前速度预计无法在剩余预算内完成，会提前切换来源；收到少量数据不再把单个文件的总时限延长到 900 秒。
 
-如果构建日志显示 BOS / Hugging Face 超时、AIStudio 返回 404，不能把它当作模型已经准备成功。新版首先请求实际的 ModelScope 文件地址，避免根域名仅 1 秒的连通探测误排除可用源；所有源失败仍会明确终止构建。SHA256 来源于 HTTPS 官方仓库清单，属于传输内容校验，不等同于独立发布者签名。
+部分下载及其版本、大小和 SHA256 记录保留在缓存目录的 `paddlex/.downloads/<模型名>/`；超时或网络失败不会删除断点。切换来源时只续传内容身份一致的文件；服务器不支持断点时重新写入该文件，最终仍须满足完整大小及 SHA256。本地再次运行准备命令，或 Docker 构建器保留缓存挂载时的重新构建，都可复用这些断点。日志显示已接收字节、来源切换及剩余预算；单次失败或切换来源不等于整个构建失败。已完整准备的缓存会复核后复用。
+
+准备脚本直接访问实际官方文件，不再在这些来源用尽后重复进入 PaddleX 的不透明下载重试。所有直接来源失败会明确终止构建，不能把来源切换日志当作模型已经准备成功。锁文件中的 SHA256 经 HTTPS 官方仓库元数据核对，属于传输内容校验，不等同于独立发布者签名；模型升级需要同时复核并更新锁文件。
 
 本地 Linux 可预备到可写目录：
 

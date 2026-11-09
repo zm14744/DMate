@@ -1,0 +1,62 @@
+{
+  "PP-DocLayoutV3": {
+    "huggingface_revision": "241f8bdfc77a7c7bee915a5057aaee58c235a8d3",
+    "files": {
+      "inference.json": {
+        "size": 1196890,
+        "sha256": "2b68367c5b312a03de5a6e1642c597c8f95165a7e40cd59c6700cf4a5042f4fd",
+        "revision": "e8eb6a3972a1b561f8bc122fed7b86a597b03af2"
+      },
+      "inference.pdiparams": {
+        "size": 130806572,
+        "sha256": "70bd316b0582769ec968829fd1feb1a6a58b7c941b938327e551b6b12b45c137",
+        "revision": "e8eb6a3972a1b561f8bc122fed7b86a597b03af2"
+      },
+      "inference.yml": {
+        "size": 1482,
+        "sha256": "506fcfac13b3b546ae40d7886b44126420f392adb694e3f8bb6a6286a1f90fdc",
+        "revision": "e8eb6a3972a1b561f8bc122fed7b86a597b03af2"
+      }
+    }
+  },
+  "PP-OCRv6_small_det": {
+    "huggingface_revision": "106c97591b235f607453300d9fc8c1cad1b25488",
+    "files": {
+      "inference.json": {
+        "size": 229307,
+        "sha256": "89240f689a4a77aad75ef55a8df0a15c8e1d4980a327d17e58f24bbadde5aeab",
+        "revision": "0dbd8262eddcc29a186bd90a458324626974e782"
+      },
+      "inference.pdiparams": {
+        "size": 9817888,
+        "sha256": "5043d4ccc8d63402ccea8feefcee4db57077431a873e78d2191836a178a492da",
+        "revision": "0dbd8262eddcc29a186bd90a458324626974e782"
+      },
+      "inference.yml": {
+        "size": 885,
+        "sha256": "193f435274bf9f0b5f71a929bbfbcf148282df7e633b34e7c373e8f44741b516",
+        "revision": "0dbd8262eddcc29a186bd90a458324626974e782"
+      }
+    }
+  },
+  "PP-OCRv6_small_rec": {
+    "huggingface_revision": "bd619643acac4b9650c040234da8d944476ee3f1",
+    "files": {
+      "inference.json": {
+        "size": 208004,
+        "sha256": "f0bf53c853937a917affdd74467472167727f8ab0f0f7bded01c4a16c27e46e6",
+        "revision": "d87f3059c99df3e9242467f4df23027414f332aa"
+      },
+      "inference.pdiparams": {
+        "size": 21074618,
+        "sha256": "406e1e689c9a7fbb04178007a3fe10cf852afe7bf8bb3bc6dbb9d532b13bd907",
+        "revision": "d87f3059c99df3e9242467f4df23027414f332aa"
+      },
+      "inference.yml": {
+        "size": 150579,
+        "sha256": "ab078671bb49f06228eadccd34f1bb501e157f7a047095ffb943ba81512c77d1",
+        "revision": "d87f3059c99df3e9242467f4df23027414f332aa"
+      }
+    }
+  }
+}

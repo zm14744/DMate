@@ -7,6 +7,7 @@ on:
     paths:
       - "scripts/prepare_ocr_model_cache.py"
       - "scripts/test_prepare_ocr_model_cache.py"
+      - "scripts/ocr-model-lock.json"
       - "ocr_runtime.py"
       - "Dockerfile"
       - ".github/workflows/validate-ocr-model-cache.yml"
