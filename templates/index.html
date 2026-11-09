@@ -1,11 +1,19 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-appearance-theme="light">
+<html lang="zh-CN" data-appearance-theme="light" data-desktop-sidebar="expanded">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preload" as="style" href="/static/chat-composer.css?v={{ dmate_web_revision }}">
+<link rel="preload" as="style" href="/static/desktop-shell.css?v={{ dmate_web_revision }}">
 <link rel="preload" as="script" href="/static/script.js?v={{ dmate_web_revision }}">
 <link rel="preload" as="script" href="/static/vendor/mathjax-3.2.2/es5/tex-svg.js">
+<script>
+try {
+    if (localStorage.getItem('dmate_desktop_sidebar_collapsed_v1') === '1') {
+        document.documentElement.dataset.desktopSidebar = 'collapsed';
+    }
+} catch (_) {}
+</script>
 <script>
 /*
  * 移动端导航说明：Fennec/Android 的系统返回键保持浏览器原生行为。
@@ -8843,6 +8851,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 <link rel="stylesheet" href="/static/appearance-panels.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/learning-report.css?v={{ dmate_web_revision }}">
 <link rel="stylesheet" href="/static/red-circle-controls.css?v={{ dmate_web_revision }}">
+<link rel="stylesheet" href="/static/desktop-shell.css?v={{ dmate_web_revision }}">
 <style>
 /* Keep focus feedback inside the control, without a blue or red outer ring.
    Important layer declarations also override the older themed focus rules. */
@@ -8906,7 +8915,10 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 <div id="mobileShellBackdrop" class="mobile-shell-backdrop" aria-hidden="true"></div>
 
-<div class="left">
+<div id="conversationSidebar" class="left">
+    <button id="desktopSidebarToggle" class="desktop-shell-button desktop-sidebar-toggle" type="button" aria-label="收起对话列表" title="收起对话列表" aria-controls="conversationSidebar" aria-expanded="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+    </button>
     <div class="mobile-drawer-head">
         <div>对话</div>
         <button id="mobileNavClose" class="mobile-drawer-close" type="button" aria-label="关闭对话列表">×</button>
@@ -8927,6 +8939,14 @@ window.DMATE_CLIENT_CONFIG = {{ {
 </div>
 
 <div class="center chat-empty">
+    <div class="desktop-chat-toolbar">
+        <button id="desktopSidebarOpen" class="desktop-shell-button" type="button" aria-label="展开对话列表" title="展开对话列表" aria-controls="conversationSidebar" aria-expanded="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+        </button>
+        <button id="desktopToolsBtn" class="desktop-shell-button" type="button" aria-label="打开学习工具" title="学习工具" aria-controls="learningToolsPanel" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h6M14 17h6"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="12" cy="17" r="2"/></svg>
+        </button>
+    </div>
     <div id="chat" class="chat"></div>
     <nav class="chat-jump-controls" aria-label="对话快速定位">
         <button id="chatJumpTop" class="chat-jump-button" type="button" title="回到对话顶部" aria-label="回到对话顶部" hidden>
@@ -8974,7 +8994,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
     </div>
 </div>
 
-<div class="right">
+<div id="learningToolsPanel" class="right" role="region" aria-label="学习工具">
     <div class="mobile-drawer-head">
         <div>学习工具</div>
         <button id="mobileToolsClose" class="mobile-drawer-close" type="button" aria-label="关闭学习工具">×</button>
@@ -9648,6 +9668,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script defer src="/static/learning-report.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/chat-stream.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/script.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/desktop-shell.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
 {% if is_dmate_android_app or is_dmate_desktop_app %}

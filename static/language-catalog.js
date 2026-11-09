@@ -9,6 +9,8 @@
         "离散数学智能辅学系统": "Discrete Mathematics Tutor",
         "移动端导航": "Mobile navigation",
         "打开对话列表": "Open conversation list",
+        "收起对话列表": "Collapse conversation list",
+        "展开对话列表": "Expand conversation list",
         "对话列表": "Conversations",
         "DMate 应用图标": "DMate app icon",
         "DMate 图标": "DMate icon",

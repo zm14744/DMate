@@ -24,9 +24,9 @@ body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
 body[data-appearance-theme] .interaction-mode-switch {
     position:relative; isolation:isolate; display:inline-grid;
     grid-template-columns:repeat(2,minmax(0,1fr)); flex:none;
-    box-sizing:border-box; width:160px; height:36px; padding:3px; gap:0;
+    box-sizing:border-box; width:128px; height:30px; padding:3px; gap:0;
     border:0; border-radius:999px; background:var(--surface-1,#f1f5f9);
-    color:var(--text-secondary,#64748b); font-size:14px; line-height:1;
+    color:var(--text-secondary,#64748b); font-size:12px; line-height:1;
     white-space:nowrap;
 }
 body[data-appearance-theme] .interaction-mode-switch::before {
@@ -51,7 +51,7 @@ body[data-appearance-theme] .interaction-mode-switch > button[aria-pressed="true
 body[data-appearance-theme] .interaction-mode-switch > button:focus-visible { text-decoration:underline; text-underline-offset:4px; }
 body[data-appearance-theme] .interaction-mode-switch > button:disabled { cursor:not-allowed; }
 @media(max-width:1100px) {
-    body[data-appearance-theme] .interaction-mode-switch { width:152px; height:34px; font-size:13px; }
+    body[data-appearance-theme] .interaction-mode-switch { width:120px; height:28px; }
 }
 @media(prefers-reduced-motion:reduce) {
     body[data-appearance-theme] .interaction-mode-switch::before,
@@ -201,7 +201,17 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) {
     padding:0 clamp(8px,1vw,18px) calc(16px + env(safe-area-inset-bottom,0px)) !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode {
-    position:absolute; left:clamp(18px,2vw,30px);
+    position:absolute; top:-38px; left:clamp(18px,2vw,30px);
+}
+/* Reserve a row for the mode switch instead of covering the last message. */
+body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) {
+    padding-top:38px !important;
+}
+body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { top:0; }
+@media(max-width:1100px) {
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode { top:-36px; }
+    body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) { padding-top:36px !important; }
+    body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { top:0; }
 }
 /* Activation does not add an outer ring, including the real file picker
    layered over its visible plus button. */
