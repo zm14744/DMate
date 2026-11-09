@@ -36,6 +36,7 @@ function initManualQuestionMode() {
     const container = document.getElementById("manualQuestionMode");
     if (!container) return;
     const updateUi = () => {
+        container.dataset.mode = manualQuestionMode ? "question" : "chat";
         for (const button of container.querySelectorAll("[data-manual-question]")) {
             const selected = (button.dataset.manualQuestion === "yes") === manualQuestionMode;
             button.setAttribute("aria-pressed", String(selected));
@@ -15038,13 +15039,11 @@ function renderOcrGrouping(panel, hasImages) {
         const controls = document.createElement("div");
         controls.className = "ocr-group-controls";
         const question = document.createElement("div");
-        question.className = "ocr-group-question";
+        question.className = "ocr-group-question interaction-mode-switch";
+        question.dataset.mode = task.isQuestion !== false ? "question" : "chat";
         question.setAttribute("role", "group");
-        question.setAttribute("aria-label", `图片${index}是否为题目`);
-        const title = document.createElement("span");
-        title.textContent = "题目";
-        question.append(title);
-        for (const [value, label] of [[true, "是"], [false, "否"]]) {
+        question.setAttribute("aria-label", `图片${index}模式`);
+        for (const [value, label] of [[false, "聊天"], [true, "解题"]]) {
             const choice = document.createElement("button");
             choice.type = "button";
             choice.className = "ocr-group-question-choice";
@@ -15052,10 +15051,7 @@ function renderOcrGrouping(panel, hasImages) {
             choice.dataset.taskId = task.id;
             choice.setAttribute("aria-pressed", String((task.isQuestion !== false) === value));
             choice.disabled = locked;
-            const dot = document.createElement("span");
-            dot.className = "ocr-group-question-dot";
-            dot.setAttribute("aria-hidden", "true");
-            choice.append(dot, label);
+            choice.textContent = label;
             question.append(choice);
         }
         const group = document.createElement("label");
@@ -15118,7 +15114,12 @@ function openOcrGrouping() {
             const task = ocrTasks.get(choice?.dataset.taskId);
             if (!task || ocrBatchPreparing || ocrSolvingSessions.size) return;
             task.isQuestion = choice.dataset.groupQuestion === "true";
-            renderOcrGrouping(document.getElementById("ocrTaskPanel"), true);
+            // Keep the controls mounted so the selection can slide and focus stays put.
+            const modeSwitch = choice.closest(".ocr-group-question");
+            modeSwitch.dataset.mode = task.isQuestion ? "question" : "chat";
+            for (const button of modeSwitch.querySelectorAll("[data-group-question]")) {
+                button.setAttribute("aria-pressed", String((button.dataset.groupQuestion === "true") === task.isQuestion));
+            }
         });
         dialog.addEventListener("change", event => {
             const select = event.target.closest("select[data-group-field]");
@@ -17448,11 +17449,11 @@ function renderSessions() {
 
             const confirmed = await showAppConfirm({
                 title:"删除这段对话？",
-                body:"这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留",
+                body:"删除后，聊天记录和学习统计将不可恢复",
                 confirmText:"删除对话",
                 cancelText:"取消",
                 confirmTone:"danger",
-                fallbackText:"确定删除这段对话吗？\n\n这段对话产生的学习统计会同步删除；已经加入错题本的题目仍会保留"
+                fallbackText:"确定删除这段对话吗？\n\n删除后，聊天记录和学习统计将不可恢复"
             });
 
             if (!confirmed) {
