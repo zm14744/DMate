@@ -209,7 +209,7 @@
             if (event.target.closest?.('button')) event.preventDefault();
         }
 
-        function onToggleClick() { setOpen(!opened); }
+        function onToggleClick() { setOpen(!opened, opened); }
         function onToggleMouseDown(event) { event.preventDefault(); }
         function onCloseClick() { setOpen(false, true); }
 
