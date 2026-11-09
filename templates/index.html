@@ -10095,46 +10095,49 @@ html[data-ui-language="en"] .learning-review-section-title {
 </style>
 
 <style id="dmateLightWorkspaceSidebarSwap">
-/* Light theme: keep the main conversation workspace bright and move the
-   previous workspace blue-gray surface to the left navigation rail.
-   Custom wallpaper mode and all non-light themes retain their own surfaces. */
-html[data-appearance-theme="light"] body:not(.has-custom-background),
+/* Light theme surface hierarchy: bright conversation workspace, muted navigation rail.
+   Match the specificity of the existing root/body theme rules so this swap wins
+   over the legacy light-theme backgrounds instead of merely appending a weaker rule. */
+:root[data-appearance-theme="light"] body:not(.has-custom-background),
 body[data-appearance-theme="light"]:not(.has-custom-background) {
+    background:#f8fafc !important;
     background-color:#f8fafc !important;
     background-image:linear-gradient(#f8fafc,#f8fafc) !important;
 }
-html[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
-html[data-appearance-theme="light"] body:not(.has-custom-background) .center,
-html[data-appearance-theme="light"] body:not(.has-custom-background) .chat,
-html[data-appearance-theme="light"] body:not(.has-custom-background) .input-wrap,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .center,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .chat,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .input-wrap,
 body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
 body[data-appearance-theme="light"]:not(.has-custom-background) .center,
 body[data-appearance-theme="light"]:not(.has-custom-background) .chat,
 body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
+    background:#f8fafc !important;
     background-color:#f8fafc !important;
     background-image:linear-gradient(#f8fafc,#f8fafc) !important;
 }
-html[data-appearance-theme="light"] body:not(.has-custom-background) .left,
-html[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
 body[data-appearance-theme="light"]:not(.has-custom-background) .left,
 body[data-appearance-theme="light"]:not(.has-custom-background) .mobile-topbar {
+    background:#eef3f8 !important;
     background-color:#eef3f8 !important;
     background-image:linear-gradient(#eef3f8,#eef3f8) !important;
     color:#0f172a !important;
 }
 @media (min-width:1101px) {
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .left,
+    :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
     body[data-appearance-theme="light"]:not(.has-custom-background) .left {
         border-right:1px solid #dbe4ee !important;
     }
 }
 @media (max-width:1100px) {
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .left,
+    :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
     body[data-appearance-theme="light"]:not(.has-custom-background) .left {
         border-right:0 !important;
         border-bottom-color:#dbe4ee !important;
     }
-    html[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
+    :root[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
     body[data-appearance-theme="light"]:not(.has-custom-background) .mobile-topbar {
         border-bottom-color:#dbe4ee !important;
     }
