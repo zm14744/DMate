@@ -8261,7 +8261,7 @@ function buildWrongBookPdfExportElement(items) {
     container.style.padding = "34px 40px";
     container.style.background = "#ffffff";
     container.style.color = "#111827";
-    container.style.fontFamily = 'Arial, "Microsoft YaHei", "PingFang SC", sans-serif';
+    container.style.fontFamily = window.getComputedStyle(document.body || document.documentElement).fontFamily || "system-ui, sans-serif";
     container.style.lineHeight = "1.65";
     container.style.zIndex = "-1";
 
@@ -10656,7 +10656,7 @@ function replaceClipboardMathForHtml(root) {
 }
 
 function applyClipboardRichStyles(root) {
-    root.style.fontFamily = 'Arial, "Microsoft YaHei", "PingFang SC", sans-serif';
+    root.style.fontFamily = window.getComputedStyle(document.body || document.documentElement).fontFamily || "system-ui, sans-serif";
     root.style.lineHeight = "1.6";
 
     root.querySelectorAll("table").forEach(table => {
