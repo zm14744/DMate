@@ -210,9 +210,12 @@
         }
 
         function onToggleClick() { setOpen(!opened); }
+        function onToggleMouseDown(event) { event.preventDefault(); }
         function onCloseClick() { setOpen(false, true); }
 
         toggle.addEventListener('click', onToggleClick);
+        toggle.addEventListener('mousedown', onToggleMouseDown);
+        toggle.addEventListener('keydown', onEscape);
         closeButton.addEventListener('click', onCloseClick);
         panel.addEventListener('click', onPanelClick);
         panel.addEventListener('mousedown', onPanelMouseDown);
@@ -227,6 +230,8 @@
             },
             destroy() {
                 toggle.removeEventListener('click', onToggleClick);
+                toggle.removeEventListener('mousedown', onToggleMouseDown);
+                toggle.removeEventListener('keydown', onEscape);
                 closeButton.removeEventListener('click', onCloseClick);
                 panel.removeEventListener('click', onPanelClick);
                 panel.removeEventListener('mousedown', onPanelMouseDown);
