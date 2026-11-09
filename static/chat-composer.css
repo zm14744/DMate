@@ -341,49 +341,39 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     font-weight:600;
 }
 
-/* Red circular close control */
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close,
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:hover,
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:active {
-    display:flex !important;
-    flex:0 0 30px !important;
-    align-items:center !important;
-    justify-content:center !important;
-    width:30px !important;
-    min-width:30px !important;
-    max-width:30px !important;
-    height:30px !important;
-    min-height:30px !important;
-    max-height:30px !important;
+/* Match the existing solid-red, 20px circular close controls. */
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close {
+    display:block !important;
+    flex:0 0 20px !important;
+    width:20px !important;
+    min-width:20px !important;
+    max-width:20px !important;
+    height:20px !important;
+    min-height:20px !important;
+    max-height:20px !important;
     margin:0 !important;
     padding:0 !important;
     border:0 !important;
     border-radius:50% !important;
     background:#ef4444 !important;
-    background-color:#ef4444 !important;
     background-image:none !important;
-    color:#fff !important;
-    font-size:20px !important;
-    font-weight:500 !important;
-    line-height:1 !important;
+    color:transparent !important;
+    font-size:0 !important;
     box-shadow:none !important;
     filter:none !important;
     cursor:pointer !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:hover {
-    background:#dc2626 !important;
-    background-color:#dc2626 !important;
-}
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:active {
-    background:#b91c1c !important;
-    background-color:#b91c1c !important;
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:focus-visible {
+    outline:2px solid rgba(239,68,68,.32) !important;
+    outline-offset:3px !important;
 }
 
-/* Nine categories: a fixed two-row grid, with no horizontal scrollbar or edge divider. */
+/* Eight categories: four evenly spaced tabs per row, without a scrollbar. */
+
 .dmate-symbol-tabs {
     display:grid !important;
     flex:0 0 auto !important;
-    grid-template-columns:repeat(5,minmax(0,1fr));
+    grid-template-columns:repeat(4,minmax(0,1fr));
     gap:5px;
     width:100%;
     min-width:0;

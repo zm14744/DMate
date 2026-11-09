@@ -27,9 +27,23 @@ body[data-appearance-theme="dark"] {
 /* A named important layer supersedes old theme/mobile !important fills,
    including the light-theme PNG that otherwise masks hover colors. */
 @layer dmate-button-themes {
+    /* Separate the light conversation rail and its actions from the canvas. */
+    @media(min-width:1101px) {
+        body[data-appearance-theme="light"]:not(.has-custom-background) .left {
+            --dm-control-bg:#ffffff;
+            --dm-control-hover-bg:#f3f7fc;
+            --dm-control-border:#c3d1e2;
+            --dm-control-hover-border:#91a9c2;
+            background-color:#e2ebf5!important;
+            background-image:none!important;
+            border-right:1px solid #c0cedf!important;
+        }
+    }
+
     body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
         #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
         .voice-input-button,.manual-question-choice,.ocr-group-question-choice,
+        .dmate-symbol-keyboard,.dmate-symbol-panel-close,
         .modal-close-dot,.dmate-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
         .wrong-search-clear,.ocr-task-remove,.dcn-close,.dcn-search-clear,.dcn-note-delete,.dcn-analysis-cancel,
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
@@ -51,6 +65,7 @@ body[data-appearance-theme="dark"] {
     body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
         #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
         .voice-input-button,.manual-question-choice,.ocr-group-question-choice,
+        .dmate-symbol-keyboard,.dmate-symbol-panel-close,
         .modal-close-dot,.dmate-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
         .wrong-search-clear,.ocr-task-remove,.dcn-close,.dcn-search-clear,.dcn-note-delete,.dcn-analysis-cancel,
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,

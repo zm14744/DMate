@@ -2,11 +2,7 @@
     'use strict';
     const instances = new WeakMap();
 
-    const RECENT_SYMBOLS_KEY = 'dmate.symbolKeyboard.recent.v1';
-    const RECENT_SYMBOLS_LIMIT = 20;
-
     const SYMBOL_GROUPS = [
-        { id:'recent', label:'最近', items:[] },
         { id:'common', label:'常用', items:[
             ['∀','任意／全称量词'], ['∃','存在量词'], ['∈','属于'], ['∉','不属于'],
             ['⊆','子集或等于'], ['⊊','真子集'], ['∪','并集'], ['∩','交集'],
@@ -74,30 +70,6 @@
         const host = input.parentElement;
         if (!host || host.querySelector('.dmate-symbol-keyboard')) return null;
 
-        function readRecentSymbols() {
-            try {
-                const stored = win.localStorage.getItem(RECENT_SYMBOLS_KEY);
-                const parsed = JSON.parse(stored || '[]');
-                if (!Array.isArray(parsed)) return [];
-                return parsed
-                    .filter(item => item && typeof item.value === 'string' && item.value.length > 0 && item.value.length <= 20 && !item.value.includes('□') && !item.value.includes('\\square'))
-                    .slice(0, RECENT_SYMBOLS_LIMIT);
-            } catch (_error) {
-                return [];
-            }
-        }
-
-        let recentSymbols = readRecentSymbols();
-
-        function rememberSymbol(value, label) {
-            recentSymbols = recentSymbols.filter(item => item.value !== value);
-            recentSymbols.unshift({ value, label:label || value });
-            recentSymbols = recentSymbols.slice(0, RECENT_SYMBOLS_LIMIT);
-            try {
-                win.localStorage.setItem(RECENT_SYMBOLS_KEY, JSON.stringify(recentSymbols));
-            } catch (_error) {}
-        }
-
         function normalizeItem(item) {
             if (Array.isArray(item)) {
                 return {
@@ -134,10 +106,9 @@
         heading.textContent = '数学符号';
         const closeButton = doc.createElement('button');
         closeButton.type = 'button';
-        closeButton.className = 'dmate-symbol-panel-close';
+        closeButton.className = 'dmate-symbol-panel-close modal-close-dot';
         closeButton.setAttribute('aria-label', '关闭符号键盘');
         closeButton.title = '关闭';
-        closeButton.textContent = '×';
         header.append(heading, closeButton);
 
         const tabs = doc.createElement('div');
@@ -161,10 +132,6 @@
             catch (_error) { element?.focus?.(); }
         }
 
-        function getGroupItems(group) {
-            return group.id === 'recent' ? recentSymbols : group.items;
-        }
-
         function renderGroup() {
             tabs.replaceChildren();
             grid.replaceChildren();
@@ -181,12 +148,12 @@
                 tabs.appendChild(tab);
             }
 
-            const selected = SYMBOL_GROUPS.find(group => group.id === activeGroup) || SYMBOL_GROUPS[1];
-            const items = getGroupItems(selected).map(normalizeItem).filter(item => item.value);
+            const selected = SYMBOL_GROUPS.find(group => group.id === activeGroup) || SYMBOL_GROUPS[0];
+            const items = selected.items.map(normalizeItem).filter(item => item.value);
             if (!items.length) {
                 const empty = doc.createElement('div');
                 empty.className = 'dmate-symbol-empty';
-                empty.textContent = '暂无最近使用的符号。点击其他分类插入后，这里会自动记录。';
+                empty.textContent = '该分类暂无符号。';
                 grid.appendChild(empty);
                 return;
             }
@@ -198,7 +165,6 @@
                 if (item.value.length > 3 || /[A-Za-z]/.test(item.value)) key.classList.add('is-text');
                 key.textContent = item.value;
                 key.dataset.symbolValue = item.value;
-                key.dataset.symbolLabel = item.label;
                 key.title = item.label;
                 key.setAttribute('aria-label', item.label + '：' + item.value);
                 grid.appendChild(key);
@@ -218,7 +184,7 @@
             }
         }
 
-        function insertSymbol(value, label) {
+        function insertSymbol(value) {
             if (input.disabled || input.readOnly || !value) return;
             const start = Number.isInteger(input.selectionStart) ? input.selectionStart : input.value.length;
             const end = Number.isInteger(input.selectionEnd) ? input.selectionEnd : start;
@@ -244,8 +210,6 @@
                 inputEvent = new win.Event('input', { bubbles:true });
             }
             input.dispatchEvent(inputEvent);
-            rememberSymbol(value, label);
-            if (activeGroup === 'recent') renderGroup();
         }
 
         function onPanelClick(event) {
@@ -258,10 +222,7 @@
             }
             const key = event.target.closest?.('[data-symbol-value]');
             if (key && panel.contains(key)) {
-                insertSymbol(
-                    key.dataset.symbolValue || '',
-                    key.dataset.symbolLabel || key.dataset.symbolValue || ''
-                );
+                insertSymbol(key.dataset.symbolValue || '');
             }
         }
 

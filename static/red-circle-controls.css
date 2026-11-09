@@ -4,7 +4,7 @@
 @layer dmate-red-circle-controls {
     button:is(
         #sendBtn.ai-stop-button,#ocrCancelBtn,
-        .modal-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
+        .modal-close-dot,.dmate-symbol-panel-close,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
         .wrong-search-clear,.ocr-task-remove,
         .dcn-close,.dcn-search-clear,.dcn-note-delete,
         .dge-panel-close,.dgs-source-delete,
