@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,6 +39,7 @@ DEFAULT_CACHE_DIR = '/opt/dmate-model-cache'
 SCHEMA_VERSION = 2
 MODELSCOPE_API = 'https://modelscope.cn/api/v1/models/PaddlePaddle'
 DOWNLOAD_ATTEMPTS = 3
+DOWNLOAD_PROGRESS_INTERVAL = 15
 
 
 class CachePreparationError(RuntimeError):
@@ -61,18 +63,30 @@ def _caused_by_download_deadline(exc):
 
 
 @contextmanager
-def _download_deadline(seconds):
+def _download_deadline(seconds, *, hard_deadline=None):
     if not hasattr(signal, 'setitimer'):
         raise CachePreparationError('download_deadline_requires_posix')
+    def interval():
+        remaining = seconds if hard_deadline is None else min(
+            seconds, hard_deadline - time.monotonic())
+        if remaining <= 0:
+            raise _DownloadDeadline('model file exhausted its total download budget')
+        return remaining
+
+    def refresh():
+        signal.setitimer(signal.ITIMER_REAL, interval())
+
     def expired(signum, frame):
         # PaddleX catches this exception and advances to another available
         # hoster. Re-arm the deadline so the fallback host also has a limit.
-        signal.setitimer(signal.ITIMER_REAL, seconds, 0)
+        if hard_deadline is None:
+            signal.setitimer(signal.ITIMER_REAL, seconds, 0)
         raise _DownloadDeadline(f'model source exceeded {seconds:g}s')
+    initial_interval = interval()
     previous = signal.signal(signal.SIGALRM, expired)
-    previous_timer = signal.setitimer(signal.ITIMER_REAL, seconds)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, initial_interval)
     try:
-        yield
+        yield refresh
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous)
@@ -299,6 +313,11 @@ def _download_modelscope_file(http, name, filename, record, destination, timeout
     import requests
     last_error = None
     expected_size = record['size']
+    # Keep the same maximum transfer budget as three fixed-length attempts,
+    # while letting a healthy stream continue instead of interrupting it at
+    # exactly timeout_seconds. Retries share this budget rather than restart it.
+    started = time.monotonic()
+    hard_deadline = started + timeout_seconds * DOWNLOAD_ATTEMPTS
     for attempt in range(DOWNLOAD_ATTEMPTS):
         offset = destination.stat().st_size if destination.exists() else 0
         if offset == expected_size:
@@ -310,7 +329,14 @@ def _download_modelscope_file(http, name, filename, record, destination, timeout
             destination.unlink()
             offset = 0
         try:
-            with _download_deadline(timeout_seconds):
+            remaining = hard_deadline - time.monotonic()
+            if remaining <= 0:
+                raise _DownloadDeadline('model file exhausted its total download budget')
+            print(f'Official ModelScope {name}/{filename}: attempt {attempt + 1}/'
+                  f'{DOWNLOAD_ATTEMPTS}, starting at {offset}/{expected_size} bytes; '
+                  f'{remaining:.0f}s total download budget remaining.', file=sys.stderr, flush=True)
+            last_progress = time.monotonic()
+            with _download_deadline(timeout_seconds, hard_deadline=hard_deadline) as refresh:
                 with http.get(f'{MODELSCOPE_API}/{name}/repo',
                               params={'Revision': record['revision'], 'FilePath': filename},
                               headers={'Range': f'bytes={offset}-', 'Accept-Encoding': 'identity'},
@@ -326,6 +352,9 @@ def _download_modelscope_file(http, name, filename, record, destination, timeout
                     elif response.status_code == 200:
                         # A server may ignore Range; replace, never append its
                         # complete response to the bytes from the first attempt.
+                        if offset:
+                            print(f'Official ModelScope {name}/{filename}: server ignored Range; '
+                                  'restarting this file from byte 0.', file=sys.stderr, flush=True)
                         offset = 0
                     else:
                         raise CachePreparationError('modelscope_unexpected_file_status')
@@ -336,19 +365,37 @@ def _download_modelscope_file(http, name, filename, record, destination, timeout
                             if received > expected_size:
                                 raise CachePreparationError('modelscope_file_capacity')
                             target.write(chunk)
+                            if chunk:
+                                refresh()
+                            now = time.monotonic()
+                            if now - last_progress >= DOWNLOAD_PROGRESS_INTERVAL:
+                                print(f'Official ModelScope {name}/{filename}: '
+                                      f'{received}/{expected_size} bytes '
+                                      f'({100 * received / expected_size:.1f}%), '
+                                      f'{now - started:.0f}s elapsed.', file=sys.stderr, flush=True)
+                                last_progress = now
             if destination.stat().st_size != expected_size:
                 raise CachePreparationError('modelscope_incomplete_file')
             if _sha256(destination) != record['sha256']:
                 destination.unlink()
                 raise CachePreparationError('modelscope_file_hash_mismatch')
+            print(f'Official ModelScope {name}/{filename}: verified '
+                  f'{expected_size} bytes and SHA256.', file=sys.stderr, flush=True)
             return
         except (requests.RequestException, _DownloadDeadline, CachePreparationError) as exc:
             last_error = exc
-            print(f'Official ModelScope {name}/{filename}: attempt {attempt + 1}/'
+            retained = destination.stat().st_size if destination.exists() else 0
+            remaining = max(0, hard_deadline - time.monotonic())
+            permanent_error = (isinstance(exc, requests.HTTPError) and exc.response is not None
+                               and exc.response.status_code in (401, 403, 404))
+            retries = DOWNLOAD_ATTEMPTS - attempt - 1 if remaining > 0 and not permanent_error else 0
+            action = 'retrying' if retries else 'no further direct download attempts'
+            print(f'Official ModelScope {name}/{filename}: WARNING attempt {attempt + 1}/'
                   f'{DOWNLOAD_ATTEMPTS} failed ({type(exc).__name__}); '
-                  'retaining verified-source partial bytes for retry.', file=sys.stderr)
-            if isinstance(exc, requests.HTTPError) and exc.response is not None \
-                    and exc.response.status_code in (401, 403, 404):
+                  f'{retained}/{expected_size} partial bytes retained, awaiting full SHA256; '
+                  f'{action}; {retries} retries and {remaining:.0f}s total download budget remaining.',
+                  file=sys.stderr, flush=True)
+            if not retries:
                 break
     raise CachePreparationError(f'modelscope_file_download_failed:{name}:{filename}') from last_error
 

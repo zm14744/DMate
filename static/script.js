@@ -22087,19 +22087,14 @@ function downloadOptionsForCurrentPlatform() {
 
     // Public release assets are fixed here, independent of deployment URL settings.
     // GitHub and GitCode now serve the same published desktop packages.
-    function installers(githubFilename, {gitcodeFilename = githubFilename, formatLabel = "", preferGithub = true} = {}) {
+    function installers(githubFilename, {gitcodeFilename = githubFilename, formatLabel = ""} = {}) {
         const gitcodeUrl = gitcodeDownloadBase + encodeURIComponent(gitcodeFilename) + "/download";
         const githubUrl = githubDownloadBase + encodeURIComponent(githubFilename);
         const suffix = formatLabel ? " · " + formatLabel : "";
-        return preferGithub
-            ? [
-                { label:"GitHub" + suffix, url:githubUrl },
-                { label:"GitCode" + suffix, url:gitcodeUrl, secondary:true }
-            ]
-            : [
-                { label:"GitCode" + suffix, url:gitcodeUrl },
-                { label:"GitHub" + suffix, url:githubUrl, secondary:true }
-            ];
+        return [
+            { label:"GitCode" + suffix, url:gitcodeUrl },
+            { label:"GitHub" + suffix, url:githubUrl, secondary:true }
+        ];
     }
     if (platform === "ios") {
         return {
@@ -22112,7 +22107,7 @@ function downloadOptionsForCurrentPlatform() {
         return {
             platform:"Android 1.0.3",
             text:"选择下载源",
-            actions:installers("DMate-Android-1.0.3.apk", {preferGithub:false})
+            actions:installers("DMate-Android-1.0.3.apk")
         };
     }
     if (platform === "windows") {
@@ -22153,8 +22148,8 @@ function downloadOptionsForCurrentPlatform() {
         platform:"桌面系统",
         text:"选择下载源",
         actions:[
-            { label:"GitHub", url:githubRelease },
-            { label:"GitCode", url:gitcodeRelease, secondary:true },
+            { label:"GitCode", url:gitcodeRelease },
+            { label:"GitHub", url:githubRelease, secondary:true },
             { label:"Microsoft Store", url:microsoftStore, secondary:true },
             { label:"Snap Store", url:snap, secondary:true }
         ]

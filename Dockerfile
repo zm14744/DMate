@@ -29,6 +29,8 @@ RUN python -m pip install --upgrade pip && \
 
 # Fetch verified official ModelScope files (PaddleX sources remain fallback),
 # then export the same two Small text models to ONNX without running inference.
+# File transfers keep progressing within a shared bounded retry budget and log
+# byte progress; a single attempt timeout does not mean the build has failed.
 # Ordinary source changes reuse these prepared model layers.
 COPY ocr_runtime.py image_upload_limits.py ./
 COPY scripts/prepare_ocr_model_cache.py ./scripts/prepare_ocr_model_cache.py

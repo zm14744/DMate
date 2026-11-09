@@ -263,7 +263,7 @@
                 link.href = url;
                 link.textContent = label;
                 link.rel = 'noopener noreferrer';
-                if (links.childElementCount) link.className = 'secondary';
+                if (host !== 'api.gitcode.com') link.className = 'secondary';
                 if (client.kind === 'desktop') {
                     link.target = '_blank';
                     link.addEventListener('click', () => {

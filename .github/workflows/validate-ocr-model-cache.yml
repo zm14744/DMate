@@ -6,7 +6,9 @@ on:
       - main
     paths:
       - "scripts/prepare_ocr_model_cache.py"
+      - "scripts/test_prepare_ocr_model_cache.py"
       - "ocr_runtime.py"
+      - "Dockerfile"
       - ".github/workflows/validate-ocr-model-cache.yml"
   workflow_dispatch:
 
@@ -25,6 +27,9 @@ jobs:
       - name: Compile model preparation modules
         run: |
           python -m py_compile scripts/prepare_ocr_model_cache.py ocr_runtime.py
+
+      - name: Check bounded downloads, resume handling and integrity offline
+        run: python scripts/test_prepare_ocr_model_cache.py -v
 
       - name: Verify source timeout falls through to the next host
         run: |
