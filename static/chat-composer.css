@@ -286,7 +286,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
     position:absolute !important;
     z-index:1200 !important;
-    right:0 !important;
+    right:-46px !important;
     bottom:calc(100% + 10px) !important;
     display:flex !important;
     flex-direction:column !important;
@@ -418,6 +418,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     outline-offset:1px !important;
 }
 @media(max-width:680px) {
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) { right:-41px !important; }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard {
         bottom:1px !important;
         height:34px !important;
