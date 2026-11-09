@@ -34,20 +34,19 @@
 
 :root {
     --dmate-font-ui:
-        "Segoe UI Variable",
-        "Segoe UI",
+        system-ui,
         -apple-system,
         BlinkMacSystemFont,
-        "Roboto",
+        "Segoe UI Variable",
+        "Segoe UI",
+        Roboto,
         "Helvetica Neue",
-        "Noto Sans",
         Arial,
         "PingFang SC",
         "Microsoft YaHei UI",
         "Microsoft YaHei",
         "Noto Sans CJK SC",
         "Noto Sans SC",
-        system-ui,
         sans-serif;
 }
 
@@ -3854,7 +3853,7 @@ body[data-appearance-theme="light"] .msg-actions button {
         border-radius:12px;
         background:transparent;
         color:var(--text-muted);
-        font:300 28px/1 Arial,sans-serif;
+        font:300 28px/1 var(--dmate-font-ui);
         cursor:pointer;
     }
 
