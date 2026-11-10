@@ -160,8 +160,8 @@
             }
         }
 
-        // Position within the composer, not inside the mobile shell's
-        // viewport-fixed containing block (which could drop it below the input).
+        // Keep the mobile symbol palette anchored to the input capsule.
+        // Composer-local absolute positioning works inside mobile shell transforms.
         function positionSymbolPanel() {
             if (!opened || !win.matchMedia?.('(max-width:1100px)').matches) {
                 for (const key of ['--dm-symbol-top', '--dm-symbol-left',
@@ -174,17 +174,24 @@
             const viewTop = viewport?.offsetTop || 0;
             const viewLeft = viewport?.offsetLeft || 0;
             const viewWidth = viewport?.width || win.innerWidth;
+            const viewBottom = viewTop + (viewport?.height || win.innerHeight) - 10;
             const topbar = doc.querySelector('.mobile-topbar');
             const topbarBottom = topbar && win.getComputedStyle(topbar).display !== 'none'
                 ? topbar.getBoundingClientRect().bottom : 0;
             const centerTop = doc.querySelector('.center')?.getBoundingClientRect().top || 0;
             const topLimit = Math.max(viewTop + 8, topbarBottom + 8, centerTop + 8);
             const anchor = toggle.getBoundingClientRect();
+            const inputRect = host.closest('.input')?.getBoundingClientRect() || anchor;
             const hostRect = host.getBoundingClientRect();
 
-            // Always open above the input. The symbol grid scrolls internally.
-            const availableAbove = Math.max(0, anchor.top - topLimit - 8);
-            const maxHeight = Math.max(60, Math.min(292, availableAbove));
+            // Prefer BELOW the entire input capsule. If the soft keyboard
+            // leaves less than one usable row, fall back above rather than
+            // rendering an inaccessible popup past the visible viewport.
+            const availableBelow = Math.max(0, viewBottom - inputRect.bottom - 8);
+            const availableAbove = Math.max(0, inputRect.top - topLimit - 8);
+            const placeBelow = availableBelow >= 146 || availableBelow >= availableAbove;
+            const available = placeBelow ? availableBelow : availableAbove;
+            const maxHeight = Math.max(0, Math.min(292, available));
             const width = Math.min(312, Math.max(80, viewWidth - 20));
             panel.style.setProperty('--dm-symbol-width', width + 'px');
             panel.style.setProperty('--dm-symbol-max-height', maxHeight + 'px');
@@ -192,7 +199,9 @@
             const left = Math.max(viewLeft + 10,
                 Math.min(anchor.right - bounds.width + 12,
                          viewLeft + viewWidth - bounds.width - 10));
-            const top = Math.max(topLimit, anchor.top - bounds.height - 8);
+            const top = placeBelow
+                ? inputRect.bottom + 8
+                : Math.max(topLimit, inputRect.top - bounds.height - 8);
 
             const scaleX = host.offsetWidth > 0 ? hostRect.width / host.offsetWidth : 1;
             const scaleY = host.offsetHeight > 0 ? hostRect.height / host.offsetHeight : 1;
