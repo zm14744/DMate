@@ -89,12 +89,7 @@
         const heading = doc.createElement('div');
         heading.className = 'dmate-symbol-panel-title';
         heading.textContent = '数学符号';
-        const closeButton = doc.createElement('button');
-        closeButton.type = 'button';
-        closeButton.className = 'dmate-symbol-panel-close modal-close-dot';
-        closeButton.setAttribute('aria-label', '关闭符号键盘');
-        closeButton.title = '关闭';
-        header.append(heading, closeButton);
+        header.append(heading);
 
         const tabs = doc.createElement('div');
         tabs.className = 'dmate-symbol-tabs';
@@ -120,6 +115,15 @@
         function renderGroup() {
             tabs.replaceChildren();
             grid.replaceChildren();
+            // Use the actual active conversation fill, so selected symbol tabs
+            // match the sidebar in light, dark, and custom appearance themes.
+            const activeSession = doc.querySelector('#sessions .session.active');
+            const activeFill = activeSession ? win.getComputedStyle(activeSession).backgroundColor : '';
+            if (activeFill && activeFill !== 'transparent' && activeFill !== 'rgba(0, 0, 0, 0)') {
+                panel.style.setProperty('--dm-symbol-selected-bg', activeFill);
+            } else {
+                panel.style.removeProperty('--dm-symbol-selected-bg');
+            }
 
             for (const group of SYMBOL_GROUPS) {
                 const tab = doc.createElement('button');
@@ -274,12 +278,10 @@
 
         function onToggleClick() { setOpen(!opened, opened); }
         function onToggleMouseDown(event) { event.preventDefault(); }
-        function onCloseClick() { setOpen(false, true); }
 
         toggle.addEventListener('click', onToggleClick);
         toggle.addEventListener('mousedown', onToggleMouseDown);
         toggle.addEventListener('keydown', onEscape);
-        closeButton.addEventListener('click', onCloseClick);
         panel.addEventListener('click', onPanelClick);
         panel.addEventListener('mousedown', onPanelMouseDown);
         panel.addEventListener('keydown', onEscape);
@@ -298,7 +300,6 @@
                 toggle.removeEventListener('click', onToggleClick);
                 toggle.removeEventListener('mousedown', onToggleMouseDown);
                 toggle.removeEventListener('keydown', onEscape);
-                closeButton.removeEventListener('click', onCloseClick);
                 panel.removeEventListener('click', onPanelClick);
                 panel.removeEventListener('mousedown', onPanelMouseDown);
                 panel.removeEventListener('keydown', onEscape);

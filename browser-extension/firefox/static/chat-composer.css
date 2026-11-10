@@ -284,33 +284,6 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     font-weight:600;
 }
 
-/* Match the existing solid-red, 20px circular close controls. */
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close {
-    display:block !important;
-    flex:0 0 20px !important;
-    width:20px !important;
-    min-width:20px !important;
-    max-width:20px !important;
-    height:20px !important;
-    min-height:20px !important;
-    max-height:20px !important;
-    margin:0 !important;
-    padding:0 !important;
-    border:0 !important;
-    border-radius:50% !important;
-    background:#ef4444 !important;
-    background-image:none !important;
-    color:transparent !important;
-    font-size:0 !important;
-    box-shadow:none !important;
-    filter:none !important;
-    cursor:pointer !important;
-}
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-panel-close:focus-visible {
-    outline:2px solid rgba(239,68,68,.32) !important;
-    outline-offset:3px !important;
-}
-
 /* Six focused categories: three evenly spaced tabs per row. */
 
 .dmate-symbol-tabs {
@@ -358,10 +331,18 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     box-shadow:none !important;
     cursor:pointer !important;
 }
+/* Same filled state as the active conversation, without the blue border. */
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab[aria-pressed="true"] {
-    border-color:var(--accent,#3b82f6) !important;
-    background:var(--accent-bg,#eff6ff) !important;
-    color:var(--text-strong,#0f172a) !important;
+    border-color:transparent !important;
+    background:var(--dm-symbol-selected-bg,var(--surface-3,#e2e8f0)) !important;
+    background-image:none !important;
+    color:var(--text-primary,#334155) !important;
+    font-weight:600 !important;
+    box-shadow:none !important;
+}
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab:focus-visible {
+    outline:2px solid var(--text-secondary,#64748b) !important;
+    outline-offset:1px !important;
 }
 .dmate-symbol-empty {
     grid-column:1 / -1;

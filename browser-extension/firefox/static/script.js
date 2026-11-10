@@ -22216,11 +22216,9 @@ function initDmateDownloadDialog() {
         return;
     }
 
-    const platform = detectDmateInstallPlatform();
     button.hidden = false;
     button.setAttribute("aria-hidden", "false");
-    if (platform === "android" || platform === "ios") button.textContent = "下载 DMate";
-    else button.textContent = "下载 DMate 桌面版";
+    button.textContent = "下载 DMate";
 
     button.addEventListener("click", openDmateDownloadDialog);
 
