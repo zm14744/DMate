@@ -53,6 +53,26 @@ body[data-appearance-theme] .interaction-mode-switch > button:disabled { cursor:
 @media(max-width:1100px) {
     body[data-appearance-theme] .interaction-mode-switch { width:120px; height:28px; }
 }
+
+/* iPad in both orientations and Split View: larger tappable symbol keys. */
+@media(min-width:681px) and (max-width:1100px) {
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-grid {
+        grid-auto-rows:40px;
+        gap:5px;
+    }
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key,
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key.is-text {
+        height:40px !important;
+        min-height:40px !important;
+        max-height:40px !important;
+    }
+}
+body[data-appearance-theme] > .dmate-symbol-panel :is(.dmate-symbol-tab,.dmate-symbol-key) {
+    pointer-events:auto !important;
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+}
+
 @media(prefers-reduced-motion:reduce) {
     body[data-appearance-theme] .interaction-mode-switch::before,
     body[data-appearance-theme] .interaction-mode-switch > button { transition:none; }
@@ -299,17 +319,20 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
 
 /* Popup */
 .dmate-symbol-panel[hidden] { display:none !important; }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
-    position:absolute !important;
-    z-index:1200 !important;
-    right:-46px !important;
-    bottom:calc(100% + 10px) !important;
+body[data-appearance-theme] > .dmate-symbol-panel:not([hidden]) {
+    position:fixed !important;
+    z-index:950 !important;
+    top:var(--dm-symbol-top,10px) !important;
+    left:var(--dm-symbol-left,10px) !important;
+    right:auto !important;
+    bottom:auto !important;
     display:flex !important;
     flex-direction:column !important;
     box-sizing:border-box !important;
-    width:min(360px,calc(100vw - 28px)) !important;
-    max-width:calc(100vw - 28px) !important;
-    max-height:min(380px,58vh) !important;
+    width:var(--dm-symbol-width,min(360px,calc(100vw - 20px))) !important;
+    max-width:calc(100vw - 20px) !important;
+    max-height:var(--dm-symbol-max-height,min(380px,calc(100dvh - 20px))) !important;
+    pointer-events:auto !important;
     margin:0 !important;
     padding:10px !important;
     overflow:hidden !important;
@@ -319,11 +342,6 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     color:var(--text-primary,#334155) !important;
     box-shadow:0 12px 34px rgba(15,23,42,.20) !important;
     text-align:left !important;
-}
-@supports (height:100dvh) {
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
-        max-height:min(380px,58dvh) !important;
-    }
 }
 .dmate-symbol-panel-head {
     display:flex;
@@ -368,7 +386,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question
     width:0 !important;
     height:0 !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab {
+body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-tab {
     display:flex !important;
     align-items:center !important;
     justify-content:center !important;
@@ -389,7 +407,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     cursor:pointer !important;
 }
 /* Same filled state as the active conversation, without the blue border. */
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab[aria-pressed="true"] {
+body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-tab[aria-pressed="true"] {
     border-color:transparent !important;
     background:var(--dm-symbol-selected-bg,var(--surface-3,#e2e8f0)) !important;
     background-image:none !important;
@@ -397,7 +415,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     font-weight:600 !important;
     box-shadow:none !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab:focus-visible {
+body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-tab:focus-visible {
     outline:2px solid var(--text-secondary,#64748b) !important;
     outline-offset:1px !important;
 }
@@ -423,7 +441,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     overscroll-behavior:contain;
     scrollbar-width:thin;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key {
+body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key {
     display:flex !important;
     align-items:center !important;
     justify-content:center !important;
@@ -442,7 +460,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     box-shadow:none !important;
     cursor:pointer !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key.is-text {
+body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key.is-text {
     min-height:38px !important;
     padding:4px 3px !important;
     font-size:11px !important;
@@ -453,26 +471,19 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     word-break:normal !important;
     text-align:center !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key:hover {
+body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key:hover {
     border-color:var(--accent,#3b82f6) !important;
     background:var(--accent-bg,#eff6ff) !important;
 }
-body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel button:focus-visible {
+body[data-appearance-theme] > .dmate-symbol-panel button:focus-visible {
     outline:2px solid var(--accent,#3b82f6) !important;
     outline-offset:1px !important;
 }
 @media(max-width:1100px) {
-    /* Mobile popup follows the composer: below the input when space permits,
-       with the symbol grid scrolling inside the available visible area. */
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
-        position:absolute !important;
-        top:var(--dm-symbol-top,calc(100% + 10px)) !important;
-        left:var(--dm-symbol-left,0px) !important;
-        right:auto !important;
-        bottom:auto !important;
-        width:var(--dm-symbol-width,min(312px,calc(100vw - 20px))) !important;
-        max-width:calc(100vw - 20px) !important;
-        max-height:var(--dm-symbol-max-height,min(292px,42dvh)) !important;
+    /* The popover is outside clipped shells (Safari, iPad split view). */
+    body[data-appearance-theme] > .dmate-symbol-panel:not([hidden]) {
+        width:var(--dm-symbol-width,min(340px,calc(100vw - 20px))) !important;
+        max-height:var(--dm-symbol-max-height,min(320px,calc(100dvh - 20px))) !important;
         padding:8px !important;
         border-radius:13px !important;
         box-shadow:0 10px 28px rgba(15,23,42,.18) !important;
@@ -493,7 +504,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
         gap:3px;
         padding:0 0 5px;
     }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab {
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-tab {
         height:26px !important;
         min-height:26px !important;
         max-height:26px !important;
@@ -501,24 +512,24 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
         font-size:12px !important;
         border-radius:6px !important;
     }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-grid {
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-grid {
         grid-template-columns:repeat(6,minmax(0,1fr));
         grid-auto-rows:31px;
         gap:4px;
         padding:2px 0 1px;
     }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key,
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key.is-text {
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key,
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key.is-text {
         height:31px !important;
         min-height:31px !important;
         max-height:31px !important;
         padding:2px 1px !important;
         border-radius:6px !important;
     }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key {
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key {
         font-size:16px !important;
     }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key.is-text {
+    body[data-appearance-theme] > .dmate-symbol-panel .dmate-symbol-key.is-text {
         font-size:10px !important;
         line-height:1.1 !important;
     }

@@ -102,7 +102,8 @@
         grid.setAttribute('aria-label', '可插入的数学符号');
 
         panel.append(header, tabs, grid);
-        host.append(toggle, panel);
+        host.append(toggle);
+        doc.body.append(panel);
 
         let activeGroup = 'logic';
         let opened = false;
@@ -160,55 +161,63 @@
             }
         }
 
-        // Keep the mobile symbol palette anchored to the input capsule.
-        // Composer-local absolute positioning works inside mobile shell transforms.
+        // A body-level popover avoids overflow/transform clipping by the
+        // desktop composer, Safari visual viewport and iPad split-view shell.
         function positionSymbolPanel() {
-            if (!opened || !win.matchMedia?.('(max-width:1100px)').matches) {
-                for (const key of ['--dm-symbol-top', '--dm-symbol-left',
-                                   '--dm-symbol-width', '--dm-symbol-max-height']) {
-                    panel.style.removeProperty(key);
-                }
-                return;
-            }
+            if (!opened || panel.hidden) return;
             const viewport = win.visualViewport;
             const viewTop = viewport?.offsetTop || 0;
             const viewLeft = viewport?.offsetLeft || 0;
-            const viewWidth = viewport?.width || win.innerWidth;
-            const viewBottom = viewTop + (viewport?.height || win.innerHeight) - 10;
+            const viewWidth = viewport?.width || win.innerWidth || 360;
+            const viewHeight = viewport?.height || win.innerHeight || 600;
+            const compact = win.matchMedia?.('(max-width:1100px)').matches ?? false;
+            const phone = win.matchMedia?.('(max-width:680px)').matches ?? false;
+            const width = Math.min(phone ? 312 : compact ? 340 : 360,
+                Math.max(80, viewWidth - 20));
             const topbar = doc.querySelector('.mobile-topbar');
-            const topbarBottom = topbar && win.getComputedStyle(topbar).display !== 'none'
+            const topbarBottom = compact && topbar
+                && win.getComputedStyle(topbar).display !== 'none'
                 ? topbar.getBoundingClientRect().bottom : 0;
-            const centerTop = doc.querySelector('.center')?.getBoundingClientRect().top || 0;
-            const topLimit = Math.max(viewTop + 8, topbarBottom + 8, centerTop + 8);
-            const anchor = toggle.getBoundingClientRect();
-            const inputRect = host.closest('.input')?.getBoundingClientRect() || anchor;
-            const hostRect = host.getBoundingClientRect();
+            const topLimit = Math.max(viewTop + 10, topbarBottom + 8);
+            const bottomLimit = viewTop + viewHeight - 10;
+            const toggleBounds = toggle.getBoundingClientRect();
+            const inputBounds = host.closest('.input')?.getBoundingClientRect()
+                || toggleBounds;
+            const above = Math.max(0, inputBounds.top - topLimit - 8);
+            const below = Math.max(0, bottomLimit - inputBounds.bottom - 8);
 
-            // Prefer BELOW the entire input capsule. If the soft keyboard
-            // leaves less than one usable row, fall back above rather than
-            // rendering an inaccessible popup past the visible viewport.
-            const availableBelow = Math.max(0, viewBottom - inputRect.bottom - 8);
-            const availableAbove = Math.max(0, inputRect.top - topLimit - 8);
-            const placeBelow = availableBelow >= 146 || availableBelow >= availableAbove;
-            const available = placeBelow ? availableBelow : availableAbove;
-            const maxHeight = Math.max(0, Math.min(292, available));
-            const width = Math.min(312, Math.max(80, viewWidth - 20));
+            // Compact layouts prefer the space below the input when usable;
+            // desktop browsers prefer above it. Both can fall back when
+            // Safari toolbars, iPad multitasking or the keyboard move.
+            const placeBelow = compact
+                ? (below >= 150 || below > above)
+                : (above < 160 && below > above);
+            const available = placeBelow ? below : above;
+            const maxHeight = Math.max(0, Math.min(compact ? 320 : 380, available));
             panel.style.setProperty('--dm-symbol-width', width + 'px');
             panel.style.setProperty('--dm-symbol-max-height', maxHeight + 'px');
-            const bounds = panel.getBoundingClientRect();
-            const left = Math.max(viewLeft + 10,
-                Math.min(anchor.right - bounds.width + 12,
-                         viewLeft + viewWidth - bounds.width - 10));
-            const top = placeBelow
-                ? inputRect.bottom + 8
-                : Math.max(topLimit, inputRect.top - bounds.height - 8);
 
-            const scaleX = host.offsetWidth > 0 ? hostRect.width / host.offsetWidth : 1;
-            const scaleY = host.offsetHeight > 0 ? hostRect.height / host.offsetHeight : 1;
-            panel.style.setProperty('--dm-symbol-left',
-                Math.round((left - hostRect.left) / (scaleX || 1)) + 'px');
-            panel.style.setProperty('--dm-symbol-top',
-                Math.round((top - hostRect.top) / (scaleY || 1)) + 'px');
+            const measured = panel.getBoundingClientRect();
+            const panelHeight = Math.min(measured.height, maxHeight);
+            const rawTop = placeBelow
+                ? inputBounds.bottom + 8 : inputBounds.top - panelHeight - 8;
+            const top = Math.max(topLimit, Math.min(rawTop, bottomLimit - panelHeight));
+            const rightLimit = viewLeft + viewWidth - width - 10;
+            const left = Math.max(viewLeft + 10, Math.min(
+                toggleBounds.right - width + 12, rightLimit
+            ));
+            panel.style.setProperty('--dm-symbol-left', Math.round(left) + 'px');
+            panel.style.setProperty('--dm-symbol-top', Math.round(top) + 'px');
+        }
+
+        let positionFrame = 0;
+        function requestPanelPosition(event) {
+            if (!opened || (event?.target && panel.contains(event.target))) return;
+            if (positionFrame) return;
+            positionFrame = win.requestAnimationFrame(() => {
+                positionFrame = 0;
+                positionSymbolPanel();
+            });
         }
 
         function setOpen(next, restoreFocus = false) {
@@ -281,24 +290,18 @@
             setOpen(false, true);
         }
 
-        function onPanelMouseDown(event) {
-            if (event.target.closest?.('button')) event.preventDefault();
-        }
-
         function onToggleClick() { setOpen(!opened, opened); }
-        function onToggleMouseDown(event) { event.preventDefault(); }
 
         toggle.addEventListener('click', onToggleClick);
-        toggle.addEventListener('mousedown', onToggleMouseDown);
         toggle.addEventListener('keydown', onEscape);
         panel.addEventListener('click', onPanelClick);
-        panel.addEventListener('mousedown', onPanelMouseDown);
         panel.addEventListener('keydown', onEscape);
         input.addEventListener('keydown', onEscape);
         doc.addEventListener('pointerdown', onOutsidePointer);
-        win.addEventListener('resize', positionSymbolPanel);
-        win.visualViewport?.addEventListener('resize', positionSymbolPanel);
-        doc.addEventListener('scroll', positionSymbolPanel, true);
+        win.addEventListener('resize', requestPanelPosition);
+        win.visualViewport?.addEventListener('resize', requestPanelPosition);
+        win.visualViewport?.addEventListener('scroll', requestPanelPosition);
+        doc.addEventListener('scroll', requestPanelPosition, true);
 
         return {
             refresh() {
@@ -307,16 +310,16 @@
             },
             destroy() {
                 toggle.removeEventListener('click', onToggleClick);
-                toggle.removeEventListener('mousedown', onToggleMouseDown);
                 toggle.removeEventListener('keydown', onEscape);
                 panel.removeEventListener('click', onPanelClick);
-                panel.removeEventListener('mousedown', onPanelMouseDown);
                 panel.removeEventListener('keydown', onEscape);
                 input.removeEventListener('keydown', onEscape);
                 doc.removeEventListener('pointerdown', onOutsidePointer);
-                win.removeEventListener('resize', positionSymbolPanel);
-                win.visualViewport?.removeEventListener('resize', positionSymbolPanel);
-                doc.removeEventListener('scroll', positionSymbolPanel, true);
+                win.removeEventListener('resize', requestPanelPosition);
+                win.visualViewport?.removeEventListener('resize', requestPanelPosition);
+                win.visualViewport?.removeEventListener('scroll', requestPanelPosition);
+                doc.removeEventListener('scroll', requestPanelPosition, true);
+                if (positionFrame) win.cancelAnimationFrame(positionFrame);
                 toggle.remove();
                 panel.remove();
             }
