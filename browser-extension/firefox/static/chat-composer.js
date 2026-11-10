@@ -156,45 +156,46 @@
             }
         }
 
-        // Keep the compact mobile palette fully visible above or below the
-        // composer, including when the browser toolbar or soft keyboard moves.
+        // Position within the composer, not inside the mobile shell's
+        // viewport-fixed containing block (which could drop it below the input).
         function positionSymbolPanel() {
-            if (!opened || !win.matchMedia?.('(max-width:680px)').matches) {
-                panel.style.removeProperty('--dm-symbol-top');
-                panel.style.removeProperty('--dm-symbol-left');
-                panel.style.removeProperty('--dm-symbol-max-height');
+            if (!opened || !win.matchMedia?.('(max-width:1100px)').matches) {
+                for (const key of ['--dm-symbol-top', '--dm-symbol-left',
+                                   '--dm-symbol-width', '--dm-symbol-max-height']) {
+                    panel.style.removeProperty(key);
+                }
                 return;
             }
-
             const viewport = win.visualViewport;
             const viewTop = viewport?.offsetTop || 0;
             const viewLeft = viewport?.offsetLeft || 0;
-            const viewHeight = viewport?.height || win.innerHeight;
             const viewWidth = viewport?.width || win.innerWidth;
             const topbar = doc.querySelector('.mobile-topbar');
             const topbarBottom = topbar && win.getComputedStyle(topbar).display !== 'none'
                 ? topbar.getBoundingClientRect().bottom : 0;
             const centerTop = doc.querySelector('.center')?.getBoundingClientRect().top || 0;
             const topLimit = Math.max(viewTop + 8, topbarBottom + 8, centerTop + 8);
-            const bottomLimit = viewTop + viewHeight - 10;
             const anchor = toggle.getBoundingClientRect();
-            const above = Math.max(0, anchor.top - topLimit - 8);
-            const below = Math.max(0, bottomLimit - anchor.bottom - 8);
-            const placeAbove = above >= 170 || above >= below;
-            const available = placeAbove ? above : below;
-            const maxHeight = Math.max(80, Math.min(292, available));
-            const width = Math.min(312, Math.max(180, viewWidth - 20));
+            const hostRect = host.getBoundingClientRect();
 
+            // Always open above the input. The symbol grid scrolls internally.
+            const availableAbove = Math.max(0, anchor.top - topLimit - 8);
+            const maxHeight = Math.max(60, Math.min(292, availableAbove));
+            const width = Math.min(312, Math.max(80, viewWidth - 20));
+            panel.style.setProperty('--dm-symbol-width', width + 'px');
             panel.style.setProperty('--dm-symbol-max-height', maxHeight + 'px');
-            const actualHeight = Math.min(panel.getBoundingClientRect().height, maxHeight);
+            const bounds = panel.getBoundingClientRect();
             const left = Math.max(viewLeft + 10,
-                Math.min(anchor.right + 12 - width, viewLeft + viewWidth - width - 10));
-            const rawTop = placeAbove
-                ? anchor.top - 8 - actualHeight
-                : anchor.bottom + 8;
-            const top = Math.max(topLimit, Math.min(rawTop, bottomLimit - actualHeight));
-            panel.style.setProperty('--dm-symbol-left', Math.round(left) + 'px');
-            panel.style.setProperty('--dm-symbol-top', Math.round(top) + 'px');
+                Math.min(anchor.right - bounds.width + 12,
+                         viewLeft + viewWidth - bounds.width - 10));
+            const top = Math.max(topLimit, anchor.top - bounds.height - 8);
+
+            const scaleX = host.offsetWidth > 0 ? hostRect.width / host.offsetWidth : 1;
+            const scaleY = host.offsetHeight > 0 ? hostRect.height / host.offsetHeight : 1;
+            panel.style.setProperty('--dm-symbol-left',
+                Math.round((left - hostRect.left) / (scaleX || 1)) + 'px');
+            panel.style.setProperty('--dm-symbol-top',
+                Math.round((top - hostRect.top) / (scaleY || 1)) + 'px');
         }
 
         function setOpen(next, restoreFocus = false) {

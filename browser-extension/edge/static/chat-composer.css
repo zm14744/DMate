@@ -423,16 +423,16 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     outline:2px solid var(--accent,#3b82f6) !important;
     outline-offset:1px !important;
 }
-@media(max-width:680px) {
-    /* Viewport-fitted popover: its heading and close button never sit above the
-       mobile top bar; the symbol list alone scrolls inside this compact card. */
+@media(max-width:1100px) {
+    /* Mobile popup anchored to the composer. Absolute coordinates prevent
+       transformed mobile-shell ancestors from displacing fixed popovers. */
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
-        position:fixed !important;
-        top:var(--dm-symbol-top,24vh) !important;
-        left:var(--dm-symbol-left,10px) !important;
+        position:absolute !important;
+        top:var(--dm-symbol-top,-300px) !important;
+        left:var(--dm-symbol-left,0px) !important;
         right:auto !important;
         bottom:auto !important;
-        width:min(312px,calc(100vw - 20px)) !important;
+        width:var(--dm-symbol-width,min(312px,calc(100vw - 20px))) !important;
         max-width:calc(100vw - 20px) !important;
         max-height:var(--dm-symbol-max-height,min(292px,42dvh)) !important;
         padding:8px !important;
