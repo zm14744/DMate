@@ -107,7 +107,7 @@
     body[data-appearance-theme] #learningToolsPanel .panel-heading-row { font-size:15px; }
     body[data-appearance-theme] #learningToolsPanel #info { margin:10px 0 0; font-size:13px; overflow-wrap:anywhere; }
     body[data-appearance-theme] #learningToolsPanel .learning-panel { margin-top:16px; padding-top:16px; }
-    body[data-appearance-theme] #learningToolsPanel .learning-tools-secondary { margin-top:20px; }
+    body[data-appearance-theme] #learningToolsPanel .learning-tools-secondary { margin-top:32px; }
     body[data-appearance-theme] #learningToolsPanel .learning-actions button { min-height:36px; font-size:14px; }
     body[data-appearance-theme].has-custom-background #learningToolsPanel {
         background:var(--dm-frost-panel-strong,var(--surface-2)) !important;

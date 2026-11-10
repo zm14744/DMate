@@ -3,7 +3,6 @@
     'use strict';
 
     const document = root.document;
-    const SIDEBAR_STORAGE_KEY = 'dmate_desktop_sidebar_collapsed_v1';
 
     function bind() {
         const html = document.documentElement;
@@ -16,10 +15,10 @@
         if (!sidebar || !toolsPanel || !sidebarClose || !sidebarOpen || !toolsButton || !media) return;
 
         let desktop = media.matches;
-        let sidebarCollapsed = html.dataset.desktopSidebar === 'collapsed';
+        // Every visit starts with the same compact layout for guests and accounts.
+        let sidebarCollapsed = true;
         let toolsOpen = false;
         let cancelScrollAnchor = () => {};
-        try { sidebarCollapsed = root.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1'; } catch (_) {}
 
         function label(button, source) {
             const value = root.DMateI18n?.t(source) || source;
@@ -105,7 +104,6 @@
             preserveChatPosition();
             sidebarCollapsed = collapsed;
             renderSidebar(true);
-            try { root.localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed ? '1' : '0'); } catch (_) {}
         }
 
         function setToolsOpen(open, returnFocus = false) {
