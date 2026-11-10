@@ -311,7 +311,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     outline-offset:3px !important;
 }
 
-/* Eight categories: four evenly spaced tabs per row, without a scrollbar. */
+/* Seven categories: four evenly spaced tabs per row, without a scrollbar. */
 
 .dmate-symbol-tabs {
     display:grid !important;
@@ -424,10 +424,20 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     outline-offset:1px !important;
 }
 @media(max-width:680px) {
+    /* Viewport-fitted popover: its heading and close button never sit above the
+       mobile top bar; the symbol list alone scrolls inside this compact card. */
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-panel:not([hidden]) {
-        right:-41px !important;
-        width:min(340px,calc(100vw - 20px)) !important;
+        position:fixed !important;
+        top:var(--dm-symbol-top,24vh) !important;
+        left:var(--dm-symbol-left,10px) !important;
+        right:auto !important;
+        bottom:auto !important;
+        width:min(312px,calc(100vw - 20px)) !important;
         max-width:calc(100vw - 20px) !important;
+        max-height:var(--dm-symbol-max-height,min(292px,42dvh)) !important;
+        padding:8px !important;
+        border-radius:13px !important;
+        box-shadow:0 10px 28px rgba(15,23,42,.18) !important;
     }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > .dmate-symbol-keyboard {
         bottom:1px !important;
@@ -436,8 +446,43 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
         max-height:34px !important;
         padding:6px !important;
     }
+    .dmate-symbol-panel-head {
+        min-height:24px;
+        margin-bottom:5px;
+    }
+    .dmate-symbol-panel-title { font-size:13px; }
+    .dmate-symbol-tabs {
+        gap:3px;
+        padding:0 0 5px;
+    }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-tab {
+        height:26px !important;
+        min-height:26px !important;
+        max-height:26px !important;
+        padding:3px 2px !important;
+        font-size:12px !important;
+        border-radius:6px !important;
+    }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-grid {
-        grid-template-columns:repeat(5,minmax(0,1fr));
+        grid-template-columns:repeat(6,minmax(0,1fr));
+        grid-auto-rows:31px;
+        gap:4px;
+        padding:2px 0 1px;
+    }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key,
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key.is-text {
+        height:31px !important;
+        min-height:31px !important;
+        max-height:31px !important;
+        padding:2px 1px !important;
+        border-radius:6px !important;
+    }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key {
+        font-size:16px !important;
+    }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-panel .dmate-symbol-key.is-text {
+        font-size:10px !important;
+        line-height:1.1 !important;
     }
 }
 @media(prefers-reduced-motion:reduce) {

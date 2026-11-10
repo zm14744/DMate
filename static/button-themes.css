@@ -43,7 +43,7 @@ body[data-appearance-theme="dark"] {
     body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
         #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
         .voice-input-button,.manual-question-choice,.ocr-group-question-choice,
-        .dmate-symbol-keyboard,.dmate-symbol-panel-close,.desktop-shell-button,
+        .dmate-symbol-keyboard,.dmate-symbol-panel-close,.dmate-symbol-tab,.dmate-symbol-key,.desktop-shell-button,
         .modal-close-dot,.dmate-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
         .wrong-search-clear,.ocr-task-remove,.dcn-close,.dcn-search-clear,.dcn-note-delete,.dcn-analysis-cancel,
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,
@@ -65,7 +65,7 @@ body[data-appearance-theme="dark"] {
     body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
         #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
         .voice-input-button,.manual-question-choice,.ocr-group-question-choice,
-        .dmate-symbol-keyboard,.dmate-symbol-panel-close,.desktop-shell-button,
+        .dmate-symbol-keyboard,.dmate-symbol-panel-close,.dmate-symbol-tab,.dmate-symbol-key,.desktop-shell-button,
         .modal-close-dot,.dmate-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
         .wrong-search-clear,.ocr-task-remove,.dcn-close,.dcn-search-clear,.dcn-note-delete,.dcn-analysis-cancel,
         .dge-panel-close,.dgs-source-delete,.ddw-history-delete,.ddw-export-close,.session > button.del,

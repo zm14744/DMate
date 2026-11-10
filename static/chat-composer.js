@@ -31,13 +31,6 @@
             ['≪','远小于'], ['≫','远大于'], ['∝','正比于'], ['∥','平行'],
             ['⊥','垂直'], ['∘','关系复合'], ['≺','先于'], ['≼','不严格先于']
         ]},
-        { id:'graph', label:'图论', items:[
-            ['G=(V,E)','图的表示'], ['V(G)','顶点集'], ['E(G)','边集'], ['deg(v)','顶点度'],
-            ['d(v)','顶点度'], ['N(v)','开邻域'], ['N[v]','闭邻域'], ['δ(G)','最小度'],
-            ['Δ(G)','最大度'], ['Kₙ','完全图'], ['Kₘ,ₙ','完全二部图'], ['Pₙ','路径图'],
-            ['Cₙ','圈图'], ['T','树'], ['χ(G)','色数'], ['ω(G)','团数'],
-            ['α(G)','独立数'], ['κ(G)','点连通度'], ['λ(G)','边连通度'], ['u∼v','相邻顶点']
-        ]},
         { id:'number', label:'数论', items:[
             ['ℕ','自然数集'], ['ℤ','整数集'], ['ℚ','有理数集'], ['ℝ','实数集'],
             ['ℂ','复数集'], ['∣','整除'], ['∤','不整除'], ['≡','同余'],
@@ -47,10 +40,14 @@
         ]},
         { id:'count', label:'计数', items:[
             ['∑','求和'], ['∏','连乘'], ['n!','阶乘'], ['C(n,k)','组合数'],
-            ['P(n,k)','排列数'], ['|A|','集合基数'], ['2ⁿ','2 的 n 次方'], ['₀','下标零'],
-            ['₁','下标一'], ['₂','下标二'], ['₃','下标三'], ['ₙ','下标 n'],
-            ['⁰','上标零'], ['¹','上标一'], ['²','上标二'], ['³','上标三'],
-            ['ⁿ','上标 n'], ['…','省略号'], ['n choose k','组合数读法'], ['A×B','笛卡尔积']
+            ['P(n,k)','排列数'], ['|A|','集合基数'], ['2ⁿ','2 的 n 次方'], ['ⁿ','上标 n'],
+            ['⁰','上标 0'],  ['¹','上标 1'],  ['²','上标 2'],  ['³','上标 3'],
+            ['⁴','上标 4'],  ['⁵','上标 5'],  ['⁶','上标 6'],  ['⁷','上标 7'],
+            ['⁸','上标 8'],  ['⁹','上标 9']
+            ['₀','下标 0'],  ['₁','下标 1'],  ['₂','下标 2'],  ['₃','下标 3'],
+            ['₄','下标 4'],  ['₅','下标 5'],  ['₆','下标 6'],  ['₇','下标 7'],
+            ['₈','下标 8'],  ['₉','下标 9']
+            ['ₙ','下标 n'], ['…','省略号'], ['n choose k','组合数读法'], ['A×B','笛卡尔积']
         ]},
         { id:'greek', label:'希腊', items:[
             ['α','alpha'], ['β','beta'], ['γ','gamma'], ['δ','delta'],
@@ -171,12 +168,54 @@
             }
         }
 
+        // Keep the compact mobile palette fully visible above or below the
+        // composer, including when the browser toolbar or soft keyboard moves.
+        function positionSymbolPanel() {
+            if (!opened || !win.matchMedia?.('(max-width:680px)').matches) {
+                panel.style.removeProperty('--dm-symbol-top');
+                panel.style.removeProperty('--dm-symbol-left');
+                panel.style.removeProperty('--dm-symbol-max-height');
+                return;
+            }
+
+            const viewport = win.visualViewport;
+            const viewTop = viewport?.offsetTop || 0;
+            const viewLeft = viewport?.offsetLeft || 0;
+            const viewHeight = viewport?.height || win.innerHeight;
+            const viewWidth = viewport?.width || win.innerWidth;
+            const topbar = doc.querySelector('.mobile-topbar');
+            const topbarBottom = topbar && win.getComputedStyle(topbar).display !== 'none'
+                ? topbar.getBoundingClientRect().bottom : 0;
+            const centerTop = doc.querySelector('.center')?.getBoundingClientRect().top || 0;
+            const topLimit = Math.max(viewTop + 8, topbarBottom + 8, centerTop + 8);
+            const bottomLimit = viewTop + viewHeight - 10;
+            const anchor = toggle.getBoundingClientRect();
+            const above = Math.max(0, anchor.top - topLimit - 8);
+            const below = Math.max(0, bottomLimit - anchor.bottom - 8);
+            const placeAbove = above >= 170 || above >= below;
+            const available = placeAbove ? above : below;
+            const maxHeight = Math.max(80, Math.min(292, available));
+            const width = Math.min(312, Math.max(180, viewWidth - 20));
+
+            panel.style.setProperty('--dm-symbol-max-height', maxHeight + 'px');
+            const actualHeight = Math.min(panel.getBoundingClientRect().height, maxHeight);
+            const left = Math.max(viewLeft + 10,
+                Math.min(anchor.right + 12 - width, viewLeft + viewWidth - width - 10));
+            const rawTop = placeAbove
+                ? anchor.top - 8 - actualHeight
+                : anchor.bottom + 8;
+            const top = Math.max(topLimit, Math.min(rawTop, bottomLimit - actualHeight));
+            panel.style.setProperty('--dm-symbol-left', Math.round(left) + 'px');
+            panel.style.setProperty('--dm-symbol-top', Math.round(top) + 'px');
+        }
+
         function setOpen(next, restoreFocus = false) {
             opened = Boolean(next);
             panel.hidden = !opened;
             toggle.setAttribute('aria-expanded', String(opened));
             if (opened) {
                 renderGroup();
+                positionSymbolPanel();
                 const activeTab = tabs.querySelector('[data-symbol-category="' + activeGroup + '"]');
                 focusSafely(activeTab);
             } else if (restoreFocus) {
@@ -217,6 +256,7 @@
             if (tab && panel.contains(tab)) {
                 activeGroup = tab.dataset.symbolCategory;
                 renderGroup();
+                positionSymbolPanel();
                 focusSafely(tabs.querySelector('[data-symbol-category="' + activeGroup + '"]'));
                 return;
             }
@@ -256,6 +296,9 @@
         panel.addEventListener('keydown', onEscape);
         input.addEventListener('keydown', onEscape);
         doc.addEventListener('pointerdown', onOutsidePointer);
+        win.addEventListener('resize', positionSymbolPanel);
+        win.visualViewport?.addEventListener('resize', positionSymbolPanel);
+        doc.addEventListener('scroll', positionSymbolPanel, true);
 
         return {
             refresh() {
@@ -272,6 +315,9 @@
                 panel.removeEventListener('keydown', onEscape);
                 input.removeEventListener('keydown', onEscape);
                 doc.removeEventListener('pointerdown', onOutsidePointer);
+                win.removeEventListener('resize', positionSymbolPanel);
+                win.visualViewport?.removeEventListener('resize', positionSymbolPanel);
+                doc.removeEventListener('scroll', positionSymbolPanel, true);
                 toggle.remove();
                 panel.remove();
             }
