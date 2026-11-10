@@ -7314,7 +7314,9 @@ function renderLearningSummary() {
     const wrongButton = document.getElementById("wrongBookBtn");
     const wrongCount = learningState.wrongQuestions.length;
     if (wrongButton) {
-        wrongButton.textContent = `错题本 (${wrongCount})`;
+        const label = wrongButton.querySelector(".dmate-ui-label");
+        if (label) label.textContent = `错题本 (${wrongCount})`;
+        else wrongButton.textContent = `错题本 (${wrongCount})`;
     }
 }
 
@@ -22219,7 +22221,9 @@ function initDmateDownloadDialog() {
 
     button.hidden = false;
     button.setAttribute("aria-hidden", "false");
-    button.textContent = "下载 DMate";
+    const downloadLabel = button.querySelector(".dmate-ui-label");
+    if (downloadLabel) downloadLabel.textContent = "下载 DMate";
+    else button.textContent = "下载 DMate";
 
     button.addEventListener("click", openDmateDownloadDialog);
 

@@ -40,6 +40,10 @@
 
 这些固定版本由网站本域的 `static/vendor/` 提供，浏览器显示公式、Markdown、净化内容和导出时不再依赖 jsDelivr。各组件目录保留其 npm 发布包中的许可证；[资源清单](static/vendor/manifest.json) 记录官方 npm 归档地址、归档 SHA-512 完整性值及分发文件的 SHA256。MathJax 同时包含菜单、TeX 扩展、字体及辅助功能需要的按需资源；完整版本边界和更新方式见 [资源说明](static/vendor/README.md)。
 
+## 界面图标
+
+DMate 网页及 Edge / Firefox 浏览器扩展的部分按钮采用 [Lucide Icons](https://lucide.dev/) 的 8 个静态 SVG 线性图标，不通过外部 CDN 加载。Lucide 图标使用 ISC 许可证；其中由 Feather 衍生的 `download` 图标另包含 Feather 的 MIT 授权说明。完整许可证随网页及各浏览器扩展一同保存在 `static/lucide-icons-LICENSE.txt`。
+
 ## 模型与外部服务
 
 - [DeepSeek](https://api-docs.deepseek.com/)：文本问答、讲解和相关文本任务；默认模型配置见 [部署说明](docs/DEPLOYMENT.md)。不承担当前网页图形识别。

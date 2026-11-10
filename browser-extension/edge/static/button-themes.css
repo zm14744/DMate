@@ -137,3 +137,51 @@ body[data-appearance-theme="dark"] {
 @media(prefers-reduced-motion:reduce) {
     body[data-appearance-theme] { --dm-control-transition:none; }
 }
+
+/* Lucide outline icons: one geometry across light / dark / navy.
+   Source artwork: https://lucide.dev/ (ISC; download is Feather-derived MIT).
+   The original licenses are distributed as static/lucide-icons-LICENSE.txt. */
+body[data-appearance-theme] :is(
+    #learningToolsPanel .learning-actions button,
+    #downloadAppBtn, #accountBtn, #appearanceBtn
+) {
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:10px !important;
+}
+
+body[data-appearance-theme] .dmate-lucide-icon {
+    display:block !important;
+    flex:0 0 20px !important;
+    width:20px !important;
+    height:20px !important;
+    min-width:20px !important;
+    min-height:20px !important;
+    stroke:currentColor;
+    stroke-width:1.8;
+    pointer-events:none;
+}
+
+/* Labels remain centered as a group with their icon; count/name may change. */
+body[data-appearance-theme] :is(
+    #learningToolsPanel .learning-actions button,
+    #downloadAppBtn, #accountBtn, #appearanceBtn
+) :is(.dmate-ui-label, #accountEntryLabel) {
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+/* Reuse existing account-state classes and three-theme success/warning tokens.
+   Only the UserRound icon changes color, never the account label. */
+body[data-appearance-theme] #accountBtn .account-entry-icon {
+    color:var(--text-muted,#94a3b8) !important;
+}
+body[data-appearance-theme] #accountBtn.is-authenticated .account-entry-icon {
+    color:var(--dm-success-text,#22c55e) !important;
+}
+body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
+    color:var(--dm-warning-text,#f59e0b) !important;
+}
