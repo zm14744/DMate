@@ -22079,6 +22079,7 @@ function detectDmateInstallPlatform() {
 
 function downloadOptionsForCurrentPlatform() {
     const platform = detectDmateInstallPlatform();
+    const downloadPrompt = dmateUiText("选择下载源", "Choose a download source");
     const gitcodeRelease = "https://gitcode.com/zm14744/DMate/releases/v1.0.1";
     const gitcodeDownloadBase = "https://api.gitcode.com/api/v5/repos/zm14744/DMate/releases/v1.0.1/attach_files/";
     const githubRelease = "https://github.com/zm14744/DMate/releases/tag/v1.0.1";
@@ -22106,21 +22107,21 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "ios") {
         return {
             platform:"iPhone / iPad",
-            text:"选择下载源",
+            text:downloadPrompt,
             actions:installers("DMate-iPhone-iPad-fullscreen.mobileconfig")
         };
     }
     if (platform === "android") {
         return {
             platform:"Android 1.0.3",
-            text:"选择下载源",
+            text:downloadPrompt,
             actions:installers("DMate-Android-1.0.3.apk", {preferGithub:false})
         };
     }
     if (platform === "windows") {
         return {
             platform:"Windows",
-            text:"选择下载源",
+            text:downloadPrompt,
             actions:[
                 ...installers("DMate_1.0.2_x64-setup.exe"),
                 { label:"Microsoft Store", url:microsoftStore, secondary:true },
@@ -22131,8 +22132,7 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "macos") {
         return {
             platform:"macOS",
-            text:dmateUiText("选择下载源。GitHub 上的 macOS 安装包尚未经过 Apple 公证。",
-                "Choose a download source. The macOS installer on GitHub has not been notarized by Apple."),
+            text:downloadPrompt,
             actions:[
                 ...installers("DMate_1.0.2_universal.dmg"),
                 { label:"itch.io", url:itch, secondary:true }
@@ -22142,7 +22142,7 @@ function downloadOptionsForCurrentPlatform() {
     if (platform === "linux") {
         return {
             platform:"Linux（x86-64 / amd64）",
-            text:"选择下载源",
+            text:downloadPrompt,
             actions:[
                 ...installers("DMate_1.0.2_amd64.deb", {formatLabel:"DEB"}),
                 ...installers("DMate_1.0.2_amd64.AppImage", {formatLabel:"AppImage"}),
@@ -22153,7 +22153,7 @@ function downloadOptionsForCurrentPlatform() {
     }
     return {
         platform:"桌面系统",
-        text:"选择下载源",
+        text:downloadPrompt,
         actions:[
             { label:"GitHub", url:githubRelease },
             { label:"GitCode", url:gitcodeRelease, secondary:true },

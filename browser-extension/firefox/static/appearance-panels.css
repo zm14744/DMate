@@ -22,11 +22,11 @@ body[data-appearance-theme] {
         .appearance-background-preview:not([data-has-background="true"]),
         .wrong-card,.wrong-feedback,.wrong-empty,.wrong-answer-body,.wrong-analysis-body,.wrong-solution-body,
         .learning-review-intro,.learning-review-section,
-        .kg-section,.kg-mobile-section,.kg-mobile-viewport,.kg-history-item,.kg-history-preview,
-        .graph-metric,.graph-detail-tip,.graph-detail-empty,.graph-summary-item,.graph-summary-item.focus,
+        .kg-section,.kg-mobile-section,.kg-mobile-viewport,.kg-history-item:not(.active),.kg-history-preview,
+        .graph-metric,.graph-detail-tip,.graph-detail-empty,.graph-summary-item:not(.focus),
         .dge-original,.dge-visual,.dge-toolbar,.dge-view-controls,.dge-review-summary,.dge-node-panel,.dge-edge-panel,
-        .dgs-information-card,.dgs-source-card,.ddw-history-item.is-current,
-        .dcn-explanation,.dcn-relation,.dcn-note.is-current,.ocr-group-list,.ocr-group-row,
+        .dgs-information-card,.dgs-source-card,
+        .dcn-explanation,.dcn-relation,.ocr-group-list,.ocr-group-row,
         .account-panel,
         .account-register-panel,.account-email-recovery-panel,.account-recovery-panel,
         .account-email-bind-panel,.account-recovery-code-panel,.account-registration-recovery-panel,
@@ -74,13 +74,26 @@ body[data-appearance-theme] {
         background-color:transparent!important;
         background-image:none!important;
     }
-    body[data-appearance-theme="dark"] .left #sessions .session.active {
-        background-color:#3d3d3d!important;
+    body[data-appearance-theme] .left #sessions .session.active {
+        background-color:var(--dm-selected-bg)!important;
         background-image:none!important;
+        border-color:transparent!important;
+        box-shadow:none!important;
     }
-    body[data-appearance-theme="navy"] .left #sessions .session.active {
-        background-color:var(--accent-bg)!important;
+    body[data-appearance-theme] .left #sessions .session.active span {
+        color:var(--text-primary)!important;
+        -webkit-text-fill-color:var(--text-primary)!important;
+    }
+    /* The panel-surface layer also clears historical fills; reapply neutral
+       selection on the active list rows after that transparent reset. */
+    body[data-appearance-theme] :is(
+        .kg-history-item.active,.graph-summary-item.focus,
+        .dcn-note.is-current,.ddw-history-item.is-current
+    ) {
+        background-color:var(--dm-selected-bg)!important;
         background-image:none!important;
+        border-color:transparent!important;
+        box-shadow:none!important;
     }
 
     /* Empty lists keep their centering and spacing without a separate strip. */

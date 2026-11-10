@@ -24,6 +24,24 @@ body[data-appearance-theme="dark"] {
     --dm-control-text:#ededed;
 }
 
+
+/* Shared neutral selection palette, matching the active conversation. */
+body[data-appearance-theme="light"] {
+    --dm-selected-bg:#dce4ee;
+    --dm-selected-hover:#cfd9e5;
+    --dm-selected-ring:#718096;
+}
+body[data-appearance-theme="dark"] {
+    --dm-selected-bg:#3d3d3d;
+    --dm-selected-hover:#494949;
+    --dm-selected-ring:#8d8d8d;
+}
+body[data-appearance-theme="navy"] {
+    --dm-selected-bg:#334155;
+    --dm-selected-hover:#40536b;
+    --dm-selected-ring:#94a3b8;
+}
+
 /* A named important layer supersedes old theme/mobile !important fills,
    including the light-theme PNG that otherwise masks hover colors. */
 @layer dmate-button-themes {
@@ -103,10 +121,10 @@ body[data-appearance-theme="dark"] {
     }
 
     body[data-appearance-theme] button:is(.active,.is-active,[aria-pressed="true"],[aria-selected="true"]) {
-        --dm-control-bg:rgba(var(--accent-rgb),.18);
-        --dm-control-hover-bg:rgba(var(--accent-rgb),.28);
-        --dm-control-border:var(--accent);
-        --dm-control-hover-border:var(--accent);
+        --dm-control-bg:var(--dm-selected-bg);
+        --dm-control-hover-bg:var(--dm-selected-hover);
+        --dm-control-border:transparent;
+        --dm-control-hover-border:transparent;
         --dm-control-text:var(--text-primary);
     }
     body[data-appearance-theme] :is(
@@ -266,5 +284,88 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
 @media(max-width:1100px) {
     body[data-appearance-theme] #learningToolsPanel .panel-heading-row.learning-title {
         display:none !important;
+    }
+}
+
+/* Neutral selection states across settings and selectable tool panels.
+   Actual primary actions, destructive controls and graph strokes keep their
+   own semantic/theme colors. A selection is not a blue action button. */
+@layer dmate-button-themes {
+    body[data-appearance-theme] :is(
+        .appearance-segmented button.active,
+        .wrong-filters button.active,
+        .graph-side-tab.active,
+        .graph-toolbar-left button.active,
+        .mobile-choice-option.active,
+        .dge-node-row.is-selected,
+        .dge-edge-row.is-selected,
+        .dge-review-relation.is-selected,
+        .dge-tabs [aria-selected="true"],
+        .dgs-modes [aria-selected="true"],
+        .kg-history-item.active,
+        .kg-mobile-node.selected,
+        .graph-summary-item.focus,
+        .dcn-note.is-current,
+        .ddw-history-item.is-current
+    ) {
+        background:var(--dm-selected-bg) !important;
+        background-color:var(--dm-selected-bg) !important;
+        background-image:none !important;
+        border-color:transparent !important;
+        color:var(--text-primary) !important;
+        -webkit-text-fill-color:currentColor !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme] .mobile-choice-option.active .mobile-choice-option-check {
+        border-color:var(--dm-selected-ring) !important;
+        background:var(--dm-selected-ring) !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme] .kg-mobile-node.selected {
+        border-width:1px !important;
+    }
+    body[data-appearance-theme] .graph-summary-item.focus :is(
+        .graph-summary-label,.graph-summary-value
+    ) {
+        color:var(--text-primary) !important;
+        -webkit-text-fill-color:var(--text-primary) !important;
+    }
+    /* Swatch center keeps its real blue/purple/teal color: only the selection
+       ring becomes neutral, without an accent-colored glow. */
+    body[data-appearance-theme] .appearance-swatch.active {
+        outline:3px solid var(--dm-selected-ring) !important;
+        outline-offset:3px !important;
+        border-color:transparent !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme] :is(
+        .appearance-segmented button:not(.active),
+        .wrong-filters button:not(.active),
+        .graph-side-tab:not(.active),
+        .graph-toolbar-left button:not(.active),
+        .dge-tabs [aria-selected="false"],
+        .dgs-modes [aria-selected="false"],
+        .dge-review-relation:not(.is-selected)
+    ):not(:disabled):hover {
+        background:var(--dm-selected-hover) !important;
+        background-image:none !important;
+        border-color:transparent !important;
+        box-shadow:none !important;
+    }
+    body[data-appearance-theme] :is(
+        .appearance-segmented button,
+        .appearance-swatch,
+        .wrong-filters button,
+        .graph-side-tab,
+        .graph-toolbar-left button,
+        .mobile-choice-option,
+        .dge-node-row,
+        .dge-edge-row,
+        .dge-review-relation,
+        .dge-tabs [aria-selected],
+        .dgs-modes [aria-selected]
+    ):focus-visible {
+        outline:2px solid var(--dm-selected-ring) !important;
+        outline-offset:2px !important;
     }
 }
