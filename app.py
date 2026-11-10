@@ -66,6 +66,7 @@ except (ImportError, OSError) as _fusion_import_error:
 from graph_ocr_cleanup import clean_graph_question_text, select_graph_question_text, ocr_is_label_dominated
 from classification_semantic import classify_ambiguous_questions
 from exercise_intent import EXERCISE_INTENT_RULES, classify_exercise_request
+from exercise_relation_check import verify_relation_closure_count
 from teaching import (
     analyze_messages,
     analyze_question,
@@ -2849,10 +2850,15 @@ def _exercise_answer_valid(answer):
 
 
 def _exercise_answer_simple_consistency(question, answer):
-    """只核查极窄且可精确计算的单问幂模题；其余题不猜测答案。"""
+    """核查可确定的有限关系闭包数量与单问幂模结果；无法解析则跳过。"""
     text = str(question or "")
     value = str(answer or "").strip()
-    # 若有多小问/中国剩余/模运算的后续条件，则不做此种单问核验。
+    # Small, explicitly given relations are cheap to verify exactly.
+    # Unknown answer notation is not rejected, but a provably wrong count is.
+    closure_consistency = verify_relation_closure_count(text, value)
+    if closure_consistency is False:
+        return False
+    # 若有多小问/中国剩余/模运算的后续条件，则不做单问幂模核验。
     if re.search(r"[（(]\s*[1-9]\s*[)）]|中国剩余|费马|\n\s*\d+[.、]", text):
         return True
     match = re.fullmatch(

@@ -5,6 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from exercise_intent import classify_exercise_request
+from exercise_relation_check import is_routine_small_relation_question
 
 
 MODE_LABELS = {
@@ -1391,6 +1392,13 @@ def _estimate_difficulty(text, knowledge_points=None, question_type="一般题")
         and not re.search(r"极值|构造|当且仅当|充分必要|所有方案|证明.*并", normalized)
     ):
         return "简单"
+
+    # A small, explicitly listed relation with routine matrix, property and
+    # closure checks does not become a hard problem merely because three
+    # distinct action verbs occur in three subquestions. Real proofs,
+    # optimization and structural constructions retain their normal score.
+    if score >= 4 and is_routine_small_relation_question(value, subquestion_count):
+        score = 3
 
     if score >= 4:
         return "困难"

@@ -1,0 +1,30 @@
+name: Verify DMate Exercise Generation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app.py'
+      - 'teaching.py'
+      - 'exercise_relation_check.py'
+      - 'exercise_intent.py'
+      - 'static/exercise-intent-rules.json'
+      - 'scripts/test_exercise_generation_regression.py'
+      - '.github/workflows/test-exercise-generation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exercise-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run offline exercise regressions
+        run: python -m unittest discover -s scripts -p 'test_exercise_generation_regression.py' -v
