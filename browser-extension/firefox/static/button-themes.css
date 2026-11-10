@@ -261,3 +261,10 @@ body[data-appearance-theme] #accountBtn.is-authenticated .account-entry-icon {
 body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
     color:var(--dm-warning-text,#f59e0b) !important;
 }
+
+/* The mobile tools drawer already has its own “学习工具” heading. */
+@media(max-width:1100px) {
+    body[data-appearance-theme] #learningToolsPanel .panel-heading-row.learning-title {
+        display:none !important;
+    }
+}
