@@ -311,12 +311,12 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .dmate-symbol-pa
     outline-offset:3px !important;
 }
 
-/* Seven categories: four evenly spaced tabs per row, without a scrollbar. */
+/* Six focused categories: three evenly spaced tabs per row. */
 
 .dmate-symbol-tabs {
     display:grid !important;
     flex:0 0 auto !important;
-    grid-template-columns:repeat(4,minmax(0,1fr));
+    grid-template-columns:repeat(3,minmax(0,1fr));
     gap:5px;
     width:100%;
     min-width:0;
