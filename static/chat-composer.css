@@ -40,7 +40,12 @@ body[data-appearance-theme] .interaction-mode-switch[data-mode="question"] {
 }
 /* A slightly shorter track leaves the active segment raised, as in the reference. */
 body[data-appearance-theme="light"] .interaction-mode-switch {
-    --dmate-mode-track-border:#e4e9ee;
+    --dmate-mode-track-bg:rgba(231,236,242,var(--panel-alpha,1));
+    --dmate-mode-track-border:rgba(148,163,184,.16);
+    --dmate-mode-active-bg:rgba(255,255,255,var(--panel-alpha,1));
+}
+body[data-appearance-theme="light"] .interaction-mode-switch::before {
+    box-shadow:0 1px 4px rgba(15,23,42,.10),0 0 0 1px rgba(15,23,42,.035);
 }
 body[data-appearance-theme="dark"] .interaction-mode-switch {
     --dmate-mode-track-bg:#1b1b1b;
@@ -119,7 +124,8 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input {
 /* Theme-specific composer outlines and depth. */
 body[data-appearance-theme="light"] .center > .input-wrap:not([hidden]) > .input,
 body[data-appearance-theme="light"] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
-    border:1px solid #e5e5e5 !important;
+    border:1px solid rgba(148,163,184,.24) !important;
+    box-shadow:0 4px 16px rgba(15,23,42,.055),0 1px 3px rgba(15,23,42,.025) !important;
 }
 body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input,
 body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
