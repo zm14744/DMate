@@ -42,17 +42,13 @@ body[data-appearance-theme] {
         background-image:none!important;
     }
 
-    /* Keep the light conversation sidebar distinct from the workspace.
-       This belongs in the same important layer as the shared panel paint:
-       later button-theme rules cannot override that layer's background. */
+    /* Keep a barely shaded light sidebar without a visible dividing stroke.
+       The shared panel paint uses an important layer, so override it here rather
+       than adding another competing unlayered background. */
     body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-        background-color:#e2ebf5!important;
+        background-color:#f1f3f5!important;
         background-image:none!important;
-    }
-    @media (min-width:1101px) {
-        body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-            border-right:1px solid #c0cedf!important;
-        }
+        border-right-color:transparent!important;
     }
 
     /* Session details are inline sidebar text, including the empty “无”. */
