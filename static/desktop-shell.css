@@ -80,7 +80,7 @@
     body[data-appearance-theme] .center > #chat > .msg { max-width:85%; }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) {
         flex:0 0 auto; width:min(100%,calc(var(--dmate-reading-width) + 48px)) !important;
-        margin:0 auto !important; padding:38px 24px 16px !important;
+        margin:0 auto !important; padding:var(--dmate-mode-row-height) 24px 16px !important;
     }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap > .manual-question-mode { left:24px; }
     body[data-appearance-theme] .center.chat-empty > .input-wrap > .manual-question-mode { left:0; }
