@@ -20,29 +20,36 @@ body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
     }
 }
 
-/* Shared Chat / Solve segments for typed messages and individual images. */
+/* GPT-style segmented switch shared by the composer and grouped images. */
 body[data-appearance-theme] .interaction-mode-switch {
     position:relative; isolation:isolate; display:inline-grid;
     grid-template-columns:repeat(2,minmax(0,1fr)); flex:none;
-    box-sizing:border-box; width:128px; height:30px; padding:3px; gap:0;
-    border:1px solid var(--dm-control-border,var(--border-strong,#cbd5e1));
-    border-radius:999px; background:var(--surface-1,#f1f5f9);
+    box-sizing:border-box; width:224px; height:36px; padding:4px; gap:0;
+    border:0 !important; border-radius:999px;
+    background:var(--surface-1,#f1f5f9); box-shadow:none !important;
     color:var(--text-secondary,#64748b); font-size:12px; line-height:1;
     white-space:nowrap;
 }
-/* A quiet outer outline in the light theme: visible but not a dark pill. */
+/* Preserve the existing light-theme outline exactly. */
 body[data-appearance-theme="light"] .interaction-mode-switch {
-    border-color:#e4e9ee;
+    border:1px solid #e4e9ee !important;
 }
+/* Match ChatGPT's quiet charcoal track and slightly lighter active segment. */
 body[data-appearance-theme="dark"] .interaction-mode-switch {
-    border-color:#3b3b3b;
+    border:0 !important; background:#1b1b1b !important;
+}
+body[data-appearance-theme="dark"] .interaction-mode-switch::before {
+    background:#212121 !important;
 }
 body[data-appearance-theme="navy"] .interaction-mode-switch {
-    border-color:#3a485d;
+    border:0 !important; background:var(--surface-1,#0b1220) !important;
+}
+body[data-appearance-theme="navy"] .interaction-mode-switch::before {
+    background:var(--surface-3,#1f2937) !important;
 }
 body[data-appearance-theme] .interaction-mode-switch::before {
-    content:""; position:absolute; z-index:0; top:3px; bottom:3px; left:3px;
-    width:calc((100% - 6px) / 2); border-radius:999px;
+    content:""; position:absolute; z-index:0; top:4px; bottom:4px; left:4px;
+    width:calc((100% - 8px) / 2); border-radius:999px;
     background:var(--surface-3,#e2e8f0); pointer-events:none;
     transition:transform .18s ease;
 }
@@ -62,7 +69,7 @@ body[data-appearance-theme] .interaction-mode-switch > button[aria-pressed="true
 body[data-appearance-theme] .interaction-mode-switch > button:focus-visible { text-decoration:underline; text-underline-offset:4px; }
 body[data-appearance-theme] .interaction-mode-switch > button:disabled { cursor:not-allowed; }
 @media(max-width:1100px) {
-    body[data-appearance-theme] .interaction-mode-switch { width:120px; height:28px; }
+    body[data-appearance-theme] .interaction-mode-switch { width:min(224px,100%); height:36px; }
 }
 
 /* iPad in both orientations and Split View: larger tappable symbol keys. */
@@ -241,7 +248,7 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) {
     padding:0 clamp(8px,1vw,18px) calc(16px + env(safe-area-inset-bottom,0px)) !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode {
-    position:absolute; top:-38px; left:clamp(18px,2vw,30px);
+    position:absolute; top:-44px; left:clamp(18px,2vw,30px);
 }
 /* Reserve a row for the mode switch instead of covering the last message. */
 body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) {
@@ -249,7 +256,7 @@ body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden])
 }
 body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { top:0; }
 @media(max-width:1100px) {
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode { top:-36px; }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode { top:-42px; }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) { padding-top:36px !important; }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { top:0; }
 }
