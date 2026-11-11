@@ -116,14 +116,15 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input {
     border-radius:28px !important; background:var(--surface-2,#f4f4f5) !important;
     box-shadow:none !important;
 }
-/* Theme-specific composer outlines; keep each theme surface fill unchanged. */
+/* Theme-specific composer outlines and depth. */
 body[data-appearance-theme="light"] .center > .input-wrap:not([hidden]) > .input,
 body[data-appearance-theme="light"] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
     border:1px solid #e5e5e5 !important;
 }
 body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input,
 body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input.composer-expanded {
-    border:1px solid #3a3a3a !important;
+    border:1px solid rgba(148,163,184,.12) !important;
+    box-shadow:0 5px 18px rgba(2,6,23,.20),inset 0 1px 0 rgba(226,232,240,.035) !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input.composer-expanded { border-radius:24px !important; }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .manual-question-composer {

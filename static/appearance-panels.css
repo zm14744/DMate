@@ -72,6 +72,14 @@ body[data-appearance-theme] {
         -webkit-backdrop-filter:none!important;
     }
 
+    /* A single translucent paint preserves the appearance opacity setting. */
+    body[data-appearance-theme="navy"] .center > .input-wrap:not([hidden]) > .input {
+        background-color:transparent!important;
+        background-image:linear-gradient(180deg,
+            rgba(27,38,59,var(--panel-alpha,1)),
+            rgba(23,33,53,var(--panel-alpha,1)))!important;
+    }
+
     /* Idle conversations merge into the sidebar in every theme. The current
        conversation keeps a distinct fill, independent of historical mobile
        and theme rules (dark previously used #181818 on a #171717 sidebar). */
