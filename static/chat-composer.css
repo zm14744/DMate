@@ -24,32 +24,33 @@ body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
 body[data-appearance-theme] .interaction-mode-switch {
     position:relative; isolation:isolate; display:inline-grid;
     grid-template-columns:repeat(2,minmax(0,1fr)); flex:none;
-    box-sizing:border-box; width:224px; height:36px; padding:4px; gap:0;
+    box-sizing:border-box; width:224px; height:36px; padding:0; gap:0;
     border:0 !important; border-radius:999px;
     background:var(--surface-1,#f1f5f9); box-shadow:none !important;
     color:var(--text-secondary,#64748b); font-size:12px; line-height:1;
     white-space:nowrap;
 }
-/* Preserve the existing light-theme outline exactly. */
+/* Keep the existing light-theme outline; dark and navy use a completely borderless track. */
 body[data-appearance-theme="light"] .interaction-mode-switch {
     border:1px solid #e4e9ee !important;
 }
-/* Match ChatGPT's quiet charcoal track and slightly lighter active segment. */
 body[data-appearance-theme="dark"] .interaction-mode-switch {
-    border:0 !important; background:#1b1b1b !important;
+    border:0 !important;
+    background:#1b1b1b !important;
+}
+body[data-appearance-theme="navy"] .interaction-mode-switch {
+    border:0 !important;
+    background:var(--surface-1,#0b1220) !important;
 }
 body[data-appearance-theme="dark"] .interaction-mode-switch::before {
     background:#212121 !important;
-}
-body[data-appearance-theme="navy"] .interaction-mode-switch {
-    border:0 !important; background:var(--surface-1,#0b1220) !important;
 }
 body[data-appearance-theme="navy"] .interaction-mode-switch::before {
     background:var(--surface-3,#1f2937) !important;
 }
 body[data-appearance-theme] .interaction-mode-switch::before {
-    content:""; position:absolute; z-index:0; top:4px; bottom:4px; left:4px;
-    width:calc((100% - 8px) / 2); border-radius:999px;
+    content:""; position:absolute; z-index:0; top:0; bottom:0; left:0;
+    width:50%; border-radius:999px;
     background:var(--surface-3,#e2e8f0); pointer-events:none;
     transition:transform .18s ease;
 }
