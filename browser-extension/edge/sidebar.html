@@ -8811,10 +8811,9 @@ button:focus-visible, summary:focus-visible, [role="button"]:focus-visible { fil
         <div id="ocrUploadActions" class="ocr-upload-actions"></div>
     </div>
     <div class="input-wrap">
-        <div id="manualQuestionMode" class="manual-question-mode" role="group" aria-label="手动输入是否为题目">
-            <span class="manual-question-mode-label">题目</span>
-            <button type="button" class="manual-question-choice" data-manual-question="yes" aria-pressed="false" title="本条作为题目，自动识别难度"><span class="manual-question-dot" aria-hidden="true"></span>是</button>
-            <button type="button" class="manual-question-choice" data-manual-question="no" aria-pressed="true" title="本条作为普通聊天"><span class="manual-question-dot" aria-hidden="true"></span>否</button>
+        <div id="manualQuestionMode" class="manual-question-mode interaction-mode-switch" data-mode="chat" role="group" aria-label="输入模式">
+            <button type="button" class="manual-question-choice" data-manual-question="no" aria-pressed="true" title="本条作为普通聊天">聊天</button>
+            <button type="button" class="manual-question-choice" data-manual-question="yes" aria-pressed="false" title="本条作为题目，自动识别难度">解题</button>
         </div>
         <div class="input">
             <div class="manual-question-composer">
