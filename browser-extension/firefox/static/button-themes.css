@@ -369,3 +369,72 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         outline-offset:2px !important;
     }
 }
+
+/* Quiet, borderless inactive choices in dialogs. Match the navigation rows:
+   selection stays visibly filled, hover gets a subtle surface, and the
+   transparent 1px border preserves existing button dimensions. Action buttons,
+   editable fields, destructive controls and swatch selection rings are
+   intentionally outside this group. */
+@layer dmate-button-themes {
+    body[data-appearance-theme] :is(
+        .appearance-segmented button:not(.active),
+        .wrong-filters button:not(.active),
+        .graph-side-tab:not(.active),
+        #knowledgeGraphScopeBtn:not(.active),
+        #knowledgeGraphFocusBtn:not(.active),
+        .mobile-choice-option:not(.active),
+        .dge-tabs [aria-selected="false"],
+        .dgs-modes [aria-selected="false"],
+        .dge-review-relation:not(.is-selected),
+        .graph-summary-item:not(.focus),
+        .kg-history-item:not(.active),
+        .ddw-history-item:not(.is-current)
+    ) {
+        --dm-control-bg:transparent;
+        --dm-control-border:transparent;
+        --dm-control-hover-bg:var(--dm-nav-hover,var(--dm-selected-hover));
+        --dm-control-hover-border:transparent;
+        background-color:transparent!important;
+        background-image:none!important;
+        border-color:transparent!important;
+        box-shadow:none!important;
+    }
+    @media(hover:hover) {
+        body[data-appearance-theme] :is(
+        .appearance-segmented button:not(.active),
+        .wrong-filters button:not(.active),
+        .graph-side-tab:not(.active),
+        #knowledgeGraphScopeBtn:not(.active),
+        #knowledgeGraphFocusBtn:not(.active),
+        .mobile-choice-option:not(.active),
+        .dge-tabs [aria-selected="false"],
+        .dgs-modes [aria-selected="false"],
+        .dge-review-relation:not(.is-selected),
+        .graph-summary-item:not(.focus),
+        .kg-history-item:not(.active),
+        .ddw-history-item:not(.is-current)
+    ):not(:disabled):not([aria-disabled="true"]):hover {
+            background-color:var(--dm-nav-hover,var(--dm-selected-hover))!important;
+            background-image:none!important;
+            border-color:transparent!important;
+            box-shadow:none!important;
+        }
+    }
+    body[data-appearance-theme] :is(
+        .appearance-segmented button:not(.active),
+        .wrong-filters button:not(.active),
+        .graph-side-tab:not(.active),
+        #knowledgeGraphScopeBtn:not(.active),
+        #knowledgeGraphFocusBtn:not(.active),
+        .mobile-choice-option:not(.active),
+        .dge-tabs [aria-selected="false"],
+        .dgs-modes [aria-selected="false"],
+        .dge-review-relation:not(.is-selected),
+        .graph-summary-item:not(.focus),
+        .kg-history-item:not(.active),
+        .ddw-history-item:not(.is-current)
+    ):focus-visible {
+        outline:2px solid var(--dm-selected-ring)!important;
+        outline-offset:2px!important;
+    }
+}
