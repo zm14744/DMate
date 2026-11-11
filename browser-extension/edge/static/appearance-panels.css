@@ -46,7 +46,7 @@ body[data-appearance-theme] {
        The shared panel paint uses an important layer, so override it here rather
        than adding another competing unlayered background. */
     body[data-appearance-theme="light"]:not(.has-custom-background) .left {
-        background-color:#f1f3f5!important;
+        background-color:#e9edf2!important;
         background-image:none!important;
         border-right-color:transparent!important;
     }
