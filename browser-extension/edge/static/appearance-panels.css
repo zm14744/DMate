@@ -135,3 +135,86 @@ body[data-appearance-theme] {
         background-color:rgba(var(--surface-2-rgb),var(--panel-alpha))!important;
     }
 }
+
+/* Knowledge graph node-level teaching video resources. */
+#knowledgeGraphModal .kg-video-section {
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--surface-3);
+}
+#knowledgeGraphModal .kg-video-section-title {
+    margin-bottom:5px;
+    color:var(--text-subtle);
+    font-size:var(--font-xs);
+    font-weight:600;
+}
+#knowledgeGraphModal .kg-video-hint {
+    margin-bottom:8px;
+    color:var(--text-muted);
+    font-size:var(--font-xxs);
+    line-height:1.5;
+}
+#knowledgeGraphModal .kg-video-card {
+    margin-top:8px;
+    padding:10px 11px;
+    border:1px solid var(--surface-3);
+    border-radius:9px;
+    background:var(--surface-0);
+}
+#knowledgeGraphModal .kg-video-card-top {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:9px;
+}
+#knowledgeGraphModal .kg-video-title {
+    min-width:0;
+    color:var(--text-primary);
+    font-size:var(--font-small);
+    font-weight:600;
+    line-height:1.5;
+    overflow-wrap:anywhere;
+}
+#knowledgeGraphModal .kg-video-badge {
+    flex:none;
+    padding:2px 7px;
+    border-radius:999px;
+    background:var(--surface-3);
+    color:var(--text-muted);
+    font-size:10px;
+    line-height:1.5;
+}
+#knowledgeGraphModal .kg-video-meta {
+    margin-top:5px;
+    color:var(--text-muted);
+    font-size:var(--font-xxs);
+    line-height:1.5;
+    overflow-wrap:anywhere;
+}
+#knowledgeGraphModal .kg-video-sections {
+    margin-top:6px;
+    color:var(--text-secondary);
+    font-size:var(--font-xs);
+    line-height:1.55;
+    overflow-wrap:anywhere;
+}
+#knowledgeGraphModal .kg-video-note {
+    margin-top:7px;
+    padding:7px 8px;
+    border-radius:7px;
+    background:var(--surface-1);
+    color:var(--text-subtle);
+    font-size:var(--font-xxs);
+    line-height:1.55;
+}
+#knowledgeGraphModal .kg-video-open {
+    display:inline-flex;
+    margin-top:8px;
+    color:var(--accent);
+    font-size:var(--font-xs);
+    font-weight:600;
+    text-decoration:none;
+}
+#knowledgeGraphModal .kg-video-open:hover {
+    text-decoration:underline;
+}
