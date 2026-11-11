@@ -17546,6 +17546,20 @@ function normalizeKnowledgeGraphData(data) {
         return null;
     }
 
+    const videoSources = Array.isArray(data.video_sources)
+        ? data.video_sources
+            .filter(source => source && typeof source === "object")
+            .map(source => ({
+                id: typeof source.id === "string" ? source.id.trim() : "",
+                name: typeof source.name === "string" ? source.name.trim() : "",
+                course: typeof source.course === "string" ? source.course.trim() : "",
+                platform: typeof source.platform === "string" ? source.platform.trim() : "",
+                url: typeof source.url === "string" ? source.url.trim() : "",
+                note: typeof source.note === "string" ? source.note.trim() : ""
+            }))
+            .filter(source => source.id && /^https?:\/\//i.test(source.url))
+        : [];
+
     const nodes = Array.isArray(data.nodes)
         ? data.nodes
             .filter(node => node && typeof node === "object")
@@ -17565,7 +17579,27 @@ function normalizeKnowledgeGraphData(data) {
                     : "",
                 note: typeof node.note === "string"
                     ? node.note.trim()
-                    : ""
+                    : "",
+                videos: Array.isArray(node.videos)
+                    ? node.videos
+                        .filter(video => video && typeof video === "object")
+                        .map(video => ({
+                            sourceId: typeof video.source_id === "string"
+                                ? video.source_id.trim()
+                                : "",
+                            title: typeof video.title === "string"
+                                ? video.title.trim()
+                                : "",
+                            sections: uniqueTextList(video.sections, 8),
+                            verification: typeof video.verification === "string"
+                                ? video.verification.trim()
+                                : "",
+                            note: typeof video.note === "string"
+                                ? video.note.trim()
+                                : ""
+                        }))
+                        .filter(video => video.sourceId && video.sections.length)
+                    : []
             }))
             .filter(node => node.id && node.name)
         : [];
@@ -17580,6 +17614,7 @@ function normalizeKnowledgeGraphData(data) {
         description: typeof data.description === "string"
             ? data.description.trim()
             : "",
+        videoSources,
         nodes
     };
 }
@@ -21047,6 +21082,82 @@ function renderKnowledgeGraphDetail() {
             [node.note],
             ""
         );
+    }
+
+    const videos = Array.isArray(node.videos) ? node.videos : [];
+    if (videos.length) {
+        const section = document.createElement("section");
+        section.className = "kg-video-section";
+
+        const heading = document.createElement("div");
+        heading.className = "kg-video-section-title";
+        heading.textContent = "教学视频";
+        section.appendChild(heading);
+
+        const hint = document.createElement("div");
+        hint.className = "kg-video-hint";
+        hint.textContent = "按知识点匹配的首选课程章节；视频内容尚未逐段人工抽查。";
+        section.appendChild(hint);
+
+        for (const video of videos) {
+            const source = (knowledgeGraphData.videoSources || []).find(
+                item => item.id === video.sourceId
+            );
+            if (!source) continue;
+
+            const card = document.createElement("div");
+            card.className = "kg-video-card";
+
+            const top = document.createElement("div");
+            top.className = "kg-video-card-top";
+
+            const videoTitle = document.createElement("div");
+            videoTitle.className = "kg-video-title";
+            videoTitle.textContent = video.title || "课程视频";
+
+            const badge = document.createElement("span");
+            badge.className = "kg-video-badge";
+            badge.textContent = "首选";
+            top.appendChild(videoTitle);
+            top.appendChild(badge);
+            card.appendChild(top);
+
+            const meta = document.createElement("div");
+            meta.className = "kg-video-meta";
+            meta.textContent = [source.name, source.course, source.platform]
+                .filter(Boolean)
+                .join(" · ");
+            card.appendChild(meta);
+
+            const lesson = document.createElement("div");
+            lesson.className = "kg-video-sections";
+            lesson.textContent = "章节：" + video.sections.join("、");
+            card.appendChild(lesson);
+
+            if (video.note) {
+                const note = document.createElement("div");
+                note.className = "kg-video-note";
+                note.textContent = video.note;
+                card.appendChild(note);
+            }
+
+            const url = source.url;
+            if (/^https?:\/\//i.test(url)) {
+                const link = document.createElement("a");
+                link.className = "kg-video-open";
+                link.href = url;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                link.textContent = "打开课程";
+                card.appendChild(link);
+            }
+
+            section.appendChild(card);
+        }
+
+        if (section.querySelector(".kg-video-card")) {
+            detail.appendChild(section);
+        }
     }
 }
 
