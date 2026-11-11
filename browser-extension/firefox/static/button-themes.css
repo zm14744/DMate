@@ -386,6 +386,7 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         .dge-tabs [aria-selected="false"],
         .dgs-modes [aria-selected="false"],
         .dge-review-relation:not(.is-selected),
+        .dge-tool-palette .dge-overlay-tools button[data-overlay-tool]:not(.is-active),
         .graph-summary-item:not(.focus),
         .kg-history-item:not(.active),
         .ddw-history-item:not(.is-current)
@@ -410,6 +411,7 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         .dge-tabs [aria-selected="false"],
         .dgs-modes [aria-selected="false"],
         .dge-review-relation:not(.is-selected),
+        .dge-tool-palette .dge-overlay-tools button[data-overlay-tool]:not(.is-active),
         .graph-summary-item:not(.focus),
         .kg-history-item:not(.active),
         .ddw-history-item:not(.is-current)
@@ -430,6 +432,7 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         .dge-tabs [aria-selected="false"],
         .dgs-modes [aria-selected="false"],
         .dge-review-relation:not(.is-selected),
+        .dge-tool-palette .dge-overlay-tools button[data-overlay-tool]:not(.is-active),
         .graph-summary-item:not(.focus),
         .kg-history-item:not(.active),
         .ddw-history-item:not(.is-current)
