@@ -23,12 +23,16 @@ body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
 /* GPT-style segmented switch shared by the composer and grouped images. */
 body[data-appearance-theme] .interaction-mode-switch {
     position:relative; isolation:isolate; display:inline-grid;
-    grid-template-columns:repeat(2,minmax(0,1fr)); flex:none;
-    box-sizing:border-box; width:224px; height:36px; padding:0; gap:0;
+    grid-template-columns:minmax(0,54fr) minmax(0,46fr); flex:none;
+    box-sizing:border-box; width:216px; height:34px; padding:0; gap:0;
     border:0 !important; border-radius:999px;
     background:var(--surface-1,#f1f5f9); box-shadow:none !important;
     color:var(--text-secondary,#64748b); font-size:12px; line-height:1;
     white-space:nowrap;
+    transition:grid-template-columns .18s ease;
+}
+body[data-appearance-theme] .interaction-mode-switch[data-mode="question"] {
+    grid-template-columns:minmax(0,46fr) minmax(0,54fr);
 }
 /* Keep the existing light-theme outline; dark and navy use a completely borderless track. */
 body[data-appearance-theme="light"] .interaction-mode-switch {
@@ -50,11 +54,11 @@ body[data-appearance-theme="navy"] .interaction-mode-switch::before {
 }
 body[data-appearance-theme] .interaction-mode-switch::before {
     content:""; position:absolute; z-index:0; top:0; bottom:0; left:0;
-    width:50%; border-radius:999px;
+    width:54%; border-radius:999px;
     background:var(--surface-3,#e2e8f0); pointer-events:none;
-    transition:transform .18s ease;
+    transition:left .18s ease;
 }
-body[data-appearance-theme] .interaction-mode-switch[data-mode="question"]::before { transform:translateX(100%); }
+body[data-appearance-theme] .interaction-mode-switch[data-mode="question"]::before { left:46%; }
 body[data-appearance-theme] .interaction-mode-switch > button {
     position:relative; z-index:1; display:inline-flex !important;
     align-items:center; justify-content:center; box-sizing:border-box !important;
@@ -70,7 +74,7 @@ body[data-appearance-theme] .interaction-mode-switch > button[aria-pressed="true
 body[data-appearance-theme] .interaction-mode-switch > button:focus-visible { text-decoration:underline; text-underline-offset:4px; }
 body[data-appearance-theme] .interaction-mode-switch > button:disabled { cursor:not-allowed; }
 @media(max-width:1100px) {
-    body[data-appearance-theme] .interaction-mode-switch { width:min(224px,100%); height:36px; }
+    body[data-appearance-theme] .interaction-mode-switch { width:min(216px,100%); height:34px; }
 }
 
 /* iPad in both orientations and Split View: larger tappable symbol keys. */
@@ -249,16 +253,16 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) {
     padding:0 clamp(8px,1vw,18px) calc(16px + env(safe-area-inset-bottom,0px)) !important;
 }
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode {
-    position:absolute; top:-44px; left:clamp(18px,2vw,30px);
+    position:absolute; top:-42px; left:clamp(18px,2vw,30px);
 }
 /* Reserve a row for the mode switch instead of covering the last message. */
 body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) {
-    padding-top:38px !important;
+    padding-top:42px !important;
 }
 body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { top:0; }
 @media(max-width:1100px) {
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode { top:-42px; }
-    body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) { padding-top:36px !important; }
+    body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) { padding-top:42px !important; }
     body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { top:0; }
 }
 /* Activation does not add an outer ring, including the real file picker
