@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="/extension/api-bridge.js"></script>
-<link rel="preload" as="style" href="/static/chat-composer.css?v=edge-1.0.8">
+<link rel="preload" as="style" href="/static/chat-composer.css?v=edge-1.0.9">
 <link rel="preload" as="script" href="/static/script.js?v=edge-1.0.4">
 <link rel="preload" as="script" href="/static/vendor/mathjax-3.2.2/es5/tex-svg.js">
 
@@ -8279,65 +8279,11 @@ body[data-appearance-theme] .input .manual-question-composer > #text:focus {
     padding:0 12px !important;
 }
 .input-wrap > .manual-question-mode[hidden] { display:none !important; }
-.input-wrap > .manual-question-mode {
-    position:absolute;
-    top:-25px;
+body[data-appearance-theme] .input-wrap > .manual-question-mode {
+    position:absolute !important;
+    top:-44px !important;
     left:12px;
     z-index:2;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    height:17px;
-    white-space:nowrap;
-    font-size:11px;
-    line-height:16px;
-    color:var(--text-muted);
-}
-body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question-choice {
-    box-sizing:border-box !important;
-    display:inline-flex !important;
-    align-items:center;
-    justify-content:center;
-    gap:3px;
-    width:auto !important;
-    min-width:0 !important;
-    max-width:none !important;
-    height:17px !important;
-    min-height:17px !important;
-    max-height:17px !important;
-    margin:0 !important;
-    padding:0 2px !important;
-    border:0 !important;
-    border-radius:3px !important;
-    background:transparent !important;
-    background-image:none !important;
-    box-shadow:none !important;
-    color:var(--text-secondary) !important;
-    -webkit-text-fill-color:var(--text-secondary) !important;
-    font:inherit !important;
-    line-height:16px !important;
-    cursor:pointer;
-}
-.input-wrap > .manual-question-mode .manual-question-choice .manual-question-dot {
-    display:inline-block;
-    box-sizing:border-box;
-    flex:none;
-    width:11px;
-    height:11px;
-    border:1.4px solid var(--text-muted);
-    border-radius:50%;
-}
-.input-wrap > .manual-question-mode .manual-question-choice[aria-pressed="true"] .manual-question-dot {
-    border:1.4px solid var(--accent);
-    background:var(--accent);
-}
-body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question-choice[aria-pressed="true"] {
-    color:var(--text-primary) !important;
-    -webkit-text-fill-color:var(--text-primary) !important;
-}
-.input-wrap > .manual-question-mode .manual-question-choice:focus-visible {
-    outline:2px solid var(--accent) !important;
-    outline-offset:1px;
 }
 @media (max-width:1100px) {
     .input .manual-question-composer {
@@ -8351,11 +8297,9 @@ body[data-appearance-theme] .input-wrap > .manual-question-mode .manual-question
         max-height:42px !important;
         padding:0 8px !important;
     }
-    .input-wrap > .manual-question-mode {
-        top:-22px;
+    body[data-appearance-theme] .input-wrap > .manual-question-mode {
+        top:-41px !important;
         left:8px;
-        gap:6px;
-        font-size:10px;
     }
 }
 
@@ -8759,7 +8703,7 @@ body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
 </style>
 <link rel="stylesheet" href="/static/voice-input.css?v=edge-1.0.4">
 <link rel="stylesheet" href="/static/concept-notebook.css?v=edge-1.0.4">
-<link rel="stylesheet" href="/static/chat-composer.css?v=edge-1.0.8">
+<link rel="stylesheet" href="/static/chat-composer.css?v=edge-1.0.9">
 <link rel="stylesheet" href="/static/image-groups.css?v=edge-1.0.4">
 <link rel="stylesheet" href="/static/drawing-workspace.css?v=edge-1.0.4">
 <link rel="stylesheet" href="/static/ai-answer-renderer.css?v=edge-1.0.4">
