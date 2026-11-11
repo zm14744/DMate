@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -21,7 +21,17 @@
       "id": "logic_truth",
       "name": "命题与真值",
       "category": "命题逻辑",
-      "prerequisites": []
+      "prerequisites": [],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "命题及命题的真值",
+          "sections": [
+            "P1 命题及命题的真值"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
+      ]
     },
     {
       "id": "logic_connectives",
@@ -29,6 +39,16 @@
       "category": "命题逻辑",
       "prerequisites": [
         "命题与真值"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "逻辑连接词",
+          "sections": [
+            "P2 逻辑连接词"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -37,6 +57,16 @@
       "category": "命题逻辑",
       "prerequisites": [
         "逻辑联结词"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "命题公式及其真值表",
+          "sections": [
+            "P4 命题公式及其真值表"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -45,6 +75,16 @@
       "category": "命题逻辑",
       "prerequisites": [
         "真值表"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "命题公式的等价",
+          "sections": [
+            "P5 命题公式的等价"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -53,6 +93,18 @@
       "category": "命题逻辑",
       "prerequisites": [
         "逻辑等价"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "主析取范式与主合取范式",
+          "sections": [
+            "P8 主析取范式",
+            "P9 主合取范式"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "一个知识点的两种标准范式，作为同一组连续资源展示。"
+        }
       ]
     },
     {
@@ -62,6 +114,17 @@
       "prerequisites": [
         "逻辑联结词",
         "逻辑等价"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "命题逻辑推理",
+          "sections": [
+            "P10 直接推理",
+            "P11 间接推理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -70,6 +133,16 @@
       "category": "谓词逻辑",
       "prerequisites": [
         "命题与真值"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "谓词逻辑的基本概念",
+          "sections": [
+            "P12 谓词逻辑的基本概念"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -78,6 +151,16 @@
       "category": "谓词逻辑",
       "prerequisites": [
         "谓词与个体域"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "一阶逻辑命题符号化",
+          "sections": [
+            "4.2 一阶逻辑命题符号化"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -86,6 +169,16 @@
       "category": "谓词逻辑",
       "prerequisites": [
         "量词"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "一阶逻辑公式及其解释",
+          "sections": [
+            "4.3 一阶逻辑公式及其解释"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -95,6 +188,16 @@
       "prerequisites": [
         "量词",
         "变元与辖域"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "一阶逻辑的推理理论",
+          "sections": [
+            "5.4 一阶逻辑的推理理论"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -103,6 +206,17 @@
       "category": "谓词逻辑",
       "prerequisites": [
         "量词推理与否定"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "一阶逻辑前束范式",
+          "sections": [
+            "5.3 一阶逻辑前束范式"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "注意：课程原目录中5.3排在5.4之前，而知识图谱把量词推理与否定设为建议前置；前台仍按图谱关系呈现。"
+        }
       ]
     },
     {
@@ -111,6 +225,19 @@
       "category": "证明与归纳",
       "prerequisites": [
         "命题推理"
+      ],
+      "videos": [
+        {
+          "source_id": "cincinnati_math1071",
+          "title": "直接证明与反证法",
+          "sections": [
+            "L32 How to Prove Math Theorems",
+            "L33 Step-By-Step Guide to Proofs",
+            "L38 Proof by Contradiction"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "图谱节点合并了直接证明与反证法，因此用同一课程中的相关章节组成一个资源组。"
+        }
       ]
     },
     {
@@ -119,6 +246,16 @@
       "category": "证明与归纳",
       "prerequisites": [
         "命题推理"
+      ],
+      "videos": [
+        {
+          "source_id": "cincinnati_math1071",
+          "title": "数学归纳法",
+          "sections": [
+            "L45 Intro to Mathematical Induction"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -127,13 +264,33 @@
       "category": "证明与归纳",
       "prerequisites": [
         "数学归纳法"
+      ],
+      "videos": [
+        {
+          "source_id": "cincinnati_math1071",
+          "title": "强归纳法",
+          "sections": [
+            "L47 Strong Induction"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
       "id": "set_operation",
       "name": "集合运算",
       "category": "集合与关系",
-      "prerequisites": []
+      "prerequisites": [],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "集合的运算",
+          "sections": [
+            "6.3 集合的运算"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
+      ]
     },
     {
       "id": "relation_cartesian",
@@ -141,6 +298,17 @@
       "category": "集合与关系",
       "prerequisites": [
         "集合运算"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "笛卡尔积与二元关系",
+          "sections": [
+            "7.2 有序对与笛卡儿积",
+            "7.3 二元关系"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -149,6 +317,16 @@
       "category": "集合与关系",
       "prerequisites": [
         "笛卡尔积与关系"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "关系的运算",
+          "sections": [
+            "7.4 关系的运算"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -157,6 +335,16 @@
       "category": "集合与关系",
       "prerequisites": [
         "笛卡尔积与关系"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "关系的性质",
+          "sections": [
+            "7.5 关系的性质"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -165,6 +353,16 @@
       "category": "集合与关系",
       "prerequisites": [
         "关系性质"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "等价关系与划分",
+          "sections": [
+            "7.7 等价关系与划分"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -173,6 +371,16 @@
       "category": "集合与关系",
       "prerequisites": [
         "关系性质"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "偏序关系",
+          "sections": [
+            "7.8 偏序关系"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -182,6 +390,16 @@
       "prerequisites": [
         "关系运算",
         "关系性质"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "关系的闭包",
+          "sections": [
+            "7.6 关系的闭包"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -190,6 +408,16 @@
       "category": "函数",
       "prerequisites": [
         "集合运算"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "函数的定义",
+          "sections": [
+            "8.2 函数的定义"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -198,6 +426,16 @@
       "category": "函数",
       "prerequisites": [
         "函数与映射"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "函数的性质（单射、满射与双射）",
+          "sections": [
+            "8.3 函数的性质"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -206,6 +444,16 @@
       "category": "函数",
       "prerequisites": [
         "函数与映射"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "函数的复合",
+          "sections": [
+            "8.4 函数的复合"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -215,13 +463,35 @@
       "prerequisites": [
         "单射满射双射",
         "复合函数"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "函数的反函数",
+          "sections": [
+            "8.5 函数的反函数"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
       "id": "number_prime",
       "name": "整除与素数",
       "category": "初等数论",
-      "prerequisites": []
+      "prerequisites": [],
+      "videos": [
+        {
+          "source_id": "hit_info_math",
+          "title": "初识数论与整数分解",
+          "sections": [
+            "5.1 初识数论",
+            "5.10 整数分解定理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "目录标题与数论基础、素因子分解相对应；整除和素数定义的实际讲授范围仍建议抽查。"
+        }
+      ]
     },
     {
       "id": "number_gcd",
@@ -229,6 +499,17 @@
       "category": "初等数论",
       "prerequisites": [
         "整除与素数"
+      ],
+      "videos": [
+        {
+          "source_id": "hit_info_math",
+          "title": "最大公因数与欧几里得算法",
+          "sections": [
+            "5.2 辗转相除法",
+            "5.3 最大公因数和互素"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -237,6 +518,16 @@
       "category": "初等数论",
       "prerequisites": [
         "整除与素数"
+      ],
+      "videos": [
+        {
+          "source_id": "hit_info_math",
+          "title": "同余及其性质",
+          "sections": [
+            "5.7 同余及其性质"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -246,6 +537,16 @@
       "prerequisites": [
         "同余与模运算",
         "最大公因数与欧几里得算法"
+      ],
+      "videos": [
+        {
+          "source_id": "hit_info_math",
+          "title": "同余方程及求解",
+          "sections": [
+            "5.8 同余方程及求解"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -255,6 +556,17 @@
       "prerequisites": [
         "同余与模运算",
         "最大公因数与欧几里得算法"
+      ],
+      "videos": [
+        {
+          "source_id": "hit_info_math",
+          "title": "中国剩余定理（孙子定理）",
+          "sections": [
+            "5.14 孙子定理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "模逆计算基础在5.8同余方程及求解中学习；为避免同一视频重复挂载，这里只挂CRT对应章节。需抽查5.14是否充分解释模逆的使用。"
+        }
       ]
     },
     {
@@ -264,6 +576,17 @@
       "prerequisites": [
         "同余与模运算",
         "整除与素数"
+      ],
+      "videos": [
+        {
+          "source_id": "hit_info_math",
+          "title": "欧拉定理",
+          "sections": [
+            "5.13 欧拉定理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "目录明确对应欧拉定理；图谱节点还包含费马小定理，需抽查视频是否明确讲到费马小定理或其作为欧拉定理特例。"
+        }
       ]
     },
     {
@@ -274,13 +597,33 @@
         "线性同余方程",
         "欧拉定理与费马小定理"
       ],
-      "level": "拓展"
+      "level": "拓展",
+      "videos": [
+        {
+          "source_id": "hit_info_math",
+          "title": "RSA算法",
+          "sections": [
+            "5.15 RSA算法"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
+      ]
     },
     {
       "id": "count_basic",
       "name": "基本计数原理",
       "category": "计数与组合",
-      "prerequisites": []
+      "prerequisites": [],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "加法原理与乘法原理",
+          "sections": [
+            "3.1 加法原理与乘法原理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
+      ]
     },
     {
       "id": "count_perm_comb",
@@ -288,6 +631,16 @@
       "category": "计数与组合",
       "prerequisites": [
         "基本计数原理"
+      ],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "排列与组合",
+          "sections": [
+            "3.2.1 集合的排列数和组合数"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -296,6 +649,16 @@
       "category": "计数与组合",
       "prerequisites": [
         "排列与组合"
+      ],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "二项式定理",
+          "sections": [
+            "3.4.1 二项式定理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -304,6 +667,17 @@
       "category": "计数与组合",
       "prerequisites": [
         "基本计数原理"
+      ],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "鸽巢原理",
+          "sections": [
+            "2.1 鸽巢原理的简单形式",
+            "2.2 鸽巢原理的加强形式"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -313,6 +687,16 @@
       "prerequisites": [
         "基本计数原理",
         "集合运算"
+      ],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "容斥原理",
+          "sections": [
+            "4.1.1 容斥原理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -322,13 +706,34 @@
       "prerequisites": [
         "递推关系建模",
         "排列与组合"
+      ],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "生成函数",
+          "sections": [
+            "5.1 生成函数的定义和性质"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "原课程播放列表先讲生成函数、后讲递推；DMate建议按知识图谱前置关系，在递推建模与排列组合之后学习。"
+        }
       ]
     },
     {
       "id": "recurrence_model",
       "name": "递推关系建模",
       "category": "递推关系",
-      "prerequisites": []
+      "prerequisites": [],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "递推关系的建立",
+          "sections": [
+            "6.1 递推关系的建立"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
+      ]
     },
     {
       "id": "recurrence_homogeneous",
@@ -336,6 +741,16 @@
       "category": "递推关系",
       "prerequisites": [
         "递推关系建模"
+      ],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "常系数线性齐次递推关系",
+          "sections": [
+            "6.2 常系数线性齐次递推关系的求解"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -344,6 +759,16 @@
       "category": "递推关系",
       "prerequisites": [
         "线性齐次递推"
+      ],
+      "videos": [
+        {
+          "source_id": "comb34",
+          "title": "常系数线性非齐次递推关系",
+          "sections": [
+            "6.3 常系数线性非齐次递推关系的求解"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -352,13 +777,37 @@
       "category": "递推关系",
       "prerequisites": [
         "递推关系建模"
+      ],
+      "videos": [
+        {
+          "source_id": "cincinnati_math1071",
+          "title": "递归数列",
+          "sections": [
+            "L48 Recursive Sequences"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "目录对应递归数列；视频是否明确讲授初始项/初始条件仍需抽查。"
+        }
       ]
     },
     {
       "id": "graph_basic",
       "name": "图的基本概念",
       "category": "图论",
-      "prerequisites": []
+      "prerequisites": [],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "图的基本概念",
+          "sections": [
+            "12.2 图（上）",
+            "12.3 图（中）",
+            "12.4 图（下）"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "三个连续章节合并为图论基础资源组，避免将同一课程的连续内容拆成多个重复推荐。"
+        }
+      ]
     },
     {
       "id": "graph_isomorphism",
@@ -366,6 +815,16 @@
       "category": "图论",
       "prerequisites": [
         "图的基本概念"
+      ],
+      "videos": [
+        {
+          "source_id": "hit_graph",
+          "title": "图同构",
+          "sections": [
+            "1.9 同构"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -374,6 +833,16 @@
       "category": "图论",
       "prerequisites": [
         "图的基本概念"
+      ],
+      "videos": [
+        {
+          "source_id": "hit_graph",
+          "title": "邻接矩阵",
+          "sections": [
+            "5.1 邻接矩阵"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -384,7 +853,18 @@
         "图的基本概念",
         "邻接矩阵"
       ],
-      "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵"
+      "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "图的矩阵表示",
+          "sections": [
+            "12.8 图的矩阵表示"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "节点重点是关联矩阵、度矩阵与拉普拉斯矩阵；课程目录标题对应图的矩阵表示，具体覆盖范围需抽查。"
+        }
+      ]
     },
     {
       "id": "graph_connectivity",
@@ -392,6 +872,18 @@
       "category": "图论",
       "prerequisites": [
         "图的基本概念"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "路径与连通性",
+          "sections": [
+            "12.5 通路与同路",
+            "12.6 图的连通性（上）",
+            "12.7 图的连通性（下）"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -400,6 +892,17 @@
       "category": "图论",
       "prerequisites": [
         "路径与连通性"
+      ],
+      "videos": [
+        {
+          "source_id": "hit_graph_spoc",
+          "title": "割点、桥与割集",
+          "sections": [
+            "6.3 割点、桥与割集"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "旧版2020春SPOC资源，需确认当前账号能否正常访问课程视频。"
+        }
       ]
     },
     {
@@ -408,6 +911,17 @@
       "category": "图论",
       "prerequisites": [
         "图的基本概念"
+      ],
+      "videos": [
+        {
+          "source_id": "ucsd_discrete",
+          "title": "带权图",
+          "sections": [
+            "图论模块 10：带权图"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。"
+        }
       ]
     },
     {
@@ -416,6 +930,16 @@
       "category": "图论",
       "prerequisites": [
         "路径与连通性"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "欧拉图",
+          "sections": [
+            "13.2 欧拉图"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -424,6 +948,16 @@
       "category": "图论",
       "prerequisites": [
         "路径与连通性"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "哈密顿图",
+          "sections": [
+            "13.3 哈密顿图"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -433,6 +967,16 @@
       "prerequisites": [
         "路径与连通性",
         "带权图"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "最短路问题",
+          "sections": [
+            "13.4 最短路问题"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -441,6 +985,17 @@
       "category": "图论",
       "prerequisites": [
         "图的基本概念"
+      ],
+      "videos": [
+        {
+          "source_id": "ucsd_discrete",
+          "title": "图着色",
+          "sections": [
+            "图论模块 38：图着色"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。"
+        }
       ]
     },
     {
@@ -449,6 +1004,18 @@
       "category": "图论",
       "prerequisites": [
         "图的基本概念"
+      ],
+      "videos": [
+        {
+          "source_id": "ucsd_discrete",
+          "title": "平面图及欧拉公式",
+          "sections": [
+            "图论模块 34：平面图",
+            "图论模块 35：欧拉公式"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "两个相邻章节共同覆盖平面图及其基本性质。"
+        }
       ]
     },
     {
@@ -458,6 +1025,17 @@
       "prerequisites": [
         "图的基本概念",
         "路径与连通性"
+      ],
+      "videos": [
+        {
+          "source_id": "ucsd_discrete",
+          "title": "二部图",
+          "sections": [
+            "图论模块 13：二分图"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。"
+        }
       ]
     },
     {
@@ -467,6 +1045,17 @@
       "prerequisites": [
         "图的基本概念",
         "路径与连通性"
+      ],
+      "videos": [
+        {
+          "source_id": "cqjtu_graph_algorithms",
+          "title": "AOV网络与拓扑排序",
+          "sections": [
+            "2.3.1 AOV网络与拓扑排序",
+            "2.3.2 拓扑排序实现方法"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -475,6 +1064,20 @@
       "category": "图论",
       "prerequisites": [
         "图的基本概念"
+      ],
+      "videos": [
+        {
+          "source_id": "cqjtu_graph_algorithms",
+          "title": "支配集、覆盖集与独立集",
+          "sections": [
+            "7.1.1 点支配集",
+            "7.1.2 点覆盖集",
+            "7.1.3 点独立集",
+            "7.1.4 三者之间的联系"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "四个连续小节作为一个专题资源组；不再重复挂载UCSD的团、独立集或顶点覆盖视频。"
+        }
       ]
     },
     {
@@ -484,6 +1087,18 @@
       "prerequisites": [
         "图的基本概念",
         "二部图"
+      ],
+      "videos": [
+        {
+          "source_id": "ucsd_discrete",
+          "title": "图匹配与霍尔定理",
+          "sections": [
+            "图论模块 31：匹配",
+            "图论模块 32：霍尔定理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "在二部图节点之后推荐，两个章节共同补足匹配及其存在条件。"
+        }
       ]
     },
     {
@@ -493,6 +1108,16 @@
       "prerequisites": [
         "图的基本概念",
         "路径与连通性"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "无向树及其性质",
+          "sections": [
+            "14.2 无向树及其性质"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -501,6 +1126,16 @@
       "category": "图论",
       "prerequisites": [
         "树的基本性质"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "根树及其应用",
+          "sections": [
+            "14.5 根树及其应用"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -510,6 +1145,16 @@
       "prerequisites": [
         "树的基本性质",
         "路径与连通性"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "生成树",
+          "sections": [
+            "14.3 生成树"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -519,6 +1164,17 @@
       "prerequisites": [
         "生成树",
         "带权图"
+      ],
+      "videos": [
+        {
+          "source_id": "ucsd_discrete",
+          "title": "最小生成树",
+          "sections": [
+            "图论模块 28：最小生成树"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。"
+        }
       ]
     },
     {
@@ -529,7 +1185,18 @@
         "图的矩阵表示",
         "生成树"
       ],
-      "level": "拓展"
+      "level": "拓展",
+      "videos": [
+        {
+          "source_id": "ecust_algebraic_graph",
+          "title": "拉普拉斯特征值与矩阵树定理",
+          "sections": [
+            "3.1 拉普拉斯特征值与矩阵树定理"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "研究生课程，作为图谱拓展节点资源，不作为本科图论基础必修视频。"
+        }
+      ]
     },
     {
       "id": "algebra_system",
@@ -537,6 +1204,17 @@
       "category": "代数结构",
       "prerequisites": [
         "函数与映射"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "二元运算及其性质",
+          "sections": [
+            "P43 二元运算及其性质",
+            "P44 二元运算中的特殊元"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -545,6 +1223,17 @@
       "category": "代数结构",
       "prerequisites": [
         "代数系统"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "群与子群",
+          "sections": [
+            "P48 群的定义及性质",
+            "P49 子群及其证明"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -554,6 +1243,18 @@
       "prerequisites": [
         "群与子群",
         "函数与映射"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "代数系统的同态与同构",
+          "sections": [
+            "P45 代数系统的同态与同构",
+            "P46 代数系统同构的性质"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查",
+          "note": "东北大学课程把一般代数系统同态放在群论章节之前；知识图谱当前将群与子群列为建议前置，二者教学顺序存在差异。"
+        }
       ]
     },
     {
@@ -562,6 +1263,16 @@
       "category": "代数结构",
       "prerequisites": [
         "群与子群"
+      ],
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "环与域",
+          "sections": [
+            "P53 环与域"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     },
     {
@@ -570,7 +1281,104 @@
       "category": "代数结构",
       "prerequisites": [
         "偏序关系"
+      ],
+      "videos": [
+        {
+          "source_id": "sdnu_discrete",
+          "title": "格与布尔代数",
+          "sections": [
+            "11.2 格的定义与性质",
+            "11.3 分配格、有补格与布尔代数"
+          ],
+          "verification": "章节目录对应，视频内容待逐段抽查"
+        }
       ]
     }
-  ]
+  ],
+  "video_sources": [
+    {
+      "id": "neu_discrete",
+      "name": "东北大学",
+      "course": "离散数学（2023版）",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1ru411V76r/",
+      "note": "课程选集目录使用P编号；本映射按视频目录标题定位。"
+    },
+    {
+      "id": "sdnu_discrete",
+      "name": "山东师范大学",
+      "course": "离散数学",
+      "platform": "山东师范大学在线课程",
+      "url": "https://mooc.spoc.sdnu.edu.cn/course/20980000001144.html",
+      "note": "官方课程页列有对应章节目录。"
+    },
+    {
+      "id": "cincinnati_math1071",
+      "name": "辛辛那提大学",
+      "course": "MATH1071 Discrete Mathematics (2020)",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/",
+      "note": "Trefor Bazett 主讲；中文字幕为机器翻译，建议结合英文字幕。"
+    },
+    {
+      "id": "hit_info_math",
+      "name": "哈尔滨工业大学",
+      "course": "信息安全数学基础",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1zt411S7r8/",
+      "note": "第5章包含初等数论、同余、欧拉定理、孙子定理与RSA。"
+    },
+    {
+      "id": "comb34",
+      "name": "组合数学课程",
+      "course": "组合数学（34段）",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV13E411p7cb/",
+      "note": "目录包含鸽巢原理、计数、排列组合、容斥、生成函数和递推关系。"
+    },
+    {
+      "id": "ucsd_discrete",
+      "name": "加州大学圣迭戈分校（UCSD）",
+      "course": "Discrete Mathematics（221段合集）",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1Kw411L7b5/",
+      "note": "五门Coursera课程合集；各子课程章节编号会重置。中文字幕为机器翻译，章节定位需同时显示模块名。"
+    },
+    {
+      "id": "hit_graph",
+      "name": "哈尔滨工业大学",
+      "course": "集合论与图论（下）",
+      "platform": "中国大学MOOC",
+      "url": "https://www.icourse163.org/course/HIT-1003781003?tid=1487109453",
+      "note": "官方课程大纲列有图同构、邻接矩阵等章节。"
+    },
+    {
+      "id": "hit_graph_spoc",
+      "name": "哈尔滨工业大学",
+      "course": "2020春集合论与图论（下）（姜守旭）",
+      "platform": "中国大学MOOC SPOC",
+      "url": "https://www.icourse163.org/spoc/course/HIT-1457261164?tid=1457801442",
+      "note": "旧版SPOC课程，具体视频访问权限可能受课程状态影响。"
+    },
+    {
+      "id": "cqjtu_graph_algorithms",
+      "name": "重庆交通大学",
+      "course": "图论算法理论、实现及应用",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1np4y137AN/",
+      "note": "偏图论算法与实现；此处只取其他主干课程没有直接覆盖的专题。"
+    },
+    {
+      "id": "ecust_algebraic_graph",
+      "name": "华东理工大学",
+      "course": "代数图论",
+      "platform": "华东理工大学研究生平台",
+      "url": "https://mooc.s.ecust.edu.cn/course/441650000019307.html?articleId=158499&edit=false",
+      "note": "研究生课程，矩阵树定理部分难度高于本科离散数学基础。"
+    }
+  ],
+  "video_resource_policy": {
+    "primary_per_node": 1,
+    "note": "每个知识节点只配置一套首选课程资源；同一资源组可以包含为覆盖一个复合知识点所必需的连续章节。章节目录已对照公开课程页/视频选集整理，视频内容尚未逐段人工抽查。"
+  }
 }
