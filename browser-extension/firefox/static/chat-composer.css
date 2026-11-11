@@ -217,6 +217,9 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) {
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode {
     position:absolute !important; top:-44px !important; left:clamp(18px,2vw,30px);
 }
+@media(max-width:1100px) {
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .manual-question-mode { top:-42px !important; }
+}
 /* Activation does not add an outer ring, including the real file picker
    layered over its visible plus button. */
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) button,
