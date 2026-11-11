@@ -25,7 +25,8 @@ body[data-appearance-theme] .interaction-mode-switch {
     position:relative; isolation:isolate; display:inline-grid;
     grid-template-columns:repeat(2,minmax(0,1fr)); flex:none;
     box-sizing:border-box; width:128px; height:30px; padding:3px; gap:0;
-    border:0; border-radius:999px; background:var(--surface-1,#f1f5f9);
+    border:1px solid var(--dm-control-border,var(--border-strong,#cbd5e1));
+    border-radius:999px; background:var(--surface-1,#f1f5f9);
     color:var(--text-secondary,#64748b); font-size:12px; line-height:1;
     white-space:nowrap;
 }
