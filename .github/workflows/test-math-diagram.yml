@@ -45,7 +45,11 @@ jobs:
           python -m pip install networkx jsonschema requests
       - name: Compile and test diagram structure generation
         run: |
-          python -m py_compile math_diagram.py
+          python -m py_compile app.py math_diagram.py
           PYTHONPATH=. python scripts/test_math_diagram.py
+      - name: Validate drawing workspace integration syntax
+        run: |
+          node --check static/math-diagram.js
+          node --check static/drawing-workspace.js
       - name: Test real Graphviz WASM layout and editor coordinates
         run: node scripts/test_math_diagram.cjs
