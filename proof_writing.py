@@ -17,7 +17,7 @@ PROOF_WRITING_STANDARD_ZH = r"""【数学证明写作规范｜DMate 统一标准
 二、变量、定义域与量词
 1. 每个新变量首次出现时交代其所属集合、取值范围和引入理由；辅助变量也要说明存在依据。
 2. 证明全称命题时，使用“任取……”“对于任意……”并证明所取对象具有目标性质；不能只验证一个特例。
-3. 证明存在命题时，给出明确对象或构造，并逐项验证它满足要求；不能把“任意”误写成“存在”，也不能只说“显然存在”。
+3. 证明存在命题时，可以给出明确见证或构造并逐项核验，也可以给出完整、有效的非构造存在性论证，例如概率法或反证法。遵循题目或用户指定的证明方法；非构造证明不必强行给出具体见证。不能把“任意”误写成“存在”，也不能只说“显然存在”。
 4. 证明正文优先用准确的中文自然语言表达量词和逻辑关系，例如“任取”“存在”“若……则……”。除非题目要求形式化逻辑表达，或符号确实有助于定义对象，否则不要把证明正文写成由 ∀、∃、⇒、∧、∨、¬ 拼成的符号串。数学公式中的代数符号正常使用。
 
 三、按命题结构选择证明方法
@@ -66,7 +66,7 @@ Apply this policy only when the task involves giving, explaining, checking, grad
 Preserve the original domain, hypotheses, quantifiers, and conclusion. Identify whether the target is universal, existential, conditional, biconditional, a set inclusion/equality, uniqueness, induction, or disproof. An implication P => Q does not become a biconditional without proving the reverse direction.
 
 2. Define variables and quantifiers.
-Introduce every new variable with its domain, range, scope, and reason for introduction. To prove a universal statement, choose an arbitrary object from the stated domain and prove the property for that arbitrary object. To prove existence, construct or specify a witness and verify it. Do not confuse arbitrary choice with existence. In proof prose, prefer precise natural-language quantifiers such as "let x be arbitrary" and "there exists"; use symbolic quantifiers and connectives in the proof body only when formalization is requested or they genuinely clarify the mathematics. Ordinary algebraic notation remains appropriate.
+Introduce every new variable with its domain, range, scope, and reason for introduction. To prove a universal statement, choose an arbitrary object from the stated domain and prove the property for that arbitrary object. To prove existence, provide and verify a witness or construction, or give a complete, valid nonconstructive existence argument, such as a probabilistic argument or proof by contradiction. Follow the method specified by the problem or user; a nonconstructive proof need not supply a concrete witness. Do not confuse arbitrary choice with existence. In proof prose, prefer precise natural-language quantifiers such as "let x be arbitrary" and "there exists"; use symbolic quantifiers and connectives in the proof body only when formalization is requested or they genuinely clarify the mathematics. Ordinary algebraic notation remains appropriate.
 
 3. Match the method to the logical form.
 - Direct proof: use the hypotheses and derive the target.

@@ -349,6 +349,10 @@ const response = await fetch("/chat", {
 
 `POST /drawing/generate` 接收 `{"requirement": "需要生成的数学图", "language": "zh-CN"}`。要求最多 2000 字符，请求体最多 12,000 字节。DeepSeek 以 JSON 结构返回单幅图；服务端校验图结构，最多 80 个顶点、240 条边。成功时返回 `ok`、`kind`、`title` 和 `document`。支持一般图及常见图族、哈斯图、循环群 Cayley 图、循环群子群格、模整数环理想格和零因子图。暂不支持或条件不足时返回错误，不会自行补造数学条件。浏览器随后使用本域 Viz.js / Graphviz WASM 计算布局，并在独立画板中新建可编辑页面；它不修改当前画页，也不代替数学性质校验。
 
+对完整、简单且明确的中英文绘图请求，另核对指定的结构与参数：`K_n`、`K_{m,n}`、指定顶点数的完全图/树/路径/回路，以及指定 `Z_n` 模数的 Cayley 图/子群格/理想格/零因子图。核对实际边结构，不仅依赖模型声明的图族；不符时返回 HTTP 502 和 `code: "math_diagram_requirement_mismatch"`，不会改写生成结果来凑条件。含修改、否定、多个结构或其他复杂描述的请求不额外猜测参数，仍执行原有结构校验；这不是对任意自然语言条件的完整数学证明。
+
+浏览器布局同时保留顶点坐标和 Graphviz 连线路径，将曲线采样到既有 `edge.path` 字段（每条最多 128 点）。编辑器、历史保存和 PNG 导出使用同一份几何信息，避免丢弃绕行路径后把边画过无关顶点。
+
 `POST /drawing/guide` 接收 `{"document": 当前画图文档, "requirement": "本轮要求"}`。要求最多 2000 字符，文档最多 200,000 字节、16 幅图、总计 200 个顶点和 600 条边。允许空白或含未知项的草稿，返回 `ok`、`answer` 和 `document_digest`。它只提供文字指导，不修改或上传图形。
 
 `POST /drawing/upload` 使用 multipart：`image` 为单帧 PNG，`document` 为完整结构 JSON 字符串，`request_id` 为新任务 ID。图片与结构通过校验后登记来源，返回 `ok`、原图摘要、请求 ID 与 `document`。这里不会重新读图或解题，后续仍需确认。

@@ -1,6 +1,12 @@
 """Regression tests for DMate's shared proof-writing policy."""
 
+import importlib.util
+import json
+from pathlib import Path
+import sys
+from types import ModuleType
 import unittest
+from unittest.mock import Mock, patch
 
 from teaching import teaching_prompt
 
@@ -11,6 +17,31 @@ from proof_writing import (
     PROOF_WRITING_STANDARD_ZH,
     proof_writing_prompt,
 )
+
+
+def load_runtime_module(name):
+    """Load the real entry point without installing unused HTTP/image clients.
+
+    Completion is replaced in these request-assembly tests. No generated proof
+    is assessed, and neither network requests nor image operations run.
+    """
+    stubs = {}
+    if importlib.util.find_spec('requests') is None:
+        requests = ModuleType('requests')
+        requests.RequestException = type('RequestException', (Exception,), {})
+        requests.Timeout = type('Timeout', (requests.RequestException,), {})
+        stubs['requests'] = requests
+    if importlib.util.find_spec('PIL') is None:
+        pillow = ModuleType('PIL')
+        for component in ('Image', 'ImageOps', 'ImageEnhance', 'ImageFilter'):
+            setattr(pillow, component, ModuleType('PIL.' + component))
+        stubs['PIL'] = pillow
+    path = Path(__file__).resolve().parents[1] / (name + '.py')
+    spec = importlib.util.spec_from_file_location('_proof_test_' + name, path)
+    module = importlib.util.module_from_spec(spec)
+    with patch.dict(sys.modules, stubs):
+        spec.loader.exec_module(module)
+    return module
 
 
 class ProofWritingPolicyTests(unittest.TestCase):
@@ -117,6 +148,59 @@ class ProofWritingPolicyTests(unittest.TestCase):
 
     def test_non_english_language_defaults_to_chinese(self):
         self.assertIn(PROOF_WRITING_STANDARD_ZH, proof_writing_prompt("zh-Hans"))
+
+    def test_existence_rules_allow_both_methods_without_forcing_a_witness(self):
+        chinese = proof_writing_prompt('zh-CN')
+        english = proof_writing_prompt('en')
+        for rule in ('明确见证或构造并逐项核验', '完整、有效的非构造存在性论证',
+                     '遵循题目或用户指定的证明方法', '非构造证明不必强行给出具体见证'):
+            self.assertIn(rule, chinese)
+        for rule in ('provide and verify a witness or construction',
+                     'complete, valid nonconstructive existence argument',
+                     'Follow the method specified by the problem or user',
+                     'a nonconstructive proof need not supply a concrete witness'):
+            self.assertIn(rule, english)
+        self.assertNotIn('给出明确对象或构造，并逐项验证它满足要求', chinese)
+        self.assertNotIn('To prove existence, construct or specify a witness and verify it.', english)
+
+    def test_chat_requests_include_the_correct_policy_and_preserve_requested_method(self):
+        ai = load_runtime_module('ai')
+        requests = {
+            'zh-CN':'请用概率方法给出非构造存在性证明，不构造具体图。',
+            'en':'Use a probabilistic, nonconstructive existence proof; do not construct a concrete graph.',
+        }
+        for language, request in requests.items():
+            with self.subTest(language=language), patch.object(ai, 'DEEPSEEK_API_KEY', 'test-only'), \
+                    patch.object(ai, 'ASK_AI_MOCK', False), patch.object(ai, '_request_text_completion',
+                    return_value={'ok':True, 'content':'Proof placeholder.', 'choice':{'finish_reason':'stop'}}) as completion:
+                result = ai.ask_ai([{'role':'user', 'content':request}],
+                                   teaching_context={'mode':'full_solution', 'response_language':language})
+                self.assertTrue(result['ok'])
+                completion.assert_called_once()
+                messages = completion.call_args.args[0]
+                self.assertEqual(messages[-1], {'role':'user', 'content':request})
+                self.assertEqual(messages[0]['role'], 'system')
+                self.assertEqual(messages[0]['content'].count(proof_writing_prompt(language)), 1)
+
+    def test_notebook_requests_include_the_same_policy_and_preserve_requested_method(self):
+        notebook = load_runtime_module('concept_notebook')
+        answer = {'explanations':[{'note_id':'probability', 'explanation':'Explanation placeholder.'}],
+                  'relations':[], 'summary':'Summary placeholder.'}
+        questions = {'zh-CN':'请使用非构造证明，不要强求具体见证。',
+                     'en':'Use a nonconstructive proof; do not construct a witness.'}
+        for language, question in questions.items():
+            with self.subTest(language=language):
+                request = {'action':'explain', 'language':language,
+                           'notes':[{'id':'probability', 'title':'Existence', 'content':'Probabilistic method'}],
+                           'question':question}
+                completion = Mock(return_value={'ok':True, 'content':json.dumps(answer)})
+                result = notebook.analyze_notebook(request, completion=completion)
+                self.assertTrue(result['ok'])
+                completion.assert_called_once()
+                messages = completion.call_args.args[0]
+                self.assertEqual(messages[0]['role'], 'system')
+                self.assertEqual(messages[0]['content'].count(proof_writing_prompt(language)), 1)
+                self.assertEqual(json.loads(messages[1]['content'])['question'], request['question'])
 
 
 if __name__ == "__main__":

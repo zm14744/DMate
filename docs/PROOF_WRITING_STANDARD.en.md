@@ -14,7 +14,7 @@ This standard governs DMate's discrete-mathematics tutoring, proof hints, comple
 
 1. **Preserve the proposition:** retain the original domain, assumptions, quantifiers and conclusion; never silently strengthen an implication into an equivalence.
 2. **Define variables:** state each new variable's domain, origin and role.
-3. **Respect quantifiers:** use an arbitrary object for universal claims; provide a witness, construction or valid existence argument for existential claims.
+3. **Respect quantifiers:** use an arbitrary object for universal claims; provide a witness, construction or valid existence argument for existential claims. Follow the method specified by the problem; a nonconstructive probabilistic argument or proof by contradiction need not construct a concrete witness.
 4. **Justify inferences:** every substantive conclusion must follow from a hypothesis, definition, established result, theorem or valid transformation.
 5. **Write natural mathematical English:** use complete sentences to connect equations. Do not replace prose with a chain of logical symbols unless formal logic is requested.
 6. **Use stable terminology:** respect the user's textbook and instructor conventions; distinguish necessary/sufficient, converse/contrapositive, antisymmetric/asymmetric, injective/surjective and homomorphism/isomorphism.

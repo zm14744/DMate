@@ -29,10 +29,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Python 3.11
+      - name: Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
       - name: Compile proof-writing integrations
         run: python -m py_compile ai.py concept_notebook.py proof_writing.py proof_writing_extended.py
       - name: Run offline exercise regressions

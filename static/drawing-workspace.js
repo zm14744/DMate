@@ -121,9 +121,9 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     observedPalette=palette;const trigger=palette.querySelector(':scope > summary');
     trigger?.setAttribute('aria-label','绘图工具');trigger?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();toggleTools();});
    }
-   const empty=!active(),disabled=exportBusy||Boolean(exportPreview);name.disabled=empty||disabled;editorHost.inert=disabled;rail.inert=empty||disabled;
+   const empty=!active(),disabled=exportBusy||Boolean(exportPreview);name.disabled=empty||disabled;editorHost.inert=disabled;rail.inert=disabled;
    if(viewport)viewport.inert=empty;
-   settingsButton.disabled=empty||disabled;informationButton.disabled=empty||disabled;aiButton.disabled=empty||disabled;shell.classList.toggle('is-empty',empty);
+   settingsButton.disabled=empty||disabled;informationButton.disabled=empty||disabled;aiButton.disabled=disabled;shell.classList.toggle('is-empty',empty);
    if(palette){palette.open=toolsExpanded&&!empty;const trigger=palette.querySelector(':scope > summary');trigger?.setAttribute('aria-expanded',String(palette.open));trigger?.setAttribute('aria-disabled',String(disabled));}
    for(const item of editorHost.querySelectorAll('.dge-float-panel')){
     const content=item.querySelector(':scope > .dge-float-content');

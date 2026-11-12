@@ -9,6 +9,7 @@ import json
 import math
 import re
 import threading
+import unicodedata
 
 import networkx as nx
 import requests
@@ -141,6 +142,7 @@ _ERRORS_EN = {
     "带权图的每条边都必须提供权值。": "Every edge in a weighted graph must have a weight.",
     "图形超过当前原型的规模限制。": "The diagram exceeds this prototype's size limit.",
     "图族结构与定义不符，请调整绘图要求。": "The generated graph does not satisfy its stated graph-family definition.",
+    "生成的数学图不符合请求中明确指定的结构或参数，请重试。": "The generated diagram does not match the structure or parameters explicitly requested. Please try again.",
     "哈斯图关系包含自反关系或未知元素。": "The Hasse relation contains a reflexive pair or an unknown element.",
     "哈斯图关系存在有向环，不构成偏序结构。": "The Hasse relation contains a directed cycle and is not a partial order.",
     "生成元不能生成整个循环群。": "The supplied generators do not generate the whole cyclic group.",
@@ -444,6 +446,119 @@ def build_document(spec, *, language="zh-CN"):
     raise MathDiagramError("unsupported_math_diagram", "该数学结构暂不支持自动生成。", status=422)
 
 
+_REQUEST_COUNT = r"(?:[0-9]+|[一二两三四五六七八九]?十[一二三四五六七八九]?|[一二两三四五六七八九])"
+_REQUEST_FAMILIES = {
+    "完全图": "complete", "complete graph": "complete",
+    "树": "tree", "tree": "tree", "路径": "path", "path": "path",
+    "回路": "cycle", "环": "cycle", "循环图": "cycle", "cycle": "cycle",
+}
+_REQUEST_ZN = r"Z\s*_?\s*(?:\{\s*([0-9]+)\s*\}|([0-9]+))"
+
+
+def _request_count(value):
+    if value.isascii() and value.isdecimal():
+        return int(value)
+    digits = {char: index for index, char in enumerate("零一二三四五六七八九")}
+    digits["两"] = 2
+    if "十" in value:
+        tens, units = value.split("十")
+        return digits.get(tens, 1) * 10 + digits.get(units, 0)
+    return digits[value]
+
+
+def _explicit_requirement_constraints(requirement):
+    """Recognize only complete, simple requests, never keywords in free text.
+
+    Full matches intentionally exclude edits, negations, comparisons and requests
+    for several structures. Unrecognized wording still receives normal model
+    schema/structure validation; it is not assigned an inferred constraint.
+    """
+    text = unicodedata.normalize("NFKC", requirement).strip()
+    text = text.replace("$", "").replace(r"\(", "").replace(r"\)", "")
+    text = re.sub(r"\s+", " ", text).strip(" .!。!！?？")
+    text = re.sub(r"^(?:(?:请(?:你)?(?:帮我)?|帮我)?(?:画出?|绘制|生成))\s*", "", text)
+    text = re.sub(r"^(?:一个|一幅|一张|一棵|一条)\s*", "", text)
+    text = re.sub(r"^(?:please\s+)?(?:draw|generate|create|plot|show)(?:\s+me)?\s+", "", text, flags=re.I)
+    text = re.sub(r"^(?:an?|the)\s+", "", text, flags=re.I)
+
+    # Standard K_n and K_{m,n}; prefixes must agree with the notation.
+    match = re.fullmatch(
+        r"(?:(完全图|完全二部图|完全二分图|complete graph|complete bipartite graph)\s*)?"
+        r"K\s*_?\s*(\{\s*[0-9]+\s*(?:,\s*[0-9]+\s*)?\}|[0-9]+\s*(?:,\s*[0-9]+)?)",
+        text, flags=re.I,
+    )
+    if match:
+        parts = tuple(int(part.strip()) for part in match[2].strip("{} ").split(","))
+        prefix = (match[1] or "").lower()
+        if len(parts) == 1 and prefix not in {"完全二部图", "完全二分图", "complete bipartite graph"}:
+            return {"kind": "graph", "family": "complete", "vertices": parts[0]}
+        if len(parts) == 2 and prefix not in {"完全图", "complete graph"}:
+            return {"kind": "graph", "family": "complete_bipartite", "vertices": sum(parts), "parts": parts}
+        return None
+
+    match = re.fullmatch(
+        rf"(?:有|具有|含有|含)?\s*({_REQUEST_COUNT})\s*个?\s*顶点\s*的?\s*(完全图|树|路径|回路|环|循环图)", text,
+    )
+    if match:
+        return {"kind": "graph", "family": _REQUEST_FAMILIES[match[2]], "vertices": _request_count(match[1])}
+    match = re.fullmatch(r"(complete graph|tree|path|cycle)\s+(?:on|with|having)\s+([0-9]+)\s+(?:vertices|nodes)", text, flags=re.I)
+    if match:
+        return {"kind": "graph", "family": _REQUEST_FAMILIES[match[1].lower()], "vertices": int(match[2])}
+    match = re.fullmatch(r"([0-9]+)[ -]+(?:vertex|node)\s+(complete graph|tree|path|cycle)", text, flags=re.I)
+    if match:
+        return {"kind": "graph", "family": _REQUEST_FAMILIES[match[2].lower()], "vertices": int(match[1])}
+
+    for kind, chinese, english, domain in (
+        ("cyclic_cayley", r"(?:Cayley\s*图|凯莱图)", r"cayley graph", r"(?:循环群|群)"),
+        ("cyclic_subgroup_lattice", "子群格", "subgroup lattice", r"(?:循环群|群)"),
+        ("ideal_lattice_zn", "理想格", "ideal lattice", r"(?:交换环|环)"),
+        ("zero_divisor_graph", "零因子图", r"zero[- ]divisor graph", r"(?:交换环|环)"),
+    ):
+        match = re.fullmatch(rf"(?:{domain}\s*)?{_REQUEST_ZN}\s*的?\s*{chinese}", text, flags=re.I)
+        if not match:
+            english_domain = r"(?:cyclic group|group)" if kind.startswith("cyclic_") else "ring"
+            match = re.fullmatch(rf"{english}\s+of\s+(?:the\s+)?(?:{english_domain}\s+)?{_REQUEST_ZN}", text, flags=re.I)
+        if match:
+            return {"kind": kind, "modulus": int(match[1] or match[2])}
+    return None
+
+
+def _validate_requirement_constraints(requirement, spec, document):
+    constraints = _explicit_requirement_constraints(requirement)
+    if constraints is None:
+        return
+
+    def mismatch():
+        raise MathDiagramError(
+            "math_diagram_requirement_mismatch",
+            "生成的数学图不符合请求中明确指定的结构或参数，请重试。", status=502,
+        )
+
+    if spec["kind"] != constraints["kind"]:
+        mismatch()
+    if "modulus" in constraints:
+        if spec.get("modulus") != constraints["modulus"]:
+            mismatch()
+        return
+    graph = document["graphs"][0]
+    if len(graph["vertices"]) != constraints["vertices"]:
+        mismatch()
+    try:
+        # Check the requested family against actual edges even if the model
+        # reports graph_family='general' or another, weaker family.
+        _validate_graph_family(constraints["family"], graph["directed"], graph["vertices"], graph["edges"])
+    except MathDiagramError:
+        mismatch()
+    if "parts" in constraints:
+        structure = nx.Graph()
+        structure.add_nodes_from(vertex["id"] for vertex in graph["vertices"])
+        structure.add_edges_from((edge["from"], edge["to"]) for edge in graph["edges"])
+        coloring = nx.algorithms.bipartite.color(structure)
+        left = sum(color == 0 for color in coloring.values())
+        if sorted((left, len(coloring) - left)) != sorted(constraints["parts"]):
+            mismatch()
+
+
 def generate_diagram(payload, *, completion=None):
     language = normalize_language(payload.get("language") if isinstance(payload, dict) else None)
     try:
@@ -472,6 +587,7 @@ def generate_diagram(payload, *, completion=None):
                 raise MathDiagramError("math_diagram_connection_failed", "数学图生成暂时不可用，请稍后重试。", status=502) from exc
             spec = _parse_model_result(response)
             document, kind = build_document(spec, language=language)
+            _validate_requirement_constraints(requirement, spec, document)
             return {"ok": True, "kind": kind, "title": document["graphs"][0]["name"], "document": document}
         finally:
             _ACTIVE.release()
