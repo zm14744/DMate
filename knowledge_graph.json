@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -190,7 +190,38 @@
       "prerequisites": [
         "逻辑等价"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "zjut_class2025",
+          "title": "范式的概念与演算",
+          "sections": [
+            "范式的概念与演算"
+          ],
+          "lessons": [
+            {
+              "title": "范式的概念与演算",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=6"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
+          "note": ""
+        },
+        {
+          "source_id": "zjut_class2025",
+          "title": "主范式的求法",
+          "sections": [
+            "主范式的求法"
+          ],
+          "lessons": [
+            {
+              "title": "主范式的求法",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=7"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "logic_reasoning",
@@ -413,21 +444,6 @@
           ],
           "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
           "note": ""
-        },
-        {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Introduction and Proofs",
-          "sections": [
-            "MIT 6.042J: Introduction and Proofs"
-          ],
-          "lessons": [
-            {
-              "title": "MIT 6.042J: Introduction and Proofs",
-              "url": "https://www.youtube.com/watch?v=L3LMbpZIKhQ"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
         }
       ]
     },
@@ -468,21 +484,6 @@
           ],
           "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
           "note": ""
-        },
-        {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Induction",
-          "sections": [
-            "MIT 6.042J: Induction"
-          ],
-          "lessons": [
-            {
-              "title": "MIT 6.042J: Induction",
-              "url": "https://www.youtube.com/watch?v=z8HKWUWS-lA"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
         }
       ]
     },
@@ -519,21 +520,6 @@
             {
               "title": "Strong Induction",
               "url": "https://www.youtube.com/watch?v=rfA0h9udl7E"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
-        },
-        {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Strong Induction",
-          "sections": [
-            "MIT 6.042J: Strong Induction"
-          ],
-          "lessons": [
-            {
-              "title": "MIT 6.042J: Strong Induction",
-              "url": "https://www.youtube.com/watch?v=NuGDkmwEObM"
             }
           ],
           "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
@@ -750,7 +736,23 @@
       "prerequisites": [
         "关系性质"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "zjut_class2025",
+          "title": "偏序关系",
+          "sections": [
+            "偏序关系"
+          ],
+          "lessons": [
+            {
+              "title": "偏序关系",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=28"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "relation_closure",
@@ -760,7 +762,23 @@
         "关系运算",
         "关系性质"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "zjut_class2025",
+          "title": "关系的闭包",
+          "sections": [
+            "关系的闭包"
+          ],
+          "lessons": [
+            {
+              "title": "关系的闭包",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=22"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "function_mapping",
@@ -983,21 +1001,6 @@
           ],
           "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
           "note": ""
-        },
-        {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Number Theory I",
-          "sections": [
-            "MIT 6.042J: Number Theory I"
-          ],
-          "lessons": [
-            {
-              "title": "MIT 6.042J: Number Theory I",
-              "url": "https://www.youtube.com/watch?v=NuY7szYSXSw"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
         }
       ]
     },
@@ -1111,23 +1114,7 @@
         "欧拉定理与费马小定理"
       ],
       "level": "拓展",
-      "videos": [
-        {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Number Theory II",
-          "sections": [
-            "MIT 6.042J: Number Theory II"
-          ],
-          "lessons": [
-            {
-              "title": "MIT 6.042J: Number Theory II",
-              "url": "https://www.youtube.com/watch?v=XX7ePR21Ook"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
-        }
-      ]
+      "videos": []
     },
     {
       "id": "count_basic",
@@ -1148,21 +1135,6 @@
             }
           ],
           "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
-        },
-        {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Counting Rules I",
-          "sections": [
-            "MIT 6.042J: Counting Rules I"
-          ],
-          "lessons": [
-            {
-              "title": "MIT 6.042J: Counting Rules I",
-              "url": "https://www.youtube.com/watch?v=pNt5Ll6hGqo"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
           "note": ""
         }
       ]
@@ -1273,6 +1245,21 @@
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
           "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "鸽巢原理（概念与例题）",
+          "sections": [
+            "鸽巢原理（概念与例题）"
+          ],
+          "lessons": [
+            {
+              "title": "鸽巢原理（概念与例题）",
+              "url": "https://www.youtube.com/watch?v=2-mxYrCNX60"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
+          "note": ""
         }
       ]
     },
@@ -1316,18 +1303,18 @@
           "note": ""
         },
         {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Counting Rules II",
+          "source_id": "trevtutor",
+          "title": "容斥原理（有具体例题）",
           "sections": [
-            "MIT 6.042J: Counting Rules II"
+            "容斥原理（有具体例题）"
           ],
           "lessons": [
             {
-              "title": "MIT 6.042J: Counting Rules II",
-              "url": "https://www.youtube.com/watch?v=09yIb3VHhMI"
+              "title": "容斥原理（有具体例题）",
+              "url": "https://www.youtube.com/watch?v=GS7dIWA6Hpo"
             }
           ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
         }
       ]
@@ -1354,6 +1341,36 @@
             }
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "生成函数：定义和练习",
+          "sections": [
+            "生成函数：定义和练习"
+          ],
+          "lessons": [
+            {
+              "title": "生成函数：定义和练习",
+              "url": "https://www.youtube.com/watch?v=-drdeNMoe8w"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
+          "note": ""
+        },
+        {
+          "source_id": "blue1brown",
+          "title": "Generating Functions · Olympiad Level Counting（动画推导）",
+          "sections": [
+            "Generating Functions · Olympiad Level Counting（动画推导）"
+          ],
+          "lessons": [
+            {
+              "title": "Generating Functions · Olympiad Level Counting（动画推导）",
+              "url": "https://www.youtube.com/watch?v=bOXCLR3Wric"
+            }
+          ],
+          "verification": "3Blue1Brown原创动画视频，内容与生成函数应用匹配",
           "note": ""
         }
       ]
@@ -1393,6 +1410,21 @@
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
           "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "递推关系的定义与建模",
+          "sections": [
+            "递推关系的定义与建模"
+          ],
+          "lessons": [
+            {
+              "title": "递推关系的定义与建模",
+              "url": "https://www.youtube.com/watch?v=eAaP4XaB8hM"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
+          "note": ""
         }
       ]
     },
@@ -1405,18 +1437,18 @@
       ],
       "videos": [
         {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Linear Recurrences",
+          "source_id": "trevtutor",
+          "title": "齐次线性递推关系求解",
           "sections": [
-            "MIT 6.042J: Linear Recurrences"
+            "齐次线性递推关系求解"
           ],
           "lessons": [
             {
-              "title": "MIT 6.042J: Linear Recurrences",
-              "url": "https://www.youtube.com/watch?v=TWBB-JlmYUc"
+              "title": "齐次线性递推关系求解",
+              "url": "https://www.youtube.com/watch?v=7mhvA5L7KqY"
             }
           ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
         }
       ]
@@ -1442,6 +1474,21 @@
             }
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "非齐次线性递推关系求解",
+          "sections": [
+            "非齐次线性递推关系求解"
+          ],
+          "lessons": [
+            {
+              "title": "非齐次线性递推关系求解",
+              "url": "https://www.youtube.com/watch?v=EfF_XSEX1Sk"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
         }
       ]
@@ -1546,6 +1593,21 @@
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
           "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "图同构与二部图",
+          "sections": [
+            "图同构与二部图"
+          ],
+          "lessons": [
+            {
+              "title": "图同构与二部图",
+              "url": "https://www.youtube.com/watch?v=W9nJRN3ajuk"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
+          "note": ""
         }
       ]
     },
@@ -1570,6 +1632,21 @@
             }
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        },
+        {
+          "source_id": "zjut_class2025",
+          "title": "图的矩阵表示",
+          "sections": [
+            "图的矩阵表示"
+          ],
+          "lessons": [
+            {
+              "title": "图的矩阵表示",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=48"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
           "note": ""
         }
       ]
@@ -1597,6 +1674,36 @@
             }
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        },
+        {
+          "source_id": "zjut_class2025",
+          "title": "图的矩阵表示",
+          "sections": [
+            "图的矩阵表示"
+          ],
+          "lessons": [
+            {
+              "title": "图的矩阵表示",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=48"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
+          "note": ""
+        },
+        {
+          "source_id": "zjut_class2025",
+          "title": "图的矩阵表示（续）",
+          "sections": [
+            "图的矩阵表示（续）"
+          ],
+          "lessons": [
+            {
+              "title": "图的矩阵表示（续）",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=49"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
           "note": ""
         }
       ]
@@ -1712,6 +1819,21 @@
           ],
           "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
           "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "欧拉通路与欧拉回路",
+          "sections": [
+            "欧拉通路与欧拉回路"
+          ],
+          "lessons": [
+            {
+              "title": "欧拉通路与欧拉回路",
+              "url": "https://www.youtube.com/watch?v=Ou345pSYDoE"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
+          "note": ""
         }
       ]
     },
@@ -1736,6 +1858,21 @@
             }
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "哈密顿回路",
+          "sections": [
+            "哈密顿回路"
+          ],
+          "lessons": [
+            {
+              "title": "哈密顿回路",
+              "url": "https://www.youtube.com/watch?v=t_6VByupc1U"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
         }
       ]
@@ -1790,18 +1927,18 @@
           ]
         },
         {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Graph Theory and Coloring",
+          "source_id": "trevtutor",
+          "title": "图着色与色多项式",
           "sections": [
-            "MIT 6.042J: Graph Theory and Coloring"
+            "图着色与色多项式"
           ],
           "lessons": [
             {
-              "title": "MIT 6.042J: Graph Theory and Coloring",
-              "url": "https://www.youtube.com/watch?v=h9wxtqoa1jY"
+              "title": "图着色与色多项式",
+              "url": "https://www.youtube.com/watch?v=J7g5HMZgKMU"
             }
           ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
         }
       ]
@@ -1833,6 +1970,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=98"
             }
           ]
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "平面图",
+          "sections": [
+            "平面图"
+          ],
+          "lessons": [
+            {
+              "title": "平面图",
+              "url": "https://www.youtube.com/watch?v=ETtXKpfBWNI"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
+          "note": ""
         }
       ]
     },
@@ -1859,6 +2011,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=76"
             }
           ]
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "图同构与二部图",
+          "sections": [
+            "图同构与二部图"
+          ],
+          "lessons": [
+            {
+              "title": "图同构与二部图",
+              "url": "https://www.youtube.com/watch?v=W9nJRN3ajuk"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
+          "note": ""
         }
       ]
     },
@@ -1925,21 +2092,6 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=95"
             }
           ]
-        },
-        {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Matching Problems",
-          "sections": [
-            "MIT 6.042J: Matching Problems"
-          ],
-          "lessons": [
-            {
-              "title": "MIT 6.042J: Matching Problems",
-              "url": "https://www.youtube.com/watch?v=5RSMLgy06Ew"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
         }
       ]
     },
@@ -1981,6 +2133,36 @@
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
           "note": ""
+        },
+        {
+          "source_id": "zjut_class2025",
+          "title": "树的概念",
+          "sections": [
+            "树的概念"
+          ],
+          "lessons": [
+            {
+              "title": "树的概念",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=53"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
+          "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "树的基本性质",
+          "sections": [
+            "树的基本性质"
+          ],
+          "lessons": [
+            {
+              "title": "树的基本性质",
+              "url": "https://www.youtube.com/watch?v=zEQZpTizgLo"
+            }
+          ],
+          "verification": "讲师本人公开课程目录对应的单集标题和URL",
+          "note": ""
         }
       ]
     },
@@ -2005,6 +2187,21 @@
             }
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        },
+        {
+          "source_id": "zjut_class2025",
+          "title": "根树和哈夫曼树",
+          "sections": [
+            "根树和哈夫曼树"
+          ],
+          "lessons": [
+            {
+              "title": "根树和哈夫曼树",
+              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=55"
+            }
+          ],
+          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
           "note": ""
         }
       ]
@@ -2058,21 +2255,6 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=91"
             }
           ]
-        },
-        {
-          "source_id": "mit_ocw",
-          "title": "MIT 6.042J: Minimum Spanning Trees",
-          "sections": [
-            "MIT 6.042J: Minimum Spanning Trees"
-          ],
-          "lessons": [
-            {
-              "title": "MIT 6.042J: Minimum Spanning Trees",
-              "url": "https://www.youtube.com/watch?v=GJpt_3ie4WU"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
         },
         {
           "source_id": "william_fiset",
@@ -2302,13 +2484,6 @@
       "note": "讲师本人讲解并逐步推导；仅使用独立视频链接。"
     },
     {
-      "id": "mit_ocw",
-      "name": "麻省理工学院 · MIT OpenCourseWare",
-      "course": "6.042J Mathematics for Computer Science",
-      "platform": "YouTube",
-      "note": "MIT公开课正式课堂录像；非纯PPT配音，但2010年拍摄，清晰度因片源而异。"
-    },
-    {
       "id": "socratica_bilibili",
       "name": "Socratica · 数学动画团队",
       "course": "Abstract Algebra（动画解释）",
@@ -2363,12 +2538,33 @@
       "course": "Discrete Math I & II（本人原创授课）",
       "platform": "YouTube",
       "note": "采用分步骤讲解与练习，附课件但不是单纯朗读PPT；明确讲师与章节。"
+    },
+    {
+      "id": "trevtutor",
+      "name": "TrevTutor · Trevor（离散数学讲师）",
+      "course": "Discrete Mathematics II",
+      "platform": "YouTube",
+      "note": "原讲师网站逐项提供本课程单集，含讲解、例题和演算过程。"
+    },
+    {
+      "id": "zjut_class2025",
+      "name": "浙江工业大学 · 小花醉猫（教师）",
+      "course": "2025离散数学课堂实录",
+      "platform": "哔哩哔哩",
+      "note": "教师本人发布的课堂实录，避免目录标注无声或音效不佳的原视频分段。"
+    },
+    {
+      "id": "blue1brown",
+      "name": "3Blue1Brown · Grant Sanderson",
+      "course": "Olympiad Level Counting / Generating Functions",
+      "platform": "YouTube",
+      "note": "制作团队明确，数学动画与推导示例；视频为独立专题。"
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": 0,
+    "primary_per_node": "quality_before_completeness",
     "link_type": "curated_direct_video_only",
     "quality_priority": "有明确讲师/学校/制作机构，采用板书推导、课堂互动、动画演示或算法可视化，排除匿名混剪和无法评估的PPT朗读资源",
-    "note": "以质量优先，不强行给每个知识点凑齐B站和YouTube。链接必须直达指定选集或YouTube单集；对出处、清晰度或讲法无把握的先不展示。是否高清、是否纯PPT朗读需在可播放环境中抽样实测，未实测不得宣称验证完毕。"
+    "note": "优先真实授课者/原作者的板书推导、动态演示和例题，剔除匿名/无可靠出处资源、原视频明确标记音质差的选集与部分低清老课堂录像；不为凑齐B站和YouTube而添加内容。链接直达实际章节，不使用课程目录。视频画质和内容未经过全部逐帧实测，不作高清保证。"
   }
 }
