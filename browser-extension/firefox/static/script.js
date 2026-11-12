@@ -17550,6 +17550,7 @@ function normalizeKnowledgeGraphData(data) {
             .map(source => ({
                 id: typeof source.id === "string" ? source.id.trim() : "",
                 name: typeof source.name === "string" ? source.name.trim() : "",
+                publisher: typeof source.publisher === "string" ? source.publisher : "",
                 course: typeof source.course === "string" ? source.course.trim() : "",
                 platform: typeof source.platform === "string" ? source.platform.trim() : "",
                 url: typeof source.url === "string" ? source.url.trim() : "",
@@ -21110,17 +21111,12 @@ function renderKnowledgeGraphDetail() {
         section.appendChild(heading);
 
         const platforms = new Map([["Bilibili", []], ["YouTube", []]]);
-        const schoolForVideo = video => {
+        const publisherForVideo = video => {
             const source = (knowledgeGraphData.videoSources || []).find(
                 item => item.id === video.sourceId
             );
-            if (!source || !source.name) {
-                return "";
-            }
-            if (source.id === "ucla_enumerative_matrix_tree") {
-                return "加州大学洛杉矶分校";
-            }
-            return String(source.name).trim();
+            // Use the original platform uploader only, never an inferred affiliation.
+            return source ? String(source.publisher || "") : "";
         };
         const shortDescription = text => {
             const caption = document.createElement("small");
@@ -21146,15 +21142,16 @@ function renderKnowledgeGraphDetail() {
             titleLink.addEventListener("mouseleave", () => { titleLink.style.textDecoration = "none"; });
             info.appendChild(titleLink);
 
-            // 机构或讲师是独立的来源信息，不得拼接进视频标题。
-            const source = shortDescription(item.school);
-            source.style.opacity = "0.7";
-            info.appendChild(source);
+            // The exact uploader name is optional when it cannot be verified.
+            if (item.publisher) {
+                const source = shortDescription(item.publisher);
+                source.style.opacity = "0.7";
+                info.appendChild(source);
+            }
             row.appendChild(info);
         };
         for (const video of videos) {
-            const school = schoolForVideo(video);
-            if (!school) continue;
+            const publisher = publisherForVideo(video);
             for (const lesson of (video.lessons || [])) {
                 const url = String(lesson.url || "");
                 const platform = /^https:\/\/www\.bilibili\.com\/video\/BV[A-Za-z0-9]+\/\?p=[1-9]\d*$/.test(url)
@@ -21164,7 +21161,7 @@ function renderKnowledgeGraphDetail() {
                 if (platform && !platforms.get(platform).some(item => item.url === url)) {
                     platforms.get(platform).push({
                         title: String(lesson.title || ""),
-                        school,
+                        publisher,
                         url
                     });
                 }
@@ -21199,7 +21196,7 @@ function renderKnowledgeGraphDetail() {
                 unavailable.textContent = platform;
                 unavailable.style.cssText = "color:var(--text-secondary,#a3a3a3);";
                 row.appendChild(unavailable);
-                row.appendChild(shortDescription("暂无核对过的对应单集"));
+
             }
             entries.appendChild(row);
 
