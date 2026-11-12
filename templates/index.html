@@ -9027,6 +9027,14 @@ window.DMATE_CLIENT_CONFIG = {{ {
                 <button id="learningReviewBtn" type="button"><svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 16v5" /><path d="M16 14.639V21" /><path d="M20 10.656V21" /><path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15" /><path d="M4 18.463V21" /><path d="M8 14.656V21" /></svg><span class="dmate-ui-label">学习回顾</span></button>
             </div>
         </div>
+        <div class="learning-actions learning-actions-single offline-entry-action">
+            <button id="offlineWorkspaceBtn" type="button" aria-label="打开离线学习工作区" title="离线版">
+                <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/>
+                </svg>
+                <span class="dmate-ui-label">离线版</span>
+            </button>
+        </div>
 
     </div>
 </div>
@@ -9670,6 +9678,7 @@ window.DMATE_CLIENT_CONFIG = {{ {
 <script defer src="/static/ui-tooltip.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/mobile-select.js?v={{ dmate_web_revision }}"></script>
 <script defer src="/static/web-sync.js?v={{ dmate_web_revision }}"></script>
+<script defer src="/static/offline-entry.js?v={{ dmate_web_revision }}"></script>
 {% if is_dmate_android_app or is_dmate_desktop_app %}
 <script defer src="/static/client-update.js?v={{ dmate_web_revision }}"></script>
 {% endif %}
