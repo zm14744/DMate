@@ -17602,7 +17602,10 @@ function normalizeKnowledgeGraphData(data) {
                                             ? lesson.url.trim()
                                             : ""
                                     }))
-                                    .filter(lesson => lesson.title && /^https:\/\/www\.bilibili\.com\/video\/BV[a-zA-Z0-9]+\/\?p=\d+$/.test(lesson.url))
+                                    .filter(lesson => lesson.title && (
+                                        /^https:\/\/www\.bilibili\.com\/video\/BV[a-zA-Z0-9]+\/\?p=\d+$/.test(lesson.url)
+                                        || /^https:\/\/vimeo\.com\/\d+$/.test(lesson.url)
+                                    ))
                                 : [],
                             verification: typeof video.verification === "string"
                                 ? video.verification.trim()
