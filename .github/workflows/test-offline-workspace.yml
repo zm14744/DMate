@@ -1,0 +1,72 @@
+name: Test offline workspace
+
+on:
+  push:
+    paths:
+      - 'app.py'
+      - 'templates/index.html'
+      - 'static/offline*'
+      - 'static/offline-content/**'
+      - '.github/workflows/test-offline-workspace.yml'
+  pull_request:
+    paths:
+      - 'app.py'
+      - 'templates/index.html'
+      - 'static/offline*'
+      - 'static/offline-content/**'
+      - '.github/workflows/test-offline-workspace.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Python syntax
+        run: python -m py_compile app.py
+      - name: Validate offline JavaScript syntax
+        run: |
+          node --check static/offline.js
+          node --check static/offline-entry.js
+          node --check static/offline-service-worker.js
+      - name: Validate JSON content packs
+        run: |
+          python -m json.tool static/offline-content/concepts.zh-CN.json > /dev/null
+          python -m json.tool static/offline-content/questions.zh-CN.json > /dev/null
+          python -m json.tool static/offline-content/knowledge_graph.json > /dev/null
+      - name: Validate content references
+        run: |
+          python - <<'PY'
+          import json
+          concepts = json.load(open("static/offline-content/concepts.zh-CN.json", encoding="utf-8"))
+          questions = json.load(open("static/offline-content/questions.zh-CN.json", encoding="utf-8"))
+          graph = json.load(open("static/offline-content/knowledge_graph.json", encoding="utf-8"))
+          graph_ids = {node["id"] for node in graph["nodes"]}
+          concept_ids = {item["id"] for item in concepts["concepts"]}
+          assert len(concept_ids) == len(concepts["concepts"])
+          assert all(item["id"] in graph_ids for item in concepts["concepts"])
+          assert all(ref in concept_ids for question in questions["questions"] for ref in question["knowledge_points"])
+          assert all(len(item["title"]) and len(item["definition"]) for item in concepts["concepts"])
+          assert all(len(item["statement"]) and len(item.get("explanation", "")) for item in questions["questions"])
+          print(f'{len(concepts["concepts"])} concepts; {len(questions["questions"])} questions; references valid')
+          PY
+      - name: Verify service worker precache files exist
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          worker = Path("static/offline-service-worker.js").read_text(encoding="utf-8")
+          paths = re.findall(r'"(/(?:offline|static/[^"]+))"', worker)
+          missing = [p for p in paths if p != "/offline" and not Path(p.lstrip("/")).exists()]
+          assert not missing, f"Missing precache assets: {missing}"
+          print(f"{len(paths)} precache entries checked")
+          PY
