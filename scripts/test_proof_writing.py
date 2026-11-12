@@ -41,7 +41,7 @@ class ProofWritingPolicyTests(unittest.TestCase):
 
     def test_bilingual_method_coverage_has_same_ids_and_source_evidence(self):
         ids = [row[0] for row in PROOF_DOMAINS]
-        self.assertGreaterEqual(len(ids), 35)
+        self.assertGreaterEqual(len(ids), 28)
         self.assertEqual(len(ids), len(set(ids)))
         self.assertGreaterEqual(len(PROOF_SOURCES), 8)
         for key, zh_title, en_title, zh_rule, en_rule, sources in PROOF_DOMAINS:
@@ -53,7 +53,7 @@ class ProofWritingPolicyTests(unittest.TestCase):
                 self.assertIn(zh_title, proof_coverage_prompt("zh-CN"))
                 self.assertIn(en_title, proof_coverage_prompt("en"))
         method_ids = [row[0] for row in PROOF_METHODS]
-        self.assertGreaterEqual(len(method_ids), 20)
+        self.assertGreaterEqual(len(method_ids), 23)
         self.assertEqual(len(method_ids), len(set(method_ids)))
         for key, zh, en, caution_zh, caution_en in PROOF_METHODS:
             with self.subTest(method=key):
@@ -68,6 +68,36 @@ class ProofWritingPolicyTests(unittest.TestCase):
         for source in PROOF_SOURCES.values():
             self.assertTrue(source["url"].startswith("https://"))
             self.assertTrue(source["name"] and source["role"])
+
+    def test_scope_is_discrete_mathematics_only(self):
+        domain_ids = {row[0] for row in PROOF_DOMAINS}
+        required = {
+            "logic_scope", "logical_implications", "set_theory", "relations_functions",
+            "induction_family", "structural_induction", "number_theory", "congruences",
+            "combinatorial_structures", "inclusion_exclusion", "graph_theory",
+            "graph_planarity", "trees", "graph_algorithms", "posets_lattices",
+            "algebra", "boolean_algebra", "automata", "formal_languages",
+            "invariants", "termination", "recursion", "asymptotic"
+        }
+        self.assertTrue(required.issubset(domain_ids))
+        forbidden_domains = {
+            "real_completeness", "sequences_series", "epsilon_delta", "continuity",
+            "differentiation", "integration", "metric_topology", "linear_algebra",
+            "matrices_eigen", "geometry", "optimization", "ode",
+            "multivariable_calculus", "complex_analysis", "convexity_optimization"
+        }
+        self.assertTrue(domain_ids.isdisjoint(forbidden_domains))
+        method_ids = {row[0] for row in PROOF_METHODS}
+        self.assertTrue({"truth_table", "counterexample", "exhaustive"}.issubset(method_ids))
+        self.assertTrue(method_ids.isdisjoint({"epsilon_delta", "sequential", "open_cover"}))
+        prompt_zh = proof_coverage_prompt("zh-CN")
+        prompt_en = proof_coverage_prompt("en")
+        for forbidden in ("ε-δ 证明", "开覆盖证明", "实分析", "微分方程"):
+            self.assertNotIn(forbidden, prompt_zh)
+        for forbidden in ("epsilon-delta", "open-cover proof", "real analysis", "differential equations"):
+            self.assertNotIn(forbidden, prompt_en)
+        for source in ("mit_real_analysis", "mit_linear_algebra", "mit_metric", "mit_optimization"):
+            self.assertNotIn(source, PROOF_SOURCES)
 
     def test_full_chinese_and_english_prompts_share_all_domains(self):
         chinese = proof_writing_prompt("zh-CN")

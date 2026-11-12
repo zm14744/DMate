@@ -1,182 +1,121 @@
-# DMate 数学证明表达规范
+# DMate 离散数学证明表达规范
 
-版本：1.0
+版本：3.0（仅限离散数学及其紧密相关的算法内容）
 
-## 目标与适用范围
+## 目标与边界
 
-本规范统一 DMate 在聊天解题、完整解析、概念笔记分析、证明提示和学生证明批改中的数学证明表达。它统一逻辑责任、术语和书写质量，不规定所有证明必须采用同一种句式，也不覆盖课程教材或教师明确指定的记号约定。
+本规范服务于 DMate 的离散数学学习、解题、证明提示、完整解析、题库答案、概念笔记和证明批改。它不把 DMate 扩展成通用高等数学平台。
 
-**核心标准：每个非平凡结论都必须有可追溯的依据；每个量词、变量和逻辑方向都必须明确；最终证明应当是完整、清晰、可独立检查的数学论证。**
+**覆盖范围：** 数理逻辑、集合、关系与函数、数论、组合数学、数学归纳与递归、图论与树、偏序与格、群环等离散代数结构、布尔代数、自动机与形式语言、离散概率、算法正确性与复杂度。
 
-## 统一要求
+**不作为 DMate 专门证明模块的领域：** 实分析、ε-δ 极限、连续性与微积分、一般拓扑、线性代数课程、微分方程、复分析和连续优化。通用逻辑原则当然仍适用于任何数学论证，但不为这些学科建立专门教学清单。
 
-1. **命题准确**：保留原题的定义域、假设、量词和结论，不把蕴含偷换成等价。
-2. **变量明确**：首次出现时说明变量的范围、作用和引入依据。
-3. **量词准确**：全称命题用“任取/对于任意”；存在命题给出见证或构造并验证。
-4. **方法匹配**：根据命题逻辑结构选择直接证明、逆否证明、反证、分类讨论、双向证明、集合包含证明、存在唯一性证明或归纳法。
-5. **推理可追溯**：每个关键步骤标明来自题设、定义、已证结论、定理或有效变形。
-6. **自然语言组织**：证明正文使用完整句子，公式嵌入论证；除形式化逻辑题外，不把证明写成符号联结词的堆叠。
-7. **术语与符号稳定**：同一对象保持同一名称和符号；优先服从课程教材约定；存在歧义的定义域约定必须说明。
-8. **结论闭合**：最后明确回到原待证命题；若命题为假，给出核验过的反例。
-9. **简洁而不跳步**：可以省略常规运算，但不能省略关键逻辑转换、定义使用、量词变化或情形覆盖。
-10. **批改先诊断**：指出最早的实质性错误，区分逻辑错误、缺少依据、量词错误、情形遗漏、术语问题和纯表达问题；认可有效的不同证明方法。
+## 一、统一证明语言
 
-## 证明方法的最低检查项
+1. **命题不变：** 保留原题定义域、条件、量词和结论；不把蕴含偷换成等价。
+2. **变量有界：** 新变量首次出现时说明取值范围、来源和用途。
+3. **量词准确：** 全称命题使用“任取”；存在命题给出见证、构造或有效存在性论证。
+4. **推理有据：** 关键结论必须来自题设、定义、已证命题、定理或合法变形。
+5. **自然语言组织：** 用完整中文句子串联公式；除形式逻辑题外，不把证明写成逻辑符号堆叠。
+6. **术语稳定：** 服从用户教材和教师约定；严格区分必要/充分、逆命题/逆否命题、反对称/非对称、单射/满射、同态/同构。
+7. **简洁不跳步：** 可以省略常规运算，但不能省略量词变化、关键定义、逻辑方向或情形覆盖。
+8. **结论闭合：** 明确回扣原命题；不能证明时说明条件不足、论证未完成或给出反例。
+9. **公平批改：** 找到最早的实质性错误；认可有效的不同证明方法，不把表达风格差异误判为数学错误。
 
-| 证明类型 | 必须核对的内容 |
-| --- | --- |
-| 直接证明 | 从题设出发，推出待证结论 |
-| 逆否证明 | 明确写出逆否命题，不得误用逆命题 |
-| 反证法 | 在原假设下否定准确的待证结论，并导出矛盾 |
-| 当且仅当 | 两个方向都得到证明 |
-| 集合包含/相等 | 任取元素证明包含；相等须覆盖两个方向 |
-| 存在性 | 给出并验证一个满足条件的对象 |
-| 唯一性 | 任取两个满足条件的对象，证明二者相等 |
-| 分类讨论 | 情形覆盖全部可能性，每种情形均完成论证 |
-| 数学归纳法 | 起点覆盖正确、归纳假设范围明确、归纳步骤不循环 |
-| 反例 | 对象满足定义域条件且确实使结论失败 |
+## 二、离散数学领域覆盖
 
-## 统一用语
+以下规则均由同一数据源提供中文和英文版本，领域 ID 保持一致。
 
-| 含义 | 默认表达 |
-| --- | --- |
-| Universal | 任取、对于任意 |
-| Existential | 存在、存在一个 |
-| Hypothesis | 已知、假设、由题设 |
-| Definition | 根据……的定义 |
-| Implication | 若……则…… |
-| Biconditional | 当且仅当 |
-| Contrapositive | 逆否命题 |
-| Contradiction | 反证法、导出矛盾 |
-| Induction hypothesis | 归纳假设 |
-| Inductive step | 归纳步骤 |
-
-“显然”“易知”“同理”“由题意”等表达不能替代关键论证。“必要性”和“充分性”必须对应正确的逻辑方向。“逆命题”和“逆否命题”必须严格区分。
-
-## 教学模式
-
-- **提示引导**：指出命题结构和下一步，不提前泄露完整证明。
-- **完整解析**：提供完整、可独立检查的证明；必要时先用简短文字说明证明路线。
-- **答案诊断**：先定位学生证明的最早错误，再解释原因和修正方向；未经请求不直接覆盖学生原有思路。
-- **概念笔记**：涉及定理证明时，保留定义条件、证明依据和结论边界。
-
-## 依据与参考
-
-本规范综合参考以下数学教学与写作材料：
-
-- Stanford University, CS103, [Proofwriting Checklist](https://web.stanford.edu/class/cs103/proofwriting_checklist)：明确假设与目标、变量作用域、完整句子、避免符号化证明正文及避免“contradiction sandwich”。
-- Massachusetts Institute of Technology, 6.042J, *Mathematics for Computer Science*, [Course Notes](https://s3.amazonaws.com/if-else-assets/MIT6_042JS10_notes.pdf)：逻辑推理依据、标准证明方法、证明路线、线性论证、适度使用符号及证明清晰度。
-- American Mathematical Society, *Language, Logic, and Proof*, [Chapter 1 and Appendix: Writing Mathematics](https://www.ams.org/bookstore/pspdf/amstext-26-prev.pdf)：数学语言精确性、变量定义、完整句子、正确术语以及引用定义和定理。
-- Richard Hammack, *Book of Proof*, [Third Edition](https://richardhammack.github.io/BookOfProof/)：直接证明、逆否证明、反证、双向证明、集合证明、反例、归纳法、关系与函数证明。
-
-这些材料提供的是通行的证明写作原则，而不是一套必须逐字照搬的统一模板。DMate 的默认表达以中文本科离散数学教学为基准，并尊重用户课程中的明确约定。
-
-## 版本 2：中英文等覆盖与来源核查（2026-11）
-
-**语言平等原则。** 中英文以同一个 `proof_writing_extended.py` 规则表为事实来源，每条规则均有唯一 ID、中英文自然表达及参考资料 ID。中文和英文只在句式、教学语言、术语习惯上不同，不能在定义域、量词、逻辑条件、证明步骤或批改尺度上降低任一语言的要求。英文并非机械翻译中文；依英语数学写作规范采用 *Let ... be arbitrary*, *There exists*, *By definition*, *For the converse direction* 等自然句式。
-
-### 分领域证明覆盖矩阵
-
-| 规则 ID | 中文覆盖内容 | 英文对应 |
+| 领域 ID | 中文覆盖内容 | 主要检查点 |
 | --- | --- | --- |
-| `logic_scope` | 逻辑形式与量词 | Logical form and quantifiers |
-| `logical_implications` | 蕴含、等价与证明方向 | Implication, equivalence and proof direction |
-| `induction_family` | 归纳、强归纳与最小反例 | Induction, strong induction and minimal counterexample |
-| `structural_induction` | 结构归纳与递归对象 | Structural induction and recursively defined objects |
-| `invariants` | 不变量与算法正确性 | Invariants and algorithm correctness |
-| `termination` | 终止性与总正确性 | Termination and total correctness |
-| `recursion` | 递归与递推证明 | Recursive algorithms and recurrences |
-| `bijection` | 双射与组合计数 | Bijections and combinatorial counting |
-| `double_counting` | 双重计数与恒等式 | Double counting and identities |
-| `pigeonhole` | 抽屉原理与极值 | Pigeonhole principle and extremal arguments |
-| `inclusion_exclusion` | 容斥与分类计数 | Inclusion–exclusion and case counting |
-| `graph_theory` | 图论性质与同构 | Graph properties and isomorphism |
-| `graph_planarity` | 平面性与图嵌入 | Planarity and graph embeddings |
-| `relations_functions` | 关系、映射与商结构 | Relations, functions and quotient structures |
-| `algebra` | 群、环与同态 | Groups, rings and homomorphisms |
-| `automata` | 自动机与状态转移 | Automata and state transitions |
-| `probability` | 概率计数与存在性 | Probability and existential arguments |
-| `asymptotic` | 渐近界与复杂度 | Asymptotic bounds and complexity |
+| `logic_scope` | 逻辑形式与量词 | 命题、谓词、自由/约束变元、量词顺序与否定 |
+| `logical_implications` | 蕴含、等价与证明方向 | 逆命题、逆否命题、充分必要条件 |
+| `set_theory` | 集合论与集合运算 | 属于、包含、相等、幂集、笛卡尔积、基数 |
+| `relations_functions` | 关系、函数与商结构 | 等价关系、偏序、单射、满射、双射、良定义 |
+| `number_theory` | 数论与整除性 | 整除、素数、最大公因数、欧几里得算法 |
+| `congruences` | 同余与中国剩余定理 | 模运算、约分条件、CRT 适用条件 |
+| `induction_family` | 归纳、强归纳与最小反例 | 起点、归纳假设范围、归纳步骤 |
+| `structural_induction` | 结构归纳与递归对象 | 每种基本构造和递归构造 |
+| `recursion` | 递归与递推证明 | 初始条件、递推关系、递归规模 |
+| `combinatorial_structures` | 组合结构与计数恒等式 | 排列、组合、二项式系数、构造与计数 |
+| `bijection` | 双射与组合计数 | 映射、逆映射、单射与满射 |
+| `double_counting` | 双重计数 | 同一对象集合、重数一致 |
+| `pigeonhole` | 抽屉原理与极值 | 对象/抽屉对应、数量界 |
+| `inclusion_exclusion` | 容斥与分类计数 | 交集、符号、互斥与覆盖 |
+| `graph_theory` | 图论性质与同构 | 度、路径、连通、回路、同构 |
+| `graph_planarity` | 平面性与图嵌入 | 欧拉公式前提、禁用结构 |
+| `trees` | 树与森林 | 连通、无环、生成树、根树 |
+| `graph_algorithms` | 图算法与算法正确性 | BFS、DFS、最短路、生成树、匹配、流 |
+| `posets_lattices` | 偏序集与格 | 自反、反对称、传递、覆盖关系、上/下确界 |
+| `algebra` | 群、环与同态 | 公理、子群、陪集、同态、同构、理想 |
+| `boolean_algebra` | 布尔代数与逻辑化简 | 布尔公理、德摩根律、对偶原理 |
+| `automata` | 自动机与状态转移 | 初态、终态、转移规则、可达性 |
+| `formal_languages` | 形式语言与文法 | 字母表、语言、文法、正则表达式、自动机等价 |
+| `invariants` | 不变量与算法正确性 | 初始化、保持、退出条件 |
+| `termination` | 终止性与总正确性 | 良基度量、部分正确性与终止性 |
+| `probability` | 离散概率与存在性 | 样本空间、独立性、期望、概率方法 |
+| `asymptotic` | 渐近界与算法复杂度 | O、Ω、Θ 的常数与阈值 |
+| `cardinality` | 有限集、可数性与基数 | 枚举、注入、双射、不可数性 |
 
-矩阵侧重**本科离散数学及相关算法证明**，并不声称已覆盖全部数学研究领域、任意公理体系或所有高等数学证明习惯。
+## 三、证明方法覆盖
 
-### 中英文术语对应的语义约束
+领域与方法分开管理。同一种证明方法可以用于多个领域，一个领域也可以采用多种方法。
 
-| 中文 | 标准英语 | 关键区别 |
+| 方法 ID | 中文名称 | English |
 | --- | --- | --- |
-| 任取／对于任意 | Let ... be arbitrary / For every ... | 证明全称命题，不是只举一个例子 |
-| 存在／存在一个 | There exists / There is some ... | 必须给出见证或存在性论证 |
-| 若 P，则 Q | If P, then Q | 方向为 P⇒Q |
-| P 仅当 Q | P only if Q | 方向仍为 P⇒Q；`P if Q` 表示 Q⇒P |
-| 当且仅当 | If and only if | 必须证明两个方向 |
-| 逆否证明 | Proof by contrapositive | 不能和逆命题混淆 |
-| 反证法 | Proof by contradiction | 否定真正待证结论 |
-| 不妨设 | Without loss of generality | 必须有对称性或等价理由 |
-| 归纳假设／归纳步骤 | Induction hypothesis / Inductive step | 明确有效下标 |
-| 循环不变量 | Loop invariant | 初始化、保持、退出时的作用 |
-| 双射 | Bijection | 要证明单射和满射 |
-| 同态／同构 | Homomorphism / Isomorphism | 同构除运算保持还需双射 |
+| `direct` | 直接证明 | Direct proof |
+| `contrapositive` | 逆否证明 | Proof by contrapositive |
+| `contradiction` | 反证法 | Proof by contradiction |
+| `cases` | 分类讨论 | Proof by cases |
+| `construction` | 构造性证明 | Constructive proof |
+| `existence` | 非构造存在性 | Nonconstructive existence |
+| `uniqueness` | 唯一性证明 | Uniqueness proof |
+| `weak_induction` | 普通归纳法 | Weak induction |
+| `strong_induction` | 强归纳法 | Strong induction |
+| `structural_induction` | 结构归纳法 | Structural induction |
+| `minimal_counterexample` | 最小反例法 | Minimal-counterexample method |
+| `infinite_descent` | 无穷递降法 | Infinite descent |
+| `bijection` | 双射证明 | Bijective proof |
+| `double_counting` | 双重计数 | Double counting |
+| `pigeonhole` | 抽屉原理 | Pigeonhole argument |
+| `extremal` | 极值原理 | Extremal argument |
+| `invariant` | 不变量证明 | Invariant proof |
+| `probabilistic` | 概率方法 | Probabilistic method |
+| `algebraic` | 代数恒等变形 | Algebraic identity proof |
+| `equivalence_chain` | 等价链证明 | Equivalence-chain proof |
+| `truth_table` | 真值表验证 | Truth-table verification |
+| `counterexample` | 反例否证 | Disproof by counterexample |
+| `exhaustive` | 有限穷举证明 | Proof by exhaustive enumeration |
 
-“反对称”应对应 *antisymmetric*，“非对称”对应 *asymmetric*；出现这类易混术语时，应核对定义而非根据文字相似性判断。中文和英文均须尊重题目、课程或教师明确规定的记号和定义域。
+## 四、中英文统一原则
 
-### 来源的权威性与适用边界
+中文和英文使用同一组领域 ID、证明方法 ID、逻辑要求与错误分类。英文采用自然数学英语，而非逐字翻译中文。
 
-| 参考来源 | 角色与可核验范围 |
-| --- | --- |
-| [Stanford CS103 Proofwriting Checklist](https://web.stanford.edu/class/cs103/proofwriting_checklist) | 官方课程的证明书写指导，尤其是变量作用域、假设与目标、句子与逻辑负担 |
-| [CMU 15-251 Proof Guidelines](https://www.cs.cmu.edu/~arielpro/15251f17/docs/proof-checklist.pdf) | 官方课程的数学证明写作与论证流程指导 |
-| [MIT 6.1200J (2024) Reading List](https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/pages/readings/) | 官方较新课程对证明、归纳、状态机、算法等主题的覆盖依据 |
-| [MIT 6.042J (2015) Readings](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/pages/readings/) | 官方教材章节对图论、数论、计数、概率等证明领域的覆盖依据 |
-| [Hammack, Book of Proof](https://richardhammack.github.io/BookOfProof/) | 经美国数学研究所开放教材项目认可，覆盖标准证明方法、集合/关系/函数及归纳 |
-| [AMS: Language, Logic, and Proof](https://www.ams.org/bookstore/pspdf/amstext-26-prev.pdf) | 专业数学出版机构教材，特别适合数学语言、符号与写作准确性 |
-| [高等教育出版社《离散数学》第3版](https://www.hep.com.cn/book/show/2d67dc4c-217a-41db-81b2-56bfe7428879) | 中文课程范围、术语及教材体系参考；目前核对的是出版社公开目录与介绍，不声称已逐页审阅全书 |
-| [配套《离散数学学习指导与习题解析》第3版](https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=66ca132674ce561611bda659) | 中文大学习题类型与解答覆盖的公开目录参考；不直接重印习题和解析 |
+| 中文 | 英文 | 逻辑含义 |
+| --- | --- | --- |
+| 任取 | Let ... be arbitrary | 全称命题的任意对象 |
+| 存在 | There exists | 必须有见证或存在性论证 |
+| 若 P，则 Q | If P, then Q | P⇒Q |
+| P 仅当 Q | P only if Q | P⇒Q；P if Q 则为 Q⇒P |
+| 当且仅当 | If and only if | 两个方向 |
+| 逆否证明 | Proof by contrapositive | 不能混同逆命题 |
+| 反证法 | Proof by contradiction | 否定准确的待证结论 |
+| 不妨设 | Without loss of generality | 必须有对称或等价依据 |
+| 反对称 | Antisymmetric | 不等于 asymmetric |
+| 同态／同构 | Homomorphism / Isomorphism | 同构还要求双射 |
 
-这里的“权威”指来源机构及材料本身可靠，并非这些机构对 DMate 的实际模型回答、评分或产品功能做了认证。**来源丰富不等于 AI 证明必定正确**。现有单元测试核验的是两种语言的规则覆盖、来源 ID 完整性和代码接入；数学正确性还需要双语真实题目的独立检验，尤其应检查错误证明的识别能力。
+## 五、权威来源与边界
 
-本规范综合归纳公开的证明教学原则，未将课本的受版权保护长段落、习题及解析复制进 DMate，亦不因链接权威资料就宣称获得其商业再分发许可。英文详细版本见 [Proof Writing Standard (English)](PROOF_WRITING_STANDARD.en.md)。
+- [MIT 6.1200J Mathematics for Computer Science (2024)](https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/pages/readings/)：离散数学、证明、归纳、算法不变量与状态机。
+- [MIT 6.042J Mathematics for Computer Science (2015)](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/pages/readings/)：逻辑、集合、数论、计数、图论、概率。
+- [Hammack, Book of Proof](https://richardhammack.github.io/BookOfProof/)：证明方法、集合、关系、函数、归纳与基数。
+- [Stanford CS103 Proofwriting Checklist](https://web.stanford.edu/class/cs103/proofwriting_checklist)：变量作用域、假设/目标、自然语言证明写作。
+- [CMU 15-251 Proof Guidelines](https://www.cs.cmu.edu/~arielpro/15251f17/docs/proof-checklist.pdf)：论证结构与证明表达。
+- [AMS, Language, Logic, and Proof](https://www.ams.org/bookstore/pspdf/amstext-26-prev.pdf)：数学语言、符号和写作准确性。
+- [高等教育出版社《离散数学》第3版](https://www.hep.com.cn/book/show/2d67dc4c-217a-41db-81b2-56bfe7428879)：中文本科课程术语和范围参考；目前依据公开出版社目录，不声称逐页审阅全书。
+- [高等教育出版社《离散数学学习指导与习题解析》第3版](https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=66ca132674ce561611bda659)：中文习题范围参考，不复制其受版权保护的习题和解析。
+- [MIT 18.781 Theory of Numbers](https://ocw.mit.edu/courses/18-781-theory-of-numbers-spring-2012/pages/lecture-notes/) 与 [MIT 18.703 Modern Algebra](https://ocw.mit.edu/courses/18-703-modern-algebra-spring-2013/pages/lecture-notes/)：仅用于离散数学中数论、群环等专题的补充。
 
+这些来源是规范依据，不代表来源机构认证 DMate，也不代表 AI 生成证明已经通过数学验证。当前 CI 检查的是规则覆盖和代码接入；模型数学正确性还需通过中英文同题测试。
 
-### 扩展学科覆盖（版本 2.1）
-
-在原有离散数学及算法证明领域之外，统一规则表现已增加下列领域。每一项均有独立规则 ID，并同时提供中文和英文要求：
-
-| 规则 ID | 领域 |
-| --- | --- |
-| `number_theory` | 数论与整除性 |
-| `congruences` | 同余与中国剩余定理 |
-| `inequalities` | 不等式与极值估计 |
-| `real_completeness` | 实数完备性与上确界 |
-| `sequences_series` | 数列、级数与收敛 |
-| `epsilon_delta` | ε-δ 与极限证明 |
-| `continuity` | 连续性与一致连续性 |
-| `differentiation` | 微分、中值定理与 Taylor 展开 |
-| `integration` | Riemann 积分与微积分基本定理 |
-| `metric_topology` | 度量空间与拓扑证明 |
-| `linear_algebra` | 线性空间、基与维数 |
-| `matrices_eigen` | 矩阵、线性变换与特征值 |
-| `polynomial_algebra` | 多项式与代数方程 |
-| `geometry` | 欧氏几何与几何变换 |
-| `optimization` | 凸性与最优化证明 |
-| `ode` | 微分方程存在性与唯一性 |
-| `cardinality` | 有限集、可数性与基数 |
-| `multivariable_calculus` | 多元微积分与向量分析 |
-| `complex_analysis` | 复分析基础证明 |
-| `convexity_optimization` | 凸分析与对偶性 |
-
-### 证明方法覆盖
-
-学科领域与证明方法分开管理：一个领域可以需要多种证明方法，同一种方法也可以跨多个领域使用。当前统一方法清单包括：
-
-直接证明、逆否证明、反证法、分类讨论、构造性证明、非构造存在性证明、唯一性证明、普通归纳法、强归纳法、结构归纳法、最小反例法、无穷递降法、双射证明、双重计数、抽屉原理、极值原理、不变量证明、概率方法、ε-δ 证明、序列刻画证明、开覆盖证明、代数恒等变形证明和等价链证明。
-
-### 新增权威课程来源
-
-- [MIT 18.100B Real Analysis（Spring 2025）](https://ocw.mit.edu/courses/18-100b-real-analysis-spring-2025/pages/lecture-notes/)：包含 How to Write a Proof、实数完备性、数列级数、连续性、度量空间、微分、积分、一致收敛和微分方程存在唯一性。
-- [MIT 18.781 Theory of Numbers](https://ocw.mit.edu/courses/18-781-theory-of-numbers-spring-2012/pages/lecture-notes/)：整除、素数、最大公因数、欧几里得算法、同余、中国剩余定理、丢番图方程和无穷递降。
-- [MIT 18.06 Linear Algebra](https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/)：线性无关、基、维数、线性变换、矩阵与特征值。
-- [MIT 18.703 Modern Algebra](https://ocw.mit.edu/courses/18-703-modern-algebra-spring-2013/pages/lecture-notes/)：群、子群、商群、同态、环、理想、域和多项式环。
-- [MIT 18.S190 Introduction to Metric Spaces](https://ocw.mit.edu/courses/18-s190-introduction-to-metric-spaces-january-iap-2023/pages/lecture-notes/)：度量空间、完备性、紧致性与拓扑证明。
-- [MIT 6.7220J/15.084 Nonlinear Optimization](https://ocw.mit.edu/courses/6-7220j-nonlinear-optimization-spring-2025/)：凸性和最优化条件。
-
-**覆盖边界：** 当前规范面向本科核心数学、离散数学、算法与部分高年级基础课程，覆盖范围显著扩展，但不声称穷尽所有数学分支、研究级专门领域或所有形式化公理系统。遇到尚未列入清单的题型，模型仍须遵守通用逻辑、定义、量词和推理标准；不得因为没有专门规则就拒绝有效证明。
+**范围声明：** 本规范面向本科离散数学及其紧密相关的算法、组合与代数专题，不声称覆盖所有数学学科。未单独列出的离散数学题型仍须遵守通用逻辑与证明语言规范，不得因缺少专门条目而拒绝处理。

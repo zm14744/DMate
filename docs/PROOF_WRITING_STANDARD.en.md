@@ -1,133 +1,121 @@
-# DMate Mathematical Proof-Writing Standard
+# DMate Discrete Mathematics Proof-Writing Standard
 
-Version: 2.0 — Chinese/English parity
+Version: 3.0 — Discrete mathematics only
 
 ## Purpose and scope
 
-This is the English-language counterpart to [DMate 数学证明表达规范](PROOF_WRITING_STANDARD.md). Both language variants are generated from the same domain checklist and source registry in `proof_writing_extended.py`. English proofs must meet the same logical, mathematical and pedagogical standards as Chinese proofs, while using idiomatic English mathematical prose rather than translating Chinese sentence patterns word for word.
+This standard governs DMate's discrete-mathematics tutoring, proof hints, complete solutions, exercise answers, concept notes and proof review. It does not turn DMate into a general higher-mathematics platform.
 
-**Core requirement:** Every nontrivial conclusion must be justified; variable domains, quantifier scopes and logical directions must be explicit; a completed proof must be clear, sound and independently checkable.
+**Included scope:** mathematical logic, sets, relations and functions, number theory, combinatorics, induction and recursion, graph theory and trees, posets and lattices, discrete algebraic structures, Boolean algebra, automata and formal languages, discrete probability, algorithm correctness and complexity.
 
-## Shared principles
+**Not separate DMate proof modules:** real analysis, epsilon-delta limits, continuity and calculus, general topology, linear-algebra coursework, differential equations, complex analysis and continuous optimization. General logical principles still apply to any mathematical argument, but these subjects do not receive dedicated DMate proof checklists.
 
-1. **Preserve the proposition.** Keep the original domain, hypotheses, quantifiers and conclusion. Never silently replace an implication with a biconditional.
-2. **Introduce variables.** Each variable must have an identified origin, domain and role.
-3. **Use quantifiers correctly.** For universal claims, choose an arbitrary object. For existence, supply a witness, construction or valid nonconstructive argument.
-4. **Choose the appropriate method.** Direct proof, contrapositive, contradiction, equivalence, cases, induction, structural induction, construction and counterexample are alternatives, not a rigid template.
-5. **Justify reasoning steps.** Tie each important inference to an assumption, definition, theorem or previous result; avoid handwaving.
-6. **Write mathematical English.** Use complete sentences alongside well-formatted equations. Do not use strings of logical symbols as a substitute for prose unless formal logic is explicitly requested.
-7. **Maintain consistent terms.** Preserve course-defined notation and distinguish necessary/sufficient, converse/contrapositive, antisymmetric/asymmetric, injective/surjective, and homomorphism/isomorphism.
-8. **Conclude the original claim.** End by showing precisely what has been established. An incomplete proof must be labeled incomplete.
-9. **Be concise without logical gaps.** Omit routine manipulations, not critical changes of scope, direction, assumptions or case coverage.
-10. **Review the student's reasoning fairly.** Identify the earliest substantive error; distinguish genuine logical flaws from cosmetic differences; accept sound alternative methods.
+## 1. Shared proof-language requirements
 
-## Domain coverage: one-to-one with Chinese
+1. **Preserve the proposition:** retain the original domain, assumptions, quantifiers and conclusion; never silently strengthen an implication into an equivalence.
+2. **Define variables:** state each new variable's domain, origin and role.
+3. **Respect quantifiers:** use an arbitrary object for universal claims; provide a witness, construction or valid existence argument for existential claims.
+4. **Justify inferences:** every substantive conclusion must follow from a hypothesis, definition, established result, theorem or valid transformation.
+5. **Write natural mathematical English:** use complete sentences to connect equations. Do not replace prose with a chain of logical symbols unless formal logic is requested.
+6. **Use stable terminology:** respect the user's textbook and instructor conventions; distinguish necessary/sufficient, converse/contrapositive, antisymmetric/asymmetric, injective/surjective and homomorphism/isomorphism.
+7. **Be concise without gaps:** routine algebra may be compressed, but quantifier changes, definitions, logical directions and case coverage may not.
+8. **Close the argument:** return explicitly to the original claim; if the proof is incomplete, say so, or provide a verified counterexample when the statement is false.
+9. **Review fairly:** locate the earliest substantive error and accept valid alternative proofs rather than marking stylistic differences as mathematical errors.
 
-| Rule ID | English scope | 中文对应 |
+## 2. Discrete-mathematics domain coverage
+
+The same rule registry supplies Chinese and English guidance with identical stable IDs.
+
+| Domain ID | English coverage | Main checks |
 | --- | --- | --- |
-| `logic_scope` | Logical form and quantifiers | 逻辑形式与量词 |
-| `logical_implications` | Implication, equivalence and proof direction | 蕴含、等价与证明方向 |
-| `induction_family` | Induction, strong induction and minimal counterexample | 归纳、强归纳与最小反例 |
-| `structural_induction` | Structural induction and recursively defined objects | 结构归纳与递归对象 |
-| `invariants` | Invariants and algorithm correctness | 不变量与算法正确性 |
-| `termination` | Termination and total correctness | 终止性与总正确性 |
-| `recursion` | Recursive algorithms and recurrences | 递归与递推证明 |
-| `bijection` | Bijections and combinatorial counting | 双射与组合计数 |
-| `double_counting` | Double counting and identities | 双重计数与恒等式 |
-| `pigeonhole` | Pigeonhole principle and extremal arguments | 抽屉原理与极值 |
-| `inclusion_exclusion` | Inclusion–exclusion and case counting | 容斥与分类计数 |
-| `graph_theory` | Graph properties and isomorphism | 图论性质与同构 |
-| `graph_planarity` | Planarity and graph embeddings | 平面性与图嵌入 |
-| `relations_functions` | Relations, functions and quotient structures | 关系、映射与商结构 |
-| `algebra` | Groups, rings and homomorphisms | 群、环与同态 |
-| `automata` | Automata and state transitions | 自动机与状态转移 |
-| `probability` | Probability and existential arguments | 概率计数与存在性 |
-| `asymptotic` | Asymptotic bounds and complexity | 渐近界与复杂度 |
+| `logic_scope` | Logical form and quantifiers | Propositions, predicates, free/bound variables, quantifier order and negation |
+| `logical_implications` | Implication, equivalence and proof direction | Converse, contrapositive, necessary and sufficient conditions |
+| `set_theory` | Set theory and set operations | Membership, inclusion, equality, power sets, products and cardinality |
+| `relations_functions` | Relations, functions and quotient structures | Equivalence, partial orders, injectivity, surjectivity, bijections and well-definedness |
+| `number_theory` | Number theory and divisibility | Divisibility, primes, gcd and Euclidean algorithm |
+| `congruences` | Congruences and the Chinese remainder theorem | Modular arithmetic, cancellation conditions and CRT hypotheses |
+| `induction_family` | Induction, strong induction and minimal counterexample | Base cases, hypothesis range and inductive step |
+| `structural_induction` | Structural induction and recursive objects | Every base and recursive constructor |
+| `recursion` | Recursive definitions and recurrences | Initial conditions, recurrence and decreasing instance size |
+| `combinatorial_structures` | Combinatorial structures and counting identities | Permutations, combinations, binomial coefficients and constructions |
+| `bijection` | Bijections and combinatorial counting | Map, inverse, injectivity and surjectivity |
+| `double_counting` | Double counting | Same collection and matching multiplicities |
+| `pigeonhole` | Pigeonhole principle and extremal arguments | Object/box assignment and cardinality bounds |
+| `inclusion_exclusion` | Inclusion–exclusion and case counting | Intersections, signs, disjointness and coverage |
+| `graph_theory` | Graph properties and isomorphism | Degree, paths, connectivity, cycles and isomorphism |
+| `graph_planarity` | Planarity and graph embeddings | Euler hypotheses and structural obstructions |
+| `trees` | Trees and forests | Connectivity, acyclicity, spanning and rooted trees |
+| `graph_algorithms` | Graph algorithms and correctness | BFS, DFS, shortest paths, spanning trees, matching and flow |
+| `posets_lattices` | Posets and lattices | Reflexivity, antisymmetry, transitivity, covers, joins and meets |
+| `algebra` | Groups, rings and homomorphisms | Axioms, subgroups, cosets, homomorphisms, isomorphisms and ideals |
+| `boolean_algebra` | Boolean algebra and logical simplification | Boolean axioms, De Morgan's laws and duality |
+| `automata` | Automata and state transitions | Initial/final states, transitions and reachability |
+| `formal_languages` | Formal languages and grammars | Alphabet, languages, grammars, regular expressions and automata equivalence |
+| `invariants` | Invariants and algorithm correctness | Initialization, preservation and exit condition |
+| `termination` | Termination and total correctness | Well-founded measures, partial correctness and termination |
+| `probability` | Discrete probability and existence | Sample spaces, independence, expectation and probabilistic method |
+| `asymptotic` | Asymptotic bounds and algorithm complexity | Constants and thresholds for O, Ω and Θ |
+| `cardinality` | Finite sets, countability and cardinality | Enumeration, injections, bijections and uncountability |
 
-The matrix targets **undergraduate discrete mathematics and nearby algorithmic proof topics**. It does not claim exhaustive coverage of every field of research mathematics or every formal proof calculus.
+## 3. Proof-method coverage
 
-## Terminology and logical direction
+Domains and methods are separate: one method can apply in several domains, and one domain may require multiple methods.
 
-| English expression | Chinese equivalent | Meaning to verify |
+| Method ID | English method | 中文名称 |
 | --- | --- | --- |
-| Let ... be arbitrary / For every ... | 任取／对于任意 | Universal claim; not a single example |
-| There exists / There is some ... | 存在／存在一个 | Requires an existence argument |
-| If P, then Q | 若 P，则 Q | P implies Q |
-| P only if Q | P 仅当 Q | P implies Q; **P if Q** means Q implies P |
+| `direct` | Direct proof | 直接证明 |
+| `contrapositive` | Proof by contrapositive | 逆否证明 |
+| `contradiction` | Proof by contradiction | 反证法 |
+| `cases` | Proof by cases | 分类讨论 |
+| `construction` | Constructive proof | 构造性证明 |
+| `existence` | Nonconstructive existence | 非构造存在性 |
+| `uniqueness` | Uniqueness proof | 唯一性证明 |
+| `weak_induction` | Weak induction | 普通归纳法 |
+| `strong_induction` | Strong induction | 强归纳法 |
+| `structural_induction` | Structural induction | 结构归纳法 |
+| `minimal_counterexample` | Minimal-counterexample method | 最小反例法 |
+| `infinite_descent` | Infinite descent | 无穷递降法 |
+| `bijection` | Bijective proof | 双射证明 |
+| `double_counting` | Double counting | 双重计数 |
+| `pigeonhole` | Pigeonhole argument | 抽屉原理 |
+| `extremal` | Extremal argument | 极值原理 |
+| `invariant` | Invariant proof | 不变量证明 |
+| `probabilistic` | Probabilistic method | 概率方法 |
+| `algebraic` | Algebraic identity proof | 代数恒等变形 |
+| `equivalence_chain` | Equivalence-chain proof | 等价链证明 |
+| `truth_table` | Truth-table verification | 真值表验证 |
+| `counterexample` | Disproof by counterexample | 反例否证 |
+| `exhaustive` | Proof by exhaustive enumeration | 有限穷举证明 |
+
+## 4. Chinese/English parity
+
+Both languages use the same domain IDs, method IDs, logical requirements and error categories. English should use idiomatic mathematical prose rather than literal translation.
+
+| English | 中文 | Logical meaning |
+| --- | --- | --- |
+| Let ... be arbitrary | 任取 | Arbitrary object for a universal claim |
+| There exists | 存在 | Requires a witness or existence argument |
+| If P, then Q | 若 P，则 Q | P=>Q |
+| P only if Q | P 仅当 Q | P=>Q; P if Q means Q=>P |
 | If and only if | 当且仅当 | Both directions |
 | Proof by contrapositive | 逆否证明 | Not the converse |
 | Proof by contradiction | 反证法 | Negate the actual target |
-| Without loss of generality | 不妨设 | Only with an explicit symmetry or equivalence rationale |
-| Induction hypothesis / Inductive step | 归纳假设／归纳步骤 | State valid indices |
-| Loop invariant | 循环不变量 | Prove initialization, preservation and use at exit |
-| Bijection | 双射／一一对应 | Establish injectivity and surjectivity |
-| Homomorphism / Isomorphism | 同态／同构 | Isomorphism additionally requires bijectivity |
+| Without loss of generality | 不妨设 | Requires symmetry or equivalence |
+| Antisymmetric | 反对称 | Not the same as asymmetric |
+| Homomorphism / Isomorphism | 同态／同构 | Isomorphism also requires bijectivity |
 
-Avoid unnatural translations such as "According to the meaning of the question" as a generic replacement for a justification. Use *By the given hypothesis*, *By definition*, *By the inductive hypothesis*, *It follows that*, or *For the reverse implication* only where the claimed basis is valid.
+## 5. Authoritative sources and boundaries
 
-## Teaching behavior
+- [MIT 6.1200J Mathematics for Computer Science (2024)](https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/pages/readings/): discrete mathematics, proofs, induction, algorithm invariants and state machines.
+- [MIT 6.042J Mathematics for Computer Science (2015)](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/pages/readings/): logic, sets, number theory, counting, graph theory and probability.
+- [Hammack, Book of Proof](https://richardhammack.github.io/BookOfProof/): proof methods, sets, relations, functions, induction and cardinality.
+- [Stanford CS103 Proofwriting Checklist](https://web.stanford.edu/class/cs103/proofwriting_checklist): variable scope, assumptions/goals and natural-language proof writing.
+- [CMU 15-251 Proof Guidelines](https://www.cs.cmu.edu/~arielpro/15251f17/docs/proof-checklist.pdf): proof structure and expression.
+- [AMS, Language, Logic, and Proof](https://www.ams.org/bookstore/pspdf/amstext-26-prev.pdf): mathematical language, notation and writing precision.
+- [Higher Education Press, Discrete Mathematics (3rd ed.)](https://www.hep.com.cn/book/show/2d67dc4c-217a-41db-81b2-56bfe7428879): Chinese undergraduate terminology and scope; only the public publisher record is used here.
+- [Higher Education Press companion exercise guide](https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=66ca132674ce561611bda659): Chinese exercise-scope reference; copyrighted exercises and solutions are not copied.
+- [MIT 18.781 Theory of Numbers](https://ocw.mit.edu/courses/18-781-theory-of-numbers-spring-2012/pages/lecture-notes/) and [MIT 18.703 Modern Algebra](https://ocw.mit.edu/courses/18-703-modern-algebra-spring-2013/pages/lecture-notes/): supplementary sources only for number theory and discrete algebraic structures.
 
-- **Hint:** Reveal only useful next steps, not a full proof.
-- **Complete solution:** Supply the entire, independently checkable argument.
-- **Answer review:** Identify the earliest substantive error, explain the issue and its impact, and do not reject valid alternative proofs.
-- **Concept notes:** Distinguish definitions, conditions, statements of theorems and actual proofs.
+These sources inform the standard; they do not certify DMate or any AI-generated proof. CI verifies coverage and integration, while mathematical correctness still requires bilingual tests on real problems.
 
-## Authority, evidence and licensing
-
-| Primary source | Role and evidence boundary |
-| --- | --- |
-| [Stanford CS103 Proofwriting Checklist](https://web.stanford.edu/class/cs103/proofwriting_checklist) | Official university guidance on proof prose, assumptions/goals and variable scope |
-| [CMU 15-251 Proof Guidelines](https://www.cs.cmu.edu/~arielpro/15251f17/docs/proof-checklist.pdf) | Official university guidance on proof style and logical flow |
-| [MIT 6.1200J (2024) Readings](https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/pages/readings/) | Official course scope for mathematical proofs, induction and invariants |
-| [MIT 6.042J (2015) Readings](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/pages/readings/) | Official discrete mathematics text and associated proof domains |
-| [Hammack, Book of Proof](https://richardhammack.github.io/BookOfProof/) | Text approved by the American Institute of Mathematics' Open Textbook Initiative; systematic proof methods |
-| [AMS, Language, Logic, and Proof](https://www.ams.org/bookstore/pspdf/amstext-26-prev.pdf) | Mathematical language, terminology and writing precision |
-| [Higher Education Press, Discrete Mathematics (3rd ed.)](https://www.hep.com.cn/book/show/2d67dc4c-217a-41db-81b2-56bfe7428879) | Chinese undergraduate curricular scope and terminology; only the public publisher record has been verified here |
-| [Companion exercise and solutions volume](https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=66ca132674ce561611bda659) | Public curriculum/exercise-scope reference; the full copyrighted book has not been audited |
-
-Authority belongs to the referenced institutions and authors. **They have not endorsed DMate or verified any individual AI-generated proof.** CI tests verify parity of the instructions, source IDs and integration; semantic correctness of real English or Chinese model outputs still requires independent, bilingual evaluations. The guidance is an original synthesis of mathematical proof-writing principles; it does not reproduce the textbooks' protected solutions, long passages or exercises and does not imply a commercial redistribution license.
-
-
-## Expanded subject coverage (version 2.1)
-
-Beyond discrete mathematics and algorithms, the shared rule registry now includes the following subject-specific domains. Each has a stable rule ID and paired Chinese/English guidance:
-
-| Rule ID | Subject |
-| --- | --- |
-| `number_theory` | Number theory and divisibility |
-| `congruences` | Congruences and the Chinese remainder theorem |
-| `inequalities` | Inequalities and extremal estimates |
-| `real_completeness` | Completeness of the real numbers and suprema |
-| `sequences_series` | Sequences, series and convergence |
-| `epsilon_delta` | Epsilon-delta limit proofs |
-| `continuity` | Continuity and uniform continuity |
-| `differentiation` | Differentiation, mean value theorems and Taylor expansion |
-| `integration` | Riemann integration and the fundamental theorem of calculus |
-| `metric_topology` | Metric spaces and topology |
-| `linear_algebra` | Vector spaces, bases and dimension |
-| `matrices_eigen` | Matrices, linear maps and eigenvalues |
-| `polynomial_algebra` | Polynomials and algebraic equations |
-| `geometry` | Euclidean geometry and transformations |
-| `optimization` | Convexity and optimization |
-| `ode` | Existence and uniqueness for differential equations |
-| `cardinality` | Finite sets, countability and cardinality |
-| `multivariable_calculus` | Multivariable calculus and vector analysis |
-| `complex_analysis` | Introductory complex analysis |
-| `convexity_optimization` | Convex analysis and duality |
-
-## Proof-method coverage
-
-Subject domains and proof methods are tracked separately: one subject may require several methods, and a method may apply across many subjects. The shared method checklist includes:
-
-Direct proof, contrapositive, contradiction, proof by cases, constructive proof, nonconstructive existence, uniqueness, weak induction, strong induction, structural induction, minimal counterexample, infinite descent, bijection, double counting, pigeonhole, extremal arguments, invariants, probabilistic method, epsilon-delta, sequential characterization, open-cover proof, algebraic identity proof and equivalence chains.
-
-## Additional authoritative course sources
-
-- [MIT 18.100B Real Analysis (Spring 2025)](https://ocw.mit.edu/courses/18-100b-real-analysis-spring-2025/pages/lecture-notes/): proof writing, completeness, sequences and series, continuity, metric spaces, differentiation, integration, uniform convergence and ODE existence/uniqueness.
-- [MIT 18.781 Theory of Numbers](https://ocw.mit.edu/courses/18-781-theory-of-numbers-spring-2012/pages/lecture-notes/): divisibility, primes, gcd, Euclidean algorithm, congruences, CRT, Diophantine equations and descent.
-- [MIT 18.06 Linear Algebra](https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/): independence, bases, dimension, linear transformations, matrices and eigenvalues.
-- [MIT 18.703 Modern Algebra](https://ocw.mit.edu/courses/18-703-modern-algebra-spring-2013/pages/lecture-notes/): groups, subgroups, quotient groups, homomorphisms, rings, ideals, fields and polynomial rings.
-- [MIT 18.S190 Introduction to Metric Spaces](https://ocw.mit.edu/courses/18-s190-introduction-to-metric-spaces-january-iap-2023/pages/lecture-notes/): metric spaces, completeness, compactness and topology.
-- [MIT 6.7220J/15.084 Nonlinear Optimization](https://ocw.mit.edu/courses/6-7220j-nonlinear-optimization-spring-2025/): convexity and optimization conditions.
-
-**Coverage boundary:** The standard targets core undergraduate mathematics, discrete mathematics, algorithms and selected upper-level foundational courses. It is substantially broader, but it does not claim to exhaust every mathematical discipline, research specialty or formal axiomatic system. For a topic not listed explicitly, the model must still obey the general standards for logic, definitions, quantifiers and valid inference; lack of a dedicated checklist is not a reason to reject a valid proof.
+**Scope statement:** This standard targets undergraduate discrete mathematics and closely related algorithms, combinatorics and algebra. It does not claim to cover all mathematics. A discrete-mathematics topic not listed explicitly must still be handled using the general rules of logic, definitions and valid inference; lack of a dedicated row is not a reason to reject a valid proof.
