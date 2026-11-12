@@ -572,19 +572,6 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
-          "sections": [
-            "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction"
-          ],
-          "lessons": [
-            {
-              "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=56"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "1.8.4 Strong Induction",
           "sections": [
@@ -594,6 +581,19 @@
             {
               "title": "1.8.4 Strong Induction",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=22"
+            }
+          ]
+        },
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
+          "sections": [
+            "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction"
+          ],
+          "lessons": [
+            {
+              "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=56"
             }
           ]
         }
@@ -949,19 +949,6 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "17.1.0.2 素数",
-          "sections": [
-            "17.1.0.2 素数"
-          ],
-          "lessons": [
-            {
-              "title": "17.1.0.2 素数",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=71"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "2.1.7 Prime Factorization",
           "sections": [
@@ -971,6 +958,19 @@
             {
               "title": "2.1.7 Prime Factorization",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=39"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "17.1.0.2 素数",
+          "sections": [
+            "17.1.0.2 素数"
+          ],
+          "lessons": [
+            {
+              "title": "17.1.0.2 素数",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=71"
             }
           ]
         }
@@ -985,19 +985,6 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "17.2.0.3 最大公约数和最小公倍数",
-          "sections": [
-            "17.2.0.3 最大公约数和最小公倍数"
-          ],
-          "lessons": [
-            {
-              "title": "17.2.0.3 最大公约数和最小公倍数",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=72"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "2.1.2 Euclidean Algorithm",
           "sections": [
@@ -1007,6 +994,19 @@
             {
               "title": "2.1.2 Euclidean Algorithm",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=36"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "17.2.0.3 最大公约数和最小公倍数",
+          "sections": [
+            "17.2.0.3 最大公约数和最小公倍数"
+          ],
+          "lessons": [
+            {
+              "title": "17.2.0.3 最大公约数和最小公倍数",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=72"
             }
           ]
         }
@@ -1021,19 +1021,6 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "17.3.0.2 同余",
-          "sections": [
-            "17.3.0.2 同余"
-          ],
-          "lessons": [
-            {
-              "title": "17.3.0.2 同余",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=73"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "2.2.1 Congruence mod n",
           "sections": [
@@ -1043,6 +1030,19 @@
             {
               "title": "2.2.1 Congruence mod n",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=40"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "17.3.0.2 同余",
+          "sections": [
+            "17.3.0.2 同余"
+          ],
+          "lessons": [
+            {
+              "title": "17.3.0.2 同余",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=73"
             }
           ]
         }
@@ -1058,19 +1058,6 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "17.4.0.2 一次同余方程",
-          "sections": [
-            "17.4.0.2 一次同余方程"
-          ],
-          "lessons": [
-            {
-              "title": "17.4.0.2 一次同余方程",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=74"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "2.2.3 Inverses mod n",
           "sections": [
@@ -1080,6 +1067,19 @@
             {
               "title": "2.2.3 Inverses mod n",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=41"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "17.4.0.2 一次同余方程",
+          "sections": [
+            "17.4.0.2 一次同余方程"
+          ],
+          "lessons": [
+            {
+              "title": "17.4.0.2 一次同余方程",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=74"
             }
           ]
         }
@@ -1164,19 +1164,6 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "Discrete Math - 6.1.1 Counting Rules",
-          "sections": [
-            "Discrete Math - 6.1.1 Counting Rules"
-          ],
-          "lessons": [
-            {
-              "title": "Discrete Math - 6.1.1 Counting Rules",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=60"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "3.3.1 Sum And Product Rules",
           "sections": [
@@ -1186,6 +1173,19 @@
             {
               "title": "3.3.1 Sum And Product Rules",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=75"
+            }
+          ]
+        },
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 6.1.1 Counting Rules",
+          "sections": [
+            "Discrete Math - 6.1.1 Counting Rules"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 6.1.1 Counting Rules",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=60"
             }
           ]
         }
@@ -1200,19 +1200,6 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "Discrete Math - 6.3.1 Permutations and Combinations",
-          "sections": [
-            "Discrete Math - 6.3.1 Permutations and Combinations"
-          ],
-          "lessons": [
-            {
-              "title": "Discrete Math - 6.3.1 Permutations and Combinations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=61"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "3.4.1 Generalized Counting Rules",
           "sections": [
@@ -1222,6 +1209,19 @@
             {
               "title": "3.4.1 Generalized Counting Rules",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=77"
+            }
+          ]
+        },
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 6.3.1 Permutations and Combinations",
+          "sections": [
+            "Discrete Math - 6.3.1 Permutations and Combinations"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 6.3.1 Permutations and Combinations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=61"
             }
           ]
         }
@@ -1236,19 +1236,6 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "Discrete Math - 6.4.1 The Binomial Theorem",
-          "sections": [
-            "Discrete Math - 6.4.1 The Binomial Theorem"
-          ],
-          "lessons": [
-            {
-              "title": "Discrete Math - 6.4.1 The Binomial Theorem",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "3.4.4 Binomial Theorem",
           "sections": [
@@ -1258,6 +1245,19 @@
             {
               "title": "3.4.4 Binomial Theorem",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=79"
+            }
+          ]
+        },
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 6.4.1 The Binomial Theorem",
+          "sections": [
+            "Discrete Math - 6.4.1 The Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 6.4.1 The Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
             }
           ]
         }
@@ -1296,19 +1296,6 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion",
-          "sections": [
-            "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion"
-          ],
-          "lessons": [
-            {
-              "title": "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=69"
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2015_bilibili",
           "title": "3.5.3 Inclusion-Exclusion Example",
           "sections": [
@@ -1318,6 +1305,19 @@
             {
               "title": "3.5.3 Inclusion-Exclusion Example",
               "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=82"
+            }
+          ]
+        },
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion",
+          "sections": [
+            "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=69"
             }
           ]
         }
