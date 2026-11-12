@@ -289,7 +289,7 @@ def restore_backup(payload):
                                for k, n in (("id", 64), ("title", 120),
                                             ("content", 10000), ("updated_at", 64)))):
                 raise ValueError("笔记或错题记录不正确")
-            con.execute("INSERT INTO items VALUES(?,?,?,?,?)", (
+            con.execute("INSERT INTO items VALUES(?,?,?,?,?,?)", (
                 item["id"], item["kind"], item["title"], item["content"],
                 item["status"], item["updated_at"]))
 
@@ -447,7 +447,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("标题和内容不能为空")
                 iid = uuid.uuid4().hex
                 with database() as con:
-                    con.execute("INSERT INTO items VALUES(?,?,?,?,?)",
+                    con.execute("INSERT INTO items VALUES(?,?,?,?,?,?)",
                                 (iid, kind, title, body, "open", now()))
                 self.send_json({"id": iid}, 201)
             elif path == "/api/graph":
