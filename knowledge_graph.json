@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -279,15 +279,15 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "1.6推理规则+1.7证明导论",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "1.2.1 Proof by Contradiction",
           "sections": [
-            "1.6推理规则+1.7证明导论"
+            "1.2.1 Proof by Contradiction"
           ],
           "lessons": [
             {
-              "title": "1.6推理规则+1.7证明导论",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=6"
+              "title": "1.2.1 Proof by Contradiction",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=1"
             }
           ]
         }
@@ -301,6 +301,19 @@
         "命题推理"
       ],
       "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "2. Induction",
+          "sections": [
+            "2. Induction"
+          ],
+          "lessons": [
+            {
+              "title": "2. Induction",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=2"
+            }
+          ]
+        },
         {
           "source_id": "sawfin_bilibili",
           "title": "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula",
@@ -324,6 +337,19 @@
         "数学归纳法"
       ],
       "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "3. Strong Induction",
+          "sections": [
+            "3. Strong Induction"
+          ],
+          "lessons": [
+            {
+              "title": "3. Strong Induction",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=3"
+            }
+          ]
+        },
         {
           "source_id": "sawfin_bilibili",
           "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
@@ -391,6 +417,19 @@
         "笛卡尔积与关系"
       ],
       "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "11. Relations, Partial Orders, and Scheduling",
+          "sections": [
+            "11. Relations, Partial Orders, and Scheduling"
+          ],
+          "lessons": [
+            {
+              "title": "11. Relations, Partial Orders, and Scheduling",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=11"
+            }
+          ]
+        },
         {
           "source_id": "dogeman_discrete",
           "title": "2.2.0.3 二元关系",
@@ -460,6 +499,19 @@
         "关系性质"
       ],
       "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "11. Relations, Partial Orders, and Scheduling",
+          "sections": [
+            "11. Relations, Partial Orders, and Scheduling"
+          ],
+          "lessons": [
+            {
+              "title": "11. Relations, Partial Orders, and Scheduling",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=11"
+            }
+          ]
+        },
         {
           "source_id": "dogeman_discrete",
           "title": "2.6.0.3 序关系",
@@ -599,15 +651,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "mit_6042j_2015_bilibili",
-          "title": "2.1.7 Prime Factorization",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "4. Number Theory I",
           "sections": [
-            "2.1.7 Prime Factorization"
+            "4. Number Theory I"
           ],
           "lessons": [
             {
-              "title": "2.1.7 Prime Factorization",
-              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=39"
+              "title": "4. Number Theory I",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=4"
             }
           ]
         }
@@ -622,15 +674,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2015_bilibili",
-          "title": "2.1.2 Euclidean Algorithm",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "4. Number Theory I",
           "sections": [
-            "2.1.2 Euclidean Algorithm"
+            "4. Number Theory I"
           ],
           "lessons": [
             {
-              "title": "2.1.2 Euclidean Algorithm",
-              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=36"
+              "title": "4. Number Theory I",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=4"
             }
           ]
         }
@@ -645,15 +697,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2015_bilibili",
-          "title": "2.2.1 Congruence mod n",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "5. Number Theory II",
           "sections": [
-            "2.2.1 Congruence mod n"
+            "5. Number Theory II"
           ],
           "lessons": [
             {
-              "title": "2.2.1 Congruence mod n",
-              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=40"
+              "title": "5. Number Theory II",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
             }
           ]
         }
@@ -669,15 +721,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2015_bilibili",
-          "title": "2.2.3 Inverses mod n",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "5. Number Theory II",
           "sections": [
-            "2.2.3 Inverses mod n"
+            "5. Number Theory II"
           ],
           "lessons": [
             {
-              "title": "2.2.3 Inverses mod n",
-              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=41"
+              "title": "5. Number Theory II",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
             }
           ]
         }
@@ -717,15 +769,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2015_bilibili",
-          "title": "2.3.1 Modular Exponentiation Euler's Function",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "5. Number Theory II",
           "sections": [
-            "2.3.1 Modular Exponentiation Euler's Function"
+            "5. Number Theory II"
           ],
           "lessons": [
             {
-              "title": "2.3.1 Modular Exponentiation Euler's Function",
-              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=42"
+              "title": "5. Number Theory II",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
             }
           ]
         }
@@ -742,15 +794,15 @@
       "level": "拓展",
       "videos": [
         {
-          "source_id": "mit_6042j_2015_bilibili",
-          "title": "2.4.1 RSA Public Key Encryption",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "5. Number Theory II",
           "sections": [
-            "2.4.1 RSA Public Key Encryption"
+            "5. Number Theory II"
           ],
           "lessons": [
             {
-              "title": "2.4.1 RSA Public Key Encryption",
-              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=44"
+              "title": "5. Number Theory II",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
             }
           ]
         }
@@ -763,15 +815,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "3.1计数的基础+3.2鸽巢原理",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "16. Counting Rules I",
           "sections": [
-            "3.1计数的基础+3.2鸽巢原理"
+            "16. Counting Rules I"
           ],
           "lessons": [
             {
-              "title": "3.1计数的基础+3.2鸽巢原理",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=14"
+              "title": "16. Counting Rules I",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=16"
             }
           ]
         }
@@ -786,15 +838,15 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "3.3排列与组合+3.4二项式系数和恒等式+3.5排列与组合的推广",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "16. Counting Rules I",
           "sections": [
-            "3.3排列与组合+3.4二项式系数和恒等式+3.5排列与组合的推广"
+            "16. Counting Rules I"
           ],
           "lessons": [
             {
-              "title": "3.3排列与组合+3.4二项式系数和恒等式+3.5排列与组合的推广",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=15"
+              "title": "16. Counting Rules I",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=16"
             }
           ]
         }
@@ -809,15 +861,15 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "3.3排列与组合+3.4二项式系数和恒等式+3.5排列与组合的推广",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "17. Counting Rules II",
           "sections": [
-            "3.3排列与组合+3.4二项式系数和恒等式+3.5排列与组合的推广"
+            "17. Counting Rules II"
           ],
           "lessons": [
             {
-              "title": "3.3排列与组合+3.4二项式系数和恒等式+3.5排列与组合的推广",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=15"
+              "title": "17. Counting Rules II",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=17"
             }
           ]
         }
@@ -832,15 +884,15 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "3.1计数的基础+3.2鸽巢原理",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "17. Counting Rules II",
           "sections": [
-            "3.1计数的基础+3.2鸽巢原理"
+            "17. Counting Rules II"
           ],
           "lessons": [
             {
-              "title": "3.1计数的基础+3.2鸽巢原理",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=14"
+              "title": "17. Counting Rules II",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=17"
             }
           ]
         }
@@ -856,15 +908,15 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "4.5容斥+4.6容斥原理的应用",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "17. Counting Rules II",
           "sections": [
-            "4.5容斥+4.6容斥原理的应用"
+            "17. Counting Rules II"
           ],
           "lessons": [
             {
-              "title": "4.5容斥+4.6容斥原理的应用",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=23"
+              "title": "17. Counting Rules II",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=17"
             }
           ]
         }
@@ -878,21 +930,7 @@
         "递推关系建模",
         "排列与组合"
       ],
-      "videos": [
-        {
-          "source_id": "cqu_discrete_liuran",
-          "title": "4.3分治算法和递推关系+4.4生成函数",
-          "sections": [
-            "4.3分治算法和递推关系+4.4生成函数"
-          ],
-          "lessons": [
-            {
-              "title": "4.3分治算法和递推关系+4.4生成函数",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=22"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "recurrence_model",
@@ -901,15 +939,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "4.1递推关系的应用+4.2求解线性递推关系",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "14. Divide and Conquer Recurrences",
           "sections": [
-            "4.1递推关系的应用+4.2求解线性递推关系"
+            "14. Divide and Conquer Recurrences"
           ],
           "lessons": [
             {
-              "title": "4.1递推关系的应用+4.2求解线性递推关系",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=16"
+              "title": "14. Divide and Conquer Recurrences",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=14"
             }
           ]
         }
@@ -924,15 +962,15 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "4.1递推关系的应用+4.2求解线性递推关系",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "15. Linear Recurrences",
           "sections": [
-            "4.1递推关系的应用+4.2求解线性递推关系"
+            "15. Linear Recurrences"
           ],
           "lessons": [
             {
-              "title": "4.1递推关系的应用+4.2求解线性递推关系",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=16"
+              "title": "15. Linear Recurrences",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
             }
           ]
         }
@@ -947,15 +985,15 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "4.1递推关系的应用+4.2求解线性递推关系",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "15. Linear Recurrences",
           "sections": [
-            "4.1递推关系的应用+4.2求解线性递推关系"
+            "15. Linear Recurrences"
           ],
           "lessons": [
             {
-              "title": "4.1递推关系的应用+4.2求解线性递推关系",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=16"
+              "title": "15. Linear Recurrences",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
             }
           ]
         }
@@ -970,15 +1008,15 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liuran",
-          "title": "4.1递推关系的应用+4.2求解线性递推关系",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "15. Linear Recurrences",
           "sections": [
-            "4.1递推关系的应用+4.2求解线性递推关系"
+            "15. Linear Recurrences"
           ],
           "lessons": [
             {
-              "title": "4.1递推关系的应用+4.2求解线性递推关系",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=16"
+              "title": "15. Linear Recurrences",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
             }
           ]
         }
@@ -990,6 +1028,19 @@
       "category": "图论",
       "prerequisites": [],
       "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "6. Graph Theory and Coloring",
+          "sections": [
+            "6. Graph Theory and Coloring"
+          ],
+          "lessons": [
+            {
+              "title": "6. Graph Theory and Coloring",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=6"
+            }
+          ]
+        },
         {
           "source_id": "pflyan_graph",
           "title": "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
@@ -1158,6 +1209,19 @@
       ],
       "videos": [
         {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "10. Graph Theory III",
+          "sections": [
+            "10. Graph Theory III"
+          ],
+          "lessons": [
+            {
+              "title": "10. Graph Theory III",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=10"
+            }
+          ]
+        },
+        {
           "source_id": "pflyan_graph",
           "title": "7-2 〖欧拉图〗无向欧拉图判定的充要条件",
           "sections": [
@@ -1205,6 +1269,19 @@
       ],
       "videos": [
         {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "9. Communication Networks",
+          "sections": [
+            "9. Communication Networks"
+          ],
+          "lessons": [
+            {
+              "title": "9. Communication Networks",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=9"
+            }
+          ]
+        },
+        {
           "source_id": "pflyan_graph",
           "title": "5-2 〖最短路径问题〗迪杰斯特拉算法：可以找到最优解的贪心算法",
           "sections": [
@@ -1227,6 +1304,19 @@
         "图的基本概念"
       ],
       "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "6. Graph Theory and Coloring",
+          "sections": [
+            "6. Graph Theory and Coloring"
+          ],
+          "lessons": [
+            {
+              "title": "6. Graph Theory and Coloring",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=6"
+            }
+          ]
+        },
         {
           "source_id": "dogeman_discrete",
           "title": "11.1.0.3 点着色",
@@ -1275,6 +1365,19 @@
       ],
       "videos": [
         {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "7. Matching Problems",
+          "sections": [
+            "7. Matching Problems"
+          ],
+          "lessons": [
+            {
+              "title": "7. Matching Problems",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=7"
+            }
+          ]
+        },
+        {
           "source_id": "pflyan_graph",
           "title": "9-1 〖无向二部图〗判定二部图的充要条件",
           "sections": [
@@ -1298,6 +1401,19 @@
         "路径与连通性"
       ],
       "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "11. Relations, Partial Orders, and Scheduling",
+          "sections": [
+            "11. Relations, Partial Orders, and Scheduling"
+          ],
+          "lessons": [
+            {
+              "title": "11. Relations, Partial Orders, and Scheduling",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=11"
+            }
+          ]
+        },
         {
           "source_id": "graph_animation_bili",
           "title": "图-拓扑排序",
@@ -1345,6 +1461,19 @@
         "二部图"
       ],
       "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "7. Matching Problems",
+          "sections": [
+            "7. Matching Problems"
+          ],
+          "lessons": [
+            {
+              "title": "7. Matching Problems",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=7"
+            }
+          ]
+        },
         {
           "source_id": "pflyan_graph",
           "title": "9-2 〖无向二部图〗匹配和完备匹配",
@@ -1417,6 +1546,19 @@
       ],
       "videos": [
         {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "8. Graph Theory II - Minimum Spanning Trees",
+          "sections": [
+            "8. Graph Theory II - Minimum Spanning Trees"
+          ],
+          "lessons": [
+            {
+              "title": "8. Graph Theory II - Minimum Spanning Trees",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=8"
+            }
+          ]
+        },
+        {
           "source_id": "uestc_discrete_lower",
           "title": "9.1.3 生成树",
           "sections": [
@@ -1441,6 +1583,19 @@
       ],
       "videos": [
         {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "8. Graph Theory II - Minimum Spanning Trees",
+          "sections": [
+            "8. Graph Theory II - Minimum Spanning Trees"
+          ],
+          "lessons": [
+            {
+              "title": "8. Graph Theory II - Minimum Spanning Trees",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=8"
+            }
+          ]
+        },
+        {
           "source_id": "uestc_discrete_lower",
           "title": "9.1.4 最小生成树",
           "sections": [
@@ -1464,21 +1619,7 @@
         "生成树"
       ],
       "level": "拓展",
-      "videos": [
-        {
-          "source_id": "steve_butler_spectral_bili",
-          "title": "16 - 矩阵树定理 中配+中字",
-          "sections": [
-            "16 - 矩阵树定理 中配+中字"
-          ],
-          "lessons": [
-            {
-              "title": "16 - 矩阵树定理 中配+中字",
-              "url": "https://www.bilibili.com/video/BV11kga6FEez/?p=16"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "algebra_system",
@@ -1603,16 +1744,8 @@
       "name": "东北大学 · 离散数学（女教师部分）",
       "course": "离散数学（P1–P19）",
       "platform": "Bilibili",
-      "publisher": "",
-      "note": "只收录P1–P19女教师讲授部分；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；上传者授权状态未核实，仅提供原视频外链，不下载或托管。"
-    },
-    {
-      "id": "cqu_discrete_liuran",
-      "name": "重庆大学计算机学院 · 刘然",
-      "course": "《离散数学及其应用》",
-      "platform": "Bilibili",
-      "publisher": "cququantum",
-      "note": "2020年春重庆大学计算机学院刘然老师课程录播；B站页面约29.8万播放。上传账号为第三方账号，非学校官方账号；因课程覆盖计数、递推和生成函数且热度较高，暂作外部链接候选，不下载或托管。"
+      "publisher": "东北大学",
+      "note": "东北大学离散数学课程，仅收录女教师讲授的P1–P19；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；上传者授权状态未核实，仅提供原视频外链，不下载或托管。"
     },
     {
       "id": "sawfin_bilibili",
@@ -1629,14 +1762,6 @@
       "platform": "Bilibili",
       "publisher": "dogeman先生",
       "note": "UP主原创讲解，章节按知识点、重要程度和难度组织。用于集合、关系、函数、部分图论专题及代数结构。"
-    },
-    {
-      "id": "mit_6042j_2015_bilibili",
-      "name": "MIT · 6.042J · Spring 2015",
-      "course": "Mathematics for Computer Science (2015)",
-      "platform": "Bilibili",
-      "publisher": "",
-      "note": "采用用户选定的2015版本，B站版本标注精翻双语字幕。用于初等数论及RSA。仅提供原视频外链，不下载、托管或重新分发视频/字幕；字幕公式与术语仍需抽查。"
     },
     {
       "id": "crt_fraljimetry",
@@ -1680,19 +1805,25 @@
     },
     {
       "id": "steve_butler_spectral_bili",
-      "name": "Iowa State University · Steve Butler",
+      "name": "Steve Butler · Spectral Graph Theory",
       "course": "Spectral Graph Theory（Fall 2023）",
       "platform": "Bilibili",
-      "publisher": "脑袋要有光",
-      "note": "Steve Butler 的图谱理论课程中文配音+中文字幕版本，矩阵树定理为第16讲。B站上传者为第三方翻译账号，翻译授权及字幕准确性尚未独立核实；仅作为专题外链，不下载或托管。"
+      "publisher": "Steve Butler",
+      "note": "用户要求只采用Steve Butler英文原声，不使用中文配音版。此前找到的B站中配版已排除；待确认B站英文原声版本链接后再恢复矩阵树定理节点。"
+    },
+    {
+      "id": "mit_6042j_2010_bilibili",
+      "name": "MIT · 6.042J · Fall 2010",
+      "course": "Mathematics for Computer Science (Fall 2010)",
+      "platform": "Bilibili",
+      "publisher": "MIT",
+      "note": "采用用户指定的2010版，B站版本为中英字幕课程。只提供原视频外链，不下载、托管或重新分发视频/字幕。"
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": "exactly_one_course",
+    "primary_per_node": "one selected Bilibili course per node; multiple adjacent lesson links may belong to that one course",
     "platform_policy": "Bilibili_only",
-    "link_type": "direct_lesson_links",
-    "course_continuity": "Prefer one continuous course across adjacent nodes within each knowledge module; change source mainly at module boundaries or for specialist topics.",
-    "quality_priority": "Prefer original instructors, official university accounts, or high-heat courses with identifiable teachers. Reject anonymous PPT-reading, poor subtitles, poor image quality, and suspicious reuploads.",
-    "note": "Every knowledge node has exactly one selected primary course/video entry. Adjacent concepts reuse the same course series where possible; multi-topic lectures may serve more than one closely related node. All links jump to specific Bilibili episodes. DMate only links to the original Bilibili pages; it does not download, host, or redistribute video files or subtitles. No YouTube links."
+    "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
+    "note": "Only direct Bilibili episode links. No YouTube links. Do not download, host, or redistribute video files or subtitles. MIT uses Fall 2010, not Spring 2015. CMU 21-228 (Po-Shen Loh, 2021) is approved for addition once the exact Bilibili video URL is confirmed. Steve Butler Chinese-dubbed version is excluded; only original English audio is acceptable."
   }
 }
