@@ -7,7 +7,10 @@ on:
       - 'templates/index.html'
       - 'static/**'
       - 'scripts/sync_offline_styles.py'
+      - 'scripts/sync_offline_shell.py'
       - 'scripts/test_offline_workspace_browser.cjs'
+      - 'scripts/test_offline_appearance_browser.cjs'
+      - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
@@ -18,7 +21,10 @@ on:
       - 'templates/index.html'
       - 'static/**'
       - 'scripts/sync_offline_styles.py'
+      - 'scripts/sync_offline_shell.py'
       - 'scripts/test_offline_workspace_browser.cjs'
+      - 'scripts/test_offline_appearance_browser.cjs'
+      - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
       - 'scripts/test_service_worker_cache_browser.cjs'
       - 'scripts/test_drawing_panels_browser.cjs'
@@ -52,14 +58,19 @@ jobs:
           node --check static/offline-entry.js
           node --check static/offline-service-worker.js
           node --check static/offline-shell.js
+          node --check static/offline-appearance.js
           node --check static/offline-knowledge-graph.js
           node --check static/script.js
           node --check scripts/test_offline_workspace_browser.cjs
+          node --check scripts/test_offline_appearance_browser.cjs
+          node --check scripts/test_offline_data_migration_browser.cjs
           node --check scripts/test_mobile_drawers_browser.cjs
           node --check scripts/test_service_worker_cache_browser.cjs
           node --check scripts/test_drawing_panels_browser.cjs
       - name: Verify offline styles match the online workspace
-        run: python scripts/sync_offline_styles.py --check
+        run: |
+          python scripts/sync_offline_styles.py --check
+          python scripts/sync_offline_shell.py --check
       - name: Validate JSON content packs
         run: |
           python -m json.tool static/offline-content/concepts.zh-CN.json > /dev/null
@@ -120,6 +131,8 @@ jobs:
         run: |
           mkdir -p artifacts/offline-workspace
           node scripts/test_offline_workspace_browser.cjs
+          node scripts/test_offline_appearance_browser.cjs
+          node scripts/test_offline_data_migration_browser.cjs
           node scripts/test_service_worker_cache_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_drawing_panels_browser.cjs

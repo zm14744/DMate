@@ -3,14 +3,16 @@
   const $ = id => document.getElementById(id);
   const DB_NAME = "dmate-offline-workspace";
   const DB_VERSION = 2;
+  const NOTE_JOURNAL_KEY = "dmate:offline:notebook-journal:v1";
   const state = {
     db: null, concepts: [], questions: [], graph: null,
-    panel: "mistakes", selectedQuestion: null, selectedConcept: null,
+    panel: "", selectedQuestion: null, selectedConcept: null,
     selectedOption: [], revealed: false, recordKind: "note", editingId: null,
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
     questionDifficulty: "", conceptQuery: "", graphQuery: "", graphController: null,
     selectedNoteId: null, noteQuery: "", noteRows: [], noteSaveQueue: Promise.resolve(),
-    questionResponses: new Map(), appearanceQueue: Promise.resolve()
+    questionResponses: new Map(), appearanceQueue: Promise.resolve(),
+    notebookController: null, notebookSnapshot: {notes:[],deleted:{}}, mistakeFilter:"all", mistakeSearch:"", mistakeSort:"recent", graphFocus:false
   };
   const panelMeta = {
     mistakes: ["错题本", "在本机查看、整理和复习已保存的错题。"],
@@ -18,7 +20,8 @@
     drawing: ["绘图", "使用 DMate 图形编辑器，在本机创建和保存数学图形。"],
     graph: ["知识图谱", "浏览离散数学知识点及其前置关系。"],
     questions: ["题库", "按章节和难度练习，查看参考答案与解析。"],
-    concepts: ["概念库", "使用简体中文查看定义、解释、例题和易错点。"]
+    concepts: ["概念库", "使用简体中文查看定义、解释、例题和易错点。"],
+    review: ["学习回顾", "查看保存在本机的学习记录。"]
   };
 
   function toast(message) {
@@ -135,50 +138,7 @@
     if (!settings) {
       try { settings = JSON.parse(localStorage.getItem("dmate:offline:appearance:v1") || "null"); } catch (_) {}
     }
-    settings ||= {};
-    const mode = ["light","dark","navy"].includes(settings.mode) ? settings.mode
-      : (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    const root = document.documentElement;
-    const body = document.body;
-    root.dataset.appearanceTheme = mode;
-    body.dataset.appearanceTheme = mode;
-    root.style.colorScheme = mode === "light" ? "only light" : "dark";
-    body.style.colorScheme = mode === "light" ? "only light" : "dark";
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = mode === "light" ? "#f8fafc" : (mode === "navy" ? "#0f172a" : "#171717");
-
-    const accents = {
-      blue:["#3b82f6","59,130,246","#2563eb","#1d4ed8","#60a5fa","#93c5fd"],
-      purple:["#8b5cf6","139,92,246","#7c3aed","#6d28d9","#a78bfa","#c4b5fd"],
-      teal:["#14b8a6","20,184,166","#0d9488","#0f766e","#5eead4","#99f6e4"]
-    };
-    const accent = accents[settings.accent] || accents.blue;
-    ["--accent","--accent-rgb","--accent-deep","--accent-deeper","--accent-soft","--accent-pale"]
-      .forEach((key,index) => root.style.setProperty(key,accent[index]));
-    root.style.setProperty("--accent-bg","rgba("+accent[1]+",.22)");
-
-    const panelAlpha = Math.max(.75,Math.min(1,(Number(settings.panelOpacity)||100)/100));
-    root.style.setProperty("--panel-alpha",String(panelAlpha));
-    root.style.setProperty("--workspace-alpha",String(Math.max(.08,Math.min(.18,panelAlpha*.14))));
-    root.style.setProperty("--shell-alpha",String(Math.max(.30,Math.min(.48,panelAlpha*.44))));
-    root.style.setProperty("--composer-alpha",String(Math.max(.38,Math.min(.58,panelAlpha*.52))));
-    root.style.setProperty("--bubble-alpha",String(Math.max(.6,Math.min(1,(Number(settings.bubbleOpacity)||100)/100))));
-    root.style.setProperty("--font-scale",settings.fontSize==="small"?".92":settings.fontSize==="large"?"1.08":"1");
-    root.style.setProperty("--background-size",settings.backgroundFit==="contain"?"contain":"cover");
-    root.style.setProperty("--background-blur",Math.max(0,Math.min(12,Number(settings.blur)||0))+"px");
-    root.style.setProperty("--background-mask-alpha",String(Math.max(0,Math.min(70,Number(settings.mask??35)))/100));
-
-    const layer = $("appearanceBackgroundLayer");
-    const blob = saved?.backgroundBlob;
-    if (blob instanceof Blob && blob.size > 0 && layer) {
-      if (state.backgroundUrl) URL.revokeObjectURL(state.backgroundUrl);
-      state.backgroundUrl = URL.createObjectURL(blob);
-      layer.style.backgroundImage = 'url("'+state.backgroundUrl+'")';
-      body.classList.add("has-custom-background");
-    } else {
-      body.classList.remove("has-custom-background");
-      if (layer) layer.style.backgroundImage = "none";
-    }
+    window.DMateOfflineAppearance?.apply(settings || {}, saved?.backgroundBlob || null);
   }
 
   const stamp = () => new Date().toISOString();
@@ -189,17 +149,32 @@
     try { payload = JSON.parse(sessionStorage.getItem("dmate_offline_migration_v1") || "null"); }
     catch (_) { payload = null; }
     if (!payload || typeof payload !== "object") return;
-    const toIso = value => {
-      const time = Number(value);
-      return new Date(Number.isFinite(time) && time > 0 ? time : Date.now()).toISOString();
+    const timestamp = value => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? Math.max(0, numeric) : Date.parse(value) || 0;
     };
+    const toIso = value => new Date(timestamp(value) || Date.now()).toISOString();
+    // Apply locally acknowledged edits first. Otherwise the later journal
+    // replay could overwrite a newer import or hide newly imported note IDs.
+    try {
+      const raw = localStorage.getItem(NOTE_JOURNAL_KEY), pending = raw ? JSON.parse(raw) : null;
+      if (pending?.version === 1 && Array.isArray(pending.rows) && Array.isArray(pending.snapshot?.notes)) {
+        await queueNotebook(pending, raw);
+      }
+    } catch (error) {
+      toast("本机笔记草稿尚未写入，已保留当前内容，稍后重试导入。");
+      return;
+    }
+    const mistakes = new Map((await all("mistakes")).map(row => [row.id, row]));
     for (const item of Array.isArray(payload.wrongQuestions) ? payload.wrongQuestions : []) {
       if (!item || typeof item.question !== "string" || !item.question.trim()) continue;
+      const id = String(item.id || uid()), existing = mistakes.get(id);
+      if (existing && timestamp(item.updatedAt) <= timestamp(existing.updatedAt)) continue;
       const reference = item.referenceAnswer;
       const answer = item.answer || (typeof reference === "string" ? reference
         : reference && typeof reference === "object" ? (reference.text || reference.answer || JSON.stringify(reference)) : "");
-      await put("mistakes", {
-        id: String(item.id || uid()),
+      const row = {
+        ...(existing || {}), id,
         title: String(item.category || item.question).slice(0, 72) || "错题",
         statement: item.question,
         answer: String(answer || ""),
@@ -207,18 +182,36 @@
         knowledgePoints: Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],
         status: item.corrected ? "resolved" : "pending",
         updatedAt: toIso(item.updatedAt)
-      });
+      };
+      await put("mistakes", row); mistakes.set(id, row);
     }
+    const notes = new Map((await all("notes")).map(row => [row.id, row]));
+    const metadata = await transaction("settings", "readonly", os => os.get("notebook-deletions"));
+    const deleted = metadata?.deleted || {};
     for (const note of Array.isArray(payload.notes) ? payload.notes : []) {
       if (!note || typeof note.title !== "string" || typeof note.content !== "string") continue;
-      await put("notes", {
-        id: String(note.id || uid()), title: note.title, content: note.content,
-        updatedAt: toIso(note.updatedAt)
-      });
+      const id = String(note.id || uid()), existing = notes.get(id), incomingAt = timestamp(note.updatedAt);
+      if (Object.hasOwn(deleted, id) && incomingAt <= timestamp(deleted[id])) continue;
+      if (existing && incomingAt <= timestamp(existing.updatedAt)) continue;
+      const row = {...(existing || {}), id, title:note.title, content:note.content, updatedAt:toIso(note.updatedAt)};
+      await put("notes", row); notes.set(id, row);
     }
     if (typeof payload.drawings === "string" && payload.drawings) {
-      try { localStorage.setItem("dmate:offline:drawing-gallery:v1", payload.drawings); }
-      catch (error) { toast("旧绘图库未能迁移，请先导出原画板：" + (error?.message || "")); }
+      try {
+        const key = "dmate:offline:drawing-gallery:v1", current = localStorage.getItem(key);
+        if (!current) localStorage.setItem(key, payload.drawings);
+        else {
+          const local = JSON.parse(current), incoming = JSON.parse(payload.drawings);
+          if (Array.isArray(local?.pages) && Array.isArray(incoming?.pages)) {
+            const pages = local.pages.slice(), ids = new Set(pages.map(page => page.id));
+            for (const page of incoming.pages) if (page && typeof page.id === "string" && !ids.has(page.id) && pages.length < 50) {
+              pages.push(page); ids.add(page.id);
+            }
+            // Local page positions, documents and the active page stay intact.
+            localStorage.setItem(key, JSON.stringify({...local, pages}));
+          }
+        }
+      } catch (error) { toast("本机绘图库已保留，部分在线绘图未能导入：" + (error?.message || "")); }
     }
     sessionStorage.removeItem("dmate_offline_migration_v1");
     toast("已导入当前账号的错题、笔记和绘图到本机离线区");
@@ -244,39 +237,46 @@
     $("returnOnline").title = online ? "返回在线版" : "网络恢复后可返回在线版";
   }
 
-  function switchPanel(name) {
+  async function switchPanel(name, trigger) {
     if (!panelMeta[name]) return;
     state.panel = name;
-    document.querySelectorAll(".offline-nav-item").forEach(item => {
-      const selected = item.dataset.panel === name;
-      item.classList.toggle("active", selected);
-      if (selected) item.setAttribute("aria-current", "page"); else item.removeAttribute("aria-current");
-    });
-    for (const key of Object.keys(panelMeta)) {
-      const node = $(key + "Panel");
-      if (node) node.hidden = key !== name;
-    }
-    $("panelTitle").textContent = panelMeta[name][0];
-    $("panelDescription").textContent = panelMeta[name][1];
-    let rendering;
-    if (name === "mistakes") rendering = renderMistakes();
-    if (name === "notes") rendering = renderNotes();
+    const section = $(name + "Panel");
+    if (section) section.hidden = false;
+    if ($("panelTitle")) $("panelTitle").textContent = panelMeta[name][0];
+    if ($("panelDescription")) $("panelDescription").textContent = panelMeta[name][1];
+    // Open before drawing/graph mount so their camera measures the actual modal.
+    window.DMateOfflineShell?.openModule(name, trigger);
+    if (name === "mistakes") await renderMistakes();
+    if (name === "notes") await renderNotes();
     if (name === "drawing") mountDrawing();
     if (name === "graph") renderGraph();
     if (name === "questions") renderQuestions();
     if (name === "concepts") renderConcepts();
+    if (name === "review") await renderReview();
     window.dispatchEvent(new CustomEvent("dmate:offlinepanelchange", {detail:{panel:name}}));
-    return rendering;
   }
 
   async function renderMistakes() {
-    const rows = (await all("mistakes")).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
-    $("mistakeCount").textContent = rows.length + " 道错题";
+    const saved = await all("mistakes");
+    if ($("mistakeCount")) $("mistakeCount").textContent = saved.length + " 道错题";
+    const label = $("wrongBookBtn")?.querySelector(".dmate-ui-label");
+    if (label) label.textContent = "错题本 (" + saved.length + ")";
+    if ($("wrongBookStats")) $("wrongBookStats").textContent = "共 " + saved.length + " 道 · 待处理 " + saved.filter(row => row.status !== "resolved").length + " 道";
+    const query = state.mistakeSearch.toLocaleLowerCase();
+    const rows = saved.filter(row => (state.mistakeFilter === "all" || (state.mistakeFilter === "corrected") === (row.status === "resolved"))
+      && (!query || [row.title,row.statement,row.content,row.answer,row.explanation].join("\n").toLocaleLowerCase().includes(query)));
+    rows.sort((a,b) => state.mistakeSort === "oldest" ? String(a.updatedAt).localeCompare(String(b.updatedAt))
+      : state.mistakeSort === "mistakes" ? (Number(b.wrongCount) || 1) - (Number(a.wrongCount) || 1)
+      : String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    document.querySelectorAll("[data-wrong-filter]").forEach(button => {
+      const active = button.dataset.wrongFilter === state.mistakeFilter;
+      button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active));
+    });
     const list = $("mistakeList");
     list.classList.add("wrong-book-list");
     list.replaceChildren();
     if (!rows.length) {
-      list.append(el("div", "wrong-empty offline-empty", "无"));
+      list.append(el("div", "wrong-empty", "无"));
       return;
     }
     for (const row of rows) {
@@ -298,88 +298,114 @@
       }
       card.append(answerDetails("查看答案", row.answer || "这条记录没有保存参考答案。"));
       if (row.explanation) card.append(answerDetails("查看解析", row.explanation, "wrong-analysis-details"));
-      const actions = el("div", "wrong-actions record-actions");
-      if (row.status !== "resolved") actions.append(action("完成订正", "", async () => {
+      const actions = el("div", "wrong-actions");
+      if (row.status !== "resolved") actions.append(button("完成订正", "", async () => {
         await put("mistakes", {...row, status:"resolved", updatedAt:stamp()}); renderMistakes();
-      }, "check"));
-      const edit = action("编辑/笔记", "secondary", () => openRecord("mistakes", row), "edit");
+      }));
+      const edit = button("编辑/笔记", "secondary", () => openRecord("mistakes", row));
       edit.dataset.action = "edit-mistake";
-      const deletion = action("移出错题本", "secondary danger", async () => {
+      const deletion = button("移出错题本", "secondary danger", async () => {
         if (await confirmDelete($("mistakesPanel"), "移出这道错题？", row.statement || row.title)) {
           await remove("mistakes", row.id); await renderMistakes();
         }
-      }, "trash");
+      });
       deletion.dataset.action = "delete-mistake";
+      for (const control of [edit, deletion]) { control.setAttribute("aria-label",control.textContent); control.title=control.textContent; }
       actions.append(edit, deletion); card.append(actions); list.append(card);
     }
   }
 
-  async function renderNotes() {
-    await state.noteSaveQueue;
-    const rows = (await all("notes")).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
-    state.noteRows = rows;
-    if (!rows.some(row => row.id === state.selectedNoteId)) state.selectedNoteId = rows[0]?.id || null;
-    $("noteCount").textContent = rows.length + " 条笔记";
-    const host = $("noteList");
-    host.classList.add("dcn-content", "offline-notebook");
-    host.replaceChildren();
-    const sidebar = el("aside", "dcn-sidebar"), main = el("section", "dcn-main");
-    sidebar.setAttribute("aria-label", "概念笔记列表");
-    const search = el("input", "dcn-search");
-    search.type = "search"; search.placeholder = "搜索"; search.setAttribute("aria-label", "搜索笔记"); search.value = state.noteQuery;
-    const list = el("div", "dcn-list");
-    function renderList() {
-      list.replaceChildren();
-      const query = state.noteQuery.toLocaleLowerCase();
-      const visible = state.noteRows.filter(row => !query || (row.title + "\n" + row.content).toLocaleLowerCase().includes(query));
-      if (!visible.length) list.append(el("p", "dcn-list-empty", rows.length ? "没有匹配的概念。" : "无"));
-      for (const row of visible) {
-        const item = el("div", "dcn-note" + (row.id === state.selectedNoteId ? " is-current" : ""));
-        item.dataset.noteId = row.id;
-        const open = button(row.title.trim() || "未命名概念", "dcn-note-open", () => {
-          state.selectedNoteId = row.id; renderList(); renderEditor();
-        });
-        open.setAttribute("aria-current", String(row.id === state.selectedNoteId));
-        const deletion = button("", "dcn-note-delete", async () => {
-          if (await confirmDelete($("notesPanel"), "删除这个概念？", row.title.trim() || "未命名概念")) {
-            await state.noteSaveQueue; await remove("notes", row.id); await renderNotes();
-          }
-        });
-        deletion.title = "删除概念：" + (row.title.trim() || "未命名概念");
-        deletion.setAttribute("aria-label", deletion.title);
-        item.append(open, deletion); list.append(item);
+  function notebookRows(snapshot) {
+    const previous = new Map(state.noteRows.map(row => [row.id, row]));
+    return snapshot.notes.map(note => ({...(previous.get(note.id) || {}), id:note.id, title:note.title,
+      content:note.content, updatedAt:new Date(note.updatedAt).toISOString()}));
+  }
+
+  function writeNotebook(payload) {
+    return new Promise((resolve, reject) => {
+      const tx = state.db.transaction(["notes", "settings"], "readwrite");
+      const notes = tx.objectStore("notes");
+      for (const row of payload.rows) notes.put(row);
+      const current = new Map(payload.snapshot.notes.map(note => [note.id, note.updatedAt]));
+      for (const [id, deletedAt] of Object.entries(payload.snapshot.deleted || {})) {
+        if (!(current.get(id) > deletedAt)) notes.delete(id);
       }
+      tx.objectStore("settings").put({id:"notebook-deletions", deleted:payload.snapshot.deleted || {}, updatedAt:stamp()});
+      tx.oncomplete = resolve;
+      tx.onerror = tx.onabort = () => reject(tx.error || new Error("笔记保存失败"));
+    });
+  }
+
+  function queueNotebook(payload, journal) {
+    const operation = state.noteSaveQueue.then(async () => {
+      await writeNotebook(payload);
+      // A newer edit may already be queued; never remove its recovery copy.
+      if (localStorage.getItem(NOTE_JOURNAL_KEY) === journal) localStorage.removeItem(NOTE_JOURNAL_KEY);
+      if ($("noteCount")) $("noteCount").textContent = state.notebookSnapshot.notes.length + " 条笔记";
+    });
+    state.noteSaveQueue = operation.catch(error => {
+      // The synchronous journal remains durable even when IndexedDB is full.
+      // Keep the error visible; a later edit/open retries that latest snapshot.
+      const saved = $("conceptNotebookDialog")?.querySelector(".dcn-saved");
+      if (saved) saved.textContent = "笔记暂存于本机，数据库保存失败，请重试。";
+      toast(error?.message || "笔记保存失败，已保留本机草稿");
+    });
+    return operation;
+  }
+
+  function saveNotebook(snapshot) {
+    snapshot = JSON.parse(JSON.stringify(snapshot));
+    for (const note of snapshot.notes) if (note.updatedAt > (snapshot.deleted[note.id] ?? Infinity)) delete snapshot.deleted[note.id];
+    const rows = notebookRows(snapshot), payload = {version:1, snapshot, rows};
+    const journal = JSON.stringify(payload);
+    // The shared component has a synchronous persistence contract. Only
+    // acknowledge an edit after a recoverable local copy was really written.
+    localStorage.setItem(NOTE_JOURNAL_KEY, journal);
+    state.notebookSnapshot = JSON.parse(JSON.stringify(snapshot));
+    state.noteRows = rows;
+    void queueNotebook(payload, journal).catch(() => {});
+  }
+
+  async function initNotebook() {
+    state.noteRows = await all("notes");
+    const metadata = await transaction("settings", "readonly", os => os.get("notebook-deletions"));
+    state.notebookSnapshot = {notes:state.noteRows.map(row => ({id:row.id, title:String(row.title || ""), content:String(row.content || ""),
+      updatedAt:Number.isFinite(Number(row.updatedAt)) ? Number(row.updatedAt) : Date.parse(row.updatedAt) || Date.now()})), deleted:metadata?.deleted || {}};
+    state.notebookSnapshot.notes = state.notebookSnapshot.notes.filter(note =>
+      !(state.notebookSnapshot.deleted[note.id] >= note.updatedAt));
+    for (const note of state.notebookSnapshot.notes) if (note.updatedAt > (state.notebookSnapshot.deleted[note.id] ?? Infinity)) delete state.notebookSnapshot.deleted[note.id];
+    try {
+      const raw = localStorage.getItem(NOTE_JOURNAL_KEY), pending = raw ? JSON.parse(raw) : null;
+      if (pending?.version === 1 && Array.isArray(pending.rows) && Array.isArray(pending.snapshot?.notes)) {
+        state.notebookSnapshot = pending.snapshot;
+        state.noteRows = pending.rows;
+        await queueNotebook(pending, raw).catch(() => {});
+      }
+    } catch (error) { toast(error?.message || "笔记草稿暂时无法恢复"); }
+    state.notebookController = window.DMateConceptNotebook.mount({
+      button:$("conceptNotebookBtn"), dialog:$("conceptNotebookDialog"),
+      getContextKey:() => "offline-local", getState:() => state.notebookSnapshot,
+      onChange:saveNotebook,
+      confirmDelete:options => window.DMateDeleteConfirm.request($("conceptNotebookDialog"), options),
+      // Keep the shared analysis controls and their normal error presentation,
+      // without ever issuing a network request for an offline-only operation.
+      fetch:async () => ({ok:false, json:async () => ({ok:false, error:"AI 解释与关联分析需要联网；离线可编辑笔记，或在概念库查看内置解释。"})})
+    });
+  }
+
+  async function renderNotes() {
+    if (!state.notebookController) await initNotebook();
+    const raw = localStorage.getItem(NOTE_JOURNAL_KEY);
+    if (raw) {
+      try { await queueNotebook(JSON.parse(raw), raw); } catch (_) {}
     }
-    function renderEditor() {
-      main.replaceChildren();
-      const row = state.noteRows.find(note => note.id === state.selectedNoteId);
-      if (!row) { main.append(el("div", "offline-empty", "无")); return; }
-      const editor = el("section", "dcn-editor");
-      const nameLabel = el("label", "", "概念名称"), name = el("input", "dcn-title");
-      name.maxLength = 160; name.value = row.title; name.setAttribute("aria-label", "概念名称"); nameLabel.append(name);
-      const bodyLabel = el("label", "", "我的概念笔记"), body = el("textarea", "dcn-original");
-      body.maxLength = Math.max(12000, row.content.length); body.rows = 9; body.value = row.content; body.setAttribute("aria-label", "我的概念笔记"); bodyLabel.append(body);
-      const saved = el("span", "dcn-saved", "已保存在本机"); saved.setAttribute("role", "status");
-      const edit = () => {
-        row.title = name.value; row.content = body.value; row.updatedAt = stamp();
-        const value = {...row}; saved.textContent = "正在保存…";
-        state.noteSaveQueue = state.noteSaveQueue.then(() => put("notes", value)).then(() => {
-          saved.textContent = "已保存在本机";
-        }).catch(error => { saved.textContent = "保存失败，请保留当前页面后重试。"; toast(error?.message || "笔记保存失败"); });
-        renderList();
-      };
-      name.addEventListener("input", edit); body.addEventListener("input", edit);
-      editor.append(nameLabel, bodyLabel, saved); main.append(editor);
-    }
-    search.addEventListener("input", () => { state.noteQuery = search.value.trim(); renderList(); });
-    sidebar.append(search, list); host.append(sidebar, main); renderList(); renderEditor();
+    state.notebookController.refresh();
+    state.notebookController.open();
   }
 
   async function createNote() {
-    await state.noteSaveQueue;
-    const row = {id:uid(), title:"", content:"", updatedAt:stamp()};
-    await put("notes", row); state.selectedNoteId = row.id; state.noteQuery = "";
-    await renderNotes(); $("noteList").querySelector(".dcn-title")?.focus();
+    await switchPanel("notes");
+    $("conceptNotebookDialog").querySelector(".dcn-primary")?.click();
   }
 
   function openRecord(kind, row = null) {
@@ -606,30 +632,63 @@
 
   function renderGraph() {
     if (!state.graph?.nodes) return;
-    const categories = [...new Set(state.graph.nodes.map(n => n.category))];
-    const filters = $("graphCategories"); filters.replaceChildren();
-    filters.append(button("全部", "offline-chip" + (!state.graphCategory ? " active" : ""), () => { state.graphCategory=""; renderGraph(); }));
-    for (const category of categories) {
-      filters.append(button(category, "offline-chip" + (state.graphCategory === category ? " active" : ""), () => { state.graphCategory=category; renderGraph(); }));
+    const query = ($("knowledgeGraphSearch") || $("graphSearch"))?.value.trim().toLocaleLowerCase() || "";
+    const categories = [...new Set(state.graph.nodes.map(node => node.category))];
+    const category = $("knowledgeGraphCategory");
+    if (category && category.options.length !== categories.length + 1) {
+      category.replaceChildren(new Option("全部", ""), ...categories.map(value => new Option(value, value)));
+      category.value=state.graphCategory;
     }
-    const query = $("graphSearch").value.trim().toLocaleLowerCase();
-    const nodes = state.graph.nodes.filter(n =>
-      (!state.graphCategory || n.category === state.graphCategory) &&
-      (!query || [n.name,n.category].join(" ").toLocaleLowerCase().includes(query))
-    );
-    $("graphCount").textContent = nodes.length + " 个知识点";
-    const host = $("graphNodes");
+    if ($("knowledgeGraphCategoryTrigger")) $("knowledgeGraphCategoryTrigger").textContent = "模块：" + (state.graphCategory || "全部");
+    const nodes = state.graph.nodes.filter(node => (!state.graphCategory || node.category === state.graphCategory)
+      && (!query || [node.name,node.category].join(" ").toLocaleLowerCase().includes(query)));
+    if ($("graphCount")) $("graphCount").textContent = nodes.length + " 个知识点";
+    const host = $("knowledgeGraphCanvas") || $("graphNodes");
     state.graphController?.destroy(); state.graphController = null;
-    host.classList.remove("offline-card-grid"); host.replaceChildren();
+    host.replaceChildren();
     if (!window.DMateOfflineGraph?.mount) {
-      host.append(el("div", "kg-empty", "知识图谱组件尚未加载，请刷新后重试。")); return;
+      host.append(el("div", "wrong-empty", "知识图谱组件尚未加载，请刷新后重试。")); return;
     }
-    state.graphController = window.DMateOfflineGraph.mount(host, {nodes, onSelect(node) {
-      const concept = state.concepts.find(c => c.id === node.id || c.title === node.name);
+    state.graphController = window.DMateOfflineGraph.mount(host, {nodes, onNotice:toast, onSelect(node) {
+      const concept = state.concepts.find(item => item.id === node.id || item.title === node.name);
       if (concept) {
-        $("conceptSearch").value = ""; switchPanel("concepts"); fillConceptDetail(concept);
+        $("conceptSearch").value = ""; state.selectedConcept = concept;
+        void switchPanel("concepts");
       } else toast("该知识点尚无独立概念条目");
     }});
+    if ($("knowledgeGraphSummary")) $("knowledgeGraphSummary").textContent = (state.graphCategory || "全部知识") + " · " + nodes.length + " 个知识点";
+    applyGraphFocus();
+  }
+
+  async function applyGraphFocus() {
+    const controller=state.graphController;
+    $("knowledgeGraphScopeBtn")?.classList.toggle("active", state.graphFocus);
+    $("knowledgeGraphScopeBtn")?.setAttribute("aria-pressed", String(state.graphFocus));
+    $("knowledgeGraphFocusBtn")?.classList.toggle("active", !state.graphFocus);
+    $("knowledgeGraphFocusBtn")?.setAttribute("aria-pressed", String(!state.graphFocus));
+    if (!controller) return;
+    if (!state.graphFocus) { controller.showAll(); return; }
+    let question=state.selectedQuestion;
+    if (!question) {
+      const recent=(await all("practice")).sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+      question=state.questions.find(item => item.id === recent?.questionId);
+    }
+    if (controller !== state.graphController) return;
+    if (!question?.knowledge_points?.length) { controller.showAll(); toast("暂无最近练习，先显示全部知识。完成练习后可查看关联知识。"); return; }
+    controller.focus(question.knowledge_points);
+  }
+
+  async function showGraphHistory() {
+    $("knowledgeGraphDetailTab")?.classList.remove("active"); $("knowledgeGraphHistoryTab")?.classList.add("active");
+    $("knowledgeGraphDetailWrap")?.classList.add("hidden"); $("knowledgeGraphHistoryWrap")?.classList.remove("hidden");
+    const history=$("knowledgeGraphHistory"), rows=(await all("practice")).sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    history.replaceChildren();
+    for (const row of rows) {
+      const question=state.questions.find(item => item.id === row.questionId); if (!question) continue;
+      const item=button("", "kg-history-item", () => { state.selectedQuestion=question; state.graphFocus=true; void applyGraphFocus(); });
+      item.append(el("div", "kg-history-item-top", question.title), el("div", "small", new Date(row.createdAt).toLocaleString())); history.append(item);
+    }
+    if (!history.childElementCount) history.append(el("div", "wrong-empty", "无"));
   }
 
   function mountDrawing() {
@@ -655,7 +714,9 @@
 
   async function exportData() {
     await state.noteSaveQueue;
-    const [mistakes, notes, practice] = await Promise.all([all("mistakes"), all("notes"), all("practice")]);
+    const [mistakes, practice] = await Promise.all([all("mistakes"), all("practice")]);
+    // Include the durable journal's latest edits even if IndexedDB is full.
+    const notes = notebookRows(state.notebookSnapshot);
     const drawings = localStorage.getItem("dmate:offline:drawing-gallery:v1") || "";
     const payload = {format:"dmate-offline-backup",version:1,createdAt:stamp(),mistakes,notes,practice,drawings};
     const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
@@ -678,53 +739,171 @@
     if (!previous) {
       try { previous = JSON.parse(localStorage.getItem("dmate:offline:appearance:v1") || "null"); } catch (_) {}
     }
+    const patch = changes?.settings || changes || {};
     const fields = ["mode", "accent", "fontSize", "panelOpacity", "bubbleOpacity", "backgroundFit", "blur", "mask"];
     const next = {...(previous || {})};
-    for (const key of fields) if (Object.hasOwn(changes || {}, key)) next[key] = changes[key];
-    // Preserve the existing background Blob and all saved appearance metadata.
-    await put("settings", {...(saved || {}), id:"appearance", settings:next, updatedAt:stamp()});
+    for (const key of fields) if (Object.hasOwn(patch, key)) next[key] = patch[key];
+    const value = {...(saved || {}), id:"appearance", settings:next, updatedAt:stamp()};
+    if (changes?.removeBackground) delete value.backgroundBlob;
+    else if (changes?.backgroundBlob instanceof Blob) value.backgroundBlob = changes.backgroundBlob;
+    await put("settings", value);
     try { localStorage.setItem("dmate:offline:appearance:v1", JSON.stringify(next)); } catch (_) {}
-    await applyOriginalAppearance();
+    window.DMateOfflineAppearance?.apply(next, value.backgroundBlob || null);
     window.dispatchEvent(new CustomEvent("offline:appearance-applied", {detail:{settings:next}}));
   }
 
+  async function renderReview() {
+    const [mistakes, practice] = await Promise.all([all("mistakes"), all("practice")]);
+    const body = $("learningReviewBody");
+    let summary = body.querySelector("[data-offline-review-summary]");
+    if (!summary) { summary = el("section", "learning-review-section"); summary.dataset.offlineReviewSummary = ""; body.prepend(summary); }
+    summary.replaceChildren(el("h3", "", "学习记录"));
+    summary.append(el("p", "", "共完成 " + practice.length + " 次练习，保存 " + mistakes.length + " 道错题、" + state.notebookSnapshot.notes.length + " 条概念笔记。"));
+  }
+
+  function queryLocal(text, mode) {
+    const query = String(text || "").trim();
+    if (!query) return;
+    const chat = $("chat");
+    chat.closest(".center")?.classList.remove("chat-empty");
+    const message = (role, content) => {
+      const bubble = el("div", "msg " + role), inner = el("div", "msg-content");
+      if (typeof content === "string") inner.textContent = content; else inner.append(content);
+      bubble.append(inner); chat.append(bubble); return inner;
+    };
+    message("user", query);
+    const key = query.toLocaleLowerCase(), ignored = new Set(["什么","么是","是什","解释","说明","一下","帮我","讲讲","告诉","怎么","如何"]);
+    const chinese = (key.match(/[\u3400-\u9fff]{2,}/g) || []).flatMap(part =>
+      Array.from({length:part.length-1}, (_,index) => part.slice(index,index+2)).filter(term => !ignored.has(term)));
+    const tokens = [...new Set([...(key.match(/[a-z0-9]+|[\u3400-\u9fff]{2,}/g) || [key]), ...chinese,
+      ...state.concepts.flatMap(item => [item.title,item.category]).filter(term => key.includes(term.toLocaleLowerCase()))])];
+    const score = text => {
+      const source = String(text).toLocaleLowerCase();
+      return (source.includes(key) ? 20 : 0) + tokens.reduce((sum, token) => sum + (source.includes(token) ? Math.min(token.length, 8) : 0), 0);
+    };
+    const concepts = state.concepts.map(item => ({item, rank:score([item.title,item.category,item.summary,item.definition].join(" "))}))
+      .filter(row => row.rank > 0).sort((a,b) => b.rank-a.rank).slice(0,3);
+    const questions = state.questions.map(item => ({item, rank:score([item.title,item.category,item.statement].join(" "))}))
+      .filter(row => row.rank > 0).sort((a,b) => b.rank-a.rank).slice(0,3);
+    const response = el("div", "ai-content");
+    if (!concepts.length && !questions.length) response.append(el("p", "", "离线资料中没有找到匹配内容。可在学习工具中查看概念、练习、错题和笔记；联网后可使用完整聊天与解题。"));
+    else {
+      response.append(el("p", "", "在本机资料中找到以下内容："));
+      const addConcept = ({item}) => {
+        const section = el("section", ""); section.append(el("h3", "", item.title), rich("", item.definition));
+        section.append(button("查看概念", "", async () => { state.selectedConcept=item; $("conceptSearch").value=""; await switchPanel("concepts"); })); response.append(section);
+      };
+      const addQuestion = ({item}) => response.append(button(item.title, "", async () => {
+        state.questionCategory=""; state.questionDifficulty=""; $("questionCategory").value=""; $("questionDifficulty").value="";
+        await switchPanel("questions"); selectQuestion(item);
+      }));
+      if (mode === "question") { questions.forEach(addQuestion); concepts.forEach(addConcept); }
+      else { concepts.forEach(addConcept); questions.forEach(addQuestion); }
+    }
+    message("ai", response); chat.scrollTop=chat.scrollHeight;
+  }
+
+  let choiceResolver=null;
+  function closeChoice(result=null) {
+    const modal=$("mobileChoiceModal"), resolve=choiceResolver; choiceResolver=null;
+    if (modal) { modal.classList.add("hidden"); modal.setAttribute("aria-hidden","true"); if (modal.open) modal.close(); }
+    if (resolve) resolve(result);
+  }
+  function openChoice({title="请选择", intro="", options=[], value=""}={}) {
+    const modal=$("mobileChoiceModal"); if (!modal) return Promise.resolve(null);
+    closeChoice(); $("mobileChoiceTitle").textContent=title; $("mobileChoiceIntro").textContent=intro;
+    $("mobileChoiceIntro").hidden=!intro; $("mobileChoiceIntro").classList.toggle("hidden", !intro);
+    $("mobileChoiceList").replaceChildren(...options.map(option => {
+      const item=button("", "mobile-choice-option" + (String(option.value) === String(value) ? " active" : ""), () => closeChoice(option));
+      item.disabled=Boolean(option.disabled); item.setAttribute("role","radio"); item.setAttribute("aria-checked",String(String(option.value) === String(value)));
+      item.append(el("span","mobile-choice-option-text",option.label), el("span","mobile-choice-option-check")); return item;
+    }));
+    modal.classList.remove("hidden"); modal.setAttribute("aria-hidden","false");
+    if (!modal.open) modal.showModal();
+    requestAnimationFrame(() => (modal.querySelector(".mobile-choice-option.active:not(:disabled)") || modal.querySelector("button:not(:disabled)"))?.focus({preventScroll:true}));
+    return new Promise(resolve => { choiceResolver=resolve; });
+  }
+  async function chooseSelect(select, title) {
+    const result=await openChoice({title,value:select.value, options:[...select.options].map(option => ({value:option.value,label:option.label,disabled:option.disabled}))});
+    if (result && select.isConnected && select.value !== result.value) { select.value=result.value; select.dispatchEvent(new Event("change",{bubbles:true})); }
+  }
+  window.openMobileChoiceModal=openChoice;
+  window.closeMobileChoiceModal=()=>closeChoice();
+
   function bind() {
-    document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
-    $("addMistake").addEventListener("click", () => openRecord("mistakes"));
-    $("addNote").addEventListener("click", () => createNote().catch(error => toast(error?.message || "无法新建笔记")));
+    document.querySelectorAll("[data-offline-panel]").forEach(item => item.addEventListener("click", () => {
+      void switchPanel(item.dataset.offlinePanel, item).catch(error => toast(error?.message || "无法打开学习工具"));
+    }));
+    $("addMistake")?.addEventListener("click", () => openRecord("mistakes"));
+    $("addNote")?.addEventListener("click", () => createNote().catch(error => toast(error?.message || "无法新建笔记")));
     $("recordForm").addEventListener("submit", event => saveRecord(event).catch(error => toast(error?.message || "本地保存失败")));
     $("cancelRecord").addEventListener("click", () => $("recordDialog").close());
     $("cancelRecordSecondary")?.addEventListener("click", () => $("recordDialog").close());
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
-    $("graphSearch").addEventListener("input", renderGraph);
+    ($("knowledgeGraphSearch") || $("graphSearch"))?.addEventListener("input", renderGraph);
+    $("wrongBookSearch")?.addEventListener("input", event => {
+      state.mistakeSearch=event.target.value.trim(); $("wrongBookSearchClear")?.classList.toggle("hidden", !event.target.value); void renderMistakes();
+    });
+    $("wrongBookSearchClear")?.addEventListener("click", () => {
+      $("wrongBookSearch").value=""; state.mistakeSearch=""; $("wrongBookSearchClear").classList.add("hidden"); void renderMistakes();
+    });
+    $("wrongBookSort")?.addEventListener("change", event => {
+      state.mistakeSort=event.target.value;
+      if ($("wrongBookSortTrigger")) $("wrongBookSortTrigger").textContent=event.target.selectedOptions[0].textContent;
+      void renderMistakes();
+    });
+    $("wrongBookSortTrigger")?.addEventListener("click", () => { void chooseSelect($("wrongBookSort"), "错题排序"); });
+    document.querySelectorAll("[data-wrong-filter]").forEach(item => item.addEventListener("click", () => {
+      state.mistakeFilter=state.mistakeFilter===item.dataset.wrongFilter ? "all" : item.dataset.wrongFilter; void renderMistakes();
+    }));
+    $("wrongPdfBtn")?.addEventListener("click", () => window.print());
+    $("mobileChoiceClose")?.addEventListener("click", () => closeChoice());
+    $("mobileChoiceModal")?.addEventListener("cancel", event => { event.preventDefault(); closeChoice(); });
+    $("mobileChoiceModal")?.addEventListener("click", event => { if (event.target === event.currentTarget) closeChoice(); });
+    $("knowledgeGraphCategory")?.addEventListener("change", event => { state.graphCategory=event.target.value; state.graphFocus=false; renderGraph(); });
+    $("knowledgeGraphCategoryTrigger")?.addEventListener("click", () => { void chooseSelect($("knowledgeGraphCategory"), "知识图谱分类"); });
+    $("knowledgeGraphScopeBtn")?.addEventListener("click", () => { state.graphFocus=true; void applyGraphFocus(); });
+    $("knowledgeGraphFocusBtn")?.addEventListener("click", () => { state.graphFocus=false; void applyGraphFocus(); });
+    $("knowledgeGraphHistoryTab")?.addEventListener("click", () => { void showGraphHistory(); });
+    $("knowledgeGraphDetailTab")?.addEventListener("click", () => {
+      $("knowledgeGraphDetailTab").classList.add("active"); $("knowledgeGraphHistoryTab").classList.remove("active");
+      $("knowledgeGraphDetailWrap").classList.remove("hidden"); $("knowledgeGraphHistoryWrap").classList.add("hidden");
+    });
+    window.addEventListener("offline:query", event => queryLocal(event.detail?.text, event.detail?.mode));
+    window.addEventListener("offline:toast", event => toast(event.detail?.message || event.detail));
     $("exportLocalData").addEventListener("click", () => exportData().catch(error => toast(error.message)));
     $("returnOnline").addEventListener("click", returnOnline);
     window.addEventListener("online", setNetworkStatus);
     window.addEventListener("offline", setNetworkStatus);
     window.addEventListener("offline:appearance-change", event => {
       state.appearanceQueue = state.appearanceQueue.then(() => saveAppearance(event.detail))
-        .catch(error => toast(error?.message || "外观保存失败"));
+        .catch(error => { window.DMateOfflineAppearance?.fail(error); toast(error?.message || "外观保存失败"); });
     });
   }
 
   async function init() {
     try {
       setNetworkStatus();
+      if ($("info")) { $("info").textContent="无"; $("info").classList.add("is-empty"); }
       state.db = await openDb();
       await applyOriginalAppearance();
       configureRenderer();
       await migrateCurrentAccountData();
       await loadResources();
+      await initNotebook();
       bind();
       $("saveState").textContent = "本地保存已启用";
-      await switchPanel("mistakes");
+      await renderMistakes();
       document.documentElement.dataset.offlineReady = "true";
     } catch (error) {
       $("saveState").textContent = "初始化失败";
       toast(error?.message || "离线工作区初始化失败");
     }
   }
+  window.DMateOfflineWorkspace = {openPanel:switchPanel, closeNotebook() {
+    state.notebookController?.close(); return !$("conceptNotebookDialog").open;
+  }};
   init();
 })();

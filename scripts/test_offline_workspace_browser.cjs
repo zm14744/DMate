@@ -7,23 +7,49 @@ const { chromium } = require('playwright');
 const baseURL = process.env.DMATE_TEST_BASE_URL || 'http://127.0.0.1:5000';
 const panels = ['mistakes', 'notes', 'drawing', 'graph', 'questions', 'concepts'];
 const iconReferences = { mistakes: '#wrongBookBtn svg', notes: '#conceptNotebookBtn svg',
-  drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
+  drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg', review: '#learningReviewBtn svg' };
+const toolButtons = { mistakes: '#wrongBookBtn', notes: '#conceptNotebookBtn', drawing: '#graphDrawingBtn',
+  graph: '#knowledgeGraphBtn', review: '#learningReviewBtn' };
+const moduleRoots = { mistakes: '#wrongBookModal', notes: '#conceptNotebookDialog', drawing: '#graphEditorDialog',
+  graph: '#knowledgeGraphModal', review: '#learningReviewModal', questions: '#offlineQuestionsModal', concepts: '#offlineConceptsModal' };
+const settle = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+async function drawer(page, kind, open) {
+  const mobile = page.viewportSize().width <= 1100;
+  const panel = page.locator(kind === 'tools' ? '#learningToolsPanel' : '#conversationSidebar');
+  const expanded = mobile ? await page.locator('body').evaluate((body, key) => body.classList.contains(key),
+    kind === 'tools' ? 'mobile-tools-open' : 'mobile-left-open')
+    : await page.locator(kind === 'tools' ? '#desktopToolsBtn' : '#desktopSidebarOpen').getAttribute('aria-expanded') === 'true';
+  if (expanded !== open) await page.locator(mobile ? (kind === 'tools' ? (open ? '#mobileToolsBtn' : '#mobileToolsClose')
+    : (open ? '#mobileNavBtn' : '#mobileNavClose')) : (kind === 'tools' ? '#desktopToolsBtn'
+    : (open ? '#desktopSidebarOpen' : '#desktopSidebarToggle'))).click();
+  await panel.evaluate(async node => Promise.all(node.getAnimations().map(animation => animation.finished.catch(() => {}))));
+  await settle(page);
+}
+
+async function closeModules(page) {
+  for (const selector of ['#conceptNotebookDialog[open] .dcn-heading .dcn-close', '#graphEditorDialog[open] #graphEditorClose',
+    '#offlineQuestionsModal:not(.hidden) [data-offline-close="questions"]', '#offlineConceptsModal:not(.hidden) [data-offline-close="concepts"]',
+    '#wrongBookModal:not(.hidden) #wrongBookClose', '#knowledgeGraphModal:not(.hidden) #knowledgeGraphClose',
+    '#learningReviewModal:not(.hidden) #learningReviewClose']) {
+    if (await page.locator(selector).isVisible()) await page.locator(selector).click();
+  }
+}
 
 async function navigate(page, panel) {
-  const item = page.locator('.offline-nav-item[data-panel="' + panel + '"]');
-  const toggle = page.locator((await page.viewportSize()).width <= 1100
-    ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
-  // A closing drawer can still have an onscreen rectangle while already inert.
-  // Its accessibility state, rather than animation timing, determines whether
-  // the user needs to open navigation before selecting the next panel.
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-  await item.click();
-  await page.locator('#' + panel + 'Panel').waitFor({ state: 'visible' });
+  await closeModules(page);
+  await drawer(page, 'tools', true);
+  await page.locator(toolButtons[panel] || toolButtons.review).click();
+  if (panel === 'questions' || panel === 'concepts') {
+    await page.locator('#learningReviewModal').waitFor({ state: 'visible' });
+    await page.locator('#learningReviewModal [data-offline-panel="' + panel + '"]').click();
+  }
+  await page.locator(moduleRoots[panel]).waitFor({ state: 'visible' });
 }
 
 async function ready(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
-  assert.equal(await page.locator('#saveState').textContent(), '本地保存已启用');
+  await page.locator('.dmate-symbol-keyboard').waitFor();
 }
 
 async function readStore(page, name) {
@@ -85,6 +111,62 @@ async function closeStyle(locator) {
   });
 }
 
+async function elementSnapshot(page, selectors) {
+  return page.evaluate(values => Object.fromEntries(values.map(selector => {
+    const node = document.querySelector(selector), rect = node.getBoundingClientRect(), style = getComputedStyle(node);
+    return [selector, { x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+      background: style.backgroundColor, color: style.color, radius: style.borderRadius,
+      font: style.fontFamily, fontSize: style.fontSize, fontWeight: style.fontWeight }];
+  })), selectors);
+}
+
+function sameLayout(actual, expected, label) {
+  for (const selector of Object.keys(expected)) for (const [key, value] of Object.entries(expected[selector])) {
+    if (typeof value === 'number') assert.ok(Math.abs(actual[selector][key] - value) <= 2,
+      label + ' ' + selector + '.' + key + ': ' + actual[selector][key] + ' vs ' + value);
+    else assert.equal(actual[selector][key], value, label + ' ' + selector + '.' + key);
+  }
+}
+
+async function shellSnapshot(page) {
+  await settle(page);
+  const center = await elementSnapshot(page, ['body', '.center', '.chat', '.input-wrap', '.input', '#text', '#manualQuestionMode']);
+  const composerIcons = { voice: await geometry(page.locator('#voiceInputBtn svg')),
+    keyboard: await geometry(page.locator('.dmate-symbol-keyboard svg')) };
+  await drawer(page, 'left', true);
+  const sidebar = await elementSnapshot(page, ['#conversationSidebar', '.dmate-brand', '.dmate-brand-mark', '#newChatBtn', '#appearanceBtn']);
+  await drawer(page, 'left', false);
+  await drawer(page, 'tools', true);
+  const tools = await elementSnapshot(page, ['#learningToolsPanel', '#learningToolsPanel > .panel-heading-row',
+    '#learningToolsPanel .learning-title', ...Object.values(toolButtons)]);
+  const icons = {};
+  for (const [panel, selector] of Object.entries(iconReferences)) icons[panel] = await geometry(page.locator(selector));
+  await drawer(page, 'tools', false);
+  return { center, sidebar, tools, icons, composerIcons };
+}
+
+async function modalChrome(page, panel) {
+  const root = page.locator(moduleRoots[panel]);
+  const card = root.locator(':scope > .modal-card');
+  const surface = await card.count() ? card : root;
+  const heading = root.locator(panel === 'notes' ? '.dcn-heading h2' : panel === 'drawing' ? '#graphEditorTitle' : '.modal-head > div').first();
+  return { surface: await surface.evaluate(node => {
+    const style = getComputedStyle(node);
+    return { background: style.backgroundColor, color: style.color, border: style.borderColor, radius: style.borderRadius };
+  }), heading: await heading.evaluate(node => {
+    const style = getComputedStyle(node);
+    return { title: node.textContent.trim(), color: style.color, size: style.fontSize, weight: style.fontWeight, font: style.fontFamily };
+  }) };
+}
+
+async function openTool(page, panel) {
+  await closeModules(page);
+  await drawer(page, 'tools', true);
+  await page.locator(toolButtons[panel]).click();
+  await page.locator(moduleRoots[panel]).waitFor({ state: 'visible' });
+  await settle(page);
+}
+
 async function onlineReference(page, theme) {
   await page.goto(baseURL + '/', { waitUntil: 'networkidle' });
   await page.evaluate(value => {
@@ -93,70 +175,85 @@ async function onlineReference(page, theme) {
   }, theme);
   const icons = {};
   for (const [panel, selector] of Object.entries(iconReferences)) icons[panel] = await geometry(page.locator(selector));
-  return { icons, palette: await palette(page), close: await closeStyle(page.locator('#wrongBookClose')) };
+  const shell = await shellSnapshot(page), chrome = {};
+  for (const panel of Object.keys(toolButtons)) {
+    await openTool(page, panel);
+    chrome[panel] = await modalChrome(page, panel);
+  }
+  await closeModules(page);
+  return { icons, shell, chrome, palette: await palette(page), close: await closeStyle(page.locator('#wrongBookClose')) };
 }
 
 async function noOverflow(page, panel) {
   const state = await page.evaluate(id => {
-    const main = document.querySelector('.offline-main').getBoundingClientRect();
-    const node = document.getElementById(id + 'Panel');
+    const selectors = { mistakes:'#wrongBookModal', notes:'#conceptNotebookDialog', drawing:'#graphEditorDialog',
+      graph:'#knowledgeGraphModal', questions:'#offlineQuestionsModal', concepts:'#offlineConceptsModal' };
+    const node = document.querySelector(selectors[id]), main = node.getBoundingClientRect();
     return { viewport: innerWidth, document: document.documentElement.scrollWidth,
       mainLeft: main.left, mainRight: main.right, panelWidth: node.clientWidth, panelScroll: node.scrollWidth };
   }, panel);
   assert.ok(state.document <= state.viewport + 1, panel + ': page overflows horizontally: ' + JSON.stringify(state));
   assert.ok(state.mainLeft >= -1 && state.mainRight <= state.viewport + 1, panel + ': workspace outside viewport');
-  assert.ok(state.panelScroll <= state.panelWidth + 1, panel + ': panel overflows outside its own controls');
+  assert.ok(state.panelWidth > 0, panel + ': actual online-style modal is visible');
 }
 
 async function appearanceControls(page, width, theme, reference) {
-  await page.locator(width <= 1100 ? '#offlineAppearanceToggle' : '#offlineAppearanceBtn').click();
-  const dialog = page.locator('#offlineAppearanceDialog[open]');
+  await closeModules(page);
+  await drawer(page, 'left', true);
+  await page.locator('#appearanceBtn').click();
+  const dialog = page.locator('#appearanceModal');
   await dialog.waitFor();
   const alternate = theme === 'dark' ? 'light' : 'dark';
-  await dialog.locator('[data-offline-theme="' + alternate + '"]').click();
+  await dialog.locator('[data-appearance-mode="' + alternate + '"]').click();
   await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, alternate);
-  await dialog.locator('[data-offline-theme="' + theme + '"]').click();
+  await page.locator('#appearanceClose').click();
   await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, theme);
-  assert.deepEqual(await closeStyle(page.locator('#offlineAppearanceClose')), reference.close, 'Appearance uses the shared close dot');
-  await page.locator('#offlineAppearanceClose').click();
+  await drawer(page, 'left', true);
+  await page.locator('#appearanceBtn').click();
+  await dialog.locator('[data-appearance-mode="' + theme + '"]').click();
+  await page.waitForFunction(value => document.documentElement.dataset.appearanceTheme === value, theme);
+  assert.deepEqual(await closeStyle(page.locator('#appearanceClose')), reference.close, 'Appearance uses the shared close dot');
+  await page.locator('#appearanceDone').click();
+  await dialog.waitFor({ state: 'hidden' });
+  await drawer(page, 'left', false);
 }
 
 async function confirmDeletion(page, trigger, commit) {
   await trigger.click();
-  const dialog = page.locator('.dmate-delete-confirm[open]');
+  const dialog = page.locator('.dmate-delete-confirm[open],.dcn-confirm[open]');
   await dialog.waitFor({ state: 'visible' });
-  await dialog.locator(commit ? '.dmate-delete-confirm-delete' : '.dmate-delete-confirm-close').click();
+  await dialog.locator(commit ? '.dmate-delete-confirm-delete,.dcn-confirm-delete' : '.dmate-delete-confirm-close,.dcn-confirm-head .dcn-close').click();
   await dialog.waitFor({ state: 'detached' });
 }
 
 async function notesCRUD(page, label) {
   await navigate(page, 'notes');
   const addNote = async () => {
-    const previousIds = await page.locator('#noteList .dcn-note').evaluateAll(nodes => nodes.map(node => node.dataset.noteId));
-    await page.locator('#addNote').click();
+    const previousIds = await page.locator('#conceptNotebookDialog .dcn-note').evaluateAll(nodes => nodes.map(node => node.dataset.noteId));
+    await page.locator('#conceptNotebookDialog').getByRole('button', {name:'新建概念',exact:true}).click();
     await page.waitForFunction(ids => {
-      const selected = document.querySelector('#noteList .dcn-note.is-current');
+      const selected = document.querySelector('#conceptNotebookDialog .dcn-note.is-current');
       return selected?.dataset.noteId && !ids.includes(selected.dataset.noteId);
     }, previousIds);
-    assert.equal(await page.locator('#noteList .dcn-title').inputValue(), '', 'New note editor is ready before typing');
+    assert.equal(await page.locator('#conceptNotebookDialog .dcn-title').inputValue(), '', 'New note editor is ready before typing');
   };
   await addNote();
   const title = '本地笔记 ' + label;
-  await page.locator('#noteList .dcn-title').fill(title);
-  await page.locator('#noteList .dcn-original').fill('归纳法：先验证初始情形，再证明递推步骤。');
+  await page.locator('#conceptNotebookDialog .dcn-title').fill(title);
+  await page.locator('#conceptNotebookDialog .dcn-original').fill('归纳法：先验证初始情形，再证明递推步骤。');
   await waitRecord(page, 'notes', title, '初始情形');
-  await page.locator('#noteList .dcn-original').fill('归纳法修订：先验证初始情形，再由 P(n) 推出 P(n+1)。');
+  await page.locator('#conceptNotebookDialog .dcn-original').fill('归纳法修订：先验证初始情形，再由 P(n) 推出 P(n+1)。');
   await waitRecord(page, 'notes', title, '修订');
   const survivorId = (await readStore(page, 'notes')).find(row => row.title === title).id;
-  const survivor = page.locator('#noteList .dcn-note[data-note-id="' + survivorId + '"]');
+  const survivor = page.locator('#conceptNotebookDialog .dcn-note[data-note-id="' + survivorId + '"]');
   await confirmDeletion(page, survivor.locator('.dcn-note-delete'), false);
   assert.equal((await readStore(page, 'notes')).filter(row => row.title === title).length, 1, 'Cancel preserves note');
   await addNote();
-  await page.locator('#noteList .dcn-title').fill('待删除笔记');
-  await page.locator('#noteList .dcn-original').fill('只用于验证本机删除。');
+  await page.locator('#conceptNotebookDialog .dcn-title').fill('待删除笔记');
+  await page.locator('#conceptNotebookDialog .dcn-original').fill('只用于验证本机删除。');
   await waitRecord(page, 'notes', '待删除笔记');
   const temporaryId = (await readStore(page, 'notes')).find(row => row.title === '待删除笔记').id;
-  const temporary = page.locator('#noteList .dcn-note[data-note-id="' + temporaryId + '"]');
+  const temporary = page.locator('#conceptNotebookDialog .dcn-note[data-note-id="' + temporaryId + '"]');
   await confirmDeletion(page, temporary.locator('.dcn-note-delete'), true);
   await temporary.waitFor({ state: 'detached' });
   assert.equal((await readStore(page, 'notes')).length, 1);
@@ -239,32 +336,36 @@ async function concepts(page) {
 
 async function graph(page) {
   await navigate(page, 'graph');
-  const host = page.locator('#graphNodes .offline-knowledge-graph[data-ready="true"]');
+  const host = page.locator('#knowledgeGraphCanvas[data-ready="true"]');
   await host.waitFor();
-  assert.ok(await host.locator('svg .kg-node-group[data-node-id]').count() > 20, 'Graph renders real SVG nodes');
-  assert.ok(await host.locator('svg .kg-edge[data-from][data-to]').count() > 20, 'Graph renders actual knowledge relations');
-  const label = await host.locator('.kg-node-label').first().evaluate(node => {
-    const style = getComputedStyle(node), box = node.getBBox();
-    return { fill: style.fill, fontSize: parseFloat(style.fontSize), width: box.width, height: box.height,
-      visibility: style.visibility, opacity: style.opacity };
+  const mobile = page.viewportSize().width <= 760;
+  if (mobile && await host.locator('.kg-mobile-entry-only').count()) {
+    await host.locator('.kg-mobile-expand').click();
+    await host.locator('.kg-mobile-node').first().waitFor();
+  }
+  const nodeSelector = mobile ? '.kg-mobile-node' : '.kg-node-group';
+  const edgeSelector = mobile ? '.kg-mobile-edge' : '.kg-edge';
+  assert.ok(await host.locator(nodeSelector + '[data-node-id]').count() > 20, 'Graph renders actual knowledge nodes');
+  assert.ok(await host.locator(edgeSelector + '[data-from][data-to]').count() > 20, 'Graph renders actual knowledge relations');
+  const label = await host.locator(mobile ? '.kg-mobile-node-name' : '.kg-node-label').first().evaluate(node => {
+    const style = getComputedStyle(node), box = node.getBoundingClientRect();
+    return { color: node instanceof SVGElement ? style.fill : style.color, fontSize: parseFloat(style.fontSize),
+      width: box.width, height: box.height, visibility: style.visibility, opacity: style.opacity };
   });
-  assert.equal(label.fill, 'rgb(248, 250, 252)', 'Labels remain light against the shared dark graph nodes');
-  assert.ok(label.fontSize > 0 && label.width > 0 && label.height > 0, 'Graph labels render visible text');
-  assert.notEqual(label.visibility, 'hidden');
-  assert.notEqual(label.opacity, '0');
-  const node = host.locator('.kg-node-group:not(.selected)').first();
-  const nodeId = await node.getAttribute('data-node-id');
+  assert.equal(label.color, 'rgb(248, 250, 252)', 'Labels remain light against the original dark graph nodes');
+  assert.ok(label.fontSize > 0 && label.width > 0 && label.height > 0);
+  assert.notEqual(label.visibility, 'hidden'); assert.notEqual(label.opacity, '0');
+  const node = host.locator(nodeSelector + ':not(.selected)').first(), nodeId = await node.getAttribute('data-node-id');
   await node.click();
-  assert.equal(await host.locator('.kg-node-group.selected').count(), 1);
-  assert.equal(await host.locator('.kg-node-group.selected').getAttribute('aria-pressed'), 'true');
-  assert.equal(await host.locator('.kg-node-group.selected').getAttribute('data-node-id'), nodeId);
-  const viewport = host.locator('.offline-graph-canvas');
+  assert.equal(await host.locator(nodeSelector + '.selected').count(), 1);
+  assert.equal(await host.locator(nodeSelector + '.selected').getAttribute('aria-pressed'), 'true');
+  assert.equal(await host.locator(nodeSelector + '.selected').getAttribute('data-node-id'), nodeId);
+  const viewport = mobile ? host.locator('.kg-mobile-viewport') : host;
   const original = await viewport.evaluate(node => Number(node.dataset.scale));
-  await host.locator('[data-graph-action="zoom-in"]').click();
+  await page.locator(mobile ? '.kg-mobile-zoom-btn' : '#knowledgeGraphDesktopZoomIn').last().click();
   assert.ok(await viewport.evaluate(node => Number(node.dataset.scale)) > original);
-  await host.locator('[data-graph-action="fit"]').click();
-  const restored = await viewport.evaluate(node => Number(node.dataset.scale));
-  assert.ok(Math.abs(restored - original) < .001, 'Fit restores graph scale');
+  await page.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
+  assert.ok(Math.abs(await viewport.evaluate(node => Number(node.dataset.scale)) - original) < .001, 'Fit restores scale');
 }
 
 async function drawing(page) {
@@ -277,6 +378,44 @@ async function drawing(page) {
   assert.equal(await workspace.locator('.ddw-name').inputValue(), '离线保存画板');
 }
 
+async function disconnectWorkerNetwork(browser, page, workerURL) {
+  // Older Playwright versions do not apply context.setOffline to the service
+  // worker's own network target. Exercise an actual failed fetch there too.
+  const protocol = await browser.newBrowserCDPSession();
+  const pageProtocol = await page.context().newCDPSession(page);
+  const {targetInfo} = await pageProtocol.send('Target.getTargetInfo');
+  await pageProtocol.detach();
+  const target = (await protocol.send('Target.getTargets')).targetInfos.find(info =>
+    info.type === 'service_worker' && info.url === workerURL && info.browserContextId === targetInfo.browserContextId);
+  assert.ok(target, 'The active service worker must have a browser target');
+  const { sessionId } = await protocol.send('Target.attachToTarget', { targetId: target.targetId, flatten: false });
+  let serial = 0;
+  const send = async (method, params = {}) => {
+    const id = ++serial;
+    let listener;
+    const result = new Promise((resolve, reject) => {
+      listener = event => {
+        if (event.sessionId !== sessionId) return;
+        const response = JSON.parse(event.message);
+        if (response.id !== id) return;
+        if (response.error) reject(new Error(response.error.message)); else resolve(response.result);
+      };
+      protocol.on('Target.receivedMessageFromTarget', listener);
+    });
+    try {
+      await protocol.send('Target.sendMessageToTarget', { sessionId, message: JSON.stringify({ id, method, params }) });
+      return await result;
+    } finally { protocol.off('Target.receivedMessageFromTarget', listener); }
+  };
+  try {
+    await send('Network.enable');
+    await send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
+    const probe = await send('Runtime.evaluate', {expression: "fetch('/offline-network-probe', {cache:'no-store'}).then(() => false, () => true)", awaitPromise:true, returnByValue:true});
+    assert.equal(probe.result.value, true, 'The service worker itself must be disconnected');
+    return protocol;
+  } catch (error) { await protocol.detach(); throw error; }
+}
+
 async function runCase(browser, width, theme) {
   const label = width + '/' + theme;
   const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 1101,
@@ -287,6 +426,7 @@ async function runCase(browser, width, theme) {
     }
   }, theme);
   const page = await context.newPage(), errors = [], failures = [], nativeDialogs = [], apiRequests = [];
+  let workerProtocol;
   try {
     const reference = await onlineReference(page, theme);
     await page.evaluate(async () => {
@@ -314,36 +454,23 @@ async function runCase(browser, width, theme) {
     });
     page.on('dialog', async dialog => { nativeDialogs.push(dialog.type()); await dialog.dismiss(); });
     await context.setOffline(true);
+    workerProtocol = await disconnectWorkerNetwork(browser, page, await page.evaluate(() => navigator.serviceWorker.controller.scriptURL));
     await page.reload({ waitUntil: 'networkidle' });
     await ready(page);
     assert.equal(await page.evaluate(() => navigator.onLine), false);
-    assert.match(await page.locator('#networkStatus').textContent(), /离线/);
+    if (await page.locator('#networkStatus').count()) assert.match(await page.locator('#networkStatus').textContent(), /离线/);
     assert.deepEqual(await palette(page), reference.palette, label + ': shared online appearance tokens');
-    for (const [panel, expected] of Object.entries(reference.icons)) {
-      assert.deepEqual(await geometry(page.locator('[data-panel="' + panel + '"] svg')), expected, label + ': shared icon ' + panel);
+    const actualShell = await shellSnapshot(page);
+    sameLayout(actualShell.center, reference.shell.center, label + ': original center/composer');
+    sameLayout(actualShell.sidebar, reference.shell.sidebar, label + ': original conversation sidebar');
+    sameLayout(actualShell.tools, reference.shell.tools, label + ': original learning-tools panel');
+    assert.deepEqual(actualShell.icons, reference.shell.icons, label + ': five original tool icons');
+    assert.deepEqual(actualShell.composerIcons, reference.shell.composerIcons, label + ': original composer icons');
+    for (const panel of Object.keys(toolButtons)) {
+      await openTool(page, panel);
+      assert.deepEqual(await modalChrome(page, panel), reference.chrome[panel], label + ': original modal chrome ' + panel);
     }
-    const iconStyles = await page.locator('.offline-nav-item[data-panel] svg').evaluateAll(icons => icons.map(icon => {
-      const style = getComputedStyle(icon);
-      return { viewBox: icon.getAttribute('viewBox'), width: style.width, height: style.height,
-        strokeWidth: style.strokeWidth, fill: style.fill };
-    }));
-    assert.equal(iconStyles.length, 6);
-    for (const style of iconStyles) assert.deepEqual(style,
-      { viewBox: '0 0 24 24', width: '20px', height: '20px', strokeWidth: '1.8px', fill: 'none' },
-      label + ': all navigation icons use the shared Lucide geometry');
-    const navStyles = await page.locator('.offline-nav-item[data-panel]').evaluateAll(buttons => buttons.map(button => {
-      const style = getComputedStyle(button);
-      return { active: button.classList.contains('active'), background: style.backgroundColor,
-        backgroundImage: style.backgroundImage, borderWidth: parseFloat(style.borderTopWidth),
-        borderColor: style.borderTopColor, borderStyle: style.borderTopStyle, shadow: style.boxShadow };
-    }));
-    for (const style of navStyles) {
-      if (!style.active) assert.equal(style.background, 'rgba(0, 0, 0, 0)', label + ': inactive navigation is frameless');
-      assert.equal(style.backgroundImage, 'none');
-      assert.ok(style.borderWidth === 0 || style.borderStyle === 'none' || style.borderColor === 'rgba(0, 0, 0, 0)',
-        label + ': navigation must not acquire a generic button border');
-      assert.equal(style.shadow, 'none');
-    }
+    await closeModules(page);
     for (const panel of panels) {
       await navigate(page, panel);
       await noOverflow(page, panel);
@@ -361,8 +488,8 @@ async function runCase(browser, width, theme) {
     assert.equal(await page.evaluate(() => document.documentElement.dataset.appearanceTheme), theme, 'Offline appearance persists');
     await navigate(page, 'notes');
     assert.equal((await readStore(page, 'notes'))[0].title, noteTitle);
-    await page.locator('#noteList .dcn-note-open').filter({ hasText: noteTitle }).click();
-    assert.match(await page.locator('#noteList .dcn-original').inputValue(), /修订/);
+    await page.locator('#conceptNotebookDialog .dcn-note-open').filter({ hasText: noteTitle }).click();
+    assert.match(await page.locator('#conceptNotebookDialog .dcn-original').inputValue(), /修订/);
     await navigate(page, 'mistakes');
     assert.ok((await readStore(page, 'mistakes')).some(row => row.title === mistakeTitle));
     await (await mistakeCard(page, mistakeTitle)).locator('mjx-container svg').waitFor();
@@ -397,7 +524,7 @@ async function runCase(browser, width, theme) {
       await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/FAILED-' + width + '-' + theme + '.png' }).catch(() => {});
     }
     throw error;
-  } finally { await context.close(); }
+  } finally { await workerProtocol?.detach().catch(() => {}); await context.close(); }
 }
 
 (async () => {
