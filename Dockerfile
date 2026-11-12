@@ -45,6 +45,9 @@ RUN --mount=type=cache,id=dmate-ocr-model-cache-v2,target=/var/cache/dmate-model
 
 COPY . .
 
+# Reject application syntax errors during the build, before replacing a running service.
+RUN python -m compileall -q -l .
+
 # Regenerate sharp platform-specific icons as part of every production image build.
 RUN python scripts/generate_icons.py
 

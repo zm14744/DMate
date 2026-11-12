@@ -148,7 +148,7 @@ PROOF_DOMAINS = (
     ("cardinality", "有限集、可数性与基数", "Finite sets, countability and cardinality",
      "证明集合等势时给出双射；证明可数时给出枚举或注入到自然数的映射；证明不可数时使用对角线或其他有效论证，并说明映射的定义域和值域。",
      "For equipotence, construct a bijection. For countability, give an enumeration or injection into the natural numbers. For uncountability, use a valid diagonal or other argument and state the map's domain and codomain.",
-     ("hammack", "mit_real_analysis")),
+     ("hammack",)),
     ("set_theory", "集合论与集合运算", "Set theory and set operations",
      "证明集合包含时任取源集合元素并证明其属于目标集合；证明相等时完成两个包含方向。使用幂集、笛卡尔积、差集、补集和基数时明确全集、定义域与运算约定，不能把元素属于与集合包含混淆。",
      "For set inclusion, take an arbitrary element of the source set and show it belongs to the target; for equality, prove both inclusions. State the universe and conventions for power sets, Cartesian products, differences, complements and cardinalities. Do not confuse membership with inclusion.",
@@ -201,7 +201,6 @@ PROOF_METHODS = (
     ("probabilistic", "概率方法", "Probabilistic method", "由概率界严格推出存在或高概率性质。", "Derive existence or high-probability claims from valid probability bounds."),
     ("algebraic", "代数恒等变形证明", "Algebraic identity proof", "每步等式使用合法运算并核对定义域。", "Justify each identity transformation and verify domains."),
     ("equivalence_chain", "等价链证明", "Equivalence-chain proof", "逐步证明每个等价变形方向成立。", "Justify both directions of every equivalence step."),
-)
     ("truth_table", "真值表验证", "Truth-table verification", "对有限命题变元的所有真值赋值逐行核验；说明变量顺序及行覆盖完整，不把抽样行当作证明。", "Check every truth assignment for the finite set of propositional variables. State the variable order and ensure all rows are covered; sampled rows are not a proof."),
     ("counterexample", "反例否证", "Disproof by counterexample", "反驳全称命题时，给出定义域内的具体对象，核验前提成立且结论失败；不要把反例当成对存在命题的否证。", "To refute a universal claim, give an object in the stated domain and verify that the hypotheses hold while the conclusion fails. A counterexample to a universal statement is not a refutation of an existential claim."),
     ("exhaustive", "有限穷举证明", "Proof by exhaustive enumeration", "只有对象集合确实有限且每种情况均被覆盖时才能使用；说明枚举范围和完整性，不能用有限样例推断无限情形。", "Use only when the domain is finite and every case is covered. State the enumeration range and why it is exhaustive; finite examples do not establish an infinite claim."),
