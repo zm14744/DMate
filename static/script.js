@@ -21110,75 +21110,62 @@ function renderKnowledgeGraphDetail() {
         heading.textContent = "教学视频";
         section.appendChild(heading);
 
-        const hint = document.createElement("div");
-        hint.className = "kg-video-hint";
-        hint.textContent = "点击章节直接播放对应选集；课程内容仍建议结合教学大纲核对。";
-        section.appendChild(hint);
-
+        const platforms = new Map([["B站", []], ["YouTube", []]]);
         for (const video of videos) {
-            const source = (knowledgeGraphData.videoSources || []).find(
-                item => item.id === video.sourceId
-            );
-            if (!source) continue;
+            for (const lesson of (video.lessons || [])) {
+                const url = String(lesson.url || "");
+                const platform = /^https:\/\/www\.bilibili\.com\/video\/BV[A-Za-z0-9]+\/\?p=[1-9]\d*$/.test(url)
+                    ? "B站"
+                    : /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/.test(url)
+                        ? "YouTube" : "";
+                if (platform && !platforms.get(platform).some(item => item.url === url)) {
+                    platforms.get(platform).push({title: String(lesson.title || ""), url});
+                }
+            }
+        }
 
-            const card = document.createElement("div");
-            card.className = "kg-video-card";
-
-            const top = document.createElement("div");
-            top.className = "kg-video-card-top";
-
-            const videoTitle = document.createElement("div");
-            videoTitle.className = "kg-video-title";
-            videoTitle.textContent = video.title || "课程视频";
-
-            const badge = document.createElement("span");
-            badge.className = "kg-video-badge";
-            badge.textContent = "首选";
-            top.appendChild(videoTitle);
-            top.appendChild(badge);
-            card.appendChild(top);
-
-            const meta = document.createElement("div");
-            meta.className = "kg-video-meta";
-            meta.textContent = [source.name, source.course, source.platform]
-                .filter(Boolean)
-                .join(" · ");
-            card.appendChild(meta);
-
-            const lessons = document.createElement("div");
-            lessons.className = "kg-video-sections";
-
-            if (video.lessons.length) {
-                for (const lesson of video.lessons) {
+        const entries = document.createElement("div");
+        entries.className = "kg-video-sections";
+        entries.style.cssText = "display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;";
+        for (const [platform, items] of platforms) {
+            if (!items.length) {
+                const unavailable = document.createElement("span");
+                unavailable.textContent = platform;
+                unavailable.title = "暂未找到可核对的该平台单集视频";
+                unavailable.style.cssText = "color:var(--text-secondary,#888);opacity:.55;cursor:not-allowed;";
+                entries.appendChild(unavailable);
+            } else if (items.length === 1) {
+                const link = document.createElement("a");
+                link.className = "kg-video-open";
+                link.textContent = platform;
+                link.href = items[0].url;
+                link.title = items[0].title;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                entries.appendChild(link);
+            } else {
+                const details = document.createElement("details");
+                const summary = document.createElement("summary");
+                summary.textContent = platform;
+                summary.style.cssText = "cursor:pointer;color:var(--accent-color,#3b82f6);";
+                details.appendChild(summary);
+                const options = document.createElement("div");
+                options.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-top:8px;";
+                for (const item of items) {
                     const link = document.createElement("a");
                     link.className = "kg-video-open";
-                    link.href = lesson.url;
+                    link.textContent = item.title || platform;
+                    link.href = item.url;
                     link.target = "_blank";
                     link.rel = "noopener noreferrer";
-                    link.textContent = "播放 · " + lesson.title;
-                    lessons.appendChild(link);
+                    options.appendChild(link);
                 }
-            } else {
-                const missing = document.createElement("span");
-                missing.className = "kg-video-unavailable";
-                missing.textContent = "尚无已核实的单集视频直达地址";
-                lessons.appendChild(missing);
+                details.appendChild(options);
+                entries.appendChild(details);
             }
-            card.appendChild(lessons);
-
-            if (video.note) {
-                const note = document.createElement("div");
-                note.className = "kg-video-note";
-                note.textContent = video.note;
-                card.appendChild(note);
-            }
-
-            section.appendChild(card);
         }
-
-        if (section.querySelector(".kg-video-card")) {
-            detail.appendChild(section);
-        }
+        section.appendChild(entries);
+        detail.appendChild(section);
     }
 }
 
