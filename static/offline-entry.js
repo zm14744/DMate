@@ -1,9 +1,9 @@
 (() => {
   "use strict";
   const button = document.getElementById("offlineWorkspaceBtn");
-  function prepareCurrentAccountData() {
+  async function prepareCurrentAccountData() {
     try {
-      let snapshot = window.DMateOfflineBridge?.snapshot?.() || null;
+      let snapshot = window.DMateOfflineBridge?.snapshot ? await window.DMateOfflineBridge.snapshot() : null;
       if (!snapshot) {
         const root = document.documentElement;
         const username = root.dataset.accountAuthenticated === "1" ? root.dataset.accountUsername : "";
@@ -47,9 +47,10 @@
   async function openOfflineWorkspace() {
     if (button) {
       button.disabled = true;
-      button.textContent = "准备中…";
+      const label = button.querySelector(".dmate-ui-label");
+      if (label) label.textContent = "准备中…";
     }
-    prepareCurrentAccountData();
+    await prepareCurrentAccountData();
     if ("serviceWorker" in navigator && window.isSecureContext) {
       try {
         await navigator.serviceWorker.register("/offline-service-worker.js", {scope:"/"});

@@ -2,12 +2,12 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const DB_NAME = "dmate-offline-workspace";
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const state = {
     db: null, concepts: [], questions: [], graph: null,
     panel: "mistakes", selectedQuestion: null, selectedConcept: null,
     selectedOption: [], revealed: false, recordKind: "note", editingId: null,
-    drawingController: null, graphCategory: "", questionCategory: "",
+    drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
     questionDifficulty: "", conceptQuery: "", graphQuery: ""
   };
   const panelMeta = {
@@ -43,7 +43,7 @@
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
-        for (const store of ["mistakes", "notes", "practice"]) {
+        for (const store of ["mistakes", "notes", "practice", "settings"]) {
           if (!db.objectStoreNames.contains(store)) {
             const objectStore = db.createObjectStore(store, { keyPath: "id" });
             objectStore.createIndex("updatedAt", "updatedAt");
@@ -69,6 +69,59 @@
   const all = store => transaction(store, "readonly", os => os.getAll());
   const put = (store, value) => transaction(store, "readwrite", os => os.put(value));
   const remove = (store, id) => transaction(store, "readwrite", os => os.delete(id));
+  async function applyOriginalAppearance() {
+    let saved = null;
+    try { saved = await transaction("settings", "readonly", os => os.get("appearance")); } catch (_) {}
+    let settings = saved?.settings || null;
+    if (!settings) {
+      try { settings = JSON.parse(localStorage.getItem("dmate:offline:appearance:v1") || "null"); } catch (_) {}
+    }
+    settings ||= {};
+    const mode = ["light","dark","navy"].includes(settings.mode) ? settings.mode
+      : (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const root = document.documentElement;
+    const body = document.body;
+    root.dataset.appearanceTheme = mode;
+    body.dataset.appearanceTheme = mode;
+    root.style.colorScheme = mode === "light" ? "only light" : "dark";
+    body.style.colorScheme = mode === "light" ? "only light" : "dark";
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = mode === "light" ? "#f8fafc" : (mode === "navy" ? "#0f172a" : "#171717");
+
+    const accents = {
+      blue:["#3b82f6","59,130,246","#2563eb","#1d4ed8","#60a5fa","#93c5fd"],
+      purple:["#8b5cf6","139,92,246","#7c3aed","#6d28d9","#a78bfa","#c4b5fd"],
+      teal:["#14b8a6","20,184,166","#0d9488","#0f766e","#5eead4","#99f6e4"]
+    };
+    const accent = accents[settings.accent] || accents.blue;
+    ["--accent","--accent-rgb","--accent-deep","--accent-deeper","--accent-soft","--accent-pale"]
+      .forEach((key,index) => root.style.setProperty(key,accent[index]));
+    root.style.setProperty("--accent-bg","rgba("+accent[1]+",.22)");
+
+    const panelAlpha = Math.max(.75,Math.min(1,(Number(settings.panelOpacity)||100)/100));
+    root.style.setProperty("--panel-alpha",String(panelAlpha));
+    root.style.setProperty("--workspace-alpha",String(Math.max(.08,Math.min(.18,panelAlpha*.14))));
+    root.style.setProperty("--shell-alpha",String(Math.max(.30,Math.min(.48,panelAlpha*.44))));
+    root.style.setProperty("--composer-alpha",String(Math.max(.38,Math.min(.58,panelAlpha*.52))));
+    root.style.setProperty("--bubble-alpha",String(Math.max(.6,Math.min(1,(Number(settings.bubbleOpacity)||100)/100))));
+    root.style.setProperty("--font-scale",settings.fontSize==="small"?".92":settings.fontSize==="large"?"1.08":"1");
+    root.style.setProperty("--background-size",settings.backgroundFit==="contain"?"contain":"cover");
+    root.style.setProperty("--background-blur",Math.max(0,Math.min(12,Number(settings.blur)||0))+"px");
+    root.style.setProperty("--background-mask-alpha",String(Math.max(0,Math.min(70,Number(settings.mask??35)))/100));
+
+    const layer = $("appearanceBackgroundLayer");
+    const blob = saved?.backgroundBlob;
+    if (blob instanceof Blob && blob.size > 0 && layer) {
+      if (state.backgroundUrl) URL.revokeObjectURL(state.backgroundUrl);
+      state.backgroundUrl = URL.createObjectURL(blob);
+      layer.style.backgroundImage = 'url("'+state.backgroundUrl+'")';
+      body.classList.add("has-custom-background");
+    } else {
+      body.classList.remove("has-custom-background");
+      if (layer) layer.style.backgroundImage = "none";
+    }
+  }
+
   const stamp = () => new Date().toISOString();
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "local-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
@@ -484,6 +537,7 @@
     $("addNote").addEventListener("click", () => openRecord("notes"));
     $("recordForm").addEventListener("submit", saveRecord);
     $("cancelRecord").addEventListener("click", () => $("recordDialog").close());
+    $("cancelRecordSecondary")?.addEventListener("click", () => $("recordDialog").close());
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
@@ -498,6 +552,7 @@
     try {
       setNetworkStatus();
       state.db = await openDb();
+      await applyOriginalAppearance();
       await migrateCurrentAccountData();
       await loadResources();
       bind();
