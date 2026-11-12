@@ -1,8 +1,42 @@
 (() => {
   "use strict";
   const button = document.getElementById("offlineWorkspaceBtn");
+  function prepareCurrentAccountData() {
+    try {
+      const root = document.documentElement;
+      const username = root.dataset.accountAuthenticated === "1" ? root.dataset.accountUsername : "";
+      if (!username) return;
+      const learning = JSON.parse(localStorage.getItem("discrete_math_ai_learning_v1") || "null");
+      if (!learning || typeof learning !== "object") return;
+      const wrongQuestions = Array.isArray(learning.wrongQuestions) ? learning.wrongQuestions : [];
+      const notes = Array.isArray(learning.conceptNotebook?.notes) ? learning.conceptNotebook.notes : [];
+      const deletedWrong = learning.deletedWrongQuestionIds || {};
+      const deletedNotes = learning.conceptNotebook?.deleted || {};
+      const galleryKey = "dmate:graph-gallery:v1::" + encodeURIComponent("account:" + username);
+      const drawingKey = "dmate:graph-drawing:v1";
+      let drawings = localStorage.getItem(galleryKey) || "";
+      if (!drawings && localStorage.getItem(drawingKey + ":owner") === "account:" + username) {
+        const legacy = localStorage.getItem(drawingKey);
+        if (legacy) {
+          try {
+            const document = JSON.parse(legacy);
+            drawings = JSON.stringify({version:1,pages:[{id:"legacy-local",name:document.graphs?.[0]?.name || "我的绘图",document,updatedAt:Date.now()}]});
+          } catch (_) {}
+        }
+      }
+      sessionStorage.setItem("dmate_offline_migration_v1", JSON.stringify({
+        username,
+        wrongQuestions: wrongQuestions.filter(row => row && !deletedWrong[String(row.id)]),
+        notes: notes.filter(row => row && !(Number(deletedNotes[String(row.id)]) >= Number(row.updatedAt || 0))),
+        drawings
+      }));
+    } catch (error) {
+      console.warn("DMate 离线数据准备未完成：", error);
+    }
+  }
   if (button) {
     button.addEventListener("click", () => {
+      prepareCurrentAccountData();
       window.location.assign("/offline");
     });
   }
