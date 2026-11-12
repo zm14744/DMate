@@ -66,7 +66,7 @@
     body[data-appearance-theme] .desktop-shell-button:focus-visible { outline:2px solid var(--accent) !important; outline-offset:-2px !important; }
     .desktop-shell-button svg {
         width:22px; height:22px; fill:none; stroke:currentColor;
-        stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
+        stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
     }
     body[data-appearance-theme] #desktopSidebarToggle { position:absolute; top:15px; right:10px; }
     body[data-appearance-theme] #desktopSidebarOpen { visibility:hidden; pointer-events:none; }
