@@ -1146,14 +1146,14 @@
       "videos": [
         {
           "source_id": "bili_rsa_course",
-          "title": "RSA 加密算法及其数学基础",
+          "title": "现代密码学｜RSA加密算法及其数学基础",
           "sections": [
-            "RSA 加密算法及其数学基础"
+            "现代密码学｜RSA加密算法及其数学基础"
           ],
           "lessons": [
             {
-              "title": "RSA 加密算法及其数学基础",
-              "url": "https://www.bilibili.com/video/BV1gT4y117My/?p=5"
+              "title": "现代密码学｜RSA加密算法及其数学基础",
+              "url": "https://www.bilibili.com/video/BV1gT4y117My/?p=1"
             }
           ]
         },
@@ -2492,7 +2492,7 @@
       "course": "Abstract Algebra（动画解释）",
       "platform": "Bilibili",
       "note": "有明确制作团队，动画+讲解；B站镜像分P直达。",
-      "publisher": ""
+      "publisher": "鸡蛋忍者"
     },
     {
       "id": "socratica_youtube",
@@ -2580,7 +2580,7 @@
       "course": "RSA 加密及数学基础讲解",
       "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
+      "publisher": "我有一个小脑瓜"
     },
     {
       "id": "combinatorics_bili",
