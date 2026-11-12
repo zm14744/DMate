@@ -1,5 +1,5 @@
 {
-  "version": 26,
+  "version": 27,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -320,14 +320,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p0 Lec 1 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p0 Lec 1 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p0 Lec 1 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=1"
+              "title": "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=1"
             }
           ]
         }
@@ -715,14 +715,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=4"
+              "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=4"
             }
           ]
         }
@@ -738,14 +738,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=4"
+              "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=4"
             }
           ]
         }
@@ -761,14 +761,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
+              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
             }
           ]
         }
@@ -785,14 +785,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
+              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
             }
           ]
         }
@@ -833,14 +833,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
+              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
             }
           ]
         }
@@ -858,14 +858,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
+              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
             }
           ]
         }
@@ -1031,14 +1031,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
+              "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15"
             }
           ]
         }
@@ -1054,14 +1054,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
+              "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15"
             }
           ]
         }
@@ -1077,14 +1077,14 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+            "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
+              "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15"
             }
           ]
         }
@@ -1932,8 +1932,8 @@
       "name": "MIT · 6.042J · Fall 2010",
       "course": "Mathematics for Computer Science (Fall 2010)",
       "platform": "Bilibili",
-      "publisher": "",
-      "note": "B站版本BV1oP2dY6E7c，采用MIT 6.042J Fall 2010课程；上传者身份尚未独立核实，因此不标注未经确认的UP主名称。仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
+      "publisher": "抹茶味的盖子",
+      "note": "采用B站BV1zh41167Uy版本，页面标注专业中英文字幕，完整25讲；课程为MIT 6.042J Fall 2010。仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
     },
     {
       "id": "bjtu_discrete",
@@ -1964,7 +1964,7 @@
     "primary_per_node": "exactly one active course source per knowledge node; related consecutive episodes from that same course may be listed",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
-    "note": "The six CMU 21-228 episodes are mapped only to the six topics actually visible in the Bilibili playlist. Do not infer further episodes from the university syllabus. MIT uses Fall 2010. Beijing Jiaotong relation/function and counting links are direct part links. The two remaining nodes are intentionally unfilled pending a suitable Chinese-subtitled/original Bilibili lesson; never pad with low-quality or unrelated videos.",
+    "note": "MIT Fall 2010 uses the Bilibili BV1zh41167Uy version, whose page lists 25 lectures and professional Chinese-English subtitles. All MIT node links point to the matching lecture part numbers.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
