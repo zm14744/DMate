@@ -36,7 +36,7 @@ def _json(value):
 
 _PROMPT = """你是 DMate 的数学图结构解析器。你只负责把用户的自然语言绘图要求转换为结构化数学数据，不负责绘图，不输出 DOT、SVG、HTML、Markdown 或表格。
 
-只允许以下四种 kind：
+只允许以下六种 kind：
 1. graph：图论中的普通图、有向图、带权图、树、完全图、二部图、路径、回路、连通结构、生成树等。
 2. hasse：有限偏序集的哈斯图。vertices 给出元素，order_relations 给出用于定义偏序的严格小于关系边；只需给出能确定关系的边，程序会检查有向无环性并计算传递约简。
 3. cyclic_cayley：循环群 Z_n 的 Cayley 图。只输出 modulus 和 generators，群元素及边由程序根据模 n 加法计算。
@@ -48,7 +48,8 @@ _PROMPT = """你是 DMate 的数学图结构解析器。你只负责把用户的
 
 必须只返回一个 JSON 对象，字段如下：
 {
-  "kind": "graph | hasse | cyclic_cayley | zero_divisor_graph | unsupported",
+  "kind": "graph | hasse | cyclic_cayley | cyclic_subgroup_lattice | ideal_lattice_zn | zero_divisor_graph | unsupported",
+  "graph_family": "general | simple | complete | bipartite | complete_bipartite | tree | forest | path | cycle | regular | multigraph（仅 graph 使用）",
   "title": "简短图名",
   "directed": false,
   "weighted": false,
@@ -62,7 +63,7 @@ _PROMPT = """你是 DMate 的数学图结构解析器。你只负责把用户的
 未使用的字段可以省略；如果输出 null，也只用于未使用的可选字段。
 
 字段使用规则：
-- graph：必须提供 vertices 和 edges。顶点 id 使用简短、唯一的 ASCII 标识符；label 是显示文字。每条边的 from/to 必须引用已声明的顶点。direction 只能是 forward 或 undirected。若 weighted=true，每条边必须提供 weight。不要猜测题目没有给出的顶点、边、方向或权值；若用户要求的是一个标准图族，可以按该图族的数学定义构造。
+- graph：必须提供 graph_family、vertices 和 edges。顶点 id 使用简短、唯一的 ASCII 标识符；label 是显示文字。每条边的 from/to 必须引用已声明的顶点。direction 只能是 forward 或 undirected。若 weighted=true，每条边必须提供 weight；weighted=false 时不得输出权值。graph_family 必须准确描述图族，程序会对 simple、complete、bipartite、complete_bipartite、tree、forest、path、cycle、regular 做确定性校验。不要猜测题目没有给出的顶点、边、方向或权值；若用户要求的是一个标准图族，可以按该图族的数学定义构造。
 - hasse：必须提供 vertices 和 order_relations。关系对 [a,b] 表示 a 严格小于 b。不要加入自反关系。不要把可传递的关系误当成覆盖关系；程序会计算传递约简。
 - cyclic_cayley：modulus 为 2 到 24 的整数，generators 是 Z_n 中能生成整个循环群的非零整数生成元。生成元按模 n 解释。
 - cyclic_subgroup_lattice：modulus 为 2 到 30 的整数，表示加法群 Z_n。程序根据 n 的正因数生成子群，并按实际包含关系计算哈斯边。
@@ -78,6 +79,7 @@ _MODEL_SCHEMA = {
     "required": ["kind", "title"],
     "properties": {
         "kind": {"enum": ["graph", "hasse", "cyclic_cayley", "cyclic_subgroup_lattice", "ideal_lattice_zn", "zero_divisor_graph", "unsupported"]},
+        "graph_family": {"enum": ["general", "simple", "complete", "bipartite", "complete_bipartite", "tree", "forest", "path", "cycle", "regular", "multigraph"]},
         "title": {"type": "string", "minLength": 1, "maxLength": 80},
         "directed": {"type": ["boolean", "null"]},
         "weighted": {"type": ["boolean", "null"]},
@@ -137,6 +139,7 @@ _ERRORS_EN = {
     "边方向与图类型不一致。": "An edge direction conflicts with the graph type.",
     "带权图的每条边都必须提供权值。": "Every edge in a weighted graph must have a weight.",
     "图形超过当前原型的规模限制。": "The diagram exceeds this prototype's size limit.",
+    "图族结构与定义不符，请调整绘图要求。": "The generated graph does not satisfy its stated graph-family definition.",
     "哈斯图关系包含自反关系或未知元素。": "The Hasse relation contains a reflexive pair or an unknown element.",
     "哈斯图关系存在有向环，不构成偏序结构。": "The Hasse relation contains a directed cycle and is not a partial order.",
     "生成元不能生成整个循环群。": "The supplied generators do not generate the whole cyclic group.",
@@ -223,6 +226,62 @@ def _document(title, directed, weighted, vertices, edges):
     }
 
 
+def _validate_graph_family(family, directed, vertices, edges):
+    allowed = {"general", "simple", "complete", "bipartite", "complete_bipartite",
+               "tree", "forest", "path", "cycle", "regular", "multigraph"}
+    if family not in allowed:
+        raise MathDiagramError("invalid_graph_family", "模型没有返回有效的数学图结构，请调整描述后重试。", status=502)
+    if family in {"general", "multigraph"}:
+        return
+    if family in {"complete", "bipartite", "complete_bipartite", "tree", "forest", "path", "cycle", "regular"} and directed:
+        raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+
+    graph = nx.DiGraph() if directed else nx.Graph()
+    graph.add_nodes_from(vertex["id"] for vertex in vertices)
+    seen = set()
+    for edge in edges:
+        pair = (edge["from"], edge["to"])
+        key = pair if directed else tuple(sorted(pair))
+        if pair[0] == pair[1] or key in seen:
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+        seen.add(key)
+        graph.add_edge(*pair)
+
+    if family == "simple":
+        return
+    if family == "complete":
+        count = len(vertices)
+        if graph.number_of_edges() != count * (count - 1) // 2:
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+    elif family == "bipartite":
+        if not nx.is_bipartite(graph):
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+    elif family == "complete_bipartite":
+        if len(vertices) < 2 or not nx.is_connected(graph) or not nx.is_bipartite(graph):
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+        coloring = nx.algorithms.bipartite.color(graph)
+        left = sum(color == 0 for color in coloring.values())
+        right = len(vertices) - left
+        if not left or not right or graph.number_of_edges() != left * right:
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+    elif family == "tree":
+        if not nx.is_tree(graph):
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+    elif family == "forest":
+        if not nx.is_forest(graph):
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+    elif family == "path":
+        if len(vertices) < 2 or not nx.is_tree(graph) or max(dict(graph.degree()).values(), default=0) > 2:
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+    elif family == "cycle":
+        if len(vertices) < 3 or not nx.is_connected(graph) or any(degree != 2 for _, degree in graph.degree()):
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+    elif family == "regular":
+        degrees = {degree for _, degree in graph.degree()}
+        if len(degrees) > 1:
+            raise MathDiagramError("graph_family_mismatch", "图族结构与定义不符，请调整绘图要求。", status=502)
+
+
 def _build_graph(spec):
     vertices, vertex_ids = _vertices(spec)
     directed = spec.get("directed", False)
@@ -246,9 +305,7 @@ def _build_graph(spec):
                 raise MathDiagramError("missing_math_diagram_weight", "带权图的每条边都必须提供权值。", status=502)
             edge["weight"] = weight
         elif weight is not None:
-            if isinstance(weight, bool) or not isinstance(weight, (str, int, float)) or isinstance(weight, float) and not math.isfinite(weight):
-                raise MathDiagramError("invalid_math_diagram_weight", "模型没有返回有效的数学图结构，请调整描述后重试。", status=502)
-            edge["weight"] = weight
+            raise MathDiagramError("unexpected_math_diagram_weight", "模型没有返回有效的数学图结构，请调整描述后重试。", status=502)
         label = row.get("edge_label")
         if label is not None:
             if not isinstance(label, str) or len(label) > 80:
@@ -256,6 +313,7 @@ def _build_graph(spec):
             if label:
                 edge["edge_label"] = label
         edges.append(edge)
+    _validate_graph_family(spec.get("graph_family", "general"), directed, vertices, edges)
     return _document(_title(spec), directed, weighted, vertices, edges), "graph"
 
 

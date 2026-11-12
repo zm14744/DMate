@@ -207,12 +207,15 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   function createPageFromDocument(documentValue,pageName,requestText=''){
    if(pages.length>=50)throw new Error('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');
    if(!goodDocument(documentValue)||documentValue.graphs.length!==1||!documentValue.graphs[0].vertices.length)throw new Error('生成的数学图结构无效，未创建画板。');
-   collect();persist();const title=caption(pageName||documentValue.graphs[0].name||uiText('数学图','Math diagram'));
-   const page={id:id(),name:title,document:clone(documentValue),requirement:String(requestText||'').slice(0,2000),createdAt:Date.now(),updatedAt:Date.now()};
+   const normalized=root.DMateGraphEditor.importDocument(documentValue);
+   const issues=root.DMateGraphEditor.validateDocument(normalized);
+   if(issues.length)throw new Error(issues[0]);
+   collect();persist();const title=caption(pageName||normalized.graphs[0].name||uiText('数学图','Math diagram'));
+   const page={id:id(),name:title,document:clone(normalized),requirement:String(requestText||'').slice(0,2000),createdAt:Date.now(),updatedAt:Date.now()};
    pages.push(page);activeId=page.id;panelMode='';persist();mountPage();setStatus(uiText('数学图已生成，可以继续编辑。','Mathematical diagram generated. You can continue editing it.'));
    return page.id;
   }
-  function togglePanel(mode){if(mode==='ai'&&!active())return;closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
+  function togglePanel(mode){closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
   function renderPanel(){
    panel.style.visibility='hidden';panel.hidden=!panelMode;panel.replaceChildren();historyButton.setAttribute('aria-expanded',String(panelMode==='history'));aiButton.setAttribute('aria-expanded',String(panelMode==='ai'));
    if(!panelMode){queueChrome();return;}
@@ -230,7 +233,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    const label=el('label','ddw-ai-label','要求（可选）'),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label','绘图指导要求（可选）');
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
    const actionRow=el('div','ddw-ai-actions');
-   const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.append(sendIcon());ask.disabled=Boolean(aiAbort);ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='指导当前图形';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
+   const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.append(sendIcon());ask.disabled=Boolean(aiAbort)||!active();ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='指导当前图形';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
    const generate=button(uiText('生成数学图','Generate diagram'),()=>requestGenerate(),'ddw-generate-button');generate.disabled=Boolean(aiAbort);generate.setAttribute('aria-busy',String(Boolean(aiAbort)));
    const result=el('div','ddw-ai-answer');result.setAttribute('data-i18n-content','');result.setAttribute('aria-live','polite');
    actionRow.append(ask,generate);panel.append(label,actionRow,result);
@@ -278,7 +281,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    finally{if(epoch===aiEpoch){aiAbort=null;if(!destroyed)renderPanel();}}
   }
   async function requestGenerate(){
-   if(aiAbort||destroyed||!active())return;
+   if(aiAbort||destroyed)return;
    const request=requirement.trim();
    if(!request){setStatus(uiText('请先描述需要生成的数学图。','Describe the mathematical diagram you want to generate first.'));return;}
    if(!root.DMateMathDiagram?.generate){setStatus(uiText('数学图生成模块未加载，请刷新后重试。','The diagram generator is not loaded. Refresh and try again.'));return;}

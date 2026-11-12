@@ -1,6 +1,7 @@
+import json
 import unittest
 
-from math_diagram import MathDiagramError, build_document
+from math_diagram import MathDiagramError, build_document, generate_diagram
 
 
 class MathDiagramStructureTests(unittest.TestCase):
@@ -102,6 +103,60 @@ class MathDiagramStructureTests(unittest.TestCase):
                 "edges": [{"from": "v1", "to": "v2"}],
             })
 
+
+    def test_complete_graph_is_checked(self):
+        document, kind = build_document({
+            "kind": "graph", "graph_family": "complete", "title": "K3",
+            "directed": False, "weighted": False,
+            "vertices": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}, {"id": "c", "label": "C"}],
+            "edges": [{"from": "a", "to": "b"}, {"from": "a", "to": "c"}, {"from": "b", "to": "c"}],
+        })
+        self.assertEqual(kind, "graph")
+        self.assertEqual(len(document["graphs"][0]["edges"]), 3)
+
+    def test_complete_graph_rejects_missing_edge(self):
+        with self.assertRaises(MathDiagramError):
+            build_document({
+                "kind": "graph", "graph_family": "complete", "title": "not K3",
+                "directed": False, "weighted": False,
+                "vertices": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}, {"id": "c", "label": "C"}],
+                "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "c"}],
+            })
+
+    def test_tree_rejects_disconnected_structure(self):
+        with self.assertRaises(MathDiagramError):
+            build_document({
+                "kind": "graph", "graph_family": "tree", "title": "not a tree",
+                "directed": False, "weighted": False,
+                "vertices": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}, {"id": "c", "label": "C"}],
+                "edges": [{"from": "a", "to": "b"}],
+            })
+
+    def test_bipartite_rejects_odd_cycle(self):
+        with self.assertRaises(MathDiagramError):
+            build_document({
+                "kind": "graph", "graph_family": "bipartite", "title": "not bipartite",
+                "directed": False, "weighted": False,
+                "vertices": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}, {"id": "c", "label": "C"}],
+                "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "c"}, {"from": "c", "to": "a"}],
+            })
+
+    def test_generate_diagram_uses_json_mode_and_validates_output(self):
+        response_spec = {
+            "kind": "graph", "graph_family": "tree", "title": "A three-node tree",
+            "directed": False, "weighted": False,
+            "vertices": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}, {"id": "c", "label": "C"}],
+            "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "c"}],
+        }
+        observed = {}
+        def completion(messages, **kwargs):
+            observed.update(kwargs)
+            return {"ok": True, "content": json.dumps(response_spec), "choice": {"finish_reason": "stop"}}
+        result = generate_diagram({"requirement": "生成一棵三个顶点的树", "language": "zh-CN"}, completion=completion)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["kind"], "graph")
+        self.assertEqual(observed["response_format"], {"type": "json_object"})
+        self.assertEqual(len(result["document"]["graphs"][0]["edges"]), 2)
 
 if __name__ == "__main__":
     unittest.main()

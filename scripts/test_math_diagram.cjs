@@ -6,26 +6,15 @@ const path = require('node:path');
 const api = require('../static/math-diagram.js');
 
 (async () => {
-  const bundles = [
-    {
-      url: 'https://cdn.jsdelivr.net/gh/siyuan-note/siyuan@be17ed1e0510bb6371cb8a162e16898a697fa118/app/stage/protyle/js/graphviz/viz.js',
-      integrity: 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4='
-    },
-    {
-      url: 'https://github.com/mdaines/viz-js/releases/download/release-viz-3.31.0/viz-global.js',
-      integrity: 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4='
-    }
-  ];
-  for (const bundle of bundles) {
-    const response = await fetch(bundle.url);
-    assert.equal(response.ok, true, 'The pinned browser bundle URL must be reachable: ' + bundle.url);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    const sri = 'sha256-' + crypto.createHash('sha256').update(bytes).digest('base64');
-    assert.equal(sri, bundle.integrity, 'The browser bundle must match its Subresource Integrity hash.');
-  }
+  const vendorPath = path.join(__dirname, '..', 'static', 'vendor', 'viz-js-3.31.0', 'viz-global.js');
+  const vendorBytes = fs.readFileSync(vendorPath);
+  const sri = 'sha256-' + crypto.createHash('sha256').update(vendorBytes).digest('base64');
+  assert.equal(sri, 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4=',
+    'The vendored Graphviz bundle must match its verified upstream bytes.');
 
-  const Viz = await import('@viz-js/viz');
+  const Viz = require(vendorPath);
   const viz = await Viz.instance();
+  assert.ok(viz.graphvizVersion, 'The vendored layout engine should report its Graphviz version.');
 
   const graphDocument = {
     body_text: '',

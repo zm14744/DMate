@@ -2,16 +2,10 @@
     'use strict';
 
     const VERSION = '3.31.0';
-    const SOURCES = [
-        {
-            url: 'https://cdn.jsdelivr.net/gh/siyuan-note/siyuan@be17ed1e0510bb6371cb8a162e16898a697fa118/app/stage/protyle/js/graphviz/viz.js',
-            integrity: 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4='
-        },
-        {
-            url: 'https://github.com/mdaines/viz-js/releases/download/release-viz-' + VERSION + '/viz-global.js',
-            integrity: 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4='
-        }
-    ];
+    const SOURCE = {
+        url: '/static/vendor/viz-js-' + VERSION + '/viz-global.js',
+        integrity: 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4='
+    };
     let vizPromise = null;
 
     function loadViz() {
@@ -20,27 +14,25 @@
         vizPromise = new Promise((resolve, reject) => {
             const doc = root.document;
             if (!doc) { reject(new Error('当前环境无法加载数学布局引擎。')); return; }
-            let index = 0;
-            const next = () => {
-                if (index >= SOURCES.length) {
+            const script = doc.createElement('script');
+            script.src = SOURCE.url;
+            script.integrity = SOURCE.integrity;
+            script.crossOrigin = 'anonymous';
+            script.async = true;
+            script.onload = () => {
+                if (root.Viz && typeof root.Viz.instance === 'function') resolve(root.Viz);
+                else {
+                    script.remove();
                     vizPromise = null;
-                    reject(new Error('数学自动布局组件暂时无法加载，请检查网络后重试。'));
-                    return;
+                    reject(new Error('数学自动布局组件未能初始化，请刷新后重试。'));
                 }
-                const script = doc.createElement('script');
-                const source = SOURCES[index++];
-                script.src = source.url;
-                script.integrity = source.integrity;
-                script.crossOrigin = 'anonymous';
-                script.async = true;
-                script.onload = () => {
-                    if (root.Viz && typeof root.Viz.instance === 'function') resolve(root.Viz);
-                    else { script.remove(); next(); }
-                };
-                script.onerror = () => { script.remove(); next(); };
-                doc.head.appendChild(script);
             };
-            next();
+            script.onerror = () => {
+                script.remove();
+                vizPromise = null;
+                reject(new Error('数学自动布局组件暂时无法加载，请刷新后重试。'));
+            };
+            doc.head.appendChild(script);
         });
         return vizPromise;
     }
@@ -120,7 +112,8 @@
         const engine = engineFor(kind, graph);
         const result = viz.render(buildDot(document, kind), {format: 'plain', engine});
         if (!result || result.status !== 'success') {
-            const detail = Array.isArray(result && result.errors) ? result.errors.join('；') : '';
+            const detail = Array.isArray(result && result.errors)
+                ? result.errors.map(error => error && error.message ? error.message : String(error)).join('；') : '';
             throw new Error(detail || '数学图自动布局失败，请调整绘图要求。');
         }
         const positions = parsePlain(result.output);
@@ -134,10 +127,13 @@
         const rangeX = maxX - minX, rangeY = maxY - minY;
         const copy = JSON.parse(JSON.stringify(document));
         const target = copy.graphs[0];
+        const span = Math.max(rangeX, rangeY);
+        const scale = span < 1e-8 ? 0 : 0.82 / span;
+        const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
         for (const vertex of target.vertices) {
             const point = positions.get(vertex.id);
-            vertex.x = rangeX < 1e-8 ? 0.5 : 0.09 + (point[0] - minX) / rangeX * 0.82;
-            vertex.y = rangeY < 1e-8 ? 0.5 : 0.09 + (maxY - point[1]) / rangeY * 0.82;
+            vertex.x = scale ? 0.5 + (point[0] - centerX) * scale : 0.5;
+            vertex.y = scale ? 0.5 - (point[1] - centerY) * scale : 0.5;
         }
         return {document: copy, engine};
     }
