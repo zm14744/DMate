@@ -1,14 +1,14 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v3";
+const CACHE_NAME = "dmate-offline-shell-v4";
 const PRECACHE = [
   "/offline",
-  "/static/dmate-main.css?v=3",
-  "/static/dmate-shared-overrides.css?v=3",
-  "/static/offline.css?v=3",
-  "/static/offline.js?v=3",
-  "/static/offline-shell.js?v=3",
-  "/static/offline-knowledge-graph.js?v=3",
-  "/static/offline-knowledge-graph.css?v=3",
+  "/static/dmate-main.css?v=4",
+  "/static/dmate-shared-overrides.css?v=4",
+  "/static/offline.css?v=4",
+  "/static/offline.js?v=4",
+  "/static/offline-shell.js?v=4",
+  "/static/offline-knowledge-graph.js?v=4",
+  "/static/offline-knowledge-graph.css?v=4",
   "/static/offline-entry.js",
   "/static/icons/dmate-brand-v52.svg",
   "/static/offline-content/concepts.zh-CN.json",
@@ -117,16 +117,29 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  if (PRECACHE.some(path => new URL(path, self.location.origin).pathname === url.pathname)) {
+  const canonicalPath = PRECACHE.find(path => new URL(path, self.location.origin).pathname === url.pathname);
+  if (canonicalPath) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(request) || await cache.match(url.pathname, {ignoreSearch:true});
-      if (cached) return cached;
-      const response = await fetch(request);
-      if (response && response.ok) {
-        await cache.put(request, response.clone());
+      const canonicalURL = new URL(canonicalPath, self.location.origin).href;
+      // The offline shell pins its assets. Online pages use revision queries:
+      // fetch those fresh instead of letting an old offline copy mask updates.
+      if (url.href === canonicalURL) {
+        const cached = await cache.match(request);
+        if (cached) return cached;
       }
-      return response;
+      try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+          // A cache write failure must not replace a fresh network response.
+          await cache.put(request, response.clone()).catch(() => {});
+        }
+        return response;
+      } catch (error) {
+        const cached = await cache.match(request) || await cache.match(canonicalURL);
+        if (cached) return cached;
+        throw error;
+      }
     })());
   }
 });

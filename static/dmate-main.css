@@ -3813,6 +3813,17 @@ body[data-appearance-theme="light"] .msg-actions button {
         font-weight:700;
     }
 
+    .mobile-drawer-head.mobile-drawer-close-row {
+        justify-content:flex-end;
+    }
+
+    #conversationSidebar > #newChatBtn {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        text-align:center !important;
+    }
+
     .mobile-drawer-close {
         width:38px;
         height:38px;

@@ -280,13 +280,6 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
     color:var(--dm-warning-text,#f59e0b) !important;
 }
 
-/* The mobile tools drawer already has its own “学习工具” heading. */
-@media(max-width:1100px) {
-    body[data-appearance-theme] #learningToolsPanel .panel-heading-row.learning-title {
-        display:none !important;
-    }
-}
-
 /* Neutral selection states across settings and selectable tool panels.
    Actual primary actions, destructive controls and graph strokes keep their
    own semantic/theme colors. A selection is not a blue action button. */

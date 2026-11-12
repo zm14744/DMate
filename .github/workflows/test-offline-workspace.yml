@@ -8,6 +8,8 @@ on:
       - 'static/**'
       - 'scripts/sync_offline_styles.py'
       - 'scripts/test_offline_workspace_browser.cjs'
+      - 'scripts/test_mobile_drawers_browser.cjs'
+      - 'scripts/test_service_worker_cache_browser.cjs'
       - '.github/workflows/test-offline-workspace.yml'
   pull_request:
     paths:
@@ -16,6 +18,8 @@ on:
       - 'static/**'
       - 'scripts/sync_offline_styles.py'
       - 'scripts/test_offline_workspace_browser.cjs'
+      - 'scripts/test_mobile_drawers_browser.cjs'
+      - 'scripts/test_service_worker_cache_browser.cjs'
       - '.github/workflows/test-offline-workspace.yml'
   workflow_dispatch:
 
@@ -49,6 +53,8 @@ jobs:
           node --check static/offline-knowledge-graph.js
           node --check static/script.js
           node --check scripts/test_offline_workspace_browser.cjs
+          node --check scripts/test_mobile_drawers_browser.cjs
+          node --check scripts/test_service_worker_cache_browser.cjs
       - name: Verify offline styles match the online workspace
         run: python scripts/sync_offline_styles.py --check
       - name: Validate JSON content packs
@@ -111,6 +117,8 @@ jobs:
         run: |
           mkdir -p artifacts/offline-workspace
           node scripts/test_offline_workspace_browser.cjs
+          node scripts/test_service_worker_cache_browser.cjs
+          node scripts/test_mobile_drawers_browser.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4

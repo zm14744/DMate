@@ -21437,6 +21437,7 @@ function renderInfo() {
     info.setAttribute("data-i18n-content", "");
 
     const session = getCurrent();
+    info.classList.toggle("is-empty", !session);
 
     if (!session) {
         info.innerText = dmateUiText("无");
