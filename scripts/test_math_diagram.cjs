@@ -6,10 +6,13 @@ const path = require('node:path');
 const api = require('../static/math-diagram.js');
 
 (async () => {
-  const bundle = path.join(process.cwd(), 'node_modules/@viz-js/viz/dist/viz-global.js');
-  const sri = 'sha256-' + crypto.createHash('sha256').update(fs.readFileSync(bundle)).digest('base64');
+  const bundleURL = 'https://cdn.jsdelivr.net/gh/siyuan-note/siyuan@be17ed1e0510bb6371cb8a162e16898a697fa118/app/stage/protyle/js/graphviz/viz.js';
+  const bundleResponse = await fetch(bundleURL);
+  assert.equal(bundleResponse.ok, true, 'The pinned browser bundle CDN URL must be reachable.');
+  const bundleBytes = Buffer.from(await bundleResponse.arrayBuffer());
+  const sri = 'sha256-' + crypto.createHash('sha256').update(bundleBytes).digest('base64');
   assert.equal(sri, 'sha256-yeCzEPmIORDgHGYFS4t/9L49hpUUERZjXnKwrxUmkg==',
-    'The pinned browser bundle must match the Subresource Integrity hash.');
+    'The pinned browser bundle must match the upstream Subresource Integrity hash.');
 
   const Viz = await import('@viz-js/viz');
   const viz = await Viz.instance();

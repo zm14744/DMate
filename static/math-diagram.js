@@ -4,8 +4,8 @@
     const VERSION = '3.31.0';
     const INTEGRITY = 'sha256-yeCzEPmIORDgHGYFS4t/9L49hpUUERZjXnKwrxUmkg==';
     const SOURCES = [
-        'https://cdn.jsdelivr.net/npm/@viz-js/viz@' + VERSION + '/dist/viz-global.js',
-        'https://unpkg.com/@viz-js/viz@' + VERSION + '/dist/viz-global.js'
+        'https://cdn.jsdelivr.net/gh/siyuan-note/siyuan@be17ed1e0510bb6371cb8a162e16898a697fa118/app/stage/protyle/js/graphviz/viz.js',
+        'https://github.com/mdaines/viz-js/releases/download/release-viz-' + VERSION + '/viz-global.js'
     ];
     let vizPromise = null;
 
