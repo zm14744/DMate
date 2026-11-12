@@ -1,5 +1,5 @@
 {
-  "version": 20,
+  "version": 21,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -302,15 +302,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "2. Induction",
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第2讲：数学归纳法，正向与反向归纳",
           "sections": [
-            "2. Induction"
+            "第2讲：数学归纳法，正向与反向归纳"
           ],
           "lessons": [
             {
-              "title": "2. Induction",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=2"
+              "title": "第2讲：数学归纳法，正向与反向归纳",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=2"
             }
           ]
         }
@@ -325,15 +325,15 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "3. Strong Induction",
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第3讲：归纳法进阶证明技巧",
           "sections": [
-            "3. Strong Induction"
+            "第3讲：归纳法进阶证明技巧"
           ],
           "lessons": [
             {
-              "title": "3. Strong Induction",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=3"
+              "title": "第3讲：归纳法进阶证明技巧",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=3"
             }
           ]
         }
@@ -763,24 +763,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "bjtu_discrete",
-          "title": "1.3 计数基础(1)--乘法原理和加法原理",
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第1讲：课程导引、基础计数原理",
           "sections": [
-            "1.3 计数基础(1)--乘法原理和加法原理"
+            "第1讲：课程导引、基础计数原理"
           ],
           "lessons": [
             {
-              "source_id": "bjtu_discrete",
-              "title": "1.3 计数基础(1)--乘法原理和加法原理",
-              "sections": [
-                "1.3 计数基础(1)--乘法原理和加法原理"
-              ],
-              "lessons": [
-                {
-                  "title": "1.3 计数基础(1)--乘法原理和加法原理",
-                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=10"
-                }
-              ]
+              "title": "第1讲：课程导引、基础计数原理",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=1"
             }
           ]
         }
@@ -850,24 +841,15 @@
       ],
       "videos": [
         {
-          "source_id": "bjtu_discrete",
-          "title": "(4)--鸽巢原理",
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第6讲：鸽巢原理",
           "sections": [
-            "(4)--鸽巢原理"
+            "第6讲：鸽巢原理"
           ],
           "lessons": [
             {
-              "source_id": "bjtu_discrete",
-              "title": "(4)--鸽巢原理",
-              "sections": [
-                "(4)--鸽巢原理"
-              ],
-              "lessons": [
-                {
-                  "title": "(4)--鸽巢原理",
-                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=13"
-                }
-              ]
+              "title": "第6讲：鸽巢原理",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=6"
             }
           ]
         }
@@ -883,24 +865,20 @@
       ],
       "videos": [
         {
-          "source_id": "bjtu_discrete",
-          "title": "(5)--容斥原理",
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第4讲：容斥原理基础",
           "sections": [
-            "(5)--容斥原理"
+            "第4讲：容斥原理基础",
+            "第5讲：容斥原理典型应用"
           ],
           "lessons": [
             {
-              "source_id": "bjtu_discrete",
-              "title": "(5)--容斥原理",
-              "sections": [
-                "(5)--容斥原理"
-              ],
-              "lessons": [
-                {
-                  "title": "(5)--容斥原理",
-                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=14"
-                }
-              ]
+              "title": "第4讲：容斥原理基础",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=4"
+            },
+            {
+              "title": "第5讲：容斥原理典型应用",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=5"
             }
           ]
         }
@@ -1667,6 +1645,14 @@
       "platform": "Bilibili",
       "publisher": "格物嘉",
       "note": "B站上传者为格物嘉，页面标注原课程来源为北京交通大学中国大学MOOC（NJTU-1002530017），共194讲。用于计数基础、排列组合、鸽巢原理、容斥及递推关系的连续补充；只提供原视频外链，不下载或托管。上传授权尚未核实。"
+    },
+    {
+      "id": "cmu_21_228_2021_bilibili",
+      "name": "卡内基梅隆大学 · Po-Shen Loh",
+      "course": "21-228 Discrete Mathematics（Spring 2021）",
+      "platform": "Bilibili",
+      "publisher": "无为斋主",
+      "note": "卡内基梅隆大学Po-Shen Loh教授2021年春季离散数学课程。B站视频BV1jA4L66ELr；用户截图核实前六讲标题与时长。课程官方大纲覆盖计数、归纳、容斥、鸽巢、二项式系数、递推、生成函数、图论、树、匹配与平面图。仅提供B站外链，不下载或托管。"
     }
   ],
   "video_resource_policy": {
@@ -1713,12 +1699,12 @@
       "course": "21-228 Discrete Mathematics（Spring 2021）",
       "instructor": "Po-Shen Loh",
       "platform": "Bilibili",
-      "url": null,
+      "url": "https://www.bilibili.com/video/BV1jA4L66ELr/",
       "uploader": "无为斋主",
       "screenshot_title": "【卡内基梅隆大学】离散数学 | 2021 | 证明无从下手，练就离散数理思维",
       "duration": "31:26:24",
       "official_course_url": "https://www.math.cmu.edu/~ploh/2021-228.shtml",
-      "status": "confirmed_by_user_screenshot_waiting_exact_bvid",
+      "status": "active_first_six_lessons_verified_by_user_screenshot",
       "coverage": [
         "基本计数",
         "数学归纳",
@@ -1733,11 +1719,12 @@
         "匹配",
         "平面图"
       ],
-      "note": "用户提供的B站截图确认该视频页面、UP主无为斋主、上传时间、播放量和65集合集信息。CMU官方大纲确认课程由Po-Shen Loh于Spring 2021讲授，覆盖计数、递推、生成函数、图论与树。B站搜索暂未返回该新上传低播放量视频的可核验BV号；不得猜测链接。取得精确视频链接后，将按具体单集映射计数与递推节点。",
+      "note": "精确B站BV号由用户地址栏截图确认。前六讲标题及单集时长由用户提供的B站合集截图核实；已映射到基础计数、数学归纳、归纳法进阶、容斥原理、鸽巢原理节点。其余主题按CMU官方大纲确认，但未见对应B站分集标题前不猜测p编号。",
       "screenshot_date": "2026-11-12 17:00:00",
       "screenshot_views": 396,
       "screenshot_comments": 0,
-      "playlist_position": "38/65"
+      "playlist_position": "38/65",
+      "source_id": "cmu_21_228_2021_bilibili"
     }
   ]
 }
