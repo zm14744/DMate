@@ -1,5 +1,5 @@
 {
-  "version": 21,
+  "version": 22,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1652,7 +1652,7 @@
       "course": "21-228 Discrete Mathematics（Spring 2021）",
       "platform": "Bilibili",
       "publisher": "无为斋主",
-      "note": "卡内基梅隆大学Po-Shen Loh教授2021年春季离散数学课程。B站视频BV1jA4L66ELr；用户截图核实前六讲标题与时长。课程官方大纲覆盖计数、归纳、容斥、鸽巢、二项式系数、递推、生成函数、图论、树、匹配与平面图。仅提供B站外链，不下载或托管。"
+      "note": "卡内基梅隆大学Po-Shen Loh教授2021年春季离散数学课程。B站视频BV1jA4L66ELr，用户截图显示本课程共6个分P；截图中的38/65是外层“数学学院（世界名校精品课）”合集位置，不是本课程讲数。六讲分别为课程导引/基础计数、数学归纳法、归纳法进阶、容斥基础、容斥应用、鸽巢原理。仅提供B站外链，不下载或托管。"
     }
   ],
   "video_resource_policy": {
@@ -1704,7 +1704,7 @@
       "screenshot_title": "【卡内基梅隆大学】离散数学 | 2021 | 证明无从下手，练就离散数理思维",
       "duration": "31:26:24",
       "official_course_url": "https://www.math.cmu.edu/~ploh/2021-228.shtml",
-      "status": "active_first_six_lessons_verified_by_user_screenshot",
+      "status": "six_episodes_verified_by_user_screenshot",
       "coverage": [
         "基本计数",
         "数学归纳",
@@ -1719,12 +1719,52 @@
         "匹配",
         "平面图"
       ],
-      "note": "精确B站BV号由用户地址栏截图确认。前六讲标题及单集时长由用户提供的B站合集截图核实；已映射到基础计数、数学归纳、归纳法进阶、容斥原理、鸽巢原理节点。其余主题按CMU官方大纲确认，但未见对应B站分集标题前不猜测p编号。",
+      "note": "已由用户提供的B站页面截图确认：38/65表示该课程在“数学学院（世界名校精品课）”外层合集中的位置；当前CMU课程自身共有6个分P。六讲标题、时长及对应知识节点已全部录入。",
       "screenshot_date": "2026-11-12 17:00:00",
       "screenshot_views": 396,
       "screenshot_comments": 0,
       "playlist_position": "38/65",
-      "source_id": "cmu_21_228_2021_bilibili"
+      "source_id": "cmu_21_228_2021_bilibili",
+      "episode_count": 6,
+      "outer_collection_position": "38/65",
+      "episodes": [
+        {
+          "p": 1,
+          "title": "第1讲：课程导引、基础计数原理",
+          "duration": "57:47",
+          "node": "count_basic"
+        },
+        {
+          "p": 2,
+          "title": "第2讲：数学归纳法，正向与反向归纳",
+          "duration": "01:03:02",
+          "node": "proof_induction"
+        },
+        {
+          "p": 3,
+          "title": "第3讲：归纳法进阶证明技巧",
+          "duration": "57:42",
+          "node": "proof_strong_induction"
+        },
+        {
+          "p": 4,
+          "title": "第4讲：容斥原理基础",
+          "duration": "53:56",
+          "node": "count_inclusion"
+        },
+        {
+          "p": 5,
+          "title": "第5讲：容斥原理典型应用",
+          "duration": "56:22",
+          "node": "count_inclusion"
+        },
+        {
+          "p": 6,
+          "title": "第6讲：鸽巢原理",
+          "duration": "51:37",
+          "node": "count_pigeonhole"
+        }
+      ]
     }
   ]
 }
