@@ -3372,6 +3372,31 @@ def drawing_guide():
     return response
 
 
+@app.route("/drawing/generate", methods=["POST"])
+def drawing_generate():
+    """Generate a validated mathematical graph structure for the local drawing workspace."""
+    from math_diagram import MathDiagramError, generate_diagram
+    if not _check_rate_limit(_get_client_ip(), "drawing_generate"):
+        response = jsonify({"ok": False, "error": "数学图生成过于频繁，请稍后重试。", "code": "math_diagram_rate_limited"})
+        response.status_code = 429
+    elif request.content_length is not None and request.content_length > 12_000:
+        response = jsonify({"ok": False, "error": "绘图要求过长，请精简后重试。", "code": "math_diagram_request_too_large"})
+        response.status_code = 413
+    else:
+        try:
+            payload = request.get_json(silent=True)
+            if isinstance(payload, dict):
+                payload = {**payload, "language": request_language(request)}
+            result = generate_diagram(payload)
+        except MathDiagramError as exc:
+            response = jsonify({"ok": False, "error": exc.message, "code": exc.code})
+            response.status_code = exc.status
+        else:
+            response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/drawing/upload", methods=["POST"])
 def drawing_upload():
     """Stage an actual drawing and its exact structure; do not recognize or solve."""
