@@ -29,247 +29,68 @@
   };
   const $ = id => document.getElementById(id);
   const mobile = window.matchMedia('(max-width:1100px)');
-  const moduleIds = {
-    mistakes:'wrongBookModal', notes:'conceptNotebookDialog', drawing:'graphEditorDialog',
-    graph:'knowledgeGraphModal', questions:'offlineQuestionsModal', concepts:'offlineConceptsModal',
-    review:'learningReviewModal'
-  };
-  const moduleButtons = {
-    mistakes:'wrongBookBtn', notes:'conceptNotebookBtn', drawing:'graphDrawingBtn',
-    graph:'knowledgeGraphBtn', review:'learningReviewBtn'
-  };
-  const origins = new Map();
-  const activeModules = new Set();
-  let drawerTrigger = null;
-  let composer = null;
-  let mode = 'chat';
-  let viewportFrame = 0;
-
-  function toast(message) {
-    let node = $('offlineToast');
-    if (!node) {
-      node = document.createElement('div'); node.id = 'offlineToast';
-      node.className = 'offline-toast'; node.setAttribute('role','status');
-      document.body.appendChild(node);
-    }
-    node.textContent = message; node.hidden = false;
-    clearTimeout(toast.timer); toast.timer = setTimeout(() => { node.hidden = true; }, 3000);
-  }
-  function visible(element) {
-    return Boolean(element?.isConnected && !element.closest('[inert]') && element.getClientRects().length);
-  }
-  function focus(element) { if (visible(element)) element.focus({preventScroll:true}); }
-  function drawerPanel() {
-    return document.body.classList.contains('mobile-left-open') ? $('conversationSidebar')
-      : document.body.classList.contains('mobile-tools-open') ? $('learningToolsPanel') : null;
-  }
-  function refreshDrawers() {
-    const sidebar = $('conversationSidebar'), tools = $('learningToolsPanel');
-    const leftOpen = mobile.matches && document.body.classList.contains('mobile-left-open');
-    const toolsOpen = mobile.matches && document.body.classList.contains('mobile-tools-open');
-    if (mobile.matches) {
-      if (sidebar) { if (!leftOpen && sidebar.contains(document.activeElement)) document.activeElement.blur(); sidebar.inert = !leftOpen; sidebar.setAttribute('aria-hidden',String(!leftOpen)); }
-      if (tools) { if (!toolsOpen && tools.contains(document.activeElement)) document.activeElement.blur(); tools.inert = !toolsOpen; tools.setAttribute('aria-hidden',String(!toolsOpen)); }
-    }
-    const center = document.querySelector('.center');
-    if (center) center.inert = leftOpen || toolsOpen;
-    $('mobileNavBtn')?.setAttribute('aria-expanded',String(leftOpen));
-    $('mobileToolsBtn')?.setAttribute('aria-expanded',String(toolsOpen));
-    $('mobileShellBackdrop')?.setAttribute('aria-hidden',String(!(leftOpen || toolsOpen)));
-  }
-  function closeDrawers(restore = true) {
-    const hadDrawer = Boolean(drawerPanel());
-    document.body.classList.remove('mobile-left-open','mobile-tools-open');
-    refreshDrawers();
-    if (restore && mobile.matches && hadDrawer) focus(drawerTrigger || $('mobileToolsBtn'));
-  }
-  function openDrawer(kind, trigger) {
-    if (!mobile.matches) return;
-    const targetClass = kind === 'left' ? 'mobile-left-open' : 'mobile-tools-open';
-    const wasOpen = document.body.classList.contains(targetClass);
-    closeDrawers(false);
-    if (wasOpen) return;
-    drawerTrigger = trigger;
-    document.body.classList.add(targetClass);
-    refreshDrawers();
-    const panel = drawerPanel();
-    requestAnimationFrame(() => focus(panel?.querySelector('.mobile-drawer-close,button:not(:disabled)')));
-  }
-  function moduleOpen(node) {
-    return node instanceof HTMLDialogElement ? node.open : Boolean(node && !node.classList.contains('hidden'));
-  }
-  function anyModuleOpen() { return Object.values(moduleIds).some(id => moduleOpen($(id))); }
-  function finishClose(name, restore) {
-    const node = $(moduleIds[name]);
-    node?.setAttribute('aria-hidden','true');
-    const previous = origins.get(name); origins.delete(name);
-    const wasActive = activeModules.delete(name);
-    if (wasActive) window.dispatchEvent(new CustomEvent('offline:module-close',{detail:{name}}));
-    if (restore && !anyModuleOpen()) {
-      const fallback = mobile.matches ? $('mobileToolsBtn') : $('desktopToolsBtn');
-      focus(visible(previous) ? previous : fallback);
+  let lastDrawerTrigger = null;
+  function updateDrawer() {
+    const open = mobile.matches ? document.body.classList.contains('offline-nav-open')
+      : document.documentElement.dataset.offlineSidebar !== 'collapsed';
+    $('offlineSidebar').inert = !open;
+    $('offlineNavBackdrop').hidden = !mobile.matches || !open;
+    for (const id of ['offlineNavToggle','offlineDesktopSidebarToggle','offlineDesktopSidebarOpen']) {
+      $(id).setAttribute('aria-expanded',String(open));
     }
   }
-  function closeModule(name, restore = true) {
-    const node = $(moduleIds[name]);
-    if (!node) return false;
-    if (name === 'notes' && node.open) {
-      // The notebook owns its persistence guard and may refuse to close.
-      if (!window.DMateOfflineWorkspace?.closeNotebook?.()) return false;
-    } else if (node instanceof HTMLDialogElement) { if (node.open) node.close(); }
-    else node.classList.add('hidden');
-    finishClose(name,restore);
-    return true;
+  function closeDrawer(restore = true) {
+    document.body.classList.remove('offline-nav-open');
+    updateDrawer();
+    if (restore && mobile.matches) (lastDrawerTrigger || $('offlineNavToggle')).focus({preventScroll:true});
   }
-  function openModule(name, trigger = document.activeElement) {
-    const node = $(moduleIds[name]);
-    if (!node) return null;
-    const wasOpen = moduleOpen(node);
-    for (const other of Object.keys(moduleIds)) {
-      if (other !== name && moduleOpen($(moduleIds[other])) && !closeModule(other,false)) return null;
-    }
-    if (!wasOpen) origins.set(name,visible(trigger) ? trigger : $(moduleButtons[name]));
-    closeDrawers(false);
-    node.setAttribute('aria-hidden','false');
-    if (node instanceof HTMLDialogElement) { if (!node.open) node.showModal(); }
-    else {
-      node.classList.remove('hidden');
-      const card = node.querySelector('.modal-card');
-      card?.setAttribute('role','dialog'); card?.setAttribute('aria-modal','true');
-    }
-    activeModules.add(name);
-    if (!wasOpen) {
-      window.dispatchEvent(new CustomEvent('offline:module-open',{detail:{name}}));
-      const heading = node.querySelector('.modal-head > div,.modal-head h2,.dcn-heading h2,.graph-editor-dialog-head h2');
-      if (heading) { heading.tabIndex = -1; requestAnimationFrame(() => focus(heading)); }
-    }
-    return node;
-  }
-  window.DMateOfflineShell = {openModule,closeModule,closeDrawers,toast};
-
-  $('mobileNavBtn')?.addEventListener('click',event => openDrawer('left',event.currentTarget));
-  $('mobileToolsBtn')?.addEventListener('click',event => openDrawer('tools',event.currentTarget));
-  $('mobileNavClose')?.addEventListener('click',() => closeDrawers());
-  $('mobileToolsClose')?.addEventListener('click',() => closeDrawers());
-  $('mobileShellBackdrop')?.addEventListener('click',() => closeDrawers());
-  $('appearanceBtn')?.addEventListener('click',() => closeDrawers(false));
+  $('offlineNavToggle').addEventListener('click', () => {
+    lastDrawerTrigger = $('offlineNavToggle');
+    document.body.classList.add('offline-nav-open');
+    updateDrawer();
+    requestAnimationFrame(() => document.querySelector('.offline-nav-item.active')?.focus({preventScroll:true}));
+  });
+  $('offlineNavClose').addEventListener('click',() => closeDrawer());
+  $('offlineNavBackdrop').addEventListener('click',() => closeDrawer());
+  $('offlineDesktopSidebarToggle').addEventListener('click',() => {
+    document.documentElement.dataset.offlineSidebar = 'collapsed';
+    updateDrawer();
+    $('offlineDesktopSidebarOpen').focus({preventScroll:true});
+  });
+  $('offlineDesktopSidebarOpen').addEventListener('click',() => {
+    delete document.documentElement.dataset.offlineSidebar;
+    updateDrawer();
+    $('offlineDesktopSidebarToggle').focus({preventScroll:true});
+  });
+  document.querySelectorAll('.offline-nav-item[data-panel]').forEach(button => button.addEventListener('click',() => closeDrawer(false)));
   document.addEventListener('keydown',event => {
-    const panel = drawerPanel();
-    if (event.key === 'Escape') {
-      const topDialog = [...document.querySelectorAll('dialog[open]')].at(-1);
-      if (topDialog) return; // Native dialog/confirmation owns its Escape key.
-      const name = [...activeModules].reverse().find(name => moduleOpen($(moduleIds[name])));
-      if (name) { event.preventDefault(); closeModule(name); return; }
-      if (panel) { event.preventDefault(); closeDrawers(); }
-    }
-    if (event.key === 'Tab' && panel) {
-      const controls = [...panel.querySelectorAll('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled)')].filter(visible);
+    if (event.key === 'Escape' && document.body.classList.contains('offline-nav-open')) closeDrawer();
+    if (event.key === 'Tab' && mobile.matches && document.body.classList.contains('offline-nav-open')) {
+      const controls = [...$('offlineSidebar').querySelectorAll('button:not(:disabled),a[href]')].filter(node => node.getClientRects().length);
       const first = controls[0], last = controls.at(-1);
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); focus(last); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); focus(first); }
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
   });
-  for (const [name,id] of Object.entries(moduleIds)) {
-    const node = $(id);
-    if (!node) continue;
-    node.addEventListener('click',event => {
-      // Notebook controls, backdrop and cancellation are component-owned.
-      if (name === 'notes') return;
-      const close = event.target.closest?.('.modal-close-dot,.dcn-close,.graph-editor-close-dot,[data-offline-close]');
-      if (close && close.closest('dialog') === (node instanceof HTMLDialogElement ? node : null)) {
-        closeModule(name); return;
-      }
-      if (event.target !== node) return;
-      if (!(node instanceof HTMLDialogElement)) { closeModule(name); return; }
-      const rect = node.getBoundingClientRect();
-      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeModule(name);
+  mobile.addEventListener('change',() => closeDrawer(false));
+  updateDrawer();
+  const titleObserver = new MutationObserver(() => {
+    $('offlineMobileTitle').textContent = $('panelTitle').textContent;
+    document.querySelectorAll('.offline-nav-item[data-panel]').forEach(button => {
+      button.setAttribute('aria-current',button.classList.contains('active') ? 'page' : 'false');
     });
-    if (node instanceof HTMLDialogElement) {
-      node.addEventListener('close',() => { if (!node.open && activeModules.has(name)) finishClose(name,true); });
-    }
-  }
-  mobile.addEventListener('change',() => {
-    closeDrawers(false); syncViewport();
-    requestAnimationFrame(refreshDrawers);
   });
-  // The shared desktop binder releases inert on mobile at DOMContentLoaded.
-  // Reapply mobile drawer state after that binder and after breakpoint changes.
-  window.addEventListener('load',refreshDrawers,{once:true});
-  refreshDrawers();
+  titleObserver.observe($('panelTitle'),{childList:true,subtree:true,characterData:true});
 
-  const input = $('text'), send = $('sendBtn');
-  function refreshSend() {
-    if (send) send.disabled = !input?.value.trim() || document.documentElement.dataset.offlineReady !== 'true';
+  function openAppearance(event) {
+    const trigger = event.currentTarget;
+    closeDrawer(false);
+    // A mobile drawer becomes inert when closed. Return focus to its visible
+    // appearance entry; desktop retains the button that opened the settings.
+    const returnTarget = mobile.matches ? $('offlineAppearanceToggle') : trigger;
+    returnTarget?.focus({preventScroll:true});
+    window.DMateOfflineAppearance?.open();
   }
-  function sendQuery() {
-    const text = input?.value.trim();
-    if (!text) return;
-    if (document.documentElement.dataset.offlineReady !== 'true') { toast('正在准备本地学习资料，请稍后再试'); return; }
-    window.dispatchEvent(new CustomEvent('offline:query',{detail:{text,mode}}));
-    input.value = ''; composer?.refresh(); refreshSend();
-  }
-  if (input && window.DMateChatComposer?.mount) {
-    composer = window.DMateChatComposer.mount({input,onSend:sendQuery});
-    input.addEventListener('input',refreshSend);
-    new MutationObserver(refreshSend).observe(document.documentElement,{attributes:true,attributeFilter:['data-offline-ready']});
-  }
-  window.handleSendOrStop = sendQuery;
-  if (send) send.onclick = sendQuery;
-  const modeControl = $('manualQuestionMode');
-  try { mode = sessionStorage.getItem('dmate:offline:composer-mode:v1') === 'question' ? 'question' : 'chat'; } catch (_) {}
-  function updateMode() {
-    if (!modeControl) return;
-    modeControl.dataset.mode = mode;
-    modeControl.querySelectorAll('[data-manual-question]').forEach(button => button.setAttribute('aria-pressed',String((button.dataset.manualQuestion === 'yes') === (mode === 'question'))));
-  }
-  modeControl?.querySelectorAll('[data-manual-question]').forEach(button => button.addEventListener('click',() => {
-    mode = button.dataset.manualQuestion === 'yes' ? 'question' : 'chat';
-    try { sessionStorage.setItem('dmate:offline:composer-mode:v1',mode); } catch (_) {}
-    updateMode();
-  }));
-  updateMode(); refreshSend();
-
-  function newChat() {
-    $('chat')?.replaceChildren();
-    if (input) input.value = '';
-    document.querySelector('.center')?.classList.add('chat-empty');
-    if ($('mobileConversationTitle')) $('mobileConversationTitle').textContent = 'DMate';
-    closeDrawers(false); composer?.refresh(); refreshSend();
-    window.dispatchEvent(new CustomEvent('offline:new-chat'));
-  }
-  window.newChat = newChat;
-  if ($('newChatBtn')) $('newChatBtn').onclick = newChat;
-  const onlineRequired = () => toast('此功能需要联网，请返回在线版使用');
-  for (const id of ['imageBtn','voiceInputBtn','downloadAppBtn','accountBtn']) if ($(id)) $(id).onclick = onlineRequired;
-  const imageInput = $('imageInput');
-  if (imageInput) { imageInput.disabled = true; imageInput.tabIndex = -1; imageInput.style.setProperty('pointer-events','none','important'); }
-  input?.addEventListener('paste',event => {
-    if ([...(event.clipboardData?.items || [])].some(item => item.type.startsWith('image/'))) { event.preventDefault(); onlineRequired(); }
-  });
-  document.querySelector('.center')?.addEventListener('dragover',event => {
-    if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
-  });
-  document.querySelector('.center')?.addEventListener('drop',event => {
-    if (event.dataTransfer?.files.length) { event.preventDefault(); onlineRequired(); }
-  });
-  function syncViewport() {
-    if (viewportFrame) cancelAnimationFrame(viewportFrame);
-    viewportFrame = requestAnimationFrame(() => {
-      viewportFrame = 0;
-      const root = document.documentElement;
-      if (!mobile.matches) {
-        root.style.removeProperty('--app-visible-height'); root.style.removeProperty('--app-viewport-top');
-        document.body.classList.remove('mobile-keyboard-open'); return;
-      }
-      const height = Math.max(1,Math.round(window.visualViewport?.height || innerHeight));
-      const top = Math.max(0,Math.round(window.visualViewport?.offsetTop || 0));
-      root.style.setProperty('--app-visible-height',height+'px'); root.style.setProperty('--app-viewport-top',top+'px');
-      document.body.classList.toggle('mobile-keyboard-open',innerHeight-height-top>110);
-    });
-  }
-  window.addEventListener('resize',syncViewport,{passive:true});
-  window.visualViewport?.addEventListener('resize',syncViewport,{passive:true});
-  window.visualViewport?.addEventListener('scroll',syncViewport,{passive:true});
-  input?.addEventListener('focus',syncViewport); input?.addEventListener('blur',syncViewport);
-  syncViewport();
+  $('offlineAppearanceBtn').addEventListener('click',openAppearance);
+  $('offlineAppearanceToggle').addEventListener('click',openAppearance);
 })();

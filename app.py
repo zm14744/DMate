@@ -2322,47 +2322,55 @@ def sitemap_xml():
     return response
 
 
-_FAVICON_BASE = "dmate-favicon-original-v56"
+_OTHER_SEARCH_ICON_USER_AGENT = re.compile(
+    r"Googlebot|Google\s+Favicon|GoogleOther|Google-InspectionTool|"
+    r"DuckDuckBot|YandexBot|Baiduspider|Sogou|Bytespider|PetalBot", re.IGNORECASE
+)
 
 
-def _favicon_response(suffix, content_type):
-    # Browser fallbacks use the exact same frozen artwork as the page links.
-    response = app.send_static_file(f"icons/{_FAVICON_BASE}{suffix}")
+def _search_favicon_base():
+    # Favicon fetchers do not always identify themselves as Bing crawlers.
+    # Give the shared fallback the same opaque artwork; keep other identified
+    # search crawlers on their established, explicitly declared resource set.
+    return ("dmate-search-v53" if _OTHER_SEARCH_ICON_USER_AGENT.search(
+        request.headers.get("User-Agent", "")) else "dmate-bing-v55")
+
+
+def _search_favicon_response(suffix, content_type):
+    response = app.send_static_file(f"icons/{_search_favicon_base()}{suffix}")
     response.headers["Content-Type"] = content_type
-    response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
+    response.vary.add("User-Agent")
     return response
 
 
 @app.route("/favicon.ico")
 def favicon_ico():
     """A consistent, opaque DMate favicon for indexers and browser fallbacks."""
-    return _favicon_response(".ico", "image/x-icon")
+    return _search_favicon_response(".ico", "image/x-icon")
 
 
 @app.route("/apple-touch-icon.png")
 @app.route("/apple-touch-icon-precomposed.png")
 def apple_touch_icon_root():
-    """Keep home-screen artwork separate from browser tab selection."""
-    response = app.send_static_file("icons/dmate-app-v52-180.png")
-    response.headers["Content-Type"] = "image/png"
-    response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
-    return response
+    """Unidentified favicon fetchers use the same opaque fallback everywhere."""
+    return _search_favicon_response("-192.png", "image/png")
 
 
 @app.route("/favicon-16.png")
 def favicon_png_16_root():
-    return _favicon_response("-16.png", "image/png")
+    return _search_favicon_response("-16.png", "image/png")
 
 
 @app.route("/favicon-32.png")
 def favicon_png_32_root():
-    return _favicon_response("-32.png", "image/png")
+    return _search_favicon_response("-32.png", "image/png")
 
 
 @app.route("/favicon-64.png")
 def favicon_png_root():
-    """Use the same browser icon for every platform and requester."""
-    return _favicon_response("-64.png", "image/png")
+    """Search bots and Safari can fetch the same clearly branded PNG."""
+    return _search_favicon_response("-64.png", "image/png")
 
 
 @app.route("/favicon-48.png")
@@ -2370,9 +2378,9 @@ def favicon_png_root():
 @app.route("/favicon-192.png")
 @app.route("/favicon.png")
 def search_favicon_png_root():
-    """Serve the original opaque icon at each fallback size."""
+    """Opaque, independently rendered sizes for search-result icon fetching."""
     size = {"/favicon-48.png": 48, "/favicon-96.png": 96}.get(request.path, 192)
-    return _favicon_response(f"-{size}.png", "image/png")
+    return _search_favicon_response(f"-{size}.png", "image/png")
 
 
 @app.route("/DMate.mobileconfig")
@@ -2439,8 +2447,29 @@ def home():
     user_agent = request.headers.get("User-Agent", "")
     is_android = bool(re.search(r"Android", user_agent, re.IGNORECASE))
     is_ios = bool(re.search(r"iPhone|iPad|iPod|Macintosh.*Mobile", user_agent, re.IGNORECASE))
+    is_mac_safari = bool(re.search(r"Macintosh|Mac OS X", user_agent, re.IGNORECASE)
+        and re.search(r"Safari/", user_agent, re.IGNORECASE)
+        and not re.search(r"Chrome/|Chromium/|CriOS/|Edg/|OPR/|Firefox/|FxiOS/", user_agent, re.IGNORECASE))
     is_dmate_android_app = bool(re.search(r"DMateAndroid/", user_agent, re.IGNORECASE))
     is_dmate_desktop_app = bool(re.search(r"DMateDesktop/", user_agent, re.IGNORECASE))
+    is_android_browser = is_android and not is_dmate_android_app
+    is_windows_browser = bool(re.search(r"Windows", user_agent, re.IGNORECASE) and not is_dmate_desktop_app)
+    # Desktop Firefox on any OS shares the exact Windows Edge favicon tags.
+    # Android Fennec, Safari, search crawler, and packaged-app icons are separate.
+    is_desktop_firefox = bool(not is_android and not is_ios
+        and not is_dmate_android_app and not is_dmate_desktop_app
+        and re.search(r"Firefox/", user_agent, re.IGNORECASE))
+    # Include general Google fetchers and the legacy Google Favicon identifier.
+    # All receive opaque search artwork, even with Windows/Android/Safari UA
+    # tokens, while browser-specific tab icons stay intact.
+    is_search_crawler = bool(re.search(
+        r"bingbot|adidxbot|BingPreview|MicrosoftPreview|msnbot|"
+        r"Googlebot|Google\s+Favicon|GoogleOther|Google-InspectionTool|"
+        r"DuckDuckBot|YandexBot|Baiduspider|Sogou|Bytespider|PetalBot",
+        user_agent, re.IGNORECASE))
+    is_android_edge = bool(is_android_browser and re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE))
+    is_android_firefox = bool(is_android_browser and re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE))
+
     # 首页直接注入与 teaching.py / app.py 共用的 knowledge_graph.json，
     # 避免前端再维护一份硬编码图谱而产生不同步。
     # 客户端通过远程网页获取新功能：不允许 WebView 缓存旧 HTML
@@ -2453,11 +2482,19 @@ def home():
             if _RUNTIME_SOURCE.get("status") == "ok" else None),
         is_android=is_android,
         is_ios=is_ios,
+        is_mac_safari=is_mac_safari,
+        is_search_crawler=is_search_crawler,
+        search_favicon_base=_search_favicon_base(),
+        is_android_browser=is_android_browser,
+        is_windows_browser=is_windows_browser,
+        is_desktop_firefox=is_desktop_firefox,
+        is_android_edge=is_android_edge,
+        is_android_firefox=is_android_firefox,
         is_dmate_android_app=is_dmate_android_app,
         is_dmate_desktop_app=is_dmate_desktop_app,
     ))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    # Native-client controls depend on the request's platform.
+    # The favicon and native-client controls depend on the request's platform.
     response.vary.add("User-Agent")
     return response
 

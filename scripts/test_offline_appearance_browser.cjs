@@ -13,10 +13,18 @@ async function ready(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
 }
 async function openAppearance(page) {
-  if (await page.locator('html').getAttribute('data-desktop-sidebar') === 'collapsed') {
-    await page.locator('#desktopSidebarOpen').click();
+  if (await page.locator('#offlineAppearanceBtn').count()) {
+    const mobile = page.viewportSize().width <= 1100;
+    if (!mobile && await page.locator('#offlineDesktopSidebarOpen').getAttribute('aria-expanded') !== 'true') {
+      await page.locator('#offlineDesktopSidebarOpen').click();
+    }
+    await page.locator(mobile ? '#offlineAppearanceToggle' : '#offlineAppearanceBtn').click();
+  } else {
+    if (await page.locator('html').getAttribute('data-desktop-sidebar') === 'collapsed') {
+      await page.locator('#desktopSidebarOpen').click();
+    }
+    await page.locator('#appearanceBtn').click();
   }
-  await page.locator('#appearanceBtn').click();
   await page.locator('#appearanceModal').waitFor({ state:'visible' });
 }
 async function settledWallpaper(page) {
@@ -32,8 +40,9 @@ async function appearance(page) {
       '--bubble-alpha','--font-scale','--background-mask-alpha','--background-blur','--background-size','--accent']) {
       result[key] = document.documentElement.style.getPropertyValue(key);
     }
-    for (const [name,selector] of [['background','#appearanceBackgroundLayer'],['mask','.appearance-mask-layer'],
-      ['layout','.layout'],['sidebar','#conversationSidebar'],['center','.center'],['composer','.input'],['tools','#learningToolsPanel']]) {
+    // The offline workspace retains its six-panel layout. Only shared wallpaper
+    // layers and appearance settings must match the online application.
+    for (const [name,selector] of [['background','#appearanceBackgroundLayer'],['mask','.appearance-mask-layer']]) {
       const node = document.querySelector(selector);
       if (!node) throw new Error('Missing shared visual element: ' + selector);
       const style = getComputedStyle(node);
@@ -42,6 +51,19 @@ async function appearance(page) {
     }
     result.hasBackground = document.body.classList.contains('has-custom-background');
     return result;
+  });
+}
+async function appearanceControls(page) {
+  return page.locator('#appearanceModal').evaluate(dialog => {
+    const selectors = ['.appearance-card', '.modal-head', '.appearance-section-title',
+      '[data-appearance-mode="dark"]', '[data-appearance-accent="purple"]', '[data-appearance-font="large"]',
+      '[data-appearance-fit="contain"]', '#appearanceMaskRange', '#appearanceBlurRange',
+      '#appearancePanelRange', '#appearanceBubbleRange', '#appearanceDone', '#appearanceClose'];
+    return Object.fromEntries(selectors.map(selector => {
+      const node = dialog.querySelector(selector), style = getComputedStyle(node);
+      return [selector, Object.fromEntries(['backgroundColor', 'color', 'fontFamily', 'fontSize', 'fontWeight',
+        'borderTopColor', 'borderTopWidth', 'borderRadius', 'boxShadow'].map(key => [key, style[key]]))];
+    }));
   });
 }
 
@@ -56,7 +78,7 @@ async function appearance(page) {
     await page.goto(baseURL + '/', { waitUntil:'networkidle' });
     await page.evaluate(async settings => {
       appearanceSettings = { ...APPEARANCE_DEFAULTS, ...settings };
-      applyAppearanceSettings({ save:false });
+      applyAppearanceSettings({ save:true });
       const canvas = document.createElement('canvas'); canvas.width = 80; canvas.height = 60;
       const drawing = canvas.getContext('2d'); drawing.fillStyle = '#326a8f'; drawing.fillRect(0,0,80,60);
       const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/png'));
@@ -66,14 +88,18 @@ async function appearance(page) {
     }, profile);
     await settledWallpaper(page);
     const online = await appearance(page);
+    await openAppearance(page);
+    const onlineControls = await appearanceControls(page);
+    await page.locator('#appearanceClose').click();
     await page.goto(baseURL + '/offline', { waitUntil:'networkidle' });
     await ready(page);
     await settledWallpaper(page);
     assert.deepEqual(await appearance(page), online,
-      'Offline wallpaper, theme, font, opacity, and all shared layers must match online');
-    console.log('PASS online/offline custom wallpaper, ten appearance variables, and seven visual layers match');
+      'Offline wallpaper, theme, font, opacity, and shared background layers must match online');
+    console.log('PASS online/offline custom wallpaper, ten appearance variables, and both background layers match');
 
     await openAppearance(page);
+    assert.deepEqual(await appearanceControls(page), onlineControls, 'The full appearance dialog retains online control styles');
     const png = await page.evaluate(() => {
       const canvas = document.createElement('canvas'); canvas.width = canvas.height = 8;
       const drawing = canvas.getContext('2d'); drawing.fillStyle = '#c78336'; drawing.fillRect(0,0,8,8);

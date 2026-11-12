@@ -4286,15 +4286,17 @@ body[data-appearance-theme="light"] .kg-node-badge,
     height:100%;
 }
 
-/* 左侧底部三个入口统一留出 8px 间距，避免按钮彼此贴合。 */
+/* 左侧底部入口统一留出 8px 间距，避免按钮彼此贴合。 */
 .download-entry,
 .account-entry,
+.offline-entry,
 .appearance-entry {
     flex:0 0 auto;
     min-height:46px;
     margin-bottom:0 !important;
 }
-.download-entry {
+.download-entry,
+.offline-entry {
     margin-top:8px !important;
 }
 

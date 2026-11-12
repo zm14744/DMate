@@ -110,7 +110,7 @@ jobs:
           python -m pip install -r requirements.txt
           npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
           npx playwright install --with-deps chromium
-      - name: Verify the original favicon is identical on every platform
+      - name: Verify the original favicon variants on each platform
         env:
           OMP_NUM_THREADS: '1'
           MKL_NUM_THREADS: '1'

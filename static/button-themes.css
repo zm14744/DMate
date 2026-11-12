@@ -60,7 +60,7 @@ body[data-appearance-theme="navy"] {
 
     body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
         #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
-        #downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn,
+        #downloadAppBtn,#accountBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn,
         .voice-input-button,.manual-question-choice,.ocr-group-question-choice,
         .dmate-symbol-keyboard,.dmate-symbol-panel-close,.dmate-symbol-tab,.dmate-symbol-key,.desktop-shell-button,
         .modal-close-dot,.dmate-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
@@ -83,7 +83,7 @@ body[data-appearance-theme="navy"] {
 
     body[data-appearance-theme] :is(button,.download-actions > a):not(:is(
         #sendBtn,#imageBtn,#voiceInputBtn,#ocrCancelBtn,
-        #downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn,
+        #downloadAppBtn,#accountBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn,
         .voice-input-button,.manual-question-choice,.ocr-group-question-choice,
         .dmate-symbol-keyboard,.dmate-symbol-panel-close,.dmate-symbol-tab,.dmate-symbol-key,.desktop-shell-button,
         .modal-close-dot,.dmate-close-dot,.mobile-drawer-close,.graph-editor-close-dot,.ocr-group-close,
@@ -153,10 +153,10 @@ body[data-appearance-theme="navy"] {
         --dm-control-text:#fff;
     }
 
-    /* The eight navigation entries are frameless rows, not raised buttons.
+    /* Navigation entries are frameless rows, not raised buttons.
        Keep the icon at the same x position regardless of label length.
        This does not affect "New conversation", red delete dots or modal buttons. */
-    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]) {
+    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]) {
         display:grid !important;
         grid-template-columns:20px minmax(0,160px) !important;
         justify-content:center !important;
@@ -181,11 +181,11 @@ body[data-appearance-theme="navy"] {
         cursor:pointer;
         transition:background-color .16s ease,color .16s ease !important;
     }
-    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]) > .dmate-lucide-icon {
+    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]) > .dmate-lucide-icon {
         grid-column:1;
         justify-self:start;
     }
-    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]) > :is(.dmate-ui-label,#accountEntryLabel) {
+    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]) > :is(.dmate-ui-label,#accountEntryLabel) {
         grid-column:2;
         justify-self:start;
         text-align:left !important;
@@ -206,7 +206,7 @@ body[data-appearance-theme="navy"] {
         --dm-nav-pressed:rgba(148,163,184,.25);
     }
     @media(hover:hover) {
-        body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]):not(:disabled):not([aria-disabled="true"]):hover {
+        body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]):not(:disabled):not([aria-disabled="true"]):hover {
             background:var(--dm-nav-hover) !important;
             background-color:var(--dm-nav-hover) !important;
             background-image:none !important;
@@ -214,12 +214,12 @@ body[data-appearance-theme="navy"] {
             box-shadow:none !important;
         }
     }
-    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]):not(:disabled):active {
+    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]):not(:disabled):active {
         background:var(--dm-nav-pressed) !important;
         background-color:var(--dm-nav-pressed) !important;
         background-image:none !important;
     }
-    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]):focus-visible {
+    body[data-appearance-theme] :is(#downloadAppBtn,#accountBtn,#offlineWorkspaceBtn,#appearanceBtn,#wrongBookBtn,#conceptNotebookBtn,#knowledgeGraphBtn,#graphDrawingBtn,#learningReviewBtn):not([hidden]):focus-visible {
         background:var(--dm-nav-hover) !important;
         background-color:var(--dm-nav-hover) !important;
         outline:2px solid var(--text-muted) !important;
@@ -237,7 +237,7 @@ body[data-appearance-theme="navy"] {
    The original licenses are distributed as static/lucide-icons-LICENSE.txt. */
 body[data-appearance-theme] :is(
     #learningToolsPanel .learning-actions button,
-    #downloadAppBtn, #accountBtn, #appearanceBtn
+    #downloadAppBtn, #accountBtn, #offlineWorkspaceBtn, #appearanceBtn
 ) {
     display:inline-flex !important;
     align-items:center !important;
@@ -260,7 +260,7 @@ body[data-appearance-theme] .dmate-lucide-icon {
 /* Labels remain centered as a group with their icon; count/name may change. */
 body[data-appearance-theme] :is(
     #learningToolsPanel .learning-actions button,
-    #downloadAppBtn, #accountBtn, #appearanceBtn
+    #downloadAppBtn, #accountBtn, #offlineWorkspaceBtn, #appearanceBtn
 ) :is(.dmate-ui-label, #accountEntryLabel) {
     min-width:0;
     overflow:hidden;
@@ -455,6 +455,7 @@ body[data-appearance-theme] :is(
     .dmate-symbol-keyboard,
     .mobile-install-button,
     #downloadAppBtn,
+    #offlineWorkspaceBtn,
     #appearanceBtn,
     #wrongBookBtn,
     #conceptNotebookBtn,
@@ -477,6 +478,7 @@ body[data-appearance-theme] :is(
     .dmate-symbol-keyboard,
     .mobile-install-button,
     #downloadAppBtn,
+    #offlineWorkspaceBtn,
     #appearanceBtn,
     #wrongBookBtn,
     #conceptNotebookBtn,
@@ -500,6 +502,7 @@ body[data-appearance-theme] :is(
         .dmate-symbol-keyboard,
         .mobile-install-button,
         #downloadAppBtn,
+        #offlineWorkspaceBtn,
         #appearanceBtn,
         #wrongBookBtn,
         #conceptNotebookBtn,

@@ -99,17 +99,49 @@
 })();
 </script>
 
-<!-- BEGIN SHARED FAVICON -->
-<!-- Keep the original opaque artwork identical across browsers and themes. -->
-<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-favicon-original-v56.ico">
-<link id="dmateFavicon16" rel="icon" type="image/png" sizes="16x16" href="/static/icons/dmate-favicon-original-v56-16.png">
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/dmate-favicon-original-v56-32.png">
-<link id="dmateFavicon48" rel="icon" type="image/png" sizes="48x48" href="/static/icons/dmate-favicon-original-v56-48.png">
-<link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/dmate-favicon-original-v56-192.png">
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/dmate-app-v52-180.png">
+{% if is_search_crawler %}
+<!-- Bing uses its RGB favicon set; other crawlers retain their existing artwork. -->
+<link rel="shortcut icon" type="image/x-icon" href="/static/icons/{{ search_favicon_base }}.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/{{ search_favicon_base }}-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/static/icons/{{ search_favicon_base }}-48.png">
+<link rel="icon" type="image/png" sizes="96x96" href="/static/icons/{{ search_favicon_base }}-96.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/{{ search_favicon_base }}-192.png">
+{% elif is_mac_safari %}
+<!-- Safari 26 uses the same site favicon in the URL field and tab chrome.
+     The previous blur/focus handler incorrectly claimed to control them
+     separately and could recolor the normal tab. Keep the user's existing
+     BLACK small-tab geometry stable in both macOS themes. A website cannot
+     force a separate WHITE Smart Search field icon without also risking the
+     tab favicon; the browser owns this presentation. -->
+<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-tab-black-v52.ico">
+<link id="dmateSafariFaviconPng" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-tab-black-v52-64.png">
+<link id="dmateSafariFavicon" rel="icon" type="image/svg+xml" sizes="any" href="/static/icons/dmate-tab-black-v52.svg">
+{% elif is_android_browser %}
+<!-- Android browsers share native-size renders of the same vector artwork. -->
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/dmate-app-v52-32.png">
+<link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/dmate-app-v52-192.png">
+{% elif is_desktop_firefox or is_windows_browser %}
+<!-- Firefox desktop and Windows Edge use the SAME browser-tab SVG, PNG and ICO.
+     Do not generate a Firefox-specific icon: share the exact assets, sizes,
+     order and URL versions to keep geometry, color and sharpness aligned. -->
+
+<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-tab-white-v52.ico">
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/dmate-tab-white-v52-32.png">
+<link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" sizes="any" href="/static/icons/dmate-tab-white-v52.svg">
 <meta name="msapplication-TileImage" content="/static/icons/dmate-app-v52-192.png">
 <meta name="msapplication-TileColor" content="#000000">
-<!-- END SHARED FAVICON -->
+{% else %}
+<!-- Opaque application icon fallback for other browsers and installed shells. -->
+<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-app-v52.ico">
+<link id="dmateFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-app-v52-64.png">
+{% endif %}
+{% if is_search_crawler %}
+<!-- Google can also select an apple-touch-icon as its favicon. Keep every
+     crawler-visible candidate on the same opaque search artwork. -->
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="192x192" href="/static/icons/{{ search_favicon_base }}-192.png">
+{% else %}
+<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/dmate-app-v52-180.png">
+{% endif %}
 <title>DMate - 离散数学智能辅学系统</title>
 
 <style>
@@ -4401,15 +4433,17 @@ body[data-appearance-theme="light"] .kg-node-badge,
     height:100%;
 }
 
-/* 左侧底部三个入口统一留出 8px 间距，避免按钮彼此贴合。 */
+/* 左侧底部入口统一留出 8px 间距，避免按钮彼此贴合。 */
 .download-entry,
 .account-entry,
+.offline-entry,
 .appearance-entry {
     flex:0 0 auto;
     min-height:46px;
     margin-bottom:0 !important;
 }
-.download-entry {
+.download-entry,
+.offline-entry {
     margin-top:8px !important;
 }
 
@@ -8910,13 +8944,13 @@ window.DMATE_CLIENT_CONFIG = {{ {
     <button id="newChatBtn" class="btn" onclick="newChat()">＋ 新对话</button>
     <div id="sessions"></div>
     <button id="downloadAppBtn" class="btn download-entry" type="button"{% if is_dmate_android_app or is_dmate_desktop_app %} hidden{% endif %}><svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /></svg><span class="dmate-ui-label">下载 DMate</span></button>
+    <button id="accountBtn" class="btn account-entry" type="button"><svg class="dmate-lucide-icon account-entry-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" /></svg><span id="accountEntryLabel">登录 / 注册</span></button>
     <button id="offlineWorkspaceBtn" class="btn offline-entry" type="button" aria-label="打开离线学习工作区" title="离线版">
         <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
             <path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/>
         </svg>
         <span class="dmate-ui-label">离线版</span>
     </button>
-    <button id="accountBtn" class="btn account-entry" type="button"><svg class="dmate-lucide-icon account-entry-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" /></svg><span id="accountEntryLabel">登录 / 注册</span></button>
     <button id="appearanceBtn" class="btn appearance-entry" type="button"><svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></svg><span class="dmate-ui-label">外观</span></button>
 </div>
 

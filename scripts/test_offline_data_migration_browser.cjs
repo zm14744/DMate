@@ -10,6 +10,12 @@ const iso = value => new Date(value).toISOString();
 const note = (id, updatedAt, content, extra = {}) => ({ id, title:id, content, updatedAt:iso(updatedAt), ...extra });
 const ready = page => page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
 
+async function openNotes(page) {
+  const button = page.locator('.offline-nav-item[data-panel="notes"]');
+  if (!await button.isVisible()) await page.locator('#offlineDesktopSidebarOpen').click();
+  await button.click();
+}
+
 async function prepare(page, seed) {
   await page.goto(baseURL + '/offline');
   await ready(page);
@@ -76,7 +82,7 @@ async function read(page) {
     assert.equal(first.deleted['deleted-note'], 4000);
     assert.equal(first.mistakes[0].statement, 'latest offline question');
     assert.equal(first.mistakes[0].status, 'resolved'); assert.equal(first.mistakes[0].custom, 'keep');
-    await page.evaluate(() => DMateOfflineWorkspace.openPanel('notes'));
+    await openNotes(page);
     await page.locator('.dcn-note-open').filter({ hasText:'new-note' }).waitFor();
     assert.equal(await page.locator('.dcn-note-open').filter({ hasText:'deleted-note' }).count(), 0);
     await context.close();
@@ -93,7 +99,7 @@ async function read(page) {
     assert.equal(recovered.content, 'durable journal edit'); assert.deepEqual(recovered.custom, extra.custom);
     assert.equal(recovered.createdAt, extra.createdAt);
     assert.equal(await recoveryPage.evaluate(key => localStorage.getItem(key), journalKey), null);
-    await recoveryPage.evaluate(() => DMateOfflineWorkspace.openPanel('notes'));
+    await openNotes(recoveryPage);
     await recoveryPage.locator('.dcn-note-open').filter({ hasText:'import-with-journal' }).waitFor();
     await recoveryContext.close();
     console.log('Offline migration preserves newer edits, metadata, tombstones and journal recovery.');
