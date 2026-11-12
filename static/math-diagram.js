@@ -9,7 +9,7 @@
         },
         {
             url: 'https://github.com/mdaines/viz-js/releases/download/release-viz-' + VERSION + '/viz-global.js',
-            integrity: 'sha256-yeCzEPmIORDgHGYFS4t/9L49hpUUERZjXnKwrxUmkg=='
+            integrity: 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4='
         }
     ];
     let vizPromise = null;
