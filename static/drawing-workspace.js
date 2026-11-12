@@ -231,7 +231,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
      row.append(open,remove);list.append(row);
     });if(!pages.length)list.append(el('p','ddw-history-empty','无'));panel.append(list);syncChrome();return;
    }
-   const label=el('label','ddw-ai-label','要求（可选）'),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label','绘图指导要求（可选）');
+   const label=el('label','ddw-ai-label',uiText('绘图要求（生成时必填，指导可选）','Diagram request (required for generation; optional for guidance)')),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label',uiText('绘图要求（生成时必填，指导可选）','Diagram request (required for generation; optional for guidance)'));
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
    const actionRow=el('div','ddw-ai-actions');
    const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.append(sendIcon());ask.disabled=Boolean(aiAbort)||!active();ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='指导当前图形';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
