@@ -31,10 +31,12 @@ jobs:
         with:
           node-version: "22"
       - name: Install focused test dependencies
-        run: python -m pip install networkx jsonschema requests
+        run: |
+          python -m pip install networkx jsonschema requests
+          npm install --no-save --no-package-lock @viz-js/viz@3.31.0
       - name: Compile and test diagram structure generation
         run: |
           python -m py_compile math_diagram.py
           PYTHONPATH=. python scripts/test_math_diagram.py
-      - name: Test Graphviz DOT conversion and editor coordinates
+      - name: Test real Graphviz WASM layout and editor coordinates
         run: node scripts/test_math_diagram.cjs
