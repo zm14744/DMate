@@ -1,5 +1,5 @@
 {
-  "version": 24,
+  "version": 25,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -101,12 +101,17 @@
           "source_id": "neu_discrete_female",
           "title": "命题公式的等价",
           "sections": [
-            "命题公式的等价"
+            "命题公式的等价",
+            "重言式与重言蕴含式"
           ],
           "lessons": [
             {
               "title": "命题公式的等价",
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=5"
+            },
+            {
+              "title": "重言式与重言蕴含式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=6"
             }
           ]
         }
@@ -245,7 +250,7 @@
     },
     {
       "id": "predicate_reasoning",
-      "name": "量词推理与否定",
+      "name": "谓词逻辑等价与推理",
       "category": "谓词逻辑",
       "prerequisites": [
         "量词",
@@ -554,12 +559,17 @@
           "source_id": "dogeman_discrete",
           "title": "2.6.0.3 序关系",
           "sections": [
-            "2.6.0.3 序关系"
+            "2.6.0.3 序关系",
+            "2.7.0.3 序关系的性质"
           ],
           "lessons": [
             {
               "title": "2.6.0.3 序关系",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=12"
+            },
+            {
+              "title": "2.7.0.3 序关系的性质",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=13"
             }
           ]
         }
@@ -1093,7 +1103,8 @@
             "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
             "1-2 〖图的基本概念〗图的分类",
             "1-3 〖图的基本概念〗结点的度与握手定理",
-            "1-4 〖图的基本概念〗正则图和无向完全图"
+            "1-4 〖图的基本概念〗正则图和无向完全图",
+            "1-6 〖图的基本概念〗子图和补图"
           ],
           "lessons": [
             {
@@ -1111,6 +1122,10 @@
             {
               "title": "1-4 〖图的基本概念〗正则图和无向完全图",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=5"
+            },
+            {
+              "title": "1-6 〖图的基本概念〗子图和补图",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=7"
             }
           ]
         }
@@ -1280,11 +1295,18 @@
       "videos": [
         {
           "source_id": "pflyan_graph",
-          "title": "2-3 〖无向图的连通性〗各结点在维持图的连通性上的重要性不同：点割集和割点、结点连通度",
+          "title": "2-2 〖无向图的连通性〗如何表示从图中删去点集和边集",
           "sections": [
-            "2-3 〖无向图的连通性〗各结点在维持图的连通性上的重要性不同：点割集和割点、结点连通度"
+            "2-2 〖无向图的连通性〗如何表示从图中删去点集和边集",
+            "2-3 〖无向图的连通性〗各结点在维持图的连通性上的重要性不同：点割集和割点、结点连通度",
+            "2-4 〖无向图的连通性〗各边在维持图的连通性上的重要性不同：边割集和割边、边连通度",
+            "2-5 〖无向图的连通性〗结点连通度、边连通度和最小度的关系"
           ],
           "lessons": [
+            {
+              "title": "2-2 〖无向图的连通性〗如何表示从图中删去点集和边集",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=11"
+            },
             {
               "title": "2-3 〖无向图的连通性〗各结点在维持图的连通性上的重要性不同：点割集和割点、结点连通度",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=12"
@@ -1292,6 +1314,10 @@
             {
               "title": "2-4 〖无向图的连通性〗各边在维持图的连通性上的重要性不同：边割集和割边、边连通度",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=13"
+            },
+            {
+              "title": "2-5 〖无向图的连通性〗结点连通度、边连通度和最小度的关系",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=14"
             }
           ]
         }
@@ -1906,8 +1932,8 @@
       "name": "MIT · 6.042J · Fall 2010",
       "course": "Mathematics for Computer Science (Fall 2010)",
       "platform": "Bilibili",
-      "publisher": "常青藤中英字幕课程",
-      "note": "B站上传页面标注中英字幕，上传者为常青藤中英字幕课程。MIT官方课程Fall 2010。仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
+      "publisher": "",
+      "note": "B站版本BV1oP2dY6E7c，采用MIT 6.042J Fall 2010课程；上传者身份尚未独立核实，因此不标注未经确认的UP主名称。仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
     },
     {
       "id": "bjtu_discrete",
@@ -2056,7 +2082,6 @@
       "uploader": "兴趣使然的现代人",
       "status": "candidate_subtitle_and_part_index_review_required",
       "coverage": [
-        "鸽巢原理",
         "排列与组合",
         "二项式定理",
         "递推关系",
@@ -2065,7 +2090,7 @@
         "生成函数",
         "生成函数求解递推关系"
       ],
-      "note": "B站页面列出Discrete Math II的完整章节，包括6.1计数规则、6.3排列组合、6.4二项式定理、8.2齐次/非齐次递推、8.4生成函数。上传者为兴趣使然的现代人，页面未明确说明字幕来源、是否配音及其翻译质量；具体分P参数也需核实，因此暂不加入正式节点。"
+      "note": "B站页面可见Discrete Math II分集，包括8.2.1–8.2.4齐次与非齐次递推、8.4.1–8.4.7生成函数。上传者为兴趣使然的现代人；尚未核实是否原声、字幕来源与翻译准确度，且多分集在页面列表中的精确p编号尚未核验，暂不映射正式节点。"
     }
   ]
 }
