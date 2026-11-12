@@ -19062,6 +19062,9 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     let pendingPinch = null;
     let suppressClickUntil = 0;
     let minimumScale = 0.35;
+    let fitted = true;
+    let resizeFrame = 0;
+    let lastCenterAnchor = null;
 
     const currentScale = () => (
         clampMobileGraphScale(viewport._kgScale || 1, minimumScale)
@@ -19073,27 +19076,52 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         }
     };
 
+    const graphPoint = anchor => {
+        const viewRect = viewport.getBoundingClientRect();
+        const stageRect = stage.getBoundingClientRect();
+        const scale = currentScale();
+        return {
+            x: (viewRect.left + anchor.x - stageRect.left) / scale,
+            y: (viewRect.top + anchor.y - stageRect.top) / scale
+        };
+    };
+
+    const positionGraphPoint = (point, anchor) => {
+        const viewRect = viewport.getBoundingClientRect();
+        const stageRect = stage.getBoundingClientRect();
+        const scale = currentScale();
+        viewport.scrollLeft += stageRect.left - viewRect.left + point.x * scale - anchor.x;
+        viewport.scrollTop += stageRect.top - viewRect.top + point.y * scale - anchor.y;
+    };
+
+    const centerAnchor = () => {
+        const styles = window.getComputedStyle(viewport);
+        const left = parseFloat(styles.paddingLeft) || 0;
+        const right = parseFloat(styles.paddingRight) || 0;
+        const top = parseFloat(styles.paddingTop) || 0;
+        const bottom = parseFloat(styles.paddingBottom) || 0;
+        return {
+            x: viewport.clientLeft + left + (viewport.clientWidth - left - right) / 2,
+            y: viewport.clientTop + top + (viewport.clientHeight - top - bottom) / 2
+        };
+    };
+
     const applyScale = (nextScale, anchor = null) => {
-        const oldScale = currentScale();
+        const point = anchor ? graphPoint(anchor) : null;
         const scale = clampMobileGraphScale(nextScale, minimumScale);
-
-        let contentX = null;
-        let contentY = null;
-        if (anchor) {
-            contentX = (viewport.scrollLeft + anchor.x) / oldScale;
-            contentY = (viewport.scrollTop + anchor.y) / oldScale;
-        }
-
+        fitted = false;
         viewport._kgScale = scale;
         surface.style.width = `${Math.ceil(baseWidth * scale)}px`;
         surface.style.height = `${Math.ceil(baseHeight * scale)}px`;
         stage.style.transform = `scale(${scale})`;
+        // The surface fills each free axis; center the actual transformed graph
+        // inside it, while oversized axes keep their full scroll range.
+        stage.style.left = `${Math.max(0, (surface.clientWidth - baseWidth * scale) / 2)}px`;
+        stage.style.top = `${Math.max(0, (surface.clientHeight - baseHeight * scale) / 2)}px`;
         updateLabel(scale);
 
-        if (anchor && contentX !== null && contentY !== null) {
-            viewport.scrollLeft = Math.max(0, contentX * scale - anchor.x);
-            viewport.scrollTop = Math.max(0, contentY * scale - anchor.y);
-        }
+        if (point) positionGraphPoint(point, anchor);
+        lastCenterAnchor = centerAnchor();
 
         return scale;
     };
@@ -19107,21 +19135,35 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
             - padding("paddingLeft") - padding("paddingRight") - 24);
         const availableHeight = Math.max(1, viewport.clientHeight
             - padding("paddingTop") - padding("paddingBottom") - 24);
-        const scale = Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight);
-        // 全部知识的图可能很大；适应时允许低于手动缩放原来的 35% 下限。
-        minimumScale = Math.min(0.35, scale);
+        const widthScale = availableWidth / baseWidth;
+        const heightScale = availableHeight / baseHeight;
+        const containedScale = Math.min(1, widthScale, heightScale);
+        // Tall and wide graphs must remain readable. Allow scrolling instead
+        // of shrinking labels to a few pixels; manual zoom-out retains overview.
+        const tall = heightScale < Math.min(1, widthScale) * 0.72;
+        const scale = Math.max(0.85, tall ? Math.min(1, widthScale) : containedScale);
+        minimumScale = Math.min(0.35, containedScale);
         applyScale(scale);
+        fitted = true;
         viewport.style.visibility = "";
-        requestAnimationFrame(() => {
-            viewport.scrollLeft = 0;
-            viewport.scrollTop = 0;
-        });
+        viewport.scrollLeft = 0;
+        viewport.scrollTop = 0;
+        // In a large, sparse layout the top-left corner can contain no nodes.
+        // Start at the selected concept; all other nodes remain reachable.
+        const selected = stage.querySelector(".kg-mobile-node.selected");
+        if (selected) {
+            positionGraphPoint({
+                x: selected.offsetLeft + selected.offsetWidth / 2,
+                y: selected.offsetTop + selected.offsetHeight / 2
+            }, centerAnchor());
+        }
     };
 
     viewport._kgSetScale = applyScale;
     viewport._kgFit = fitGraph;
     viewport._kgReset = () => {
         applyScale(1);
+        viewport.scrollLeft = 0;
         viewport.scrollTop = 0;
     };
 
@@ -19129,6 +19171,34 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     surface.style.overflow = "hidden";
     viewport.style.visibility = "hidden";
     applyScale(1);
+    fitted = true;
+
+    let previousSize = "";
+    const resizeObserver = new ResizeObserver(() => {
+        if (!viewport.isConnected) {
+            viewport._kgDispose?.();
+            return;
+        }
+        const size = `${viewport.clientWidth}:${viewport.clientHeight}`;
+        if (size === previousSize || !viewport.clientWidth || !viewport.clientHeight) return;
+        previousSize = size;
+        const point = graphPoint(lastCenterAnchor || centerAnchor());
+        cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+            resizeFrame = 0;
+            if (fitted) fitGraph();
+            else {
+                applyScale(currentScale());
+                positionGraphPoint(point, centerAnchor());
+            }
+        });
+    });
+    resizeObserver.observe(viewport);
+    viewport._kgDispose = () => {
+        resizeObserver.disconnect();
+        cancelAnimationFrame(resizeFrame);
+        cancelAnimationFrame(pinchFrame);
+    };
 
     const viewportPoint = event => {
         const rect = viewport.getBoundingClientRect();
@@ -19172,8 +19242,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
                 pinch = {
                     distance: Math.max(1, pointerDistance(a, b)),
                     scale,
-                    contentX: (viewport.scrollLeft + center.x) / scale,
-                    contentY: (viewport.scrollTop + center.y) / scale
+                    point: graphPoint(center)
                 };
                 fullscreenPan = null;
                 event.preventDefault();
@@ -19209,8 +19278,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
                 pinch = {
                     distance: Math.max(1, pointerDistance(a, b)),
                     scale,
-                    contentX: (viewport.scrollLeft + center.x) / scale,
-                    contentY: (viewport.scrollTop + center.y) / scale
+                    point: graphPoint(center)
                 };
             }
 
@@ -19220,7 +19288,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
                 minimumScale
             );
             // 合并高频 pointermove：一帧只布局、缩放和定位一次。
-            pendingPinch = { scale, center, contentX:pinch.contentX, contentY:pinch.contentY };
+            pendingPinch = { scale, center, point:pinch.point };
             if (!pinchFrame) {
                 pinchFrame = requestAnimationFrame(() => {
                     pinchFrame = 0;
@@ -19228,8 +19296,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
                     pendingPinch = null;
                     if (!target) return;
                     applyScale(target.scale);
-                    viewport.scrollLeft = Math.max(0, target.contentX * target.scale - target.center.x);
-                    viewport.scrollTop = Math.max(0, target.contentY * target.scale - target.center.y);
+                    positionGraphPoint(target.point, target.center);
                 });
             }
             suppressClickUntil = performance.now() + 300;
@@ -19241,6 +19308,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
             const dx = event.clientX - fullscreenPan.x;
             const dy = event.clientY - fullscreenPan.y;
             if (Math.abs(dx) + Math.abs(dy) > 4) {
+                fitted = false;
                 fullscreenPan.moved = true;
                 suppressClickUntil = performance.now() + 300;
             }
@@ -19322,8 +19390,7 @@ function setKnowledgeGraphFullscreenView(enabled) {
         if (!viewport) return;
 
         if (next) {
-            // 完整查看默认先把整张图放进屏幕；随后可双指缩放、单指拖动，
-            // 或用底部 +/- / 适应按钮调整。
+            // 小图居中，大图保留可读大小；双指缩放、单指拖动查看全部节点。
             viewport._kgFit?.();
         } else {
             // 回到普通预览时恢复 100%，预览内可双向滚动整张图谱。
@@ -19391,6 +19458,7 @@ function closeKnowledgeGraph() {
     );
 
     if (modal) {
+        modal.querySelectorAll(".kg-mobile-viewport").forEach(viewport => viewport._kgDispose?.());
         modal.classList.add("hidden");
         modal.classList.remove("graph-fullscreen-view");
     }
@@ -19419,6 +19487,7 @@ function renderKnowledgeGraphLoading(message) {
     }
 
     if (canvas) {
+        canvas.querySelectorAll(".kg-mobile-viewport").forEach(viewport => viewport._kgDispose?.());
         canvas.innerHTML = `<div class="kg-empty">${message}</div>`;
     }
 
@@ -20089,7 +20158,10 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     zoomFit.type = "button";
     zoomFit.className = "kg-mobile-zoom-fit";
     zoomFit.textContent = "适应";
-    zoomFit.setAttribute("aria-label", "适应屏幕显示完整图谱");
+    zoomFit.setAttribute("aria-label", dmateUiText("适应可读大小，可拖动查看全部节点",
+        "Fit to a readable size; drag to explore all concepts"));
+    zoomFit.title = dmateUiText("小图居中显示，大图保持可读，可拖动查看全部节点",
+        "Center small graphs and keep large graphs readable; drag to explore all concepts");
 
     zoomControls.append(zoomOut, zoomLabel, zoomIn, zoomFit);
     section.appendChild(zoomControls);
@@ -20141,7 +20213,6 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     }
 
     // 距离解决密集问题：左右预留足够走线通道，上下给弯曲关系留空间。
-    const viewportWidth = Math.max(280, (container.clientWidth || window.innerWidth || 360) - 20);
     const columnCount = Math.max(columnKeys.length, 1);
     const marginX = 38;
     const marginY = 48;
@@ -20150,7 +20221,7 @@ function renderMobileKnowledgeGraphSection(container, nodes, title, description,
     const nodeWidth = 144;
     const nodeHeight = 76;
     const maxRows = Math.max(...columnKeys.map(key => columns.get(key).length), 1);
-    const stageWidth = Math.max(viewportWidth, marginX * 2 + columnCount * nodeWidth + (columnCount - 1) * gapX);
+    const stageWidth = marginX * 2 + columnCount * nodeWidth + (columnCount - 1) * gapX;
     const stageHeight = marginY * 2 + maxRows * nodeHeight + (maxRows - 1) * gapY;
 
     const viewport = document.createElement("div");
@@ -21233,6 +21304,7 @@ function renderKnowledgeGraph() {
     knowledgeGraphPreparedPngPromise = null;
     knowledgeGraphPreparedPngKey = "";
     if (!knowledgeGraphData.nodes.length) {
+        canvas.querySelectorAll(".kg-mobile-viewport").forEach(viewport => viewport._kgDispose?.());
         canvas.innerHTML = (
             '<div class="kg-empty">知识图谱目前还是空的。</div>'
         );
@@ -21300,6 +21372,7 @@ function renderKnowledgeGraph() {
             context
         );
     }
+    canvas.querySelectorAll(".kg-mobile-viewport").forEach(viewport => viewport._kgDispose?.());
     canvas.replaceChildren(fragment);
     if (!mobileGraph) {
         // 每次切换模块/最近一题关联/全部知识都自动重新适应，不继承上一张图的比例。
@@ -21311,6 +21384,14 @@ function renderKnowledgeGraph() {
     // 不预先生成高分辨率 PNG。只有点“以图片形式复制”才渲染，
     // 否则每次切换模块会触发 html2canvas 占用主线程，并临时撑开页面宽度。
 }
+
+// Rotation and split-view changes can switch between the mobile and desktop
+// renderers. Rebuild only on that breakpoint, preserving the selected graph.
+window.matchMedia?.("(max-width: 760px)").addEventListener("change", () => {
+    const modal = document.getElementById("knowledgeGraphModal");
+    if (!modal || modal.classList.contains("hidden")) return;
+    renderKnowledgeGraph();
+});
 
 
 // -----------------------------
