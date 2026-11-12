@@ -4,6 +4,8 @@ This policy standardizes logical accountability and mathematical prose without
 forcing every problem into one rigid template.
 """
 
+from proof_writing_extended import proof_coverage_prompt
+
 PROOF_WRITING_STANDARD_ZH = r"""【数学证明写作规范｜DMate 统一标准】
 本规范只在本轮涉及给出、解释、检查、批改或改写数学证明时适用。它统一逻辑表达和书写质量，不强迫所有题目套用同一个模板，也不改变题目指定的证明方法。
 
@@ -94,5 +96,5 @@ def proof_writing_prompt(language="zh-CN"):
     """Return the canonical proof-writing policy in the requested response language."""
     normalized = str(language or "").strip().lower().replace("_", "-")
     if normalized.startswith("en"):
-        return "\n\n" + PROOF_WRITING_STANDARD_EN + "\n"
-    return "\n\n" + PROOF_WRITING_STANDARD_ZH + "\n"
+        return "\n\n" + PROOF_WRITING_STANDARD_EN + "\n" + proof_coverage_prompt("en")
+    return "\n\n" + PROOF_WRITING_STANDARD_ZH + "\n" + proof_coverage_prompt("zh-CN")

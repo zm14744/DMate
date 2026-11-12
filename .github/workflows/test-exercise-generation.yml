@@ -9,6 +9,9 @@ on:
       - 'ai.py'
       - 'concept_notebook.py'
       - 'proof_writing.py'
+      - 'proof_writing_extended.py'
+      - 'docs/PROOF_WRITING_STANDARD.md'
+      - 'docs/PROOF_WRITING_STANDARD.en.md'
       - 'scripts/test_proof_writing.py'
       - 'exercise_relation_check.py'
       - 'exercise_intent.py'
@@ -31,7 +34,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile proof-writing integrations
-        run: python -m py_compile ai.py concept_notebook.py proof_writing.py
+        run: python -m py_compile ai.py concept_notebook.py proof_writing.py proof_writing_extended.py
       - name: Run offline exercise regressions
         run: python -m unittest discover -s scripts -p 'test_exercise_generation_regression.py' -v
       - name: Run proof-writing policy regressions

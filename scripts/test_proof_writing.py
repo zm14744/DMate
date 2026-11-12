@@ -4,6 +4,8 @@ import unittest
 
 from teaching import teaching_prompt
 
+from proof_writing_extended import PROOF_DOMAINS, PROOF_GLOSSARY, PROOF_SOURCES, proof_coverage_prompt
+
 from proof_writing import (
     PROOF_WRITING_STANDARD_EN,
     PROOF_WRITING_STANDARD_ZH,
@@ -36,6 +38,41 @@ class ProofWritingPolicyTests(unittest.TestCase):
         english = teaching_prompt({"mode": "exercise", "response_language": "en"})
         self.assertIn("完整、可独立检查的规范证明", chinese)
         self.assertIn("complete, independently checkable proof", english)
+
+    def test_bilingual_method_coverage_has_same_ids_and_source_evidence(self):
+        ids = [row[0] for row in PROOF_DOMAINS]
+        self.assertGreaterEqual(len(ids), 18)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertGreaterEqual(len(PROOF_SOURCES), 8)
+        for key, zh_title, en_title, zh_rule, en_rule, sources in PROOF_DOMAINS:
+            with self.subTest(method=key):
+                self.assertTrue(zh_title.strip() and en_title.strip())
+                self.assertTrue(zh_rule.strip() and en_rule.strip())
+                self.assertGreaterEqual(len(sources), 1)
+                self.assertTrue(all(source in PROOF_SOURCES for source in sources))
+                self.assertIn(zh_title, proof_coverage_prompt("zh-CN"))
+                self.assertIn(en_title, proof_coverage_prompt("en"))
+        for key, zh, en, caution_zh, caution_en in PROOF_GLOSSARY:
+            with self.subTest(terminology=key):
+                self.assertTrue(all(x.strip() for x in (zh, en, caution_zh, caution_en)))
+                self.assertIn(zh, proof_coverage_prompt("zh"))
+                self.assertIn(en, proof_coverage_prompt("en"))
+        for source in PROOF_SOURCES.values():
+            self.assertTrue(source["url"].startswith("https://"))
+            self.assertTrue(source["name"] and source["role"])
+
+    def test_full_chinese_and_english_prompts_share_all_domains(self):
+        chinese = proof_writing_prompt("zh-CN")
+        english = proof_writing_prompt("en-US")
+        self.assertIn("【分领域证明核对要求", chinese)
+        self.assertIn("[Domain-specific proof checks", english)
+        for _, zh_title, en_title, _, _, _ in PROOF_DOMAINS:
+            self.assertEqual(chinese.count(zh_title), 1)
+            self.assertEqual(english.count(en_title), 1)
+        self.assertIn("only if Q", english)
+        self.assertIn("仅当 Q", chinese)
+        self.assertIn("without circularity", english)
+        self.assertIn("不能循环论证", chinese)
 
     def test_non_english_language_defaults_to_chinese(self):
         self.assertIn(PROOF_WRITING_STANDARD_ZH, proof_writing_prompt("zh-Hans"))

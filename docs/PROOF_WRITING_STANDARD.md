@@ -70,3 +70,68 @@
 - Richard Hammack, *Book of Proof*, [Third Edition](https://richardhammack.github.io/BookOfProof/)：直接证明、逆否证明、反证、双向证明、集合证明、反例、归纳法、关系与函数证明。
 
 这些材料提供的是通行的证明写作原则，而不是一套必须逐字照搬的统一模板。DMate 的默认表达以中文本科离散数学教学为基准，并尊重用户课程中的明确约定。
+
+## 版本 2：中英文等覆盖与来源核查（2026-11）
+
+**语言平等原则。** 中英文以同一个 `proof_writing_extended.py` 规则表为事实来源，每条规则均有唯一 ID、中英文自然表达及参考资料 ID。中文和英文只在句式、教学语言、术语习惯上不同，不能在定义域、量词、逻辑条件、证明步骤或批改尺度上降低任一语言的要求。英文并非机械翻译中文；依英语数学写作规范采用 *Let ... be arbitrary*, *There exists*, *By definition*, *For the converse direction* 等自然句式。
+
+### 分领域证明覆盖矩阵
+
+| 规则 ID | 中文覆盖内容 | 英文对应 |
+| --- | --- | --- |
+| `logic_scope` | 逻辑形式与量词 | Logical form and quantifiers |
+| `logical_implications` | 蕴含、等价与证明方向 | Implication, equivalence and proof direction |
+| `induction_family` | 归纳、强归纳与最小反例 | Induction, strong induction and minimal counterexample |
+| `structural_induction` | 结构归纳与递归对象 | Structural induction and recursively defined objects |
+| `invariants` | 不变量与算法正确性 | Invariants and algorithm correctness |
+| `termination` | 终止性与总正确性 | Termination and total correctness |
+| `recursion` | 递归与递推证明 | Recursive algorithms and recurrences |
+| `bijection` | 双射与组合计数 | Bijections and combinatorial counting |
+| `double_counting` | 双重计数与恒等式 | Double counting and identities |
+| `pigeonhole` | 抽屉原理与极值 | Pigeonhole principle and extremal arguments |
+| `inclusion_exclusion` | 容斥与分类计数 | Inclusion–exclusion and case counting |
+| `graph_theory` | 图论性质与同构 | Graph properties and isomorphism |
+| `graph_planarity` | 平面性与图嵌入 | Planarity and graph embeddings |
+| `relations_functions` | 关系、映射与商结构 | Relations, functions and quotient structures |
+| `algebra` | 群、环与同态 | Groups, rings and homomorphisms |
+| `automata` | 自动机与状态转移 | Automata and state transitions |
+| `probability` | 概率计数与存在性 | Probability and existential arguments |
+| `asymptotic` | 渐近界与复杂度 | Asymptotic bounds and complexity |
+
+矩阵侧重**本科离散数学及相关算法证明**，并不声称已覆盖全部数学研究领域、任意公理体系或所有高等数学证明习惯。
+
+### 中英文术语对应的语义约束
+
+| 中文 | 标准英语 | 关键区别 |
+| --- | --- | --- |
+| 任取／对于任意 | Let ... be arbitrary / For every ... | 证明全称命题，不是只举一个例子 |
+| 存在／存在一个 | There exists / There is some ... | 必须给出见证或存在性论证 |
+| 若 P，则 Q | If P, then Q | 方向为 P⇒Q |
+| P 仅当 Q | P only if Q | 方向仍为 P⇒Q；`P if Q` 表示 Q⇒P |
+| 当且仅当 | If and only if | 必须证明两个方向 |
+| 逆否证明 | Proof by contrapositive | 不能和逆命题混淆 |
+| 反证法 | Proof by contradiction | 否定真正待证结论 |
+| 不妨设 | Without loss of generality | 必须有对称性或等价理由 |
+| 归纳假设／归纳步骤 | Induction hypothesis / Inductive step | 明确有效下标 |
+| 循环不变量 | Loop invariant | 初始化、保持、退出时的作用 |
+| 双射 | Bijection | 要证明单射和满射 |
+| 同态／同构 | Homomorphism / Isomorphism | 同构除运算保持还需双射 |
+
+“反对称”应对应 *antisymmetric*，“非对称”对应 *asymmetric*；出现这类易混术语时，应核对定义而非根据文字相似性判断。中文和英文均须尊重题目、课程或教师明确规定的记号和定义域。
+
+### 来源的权威性与适用边界
+
+| 参考来源 | 角色与可核验范围 |
+| --- | --- |
+| [Stanford CS103 Proofwriting Checklist](https://web.stanford.edu/class/cs103/proofwriting_checklist) | 官方课程的证明书写指导，尤其是变量作用域、假设与目标、句子与逻辑负担 |
+| [CMU 15-251 Proof Guidelines](https://www.cs.cmu.edu/~arielpro/15251f17/docs/proof-checklist.pdf) | 官方课程的数学证明写作与论证流程指导 |
+| [MIT 6.1200J (2024) Reading List](https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/pages/readings/) | 官方较新课程对证明、归纳、状态机、算法等主题的覆盖依据 |
+| [MIT 6.042J (2015) Readings](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/pages/readings/) | 官方教材章节对图论、数论、计数、概率等证明领域的覆盖依据 |
+| [Hammack, Book of Proof](https://richardhammack.github.io/BookOfProof/) | 经美国数学研究所开放教材项目认可，覆盖标准证明方法、集合/关系/函数及归纳 |
+| [AMS: Language, Logic, and Proof](https://www.ams.org/bookstore/pspdf/amstext-26-prev.pdf) | 专业数学出版机构教材，特别适合数学语言、符号与写作准确性 |
+| [高等教育出版社《离散数学》第3版](https://www.hep.com.cn/book/show/2d67dc4c-217a-41db-81b2-56bfe7428879) | 中文课程范围、术语及教材体系参考；目前核对的是出版社公开目录与介绍，不声称已逐页审阅全书 |
+| [配套《离散数学学习指导与习题解析》第3版](https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=66ca132674ce561611bda659) | 中文大学习题类型与解答覆盖的公开目录参考；不直接重印习题和解析 |
+
+这里的“权威”指来源机构及材料本身可靠，并非这些机构对 DMate 的实际模型回答、评分或产品功能做了认证。**来源丰富不等于 AI 证明必定正确**。现有单元测试核验的是两种语言的规则覆盖、来源 ID 完整性和代码接入；数学正确性还需要双语真实题目的独立检验，尤其应检查错误证明的识别能力。
+
+本规范综合归纳公开的证明教学原则，未将课本的受版权保护长段落、习题及解析复制进 DMate，亦不因链接权威资料就宣称获得其商业再分发许可。英文详细版本见 [Proof Writing Standard (English)](PROOF_WRITING_STANDARD.en.md)。
