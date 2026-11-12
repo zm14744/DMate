@@ -39,6 +39,7 @@ class FakeOllama(BaseHTTPRequestHandler):
             return
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length"))))
         assert body["model"] == "qwen3:4b"
+        assert body["think"] is None
         assert body["messages"][-1]["content"] == "证明偶数加偶数还是偶数"
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson")
