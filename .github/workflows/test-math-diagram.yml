@@ -1,0 +1,40 @@
+name: Math diagram prototype
+
+on:
+  push:
+    branches:
+      - feature/math-diagram-prototype
+    paths:
+      - "math_diagram.py"
+      - "static/math-diagram.js"
+      - "static/drawing-workspace.js"
+      - "scripts/test_math_diagram.py"
+      - "scripts/test_math_diagram.cjs"
+      - ".github/workflows/test-math-diagram.yml"
+  pull_request:
+    paths:
+      - "math_diagram.py"
+      - "static/math-diagram.js"
+      - "static/drawing-workspace.js"
+      - "scripts/test_math_diagram.py"
+      - "scripts/test_math_diagram.cjs"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install focused test dependencies
+        run: python -m pip install networkx jsonschema requests
+      - name: Compile and test diagram structure generation
+        run: |
+          python -m py_compile math_diagram.py
+          python scripts/test_math_diagram.py
+      - name: Test Graphviz DOT conversion and editor coordinates
+        run: node scripts/test_math_diagram.cjs
