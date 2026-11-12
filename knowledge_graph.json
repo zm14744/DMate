@@ -1,5 +1,5 @@
 {
-  "version": 22,
+  "version": 23,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -50,12 +50,17 @@
           "source_id": "neu_discrete_female",
           "title": "逻辑连接词",
           "sections": [
-            "逻辑连接词"
+            "逻辑连接词",
+            "命题符号化"
           ],
           "lessons": [
             {
               "title": "逻辑连接词",
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=2"
+            },
+            {
+              "title": "命题符号化",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=3"
             }
           ]
         }
@@ -119,12 +124,22 @@
           "source_id": "neu_discrete_female",
           "title": "析取范式与合取范式",
           "sections": [
-            "析取范式与合取范式"
+            "析取范式与合取范式",
+            "主析取范式",
+            "主合取范式"
           ],
           "lessons": [
             {
               "title": "析取范式与合取范式",
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=7"
+            },
+            {
+              "title": "主析取范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=8"
+            },
+            {
+              "title": "主合取范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=9"
             }
           ]
         }
@@ -143,12 +158,17 @@
           "source_id": "neu_discrete_female",
           "title": "命题逻辑推理一：直接推理",
           "sections": [
-            "命题逻辑推理一：直接推理"
+            "命题逻辑推理一：直接推理",
+            "命题逻辑推理二：间接推理"
           ],
           "lessons": [
             {
               "title": "命题逻辑推理一：直接推理",
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=10"
+            },
+            {
+              "title": "命题逻辑推理二：间接推理",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=11"
             }
           ]
         }
@@ -234,14 +254,29 @@
       "videos": [
         {
           "source_id": "neu_discrete_female",
-          "title": "谓词演算的推理理论（一）",
+          "title": "谓词演算的等价式与蕴含式（一）",
           "sections": [
-            "谓词演算的推理理论（一）"
+            "谓词演算的等价式与蕴含式（一）",
+            "谓词演算的等价式与蕴含式（二）",
+            "谓词演算的推理理论（一）",
+            "谓词演算的推理理论（二）"
           ],
           "lessons": [
             {
+              "title": "谓词演算的等价式与蕴含式（一）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=15"
+            },
+            {
+              "title": "谓词演算的等价式与蕴含式（二）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=16"
+            },
+            {
               "title": "谓词演算的推理理论（一）",
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=18"
+            },
+            {
+              "title": "谓词演算的推理理论（二）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=19"
             }
           ]
         }
@@ -280,13 +315,13 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "1.2.1 Proof by Contradiction",
+          "title": "p0 Lec 1 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "1.2.1 Proof by Contradiction"
+            "p0 Lec 1 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "1.2.1 Proof by Contradiction",
+              "title": "p0 Lec 1 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=1"
             }
           ]
@@ -346,15 +381,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "1.4.0.3 集合恒等式",
+          "source_id": "bjtu_discrete",
+          "title": "1.1 集合与序列(2)--集合的运算",
           "sections": [
-            "1.4.0.3 集合恒等式"
+            "1.1 集合与序列(2)--集合的运算"
           ],
           "lessons": [
             {
-              "title": "1.4.0.3 集合恒等式",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=5"
+              "title": "1.1 集合与序列(2)--集合的运算",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=3"
             }
           ]
         }
@@ -369,15 +404,15 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "2.1.0.2 有序对和卡氏积",
+          "source_id": "bjtu_discrete",
+          "title": "4.1 关系及其表示(1)--有序对与笛卡儿积",
           "sections": [
-            "2.1.0.2 有序对和卡氏积"
+            "4.1 关系及其表示(1)--有序对与笛卡儿积"
           ],
           "lessons": [
             {
-              "title": "2.1.0.2 有序对和卡氏积",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=7"
+              "title": "4.1 关系及其表示(1)--有序对与笛卡儿积",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=45"
             }
           ]
         }
@@ -392,15 +427,30 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "2.2.0.3 二元关系",
+          "source_id": "bjtu_discrete",
+          "title": "4.2 关系的运算(1)--关系的基本运算",
           "sections": [
-            "2.2.0.3 二元关系"
+            "4.2 关系的运算(1)--关系的基本运算",
+            "(2)--关系运算的性质",
+            "(3)--关系的幂和道路（一）",
+            "(4)--关系的幂和道路（二）"
           ],
           "lessons": [
             {
-              "title": "2.2.0.3 二元关系",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=8"
+              "title": "4.2 关系的运算(1)--关系的基本运算",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=49"
+            },
+            {
+              "title": "(2)--关系运算的性质",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=50"
+            },
+            {
+              "title": "(3)--关系的幂和道路（一）",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=51"
+            },
+            {
+              "title": "(4)--关系的幂和道路（二）",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=52"
             }
           ]
         }
@@ -415,15 +465,40 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "2.3.0.3 关系的三种性质",
+          "source_id": "bjtu_discrete",
+          "title": "4.3 关系的性质(1)--关系的性质——自反性",
           "sections": [
-            "2.3.0.3 关系的三种性质"
+            "4.3 关系的性质(1)--关系的性质——自反性",
+            "(2)--关系的性质——对称性",
+            "(3)--关系的性质——传递性",
+            "(4)--关系性质的判断",
+            "(5)--关系运算对性质的保持",
+            "(6)--扩展材料——特殊关系的计数"
           ],
           "lessons": [
             {
-              "title": "2.3.0.3 关系的三种性质",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=9"
+              "title": "4.3 关系的性质(1)--关系的性质——自反性",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=53"
+            },
+            {
+              "title": "(2)--关系的性质——对称性",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=54"
+            },
+            {
+              "title": "(3)--关系的性质——传递性",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=55"
+            },
+            {
+              "title": "(4)--关系性质的判断",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=56"
+            },
+            {
+              "title": "(5)--关系运算对性质的保持",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=57"
+            },
+            {
+              "title": "(6)--扩展材料——特殊关系的计数",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=58"
             }
           ]
         }
@@ -438,15 +513,30 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "2.5.0.3 等价关系与划分",
+          "source_id": "bjtu_discrete",
+          "title": "4.5 等价关系和集合的划分(1)--划分",
           "sections": [
-            "2.5.0.3 等价关系与划分"
+            "4.5 等价关系和集合的划分(1)--划分",
+            "(2)--等价关系、等价类和商集",
+            "(3)--由划分构造等价关系",
+            "(4)--由等价关系得到划分"
           ],
           "lessons": [
             {
-              "title": "2.5.0.3 等价关系与划分",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=11"
+              "title": "4.5 等价关系和集合的划分(1)--划分",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=63"
+            },
+            {
+              "title": "(2)--等价关系、等价类和商集",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=64"
+            },
+            {
+              "title": "(3)--由划分构造等价关系",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=65"
+            },
+            {
+              "title": "(4)--由等价关系得到划分",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=66"
             }
           ]
         }
@@ -485,15 +575,30 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "2.4.0.3 关系的幂运算和闭包",
+          "source_id": "bjtu_discrete",
+          "title": "4.4 关系的闭包(1)--关系的闭包",
           "sections": [
-            "2.4.0.3 关系的幂运算和闭包"
+            "4.4 关系的闭包(1)--关系的闭包",
+            "(2)--关系闭包运算的性质",
+            "(3)--沃舍尔算法",
+            "(4)--沃舍尔算法纸上作业法"
           ],
           "lessons": [
             {
-              "title": "2.4.0.3 关系的幂运算和闭包",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=10"
+              "title": "4.4 关系的闭包(1)--关系的闭包",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=59"
+            },
+            {
+              "title": "(2)--关系闭包运算的性质",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=60"
+            },
+            {
+              "title": "(3)--沃舍尔算法",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=61"
+            },
+            {
+              "title": "(4)--沃舍尔算法纸上作业法",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=62"
             }
           ]
         }
@@ -508,15 +613,15 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "3.1.0.3 函数(上）",
+          "source_id": "bjtu_discrete",
+          "title": "5.1 函数的定义(1)--函数",
           "sections": [
-            "3.1.0.3 函数(上）"
+            "5.1 函数的定义(1)--函数"
           ],
           "lessons": [
             {
-              "title": "3.1.0.3 函数(上）",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=15"
+              "title": "5.1 函数的定义(1)--函数",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=68"
             }
           ]
         }
@@ -531,15 +636,15 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "3.2.0.3 函数(下）",
+          "source_id": "bjtu_discrete",
+          "title": "5.2 函数的性质(1)--函数的性质",
           "sections": [
-            "3.2.0.3 函数(下）"
+            "5.2 函数的性质(1)--函数的性质"
           ],
           "lessons": [
             {
-              "title": "3.2.0.3 函数(下）",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=16"
+              "title": "5.2 函数的性质(1)--函数的性质",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=69"
             }
           ]
         }
@@ -554,15 +659,15 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "3.2.0.3 函数(下）",
+          "source_id": "bjtu_discrete",
+          "title": "5.3 函数的复合(1)--函数的复合",
           "sections": [
-            "3.2.0.3 函数(下）"
+            "5.3 函数的复合(1)--函数的复合"
           ],
           "lessons": [
             {
-              "title": "3.2.0.3 函数(下）",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=16"
+              "title": "5.3 函数的复合(1)--函数的复合",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=70"
             }
           ]
         }
@@ -578,15 +683,15 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "3.2.0.3 函数(下）",
+          "source_id": "bjtu_discrete",
+          "title": "5.4 逆函数(1)--逆函数",
           "sections": [
-            "3.2.0.3 函数(下）"
+            "5.4 逆函数(1)--逆函数"
           ],
           "lessons": [
             {
-              "title": "3.2.0.3 函数(下）",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=16"
+              "title": "5.4 逆函数(1)--逆函数",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=71"
             }
           ]
         }
@@ -600,13 +705,13 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "4. Number Theory I",
+          "title": "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "4. Number Theory I"
+            "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "4. Number Theory I",
+              "title": "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=4"
             }
           ]
@@ -623,13 +728,13 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "4. Number Theory I",
+          "title": "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "4. Number Theory I"
+            "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "4. Number Theory I",
+              "title": "p3 Lec 4 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=4"
             }
           ]
@@ -646,13 +751,13 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "5. Number Theory II",
+          "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "5. Number Theory II"
+            "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "5. Number Theory II",
+              "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
             }
           ]
@@ -670,13 +775,13 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "5. Number Theory II",
+          "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "5. Number Theory II"
+            "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "5. Number Theory II",
+              "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
             }
           ]
@@ -685,7 +790,7 @@
     },
     {
       "id": "number_inverse_crt",
-      "name": "模逆与中国剩余定理",
+      "name": "中国剩余定理",
       "category": "初等数论",
       "prerequisites": [
         "同余与模运算",
@@ -718,13 +823,13 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "5. Number Theory II",
+          "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "5. Number Theory II"
+            "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "5. Number Theory II",
+              "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
             }
           ]
@@ -743,13 +848,13 @@
       "videos": [
         {
           "source_id": "mit_6042j_2010_bilibili",
-          "title": "5. Number Theory II",
+          "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "5. Number Theory II"
+            "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "5. Number Theory II",
+              "title": "p4 Lec 5 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=5"
             }
           ]
@@ -786,38 +891,15 @@
       ],
       "videos": [
         {
-          "source_id": "bjtu_discrete",
-          "title": "(2)--排列",
+          "source_id": "sawfin_bilibili",
+          "title": "p60 Discrete Math - 6.3.1 Permutations and Combinations",
           "sections": [
-            "(2)--排列",
-            "(3)--组合"
+            "p60 Discrete Math - 6.3.1 Permutations and Combinations"
           ],
           "lessons": [
             {
-              "source_id": "bjtu_discrete",
-              "title": "(2)--排列",
-              "sections": [
-                "(2)--排列"
-              ],
-              "lessons": [
-                {
-                  "title": "(2)--排列",
-                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=11"
-                }
-              ]
-            },
-            {
-              "source_id": "bjtu_discrete",
-              "title": "(3)--组合",
-              "sections": [
-                "(3)--组合"
-              ],
-              "lessons": [
-                {
-                  "title": "(3)--组合",
-                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=12"
-                }
-              ]
+              "title": "p60 Discrete Math - 6.3.1 Permutations and Combinations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=61"
             }
           ]
         }
@@ -830,7 +912,21 @@
       "prerequisites": [
         "排列与组合"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
+          "sections": [
+            "p62 Discrete Math - 6.4.1 The Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_pigeonhole",
@@ -901,24 +997,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "bjtu_discrete",
-          "title": "(10)--扩展内容——递推关系",
+          "source_id": "sawfin_bilibili",
+          "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
           "sections": [
-            "(10)--扩展内容——递推关系"
+            "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations"
           ],
           "lessons": [
             {
-              "source_id": "bjtu_discrete",
-              "title": "(10)--扩展内容——递推关系",
-              "sections": [
-                "(10)--扩展内容——递推关系"
-              ],
-              "lessons": [
-                {
-                  "title": "(10)--扩展内容——递推关系",
-                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=19"
-                }
-              ]
+              "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=68"
             }
           ]
         }
@@ -931,7 +1018,21 @@
       "prerequisites": [
         "递推关系建模"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_nonhomogeneous",
@@ -940,7 +1041,21 @@
       "prerequisites": [
         "线性齐次递推"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_initial",
@@ -951,24 +1066,15 @@
       ],
       "videos": [
         {
-          "source_id": "bjtu_discrete",
-          "title": "(10)--扩展内容——递推关系",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "(10)--扩展内容——递推关系"
+            "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "source_id": "bjtu_discrete",
-              "title": "(10)--扩展内容——递推关系",
-              "sections": [
-                "(10)--扩展内容——递推关系"
-              ],
-              "lessons": [
-                {
-                  "title": "(10)--扩展内容——递推关系",
-                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=19"
-                }
-              ]
+              "title": "p14 Lec 15 ｜ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
             }
           ]
         }
@@ -984,12 +1090,27 @@
           "source_id": "pflyan_graph",
           "title": "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
           "sections": [
-            "1-1 〖图的基本概念〗图中组成、顶点与边的关系"
+            "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
+            "1-2 〖图的基本概念〗图的分类",
+            "1-3 〖图的基本概念〗结点的度与握手定理",
+            "1-4 〖图的基本概念〗正则图和无向完全图"
           ],
           "lessons": [
             {
               "title": "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=2"
+            },
+            {
+              "title": "1-2 〖图的基本概念〗图的分类",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=3"
+            },
+            {
+              "title": "1-3 〖图的基本概念〗结点的度与握手定理",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=4"
+            },
+            {
+              "title": "1-4 〖图的基本概念〗正则图和无向完全图",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=5"
             }
           ]
         }
@@ -1030,12 +1151,22 @@
           "source_id": "pflyan_graph",
           "title": "4-1 〖图的三种矩阵表示〗邻接矩阵",
           "sections": [
-            "4-1 〖图的三种矩阵表示〗邻接矩阵"
+            "4-1 〖图的三种矩阵表示〗邻接矩阵",
+            "4-2 〖图的三种矩阵表示〗邻接矩阵的性质",
+            "4-3 〖图的三种矩阵表示〗邻接矩阵的幂"
           ],
           "lessons": [
             {
               "title": "4-1 〖图的三种矩阵表示〗邻接矩阵",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=18"
+            },
+            {
+              "title": "4-2 〖图的三种矩阵表示〗邻接矩阵的性质",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=19"
+            },
+            {
+              "title": "4-3 〖图的三种矩阵表示〗邻接矩阵的幂",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=20"
             }
           ]
         }
@@ -1053,11 +1184,36 @@
       "videos": [
         {
           "source_id": "pflyan_graph",
-          "title": "4-8 〖图的三种矩阵表示〗关联矩阵",
+          "title": "4-1 〖图的三种矩阵表示〗邻接矩阵",
           "sections": [
+            "4-1 〖图的三种矩阵表示〗邻接矩阵",
+            "4-4 〖图的三种矩阵表示〗可达矩阵",
+            "4-5 〖图的三种矩阵表示〗可达矩阵的求法（一）",
+            "4-6 〖图的三种矩阵表示〗可达矩阵的求法（二）",
+            "4-7 〖图的三种矩阵表示〗利用可达矩阵求强分图",
             "4-8 〖图的三种矩阵表示〗关联矩阵"
           ],
           "lessons": [
+            {
+              "title": "4-1 〖图的三种矩阵表示〗邻接矩阵",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=18"
+            },
+            {
+              "title": "4-4 〖图的三种矩阵表示〗可达矩阵",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=21"
+            },
+            {
+              "title": "4-5 〖图的三种矩阵表示〗可达矩阵的求法（一）",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=22"
+            },
+            {
+              "title": "4-6 〖图的三种矩阵表示〗可达矩阵的求法（二）",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=23"
+            },
+            {
+              "title": "4-7 〖图的三种矩阵表示〗利用可达矩阵求强分图",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=24"
+            },
             {
               "title": "4-8 〖图的三种矩阵表示〗关联矩阵",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=25"
@@ -1076,14 +1232,39 @@
       "videos": [
         {
           "source_id": "pflyan_graph",
-          "title": "2-1 〖无向图的连通性〗结点间的连通性、连通图和分离图、连通分支数",
+          "title": "1-7 〖图的基本概念〗路径与回路、简单路与基本路",
           "sections": [
-            "2-1 〖无向图的连通性〗结点间的连通性、连通图和分离图、连通分支数"
+            "1-7 〖图的基本概念〗路径与回路、简单路与基本路",
+            "1-8 〖图的基本概念〗有向图中基本路的应用",
+            "2-1 〖无向图的连通性〗结点间的连通性、连通图和分离图、连通分支数",
+            "3-1 〖有向图的连通性〗强连通、单向连通、弱连通和非连通",
+            "3-2 〖有向图的连通性〗强分图、单向分图和弱分图",
+            "3-3 〖有向图的连通性〗强分图的应用：利用资源分配图识别进程间的死锁"
           ],
           "lessons": [
             {
+              "title": "1-7 〖图的基本概念〗路径与回路、简单路与基本路",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=8"
+            },
+            {
+              "title": "1-8 〖图的基本概念〗有向图中基本路的应用",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=9"
+            },
+            {
               "title": "2-1 〖无向图的连通性〗结点间的连通性、连通图和分离图、连通分支数",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=10"
+            },
+            {
+              "title": "3-1 〖有向图的连通性〗强连通、单向连通、弱连通和非连通",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=15"
+            },
+            {
+              "title": "3-2 〖有向图的连通性〗强分图、单向分图和弱分图",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=16"
+            },
+            {
+              "title": "3-3 〖有向图的连通性〗强分图的应用：利用资源分配图识别进程间的死锁",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=17"
             }
           ]
         }
@@ -1149,14 +1330,24 @@
       "videos": [
         {
           "source_id": "pflyan_graph",
-          "title": "7-2 〖欧拉图〗无向欧拉图判定的充要条件",
+          "title": "7-1 〖欧拉图〗七桥问题",
           "sections": [
-            "7-2 〖欧拉图〗无向欧拉图判定的充要条件"
+            "7-1 〖欧拉图〗七桥问题",
+            "7-2 〖欧拉图〗无向欧拉图判定的充要条件",
+            "7-3 〖欧拉图〗有向欧拉图判定的充要条件"
           ],
           "lessons": [
             {
+              "title": "7-1 〖欧拉图〗七桥问题",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=30"
+            },
+            {
               "title": "7-2 〖欧拉图〗无向欧拉图判定的充要条件",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=31"
+            },
+            {
+              "title": "7-3 〖欧拉图〗有向欧拉图判定的充要条件",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=32"
             }
           ]
         }
@@ -1174,12 +1365,32 @@
           "source_id": "pflyan_graph",
           "title": "8-1 〖哈密顿图〗哈密顿的周游世界游戏",
           "sections": [
-            "8-1 〖哈密顿图〗哈密顿的周游世界游戏"
+            "8-1 〖哈密顿图〗哈密顿的周游世界游戏",
+            "8-2 〖哈密顿图〗哈密顿图的一个充分条件",
+            "8-3 〖哈密顿图〗哈密顿图的必要条件",
+            "8-4 〖哈密顿图〗哈密顿图的另一个充分条件",
+            "8-5 〖哈密顿图〗不存在必要且充分条件"
           ],
           "lessons": [
             {
               "title": "8-1 〖哈密顿图〗哈密顿的周游世界游戏",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=33"
+            },
+            {
+              "title": "8-2 〖哈密顿图〗哈密顿图的一个充分条件",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=34"
+            },
+            {
+              "title": "8-3 〖哈密顿图〗哈密顿图的必要条件",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=35"
+            },
+            {
+              "title": "8-4 〖哈密顿图〗哈密顿图的另一个充分条件",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=36"
+            },
+            {
+              "title": "8-5 〖哈密顿图〗不存在必要且充分条件",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=37"
             }
           ]
         }
@@ -1196,11 +1407,16 @@
       "videos": [
         {
           "source_id": "pflyan_graph",
-          "title": "5-2 〖最短路径问题〗迪杰斯特拉算法：可以找到最优解的贪心算法",
+          "title": "5-1 〖最短路径问题〗最短路径问题与Moore算法",
           "sections": [
+            "5-1 〖最短路径问题〗最短路径问题与Moore算法",
             "5-2 〖最短路径问题〗迪杰斯特拉算法：可以找到最优解的贪心算法"
           ],
           "lessons": [
+            {
+              "title": "5-1 〖最短路径问题〗最短路径问题与Moore算法",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=26"
+            },
             {
               "title": "5-2 〖最短路径问题〗迪杰斯特拉算法：可以找到最优解的贪心算法",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=27"
@@ -1244,12 +1460,27 @@
           "source_id": "pflyan_graph",
           "title": "10-1 〖无向平面图〗平面图及其面",
           "sections": [
-            "10-1 〖无向平面图〗平面图及其面"
+            "10-1 〖无向平面图〗平面图及其面",
+            "10-2 〖无向平面图〗连通平面图",
+            "10-3 〖无向平面图〗同胚与收缩",
+            "10-4 〖无向平面图〗极大平面图"
           ],
           "lessons": [
             {
               "title": "10-1 〖无向平面图〗平面图及其面",
               "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=40"
+            },
+            {
+              "title": "10-2 〖无向平面图〗连通平面图",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=41"
+            },
+            {
+              "title": "10-3 〖无向平面图〗同胚与收缩",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=42"
+            },
+            {
+              "title": "10-4 〖无向平面图〗极大平面图",
+              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=43"
             }
           ]
         }
@@ -1297,7 +1528,7 @@
           "lessons": [
             {
               "title": "图-拓扑排序",
-              "url": "https://www.bilibili.com/video/BV1XV411X7T7/?p=1"
+              "url": "https://www.bilibili.com/video/BV1XV411X7T7/"
             }
           ]
         }
@@ -1361,11 +1592,16 @@
       "videos": [
         {
           "source_id": "uestc_discrete_lower",
-          "title": "9.1.2 无向树",
+          "title": "9.1.1 树的引入",
           "sections": [
+            "9.1.1 树的引入",
             "9.1.2 无向树"
           ],
           "lessons": [
+            {
+              "title": "9.1.1 树的引入",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=19"
+            },
             {
               "title": "9.1.2 无向树",
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=20"
@@ -1635,8 +1871,8 @@
       "name": "MIT · 6.042J · Fall 2010",
       "course": "Mathematics for Computer Science (Fall 2010)",
       "platform": "Bilibili",
-      "publisher": "麦洛的烦恼",
-      "note": "MIT官方课程为Fall 2010版；B站上传者为麦洛的烦恼，页面标注中英文字幕。DMate仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
+      "publisher": "常青藤中英字幕课程",
+      "note": "B站上传页面标注中英字幕，上传者为常青藤中英字幕课程。MIT官方课程Fall 2010。仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
     },
     {
       "id": "bjtu_discrete",
@@ -1653,13 +1889,21 @@
       "platform": "Bilibili",
       "publisher": "无为斋主",
       "note": "卡内基梅隆大学Po-Shen Loh教授2021年春季离散数学课程。B站视频BV1jA4L66ELr，用户截图显示本课程共6个分P；截图中的38/65是外层“数学学院（世界名校精品课）”合集位置，不是本课程讲数。六讲分别为课程导引/基础计数、数学归纳法、归纳法进阶、容斥基础、容斥应用、鸽巢原理。仅提供B站外链，不下载或托管。"
+    },
+    {
+      "id": "sawfin_bilibili",
+      "name": "Bellevue University · Kimberly Brehm",
+      "course": "Discrete Math I",
+      "platform": "Bilibili",
+      "publisher": "常青藤中英字幕课程",
+      "note": "Kimberly Brehm 的大学离散数学课程；B站页面标注中英字幕，上传者说明为唯一翻译发布账号。用于排列组合、二项式定理和递推建模。仅外链跳转，不下载或托管。"
     }
   ],
   "video_resource_policy": {
     "primary_per_node": "one selected Bilibili course per node; multiple adjacent lesson links may belong to that one course",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
-    "note": "Bilibili-only. MIT uses Fall 2010. CMU 21-228 Spring 2021 is confirmed by user screenshot and official syllabus; exact Bilibili BV URL remains unresolved, so it is a candidate and not yet mapped to active nodes. Steve Butler has been removed completely. Do not use the Chinese-dubbed Steve Butler version or the previously rejected UCLA/Socratica Bilibili versions. Do not fabricate video URLs.",
+    "note": "Bilibili-only. One primary course per node; related consecutive episodes from that same course may be listed under the node. Direct episode links and original Bilibili part titles are required. The CMU 21-228 upload is only six parts; do not infer later syllabus topics from the official course outline. MIT 6.042J uses Fall 2010. Beijing Jiaotong relationship/function part links were rebuilt from the actual 194-part Bilibili list. The generating-functions and matrix-tree-theorem nodes remain unfilled pending a verified, quality-approved Bilibili lesson; do not fabricate links.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs."
   },
   "video_resource_candidates": [
