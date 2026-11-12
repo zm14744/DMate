@@ -58,7 +58,7 @@ async function bootstrap() {
   } else {
     for (const name of ui.models) select.add(new Option(name, name));
     const saved = localStorage.getItem("dmate-offline-model");
-    const preferred = [saved, "qwen3:4b", "qwen3-vl:4b"].find(n => ui.models.includes(n));
+    const preferred = [saved, "qwen3:4b-thinking-2507-q4_K_M", "qwen3:4b-thinking", "qwen3:4b", "qwen3-vl:4b"].find(n => ui.models.includes(n));
     select.value = preferred || ui.models[0];
   }
   renderSessions();
