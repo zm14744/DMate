@@ -12,6 +12,7 @@ import threading
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
 from teaching import teaching_prompt, _active_question_from_messages
+from proof_writing import proof_writing_prompt
 from server_i18n import normalize_language, localize_error_payload
 from graph_ocr_cleanup import ocr_is_label_dominated
 from chat_limits import (MAX_MESSAGE_CHARS, MAX_HISTORY_MESSAGES,
@@ -1452,7 +1453,7 @@ $$
     base_prompt = SYSTEM_PROMPT
     if response_language == "en":
         base_prompt = base_prompt.replace("- 使用中文回答。", "- Respond in English.")
-    system_content = base_prompt + teaching_prompt(context)
+    system_content = base_prompt + teaching_prompt(context) + proof_writing_prompt(response_language)
     if context.get("semantic_math"):
         from graph_semantic_solver import semantic_math_prompt
         system_content += semantic_math_prompt(context["semantic_math"])

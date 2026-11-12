@@ -15,6 +15,7 @@ import threading
 import requests
 
 from server_i18n import localized, normalize_language
+from proof_writing import proof_writing_prompt
 
 MAX_NOTES = 12
 MAX_CONTENT = 6000
@@ -202,7 +203,7 @@ def _analyze_notebook(payload, *, completion=None):
             completion = _request_text_completion
         try:
             response = completion([
-                {'role': 'system', 'content': localized(_PROMPT, _PROMPT_EN, source['language'])},
+                {'role': 'system', 'content': localized(_PROMPT, _PROMPT_EN, source['language']) + proof_writing_prompt(source['language'])},
                 {'role': 'user', 'content': _json(source)},
             ], retries=0, reasoning_effort='none', max_tokens=6000,
                 timeout=(8, 60), response_format={'type': 'json_object'})

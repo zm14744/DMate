@@ -6,6 +6,10 @@ on:
     paths:
       - 'app.py'
       - 'teaching.py'
+      - 'ai.py'
+      - 'concept_notebook.py'
+      - 'proof_writing.py'
+      - 'scripts/test_proof_writing.py'
       - 'exercise_relation_check.py'
       - 'exercise_intent.py'
       - 'static/exercise-intent-rules.json'
@@ -28,3 +32,5 @@ jobs:
           python-version: '3.11'
       - name: Run offline exercise regressions
         run: python -m unittest discover -s scripts -p 'test_exercise_generation_regression.py' -v
+      - name: Run proof-writing policy regressions
+        run: python -m unittest discover -s scripts -p 'test_proof_writing.py' -v
