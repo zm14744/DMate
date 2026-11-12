@@ -21111,6 +21111,13 @@ function renderKnowledgeGraphDetail() {
         section.appendChild(heading);
 
         const platforms = new Map([["B站", []], ["YouTube", []]]);
+        const shortDescription = text => {
+            const caption = document.createElement("small");
+            caption.className = "kg-video-caption";
+            caption.textContent = String(text || node.name);
+            caption.style.cssText = "font-size:12px;line-height:1.6;color:var(--text-secondary,#a3a3a3);overflow-wrap:anywhere;";
+            return caption;
+        };
         for (const video of videos) {
             for (const lesson of (video.lessons || [])) {
                 const url = String(lesson.url || "");
@@ -21126,7 +21133,7 @@ function renderKnowledgeGraphDetail() {
 
         const entries = document.createElement("div");
         entries.className = "kg-video-sections";
-        entries.style.cssText = "display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;";
+        entries.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:11px;";
         for (const [platform, items] of platforms) {
             if (!items.length) {
                 const unavailable = document.createElement("span");
@@ -21142,12 +21149,20 @@ function renderKnowledgeGraphDetail() {
                 link.title = items[0].title;
                 link.target = "_blank";
                 link.rel = "noopener noreferrer";
-                entries.appendChild(link);
+                const row = document.createElement("div");
+                row.className = "kg-video-platform-row";
+                row.style.cssText = "display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;";
+                row.appendChild(link);
+                row.appendChild(shortDescription(items[0].title));
+                entries.appendChild(row);
             } else {
                 const details = document.createElement("details");
                 const summary = document.createElement("summary");
-                summary.textContent = platform;
-                summary.style.cssText = "cursor:pointer;color:var(--accent-color,#3b82f6);";
+                summary.textContent = platform + "（" + items.length + "集）";
+                summary.style.cssText = "cursor:pointer;color:var(--accent-color,#3b82f6);line-height:1.7;";
+                const topics = items.map(item => item.title || node.name);
+                const preview = topics.slice(0, 2).join(" / ") + (topics.length > 2 ? " 等" : "");
+                summary.appendChild(shortDescription(" · " + preview));
                 details.appendChild(summary);
                 const options = document.createElement("div");
                 options.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-top:8px;";
