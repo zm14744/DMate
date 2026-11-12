@@ -112,6 +112,7 @@ async function openSession(id) {
     messages.replaceChildren();
     if (!data.messages.length) showEmpty();
     for (const m of data.messages) appendMessage(m.role, m.content, false);
+    typesetMath(messages);
     scrollBottom();
   } catch (err) {
     toast(err.message);
@@ -155,6 +156,12 @@ function appendMessage(role, text, toBottom = true) {
   $("messages").append(message);
   if (toBottom) scrollBottom();
   return bubble;
+}
+
+function typesetMath(target) {
+  if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
+    window.MathJax.typesetPromise([target]).catch(() => {});
+  }
 }
 
 function scrollBottom() {
@@ -315,6 +322,11 @@ async function attachImage(event) {
       reader.readAsDataURL(file);
     });
     ui.image = encoded;
+    const vision = ui.models.find(name => name.startsWith("qwen3-vl:"));
+    if (vision && !$("modelSelect").value.includes("vl")) {
+      $("modelSelect").value = vision;
+      toast("已切换为本机视觉模型，以便识别图片");
+    }
     $("imagePreview").src = encoded;
     $("imageName").textContent = file.name;
     $("imageChip").hidden = false;
@@ -390,6 +402,7 @@ async function sendChat(event) {
       }
     }
     if (!streamCompleted) throw new Error("连接中断，未获得完整回答");
+    typesetMath(bubble);
   } catch (err) {
     if (bubble && !bubble.textContent.trim()) bubble.textContent = "未生成完整回答。";
     toast(controller.signal.aborted ? "已停止生成" : err.message);
