@@ -441,3 +441,87 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         outline-offset:2px!important;
     }
 }
+
+/* Consistent outline-icon contrast across desktop, mobile and all themes.
+   Colors are tokens, not hard-coded per breakpoint. The chosen appearance
+   palette also applies to frosted panels over custom image backgrounds.
+   Keep semantic red/green/amber icons and white-on-primary actions intact. */
+body[data-appearance-theme] {
+    --dm-icon-rest:var(--text-secondary);
+    --dm-icon-emphasis:var(--text-primary);
+}
+
+body[data-appearance-theme] :is(
+    .mobile-topbar-button,
+    .desktop-shell-button,
+    .chat-jump-button,
+    .chat-text-copy,
+    .dmate-symbol-keyboard,
+    .mobile-install-button,
+    #downloadAppBtn,
+    #appearanceBtn,
+    #wrongBookBtn,
+    #conceptNotebookBtn,
+    #knowledgeGraphBtn,
+    #graphDrawingBtn,
+    #learningReviewBtn,
+    #accountBtn:not(.is-authenticated):not(.is-syncing),
+    #voiceInputBtn:not([data-voice-state="recording"]):not([data-voice-state="finishing"])
+) > svg {
+    color:var(--dm-icon-rest) !important;
+}
+
+/* Do not brighten icons merely because the same control is on a phone.
+   One interaction treatment is shared by mouse, keyboard and touch. */
+body[data-appearance-theme] :is(
+    .mobile-topbar-button,
+    .desktop-shell-button,
+    .chat-jump-button,
+    .chat-text-copy,
+    .dmate-symbol-keyboard,
+    .mobile-install-button,
+    #downloadAppBtn,
+    #appearanceBtn,
+    #wrongBookBtn,
+    #conceptNotebookBtn,
+    #knowledgeGraphBtn,
+    #graphDrawingBtn,
+    #learningReviewBtn,
+    #accountBtn:not(.is-authenticated):not(.is-syncing),
+    #voiceInputBtn:not([data-voice-state="recording"]):not([data-voice-state="finishing"])
+):is(:hover,:focus-visible,:active,[aria-expanded="true"]) > svg {
+    color:var(--dm-icon-emphasis) !important;
+}
+
+/* Drawer-open indicators are distinct from the closed default state. */
+body[data-appearance-theme].mobile-left-open #mobileNavBtn > svg,
+body[data-appearance-theme].mobile-tools-open #mobileToolsBtn > svg,
+body[data-appearance-theme].desktop-tools-open #desktopToolsBtn > svg {
+    color:var(--dm-icon-emphasis) !important;
+}
+
+/* The upload '+' is an SVG mask rather than an SVG element.
+   It must use the same icon palette as the adjacent microphone and keyboard. */
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) #imageBtn::before,
+body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn::before {
+    background:var(--dm-icon-rest) !important;
+}
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) #imageBtn:is(:hover,:active,:focus-visible)::before,
+body[data-appearance-theme] .center > .input-wrap:not([hidden]) .image-picker-wrap:focus-within > #imageBtn::before,
+body[data-appearance-theme] #ocrUploadActions > .image-picker-wrap > #imageBtn:is(:hover,:active,:focus-visible)::before {
+    background:var(--dm-icon-emphasis) !important;
+}
+
+/* Honor accessibility contrast preferences without changing icon geometry. */
+@media (prefers-contrast:more) {
+    body[data-appearance-theme] {
+        --dm-icon-rest:var(--text-primary);
+        --dm-icon-emphasis:var(--text-strong);
+    }
+}
+@media (forced-colors:active) {
+    body[data-appearance-theme] {
+        --dm-icon-rest:ButtonText;
+        --dm-icon-emphasis:Highlight;
+    }
+}
