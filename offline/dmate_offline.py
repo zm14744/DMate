@@ -28,7 +28,7 @@ import webbrowser
 HERE = Path(__file__).resolve().parent
 DATA_HOME = Path(os.environ.get("DMATE_OFFLINE_HOME", "~/.dmate-offline")).expanduser()
 DB_FILE = DATA_HOME / "dmate.sqlite3"
-MAX_JSON_BYTES = 8 * 1024 * 1024
+MAX_JSON_BYTES = 10 * 1024 * 1024
 SYSTEM_PROMPT = (
     "你是 DMate Offline，一个专注于离散数学与大学课程的本地辅学助手。"
     "优先说明解题思路，分步骤推导，提醒学生自行核验结论。"
@@ -102,11 +102,15 @@ def available_models():
             if response.status != 200:
                 raise OSError("Ollama 无法列出本地模型")
             models = json.loads(response.read(512 * 1024)).get("models", [])
-            names = sorted(
-                {x["name"] for x in models
-                 if isinstance(x, dict) and isinstance(x.get("name"), str)}
-            )
-            return names[:100], None
+            # Never offer Ollama cloud models in an explicitly offline app.
+            names = sorted({
+                x["name"] for x in models
+                if isinstance(x, dict)
+                and isinstance(x.get("name"), str)
+                and not x["name"].lower().endswith(("-cloud", ":cloud"))
+            })
+            return (names[:100], None) if names else (
+                [], "未发现本地模型；请先运行 ollama pull qwen3:4b")
         finally:
             con.close()
     except (OSError, ValueError, http.client.HTTPException) as exc:
