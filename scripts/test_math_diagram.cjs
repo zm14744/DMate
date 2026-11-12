@@ -35,8 +35,8 @@ const fakeViz = {
 api.layoutDocument(document, 'graph', fakeViz).then(result => {
   const vertices = result.document.graphs[0].vertices;
   assert.equal(result.engine, 'neato');
-  assert.deepEqual([vertices[0].x, vertices[0].y], [0.09, 0.91]);
-  assert.deepEqual([vertices[1].x, vertices[1].y], [0.91, 0.09]);
+  assert.ok(Math.abs(vertices[0].x - 0.09) < 1e-9 && Math.abs(vertices[0].y - 0.91) < 1e-9);
+  assert.ok(Math.abs(vertices[1].x - 0.91) < 1e-9 && Math.abs(vertices[1].y - 0.09) < 1e-9);
   console.log('PASS math diagram DOT generation, plain parsing and editor coordinates');
 }).catch(error => {
   console.error(error);
