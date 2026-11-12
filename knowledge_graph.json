@@ -61,19 +61,6 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=2"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-02 命题的概念",
-          "sections": [
-            "01-02 命题的概念"
-          ],
-          "lessons": [
-            {
-              "title": "01-02 命题的概念",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=4"
-            }
-          ]
         }
       ]
     },
@@ -125,15 +112,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-03 命题联结词",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.4.1 Propositional Operators",
           "sections": [
-            "01-03 命题联结词"
+            "1.4.1 Propositional Operators"
           ],
           "lessons": [
             {
-              "title": "01-03 命题联结词",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=5"
+              "title": "1.4.1 Propositional Operators",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=9"
             }
           ]
         }
@@ -174,15 +161,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-07 真值表",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.4.4 Truth Tables",
           "sections": [
-            "01-07 真值表"
+            "1.4.4 Truth Tables"
           ],
           "lessons": [
             {
-              "title": "01-07 真值表",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=9"
+              "title": "1.4.4 Truth Tables",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=11"
             }
           ]
         }
@@ -221,19 +208,6 @@
               "url": "https://www.bilibili.com/video/BV1kK4y197bh/?p=10"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-08 等价关系",
-          "sections": [
-            "01-08 等价关系"
-          ],
-          "lessons": [
-            {
-              "title": "01-08 等价关系",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=10"
-            }
-          ]
         }
       ]
     },
@@ -255,19 +229,6 @@
             {
               "title": "析取范式与合取范式",
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=7"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-23 范式的求法",
-          "sections": [
-            "01-23 范式的求法"
-          ],
-          "lessons": [
-            {
-              "title": "01-23 范式的求法",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=25"
             }
           ]
         }
@@ -292,19 +253,6 @@
             {
               "title": "命题逻辑推理一：直接推理",
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=10"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-24 推理理论",
-          "sections": [
-            "01-24 推理理论"
-          ],
-          "lessons": [
-            {
-              "title": "01-24 推理理论",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=26"
             }
           ]
         }
@@ -358,15 +306,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "02-01 谓词的概念",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.5.1 Predicate Logic 1",
           "sections": [
-            "02-01 谓词的概念"
+            "1.5.1 Predicate Logic 1"
           ],
           "lessons": [
             {
-              "title": "02-01 谓词的概念",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=32"
+              "title": "1.5.1 Predicate Logic 1",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=12"
             }
           ]
         }
@@ -431,6 +379,19 @@
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=11"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.5.2 Predicate Logic 2",
+          "sections": [
+            "1.5.2 Predicate Logic 2"
+          ],
+          "lessons": [
+            {
+              "title": "1.5.2 Predicate Logic 2",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=13"
+            }
+          ]
         }
       ]
     },
@@ -469,15 +430,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "02-04 约束变元及换名",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.5.4 Predicate Logic 3",
           "sections": [
-            "02-04 约束变元及换名"
+            "1.5.4 Predicate Logic 3"
           ],
           "lessons": [
             {
-              "title": "02-04 约束变元及换名",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=35"
+              "title": "1.5.4 Predicate Logic 3",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=14"
             }
           ]
         }
@@ -504,19 +465,6 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=18"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "02-10 谓词逻辑的推理",
-          "sections": [
-            "02-10 谓词逻辑的推理"
-          ],
-          "lessons": [
-            {
-              "title": "02-10 谓词逻辑的推理",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=41"
-            }
-          ]
         }
       ]
     },
@@ -540,19 +488,6 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=17"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "02-08 前束范式",
-          "sections": [
-            "02-08 前束范式"
-          ],
-          "lessons": [
-            {
-              "title": "02-08 前束范式",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=39"
-            }
-          ]
         }
       ]
     },
@@ -565,15 +500,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-26 反证法",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.2.1 Proof by Contradiction",
           "sections": [
-            "01-26 反证法"
+            "1.2.1 Proof by Contradiction"
           ],
           "lessons": [
             {
-              "title": "01-26 反证法",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=28"
+              "title": "1.2.1 Proof by Contradiction",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=4"
             }
           ]
         }
@@ -599,6 +534,19 @@
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=53"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.8.1 Induction",
+          "sections": [
+            "1.8.1 Induction"
+          ],
+          "lessons": [
+            {
+              "title": "1.8.1 Induction",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=20"
+            }
+          ]
         }
       ]
     },
@@ -620,6 +568,19 @@
             {
               "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=56"
+            }
+          ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.8.4 Strong Induction",
+          "sections": [
+            "1.8.4 Strong Induction"
+          ],
+          "lessons": [
+            {
+              "title": "1.8.4 Strong Induction",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=22"
             }
           ]
         }
@@ -658,15 +619,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-04 集合的运算(1)",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.6.2 Sets Operations",
           "sections": [
-            "03-04 集合的运算(1)"
+            "1.6.2 Sets Operations"
           ],
           "lessons": [
             {
-              "title": "03-04 集合的运算(1)",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=46"
+              "title": "1.6.2 Sets Operations",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=16"
             }
           ]
         }
@@ -694,15 +655,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-06 笛卡尔积",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.7.1 Relations",
           "sections": [
-            "03-06 笛卡尔积"
+            "1.7.1 Relations"
           ],
           "lessons": [
             {
-              "title": "03-06 笛卡尔积",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=48"
+              "title": "1.7.1 Relations",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=17"
             }
           ]
         }
@@ -717,15 +678,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-12 复合关系(1)",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.7.1 Relations",
           "sections": [
-            "03-12 复合关系(1)"
+            "1.7.1 Relations"
           ],
           "lessons": [
             {
-              "title": "03-12 复合关系(1)",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=54"
+              "title": "1.7.1 Relations",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=17"
             }
           ]
         }
@@ -753,15 +714,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-09 自反和反自反",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.7.1 Relations",
           "sections": [
-            "03-09 自反和反自反"
+            "1.7.1 Relations"
           ],
           "lessons": [
             {
-              "title": "03-09 自反和反自反",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=51"
+              "title": "1.7.1 Relations",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=17"
             }
           ]
         }
@@ -802,15 +763,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-18 等价关系",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.7.4 Equivalence Relations",
           "sections": [
-            "03-18 等价关系"
+            "2.7.4 Equivalence Relations"
           ],
           "lessons": [
             {
-              "title": "03-18 等价关系",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=60"
+              "title": "2.7.4 Equivalence Relations",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=53"
             }
           ]
         }
@@ -838,15 +799,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-21 偏序关系",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.7.1 Partial Orders",
           "sections": [
-            "03-21 偏序关系"
+            "2.7.1 Partial Orders"
           ],
           "lessons": [
             {
-              "title": "03-21 偏序关系",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=63"
+              "title": "2.7.1 Partial Orders",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=51"
             }
           ]
         }
@@ -871,19 +832,6 @@
             {
               "title": "2.4.0.3 关系的幂运算和闭包",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=10"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-15 关系的闭包",
-          "sections": [
-            "03-15 关系的闭包"
-          ],
-          "lessons": [
-            {
-              "title": "03-15 关系的闭包",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=57"
             }
           ]
         }
@@ -911,15 +859,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "04-01 函数的定义",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.7.3 Relational Mappings",
           "sections": [
-            "04-01 函数的定义"
+            "1.7.3 Relational Mappings"
           ],
           "lessons": [
             {
-              "title": "04-01 函数的定义",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=68"
+              "title": "1.7.3 Relational Mappings",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=18"
             }
           ]
         }
@@ -932,21 +880,7 @@
       "prerequisites": [
         "函数与映射"
       ],
-      "videos": [
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "04-03 特殊函数",
-          "sections": [
-            "04-03 特殊函数"
-          ],
-          "lessons": [
-            {
-              "title": "04-03 特殊函数",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=70"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "function_composition",
@@ -968,19 +902,6 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=16"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "04-04 函数的复合",
-          "sections": [
-            "04-04 函数的复合"
-          ],
-          "lessons": [
-            {
-              "title": "04-04 函数的复合",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=71"
-            }
-          ]
         }
       ]
     },
@@ -992,21 +913,7 @@
         "单射满射双射",
         "复合函数"
       ],
-      "videos": [
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "04-06 逆函数",
-          "sections": [
-            "04-06 逆函数"
-          ],
-          "lessons": [
-            {
-              "title": "04-06 逆函数",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=73"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "number_prime",
@@ -1024,6 +931,19 @@
             {
               "title": "17.1.0.2 素数",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=71"
+            }
+          ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.1.7 Prime Factorization",
+          "sections": [
+            "2.1.7 Prime Factorization"
+          ],
+          "lessons": [
+            {
+              "title": "2.1.7 Prime Factorization",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=39"
             }
           ]
         }
@@ -1049,6 +969,19 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=72"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.1.2 Euclidean Algorithm",
+          "sections": [
+            "2.1.2 Euclidean Algorithm"
+          ],
+          "lessons": [
+            {
+              "title": "2.1.2 Euclidean Algorithm",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=36"
+            }
+          ]
         }
       ]
     },
@@ -1070,6 +1003,19 @@
             {
               "title": "17.3.0.2 同余",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=73"
+            }
+          ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.2.1 Congruence mod n",
+          "sections": [
+            "2.2.1 Congruence mod n"
+          ],
+          "lessons": [
+            {
+              "title": "2.2.1 Congruence mod n",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=40"
             }
           ]
         }
@@ -1096,6 +1042,19 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=74"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.2.3 Inverses mod n",
+          "sections": [
+            "2.2.3 Inverses mod n"
+          ],
+          "lessons": [
+            {
+              "title": "2.2.3 Inverses mod n",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=41"
+            }
+          ]
         }
       ]
     },
@@ -1117,7 +1076,21 @@
         "同余与模运算",
         "整除与素数"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.3.1 Modular Exponentiation Euler's Function",
+          "sections": [
+            "2.3.1 Modular Exponentiation Euler's Function"
+          ],
+          "lessons": [
+            {
+              "title": "2.3.1 Modular Exponentiation Euler's Function",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=42"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_rsa",
@@ -1141,6 +1114,19 @@
               "url": "https://www.bilibili.com/video/BV1gT4y117My/?p=1"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.4.1 RSA Public Key Encryption",
+          "sections": [
+            "2.4.1 RSA Public Key Encryption"
+          ],
+          "lessons": [
+            {
+              "title": "2.4.1 RSA Public Key Encryption",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=44"
+            }
+          ]
         }
       ]
     },
@@ -1160,6 +1146,19 @@
             {
               "title": "Discrete Math - 6.1.1 Counting Rules",
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=60"
+            }
+          ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "3.3.1 Sum And Product Rules",
+          "sections": [
+            "3.3.1 Sum And Product Rules"
+          ],
+          "lessons": [
+            {
+              "title": "3.3.1 Sum And Product Rules",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=75"
             }
           ]
         }
@@ -1185,6 +1184,19 @@
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=61"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "3.3.3 Counting with Bijections",
+          "sections": [
+            "3.3.3 Counting with Bijections"
+          ],
+          "lessons": [
+            {
+              "title": "3.3.3 Counting with Bijections",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=76"
+            }
+          ]
         }
       ]
     },
@@ -1208,6 +1220,19 @@
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "3.4.4 Binomial Theorem",
+          "sections": [
+            "3.4.4 Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "3.4.4 Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=79"
+            }
+          ]
         }
       ]
     },
@@ -1218,7 +1243,21 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "3.5.1 The Pigeonhole Principle",
+          "sections": [
+            "3.5.1 The Pigeonhole Principle"
+          ],
+          "lessons": [
+            {
+              "title": "3.5.1 The Pigeonhole Principle",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=81"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_inclusion",
@@ -1239,6 +1278,19 @@
             {
               "title": "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion",
               "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=69"
+            }
+          ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "3.5.3 Inclusion-Exclusion Example",
+          "sections": [
+            "3.5.3 Inclusion-Exclusion Example"
+          ],
+          "lessons": [
+            {
+              "title": "3.5.3 Inclusion-Exclusion Example",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=82"
             }
           ]
         }
@@ -1349,15 +1401,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-02 图的基本概念",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.5.1 Digraphs - Walks & Paths",
           "sections": [
-            "07-02 图的基本概念"
+            "2.5.1 Digraphs - Walks & Paths"
           ],
           "lessons": [
             {
-              "title": "07-02 图的基本概念",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=112"
+              "title": "2.5.1 Digraphs - Walks & Paths",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=46"
             }
           ]
         }
@@ -1385,15 +1437,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-05 图的同构",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.8.3 Isomorphism",
           "sections": [
-            "07-05 图的同构"
+            "2.8.3 Isomorphism"
           ],
           "lessons": [
             {
-              "title": "07-05 图的同构",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=115"
+              "title": "2.8.3 Isomorphism",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=55"
             }
           ]
         }
@@ -1417,19 +1469,6 @@
             {
               "title": "9.2.0.3 邻接矩阵和相邻矩阵",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=38"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-09 图的矩阵表示",
-          "sections": [
-            "07-09 图的矩阵表示"
-          ],
-          "lessons": [
-            {
-              "title": "07-09 图的矩阵表示",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=119"
             }
           ]
         }
@@ -1470,19 +1509,6 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=37"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-09 图的矩阵表示",
-          "sections": [
-            "07-09 图的矩阵表示"
-          ],
-          "lessons": [
-            {
-              "title": "07-09 图的矩阵表示",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=119"
-            }
-          ]
         }
       ]
     },
@@ -1521,15 +1547,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-06 路与回路",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.5.3 Digraphs - Connected Vertices",
           "sections": [
-            "07-06 路与回路"
+            "2.5.3 Digraphs - Connected Vertices"
           ],
           "lessons": [
             {
-              "title": "07-06 路与回路",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=116"
+              "title": "2.5.3 Digraphs - Connected Vertices",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=47"
             }
           ]
         }
@@ -1587,19 +1613,6 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=33"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-10 欧拉图",
-          "sections": [
-            "07-10 欧拉图"
-          ],
-          "lessons": [
-            {
-              "title": "07-10 欧拉图",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=120"
-            }
-          ]
         }
       ]
     },
@@ -1621,19 +1634,6 @@
             {
               "title": "7.2.0.3 哈密顿图",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=34"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-11 汉密尔顿图",
-          "sections": [
-            "07-11 汉密尔顿图"
-          ],
-          "lessons": [
-            {
-              "title": "07-11 汉密尔顿图",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=121"
             }
           ]
         }
@@ -1685,15 +1685,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-18 着色法",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.9.1 Coloring",
           "sections": [
-            "07-18 着色法"
+            "2.9.1 Coloring"
           ],
           "lessons": [
             {
-              "title": "07-18 着色法",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=128"
+              "title": "2.9.1 Coloring",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=56"
             }
           ]
         }
@@ -1717,19 +1717,6 @@
             {
               "title": "10.1.0.2 平面图的基本概念",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=39"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-14 平面图",
-          "sections": [
-            "07-14 平面图"
-          ],
-          "lessons": [
-            {
-              "title": "07-14 平面图",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=124"
             }
           ]
         }
@@ -1756,6 +1743,19 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=50"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.11.7 Bipartite Matching",
+          "sections": [
+            "2.11.7 Bipartite Matching"
+          ],
+          "lessons": [
+            {
+              "title": "2.11.7 Bipartite Matching",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=65"
+            }
+          ]
         }
       ]
     },
@@ -1778,6 +1778,19 @@
             {
               "title": "图-拓扑排序",
               "url": "https://www.bilibili.com/video/BV1XV411X7T7/?p=1"
+            }
+          ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.6.1 DAGs",
+          "sections": [
+            "2.6.1 DAGs"
+          ],
+          "lessons": [
+            {
+              "title": "2.6.1 DAGs",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=48"
             }
           ]
         }
@@ -1827,6 +1840,19 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=48"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.11.7 Bipartite Matching",
+          "sections": [
+            "2.11.7 Bipartite Matching"
+          ],
+          "lessons": [
+            {
+              "title": "2.11.7 Bipartite Matching",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=65"
+            }
+          ]
         }
       ]
     },
@@ -1866,15 +1892,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-20 树的性质",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.10.1 Trees",
           "sections": [
-            "07-20 树的性质"
+            "2.10.1 Trees"
           ],
           "lessons": [
             {
-              "title": "07-20 树的性质",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=130"
+              "title": "2.10.1 Trees",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=59"
             }
           ]
         }
@@ -1898,19 +1924,6 @@
             {
               "title": "9.2.1 根树",
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=23"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-23 根树",
-          "sections": [
-            "07-23 根树"
-          ],
-          "lessons": [
-            {
-              "title": "07-23 根树",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=133"
             }
           ]
         }
@@ -1952,15 +1965,15 @@
           ]
         },
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-21 生成树",
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.10.5 Spanning Trees",
           "sections": [
-            "07-21 生成树"
+            "2.10.5 Spanning Trees"
           ],
           "lessons": [
             {
-              "title": "07-21 生成树",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=131"
+              "title": "2.10.5 Spanning Trees",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=61"
             }
           ]
         }
@@ -1985,19 +1998,6 @@
             {
               "title": "9.1.4 最小生成树",
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=22"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-22 最小生成树",
-          "sections": [
-            "07-22 最小生成树"
-          ],
-          "lessons": [
-            {
-              "title": "07-22 最小生成树",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=132"
             }
           ]
         }
@@ -2034,19 +2034,6 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=52"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "05-02 代数系统",
-          "sections": [
-            "05-02 代数系统"
-          ],
-          "lessons": [
-            {
-              "title": "05-02 代数系统",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=75"
-            }
-          ]
         }
       ]
     },
@@ -2068,19 +2055,6 @@
             {
               "title": "14.3.0.3 群的定义与性质",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=56"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "05-10 群",
-          "sections": [
-            "05-10 群"
-          ],
-          "lessons": [
-            {
-              "title": "05-10 群",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=84"
             }
           ]
         }
@@ -2105,19 +2079,6 @@
             {
               "title": "13.3.0.2 代数系统的同态与同构",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=53"
-            }
-          ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "05-23 同态与同构",
-          "sections": [
-            "05-23 同态与同构"
-          ],
-          "lessons": [
-            {
-              "title": "05-23 同态与同构",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=97"
             }
           ]
         }
@@ -2166,19 +2127,6 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=70"
             }
           ]
-        },
-        {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "06-08 布尔代数",
-          "sections": [
-            "06-08 布尔代数"
-          ],
-          "lessons": [
-            {
-              "title": "06-08 布尔代数",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=107"
-            }
-          ]
         }
       ]
     }
@@ -2207,13 +2155,6 @@
       "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
       "publisher": "动画讲解计算机知识"
-    },
-    {
-      "id": "xiaohuazuimao_2021",
-      "name": "小花醉猫",
-      "course": "（新版）离散数学全套（提醒：本人首页有全新课堂实录课。）",
-      "platform": "Bilibili",
-      "publisher": "小花醉猫"
     },
     {
       "id": "chenggong_weighted",
@@ -2253,6 +2194,14 @@
       "platform": "Bilibili",
       "publisher": "",
       "note": "B站页面标注原始课程来源为辽宁省本科教学网；上传者与授权状态尚未核实，仅作外部链接，不下载或托管。只收录P1–P19；P20《集合的基本概念》及之后不属于该教师讲授部分，不纳入。"
+    },
+    {
+      "id": "mit_6042j_2015_bilibili",
+      "name": "MIT · 6.042J · Spring 2015",
+      "course": "Mathematics for Computer Science (2015)",
+      "platform": "Bilibili",
+      "publisher": "",
+      "note": "B站版本标题标注「精翻·双语字幕」；本项目仅提供原视频外链，不下载、托管或重新分发视频/字幕。收录前仍需抽查数学术语与公式字幕。"
     }
   ],
   "video_resource_policy": {
