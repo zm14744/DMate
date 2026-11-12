@@ -21110,6 +21110,22 @@ function renderKnowledgeGraphDetail() {
         section.appendChild(heading);
 
         const platforms = new Map([["B站", []], ["YouTube", []]]);
+        const schoolForVideo = video => {
+            const source = (knowledgeGraphData.videoSources || []).find(
+                item => item.id === video.sourceId
+            );
+            if (!source || ["verified_youtube_topic_lectures", "comb34"].includes(source.id)) {
+                return "院校未注明";
+            }
+            if (source.id === "ucla_enumerative_matrix_tree") {
+                return "加州大学洛杉矶分校";
+            }
+            return String(source.name || "院校未注明").split(" · ")[0];
+        };
+        const shortLessonTitle = title => String(title || node.name)
+            .replace(/^(?:P|L)\d+\s+/i, "")
+            .replace(/^第\d+讲[:：\s]*/, "")
+            .replace(/^\d+\s+(?=\S)/, "");
         const shortDescription = text => {
             const caption = document.createElement("small");
             caption.className = "kg-video-caption";
@@ -21125,7 +21141,11 @@ function renderKnowledgeGraphDetail() {
                     : /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/.test(url)
                         ? "YouTube" : "";
                 if (platform && !platforms.get(platform).some(item => item.url === url)) {
-                    platforms.get(platform).push({title: String(lesson.title || ""), url});
+                    platforms.get(platform).push({
+                        title: String(lesson.title || ""),
+                        school: schoolForVideo(video),
+                        url
+                    });
                 }
             }
         }
@@ -21152,23 +21172,24 @@ function renderKnowledgeGraphDetail() {
                 row.className = "kg-video-platform-row";
                 row.style.cssText = "display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;";
                 row.appendChild(link);
-                row.appendChild(shortDescription(items[0].title));
+                row.appendChild(shortDescription(items[0].school + " · " + shortLessonTitle(items[0].title)));
                 entries.appendChild(row);
             } else {
                 const details = document.createElement("details");
                 const summary = document.createElement("summary");
-                summary.textContent = platform + "（" + items.length + "集）";
+                summary.textContent = platform;
                 summary.style.cssText = "cursor:pointer;color:var(--accent-color,#3b82f6);line-height:1.7;";
-                const topics = items.map(item => item.title || node.name);
+                const topics = items.map(item => shortLessonTitle(item.title));
                 const preview = topics.slice(0, 2).join(" / ") + (topics.length > 2 ? " 等" : "");
-                summary.appendChild(shortDescription(" · " + preview));
+                const schools = [...new Set(items.map(item => item.school))].join(" / ");
+                summary.appendChild(shortDescription(" · " + schools + " · " + preview));
                 details.appendChild(summary);
                 const options = document.createElement("div");
                 options.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-top:8px;";
                 for (const item of items) {
                     const link = document.createElement("a");
                     link.className = "kg-video-open";
-                    link.textContent = item.title || platform;
+                    link.textContent = shortLessonTitle(item.title);
                     link.href = item.url;
                     link.target = "_blank";
                     link.rel = "noopener noreferrer";
