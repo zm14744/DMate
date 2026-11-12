@@ -17,7 +17,7 @@ from jsonschema import Draft202012Validator
 from server_i18n import localized, normalize_language
 
 
-MAX_REQUIREMENT = 1500
+MAX_REQUIREMENT = 2000
 MAX_RESPONSE = 40000
 MAX_VERTICES = 80
 MAX_EDGES = 240
@@ -129,7 +129,7 @@ _MODEL_VALIDATOR = Draft202012Validator(_MODEL_SCHEMA)
 
 _ERRORS_EN = {
     "请描述需要生成的数学图。": "Describe the mathematical diagram you want to generate.",
-    "绘图要求不能超过1500字。": "The drawing request cannot exceed 1,500 characters.",
+    "绘图要求不能超过2000字。": "The drawing request cannot exceed 2,000 characters.",
     "数学图生成服务繁忙，请稍后重试。": "The diagram generator is busy. Please try again later.",
     "数学图生成暂时不可用，请稍后重试。": "The diagram generator is temporarily unavailable.",
     "模型没有返回有效的数学图结构，请调整描述后重试。": "The model did not return a valid mathematical diagram. Refine the request and try again.",
@@ -164,7 +164,7 @@ def _normalize_request(payload):
     if not isinstance(requirement, str) or not requirement.strip():
         raise MathDiagramError("empty_math_diagram_request", "请描述需要生成的数学图。")
     if len(requirement) > MAX_REQUIREMENT:
-        raise MathDiagramError("math_diagram_request_too_large", "绘图要求不能超过1500字。", status=413)
+        raise MathDiagramError("math_diagram_request_too_large", "绘图要求不能超过2000字。", status=413)
     return requirement.strip(), language
 
 
