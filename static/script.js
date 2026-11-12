@@ -21156,46 +21156,53 @@ function renderKnowledgeGraphDetail() {
         const entries = document.createElement("div");
         entries.className = "kg-video-sections";
         entries.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:11px;";
+
+        // 每个知识点同时显示两个平台的可直接点击的单集入口。
+        // 有额外相关视频时保留独立链接，不让平台名变成需展开的目录。
         for (const [platform, items] of platforms) {
-            if (!items.length) {
-                continue;
-            } else if (items.length === 1) {
+            const row = document.createElement("div");
+            row.className = "kg-video-platform-row";
+            row.style.cssText = "display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;";
+
+            if (items.length) {
+                const primary = items[0];
                 const link = document.createElement("a");
                 link.className = "kg-video-open";
                 link.textContent = platform;
-                link.href = items[0].url;
-                link.title = items[0].title;
+                link.href = primary.url;
+                link.title = primary.title;
                 link.target = "_blank";
                 link.rel = "noopener noreferrer";
-                const row = document.createElement("div");
-                row.className = "kg-video-platform-row";
-                row.style.cssText = "display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;";
                 row.appendChild(link);
-                row.appendChild(shortDescription(items[0].school + " · " + shortLessonTitle(items[0].title)));
-                entries.appendChild(row);
+                row.appendChild(shortDescription(
+                    primary.school + " · " + shortLessonTitle(primary.title)
+                ));
             } else {
-                const details = document.createElement("details");
-                const summary = document.createElement("summary");
-                summary.textContent = platform;
-                summary.style.cssText = "cursor:pointer;color:var(--accent-color,#3b82f6);line-height:1.7;";
-                const topics = items.map(item => shortLessonTitle(item.title));
-                const preview = topics.slice(0, 2).join(" / ") + (topics.length > 2 ? " 等" : "");
-                const schools = [...new Set(items.map(item => item.school))].join(" / ");
-                summary.appendChild(shortDescription(" · " + schools + " · " + preview));
-                details.appendChild(summary);
-                const options = document.createElement("div");
-                options.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-top:8px;";
-                for (const item of items) {
-                    const link = document.createElement("a");
-                    link.className = "kg-video-open";
-                    link.textContent = shortLessonTitle(item.title);
-                    link.href = item.url;
-                    link.target = "_blank";
-                    link.rel = "noopener noreferrer";
-                    options.appendChild(link);
-                }
-                details.appendChild(options);
-                entries.appendChild(details);
+                const unavailable = document.createElement("span");
+                unavailable.className = "kg-video-platform-unavailable";
+                unavailable.textContent = platform;
+                unavailable.style.cssText = "color:var(--text-secondary,#a3a3a3);";
+                row.appendChild(unavailable);
+                row.appendChild(shortDescription("暂无核对过的对应单集"));
+            }
+            entries.appendChild(row);
+
+            for (const item of items.slice(1)) {
+                const extraRow = document.createElement("div");
+                extraRow.className = "kg-video-platform-row";
+                extraRow.style.cssText = "display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;";
+                const extraLink = document.createElement("a");
+                extraLink.className = "kg-video-open";
+                extraLink.textContent = platform;
+                extraLink.href = item.url;
+                extraLink.title = item.title;
+                extraLink.target = "_blank";
+                extraLink.rel = "noopener noreferrer";
+                extraRow.appendChild(extraLink);
+                extraRow.appendChild(shortDescription(
+                    item.school + " · " + shortLessonTitle(item.title)
+                ));
+                entries.appendChild(extraRow);
             }
         }
         section.appendChild(entries);
