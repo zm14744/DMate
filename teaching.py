@@ -2882,8 +2882,10 @@ def _english_teaching_prompt(context):
         "Internally verify solvability and the final answer before responding; do not invent unchecked results. "
         "At the very end append the system-only hidden answer block using these exact delimiters: "
         "[[WRONGBOOK_ANSWER]]final answer[[/WRONGBOOK_ANSWER]]. "
-        "Inside that block include only the actual final answer, in English with mathematical notation, "
-        "without reasoning, calculations or hints. For multiple parts label final results (1), (2), (3). "
+        "If any part explicitly asks for a proof, justification or verification, the hidden block must include "
+        "a complete, independently checkable proof that follows DMate's proof-writing standard; do not give only the conclusion. "
+        "For non-proof parts, include only the final result, without extra hints or visible explanations. "
+        "For multiple parts label the results (1), (2), (3). "
         "Output nothing except [Question], the problem statement, and the hidden answer block."
     )
     mode_instruction = {
@@ -3030,7 +3032,8 @@ def teaching_prompt(context):
             "生成前在内部快速检查题意、可解性和隐藏答案是否一致，禁止编造未经核算的最终结果。"
             "在整条回答最后，额外追加一个仅供系统读取的隐藏答案块，格式必须严格为："
             "[[WRONGBOOK_ANSWER]]最终答案[[/WRONGBOOK_ANSWER]]。"
-            "隐藏答案块里只写最终答案本身，绝对不要写理由、计算过程、解析或提示。"
+            "如果任何小问明确要求证明、说明理由或验证命题，隐藏答案块必须包含对应的完整、可独立检查的规范证明，不能只写结论；"
+            "其他非证明小问只写最终结果，不附加提示或面向学生的额外解析。"
             "如果有多个小问，只按(1)(2)(3)分别给最终结果。"
             "除【题目】、题干和隐藏答案块外，不允许输出其它内容。"
         ),
