@@ -1988,7 +1988,7 @@
       "course": "21-228 Discrete Mathematics（Spring 2021）",
       "platform": "Bilibili",
       "publisher": "无为斋主",
-      "note": "卡内基梅隆大学Po-Shen Loh教授2021年春季离散数学课程。B站视频BV1jA4L66ELr，用户截图显示本课程共6个分P；截图中的38/65是外层“数学学院（世界名校精品课）”合集位置，不是本课程讲数。六讲分别为课程导引/基础计数、数学归纳法、归纳法进阶、容斥基础、容斥应用、鸽巢原理。仅提供B站外链，不下载或托管。"
+      "note": "卡内基梅隆大学Po-Shen Loh教授2021年春季离散数学课程。B站视频BV1jA4L66ELr；用户截图核实前六讲标题与时长。第3讲“归纳法进阶证明技巧”暂按强归纳法/归纳证明进阶映射，需进一步核对视频内容。仅提供B站外链，不下载或托管。"
     },
     {
       "id": "sawfin_bilibili",
@@ -2015,12 +2015,12 @@
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
-      "nodes_with_active_course": 67,
-      "nodes_pending": "tree_matrix_tree",
-      "direct_episode_links": 128,
+      "nodes_with_active_course": 66,
+      "nodes_pending": "count_generating; tree_matrix_tree",
+      "direct_episode_links": 132,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
-      "last_audit_scope": "episode titles, Bilibili part indices, topic-node fit, source references, and direct-link structure"
+      "last_audit_scope": "Bilibili episode title and part-index checks, topic-node fit, source references, direct-link structure; video speech/subtitle content not fully watched end-to-end"
     }
   },
   "video_resource_candidates": [
