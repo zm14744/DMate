@@ -34,11 +34,27 @@
       console.warn("DMate 离线数据准备未完成：", error);
     }
   }
+  async function openOfflineWorkspace() {
+    if (button) {
+      button.disabled = true;
+      button.textContent = "准备中…";
+    }
+    prepareCurrentAccountData();
+    if ("serviceWorker" in navigator && window.isSecureContext) {
+      try {
+        await navigator.serviceWorker.register("/offline-service-worker.js", {scope:"/"});
+        await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("离线资源准备超时")), 15000))
+        ]);
+      } catch (error) {
+        console.warn("离线资源尚未完全准备：", error);
+      }
+    }
+    window.location.assign("/offline");
+  }
   if (button) {
-    button.addEventListener("click", () => {
-      prepareCurrentAccountData();
-      window.location.assign("/offline");
-    });
+    button.addEventListener("click", () => { void openOfflineWorkspace(); });
   }
   if (!("serviceWorker" in navigator) || !window.isSecureContext) {
     if (button) {
