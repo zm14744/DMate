@@ -135,3 +135,48 @@
 这里的“权威”指来源机构及材料本身可靠，并非这些机构对 DMate 的实际模型回答、评分或产品功能做了认证。**来源丰富不等于 AI 证明必定正确**。现有单元测试核验的是两种语言的规则覆盖、来源 ID 完整性和代码接入；数学正确性还需要双语真实题目的独立检验，尤其应检查错误证明的识别能力。
 
 本规范综合归纳公开的证明教学原则，未将课本的受版权保护长段落、习题及解析复制进 DMate，亦不因链接权威资料就宣称获得其商业再分发许可。英文详细版本见 [Proof Writing Standard (English)](PROOF_WRITING_STANDARD.en.md)。
+
+
+### 扩展学科覆盖（版本 2.1）
+
+在原有离散数学及算法证明领域之外，统一规则表现已增加下列领域。每一项均有独立规则 ID，并同时提供中文和英文要求：
+
+| 规则 ID | 领域 |
+| --- | --- |
+| `number_theory` | 数论与整除性 |
+| `congruences` | 同余与中国剩余定理 |
+| `inequalities` | 不等式与极值估计 |
+| `real_completeness` | 实数完备性与上确界 |
+| `sequences_series` | 数列、级数与收敛 |
+| `epsilon_delta` | ε-δ 与极限证明 |
+| `continuity` | 连续性与一致连续性 |
+| `differentiation` | 微分、中值定理与 Taylor 展开 |
+| `integration` | Riemann 积分与微积分基本定理 |
+| `metric_topology` | 度量空间与拓扑证明 |
+| `linear_algebra` | 线性空间、基与维数 |
+| `matrices_eigen` | 矩阵、线性变换与特征值 |
+| `polynomial_algebra` | 多项式与代数方程 |
+| `geometry` | 欧氏几何与几何变换 |
+| `optimization` | 凸性与最优化证明 |
+| `ode` | 微分方程存在性与唯一性 |
+| `cardinality` | 有限集、可数性与基数 |
+| `multivariable_calculus` | 多元微积分与向量分析 |
+| `complex_analysis` | 复分析基础证明 |
+| `convexity_optimization` | 凸分析与对偶性 |
+
+### 证明方法覆盖
+
+学科领域与证明方法分开管理：一个领域可以需要多种证明方法，同一种方法也可以跨多个领域使用。当前统一方法清单包括：
+
+直接证明、逆否证明、反证法、分类讨论、构造性证明、非构造存在性证明、唯一性证明、普通归纳法、强归纳法、结构归纳法、最小反例法、无穷递降法、双射证明、双重计数、抽屉原理、极值原理、不变量证明、概率方法、ε-δ 证明、序列刻画证明、开覆盖证明、代数恒等变形证明和等价链证明。
+
+### 新增权威课程来源
+
+- [MIT 18.100B Real Analysis（Spring 2025）](https://ocw.mit.edu/courses/18-100b-real-analysis-spring-2025/pages/lecture-notes/)：包含 How to Write a Proof、实数完备性、数列级数、连续性、度量空间、微分、积分、一致收敛和微分方程存在唯一性。
+- [MIT 18.781 Theory of Numbers](https://ocw.mit.edu/courses/18-781-theory-of-numbers-spring-2012/pages/lecture-notes/)：整除、素数、最大公因数、欧几里得算法、同余、中国剩余定理、丢番图方程和无穷递降。
+- [MIT 18.06 Linear Algebra](https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/)：线性无关、基、维数、线性变换、矩阵与特征值。
+- [MIT 18.703 Modern Algebra](https://ocw.mit.edu/courses/18-703-modern-algebra-spring-2013/pages/lecture-notes/)：群、子群、商群、同态、环、理想、域和多项式环。
+- [MIT 18.S190 Introduction to Metric Spaces](https://ocw.mit.edu/courses/18-s190-introduction-to-metric-spaces-january-iap-2023/pages/lecture-notes/)：度量空间、完备性、紧致性与拓扑证明。
+- [MIT 6.7220J/15.084 Nonlinear Optimization](https://ocw.mit.edu/courses/6-7220j-nonlinear-optimization-spring-2025/)：凸性和最优化条件。
+
+**覆盖边界：** 当前规范面向本科核心数学、离散数学、算法与部分高年级基础课程，覆盖范围显著扩展，但不声称穷尽所有数学分支、研究级专门领域或所有形式化公理系统。遇到尚未列入清单的题型，模型仍须遵守通用逻辑、定义、量词和推理标准；不得因为没有专门规则就拒绝有效证明。

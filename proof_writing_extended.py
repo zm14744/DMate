@@ -46,6 +46,41 @@ PROOF_SOURCES = {
         "url": "https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=66ca132674ce561611bda659",
         "role": "Chinese undergraduate exercise coverage (publisher catalog)",
     },
+    "mit_real_analysis": {
+        "name": "MIT 18.100B — Real Analysis (Spring 2025)",
+        "url": "https://ocw.mit.edu/courses/18-100b-real-analysis-spring-2025/pages/lecture-notes/",
+        "role": "proof writing, epsilon-delta, sequences, series, continuity, derivatives, integrals, uniform convergence and ODEs",
+    },
+    "mit_number_theory": {
+        "name": "MIT 18.781 — Theory of Numbers (Spring 2012)",
+        "url": "https://ocw.mit.edu/courses/18-781-theory-of-numbers-spring-2012/pages/lecture-notes/",
+        "role": "divisibility, primes, gcd, Euclidean algorithm, congruences, CRT, Diophantine equations and descent",
+    },
+    "mit_linear_algebra": {
+        "name": "MIT 18.06 — Linear Algebra",
+        "url": "https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/",
+        "role": "linear independence, bases, dimension, linear transformations, determinants and eigenvalues",
+    },
+    "mit_algebra": {
+        "name": "MIT 18.703 — Modern Algebra (Spring 2013)",
+        "url": "https://ocw.mit.edu/courses/18-703-modern-algebra-spring-2013/pages/lecture-notes/",
+        "role": "groups, subgroups, quotient groups, homomorphisms, rings, ideals, fields and polynomial rings",
+    },
+    "mit_metric": {
+        "name": "MIT 18.S190 — Introduction to Metric Spaces (January 2023)",
+        "url": "https://ocw.mit.edu/courses/18-s190-introduction-to-metric-spaces-january-iap-2023/pages/lecture-notes/",
+        "role": "metric spaces, continuity, completeness, compactness and connectedness",
+    },
+    "mit_probability": {
+        "name": "MIT 6.1200J — Mathematics for Computer Science (Spring 2024), Expectation",
+        "url": "https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/mit6_1200j_s24_lec22.pdf",
+        "role": "probability, expectation, independence and discrete probabilistic arguments",
+    },
+    "mit_optimization": {
+        "name": "MIT 6.7220J/15.084 — Nonlinear Optimization (Spring 2025)",
+        "url": "https://ocw.mit.edu/courses/6-7220j-nonlinear-optimization-spring-2025/",
+        "role": "convexity, optimality, derivatives and optimization proofs",
+    },
 }
 
 # id, zh heading, en heading, zh requirement, en requirement, supporting sources.
@@ -122,7 +157,115 @@ PROOF_DOMAINS = (
      "大 O、Ω、Θ 证明须明确函数定义域，正确给出常数和充分大的阈值，并验证不等式；不要用有限数值测试冒充渐近证明。",
      "For big-O, big-Omega and big-Theta, state the function domain, choose valid constants and a sufficiently large threshold, and verify the required inequality. Finite numeric tests are not asymptotic proofs.",
      ("mit_2024", "mit_2015")),
+    ("number_theory", "数论与整除性", "Number theory and divisibility",
+     "证明整除、最大公因数、素数性质时明确整数范围和整除定义；使用带余除法、欧几里得算法或唯一分解时核对条件。无穷递降须给出严格下降的正整数或其他良基量。",
+     "State the integer domains and divisibility definitions. Check the hypotheses of the division algorithm, Euclidean algorithm and unique factorization. Infinite descent must produce a strictly smaller positive integer or another well-founded measure.",
+     ("mit_number_theory", "mit_2015", "hep_discrete")),
+    ("congruences", "同余与中国剩余定理", "Congruences and the Chinese remainder theorem",
+     "区分整数等式与模 n 同余；约去因子前验证其与模数互素等条件。中国剩余定理须核对模数两两互素的适用条件，并说明构造解及唯一性所在的模数范围。",
+     "Distinguish integer equality from congruence modulo n. Before cancellation, verify coprimality or the appropriate divisibility condition. Check pairwise-coprime hypotheses for the Chinese remainder theorem and state the modulus under which the solution is unique.",
+     ("mit_number_theory", "mit_2015")),
+    ("inequalities", "不等式与极值估计", "Inequalities and extremal estimates",
+     "每次乘除不等式前核对因子正负；平方、开方、取倒数或取对数须核对定义域与单调性。说明等号成立条件；不能只验证数值例子。",
+     "Check signs before multiplying or dividing inequalities. Squaring, taking roots, reciprocals or logarithms requires domain and monotonicity conditions. State equality conditions; numerical examples are not proofs.",
+     ("mit_real_analysis", "mit_2015")),
+    ("real_completeness", "实数完备性与上确界", "Completeness of the real numbers and suprema",
+     "使用上确界、下确界或完备性时先证明集合非空且有相应界；区分上界与最大元，并按 ε 逼近性质证明上确界结论。",
+     "Before invoking completeness or a supremum/infimum, establish nonemptiness and the relevant boundedness. Distinguish an upper bound from a maximum and use the epsilon-approximation property where needed.",
+     ("mit_real_analysis", "mit_2015")),
+    ("sequences_series", "数列、级数与收敛", "Sequences, series and convergence",
+     "明确收敛对象、极限和指标；使用 Cauchy 判别、比较判别、单调有界定理或幂级数性质时核对全部条件。点态收敛与一致收敛不得混淆。",
+     "Identify the sequence or series, its limit and index range. Verify all hypotheses of Cauchy, comparison, monotone convergence and power-series tests. Do not confuse pointwise with uniform convergence.",
+     ("mit_real_analysis", "mit_2015")),
+    ("epsilon_delta", "ε-δ 与极限证明", "Epsilon-delta limit proofs",
+     "按量词顺序先任取 ε>0，再构造只依赖 ε（及固定参数）的 δ>0；最后证明 0<|x-a|<δ 确实推出目标估计。δ 不得依赖正在趋近的变量 x。",
+     "Respect the quantifier order: choose an arbitrary epsilon > 0, then construct a delta > 0 depending only on epsilon and fixed parameters. Verify that 0 < |x-a| < delta implies the required estimate. Delta must not depend on the varying x.",
+     ("mit_real_analysis", "ams")),
+    ("continuity", "连续性与一致连续性", "Continuity and uniform continuity",
+     "分别识别点态连续与一致连续的量词顺序；使用序列刻画时说明其适用的度量/拓扑环境。紧致性推出一致连续等结论须先验证空间条件。",
+     "Distinguish pointwise and uniform continuity by their quantifier order. State the metric or topological setting when using sequential characterizations. Verify compactness hypotheses before invoking results such as uniform continuity on compact spaces.",
+     ("mit_real_analysis", "mit_metric")),
+    ("differentiation", "微分、中值定理与 Taylor 展开", "Differentiation, mean value theorems and Taylor expansion",
+     "使用 Rolle 定理、拉格朗日中值定理或 Taylor 定理前核对区间连续性、内部可导性和余项条件；L'Hôpital 法则须核对不定式及其适用假设。",
+     "Check continuity, differentiability and remainder hypotheses before applying Rolle's theorem, the mean value theorem or Taylor's theorem. L'Hopital's rule requires a valid indeterminate form and its stated hypotheses.",
+     ("mit_real_analysis",)),
+    ("integration", "Riemann 积分与微积分基本定理", "Riemann integration and the fundamental theorem of calculus",
+     "使用可积性、积分中值定理或微积分基本定理时核对函数与区间条件；交换极限、积分或求导顺序时必须证明一致收敛、支配条件或相应定理假设。",
+     "Verify function and interval hypotheses for integrability, the integral mean value theorem and the fundamental theorem of calculus. Interchanging limits, integrals or derivatives requires uniform convergence, domination or the relevant theorem's hypotheses.",
+     ("mit_real_analysis",)),
+    ("metric_topology", "度量空间与拓扑证明", "Metric spaces and topology",
+     "明确度量、开集、闭集、邻域、紧致、连通等定义；开覆盖证明须构造覆盖并论证有限子覆盖。不能把实数直线上的结论无条件推广到任意度量或拓扑空间。",
+     "State the definitions of metric, open and closed sets, neighborhoods, compactness and connectedness. An open-cover proof must construct the cover and justify a finite subcover. Do not transfer real-line results to arbitrary metric or topological spaces without hypotheses.",
+     ("mit_metric", "mit_real_analysis")),
+    ("linear_algebra", "线性空间、基与维数", "Vector spaces, bases and dimension",
+     "证明子空间须验证非空及线性封闭；证明线性无关、张成、基和维数时严格使用相应定义。秩-零度定理须明确线性映射的定义域、陪域及有限维条件。",
+     "Verify nonemptiness and closure for subspaces. Use the exact definitions of linear independence, span, basis and dimension. State the domain, codomain and finite-dimensional hypotheses for rank-nullity.",
+     ("mit_linear_algebra", "hep_discrete")),
+    ("matrices_eigen", "矩阵、线性变换与特征值", "Matrices, linear maps and eigenvalues",
+     "矩阵等式证明应核对维数和乘法顺序；相似、可对角化、特征空间和谱定理结论须核对域、维数及对称/正规等必要条件，不能把数值计算代替一般证明。",
+     "Check dimensions and multiplication order in matrix identities. Similarity, diagonalizability, eigenspaces and spectral theorems require their field, dimension, symmetry or normality hypotheses. Numerical computation alone is not a general proof.",
+     ("mit_linear_algebra", "mit_2015")),
+    ("polynomial_algebra", "多项式与代数方程", "Polynomials and algebraic equations",
+     "使用多项式整除、因式定理、根的重数或不可约性时说明系数环/域；多项式除法、唯一分解和根数界须核对底层代数结构。",
+     "State the coefficient ring or field when using divisibility, the factor theorem, root multiplicity or irreducibility. Polynomial division, unique factorization and root bounds depend on the underlying algebraic structure.",
+     ("mit_algebra", "mit_number_theory")),
+    ("geometry", "欧氏几何与几何变换", "Euclidean geometry and geometric transformations",
+     "几何证明须明确使用的公理、定义、角度/长度关系和构造条件；相似、全等、平行、垂直和圆幂等结论要核对对应判定条件。图形仅用于辅助，不以视觉直观替代论证。",
+     "State the geometric axioms, definitions, angle/length relations and construction assumptions. Verify the criteria for similarity, congruence, parallelism, perpendicularity and power-of-a-point arguments. A diagram is auxiliary, not a substitute for proof.",
+     ("ams", "hep_discrete")),
+    ("optimization", "凸性与最优化证明", "Convexity and optimization proofs",
+     "证明凸性须回到定义或等价判据；证明极小点/极大点或最优性条件时核对可行域、可微性、凸性和约束资格条件。KKT 条件不能脱离假设当作充分必要条件。",
+     "Prove convexity from its definition or a valid equivalent criterion. For optimality, verify feasibility, differentiability, convexity and constraint qualifications. KKT conditions are not automatically necessary and sufficient without their hypotheses.",
+     ("mit_optimization", "mit_real_analysis")),
+    ("ode", "微分方程存在性与唯一性", "Existence and uniqueness for differential equations",
+     "使用 Picard-Lindelöf 等存在唯一性定理时明确初值问题、定义域、连续性及 Lipschitz 条件；局部解与全局解必须区分，不能由数值轨迹推出唯一性。",
+     "State the initial-value problem and verify continuity and Lipschitz hypotheses before applying Picard-Lindelof. Distinguish local from global existence; numerical trajectories do not prove uniqueness.",
+     ("mit_real_analysis",)),
+    ("cardinality", "有限集、可数性与基数", "Finite sets, countability and cardinality",
+     "证明集合等势时给出双射；证明可数时给出枚举或注入到自然数的映射；证明不可数时使用对角线或其他有效论证，并说明映射的定义域和值域。",
+     "For equipotence, construct a bijection. For countability, give an enumeration or injection into the natural numbers. For uncountability, use a valid diagonal or other argument and state the map's domain and codomain.",
+     ("hammack", "mit_real_analysis")),
+    ("multivariable_calculus", "多元微积分与向量分析", "Multivariable calculus and vector analysis",
+     "多元极限须处理路径依赖并区分逐路径验证与完整证明；链式法则、隐函数/反函数定理、Green/Stokes/Gauss 定理须核对可微性、区域边界、方向和正则性条件。",
+     "A multivariable limit proof must address path dependence; checking selected paths alone cannot establish a limit. Verify differentiability, boundary regularity, orientation and domain hypotheses for chain rule, implicit/inverse function theorems and Green/Stokes/divergence theorems.",
+     ("mit_real_analysis", "mit_metric")),
+    ("complex_analysis", "复分析基础证明", "Introductory complex analysis",
+     "复可微、解析、Cauchy 积分定理/公式、幂级数和留数结论须核对区域连通性、解析性及曲线条件；不能直接把实变量微积分结论照搬到复平面。",
+     "Check domain connectivity, analyticity and contour hypotheses for complex differentiability, Cauchy's theorem/formula, power series and residues. Real-variable calculus results cannot be transferred to the complex plane without justification.",
+     ("ams", "mit_real_analysis")),
+    ("convexity_optimization", "凸分析与对偶性", "Convex analysis and duality",
+     "对偶性和最优性证明应明确原问题与对偶问题、弱/强对偶的条件及可行性；不能把弱对偶直接升级为强对偶，也不能忽略 Slater 等约束资格条件。",
+     "State the primal and dual problems and the hypotheses for weak and strong duality. Do not infer strong duality from weak duality or omit constraint qualifications such as Slater's condition.",
+     ("mit_optimization",)),
 )
+
+# Proof methods are separate from subject domains: a domain may require several methods.
+PROOF_METHODS = (
+    ("direct", "直接证明", "Direct proof", "从假设按有效推理推出结论。", "Derive the target from the hypotheses by valid steps."),
+    ("contrapositive", "逆否证明", "Proof by contrapositive", "证明等价的逆否命题，不误用逆命题。", "Prove the equivalent contrapositive, not the converse."),
+    ("contradiction", "反证法", "Proof by contradiction", "在原假设下否定准确的目标并导出矛盾。", "Negate the actual target under the original hypotheses and derive a contradiction."),
+    ("cases", "分类讨论", "Proof by cases", "情形彼此清楚且覆盖全部可能性。", "Make cases clear and exhaustive."),
+    ("construction", "构造性证明", "Constructive proof", "明确构造对象并逐项验证性质。", "Construct a witness explicitly and verify its properties."),
+    ("existence", "非构造存在性", "Nonconstructive existence proof", "说明定理或逻辑依据如何保证对象存在。", "Explain which theorem or argument guarantees existence."),
+    ("uniqueness", "唯一性证明", "Uniqueness proof", "任取两个满足条件的对象并证明相等。", "Take any two witnesses and prove they are equal."),
+    ("weak_induction", "普通数学归纳法", "Weak induction", "明确起点、归纳假设和下一步。", "State the base case, induction hypothesis and successor step."),
+    ("strong_induction", "强归纳法", "Strong induction", "说明可使用的所有较小指标。", "State exactly which earlier indices may be used."),
+    ("structural_induction", "结构归纳法", "Structural induction", "覆盖每一种基本构造和递归构造。", "Cover every base constructor and recursive constructor."),
+    ("minimal_counterexample", "最小反例法", "Minimal-counterexample method", "证明最小反例存在，并从其最小性推出矛盾。", "Establish a minimal counterexample and use its minimality to derive a contradiction."),
+    ("infinite_descent", "无穷递降法", "Infinite descent", "构造严格下降的良基量，排除无限递降。", "Construct a strictly decreasing well-founded measure, ruling out infinite descent."),
+    ("bijection", "双射证明", "Bijective proof", "给出映射并证明可逆或双射。", "Define the map and prove it is bijective or invertible."),
+    ("double_counting", "双重计数", "Double counting", "从两种方式计数同一对象集合。", "Count the same collection in two justified ways."),
+    ("pigeonhole", "抽屉原理证明", "Pigeonhole argument", "明确对象、抽屉及数量界。", "Specify objects, boxes and cardinality bounds."),
+    ("extremal", "极值原理", "Extremal argument", "证明极值对象存在，再利用其极值性质。", "Establish an extremal object and exploit its extremal property."),
+    ("invariant", "不变量证明", "Invariant proof", "证明初始化、保持和退出结论。", "Prove initialization, preservation and the exit implication."),
+    ("probabilistic", "概率方法", "Probabilistic method", "由概率界严格推出存在或高概率性质。", "Derive existence or high-probability claims from valid probability bounds."),
+    ("epsilon_delta", "ε-δ 证明", "Epsilon-delta proof", "遵守量词顺序并构造合法 δ。", "Respect quantifier order and construct a valid delta."),
+    ("sequential", "序列刻画证明", "Sequential-characterization proof", "确认所在空间中序列刻画定理的适用条件。", "Verify that the sequential characterization applies in the given space."),
+    ("open_cover", "开覆盖证明", "Open-cover proof", "构造开覆盖并使用有限子覆盖性质。", "Construct an open cover and use the finite-subcover property."),
+    ("algebraic", "代数恒等变形证明", "Algebraic identity proof", "每步等式使用合法运算并核对定义域。", "Justify each identity transformation and verify domains."),
+    ("equivalence_chain", "等价链证明", "Equivalence-chain proof", "逐步证明每个等价变形方向成立。", "Justify both directions of every equivalence step."),
+)
+
 
 # id, Chinese expression, English expression, semantic caution (Chinese / English).
 PROOF_GLOSSARY = (
@@ -166,6 +309,13 @@ def proof_coverage_prompt(language="zh-CN"):
     for index, (_, title_zh, title_en, rule_zh, rule_en, _) in enumerate(PROOF_DOMAINS, 1):
         title, rule = (title_en, rule_en) if english else (title_zh, rule_zh)
         lines.append(f"{index}. {title}：{rule}" if not english else f"{index}. {title}: {rule}")
+    method_heading = (
+        "[Proof-method selection checklist; select methods from the proposition's structure]"
+        if english else "【证明方法选择清单｜根据命题结构选择，不机械套用】"
+    )
+    lines.append(method_heading)
+    for key, zh, en, caution_zh, caution_en in PROOF_METHODS:
+        lines.append(f"{en}: {caution_en}" if english else f"{zh}：{caution_zh}")
     lines.append(
         "[Bilingual terminology cross-check; use the correct natural expression, never mechanical translation]"
         if english else "【中英文术语语义对照｜用自然的语言，不逐字硬译】"

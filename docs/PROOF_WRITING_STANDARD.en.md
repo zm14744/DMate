@@ -86,3 +86,48 @@ Avoid unnatural translations such as "According to the meaning of the question" 
 | [Companion exercise and solutions volume](https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=66ca132674ce561611bda659) | Public curriculum/exercise-scope reference; the full copyrighted book has not been audited |
 
 Authority belongs to the referenced institutions and authors. **They have not endorsed DMate or verified any individual AI-generated proof.** CI tests verify parity of the instructions, source IDs and integration; semantic correctness of real English or Chinese model outputs still requires independent, bilingual evaluations. The guidance is an original synthesis of mathematical proof-writing principles; it does not reproduce the textbooks' protected solutions, long passages or exercises and does not imply a commercial redistribution license.
+
+
+## Expanded subject coverage (version 2.1)
+
+Beyond discrete mathematics and algorithms, the shared rule registry now includes the following subject-specific domains. Each has a stable rule ID and paired Chinese/English guidance:
+
+| Rule ID | Subject |
+| --- | --- |
+| `number_theory` | Number theory and divisibility |
+| `congruences` | Congruences and the Chinese remainder theorem |
+| `inequalities` | Inequalities and extremal estimates |
+| `real_completeness` | Completeness of the real numbers and suprema |
+| `sequences_series` | Sequences, series and convergence |
+| `epsilon_delta` | Epsilon-delta limit proofs |
+| `continuity` | Continuity and uniform continuity |
+| `differentiation` | Differentiation, mean value theorems and Taylor expansion |
+| `integration` | Riemann integration and the fundamental theorem of calculus |
+| `metric_topology` | Metric spaces and topology |
+| `linear_algebra` | Vector spaces, bases and dimension |
+| `matrices_eigen` | Matrices, linear maps and eigenvalues |
+| `polynomial_algebra` | Polynomials and algebraic equations |
+| `geometry` | Euclidean geometry and transformations |
+| `optimization` | Convexity and optimization |
+| `ode` | Existence and uniqueness for differential equations |
+| `cardinality` | Finite sets, countability and cardinality |
+| `multivariable_calculus` | Multivariable calculus and vector analysis |
+| `complex_analysis` | Introductory complex analysis |
+| `convexity_optimization` | Convex analysis and duality |
+
+## Proof-method coverage
+
+Subject domains and proof methods are tracked separately: one subject may require several methods, and a method may apply across many subjects. The shared method checklist includes:
+
+Direct proof, contrapositive, contradiction, proof by cases, constructive proof, nonconstructive existence, uniqueness, weak induction, strong induction, structural induction, minimal counterexample, infinite descent, bijection, double counting, pigeonhole, extremal arguments, invariants, probabilistic method, epsilon-delta, sequential characterization, open-cover proof, algebraic identity proof and equivalence chains.
+
+## Additional authoritative course sources
+
+- [MIT 18.100B Real Analysis (Spring 2025)](https://ocw.mit.edu/courses/18-100b-real-analysis-spring-2025/pages/lecture-notes/): proof writing, completeness, sequences and series, continuity, metric spaces, differentiation, integration, uniform convergence and ODE existence/uniqueness.
+- [MIT 18.781 Theory of Numbers](https://ocw.mit.edu/courses/18-781-theory-of-numbers-spring-2012/pages/lecture-notes/): divisibility, primes, gcd, Euclidean algorithm, congruences, CRT, Diophantine equations and descent.
+- [MIT 18.06 Linear Algebra](https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/): independence, bases, dimension, linear transformations, matrices and eigenvalues.
+- [MIT 18.703 Modern Algebra](https://ocw.mit.edu/courses/18-703-modern-algebra-spring-2013/pages/lecture-notes/): groups, subgroups, quotient groups, homomorphisms, rings, ideals, fields and polynomial rings.
+- [MIT 18.S190 Introduction to Metric Spaces](https://ocw.mit.edu/courses/18-s190-introduction-to-metric-spaces-january-iap-2023/pages/lecture-notes/): metric spaces, completeness, compactness and topology.
+- [MIT 6.7220J/15.084 Nonlinear Optimization](https://ocw.mit.edu/courses/6-7220j-nonlinear-optimization-spring-2025/): convexity and optimization conditions.
+
+**Coverage boundary:** The standard targets core undergraduate mathematics, discrete mathematics, algorithms and selected upper-level foundational courses. It is substantially broader, but it does not claim to exhaust every mathematical discipline, research specialty or formal axiomatic system. For a topic not listed explicitly, the model must still obey the general standards for logic, definitions, quantifiers and valid inference; lack of a dedicated checklist is not a reason to reject a valid proof.
