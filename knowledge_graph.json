@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1399,7 +1399,38 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "trevtutor",
+          "title": "Pigeonhole Principle — TrevTutor",
+          "sections": [
+            "Pigeonhole Principle — TrevTutor"
+          ],
+          "lessons": [
+            {
+              "title": "Pigeonhole Principle — TrevTutor",
+              "url": "https://www.youtube.com/watch?v=2-mxYrCNX60"
+            }
+          ],
+          "verification": "已核对原频道单集标题与讲师身份",
+          "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "Pigeonhole Principle: Worked Examples",
+          "sections": [
+            "Pigeonhole Principle: Worked Examples"
+          ],
+          "lessons": [
+            {
+              "title": "Pigeonhole Principle: Worked Examples",
+              "url": "https://www.youtube.com/watch?v=pPuvnD4PYNE"
+            }
+          ],
+          "verification": "已核对原频道单集标题与讲师身份",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "count_inclusion",
@@ -1435,7 +1466,38 @@
         "递推关系建模",
         "排列与组合"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "3blue1brown",
+          "title": "Olympiad Level Counting: Generating Functions（动画推导）",
+          "sections": [
+            "Olympiad Level Counting: Generating Functions（动画推导）"
+          ],
+          "lessons": [
+            {
+              "title": "Olympiad Level Counting: Generating Functions（动画推导）",
+              "url": "https://www.youtube.com/watch?v=bOXCLR3Wric"
+            }
+          ],
+          "verification": "已核对原频道单集标题与讲师身份",
+          "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "Generating Functions（定义与例题）",
+          "sections": [
+            "Generating Functions（定义与例题）"
+          ],
+          "lessons": [
+            {
+              "title": "Generating Functions（定义与例题）",
+              "url": "https://www.youtube.com/watch?v=-drdeNMoe8w"
+            }
+          ],
+          "verification": "已核对原频道单集标题与讲师身份",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "recurrence_model",
@@ -2547,6 +2609,20 @@
       "course": "2025 离散数学课堂实录",
       "platform": "哔哩哔哩",
       "note": "真实课堂录制；避开目录中明确标注无声或音质差的第28、29、34、35课及原23号无声段。"
+    },
+    {
+      "id": "trevtutor",
+      "name": "TrevTutor（离散数学讲师）",
+      "course": "Discrete Mathematics I & II",
+      "platform": "YouTube",
+      "note": "原频道可查证讲师、课程大纲、例题推导；链接为具体视频。"
+    },
+    {
+      "id": "3blue1brown",
+      "name": "3Blue1Brown · Grant Sanderson",
+      "course": "Visual Mathematics",
+      "platform": "YouTube",
+      "note": "通过动画推演组合计数的生成函数，非PPT朗读。"
     }
   ],
   "video_resource_policy": {
