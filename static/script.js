@@ -22961,3 +22961,27 @@ document.addEventListener(
         }
     }
 );
+
+
+// 离线工作区只读取当前页面已经通过账号验证、或当前游客会话中的学习数据。
+// 不从 localStorage 的旧账号标记推断身份，也不上传这份快照。
+window.DMateOfflineBridge = Object.freeze({
+    snapshot() {
+        const wrongQuestions = Array.isArray(learningState?.wrongQuestions)
+            ? JSON.parse(JSON.stringify(learningState.wrongQuestions)) : [];
+        const notes = Array.isArray(learningState?.conceptNotebook?.notes)
+            ? JSON.parse(JSON.stringify(learningState.conceptNotebook.notes)) : [];
+        let drawings = [];
+        try {
+            drawings = typeof collectLearningReviewDrawings === "function"
+                ? collectLearningReviewDrawings() : [];
+        } catch (_error) {}
+        return {
+            authenticated: Boolean(accountState.authenticated && accountState.username),
+            username: accountState.authenticated ? accountState.username : "",
+            wrongQuestions,
+            notes,
+            drawings: Array.isArray(drawings) ? JSON.parse(JSON.stringify(drawings)) : []
+        };
+    }
+});

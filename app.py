@@ -2410,6 +2410,26 @@ def retire_legacy_dmate_service_worker():
     return response
 
 
+@app.route("/offline")
+def offline_learning_workspace():
+    """Serve the self-contained local learning workspace."""
+    response = app.send_static_file("offline.html")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@app.route("/offline-service-worker.js")
+def offline_learning_service_worker():
+    """Serve the offline worker at the origin root so it can control navigation."""
+    response = app.send_static_file("offline-service-worker.js")
+    response.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @app.route("/web-version")
 def web_application_revision():
     """Report the live deployed web/backend revision without caching."""
