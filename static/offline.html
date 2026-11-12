@@ -4,12 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f7f8fa">
-<title>DMate 离线学习工作区</title>
-<link rel="stylesheet" href="/static/offline.css?v=1">
+<meta name="theme-color" content="#f8fafc">
+<title>DMate - 离散数学智能辅学系统</title>
+<script>
+/* 首帧直接沿用 DMate 当前设备的外观设置，避免离线工作区闪现另一套主题。 */
+(function () {
+  try {
+    var settings = JSON.parse(localStorage.getItem("dmate:offline:appearance:v1") || "null") || {};
+    var mode = ["light","dark","navy"].includes(settings.mode) ? settings.mode
+      : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    var root = document.documentElement;
+    root.dataset.appearanceTheme = mode;
+    root.style.colorScheme = mode === "light" ? "only light" : "dark";
+    var accents = {
+      blue:["#3b82f6","59,130,246","#2563eb","#1d4ed8","#60a5fa","#93c5fd"],
+      purple:["#8b5cf6","139,92,246","#7c3aed","#6d28d9","#a78bfa","#c4b5fd"],
+      teal:["#14b8a6","20,184,166","#0d9488","#0f766e","#5eead4","#99f6e4"]
+    };
+    var accent = accents[settings.accent] || accents.blue;
+    ["--accent","--accent-rgb","--accent-deep","--accent-deeper","--accent-soft","--accent-pale"]
+      .forEach(function (key,index) { root.style.setProperty(key,accent[index]); });
+    root.style.setProperty("--accent-bg","rgba("+accent[1]+",.22)");
+    root.style.setProperty("--font-scale",settings.fontSize === "small" ? ".92" : settings.fontSize === "large" ? "1.08" : "1");
+    root.style.setProperty("--panel-alpha",String((Number(settings.panelOpacity) || 100)/100));
+    root.style.setProperty("--bubble-alpha",String((Number(settings.bubbleOpacity) || 100)/100));
+  } catch (_) {}
+})();
+</script>
+<link rel="stylesheet" href="/static/dmate-main.css?v=1">
+<link rel="stylesheet" href="/static/desktop-shell.css">
 <link rel="stylesheet" href="/static/graph-editor.css">
 <link rel="stylesheet" href="/static/drawing-workspace.css">
 <link rel="stylesheet" href="/static/modal-chrome.css">
+<link rel="stylesheet" href="/static/offline.css?v=2">
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js"></script>
 <script defer src="/static/graph-editor-overlay.js"></script>
@@ -18,40 +45,69 @@
 <script defer src="/static/drawing-export.js"></script>
 <script defer src="/static/graph-editor.js"></script>
 <script defer src="/static/drawing-workspace.js"></script>
-<script defer src="/static/offline.js?v=1"></script>
+<script defer src="/static/offline.js?v=2"></script>
 </head>
-<body>
-<div class="offline-shell">
-  <aside class="offline-sidebar">
-    <a class="offline-brand" href="/offline" aria-label="DMate 离线学习工作区">
-      <span class="offline-mark">D</span>
-      <span><strong>DMate</strong><small>OFFLINE WORKSPACE</small></span>
-    </a>
-    <div class="offline-status" id="networkStatus" role="status"><span class="status-dot"></span><span>正在检查网络</span></div>
+<body data-appearance-theme="light">
+<div id="appearanceBackgroundLayer" class="appearance-background-layer" aria-hidden="true"></div>
+<div class="appearance-mask-layer" aria-hidden="true"></div>
+
+<div class="layout offline-layout">
+  <aside class="left offline-sidebar">
+    <div class="dmate-brand" aria-label="DMate - 离散数学智能辅学系统">
+      <img class="dmate-brand-mark" src="/static/icons/dmate-brand-v52.svg" width="38" height="38" alt="DMate 图标">
+      <div class="dmate-brand-copy">
+        <h1 class="dmate-brand-name">DMate</h1>
+        <div class="dmate-brand-subtitle">离散数学智能辅学系统</div>
+      </div>
+    </div>
+
+    <div class="offline-sidebar-heading">离线学习</div>
     <nav class="offline-nav" aria-label="离线学习模块">
-      <button type="button" class="offline-nav-item active" data-panel="mistakes">错题本</button>
-      <button type="button" class="offline-nav-item" data-panel="notes">概念笔记</button>
-      <button type="button" class="offline-nav-item" data-panel="drawing">独立绘图</button>
-      <button type="button" class="offline-nav-item" data-panel="graph">知识图谱</button>
-      <button type="button" class="offline-nav-item" data-panel="questions">题库</button>
-      <button type="button" class="offline-nav-item" data-panel="concepts">概念库</button>
+      <button type="button" class="offline-nav-item active" data-panel="mistakes">
+        <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 7.5-5 5"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="m9.5 7.5 5 5"/></svg>
+        <span>错题本</span>
+      </button>
+      <button type="button" class="offline-nav-item" data-panel="notes">
+        <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>
+        <span>概念笔记</span>
+      </button>
+      <button type="button" class="offline-nav-item" data-panel="drawing">
+        <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 7 8.7 2.7a2.41 2.41 0 0 0-3.4 0L2.7 5.3a2.41 2.41 0 0 0 0 3.4L7 13"/><path d="m8 6 2-2"/><path d="m18 16 2-2"/><path d="m17 11 4.3 4.3c.94.94.94 2.46 0 3.4l-2.6 2.6c-.94.94-2.46.94-3.4 0L11 17"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+        <span>独立绘图</span>
+      </button>
+      <button type="button" class="offline-nav-item" data-panel="graph">
+        <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+        <span>知识图谱</span>
+      </button>
+      <button type="button" class="offline-nav-item" data-panel="questions">
+        <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 1 4 17.5z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/><path d="M8 7h8"/><path d="M8 10h6"/></svg>
+        <span>题库</span>
+      </button>
+      <button type="button" class="offline-nav-item" data-panel="concepts">
+        <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8"/><path d="M8 11h8"/></svg>
+        <span>概念库</span>
+      </button>
     </nav>
+
     <div class="offline-sidebar-bottom">
-      <div class="offline-local-note">学习记录保存在本机。离线编辑不会丢失；网络恢复后可返回在线版继续使用云端服务。</div>
-      <button type="button" id="returnOnline" class="offline-return">返回在线版</button>
+      <div class="offline-status" id="networkStatus" role="status"><span class="status-dot"></span><span>正在检查网络</span></div>
+      <button type="button" id="returnOnline" class="btn offline-return">
+        <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h12"/><path d="M3 5v14"/></svg>
+        <span>返回在线版</span>
+      </button>
     </div>
   </aside>
 
-  <main class="offline-main">
+  <main class="center offline-main">
     <header class="offline-header">
       <div>
-        <div class="offline-eyebrow">DMATE / LOCAL LEARNING</div>
+        <div class="offline-eyebrow">DMate / 离线学习</div>
         <h1 id="panelTitle">错题本</h1>
         <p id="panelDescription">在本机查看、整理和复习已保存的错题。</p>
       </div>
       <div class="offline-header-actions">
         <span class="offline-save-state" id="saveState">本地保存已启用</span>
-        <button type="button" id="exportLocalData" class="offline-quiet-button">导出本地数据</button>
+        <button type="button" id="exportLocalData" class="btn offline-export">导出本地数据</button>
       </div>
     </header>
 
@@ -121,16 +177,21 @@
   </main>
 </div>
 
-<dialog id="recordDialog" class="offline-dialog">
-  <form id="recordForm" class="offline-form">
-    <h2 id="recordDialogTitle">添加记录</h2>
-    <label>标题<input id="recordTitle" maxlength="160" required></label>
-    <label>内容<textarea id="recordContent" rows="9" maxlength="12000" required></textarea></label>
-    <div class="offline-dialog-actions">
-      <button type="button" class="offline-quiet-button" id="cancelRecord">取消</button>
-      <button type="submit" class="offline-primary">保存到本机</button>
+<dialog id="recordDialog" class="modal hidden offline-dialog">
+  <div class="modal-card offline-form">
+    <div class="modal-head">
+      <div id="recordDialogTitle">添加记录</div>
+      <button type="button" class="modal-close-dot" id="cancelRecord" aria-label="关闭" title="关闭"></button>
     </div>
-  </form>
+    <form id="recordForm">
+      <label>标题<input id="recordTitle" maxlength="160" required></label>
+      <label>内容<textarea id="recordContent" rows="9" maxlength="12000" required></textarea></label>
+      <div class="offline-dialog-actions">
+        <button type="button" class="btn" id="cancelRecordSecondary">取消</button>
+        <button type="submit" class="offline-primary">保存到本机</button>
+      </div>
+    </form>
+  </div>
 </dialog>
 <div class="offline-toast" id="offlineToast" role="status" hidden></div>
 </body>
