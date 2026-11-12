@@ -223,7 +223,9 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    const header=el('div','ddw-panel-header');header.append(el('h3','',panelMode==='history'?'历史绘图':'AI指导'));panel.append(header);
    if(panelMode==='history'){
     const list=el('div','ddw-history-list');
-    pages.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(p=>{
+    // The persisted array is the creation order; visiting or editing a page
+    // must not move any of the history controls under the user's pointer.
+    pages.forEach(p=>{
      const row=el('div','ddw-history-item'+(p.id===activeId?' is-current':'')),open=button(p.name,()=>switchPage(p.id),'ddw-history-open');
      open.setAttribute('data-i18n-content','');
      open.setAttribute('aria-current',String(p.id===activeId));
