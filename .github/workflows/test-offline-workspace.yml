@@ -8,6 +8,7 @@ on:
       - 'static/**'
       - 'scripts/sync_offline_styles.py'
       - 'scripts/sync_offline_shell.py'
+      - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
@@ -22,6 +23,7 @@ on:
       - 'static/**'
       - 'scripts/sync_offline_styles.py'
       - 'scripts/sync_offline_shell.py'
+      - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
@@ -108,6 +110,12 @@ jobs:
           python -m pip install -r requirements.txt
           npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
           npx playwright install --with-deps chromium
+      - name: Verify the original favicon is identical on every platform
+        env:
+          OMP_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+        run: python scripts/test_favicon_consistency.py
       - name: Start the application
         env:
           PORT: '5000'

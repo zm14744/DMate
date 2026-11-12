@@ -2,7 +2,7 @@
 """Keep the offline shell and dialogs identical to the online template.
 
 The offline HTML contains ``<!-- BEGIN ONLINE NAME -->`` / ``<!-- END ONLINE
-NAME -->`` pairs. The required names are STYLES, SHELL, APPEARANCE, BACKGROUND
+NAME -->`` pairs. The required names are FAVICON, STYLES, SHELL, APPEARANCE, BACKGROUND
 VIEWER and KNOWLEDGE GRAPH. Optional pairs are WRONG BOOK, DRAWING DIALOG and
 LEARNING REVIEW. Run normally to update them, or use --check in CI.
 
@@ -21,7 +21,7 @@ VOID_TAGS = {
     'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
     'meta', 'param', 'source', 'track', 'wbr',
 }
-REQUIRED = ('STYLES', 'SHELL', 'APPEARANCE', 'BACKGROUND VIEWER', 'KNOWLEDGE GRAPH')
+REQUIRED = ('FAVICON', 'STYLES', 'SHELL', 'APPEARANCE', 'BACKGROUND VIEWER', 'KNOWLEDGE GRAPH')
 ASSET_VERSION = '6'
 ELEMENT_IDS = {
     'APPEARANCE': 'appearanceModal',
@@ -163,7 +163,9 @@ def sync(online, offline):
         pattern = re.compile(re.escape(begin) + r'[\s\S]*?' + re.escape(end))
         if not pattern.search(offline):
             raise ValueError('Online marker pair is out of order: ' + name)
-        if name == 'STYLES':
+        if name == 'FAVICON':
+            fragment = re.search(r'<!-- BEGIN SHARED FAVICON -->([\s\S]*?)<!-- END SHARED FAVICON -->', online).group(1)
+        elif name == 'STYLES':
             fragment = styles_fragment(parsed)
         elif name == 'SHELL':
             fragment = shell_fragment(parsed.extract(layout=True))

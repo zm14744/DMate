@@ -5,13 +5,8 @@ on:
     branches: [main]
     paths:
       - "scripts/generate_icons.py"
-      - "templates/index.html"
-      - "app.py"
-      - "static/script.js"
-      - "static/icons/**"
-      - "desktop/src-tauri/icons/**"
-      - "android/app/src/main/res/**"
-      - ".github/workflows/sync-icon-assets.yml"
+      # Page and favicon reference changes must preserve existing icon bytes.
+      # Regenerate native/platform artwork only when its generator changes.
 permissions:
   contents: write
 jobs:
