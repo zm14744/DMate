@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 13,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -111,7 +111,7 @@
           ],
           "lessons": [
             {
-              "title": "Truth Tables",
+              "title": "Truth Tables: Negation, Conjunction, Disjunction",
               "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=11"
             },
             {
@@ -124,13 +124,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Truth Tables",
+          "title": "Truth Tables: Negation, Conjunction and Disjunction",
           "sections": [
-            "Truth Tables"
+            "Truth Tables: Negation, Conjunction and Disjunction"
           ],
           "lessons": [
             {
-              "title": "Truth Tables",
+              "title": "Truth Tables: Negation, Conjunction and Disjunction",
               "url": "https://www.youtube.com/watch?v=7mulE-zramc"
             }
           ],
@@ -1635,13 +1635,13 @@
         },
         {
           "source_id": "blue1brown",
-          "title": "Generating Functions · Olympiad Level Counting",
+          "title": "Olympiad level counting (Generating functions)",
           "sections": [
-            "Generating Functions · Olympiad Level Counting"
+            "Olympiad level counting (Generating functions)"
           ],
           "lessons": [
             {
-              "title": "Generating Functions · Olympiad Level Counting",
+              "title": "Olympiad level counting (Generating functions)",
               "url": "https://www.youtube.com/watch?v=bOXCLR3Wric"
             }
           ],
@@ -2284,13 +2284,13 @@
       "videos": [
         {
           "source_id": "william_fiset",
-          "title": "Dijkstra's Shortest Path Algorithm",
+          "title": "Dijkstra Shortest Path Algorithm | Graph Theory",
           "sections": [
-            "Dijkstra's Shortest Path Algorithm"
+            "Dijkstra Shortest Path Algorithm | Graph Theory"
           ],
           "lessons": [
             {
-              "title": "Dijkstra's Shortest Path Algorithm",
+              "title": "Dijkstra Shortest Path Algorithm | Graph Theory",
               "url": "https://www.youtube.com/watch?v=pSqmAO-m7Lk"
             }
           ],
@@ -2772,15 +2772,15 @@
       "videos": [
         {
           "source_id": "steve_butler_spectral",
-          "title": "Matrix Tree Theorem",
+          "title": "(Spectral; Fall 23) 16 - Matrix Tree Theorem",
           "sections": [
-            "Matrix Tree Theorem"
+            "(Spectral; Fall 23) 16 - Matrix Tree Theorem"
           ],
           "verification": "已在教师官方2023年谱图理论课程页面核对第16讲YouTube直达视频",
           "note": "拓展节点。官方YouTube单集视频为英文授课，从拉普拉斯矩阵引出矩阵树定理；原Vimeo地址404，已弃用。",
           "lessons": [
             {
-              "title": "Matrix Tree Theorem",
+              "title": "(Spectral; Fall 23) 16 - Matrix Tree Theorem",
               "url": "https://www.youtube.com/watch?v=AcVPX2JOM1U"
             }
           ]
@@ -3022,238 +3022,272 @@
       "name": "辛辛那提大学 · Trefor Bazett",
       "course": "Discrete Mathematics（板书推导与例题）",
       "platform": "Bilibili",
-      "note": "授课者署名明确；用具体分P视频，不使用课程首页。"
+      "note": "授课者署名明确；用具体分P视频，不使用课程首页。",
+      "publisher": "ShowMeAI"
     },
     {
       "id": "trefor_youtube",
       "name": "辛辛那提大学 · Dr. Trefor Bazett",
       "course": "Discrete Mathematics（教师本人频道）",
       "platform": "YouTube",
-      "note": "讲师本人讲解并逐步推导；仅使用独立视频链接。"
+      "note": "讲师本人讲解并逐步推导；仅使用独立视频链接。",
+      "publisher": "Trefor Bazett"
     },
     {
       "id": "socratica_bilibili",
       "name": "Socratica · 数学动画团队",
       "course": "Abstract Algebra（动画解释）",
       "platform": "Bilibili",
-      "note": "有明确制作团队，动画+讲解；B站镜像分P直达。"
+      "note": "有明确制作团队，动画+讲解；B站镜像分P直达。",
+      "publisher": ""
     },
     {
       "id": "socratica_youtube",
       "name": "Socratica · 数学动画团队",
       "course": "Abstract Algebra（原创教学视频）",
       "platform": "YouTube",
-      "note": "明确制作团队的原创教学视频；图示讲解，不是念PPT。"
+      "note": "明确制作团队的原创教学视频；图示讲解，不是念PPT。",
+      "publisher": "Socratica"
     },
     {
       "id": "liu_math",
       "name": "刘币老师 · 数学专题",
       "course": "初等数论（推导与例题）",
       "platform": "Bilibili",
-      "note": "有明确署名的原创授课讲解。"
+      "note": "有明确署名的原创授课讲解。",
+      "publisher": ""
     },
     {
       "id": "ucsd_discrete",
       "name": "加州大学圣迭戈分校（UCSD）",
       "course": "Discrete Mathematics（Coursera短视频课程）",
       "platform": "Bilibili",
-      "note": "大学公开课视频，配图解讲解；B站为中文字幕转载，字幕质量不保证。"
+      "note": "大学公开课视频，配图解讲解；B站为中文字幕转载，字幕质量不保证。",
+      "publisher": ""
     },
     {
       "id": "william_fiset",
       "name": "William Fiset · 图论算法讲师",
       "course": "Graph Theory（算法可视化与实现）",
       "platform": "YouTube",
-      "note": "讲师署名明确，讲算法逻辑与实例、不是朗读幻灯片。"
+      "note": "讲师署名明确，讲算法逻辑与实例、不是朗读幻灯片。",
+      "publisher": "WilliamFiset"
     },
     {
       "id": "steve_butler_spectral",
       "name": "艾奥瓦州立大学 · Steve Butler",
       "course": "Spectral Graph Theory Lecture 16",
       "platform": "YouTube",
-      "note": "教师授课官方单集，讲授矩阵树定理。"
+      "note": "教师授课官方单集，讲授矩阵树定理。",
+      "publisher": "Steve Butler"
     },
     {
       "id": "sawfin_bilibili",
       "name": "Kimberly Brehm · 离散数学讲师",
       "course": "Discrete Math I（完整课程高清转载）",
       "platform": "Bilibili",
-      "note": "含题目推演与例题演示的正式教学视频，B站按明确的分P章节定位。"
+      "note": "含题目推演与例题演示的正式教学视频，B站按明确的分P章节定位。",
+      "publisher": ""
     },
     {
       "id": "sawfin_youtube",
       "name": "Kimberly Brehm · SawFin Mathematics",
       "course": "Discrete Math I & II（本人原创授课）",
       "platform": "YouTube",
-      "note": "采用分步骤讲解与练习，附课件但不是单纯朗读PPT；明确讲师与章节。"
+      "note": "采用分步骤讲解与练习，附课件但不是单纯朗读PPT；明确讲师与章节。",
+      "publisher": "Kimberly Brehm"
     },
     {
       "id": "trevtutor",
       "name": "TrevTutor · Trevor（离散数学讲师）",
       "course": "Discrete Mathematics II",
       "platform": "YouTube",
-      "note": "原讲师网站逐项提供本课程单集，含讲解、例题和演算过程。"
+      "note": "原讲师网站逐项提供本课程单集，含讲解、例题和演算过程。",
+      "publisher": "TrevTutor"
     },
     {
       "id": "zjut_class2025",
       "name": "浙江工业大学 · 小花醉猫（教师）",
       "course": "2025离散数学课堂实录",
       "platform": "Bilibili",
-      "note": "教师本人发布的课堂实录，避免目录标注无声或音效不佳的原视频分段。"
+      "note": "教师本人发布的课堂实录，避免目录标注无声或音效不佳的原视频分段。",
+      "publisher": "小花醉猫"
     },
     {
       "id": "blue1brown",
       "name": "3Blue1Brown · Grant Sanderson",
       "course": "Olympiad Level Counting / Generating Functions",
       "platform": "YouTube",
-      "note": "制作团队明确，数学动画与推导示例；视频为独立专题。"
+      "note": "制作团队明确，数学动画与推导示例；视频为独立专题。",
+      "publisher": "3Blue1Brown"
     },
     {
       "id": "numberphile_visual",
       "name": "Numberphile · Tadashi Tokieda",
       "course": "数学概念实物演示",
       "platform": "YouTube",
-      "note": "有署名的数学家现场演示；只讲中国剩余定理的直观部分。"
+      "note": "有署名的数学家现场演示；只讲中国剩余定理的直观部分。",
+      "publisher": "Numberphile"
     },
     {
       "id": "art_of_the_problem",
       "name": "Art of the Problem · Brit Cruise",
       "course": "Cryptography 视觉化解说",
       "platform": "YouTube",
-      "note": "讲师、制作团队可确认，使用原创数学动画推导。"
+      "note": "讲师、制作团队可确认，使用原创数学动画推导。",
+      "publisher": "Art of the Problem"
     },
     {
       "id": "neso_academy",
       "name": "Neso Academy",
       "course": "网络安全与数论",
       "platform": "YouTube",
-      "note": "以概念演算与例题讲授欧拉定理。"
+      "note": "以概念演算与例题讲授欧拉定理。",
+      "publisher": "Neso Academy"
     },
     {
       "id": "khan_cs_labs",
       "name": "Khan Academy Labs · Brit Cruise",
       "course": "Journey into Cryptography",
       "platform": "YouTube",
-      "note": "用可视化珠串动画解释费马小定理。"
+      "note": "用可视化珠串动画解释费马小定理。",
+      "publisher": "Khan Academy"
     },
     {
       "id": "neu_discrete",
       "name": "东北大学 · 胡明涵、赵志滨等",
       "course": "离散数学（大学公开课）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "sjtu_crypto",
       "name": "上海交通大学 · 陈恭亮",
       "course": "信息安全数学基础（国家精品课）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "bili_rsa_course",
       "name": "现代密码学 · 我有一个小脑瓜",
       "course": "RSA 加密及数学基础讲解",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "cqu_discrete",
       "name": "重庆大学 · 刘然",
       "course": "离散数学及其应用（课程实录）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "combinatorics_bili",
       "name": "组合数学 · 系列课程",
       "course": "递推关系与组合数学专题",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "xtu_wangting",
       "name": "湘潭大学 · 王婷",
       "course": "离散数学·图论与组合数学",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "nju_chenggong",
       "name": "南京大学 · 程龚",
       "course": "图论与算法（大学课程）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "hit_graph_course",
       "name": "哈尔滨工业大学 · 图论公开课",
       "course": "离散数学之集合论与图论",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "wangshusen_bili",
       "name": "王树森 · 图论与图算法",
       "course": "图论算法视频教程",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "graph_animation_bili",
       "name": "动画讲解计算机知识",
       "course": "数据结构·图（动画讲解）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "pku_discrete",
       "name": "北京大学 · 王捍贫",
       "course": "离散数学（国家精品课）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "ucla_matrix_tree",
       "name": "UCLA · 组合数学公开课",
       "course": "矩阵树定理（课程单讲）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "uestc_lattice",
       "name": "电子科技大学 · 离散数学公开课",
       "course": "代数、群与格·布尔代数",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": ""
     },
     {
       "id": "numberphile_gcd",
       "name": "Numberphile · 数学科普团队",
       "course": "Euclid's Algorithm",
       "platform": "YouTube",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": "Numberphile"
     },
     {
       "id": "purohit_graph",
       "name": "Dr. Gajendra Purohit · 数学讲师",
       "course": "Graph Theory · Weighted Graphs",
       "platform": "YouTube",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": "Dr. Gajendra Purohit"
     },
     {
       "id": "morpheus_logic",
       "name": "The Morpheus Tutorials · 逻辑课程",
       "course": "Predicate Logic · Prenex Normal Form",
       "platform": "YouTube",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": "The Morpheus Tutorials"
     },
     {
       "id": "algos_attitude",
       "name": "Algorithms with Attitude · 算法讲师",
       "course": "Independent Set / Vertex Cover / Dominating Set",
       "platform": "YouTube",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
+      "publisher": "Algorithms with Attitude"
     }
   ],
   "video_resource_policy": {
