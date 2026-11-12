@@ -40,7 +40,9 @@ _PROMPT = """你是 DMate 的数学图结构解析器。你只负责把用户的
 1. graph：图论中的普通图、有向图、带权图、树、完全图、二部图、路径、回路、连通结构、生成树等。
 2. hasse：有限偏序集的哈斯图。vertices 给出元素，order_relations 给出用于定义偏序的严格小于关系边；只需给出能确定关系的边，程序会检查有向无环性并计算传递约简。
 3. cyclic_cayley：循环群 Z_n 的 Cayley 图。只输出 modulus 和 generators，群元素及边由程序根据模 n 加法计算。
-4. zero_divisor_graph：交换环 Z_n 的零因子图。只输出 modulus，非零零因子及相邻关系由程序根据模 n 乘法计算。
+4. cyclic_subgroup_lattice：循环群 Z_n 的子群格。只输出 modulus，程序根据 n 的因数计算全部子群及包含关系。
+5. ideal_lattice_zn：交换环 Z_n 的理想格。只输出 modulus，程序根据 n 的因数计算全部理想及包含关系。
+6. zero_divisor_graph：交换环 Z_n 的零因子图。只输出 modulus，非零零因子及相邻关系由程序根据模 n 乘法计算。
 
 不要生成集合韦恩图、简单集合包含示意图、映射示意图、任何运算表，也不要把纯定义或定理画成装饰性插图。若请求不属于上述类型，kind 使用 unsupported，并在 reason 中简短说明。
 
@@ -63,6 +65,8 @@ _PROMPT = """你是 DMate 的数学图结构解析器。你只负责把用户的
 - graph：必须提供 vertices 和 edges。顶点 id 使用简短、唯一的 ASCII 标识符；label 是显示文字。每条边的 from/to 必须引用已声明的顶点。direction 只能是 forward 或 undirected。若 weighted=true，每条边必须提供 weight。不要猜测题目没有给出的顶点、边、方向或权值；若用户要求的是一个标准图族，可以按该图族的数学定义构造。
 - hasse：必须提供 vertices 和 order_relations。关系对 [a,b] 表示 a 严格小于 b。不要加入自反关系。不要把可传递的关系误当成覆盖关系；程序会计算传递约简。
 - cyclic_cayley：modulus 为 2 到 24 的整数，generators 是 Z_n 中能生成整个循环群的非零整数生成元。生成元按模 n 解释。
+- cyclic_subgroup_lattice：modulus 为 2 到 30 的整数，表示加法群 Z_n。程序根据 n 的正因数生成子群，并按实际包含关系计算哈斯边。
+- ideal_lattice_zn：modulus 为 2 到 30 的整数，表示交换环 Z_n。程序根据 n 的正因数生成全部理想，并按实际包含关系计算哈斯边。
 - zero_divisor_graph：modulus 为 4 到 30 的合数，表示交换环 Z_n。程序会排除 0，并按 xy ≡ 0 (mod n) 计算不同非零零因子之间的边。
 - 不允许附加解释文字。不要输出未经用户要求的其他图形。
 - 若题目条件不足以唯一确定图结构，使用 unsupported，不要自行补造数学条件。"""
@@ -73,7 +77,7 @@ _MODEL_SCHEMA = {
     "additionalProperties": False,
     "required": ["kind", "title"],
     "properties": {
-        "kind": {"enum": ["graph", "hasse", "cyclic_cayley", "zero_divisor_graph", "unsupported"]},
+        "kind": {"enum": ["graph", "hasse", "cyclic_cayley", "cyclic_subgroup_lattice", "ideal_lattice_zn", "zero_divisor_graph", "unsupported"]},
         "title": {"type": "string", "minLength": 1, "maxLength": 80},
         "directed": {"type": ["boolean", "null"]},
         "weighted": {"type": ["boolean", "null"]},
@@ -322,6 +326,27 @@ def _build_cyclic_cayley(spec):
     return _document(title, not symmetric, False, vertices, edges), "cyclic_cayley"
 
 
+def _build_cyclic_lattice(spec, kind):
+    modulus = spec.get("modulus")
+    if not isinstance(modulus, int) or isinstance(modulus, bool) or not 2 <= modulus <= 30:
+        raise MathDiagramError("invalid_lattice_modulus", "循环群或环的模数无效。", status=502)
+    divisors = [value for value in range(1, modulus + 1) if modulus % value == 0]
+    if kind == "cyclic_subgroup_lattice":
+        vertices = [{"id": "d" + str(value), "label": "⟨" + str(value) + "⟩"} for value in divisors]
+    else:
+        vertices = [{"id": "d" + str(value), "label": "(" + str(value) + ")"} for value in divisors]
+    relations = [
+        ["d" + str(lower), "d" + str(upper)]
+        for lower in divisors for upper in divisors
+        if lower != upper and lower % upper == 0
+    ]
+    return _build_hasse({
+        "title": _title(spec),
+        "vertices": vertices,
+        "order_relations": relations,
+    })
+
+
 def _build_zero_divisor_graph(spec):
     modulus = spec.get("modulus")
     if not isinstance(modulus, int) or isinstance(modulus, bool) or not 4 <= modulus <= 30 or all(modulus % p for p in range(2, int(math.sqrt(modulus)) + 1)):
@@ -349,6 +374,8 @@ def build_document(spec):
         return _build_hasse(spec)
     if kind == "cyclic_cayley":
         return _build_cyclic_cayley(spec)
+    if kind in ("cyclic_subgroup_lattice", "ideal_lattice_zn"):
+        return _build_cyclic_lattice(spec, kind)
     if kind == "zero_divisor_graph":
         return _build_zero_divisor_graph(spec)
     raise MathDiagramError("unsupported_math_diagram", "该数学结构暂不支持自动生成。", status=422)

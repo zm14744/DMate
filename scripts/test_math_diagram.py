@@ -55,6 +55,28 @@ class MathDiagramStructureTests(unittest.TestCase):
                 "modulus": 8, "generators": [2],
             })
 
+    def test_cyclic_subgroup_lattice_z12(self):
+        document, kind = build_document({
+            "kind": "cyclic_subgroup_lattice", "title": "Subgroup lattice of Z12",
+            "modulus": 12,
+        })
+        graph = document["graphs"][0]
+        self.assertEqual(kind, "hasse")
+        self.assertEqual({vertex["label"] for vertex in graph["vertices"]},
+                         {"⟨1⟩", "⟨2⟩", "⟨3⟩", "⟨4⟩", "⟨6⟩", "⟨12⟩"})
+        self.assertEqual(len(graph["edges"]), 7)
+
+    def test_ideal_lattice_z12(self):
+        document, kind = build_document({
+            "kind": "ideal_lattice_zn", "title": "Ideal lattice of Z12",
+            "modulus": 12,
+        })
+        graph = document["graphs"][0]
+        self.assertEqual(kind, "hasse")
+        self.assertEqual({vertex["label"] for vertex in graph["vertices"]},
+                         {"(1)", "(2)", "(3)", "(4)", "(6)", "(12)"})
+        self.assertEqual(len(graph["edges"]), 7)
+
     def test_zero_divisor_graph_z6(self):
         document, kind = build_document({
             "kind": "zero_divisor_graph", "title": "Zero-divisor graph of Z6",
