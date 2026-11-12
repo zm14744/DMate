@@ -546,7 +546,7 @@ class Handler(BaseHTTPRequestHandler):
         messages.append(user_message)
         payload = json.dumps({
             "model": model, "messages": messages,
-            "stream": True, "think": False,
+            "stream": True, "think": None,
             "options": {"num_ctx": 4096, "temperature": 0.25},
         }).encode("utf-8")
         local = http.client.HTTPConnection("127.0.0.1", ollama_port(), timeout=180)
