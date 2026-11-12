@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="referrer" content="no-referrer">
+  <title>DMate Offline — 本地学习工作台</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand"><div class="brand-mark">D</div><div><strong>DMate</strong><span>OFFLINE</span></div></div>
+      <button id="newSession" class="primary new-chat">＋ 新对话</button>
+      <nav class="nav">
+        <button class="nav-button active" data-panel="chat">对话</button>
+        <button class="nav-button" data-panel="mistake">错题本</button>
+        <button class="nav-button" data-panel="note">笔记</button>
+        <button class="nav-button" data-panel="graph">图论工具</button>
+      </nav>
+      <div class="section-heading">历史对话</div>
+      <div id="sessionList" class="session-list" aria-label="历史对话"></div>
+      <div class="sidebar-footer">
+        <button id="exportBackup" class="subtle">导出学习数据</button>
+        <button id="importBackup" class="subtle">导入学习数据</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+        <small>数据保存在这台电脑中，不需要登录。</small>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="heading">
+          <h1 id="panelTitle">学习对话</h1>
+          <p id="panelSubtitle">你与本地模型之间的对话不会发往 DMate 云端。</p>
+        </div>
+        <div class="model-controls">
+          <span id="serviceStatus" class="status" role="status">检查模型中…</span>
+          <select id="modelSelect" aria-label="本机 AI 模型"><option value="">检查中…</option></select>
+          <button id="refreshModels" class="icon-button" title="刷新本地模型列表" aria-label="刷新本地模型列表">↻</button>
+        </div>
+      </header>
+
+      <section id="chatPanel" class="panel chat-panel">
+        <div id="messages" class="messages" aria-live="polite">
+          <div class="empty-state">
+            <h2>有什么可以一起研究的？</h2>
+            <p>离散数学、线性代数、程序设计，或者上传一道题的图片。</p>
+          </div>
+        </div>
+        <div class="composer-wrap">
+          <div id="imageChip" class="image-chip" hidden>
+            <img id="imagePreview" alt="即将发送的图片缩略图">
+            <span id="imageName"></span>
+            <button id="clearImage" title="移除图片" aria-label="移除图片">×</button>
+          </div>
+          <form id="chatForm" class="composer">
+            <textarea id="messageInput" rows="2" maxlength="6000"
+              placeholder="输入问题，Enter 发送，Shift + Enter 换行…" required></textarea>
+            <div class="composer-actions">
+              <label class="attachment" title="添加图片" for="imageInput">＋ 图片</label>
+              <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+              <span class="hint">图片由本机视觉模型处理，原图不存入历史。</span>
+              <button id="sendButton" type="submit" class="primary">发送</button>
+              <button id="stopButton" type="button" class="secondary" hidden>停止</button>
+            </div>
+          </form>
+          <p class="disclaimer">AI 可能出错。涉及公式、证明和图结构时，请对照原题核验。</p>
+        </div>
+      </section>
+
+      <section id="itemsPanel" class="panel item-panel" hidden>
+        <div class="tool-header">
+          <p id="itemsDescription">将重要内容保存到本机。</p>
+          <button id="addItem" class="primary">＋ 新建</button>
+        </div>
+        <div id="itemList" class="item-list"></div>
+      </section>
+
+      <section id="graphPanel" class="panel graph-panel" hidden>
+        <div class="tool-intro">
+          <h2>图论计算</h2>
+          <p>不调用 AI，直接在本机计算邻接矩阵、度、连通分量和广度优先遍历。当前支持无自环简单图。</p>
+        </div>
+        <form id="graphForm" class="graph-form">
+          <label>顶点（用逗号分隔）<input id="graphVertices" value="A,B,C,D" maxlength="2000" placeholder="A,B,C,D"></label>
+          <label>边（每行一条，例如 A B）
+            <textarea id="graphEdges" rows="7" maxlength="8000">A B
+B C
+C D
+D A</textarea>
+          </label>
+          <div class="graph-row">
+            <label>遍历起点<input id="graphStart" value="A" maxlength="40"></label>
+            <label class="checkbox"><input id="graphDirected" type="checkbox"> 有向图</label>
+          </div>
+          <button type="submit" class="primary">计算</button>
+        </form>
+        <div id="graphOutput" class="graph-output" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="itemDialog">
+    <form id="itemForm" class="editor">
+      <h2 id="itemDialogTitle">新增记录</h2>
+      <label>标题<input id="itemTitle" maxlength="120" required placeholder="例如：欧拉回路判定"></label>
+      <label>内容<textarea id="itemContent" rows="9" maxlength="10000" required placeholder="记下题目、思路、错误原因或知识点…"></textarea></label>
+      <label id="itemStatusLabel">状态<select id="itemStatus"><option value="open">待复习</option><option value="resolved">已掌握</option></select></label>
+      <div class="editor-actions">
+        <button type="button" class="secondary" id="cancelItem">取消</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
