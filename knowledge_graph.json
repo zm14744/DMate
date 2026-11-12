@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1266,7 +1266,7 @@
             "图论模块 10：带权图"
           ],
           "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。",
+          "note": "已换算UCSD合集的实际分P序号，点击即可进入对应图论章节，无需从目录查找。",
           "lessons": [
             {
               "title": "图论模块 10：带权图",
@@ -1367,7 +1367,7 @@
             "图论模块 38：图着色"
           ],
           "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。",
+          "note": "已换算UCSD合集的实际分P序号，点击即可进入对应图论章节，无需从目录查找。",
           "lessons": [
             {
               "title": "图论模块 38：图着色",
@@ -1423,7 +1423,7 @@
             "图论模块 13：二分图"
           ],
           "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。",
+          "note": "已换算UCSD合集的实际分P序号，点击即可进入对应图论章节，无需从目录查找。",
           "lessons": [
             {
               "title": "图论模块 13：二分图",
@@ -1617,7 +1617,7 @@
             "图论模块 28：最小生成树"
           ],
           "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。",
+          "note": "已换算UCSD合集的实际分P序号，点击即可进入对应图论章节，无需从目录查找。",
           "lessons": [
             {
               "title": "图论模块 28：最小生成树",
@@ -1643,12 +1643,12 @@
           "sections": [
             "第16讲 Matrix Tree Theorem"
           ],
-          "verification": "任课教师官方课程页提供第16讲Vimeo直达链接",
-          "note": "拓展节点。视频为英文教学，内容从拉普拉斯矩阵引出矩阵树定理；该链接直达第16讲，但Vimeo在部分网络环境中可能访问受限。",
+          "verification": "已在教师官方2023年谱图理论课程页面核对第16讲YouTube直达视频",
+          "note": "拓展节点。官方YouTube单集视频为英文授课，从拉普拉斯矩阵引出矩阵树定理；原Vimeo地址404，已弃用。",
           "lessons": [
             {
               "title": "第16讲：Matrix Tree Theorem",
-              "url": "https://vimeo.com/874943643"
+              "url": "https://www.youtube.com/watch?v=AcVPX2JOM1U"
             }
           ]
         }
@@ -1814,7 +1814,6 @@
       "name": "东北大学",
       "course": "离散数学（完整69讲）",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1d7411v7zu/",
       "note": "使用与目录P1–P69严格一致的69集完整版本，避免62集版本跳错章节。"
     },
     {
@@ -1822,7 +1821,6 @@
       "name": "辛辛那提大学",
       "course": "MATH1071 Discrete Mathematics (2020)",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/",
       "note": "Trefor Bazett 主讲；中文字幕为机器翻译，建议结合英文字幕。"
     },
     {
@@ -1830,23 +1828,20 @@
       "name": "哈尔滨工业大学",
       "course": "集合论与图论（60讲）",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1AW411v7or/",
-      "note": "合集缺第13和57号原始章节；第11讲的实际视频选集序号仍为p=11。"
+      "note": "合集缺第13和57号原始章节；第11讲的实际视频选集序号仍为p=11。 知识图谱仅使用B站对应分P直达链接，不跳转失效的哈工大MOOC课程页面。"
     },
     {
       "id": "hit_info_math",
       "name": "哈尔滨工业大学",
       "course": "信息安全数学基础",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1zt411S7r8/",
-      "note": "第5章包含初等数论、同余、欧拉定理、孙子定理与RSA。"
+      "note": "第5章包含初等数论、同余、欧拉定理、孙子定理与RSA。 知识图谱仅使用B站对应分P直达链接，不跳转失效的哈工大MOOC课程页面。"
     },
     {
       "id": "comb34",
       "name": "组合数学课程",
       "course": "组合数学（34段）",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV13E411p7cb/",
       "note": "目录包含鸽巢原理、计数、排列组合、容斥、生成函数和递推关系。"
     },
     {
@@ -1854,23 +1849,20 @@
       "name": "哈尔滨工业大学",
       "course": "集合论与图论（下）",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1Fb411M7d9/",
-      "note": "官方课程大纲列有图同构、邻接矩阵等章节。"
+      "note": "官方课程大纲列有图同构、邻接矩阵等章节。 知识图谱仅使用B站对应分P直达链接，不跳转失效的哈工大MOOC课程页面。"
     },
     {
       "id": "hit_graph_2017",
       "name": "哈尔滨工业大学",
       "course": "集合论与图论2017（48集）",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1Eb41137gB/",
-      "note": "第34集包含生成树、割点、桥；用于替代无法访问的旧MOOC。"
+      "note": "第34集包含生成树、割点、桥；用于替代无法访问的旧MOOC。 知识图谱仅使用B站对应分P直达链接，不跳转失效的哈工大MOOC课程页面。"
     },
     {
       "id": "ucsd_discrete",
       "name": "加州大学圣迭戈分校（UCSD）",
       "course": "Discrete Mathematics（221段合集）",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1Kw411L7b5/",
       "note": "五门Coursera课程合集；各子课程章节编号会重置。中文字幕为机器翻译，章节定位需同时显示模块名。"
     },
     {
@@ -1878,7 +1870,6 @@
       "name": "重庆交通大学",
       "course": "图论算法理论、实现及应用",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1np4y137AN/",
       "note": "偏图论算法与实现；此处只取其他主干课程没有直接覆盖的专题。"
     },
     {
@@ -1886,21 +1877,20 @@
       "name": "北京大学",
       "course": "离散数学 王捍贫（134讲）",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1144y1W7oL/",
       "note": "第35个选集标作034，主题为支配集、点覆盖集与点独立集。"
     },
     {
       "id": "steve_butler_spectral",
       "name": "艾奥瓦州立大学 · Steve Butler",
       "course": "谱图理论（2023）第16讲：Matrix Tree Theorem",
-      "platform": "Vimeo（官方授课视频）",
-      "url": "https://vimeo.com/874943643",
-      "note": "直接进入第16讲，无需课程目录；非国内平台，实际访问速度可能受网络环境影响。"
+      "platform": "YouTube（教师官方授课视频）",
+      "url": "https://www.youtube.com/watch?v=AcVPX2JOM1U",
+      "note": "教师2023年谱图理论课程第16讲官方YouTube视频；原Vimeo链接返回404，已改为单集直达。"
     }
   ],
   "video_resource_policy": {
     "primary_per_node": 1,
     "link_type": "per_lesson_direct_url",
-    "note": "每个节点显示对应章节的真实直接播放链接。以B站选集?p=集数为主，矩阵树定理使用授课教师官方Vimeo单节视频。无法访问的哈工大MOOC与其他课程目录链接均不作为播放按钮。"
+    "note": "只展示各个知识点对应的单集播放地址：B站必须包含准确的?p=选集序号，YouTube必须直达单条视频。哈工大MOOC课程首页和其他课程目录链接不得用作播放入口；视频源元数据不再保留合集首页URL。"
   }
 }
