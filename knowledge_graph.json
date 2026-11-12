@@ -24,6 +24,19 @@
       "prerequisites": [],
       "videos": [
         {
+          "source_id": "neu_discrete_female",
+          "title": "命题及命题的真值",
+          "sections": [
+            "命题及命题的真值"
+          ],
+          "lessons": [
+            {
+              "title": "命题及命题的真值",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=1"
+            }
+          ]
+        },
+        {
           "source_id": "uestc_discrete_upper",
           "title": "2.1.1",
           "sections": [
@@ -72,6 +85,19 @@
         "命题与真值"
       ],
       "videos": [
+        {
+          "source_id": "neu_discrete_female",
+          "title": "逻辑连接词",
+          "sections": [
+            "逻辑连接词"
+          ],
+          "lessons": [
+            {
+              "title": "逻辑连接词",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=2"
+            }
+          ]
+        },
         {
           "source_id": "uestc_discrete_upper",
           "title": "2.2.1",
@@ -122,6 +148,19 @@
       ],
       "videos": [
         {
+          "source_id": "neu_discrete_female",
+          "title": "命题公式及其真值表",
+          "sections": [
+            "命题公式及其真值表"
+          ],
+          "lessons": [
+            {
+              "title": "命题公式及其真值表",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=4"
+            }
+          ]
+        },
+        {
           "source_id": "uestc_discrete_upper",
           "title": "2.4.1",
           "sections": [
@@ -157,6 +196,19 @@
         "真值表"
       ],
       "videos": [
+        {
+          "source_id": "neu_discrete_female",
+          "title": "命题公式的等价",
+          "sections": [
+            "命题公式的等价"
+          ],
+          "lessons": [
+            {
+              "title": "命题公式的等价",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=5"
+            }
+          ]
+        },
         {
           "source_id": "uestc_discrete_upper",
           "title": "2.5.1",
@@ -194,6 +246,19 @@
       ],
       "videos": [
         {
+          "source_id": "neu_discrete_female",
+          "title": "析取范式与合取范式",
+          "sections": [
+            "析取范式与合取范式"
+          ],
+          "lessons": [
+            {
+              "title": "析取范式与合取范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=7"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "01-23 范式的求法",
           "sections": [
@@ -218,6 +283,19 @@
       ],
       "videos": [
         {
+          "source_id": "neu_discrete_female",
+          "title": "命题逻辑推理一：直接推理",
+          "sections": [
+            "命题逻辑推理一：直接推理"
+          ],
+          "lessons": [
+            {
+              "title": "命题逻辑推理一：直接推理",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=10"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "01-24 推理理论",
           "sections": [
@@ -240,6 +318,19 @@
         "命题与真值"
       ],
       "videos": [
+        {
+          "source_id": "neu_discrete_female",
+          "title": "谓词逻辑的基本概念",
+          "sections": [
+            "谓词逻辑的基本概念"
+          ],
+          "lessons": [
+            {
+              "title": "谓词逻辑的基本概念",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=12"
+            }
+          ]
+        },
         {
           "source_id": "uestc_discrete_upper",
           "title": "3.1.1",
@@ -290,6 +381,19 @@
       ],
       "videos": [
         {
+          "source_id": "neu_discrete_female",
+          "title": "谓词逻辑中量词的符号化",
+          "sections": [
+            "谓词逻辑中量词的符号化"
+          ],
+          "lessons": [
+            {
+              "title": "谓词逻辑中量词的符号化",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=14"
+            }
+          ]
+        },
+        {
           "source_id": "uestc_discrete_upper",
           "title": "3.2.1",
           "sections": [
@@ -339,6 +443,19 @@
       ],
       "videos": [
         {
+          "source_id": "neu_discrete_female",
+          "title": "谓词公式与量词的辖域",
+          "sections": [
+            "谓词公式与量词的辖域"
+          ],
+          "lessons": [
+            {
+              "title": "谓词公式与量词的辖域",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=13"
+            }
+          ]
+        },
+        {
           "source_id": "dogeman_discrete",
           "title": "1.2.0.2谓词逻辑",
           "sections": [
@@ -376,6 +493,19 @@
       ],
       "videos": [
         {
+          "source_id": "neu_discrete_female",
+          "title": "谓词演算的推理理论（一）",
+          "sections": [
+            "谓词演算的推理理论（一）"
+          ],
+          "lessons": [
+            {
+              "title": "谓词演算的推理理论（一）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=18"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "02-10 谓词逻辑的推理",
           "sections": [
@@ -398,6 +528,19 @@
         "量词推理与否定"
       ],
       "videos": [
+        {
+          "source_id": "neu_discrete_female",
+          "title": "前束范式",
+          "sections": [
+            "前束范式"
+          ],
+          "lessons": [
+            {
+              "title": "前束范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=17"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "02-08 前束范式",
@@ -2032,6 +2175,14 @@
       "platform": "Bilibili",
       "publisher": "电子科技大学",
       "note": "电子科技大学官方账号发布；仅使用具体分P链接。"
+    },
+    {
+      "id": "neu_discrete_female",
+      "name": "东北大学 · 离散数学（女教师部分）",
+      "course": "离散数学（第1–19讲）",
+      "platform": "Bilibili",
+      "publisher": "",
+      "note": "B站页面标注原始课程来源为辽宁省本科教学网；上传者与授权状态尚未核实，仅作外部链接，不下载或托管。只收录P1–P19；P20《集合的基本概念》及之后不属于该教师讲授部分，不纳入。"
     }
   ],
   "video_resource_policy": {
