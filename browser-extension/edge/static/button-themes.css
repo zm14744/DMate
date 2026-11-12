@@ -451,6 +451,13 @@ body[data-appearance-theme] {
     --dm-icon-emphasis:var(--text-primary);
 }
 
+/* Translucent panes over photo backgrounds need slightly stronger contrast.
+   This is still theme-driven and identical at both responsive breakpoints. */
+body[data-appearance-theme].has-custom-background {
+    --dm-icon-rest:var(--text-primary);
+    --dm-icon-emphasis:var(--text-strong);
+}
+
 body[data-appearance-theme] :is(
     .mobile-topbar-button,
     .desktop-shell-button,
@@ -489,8 +496,32 @@ body[data-appearance-theme] :is(
     #learningReviewBtn,
     #accountBtn:not(.is-authenticated):not(.is-syncing),
     #voiceInputBtn:not([data-voice-state="recording"]):not([data-voice-state="finishing"])
-):is(:hover,:focus-visible,:active,[aria-expanded="true"]) > svg {
+):is(:focus-visible,:active,[aria-expanded="true"]) > svg {
     color:var(--dm-icon-emphasis) !important;
+}
+
+/* Touch browsers can retain :hover after a tap; only true pointer devices
+   use hover highlighting, while taps receive the same active feedback. */
+@media (hover:hover) {
+    body[data-appearance-theme] :is(
+        .mobile-topbar-button,
+        .desktop-shell-button,
+        .chat-jump-button,
+        .chat-text-copy,
+        .dmate-symbol-keyboard,
+        .mobile-install-button,
+        #downloadAppBtn,
+        #appearanceBtn,
+        #wrongBookBtn,
+        #conceptNotebookBtn,
+        #knowledgeGraphBtn,
+        #graphDrawingBtn,
+        #learningReviewBtn,
+        #accountBtn:not(.is-authenticated):not(.is-syncing),
+        #voiceInputBtn:not([data-voice-state="recording"]):not([data-voice-state="finishing"])
+    ):hover > svg {
+        color:var(--dm-icon-emphasis) !important;
+    }
 }
 
 /* Drawer-open indicators are distinct from the closed default state. */
