@@ -19061,6 +19061,7 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     let pinchFrame = 0;
     let pendingPinch = null;
     let suppressClickUntil = 0;
+    const dragSlop = 8;
     let minimumScale = 0.35;
     let fitted = true;
     let resizeFrame = 0;
@@ -19230,12 +19231,15 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         // 不拦截 pointermove，以保留安卓浏览器的惯性与边界滚动。
         if (!fullscreen) return;
 
+        // A fresh gesture must not inherit the previous drag's click guard.
+        if (!pointers.size) suppressClickUntil = 0;
         pointers.set(event.pointerId, event);
 
         if (fullscreen) {
-            try { viewport.setPointerCapture(event.pointerId); } catch (_error) {}
-
             if (pointers.size >= 2) {
+                for (const pointerId of pointers.keys()) {
+                    try { viewport.setPointerCapture(pointerId); } catch (_error) {}
+                }
                 const [a, b] = [...pointers.values()].slice(0, 2);
                 const center = pointerCenter(a, b);
                 const scale = currentScale();
@@ -19245,12 +19249,14 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
                     point: graphPoint(center)
                 };
                 fullscreenPan = null;
+                suppressClickUntil = performance.now() + 300;
                 event.preventDefault();
                 return;
             }
 
             fullscreenPan = {
                 pointerId: event.pointerId,
+                node: event.target.closest?.(".kg-mobile-node"),
                 x: event.clientX,
                 y: event.clientY,
                 left: viewport.scrollLeft,
@@ -19307,11 +19313,15 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
         if (fullscreen && fullscreenPan?.pointerId === event.pointerId) {
             const dx = event.clientX - fullscreenPan.x;
             const dy = event.clientY - fullscreenPan.y;
-            if (Math.abs(dx) + Math.abs(dy) > 4) {
-                fitted = false;
+            // Finger taps naturally wobble a few pixels. Keep the native node
+            // click (and its original target) until this is a real drag.
+            if (!fullscreenPan.moved) {
+                if (Math.hypot(dx, dy) < dragSlop) return;
                 fullscreenPan.moved = true;
-                suppressClickUntil = performance.now() + 300;
+                try { viewport.setPointerCapture(event.pointerId); } catch (_error) {}
             }
+            fitted = false;
+            suppressClickUntil = performance.now() + 300;
             viewport.scrollLeft = fullscreenPan.left - dx;
             viewport.scrollTop = fullscreenPan.top - dy;
             event.preventDefault();
@@ -19321,6 +19331,17 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
     }, { passive: false });
 
     const finishPointer = event => {
+        const tappedNode = event.type === "pointerup" && event.pointerType !== "mouse"
+            && fullscreenPan?.pointerId === event.pointerId && !fullscreenPan.moved
+            && Math.hypot(event.clientX - fullscreenPan.x, event.clientY - fullscreenPan.y) < dragSlop
+            && pointers.size === 1 && !pinch
+            ? fullscreenPan.node : null;
+        if (pinch || fullscreenPan?.moved) {
+            // Suppress only the compatibility click from this completed
+            // gesture, even if the user paused before lifting their finger.
+            suppressClickUntil = performance.now() + 300;
+        }
+        const wasPinching = Boolean(pinch);
         pointers.delete(event.pointerId);
 
         if (fullscreenPan?.pointerId === event.pointerId) {
@@ -19342,16 +19363,28 @@ function installMobileGraphInteraction(viewport, surface, stage, zoomLabel) {
                 y: remaining.clientY,
                 left: viewport.scrollLeft,
                 top: viewport.scrollTop,
-                moved: false
+                moved: wasPinching
             };
+        }
+
+        if (tappedNode?.isConnected) {
+            // Some touch browsers omit the compatibility click after a drag.
+            // Activate a recognized tap once, then ignore its duplicate click.
+            suppressClickUntil = performance.now() + 300;
+            tappedNode.click();
         }
     };
 
     viewport.addEventListener("pointerup", finishPointer, { passive: true });
     viewport.addEventListener("pointercancel", finishPointer, { passive: true });
+    viewport.addEventListener("pointerleave", event => {
+        if (event.pointerType === "mouse" && !viewport.hasPointerCapture(event.pointerId)) {
+            finishPointer(event);
+        }
+    }, { passive: true });
 
     viewport.addEventListener("click", event => {
-        if (performance.now() < suppressClickUntil) {
+        if (event.detail > 0 && performance.now() < suppressClickUntil) {
             event.preventDefault();
             event.stopPropagation();
         }

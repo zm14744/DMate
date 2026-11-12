@@ -215,10 +215,108 @@ async function checkSelectionBorder(browser, theme) {
   } finally { await mobile.close(); await desktop.close(); }
 }
 
+async function checkNodeGestures(browser, width) {
+  const page = await browser.newPage({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    await page.goto(baseURL, { waitUntil: 'networkidle' });
+    await page.evaluate(() => openKnowledgeGraph());
+    await page.waitForSelector('.kg-mobile-entry-only');
+    // Exercise the actual module picker before testing the graph's gesture area.
+    await page.locator('#knowledgeGraphCategoryTrigger').tap();
+    await page.waitForSelector('#mobileChoiceModal[open]');
+    await page.locator('.mobile-choice-option').filter({ hasText: '证明与归纳' }).tap();
+    await page.waitForFunction(() => document.getElementById('knowledgeGraphCategory').value === '证明与归纳');
+    assert.equal(await page.locator('#mobileChoiceModal').evaluate(modal => modal.open), false);
+    await page.locator('.kg-mobile-expand').tap();
+    await settleGraph(page);
+    await page.evaluate(() => {
+      const selectNode = selectKnowledgeGraphNode;
+      window.graphSelectionCount = 0;
+      window.selectKnowledgeGraphNode = (...args) => {
+        window.graphSelectionCount++;
+        return selectNode(...args);
+      };
+    });
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+    const selectedName = () => page.locator('.kg-mobile-node.selected').getAttribute('aria-label');
+    const nodePoint = () => page.evaluate(() => {
+      const view = document.querySelector('.kg-mobile-viewport').getBoundingClientRect();
+      const node = [...document.querySelectorAll('.kg-mobile-node:not(.selected)')].find(candidate => {
+        const rect = candidate.getBoundingClientRect();
+        const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+        return x > view.left + 8 && x < view.right - 8 && y > view.top + 8 && y < view.bottom - 80;
+      });
+      if (!node) throw new Error('No visible unselected knowledge node');
+      const rect = node.getBoundingClientRect();
+      return { name: node.getAttribute('aria-label'), x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    });
+    const nativeTap = async (point, dx = 0, dy = 0) => {
+      const count = await page.evaluate(() => window.graphSelectionCount);
+      await touch('touchStart', [{ id: 1, x: point.x, y: point.y }]);
+      if (dx || dy) await touch('touchMove', [{ id: 1, x: point.x + dx, y: point.y + dy }]);
+      await touch('touchEnd', []);
+      await page.waitForFunction(name => document.querySelector('.kg-mobile-node.selected')?.getAttribute('aria-label') === name,
+        point.name, { timeout: 2000 });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+      assert.equal(await page.evaluate(() => window.graphSelectionCount), count + 1,
+        width + ': one tap must activate exactly once');
+    };
+    let point = await nodePoint();
+    await page.mouse.click(point.x, point.y);
+    assert.equal(await selectedName(), point.name, width + ': mouse click must reach the node');
+    assert.equal(await page.evaluate(() => window.graphSelectionCount), 1, width + ': one mouse click must activate once');
+    for (const [dx, dy] of [[3, 2], [-4, 0]]) {
+      point = await nodePoint();
+      const before = await snapshot(page);
+      await nativeTap(point, dx, dy);
+      const after = await snapshot(page);
+      near(after.scroll.left, before.scroll.left, width + ': finger jitter must not pan horizontally', .5);
+      near(after.scroll.top, before.scroll.top, width + ': finger jitter must not pan vertically', .5);
+    }
+
+    await fit(page);
+    // Enlarge this small module so both tested widths have a real pan range.
+    for (let index = 0; index < 3; index++) await page.locator('.kg-mobile-zoom-btn').last().click();
+    point = await nodePoint();
+    const beforeDrag = await selectedName();
+    const beforeDragCount = await page.evaluate(() => window.graphSelectionCount);
+    const oldLeft = (await snapshot(page)).scroll.left;
+    await touch('touchStart', [{ id: 1, x: point.x, y: point.y }]);
+    await touch('touchMove', [{ id: 1, x: point.x - 24, y: point.y }]);
+    await touch('touchEnd', []);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    assert.equal(await selectedName(), beforeDrag, width + ': dragging must not select the pressed node');
+    assert.equal(await page.evaluate(() => window.graphSelectionCount), beforeDragCount, width + ': drag must not activate a node');
+    assert.ok((await snapshot(page)).scroll.left > oldLeft, width + ': horizontal drag must pan the graph');
+    await nativeTap(await nodePoint()); // A new tap must work without a cooldown after dragging.
+
+    await fit(page);
+    const beforePinch = (await snapshot(page)).scale;
+    const beforePinchCount = await page.evaluate(() => window.graphSelectionCount);
+    const center = await page.locator('.kg-mobile-viewport').evaluate(view => {
+      const rect = view.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    });
+    await touch('touchStart', [{ id: 1, x: center.x - 30, y: center.y }, { id: 2, x: center.x + 30, y: center.y }]);
+    await touch('touchMove', [{ id: 1, x: center.x - 45, y: center.y }, { id: 2, x: center.x + 45, y: center.y }]);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    await touch('touchEnd', []);
+    assert.ok((await snapshot(page)).scale > beforePinch, width + ': native pinch must zoom');
+    assert.equal(await page.evaluate(() => window.graphSelectionCount), beforePinchCount, width + ': pinch must not activate a node');
+    await nativeTap(await nodePoint()); // Pinch suppression must not swallow the next distinct tap.
+    assert.deepEqual(errors, [], width + ': gesture page errors');
+    console.log('PASS ' + width + ': module picker, mouse click, touch jitter, drag and pinch followed by fresh taps');
+  } finally { await page.close(); }
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
+    for (const width of [390, 620]) await checkNodeGestures(browser, width);
     for (const theme of ['light', 'dark', 'navy']) await checkSelectionBorder(browser, theme);
     for (const width of [390, 620]) await mobileCase(browser, width);
     const page = await browser.newPage({ viewport: { width: 820, height: 844 } });
