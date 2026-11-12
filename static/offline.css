@@ -470,8 +470,11 @@ body.has-custom-background .offline-header{
 @media(max-width:1100px){
   .offline-layout{grid-template-columns:1fr!important;grid-template-rows:auto minmax(0,1fr);height:100dvh}
   .offline-sidebar.left{
+    position:relative!important;
+    inset:auto!important;
     width:100%;
-    height:auto;
+    height:auto!important;
+    max-height:none!important;
     min-height:0;
     padding:8px 12px 7px;
     border-right:0;
