@@ -193,13 +193,13 @@
       "videos": [
         {
           "source_id": "zjut_class2025",
-          "title": "范式的概念与演算",
+          "title": "06-第1章-命题逻辑-范式的概念和演算",
           "sections": [
-            "范式的概念与演算"
+            "06-第1章-命题逻辑-范式的概念和演算"
           ],
           "lessons": [
             {
-              "title": "范式的概念与演算",
+              "title": "06-第1章-命题逻辑-范式的概念和演算",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=6"
             }
           ],
@@ -208,13 +208,13 @@
         },
         {
           "source_id": "zjut_class2025",
-          "title": "主范式的求法",
+          "title": "07-第1章-命题逻辑-主范式的求法（本章重点）",
           "sections": [
-            "主范式的求法"
+            "07-第1章-命题逻辑-主范式的求法（本章重点）"
           ],
           "lessons": [
             {
-              "title": "主范式的求法",
+              "title": "07-第1章-命题逻辑-主范式的求法（本章重点）",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=7"
             }
           ],
@@ -816,13 +816,13 @@
       "videos": [
         {
           "source_id": "zjut_class2025",
-          "title": "偏序关系",
+          "title": "27-第3章-偏序关系",
           "sections": [
-            "偏序关系"
+            "27-第3章-偏序关系"
           ],
           "lessons": [
             {
-              "title": "偏序关系",
+              "title": "27-第3章-偏序关系",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=28"
             }
           ],
@@ -857,13 +857,13 @@
       "videos": [
         {
           "source_id": "zjut_class2025",
-          "title": "关系的闭包",
+          "title": "22-第3章-关系的闭包",
           "sections": [
-            "关系的闭包"
+            "22-第3章-关系的闭包"
           ],
           "lessons": [
             {
-              "title": "关系的闭包",
+              "title": "22-第3章-关系的闭包",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=22"
             }
           ],
@@ -1111,13 +1111,13 @@
         },
         {
           "source_id": "numberphile_gcd",
-          "title": "Euclid's Algorithm（最大公因数）",
+          "title": "Euclid's Algorithm",
           "sections": [
-            "Euclid's Algorithm（最大公因数）"
+            "Euclid's Algorithm"
           ],
           "lessons": [
             {
-              "title": "Euclid's Algorithm（最大公因数）",
+              "title": "Euclid's Algorithm",
               "url": "https://www.youtube.com/watch?v=6Y3jHHE_hbA"
             }
           ],
@@ -1233,13 +1233,13 @@
       "videos": [
         {
           "source_id": "numberphile_visual",
-          "title": "Chinese Remainder Theorem and Cards（中国剩余定理：扑克牌演示）",
+          "title": "Chinese Remainder Theorem and Cards",
           "sections": [
-            "Chinese Remainder Theorem and Cards（中国剩余定理：扑克牌演示）"
+            "Chinese Remainder Theorem and Cards"
           ],
           "lessons": [
             {
-              "title": "Chinese Remainder Theorem and Cards（中国剩余定理：扑克牌演示）",
+              "title": "Chinese Remainder Theorem and Cards",
               "url": "https://www.youtube.com/watch?v=l9dXo5f3zDc"
             }
           ],
@@ -1274,13 +1274,13 @@
       "videos": [
         {
           "source_id": "neso_academy",
-          "title": "Euler's Theorem（欧拉定理与例题）",
+          "title": "Euler's Theorem",
           "sections": [
-            "Euler's Theorem（欧拉定理与例题）"
+            "Euler's Theorem"
           ],
           "lessons": [
             {
-              "title": "Euler's Theorem（欧拉定理与例题）",
+              "title": "Euler's Theorem",
               "url": "https://www.youtube.com/watch?v=DyOv20d4c70"
             }
           ],
@@ -1289,13 +1289,13 @@
         },
         {
           "source_id": "khan_cs_labs",
-          "title": "Fermat's Little Theorem（费马小定理可视化）",
+          "title": "Fermat's Little Theorem",
           "sections": [
-            "Fermat's Little Theorem（费马小定理可视化）"
+            "Fermat's Little Theorem"
           ],
           "lessons": [
             {
-              "title": "Fermat's Little Theorem（费马小定理可视化）",
+              "title": "Fermat's Little Theorem",
               "url": "https://www.youtube.com/watch?v=OoQ16YCYksw"
             }
           ],
@@ -1331,13 +1331,13 @@
       "videos": [
         {
           "source_id": "art_of_the_problem",
-          "title": "RSA Encryption Algorithm（RSA加密动画与推导）",
+          "title": "RSA Encryption Algorithm",
           "sections": [
-            "RSA Encryption Algorithm（RSA加密动画与推导）"
+            "RSA Encryption Algorithm"
           ],
           "lessons": [
             {
-              "title": "RSA Encryption Algorithm（RSA加密动画与推导）",
+              "title": "RSA Encryption Algorithm",
               "url": "https://www.youtube.com/watch?v=wXB-V_Keiu8"
             }
           ],
@@ -1508,13 +1508,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "鸽巢原理（概念与例题）",
+          "title": "Pigeonhole Principle",
           "sections": [
-            "鸽巢原理（概念与例题）"
+            "Pigeonhole Principle"
           ],
           "lessons": [
             {
-              "title": "鸽巢原理（概念与例题）",
+              "title": "Pigeonhole Principle",
               "url": "https://www.youtube.com/watch?v=2-mxYrCNX60"
             }
           ],
@@ -1523,13 +1523,13 @@
         },
         {
           "source_id": "cqu_discrete",
-          "title": "计数基础与鸽巢原理",
+          "title": "3.1计数的基础+3.2鸽巢原理",
           "sections": [
-            "计数基础与鸽巢原理"
+            "3.1计数的基础+3.2鸽巢原理"
           ],
           "lessons": [
             {
-              "title": "计数基础与鸽巢原理",
+              "title": "3.1计数的基础+3.2鸽巢原理",
               "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=14"
             }
           ],
@@ -1579,13 +1579,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "容斥原理（有具体例题）",
+          "title": "INCLUSION-EXCLUSION PRINCIPLE - DISCRETE MATHEMATICS",
           "sections": [
-            "容斥原理（有具体例题）"
+            "INCLUSION-EXCLUSION PRINCIPLE - DISCRETE MATHEMATICS"
           ],
           "lessons": [
             {
-              "title": "容斥原理（有具体例题）",
+              "title": "INCLUSION-EXCLUSION PRINCIPLE - DISCRETE MATHEMATICS",
               "url": "https://www.youtube.com/watch?v=GS7dIWA6Hpo"
             }
           ],
@@ -1620,13 +1620,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "生成函数：定义和练习",
+          "title": "GENERATING FUNCTIONS - Discrete Mathematics",
           "sections": [
-            "生成函数：定义和练习"
+            "GENERATING FUNCTIONS - Discrete Mathematics"
           ],
           "lessons": [
             {
-              "title": "生成函数：定义和练习",
+              "title": "GENERATING FUNCTIONS - Discrete Mathematics",
               "url": "https://www.youtube.com/watch?v=-drdeNMoe8w"
             }
           ],
@@ -1635,13 +1635,13 @@
         },
         {
           "source_id": "blue1brown",
-          "title": "Generating Functions · Olympiad Level Counting（动画推导）",
+          "title": "Generating Functions · Olympiad Level Counting",
           "sections": [
-            "Generating Functions · Olympiad Level Counting（动画推导）"
+            "Generating Functions · Olympiad Level Counting"
           ],
           "lessons": [
             {
-              "title": "Generating Functions · Olympiad Level Counting（动画推导）",
+              "title": "Generating Functions · Olympiad Level Counting",
               "url": "https://www.youtube.com/watch?v=bOXCLR3Wric"
             }
           ],
@@ -1650,13 +1650,13 @@
         },
         {
           "source_id": "cqu_discrete",
-          "title": "生成函数（4.4）",
+          "title": "4.3分治算法和递推关系+4.4生成函数",
           "sections": [
-            "生成函数（4.4）"
+            "4.3分治算法和递推关系+4.4生成函数"
           ],
           "lessons": [
             {
-              "title": "生成函数（4.4）",
+              "title": "4.3分治算法和递推关系+4.4生成函数",
               "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=22"
             }
           ],
@@ -1703,13 +1703,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "递推关系的定义与建模",
+          "title": "RECURRENCE RELATIONS - DISCRETE MATHEMATICS",
           "sections": [
-            "递推关系的定义与建模"
+            "RECURRENCE RELATIONS - DISCRETE MATHEMATICS"
           ],
           "lessons": [
             {
-              "title": "递推关系的定义与建模",
+              "title": "RECURRENCE RELATIONS - DISCRETE MATHEMATICS",
               "url": "https://www.youtube.com/watch?v=eAaP4XaB8hM"
             }
           ],
@@ -1728,13 +1728,13 @@
       "videos": [
         {
           "source_id": "trevtutor",
-          "title": "齐次线性递推关系求解",
+          "title": "HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
           "sections": [
-            "齐次线性递推关系求解"
+            "HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics"
           ],
           "lessons": [
             {
-              "title": "齐次线性递推关系求解",
+              "title": "HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
               "url": "https://www.youtube.com/watch?v=7mhvA5L7KqY"
             }
           ],
@@ -1743,13 +1743,13 @@
         },
         {
           "source_id": "cqu_discrete",
-          "title": "求解线性递推关系（4.2）",
+          "title": "4.1递推关系的应用+4.2求解线性递推关系",
           "sections": [
-            "求解线性递推关系（4.2）"
+            "4.1递推关系的应用+4.2求解线性递推关系"
           ],
           "lessons": [
             {
-              "title": "求解线性递推关系（4.2）",
+              "title": "4.1递推关系的应用+4.2求解线性递推关系",
               "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=16"
             }
           ],
@@ -1783,13 +1783,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "非齐次线性递推关系求解",
+          "title": "NON-HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
           "sections": [
-            "非齐次线性递推关系求解"
+            "NON-HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics"
           ],
           "lessons": [
             {
-              "title": "非齐次线性递推关系求解",
+              "title": "NON-HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
               "url": "https://www.youtube.com/watch?v=EfF_XSEX1Sk"
             }
           ],
@@ -1916,13 +1916,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "图同构与二部图",
+          "title": "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS",
           "sections": [
-            "图同构与二部图"
+            "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS"
           ],
           "lessons": [
             {
-              "title": "图同构与二部图",
+              "title": "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS",
               "url": "https://www.youtube.com/watch?v=W9nJRN3ajuk"
             }
           ],
@@ -1971,13 +1971,13 @@
         },
         {
           "source_id": "zjut_class2025",
-          "title": "图的矩阵表示",
+          "title": "45-第6章-图论-图的矩阵表示",
           "sections": [
-            "图的矩阵表示"
+            "45-第6章-图论-图的矩阵表示"
           ],
           "lessons": [
             {
-              "title": "图的矩阵表示",
+              "title": "45-第6章-图论-图的矩阵表示",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=48"
             }
           ],
@@ -2013,13 +2013,13 @@
         },
         {
           "source_id": "zjut_class2025",
-          "title": "图的矩阵表示",
+          "title": "45-第6章-图论-图的矩阵表示",
           "sections": [
-            "图的矩阵表示"
+            "45-第6章-图论-图的矩阵表示"
           ],
           "lessons": [
             {
-              "title": "图的矩阵表示",
+              "title": "45-第6章-图论-图的矩阵表示",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=48"
             }
           ],
@@ -2028,13 +2028,13 @@
         },
         {
           "source_id": "zjut_class2025",
-          "title": "图的矩阵表示（续）",
+          "title": "46-第6章-图论-图的矩阵表示2",
           "sections": [
-            "图的矩阵表示（续）"
+            "46-第6章-图论-图的矩阵表示2"
           ],
           "lessons": [
             {
-              "title": "图的矩阵表示（续）",
+              "title": "46-第6章-图论-图的矩阵表示2",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=49"
             }
           ],
@@ -2093,13 +2093,13 @@
       "videos": [
         {
           "source_id": "william_fiset",
-          "title": "Bridges and Articulation Points Algorithm（割点与桥）",
+          "title": "Bridges and Articulation Points Algorithm",
           "sections": [
-            "Bridges and Articulation Points Algorithm（割点与桥）"
+            "Bridges and Articulation Points Algorithm"
           ],
           "lessons": [
             {
-              "title": "Bridges and Articulation Points Algorithm（割点与桥）",
+              "title": "Bridges and Articulation Points Algorithm",
               "url": "https://www.youtube.com/watch?v=aZXi1unBdJA"
             }
           ],
@@ -2133,7 +2133,7 @@
       "videos": [
         {
           "source_id": "ucsd_discrete",
-          "title": "带权图",
+          "title": "图论模块 10：带权图",
           "sections": [
             "图论模块 10：带权图"
           ],
@@ -2203,13 +2203,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "欧拉通路与欧拉回路",
+          "title": "[Discrete Mathematics] Euler Circuits and Euler Trails",
           "sections": [
-            "欧拉通路与欧拉回路"
+            "[Discrete Mathematics] Euler Circuits and Euler Trails"
           ],
           "lessons": [
             {
-              "title": "欧拉通路与欧拉回路",
+              "title": "[Discrete Mathematics] Euler Circuits and Euler Trails",
               "url": "https://www.youtube.com/watch?v=Ou345pSYDoE"
             }
           ],
@@ -2243,13 +2243,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "哈密顿回路",
+          "title": "[Discrete Mathematics] Hamilton Cycles",
           "sections": [
-            "哈密顿回路"
+            "[Discrete Mathematics] Hamilton Cycles"
           ],
           "lessons": [
             {
-              "title": "哈密顿回路",
+              "title": "[Discrete Mathematics] Hamilton Cycles",
               "url": "https://www.youtube.com/watch?v=t_6VByupc1U"
             }
           ],
@@ -2324,7 +2324,7 @@
       "videos": [
         {
           "source_id": "ucsd_discrete",
-          "title": "图着色",
+          "title": "图论模块 38：图着色",
           "sections": [
             "图论模块 38：图着色"
           ],
@@ -2339,13 +2339,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "图着色与色多项式",
+          "title": "[Discrete Mathematics] Graph Coloring and Chromatic Polynomials",
           "sections": [
-            "图着色与色多项式"
+            "[Discrete Mathematics] Graph Coloring and Chromatic Polynomials"
           ],
           "lessons": [
             {
-              "title": "图着色与色多项式",
+              "title": "[Discrete Mathematics] Graph Coloring and Chromatic Polynomials",
               "url": "https://www.youtube.com/watch?v=J7g5HMZgKMU"
             }
           ],
@@ -2384,13 +2384,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "平面图",
+          "title": "[Discrete Mathematics] Planar Graphs",
           "sections": [
-            "平面图"
+            "[Discrete Mathematics] Planar Graphs"
           ],
           "lessons": [
             {
-              "title": "平面图",
+              "title": "[Discrete Mathematics] Planar Graphs",
               "url": "https://www.youtube.com/watch?v=ETtXKpfBWNI"
             }
           ],
@@ -2410,7 +2410,7 @@
       "videos": [
         {
           "source_id": "ucsd_discrete",
-          "title": "二部图",
+          "title": "图论模块 13：二分图",
           "sections": [
             "图论模块 13：二分图"
           ],
@@ -2425,13 +2425,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "图同构与二部图",
+          "title": "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS",
           "sections": [
-            "图同构与二部图"
+            "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS"
           ],
           "lessons": [
             {
-              "title": "图同构与二部图",
+              "title": "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS",
               "url": "https://www.youtube.com/watch?v=W9nJRN3ajuk"
             }
           ],
@@ -2466,13 +2466,13 @@
         },
         {
           "source_id": "graph_animation_bili",
-          "title": "拓扑排序（动画讲解）",
+          "title": "拓扑排序",
           "sections": [
-            "拓扑排序（动画讲解）"
+            "拓扑排序"
           ],
           "lessons": [
             {
-              "title": "拓扑排序（动画讲解）",
+              "title": "拓扑排序",
               "url": "https://www.bilibili.com/video/BV1XV411X7T7/?p=30"
             }
           ],
@@ -2608,13 +2608,13 @@
         },
         {
           "source_id": "zjut_class2025",
-          "title": "树的概念",
+          "title": "50-第6章-图论-树的概念",
           "sections": [
-            "树的概念"
+            "50-第6章-图论-树的概念"
           ],
           "lessons": [
             {
-              "title": "树的概念",
+              "title": "50-第6章-图论-树的概念",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=53"
             }
           ],
@@ -2623,13 +2623,13 @@
         },
         {
           "source_id": "trevtutor",
-          "title": "树的基本性质",
+          "title": "[Discrete Mathematics] Trees",
           "sections": [
-            "树的基本性质"
+            "[Discrete Mathematics] Trees"
           ],
           "lessons": [
             {
-              "title": "树的基本性质",
+              "title": "[Discrete Mathematics] Trees",
               "url": "https://www.youtube.com/watch?v=zEQZpTizgLo"
             }
           ],
@@ -2663,13 +2663,13 @@
         },
         {
           "source_id": "zjut_class2025",
-          "title": "根树和哈夫曼树",
+          "title": "52-第6章-图论-根树和哈夫曼树",
           "sections": [
-            "根树和哈夫曼树"
+            "52-第6章-图论-根树和哈夫曼树"
           ],
           "lessons": [
             {
-              "title": "根树和哈夫曼树",
+              "title": "52-第6章-图论-根树和哈夫曼树",
               "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=55"
             }
           ],
@@ -2730,7 +2730,7 @@
       "videos": [
         {
           "source_id": "ucsd_discrete",
-          "title": "最小生成树",
+          "title": "图论模块 28：最小生成树",
           "sections": [
             "图论模块 28：最小生成树"
           ],
@@ -2772,28 +2772,28 @@
       "videos": [
         {
           "source_id": "steve_butler_spectral",
-          "title": "Matrix Tree Theorem（矩阵树定理）",
+          "title": "Matrix Tree Theorem",
           "sections": [
-            "第16讲 Matrix Tree Theorem"
+            "Matrix Tree Theorem"
           ],
           "verification": "已在教师官方2023年谱图理论课程页面核对第16讲YouTube直达视频",
           "note": "拓展节点。官方YouTube单集视频为英文授课，从拉普拉斯矩阵引出矩阵树定理；原Vimeo地址404，已弃用。",
           "lessons": [
             {
-              "title": "第16讲：Matrix Tree Theorem",
+              "title": "Matrix Tree Theorem",
               "url": "https://www.youtube.com/watch?v=AcVPX2JOM1U"
             }
           ]
         },
         {
           "source_id": "ucla_matrix_tree",
-          "title": "矩阵树定理（公开课单讲）",
+          "title": "矩阵树定理",
           "sections": [
-            "矩阵树定理（公开课单讲）"
+            "矩阵树定理"
           ],
           "lessons": [
             {
-              "title": "矩阵树定理（公开课单讲）",
+              "title": "矩阵树定理",
               "url": "https://www.bilibili.com/video/BV1L5411m7Tq/?p=27"
             }
           ],
@@ -2985,13 +2985,13 @@
       "videos": [
         {
           "source_id": "trevtutor",
-          "title": "Boolean Algebra in 13 Minutes（布尔代数与真值表）",
+          "title": "Boolean Algebra in 13 Minutes",
           "sections": [
-            "Boolean Algebra in 13 Minutes（布尔代数与真值表）"
+            "Boolean Algebra in 13 Minutes"
           ],
           "lessons": [
             {
-              "title": "Boolean Algebra in 13 Minutes（布尔代数与真值表）",
+              "title": "Boolean Algebra in 13 Minutes",
               "url": "https://www.youtube.com/watch?v=cTjFy18SjRc"
             }
           ],
@@ -3000,13 +3000,13 @@
         },
         {
           "source_id": "uestc_lattice",
-          "title": "10.4 布尔代数",
+          "title": "10.4布尔代数",
           "sections": [
-            "10.4 布尔代数"
+            "10.4布尔代数"
           ],
           "lessons": [
             {
-              "title": "10.4 布尔代数",
+              "title": "10.4布尔代数",
               "url": "https://www.bilibili.com/video/BV1En4y1X7Cc/?p=24"
             }
           ],
@@ -3021,7 +3021,7 @@
       "id": "cincinnati_math1071",
       "name": "辛辛那提大学 · Trefor Bazett",
       "course": "Discrete Mathematics（板书推导与例题）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "授课者署名明确；用具体分P视频，不使用课程首页。"
     },
     {
@@ -3035,7 +3035,7 @@
       "id": "socratica_bilibili",
       "name": "Socratica · 数学动画团队",
       "course": "Abstract Algebra（动画解释）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "有明确制作团队，动画+讲解；B站镜像分P直达。"
     },
     {
@@ -3049,14 +3049,14 @@
       "id": "liu_math",
       "name": "刘币老师 · 数学专题",
       "course": "初等数论（推导与例题）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "有明确署名的原创授课讲解。"
     },
     {
       "id": "ucsd_discrete",
       "name": "加州大学圣迭戈分校（UCSD）",
       "course": "Discrete Mathematics（Coursera短视频课程）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "大学公开课视频，配图解讲解；B站为中文字幕转载，字幕质量不保证。"
     },
     {
@@ -3077,7 +3077,7 @@
       "id": "sawfin_bilibili",
       "name": "Kimberly Brehm · 离散数学讲师",
       "course": "Discrete Math I（完整课程高清转载）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "含题目推演与例题演示的正式教学视频，B站按明确的分P章节定位。"
     },
     {
@@ -3098,7 +3098,7 @@
       "id": "zjut_class2025",
       "name": "浙江工业大学 · 小花醉猫（教师）",
       "course": "2025离散数学课堂实录",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "教师本人发布的课堂实录，避免目录标注无声或音效不佳的原视频分段。"
     },
     {
@@ -3140,91 +3140,91 @@
       "id": "neu_discrete",
       "name": "东北大学 · 胡明涵、赵志滨等",
       "course": "离散数学（大学公开课）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "sjtu_crypto",
       "name": "上海交通大学 · 陈恭亮",
       "course": "信息安全数学基础（国家精品课）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "bili_rsa_course",
       "name": "现代密码学 · 我有一个小脑瓜",
       "course": "RSA 加密及数学基础讲解",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "cqu_discrete",
       "name": "重庆大学 · 刘然",
       "course": "离散数学及其应用（课程实录）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "combinatorics_bili",
       "name": "组合数学 · 系列课程",
       "course": "递推关系与组合数学专题",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "xtu_wangting",
       "name": "湘潭大学 · 王婷",
       "course": "离散数学·图论与组合数学",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "nju_chenggong",
       "name": "南京大学 · 程龚",
       "course": "图论与算法（大学课程）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "hit_graph_course",
       "name": "哈尔滨工业大学 · 图论公开课",
       "course": "离散数学之集合论与图论",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "wangshusen_bili",
       "name": "王树森 · 图论与图算法",
       "course": "图论算法视频教程",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "graph_animation_bili",
       "name": "动画讲解计算机知识",
       "course": "数据结构·图（动画讲解）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "pku_discrete",
       "name": "北京大学 · 王捍贫",
       "course": "离散数学（国家精品课）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "ucla_matrix_tree",
       "name": "UCLA · 组合数学公开课",
       "course": "矩阵树定理（课程单讲）",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
       "id": "uestc_lattice",
       "name": "电子科技大学 · 离散数学公开课",
       "course": "代数、群与格·布尔代数",
-      "platform": "哔哩哔哩",
+      "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     },
     {
