@@ -21114,13 +21114,13 @@ function renderKnowledgeGraphDetail() {
             const source = (knowledgeGraphData.videoSources || []).find(
                 item => item.id === video.sourceId
             );
-            if (!source || ["verified_youtube_topic_lectures", "comb34"].includes(source.id)) {
-                return "院校未注明";
+            if (!source || !source.name) {
+                return "";
             }
             if (source.id === "ucla_enumerative_matrix_tree") {
                 return "加州大学洛杉矶分校";
             }
-            return String(source.name || "院校未注明").split(" · ")[0];
+            return String(source.name).trim();
         };
         const shortLessonTitle = title => String(title || node.name)
             .replace(/^(?:P|L)\d+\s+/i, "")
@@ -21134,6 +21134,8 @@ function renderKnowledgeGraphDetail() {
             return caption;
         };
         for (const video of videos) {
+            const school = schoolForVideo(video);
+            if (!school) continue;
             for (const lesson of (video.lessons || [])) {
                 const url = String(lesson.url || "");
                 const platform = /^https:\/\/www\.bilibili\.com\/video\/BV[A-Za-z0-9]+\/\?p=[1-9]\d*$/.test(url)
@@ -21143,7 +21145,7 @@ function renderKnowledgeGraphDetail() {
                 if (platform && !platforms.get(platform).some(item => item.url === url)) {
                     platforms.get(platform).push({
                         title: String(lesson.title || ""),
-                        school: schoolForVideo(video),
+                        school,
                         url
                     });
                 }
@@ -21155,11 +21157,7 @@ function renderKnowledgeGraphDetail() {
         entries.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:11px;";
         for (const [platform, items] of platforms) {
             if (!items.length) {
-                const unavailable = document.createElement("span");
-                unavailable.textContent = platform;
-                unavailable.title = "暂未找到可核对的该平台单集视频";
-                unavailable.style.cssText = "color:var(--text-secondary,#888);opacity:.55;cursor:not-allowed;";
-                entries.appendChild(unavailable);
+                continue;
             } else if (items.length === 1) {
                 const link = document.createElement("a");
                 link.className = "kg-video-open";
