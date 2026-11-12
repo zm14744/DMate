@@ -7,6 +7,9 @@ on:
       - 'templates/index.html'
       - 'static/offline*'
       - 'static/offline-content/**'
+      - 'static/script.js'
+      - 'static/dmate-main.css'
+      - 'static/icons/dmate-brand-v52.svg'
       - '.github/workflows/test-offline-workspace.yml'
   pull_request:
     paths:
@@ -38,6 +41,7 @@ jobs:
           node --check static/offline.js
           node --check static/offline-entry.js
           node --check static/offline-service-worker.js
+          node --check static/script.js
       - name: Validate JSON content packs
         run: |
           python -m json.tool static/offline-content/concepts.zh-CN.json > /dev/null
