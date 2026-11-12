@@ -24,6 +24,32 @@
       "prerequisites": [],
       "videos": [
         {
+          "source_id": "uestc_discrete_upper",
+          "title": "2.1.1",
+          "sections": [
+            "2.1.1"
+          ],
+          "lessons": [
+            {
+              "title": "2.1.1",
+              "url": "https://www.bilibili.com/video/BV1kK4y197bh/?p=6"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "1.1.0.2命题逻辑",
+          "sections": [
+            "1.1.0.2命题逻辑"
+          ],
+          "lessons": [
+            {
+              "title": "1.1.0.2命题逻辑",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=2"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "01-02 命题的概念",
           "sections": [
@@ -46,6 +72,32 @@
         "命题与真值"
       ],
       "videos": [
+        {
+          "source_id": "uestc_discrete_upper",
+          "title": "2.2.1",
+          "sections": [
+            "2.2.1"
+          ],
+          "lessons": [
+            {
+              "title": "2.2.1",
+              "url": "https://www.bilibili.com/video/BV1kK4y197bh/?p=7"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "1.1.0.2命题逻辑",
+          "sections": [
+            "1.1.0.2命题逻辑"
+          ],
+          "lessons": [
+            {
+              "title": "1.1.0.2命题逻辑",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=2"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "01-03 命题联结词",
@@ -70,6 +122,19 @@
       ],
       "videos": [
         {
+          "source_id": "uestc_discrete_upper",
+          "title": "2.4.1",
+          "sections": [
+            "2.4.1"
+          ],
+          "lessons": [
+            {
+              "title": "2.4.1",
+              "url": "https://www.bilibili.com/video/BV1kK4y197bh/?p=9"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "01-07 真值表",
           "sections": [
@@ -92,6 +157,19 @@
         "真值表"
       ],
       "videos": [
+        {
+          "source_id": "uestc_discrete_upper",
+          "title": "2.5.1",
+          "sections": [
+            "2.5.1"
+          ],
+          "lessons": [
+            {
+              "title": "2.5.1",
+              "url": "https://www.bilibili.com/video/BV1kK4y197bh/?p=10"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "01-08 等价关系",
@@ -163,6 +241,32 @@
       ],
       "videos": [
         {
+          "source_id": "uestc_discrete_upper",
+          "title": "3.1.1",
+          "sections": [
+            "3.1.1"
+          ],
+          "lessons": [
+            {
+              "title": "3.1.1",
+              "url": "https://www.bilibili.com/video/BV1kK4y197bh/?p=12"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "1.2.0.2谓词逻辑",
+          "sections": [
+            "1.2.0.2谓词逻辑"
+          ],
+          "lessons": [
+            {
+              "title": "1.2.0.2谓词逻辑",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=3"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "02-01 谓词的概念",
           "sections": [
@@ -186,6 +290,32 @@
       ],
       "videos": [
         {
+          "source_id": "uestc_discrete_upper",
+          "title": "3.2.1",
+          "sections": [
+            "3.2.1"
+          ],
+          "lessons": [
+            {
+              "title": "3.2.1",
+              "url": "https://www.bilibili.com/video/BV1kK4y197bh/?p=13"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "1.2.0.2谓词逻辑",
+          "sections": [
+            "1.2.0.2谓词逻辑"
+          ],
+          "lessons": [
+            {
+              "title": "1.2.0.2谓词逻辑",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=3"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_bilibili",
           "title": "p10 Discrete Math - 1.4.2 Quantifiers",
           "sections": [
@@ -208,6 +338,19 @@
         "量词"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "1.2.0.2谓词逻辑",
+          "sections": [
+            "1.2.0.2谓词逻辑"
+          ],
+          "lessons": [
+            {
+              "title": "1.2.0.2谓词逻辑",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=3"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "02-04 约束变元及换名",
@@ -346,6 +489,32 @@
       "prerequisites": [],
       "videos": [
         {
+          "source_id": "uestc_discrete_upper",
+          "title": "1.3.1",
+          "sections": [
+            "1.3.1"
+          ],
+          "lessons": [
+            {
+              "title": "1.3.1",
+              "url": "https://www.bilibili.com/video/BV1kK4y197bh/?p=3"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "1.4.0.3 集合恒等式",
+          "sections": [
+            "1.4.0.3 集合恒等式"
+          ],
+          "lessons": [
+            {
+              "title": "1.4.0.3 集合恒等式",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=5"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "03-04 集合的运算(1)",
           "sections": [
@@ -368,6 +537,19 @@
         "集合运算"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "2.1.0.2 有序对和卡氏积",
+          "sections": [
+            "2.1.0.2 有序对和卡氏积"
+          ],
+          "lessons": [
+            {
+              "title": "2.1.0.2 有序对和卡氏积",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=7"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "03-06 笛卡尔积",
@@ -415,6 +597,19 @@
       ],
       "videos": [
         {
+          "source_id": "dogeman_discrete",
+          "title": "2.3.0.3 关系的三种性质",
+          "sections": [
+            "2.3.0.3 关系的三种性质"
+          ],
+          "lessons": [
+            {
+              "title": "2.3.0.3 关系的三种性质",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=9"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "03-09 自反和反自反",
           "sections": [
@@ -438,6 +633,32 @@
       ],
       "videos": [
         {
+          "source_id": "uestc_discrete_lower",
+          "title": "7.1.1 等价关系",
+          "sections": [
+            "7.1.1 等价关系"
+          ],
+          "lessons": [
+            {
+              "title": "7.1.1 等价关系",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=1"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "2.5.0.3 等价关系与划分",
+          "sections": [
+            "2.5.0.3 等价关系与划分"
+          ],
+          "lessons": [
+            {
+              "title": "2.5.0.3 等价关系与划分",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=11"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "03-18 等价关系",
           "sections": [
@@ -460,6 +681,19 @@
         "关系性质"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "2.6.0.3 序关系",
+          "sections": [
+            "2.6.0.3 序关系"
+          ],
+          "lessons": [
+            {
+              "title": "2.6.0.3 序关系",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=12"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "03-21 偏序关系",
@@ -485,6 +719,19 @@
       ],
       "videos": [
         {
+          "source_id": "dogeman_discrete",
+          "title": "2.4.0.3 关系的幂运算和闭包",
+          "sections": [
+            "2.4.0.3 关系的幂运算和闭包"
+          ],
+          "lessons": [
+            {
+              "title": "2.4.0.3 关系的幂运算和闭包",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=10"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "03-15 关系的闭包",
           "sections": [
@@ -507,6 +754,19 @@
         "集合运算"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "3.1.0.3 函数(上）",
+          "sections": [
+            "3.1.0.3 函数(上）"
+          ],
+          "lessons": [
+            {
+              "title": "3.1.0.3 函数(上）",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=15"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "04-01 函数的定义",
@@ -554,6 +814,19 @@
       ],
       "videos": [
         {
+          "source_id": "dogeman_discrete",
+          "title": "3.2.0.3 函数(下）",
+          "sections": [
+            "3.2.0.3 函数(下）"
+          ],
+          "lessons": [
+            {
+              "title": "3.2.0.3 函数(下）",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=16"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "04-04 函数的复合",
           "sections": [
@@ -597,7 +870,21 @@
       "name": "整除与素数",
       "category": "初等数论",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "17.1.0.2 素数",
+          "sections": [
+            "17.1.0.2 素数"
+          ],
+          "lessons": [
+            {
+              "title": "17.1.0.2 素数",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=71"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_gcd",
@@ -606,7 +893,21 @@
       "prerequisites": [
         "整除与素数"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "17.2.0.3 最大公约数和最小公倍数",
+          "sections": [
+            "17.2.0.3 最大公约数和最小公倍数"
+          ],
+          "lessons": [
+            {
+              "title": "17.2.0.3 最大公约数和最小公倍数",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=72"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_congruence",
@@ -615,7 +916,21 @@
       "prerequisites": [
         "整除与素数"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "17.3.0.2 同余",
+          "sections": [
+            "17.3.0.2 同余"
+          ],
+          "lessons": [
+            {
+              "title": "17.3.0.2 同余",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=73"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_linear_congruence",
@@ -625,7 +940,21 @@
         "同余与模运算",
         "最大公因数与欧几里得算法"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "17.4.0.2 一次同余方程",
+          "sections": [
+            "17.4.0.2 一次同余方程"
+          ],
+          "lessons": [
+            {
+              "title": "17.4.0.2 一次同余方程",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=74"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_inverse_crt",
@@ -781,6 +1110,32 @@
       "prerequisites": [],
       "videos": [
         {
+          "source_id": "uestc_discrete_lower",
+          "title": "8.1.1 图的引入",
+          "sections": [
+            "8.1.1 图的引入"
+          ],
+          "lessons": [
+            {
+              "title": "8.1.1 图的引入",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=9"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "6.1.0.2 图的基本概念",
+          "sections": [
+            "6.1.0.2 图的基本概念"
+          ],
+          "lessons": [
+            {
+              "title": "6.1.0.2 图的基本概念",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=25"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-02 图的基本概念",
           "sections": [
@@ -804,6 +1159,19 @@
       ],
       "videos": [
         {
+          "source_id": "uestc_discrete_lower",
+          "title": "8.1.6 图的同构",
+          "sections": [
+            "8.1.6 图的同构"
+          ],
+          "lessons": [
+            {
+              "title": "8.1.6 图的同构",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=14"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-05 图的同构",
           "sections": [
@@ -826,6 +1194,19 @@
         "图的基本概念"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "9.2.0.3 邻接矩阵和相邻矩阵",
+          "sections": [
+            "9.2.0.3 邻接矩阵和相邻矩阵"
+          ],
+          "lessons": [
+            {
+              "title": "9.2.0.3 邻接矩阵和相邻矩阵",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=38"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-09 图的矩阵表示",
@@ -852,6 +1233,32 @@
       "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
       "videos": [
         {
+          "source_id": "uestc_discrete_lower",
+          "title": "8.1.2 图的表示",
+          "sections": [
+            "8.1.2 图的表示"
+          ],
+          "lessons": [
+            {
+              "title": "8.1.2 图的表示",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=10"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "9.1.0.3 关联矩阵",
+          "sections": [
+            "9.1.0.3 关联矩阵"
+          ],
+          "lessons": [
+            {
+              "title": "9.1.0.3 关联矩阵",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=37"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-09 图的矩阵表示",
           "sections": [
@@ -875,6 +1282,32 @@
       ],
       "videos": [
         {
+          "source_id": "uestc_discrete_lower",
+          "title": "8.2.3 无向图的连通性",
+          "sections": [
+            "8.2.3 无向图的连通性"
+          ],
+          "lessons": [
+            {
+              "title": "8.2.3 无向图的连通性",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=17"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "6.5.0.3 无向图和有向图的连通性",
+          "sections": [
+            "6.5.0.3 无向图和有向图的连通性"
+          ],
+          "lessons": [
+            {
+              "title": "6.5.0.3 无向图和有向图的连通性",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=29"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-06 路与回路",
           "sections": [
@@ -896,21 +1329,7 @@
       "prerequisites": [
         "路径与连通性"
       ],
-      "videos": [
-        {
-          "source_id": "fang_cut",
-          "title": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
-          "sections": [
-            "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集"
-          ],
-          "lessons": [
-            {
-              "title": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
-              "url": "https://www.bilibili.com/video/BV1oT421U7EK/?p=1"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "graph_weighted",
@@ -944,6 +1363,19 @@
       ],
       "videos": [
         {
+          "source_id": "dogeman_discrete",
+          "title": "7.1.0.3 欧拉图",
+          "sections": [
+            "7.1.0.3 欧拉图"
+          ],
+          "lessons": [
+            {
+              "title": "7.1.0.3 欧拉图",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=33"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-10 欧拉图",
           "sections": [
@@ -966,6 +1398,19 @@
         "路径与连通性"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "7.2.0.3 哈密顿图",
+          "sections": [
+            "7.2.0.3 哈密顿图"
+          ],
+          "lessons": [
+            {
+              "title": "7.2.0.3 哈密顿图",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=34"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-11 汉密尔顿图",
@@ -991,15 +1436,15 @@
       ],
       "videos": [
         {
-          "source_id": "wangshusen_2023",
-          "title": "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs",
+          "source_id": "uestc_discrete_lower",
+          "title": "8.2.2 可达性与最短通路",
           "sections": [
-            "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs"
+            "8.2.2 可达性与最短通路"
           ],
           "lessons": [
             {
-              "title": "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs",
-              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=9"
+              "title": "8.2.2 可达性与最短通路",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=16"
             }
           ]
         }
@@ -1013,6 +1458,19 @@
         "图的基本概念"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "11.1.0.3 点着色",
+          "sections": [
+            "11.1.0.3 点着色"
+          ],
+          "lessons": [
+            {
+              "title": "11.1.0.3 点着色",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=42"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-18 着色法",
@@ -1036,6 +1494,19 @@
         "图的基本概念"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "10.1.0.2 平面图的基本概念",
+          "sections": [
+            "10.1.0.2 平面图的基本概念"
+          ],
+          "lessons": [
+            {
+              "title": "10.1.0.2 平面图的基本概念",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=39"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-14 平面图",
@@ -1061,15 +1532,15 @@
       ],
       "videos": [
         {
-          "source_id": "wangshusen_2023",
-          "title": "18. 14-1- 二部图及其判定算法 Bipartite Graphs",
+          "source_id": "dogeman_discrete",
+          "title": "12.6.0.2 二部图中的匹配",
           "sections": [
-            "18. 14-1- 二部图及其判定算法 Bipartite Graphs"
+            "12.6.0.2 二部图中的匹配"
           ],
           "lessons": [
             {
-              "title": "18. 14-1- 二部图及其判定算法 Bipartite Graphs",
-              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=18"
+              "title": "12.6.0.2 二部图中的匹配",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=50"
             }
           ]
         }
@@ -1106,7 +1577,21 @@
       "prerequisites": [
         "图的基本概念"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "12.1.0.3 支配集，(点)独立集",
+          "sections": [
+            "12.1.0.3 支配集，(点)独立集"
+          ],
+          "lessons": [
+            {
+              "title": "12.1.0.3 支配集，(点)独立集",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=45"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "graph_matching",
@@ -1118,15 +1603,15 @@
       ],
       "videos": [
         {
-          "source_id": "wangshusen_2023",
-          "title": "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)",
+          "source_id": "dogeman_discrete",
+          "title": "12.4.0.3 边覆盖集与匹配",
           "sections": [
-            "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)"
+            "12.4.0.3 边覆盖集与匹配"
           ],
           "lessons": [
             {
-              "title": "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)",
-              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=19"
+              "title": "12.4.0.3 边覆盖集与匹配",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=48"
             }
           ]
         }
@@ -1141,6 +1626,32 @@
         "路径与连通性"
       ],
       "videos": [
+        {
+          "source_id": "uestc_discrete_lower",
+          "title": "9.1.2 无向树",
+          "sections": [
+            "9.1.2 无向树"
+          ],
+          "lessons": [
+            {
+              "title": "9.1.2 无向树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=20"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "8.1.0.2 无向树的定义与性质",
+          "sections": [
+            "8.1.0.2 无向树的定义与性质"
+          ],
+          "lessons": [
+            {
+              "title": "8.1.0.2 无向树的定义与性质",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=35"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-20 树的性质",
@@ -1164,6 +1675,19 @@
         "树的基本性质"
       ],
       "videos": [
+        {
+          "source_id": "uestc_discrete_lower",
+          "title": "9.2.1 根树",
+          "sections": [
+            "9.2.1 根树"
+          ],
+          "lessons": [
+            {
+              "title": "9.2.1 根树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=23"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-23 根树",
@@ -1189,6 +1713,32 @@
       ],
       "videos": [
         {
+          "source_id": "uestc_discrete_lower",
+          "title": "9.1.3 生成树",
+          "sections": [
+            "9.1.3 生成树"
+          ],
+          "lessons": [
+            {
+              "title": "9.1.3 生成树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=21"
+            }
+          ]
+        },
+        {
+          "source_id": "dogeman_discrete",
+          "title": "8.2.0.3 生成树",
+          "sections": [
+            "8.2.0.3 生成树"
+          ],
+          "lessons": [
+            {
+              "title": "8.2.0.3 生成树",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=36"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-21 生成树",
           "sections": [
@@ -1212,6 +1762,19 @@
         "带权图"
       ],
       "videos": [
+        {
+          "source_id": "uestc_discrete_lower",
+          "title": "9.1.4 最小生成树",
+          "sections": [
+            "9.1.4 最小生成树"
+          ],
+          "lessons": [
+            {
+              "title": "9.1.4 最小生成树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=22"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "07-22 最小生成树",
@@ -1247,6 +1810,19 @@
       ],
       "videos": [
         {
+          "source_id": "dogeman_discrete",
+          "title": "13.2.0.3 代数系统",
+          "sections": [
+            "13.2.0.3 代数系统"
+          ],
+          "lessons": [
+            {
+              "title": "13.2.0.3 代数系统",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=52"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "05-02 代数系统",
           "sections": [
@@ -1269,6 +1845,19 @@
         "代数系统"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "14.3.0.3 群的定义与性质",
+          "sections": [
+            "14.3.0.3 群的定义与性质"
+          ],
+          "lessons": [
+            {
+              "title": "14.3.0.3 群的定义与性质",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=56"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "05-10 群",
@@ -1294,6 +1883,19 @@
       ],
       "videos": [
         {
+          "source_id": "dogeman_discrete",
+          "title": "13.3.0.2 代数系统的同态与同构",
+          "sections": [
+            "13.3.0.2 代数系统的同态与同构"
+          ],
+          "lessons": [
+            {
+              "title": "13.3.0.2 代数系统的同态与同构",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=53"
+            }
+          ]
+        },
+        {
           "source_id": "xiaohuazuimao_2021",
           "title": "05-23 同态与同构",
           "sections": [
@@ -1315,7 +1917,21 @@
       "prerequisites": [
         "群与子群"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "15.1.0.3 环与域",
+          "sections": [
+            "15.1.0.3 环与域"
+          ],
+          "lessons": [
+            {
+              "title": "15.1.0.3 环与域",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=64"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "algebra_lattice_bool",
@@ -1325,6 +1941,19 @@
         "偏序关系"
       ],
       "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "16.4.0.3 布尔格和布尔代数",
+          "sections": [
+            "16.4.0.3 布尔格和布尔代数"
+          ],
+          "lessons": [
+            {
+              "title": "16.4.0.3 布尔格和布尔代数",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=70"
+            }
+          ]
+        },
         {
           "source_id": "xiaohuazuimao_2021",
           "title": "06-08 布尔代数",
@@ -1374,13 +2003,6 @@
       "publisher": "小花醉猫"
     },
     {
-      "id": "wangshusen_2023",
-      "name": "王树森",
-      "course": "【王树森】数据结构和算法完整课程",
-      "platform": "Bilibili",
-      "publisher": ""
-    },
-    {
       "id": "chenggong_weighted",
       "name": "程龚老师",
       "course": "南大程龚主讲《图论与算法》(GTA)",
@@ -1388,11 +2010,28 @@
       "publisher": "程龚老师"
     },
     {
-      "id": "fang_cut",
-      "name": "01壹萬",
-      "course": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
+      "id": "dogeman_discrete",
+      "name": "dogeman先生",
+      "course": "学生来讲《离散数学》，最简明易懂的离散数学教程！（已完结）",
       "platform": "Bilibili",
-      "publisher": "01壹萬"
+      "publisher": "dogeman先生",
+      "note": "UP主原创讲解；按章节、重要程度与难度拆分，覆盖逻辑、关系、图论、代数结构和初等数论。"
+    },
+    {
+      "id": "uestc_discrete_upper",
+      "name": "电子科技大学 · 王丽杰",
+      "course": "〖电子科技大学〗离散数学（上）王丽杰",
+      "platform": "Bilibili",
+      "publisher": "电子科技大学",
+      "note": "电子科技大学官方账号发布；仅使用具体分P链接。"
+    },
+    {
+      "id": "uestc_discrete_lower",
+      "name": "电子科技大学 · 王丽杰",
+      "course": "〖电子科技大学〗离散数学（下）王丽杰",
+      "platform": "Bilibili",
+      "publisher": "电子科技大学",
+      "note": "电子科技大学官方账号发布；仅使用具体分P链接。"
     }
   ],
   "video_resource_policy": {
