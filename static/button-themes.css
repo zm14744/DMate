@@ -303,7 +303,6 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         .dge-tabs [aria-selected="true"],
         .dgs-modes [aria-selected="true"],
         .kg-history-item.active,
-        .kg-mobile-node.selected,
         .graph-summary-item.focus,
         .dcn-note.is-current,
         .ddw-history-item.is-current
@@ -320,9 +319,6 @@ body[data-appearance-theme] #accountBtn.is-syncing .account-entry-icon {
         border-color:var(--dm-selected-ring) !important;
         background:var(--dm-selected-ring) !important;
         box-shadow:none !important;
-    }
-    body[data-appearance-theme] .kg-mobile-node.selected {
-        border-width:1px !important;
     }
     body[data-appearance-theme] .graph-summary-item.focus :is(
         .graph-summary-label,.graph-summary-value

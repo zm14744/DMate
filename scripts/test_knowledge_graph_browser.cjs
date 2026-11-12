@@ -1,4 +1,4 @@
-/* Real-app regression for mobile knowledge-graph fitting and navigation.
+/* Real-app regression for mobile knowledge-graph fitting, selection and navigation.
  * Start the Flask app first. Set CHROMIUM_EXECUTABLE_PATH to use a system engine.
  */
 'use strict';
@@ -154,10 +154,72 @@ async function mobileCase(browser, width) {
   } finally { await page.close(); }
 }
 
+async function checkSelectionBorder(browser, theme) {
+  const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const desktop = await browser.newPage({ viewport: { width: 1024, height: 844 } });
+  const errors = [];
+  mobile.on('pageerror', error => errors.push(error.message));
+  desktop.on('pageerror', error => errors.push(error.message));
+  try {
+    for (const page of [mobile, desktop]) {
+      await page.goto(baseURL, { waitUntil: 'networkidle' });
+      await page.evaluate(value => {
+        document.documentElement.dataset.appearanceTheme = value;
+        document.body.dataset.appearanceTheme = value;
+        openKnowledgeGraph();
+      }, theme);
+      await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
+      await page.evaluate(() => setKnowledgeGraphFilter('证明与归纳'));
+    }
+    await mobile.locator('.kg-mobile-expand').click();
+    await settleGraph(mobile);
+    const accent = await mobile.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--accent)';
+      document.body.appendChild(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    const scale = (await snapshot(mobile)).scale;
+    const firstName = await mobile.locator('.kg-mobile-node:not(.selected)').first().getAttribute('aria-label');
+    const first = mobile.locator('.kg-mobile-stage').getByRole('button', { name: firstName, exact: true });
+    await first.tap();
+    assert.equal(await mobile.locator('.kg-mobile-node.selected').count(), 1, theme + ': only one node selected');
+    assert.equal(await first.evaluate(node => node.classList.contains('selected')), true);
+    const secondName = await mobile.locator('.kg-mobile-node:not(.selected)').first().getAttribute('aria-label');
+    const second = mobile.locator('.kg-mobile-stage').getByRole('button', { name: secondName, exact: true });
+    await second.tap();
+    assert.equal(await first.evaluate(node => node.classList.contains('selected')), false, theme + ': previous node deselected');
+    assert.equal(await second.evaluate(node => node.classList.contains('selected')), true);
+    assert.equal(await mobile.locator('.kg-mobile-node.selected').count(), 1);
+    const border = await second.evaluate(node => {
+      const style = getComputedStyle(node);
+      return { color: style.borderTopColor, width: parseFloat(style.borderTopWidth) };
+    });
+    assert.equal(border.color, accent, theme + ': tapped node must have a visible accent border');
+    assert.ok(border.width >= 3, theme + ': selection border must remain prominent');
+    near((await snapshot(mobile)).scale, scale, theme + ': node selection preserves zoom', .0001);
+    // The shared focus layer can hide shadows while focused; the selection ring
+    // must remain after focus moves away from the selected node.
+    await second.evaluate(node => node.blur());
+    assert.notEqual(await second.evaluate(node => getComputedStyle(node).boxShadow), 'none', theme + ': selected node ring');
+    await desktop.locator('.kg-node-group:not(.selected)').first().click();
+    const desktopStroke = await desktop.locator('.kg-node-group.selected rect').evaluate(rect => getComputedStyle(rect).stroke);
+    assert.equal(border.color, desktopStroke, theme + ': mobile border matches desktop selection stroke');
+    if (process.env.KG_SCREENSHOT_DIR) {
+      await mobile.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-selection-after-390-' + theme + '.png' });
+    }
+    assert.deepEqual(errors, [], theme + ': selection page errors');
+    console.log('PASS ' + theme + ': mobile node taps switch the accent border, matching desktop');
+  } finally { await mobile.close(); await desktop.close(); }
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
+    for (const theme of ['light', 'dark', 'navy']) await checkSelectionBorder(browser, theme);
     for (const width of [390, 620]) await mobileCase(browser, width);
     const page = await browser.newPage({ viewport: { width: 820, height: 844 } });
     try {
