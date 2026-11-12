@@ -37,8 +37,9 @@
 | DOMPurify | 3.2.6 | [Apache-2.0 或 MPL-2.0](https://github.com/cure53/DOMPurify) |
 | html2canvas | 1.4.1 | [MIT](https://github.com/niklasvh/html2canvas) |
 | jsPDF | 2.5.2 | [MIT](https://github.com/parallax/jsPDF) |
+| Viz.js / Graphviz / Expat | 3.31.0 / 16.1.0 | Viz.js 与 Expat 使用 MIT；Graphviz 使用 EPL-1.0。完整文本和固定 bundle 来源见 [`static/vendor/viz-js-3.31.0/`](static/vendor/viz-js-3.31.0/) 及其 `manifest.json`。
 
-这些固定版本由网站本域的 `static/vendor/` 提供，浏览器显示公式、Markdown、净化内容和导出时不再依赖 jsDelivr。各组件目录保留其 npm 发布包中的许可证；[资源清单](static/vendor/manifest.json) 记录官方 npm 归档地址、归档 SHA-512 完整性值及分发文件的 SHA256。MathJax 同时包含菜单、TeX 扩展、字体及辅助功能需要的按需资源；完整版本边界和更新方式见 [资源说明](static/vendor/README.md)。
+这些固定版本由网站本域的 `static/vendor/` 提供，浏览器显示公式、Markdown、净化内容、导出及数学图布局时不再依赖 jsDelivr 或其他公共 CDN。Viz.js 3.31.0 / Graphviz 16.1.0 的 bundle 固定到清单记录的上游提交，并通过 SHA-256 SRI 校验；同时保留 Viz.js MIT、Graphviz EPL-1.0 和 Expat MIT 许可文本。各组件目录保留其 npm 发布包中的许可证；[资源清单](static/vendor/manifest.json) 记录官方 npm 归档地址、归档 SHA-512 完整性值及分发文件的 SHA256。MathJax 同时包含菜单、TeX 扩展、字体及辅助功能需要的按需资源；完整版本边界和更新方式见 [资源说明](static/vendor/README.md)。
 
 ## 界面图标
 
@@ -46,7 +47,7 @@ DMate 网页及 Edge / Firefox 浏览器扩展的部分按钮采用 [Lucide Icon
 
 ## 模型与外部服务
 
-- [DeepSeek](https://api-docs.deepseek.com/)：文本问答、讲解和相关文本任务；默认模型配置见 [部署说明](docs/DEPLOYMENT.md)。不承担当前网页图形识别。
+- [DeepSeek](https://api-docs.deepseek.com/)：文本问答、讲解、数学图结构生成及相关文本任务；默认模型配置见 [部署说明](docs/DEPLOYMENT.md)。不承担当前网页图形识别。
 - [阿里云百炼 / 通义千问](https://help.aliyun.com/zh/model-studio/)：当前图片图形识别和语音转写。自动图形识别使用 qwen3.8-flash，语音默认 qwen-audio-3.1-asr-flash；兼容视觉路径的配置与默认值见 [识别链路](docs/RECOGNITION.md)。远程模型按提供方服务条款使用，不随源码分发其权重。
 - [智谱](https://open.bigmodel.cn/)：代码保留显式选择的兼容视觉适配器；仅配置密钥不会自动切换当前默认识别链路。
 - [Brevo](https://developers.brevo.com/) 与 SMTP：账号邮箱验证码的发送通道，按部署配置启用。

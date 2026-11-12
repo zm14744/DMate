@@ -34,7 +34,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   const newButton=button('新建空白页',()=>newPage()),exportButton=button('导出图片',()=>exportImage()),uploadButton=button('上传',()=>uploadImage(),'ddw-primary ddw-upload-button');
   uploadButton.setAttribute('aria-label','上传');uploadButton.title='上传';
   actions.append(newButton,historyButton,exportButton,uploadButton);top.append(name,actions);rail.append(settingsButton,informationButton,aiButton);body.append(editorHost,rail);shell.append(top,body,panel,noticeOwner);host.replaceChildren(shell);host.classList.add('has-drawing-workspace');
-  let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false;
+  let requirement='',answer='',answerDocument='',answerRequirement='',nameFollowsGraph=false,aiTask='';
   const active=()=>pages.find(p=>p.id===activeId);
   function showNextNotice(){
    if(destroyed||noticeFrame||noticeCurrent||!noticeQueue.length)return;
@@ -58,10 +58,11 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    if((persistent&&persistNoticeShown===value)||noticeCurrent===value||noticeQueue.some(item=>item.message===value))return;
    noticeQueue.push({message:value,persistent});showNextNotice();
   }
-  function abortAnswer(){aiEpoch++;aiAbort?.abort();aiAbort=null;}
+  function abortAnswer(){aiEpoch++;aiAbort?.abort();aiAbort=null;aiTask='';}
   function invalidateAnswer(){
    abortAnswer();answer='';answerDocument='';answerRequirement='';
-   const ask=panel.querySelector('[data-drawing-guide]');if(ask){ask.disabled=false;ask.setAttribute('aria-busy','false');}
+   const ask=panel.querySelector('[data-drawing-guide]');if(ask){ask.disabled=!active();ask.setAttribute('aria-busy','false');}
+   const generate=panel.querySelector('[data-math-diagram-generate]');if(generate){generate.disabled=false;generate.textContent=uiText('生成数学图','Generate diagram');generate.setAttribute('aria-busy','false');}
    const result=panel.querySelector('.ddw-ai-answer');if(result)result.replaceChildren();
   }
   function editorPanel(key){return editorHost.querySelector('.dge-float-panel[data-panel-key="'+key+'"]');}
@@ -204,7 +205,18 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
    cancelDelete();collect();persist();abortAnswer();const pageName=uiText('绘图 '+(pages.length+1),'Drawing '+(pages.length+1)),p={id:id(),name:pageName,document:blank(pageName),requirement:'',createdAt:Date.now(),updatedAt:Date.now()};pages.push(p);activeId=p.id;persist();mountPage();setStatus('');
   }
-  function togglePanel(mode){if(mode==='ai'&&!active())return;closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
+  function createPageFromDocument(documentValue,pageName,requestText=''){
+   if(pages.length>=50)throw new Error('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');
+   if(!goodDocument(documentValue)||documentValue.graphs.length!==1||!documentValue.graphs[0].vertices.length)throw new Error('生成的数学图结构无效，未创建画板。');
+   const normalized=root.DMateGraphEditor.importDocument(documentValue);
+   const issues=root.DMateGraphEditor.validateDocument(normalized);
+   if(issues.length)throw new Error(issues[0]);
+   collect();persist();const title=caption(pageName||normalized.graphs[0].name||uiText('数学图','Math diagram'));
+   const page={id:id(),name:title,document:clone(normalized),requirement:String(requestText||'').slice(0,2000),createdAt:Date.now(),updatedAt:Date.now()};
+   pages.push(page);activeId=page.id;panelMode='';persist();mountPage();setStatus(uiText('数学图已生成，可以继续编辑。','Mathematical diagram generated. You can continue editing it.'));
+   return page.id;
+  }
+  function togglePanel(mode){closeTools();editorHost.querySelector('.dge-selection-panel .dge-panel-close')?.click();closeEditorPanels();panelMode=panelMode===mode?'':mode;renderPanel();syncChrome();}
   function renderPanel(){
    panel.style.visibility='hidden';panel.hidden=!panelMode;panel.replaceChildren();historyButton.setAttribute('aria-expanded',String(panelMode==='history'));aiButton.setAttribute('aria-expanded',String(panelMode==='ai'));
    if(!panelMode){queueChrome();return;}
@@ -221,13 +233,17 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    }
    const label=el('label','ddw-ai-label','要求（可选）'),input=el('textarea','ddw-ai-requirement');input.rows=3;input.maxLength=2000;input.value=requirement;input.setAttribute('aria-label','绘图指导要求（可选）');
    input.addEventListener('input',()=>{requirement=input.value;const p=active();if(p){p.requirement=requirement;p.updatedAt=Date.now();schedule();}invalidateAnswer();});label.append(input);
-   const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.append(sendIcon());ask.disabled=Boolean(aiAbort);ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='请求 AI 指导';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
+   const actionRow=el('div','ddw-ai-actions');
+   const ask=button('',()=>requestGuide(),'ddw-guide-button');ask.append(sendIcon());ask.disabled=Boolean(aiAbort)||!active();ask.dataset.drawingGuide='true';ask.setAttribute('aria-label','请求 AI 指导');ask.title='指导当前图形';ask.setAttribute('aria-busy',String(Boolean(aiAbort)));
+   const generate=button(uiText(aiTask==='generate'?'正在生成…':'生成数学图',aiTask==='generate'?'Generating…':'Generate diagram'),()=>requestGenerate(),'ddw-generate-button');generate.disabled=Boolean(aiAbort);generate.dataset.mathDiagramGenerate='true';generate.setAttribute('aria-busy',String(aiTask==='generate'));
    const result=el('div','ddw-ai-answer');result.setAttribute('data-i18n-content','');result.setAttribute('aria-live','polite');
-   panel.append(label,ask,result);
+   actionRow.append(ask,generate);panel.append(label,actionRow,result);
    if(answer){
     const renderedAnswer=answer,renderedPage=activeId,renderedRequirement=requirement;
     if(root.DMateAIAnswer?.render)root.DMateAIAnswer.render(result,answer,{isCurrent:()=>!destroyed&&panelMode==='ai'&&activeId===renderedPage&&answer===renderedAnswer&&requirement===renderedRequirement});
     else result.textContent=answer;
+   } else if(aiTask==='generate') {
+    result.textContent=uiText('正在生成数学图并自动布局…','Generating and laying out the diagram…');
    }
    syncChrome();
   }
@@ -257,7 +273,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
   async function requestGuide(){
    if(aiAbort||destroyed||!active())return;collect();persist();
    const snapshot=clone(currentDocument()),snapshotKey=fingerprint(snapshot),request=requirement,selected=activeId,epoch=++aiEpoch;
-   const controller=new win.AbortController();aiAbort=controller;answer='';renderPanel();setStatus('');
+   const controller=new win.AbortController();aiAbort=controller;aiTask='guide';answer='';renderPanel();setStatus('');
    try{
     const response=await win.fetch('/drawing/guide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({document:snapshot,requirement:request,language:root.DMateI18n?.getLanguage?.()||doc.documentElement.lang||'zh-CN'}),signal:controller.signal});
     let result;try{result=await response.json();}catch(_){throw new Error(uiText('AI 返回内容无效，请重试。'));}
@@ -265,7 +281,22 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
     if(destroyed||epoch!==aiEpoch||activeId!==selected||fingerprint(currentDocument())!==snapshotKey||requirement!==request)return;
     answer=result.answer;answerDocument=snapshotKey;answerRequirement=request;setStatus('');
    }catch(error){if(!destroyed&&epoch===aiEpoch&&error?.name!=='AbortError')setStatus(error?.message||'AI 指导失败，请重试。');}
-   finally{if(epoch===aiEpoch){aiAbort=null;if(!destroyed)renderPanel();}}
+   finally{if(epoch===aiEpoch){aiAbort=null;aiTask='';if(!destroyed)renderPanel();}}
+  }
+  async function requestGenerate(){
+   if(aiAbort||destroyed)return;
+   const request=requirement.trim();
+   if(!request){setStatus(uiText('请先描述需要生成的数学图。','Describe the mathematical diagram you want to generate first.'));return;}
+   if(pages.length>=50){setStatus('最多保留 50 张绘图，请先导出并删除不再需要的历史绘图。');return;}
+   if(!root.DMateMathDiagram?.generate){setStatus(uiText('数学图生成模块未加载，请刷新后重试。','The diagram generator is not loaded. Refresh and try again.'));return;}
+   const selected=activeId,epoch=++aiEpoch,controller=new win.AbortController();aiAbort=controller;aiTask='generate';answer='';renderPanel();setStatus('');
+   try{
+    const result=await root.DMateMathDiagram.generate(request,root.DMateI18n?.getLanguage?.()||doc.documentElement.lang||'zh-CN',controller.signal);
+    if(destroyed||epoch!==aiEpoch||activeId!==selected||requirement.trim()!==request)return;
+    createPageFromDocument(result.document,result.title,request);
+   }catch(error){
+    if(!destroyed&&epoch===aiEpoch&&error?.name!=='AbortError')setStatus(error?.message||uiText('数学图生成失败，请重试。','Diagram generation failed. Please try again.'));
+   }finally{if(epoch===aiEpoch){aiAbort=null;aiTask='';if(!destroyed)renderPanel();}}
   }
   async function makeImage(){
    if(!active())throw new Error(uiText('请先新建空白页。'));
@@ -325,7 +356,7 @@ const uiText=(source,english)=>root.DMateI18n?.t?.(source,english)??source;
    name:caption(graph.name||p.name+' '+(index+1)),document:{...clone(p.document),graphs:[clone(graph)]}})));
   mountPage();persist();
   const pageHide=()=>{collect();persist(false);};win.addEventListener('pagehide',pageHide);
-  return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,
+  return{getDocument:()=>clone(currentDocument()),getPages:()=>clone(pages),isBusy:()=>uploadBusy,createPageFromDocument,
    destroy(){if(destroyed)return;collect();persist(false);destroyed=true;noticeQueue=[];if(noticeFrame)win.cancelAnimationFrame(noticeFrame);root.DMateDeleteConfirm?.cancel(noticeOwner);cancelDelete();closeExportPreview();clearTimeout(timer);if(chromeFrame)win.cancelAnimationFrame(chromeFrame);chromeObserver.disconnect();resizeObserver?.disconnect();abortAnswer();doc.removeEventListener('pointerdown',outsidePointer,true);doc.removeEventListener('keydown',escapeKey,true);doc.removeEventListener('scroll',documentScrolled,true);win.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('resize',queueChrome);win.visualViewport?.removeEventListener('scroll',queueChrome);win.removeEventListener('pagehide',pageHide);editor?.destroy();host.replaceChildren();host.classList.remove('has-drawing-workspace');}};
  }
  root.DMateDrawingWorkspace={mount,blankDocument:blank};

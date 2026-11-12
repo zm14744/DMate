@@ -9,7 +9,7 @@
 | 部署范围 | 需要准备 | 未准备时的表现 |
 | --- | --- | --- |
 | 打开页面、手工编辑画板、查看内置知识图谱 | Python 服务及静态资源 | 服务未启动时页面无法访问 |
-| AI 教学、出题、错题分析、概念分析、绘图指导 | DeepSeek Key 和服务网络 | 相关 AI 请求返回配置或服务错误，不能因此判断画板或页面本身损坏 |
+| AI 教学、出题、错题分析、概念分析、绘图指导、数学图生成 | DeepSeek Key 和服务网络 | 相关 AI 请求返回配置或服务错误，不能因此判断画板或页面本身损坏 |
 | 网页自动识图、选区图形重识别 | DashScope Key、可访问的视觉服务地址 | 自动扫描与图形选区重识别不能完成；独立画板仍可使用 |
 | 文字框识别 | ONNX Runtime、PaddleOCR / PaddleX 依赖、已转换文字模型、可写缓存、足够的进程内存 | 选区 OCR 报初始化、缓存或资源错误；它不使用 DeepSeek Key |
 | 语音转文字 | DashScope 语音权限、模型与词库、浏览器麦克风权限 | 不能录音或转写，文字输入仍可使用 |
@@ -139,9 +139,11 @@ macOS 麦克风权限文案由 `Info.plist` 与 `locales/en.lproj/InfoPlist.stri
 
 ## 模型服务
 
+数学图生成使用现有 `DEEPSEEK_API_KEY` 和 `DEEPSEEK_CHAT_MODEL`，不需要额外模型密钥。DeepSeek 只生成受 JSON Schema 约束的图结构；服务端用 NetworkX 校验图族、偏序及群环结构，再由浏览器本域加载的 Viz.js / Graphviz WASM 计算布局。生成结果写入 DMate 原有可编辑画板，布局引擎不承担数学语义判断。
+
 | 变量 | 当前用途与默认值 |
 | --- | --- |
-| `DEEPSEEK_API_KEY` | 教学、出题、答案诊断、笔记分析、绘图指导所需 |
+| `DEEPSEEK_API_KEY` | 教学、出题、答案诊断、笔记分析、绘图指导、数学图结构生成所需 |
 | `DEEPSEEK_CHAT_MODEL` | 默认 `deepseek-flash`；文本地址固定为 `https://api.deepseek.com/chat/completions` |
 | `DEEPSEEK_MAX_OUTPUT_TOKENS` | 默认 5000，限制在 2000–6000 |
 | `MEDIUM_MAX_OUTPUT_TOKENS` | high 思考输出预算，默认 8000，上限 12000，且不小于普通预算 |
@@ -365,7 +367,7 @@ Android release 构建使用仓库 Secrets `DMATE_ANDROID_KEYSTORE_BASE64`、`DM
 
 页面打开下载弹窗时直接使用上述固定地址，不请求发行版列表 API，也不动态解析 `latest`；GitCode 附件下载接口本身仍是实际下载目标。网站不再携带 APK 二进制，不保留旧站内 APK 下载路由、跳转或更新地址兼容。APK 下载按钮和更新清单只使用 GitCode / GitHub 的公开附件地址，网站不代理安装包传输。`static/downloads/DMate-Android-1.0.3.json` 仅作为产物来源与校验元数据保留，不是可下载安装包。
 
-公式与富文本等前端依赖位于 `static/vendor/<组件-版本>/`，含 MathJax 本地按需资源、上游许可和完整性清单，镜像必须包含这些文件。版本化的第三方目录成功响应允许一年 immutable 缓存；业务 JS / CSS、未版本化资源清单和 `/web-version` 仍禁用旧缓存。升级第三方库应使用新版本目录，不能原地替换已长期缓存的文件。安装壳检查网页更新时会在忙碌期间延后重载；这不能更新 APK / Tauri 中的原生代码。
+公式、富文本和数学图布局等前端依赖位于 `static/vendor/<组件-版本>/`，含 MathJax 本地按需资源、Viz.js / Graphviz WASM、上游许可和完整性清单，镜像必须包含这些文件。版本化的第三方目录成功响应允许一年 immutable 缓存；业务 JS / CSS、未版本化资源清单和 `/web-version` 仍禁用旧缓存。升级第三方库应使用新版本目录，不能原地替换已长期缓存的文件。安装壳检查网页更新时会在忙碌期间延后重载；这不能更新 APK / Tauri 中的原生代码。
 
 旧 Service Worker 和历史缓存只在当前页内清退，不再由清理回调强制刷新。`web-sync.js` 保留安装壳的自动网页更新，并增加防重复跳转保护：会话存储不可用或写入校验失败时停止自动跳转，跨版本跳转也受冷却约束，同一目标未成功载入及 A/B 版本回跳不再反复重试。需要真正回滚到先前版本时，可在保存必要内容后手动刷新；这些保护不改变独立的原生安装包更新提醒。
 
