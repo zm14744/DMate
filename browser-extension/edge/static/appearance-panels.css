@@ -218,3 +218,20 @@ body[data-appearance-theme] {
 #knowledgeGraphModal .kg-video-open:hover {
     text-decoration:underline;
 }
+#knowledgeGraphModal .kg-video-sections {
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:5px;
+}
+#knowledgeGraphModal .kg-video-sections > .kg-video-open {
+    display:block;
+    margin-top:0;
+    min-width:0;
+    max-width:100%;
+    overflow-wrap:anywhere;
+}
+#knowledgeGraphModal .kg-video-unavailable {
+    color:var(--text-subtle);
+    font-size:var(--font-xs);
+}
