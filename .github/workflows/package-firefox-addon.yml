@@ -7,6 +7,7 @@ on:
       - 'browser-extension/firefox/**'
       - '.github/workflows/package-firefox-addon.yml'
       - 'templates/index.html'
+      - 'templates/_favicon_links.html'
       - 'static/**'
       - 'docs/SECURITY_PRIVACY.md'
       - 'THIRD_PARTY_LICENSES.md'
@@ -94,6 +95,7 @@ jobs:
           mkdir -p "$SRC/extension" "$SRC/original-frontend/static" "$SRC/vendor-source"
           cp -a browser-extension/firefox/. "$SRC/extension/"
           cp templates/index.html "$SRC/original-frontend/templates-index.html"
+          cp templates/_favicon_links.html "$SRC/original-frontend/_favicon_links.html"
           cp -a static/. "$SRC/original-frontend/static/"
           cp docs/SECURITY_PRIVACY.md "$SRC/SECURITY_PRIVACY.md"
           cp THIRD_PARTY_LICENSES.md "$SRC/THIRD_PARTY_LICENSES.md"
