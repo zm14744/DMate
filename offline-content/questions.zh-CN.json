@@ -1,0 +1,327 @@
+{
+  "schema_version": 1,
+  "pack_id": "discrete-mathematics-core-zh-cn",
+  "pack_version": "0.1.0-preview",
+  "language": "zh-CN",
+  "subject": "离散数学",
+  "title": "离散数学核心题库（预览）",
+  "description": "本预览包含独立编写的中文示例题，覆盖命题逻辑、量词、集合、关系、函数、偏序、图论、计数与证明。",
+  "content_policy": "题干、选项、答案和解析均为独立编写，不直接复制或翻译第三方教材题目。正式发布前须进行数学审校、难度标定和版权复核。",
+  "questions": [
+    {
+      "id": "q01",
+      "title": "判断命题",
+      "category": "命题逻辑",
+      "knowledge_points": [
+        "logic_truth"
+      ],
+      "difficulty": "基础",
+      "type": "单项选择",
+      "statement": "下列陈述中，哪一个是一个假命题？",
+      "options": [
+        {
+          "key": "A",
+          "text": "请把这道题写在纸上。"
+        },
+        {
+          "key": "B",
+          "text": "17是素数。"
+        },
+        {
+          "key": "C",
+          "text": "9是偶数。"
+        },
+        {
+          "key": "D",
+          "text": "x大于3。"
+        }
+      ],
+      "answer": [
+        "C"
+      ],
+      "explanation": "“9是偶数”是能够明确判断真假的陈述，而且它为假。A是祈使句；D含有未指定的自由变量x，尚未形成确定命题；B是真命题。",
+      "grading_criteria": "选出C得满分；若能说明A不是陈述命题、D含自由变量，可作为过程性反馈。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q02",
+      "title": "蕴含命题的真值",
+      "category": "命题逻辑",
+      "knowledge_points": [
+        "logic_connectives"
+      ],
+      "difficulty": "基础",
+      "type": "单项选择",
+      "statement": "当命题p为假、命题q为真时，复合命题 p→q 的真值是什么？",
+      "options": [
+        {
+          "key": "A",
+          "text": "真"
+        },
+        {
+          "key": "B",
+          "text": "假"
+        },
+        {
+          "key": "C",
+          "text": "无法确定"
+        },
+        {
+          "key": "D",
+          "text": "p与q必须同时为真"
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "explanation": "蕴含命题只有在前件为真、后件为假时才为假。当前件p为假时，无论q真或假，p→q都为真。",
+      "grading_criteria": "选择A得满分。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q03",
+      "title": "逻辑等价变形",
+      "category": "命题逻辑",
+      "knowledge_points": [
+        "logic_connectives",
+        "logic_equivalence"
+      ],
+      "difficulty": "基础",
+      "type": "填空",
+      "statement": "根据蕴含命题的等价律，p→q 等价于 ______。",
+      "answer_text": "¬p∨q",
+      "explanation": "p→q 只在p真且q假时为假。¬p∨q也恰好只在p真且q假时为假，因此二者在所有真值赋值下相同。",
+      "grading_criteria": "答案为“¬p∨q”或含义相同的规范表达式得满分。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "考查通用逻辑恒等式，未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q04",
+      "title": "否定全称命题",
+      "category": "谓词逻辑",
+      "knowledge_points": [
+        "predicate_quantifier"
+      ],
+      "difficulty": "基础",
+      "type": "填空",
+      "statement": "写出命题“对每个整数n，都有 n²≥0”的否定。要求保留完整论域。",
+      "answer_text": "存在整数n，使得 n²<0。",
+      "explanation": "否定全称量词时要改为存在量词，并否定谓词：¬(∀n∈整数，n²≥0) 等价于 ∃n∈整数，使 n²<0。",
+      "grading_criteria": "必须同时出现“存在整数n”和“n²<0”；只写出不等式而漏掉存在量词，不得满分。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q05",
+      "title": "集合运算",
+      "category": "集合与关系",
+      "knowledge_points": [
+        "set_operation"
+      ],
+      "difficulty": "基础",
+      "type": "计算",
+      "statement": "设全集U={1,2,3,4,5,6,7,8}，A={1,2,3,5}，B={2,4,5,7}。求 A∪B、A∩B、A∖B 和A在U中的补集。",
+      "answer_text": "A∪B={1,2,3,4,5,7}；A∩B={2,5}；A∖B={1,3}；U∖A={4,6,7,8}。",
+      "explanation": "并集收集至少属于一个集合的元素；交集只保留同时属于两个集合的元素；差集A∖B保留属于A但不属于B的元素；补集必须相对于给定全集U计算。",
+      "grading_criteria": "四项结果各占25%；元素顺序不同但集合相同均视为正确。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q06",
+      "title": "判断关系性质",
+      "category": "集合与关系",
+      "knowledge_points": [
+        "relation_property"
+      ],
+      "difficulty": "中等",
+      "type": "多项选择",
+      "statement": "设A={1,2,3}，关系R={(1,1),(2,2),(3,3),(1,2),(2,1)}。下列哪些性质成立？",
+      "options": [
+        {
+          "key": "A",
+          "text": "自反性"
+        },
+        {
+          "key": "B",
+          "text": "对称性"
+        },
+        {
+          "key": "C",
+          "text": "反对称性"
+        },
+        {
+          "key": "D",
+          "text": "传递性"
+        }
+      ],
+      "answer": [
+        "A",
+        "B",
+        "D"
+      ],
+      "explanation": "三个自反有序对都在R中，因此R自反。唯一的非对角有序对(1,2)有反向有序对(2,1)，因此R对称。由于1≠2但两方向关系同时成立，R不反对称。对{1,2}内部的关系组合以及元素3的自反关系检查可知，R满足传递性。",
+      "grading_criteria": "完整选出A、B、D且不选C得满分；多选或漏选按部分正确处理。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q07",
+      "title": "模同余的等价类",
+      "category": "集合与关系",
+      "knowledge_points": [
+        "relation_equivalence"
+      ],
+      "difficulty": "中等",
+      "type": "简答",
+      "statement": "在整数集合上定义关系：a与b相关，当且仅当4整除a−b。写出该关系的全部不同等价类，并判断7与−1是否属于同一个等价类。",
+      "answer_text": "共有四个等价类：[0]、[1]、[2]、[3]，分别由模4余数为0、1、2、3的整数构成。7−(−1)=8能被4整除，因此7与−1属于同一个等价类。",
+      "explanation": "两个整数模4同余，当且仅当它们除以4的余数相同。整数除以4只有0、1、2、3四种余数，因此恰有四个等价类。",
+      "grading_criteria": "写出四类的余数描述占70%；正确判断7与−1同类并给出差值占30%。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q08",
+      "title": "单射与满射",
+      "category": "函数",
+      "knowledge_points": [
+        "function_injection"
+      ],
+      "difficulty": "中等",
+      "type": "证明",
+      "statement": "设f:整数→整数，f(n)=2n+1。证明f是单射，但不是满射。",
+      "answer_text": "单射：设f(a)=f(b)，则2a+1=2b+1，从而a=b，所以f为单射。非满射：任取偶整数2k，若存在整数n使f(n)=2k，则2n+1=2k，得到n=k−1/2，这不是整数。因此偶整数不在值域中，f不是满射。",
+      "explanation": "单射要从函数值相等推出输入相等；非满射只需找出陪域中一个没有原像的元素。这里任意偶整数都没有整数原像。",
+      "grading_criteria": "正确证明单射占40%；指出偶整数无原像并说明原因占60%。只举一个输入输出例子不能代替证明。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q09",
+      "title": "整除关系下的偏序",
+      "category": "集合与关系",
+      "knowledge_points": [
+        "relation_order"
+      ],
+      "difficulty": "中等",
+      "type": "简答",
+      "statement": "在集合A={1,2,3,6}上定义关系“a整除b”。写出该偏序集的最小元、最大元，并指出一对不可比元素。",
+      "answer_text": "最小元为1，最大元为6；2与3不可比。",
+      "explanation": "1整除A中的每个元素，所以1是最小元；A中的每个元素都整除6，所以6是最大元。2不能整除3，3也不能整除2，因此二者不可比。",
+      "grading_criteria": "三个判断均正确得满分；需要区分最小元和极小元的概念。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q10",
+      "title": "握手定理",
+      "category": "图论",
+      "knowledge_points": [
+        "graph_basic"
+      ],
+      "difficulty": "基础",
+      "type": "计算",
+      "statement": "一个有限无向图的四个顶点度数依次为3、2、2、1。求该图的边数。",
+      "answer_text": "边数为4。",
+      "explanation": "根据握手定理，所有顶点的度数之和等于边数的两倍。度数和为3+2+2+1=8，因此边数为8÷2=4。",
+      "grading_criteria": "写出握手定理并计算出4条边得满分。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q11",
+      "title": "连通分量",
+      "category": "图论",
+      "knowledge_points": [
+        "graph_connectivity"
+      ],
+      "difficulty": "中等",
+      "type": "简答",
+      "statement": "无向图的顶点集为{A,B,C,D}，边集为{{A,B},{B,C}}。写出该图的全部连通分量。",
+      "answer_text": "两个连通分量：一个由顶点A、B、C及边{A,B}、{B,C}组成；另一个是只含顶点D的孤立顶点。",
+      "explanation": "A、B、C之间存在路径，因此属于同一个连通分量。D没有与其他顶点相连，单独构成一个连通分量。",
+      "grading_criteria": "正确识别{A,B,C}和{D}两个分量得满分；不能遗漏孤立顶点。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q12",
+      "title": "树的边数与删除边",
+      "category": "图论",
+      "knowledge_points": [
+        "tree_basic"
+      ],
+      "difficulty": "基础",
+      "type": "简答",
+      "statement": "一棵树有9个顶点。它有多少条边？删除其中任意一条边后，连通分量的数量变为多少？",
+      "answer_text": "原树有8条边；删除任意一条边后，图分成两个连通分量。",
+      "explanation": "含n个顶点的树有n−1条边，因此边数为9−1=8。树中任意一条边都是桥，删除后图不再连通，并且恰好分成两个连通分量。",
+      "grading_criteria": "边数和连通分量数量各占50%；应说明树中任意边都是桥。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q13",
+      "title": "鸽巢原理的应用",
+      "category": "计数与组合",
+      "knowledge_points": [
+        "count_pigeonhole"
+      ],
+      "difficulty": "基础",
+      "type": "证明",
+      "statement": "证明：任意13个人中，至少有两个人出生在同一个月份。",
+      "answer_text": "把12个月份看作12个盒子，把13个人看作13个对象，每个人放入其出生月份对应的盒子。由于对象数13大于盒子数12，根据鸽巢原理，至少有一个月份对应的盒子中有不少于2个人。因此至少有两个人出生在同一个月份。",
+      "explanation": "关键是明确对象和盒子：对象是人，盒子是月份。无需知道具体是哪两个人，也无需知道每个月有多少人。",
+      "grading_criteria": "正确对应13个人和12个月份占40%；正确使用鸽巢原理并得出结论占60%。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    },
+    {
+      "id": "q14",
+      "title": "数学归纳法证明奇数和",
+      "category": "证明与归纳",
+      "knowledge_points": [
+        "proof_induction"
+      ],
+      "difficulty": "中等",
+      "type": "证明",
+      "statement": "用数学归纳法证明：对任意正整数n，1+3+5+⋯+(2n−1)=n²。",
+      "answer_text": "归纳基础：n=1时，左边为1，右边为1²=1，命题成立。归纳假设：假设n=k时成立，即1+3+⋯+(2k−1)=k²。归纳步骤：当n=k+1时，左边等于k²+[2(k+1)−1]=k²+2k+1=(k+1)²，等于右边。因此命题对k+1成立。由数学归纳法，命题对所有正整数n成立。",
+      "explanation": "证明结构必须包含基础情形、归纳假设和归纳步骤。归纳步骤中将第k+1个奇数2k+1加到前k项之和上。",
+      "grading_criteria": "基础情形占20%；正确写出归纳假设占20%；归纳步骤代数推导正确占40%；结论完整占20%。",
+      "source": {
+        "kind": "DMate独立编写",
+        "note": "未复制第三方题干。"
+      }
+    }
+  ]
+}
