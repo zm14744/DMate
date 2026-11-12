@@ -1,5 +1,5 @@
 {
-  "version": 27,
+  "version": 28,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -556,20 +556,45 @@
       ],
       "videos": [
         {
-          "source_id": "dogeman_discrete",
-          "title": "2.6.0.3 序关系",
+          "source_id": "bjtu_discrete",
+          "title": "第六讲(1)--偏序集",
           "sections": [
-            "2.6.0.3 序关系",
-            "2.7.0.3 序关系的性质"
+            "第六讲(1)--偏序集",
+            "(2)--积偏序与字典序",
+            "(3)--哈斯图",
+            "(1)--极大元与极小元",
+            "(2)--最大元与最小元",
+            "(3)--上界与下界",
+            "(4)--上确界与下确界"
           ],
           "lessons": [
             {
-              "title": "2.6.0.3 序关系",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=12"
+              "title": "第六讲(1)--偏序集",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=81"
             },
             {
-              "title": "2.7.0.3 序关系的性质",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=13"
+              "title": "(2)--积偏序与字典序",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=82"
+            },
+            {
+              "title": "(3)--哈斯图",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=83"
+            },
+            {
+              "title": "(1)--极大元与极小元",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=84"
+            },
+            {
+              "title": "(2)--最大元与最小元",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=85"
+            },
+            {
+              "title": "(3)--上界与下界",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=86"
+            },
+            {
+              "title": "(4)--上确界与下确界",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=87"
             }
           ]
         }
