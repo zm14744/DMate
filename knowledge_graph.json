@@ -1,5 +1,5 @@
 {
-  "version": 25,
+  "version": 26,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1961,116 +1961,22 @@
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": "one selected Bilibili course per node; multiple adjacent lesson links may belong to that one course",
+    "primary_per_node": "exactly one active course source per knowledge node; related consecutive episodes from that same course may be listed",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
-    "note": "Bilibili-only. One primary course per node; related consecutive episodes from that same course may be listed under the node. Direct episode links and original Bilibili part titles are required. The CMU 21-228 upload is only six parts; do not infer later syllabus topics from the official course outline. MIT 6.042J uses Fall 2010. Beijing Jiaotong relationship/function part links were rebuilt from the actual 194-part Bilibili list. The generating-functions and matrix-tree-theorem nodes remain unfilled pending a verified, quality-approved Bilibili lesson; do not fabricate links.",
-    "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs."
+    "note": "The six CMU 21-228 episodes are mapped only to the six topics actually visible in the Bilibili playlist. Do not infer further episodes from the university syllabus. MIT uses Fall 2010. Beijing Jiaotong relation/function and counting links are direct part links. The two remaining nodes are intentionally unfilled pending a suitable Chinese-subtitled/original Bilibili lesson; never pad with low-quality or unrelated videos.",
+    "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
+    "audit_status": {
+      "nodes_total": 68,
+      "nodes_with_active_course": 66,
+      "nodes_pending": "count_generating; tree_matrix_tree",
+      "direct_episode_links": 127,
+      "nested_or_missing_episode_urls": 0,
+      "youtube_links": 0,
+      "last_audit_scope": "episode titles, Bilibili part indices, topic-node fit, source references, and direct-link structure"
+    }
   },
   "video_resource_candidates": [
-    {
-      "id": "bjtu_discrete_candidate",
-      "institution": "北京交通大学",
-      "display_name": "北京交通大学 · 离散数学",
-      "course": "离散数学（194讲）",
-      "platform": "Bilibili",
-      "url": "https://www.bilibili.com/video/BV1r4411r7Ya/",
-      "uploader": "格物嘉",
-      "views": "约2.6万",
-      "official_course_url": "https://www.icourse163.org/learn/NJTU-1002530017?tid=1205949204#/learn/content",
-      "status": "selected_for_counting_and_recurrence_nodes",
-      "coverage": [
-        "集合",
-        "数论",
-        "计数",
-        "命题逻辑",
-        "谓词逻辑",
-        "关系",
-        "函数",
-        "偏序",
-        "图论",
-        "树",
-        "匹配",
-        "网络流",
-        "代数结构",
-        "有限语言与自动机"
-      ],
-      "note": "B站页面链接到北京交通大学中国大学MOOC课程页面，包含194个分P，覆盖面很广。上传账号为格物嘉，并非学校官方账号；可纳入课程质量比较，但上传授权仍需单独核验。产品显示名称标注北京交通大学，同时保留上传者信息。"
-    },
-    {
-      "id": "cmu_21_228_2021_candidate",
-      "institution": "Carnegie Mellon University",
-      "display_name": "卡内基梅隆大学 · 21-228 离散数学",
-      "course": "21-228 Discrete Mathematics（Spring 2021）",
-      "instructor": "Po-Shen Loh",
-      "platform": "Bilibili",
-      "url": "https://www.bilibili.com/video/BV1jA4L66ELr/",
-      "uploader": "无为斋主",
-      "screenshot_title": "【卡内基梅隆大学】离散数学 | 2021 | 证明无从下手，练就离散数理思维",
-      "duration": "31:26:24",
-      "official_course_url": "https://www.math.cmu.edu/~ploh/2021-228.shtml",
-      "status": "six_episodes_verified_by_user_screenshot",
-      "coverage": [
-        "基本计数",
-        "数学归纳",
-        "容斥原理",
-        "鸽巢原理",
-        "二项式系数",
-        "递推关系",
-        "线性递推",
-        "生成函数",
-        "图论",
-        "树",
-        "匹配",
-        "平面图"
-      ],
-      "note": "已由用户提供的B站页面截图确认：38/65表示该课程在“数学学院（世界名校精品课）”外层合集中的位置；当前CMU课程自身共有6个分P。六讲标题、时长及对应知识节点已全部录入。",
-      "screenshot_date": "2026-11-12 17:00:00",
-      "screenshot_views": 396,
-      "screenshot_comments": 0,
-      "playlist_position": "38/65",
-      "source_id": "cmu_21_228_2021_bilibili",
-      "episode_count": 6,
-      "outer_collection_position": "38/65",
-      "episodes": [
-        {
-          "p": 1,
-          "title": "第1讲：课程导引、基础计数原理",
-          "duration": "57:47",
-          "node": "count_basic"
-        },
-        {
-          "p": 2,
-          "title": "第2讲：数学归纳法，正向与反向归纳",
-          "duration": "01:03:02",
-          "node": "proof_induction"
-        },
-        {
-          "p": 3,
-          "title": "第3讲：归纳法进阶证明技巧",
-          "duration": "57:42",
-          "node": "proof_strong_induction"
-        },
-        {
-          "p": 4,
-          "title": "第4讲：容斥原理基础",
-          "duration": "53:56",
-          "node": "count_inclusion"
-        },
-        {
-          "p": 5,
-          "title": "第5讲：容斥原理典型应用",
-          "duration": "56:22",
-          "node": "count_inclusion"
-        },
-        {
-          "p": 6,
-          "title": "第6讲：鸽巢原理",
-          "duration": "51:37",
-          "node": "count_pigeonhole"
-        }
-      ]
-    },
     {
       "id": "kimberly_brehm_discrete_math_ii_candidate",
       "institution": "Bellevue University",
