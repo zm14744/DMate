@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -362,6 +362,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Free and Bound Variables in Quantifications",
+          "sections": [
+            "Free and Bound Variables in Quantifications"
+          ],
+          "lessons": [
+            {
+              "title": "Free and Bound Variables in Quantifications",
+              "url": "https://www.youtube.com/watch?v=vpdJvEfQj6Q"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -433,6 +448,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=17"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Predicate Logic: Prenex Normal Form",
+          "sections": [
+            "Predicate Logic: Prenex Normal Form"
+          ],
+          "lessons": [
+            {
+              "title": "Predicate Logic: Prenex Normal Form",
+              "url": "https://www.youtube.com/watch?v=GpZ9SbRTEZA"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -840,6 +870,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Transitive Closure of Relations",
+          "sections": [
+            "Transitive Closure of Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Transitive Closure of Relations",
+              "url": "https://www.youtube.com/watch?v=cAm6Qi3nzhY"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -905,6 +950,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Injective, Surjective and Bijective Functions",
+          "sections": [
+            "Injective, Surjective and Bijective Functions"
+          ],
+          "lessons": [
+            {
+              "title": "Injective, Surjective and Bijective Functions",
+              "url": "https://www.youtube.com/watch?v=Rx5RXPz0o3c"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -929,6 +989,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=36"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Composition of Functions",
+          "sections": [
+            "Composition of Functions"
+          ],
+          "lessons": [
+            {
+              "title": "Composition of Functions",
+              "url": "https://www.youtube.com/watch?v=aQefXelCN5Y"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
           "note": ""
         }
       ]
@@ -955,6 +1030,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=37"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Inverse Functions",
+          "sections": [
+            "Inverse Functions"
+          ],
+          "lessons": [
+            {
+              "title": "Inverse Functions",
+              "url": "https://www.youtube.com/watch?v=aQefXelCN5Y"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
           "note": ""
         }
       ]
@@ -1028,6 +1118,21 @@
               "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=31"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "The Euclidean Algorithm",
+          "sections": [
+            "The Euclidean Algorithm"
+          ],
+          "lessons": [
+            {
+              "title": "The Euclidean Algorithm",
+              "url": "https://www.youtube.com/watch?v=p5gn2hj51hs"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1092,6 +1197,21 @@
               "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=36"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Solving a Linear Congruence",
+          "sections": [
+            "Solving a Linear Congruence"
+          ],
+          "lessons": [
+            {
+              "title": "Solving a Linear Congruence",
+              "url": "https://www.youtube.com/watch?v=R9uOG42mfNY"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1118,6 +1238,21 @@
               "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=42"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "MIT Lecture 10: Modular Inverse and Chinese Remainder Theorem",
+          "sections": [
+            "MIT Lecture 10: Modular Inverse and Chinese Remainder Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "MIT Lecture 10: Modular Inverse and Chinese Remainder Theorem",
+              "url": "https://www.youtube.com/watch?v=wkmDtvO222A"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1144,6 +1279,36 @@
               "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=41"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Euler's Theorem",
+          "sections": [
+            "Euler's Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "Euler's Theorem",
+              "url": "https://www.youtube.com/watch?v=FHkS3ydTM3M"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Fermat's Little Theorem",
+          "sections": [
+            "Fermat's Little Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "Fermat's Little Theorem",
+              "url": "https://www.youtube.com/watch?v=7C0ZMLdzDAo"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1170,6 +1335,21 @@
               "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=43"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "RSA Algorithm - Mathematics of Cryptography",
+          "sections": [
+            "RSA Algorithm - Mathematics of Cryptography"
+          ],
+          "lessons": [
+            {
+              "title": "RSA Algorithm - Mathematics of Cryptography",
+              "url": "https://www.youtube.com/watch?v=pM9IO9Bnn_g"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1270,6 +1450,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=10"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Discrete Math: The Binomial Theorem",
+          "sections": [
+            "Discrete Math: The Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math: The Binomial Theorem",
+              "url": "https://www.youtube.com/watch?v=m8TsPMfcasI"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1299,6 +1494,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=4"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Discrete Math II: Pigeonhole Principle",
+          "sections": [
+            "Discrete Math II: Pigeonhole Principle"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math II: Pigeonhole Principle",
+              "url": "https://www.youtube.com/watch?v=xEuPd4k_IPo"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1365,6 +1575,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=24"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Generating Functions and Their Applications in Counting",
+          "sections": [
+            "Generating Functions and Their Applications in Counting"
+          ],
+          "lessons": [
+            {
+              "title": "Generating Functions and Their Applications in Counting",
+              "url": "https://www.youtube.com/watch?v=sLVFVD_EfwE"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1387,6 +1612,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=29"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Modeling with Recurrence Relations",
+          "sections": [
+            "Modeling with Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Modeling with Recurrence Relations",
+              "url": "https://www.youtube.com/watch?v=awR_p6J7Lyg"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1450,6 +1690,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=31"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Non-Homogeneous Linear Recurrence Relations",
+          "sections": [
+            "Non-Homogeneous Linear Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Non-Homogeneous Linear Recurrence Relations",
+              "url": "https://www.youtube.com/watch?v=NKsz2mGxX4A"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1591,6 +1846,21 @@
               "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=27"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Matrix Representation: Adjacency and Incidence Matrices",
+          "sections": [
+            "Matrix Representation: Adjacency and Incidence Matrices"
+          ],
+          "lessons": [
+            {
+              "title": "Matrix Representation: Adjacency and Incidence Matrices",
+              "url": "https://www.youtube.com/watch?v=y6EgXkswWZQ"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1698,6 +1968,21 @@
               "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=34"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Articulation Points and Bridges",
+          "sections": [
+            "Articulation Points and Bridges"
+          ],
+          "lessons": [
+            {
+              "title": "Articulation Points and Bridges",
+              "url": "https://www.youtube.com/watch?v=Aw59z33sbk8"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1723,6 +2008,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=73"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Weighted Graph and Shortest Path",
+          "sections": [
+            "Weighted Graph and Shortest Path"
+          ],
+          "lessons": [
+            {
+              "title": "Weighted Graph and Shortest Path",
+              "url": "https://www.youtube.com/watch?v=iOu3PXv5L6w"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1914,6 +2214,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=98"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Planar Graphs and Euler's Formula",
+          "sections": [
+            "Planar Graphs and Euler's Formula"
+          ],
+          "lessons": [
+            {
+              "title": "Planar Graphs and Euler's Formula",
+              "url": "https://www.youtube.com/watch?v=fViBu7i6bRg"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -1940,6 +2255,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=76"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Bipartite, Regular and Complete Graphs",
+          "sections": [
+            "Bipartite, Regular and Complete Graphs"
+          ],
+          "lessons": [
+            {
+              "title": "Bipartite, Regular and Complete Graphs",
+              "url": "https://www.youtube.com/watch?v=NzBjBE27NcE"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -2010,6 +2340,36 @@
               "url": "https://www.bilibili.com/video/BV1144y1W7oL/?p=35"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Dominating Sets in Graph Theory",
+          "sections": [
+            "Dominating Sets in Graph Theory"
+          ],
+          "lessons": [
+            {
+              "title": "Dominating Sets in Graph Theory",
+              "url": "https://www.youtube.com/watch?v=Lg2t1xY6Cbo"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Vertex Covers and Independent Sets",
+          "sections": [
+            "Vertex Covers and Independent Sets"
+          ],
+          "lessons": [
+            {
+              "title": "Vertex Covers and Independent Sets",
+              "url": "https://www.youtube.com/watch?v=1KkT7y8nxH0"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -2041,6 +2401,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=95"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Matching Basics and Hall's Marriage Theorem",
+          "sections": [
+            "Matching Basics and Hall's Marriage Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "Matching Basics and Hall's Marriage Theorem",
+              "url": "https://www.youtube.com/watch?v=0y8lcIWtqqo"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -2066,6 +2441,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=66"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Introduction to Trees and Their Properties",
+          "sections": [
+            "Introduction to Trees and Their Properties"
+          ],
+          "lessons": [
+            {
+              "title": "Introduction to Trees and Their Properties",
+              "url": "https://www.youtube.com/watch?v=lTaKhF2tObc"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
           "note": ""
         }
       ]
@@ -2097,6 +2487,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Rooted Trees and Binary Trees",
+          "sections": [
+            "Rooted Trees and Binary Trees"
+          ],
+          "lessons": [
+            {
+              "title": "Rooted Trees and Binary Trees",
+              "url": "https://www.youtube.com/watch?v=tjVcBxbcY6Q"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -2122,6 +2527,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=67"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Spanning Tree and Binary Tree",
+          "sections": [
+            "Spanning Tree and Binary Tree"
+          ],
+          "lessons": [
+            {
+              "title": "Spanning Tree and Binary Tree",
+              "url": "https://www.youtube.com/watch?v=sx8BVee3k2c"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
           "note": ""
         }
       ]
@@ -2235,6 +2655,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=44"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Algebraic Structures and Binary Operations",
+          "sections": [
+            "Algebraic Structures and Binary Operations"
+          ],
+          "lessons": [
+            {
+              "title": "Algebraic Structures and Binary Operations",
+              "url": "https://www.youtube.com/watch?v=q8QGKCPrikk"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -2264,6 +2699,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=49"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Group Theory: Subgroups",
+          "sections": [
+            "Group Theory: Subgroups"
+          ],
+          "lessons": [
+            {
+              "title": "Group Theory: Subgroups",
+              "url": "https://www.youtube.com/watch?v=rONgcxp-Y8w"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -2295,6 +2745,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=46"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Group Homomorphisms",
+          "sections": [
+            "Group Homomorphisms"
+          ],
+          "lessons": [
+            {
+              "title": "Group Homomorphisms",
+              "url": "https://www.youtube.com/watch?v=rJpu22jMeIY"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -2319,6 +2784,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=53"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Rings and Fields",
+          "sections": [
+            "Rings and Fields"
+          ],
+          "lessons": [
+            {
+              "title": "Rings and Fields",
+              "url": "https://www.youtube.com/watch?v=MAcdesa9RqA"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
+          "note": ""
         }
       ]
     },
@@ -2358,6 +2838,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=57"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Lattices and Boolean Lattices",
+          "sections": [
+            "Lattices and Boolean Lattices"
+          ],
+          "lessons": [
+            {
+              "title": "Lattices and Boolean Lattices",
+              "url": "https://www.youtube.com/watch?v=tj6aCOvDcD0"
+            }
+          ],
+          "verification": "根据单集标题与公开教学资源匹配；完整播放可用性仍需抽查",
           "note": ""
         }
       ]
@@ -2460,6 +2955,6 @@
   "video_resource_policy": {
     "primary_per_node": 1,
     "link_type": "per_lesson_direct_url",
-    "note": "教学视频提供B站和YouTube两个简洁平台入口。仅使用B站正确的?p=选集序号或YouTube单集watch地址；找不到可靠单集时显示不可点击的平台名，不用课程首页或搜索页替代。"
+    "note": "每个知识点只显示B站/YouTube两个平台入口，链接均指向该主题的独立视频或准确分P选集。不展示提示、首选、学校、课程名或备注说明；同平台多集可展开选择。"
   }
 }
