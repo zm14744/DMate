@@ -924,19 +924,6 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "sjtu_crypto",
-          "title": "1.2 素数与厄拉脱塞师筛法",
-          "sections": [
-            "1.2 素数与厄拉脱塞师筛法"
-          ],
-          "lessons": [
-            {
-              "title": "1.2 素数与厄拉脱塞师筛法",
-              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=2"
-            }
-          ]
-        },
-        {
           "source_id": "trefor_youtube",
           "title": "Proof: There are infinitely many primes numbers",
           "sections": [
@@ -960,19 +947,6 @@
       ],
       "videos": [
         {
-          "source_id": "sjtu_crypto",
-          "title": "1.4 最大公因数与广义欧几里得除法",
-          "sections": [
-            "1.4 最大公因数与广义欧几里得除法"
-          ],
-          "lessons": [
-            {
-              "title": "1.4 最大公因数与广义欧几里得除法",
-              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=4"
-            }
-          ]
-        },
-        {
           "source_id": "numberphile_gcd",
           "title": "Euclid's Algorithm",
           "sections": [
@@ -995,19 +969,6 @@
         "整除与素数"
       ],
       "videos": [
-        {
-          "source_id": "sjtu_crypto",
-          "title": "同余的基本概念和性质",
-          "sections": [
-            "同余的基本概念和性质"
-          ],
-          "lessons": [
-            {
-              "title": "同余的基本概念和性质",
-              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=9"
-            }
-          ]
-        },
         {
           "source_id": "trefor_youtube",
           "title": "Quotient-Remainder Theorem and Modular Arithmetic",
@@ -1033,19 +994,6 @@
       ],
       "videos": [
         {
-          "source_id": "sjtu_crypto",
-          "title": "同余式的基本概念与一次同余式",
-          "sections": [
-            "同余式的基本概念与一次同余式"
-          ],
-          "lessons": [
-            {
-              "title": "同余式的基本概念与一次同余式",
-              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=14"
-            }
-          ]
-        },
-        {
           "source_id": "sawfin_youtube",
           "title": "Solving Linear Congruences Using the Inverse",
           "sections": [
@@ -1070,19 +1018,6 @@
       ],
       "videos": [
         {
-          "source_id": "sjtu_crypto",
-          "title": "2个方程的中国剩余定理",
-          "sections": [
-            "2个方程的中国剩余定理"
-          ],
-          "lessons": [
-            {
-              "title": "2个方程的中国剩余定理",
-              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=15"
-            }
-          ]
-        },
-        {
           "source_id": "numberphile_visual",
           "title": "Chinese Remainder Theorem and Cards",
           "sections": [
@@ -1106,19 +1041,6 @@
         "整除与素数"
       ],
       "videos": [
-        {
-          "source_id": "sjtu_crypto",
-          "title": "欧拉定理 费马小定理 Wilson 定理",
-          "sections": [
-            "欧拉定理 费马小定理 Wilson 定理"
-          ],
-          "lessons": [
-            {
-              "title": "欧拉定理 费马小定理 Wilson 定理",
-              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=12"
-            }
-          ]
-        },
         {
           "source_id": "neso_academy",
           "title": "Euler's Theorem",
@@ -1179,19 +1101,6 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "combinatorics_bili",
-          "title": "3.1加法原理与乘法原理",
-          "sections": [
-            "3.1加法原理与乘法原理"
-          ],
-          "lessons": [
-            {
-              "title": "3.1加法原理与乘法原理",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=5"
-            }
-          ]
-        },
-        {
           "source_id": "trevtutor",
           "title": "Rule of Sum and Rule of Product",
           "sections": [
@@ -1214,19 +1123,6 @@
         "基本计数原理"
       ],
       "videos": [
-        {
-          "source_id": "combinatorics_bili",
-          "title": "3.2.1集合的排列数和组合数",
-          "sections": [
-            "3.2.1集合的排列数和组合数"
-          ],
-          "lessons": [
-            {
-              "title": "3.2.1集合的排列数和组合数",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=6"
-            }
-          ]
-        },
         {
           "source_id": "trefor_youtube",
           "title": "Combinations Formula: Counting the number of ways to choose r items from n items.",
@@ -1251,19 +1147,6 @@
       ],
       "videos": [
         {
-          "source_id": "combinatorics_bili",
-          "title": "3.4.1二项式定理",
-          "sections": [
-            "3.4.1二项式定理"
-          ],
-          "lessons": [
-            {
-              "title": "3.4.1二项式定理",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=10"
-            }
-          ]
-        },
-        {
           "source_id": "sawfin_youtube",
           "title": "The Binomial Theorem",
           "sections": [
@@ -1286,19 +1169,6 @@
         "基本计数原理"
       ],
       "videos": [
-        {
-          "source_id": "combinatorics_bili",
-          "title": "2.1鸽巢原理的简单形式",
-          "sections": [
-            "2.1鸽巢原理的简单形式"
-          ],
-          "lessons": [
-            {
-              "title": "2.1鸽巢原理的简单形式",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=3"
-            }
-          ]
-        },
         {
           "source_id": "sawfin_youtube",
           "title": "The Pigeonhole Principle",
@@ -1324,19 +1194,6 @@
       ],
       "videos": [
         {
-          "source_id": "combinatorics_bili",
-          "title": "4.1.1容斥原理",
-          "sections": [
-            "4.1.1容斥原理"
-          ],
-          "lessons": [
-            {
-              "title": "4.1.1容斥原理",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=18"
-            }
-          ]
-        },
-        {
           "source_id": "trevtutor",
           "title": "INCLUSION-EXCLUSION PRINCIPLE - DISCRETE MATHEMATICS",
           "sections": [
@@ -1361,19 +1218,6 @@
       ],
       "videos": [
         {
-          "source_id": "combinatorics_bili",
-          "title": "5.1 生成函数的定义和性质",
-          "sections": [
-            "5.1 生成函数的定义和性质"
-          ],
-          "lessons": [
-            {
-              "title": "5.1 生成函数的定义和性质",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=24"
-            }
-          ]
-        },
-        {
           "source_id": "sawfin_youtube",
           "title": "Generating Functions: Solving Counting Problems",
           "sections": [
@@ -1394,19 +1238,6 @@
       "category": "递推关系",
       "prerequisites": [],
       "videos": [
-        {
-          "source_id": "combinatorics_bili",
-          "title": "6.1 递推关系的建立",
-          "sections": [
-            "6.1 递推关系的建立"
-          ],
-          "lessons": [
-            {
-              "title": "6.1 递推关系的建立",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=29"
-            }
-          ]
-        },
         {
           "source_id": "sawfin_youtube",
           "title": "Modeling with Recurrence Relations",
@@ -1431,19 +1262,6 @@
       ],
       "videos": [
         {
-          "source_id": "combinatorics_bili",
-          "title": "6.2 常系数线性齐次递推关系的求解",
-          "sections": [
-            "6.2 常系数线性齐次递推关系的求解"
-          ],
-          "lessons": [
-            {
-              "title": "6.2 常系数线性齐次递推关系的求解",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=30"
-            }
-          ]
-        },
-        {
           "source_id": "trevtutor",
           "title": "HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
           "sections": [
@@ -1466,19 +1284,6 @@
         "线性齐次递推"
       ],
       "videos": [
-        {
-          "source_id": "combinatorics_bili",
-          "title": "6.3 常系数线性非齐次递推关系的求解",
-          "sections": [
-            "6.3 常系数线性非齐次递推关系的求解"
-          ],
-          "lessons": [
-            {
-              "title": "6.3 常系数线性非齐次递推关系的求解",
-              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=31"
-            }
-          ]
-        },
         {
           "source_id": "sawfin_youtube",
           "title": "Non-Homogeneous Linear Recurrence Relations",
@@ -2046,19 +1851,6 @@
       ],
       "videos": [
         {
-          "source_id": "pku_discrete",
-          "title": "034-第12章-支配集、覆盖集、独立集与匹配（教材第十三章）-支配集、点覆盖集、点独立集",
-          "sections": [
-            "034-第12章-支配集、覆盖集、独立集与匹配（教材第十三章）-支配集、点覆盖集、点独立集"
-          ],
-          "lessons": [
-            {
-              "title": "034-第12章-支配集、覆盖集、独立集与匹配（教材第十三章）-支配集、点覆盖集、点独立集",
-              "url": "https://www.bilibili.com/video/BV1144y1W7oL/?p=34"
-            }
-          ]
-        },
-        {
           "source_id": "algos_attitude",
           "title": "Clique, Independent Set, Vertex Cover, and Dominating Set",
           "sections": [
@@ -2567,14 +2359,6 @@
       "publisher": "Neso Academy"
     },
     {
-      "id": "sjtu_crypto",
-      "name": "上海交通大学 · 陈恭亮",
-      "course": "信息安全数学基础（国家精品课）",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
       "id": "bili_rsa_course",
       "name": "现代密码学 · 我有一个小脑瓜",
       "course": "RSA 加密及数学基础讲解",
@@ -2583,28 +2367,12 @@
       "publisher": "我有一个小脑瓜"
     },
     {
-      "id": "combinatorics_bili",
-      "name": "组合数学 · 系列课程",
-      "course": "递推关系与组合数学专题",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
       "id": "graph_animation_bili",
       "name": "动画讲解计算机知识",
       "course": "数据结构·图（动画讲解）",
       "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
       "publisher": "动画讲解计算机知识"
-    },
-    {
-      "id": "pku_discrete",
-      "name": "北京大学 · 王捍贫",
-      "course": "离散数学（国家精品课）",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
     },
     {
       "id": "ucla_matrix_tree",
