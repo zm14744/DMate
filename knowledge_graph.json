@@ -1,5 +1,5 @@
 {
-  "version": 23,
+  "version": 24,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1437,12 +1437,22 @@
           "source_id": "dogeman_discrete",
           "title": "11.1.0.3 点着色",
           "sections": [
-            "11.1.0.3 点着色"
+            "11.1.0.3 点着色",
+            "11.2.0.3 地图着色和平面图的点着色，边着色",
+            "11.3.0.3 六色定理和五色定理的证明"
           ],
           "lessons": [
             {
               "title": "11.1.0.3 点着色",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=42"
+            },
+            {
+              "title": "11.2.0.3 地图着色和平面图的点着色，边着色",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=43"
+            },
+            {
+              "title": "11.3.0.3 六色定理和五色定理的证明",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=44"
             }
           ]
         }
@@ -1546,12 +1556,22 @@
           "source_id": "dogeman_discrete",
           "title": "12.1.0.3 支配集，(点)独立集",
           "sections": [
-            "12.1.0.3 支配集，(点)独立集"
+            "12.1.0.3 支配集，(点)独立集",
+            "12.2.0.3 团，点覆盖(集）",
+            "12.3.0.3 求解全体极小支配集，极小点覆盖，极大独立集"
           ],
           "lessons": [
             {
               "title": "12.1.0.3 支配集，(点)独立集",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=45"
+            },
+            {
+              "title": "12.2.0.3 团，点覆盖(集）",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=46"
+            },
+            {
+              "title": "12.3.0.3 求解全体极小支配集，极小点覆盖，极大独立集",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=47"
             }
           ]
         }
@@ -1594,12 +1614,12 @@
           "source_id": "uestc_discrete_lower",
           "title": "9.1.1 树的引入",
           "sections": [
-            "9.1.1 树的引入",
+            "9.1.1 认识树",
             "9.1.2 无向树"
           ],
           "lessons": [
             {
-              "title": "9.1.1 树的引入",
+              "title": "9.1.1 认识树",
               "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=19"
             },
             {
@@ -1727,12 +1747,27 @@
           "source_id": "dogeman_discrete",
           "title": "14.3.0.3 群的定义与性质",
           "sections": [
-            "14.3.0.3 群的定义与性质"
+            "14.3.0.3 群的定义与性质",
+            "14.4.0.3 群的相关定理",
+            "14.5.0.3 子群（上）",
+            "14.6.0.3 子群（下）"
           ],
           "lessons": [
             {
               "title": "14.3.0.3 群的定义与性质",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=56"
+            },
+            {
+              "title": "14.4.0.3 群的相关定理",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=57"
+            },
+            {
+              "title": "14.5.0.3 子群（上）",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=58"
+            },
+            {
+              "title": "14.6.0.3 子群（下）",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=59"
             }
           ]
         }
@@ -2009,6 +2044,28 @@
           "node": "count_pigeonhole"
         }
       ]
+    },
+    {
+      "id": "kimberly_brehm_discrete_math_ii_candidate",
+      "institution": "Bellevue University",
+      "display_name": "Bellevue University · Kimberly Brehm · Discrete Math II",
+      "course": "Discrete Math II",
+      "instructor": "Kimberly Brehm",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1SyahzvExP/",
+      "uploader": "兴趣使然的现代人",
+      "status": "candidate_subtitle_and_part_index_review_required",
+      "coverage": [
+        "鸽巢原理",
+        "排列与组合",
+        "二项式定理",
+        "递推关系",
+        "线性齐次递推",
+        "非齐次递推",
+        "生成函数",
+        "生成函数求解递推关系"
+      ],
+      "note": "B站页面列出Discrete Math II的完整章节，包括6.1计数规则、6.3排列组合、6.4二项式定理、8.2齐次/非齐次递推、8.4生成函数。上传者为兴趣使然的现代人，页面未明确说明字幕来源、是否配音及其翻译质量；具体分P参数也需核实，因此暂不加入正式节点。"
     }
   ]
 }
