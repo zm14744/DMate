@@ -21173,49 +21173,25 @@ function renderKnowledgeGraphDetail() {
         entries.className = "kg-video-sections";
         entries.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:11px;";
 
-        // 每个知识点同时显示两个平台的可直接点击的单集入口。
-        // 有额外相关视频时保留独立链接，不让平台名变成需展开的目录。
+        // 每张知识卡片只显示 Bilibili 与 YouTube 各一条精选单集。
         for (const [platform, items] of platforms) {
+            const item = items[0];
+            if (!item) continue;
+
             const row = document.createElement("div");
             row.className = "kg-video-platform-row";
             row.style.cssText = "display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;";
 
-            if (items.length) {
-                const primary = items[0];
-                const link = document.createElement("a");
-                link.className = "kg-video-open";
-                link.textContent = platform;
-                link.href = primary.url;
-                link.title = primary.title;
-                link.target = "_blank";
-                link.rel = "noopener noreferrer";
-                row.appendChild(link);
-                appendVideoInfo(row, primary);
-            } else {
-                const unavailable = document.createElement("span");
-                unavailable.className = "kg-video-platform-unavailable";
-                unavailable.textContent = platform;
-                unavailable.style.cssText = "color:var(--text-secondary,#a3a3a3);";
-                row.appendChild(unavailable);
-
-            }
+            const link = document.createElement("a");
+            link.className = "kg-video-open";
+            link.textContent = platform;
+            link.href = item.url;
+            link.title = item.title;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            row.appendChild(link);
+            appendVideoInfo(row, item);
             entries.appendChild(row);
-
-            for (const item of items.slice(1)) {
-                const extraRow = document.createElement("div");
-                extraRow.className = "kg-video-platform-row";
-                extraRow.style.cssText = "display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;";
-                const extraLink = document.createElement("a");
-                extraLink.className = "kg-video-open";
-                extraLink.textContent = platform;
-                extraLink.href = item.url;
-                extraLink.title = item.title;
-                extraLink.target = "_blank";
-                extraLink.rel = "noopener noreferrer";
-                extraRow.appendChild(extraLink);
-                appendVideoInfo(extraRow, item);
-                entries.appendChild(extraRow);
-            }
         }
         section.appendChild(entries);
         detail.appendChild(section);
