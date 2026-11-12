@@ -35,6 +35,6 @@ jobs:
       - name: Compile and test diagram structure generation
         run: |
           python -m py_compile math_diagram.py
-          python scripts/test_math_diagram.py
+          PYTHONPATH=. python scripts/test_math_diagram.py
       - name: Test Graphviz DOT conversion and editor coordinates
         run: node scripts/test_math_diagram.cjs
