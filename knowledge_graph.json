@@ -381,6 +381,21 @@
           ],
           "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
           "note": "详细讲解辖域、自由/约束变元和练习。"
+        },
+        {
+          "source_id": "neu_discrete",
+          "title": "谓词公式与量词的辖域",
+          "sections": [
+            "谓词公式与量词的辖域"
+          ],
+          "lessons": [
+            {
+              "title": "谓词公式与量词的辖域",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=13"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -432,7 +447,38 @@
       "prerequisites": [
         "量词推理与否定"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "neu_discrete",
+          "title": "前束范式",
+          "sections": [
+            "前束范式"
+          ],
+          "lessons": [
+            {
+              "title": "前束范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=17"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
+        },
+        {
+          "source_id": "morpheus_logic",
+          "title": "Predicate Logic #8: The Prenex Normal Form",
+          "sections": [
+            "Predicate Logic #8: The Prenex Normal Form"
+          ],
+          "lessons": [
+            {
+              "title": "Predicate Logic #8: The Prenex Normal Form",
+              "url": "https://www.youtube.com/watch?v=GpZ9SbRTEZA"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
+        }
+      ]
     },
     {
       "id": "proof_direct_contradiction",
@@ -782,6 +828,21 @@
           ],
           "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
           "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "Partial Orders and Hasse Diagrams",
+          "sections": [
+            "Partial Orders and Hasse Diagrams"
+          ],
+          "lessons": [
+            {
+              "title": "Partial Orders and Hasse Diagrams",
+              "url": "https://www.youtube.com/watch?v=R36F8CWAi2k"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -808,6 +869,21 @@
           ],
           "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
           "note": ""
+        },
+        {
+          "source_id": "neso_academy",
+          "title": "Closure of Relations – Part 1",
+          "sections": [
+            "Closure of Relations – Part 1"
+          ],
+          "lessons": [
+            {
+              "title": "Closure of Relations – Part 1",
+              "url": "https://www.youtube.com/watch?v=SgQJlKLWJmY"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1032,6 +1108,21 @@
           ],
           "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
           "note": ""
+        },
+        {
+          "source_id": "numberphile_gcd",
+          "title": "Euclid's Algorithm（最大公因数）",
+          "sections": [
+            "Euclid's Algorithm（最大公因数）"
+          ],
+          "lessons": [
+            {
+              "title": "Euclid's Algorithm（最大公因数）",
+              "url": "https://www.youtube.com/watch?v=6Y3jHHE_hbA"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1113,6 +1204,21 @@
           ],
           "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
           "note": ""
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Solving Linear Congruences Using the Inverse",
+          "sections": [
+            "Solving Linear Congruences Using the Inverse"
+          ],
+          "lessons": [
+            {
+              "title": "Solving Linear Congruences Using the Inverse",
+              "url": "https://www.youtube.com/watch?v=bZ275aLiypo"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1139,6 +1245,21 @@
           ],
           "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
           "note": "直观演示中国剩余定理，但不涵盖模逆算法。"
+        },
+        {
+          "source_id": "sjtu_crypto",
+          "title": "中国剩余定理：两个方程的情形",
+          "sections": [
+            "中国剩余定理：两个方程的情形"
+          ],
+          "lessons": [
+            {
+              "title": "中国剩余定理：两个方程的情形",
+              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=15"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1180,6 +1301,21 @@
           ],
           "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
           "note": "Khan Academy Labs使用彩色珠串动画解释费马小定理。"
+        },
+        {
+          "source_id": "sjtu_crypto",
+          "title": "欧拉定理、费马小定理与 Wilson 定理",
+          "sections": [
+            "欧拉定理、费马小定理与 Wilson 定理"
+          ],
+          "lessons": [
+            {
+              "title": "欧拉定理、费马小定理与 Wilson 定理",
+              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=12"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1207,6 +1343,21 @@
           ],
           "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
           "note": "Brit Cruise制作的RSA加密动画，讲解公私钥和数论直觉；为较早期的视频。"
+        },
+        {
+          "source_id": "bili_rsa_course",
+          "title": "RSA 加密算法及其数学基础",
+          "sections": [
+            "RSA 加密算法及其数学基础"
+          ],
+          "lessons": [
+            {
+              "title": "RSA 加密算法及其数学基础",
+              "url": "https://www.bilibili.com/video/BV1gT4y117My/?p=5"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1230,6 +1381,21 @@
           ],
           "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
           "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "Rule of Sum and Rule of Product",
+          "sections": [
+            "Rule of Sum and Rule of Product"
+          ],
+          "lessons": [
+            {
+              "title": "Rule of Sum and Rule of Product",
+              "url": "https://www.youtube.com/watch?v=8JiWWvEoaoc"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1354,6 +1520,21 @@
           ],
           "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
+        },
+        {
+          "source_id": "cqu_discrete",
+          "title": "计数基础与鸽巢原理",
+          "sections": [
+            "计数基础与鸽巢原理"
+          ],
+          "lessons": [
+            {
+              "title": "计数基础与鸽巢原理",
+              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=14"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1466,6 +1647,21 @@
           ],
           "verification": "3Blue1Brown原创动画视频，内容与生成函数应用匹配",
           "note": ""
+        },
+        {
+          "source_id": "cqu_discrete",
+          "title": "生成函数（4.4）",
+          "sections": [
+            "生成函数（4.4）"
+          ],
+          "lessons": [
+            {
+              "title": "生成函数（4.4）",
+              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=22"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1544,6 +1740,21 @@
           ],
           "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
+        },
+        {
+          "source_id": "cqu_discrete",
+          "title": "求解线性递推关系（4.2）",
+          "sections": [
+            "求解线性递推关系（4.2）"
+          ],
+          "lessons": [
+            {
+              "title": "求解线性递推关系（4.2）",
+              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=16"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1584,6 +1795,21 @@
           ],
           "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
+        },
+        {
+          "source_id": "combinatorics_bili",
+          "title": "6.3 常系数线性非齐次递推关系的求解",
+          "sections": [
+            "6.3 常系数线性非齐次递推关系的求解"
+          ],
+          "lessons": [
+            {
+              "title": "6.3 常系数线性非齐次递推关系的求解",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=31"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1702,6 +1928,21 @@
           ],
           "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
+        },
+        {
+          "source_id": "xtu_wangting",
+          "title": "2.2 图的同构",
+          "sections": [
+            "2.2 图的同构"
+          ],
+          "lessons": [
+            {
+              "title": "2.2 图的同构",
+              "url": "https://www.bilibili.com/video/BV1T5411J7ux/?p=4"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1864,6 +2105,21 @@
           ],
           "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
           "note": "图示与DFS算法分步骤演示。"
+        },
+        {
+          "source_id": "nju_chenggong",
+          "title": "2.2.1 割点和割边：理论",
+          "sections": [
+            "2.2.1 割点和割边：理论"
+          ],
+          "lessons": [
+            {
+              "title": "2.2.1 割点和割边：理论",
+              "url": "https://www.bilibili.com/video/BV1EPhfePE34/?p=8"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1889,6 +2145,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=73"
             }
           ]
+        },
+        {
+          "source_id": "purohit_graph",
+          "title": "Weighted Graph & Shortest Path",
+          "sections": [
+            "Weighted Graph & Shortest Path"
+          ],
+          "lessons": [
+            {
+              "title": "Weighted Graph & Shortest Path",
+              "url": "https://www.youtube.com/watch?v=iOu3PXv5L6w"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -1984,6 +2255,21 @@
           ],
           "verification": "讲师本人公开课程目录对应的单集标题和URL",
           "note": ""
+        },
+        {
+          "source_id": "hit_graph_course",
+          "title": "第30讲：哈密顿图",
+          "sections": [
+            "第30讲：哈密顿图"
+          ],
+          "lessons": [
+            {
+              "title": "第30讲：哈密顿图",
+              "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=30"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -2010,6 +2296,21 @@
           ],
           "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
           "note": ""
+        },
+        {
+          "source_id": "wangshusen_bili",
+          "title": "Dijkstra 算法：有权图最短路",
+          "sections": [
+            "Dijkstra 算法：有权图最短路"
+          ],
+          "lessons": [
+            {
+              "title": "Dijkstra 算法：有权图最短路",
+              "url": "https://www.bilibili.com/video/BV1g24y1Y7wa/?p=4"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -2162,6 +2463,21 @@
           ],
           "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
           "note": ""
+        },
+        {
+          "source_id": "graph_animation_bili",
+          "title": "拓扑排序（动画讲解）",
+          "sections": [
+            "拓扑排序（动画讲解）"
+          ],
+          "lessons": [
+            {
+              "title": "拓扑排序（动画讲解）",
+              "url": "https://www.bilibili.com/video/BV1XV411X7T7/?p=30"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -2172,7 +2488,38 @@
       "prerequisites": [
         "图的基本概念"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "pku_discrete",
+          "title": "支配集、点覆盖集与点独立集",
+          "sections": [
+            "支配集、点覆盖集与点独立集"
+          ],
+          "lessons": [
+            {
+              "title": "支配集、点覆盖集与点独立集",
+              "url": "https://www.bilibili.com/video/BV1144y1W7oL/?p=34"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
+        },
+        {
+          "source_id": "algos_attitude",
+          "title": "Clique, Independent Set, Vertex Cover, and Dominating Set",
+          "sections": [
+            "Clique, Independent Set, Vertex Cover, and Dominating Set"
+          ],
+          "lessons": [
+            {
+              "title": "Clique, Independent Set, Vertex Cover, and Dominating Set",
+              "url": "https://www.youtube.com/watch?v=u5W32YxmnL8"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
+        }
+      ]
     },
     {
       "id": "graph_matching",
@@ -2202,6 +2549,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=95"
             }
           ]
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Bipartite Graph Matching and Hall's Marriage Theorem",
+          "sections": [
+            "Bipartite Graph Matching and Hall's Marriage Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "Bipartite Graph Matching and Hall's Marriage Theorem",
+              "url": "https://www.youtube.com/watch?v=zCIzBP1S44w"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -2339,6 +2701,21 @@
           ],
           "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
           "note": ""
+        },
+        {
+          "source_id": "xtu_wangting",
+          "title": "3.2 生成树",
+          "sections": [
+            "3.2 生成树"
+          ],
+          "lessons": [
+            {
+              "title": "3.2 生成树",
+              "url": "https://www.bilibili.com/video/BV1T5411J7ux/?p=14"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -2407,6 +2784,21 @@
               "url": "https://www.youtube.com/watch?v=AcVPX2JOM1U"
             }
           ]
+        },
+        {
+          "source_id": "ucla_matrix_tree",
+          "title": "矩阵树定理（公开课单讲）",
+          "sections": [
+            "矩阵树定理（公开课单讲）"
+          ],
+          "lessons": [
+            {
+              "title": "矩阵树定理（公开课单讲）",
+              "url": "https://www.bilibili.com/video/BV1L5411m7Tq/?p=27"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -2565,6 +2957,21 @@
           ],
           "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
           "note": ""
+        },
+        {
+          "source_id": "socratica_youtube",
+          "title": "Field Definition (Expanded)",
+          "sections": [
+            "Field Definition (Expanded)"
+          ],
+          "lessons": [
+            {
+              "title": "Field Definition (Expanded)",
+              "url": "https://www.youtube.com/watch?v=KCSZ4QhOw0I"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     },
@@ -2590,6 +2997,21 @@
           ],
           "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
           "note": "布尔代数部分，未覆盖一般格理论；视频制作方在介绍中指出个别术语口误。"
+        },
+        {
+          "source_id": "uestc_lattice",
+          "title": "10.4 布尔代数",
+          "sections": [
+            "10.4 布尔代数"
+          ],
+          "lessons": [
+            {
+              "title": "10.4 布尔代数",
+              "url": "https://www.bilibili.com/video/BV1En4y1X7Cc/?p=24"
+            }
+          ],
+          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
+          "note": "对应本知识点，直达单集"
         }
       ]
     }
@@ -2713,6 +3135,125 @@
       "course": "Journey into Cryptography",
       "platform": "YouTube",
       "note": "用可视化珠串动画解释费马小定理。"
+    },
+    {
+      "id": "neu_discrete",
+      "name": "东北大学 · 胡明涵、赵志滨等",
+      "course": "离散数学（大学公开课）",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "sjtu_crypto",
+      "name": "上海交通大学 · 陈恭亮",
+      "course": "信息安全数学基础（国家精品课）",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "bili_rsa_course",
+      "name": "现代密码学 · 我有一个小脑瓜",
+      "course": "RSA 加密及数学基础讲解",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "cqu_discrete",
+      "name": "重庆大学 · 刘然",
+      "course": "离散数学及其应用（课程实录）",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "combinatorics_bili",
+      "name": "组合数学 · 系列课程",
+      "course": "递推关系与组合数学专题",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "xtu_wangting",
+      "name": "湘潭大学 · 王婷",
+      "course": "离散数学·图论与组合数学",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "nju_chenggong",
+      "name": "南京大学 · 程龚",
+      "course": "图论与算法（大学课程）",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "hit_graph_course",
+      "name": "哈尔滨工业大学 · 图论公开课",
+      "course": "离散数学之集合论与图论",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "wangshusen_bili",
+      "name": "王树森 · 图论与图算法",
+      "course": "图论算法视频教程",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "graph_animation_bili",
+      "name": "动画讲解计算机知识",
+      "course": "数据结构·图（动画讲解）",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "pku_discrete",
+      "name": "北京大学 · 王捍贫",
+      "course": "离散数学（国家精品课）",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "ucla_matrix_tree",
+      "name": "UCLA · 组合数学公开课",
+      "course": "矩阵树定理（课程单讲）",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "uestc_lattice",
+      "name": "电子科技大学 · 离散数学公开课",
+      "course": "代数、群与格·布尔代数",
+      "platform": "哔哩哔哩",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "numberphile_gcd",
+      "name": "Numberphile · 数学科普团队",
+      "course": "Euclid's Algorithm",
+      "platform": "YouTube",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "purohit_graph",
+      "name": "Dr. Gajendra Purohit · 数学讲师",
+      "course": "Graph Theory · Weighted Graphs",
+      "platform": "YouTube",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "morpheus_logic",
+      "name": "The Morpheus Tutorials · 逻辑课程",
+      "course": "Predicate Logic · Prenex Normal Form",
+      "platform": "YouTube",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
+    },
+    {
+      "id": "algos_attitude",
+      "name": "Algorithms with Attitude · 算法讲师",
+      "course": "Independent Set / Vertex Cover / Dominating Set",
+      "platform": "YouTube",
+      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。"
     }
   ],
   "video_resource_policy": {
