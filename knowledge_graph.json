@@ -1,5 +1,5 @@
 {
-  "version": 13,
+  "version": 14,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -24,19 +24,17 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Intro to Logical Statements",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "01-02 命题的概念",
           "sections": [
-            "Intro to Logical Statements"
+            "01-02 命题的概念"
           ],
           "lessons": [
             {
-              "title": "Intro to Logical Statements",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=10"
+              "title": "01-02 命题的概念",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=4"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -49,9 +47,7 @@
               "title": "Intro to Logical Statements",
               "url": "https://www.youtube.com/watch?v=q2eyZZK-OIk"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -64,19 +60,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Truth Tables: Negation, Conjunction, Disjunction",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "01-03 命题联结词",
           "sections": [
-            "Truth Tables: Negation, Conjunction, Disjunction"
+            "01-03 命题联结词"
           ],
           "lessons": [
             {
-              "title": "Truth Tables: Negation, Conjunction, Disjunction",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=11"
+              "title": "01-03 命题联结词",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=5"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -89,9 +83,7 @@
               "title": "Intro to Truth Tables |  Negation, Conjunction, and Disjunction",
               "url": "https://www.youtube.com/watch?v=7mulE-zramc"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -104,23 +96,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Truth Tables / Truth Table Example",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "01-07 真值表",
           "sections": [
-            "Truth Tables / Truth Table Example"
+            "01-07 真值表"
           ],
           "lessons": [
             {
-              "title": "Truth Tables: Negation, Conjunction, Disjunction",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=11"
-            },
-            {
-              "title": "Truth Table Example",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=12"
+              "title": "01-07 真值表",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=9"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -133,9 +119,7 @@
               "title": "Intro to Truth Tables |  Negation, Conjunction, and Disjunction",
               "url": "https://www.youtube.com/watch?v=7mulE-zramc"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -148,23 +132,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Logical Equivalence / De Morgan's Laws",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "01-08 等价关系",
           "sections": [
-            "Logical Equivalence / De Morgan's Laws"
+            "01-08 等价关系"
           ],
           "lessons": [
             {
-              "title": "Logical Equivalence",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=13"
-            },
-            {
-              "title": "De Morgan's Laws",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=15"
+              "title": "01-08 等价关系",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=10"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -177,9 +155,7 @@
               "title": "Logical Equivalence of Two Statements",
               "url": "https://www.youtube.com/watch?v=U2zPxuj8mnI"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -192,34 +168,17 @@
       ],
       "videos": [
         {
-          "source_id": "zjut_class2025",
-          "title": "06-第1章-命题逻辑-范式的概念和演算",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "01-23 范式的求法",
           "sections": [
-            "06-第1章-命题逻辑-范式的概念和演算"
+            "01-23 范式的求法"
           ],
           "lessons": [
             {
-              "title": "06-第1章-命题逻辑-范式的概念和演算",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=6"
+              "title": "01-23 范式的求法",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=25"
             }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
-        },
-        {
-          "source_id": "zjut_class2025",
-          "title": "07-第1章-命题逻辑-主范式的求法（本章重点）",
-          "sections": [
-            "07-第1章-命题逻辑-主范式的求法（本章重点）"
-          ],
-          "lessons": [
-            {
-              "title": "07-第1章-命题逻辑-主范式的求法（本章重点）",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=7"
-            }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
+          ]
         },
         {
           "source_id": "trevtutor",
@@ -232,9 +191,7 @@
               "title": "Conjunctive Normal Form (CNF) and Disjunctive Normal Form (DNF)",
               "url": "https://www.youtube.com/watch?v=2cgHa02s_SA"
             }
-          ],
-          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
-          "note": "带范式推导和练习。"
+          ]
         }
       ]
     },
@@ -248,19 +205,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Logical Arguments: Modus Ponens and Modus Tollens",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "01-24 推理理论",
           "sections": [
-            "Logical Arguments: Modus Ponens and Modus Tollens"
+            "01-24 推理理论"
           ],
           "lessons": [
             {
-              "title": "Logical Arguments: Modus Ponens and Modus Tollens",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=22"
+              "title": "01-24 推理理论",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=26"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -273,9 +228,7 @@
               "title": "Logical Arguments – Modus Ponens & Modus Tollens",
               "url": "https://www.youtube.com/watch?v=NTSZMdGlo4g"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -288,19 +241,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Predicates and Their Truth Sets",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "02-01 谓词的概念",
           "sections": [
-            "Predicates and Their Truth Sets"
+            "02-01 谓词的概念"
           ],
           "lessons": [
             {
-              "title": "Predicates and Their Truth Sets",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=25"
+              "title": "02-01 谓词的概念",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=32"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -313,9 +264,7 @@
               "title": "Predicates and their Truth Sets",
               "url": "https://www.youtube.com/watch?v=9MPA_LUmmoo"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -328,19 +277,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Universal and Existential Quantifiers",
+          "source_id": "sawfin_bilibili",
+          "title": "p10 Discrete Math - 1.4.2 Quantifiers",
           "sections": [
-            "Universal and Existential Quantifiers"
+            "p10 Discrete Math - 1.4.2 Quantifiers"
           ],
           "lessons": [
             {
-              "title": "Universal and Existential Quantifiers",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=26"
+              "title": "p10 Discrete Math - 1.4.2 Quantifiers",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=11"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -353,9 +300,7 @@
               "title": "Universal and Existential Quantifiers, ∀ “For All” and ∃ “There Exists”",
               "url": "https://www.youtube.com/watch?v=GJpezCUMOxA"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -368,6 +313,19 @@
       ],
       "videos": [
         {
+          "source_id": "xiaohuazuimao_2021",
+          "title": "02-04 约束变元及换名",
+          "sections": [
+            "02-04 约束变元及换名"
+          ],
+          "lessons": [
+            {
+              "title": "02-04 约束变元及换名",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=35"
+            }
+          ]
+        },
+        {
           "source_id": "trevtutor",
           "title": "SCOPE and FREE and BOUND Variables in Predicate Logic",
           "sections": [
@@ -378,24 +336,7 @@
               "title": "SCOPE and FREE and BOUND Variables in Predicate Logic",
               "url": "https://www.youtube.com/watch?v=qnvFQfy4ILA"
             }
-          ],
-          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
-          "note": "详细讲解辖域、自由/约束变元和练习。"
-        },
-        {
-          "source_id": "neu_discrete",
-          "title": "谓词公式与量词的辖域",
-          "sections": [
-            "谓词公式与量词的辖域"
-          ],
-          "lessons": [
-            {
-              "title": "谓词公式与量词的辖域",
-              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=13"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -409,19 +350,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Negating Quantifiers",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "02-10 谓词逻辑的推理",
           "sections": [
-            "Negating Quantifiers"
+            "02-10 谓词逻辑的推理"
           ],
           "lessons": [
             {
-              "title": "Negating Quantifiers",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=27"
+              "title": "02-10 谓词逻辑的推理",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=41"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -434,9 +373,7 @@
               "title": "Negating Universal and Existential Quantifiers",
               "url": "https://www.youtube.com/watch?v=q1rKFGSiZE8"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -449,19 +386,17 @@
       ],
       "videos": [
         {
-          "source_id": "neu_discrete",
-          "title": "前束范式",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "02-08 前束范式",
           "sections": [
-            "前束范式"
+            "02-08 前束范式"
           ],
           "lessons": [
             {
-              "title": "前束范式",
-              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=17"
+              "title": "02-08 前束范式",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=39"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         },
         {
           "source_id": "morpheus_logic",
@@ -474,9 +409,7 @@
               "title": "Predicate Logic #8: The Prenex Normal Form",
               "url": "https://www.youtube.com/watch?v=GpZ9SbRTEZA"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -489,23 +422,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "How to Prove Math Theorems / Proof by Contradiction",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "01-26 反证法",
           "sections": [
-            "How to Prove Math Theorems / Proof by Contradiction"
+            "01-26 反证法"
           ],
           "lessons": [
             {
-              "title": "How to Prove Math Theorems",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=32"
-            },
-            {
-              "title": "Proof by Contradiction",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=38"
+              "title": "01-26 反证法",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=28"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -518,9 +445,7 @@
               "title": "Proof by Contradiction | Method & First Example",
               "url": "https://www.youtube.com/watch?v=huGWXh4l1M0"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -533,19 +458,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Mathematical Induction",
+          "source_id": "sawfin_bilibili",
+          "title": "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula",
           "sections": [
-            "Mathematical Induction"
+            "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula"
           ],
           "lessons": [
             {
-              "title": "Mathematical Induction",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=45"
+              "title": "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=53"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -558,9 +481,7 @@
               "title": "Intro to Mathematical Induction",
               "url": "https://www.youtube.com/watch?v=GdM_iA1Zek4"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -573,19 +494,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Strong Induction",
+          "source_id": "sawfin_bilibili",
+          "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
           "sections": [
-            "Strong Induction"
+            "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction"
           ],
           "lessons": [
             {
-              "title": "Strong Induction",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=47"
+              "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=56"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -598,9 +517,7 @@
               "title": "Strong Induction // Intro and Full Example",
               "url": "https://www.youtube.com/watch?v=rfA0h9udl7E"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -611,23 +528,17 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Union of Two Sets / Intersection of Two Sets",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "03-04 集合的运算(1)",
           "sections": [
-            "Union of Two Sets / Intersection of Two Sets"
+            "03-04 集合的运算(1)"
           ],
           "lessons": [
             {
-              "title": "Union of Two Sets",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=52"
-            },
-            {
-              "title": "Intersection of Two Sets",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=53"
+              "title": "03-04 集合的运算(1)",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=46"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -640,9 +551,7 @@
               "title": "The union of two sets",
               "url": "https://www.youtube.com/watch?v=EF3m9bSbtdI"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -655,19 +564,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Cartesian Product of Two Sets",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "03-06 笛卡尔积",
           "sections": [
-            "Cartesian Product of Two Sets"
+            "03-06 笛卡尔积"
           ],
           "lessons": [
             {
-              "title": "Cartesian Product of Two Sets",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=5"
+              "title": "03-06 笛卡尔积",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=48"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -680,9 +587,7 @@
               "title": "Cartesian Product of Two Sets A x B",
               "url": "https://www.youtube.com/watch?v=ufjEv-5nmcA"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -695,19 +600,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Relations and Their Inverses",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "03-12 复合关系(1)",
           "sections": [
-            "Relations and Their Inverses"
+            "03-12 复合关系(1)"
           ],
           "lessons": [
             {
-              "title": "Relations and Their Inverses",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=56"
+              "title": "03-12 复合关系(1)",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=54"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -720,9 +623,7 @@
               "title": "Relations and their Inverses",
               "url": "https://www.youtube.com/watch?v=cQiyDUiIcOQ"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -735,19 +636,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Reflexive, Symmetric and Transitive Relations",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "03-09 自反和反自反",
           "sections": [
-            "Reflexive, Symmetric and Transitive Relations"
+            "03-09 自反和反自反"
           ],
           "lessons": [
             {
-              "title": "Reflexive, Symmetric and Transitive Relations",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=57"
+              "title": "03-09 自反和反自反",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=51"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -760,9 +659,7 @@
               "title": "Reflexive, Symmetric, and Transitive Relations on a Set",
               "url": "https://www.youtube.com/watch?v=q0xN_N7l_Kw"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -775,19 +672,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Equivalence Relations",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "03-18 等价关系",
           "sections": [
-            "Equivalence Relations"
+            "03-18 等价关系"
           ],
           "lessons": [
             {
-              "title": "Equivalence Relations",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=58"
+              "title": "03-18 等价关系",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=60"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -800,9 +695,7 @@
               "title": "Equivalence Relations – Reflexive, Symmetric, and Transitive",
               "url": "https://www.youtube.com/watch?v=T6RUxvJR8i4"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -815,19 +708,17 @@
       ],
       "videos": [
         {
-          "source_id": "zjut_class2025",
-          "title": "27-第3章-偏序关系",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "03-21 偏序关系",
           "sections": [
-            "27-第3章-偏序关系"
+            "03-21 偏序关系"
           ],
           "lessons": [
             {
-              "title": "27-第3章-偏序关系",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=28"
+              "title": "03-21 偏序关系",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=63"
             }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
+          ]
         },
         {
           "source_id": "trevtutor",
@@ -840,9 +731,7 @@
               "title": "Partial Orders and Hasse Diagrams",
               "url": "https://www.youtube.com/watch?v=R36F8CWAi2k"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -856,19 +745,17 @@
       ],
       "videos": [
         {
-          "source_id": "zjut_class2025",
-          "title": "22-第3章-关系的闭包",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "03-15 关系的闭包",
           "sections": [
-            "22-第3章-关系的闭包"
+            "03-15 关系的闭包"
           ],
           "lessons": [
             {
-              "title": "22-第3章-关系的闭包",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=22"
+              "title": "03-15 关系的闭包",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=57"
             }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
+          ]
         },
         {
           "source_id": "neso_academy",
@@ -881,9 +768,7 @@
               "title": "Closure of Relations – Part 1",
               "url": "https://www.youtube.com/watch?v=SgQJlKLWJmY"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -896,19 +781,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Intuitive Idea of a Function",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "04-01 函数的定义",
           "sections": [
-            "Intuitive Idea of a Function"
+            "04-01 函数的定义"
           ],
           "lessons": [
             {
-              "title": "Intuitive Idea of a Function",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=7"
+              "title": "04-01 函数的定义",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=68"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -921,9 +804,7 @@
               "title": "The intuitive idea of a function",
               "url": "https://www.youtube.com/watch?v=G8qvOZ9DE3c"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -936,19 +817,17 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "One-to-One and Onto Functions",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "04-03 特殊函数",
           "sections": [
-            "One-to-One and Onto Functions"
+            "04-03 特殊函数"
           ],
           "lessons": [
             {
-              "title": "One-to-One and Onto Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=27"
+              "title": "04-03 特殊函数",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=70"
             }
-          ],
-          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "sawfin_youtube",
@@ -961,9 +840,7 @@
               "title": "One-to-One and Onto Functions",
               "url": "https://www.youtube.com/watch?v=plSzGYwo-ew"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
+          ]
         }
       ]
     },
@@ -976,19 +853,17 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "Inverse Functions and Composition of Functions",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "04-04 函数的复合",
           "sections": [
-            "Inverse Functions and Composition of Functions"
+            "04-04 函数的复合"
           ],
           "lessons": [
             {
-              "title": "Inverse Functions and Composition of Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=28"
+              "title": "04-04 函数的复合",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=71"
             }
-          ],
-          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "sawfin_youtube",
@@ -1001,9 +876,7 @@
               "title": "Inverse Functions and Composition of Functions",
               "url": "https://www.youtube.com/watch?v=aQefXelCN5Y"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1017,19 +890,17 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "Inverse Functions and Composition of Functions",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "04-06 逆函数",
           "sections": [
-            "Inverse Functions and Composition of Functions"
+            "04-06 逆函数"
           ],
           "lessons": [
             {
-              "title": "Inverse Functions and Composition of Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=28"
+              "title": "04-06 逆函数",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=73"
             }
-          ],
-          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "sawfin_youtube",
@@ -1042,9 +913,7 @@
               "title": "Inverse Functions and Composition of Functions",
               "url": "https://www.youtube.com/watch?v=aQefXelCN5Y"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1055,19 +924,17 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Proof: Infinitely Many Prime Numbers",
+          "source_id": "sjtu_crypto",
+          "title": "1.2 素数与厄拉脱塞师筛法",
           "sections": [
-            "Proof: Infinitely Many Prime Numbers"
+            "1.2 素数与厄拉脱塞师筛法"
           ],
           "lessons": [
             {
-              "title": "Proof: Infinitely Many Prime Numbers",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=41"
+              "title": "1.2 素数与厄拉脱塞师筛法",
+              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=2"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -1080,9 +947,7 @@
               "title": "Proof: There are infinitely many primes numbers",
               "url": "https://www.youtube.com/watch?v=inUkhh8-h-I"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1095,19 +960,17 @@
       ],
       "videos": [
         {
-          "source_id": "liu_math",
-          "title": "初等数论：整除理论",
+          "source_id": "sjtu_crypto",
+          "title": "1.4 最大公因数与广义欧几里得除法",
           "sections": [
-            "初等数论：整除理论"
+            "1.4 最大公因数与广义欧几里得除法"
           ],
           "lessons": [
             {
-              "title": "初等数论：整除理论",
-              "url": "https://www.bilibili.com/video/BV1NS421d76d/?p=6"
+              "title": "1.4 最大公因数与广义欧几里得除法",
+              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=4"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "numberphile_gcd",
@@ -1120,9 +983,7 @@
               "title": "Euclid's Algorithm",
               "url": "https://www.youtube.com/watch?v=6Y3jHHE_hbA"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1135,34 +996,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Quotient-Remainder Theorem and Modular Arithmetic",
+          "source_id": "sjtu_crypto",
+          "title": "同余的基本概念和性质",
           "sections": [
-            "Quotient-Remainder Theorem and Modular Arithmetic"
+            "同余的基本概念和性质"
           ],
           "lessons": [
             {
-              "title": "Quotient-Remainder Theorem and Modular Arithmetic",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=40"
+              "title": "同余的基本概念和性质",
+              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=9"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
-        },
-        {
-          "source_id": "liu_math",
-          "title": "初等数论：同余理论",
-          "sections": [
-            "初等数论：同余理论"
-          ],
-          "lessons": [
-            {
-              "title": "初等数论：同余理论",
-              "url": "https://www.bilibili.com/video/BV1NS421d76d/?p=7"
-            }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -1175,9 +1019,7 @@
               "title": "Quotient-Remainder Theorem and Modular Arithmetic",
               "url": "https://www.youtube.com/watch?v=jCUOhbk1O_o"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1191,19 +1033,17 @@
       ],
       "videos": [
         {
-          "source_id": "liu_math",
-          "title": "初等数论：同余理论",
+          "source_id": "sjtu_crypto",
+          "title": "同余式的基本概念与一次同余式",
           "sections": [
-            "初等数论：同余理论"
+            "同余式的基本概念与一次同余式"
           ],
           "lessons": [
             {
-              "title": "初等数论：同余理论",
-              "url": "https://www.bilibili.com/video/BV1NS421d76d/?p=7"
+              "title": "同余式的基本概念与一次同余式",
+              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=14"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "sawfin_youtube",
@@ -1216,9 +1056,7 @@
               "title": "Solving Linear Congruences Using the Inverse",
               "url": "https://www.youtube.com/watch?v=bZ275aLiypo"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1232,6 +1070,19 @@
       ],
       "videos": [
         {
+          "source_id": "sjtu_crypto",
+          "title": "2个方程的中国剩余定理",
+          "sections": [
+            "2个方程的中国剩余定理"
+          ],
+          "lessons": [
+            {
+              "title": "2个方程的中国剩余定理",
+              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=15"
+            }
+          ]
+        },
+        {
           "source_id": "numberphile_visual",
           "title": "Chinese Remainder Theorem and Cards",
           "sections": [
@@ -1242,24 +1093,7 @@
               "title": "Chinese Remainder Theorem and Cards",
               "url": "https://www.youtube.com/watch?v=l9dXo5f3zDc"
             }
-          ],
-          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
-          "note": "直观演示中国剩余定理，但不涵盖模逆算法。"
-        },
-        {
-          "source_id": "sjtu_crypto",
-          "title": "中国剩余定理：两个方程的情形",
-          "sections": [
-            "中国剩余定理：两个方程的情形"
-          ],
-          "lessons": [
-            {
-              "title": "中国剩余定理：两个方程的情形",
-              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=15"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1273,6 +1107,19 @@
       ],
       "videos": [
         {
+          "source_id": "sjtu_crypto",
+          "title": "欧拉定理 费马小定理 Wilson 定理",
+          "sections": [
+            "欧拉定理 费马小定理 Wilson 定理"
+          ],
+          "lessons": [
+            {
+              "title": "欧拉定理 费马小定理 Wilson 定理",
+              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=12"
+            }
+          ]
+        },
+        {
           "source_id": "neso_academy",
           "title": "Euler's Theorem",
           "sections": [
@@ -1283,39 +1130,7 @@
               "title": "Euler's Theorem",
               "url": "https://www.youtube.com/watch?v=DyOv20d4c70"
             }
-          ],
-          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
-          "note": "欧拉定理的算例与推导。"
-        },
-        {
-          "source_id": "khan_cs_labs",
-          "title": "Fermat's Little Theorem",
-          "sections": [
-            "Fermat's Little Theorem"
-          ],
-          "lessons": [
-            {
-              "title": "Fermat's Little Theorem",
-              "url": "https://www.youtube.com/watch?v=OoQ16YCYksw"
-            }
-          ],
-          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
-          "note": "Khan Academy Labs使用彩色珠串动画解释费马小定理。"
-        },
-        {
-          "source_id": "sjtu_crypto",
-          "title": "欧拉定理、费马小定理与 Wilson 定理",
-          "sections": [
-            "欧拉定理、费马小定理与 Wilson 定理"
-          ],
-          "lessons": [
-            {
-              "title": "欧拉定理、费马小定理与 Wilson 定理",
-              "url": "https://www.bilibili.com/video/BV1ZQ4y1W7rL/?p=12"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1330,21 +1145,6 @@
       "level": "拓展",
       "videos": [
         {
-          "source_id": "art_of_the_problem",
-          "title": "Public Key Cryptography: RSA Encryption Algorithm",
-          "sections": [
-            "Public Key Cryptography: RSA Encryption Algorithm"
-          ],
-          "lessons": [
-            {
-              "title": "Public Key Cryptography: RSA Encryption Algorithm",
-              "url": "https://www.youtube.com/watch?v=wXB-V_Keiu8"
-            }
-          ],
-          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
-          "note": "Brit Cruise制作的RSA加密动画，讲解公私钥和数论直觉；为较早期的视频。"
-        },
-        {
           "source_id": "bili_rsa_course",
           "title": "RSA 加密算法及其数学基础",
           "sections": [
@@ -1355,9 +1155,20 @@
               "title": "RSA 加密算法及其数学基础",
               "url": "https://www.bilibili.com/video/BV1gT4y117My/?p=5"
             }
+          ]
+        },
+        {
+          "source_id": "art_of_the_problem",
+          "title": "Public Key Cryptography: RSA Encryption Algorithm",
+          "sections": [
+            "Public Key Cryptography: RSA Encryption Algorithm"
           ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          "lessons": [
+            {
+              "title": "Public Key Cryptography: RSA Encryption Algorithm",
+              "url": "https://www.youtube.com/watch?v=wXB-V_Keiu8"
+            }
+          ]
         }
       ]
     },
@@ -1368,19 +1179,17 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Summation Rule for Disjoint Unions",
+          "source_id": "combinatorics_bili",
+          "title": "3.1加法原理与乘法原理",
           "sections": [
-            "Summation Rule for Disjoint Unions"
+            "3.1加法原理与乘法原理"
           ],
           "lessons": [
             {
-              "title": "Summation Rule for Disjoint Unions",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=64"
+              "title": "3.1加法原理与乘法原理",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=5"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trevtutor",
@@ -1393,9 +1202,7 @@
               "title": "Rule of Sum and Rule of Product",
               "url": "https://www.youtube.com/watch?v=8JiWWvEoaoc"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1408,23 +1215,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Permutations / Combinations Formula",
+          "source_id": "combinatorics_bili",
+          "title": "3.2.1集合的排列数和组合数",
           "sections": [
-            "Permutations / Combinations Formula"
+            "3.2.1集合的排列数和组合数"
           ],
           "lessons": [
             {
-              "title": "Permutations",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=63"
-            },
-            {
-              "title": "Combinations Formula",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=67"
+              "title": "3.2.1集合的排列数和组合数",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=6"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -1437,9 +1238,7 @@
               "title": "Combinations Formula: Counting the number of ways to choose r items from n items.",
               "url": "https://www.youtube.com/watch?v=6KYp4zjqT6s"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1452,19 +1251,17 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "The Binomial Theorem",
+          "source_id": "combinatorics_bili",
+          "title": "3.4.1二项式定理",
           "sections": [
-            "The Binomial Theorem"
+            "3.4.1二项式定理"
           ],
           "lessons": [
             {
-              "title": "The Binomial Theorem",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=62"
+              "title": "3.4.1二项式定理",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=10"
             }
-          ],
-          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "sawfin_youtube",
@@ -1477,9 +1274,7 @@
               "title": "The Binomial Theorem",
               "url": "https://www.youtube.com/watch?v=m8TsPMfcasI"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1492,6 +1287,19 @@
       ],
       "videos": [
         {
+          "source_id": "combinatorics_bili",
+          "title": "2.1鸽巢原理的简单形式",
+          "sections": [
+            "2.1鸽巢原理的简单形式"
+          ],
+          "lessons": [
+            {
+              "title": "2.1鸽巢原理的简单形式",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=3"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_youtube",
           "title": "The Pigeonhole Principle",
           "sections": [
@@ -1502,39 +1310,7 @@
               "title": "The Pigeonhole Principle",
               "url": "https://www.youtube.com/watch?v=xEuPd4k_IPo"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "trevtutor",
-          "title": "Pigeonhole Principle",
-          "sections": [
-            "Pigeonhole Principle"
-          ],
-          "lessons": [
-            {
-              "title": "Pigeonhole Principle",
-              "url": "https://www.youtube.com/watch?v=2-mxYrCNX60"
-            }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
-        },
-        {
-          "source_id": "cqu_discrete",
-          "title": "3.1计数的基础+3.2鸽巢原理",
-          "sections": [
-            "3.1计数的基础+3.2鸽巢原理"
-          ],
-          "lessons": [
-            {
-              "title": "3.1计数的基础+3.2鸽巢原理",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=14"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1548,34 +1324,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Counting Intersecting Sets",
+          "source_id": "combinatorics_bili",
+          "title": "4.1.1容斥原理",
           "sections": [
-            "Counting Intersecting Sets"
+            "4.1.1容斥原理"
           ],
           "lessons": [
             {
-              "title": "Counting Intersecting Sets",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=65"
+              "title": "4.1.1容斥原理",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=18"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
-        },
-        {
-          "source_id": "trefor_youtube",
-          "title": "Counting formula for two intersecting sets: N(A union B)=N(A)+N(B)-N(A intersect B)",
-          "sections": [
-            "Counting formula for two intersecting sets: N(A union B)=N(A)+N(B)-N(A intersect B)"
-          ],
-          "lessons": [
-            {
-              "title": "Counting formula for two intersecting sets: N(A union B)=N(A)+N(B)-N(A intersect B)",
-              "url": "https://www.youtube.com/watch?v=U_kOuvs6zcw"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         },
         {
           "source_id": "trevtutor",
@@ -1588,9 +1347,7 @@
               "title": "INCLUSION-EXCLUSION PRINCIPLE - DISCRETE MATHEMATICS",
               "url": "https://www.youtube.com/watch?v=GS7dIWA6Hpo"
             }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1604,6 +1361,19 @@
       ],
       "videos": [
         {
+          "source_id": "combinatorics_bili",
+          "title": "5.1 生成函数的定义和性质",
+          "sections": [
+            "5.1 生成函数的定义和性质"
+          ],
+          "lessons": [
+            {
+              "title": "5.1 生成函数的定义和性质",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=24"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_youtube",
           "title": "Generating Functions: Solving Counting Problems",
           "sections": [
@@ -1614,54 +1384,7 @@
               "title": "Generating Functions: Solving Counting Problems",
               "url": "https://www.youtube.com/watch?v=mZ9gmFtxBNg"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "trevtutor",
-          "title": "GENERATING FUNCTIONS - Discrete Mathematics",
-          "sections": [
-            "GENERATING FUNCTIONS - Discrete Mathematics"
-          ],
-          "lessons": [
-            {
-              "title": "GENERATING FUNCTIONS - Discrete Mathematics",
-              "url": "https://www.youtube.com/watch?v=-drdeNMoe8w"
-            }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
-        },
-        {
-          "source_id": "blue1brown",
-          "title": "Olympiad level counting (Generating functions)",
-          "sections": [
-            "Olympiad level counting (Generating functions)"
-          ],
-          "lessons": [
-            {
-              "title": "Olympiad level counting (Generating functions)",
-              "url": "https://www.youtube.com/watch?v=bOXCLR3Wric"
-            }
-          ],
-          "verification": "3Blue1Brown原创动画视频，内容与生成函数应用匹配",
-          "note": ""
-        },
-        {
-          "source_id": "cqu_discrete",
-          "title": "4.3分治算法和递推关系+4.4生成函数",
-          "sections": [
-            "4.3分治算法和递推关系+4.4生成函数"
-          ],
-          "lessons": [
-            {
-              "title": "4.3分治算法和递推关系+4.4生成函数",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=22"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1672,19 +1395,17 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "Modeling with Recurrence Relations",
+          "source_id": "combinatorics_bili",
+          "title": "6.1 递推关系的建立",
           "sections": [
-            "Modeling with Recurrence Relations"
+            "6.1 递推关系的建立"
           ],
           "lessons": [
             {
-              "title": "Modeling with Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=67"
+              "title": "6.1 递推关系的建立",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=29"
             }
-          ],
-          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "sawfin_youtube",
@@ -1697,24 +1418,7 @@
               "title": "Modeling with Recurrence Relations",
               "url": "https://www.youtube.com/watch?v=awR_p6J7Lyg"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "trevtutor",
-          "title": "RECURRENCE RELATIONS - DISCRETE MATHEMATICS",
-          "sections": [
-            "RECURRENCE RELATIONS - DISCRETE MATHEMATICS"
-          ],
-          "lessons": [
-            {
-              "title": "RECURRENCE RELATIONS - DISCRETE MATHEMATICS",
-              "url": "https://www.youtube.com/watch?v=eAaP4XaB8hM"
-            }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1727,6 +1431,19 @@
       ],
       "videos": [
         {
+          "source_id": "combinatorics_bili",
+          "title": "6.2 常系数线性齐次递推关系的求解",
+          "sections": [
+            "6.2 常系数线性齐次递推关系的求解"
+          ],
+          "lessons": [
+            {
+              "title": "6.2 常系数线性齐次递推关系的求解",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=30"
+            }
+          ]
+        },
+        {
           "source_id": "trevtutor",
           "title": "HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
           "sections": [
@@ -1737,24 +1454,7 @@
               "title": "HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
               "url": "https://www.youtube.com/watch?v=7mhvA5L7KqY"
             }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
-        },
-        {
-          "source_id": "cqu_discrete",
-          "title": "4.1递推关系的应用+4.2求解线性递推关系",
-          "sections": [
-            "4.1递推关系的应用+4.2求解线性递推关系"
-          ],
-          "lessons": [
-            {
-              "title": "4.1递推关系的应用+4.2求解线性递推关系",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=16"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1767,36 +1467,6 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_youtube",
-          "title": "Non-Homogeneous Linear Recurrence Relations",
-          "sections": [
-            "Non-Homogeneous Linear Recurrence Relations"
-          ],
-          "lessons": [
-            {
-              "title": "Non-Homogeneous Linear Recurrence Relations",
-              "url": "https://www.youtube.com/watch?v=NKsz2mGxX4A"
-            }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "trevtutor",
-          "title": "NON-HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
-          "sections": [
-            "NON-HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics"
-          ],
-          "lessons": [
-            {
-              "title": "NON-HOMOGENEOUS RECURRENCE RELATIONS - Discrete Mathematics",
-              "url": "https://www.youtube.com/watch?v=EfF_XSEX1Sk"
-            }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
-        },
-        {
           "source_id": "combinatorics_bili",
           "title": "6.3 常系数线性非齐次递推关系的求解",
           "sections": [
@@ -1807,9 +1477,20 @@
               "title": "6.3 常系数线性非齐次递推关系的求解",
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=31"
             }
+          ]
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Non-Homogeneous Linear Recurrence Relations",
+          "sections": [
+            "Non-Homogeneous Linear Recurrence Relations"
           ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          "lessons": [
+            {
+              "title": "Non-Homogeneous Linear Recurrence Relations",
+              "url": "https://www.youtube.com/watch?v=NKsz2mGxX4A"
+            }
+          ]
         }
       ]
     },
@@ -1822,19 +1503,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Recursive Sequences",
+          "source_id": "sawfin_bilibili",
+          "title": "p31 Discrete Math - 2.4.2 Recurrence Relations",
           "sections": [
-            "Recursive Sequences"
+            "p31 Discrete Math - 2.4.2 Recurrence Relations"
           ],
           "lessons": [
             {
-              "title": "Recursive Sequences",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=48"
+              "title": "p31 Discrete Math - 2.4.2 Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=32"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -1847,9 +1526,7 @@
               "title": "Recursive Sequences",
               "url": "https://www.youtube.com/watch?v=0OcUAjOXmFc"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1860,19 +1537,17 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Intro to Graph Theory",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-02 图的基本概念",
           "sections": [
-            "Intro to Graph Theory"
+            "07-02 图的基本概念"
           ],
           "lessons": [
             {
-              "title": "Intro to Graph Theory",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=79"
+              "title": "07-02 图的基本概念",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=112"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -1885,9 +1560,7 @@
               "title": "Intro to Graph Theory | Definitions & Ex: 7 Bridges of Konigsberg",
               "url": "https://www.youtube.com/watch?v=C7YrMRdLkqo"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1900,6 +1573,19 @@
       ],
       "videos": [
         {
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-05 图的同构",
+          "sections": [
+            "07-05 图的同构"
+          ],
+          "lessons": [
+            {
+              "title": "07-05 图的同构",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=115"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_youtube",
           "title": "Graph Isomorphisms",
           "sections": [
@@ -1910,39 +1596,7 @@
               "title": "Graph Isomorphisms",
               "url": "https://www.youtube.com/watch?v=Ymb2qaVgN58"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "trevtutor",
-          "title": "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS",
-          "sections": [
-            "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS"
-          ],
-          "lessons": [
-            {
-              "title": "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS",
-              "url": "https://www.youtube.com/watch?v=W9nJRN3ajuk"
-            }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
-        },
-        {
-          "source_id": "xtu_wangting",
-          "title": "2.2 图的同构",
-          "sections": [
-            "2.2 图的同构"
-          ],
-          "lessons": [
-            {
-              "title": "2.2 图的同构",
-              "url": "https://www.bilibili.com/video/BV1T5411J7ux/?p=4"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -1955,6 +1609,19 @@
       ],
       "videos": [
         {
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-09 图的矩阵表示",
+          "sections": [
+            "07-09 图的矩阵表示"
+          ],
+          "lessons": [
+            {
+              "title": "07-09 图的矩阵表示",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=119"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_youtube",
           "title": "Representing Graphs: Adjacency and Incidence Matrices",
           "sections": [
@@ -1965,24 +1632,7 @@
               "title": "Representing Graphs: Adjacency and Incidence Matrices",
               "url": "https://www.youtube.com/watch?v=hJ29yobFlyQ"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "zjut_class2025",
-          "title": "45-第6章-图论-图的矩阵表示",
-          "sections": [
-            "45-第6章-图论-图的矩阵表示"
-          ],
-          "lessons": [
-            {
-              "title": "45-第6章-图论-图的矩阵表示",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=48"
-            }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
+          ]
         }
       ]
     },
@@ -1997,6 +1647,19 @@
       "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
       "videos": [
         {
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-09 图的矩阵表示",
+          "sections": [
+            "07-09 图的矩阵表示"
+          ],
+          "lessons": [
+            {
+              "title": "07-09 图的矩阵表示",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=119"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_youtube",
           "title": "Representing Graphs: Adjacency and Incidence Matrices",
           "sections": [
@@ -2007,39 +1670,7 @@
               "title": "Representing Graphs: Adjacency and Incidence Matrices",
               "url": "https://www.youtube.com/watch?v=hJ29yobFlyQ"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "zjut_class2025",
-          "title": "45-第6章-图论-图的矩阵表示",
-          "sections": [
-            "45-第6章-图论-图的矩阵表示"
-          ],
-          "lessons": [
-            {
-              "title": "45-第6章-图论-图的矩阵表示",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=48"
-            }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
-        },
-        {
-          "source_id": "zjut_class2025",
-          "title": "46-第6章-图论-图的矩阵表示2",
-          "sections": [
-            "46-第6章-图论-图的矩阵表示2"
-          ],
-          "lessons": [
-            {
-              "title": "46-第6章-图论-图的矩阵表示2",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=49"
-            }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2052,19 +1683,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Connected Graphs and Subgraphs",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-06 路与回路",
           "sections": [
-            "Connected Graphs and Subgraphs"
+            "07-06 路与回路"
           ],
           "lessons": [
             {
-              "title": "Connected Graphs and Subgraphs",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=80"
+              "title": "07-06 路与回路",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=116"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "trefor_youtube",
@@ -2077,9 +1706,7 @@
               "title": "Properties in Graph Theory: Complete, Connected, Subgraph, Induced Subgraph",
               "url": "https://www.youtube.com/watch?v=gC0RNpD2P1Y"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2092,6 +1719,19 @@
       ],
       "videos": [
         {
+          "source_id": "fang_cut",
+          "title": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
+          "sections": [
+            "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集"
+          ],
+          "lessons": [
+            {
+              "title": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
+              "url": "https://www.bilibili.com/video/BV1oT421U7EK/?p=1"
+            }
+          ]
+        },
+        {
           "source_id": "william_fiset",
           "title": "Bridges and Articulation Points Algorithm",
           "sections": [
@@ -2102,24 +1742,7 @@
               "title": "Bridges and Articulation Points Algorithm",
               "url": "https://www.youtube.com/watch?v=aZXi1unBdJA"
             }
-          ],
-          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
-          "note": "图示与DFS算法分步骤演示。"
-        },
-        {
-          "source_id": "nju_chenggong",
-          "title": "2.2.1 割点和割边：理论",
-          "sections": [
-            "2.2.1 割点和割边：理论"
-          ],
-          "lessons": [
-            {
-              "title": "2.2.1 割点和割边：理论",
-              "url": "https://www.bilibili.com/video/BV1EPhfePE34/?p=8"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2132,17 +1755,15 @@
       ],
       "videos": [
         {
-          "source_id": "ucsd_discrete",
-          "title": "图论模块 10：带权图",
+          "source_id": "chenggong_weighted",
+          "title": "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论",
           "sections": [
-            "图论模块 10：带权图"
+            "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论"
           ],
-          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "已换算UCSD合集的实际分P序号，点击即可进入对应图论章节，无需从目录查找。",
           "lessons": [
             {
-              "title": "图论模块 10：带权图",
-              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=73"
+              "title": "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论",
+              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/?p=1"
             }
           ]
         },
@@ -2157,9 +1778,7 @@
               "title": "Weighted Graph & Shortest Path",
               "url": "https://www.youtube.com/watch?v=iOu3PXv5L6w"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2172,34 +1791,17 @@
       ],
       "videos": [
         {
-          "source_id": "cincinnati_math1071",
-          "title": "Euler Paths and Bridges of Konigsberg",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-10 欧拉图",
           "sections": [
-            "Euler Paths and Bridges of Konigsberg"
+            "07-10 欧拉图"
           ],
           "lessons": [
             {
-              "title": "Euler Paths and Bridges of Konigsberg",
-              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=82"
+              "title": "07-10 欧拉图",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=120"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
-        },
-        {
-          "source_id": "trefor_youtube",
-          "title": "Euler Paths & the 7 Bridges of Konigsberg | Graph Theory",
-          "sections": [
-            "Euler Paths & the 7 Bridges of Konigsberg | Graph Theory"
-          ],
-          "lessons": [
-            {
-              "title": "Euler Paths & the 7 Bridges of Konigsberg | Graph Theory",
-              "url": "https://www.youtube.com/watch?v=dSK5jTEe-AM"
-            }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         },
         {
           "source_id": "trevtutor",
@@ -2212,9 +1814,7 @@
               "title": "[Discrete Mathematics] Euler Circuits and Euler Trails",
               "url": "https://www.youtube.com/watch?v=Ou345pSYDoE"
             }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2227,6 +1827,19 @@
       ],
       "videos": [
         {
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-11 汉密尔顿图",
+          "sections": [
+            "07-11 汉密尔顿图"
+          ],
+          "lessons": [
+            {
+              "title": "07-11 汉密尔顿图",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=121"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_youtube",
           "title": "Hamilton Paths and Circuits",
           "sections": [
@@ -2237,39 +1850,7 @@
               "title": "Hamilton Paths and Circuits",
               "url": "https://www.youtube.com/watch?v=aOM1CsHMxKo"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "trevtutor",
-          "title": "[Discrete Mathematics] Hamilton Cycles",
-          "sections": [
-            "[Discrete Mathematics] Hamilton Cycles"
-          ],
-          "lessons": [
-            {
-              "title": "[Discrete Mathematics] Hamilton Cycles",
-              "url": "https://www.youtube.com/watch?v=t_6VByupc1U"
-            }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
-        },
-        {
-          "source_id": "hit_graph_course",
-          "title": "第30讲：哈密顿图",
-          "sections": [
-            "第30讲：哈密顿图"
-          ],
-          "lessons": [
-            {
-              "title": "第30讲：哈密顿图",
-              "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=30"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2283,6 +1864,19 @@
       ],
       "videos": [
         {
+          "source_id": "wangshusen_2023",
+          "title": "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs",
+          "sections": [
+            "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs"
+          ],
+          "lessons": [
+            {
+              "title": "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs",
+              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=9"
+            }
+          ]
+        },
+        {
           "source_id": "william_fiset",
           "title": "Dijkstra Shortest Path Algorithm | Graph Theory",
           "sections": [
@@ -2293,24 +1887,7 @@
               "title": "Dijkstra Shortest Path Algorithm | Graph Theory",
               "url": "https://www.youtube.com/watch?v=pSqmAO-m7Lk"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
-        },
-        {
-          "source_id": "wangshusen_bili",
-          "title": "Dijkstra 算法：有权图最短路",
-          "sections": [
-            "Dijkstra 算法：有权图最短路"
-          ],
-          "lessons": [
-            {
-              "title": "Dijkstra 算法：有权图最短路",
-              "url": "https://www.bilibili.com/video/BV1g24y1Y7wa/?p=4"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2323,17 +1900,15 @@
       ],
       "videos": [
         {
-          "source_id": "ucsd_discrete",
-          "title": "图论模块 38：图着色",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-18 着色法",
           "sections": [
-            "图论模块 38：图着色"
+            "07-18 着色法"
           ],
-          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "已换算UCSD合集的实际分P序号，点击即可进入对应图论章节，无需从目录查找。",
           "lessons": [
             {
-              "title": "图论模块 38：图着色",
-              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=101"
+              "title": "07-18 着色法",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=128"
             }
           ]
         },
@@ -2348,9 +1923,7 @@
               "title": "[Discrete Mathematics] Graph Coloring and Chromatic Polynomials",
               "url": "https://www.youtube.com/watch?v=J7g5HMZgKMU"
             }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2363,22 +1936,15 @@
       ],
       "videos": [
         {
-          "source_id": "ucsd_discrete",
-          "title": "平面图及欧拉公式",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-14 平面图",
           "sections": [
-            "图论模块 34：平面图",
-            "图论模块 35：欧拉公式"
+            "07-14 平面图"
           ],
-          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "两个相邻章节共同覆盖平面图及其基本性质。",
           "lessons": [
             {
-              "title": "图论模块 34：平面图",
-              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=97"
-            },
-            {
-              "title": "图论模块 35：欧拉公式",
-              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=98"
+              "title": "07-14 平面图",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=124"
             }
           ]
         },
@@ -2393,9 +1959,7 @@
               "title": "[Discrete Mathematics] Planar Graphs",
               "url": "https://www.youtube.com/watch?v=ETtXKpfBWNI"
             }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2409,17 +1973,15 @@
       ],
       "videos": [
         {
-          "source_id": "ucsd_discrete",
-          "title": "图论模块 13：二分图",
+          "source_id": "wangshusen_2023",
+          "title": "18. 14-1- 二部图及其判定算法 Bipartite Graphs",
           "sections": [
-            "图论模块 13：二分图"
+            "18. 14-1- 二部图及其判定算法 Bipartite Graphs"
           ],
-          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "已换算UCSD合集的实际分P序号，点击即可进入对应图论章节，无需从目录查找。",
           "lessons": [
             {
-              "title": "图论模块 13：二分图",
-              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=76"
+              "title": "18. 14-1- 二部图及其判定算法 Bipartite Graphs",
+              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=18"
             }
           ]
         },
@@ -2434,9 +1996,7 @@
               "title": "ISOMORPHISMS and BIPARTITE GRAPHS - DISCRETE MATHEMATICS",
               "url": "https://www.youtube.com/watch?v=W9nJRN3ajuk"
             }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2450,6 +2010,19 @@
       ],
       "videos": [
         {
+          "source_id": "graph_animation_bili",
+          "title": "图-拓扑排序",
+          "sections": [
+            "图-拓扑排序"
+          ],
+          "lessons": [
+            {
+              "title": "图-拓扑排序",
+              "url": "https://www.bilibili.com/video/BV1XV411X7T7/?p=1"
+            }
+          ]
+        },
+        {
           "source_id": "william_fiset",
           "title": "Topological Sort Algorithm | Graph Theory",
           "sections": [
@@ -2460,24 +2033,7 @@
               "title": "Topological Sort Algorithm | Graph Theory",
               "url": "https://www.youtube.com/watch?v=eL-KzMXSXXI"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
-        },
-        {
-          "source_id": "graph_animation_bili",
-          "title": "拓扑排序",
-          "sections": [
-            "拓扑排序"
-          ],
-          "lessons": [
-            {
-              "title": "拓扑排序",
-              "url": "https://www.bilibili.com/video/BV1XV411X7T7/?p=30"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2491,18 +2047,16 @@
       "videos": [
         {
           "source_id": "pku_discrete",
-          "title": "支配集、点覆盖集与点独立集",
+          "title": "034-第12章-支配集、覆盖集、独立集与匹配（教材第十三章）-支配集、点覆盖集、点独立集",
           "sections": [
-            "支配集、点覆盖集与点独立集"
+            "034-第12章-支配集、覆盖集、独立集与匹配（教材第十三章）-支配集、点覆盖集、点独立集"
           ],
           "lessons": [
             {
-              "title": "支配集、点覆盖集与点独立集",
+              "title": "034-第12章-支配集、覆盖集、独立集与匹配（教材第十三章）-支配集、点覆盖集、点独立集",
               "url": "https://www.bilibili.com/video/BV1144y1W7oL/?p=34"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         },
         {
           "source_id": "algos_attitude",
@@ -2515,9 +2069,7 @@
               "title": "Clique, Independent Set, Vertex Cover, and Dominating Set",
               "url": "https://www.youtube.com/watch?v=u5W32YxmnL8"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2531,22 +2083,15 @@
       ],
       "videos": [
         {
-          "source_id": "ucsd_discrete",
-          "title": "图匹配与霍尔定理",
+          "source_id": "wangshusen_2023",
+          "title": "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)",
           "sections": [
-            "图论模块 31：匹配",
-            "图论模块 32：霍尔定理"
+            "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)"
           ],
-          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "在二部图节点之后推荐，两个章节共同补足匹配及其存在条件。",
           "lessons": [
             {
-              "title": "图论模块 31：匹配",
-              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=94"
-            },
-            {
-              "title": "图论模块 32：霍尔定理",
-              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=95"
+              "title": "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)",
+              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=19"
             }
           ]
         },
@@ -2561,9 +2106,7 @@
               "title": "Bipartite Graph Matching and Hall's Marriage Theorem",
               "url": "https://www.youtube.com/watch?v=zCIzBP1S44w"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2577,19 +2120,17 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "Introduction to Trees",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-20 树的性质",
           "sections": [
-            "Introduction to Trees"
+            "07-20 树的性质"
           ],
           "lessons": [
             {
-              "title": "Introduction to Trees",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=79"
+              "title": "07-20 树的性质",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=130"
             }
-          ],
-          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "sawfin_youtube",
@@ -2602,39 +2143,7 @@
               "title": "Introduction to Trees",
               "url": "https://www.youtube.com/watch?v=lTaKhF2tObc"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "zjut_class2025",
-          "title": "50-第6章-图论-树的概念",
-          "sections": [
-            "50-第6章-图论-树的概念"
-          ],
-          "lessons": [
-            {
-              "title": "50-第6章-图论-树的概念",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=53"
-            }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
-        },
-        {
-          "source_id": "trevtutor",
-          "title": "[Discrete Mathematics] Trees",
-          "sections": [
-            "[Discrete Mathematics] Trees"
-          ],
-          "lessons": [
-            {
-              "title": "[Discrete Mathematics] Trees",
-              "url": "https://www.youtube.com/watch?v=zEQZpTizgLo"
-            }
-          ],
-          "verification": "讲师本人公开课程目录对应的单集标题和URL",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2647,6 +2156,19 @@
       ],
       "videos": [
         {
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-23 根树",
+          "sections": [
+            "07-23 根树"
+          ],
+          "lessons": [
+            {
+              "title": "07-23 根树",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=133"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_youtube",
           "title": "Rooted Trees",
           "sections": [
@@ -2657,24 +2179,7 @@
               "title": "Rooted Trees",
               "url": "https://www.youtube.com/watch?v=g9_PuhLwkOU"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "zjut_class2025",
-          "title": "52-第6章-图论-根树和哈夫曼树",
-          "sections": [
-            "52-第6章-图论-根树和哈夫曼树"
-          ],
-          "lessons": [
-            {
-              "title": "52-第6章-图论-根树和哈夫曼树",
-              "url": "https://www.bilibili.com/video/BV13QndzmECz/?p=55"
-            }
-          ],
-          "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2688,6 +2193,19 @@
       ],
       "videos": [
         {
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-21 生成树",
+          "sections": [
+            "07-21 生成树"
+          ],
+          "lessons": [
+            {
+              "title": "07-21 生成树",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=131"
+            }
+          ]
+        },
+        {
           "source_id": "sawfin_youtube",
           "title": "Spanning Trees: Depth-First Search",
           "sections": [
@@ -2698,24 +2216,7 @@
               "title": "Spanning Trees: Depth-First Search",
               "url": "https://www.youtube.com/watch?v=urjzBqwQcfg"
             }
-          ],
-          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
-          "note": ""
-        },
-        {
-          "source_id": "xtu_wangting",
-          "title": "3.2 生成树",
-          "sections": [
-            "3.2 生成树"
-          ],
-          "lessons": [
-            {
-              "title": "3.2 生成树",
-              "url": "https://www.bilibili.com/video/BV1T5411J7ux/?p=14"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2729,17 +2230,15 @@
       ],
       "videos": [
         {
-          "source_id": "ucsd_discrete",
-          "title": "图论模块 28：最小生成树",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "07-22 最小生成树",
           "sections": [
-            "图论模块 28：最小生成树"
+            "07-22 最小生成树"
           ],
-          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
-          "note": "已换算UCSD合集的实际分P序号，点击即可进入对应图论章节，无需从目录查找。",
           "lessons": [
             {
-              "title": "图论模块 28：最小生成树",
-              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=91"
+              "title": "07-22 最小生成树",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=132"
             }
           ]
         },
@@ -2754,9 +2253,7 @@
               "title": "Prim's Minimum Spanning Tree Algorithm",
               "url": "https://www.youtube.com/watch?v=jsmMtJpPnhU"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2771,21 +2268,6 @@
       "level": "拓展",
       "videos": [
         {
-          "source_id": "steve_butler_spectral",
-          "title": "(Spectral; Fall 23) 16 - Matrix Tree Theorem",
-          "sections": [
-            "(Spectral; Fall 23) 16 - Matrix Tree Theorem"
-          ],
-          "verification": "已在教师官方2023年谱图理论课程页面核对第16讲YouTube直达视频",
-          "note": "拓展节点。官方YouTube单集视频为英文授课，从拉普拉斯矩阵引出矩阵树定理；原Vimeo地址404，已弃用。",
-          "lessons": [
-            {
-              "title": "(Spectral; Fall 23) 16 - Matrix Tree Theorem",
-              "url": "https://www.youtube.com/watch?v=AcVPX2JOM1U"
-            }
-          ]
-        },
-        {
           "source_id": "ucla_matrix_tree",
           "title": "矩阵树定理",
           "sections": [
@@ -2796,9 +2278,20 @@
               "title": "矩阵树定理",
               "url": "https://www.bilibili.com/video/BV1L5411m7Tq/?p=27"
             }
+          ]
+        },
+        {
+          "source_id": "steve_butler_spectral",
+          "title": "(Spectral; Fall 23) 16 - Matrix Tree Theorem",
+          "sections": [
+            "(Spectral; Fall 23) 16 - Matrix Tree Theorem"
           ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          "lessons": [
+            {
+              "title": "(Spectral; Fall 23) 16 - Matrix Tree Theorem",
+              "url": "https://www.youtube.com/watch?v=AcVPX2JOM1U"
+            }
+          ]
         }
       ]
     },
@@ -2811,19 +2304,17 @@
       ],
       "videos": [
         {
-          "source_id": "socratica_bilibili",
-          "title": "What Is Abstract Algebra?",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "05-02 代数系统",
           "sections": [
-            "What Is Abstract Algebra?"
+            "05-02 代数系统"
           ],
           "lessons": [
             {
-              "title": "What Is Abstract Algebra?",
-              "url": "https://www.bilibili.com/video/BV1Bx41157DD/?p=1"
+              "title": "05-02 代数系统",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=75"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "socratica_youtube",
@@ -2836,9 +2327,7 @@
               "title": "What Is Abstract Algebra?",
               "url": "https://www.youtube.com/watch?v=IP7nW_hKB7I"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2851,19 +2340,17 @@
       ],
       "videos": [
         {
-          "source_id": "socratica_bilibili",
-          "title": "Group Definition (Expanded)",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "05-10 群",
           "sections": [
-            "Group Definition (Expanded)"
+            "05-10 群"
           ],
           "lessons": [
             {
-              "title": "Group Definition (Expanded)",
-              "url": "https://www.bilibili.com/video/BV1Bx41157DD/?p=3"
+              "title": "05-10 群",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=84"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "socratica_youtube",
@@ -2876,9 +2363,7 @@
               "title": "Group Definition (Expanded)",
               "url": "https://www.youtube.com/watch?v=g7L_r6zw4-c"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2892,23 +2377,17 @@
       ],
       "videos": [
         {
-          "source_id": "socratica_bilibili",
-          "title": "Homomorphisms / Isomorphisms",
+          "source_id": "xiaohuazuimao_2021",
+          "title": "05-23 同态与同构",
           "sections": [
-            "Homomorphisms / Isomorphisms"
+            "05-23 同态与同构"
           ],
           "lessons": [
             {
-              "title": "Homomorphisms",
-              "url": "https://www.bilibili.com/video/BV1Bx41157DD/?p=17"
-            },
-            {
-              "title": "Isomorphisms",
-              "url": "https://www.bilibili.com/video/BV1Bx41157DD/?p=18"
+              "title": "05-23 同态与同构",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=97"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "socratica_youtube",
@@ -2921,9 +2400,7 @@
               "title": "Group Homomorphisms",
               "url": "https://www.youtube.com/watch?v=XPF5fe1WdKY"
             }
-          ],
-          "verification": "讲师或制作机构来源明确且标题对应；播放清晰度未逐条实测",
-          "note": ""
+          ]
         }
       ]
     },
@@ -2937,26 +2414,16 @@
       "videos": [
         {
           "source_id": "socratica_bilibili",
-          "title": "Definition of a Ring / Ring Examples / Field Definition (Expanded)",
+          "title": "Definition of a Ring",
           "sections": [
-            "Definition of a Ring / Ring Examples / Field Definition (Expanded)"
+            "Definition of a Ring"
           ],
           "lessons": [
             {
               "title": "Definition of a Ring",
               "url": "https://www.bilibili.com/video/BV1Bx41157DD/?p=20"
-            },
-            {
-              "title": "Ring Examples",
-              "url": "https://www.bilibili.com/video/BV1Bx41157DD/?p=21"
-            },
-            {
-              "title": "Field Definition (Expanded)",
-              "url": "https://www.bilibili.com/video/BV1Bx41157DD/?p=25"
             }
-          ],
-          "verification": "已与公开选集标题和讲师来源核对；未逐条实播",
-          "note": ""
+          ]
         },
         {
           "source_id": "socratica_youtube",
@@ -2969,9 +2436,7 @@
               "title": "Field Definition (Expanded)",
               "url": "https://www.youtube.com/watch?v=KCSZ4QhOw0I"
             }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     },
@@ -2984,6 +2449,19 @@
       ],
       "videos": [
         {
+          "source_id": "xiaohuazuimao_2021",
+          "title": "06-08 布尔代数",
+          "sections": [
+            "06-08 布尔代数"
+          ],
+          "lessons": [
+            {
+              "title": "06-08 布尔代数",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=107"
+            }
+          ]
+        },
+        {
           "source_id": "trevtutor",
           "title": "Boolean Algebra in 13 Minutes",
           "sections": [
@@ -2994,37 +2472,12 @@
               "title": "Boolean Algebra in 13 Minutes",
               "url": "https://www.youtube.com/watch?v=cTjFy18SjRc"
             }
-          ],
-          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
-          "note": "布尔代数部分，未覆盖一般格理论；视频制作方在介绍中指出个别术语口误。"
-        },
-        {
-          "source_id": "uestc_lattice",
-          "title": "10.4布尔代数",
-          "sections": [
-            "10.4布尔代数"
-          ],
-          "lessons": [
-            {
-              "title": "10.4布尔代数",
-              "url": "https://www.bilibili.com/video/BV1En4y1X7Cc/?p=24"
-            }
-          ],
-          "verification": "已依据公开视频标题/选集位置核对；播放质量未逐条实播",
-          "note": "对应本知识点，直达单集"
+          ]
         }
       ]
     }
   ],
   "video_sources": [
-    {
-      "id": "cincinnati_math1071",
-      "name": "辛辛那提大学 · Trefor Bazett",
-      "course": "Discrete Mathematics（板书推导与例题）",
-      "platform": "Bilibili",
-      "note": "授课者署名明确；用具体分P视频，不使用课程首页。",
-      "publisher": "ShowMeAI"
-    },
     {
       "id": "trefor_youtube",
       "name": "辛辛那提大学 · Dr. Trefor Bazett",
@@ -3050,22 +2503,6 @@
       "publisher": "Socratica"
     },
     {
-      "id": "liu_math",
-      "name": "刘币老师 · 数学专题",
-      "course": "初等数论（推导与例题）",
-      "platform": "Bilibili",
-      "note": "有明确署名的原创授课讲解。",
-      "publisher": ""
-    },
-    {
-      "id": "ucsd_discrete",
-      "name": "加州大学圣迭戈分校（UCSD）",
-      "course": "Discrete Mathematics（Coursera短视频课程）",
-      "platform": "Bilibili",
-      "note": "大学公开课视频，配图解讲解；B站为中文字幕转载，字幕质量不保证。",
-      "publisher": ""
-    },
-    {
       "id": "william_fiset",
       "name": "William Fiset · 图论算法讲师",
       "course": "Graph Theory（算法可视化与实现）",
@@ -3087,7 +2524,7 @@
       "course": "Discrete Math I（完整课程高清转载）",
       "platform": "Bilibili",
       "note": "含题目推演与例题演示的正式教学视频，B站按明确的分P章节定位。",
-      "publisher": ""
+      "publisher": "常青藤中英字幕课程"
     },
     {
       "id": "sawfin_youtube",
@@ -3104,22 +2541,6 @@
       "platform": "YouTube",
       "note": "原讲师网站逐项提供本课程单集，含讲解、例题和演算过程。",
       "publisher": "TrevTutor"
-    },
-    {
-      "id": "zjut_class2025",
-      "name": "浙江工业大学 · 小花醉猫（教师）",
-      "course": "2025离散数学课堂实录",
-      "platform": "Bilibili",
-      "note": "教师本人发布的课堂实录，避免目录标注无声或音效不佳的原视频分段。",
-      "publisher": "小花醉猫"
-    },
-    {
-      "id": "blue1brown",
-      "name": "3Blue1Brown · Grant Sanderson",
-      "course": "Olympiad Level Counting / Generating Functions",
-      "platform": "YouTube",
-      "note": "制作团队明确，数学动画与推导示例；视频为独立专题。",
-      "publisher": "3Blue1Brown"
     },
     {
       "id": "numberphile_visual",
@@ -3146,22 +2567,6 @@
       "publisher": "Neso Academy"
     },
     {
-      "id": "khan_cs_labs",
-      "name": "Khan Academy Labs · Brit Cruise",
-      "course": "Journey into Cryptography",
-      "platform": "YouTube",
-      "note": "用可视化珠串动画解释费马小定理。",
-      "publisher": "Khan Academy"
-    },
-    {
-      "id": "neu_discrete",
-      "name": "东北大学 · 胡明涵、赵志滨等",
-      "course": "离散数学（大学公开课）",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
       "id": "sjtu_crypto",
       "name": "上海交通大学 · 陈恭亮",
       "course": "信息安全数学基础（国家精品课）",
@@ -3178,49 +2583,9 @@
       "publisher": ""
     },
     {
-      "id": "cqu_discrete",
-      "name": "重庆大学 · 刘然",
-      "course": "离散数学及其应用（课程实录）",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
       "id": "combinatorics_bili",
       "name": "组合数学 · 系列课程",
       "course": "递推关系与组合数学专题",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
-      "id": "xtu_wangting",
-      "name": "湘潭大学 · 王婷",
-      "course": "离散数学·图论与组合数学",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
-      "id": "nju_chenggong",
-      "name": "南京大学 · 程龚",
-      "course": "图论与算法（大学课程）",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
-      "id": "hit_graph_course",
-      "name": "哈尔滨工业大学 · 图论公开课",
-      "course": "离散数学之集合论与图论",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
-      "id": "wangshusen_bili",
-      "name": "王树森 · 图论与图算法",
-      "course": "图论算法视频教程",
       "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
       "publisher": ""
@@ -3231,7 +2596,7 @@
       "course": "数据结构·图（动画讲解）",
       "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
+      "publisher": "动画讲解计算机知识"
     },
     {
       "id": "pku_discrete",
@@ -3245,14 +2610,6 @@
       "id": "ucla_matrix_tree",
       "name": "UCLA · 组合数学公开课",
       "course": "矩阵树定理（课程单讲）",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
-    },
-    {
-      "id": "uestc_lattice",
-      "name": "电子科技大学 · 离散数学公开课",
-      "course": "代数、群与格·布尔代数",
       "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
       "publisher": ""
@@ -3288,6 +2645,34 @@
       "platform": "YouTube",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
       "publisher": "Algorithms with Attitude"
+    },
+    {
+      "id": "xiaohuazuimao_2021",
+      "name": "小花醉猫",
+      "course": "（新版）离散数学全套（提醒：本人首页有全新课堂实录课。）",
+      "platform": "Bilibili",
+      "publisher": "小花醉猫"
+    },
+    {
+      "id": "wangshusen_2023",
+      "name": "王树森",
+      "course": "【王树森】数据结构和算法完整课程",
+      "platform": "Bilibili",
+      "publisher": ""
+    },
+    {
+      "id": "chenggong_weighted",
+      "name": "程龚老师",
+      "course": "南大程龚主讲《图论与算法》(GTA)",
+      "platform": "Bilibili",
+      "publisher": "程龚老师"
+    },
+    {
+      "id": "fang_cut",
+      "name": "01壹萬",
+      "course": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
+      "platform": "Bilibili",
+      "publisher": "01壹萬"
     }
   ],
   "video_resource_policy": {
