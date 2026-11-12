@@ -22966,7 +22966,7 @@ document.addEventListener(
 // 离线工作区只读取当前页面已经通过账号验证、或当前游客会话中的学习数据。
 // 不从 localStorage 的旧账号标记推断身份，也不上传这份快照。
 window.DMateOfflineBridge = Object.freeze({
-    snapshot() {
+    async snapshot() {
         const wrongQuestions = Array.isArray(learningState?.wrongQuestions)
             ? JSON.parse(JSON.stringify(learningState.wrongQuestions)) : [];
         const notes = Array.isArray(learningState?.conceptNotebook?.notes)
@@ -22976,6 +22976,40 @@ window.DMateOfflineBridge = Object.freeze({
             drawings = typeof collectLearningReviewDrawings === "function"
                 ? collectLearningReviewDrawings() : [];
         } catch (_error) {}
+
+        // 离线工作区复用 DMate 当前设备的主题、字体、透明度和用户背景。
+        const settings = JSON.parse(JSON.stringify(appearanceSettings || {}));
+        let backgroundBlob = null;
+        try {
+            backgroundBlob = await readAppearanceBackgroundBlob();
+        } catch (_error) {}
+        try {
+            localStorage.setItem("dmate:offline:appearance:v1", JSON.stringify(settings));
+            await new Promise((resolve, reject) => {
+                const request = indexedDB.open("dmate-offline-workspace", 2);
+                request.onupgradeneeded = () => {
+                    const db = request.result;
+                    for (const store of ["mistakes", "notes", "practice", "settings"]) {
+                        if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, {keyPath:"id"});
+                    }
+                };
+                request.onerror = () => reject(request.error || new Error("离线外观数据准备失败"));
+                request.onsuccess = () => {
+                    const db = request.result;
+                    const tx = db.transaction("settings", "readwrite");
+                    tx.objectStore("settings").put({
+                        id:"appearance", settings, backgroundBlob,
+                        updatedAt:Date.now()
+                    });
+                    tx.oncomplete = () => { db.close(); resolve(); };
+                    tx.onerror = () => { const error=tx.error; db.close(); reject(error || new Error("离线外观数据保存失败")); };
+                    tx.onabort = () => { const error=tx.error; db.close(); reject(error || new Error("离线外观数据保存中断")); };
+                };
+            });
+        } catch (error) {
+            console.warn("DMate 原有外观未能复制到离线工作区：", error);
+        }
+
         return {
             authenticated: Boolean(accountState.authenticated && accountState.username),
             username: accountState.authenticated ? accountState.username : "",
