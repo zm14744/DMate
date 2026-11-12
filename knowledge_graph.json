@@ -1,5 +1,5 @@
 {
-  "version": 29,
+  "version": 30,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -2015,9 +2015,9 @@
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
-      "nodes_with_active_course": 66,
-      "nodes_pending": "count_generating; tree_matrix_tree",
-      "direct_episode_links": 132,
+      "nodes_with_active_course": 67,
+      "nodes_pending": "tree_matrix_tree",
+      "direct_episode_links": 133,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
       "last_audit_scope": "Bilibili episode title and part-index checks, topic-node fit, source references, direct-link structure; video speech/subtitle content not fully watched end-to-end"
