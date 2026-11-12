@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -36,6 +36,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=1"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Intro to Logical Statements",
+          "sections": [
+            "Intro to Logical Statements"
+          ],
+          "lessons": [
+            {
+              "title": "Intro to Logical Statements",
+              "url": "https://www.youtube.com/watch?v=q2eyZZK-OIk"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -60,6 +75,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=2"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Truth Tables: Negation, Conjunction, Disjunction",
+          "sections": [
+            "Truth Tables: Negation, Conjunction, Disjunction"
+          ],
+          "lessons": [
+            {
+              "title": "Truth Tables: Negation, Conjunction, Disjunction",
+              "url": "https://www.youtube.com/watch?v=7mulE-zramc"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -84,6 +114,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=4"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Truth Tables",
+          "sections": [
+            "Truth Tables"
+          ],
+          "lessons": [
+            {
+              "title": "Truth Tables",
+              "url": "https://www.youtube.com/watch?v=7mulE-zramc"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -108,6 +153,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=5"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Logical Equivalence",
+          "sections": [
+            "Logical Equivalence"
+          ],
+          "lessons": [
+            {
+              "title": "Logical Equivalence",
+              "url": "https://www.youtube.com/watch?v=U2zPxuj8mnI"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -138,6 +198,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=9"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "CNF & DNF",
+          "sections": [
+            "CNF & DNF"
+          ],
+          "lessons": [
+            {
+              "title": "CNF & DNF",
+              "url": "https://www.youtube.com/watch?v=j018nHM-WSQ"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -168,6 +243,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=11"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Modus Ponens & Modus Tollens",
+          "sections": [
+            "Modus Ponens & Modus Tollens"
+          ],
+          "lessons": [
+            {
+              "title": "Modus Ponens & Modus Tollens",
+              "url": "https://www.youtube.com/watch?v=NTSZMdGlo4g"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -192,6 +282,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=12"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Predicates and their Truth Sets",
+          "sections": [
+            "Predicates and their Truth Sets"
+          ],
+          "lessons": [
+            {
+              "title": "Predicates and their Truth Sets",
+              "url": "https://www.youtube.com/watch?v=9MPA_LUmmoo"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -216,6 +321,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=14"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Universal and Existential Quantifiers",
+          "sections": [
+            "Universal and Existential Quantifiers"
+          ],
+          "lessons": [
+            {
+              "title": "Universal and Existential Quantifiers",
+              "url": "https://www.youtube.com/watch?v=GJpezCUMOxA"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
           "note": ""
         }
       ]
@@ -272,6 +392,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=19"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Negating Quantifiers",
+          "sections": [
+            "Negating Quantifiers"
+          ],
+          "lessons": [
+            {
+              "title": "Negating Quantifiers",
+              "url": "https://www.youtube.com/watch?v=q1rKFGSiZE8"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
           "note": ""
         }
       ]
@@ -333,6 +468,21 @@
               "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=38"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Proof by Contradiction",
+          "sections": [
+            "Proof by Contradiction"
+          ],
+          "lessons": [
+            {
+              "title": "Proof by Contradiction",
+              "url": "https://www.youtube.com/watch?v=huGWXh4l1M0"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -357,6 +507,21 @@
               "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=45"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Intro to Mathematical Induction",
+          "sections": [
+            "Intro to Mathematical Induction"
+          ],
+          "lessons": [
+            {
+              "title": "Intro to Mathematical Induction",
+              "url": "https://www.youtube.com/watch?v=GdM_iA1Zek4"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -381,6 +546,21 @@
               "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=47"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Strong Induction",
+          "sections": [
+            "Strong Induction"
+          ],
+          "lessons": [
+            {
+              "title": "Strong Induction",
+              "url": "https://www.youtube.com/watch?v=rfA0h9udl7E"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -403,6 +583,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=23"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "The Union of Two Sets",
+          "sections": [
+            "The Union of Two Sets"
+          ],
+          "lessons": [
+            {
+              "title": "The Union of Two Sets",
+              "url": "https://www.youtube.com/watch?v=EF3m9bSbtdI"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
           "note": ""
         }
       ]
@@ -434,6 +629,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Cartesian Product of Two Sets",
+          "sections": [
+            "Cartesian Product of Two Sets"
+          ],
+          "lessons": [
+            {
+              "title": "Cartesian Product of Two Sets",
+              "url": "https://www.youtube.com/watch?v=ufjEv-5nmcA"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -464,6 +674,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Relations and their Inverses",
+          "sections": [
+            "Relations and their Inverses"
+          ],
+          "lessons": [
+            {
+              "title": "Relations and their Inverses",
+              "url": "https://www.youtube.com/watch?v=cQiyDUiIcOQ"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -488,6 +713,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=27"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Reflexive, Symmetric, Transitive Relations",
+          "sections": [
+            "Reflexive, Symmetric, Transitive Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Reflexive, Symmetric, Transitive Relations",
+              "url": "https://www.youtube.com/watch?v=q0xN_N7l_Kw"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
           "note": ""
         }
       ]
@@ -519,6 +759,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Equivalence Relations",
+          "sections": [
+            "Equivalence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Equivalence Relations",
+              "url": "https://www.youtube.com/watch?v=T6RUxvJR8i4"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -543,6 +798,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=34"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Partial Orderings",
+          "sections": [
+            "Partial Orderings"
+          ],
+          "lessons": [
+            {
+              "title": "Partial Orderings",
+              "url": "https://www.youtube.com/watch?v=R36F8CWAi2k"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
           "note": ""
         }
       ]
@@ -594,6 +864,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=35"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Intuitive Idea of a Function",
+          "sections": [
+            "Intuitive Idea of a Function"
+          ],
+          "lessons": [
+            {
+              "title": "Intuitive Idea of a Function",
+              "url": "https://www.youtube.com/watch?v=G8qvOZ9DE3c"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
           "note": ""
         }
       ]
@@ -699,6 +984,21 @@
               "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=38"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Proof of Infinitely Many Prime Numbers",
+          "sections": [
+            "Proof of Infinitely Many Prime Numbers"
+          ],
+          "lessons": [
+            {
+              "title": "Proof of Infinitely Many Prime Numbers",
+              "url": "https://www.youtube.com/watch?v=inUkhh8-h-I"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -752,6 +1052,21 @@
               "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=35"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Quotient-Remainder Theorem and Modular Arithmetic",
+          "sections": [
+            "Quotient-Remainder Theorem and Modular Arithmetic"
+          ],
+          "lessons": [
+            {
+              "title": "Quotient-Remainder Theorem and Modular Arithmetic",
+              "url": "https://www.youtube.com/watch?v=jCUOhbk1O_o"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -877,6 +1192,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=5"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Product Rule",
+          "sections": [
+            "Product Rule"
+          ],
+          "lessons": [
+            {
+              "title": "Product Rule",
+              "url": "https://www.youtube.com/watch?v=3H6ET7P902Q"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -901,6 +1231,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=6"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Combinations Formula",
+          "sections": [
+            "Combinations Formula"
+          ],
+          "lessons": [
+            {
+              "title": "Combinations Formula",
+              "url": "https://www.youtube.com/watch?v=6KYp4zjqT6s"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -979,6 +1324,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=18"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Counting Formula for Two Intersecting Sets",
+          "sections": [
+            "Counting Formula for Two Intersecting Sets"
+          ],
+          "lessons": [
+            {
+              "title": "Counting Formula for Two Intersecting Sets",
+              "url": "https://www.youtube.com/watch?v=U_kOuvs6zcw"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1051,6 +1411,21 @@
               "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=30"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Solving Linear Recurrence Relations",
+          "sections": [
+            "Solving Linear Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Solving Linear Recurrence Relations",
+              "url": "https://www.youtube.com/watch?v=aHw7hAAjbD0"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1100,6 +1475,21 @@
               "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=48"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Recursive Sequences",
+          "sections": [
+            "Recursive Sequences"
+          ],
+          "lessons": [
+            {
+              "title": "Recursive Sequences",
+              "url": "https://www.youtube.com/watch?v=0OcUAjOXmFc"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1123,6 +1513,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=58"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Intro to Graph Theory",
+          "sections": [
+            "Intro to Graph Theory"
+          ],
+          "lessons": [
+            {
+              "title": "Intro to Graph Theory",
+              "url": "https://www.youtube.com/watch?v=C7YrMRdLkqo"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1147,6 +1552,21 @@
               "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=9"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Discrete Math II: Graph Isomorphisms",
+          "sections": [
+            "Discrete Math II: Graph Isomorphisms"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math II: Graph Isomorphisms",
+              "url": "https://www.youtube.com/watch?v=Ymb2qaVgN58"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1198,6 +1618,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=60"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Graph Representation",
+          "sections": [
+            "Graph Representation"
+          ],
+          "lessons": [
+            {
+              "title": "Graph Representation",
+              "url": "https://www.youtube.com/watch?v=DvYHZmTFvR8"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1222,6 +1657,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=59"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Connected Graphs and Subgraphs",
+          "sections": [
+            "Connected Graphs and Subgraphs"
+          ],
+          "lessons": [
+            {
+              "title": "Connected Graphs and Subgraphs",
+              "url": "https://www.youtube.com/watch?v=gC0RNpD2P1Y"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
           "note": ""
         }
       ]
@@ -1298,6 +1748,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Euler Paths",
+          "sections": [
+            "Euler Paths"
+          ],
+          "lessons": [
+            {
+              "title": "Euler Paths",
+              "url": "https://www.youtube.com/watch?v=dSK5jTEe-AM"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1322,6 +1787,21 @@
               "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=62"
             }
           ],
+          "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Hamiltonian Path and Cycle",
+          "sections": [
+            "Hamiltonian Path and Cycle"
+          ],
+          "lessons": [
+            {
+              "title": "Hamiltonian Path and Cycle",
+              "url": "https://www.youtube.com/watch?v=s00NJIRAEUc"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
           "note": ""
         }
       ]
@@ -1349,6 +1829,21 @@
             }
           ],
           "note": ""
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Dijkstra's Shortest Path Algorithm",
+          "sections": [
+            "Dijkstra's Shortest Path Algorithm"
+          ],
+          "lessons": [
+            {
+              "title": "Dijkstra's Shortest Path Algorithm",
+              "url": "https://www.youtube.com/watch?v=c_bkMGhzwDs"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1374,6 +1869,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=101"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Graph Coloring & Chromatic Number",
+          "sections": [
+            "Graph Coloring & Chromatic Number"
+          ],
+          "lessons": [
+            {
+              "title": "Graph Coloring & Chromatic Number",
+              "url": "https://www.youtube.com/watch?v=At-tZ9pKSBE"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1460,6 +1970,21 @@
               "url": "https://www.bilibili.com/video/BV1np4y137AN/?p=37"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Topological Sort",
+          "sections": [
+            "Topological Sort"
+          ],
+          "lessons": [
+            {
+              "title": "Topological Sort",
+              "url": "https://www.youtube.com/watch?v=EJoKJiod0KQ"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1624,6 +2149,21 @@
               "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=91"
             }
           ]
+        },
+        {
+          "source_id": "verified_youtube_topic_lectures",
+          "title": "Prim's Minimum Spanning Tree Algorithm",
+          "sections": [
+            "Prim's Minimum Spanning Tree Algorithm"
+          ],
+          "lessons": [
+            {
+              "title": "Prim's Minimum Spanning Tree Algorithm",
+              "url": "https://www.youtube.com/watch?v=KMTZ4HqDsiU"
+            }
+          ],
+          "verification": "根据公开单集标题对应知识点，播放状态待抽查",
+          "note": ""
         }
       ]
     },
@@ -1637,6 +2177,21 @@
       ],
       "level": "拓展",
       "videos": [
+        {
+          "source_id": "ucla_enumerative_matrix_tree",
+          "title": "Matrix-Tree theorem. Rooted plane trees",
+          "sections": [
+            "UCLA Math 184 第27讲：Matrix-Tree theorem"
+          ],
+          "lessons": [
+            {
+              "title": "P27 Matrix-Tree theorem",
+              "url": "https://www.bilibili.com/video/BV1L5411m7Tq/?p=27"
+            }
+          ],
+          "verification": "B站课程28段目录中第27集标题直接对应Matrix-Tree theorem",
+          "note": ""
+        },
         {
           "source_id": "steve_butler_spectral",
           "title": "Matrix Tree Theorem（矩阵树定理）",
@@ -1886,11 +2441,25 @@
       "platform": "YouTube（教师官方授课视频）",
       "url": "https://www.youtube.com/watch?v=AcVPX2JOM1U",
       "note": "教师2023年谱图理论课程第16讲官方YouTube视频；原Vimeo链接返回404，已改为单集直达。"
+    },
+    {
+      "id": "verified_youtube_topic_lectures",
+      "name": "相关专题视频",
+      "course": "单集教学视频",
+      "platform": "YouTube",
+      "note": "按知识节点匹配具体单集，不跳转课程或合集目录。"
+    },
+    {
+      "id": "ucla_enumerative_matrix_tree",
+      "name": "UCLA",
+      "course": "Enumerative Combinatorics, Lecture 27",
+      "platform": "哔哩哔哩",
+      "note": "矩阵树定理，P27。"
     }
   ],
   "video_resource_policy": {
     "primary_per_node": 1,
     "link_type": "per_lesson_direct_url",
-    "note": "只展示各个知识点对应的单集播放地址：B站必须包含准确的?p=选集序号，YouTube必须直达单条视频。哈工大MOOC课程首页和其他课程目录链接不得用作播放入口；视频源元数据不再保留合集首页URL。"
+    "note": "教学视频提供B站和YouTube两个简洁平台入口。仅使用B站正确的?p=选集序号或YouTube单集watch地址；找不到可靠单集时显示不可点击的平台名，不用课程首页或搜索页替代。"
   }
 }
