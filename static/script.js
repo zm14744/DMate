@@ -21215,7 +21215,7 @@ function renderKnowledgeGraphDetail() {
         heading.textContent = "教学视频";
         section.appendChild(heading);
 
-        const platforms = new Map([["Bilibili", []], ["YouTube", []]]);
+        const platforms = new Map([["Bilibili", []]]);
         const publisherForVideo = video => {
             const source = (knowledgeGraphData.videoSources || []).find(
                 item => item.id === video.sourceId
@@ -21230,26 +21230,29 @@ function renderKnowledgeGraphDetail() {
             caption.style.cssText = "font-size:12px;line-height:1.6;color:var(--text-secondary,#a3a3a3);overflow-wrap:anywhere;";
             return caption;
         };
-        const appendVideoInfo = (row, item) => {
+        const appendVideoInfo = (row, items) => {
             const info = document.createElement("div");
             info.className = "kg-video-info";
             info.style.cssText = "display:flex;flex-direction:column;gap:1px;min-width:0;";
 
-            // 标题严格取自视频数据，原文原样展示，不翻译、不删讲次编号。
-            const titleLink = document.createElement("a");
-            titleLink.className = "kg-video-lesson-title";
-            titleLink.textContent = item.title;
-            titleLink.href = item.url;
-            titleLink.target = "_blank";
-            titleLink.rel = "noopener noreferrer";
-            titleLink.style.cssText = "font-size:12px;line-height:1.6;color:var(--text-secondary,#a3a3a3);overflow-wrap:anywhere;text-decoration:none;";
-            titleLink.addEventListener("mouseenter", () => { titleLink.style.textDecoration = "underline"; });
-            titleLink.addEventListener("mouseleave", () => { titleLink.style.textDecoration = "none"; });
-            info.appendChild(titleLink);
+            // 同一套课程可对应多个连续单集；标题严格使用原视频名称。
+            for (const item of items) {
+                const titleLink = document.createElement("a");
+                titleLink.className = "kg-video-lesson-title";
+                titleLink.textContent = item.title;
+                titleLink.href = item.url;
+                titleLink.target = "_blank";
+                titleLink.rel = "noopener noreferrer";
+                titleLink.style.cssText = "font-size:12px;line-height:1.6;color:var(--text-secondary,#a3a3a3);overflow-wrap:anywhere;text-decoration:none;";
+                titleLink.addEventListener("mouseenter", () => { titleLink.style.textDecoration = "underline"; });
+                titleLink.addEventListener("mouseleave", () => { titleLink.style.textDecoration = "none"; });
+                info.appendChild(titleLink);
+            }
 
             // The exact uploader name is optional when it cannot be verified.
-            if (item.publisher) {
-                const source = shortDescription(item.publisher);
+            const publisher = items.find(item => item.publisher)?.publisher || "";
+            if (publisher) {
+                const source = shortDescription(publisher);
                 source.style.opacity = "0.7";
                 info.appendChild(source);
             }
@@ -21259,10 +21262,8 @@ function renderKnowledgeGraphDetail() {
             const publisher = publisherForVideo(video);
             for (const lesson of (video.lessons || [])) {
                 const url = String(lesson.url || "");
-                const platform = /^https:\/\/www\.bilibili\.com\/video\/BV[A-Za-z0-9]+\/\?p=[1-9]\d*$/.test(url)
-                    ? "Bilibili"
-                    : /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/.test(url)
-                        ? "YouTube" : "";
+                const platform = /^https:\/\/www\.bilibili\.com\/video\/BV[A-Za-z0-9]+\/(?:\?p=[1-9]\d*)?$/.test(url)
+                    ? "Bilibili" : "";
                 if (platform && !platforms.get(platform).some(item => item.url === url)) {
                     platforms.get(platform).push({
                         title: String(lesson.title || ""),
@@ -21277,7 +21278,7 @@ function renderKnowledgeGraphDetail() {
         entries.className = "kg-video-sections";
         entries.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:11px;";
 
-        // 每张知识卡片只显示 Bilibili 与 YouTube 各一条精选单集。
+        // 每个知识节点只显示一套精选 Bilibili 课程；同一课程可列出多个相关单集。
         for (const [platform, items] of platforms) {
             const item = items[0];
             if (!item) continue;
@@ -21294,7 +21295,7 @@ function renderKnowledgeGraphDetail() {
             link.target = "_blank";
             link.rel = "noopener noreferrer";
             row.appendChild(link);
-            appendVideoInfo(row, item);
+            appendVideoInfo(row, items);
             entries.appendChild(row);
         }
         section.appendChild(entries);
