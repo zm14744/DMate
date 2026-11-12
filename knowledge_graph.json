@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -29,7 +29,13 @@
           "sections": [
             "P1 命题及命题的真值"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P1 命题及命题的真值",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=1"
+            }
+          ]
         }
       ]
     },
@@ -47,7 +53,13 @@
           "sections": [
             "P2 逻辑连接词"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P2 逻辑连接词",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=2"
+            }
+          ]
         }
       ]
     },
@@ -65,7 +77,13 @@
           "sections": [
             "P4 命题公式及其真值表"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P4 命题公式及其真值表",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=4"
+            }
+          ]
         }
       ]
     },
@@ -83,7 +101,13 @@
           "sections": [
             "P5 命题公式的等价"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P5 命题公式的等价",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=5"
+            }
+          ]
         }
       ]
     },
@@ -102,8 +126,18 @@
             "P8 主析取范式",
             "P9 主合取范式"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "一个知识点的两种标准范式，作为同一组连续资源展示。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "一个知识点的两种标准范式，作为同一组连续资源展示。",
+          "lessons": [
+            {
+              "title": "P8 主析取范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=8"
+            },
+            {
+              "title": "P9 主合取范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=9"
+            }
+          ]
         }
       ]
     },
@@ -123,7 +157,17 @@
             "P10 直接推理",
             "P11 间接推理"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P10 直接推理",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=10"
+            },
+            {
+              "title": "P11 间接推理",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=11"
+            }
+          ]
         }
       ]
     },
@@ -141,7 +185,13 @@
           "sections": [
             "P12 谓词逻辑的基本概念"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P12 谓词逻辑的基本概念",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=12"
+            }
+          ]
         }
       ]
     },
@@ -154,12 +204,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "一阶逻辑命题符号化",
+          "source_id": "neu_discrete",
+          "title": "谓词逻辑中量词的符号化",
           "sections": [
-            "4.2 一阶逻辑命题符号化"
+            "P14 谓词逻辑中量词的符号化"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P14 谓词逻辑中量词的符号化",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=14"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -172,12 +229,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "一阶逻辑公式及其解释",
+          "source_id": "neu_discrete",
+          "title": "谓词公式与量词的辖域",
           "sections": [
-            "4.3 一阶逻辑公式及其解释"
+            "P13 谓词公式与量词的辖域"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P13 谓词公式与量词的辖域",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=13"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -191,12 +255,24 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "一阶逻辑的推理理论",
+          "source_id": "neu_discrete",
+          "title": "量词推理与否定",
           "sections": [
-            "5.4 一阶逻辑的推理理论"
+            "P18 谓词演算推理理论（一）",
+            "P19 谓词演算推理理论（二）"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P18 谓词演算推理理论（一）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=18"
+            },
+            {
+              "title": "P19 谓词演算推理理论（二）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=19"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -209,13 +285,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "一阶逻辑前束范式",
+          "source_id": "neu_discrete",
+          "title": "前束范式",
           "sections": [
-            "5.3 一阶逻辑前束范式"
+            "P17 前束范式"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "注意：课程原目录中5.3排在5.4之前，而知识图谱把量词推理与否定设为建议前置；前台仍按图谱关系呈现。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "按知识图谱建议前置关系呈现；无需再跳转课程目录寻找章节。",
+          "lessons": [
+            {
+              "title": "P17 前束范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=17"
+            }
+          ]
         }
       ]
     },
@@ -235,8 +317,22 @@
             "L33 Step-By-Step Guide to Proofs",
             "L38 Proof by Contradiction"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "图谱节点合并了直接证明与反证法，因此用同一课程中的相关章节组成一个资源组。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "图谱节点合并了直接证明与反证法，因此用同一课程中的相关章节组成一个资源组。",
+          "lessons": [
+            {
+              "title": "L32 How to Prove Math Theorems",
+              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=32"
+            },
+            {
+              "title": "L33 Step-By-Step Guide to Proofs",
+              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=33"
+            },
+            {
+              "title": "L38 Proof by Contradiction",
+              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=38"
+            }
+          ]
         }
       ]
     },
@@ -254,7 +350,13 @@
           "sections": [
             "L45 Intro to Mathematical Induction"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "L45 Intro to Mathematical Induction",
+              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=45"
+            }
+          ]
         }
       ]
     },
@@ -272,7 +374,13 @@
           "sections": [
             "L47 Strong Induction"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "L47 Strong Induction",
+              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=47"
+            }
+          ]
         }
       ]
     },
@@ -283,12 +391,19 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "集合的运算",
           "sections": [
-            "6.3 集合的运算"
+            "P23 集合的运算"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P23 集合的运算",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=23"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -301,13 +416,24 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "笛卡尔积与二元关系",
+          "source_id": "neu_discrete",
+          "title": "笛卡尔积与关系",
           "sections": [
-            "7.2 有序对与笛卡儿积",
-            "7.3 二元关系"
+            "P25 序偶与集合的笛卡尔积",
+            "P26 二元关系及其表示法"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P25 序偶与集合的笛卡尔积",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=25"
+            },
+            {
+              "title": "P26 二元关系及其表示法",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=26"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -320,12 +446,24 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "关系的运算",
+          "source_id": "neu_discrete",
+          "title": "关系运算",
           "sections": [
-            "7.4 关系的运算"
+            "P28 关系的复合运算",
+            "P29 关系的求逆运算"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P28 关系的复合运算",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=28"
+            },
+            {
+              "title": "P29 关系的求逆运算",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=29"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -338,12 +476,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "关系的性质",
+          "source_id": "neu_discrete",
+          "title": "二元关系的性质",
           "sections": [
-            "7.5 关系的性质"
+            "P27 二元关系的性质"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P27 二元关系的性质",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=27"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -356,12 +501,24 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "等价关系与划分",
           "sections": [
-            "7.7 等价关系与划分"
+            "P31 集合的划分与覆盖",
+            "P32 等价关系与等价类"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P31 集合的划分与覆盖",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=31"
+            },
+            {
+              "title": "P32 等价关系与等价类",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=32"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -374,12 +531,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "偏序关系",
           "sections": [
-            "7.8 偏序关系"
+            "P34 偏序关系"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P34 偏序关系",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=34"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -393,12 +557,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "关系的闭包",
+          "source_id": "neu_discrete",
+          "title": "关系的闭包运算",
           "sections": [
-            "7.6 关系的闭包"
+            "P30 关系的闭包运算"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P30 关系的闭包运算",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=30"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -411,12 +582,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "函数的定义",
+          "source_id": "neu_discrete",
+          "title": "函数的基本概念",
           "sections": [
-            "8.2 函数的定义"
+            "P35 函数的基本概念"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P35 函数的基本概念",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=35"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -429,12 +607,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "函数的性质（单射、满射与双射）",
+          "source_id": "hit_set_graph",
+          "title": "映射的一般性质（单射、满射等）",
           "sections": [
-            "8.3 函数的性质"
+            "11.映射的一般性质（单射、满射等）"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "11.映射的一般性质（单射、满射等）",
+              "url": "https://www.bilibili.com/video/BV1AW411v7or/?p=11"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -447,12 +632,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "函数的复合",
           "sections": [
-            "8.4 函数的复合"
+            "P36 函数的复合"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P36 函数的复合",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=36"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -466,12 +658,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "函数的反函数",
+          "source_id": "neu_discrete",
+          "title": "逆函数及其性质",
           "sections": [
-            "8.5 函数的反函数"
+            "P37 逆函数及其性质"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P37 逆函数及其性质",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=37"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -488,8 +687,18 @@
             "5.1 初识数论",
             "5.10 整数分解定理"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "目录标题与数论基础、素因子分解相对应；整除和素数定义的实际讲授范围仍建议抽查。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "目录标题与数论基础、素因子分解相对应；整除和素数定义的实际讲授范围仍建议抽查。",
+          "lessons": [
+            {
+              "title": "5.1 初识数论",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=29"
+            },
+            {
+              "title": "5.10 整数分解定理",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=38"
+            }
+          ]
         }
       ]
     },
@@ -508,7 +717,17 @@
             "5.2 辗转相除法",
             "5.3 最大公因数和互素"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "5.2 辗转相除法",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=30"
+            },
+            {
+              "title": "5.3 最大公因数和互素",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=31"
+            }
+          ]
         }
       ]
     },
@@ -526,7 +745,13 @@
           "sections": [
             "5.7 同余及其性质"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "5.7 同余及其性质",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=35"
+            }
+          ]
         }
       ]
     },
@@ -545,7 +770,13 @@
           "sections": [
             "5.8 同余方程及求解"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "5.8 同余方程及求解",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=36"
+            }
+          ]
         }
       ]
     },
@@ -564,8 +795,14 @@
           "sections": [
             "5.14 孙子定理"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "模逆计算基础在5.8同余方程及求解中学习；为避免同一视频重复挂载，这里只挂CRT对应章节。需抽查5.14是否充分解释模逆的使用。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "模逆方法见本课程5.8（在线性同余方程节点），本节直达5.14孙子定理，避免重复分配同一视频。",
+          "lessons": [
+            {
+              "title": "5.14 孙子定理",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=42"
+            }
+          ]
         }
       ]
     },
@@ -584,8 +821,14 @@
           "sections": [
             "5.13 欧拉定理"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "目录明确对应欧拉定理；图谱节点还包含费马小定理，需抽查视频是否明确讲到费马小定理或其作为欧拉定理特例。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "目录明确对应欧拉定理；图谱节点还包含费马小定理，需抽查视频是否明确讲到费马小定理或其作为欧拉定理特例。",
+          "lessons": [
+            {
+              "title": "5.13 欧拉定理",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=41"
+            }
+          ]
         }
       ]
     },
@@ -605,7 +848,13 @@
           "sections": [
             "5.15 RSA算法"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "5.15 RSA算法",
+              "url": "https://www.bilibili.com/video/BV1zt411S7r8/?p=43"
+            }
+          ]
         }
       ]
     },
@@ -621,7 +870,13 @@
           "sections": [
             "3.1 加法原理与乘法原理"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "3.1 加法原理与乘法原理",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=5"
+            }
+          ]
         }
       ]
     },
@@ -639,7 +894,13 @@
           "sections": [
             "3.2.1 集合的排列数和组合数"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "3.2.1 集合的排列数和组合数",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=6"
+            }
+          ]
         }
       ]
     },
@@ -657,7 +918,13 @@
           "sections": [
             "3.4.1 二项式定理"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "3.4.1 二项式定理",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=10"
+            }
+          ]
         }
       ]
     },
@@ -676,7 +943,17 @@
             "2.1 鸽巢原理的简单形式",
             "2.2 鸽巢原理的加强形式"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "2.1 鸽巢原理的简单形式",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=3"
+            },
+            {
+              "title": "2.2 鸽巢原理的加强形式",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=4"
+            }
+          ]
         }
       ]
     },
@@ -695,7 +972,13 @@
           "sections": [
             "4.1.1 容斥原理"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "4.1.1 容斥原理",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=18"
+            }
+          ]
         }
       ]
     },
@@ -714,8 +997,14 @@
           "sections": [
             "5.1 生成函数的定义和性质"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "原课程播放列表先讲生成函数、后讲递推；DMate建议按知识图谱前置关系，在递推建模与排列组合之后学习。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "原课程播放列表先讲生成函数、后讲递推；DMate建议按知识图谱前置关系，在递推建模与排列组合之后学习。",
+          "lessons": [
+            {
+              "title": "5.1 生成函数的定义和性质",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=24"
+            }
+          ]
         }
       ]
     },
@@ -731,7 +1020,13 @@
           "sections": [
             "6.1 递推关系的建立"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "6.1 递推关系的建立",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=29"
+            }
+          ]
         }
       ]
     },
@@ -749,7 +1044,13 @@
           "sections": [
             "6.2 常系数线性齐次递推关系的求解"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "6.2 常系数线性齐次递推关系的求解",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=30"
+            }
+          ]
         }
       ]
     },
@@ -767,7 +1068,13 @@
           "sections": [
             "6.3 常系数线性非齐次递推关系的求解"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "6.3 常系数线性非齐次递推关系的求解",
+              "url": "https://www.bilibili.com/video/BV13E411p7cb/?p=31"
+            }
+          ]
         }
       ]
     },
@@ -785,8 +1092,14 @@
           "sections": [
             "L48 Recursive Sequences"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "目录对应递归数列；视频是否明确讲授初始项/初始条件仍需抽查。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "目录对应递归数列；视频是否明确讲授初始项/初始条件仍需抽查。",
+          "lessons": [
+            {
+              "title": "L48 Recursive Sequences",
+              "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/?p=48"
+            }
+          ]
         }
       ]
     },
@@ -797,15 +1110,19 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "图的基本概念",
           "sections": [
-            "12.2 图（上）",
-            "12.3 图（中）",
-            "12.4 图（下）"
+            "P58 图的基本概念"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "三个连续章节合并为图论基础资源组，避免将同一课程的连续内容拆成多个重复推荐。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "",
+          "lessons": [
+            {
+              "title": "P58 图的基本概念",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=58"
+            }
+          ]
         }
       ]
     },
@@ -819,11 +1136,17 @@
       "videos": [
         {
           "source_id": "hit_graph",
-          "title": "图同构",
+          "title": "同构",
           "sections": [
-            "1.9 同构"
+            "1.9.1 同构"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "1.9.1 同构",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=9"
+            }
+          ]
         }
       ]
     },
@@ -839,9 +1162,15 @@
           "source_id": "hit_graph",
           "title": "邻接矩阵",
           "sections": [
-            "5.1 邻接矩阵"
+            "5.1.1 邻接矩阵"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "5.1.1 邻接矩阵",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=27"
+            }
+          ]
         }
       ]
     },
@@ -856,13 +1185,19 @@
       "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "图的矩阵表示",
           "sections": [
-            "12.8 图的矩阵表示"
+            "P60 图的矩阵表示"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "与“邻接矩阵”节点分工：邻接矩阵已由哈工大5.1单独覆盖；此处在山东师大12.8中重点看关联矩阵、度矩阵与拉普拉斯矩阵，若视频重复讲邻接矩阵可跳过该部分。实际覆盖范围仍需抽查。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "在本节关注邻接/关联/度/拉普拉斯矩阵的相关内容；课程实际覆盖到哪些矩阵类型仍需抽查。",
+          "lessons": [
+            {
+              "title": "P60 图的矩阵表示",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=60"
+            }
+          ]
         }
       ]
     },
@@ -875,14 +1210,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "路径与连通性",
+          "source_id": "neu_discrete",
+          "title": "图的连通性",
           "sections": [
-            "12.5 通路与同路",
-            "12.6 图的连通性（上）",
-            "12.7 图的连通性（下）"
+            "P59 图的连通性"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P59 图的连通性",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=59"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -895,13 +1235,19 @@
       ],
       "videos": [
         {
-          "source_id": "hit_graph_spoc",
-          "title": "割点、桥与割集",
+          "source_id": "hit_graph_2017",
+          "title": "生成树、割点与桥",
           "sections": [
-            "6.3 割点、桥与割集"
+            "34 生成树、割点与桥"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "旧版2020春SPOC资源，需确认当前账号能否正常访问课程视频。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "已替换原无法访问的哈工大 MOOC，使用B站2017版课程第34集，涵盖割点与桥。",
+          "lessons": [
+            {
+              "title": "34 生成树、割点与桥",
+              "url": "https://www.bilibili.com/video/BV1Eb41137gB/?p=34"
+            }
+          ]
         }
       ]
     },
@@ -919,8 +1265,14 @@
           "sections": [
             "图论模块 10：带权图"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。",
+          "lessons": [
+            {
+              "title": "图论模块 10：带权图",
+              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=73"
+            }
+          ]
         }
       ]
     },
@@ -933,12 +1285,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "欧拉图",
           "sections": [
-            "13.2 欧拉图"
+            "P61 欧拉图"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P61 欧拉图",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=61"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -951,12 +1310,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "哈密顿图",
+          "source_id": "neu_discrete",
+          "title": "汉密尔顿图",
           "sections": [
-            "13.3 哈密顿图"
+            "P62 汉密尔顿图"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P62 汉密尔顿图",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=62"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -970,12 +1336,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "最短路问题",
+          "source_id": "neu_discrete",
+          "title": "最短通路问题",
           "sections": [
-            "13.4 最短路问题"
+            "P63 最短通路问题"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P63 最短通路问题",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=63"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -993,8 +1366,14 @@
           "sections": [
             "图论模块 38：图着色"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。",
+          "lessons": [
+            {
+              "title": "图论模块 38：图着色",
+              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=101"
+            }
+          ]
         }
       ]
     },
@@ -1013,8 +1392,18 @@
             "图论模块 34：平面图",
             "图论模块 35：欧拉公式"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "两个相邻章节共同覆盖平面图及其基本性质。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "两个相邻章节共同覆盖平面图及其基本性质。",
+          "lessons": [
+            {
+              "title": "图论模块 34：平面图",
+              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=97"
+            },
+            {
+              "title": "图论模块 35：欧拉公式",
+              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=98"
+            }
+          ]
         }
       ]
     },
@@ -1033,8 +1422,14 @@
           "sections": [
             "图论模块 13：二分图"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。",
+          "lessons": [
+            {
+              "title": "图论模块 13：二分图",
+              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=76"
+            }
+          ]
         }
       ]
     },
@@ -1054,7 +1449,17 @@
             "2.3.1 AOV网络与拓扑排序",
             "2.3.2 拓扑排序实现方法"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "2.3.1 AOV网络与拓扑排序",
+              "url": "https://www.bilibili.com/video/BV1np4y137AN/?p=36"
+            },
+            {
+              "title": "2.3.2 拓扑排序实现方法",
+              "url": "https://www.bilibili.com/video/BV1np4y137AN/?p=37"
+            }
+          ]
         }
       ]
     },
@@ -1067,16 +1472,19 @@
       ],
       "videos": [
         {
-          "source_id": "cqjtu_graph_algorithms",
-          "title": "支配集、覆盖集与独立集",
+          "source_id": "pku_discrete",
+          "title": "支配集、点覆盖集、点独立集",
           "sections": [
-            "7.1.1 点支配集",
-            "7.1.2 点覆盖集",
-            "7.1.3 点独立集",
-            "7.1.4 三者之间的联系"
+            "034 支配集、点覆盖集、点独立集"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "四个连续小节作为一个专题资源组；不再重复挂载UCSD的团、独立集或顶点覆盖视频。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "四个连续小节作为一个专题资源组；不再重复挂载UCSD的团、独立集或顶点覆盖视频。",
+          "lessons": [
+            {
+              "title": "034 支配集、点覆盖集、点独立集",
+              "url": "https://www.bilibili.com/video/BV1144y1W7oL/?p=35"
+            }
+          ]
         }
       ]
     },
@@ -1096,8 +1504,18 @@
             "图论模块 31：匹配",
             "图论模块 32：霍尔定理"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "在二部图节点之后推荐，两个章节共同补足匹配及其存在条件。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "在二部图节点之后推荐，两个章节共同补足匹配及其存在条件。",
+          "lessons": [
+            {
+              "title": "图论模块 31：匹配",
+              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=94"
+            },
+            {
+              "title": "图论模块 32：霍尔定理",
+              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=95"
+            }
+          ]
         }
       ]
     },
@@ -1111,12 +1529,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "无向树及其性质",
           "sections": [
-            "14.2 无向树及其性质"
+            "P66 无向树及其性质"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P66 无向树及其性质",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=66"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -1129,12 +1554,24 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
-          "title": "根树及其应用",
+          "source_id": "neu_discrete",
+          "title": "根树",
           "sections": [
-            "14.5 根树及其应用"
+            "P68 根树",
+            "P69 根树的应用"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P68 根树",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=68"
+            },
+            {
+              "title": "P69 根树的应用",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=69"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -1148,12 +1585,19 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "生成树",
           "sections": [
-            "14.3 生成树"
+            "P67 生成树"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P67 生成树",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=67"
+            }
+          ],
+          "note": ""
         }
       ]
     },
@@ -1172,8 +1616,14 @@
           "sections": [
             "图论模块 28：最小生成树"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "UCSD合集的章节编号会在不同子课程中重置，打开后请在图论模块内查找。",
+          "lessons": [
+            {
+              "title": "图论模块 28：最小生成树",
+              "url": "https://www.bilibili.com/video/BV1Kw411L7b5/?p=91"
+            }
+          ]
         }
       ]
     },
@@ -1188,13 +1638,14 @@
       "level": "拓展",
       "videos": [
         {
-          "source_id": "ecust_algebraic_graph",
+          "source_id": "spectral_graph_unverified",
           "title": "拉普拉斯特征值与矩阵树定理",
           "sections": [
-            "3.1 拉普拉斯特征值与矩阵树定理"
+            "16 矩阵树定理（公开课程目录已确认，但单节播放链接尚未核实）"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "研究生课程，作为图谱拓展节点资源，不作为本科图论基础必修视频。"
+          "verification": "待核实直达链接",
+          "note": "目前未找到可核实的单节视频直达地址；原华东理工研究生MOOC仅有课程目录，不再提供误导性的目录跳转。",
+          "lessons": []
         }
       ]
     },
@@ -1213,7 +1664,17 @@
             "P43 二元运算及其性质",
             "P44 二元运算中的特殊元"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P43 二元运算及其性质",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=43"
+            },
+            {
+              "title": "P44 二元运算中的特殊元",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=44"
+            }
+          ]
         }
       ]
     },
@@ -1232,7 +1693,17 @@
             "P48 群的定义及性质",
             "P49 子群及其证明"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P48 群的定义及性质",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=48"
+            },
+            {
+              "title": "P49 子群及其证明",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=49"
+            }
+          ]
         }
       ]
     },
@@ -1252,8 +1723,18 @@
             "P45 代数系统的同态与同构",
             "P46 代数系统同构的性质"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查",
-          "note": "东北大学课程把一般代数系统同态放在群论章节之前；知识图谱当前将群与子群列为建议前置，二者教学顺序存在差异。"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "note": "东北大学课程把一般代数系统同态放在群论章节之前；知识图谱当前将群与子群列为建议前置，二者教学顺序存在差异。",
+          "lessons": [
+            {
+              "title": "P45 代数系统的同态与同构",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=45"
+            },
+            {
+              "title": "P46 代数系统同构的性质",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=46"
+            }
+          ]
         }
       ]
     },
@@ -1271,7 +1752,13 @@
           "sections": [
             "P53 环与域"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P53 环与域",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=53"
+            }
+          ]
         }
       ]
     },
@@ -1284,13 +1771,34 @@
       ],
       "videos": [
         {
-          "source_id": "sdnu_discrete",
+          "source_id": "neu_discrete",
           "title": "格与布尔代数",
           "sections": [
-            "11.2 格的定义与性质",
-            "11.3 分配格、有补格与布尔代数"
+            "P54 格的基本概念",
+            "P55 格的性质",
+            "P56 特殊的格",
+            "P57 布尔代数"
           ],
-          "verification": "章节目录对应，视频内容待逐段抽查"
+          "verification": "根据公开选集名称与顺序定位到具体集数，仍需播放抽查内容",
+          "lessons": [
+            {
+              "title": "P54 格的基本概念",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=54"
+            },
+            {
+              "title": "P55 格的性质",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=55"
+            },
+            {
+              "title": "P56 特殊的格",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=56"
+            },
+            {
+              "title": "P57 布尔代数",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=57"
+            }
+          ],
+          "note": ""
         }
       ]
     }
@@ -1299,18 +1807,10 @@
     {
       "id": "neu_discrete",
       "name": "东北大学",
-      "course": "离散数学（2023版）",
+      "course": "离散数学（完整69讲）",
       "platform": "哔哩哔哩",
-      "url": "https://www.bilibili.com/video/BV1ru411V76r/",
-      "note": "课程选集目录使用P编号；本映射按视频目录标题定位。"
-    },
-    {
-      "id": "sdnu_discrete",
-      "name": "山东师范大学",
-      "course": "离散数学",
-      "platform": "山东师范大学在线课程",
-      "url": "https://mooc.spoc.sdnu.edu.cn/course/20980000001144.html",
-      "note": "官方课程页列有对应章节目录。"
+      "url": "https://www.bilibili.com/video/BV1d7411v7zu/",
+      "note": "使用与目录P1–P69严格一致的69集完整版本，避免62集版本跳错章节。"
     },
     {
       "id": "cincinnati_math1071",
@@ -1319,6 +1819,14 @@
       "platform": "哔哩哔哩",
       "url": "https://www.bilibili.com/video/BV1Sq4y1K7tZ/",
       "note": "Trefor Bazett 主讲；中文字幕为机器翻译，建议结合英文字幕。"
+    },
+    {
+      "id": "hit_set_graph",
+      "name": "哈尔滨工业大学",
+      "course": "集合论与图论（60讲）",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1AW411v7or/",
+      "note": "合集缺第13和57号原始章节；第11讲的实际视频选集序号仍为p=11。"
     },
     {
       "id": "hit_info_math",
@@ -1337,28 +1845,28 @@
       "note": "目录包含鸽巢原理、计数、排列组合、容斥、生成函数和递推关系。"
     },
     {
+      "id": "hit_graph",
+      "name": "哈尔滨工业大学",
+      "course": "集合论与图论（下）",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1Fb411M7d9/",
+      "note": "官方课程大纲列有图同构、邻接矩阵等章节。"
+    },
+    {
+      "id": "hit_graph_2017",
+      "name": "哈尔滨工业大学",
+      "course": "集合论与图论2017（48集）",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1Eb41137gB/",
+      "note": "第34集包含生成树、割点、桥；用于替代无法访问的旧MOOC。"
+    },
+    {
       "id": "ucsd_discrete",
       "name": "加州大学圣迭戈分校（UCSD）",
       "course": "Discrete Mathematics（221段合集）",
       "platform": "哔哩哔哩",
       "url": "https://www.bilibili.com/video/BV1Kw411L7b5/",
       "note": "五门Coursera课程合集；各子课程章节编号会重置。中文字幕为机器翻译，章节定位需同时显示模块名。"
-    },
-    {
-      "id": "hit_graph",
-      "name": "哈尔滨工业大学",
-      "course": "集合论与图论（下）",
-      "platform": "中国大学MOOC",
-      "url": "https://www.icourse163.org/course/HIT-1003781003?tid=1487109453",
-      "note": "官方课程大纲列有图同构、邻接矩阵等章节。"
-    },
-    {
-      "id": "hit_graph_spoc",
-      "name": "哈尔滨工业大学",
-      "course": "2020春集合论与图论（下）（姜守旭）",
-      "platform": "中国大学MOOC SPOC",
-      "url": "https://www.icourse163.org/spoc/course/HIT-1457261164?tid=1457801442",
-      "note": "旧版SPOC课程，具体视频访问权限可能受课程状态影响。"
     },
     {
       "id": "cqjtu_graph_algorithms",
@@ -1369,16 +1877,25 @@
       "note": "偏图论算法与实现；此处只取其他主干课程没有直接覆盖的专题。"
     },
     {
-      "id": "ecust_algebraic_graph",
-      "name": "华东理工大学",
-      "course": "代数图论",
-      "platform": "华东理工大学研究生平台",
-      "url": "https://mooc.s.ecust.edu.cn/course/441650000019307.html?articleId=158499&edit=false",
-      "note": "研究生课程，矩阵树定理部分难度高于本科离散数学基础。"
+      "id": "pku_discrete",
+      "name": "北京大学",
+      "course": "离散数学 王捍贫（134讲）",
+      "platform": "哔哩哔哩",
+      "url": "https://www.bilibili.com/video/BV1144y1W7oL/",
+      "note": "第35个选集标作034，主题为支配集、点覆盖集与点独立集。"
+    },
+    {
+      "id": "spectral_graph_unverified",
+      "name": "公开谱图理论课程",
+      "course": "矩阵树定理（待核实单集）",
+      "platform": "待确认",
+      "url": "",
+      "note": "无具体单集直达地址，页面不显示伪直达按钮。"
     }
   ],
   "video_resource_policy": {
     "primary_per_node": 1,
-    "note": "每个知识节点只配置一套首选课程资源；同一资源组可以包含为覆盖一个复合知识点所必需的连续章节。章节目录已对照公开课程页/视频选集整理，视频内容尚未逐段人工抽查。"
+    "link_type": "per_lesson_direct_url",
+    "note": "每个节点显示对应视频选集中的具体集数链接（B站?p=集数），而不是统一跳转课程首页。旧MOOC链接不再作为教学视频入口；无法核实的单集不会伪装成直达链接。具体视频内容仍需播放核查。"
   }
 }
