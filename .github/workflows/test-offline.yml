@@ -1,0 +1,32 @@
+name: Test DMate Offline
+
+on:
+  push:
+    paths:
+      - 'offline/**'
+      - '.github/workflows/test-offline.yml'
+  pull_request:
+    paths:
+      - 'offline/**'
+      - '.github/workflows/test-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Check syntax
+        run: python -m compileall -q offline
+      - name: Run standard-library tests
+        run: python -m unittest discover -s offline -p 'test_*.py' -v
