@@ -1149,7 +1149,21 @@
       "name": "基本计数原理",
       "category": "计数与组合",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 6.1.1 Counting Rules",
+          "sections": [
+            "Discrete Math - 6.1.1 Counting Rules"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 6.1.1 Counting Rules",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=60"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_perm_comb",
@@ -1158,7 +1172,21 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 6.3.1 Permutations and Combinations",
+          "sections": [
+            "Discrete Math - 6.3.1 Permutations and Combinations"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 6.3.1 Permutations and Combinations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=61"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_binomial",
@@ -1167,7 +1195,21 @@
       "prerequisites": [
         "排列与组合"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 6.4.1 The Binomial Theorem",
+          "sections": [
+            "Discrete Math - 6.4.1 The Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 6.4.1 The Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_pigeonhole",
@@ -1186,7 +1228,21 @@
         "基本计数原理",
         "集合运算"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion",
+          "sections": [
+            "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 8.5.1 The Principle of Inclusion-Exclusion",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=69"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_generating",
@@ -1203,7 +1259,21 @@
       "name": "递推关系建模",
       "category": "递推关系",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Discrete Math - 8.1.1 Modeling with Recurrence Relations",
+          "sections": [
+            "Discrete Math - 8.1.1 Modeling with Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Discrete Math - 8.1.1 Modeling with Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=68"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_homogeneous",
@@ -2116,10 +2186,10 @@
   "video_sources": [
     {
       "id": "sawfin_bilibili",
-      "name": "Kimberly Brehm · 离散数学讲师",
-      "course": "Discrete Math I（完整课程高清转载）",
+      "name": "Bellevue University · Kimberly Brehm",
+      "course": "Discrete Math I（大学教师本人授课）",
       "platform": "Bilibili",
-      "note": "含题目推演与例题演示的正式教学视频，B站按明确的分P章节定位。",
+      "note": "讲师 Kimberly Brehm 为 Bellevue University 副教授及数学本科项目主任，研究教学领域包括离散数学与组合数学；B站页面标注中英字幕。仅外链跳转，不下载或托管；字幕专业度仍应抽样复核。",
       "publisher": "常青藤中英字幕课程"
     },
     {
