@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -220,6 +220,21 @@
           ],
           "verification": "2025年课程原作者B站分P目录列出对应标题；非纯音质问题分集",
           "note": ""
+        },
+        {
+          "source_id": "trevtutor",
+          "title": "Conjunctive Normal Form (CNF) and Disjunctive Normal Form (DNF)",
+          "sections": [
+            "Conjunctive Normal Form (CNF) and Disjunctive Normal Form (DNF)"
+          ],
+          "lessons": [
+            {
+              "title": "Conjunctive Normal Form (CNF) and Disjunctive Normal Form (DNF)",
+              "url": "https://www.youtube.com/watch?v=2cgHa02s_SA"
+            }
+          ],
+          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
+          "note": "带范式推导和练习。"
         }
       ]
     },
@@ -351,7 +366,23 @@
       "prerequisites": [
         "量词"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "trevtutor",
+          "title": "SCOPE and FREE and BOUND Variables in Predicate Logic",
+          "sections": [
+            "SCOPE and FREE and BOUND Variables in Predicate Logic"
+          ],
+          "lessons": [
+            {
+              "title": "SCOPE and FREE and BOUND Variables in Predicate Logic",
+              "url": "https://www.youtube.com/watch?v=qnvFQfy4ILA"
+            }
+          ],
+          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
+          "note": "详细讲解辖域、自由/约束变元和练习。"
+        }
+      ]
     },
     {
       "id": "predicate_reasoning",
@@ -1093,7 +1124,23 @@
         "同余与模运算",
         "最大公因数与欧几里得算法"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "numberphile_visual",
+          "title": "Chinese Remainder Theorem and Cards（中国剩余定理：扑克牌演示）",
+          "sections": [
+            "Chinese Remainder Theorem and Cards（中国剩余定理：扑克牌演示）"
+          ],
+          "lessons": [
+            {
+              "title": "Chinese Remainder Theorem and Cards（中国剩余定理：扑克牌演示）",
+              "url": "https://www.youtube.com/watch?v=l9dXo5f3zDc"
+            }
+          ],
+          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
+          "note": "直观演示中国剩余定理，但不涵盖模逆算法。"
+        }
+      ]
     },
     {
       "id": "number_euler_fermat",
@@ -1103,7 +1150,38 @@
         "同余与模运算",
         "整除与素数"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "neso_academy",
+          "title": "Euler's Theorem（欧拉定理与例题）",
+          "sections": [
+            "Euler's Theorem（欧拉定理与例题）"
+          ],
+          "lessons": [
+            {
+              "title": "Euler's Theorem（欧拉定理与例题）",
+              "url": "https://www.youtube.com/watch?v=DyOv20d4c70"
+            }
+          ],
+          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
+          "note": "欧拉定理的算例与推导。"
+        },
+        {
+          "source_id": "khan_cs_labs",
+          "title": "Fermat's Little Theorem（费马小定理可视化）",
+          "sections": [
+            "Fermat's Little Theorem（费马小定理可视化）"
+          ],
+          "lessons": [
+            {
+              "title": "Fermat's Little Theorem（费马小定理可视化）",
+              "url": "https://www.youtube.com/watch?v=OoQ16YCYksw"
+            }
+          ],
+          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
+          "note": "Khan Academy Labs使用彩色珠串动画解释费马小定理。"
+        }
+      ]
     },
     {
       "id": "number_rsa",
@@ -1114,7 +1192,23 @@
         "欧拉定理与费马小定理"
       ],
       "level": "拓展",
-      "videos": []
+      "videos": [
+        {
+          "source_id": "art_of_the_problem",
+          "title": "RSA Encryption Algorithm（RSA加密动画与推导）",
+          "sections": [
+            "RSA Encryption Algorithm（RSA加密动画与推导）"
+          ],
+          "lessons": [
+            {
+              "title": "RSA Encryption Algorithm（RSA加密动画与推导）",
+              "url": "https://www.youtube.com/watch?v=wXB-V_Keiu8"
+            }
+          ],
+          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
+          "note": "Brit Cruise制作的RSA加密动画，讲解公私钥和数论直觉；为较早期的视频。"
+        }
+      ]
     },
     {
       "id": "count_basic",
@@ -1755,7 +1849,23 @@
       "prerequisites": [
         "路径与连通性"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "william_fiset",
+          "title": "Bridges and Articulation Points Algorithm（割点与桥）",
+          "sections": [
+            "Bridges and Articulation Points Algorithm（割点与桥）"
+          ],
+          "lessons": [
+            {
+              "title": "Bridges and Articulation Points Algorithm（割点与桥）",
+              "url": "https://www.youtube.com/watch?v=aZXi1unBdJA"
+            }
+          ],
+          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
+          "note": "图示与DFS算法分步骤演示。"
+        }
+      ]
     },
     {
       "id": "graph_weighted",
@@ -2465,7 +2575,23 @@
       "prerequisites": [
         "偏序关系"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "trevtutor",
+          "title": "Boolean Algebra in 13 Minutes（布尔代数与真值表）",
+          "sections": [
+            "Boolean Algebra in 13 Minutes（布尔代数与真值表）"
+          ],
+          "lessons": [
+            {
+              "title": "Boolean Algebra in 13 Minutes（布尔代数与真值表）",
+              "url": "https://www.youtube.com/watch?v=cTjFy18SjRc"
+            }
+          ],
+          "verification": "已核对视频发布机构/讲解者及视频主题，尚未逐条完成画质与播放抽查",
+          "note": "布尔代数部分，未覆盖一般格理论；视频制作方在介绍中指出个别术语口误。"
+        }
+      ]
     }
   ],
   "video_sources": [
@@ -2559,12 +2685,40 @@
       "course": "Olympiad Level Counting / Generating Functions",
       "platform": "YouTube",
       "note": "制作团队明确，数学动画与推导示例；视频为独立专题。"
+    },
+    {
+      "id": "numberphile_visual",
+      "name": "Numberphile · Tadashi Tokieda",
+      "course": "数学概念实物演示",
+      "platform": "YouTube",
+      "note": "有署名的数学家现场演示；只讲中国剩余定理的直观部分。"
+    },
+    {
+      "id": "art_of_the_problem",
+      "name": "Art of the Problem · Brit Cruise",
+      "course": "Cryptography 视觉化解说",
+      "platform": "YouTube",
+      "note": "讲师、制作团队可确认，使用原创数学动画推导。"
+    },
+    {
+      "id": "neso_academy",
+      "name": "Neso Academy",
+      "course": "网络安全与数论",
+      "platform": "YouTube",
+      "note": "以概念演算与例题讲授欧拉定理。"
+    },
+    {
+      "id": "khan_cs_labs",
+      "name": "Khan Academy Labs · Brit Cruise",
+      "course": "Journey into Cryptography",
+      "platform": "YouTube",
+      "note": "用可视化珠串动画解释费马小定理。"
     }
   ],
   "video_resource_policy": {
     "primary_per_node": "quality_before_completeness",
     "link_type": "curated_direct_video_only",
     "quality_priority": "有明确讲师/学校/制作机构，采用板书推导、课堂互动、动画演示或算法可视化，排除匿名混剪和无法评估的PPT朗读资源",
-    "note": "优先真实授课者/原作者的板书推导、动态演示和例题，剔除匿名/无可靠出处资源、原视频明确标记音质差的选集与部分低清老课堂录像；不为凑齐B站和YouTube而添加内容。链接直达实际章节，不使用课程目录。视频画质和内容未经过全部逐帧实测，不作高清保证。"
+    "note": "优先真实授课者或原作者的板书推导、动态演示、计算过程和例题。剔除匿名、出身不明或可能只是朗读PPT的链接，不为凑齐两个平台而补链接。平台链接仅直达单集。资源可以仅覆盖节点部分知识点，须说明覆盖范围。未逐条实播不得宣称所有视频高清或可播放。"
   }
 }
