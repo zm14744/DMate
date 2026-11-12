@@ -1,5 +1,5 @@
 {
-  "version": 17,
+  "version": 18,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1449,8 +1449,8 @@
       "name": "东北大学 · 离散数学（女教师部分）",
       "course": "离散数学（P1–P19）",
       "platform": "Bilibili",
-      "publisher": "东北大学",
-      "note": "东北大学离散数学课程，仅收录女教师讲授的P1–P19；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；上传者授权状态未核实，仅提供原视频外链，不下载或托管。"
+      "publisher": "",
+      "note": "东北大学离散数学课程，仅收录女教师讲授的P1–P19；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；B站上传者及授权状态未核实，仅提供原视频外链，不下载或托管。"
     },
     {
       "id": "dogeman_discrete",
@@ -1501,20 +1501,12 @@
       "note": "电子科技大学官方账号发布；用于树、生成树、最小生成树和根树，均直达具体分P。"
     },
     {
-      "id": "steve_butler_spectral_bili",
-      "name": "Steve Butler · Spectral Graph Theory",
-      "course": "Spectral Graph Theory（Fall 2023）",
-      "platform": "Bilibili",
-      "publisher": "Steve Butler",
-      "note": "用户要求只采用Steve Butler英文原声，不使用中文配音版。此前找到的B站中配版已排除；待确认B站英文原声版本链接后再恢复矩阵树定理节点。"
-    },
-    {
       "id": "mit_6042j_2010_bilibili",
       "name": "MIT · 6.042J · Fall 2010",
       "course": "Mathematics for Computer Science (Fall 2010)",
       "platform": "Bilibili",
-      "publisher": "MIT",
-      "note": "采用用户指定的2010版，B站版本为中英字幕课程。只提供原视频外链，不下载、托管或重新分发视频/字幕。"
+      "publisher": "麦洛的烦恼",
+      "note": "MIT官方课程为Fall 2010版；B站上传者为麦洛的烦恼，页面标注中英文字幕。DMate仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
     }
   ],
   "video_resource_policy": {
