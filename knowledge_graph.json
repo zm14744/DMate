@@ -1,5 +1,5 @@
 {
-  "version": 16,
+  "version": 17,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1521,6 +1521,80 @@
     "primary_per_node": "one selected Bilibili course per node; multiple adjacent lesson links may belong to that one course",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
-    "note": "Only direct Bilibili episode links. No YouTube links. Do not download, host, or redistribute video files or subtitles. MIT uses Fall 2010, not Spring 2015. CMU 21-228 (Po-Shen Loh, 2021) is approved for addition once the exact Bilibili video URL is confirmed. Steve Butler Chinese-dubbed version is excluded; only original English audio is acceptable."
-  }
+    "note": "Every active knowledge node must have one selected Bilibili course. Candidate resources do not appear as active teaching links until verified. Beijing Jiaotong University course is under consideration, displayed with the institution name while preserving the actual Bilibili uploader. CMU 21-228 Spring 2021 is a high-priority candidate; exact Bilibili URL is not yet independently resolved. Steve Butler Chinese-dubbed version is excluded; only original English audio is acceptable.",
+    "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs."
+  },
+  "video_resource_candidates": [
+    {
+      "id": "bjtu_discrete_candidate",
+      "institution": "北京交通大学",
+      "display_name": "北京交通大学 · 离散数学",
+      "course": "离散数学（194讲）",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1r4411r7Ya/",
+      "uploader": "格物嘉",
+      "views": "约2.6万",
+      "official_course_url": "https://www.icourse163.org/learn/NJTU-1002530017?tid=1205949204#/learn/content",
+      "status": "candidate",
+      "coverage": [
+        "集合",
+        "数论",
+        "计数",
+        "命题逻辑",
+        "谓词逻辑",
+        "关系",
+        "函数",
+        "偏序",
+        "图论",
+        "树",
+        "匹配",
+        "网络流",
+        "代数结构",
+        "有限语言与自动机"
+      ],
+      "note": "B站页面链接到北京交通大学中国大学MOOC课程页面，包含194个分P，覆盖面很广。上传账号为格物嘉，并非学校官方账号；可纳入课程质量比较，但上传授权仍需单独核验。产品显示名称标注北京交通大学，同时保留上传者信息。"
+    },
+    {
+      "id": "cmu_21_228_2021_candidate",
+      "institution": "Carnegie Mellon University",
+      "display_name": "卡内基梅隆大学 · 21-228 离散数学",
+      "course": "21-228 Discrete Mathematics（Spring 2021）",
+      "instructor": "Po-Shen Loh",
+      "platform": "Bilibili",
+      "url": null,
+      "uploader": "无为斋主",
+      "screenshot_title": "【卡内基梅隆大学】离散数学 | 2021 | 证明无从下手，练就离散数理思维",
+      "duration": "31:26:24",
+      "official_course_url": "https://www.math.cmu.edu/~ploh/2021-228.shtml",
+      "status": "candidate_waiting_exact_bilibili_url",
+      "coverage": [
+        "组合计数",
+        "递推关系",
+        "生成函数",
+        "图论",
+        "数论",
+        "概率"
+      ],
+      "note": "用户提供的B站页面截图确认该课程视频存在，课程官网确认讲师Po-Shen Loh及21-228 Spring 2021课程内容。公开搜索暂未返回可核实的BV号，因此暂不猜测视频地址，也不映射到节点。"
+    },
+    {
+      "id": "steve_butler_spectral_2023_candidate",
+      "institution": "Iowa State University",
+      "display_name": "Steve Butler · Spectral Graph Theory",
+      "course": "Spectral Graph Theory（Fall 2023）",
+      "instructor": "Steve Butler",
+      "platform": "Bilibili",
+      "url": null,
+      "official_course_url": "https://www.stevebutler.org/spectral2023",
+      "excluded_dub_url": "https://www.bilibili.com/list/ml2777689747?bvid=BV11kga6FEez&oid=116974289945883",
+      "status": "candidate_waiting_english_original",
+      "coverage": [
+        "图的邻接矩阵",
+        "特征值",
+        "拉普拉斯矩阵",
+        "矩阵树定理"
+      ],
+      "note": "已确认B站存在中文配音+中文字幕版本，但按用户要求排除中配版。公开搜索未找到可核实的B站英文原声版本，故不作为当前教学入口。"
+    }
+  ]
 }
