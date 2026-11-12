@@ -72,6 +72,46 @@
   const stamp = () => new Date().toISOString();
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "local-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
+  async function migrateCurrentAccountData() {
+    let payload;
+    try { payload = JSON.parse(sessionStorage.getItem("dmate_offline_migration_v1") || "null"); }
+    catch (_) { payload = null; }
+    if (!payload || typeof payload !== "object") return;
+    const toIso = value => {
+      const time = Number(value);
+      return new Date(Number.isFinite(time) && time > 0 ? time : Date.now()).toISOString();
+    };
+    for (const item of Array.isArray(payload.wrongQuestions) ? payload.wrongQuestions : []) {
+      if (!item || typeof item.question !== "string" || !item.question.trim()) continue;
+      const reference = item.referenceAnswer;
+      const answer = item.answer || (typeof reference === "string" ? reference
+        : reference && typeof reference === "object" ? (reference.text || reference.answer || JSON.stringify(reference)) : "");
+      await put("mistakes", {
+        id: String(item.id || uid()),
+        title: String(item.category || item.question).slice(0, 72) || "错题",
+        statement: item.question,
+        answer: String(answer || ""),
+        explanation: String(item.analysis || item.solution || ""),
+        knowledgePoints: Array.isArray(item.knowledgePoints) ? item.knowledgePoints : [],
+        status: item.corrected ? "resolved" : "pending",
+        updatedAt: toIso(item.updatedAt)
+      });
+    }
+    for (const note of Array.isArray(payload.notes) ? payload.notes : []) {
+      if (!note || typeof note.title !== "string" || typeof note.content !== "string") continue;
+      await put("notes", {
+        id: String(note.id || uid()), title: note.title, content: note.content,
+        updatedAt: toIso(note.updatedAt)
+      });
+    }
+    if (typeof payload.drawings === "string" && payload.drawings) {
+      try { localStorage.setItem("dmate:offline:drawing-gallery:v1", payload.drawings); }
+      catch (error) { toast("旧绘图库未能迁移，请先导出原画板：" + (error?.message || "")); }
+    }
+    sessionStorage.removeItem("dmate_offline_migration_v1");
+    toast("已导入当前账号的错题、笔记和绘图到本机离线区");
+  }
+
   async function loadResources() {
     const [concepts, questions, graph] = await Promise.all([
       fetch("/static/offline-content/concepts.zh-CN.json", {cache:"no-store"}).then(r => { if(!r.ok) throw Error("概念库资源不可用"); return r.json(); }),
@@ -458,6 +498,7 @@
     try {
       setNetworkStatus();
       state.db = await openDb();
+      await migrateCurrentAccountData();
       await loadResources();
       bind();
       renderMistakes();
