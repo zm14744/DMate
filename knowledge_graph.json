@@ -1,5 +1,5 @@
 {
-  "version": 30,
+  "version": 31,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1025,15 +1025,20 @@
       ],
       "videos": [
         {
-          "source_id": "cqu_discrete_liu",
-          "title": "4.3分治算法和递推关系+4.4生成函数",
+          "source_id": "nymu_combinatorics_fuhenglin",
+          "title": "生成函数",
           "sections": [
-            "4.3分治算法和递推关系+4.4生成函数"
+            "Lec20 - 计数原理2与生成函数1",
+            "Lec21 - 生成函数2"
           ],
           "lessons": [
             {
-              "title": "4.3分治算法和递推关系+4.4生成函数",
-              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=17"
+              "title": "Lec20 - 计数原理2与生成函数1",
+              "url": "https://www.bilibili.com/video/BV1NJ4m1j77r/?p=20"
+            },
+            {
+              "title": "Lec21 - 生成函数2",
+              "url": "https://www.bilibili.com/video/BV1NJ4m1j77r/?p=21"
             }
           ]
         }
@@ -1136,35 +1141,25 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "图的基本概念",
           "sections": [
-            "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
-            "1-2 〖图的基本概念〗图的分类",
-            "1-3 〖图的基本概念〗结点的度与握手定理",
-            "1-4 〖图的基本概念〗正则图和无向完全图",
-            "1-6 〖图的基本概念〗子图和补图"
+            "07-02 图的基本概念",
+            "07-03 握手定理",
+            "07-04 完全图，子图和补图"
           ],
           "lessons": [
             {
-              "title": "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=2"
+              "title": "07-02 图的基本概念",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=112"
             },
             {
-              "title": "1-2 〖图的基本概念〗图的分类",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=3"
+              "title": "07-03 握手定理",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=113"
             },
             {
-              "title": "1-3 〖图的基本概念〗结点的度与握手定理",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=4"
-            },
-            {
-              "title": "1-4 〖图的基本概念〗正则图和无向完全图",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=5"
-            },
-            {
-              "title": "1-6 〖图的基本概念〗子图和补图",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=7"
+              "title": "07-04 完全图，子图和补图",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=114"
             }
           ]
         }
@@ -1179,15 +1174,15 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "1-5 〖图的基本概念〗图的同构及判别方法",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "图同构",
           "sections": [
-            "1-5 〖图的基本概念〗图的同构及判别方法"
+            "07-05 图的同构"
           ],
           "lessons": [
             {
-              "title": "1-5 〖图的基本概念〗图的同构及判别方法",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=6"
+              "title": "07-05 图的同构",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=115"
             }
           ]
         }
@@ -1202,25 +1197,15 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "4-1 〖图的三种矩阵表示〗邻接矩阵",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "邻接矩阵",
           "sections": [
-            "4-1 〖图的三种矩阵表示〗邻接矩阵",
-            "4-2 〖图的三种矩阵表示〗邻接矩阵的性质",
-            "4-3 〖图的三种矩阵表示〗邻接矩阵的幂"
+            "07-09 图的矩阵表示"
           ],
           "lessons": [
             {
-              "title": "4-1 〖图的三种矩阵表示〗邻接矩阵",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=18"
-            },
-            {
-              "title": "4-2 〖图的三种矩阵表示〗邻接矩阵的性质",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=19"
-            },
-            {
-              "title": "4-3 〖图的三种矩阵表示〗邻接矩阵的幂",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=20"
+              "title": "07-09 图的矩阵表示",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=119"
             }
           ]
         }
@@ -1237,40 +1222,15 @@
       "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "4-1 〖图的三种矩阵表示〗邻接矩阵",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "图的矩阵表示",
           "sections": [
-            "4-1 〖图的三种矩阵表示〗邻接矩阵",
-            "4-4 〖图的三种矩阵表示〗可达矩阵",
-            "4-5 〖图的三种矩阵表示〗可达矩阵的求法（一）",
-            "4-6 〖图的三种矩阵表示〗可达矩阵的求法（二）",
-            "4-7 〖图的三种矩阵表示〗利用可达矩阵求强分图",
-            "4-8 〖图的三种矩阵表示〗关联矩阵"
+            "07-09 图的矩阵表示"
           ],
           "lessons": [
             {
-              "title": "4-1 〖图的三种矩阵表示〗邻接矩阵",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=18"
-            },
-            {
-              "title": "4-4 〖图的三种矩阵表示〗可达矩阵",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=21"
-            },
-            {
-              "title": "4-5 〖图的三种矩阵表示〗可达矩阵的求法（一）",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=22"
-            },
-            {
-              "title": "4-6 〖图的三种矩阵表示〗可达矩阵的求法（二）",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=23"
-            },
-            {
-              "title": "4-7 〖图的三种矩阵表示〗利用可达矩阵求强分图",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=24"
-            },
-            {
-              "title": "4-8 〖图的三种矩阵表示〗关联矩阵",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=25"
+              "title": "07-09 图的矩阵表示",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=119"
             }
           ]
         }
@@ -1285,40 +1245,35 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "1-7 〖图的基本概念〗路径与回路、简单路与基本路",
+          "source_id": "chenggong_gta",
+          "title": "连通性与图的遍历",
           "sections": [
-            "1-7 〖图的基本概念〗路径与回路、简单路与基本路",
-            "1-8 〖图的基本概念〗有向图中基本路的应用",
-            "2-1 〖无向图的连通性〗结点间的连通性、连通图和分离图、连通分支数",
-            "3-1 〖有向图的连通性〗强连通、单向连通、弱连通和非连通",
-            "3-2 〖有向图的连通性〗强分图、单向分图和弱分图",
-            "3-3 〖有向图的连通性〗强分图的应用：利用资源分配图识别进程间的死锁"
+            "2.1.1-连通和DFS-理论",
+            "2.1.2-连通和DFS-算法",
+            "7.3.1-有向图的连通-理论",
+            "7.3.2.1-有向图的连通-计算强连通定向的算法",
+            "7.3.2.2-有向图的连通-计算强连通分支的算法"
           ],
           "lessons": [
             {
-              "title": "1-7 〖图的基本概念〗路径与回路、简单路与基本路",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=8"
+              "title": "2.1.1-连通和DFS-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=6"
             },
             {
-              "title": "1-8 〖图的基本概念〗有向图中基本路的应用",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=9"
+              "title": "2.1.2-连通和DFS-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=7"
             },
             {
-              "title": "2-1 〖无向图的连通性〗结点间的连通性、连通图和分离图、连通分支数",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=10"
+              "title": "7.3.1-有向图的连通-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=39"
             },
             {
-              "title": "3-1 〖有向图的连通性〗强连通、单向连通、弱连通和非连通",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=15"
+              "title": "7.3.2.1-有向图的连通-计算强连通定向的算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=40"
             },
             {
-              "title": "3-2 〖有向图的连通性〗强分图、单向分图和弱分图",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=16"
-            },
-            {
-              "title": "3-3 〖有向图的连通性〗强分图的应用：利用资源分配图识别进程间的死锁",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=17"
+              "title": "7.3.2.2-有向图的连通-计算强连通分支的算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=41"
             }
           ]
         }
@@ -1333,30 +1288,25 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "2-2 〖无向图的连通性〗如何表示从图中删去点集和边集",
+          "source_id": "chenggong_gta",
+          "title": "割点、割边与割集",
           "sections": [
-            "2-2 〖无向图的连通性〗如何表示从图中删去点集和边集",
-            "2-3 〖无向图的连通性〗各结点在维持图的连通性上的重要性不同：点割集和割点、结点连通度",
-            "2-4 〖无向图的连通性〗各边在维持图的连通性上的重要性不同：边割集和割边、边连通度",
-            "2-5 〖无向图的连通性〗结点连通度、边连通度和最小度的关系"
+            "2.2.1-割点和割边-理论",
+            "2.2.2-割点和割边-算法",
+            "4.2-割集和连通度"
           ],
           "lessons": [
             {
-              "title": "2-2 〖无向图的连通性〗如何表示从图中删去点集和边集",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=11"
+              "title": "2.2.1-割点和割边-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=8"
             },
             {
-              "title": "2-3 〖无向图的连通性〗各结点在维持图的连通性上的重要性不同：点割集和割点、结点连通度",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=12"
+              "title": "2.2.2-割点和割边-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=9"
             },
             {
-              "title": "2-4 〖无向图的连通性〗各边在维持图的连通性上的重要性不同：边割集和割边、边连通度",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=13"
-            },
-            {
-              "title": "2-5 〖无向图的连通性〗结点连通度、边连通度和最小度的关系",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=14"
+              "title": "4.2-割集和连通度",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=21"
             }
           ]
         }
@@ -1371,15 +1321,20 @@
       ],
       "videos": [
         {
-          "source_id": "chenggong_weighted",
-          "title": "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论",
+          "source_id": "chenggong_gta",
+          "title": "赋权图和距离",
           "sections": [
-            "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论"
+            "6.1.1-赋权图和距离-理论",
+            "6.1.2-赋权图和距离-算法"
           ],
           "lessons": [
             {
-              "title": "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论",
-              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/"
+              "title": "6.1.1-赋权图和距离-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+            },
+            {
+              "title": "6.1.2-赋权图和距离-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=28"
             }
           ]
         }
@@ -1394,25 +1349,20 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "7-1 〖欧拉图〗七桥问题",
+          "source_id": "chenggong_gta",
+          "title": "欧拉图",
           "sections": [
-            "7-1 〖欧拉图〗七桥问题",
-            "7-2 〖欧拉图〗无向欧拉图判定的充要条件",
-            "7-3 〖欧拉图〗有向欧拉图判定的充要条件"
+            "3.3.1-欧拉图-理论",
+            "3.3.2-欧拉图-算法"
           ],
           "lessons": [
             {
-              "title": "7-1 〖欧拉图〗七桥问题",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=30"
+              "title": "3.3.1-欧拉图-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=16"
             },
             {
-              "title": "7-2 〖欧拉图〗无向欧拉图判定的充要条件",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=31"
-            },
-            {
-              "title": "7-3 〖欧拉图〗有向欧拉图判定的充要条件",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=32"
+              "title": "3.3.2-欧拉图-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=17"
             }
           ]
         }
@@ -1427,35 +1377,15 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "8-1 〖哈密顿图〗哈密顿的周游世界游戏",
+          "source_id": "chenggong_gta",
+          "title": "哈密尔顿图",
           "sections": [
-            "8-1 〖哈密顿图〗哈密顿的周游世界游戏",
-            "8-2 〖哈密顿图〗哈密顿图的一个充分条件",
-            "8-3 〖哈密顿图〗哈密顿图的必要条件",
-            "8-4 〖哈密顿图〗哈密顿图的另一个充分条件",
-            "8-5 〖哈密顿图〗不存在必要且充分条件"
+            "3.4-哈密尔顿图"
           ],
           "lessons": [
             {
-              "title": "8-1 〖哈密顿图〗哈密顿的周游世界游戏",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=33"
-            },
-            {
-              "title": "8-2 〖哈密顿图〗哈密顿图的一个充分条件",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=34"
-            },
-            {
-              "title": "8-3 〖哈密顿图〗哈密顿图的必要条件",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=35"
-            },
-            {
-              "title": "8-4 〖哈密顿图〗哈密顿图的另一个充分条件",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=36"
-            },
-            {
-              "title": "8-5 〖哈密顿图〗不存在必要且充分条件",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=37"
+              "title": "3.4-哈密尔顿图",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=18"
             }
           ]
         }
@@ -1471,20 +1401,35 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "5-1 〖最短路径问题〗最短路径问题与Moore算法",
+          "source_id": "chenggong_gta",
+          "title": "最短路径与距离",
           "sections": [
-            "5-1 〖最短路径问题〗最短路径问题与Moore算法",
-            "5-2 〖最短路径问题〗迪杰斯特拉算法：可以找到最优解的贪心算法"
+            "2.3.1-距离和BFS-理论",
+            "2.3.2-距离和BFS-算法",
+            "6.1.1-赋权图和距离-理论",
+            "6.1.2-赋权图和距离-算法",
+            "7.4-有向图的距离"
           ],
           "lessons": [
             {
-              "title": "5-1 〖最短路径问题〗最短路径问题与Moore算法",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=26"
+              "title": "2.3.1-距离和BFS-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=10"
             },
             {
-              "title": "5-2 〖最短路径问题〗迪杰斯特拉算法：可以找到最优解的贪心算法",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=27"
+              "title": "2.3.2-距离和BFS-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=11"
+            },
+            {
+              "title": "6.1.1-赋权图和距离-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+            },
+            {
+              "title": "6.1.2-赋权图和距离-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=28"
+            },
+            {
+              "title": "7.4-有向图的距离",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=42"
             }
           ]
         }
@@ -1532,30 +1477,25 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "10-1 〖无向平面图〗平面图及其面",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "平面图",
           "sections": [
-            "10-1 〖无向平面图〗平面图及其面",
-            "10-2 〖无向平面图〗连通平面图",
-            "10-3 〖无向平面图〗同胚与收缩",
-            "10-4 〖无向平面图〗极大平面图"
+            "07-14 平面图",
+            "07-15 平面图的判定",
+            "07-16 对偶图"
           ],
           "lessons": [
             {
-              "title": "10-1 〖无向平面图〗平面图及其面",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=40"
+              "title": "07-14 平面图",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=124"
             },
             {
-              "title": "10-2 〖无向平面图〗连通平面图",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=41"
+              "title": "07-15 平面图的判定",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=125"
             },
             {
-              "title": "10-3 〖无向平面图〗同胚与收缩",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=42"
-            },
-            {
-              "title": "10-4 〖无向平面图〗极大平面图",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=43"
+              "title": "07-16 对偶图",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=126"
             }
           ]
         }
@@ -1571,15 +1511,20 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "9-1 〖无向二部图〗判定二部图的充要条件",
+          "source_id": "chenggong_gta",
+          "title": "二部图",
           "sections": [
-            "9-1 〖无向二部图〗判定二部图的充要条件"
+            "3.2.1-二分图-理论",
+            "3.2.2-二分图-算法"
           ],
           "lessons": [
             {
-              "title": "9-1 〖无向二部图〗判定二部图的充要条件",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=38"
+              "title": "3.2.1-二分图-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=14"
+            },
+            {
+              "title": "3.2.2-二分图-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=15"
             }
           ]
         }
@@ -1652,15 +1597,35 @@
       ],
       "videos": [
         {
-          "source_id": "pflyan_graph",
-          "title": "9-2 〖无向二部图〗匹配和完备匹配",
+          "source_id": "chenggong_gta",
+          "title": "匹配与最大匹配",
           "sections": [
-            "9-2 〖无向二部图〗匹配和完备匹配"
+            "5.1.1-匹配和最大匹配-理论",
+            "5.1.2.1-匹配和最大匹配-匈牙利算法",
+            "5.1.2.2-匹配和最大匹配-霍普克罗夫特-卡普算法",
+            "5.1.2.3-匹配和最大匹配-花算法",
+            "5.2-完美匹配"
           ],
           "lessons": [
             {
-              "title": "9-2 〖无向二部图〗匹配和完备匹配",
-              "url": "https://www.bilibili.com/video/BV1Ny4y167GN/?p=39"
+              "title": "5.1.1-匹配和最大匹配-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=22"
+            },
+            {
+              "title": "5.1.2.1-匹配和最大匹配-匈牙利算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=23"
+            },
+            {
+              "title": "5.1.2.2-匹配和最大匹配-霍普克罗夫特-卡普算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=24"
+            },
+            {
+              "title": "5.1.2.3-匹配和最大匹配-花算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=25"
+            },
+            {
+              "title": "5.2-完美匹配",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=26"
             }
           ]
         }
@@ -1935,22 +1900,6 @@
       "note": "UP主原创的中国剩余定理证明视频，聚焦同余方程组存在唯一解；作为数论专题补充，仅提供原视频外链。"
     },
     {
-      "id": "pflyan_graph",
-      "name": "pFLYan · 离散数学图论",
-      "course": "离散数学〖11. 图〗",
-      "platform": "Bilibili",
-      "publisher": "pFLYan",
-      "note": "43个分P，约6.9万播放；覆盖图的基本概念、同构、连通性、割点割边、矩阵表示、最短路、欧拉图、哈密顿图、二部图和平面图。UP主页面提供配套课件下载信息；只链接原视频，不复制课件。"
-    },
-    {
-      "id": "chenggong_weighted",
-      "name": "南京大学 · 程龚",
-      "course": "《图论与算法》(GTA) · 赋权图和距离",
-      "platform": "Bilibili",
-      "publisher": "程龚老师",
-      "note": "南京大学计算机学院程龚教授本人账号发布；用于赋权图与距离的理论讲解，链接直达具体单集。"
-    },
-    {
       "id": "graph_animation_bili",
       "name": "动画讲解计算机知识",
       "course": "数据结构·图（动画讲解）",
@@ -1999,28 +1948,44 @@
       "note": "Kimberly Brehm 的大学离散数学课程；B站页面标注中英字幕，上传者说明为唯一翻译发布账号。用于排列组合、二项式定理和递推建模。仅外链跳转，不下载或托管。"
     },
     {
-      "id": "cqu_discrete_liu",
-      "name": "重庆大学 · 刘然",
-      "course": "《离散数学及其应用》（2020春）",
+      "id": "chenggong_gta",
+      "name": "南京大学 · 程龚",
+      "course": "《图论与算法》(GTA)",
       "platform": "Bilibili",
-      "publisher": "litchi__mango",
-      "note": "重庆大学计算机学院刘然老师2020春录播课，教材为 Kenneth H. Rosen《Discrete Mathematics and Its Applications》，并补充左孝凌《离散数学》。仅用于生成函数节点，选用第17个分P《4.3分治算法和递推关系+4.4生成函数》。B站上传者为 litchi__mango，授权状态未核实；仅提供原视频外链，不下载或托管。"
+      "publisher": "程龚老师",
+      "note": "南京大学计算机学院程龚教授主讲的42分P系列，配套教材《图论与算法》（清华大学出版社，2024）。用于图的连通与遍历、割点割边、距离与BFS、二部图、欧拉图、哈密顿图、匹配、赋权图与距离、有向图等专题。只提供原视频外链，不下载或托管。"
+    },
+    {
+      "id": "zjut_discrete_xiaohua",
+      "name": "浙江工业大学 · 小花醉猫",
+      "course": "（新版）离散数学全套",
+      "platform": "Bilibili",
+      "publisher": "小花醉猫",
+      "note": "浙江工业大学教师本人原创视频，共137分P，覆盖国内常用离散数学教材。用于图的基本概念、图同构、图的矩阵表示和平面图专题；按知识点链接到具体分P。仅提供原视频外链，不下载或托管。"
+    },
+    {
+      "id": "nymu_combinatorics_fuhenglin",
+      "name": "国立阳明交通大学 · 傅恒霖",
+      "course": "组合学导论 Introduction to Combinatorics（2021）",
+      "platform": "Bilibili",
+      "publisher": "ctu1896",
+      "note": "国立阳明交通大学应用数学系傅恒霖老师2021年课程。Lec20讲计数原理与生成函数入门，Lec21继续讲生成函数；用于生成函数节点，承接排列组合与计数基础。仅提供原视频外链，不下载或托管。"
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": "exactly one active course source per knowledge node; related consecutive episodes from that same course may be listed",
+    "primary_per_node": "one selected Bilibili course per node; related consecutive lesson links may belong to that one course",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
-    "note": "MIT Fall 2010 uses the Bilibili BV1zh41167Uy version, whose page lists 25 lectures and professional Chinese-English subtitles. All MIT node links point to the matching lecture part numbers.",
+    "note": "Bilibili-only. The rejected Chongqing University Liu Ran resource and all pFLYan graph lessons have been removed from active mappings and source records. Graph foundations and planar graphs use the original Zhejiang University of Technology teacher's course; core graph theory and algorithms use Nanjing University Professor Cheng Gong's GTA course; generating functions use the 2021 Yang Ming Chiao Tung University combinatorics course. The matrix-tree-theorem node remains pending until a suitable Bilibili lesson is verified. Never infer video links from a course syllabus or fabricate BV IDs.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
       "nodes_with_active_course": 67,
       "nodes_pending": "tree_matrix_tree",
-      "direct_episode_links": 133,
+      "direct_episode_links": 126,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
-      "last_audit_scope": "Bilibili episode title and part-index checks, topic-node fit, source references, direct-link structure; video speech/subtitle content not fully watched end-to-end"
+      "last_audit_scope": "replaced all pFLYan graph mappings and the Chongqing University generating-functions mapping; checked source records, direct Bilibili BV IDs, part titles and playlist order"
     }
   },
   "video_resource_candidates": [
