@@ -31,12 +31,19 @@
   } catch (_) {}
 })();
 </script>
-<link rel="stylesheet" href="/static/dmate-main.css?v=1">
+<link rel="stylesheet" href="/static/dmate-main.css?v=3">
 
 <link rel="stylesheet" href="/static/graph-editor.css">
 <link rel="stylesheet" href="/static/drawing-workspace.css">
 <link rel="stylesheet" href="/static/modal-chrome.css">
-<link rel="stylesheet" href="/static/offline.css?v=2">
+<link rel="stylesheet" href="/static/concept-notebook.css">
+<link rel="stylesheet" href="/static/ai-answer-renderer.css">
+<link rel="stylesheet" href="/static/red-circle-controls.css">
+<link rel="stylesheet" href="/static/ui-tooltip.css">
+<link rel="stylesheet" href="/static/button-themes.css">
+<link rel="stylesheet" href="/static/dmate-shared-overrides.css?v=3">
+<link rel="stylesheet" href="/static/offline-knowledge-graph.css?v=3">
+<link rel="stylesheet" href="/static/offline.css?v=3">
 <script defer src="/static/graph-editor-model.js"></script>
 <script defer src="/static/graph-editor-format.js"></script>
 <script defer src="/static/graph-editor-overlay.js"></script>
@@ -45,15 +52,33 @@
 <script defer src="/static/drawing-export.js"></script>
 <script defer src="/static/graph-editor.js"></script>
 <script defer src="/static/drawing-workspace.js"></script>
-<script defer src="/static/offline.js?v=2"></script>
+<script>
+window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:{inlineMath:[['\\(','\\)'],['$','$']],displayMath:[['\\[','\\]'],['$$','$$']]},svg:{fontCache:'none'},startup:{typeset:false},options:{enableMenu:false}};
+</script>
+<script defer src="/static/vendor/mathjax-3.2.2/es5/tex-svg.js"></script>
+<script defer src="/static/vendor/marked-15.0.12/marked.umd.js"></script>
+<script defer src="/static/vendor/dompurify-3.2.6/purify.min.js"></script>
+<script defer src="/static/ui-tooltip.js"></script>
+<script defer src="/static/offline-shell.js?v=3"></script>
+<script defer src="/static/offline-knowledge-graph.js?v=3"></script>
+<script defer src="/static/offline-entry.js"></script>
+<script defer src="/static/offline.js?v=3"></script>
 </head>
-<body>
+<body class="offline-workspace">
 <script>document.body.dataset.appearanceTheme=document.documentElement.dataset.appearanceTheme||"light";</script>
 <div id="appearanceBackgroundLayer" class="appearance-background-layer" aria-hidden="true"></div>
 <div class="appearance-mask-layer" aria-hidden="true"></div>
 
 <div class="layout offline-layout">
-  <aside class="left offline-sidebar">
+  <header class="mobile-topbar offline-topbar" aria-label="移动端导航">
+    <button id="offlineNavToggle" class="mobile-topbar-button" type="button" aria-label="打开学习工具" aria-controls="offlineSidebar" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+    <div class="mobile-topbar-brand"><img class="mobile-dmate-mark" src="/static/icons/dmate-brand-v52.svg" alt="DMate 应用图标"><div id="offlineMobileTitle" class="mobile-topbar-title">错题本</div></div>
+    <button id="offlineAppearanceToggle" class="mobile-topbar-button" type="button" aria-label="外观" title="外观"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg></button>
+  </header>
+  <div id="offlineNavBackdrop" class="offline-nav-backdrop" hidden></div>
+  <aside id="offlineSidebar" class="left offline-sidebar" aria-label="学习工具">
+    <div class="offline-drawer-head"><span>学习工具</span><button id="offlineNavClose" class="mobile-drawer-close" type="button" aria-label="关闭学习工具"></button></div>
+    <button id="offlineDesktopSidebarToggle" class="offline-icon-button offline-sidebar-toggle" type="button" aria-label="收起学习工具" title="收起学习工具" aria-controls="offlineSidebar" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     <div class="dmate-brand" aria-label="DMate - 离散数学智能辅学系统">
       <img class="dmate-brand-mark" src="/static/icons/dmate-brand-v52.svg" width="38" height="38" alt="DMate 图标">
       <div class="dmate-brand-copy">
@@ -62,21 +87,21 @@
       </div>
     </div>
 
-    <div class="offline-sidebar-heading">离线学习</div>
+    <div class="offline-sidebar-heading">学习工具</div>
     <nav class="offline-nav" aria-label="离线学习模块">
-      <button type="button" class="offline-nav-item active" data-panel="mistakes">
+      <button type="button" id="wrongBookBtn" class="offline-nav-item active" data-panel="mistakes">
         <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 7.5-5 5"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="m9.5 7.5 5 5"/></svg>
         <span>错题本</span>
       </button>
-      <button type="button" class="offline-nav-item" data-panel="notes">
+      <button type="button" id="conceptNotebookBtn" class="offline-nav-item" data-panel="notes">
         <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>
-        <span>概念笔记</span>
+        <span>笔记本</span>
       </button>
-      <button type="button" class="offline-nav-item" data-panel="drawing">
+      <button type="button" id="graphDrawingBtn" class="offline-nav-item" data-panel="drawing">
         <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 7 8.7 2.7a2.41 2.41 0 0 0-3.4 0L2.7 5.3a2.41 2.41 0 0 0 0 3.4L7 13"/><path d="m8 6 2-2"/><path d="m18 16 2-2"/><path d="m17 11 4.3 4.3c.94.94.94 2.46 0 3.4l-2.6 2.6c-.94.94-2.46.94-3.4 0L11 17"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
-        <span>独立绘图</span>
+        <span>绘图</span>
       </button>
-      <button type="button" class="offline-nav-item" data-panel="graph">
+      <button type="button" id="knowledgeGraphBtn" class="offline-nav-item" data-panel="graph">
         <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
         <span>知识图谱</span>
       </button>
@@ -91,6 +116,7 @@
     </nav>
 
     <div class="offline-sidebar-bottom">
+      <button id="offlineAppearanceBtn" class="offline-nav-item" type="button"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a1 1 0 1 0 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/></svg><span>外观</span></button>
       <div class="offline-status" id="networkStatus" role="status"><span class="status-dot"></span><span>正在检查网络</span></div>
       <button type="button" id="returnOnline" class="btn offline-return">
         <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h12"/><path d="M3 5v14"/></svg>
@@ -99,23 +125,24 @@
     </div>
   </aside>
 
-  <main class="center offline-main">
+  <main id="offlineMain" class="center offline-main">
     <header class="offline-header">
-      <div>
-        <div class="offline-eyebrow">DMate / 离线学习</div>
+      <button id="offlineDesktopSidebarOpen" class="offline-icon-button" type="button" aria-label="展开学习工具" title="展开学习工具" aria-controls="offlineSidebar" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+      <div class="offline-header-copy">
+
         <h1 id="panelTitle">错题本</h1>
         <p id="panelDescription">在本机查看、整理和复习已保存的错题。</p>
       </div>
       <div class="offline-header-actions">
         <span class="offline-save-state" id="saveState">本地保存已启用</span>
-        <button type="button" id="exportLocalData" class="btn offline-export">导出本地数据</button>
+        <button type="button" id="exportLocalData" class="btn offline-export" title="导出本地数据"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg><span>导出</span></button>
       </div>
     </header>
 
     <section class="offline-panel" id="mistakesPanel">
       <div class="offline-toolbar">
         <div><strong id="mistakeCount">0 道错题</strong><span class="toolbar-muted">仅保存在当前设备</span></div>
-        <button type="button" class="offline-primary" id="addMistake">＋ 添加错题</button>
+        <button type="button" class="offline-primary primary" id="addMistake"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>添加错题</span></button>
       </div>
       <div class="offline-list" id="mistakeList"></div>
     </section>
@@ -123,7 +150,7 @@
     <section class="offline-panel" id="notesPanel" hidden>
       <div class="offline-toolbar">
         <div><strong id="noteCount">0 条笔记</strong><span class="toolbar-muted">可随时编辑</span></div>
-        <button type="button" class="offline-primary" id="addNote">＋ 新建笔记</button>
+        <button type="button" class="offline-primary primary" id="addNote"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>新建概念</span></button>
       </div>
       <div class="offline-card-grid" id="noteList"></div>
     </section>
@@ -188,10 +215,25 @@
       <label>标题<input id="recordTitle" maxlength="160" required></label>
       <label>内容<textarea id="recordContent" rows="9" maxlength="12000" required></textarea></label>
       <div class="offline-dialog-actions">
-        <button type="button" class="btn" id="cancelRecordSecondary">取消</button>
-        <button type="submit" class="offline-primary">保存到本机</button>
+          <button type="submit" class="offline-primary primary">保存到本机</button>
       </div>
     </form>
+  </div>
+</dialog>
+<dialog id="offlineAppearanceDialog" class="modal offline-dialog offline-appearance-dialog" aria-labelledby="offlineAppearanceTitle">
+  <div class="modal-card appearance-card">
+    <div class="modal-head"><div id="offlineAppearanceTitle" tabindex="-1" autofocus>外观</div><button id="offlineAppearanceClose" class="modal-close-dot" type="button" aria-label="关闭外观" title="关闭外观"></button></div>
+    <div class="appearance-body">
+      <section class="appearance-section"><div class="appearance-section-title">主题</div><div class="appearance-segmented">
+        <button type="button" data-offline-theme="light">浅色</button><button type="button" data-offline-theme="dark">深色</button><button type="button" data-offline-theme="navy">藏青</button>
+      </div></section>
+      <section class="appearance-section"><div class="appearance-section-title">强调色</div><div class="appearance-swatches">
+        <button type="button" class="appearance-swatch" data-offline-accent="blue" aria-label="蓝色" style="--swatch:#3b82f6"></button><button type="button" class="appearance-swatch" data-offline-accent="purple" aria-label="紫色" style="--swatch:#8b5cf6"></button><button type="button" class="appearance-swatch" data-offline-accent="teal" aria-label="青色" style="--swatch:#14b8a6"></button>
+      </div></section>
+      <section class="appearance-section"><div class="appearance-section-title">字号</div><div class="appearance-segmented">
+        <button type="button" data-offline-font="small">小</button><button type="button" data-offline-font="medium">标准</button><button type="button" data-offline-font="large">大</button>
+      </div></section>
+    </div>
   </div>
 </dialog>
 <div class="offline-toast" id="offlineToast" role="status" hidden></div>

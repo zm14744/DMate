@@ -1,0 +1,631 @@
+/* Generated from templates/index.html by scripts/sync_offline_styles.py. */
+.ocr-task-panel[hidden] { display:none !important; }
+.ocr-task-panel { flex:none; box-sizing:border-box; width:min(820px,calc(100% - 32px)); margin:0 auto 12px; padding:12px; border:1px solid var(--border-strong); border-radius:12px; background:var(--surface-2); max-height:min(42dvh,430px); overflow:auto; }
+.ocr-task-panel-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.ocr-task-panel-head h2 { margin:0; font-size:15px; }
+.ocr-task-panel-hint { font-size:12px; color:var(--text-subtle); }
+.ocr-task-panel-hint { margin:7px 0 12px; line-height:1.5; }
+.ocr-task-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.ocr-task-card { position:relative; display:flex; align-items:center; gap:10px; min-width:0; min-height:78px; padding:9px 42px 9px 10px; border:1px solid var(--border-strong); border-radius:10px; background:var(--surface-1); }
+.ocr-task-thumbnail { width:64px; height:54px; flex:none; object-fit:contain; border-radius:5px; background:#fff; }
+.ocr-task-remove {
+    position:absolute; top:10px; right:10px;
+    box-sizing:border-box; width:22px; height:22px; min-width:22px; min-height:22px;
+    padding:0; border:0; border-radius:50%; background:#ef4444;
+    box-shadow:none; cursor:pointer;
+}
+.ocr-task-remove:focus-visible { outline:2px solid #ef4444; outline-offset:3px; }
+.ocr-task-remove:disabled { opacity:.45; cursor:wait; }
+@media(hover:hover) and (pointer:fine) {
+    .ocr-task-remove:not(:disabled):hover { background:#dc2626; }
+}
+@media(hover:none), (pointer:coarse) {
+    .ocr-task-remove:not(:disabled):hover { background:#ef4444; }
+}
+.ocr-task-content { min-width:0; flex:1; }
+.ocr-task-status { margin:5px 0; color:var(--text-primary); font-weight:600; font-size:13px; }
+.ocr-task-summary,.ocr-task-notice,.ocr-task-slow { margin:4px 0; font-size:12px; line-height:1.5; color:var(--text-subtle); overflow-wrap:anywhere; }
+.ocr-task-notice { max-height:4.5em; overflow:auto; }
+.ocr-task-slow { color:#c58121; }
+.ocr-task-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+.ocr-task-actions button { padding:6px 9px; border-radius:7px; border:1px solid var(--border-strong); font:inherit; font-size:12px; background:var(--surface-3); color:var(--text-primary); cursor:pointer; }
+.ocr-task-actions button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.ocr-task-actions button:disabled { opacity:.55; cursor:wait; }
+
+.graph-editor-dialog { position:fixed; inset:0; width:min(1280px,96vw); max-width:96vw; height:min(900px,94dvh); max-height:94dvh; box-sizing:border-box; margin:auto; padding:18px; border:1px solid var(--border-strong); border-radius:16px; background:var(--surface-1); color:var(--text-primary); overflow:hidden; }
+/* Original images and floating content set their own visibility. Hide the
+   entire subtree while the first modal/image layout is prepared. */
+.graph-editor-dialog[data-positioning], .graph-editor-dialog[data-positioning] *, .graph-editor-dialog[data-positioning]::backdrop { visibility:hidden!important; pointer-events:none!important; }
+.graph-editor-dialog[open] { display:flex; flex-direction:column; }
+.graph-editor-dialog > #graphEditorMount { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.graph-editor-dialog::backdrop { background:rgba(0,0,0,.6); }
+.graph-editor-dialog-head { display:flex; flex:0 0 auto; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.graph-editor-dialog-head > h2 { margin:0; font-size:18px; overflow-wrap:anywhere; min-width:0; }
+.graph-editor-dialog .graph-editor-close-dot {
+    appearance:none; -webkit-appearance:none; display:block; flex:0 0 22px;
+    width:22px; min-width:22px; height:22px; min-height:22px;
+    margin:0; padding:0!important; border:0!important; border-radius:50%;
+    background:#ef4444!important; box-shadow:none!important; cursor:pointer;
+}
+.graph-editor-dialog .graph-editor-close-dot:hover:not(:disabled) { background:#dc2626!important; }
+.graph-editor-dialog .graph-editor-close-dot:focus-visible { outline:2px solid #ef4444; outline-offset:3px; }
+.graph-editor-dialog .graph-editor-close-dot:disabled { opacity:.45; cursor:wait; }
+@media(max-width:760px) {
+    .ocr-task-panel { width:calc(100% - 16px); margin:0 auto 8px; padding:8px; max-height:36dvh; }
+    .ocr-task-list { grid-template-columns:minmax(0,1fr); }
+    .graph-editor-dialog { width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border-radius:0; padding:12px; }
+}
+
+/* The image task area is ONE larger panel plus ONE upload control, visually
+   outside the panel on its lower-right. The ordinary chat composer is
+   restored when the last image task is removed. No duplicate file input. */
+.ocr-upload-stage[hidden],
+.center > .input-wrap[hidden],
+.ocr-upload-stage .ocr-task-panel[hidden] {
+    display:none !important;
+}
+.ocr-upload-stage {
+    display:flex; flex:0 1 auto; box-sizing:border-box; align-items:flex-end;
+    gap:14px; width:min(1280px,calc(100% - 36px));
+    min-width:0; margin:0 auto 16px;
+}
+.ocr-upload-stage > .ocr-task-panel {
+    flex:1 1 auto; box-sizing:border-box; min-width:0; width:auto;
+    min-height:260px; max-height:min(62dvh,670px);
+    margin:0; padding:20px 22px; border-radius:16px; overflow:auto;
+}
+.ocr-upload-stage .ocr-task-panel-head h2 {font-size:20px;line-height:1.4;}
+.ocr-upload-stage .ocr-task-panel-hint {margin:8px 0 18px;}
+.ocr-upload-actions {display:flex; gap:12px; flex:0 0 auto; align-self:flex-end; align-items:center; min-width:0;}
+.ocr-upload-stage .image-picker-wrap {
+    position:relative; display:inline-flex; flex:0 0 auto;
+    align-items:center; justify-content:center; align-self:flex-end;
+}
+.ocr-upload-stage .image-picker-wrap[hidden] {display:none !important;}
+body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn {
+    box-sizing:border-box !important; display:inline-flex !important;
+    align-items:center !important; justify-content:center !important;
+    flex:0 0 auto !important; width:auto !important;
+    min-width:120px !important; max-width:none !important;
+    height:52px !important; min-height:52px !important; max-height:52px !important;
+    margin:0 !important; padding:0 19px !important;
+    border:0 !important; border-radius:12px !important;
+    background:var(--accent) !important; color:#fff !important;
+    -webkit-text-fill-color:#fff !important;
+    font-size:15px !important; font-weight:650 !important;
+    line-height:1.2 !important; white-space:nowrap !important;
+    text-indent:0 !important; box-shadow:none !important; cursor:pointer;
+}
+body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn::before {
+    content:none !important; display:none !important;
+}
+body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn:disabled {
+    opacity:.5 !important; cursor:not-allowed;
+}
+body[data-appearance-theme] .ocr-upload-stage #sendBtn {
+    box-sizing:border-box !important; display:inline-flex !important;
+    align-items:center !important; justify-content:center !important;
+    width:auto !important; min-width:80px !important; flex:0 0 auto !important;
+    height:52px !important; min-height:52px !important; max-height:52px !important;
+    margin:0 !important; padding:0 19px !important; border:0 !important;
+    border-radius:12px !important; background:var(--accent) !important; color:#fff !important;
+    -webkit-text-fill-color:#fff !important; font-size:15px !important; font-weight:650 !important;
+    line-height:1.2 !important; white-space:nowrap !important; cursor:pointer;
+}
+body[data-appearance-theme] .ocr-upload-stage #sendBtn:disabled {opacity:.5 !important;cursor:not-allowed;}
+body[data-appearance-theme] .ocr-upload-stage #sendBtn[hidden] {display:none !important;}
+/* Keep the actual file input covering the visible button. Direct native taps
+   remain supported in older Android WebView and WebKit. */
+body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageInput {
+    position:absolute !important; inset:0 !important;
+    width:100% !important; min-width:100% !important; max-width:100% !important;
+    height:100% !important; min-height:100% !important; max-height:100% !important;
+    margin:0 !important; padding:0 !important; border:0 !important;
+    opacity:0 !important; clip-path:none !important;
+    overflow:visible !important; pointer-events:auto !important;
+    cursor:pointer !important; z-index:2 !important;
+}
+.ocr-upload-stage .image-picker-wrap:has(> #imageInput:focus-visible) > #imageBtn {
+    outline:2px solid var(--accent) !important; outline-offset:3px;
+}
+@media(max-width:760px) {
+    .ocr-upload-stage {
+        flex-direction:column; align-items:stretch; gap:10px;
+        width:calc(100% - 16px);
+        margin-bottom:max(10px,env(safe-area-inset-bottom));
+    }
+    .ocr-upload-stage > .ocr-task-panel {
+        width:100%; flex:none; min-height:190px;
+        max-height:min(52dvh,480px); padding:14px;
+    }
+    .ocr-upload-actions {align-self:flex-end;}
+    body[data-appearance-theme] .ocr-upload-stage .image-picker-wrap > #imageBtn {
+        height:46px !important; min-height:46px !important; max-height:46px !important;
+        min-width:108px !important; padding:0 16px !important;
+        font-size:14px !important;
+    }
+    body[data-appearance-theme] .ocr-upload-stage #sendBtn {
+        height:46px !important; min-height:46px !important; max-height:46px !important;
+        min-width:72px !important; padding:0 16px !important; font-size:14px !important;
+    }
+}
+
+/* Keep focus feedback inside the control, without a blue or red outer ring.
+   Important layer declarations also override the older themed focus rules. */
+button, input, textarea, select, summary, [role="button"], .image-picker-wrap, label {
+    -webkit-tap-highlight-color:transparent;
+}
+@layer dmate-control-focus {
+    :is(button, input, textarea, select, summary, a, [role="button"], [role="tab"]):is(:focus, :focus-visible) {
+        outline:none !important;
+        outline-offset:0 !important;
+        box-shadow:none !important;
+    }
+    input:not([type="checkbox"]):not([type="radio"]):is(:focus, :focus-visible),
+    textarea:is(:focus, :focus-visible), select:is(:focus, :focus-visible) {
+        border-color:var(--border-strong,#cbd5e1) !important;
+    }
+    .image-picker-wrap:focus-within > #imageBtn,
+    .image-picker-wrap:has(> #imageInput:focus-visible) > #imageBtn {
+        outline:none !important;
+        box-shadow:none !important;
+    }
+}
+button:focus-visible, summary:focus-visible, [role="button"]:focus-visible { filter:brightness(.9); }
+
+/* English typography layer: visual-only overrides, scoped to English UI. */
+html[data-ui-language="en"] {
+    --dmate-reading-line: 1.72;
+    --dmate-paragraph-gap: .82em;
+}
+html[data-ui-language="en"] body,
+html[data-ui-language="en"] button,
+html[data-ui-language="en"] input,
+html[data-ui-language="en"] textarea,
+html[data-ui-language="en"] select {
+    font-family:var(--dmate-font-ui);
+    font-kerning: normal;
+    font-feature-settings: "kern" 1, "liga" 1;
+}
+html[data-ui-language="en"] body { letter-spacing: .002em; line-height: 1.5; }
+html[data-ui-language="en"] .msg {
+    max-width: min(78%, 920px);
+    line-height: var(--dmate-reading-line);
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: auto;
+}
+html[data-ui-language="en"] .msg-content,
+html[data-ui-language="en"] .ai-content,
+html[data-ui-language="en"] .wrong-answer-inner,
+html[data-ui-language="en"] .wrong-analysis-body,
+html[data-ui-language="en"] .learning-review-body,
+html[data-ui-language="en"] .concept-notebook-content,
+html[data-ui-language="en"] .graph-detail-body,
+html[data-ui-language="en"] .ocr-review-rendered {
+    line-height: var(--dmate-reading-line);
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+html[data-ui-language="en"] .ai-content p,
+html[data-ui-language="en"] .wrong-answer-inner p,
+html[data-ui-language="en"] .wrong-analysis-body p,
+html[data-ui-language="en"] .ocr-review-rendered p {
+    margin-block: var(--dmate-paragraph-gap);
+}
+html[data-ui-language="en"] .ai-content p:first-child,
+html[data-ui-language="en"] .wrong-answer-inner p:first-child,
+html[data-ui-language="en"] .wrong-analysis-body p:first-child { margin-top: 0; }
+html[data-ui-language="en"] .ai-content h1,
+html[data-ui-language="en"] .ai-content h2,
+html[data-ui-language="en"] .ai-content h3,
+html[data-ui-language="en"] .wrong-answer-inner h1,
+html[data-ui-language="en"] .wrong-answer-inner h2,
+html[data-ui-language="en"] .wrong-answer-inner h3,
+html[data-ui-language="en"] .wrong-analysis-body h1,
+html[data-ui-language="en"] .wrong-analysis-body h2,
+html[data-ui-language="en"] .wrong-analysis-body h3 {
+    line-height: 1.32;
+    letter-spacing: -.018em;
+    overflow-wrap: break-word;
+    word-break: normal;
+    margin-block: 1.15em .55em;
+}
+html[data-ui-language="en"] .ai-content ul,
+html[data-ui-language="en"] .ai-content ol,
+html[data-ui-language="en"] .wrong-answer-inner ul,
+html[data-ui-language="en"] .wrong-answer-inner ol,
+html[data-ui-language="en"] .wrong-analysis-body ul,
+html[data-ui-language="en"] .wrong-analysis-body ol {
+    padding-inline-start: 1.65em;
+    margin-block: .65em;
+}
+html[data-ui-language="en"] .ai-content li,
+html[data-ui-language="en"] .wrong-answer-inner li,
+html[data-ui-language="en"] .wrong-analysis-body li {
+    padding-inline-start: .12em;
+    margin-block: .28em;
+}
+html[data-ui-language="en"] .ai-content blockquote,
+html[data-ui-language="en"] .wrong-answer-inner blockquote,
+html[data-ui-language="en"] .wrong-analysis-body blockquote {
+    margin-inline: 0;
+    padding-inline-start: 1em;
+}
+html[data-ui-language="en"] .ai-content table,
+html[data-ui-language="en"] .wrong-answer-inner table,
+html[data-ui-language="en"] .wrong-analysis-body table,
+html[data-ui-language="en"] .ocr-review-rendered table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+    font-size: .94em;
+    line-height: 1.5;
+}
+html[data-ui-language="en"] .ai-content th,
+html[data-ui-language="en"] .ai-content td,
+html[data-ui-language="en"] .wrong-answer-inner th,
+html[data-ui-language="en"] .wrong-answer-inner td,
+html[data-ui-language="en"] .wrong-analysis-body th,
+html[data-ui-language="en"] .wrong-analysis-body td,
+html[data-ui-language="en"] .ocr-review-rendered th,
+html[data-ui-language="en"] .ocr-review-rendered td {
+    padding: .58em .72em;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+html[data-ui-language="en"] .ai-content pre,
+html[data-ui-language="en"] .wrong-answer-inner pre,
+html[data-ui-language="en"] .wrong-analysis-body pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.55;
+    tab-size: 4;
+}
+html[data-ui-language="en"] .ai-content code,
+html[data-ui-language="en"] .wrong-answer-inner code,
+html[data-ui-language="en"] .wrong-analysis-body code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: .91em;
+    overflow-wrap: anywhere;
+}
+html[data-ui-language="en"] .ai-content mjx-container,
+html[data-ui-language="en"] .wrong-answer-inner mjx-container,
+html[data-ui-language="en"] .wrong-analysis-body mjx-container,
+html[data-ui-language="en"] .ocr-review-rendered mjx-container {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+html[data-ui-language="en"] .ai-content mjx-container[display="true"],
+html[data-ui-language="en"] .wrong-answer-inner mjx-container[display="true"],
+html[data-ui-language="en"] .wrong-analysis-body mjx-container[display="true"] {
+    margin: 1.05em 0 !important;
+}
+html[data-ui-language="en"] .msg,
+html[data-ui-language="en"] .wrong-question,
+html[data-ui-language="en"] .wrong-feedback,
+html[data-ui-language="en"] .wrong-note-body {
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+html[data-ui-language="en"] input,
+html[data-ui-language="en"] textarea,
+html[data-ui-language="en"] select { letter-spacing: 0; }
+@media (max-width: 760px) {
+    html[data-ui-language="en"] .msg { max-width: 88%; line-height: 1.68; }
+    html[data-ui-language="en"] .ai-content table,
+    html[data-ui-language="en"] .wrong-answer-inner table,
+    html[data-ui-language="en"] .wrong-analysis-body table { font-size: .9em; }
+}
+
+/* Workspace-specific English reading and diagram-label refinements. */
+html[data-ui-language="en"] .wrong-card,
+html[data-ui-language="en"] .wrong-question,
+html[data-ui-language="en"] .wrong-feedback,
+html[data-ui-language="en"] .wrong-feedback-body,
+html[data-ui-language="en"] .wrong-note-body,
+html[data-ui-language="en"] .wrong-answer-body,
+html[data-ui-language="en"] .wrong-solution-body,
+html[data-ui-language="en"] .wrong-answer-inner,
+html[data-ui-language="en"] .wrong-analysis-body,
+html[data-ui-language="en"] .learning-review-section-text,
+html[data-ui-language="en"] .graph-summary,
+html[data-ui-language="en"] .graph-detail-body,
+html[data-ui-language="en"] .kg-history-item,
+html[data-ui-language="en"] .kg-history-preview,
+html[data-ui-language="en"] .ocr-review-question,
+html[data-ui-language="en"] #ocrReviewQuestion,
+html[data-ui-language="en"] .ocr-review-rendered,
+html[data-ui-language="en"] .dcn-dialog,
+html[data-ui-language="en"] .dcn-list,
+html[data-ui-language="en"] .dcn-main,
+html[data-ui-language="en"] .dcn-ai-result,
+html[data-ui-language="en"] .dcn-result,
+html[data-ui-language="en"] .dge-text-excerpt,
+html[data-ui-language="en"] .dge-muted,
+html[data-ui-language="en"] .dgs-content {
+    line-height: 1.7;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    letter-spacing: .002em;
+}
+html[data-ui-language="en"] .wrong-question,
+html[data-ui-language="en"] .wrong-feedback,
+html[data-ui-language="en"] .wrong-note-body {
+    white-space: normal;
+}
+html[data-ui-language="en"] .wrong-question,
+html[data-ui-language="en"] .wrong-feedback-body,
+html[data-ui-language="en"] .wrong-answer-body,
+html[data-ui-language="en"] .wrong-solution-body,
+html[data-ui-language="en"] .wrong-analysis-body,
+html[data-ui-language="en"] .kg-history-preview,
+html[data-ui-language="en"] .graph-detail-body,
+html[data-ui-language="en"] .ocr-review-rendered,
+html[data-ui-language="en"] .dcn-main,
+html[data-ui-language="en"] .dcn-ai-result {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+html[data-ui-language="en"] .wrong-question p,
+html[data-ui-language="en"] .wrong-feedback-body p,
+html[data-ui-language="en"] .wrong-answer-body p,
+html[data-ui-language="en"] .wrong-solution-body p,
+html[data-ui-language="en"] .wrong-answer-inner p,
+html[data-ui-language="en"] .wrong-analysis-body p,
+html[data-ui-language="en"] .learning-review-section-text p,
+html[data-ui-language="en"] .kg-history-preview p,
+html[data-ui-language="en"] .graph-detail-body p,
+html[data-ui-language="en"] .ocr-review-rendered p,
+html[data-ui-language="en"] .dcn-ai-result p {
+    margin-block: .72em;
+}
+html[data-ui-language="en"] .wrong-question h1,
+html[data-ui-language="en"] .wrong-question h2,
+html[data-ui-language="en"] .wrong-question h3,
+html[data-ui-language="en"] .wrong-answer-inner h1,
+html[data-ui-language="en"] .wrong-answer-inner h2,
+html[data-ui-language="en"] .wrong-answer-inner h3,
+html[data-ui-language="en"] .wrong-analysis-body h1,
+html[data-ui-language="en"] .wrong-analysis-body h2,
+html[data-ui-language="en"] .wrong-analysis-body h3,
+html[data-ui-language="en"] .dcn-ai-result h1,
+html[data-ui-language="en"] .dcn-ai-result h2,
+html[data-ui-language="en"] .dcn-ai-result h3 {
+    line-height: 1.32;
+    letter-spacing: -.015em;
+    word-break: normal;
+    overflow-wrap: break-word;
+    margin-block: 1.05em .52em;
+}
+html[data-ui-language="en"] .wrong-answer-inner ul,
+html[data-ui-language="en"] .wrong-answer-inner ol,
+html[data-ui-language="en"] .wrong-analysis-body ul,
+html[data-ui-language="en"] .wrong-analysis-body ol,
+html[data-ui-language="en"] .learning-review-section-text ul,
+html[data-ui-language="en"] .learning-review-section-text ol,
+html[data-ui-language="en"] .kg-history-preview ul,
+html[data-ui-language="en"] .kg-history-preview ol,
+html[data-ui-language="en"] .graph-detail-body ul,
+html[data-ui-language="en"] .graph-detail-body ol,
+html[data-ui-language="en"] .ocr-review-rendered ul,
+html[data-ui-language="en"] .ocr-review-rendered ol,
+html[data-ui-language="en"] .dcn-ai-result ul,
+html[data-ui-language="en"] .dcn-ai-result ol {
+    padding-inline-start: 1.65em;
+    margin-block: .65em;
+}
+html[data-ui-language="en"] .wrong-answer-inner li,
+html[data-ui-language="en"] .wrong-analysis-body li,
+html[data-ui-language="en"] .learning-review-section-text li,
+html[data-ui-language="en"] .kg-history-preview li,
+html[data-ui-language="en"] .graph-detail-body li,
+html[data-ui-language="en"] .ocr-review-rendered li,
+html[data-ui-language="en"] .dcn-ai-result li {
+    margin-block: .28em;
+    padding-inline-start: .12em;
+}
+html[data-ui-language="en"] .wrong-answer-inner table,
+html[data-ui-language="en"] .wrong-analysis-body table,
+html[data-ui-language="en"] .learning-review-section-text table,
+html[data-ui-language="en"] .kg-history-preview table,
+html[data-ui-language="en"] .graph-detail-body table,
+html[data-ui-language="en"] .ocr-review-rendered table,
+html[data-ui-language="en"] .dcn-ai-result table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    table-layout: auto;
+    font-size: .94em;
+    line-height: 1.5;
+}
+html[data-ui-language="en"] .wrong-answer-inner th,
+html[data-ui-language="en"] .wrong-answer-inner td,
+html[data-ui-language="en"] .wrong-analysis-body th,
+html[data-ui-language="en"] .wrong-analysis-body td,
+html[data-ui-language="en"] .learning-review-section-text th,
+html[data-ui-language="en"] .learning-review-section-text td,
+html[data-ui-language="en"] .kg-history-preview th,
+html[data-ui-language="en"] .kg-history-preview td,
+html[data-ui-language="en"] .graph-detail-body th,
+html[data-ui-language="en"] .graph-detail-body td,
+html[data-ui-language="en"] .ocr-review-rendered th,
+html[data-ui-language="en"] .ocr-review-rendered td,
+html[data-ui-language="en"] .dcn-ai-result th,
+html[data-ui-language="en"] .dcn-ai-result td {
+    padding: .56em .7em;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+html[data-ui-language="en"] .wrong-answer-inner pre,
+html[data-ui-language="en"] .wrong-analysis-body pre,
+html[data-ui-language="en"] .kg-history-preview pre,
+html[data-ui-language="en"] .graph-detail-body pre,
+html[data-ui-language="en"] .ocr-review-rendered pre,
+html[data-ui-language="en"] .dcn-ai-result pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.55;
+    tab-size: 4;
+}
+html[data-ui-language="en"] .wrong-answer-inner code,
+html[data-ui-language="en"] .wrong-analysis-body code,
+html[data-ui-language="en"] .kg-history-preview code,
+html[data-ui-language="en"] .graph-detail-body code,
+html[data-ui-language="en"] .ocr-review-rendered code,
+html[data-ui-language="en"] .dcn-ai-result code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: .91em;
+    overflow-wrap: anywhere;
+}
+html[data-ui-language="en"] .wrong-question mjx-container,
+html[data-ui-language="en"] .wrong-feedback-body mjx-container,
+html[data-ui-language="en"] .wrong-answer-body mjx-container,
+html[data-ui-language="en"] .wrong-solution-body mjx-container,
+html[data-ui-language="en"] .wrong-answer-inner mjx-container,
+html[data-ui-language="en"] .wrong-analysis-body mjx-container,
+html[data-ui-language="en"] .learning-review-body mjx-container,
+html[data-ui-language="en"] .graph-detail-body mjx-container,
+html[data-ui-language="en"] .kg-history-preview mjx-container,
+html[data-ui-language="en"] .ocr-review-rendered mjx-container,
+html[data-ui-language="en"] .dcn-ai-result mjx-container {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+html[data-ui-language="en"] .wrong-answer-inner mjx-container[display="true"],
+html[data-ui-language="en"] .wrong-analysis-body mjx-container[display="true"],
+html[data-ui-language="en"] .learning-review-body mjx-container[display="true"],
+html[data-ui-language="en"] .graph-detail-body mjx-container[display="true"],
+html[data-ui-language="en"] .kg-history-preview mjx-container[display="true"],
+html[data-ui-language="en"] .ocr-review-rendered mjx-container[display="true"],
+html[data-ui-language="en"] .dcn-ai-result mjx-container[display="true"] {
+    margin: 1em 0 !important;
+}
+/* Concept notebook: longer English note titles and AI explanations. */
+html[data-ui-language="en"] .dcn-dialog { font-family: inherit; }
+html[data-ui-language="en"] .dcn-note-open,
+html[data-ui-language="en"] .dcn-list-empty,
+html[data-ui-language="en"] .dcn-selection,
+html[data-ui-language="en"] .dcn-saved,
+html[data-ui-language="en"] .dcn-status {
+    overflow-wrap: anywhere;
+    word-break: normal;
+    line-height: 1.5;
+}
+html[data-ui-language="en"] .dcn-dialog input,
+html[data-ui-language="en"] .dcn-dialog textarea {
+    font-family: inherit;
+    line-height: 1.62;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+/* Graph recognition/editor: allow long Latin labels without breaking each letter. */
+html[data-ui-language="en"] .dge-text-excerpt,
+html[data-ui-language="en"] .dge-text-body,
+html[data-ui-language="en"] .dgs-content,
+html[data-ui-language="en"] .dge-panel,
+html[data-ui-language="en"] .dge-property-panel {
+    overflow-wrap: anywhere;
+    word-break: normal;
+    line-height: 1.55;
+}
+html[data-ui-language="en"] .dge-visual-node text {
+    font-family:var(--dmate-font-ui);
+    font-size: 11px;
+}
+html[data-ui-language="en"] .kg-mobile-node-name,
+html[data-ui-language="en"] .kg-mobile-node-badge {
+    overflow-wrap: anywhere;
+    word-break: normal;
+    hyphens: auto;
+    line-height: 1.25;
+}
+html[data-ui-language="en"] .kg-mobile-node-name { font-size: 12px; }
+html[data-ui-language="en"] .kg-mobile-node-badge { font-size: 9px; }
+html[data-ui-language="en"] .graph-detail-title,
+html[data-ui-language="en"] .learning-review-section-title {
+    line-height: 1.34;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+@media (max-width: 760px) {
+    html[data-ui-language="en"] .wrong-answer-inner,
+    html[data-ui-language="en"] .wrong-analysis-body,
+    html[data-ui-language="en"] .learning-review-section-text,
+    html[data-ui-language="en"] .graph-detail-body,
+    html[data-ui-language="en"] .kg-history-preview,
+    html[data-ui-language="en"] .ocr-review-rendered,
+    html[data-ui-language="en"] .dcn-main {
+        line-height: 1.66;
+    }
+    html[data-ui-language="en"] .wrong-answer-inner table,
+    html[data-ui-language="en"] .wrong-analysis-body table,
+    html[data-ui-language="en"] .graph-detail-body table,
+    html[data-ui-language="en"] .ocr-review-rendered table,
+    html[data-ui-language="en"] .dcn-ai-result table { font-size: .9em; }
+}
+
+/* Desktop: center the empty-state text beneath the conversation-info heading.
+   Keep the compact mobile information drawer layout unchanged. */
+@media (min-width: 1101px) {
+    .right #info {
+        text-align: center;
+    }
+}
+
+/* Light theme surface hierarchy: bright conversation workspace, muted navigation rail.
+   Match the specificity of the existing root/body theme rules so this swap wins
+   over the legacy light-theme backgrounds instead of merely appending a weaker rule. */
+:root[data-appearance-theme="light"] body:not(.has-custom-background),
+body[data-appearance-theme="light"]:not(.has-custom-background) {
+    background:#f8fafc !important;
+    background-color:#f8fafc !important;
+    background-image:linear-gradient(#f8fafc,#f8fafc) !important;
+}
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .layout,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .center,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .chat,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .input-wrap,
+body[data-appearance-theme="light"]:not(.has-custom-background) .layout,
+body[data-appearance-theme="light"]:not(.has-custom-background) .center,
+body[data-appearance-theme="light"]:not(.has-custom-background) .chat,
+body[data-appearance-theme="light"]:not(.has-custom-background) .input-wrap {
+    background:#f8fafc !important;
+    background-color:#f8fafc !important;
+    background-image:linear-gradient(#f8fafc,#f8fafc) !important;
+}
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
+:root[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
+body[data-appearance-theme="light"]:not(.has-custom-background) .left,
+body[data-appearance-theme="light"]:not(.has-custom-background) .mobile-topbar {
+    background:#eef3f8 !important;
+    background-color:#eef3f8 !important;
+    background-image:linear-gradient(#eef3f8,#eef3f8) !important;
+    color:#0f172a !important;
+}
+@media (min-width:1101px) {
+    :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .left {
+        border-right:1px solid #dbe4ee !important;
+    }
+}
+@media (max-width:1100px) {
+    :root[data-appearance-theme="light"] body:not(.has-custom-background) .left,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .left {
+        border-right:0 !important;
+        border-bottom-color:#dbe4ee !important;
+    }
+    :root[data-appearance-theme="light"] body:not(.has-custom-background) .mobile-topbar,
+    body[data-appearance-theme="light"]:not(.has-custom-background) .mobile-topbar {
+        border-bottom-color:#dbe4ee !important;
+    }
+}

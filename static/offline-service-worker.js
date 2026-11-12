@@ -1,17 +1,28 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v2";
+const CACHE_NAME = "dmate-offline-shell-v3";
 const PRECACHE = [
   "/offline",
-  "/static/dmate-main.css?v=1",
-  "/static/offline.css?v=2",
+  "/static/dmate-main.css?v=3",
+  "/static/dmate-shared-overrides.css?v=3",
+  "/static/offline.css?v=3",
+  "/static/offline.js?v=3",
+  "/static/offline-shell.js?v=3",
+  "/static/offline-knowledge-graph.js?v=3",
+  "/static/offline-knowledge-graph.css?v=3",
+  "/static/offline-entry.js",
   "/static/icons/dmate-brand-v52.svg",
-  "/static/offline.js?v=2",
   "/static/offline-content/concepts.zh-CN.json",
   "/static/offline-content/questions.zh-CN.json",
   "/static/offline-content/knowledge_graph.json",
   "/static/graph-editor.css",
   "/static/drawing-workspace.css",
   "/static/modal-chrome.css",
+  "/static/concept-notebook.css",
+  "/static/button-themes.css",
+  "/static/ai-answer-renderer.css",
+  "/static/red-circle-controls.css",
+  "/static/ui-tooltip.css",
+  "/static/ui-tooltip.js",
   "/static/graph-editor-model.js",
   "/static/graph-editor-format.js",
   "/static/graph-editor-overlay.js",
@@ -19,7 +30,46 @@ const PRECACHE = [
   "/static/delete-confirm.js",
   "/static/drawing-export.js",
   "/static/graph-editor.js",
-  "/static/drawing-workspace.js"
+  "/static/drawing-workspace.js",
+  "/static/vendor/marked-15.0.12/marked.umd.js",
+  "/static/vendor/dompurify-3.2.6/purify.min.js",
+  "/static/vendor/mathjax-3.2.2/es5/tex-svg.js",
+  "/static/vendor/mathjax-3.2.2/es5/output/svg/fonts/tex.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/action.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/all-packages.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/ams.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/amscd.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/autoload.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/bbox.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/boldsymbol.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/braket.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/bussproofs.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/cancel.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/cases.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/centernot.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/color.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/colortbl.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/colorv2.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/configmacros.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/empheq.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/enclose.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/extpfeil.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/gensymb.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/html.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/mathtools.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/mhchem.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/newcommand.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/noerrors.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/noundefined.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/physics.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/require.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/setoptions.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/tagformat.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/textcomp.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/textmacros.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/unicode.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/upgreek.js",
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/verb.js"
 ];
 
 self.addEventListener("install", event => {
@@ -55,7 +105,8 @@ self.addEventListener("fetch", event => {
         }
         return response;
       } catch (_) {
-        const cached = await caches.match("/offline");
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match("/offline");
         if (cached) return cached;
         return new Response(
           "<!doctype html><html lang='zh-CN'><meta charset='utf-8'><title>DMate 离线</title><body><p>离线学习资源尚未准备。请在有网络时打开 DMate 并进入离线版完成准备。</p></body></html>",
@@ -68,11 +119,11 @@ self.addEventListener("fetch", event => {
 
   if (PRECACHE.some(path => new URL(path, self.location.origin).pathname === url.pathname)) {
     event.respondWith((async () => {
-      const cached = await caches.match(request) || await caches.match(url.pathname);
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match(request) || await cache.match(url.pathname, {ignoreSearch:true});
       if (cached) return cached;
       const response = await fetch(request);
       if (response && response.ok) {
-        const cache = await caches.open(CACHE_NAME);
         await cache.put(request, response.clone());
       }
       return response;

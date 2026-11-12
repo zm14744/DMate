@@ -92,6 +92,17 @@
 - 自定义背景图从现有外观 IndexedDB 读取，并复制到离线工作区本地设置库；原始外观设置不被修改。
 - 离线工作区只增加必要的布局和内容样式，不重绘原有 Logo、图标或背景。
 
+公共页面样式由 `scripts/sync_offline_styles.py` 从在线模板导出为
+`static/dmate-main.css` 与 `static/dmate-shared-overrides.css`。在线模板的内联样式
+调整后，运行 `python scripts/sync_offline_styles.py` 同步；CI 使用 `--check`
+检查两端是否一致。离线布局保留在 `offline.css`，按钮、笔记、绘图、弹窗、
+公式排版及图标复用在线组件。知识图谱以同样的节点、连线和选中描边显示，
+离线题库与概念库沿用相同的列表和详情样式。
+
+上述样式、脚本及本地 Markdown / MathJax 资源均纳入离线缓存；新增依赖时
+同步更新 `offline-service-worker.js` 的资源清单和缓存版本，避免断网后缺少图标、
+弹窗或公式。浏览器回归需要完成在线准备，再断网刷新并检查各模块和本机记录。
+
 ## 5. 对现有代码的影响
 
 当前架构有几个必须先处理的事实：
