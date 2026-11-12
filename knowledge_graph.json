@@ -292,7 +292,7 @@
       "name": "前束范式",
       "category": "谓词逻辑",
       "prerequisites": [
-        "量词推理与否定"
+        "谓词逻辑等价与推理"
       ],
       "videos": [
         {

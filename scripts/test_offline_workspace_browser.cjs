@@ -340,6 +340,54 @@ async function concepts(page) {
   await page.locator('#conceptSearch').fill('');
 }
 
+async function curriculum(page) {
+  const [concepts, questions, graph, references] = await page.evaluate(async () => {
+    const packs = await Promise.all(['concepts.zh-CN.json', 'questions.zh-CN.json',
+      'knowledge_graph.json', 'references.zh-CN.json'].map(async name => {
+      const response = await fetch('/static/offline-content/' + name);
+      if (!response.ok) throw new Error('Offline pack unavailable: ' + name);
+      return response.json();
+    }));
+    return [packs[0].concepts, packs[1].questions, packs[2].nodes, packs[3].sources];
+  });
+  assert.equal(await page.locator('#conceptList .concept-item').count(), concepts.length);
+  assert.ok(concepts.length >= graph.length * 4, 'Topics contain substantive detailed concepts');
+  assert.ok(questions.length >= graph.length * 8, 'Every broad topic has multiple exercises');
+  assert.ok(references.length >= 3 && references.every(source => source.commercial_use_permitted),
+    'The commercial-use reference registry is readable without a network');
+  await navigate(page, 'questions');
+  for (const difficulty of [...new Set(questions.map(question => question.difficulty))]) {
+    await page.locator('#questionDifficulty').selectOption(difficulty);
+    assert.equal(await page.locator('#questionList .question-item').count(),
+      questions.filter(question => question.difficulty === difficulty).length, 'Difficulty filter: ' + difficulty);
+  }
+  await page.locator('#questionDifficulty').selectOption('');
+  const categories = new Set();
+  for (const topic of graph) {
+    if (categories.has(topic.category)) continue;
+    categories.add(topic.category);
+    await navigate(page, 'concepts');
+    await page.locator('#conceptList [data-concept-id="' + topic.id + '"]').click();
+    const overview = concepts.find(item => item.id === topic.id);
+    assert.equal(await page.locator('#conceptDetail .concept-topic-links [data-concept-id]').count(),
+      overview.related_concepts.length);
+    const child = concepts.find(item => item.id === overview.related_concepts[0]);
+    await page.locator('#conceptDetail .concept-topic-links [data-concept-id="' + child.id + '"]').click();
+    assert.equal(await page.locator('#conceptDetail .detail-title').innerText(), child.title);
+    await page.locator('#conceptDetail [data-question-id="' + child.related_questions[0] + '"]').click();
+    await page.locator('#questionsPanel').waitFor({ state: 'visible' });
+    const question = questions.find(item => item.id === child.related_questions[0]);
+    assert.equal(await page.locator('#questionDetail .detail-title').innerText(), question.title);
+    await page.locator('#questionDetail').getByRole('button', {name:'查看参考答案', exact:true}).click();
+    assert.ok((await page.locator('#questionDetail .answer-panel').innerText()).includes('评分要点'));
+    await page.locator('#questionDetail .question-concept-links [data-concept-id="' + child.id + '"]').click();
+    await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#conceptDetail .detail-title').innerText(), child.title);
+    await page.locator('#conceptDetail .concept-topic-links [data-concept-id="' + topic.id + '"]').click();
+    assert.equal(await page.locator('#conceptDetail .detail-title').innerText(), topic.name);
+  }
+}
+
 async function graph(page) {
   await navigate(page, 'graph');
   const host = page.locator('#graphNodes .offline-knowledge-graph[data-ready="true"]');
@@ -368,6 +416,12 @@ async function graph(page) {
   await host.locator('[data-graph-action="fit"]').click();
   const restored = await viewport.evaluate(node => Number(node.dataset.scale));
   assert.ok(Math.abs(restored - original) < .001, 'Fit restores graph scale');
+  await host.locator('.offline-graph-concept-button').click();
+  await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), nodeId,
+    'The graph opens the overview for its exact topic ID');
+  assert.ok(await page.locator('#conceptDetail .concept-topic-links [data-concept-id]').count() >= 3,
+    'Every graph topic leads to its detailed concepts');
 }
 
 async function drawing(page) {
@@ -498,6 +552,7 @@ async function runCase(browser, width, theme) {
     const mistakeTitle = await mistakesCRUD(page, label, reference);
     await practice(page);
     await concepts(page);
+    if (theme === 'dark') await curriculum(page);
     await graph(page);
     await drawing(page);
     await sidebarExport(page, width, noteTitle, mistakeTitle);

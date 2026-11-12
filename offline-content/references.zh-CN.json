@@ -1,0 +1,855 @@
+{
+  "schema_version": 1,
+  "retrieved_on": "2026-11-12",
+  "reference_policy": "以下是数学事实与课程覆盖的参考书目，不是教材译文、改编题或习题导入清单。逐大类保留相关参考章节与固定修订链接，不声称每个原创细分或新题均源自、摘录自这些教材。",
+  "sources": [
+    {
+      "id": "dmoi3",
+      "title": "离散数学：开放式导论",
+      "authors": "Oscar Levin",
+      "version": "第三版；固定标签 3rd-ed",
+      "revision": "a8e4949bc45daf100930c1182983778f56ab689f",
+      "url": "https://discrete.openmathbooks.org/dmoi3.html",
+      "repository_url": "https://github.com/oscarlevin/discrete-book",
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "license_evidence_url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/frontmatter.ptx",
+      "license_evidence_sha256": "7d3b1f5f6fb32378674014d12ef3a5edf36101b30cb17b37f5e6d10e506a42bc",
+      "commercial_use_permitted": true,
+      "retrieved_on": "2026-11-12",
+      "usage": "仅核对课程覆盖、通行数学事实与定理适用条件；未复制或翻译教材正文、题目、答案、插图或代码。不是本原创内容包的许可证。"
+    },
+    {
+      "id": "appcomb",
+      "title": "应用组合数学",
+      "authors": "Mitchel T. Keller；William T. Trotter",
+      "version": "公开源码固定修订",
+      "revision": "e25b222aabf2f19d32910f5b8a96cdb7f6da97c3",
+      "url": "https://appliedcombinatorics.org/book/app-comb.html",
+      "repository_url": "https://github.com/mitchkeller/applied-combinatorics",
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "license_evidence_url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/LICENSE.md",
+      "license_evidence_sha256": "bae5ccc863235f984a52c07d011e48a86c0c12f923be2dedd8624c7abdc22c6c",
+      "commercial_use_permitted": true,
+      "retrieved_on": "2026-11-12",
+      "usage": "仅核对课程覆盖、通行数学事实与定理适用条件；未复制或翻译教材正文、题目、答案、插图或代码。不是本原创内容包的许可证。"
+    },
+    {
+      "id": "aata",
+      "title": "抽象代数：理论与应用",
+      "authors": "Thomas W. Judson；Robert A. Beezer（Sage 部分）",
+      "version": "2026 年度版，固定修订",
+      "revision": "3069910e3ded72ff5e18837a97a0e810c92790e2",
+      "url": "https://judsonbooks.org/aata/",
+      "repository_url": "https://github.com/twjudson/aata",
+      "license": "GFDL-1.3-or-later",
+      "license_url": "https://www.gnu.org/licenses/fdl-1.3.html",
+      "license_evidence_url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/COPYING",
+      "license_evidence_sha256": "b7d47749512a424173f6a20daeea7b00f36b9f5ef95c25930fdbc3bd549b8983",
+      "commercial_use_permitted": true,
+      "retrieved_on": "2026-11-12",
+      "usage": "仅核对课程覆盖、通行数学事实与定理适用条件；未复制或翻译教材正文、题目、答案、插图或代码。不是本原创内容包的许可证。",
+      "license_note": "COPYING 为 GFDL 1.3 或以后版本，frontmatter.xml 为 1.2 或以后版本。若未来改编，选择同时满足二者的 1.3 或以后版本；修改后的文档仍须按 GFDL 发布并保留署名、完整许可与历史。大量不透明副本须履行第3节的透明格式提供义务。当前仅作事实核对参考，未导入受保护表达。"
+    },
+    {
+      "id": "openlogic",
+      "title": "开放逻辑文本（英文原项目）",
+      "authors": "The Open Logic Project",
+      "version": "英文原项目固定修订",
+      "revision": "1e960beff9ed7835bf3e3f1335e21af3439cd107",
+      "url": "https://openlogicproject.org/",
+      "repository_url": "https://github.com/OpenLogicProject/OpenLogic",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_evidence_url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/LICENSE.md",
+      "license_evidence_sha256": "bb5e0179a1e9bdb55634a4303784cf73c297a1dcee27b92cd546bf398075531c",
+      "commercial_use_permitted": true,
+      "retrieved_on": "2026-11-12",
+      "usage": "仅核对课程覆盖、通行数学事实与定理适用条件；未复制或翻译教材正文、题目、答案、插图或代码。不是本原创内容包的许可证。"
+    },
+    {
+      "id": "networkx",
+      "title": "NetworkX 算法文档",
+      "authors": "NetworkX Developers",
+      "version": "固定源码修订中的算法文档",
+      "revision": "6855cd586982cc2e4710b8eb87251ccf56674bf1",
+      "url": "https://networkx.org/documentation/stable/",
+      "repository_url": "https://github.com/networkx/networkx",
+      "license": "BSD-3-Clause",
+      "license_url": "https://opensource.org/license/bsd-3-clause",
+      "license_evidence_url": "https://github.com/networkx/networkx/blob/6855cd586982cc2e4710b8eb87251ccf56674bf1/LICENSE.txt",
+      "license_evidence_sha256": "6025f323ea29dc2f0ee0abd9523bf910186f55b0e148e6ebf646c55566278e2e",
+      "commercial_use_permitted": true,
+      "retrieved_on": "2026-11-12",
+      "usage": "仅核对课程覆盖、通行数学事实与定理适用条件；未复制或翻译教材正文、题目、答案、插图或代码。不是本原创内容包的许可证。"
+    }
+  ],
+  "excluded_imports": [
+    {
+      "title": "MIT OCW 6.042J 课程材料",
+      "reason": "CC BY-NC-SA：未取得另行商用许可，不复制、翻译、改编或打包。"
+    },
+    {
+      "title": "DMOI 第四版",
+      "reason": "非商业版本不进入本内容包；本次只锁定第三版。"
+    },
+    {
+      "title": "未逐题核实许可的网络题库、课件及试卷",
+      "reason": "公开可读不能替代商业复制与改编许可。"
+    }
+  ],
+  "topic_references": {
+    "logic_truth": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "命题逻辑：真值表、逻辑等价与推理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-prop.ptx"
+      }
+    ],
+    "logic_connectives": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "命题逻辑：真值表、逻辑等价与推理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-prop.ptx"
+      }
+    ],
+    "logic_truth_table": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "命题逻辑：真值表、逻辑等价与推理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-prop.ptx"
+      }
+    ],
+    "logic_equivalence": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "命题逻辑：真值表、逻辑等价与推理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-prop.ptx"
+      }
+    ],
+    "logic_normal_form": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "命题逻辑：真值表、逻辑等价与推理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-prop.ptx"
+      }
+    ],
+    "logic_reasoning": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "命题逻辑：真值表、逻辑等价与推理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-prop.ptx"
+      }
+    ],
+    "predicate_domain": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "自由变元、约束变元与辖域",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "量词推理规则与变元条件",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+      }
+    ],
+    "predicate_quantifier": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "自由变元、约束变元与辖域",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "量词推理规则与变元条件",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+      }
+    ],
+    "predicate_variable": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "自由变元、约束变元与辖域",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "量词推理规则与变元条件",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+      }
+    ],
+    "predicate_reasoning": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "自由变元、约束变元与辖域",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "量词推理规则与变元条件",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+      }
+    ],
+    "predicate_prenex": [
+      {
+        "source_id": "dmoi3",
+        "section": "数学陈述：命题、联结词和量词",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "自由变元、约束变元与辖域",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "量词推理规则与变元条件",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "前束形式的定义（只参考量词前缀与无量词母式这一通行定义）",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/proof-theory/cut-elimination/midsequent.tex"
+      }
+    ],
+    "proof_direct_contradiction": [
+      {
+        "source_id": "dmoi3",
+        "section": "直接证明、逆否证明与反证法",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-proofs.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "数学归纳法与强归纳法",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_seq-induction.ptx"
+      }
+    ],
+    "proof_induction": [
+      {
+        "source_id": "dmoi3",
+        "section": "直接证明、逆否证明与反证法",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-proofs.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "数学归纳法与强归纳法",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_seq-induction.ptx"
+      }
+    ],
+    "proof_strong_induction": [
+      {
+        "source_id": "dmoi3",
+        "section": "直接证明、逆否证明与反证法",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_logic-proofs.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "数学归纳法与强归纳法",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_seq-induction.ptx"
+      }
+    ],
+    "set_operation": [
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      }
+    ],
+    "relation_cartesian": [
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      }
+    ],
+    "relation_operation": [
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "关系运算：逆关系、关系积与关系幂",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/sets-functions-relations/relations/operations.tex"
+      }
+    ],
+    "relation_property": [
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "关系的自反、反自反、对称、反对称与传递性质",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/sets-functions-relations/relations/special-properties.tex"
+      }
+    ],
+    "relation_equivalence": [
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      }
+    ],
+    "relation_order": [
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      },
+      {
+        "source_id": "aata",
+        "section": "格与布尔代数：偏序、上界和下界",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/boolean.xml"
+      }
+    ],
+    "relation_closure": [
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      },
+      {
+        "source_id": "openlogic",
+        "section": "传递闭包与自反传递闭包的定义",
+        "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/sets-functions-relations/relations/operations.tex"
+      }
+    ],
+    "function_mapping": [
+      {
+        "source_id": "dmoi3",
+        "section": "函数：定义域、陪域、像、单射、满射与复合",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-functions.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      }
+    ],
+    "function_injection": [
+      {
+        "source_id": "dmoi3",
+        "section": "函数：定义域、陪域、像、单射、满射与复合",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-functions.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      }
+    ],
+    "function_composition": [
+      {
+        "source_id": "dmoi3",
+        "section": "函数：定义域、陪域、像、单射、满射与复合",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-functions.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      }
+    ],
+    "function_inverse": [
+      {
+        "source_id": "dmoi3",
+        "section": "函数：定义域、陪域、像、单射、满射与复合",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-functions.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "预备知识：集合、函数与等价关系",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/sets.xml"
+      }
+    ],
+    "number_prime": [
+      {
+        "source_id": "dmoi3",
+        "section": "初等数论：整除、同余与线性丢番图方程",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_addtops-numbth.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "整数：除法算法、最大公因数与贝祖等式",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/integers.xml"
+      }
+    ],
+    "number_gcd": [
+      {
+        "source_id": "dmoi3",
+        "section": "初等数论：整除、同余与线性丢番图方程",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_addtops-numbth.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "整数：除法算法、最大公因数与贝祖等式",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/integers.xml"
+      }
+    ],
+    "number_congruence": [
+      {
+        "source_id": "dmoi3",
+        "section": "初等数论：整除、同余与线性丢番图方程",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_addtops-numbth.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "整数：除法算法、最大公因数与贝祖等式",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/integers.xml"
+      }
+    ],
+    "number_linear_congruence": [
+      {
+        "source_id": "dmoi3",
+        "section": "初等数论：整除、同余与线性丢番图方程",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_addtops-numbth.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "整数：除法算法、最大公因数与贝祖等式",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/integers.xml"
+      }
+    ],
+    "number_inverse_crt": [
+      {
+        "source_id": "dmoi3",
+        "section": "初等数论：整除、同余与线性丢番图方程",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_addtops-numbth.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "整数：除法算法、最大公因数与贝祖等式",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/integers.xml"
+      },
+      {
+        "source_id": "aata",
+        "section": "环：软件设计应用中的中国剩余定理",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/rings.xml"
+      }
+    ],
+    "number_euler_fermat": [
+      {
+        "source_id": "dmoi3",
+        "section": "初等数论：整除、同余与线性丢番图方程",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_addtops-numbth.ptx"
+      },
+      {
+        "source_id": "aata",
+        "section": "整数：除法算法、最大公因数与贝祖等式",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/integers.xml"
+      },
+      {
+        "source_id": "aata",
+        "section": "陪集与拉格朗日定理：费马小定理与欧拉定理",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/cosets.xml"
+      },
+      {
+        "source_id": "aata",
+        "section": "密码学导论：素性检验与伪素数的数学区别",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/crypt.xml"
+      }
+    ],
+    "number_rsa": [
+      {
+        "source_id": "aata",
+        "section": "密码学导论：公钥密码与教学用 RSA",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/crypt.xml"
+      },
+      {
+        "source_id": "aata",
+        "section": "费马小定理与欧拉定理",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/cosets.xml"
+      }
+    ],
+    "count_basic": [
+      {
+        "source_id": "dmoi3",
+        "section": "加法与乘法原理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_counting-addmult.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "排列与组合",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_counting-combperm.ptx"
+      }
+    ],
+    "count_perm_comb": [
+      {
+        "source_id": "dmoi3",
+        "section": "加法与乘法原理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_counting-addmult.ptx"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "排列与组合",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_counting-combperm.ptx"
+      }
+    ],
+    "count_binomial": [
+      {
+        "source_id": "dmoi3",
+        "section": "二项式系数与帕斯卡恒等式",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_counting-binom.ptx"
+      }
+    ],
+    "count_pigeonhole": [
+      {
+        "source_id": "appcomb",
+        "section": "鸽巢原理",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_basics_pigeonhole.ptx"
+      }
+    ],
+    "count_inclusion": [
+      {
+        "source_id": "dmoi3",
+        "section": "使用容斥原理计数",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_counting-advPIE.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "容斥原理",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/ch_inclusion-exclusion.ptx"
+      }
+    ],
+    "count_generating": [
+      {
+        "source_id": "dmoi3",
+        "section": "生成函数",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_addtops-genfun.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "生成函数：基本符号与定义",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_genfunction_intro.ptx"
+      }
+    ],
+    "recurrence_model": [
+      {
+        "source_id": "dmoi3",
+        "section": "递推关系求解",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_seq-recurrence.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "常系数线性齐次与非齐次递推",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_recurrence_linear.ptx"
+      }
+    ],
+    "recurrence_homogeneous": [
+      {
+        "source_id": "dmoi3",
+        "section": "递推关系求解",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_seq-recurrence.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "常系数线性齐次与非齐次递推",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_recurrence_linear.ptx"
+      }
+    ],
+    "recurrence_nonhomogeneous": [
+      {
+        "source_id": "dmoi3",
+        "section": "递推关系求解",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_seq-recurrence.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "常系数线性齐次与非齐次递推",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_recurrence_linear.ptx"
+      }
+    ],
+    "recurrence_initial": [
+      {
+        "source_id": "dmoi3",
+        "section": "递推关系求解",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_seq-recurrence.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "常系数线性齐次与非齐次递推",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_recurrence_linear.ptx"
+      }
+    ],
+    "graph_basic": [
+      {
+        "source_id": "dmoi3",
+        "section": "图论：基本定义、同构与邻接",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-intro.ptx"
+      }
+    ],
+    "graph_isomorphism": [
+      {
+        "source_id": "dmoi3",
+        "section": "图论：基本定义、同构与邻接",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-intro.ptx"
+      }
+    ],
+    "graph_adjacency": [
+      {
+        "source_id": "networkx",
+        "section": "邻接矩阵与关联矩阵的约定",
+        "url": "https://github.com/networkx/networkx/blob/6855cd586982cc2e4710b8eb87251ccf56674bf1/networkx/linalg/graphmatrix.py"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "图论：基本定义、同构与邻接",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-intro.ptx"
+      }
+    ],
+    "graph_matrix": [
+      {
+        "source_id": "networkx",
+        "section": "邻接矩阵与关联矩阵的约定",
+        "url": "https://github.com/networkx/networkx/blob/6855cd586982cc2e4710b8eb87251ccf56674bf1/networkx/linalg/graphmatrix.py"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "图论：基本定义、同构与邻接",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-intro.ptx"
+      }
+    ],
+    "graph_connectivity": [
+      {
+        "source_id": "dmoi3",
+        "section": "图论：基本定义、同构与邻接",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-intro.ptx"
+      }
+    ],
+    "graph_cut": [
+      {
+        "source_id": "networkx",
+        "section": "双连通分量与割点文档",
+        "url": "https://github.com/networkx/networkx/blob/6855cd586982cc2e4710b8eb87251ccf56674bf1/networkx/algorithms/components/biconnected.py"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "图论：基本定义、同构与邻接",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-intro.ptx"
+      }
+    ],
+    "graph_weighted": [
+      {
+        "source_id": "appcomb",
+        "section": "非负边权与迪杰斯特拉最短路算法",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_graphalgorithms_shortest-paths.ptx"
+      }
+    ],
+    "graph_euler": [
+      {
+        "source_id": "dmoi3",
+        "section": "欧拉路径与哈密顿路径",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-paths.ptx"
+      }
+    ],
+    "graph_hamilton": [
+      {
+        "source_id": "dmoi3",
+        "section": "欧拉路径与哈密顿路径",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-paths.ptx"
+      }
+    ],
+    "graph_shortest": [
+      {
+        "source_id": "appcomb",
+        "section": "非负边权与迪杰斯特拉最短路算法",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_graphalgorithms_shortest-paths.ptx"
+      }
+    ],
+    "graph_coloring": [
+      {
+        "source_id": "dmoi3",
+        "section": "图的顶点着色与色数",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-coloring.ptx"
+      }
+    ],
+    "graph_planar": [
+      {
+        "source_id": "dmoi3",
+        "section": "平面图、欧拉公式与不可平面性",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-planar.ptx"
+      }
+    ],
+    "graph_bipartite": [
+      {
+        "source_id": "dmoi3",
+        "section": "二部图匹配与霍尔定理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-matchings.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "二部图匹配",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_flowapplications_bip-match.ptx"
+      }
+    ],
+    "graph_topological": [
+      {
+        "source_id": "appcomb",
+        "section": "偏序集的线性扩张",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_posets_sorting.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "有向图",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_graphalgorithms_digraphs.ptx"
+      }
+    ],
+    "graph_domination": [
+      {
+        "source_id": "networkx",
+        "section": "支配集定义及极小与最小的区别",
+        "url": "https://github.com/networkx/networkx/blob/6855cd586982cc2e4710b8eb87251ccf56674bf1/networkx/algorithms/dominating.py"
+      },
+      {
+        "source_id": "dmoi3",
+        "section": "图论：基本定义、同构与邻接",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-intro.ptx"
+      }
+    ],
+    "graph_matching": [
+      {
+        "source_id": "dmoi3",
+        "section": "二部图匹配与霍尔定理",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-matchings.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "二部图匹配",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_flowapplications_bip-match.ptx"
+      }
+    ],
+    "tree_basic": [
+      {
+        "source_id": "dmoi3",
+        "section": "树、根树、遍历与生成树",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-trees.ptx"
+      }
+    ],
+    "tree_rooted": [
+      {
+        "source_id": "dmoi3",
+        "section": "树、根树、遍历与生成树",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-trees.ptx"
+      }
+    ],
+    "tree_spanning": [
+      {
+        "source_id": "dmoi3",
+        "section": "树、根树、遍历与生成树",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-trees.ptx"
+      }
+    ],
+    "tree_mst": [
+      {
+        "source_id": "dmoi3",
+        "section": "树、根树、遍历与生成树",
+        "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_gt-trees.ptx"
+      },
+      {
+        "source_id": "appcomb",
+        "section": "最小权生成树",
+        "url": "https://github.com/mitchkeller/applied-combinatorics/blob/e25b222aabf2f19d32910f5b8a96cdb7f6da97c3/source/s_graphalgorithms_min-wt-span.ptx"
+      }
+    ],
+    "tree_matrix_tree": [
+      {
+        "source_id": "networkx",
+        "section": "生成树数量：拉普拉斯矩阵、代数余子式与矩阵树定理",
+        "url": "https://github.com/networkx/networkx/blob/6855cd586982cc2e4710b8eb87251ccf56674bf1/networkx/algorithms/tree/mst.py"
+      }
+    ],
+    "algebra_system": [
+      {
+        "source_id": "aata",
+        "section": "群：二元运算、封闭性与结合律",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/groups.xml"
+      }
+    ],
+    "algebra_group": [
+      {
+        "source_id": "aata",
+        "section": "群与子群",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/groups.xml"
+      },
+      {
+        "source_id": "aata",
+        "section": "循环群：循环子群、元素阶与生成元",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/cyclic.xml"
+      }
+    ],
+    "algebra_homomorphism": [
+      {
+        "source_id": "aata",
+        "section": "群同态与同构",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
+      }
+    ],
+    "algebra_ring_field": [
+      {
+        "source_id": "aata",
+        "section": "环、整环与域",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/rings.xml"
+      }
+    ],
+    "algebra_lattice_bool": [
+      {
+        "source_id": "aata",
+        "section": "格与布尔代数",
+        "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/boolean.xml"
+      }
+    ]
+  }
+}

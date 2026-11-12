@@ -1,5 +1,5 @@
 {
-  "version": 14,
+  "version": 31,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -24,15 +24,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-02 命题的概念",
+          "source_id": "neu_discrete_female",
+          "title": "命题及命题的真值",
           "sections": [
-            "01-02 命题的概念"
+            "命题及命题的真值"
           ],
           "lessons": [
             {
-              "title": "01-02 命题的概念",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=4"
+              "title": "命题及命题的真值",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=1"
             }
           ]
         }
@@ -47,15 +47,20 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-03 命题联结词",
+          "source_id": "neu_discrete_female",
+          "title": "逻辑连接词",
           "sections": [
-            "01-03 命题联结词"
+            "逻辑连接词",
+            "命题符号化"
           ],
           "lessons": [
             {
-              "title": "01-03 命题联结词",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=5"
+              "title": "逻辑连接词",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=2"
+            },
+            {
+              "title": "命题符号化",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=3"
             }
           ]
         }
@@ -70,15 +75,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-07 真值表",
+          "source_id": "neu_discrete_female",
+          "title": "命题公式及其真值表",
           "sections": [
-            "01-07 真值表"
+            "命题公式及其真值表"
           ],
           "lessons": [
             {
-              "title": "01-07 真值表",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=9"
+              "title": "命题公式及其真值表",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=4"
             }
           ]
         }
@@ -93,15 +98,20 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-08 等价关系",
+          "source_id": "neu_discrete_female",
+          "title": "命题公式的等价",
           "sections": [
-            "01-08 等价关系"
+            "命题公式的等价",
+            "重言式与重言蕴含式"
           ],
           "lessons": [
             {
-              "title": "01-08 等价关系",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=10"
+              "title": "命题公式的等价",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=5"
+            },
+            {
+              "title": "重言式与重言蕴含式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=6"
             }
           ]
         }
@@ -116,15 +126,25 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-23 范式的求法",
+          "source_id": "neu_discrete_female",
+          "title": "析取范式与合取范式",
           "sections": [
-            "01-23 范式的求法"
+            "析取范式与合取范式",
+            "主析取范式",
+            "主合取范式"
           ],
           "lessons": [
             {
-              "title": "01-23 范式的求法",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=25"
+              "title": "析取范式与合取范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=7"
+            },
+            {
+              "title": "主析取范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=8"
+            },
+            {
+              "title": "主合取范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=9"
             }
           ]
         }
@@ -140,15 +160,20 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-24 推理理论",
+          "source_id": "neu_discrete_female",
+          "title": "命题逻辑推理一：直接推理",
           "sections": [
-            "01-24 推理理论"
+            "命题逻辑推理一：直接推理",
+            "命题逻辑推理二：间接推理"
           ],
           "lessons": [
             {
-              "title": "01-24 推理理论",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=26"
+              "title": "命题逻辑推理一：直接推理",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=10"
+            },
+            {
+              "title": "命题逻辑推理二：间接推理",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=11"
             }
           ]
         }
@@ -163,15 +188,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "02-01 谓词的概念",
+          "source_id": "neu_discrete_female",
+          "title": "谓词逻辑的基本概念",
           "sections": [
-            "02-01 谓词的概念"
+            "谓词逻辑的基本概念"
           ],
           "lessons": [
             {
-              "title": "02-01 谓词的概念",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=32"
+              "title": "谓词逻辑的基本概念",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=12"
             }
           ]
         }
@@ -186,15 +211,15 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "p10 Discrete Math - 1.4.2 Quantifiers",
+          "source_id": "neu_discrete_female",
+          "title": "谓词逻辑中量词的符号化",
           "sections": [
-            "p10 Discrete Math - 1.4.2 Quantifiers"
+            "谓词逻辑中量词的符号化"
           ],
           "lessons": [
             {
-              "title": "p10 Discrete Math - 1.4.2 Quantifiers",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=11"
+              "title": "谓词逻辑中量词的符号化",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=14"
             }
           ]
         }
@@ -209,15 +234,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "02-04 约束变元及换名",
+          "source_id": "neu_discrete_female",
+          "title": "谓词公式与量词的辖域",
           "sections": [
-            "02-04 约束变元及换名"
+            "谓词公式与量词的辖域"
           ],
           "lessons": [
             {
-              "title": "02-04 约束变元及换名",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=35"
+              "title": "谓词公式与量词的辖域",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=13"
             }
           ]
         }
@@ -225,7 +250,7 @@
     },
     {
       "id": "predicate_reasoning",
-      "name": "量词推理与否定",
+      "name": "谓词逻辑等价与推理",
       "category": "谓词逻辑",
       "prerequisites": [
         "量词",
@@ -233,15 +258,30 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "02-10 谓词逻辑的推理",
+          "source_id": "neu_discrete_female",
+          "title": "谓词演算的等价式与蕴含式（一）",
           "sections": [
-            "02-10 谓词逻辑的推理"
+            "谓词演算的等价式与蕴含式（一）",
+            "谓词演算的等价式与蕴含式（二）",
+            "谓词演算的推理理论（一）",
+            "谓词演算的推理理论（二）"
           ],
           "lessons": [
             {
-              "title": "02-10 谓词逻辑的推理",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=41"
+              "title": "谓词演算的等价式与蕴含式（一）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=15"
+            },
+            {
+              "title": "谓词演算的等价式与蕴含式（二）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=16"
+            },
+            {
+              "title": "谓词演算的推理理论（一）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=18"
+            },
+            {
+              "title": "谓词演算的推理理论（二）",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=19"
             }
           ]
         }
@@ -252,19 +292,19 @@
       "name": "前束范式",
       "category": "谓词逻辑",
       "prerequisites": [
-        "量词推理与否定"
+        "谓词逻辑等价与推理"
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "02-08 前束范式",
+          "source_id": "neu_discrete_female",
+          "title": "前束范式",
           "sections": [
-            "02-08 前束范式"
+            "前束范式"
           ],
           "lessons": [
             {
-              "title": "02-08 前束范式",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=39"
+              "title": "前束范式",
+              "url": "https://www.bilibili.com/video/BV1d7411v7zu/?p=17"
             }
           ]
         }
@@ -279,15 +319,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "01-26 反证法",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "01-26 反证法"
+            "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "01-26 反证法",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=28"
+              "title": "1. Lec 1 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=1"
             }
           ]
         }
@@ -302,15 +342,15 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula",
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第2讲：数学归纳法，正向与反向归纳",
           "sections": [
-            "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula"
+            "第2讲：数学归纳法，正向与反向归纳"
           ],
           "lessons": [
             {
-              "title": "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=53"
+              "title": "第2讲：数学归纳法，正向与反向归纳",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=2"
             }
           ]
         }
@@ -325,15 +365,15 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第3讲：归纳法进阶证明技巧",
           "sections": [
-            "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction"
+            "第3讲：归纳法进阶证明技巧"
           ],
           "lessons": [
             {
-              "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=56"
+              "title": "第3讲：归纳法进阶证明技巧",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=3"
             }
           ]
         }
@@ -346,15 +386,15 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-04 集合的运算(1)",
+          "source_id": "bjtu_discrete",
+          "title": "1.1 集合与序列(2)--集合的运算",
           "sections": [
-            "03-04 集合的运算(1)"
+            "1.1 集合与序列(2)--集合的运算"
           ],
           "lessons": [
             {
-              "title": "03-04 集合的运算(1)",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=46"
+              "title": "1.1 集合与序列(2)--集合的运算",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=3"
             }
           ]
         }
@@ -369,15 +409,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-06 笛卡尔积",
+          "source_id": "bjtu_discrete",
+          "title": "4.1 关系及其表示(1)--有序对与笛卡儿积",
           "sections": [
-            "03-06 笛卡尔积"
+            "4.1 关系及其表示(1)--有序对与笛卡儿积"
           ],
           "lessons": [
             {
-              "title": "03-06 笛卡尔积",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=48"
+              "title": "4.1 关系及其表示(1)--有序对与笛卡儿积",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=45"
             }
           ]
         }
@@ -392,15 +432,30 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-12 复合关系(1)",
+          "source_id": "bjtu_discrete",
+          "title": "4.2 关系的运算(1)--关系的基本运算",
           "sections": [
-            "03-12 复合关系(1)"
+            "4.2 关系的运算(1)--关系的基本运算",
+            "(2)--关系运算的性质",
+            "(3)--关系的幂和道路（一）",
+            "(4)--关系的幂和道路（二）"
           ],
           "lessons": [
             {
-              "title": "03-12 复合关系(1)",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=54"
+              "title": "4.2 关系的运算(1)--关系的基本运算",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=49"
+            },
+            {
+              "title": "(2)--关系运算的性质",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=50"
+            },
+            {
+              "title": "(3)--关系的幂和道路（一）",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=51"
+            },
+            {
+              "title": "(4)--关系的幂和道路（二）",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=52"
             }
           ]
         }
@@ -415,15 +470,40 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-09 自反和反自反",
+          "source_id": "bjtu_discrete",
+          "title": "4.3 关系的性质(1)--关系的性质——自反性",
           "sections": [
-            "03-09 自反和反自反"
+            "4.3 关系的性质(1)--关系的性质——自反性",
+            "(2)--关系的性质——对称性",
+            "(3)--关系的性质——传递性",
+            "(4)--关系性质的判断",
+            "(5)--关系运算对性质的保持",
+            "(6)--扩展材料——特殊关系的计数"
           ],
           "lessons": [
             {
-              "title": "03-09 自反和反自反",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=51"
+              "title": "4.3 关系的性质(1)--关系的性质——自反性",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=53"
+            },
+            {
+              "title": "(2)--关系的性质——对称性",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=54"
+            },
+            {
+              "title": "(3)--关系的性质——传递性",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=55"
+            },
+            {
+              "title": "(4)--关系性质的判断",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=56"
+            },
+            {
+              "title": "(5)--关系运算对性质的保持",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=57"
+            },
+            {
+              "title": "(6)--扩展材料——特殊关系的计数",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=58"
             }
           ]
         }
@@ -438,15 +518,30 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-18 等价关系",
+          "source_id": "bjtu_discrete",
+          "title": "4.5 等价关系和集合的划分(1)--划分",
           "sections": [
-            "03-18 等价关系"
+            "4.5 等价关系和集合的划分(1)--划分",
+            "(2)--等价关系、等价类和商集",
+            "(3)--由划分构造等价关系",
+            "(4)--由等价关系得到划分"
           ],
           "lessons": [
             {
-              "title": "03-18 等价关系",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=60"
+              "title": "4.5 等价关系和集合的划分(1)--划分",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=63"
+            },
+            {
+              "title": "(2)--等价关系、等价类和商集",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=64"
+            },
+            {
+              "title": "(3)--由划分构造等价关系",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=65"
+            },
+            {
+              "title": "(4)--由等价关系得到划分",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=66"
             }
           ]
         }
@@ -461,15 +556,45 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-21 偏序关系",
+          "source_id": "bjtu_discrete",
+          "title": "第六讲(1)--偏序集",
           "sections": [
-            "03-21 偏序关系"
+            "第六讲(1)--偏序集",
+            "(2)--积偏序与字典序",
+            "(3)--哈斯图",
+            "(1)--极大元与极小元",
+            "(2)--最大元与最小元",
+            "(3)--上界与下界",
+            "(4)--上确界与下确界"
           ],
           "lessons": [
             {
-              "title": "03-21 偏序关系",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=63"
+              "title": "第六讲(1)--偏序集",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=81"
+            },
+            {
+              "title": "(2)--积偏序与字典序",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=82"
+            },
+            {
+              "title": "(3)--哈斯图",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=83"
+            },
+            {
+              "title": "(1)--极大元与极小元",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=84"
+            },
+            {
+              "title": "(2)--最大元与最小元",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=85"
+            },
+            {
+              "title": "(3)--上界与下界",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=86"
+            },
+            {
+              "title": "(4)--上确界与下确界",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=87"
             }
           ]
         }
@@ -485,15 +610,30 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "03-15 关系的闭包",
+          "source_id": "bjtu_discrete",
+          "title": "4.4 关系的闭包(1)--关系的闭包",
           "sections": [
-            "03-15 关系的闭包"
+            "4.4 关系的闭包(1)--关系的闭包",
+            "(2)--关系闭包运算的性质",
+            "(3)--沃舍尔算法",
+            "(4)--沃舍尔算法纸上作业法"
           ],
           "lessons": [
             {
-              "title": "03-15 关系的闭包",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=57"
+              "title": "4.4 关系的闭包(1)--关系的闭包",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=59"
+            },
+            {
+              "title": "(2)--关系闭包运算的性质",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=60"
+            },
+            {
+              "title": "(3)--沃舍尔算法",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=61"
+            },
+            {
+              "title": "(4)--沃舍尔算法纸上作业法",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=62"
             }
           ]
         }
@@ -508,15 +648,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "04-01 函数的定义",
+          "source_id": "bjtu_discrete",
+          "title": "5.1 函数的定义(1)--函数",
           "sections": [
-            "04-01 函数的定义"
+            "5.1 函数的定义(1)--函数"
           ],
           "lessons": [
             {
-              "title": "04-01 函数的定义",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=68"
+              "title": "5.1 函数的定义(1)--函数",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=68"
             }
           ]
         }
@@ -531,15 +671,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "04-03 特殊函数",
+          "source_id": "bjtu_discrete",
+          "title": "5.2 函数的性质(1)--函数的性质",
           "sections": [
-            "04-03 特殊函数"
+            "5.2 函数的性质(1)--函数的性质"
           ],
           "lessons": [
             {
-              "title": "04-03 特殊函数",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=70"
+              "title": "5.2 函数的性质(1)--函数的性质",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=69"
             }
           ]
         }
@@ -554,15 +694,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "04-04 函数的复合",
+          "source_id": "bjtu_discrete",
+          "title": "5.3 函数的复合(1)--函数的复合",
           "sections": [
-            "04-04 函数的复合"
+            "5.3 函数的复合(1)--函数的复合"
           ],
           "lessons": [
             {
-              "title": "04-04 函数的复合",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=71"
+              "title": "5.3 函数的复合(1)--函数的复合",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=70"
             }
           ]
         }
@@ -578,15 +718,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "04-06 逆函数",
+          "source_id": "bjtu_discrete",
+          "title": "5.4 逆函数(1)--逆函数",
           "sections": [
-            "04-06 逆函数"
+            "5.4 逆函数(1)--逆函数"
           ],
           "lessons": [
             {
-              "title": "04-06 逆函数",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=73"
+              "title": "5.4 逆函数(1)--逆函数",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=71"
             }
           ]
         }
@@ -597,7 +737,21 @@
       "name": "整除与素数",
       "category": "初等数论",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=4"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_gcd",
@@ -606,7 +760,21 @@
       "prerequisites": [
         "整除与素数"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "2. Lec 4 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=4"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_congruence",
@@ -615,7 +783,21 @@
       "prerequisites": [
         "整除与素数"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_linear_congruence",
@@ -625,17 +807,45 @@
         "同余与模运算",
         "最大公因数与欧几里得算法"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_inverse_crt",
-      "name": "模逆与中国剩余定理",
+      "name": "中国剩余定理",
       "category": "初等数论",
       "prerequisites": [
         "同余与模运算",
         "最大公因数与欧几里得算法"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "crt_fraljimetry",
+          "title": "中国剩余定理（孙子定理）的证明〖一类存在唯一解的同余方程组〗",
+          "sections": [
+            "中国剩余定理（孙子定理）的证明〖一类存在唯一解的同余方程组〗"
+          ],
+          "lessons": [
+            {
+              "title": "中国剩余定理（孙子定理）的证明〖一类存在唯一解的同余方程组〗",
+              "url": "https://www.bilibili.com/video/BV13b4y1Y7wh/"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_euler_fermat",
@@ -645,7 +855,21 @@
         "同余与模运算",
         "整除与素数"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "number_rsa",
@@ -658,15 +882,15 @@
       "level": "拓展",
       "videos": [
         {
-          "source_id": "bili_rsa_course",
-          "title": "现代密码学｜RSA加密算法及其数学基础",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "现代密码学｜RSA加密算法及其数学基础"
+            "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "现代密码学｜RSA加密算法及其数学基础",
-              "url": "https://www.bilibili.com/video/BV1gT4y117My/?p=1"
+              "title": "3. Lec 5 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=5"
             }
           ]
         }
@@ -677,7 +901,21 @@
       "name": "基本计数原理",
       "category": "计数与组合",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第1讲：课程导引、基础计数原理",
+          "sections": [
+            "第1讲：课程导引、基础计数原理"
+          ],
+          "lessons": [
+            {
+              "title": "第1讲：课程导引、基础计数原理",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=1"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_perm_comb",
@@ -686,7 +924,21 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "p60 Discrete Math - 6.3.1 Permutations and Combinations",
+          "sections": [
+            "p60 Discrete Math - 6.3.1 Permutations and Combinations"
+          ],
+          "lessons": [
+            {
+              "title": "p60 Discrete Math - 6.3.1 Permutations and Combinations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=61"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_binomial",
@@ -695,7 +947,21 @@
       "prerequisites": [
         "排列与组合"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
+          "sections": [
+            "p62 Discrete Math - 6.4.1 The Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_pigeonhole",
@@ -704,7 +970,21 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第6讲：鸽巢原理",
+          "sections": [
+            "第6讲：鸽巢原理"
+          ],
+          "lessons": [
+            {
+              "title": "第6讲：鸽巢原理",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=6"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_inclusion",
@@ -714,7 +994,26 @@
         "基本计数原理",
         "集合运算"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "cmu_21_228_2021_bilibili",
+          "title": "第4讲：容斥原理基础",
+          "sections": [
+            "第4讲：容斥原理基础",
+            "第5讲：容斥原理典型应用"
+          ],
+          "lessons": [
+            {
+              "title": "第4讲：容斥原理基础",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=4"
+            },
+            {
+              "title": "第5讲：容斥原理典型应用",
+              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=5"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_generating",
@@ -724,14 +1023,47 @@
         "递推关系建模",
         "排列与组合"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "nymu_combinatorics_fuhenglin",
+          "title": "生成函数",
+          "sections": [
+            "Lec20 - 计数原理2与生成函数1",
+            "Lec21 - 生成函数2"
+          ],
+          "lessons": [
+            {
+              "title": "Lec20 - 计数原理2与生成函数1",
+              "url": "https://www.bilibili.com/video/BV1NJ4m1j77r/?p=20"
+            },
+            {
+              "title": "Lec21 - 生成函数2",
+              "url": "https://www.bilibili.com/video/BV1NJ4m1j77r/?p=21"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_model",
       "name": "递推关系建模",
       "category": "递推关系",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
+          "sections": [
+            "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=68"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_homogeneous",
@@ -740,7 +1072,21 @@
       "prerequisites": [
         "递推关系建模"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_nonhomogeneous",
@@ -749,7 +1095,21 @@
       "prerequisites": [
         "线性齐次递推"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+          "sections": [
+            "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
+          ],
+          "lessons": [
+            {
+              "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_initial",
@@ -760,15 +1120,15 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
-          "title": "p31 Discrete Math - 2.4.2 Recurrence Relations",
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
-            "p31 Discrete Math - 2.4.2 Recurrence Relations"
+            "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010"
           ],
           "lessons": [
             {
-              "title": "p31 Discrete Math - 2.4.2 Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=32"
+              "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=15"
             }
           ]
         }
@@ -781,15 +1141,25 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-02 图的基本概念",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "图的基本概念",
           "sections": [
-            "07-02 图的基本概念"
+            "07-02 图的基本概念",
+            "07-03 握手定理",
+            "07-04 完全图，子图和补图"
           ],
           "lessons": [
             {
               "title": "07-02 图的基本概念",
               "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=112"
+            },
+            {
+              "title": "07-03 握手定理",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=113"
+            },
+            {
+              "title": "07-04 完全图，子图和补图",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=114"
             }
           ]
         }
@@ -804,8 +1174,8 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-05 图的同构",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "图同构",
           "sections": [
             "07-05 图的同构"
           ],
@@ -827,8 +1197,8 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-09 图的矩阵表示",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "邻接矩阵",
           "sections": [
             "07-09 图的矩阵表示"
           ],
@@ -852,8 +1222,8 @@
       "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-09 图的矩阵表示",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "图的矩阵表示",
           "sections": [
             "07-09 图的矩阵表示"
           ],
@@ -875,15 +1245,35 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-06 路与回路",
+          "source_id": "chenggong_gta",
+          "title": "连通性与图的遍历",
           "sections": [
-            "07-06 路与回路"
+            "2.1.1-连通和DFS-理论",
+            "2.1.2-连通和DFS-算法",
+            "7.3.1-有向图的连通-理论",
+            "7.3.2.1-有向图的连通-计算强连通定向的算法",
+            "7.3.2.2-有向图的连通-计算强连通分支的算法"
           ],
           "lessons": [
             {
-              "title": "07-06 路与回路",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=116"
+              "title": "2.1.1-连通和DFS-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=6"
+            },
+            {
+              "title": "2.1.2-连通和DFS-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=7"
+            },
+            {
+              "title": "7.3.1-有向图的连通-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=39"
+            },
+            {
+              "title": "7.3.2.1-有向图的连通-计算强连通定向的算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=40"
+            },
+            {
+              "title": "7.3.2.2-有向图的连通-计算强连通分支的算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=41"
             }
           ]
         }
@@ -898,15 +1288,25 @@
       ],
       "videos": [
         {
-          "source_id": "fang_cut",
-          "title": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
+          "source_id": "chenggong_gta",
+          "title": "割点、割边与割集",
           "sections": [
-            "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集"
+            "2.2.1-割点和割边-理论",
+            "2.2.2-割点和割边-算法",
+            "4.2-割集和连通度"
           ],
           "lessons": [
             {
-              "title": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
-              "url": "https://www.bilibili.com/video/BV1oT421U7EK/?p=1"
+              "title": "2.2.1-割点和割边-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=8"
+            },
+            {
+              "title": "2.2.2-割点和割边-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=9"
+            },
+            {
+              "title": "4.2-割集和连通度",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=21"
             }
           ]
         }
@@ -921,15 +1321,20 @@
       ],
       "videos": [
         {
-          "source_id": "chenggong_weighted",
-          "title": "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论",
+          "source_id": "chenggong_gta",
+          "title": "赋权图和距离",
           "sections": [
-            "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论"
+            "6.1.1-赋权图和距离-理论",
+            "6.1.2-赋权图和距离-算法"
           ],
           "lessons": [
             {
-              "title": "南大程龚主讲《图论与算法》(GTA)-6.1.1-赋权图-赋权图和距离-理论",
-              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/?p=1"
+              "title": "6.1.1-赋权图和距离-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+            },
+            {
+              "title": "6.1.2-赋权图和距离-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=28"
             }
           ]
         }
@@ -944,15 +1349,20 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-10 欧拉图",
+          "source_id": "chenggong_gta",
+          "title": "欧拉图",
           "sections": [
-            "07-10 欧拉图"
+            "3.3.1-欧拉图-理论",
+            "3.3.2-欧拉图-算法"
           ],
           "lessons": [
             {
-              "title": "07-10 欧拉图",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=120"
+              "title": "3.3.1-欧拉图-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=16"
+            },
+            {
+              "title": "3.3.2-欧拉图-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=17"
             }
           ]
         }
@@ -967,15 +1377,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-11 汉密尔顿图",
+          "source_id": "chenggong_gta",
+          "title": "哈密尔顿图",
           "sections": [
-            "07-11 汉密尔顿图"
+            "3.4-哈密尔顿图"
           ],
           "lessons": [
             {
-              "title": "07-11 汉密尔顿图",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=121"
+              "title": "3.4-哈密尔顿图",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=18"
             }
           ]
         }
@@ -991,15 +1401,35 @@
       ],
       "videos": [
         {
-          "source_id": "wangshusen_2023",
-          "title": "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs",
+          "source_id": "chenggong_gta",
+          "title": "最短路径与距离",
           "sections": [
-            "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs"
+            "2.3.1-距离和BFS-理论",
+            "2.3.2-距离和BFS-算法",
+            "6.1.1-赋权图和距离-理论",
+            "6.1.2-赋权图和距离-算法",
+            "7.4-有向图的距离"
           ],
           "lessons": [
             {
-              "title": "09. 11-3- Dijkstra 算法 寻找有权图中最短路 Finding Shortest Path in Weighted Graphs",
-              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=9"
+              "title": "2.3.1-距离和BFS-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=10"
+            },
+            {
+              "title": "2.3.2-距离和BFS-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=11"
+            },
+            {
+              "title": "6.1.1-赋权图和距离-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+            },
+            {
+              "title": "6.1.2-赋权图和距离-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=28"
+            },
+            {
+              "title": "7.4-有向图的距离",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=42"
             }
           ]
         }
@@ -1014,15 +1444,25 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-18 着色法",
+          "source_id": "dogeman_discrete",
+          "title": "11.1.0.3 点着色",
           "sections": [
-            "07-18 着色法"
+            "11.1.0.3 点着色",
+            "11.2.0.3 地图着色和平面图的点着色，边着色",
+            "11.3.0.3 六色定理和五色定理的证明"
           ],
           "lessons": [
             {
-              "title": "07-18 着色法",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=128"
+              "title": "11.1.0.3 点着色",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=42"
+            },
+            {
+              "title": "11.2.0.3 地图着色和平面图的点着色，边着色",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=43"
+            },
+            {
+              "title": "11.3.0.3 六色定理和五色定理的证明",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=44"
             }
           ]
         }
@@ -1037,15 +1477,25 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-14 平面图",
+          "source_id": "zjut_discrete_xiaohua",
+          "title": "平面图",
           "sections": [
-            "07-14 平面图"
+            "07-14 平面图",
+            "07-15 平面图的判定",
+            "07-16 对偶图"
           ],
           "lessons": [
             {
               "title": "07-14 平面图",
               "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=124"
+            },
+            {
+              "title": "07-15 平面图的判定",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=125"
+            },
+            {
+              "title": "07-16 对偶图",
+              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=126"
             }
           ]
         }
@@ -1061,15 +1511,20 @@
       ],
       "videos": [
         {
-          "source_id": "wangshusen_2023",
-          "title": "18. 14-1- 二部图及其判定算法 Bipartite Graphs",
+          "source_id": "chenggong_gta",
+          "title": "二部图",
           "sections": [
-            "18. 14-1- 二部图及其判定算法 Bipartite Graphs"
+            "3.2.1-二分图-理论",
+            "3.2.2-二分图-算法"
           ],
           "lessons": [
             {
-              "title": "18. 14-1- 二部图及其判定算法 Bipartite Graphs",
-              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=18"
+              "title": "3.2.1-二分图-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=14"
+            },
+            {
+              "title": "3.2.2-二分图-算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=15"
             }
           ]
         }
@@ -1093,7 +1548,7 @@
           "lessons": [
             {
               "title": "图-拓扑排序",
-              "url": "https://www.bilibili.com/video/BV1XV411X7T7/?p=1"
+              "url": "https://www.bilibili.com/video/BV1XV411X7T7/"
             }
           ]
         }
@@ -1106,7 +1561,31 @@
       "prerequisites": [
         "图的基本概念"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "12.1.0.3 支配集，(点)独立集",
+          "sections": [
+            "12.1.0.3 支配集，(点)独立集",
+            "12.2.0.3 团，点覆盖(集）",
+            "12.3.0.3 求解全体极小支配集，极小点覆盖，极大独立集"
+          ],
+          "lessons": [
+            {
+              "title": "12.1.0.3 支配集，(点)独立集",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=45"
+            },
+            {
+              "title": "12.2.0.3 团，点覆盖(集）",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=46"
+            },
+            {
+              "title": "12.3.0.3 求解全体极小支配集，极小点覆盖，极大独立集",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=47"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "graph_matching",
@@ -1118,15 +1597,35 @@
       ],
       "videos": [
         {
-          "source_id": "wangshusen_2023",
-          "title": "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)",
+          "source_id": "chenggong_gta",
+          "title": "匹配与最大匹配",
           "sections": [
-            "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)"
+            "5.1.1-匹配和最大匹配-理论",
+            "5.1.2.1-匹配和最大匹配-匈牙利算法",
+            "5.1.2.2-匹配和最大匹配-霍普克罗夫特-卡普算法",
+            "5.1.2.3-匹配和最大匹配-花算法",
+            "5.2-完美匹配"
           ],
           "lessons": [
             {
-              "title": "19. 14-2- 无权二部图中的最大匹配 Maximum-Cardinality Bipartite Matching (MCBM)",
-              "url": "https://www.bilibili.com/video/BV1aR4y127bE/?p=19"
+              "title": "5.1.1-匹配和最大匹配-理论",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=22"
+            },
+            {
+              "title": "5.1.2.1-匹配和最大匹配-匈牙利算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=23"
+            },
+            {
+              "title": "5.1.2.2-匹配和最大匹配-霍普克罗夫特-卡普算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=24"
+            },
+            {
+              "title": "5.1.2.3-匹配和最大匹配-花算法",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=25"
+            },
+            {
+              "title": "5.2-完美匹配",
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=26"
             }
           ]
         }
@@ -1142,15 +1641,20 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-20 树的性质",
+          "source_id": "uestc_discrete_lower",
+          "title": "9.1.1 树的引入",
           "sections": [
-            "07-20 树的性质"
+            "9.1.1 认识树",
+            "9.1.2 无向树"
           ],
           "lessons": [
             {
-              "title": "07-20 树的性质",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=130"
+              "title": "9.1.1 认识树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=19"
+            },
+            {
+              "title": "9.1.2 无向树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=20"
             }
           ]
         }
@@ -1165,15 +1669,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-23 根树",
+          "source_id": "uestc_discrete_lower",
+          "title": "9.2.1 根树",
           "sections": [
-            "07-23 根树"
+            "9.2.1 根树"
           ],
           "lessons": [
             {
-              "title": "07-23 根树",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=133"
+              "title": "9.2.1 根树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=23"
             }
           ]
         }
@@ -1189,15 +1693,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-21 生成树",
+          "source_id": "uestc_discrete_lower",
+          "title": "9.1.3 生成树",
           "sections": [
-            "07-21 生成树"
+            "9.1.3 生成树"
           ],
           "lessons": [
             {
-              "title": "07-21 生成树",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=131"
+              "title": "9.1.3 生成树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=21"
             }
           ]
         }
@@ -1213,15 +1717,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "07-22 最小生成树",
+          "source_id": "uestc_discrete_lower",
+          "title": "9.1.4 最小生成树",
           "sections": [
-            "07-22 最小生成树"
+            "9.1.4 最小生成树"
           ],
           "lessons": [
             {
-              "title": "07-22 最小生成树",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=132"
+              "title": "9.1.4 最小生成树",
+              "url": "https://www.bilibili.com/video/BV18B4y1F7uj/?p=22"
             }
           ]
         }
@@ -1247,15 +1751,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "05-02 代数系统",
+          "source_id": "dogeman_discrete",
+          "title": "13.2.0.3 代数系统",
           "sections": [
-            "05-02 代数系统"
+            "13.2.0.3 代数系统"
           ],
           "lessons": [
             {
-              "title": "05-02 代数系统",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=75"
+              "title": "13.2.0.3 代数系统",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=52"
             }
           ]
         }
@@ -1270,15 +1774,30 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "05-10 群",
+          "source_id": "dogeman_discrete",
+          "title": "14.3.0.3 群的定义与性质",
           "sections": [
-            "05-10 群"
+            "14.3.0.3 群的定义与性质",
+            "14.4.0.3 群的相关定理",
+            "14.5.0.3 子群（上）",
+            "14.6.0.3 子群（下）"
           ],
           "lessons": [
             {
-              "title": "05-10 群",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=84"
+              "title": "14.3.0.3 群的定义与性质",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=56"
+            },
+            {
+              "title": "14.4.0.3 群的相关定理",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=57"
+            },
+            {
+              "title": "14.5.0.3 子群（上）",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=58"
+            },
+            {
+              "title": "14.6.0.3 子群（下）",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=59"
             }
           ]
         }
@@ -1294,15 +1813,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "05-23 同态与同构",
+          "source_id": "dogeman_discrete",
+          "title": "13.3.0.2 代数系统的同态与同构",
           "sections": [
-            "05-23 同态与同构"
+            "13.3.0.2 代数系统的同态与同构"
           ],
           "lessons": [
             {
-              "title": "05-23 同态与同构",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=97"
+              "title": "13.3.0.2 代数系统的同态与同构",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=53"
             }
           ]
         }
@@ -1315,7 +1834,21 @@
       "prerequisites": [
         "群与子群"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "15.1.0.3 环与域",
+          "sections": [
+            "15.1.0.3 环与域"
+          ],
+          "lessons": [
+            {
+              "title": "15.1.0.3 环与域",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=64"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "algebra_lattice_bool",
@@ -1326,15 +1859,15 @@
       ],
       "videos": [
         {
-          "source_id": "xiaohuazuimao_2021",
-          "title": "06-08 布尔代数",
+          "source_id": "dogeman_discrete",
+          "title": "16.4.0.3 布尔格和布尔代数",
           "sections": [
-            "06-08 布尔代数"
+            "16.4.0.3 布尔格和布尔代数"
           ],
           "lessons": [
             {
-              "title": "06-08 布尔代数",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=107"
+              "title": "16.4.0.3 布尔格和布尔代数",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=70"
             }
           ]
         }
@@ -1343,62 +1876,139 @@
   ],
   "video_sources": [
     {
-      "id": "sawfin_bilibili",
-      "name": "Kimberly Brehm · 离散数学讲师",
-      "course": "Discrete Math I（完整课程高清转载）",
+      "id": "neu_discrete_female",
+      "name": "东北大学 · 离散数学（女教师部分）",
+      "course": "离散数学（P1–P19）",
       "platform": "Bilibili",
-      "note": "含题目推演与例题演示的正式教学视频，B站按明确的分P章节定位。",
-      "publisher": "常青藤中英字幕课程"
+      "publisher": "",
+      "note": "东北大学离散数学课程，仅收录女教师讲授的P1–P19；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；B站上传者及授权状态未核实，仅提供原视频外链，不下载或托管。"
     },
     {
-      "id": "bili_rsa_course",
-      "name": "现代密码学 · 我有一个小脑瓜",
-      "course": "RSA 加密及数学基础讲解",
+      "id": "dogeman_discrete",
+      "name": "dogeman先生",
+      "course": "学生来讲《离散数学》，最简明易懂的离散数学教程！（已完结）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": "我有一个小脑瓜"
+      "publisher": "dogeman先生",
+      "note": "UP主原创讲解，章节按知识点、重要程度和难度组织。用于集合、关系、函数、部分图论专题及代数结构。"
+    },
+    {
+      "id": "crt_fraljimetry",
+      "name": "Fraljimetry 的数学工厂",
+      "course": "中国剩余定理（孙子定理）的证明",
+      "platform": "Bilibili",
+      "publisher": "Fraljimetry的数学工厂",
+      "note": "UP主原创的中国剩余定理证明视频，聚焦同余方程组存在唯一解；作为数论专题补充，仅提供原视频外链。"
     },
     {
       "id": "graph_animation_bili",
       "name": "动画讲解计算机知识",
       "course": "数据结构·图（动画讲解）",
       "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": "动画讲解计算机知识"
+      "publisher": "动画讲解计算机知识",
+      "note": "图论拓扑排序动画讲解，作为单个知识点的可视化补充。"
     },
     {
-      "id": "xiaohuazuimao_2021",
-      "name": "小花醉猫",
-      "course": "（新版）离散数学全套（提醒：本人首页有全新课堂实录课。）",
+      "id": "uestc_discrete_lower",
+      "name": "电子科技大学 · 王丽杰",
+      "course": "〖电子科技大学〗离散数学（下）王丽杰",
       "platform": "Bilibili",
-      "publisher": "小花醉猫"
+      "publisher": "电子科技大学",
+      "note": "电子科技大学官方账号发布；用于树、生成树、最小生成树和根树，均直达具体分P。"
     },
     {
-      "id": "wangshusen_2023",
-      "name": "王树森",
-      "course": "【王树森】数据结构和算法完整课程",
+      "id": "mit_6042j_2010_bilibili",
+      "name": "MIT · 6.042J · Fall 2010",
+      "course": "Mathematics for Computer Science (Fall 2010)",
       "platform": "Bilibili",
-      "publisher": ""
+      "publisher": "抹茶味的盖子",
+      "note": "采用B站BV1zh41167Uy版本，页面标注专业中英文字幕，完整25讲；课程为MIT 6.042J Fall 2010。仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
     },
     {
-      "id": "chenggong_weighted",
-      "name": "程龚老师",
-      "course": "南大程龚主讲《图论与算法》(GTA)",
+      "id": "bjtu_discrete",
+      "name": "北京交通大学 · 离散数学",
+      "course": "离散数学（194讲）",
       "platform": "Bilibili",
-      "publisher": "程龚老师"
+      "publisher": "格物嘉",
+      "note": "B站上传者为格物嘉，页面标注原课程来源为北京交通大学中国大学MOOC（NJTU-1002530017），共194讲。用于计数基础、排列组合、鸽巢原理、容斥及递推关系的连续补充；只提供原视频外链，不下载或托管。上传授权尚未核实。"
     },
     {
-      "id": "fang_cut",
-      "name": "01壹萬",
-      "course": "方老师离散数学典型题讲解3-4割点、点割集、割边、边割集",
+      "id": "cmu_21_228_2021_bilibili",
+      "name": "卡内基梅隆大学 · Po-Shen Loh",
+      "course": "21-228 Discrete Mathematics（Spring 2021）",
       "platform": "Bilibili",
-      "publisher": "01壹萬"
+      "publisher": "无为斋主",
+      "note": "卡内基梅隆大学Po-Shen Loh教授2021年春季离散数学课程。B站视频BV1jA4L66ELr；用户截图核实前六讲标题与时长。第3讲“归纳法进阶证明技巧”暂按强归纳法/归纳证明进阶映射，需进一步核对视频内容。仅提供B站外链，不下载或托管。"
+    },
+    {
+      "id": "sawfin_bilibili",
+      "name": "Bellevue University · Kimberly Brehm",
+      "course": "Discrete Math I",
+      "platform": "Bilibili",
+      "publisher": "常青藤中英字幕课程",
+      "note": "Kimberly Brehm 的大学离散数学课程；B站页面标注中英字幕，上传者说明为唯一翻译发布账号。用于排列组合、二项式定理和递推建模。仅外链跳转，不下载或托管。"
+    },
+    {
+      "id": "chenggong_gta",
+      "name": "南京大学 · 程龚",
+      "course": "《图论与算法》(GTA)",
+      "platform": "Bilibili",
+      "publisher": "程龚老师",
+      "note": "南京大学计算机学院程龚教授主讲的42分P系列，配套教材《图论与算法》（清华大学出版社，2024）。用于图的连通与遍历、割点割边、距离与BFS、二部图、欧拉图、哈密顿图、匹配、赋权图与距离、有向图等专题。只提供原视频外链，不下载或托管。"
+    },
+    {
+      "id": "zjut_discrete_xiaohua",
+      "name": "浙江工业大学 · 小花醉猫",
+      "course": "（新版）离散数学全套",
+      "platform": "Bilibili",
+      "publisher": "小花醉猫",
+      "note": "浙江工业大学教师本人原创视频，共137分P，覆盖国内常用离散数学教材。用于图的基本概念、图同构、图的矩阵表示和平面图专题；按知识点链接到具体分P。仅提供原视频外链，不下载或托管。"
+    },
+    {
+      "id": "nymu_combinatorics_fuhenglin",
+      "name": "国立阳明交通大学 · 傅恒霖",
+      "course": "组合学导论 Introduction to Combinatorics（2021）",
+      "platform": "Bilibili",
+      "publisher": "ctu1896",
+      "note": "国立阳明交通大学应用数学系傅恒霖老师2021年课程。Lec20讲计数原理与生成函数入门，Lec21继续讲生成函数；用于生成函数节点，承接排列组合与计数基础。仅提供原视频外链，不下载或托管。"
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": "quality_before_completeness",
-    "link_type": "curated_direct_video_only",
-    "quality_priority": "有明确讲师/学校/制作机构，采用板书推导、课堂互动、动画演示或算法可视化，排除匿名混剪和无法评估的PPT朗读资源",
-    "note": "优先真实授课者或原作者的板书推导、动态演示、计算过程和例题。剔除匿名、出身不明或可能只是朗读PPT的链接，不为凑齐两个平台而补链接。平台链接仅直达单集。资源可以仅覆盖节点部分知识点，须说明覆盖范围。未逐条实播不得宣称所有视频高清或可播放。"
-  }
+    "primary_per_node": "one selected Bilibili course per node; related consecutive lesson links may belong to that one course",
+    "platform_policy": "Bilibili_only",
+    "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
+    "note": "Bilibili-only. The rejected Chongqing University Liu Ran resource and all pFLYan graph lessons have been removed from active mappings and source records. Graph foundations and planar graphs use the original Zhejiang University of Technology teacher's course; core graph theory and algorithms use Nanjing University Professor Cheng Gong's GTA course; generating functions use the 2021 Yang Ming Chiao Tung University combinatorics course. The matrix-tree-theorem node remains pending until a suitable Bilibili lesson is verified. Never infer video links from a course syllabus or fabricate BV IDs.",
+    "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
+    "audit_status": {
+      "nodes_total": 68,
+      "nodes_with_active_course": 67,
+      "nodes_pending": "tree_matrix_tree",
+      "direct_episode_links": 126,
+      "nested_or_missing_episode_urls": 0,
+      "youtube_links": 0,
+      "last_audit_scope": "replaced all pFLYan graph mappings and the Chongqing University generating-functions mapping; checked source records, direct Bilibili BV IDs, part titles and playlist order"
+    }
+  },
+  "video_resource_candidates": [
+    {
+      "id": "kimberly_brehm_discrete_math_ii_candidate",
+      "institution": "Bellevue University",
+      "display_name": "Bellevue University · Kimberly Brehm · Discrete Math II",
+      "course": "Discrete Math II",
+      "instructor": "Kimberly Brehm",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1SyahzvExP/",
+      "uploader": "兴趣使然的现代人",
+      "status": "candidate_subtitle_and_part_index_review_required",
+      "coverage": [
+        "排列与组合",
+        "二项式定理",
+        "递推关系",
+        "线性齐次递推",
+        "非齐次递推",
+        "生成函数",
+        "生成函数求解递推关系"
+      ],
+      "note": "B站页面可见Discrete Math II分集，包括8.2.1–8.2.4齐次与非齐次递推、8.4.1–8.4.7生成函数。上传者为兴趣使然的现代人；尚未核实是否原声、字幕来源与翻译准确度，且多分集在页面列表中的精确p编号尚未核验，暂不映射正式节点。"
+    }
+  ]
 }

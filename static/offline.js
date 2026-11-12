@@ -494,6 +494,18 @@
     detail.replaceChildren();
     detail.append(el("div", "detail-kicker", question.category + " / " + question.difficulty + " / " + question.type));
     detail.append(el("h2", "detail-title", question.title));
+    const concepts = el("div", "prereq-list question-concept-links");
+    for (const id of question.knowledge_points || []) {
+      const concept = state.concepts.find(item => item.id === id);
+      if (concept) {
+        const link = button("知识点：" + concept.title, "", () => {
+          $("conceptSearch").value = "";
+          switchPanel("concepts"); fillConceptDetail(concept);
+        });
+        link.dataset.conceptId = id; concepts.append(link);
+      }
+    }
+    if (concepts.children.length) detail.append(concepts);
     const statement = el("div", "detail-section wrong-question-section");
     statement.append(el("h3", "", "题目"));
     statement.append(rich("wrong-question", question.statement));
@@ -562,6 +574,19 @@
     detail.append(el("div", "detail-kicker", concept.category));
     detail.append(el("h2", "detail-title", concept.title));
     detail.append(rich("concept-summary", concept.summary));
+    const topic = state.concepts.find(item => item.id === concept.graph_node_id);
+    const children = (concept.related_concepts || []).map(id => state.concepts.find(item => item.id === id)).filter(Boolean);
+    if (children.length || (topic && topic.id !== concept.id)) {
+      const section = el("section", "detail-section concept-topic-links");
+      section.append(el("h3", "", children.length ? "细分概念" : "所属图谱知识点"));
+      const links = el("div", "prereq-list");
+      for (const item of children.length ? children : [topic]) {
+        const link = button(item.title, "", () => fillConceptDetail(item));
+        link.dataset.conceptId = item.id;
+        links.append(link);
+      }
+      section.append(links); detail.append(section);
+    }
     document.querySelectorAll(".concept-item").forEach(item => {
       const selected = item.dataset.conceptId === concept.id;
       item.classList.toggle("active", selected); item.setAttribute("aria-current", String(selected));
@@ -590,11 +615,14 @@
     }
     for (const id of concept.related_questions || []) {
       const q = state.questions.find(x => x.id === id);
-      if (q) prereqs.append(button("练习：" + q.title, "", () => {
-        state.questionCategory = ""; state.questionDifficulty = "";
-        $("questionCategory").value = ""; $("questionDifficulty").value = "";
-        switchPanel("questions"); selectQuestion(q);
-      }));
+      if (q) {
+        const link = button("练习：" + q.title, "", () => {
+          state.questionCategory = ""; state.questionDifficulty = "";
+          $("questionCategory").value = ""; $("questionDifficulty").value = "";
+          switchPanel("questions"); selectQuestion(q);
+        });
+        link.dataset.questionId = id; prereqs.append(link);
+      }
     }
     if (!prereqs.children.length) prereqs.append(el("span", "", "暂无已关联条目"));
     related.append(prereqs); detail.append(related);
