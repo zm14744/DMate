@@ -13,11 +13,8 @@ body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) {
         left:max(12px,env(safe-area-inset-left,0px));
         right:max(12px,env(safe-area-inset-right,0px));
     }
-    body[data-appearance-theme].mobile-keyboard-open .center.chat-empty > .input-wrap:not([hidden]) {
-        position:relative; inset:auto; transform:none;
-        width:100% !important; max-width:none;
-        padding:0 12px max(8px,env(safe-area-inset-bottom,0px)) !important;
-    }
+    /* Keep the same capsule width and anchor when the visual viewport shrinks
+       for the keyboard; the center already follows its visible height. */
 }
 
 /* GPT-style segmented switch shared by the composer and grouped images. */
@@ -276,6 +273,11 @@ body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden])
     padding-top:var(--dmate-mode-row-height) !important;
 }
 body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { top:0; }
+@media(max-width:1100px) {
+    /* The empty composer has no wrapper padding; active conversations do. */
+    body[data-appearance-theme] .center.chat-empty > .input-wrap:not([hidden]) > .manual-question-mode { left:0; }
+    body[data-appearance-theme] .center:not(.chat-empty) > .input-wrap:not([hidden]) > .manual-question-mode { left:clamp(8px,1vw,18px); }
+}
 /* Activation does not add an outer ring, including the real file picker
    layered over its visible plus button. */
 body[data-appearance-theme] .center > .input-wrap:not([hidden]) button,
@@ -292,7 +294,11 @@ body[data-appearance-theme] .center > .input-wrap:not([hidden]) .image-picker-wr
 }
 @media(max-width:680px) {
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .manual-question-composer { min-height:36px !important; }
-    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text { min-height:36px !important; height:36px !important; padding-top:6px !important; padding-bottom:6px !important; }
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text,
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text:hover,
+    body[data-appearance-theme] .center > .input-wrap:not([hidden]) .manual-question-composer > textarea#text:focus {
+        min-height:36px !important; height:36px !important; padding-top:6px !important; padding-bottom:6px !important;
+    }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn,
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > #sendBtn.ai-stop-button { flex-basis:36px !important; width:36px !important; min-width:36px !important; max-width:36px !important; height:36px !important; min-height:36px !important; max-height:36px !important; }
     body[data-appearance-theme] .center > .input-wrap:not([hidden]) > .input > .image-picker-wrap,

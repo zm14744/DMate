@@ -17,6 +17,9 @@ function mount(options){
  const noteName=note=>note.title.trim()||uiText('未命名概念','Untitled concept');
  dialog.classList.add('dcn-dialog');dialog.setAttribute('aria-labelledby','conceptNotebookTitle');
  const heading=el('header','dcn-heading'),headingText=el('h2','','笔记本');headingText.id='conceptNotebookTitle';
+ // Announce the notebook first instead of focusing the close button and
+ // immediately displaying its tooltip. Tab still reaches every action.
+ headingText.tabIndex=-1;headingText.autofocus=true;
  const closeButton=action('',close,'dcn-close');closeButton.title='关闭笔记本';closeButton.setAttribute('aria-label','关闭笔记本');heading.append(headingText,closeButton);
  const content=el('div','dcn-content'),sidebar=el('aside','dcn-sidebar'),main=el('section','dcn-main');
  sidebar.setAttribute('aria-label','概念笔记列表');

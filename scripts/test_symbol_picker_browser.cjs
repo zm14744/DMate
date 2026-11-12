@@ -27,6 +27,7 @@ const base=[
 const fixture='<!doctype html><html lang="zh-CN"><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>'
 +base+'</style><style>'+style+'</style></head><body data-appearance-theme="dark"><div class="layout">'
 +'<div class="mobile-topbar">DMate</div><div class="center chat-empty"><div class="input-wrap">'
++'<div class="manual-question-mode interaction-mode-switch" data-mode="chat"><button>Chat</button><button>Solve</button></div>'
 +'<div class="input"><div class="manual-question-composer"><textarea id="text"></textarea></div></div>'
 +'</div></div></div><div id="sessions"><div class="session active">新对话</div></div>'
 +'<button id="outside" type="button">outside</button></body></html>';
@@ -48,8 +49,32 @@ async function verify(browser,engine,size){
   page.on('pageerror',error=>errors.push(error.message));
   await page.setContent(fixture);
   await page.addScriptTag({content:source});
+  const geometry=()=>page.evaluate(()=>{
+    const rect=selector=>{
+      const {x,y,width,height}=document.querySelector(selector).getBoundingClientRect();
+      return {x,y,width,height};
+    };
+    return {input:rect('.input'),text:rect('#text'),mode:rect('.manual-question-mode')};
+  });
+  await page.evaluate(()=>window.DMateChatComposer.mount({input:document.getElementById('text'),onSend:()=>{}}));
+  const unfocused=await geometry();
+  await page.locator('#text').focus();
+  const focused=await geometry();
+  assert.deepEqual(focused.input,unfocused.input,engine+'/'+size.name+': focus moved or resized the capsule');
+  assert.deepEqual(focused.text,unfocused.text,engine+'/'+size.name+': focus moved or resized the textarea');
+  if(size.compact){
+    assert.equal(focused.mode.x,focused.input.x,engine+'/'+size.name+': initial mode switch must align left');
+    await page.evaluate(()=>document.body.classList.add('mobile-keyboard-open'));
+    assert.deepEqual((await geometry()).input,focused.input,engine+'/'+size.name+': keyboard class changed capsule geometry');
+    await page.evaluate(()=>{
+      document.body.classList.remove('mobile-keyboard-open');
+      document.querySelector('.center').classList.remove('chat-empty');
+    });
+    const conversation=await geometry();
+    assert.equal(conversation.mode.x,conversation.input.x,engine+'/'+size.name+': new conversation mode switch must align left');
+    await page.evaluate(()=>document.querySelector('.center').classList.add('chat-empty'));
+  }
   await page.evaluate(()=>{
-    window.DMateChatComposer.mount({input:document.getElementById('text'),onSend:()=>{}});
     const input=document.getElementById('text');
     input.value='AB';input.focus();input.setSelectionRange(1,1);
   });
