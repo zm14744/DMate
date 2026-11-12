@@ -21109,7 +21109,7 @@ function renderKnowledgeGraphDetail() {
         heading.textContent = "教学视频";
         section.appendChild(heading);
 
-        const platforms = new Map([["B站", []], ["YouTube", []]]);
+        const platforms = new Map([["Bilibili", []], ["YouTube", []]]);
         const schoolForVideo = video => {
             const source = (knowledgeGraphData.videoSources || []).find(
                 item => item.id === video.sourceId
@@ -21122,10 +21122,6 @@ function renderKnowledgeGraphDetail() {
             }
             return String(source.name).trim();
         };
-        const shortLessonTitle = title => String(title || node.name)
-            .replace(/^(?:P|L)\d+\s+/i, "")
-            .replace(/^第\d+讲[:：\s]*/, "")
-            .replace(/^\d+\s+(?=\S)/, "");
         const shortDescription = text => {
             const caption = document.createElement("small");
             caption.className = "kg-video-caption";
@@ -21133,13 +21129,36 @@ function renderKnowledgeGraphDetail() {
             caption.style.cssText = "font-size:12px;line-height:1.6;color:var(--text-secondary,#a3a3a3);overflow-wrap:anywhere;";
             return caption;
         };
+        const appendVideoInfo = (row, item) => {
+            const info = document.createElement("div");
+            info.className = "kg-video-info";
+            info.style.cssText = "display:flex;flex-direction:column;gap:1px;min-width:0;";
+
+            // 标题严格取自视频数据，原文原样展示，不翻译、不删讲次编号。
+            const titleLink = document.createElement("a");
+            titleLink.className = "kg-video-lesson-title";
+            titleLink.textContent = item.title;
+            titleLink.href = item.url;
+            titleLink.target = "_blank";
+            titleLink.rel = "noopener noreferrer";
+            titleLink.style.cssText = "font-size:12px;line-height:1.6;color:var(--text-secondary,#a3a3a3);overflow-wrap:anywhere;text-decoration:none;";
+            titleLink.addEventListener("mouseenter", () => { titleLink.style.textDecoration = "underline"; });
+            titleLink.addEventListener("mouseleave", () => { titleLink.style.textDecoration = "none"; });
+            info.appendChild(titleLink);
+
+            // 机构或讲师是独立的来源信息，不得拼接进视频标题。
+            const source = shortDescription(item.school);
+            source.style.opacity = "0.7";
+            info.appendChild(source);
+            row.appendChild(info);
+        };
         for (const video of videos) {
             const school = schoolForVideo(video);
             if (!school) continue;
             for (const lesson of (video.lessons || [])) {
                 const url = String(lesson.url || "");
                 const platform = /^https:\/\/www\.bilibili\.com\/video\/BV[A-Za-z0-9]+\/\?p=[1-9]\d*$/.test(url)
-                    ? "B站"
+                    ? "Bilibili"
                     : /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/.test(url)
                         ? "YouTube" : "";
                 if (platform && !platforms.get(platform).some(item => item.url === url)) {
@@ -21173,9 +21192,7 @@ function renderKnowledgeGraphDetail() {
                 link.target = "_blank";
                 link.rel = "noopener noreferrer";
                 row.appendChild(link);
-                row.appendChild(shortDescription(
-                    primary.school + " · " + shortLessonTitle(primary.title)
-                ));
+                appendVideoInfo(row, primary);
             } else {
                 const unavailable = document.createElement("span");
                 unavailable.className = "kg-video-platform-unavailable";
@@ -21198,9 +21215,7 @@ function renderKnowledgeGraphDetail() {
                 extraLink.target = "_blank";
                 extraLink.rel = "noopener noreferrer";
                 extraRow.appendChild(extraLink);
-                extraRow.appendChild(shortDescription(
-                    item.school + " · " + shortLessonTitle(item.title)
-                ));
+                appendVideoInfo(extraRow, item);
                 entries.appendChild(extraRow);
             }
         }
