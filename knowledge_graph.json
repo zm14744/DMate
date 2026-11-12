@@ -2060,19 +2060,6 @@
       "level": "拓展",
       "videos": [
         {
-          "source_id": "ucla_matrix_tree",
-          "title": "矩阵树定理",
-          "sections": [
-            "矩阵树定理"
-          ],
-          "lessons": [
-            {
-              "title": "矩阵树定理",
-              "url": "https://www.bilibili.com/video/BV1L5411m7Tq/?p=27"
-            }
-          ]
-        },
-        {
           "source_id": "steve_butler_spectral",
           "title": "(Spectral; Fall 23) 16 - Matrix Tree Theorem",
           "sections": [
@@ -2205,19 +2192,6 @@
       ],
       "videos": [
         {
-          "source_id": "socratica_bilibili",
-          "title": "20.The definition of a Ring",
-          "sections": [
-            "20.The definition of a Ring"
-          ],
-          "lessons": [
-            {
-              "title": "20.The definition of a Ring",
-              "url": "https://www.bilibili.com/video/BV1Bx41157DD/?p=20"
-            }
-          ]
-        },
-        {
           "source_id": "socratica_youtube",
           "title": "Field Definition (Expanded)",
           "sections": [
@@ -2277,14 +2251,6 @@
       "platform": "YouTube",
       "note": "讲师本人讲解并逐步推导；仅使用独立视频链接。",
       "publisher": "Dr. Trefor Bazett"
-    },
-    {
-      "id": "socratica_bilibili",
-      "name": "Socratica · 数学动画团队",
-      "course": "Abstract Algebra（动画解释）",
-      "platform": "Bilibili",
-      "note": "有明确制作团队，动画+讲解；B站镜像分P直达。",
-      "publisher": "鸡蛋忍者"
     },
     {
       "id": "socratica_youtube",
@@ -2373,14 +2339,6 @@
       "platform": "Bilibili",
       "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
       "publisher": "动画讲解计算机知识"
-    },
-    {
-      "id": "ucla_matrix_tree",
-      "name": "UCLA · 组合数学公开课",
-      "course": "矩阵树定理（课程单讲）",
-      "platform": "Bilibili",
-      "note": "明确标注讲师或制作来源；链接直达该讲，不使用课程目录。",
-      "publisher": ""
     },
     {
       "id": "numberphile_gcd",
