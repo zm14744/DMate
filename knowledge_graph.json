@@ -1,5 +1,5 @@
 {
-  "version": 18,
+  "version": 19,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -761,7 +761,30 @@
       "name": "基本计数原理",
       "category": "计数与组合",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "bjtu_discrete",
+          "title": "1.3 计数基础(1)--乘法原理和加法原理",
+          "sections": [
+            "1.3 计数基础(1)--乘法原理和加法原理"
+          ],
+          "lessons": [
+            {
+              "source_id": "bjtu_discrete",
+              "title": "1.3 计数基础(1)--乘法原理和加法原理",
+              "sections": [
+                "1.3 计数基础(1)--乘法原理和加法原理"
+              ],
+              "lessons": [
+                {
+                  "title": "1.3 计数基础(1)--乘法原理和加法原理",
+                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=10"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_perm_comb",
@@ -770,7 +793,44 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "bjtu_discrete",
+          "title": "(2)--排列",
+          "sections": [
+            "(2)--排列",
+            "(3)--组合"
+          ],
+          "lessons": [
+            {
+              "source_id": "bjtu_discrete",
+              "title": "(2)--排列",
+              "sections": [
+                "(2)--排列"
+              ],
+              "lessons": [
+                {
+                  "title": "(2)--排列",
+                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=11"
+                }
+              ]
+            },
+            {
+              "source_id": "bjtu_discrete",
+              "title": "(3)--组合",
+              "sections": [
+                "(3)--组合"
+              ],
+              "lessons": [
+                {
+                  "title": "(3)--组合",
+                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=12"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_binomial",
@@ -788,7 +848,30 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "bjtu_discrete",
+          "title": "(4)--鸽巢原理",
+          "sections": [
+            "(4)--鸽巢原理"
+          ],
+          "lessons": [
+            {
+              "source_id": "bjtu_discrete",
+              "title": "(4)--鸽巢原理",
+              "sections": [
+                "(4)--鸽巢原理"
+              ],
+              "lessons": [
+                {
+                  "title": "(4)--鸽巢原理",
+                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=13"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_inclusion",
@@ -798,7 +881,30 @@
         "基本计数原理",
         "集合运算"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "bjtu_discrete",
+          "title": "(5)--容斥原理",
+          "sections": [
+            "(5)--容斥原理"
+          ],
+          "lessons": [
+            {
+              "source_id": "bjtu_discrete",
+              "title": "(5)--容斥原理",
+              "sections": [
+                "(5)--容斥原理"
+              ],
+              "lessons": [
+                {
+                  "title": "(5)--容斥原理",
+                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=14"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "count_generating",
@@ -815,7 +921,30 @@
       "name": "递推关系建模",
       "category": "递推关系",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "bjtu_discrete",
+          "title": "(10)--扩展内容——递推关系",
+          "sections": [
+            "(10)--扩展内容——递推关系"
+          ],
+          "lessons": [
+            {
+              "source_id": "bjtu_discrete",
+              "title": "(10)--扩展内容——递推关系",
+              "sections": [
+                "(10)--扩展内容——递推关系"
+              ],
+              "lessons": [
+                {
+                  "title": "(10)--扩展内容——递推关系",
+                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=19"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_homogeneous",
@@ -842,7 +971,30 @@
       "prerequisites": [
         "递推关系建模"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "bjtu_discrete",
+          "title": "(10)--扩展内容——递推关系",
+          "sections": [
+            "(10)--扩展内容——递推关系"
+          ],
+          "lessons": [
+            {
+              "source_id": "bjtu_discrete",
+              "title": "(10)--扩展内容——递推关系",
+              "sections": [
+                "(10)--扩展内容——递推关系"
+              ],
+              "lessons": [
+                {
+                  "title": "(10)--扩展内容——递推关系",
+                  "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=19"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "graph_basic",
@@ -1507,6 +1659,14 @@
       "platform": "Bilibili",
       "publisher": "麦洛的烦恼",
       "note": "MIT官方课程为Fall 2010版；B站上传者为麦洛的烦恼，页面标注中英文字幕。DMate仅提供原视频外链，不下载、托管或重新分发视频/字幕。"
+    },
+    {
+      "id": "bjtu_discrete",
+      "name": "北京交通大学 · 离散数学",
+      "course": "离散数学（194讲）",
+      "platform": "Bilibili",
+      "publisher": "格物嘉",
+      "note": "B站上传者为格物嘉，页面标注原课程来源为北京交通大学中国大学MOOC（NJTU-1002530017），共194讲。用于计数基础、排列组合、鸽巢原理、容斥及递推关系的连续补充；只提供原视频外链，不下载或托管。上传授权尚未核实。"
     }
   ],
   "video_resource_policy": {
@@ -1527,7 +1687,7 @@
       "uploader": "格物嘉",
       "views": "约2.6万",
       "official_course_url": "https://www.icourse163.org/learn/NJTU-1002530017?tid=1205949204#/learn/content",
-      "status": "candidate",
+      "status": "selected_for_counting_and_recurrence_nodes",
       "coverage": [
         "集合",
         "数论",
