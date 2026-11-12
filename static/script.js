@@ -17557,7 +17557,7 @@ function normalizeKnowledgeGraphData(data) {
                 url: typeof source.url === "string" ? source.url.trim() : "",
                 note: typeof source.note === "string" ? source.note.trim() : ""
             }))
-            .filter(source => source.id && /^https?:\/\//i.test(source.url))
+            .filter(source => source.id)
         : [];
 
     const nodes = Array.isArray(data.nodes)
@@ -17591,6 +17591,19 @@ function normalizeKnowledgeGraphData(data) {
                                 ? video.title.trim()
                                 : "",
                             sections: uniqueTextList(video.sections, 8),
+                            lessons: Array.isArray(video.lessons)
+                                ? video.lessons
+                                    .filter(lesson => lesson && typeof lesson === "object")
+                                    .map(lesson => ({
+                                        title: typeof lesson.title === "string"
+                                            ? lesson.title.trim()
+                                            : "",
+                                        url: typeof lesson.url === "string"
+                                            ? lesson.url.trim()
+                                            : ""
+                                    }))
+                                    .filter(lesson => lesson.title && /^https:\/\/www\.bilibili\.com\/video\/BV[a-zA-Z0-9]+\/\?p=\d+$/.test(lesson.url))
+                                : [],
                             verification: typeof video.verification === "string"
                                 ? video.verification.trim()
                                 : "",
@@ -21096,7 +21109,7 @@ function renderKnowledgeGraphDetail() {
 
         const hint = document.createElement("div");
         hint.className = "kg-video-hint";
-        hint.textContent = "按知识点匹配的首选课程章节；视频内容尚未逐段人工抽查。";
+        hint.textContent = "点击章节直接播放对应选集；课程内容仍建议结合教学大纲核对。";
         section.appendChild(hint);
 
         for (const video of videos) {
@@ -21129,27 +21142,32 @@ function renderKnowledgeGraphDetail() {
                 .join(" · ");
             card.appendChild(meta);
 
-            const lesson = document.createElement("div");
-            lesson.className = "kg-video-sections";
-            lesson.textContent = "章节：" + video.sections.join("、");
-            card.appendChild(lesson);
+            const lessons = document.createElement("div");
+            lessons.className = "kg-video-sections";
+
+            if (video.lessons.length) {
+                for (const lesson of video.lessons) {
+                    const link = document.createElement("a");
+                    link.className = "kg-video-open";
+                    link.href = lesson.url;
+                    link.target = "_blank";
+                    link.rel = "noopener noreferrer";
+                    link.textContent = "播放 · " + lesson.title;
+                    lessons.appendChild(link);
+                }
+            } else {
+                const missing = document.createElement("span");
+                missing.className = "kg-video-unavailable";
+                missing.textContent = "尚无已核实的单集视频直达地址";
+                lessons.appendChild(missing);
+            }
+            card.appendChild(lessons);
 
             if (video.note) {
                 const note = document.createElement("div");
                 note.className = "kg-video-note";
                 note.textContent = video.note;
                 card.appendChild(note);
-            }
-
-            const url = source.url;
-            if (/^https?:\/\//i.test(url)) {
-                const link = document.createElement("a");
-                link.className = "kg-video-open";
-                link.href = url;
-                link.target = "_blank";
-                link.rel = "noopener noreferrer";
-                link.textContent = "打开课程";
-                card.appendChild(link);
             }
 
             section.appendChild(card);
