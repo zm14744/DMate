@@ -61,6 +61,19 @@
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=2"
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.4.1 Propositional Operators",
+          "sections": [
+            "1.4.1 Propositional Operators"
+          ],
+          "lessons": [
+            {
+              "title": "1.4.1 Propositional Operators",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=9"
+            }
+          ]
         }
       ]
     },
@@ -880,7 +893,21 @@
       "prerequisites": [
         "函数与映射"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "1.7.3 Relational Mappings",
+          "sections": [
+            "1.7.3 Relational Mappings"
+          ],
+          "lessons": [
+            {
+              "title": "1.7.3 Relational Mappings",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=18"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "function_composition",
@@ -1187,14 +1214,14 @@
         },
         {
           "source_id": "mit_6042j_2015_bilibili",
-          "title": "3.3.3 Counting with Bijections",
+          "title": "3.4.1 Generalized Counting Rules",
           "sections": [
-            "3.3.3 Counting with Bijections"
+            "3.4.1 Generalized Counting Rules"
           ],
           "lessons": [
             {
-              "title": "3.3.3 Counting with Bijections",
-              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=76"
+              "title": "3.4.1 Generalized Counting Rules",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=77"
             }
           ]
         }
@@ -2032,6 +2059,19 @@
             {
               "title": "13.2.0.3 代数系统",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=52"
+            }
+          ]
+        },
+        {
+          "source_id": "mit_6042j_2015_bilibili",
+          "title": "2.3.3 The Ring Z",
+          "sections": [
+            "2.3.3 The Ring Z"
+          ],
+          "lessons": [
+            {
+              "title": "2.3.3 The Ring Z",
+              "url": "https://www.bilibili.com/video/BV16ptTeEEtt/?p=43"
             }
           ]
         }
