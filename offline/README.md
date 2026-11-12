@@ -11,10 +11,10 @@
 联网状态下，在终端运行：
 
 ~~~sh
-ollama pull qwen3:4b
+ollama pull qwen3:4b-thinking-2507-q4_K_M
 ~~~
 
-该文本模型下载量约 **2.5GB**。如果要识别题目图片，可额外下载：
+该文本模型下载量约 **2.5GB**。它是专门的 Thinking 版本，更适合数学推理和证明任务。如果要识别题目图片，可额外下载：
 
 ~~~sh
 ollama pull qwen3-vl:4b
