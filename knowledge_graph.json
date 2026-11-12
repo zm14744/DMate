@@ -168,13 +168,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Logical Equivalence",
+          "title": "Logical Equivalence of Two Statements",
           "sections": [
-            "Logical Equivalence"
+            "Logical Equivalence of Two Statements"
           ],
           "lessons": [
             {
-              "title": "Logical Equivalence",
+              "title": "Logical Equivalence of Two Statements",
               "url": "https://www.youtube.com/watch?v=U2zPxuj8mnI"
             }
           ],
@@ -264,13 +264,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Modus Ponens and Modus Tollens",
+          "title": "Logical Arguments – Modus Ponens & Modus Tollens",
           "sections": [
-            "Modus Ponens and Modus Tollens"
+            "Logical Arguments – Modus Ponens & Modus Tollens"
           ],
           "lessons": [
             {
-              "title": "Modus Ponens and Modus Tollens",
+              "title": "Logical Arguments – Modus Ponens & Modus Tollens",
               "url": "https://www.youtube.com/watch?v=NTSZMdGlo4g"
             }
           ],
@@ -304,13 +304,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Predicates and Their Truth Sets",
+          "title": "Predicates and their Truth Sets",
           "sections": [
-            "Predicates and Their Truth Sets"
+            "Predicates and their Truth Sets"
           ],
           "lessons": [
             {
-              "title": "Predicates and Their Truth Sets",
+              "title": "Predicates and their Truth Sets",
               "url": "https://www.youtube.com/watch?v=9MPA_LUmmoo"
             }
           ],
@@ -344,13 +344,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Universal and Existential Quantifiers",
+          "title": "Universal and Existential Quantifiers, ∀ “For All” and ∃ “There Exists”",
           "sections": [
-            "Universal and Existential Quantifiers"
+            "Universal and Existential Quantifiers, ∀ “For All” and ∃ “There Exists”"
           ],
           "lessons": [
             {
-              "title": "Universal and Existential Quantifiers",
+              "title": "Universal and Existential Quantifiers, ∀ “For All” and ∃ “There Exists”",
               "url": "https://www.youtube.com/watch?v=GJpezCUMOxA"
             }
           ],
@@ -425,13 +425,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Negating Quantifiers",
+          "title": "Negating Universal and Existential Quantifiers",
           "sections": [
-            "Negating Quantifiers"
+            "Negating Universal and Existential Quantifiers"
           ],
           "lessons": [
             {
-              "title": "Negating Quantifiers",
+              "title": "Negating Universal and Existential Quantifiers",
               "url": "https://www.youtube.com/watch?v=q1rKFGSiZE8"
             }
           ],
@@ -509,13 +509,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Proof by Contradiction",
+          "title": "Proof by Contradiction | Method & First Example",
           "sections": [
-            "Proof by Contradiction"
+            "Proof by Contradiction | Method & First Example"
           ],
           "lessons": [
             {
-              "title": "Proof by Contradiction",
+              "title": "Proof by Contradiction | Method & First Example",
               "url": "https://www.youtube.com/watch?v=huGWXh4l1M0"
             }
           ],
@@ -589,13 +589,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Strong Induction",
+          "title": "Strong Induction // Intro and Full Example",
           "sections": [
-            "Strong Induction"
+            "Strong Induction // Intro and Full Example"
           ],
           "lessons": [
             {
-              "title": "Strong Induction",
+              "title": "Strong Induction // Intro and Full Example",
               "url": "https://www.youtube.com/watch?v=rfA0h9udl7E"
             }
           ],
@@ -631,13 +631,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "The Union of Two Sets",
+          "title": "The union of two sets",
           "sections": [
-            "The Union of Two Sets"
+            "The union of two sets"
           ],
           "lessons": [
             {
-              "title": "The Union of Two Sets",
+              "title": "The union of two sets",
               "url": "https://www.youtube.com/watch?v=EF3m9bSbtdI"
             }
           ],
@@ -671,13 +671,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Cartesian Product of Two Sets",
+          "title": "Cartesian Product of Two Sets A x B",
           "sections": [
-            "Cartesian Product of Two Sets"
+            "Cartesian Product of Two Sets A x B"
           ],
           "lessons": [
             {
-              "title": "Cartesian Product of Two Sets",
+              "title": "Cartesian Product of Two Sets A x B",
               "url": "https://www.youtube.com/watch?v=ufjEv-5nmcA"
             }
           ],
@@ -711,13 +711,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Relations and Their Inverses",
+          "title": "Relations and their Inverses",
           "sections": [
-            "Relations and Their Inverses"
+            "Relations and their Inverses"
           ],
           "lessons": [
             {
-              "title": "Relations and Their Inverses",
+              "title": "Relations and their Inverses",
               "url": "https://www.youtube.com/watch?v=cQiyDUiIcOQ"
             }
           ],
@@ -751,13 +751,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Reflexive, Symmetric and Transitive Relations",
+          "title": "Reflexive, Symmetric, and Transitive Relations on a Set",
           "sections": [
-            "Reflexive, Symmetric and Transitive Relations"
+            "Reflexive, Symmetric, and Transitive Relations on a Set"
           ],
           "lessons": [
             {
-              "title": "Reflexive, Symmetric and Transitive Relations",
+              "title": "Reflexive, Symmetric, and Transitive Relations on a Set",
               "url": "https://www.youtube.com/watch?v=q0xN_N7l_Kw"
             }
           ],
@@ -791,13 +791,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Equivalence Relations",
+          "title": "Equivalence Relations – Reflexive, Symmetric, and Transitive",
           "sections": [
-            "Equivalence Relations"
+            "Equivalence Relations – Reflexive, Symmetric, and Transitive"
           ],
           "lessons": [
             {
-              "title": "Equivalence Relations",
+              "title": "Equivalence Relations – Reflexive, Symmetric, and Transitive",
               "url": "https://www.youtube.com/watch?v=T6RUxvJR8i4"
             }
           ],
@@ -912,13 +912,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Intuitive Idea of a Function",
+          "title": "The intuitive idea of a function",
           "sections": [
-            "Intuitive Idea of a Function"
+            "The intuitive idea of a function"
           ],
           "lessons": [
             {
-              "title": "Intuitive Idea of a Function",
+              "title": "The intuitive idea of a function",
               "url": "https://www.youtube.com/watch?v=G8qvOZ9DE3c"
             }
           ],
@@ -1071,13 +1071,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Proof: Infinitely Many Prime Numbers",
+          "title": "Proof: There are infinitely many primes numbers",
           "sections": [
-            "Proof: Infinitely Many Prime Numbers"
+            "Proof: There are infinitely many primes numbers"
           ],
           "lessons": [
             {
-              "title": "Proof: Infinitely Many Prime Numbers",
+              "title": "Proof: There are infinitely many primes numbers",
               "url": "https://www.youtube.com/watch?v=inUkhh8-h-I"
             }
           ],
@@ -1428,13 +1428,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Combinations Formula",
+          "title": "Combinations Formula: Counting the number of ways to choose r items from n items.",
           "sections": [
-            "Combinations Formula"
+            "Combinations Formula: Counting the number of ways to choose r items from n items."
           ],
           "lessons": [
             {
-              "title": "Combinations Formula",
+              "title": "Combinations Formula: Counting the number of ways to choose r items from n items.",
               "url": "https://www.youtube.com/watch?v=6KYp4zjqT6s"
             }
           ],
@@ -1564,13 +1564,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Counting Formula for Two Intersecting Sets",
+          "title": "Counting formula for two intersecting sets: N(A union B)=N(A)+N(B)-N(A intersect B)",
           "sections": [
-            "Counting Formula for Two Intersecting Sets"
+            "Counting formula for two intersecting sets: N(A union B)=N(A)+N(B)-N(A intersect B)"
           ],
           "lessons": [
             {
-              "title": "Counting Formula for Two Intersecting Sets",
+              "title": "Counting formula for two intersecting sets: N(A union B)=N(A)+N(B)-N(A intersect B)",
               "url": "https://www.youtube.com/watch?v=U_kOuvs6zcw"
             }
           ],
@@ -1876,13 +1876,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Intro to Graph Theory",
+          "title": "Intro to Graph Theory | Definitions & Ex: 7 Bridges of Konigsberg",
           "sections": [
-            "Intro to Graph Theory"
+            "Intro to Graph Theory | Definitions & Ex: 7 Bridges of Konigsberg"
           ],
           "lessons": [
             {
-              "title": "Intro to Graph Theory",
+              "title": "Intro to Graph Theory | Definitions & Ex: 7 Bridges of Konigsberg",
               "url": "https://www.youtube.com/watch?v=C7YrMRdLkqo"
             }
           ],
@@ -2068,13 +2068,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Complete and Connected Graphs, Subgraphs",
+          "title": "Properties in Graph Theory: Complete, Connected, Subgraph, Induced Subgraph",
           "sections": [
-            "Complete and Connected Graphs, Subgraphs"
+            "Properties in Graph Theory: Complete, Connected, Subgraph, Induced Subgraph"
           ],
           "lessons": [
             {
-              "title": "Complete and Connected Graphs, Subgraphs",
+              "title": "Properties in Graph Theory: Complete, Connected, Subgraph, Induced Subgraph",
               "url": "https://www.youtube.com/watch?v=gC0RNpD2P1Y"
             }
           ],
@@ -2188,13 +2188,13 @@
         },
         {
           "source_id": "trefor_youtube",
-          "title": "Euler Paths",
+          "title": "Euler Paths & the 7 Bridges of Konigsberg | Graph Theory",
           "sections": [
-            "Euler Paths"
+            "Euler Paths & the 7 Bridges of Konigsberg | Graph Theory"
           ],
           "lessons": [
             {
-              "title": "Euler Paths",
+              "title": "Euler Paths & the 7 Bridges of Konigsberg | Graph Theory",
               "url": "https://www.youtube.com/watch?v=dSK5jTEe-AM"
             }
           ],
