@@ -1,5 +1,5 @@
 {
-  "version": 28,
+  "version": 29,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1023,7 +1023,21 @@
         "递推关系建模",
         "排列与组合"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "cqu_discrete_liu",
+          "title": "4.3分治算法和递推关系+4.4生成函数",
+          "sections": [
+            "4.3分治算法和递推关系+4.4生成函数"
+          ],
+          "lessons": [
+            {
+              "title": "4.3分治算法和递推关系+4.4生成函数",
+              "url": "https://www.bilibili.com/video/BV1Hi4y1w7YA/?p=17"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "recurrence_model",
@@ -1983,6 +1997,14 @@
       "platform": "Bilibili",
       "publisher": "常青藤中英字幕课程",
       "note": "Kimberly Brehm 的大学离散数学课程；B站页面标注中英字幕，上传者说明为唯一翻译发布账号。用于排列组合、二项式定理和递推建模。仅外链跳转，不下载或托管。"
+    },
+    {
+      "id": "cqu_discrete_liu",
+      "name": "重庆大学 · 刘然",
+      "course": "《离散数学及其应用》（2020春）",
+      "platform": "Bilibili",
+      "publisher": "litchi__mango",
+      "note": "重庆大学计算机学院刘然老师2020春录播课，教材为 Kenneth H. Rosen《Discrete Mathematics and Its Applications》，并补充左孝凌《离散数学》。仅用于生成函数节点，选用第17个分P《4.3分治算法和递推关系+4.4生成函数》。B站上传者为 litchi__mango，授权状态未核实；仅提供原视频外链，不下载或托管。"
     }
   ],
   "video_resource_policy": {
@@ -1993,9 +2015,9 @@
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
-      "nodes_with_active_course": 66,
-      "nodes_pending": "count_generating; tree_matrix_tree",
-      "direct_episode_links": 127,
+      "nodes_with_active_course": 67,
+      "nodes_pending": "tree_matrix_tree",
+      "direct_episode_links": 128,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
       "last_audit_scope": "episode titles, Bilibili part indices, topic-node fit, source references, and direct-link structure"
