@@ -127,7 +127,6 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
       <button id="offlineAppearanceBtn" class="offline-nav-item" type="button"><!-- BEGIN ONLINE APPEARANCE ICON -->
 <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></svg>
 <!-- END ONLINE APPEARANCE ICON --><span>外观</span></button>
-      <button type="button" id="exportLocalData" class="offline-nav-item" title="导出本地数据"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg><span>导出本地数据</span></button>
       <button type="button" id="returnOnline" class="btn offline-return">
         <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
         <span>返回在线版</span>
@@ -146,12 +145,8 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
       <div class="offline-list" id="mistakeList"></div>
     </section>
 
-    <section class="offline-panel" id="notesPanel" hidden>
-      <div class="offline-toolbar">
-        <div><strong id="noteCount">0 条笔记</strong><span class="toolbar-muted">可随时编辑</span></div>
-        <button type="button" class="offline-primary primary" id="addNote"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>新建概念</span></button>
-      </div>
-      <div class="offline-card-grid" id="noteList"></div>
+    <section class="offline-panel dcn-dialog offline-notebook" id="notesPanel" aria-label="笔记本" hidden>
+      <div class="dcn-content" id="noteList"></div>
     </section>
 
     <section class="offline-panel" id="drawingPanel" hidden>

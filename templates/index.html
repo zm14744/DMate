@@ -7192,17 +7192,36 @@ body[data-appearance-theme="dark"] .right { border-left-color:#181818 !important
 /* 2026-10-10 桌面图谱：真实尺寸绘制，局部缩放、稳定滚动条，不缩整页。 */
 @media (min-width:761px) {
     #knowledgeGraphModal .knowledge-graph-canvas {
-        scrollbar-gutter:stable;
-        overflow:auto;
+        display:flex;
+        flex-direction:column;
+        overflow:hidden!important;
         overflow-anchor:none;
         min-width:0;
     }
     #knowledgeGraphModal .kg-section {
         box-sizing:border-box;
-        width:max-content;
-        min-width:100%;
-        max-width:none;
-        overflow:visible;
+        display:flex;
+        flex:1 1 auto;
+        flex-direction:column;
+        width:100%;
+        max-width:100%;
+        min-width:0;
+        min-height:0;
+        overflow:hidden!important;
+    }
+    #knowledgeGraphModal .kg-section-title,
+    #knowledgeGraphModal .kg-section-desc {
+        flex:none;
+    }
+    #knowledgeGraphModal .kg-desktop-viewport {
+        flex:1 1 auto;
+        min-width:0;
+        min-height:0;
+        overflow:auto;
+        scrollbar-gutter:stable;
+        scrollbar-width:thin;
+        scrollbar-color:var(--border-mid) transparent;
+        overscroll-behavior:contain;
     }
     #knowledgeGraphModal .kg-desktop-zoom-surface {
         position:relative;
@@ -9587,7 +9606,6 @@ window.DMATE_CLIENT_CONFIG = {{ {
 
         <div class="knowledge-graph-layout">
             <div class="knowledge-graph-main">
-                <div id="knowledgeGraphSummary" class="graph-summary"></div>
                 <div id="knowledgeGraphCanvas" class="knowledge-graph-canvas">
                     <div class="wrong-empty">知识图谱加载中…</div>
                 </div>

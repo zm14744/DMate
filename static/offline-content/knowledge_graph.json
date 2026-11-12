@@ -1,5 +1,5 @@
 {
-  "version": 31,
+  "version": 32,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1141,25 +1141,30 @@
       "prerequisites": [],
       "videos": [
         {
-          "source_id": "zjut_discrete_xiaohua",
+          "source_id": "hit_graph_theory",
           "title": "图的基本概念",
           "sections": [
-            "07-02 图的基本概念",
-            "07-03 握手定理",
-            "07-04 完全图，子图和补图"
+            "1.3.1 图",
+            "1.6.1 子图",
+            "1.7.1 度",
+            "1.8.1 正则图"
           ],
           "lessons": [
             {
-              "title": "07-02 图的基本概念",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=112"
+              "title": "1.3.1 图",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=3"
             },
             {
-              "title": "07-03 握手定理",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=113"
+              "title": "1.6.1 子图",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=6"
             },
             {
-              "title": "07-04 完全图，子图和补图",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=114"
+              "title": "1.7.1 度",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=7"
+            },
+            {
+              "title": "1.8.1 正则图",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=8"
             }
           ]
         }
@@ -1174,15 +1179,15 @@
       ],
       "videos": [
         {
-          "source_id": "zjut_discrete_xiaohua",
+          "source_id": "hit_graph_theory",
           "title": "图同构",
           "sections": [
-            "07-05 图的同构"
+            "1.9.1 同构"
           ],
           "lessons": [
             {
-              "title": "07-05 图的同构",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=115"
+              "title": "1.9.1 同构",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=9"
             }
           ]
         }
@@ -1197,15 +1202,15 @@
       ],
       "videos": [
         {
-          "source_id": "zjut_discrete_xiaohua",
+          "source_id": "hit_graph_theory",
           "title": "邻接矩阵",
           "sections": [
-            "07-09 图的矩阵表示"
+            "5.1.1 邻接矩阵"
           ],
           "lessons": [
             {
-              "title": "07-09 图的矩阵表示",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=119"
+              "title": "5.1.1 邻接矩阵",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=27"
             }
           ]
         }
@@ -1222,15 +1227,25 @@
       "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
       "videos": [
         {
-          "source_id": "zjut_discrete_xiaohua",
+          "source_id": "hit_graph_theory",
           "title": "图的矩阵表示",
           "sections": [
-            "07-09 图的矩阵表示"
+            "5.1.1 邻接矩阵",
+            "5.2.1 邻接表",
+            "5.3.1 关联矩阵"
           ],
           "lessons": [
             {
-              "title": "07-09 图的矩阵表示",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=119"
+              "title": "5.1.1 邻接矩阵",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=27"
+            },
+            {
+              "title": "5.2.1 邻接表",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=28"
+            },
+            {
+              "title": "5.3.1 关联矩阵",
+              "url": "https://www.bilibili.com/video/BV1Fb411M7d9/?p=29"
             }
           ]
         }
@@ -1477,25 +1492,20 @@
       ],
       "videos": [
         {
-          "source_id": "zjut_discrete_xiaohua",
+          "source_id": "scut_discrete_math",
           "title": "平面图",
           "sections": [
-            "07-14 平面图",
-            "07-15 平面图的判定",
-            "07-16 对偶图"
+            "6.6.1 平面图",
+            "6.6.2 对偶图与图的着色"
           ],
           "lessons": [
             {
-              "title": "07-14 平面图",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=124"
+              "title": "6.6.1 平面图",
+              "url": "https://www.bilibili.com/video/BV1YQ4y1Z7uE/?p=44"
             },
             {
-              "title": "07-15 平面图的判定",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=125"
-            },
-            {
-              "title": "07-16 对偶图",
-              "url": "https://www.bilibili.com/video/BV1Ap4y18751/?p=126"
+              "title": "6.6.2 对偶图与图的着色",
+              "url": "https://www.bilibili.com/video/BV1YQ4y1Z7uE/?p=45"
             }
           ]
         }
@@ -1740,7 +1750,26 @@
         "生成树"
       ],
       "level": "拓展",
-      "videos": []
+      "videos": [
+        {
+          "source_id": "ardila_enumerative_combinatorics",
+          "title": "矩阵树定理",
+          "sections": [
+            "Lecture 15 . Enumerative Combinatorics (Federico Ardila) — Trees",
+            "Lecture 16 . Enumerative Combinatorics (Federico Ardila) — Matrix-Tree Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "Lecture 15 . Enumerative Combinatorics (Federico Ardila) — Trees",
+              "url": "https://www.bilibili.com/video/BV1Lt411K7bB/?p=15"
+            },
+            {
+              "title": "Lecture 16 . Enumerative Combinatorics (Federico Ardila) — Matrix-Tree Theorem",
+              "url": "https://www.bilibili.com/video/BV1Lt411K7bB/?p=16"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "algebra_system",
@@ -1956,36 +1985,52 @@
       "note": "南京大学计算机学院程龚教授主讲的42分P系列，配套教材《图论与算法》（清华大学出版社，2024）。用于图的连通与遍历、割点割边、距离与BFS、二部图、欧拉图、哈密顿图、匹配、赋权图与距离、有向图等专题。只提供原视频外链，不下载或托管。"
     },
     {
-      "id": "zjut_discrete_xiaohua",
-      "name": "浙江工业大学 · 小花醉猫",
-      "course": "（新版）离散数学全套",
-      "platform": "Bilibili",
-      "publisher": "小花醉猫",
-      "note": "浙江工业大学教师本人原创视频，共137分P，覆盖国内常用离散数学教材。用于图的基本概念、图同构、图的矩阵表示和平面图专题；按知识点链接到具体分P。仅提供原视频外链，不下载或托管。"
-    },
-    {
       "id": "nymu_combinatorics_fuhenglin",
       "name": "国立阳明交通大学 · 傅恒霖",
       "course": "组合学导论 Introduction to Combinatorics（2021）",
       "platform": "Bilibili",
       "publisher": "ctu1896",
       "note": "国立阳明交通大学应用数学系傅恒霖老师2021年课程。Lec20讲计数原理与生成函数入门，Lec21继续讲生成函数；用于生成函数节点，承接排列组合与计数基础。仅提供原视频外链，不下载或托管。"
+    },
+    {
+      "id": "hit_graph_theory",
+      "name": "哈尔滨工业大学 · 图论",
+      "course": "图论（HIT）",
+      "platform": "Bilibili",
+      "publisher": "天选憨憨曹冒冒",
+      "note": "哈尔滨工业大学图论课程，B站共72个分P，原课程入口为中国大学MOOC HIT-1003781003。用于图的基本概念、子图、顶点度、正则图、图同构，以及邻接矩阵、邻接表和关联矩阵。仅提供原视频外链，不下载或托管。"
+    },
+    {
+      "id": "scut_discrete_math",
+      "name": "华南理工大学 · 陈琼、马千里、陈伟能",
+      "course": "离散数学（中国大学MOOC）",
+      "platform": "Bilibili",
+      "publisher": "荟呀荟学习",
+      "note": "华南理工大学离散数学公开课。学校中国大学MOOC课程页列出的授课教师为陈琼、马千里、陈伟能；B站合集为第三方上传，页面标注个人学习研究用途，授权状态未核实。此处仅用于平面图、对偶图和着色专题，提供原视频外链，不下载或托管。"
+    },
+    {
+      "id": "ardila_enumerative_combinatorics",
+      "name": "San Francisco State University / Universidad de los Andes · Federico Ardila",
+      "course": "Enumerative Combinatorics（2013）",
+      "platform": "Bilibili",
+      "publisher": "pippozzz",
+      "note": "Federico Ardila在San Francisco State University与Universidad de los Andes联合开设的组合学课程。Lecture 15讲树与生成树，Lecture 16讲生成树计数、图的关联矩阵、拉普拉斯矩阵及Kirchhoff矩阵树定理的证明。英文原声；未核实中文字幕。B站第三方上传，仅提供原视频外链，不下载或托管。"
     }
   ],
   "video_resource_policy": {
     "primary_per_node": "one selected Bilibili course per node; related consecutive lesson links may belong to that one course",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course series wherever the syllabus supports it; use specialist videos only for genuinely specialist topics.",
-    "note": "Bilibili-only. The rejected Chongqing University Liu Ran resource and all pFLYan graph lessons have been removed from active mappings and source records. Graph foundations and planar graphs use the original Zhejiang University of Technology teacher's course; core graph theory and algorithms use Nanjing University Professor Cheng Gong's GTA course; generating functions use the 2021 Yang Ming Chiao Tung University combinatorics course. The matrix-tree-theorem node remains pending until a suitable Bilibili lesson is verified. Never infer video links from a course syllabus or fabricate BV IDs.",
+    "note": "Bilibili-only. The rejected Chongqing University Liu Ran, pFLYan, and Zhejiang University of Technology sources are removed from active mappings and source records. Graph foundations, isomorphism, and matrix representations use the Harbin Institute of Technology graph theory course; planar graphs use the South China University of Technology discrete mathematics course; core graph theory algorithms continue to use Nanjing University Professor Cheng Gong's GTA course. The Matrix-Tree theorem uses Federico Ardila's Enumerative Combinatorics Lecture 16 on Bilibili, preceded by Lecture 15 on trees. The Ardila lecture is English original and no Chinese subtitles have been verified. Do not fabricate video links.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
-      "nodes_with_active_course": 67,
-      "nodes_pending": "tree_matrix_tree",
-      "direct_episode_links": 126,
+      "nodes_with_active_course": 68,
+      "nodes_pending": "none",
+      "direct_episode_links": 130,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
-      "last_audit_scope": "replaced all pFLYan graph mappings and the Chongqing University generating-functions mapping; checked source records, direct Bilibili BV IDs, part titles and playlist order"
+      "last_audit_scope": "removed Zhejiang University of Technology; replaced graph foundations, isomorphism, matrices, planar graphs; added a verified Bilibili Matrix-Tree theorem lecture and its tree prerequisite"
     }
   },
   "video_resource_candidates": [

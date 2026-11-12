@@ -75,6 +75,105 @@ async function fit(page) {
   return snapshot(page);
 }
 
+async function checkPanelPresentation(browser, width) {
+  const mobile = width <= 760;
+  const page = await browser.newPage({ viewport: { width, height: 844 },
+    ...(mobile ? { isMobile: true, hasTouch: true } : {}) });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    await page.goto(baseURL, { waitUntil: 'networkidle' });
+    await page.evaluate(() => openKnowledgeGraph());
+    await page.waitForSelector('#knowledgeGraphCanvas .kg-section');
+    assert.equal(await page.locator('#knowledgeGraphSummary, #knowledgeGraphModal .graph-summary').count(), 0,
+      width + ': remove the whole summary row');
+
+    // Keep this same dialog open while changing language in both directions.
+    await page.evaluate(() => selectKnowledgeGraphNode('logic_truth'));
+    const heading = page.locator('[data-kg-video-heading]');
+    await heading.waitFor();
+    for (const [language, expected] of [['en', 'Teaching videos'], ['zh-CN', '教学视频']]) {
+      await page.evaluate(value => window.DMateI18n.setLanguage(value, false), language);
+      await page.waitForFunction(text => document.querySelector('[data-kg-video-heading]')?.textContent === text, expected);
+      assert.equal(await page.locator('#knowledgeGraphModal').evaluate(modal => modal.classList.contains('hidden')), false);
+      const styles = await page.evaluate(() => {
+        const title = document.querySelector('[data-kg-video-heading]');
+        const field = document.querySelector('#knowledgeGraphDetail .graph-detail-field-label:not([data-kg-video-heading])');
+        const values = node => {
+          const css = getComputedStyle(node);
+          return Object.fromEntries(['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color'].map(key => [key, css[key]]));
+        };
+        return { title: values(title), field: values(field) };
+      });
+      assert.deepEqual(styles.title, styles.field, width + '/' + language + ': video heading matches adjacent field labels');
+    }
+
+    if (!mobile) {
+      const frameState = () => page.evaluate(() => {
+        const frame = document.querySelector('#knowledgeGraphCanvas .kg-section');
+        const canvas = document.getElementById('knowledgeGraphCanvas');
+        const rect = frame.getBoundingClientRect(), parent = canvas.getBoundingClientRect();
+        const css = getComputedStyle(frame);
+        const outsideRoundedCorner = (x, y) => !frame.contains(document.elementFromPoint(x, y));
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+          parentLeft: parent.left, parentRight: parent.right, overflow: css.overflow,
+          radii: [css.borderTopLeftRadius, css.borderTopRightRadius, css.borderBottomLeftRadius, css.borderBottomRightRadius].map(parseFloat),
+          clippedCorners: [outsideRoundedCorner(rect.left + 1, rect.top + 1),
+            outsideRoundedCorner(rect.right - 1, rect.top + 1),
+            outsideRoundedCorner(rect.left + 1, rect.bottom - 1),
+            outsideRoundedCorner(rect.right - 1, rect.bottom - 1)] };
+      });
+      const initial = await frameState();
+      assert.ok(initial.left >= initial.parentLeft && initial.right <= initial.parentRight + 1,
+        width + ': graph frame fits the visible canvas');
+      assert.equal(initial.overflow, 'hidden', width + ': frame clips content at its rounded outline');
+      assert.ok(initial.radii.every(radius => radius >= 10), width + ': every frame corner is rounded');
+      assert.deepEqual(initial.clippedCorners, [true, true, true, true], width + ': hit testing respects all four rounded corners');
+      await page.locator('#knowledgeGraphDesktopZoomIn').click({ clickCount: 5 });
+      const scroll = await page.locator('.kg-desktop-viewport').evaluate(view => {
+        view.scrollLeft = view.scrollWidth;
+        view.scrollTop = view.scrollHeight;
+        const rect = view.getBoundingClientRect();
+        const rightmostNode = Math.max(...[...view.querySelectorAll('.kg-node-group')].map(node => node.getBoundingClientRect().right));
+        return { left: view.scrollLeft, top: view.scrollTop, viewLeft: rect.left, right: rect.right, rightmostNode };
+      });
+      assert.ok(scroll.left > 0, width + ': zoomed graph still scrolls horizontally');
+      assert.ok(scroll.rightmostNode <= scroll.right + 1.5, width + ': far-right nodes remain reachable');
+      assert.ok(scroll.rightmostNode > scroll.viewLeft, width + ': horizontal scrolling cannot overshoot all graph nodes');
+      const zoomed = await frameState();
+      for (const edge of ['left', 'right', 'top', 'bottom']) near(zoomed[edge], initial[edge], width + ': scrolling preserves frame ' + edge);
+      assert.deepEqual(zoomed.clippedCorners, [true, true, true, true], width + ': zoomed content stays clipped at both right corners');
+      await page.locator('#knowledgeGraphDesktopZoomFit').click();
+      assert.equal(await page.locator('.kg-desktop-viewport').evaluate(view => view.scrollLeft), 0,
+        width + ': Fit resets the internal horizontal scroll');
+      // Crossing from a centered small graph into horizontal scrolling must
+      // preserve the graph point under the viewport center.
+      await page.evaluate(() => {
+        setKnowledgeGraphFilter('命题逻辑');
+        const view = document.querySelector('.kg-desktop-viewport');
+        const stage = view.querySelector('.kg-desktop-zoom-stage');
+        setKnowledgeGraphDesktopScale(view.clientWidth * .9 / Number(stage.dataset.baseWidth), false);
+        view.scrollLeft = 0;
+      });
+      const centerPoint = () => page.locator('.kg-desktop-viewport').evaluate(view => {
+        const rect = view.getBoundingClientRect(), stage = view.querySelector('.kg-desktop-zoom-stage').getBoundingClientRect();
+        const scale = Number(view.querySelector('.kg-desktop-zoom-surface').dataset.scale);
+        return (rect.left + view.clientLeft + view.clientWidth / 2 - stage.left) / scale;
+      });
+      const centered = await centerPoint();
+      await page.locator('#knowledgeGraphDesktopZoomIn').click();
+      near(await centerPoint(), centered, width + ': centered graph keeps its zoom anchor', .75);
+      if (process.env.KG_SCREENSHOT_DIR) {
+        await page.evaluate(() => window.DMateI18n.setLanguage('en', false));
+        await page.waitForFunction(() => document.querySelector('[data-kg-video-heading]')?.textContent === 'Teaching videos');
+        await page.screenshot({ path: process.env.KG_SCREENSHOT_DIR + '/graph-panel-after-' + width + '-en.png' });
+      }
+    }
+    assert.deepEqual(errors, [], width + ': graph presentation page errors');
+    console.log('PASS ' + width + ': summary removed, video typography and live language switching' + (mobile ? '' : ', clipped frame and zoomed horizontal scrolling'));
+  } finally { await page.close(); }
+}
+
 async function mobileCase(browser, width) {
   const page = await browser.newPage({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true });
   const errors = [];
@@ -316,6 +415,7 @@ async function checkNodeGestures(browser, width) {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   try {
+    for (const width of [1440, 820, 390]) await checkPanelPresentation(browser, width);
     for (const width of [390, 620]) await checkNodeGestures(browser, width);
     for (const theme of ['light', 'dark', 'navy']) await checkSelectionBorder(browser, theme);
     for (const width of [390, 620]) await mobileCase(browser, width);

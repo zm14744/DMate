@@ -29,6 +29,8 @@ async function ready(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
   assert.equal(await page.locator('.offline-header,#networkStatus,#saveState').count(), 0,
     'The removed header, save-state label, and network status are absent from the DOM');
+  assert.equal(await page.locator('#exportLocalData').count(), 0, 'The local-data export entry is removed');
+  assert.equal(await page.locator('#offlineSidebar button').filter({ hasText: /^导出本地数据$/ }).count(), 0);
 }
 
 async function readStore(page, name) {
@@ -172,31 +174,6 @@ async function sidebarControls(page, width) {
   assert.equal(await page.locator('#offlineSidebar').evaluate(node => node.inert), false);
 }
 
-async function sidebarExport(page, width, noteTitle, mistakeTitle) {
-  const toggle = page.locator(width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-  const button = page.locator('#exportLocalData');
-  const style = await button.evaluate(node => ({ inSidebar: Boolean(node.closest('#offlineSidebar')),
-    tag: node.localName, background: getComputedStyle(node).backgroundColor, shadow: getComputedStyle(node).boxShadow }));
-  assert.deepEqual(style, { inSidebar: true, tag: 'button', background: 'rgba(0, 0, 0, 0)', shadow: 'none' },
-    'Export is an ordinary sidebar button');
-  const downloading = page.waitForEvent('download');
-  await button.click();
-  const download = await downloading;
-  assert.equal(download.suggestedFilename(), 'dmate-offline-backup.json');
-  const chunks = [];
-  for await (const chunk of await download.createReadStream()) chunks.push(chunk);
-  const backup = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  assert.equal(backup.format, 'dmate-offline-backup');
-  assert.equal(backup.version, 1);
-  assert.ok(backup.notes.some(note => note.title === noteTitle && note.content.includes('修订')));
-  assert.ok(backup.mistakes.some(mistake => mistake.title === mistakeTitle));
-  assert.ok(backup.practice.length >= 2);
-  assert.ok(JSON.parse(backup.drawings).pages.some(drawing => drawing.name === '离线保存画板'));
-  assert.equal(await download.failure(), null, 'Backup saves successfully while offline');
-  if (width <= 1100) await page.locator('#offlineNavClose').click();
-}
-
 async function appearanceControls(page, width, theme, reference) {
   for (const selector of ['#offlineAppearanceBtn svg', '#offlineAppearanceToggle svg']) {
     assert.deepEqual(await geometry(page.locator(selector)), reference.appearanceIcon, 'Appearance entry shares the online icon: ' + selector);
@@ -230,6 +207,133 @@ async function confirmDeletion(page, trigger, commit) {
   await dialog.waitFor({ state: 'visible' });
   await dialog.locator(commit ? '.dmate-delete-confirm-delete' : '.dmate-delete-confirm-close').click();
   await dialog.waitFor({ state: 'detached' });
+}
+
+async function notebookSnapshot(page, selector) {
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.locator(selector).evaluate(async node => {
+    await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+  });
+  return page.locator(selector).evaluate(content => {
+    const origin = content.getBoundingClientRect();
+    const selectors = [':scope', '.dcn-sidebar', '.dcn-sidebar > .dcn-primary', '.dcn-search-wrap', '.dcn-search',
+      '.dcn-search-clear', '.dcn-selection', '.dcn-list', '.dcn-list-empty', '.dcn-note', '.dcn-note-select',
+      '.dcn-note input[type=checkbox]', '.dcn-note-open', '.dcn-note-delete', '.dcn-main', '.dcn-editor',
+      '.dcn-editor > label:first-child', '.dcn-title', '.dcn-editor > label:nth-child(2)', '.dcn-original',
+      '.dcn-saved', '.dcn-ai', '.dcn-ai > label', '.dcn-question', '.dcn-ai-actions',
+      '.dcn-ai-actions > button:first-child', '.dcn-ai-actions > button:nth-child(2)', '.dcn-analysis-cancel',
+      '.dcn-status', '.dcn-results'];
+    const properties = ['display', 'boxSizing', 'position', 'gridTemplateColumns', 'gridTemplateRows',
+      'flexDirection', 'flexWrap', 'alignItems', 'justifyContent', 'gap', 'rowGap', 'columnGap',
+      'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+      'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'textAlign', 'whiteSpace', 'color', 'backgroundColor',
+      'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderTopStyle',
+      'borderTopColor', 'borderRadius', 'boxShadow', 'minHeight', 'appearance', 'opacity'];
+    const elements = {};
+    for (const key of selectors) {
+      const node = key === ':scope' ? content : content.querySelector(key);
+      const rect = node?.getBoundingClientRect(), style = node && getComputedStyle(node);
+      const visible = Boolean(node && node.getClientRects().length && rect.width > 0 && rect.height > 0
+        && style.display !== 'none' && style.visibility !== 'hidden');
+      if (!visible) { elements[key] = { visible: false }; continue; }
+      const compared = properties.filter(property => !(property === 'opacity' && node.matches('.dcn-ai-actions > button')));
+      elements[key] = { visible: true, geometry: { x: rect.x - origin.x, y: rect.y - origin.y, width: rect.width, height: rect.height },
+        style: Object.fromEntries(compared.map(property => [property, style[property]])) };
+      if (node.matches('input,textarea')) elements[key].value = node.value;
+      if (node.matches('input[type=checkbox]')) elements[key].checked = node.checked;
+    }
+    return { text: content.innerText.replace(/\s+/g, ' ').trim(), elements };
+  });
+}
+
+async function compareNotebook(page, online, label, phase) {
+  const size = await page.locator('#noteList').evaluate(node => {
+    const rect = node.getBoundingClientRect(), panel = node.parentElement, box = panel.getBoundingClientRect(), style = getComputedStyle(panel);
+    return { width: rect.width, height: rect.height, gaps: [
+      rect.left - box.left - parseFloat(style.borderLeftWidth) - parseFloat(style.paddingLeft),
+      box.right - rect.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight),
+      rect.top - box.top - parseFloat(style.borderTopWidth) - parseFloat(style.paddingTop),
+      box.bottom - rect.bottom - parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom)] };
+  });
+  assert.ok(size.gaps.every(gap => Math.abs(gap) <= 2), label + '/' + phase + ': notebook content fills its embedded container: ' + JSON.stringify(size));
+  // Match the content container, keeping the online component's actual CSS and
+  // viewport breakpoints. Modal framing and embedded page placement differ.
+  await online.evaluate(({ width, height }) => {
+    const dialog = document.getElementById('conceptNotebookDialog'), content = dialog.querySelector('.dcn-content');
+    const style = getComputedStyle(dialog), heading = dialog.querySelector('.dcn-heading').getBoundingClientRect();
+    const horizontal = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+      + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+    const vertical = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+      + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) + heading.height + parseFloat(style.rowGap);
+    Object.assign(dialog.style, { width: width + horizontal + 'px', height: height + vertical + 'px',
+      maxWidth: 'none', maxHeight: 'none', minHeight: '0' });
+    Object.assign(content.style, { width: width + 'px', height: height + 'px', flex: 'none' });
+  }, size);
+  const expected = await notebookSnapshot(online, '#conceptNotebookDialog .dcn-content');
+  const actual = await notebookSnapshot(page, '#noteList');
+  assert.equal(actual.text, expected.text, label + '/' + phase + ': notebook text and visible structure match online');
+  for (const [selector, reference] of Object.entries(expected.elements)) {
+    const current = actual.elements[selector], message = label + '/' + phase + ': ' + selector;
+    assert.equal(current.visible, reference.visible, message + ' visibility');
+    if (!reference.visible) continue;
+    assert.deepEqual(current.style, reference.style, message + ' computed style');
+    assert.equal(current.value, reference.value, message + ' value');
+    assert.equal(current.checked, reference.checked, message + ' checkbox');
+    for (const key of ['x', 'y', 'width', 'height']) {
+      assert.ok(Math.abs(current.geometry[key] - reference.geometry[key]) <= 2,
+        message + ' ' + key + ': offline=' + current.geometry[key] + ', online=' + reference.geometry[key]);
+    }
+  }
+  if (process.env.OFFLINE_SCREENSHOT_DIR) {
+    const suffix = label.replace('/', '-') + '-' + phase + '.png';
+    await online.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/notebook-online-' + suffix });
+    await page.screenshot({ path: process.env.OFFLINE_SCREENSHOT_DIR + '/notebook-offline-' + suffix });
+  }
+}
+
+async function notebookParity(browser, page, width, theme, label) {
+  await navigate(page, 'notes');
+  await page.locator('#addNote').waitFor();
+  assert.equal(await page.locator('#notesPanel > .offline-toolbar,#notesPanel > .dcn-heading,#noteCount').count(), 0,
+    'The embedded notebook has no replacement heading or toolbar');
+  assert.deepEqual(await readStore(page, 'notes'), [], 'Notebook comparison begins with the real empty state');
+  const context = await browser.newContext({ viewport: page.viewportSize(), isMobile: width < 1101,
+    hasTouch: width < 1101, serviceWorkers: 'block' });
+  const online = await context.newPage(), errors = [];
+  online.on('pageerror', error => errors.push(error.message));
+  try {
+    await online.goto(baseURL + '/', { waitUntil: 'networkidle' });
+    await online.evaluate(mode => { appearanceSettings = { ...APPEARANCE_DEFAULTS, mode }; applyAppearanceSettings({ save: false }); }, theme);
+    const toggle = online.locator(width <= 1100 ? '#mobileToolsBtn' : '#desktopToolsBtn');
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    await online.locator('#conceptNotebookBtn').click();
+    await online.locator('#conceptNotebookDialog[open]').waitFor();
+    await compareNotebook(page, online, label, 'empty');
+    await page.locator('#addNote').click();
+    await page.waitForFunction(() => Boolean(document.querySelector('#noteList .dcn-note.is-current')));
+    await online.locator('#conceptNotebookDialog .dcn-sidebar > .dcn-primary').click();
+    await compareNotebook(page, online, label, 'new');
+    const title = '笔记布局示例', content = '集合与关系：先说明对象，再核对定义中的全部条件。';
+    await page.locator('#noteList .dcn-title').fill(title);
+    await online.locator('#conceptNotebookDialog .dcn-title').fill(title);
+    await page.locator('#noteList .dcn-original').fill(content);
+    await online.locator('#conceptNotebookDialog .dcn-original').fill(content);
+    await waitRecord(page, 'notes', title, content);
+    await page.locator('#noteList .dcn-note input[type=checkbox]').check();
+    await online.locator('#conceptNotebookDialog .dcn-note input[type=checkbox]').check();
+    assert.equal(await online.locator('#conceptNotebookDialog .dcn-ai-actions > button').first().isEnabled(), true);
+    const disabled = await page.locator('#noteList .dcn-ai-actions > button').evaluateAll(buttons =>
+      buttons.filter(button => button.getClientRects().length).every(button => button.disabled));
+    assert.equal(disabled, true, 'Offline AI controls keep the explicit network capability difference');
+    await compareNotebook(page, online, label, 'populated');
+    const row = (await readStore(page, 'notes')).find(note => note.title === title);
+    const fixture = page.locator('#noteList .dcn-note[data-note-id="' + row.id + '"]');
+    await confirmDeletion(page, fixture.locator('.dcn-note-delete'), true);
+    await fixture.waitFor({ state: 'detached' });
+    assert.deepEqual(await readStore(page, 'notes'), [], 'Parity fixture is removed before CRUD regression');
+    assert.deepEqual(errors, [], label + ': online notebook reference has no page errors');
+  } finally { await context.close(); }
 }
 
 async function notesCRUD(page, label) {
@@ -548,6 +652,7 @@ async function runCase(browser, width, theme) {
       await noOverflow(page, panel);
     }
     await appearanceControls(page, width, theme, reference);
+    await notebookParity(browser, page, width, theme, label);
     const noteTitle = await notesCRUD(page, label);
     const mistakeTitle = await mistakesCRUD(page, label, reference);
     await practice(page);
@@ -555,7 +660,6 @@ async function runCase(browser, width, theme) {
     if (theme === 'dark') await curriculum(page);
     await graph(page);
     await drawing(page);
-    await sidebarExport(page, width, noteTitle, mistakeTitle);
     // A second fully offline navigation must restore records and the drawing.
     await page.reload({ waitUntil: 'networkidle' });
     await ready(page);

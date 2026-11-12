@@ -19500,9 +19500,6 @@ function closeKnowledgeGraph() {
 }
 
 function renderKnowledgeGraphLoading(message) {
-    const summary = document.getElementById(
-        "knowledgeGraphSummary"
-    );
     const canvas = document.getElementById(
         "knowledgeGraphCanvas"
     );
@@ -19512,12 +19509,6 @@ function renderKnowledgeGraphLoading(message) {
     const detail = document.getElementById(
         "knowledgeGraphDetail"
     );
-
-    if (summary) {
-        summary.textContent = (
-            "这里可以查看当前题目，也可以汇总本对话前面做过的题目"
-        );
-    }
 
     if (canvas) {
         canvas.querySelectorAll(".kg-mobile-viewport").forEach(viewport => viewport._kgDispose?.());
@@ -20439,14 +20430,26 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     const canvas = document.getElementById("knowledgeGraphCanvas");
     const surface = canvas?.querySelector(".kg-desktop-zoom-surface");
     const stage = surface?.querySelector(".kg-desktop-zoom-stage");
-    if (!canvas || !surface || !stage) return;
+    const viewport = canvas?.querySelector(".kg-desktop-viewport");
+    if (!canvas || !surface || !stage || !viewport) return;
 
     const baseWidth = Number(stage.dataset.baseWidth) || 1;
     const baseHeight = Number(stage.dataset.baseHeight) || 1;
     const previous = Number(surface.dataset.scale) || 1;
     const next = Math.max(0.2, Math.min(2.5, Number(value) || 1));
-    const anchorX = keepCenter ? (canvas.scrollLeft + canvas.clientWidth / 2) / previous : 0;
-    const anchorY = keepCenter ? (canvas.scrollTop + canvas.clientHeight / 2) / previous : 0;
+    const center = () => {
+        const rect = viewport.getBoundingClientRect();
+        return {
+            x: rect.left + viewport.clientLeft + viewport.clientWidth / 2,
+            y: rect.top + viewport.clientTop + viewport.clientHeight / 2
+        };
+    };
+    const anchor = keepCenter ? center() : null;
+    const oldStage = keepCenter ? stage.getBoundingClientRect() : null;
+    const point = keepCenter ? {
+        x: (anchor.x - oldStage.left) / previous,
+        y: (anchor.y - oldStage.top) / previous
+    } : null;
 
     knowledgeGraphDesktopScale = next;
     surface.dataset.scale = String(next);
@@ -20454,8 +20457,10 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
     surface.style.height = `${Math.ceil(baseHeight * next)}px`;
     stage.style.transform = `scale(${next})`;
     if (keepCenter) {
-        canvas.scrollLeft = Math.max(0, anchorX * next - canvas.clientWidth / 2);
-        canvas.scrollTop = Math.max(0, anchorY * next - canvas.clientHeight / 2);
+        const movedStage = stage.getBoundingClientRect();
+        const target = center();
+        viewport.scrollLeft += movedStage.left + point.x * next - target.x;
+        viewport.scrollTop += movedStage.top + point.y * next - target.y;
     }
     const label = document.getElementById("knowledgeGraphDesktopZoomLabel");
     if (label) label.textContent = `${Math.round(next * 100)}%`;
@@ -20468,11 +20473,12 @@ function setKnowledgeGraphDesktopScale(value, keepCenter = true) {
 function fitKnowledgeGraphDesktop() {
     const canvas = document.getElementById("knowledgeGraphCanvas");
     const stage = canvas?.querySelector(".kg-desktop-zoom-stage");
-    if (!canvas || !stage) return;
+    const viewport = canvas?.querySelector(".kg-desktop-viewport");
+    if (!canvas || !stage || !viewport) return;
     const width = Number(stage.dataset.baseWidth) || 1;
     const height = Number(stage.dataset.baseHeight) || 1;
-    const availableWidth = Math.max(1, canvas.clientWidth - 64);
-    const availableHeight = Math.max(1, canvas.clientHeight - 104);
+    const availableWidth = Math.max(1, viewport.clientWidth - 24);
+    const availableHeight = Math.max(1, viewport.clientHeight - 24);
     const widthScale = availableWidth / width;
     const heightScale = availableHeight / height;
     const isTall = heightScale < Math.min(widthScale, 1.15) * 0.72;
@@ -20482,8 +20488,8 @@ function fitKnowledgeGraphDesktop() {
     // 极宽的图谱宁可局部横向滚动，也不能把节点文字缩至不可阅读。
     const fitted = Math.max(0.65, preferred);
     setKnowledgeGraphDesktopScale(fitted, false);
-    canvas.scrollLeft = 0;
-    canvas.scrollTop = 0;
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 0;
 }
 
 function installKnowledgeGraphDesktopZoom() {
@@ -20759,6 +20765,9 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
         svg.appendChild(group);
     }
 
+    // 固定圆角卡片的宽高，只有内部视口随真实尺寸的图谱二维滚动。
+    const viewport = document.createElement("div");
+    viewport.className = "kg-desktop-viewport";
     // 注意不对 SVG 用 width:100%：整张大图会被压缩到容器宽度，文字小且滚动布局抖动。
     const surface = document.createElement("div");
     surface.className = "kg-desktop-zoom-surface";
@@ -20772,95 +20781,10 @@ function renderKnowledgeGraphSection(container, nodes, title, description, conte
     svg.style.height = `${svgHeight}px`;
     stage.appendChild(svg);
     surface.appendChild(stage);
-    section.appendChild(surface);
+    viewport.appendChild(surface);
+    section.appendChild(viewport);
     container.appendChild(section);
 }
-
-function renderKnowledgeGraphSummary(context) {
-    const summary = document.getElementById(
-        "knowledgeGraphSummary"
-    );
-
-    if (!summary) return;
-
-    summary.innerHTML = "";
-
-    const addItem = (
-        label,
-        value,
-        className = ""
-    ) => {
-        if (!value) return;
-
-        const item = document.createElement("div");
-        item.className = [
-            "graph-summary-item",
-            className
-        ]
-            .filter(Boolean)
-            .join(" ");
-
-        const labelNode = document.createElement("span");
-        labelNode.className = "graph-summary-label";
-        labelNode.textContent = label;
-
-        const valueNode = document.createElement("span");
-        valueNode.className = "graph-summary-value";
-        valueNode.textContent = value;
-
-        item.appendChild(labelNode);
-        item.appendChild(valueNode);
-        summary.appendChild(item);
-    };
-
-    if (knowledgeGraphScope === "conversation") {
-        addItem(
-            "查看范围",
-            context.questionCount > 0
-                ? `本对话 · ${context.questionCount} 道题`
-                : "本对话"
-        );
-
-    } else if (knowledgeGraphScope === "history") {
-        addItem(
-            "查看范围",
-            `历史第 ${context.historyOrder || "?"} 题`
-        );
-
-    }
-    // 图谱保留分类筛选功能，摘要不重复显示模块标签。
-
-    const related = uniqueTextList(
-        context.knowledgePoints || [],
-        12
-    );
-
-    if (related.length) {
-        addItem(
-            knowledgeGraphScope === "conversation"
-                ? "本对话相关"
-                : (
-                    knowledgeGraphScope === "history"
-                        ? "历史题相关"
-                        : "本题相关"
-                ),
-            dmateKnowledgeList(related)
-        );
-    } else {
-        addItem(
-            "当前视图",
-            knowledgeGraphViewMode === "focus"
-                ? (
-                    knowledgeGraphScope === "conversation"
-                        ? "本对话暂时没有可汇总的知识点"
-                        : "与当前题目直接相关的知识"
-                )
-                : "完整范围"
-        );
-    }
-}
-
-
 
 function setKnowledgeGraphSideMode(mode) {
     knowledgeGraphSideMode = (
@@ -21211,8 +21135,9 @@ function renderKnowledgeGraphDetail() {
         section.className = "kg-video-section";
 
         const heading = document.createElement("div");
-        heading.className = "kg-video-section-title";
-        heading.textContent = "教学视频";
+        heading.className = "graph-detail-field-label";
+        heading.dataset.kgVideoHeading = "";
+        heading.textContent = dmateUiText("教学视频");
         section.appendChild(heading);
 
         const platforms = new Map([["Bilibili", []]]);
@@ -21334,7 +21259,6 @@ function renderKnowledgeGraph() {
 
     if (!canvas) return;
 
-    renderKnowledgeGraphSummary(context);
     knowledgeGraphPreparedPngPromise = null;
     knowledgeGraphPreparedPngKey = "";
     if (!knowledgeGraphData.nodes.length) {

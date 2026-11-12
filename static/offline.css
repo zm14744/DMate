@@ -86,15 +86,9 @@ body.offline-workspace .offline-main.center { position:relative; display:flex !i
 .offline-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; padding:36px 16px; color:var(--text-muted); text-align:center; }
 .offline-empty h2 { margin:0 0 8px; color:var(--text-primary); font-size:15px; font-weight:500; }
 .offline-empty p { margin:0; max-width:380px; color:var(--text-muted); font-size:13px; line-height:1.7; }
-.offline-notebook.dcn-content { display:grid; grid-template-columns:minmax(180px,260px) minmax(0,1fr); min-height:400px; height:calc(100dvh - 240px); max-height:760px; gap:20px; overflow:hidden; }
-.offline-notebook .dcn-search,.offline-notebook .dcn-title,.offline-notebook .dcn-original { display:block; width:100%; min-width:0; max-width:100%; margin:6px 0 0; padding:10px; border:1px solid var(--border-strong); border-radius:9px; background:var(--surface-1); color:var(--text-primary); font:inherit; font-size:14px; line-height:1.6; }
-.offline-notebook .dcn-search { margin:0; }
-.offline-notebook label { display:block; font-size:14px; font-weight:600; line-height:1.5; }
-.offline-notebook .dcn-original { min-height:210px; resize:vertical; }
-.offline-notebook .dcn-note-open { flex:1; min-width:0; padding:6px; border:0; background:transparent; color:var(--text-primary); font:inherit; font-size:14px; text-align:left; overflow-wrap:anywhere; }
-.offline-notebook .dcn-note-delete { appearance:none; flex:none; width:20px; min-width:20px; max-width:20px; height:20px; min-height:20px; padding:0; border:0; border-radius:50%; background:#ef4444; color:transparent; font-size:0; cursor:pointer; }
-.offline-notebook .dcn-note-delete svg { display:none; }
-.offline-notebook .dcn-saved { font-size:12px; }
+/* The notebook uses the online component's content and control rules. Only
+   its outer box adapts from a modal dialog to the offline panel container. */
+#notesPanel.offline-notebook { display:flex; flex-direction:column; height:auto; max-height:none; min-height:0; background:var(--surface-1); }
 .offline-dialog { position:fixed; inset:0; width:min(560px,calc(100vw - 32px)); max-width:calc(100vw - 32px); height:fit-content; max-height:calc(100dvh - 32px); margin:auto; padding:0; border:1px solid var(--border-strong); border-radius:18px; background:var(--surface-2); color:var(--text-primary); overflow:auto; }
 .offline-dialog:not([open]) { display:none !important; }
 .offline-dialog[open] { display:block !important; }
@@ -130,7 +124,7 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   body.offline-workspace[data-appearance-theme] #offlineSidebar :is(.offline-nav-item,.offline-return):hover { background:var(--dm-nav-hover,var(--surface-3)) !important; }
   body.offline-workspace[data-appearance-theme] :is(#offlineMain,#recordDialog) .offline-primary { background:var(--accent) !important; border-color:var(--accent) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }
   body.offline-workspace[data-appearance-theme] :is(#offlineDesktopSidebarToggle,#offlineDesktopSidebarOpen,#offlineNavToggle,#offlineAppearanceToggle):is(.offline-icon-button,.mobile-topbar-button) { border:0 !important; background:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
-  body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item,.concept-item,.dcn-note-open) { background:transparent !important; border-color:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
+  body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item,.concept-item) { background:transparent !important; border-color:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain :is(.question-item.active,.concept-item.active) { background:var(--dm-selected-bg,var(--surface-3)) !important; }
   body.offline-workspace[data-appearance-theme] #offlineMain .question-option.selected { background:var(--dm-selected-bg,var(--surface-3)) !important; border-color:var(--dm-selected-ring) !important; }
 }
@@ -165,9 +159,6 @@ body.offline-workspace.has-custom-background .offline-panel { background:rgba(va
   .offline-search { width:100%; min-width:0; }
   .offline-card-grid { grid-template-columns:1fr; }
   .record-meta { align-items:flex-start; flex-direction:column; }
-  .offline-notebook.dcn-content { grid-template-columns:1fr; grid-template-rows:minmax(120px,22dvh) minmax(240px,1fr); gap:14px; height:auto; min-height:520px; max-height:none; }
-  .offline-notebook .dcn-sidebar { display:flex; }
-  .offline-notebook .dcn-original { min-height:180px; }
   .offline-dialog { border-radius:14px; width:calc(100vw - 20px); max-height:calc(100dvh - 24px); }
   .offline-dialog .modal-head { min-height:54px; padding:12px 14px; }
   .offline-dialog .modal-close-dot { width:22px; min-width:22px; height:22px; min-height:22px; }

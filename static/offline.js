@@ -11,6 +11,7 @@
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
     questionDifficulty: "", conceptQuery: "", graphQuery: "", graphController: null,
     selectedNoteId: null, noteQuery: "", noteRows: [], noteSaveQueue: Promise.resolve(),
+    noteSelectedIds: new Set(), noteQuestion: "", noteDrafts: new Map(), noteSaveStatus: new Map(), noteDeletePending: null,
     questionResponses: new Map(), appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
@@ -329,72 +330,191 @@
     }
   }
 
-  async function renderNotes() {
+  function noteTime(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(0, numeric) : Date.parse(value) || 0;
+  }
+
+  function setNoteSaveStatus(id, message) {
+    state.noteSaveStatus.set(id, message);
+    const saved = $("noteList").querySelector(".dcn-saved");
+    if (saved?.dataset.noteId === id) saved.textContent = message;
+  }
+
+  function queueNoteSave(row) {
+    const snapshot = {...row};
+    state.noteDrafts.set(row.id, snapshot);
+    setNoteSaveStatus(row.id, "正在保存…");
+    state.noteSaveQueue = state.noteSaveQueue.then(async () => {
+      try {
+        await put("notes", snapshot);
+        if (state.noteDrafts.get(row.id) === snapshot) {
+          state.noteDrafts.delete(row.id);
+          setNoteSaveStatus(row.id, "");
+        }
+        return true;
+      } catch (error) {
+        if (state.noteDrafts.get(row.id) === snapshot) {
+          setNoteSaveStatus(row.id, "保存失败，请保留当前页面后重试。");
+          toast(error?.message || "笔记保存失败");
+        }
+        return false;
+      }
+    });
+    return state.noteSaveQueue;
+  }
+
+  async function flushNoteDrafts() {
     await state.noteSaveQueue;
-    const rows = (await all("notes")).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
+    for (const row of [...state.noteDrafts.values()]) queueNoteSave(row);
+    await state.noteSaveQueue;
+    return state.noteDrafts.size === 0;
+  }
+
+  async function deleteNote(row) {
+    await new Promise((resolve, reject) => {
+      const tx = state.db.transaction(["notes", "settings"], "readwrite");
+      const settings = tx.objectStore("settings");
+      const request = settings.get("notebook-deletions");
+      request.onsuccess = () => {
+        const previous = request.result || {};
+        const deleted = {...(previous.deleted || {})};
+        deleted[row.id] = Math.max(Date.now(), noteTime(row.updatedAt) + 1, noteTime(deleted[row.id]));
+        settings.put({...previous, id:"notebook-deletions", deleted, updatedAt:stamp()});
+      };
+      tx.objectStore("notes").delete(row.id);
+      tx.oncomplete = resolve;
+      tx.onerror = tx.onabort = () => reject(tx.error || new Error("概念尚未删除，请重试。"));
+    });
+    state.noteDrafts.delete(row.id);
+    state.noteSaveStatus.delete(row.id);
+    state.noteSelectedIds.delete(row.id);
+  }
+
+  async function renderNotes() {
+    await flushNoteDrafts();
+    const byId = new Map((await all("notes")).map(row => [row.id, row]));
+    // A failed write stays visible and retryable when changing panels. Read the
+    // drafts after IndexedDB finishes so newer input also wins this merge.
+    for (const [id, row] of state.noteDrafts) byId.set(id, {...row});
+    const rows = [...byId.values()].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
     state.noteRows = rows;
     if (!rows.some(row => row.id === state.selectedNoteId)) state.selectedNoteId = rows[0]?.id || null;
-    $("noteCount").textContent = rows.length + " 条笔记";
+    state.noteSelectedIds = new Set([...state.noteSelectedIds].filter(id => byId.has(id)));
     const host = $("noteList");
-    host.classList.add("dcn-content", "offline-notebook");
     host.replaceChildren();
     const sidebar = el("aside", "dcn-sidebar"), main = el("section", "dcn-main");
     sidebar.setAttribute("aria-label", "概念笔记列表");
+    const create = button("新建概念", "dcn-primary", createNote);
+    create.id = "addNote";
     const search = el("input", "dcn-search");
-    search.type = "search"; search.placeholder = "搜索"; search.setAttribute("aria-label", "搜索笔记"); search.value = state.noteQuery;
-    const list = el("div", "dcn-list");
+    search.type = "search"; search.placeholder = "搜索"; search.setAttribute("aria-label", "搜索"); search.value = state.noteQuery;
+    const searchWrap = el("div", "dcn-search-wrap");
+    const searchClear = button("", "dcn-search-clear", () => {
+      search.value = ""; state.noteQuery = ""; renderList(); search.focus({preventScroll:true});
+    });
+    searchClear.title = "清空搜索"; searchClear.setAttribute("aria-label", "清空搜索");
+    searchWrap.append(search, searchClear);
+    const list = el("div", "dcn-list"), selection = el("div", "dcn-selection"), count = el("span");
+    selection.append(count);
+    const editor = el("section", "dcn-editor");
+    const nameLabel = el("label", "", "概念名称"), name = el("input", "dcn-title");
+    name.maxLength = 160; name.setAttribute("aria-label", "概念名称"); nameLabel.append(name);
+    const bodyLabel = el("label", "", "我的概念笔记"), body = el("textarea", "dcn-original");
+    body.rows = 9; body.setAttribute("aria-label", "我的概念笔记"); bodyLabel.append(body);
+    const saved = el("span", "dcn-saved"); saved.setAttribute("role", "status");
+    editor.append(nameLabel, bodyLabel, saved);
+    const ai = el("section", "dcn-ai");
+    const questionLabel = el("label", "", "补充要求（可选）"), question = el("textarea", "dcn-question");
+    question.maxLength = 1000; question.rows = 2; question.value = state.noteQuestion;
+    question.setAttribute("aria-label", "补充要求（可选）"); questionLabel.append(question);
+    const controls = el("div", "dcn-ai-actions");
+    const explain = button("AI 解释", "dcn-primary", () => {}), relations = button("分析关联", "", () => {});
+    for (const control of [explain, relations]) { control.disabled = true; control.title = "请在在线版使用"; }
+    const cancel = button("", "dcn-close dcn-analysis-cancel", () => {});
+    cancel.hidden = true; cancel.title = "取消分析"; cancel.setAttribute("aria-label", "取消分析");
+    const status = el("p", "dcn-status"), result = el("div", "dcn-results");
+    status.setAttribute("role", "status"); result.setAttribute("aria-label", "AI 解释与概念关联");
+    controls.append(explain, relations, cancel); ai.append(questionLabel, controls, status, result);
+    main.append(editor, ai);
+    function renderActions() {
+      const empty = state.noteRows.length === 0;
+      $("notesPanel").classList.toggle("is-empty", empty);
+      selection.hidden = empty; main.hidden = empty; ai.hidden = empty;
+      count.textContent = "已选 " + state.noteSelectedIds.size + " 条";
+      for (const deletion of host.querySelectorAll(".dcn-note-delete")) deletion.disabled = Boolean(state.noteDeletePending);
+    }
     function renderList() {
       list.replaceChildren();
-      const query = state.noteQuery.toLocaleLowerCase();
+      searchClear.hidden = !search.value;
+      const query = state.noteQuery.trim().toLocaleLowerCase();
       const visible = state.noteRows.filter(row => !query || (row.title + "\n" + row.content).toLocaleLowerCase().includes(query));
       if (!visible.length) list.append(el("p", "dcn-list-empty", rows.length ? "没有匹配的概念。" : "无"));
+      const names = new Map();
+      for (const row of state.noteRows) {
+        const title = row.title.trim() || "未命名概念";
+        names.set(title, (names.get(title) || 0) + 1);
+      }
       for (const row of visible) {
+        const title = row.title.trim() || "未命名概念";
         const item = el("div", "dcn-note" + (row.id === state.selectedNoteId ? " is-current" : ""));
         item.dataset.noteId = row.id;
-        const open = button(row.title.trim() || "未命名概念", "dcn-note-open", () => {
-          state.selectedNoteId = row.id; renderList(); renderEditor();
+        const hit = el("label", "dcn-note-select"), check = el("input");
+        check.type = "checkbox"; check.checked = state.noteSelectedIds.has(row.id);
+        check.setAttribute("aria-label", "选择概念：" + title); hit.append(check);
+        check.addEventListener("change", () => {
+          if (check.checked) state.noteSelectedIds.add(row.id); else state.noteSelectedIds.delete(row.id);
+          renderActions();
         });
+        const open = button(title, "dcn-note-open", () => {
+          state.selectedNoteId = row.id; renderList(); renderEditor(); renderActions();
+        });
+        if (row.title.trim()) open.setAttribute("data-i18n-content", "");
         open.setAttribute("aria-current", String(row.id === state.selectedNoteId));
-        const deletion = button("", "dcn-note-delete", async () => {
-          if (await confirmDelete($("notesPanel"), "删除这个概念？", row.title.trim() || "未命名概念")) {
-            await state.noteSaveQueue; await remove("notes", row.id); await renderNotes();
+        const deletion = button("", "dcn-note-delete", async event => {
+          event.stopPropagation();
+          if (state.noteDeletePending) return;
+          state.noteDeletePending = row.id; renderActions();
+          try {
+            if (!await confirmDelete($("notesPanel"), "删除这个概念？", title)) return;
+            if (!await flushNoteDrafts()) { toast("笔记尚未保存，请保留当前页面后重试。"); return; }
+            await deleteNote(state.noteRows.find(note => note.id === row.id) || row); await renderNotes();
+          } finally {
+            state.noteDeletePending = null; renderActions();
           }
         });
-        deletion.title = "删除概念：" + (row.title.trim() || "未命名概念");
-        deletion.setAttribute("aria-label", deletion.title);
-        item.append(open, deletion); list.append(item);
+        deletion.title = "删除" + title;
+        deletion.setAttribute("aria-label", "删除概念：" + title + (names.get(title) > 1 ? "（" + row.id + "）" : ""));
+        item.append(hit, open, deletion); list.append(item);
       }
     }
     function renderEditor() {
-      main.replaceChildren();
       const row = state.noteRows.find(note => note.id === state.selectedNoteId);
-      if (!row) { main.append(el("div", "offline-empty", "无")); return; }
-      const editor = el("section", "dcn-editor");
-      const nameLabel = el("label", "", "概念名称"), name = el("input", "dcn-title");
-      name.maxLength = 160; name.value = row.title; name.setAttribute("aria-label", "概念名称"); nameLabel.append(name);
-      const bodyLabel = el("label", "", "我的概念笔记"), body = el("textarea", "dcn-original");
-      body.maxLength = Math.max(12000, row.content.length); body.rows = 9; body.value = row.content; body.setAttribute("aria-label", "我的概念笔记"); bodyLabel.append(body);
-      const saved = el("span", "dcn-saved", "已保存在本机"); saved.setAttribute("role", "status");
-      const edit = () => {
-        row.title = name.value; row.content = body.value; row.updatedAt = stamp();
-        const value = {...row}; saved.textContent = "正在保存…";
-        state.noteSaveQueue = state.noteSaveQueue.then(() => put("notes", value)).then(() => {
-          saved.textContent = "已保存在本机";
-        }).catch(error => { saved.textContent = "保存失败，请保留当前页面后重试。"; toast(error?.message || "笔记保存失败"); });
-        renderList();
-      };
-      name.addEventListener("input", edit); body.addEventListener("input", edit);
-      editor.append(nameLabel, bodyLabel, saved); main.append(editor);
+      editor.hidden = !row;
+      name.value = row?.title || ""; body.value = row?.content || "";
+      body.maxLength = Math.max(12000, row?.content.length || 0);
+      saved.dataset.noteId = row?.id || "";
+      saved.textContent = row ? state.noteSaveStatus.get(row.id) || "" : "";
     }
-    search.addEventListener("input", () => { state.noteQuery = search.value.trim(); renderList(); });
-    sidebar.append(search, list); host.append(sidebar, main); renderList(); renderEditor();
+    const edit = () => {
+      const row = state.noteRows.find(note => note.id === state.selectedNoteId);
+      if (!row) return;
+      row.title = name.value; row.content = body.value;
+      row.updatedAt = new Date(Math.max(Date.now(), noteTime(row.updatedAt) + 1)).toISOString();
+      queueNoteSave(row); renderList();
+    };
+    name.addEventListener("input", edit); body.addEventListener("input", edit);
+    question.addEventListener("input", () => { state.noteQuestion = question.value; });
+    search.addEventListener("input", () => { state.noteQuery = search.value; renderList(); });
+    sidebar.append(create, searchWrap, selection, list); host.append(sidebar, main);
+    renderList(); renderEditor(); renderActions();
   }
 
   async function createNote() {
-    await state.noteSaveQueue;
+    if (!await flushNoteDrafts()) { toast("笔记尚未保存，请保留当前页面后重试。"); return; }
     const row = {id:uid(), title:"", content:"", updatedAt:stamp()};
     await put("notes", row); state.selectedNoteId = row.id; state.noteQuery = "";
-    await renderNotes(); $("noteList").querySelector(".dcn-title")?.focus();
+    await renderNotes(); $("noteList").querySelector(".dcn-title")?.focus({preventScroll:true});
   }
 
   function openRecord(kind, row = null) {
@@ -696,20 +816,6 @@
     }
   }
 
-  async function exportData() {
-    await state.noteSaveQueue;
-    const [mistakes, notes, practice] = await Promise.all([all("mistakes"), all("notes"), all("practice")]);
-    const drawings = localStorage.getItem("dmate:offline:drawing-gallery:v1") || "";
-    const payload = {format:"dmate-offline-backup",version:1,createdAt:stamp(),mistakes,notes,practice,drawings};
-    const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = "dmate-offline-backup.json";
-    document.body.append(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast("本地学习数据已导出");
-  }
-
   async function returnOnline() {
     if (!navigator.onLine) return toast("当前没有网络，在线版暂时无法打开");
     window.location.assign("/");
@@ -737,7 +843,6 @@
   function bind() {
     document.querySelectorAll(".offline-nav-item").forEach(item => item.addEventListener("click", () => switchPanel(item.dataset.panel)));
     $("addMistake").addEventListener("click", () => openRecord("mistakes"));
-    $("addNote").addEventListener("click", () => createNote().catch(error => toast(error?.message || "无法新建笔记")));
     $("recordForm").addEventListener("submit", event => saveRecord(event).catch(error => toast(error?.message || "本地保存失败")));
     $("cancelRecord").addEventListener("click", () => $("recordDialog").close());
     $("cancelRecordSecondary")?.addEventListener("click", () => $("recordDialog").close());
@@ -745,7 +850,6 @@
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
     $("graphSearch").addEventListener("input", renderGraph);
-    $("exportLocalData").addEventListener("click", () => exportData().catch(error => toast(error.message)));
     $("returnOnline").addEventListener("click", returnOnline);
     window.addEventListener("online", setNetworkStatus);
     window.addEventListener("offline", setNetworkStatus);

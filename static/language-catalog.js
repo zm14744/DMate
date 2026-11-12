@@ -704,6 +704,7 @@
         "图中前置知识": "Prerequisites shown in the graph",
         "当前图中暂无前置": "No prerequisites in the current graph",
         "图中直接后续": "Direct follow-up concepts in the graph",
+        "教学视频": "Teaching videos",
         "当前图中暂无后续": "No follow-up concepts in the current graph",
         "说明": "Description",
         "知识图谱目前还是空的。": "The Knowledge Graph is empty.",
