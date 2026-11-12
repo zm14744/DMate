@@ -111,7 +111,7 @@ button:disabled{opacity:.5;cursor:default}
 .offline-form textarea{resize:vertical;line-height:1.7}
 .offline-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:5px}
 .offline-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:10000;background:var(--off-accent);color:var(--off-accent-text);border-radius:9px;padding:10px 15px;box-shadow:0 8px 25px #0002;font-size:12px;max-width:90vw}
-.dmate-drawing-workspace .ddw-ai-button,.dmate-drawing-workspace .ddw-upload-button{display:none!important}
+.dmate-drawing-workspace .ddw-side-actions>button:nth-child(3),.dmate-drawing-workspace .ddw-ai-button,.dmate-drawing-workspace .ddw-upload-button{display:none!important}
 @media(max-width:850px){
  .offline-shell{grid-template-columns:1fr}
  .offline-sidebar{min-height:0;padding:10px 12px 8px;border-right:0;border-bottom:1px solid var(--off-line);display:grid;grid-template-columns:1fr auto;gap:8px}
