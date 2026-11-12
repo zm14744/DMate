@@ -2,10 +2,15 @@
     'use strict';
 
     const VERSION = '3.31.0';
-    const INTEGRITY = 'sha256-yeCzEPmIORDgHGYFS4t/9L49hpUUERZjXnKwrxUmkg==';
     const SOURCES = [
-        'https://cdn.jsdelivr.net/gh/siyuan-note/siyuan@be17ed1e0510bb6371cb8a162e16898a697fa118/app/stage/protyle/js/graphviz/viz.js',
-        'https://github.com/mdaines/viz-js/releases/download/release-viz-' + VERSION + '/viz-global.js'
+        {
+            url: 'https://cdn.jsdelivr.net/gh/siyuan-note/siyuan@be17ed1e0510bb6371cb8a162e16898a697fa118/app/stage/protyle/js/graphviz/viz.js',
+            integrity: 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4='
+        },
+        {
+            url: 'https://github.com/mdaines/viz-js/releases/download/release-viz-' + VERSION + '/viz-global.js',
+            integrity: 'sha256-yeCzEPmIORDgHGYFS4t/9L49hpUUERZjXnKwrxUmkg=='
+        }
     ];
     let vizPromise = null;
 
@@ -23,8 +28,9 @@
                     return;
                 }
                 const script = doc.createElement('script');
-                script.src = SOURCES[index++];
-                script.integrity = INTEGRITY;
+                const source = SOURCES[index++];
+                script.src = source.url;
+                script.integrity = source.integrity;
                 script.crossOrigin = 'anonymous';
                 script.async = true;
                 script.onload = () => {

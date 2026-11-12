@@ -6,13 +6,23 @@ const path = require('node:path');
 const api = require('../static/math-diagram.js');
 
 (async () => {
-  const bundleURL = 'https://cdn.jsdelivr.net/gh/siyuan-note/siyuan@be17ed1e0510bb6371cb8a162e16898a697fa118/app/stage/protyle/js/graphviz/viz.js';
-  const bundleResponse = await fetch(bundleURL);
-  assert.equal(bundleResponse.ok, true, 'The pinned browser bundle CDN URL must be reachable.');
-  const bundleBytes = Buffer.from(await bundleResponse.arrayBuffer());
-  const sri = 'sha256-' + crypto.createHash('sha256').update(bundleBytes).digest('base64');
-  assert.equal(sri, 'sha256-yeCzEPmIORDgHGYFS4t/9L49hpUUERZjXnKwrxUmkg==',
-    'The pinned browser bundle must match the upstream Subresource Integrity hash.');
+  const bundles = [
+    {
+      url: 'https://cdn.jsdelivr.net/gh/siyuan-note/siyuan@be17ed1e0510bb6371cb8a162e16898a697fa118/app/stage/protyle/js/graphviz/viz.js',
+      integrity: 'sha256-yeCzEPmIORDgHGYFS0i3/0vj2GlRQRFmNecrCvFSaS4='
+    },
+    {
+      url: 'https://github.com/mdaines/viz-js/releases/download/release-viz-3.31.0/viz-global.js',
+      integrity: 'sha256-yeCzEPmIORDgHGYFS4t/9L49hpUUERZjXnKwrxUmkg=='
+    }
+  ];
+  for (const bundle of bundles) {
+    const response = await fetch(bundle.url);
+    assert.equal(response.ok, true, 'The pinned browser bundle URL must be reachable: ' + bundle.url);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const sri = 'sha256-' + crypto.createHash('sha256').update(bytes).digest('base64');
+    assert.equal(sri, bundle.integrity, 'The browser bundle must match its Subresource Integrity hash.');
+  }
 
   const Viz = await import('@viz-js/viz');
   const viz = await Viz.instance();
