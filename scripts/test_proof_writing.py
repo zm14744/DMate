@@ -2,6 +2,8 @@
 
 import unittest
 
+from teaching import teaching_prompt
+
 from proof_writing import (
     PROOF_WRITING_STANDARD_EN,
     PROOF_WRITING_STANDARD_ZH,
@@ -27,6 +29,13 @@ class ProofWritingPolicyTests(unittest.TestCase):
         self.assertIn(PROOF_WRITING_STANDARD_ZH, proof_writing_prompt("zh-CN"))
         self.assertIn(PROOF_WRITING_STANDARD_EN, proof_writing_prompt("en"))
         self.assertIn(PROOF_WRITING_STANDARD_EN, proof_writing_prompt("en-US"))
+
+
+    def test_proof_exercises_store_a_complete_hidden_proof(self):
+        chinese = teaching_prompt({"mode": "exercise", "response_language": "zh-CN"})
+        english = teaching_prompt({"mode": "exercise", "response_language": "en"})
+        self.assertIn("完整、可独立检查的规范证明", chinese)
+        self.assertIn("complete, independently checkable proof", english)
 
     def test_non_english_language_defaults_to_chinese(self):
         self.assertIn(PROOF_WRITING_STANDARD_ZH, proof_writing_prompt("zh-Hans"))
