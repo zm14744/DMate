@@ -8,7 +8,7 @@ This standard governs DMate's discrete-mathematics tutoring, proof hints, comple
 
 **Included scope:** mathematical logic, sets, relations and functions, number theory, combinatorics, induction and recursion, graph theory and trees, posets and lattices, discrete algebraic structures, Boolean algebra, automata and formal languages, discrete probability, algorithm correctness and complexity.
 
-**Not separate DMate proof modules:** real analysis, epsilon-delta limits, continuity and calculus, general topology, linear-algebra coursework, differential equations, complex analysis and continuous optimization. General logical principles still apply to any mathematical argument, but these subjects do not receive dedicated DMate proof checklists.
+**Not separate DMate proof modules:** real analysis, epsilon-delta limits, continuity and calculus, general topology, linear-algebra coursework, differential equations, complex analysis and continuous optimization. Shared logical terminology and proof methods are applied only within the discrete-mathematics curriculum above; they do not extend this standard's subject coverage.
 
 ## 1. Shared proof-language requirements
 

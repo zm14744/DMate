@@ -257,9 +257,6 @@
 
   function setNetworkStatus() {
     const online = navigator.onLine;
-    const status = $("networkStatus");
-    status.className = "offline-status " + (online ? "online" : "offline");
-    status.lastElementChild.textContent = online ? "网络已连接 · 本地可用" : "离线状态 · 本地运行";
     $("returnOnline").disabled = !online;
     $("returnOnline").title = online ? "返回在线版" : "网络恢复后可返回在线版";
   }
@@ -276,8 +273,6 @@
       const node = $(key + "Panel");
       if (node) node.hidden = key !== name;
     }
-    $("panelTitle").textContent = panelMeta[name][0];
-    $("panelDescription").textContent = panelMeta[name][1];
     let rendering;
     if (name === "mistakes") rendering = renderMistakes();
     if (name === "notes") rendering = renderNotes();
@@ -285,7 +280,7 @@
     if (name === "graph") renderGraph();
     if (name === "questions") renderQuestions();
     if (name === "concepts") renderConcepts();
-    window.dispatchEvent(new CustomEvent("dmate:offlinepanelchange", {detail:{panel:name}}));
+    window.dispatchEvent(new CustomEvent("dmate:offlinepanelchange", {detail:{panel:name,title:panelMeta[name][0]}}));
     return rendering;
   }
 
@@ -742,11 +737,9 @@
       await migrateCurrentAccountData();
       await loadResources();
       bind();
-      $("saveState").textContent = "本地保存已启用";
       await switchPanel("mistakes");
       document.documentElement.dataset.offlineReady = "true";
     } catch (error) {
-      $("saveState").textContent = "初始化失败";
       toast(error?.message || "离线工作区初始化失败");
     }
   }

@@ -133,8 +133,8 @@ class ProofWritingPolicyTests(unittest.TestCase):
     def test_full_chinese_and_english_prompts_share_all_domains(self):
         chinese = proof_writing_prompt("zh-CN")
         english = proof_writing_prompt("en-US")
-        self.assertIn("【分领域证明核对要求", chinese)
-        self.assertIn("[Domain-specific proof checks", english)
+        self.assertIn("【离散数学分领域证明核对要求", chinese)
+        self.assertIn("[Discrete-mathematics proof checks", english)
         for _, zh_title, en_title, _, _, _ in PROOF_DOMAINS:
             self.assertEqual(chinese.count(zh_title), 1)
             self.assertEqual(english.count(en_title), 1)
@@ -148,6 +148,28 @@ class ProofWritingPolicyTests(unittest.TestCase):
 
     def test_non_english_language_defaults_to_chinese(self):
         self.assertIn(PROOF_WRITING_STANDARD_ZH, proof_writing_prompt("zh-Hans"))
+
+    def test_runtime_and_docs_limit_the_policy_to_the_discrete_curriculum(self):
+        root = Path(__file__).resolve().parents[1]
+        chinese = proof_writing_prompt('zh-CN')
+        english = proof_writing_prompt('en')
+        self.assertTrue(chinese.lstrip().startswith('【离散数学证明写作规范'))
+        self.assertTrue(english.lstrip().startswith('[DMate Discrete Mathematics Proof-Writing Standard]'))
+        self.assertIn('仅适用于离散数学及其课程内紧密相关的算法、群环结构和数论应用', chinese)
+        self.assertIn('only to proof tasks in discrete mathematics', english)
+        self.assertIn('including algorithms, group/ring structures and number-theoretic applications', english)
+        self.assertIn('不为微积分、实分析、一般拓扑、微分方程、连续优化等其他学科建立专门证明要求', chinese)
+        self.assertIn('does not introduce dedicated proof requirements for calculus', english)
+        for subject in ('微积分', '实分析', '一般拓扑', '微分方程', '连续优化'):
+            self.assertIn(subject, PROOF_WRITING_STANDARD_ZH.split('\n\n', 1)[0])
+        for subject in ('calculus', 'real analysis', 'general topology', 'differential equations', 'continuous optimization'):
+            self.assertIn(subject, PROOF_WRITING_STANDARD_EN.split('\n\n', 1)[0])
+        self.assertIn('仅用于该课程范围内的相关题型', proof_coverage_prompt('zh-CN'))
+        self.assertIn('only to relevant topics within that curriculum', proof_coverage_prompt('en'))
+        chinese_docs = (root / 'docs/PROOF_WRITING_STANDARD.md').read_text(encoding='utf-8')
+        english_docs = (root / 'docs/PROOF_WRITING_STANDARD.en.md').read_text(encoding='utf-8')
+        self.assertIn('仅用于上述离散数学课程范围', chinese_docs)
+        self.assertIn('only within the discrete-mathematics curriculum above', english_docs)
 
     def test_existence_rules_allow_both_methods_without_forcing_a_witness(self):
         chinese = proof_writing_prompt('zh-CN')

@@ -2410,38 +2410,7 @@ def retire_legacy_dmate_service_worker():
     return response
 
 
-@app.route("/offline")
-def offline_learning_workspace():
-    """Serve the self-contained local learning workspace."""
-    response = app.send_static_file("offline.html")
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    return response
-
-
-@app.route("/offline-service-worker.js")
-def offline_learning_service_worker():
-    """Serve the offline worker at the origin root so it can control navigation."""
-    response = app.send_static_file("offline-service-worker.js")
-    response.headers["Content-Type"] = "application/javascript; charset=utf-8"
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Service-Worker-Allowed"] = "/"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    return response
-
-
-@app.route("/web-version")
-def web_application_revision():
-    """Report the live deployed web/backend revision without caching."""
-    revision = (_RUNTIME_SOURCE.get("manifest_sha256")
-        if _RUNTIME_SOURCE.get("status") == "ok" else None)
-    response = jsonify({"revision": revision})
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    return response
-
-
-@app.route("/")
-def home():
+def _web_client_template_context():
     # 普通 Android 浏览器显示 APK 下载入口；已安装的 APK 隐藏重复入口。
     # APK 自己追加 DMateAndroid/<version> UA，可据此隐藏网页内的下载入口。
     user_agent = request.headers.get("User-Agent", "")
@@ -2470,6 +2439,59 @@ def home():
     is_android_edge = bool(is_android_browser and re.search(r"EdgA/|Edg/|Edge/", user_agent, re.IGNORECASE))
     is_android_firefox = bool(is_android_browser and re.search(r"Firefox/|Fennec/", user_agent, re.IGNORECASE))
 
+    return {
+        "is_android": is_android,
+        "is_ios": is_ios,
+        "is_mac_safari": is_mac_safari,
+        "is_search_crawler": is_search_crawler,
+        "is_android_browser": is_android_browser,
+        "is_windows_browser": is_windows_browser,
+        "is_desktop_firefox": is_desktop_firefox,
+        "is_android_edge": is_android_edge,
+        "is_android_firefox": is_android_firefox,
+        "is_dmate_android_app": is_dmate_android_app,
+        "is_dmate_desktop_app": is_dmate_desktop_app,
+        "search_favicon_base": _search_favicon_base(),
+    }
+
+
+@app.route("/offline")
+@app.route("/static/offline.html")
+def offline_learning_workspace():
+    """Serve the self-contained local learning workspace."""
+    with app.open_resource("static/offline.html") as source:
+        html = source.read().decode("utf-8")
+    favicon = render_template("_favicon_links.html", **_web_client_template_context())
+    response = make_response(html.replace("<!-- DMATE_CURRENT_ONLINE_FAVICON -->", favicon, 1))
+    response.vary.add("User-Agent")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@app.route("/offline-service-worker.js")
+def offline_learning_service_worker():
+    """Serve the offline worker at the origin root so it can control navigation."""
+    response = app.send_static_file("offline-service-worker.js")
+    response.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@app.route("/web-version")
+def web_application_revision():
+    """Report the live deployed web/backend revision without caching."""
+    revision = (_RUNTIME_SOURCE.get("manifest_sha256")
+        if _RUNTIME_SOURCE.get("status") == "ok" else None)
+    response = jsonify({"revision": revision})
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return response
+
+
+@app.route("/")
+def home():
     # 首页直接注入与 teaching.py / app.py 共用的 knowledge_graph.json，
     # 避免前端再维护一份硬编码图谱而产生不同步。
     # 客户端通过远程网页获取新功能：不允许 WebView 缓存旧 HTML
@@ -2480,18 +2502,7 @@ def home():
         exercise_intent_rules=EXERCISE_INTENT_RULES,
         dmate_web_revision=(_RUNTIME_SOURCE.get("manifest_sha256")
             if _RUNTIME_SOURCE.get("status") == "ok" else None),
-        is_android=is_android,
-        is_ios=is_ios,
-        is_mac_safari=is_mac_safari,
-        is_search_crawler=is_search_crawler,
-        search_favicon_base=_search_favicon_base(),
-        is_android_browser=is_android_browser,
-        is_windows_browser=is_windows_browser,
-        is_desktop_firefox=is_desktop_firefox,
-        is_android_edge=is_android_edge,
-        is_android_firefox=is_android_firefox,
-        is_dmate_android_app=is_dmate_android_app,
-        is_dmate_desktop_app=is_dmate_desktop_app,
+        **_web_client_template_context(),
     ))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     # The favicon and native-client controls depend on the request's platform.

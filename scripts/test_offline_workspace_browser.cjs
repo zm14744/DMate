@@ -17,13 +17,18 @@ async function navigate(page, panel) {
   // Its accessibility state, rather than animation timing, determines whether
   // the user needs to open navigation before selecting the next panel.
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  const title = (await item.innerText()).trim();
   await item.click();
   await page.locator('#' + panel + 'Panel').waitFor({ state: 'visible' });
+  if (page.viewportSize().width <= 1100) {
+    await page.waitForFunction(expected => document.getElementById('offlineMobileTitle').textContent.trim() === expected, title);
+  }
 }
 
 async function ready(page) {
   await page.waitForFunction(() => document.documentElement.dataset.offlineReady === 'true');
-  assert.equal(await page.locator('#saveState').textContent(), '本地保存已启用');
+  assert.equal(await page.locator('.offline-header,#networkStatus,#saveState').count(), 0,
+    'The removed header, save-state label, and network status are absent from the DOM');
 }
 
 async function readStore(page, name) {
@@ -135,11 +140,61 @@ async function noOverflow(page, panel) {
     const main = document.querySelector('.offline-main').getBoundingClientRect();
     const node = document.getElementById(id + 'Panel');
     return { viewport: innerWidth, document: document.documentElement.scrollWidth,
-      mainLeft: main.left, mainRight: main.right, panelWidth: node.clientWidth, panelScroll: node.scrollWidth };
+      mainLeft: main.left, mainRight: main.right, panelWidth: node.clientWidth, panelScroll: node.scrollWidth,
+      panelTop: node.getBoundingClientRect().top - main.top, marginTop: parseFloat(getComputedStyle(node).marginTop) };
   }, panel);
   assert.ok(state.document <= state.viewport + 1, panel + ': page overflows horizontally: ' + JSON.stringify(state));
   assert.ok(state.mainLeft >= -1 && state.mainRight <= state.viewport + 1, panel + ': workspace outside viewport');
   assert.ok(state.panelScroll <= state.panelWidth + 1, panel + ': panel overflows outside its own controls');
+  assert.ok(Math.abs(state.panelTop - state.marginTop) <= 2, panel + ': no empty header row precedes the content: ' + JSON.stringify(state));
+}
+
+async function sidebarControls(page, width) {
+  const opener = page.locator('#offlineDesktopSidebarOpen');
+  if (width <= 1100) {
+    assert.equal(await opener.isVisible(), false, 'Desktop floating opener stays hidden on mobile');
+    return;
+  }
+  if (await opener.getAttribute('aria-expanded') !== 'true') await opener.click();
+  assert.equal(await opener.isVisible(), false, 'Expanded sidebar has no floating opener');
+  const panelTop = await page.locator('#mistakesPanel').evaluate(node => node.getBoundingClientRect().top);
+  await page.locator('#offlineDesktopSidebarToggle').click();
+  await opener.waitFor({ state: 'visible' });
+  assert.equal(await opener.getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.locator('#offlineSidebar').evaluate(node => node.inert), true);
+  const floating = await opener.evaluate(node => ({ inMain: Boolean(node.closest('#offlineMain')), position: getComputedStyle(node).position }));
+  assert.ok(floating.inMain && ['absolute', 'fixed'].includes(floating.position), 'Collapsed opener floats in the main area');
+  await noOverflow(page, 'mistakes');
+  assert.ok(Math.abs(await page.locator('#mistakesPanel').evaluate(node => node.getBoundingClientRect().top) - panelTop) <= 2,
+    'Collapsing navigation does not add a top content row');
+  await opener.click();
+  await opener.waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('#offlineSidebar').evaluate(node => node.inert), false);
+}
+
+async function sidebarExport(page, width, noteTitle, mistakeTitle) {
+  const toggle = page.locator(width <= 1100 ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  const button = page.locator('#exportLocalData');
+  const style = await button.evaluate(node => ({ inSidebar: Boolean(node.closest('#offlineSidebar')),
+    tag: node.localName, background: getComputedStyle(node).backgroundColor, shadow: getComputedStyle(node).boxShadow }));
+  assert.deepEqual(style, { inSidebar: true, tag: 'button', background: 'rgba(0, 0, 0, 0)', shadow: 'none' },
+    'Export is an ordinary sidebar button');
+  const downloading = page.waitForEvent('download');
+  await button.click();
+  const download = await downloading;
+  assert.equal(download.suggestedFilename(), 'dmate-offline-backup.json');
+  const chunks = [];
+  for await (const chunk of await download.createReadStream()) chunks.push(chunk);
+  const backup = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  assert.equal(backup.format, 'dmate-offline-backup');
+  assert.equal(backup.version, 1);
+  assert.ok(backup.notes.some(note => note.title === noteTitle && note.content.includes('修订')));
+  assert.ok(backup.mistakes.some(mistake => mistake.title === mistakeTitle));
+  assert.ok(backup.practice.length >= 2);
+  assert.ok(JSON.parse(backup.drawings).pages.some(drawing => drawing.name === '离线保存画板'));
+  assert.equal(await download.failure(), null, 'Backup saves successfully while offline');
+  if (width <= 1100) await page.locator('#offlineNavClose').click();
 }
 
 async function appearanceControls(page, width, theme, reference) {
@@ -396,7 +451,9 @@ async function runCase(browser, width, theme) {
     page.on('pageerror', error => errors.push(error.message));
     page.on('requestfailed', request => failures.push(request.url() + ': ' + request.failure()?.errorText));
     page.on('request', request => {
-      const path = new URL(request.url()).pathname;
+      const url = new URL(request.url());
+      if (!['http:', 'https:'].includes(url.protocol)) return; // local Blob backup downloads do not call a server
+      const path = url.pathname;
       if (!path.startsWith('/static/') && !['/offline', '/offline-service-worker.js', '/favicon.ico'].includes(path)) apiRequests.push(path);
     });
     page.on('dialog', async dialog => { nativeDialogs.push(dialog.type()); await dialog.dismiss(); });
@@ -405,7 +462,7 @@ async function runCase(browser, width, theme) {
     await page.reload({ waitUntil: 'networkidle' });
     await ready(page);
     assert.equal(await page.evaluate(() => navigator.onLine), false);
-    assert.match(await page.locator('#networkStatus').textContent(), /离线/);
+    await sidebarControls(page, width);
     assert.deepEqual(await palette(page), reference.palette, label + ': shared online appearance tokens');
     for (const [panel, expected] of Object.entries(reference.icons)) {
       assert.deepEqual(await geometry(page.locator('[data-panel="' + panel + '"] svg')), expected, label + ': shared icon ' + panel);
@@ -443,6 +500,7 @@ async function runCase(browser, width, theme) {
     await concepts(page);
     await graph(page);
     await drawing(page);
+    await sidebarExport(page, width, noteTitle, mistakeTitle);
     // A second fully offline navigation must restore records and the drawing.
     await page.reload({ waitUntil: 'networkidle' });
     await ready(page);

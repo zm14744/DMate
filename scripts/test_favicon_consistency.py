@@ -2,10 +2,12 @@
 """Preserve the favicon platform branches and artwork from a65f873.
 
 Run from any directory: .venv/bin/python scripts/test_favicon_consistency.py
-This checks the original differences; it does not require unified artwork.
+Online artwork and platform differences stay fixed; offline mirrors that UA.
 """
 
 import hashlib
+import json
+import re
 import sys
 import unittest
 from html.parser import HTMLParser
@@ -78,6 +80,46 @@ CASES = {
                      "/static/icons/dmate-bing-v55-192.png"),
 }
 
+# IDs and complete declarations are frozen from the online branches, not
+# derived from the implementation under test or from the offline response.
+ORIGINAL_ICON_IDS = {
+    "macOS Safari": (None, "dmateSafariFaviconPng", "dmateSafariFavicon"),
+    "Windows Edge": (None, "dmateFavicon", "dmateFaviconSvg"),
+    "desktop Firefox": (None, "dmateFavicon", "dmateFaviconSvg"),
+    "Android browser": ("dmateFavicon", "dmateFavicon192"),
+    "other browser": (None, "dmateFavicon"),
+    "native desktop": (None, "dmateFavicon"),
+    "Google crawler": (None,) * 5,
+    "Bing crawler": (None,) * 5,
+}
+
+
+def normalized_tag(tag, attrs):
+    return tag, tuple(sorted(attrs.items()))
+
+
+def original_tags(name, icons, apple_icon):
+    tags = []
+    for (href, mime, sizes), icon_id in zip(icons, ORIGINAL_ICON_IDS[name]):
+        attrs = {"rel": "shortcut icon" if mime == "image/x-icon" else "icon",
+                 "type": mime, "href": href}
+        if sizes:
+            attrs["sizes"] = sizes
+        if icon_id:
+            attrs["id"] = icon_id
+        tags.append(normalized_tag("link", attrs))
+    if name in ("Windows Edge", "desktop Firefox"):
+        tags.extend([
+            normalized_tag("meta", {"name": "msapplication-TileImage",
+                                   "content": "/static/icons/dmate-app-v52-192.png"}),
+            normalized_tag("meta", {"name": "msapplication-TileColor", "content": "#000000"}),
+        ])
+    tags.append(normalized_tag("link", {
+        "id": "dmateAppleTouchIcon", "rel": "apple-touch-icon",
+        "sizes": "192x192" if name.endswith("crawler") else "180x180", "href": apple_icon,
+    }))
+    return tags
+
 
 class HeadIcons(HTMLParser):
     def __init__(self, html):
@@ -85,14 +127,20 @@ class HeadIcons(HTMLParser):
         self.in_head = False
         self.icons = []
         self.apple_icons = []
+        self.tags = []
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
         if tag == "head":
             self.in_head = True
+        attrs = dict(attrs)
+        if self.in_head and tag == "meta" and attrs.get("name", "").lower() in (
+                "msapplication-tileimage", "msapplication-tilecolor"):
+            self.tags.append(normalized_tag(tag, attrs))
         if self.in_head and tag == "link":
-            attrs = dict(attrs)
             rel = set(attrs.get("rel", "").lower().split())
+            if rel & {"icon", "apple-touch-icon", "apple-touch-icon-precomposed", "mask-icon"}:
+                self.tags.append(normalized_tag(tag, attrs))
             if "icon" in rel:
                 self.icons.append((attrs.get("href"), attrs.get("type"), attrs.get("sizes")))
             if "apple-touch-icon" in rel:
@@ -128,13 +176,38 @@ class OriginalPlatformFaviconTests(unittest.TestCase):
                 head = HeadIcons(self.response("/", user_agent).get_data(as_text=True))
                 self.assertEqual(head.icons, icons)
                 self.assertEqual(head.apple_icons, [apple_icon])
+                self.assertEqual(head.tags, original_tags(name, icons, apple_icon))
 
-    def test_offline_keeps_its_original_undeclared_favicon(self):
+    def test_offline_matches_online_complete_favicon_declarations_for_each_ua(self):
         for name, (user_agent, _, _) in CASES.items():
             with self.subTest(platform=name):
-                head = HeadIcons(self.response("/offline", user_agent).get_data(as_text=True))
-                self.assertEqual(head.icons, [])
-                self.assertEqual(head.apple_icons, [])
+                online = HeadIcons(self.response("/", user_agent).get_data(as_text=True))
+                response = self.response("/offline", user_agent)
+                html = response.get_data(as_text=True)
+                offline = HeadIcons(html)
+                self.assertTrue(online.tags)
+                self.assertEqual(offline.tags, online.tags)
+                self.assertIn("User-Agent", response.vary)
+                self.assertIn("no-store", response.headers.get("Cache-Control", ""))
+                self.assertNotIn("DMATE_FAVICON_LINKS", html)
+                for tag, attributes in offline.tags:
+                    attrs = dict(attributes)
+                    path = attrs.get("href") if tag == "link" else attrs.get("content", "")
+                    if path.startswith("/static/icons/"):
+                        asset = self.response(path, user_agent).get_data()
+                        self.assertEqual(asset, self.assets[Path(path).name])
+
+    def test_offline_worker_precaches_every_platform_favicon_resource(self):
+        worker = (ROOT / "static" / "offline-service-worker.js").read_text()
+        precache = json.loads(re.search(r"const PRECACHE\s*=\s*(\[[\s\S]*?\]);", worker).group(1))
+        for name, (user_agent, _, _) in CASES.items():
+            head = HeadIcons(self.response("/", user_agent).get_data(as_text=True))
+            for tag, attributes in head.tags:
+                attrs = dict(attributes)
+                path = attrs.get("href") if tag == "link" else attrs.get("content", "")
+                if path.startswith("/static/icons/"):
+                    with self.subTest(platform=name, resource=path):
+                        self.assertIn(path, precache)
 
     def test_root_fallback_keeps_original_google_and_shared_bing_artwork(self):
         routes = {"/favicon.ico": (".ico", "image/x-icon")}

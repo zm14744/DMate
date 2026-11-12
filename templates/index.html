@@ -99,49 +99,7 @@
 })();
 </script>
 
-{% if is_search_crawler %}
-<!-- Bing uses its RGB favicon set; other crawlers retain their existing artwork. -->
-<link rel="shortcut icon" type="image/x-icon" href="/static/icons/{{ search_favicon_base }}.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/{{ search_favicon_base }}-32.png">
-<link rel="icon" type="image/png" sizes="48x48" href="/static/icons/{{ search_favicon_base }}-48.png">
-<link rel="icon" type="image/png" sizes="96x96" href="/static/icons/{{ search_favicon_base }}-96.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/{{ search_favicon_base }}-192.png">
-{% elif is_mac_safari %}
-<!-- Safari 26 uses the same site favicon in the URL field and tab chrome.
-     The previous blur/focus handler incorrectly claimed to control them
-     separately and could recolor the normal tab. Keep the user's existing
-     BLACK small-tab geometry stable in both macOS themes. A website cannot
-     force a separate WHITE Smart Search field icon without also risking the
-     tab favicon; the browser owns this presentation. -->
-<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-tab-black-v52.ico">
-<link id="dmateSafariFaviconPng" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-tab-black-v52-64.png">
-<link id="dmateSafariFavicon" rel="icon" type="image/svg+xml" sizes="any" href="/static/icons/dmate-tab-black-v52.svg">
-{% elif is_android_browser %}
-<!-- Android browsers share native-size renders of the same vector artwork. -->
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/dmate-app-v52-32.png">
-<link id="dmateFavicon192" rel="icon" type="image/png" sizes="192x192" href="/static/icons/dmate-app-v52-192.png">
-{% elif is_desktop_firefox or is_windows_browser %}
-<!-- Firefox desktop and Windows Edge use the SAME browser-tab SVG, PNG and ICO.
-     Do not generate a Firefox-specific icon: share the exact assets, sizes,
-     order and URL versions to keep geometry, color and sharpness aligned. -->
-
-<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-tab-white-v52.ico">
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="32x32" href="/static/icons/dmate-tab-white-v52-32.png">
-<link id="dmateFaviconSvg" rel="icon" type="image/svg+xml" sizes="any" href="/static/icons/dmate-tab-white-v52.svg">
-<meta name="msapplication-TileImage" content="/static/icons/dmate-app-v52-192.png">
-<meta name="msapplication-TileColor" content="#000000">
-{% else %}
-<!-- Opaque application icon fallback for other browsers and installed shells. -->
-<link rel="shortcut icon" type="image/x-icon" href="/static/icons/dmate-app-v52.ico">
-<link id="dmateFavicon" rel="icon" type="image/png" sizes="64x64" href="/static/icons/dmate-app-v52-64.png">
-{% endif %}
-{% if is_search_crawler %}
-<!-- Google can also select an apple-touch-icon as its favicon. Keep every
-     crawler-visible candidate on the same opaque search artwork. -->
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="192x192" href="/static/icons/{{ search_favicon_base }}-192.png">
-{% else %}
-<link id="dmateAppleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="/static/icons/dmate-app-v52-180.png">
-{% endif %}
+{% include '_favicon_links.html' %}
 <title>DMate - 离散数学智能辅学系统</title>
 
 <style>

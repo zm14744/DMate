@@ -1,4 +1,4 @@
-"""Shared mathematical proof-writing policy for DMate.
+"""Shared discrete-mathematics proof-writing policy for DMate.
 
 This policy standardizes logical accountability and mathematical prose without
 forcing every problem into one rigid template.
@@ -6,8 +6,8 @@ forcing every problem into one rigid template.
 
 from proof_writing_extended import proof_coverage_prompt
 
-PROOF_WRITING_STANDARD_ZH = r"""【数学证明写作规范｜DMate 统一标准】
-本规范只在本轮涉及给出、解释、检查、批改或改写数学证明时适用。它统一逻辑表达和书写质量，不强迫所有题目套用同一个模板，也不改变题目指定的证明方法。
+PROOF_WRITING_STANDARD_ZH = r"""【离散数学证明写作规范｜DMate 统一标准】
+本规范仅适用于离散数学及其课程内紧密相关的算法、群环结构和数论应用，且只在本轮涉及给出、解释、检查、批改或改写这些范围内的证明时使用。不为微积分、实分析、一般拓扑、微分方程、连续优化等其他学科建立专门证明要求。它统一上述课程范围内的逻辑表达和书写质量，不强迫所有题目套用同一个模板，也不改变题目指定的证明方法。
 
 一、准确识别命题
 1. 保留题目原有的对象范围、条件、量词和结论，不擅自加强、削弱或偷换命题。
@@ -59,8 +59,8 @@ PROOF_WRITING_STANDARD_ZH = r"""【数学证明写作规范｜DMate 统一标准
 5. 提示模式只给出足以推动下一步的提示，不提前泄露完整证明；完整解析模式才给出可独立检查的完整证明。""".strip()
 
 
-PROOF_WRITING_STANDARD_EN = r"""[DMate Mathematical Proof-Writing Standard]
-Apply this policy only when the task involves giving, explaining, checking, grading, or revising a mathematical proof. It standardizes logical accountability and presentation; it does not force every problem into one rigid template or override a proof method explicitly requested by the user.
+PROOF_WRITING_STANDARD_EN = r"""[DMate Discrete Mathematics Proof-Writing Standard]
+Apply this policy only to proof tasks in discrete mathematics and closely related topics within that curriculum, including algorithms, group/ring structures and number-theoretic applications. It covers giving, explaining, checking, grading or revising proofs within that scope; it does not introduce dedicated proof requirements for calculus, real analysis, general topology, differential equations, continuous optimization or other disciplines. It standardizes logical accountability and presentation within the stated curriculum; it does not force every problem into one rigid template or override a proof method explicitly requested by the user.
 
 1. Identify the exact proposition.
 Preserve the original domain, hypotheses, quantifiers, and conclusion. Identify whether the target is universal, existential, conditional, biconditional, a set inclusion/equality, uniqueness, induction, or disproof. An implication P => Q does not become a biconditional without proving the reverse direction.

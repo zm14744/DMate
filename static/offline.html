@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f8fafc">
+<!-- DMATE_CURRENT_ONLINE_FAVICON -->
 <title>DMate - 离散数学智能辅学系统</title>
 <script>
 /* 首帧直接沿用 DMate 当前设备的外观设置，避免离线工作区闪现另一套主题。 */
@@ -126,7 +127,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
       <button id="offlineAppearanceBtn" class="offline-nav-item" type="button"><!-- BEGIN ONLINE APPEARANCE ICON -->
 <svg class="dmate-lucide-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></svg>
 <!-- END ONLINE APPEARANCE ICON --><span>外观</span></button>
-      <div class="offline-status" id="networkStatus" role="status"><span class="status-dot"></span><span>正在检查网络</span></div>
+      <button type="button" id="exportLocalData" class="offline-nav-item" title="导出本地数据"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg><span>导出本地数据</span></button>
       <button type="button" id="returnOnline" class="btn offline-return">
         <svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
         <span>返回在线版</span>
@@ -135,18 +136,7 @@ window.MathJax={loader:{paths:{mathjax:'/static/vendor/mathjax-3.2.2/es5'}},tex:
   </aside>
 
   <main id="offlineMain" class="center offline-main">
-    <header class="offline-header">
-      <button id="offlineDesktopSidebarOpen" class="offline-icon-button" type="button" aria-label="展开学习工具" title="展开学习工具" aria-controls="offlineSidebar" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
-      <div class="offline-header-copy">
-
-        <h1 id="panelTitle">错题本</h1>
-        <p id="panelDescription">在本机查看、整理和复习已保存的错题。</p>
-      </div>
-      <div class="offline-header-actions">
-        <span class="offline-save-state" id="saveState">本地保存已启用</span>
-        <button type="button" id="exportLocalData" class="btn offline-export" title="导出本地数据"><svg class="dmate-lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg><span>导出</span></button>
-      </div>
-    </header>
+    <button id="offlineDesktopSidebarOpen" class="offline-icon-button" type="button" aria-label="展开学习工具" title="展开学习工具" aria-controls="offlineSidebar" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
 
     <section class="offline-panel" id="mistakesPanel">
       <div class="offline-toolbar">

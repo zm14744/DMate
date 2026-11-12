@@ -1,4 +1,4 @@
-"""Bilingual, source-traceable proof coverage for DMate.
+"""Bilingual, source-traceable discrete-mathematics proof coverage for DMate.
 
 Each proof domain is defined once with equally scoped Chinese and English
 instructions. This is a teaching standard, not a machine proof checker.
@@ -241,8 +241,8 @@ def proof_coverage_prompt(language="zh-CN"):
     """Build the same checklist sections for Chinese and English."""
     english = str(language or "").strip().lower().replace("_", "-").startswith("en")
     heading = (
-        "[Domain-specific proof checks; apply only when relevant to the user's task]"
-        if english else "【分领域证明核对要求｜只在相关题型中应用】"
+        "[Discrete-mathematics proof checks; apply only to relevant topics within that curriculum]"
+        if english else "【离散数学分领域证明核对要求｜仅用于该课程范围内的相关题型】"
     )
     lines = [heading]
     for index, (_, title_zh, title_en, rule_zh, rule_en, _) in enumerate(PROOF_DOMAINS, 1):

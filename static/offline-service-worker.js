@@ -1,5 +1,5 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v9";
+const CACHE_NAME = "dmate-offline-shell-v10";
 const PRECACHE = [
   "/offline",
   "/static/icons/dmate-app-v52.ico",
@@ -80,7 +80,28 @@ const PRECACHE = [
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/textmacros.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/unicode.js",
   "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/upgreek.js",
-  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/verb.js"
+  "/static/vendor/mathjax-3.2.2/es5/input/tex/extensions/verb.js",
+  "/static/icons/dmate-tab-black-v52.ico",
+  "/static/icons/dmate-tab-black-v52-64.png",
+  "/static/icons/dmate-tab-black-v52.svg",
+  "/static/icons/dmate-tab-white-v52.ico",
+  "/static/icons/dmate-tab-white-v52-32.png",
+  "/static/icons/dmate-tab-white-v52.svg",
+  "/static/icons/dmate-app-v52-64.png",
+  "/static/icons/dmate-search-v53.ico",
+  "/static/icons/dmate-search-v53-16.png",
+  "/static/icons/dmate-search-v53-32.png",
+  "/static/icons/dmate-search-v53-48.png",
+  "/static/icons/dmate-search-v53-64.png",
+  "/static/icons/dmate-search-v53-96.png",
+  "/static/icons/dmate-search-v53-192.png",
+  "/static/icons/dmate-bing-v55.ico",
+  "/static/icons/dmate-bing-v55-16.png",
+  "/static/icons/dmate-bing-v55-32.png",
+  "/static/icons/dmate-bing-v55-48.png",
+  "/static/icons/dmate-bing-v55-64.png",
+  "/static/icons/dmate-bing-v55-96.png",
+  "/static/icons/dmate-bing-v55-192.png"
 ];
 
 self.addEventListener("install", event => {
