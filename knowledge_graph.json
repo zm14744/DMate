@@ -1331,13 +1331,13 @@
       "videos": [
         {
           "source_id": "art_of_the_problem",
-          "title": "RSA Encryption Algorithm",
+          "title": "Public Key Cryptography: RSA Encryption Algorithm",
           "sections": [
-            "RSA Encryption Algorithm"
+            "Public Key Cryptography: RSA Encryption Algorithm"
           ],
           "lessons": [
             {
-              "title": "RSA Encryption Algorithm",
+              "title": "Public Key Cryptography: RSA Encryption Algorithm",
               "url": "https://www.youtube.com/watch?v=wXB-V_Keiu8"
             }
           ],
