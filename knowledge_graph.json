@@ -313,19 +313,6 @@
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=2"
             }
           ]
-        },
-        {
-          "source_id": "sawfin_bilibili",
-          "title": "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula",
-          "sections": [
-            "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula"
-          ],
-          "lessons": [
-            {
-              "title": "p52 Discrete Math - 5.1.1 Proof Using Mathematical Induction - Summation Formula",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=53"
-            }
-          ]
         }
       ]
     },
@@ -347,19 +334,6 @@
             {
               "title": "3. Strong Induction",
               "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=3"
-            }
-          ]
-        },
-        {
-          "source_id": "sawfin_bilibili",
-          "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
-          "sections": [
-            "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction"
-          ],
-          "lessons": [
-            {
-              "title": "p55 Discrete Math - 5.2.1 The Well-Ordering Principle and Strong Induction",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=56"
             }
           ]
         }
@@ -417,19 +391,6 @@
         "笛卡尔积与关系"
       ],
       "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "11. Relations, Partial Orders, and Scheduling",
-          "sections": [
-            "11. Relations, Partial Orders, and Scheduling"
-          ],
-          "lessons": [
-            {
-              "title": "11. Relations, Partial Orders, and Scheduling",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=11"
-            }
-          ]
-        },
         {
           "source_id": "dogeman_discrete",
           "title": "2.2.0.3 二元关系",
@@ -499,19 +460,6 @@
         "关系性质"
       ],
       "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "11. Relations, Partial Orders, and Scheduling",
-          "sections": [
-            "11. Relations, Partial Orders, and Scheduling"
-          ],
-          "lessons": [
-            {
-              "title": "11. Relations, Partial Orders, and Scheduling",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=11"
-            }
-          ]
-        },
         {
           "source_id": "dogeman_discrete",
           "title": "2.6.0.3 序关系",
@@ -813,21 +761,7 @@
       "name": "基本计数原理",
       "category": "计数与组合",
       "prerequisites": [],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "16. Counting Rules I",
-          "sections": [
-            "16. Counting Rules I"
-          ],
-          "lessons": [
-            {
-              "title": "16. Counting Rules I",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=16"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "count_perm_comb",
@@ -836,21 +770,7 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "16. Counting Rules I",
-          "sections": [
-            "16. Counting Rules I"
-          ],
-          "lessons": [
-            {
-              "title": "16. Counting Rules I",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=16"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "count_binomial",
@@ -859,21 +779,7 @@
       "prerequisites": [
         "排列与组合"
       ],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "17. Counting Rules II",
-          "sections": [
-            "17. Counting Rules II"
-          ],
-          "lessons": [
-            {
-              "title": "17. Counting Rules II",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=17"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "count_pigeonhole",
@@ -882,21 +788,7 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "17. Counting Rules II",
-          "sections": [
-            "17. Counting Rules II"
-          ],
-          "lessons": [
-            {
-              "title": "17. Counting Rules II",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=17"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "count_inclusion",
@@ -906,21 +798,7 @@
         "基本计数原理",
         "集合运算"
       ],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "17. Counting Rules II",
-          "sections": [
-            "17. Counting Rules II"
-          ],
-          "lessons": [
-            {
-              "title": "17. Counting Rules II",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=17"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "count_generating",
@@ -937,21 +815,7 @@
       "name": "递推关系建模",
       "category": "递推关系",
       "prerequisites": [],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "14. Divide and Conquer Recurrences",
-          "sections": [
-            "14. Divide and Conquer Recurrences"
-          ],
-          "lessons": [
-            {
-              "title": "14. Divide and Conquer Recurrences",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=14"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "recurrence_homogeneous",
@@ -960,21 +824,7 @@
       "prerequisites": [
         "递推关系建模"
       ],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "15. Linear Recurrences",
-          "sections": [
-            "15. Linear Recurrences"
-          ],
-          "lessons": [
-            {
-              "title": "15. Linear Recurrences",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "recurrence_nonhomogeneous",
@@ -983,21 +833,7 @@
       "prerequisites": [
         "线性齐次递推"
       ],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "15. Linear Recurrences",
-          "sections": [
-            "15. Linear Recurrences"
-          ],
-          "lessons": [
-            {
-              "title": "15. Linear Recurrences",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "recurrence_initial",
@@ -1006,21 +842,7 @@
       "prerequisites": [
         "递推关系建模"
       ],
-      "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "15. Linear Recurrences",
-          "sections": [
-            "15. Linear Recurrences"
-          ],
-          "lessons": [
-            {
-              "title": "15. Linear Recurrences",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=15"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "graph_basic",
@@ -1028,19 +850,6 @@
       "category": "图论",
       "prerequisites": [],
       "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "6. Graph Theory and Coloring",
-          "sections": [
-            "6. Graph Theory and Coloring"
-          ],
-          "lessons": [
-            {
-              "title": "6. Graph Theory and Coloring",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=6"
-            }
-          ]
-        },
         {
           "source_id": "pflyan_graph",
           "title": "1-1 〖图的基本概念〗图中组成、顶点与边的关系",
@@ -1209,19 +1018,6 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "10. Graph Theory III",
-          "sections": [
-            "10. Graph Theory III"
-          ],
-          "lessons": [
-            {
-              "title": "10. Graph Theory III",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=10"
-            }
-          ]
-        },
-        {
           "source_id": "pflyan_graph",
           "title": "7-2 〖欧拉图〗无向欧拉图判定的充要条件",
           "sections": [
@@ -1269,19 +1065,6 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "9. Communication Networks",
-          "sections": [
-            "9. Communication Networks"
-          ],
-          "lessons": [
-            {
-              "title": "9. Communication Networks",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=9"
-            }
-          ]
-        },
-        {
           "source_id": "pflyan_graph",
           "title": "5-2 〖最短路径问题〗迪杰斯特拉算法：可以找到最优解的贪心算法",
           "sections": [
@@ -1304,19 +1087,6 @@
         "图的基本概念"
       ],
       "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "6. Graph Theory and Coloring",
-          "sections": [
-            "6. Graph Theory and Coloring"
-          ],
-          "lessons": [
-            {
-              "title": "6. Graph Theory and Coloring",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=6"
-            }
-          ]
-        },
         {
           "source_id": "dogeman_discrete",
           "title": "11.1.0.3 点着色",
@@ -1365,19 +1135,6 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "7. Matching Problems",
-          "sections": [
-            "7. Matching Problems"
-          ],
-          "lessons": [
-            {
-              "title": "7. Matching Problems",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=7"
-            }
-          ]
-        },
-        {
           "source_id": "pflyan_graph",
           "title": "9-1 〖无向二部图〗判定二部图的充要条件",
           "sections": [
@@ -1401,19 +1158,6 @@
         "路径与连通性"
       ],
       "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "11. Relations, Partial Orders, and Scheduling",
-          "sections": [
-            "11. Relations, Partial Orders, and Scheduling"
-          ],
-          "lessons": [
-            {
-              "title": "11. Relations, Partial Orders, and Scheduling",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=11"
-            }
-          ]
-        },
         {
           "source_id": "graph_animation_bili",
           "title": "图-拓扑排序",
@@ -1461,19 +1205,6 @@
         "二部图"
       ],
       "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "7. Matching Problems",
-          "sections": [
-            "7. Matching Problems"
-          ],
-          "lessons": [
-            {
-              "title": "7. Matching Problems",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=7"
-            }
-          ]
-        },
         {
           "source_id": "pflyan_graph",
           "title": "9-2 〖无向二部图〗匹配和完备匹配",
@@ -1546,19 +1277,6 @@
       ],
       "videos": [
         {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "8. Graph Theory II - Minimum Spanning Trees",
-          "sections": [
-            "8. Graph Theory II - Minimum Spanning Trees"
-          ],
-          "lessons": [
-            {
-              "title": "8. Graph Theory II - Minimum Spanning Trees",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=8"
-            }
-          ]
-        },
-        {
           "source_id": "uestc_discrete_lower",
           "title": "9.1.3 生成树",
           "sections": [
@@ -1582,19 +1300,6 @@
         "带权图"
       ],
       "videos": [
-        {
-          "source_id": "mit_6042j_2010_bilibili",
-          "title": "8. Graph Theory II - Minimum Spanning Trees",
-          "sections": [
-            "8. Graph Theory II - Minimum Spanning Trees"
-          ],
-          "lessons": [
-            {
-              "title": "8. Graph Theory II - Minimum Spanning Trees",
-              "url": "https://www.bilibili.com/video/BV1oP2dY6E7c/?p=8"
-            }
-          ]
-        },
         {
           "source_id": "uestc_discrete_lower",
           "title": "9.1.4 最小生成树",
@@ -1746,14 +1451,6 @@
       "platform": "Bilibili",
       "publisher": "东北大学",
       "note": "东北大学离散数学课程，仅收录女教师讲授的P1–P19；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；上传者授权状态未核实，仅提供原视频外链，不下载或托管。"
-    },
-    {
-      "id": "sawfin_bilibili",
-      "name": "Bellevue University · Kimberly Brehm",
-      "course": "Discrete Math I（大学教师本人授课）",
-      "platform": "Bilibili",
-      "publisher": "常青藤中英字幕课程",
-      "note": "讲师 Kimberly Brehm 为 Bellevue University 数学副教授；B站版本标注中英字幕。用于数学归纳法与强归纳法；字幕术语仍需抽样复核。仅外链跳转，不下载或托管。"
     },
     {
       "id": "dogeman_discrete",
