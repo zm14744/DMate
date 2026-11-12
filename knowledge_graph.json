@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -809,7 +809,38 @@
       "prerequisites": [
         "函数与映射"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "One-to-One and Onto Functions",
+          "sections": [
+            "One-to-One and Onto Functions"
+          ],
+          "lessons": [
+            {
+              "title": "One-to-One and Onto Functions",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=27"
+            }
+          ],
+          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
+          "note": ""
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "One-to-One and Onto Functions",
+          "sections": [
+            "One-to-One and Onto Functions"
+          ],
+          "lessons": [
+            {
+              "title": "One-to-One and Onto Functions",
+              "url": "https://www.youtube.com/watch?v=plSzGYwo-ew"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "function_composition",
@@ -818,7 +849,38 @@
       "prerequisites": [
         "函数与映射"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Inverse Functions and Composition of Functions",
+          "sections": [
+            "Inverse Functions and Composition of Functions"
+          ],
+          "lessons": [
+            {
+              "title": "Inverse Functions and Composition of Functions",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=28"
+            }
+          ],
+          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
+          "note": ""
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Inverse Functions and Composition of Functions",
+          "sections": [
+            "Inverse Functions and Composition of Functions"
+          ],
+          "lessons": [
+            {
+              "title": "Inverse Functions and Composition of Functions",
+              "url": "https://www.youtube.com/watch?v=aQefXelCN5Y"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "function_inverse",
@@ -828,7 +890,38 @@
         "单射满射双射",
         "复合函数"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Inverse Functions and Composition of Functions",
+          "sections": [
+            "Inverse Functions and Composition of Functions"
+          ],
+          "lessons": [
+            {
+              "title": "Inverse Functions and Composition of Functions",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=28"
+            }
+          ],
+          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
+          "note": ""
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Inverse Functions and Composition of Functions",
+          "sections": [
+            "Inverse Functions and Composition of Functions"
+          ],
+          "lessons": [
+            {
+              "title": "Inverse Functions and Composition of Functions",
+              "url": "https://www.youtube.com/watch?v=aQefXelCN5Y"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "number_prime",
@@ -1125,7 +1218,38 @@
       "prerequisites": [
         "排列与组合"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "The Binomial Theorem",
+          "sections": [
+            "The Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "The Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=62"
+            }
+          ],
+          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
+          "note": ""
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "The Binomial Theorem",
+          "sections": [
+            "The Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "The Binomial Theorem",
+              "url": "https://www.youtube.com/watch?v=m8TsPMfcasI"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "count_pigeonhole",
@@ -1134,7 +1258,23 @@
       "prerequisites": [
         "基本计数原理"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "The Pigeonhole Principle",
+          "sections": [
+            "The Pigeonhole Principle"
+          ],
+          "lessons": [
+            {
+              "title": "The Pigeonhole Principle",
+              "url": "https://www.youtube.com/watch?v=xEuPd4k_IPo"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "count_inclusion",
@@ -1200,14 +1340,61 @@
         "递推关系建模",
         "排列与组合"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Generating Functions: Solving Counting Problems",
+          "sections": [
+            "Generating Functions: Solving Counting Problems"
+          ],
+          "lessons": [
+            {
+              "title": "Generating Functions: Solving Counting Problems",
+              "url": "https://www.youtube.com/watch?v=mZ9gmFtxBNg"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "recurrence_model",
       "name": "递推关系建模",
       "category": "递推关系",
       "prerequisites": [],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Modeling with Recurrence Relations",
+          "sections": [
+            "Modeling with Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Modeling with Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=67"
+            }
+          ],
+          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
+          "note": ""
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Modeling with Recurrence Relations",
+          "sections": [
+            "Modeling with Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Modeling with Recurrence Relations",
+              "url": "https://www.youtube.com/watch?v=awR_p6J7Lyg"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "recurrence_homogeneous",
@@ -1241,7 +1428,23 @@
       "prerequisites": [
         "线性齐次递推"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Non-Homogeneous Linear Recurrence Relations",
+          "sections": [
+            "Non-Homogeneous Linear Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "Non-Homogeneous Linear Recurrence Relations",
+              "url": "https://www.youtube.com/watch?v=NKsz2mGxX4A"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "recurrence_initial",
@@ -1328,7 +1531,23 @@
       "prerequisites": [
         "图的基本概念"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Graph Isomorphisms",
+          "sections": [
+            "Graph Isomorphisms"
+          ],
+          "lessons": [
+            {
+              "title": "Graph Isomorphisms",
+              "url": "https://www.youtube.com/watch?v=Ymb2qaVgN58"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "graph_adjacency",
@@ -1337,7 +1556,23 @@
       "prerequisites": [
         "图的基本概念"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Representing Graphs: Adjacency and Incidence Matrices",
+          "sections": [
+            "Representing Graphs: Adjacency and Incidence Matrices"
+          ],
+          "lessons": [
+            {
+              "title": "Representing Graphs: Adjacency and Incidence Matrices",
+              "url": "https://www.youtube.com/watch?v=hJ29yobFlyQ"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "graph_matrix",
@@ -1348,7 +1583,23 @@
         "邻接矩阵"
       ],
       "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Representing Graphs: Adjacency and Incidence Matrices",
+          "sections": [
+            "Representing Graphs: Adjacency and Incidence Matrices"
+          ],
+          "lessons": [
+            {
+              "title": "Representing Graphs: Adjacency and Incidence Matrices",
+              "url": "https://www.youtube.com/watch?v=hJ29yobFlyQ"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "graph_connectivity",
@@ -1471,7 +1722,23 @@
       "prerequisites": [
         "路径与连通性"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Hamilton Paths and Circuits",
+          "sections": [
+            "Hamilton Paths and Circuits"
+          ],
+          "lessons": [
+            {
+              "title": "Hamilton Paths and Circuits",
+              "url": "https://www.youtube.com/watch?v=aOM1CsHMxKo"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "graph_shortest",
@@ -1684,7 +1951,38 @@
         "图的基本概念",
         "路径与连通性"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_bilibili",
+          "title": "Introduction to Trees",
+          "sections": [
+            "Introduction to Trees"
+          ],
+          "lessons": [
+            {
+              "title": "Introduction to Trees",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=79"
+            }
+          ],
+          "verification": "B站选集列出主讲 Kimberly Brehm 和对应 p 标题；可用性未全部实播",
+          "note": ""
+        },
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Introduction to Trees",
+          "sections": [
+            "Introduction to Trees"
+          ],
+          "lessons": [
+            {
+              "title": "Introduction to Trees",
+              "url": "https://www.youtube.com/watch?v=lTaKhF2tObc"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "tree_rooted",
@@ -1693,7 +1991,23 @@
       "prerequisites": [
         "树的基本性质"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Rooted Trees",
+          "sections": [
+            "Rooted Trees"
+          ],
+          "lessons": [
+            {
+              "title": "Rooted Trees",
+              "url": "https://www.youtube.com/watch?v=g9_PuhLwkOU"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "tree_spanning",
@@ -1703,7 +2017,23 @@
         "树的基本性质",
         "路径与连通性"
       ],
-      "videos": []
+      "videos": [
+        {
+          "source_id": "sawfin_youtube",
+          "title": "Spanning Trees: Depth-First Search",
+          "sections": [
+            "Spanning Trees: Depth-First Search"
+          ],
+          "lessons": [
+            {
+              "title": "Spanning Trees: Depth-First Search",
+              "url": "https://www.youtube.com/watch?v=urjzBqwQcfg"
+            }
+          ],
+          "verification": "YouTube/Kimberly Brehm 官方单集及章节描述匹配；未逐一测试高清播放",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "tree_mst",
@@ -2019,6 +2349,20 @@
       "course": "Spectral Graph Theory Lecture 16",
       "platform": "YouTube",
       "note": "教师授课官方单集，讲授矩阵树定理。"
+    },
+    {
+      "id": "sawfin_bilibili",
+      "name": "Kimberly Brehm · 离散数学讲师",
+      "course": "Discrete Math I（完整课程高清转载）",
+      "platform": "哔哩哔哩",
+      "note": "含题目推演与例题演示的正式教学视频，B站按明确的分P章节定位。"
+    },
+    {
+      "id": "sawfin_youtube",
+      "name": "Kimberly Brehm · SawFin Mathematics",
+      "course": "Discrete Math I & II（本人原创授课）",
+      "platform": "YouTube",
+      "note": "采用分步骤讲解与练习，附课件但不是单纯朗读PPT；明确讲师与章节。"
     }
   ],
   "video_resource_policy": {
