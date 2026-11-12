@@ -17,6 +17,9 @@ on:
       - 'templates/index.html'
       - 'static/offline*'
       - 'static/offline-content/**'
+      - 'static/script.js'
+      - 'static/dmate-main.css'
+      - 'static/icons/dmate-brand-v52.svg'
       - '.github/workflows/test-offline-workspace.yml'
   workflow_dispatch:
 
