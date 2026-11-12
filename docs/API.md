@@ -46,7 +46,7 @@ if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 | POST | `/graph/figure-type` | 扫描选区的箭头、权值类型 |
 | POST | `/graph/confirm` | 校验并确认编辑后的完整题目 |
 | POST | `/graph/describe` | 已确认图形的可选外观描述 |
-| POST | `/drawing/guide`、`/drawing/upload` | 画图指导、上传画板导出结果 |
+| POST | `/drawing/generate`、`/drawing/guide`、`/drawing/upload` | 数学图生成、画图指导、上传画板导出结果 |
 | POST | `/notebook/analyze` | 解释选中概念或分析关联 |
 | POST | `/voice/transcribe` | 录音转文字 |
 | GET / POST | `/auth/*` | 账号与邮箱操作，见下表 |
@@ -346,6 +346,8 @@ const response = await fetch("/chat", {
 请求含 `semantic_context` 和匹配的 `drawing_document`。只为已确认图形生成可选外观文字，不修改数学结构；内容改变返回 409，模型描述不可用时可返回 `status: "unavailable"` 与空描述。请求体最多 500,000 字节。
 
 ## 画板接口
+
+`POST /drawing/generate` 接收 `{"requirement": "需要生成的数学图", "language": "zh-CN"}`。要求最多 2000 字符，请求体最多 12,000 字节。DeepSeek 以 JSON 结构返回单幅图；服务端校验图结构，最多 80 个顶点、240 条边。成功时返回 `ok`、`kind`、`title` 和 `document`。支持一般图及常见图族、哈斯图、循环群 Cayley 图、循环群子群格、模整数环理想格和零因子图。暂不支持或条件不足时返回错误，不会自行补造数学条件。浏览器随后使用本域 Viz.js / Graphviz WASM 计算布局，并在独立画板中新建可编辑页面；它不修改当前画页，也不代替数学性质校验。
 
 `POST /drawing/guide` 接收 `{"document": 当前画图文档, "requirement": "本轮要求"}`。要求最多 2000 字符，文档最多 200,000 字节、16 幅图、总计 200 个顶点和 600 条边。允许空白或含未知项的草稿，返回 `ok`、`answer` 和 `document_digest`。它只提供文字指导，不修改或上传图形。
 
