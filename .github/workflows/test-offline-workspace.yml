@@ -66,7 +66,7 @@ jobs:
           from pathlib import Path
           worker = Path("static/offline-service-worker.js").read_text(encoding="utf-8")
           paths = re.findall(r'"(/(?:offline|static/[^"]+))"', worker)
-          missing = [p for p in paths if p != "/offline" and not Path(p.lstrip("/")).exists()]
+          missing = [p for p in paths if p != "/offline" and not Path(p.split("?", 1)[0].lstrip("/")).exists()]
           assert not missing, f"Missing precache assets: {missing}"
           print(f"{len(paths)} precache entries checked")
           PY
