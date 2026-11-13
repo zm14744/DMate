@@ -1556,6 +1556,234 @@
       ]
     },
     {
+      "id": "predicate_variable",
+      "title": "变元与辖域",
+      "category": "谓词逻辑",
+      "summary": "量词只约束其辖域中与它同名的变元出现；同一符号可以在不同位置分别自由或约束。",
+      "definition": "量词的辖域是它所支配的子公式。某个变元出现若位于相应量词辖域中并被它约束，就是约束出现；其余是自由出现。没有自由变元的公式称封闭公式。约束变元可改成不造成冲突的新名字，但替换自由变元时必须避免变量捕获。",
+      "explanation": "先根据括号确定量词辖域，再按每次出现判断归属，不能仅按字母是否在公式里出现过量词判断。嵌套同名量词会遮蔽外层同名绑定。为了安全代入，可先把可能冲突的约束变量改成全新的名字，再只替换目标变量的自由出现。",
+      "notation": [
+        "FV(A)：公式A的自由变元集合。",
+        "∀x(P(x)∨Q(y))中，x被约束而y自由。",
+        "约束变元改名：∀xP(x)与∀uP(u)等价，前提是u为合适的新名字。"
+      ],
+      "example": "在∀x(P(x,y)→∃y Q(x,y,z))中，P中的y与Q中的z自由，x的出现均被外层∀x约束，Q中的y被内层∃y约束。因此FV={y,z}，不能把全部y都判成约束出现。",
+      "common_mistakes": [
+        "把量词的作用范围越过括号扩展到整个公式。",
+        "替换自由变量时把原本自由的变量捕获到量词中。",
+        "改名外层变量时连同被内层同名量词遮蔽的位置一起改掉。"
+      ],
+      "prerequisites": [
+        "predicate_domain"
+      ],
+      "related_questions": [
+        "q_predicate_variable_01",
+        "q_predicate_variable_02",
+        "q_predicate_variable_03",
+        "q_predicate_variable_04",
+        "q_predicate_variable_05",
+        "q_predicate_variable_06",
+        "q_predicate_variable_07",
+        "q_predicate_variable_08"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "graph_node_id": "predicate_variable",
+      "references": [
+        {
+          "source_id": "dmoi3",
+          "section": "数学陈述：命题、联结词和量词",
+          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "自由变元、约束变元与辖域",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "量词推理规则与变元条件",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+        }
+      ],
+      "related_concepts": [
+        "predicate_variable__free_bound_scope",
+        "predicate_variable__alpha_renaming",
+        "predicate_variable__capture_avoidance",
+        "predicate_variable__quantifier_scope"
+      ]
+    },
+    {
+      "id": "predicate_variable__free_bound_scope",
+      "graph_node_id": "predicate_variable",
+      "title": "自由变元与约束变元",
+      "category": "谓词逻辑",
+      "summary": "变量的自由或约束属性属于某次出现，必须结合括号与最近的对应量词判断。",
+      "definition": "在量词辖域内被同名量词绑定的变元出现是约束出现，其余是自由出现。量词辖域之外的同名变元不受它约束，内层同名量词会遮蔽外层。",
+      "explanation": "计算自由变元集合时应遍历公式的结构。一个字母可以同时拥有自由与约束出现；只要还有自由出现，它就属于自由变元集合。",
+      "notation": [
+        "FV(∀xA)=FV(A)去掉x。",
+        "FV(A∨B)=FV(A)∪FV(B)。"
+      ],
+      "example": "(∀xP(x))∨Q(x)中的Q(x)有自由x；∀x(P(x)∨Q(x))则没有自由x。",
+      "common_mistakes": [
+        "只因出现∀x就把全式所有x都划为约束。",
+        "忽略内层同名绑定。"
+      ],
+      "prerequisites": [
+        "predicate_variable"
+      ],
+      "related_questions": [
+        "q_predicate_variable_01",
+        "q_predicate_variable_04"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "dmoi3",
+          "section": "数学陈述：命题、联结词和量词",
+          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "自由变元、约束变元与辖域",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "量词推理规则与变元条件",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+        }
+      ]
+    },
+    {
+      "id": "predicate_variable__alpha_renaming",
+      "graph_node_id": "predicate_variable",
+      "title": "约束变元改名与遮蔽",
+      "category": "谓词逻辑",
+      "summary": "对同一绑定及它所约束的位置一致改成新名字，不改变公式语义。",
+      "definition": "合法的约束改名把量词变量和它绑定的全部出现一起改名，同时不捕获原自由变量，也不改变内层同名量词绑定的位置。使用未出现的新名字是常用安全办法。",
+      "explanation": "改名不是对整个字符串的全局替换。嵌套量词中的同名字母可能属于不同绑定，必须按语法结构分别处理。",
+      "notation": [
+        "∀xP(x)与∀uP(u)可作合法改名。",
+        "新名字不得与相关自由变量冲突。"
+      ],
+      "example": "∀x(P(x)∧∃xQ(x))先改外层得∀u(P(u)∧∃xQ(x))，Q里的x仍属内层量词。",
+      "common_mistakes": [
+        "把自由变量一起改掉。",
+        "外层改名时越过内层同名量词。"
+      ],
+      "prerequisites": [
+        "predicate_variable"
+      ],
+      "related_questions": [
+        "q_predicate_variable_02",
+        "q_predicate_variable_05"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "dmoi3",
+          "section": "数学陈述：命题、联结词和量词",
+          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "自由变元、约束变元与辖域",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "量词推理规则与变元条件",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+        }
+      ]
+    },
+    {
+      "id": "predicate_variable__capture_avoidance",
+      "graph_node_id": "predicate_variable",
+      "title": "无捕获代入",
+      "category": "谓词逻辑",
+      "summary": "把项代入自由变量位置时，不能使代入项中的变量意外被量词绑定。",
+      "definition": "对自由x进行代入，仅替换自由出现。若代入项的变量会落入同名量词辖域而被捕获，应先把该约束变量改成新名字，再完成代入。",
+      "explanation": "变量捕获会把原本固定的外部参数变成受量化对象，从而改变真假条件。通过在有限模型里指定自由赋值，可直观看出正确代入与错误代入的差异。",
+      "notation": [
+        "(∃yR(x,y))[x:=y]应先改名为∃zR(x,z)。",
+        "正确结果为∃zR(y,z)，其中y仍自由。"
+      ],
+      "example": "R表示不等于、D={0,1}且自由y=0时，∃zR(y,z)真，而被捕获的∃yR(y,y)假。",
+      "common_mistakes": [
+        "将代入操作当成不看量词的文本替换。",
+        "把代入后自由变量数量的异常减少忽略掉。"
+      ],
+      "prerequisites": [
+        "predicate_variable"
+      ],
+      "related_questions": [
+        "q_predicate_variable_03",
+        "q_predicate_variable_06"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "dmoi3",
+          "section": "数学陈述：命题、联结词和量词",
+          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "自由变元、约束变元与辖域",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "量词推理规则与变元条件",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+        }
+      ]
+    },
+    {
+      "id": "predicate_variable__quantifier_scope",
+      "graph_node_id": "predicate_variable",
+      "title": "量词辖域与括号",
+      "category": "谓词逻辑",
+      "summary": "量词只能绑定它的语法辖域中的对应变量，括号变化可能改变真假。",
+      "definition": "在∀xA中，A为该量词的辖域。若后面还有辖域外子公式，其中同名x不受此前∀x绑定；应使用括号明确量词作用到哪里。",
+      "explanation": "量词辖域的改变不同于合法改名。将量词从一个子式扩到整个联结公式时，必须另行验证自由变量条件，不能仅凭书写方便。",
+      "notation": [
+        "(∀xP(x))∨Q(x)与∀x(P(x)∨Q(x))辖域不同。",
+        "用括号明确完整母式。"
+      ],
+      "example": "当P、Q仅在0真且D={0,1}、自由x=0时，前式真而后式假。",
+      "common_mistakes": [
+        "默认量词一直作用到整行末尾。",
+        "把辖域扩大当成无条件等价变换。"
+      ],
+      "prerequisites": [
+        "predicate_variable"
+      ],
+      "related_questions": [
+        "q_predicate_variable_04"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "dmoi3",
+          "section": "数学陈述：命题、联结词和量词",
+          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "自由变元、约束变元与辖域",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
+        },
+        {
+          "source_id": "openlogic",
+          "section": "量词推理规则与变元条件",
+          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
+        }
+      ]
+    },
+    {
       "id": "predicate_quantifier",
       "title": "量词",
       "category": "谓词逻辑",
@@ -1575,7 +1803,7 @@
         "用论域外的对象作为存在见证或全称反例。"
       ],
       "prerequisites": [
-        "predicate_domain"
+        "predicate_variable"
       ],
       "related_questions": [
         "q04",
@@ -1809,234 +2037,6 @@
       ],
       "related_questions": [
         "q_predicate_quantifier_08"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "dmoi3",
-          "section": "数学陈述：命题、联结词和量词",
-          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "自由变元、约束变元与辖域",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "量词推理规则与变元条件",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
-        }
-      ]
-    },
-    {
-      "id": "predicate_variable",
-      "title": "变元与辖域",
-      "category": "谓词逻辑",
-      "summary": "量词只约束其辖域中与它同名的变元出现；同一符号可以在不同位置分别自由或约束。",
-      "definition": "量词的辖域是它所支配的子公式。某个变元出现若位于相应量词辖域中并被它约束，就是约束出现；其余是自由出现。没有自由变元的公式称封闭公式。约束变元可改成不造成冲突的新名字，但替换自由变元时必须避免变量捕获。",
-      "explanation": "先根据括号确定量词辖域，再按每次出现判断归属，不能仅按字母是否在公式里出现过量词判断。嵌套同名量词会遮蔽外层同名绑定。为了安全代入，可先把可能冲突的约束变量改成全新的名字，再只替换目标变量的自由出现。",
-      "notation": [
-        "FV(A)：公式A的自由变元集合。",
-        "∀x(P(x)∨Q(y))中，x被约束而y自由。",
-        "约束变元改名：∀xP(x)与∀uP(u)等价，前提是u为合适的新名字。"
-      ],
-      "example": "在∀x(P(x,y)→∃y Q(x,y,z))中，P中的y与Q中的z自由，x的出现均被外层∀x约束，Q中的y被内层∃y约束。因此FV={y,z}，不能把全部y都判成约束出现。",
-      "common_mistakes": [
-        "把量词的作用范围越过括号扩展到整个公式。",
-        "替换自由变量时把原本自由的变量捕获到量词中。",
-        "改名外层变量时连同被内层同名量词遮蔽的位置一起改掉。"
-      ],
-      "prerequisites": [
-        "predicate_quantifier"
-      ],
-      "related_questions": [
-        "q_predicate_variable_01",
-        "q_predicate_variable_02",
-        "q_predicate_variable_03",
-        "q_predicate_variable_04",
-        "q_predicate_variable_05",
-        "q_predicate_variable_06",
-        "q_predicate_variable_07",
-        "q_predicate_variable_08"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "graph_node_id": "predicate_variable",
-      "references": [
-        {
-          "source_id": "dmoi3",
-          "section": "数学陈述：命题、联结词和量词",
-          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "自由变元、约束变元与辖域",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "量词推理规则与变元条件",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
-        }
-      ],
-      "related_concepts": [
-        "predicate_variable__free_bound_scope",
-        "predicate_variable__alpha_renaming",
-        "predicate_variable__capture_avoidance",
-        "predicate_variable__quantifier_scope"
-      ]
-    },
-    {
-      "id": "predicate_variable__free_bound_scope",
-      "graph_node_id": "predicate_variable",
-      "title": "自由变元与约束变元",
-      "category": "谓词逻辑",
-      "summary": "变量的自由或约束属性属于某次出现，必须结合括号与最近的对应量词判断。",
-      "definition": "在量词辖域内被同名量词绑定的变元出现是约束出现，其余是自由出现。量词辖域之外的同名变元不受它约束，内层同名量词会遮蔽外层。",
-      "explanation": "计算自由变元集合时应遍历公式的结构。一个字母可以同时拥有自由与约束出现；只要还有自由出现，它就属于自由变元集合。",
-      "notation": [
-        "FV(∀xA)=FV(A)去掉x。",
-        "FV(A∨B)=FV(A)∪FV(B)。"
-      ],
-      "example": "(∀xP(x))∨Q(x)中的Q(x)有自由x；∀x(P(x)∨Q(x))则没有自由x。",
-      "common_mistakes": [
-        "只因出现∀x就把全式所有x都划为约束。",
-        "忽略内层同名绑定。"
-      ],
-      "prerequisites": [
-        "predicate_variable"
-      ],
-      "related_questions": [
-        "q_predicate_variable_01",
-        "q_predicate_variable_04"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "dmoi3",
-          "section": "数学陈述：命题、联结词和量词",
-          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "自由变元、约束变元与辖域",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "量词推理规则与变元条件",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
-        }
-      ]
-    },
-    {
-      "id": "predicate_variable__alpha_renaming",
-      "graph_node_id": "predicate_variable",
-      "title": "约束变元改名与遮蔽",
-      "category": "谓词逻辑",
-      "summary": "对同一绑定及它所约束的位置一致改成新名字，不改变公式语义。",
-      "definition": "合法的约束改名把量词变量和它绑定的全部出现一起改名，同时不捕获原自由变量，也不改变内层同名量词绑定的位置。使用未出现的新名字是常用安全办法。",
-      "explanation": "改名不是对整个字符串的全局替换。嵌套量词中的同名字母可能属于不同绑定，必须按语法结构分别处理。",
-      "notation": [
-        "∀xP(x)与∀uP(u)可作合法改名。",
-        "新名字不得与相关自由变量冲突。"
-      ],
-      "example": "∀x(P(x)∧∃xQ(x))先改外层得∀u(P(u)∧∃xQ(x))，Q里的x仍属内层量词。",
-      "common_mistakes": [
-        "把自由变量一起改掉。",
-        "外层改名时越过内层同名量词。"
-      ],
-      "prerequisites": [
-        "predicate_variable"
-      ],
-      "related_questions": [
-        "q_predicate_variable_02",
-        "q_predicate_variable_05"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "dmoi3",
-          "section": "数学陈述：命题、联结词和量词",
-          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "自由变元、约束变元与辖域",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "量词推理规则与变元条件",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
-        }
-      ]
-    },
-    {
-      "id": "predicate_variable__capture_avoidance",
-      "graph_node_id": "predicate_variable",
-      "title": "无捕获代入",
-      "category": "谓词逻辑",
-      "summary": "把项代入自由变量位置时，不能使代入项中的变量意外被量词绑定。",
-      "definition": "对自由x进行代入，仅替换自由出现。若代入项的变量会落入同名量词辖域而被捕获，应先把该约束变量改成新名字，再完成代入。",
-      "explanation": "变量捕获会把原本固定的外部参数变成受量化对象，从而改变真假条件。通过在有限模型里指定自由赋值，可直观看出正确代入与错误代入的差异。",
-      "notation": [
-        "(∃yR(x,y))[x:=y]应先改名为∃zR(x,z)。",
-        "正确结果为∃zR(y,z)，其中y仍自由。"
-      ],
-      "example": "R表示不等于、D={0,1}且自由y=0时，∃zR(y,z)真，而被捕获的∃yR(y,y)假。",
-      "common_mistakes": [
-        "将代入操作当成不看量词的文本替换。",
-        "把代入后自由变量数量的异常减少忽略掉。"
-      ],
-      "prerequisites": [
-        "predicate_variable"
-      ],
-      "related_questions": [
-        "q_predicate_variable_03",
-        "q_predicate_variable_06"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "dmoi3",
-          "section": "数学陈述：命题、联结词和量词",
-          "url": "https://github.com/oscarlevin/discrete-book/blob/a8e4949bc45daf100930c1182983778f56ab689f/ptx/sec_intro-statements.ptx"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "自由变元、约束变元与辖域",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/syntax-and-semantics/free-vars-sentences.tex"
-        },
-        {
-          "source_id": "openlogic",
-          "section": "量词推理规则与变元条件",
-          "url": "https://github.com/OpenLogicProject/OpenLogic/blob/1e960beff9ed7835bf3e3f1335e21af3439cd107/content/first-order-logic/natural-deduction/quantifier-rules.tex"
-        }
-      ]
-    },
-    {
-      "id": "predicate_variable__quantifier_scope",
-      "graph_node_id": "predicate_variable",
-      "title": "量词辖域与括号",
-      "category": "谓词逻辑",
-      "summary": "量词只能绑定它的语法辖域中的对应变量，括号变化可能改变真假。",
-      "definition": "在∀xA中，A为该量词的辖域。若后面还有辖域外子公式，其中同名x不受此前∀x绑定；应使用括号明确量词作用到哪里。",
-      "explanation": "量词辖域的改变不同于合法改名。将量词从一个子式扩到整个联结公式时，必须另行验证自由变量条件，不能仅凭书写方便。",
-      "notation": [
-        "(∀xP(x))∨Q(x)与∀x(P(x)∨Q(x))辖域不同。",
-        "用括号明确完整母式。"
-      ],
-      "example": "当P、Q仅在0真且D={0,1}、自由x=0时，前式真而后式假。",
-      "common_mistakes": [
-        "默认量词一直作用到整行末尾。",
-        "把辖域扩大当成无条件等价变换。"
-      ],
-      "prerequisites": [
-        "predicate_variable"
-      ],
-      "related_questions": [
-        "q_predicate_variable_04"
       ],
       "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
       "references": [
@@ -2394,7 +2394,8 @@
         "为了排列整齐而随意交换全称量词与存在量词。"
       ],
       "prerequisites": [
-        "predicate_reasoning"
+        "predicate_quantifier",
+        "predicate_variable"
       ],
       "related_questions": [
         "q_predicate_prenex_01",
@@ -11858,7 +11859,8 @@
       ],
       "prerequisites": [
         "graph_basic",
-        "graph_connectivity"
+        "graph_connectivity",
+        "relation_order"
       ],
       "related_questions": [
         "q_graph_topological_01",
@@ -13385,6 +13387,223 @@
       ]
     },
     {
+      "id": "algebra_homomorphism",
+      "title": "同态与同构",
+      "category": "代数结构",
+      "summary": "同态保持运算，同构是双射同态，表示两个代数系统在结构上完全一致。",
+      "definition": "对群(G,*)和(H,∘)，映射φ:G→H若满足φ(a*b)=φ(a)∘φ(b)，称为群同态。若它还是双射，则称为同构。核kerφ={g∈G:φ(g)=e_H}，像imφ={φ(g):g∈G}。群同态自动保持单位元和逆元。",
+      "explanation": "证明同构需要同时说明映射定义良好、保持运算、单射和满射。元素个数相同仅是有限群同构的必要条件之一；元素阶、是否交换等结构性质可用来反驳同构。核是G的子群，而且同态单射当且仅当核只有单位元。",
+      "notation": [
+        "φ(a⁻¹)=φ(a)⁻¹。",
+        "kerφ≤G，imφ≤H。",
+        "G≅H表示G与H同构。"
+      ],
+      "example": "φ:ℤ₆→ℤ₃，φ([x]₆)=[x]₃，是满同态，其核为{[0]₆,[3]₆}，所以它不是单射，也不是同构。",
+      "common_mistakes": [
+        "只凭两个群元素个数相等就断言同构。",
+        "检查具体整数代表元时漏证映射定义良好。",
+        "把核误写成值域H中单位元的集合，而不是定义域中的原像。"
+      ],
+      "prerequisites": [
+        "algebra_system",
+        "function_mapping"
+      ],
+      "related_questions": [
+        "q_algebra_homomorphism_01",
+        "q_algebra_homomorphism_02",
+        "q_algebra_homomorphism_03",
+        "q_algebra_homomorphism_04",
+        "q_algebra_homomorphism_05",
+        "q_algebra_homomorphism_06",
+        "q_algebra_homomorphism_07",
+        "q_algebra_homomorphism_08"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "graph_node_id": "algebra_homomorphism",
+      "references": [
+        {
+          "source_id": "aata",
+          "section": "群同态与同构",
+          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
+        }
+      ],
+      "related_concepts": [
+        "algebra_homomorphism__images",
+        "algebra_homomorphism__isomorphism_invariants",
+        "algebra_homomorphism__kernels",
+        "algebra_homomorphism__operation_preservation",
+        "algebra_homomorphism__structural_invariants"
+      ]
+    },
+    {
+      "id": "algebra_homomorphism__images",
+      "graph_node_id": "algebra_homomorphism",
+      "title": "群同态的像与满射",
+      "category": "代数结构",
+      "summary": "像是目标群中实际由映射到达的元素组成的子群。",
+      "definition": "群同态φ:G→H的像为imφ={φ(g):g∈G}，它是H的子群。φ满射当且仅当imφ=H。有限群同态中，每个非空纤维都与核等势。",
+      "explanation": "像的元素属于目标群，核的元素属于定义域，两者角色不同。计算像可枚举定义域代表元，也可描述所有可能输出；有限时纤维计数给|G|=|kerφ|·|imφ|。",
+      "notation": [
+        "imφ≤H。",
+        "有限时|G|=|kerφ|·|imφ|。"
+      ],
+      "example": "ℤ₈上的倍乘同态φ(x)=2x的像是{0,2,4,6}，因此不是到ℤ₈的满射。",
+      "common_mistakes": [
+        "只写目标群H就称为像。",
+        "把核与像的元素放在同一个集合中比较而忽略所属群。"
+      ],
+      "prerequisites": [
+        "algebra_homomorphism__operation_preservation",
+        "algebra_homomorphism__kernels"
+      ],
+      "related_questions": [
+        "q_algebra_homomorphism_02",
+        "q_algebra_homomorphism_08"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "aata",
+          "section": "群同态与同构",
+          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
+        }
+      ]
+    },
+    {
+      "id": "algebra_homomorphism__isomorphism_invariants",
+      "graph_node_id": "algebra_homomorphism",
+      "title": "群同构",
+      "category": "代数结构",
+      "summary": "保持运算的双射让两套群结构相对应。",
+      "definition": "群之间的双射同态称为群同构。构造一个群同构，需要同时满足映射定义良好、保持运算、单射和满射。",
+      "explanation": "双射只说明元素对应，还要保持运算才说明结构对应。同构的逆映射也保持运算，因此两个系统可在结构性质上互相转译。",
+      "notation": [
+        "G≅H。",
+        "ord(φ(g))=ord(g)，当φ是同构。"
+      ],
+      "example": "ℤ₄到模5乘法单位群的映射[x]↦2ˣ，四个像依次为1、2、4、3，是一个同构。",
+      "common_mistakes": [
+        "只按元素个数判断同构。",
+        "把同构要求误写成任意双射。"
+      ],
+      "prerequisites": [
+        "algebra_homomorphism__operation_preservation"
+      ],
+      "related_questions": [
+        "q_algebra_homomorphism_06"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "aata",
+          "section": "群同态与同构",
+          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
+        }
+      ]
+    },
+    {
+      "id": "algebra_homomorphism__kernels",
+      "graph_node_id": "algebra_homomorphism",
+      "title": "群同态的核与平凡核判据",
+      "category": "代数结构",
+      "summary": "核收集全部映到目标单位元的定义域元素。",
+      "definition": "对群同态φ:G→H，kerφ={g∈G:φ(g)=e_H}。它是定义域G的子群。φ为单射当且仅当kerφ仅含e_G。",
+      "explanation": "核描述映射压缩了哪些结构。若φ(a)=φ(b)，则ab⁻¹落在核中；核只有单位元时，就能恢复a=b。核的元素不能写成目标群元素。",
+      "notation": [
+        "kerφ=φ⁻¹({e_H})。",
+        "φ单射 ⇔ kerφ={e_G}。"
+      ],
+      "example": "模约简φ:ℤ₆→ℤ₃的核是{0,3}，因此它不是单射。",
+      "common_mistakes": [
+        "把核写成像中的单位元本身。",
+        "满射时就误以为核平凡。"
+      ],
+      "prerequisites": [
+        "algebra_homomorphism__operation_preservation"
+      ],
+      "related_questions": [
+        "q_algebra_homomorphism_01",
+        "q_algebra_homomorphism_02",
+        "q_algebra_homomorphism_04",
+        "q_algebra_homomorphism_08"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "aata",
+          "section": "群同态与同构",
+          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
+        }
+      ]
+    },
+    {
+      "id": "algebra_homomorphism__operation_preservation",
+      "graph_node_id": "algebra_homomorphism",
+      "title": "群同态的运算保持与定义良好",
+      "category": "代数结构",
+      "summary": "同态不仅是一个函数，还必须在商结构中定义良好并保持运算。",
+      "definition": "φ:G→H是群同态，指对全部a、b有φ(ab)=φ(a)φ(b)。若用余数类代表元给出公式，还必须证明不同代表元给出同一个像类。",
+      "explanation": "先检查映射是否真正定义，再验证运算保持。即使一个公式是双射，若它不保持单位元或运算，也不能称为同态或同构。",
+      "notation": [
+        "φ(ab)=φ(a)φ(b)。",
+        "加法群中写成φ(a+b)=φ(a)+φ(b)。"
+      ],
+      "example": "整数加法上的g(x)=2x是同态；f(x)=x+1因f(0)=1≠0，不是加法群同态。",
+      "common_mistakes": [
+        "只检查映射存在就称同态。",
+        "在余数类映射中漏证代表元选择无关。"
+      ],
+      "prerequisites": [
+        "algebra_homomorphism"
+      ],
+      "related_questions": [
+        "q_algebra_homomorphism_02",
+        "q_algebra_homomorphism_05",
+        "q_algebra_homomorphism_07"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "aata",
+          "section": "群同态与同构",
+          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
+        }
+      ]
+    },
+    {
+      "id": "algebra_homomorphism__structural_invariants",
+      "graph_node_id": "algebra_homomorphism",
+      "title": "同构不变量与元素阶",
+      "category": "代数结构",
+      "summary": "不变量提供不用枚举所有双射就能否定同构的方法。",
+      "definition": "若两个群同构，则同构保持元素阶、群元素个数和交换性等结构性质。只要找到其中一项不同，就可以否定同构；这些性质相同通常仍不足以证明同构。",
+      "explanation": "必要条件不能反过来当成充分条件。比较元素阶分布尤其适合小有限群，但真正证明同构仍应构造或引用完整的结构论证。",
+      "notation": [
+        "同构保持ord(g)。",
+        "不变量不同 ⇒ 不同构。"
+      ],
+      "example": "ℤ₄有阶4元素，ℤ₂×ℤ₂的非单位元素阶全为2，所以它们虽同为4个元素，仍不同构。",
+      "common_mistakes": [
+        "认为不变量相同就自动同构。",
+        "忽略群结构，仅比较集合大小。"
+      ],
+      "prerequisites": [
+        "algebra_homomorphism__isomorphism_invariants",
+        "algebra_group__element_orders"
+      ],
+      "related_questions": [
+        "q_algebra_homomorphism_03"
+      ],
+      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
+      "references": [
+        {
+          "source_id": "aata",
+          "section": "群同态与同构",
+          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
+        }
+      ]
+    },
+    {
       "id": "algebra_group",
       "title": "群与子群",
       "category": "代数结构",
@@ -13666,223 +13885,6 @@
           "source_id": "aata",
           "section": "循环群：循环子群、元素阶与生成元",
           "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/cyclic.xml"
-        }
-      ]
-    },
-    {
-      "id": "algebra_homomorphism",
-      "title": "同态与同构",
-      "category": "代数结构",
-      "summary": "同态保持运算，同构是双射同态，表示两个代数系统在结构上完全一致。",
-      "definition": "对群(G,*)和(H,∘)，映射φ:G→H若满足φ(a*b)=φ(a)∘φ(b)，称为群同态。若它还是双射，则称为同构。核kerφ={g∈G:φ(g)=e_H}，像imφ={φ(g):g∈G}。群同态自动保持单位元和逆元。",
-      "explanation": "证明同构需要同时说明映射定义良好、保持运算、单射和满射。元素个数相同仅是有限群同构的必要条件之一；元素阶、是否交换等结构性质可用来反驳同构。核是G的子群，而且同态单射当且仅当核只有单位元。",
-      "notation": [
-        "φ(a⁻¹)=φ(a)⁻¹。",
-        "kerφ≤G，imφ≤H。",
-        "G≅H表示G与H同构。"
-      ],
-      "example": "φ:ℤ₆→ℤ₃，φ([x]₆)=[x]₃，是满同态，其核为{[0]₆,[3]₆}，所以它不是单射，也不是同构。",
-      "common_mistakes": [
-        "只凭两个群元素个数相等就断言同构。",
-        "检查具体整数代表元时漏证映射定义良好。",
-        "把核误写成值域H中单位元的集合，而不是定义域中的原像。"
-      ],
-      "prerequisites": [
-        "algebra_group",
-        "function_mapping"
-      ],
-      "related_questions": [
-        "q_algebra_homomorphism_01",
-        "q_algebra_homomorphism_02",
-        "q_algebra_homomorphism_03",
-        "q_algebra_homomorphism_04",
-        "q_algebra_homomorphism_05",
-        "q_algebra_homomorphism_06",
-        "q_algebra_homomorphism_07",
-        "q_algebra_homomorphism_08"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "graph_node_id": "algebra_homomorphism",
-      "references": [
-        {
-          "source_id": "aata",
-          "section": "群同态与同构",
-          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
-        }
-      ],
-      "related_concepts": [
-        "algebra_homomorphism__images",
-        "algebra_homomorphism__isomorphism_invariants",
-        "algebra_homomorphism__kernels",
-        "algebra_homomorphism__operation_preservation",
-        "algebra_homomorphism__structural_invariants"
-      ]
-    },
-    {
-      "id": "algebra_homomorphism__images",
-      "graph_node_id": "algebra_homomorphism",
-      "title": "群同态的像与满射",
-      "category": "代数结构",
-      "summary": "像是目标群中实际由映射到达的元素组成的子群。",
-      "definition": "群同态φ:G→H的像为imφ={φ(g):g∈G}，它是H的子群。φ满射当且仅当imφ=H。有限群同态中，每个非空纤维都与核等势。",
-      "explanation": "像的元素属于目标群，核的元素属于定义域，两者角色不同。计算像可枚举定义域代表元，也可描述所有可能输出；有限时纤维计数给|G|=|kerφ|·|imφ|。",
-      "notation": [
-        "imφ≤H。",
-        "有限时|G|=|kerφ|·|imφ|。"
-      ],
-      "example": "ℤ₈上的倍乘同态φ(x)=2x的像是{0,2,4,6}，因此不是到ℤ₈的满射。",
-      "common_mistakes": [
-        "只写目标群H就称为像。",
-        "把核与像的元素放在同一个集合中比较而忽略所属群。"
-      ],
-      "prerequisites": [
-        "algebra_homomorphism__operation_preservation",
-        "algebra_homomorphism__kernels"
-      ],
-      "related_questions": [
-        "q_algebra_homomorphism_02",
-        "q_algebra_homomorphism_08"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "aata",
-          "section": "群同态与同构",
-          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
-        }
-      ]
-    },
-    {
-      "id": "algebra_homomorphism__isomorphism_invariants",
-      "graph_node_id": "algebra_homomorphism",
-      "title": "群同构",
-      "category": "代数结构",
-      "summary": "保持运算的双射让两套群结构相对应。",
-      "definition": "群之间的双射同态称为群同构。构造一个群同构，需要同时满足映射定义良好、保持运算、单射和满射。",
-      "explanation": "双射只说明元素对应，还要保持运算才说明结构对应。同构的逆映射也保持运算，因此两个系统可在结构性质上互相转译。",
-      "notation": [
-        "G≅H。",
-        "ord(φ(g))=ord(g)，当φ是同构。"
-      ],
-      "example": "ℤ₄到模5乘法单位群的映射[x]↦2ˣ，四个像依次为1、2、4、3，是一个同构。",
-      "common_mistakes": [
-        "只按元素个数判断同构。",
-        "把同构要求误写成任意双射。"
-      ],
-      "prerequisites": [
-        "algebra_homomorphism__operation_preservation"
-      ],
-      "related_questions": [
-        "q_algebra_homomorphism_06"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "aata",
-          "section": "群同态与同构",
-          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
-        }
-      ]
-    },
-    {
-      "id": "algebra_homomorphism__kernels",
-      "graph_node_id": "algebra_homomorphism",
-      "title": "群同态的核与平凡核判据",
-      "category": "代数结构",
-      "summary": "核收集全部映到目标单位元的定义域元素。",
-      "definition": "对群同态φ:G→H，kerφ={g∈G:φ(g)=e_H}。它是定义域G的子群。φ为单射当且仅当kerφ仅含e_G。",
-      "explanation": "核描述映射压缩了哪些结构。若φ(a)=φ(b)，则ab⁻¹落在核中；核只有单位元时，就能恢复a=b。核的元素不能写成目标群元素。",
-      "notation": [
-        "kerφ=φ⁻¹({e_H})。",
-        "φ单射 ⇔ kerφ={e_G}。"
-      ],
-      "example": "模约简φ:ℤ₆→ℤ₃的核是{0,3}，因此它不是单射。",
-      "common_mistakes": [
-        "把核写成像中的单位元本身。",
-        "满射时就误以为核平凡。"
-      ],
-      "prerequisites": [
-        "algebra_homomorphism__operation_preservation"
-      ],
-      "related_questions": [
-        "q_algebra_homomorphism_01",
-        "q_algebra_homomorphism_02",
-        "q_algebra_homomorphism_04",
-        "q_algebra_homomorphism_08"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "aata",
-          "section": "群同态与同构",
-          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
-        }
-      ]
-    },
-    {
-      "id": "algebra_homomorphism__operation_preservation",
-      "graph_node_id": "algebra_homomorphism",
-      "title": "群同态的运算保持与定义良好",
-      "category": "代数结构",
-      "summary": "同态不仅是一个函数，还必须在商结构中定义良好并保持运算。",
-      "definition": "φ:G→H是群同态，指对全部a、b有φ(ab)=φ(a)φ(b)。若用余数类代表元给出公式，还必须证明不同代表元给出同一个像类。",
-      "explanation": "先检查映射是否真正定义，再验证运算保持。即使一个公式是双射，若它不保持单位元或运算，也不能称为同态或同构。",
-      "notation": [
-        "φ(ab)=φ(a)φ(b)。",
-        "加法群中写成φ(a+b)=φ(a)+φ(b)。"
-      ],
-      "example": "整数加法上的g(x)=2x是同态；f(x)=x+1因f(0)=1≠0，不是加法群同态。",
-      "common_mistakes": [
-        "只检查映射存在就称同态。",
-        "在余数类映射中漏证代表元选择无关。"
-      ],
-      "prerequisites": [
-        "algebra_homomorphism"
-      ],
-      "related_questions": [
-        "q_algebra_homomorphism_02",
-        "q_algebra_homomorphism_05",
-        "q_algebra_homomorphism_07"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "aata",
-          "section": "群同态与同构",
-          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
-        }
-      ]
-    },
-    {
-      "id": "algebra_homomorphism__structural_invariants",
-      "graph_node_id": "algebra_homomorphism",
-      "title": "同构不变量与元素阶",
-      "category": "代数结构",
-      "summary": "不变量提供不用枚举所有双射就能否定同构的方法。",
-      "definition": "若两个群同构，则同构保持元素阶、群元素个数和交换性等结构性质。只要找到其中一项不同，就可以否定同构；这些性质相同通常仍不足以证明同构。",
-      "explanation": "必要条件不能反过来当成充分条件。比较元素阶分布尤其适合小有限群，但真正证明同构仍应构造或引用完整的结构论证。",
-      "notation": [
-        "同构保持ord(g)。",
-        "不变量不同 ⇒ 不同构。"
-      ],
-      "example": "ℤ₄有阶4元素，ℤ₂×ℤ₂的非单位元素阶全为2，所以它们虽同为4个元素，仍不同构。",
-      "common_mistakes": [
-        "认为不变量相同就自动同构。",
-        "忽略群结构，仅比较集合大小。"
-      ],
-      "prerequisites": [
-        "algebra_homomorphism__isomorphism_invariants",
-        "algebra_group__element_orders"
-      ],
-      "related_questions": [
-        "q_algebra_homomorphism_03"
-      ],
-      "source_note": "DMate依据通行数学事实独立编写；参考章节仅核对范围与定理条件，未复制或翻译教材段落。",
-      "references": [
-        {
-          "source_id": "aata",
-          "section": "群同态与同构",
-          "url": "https://github.com/twjudson/aata/blob/3069910e3ded72ff5e18837a97a0e810c92790e2/src/homomorph.xml"
         }
       ]
     },

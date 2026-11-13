@@ -387,7 +387,6 @@
         "完整知识图谱：单指拖动、双指缩放，所有知识关联线均可见": "Full Knowledge Graph: drag with one finger and pinch to zoom. All relationship lines are shown.",
         "重新整理": "Refresh organization",
         "重新从聊天记录逐题识别，不调用大模型": "Identify questions again from chat history without calling an AI model",
-        "如果刚刚才发送题目，可以等 AI 回复完成后再点“重新整理”": "If you just sent a question, wait for the AI response to finish, then select Refresh organization.",
         "知识点暂未识别": "Concepts have not been identified yet.",
         "查看图谱": "View graph",
         "定位原题": "Go to original question",

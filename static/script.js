@@ -20865,15 +20865,7 @@ function renderKnowledgeGraphHistory() {
     head.appendChild(refresh);
     list.appendChild(head);
 
-    if (!history.length) {
-        const empty = document.createElement("div");
-        empty.className = "graph-detail-empty";
-        empty.textContent = (
-            "如果刚刚才发送题目，可以等 AI 回复完成后再点“重新整理”"
-        );
-        list.appendChild(empty);
-        return;
-    }
+    if (!history.length) return;
 
     for (const item of history) {
         const card = document.createElement("div");

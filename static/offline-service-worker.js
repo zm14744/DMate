@@ -1,5 +1,5 @@
 "use strict";
-const CACHE_NAME = "dmate-offline-shell-v15";
+const CACHE_NAME = "dmate-offline-shell-v16";
 const PRECACHE = [
   "/offline",
   "/static/icons/dmate-app-v52.ico",
@@ -18,7 +18,7 @@ const PRECACHE = [
   "/static/appearance-panels.css",
   "/static/dmate-shared-overrides.css?v=8",
   "/static/button-themes.css",
-  "/static/offline-knowledge-graph.css?v=8",
+  "/static/offline-knowledge-graph.css?v=16",
   "/static/offline.css?v=8",
   "/static/graph-editor-model.js",
   "/static/graph-editor-format.js",
@@ -37,9 +37,9 @@ const PRECACHE = [
   "/static/language.js",
   "/static/offline-appearance.js?v=8",
   "/static/offline-shell.js?v=8",
-  "/static/offline-knowledge-graph.js?v=8",
+  "/static/offline-knowledge-graph.js?v=16",
   "/static/offline-entry.js",
-  "/static/offline.js?v=8",
+  "/static/offline.js?v=16",
   "/static/icons/dmate-brand-v52.svg",
   "/static/offline-content/concepts.zh-CN.json",
   "/static/offline-content/questions.zh-CN.json",

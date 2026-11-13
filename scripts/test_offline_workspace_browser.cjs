@@ -9,6 +9,8 @@ const panels = ['drawing', 'graph', 'questions', 'concepts'];
 const iconReferences = { drawing: '#graphDrawingBtn svg', graph: '#knowledgeGraphBtn svg' };
 
 async function navigate(page, panel) {
+  const graphClose = page.locator('#knowledgeGraphClose');
+  if (await graphClose.isVisible()) await graphClose.click();
   const item = page.locator('.offline-nav-item[data-panel="' + panel + '"]');
   const toggle = page.locator((await page.viewportSize()).width <= 1100
     ? '#offlineNavToggle' : '#offlineDesktopSidebarOpen');
@@ -211,15 +213,20 @@ async function drawingReference(page) {
 async function noOverflow(page, panel) {
   const state = await page.evaluate(id => {
     const main = document.querySelector('.offline-main').getBoundingClientRect();
-    const node = document.getElementById(id + 'Panel');
+    const node = id === 'graph' ? document.querySelector('#knowledgeGraphModal .graph-modal-card')
+      : document.getElementById(id + 'Panel');
+    const bounds = node.getBoundingClientRect();
     return { viewport: innerWidth, document: document.documentElement.scrollWidth,
       mainLeft: main.left, mainRight: main.right, panelWidth: node.clientWidth, panelScroll: node.scrollWidth,
-      panelTop: node.getBoundingClientRect().top - main.top, marginTop: parseFloat(getComputedStyle(node).marginTop) };
+      panelTop: bounds.top - main.top, marginTop: parseFloat(getComputedStyle(node).marginTop),
+      top: bounds.top, bottom: bounds.bottom, viewportHeight: innerHeight };
   }, panel);
   assert.ok(state.document <= state.viewport + 1, panel + ': page overflows horizontally: ' + JSON.stringify(state));
   assert.ok(state.mainLeft >= -1 && state.mainRight <= state.viewport + 1, panel + ': workspace outside viewport');
   assert.ok(state.panelScroll <= state.panelWidth + 1, panel + ': panel overflows outside its own controls');
-  assert.ok(Math.abs(state.panelTop - state.marginTop) <= 2, panel + ': no empty header row precedes the content: ' + JSON.stringify(state));
+  if (panel === 'graph') assert.ok(state.top >= -1 && state.bottom <= state.viewportHeight + 1,
+    'The graph dialog stays within the viewport: ' + JSON.stringify(state));
+  else assert.ok(Math.abs(state.panelTop - state.marginTop) <= 2, panel + ': no empty header row precedes the content: ' + JSON.stringify(state));
 }
 
 async function sidebarControls(page, width) {
@@ -358,32 +365,37 @@ async function curriculum(page) {
 
 async function graph(page) {
   await navigate(page, 'graph');
-  const host = page.locator('#graphNodes .offline-knowledge-graph[data-ready="true"]');
+  const host = page.locator('#graphPanel #knowledgeGraphModal[data-ready="true"]');
   await host.waitFor();
-  assert.ok(await host.locator('svg .kg-node-group[data-node-id]').count() > 20, 'Graph renders real SVG nodes');
-  assert.ok(await host.locator('svg .kg-edge[data-from][data-to]').count() > 20, 'Graph renders actual knowledge relations');
-  const label = await host.locator('.kg-node-label').first().evaluate(node => {
-    const style = getComputedStyle(node), box = node.getBBox();
-    return { fill: style.fill, fontSize: parseFloat(style.fontSize), width: box.width, height: box.height,
+  const mobile = await page.evaluate(() => matchMedia('(max-width:760px)').matches);
+  if (mobile) await host.locator('.kg-mobile-expand').click();
+  const nodeSelector = mobile ? '.kg-mobile-node' : 'svg .kg-node-group';
+  const edgeSelector = mobile ? '.kg-mobile-edge' : 'svg .kg-edge';
+  assert.ok(await host.locator(nodeSelector + '[data-node-id]').count() > 20, 'Graph renders the real course nodes');
+  assert.ok(await host.locator(edgeSelector).count() > 20, 'Graph renders actual knowledge relations');
+  const label = await host.locator(mobile ? '.kg-mobile-node-name' : '.kg-node-label').first().evaluate(node => {
+    const style = getComputedStyle(node), box = node.getBBox ? node.getBBox() : node.getBoundingClientRect();
+    return { fill: node.getBBox ? style.fill : style.color, fontSize: parseFloat(style.fontSize), width: box.width, height: box.height,
       visibility: style.visibility, opacity: style.opacity };
   });
   assert.equal(label.fill, 'rgb(248, 250, 252)', 'Labels remain light against the shared dark graph nodes');
   assert.ok(label.fontSize > 0 && label.width > 0 && label.height > 0, 'Graph labels render visible text');
   assert.notEqual(label.visibility, 'hidden');
   assert.notEqual(label.opacity, '0');
-  const node = host.locator('.kg-node-group:not(.selected)').first();
+  const node = host.locator(nodeSelector + ':not(.selected)').first();
   const nodeId = await node.getAttribute('data-node-id');
   await node.click();
-  assert.equal(await host.locator('.kg-node-group.selected').count(), 1);
-  assert.equal(await host.locator('.kg-node-group.selected').getAttribute('aria-pressed'), 'true');
-  assert.equal(await host.locator('.kg-node-group.selected').getAttribute('data-node-id'), nodeId);
+  assert.equal(await host.locator(nodeSelector + '.selected').count(), 1);
+  assert.equal(await host.locator(nodeSelector + '.selected').getAttribute('aria-pressed'), 'true');
+  assert.equal(await host.locator(nodeSelector + '.selected').getAttribute('data-node-id'), nodeId);
   const viewport = host.locator('.offline-graph-canvas');
   const original = await viewport.evaluate(node => Number(node.dataset.scale));
-  await host.locator('[data-graph-action="zoom-in"]').click();
+  await host.locator(mobile ? '.kg-mobile-zoom-btn' : '#knowledgeGraphDesktopZoomIn').last().click();
   assert.ok(await viewport.evaluate(node => Number(node.dataset.scale)) > original);
-  await host.locator('[data-graph-action="fit"]').click();
+  await host.locator(mobile ? '.kg-mobile-zoom-fit' : '#knowledgeGraphDesktopZoomFit').click();
   const restored = await viewport.evaluate(node => Number(node.dataset.scale));
   assert.ok(Math.abs(restored - original) < .001, 'Fit restores graph scale');
+  if (mobile) await host.locator('.kg-mobile-expand').click();
   await host.locator('.offline-graph-concept-button').click();
   await page.locator('#conceptsPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#conceptList .concept-item.active').getAttribute('data-concept-id'), nodeId,

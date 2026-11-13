@@ -168,6 +168,10 @@
 
   function switchPanel(name) {
     if (!panelMeta[name]) return;
+    if (name === "graph" && state.panel !== "graph") state.graphReturnPanel = state.panel;
+    if (name !== "graph" && state.graphController) {
+      state.graphController.destroy(); state.graphController = null;
+    }
     state.panel = name;
     document.querySelectorAll(".offline-nav-item").forEach(item => {
       const selected = item.dataset.panel === name;
@@ -387,30 +391,23 @@
 
   function renderGraph() {
     if (!state.graph?.nodes) return;
-    const categories = [...new Set(state.graph.nodes.map(n => n.category))];
-    const filters = $("graphCategories"); filters.replaceChildren();
-    filters.append(button("全部", "offline-chip" + (!state.graphCategory ? " active" : ""), () => { state.graphCategory=""; renderGraph(); }));
-    for (const category of categories) {
-      filters.append(button(category, "offline-chip" + (state.graphCategory === category ? " active" : ""), () => { state.graphCategory=category; renderGraph(); }));
-    }
-    const query = $("graphSearch").value.trim().toLocaleLowerCase();
-    const nodes = state.graph.nodes.filter(n =>
-      (!state.graphCategory || n.category === state.graphCategory) &&
-      (!query || [n.name,n.category].join(" ").toLocaleLowerCase().includes(query))
-    );
-    $("graphCount").textContent = nodes.length + " 个知识点";
-    const host = $("graphNodes");
+    const host = $("knowledgeGraphModal");
     state.graphController?.destroy(); state.graphController = null;
-    host.classList.remove("offline-card-grid"); host.replaceChildren();
     if (!window.DMateOfflineGraph?.mount) {
-      host.append(el("div", "kg-empty", "知识图谱组件尚未加载，请刷新后重试。")); return;
+      $("knowledgeGraphCanvas").replaceChildren(el("div", "kg-empty", "知识图谱组件尚未加载，请刷新后重试。")); return;
     }
-    state.graphController = window.DMateOfflineGraph.mount(host, {nodes, onSelect(node) {
+    state.graphController = window.DMateOfflineGraph.mount(host, {
+      nodes: state.graph.nodes, category: state.graphCategory || "全部",
+      onCategoryChange(category) { state.graphCategory = category === "全部" ? "" : category; },
+      onClose() { switchPanel(state.graphReturnPanel || "drawing"); },
+      onStatus: toast,
+      onSelect(node) {
       const concept = state.concepts.find(c => c.id === node.id || c.title === node.name);
       if (concept) {
         $("conceptSearch").value = ""; switchPanel("concepts"); fillConceptDetail(concept);
       } else toast("该知识点尚无独立概念条目");
-    }});
+      }
+    });
   }
 
   function mountDrawing() {
@@ -463,7 +460,6 @@
     $("questionCategory").addEventListener("change", event => { state.questionCategory=event.target.value; renderQuestions(); });
     $("questionDifficulty").addEventListener("change", event => { state.questionDifficulty=event.target.value; renderQuestions(); });
     $("conceptSearch").addEventListener("input", renderConcepts);
-    $("graphSearch").addEventListener("input", renderGraph);
     $("returnOnline").addEventListener("click", returnOnline);
     window.addEventListener("online", setNetworkStatus);
     window.addEventListener("offline", setNetworkStatus);

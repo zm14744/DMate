@@ -17,6 +17,7 @@ on:
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
+      - 'scripts/test_offline_graph_browser.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
@@ -40,6 +41,7 @@ on:
       - 'scripts/test_favicon_consistency.py'
       - 'scripts/test_offline_workspace_browser.cjs'
       - 'scripts/test_knowledge_graph_browser.cjs'
+      - 'scripts/test_offline_graph_browser.cjs'
       - 'scripts/test_offline_appearance_browser.cjs'
       - 'scripts/test_offline_data_migration_browser.cjs'
       - 'scripts/test_mobile_drawers_browser.cjs'
@@ -81,6 +83,7 @@ jobs:
           node --check static/script.js
           node --check scripts/test_offline_workspace_browser.cjs
           node --check scripts/test_knowledge_graph_browser.cjs
+          node --check scripts/test_offline_graph_browser.cjs
           node --check scripts/test_offline_appearance_browser.cjs
           node --check scripts/test_offline_data_migration_browser.cjs
           node --check scripts/test_mobile_drawers_browser.cjs
@@ -152,6 +155,7 @@ jobs:
           node scripts/test_service_worker_cache_browser.cjs
           node scripts/test_mobile_drawers_browser.cjs
           node scripts/test_knowledge_graph_browser.cjs
+          node scripts/test_offline_graph_browser.cjs
           node scripts/test_drawing_panels_browser.cjs
           node scripts/test_math_diagram_browser.cjs
       - name: Preserve browser screenshots
