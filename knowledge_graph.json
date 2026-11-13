@@ -1,5 +1,5 @@
 {
-  "version": 42,
+  "version": 43,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -382,8 +382,22 @@
               "title_truncated_in_screenshot": false
             }
           ]
+        },
+        {
+          "source_id": "mit_6042j_2010_bilibili",
+          "title": "Lecture 3: Strong Induction",
+          "sections": [
+            "Lecture 3: Strong Induction"
+          ],
+          "lessons": [
+            {
+              "title": "3. Lec 3 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
+              "url": "https://www.bilibili.com/video/BV1zh41167Uy/?p=3"
+            }
+          ]
         }
-      ]
+      ],
+      "note": "CMU P3为归纳证明技巧进阶；另提供MIT 2010 Lecture 3，标题明确为Strong Induction，适合需要专门学习强归纳法的学生。"
     },
     {
       "id": "set_operation",
@@ -395,9 +409,14 @@
           "source_id": "bjtu_discrete",
           "title": "1.1 集合与序列(2)--集合的运算",
           "sections": [
+            "1.1 集合与序列(1)--集合",
             "1.1 集合与序列(2)--集合的运算"
           ],
           "lessons": [
+            {
+              "title": "1.1 集合与序列(1)--集合",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=2"
+            },
             {
               "title": "1.1 集合与序列(2)--集合的运算",
               "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=3"
@@ -418,12 +437,27 @@
           "source_id": "bjtu_discrete",
           "title": "4.1 关系及其表示(1)--有序对与笛卡儿积",
           "sections": [
-            "4.1 关系及其表示(1)--有序对与笛卡儿积"
+            "4.1 关系及其表示(1)--有序对与笛卡儿积",
+            "4.1 关系及其表示(2)--二元关系",
+            "4.1 关系及其表示(3)--关系矩阵与关系图",
+            "4.1 关系及其表示(4)--定义域、值域与像集"
           ],
           "lessons": [
             {
               "title": "4.1 关系及其表示(1)--有序对与笛卡儿积",
               "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=45"
+            },
+            {
+              "title": "4.1 关系及其表示(2)--二元关系",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=46"
+            },
+            {
+              "title": "4.1 关系及其表示(3)--关系矩阵与关系图",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=47"
+            },
+            {
+              "title": "4.1 关系及其表示(4)--定义域、值域与像集",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=48"
             }
           ]
         }
@@ -856,7 +890,8 @@
             }
           ]
         }
-      ]
+      ],
+      "note": "丘维声教授采用较抽象的数论与代数视角。若只学过同余方程，建议先理解剩余类、模逆和剩余类环的基本概念，再观看中国剩余定理P29–P30；不代表其他数论节点需要提前掌握完整群环理论。"
     },
     {
       "id": "number_euler_fermat",
@@ -963,6 +998,19 @@
       ],
       "videos": [
         {
+          "source_id": "sawfin_bilibili",
+          "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
+          "sections": [
+            "p62 Discrete Math - 6.4.1 The Binomial Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
+            }
+          ]
+        },
+        {
           "source_id": "cmu_21_228_2021_bilibili",
           "title": "二项式系数基础与进阶",
           "sections": [
@@ -983,19 +1031,6 @@
               "part": 9,
               "duration": "51:14",
               "title_truncated_in_screenshot": false
-            }
-          ]
-        },
-        {
-          "source_id": "sawfin_bilibili",
-          "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
-          "sections": [
-            "p62 Discrete Math - 6.4.1 The Binomial Theorem"
-          ],
-          "lessons": [
-            {
-              "title": "p62 Discrete Math - 6.4.1 The Binomial Theorem",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=63"
             }
           ]
         }
@@ -1146,6 +1181,19 @@
       "prerequisites": [],
       "videos": [
         {
+          "source_id": "sawfin_bilibili",
+          "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
+          "sections": [
+            "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations"
+          ],
+          "lessons": [
+            {
+              "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
+              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=68"
+            }
+          ]
+        },
+        {
           "source_id": "cmu_21_228_2021_bilibili",
           "title": "递推关系：线性代数方法",
           "sections": [
@@ -1158,19 +1206,6 @@
               "part": 11,
               "duration": "55:17",
               "title_truncated_in_screenshot": false
-            }
-          ]
-        },
-        {
-          "source_id": "sawfin_bilibili",
-          "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
-          "sections": [
-            "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations"
-          ],
-          "lessons": [
-            {
-              "title": "p67 Discrete Math - 8.1.1 Modeling with Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=68"
             }
           ]
         }
@@ -1232,22 +1267,6 @@
       ],
       "videos": [
         {
-          "source_id": "cmu_21_228_2021_bilibili",
-          "title": "线性递推求解方法",
-          "sections": [
-            "第12讲：线性递推求解方法"
-          ],
-          "lessons": [
-            {
-              "title": "第12讲：线性递推求解方法",
-              "url": "https://www.bilibili.com/video/BV1jA4L66ELr/?p=12",
-              "part": 12,
-              "duration": "56:22",
-              "title_truncated_in_screenshot": false
-            }
-          ]
-        },
-        {
           "source_id": "mit_6042j_2010_bilibili",
           "title": "Lec 15 _ MIT 6.042J Mathematics for Computer Science, Fall 2010",
           "sections": [
@@ -1260,7 +1279,8 @@
             }
           ]
         }
-      ]
+      ],
+      "note": "MIT 6.042J Fall 2010 Lecture 15 原授课实录明确讲授非齐次线性递推的通解、特解和初始条件。CMU P12仅能确认一般线性递推解法，不以该讲冒充非齐次专题。"
     },
     {
       "id": "recurrence_initial",
@@ -1393,7 +1413,7 @@
         "图的基本概念",
         "邻接矩阵"
       ],
-      "note": "当前主要覆盖关联矩阵、度矩阵与拉普拉斯矩阵",
+      "note": "本节点的视频讲授邻接矩阵、邻接表和关联矩阵。邻接表属于图的存储表示，非矩阵；度矩阵、拉普拉斯矩阵由Steve Butler谱图论P14–P15进一步引入。",
       "videos": [
         {
           "source_id": "hit_graph_theory",
@@ -1847,9 +1867,23 @@
       "category": "图论",
       "prerequisites": [
         "图的基本概念",
-        "路径与连通性"
+        "路径与连通性",
+        "偏序关系"
       ],
       "videos": [
+        {
+          "source_id": "bjtu_discrete",
+          "title": "第六讲(5)--拓扑排序",
+          "sections": [
+            "(5)--拓扑排序"
+          ],
+          "lessons": [
+            {
+              "title": "(5)--拓扑排序",
+              "url": "https://www.bilibili.com/video/BV1r4411r7Ya/?p=88"
+            }
+          ]
+        },
         {
           "source_id": "graph_animation_bili",
           "title": "图-拓扑排序",
@@ -1863,7 +1897,8 @@
             }
           ]
         }
-      ]
+      ],
+      "note": "可先从北京交通大学偏序关系、哈斯图过渡到拓扑排序，再看动画视频理解有向无环图上的操作。偏序是建议前置，不是算法的严格必要条件。"
     },
     {
       "id": "graph_domination",
@@ -2145,7 +2180,8 @@
             }
           ]
         }
-      ]
+      ],
+      "note": "拓展专题。建议先掌握生成树、关联矩阵，以及基础线性代数中的矩阵和行列式，再依次看Steve Butler P14（拉普拉斯矩阵）→P15（性质）→P16（矩阵树定理）。"
     },
     {
       "id": "algebra_system",
@@ -2169,6 +2205,31 @@
           ]
         }
       ]
+    },
+    {
+      "id": "algebra_homomorphism",
+      "name": "同态与同构",
+      "category": "代数结构",
+      "prerequisites": [
+        "代数系统",
+        "函数与映射"
+      ],
+      "videos": [
+        {
+          "source_id": "dogeman_discrete",
+          "title": "13.3.0.2 代数系统的同态与同构",
+          "sections": [
+            "13.3.0.2 代数系统的同态与同构"
+          ],
+          "lessons": [
+            {
+              "title": "13.3.0.2 代数系统的同态与同构",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=53"
+            }
+          ]
+        }
+      ],
+      "note": "讲授一般代数系统的同态与同构，适合在代数系统（P52）之后、群（P56）之前学习；不要求先学群论。"
     },
     {
       "id": "algebra_group",
@@ -2209,30 +2270,6 @@
       ]
     },
     {
-      "id": "algebra_homomorphism",
-      "name": "同态与同构",
-      "category": "代数结构",
-      "prerequisites": [
-        "群与子群",
-        "函数与映射"
-      ],
-      "videos": [
-        {
-          "source_id": "dogeman_discrete",
-          "title": "13.3.0.2 代数系统的同态与同构",
-          "sections": [
-            "13.3.0.2 代数系统的同态与同构"
-          ],
-          "lessons": [
-            {
-              "title": "13.3.0.2 代数系统的同态与同构",
-              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=53"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "algebra_ring_field",
       "name": "环与域",
       "category": "代数结构",
@@ -2267,9 +2304,24 @@
           "source_id": "dogeman_discrete",
           "title": "16.4.0.3 布尔格和布尔代数",
           "sections": [
+            "16.1.0.2 格的定义与性质",
+            "16.2.0.2 格的相关定理",
+            "16.3.0.2 分配格",
             "16.4.0.3 布尔格和布尔代数"
           ],
           "lessons": [
+            {
+              "title": "16.1.0.2 格的定义与性质",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=67"
+            },
+            {
+              "title": "16.2.0.2 格的相关定理",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=68"
+            },
+            {
+              "title": "16.3.0.2 分配格",
+              "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=69"
+            },
             {
               "title": "16.4.0.3 布尔格和布尔代数",
               "url": "https://www.bilibili.com/video/BV1yguazME3s/?p=70"
@@ -2665,13 +2717,13 @@
       "nodes_total": 68,
       "nodes_with_active_course": 68,
       "nodes_pending": "none",
-      "direct_episode_links": 158,
+      "direct_episode_links": 166,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "Replaced number_inverse_crt with Qiu Weisheng 1080P Bilibili CRT P29/P30; crosschecked 88-part playlist with four introductory lessons and video titles 25/26, corrected previously misstated P numbers; other nodes unchanged"
+      "last_audit_scope": "Pedagogical continuity audit: BJTU set and binary-relation introductions added; dogeman lattice prelude P67-69 added; general homomorphism moved before group; recurrence-model and binomial introductions prioritized; ambiguous CMU nonhomogeneous mapping removed; HIT graph-matrix prerequisites clarified; BJTU topological sort and MIT strong induction added. Predicate-logic P15-P19 granularity remains a known curricular sequencing issue."
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -2948,6 +3000,22 @@
         "MIT",
         "Steve Butler ISU"
       ]
+    },
+    "curriculum_continuity_audit": {
+      "date": "2026-11-13",
+      "status": "selected_evidence_supported_fixes_applied",
+      "outstanding": [
+        "predicate_scope_quantifier_order_p13_p14",
+        "predicate_equivalence_prenex_inference_p15_p19_node_granularity",
+        "some_mit_lecture5_reused_across_four_number_theory_nodes"
+      ],
+      "sources_checked": [
+        "https://www.bilibili.com/video/BV1r4411r7Ya/",
+        "https://www.bilibili.com/video/BV1yguazME3s/",
+        "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/video_galleries/video-lectures/",
+        "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/resources/lecture-15-linear-recurrences/"
+      ],
+      "note": "Playlist titles and official lecture content checked for selected corrections. Does not represent end-to-end viewing of all individual videos or live verification of every Bilibili link."
     }
   },
   "video_resource_candidates": [
