@@ -2238,10 +2238,10 @@
     {
       "id": "sawfin_bilibili",
       "name": "Bellevue University · Kimberly Brehm",
-      "course": "Discrete Math I",
+      "course": "Discrete Math I (active Bilibili mapping)",
       "platform": "Bilibili",
       "publisher": "常青藤中英字幕课程",
-      "note": "Kimberly Brehm 的 Discrete Math I。当前B站上传 BV1hgyDY5EXv 的分集目录为内部 p0–p79，对应实际P1–P80。此BV不再用于 Discrete Math II；不得把第二门课程的内部p编号加偏移后拼到本BV上。DMate 的 Discrete Math II 使用 SawFin Mathematics 官方 YouTube 单集直链。B站仅提供原视频外链，不下载或托管。",
+      "note": "当前B站页面BV1hgyDY5EXv的 Discrete Math I 分集目录为内部 p0–p79，对应实际P1–P80；同页目录另列 Discrete Math II 的内部 p0–p53，但不能未经单集验证就把第二门课程的内部编号加80后当作本BV的P106–P134。原先将P106–P116拼接到该BV的映射已停用。DMate 的 Discrete Math II 正式节点改用 SawFin Mathematics 官方 YouTube 单集直链。B站仅提供原视频外链，不下载或托管。",
       "display_name": "Kimberly Brehm BU"
     },
     {
