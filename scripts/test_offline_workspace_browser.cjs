@@ -221,9 +221,7 @@ async function notebookSnapshot(page, selector) {
       '.dcn-search-clear', '.dcn-selection', '.dcn-list', '.dcn-list-empty', '.dcn-note', '.dcn-note-select',
       '.dcn-note input[type=checkbox]', '.dcn-note-open', '.dcn-note-delete', '.dcn-main', '.dcn-editor',
       '.dcn-editor > label:first-child', '.dcn-title', '.dcn-editor > label:nth-child(2)', '.dcn-original',
-      '.dcn-saved', '.dcn-ai', '.dcn-ai > label', '.dcn-question', '.dcn-ai-actions',
-      '.dcn-ai-actions > button:first-child', '.dcn-ai-actions > button:nth-child(2)', '.dcn-analysis-cancel',
-      '.dcn-status', '.dcn-results'];
+      '.dcn-saved'];
     const properties = ['display', 'boxSizing', 'position', 'gridTemplateColumns', 'gridTemplateRows',
       'flexDirection', 'flexWrap', 'alignItems', 'justifyContent', 'gap', 'rowGap', 'columnGap',
       'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
@@ -237,17 +235,28 @@ async function notebookSnapshot(page, selector) {
       const visible = Boolean(node && node.getClientRects().length && rect.width > 0 && rect.height > 0
         && style.display !== 'none' && style.visibility !== 'hidden');
       if (!visible) { elements[key] = { visible: false }; continue; }
-      const compared = properties.filter(property => !(property === 'opacity' && node.matches('.dcn-ai-actions > button')));
       elements[key] = { visible: true, geometry: { x: rect.x - origin.x, y: rect.y - origin.y, width: rect.width, height: rect.height },
-        style: Object.fromEntries(compared.map(property => [property, style[property]])) };
+        style: Object.fromEntries(properties.map(property => [property, style[property]])) };
       if (node.matches('input,textarea')) elements[key].value = node.value;
       if (node.matches('input[type=checkbox]')) elements[key].checked = node.checked;
     }
-    return { text: content.innerText.replace(/\s+/g, ' ').trim(), elements };
+    // Keep the real online AI area intact, excluding only its text from this
+    // editor/list comparison. Its parent geometry is still measured above.
+    const text = [], walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const parent = node.parentElement;
+      if (parent.closest('.dcn-ai') || !parent.getClientRects().length) continue;
+      const style = getComputedStyle(parent);
+      if (style.display !== 'none' && style.visibility !== 'hidden') text.push(node.textContent);
+    }
+    return { text: text.join(' ').replace(/\s+/g, ' ').trim(), elements };
   });
 }
 
 async function compareNotebook(page, online, label, phase) {
+  assert.equal(await page.locator('#notesPanel .dcn-ai,#notesPanel .dcn-question,#notesPanel .dcn-ai-actions').count(), 0,
+    label + '/' + phase + ': the complete offline AI section is absent from the DOM');
   const size = await page.locator('#noteList').evaluate(node => {
     const rect = node.getBoundingClientRect(), panel = node.parentElement, box = panel.getBoundingClientRect(), style = getComputedStyle(panel);
     return { width: rect.width, height: rect.height, gaps: [
@@ -323,9 +332,6 @@ async function notebookParity(browser, page, width, theme, label) {
     await page.locator('#noteList .dcn-note input[type=checkbox]').check();
     await online.locator('#conceptNotebookDialog .dcn-note input[type=checkbox]').check();
     assert.equal(await online.locator('#conceptNotebookDialog .dcn-ai-actions > button').first().isEnabled(), true);
-    const disabled = await page.locator('#noteList .dcn-ai-actions > button').evaluateAll(buttons =>
-      buttons.filter(button => button.getClientRects().length).every(button => button.disabled));
-    assert.equal(disabled, true, 'Offline AI controls keep the explicit network capability difference');
     await compareNotebook(page, online, label, 'populated');
     const row = (await readStore(page, 'notes')).find(note => note.title === title);
     const fixture = page.locator('#noteList .dcn-note[data-note-id="' + row.id + '"]');

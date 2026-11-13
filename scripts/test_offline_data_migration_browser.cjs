@@ -179,8 +179,10 @@ async function verifyNotebookWrites(browser) {
     assert.deepEqual(afterDelete.deletionMetadata.custom, { retained:true });
     assert.equal(await page.locator('#noteList .dcn-original').inputValue(), 'alpha pending retry');
     assert.equal(await page.locator('.dcn-note.is-current').getAttribute('data-note-id'), 'queue-a');
+    assert.equal(await page.locator('#notesPanel .dcn-ai,#notesPanel .dcn-question,#notesPanel .dcn-ai-actions').count(), 0,
+      'The offline notebook omits the complete supplemental-request and AI section');
     for (const name of ['AI 解释', '分析关联']) {
-      assert.equal(await page.locator('#noteList').getByRole('button', { name, exact:true }).isDisabled(), true);
+      assert.equal(await page.locator('#noteList').getByRole('button', { name, exact:true }).count(), 0);
     }
     assert.deepEqual(apiRequests, [], 'Offline notebook actions must not call AI or other server APIs');
     assert.deepEqual(pageErrors, []);

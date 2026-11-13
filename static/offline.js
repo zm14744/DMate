@@ -11,7 +11,7 @@
     drawingController: null, backgroundUrl: "", graphCategory: "", questionCategory: "",
     questionDifficulty: "", conceptQuery: "", graphQuery: "", graphController: null,
     selectedNoteId: null, noteQuery: "", noteRows: [], noteSaveQueue: Promise.resolve(),
-    noteSelectedIds: new Set(), noteQuestion: "", noteDrafts: new Map(), noteSaveStatus: new Map(), noteDeletePending: null,
+    noteSelectedIds: new Set(), noteDrafts: new Map(), noteSaveStatus: new Map(), noteDeletePending: null,
     questionResponses: new Map(), appearanceQueue: Promise.resolve()
   };
   const panelMeta = {
@@ -424,23 +424,11 @@
     body.rows = 9; body.setAttribute("aria-label", "我的概念笔记"); bodyLabel.append(body);
     const saved = el("span", "dcn-saved"); saved.setAttribute("role", "status");
     editor.append(nameLabel, bodyLabel, saved);
-    const ai = el("section", "dcn-ai");
-    const questionLabel = el("label", "", "补充要求（可选）"), question = el("textarea", "dcn-question");
-    question.maxLength = 1000; question.rows = 2; question.value = state.noteQuestion;
-    question.setAttribute("aria-label", "补充要求（可选）"); questionLabel.append(question);
-    const controls = el("div", "dcn-ai-actions");
-    const explain = button("AI 解释", "dcn-primary", () => {}), relations = button("分析关联", "", () => {});
-    for (const control of [explain, relations]) { control.disabled = true; control.title = "请在在线版使用"; }
-    const cancel = button("", "dcn-close dcn-analysis-cancel", () => {});
-    cancel.hidden = true; cancel.title = "取消分析"; cancel.setAttribute("aria-label", "取消分析");
-    const status = el("p", "dcn-status"), result = el("div", "dcn-results");
-    status.setAttribute("role", "status"); result.setAttribute("aria-label", "AI 解释与概念关联");
-    controls.append(explain, relations, cancel); ai.append(questionLabel, controls, status, result);
-    main.append(editor, ai);
+    main.append(editor);
     function renderActions() {
       const empty = state.noteRows.length === 0;
       $("notesPanel").classList.toggle("is-empty", empty);
-      selection.hidden = empty; main.hidden = empty; ai.hidden = empty;
+      selection.hidden = empty; main.hidden = empty;
       count.textContent = "已选 " + state.noteSelectedIds.size + " 条";
       for (const deletion of host.querySelectorAll(".dcn-note-delete")) deletion.disabled = Boolean(state.noteDeletePending);
     }
@@ -504,7 +492,6 @@
       queueNoteSave(row); renderList();
     };
     name.addEventListener("input", edit); body.addEventListener("input", edit);
-    question.addEventListener("input", () => { state.noteQuestion = question.value; });
     search.addEventListener("input", () => { state.noteQuery = search.value; renderList(); });
     sidebar.append(create, searchWrap, selection, list); host.append(sidebar, main);
     renderList(); renderEditor(); renderActions();
