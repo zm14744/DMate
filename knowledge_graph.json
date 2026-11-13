@@ -1,5 +1,5 @@
 {
-  "version": 39,
+  "version": 40,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -2287,7 +2287,7 @@
       "platform": "Bilibili",
       "publisher": "",
       "note": "东北大学离散数学课程，仅收录女教师讲授的P1–P19；P20《集合的基本概念》及之后均排除。B站页面标注原始课程来源为辽宁省本科教学网；B站上传者及授权状态未核实，仅提供原视频外链，不下载或托管。",
-      "display_name": "东北大学"
+      "display_name": "胡明涵 东北大学"
     },
     {
       "id": "dogeman_discrete",
@@ -2311,7 +2311,8 @@
       "course": "〖电子科技大学〗离散数学（下）王丽杰",
       "platform": "Bilibili",
       "publisher": "电子科技大学",
-      "note": "电子科技大学官方账号发布；用于树、生成树、最小生成树和根树，均直达具体分P。"
+      "note": "电子科技大学官方账号发布；用于树、生成树、最小生成树和根树，均直达具体分P。",
+      "display_name": "王丽杰 电子科技大学"
     },
     {
       "id": "mit_6042j_2010_bilibili",
@@ -2329,7 +2330,7 @@
       "platform": "Bilibili",
       "publisher": "格物嘉",
       "note": "B站上传者为格物嘉，页面标注原课程来源为北京交通大学中国大学MOOC（NJTU-1002530017），共194讲。用于计数基础、排列组合、鸽巢原理、容斥及递推关系的连续补充；只提供原视频外链，不下载或托管。上传授权尚未核实。",
-      "display_name": "北京交通大学"
+      "display_name": "刘铎 北京交通大学"
     },
     {
       "id": "cmu_21_228_2021_bilibili",
@@ -2588,7 +2589,7 @@
           "title_truncated_in_screenshot": true
         }
       ],
-      "display_name": "CMU"
+      "display_name": "Po-Shen Loh CMU"
     },
     {
       "id": "sawfin_bilibili",
@@ -2597,7 +2598,7 @@
       "platform": "Bilibili",
       "publisher": "常青藤中英字幕课程",
       "note": "Kimberly Brehm 的大学离散数学课程；B站页面标注中英字幕，上传者说明为唯一翻译发布账号。用于排列组合、二项式定理和递推建模。仅外链跳转，不下载或托管。",
-      "display_name": "BU"
+      "display_name": "Kimberly Brehm BU"
     },
     {
       "id": "chenggong_gta",
@@ -2606,7 +2607,7 @@
       "platform": "Bilibili",
       "publisher": "程龚老师",
       "note": "南京大学计算机学院程龚教授主讲的42分P系列，配套教材《图论与算法》（清华大学出版社，2024）。用于图的连通与遍历、割点割边、距离与BFS、二部图、欧拉图、哈密顿图、匹配、赋权图与距离、有向图等专题。只提供原视频外链，不下载或托管。",
-      "display_name": "南京大学"
+      "display_name": "程龚 南京大学"
     },
     {
       "id": "nymu_combinatorics_fuhenglin",
@@ -2614,7 +2615,8 @@
       "course": "组合学导论 Introduction to Combinatorics（2021）",
       "platform": "Bilibili",
       "publisher": "ctu1896",
-      "note": "国立阳明交通大学应用数学系傅恒霖老师2021年课程。Lec20讲计数原理与生成函数入门，Lec21继续讲生成函数；用于生成函数节点，承接排列组合与计数基础。仅提供原视频外链，不下载或托管。"
+      "note": "国立阳明交通大学应用数学系傅恒霖老师2021年课程。Lec20讲计数原理与生成函数入门，Lec21继续讲生成函数；用于生成函数节点，承接排列组合与计数基础。仅提供原视频外链，不下载或托管。",
+      "display_name": "傅恒霖 国立阳明交通大学"
     },
     {
       "id": "hit_graph_theory",
@@ -2623,7 +2625,7 @@
       "platform": "Bilibili",
       "publisher": "天选憨憨曹冒冒",
       "note": "哈尔滨工业大学图论课程，B站共72个分P，原课程入口为中国大学MOOC HIT-1003781003。用于图的基本概念、子图、顶点度、正则图、图同构，以及邻接矩阵、邻接表和关联矩阵。仅提供原视频外链，不下载或托管。",
-      "display_name": "哈尔滨工业大学"
+      "display_name": "姜守旭 哈尔滨工业大学"
     },
     {
       "id": "hit_set_graph_2017",
@@ -2632,7 +2634,7 @@
       "platform": "Bilibili",
       "publisher": "数学 计算机 游戏",
       "note": "B站合集BV1Eb41137gB，共48个分P。平面图节点采用P43《43平面图及欧拉公式》与P44《44非平面哈密顿图 库氏定理 顶点着色1》，在已选哈工大图论基础之后展开平面图及非平面图判定。上传授权未核实，产品仅提供原B站链接。",
-      "display_name": "哈尔滨工业大学"
+      "display_name": "姜守旭 哈尔滨工业大学"
     },
     {
       "id": "steve_butler_spectral_2023_bilibili",
@@ -2641,7 +2643,7 @@
       "platform": "Bilibili",
       "publisher": "脑袋要有光",
       "note": "爱荷华州立大学Steve Butler 2023秋季频谱图论，共29讲。按教师原课程目录：14 拉普拉斯矩阵导入、15 拉普拉斯矩阵性质、16 Matrix Tree Theorem，作为矩阵树定理节点连续学习资源。B站BV11kga6FEez是第三方中文AI配音＋中文字幕版本，翻译质量尚未逐句核验，本次无法独立确认B站页面播放及分P标题。仅原视频外链，不下载、托管或重新分发。教师课程目录：https://www.stevebutler.org/spectral2023",
-      "display_name": "Steve Butler"
+      "display_name": "Steve Butler 爱荷华州立大学"
     },
     {
       "id": "pku_qiu_weisheng_math_thinking",
@@ -2650,7 +2652,7 @@
       "platform": "Bilibili",
       "publisher": "",
       "note": "由北京大学丘维声教授主讲，B站页面为第三方上传的1080P修复版（视频内容授权状态未核实），页面实际列有88个分P，开头有4集导论，故标题编号25《11.1 中国剩余定理（一）》和26《11.2 中国剩余定理（二）》在该上传版本中分别对应实际P29和P30。时长28:05和22:11；前置课程还讲模m同余关系、剩余类环及可逆元，适合在现有同余知识节点后衔接。保留原B站外链，不下载、托管或重新分发。大陆版：https://www.bilibili.com/video/BV12Y411b7Yn/",
-      "display_name": "北京大学"
+      "display_name": "丘维声 北京大学"
     }
   ],
   "video_resource_policy": {
@@ -2937,6 +2939,11 @@
       ],
       "reason_for_part_number_difference": "该88分P版本开头额外收录四集导论，标题课程编号与B站实际P号相差4",
       "former_source_id": "crt_fraljimetry"
+    },
+    "display_name_policy": {
+      "format": "instructor SPACE institution",
+      "exception": "MIT remains MIT without instructor",
+      "note": "For university courses with identified instructor, display a teacher name followed by a single space and the institution label. These are course-level labels, not claims that every part is narrated by one person. The NEU uploader names multiple teaching-team members; 胡明涵 is the listed original MOOC course lead, not verified as sole lecturer of the selected P1–P19. Original publisher/uploader metadata retained; non-university creators use their original names."
     }
   },
   "video_resource_candidates": [
