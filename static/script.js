@@ -21032,7 +21032,7 @@ function renderKnowledgeGraphDetail() {
         heading.textContent = dmateUiText("教学视频");
         section.appendChild(heading);
 
-        const platforms = new Map([["Bilibili", []], ["YouTube", []]]);
+        const platforms = new Map([["Bilibili", []]]);
         const publisherForVideo = video => {
             const source = (knowledgeGraphData.videoSources || []).find(
                 item => item.id === video.sourceId
@@ -21095,9 +21095,7 @@ function renderKnowledgeGraphDetail() {
             for (const lesson of (video.lessons || [])) {
                 const url = String(lesson.url || "");
                 const platform = /^https:\/\/www\.bilibili\.com\/video\/BV[A-Za-z0-9]+\/(?:\?p=[1-9]\d*)?$/.test(url)
-                    ? "Bilibili"
-                    : /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/.test(url)
-                        ? "YouTube" : "";
+                    ? "Bilibili" : "";
                 if (platform && !platforms.get(platform).some(item => item.url === url)) {
                     platforms.get(platform).push({
                         title: String(lesson.title || ""),
