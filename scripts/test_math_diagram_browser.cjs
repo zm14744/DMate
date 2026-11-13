@@ -150,7 +150,18 @@ async function runCase(browser, width, language) {
     await page.goto(baseURL + '/', { waitUntil: 'networkidle' });
     await page.evaluate(value => DMateI18n.setLanguage(value, false), language);
     await openDrawing(page);
-    assert.deepEqual((await state(page)).pages, [], 'Fresh gallery starts empty');
+    const initial = await state(page);
+    assert.equal(initial.pages.length, 1, 'Opening an empty online gallery creates one blank page');
+    assert.deepEqual(initial.document.graphs[0].vertices, []);
+    assert.deepEqual(initial.document.graphs[0].edges, []);
+    assert.equal(await page.locator('.ddw-name').isEnabled(), true, 'The automatic page is editable');
+    // Keep covering AI generation from a genuinely empty gallery after the
+    // user deletes the automatic page, without reopening the workspace.
+    await history(page);
+    await page.locator('.ddw-history-delete').click();
+    await page.locator('.dmate-delete-confirm-delete').click();
+    await page.waitForFunction(() => ocrEditorController.getPages().length === 0);
+    assert.deepEqual((await state(page)).pages, [], 'Deleting the last page keeps this open gallery empty');
     const requirement = language === 'en' ? 'Draw the complete graph K5 with vertices 0,1,2,3,4.' : '生成完全图 K5，顶点为 0、1、2、3、4。';
     await ai(page, '');
     await page.locator('[data-math-diagram-generate]').click();

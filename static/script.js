@@ -15703,6 +15703,7 @@ function openGraphDrawing() {
         ocrEditorController = workspace?.mount ? workspace.mount(mount, {
             storageKey: "dmate:graph-gallery:v1::" + encodeURIComponent(owner),
             persistent,
+            createBlankIfEmpty: true,
             sessionState: standaloneDrawingSessionState,
             legacyDocument: cloneOcrDocument(standaloneDrawing),
             onChange: value => { standaloneDrawing = cloneOcrDocument(value); },

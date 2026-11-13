@@ -122,9 +122,174 @@ async function runCase(browser, width) {
   } finally { await page.close(); }
 }
 
+async function onlinePage(browser, width = 1440) {
+  const page = await browser.newPage({ viewport: { width, height: width === 390 ? 740 : 900 },
+    isMobile: width === 390, hasTouch: width === 390, serviceWorkers: 'block' });
+  page.regressionErrors = []; page.modelCalls = 0;
+  page.on('pageerror', error => page.regressionErrors.push(error.message));
+  // The fixture grants local persistence permissions only; it never logs in
+  // to a real account or sends a cloud/model request.
+  await page.route('**/auth/me', route => route.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ configured: true, authenticated: false }) }));
+  await page.route(/\/(?:chat|ocr|drawing\/[^?]+)(?:\?|$)/, route => {
+    page.modelCalls++; return route.abort();
+  });
+  await page.addInitScript(() => {
+    window.drawingStorageWrites = [];
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      if (this === localStorage && /^dmate:graph-(?:gallery|drawing)/.test(key)) window.drawingStorageWrites.push(key);
+      return original.call(this, key, value);
+    };
+  });
+  await page.goto(baseURL, { waitUntil: 'networkidle' });
+  await localPermissions(page);
+  return page;
+}
+
+async function localPermissions(page, username = '') {
+  await page.waitForFunction(() => document.documentElement.dataset.accountStateKnown === '1');
+  await page.evaluate(username => {
+    stopCloudLivePolling();
+    accountState.authenticated = Boolean(username); accountState.username = username;
+  }, username);
+}
+
+async function openOnline(page) {
+  const toggle = page.locator(page.viewportSize().width <= 1100 ? '#mobileToolsBtn' : '#desktopToolsBtn');
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await page.locator('#graphDrawingBtn').click();
+  await page.locator('#graphEditorDialog[open] .dmate-drawing-workspace').waitFor();
+  await page.waitForFunction(() => !document.getElementById('graphEditorDialog').dataset.positioning);
+  await settle(page);
+}
+
+async function closeOnline(page) {
+  await page.locator('#graphEditorClose').click();
+  await page.waitForFunction(() => !document.getElementById('graphEditorDialog').open && ocrEditorController === null);
+}
+
+async function onlineState(page) {
+  return page.evaluate(() => ({ pages: ocrEditorController.getPages().map(p => ({
+    id: p.id, name: p.name, document: p.document
+  })), name: document.querySelector('.ddw-name').value }));
+}
+
+async function assertEditableBlank(page) {
+  const state = await onlineState(page);
+  assert.equal(state.pages.length, 1, 'Opening an empty online gallery creates exactly one page');
+  assert.equal(state.pages[0].document.graphs.length, 1);
+  assert.deepEqual(state.pages[0].document.graphs[0].vertices, []);
+  assert.deepEqual(state.pages[0].document.graphs[0].edges, []);
+  assert.equal(await page.locator('.ddw-name').isEnabled(), true, 'Blank page name is editable');
+  assert.equal(await page.locator('.dge-overlay-viewport').evaluate(node => Boolean(node.closest('[inert]'))), false,
+    'Blank page canvas is editable, rather than the inert zero-page placeholder');
+  return state;
+}
+
+async function deleteAllOnline(page) {
+  const count = (await onlineState(page)).pages.length;
+  await history(page);
+  for (let remaining = count; remaining > 0; remaining--) {
+    await page.locator('.ddw-history-delete').first().click();
+    await page.locator('.dmate-delete-confirm-delete').click();
+    await page.waitForFunction(expected => ocrEditorController.getPages().length === expected, remaining - 1);
+  }
+  await settle(page);
+  assert.deepEqual((await onlineState(page)).pages, [], 'Deleting the last page keeps this opening empty');
+  assert.equal(await page.locator('.ddw-name').isDisabled(), true);
+}
+
+async function runGuestBlankLifecycle(browser) {
+  const page = await onlinePage(browser, 390);
+  try {
+    await openOnline(page);
+    await assertEditableBlank(page);
+    await page.locator('.ddw-name').fill('游客已有空白页');
+    const existing = await onlineState(page);
+    for (let i = 0; i < 2; i++) {
+      await closeOnline(page); await openOnline(page);
+      assert.deepEqual(await onlineState(page), existing, 'An existing empty drawing is reused, not replaced or duplicated');
+    }
+    await deleteAllOnline(page);
+    await closeOnline(page); await openOnline(page);
+    const replacement = await assertEditableBlank(page);
+    assert.notEqual(replacement.pages[0].id, existing.pages[0].id);
+    await closeOnline(page); await openOnline(page);
+    assert.deepEqual(await onlineState(page), replacement, 'Repeated reopening does not create more blank pages');
+    assert.deepEqual(await page.evaluate(() => window.drawingStorageWrites), [], 'Guest drawings never write localStorage');
+    assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(key => /^dmate:graph-(?:gallery|drawing)/.test(key))), []);
+    await page.reload({ waitUntil: 'networkidle' }); await localPermissions(page); await openOnline(page);
+    const refreshed = await assertEditableBlank(page);
+    assert.notEqual(refreshed.pages[0].id, replacement.pages[0].id, 'Guest gallery does not survive refresh');
+    assert.deepEqual(await page.evaluate(() => window.drawingStorageWrites), []);
+    assert.equal(page.modelCalls, 0); assert.deepEqual(page.regressionErrors, []);
+    console.log('PASS online guest: initial blank, same-open deletion stays empty, reopen creates one, saved blank reused, no persistent writes');
+  } finally { await page.close(); }
+}
+
+async function runAccountGalleryLifecycle(browser) {
+  const page = await onlinePage(browser), username = 'drawing-panels-local-fixture';
+  const key = 'dmate:graph-gallery:v1::' + encodeURIComponent('account:' + username);
+  try {
+    await localPermissions(page, username);
+    await page.evaluate(({ key, gallery }) => localStorage.setItem(key, JSON.stringify(gallery)), { key, gallery: { ...gallery, activeId: 'page-B' } });
+    await openOnline(page);
+    assert.equal((await onlineState(page)).name, names[1], 'Online entry restores selected existing drawing');
+    assert.equal(await page.locator('.dge-overlay-node').count(), 2);
+    assert.deepEqual((await onlineState(page)).pages.map(p => p.id), gallery.pages.map(p => p.id));
+    await page.locator('.ddw-page-actions').getByRole('button', { name: '新建空白页', exact: true }).click();
+    await page.locator('.ddw-name').fill('账号保存空白页');
+    const saved = await onlineState(page);
+    assert.equal(saved.pages.length, 4);
+    assert.equal(saved.pages.at(-1).document.graphs[0].vertices.length, 0);
+    await closeOnline(page); await openOnline(page);
+    assert.deepEqual(await onlineState(page), saved, 'Reopening reuses all drawings and the selected saved blank page');
+    await closeOnline(page); await page.reload({ waitUntil: 'networkidle' });
+    await localPermissions(page, username); await openOnline(page);
+    assert.deepEqual(await onlineState(page), saved, 'Account gallery contents and selected blank survive refresh');
+    await (await history(page)).getByText(names[1], { exact: true }).click();
+    const selected = await onlineState(page);
+    await closeOnline(page); await page.reload({ waitUntil: 'networkidle' });
+    await localPermissions(page, username); await openOnline(page);
+    assert.deepEqual(await onlineState(page), selected, 'Existing nonempty drawing selection also survives refresh');
+    await deleteAllOnline(page); await closeOnline(page);
+    assert.deepEqual(await page.evaluate(key => JSON.parse(localStorage.getItem(key)).pages, key), []);
+    // An empty gallery saved by an older version is normalized on opening.
+    await page.evaluate(key => localStorage.setItem(key, JSON.stringify({ version: 1, activeId: '', pages: [] })), key);
+    await page.reload({ waitUntil: 'networkidle' }); await localPermissions(page, username); await openOnline(page);
+    const created = await assertEditableBlank(page);
+    await closeOnline(page); await openOnline(page);
+    assert.deepEqual(await onlineState(page), created, 'Legacy empty gallery receives only one persisted blank');
+    assert.equal(page.modelCalls, 0); assert.deepEqual(page.regressionErrors, []);
+    console.log('PASS online account local fixture: existing/selected drawings, saved blank, refresh, and legacy empty gallery');
+  } finally { await page.close(); }
+}
+
+async function runDefaultEmptyContract(browser) {
+  const page = await onlinePage(browser);
+  try {
+    const count = await page.evaluate(() => {
+      const fixture = DMateDrawingWorkspace.mount(document.getElementById('graphEditorMount'), {
+        persistent: false, sessionState: { gallery: JSON.stringify({ version: 2, activeId: '', pages: [] }) },
+        legacyDocument: DMateDrawingWorkspace.blankDocument(), features: { ai: false, upload: false }
+      });
+      const count = fixture.getPages().length; fixture.destroy(); return count;
+    });
+    assert.equal(count, 0, 'Shared component without createBlankIfEmpty retains its offline zero-page contract');
+    assert.equal(page.modelCalls, 0); assert.deepEqual(page.regressionErrors, []);
+    console.log('PASS shared component: no opt-in flag preserves an empty gallery');
+  } finally { await page.close(); }
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
-  try { for (const width of [390, 1440]) await runCase(browser, width); }
+  try {
+    for (const width of [390, 1440]) await runCase(browser, width);
+    await runGuestBlankLifecycle(browser);
+    await runAccountGalleryLifecycle(browser);
+    await runDefaultEmptyContract(browser);
+  }
   finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
