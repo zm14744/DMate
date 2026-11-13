@@ -1,5 +1,5 @@
 {
-  "version": 33,
+  "version": 34,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1750,7 +1750,31 @@
         "生成树"
       ],
       "level": "拓展",
-      "videos": []
+      "videos": [
+        {
+          "source_id": "steve_butler_spectral_2023_bilibili",
+          "title": "Matrix Tree Theorem",
+          "sections": [
+            "14 - Coalescing; introduction to Laplacian",
+            "15 - Properties of Laplacian, including joins",
+            "16 - Matrix Tree Theorem"
+          ],
+          "lessons": [
+            {
+              "title": "14 - Coalescing; introduction to Laplacian",
+              "url": "https://www.bilibili.com/video/BV11kga6FEez/?p=14"
+            },
+            {
+              "title": "15 - Properties of Laplacian, including joins",
+              "url": "https://www.bilibili.com/video/BV11kga6FEez/?p=15"
+            },
+            {
+              "title": "16 - Matrix Tree Theorem",
+              "url": "https://www.bilibili.com/video/BV11kga6FEez/?p=16"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "algebra_system",
@@ -1947,7 +1971,7 @@
       "course": "21-228 Discrete Mathematics（Spring 2021）",
       "platform": "Bilibili",
       "publisher": "无为斋主",
-      "note": "卡内基梅隆大学Po-Shen Loh教授2021年春季离散数学课程。B站视频BV1jA4L66ELr；用户截图核实前六讲标题与时长。第3讲“归纳法进阶证明技巧”暂按强归纳法/归纳证明进阶映射，需进一步核对视频内容。仅提供B站外链，不下载或托管。"
+      "note": "卡内基梅隆大学Po-Shen Loh教授2021春季21-228离散数学。2021课程公开录播索引标注约35讲、约32小时；用户B站截图总时长31:26:24，不能把当前已映射的前6讲误认为课程总共只有6讲。现关联基本计数、数学归纳法、强归纳法、鸽巢原理、容斥原理共5节点；官方课表还包括二项式系数、递推、生成函数、图论、树、匹配、平面图等。当前B站具体分P标题及讲次还需逐个独立核实，未经核实不按官方课表推算P编号；只外链。"
     },
     {
       "id": "sawfin_bilibili",
@@ -1988,22 +2012,30 @@
       "platform": "Bilibili",
       "publisher": "数学 计算机 游戏",
       "note": "B站合集BV1Eb41137gB，共48个分P。平面图节点采用P43《43平面图及欧拉公式》与P44《44非平面哈密顿图 库氏定理 顶点着色1》，在已选哈工大图论基础之后展开平面图及非平面图判定。上传授权未核实，产品仅提供原B站链接。"
+    },
+    {
+      "id": "steve_butler_spectral_2023_bilibili",
+      "name": "爱荷华州立大学 · Steve Butler",
+      "course": "Spectral Graph Theory (Fall 2023)",
+      "platform": "Bilibili",
+      "publisher": "脑袋要有光",
+      "note": "爱荷华州立大学Steve Butler 2023秋季频谱图论，共29讲。按教师原课程目录：14 拉普拉斯矩阵导入、15 拉普拉斯矩阵性质、16 Matrix Tree Theorem，作为矩阵树定理节点连续学习资源。B站BV11kga6FEez是第三方中文AI配音＋中文字幕版本，翻译质量尚未逐句核验，本次无法独立确认B站页面播放及分P标题。仅原视频外链，不下载、托管或重新分发。教师课程目录：https://www.stevebutler.org/spectral2023"
     }
   ],
   "video_resource_policy": {
     "primary_per_node": "one selected Bilibili course per node; multiple adjacent lessons from that source may be listed",
     "platform_policy": "Bilibili_only",
     "course_continuity": "Keep adjacent topics within one course where possible; avoid redundant or abrupt switches.",
-    "note": "Bilibili only. The rejected South China University of Technology video and Federico Ardila lectures have been removed. The Harbin Institute of Technology graph-theory foundation remains; planar graph uses the HIT 2017 set-theory and graph-theory lectures P43–P44. The Matrix-Tree theorem requires a new confirmed Bilibili-specific lecture, excluding Federico Ardila, Steve Butler, and previously rejected UCLA/Socratica sources. Do not fill with an unrelated spanning-tree, matrix or Kirchhoff circuit law video. Keep the node pending rather than fabricate an unverified lesson.",
+    "note": "Bilibili only. CMU 2021 21-228 is approximately 35 lectures and 31–32 hours, not six lectures; its existing mapped part titles need an independent Bilibili part-list audit before expansion. Steve Butler's Fall 2023 Spectral Graph Theory is permitted and selected for Matrix-Tree theorem, using Bilibili source P14/P15/P16 aligned to the original syllabus. The Bilibili Steve Butler upload has Chinese AI dubbing; live playback and translation quality are not independently verified. Other rejected sources remain excluded. Do not invent video URLs.",
     "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
     "audit_status": {
       "nodes_total": 68,
-      "nodes_with_active_course": 67,
-      "nodes_pending": "tree_matrix_tree",
-      "direct_episode_links": 128,
+      "nodes_with_active_course": 68,
+      "nodes_pending": "none",
+      "direct_episode_links": 131,
       "nested_or_missing_episode_urls": 0,
       "youtube_links": 0,
-      "last_audit_scope": "removed rejected SCUT and Federico Ardila; replaced planar with HIT 2017 P43/P44; left Matrix-Tree node pending instead of assigning previously rejected or unrelated lectures"
+      "last_audit_scope": "CMU total-course length corrected with 2021 syllabus and an external 35-lecture index; Steve Butler original 2023 syllabus confirms Laplacian P14/P15 and Matrix Tree P16; Bilibili live playback and CMU part titles still unverified"
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -2011,6 +2043,9 @@
       "zjut_discrete_xiaohua",
       "pflyan_graph",
       "cqu_discrete_liu"
+    ],
+    "approved_source_ids": [
+      "steve_butler_spectral_2023_bilibili"
     ]
   },
   "video_resource_candidates": [
