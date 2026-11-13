@@ -1,5 +1,5 @@
 {
-  "version": 49,
+  "version": 50,
   "title": "离散数学知识脉络",
   "description": "用于教学提示、建议前置知识提醒和后续学习状态记录的轻量知识图谱。prerequisites 表示建议学习前置/依赖关系，不等同于严格数学逻辑蕴含；当前版本不记录学生掌握度。",
   "basis": [
@@ -1070,47 +1070,49 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
+          "source_id": "sawfin_youtube",
           "title": "Generating Functions",
           "sections": [
             "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
-            "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
+            "Discrete Math II - 8.4.2 Readiness for Generating Functions - Power Series and Fundamental Identity",
             "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
             "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
             "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
             "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
-            "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function"
+            "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Functions"
           ],
           "lessons": [
             {
               "title": "Discrete Math II - 8.4.1 Readiness for Generating Functions: Model with Generating Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=110"
+              "url": "https://www.youtube.com/watch?v=o6X4v2UHhUk"
             },
             {
-              "title": "Discrete Math II - 8.4.2 Readiness for Generating Functions: Power Series and Fundamental Identity",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=111"
+              "title": "Discrete Math II - 8.4.2 Readiness for Generating Functions - Power Series and Fundamental Identity",
+              "url": "https://www.youtube.com/watch?v=fQq1t7OQ9CM"
             },
             {
               "title": "Discrete Math II - 8.4.3 Readiness for Generating Functions: The Finite Geometric Series",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=112"
+              "url": "https://www.youtube.com/watch?v=mSUyYvPXyIU"
             },
             {
               "title": "Discrete Math II - 8.4.4 Readiness for Generating Functions: Binomial and Extended Binomial Theorem",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=113"
+              "url": "https://www.youtube.com/watch?v=2JFewg0XF2I"
             },
             {
               "title": "Discrete Math II - 8.4.5 Solve Counting Problems with Generating Functions",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=114"
+              "url": "https://www.youtube.com/watch?v=mZ9gmFtxBNg"
             },
             {
               "title": "Discrete Math II - 8.4.6 The Explicit Form of a Generating Function",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=115"
+              "url": "https://www.youtube.com/watch?v=So4890bLOSw"
             },
             {
-              "title": "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Function",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=116"
+              "title": "Discrete Math II - 8.4.7 Solve Recurrence Relations with Generating Functions",
+              "url": "https://www.youtube.com/watch?v=Kp2OvCjQyNs"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": ""
         }
       ]
     },
@@ -1144,27 +1146,29 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
+          "source_id": "sawfin_youtube",
           "title": "Linear Homogeneous Recurrence Relations",
           "sections": [
             "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
-            "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
-            "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation"
+            "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence Relations",
+            "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relations"
           ],
           "lessons": [
             {
               "title": "Discrete Math II - 8.2.1 Solving First-Order Linear Homogeneous Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=106"
+              "url": "https://www.youtube.com/watch?v=ZFt3VZb6y_g"
             },
             {
-              "title": "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=107"
+              "title": "Discrete Math II - 8.2.2 Solving Second-Order Linear Homogeneous Recurrence Relations",
+              "url": "https://www.youtube.com/watch?v=W_4CEKBm2v4"
             },
             {
-              "title": "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relation",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=108"
+              "title": "Discrete Math II - 8.2.3 General Case Linear Homogeneous Recurrence Relations",
+              "url": "https://www.youtube.com/watch?v=VYR-_q0olec"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": ""
         }
       ]
     },
@@ -1177,7 +1181,7 @@
       ],
       "videos": [
         {
-          "source_id": "sawfin_bilibili",
+          "source_id": "sawfin_youtube",
           "title": "Non-Homogeneous Linear Recurrence Relations",
           "sections": [
             "Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations"
@@ -1185,9 +1189,11 @@
           "lessons": [
             {
               "title": "Discrete Math II - 8.2.4 Non-Homogeneous Linear Recurrence Relations",
-              "url": "https://www.bilibili.com/video/BV1hgyDY5EXv/?p=109"
+              "url": "https://www.youtube.com/watch?v=NKsz2mGxX4A"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": ""
         }
       ]
     },
@@ -1335,26 +1341,18 @@
       "videos": [
         {
           "source_id": "chenggong_gta",
-          "title": "连通性与图的遍历",
+          "title": "连通和DFS（已核实单集）",
           "sections": [
-            "2.1.1-连通和DFS-理论",
-            "2.1.2-连通和DFS-算法",
-            "7.3.1-有向图的连通-理论"
+            "2.1.1-连通和DFS-理论"
           ],
           "lessons": [
             {
               "title": "2.1.1-连通和DFS-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=6"
-            },
-            {
-              "title": "2.1.2-连通和DFS-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=7"
-            },
-            {
-              "title": "7.3.1-有向图的连通-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=39"
+              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": "仅保留B站页面标注第6/42集的独立BV。2.1.2算法与7.3.1有向图连通尚未取得可核实的独立BV。"
         }
       ]
     },
@@ -1365,26 +1363,7 @@
       "prerequisites": [
         "路径与连通性"
       ],
-      "videos": [
-        {
-          "source_id": "chenggong_gta",
-          "title": "割点、割边与割集",
-          "sections": [
-            "2.2.1-割点和割边-理论",
-            "2.2.2-割点和割边-算法"
-          ],
-          "lessons": [
-            {
-              "title": "2.2.1-割点和割边-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=8"
-            },
-            {
-              "title": "2.2.2-割点和割边-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=9"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "graph_weighted",
@@ -1403,9 +1382,11 @@
           "lessons": [
             {
               "title": "6.1.1-赋权图和距离-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
+              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": "独立BV页面标题与6.1.1理论对应。"
         }
       ]
     },
@@ -1419,21 +1400,18 @@
       "videos": [
         {
           "source_id": "chenggong_gta",
-          "title": "欧拉图",
+          "title": "赋权欧拉图（拓展）",
           "sections": [
-            "3.3.1-欧拉图-理论",
-            "3.3.2-欧拉图-算法"
+            "6.3.1-赋权欧拉图-理论"
           ],
           "lessons": [
             {
-              "title": "3.3.1-欧拉图-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=16"
-            },
-            {
-              "title": "3.3.2-欧拉图-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=17"
+              "title": "6.3.1-赋权欧拉图-理论",
+              "url": "https://www.bilibili.com/video/BV1NCb6z7Exn/"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": "这是赋权欧拉图理论的独立单集，不冒充普通欧拉图P16/P17；普通欧拉图两集的独立BV尚未核实。"
         }
       ]
     },
@@ -1447,16 +1425,18 @@
       "videos": [
         {
           "source_id": "chenggong_gta",
-          "title": "哈密尔顿图",
+          "title": "赋权哈密顿图（拓展）",
           "sections": [
-            "3.4-哈密尔顿图"
+            "6.4.1-赋权哈密顿图-理论"
           ],
           "lessons": [
             {
-              "title": "3.4-哈密尔顿图",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=18"
+              "title": "6.4.1-赋权哈密顿图-理论",
+              "url": "https://www.bilibili.com/video/BV1CQkKBcEwQ/"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": "这是赋权哈密顿图理论的独立单集，不冒充普通哈密顿图P18；普通哈密顿图独立BV尚未核实。"
         }
       ]
     },
@@ -1471,36 +1451,18 @@
       "videos": [
         {
           "source_id": "chenggong_gta",
-          "title": "最短路径与距离",
+          "title": "赋权图和距离（距离理论补充）",
           "sections": [
-            "2.3.1-距离和BFS-理论",
-            "2.3.2-距离和BFS-算法",
-            "6.1.1-赋权图和距离-理论",
-            "6.1.2-赋权图和距离-算法",
-            "7.4-有向图的距离"
+            "6.1.1-赋权图和距离-理论"
           ],
           "lessons": [
             {
-              "title": "2.3.1-距离和BFS-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=10"
-            },
-            {
-              "title": "2.3.2-距离和BFS-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=11"
-            },
-            {
               "title": "6.1.1-赋权图和距离-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=27"
-            },
-            {
-              "title": "6.1.2-赋权图和距离-算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=28"
-            },
-            {
-              "title": "7.4-有向图的距离",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=42"
+              "url": "https://www.bilibili.com/video/BV1MU5yzbETy/"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": "仅作距离理论补充；2.3.1/2.3.2 BFS与6.1.2算法、7.4有向图距离的独立BV尚未核实。"
         }
       ]
     },
@@ -1578,21 +1540,7 @@
         "图的基本概念",
         "路径与连通性"
       ],
-      "videos": [
-        {
-          "source_id": "chenggong_gta",
-          "title": "二部图",
-          "sections": [
-            "3.2.1-二分图-理论"
-          ],
-          "lessons": [
-            {
-              "title": "3.2.1-二分图-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=14"
-            }
-          ]
-        }
-      ]
+      "videos": []
     },
     {
       "id": "graph_topological",
@@ -1663,26 +1611,18 @@
       "videos": [
         {
           "source_id": "chenggong_gta",
-          "title": "匹配与最大匹配",
+          "title": "匹配与最大匹配（算法补充）",
           "sections": [
-            "5.1.1-匹配和最大匹配-理论",
-            "5.1.2.1-匹配和最大匹配-匈牙利算法",
-            "5.2-完美匹配"
+            "5.1.2.3-匹配和最大匹配-花算法"
           ],
           "lessons": [
             {
-              "title": "5.1.1-匹配和最大匹配-理论",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=22"
-            },
-            {
-              "title": "5.1.2.1-匹配和最大匹配-匈牙利算法",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=23"
-            },
-            {
-              "title": "5.2-完美匹配",
-              "url": "https://www.bilibili.com/video/BV1gnWVegEpQ/?p=26"
+              "title": "5.1.2.3-匹配和最大匹配-花算法",
+              "url": "https://www.bilibili.com/video/BV14vZ1YfE8n/"
             }
-          ]
+          ],
+          "verification": "逐集标题与公开课程单集页面核对；使用直接单集链接",
+          "note": "这是第25/42集的独立BV，内容为花算法；匹配理论、匈牙利算法和完美匹配的独立BV尚未核实。"
         }
       ]
     },
@@ -2298,25 +2238,11 @@
     {
       "id": "sawfin_bilibili",
       "name": "Bellevue University · Kimberly Brehm",
-      "course": "Discrete Math I & II",
+      "course": "Discrete Math I",
       "platform": "Bilibili",
       "publisher": "常青藤中英字幕课程",
-      "note": "Kimberly Brehm 的两门大学离散数学课程（Discrete Math I、Discrete Math II），B站同一合集/视频列表。Discrete Math I 内部标号 p0–p79，共80讲，对应B站实际P1–P80；Discrete Math II 内部标号 p0–p53，共54讲，对应B站实际P81–P134。用于基础证明、数论、计数、排列组合、二项式定理、递推建模，以及第二课程中的强归纳、递推求解和生成函数等专题。当前DMate使用的Discrete Math I分P继续按原有已核实的P号；Discrete Math II的P106–P109按两段目录的连续分P偏移计算：内部p25–p28对应实际P106–P109。B站页面有中英字幕，上传者为常青藤中英字幕课程；页面标注未经作者授权，DMate仅提供原视频外链，不下载、托管或重新分发。",
-      "display_name": "Kimberly Brehm BU",
-      "discrete_math_ii_part_index": {
-        "first_course_internal_parts": "p0-p79",
-        "first_course_bilibili_parts": "P1-P80",
-        "second_course_internal_parts": "p0-p53",
-        "second_course_bilibili_parts": "P81-P134",
-        "mapping_rule": "Bilibili P = 81 + Discrete Math II internal part index",
-        "active_parts": [
-          106,
-          107,
-          108,
-          109
-        ],
-        "status": "part indices derived from the published 80-part first course followed by the 54-part second course; exact playback of each target part not independently checked by the search tool"
-      }
+      "note": "Kimberly Brehm 的 Discrete Math I。当前B站上传 BV1hgyDY5EXv 的分集目录为内部 p0–p79，对应实际P1–P80。此BV不再用于 Discrete Math II；不得把第二门课程的内部p编号加偏移后拼到本BV上。DMate 的 Discrete Math II 使用 SawFin Mathematics 官方 YouTube 单集直链。B站仅提供原视频外链，不下载或托管。",
+      "display_name": "Kimberly Brehm BU"
     },
     {
       "id": "chenggong_gta",
@@ -2324,8 +2250,9 @@
       "course": "《图论与算法》(GTA)",
       "platform": "Bilibili",
       "publisher": "程龚老师",
-      "note": "南京大学计算机学院程龚教授主讲的42分P系列，配套教材《图论与算法》（清华大学出版社，2024）。用于图的连通与遍历、割点割边、距离与BFS、二部图、欧拉图、哈密顿图、匹配、赋权图与距离、有向图等专题。只提供原视频外链，不下载或托管。",
-      "display_name": "程龚 南京大学"
+      "note": "南京大学计算机学院程龚教授主讲的42集《图论与算法》(GTA)。这是合集/系列，每一集有独立BV号；不能把某一集的BV加 ?p=n 当作整套课程的分集入口，也不能把课程介绍页BV1EPhfePE34分配给知识节点。当前仅保留已核实的独立单集BV；未找到可靠独立BV的节点暂不显示该来源链接，避免误跳到第6集或课程介绍。",
+      "display_name": "程龚 南京大学",
+      "url": "https://www.bilibili.com/video/BV1EPhfePE34/"
     },
     {
       "id": "nymu_combinatorics_fuhenglin",
@@ -2371,28 +2298,42 @@
       "publisher": "",
       "note": "由北京大学丘维声教授主讲，B站页面为第三方上传的1080P修复版（视频内容授权状态未核实），页面实际列有88个分P，开头有4集导论，故标题编号25《11.1 中国剩余定理（一）》和26《11.2 中国剩余定理（二）》在该上传版本中分别对应实际P29和P30。时长28:05和22:11；前置课程还讲模m同余关系、剩余类环及可逆元，适合在现有同余知识节点后衔接。保留原B站外链，不下载、托管或重新分发。大陆版：https://www.bilibili.com/video/BV12Y411b7Yn/",
       "display_name": "丘维声 北京大学"
+    },
+    {
+      "id": "sawfin_youtube",
+      "name": "Bellevue University · Kimberly Brehm",
+      "course": "Discrete Math II/Combinatorics",
+      "platform": "YouTube",
+      "publisher": "SawFin Mathematics",
+      "display_name": "Kimberly Brehm BU",
+      "url": "https://www.youtube.com/playlist?list=PLl-gb0E4MII0CsY4AE2xeZwZIkds3jIGs",
+      "note": "Kimberly Brehm 的第二门离散数学课程。采用 SawFin Mathematics 官方频道逐集 watch 链接，不再使用未经确认的B站 P106–P116 偏移链接。递推单集8.2.1–8.2.4及生成函数8.4.1–8.4.7均按标题匹配；仅使用逐集视频地址。"
     }
   ],
   "video_resource_policy": {
-    "primary_per_node": "Exactly one curated Bilibili course per knowledge node, with multiple precise lessons only when necessary to cover that node.",
-    "platform_policy": "Bilibili_only",
+    "primary_per_node": "Exactly one curated course/source per knowledge node; use precise single-episode Bilibili or YouTube URLs. Multiple lessons are allowed only when they directly cover the node.",
+    "platform_policy": "Bilibili_and_YouTube_direct_episode_urls",
     "course_continuity": "Choose source per node based on tight topic match, clear lecture content and natural continuity; knowledge graph edges are associations, not mandatory study order. Keep a single best-fit course per node; use consecutive lessons from that course when they provide necessary depth.",
-    "note": "Bilibili-only. Select lessons by direct relevance to each individual knowledge node; prefer natural continuity of course scope and difficulty within and across modules without prescribing a strict viewing order. Knowledge graph edges describe useful conceptual relationships, not mandatory steps or proof of mastering prerequisites. Do not show any study-order explanation notes in node detail panels.",
-    "candidate_policy": "Keep high-quality courses in video_resource_candidates until an exact direct Bilibili video URL and uploader/source status are verified. Never invent BV IDs.",
+    "note": "只使用能直接定位到对应单集的B站BV链接或YouTube watch链接。B站合集/课程介绍页不能冒充单集；B站 ?p=n 仅适用于同一BV内部的分P，不用于跨BV合集。BU Discrete Math II 改用SawFin Mathematics官方YouTube单集链接。南大程龚42集为每集独立BV，未核实独立BV的节点暂不提供链接，不再用错误?p参数猜测。",
+    "candidate_policy": "Keep candidates until exact direct episode URLs and uploader/source status are verified. Never invent BV IDs or infer cross-video P numbers.",
     "audit_status": {
       "nodes_total": 68,
-      "nodes_with_active_course": 68,
-      "nodes_pending": "none",
-      "direct_episode_links": 144,
+      "nodes_with_active_course": 66,
+      "nodes_pending": [
+        "graph_cut",
+        "graph_bipartite"
+      ],
+      "direct_episode_links": 132,
       "nested_or_missing_episode_urls": 0,
-      "youtube_links": 0,
+      "youtube_links": 11,
       "cmu_2021_parts_verified": 35,
       "cmu_2021_total_duration": "31:26:24",
       "cmu_2021_mapped_nodes": 18,
-      "last_audit_scope": "One selected course per node after final search. Count-generating-functions now uses BU Discrete Math II P110-P116 for a complete series naturally following BU recurrence relations; CMU P14-P17 retained in source pool but not active because BU has tighter course continuity.",
-      "unique_episode_urls": 141,
+      "last_audit_scope": "BU Discrete Math II recurrence and generating-function nodes now use exact SawFin Mathematics YouTube watch URLs. Nanjing GTA links use individual BV URLs only where the episode page/title was confirmed; unresolved episode links are intentionally disabled instead of using a false ?p=n URL.",
+      "unique_episode_urls": 129,
       "cross_node_reused_urls": 3,
-      "sources_with_selected_nodes": 13
+      "sources_with_selected_nodes": 13,
+      "nanjing_gta_verified_direct_bvs": 5
     },
     "excluded_source_ids": [
       "scut_discrete_math",
@@ -2679,7 +2620,7 @@
     ],
     "selection_audit": {
       "evaluated_nodes": 68,
-      "source_selection_pool": "Existing curated Bilibili video sources and their published course part listings",
+      "source_selection_pool": "Curated Bilibili single-episode URLs and official YouTube single-episode URLs; no collection-index or course-introduction URL is treated as a lesson.",
       "original_multi_source_nodes": 16,
       "multi_source_nodes_after": 0,
       "changes": [
@@ -2788,8 +2729,9 @@
         {
           "node": "graph_bipartite",
           "before": "chenggong_gta,cmu_21_228_2021_bilibili",
-          "selected": "chenggong_gta",
-          "parts": 1
+          "selected": null,
+          "parts": 0,
+          "status": "pending direct episode BV verification"
         },
         {
           "node": "graph_topological",
@@ -2830,14 +2772,22 @@
         {
           "node": "graph_cut",
           "before": "chenggong_gta",
-          "selected": "chenggong_gta",
-          "parts": 2
+          "selected": null,
+          "parts": 0,
+          "status": "pending direct episode BV verification"
         },
         {
           "node": "relation_property",
           "before": "bjtu_discrete",
           "selected": "bjtu_discrete",
           "parts": 5
+        },
+        {
+          "node": "graph_shortest",
+          "before": "chenggong_gta with guessed ?p values",
+          "selected": "chenggong_gta",
+          "parts": 1,
+          "status": "distance-theory supplement only; algorithm episodes pending"
         }
       ],
       "rationale_by_node": {
@@ -2966,7 +2916,7 @@
       "platform": "Bilibili",
       "url": "https://www.bilibili.com/video/BV1SyahzvExP/",
       "uploader": "兴趣使然的现代人",
-      "status": "candidate_subtitle_and_part_index_review_required",
+      "status": "not_selected_exact_episode_index_unverified",
       "coverage": [
         "排列与组合",
         "二项式定理",
@@ -2976,7 +2926,8 @@
         "生成函数",
         "生成函数求解递推关系"
       ],
-      "note": "B站页面可见Discrete Math II分集，包括8.2.1–8.2.4齐次与非齐次递推、8.4.1–8.4.7生成函数。上传者为兴趣使然的现代人；尚未核实是否原声、字幕来源与翻译准确度，且多分集在页面列表中的精确p编号尚未核验，暂不映射正式节点。"
+      "note": "页面可见Discrete Math II分集，但该第三方转载的单集播放与精确P编号未独立核实；正式图谱改用SawFin Mathematics官方YouTube逐集直链。保留作后续备用，不将推算P号写入正式节点。"
     }
-  ]
+  ],
+  "last_video_link_review": "2026-11-14"
 }
